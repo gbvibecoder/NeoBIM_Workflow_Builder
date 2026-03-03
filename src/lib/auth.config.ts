@@ -2,6 +2,8 @@ import type { NextAuthConfig } from "next-auth";
 
 // Lightweight config — no DB imports, safe for edge middleware
 export const authConfig = {
+  // Accept both NextAuth v4 (NEXTAUTH_SECRET) and v5 (AUTH_SECRET) naming
+  secret: process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET,
   pages: {
     signIn: "/login",
     error: "/login",
