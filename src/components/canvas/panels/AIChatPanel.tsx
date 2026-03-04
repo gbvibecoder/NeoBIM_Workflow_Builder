@@ -204,7 +204,7 @@ export function AIChatPanel({ messages, onAddMessage, onClear, isOpen, onToggle 
             style={{
               position: "absolute", right: 0, top: "50%", transform: "translateY(-50%)",
               zIndex: 25, padding: "10px 8px",
-              background: "#12121A", border: "1px solid #2A2A3E",
+              background: "#12121E", border: "1px solid rgba(255,255,255,0.08)",
               borderRight: "none",
               borderRadius: "8px 0 0 8px",
               cursor: "pointer", color: "#8888A0",
@@ -233,14 +233,14 @@ export function AIChatPanel({ messages, onAddMessage, onClear, isOpen, onToggle 
             transition={{ type: "spring", stiffness: 380, damping: 36 }}
             style={{
               position: "absolute", right: 0, top: 0, bottom: 0, width: 360, zIndex: 25,
-              background: "#12121A", borderLeft: "1px solid #1E1E2E",
+              background: "#12121E", borderLeft: "1px solid rgba(255,255,255,0.06)",
               display: "flex", flexDirection: "column",
               boxShadow: "-8px 0 32px rgba(0,0,0,0.4)",
             }}
           >
             {/* Header */}
             <div style={{
-              padding: "12px 14px", borderBottom: "1px solid #1E1E2E",
+              padding: "12px 14px", borderBottom: "1px solid rgba(255,255,255,0.06)",
               display: "flex", alignItems: "center", gap: 8, flexShrink: 0,
             }}>
               <Sparkles size={14} style={{ color: "#4F8AFF" }} />
@@ -252,10 +252,10 @@ export function AIChatPanel({ messages, onAddMessage, onClear, isOpen, onToggle 
                 title="Clear chat"
                 style={{
                   background: "none", border: "none", cursor: "pointer",
-                  color: "#3A3A4E", padding: 4, borderRadius: 4,
+                  color: "#3A3A50", padding: 4, borderRadius: 4,
                 }}
-                onMouseEnter={e => { e.currentTarget.style.color = "#55556A"; }}
-                onMouseLeave={e => { e.currentTarget.style.color = "#3A3A4E"; }}
+                onMouseEnter={e => { e.currentTarget.style.color = "#5C5C78"; }}
+                onMouseLeave={e => { e.currentTarget.style.color = "#3A3A50"; }}
               >
                 <Trash2 size={12} />
               </button>
@@ -263,10 +263,10 @@ export function AIChatPanel({ messages, onAddMessage, onClear, isOpen, onToggle 
                 onClick={onToggle}
                 style={{
                   background: "none", border: "none", cursor: "pointer",
-                  color: "#3A3A4E", padding: 4, borderRadius: 4,
+                  color: "#3A3A50", padding: 4, borderRadius: 4,
                 }}
                 onMouseEnter={e => { e.currentTarget.style.color = "#8888A0"; }}
-                onMouseLeave={e => { e.currentTarget.style.color = "#3A3A4E"; }}
+                onMouseLeave={e => { e.currentTarget.style.color = "#3A3A50"; }}
               >
                 <X size={13} />
               </button>
@@ -277,10 +277,10 @@ export function AIChatPanel({ messages, onAddMessage, onClear, isOpen, onToggle 
               {messages.length === 0 && (
                 <div style={{
                   textAlign: "center", padding: "32px 16px",
-                  color: "#3A3A4E", fontSize: 12,
+                  color: "#3A3A50", fontSize: 12,
                 }}>
                   <MessageSquare size={28} style={{ margin: "0 auto 10px", opacity: 0.3 }} />
-                  <div style={{ fontWeight: 600, color: "#55556A", marginBottom: 6 }}>AI Workflow Assistant</div>
+                  <div style={{ fontWeight: 600, color: "#5C5C78", marginBottom: 6 }}>AI Workflow Assistant</div>
                   <div style={{ lineHeight: 1.5 }}>
                     Tell me what to change:<br />
                     • &ldquo;Add an IFC Exporter&rdquo;<br />
@@ -312,7 +312,7 @@ export function AIChatPanel({ messages, onAddMessage, onClear, isOpen, onToggle 
                   }}>
                     {renderMessage(msg.content)}
                   </div>
-                  <span style={{ fontSize: 9, color: "#3A3A4E" }}>
+                  <span style={{ fontSize: 9, color: "#3A3A50" }}>
                     {msg.timestamp.toTimeString().slice(0, 5)}
                   </span>
                 </div>
@@ -327,7 +327,7 @@ export function AIChatPanel({ messages, onAddMessage, onClear, isOpen, onToggle 
                 }}>
                   {[0, 1, 2].map(i => (
                     <div key={i} style={{
-                      width: 5, height: 5, borderRadius: "50%", background: "#55556A",
+                      width: 5, height: 5, borderRadius: "50%", background: "#5C5C78",
                       animation: `dotPulse 1s ease-in-out ${i * 0.2}s infinite`,
                     }} />
                   ))}
@@ -338,7 +338,7 @@ export function AIChatPanel({ messages, onAddMessage, onClear, isOpen, onToggle 
 
             {/* Input */}
             <div style={{
-              padding: "10px 14px", borderTop: "1px solid #1E1E2E", flexShrink: 0,
+              padding: "10px 14px", borderTop: "1px solid rgba(255,255,255,0.06)", flexShrink: 0,
               display: "flex", gap: 8, alignItems: "flex-end",
             }}>
               <textarea
@@ -352,8 +352,8 @@ export function AIChatPanel({ messages, onAddMessage, onClear, isOpen, onToggle 
                 rows={2}
                 style={{
                   flex: 1, resize: "none", padding: "7px 9px",
-                  borderRadius: 7, border: "1px solid #1E1E2E",
-                  background: "#0E0E16", color: "#C0C0D0",
+                  borderRadius: 7, border: "1px solid rgba(255,255,255,0.06)",
+                  background: "#0B0B13", color: "#C0C0D0",
                   fontSize: 12, fontFamily: "inherit", outline: "none",
                   lineHeight: 1.5, maxHeight: 80, overflowY: "auto",
                 }}
@@ -364,7 +364,7 @@ export function AIChatPanel({ messages, onAddMessage, onClear, isOpen, onToggle 
                 style={{
                   width: 32, height: 32, borderRadius: 7, border: "none",
                   background: input.trim() ? "#4F8AFF" : "rgba(255,255,255,0.06)",
-                  color: input.trim() ? "#fff" : "#3A3A4E",
+                  color: input.trim() ? "#fff" : "#3A3A50",
                   cursor: input.trim() ? "pointer" : "default",
                   display: "flex", alignItems: "center", justifyContent: "center",
                   flexShrink: 0, transition: "all 0.15s",
@@ -373,7 +373,7 @@ export function AIChatPanel({ messages, onAddMessage, onClear, isOpen, onToggle 
                 <Send size={13} />
               </button>
             </div>
-            <div style={{ padding: "0 14px 8px", fontSize: 9, color: "#2A2A3E" }}>
+            <div style={{ padding: "0 14px 8px", fontSize: 9, color: "rgba(255,255,255,0.08)" }}>
               Enter to send · Shift+Enter for new line
             </div>
           </motion.div>

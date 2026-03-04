@@ -154,7 +154,7 @@ function DetailModal({ execution, onClose, onRerun }: DetailModalProps) {
         exit={{ opacity: 0, scale: 0.96 }}
         transition={{ type: "spring", stiffness: 360, damping: 30 }}
         style={{
-          background: "#12121A", border: "1px solid #1E1E2E",
+          background: "#12121E", border: "1px solid #1E1E2E",
           borderRadius: 14, width: "100%", maxWidth: 600,
           maxHeight: "80vh", overflow: "hidden",
           display: "flex", flexDirection: "column",
@@ -291,11 +291,11 @@ function ExecutionRow({ execution, onRerun, onViewDetails }: ExecutionRowProps) 
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       style={{
-        background: "#12121A", border: "1px solid #1E1E2E", borderRadius: 10,
+        background: "#12121E", border: "1px solid #1E1E2E", borderRadius: 10,
         padding: "14px 16px", transition: "border-color 0.15s",
       }}
       onMouseEnter={e => { e.currentTarget.style.borderColor = "#2A2A3E"; }}
-      onMouseLeave={e => { e.currentTarget.style.borderColor = "#1E1E2E"; }}
+      onMouseLeave={e => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.06)"; }}
     >
       {/* Top row */}
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
@@ -355,7 +355,7 @@ function ExecutionRow({ execution, onRerun, onViewDetails }: ExecutionRowProps) 
               transition: "all 0.1s",
             }}
             onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = "#2A2A3E"; (e.currentTarget as HTMLElement).style.color = "#8888A0"; }}
-            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = "#1E1E2E"; (e.currentTarget as HTMLElement).style.color = "#55556A"; }}
+            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = "rgba(255,255,255,0.06)"; (e.currentTarget as HTMLElement).style.color = "#55556A"; }}
           >
             <ExternalLink size={10} /> Open WF
           </button>
@@ -462,7 +462,7 @@ export default function HistoryPage() {
           ].map(s => (
             <div key={s.label} style={{
               flex: 1, padding: "12px 16px", borderRadius: 10,
-              background: "#12121A", border: "1px solid #1E1E2E",
+              background: "#12121E", border: "1px solid #1E1E2E",
             }}>
               <div style={{ fontSize: 22, fontWeight: 700, color: s.color }}>{s.value}</div>
               <div style={{ fontSize: 11, color: "#55556A", marginTop: 2 }}>{s.label}</div>
@@ -510,7 +510,7 @@ export default function HistoryPage() {
         ) : executions.length === 0 ? (
           <div style={{
             textAlign: "center", padding: 64, color: "#55556A",
-            background: "#12121A", borderRadius: 12, border: "1px solid #1E1E2E",
+            background: "#12121E", borderRadius: 12, border: "1px solid #1E1E2E",
           }}>
             <Zap size={32} style={{ margin: "0 auto 12px", opacity: 0.3 }} />
             <div style={{ fontSize: 15, fontWeight: 600, color: "#3A3A4E", marginBottom: 6 }}>No executions yet</div>

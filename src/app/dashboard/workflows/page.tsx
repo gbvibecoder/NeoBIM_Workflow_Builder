@@ -48,15 +48,15 @@ export default function WorkflowsPage() {
       <main className="flex-1 overflow-y-auto p-6">
         {loading ? (
           <div style={{ display: "flex", justifyContent: "center", padding: "60px 0" }}>
-            <div style={{ fontSize: 13, color: "#55556A" }}>Loading workflows…</div>
+            <div style={{ fontSize: 13, color: "#5C5C78" }}>Loading workflows…</div>
           </div>
         ) : workflows.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-24 text-center">
-            <div className="h-16 w-16 rounded-2xl border border-[#2A2A3E] bg-[#12121A] flex items-center justify-center mb-5">
-              <Workflow size={28} className="text-[#3A3A4E]" strokeWidth={1} />
+            <div className="h-16 w-16 rounded-2xl border border-[rgba(255,255,255,0.08)] bg-[#12121E] flex items-center justify-center mb-5">
+              <Workflow size={28} className="text-[#3A3A50]" strokeWidth={1} />
             </div>
             <h3 className="text-base font-semibold text-[#F0F0F5] mb-2">No workflows yet</h3>
-            <p className="text-sm text-[#55556A] max-w-sm leading-relaxed mb-6">
+            <p className="text-sm text-[#5C5C78] max-w-sm leading-relaxed mb-6">
               Create your first workflow by building one from scratch or cloning a prebuilt template.
             </p>
             <div className="flex items-center gap-3">
@@ -69,7 +69,7 @@ export default function WorkflowsPage() {
               </Link>
               <Link
                 href="/dashboard/templates"
-                className="flex items-center gap-2 rounded-lg border border-[#2A2A3E] bg-[#12121A] px-4 py-2.5 text-sm font-medium text-[#F0F0F5] hover:border-[#3A3A4E] hover:bg-[#1A1A26] transition-all"
+                className="flex items-center gap-2 rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#12121E] px-4 py-2.5 text-sm font-medium text-[#F0F0F5] hover:border-[#3A3A50] hover:bg-[#1A1A2A] transition-all"
               >
                 Browse Templates
                 <ArrowRight size={13} />
@@ -80,7 +80,7 @@ export default function WorkflowsPage() {
           <div>
             {/* Header row */}
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
-              <span style={{ fontSize: 13, color: "#55556A" }}>
+              <span style={{ fontSize: 13, color: "#5C5C78" }}>
                 {workflows.length} workflow{workflows.length !== 1 ? "s" : ""}
               </span>
               <Link
@@ -98,13 +98,13 @@ export default function WorkflowsPage() {
                 <div
                   key={wf.id}
                   style={{
-                    background: "#12121A", border: "1px solid #1E1E2E",
+                    background: "#12121E", border: "1px solid rgba(255,255,255,0.06)",
                     borderRadius: 12, padding: 16, cursor: "pointer",
                     transition: "border-color 0.15s",
                     display: "flex", flexDirection: "column", gap: 10,
                   }}
-                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = "#2A2A3E"; }}
-                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = "#1E1E2E"; }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = "rgba(255,255,255,0.08)"; }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = "rgba(255,255,255,0.06)"; }}
                   onClick={() => router.push(`/dashboard/canvas?id=${wf.id}`)}
                 >
                   <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
@@ -121,7 +121,7 @@ export default function WorkflowsPage() {
                           {wf.name}
                         </div>
                         {wf.description && (
-                          <div style={{ fontSize: 11, color: "#55556A", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          <div style={{ fontSize: 11, color: "#5C5C78", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                             {wf.description}
                           </div>
                         )}
@@ -132,13 +132,13 @@ export default function WorkflowsPage() {
                       <button
                         onClick={e => { e.stopPropagation(); router.push(`/dashboard/canvas?id=${wf.id}`); }}
                         style={{
-                          width: 26, height: 26, borderRadius: 6, border: "1px solid #1E1E2E",
+                          width: 26, height: 26, borderRadius: 6, border: "1px solid rgba(255,255,255,0.06)",
                           background: "transparent", cursor: "pointer",
                           display: "flex", alignItems: "center", justifyContent: "center",
-                          color: "#55556A", transition: "color 0.1s, border-color 0.1s",
+                          color: "#5C5C78", transition: "color 0.1s, border-color 0.1s",
                         }}
                         onMouseEnter={e => { e.currentTarget.style.color = "#4F8AFF"; e.currentTarget.style.borderColor = "rgba(79,138,255,0.3)"; }}
-                        onMouseLeave={e => { e.currentTarget.style.color = "#55556A"; e.currentTarget.style.borderColor = "#1E1E2E"; }}
+                        onMouseLeave={e => { e.currentTarget.style.color = "#5C5C78"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.06)"; }}
                         title="Open in canvas"
                       >
                         <ExternalLink size={11} />
@@ -146,13 +146,13 @@ export default function WorkflowsPage() {
                       <button
                         onClick={e => { e.stopPropagation(); handleDelete(wf.id, wf.name); }}
                         style={{
-                          width: 26, height: 26, borderRadius: 6, border: "1px solid #1E1E2E",
+                          width: 26, height: 26, borderRadius: 6, border: "1px solid rgba(255,255,255,0.06)",
                           background: "transparent", cursor: "pointer",
                           display: "flex", alignItems: "center", justifyContent: "center",
-                          color: "#55556A", transition: "color 0.1s, border-color 0.1s",
+                          color: "#5C5C78", transition: "color 0.1s, border-color 0.1s",
                         }}
                         onMouseEnter={e => { e.currentTarget.style.color = "#EF4444"; e.currentTarget.style.borderColor = "rgba(239,68,68,0.3)"; }}
-                        onMouseLeave={e => { e.currentTarget.style.color = "#55556A"; e.currentTarget.style.borderColor = "#1E1E2E"; }}
+                        onMouseLeave={e => { e.currentTarget.style.color = "#5C5C78"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.06)"; }}
                         title="Delete"
                       >
                         <Trash2 size={11} />
@@ -161,17 +161,17 @@ export default function WorkflowsPage() {
                   </div>
 
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 10, color: "#3A3A4E" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 10, color: "#3A3A50" }}>
                       <Clock size={9} />
                       {formatRelativeTime(new Date(wf.updatedAt))}
                     </div>
-                    <span style={{ color: "#1E1E2E" }}>·</span>
-                    <div style={{ fontSize: 10, color: "#3A3A4E" }}>
+                    <span style={{ color: "rgba(255,255,255,0.06)" }}>·</span>
+                    <div style={{ fontSize: 10, color: "#3A3A50" }}>
                       {wf._count.executions} run{wf._count.executions !== 1 ? "s" : ""}
                     </div>
                     {wf.isPublished && (
                       <>
-                        <span style={{ color: "#1E1E2E" }}>·</span>
+                        <span style={{ color: "rgba(255,255,255,0.06)" }}>·</span>
                         <div style={{ fontSize: 9, color: "#10B981", fontWeight: 600 }}>Published</div>
                       </>
                     )}

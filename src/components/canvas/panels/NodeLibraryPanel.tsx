@@ -85,11 +85,11 @@ function NodeTooltip({ node, anchorY }: { node: NodeCatalogueItem; anchorY: numb
 
       {/* Meta */}
       <div style={{ display: "flex", gap: 14, marginBottom: 8 }}>
-        <span style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 10, color: "#55556A" }}>
+        <span style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 10, color: "#5C5C78" }}>
           <Clock size={9} />
           {node.executionTime ?? "—"}
         </span>
-        <span style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 10, color: "#55556A" }}>
+        <span style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 10, color: "#5C5C78" }}>
           <Tag size={9} />
           {node.id}
         </span>
@@ -99,26 +99,26 @@ function NodeTooltip({ node, anchorY }: { node: NodeCatalogueItem; anchorY: numb
       {(node.inputs.length > 0 || node.outputs.length > 0) && (
         <div style={{
           paddingTop: 8,
-          borderTop: "1px solid rgba(30,30,46,0.8)",
+          borderTop: "1px solid rgba(255,255,255,0.06)",
           display: "flex", gap: 16, marginBottom: 8,
         }}>
           {node.inputs.length > 0 && (
             <div>
-              <div style={{ fontSize: 9, color: "#3A3A4E", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 3 }}>
+              <div style={{ fontSize: 9, color: "#3A3A50", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 3 }}>
                 In
               </div>
               {node.inputs.map(p => (
-                <div key={p.id} style={{ fontSize: 10, color: "#55556A" }}>{p.label}</div>
+                <div key={p.id} style={{ fontSize: 10, color: "#5C5C78" }}>{p.label}</div>
               ))}
             </div>
           )}
           {node.outputs.length > 0 && (
             <div>
-              <div style={{ fontSize: 9, color: "#3A3A4E", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 3 }}>
+              <div style={{ fontSize: 9, color: "#3A3A50", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 3 }}>
                 Out
               </div>
               {node.outputs.map(p => (
-                <div key={p.id} style={{ fontSize: 10, color: "#55556A" }}>{p.label}</div>
+                <div key={p.id} style={{ fontSize: 10, color: "#5C5C78" }}>{p.label}</div>
               ))}
             </div>
           )}
@@ -216,7 +216,7 @@ function NodeItem({
       <GripVertical
         size={10}
         strokeWidth={1.5}
-        style={{ color: isHovered ? "#3A3A4E" : "#1E1E2E", flexShrink: 0, position: "relative" }}
+        style={{ color: isHovered ? "#3A3A50" : "rgba(255,255,255,0.06)", flexShrink: 0, position: "relative" }}
       />
 
       {/* Icon circle */}
@@ -251,14 +251,14 @@ function NodeItem({
             }}>LIVE</span>
           ) : (
             <span style={{
-              fontSize: 8, fontWeight: 600, color: "#3A3A4E",
+              fontSize: 8, fontWeight: 600, color: "#3A3A50",
               padding: "1px 4px", borderRadius: 3,
               background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)",
               flexShrink: 0,
             }}>PREVIEW</span>
           )}
         </div>
-        <div style={{ fontSize: 10, color: "#3A3A4E", marginTop: 2 }}>
+        <div style={{ fontSize: 10, color: "#3A3A50", marginTop: 2 }}>
           {node.id} · {node.executionTime ?? "—"}
         </div>
       </div>
@@ -467,8 +467,8 @@ export function NodeLibraryPanel() {
       transition={{ duration: 0.2, ease: "easeOut" }}
       style={{
         height: "100%",
-        background: "#0E0E16",
-        borderRight: "1px solid #1E1E2E",
+        background: "#0B0B13",
+        borderRight: "1px solid rgba(255,255,255,0.06)",
         display: "flex",
         flexDirection: "column",
         overflow: "hidden",
@@ -507,9 +507,9 @@ export function NodeLibraryPanel() {
             style={{
               marginTop: "auto", marginBottom: 12,
               width: 28, height: 28, borderRadius: 6,
-              background: "transparent", border: "1px solid #2A2A3E",
+              background: "transparent", border: "1px solid rgba(255,255,255,0.08)",
               display: "flex", alignItems: "center", justifyContent: "center",
-              color: "#55556A", cursor: "pointer",
+              color: "#5C5C78", cursor: "pointer",
             }}
           >
             <ChevronRight size={12} />
@@ -522,11 +522,11 @@ export function NodeLibraryPanel() {
           <div style={{
             display: "flex", alignItems: "center", justifyContent: "space-between",
             padding: "12px 10px 12px 14px",
-            borderBottom: "1px solid #1E1E2E", flexShrink: 0,
+            borderBottom: "1px solid rgba(255,255,255,0.06)", flexShrink: 0,
           }}>
             <div>
               <div style={{ fontSize: 13, fontWeight: 600, color: "#F0F0F5" }}>Node Library</div>
-              <div style={{ fontSize: 10, color: "#3A3A4E", marginTop: 2 }}>
+              <div style={{ fontSize: 10, color: "#3A3A50", marginTop: 2 }}>
                 {NODE_CATALOGUE.length} nodes · drag to canvas
               </div>
             </div>
@@ -535,18 +535,18 @@ export function NodeLibraryPanel() {
               title="Collapse panel"
               style={{
                 width: 26, height: 26, borderRadius: 6, flexShrink: 0,
-                background: "transparent", border: "1px solid #1E1E2E",
+                background: "transparent", border: "1px solid rgba(255,255,255,0.06)",
                 display: "flex", alignItems: "center", justifyContent: "center",
-                color: "#55556A", cursor: "pointer",
+                color: "#5C5C78", cursor: "pointer",
                 transition: "background 0.15s ease, color 0.15s ease",
               }}
               onMouseEnter={e => {
-                e.currentTarget.style.background = "#1A1A26";
+                e.currentTarget.style.background = "#1A1A2A";
                 e.currentTarget.style.color = "#F0F0F5";
               }}
               onMouseLeave={e => {
                 e.currentTarget.style.background = "transparent";
-                e.currentTarget.style.color = "#55556A";
+                e.currentTarget.style.color = "#5C5C78";
               }}
             >
               <ChevronLeft size={12} />
@@ -558,7 +558,7 @@ export function NodeLibraryPanel() {
             <div style={{ position: "relative" }}>
               <Search size={12} style={{
                 position: "absolute", left: 9, top: "50%",
-                transform: "translateY(-50%)", color: "#55556A", pointerEvents: "none",
+                transform: "translateY(-50%)", color: "#5C5C78", pointerEvents: "none",
               }} />
               <input
                 type="text"
@@ -567,14 +567,14 @@ export function NodeLibraryPanel() {
                 placeholder="Search nodes..."
                 style={{
                   width: "100%", height: 30,
-                  background: "#12121A", border: "1px solid #2A2A3E",
+                  background: "#12121E", border: "1px solid rgba(255,255,255,0.08)",
                   borderRadius: 7, paddingLeft: 28, paddingRight: search ? 28 : 10,
                   fontSize: 12, color: "#F0F0F5", outline: "none",
                   boxSizing: "border-box",
                   transition: "border-color 0.15s ease",
                 }}
                 onFocus={e => { e.currentTarget.style.borderColor = "#4F8AFF"; }}
-                onBlur={e => { e.currentTarget.style.borderColor = "#2A2A3E"; }}
+                onBlur={e => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.08)"; }}
               />
               {search && (
                 <button
@@ -582,7 +582,7 @@ export function NodeLibraryPanel() {
                   style={{
                     position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)",
                     background: "transparent", border: "none",
-                    color: "#55556A", cursor: "pointer",
+                    color: "#5C5C78", cursor: "pointer",
                     display: "flex", alignItems: "center", padding: 0,
                   }}
                 >
@@ -595,7 +595,7 @@ export function NodeLibraryPanel() {
           {/* Filter chips */}
           <div style={{
             display: "flex", gap: 4, padding: "8px 10px",
-            borderBottom: "1px solid #1E1E2E", flexShrink: 0,
+            borderBottom: "1px solid rgba(255,255,255,0.06)", flexShrink: 0,
           }}>
             {FILTERS.map(f => {
               const active = activeFilter === f.value;
@@ -610,9 +610,9 @@ export function NodeLibraryPanel() {
                   style={{
                     padding: "2px 7px", borderRadius: 20, whiteSpace: "nowrap", cursor: "pointer",
                     background: active ? `rgba(${rgb}, 0.12)` : "transparent",
-                    border: `1px solid ${active ? `rgba(${rgb}, 0.4)` : "#1E1E2E"}`,
+                    border: `1px solid ${active ? `rgba(${rgb}, 0.4)` : "rgba(255,255,255,0.06)"}`,
                     fontSize: 11, fontWeight: active ? 600 : 400,
-                    color: active ? c : "#55556A",
+                    color: active ? c : "#5C5C78",
                     transition: "all 0.15s ease",
                   }}
                 >
@@ -627,8 +627,8 @@ export function NodeLibraryPanel() {
             {isFiltering ? (
               displayNodes.length === 0 ? (
                 <div style={{ padding: "32px 16px", textAlign: "center" }}>
-                  <p style={{ fontSize: 12, color: "#55556A" }}>No nodes found</p>
-                  <p style={{ fontSize: 11, color: "#3A3A4E", marginTop: 4 }}>Try a different search</p>
+                  <p style={{ fontSize: 12, color: "#5C5C78" }}>No nodes found</p>
+                  <p style={{ fontSize: 11, color: "#3A3A50", marginTop: 4 }}>Try a different search</p>
                 </div>
               ) : (
                 <div style={{ padding: "0 8px 8px" }}>

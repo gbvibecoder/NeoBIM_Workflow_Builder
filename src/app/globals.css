@@ -3,6 +3,50 @@
 @layer base {
   :root {
     color-scheme: dark;
+
+    /* ── Background hierarchy ─────────────────────────────────── */
+    --bg-base: #07070D;
+    --bg-canvas: #0B0B13;
+    --bg-card: #12121E;
+    --bg-elevated: #1A1A2A;
+    --bg-hover: #1F1F32;
+
+    /* ── Border hierarchy ─────────────────────────────────────── */
+    --border-subtle: rgba(255, 255, 255, 0.06);
+    --border-default: rgba(255, 255, 255, 0.10);
+    --border-focus: rgba(79, 138, 255, 0.4);
+
+    /* ── Text hierarchy ───────────────────────────────────────── */
+    --text-primary: #F0F0F5;
+    --text-secondary: #9898B0;
+    --text-tertiary: #5C5C78;
+    --text-disabled: #3A3A50;
+
+    /* ── Accent ───────────────────────────────────────────────── */
+    --accent-blue: #4F8AFF;
+    --accent-blue-hover: #6B9FFF;
+    --accent-blue-glow: rgba(79, 138, 255, 0.15);
+    --accent-gradient: linear-gradient(135deg, #4F8AFF, #6366F1);
+
+    /* ── Status ───────────────────────────────────────────────── */
+    --status-success: #34D399;
+    --status-warning: #FBBF24;
+    --status-error: #F87171;
+
+    /* ── Node category ────────────────────────────────────────── */
+    --node-input: #3B82F6;
+    --node-input-glow: rgba(59, 130, 246, 0.12);
+    --node-transform: #8B5CF6;
+    --node-transform-glow: rgba(139, 92, 246, 0.12);
+    --node-generate: #10B981;
+    --node-generate-glow: rgba(16, 185, 129, 0.12);
+    --node-export: #F59E0B;
+    --node-export-glow: rgba(245, 158, 11, 0.12);
+
+    /* ── Shadows ──────────────────────────────────────────────── */
+    --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.15);
+    --shadow-md: 0 4px 24px rgba(0, 0, 0, 0.25);
+    --shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.35);
   }
 
   * {
@@ -16,42 +60,49 @@
   }
 
   body {
-    background-color: #0A0A0F;
-    color: #F0F0F5;
+    background-color: var(--bg-base);
+    color: var(--text-primary);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
 
+  /* ── Global transitions for interactive elements ────────────── */
+  button, a, input, textarea, select, [role="button"] {
+    transition: all 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  /* ── Custom scrollbars ──────────────────────────────────────── */
   ::-webkit-scrollbar {
     width: 6px;
     height: 6px;
   }
 
   ::-webkit-scrollbar-track {
-    background: #12121A;
+    background: transparent;
   }
 
   ::-webkit-scrollbar-thumb {
-    background: #2A2A3E;
+    background: rgba(255, 255, 255, 0.08);
     border-radius: 3px;
   }
 
   ::-webkit-scrollbar-thumb:hover {
-    background: #3A3A4E;
+    background: rgba(255, 255, 255, 0.15);
   }
 
   /* ── Library search placeholder ── */
   input::placeholder {
-    color: #55556A;
+    color: var(--text-disabled);
   }
 
   /* ── Minimap ── */
   .react-flow__minimap {
-    background-color: rgba(18,18,26,0.92) !important;
-    border: 1px solid #1E1E2E !important;
-    border-radius: 8px !important;
+    background-color: rgba(18, 18, 30, 0.9) !important;
+    border: 1px solid var(--border-subtle) !important;
+    border-radius: 10px !important;
     overflow: hidden;
     backdrop-filter: blur(8px);
+    box-shadow: var(--shadow-md) !important;
   }
 
   .react-flow__minimap-viewport {
@@ -62,19 +113,19 @@
 
   /* ── Controls ── */
   .react-flow__controls {
-    background-color: rgba(18,18,26,0.9) !important;
-    border: 1px solid #1E1E2E !important;
+    background-color: rgba(18, 18, 30, 0.9) !important;
+    border: 1px solid var(--border-subtle) !important;
     border-radius: 10px !important;
     overflow: hidden;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5) !important;
+    box-shadow: var(--shadow-md) !important;
     backdrop-filter: blur(8px);
   }
 
   .react-flow__controls-button {
     background-color: transparent !important;
     border: none !important;
-    border-bottom: 1px solid #1E1E2E !important;
-    color: #55556A !important;
+    border-bottom: 1px solid var(--border-subtle) !important;
+    color: var(--text-tertiary) !important;
     width: 28px !important;
     height: 28px !important;
     padding: 0 !important;
@@ -90,7 +141,7 @@
 
   .react-flow__controls-button:hover {
     background-color: rgba(79, 138, 255, 0.08) !important;
-    color: #F0F0F5 !important;
+    color: var(--text-primary) !important;
   }
 
   .react-flow__controls-button svg {
@@ -115,16 +166,16 @@
   }
 
   .glass {
-    background: rgba(18, 18, 26, 0.8);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border: 1px solid rgba(30, 30, 46, 0.8);
+    background: rgba(18, 18, 30, 0.85);
+    backdrop-filter: blur(12px) saturate(1.2);
+    -webkit-backdrop-filter: blur(12px) saturate(1.2);
+    border: 1px solid var(--border-subtle);
   }
 
   .canvas-grid-bg {
-    background-image: radial-gradient(circle, #1E1E2E 1px, transparent 1px);
-    background-size: 20px 20px;
-    background-color: #0E0E16;
+    background-image: radial-gradient(circle, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+    background-size: 24px 24px;
+    background-color: var(--bg-canvas);
   }
 
   /* ── Edge animations ── */
@@ -155,11 +206,38 @@
 
   /* Canvas vignette overlay */
   .canvas-vignette {
-    background: radial-gradient(ellipse at center, transparent 60%, rgba(10, 10, 15, 0.6) 100%);
+    background: radial-gradient(ellipse at center, transparent 50%, rgba(7, 7, 13, 0.4) 100%);
     pointer-events: none;
   }
 
-  /* ── Sonner Toasts ────────────────────────────────────────────────────── */
+  /* ── Loading shimmer ─────────────────────────────────────────── */
+  @keyframes shimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+  }
+
+  .shimmer {
+    background: linear-gradient(90deg, var(--bg-card) 25%, var(--bg-elevated) 50%, var(--bg-card) 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+  }
+
+  /* ── Button press effect ─────────────────────────────────────── */
+  .press-effect:active {
+    transform: scale(0.97);
+  }
+
+  /* ── Card hover lift ─────────────────────────────────────────── */
+  .hover-lift {
+    transition: transform 150ms cubic-bezier(0.4, 0, 0.2, 1), box-shadow 150ms cubic-bezier(0.4, 0, 0.2, 1), border-color 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .hover-lift:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+  }
+
+  /* ── Sonner Toasts ────────────────────────────────────────────── */
 
   /* Force 360px width */
   [data-sonner-toaster] {
@@ -172,19 +250,19 @@
 
   /* 3px left color bar per type */
   [data-sonner-toast][data-type="success"] {
-    border-left: 3px solid #10B981 !important;
+    border-left: 3px solid #34D399 !important;
   }
   [data-sonner-toast][data-type="error"] {
-    border-left: 3px solid #EF4444 !important;
+    border-left: 3px solid #F87171 !important;
   }
   [data-sonner-toast][data-type="warning"] {
-    border-left: 3px solid #F59E0B !important;
+    border-left: 3px solid #FBBF24 !important;
   }
   [data-sonner-toast][data-type="info"] {
     border-left: 3px solid #4F8AFF !important;
   }
   [data-sonner-toast][data-type="loading"] {
-    border-left: 3px solid #8888A0 !important;
+    border-left: 3px solid var(--text-secondary) !important;
   }
   [data-sonner-toast]:not([data-type]),
   [data-sonner-toast][data-type="default"] {
@@ -195,22 +273,22 @@
   [data-sonner-toast] [data-title] {
     font-size: 12.5px !important;
     font-weight: 600 !important;
-    color: #F0F0F5 !important;
+    color: var(--text-primary) !important;
   }
 
   [data-sonner-toast] [data-description] {
     font-size: 11px !important;
-    color: #8888A0 !important;
+    color: var(--text-secondary) !important;
     margin-top: 2px !important;
   }
 
   /* Icon color per type */
-  [data-sonner-toast][data-type="success"] [data-icon] svg { color: #10B981 !important; }
-  [data-sonner-toast][data-type="error"]   [data-icon] svg { color: #EF4444 !important; }
-  [data-sonner-toast][data-type="warning"] [data-icon] svg { color: #F59E0B !important; }
+  [data-sonner-toast][data-type="success"] [data-icon] svg { color: #34D399 !important; }
+  [data-sonner-toast][data-type="error"]   [data-icon] svg { color: #F87171 !important; }
+  [data-sonner-toast][data-type="warning"] [data-icon] svg { color: #FBBF24 !important; }
   [data-sonner-toast][data-type="info"]    [data-icon] svg { color: #4F8AFF !important; }
 
-  /* ── Focus rings (keyboard nav accessibility) ──────────────────────── */
+  /* ── Focus rings (keyboard nav accessibility) ──────────────── */
 
   /* Remove default outline everywhere */
   *:focus { outline: none; }
@@ -230,7 +308,7 @@
     border-radius: 6px;
   }
 
-  /* ── Reduced motion ─────────────────────────────────────────────────── */
+  /* ── Reduced motion ─────────────────────────────────────────── */
 
   @media (prefers-reduced-motion: reduce) {
     *,

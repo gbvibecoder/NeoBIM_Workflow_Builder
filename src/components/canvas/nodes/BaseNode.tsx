@@ -145,8 +145,8 @@ export const BaseNode = memo(function BaseNode({ id, data, selected }: BaseNodeP
   const isInput  = INPUT_NODE_IDS.has(data.catalogueId);
 
   const borderColor =
-    status === "error"   ? "#EF4444" :
-    status === "success" ? "#10B981" :
+    status === "error"   ? "#F87171" :
+    status === "success" ? "#34D399" :
     color;
   const borderRgb     = hexToRgb(borderColor);
   const borderOpacity = selected ? 1.0 : isHovered ? 0.5 : 0.2;
@@ -169,13 +169,13 @@ export const BaseNode = memo(function BaseNode({ id, data, selected }: BaseNodeP
       onMouseLeave={() => setIsHovered(false)}
       style={{
         width: isInput ? 280 : 220,
-        background: "rgba(18, 18, 26, 0.88)",
+        background: "rgba(18, 18, 30, 0.85)",
         border: `1px solid rgba(${borderRgb}, ${borderOpacity})`,
-        borderRadius: 10,
-        boxShadow: `0 4px 20px rgba(0,0,0,0.35), 0 0 20px rgba(${rgb}, ${glowOpacity})`,
-        backdropFilter: "blur(12px)",
-        WebkitBackdropFilter: "blur(12px)",
-        transform: isHovered && !selected ? "scale(1.015)" : "scale(1)",
+        borderRadius: 12,
+        boxShadow: `0 4px 24px rgba(0,0,0,0.25), 0 0 0 1px rgba(255,255,255,0.03), 0 0 20px rgba(${rgb}, ${glowOpacity})`,
+        backdropFilter: "blur(12px) saturate(1.2)",
+        WebkitBackdropFilter: "blur(12px) saturate(1.2)",
+        transform: isHovered && !selected ? "scale(1.01)" : "scale(1)",
         transition: "transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease",
         overflow: "hidden",
         cursor: "pointer",
@@ -195,7 +195,7 @@ export const BaseNode = memo(function BaseNode({ id, data, selected }: BaseNodeP
         <motion.div
           style={{
             position: "absolute", inset: 0,
-            borderRadius: 10, pointerEvents: "none",
+            borderRadius: 12, pointerEvents: "none",
           }}
           animate={{
             boxShadow: [
@@ -264,7 +264,7 @@ export const BaseNode = memo(function BaseNode({ id, data, selected }: BaseNodeP
         {/* Row 2: type label */}
         {typeLabel && (
           <div style={{
-            fontSize: 11, color: "#55556A", marginTop: 5, lineHeight: 1.3,
+            fontSize: 11, color: "#5C5C78", marginTop: 5, lineHeight: 1.3,
             overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
           }}>
             {typeLabel}
@@ -277,7 +277,7 @@ export const BaseNode = memo(function BaseNode({ id, data, selected }: BaseNodeP
         {/* Row 3: progress + time */}
         <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 8 }}>
           <ProgressBar status={status} color={color} />
-          <span style={{ fontSize: 10, color: "#3A3A4E", whiteSpace: "nowrap", flexShrink: 0 }}>
+          <span style={{ fontSize: 10, color: "#5C5C78", whiteSpace: "nowrap", flexShrink: 0 }}>
             {data.executionTime ?? "< 2s"}
           </span>
         </div>

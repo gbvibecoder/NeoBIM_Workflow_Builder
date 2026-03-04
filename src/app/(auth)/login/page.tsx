@@ -46,11 +46,11 @@ function LoginForm() {
 
   return (
     <div style={{
-      background: "#12121A",
-      border: "1px solid #1E1E2E",
+      background: "#12121E",
+      border: "1px solid rgba(255,255,255,0.06)",
       borderRadius: 16,
-      padding: 28,
-      boxShadow: "0 8px 32px rgba(0,0,0,0.4)",
+      padding: 40,
+      boxShadow: "0 24px 64px rgba(0, 0, 0, 0.4)",
     }}>
       {/* Google OAuth */}
       <button
@@ -58,8 +58,8 @@ function LoginForm() {
         disabled={loading}
         style={{
           width: "100%", padding: "11px 16px",
-          borderRadius: 10, border: "1px solid #1E1E2E",
-          background: "#1A1A26", color: "#E0E0EA",
+          borderRadius: 8, border: "1px solid rgba(255,255,255,0.08)",
+          background: "#1A1A2A", color: "#F0F0F5",
           fontSize: 13, fontWeight: 500, cursor: "pointer",
           display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
           marginBottom: 20, opacity: loading ? 0.6 : 1,
@@ -70,18 +70,18 @@ function LoginForm() {
       </button>
 
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
-        <div style={{ flex: 1, height: 1, background: "#1E1E2E" }} />
+        <div style={{ flex: 1, height: 1, background: "rgba(255,255,255,0.06)" }} />
         <span style={{ fontSize: 11, color: "#3A3A4E" }}>or email</span>
-        <div style={{ flex: 1, height: 1, background: "#1E1E2E" }} />
+        <div style={{ flex: 1, height: 1, background: "rgba(255,255,255,0.06)" }} />
       </div>
 
       <form onSubmit={handleSubmit}>
         <div style={{ marginBottom: 14 }}>
-          <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: "#8888A0", marginBottom: 6 }}>
-            EMAIL
+          <label style={{ display: "block", fontSize: 13, fontWeight: 500, color: "#9898B0", marginBottom: 6 }}>
+            Email
           </label>
           <div style={{ position: "relative" }}>
-            <Mail size={13} style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "#3A3A4E" }} />
+            <Mail size={13} style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", color: "#3A3A50" }} />
             <input
               type="email"
               value={email}
@@ -89,21 +89,21 @@ function LoginForm() {
               required
               placeholder="you@example.com"
               style={{
-                width: "100%", padding: "10px 12px 10px 34px",
-                borderRadius: 8, border: "1px solid #1E1E2E",
-                background: "#0E0E16", color: "#F0F0F5",
-                fontSize: 13, outline: "none", boxSizing: "border-box",
+                width: "100%", padding: "10px 14px 10px 38px", height: 42,
+                borderRadius: 8, border: "1px solid rgba(255,255,255,0.08)",
+                background: "#0B0B13", color: "#F0F0F5",
+                fontSize: 14, outline: "none", boxSizing: "border-box",
               }}
             />
           </div>
         </div>
 
         <div style={{ marginBottom: 20 }}>
-          <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: "#8888A0", marginBottom: 6 }}>
-            PASSWORD
+          <label style={{ display: "block", fontSize: 13, fontWeight: 500, color: "#9898B0", marginBottom: 6 }}>
+            Password
           </label>
           <div style={{ position: "relative" }}>
-            <Lock size={13} style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "#3A3A4E" }} />
+            <Lock size={13} style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", color: "#3A3A50" }} />
             <input
               type="password"
               value={password}
@@ -111,10 +111,10 @@ function LoginForm() {
               required
               placeholder="••••••••"
               style={{
-                width: "100%", padding: "10px 12px 10px 34px",
-                borderRadius: 8, border: "1px solid #1E1E2E",
-                background: "#0E0E16", color: "#F0F0F5",
-                fontSize: 13, outline: "none", boxSizing: "border-box",
+                width: "100%", padding: "10px 14px 10px 38px", height: 42,
+                borderRadius: 8, border: "1px solid rgba(255,255,255,0.08)",
+                background: "#0B0B13", color: "#F0F0F5",
+                fontSize: 14, outline: "none", boxSizing: "border-box",
               }}
             />
           </div>
@@ -123,8 +123,8 @@ function LoginForm() {
         {error && (
           <div style={{
             padding: "9px 12px", borderRadius: 8,
-            background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.2)",
-            fontSize: 12, color: "#EF4444", marginBottom: 16,
+            background: "rgba(248,113,113,0.1)", border: "1px solid rgba(248,113,113,0.2)",
+            fontSize: 13, color: "#F87171", marginBottom: 16,
           }}>
             {error}
           </div>
@@ -134,10 +134,11 @@ function LoginForm() {
           type="submit"
           disabled={loading}
           style={{
-            width: "100%", padding: "11px", borderRadius: 10, border: "none",
-            background: "linear-gradient(135deg, #4F8AFF 0%, #8B5CF6 100%)",
-            color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer",
+            width: "100%", padding: "11px", height: 42, borderRadius: 8, border: "none",
+            background: "linear-gradient(135deg, #4F8AFF 0%, #6366F1 100%)",
+            color: "#fff", fontSize: 14, fontWeight: 600, cursor: "pointer",
             opacity: loading ? 0.7 : 1,
+            boxShadow: "0 0 0 1px rgba(79,138,255,0.3), 0 2px 8px rgba(79,138,255,0.2)",
           }}
         >
           {loading ? "Signing in…" : "Sign in"}
@@ -164,7 +165,7 @@ export default function LoginPage() {
             NeoBIM
           </span>
         </div>
-        <p style={{ fontSize: 13, color: "#55556A" }}>Sign in to continue</p>
+        <p style={{ fontSize: 13, color: "#5C5C78" }}>Sign in to continue</p>
       </div>
 
       <Suspense fallback={
@@ -178,7 +179,7 @@ export default function LoginPage() {
         <LoginForm />
       </Suspense>
 
-      <p style={{ textAlign: "center", fontSize: 12, color: "#55556A", marginTop: 20 }}>
+      <p style={{ textAlign: "center", fontSize: 13, color: "#5C5C78", marginTop: 20 }}>
         Don&apos;t have an account?{" "}
         <Link href="/register" style={{ color: "#4F8AFF", textDecoration: "none" }}>
           Register

@@ -78,7 +78,7 @@ export function ArtifactCard({ artifact, nodeLabel, nodeCategory, onDismiss }: A
       exit={{ opacity: 0, scale: 0.94, transition: { duration: prefersReduced ? 0 : 0.15 } }}
       transition={{ type: "spring", stiffness: 380, damping: 32, duration: prefersReduced ? 0 : undefined }}
       style={{
-        borderBottom: "1px solid #1A1A26",
+        borderBottom: "1px solid rgba(255,255,255,0.06)",
         borderLeft: `3px solid ${accentColor}`,
         background: `rgba(${rgb}, 0.03)`,
         overflow: "hidden",
@@ -120,7 +120,7 @@ export function ArtifactCard({ artifact, nodeLabel, nodeCategory, onDismiss }: A
         <motion.div
           animate={{ rotate: collapsed ? -90 : 0 }}
           transition={{ duration: 0.15 }}
-          style={{ color: "#3A3A4E", display: "flex", flexShrink: 0 }}
+          style={{ color: "#3A3A50", display: "flex", flexShrink: 0 }}
         >
           <ChevronDown size={12} />
         </motion.div>
@@ -134,11 +134,11 @@ export function ArtifactCard({ artifact, nodeLabel, nodeCategory, onDismiss }: A
               width: 16, height: 16, borderRadius: 3, flexShrink: 0,
               background: "transparent", border: "none",
               display: "flex", alignItems: "center", justifyContent: "center",
-              color: "#3A3A4E", cursor: "pointer",
+              color: "#3A3A50", cursor: "pointer",
               transition: "color 0.1s ease",
             }}
             onMouseEnter={e => { e.currentTarget.style.color = "#EF4444"; }}
-            onMouseLeave={e => { e.currentTarget.style.color = "#3A3A4E"; }}
+            onMouseLeave={e => { e.currentTarget.style.color = "#3A3A50"; }}
           >
             <X size={10} />
           </button>
@@ -217,7 +217,7 @@ function JsonBody({ data }: { data: JsonArtifactData }) {
 function ImageBody({ data }: { data: ImageArtifactData }) {
   return (
     <div>
-      <div style={{ position: "relative", height: 160, background: "#0A0A0F" }}>
+      <div style={{ position: "relative", height: 160, background: "#07070D" }}>
         {data?.url ? (
           <Image
             src={data.url}
@@ -228,12 +228,12 @@ function ImageBody({ data }: { data: ImageArtifactData }) {
           />
         ) : (
           <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%" }}>
-            <span style={{ fontSize: 11, color: "#55556A" }}>No preview</span>
+            <span style={{ fontSize: 11, color: "#5C5C78" }}>No preview</span>
           </div>
         )}
       </div>
       {data?.style && (
-        <div style={{ padding: "6px 14px 10px", fontSize: 10, color: "#55556A" }}>
+        <div style={{ padding: "6px 14px 10px", fontSize: 10, color: "#5C5C78" }}>
           {data.style}
         </div>
       )}
@@ -260,9 +260,9 @@ function KpiBody({ data, accentColor }: { data: KpiArtifactData; accentColor: st
             fontSize: 16, fontWeight: 700, color: "#F0F0F5", lineHeight: 1.1,
           }}>
             {m.value}
-            {m.unit && <span style={{ fontSize: 10, fontWeight: 400, color: "#55556A", marginLeft: 3 }}>{m.unit}</span>}
+            {m.unit && <span style={{ fontSize: 10, fontWeight: 400, color: "#5C5C78", marginLeft: 3 }}>{m.unit}</span>}
           </div>
-          <div style={{ fontSize: 9, color: "#55556A", marginTop: 3, textTransform: "uppercase" as const, letterSpacing: "0.4px" }}>
+          <div style={{ fontSize: 9, color: "#5C5C78", marginTop: 3, textTransform: "uppercase" as const, letterSpacing: "0.4px" }}>
             {m.label}
           </div>
         </div>
@@ -280,8 +280,8 @@ function TableBody({ data }: { data: TableArtifactData }) {
             {data?.headers?.map((h, i) => (
               <th key={i} style={{
                 padding: "5px 10px", textAlign: "left",
-                color: "#55556A", fontWeight: 600, whiteSpace: "nowrap",
-                borderBottom: "1px solid #1E1E2E",
+                color: "#5C5C78", fontWeight: 600, whiteSpace: "nowrap",
+                borderBottom: "1px solid rgba(255,255,255,0.06)",
               }}>
                 {h}
               </th>
@@ -319,7 +319,7 @@ function FileBody({ data }: { data: FileArtifactData }) {
         }}>
           {data?.name}
         </div>
-        <div style={{ fontSize: 10, color: "#55556A", marginTop: 2 }}>
+        <div style={{ fontSize: 10, color: "#5C5C78", marginTop: 2 }}>
           {data?.type} · {formatBytes(data?.size ?? 0)}
         </div>
       </div>

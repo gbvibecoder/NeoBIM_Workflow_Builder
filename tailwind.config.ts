@@ -9,41 +9,51 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        // Background scale
-        "bg-primary": "#0A0A0F",
-        "bg-secondary": "#12121A",
-        "bg-canvas": "#0E0E16",
-        "bg-elevated": "#1A1A26",
+        // Background hierarchy
+        "bg-base": "#07070D",
+        "bg-primary": "#07070D",
+        "bg-canvas": "#0B0B13",
+        "bg-secondary": "#0B0B13",
+        "bg-card": "#12121E",
+        "bg-elevated": "#1A1A2A",
+        "bg-hover": "#1F1F32",
 
-        // Border scale
-        "border-subtle": "#1E1E2E",
-        "border-default": "#2A2A3E",
-        "border-focus": "#4F8AFF",
+        // Border hierarchy
+        "border-subtle": "rgba(255, 255, 255, 0.06)",
+        "border-default": "rgba(255, 255, 255, 0.10)",
+        "border-focus": "rgba(79, 138, 255, 0.4)",
 
-        // Text scale
+        // Text hierarchy
         "text-primary": "#F0F0F5",
-        "text-secondary": "#8888A0",
-        "text-tertiary": "#55556A",
+        "text-secondary": "#9898B0",
+        "text-tertiary": "#5C5C78",
+        "text-disabled": "#3A3A50",
 
         // Node category colors
         "node-input": "#3B82F6",
         "node-input-bg": "rgba(59, 130, 246, 0.06)",
+        "node-input-glow": "rgba(59, 130, 246, 0.12)",
         "node-transform": "#8B5CF6",
         "node-transform-bg": "rgba(139, 92, 246, 0.06)",
+        "node-transform-glow": "rgba(139, 92, 246, 0.12)",
         "node-generate": "#10B981",
         "node-generate-bg": "rgba(16, 185, 129, 0.06)",
+        "node-generate-glow": "rgba(16, 185, 129, 0.12)",
         "node-export": "#F59E0B",
         "node-export-bg": "rgba(245, 158, 11, 0.06)",
+        "node-export-glow": "rgba(245, 158, 11, 0.12)",
 
         // Status colors
-        "status-idle": "#55556A",
+        "status-idle": "#5C5C78",
         "status-running": "#3B82F6",
-        "status-success": "#10B981",
-        "status-error": "#EF4444",
+        "status-success": "#34D399",
+        "status-error": "#F87171",
+        "status-warning": "#FBBF24",
 
         // Accent
         "accent-primary": "#4F8AFF",
-        "accent-glow": "rgba(79, 138, 255, 0.125)",
+        "accent-hover": "#6B9FFF",
+        "accent-glow": "rgba(79, 138, 255, 0.15)",
       },
       fontFamily: {
         display: ["var(--font-dm-sans)", "DM Sans", "sans-serif"],
@@ -52,11 +62,11 @@ const config: Config = {
       },
       backgroundImage: {
         "canvas-grid":
-          "radial-gradient(circle, #1E1E2E 1px, transparent 1px)",
+          "radial-gradient(circle, rgba(255, 255, 255, 0.04) 1px, transparent 1px)",
         "gradient-radial": "radial-gradient(var(--tw-gradient-stops))",
       },
       backgroundSize: {
-        "canvas-grid": "20px 20px",
+        "canvas-grid": "24px 24px",
       },
       animation: {
         "pulse-node": "pulse-node 2s cubic-bezier(0.4, 0, 0.6, 1) infinite",
@@ -65,6 +75,7 @@ const config: Config = {
         "fade-in": "fade-in 0.2s ease-out",
         "data-flow": "data-flow 1.5s linear infinite",
         "spin-slow": "spin 3s linear infinite",
+        shimmer: "shimmer 1.5s infinite",
       },
       keyframes: {
         "pulse-node": {
@@ -87,21 +98,36 @@ const config: Config = {
           "0%": { "stroke-dashoffset": "24" },
           "100%": { "stroke-dashoffset": "0" },
         },
+        shimmer: {
+          "0%": { "background-position": "-200% 0" },
+          "100%": { "background-position": "200% 0" },
+        },
       },
       boxShadow: {
-        "node-idle": "0 0 0 1px rgba(42, 42, 62, 0.8)",
-        "node-hover": "0 0 20px rgba(79, 138, 255, 0.1), 0 0 0 1px rgba(79, 138, 255, 0.3)",
-        "node-selected": "0 0 30px rgba(79, 138, 255, 0.2), 0 0 0 2px rgba(79, 138, 255, 0.6)",
+        sm: "0 2px 8px rgba(0, 0, 0, 0.15)",
+        md: "0 4px 24px rgba(0, 0, 0, 0.25)",
+        lg: "0 16px 48px rgba(0, 0, 0, 0.35)",
+        "node-idle":
+          "0 4px 24px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(255, 255, 255, 0.03)",
+        "node-hover":
+          "0 4px 24px rgba(0, 0, 0, 0.3), 0 0 24px rgba(79, 138, 255, 0.08)",
+        "node-selected":
+          "0 0 0 2px rgba(79, 138, 255, 0.15), 0 4px 24px rgba(0, 0, 0, 0.3)",
         "node-running": "0 0 20px rgba(59, 130, 246, 0.3)",
-        "node-success": "0 0 20px rgba(16, 185, 129, 0.2)",
-        "node-error": "0 0 20px rgba(239, 68, 68, 0.2)",
-        "panel": "0 0 0 1px rgba(30, 30, 46, 0.8), 0 20px 60px rgba(0, 0, 0, 0.5)",
-        "elevated": "0 8px 32px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(42, 42, 62, 0.5)",
+        "node-success": "0 0 20px rgba(52, 211, 153, 0.2)",
+        "node-error": "0 0 20px rgba(248, 113, 113, 0.2)",
+        panel:
+          "0 0 0 1px rgba(255, 255, 255, 0.06), 0 20px 60px rgba(0, 0, 0, 0.5)",
+        elevated:
+          "0 8px 32px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.06)",
+        glow: "0 0 0 1px rgba(79, 138, 255, 0.3), 0 4px 20px rgba(79, 138, 255, 0.25)",
+        "glow-hover":
+          "0 0 0 1px rgba(79, 138, 255, 0.5), 0 8px 30px rgba(79, 138, 255, 0.35)",
       },
       borderRadius: {
-        "node": "12px",
-        "card": "10px",
-        "panel": "14px",
+        node: "12px",
+        card: "14px",
+        panel: "14px",
       },
     },
   },

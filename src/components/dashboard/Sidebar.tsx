@@ -56,8 +56,8 @@ export function Sidebar() {
         display: "flex",
         flexDirection: "column",
         height: "100%",
-        background: "#0A0A0F",
-        borderRight: "1px solid #1E1E2E",
+        background: "#07070D",
+        borderRight: "1px solid rgba(255,255,255,0.06)",
         overflow: "hidden",
         flexShrink: 0,
       }}
@@ -67,7 +67,7 @@ export function Sidebar() {
         display: "flex", alignItems: "center",
         justifyContent: collapsed ? "center" : "space-between",
         padding: collapsed ? "12px 0" : "12px 16px 12px 18px",
-        borderBottom: "1px solid #1E1E2E",
+        borderBottom: "1px solid rgba(255,255,255,0.06)",
         minHeight: 52, flexShrink: 0,
       }}>
         <Link href="/dashboard" style={{ display: "flex", alignItems: "center", gap: 8, textDecoration: "none", overflow: "hidden" }}>
@@ -149,7 +149,7 @@ export function Sidebar() {
               href={item.href}
               label={item.label}
               badge={item.badge}
-              icon={<Icon size={15} strokeWidth={isActive ? 2 : 1.5} style={{ color: isActive ? "#4F8AFF" : "#55556A", flexShrink: 0, transition: "color 0.12s" }} />}
+              icon={<Icon size={18} strokeWidth={isActive ? 2 : 1.5} style={{ color: isActive ? "#4F8AFF" : "#5C5C78", flexShrink: 0, transition: "color 0.12s" }} />}
               isActive={isActive}
               collapsed={collapsed}
               showLabels={showLabels}
@@ -160,7 +160,7 @@ export function Sidebar() {
 
       {/* ── User info + sign out ─────────────────────────────────────────── */}
       {showLabels && (
-        <div style={{ padding: "10px 10px 12px", borderTop: "1px solid #1E1E2E", flexShrink: 0 }}>
+        <div style={{ padding: "10px 10px 12px", borderTop: "1px solid rgba(255,255,255,0.06)", flexShrink: 0 }}>
           {session?.user ? (
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               {/* User row */}
@@ -227,7 +227,7 @@ export function Sidebar() {
 
       {/* ── Expand button (collapsed state footer) ───────────────────────── */}
       {collapsed && (
-        <div style={{ padding: "8px", borderTop: "1px solid #1E1E2E", flexShrink: 0 }}>
+        <div style={{ padding: "8px", borderTop: "1px solid rgba(255,255,255,0.06)", flexShrink: 0 }}>
           <button
             onClick={() => setCollapsed(false)}
             title="Expand sidebar"
@@ -270,8 +270,8 @@ interface NavItemProps {
 function NavItem({ href, label, badge, icon, isActive, collapsed, showLabels }: NavItemProps) {
   const [hovered, setHovered] = useState(false);
 
-  const activeBg   = "rgba(79,138,255,0.07)";
-  const hoverBg    = "rgba(255,255,255,0.03)";
+  const activeBg   = "rgba(79,138,255,0.08)";
+  const hoverBg    = "rgba(255,255,255,0.04)";
   const borderBar  = isActive ? "#4F8AFF" : "transparent";
 
   return (
@@ -306,7 +306,7 @@ function NavItem({ href, label, badge, icon, isActive, collapsed, showLabels }: 
             flex: 1,
             fontSize: 13,
             fontWeight: isActive ? 600 : 400,
-            color: isActive ? "#E8E8F0" : "#8888A0",
+            color: isActive ? "#F0F0F5" : "#9898B0",
             whiteSpace: "nowrap",
             overflow: "hidden",
             textOverflow: "ellipsis",
@@ -317,8 +317,8 @@ function NavItem({ href, label, badge, icon, isActive, collapsed, showLabels }: 
 
           {badge && (
             <span style={{
-              fontSize: 9, padding: "1px 5px", borderRadius: 10, flexShrink: 0,
-              background: "#1A1A26", color: "#4A4A60", fontWeight: 600,
+              fontSize: 10, padding: "2px 6px", borderRadius: 6, flexShrink: 0,
+              background: "rgba(139, 92, 246, 0.12)", color: "#A78BFA", fontWeight: 600,
             }}>
               {badge}
             </span>

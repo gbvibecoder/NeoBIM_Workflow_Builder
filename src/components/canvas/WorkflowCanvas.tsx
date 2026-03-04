@@ -130,13 +130,13 @@ function CanvasEmptyState({ onPromptMode }: EmptyStateProps) {
           padding: "16px 20px",
           borderRadius: 12,
           background: "rgba(18, 18, 26, 0.7)",
-          border: "1px solid rgba(30, 30, 46, 0.8)",
+          border: "1px solid rgba(255,255,255,0.06)",
           backdropFilter: "blur(12px)",
           WebkitBackdropFilter: "blur(12px)",
           marginBottom: 24,
         }}>
           <MiniWorkflowDiagram />
-          <div style={{ fontSize: 9, color: "#3A3A4E", textAlign: "center", marginTop: 4 }}>
+          <div style={{ fontSize: 9, color: "#3A3A50", textAlign: "center", marginTop: 4 }}>
             Example AEC Pipeline
           </div>
         </div>
@@ -162,7 +162,7 @@ function CanvasEmptyState({ onPromptMode }: EmptyStateProps) {
 
         {/* Subtitle */}
         <p style={{
-          fontSize: 14, color: "#55556A",
+          fontSize: 14, color: "#5C5C78",
           lineHeight: 1.6, marginBottom: 24, maxWidth: 320,
         }}>
           Drag nodes from the library, or describe what you want with AI
@@ -452,7 +452,7 @@ function WorkflowCanvasInner({ workflowId: _workflowId }: WorkflowCanvasInnerPro
               exit={{ opacity: 0, transition: { delay: 0.5 } }}
               style={{
                 position: "absolute", top: 52, left: 0, right: 0, height: 2, zIndex: 11,
-                background: "rgba(30,30,46,0.5)",
+                background: "rgba(255,255,255,0.04)",
               }}
             >
               <motion.div
@@ -496,14 +496,14 @@ function WorkflowCanvasInner({ workflowId: _workflowId }: WorkflowCanvasInnerPro
               strokeDasharray: "6 4",
               opacity: 0.7,
             }}
-            style={{ background: "#0C0C14" }}
+            style={{ background: "#0B0B13" }}
           >
             {/* Dot grid */}
             <Background
               variant={BackgroundVariant.Dots}
-              gap={20}
-              size={1.2}
-              color="#1C1C2C"
+              gap={24}
+              size={1}
+              color="rgba(255,255,255,0.04)"
             />
 
             {/* Styled controls */}
@@ -519,14 +519,14 @@ function WorkflowCanvasInner({ workflowId: _workflowId }: WorkflowCanvasInnerPro
               nodeColor={(n) => {
                 const d = n.data as WorkflowNodeData;
                 const cfg = CATEGORY_CONFIG[d?.category as NodeCategory];
-                return cfg?.color ?? "#2A2A3E";
+                return cfg?.color ?? "rgba(255,255,255,0.08)";
               }}
               maskColor="rgba(10,10,15,0.65)"
               style={{
                 width: 160,
                 height: 100,
                 backgroundColor: "rgba(18,18,26,0.92)",
-                border: "1px solid #1E1E2E",
+                border: "1px solid rgba(255,255,255,0.06)",
                 borderRadius: 8,
                 marginBottom: 16,
                 marginRight: 16,
@@ -598,7 +598,7 @@ function WorkflowCanvasInner({ workflowId: _workflowId }: WorkflowCanvasInnerPro
                 maxHeight: "calc(100vh - 100px)",
                 display: "flex", flexDirection: "column",
                 background: "rgba(10, 10, 15, 0.96)",
-                border: "1px solid #1E1E2E",
+                border: "1px solid rgba(255,255,255,0.06)",
                 borderRadius: 12,
                 overflow: "hidden",
                 backdropFilter: "blur(16px)",
@@ -610,7 +610,7 @@ function WorkflowCanvasInner({ workflowId: _workflowId }: WorkflowCanvasInnerPro
               <div style={{
                 display: "flex", alignItems: "center", gap: 7,
                 padding: "10px 12px",
-                borderBottom: "1px solid #1E1E2E", flexShrink: 0,
+                borderBottom: "1px solid rgba(255,255,255,0.06)", flexShrink: 0,
               }}>
                 <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#10B981", flexShrink: 0 }} />
                 <span style={{ fontSize: 12, fontWeight: 600, color: "#F0F0F5", flex: 1 }}>
@@ -630,11 +630,11 @@ function WorkflowCanvasInner({ workflowId: _workflowId }: WorkflowCanvasInnerPro
                     width: 22, height: 22, borderRadius: 5, flexShrink: 0,
                     background: "transparent", border: "none",
                     display: "flex", alignItems: "center", justifyContent: "center",
-                    color: "#3A3A4E", cursor: "pointer",
+                    color: "#3A3A50", cursor: "pointer",
                     transition: "color 0.1s ease",
                   }}
                   onMouseEnter={e => { e.currentTarget.style.color = "#EF4444"; }}
-                  onMouseLeave={e => { e.currentTarget.style.color = "#3A3A4E"; }}
+                  onMouseLeave={e => { e.currentTarget.style.color = "#3A3A50"; }}
                 >
                   <X size={12} />
                 </button>

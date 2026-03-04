@@ -61,8 +61,8 @@ function StarRating({ rating }: { rating: number }) {
         <Star
           key={s}
           size={9}
-          style={{ color: s <= Math.round(rating) ? "#F59E0B" : "#2A2A3E" }}
-          fill={s <= Math.round(rating) ? "#F59E0B" : "none"}
+          style={{ color: s <= Math.round(rating) ? "#FBBF24" : "#2A2A3E" }}
+          fill={s <= Math.round(rating) ? "#FBBF24" : "none"}
         />
       ))}
       <span style={{ fontSize: 10, color: "#8888A0", marginLeft: 2 }}>
@@ -118,11 +118,11 @@ export function WorkflowCard({
       transition={{ duration: 0.22, delay: index * 0.04, ease: "easeOut" }}
       whileHover={{ y: -3, transition: { duration: 0.15 } }}
       style={{
-        borderRadius: 12,
+        borderRadius: 14,
         border: isFeatured
           ? "1px solid rgba(245,158,11,0.4)"
-          : "1px solid #1E1E2E",
-        background: "#12121A",
+          : "1px solid rgba(255,255,255,0.06)",
+        background: "#12121E",
         overflow: "hidden",
         cursor: "default",
         position: "relative",
@@ -132,10 +132,10 @@ export function WorkflowCard({
         transition: "border-color 0.15s, box-shadow 0.15s",
       }}
       onMouseEnter={e => {
-        if (!isFeatured) (e.currentTarget as HTMLElement).style.borderColor = "#2A2A3E";
+        if (!isFeatured) (e.currentTarget as HTMLElement).style.borderColor = "rgba(255,255,255,0.12)";
       }}
       onMouseLeave={e => {
-        if (!isFeatured) (e.currentTarget as HTMLElement).style.borderColor = "#1E1E2E";
+        if (!isFeatured) (e.currentTarget as HTMLElement).style.borderColor = "rgba(255,255,255,0.06)";
       }}
     >
       {/* Featured badge */}
@@ -157,8 +157,8 @@ export function WorkflowCard({
       {/* Top: Mini diagram */}
       <div style={{
         height: 130,
-        background: `linear-gradient(180deg, #0C0C14 0%, #0E0E18 100%)`,
-        borderBottom: "1px solid #1A1A26",
+        background: "#0B0B13",
+        borderBottom: "1px solid rgba(255,255,255,0.06)",
         position: "relative",
         overflow: "hidden",
       }}>
@@ -188,7 +188,7 @@ export function WorkflowCard({
       <div style={{ padding: "13px 14px 12px" }}>
         {/* Title */}
         <h3 style={{
-          fontSize: 13, fontWeight: 600, color: "#E8E8F0",
+          fontSize: 15, fontWeight: 600, color: "#F0F0F5",
           overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
           marginBottom: 5,
         }}>
@@ -197,7 +197,7 @@ export function WorkflowCard({
 
         {/* Description */}
         <p style={{
-          fontSize: 11, color: "#55556A", lineHeight: 1.5,
+          fontSize: 12, color: "#9898B0", lineHeight: 1.5,
           display: "-webkit-box",
           WebkitLineClamp: 2,
           WebkitBoxOrient: "vertical" as const,
@@ -234,7 +234,7 @@ export function WorkflowCard({
         {/* Meta row */}
         <div style={{
           display: "flex", alignItems: "center", justifyContent: "space-between",
-          paddingTop: 9, borderTop: "1px solid #1A1A26",
+          paddingTop: 9, borderTop: "1px solid rgba(255,255,255,0.06)",
         }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             {/* Complexity */}

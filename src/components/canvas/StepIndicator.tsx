@@ -68,8 +68,8 @@ export function StepIndicator() {
   return (
     <div style={{
       display: "flex", alignItems: "center", justifyContent: "center",
-      height: 40, borderBottom: "1px solid rgba(30,30,46,0.8)",
-      background: "rgba(18,18,26,0.7)", backdropFilter: "blur(8px)",
+      height: 40, borderBottom: "1px solid rgba(255,255,255,0.06)",
+      background: "rgba(18,18,30,0.7)", backdropFilter: "blur(8px)",
       WebkitBackdropFilter: "blur(8px)",
       gap: 0, zIndex: 10, position: "relative",
     }}>
@@ -108,7 +108,7 @@ export function StepIndicator() {
                   ? "#F0F0F5"
                   : step.status === "complete"
                     ? "#10B981"
-                    : "#55556A",
+                    : "#5C5C78",
                 whiteSpace: "nowrap",
                 animation: step.status === "active" && step.num === 3
                   ? "stepPulse 2s ease-in-out infinite"
@@ -116,7 +116,7 @@ export function StepIndicator() {
               }}>
                 {step.label}
               </div>
-              <div style={{ fontSize: 9, color: "#3A3A4E", whiteSpace: "nowrap" }}>
+              <div style={{ fontSize: 9, color: "#3A3A50", whiteSpace: "nowrap" }}>
                 {step.sublabel}
               </div>
             </div>
@@ -124,7 +124,7 @@ export function StepIndicator() {
 
           {/* Arrow connector */}
           {i < steps.length - 1 && (
-            <ArrowRight size={11} style={{ color: "#2A2A3E", flexShrink: 0 }} />
+            <ArrowRight size={11} style={{ color: "rgba(255,255,255,0.08)", flexShrink: 0 }} />
           )}
         </div>
       ))}

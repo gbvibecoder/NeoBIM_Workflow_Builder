@@ -22,7 +22,7 @@ const TYPE_COLOR = {
   running: "#F59E0B",
   success: "#10B981",
   error:   "#EF4444",
-  info:    "#55556A",
+  info:    "#5C5C78",
 };
 
 const TYPE_SYMBOL = {
@@ -59,19 +59,19 @@ export function ExecutionLog({ entries, isRunning, onClose }: ExecutionLogProps)
       style={{
         position: "absolute", bottom: 0, left: 0, right: 0,
         zIndex: 30,
-        background: "#0A0A0F",
-        borderTop: "1px solid #1E1E2E",
+        background: "#07070D",
+        borderTop: "1px solid rgba(255,255,255,0.06)",
         fontFamily: "'JetBrains Mono', 'Fira Mono', 'Menlo', monospace",
       }}
     >
       {/* Title bar */}
       <div style={{
         display: "flex", alignItems: "center", gap: 7,
-        padding: "6px 12px", borderBottom: "1px solid #1E1E2E",
+        padding: "6px 12px", borderBottom: "1px solid rgba(255,255,255,0.06)",
         height: 32, flexShrink: 0,
       }}>
-        <Terminal size={11} style={{ color: "#3A3A4E" }} />
-        <span style={{ fontSize: 11, color: "#55556A", fontWeight: 600, flex: 1 }}>
+        <Terminal size={11} style={{ color: "#3A3A50" }} />
+        <span style={{ fontSize: 11, color: "#5C5C78", fontWeight: 600, flex: 1 }}>
           Execution Log
           {isRunning && (
             <span style={{ color: "#F59E0B", marginLeft: 8, animation: "logPulse 1s ease-in-out infinite" }}>
@@ -81,18 +81,18 @@ export function ExecutionLog({ entries, isRunning, onClose }: ExecutionLogProps)
         </span>
         <button
           onClick={() => setCollapsed(c => !c)}
-          style={{ background: "none", border: "none", cursor: "pointer", color: "#3A3A4E", padding: 2 }}
+          style={{ background: "none", border: "none", cursor: "pointer", color: "#3A3A50", padding: 2 }}
           onMouseEnter={e => { e.currentTarget.style.color = "#8888A0"; }}
-          onMouseLeave={e => { e.currentTarget.style.color = "#3A3A4E"; }}
+          onMouseLeave={e => { e.currentTarget.style.color = "#3A3A50"; }}
         >
           {collapsed ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
         </button>
         {!isRunning && (
           <button
             onClick={onClose}
-            style={{ background: "none", border: "none", cursor: "pointer", color: "#3A3A4E", padding: 2 }}
+            style={{ background: "none", border: "none", cursor: "pointer", color: "#3A3A50", padding: 2 }}
             onMouseEnter={e => { e.currentTarget.style.color = "#EF4444"; }}
-            onMouseLeave={e => { e.currentTarget.style.color = "#3A3A4E"; }}
+            onMouseLeave={e => { e.currentTarget.style.color = "#3A3A50"; }}
           >
             <X size={12} />
           </button>
@@ -114,14 +114,14 @@ export function ExecutionLog({ entries, isRunning, onClose }: ExecutionLogProps)
             }}>
               {entries.map((entry, i) => (
                 <div key={i} style={{ display: "flex", gap: 10, fontSize: 11, lineHeight: 1.5 }}>
-                  <span style={{ color: "#2A2A3E", flexShrink: 0 }}>{fmt(entry.timestamp)}</span>
+                  <span style={{ color: "rgba(255,255,255,0.08)", flexShrink: 0 }}>{fmt(entry.timestamp)}</span>
                   <span style={{ color: TYPE_COLOR[entry.type], flexShrink: 0 }}>
                     {TYPE_SYMBOL[entry.type]}
                   </span>
                   <span style={{ color: "#C0C0D0", flex: 1 }}>
                     {entry.message}
                     {entry.detail && (
-                      <span style={{ color: "#55556A" }}> — {entry.detail}</span>
+                      <span style={{ color: "#5C5C78" }}> — {entry.detail}</span>
                     )}
                   </span>
                 </div>

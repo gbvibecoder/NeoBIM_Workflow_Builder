@@ -45,7 +45,7 @@ const MODE_CONFIG: Record<CreationMode, { label: string; icon: React.ReactNode; 
 
 function Sep() {
   return (
-    <div style={{ width: 1, height: 20, background: "#1E1E2E", margin: "0 4px", flexShrink: 0 }} />
+    <div style={{ width: 1, height: 20, background: "rgba(255,255,255,0.06)", margin: "0 4px", flexShrink: 0 }} />
   );
 }
 
@@ -67,7 +67,7 @@ function TBBtn({ onClick, icon, title, disabled }: TBBtnProps) {
         width: 30, height: 30, borderRadius: 7,
         display: "flex", alignItems: "center", justifyContent: "center",
         background: "transparent", border: "none",
-        color: "#55556A", cursor: disabled ? "not-allowed" : "pointer",
+        color: "#5C5C78", cursor: disabled ? "not-allowed" : "pointer",
         opacity: disabled ? 0.4 : 1,
         transition: "background 0.1s ease, color 0.1s ease",
       }}
@@ -170,8 +170,8 @@ export function CanvasToolbar({
         height: 52,
         display: "flex", alignItems: "center", justifyContent: "space-between",
         padding: "0 10px",
-        borderBottom: "1px solid #1E1E2E",
-        background: "rgba(10, 10, 15, 0.94)",
+        borderBottom: "1px solid rgba(255,255,255,0.06)",
+        background: "rgba(7, 7, 13, 0.85)",
         backdropFilter: "blur(12px)",
         WebkitBackdropFilter: "blur(12px)",
       }}
@@ -475,18 +475,18 @@ export function CanvasToolbar({
                 display: "flex", alignItems: "center", gap: 6,
                 height: 32, paddingLeft: 14, paddingRight: 10,
                 borderRadius: "8px 0 0 8px",
-                background: "#4F8AFF", border: "none",
+                background: "linear-gradient(135deg, #4F8AFF, #6366F1)", border: "none",
                 color: "#fff", fontSize: 13, fontWeight: 600,
-                cursor: "pointer", transition: "background 0.15s ease, box-shadow 0.15s ease",
-                boxShadow: "0 2px 12px rgba(79,138,255,0.3)",
+                cursor: "pointer", transition: "all 0.15s ease",
+                boxShadow: "0 0 0 1px rgba(79,138,255,0.3), 0 2px 12px rgba(79,138,255,0.25)",
               }}
               onMouseEnter={e => {
-                e.currentTarget.style.background = "#3D7AFF";
-                e.currentTarget.style.boxShadow = "0 2px 18px rgba(79,138,255,0.5)";
+                e.currentTarget.style.filter = "brightness(1.1)";
+                e.currentTarget.style.boxShadow = "0 0 0 1px rgba(79,138,255,0.5), 0 4px 20px rgba(79,138,255,0.35)";
               }}
               onMouseLeave={e => {
-                e.currentTarget.style.background = "#4F8AFF";
-                e.currentTarget.style.boxShadow = "0 2px 12px rgba(79,138,255,0.3)";
+                e.currentTarget.style.filter = "brightness(1)";
+                e.currentTarget.style.boxShadow = "0 0 0 1px rgba(79,138,255,0.3), 0 2px 12px rgba(79,138,255,0.25)";
               }}
             >
               <Play size={12} fill="white" />

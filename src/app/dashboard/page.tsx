@@ -19,9 +19,10 @@ export default function DashboardPage() {
   }, []);
 
   const stats = [
-    { label: "My Workflows", value: workflowCount === null ? "…" : String(workflowCount), icon: "⬡", color: "#4F8AFF", href: "/dashboard/workflows" },
-    { label: "Templates", value: `${PREBUILT_WORKFLOWS.length}`, icon: "⊞", color: "#8B5CF6", href: "/dashboard/templates" },
-    { label: "Community", value: "500+", icon: "◉", color: "#F59E0B", href: "/dashboard/community" },
+    { label: "My Workflows", value: workflowCount === null ? "..." : String(workflowCount), icon: "⬡", color: "#4F8AFF", topBorder: "#4F8AFF", href: "/dashboard/workflows" },
+    { label: "Executions", value: "—", icon: "▶", color: "#10B981", topBorder: "#10B981", href: "/dashboard/history" },
+    { label: "Templates", value: `${PREBUILT_WORKFLOWS.length}`, icon: "⊞", color: "#8B5CF6", topBorder: "#8B5CF6", href: "/dashboard/templates" },
+    { label: "Community", value: "500+", icon: "◉", color: "#F59E0B", topBorder: "#F59E0B", href: "/dashboard/community" },
   ];
 
   return (
@@ -33,12 +34,13 @@ export default function DashboardPage() {
 
       <main className="flex-1 overflow-y-auto p-6 space-y-8">
         {/* Quick stats */}
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-4 gap-4">
           {stats.map((stat) => (
             <Link
               key={stat.label}
               href={stat.href}
-              className="group rounded-xl border border-[#1E1E2E] bg-[#12121A] p-4 hover:border-[#2A2A3E] hover:bg-[#1A1A26] transition-all"
+              className="group rounded-[14px] border border-[rgba(255,255,255,0.06)] bg-[#12121E] p-5 hover:border-[rgba(255,255,255,0.12)] transition-all hover:-translate-y-0.5"
+              style={{ borderTop: `2px solid ${stat.topBorder}` }}
             >
               <div className="flex items-start justify-between mb-3">
                 <span className="text-lg" style={{ color: stat.color }}>
@@ -49,8 +51,8 @@ export default function DashboardPage() {
                   className="text-[#2A2A3E] group-hover:text-[#4F8AFF] transition-colors"
                 />
               </div>
-              <div className="text-2xl font-bold text-[#F0F0F5]">{stat.value}</div>
-              <div className="text-xs text-[#55556A] mt-0.5">{stat.label}</div>
+              <div className="text-[32px] font-bold text-[#F0F0F5] leading-tight">{stat.value}</div>
+              <div className="text-[13px] font-medium text-[#9898B0] mt-1">{stat.label}</div>
             </Link>
           ))}
         </div>
@@ -85,7 +87,7 @@ export default function DashboardPage() {
               <Link
                 key={action.title}
                 href={action.href}
-                className="group flex flex-col gap-3 rounded-xl border border-[#1E1E2E] bg-[#12121A] p-4 hover:border-[#2A2A3E] hover:bg-[#1A1A26] transition-all"
+                className="group flex items-start gap-4 rounded-[14px] border border-[rgba(255,255,255,0.06)] bg-[#12121E] p-4 hover:border-[rgba(255,255,255,0.12)] hover:bg-[#1A1A2A] transition-all hover:-translate-y-0.5"
               >
                 <div
                   className="h-9 w-9 rounded-lg flex items-center justify-center"
@@ -94,11 +96,11 @@ export default function DashboardPage() {
                   {action.icon}
                 </div>
                 <div>
-                  <div className="text-sm font-semibold text-[#F0F0F5] group-hover:text-[#4F8AFF] transition-colors flex items-center gap-1.5">
+                  <div className="text-[15px] font-semibold text-[#F0F0F5] group-hover:text-[#4F8AFF] transition-colors flex items-center gap-1.5">
                     {action.title}
-                    <ArrowRight size={12} className="opacity-0 group-hover:opacity-100 transition-opacity" />
+                    <ArrowRight size={12} className="opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
                   </div>
-                  <div className="text-xs text-[#55556A] mt-0.5">{action.description}</div>
+                  <div className="text-[13px] text-[#9898B0] mt-0.5">{action.description}</div>
                 </div>
               </Link>
             ))}
@@ -135,7 +137,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Hero Workflow highlight */}
-        <div className="rounded-xl border border-[rgba(79,138,255,0.2)] bg-[rgba(79,138,255,0.04)] p-5">
+        <div className="rounded-[14px] border border-[rgba(79,138,255,0.2)] bg-[rgba(79,138,255,0.04)] p-5">
           <div className="flex items-start justify-between">
             <div className="flex-1">
               <div className="flex items-center gap-2 mb-2">

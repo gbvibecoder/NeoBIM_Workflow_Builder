@@ -12,11 +12,11 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        background: "#0A0A0F",
+        background: "radial-gradient(ellipse 50% 40% at 50% 0%, rgba(79, 138, 255, 0.06), transparent), #07070D",
         padding: "24px",
       }}
     >
-      <div style={{ width: "100%", maxWidth: 400 }}>{children}</div>
+      <div style={{ width: "100%", maxWidth: 420 }}>{children}</div>
     </div>
   );
 }

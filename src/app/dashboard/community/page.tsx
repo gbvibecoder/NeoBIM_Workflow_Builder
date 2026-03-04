@@ -166,7 +166,7 @@ function PublishDialog({ onClose }: { onClose: () => void }) {
         transition={{ type: "spring", stiffness: 420, damping: 34 }}
         onClick={e => e.stopPropagation()}
         style={{
-          width: 480, background: "#12121A",
+          width: 480, background: "#12121E",
           borderRadius: 14, border: "1px solid #1E1E2E",
           boxShadow: "0 24px 80px rgba(0,0,0,0.6)",
           overflow: "hidden",
@@ -214,7 +214,7 @@ function PublishDialog({ onClose }: { onClose: () => void }) {
               transition: "border-color 0.1s",
             }}
             onFocus={e => { (e.currentTarget as HTMLElement).style.borderColor = "#4F8AFF"; }}
-            onBlur={e => { (e.currentTarget as HTMLElement).style.borderColor = "#1E1E2E"; }}
+            onBlur={e => { (e.currentTarget as HTMLElement).style.borderColor = "rgba(255,255,255,0.06)"; }}
           />
 
           {/* Description */}
@@ -236,7 +236,7 @@ function PublishDialog({ onClose }: { onClose: () => void }) {
               transition: "border-color 0.1s",
             }}
             onFocus={e => { (e.currentTarget as HTMLElement).style.borderColor = "#4F8AFF"; }}
-            onBlur={e => { (e.currentTarget as HTMLElement).style.borderColor = "#1E1E2E"; }}
+            onBlur={e => { (e.currentTarget as HTMLElement).style.borderColor = "rgba(255,255,255,0.06)"; }}
           />
 
           {/* Tags */}
@@ -276,7 +276,7 @@ function PublishDialog({ onClose }: { onClose: () => void }) {
                 transition: "all 0.1s",
               }}
               onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = "#2A2A3E"; }}
-              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = "#1E1E2E"; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = "rgba(255,255,255,0.06)"; }}
             >
               Cancel
             </button>
@@ -417,13 +417,13 @@ export default function CommunityPage() {
                   width: "100%", paddingLeft: 32, paddingRight: 12,
                   height: 34, borderRadius: 8,
                   border: "1px solid #1E1E2E",
-                  background: "#12121A", color: "#F0F0F5",
+                  background: "#12121E", color: "#F0F0F5",
                   fontSize: 12, outline: "none",
                   boxSizing: "border-box",
                   transition: "border-color 0.1s",
                 }}
                 onFocus={e => { (e.currentTarget as HTMLElement).style.borderColor = "#4F8AFF"; }}
-                onBlur={e => { (e.currentTarget as HTMLElement).style.borderColor = "#1E1E2E"; }}
+                onBlur={e => { (e.currentTarget as HTMLElement).style.borderColor = "rgba(255,255,255,0.06)"; }}
               />
             </div>
 
@@ -437,7 +437,7 @@ export default function CommunityPage() {
                   style={{
                     padding: "4px 11px", borderRadius: 20, cursor: "pointer",
                     fontSize: 11, fontWeight: 600,
-                    background: isActive ? "rgba(79,138,255,0.15)" : "#12121A",
+                    background: isActive ? "rgba(79,138,255,0.15)" : "#12121E",
                     border: isActive ? "1px solid rgba(79,138,255,0.35)" : "1px solid #1E1E2E",
                     color: isActive ? "#4F8AFF" : "#8888A0",
                     transition: "all 0.1s",
@@ -458,7 +458,7 @@ export default function CommunityPage() {
                   display: "flex", alignItems: "center", gap: 6,
                   padding: "5px 12px", borderRadius: 8, cursor: "pointer",
                   fontSize: 11, color: "#8888A0",
-                  background: "#12121A", border: "1px solid #1E1E2E",
+                  background: "#12121E", border: "1px solid #1E1E2E",
                 }}
               >
                 <span style={{ color: "#55556A" }}>Sort:</span>
@@ -475,7 +475,7 @@ export default function CommunityPage() {
                     style={{
                       position: "absolute", top: "calc(100% + 6px)", right: 0,
                       width: 170, zIndex: 50,
-                      background: "#12121A", borderRadius: 10,
+                      background: "#12121E", borderRadius: 10,
                       border: "1px solid #1E1E2E",
                       boxShadow: "0 8px 24px rgba(0,0,0,0.4)",
                       overflow: "hidden", padding: "4px 0",

@@ -78,7 +78,7 @@ export const MiniWorkflowDiagram = memo(function MiniWorkflowDiagram({
               />
               <span style={{
                 fontSize,
-                color: "#55556A",
+                color: "#5C5C78",
                 whiteSpace: "nowrap",
                 maxWidth: size === "lg" ? 56 : 36,
                 overflow: "hidden",

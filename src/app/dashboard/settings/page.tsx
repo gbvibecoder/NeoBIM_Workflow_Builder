@@ -60,8 +60,8 @@ export default function SettingsPage() {
       <main className="flex-1 overflow-y-auto p-6">
         <div className="max-w-2xl mx-auto space-y-6">
           {/* Profile */}
-          <section className="rounded-xl border border-[#1E1E2E] bg-[#12121A] overflow-hidden">
-            <div className="flex items-center gap-3 px-5 py-4 border-b border-[#1E1E2E]">
+          <section className="rounded-xl border border-[rgba(255,255,255,0.06)] bg-[#12121E] overflow-hidden">
+            <div className="flex items-center gap-3 px-5 py-4 border-b border-[rgba(255,255,255,0.06)]">
               <User size={15} className="text-[#4F8AFF]" />
               <h2 className="text-sm font-semibold text-[#F0F0F5]">Profile</h2>
             </div>
@@ -77,25 +77,25 @@ export default function SettingsPage() {
                 </div>
                 <div>
                   <div className="text-sm font-medium text-[#F0F0F5]">{user?.name ?? "User"}</div>
-                  <div className="text-xs text-[#55556A]">{user?.email ?? "—"}</div>
+                  <div className="text-xs text-[#5C5C78]">{user?.email ?? "—"}</div>
                 </div>
               </div>
             </div>
           </section>
 
           {/* API Keys */}
-          <section className="rounded-xl border border-[#1E1E2E] bg-[#12121A] overflow-hidden">
-            <div className="flex items-center gap-3 px-5 py-4 border-b border-[#1E1E2E]">
+          <section className="rounded-xl border border-[rgba(255,255,255,0.06)] bg-[#12121E] overflow-hidden">
+            <div className="flex items-center gap-3 px-5 py-4 border-b border-[rgba(255,255,255,0.06)]">
               <Key size={15} className="text-[#8B5CF6]" />
               <h2 className="text-sm font-semibold text-[#F0F0F5]">API Keys</h2>
             </div>
             <div className="p-5 space-y-4">
-              <p className="text-xs text-[#55556A] leading-relaxed">
+              <p className="text-xs text-[#5C5C78] leading-relaxed">
                 Add your own API keys to use real AI execution. Keys are encrypted and stored securely.
               </p>
 
               {loadingKeys ? (
-                <div className="text-xs text-[#55556A]">Loading…</div>
+                <div className="text-xs text-[#5C5C78]">Loading…</div>
               ) : (
                 <>
                   <div className="space-y-1.5">
@@ -105,9 +105,9 @@ export default function SettingsPage() {
                       value={openAiKey}
                       onChange={e => setOpenAiKey(e.target.value)}
                       placeholder="sk-..."
-                      className="w-full h-8 rounded-lg border border-[#2A2A3E] bg-[#0A0A0F] px-3 text-xs text-[#F0F0F5] placeholder:text-[#3A3A4E] focus:outline-none focus:border-[#4F8AFF] transition-colors"
+                      className="w-full h-8 rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#0B0B13] px-3 text-xs text-[#F0F0F5] placeholder:text-[#3A3A50] focus:outline-none focus:border-[#4F8AFF] transition-colors"
                     />
-                    <p className="text-[10px] text-[#3A3A4E]">Used by: Building Description (TR-003) + Concept Image (GN-003)</p>
+                    <p className="text-[10px] text-[#3A3A50]">Used by: Building Description (TR-003) + Concept Image (GN-003)</p>
                   </div>
 
                   <div className="space-y-1.5">
@@ -117,9 +117,9 @@ export default function SettingsPage() {
                       value={stabilityKey}
                       onChange={e => setStabilityKey(e.target.value)}
                       placeholder="sk-..."
-                      className="w-full h-8 rounded-lg border border-[#2A2A3E] bg-[#0A0A0F] px-3 text-xs text-[#F0F0F5] placeholder:text-[#3A3A4E] focus:outline-none focus:border-[#4F8AFF] transition-colors"
+                      className="w-full h-8 rounded-lg border border-[rgba(255,255,255,0.08)] bg-[#0B0B13] px-3 text-xs text-[#F0F0F5] placeholder:text-[#3A3A50] focus:outline-none focus:border-[#4F8AFF] transition-colors"
                     />
-                    <p className="text-[10px] text-[#3A3A4E]">Alternative for image generation</p>
+                    <p className="text-[10px] text-[#3A3A50]">Alternative for image generation</p>
                   </div>
 
                   <button
@@ -136,8 +136,8 @@ export default function SettingsPage() {
           </section>
 
           {/* Plan */}
-          <section className="rounded-xl border border-[#1E1E2E] bg-[#12121A] overflow-hidden">
-            <div className="flex items-center gap-3 px-5 py-4 border-b border-[#1E1E2E]">
+          <section className="rounded-xl border border-[rgba(255,255,255,0.06)] bg-[#12121E] overflow-hidden">
+            <div className="flex items-center gap-3 px-5 py-4 border-b border-[rgba(255,255,255,0.06)]">
               <Shield size={15} className="text-[#10B981]" />
               <h2 className="text-sm font-semibold text-[#F0F0F5]">Plan & Usage</h2>
             </div>
@@ -148,7 +148,7 @@ export default function SettingsPage() {
                     <div className="h-2 w-2 rounded-full bg-[#10B981]" />
                     <span className="text-sm font-bold text-[#F0F0F5]">Free Plan</span>
                   </div>
-                  <p className="text-xs text-[#55556A] mt-1">50 executions / month</p>
+                  <p className="text-xs text-[#5C5C78] mt-1">50 executions / month</p>
                 </div>
                 <button className="rounded-lg bg-linear-to-r from-[#4F8AFF] to-[#8B5CF6] px-4 py-2 text-xs font-semibold text-white hover:opacity-90 transition-opacity">
                   Upgrade to Pro
@@ -156,11 +156,11 @@ export default function SettingsPage() {
               </div>
 
               <div className="space-y-1.5">
-                <div className="flex justify-between text-[10px] text-[#55556A]">
+                <div className="flex justify-between text-[10px] text-[#5C5C78]">
                   <span>Executions this month</span>
                   <span>0 / 50</span>
                 </div>
-                <div className="h-1.5 rounded-full bg-[#1A1A26] overflow-hidden">
+                <div className="h-1.5 rounded-full bg-[#1A1A2A] overflow-hidden">
                   <div className="h-full w-0 rounded-full bg-[#4F8AFF]" />
                 </div>
               </div>
