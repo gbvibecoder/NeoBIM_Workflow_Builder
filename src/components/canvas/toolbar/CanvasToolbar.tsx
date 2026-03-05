@@ -200,7 +200,7 @@ export function CanvasToolbar({
       <div
         className="flex"
         style={{
-          position: "absolute", top: 0, left: 0, right: 0, zIndex: 10,
+          position: "absolute", top: 0, left: 0, right: 0, zIndex: 1000,
           height: 52,
           alignItems: "center", justifyContent: "space-between",
           padding: "0 10px",
