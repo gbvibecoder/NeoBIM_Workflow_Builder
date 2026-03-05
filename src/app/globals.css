@@ -204,9 +204,11 @@
     animation: node-shimmer 1.2s ease-in-out infinite;
   }
 
-  /* Canvas vignette overlay */
+  /* Canvas vignette overlay — subtle edge darkening + center glow */
   .canvas-vignette {
-    background: radial-gradient(ellipse at center, transparent 50%, rgba(7, 7, 13, 0.4) 100%);
+    background:
+      radial-gradient(ellipse at center, rgba(79, 138, 255, 0.015) 0%, transparent 50%),
+      radial-gradient(ellipse at center, transparent 40%, rgba(7, 7, 13, 0.5) 100%);
     pointer-events: none;
   }
 

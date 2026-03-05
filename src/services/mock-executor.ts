@@ -34,7 +34,8 @@ function mockArtifact(
 export async function executeNode(
   catalogueId: string,
   executionId: string,
-  tileInstanceId: string
+  tileInstanceId: string,
+  inputData?: Record<string, unknown>
 ): Promise<ExecutionArtifact> {
   // Simulate network delay
   const delay = getNodeDelay(catalogueId);
@@ -119,11 +120,21 @@ export async function executeNode(
         label: "Building Requirements",
       });
 
-    case "TR-003": // Building Description Generator
+    case "TR-003": { // Building Description Generator
+      // Incorporate upstream prompt data so downstream nodes (GN-001) get accurate info
+      const briefText = String(inputData?.content ?? inputData?.prompt ?? "");
+      const fm = briefText.match(/(\d+)[\s-]*(?:stor(?:e?y|ies)|floor)/i);
+      const storyCount = fm ? parseInt(fm[1], 10) : 5;
+      const residentialFloors = Math.max(storyCount - 1, 1);
+      const residentialGFA = residentialFloors * 1050;
+      const totalGFA = residentialGFA + 600;
+      const maxHeight = Math.round(storyCount * 4.2);
+      const userHint = briefText.length > 10 ? briefText.slice(0, 120) : "A mixed-use building with ground-floor retail";
       return mockArtifact(executionId, tileInstanceId, "text", {
-        content: `OSLO MIXED-USE DEVELOPMENT — BUILDING DESCRIPTION\n\nA 5-storey mixed-use building with an active ground floor retail programme (600 m²) serving the Bjørvika waterfront. Four upper residential floors accommodate 48 apartments ranging from 1-bedroom studios to 3-bedroom family units (4,200 m² total residential GFA).\n\nThe building expression responds to the Nordic context with a clean, restrained facade of white mineral render with exposed timber brise-soleil elements and floor-to-ceiling glazing to the south. The ground floor is set back 3m from the street edge to create a covered public colonnade.\n\nKey metrics: 5 floors above grade, 22m max height, 5,000 m² GFA, basement parking level.`,
+        content: `BUILDING DESCRIPTION\n\nDesign concept: ${userHint}\n\nProgramme: ${storyCount}-storey building with ground floor retail (600 m²) and ${residentialFloors} upper residential floors (${residentialGFA.toLocaleString()} m² residential GFA). The facade responds to the site context with a clean expression and floor-to-ceiling glazing.\n\nKey metrics: ${storyCount} floors above grade, ${maxHeight}m max height, ${totalGFA.toLocaleString()} m² GFA.`,
         label: "Building Description",
       });
+    }
 
     case "TR-004": // Image Understanding
       return mockArtifact(executionId, tileInstanceId, "text", {
@@ -228,17 +239,26 @@ export async function executeNode(
         label: "Site Context Data",
       });
 
-    case "GN-001": // Massing Generator
+    case "GN-001": { // Massing Generator
+      // Parse upstream data for floor count and building description
+      const upstreamText = String(inputData?.content ?? inputData?.prompt ?? "");
+      const floorMatch = upstreamText.match(/(\d+)[\s-]*(?:stor(?:e?y|ies)|floor)/i);
+      const floors = floorMatch ? parseInt(floorMatch[1], 10) : 5;
+      const heightPerFloor = 4.2;
+      const height = (floors * heightPerFloor).toFixed(1);
+      const footprint = 567;
+      const gfa = Math.round(floors * footprint * 0.98);
       return mockArtifact(executionId, tileInstanceId, "kpi", {
         metrics: [
-          { label: "GFA", value: "4,980", unit: "m²" },
-          { label: "Height", value: "21.6", unit: "m" },
-          { label: "Floors", value: 5, unit: "" },
+          { label: "GFA", value: gfa.toLocaleString(), unit: "m²" },
+          { label: "Height", value: height, unit: "m" },
+          { label: "Floors", value: floors, unit: "" },
           { label: "Coverage", value: "54", unit: "%" },
-          { label: "Footprint", value: "567", unit: "m²" },
-          { label: "Plot Ratio", value: "4.74", unit: "FAR" },
+          { label: "Footprint", value: String(footprint), unit: "m²" },
+          { label: "Plot Ratio", value: (gfa / 1050).toFixed(2), unit: "FAR" },
         ],
       });
+    }
 
     case "GN-002": // Variant Generator
       return mockArtifact(executionId, tileInstanceId, "kpi", {
@@ -249,12 +269,17 @@ export async function executeNode(
         ],
       });
 
-    case "GN-003": // Image Generator
+    case "GN-003": { // Image Generator
+      // Use a deterministic seed based on upstream content for consistent results
+      const imgPrompt = String(inputData?.content ?? inputData?.prompt ?? "architectural concept");
+      const seed = imgPrompt.slice(0, 20).replace(/\s+/g, "-").toLowerCase() || "building";
       return mockArtifact(executionId, tileInstanceId, "image", {
-        url: ARCHITECTURAL_IMAGES[Math.floor(Math.random() * ARCHITECTURAL_IMAGES.length)],
-        label: "Concept Render — Nordic Minimal",
-        style: "Nordic Minimal, white render, timber accents",
+        url: `https://picsum.photos/seed/${seed}/600/400`,
+        label: `Concept Render — ${imgPrompt.slice(0, 40)}`,
+        style: "Architectural concept render",
+        mockNote: "Mock mode — connect OPENAI_API_KEY for DALL-E 3 renders",
       });
+    }
 
     case "GN-004": // Floor Plan Generator
       return mockArtifact(executionId, tileInstanceId, "image", {

@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronDown, ChevronUp, Terminal, X, GripHorizontal } from "lucide-react";
+import { ChevronDown, Terminal, X } from "lucide-react";
 
 export interface LogEntry {
   timestamp: Date;
@@ -17,7 +17,7 @@ interface ExecutionLogProps {
   onClose: () => void;
 }
 
-const TYPE_COLOR = {
+const TYPE_COLOR: Record<LogEntry["type"], string> = {
   start:   "#4F8AFF",
   running: "#F59E0B",
   success: "#10B981",
@@ -25,158 +25,147 @@ const TYPE_COLOR = {
   info:    "#5C5C78",
 };
 
-const TYPE_SYMBOL = {
-  start:   "▶",
-  running: "◉",
-  success: "✓",
-  error:   "✗",
-  info:    "·",
+const TYPE_SYMBOL: Record<LogEntry["type"], string> = {
+  start:   "\u25B6",
+  running: "\u25C9",
+  success: "\u2713",
+  error:   "\u2717",
+  info:    "\u00B7",
 };
 
 function fmt(d: Date) {
   return d.toTimeString().slice(0, 8);
 }
 
-const MIN_HEIGHT = 120;
-const MAX_HEIGHT = 500;
-const DEFAULT_HEIGHT = 220;
-
 export function ExecutionLog({ entries, isRunning, onClose }: ExecutionLogProps) {
   const [collapsed, setCollapsed] = useState(false);
-  const [height, setHeight] = useState(DEFAULT_HEIGHT);
-  const [isResizing, setIsResizing] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
-  const resizeStartY = useRef(0);
-  const resizeStartHeight = useRef(0);
 
-  // Auto-scroll to bottom as entries appear
   useEffect(() => {
     if (!collapsed) {
       bottomRef.current?.scrollIntoView({ behavior: "smooth" });
     }
   }, [entries, collapsed]);
 
-  const handleResizeStart = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    setIsResizing(true);
-    resizeStartY.current = e.clientY;
-    resizeStartHeight.current = height;
-  }, [height]);
-
-  useEffect(() => {
-    if (!isResizing) return;
-
-    const handleMouseMove = (e: MouseEvent) => {
-      const delta = resizeStartY.current - e.clientY;
-      const newHeight = Math.max(MIN_HEIGHT, Math.min(MAX_HEIGHT, resizeStartHeight.current + delta));
-      setHeight(newHeight);
-    };
-
-    const handleMouseUp = () => {
-      setIsResizing(false);
-    };
-
-    document.addEventListener("mousemove", handleMouseMove);
-    document.addEventListener("mouseup", handleMouseUp);
-
-    return () => {
-      document.removeEventListener("mousemove", handleMouseMove);
-      document.removeEventListener("mouseup", handleMouseUp);
-    };
-  }, [isResizing]);
-
   if (entries.length === 0 && !isRunning) return null;
+
+  const statusColor = isRunning
+    ? "#F59E0B"
+    : entries[entries.length - 1]?.type === "error"
+      ? "#EF4444"
+      : "#10B981";
 
   return (
     <motion.div
-      initial={{ y: 200, opacity: 0 }}
-      animate={{ y: 0, opacity: 1 }}
-      exit={{ y: 200, opacity: 0 }}
-      transition={{ type: "spring", stiffness: 380, damping: 36 }}
+      initial={{ y: 40, opacity: 0, scale: 0.96 }}
+      animate={{ y: 0, opacity: 1, scale: 1 }}
+      exit={{ y: 40, opacity: 0, scale: 0.96 }}
+      transition={{ type: "spring", stiffness: 420, damping: 32 }}
       style={{
-        position: "absolute", bottom: 0, left: 0, right: 0,
-        zIndex: 30,
-        background: "rgba(7, 7, 13, 0.98)",
-        backdropFilter: "blur(16px)",
-        WebkitBackdropFilter: "blur(16px)",
-        borderTop: "1px solid rgba(255,255,255,0.08)",
-        boxShadow: "0 -8px 32px rgba(0,0,0,0.3)",
-        fontFamily: "'JetBrains Mono', 'Fira Mono', 'Menlo', monospace",
+        position: "absolute",
+        bottom: 16,
+        left: 16,
+        zIndex: 25,
+        width: collapsed ? 220 : 420,
+        maxWidth: "calc(100vw - 360px)",
+        borderRadius: 12,
+        overflow: "hidden",
+        background: "rgba(10, 10, 18, 0.92)",
+        border: "1px solid rgba(255,255,255,0.07)",
+        backdropFilter: "blur(20px) saturate(1.3)",
+        WebkitBackdropFilter: "blur(20px) saturate(1.3)",
+        boxShadow:
+          "0 12px 40px rgba(0,0,0,0.45), 0 0 0 1px rgba(255,255,255,0.03) inset",
+        fontFamily:
+          "'JetBrains Mono', 'Fira Mono', 'Menlo', monospace",
+        transition: "width 0.25s cubic-bezier(0.4, 0, 0.2, 1)",
       }}
     >
-      {/* Resize handle */}
-      <div
-        onMouseDown={handleResizeStart}
-        style={{
-          position: "absolute", top: 0, left: 0, right: 0,
-          height: 6,
-          cursor: "ns-resize",
-          display: "flex", alignItems: "center", justifyContent: "center",
-          opacity: isResizing ? 1 : 0,
-          transition: "opacity 0.15s ease",
-        }}
-        onMouseEnter={e => { e.currentTarget.style.opacity = "1"; }}
-        onMouseLeave={e => { if (!isResizing) e.currentTarget.style.opacity = "0"; }}
-      >
-        <GripHorizontal size={16} style={{ color: "#3A3A50" }} />
-      </div>
-
       {/* Title bar */}
-      <div style={{
-        display: "flex", alignItems: "center", gap: 7,
-        padding: "8px 14px", borderBottom: "1px solid rgba(255,255,255,0.08)",
-        height: 36, flexShrink: 0,
-      }}>
-        <Terminal size={12} style={{ color: "#4F8AFF" }} />
-        <span style={{ fontSize: 11, color: "#F0F0F5", fontWeight: 600, flex: 1 }}>
-          Execution Log
-          {isRunning && (
-            <span style={{ color: "#F59E0B", marginLeft: 10, animation: "logPulse 1.2s ease-in-out infinite" }}>
-              ● running
-            </span>
-          )}
-        </span>
-        <span style={{ fontSize: 10, color: "#5C5C78" }}>
-          {entries.length} {entries.length === 1 ? "entry" : "entries"}
-        </span>
-        <button
-          onClick={() => setCollapsed(c => !c)}
-          title={collapsed ? "Expand log" : "Collapse log"}
+      <div
+        onClick={() => setCollapsed((c) => !c)}
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          padding: "9px 12px",
+          borderBottom: collapsed
+            ? "none"
+            : "1px solid rgba(255,255,255,0.06)",
+          cursor: "pointer",
+          userSelect: "none",
+        }}
+      >
+        <div
           style={{
-            background: "none", border: "none", cursor: "pointer",
-            color: "#5C5C78", padding: 3, borderRadius: 4,
-            transition: "all 0.15s ease",
+            width: 6,
+            height: 6,
+            borderRadius: "50%",
+            background: statusColor,
+            boxShadow: `0 0 8px ${statusColor}60`,
+            flexShrink: 0,
+            animation: isRunning
+              ? "logDotPulse 1.4s ease-in-out infinite"
+              : "none",
           }}
-          onMouseEnter={e => {
-            e.currentTarget.style.background = "#1A1A26";
-            e.currentTarget.style.color = "#F0F0F5";
-          }}
-          onMouseLeave={e => {
-            e.currentTarget.style.background = "transparent";
-            e.currentTarget.style.color = "#5C5C78";
+        />
+        <Terminal size={11} style={{ color: "#5C5C78", flexShrink: 0 }} />
+        <span
+          style={{
+            fontSize: 11,
+            color: "#E0E0EA",
+            fontWeight: 600,
+            flex: 1,
           }}
         >
-          {collapsed ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
-        </button>
+          {isRunning ? "Executing\u2026" : "Execution Log"}
+        </span>
+        <span
+          style={{
+            fontSize: 9,
+            color: "#3A3A50",
+            fontWeight: 500,
+            padding: "1px 6px",
+            borderRadius: 8,
+            background: "rgba(255,255,255,0.04)",
+          }}
+        >
+          {entries.length}
+        </span>
+        <motion.div
+          animate={{ rotate: collapsed ? -90 : 0 }}
+          transition={{ duration: 0.15 }}
+          style={{ color: "#3A3A50", display: "flex", flexShrink: 0 }}
+        >
+          <ChevronDown size={12} />
+        </motion.div>
         {!isRunning && (
           <button
-            onClick={onClose}
+            onClick={(e) => {
+              e.stopPropagation();
+              onClose();
+            }}
             title="Close log"
             style={{
-              background: "none", border: "none", cursor: "pointer",
-              color: "#5C5C78", padding: 3, borderRadius: 4,
-              transition: "all 0.15s ease",
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              color: "#3A3A50",
+              padding: 2,
+              borderRadius: 4,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              flexShrink: 0,
             }}
-            onMouseEnter={e => {
-              e.currentTarget.style.background = "#2A1A1A";
+            onMouseEnter={(e) => {
               e.currentTarget.style.color = "#EF4444";
             }}
-            onMouseLeave={e => {
-              e.currentTarget.style.background = "transparent";
-              e.currentTarget.style.color = "#5C5C78";
+            onMouseLeave={(e) => {
+              e.currentTarget.style.color = "#3A3A50";
             }}
           >
-            <X size={13} />
+            <X size={12} />
           </button>
         )}
       </div>
@@ -185,49 +174,73 @@ export function ExecutionLog({ entries, isRunning, onClose }: ExecutionLogProps)
       <AnimatePresence>
         {!collapsed && (
           <motion.div
-            initial={{ height: 0 }}
-            animate={{ height }}
-            exit={{ height: 0 }}
-            transition={{ type: "spring", stiffness: 400, damping: 34 }}
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2, ease: "easeInOut" }}
             style={{ overflow: "hidden" }}
           >
-            <div style={{
-              height: "100%", overflowY: "auto", padding: "10px 14px",
-              display: "flex", flexDirection: "column", gap: 3,
-            }}>
+            <div
+              style={{
+                maxHeight: 180,
+                overflowY: "auto",
+                padding: "8px 12px",
+                display: "flex",
+                flexDirection: "column",
+                gap: 1,
+              }}
+            >
               {entries.map((entry, i) => (
                 <motion.div
                   key={i}
-                  initial={{ opacity: 0, x: -10 }}
+                  initial={{ opacity: 0, x: -6 }}
                   animate={{ opacity: 1, x: 0 }}
-                  transition={{ duration: 0.2, delay: i * 0.02 }}
+                  transition={{
+                    duration: 0.15,
+                    delay: Math.min(i * 0.015, 0.3),
+                  }}
                   style={{
-                    display: "flex", gap: 10, fontSize: 11, lineHeight: 1.6,
-                    padding: "4px 0",
+                    display: "flex",
+                    gap: 8,
+                    fontSize: 10,
+                    lineHeight: 1.7,
+                    padding: "2px 0",
                   }}
                 >
-                  <span style={{
-                    color: "rgba(255,255,255,0.12)",
-                    flexShrink: 0,
-                    fontWeight: 500,
-                  }}>
+                  <span
+                    style={{
+                      color: "rgba(255,255,255,0.1)",
+                      flexShrink: 0,
+                      fontWeight: 500,
+                    }}
+                  >
                     {fmt(entry.timestamp)}
                   </span>
-                  <span style={{
-                    color: TYPE_COLOR[entry.type],
-                    flexShrink: 0,
-                    fontWeight: 600,
-                  }}>
+                  <span
+                    style={{
+                      color: TYPE_COLOR[entry.type],
+                      flexShrink: 0,
+                      fontWeight: 600,
+                      width: 10,
+                      textAlign: "center",
+                    }}
+                  >
                     {TYPE_SYMBOL[entry.type]}
                   </span>
-                  <span style={{
-                    color: entry.type === "error" ? "#F87171" : "#E0E0F0",
-                    flex: 1,
-                  }}>
+                  <span
+                    style={{
+                      color:
+                        entry.type === "error" ? "#F87171" : "#C0C0D0",
+                      flex: 1,
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
                     {entry.message}
                     {entry.detail && (
-                      <span style={{ color: "#7C7C90", marginLeft: 8 }}>
-                        — {entry.detail}
+                      <span style={{ color: "#5C5C78", marginLeft: 6 }}>
+                        {entry.detail}
                       </span>
                     )}
                   </span>
@@ -240,9 +253,9 @@ export function ExecutionLog({ entries, isRunning, onClose }: ExecutionLogProps)
       </AnimatePresence>
 
       <style>{`
-        @keyframes logPulse {
-          0%, 100% { opacity: 1; }
-          50% { opacity: 0.35; }
+        @keyframes logDotPulse {
+          0%, 100% { opacity: 1; transform: scale(1); }
+          50% { opacity: 0.4; transform: scale(0.7); }
         }
       `}</style>
     </motion.div>
