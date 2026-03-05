@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
+import { OpenAIError } from "@/services/openai";
 import { generateBuildingDescription, generateConceptImage } from "@/services/openai";
 import { generateId } from "@/lib/utils";
 import type { ExecutionArtifact } from "@/types/execution";
@@ -265,6 +266,16 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ artifact });
   } catch (err) {
+    // Handle OpenAI-specific errors with user-friendly messages
+    if (err instanceof OpenAIError) {
+      console.error("[execute-node] OpenAI error:", err.message);
+      return NextResponse.json(
+        { error: err.userMessage },
+        { status: err.statusCode }
+      );
+    }
+    
+    // Handle generic errors
     const message = err instanceof Error ? err.message : "Execution failed";
     console.error("[execute-node] " + catalogueId + ":", message);
     return NextResponse.json({ error: message }, { status: 500 });
