@@ -37,6 +37,9 @@ const nextConfig: NextConfig = {
     ],
   },
 
+  // ─── Turbopack Config (silences webpack warning) ──────────────────
+  turbopack: {},
+
   // ─── Webpack Optimizations ─────────────────────────────────────────
   webpack: (config, { isServer }) => {
     // Exclude heavy libs from client bundle
