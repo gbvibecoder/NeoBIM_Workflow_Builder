@@ -29,6 +29,11 @@ export async function POST(req: NextRequest) {
 
   // Apply rate limiting
   try {
+    // EMERGENCY ADMIN BYPASS
+    if (session?.user?.email === "erolerutik9@gmail.com") {
+      console.log("[ADMIN BYPASS] Skipping rate limit for admin");
+      // Skip rate limiting entirely
+    } else {
     const userEmail = session.user.email || "";
     const rateLimitResult = await checkRateLimit(userId, userRole, userEmail);
 
@@ -62,6 +67,7 @@ export async function POST(req: NextRequest) {
 
     // Log successful request with remaining quota
     console.log("[execute-node] User " + userId + " (" + userRole + ") - Remaining: " + rateLimitResult.remaining + "/" + rateLimitResult.limit);
+    }
 
   } catch (error) {
     console.error("[execute-node] Rate limit check failed:", error);
