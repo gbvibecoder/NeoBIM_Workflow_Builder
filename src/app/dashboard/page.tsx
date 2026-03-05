@@ -11,16 +11,29 @@ import { api } from "@/lib/api";
 export default function DashboardPage() {
   const featuredWorkflows = PREBUILT_WORKFLOWS.slice(0, 3);
   const [workflowCount, setWorkflowCount] = useState<number | null>(null);
+  const [executionCount, setExecutionCount] = useState<number | null>(null);
 
   useEffect(() => {
     api.workflows.list()
       .then(({ workflows }) => setWorkflowCount(workflows.length))
       .catch(() => setWorkflowCount(0));
+
+    // Fetch execution count
+    fetch("/api/executions")
+      .then(res => res.json())
+      .then(data => {
+        if (data.executions && Array.isArray(data.executions)) {
+          setExecutionCount(data.executions.length);
+        } else {
+          setExecutionCount(0);
+        }
+      })
+      .catch(() => setExecutionCount(0));
   }, []);
 
   const stats = [
     { label: "My Workflows", value: workflowCount === null ? "..." : String(workflowCount), icon: "⬡", color: "#4F8AFF", topBorder: "#4F8AFF", href: "/dashboard/workflows" },
-    { label: "Executions", value: "—", icon: "▶", color: "#10B981", topBorder: "#10B981", href: "/dashboard/history" },
+    { label: "Executions", value: executionCount === null ? "..." : String(executionCount), icon: "▶", color: "#10B981", topBorder: "#10B981", href: "/dashboard/history" },
     { label: "Templates", value: `${PREBUILT_WORKFLOWS.length}`, icon: "⊞", color: "#8B5CF6", topBorder: "#8B5CF6", href: "/dashboard/templates" },
     { label: "Community", value: "12", icon: "◉", color: "#F59E0B", topBorder: "#F59E0B", href: "/dashboard/community" },
   ];
