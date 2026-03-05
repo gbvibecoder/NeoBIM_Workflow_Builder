@@ -24,6 +24,7 @@ export type WorkflowDetail = {
 };
 
 export type ExecutionSummary = {
+  startedAt: string;
   id: string;
   status: string;
   workflowId: string;
