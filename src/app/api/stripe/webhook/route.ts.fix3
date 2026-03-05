@@ -99,7 +99,7 @@ async function updateUserSubscription(
   stripeCustomerId: string,
   subscription: Stripe.Subscription
 ) {
-  const user = await prisma.user.findFirst({
+  const user = await prisma.user.findUnique({
     where: { stripeCustomerId },
   });
 
@@ -129,7 +129,7 @@ async function updateUserSubscription(
 }
 
 async function cancelUserSubscription(stripeCustomerId: string) {
-  const user = await prisma.user.findFirst({
+  const user = await prisma.user.findUnique({
     where: { stripeCustomerId },
   });
 
