@@ -85,8 +85,10 @@ export function FileUploadInput({ nodeId, data, accept, label, maxMB = 20, showP
       return;
     }
     inputFileStore.set(nodeId, file);
-    updateNode(nodeId, { data: { ...data, inputValue: file.name, fileSize: file.size } });
-  }, [nodeId, updateNode, data, maxMB]);
+    const currentNode = useWorkflowStore.getState().nodes.find(n => n.id === nodeId);
+    if (!currentNode) return;
+    updateNode(nodeId, { data: { ...currentNode.data, inputValue: file.name, fileSize: file.size } });
+  }, [nodeId, updateNode, maxMB]);
 
   const onFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
@@ -106,9 +108,11 @@ export function FileUploadInput({ nodeId, data, accept, label, maxMB = 20, showP
   const onRemove = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
     inputFileStore.delete(nodeId);
-    updateNode(nodeId, { data: { ...data, inputValue: "", fileSize: undefined } });
+    const currentNode = useWorkflowStore.getState().nodes.find(n => n.id === nodeId);
+    if (!currentNode) return;
+    updateNode(nodeId, { data: { ...currentNode.data, inputValue: "", fileSize: undefined } });
     if (inputRef.current) inputRef.current.value = "";
-  }, [nodeId, updateNode, data]);
+  }, [nodeId, updateNode]);
 
   const fileObj = inputFileStore.get(nodeId);
   const isImage = showPreview && fileObj && fileObj.type.startsWith("image/");
@@ -218,9 +222,18 @@ export function ParameterInput({ nodeId, data }: { nodeId: string; data: Workflo
   })();
 
   const update = useCallback((key: keyof Params, val: string | number) => {
-    const next = { ...params, [key]: val };
-    updateNode(nodeId, { data: { ...data, inputValue: JSON.stringify(next) } });
-  }, [nodeId, updateNode, data, params]);
+    const currentNode = useWorkflowStore.getState().nodes.find(n => n.id === nodeId);
+    if (!currentNode) return;
+    const currentParams: Params = (() => {
+      try {
+        const raw = currentNode.data.inputValue as string | undefined;
+        if (!raw) return { floors: 5, gfa: 4800, height: 22, style: "Modern" };
+        return JSON.parse(raw) as Params;
+      } catch { return { floors: 5, gfa: 4800, height: 22, style: "Modern" }; }
+    })();
+    const next = { ...currentParams, [key]: val };
+    updateNode(nodeId, { data: { ...currentNode.data, inputValue: JSON.stringify(next) } });
+  }, [nodeId, updateNode]);
 
   const inputStyle: React.CSSProperties = {
     width: "100%", boxSizing: "border-box",
@@ -277,8 +290,10 @@ export function LocationInput({ nodeId, data }: { nodeId: string; data: Workflow
   const value = (data.inputValue as string) ?? "";
 
   const onChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    updateNode(nodeId, { data: { ...data, inputValue: e.target.value } });
-  }, [nodeId, updateNode, data]);
+    const currentNode = useWorkflowStore.getState().nodes.find(n => n.id === nodeId);
+    if (!currentNode) return;
+    updateNode(nodeId, { data: { ...currentNode.data, inputValue: e.target.value } });
+  }, [nodeId, updateNode]);
 
   return (
     <div className="nodrag nowheel nopan" onMouseDown={stopAll} onClick={stopAll} onKeyDown={stopAll}>

@@ -29,7 +29,6 @@ import { AnimatedEdge } from "./edges/AnimatedEdge";
 import { NodeLibraryPanel } from "./panels/NodeLibraryPanel";
 import { CanvasToolbar } from "./toolbar/CanvasToolbar";
 import { ArtifactCard } from "./artifacts/ArtifactCard";
-import { StepIndicator } from "./StepIndicator";
 import { ExecutionLog } from "./ExecutionLog";
 import { OnboardingTour } from "./OnboardingTour";
 import { AIChatPanel } from "./panels/AIChatPanel";
@@ -235,6 +234,7 @@ function WorkflowCanvasInner({ workflowId: _workflowId }: WorkflowCanvasInnerPro
     creationMode,
     addNode,
     removeNode,
+    updateNode,
     addEdge: addStoreEdge,
     resetCanvas,
     isDirty,
@@ -301,6 +301,11 @@ function WorkflowCanvasInner({ workflowId: _workflowId }: WorkflowCanvasInnerPro
   const handleFitToNode = useCallback((nodeId: string) => {
     fitView({ nodes: [{ id: nodeId }], padding: 0.5, duration: 400 });
   }, [fitView]);
+
+  // Sync drag positions back to Zustand so store→ReactFlow effect doesn't reset them
+  const onNodeDragStop = useCallback((_: React.MouseEvent, _node: Node, draggedNodes: Node[]) => {
+    draggedNodes.forEach((n) => updateNode(n.id, { position: n.position }));
+  }, [updateNode]);
 
   const onConnect: OnConnect = useCallback(
     (connection: Connection) => {
@@ -440,9 +445,6 @@ function WorkflowCanvasInner({ workflowId: _workflowId }: WorkflowCanvasInnerPro
           onToggleLibrary={toggleNodeLibrary}
         />
 
-        {/* Step indicator bar — 40px, sits right below toolbar */}
-        <StepIndicator />
-
         {/* Execution progress bar */}
         <AnimatePresence>
           {isExecuting && (
@@ -470,13 +472,14 @@ function WorkflowCanvasInner({ workflowId: _workflowId }: WorkflowCanvasInnerPro
         </AnimatePresence>
 
         {/* React Flow */}
-        <div className="absolute inset-0 pt-[92px]">
+        <div className="absolute inset-0 pt-13">
           <ReactFlow
             nodes={nodes}
             edges={edges}
             onNodesChange={handleNodesChange}
             onEdgesChange={handleEdgesChange}
             onConnect={onConnect}
+            onNodeDragStop={onNodeDragStop}
             onNodeContextMenu={onNodeContextMenu}
             onPaneContextMenu={onPaneContextMenu}
             nodeTypes={nodeTypes}
@@ -497,20 +500,20 @@ function WorkflowCanvasInner({ workflowId: _workflowId }: WorkflowCanvasInnerPro
               strokeDasharray: "6 4",
               opacity: 0.7,
             }}
-            style={{ background: "#0B0B13" }}
+            style={{ background: "#09090F" }}
           >
-            {/* Dot grid */}
+            {/* Dot grid — subtle, refined */}
             <Background
               variant={BackgroundVariant.Dots}
-              gap={24}
-              size={1}
-              color="rgba(255,255,255,0.04)"
+              gap={20}
+              size={0.8}
+              color="rgba(255,255,255,0.045)"
             />
 
-            {/* Styled controls */}
+            {/* Styled controls — bottom-right, above minimap */}
             <Controls
-              position="bottom-left"
-              style={{ marginBottom: 16, marginLeft: 16 }}
+              position="bottom-right"
+              style={{ marginBottom: 124, marginRight: 16 }}
             />
 
             {/* Styled minimap */}
@@ -595,16 +598,16 @@ function WorkflowCanvasInner({ workflowId: _workflowId }: WorkflowCanvasInnerPro
               transition={{ type: "spring", stiffness: 380, damping: 32 }}
               style={{
                 position: "absolute", bottom: 16, right: 16, zIndex: 20,
-                width: 300,
+                width: 320,
                 maxHeight: "calc(100vh - 100px)",
                 display: "flex", flexDirection: "column",
-                background: "rgba(10, 10, 15, 0.96)",
-                border: "1px solid rgba(255,255,255,0.06)",
-                borderRadius: 12,
+                background: "rgba(10, 10, 18, 0.92)",
+                border: "1px solid rgba(255,255,255,0.07)",
+                borderRadius: 14,
                 overflow: "hidden",
-                backdropFilter: "blur(16px)",
-                WebkitBackdropFilter: "blur(16px)",
-                boxShadow: "0 16px 48px rgba(0,0,0,0.5)",
+                backdropFilter: "blur(20px) saturate(1.3)",
+                WebkitBackdropFilter: "blur(20px) saturate(1.3)",
+                boxShadow: "0 16px 48px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.03) inset",
               }}
             >
               {/* Panel header */}

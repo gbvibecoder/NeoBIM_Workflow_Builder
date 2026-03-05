@@ -102,8 +102,13 @@ async function executeNode(
     return { ...artifact, createdAt: new Date() };
   }
 
-  // Fall back to mock
-  return mockExecuteNode(catalogueId, executionId, node.id);
+  // Fall back to mock — pass upstream data so mocks can reflect user input
+  return mockExecuteNode(
+    catalogueId,
+    executionId,
+    node.id,
+    (previousArtifact?.data ?? {}) as Record<string, unknown>
+  );
 }
 
 const FLOW_DURATION_MS = 1600;
