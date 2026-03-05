@@ -280,7 +280,7 @@ function AvatarRow() {
         ))}
       </div>
       <span style={{ fontSize: 12, color: "#9898B0" }}>
-        Join <strong style={{ color: "#F0F0F5" }}>2,400+</strong> AEC professionals
+        Join AEC professionals building the future
       </span>
     </div>
   );
@@ -312,7 +312,7 @@ const FEATURES = [
   },
 ];
 
-const COMPANIES = ["Foster+Partners", "Arup", "SOM", "BIG", "Zaha Hadid Architects", "HOK"];
+const COMPANIES = ["Leading AEC Firms", "Architecture Studios", "Engineering Teams", "BIM Consultants", "Design Agencies", "Construction Tech"];
 
 // ─── Showcase workflows ───────────────────────────────────────────────────────
 
@@ -406,7 +406,7 @@ export default function LandingPage() {
             WebkitTextFillColor: "transparent",
             backgroundClip: "text",
           }}>
-            No-code workflow builder for AEC
+            No-code workflow builder for AEC · Beta
           </p>
 
           <h1 style={{
@@ -430,7 +430,7 @@ export default function LandingPage() {
             fontSize: 18, color: "#9898B0", lineHeight: 1.7,
             maxWidth: 540, marginBottom: 24,
           }}>
-            Turn project briefs into 3D massing models, renders, and IFC files. 
+            Turn project briefs into 3D massing models and photorealistic concept renders. (IFC export in development) 
             No-code workflows built for architects who value their time.
           </p>
 
@@ -457,13 +457,16 @@ export default function LandingPage() {
                   Time saved per project
                 </div>
                 <div style={{ fontSize: 20, fontWeight: 700, color: "#F0F0F5" }}>
-                  10 hours × $100/hr = <span style={{ color: "#10B981" }}>$1,000 saved</span>
+                  10 hours × $100/hr = <span style={{ color: "#10B981" }}>$1,000 saved*</span>
                 </div>
               </div>
             </div>
           </div>
 
           {/* ROI Calculator */}
+          <p style={{ fontSize: 11, color: "#5C5C78", marginTop: 8, fontStyle: "italic" }}>
+            * Estimated savings based on typical AEC project workflows
+          </p>
           <div style={{
             background: "rgba(79,138,255,0.08)",
             border: "1px solid rgba(79,138,255,0.2)",
@@ -486,7 +489,7 @@ export default function LandingPage() {
                   Time saved per project
                 </div>
                 <div style={{ fontSize: 20, fontWeight: 700, color: "#F0F0F5" }}>
-                  10 hours × $100/hr = <span style={{ color: "#10B981" }}>$1,000 saved</span>
+                  10 hours × $100/hr = <span style={{ color: "#10B981" }}>$1,000 saved*</span>
                 </div>
               </div>
             </div>
@@ -566,20 +569,20 @@ export default function LandingPage() {
                 color: "#3B82F6",
                 title: "Text-to-3D",
                 description: "Describe your building concept in plain English. Get parametric 3D massing models in seconds.",
-                badge: "AI-Powered",
+                badge: "AI-Powered · Beta",
               },
               {
                 icon: <ImageIcon size={24} />,
                 color: "#8B5CF6",
                 title: "Instant Renders",
-                description: "Generate photorealistic concept images on demand. Perfect for client presentations and design reviews.",
+                description: "Generate photorealistic concept images with AI. Perfect for early-stage design presentations.",
                 badge: "Fast",
               },
               {
                 icon: <FileCode size={24} />,
                 color: "#10B981",
-                title: "IFC Export",
-                description: "Export industry-standard IFC files ready for Revit, ArchiCAD, or any BIM software. No conversion needed.",
+                title: "IFC Export (Beta)",
+                description: "Basic IFC export in early development. Preview functionality available.",
                 badge: "BIM-Ready",
               },
             ].map(f => {
@@ -1116,7 +1119,7 @@ export default function LandingPage() {
           ))}
         </div>
         <span style={{ fontSize: 11, color: "#3A3A50" }}>
-          Built for the AEC community
+          Beta Product · Built for the AEC community
         </span>
       
       {/* Mobile Responsive Styles */}
