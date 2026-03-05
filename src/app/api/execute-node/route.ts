@@ -29,7 +29,8 @@ export async function POST(req: NextRequest) {
 
   // Apply rate limiting
   try {
-    const rateLimitResult = await checkRateLimit(userId, userRole);
+    const userEmail = session.user.email || "";
+    const rateLimitResult = await checkRateLimit(userId, userRole, userEmail);
 
     if (!rateLimitResult.success) {
       const resetDate = new Date(rateLimitResult.reset);
