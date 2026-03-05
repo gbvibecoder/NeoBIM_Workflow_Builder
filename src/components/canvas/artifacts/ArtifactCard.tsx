@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { Download, ChevronDown, X, FileText, Image as ImageIcon, Database, BarChart2, Table2, File } from "lucide-react";
-import Image from "next/image";
+
 import { formatBytes } from "@/lib/utils";
 import type {
   ExecutionArtifact,
@@ -219,12 +219,14 @@ function ImageBody({ data }: { data: ImageArtifactData }) {
     <div>
       <div style={{ position: "relative", height: 160, background: "#07070D" }}>
         {data?.url ? (
-          <Image
+          <img
             src={data.url}
             alt={data.label ?? "Artifact image"}
-            fill
-            className="object-cover"
-            sizes="300px"
+            style={{
+              width: "100%",
+              height: "100%",
+              objectFit: "cover",
+            }}
           />
         ) : (
           <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%" }}>
