@@ -73,9 +73,9 @@ export default function BillingPage() {
     },
     {
       name: "Pro",
-      price: "$29",
+      price: "$79",
       period: "per month",
-      description: "For serious AEC professionals",
+      description: "Pays for itself in 1 project",
       features: [
         "Unlimited workflow runs",
         "Priority execution queue",
