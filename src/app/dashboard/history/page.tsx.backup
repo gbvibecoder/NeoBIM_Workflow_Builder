@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Clock, CheckCircle2, XCircle, Loader2, RefreshCw,
   ChevronDown, ChevronUp, FileText, Image, Table2,
-  Zap, Filter, ExternalLink, AlertCircle
+  Zap, Filter, ExternalLink
 } from "lucide-react";
 import { Header } from "@/components/dashboard/Header";
 import { toast } from "sonner";
@@ -411,41 +411,21 @@ export default function HistoryPage() {
   const router = useRouter();
   const [executions, setExecutions] = useState<Execution[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [selectedExecution, setSelectedExecution] = useState<Execution | null>(null);
 
   const loadExecutions = useCallback(async () => {
     setLoading(true);
-    setError(null);
     try {
       const params = new URLSearchParams();
       if (statusFilter !== "ALL") params.set("status", statusFilter);
-      
-      // Add timeout to prevent infinite loading
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000);
-      
-      const res = await fetch(`/api/executions?${params}`, { 
-        signal: controller.signal,
-        cache: 'no-store' 
-      });
-      clearTimeout(timeoutId);
-      
+      const res = await fetch(`/api/executions?${params}`);
       if (res.ok) {
         const { executions } = await res.json() as { executions: Execution[] };
         setExecutions(executions);
-        setError(null);
-      } else {
-        throw new Error(`API returned ${res.status}`);
       }
-    } catch (err) {
-      const errorMsg = err instanceof Error && err.name === 'AbortError' 
-        ? "Request timed out. Please try again."
-        : "Failed to load execution history";
-      setError(errorMsg);
-      toast.error(errorMsg);
-      setExecutions([]);
+    } catch {
+      toast.error("Failed to load history");
     } finally {
       setLoading(false);
     }
@@ -521,34 +501,11 @@ export default function HistoryPage() {
           </button>
         </div>
 
-        {/* List / Error / Loading / Empty */}
+        {/* List */}
         {loading ? (
           <div style={{ textAlign: "center", padding: 64, color: "#55556A", fontSize: 13 }}>
             <Loader2 size={24} className="animate-spin" style={{ margin: "0 auto 12px" }} />
             Loading history…
-          </div>
-        ) : error ? (
-          <div style={{
-            textAlign: "center", padding: 64,
-            background: "#12121E", borderRadius: 12, border: "1px solid rgba(239,68,68,0.2)",
-          }}>
-            <AlertCircle size={32} style={{ margin: "0 auto 12px", color: "#EF4444" }} />
-            <div style={{ fontSize: 15, fontWeight: 600, color: "#EF4444", marginBottom: 6 }}>
-              {error}
-            </div>
-            <div style={{ fontSize: 12, color: "#55556A", marginBottom: 16 }}>
-              Check your connection and try again
-            </div>
-            <button
-              onClick={loadExecutions}
-              style={{
-                padding: "8px 16px", borderRadius: 8, border: "none",
-                background: "#4F8AFF", color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer",
-                display: "inline-flex", alignItems: "center", gap: 6,
-              }}
-            >
-              <RefreshCw size={12} /> Retry
-            </button>
           </div>
         ) : executions.length === 0 ? (
           <div style={{
@@ -556,12 +513,8 @@ export default function HistoryPage() {
             background: "#12121E", borderRadius: 12, border: "1px solid #1E1E2E",
           }}>
             <Zap size={32} style={{ margin: "0 auto 12px", opacity: 0.3 }} />
-            <div style={{ fontSize: 15, fontWeight: 600, color: "#8888A0", marginBottom: 6 }}>
-              No executions yet
-            </div>
-            <div style={{ fontSize: 12 }}>
-              Run a workflow to see history here.
-            </div>
+            <div style={{ fontSize: 15, fontWeight: 600, color: "#3A3A4E", marginBottom: 6 }}>No executions yet</div>
+            <div style={{ fontSize: 12 }}>Run a workflow on the canvas to see results here.</div>
           </div>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
