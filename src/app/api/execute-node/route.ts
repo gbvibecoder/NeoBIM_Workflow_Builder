@@ -293,7 +293,14 @@ function formatBuildingDescription(d: {
   programSummary: string;
   estimatedCost: string;
   constructionDuration: string;
+  narrative?: string;
 }): string {
+  // If narrative exists (TR-003 v2), use it as the primary output
+  if (d.narrative) {
+    return `# ${d.projectName}\n\n${d.narrative}\n\n---\n\n**Quick Facts**\nType: ${d.buildingType} | Floors: ${d.floors} | Area: ${d.totalArea.toLocaleString()} m²\nCost: ${d.estimatedCost} | Duration: ${d.constructionDuration}`;
+  }
+  
+  // Fallback to legacy format if no narrative
   return d.projectName.toUpperCase() + " — BUILDING DESCRIPTION\n\nType: " + d.buildingType + "\nFloors: " + d.floors + " | Total Area: " + d.totalArea.toLocaleString() + " m²\nEstimated Cost: " + d.estimatedCost + " | Duration: " + d.constructionDuration + "\n\n" + d.programSummary + "\n\nStructure: " + d.structure + "\nFacade: " + d.facade + "\n\nSustainability: " + (d.sustainabilityFeatures.join(", ") || "TBD");
 }
 
