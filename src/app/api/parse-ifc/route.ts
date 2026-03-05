@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { parseIFCBuffer } from "@/services/ifc-parser";
 
 export const maxDuration = 60; // Vercel: allow 60s for WASM parsing
 
@@ -22,6 +21,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "File must be an IFC file" }, { status: 400 });
     }
 
+    // ⚡ DYNAMIC IMPORT - Lazy load 23MB web-ifc library only when needed
+    const { parseIFCBuffer } = await import("@/services/ifc-parser");
+    
     const buffer = new Uint8Array(await file.arrayBuffer());
     const result = await parseIFCBuffer(buffer, file.name);
 
