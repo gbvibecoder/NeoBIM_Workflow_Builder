@@ -1,10 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { OpenAIError } from "@/services/openai";
 import { generateBuildingDescription, generateConceptImage } from "@/services/openai";
 import { generateId } from "@/lib/utils";
 import type { ExecutionArtifact } from "@/types/execution";
-import OpenAI from "openai";
 import * as XLSX from "xlsx";
 import { checkRateLimit, logRateLimitHit } from "@/lib/rate-limit";
 import {
@@ -12,6 +10,8 @@ import {
   applyRegionalFactor,
   calculateTotalCost,
 } from "@/lib/cost-database";
+import { assertValidInput } from "@/lib/validation";
+import { APIError, UserErrors, formatErrorResponse } from "@/lib/user-errors";
 
 // Node IDs that have real implementations
 const REAL_NODE_IDS = new Set(["TR-003", "GN-003", "TR-007", "TR-008", "EX-002"]);
@@ -21,7 +21,10 @@ export async function POST(req: NextRequest) {
 
   // Check authentication
   if (!session?.user?.id) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json(
+      formatErrorResponse(UserErrors.UNAUTHORIZED),
+      { status: 401 }
+    );
   }
 
   const userId: string = session.user.id;
@@ -44,16 +47,12 @@ export async function POST(req: NextRequest) {
       // Log the rate limit hit
       logRateLimitHit(userId, userRole, rateLimitResult.remaining);
 
+      const rateLimitError = userRole === "FREE"
+        ? UserErrors.RATE_LIMIT_FREE(hoursUntilReset)
+        : UserErrors.RATE_LIMIT_PRO(Math.ceil(hoursUntilReset * 60));
+
       return NextResponse.json(
-        {
-          error: "Rate limit exceeded",
-          message: userRole === "FREE" 
-            ? "Free tier limit: 3 executions per day. Upgrade to Pro for unlimited executions. Resets in " + hoursUntilReset + "h."
-            : "Rate limit exceeded. Please try again later.",
-          remaining: rateLimitResult.remaining,
-          reset: rateLimitResult.reset,
-          upgradeUrl: "/dashboard/billing",
-        },
+        formatErrorResponse(rateLimitError),
         { 
           status: 429,
           headers: {
@@ -77,12 +76,18 @@ export async function POST(req: NextRequest) {
   const { catalogueId, executionId, tileInstanceId, inputData, userApiKey } = await req.json();
 
   if (!REAL_NODE_IDS.has(catalogueId)) {
-    return NextResponse.json({ error: `No real implementation for ${catalogueId}` }, { status: 400 });
+    return NextResponse.json(
+      formatErrorResponse(UserErrors.NODE_NOT_IMPLEMENTED(catalogueId)),
+      { status: 400 }
+    );
   }
 
   const apiKey = userApiKey || undefined;
 
   try {
+    // STEP 1: Validate input BEFORE hitting any APIs
+    assertValidInput(catalogueId, inputData);
+
     let artifact: ExecutionArtifact;
 
     if (catalogueId === "TR-003") {
@@ -145,6 +150,7 @@ export async function POST(req: NextRequest) {
       
       let rows: string[][] = [];
       let elements: Array<{ description: string; category: string; quantity: number; unit: string }> = [];
+      let usedFallback = false;
       
       if (ifcData && typeof ifcData === "object" && ifcData.buffer) {
         // Real IFC file uploaded - parse it
@@ -192,12 +198,15 @@ export async function POST(req: NextRequest) {
           }
         } catch (parseError) {
           console.error("[TR-007] IFC parsing failed:", parseError);
-          // Fall through to fallback data
+          usedFallback = true;
         }
+      } else {
+        usedFallback = true;
       }
       
       // Fallback: provide realistic quantities if no IFC or parsing failed
       if (rows.length === 0) {
+        usedFallback = true;
         const fallbackData = [
           { desc: "External Walls", cat: "Walls", qty: 1240, unit: "m²" },
           { desc: "Internal Walls", cat: "Walls", qty: 2890, unit: "m²" },
@@ -231,7 +240,11 @@ export async function POST(req: NextRequest) {
           rows,
           _elements: elements, // Required for TR-008 compatibility
         },
-        metadata: { model: "ifc-parser-v1", real: true },
+        metadata: { 
+          model: "ifc-parser-v1", 
+          real: true,
+          warnings: usedFallback ? ["Using sample quantities (no IFC file provided or parsing failed)"] : undefined,
+        },
         createdAt: new Date(),
       };
 
@@ -243,6 +256,7 @@ export async function POST(req: NextRequest) {
       
       const rows: string[][] = [];
       let hardCostSubtotal = 0;
+      let estimatedItemsCount = 0;
       
       // Process each element
       for (const elem of elements) {
@@ -271,6 +285,7 @@ export async function POST(req: NextRequest) {
           ]);
         } else {
           // Fallback: estimate for unknown items
+          estimatedItemsCount++;
           const fallbackRate = 100; // $100 per EA as placeholder
           const lineTotal = quantity * fallbackRate;
           hardCostSubtotal += lineTotal;
@@ -309,6 +324,11 @@ export async function POST(req: NextRequest) {
       rows.push(["", "", "", "", ""]);
       rows.push(["TOTAL PROJECT COST", "", "", "", `$${costSummary.totalCost.toFixed(2)}`]);
 
+      const warnings = [];
+      if (estimatedItemsCount > 0) {
+        warnings.push(`${estimatedItemsCount} items used estimated rates (not in cost database)`);
+      }
+
       artifact = {
         id: generateId(),
         executionId: executionId ?? "local",
@@ -324,7 +344,11 @@ export async function POST(req: NextRequest) {
           _softCosts: costSummary.softCosts,
           _region: region,
         },
-        metadata: { model: "cost-database-v1", real: true },
+        metadata: { 
+          model: "cost-database-v1", 
+          real: true,
+          warnings: warnings.length > 0 ? warnings : undefined,
+        },
         createdAt: new Date(),
       };
 
@@ -364,24 +388,34 @@ export async function POST(req: NextRequest) {
       };
 
     } else {
-      return NextResponse.json({ error: "Unknown node" }, { status: 400 });
+      return NextResponse.json(
+        formatErrorResponse(UserErrors.NODE_NOT_IMPLEMENTED(catalogueId)),
+        { status: 400 }
+      );
     }
 
     return NextResponse.json({ artifact });
   } catch (err) {
-    // Handle OpenAI-specific errors with user-friendly messages
-    if (err instanceof OpenAIError) {
-      console.error("[execute-node] OpenAI error:", err.message);
+    // Handle APIError (user-friendly errors)
+    if (err instanceof APIError) {
+      console.error("[execute-node] API Error:", {
+        code: err.userError.code,
+        message: err.userError.message,
+      });
       return NextResponse.json(
-        { error: err.userMessage },
+        formatErrorResponse(err.userError),
         { status: err.statusCode }
       );
     }
     
     // Handle generic errors
     const message = err instanceof Error ? err.message : "Execution failed";
-    console.error("[execute-node] " + catalogueId + ":", message);
-    return NextResponse.json({ error: message }, { status: 500 });
+    console.error("[execute-node] " + catalogueId + ":", message, err);
+    
+    return NextResponse.json(
+      formatErrorResponse(UserErrors.INTERNAL_ERROR, message),
+      { status: 500 }
+    );
   }
 }
 
