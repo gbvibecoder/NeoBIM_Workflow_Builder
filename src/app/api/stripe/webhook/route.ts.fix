@@ -116,7 +116,7 @@ async function updateUserSubscription(
     data: {
       stripeSubscriptionId: subscription.id,
       stripePriceId: priceId,
-      stripeCurrentPeriodEnd: new Date((subscription as any).current_period_end as number * 1000),
+      stripeCurrentPeriodEnd: new Date(subscription.current_period_end as number * 1000),
       role: plan,
     },
   });

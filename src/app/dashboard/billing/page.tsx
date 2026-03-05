@@ -3,8 +3,9 @@
 import { useState, useEffect } from "react";
 import { Header } from "@/components/dashboard/Header";
 import { useSession } from "next-auth/react";
-import { Check, Sparkles, Users, Zap } from "lucide-react";
+import { Check, Sparkles, Users, Zap, Loader2 } from "lucide-react";
 import { api } from "@/lib/api";
+import { STRIPE_PLANS } from "@/lib/stripe";
 
 interface UsageStats {
   used: number;
@@ -16,6 +17,7 @@ export default function BillingPage() {
   const { data: session } = useSession();
   const [usage, setUsage] = useState<UsageStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [upgradingTo, setUpgradingTo] = useState<string | null>(null);
 
   const userRole = (session?.user as { role?: string })?.role || "FREE";
   const currentPlan = userRole === "FREE" ? "Free" : userRole === "PRO" ? "Pro" : "Team";
@@ -54,6 +56,47 @@ export default function BillingPage() {
       .finally(() => setLoading(false));
   }, [userRole]);
 
+  const handleUpgrade = async (plan: 'PRO' | 'TEAM_ADMIN') => {
+    setUpgradingTo(plan);
+    try {
+      const planKey = plan === 'PRO' ? 'PRO' : 'TEAM';
+      const priceId = plan === 'PRO' ? process.env.NEXT_PUBLIC_STRIPE_PRO_PRICE_ID : process.env.NEXT_PUBLIC_STRIPE_TEAM_PRICE_ID;
+      
+      const res = await fetch('/api/stripe/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ priceId, plan: planKey }),
+      });
+
+      const data = await res.json();
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        throw new Error(data.error || 'Failed to create checkout session');
+      }
+    } catch (error) {
+      console.error('Checkout error:', error);
+      alert('Failed to start checkout. Please try again.');
+    } finally {
+      setUpgradingTo(null);
+    }
+  };
+
+  const handleManageSubscription = async () => {
+    try {
+      const res = await fetch('/api/stripe/portal', { method: 'POST' });
+      const data = await res.json();
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        throw new Error(data.error || 'Failed to open billing portal');
+      }
+    } catch (error) {
+      console.error('Portal error:', error);
+      alert('Failed to open billing portal. Please try again.');
+    }
+  };
+
   const plans = [
     {
       name: "Free",
@@ -70,12 +113,13 @@ export default function BillingPage() {
       ctaDisabled: currentPlan === "Free",
       highlighted: false,
       color: "#9898B0",
+      planType: null,
     },
     {
       name: "Pro",
-      price: "$29",
+      price: "$79",
       period: "per month",
-      description: "For serious AEC professionals",
+      description: "Pays for itself in 1 project",
       features: [
         "Unlimited workflow runs",
         "Priority execution queue",
@@ -89,10 +133,11 @@ export default function BillingPage() {
       highlighted: true,
       color: "#4F8AFF",
       badge: "MOST POPULAR",
+      planType: "PRO" as const,
     },
     {
       name: "Team",
-      price: "$99",
+      price: "$149",
       period: "per month",
       description: "Collaborate with your team",
       features: [
@@ -107,6 +152,7 @@ export default function BillingPage() {
       ctaDisabled: currentPlan === "Team",
       highlighted: false,
       color: "#8B5CF6",
+      planType: "TEAM_ADMIN" as const,
     },
   ];
 
@@ -136,8 +182,19 @@ export default function BillingPage() {
                 First 100 users get 50% off Pro for 6 months. Limited time offer!
               </p>
             </div>
-            <button className="px-6 py-2.5 rounded-lg bg-gradient-to-r from-[#F59E0B] to-[#EF4444] text-white font-semibold text-sm hover:opacity-90 transition-opacity">
-              Claim Offer
+            <button 
+              onClick={() => handleUpgrade('PRO')}
+              disabled={upgradingTo === 'PRO'}
+              className="px-6 py-2.5 rounded-lg bg-gradient-to-r from-[#F59E0B] to-[#EF4444] text-white font-semibold text-sm hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center gap-2"
+            >
+              {upgradingTo === 'PRO' ? (
+                <>
+                  <Loader2 size={16} className="animate-spin" />
+                  Processing...
+                </>
+              ) : (
+                'Claim Offer'
+              )}
             </button>
           </div>
         </div>
@@ -182,20 +239,22 @@ export default function BillingPage() {
           </div>
         )}
 
-        {userRole === "PRO" && (
+        {userRole !== "FREE" && (
           <div className="rounded-[14px] border border-[rgba(79,138,255,0.3)] bg-gradient-to-r from-[#4F8AFF15] to-[#8B5CF615] p-6">
             <div className="flex items-center gap-4">
               <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-[#4F8AFF] to-[#8B5CF6] flex items-center justify-center">
                 <Zap size={24} className="text-white" />
               </div>
               <div className="flex-1">
-                <h3 className="text-lg font-bold text-[#F0F0F5] mb-1">Current Plan: Pro</h3>
+                <h3 className="text-lg font-bold text-[#F0F0F5] mb-1">Current Plan: {currentPlan}</h3>
                 <p className="text-sm text-[#C0C0D0]">Unlimited workflow runs. Build without limits!</p>
               </div>
-              <div className="text-right">
-                <div className="text-2xl font-bold text-[#4F8AFF]">∞</div>
-                <div className="text-xs text-[#9898B0] mt-1">Unlimited</div>
-              </div>
+              <button
+                onClick={handleManageSubscription}
+                className="px-6 py-2.5 rounded-lg bg-[#1A1A2A] text-[#F0F0F5] font-semibold text-sm hover:bg-[#2A2A3E] transition-colors"
+              >
+                Manage Billing
+              </button>
             </div>
           </div>
         )}
@@ -239,16 +298,24 @@ export default function BillingPage() {
                 </ul>
 
                 <button
-                  disabled={plan.ctaDisabled}
-                  className={`w-full py-3 rounded-lg font-semibold text-sm transition-all ${
-                    plan.ctaDisabled
+                  disabled={plan.ctaDisabled || upgradingTo !== null}
+                  onClick={() => plan.planType && handleUpgrade(plan.planType)}
+                  className={`w-full py-3 rounded-lg font-semibold text-sm transition-all flex items-center justify-center gap-2 ${
+                    plan.ctaDisabled || upgradingTo !== null
                       ? "bg-[#1A1A2A] text-[#55556A] cursor-not-allowed"
                       : plan.highlighted
                       ? "bg-gradient-to-r from-[#4F8AFF] to-[#8B5CF6] text-white hover:opacity-90"
                       : "bg-[#1A1A2A] text-[#F0F0F5] hover:bg-[#2A2A3E]"
                   }`}
                 >
-                  {plan.cta}
+                  {upgradingTo === plan.planType ? (
+                    <>
+                      <Loader2 size={16} className="animate-spin" />
+                      Processing...
+                    </>
+                  ) : (
+                    plan.cta
+                  )}
                 </button>
               </div>
             ))}
