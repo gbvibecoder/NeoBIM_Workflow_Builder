@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import { toast } from "sonner";
 import { useWorkflowStore } from "@/stores/workflow-store";
 import { useExecutionStore } from "@/stores/execution-store";
@@ -11,7 +11,7 @@ import type { WorkflowNode } from "@/types/nodes";
 import type { LogEntry } from "@/components/canvas/ExecutionLog";
 
 // Node IDs that have real API implementations
-const REAL_NODE_IDS = new Set(["TR-003", "GN-003", "IN-004", "TR-008", "EX-002"]);
+const REAL_NODE_IDS = new Set(["TR-003", "GN-003", "IN-004", "TR-007", "TR-008", "EX-002"]);
 
 // Route execution to real API or mock
 async function executeNode(
@@ -36,6 +36,18 @@ async function executeNode(
 
     if (!res.ok) {
       const err = await res.json().catch(() => ({ error: "Execution failed" }));
+      
+      // Special handling for 429 Rate Limit errors
+      if (res.status === 429) {
+        const errorData = err as { error?: string; message?: string; remaining?: number; reset?: number; upgradeUrl?: string };
+        const rateLimitError = new Error(errorData.message || errorData.error || "Rate limit exceeded");
+        (rateLimitError as any).status = 429;
+        (rateLimitError as any).remaining = errorData.remaining || 0;
+        (rateLimitError as any).reset = errorData.reset || Date.now() + 86400000;
+        (rateLimitError as any).upgradeUrl = errorData.upgradeUrl || "/dashboard/billing";
+        throw rateLimitError;
+      }
+      
       throw new Error((err as { error?: string }).error ?? "Node execution failed");
     }
 
@@ -53,6 +65,12 @@ interface UseExecutionOptions {
   onLog?: (entry: LogEntry) => void;
 }
 
+interface RateLimitInfo {
+  remaining: number;
+  reset: number;
+  upgradeUrl: string;
+}
+
 export function useExecution({ onLog }: UseExecutionOptions = {}) {
   const { nodes, currentWorkflow, updateNodeStatus, setEdgeFlowing } = useWorkflowStore();
   const {
@@ -63,6 +81,8 @@ export function useExecution({ onLog }: UseExecutionOptions = {}) {
     setProgress,
     isExecuting,
   } = useExecutionStore();
+  
+  const [rateLimitHit, setRateLimitHit] = useState<RateLimitInfo | null>(null);
 
   const log = useCallback((type: LogEntry["type"], message: string, detail?: string) => {
     onLog?.({ timestamp: new Date(), type, message, detail });
@@ -167,7 +187,25 @@ export function useExecution({ onLog }: UseExecutionOptions = {}) {
         hasError = true;
         updateNodeStatus(node.id, "error");
         const errMsg = error instanceof Error ? error.message : "Unknown error";
-        log("error", `${node.data.label} failed`, errMsg);
+        
+        // Check if this is a rate limit error
+        if ((error as any).status === 429) {
+          const resetDate = new Date((error as any).reset || Date.now() + 86400000);
+          const hoursUntilReset = Math.ceil((resetDate.getTime() - Date.now()) / (1000 * 60 * 60));
+          
+          log("error", "Rate limit exceeded", `Resets in ${hoursUntilReset}h`);
+          
+          // Set rate limit info to trigger modal
+          setRateLimitHit({
+            remaining: (error as any).remaining || 0,
+            reset: (error as any).reset || Date.now() + 86400000,
+            upgradeUrl: (error as any).upgradeUrl || "/dashboard/billing",
+          });
+        } else {
+          log("error", `${node.data.label} failed`, errMsg);
+          toast.error(`Node "${node.data.label}" failed`, { duration: 4000 });
+        }
+        
         addTileResult({
           tileInstanceId: node.id,
           catalogueId: node.data.catalogueId,
@@ -176,7 +214,7 @@ export function useExecution({ onLog }: UseExecutionOptions = {}) {
           completedAt: new Date(),
           errorMessage: errMsg,
         });
-        toast.error(`Node "${node.data.label}" failed`, { duration: 4000 });
+        
         break;
       }
     }
@@ -220,6 +258,16 @@ export function useExecution({ onLog }: UseExecutionOptions = {}) {
   const resetExecution = useCallback(() => {
     nodes.forEach((node) => updateNodeStatus(node.id, "idle"));
   }, [nodes, updateNodeStatus]);
+  
+  const clearRateLimitError = useCallback(() => {
+    setRateLimitHit(null);
+  }, []);
 
-  return { runWorkflow, resetExecution, isExecuting };
+  return { 
+    runWorkflow, 
+    resetExecution, 
+    isExecuting, 
+    rateLimitHit, 
+    clearRateLimitError 
+  };
 }

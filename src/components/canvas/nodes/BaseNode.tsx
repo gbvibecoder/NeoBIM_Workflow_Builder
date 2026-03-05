@@ -72,8 +72,8 @@ function NodeHandle({ port, handleType, position, topPct, color }: NodeHandlePro
         background: handleType === "source" ? color : "rgba(18,18,26,0.95)",
         border: `2px solid ${color}`,
         borderRadius: "50%",
-        boxShadow: hovered ? `0 0 8px rgba(${rgb}, 0.7)` : "none",
-        transition: "all 0.15s ease",
+        boxShadow: hovered ? `0 0 10px rgba(${rgb}, 0.8)` : "none",
+        transition: "all 0.18s cubic-bezier(0.4, 0, 0.2, 1)",
         cursor: "crosshair",
         zIndex: 10,
       }}
@@ -101,7 +101,7 @@ function ProgressBar({ status, color }: { status: NodeStatus; color: string }) {
         <motion.div
           initial={{ width: 0 }}
           animate={{ width: "100%" }}
-          transition={{ duration: 0.4, ease: "easeOut" }}
+          transition={{ duration: 0.5, ease: [0.4, 0, 0.2, 1] }}
           style={{
             position: "absolute",
             left: 0, top: 0, bottom: 0,
@@ -116,19 +116,16 @@ function ProgressBar({ status, color }: { status: NodeStatus; color: string }) {
           style={{
             position: "absolute",
             left: 0, top: 0, bottom: 0,
-            width: "40%",
+            width: "50%",
             borderRadius: 2,
-            background: `linear-gradient(90deg, transparent, rgba(${rgb}, 0.75), transparent)`,
+            background: `linear-gradient(90deg, transparent, rgba(${rgb}, 0.85), transparent)`,
+            animation: "shimmer 1.8s cubic-bezier(0.4, 0, 0.6, 1) infinite",
           }}
         />
       )}
     </div>
   );
 }
-
-// ─── InputField — editable area for IN-001 and IN-004 ────────────────────────
-
-// InputField removed — replaced by InputNodeContent from InputNode.tsx
 
 // ─── BaseNode ─────────────────────────────────────────────────────────────────
 
@@ -149,8 +146,14 @@ export const BaseNode = memo(function BaseNode({ id, data, selected }: BaseNodeP
     status === "success" ? "#34D399" :
     color;
   const borderRgb     = hexToRgb(borderColor);
-  const borderOpacity = selected ? 1.0 : isHovered ? 0.5 : 0.2;
-  const glowOpacity   = selected ? 0.3 : isHovered ? 0.15 : 0;
+  const borderOpacity = selected ? 1.0 : isHovered ? 0.6 : 0.25;
+  const glowOpacity   = selected ? 0.35 : isHovered ? 0.2 : 0;
+
+  // Enhanced glow for success/error states
+  const stateGlow = 
+    status === "success" ? "0 0 30px rgba(52, 211, 153, 0.4)" :
+    status === "error"   ? "0 0 30px rgba(248, 113, 113, 0.4)" :
+    "";
 
   const inLabel  = data.inputs .map(p => p.label).join(", ");
   const outLabel = data.outputs.map(p => p.label).join(", ");
@@ -160,139 +163,242 @@ export const BaseNode = memo(function BaseNode({ id, data, selected }: BaseNodeP
     inLabel             ? `${inLabel} →` :
     null;
 
+  const errorMessage = (data as WorkflowNodeData & { errorMessage?: string })?.errorMessage;
+
   return (
-    <motion.div
-      initial={prefersReduced ? false : { opacity: 0, scale: 0.88, y: 10 }}
-      animate={{ opacity: 1, scale: 1, y: 0 }}
-      transition={{ duration: prefersReduced ? 0 : 0.18, ease: "easeOut" }}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
-      style={{
-        width: isInput ? 280 : 220,
-        background: "rgba(18, 18, 30, 0.85)",
-        border: `1px solid rgba(${borderRgb}, ${borderOpacity})`,
-        borderRadius: 12,
-        boxShadow: `0 4px 24px rgba(0,0,0,0.25), 0 0 0 1px rgba(255,255,255,0.03), 0 0 20px rgba(${rgb}, ${glowOpacity})`,
-        backdropFilter: "blur(12px) saturate(1.2)",
-        WebkitBackdropFilter: "blur(12px) saturate(1.2)",
-        transform: isHovered && !selected ? "scale(1.01)" : "scale(1)",
-        transition: "transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease",
-        overflow: "hidden",
-        cursor: "pointer",
-        position: "relative",
-      }}
-    >
-      {/* Left accent bar */}
-      <div style={{
-        position: "absolute",
-        left: 0, top: 0, bottom: 0,
-        width: 3,
-        background: color,
-      }} />
+    <>
+      <motion.div
+        initial={prefersReduced ? false : { opacity: 0, scale: 0.88, y: 10 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        transition={{ duration: prefersReduced ? 0 : 0.22, ease: [0.4, 0, 0.2, 1] }}
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+        style={{
+          width: isInput ? 290 : 230,
+          background: "rgba(18, 18, 30, 0.90)",
+          border: `1px solid rgba(${borderRgb}, ${borderOpacity})`,
+          borderRadius: 12,
+          boxShadow: `
+            0 4px 24px rgba(0,0,0,0.28),
+            0 0 0 1px rgba(255,255,255,0.04),
+            0 0 24px rgba(${rgb}, ${glowOpacity})
+            ${stateGlow ? `, ${stateGlow}` : ""}
+          `,
+          backdropFilter: "blur(16px) saturate(1.3)",
+          WebkitBackdropFilter: "blur(16px) saturate(1.3)",
+          transform: isHovered && !selected ? "scale(1.015)" : "scale(1)",
+          transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
+          overflow: "hidden",
+          cursor: "pointer",
+          position: "relative",
+        }}
+      >
+        {/* Left accent bar */}
+        <div style={{
+          position: "absolute",
+          left: 0, top: 0, bottom: 0,
+          width: 3,
+          background: color,
+          boxShadow: `0 0 8px rgba(${rgb}, 0.5)`,
+        }} />
 
-      {/* Running border pulse */}
-      {status === "running" && (
-        <motion.div
-          style={{
-            position: "absolute", inset: 0,
-            borderRadius: 12, pointerEvents: "none",
-          }}
-          animate={{
-            boxShadow: [
-              `inset 0 0 0 1px rgba(${rgb}, 0.2)`,
-              `inset 0 0 0 1px rgba(${rgb}, 0.55)`,
-              `inset 0 0 0 1px rgba(${rgb}, 0.2)`,
-            ],
-          }}
-          transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
-        />
-      )}
-
-      {/* Content */}
-      <div style={{ padding: "10px 12px 10px 16px" }}>
-
-        {/* Row 1: icon + name + status + INPUT badge */}
-        <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
-          <div style={{ color, flexShrink: 0 }}>
-            {getIcon(data.icon, 14)}
-          </div>
-          <span style={{
-            fontSize: 13, fontWeight: 600, color: "#F0F0F5",
-            flex: 1, overflow: "hidden", textOverflow: "ellipsis",
-            whiteSpace: "nowrap", lineHeight: 1.2,
-          }}>
-            {data.label}
-          </span>
-          {isInput && (
-            <span style={{
-              fontSize: 8, fontWeight: 700, color: color,
-              padding: "1px 5px", borderRadius: 4,
-              background: `${color}18`,
-              border: `1px solid ${color}40`,
-              flexShrink: 0, letterSpacing: 0.5,
-            }}>
-              INPUT
-            </span>
-          )}
-          <AnimatePresence mode="wait">
-            {status === "success" && (
-              <motion.div key="s"
-                initial={{ opacity: 0, scale: 0 }} animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0 }} transition={{ duration: 0.2, ease: "backOut" }}
-                style={{ color: "#10B981", flexShrink: 0 }}>
-                <CheckCircle2 size={12} />
-              </motion.div>
-            )}
-            {status === "error" && (
-              <motion.div key="e"
-                initial={{ opacity: 0, scale: 0 }} animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0 }} transition={{ duration: 0.2, ease: "backOut" }}
-                style={{ color: "#EF4444", flexShrink: 0 }}>
-                <AlertCircle size={12} />
-              </motion.div>
-            )}
-            {status === "running" && (
-              <motion.div key="r"
-                style={{ width: 6, height: 6, borderRadius: "50%", background: color, flexShrink: 0 }}
-                animate={{ opacity: [1, 0.3, 1] }}
-                transition={{ duration: 1, repeat: Infinity }}
-              />
-            )}
-          </AnimatePresence>
-        </div>
-
-        {/* Row 2: type label */}
-        {typeLabel && (
-          <div style={{
-            fontSize: 11, color: "#5C5C78", marginTop: 5, lineHeight: 1.3,
-            overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-          }}>
-            {typeLabel}
-          </div>
+        {/* Running border pulse */}
+        {status === "running" && (
+          <motion.div
+            style={{
+              position: "absolute", inset: 0,
+              borderRadius: 12, pointerEvents: "none",
+            }}
+            animate={{
+              boxShadow: [
+                `inset 0 0 0 1px rgba(${rgb}, 0.25)`,
+                `inset 0 0 0 1px rgba(${rgb}, 0.65)`,
+                `inset 0 0 0 1px rgba(${rgb}, 0.25)`,
+              ],
+            }}
+            transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut" }}
+          />
         )}
 
-        {/* Row 2b: interactive input for all 7 input node types */}
-        {isInput && <InputNodeContent nodeId={id} data={data} />}
+        {/* Success glow animation */}
+        {status === "success" && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: [0, 0.6, 0] }}
+            transition={{ duration: 1.2, ease: "easeOut" }}
+            style={{
+              position: "absolute", inset: -2,
+              borderRadius: 12, pointerEvents: "none",
+              background: "radial-gradient(circle, rgba(52, 211, 153, 0.3) 0%, transparent 70%)",
+            }}
+          />
+        )}
 
-        {/* Row 3: progress + time */}
-        <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 8 }}>
-          <ProgressBar status={status} color={color} />
-          <span style={{ fontSize: 10, color: "#5C5C78", whiteSpace: "nowrap", flexShrink: 0 }}>
-            {data.executionTime ?? "< 2s"}
-          </span>
+        {/* Error glow animation */}
+        {status === "error" && (
+          <motion.div
+            animate={{
+              opacity: [0.4, 0.7, 0.4],
+            }}
+            transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
+            style={{
+              position: "absolute", inset: -2,
+              borderRadius: 12, pointerEvents: "none",
+              background: "radial-gradient(circle, rgba(248, 113, 113, 0.25) 0%, transparent 70%)",
+            }}
+          />
+        )}
+
+        {/* Content */}
+        <div style={{ padding: "11px 13px 11px 17px" }}>
+
+          {/* Row 1: icon + name + status + INPUT badge */}
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 1 }}>
+            <div style={{ color, flexShrink: 0 }}>
+              {getIcon(data.icon, 14)}
+            </div>
+            <span style={{
+              fontSize: 13, fontWeight: 600, color: "#F0F0F5",
+              flex: 1, overflow: "hidden", textOverflow: "ellipsis",
+              whiteSpace: "nowrap", lineHeight: 1.3,
+            }}>
+              {data.label}
+            </span>
+            {isInput && (
+              <span style={{
+                fontSize: 8, fontWeight: 700, color: color,
+                padding: "2px 6px", borderRadius: 4,
+                background: `${color}18`,
+                border: `1px solid ${color}40`,
+                flexShrink: 0, letterSpacing: 0.5,
+              }}>
+                INPUT
+              </span>
+            )}
+            <AnimatePresence mode="wait">
+              {status === "success" && (
+                <motion.div key="s"
+                  initial={{ opacity: 0, scale: 0.5, rotate: -90 }}
+                  animate={{ opacity: 1, scale: 1, rotate: 0 }}
+                  exit={{ opacity: 0, scale: 0.5 }}
+                  transition={{ type: "spring", stiffness: 400, damping: 20 }}
+                  style={{ color: "#10B981", flexShrink: 0 }}>
+                  <CheckCircle2 size={13} />
+                </motion.div>
+              )}
+              {status === "error" && (
+                <motion.div key="e"
+                  initial={{ opacity: 0, scale: 0.5 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.5 }}
+                  transition={{ type: "spring", stiffness: 400, damping: 20 }}
+                  style={{ color: "#EF4444", flexShrink: 0 }}>
+                  <AlertCircle size={13} />
+                </motion.div>
+              )}
+              {status === "running" && (
+                <motion.div key="r"
+                  style={{ width: 7, height: 7, borderRadius: "50%", background: color, flexShrink: 0 }}
+                  animate={{ opacity: [1, 0.3, 1], scale: [1, 0.85, 1] }}
+                  transition={{ duration: 1.2, repeat: Infinity }}
+                />
+              )}
+            </AnimatePresence>
+          </div>
+
+          {/* Row 2: type label */}
+          {typeLabel && (
+            <div style={{
+              fontSize: 11, color: "#7C7C90", marginTop: 6, lineHeight: 1.4,
+              overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+            }}>
+              {typeLabel}
+            </div>
+          )}
+
+          {/* Row 2b: interactive input for all 7 input node types */}
+          {isInput && <InputNodeContent nodeId={id} data={data} />}
+
+          {/* Row 3: progress + time */}
+          <div style={{ display: "flex", alignItems: "center", gap: 7, marginTop: 10 }}>
+            <ProgressBar status={status} color={color} />
+            <span style={{ fontSize: 10, color: "#8888A0", whiteSpace: "nowrap", flexShrink: 0, fontWeight: 500 }}>
+              {data.executionTime ?? "< 2s"}
+            </span>
+          </div>
         </div>
-      </div>
 
-      {/* Handles */}
-      {data.inputs.map((port, i) => (
-        <NodeHandle key={port.id} port={port} handleType="target"
-          position={Position.Left} topPct={portPercent(i, data.inputs.length)} color={color} />
-      ))}
-      {data.outputs.map((port, i) => (
-        <NodeHandle key={port.id} port={port} handleType="source"
-          position={Position.Right} topPct={portPercent(i, data.outputs.length)} color={color} />
-      ))}
-    </motion.div>
+        {/* Handles */}
+        {data.inputs.map((port, i) => (
+          <NodeHandle key={port.id} port={port} handleType="target"
+            position={Position.Left} topPct={portPercent(i, data.inputs.length)} color={color} />
+        ))}
+        {data.outputs.map((port, i) => (
+          <NodeHandle key={port.id} port={port} handleType="source"
+            position={Position.Right} topPct={portPercent(i, data.outputs.length)} color={color} />
+        ))}
+      </motion.div>
+
+      {/* Error message tooltip */}
+      <AnimatePresence>
+        {status === "error" && errorMessage && (
+          <motion.div
+            initial={{ opacity: 0, y: -5, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -5, scale: 0.95 }}
+            transition={{ type: "spring", stiffness: 400, damping: 28 }}
+            style={{
+              position: "absolute",
+              top: "100%",
+              left: "50%",
+              transform: "translateX(-50%)",
+              marginTop: 8,
+              padding: "8px 12px",
+              borderRadius: 8,
+              background: "rgba(30, 10, 10, 0.95)",
+              border: "1px solid rgba(248, 113, 113, 0.4)",
+              boxShadow: "0 8px 24px rgba(0,0,0,0.5)",
+              backdropFilter: "blur(12px)",
+              WebkitBackdropFilter: "blur(12px)",
+              maxWidth: 280,
+              zIndex: 1000,
+              pointerEvents: "none",
+            }}
+          >
+            <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
+              <AlertCircle size={14} style={{ color: "#F87171", flexShrink: 0, marginTop: 1 }} />
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 11, fontWeight: 600, color: "#F87171", marginBottom: 3 }}>
+                  Execution Error
+                </div>
+                <div style={{ fontSize: 10, color: "#E0B4B4", lineHeight: 1.5 }}>
+                  {errorMessage}
+                </div>
+              </div>
+            </div>
+            {/* Pointer triangle */}
+            <div style={{
+              position: "absolute",
+              top: -5,
+              left: "50%",
+              transform: "translateX(-50%)",
+              width: 0,
+              height: 0,
+              borderLeft: "5px solid transparent",
+              borderRight: "5px solid transparent",
+              borderBottom: "5px solid rgba(248, 113, 113, 0.4)",
+            }} />
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <style>{`
+        @keyframes shimmer {
+          0% { transform: translateX(-100%); }
+          100% { transform: translateX(300%); }
+        }
+      `}</style>
+    </>
   );
 });
 

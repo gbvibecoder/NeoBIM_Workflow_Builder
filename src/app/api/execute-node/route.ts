@@ -232,7 +232,7 @@ export async function POST(req: NextRequest) {
 
     } else if (catalogueId === "TR-008") {
       // BOQ Cost Mapper — Real unit rates with regional factors
-      const elements = inputData?.elements ?? inputData?.rows ?? [];
+      const elements = inputData?._elements ?? inputData?.elements ?? inputData?.rows ?? [];
       const region = inputData?.region ?? "USA (baseline)";
       
       const rows: string[][] = [];
