@@ -22,7 +22,7 @@ export default function DashboardPage() {
     { label: "My Workflows", value: workflowCount === null ? "..." : String(workflowCount), icon: "⬡", color: "#4F8AFF", topBorder: "#4F8AFF", href: "/dashboard/workflows" },
     { label: "Executions", value: "—", icon: "▶", color: "#10B981", topBorder: "#10B981", href: "/dashboard/history" },
     { label: "Templates", value: `${PREBUILT_WORKFLOWS.length}`, icon: "⊞", color: "#8B5CF6", topBorder: "#8B5CF6", href: "/dashboard/templates" },
-    { label: "Community", value: "500+", icon: "◉", color: "#F59E0B", topBorder: "#F59E0B", href: "/dashboard/community" },
+    { label: "Community", value: "12", icon: "◉", color: "#F59E0B", topBorder: "#F59E0B", href: "/dashboard/community" },
   ];
 
   return (

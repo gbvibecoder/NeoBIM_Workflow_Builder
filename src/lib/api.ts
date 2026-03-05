@@ -23,6 +23,15 @@ export type WorkflowDetail = {
   updatedAt: string;
 };
 
+export type ExecutionSummary = {
+  id: string;
+  workflowId: string;
+  status: string;
+  startedAt: string;
+  completedAt: string | null;
+  workflow: { id: string; name: string };
+};
+
 async function apiFetch<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(url, {
     ...init,
@@ -60,6 +69,16 @@ export const api = {
   },
 
   executions: {
+    list: (options?: { limit?: number; status?: string }) => {
+      const params = new URLSearchParams();
+      if (options?.limit) params.set("limit", String(options.limit));
+      if (options?.status) params.set("status", options.status);
+      const query = params.toString();
+      return apiFetch<{ executions: ExecutionSummary[] }>(
+        `/api/executions${query ? `?${query}` : ""}`
+      );
+    },
+
     create: (workflowId: string) =>
       apiFetch<{ execution: { id: string } }>("/api/executions", {
         method: "POST",
