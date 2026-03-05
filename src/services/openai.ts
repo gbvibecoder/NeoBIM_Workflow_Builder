@@ -75,6 +75,36 @@ export interface BuildingDescription {
   narrative: string; // 8-section professional narrative (TR-003 v2)
 }
 
+
+// ─── Helper: Parse user requirements ─────────────────────────────────────────
+
+function parseUserRequirements(prompt: string): { floors?: number; location?: string } {
+  const requirements: { floors?: number; location?: string } = {};
+  const floorMatch = prompt.match(/(\d+)[-\s]?(story|stories|floor|floors)/i);
+  if (floorMatch) requirements.floors = parseInt(floorMatch[1]);
+  const cities = ["Berlin", "Mumbai", "London", "New York", "Paris", "Tokyo", "Dubai", "Singapore"];
+  for (const city of cities) {
+    if (prompt.toLowerCase().includes(city.toLowerCase())) {
+      requirements.location = city;
+      break;
+    }
+  }
+  return requirements;
+}
+
+function enforceUserRequirements(desc: BuildingDescription, req: ReturnType<typeof parseUserRequirements>): BuildingDescription {
+  if (req.floors && desc.floors !== req.floors) {
+    console.warn(`[TR-003] Forcing floors from ${desc.floors} to ${req.floors}`);
+    desc.floors = req.floors;
+    desc.narrative = desc.narrative.replace(/\b\d+[-\s]?(story|stories)/gi, `${req.floors}-story`);
+    desc.totalArea = req.floors * 800;
+  }
+  if (req.location && !desc.projectName.toLowerCase().includes(req.location.toLowerCase())) {
+    desc.projectName = `${req.location} ${desc.buildingType}`;
+  }
+  return desc;
+}
+
 // ─── generateBuildingDescription ─────────────────────────────────────────────
 
 export async function generateBuildingDescription(
@@ -170,7 +200,9 @@ TARGET: 9/10 quality. Reference: architectural magazine features, design competi
     const content = completion.choices[0]?.message?.content;
     if (!content) throw new Error("OpenAI returned empty response");
 
-    return JSON.parse(content) as BuildingDescription;
+    const description = JSON.parse(content) as BuildingDescription;
+    const requirements = parseUserRequirements(prompt);
+    return enforceUserRequirements(description, requirements);
   });
 }
 
