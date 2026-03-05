@@ -19,7 +19,6 @@ export default defineConfig({
         '**/types/**',
         '**/*.d.ts',
       ],
-      all: true,
       lines: 70,
       functions: 70,
       branches: 70,
