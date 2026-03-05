@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/db";
+import { trackSignup } from "@/lib/analytics";
 
 export async function POST(req: NextRequest) {
   try {
-    const { name, email, password } = await req.json();
+    const { name, email, password, source } = await req.json();
 
     if (!email || !password) {
       return NextResponse.json(
@@ -34,6 +35,9 @@ export async function POST(req: NextRequest) {
       data: { name, email, password: hashedPassword },
       select: { id: true, email: true, name: true },
     });
+
+    // 🔥 TRACK SIGNUP
+    await trackSignup(user.id, source);
 
     return NextResponse.json({ user }, { status: 201 });
   } catch {

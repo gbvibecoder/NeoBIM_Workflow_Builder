@@ -456,9 +456,6 @@ export default function LandingPage() {
                 <div style={{ fontSize: 13, color: "#9898B0", marginBottom: 4 }}>
                   Time saved per project
                 </div>
-                <div style={{ fontSize: 20, fontWeight: 700, color: "#F0F0F5" }}>
-                  10 hours × $100/hr = <span style={{ color: "#10B981" }}>$1,000 saved</span>
-                </div>
               </div>
             </div>
           </div>
@@ -486,7 +483,15 @@ export default function LandingPage() {
                   Time saved per project
                 </div>
                 <div style={{ fontSize: 20, fontWeight: 700, color: "#F0F0F5" }}>
-                  10 hours × $100/hr = <span style={{ color: "#10B981" }}>$1,000 saved</span>
+                  10 hours × ,
+          }}>
+            Turn project briefs into 3D massing models, renders, and IFC files. 
+            No-code workflows built for architects who value their time.
+          </p>00/hr = <span style={{ color: "#10B981" }}>,
+          }}>
+            Turn project briefs into 3D massing models, renders, and IFC files. 
+            No-code workflows built for architects who value their time.
+          </p>,000 saved</span>
                 </div>
               </div>
             </div>
@@ -996,10 +1001,10 @@ export default function LandingPage() {
                 <span style={{ fontSize: 15, color: "#7878A0", marginLeft: 8 }}>/month</span>
               </div>
               <div style={{ marginBottom: 24, padding: "8px 12px", borderRadius: 8, background: "rgba(16,185,129,0.08)", border: "1px solid rgba(16,185,129,0.2)" }}>
-                <span style={{ fontSize: 12, color: "#10B981", fontWeight: 600 }}>💰 Save $2,000 per project, pay $79/month = 25x ROI</span>
+                <span style={{ fontSize: 12, color: "#10B981", fontWeight: 600 }}>💰 Pays for itself in 1 project</span>
               </div>
               <div style={{ marginBottom: 24, padding: "8px 12px", borderRadius: 8, background: "rgba(16,185,129,0.08)", border: "1px solid rgba(16,185,129,0.2)" }}>
-                <span style={{ fontSize: 12, color: "#10B981", fontWeight: 600 }}>💰 Save $2,000 per project, pay $79/month = 25x ROI</span>
+                <span style={{ fontSize: 12, color: "#10B981", fontWeight: 600 }}>💰 Pays for itself in 1 project</span>
               </div>
               <Link href="/dashboard" style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "11px 24px", borderRadius: 9, background: "linear-gradient(135deg, #4F8AFF 0%, #6366F1 100%)", color: "white", fontSize: 14, fontWeight: 600, textDecoration: "none", marginBottom: 28, boxShadow: "0 0 0 1px rgba(79,138,255,0.3), 0 4px 16px rgba(79,138,255,0.25)" }}>Start Free Trial</Link>
               <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: 24 }}>

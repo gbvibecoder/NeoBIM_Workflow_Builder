@@ -12,13 +12,40 @@ export default function DashboardPage() {
   const featuredWorkflows = PREBUILT_WORKFLOWS.slice(0, 3);
   const [workflowCount, setWorkflowCount] = useState<number | null>(null);
   const [executionCount, setExecutionCount] = useState<number | null>(null);
+  const [hoursSaved, setHoursSaved] = useState<number>(0);
+  const [checklistItems, setChecklistItems] = useState([
+    { id: 1, label: "Create your first workflow", completed: false, href: "/dashboard/workflows/new" },
+    { id: 2, label: "Run a template workflow", completed: false, href: "/dashboard/templates" },
+    { id: 3, label: "Explore the node library", completed: false, href: "/dashboard/canvas" },
+    { id: 4, label: "Join the community", completed: false, href: "/dashboard/community" },
+  ]);
+
+  useEffect(() => {
+    if (executionCount !== null) {
+      // Estimate 30 minutes saved per execution
+      const hours = Math.round((executionCount * 0.5) * 10) / 10;
+      setHoursSaved(hours);
+    }
+  }, [executionCount]);
+
+  useEffect(() => {
+    if (workflowCount && workflowCount > 0) {
+      setChecklistItems(prev => prev.map(item => 
+        item.id === 1 ? { ...item, completed: true } : item
+      ));
+    }
+    if (executionCount && executionCount > 0) {
+      setChecklistItems(prev => prev.map(item => 
+        item.id === 2 ? { ...item, completed: true } : item
+      ));
+    }
+  }, [workflowCount, executionCount]);
 
   useEffect(() => {
     api.workflows.list()
       .then(({ workflows }) => setWorkflowCount(workflows.length))
       .catch(() => setWorkflowCount(0));
 
-    // Fetch execution count
     fetch("/api/executions")
       .then(res => res.json())
       .then(data => {
@@ -34,8 +61,8 @@ export default function DashboardPage() {
   const stats = [
     { label: "My Workflows", value: workflowCount === null ? "..." : String(workflowCount), icon: "⬡", color: "#4F8AFF", topBorder: "#4F8AFF", href: "/dashboard/workflows" },
     { label: "Executions", value: executionCount === null ? "..." : String(executionCount), icon: "▶", color: "#10B981", topBorder: "#10B981", href: "/dashboard/history" },
+    { label: "Hours Saved", value: hoursSaved === 0 ? "..." : String(hoursSaved) + "h", icon: "⏱", color: "#F59E0B", topBorder: "#F59E0B", href: "/dashboard/history" },
     { label: "Templates", value: `${PREBUILT_WORKFLOWS.length}`, icon: "⊞", color: "#8B5CF6", topBorder: "#8B5CF6", href: "/dashboard/templates" },
-    { label: "Community", value: "12", icon: "◉", color: "#F59E0B", topBorder: "#F59E0B", href: "/dashboard/community" },
   ];
 
   return (
@@ -46,7 +73,6 @@ export default function DashboardPage() {
       />
 
       <main className="flex-1 overflow-y-auto p-6 space-y-8">
-        {/* Quick stats */}
         <div className="grid grid-cols-4 gap-4">
           {stats.map((stat) => (
             <Link
@@ -70,7 +96,6 @@ export default function DashboardPage() {
           ))}
         </div>
 
-        {/* Quick actions */}
         <div>
           <h2 className="text-sm font-semibold text-[#F0F0F5] mb-3">Quick Start</h2>
           <div className="grid grid-cols-3 gap-3">
@@ -120,7 +145,6 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Featured Templates */}
         <div>
           <div className="flex items-center justify-between mb-4">
             <div>
@@ -149,7 +173,6 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Hero Workflow highlight */}
         <div className="rounded-[14px] border border-[rgba(79,138,255,0.2)] bg-[rgba(79,138,255,0.04)] p-5">
           <div className="flex items-start justify-between">
             <div className="flex-1">

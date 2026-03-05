@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { trackFirstWorkflow } from "@/lib/analytics";
 
 // GET /api/workflows — list user's workflows
 export async function GET() {
@@ -46,6 +47,9 @@ export async function POST(req: NextRequest) {
       tileGraph: tileGraph ?? { nodes: [], edges: [] },
     },
   });
+
+  // 🔥 TRACK WORKFLOW CREATION (+ first workflow milestone)
+  await trackFirstWorkflow(session.user.id, workflow.id);
 
   return NextResponse.json({ workflow }, { status: 201 });
 }

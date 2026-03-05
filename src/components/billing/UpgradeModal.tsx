@@ -112,7 +112,7 @@ export function UpgradeModal({
                   <div className="flex items-center gap-2 mb-4">
                     <Zap size={18} className="text-[#4F8AFF]" />
                     <h3 className="text-lg font-bold text-[#F0F0F5]">Upgrade to Pro</h3>
-                    <span className="text-2xl font-bold text-[#4F8AFF]">$29/mo</span>
+                    <span className="text-2xl font-bold text-[#4F8AFF]">$79/mo</span>
                   </div>
 
                   <ul className="space-y-2.5">

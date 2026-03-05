@@ -1,0 +1,63 @@
+import Stripe from 'stripe';
+
+if (!process.env.STRIPE_SECRET_KEY) {
+  throw new Error('STRIPE_SECRET_KEY is not set');
+}
+
+export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
+  apiVersion: '2026-02-25.clover',
+  typescript: true,
+});
+
+export const STRIPE_PLANS = {
+  FREE: {
+    name: 'Free',
+    price: 0,
+    executionsPerMonth: 3,
+    features: [
+      '3 workflow executions/day',
+      'All node types',
+      'Community templates',
+      'Basic support',
+    ],
+  },
+  PRO: {
+    name: 'Pro',
+    price: 79,
+    priceId: process.env.STRIPE_PRO_PRICE_ID!,
+    executionsPerMonth: 1000,
+    features: [
+      'Unlimited workflow runs',
+      'Priority execution queue',
+      'Advanced AI models',
+      'Priority support',
+      'API access',
+      'Custom templates',
+    ],
+  },
+  TEAM: {
+    name: 'Team',
+    price: 199,
+    priceId: process.env.STRIPE_TEAM_PRICE_ID!,
+    executionsPerMonth: 10000,
+    features: [
+      'Everything in Pro',
+      '5 team seats included',
+      'Shared workflows & templates',
+      'Team analytics',
+      'SSO & SAML',
+      'Dedicated support',
+    ],
+  },
+} as const;
+
+export function getPlanByPriceId(priceId: string): 'FREE' | 'PRO' | 'TEAM' {
+  if (priceId === process.env.STRIPE_PRO_PRICE_ID) return 'PRO';
+  if (priceId === process.env.STRIPE_TEAM_PRICE_ID) return 'TEAM';
+  return 'FREE';
+}
+
+export function isSubscriptionActive(currentPeriodEnd: Date | null): boolean {
+  if (!currentPeriodEnd) return false;
+  return new Date(currentPeriodEnd) > new Date();
+}

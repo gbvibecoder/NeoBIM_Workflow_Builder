@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { trackFirstExecution } from "@/lib/analytics";
 import type { ExecutionStatus } from "@prisma/client";
 
 // GET /api/executions — list user's executions with workflow name
@@ -65,6 +66,9 @@ export async function POST(req: NextRequest) {
       ...(inputSummary && { tileResults: { inputSummary } }),
     },
   });
+
+  // 🔥 TRACK EXECUTION (+ first execution milestone)
+  await trackFirstExecution(session.user.id, execution.id);
 
   return NextResponse.json({ execution }, { status: 201 });
 }

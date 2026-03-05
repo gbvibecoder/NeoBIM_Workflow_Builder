@@ -1,0 +1,179 @@
+import { NextResponse } from 'next/server';
+import { headers } from 'next/headers';
+import { stripe, getPlanByPriceId } from '@/lib/stripe';
+import { prisma } from '@/lib/db';
+import Stripe from 'stripe';
+
+export async function POST(req: Request) {
+  const body = await req.text();
+  const headersList = await headers();
+  const signature = headersList.get('stripe-signature');
+
+  if (!signature) {
+    console.error('[STRIPE_WEBHOOK] No signature');
+    return NextResponse.json({ error: 'No signature' }, { status: 400 });
+  }
+
+  let event: Stripe.Event;
+
+  try {
+    event = stripe.webhooks.constructEvent(
+      body,
+      signature,
+      process.env.STRIPE_WEBHOOK_SECRET!
+    );
+  } catch (err: any) {
+    console.error('[STRIPE_WEBHOOK] Signature verification failed:', err.message);
+    return NextResponse.json(
+      { error: `Webhook Error: ${err.message}` },
+      { status: 400 }
+    );
+  }
+
+  console.log('[STRIPE_WEBHOOK] Event type:', event.type);
+
+  // Handle different event types
+  try {
+    switch (event.type) {
+      case 'checkout.session.completed': {
+        const session = event.data.object as Stripe.Checkout.Session;
+        await handleCheckoutCompleted(session);
+        break;
+      }
+
+      case 'customer.subscription.created':
+      case 'customer.subscription.updated': {
+        const subscription = event.data.object as Stripe.Subscription;
+        await handleSubscriptionUpdated(subscription);
+        break;
+      }
+
+      case 'customer.subscription.deleted': {
+        const subscription = event.data.object as Stripe.Subscription;
+        await handleSubscriptionDeleted(subscription);
+        break;
+      }
+
+      case 'invoice.payment_succeeded': {
+        const invoice = event.data.object as Stripe.Invoice;
+        console.log('[STRIPE_WEBHOOK] Payment succeeded for invoice:', invoice.id);
+        break;
+      }
+
+      case 'invoice.payment_failed': {
+        const invoice = event.data.object as Stripe.Invoice;
+        await handlePaymentFailed(invoice);
+        break;
+      }
+
+      default:
+        console.log(`[STRIPE_WEBHOOK] Unhandled event type: ${event.type}`);
+    }
+
+    return NextResponse.json({ received: true });
+  } catch (error: any) {
+    console.error('[STRIPE_WEBHOOK] Handler error:', error);
+    return NextResponse.json(
+      { error: 'Webhook handler failed' },
+      { status: 500 }
+    );
+  }
+}
+
+// ============================================================
+// WEBHOOK HANDLERS
+// ============================================================
+
+async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
+  const userId = session.metadata?.userId;
+  const plan = session.metadata?.plan as 'PRO' | 'TEAM_ADMIN';
+
+  if (!userId || !plan) {
+    console.error('[STRIPE_WEBHOOK] Missing metadata in checkout session');
+    return;
+  }
+
+  const subscription = await stripe.subscriptions.retrieve(
+    session.subscription as string
+  );
+
+  await prisma.user.update({
+    where: { id: userId },
+    data: {
+      stripeCustomerId: session.customer as string,
+      stripeSubscriptionId: subscription.id,
+      stripePriceId: subscription.items.data[0].price.id,
+      stripeCurrentPeriodEnd: new Date((subscription as any).current_period_end * 1000),
+      role: plan,
+    },
+  });
+
+  console.log(`[STRIPE_WEBHOOK] ✅ User ${userId} upgraded to ${plan}`);
+}
+
+async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
+  const user = await prisma.user.findFirst({
+    where: { stripeSubscriptionId: subscription.id },
+  });
+
+  if (!user) {
+    console.error('[STRIPE_WEBHOOK] User not found for subscription:', subscription.id);
+    return;
+  }
+
+  const priceId = subscription.items.data[0].price.id;
+  const newRole = getPlanByPriceId(priceId);
+
+  await prisma.user.update({
+    where: { id: user.id },
+    data: {
+      stripePriceId: priceId,
+      stripeCurrentPeriodEnd: new Date((subscription as any).current_period_end * 1000),
+      role: subscription.status === 'active' ? newRole : 'FREE',
+    },
+  });
+
+  console.log(`[STRIPE_WEBHOOK] ✅ Subscription updated for user ${user.id}`);
+}
+
+async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
+  const user = await prisma.user.findFirst({
+    where: { stripeSubscriptionId: subscription.id },
+  });
+
+  if (!user) {
+    console.error('[STRIPE_WEBHOOK] User not found for subscription:', subscription.id);
+    return;
+  }
+
+  await prisma.user.update({
+    where: { id: user.id },
+    data: {
+      stripeSubscriptionId: null,
+      stripePriceId: null,
+      stripeCurrentPeriodEnd: null,
+      role: 'FREE',
+    },
+  });
+
+  console.log(`[STRIPE_WEBHOOK] ✅ Subscription deleted, user ${user.id} downgraded to FREE`);
+}
+
+async function handlePaymentFailed(invoice: Stripe.Invoice) {
+  const customerId = invoice.customer as string;
+
+  const user = await prisma.user.findFirst({
+    where: { stripeCustomerId: customerId },
+  });
+
+  if (!user) {
+    console.error('[STRIPE_WEBHOOK] User not found for customer:', customerId);
+    return;
+  }
+
+  console.log(`[STRIPE_WEBHOOK] ⚠️ Payment failed for user ${user.id}`);
+  // TODO: Send email notification to user
+}
+
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
