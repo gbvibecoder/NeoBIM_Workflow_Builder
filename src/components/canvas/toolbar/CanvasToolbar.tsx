@@ -196,9 +196,9 @@ export function CanvasToolbar({
 
   return (
     <>
-      {/* Desktop toolbar - fixed at top */}
+      {/* Desktop toolbar - ALWAYS VISIBLE - fixed at top (no longer hidden on narrow screens) */}
       <div
-        className="hidden md:flex"
+        className="flex"
         style={{
           position: "absolute", top: 0, left: 0, right: 0, zIndex: 10,
           height: 52,
