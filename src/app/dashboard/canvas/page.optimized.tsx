@@ -1,5 +1,3 @@
-"use client";
-
 import dynamic from "next/dynamic";
 import { Suspense } from "react";
 
@@ -8,7 +6,7 @@ import { Suspense } from "react";
 const WorkflowCanvas = dynamic(
   () => import("@/components/canvas/WorkflowCanvas").then((m) => ({ default: m.WorkflowCanvas })),
   {
-    ssr: false,
+    ssr: false, // Canvas doesn't need SSR
     loading: () => (
       <div className="flex h-screen w-full items-center justify-center bg-[#07070D]">
         <div className="flex flex-col items-center gap-4">

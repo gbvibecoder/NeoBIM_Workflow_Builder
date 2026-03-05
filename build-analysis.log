@@ -1,0 +1,66 @@
+
+> workflow_builder@0.1.0 build
+> prisma generate && next build
+
+Loaded Prisma config from prisma.config.ts.
+
+Prisma schema loaded from prisma/schema.prisma.
+
+✔ Generated Prisma Client (v7.4.2) to ./node_modules/@prisma/client in 71ms
+
+Start by importing your Prisma Client (See: https://pris.ly/d/importing-client)
+
+
+▲ Next.js 16.1.6 (Turbopack)
+- Environments: .env.local, .env
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 4.2s
+  Running TypeScript ...
+  Collecting page data using 9 workers ...
+  Generating static pages using 9 workers (0/28) ...
+  Generating static pages using 9 workers (7/28) 
+  Generating static pages using 9 workers (14/28) 
+  Generating static pages using 9 workers (21/28) 
+✓ Generating static pages using 9 workers (28/28) in 223.8ms
+  Finalizing page optimization ...
+
+Route (app)
+┌ ○ /
+├ ○ /_not-found
+├ ƒ /api/analytics
+├ ƒ /api/auth/[...nextauth]
+├ ƒ /api/auth/register
+├ ƒ /api/execute-node
+├ ƒ /api/executions
+├ ƒ /api/executions/[id]
+├ ƒ /api/executions/[id]/artifacts
+├ ƒ /api/parse-ifc
+├ ƒ /api/stripe/checkout
+├ ƒ /api/stripe/checkout-session
+├ ƒ /api/stripe/customer-portal
+├ ƒ /api/stripe/portal
+├ ƒ /api/stripe/subscription
+├ ƒ /api/stripe/webhook
+├ ƒ /api/user/api-keys
+├ ƒ /api/workflows
+├ ƒ /api/workflows/[id]
+├ ○ /dashboard
+├ ○ /dashboard/analytics
+├ ○ /dashboard/billing
+├ ○ /dashboard/canvas
+├ ○ /dashboard/community
+├ ○ /dashboard/history
+├ ○ /dashboard/settings
+├ ○ /dashboard/templates
+├ ○ /dashboard/workflows
+├ ○ /dashboard/workflows/new
+├ ○ /login
+└ ○ /register
+
+
+ƒ Proxy (Middleware)
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+

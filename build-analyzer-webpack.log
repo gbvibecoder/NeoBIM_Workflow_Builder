@@ -1,0 +1,34 @@
+
+> workflow_builder@0.1.0 build
+> prisma generate && next build --webpack
+
+Loaded Prisma config from prisma.config.ts.
+
+Prisma schema loaded from prisma/schema.prisma.
+
+✔ Generated Prisma Client (v7.4.2) to ./node_modules/@prisma/client in 107ms
+
+Start by importing your Prisma Client (See: https://pris.ly/d/importing-client)
+
+
+▲ Next.js 16.1.6 (webpack)
+- Environments: .env.local, .env
+- Experiments (use with caution):
+  · optimizePackageImports
+
+  Creating an optimized production build ...
+Webpack Bundle Analyzer saved report to /Users/rutikerole/Projects/NeoBIM Workflow Builder/workflow_builder/.next/analyze/nodejs.html
+
+No bundles were parsed. Analyzer will show only original module sizes from stats file.
+
+Webpack Bundle Analyzer saved report to /Users/rutikerole/Projects/NeoBIM Workflow Builder/workflow_builder/.next/analyze/edge.html
+Webpack Bundle Analyzer saved report to /Users/rutikerole/Projects/NeoBIM Workflow Builder/workflow_builder/.next/analyze/client.html
+✓ Compiled successfully in 5.3s
+  Running TypeScript ...
+Failed to compile.
+
+src/app/api/execute-node/route.ts
+Type error: Route "src/app/api/execute-node/route.ts" does not match the required types of a Next.js Route.
+  "REAL_NODE_IDS" is not a valid Route export field.
+
+Next.js build worker exited with code: 1 and signal: null

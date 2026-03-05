@@ -14,7 +14,8 @@ function getDbUrl(): string {
       }
     } catch {}
   }
-  throw new Error("DATABASE_URL not found");
+  // Return a dummy URL for prisma generate (only needs real URL for db push/pull)
+  return "postgresql://dummy:dummy@localhost:5432/dummy";
 }
 
 export default defineConfig({

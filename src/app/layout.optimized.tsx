@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import { Toaster } from "sonner";
+import dynamic from "next/dynamic";
 import { MobileGate } from "@/components/MobileGate";
 import { SessionProvider } from "@/components/providers/SessionProvider";
-import { AnalyticsProvider } from "@/components/providers/AnalyticsProvider";
 import "./globals.css";
 
 // ─── Font Optimization: Load only needed weights + subsets ────────
@@ -14,6 +14,17 @@ const inter = Inter({
   weight: ["400", "500", "600", "700"], // Only needed weights
   preload: true,
 });
+
+// ─── Lazy Load Analytics (not critical for initial render) ────────
+const Analytics = dynamic(
+  () => import("@vercel/analytics/react").then((m) => ({ default: m.Analytics })),
+  { ssr: false }
+);
+
+const SpeedInsights = dynamic(
+  () => import("@vercel/speed-insights/next").then((m) => ({ default: m.SpeedInsights })),
+  { ssr: false }
+);
 
 export const metadata: Metadata = {
   title: {
@@ -86,7 +97,8 @@ export default function RootLayout({
           }}
         />
         {/* Analytics loaded lazily (non-blocking) */}
-        <AnalyticsProvider />
+        <Analytics />
+        <SpeedInsights />
       </body>
     </html>
   );

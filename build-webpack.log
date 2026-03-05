@@ -1,0 +1,28 @@
+
+> workflow_builder@0.1.0 build
+> prisma generate && next build --webpack
+
+Loaded Prisma config from prisma.config.ts.
+
+Prisma schema loaded from prisma/schema.prisma.
+
+✔ Generated Prisma Client (v7.4.2) to ./node_modules/@prisma/client in 69ms
+
+Start by importing your Prisma Client (See: https://pris.ly/d/importing-client)
+
+
+▲ Next.js 16.1.6 (webpack)
+- Environments: .env.local, .env
+- Experiments (use with caution):
+  · optimizePackageImports
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 7.2s
+  Running TypeScript ...
+Failed to compile.
+
+src/app/api/execute-node/route.ts
+Type error: Route "src/app/api/execute-node/route.ts" does not match the required types of a Next.js Route.
+  "REAL_NODE_IDS" is not a valid Route export field.
+
+Next.js build worker exited with code: 1 and signal: null
