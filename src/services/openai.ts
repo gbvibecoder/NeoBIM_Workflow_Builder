@@ -73,14 +73,14 @@ export async function generateConceptImage(
 
   const imagePrompt = `${style} of a ${description.buildingType}, ${description.programSummary}.
 ${description.floors} floors, ${description.facade} facade, ${description.structure} structure.
-Architectural visualization, professional photography, natural lighting, urban context.`;
+Professional architectural visualization, golden hour lighting with soft warm shadows, vibrant urban context with pedestrians and landscaping. Shot from eye-level perspective, ultra-high quality architectural photography, cinematic composition. Client-presentation ready, award-winning architectural render.`;
 
   const response = await client.images.generate({
     model: "dall-e-3",
     prompt: imagePrompt,
     n: 1,
     size: "1024x1024",
-    quality: "standard",
+    quality: "hd",
   });
 
   const image = response.data?.[0];

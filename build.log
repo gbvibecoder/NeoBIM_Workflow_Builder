@@ -1,0 +1,5 @@
+
+> workflow_builder@0.1.0 build
+> prisma generate && next build
+
+Failed to load config file "/Users/rutikerole/NeoBIM_backup" as a TypeScript/JavaScript module. Error: Error: DATABASE_URL not found
