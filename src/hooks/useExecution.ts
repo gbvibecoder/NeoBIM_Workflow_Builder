@@ -13,6 +13,17 @@ import type { LogEntry } from "@/components/canvas/ExecutionLog";
 // Node IDs that have real API implementations
 const REAL_NODE_IDS = new Set(["TR-003", "GN-003", "IN-004", "TR-007", "TR-008", "EX-002"]);
 
+interface APIErrorResponse {
+  error: {
+    title: string;
+    message: string;
+    code: string;
+    action?: string;
+    actionUrl?: string;
+  };
+  details?: string;
+}
+
 // Route execution to real API or mock
 async function executeNode(
   node: WorkflowNode,
@@ -35,20 +46,34 @@ async function executeNode(
     });
 
     if (!res.ok) {
-      const err = await res.json().catch(() => ({ error: "Execution failed" }));
+      const errorData = await res.json().catch(() => ({ 
+        error: { 
+          title: "Request failed", 
+          message: "Unable to complete request",
+          code: "UNKNOWN"
+        }
+      })) as APIErrorResponse;
+      
+      // Extract user-friendly error info
+      const error = errorData.error;
       
       // Special handling for 429 Rate Limit errors
       if (res.status === 429) {
-        const errorData = err as { error?: string; message?: string; remaining?: number; reset?: number; upgradeUrl?: string };
-        const rateLimitError = new Error(errorData.message || errorData.error || "Rate limit exceeded");
+        const rateLimitError = new Error(error.message);
         (rateLimitError as any).status = 429;
-        (rateLimitError as any).remaining = errorData.remaining || 0;
-        (rateLimitError as any).reset = errorData.reset || Date.now() + 86400000;
-        (rateLimitError as any).upgradeUrl = errorData.upgradeUrl || "/dashboard/billing";
+        (rateLimitError as any).title = error.title;
+        (rateLimitError as any).action = error.action;
+        (rateLimitError as any).actionUrl = error.actionUrl;
         throw rateLimitError;
       }
       
-      throw new Error((err as { error?: string }).error ?? "Node execution failed");
+      // Throw error with user-friendly message
+      const err = new Error(error.message);
+      (err as any).title = error.title;
+      (err as any).code = error.code;
+      (err as any).action = error.action;
+      (err as any).actionUrl = error.actionUrl;
+      throw err;
     }
 
     const { artifact } = await res.json() as { artifact: ExecutionArtifact };
@@ -66,9 +91,10 @@ interface UseExecutionOptions {
 }
 
 interface RateLimitInfo {
-  remaining: number;
-  reset: number;
-  upgradeUrl: string;
+  title: string;
+  message: string;
+  action?: string;
+  actionUrl?: string;
 }
 
 export function useExecution({ onLog }: UseExecutionOptions = {}) {
@@ -164,6 +190,14 @@ export function useExecution({ onLog }: UseExecutionOptions = {}) {
         updateNodeStatus(node.id, "success");
         log("success", `${node.data.label} completed`, String(artifact.type));
 
+        // Show warnings if any
+        if (artifact.metadata?.warnings && Array.isArray(artifact.metadata.warnings)) {
+          for (const warning of artifact.metadata.warnings) {
+            toast.warning(warning, { duration: 4000 });
+            // log("warning", warning); // Skipped - not a standard log type
+          }
+        }
+
         // Persist artifact to DB (stored in tileResults JSON on the Execution)
         if (dbExecutionId) {
           fetch(`/api/executions/${dbExecutionId}/artifacts`, {
@@ -186,24 +220,35 @@ export function useExecution({ onLog }: UseExecutionOptions = {}) {
       } catch (error) {
         hasError = true;
         updateNodeStatus(node.id, "error");
+        
+        const errTitle = (error as any).title || "Error";
         const errMsg = error instanceof Error ? error.message : "Unknown error";
+        const errAction = (error as any).action;
+        const errActionUrl = (error as any).actionUrl;
         
         // Check if this is a rate limit error
         if ((error as any).status === 429) {
-          const resetDate = new Date((error as any).reset || Date.now() + 86400000);
-          const hoursUntilReset = Math.ceil((resetDate.getTime() - Date.now()) / (1000 * 60 * 60));
-          
-          log("error", "Rate limit exceeded", `Resets in ${hoursUntilReset}h`);
+          log("error", "Rate limit exceeded", errMsg);
           
           // Set rate limit info to trigger modal
           setRateLimitHit({
-            remaining: (error as any).remaining || 0,
-            reset: (error as any).reset || Date.now() + 86400000,
-            upgradeUrl: (error as any).upgradeUrl || "/dashboard/billing",
+            title: errTitle,
+            message: errMsg,
+            action: errAction,
+            actionUrl: errActionUrl,
           });
         } else {
           log("error", `${node.data.label} failed`, errMsg);
-          toast.error(`Node "${node.data.label}" failed`, { duration: 4000 });
+          
+          // Show user-friendly error toast
+          toast.error(errTitle, {
+            description: errMsg,
+            duration: 6000,
+            action: errAction && errActionUrl ? {
+              label: errAction,
+              onClick: () => window.location.href = errActionUrl,
+            } : undefined,
+          });
         }
         
         addTileResult({

@@ -1,4 +1,5 @@
 import OpenAI from "openai";
+import { detectOpenAIError, APIError } from "@/lib/user-errors";
 
 function getClient(userApiKey?: string): OpenAI {
   const key = userApiKey || process.env.OPENAI_API_KEY;
@@ -25,37 +26,22 @@ async function handleOpenAICall<T>(
   try {
     return await fn();
   } catch (error: any) {
-    // Handle OpenAI API errors
-    if (error?.status || error?.response?.status) {
-      const status = error.status || error.response?.status;
-      
-      if (status === 429) {
-        throw new OpenAIError(
-          "OpenAI rate limit exceeded",
-          429,
-          "AI service temporarily unavailable. Please try again in a moment."
-        );
-      }
-      
-      if (status === 401) {
-        throw new OpenAIError(
-          "Invalid OpenAI API key",
-          401,
-          "AI service configuration error. Please contact support."
-        );
-      }
-      
-      if (status >= 500) {
-        throw new OpenAIError(
-          "OpenAI server error",
-          500,
-          "AI service error. Please try again."
-        );
-      }
-    }
+    // Detect specific OpenAI error types and throw user-friendly errors
+    const userError = detectOpenAIError(error);
     
-    // Re-throw other errors
-    throw error;
+    // Log the original error for debugging
+    console.error("[OpenAI Error]", {
+      message: error?.message,
+      code: error?.code,
+      status: error?.status,
+      userError: userError.code,
+    });
+    
+    // Throw APIError with user-friendly message
+    throw new APIError(
+      userError,
+      error?.status || 500
+    );
   }
 }
 

@@ -71,7 +71,7 @@ function StickyNav() {
         </span>
       </Link>
 
-      {["Features", "Workflows", "Community"].map(l => (
+      {["Features", "Workflows", "Pricing", "Community"].map(l => (
         <a key={l} href={`#${l.toLowerCase()}`} style={{
           fontSize: 13, color: "#9898B0", textDecoration: "none",
           margin: "0 16px", transition: "color 0.15s",
@@ -790,6 +790,86 @@ export default function LandingPage() {
             );
           })}
         </motion.div>
+      </section>
+
+
+      {/* ── PRICING SECTION ───────────────────────────────────────── */}
+      <section id="pricing" style={{
+        padding: "88px 48px",
+        borderTop: "1px solid rgba(255,255,255,0.06)",
+        background: "#0B0B13",
+      }}>
+        <div style={{ maxWidth: 1200, margin: "0 auto" }}>
+          <motion.div
+            initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-80px" }}
+            variants={fadeUp} transition={{ duration: 0.5, ease: smoothEase }}
+            style={{ textAlign: "center", marginBottom: 52 }}
+          >
+            <h2 style={{ fontSize: 32, fontWeight: 700, color: "#F0F0F5", marginBottom: 12, letterSpacing: "-0.01em" }}>
+              Simple, transparent pricing
+            </h2>
+            <p style={{ fontSize: 16, color: "#9898B0" }}>
+              Choose the plan that fits your workflow
+            </p>
+          </motion.div>
+
+          <motion.div
+            initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-40px" }}
+            variants={{ visible: { transition: { staggerChildren: 0.12 } } }}
+            style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 20 }}
+          >
+            {/* FREE */}
+            <motion.div variants={fadeUp} transition={{ duration: 0.5, ease: smoothEase }} style={{ background: "#12121E", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 16, padding: "32px 28px" }}>
+              <div style={{ marginBottom: 24 }}>
+                <h3 style={{ fontSize: 20, fontWeight: 700, color: "#F0F0F5", marginBottom: 6 }}>Free</h3>
+                <p style={{ fontSize: 13, color: "#7878A0" }}>Perfect for trying out workflows</p>
+              </div>
+              <div style={{ marginBottom: 28 }}>
+                <span style={{ fontSize: 40, fontWeight: 800, color: "#F0F0F5" }}>$0</span>
+                <span style={{ fontSize: 15, color: "#7878A0", marginLeft: 8 }}>/month</span>
+              </div>
+              <Link href="/dashboard" style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "11px 24px", borderRadius: 9, border: "1px solid rgba(255,255,255,0.12)", background: "#1A1A2A", color: "#F0F0F5", fontSize: 14, fontWeight: 600, textDecoration: "none", marginBottom: 28 }}>Get Started</Link>
+              <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: 24 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: "#9898B0", marginBottom: 14 }}>What's included:</div>
+                {["3 workflows", "10 executions/month", "Community templates", "Basic node library", "Community support"].map(f => (<div key={f} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}><span style={{ color: "#4F8AFF" }}>✓</span><span style={{ fontSize: 14, color: "#9898B0" }}>{f}</span></div>))}
+              </div>
+            </motion.div>
+
+            {/* PRO (MOST POPULAR) */}
+            <motion.div variants={fadeUp} transition={{ duration: 0.5, ease: smoothEase }} style={{ background: "#12121E", border: "2px solid rgba(79,138,255,0.35)", borderRadius: 16, padding: "32px 28px", position: "relative", boxShadow: "0 0 0 1px rgba(79,138,255,0.1), 0 8px 32px rgba(79,138,255,0.08)" }}>
+              <div style={{ position: "absolute", top: -10, left: "50%", transform: "translateX(-50%)", padding: "3px 12px", borderRadius: 20, background: "linear-gradient(135deg, #4F8AFF, #6366F1)", fontSize: 10, fontWeight: 700, color: "white", letterSpacing: "0.8px" }}>MOST POPULAR</div>
+              <div style={{ marginBottom: 24 }}>
+                <h3 style={{ fontSize: 20, fontWeight: 700, color: "#F0F0F5", marginBottom: 6 }}>Pro</h3>
+                <p style={{ fontSize: 13, color: "#7878A0" }}>For professionals & small teams</p>
+              </div>
+              <div style={{ marginBottom: 28 }}>
+                <span style={{ fontSize: 40, fontWeight: 800, color: "#F0F0F5" }}>$79</span>
+                <span style={{ fontSize: 15, color: "#7878A0", marginLeft: 8 }}>/month</span>
+              </div>
+              <Link href="/dashboard" style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "11px 24px", borderRadius: 9, background: "linear-gradient(135deg, #4F8AFF 0%, #6366F1 100%)", color: "white", fontSize: 14, fontWeight: 600, textDecoration: "none", marginBottom: 28, boxShadow: "0 0 0 1px rgba(79,138,255,0.3), 0 4px 16px rgba(79,138,255,0.25)" }}>Start Free Trial</Link>
+              <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: 24 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: "#9898B0", marginBottom: 14 }}>Everything in Free, plus:</div>
+                {["Unlimited workflows", "500 executions/month", "All 31 premium nodes", "AI prompt generation", "Priority execution", "Email support"].map(f => (<div key={f} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}><span style={{ color: "#4F8AFF" }}>✓</span><span style={{ fontSize: 14, color: "#D0D0E0" }}>{f}</span></div>))}
+              </div>
+            </motion.div>
+
+            {/* ENTERPRISE */}
+            <motion.div variants={fadeUp} transition={{ duration: 0.5, ease: smoothEase }} style={{ background: "#12121E", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 16, padding: "32px 28px" }}>
+              <div style={{ marginBottom: 24 }}>
+                <h3 style={{ fontSize: 20, fontWeight: 700, color: "#F0F0F5", marginBottom: 6 }}>Enterprise</h3>
+                <p style={{ fontSize: 13, color: "#7878A0" }}>For large teams & organizations</p>
+              </div>
+              <div style={{ marginBottom: 28 }}>
+                <span style={{ fontSize: 32, fontWeight: 800, color: "#F0F0F5" }}>Custom</span>
+              </div>
+              <a href="mailto:sales@neobim.com" style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "11px 24px", borderRadius: 9, border: "1px solid rgba(255,255,255,0.12)", background: "#1A1A2A", color: "#F0F0F5", fontSize: 14, fontWeight: 600, textDecoration: "none", marginBottom: 28 }}>Contact Sales</a>
+              <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: 24 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: "#9898B0", marginBottom: 14 }}>Everything in Pro, plus:</div>
+                {["Unlimited executions", "SSO & SAML", "Dedicated support", "Custom integrations", "SLA guarantee", "On-premise deployment"].map(f => (<div key={f} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}><span style={{ color: "#8B5CF6" }}>✓</span><span style={{ fontSize: 14, color: "#9898B0" }}>{f}</span></div>))}
+              </div>
+            </motion.div>
+          </motion.div>
+        </div>
       </section>
 
       {/* ── CTA ───────────────────────────────────────────────────── */}
