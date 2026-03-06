@@ -5,6 +5,7 @@
 
 import type { ExecutionArtifact, ArtifactType } from "@/types/execution";
 import { generateId } from "@/lib/utils";
+import { calculateBOQ } from "@/constants/unit-rates";
 
 const ARCHITECTURAL_IMAGES = [
   "https://picsum.photos/seed/arch1/600/400",
@@ -190,21 +191,83 @@ export async function executeNode(
       });
     }
 
-    case "TR-008": // BOQ / Cost Mapper
+    case "TR-008": { // BOQ / Cost Mapper — real CSI unit rates
+      // Map TR-007 category/description names to IFC element types
+      const CATEGORY_TO_IFC: Record<string, string> = {
+        "Walls": "IfcWall", "External Walls": "IfcWall", "Internal Walls": "IfcWall",
+        "Slabs": "IfcSlab", "Floor Slabs": "IfcSlab", "Roof Slab": "IfcRoof",
+        "Openings": "IfcWindow", "Windows": "IfcWindow", "Doors": "IfcDoor",
+        "Structure": "IfcColumn", "Columns": "IfcColumn", "Beams": "IfcBeam",
+        "Roof": "IfcRoof", "Stairs": "IfcStair", "Footings": "IfcFooting",
+        "Curtain Walls": "IfcCurtainWall", "Railings": "IfcRailing",
+      };
+
+      // Parse upstream quantities from TR-007
+      const boqQuantities = inputData?._elements || inputData?.rows || [];
+
+      let boqElements: Array<{ type: string; count: number; area?: number }> = [];
+
+      if (Array.isArray(boqQuantities) && boqQuantities.length > 0) {
+        boqElements = (boqQuantities as Record<string, unknown>[]).map((q) => {
+          const raw = (q.type as string) || (q.description as string) || (q.category as string) || "IfcWall";
+          // Resolve to IFC type — check map first, then use raw value (already IFC)
+          const ifcType = CATEGORY_TO_IFC[raw] || raw;
+          return {
+            type: ifcType,
+            count: Number(q.count ?? q.quantity ?? 1),
+            area: q.totalArea != null || q.area != null
+              ? Number(q.totalArea ?? q.area)
+              : undefined,
+          };
+        });
+      } else {
+        // Fallback: generate realistic elements from a typical 5-storey building
+        const boqFloors = Number(inputData?.floors) || 5;
+        boqElements = [
+          { type: "IfcSlab", count: boqFloors + 1, area: 500 * (boqFloors + 1) },
+          { type: "IfcWall", count: boqFloors * 12, area: 200 * boqFloors },
+          { type: "IfcColumn", count: boqFloors * 8 },
+          { type: "IfcWindow", count: boqFloors * 6 },
+          { type: "IfcDoor", count: boqFloors * 4 },
+          { type: "IfcStair", count: 2, area: 30 },
+          { type: "IfcRoof", count: 1, area: 500 },
+          { type: "IfcFooting", count: 8 },
+        ];
+      }
+
+      const boq = calculateBOQ(boqElements);
+
+      const boqHeaders = ["Division", "CSI Code", "Description", "Unit", "Qty", "Material", "Labor", "Equipment", "Total"];
+      const boqRows = boq.lines.map(line => [
+        `Div ${line.division}`,
+        line.csiCode,
+        line.description,
+        line.unit,
+        line.quantity.toLocaleString(),
+        `$${line.materialCost.toLocaleString()}`,
+        `$${line.laborCost.toLocaleString()}`,
+        `$${line.equipmentCost.toLocaleString()}`,
+        `$${line.totalCost.toLocaleString()}`,
+      ]);
+
       return mockArtifact(executionId, tileInstanceId, "table", {
-        label: "Bill of Quantities",
-        headers: ["Description", "Unit", "Qty", "Rate (NOK)", "Total (NOK)"],
-        rows: [
-          ["External walls — rendered masonry", "m²", 1240, 4500, "5,580,000"],
-          ["Internal walls — lightweight partition", "m²", 2890, 1200, "3,468,000"],
-          ["Structural slabs — RC 200mm", "m²", 3030, 3800, "11,514,000"],
-          ["Roof slab — RC 250mm + green roof", "m²", 605, 5200, "3,146,000"],
-          ["Windows — triple glazed, ALU frame", "m²", 288, 8500, "2,448,000"],
-          ["Doors — internal solid core", "No.", 58, 12000, "696,000"],
-          ["Structural columns — RC 400×400", "m³", 8.4, 15000, "126,000"],
-          ["Staircases — precast RC", "No.", 2, 280000, "560,000"],
-        ],
+        label: "Bill of Quantities — Cost Estimate",
+        headers: boqHeaders,
+        rows: boqRows,
+        _boqData: boq,
+        content: `Cost estimate: ${boq.lines.length} line items, Grand Total: $${boq.grandTotal.toLocaleString()}`,
+        summary: {
+          lineItems: boq.lines.length,
+          subtotalMaterial: boq.subtotalMaterial,
+          subtotalLabor: boq.subtotalLabor,
+          subtotalEquipment: boq.subtotalEquipment,
+          grandTotal: boq.grandTotal,
+          currency: "USD",
+          confidence: "moderate",
+          note: "Based on CSI MasterFormat unit rates, National Average 2024",
+        },
       });
+    }
 
     case "TR-009": // BIM Query
       return mockArtifact(executionId, tileInstanceId, "text", {
@@ -320,15 +383,51 @@ export async function executeNode(
       });
     }
 
-    case "EX-002": { // BOQ Exporter
-      const csvContent = "Description,Unit,Qty,Rate (NOK),Total (NOK)\nExternal walls,m²,1240,4500,5580000\nInternal walls,m²,2890,1200,3468000\nStructural slabs,m²,3030,3800,11514000\nRoof slab,m²,605,5200,3146000\nWindows,m²,288,8500,2448000\nDoors,No.,58,12000,696000\nColumns,m³,8.4,15000,126000\nStaircases,No.,2,280000,560000";
-      const csvBase64 = typeof Buffer !== "undefined" ? Buffer.from(csvContent).toString("base64") : btoa(csvContent);
+    case "EX-002": { // BOQ Exporter — professional CSV with CSI codes
+      const upstreamBoq = inputData?._boqData as {
+        lines: Array<{ division: string; csiCode: string; description: string; unit: string; quantity: number; materialRate: number; laborRate: number; equipmentRate: number; unitRate: number; materialCost: number; laborCost: number; equipmentCost: number; totalCost: number }>;
+        subtotalMaterial: number; subtotalLabor: number; subtotalEquipment: number; grandTotal: number;
+      } | undefined;
+      const upstreamSummary = inputData?.summary as Record<string, unknown> | undefined;
+
+      let exportCsvContent: string;
+      let exportLineCount: number;
+      let exportGrandTotal: number;
+
+      if (upstreamBoq?.lines?.length) {
+        // Build professional CSV from BOQ data
+        const csvLines = [
+          "Division,CSI Code,Description,Unit,Quantity,Material Rate,Labor Rate,Equipment Rate,Unit Rate,Material Cost,Labor Cost,Equipment Cost,Total Cost",
+          ...upstreamBoq.lines.map(l =>
+            `Div ${l.division},${l.csiCode},${l.description},${l.unit},${l.quantity},${l.materialRate},${l.laborRate},${l.equipmentRate},${l.unitRate},${l.materialCost},${l.laborCost},${l.equipmentCost},${l.totalCost}`
+          ),
+          "",
+          `,,SUBTOTAL - Material,,,,,,,,${upstreamBoq.subtotalMaterial},,,`,
+          `,,SUBTOTAL - Labor,,,,,,,,,${upstreamBoq.subtotalLabor},,`,
+          `,,SUBTOTAL - Equipment,,,,,,,,,,${upstreamBoq.subtotalEquipment},`,
+          `,,GRAND TOTAL,,,,,,,,,,,${upstreamBoq.grandTotal}`,
+        ];
+        exportCsvContent = csvLines.join("\n");
+        exportLineCount = upstreamBoq.lines.length;
+        exportGrandTotal = upstreamBoq.grandTotal;
+      } else {
+        // Fallback CSV
+        exportCsvContent = "Description,Unit,Qty,Unit Rate,Total\nNo BOQ data available,,,,$0";
+        exportLineCount = 0;
+        exportGrandTotal = 0;
+      }
+
+      const exportCsvBase64 = typeof Buffer !== "undefined"
+        ? Buffer.from(exportCsvContent).toString("base64")
+        : btoa(exportCsvContent);
+
       return mockArtifact(executionId, tileInstanceId, "file", {
-        name: "oslo_mixeduse_boq.csv",
+        name: `BuildFlow_BOQ_${new Date().toISOString().split("T")[0]}.csv`,
         type: "CSV Spreadsheet",
-        size: csvContent.length,
-        downloadUrl: `data:text/csv;base64,${csvBase64}`,
+        size: exportCsvContent.length,
+        downloadUrl: `data:text/csv;base64,${exportCsvBase64}`,
         label: "BOQ Export",
+        content: `BOQ Export: ${exportLineCount} line items, Grand Total: $${exportGrandTotal.toLocaleString()}`,
       });
     }
 

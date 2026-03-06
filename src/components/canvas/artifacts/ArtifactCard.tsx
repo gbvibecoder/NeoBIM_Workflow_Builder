@@ -316,36 +316,72 @@ function KpiBody({ data, accentColor }: { data: KpiArtifactData; accentColor: st
 }
 
 function TableBody({ data }: { data: TableArtifactData }) {
+  const headers = data?.headers ?? [];
+  const rows = data?.rows ?? [];
+  const isWide = headers.length > 6;
+  const summary = (data as unknown as Record<string, unknown>)?.summary as { grandTotal?: number; currency?: string; note?: string } | undefined;
+  const content = (data as unknown as Record<string, unknown>)?.content as string | undefined;
+
+  // For wide tables (BOQ), show simplified 5-column view
+  const displayHeaders = isWide
+    ? [headers[0], headers[2], headers[3], headers[4], headers[headers.length - 1]]
+    : headers;
+  const displayRows = isWide
+    ? rows.map(row => [row[0], row[2], row[3], row[4], row[row.length - 1]])
+    : rows;
+
   return (
-    <div style={{ overflow: "auto", maxHeight: 200, margin: "0 0 10px" }}>
-      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 10 }}>
-        <thead>
-          <tr style={{ background: "rgba(0,0,0,0.3)" }}>
-            {data?.headers?.map((h, i) => (
-              <th key={i} style={{
-                padding: "5px 10px", textAlign: "left",
-                color: "#5C5C78", fontWeight: 600, whiteSpace: "nowrap",
-                borderBottom: "1px solid rgba(255,255,255,0.06)",
-              }}>
-                {h}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {data?.rows?.map((row, i) => (
-            <tr key={i} style={{ borderBottom: "1px solid rgba(30,30,46,0.5)" }}>
-              {row.map((cell, j) => (
-                <td key={j} style={{
-                  padding: "5px 10px", color: "#8888A0", whiteSpace: "nowrap",
+    <div style={{ margin: "0 0 10px" }}>
+      <div style={{ overflow: "auto", maxHeight: 200 }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 10 }}>
+          <thead>
+            <tr style={{ background: "rgba(0,0,0,0.3)", position: "sticky", top: 0, zIndex: 1 }}>
+              {displayHeaders.map((h, i) => (
+                <th key={i} style={{
+                  padding: "5px 10px", textAlign: i >= 3 ? "right" : "left",
+                  color: "#5C5C78", fontWeight: 600, whiteSpace: "nowrap",
+                  borderBottom: "1px solid rgba(255,255,255,0.06)",
+                  background: "rgba(0,0,0,0.3)",
                 }}>
-                  {cell}
-                </td>
+                  {h}
+                </th>
               ))}
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {displayRows.map((row, i) => (
+              <tr key={i} style={{ borderBottom: "1px solid rgba(30,30,46,0.5)" }}>
+                {row.map((cell, j) => (
+                  <td key={j} style={{
+                    padding: "5px 10px", color: "#8888A0", whiteSpace: "nowrap",
+                    textAlign: j >= 3 ? "right" : "left",
+                    fontVariantNumeric: "tabular-nums",
+                  }}>
+                    {cell}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {(summary?.grandTotal != null || content) && (
+        <div style={{
+          padding: "6px 14px",
+          borderTop: "1px solid rgba(255,255,255,0.08)",
+          display: "flex", justifyContent: "space-between", alignItems: "center",
+          fontSize: 10,
+        }}>
+          <span style={{ color: "#5C5C78" }}>
+            {rows.length} line items{summary?.note ? ` · ${summary.note}` : ""}
+          </span>
+          {summary?.grandTotal != null && (
+            <span style={{ color: "#10B981", fontWeight: 700 }}>
+              Grand Total: ${summary.grandTotal.toLocaleString()}
+            </span>
+          )}
+        </div>
+      )}
     </div>
   );
 }
