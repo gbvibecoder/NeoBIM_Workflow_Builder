@@ -42,14 +42,30 @@ export const proTierRateLimit = new Ratelimit({
   prefix: "@upstash/ratelimit:execute-node:pro",
 });
 
+/**
+ * Check if user is an admin (bypasses rate limits)
+ * Reads from ADMIN_EMAILS environment variable (comma-separated list)
+ */
+function isAdminUser(userEmail?: string): boolean {
+  if (!userEmail) return false;
+  
+  const adminEmails = process.env.ADMIN_EMAILS;
+  if (!adminEmails) return false;
+  
+  const adminList = adminEmails.split(',').map(email => email.trim().toLowerCase());
+  return adminList.includes(userEmail.toLowerCase());
+}
+
 export async function checkRateLimit(
   userId: string,
   userRole: "FREE" | "PRO" | "TEAM_ADMIN" | "PLATFORM_ADMIN",
   userEmail?: string
 ) {
-  const adminEmail = process.env.ADMIN_EMAIL;
-  if (adminEmail && userEmail && userEmail.toLowerCase() === adminEmail.toLowerCase()) {
-    console.log("[rate-limit] Admin bypass for:", userEmail);
+  // Check if user is in admin list (bypasses rate limits)
+  if (isAdminUser(userEmail)) {
+    if (process.env.NODE_ENV === "development") {
+      console.log("[rate-limit] Admin bypass for:", userEmail);
+    }
     return {
       success: true,
       limit: 999999,
@@ -59,6 +75,7 @@ export async function checkRateLimit(
     };
   }
 
+  // Apply role-based rate limiting
   if (userRole === "PRO" || userRole === "TEAM_ADMIN" || userRole === "PLATFORM_ADMIN") {
     return await proTierRateLimit.limit(userId);
   }

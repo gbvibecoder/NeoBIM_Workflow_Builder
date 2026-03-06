@@ -3,7 +3,6 @@ import { auth } from "@/lib/auth";
 import { generateBuildingDescription, generateConceptImage } from "@/services/openai";
 import { generateId } from "@/lib/utils";
 import type { ExecutionArtifact } from "@/types/execution";
-import * as XLSX from "xlsx";
 import { checkRateLimit, logRateLimitHit } from "@/lib/rate-limit";
 import {
   findUnitRate,
@@ -32,11 +31,7 @@ export async function POST(req: NextRequest) {
 
   // Apply rate limiting
   try {
-    // EMERGENCY ADMIN BYPASS
-    if (session?.user?.email === "erolerutik9@gmail.com") {
-      console.log("[ADMIN BYPASS] Skipping rate limit for admin");
-      // Skip rate limiting entirely
-    } else {
+
     const userEmail = session.user.email || "";
     const rateLimitResult = await checkRateLimit(userId, userRole, userEmail);
 
@@ -65,9 +60,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Log successful request with remaining quota
-    console.log("[execute-node] User " + userId + " (" + userRole + ") - Remaining: " + rateLimitResult.remaining + "/" + rateLimitResult.limit);
-    }
-
+    if (process.env.NODE_ENV === "development") console.log("[execute-node] User " + userId + " (" + userRole + ") - Remaining: " + rateLimitResult.remaining + "/" + rateLimitResult.limit);
   } catch (error) {
     console.error("[execute-node] Rate limit check failed:", error);
     // If rate limiting fails, allow the request to proceed (fail open for better UX)
@@ -354,6 +347,7 @@ export async function POST(req: NextRequest) {
 
     } else if (catalogueId === "EX-002") {
       // BOQ Excel Export — generate real XLSX file
+      const XLSX = await import("xlsx");
       const rows = (inputData?.rows ?? []) as string[][];
       const headers = (inputData?.headers ?? ["Description", "Unit", "Qty", "Rate", "Total"]) as string[];
 

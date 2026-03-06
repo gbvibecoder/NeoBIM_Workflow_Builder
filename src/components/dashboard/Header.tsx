@@ -12,7 +12,12 @@ export function Header({ title, subtitle }: HeaderProps) {
     <header className="flex items-center justify-between px-6 py-3 border-b border-[rgba(255,255,255,0.06)] bg-[#07070D]">
       <div>
         {title && (
-          <h1 className="text-[20px] font-semibold text-[#F0F0F5] tracking-[-0.01em]">{title}</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-[20px] font-semibold text-[#F0F0F5] tracking-[-0.01em]">{title}</h1>
+            <span className="px-2 py-0.5 rounded-full bg-[rgba(245,158,11,0.15)] text-[#F59E0B] text-[9px] font-bold uppercase tracking-wider border border-[rgba(245,158,11,0.3)]">
+              BETA
+            </span>
+          </div>
         )}
         {subtitle && (
           <p className="text-[13px] text-[#5C5C78] mt-0.5">{subtitle}</p>

@@ -77,7 +77,7 @@ export function MobileGate({ children }: { children: React.ReactNode }) {
               lineHeight: 1.65,
             }}
           >
-            NeoBIM Workflow Builder is designed for screens 1024px and wider.
+            Workflow Builder is designed for screens 1024px and wider.
             Open it on a desktop or laptop for the best experience.
           </p>
         </div>

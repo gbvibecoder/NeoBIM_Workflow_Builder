@@ -46,3 +46,38 @@ PR_DESCRIPTION.md
 START_HERE_GOVIND.md
 STRIPE_INTEGRATION_PLAN.md
 UI_IMPROVEMENTS.md
+
+# Workspace documentation (agent reports)
+*_SUMMARY.md
+*_SUMMARY.txt
+*_REPORT.md
+*_COMPLETE.md
+*_CHECKLIST.md
+*_GUIDE.md
+*_PLAN.md
+*_FIXES.md
+*_TESTING.md
+*_REFERENCE.md
+*_VALIDATION.md
+*_AUDIT.md
+*_REQUIREMENTS.md
+START_HERE*.md
+MORNING_*.md
+DAY*_*.md
+QUICKSTART_*.md
+GO_NO_GO_*.md
+ROLLBACK_*.md
+SUBAGENT_*.md
+*.txt
+
+# Backup files
+*.bak
+*.bak2
+*.bak3
+*.bak4
+
+# Test artifacts
+coverage/
+node-validation-*.json
+dev-server.pid
+dev-server-test.log

@@ -2,19 +2,39 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { stripe, STRIPE_PLANS } from '@/lib/stripe';
 import { prisma } from '@/lib/db';
+import { 
+  formatErrorResponse, 
+  UserErrors, 
+  BillingErrors,
+  FormErrors
+} from '@/lib/user-errors';
 
 export async function POST(req: Request) {
   try {
     const session = await auth();
     if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json(
+        formatErrorResponse(UserErrors.UNAUTHORIZED),
+        { status: 401 }
+      );
     }
 
     const { priceId, plan } = await req.json();
 
     // Validate plan
-    if (!['PRO', 'TEAM_ADMIN'].includes(plan)) {
-      return NextResponse.json({ error: 'Invalid plan' }, { status: 400 });
+    if (!plan || !['PRO', 'TEAM_ADMIN'].includes(plan)) {
+      return NextResponse.json(
+        formatErrorResponse(FormErrors.REQUIRED_FIELD("plan")),
+        { status: 400 }
+      );
+    }
+
+    // Validate priceId
+    if (!priceId || typeof priceId !== 'string') {
+      return NextResponse.json(
+        formatErrorResponse(FormErrors.REQUIRED_FIELD("priceId")),
+        { status: 400 }
+      );
     }
 
     // Get user from DB
@@ -24,45 +44,87 @@ export async function POST(req: Request) {
     });
 
     if (!user) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+      return NextResponse.json(
+        formatErrorResponse({
+          title: "User not found",
+          message: "Your account could not be found. Please try signing out and back in.",
+          code: "USER_001",
+          action: "Sign Out",
+          actionUrl: "/api/auth/signout",
+        }),
+        { status: 404 }
+      );
     }
 
     // Create or get Stripe customer
     let customerId = user.stripeCustomerId;
     if (!customerId) {
-      const customer = await stripe.customers.create({
-        email: user.email!,
-        name: user.name || undefined,
-        metadata: { userId: user.id },
-      });
-      customerId = customer.id;
+      try {
+        const customer = await stripe.customers.create({
+          email: user.email!,
+          name: user.name || undefined,
+          metadata: { userId: user.id },
+        });
+        customerId = customer.id;
 
-      // Save customer ID
-      await prisma.user.update({
-        where: { id: user.id },
-        data: { stripeCustomerId: customerId },
-      });
+        // Save customer ID
+        await prisma.user.update({
+          where: { id: user.id },
+          data: { stripeCustomerId: customerId },
+        });
+      } catch (stripeError: any) {
+        console.error("[stripe/checkout] Customer creation failed:", stripeError);
+        return NextResponse.json(
+          formatErrorResponse({
+            title: "Payment setup failed",
+            message: "Unable to set up your payment account. Please try again or contact support.",
+            code: "STRIPE_001",
+          }),
+          { status: 500 }
+        );
+      }
     }
 
     // Create checkout session
-    const checkoutSession = await stripe.checkout.sessions.create({
-      customer: customerId,
-      mode: 'subscription',
-      payment_method_types: ['card'],
-      line_items: [{ price: priceId, quantity: 1 }],
-      success_url: `${process.env.NEXTAUTH_URL}/dashboard/billing?success=true`,
-      cancel_url: `${process.env.NEXTAUTH_URL}/dashboard/billing?canceled=true`,
-      metadata: {
-        userId: user.id,
-        plan,
-      },
-    });
+    try {
+      const checkoutSession = await stripe.checkout.sessions.create({
+        customer: customerId,
+        mode: 'subscription',
+        payment_method_types: ['card'],
+        line_items: [{ price: priceId, quantity: 1 }],
+        success_url: `${process.env.NEXTAUTH_URL}/dashboard/billing?success=true`,
+        cancel_url: `${process.env.NEXTAUTH_URL}/dashboard/billing?canceled=true`,
+        metadata: {
+          userId: user.id,
+          plan,
+        },
+      });
 
-    return NextResponse.json({ url: checkoutSession.url });
+      return NextResponse.json({ url: checkoutSession.url });
+    } catch (stripeError: any) {
+      console.error("[stripe/checkout] Session creation failed:", stripeError);
+      
+      // Handle specific Stripe errors
+      if (stripeError.code === 'resource_missing') {
+        return NextResponse.json(
+          formatErrorResponse({
+            title: "Invalid plan selected",
+            message: "The selected plan is not available. Please choose a different plan.",
+            code: "STRIPE_002",
+          }),
+          { status: 400 }
+        );
+      }
+      
+      return NextResponse.json(
+        formatErrorResponse(BillingErrors.PAYMENT_FAILED),
+        { status: 500 }
+      );
+    }
   } catch (error: any) {
-    console.error('Stripe checkout error:', error);
+    console.error('[stripe/checkout] Unexpected error:', error);
     return NextResponse.json(
-      { error: 'Failed to create checkout session', details: error.message },
+      formatErrorResponse(UserErrors.INTERNAL_ERROR),
       { status: 500 }
     );
   }

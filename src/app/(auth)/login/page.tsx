@@ -4,8 +4,9 @@ import { Suspense, useState } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { Mail, Lock, Chrome, Loader2 } from "lucide-react";
+import { Mail, Lock, Chrome, Loader2, AlertCircle } from "lucide-react";
 import { motion } from "framer-motion";
+import { validateEmail } from "@/lib/form-validation";
 
 function LoginForm() {
   const router = useRouter();
@@ -14,12 +15,47 @@ function LoginForm() {
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [emailError, setEmailError] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [touched, setTouched] = useState({ email: false, password: false });
+
+  function handleEmailChange(value: string) {
+    setEmail(value);
+    setError(""); // Clear form-level error
+    
+    if (touched.email) {
+      const validation = validateEmail(value);
+      setEmailError(validation.isValid ? "" : validation.error || "");
+    }
+  }
+
+  function handleEmailBlur() {
+    setTouched(prev => ({ ...prev, email: true }));
+    const validation = validateEmail(email);
+    setEmailError(validation.isValid ? "" : validation.error || "");
+  }
+
+  function handlePasswordBlur() {
+    setTouched(prev => ({ ...prev, password: true }));
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
+    
+    // Validate before submission
+    const emailValidation = validateEmail(email);
+    if (!emailValidation.isValid) {
+      setEmailError(emailValidation.error || "Invalid email");
+      return;
+    }
+    
+    if (!password || password.length === 0) {
+      setError("Please enter your password");
+      return;
+    }
+    
     setLoading(true);
 
     try {
@@ -30,11 +66,13 @@ function LoginForm() {
       });
 
       if (res?.error) {
-        setError("Invalid email or password");
+        setError("Invalid email or password. Please try again.");
       } else {
         router.push(callbackUrl);
         router.refresh();
       }
+    } catch (err) {
+      setError("Something went wrong. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -42,7 +80,12 @@ function LoginForm() {
 
   async function handleGoogle() {
     setLoading(true);
-    await signIn("google", { callbackUrl });
+    try {
+      await signIn("google", { callbackUrl });
+    } catch {
+      setError("Google sign-in failed. Please try again.");
+      setLoading(false);
+    }
   }
 
   return (
@@ -64,7 +107,7 @@ function LoginForm() {
           Welcome back
         </h2>
         <p style={{ fontSize: 14, color: "#9898B0" }}>
-          Sign in to continue to NeoBIM
+          Sign in to continue to Workflow Builder
         </p>
       </div>
 
@@ -95,6 +138,7 @@ function LoginForm() {
       </div>
 
       <form onSubmit={handleSubmit}>
+        {/* Email field with validation */}
         <motion.div
           initial={{ opacity: 0, x: -10 }}
           animate={{ opacity: 1, x: 0 }}
@@ -109,22 +153,46 @@ function LoginForm() {
             <input
               type="email"
               value={email}
-              onChange={e => setEmail(e.target.value)}
+              onChange={e => handleEmailChange(e.target.value)}
+              onBlur={handleEmailBlur}
+              onFocus={e => { 
+                if (!emailError) e.currentTarget.style.borderColor = "#4F8AFF"; 
+              }}
               required
               placeholder="you@example.com"
+              aria-invalid={!!emailError}
+              aria-describedby={emailError ? "email-error" : undefined}
               style={{
                 width: "100%", padding: "10px 14px 10px 38px", height: 42,
-                borderRadius: 8, border: "1px solid rgba(255,255,255,0.08)",
+                borderRadius: 8, 
+                border: `1px solid ${emailError ? "#EF4444" : "rgba(255,255,255,0.08)"}`,
                 background: "#0B0B13", color: "#F0F0F5",
                 fontSize: 14, outline: "none", boxSizing: "border-box",
                 transition: "border-color 0.15s",
               }}
-              onFocus={e => { e.currentTarget.style.borderColor = "#4F8AFF"; }}
-              onBlur={e => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.08)"; }}
             />
           </div>
+          {emailError && (
+            <motion.div
+              initial={{ opacity: 0, y: -4 }}
+              animate={{ opacity: 1, y: 0 }}
+              id="email-error"
+              style={{
+                marginTop: 6,
+                fontSize: 12,
+                color: "#EF4444",
+                display: "flex",
+                alignItems: "center",
+                gap: 4,
+              }}
+            >
+              <AlertCircle size={12} />
+              {emailError}
+            </motion.div>
+          )}
         </motion.div>
 
+        {/* Password field */}
         <motion.div
           initial={{ opacity: 0, x: -10 }}
           animate={{ opacity: 1, x: 0 }}
@@ -139,7 +207,9 @@ function LoginForm() {
             <input
               type="password"
               value={password}
-              onChange={e => setPassword(e.target.value)}
+              onChange={e => { setPassword(e.target.value); setError(""); }}
+              onBlur={handlePasswordBlur}
+              onFocus={e => { e.currentTarget.style.borderColor = "#4F8AFF"; }}
               required
               placeholder="••••••••"
               style={{
@@ -149,22 +219,23 @@ function LoginForm() {
                 fontSize: 14, outline: "none", boxSizing: "border-box",
                 transition: "border-color 0.15s",
               }}
-              onFocus={e => { e.currentTarget.style.borderColor = "#4F8AFF"; }}
-              onBlur={e => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.08)"; }}
             />
           </div>
         </motion.div>
 
+        {/* Form-level error */}
         {error && (
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             style={{
-              padding: "9px 12px", borderRadius: 8,
-              background: "rgba(248,113,113,0.1)", border: "1px solid rgba(248,113,113,0.2)",
+              padding: "10px 14px", borderRadius: 8,
+              background: "rgba(248,113,113,0.1)", border: "1px solid rgba(248,113,113,0.25)",
               fontSize: 13, color: "#F87171", marginBottom: 16,
+              display: "flex", alignItems: "center", gap: 8,
             }}
           >
+            <AlertCircle size={14} />
             {error}
           </motion.div>
         )}
@@ -173,12 +244,15 @@ function LoginForm() {
           whileHover={{ scale: 1.01 }}
           whileTap={{ scale: 0.99 }}
           type="submit"
-          disabled={loading}
+          disabled={loading || !!emailError}
           style={{
             width: "100%", padding: "11px", height: 42, borderRadius: 8, border: "none",
-            background: "linear-gradient(135deg, #4F8AFF 0%, #6366F1 100%)",
-            color: "#fff", fontSize: 14, fontWeight: 600, cursor: "pointer",
-            opacity: loading ? 0.7 : 1,
+            background: (loading || emailError) 
+              ? "rgba(79,138,255,0.4)" 
+              : "linear-gradient(135deg, #4F8AFF 0%, #6366F1 100%)",
+            color: "#fff", fontSize: 14, fontWeight: 600, 
+            cursor: (loading || emailError) ? "not-allowed" : "pointer",
+            opacity: (loading || emailError) ? 0.6 : 1,
             boxShadow: "0 0 0 1px rgba(79,138,255,0.3), 0 2px 8px rgba(79,138,255,0.2)",
             display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
             transition: "all 0.15s ease",
