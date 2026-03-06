@@ -200,7 +200,7 @@ function HeroAnimation() {
         {["#EF4444", "#F59E0B", "#10B981"].map(c => (
           <div key={c} style={{ width: 8, height: 8, borderRadius: "50%", background: c, opacity: 0.6 }} />
         ))}
-        <span style={{ marginLeft: 8, fontSize: 10, color: "#3A3A50", fontWeight: 500 }}>NeoBIM Canvas</span>
+        <span style={{ marginLeft: 8, fontSize: 10, color: "#3A3A50", fontWeight: 500 }}>Workflow Builder</span>
         <div style={{
           marginLeft: "auto", padding: "3px 10px", borderRadius: 6,
           background: "rgba(79,138,255,0.1)", border: "1px solid rgba(79,138,255,0.2)",
@@ -772,7 +772,7 @@ export default function LandingPage() {
               From brief to building in minutes
             </h2>
             <p style={{ fontSize: 16, color: "#9898B0" }}>
-              See how NeoBIM workflows transform AEC processes
+              See how Workflow Builder transforms AEC processes
             </p>
           </motion.div>
 

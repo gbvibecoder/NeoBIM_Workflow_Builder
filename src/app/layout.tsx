@@ -23,7 +23,7 @@ const jetbrains = JetBrains_Mono({
 export const metadata: Metadata = {
   title: {
     default: "NeoBIM — No-Code Generative Workflow Builder for AEC",
-    template: "%s | NeoBIM",
+    template: "%s | Workflow Builder",
   },
   description:
     "Build AI-powered AEC workflows visually. Drag-and-drop nodes to create pipelines from PDF briefs to 3D massing to IFC export — without writing a single line of code.",

@@ -102,7 +102,7 @@ export default function BillingPage() {
       name: "Free",
       price: "$0",
       period: "forever",
-      description: "Perfect for exploring NeoBIM",
+      description: "Perfect for exploring Workflow Builder",
       features: [
         "3 workflow runs per day",
         "Access to all node types",
