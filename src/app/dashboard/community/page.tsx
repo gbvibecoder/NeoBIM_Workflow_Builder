@@ -332,7 +332,7 @@ export default function CommunityPage() {
     }
     if (sortBy === "rating")  list.sort((a, b) => b.ratingAvg  - a.ratingAvg);
     if (sortBy === "clones")  list.sort((a, b) => b.cloneCount - a.cloneCount);
-    if (sortBy === "newest")  list.sort((a, b) => b.cloneCount - a.cloneCount); // date sim
+    if (sortBy === "newest")  list.sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime());
     return list;
   }, [search, activeFilter, sortBy]);
 
