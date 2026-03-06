@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import { toast } from "sonner";
 import { Header } from "@/components/dashboard/Header";
+import Link from "next/link";
 import { User, Key, Shield, Save, Loader2, AlertCircle } from "lucide-react";
 
 export default function SettingsPage() {
@@ -79,6 +80,7 @@ export default function SettingsPage() {
   }
 
   const user = session?.user;
+  const userRole = (user as { role?: string } | undefined)?.role || "FREE";
   const initials = user?.name
     ? user.name.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2)
     : (user?.email?.[0] ?? "U").toUpperCase();
@@ -203,24 +205,28 @@ export default function SettingsPage() {
               <div className="flex items-center justify-between mb-4">
                 <div>
                   <div className="flex items-center gap-2">
-                    <div className="h-2 w-2 rounded-full bg-[#10B981]" />
-                    <span className="text-sm font-bold text-[#F0F0F5]">Free Plan</span>
+                    <div className={`h-2 w-2 rounded-full ${userRole !== "FREE" ? "bg-[#4F8AFF]" : "bg-[#10B981]"}`} />
+                    <span className="text-sm font-bold text-[#F0F0F5]">
+                      {userRole === "FREE" ? "Free Plan" : userRole === "PRO" ? "Pro Plan" : "Team Plan"}
+                    </span>
                   </div>
-                  <p className="text-xs text-[#5C5C78] mt-1">50 executions / month</p>
+                  <p className="text-xs text-[#5C5C78] mt-1">
+                    {userRole === "FREE" ? "3 runs per day" : "Unlimited runs"}
+                  </p>
                 </div>
-                <button className="rounded-lg bg-gradient-to-r from-[#4F8AFF] to-[#8B5CF6] px-4 py-2 text-xs font-semibold text-white hover:opacity-90 transition-opacity">
-                  Upgrade to Pro
-                </button>
-              </div>
-
-              <div className="space-y-1.5">
-                <div className="flex justify-between text-[10px] text-[#5C5C78]">
-                  <span>Executions this month</span>
-                  <span>0 / 50</span>
-                </div>
-                <div className="h-1.5 rounded-full bg-[#1A1A2A] overflow-hidden">
-                  <div className="h-full w-0 rounded-full bg-[#4F8AFF]" />
-                </div>
+                {userRole === "FREE" && (
+                  <Link
+                    href="/dashboard/billing"
+                    className="rounded-lg bg-gradient-to-r from-[#4F8AFF] to-[#8B5CF6] px-4 py-2 text-xs font-semibold text-white hover:opacity-90 transition-opacity"
+                  >
+                    Upgrade to Pro
+                  </Link>
+                )}
+                {userRole !== "FREE" && (
+                  <span className="rounded-lg bg-[rgba(79,138,255,0.1)] border border-[rgba(79,138,255,0.2)] px-3 py-1.5 text-xs font-semibold text-[#4F8AFF]">
+                    Active
+                  </span>
+                )}
               </div>
             </div>
           </section>

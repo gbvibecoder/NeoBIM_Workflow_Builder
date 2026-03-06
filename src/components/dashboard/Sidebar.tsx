@@ -194,7 +194,7 @@ export function Sidebar() {
               {/* Upgrade + Sign out row */}
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                 <Link
-                  href="/dashboard/settings"
+                  href="/dashboard/billing"
                   style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 10, fontWeight: 600, color: "#4F8AFF", textDecoration: "none" }}
                 >
                   <TrendingUp size={9} />

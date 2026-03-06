@@ -21,8 +21,9 @@ export async function POST(req: Request) {
 
     const { plan } = await req.json();
 
-    // Validate plan
-    if (!plan || !['PRO', 'TEAM_ADMIN'].includes(plan)) {
+    // Validate plan (accept both 'TEAM' and 'TEAM_ADMIN' from frontend)
+    const normalizedPlan = plan === 'TEAM' ? 'TEAM_ADMIN' : plan;
+    if (!normalizedPlan || !['PRO', 'TEAM_ADMIN'].includes(normalizedPlan)) {
       return NextResponse.json(
         formatErrorResponse(FormErrors.REQUIRED_FIELD("plan")),
         { status: 400 }
@@ -30,7 +31,9 @@ export async function POST(req: Request) {
     }
 
     // Resolve priceId server-side from env
-    const priceId = plan === 'PRO' ? process.env.STRIPE_PRICE_ID : process.env.STRIPE_PRICE_ID;
+    const priceId = normalizedPlan === 'PRO'
+      ? process.env.STRIPE_PRICE_ID
+      : process.env.STRIPE_TEAM_PRICE_ID ?? process.env.STRIPE_PRICE_ID;
     if (!priceId) {
       return NextResponse.json(
         formatErrorResponse({
@@ -101,7 +104,7 @@ export async function POST(req: Request) {
         cancel_url: `${process.env.NEXTAUTH_URL}/dashboard/billing?canceled=true`,
         metadata: {
           userId: user.id,
-          plan,
+          plan: normalizedPlan,
         },
       });
 

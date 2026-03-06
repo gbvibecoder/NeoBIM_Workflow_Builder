@@ -38,7 +38,16 @@ export async function PUT(req: NextRequest, { params }: Params) {
   }
 
   const { id } = await params;
-  const { status, tileResults, errorMessage, duration } = await req.json();
+
+  // Verify ownership before updating
+  const existing = await prisma.execution.findFirst({
+    where: { id, userId: session.user.id },
+  });
+  if (!existing) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
+  const { status, tileResults, errorMessage } = await req.json();
 
   const execution = await prisma.execution.update({
     where: { id },
@@ -46,7 +55,6 @@ export async function PUT(req: NextRequest, { params }: Params) {
       ...(status && { status }),
       ...(tileResults !== undefined && { tileResults }),
       ...(errorMessage !== undefined && { errorMessage }),
-      ...(duration !== undefined && { tileResults: { ...(tileResults ?? {}), duration } }),
       ...(status && ["SUCCESS", "FAILED", "PARTIAL"].includes(status) && {
         completedAt: new Date(),
       }),

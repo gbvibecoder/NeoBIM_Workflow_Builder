@@ -96,35 +96,35 @@ export default function DashboardPage() {
       color: "#4F8AFF", 
       gradient: "linear-gradient(135deg, #4F8AFF 0%, #6B9FFF 100%)",
       href: "/dashboard/workflows",
-      trend: "+2 this week"
+      trend: workflowCount !== null && workflowCount > 0 ? `${workflowCount} total` : null
     },
-    { 
-      label: "Executions", 
-      value: executionCount === null ? "..." : executionCount, 
-      icon: "▶", 
-      color: "#10B981", 
+    {
+      label: "Executions",
+      value: executionCount === null ? "..." : executionCount,
+      icon: "▶",
+      color: "#10B981",
       gradient: "linear-gradient(135deg, #10B981 0%, #34D399 100%)",
       href: "/dashboard/history",
-      trend: "+12 today"
+      trend: executionCount !== null && executionCount > 0 ? `${executionCount} total` : null
     },
-    { 
-      label: "Hours Saved", 
-      value: hoursSaved === 0 ? "..." : hoursSaved, 
+    {
+      label: "Hours Saved",
+      value: hoursSaved === 0 ? "..." : hoursSaved,
       suffix: "h",
-      icon: "⏱", 
-      color: "#F59E0B", 
+      icon: "⏱",
+      color: "#F59E0B",
       gradient: "linear-gradient(135deg, #F59E0B 0%, #FBBF24 100%)",
       href: "/dashboard/history",
-      trend: "↑ 24% this month"
+      trend: hoursSaved > 0 ? `~${hoursSaved}h estimated` : null
     },
-    { 
-      label: "Templates", 
-      value: PREBUILT_WORKFLOWS.length, 
-      icon: "⊞", 
-      color: "#8B5CF6", 
+    {
+      label: "Templates",
+      value: PREBUILT_WORKFLOWS.length,
+      icon: "⊞",
+      color: "#8B5CF6",
       gradient: "linear-gradient(135deg, #8B5CF6 0%, #A78BFA 100%)",
       href: "/dashboard/templates",
-      trend: "15 new"
+      trend: `${PREBUILT_WORKFLOWS.length} available`
     },
   ];
 
