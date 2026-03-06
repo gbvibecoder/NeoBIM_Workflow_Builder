@@ -12,7 +12,7 @@ import type { WorkflowNode } from "@/types/nodes";
 import type { LogEntry } from "@/components/canvas/ExecutionLog";
 
 // Node IDs that have real API implementations
-const REAL_NODE_IDS = new Set(["TR-003", "GN-003", "GN-004", "TR-007", "TR-008", "EX-002"]);
+const REAL_NODE_IDS = new Set(["TR-001", "TR-003", "TR-004", "TR-012", "GN-003", "GN-004", "TR-007", "TR-008", "EX-002"]);
 
 interface APIErrorResponse {
   error: {
@@ -26,7 +26,7 @@ interface APIErrorResponse {
 }
 
 // Input node IDs whose user-supplied value should pass through directly
-const INPUT_NODE_IDS = new Set(["IN-001", "IN-005", "IN-006"]);
+const INPUT_NODE_IDS = new Set(["IN-001", "IN-002", "IN-003", "IN-005", "IN-006"]);
 
 // Demo-allowed node IDs (routed to /api/demo/execute)
 const DEMO_NODE_IDS = new Set(["TR-003", "GN-003"]);
@@ -45,6 +45,11 @@ async function executeNode(
   // instead of using the mock executor (which returns hardcoded placeholder text)
   if (INPUT_NODE_IDS.has(catalogueId)) {
     await new Promise(r => setTimeout(r, 400)); // brief delay for UX
+    const nodeData = node.data as Record<string, unknown>;
+    const fileData = nodeData.fileData as string | undefined;
+    const fileName = nodeData.fileName as string | undefined;
+    const mimeType = nodeData.mimeType as string | undefined;
+
     return {
       id: generateId(),
       executionId,
@@ -54,6 +59,9 @@ async function executeNode(
         content: inputValue ?? "",
         prompt: inputValue ?? "",
         label: "User Input",
+        ...(fileData && { fileData }),
+        ...(fileName && { fileName }),
+        ...(mimeType && { mimeType }),
       },
       metadata: { source: "user-input" },
       createdAt: new Date(),

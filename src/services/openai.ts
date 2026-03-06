@@ -388,3 +388,149 @@ Generate a TYPICAL FLOOR plan — the most representative floor. Show realistic 
     };
   });
 }
+
+// ─── parseBriefDocument (TR-001) ────────────────────────────────────────────
+
+export interface ParsedBrief {
+  projectTitle: string;
+  projectType: string;
+  site?: { address?: string; area?: string; constraints?: string };
+  programme?: Array<{ space: string; area_m2?: number; floor?: string }>;
+  constraints?: { maxHeight?: string; setbacks?: string; zoning?: string };
+  budget?: { amount?: string; currency?: string };
+  sustainability?: string;
+  designIntent?: string;
+  keyRequirements?: string[];
+  rawText: string;
+}
+
+export async function parseBriefDocument(
+  pdfText: string,
+  userApiKey?: string
+): Promise<ParsedBrief> {
+  return handleOpenAICall(async () => {
+    const client = getClient(userApiKey);
+
+    // Truncate very long documents to stay within token limits
+    const maxChars = 12000;
+    const truncated = pdfText.length > maxChars;
+    const text = truncated ? pdfText.slice(0, maxChars) : pdfText;
+
+    const completion = await client.chat.completions.create({
+      model: "gpt-4o-mini",
+      response_format: { type: "json_object" },
+      messages: [
+        {
+          role: "system",
+          content: `You are an architectural brief analyst. Given raw text extracted from a client brief PDF, structure it into the following JSON format:
+{
+  "projectTitle": "...",
+  "projectType": "residential|commercial|mixed-use|institutional|...",
+  "site": { "address": "...", "area": "...", "constraints": "..." },
+  "programme": [
+    { "space": "Retail", "area_m2": 600, "floor": "ground" },
+    { "space": "Apartments", "area_m2": 4200, "floor": "upper" }
+  ],
+  "constraints": { "maxHeight": "...", "setbacks": "...", "zoning": "..." },
+  "budget": { "amount": "...", "currency": "..." },
+  "sustainability": "...",
+  "designIntent": "...",
+  "keyRequirements": ["...", "..."]
+}
+If information is not found in the text, omit the field. Be precise with numbers. Extract ALL programme spaces with their areas.`,
+        },
+        {
+          role: "user",
+          content: `Structure this architectural brief:\n\n${text}${truncated ? "\n\n[Document truncated — first 12,000 characters shown]" : ""}`,
+        },
+      ],
+    });
+
+    const content = completion.choices[0]?.message?.content;
+    if (!content) throw new Error("OpenAI returned empty response for brief parsing");
+
+    const parsed = JSON.parse(content) as Omit<ParsedBrief, "rawText">;
+
+    return {
+      ...parsed,
+      projectTitle: parsed.projectTitle || "Untitled Project",
+      projectType: parsed.projectType || "unknown",
+      rawText: text,
+    };
+  });
+}
+
+// ─── analyzeImage (TR-004) ──────────────────────────────────────────────────
+
+export interface ImageAnalysis {
+  buildingType: string;
+  floors: number;
+  style: string;
+  features: string[];
+  description: string;
+  facade: string;
+  massing: string;
+  siteRelationship: string;
+}
+
+export async function analyzeImage(
+  imageBase64: string,
+  mimeType: string = "image/jpeg",
+  userApiKey?: string
+): Promise<ImageAnalysis> {
+  return handleOpenAICall(async () => {
+    const client = getClient(userApiKey);
+
+    const completion = await client.chat.completions.create({
+      model: "gpt-4o-mini",
+      response_format: { type: "json_object" },
+      messages: [
+        {
+          role: "system",
+          content: `You are a senior architect analyzing an image. Describe what you see in precise architectural terms. Output JSON with these fields:
+{
+  "buildingType": "Mixed-Use Tower|Residential Block|...",
+  "floors": <number>,
+  "style": "Contemporary Nordic|...",
+  "features": ["feature1", "feature2"],
+  "description": "Detailed 3-4 paragraph architectural description...",
+  "facade": "Description of facade treatment, materials, openings...",
+  "massing": "Description of building massing, setbacks, volumes...",
+  "siteRelationship": "How the building relates to its context..."
+}
+Be specific about dimensions, proportions, materials, and spatial relationships. If the image is not architectural, set buildingType to "Not Architectural" and describe what you see.`,
+        },
+        {
+          role: "user",
+          content: [
+            {
+              type: "image_url",
+              image_url: { url: `data:${mimeType};base64,${imageBase64}` },
+            },
+            {
+              type: "text",
+              text: "Analyze this image in architectural terms. Describe the building, its style, materials, and spatial qualities.",
+            },
+          ],
+        },
+      ],
+      max_tokens: 1500,
+    });
+
+    const content = completion.choices[0]?.message?.content;
+    if (!content) throw new Error("OpenAI returned empty response for image analysis");
+
+    const result = JSON.parse(content) as ImageAnalysis;
+
+    return {
+      buildingType: result.buildingType || "Unknown",
+      floors: result.floors || 1,
+      style: result.style || "Unknown",
+      features: result.features || [],
+      description: result.description || "No description generated",
+      facade: result.facade || "",
+      massing: result.massing || "",
+      siteRelationship: result.siteRelationship || "",
+    };
+  });
+}

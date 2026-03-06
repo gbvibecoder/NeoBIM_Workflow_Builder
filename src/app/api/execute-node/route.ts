@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { generateBuildingDescription, generateConceptImage, generateFloorPlan } from "@/services/openai";
+import { generateBuildingDescription, generateConceptImage, generateFloorPlan, parseBriefDocument, analyzeImage } from "@/services/openai";
+import { analyzeSite } from "@/services/site-analysis";
 import { generateId } from "@/lib/utils";
 import type { ExecutionArtifact } from "@/types/execution";
 import { checkRateLimit, logRateLimitHit } from "@/lib/rate-limit";
@@ -13,7 +14,7 @@ import { assertValidInput } from "@/lib/validation";
 import { APIError, UserErrors, formatErrorResponse } from "@/lib/user-errors";
 
 // Node IDs that have real implementations
-const REAL_NODE_IDS = new Set(["TR-003", "GN-003", "GN-004", "TR-007", "TR-008", "EX-002"]);
+const REAL_NODE_IDS = new Set(["TR-001", "TR-003", "TR-004", "TR-012", "GN-003", "GN-004", "TR-007", "TR-008", "EX-002"]);
 
 export async function POST(req: NextRequest) {
   const session = await auth();
@@ -99,6 +100,202 @@ export async function POST(req: NextRequest) {
           _raw: description,
         },
         metadata: { model: "gpt-4o-mini", real: true },
+        createdAt: new Date(),
+      };
+
+    } else if (catalogueId === "TR-001") {
+      // Document Parser — PDF text extraction + GPT structuring
+      const rawText = inputData?.content ?? inputData?.prompt ?? inputData?.rawText ?? "";
+      const pdfBase64 = inputData?.fileData ?? inputData?.buffer ?? null;
+
+      let extractedText = typeof rawText === "string" ? rawText : "";
+
+      // If we have actual PDF data (base64), extract text from it
+      if (pdfBase64 && typeof pdfBase64 === "string") {
+        try {
+          // eslint-disable-next-line @typescript-eslint/no-require-imports
+          const pdfParse = require("pdf-parse") as (buf: Buffer) => Promise<{ text: string }>;
+          const buffer = Buffer.from(pdfBase64, "base64");
+          const pdfData = await pdfParse(buffer);
+          extractedText = pdfData.text || "";
+        } catch (parseErr) {
+          console.error("[TR-001] PDF parsing failed:", parseErr);
+          // Fall through to use rawText if available
+        }
+      }
+
+      if (!extractedText || extractedText.trim().length < 20) {
+        return NextResponse.json(
+          formatErrorResponse({
+            title: "No document content",
+            message: "Could not extract text from the document. The PDF may be scanned (image-only) or too short. Try pasting the brief text into a Text Prompt node instead.",
+            code: "EMPTY_DOCUMENT",
+          }),
+          { status: 400 }
+        );
+      }
+
+      const parsed = await parseBriefDocument(extractedText, apiKey);
+
+      // Build a formatted text output that downstream nodes (TR-002, GN-001) can consume
+      const programLines = (parsed.programme ?? [])
+        .map(p => `• ${p.space}: ${p.area_m2 ? `${p.area_m2} m²` : "TBD"} (${p.floor ?? "TBD"})`)
+        .join("\n");
+
+      const formattedContent = `PROJECT BRIEF — ${parsed.projectTitle.toUpperCase()}
+
+Type: ${parsed.projectType}
+${parsed.site?.address ? `Site: ${parsed.site.address}` : ""}
+${parsed.site?.area ? `Site Area: ${parsed.site.area}` : ""}
+
+PROGRAMME REQUIREMENTS:
+${programLines || "Not specified"}
+
+${parsed.constraints ? `CONSTRAINTS:\n• Max Height: ${parsed.constraints.maxHeight ?? "N/A"}\n• Setbacks: ${parsed.constraints.setbacks ?? "N/A"}\n• Zoning: ${parsed.constraints.zoning ?? "N/A"}` : ""}
+
+${parsed.budget?.amount ? `BUDGET: ${parsed.budget.amount} ${parsed.budget.currency ?? ""}` : ""}
+
+${parsed.sustainability ? `SUSTAINABILITY: ${parsed.sustainability}` : ""}
+
+${parsed.designIntent ? `DESIGN INTENT: ${parsed.designIntent}` : ""}
+
+${parsed.keyRequirements?.length ? `KEY REQUIREMENTS:\n${parsed.keyRequirements.map(r => `• ${r}`).join("\n")}` : ""}`;
+
+      artifact = {
+        id: generateId(),
+        executionId: executionId ?? "local",
+        tileInstanceId,
+        type: "text",
+        data: {
+          content: formattedContent,
+          label: `Parsed Brief: ${parsed.projectTitle}`,
+          _raw: parsed,
+          prompt: formattedContent,
+        },
+        metadata: { model: "gpt-4o-mini", real: true },
+        createdAt: new Date(),
+      };
+
+    } else if (catalogueId === "TR-004") {
+      // Image Understanding — GPT-4o-mini Vision
+      const imageBase64 = inputData?.fileData ?? inputData?.imageBase64 ?? inputData?.base64 ?? null;
+      const imageUrl = inputData?.url ?? null;
+      const mimeType = inputData?.mimeType ?? "image/jpeg";
+
+      let base64Data: string | null = typeof imageBase64 === "string" ? imageBase64 : null;
+
+      // If we have a URL but no base64, try to fetch and convert
+      if (!base64Data && imageUrl && typeof imageUrl === "string") {
+        try {
+          const imgRes = await fetch(imageUrl);
+          if (imgRes.ok) {
+            const buffer = Buffer.from(await imgRes.arrayBuffer());
+            base64Data = buffer.toString("base64");
+          }
+        } catch {
+          // Non-fatal — will fall through to error
+        }
+      }
+
+      if (!base64Data) {
+        return NextResponse.json(
+          formatErrorResponse({
+            title: "No image data",
+            message: "No image was provided for analysis. Upload an image using the Image Upload node.",
+            code: "NO_IMAGE_DATA",
+          }),
+          { status: 400 }
+        );
+      }
+
+      const analysis = await analyzeImage(base64Data, mimeType, apiKey);
+
+      const descriptionText = `IMAGE ANALYSIS — ${analysis.buildingType}
+
+Style: ${analysis.style}
+Estimated Floors: ${analysis.floors}
+
+${analysis.description}
+
+FACADE: ${analysis.facade}
+
+MASSING: ${analysis.massing}
+
+SITE: ${analysis.siteRelationship}
+
+KEY FEATURES:
+${analysis.features.map(f => `• ${f}`).join("\n")}`;
+
+      artifact = {
+        id: generateId(),
+        executionId: executionId ?? "local",
+        tileInstanceId,
+        type: "text",
+        data: {
+          content: descriptionText,
+          label: `Image Analysis: ${analysis.buildingType}`,
+          prompt: analysis.description,
+          _raw: analysis,
+        },
+        metadata: { model: "gpt-4o-mini", real: true },
+        createdAt: new Date(),
+      };
+
+    } else if (catalogueId === "TR-012") {
+      // Site Analysis — real geographic + climate data from free APIs
+      const address = inputData?.content ?? inputData?.prompt ?? inputData?.address ?? "";
+
+      if (!address || typeof address !== "string" || address.trim().length < 3) {
+        return NextResponse.json(
+          formatErrorResponse({
+            title: "No location provided",
+            message: "Enter an address or location name using the Location Input node.",
+            code: "NO_LOCATION",
+          }),
+          { status: 400 }
+        );
+      }
+
+      const siteData = await analyzeSite(address.trim());
+
+      // Build KPI metrics for display
+      const kpiMetrics = [
+        { label: "Latitude", value: siteData.location.lat.toString(), unit: "°" },
+        { label: "Longitude", value: siteData.location.lon.toString(), unit: "°" },
+        { label: "Elevation", value: siteData.elevation.value.toString(), unit: "m" },
+        { label: "Avg Summer", value: siteData.climate.avgTempSummer.toString(), unit: "°C" },
+        { label: "Avg Winter", value: siteData.climate.avgTempWinter.toString(), unit: "°C" },
+        { label: "Annual Rain", value: siteData.climate.annualRainfall.toString(), unit: "mm" },
+      ];
+
+      const analysisText = `SITE ANALYSIS — ${siteData.location.displayName}
+
+Location: ${siteData.location.lat}°, ${siteData.location.lon}°
+Elevation: ${siteData.elevation.value} m
+Climate Zone: ${siteData.climate.zone}
+${siteData.climate.currentTemp != null ? `Current Weather: ${siteData.climate.currentTemp}°C, ${siteData.climate.currentWeather}` : ""}
+
+SOLAR GEOMETRY:
+• Summer solstice noon altitude: ${siteData.solar.summerNoonAltitude}°
+• Winter solstice noon altitude: ${siteData.solar.winterNoonAltitude}°
+• Equinox noon altitude: ${siteData.solar.equinoxNoonAltitude}°
+
+DESIGN IMPLICATIONS:
+${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
+
+      artifact = {
+        id: generateId(),
+        executionId: executionId ?? "local",
+        tileInstanceId,
+        type: "kpi",
+        data: {
+          metrics: kpiMetrics,
+          content: analysisText,
+          prompt: analysisText,
+          label: `Site Analysis: ${address}`,
+          _raw: siteData,
+        },
+        metadata: { model: "site-analysis-v1", real: true },
         createdAt: new Date(),
       };
 

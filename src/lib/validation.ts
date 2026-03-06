@@ -191,6 +191,72 @@ export function validateEX002Input(inputData: unknown): ValidationResult {
 }
 
 /**
+ * TR-001: Document Parser
+ */
+export function validateTR001Input(inputData: unknown): ValidationResult {
+  // TR-001 accepts PDF data or text content — at least one must be present
+  const input = inputData as Record<string, unknown> | null | undefined;
+  const text = input?.content ?? input?.prompt ?? input?.rawText ?? "";
+  const fileData = input?.fileData ?? input?.buffer ?? null;
+
+  if ((!text || (typeof text === "string" && text.trim().length < 20)) && !fileData) {
+    return {
+      valid: false,
+      error: "No document content provided",
+      userError: UserErrors.MISSING_REQUIRED_FIELD("document content or PDF file"),
+    };
+  }
+
+  return { valid: true };
+}
+
+/**
+ * TR-004: Image Understanding
+ */
+export function validateTR004Input(inputData: unknown): ValidationResult {
+  const input = inputData as Record<string, unknown> | null | undefined;
+  const base64 = input?.fileData ?? input?.imageBase64 ?? input?.base64 ?? null;
+  const url = input?.url ?? null;
+
+  if (!base64 && !url) {
+    return {
+      valid: false,
+      error: "No image provided for analysis",
+      userError: UserErrors.MISSING_REQUIRED_FIELD("image file or URL"),
+    };
+  }
+
+  return { valid: true };
+}
+
+/**
+ * TR-012: Site Analysis
+ */
+export function validateTR012Input(inputData: unknown): ValidationResult {
+  const input = inputData as Record<string, unknown> | null | undefined;
+  const address = input?.content ?? input?.prompt ?? input?.address ?? "";
+
+  if (typeof address !== "string" || address.trim().length < 3) {
+    return {
+      valid: false,
+      error: "Address too short (min 3 chars)",
+      userError: UserErrors.MISSING_REQUIRED_FIELD("location address"),
+    };
+  }
+
+  return { valid: true };
+}
+
+/**
+ * GN-004: Floor Plan Generator
+ */
+export function validateGN004Input(_inputData: unknown): ValidationResult {
+  // GN-004 accepts building description or falls back to defaults
+  // No strict validation — always valid
+  return { valid: true };
+}
+
+/**
  * Validate input based on node catalogue ID
  */
 export function validateNodeInput(
@@ -198,10 +264,18 @@ export function validateNodeInput(
   inputData: unknown
 ): ValidationResult {
   switch (catalogueId) {
+    case "TR-001":
+      return validateTR001Input(inputData);
     case "TR-003":
       return validateTR003Input(inputData);
+    case "TR-004":
+      return validateTR004Input(inputData);
+    case "TR-012":
+      return validateTR012Input(inputData);
     case "GN-003":
       return validateGN003Input(inputData);
+    case "GN-004":
+      return validateGN004Input(inputData);
     case "TR-007":
       return validateTR007Input(inputData);
     case "TR-008":

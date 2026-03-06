@@ -633,6 +633,180 @@ export const PREBUILT_WORKFLOWS: WorkflowTemplate[] = [
       ],
     },
   },
+  {
+    id: "wf-12",
+    name: "Text → Floor Plan + Render (Branching)",
+    description:
+      "Generate both a floor plan AND a concept render from a single text description. Demonstrates branching workflows where one input feeds two parallel AI outputs.",
+    tags: ["floor-plan", "render", "branching", "ai", "concept"],
+    category: "Concept Design",
+    complexity: "intermediate",
+    estimatedRunTime: "~60 seconds",
+    requiredInputs: ["Text description of building program"],
+    expectedOutputs: ["Building description", "SVG floor plan", "Concept architectural image"],
+    thumbnail: "https://picsum.photos/seed/wf12/600/400",
+    tileGraph: {
+      nodes: [
+        {
+          id: "n1",
+          type: "workflowNode",
+          position: { x: 100, y: 250 },
+          data: {
+            catalogueId: "IN-001",
+            label: "Text Prompt",
+            category: "input",
+            status: "idle",
+            inputs: [],
+            outputs: [{ id: "text-out", label: "Text", type: "text" }],
+            icon: "Type",
+          },
+        },
+        {
+          id: "n2",
+          type: "workflowNode",
+          position: { x: 400, y: 250 },
+          data: {
+            catalogueId: "TR-003",
+            label: "Building Description Generator",
+            category: "transform",
+            status: "idle",
+            inputs: [{ id: "json-in", label: "Requirements", type: "json" }],
+            outputs: [
+              { id: "text-out", label: "Description", type: "text" },
+              { id: "prog-out", label: "Program Blocks", type: "json" },
+            ],
+            icon: "Building2",
+          },
+        },
+        {
+          id: "n3",
+          type: "workflowNode",
+          position: { x: 740, y: 120 },
+          data: {
+            catalogueId: "GN-004",
+            label: "Floor Plan Generator",
+            category: "generate",
+            status: "idle",
+            inputs: [{ id: "prog-in", label: "Room Program", type: "json" }],
+            outputs: [
+              { id: "plan-out", label: "Floor Plan", type: "geometry" },
+              { id: "img-out", label: "Plan Image", type: "image" },
+            ],
+            icon: "LayoutGrid",
+          },
+        },
+        {
+          id: "n4",
+          type: "workflowNode",
+          position: { x: 740, y: 380 },
+          data: {
+            catalogueId: "GN-003",
+            label: "Image Generator",
+            category: "generate",
+            status: "idle",
+            inputs: [
+              { id: "ctrl-in", label: "Control Image", type: "image" },
+              { id: "prompt-in", label: "Style Prompt", type: "text" },
+            ],
+            outputs: [{ id: "images-out", label: "Concept Images", type: "image" }],
+            icon: "Palette",
+          },
+        },
+      ],
+      edges: [
+        { id: "e1-2", source: "n1", sourceHandle: "text-out", target: "n2", targetHandle: "json-in", type: "animatedEdge" },
+        { id: "e2-3", source: "n2", sourceHandle: "prog-out", target: "n3", targetHandle: "prog-in", type: "animatedEdge" },
+        { id: "e2-4", source: "n2", sourceHandle: "text-out", target: "n4", targetHandle: "ctrl-in", type: "animatedEdge" },
+      ],
+    },
+  },
+  {
+    id: "wf-13",
+    name: "Location → Site Analysis → Building Concept",
+    description:
+      "Enter an address and get real climate data, solar analysis, and design implications — then generate a context-responsive building concept with AI.",
+    tags: ["site-analysis", "climate", "solar", "location", "concept"],
+    category: "Concept Design",
+    complexity: "intermediate",
+    estimatedRunTime: "~60 seconds",
+    requiredInputs: ["Address or location name"],
+    expectedOutputs: ["Site analysis with climate data", "Building description", "Concept architectural image"],
+    thumbnail: "https://picsum.photos/seed/wf13/600/400",
+    tileGraph: {
+      nodes: [
+        {
+          id: "n1",
+          type: "workflowNode",
+          position: { x: 100, y: 200 },
+          data: {
+            catalogueId: "IN-006",
+            label: "Location Input",
+            category: "input",
+            status: "idle",
+            inputs: [],
+            outputs: [{ id: "geo-out", label: "GeoJSON", type: "geojson" }],
+            icon: "MapPin",
+          },
+        },
+        {
+          id: "n2",
+          type: "workflowNode",
+          position: { x: 380, y: 200 },
+          data: {
+            catalogueId: "TR-012",
+            label: "Site Analysis",
+            category: "transform",
+            status: "idle",
+            inputs: [{ id: "geo-in", label: "GeoJSON Location", type: "geojson" }],
+            outputs: [
+              { id: "ctx-geo-out", label: "Context Mesh", type: "geometry" },
+              { id: "site-out", label: "Site Data", type: "json" },
+            ],
+            icon: "Globe",
+          },
+        },
+        {
+          id: "n3",
+          type: "workflowNode",
+          position: { x: 660, y: 200 },
+          data: {
+            catalogueId: "TR-003",
+            label: "Building Description Generator",
+            category: "transform",
+            status: "idle",
+            inputs: [{ id: "json-in", label: "Requirements", type: "json" }],
+            outputs: [
+              { id: "text-out", label: "Description", type: "text" },
+              { id: "prog-out", label: "Program Blocks", type: "json" },
+            ],
+            icon: "Building2",
+          },
+        },
+        {
+          id: "n4",
+          type: "workflowNode",
+          position: { x: 940, y: 200 },
+          data: {
+            catalogueId: "GN-003",
+            label: "Image Generator",
+            category: "generate",
+            status: "idle",
+            inputs: [
+              { id: "ctrl-in", label: "Control Image", type: "image" },
+              { id: "prompt-in", label: "Style Prompt", type: "text" },
+            ],
+            outputs: [{ id: "images-out", label: "Concept Images", type: "image" }],
+            icon: "Palette",
+          },
+        },
+      ],
+      edges: [
+        { id: "e1-2", source: "n1", sourceHandle: "geo-out", target: "n2", targetHandle: "geo-in", type: "animatedEdge" },
+        { id: "e2-3", source: "n2", sourceHandle: "site-out", target: "n3", targetHandle: "json-in", type: "animatedEdge" },
+        { id: "e3-4", source: "n3", sourceHandle: "text-out", target: "n4", targetHandle: "ctrl-in", type: "animatedEdge" },
+      ],
+    },
+  },
 ];
 
 export const PREBUILT_WORKFLOWS_MAP = new Map(
