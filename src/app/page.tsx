@@ -5,7 +5,7 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import {
   ArrowRight, Zap, Sparkles, Users, LayoutGrid,
-  PlayCircle, FileText, Box, Download, Play,
+  PlayCircle, FileText, Box, Download, Play, Image as ImageIcon, FileCode,
 } from "lucide-react";
 import { MiniWorkflowDiagram } from "@/components/shared/MiniWorkflowDiagram";
 import { PREBUILT_WORKFLOWS } from "@/constants/prebuilt-workflows";
@@ -200,7 +200,7 @@ function HeroAnimation() {
         {["#EF4444", "#F59E0B", "#10B981"].map(c => (
           <div key={c} style={{ width: 8, height: 8, borderRadius: "50%", background: c, opacity: 0.6 }} />
         ))}
-        <span style={{ marginLeft: 8, fontSize: 10, color: "#3A3A50", fontWeight: 500 }}>NeoBIM Canvas</span>
+        <span style={{ marginLeft: 8, fontSize: 10, color: "#3A3A50", fontWeight: 500 }}>Workflow Builder</span>
         <div style={{
           marginLeft: "auto", padding: "3px 10px", borderRadius: 6,
           background: "rgba(79,138,255,0.1)", border: "1px solid rgba(79,138,255,0.2)",
@@ -280,7 +280,7 @@ function AvatarRow() {
         ))}
       </div>
       <span style={{ fontSize: 12, color: "#9898B0" }}>
-        <strong style={{ color: "#F0F0F5" }}>Join architects</strong> building the future
+        Join AEC professionals building the future
       </span>
     </div>
   );
@@ -312,7 +312,7 @@ const FEATURES = [
   },
 ];
 
-// REMOVED: Fake company names - replaced with Early Access banner
+const COMPANIES = ["Leading AEC Firms", "Architecture Studios", "Engineering Teams", "BIM Consultants", "Design Agencies", "Construction Tech"];
 
 // ─── Showcase workflows ───────────────────────────────────────────────────────
 
@@ -406,7 +406,7 @@ export default function LandingPage() {
             WebkitTextFillColor: "transparent",
             backgroundClip: "text",
           }}>
-            No-code workflow builder for AEC
+            No-code workflow builder for AEC · Beta
           </p>
 
           <h1 style={{
@@ -415,24 +415,85 @@ export default function LandingPage() {
             letterSpacing: "-0.03em",
             textShadow: "0 0 80px rgba(79, 138, 255, 0.15)",
           }}>
-            Design buildings with<br />
             <span style={{
               background: "linear-gradient(135deg, #4F8AFF 0%, #8B5CF6 100%)",
               WebkitBackgroundClip: "text",
               WebkitTextFillColor: "transparent",
               backgroundClip: "text",
             }}>
-              AI-powered workflows
-            </span>
+              Concept Design
+            </span><br />
+            in 30 Seconds
           </h1>
 
           <p style={{
             fontSize: 18, color: "#9898B0", lineHeight: 1.7,
-            maxWidth: 540, marginBottom: 32,
+            maxWidth: 540, marginBottom: 24,
           }}>
-            Drag, connect, and run visual pipelines that turn briefs into 3D models,
-            renders, and BIM exports. Built for architects and engineers.
+            Turn project briefs into 3D massing models and photorealistic concept renders. (IFC export in development) 
+            No-code workflows built for architects who value their time.
           </p>
+
+          {/* ROI Calculator */}
+          <div style={{
+            background: "rgba(79,138,255,0.08)",
+            border: "1px solid rgba(79,138,255,0.2)",
+            borderRadius: 12,
+            padding: "16px 20px",
+            marginBottom: 32,
+            maxWidth: 540,
+          }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <div style={{
+                width: 40, height: 40, borderRadius: 10,
+                background: "linear-gradient(135deg, #4F8AFF, #8B5CF6)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: 18,
+              }}>
+                💰
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 13, color: "#9898B0", marginBottom: 4 }}>
+                  Time saved per project
+                </div>
+                <div style={{ fontSize: 20, fontWeight: 700, color: "#F0F0F5" }}>
+                  10 hours × $100/hr = <span style={{ color: "#10B981" }}>$1,000 saved*</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* ROI Calculator */}
+          <p style={{ fontSize: 11, color: "#5C5C78", marginTop: 8, fontStyle: "italic" }}>
+            * Estimated savings based on typical AEC project workflows
+          </p>
+          <div style={{
+            background: "rgba(79,138,255,0.08)",
+            border: "1px solid rgba(79,138,255,0.2)",
+            borderRadius: 12,
+            padding: "16px 20px",
+            marginBottom: 32,
+            maxWidth: 540,
+          }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <div style={{
+                width: 40, height: 40, borderRadius: 10,
+                background: "linear-gradient(135deg, #4F8AFF, #8B5CF6)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: 18,
+              }}>
+                💰
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 13, color: "#9898B0", marginBottom: 4 }}>
+                  Time saved per project
+                </div>
+                <div style={{ fontSize: 20, fontWeight: 700, color: "#F0F0F5" }}>
+                  10 hours × $100/hr = <span style={{ color: "#10B981" }}>$1,000 saved*</span>
+                </div>
+              </div>
+            </div>
+          </div>
 
           <div style={{ display: "flex", gap: 12, marginBottom: 28 }}>
             <Link href="/dashboard" style={{
@@ -453,7 +514,7 @@ export default function LandingPage() {
                 (e.currentTarget as HTMLElement).style.boxShadow = "0 0 0 1px rgba(79,138,255,0.3), 0 4px 20px rgba(79,138,255,0.25)";
               }}
             >
-              Start Building — Free
+              Start Free Trial
               <ArrowRight size={16} />
             </Link>
             <Link href="/dashboard/templates" style={{
@@ -490,31 +551,135 @@ export default function LandingPage() {
           <HeroAnimation />
         </motion.div>
       </section>
+      {/* ── NEW: Core Feature Cards (Text-to-3D, Instant Renders, IFC Export) ── */}
+      <section style={{
+        padding: "48px 48px 88px",
+        background: "#0B0B13",
+        borderTop: "1px solid rgba(255,255,255,0.06)",
+      }}>
+        <div style={{ maxWidth: 1200, margin: "0 auto" }}>
+          <motion.div
+            initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-40px" }}
+            variants={stagger}
+            style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 20 }}
+          >
+            {[
+              {
+                icon: <Box size={24} />,
+                color: "#3B82F6",
+                title: "Text-to-3D",
+                description: "Describe your building concept in plain English. Get parametric 3D massing models in seconds.",
+                badge: "AI-Powered · Beta",
+              },
+              {
+                icon: <ImageIcon size={24} />,
+                color: "#8B5CF6",
+                title: "Instant Renders",
+                description: "Generate photorealistic concept images with AI. Perfect for early-stage design presentations.",
+                badge: "Fast",
+              },
+              {
+                icon: <FileCode size={24} />,
+                color: "#10B981",
+                title: "IFC Export (Beta)",
+                description: "Basic IFC export in early development. Preview functionality available.",
+                badge: "BIM-Ready",
+              },
+            ].map(f => {
+              const rgb = hexToRgb(f.color);
+              return (
+                <motion.div key={f.title} variants={fadeUp} transition={{ duration: 0.5, ease: smoothEase }} style={{
+                  background: "#12121E", borderRadius: 16,
+                  border: "1px solid rgba(255,255,255,0.06)", padding: 32,
+                  transition: "border-color 0.15s, transform 0.2s, box-shadow 0.2s",
+                  cursor: "default",
+                  position: "relative",
+                }}
+                  onMouseEnter={e => {
+                    (e.currentTarget as HTMLElement).style.borderColor = `rgba(${rgb}, 0.3)`;
+                    (e.currentTarget as HTMLElement).style.transform = "translateY(-4px)";
+                    (e.currentTarget as HTMLElement).style.boxShadow = `0 20px 40px rgba(0, 0, 0, 0.3), 0 0 30px rgba(${rgb}, 0.15)`;
+                  }}
+                  onMouseLeave={e => {
+                    (e.currentTarget as HTMLElement).style.borderColor = "rgba(255,255,255,0.06)";
+                    (e.currentTarget as HTMLElement).style.transform = "translateY(0)";
+                    (e.currentTarget as HTMLElement).style.boxShadow = "none";
+                  }}
+                >
+                  {/* Badge */}
+                  {f.badge && (
+                    <div style={{
+                      position: "absolute", top: 16, right: 16,
+                      fontSize: 9, padding: "3px 10px", borderRadius: 20,
+                      background: `rgba(${rgb}, 0.15)`,
+                      border: `1px solid rgba(${rgb}, 0.3)`,
+                      color: f.color, fontWeight: 700, letterSpacing: "0.8px",
+                    }}>
+                      {f.badge}
+                    </div>
+                  )}
 
-      {/* ── Early Access Banner ────────────────────────────────────────────── */}
+                  {/* Icon */}
+                  <div style={{
+                    width: 64, height: 64, borderRadius: 16, marginBottom: 20,
+                    background: `rgba(${rgb}, 0.08)`,
+                    border: `1px solid rgba(${rgb}, 0.12)`,
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    color: f.color,
+                  }}>
+                    {f.icon}
+                  </div>
+                  <h3 style={{ fontSize: 20, fontWeight: 700, color: "#F0F0F5", marginBottom: 10 }}>
+                    {f.title}
+                  </h3>
+                  <p style={{ fontSize: 14, color: "#9898B0", lineHeight: 1.6 }}>
+                    {f.description}
+                  </p>
+                </motion.div>
+              );
+            })}
+          </motion.div>
+        </div>
+      </section>
+
+
+      {/* ── Logo strip ────────────────────────────────────────────── */}
       <div style={{
         borderTop: "1px solid rgba(255,255,255,0.06)", borderBottom: "1px solid rgba(255,255,255,0.06)",
         padding: "20px 48px",
         display: "flex", alignItems: "center", justifyContent: "center", gap: 0,
-        background: "rgba(79,138,255,0.03)",
       }}>
         <div style={{
-          display: "flex", alignItems: "center", gap: 16,
+          display: "flex", alignItems: "center", gap: 32,
         }}>
           <div style={{
-            padding: "6px 16px",
-            borderRadius: 20,
-            background: "linear-gradient(135deg, #4F8AFF, #6366F1)",
-            fontSize: 11,
-            fontWeight: 700,
-            color: "white",
-            letterSpacing: "0.8px",
+            display: "flex", alignItems: "center", gap: 16,
           }}>
-            EARLY ACCESS
+            <div style={{ height: 1, width: 40, background: "rgba(255,255,255,0.06)" }} />
+            <span style={{ fontSize: 11, color: "#5C5C78", whiteSpace: "nowrap", fontWeight: 500 }}>
+              Trusted by teams at
+            </span>
+            <div style={{ height: 1, width: 40, background: "rgba(255,255,255,0.06)" }} />
           </div>
-          <span style={{ fontSize: 13, color: "#9898B0", fontWeight: 500 }}>
-            Join architects building the future of AEC workflows
-          </span>
+          <div style={{
+            display: "flex", gap: 36, flexWrap: "wrap", justifyContent: "center",
+            maskImage: "linear-gradient(to right, transparent 0%, black 10%, black 90%, transparent 100%)",
+            WebkitMaskImage: "linear-gradient(to right, transparent 0%, black 10%, black 90%, transparent 100%)",
+          }}>
+            {COMPANIES.map(c => (
+              <span key={c} style={{
+                fontSize: 13, fontWeight: 600, color: "#5C5C78",
+                letterSpacing: "0.5px",
+                transition: "color 0.15s",
+                cursor: "default",
+              }}
+                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = "#9898B0"; }}
+                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = "#5C5C78"; }}
+              >
+                {c}
+              </span>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -610,7 +775,7 @@ export default function LandingPage() {
               From brief to building in minutes
             </h2>
             <p style={{ fontSize: 16, color: "#9898B0" }}>
-              See how NeoBIM workflows transform AEC processes
+              See how Workflow Builder transforms AEC processes
             </p>
           </motion.div>
 
@@ -833,6 +998,12 @@ export default function LandingPage() {
                 <span style={{ fontSize: 40, fontWeight: 800, color: "#F0F0F5" }}>$79</span>
                 <span style={{ fontSize: 15, color: "#7878A0", marginLeft: 8 }}>/month</span>
               </div>
+              <div style={{ marginBottom: 24, padding: "8px 12px", borderRadius: 8, background: "rgba(16,185,129,0.08)", border: "1px solid rgba(16,185,129,0.2)" }}>
+                <span style={{ fontSize: 12, color: "#10B981", fontWeight: 600 }}>💰 Save $2,000 per project, pay $79/month = 25x ROI</span>
+              </div>
+              <div style={{ marginBottom: 24, padding: "8px 12px", borderRadius: 8, background: "rgba(16,185,129,0.08)", border: "1px solid rgba(16,185,129,0.2)" }}>
+                <span style={{ fontSize: 12, color: "#10B981", fontWeight: 600 }}>💰 Save $2,000 per project, pay $79/month = 25x ROI</span>
+              </div>
               <Link href="/dashboard" style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "11px 24px", borderRadius: 9, background: "linear-gradient(135deg, #4F8AFF 0%, #6366F1 100%)", color: "white", fontSize: 14, fontWeight: 600, textDecoration: "none", marginBottom: 28, boxShadow: "0 0 0 1px rgba(79,138,255,0.3), 0 4px 16px rgba(79,138,255,0.25)" }}>Start Free Trial</Link>
               <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: 24 }}>
                 <div style={{ fontSize: 13, fontWeight: 600, color: "#9898B0", marginBottom: 14 }}>Everything in Free, plus:</div>
@@ -948,8 +1119,198 @@ export default function LandingPage() {
           ))}
         </div>
         <span style={{ fontSize: 11, color: "#3A3A50" }}>
-          Built for the AEC community
+          Beta Product · Built for the AEC community
         </span>
+      
+      {/* Mobile Responsive Styles */}
+      <style jsx global>{`
+        @media (max-width: 768px) {
+          /* Hero section - stack vertically */
+          section[style*="minHeight: calc(100vh - 60px)"] {
+            flex-direction: column !important;
+            padding: 40px 24px !important;
+            gap: 32px !important;
+          }
+          
+          section[style*="minHeight: calc(100vh - 60px)"] > div {
+            flex: 1 !important;
+            max-width: 100% !important;
+          }
+
+          /* Hero title */
+          h1[style*="fontSize: 56"] {
+            font-size: 36px !important;
+          }
+
+          /* All grid layouts - 1 column on mobile */
+          div[style*="gridTemplateColumns: repeat(3, 1fr)"],
+          div[style*="gridTemplateColumns: repeat(4, 1fr)"] {
+            grid-template-columns: 1fr !important;
+            gap: 16px !important;
+          }
+
+          /* How it works section - stack the steps */
+          div[style*="gridTemplateColumns: 1fr 40px 1fr 40px 1fr"] {
+            grid-template-columns: 1fr !important;
+            gap: 16px !important;
+          }
+
+          /* Hide arrows between steps on mobile */
+          div[style*="gridTemplateColumns: 1fr 40px 1fr 40px 1fr"] > div[style*="display: flex"][style*="justifyContent: center"]:has(svg) {
+            display: none !important;
+          }
+
+          /* Navigation - adjust padding */
+          nav[style*="padding: 0 48px"] {
+            padding: 0 20px !important;
+          }
+
+          /* Sections - reduce padding */
+          section[style*="padding: 88px 48px"] {
+            padding: 48px 24px !important;
+          }
+
+          section[style*="padding: 48px 48px 88px"] {
+            padding: 32px 24px 48px !important;
+          }
+
+          /* CTAs - stack buttons vertically */
+          div[style*="display: flex"][style*="gap: 12"] > a {
+            width: 100%;
+            justify-content: center;
+          }
+
+          /* Increase touch target size for mobile */
+          a[style*="padding"][style*="borderRadius"] {
+            min-height: 44px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+          }
+
+          /* Logo strip - scroll on mobile */
+          div[style*="Trusted by teams"] {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+          }
+
+          /* Hero animation - smaller on mobile */
+          div[style*="borderRadius: 16"][style*="boxShadow"] {
+            transform: scale(0.9) !important;
+          }
+        }
+
+        @media (max-width: 480px) {
+          /* Extra small screens */
+          h1[style*="fontSize: 56"] {
+            font-size: 28px !important;
+          }
+
+          nav span[style*="fontSize: 17"] {
+            font-size: 15px !important;
+          }
+
+          /* Sticky nav - hide on very small screens */
+          nav[style*="position: fixed"] {
+            display: none !important;
+          }
+        }
+      `}</style>
+      
+      {/* Mobile Responsive Styles */}
+      <style jsx global>{`
+        @media (max-width: 768px) {
+          /* Hero section - stack vertically */
+          section[style*="minHeight: calc(100vh - 60px)"] {
+            flex-direction: column !important;
+            padding: 40px 24px !important;
+            gap: 32px !important;
+          }
+          
+          section[style*="minHeight: calc(100vh - 60px)"] > div {
+            flex: 1 !important;
+            max-width: 100% !important;
+          }
+
+          /* Hero title */
+          h1[style*="fontSize: 56"] {
+            font-size: 36px !important;
+          }
+
+          /* All grid layouts - 1 column on mobile */
+          div[style*="gridTemplateColumns: repeat(3, 1fr)"],
+          div[style*="gridTemplateColumns: repeat(4, 1fr)"] {
+            grid-template-columns: 1fr !important;
+            gap: 16px !important;
+          }
+
+          /* How it works section - stack the steps */
+          div[style*="gridTemplateColumns: 1fr 40px 1fr 40px 1fr"] {
+            grid-template-columns: 1fr !important;
+            gap: 16px !important;
+          }
+
+          /* Hide arrows between steps on mobile */
+          div[style*="gridTemplateColumns: 1fr 40px 1fr 40px 1fr"] > div[style*="display: flex"][style*="justifyContent: center"]:has(svg) {
+            display: none !important;
+          }
+
+          /* Navigation - adjust padding */
+          nav[style*="padding: 0 48px"] {
+            padding: 0 20px !important;
+          }
+
+          /* Sections - reduce padding */
+          section[style*="padding: 88px 48px"] {
+            padding: 48px 24px !important;
+          }
+
+          section[style*="padding: 48px 48px 88px"] {
+            padding: 32px 24px 48px !important;
+          }
+
+          /* CTAs - stack buttons vertically */
+          div[style*="display: flex"][style*="gap: 12"] > a {
+            width: 100%;
+            justify-content: center;
+          }
+
+          /* Increase touch target size for mobile */
+          a[style*="padding"][style*="borderRadius"] {
+            min-height: 44px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+          }
+
+          /* Logo strip - scroll on mobile */
+          div[style*="Trusted by teams"] {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+          }
+
+          /* Hero animation - smaller on mobile */
+          div[style*="borderRadius: 16"][style*="boxShadow"] {
+            transform: scale(0.9) !important;
+          }
+        }
+
+        @media (max-width: 480px) {
+          /* Extra small screens */
+          h1[style*="fontSize: 56"] {
+            font-size: 28px !important;
+          }
+
+          nav span[style*="fontSize: 17"] {
+            font-size: 15px !important;
+          }
+
+          /* Sticky nav - hide on very small screens */
+          nav[style*="position: fixed"] {
+            display: none !important;
+          }
+        }
+      `}</style>
       </footer>
     </div>
   );

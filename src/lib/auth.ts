@@ -5,11 +5,22 @@ import GoogleProvider from "next-auth/providers/google";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/db";
 import { authConfig } from "@/lib/auth.config";
+import { trackLogin } from "@/lib/analytics";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   ...authConfig,
   adapter: PrismaAdapter(prisma),
   session: { strategy: "jwt" },
+  callbacks: {
+    ...authConfig.callbacks,
+    async signIn({ user }) {
+      // 🔥 TRACK LOGIN
+      if (user.id) {
+        await trackLogin(user.id);
+      }
+      return true;
+    },
+  },
   providers: [
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID!,

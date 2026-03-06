@@ -1,0 +1,138 @@
+/* ═══════════════════════════════════════════════════════════════════
+   MOBILE RESPONSIVE STYLES - PERFECT MOBILE UX
+   ══════════════════════════════════════════════════════════════════ */
+
+/* ─── BASE MOBILE OVERRIDES ──────────────────────────────────────── */
+@media (max-width: 768px) {
+  /* Prevent horizontal scroll */
+  html, body {
+    overflow-x: hidden !important;
+    max-width: 100vw !important;
+  }
+  
+  /* Touch-friendly sizing */
+  * {
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+  }
+}
+
+/* ─── LANDING PAGE MOBILE ────────────────────────────────────────── */
+@media (max-width: 768px) {
+  /* Hero Section - Stack Vertically */
+  .landing-hero {
+    flex-direction: column !important;
+    padding: 32px 20px !important;
+    gap: 32px !important;
+    min-height: auto !important;
+  }
+  
+  .landing-hero > div {
+    flex: 1 1 auto !important;
+    max-width: 100% !important;
+    width: 100% !important;
+  }
+
+  /* Hero Title */
+  .hero-title {
+    font-size: 32px !important;
+    line-height: 1.1 !important;
+  }
+
+  /* Hero Description */
+  .hero-description {
+    font-size: 16px !important;
+    line-height: 1.6 !important;
+  }
+
+  /* Navigation - Mobile Friendly */
+  nav {
+    padding-left: 16px !important;
+    padding-right: 16px !important;
+  }
+
+  /* CTA Buttons - Stack on mobile */
+  .cta-group {
+    flex-direction: column !important;
+    gap: 10px !important;
+  }
+
+  .cta-group > a,
+  .cta-group > button {
+    width: 100% !important;
+    justify-content: center !important;
+  }
+
+  /* Touch Target Sizes (min 44px) */
+  a, button {
+    min-height: 44px !important;
+  }
+
+  /* All Grid Layouts - Single Column */
+  .grid-3-cols,
+  .grid-4-cols {
+    grid-template-columns: 1fr !important;
+    gap: 16px !important;
+  }
+
+  /* Sections - Reduce Padding */
+  section {
+    padding-left: 20px !important;
+    padding-right: 20px !important;
+  }
+
+  /* Dashboard stat cards */
+  .dashboard-stats {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 12px !important;
+  }
+}
+
+/* ─── EXTRA SMALL SCREENS (< 480px) ─────────────────────────────── */
+@media (max-width: 480px) {
+  .hero-title {
+    font-size: 24px !important;
+  }
+
+  .dashboard-stats {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* ─── CANVAS/WORKFLOW BUILDER MOBILE ─────────────────────────────── */
+@media (max-width: 768px) {
+  /* React Flow Canvas - Touch Optimized */
+  .react-flow {
+    touch-action: none !important;
+  }
+
+  .react-flow__viewport {
+    touch-action: pinch-zoom !important;
+  }
+
+  /* Minimap - Hide on Mobile */
+  .react-flow__minimap {
+    display: none !important;
+  }
+
+  /* Controls - Bottom Right, Larger Touch Targets */
+  .react-flow__controls {
+    bottom: 80px !important;
+    right: 16px !important;
+  }
+
+  .react-flow__controls button {
+    width: 40px !important;
+    height: 40px !important;
+  }
+}
+
+/* ─── AUTH PAGES MOBILE ──────────────────────────────────────────── */
+@media (max-width: 768px) {
+  /* Form Inputs - Prevent iOS Zoom */
+  input[type="email"],
+  input[type="password"],
+  input[type="text"] {
+    font-size: 16px !important;
+  }
+}

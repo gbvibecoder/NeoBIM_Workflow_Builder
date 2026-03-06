@@ -3,7 +3,6 @@ import { auth } from "@/lib/auth";
 import { generateBuildingDescription, generateConceptImage } from "@/services/openai";
 import { generateId } from "@/lib/utils";
 import type { ExecutionArtifact } from "@/types/execution";
-import * as XLSX from "xlsx";
 import { checkRateLimit, logRateLimitHit } from "@/lib/rate-limit";
 import {
   findUnitRate,
@@ -13,7 +12,6 @@ import {
 import { assertValidInput } from "@/lib/validation";
 import { APIError, UserErrors, formatErrorResponse } from "@/lib/user-errors";
 
-// Node IDs that have real implementations
 // Node IDs that have real implementations
 const REAL_NODE_IDS = new Set(["TR-003", "GN-003", "TR-007", "TR-008", "EX-002"]);
 
@@ -33,10 +31,7 @@ export async function POST(req: NextRequest) {
 
   // Apply rate limiting
   try {
-    // EMERGENCY ADMIN BYPASS
-    if (session?.user?.email === "erolerutik9@gmail.com") {
-      // Skip rate limiting entirely
-    } else {
+
     const userEmail = session.user.email || "";
     const rateLimitResult = await checkRateLimit(userId, userRole, userEmail);
 
@@ -65,8 +60,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Log successful request with remaining quota
-    }
-
+    if (process.env.NODE_ENV === "development") console.log("[execute-node] User " + userId + " (" + userRole + ") - Remaining: " + rateLimitResult.remaining + "/" + rateLimitResult.limit);
   } catch (error) {
     console.error("[execute-node] Rate limit check failed:", error);
     // If rate limiting fails, allow the request to proceed (fail open for better UX)
@@ -353,6 +347,7 @@ export async function POST(req: NextRequest) {
 
     } else if (catalogueId === "EX-002") {
       // BOQ Excel Export — generate real XLSX file
+      const XLSX = await import("xlsx");
       const rows = (inputData?.rows ?? []) as string[][];
       const headers = (inputData?.headers ?? ["Description", "Unit", "Qty", "Rate", "Total"]) as string[];
 
@@ -440,3 +435,4 @@ function formatBuildingDescription(d: {
   return d.projectName.toUpperCase() + " — BUILDING DESCRIPTION\n\nType: " + d.buildingType + "\nFloors: " + d.floors + " | Total Area: " + d.totalArea.toLocaleString() + " m²\nEstimated Cost: " + d.estimatedCost + " | Duration: " + d.constructionDuration + "\n\n" + d.programSummary + "\n\nStructure: " + d.structure + "\nFacade: " + d.facade + "\n\nSustainability: " + (d.sustainabilityFeatures.join(", ") || "TBD");
 }
 
+export { REAL_NODE_IDS };

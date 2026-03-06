@@ -191,3 +191,176 @@ export function detectOpenAIError(error: any): UserError {
   // Generic fallback
   return UserErrors.INTERNAL_ERROR;
 }
+
+// ─── Network Errors ───────────────────────────────────────────────────────────
+
+export const NetworkErrors = {
+  CONNECTION_FAILED: {
+    title: "Connection failed",
+    message: "Unable to reach the server. Please check your internet connection and try again.",
+    action: "Retry",
+    code: "NET_001",
+  },
+  
+  TIMEOUT: {
+    title: "Request timed out",
+    message: "The request took too long to complete. Please try again.",
+    action: "Try Again",
+    code: "NET_002",
+  },
+  
+  OFFLINE: {
+    title: "You're offline",
+    message: "No internet connection detected. Please connect to the internet and try again.",
+    code: "NET_003",
+  },
+} as const;
+
+// ─── Form Validation Errors ───────────────────────────────────────────────────
+
+export const FormErrors = {
+  INVALID_EMAIL: {
+    title: "Invalid email",
+    message: "Please enter a valid email address (e.g., you@example.com).",
+    code: "FORM_001",
+  },
+  
+  PASSWORD_TOO_SHORT: {
+    title: "Password too short",
+    message: "Password must be at least 8 characters long.",
+    code: "FORM_002",
+  },
+  
+  PASSWORDS_DONT_MATCH: {
+    title: "Passwords don't match",
+    message: "Please ensure both password fields match.",
+    code: "FORM_003",
+  },
+  
+  REQUIRED_FIELD: (fieldName: string): UserError => ({
+    title: "Required field missing",
+    message: `Please enter your ${fieldName}.`,
+    code: "FORM_004",
+  }),
+  
+  INVALID_URL: {
+    title: "Invalid URL",
+    message: "Please enter a valid URL (e.g., https://example.com).",
+    code: "FORM_005",
+  },
+} as const;
+
+// ─── Auth Errors ──────────────────────────────────────────────────────────────
+
+export const AuthErrors = {
+  LOGIN_FAILED: {
+    title: "Login failed",
+    message: "Invalid email or password. Please try again.",
+    code: "AUTH_002",
+  },
+  
+  EMAIL_ALREADY_EXISTS: {
+    title: "Email already registered",
+    message: "An account with this email already exists. Try signing in instead.",
+    action: "Sign In",
+    actionUrl: "/login",
+    code: "AUTH_003",
+  },
+  
+  SESSION_EXPIRED: {
+    title: "Session expired",
+    message: "Your session has expired. Please sign in again.",
+    action: "Sign In",
+    actionUrl: "/login",
+    code: "AUTH_004",
+  },
+  
+  OAUTH_FAILED: (provider: string): UserError => ({
+    title: `${provider} sign-in failed`,
+    message: `Unable to sign in with ${provider}. Please try again or use email instead.`,
+    code: "AUTH_005",
+  }),
+  
+  NO_PERMISSION: {
+    title: "Permission denied",
+    message: "You don't have permission to access this resource.",
+    code: "AUTH_006",
+  },
+} as const;
+
+// ─── Subscription/Billing Errors ──────────────────────────────────────────────
+
+export const BillingErrors = {
+  PAYMENT_FAILED: {
+    title: "Payment failed",
+    message: "Your payment could not be processed. Please check your card details and try again.",
+    action: "Update Payment",
+    actionUrl: "/dashboard/billing",
+    code: "BILL_001",
+  },
+  
+  SUBSCRIPTION_INACTIVE: {
+    title: "Subscription inactive",
+    message: "Your subscription is not active. Please upgrade to continue using this feature.",
+    action: "Upgrade Now",
+    actionUrl: "/dashboard/billing",
+    code: "BILL_002",
+  },
+  
+  CARD_DECLINED: {
+    title: "Card declined",
+    message: "Your card was declined. Please try a different payment method.",
+    action: "Update Card",
+    actionUrl: "/dashboard/billing",
+    code: "BILL_003",
+  },
+} as const;
+
+/**
+ * Enhanced error detection for network failures
+ */
+export function detectNetworkError(error: any): UserError | null {
+  if (!navigator.onLine) {
+    return NetworkErrors.OFFLINE;
+  }
+  
+  if (error?.code === "ECONNABORTED" || error?.message?.includes("timeout")) {
+    return NetworkErrors.TIMEOUT;
+  }
+  
+  if (error?.code === "ENOTFOUND" || error?.code === "ECONNREFUSED" || error?.message?.includes("fetch")) {
+    return NetworkErrors.CONNECTION_FAILED;
+  }
+  
+  return null;
+}
+
+/**
+ * Unified error handler for API calls
+ */
+export async function handleAPIError(error: any): Promise<UserError> {
+  // Check network errors first
+  const networkError = detectNetworkError(error);
+  if (networkError) return networkError;
+  
+  // Check if it's already a formatted API error
+  if (error?.error?.code && error?.error?.message) {
+    return error.error;
+  }
+  
+  // Check for specific status codes
+  if (error?.status === 401 || error?.statusCode === 401) {
+    return UserErrors.UNAUTHORIZED;
+  }
+  
+  if (error?.status === 429 || error?.statusCode === 429) {
+    return UserErrors.RATE_LIMIT_FREE(24); // Default to 24h
+  }
+  
+  if (error?.status === 403 || error?.statusCode === 403) {
+    return AuthErrors.NO_PERMISSION;
+  }
+  
+  // Generic fallback
+  return UserErrors.INTERNAL_ERROR;
+}

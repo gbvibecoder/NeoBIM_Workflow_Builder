@@ -3,7 +3,7 @@
  * Generates industry-standard Bill of Quantities spreadsheets
  */
 
-import * as XLSX from "xlsx";
+// XLSX imported dynamically when needed
 
 export interface BOQLineItem {
   item: string;
@@ -74,11 +74,12 @@ function inferCSIDivision(description: string): string {
 /**
  * Generate professional BOQ Excel file
  */
-export function generateProfessionalBOQ(
+export async function generateProfessionalBOQ(
   items: BOQLineItem[],
   projectInfo: BOQProjectInfo = {},
   currency: string = "USD"
-): Buffer {
+): Promise<Buffer> {
+  const XLSX = await import("xlsx");
   const wb = XLSX.utils.book_new();
   
   // Assign CSI divisions if missing

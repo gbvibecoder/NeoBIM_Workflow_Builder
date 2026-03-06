@@ -202,7 +202,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
                 fontStyle: "italic",
               }}
             >
-              "NeoBIM reduced our concept design phase from 2 weeks to 4 hours.
+              "Workflow Builder reduced our concept design phase from 2 weeks to 4 hours.
               The ROI was immediate."
             </p>
             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
