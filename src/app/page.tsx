@@ -67,7 +67,7 @@ function StickyNav() {
           <Zap size={12} color="white" fill="white" />
         </div>
         <span style={{ fontSize: 14, fontWeight: 700, color: "#F0F0F5" }}>
-          Neo<span style={{ color: "#4F8AFF" }}>BIM</span>
+          Build<span style={{ color: "#4F8AFF" }}>Flow</span>
         </span>
       </Link>
 
@@ -355,7 +355,7 @@ export default function LandingPage() {
             <Zap size={15} color="white" fill="white" />
           </div>
           <span style={{ fontSize: 17, fontWeight: 800, color: "#F0F0F5", letterSpacing: "-0.3px" }}>
-            Neo<span style={{ color: "#4F8AFF" }}>BIM</span>
+            Build<span style={{ color: "#4F8AFF" }}>Flow</span>
           </span>
         </Link>
 
@@ -971,7 +971,7 @@ export default function LandingPage() {
                 <p style={{ fontSize: 13, color: "#7878A0" }}>For professionals & small teams</p>
               </div>
               <div style={{ marginBottom: 28 }}>
-                <span style={{ fontSize: 40, fontWeight: 800, color: "#F0F0F5" }}>$79</span>
+                <span style={{ fontSize: 40, fontWeight: 800, color: "#F0F0F5" }}>$29</span>
                 <span style={{ fontSize: 15, color: "#7878A0", marginLeft: 8 }}>/month</span>
               </div>
               <div style={{ marginBottom: 24, padding: "8px 12px", borderRadius: 8, background: "rgba(16,185,129,0.08)", border: "1px solid rgba(16,185,129,0.2)" }}>

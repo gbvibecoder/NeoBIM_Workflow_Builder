@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { Zap, Users, Workflow, TrendingUp } from "lucide-react";
+import { PREBUILT_WORKFLOWS } from "@/constants/prebuilt-workflows";
 
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -81,7 +82,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
                 letterSpacing: "-0.3px",
               }}
             >
-              Neo<span style={{ color: "#4F8AFF" }}>BIM</span>
+              Build<span style={{ color: "#4F8AFF" }}>Flow</span>
             </span>
           </Link>
         </motion.div>
@@ -129,7 +130,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
           >
             {[
               { icon: <Zap size={20} />, value: "31", label: "AEC Node Types" },
-              { icon: <Workflow size={20} />, value: "7", label: "Ready-Made Templates" },
+              { icon: <Workflow size={20} />, value: String(PREBUILT_WORKFLOWS.length), label: "Ready-Made Templates" },
               { icon: <TrendingUp size={20} />, value: "Free", label: "To Start" },
               { icon: <Users size={20} />, value: "2-3 min", label: "Avg Generation" },
             ].map((stat, i) => (

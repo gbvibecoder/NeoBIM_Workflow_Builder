@@ -1,6 +1,6 @@
 {
-  "name": "NeoBIM - AI Workflow Builder for AEC",
-  "short_name": "NeoBIM",
+  "name": "BuildFlow - AI Workflow Builder for AEC",
+  "short_name": "BuildFlow",
   "description": "Build AI-powered AEC workflows visually. Drag-and-drop nodes to create pipelines from PDF briefs to 3D massing to concept renders.",
   "start_url": "/",
   "display": "standalone",
