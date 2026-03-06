@@ -81,3 +81,5 @@ coverage/
 node-validation-*.json
 dev-server.pid
 dev-server-test.log
+*.swp
+analytics-logs/
