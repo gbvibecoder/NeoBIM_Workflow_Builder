@@ -11,7 +11,7 @@ import type { WorkflowNode } from "@/types/nodes";
 import type { LogEntry } from "@/components/canvas/ExecutionLog";
 
 // Node IDs that have real API implementations
-const REAL_NODE_IDS = new Set(["TR-003", "GN-003", "IN-004", "TR-007", "TR-008", "EX-002"]);
+const REAL_NODE_IDS = new Set(["TR-003", "GN-003", "TR-007", "TR-008", "EX-002"]);
 
 interface APIErrorResponse {
   error: {
@@ -124,8 +124,88 @@ interface RateLimitInfo {
   actionUrl?: string;
 }
 
+// Topological sort using Kahn's algorithm — respects edge dependencies
+function topologicalSort(nodes: WorkflowNode[], edges: { source: string; target: string }[]): WorkflowNode[] {
+  const graph = new Map<string, string[]>();
+  const inDegree = new Map<string, number>();
+
+  for (const node of nodes) {
+    graph.set(node.id, []);
+    inDegree.set(node.id, 0);
+  }
+
+  for (const edge of edges) {
+    if (graph.has(edge.source) && inDegree.has(edge.target)) {
+      graph.get(edge.source)!.push(edge.target);
+      inDegree.set(edge.target, (inDegree.get(edge.target) || 0) + 1);
+    }
+  }
+
+  // Start with nodes that have no incoming edges
+  const queue: string[] = [];
+  for (const [nodeId, degree] of inDegree) {
+    if (degree === 0) queue.push(nodeId);
+  }
+
+  const sorted: WorkflowNode[] = [];
+  const nodeMap = new Map(nodes.map(n => [n.id, n]));
+
+  while (queue.length > 0) {
+    const current = queue.shift()!;
+    const node = nodeMap.get(current);
+    if (node) sorted.push(node);
+
+    for (const neighbor of graph.get(current) || []) {
+      inDegree.set(neighbor, (inDegree.get(neighbor) || 0) - 1);
+      if (inDegree.get(neighbor) === 0) queue.push(neighbor);
+    }
+  }
+
+  // Append any disconnected nodes not reached by edges (sorted by x-position)
+  if (sorted.length < nodes.length) {
+    const sortedIds = new Set(sorted.map(n => n.id));
+    const remaining = nodes.filter(n => !sortedIds.has(n.id)).sort((a, b) => a.position.x - b.position.x);
+    sorted.push(...remaining);
+  }
+
+  return sorted;
+}
+
+// Find upstream artifact for a node by looking at incoming edges
+function getUpstreamArtifact(
+  nodeId: string,
+  edges: { source: string; target: string }[],
+  artifactMap: Map<string, ExecutionArtifact>
+): ExecutionArtifact | null {
+  const incomingEdges = edges.filter(e => e.target === nodeId);
+
+  if (incomingEdges.length === 0) return null;
+
+  if (incomingEdges.length === 1) {
+    return artifactMap.get(incomingEdges[0].source) ?? null;
+  }
+
+  // Multiple inputs — merge data from all upstream nodes
+  const mergedData: Record<string, unknown> = {};
+  let firstArtifact: ExecutionArtifact | null = null;
+
+  for (const edge of incomingEdges) {
+    const artifact = artifactMap.get(edge.source);
+    if (artifact) {
+      if (!firstArtifact) firstArtifact = artifact;
+      if (artifact.data && typeof artifact.data === "object") {
+        Object.assign(mergedData, artifact.data);
+      }
+    }
+  }
+
+  if (!firstArtifact) return null;
+
+  return { ...firstArtifact, data: mergedData };
+}
+
 export function useExecution({ onLog }: UseExecutionOptions = {}) {
-  const { nodes, currentWorkflow, updateNodeStatus, setEdgeFlowing } = useWorkflowStore();
+  const { nodes, edges: workflowEdges, currentWorkflow, updateNodeStatus, setEdgeFlowing } = useWorkflowStore();
   const {
     startExecution,
     addTileResult,
@@ -187,11 +267,12 @@ export function useExecution({ onLog }: UseExecutionOptions = {}) {
       }
     }
 
-    // Left-to-right topological order based on x position
-    const orderedNodes = [...nodes].sort((a, b) => a.position.x - b.position.x);
+    // Topological sort — respects edge dependencies instead of x-position only
+    const orderedNodes = topologicalSort(nodes as WorkflowNode[], workflowEdges);
 
     let hasError = false;
-    let previousArtifact: ExecutionArtifact | null = null;
+    // Map of nodeId → artifact for edge-based data routing
+    const artifactMap = new Map<string, ExecutionArtifact>();
 
     for (let i = 0; i < orderedNodes.length; i++) {
       const node = orderedNodes[i] as WorkflowNode;
@@ -201,8 +282,10 @@ export function useExecution({ onLog }: UseExecutionOptions = {}) {
       log("running", `Running: ${node.data.label}`, node.data.catalogueId);
 
       try {
-        const artifact = await executeNode(node, executionId, previousArtifact, useReal);
-        previousArtifact = artifact;
+        // Get upstream data from connected nodes (via edges), not just previous in array
+        const upstreamArtifact = getUpstreamArtifact(node.id, workflowEdges, artifactMap);
+        const artifact = await executeNode(node, executionId, upstreamArtifact, useReal);
+        artifactMap.set(node.id, artifact);
 
         addArtifact(node.id, artifact);
         addTileResult({
@@ -315,6 +398,7 @@ export function useExecution({ onLog }: UseExecutionOptions = {}) {
     }
   }, [
     nodes,
+    workflowEdges,
     currentWorkflow,
     isExecuting,
     startExecution,

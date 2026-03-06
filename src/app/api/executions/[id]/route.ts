@@ -17,9 +17,6 @@ export async function GET(_req: NextRequest, { params }: Params) {
     where: { id, userId: session.user.id },
     include: {
       workflow: { select: { id: true, name: true } },
-      artifacts: {
-        orderBy: { createdAt: "asc" },
-      },
     },
   });
 
@@ -27,7 +24,23 @@ export async function GET(_req: NextRequest, { params }: Params) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  return NextResponse.json({ execution });
+  // Build artifacts from tileResults JSON (where useExecution actually stores them)
+  // The Artifact Prisma relation is empty because the write path uses tileResults JSON
+  const tileResults = Array.isArray(execution.tileResults) ? execution.tileResults : [];
+  const artifacts = (tileResults as Record<string, unknown>[]).map((result, index) => ({
+    id: `artifact-${index}`,
+    executionId: execution.id,
+    tileInstanceId: (result.nodeId as string) ?? `node-${index}`,
+    nodeId: (result.nodeId as string) ?? `node-${index}`,
+    nodeLabel: (result.nodeLabel as string) ?? null,
+    type: (result.type as string) ?? "json",
+    title: (result.title as string) ?? (result.nodeLabel as string) ?? "Result",
+    data: (result.data as Record<string, unknown>) ?? result,
+    metadata: {},
+    createdAt: (result.createdAt as string) ?? execution.startedAt?.toISOString() ?? new Date().toISOString(),
+  }));
+
+  return NextResponse.json({ execution: { ...execution, artifacts } });
 }
 
 // PUT /api/executions/[id] — update status / results

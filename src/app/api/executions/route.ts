@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
   const statusParam = searchParams.get("status") as ExecutionStatus | null;
   const limit = parseInt(searchParams.get("limit") ?? "50");
 
-  const executions = await prisma.execution.findMany({
+  const rawExecutions = await prisma.execution.findMany({
     where: {
       userId: session.user.id,
       ...(workflowId && { workflowId }),
@@ -24,13 +24,26 @@ export async function GET(req: NextRequest) {
     },
     include: {
       workflow: { select: { id: true, name: true } },
-      artifacts: {
-        select: { id: true, type: true, data: true, metadata: true, tileInstanceId: true, createdAt: true },
-        orderBy: { createdAt: "asc" },
-      },
     },
     orderBy: { startedAt: "desc" },
     take: limit,
+  });
+
+  // Build artifacts from tileResults JSON (where useExecution actually stores them)
+  const executions = rawExecutions.map(execution => {
+    const tileResults = Array.isArray(execution.tileResults) ? execution.tileResults : [];
+    const artifacts = (tileResults as Record<string, unknown>[]).map((result, index) => ({
+      id: `artifact-${index}`,
+      type: (result.type as string) ?? "json",
+      data: (result.data as Record<string, unknown>) ?? result,
+      metadata: {},
+      tileInstanceId: (result.nodeId as string) ?? `node-${index}`,
+      nodeId: (result.nodeId as string) ?? `node-${index}`,
+      nodeLabel: (result.nodeLabel as string) ?? null,
+      title: (result.title as string) ?? (result.nodeLabel as string) ?? "Result",
+      createdAt: (result.createdAt as string) ?? execution.startedAt?.toISOString(),
+    }));
+    return { ...execution, artifacts };
   });
 
   return NextResponse.json({ executions });

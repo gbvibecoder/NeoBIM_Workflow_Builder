@@ -171,21 +171,24 @@ export async function executeNode(
         label: "Compliance Report",
       });
 
-    case "TR-007": // Quantity Extractor
+    case "TR-007": { // Quantity Extractor
+      const qtoElements = [
+        { description: "External Walls", category: "Walls", quantity: 1240, unit: "m²" },
+        { description: "Internal Walls", category: "Walls", quantity: 2890, unit: "m²" },
+        { description: "Floor Slabs", category: "Slabs", quantity: 2400, unit: "m²" },
+        { description: "Roof Slab", category: "Slabs", quantity: 605, unit: "m²" },
+        { description: "Windows", category: "Openings", quantity: 96, unit: "EA" },
+        { description: "Doors", category: "Openings", quantity: 58, unit: "EA" },
+        { description: "Columns", category: "Structure", quantity: 20, unit: "EA" },
+        { description: "Beams", category: "Structure", quantity: 85, unit: "EA" },
+      ];
       return mockArtifact(executionId, tileInstanceId, "table", {
         label: "Extracted Quantities (IFC)",
-        headers: ["Element", "Count", "Area (m²)", "Volume (m³)", "Source"],
-        rows: [
-          ["IfcWall (External)", 48, 1240, 148.8, "Qto_WallBaseQuantities"],
-          ["IfcWall (Internal)", 186, 2890, 231.2, "Qto_WallBaseQuantities"],
-          ["IfcSlab (Floor)", 5, 600, 120.0, "Qto_SlabBaseQuantities"],
-          ["IfcSlab (Roof)", 1, 605, 90.75, "Qto_SlabBaseQuantities"],
-          ["IfcWindow", 96, 288, "—", "geometry_computed"],
-          ["IfcDoor", 58, 116, "—", "geometry_computed"],
-          ["IfcColumn", 20, "—", 8.4, "geometry_computed"],
-          ["IfcStair", 2, "—", 12.6, "geometry_computed"],
-        ],
+        headers: ["Category", "Element", "Quantity", "Unit"],
+        rows: qtoElements.map(e => [e.category, e.description, e.quantity.toString(), e.unit]),
+        _elements: qtoElements, // Required for TR-008 compatibility
       });
+    }
 
     case "TR-008": // BOQ / Cost Mapper
       return mockArtifact(executionId, tileInstanceId, "table", {
@@ -241,13 +244,24 @@ export async function executeNode(
 
     case "GN-001": { // Massing Generator
       // Parse upstream data for floor count and building description
+      // Check json field (from TR-002), then text content, then defaults
+      const jsonData = inputData?.json as Record<string, unknown> | undefined;
       const upstreamText = String(inputData?.content ?? inputData?.prompt ?? "");
-      const floorMatch = upstreamText.match(/(\d+)[\s-]*(?:stor(?:e?y|ies)|floor)/i);
-      const floors = floorMatch ? parseInt(floorMatch[1], 10) : 5;
+
+      const floors = (() => {
+        if (jsonData?.floors) return Number(jsonData.floors);
+        if (inputData?._raw && typeof inputData._raw === "object" && (inputData._raw as Record<string, unknown>).floors)
+          return Number((inputData._raw as Record<string, unknown>).floors);
+        const fm = upstreamText.match(/(\d+)[\s-]*(?:stor(?:e?y|ies)|floor)/i);
+        if (fm) return parseInt(fm[1], 10);
+        return 5;
+      })();
+
       const heightPerFloor = 4.2;
       const height = (floors * heightPerFloor).toFixed(1);
       const footprint = 567;
-      const gfa = Math.round(floors * footprint * 0.98);
+      const totalGFA = jsonData?.total_gfa_m2 ? Number(jsonData.total_gfa_m2) : undefined;
+      const gfa = totalGFA ?? Math.round(floors * footprint * 0.98);
       return mockArtifact(executionId, tileInstanceId, "kpi", {
         metrics: [
           { label: "GFA", value: gfa.toLocaleString(), unit: "m²" },
@@ -257,6 +271,12 @@ export async function executeNode(
           { label: "Footprint", value: String(footprint), unit: "m²" },
           { label: "Plot Ratio", value: (gfa / 1050).toFixed(2), unit: "FAR" },
         ],
+        // Pass through upstream text data so downstream nodes (GN-003) can read it
+        content: inputData?.content ?? inputData?.prompt
+          ?? (jsonData ? `${floors}-storey ${jsonData.building_type ?? "mixed-use"} building, ${gfa.toLocaleString()} m² GFA` : "Modern mixed-use building"),
+        prompt: inputData?.prompt ?? inputData?.content
+          ?? (jsonData ? `${floors}-storey ${jsonData.building_type ?? "mixed-use"} building, ${gfa.toLocaleString()} m² GFA` : "Modern mixed-use building"),
+        _raw: inputData?._raw ?? null,
       });
     }
 
@@ -288,32 +308,41 @@ export async function executeNode(
         style: "Residential layout, 12 units per floor",
       });
 
-    case "EX-001": // IFC Exporter
+    case "EX-001": { // IFC Exporter
+      const ifcContent = `ISO-10303-21;\nHEADER;\nFILE_DESCRIPTION(('NeoBIM Mock Export'),'2;1');\nFILE_NAME('mock_building.ifc','${new Date().toISOString().split("T")[0]}',('NeoBIM'),('NeoBIM'),'','','');\nFILE_SCHEMA(('IFC4'));\nENDSEC;\nDATA;\n#1=IFCPROJECT('0001',#2,$,'Mock Building Project',$,$,$,$,$);\nENDSEC;\nEND-ISO-10303-21;`;
+      const ifcBase64 = typeof Buffer !== "undefined" ? Buffer.from(ifcContent).toString("base64") : btoa(ifcContent);
       return mockArtifact(executionId, tileInstanceId, "file", {
         name: "oslo_mixeduse_v1.ifc",
         type: "IFC 4",
-        size: 2847362,
-        downloadUrl: "#",
+        size: ifcContent.length,
+        downloadUrl: `data:application/octet-stream;base64,${ifcBase64}`,
         label: "IFC Export",
       });
+    }
 
-    case "EX-002": // BOQ Exporter
+    case "EX-002": { // BOQ Exporter
+      const csvContent = "Description,Unit,Qty,Rate (NOK),Total (NOK)\nExternal walls,m²,1240,4500,5580000\nInternal walls,m²,2890,1200,3468000\nStructural slabs,m²,3030,3800,11514000\nRoof slab,m²,605,5200,3146000\nWindows,m²,288,8500,2448000\nDoors,No.,58,12000,696000\nColumns,m³,8.4,15000,126000\nStaircases,No.,2,280000,560000";
+      const csvBase64 = typeof Buffer !== "undefined" ? Buffer.from(csvContent).toString("base64") : btoa(csvContent);
       return mockArtifact(executionId, tileInstanceId, "file", {
-        name: "oslo_mixeduse_boq.xlsx",
-        type: "XLSX Spreadsheet",
-        size: 184230,
-        downloadUrl: "#",
+        name: "oslo_mixeduse_boq.csv",
+        type: "CSV Spreadsheet",
+        size: csvContent.length,
+        downloadUrl: `data:text/csv;base64,${csvBase64}`,
         label: "BOQ Export",
       });
+    }
 
-    case "EX-003": // PDF Report
+    case "EX-003": { // PDF Report
+      const reportText = `NeoBIM Compliance Report\nGenerated: ${new Date().toISOString()}\n\nOverall Status: PASS (7/8 rules)\n\nResults:\n- Maximum building height: 21.6m / 22m — PASS\n- Site coverage: 54% / 60% — PASS\n- Front setback: 3m / 3m — PASS\n- Side setback (N): 2.8m / 3m — FAIL (0.2m non-compliant)\n- Residential daylight: 1.8% / >1.5% — PASS\n- Parking minimum: 0.5/unit — PASS\n- Active ground floor: 78% / >50% — PASS\n- Green roof: 30% / >25% — PASS\n\nNote: This is a mock report. Full PDF generation coming soon.`;
+      const reportBase64 = typeof Buffer !== "undefined" ? Buffer.from(reportText).toString("base64") : btoa(reportText);
       return mockArtifact(executionId, tileInstanceId, "file", {
-        name: "compliance_report.pdf",
-        type: "PDF Document",
-        size: 1204800,
-        downloadUrl: "#",
-        label: "Compliance Report PDF",
+        name: "compliance_report.txt",
+        type: "Text Report",
+        size: reportText.length,
+        downloadUrl: `data:text/plain;base64,${reportBase64}`,
+        label: "Compliance Report",
       });
+    }
 
     case "EX-004": // Speckle Publisher
       return mockArtifact(executionId, tileInstanceId, "text", {
@@ -321,14 +350,17 @@ export async function executeNode(
         label: "Speckle Commit URL",
       });
 
-    case "EX-006": // Image Exporter
+    case "EX-006": { // Image Exporter
+      // Pass through any upstream image URL for download
+      const imageUrl = String(inputData?.url ?? "https://picsum.photos/seed/export/1024/768");
       return mockArtifact(executionId, tileInstanceId, "file", {
-        name: "concept_renders_4K.zip",
-        type: "ZIP Archive",
-        size: 28472038,
-        downloadUrl: "#",
+        name: "concept_render_4K.png",
+        type: "PNG Image",
+        size: 2847203,
+        downloadUrl: imageUrl,
         label: "High-Res Image Export",
       });
+    }
 
     default:
       return mockArtifact(executionId, tileInstanceId, "json", {
