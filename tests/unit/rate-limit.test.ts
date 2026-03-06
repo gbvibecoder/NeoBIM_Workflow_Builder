@@ -64,9 +64,9 @@ describe('Rate Limiting - CRITICAL PATH', () => {
       expect(result.remaining).toBe(999999);
     });
 
-    it('should bypass rate limits for rutik@neobim.com', async () => {
+    it('should bypass rate limits for admin email', async () => {
       const userId = 'rutik-123';
-      const userEmail = 'rutik@neobim.com';
+      const userEmail = 'erolerutik9@gmail.com';
 
       const result = await checkRateLimit(userId, 'FREE', userEmail);
 

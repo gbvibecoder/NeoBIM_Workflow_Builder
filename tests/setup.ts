@@ -13,7 +13,7 @@ beforeAll(() => {
   process.env.UPSTASH_REDIS_REST_URL = 'http://localhost:8079';
   process.env.UPSTASH_REDIS_REST_TOKEN = 'test-token';
   process.env.OPENAI_API_KEY = 'sk-test-mock-openai-key';
-  process.env.ADMIN_EMAILS = 'admin@test.com,rutik@neobim.com';
+  process.env.ADMIN_EMAILS = 'admin@test.com,erolerutik9@gmail.com';
 });
 
 afterEach(() => {

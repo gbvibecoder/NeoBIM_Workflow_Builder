@@ -3,45 +3,45 @@ version: "3.9"
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: neobim-postgres
+    container_name: buildflow-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_USER: neobim
-      POSTGRES_PASSWORD: neobim_dev_password
-      POSTGRES_DB: neobim_dev
+      POSTGRES_USER: buildflow
+      POSTGRES_PASSWORD: buildflow_dev_password
+      POSTGRES_DB: buildflow_dev
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U neobim -d neobim_dev"]
+      test: ["CMD-SHELL", "pg_isready -U buildflow -d buildflow_dev"]
       interval: 10s
       timeout: 5s
       retries: 5
 
   redis:
     image: redis:7-alpine
-    container_name: neobim-redis
+    container_name: buildflow-redis
     restart: unless-stopped
-    command: redis-server --requirepass neobim_redis_password
+    command: redis-server --requirepass buildflow_redis_password
     ports:
       - "6379:6379"
     volumes:
       - redis_data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "--no-auth-warning", "-a", "neobim_redis_password", "ping"]
+      test: ["CMD", "redis-cli", "--no-auth-warning", "-a", "buildflow_redis_password", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
 
   minio:
     image: minio/minio:latest
-    container_name: neobim-minio
+    container_name: buildflow-minio
     restart: unless-stopped
     command: server /data --console-address ":9001"
     environment:
-      MINIO_ROOT_USER: neobim_minio
-      MINIO_ROOT_PASSWORD: neobim_minio_secret
+      MINIO_ROOT_USER: buildflow_minio
+      MINIO_ROOT_PASSWORD: buildflow_minio_secret
     ports:
       - "9000:9000"
       - "9001:9001"

@@ -32,7 +32,7 @@ function warn(message) {
   console.log(`⚠️  ${message}`);
 }
 
-console.log('🔍 SEO VALIDATION — NeoBIM\n');
+console.log('🔍 SEO VALIDATION — BuildFlow\n');
 
 // 1. Check robots.txt
 const robotsPath = join(projectRoot, 'public', 'robots.txt');

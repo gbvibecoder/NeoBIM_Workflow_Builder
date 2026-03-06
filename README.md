@@ -51,8 +51,8 @@
 ### Setup
 
 ```bash
-git clone https://github.com/rutikerole/NeoBIM-Workflow-Builder.git
-cd NeoBIM-Workflow-Builder/workflow_builder
+git clone https://github.com/rutikerole/NeoBIM_Workflow_Builder.git
+cd NeoBIM_Workflow_Builder/workflow_builder
 npm install
 cp .env.example .env.local   # fill in your env vars
 npx prisma db push

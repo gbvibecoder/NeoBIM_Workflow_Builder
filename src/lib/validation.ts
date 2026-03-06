@@ -250,7 +250,7 @@ export function validateTR012Input(inputData: unknown): ValidationResult {
 /**
  * GN-004: Floor Plan Generator
  */
-export function validateGN004Input(_inputData: unknown): ValidationResult {
+export function validateGN004Input(_: unknown): ValidationResult {
   // GN-004 accepts building description or falls back to defaults
   // No strict validation — always valid
   return { valid: true };

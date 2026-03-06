@@ -34,12 +34,17 @@ const smoothEase: [number, number, number, number] = [0.25, 0.4, 0.25, 1];
 
 function StickyNav() {
   const [visible, setVisible] = useState(false);
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    setMounted(true);
     const handler = () => setVisible(window.scrollY > 180);
     window.addEventListener("scroll", handler, { passive: true });
     return () => window.removeEventListener("scroll", handler);
   }, []);
+
+  // Avoid hydration mismatch — framer-motion renders styles differently on server vs client
+  if (!mounted) return null;
 
   return (
     <motion.nav
