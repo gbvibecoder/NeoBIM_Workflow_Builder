@@ -95,20 +95,30 @@ function LoginForm() {
       initial={{ opacity: 0, y: 24 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+      className="node-card"
       style={{
-        background: "#0f1019",
-        border: "1px solid rgba(255,255,255,0.06)",
-        borderRadius: 16,
-        padding: "40px",
-        boxShadow: "0 24px 64px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255,255,255,0.02) inset",
-      }}
+        '--node-port-color': '#4F8AFF',
+        background: "rgba(15,16,25,0.95)",
+        boxShadow: "0 24px 64px rgba(0, 0, 0, 0.5), 0 0 40px rgba(79,138,255,0.03)",
+      } as React.CSSProperties}
     >
-      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}>
+      {/* Node header */}
+      <div className="node-header" style={{
+        background: "linear-gradient(135deg, rgba(79,138,255,0.1), rgba(99,102,241,0.04))",
+        borderBottom: "1px solid rgba(79,138,255,0.08)",
+        borderRadius: "16px 16px 0 0",
+        justifyContent: "space-between",
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#10B981", boxShadow: "0 0 8px #10B981" }} />
+          <span style={{ color: "#4F8AFF" }}>AUTHENTICATE</span>
+        </div>
         <LanguageSwitcher />
       </div>
 
+      <div style={{ padding: "32px 36px 36px" }}>
       {/* Header */}
-      <div style={{ marginBottom: 30 }}>
+      <div style={{ marginBottom: 28 }}>
         <h2 style={{ fontSize: 22, fontWeight: 700, color: "#F0F0F5", marginBottom: 6, letterSpacing: "-0.02em" }}>
           {t('auth.welcomeBack')}
         </h2>
@@ -289,6 +299,7 @@ function LoginForm() {
           {t('auth.createAccount')}
         </Link>
       </p>
+      </div>
     </motion.div>
   );
 }
