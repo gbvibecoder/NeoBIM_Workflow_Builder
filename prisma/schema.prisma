@@ -20,9 +20,14 @@ model User {
   stripeSubscriptionId   String?       @unique
   stripePriceId          String?
   stripeCurrentPeriodEnd DateTime?
+  // Gamification
+  xp            Int                    @default(0)
+  level         Int                    @default(1)
+
   createdAt     DateTime               @default(now())
   updatedAt     DateTime               @updatedAt
   accounts      Account[]
+  achievements  UserAchievement[]
   publications  CommunityPublication[]
   executions    Execution[]
   reviews       Review[]
@@ -229,4 +234,30 @@ enum ArtifactType {
   FILE
   TABLE
   KPI
+}
+
+// ─── Gamification ──────────────────────────────────────────────────
+
+model UserAchievement {
+  id        String   @id @default(cuid())
+  userId    String
+  action    String
+  xpAwarded Int      @default(0)
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, action])
+  @@index([userId])
+  @@map("user_achievements")
+}
+
+model FlashEventCompletion {
+  id        String   @id @default(cuid())
+  userId    String
+  eventKey  String
+  createdAt DateTime @default(now())
+
+  @@unique([userId, eventKey])
+  @@index([userId])
+  @@map("flash_event_completions")
 }

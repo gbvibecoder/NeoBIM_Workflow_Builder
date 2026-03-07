@@ -10,6 +10,7 @@ import { generateId } from "@/lib/utils";
 import { toast } from "sonner";
 import type { WorkflowTemplate } from "@/types/workflow";
 import type { WorkflowNode, WorkflowEdge, NodeStatus } from "@/types/nodes";
+import { awardXP } from "@/lib/award-xp";
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
@@ -157,6 +158,9 @@ export function PromptInput({ onClose }: PromptInputProps) {
       description: `${nodes.length} nodes placed and connected`,
       duration: 4000,
     });
+
+    // Award XP for AI prompt usage (fire-and-forget)
+    awardXP("ai-prompt-used");
 
     setIsGenerating(false);
     setStep(null);

@@ -12,6 +12,7 @@ import { useRouter } from "next/navigation";
 import type { WorkflowTemplate } from "@/types/workflow";
 import { useLocale } from "@/hooks/useLocale";
 import type { TranslationKey } from "@/lib/i18n";
+import { awardXP } from "@/lib/award-xp";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -126,6 +127,7 @@ export default function TemplatesPage() {
     if (!template) return;
     loadFromTemplate(template as WorkflowTemplate);
     toast.success(`"${template.name}" ${t('toast.cloned')}`, { description: t('toast.openingCanvas') });
+    awardXP("template-cloned");
     router.push("/dashboard/canvas");
   };
 

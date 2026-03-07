@@ -11,7 +11,6 @@ import {
   Globe,
   BookOpen,
   Settings,
-  Zap,
   Plus,
   ChevronLeft,
   ChevronRight,
@@ -108,8 +107,8 @@ export function Sidebar() {
             width: 44,
             height: 44,
             borderRadius: 10,
-            border: "1px solid rgba(255,255,255,0.08)",
-            background: "rgba(6,6,12,0.95)",
+            border: "1px solid rgba(255,255,255,0.06)",
+            background: "rgba(8,10,15,0.95)",
             backdropFilter: "blur(12px)",
             display: "flex",
             alignItems: "center",
@@ -144,8 +143,8 @@ export function Sidebar() {
         display: "flex",
         flexDirection: "column",
         height: "100%",
-        background: "#06060c",
-        borderRight: "1px solid rgba(255,255,255,0.06)",
+        background: "#080A0F",
+        borderRight: "1px solid rgba(255,255,255,0.05)",
         overflow: "hidden",
         flexShrink: 0,
         position: isMobile ? "fixed" : "relative",
@@ -158,13 +157,6 @@ export function Sidebar() {
         boxShadow: isMobile && mobileOpen ? "16px 0 48px rgba(0,0,0,0.5)" : undefined,
       }}
     >
-      {/* Subtle atmospheric glow at top */}
-      <div style={{
-        position: "absolute", top: 0, left: 0, right: 0, height: 120,
-        background: "radial-gradient(ellipse at 50% -20%, rgba(79, 138, 255, 0.04), transparent 70%)",
-        pointerEvents: "none",
-      }} />
-
       {/* ── Logo row ─────────────────────────────────────────────────────── */}
       <div style={{
         display: "flex", alignItems: "center",
@@ -177,20 +169,33 @@ export function Sidebar() {
           {/* Logo icon */}
           <div style={{
             width: 30, height: 30, borderRadius: 9, flexShrink: 0,
-            background: "linear-gradient(135deg, #4F8AFF 0%, #7C6FF7 50%, #A78BFA 100%)",
+            background: "linear-gradient(135deg, #4F8AFF 0%, #7C6FF7 50%, #6366F1 100%)",
             display: "flex", alignItems: "center", justifyContent: "center",
-            boxShadow: "0 2px 12px rgba(79,138,255,0.3), inset 0 1px 0 rgba(255,255,255,0.15)",
+            boxShadow: "0 4px 16px rgba(79,138,255,0.25), inset 0 1px 0 rgba(255,255,255,0.15)",
+            padding: 4,
           }}>
-            <Zap size={14} color="white" fill="white" />
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/logo.svg" alt="BuildFlow" style={{ width: 20, height: 20, filter: "brightness(0) invert(1)" }} />
           </div>
 
           {showLabels && (
-            <span style={{
-              fontSize: 16, fontWeight: 700, color: "#F0F0F5",
-              letterSpacing: "-0.4px", whiteSpace: "nowrap",
-            }}>
-              Build<span style={{ color: "#4F8AFF" }}>Flow</span>
-            </span>
+            <div style={{ display: "flex", flexDirection: "column" }}>
+              <span style={{
+                fontSize: 19, fontWeight: 800, color: "#F0F0F5",
+                letterSpacing: "-0.4px", whiteSpace: "nowrap", lineHeight: 1.1,
+              }}>
+                Build<span style={{ color: "#4F8AFF" }}>Flow</span>
+              </span>
+              <span style={{
+                fontSize: 7, fontWeight: 700, letterSpacing: "2px",
+                textTransform: "uppercase" as const,
+                color: "#3A3A50",
+                fontFamily: "var(--font-jetbrains), monospace",
+                marginTop: 1,
+              }}>
+                PARAMETRIC BLUEPRINT
+              </span>
+            </div>
           )}
         </Link>
 
@@ -228,7 +233,7 @@ export function Sidebar() {
       </div>
 
       {/* ── New Workflow button ───────────────────────────────────────────── */}
-      <div style={{ padding: collapsed ? "12px 10px" : "12px 12px", flexShrink: 0 }}>
+      <div style={{ padding: collapsed ? "12px 10px" : "12px 12px", flexShrink: 0, position: "relative" }}>
         <Link
           href="/dashboard/workflows/new"
           className="press-effect"
@@ -238,19 +243,21 @@ export function Sidebar() {
             padding: collapsed ? "9px" : "0",
             height: 40,
             borderRadius: 10,
-            background: "linear-gradient(to right, #4F8AFF, #6366F1)",
-            color: "white", fontWeight: 600, fontSize: 14,
+            background: "linear-gradient(135deg, #4F8AFF 0%, #6366F1 100%)",
+            color: "white", fontWeight: 600, fontSize: 13,
             textDecoration: "none",
-            boxShadow: "0 2px 16px rgba(79,138,255,0.25)",
+            boxShadow: "0 1px 3px rgba(79,138,255,0.3), 0 4px 12px rgba(79,138,255,0.15), inset 0 1px 0 rgba(255,255,255,0.1)",
+            fontFamily: "var(--font-jetbrains), monospace",
+            letterSpacing: "0.02em",
             whiteSpace: "nowrap",
             transition: "all 200ms ease",
           }}
           onMouseEnter={e => {
-            (e.currentTarget as HTMLElement).style.boxShadow = "0 4px 24px rgba(79,138,255,0.4)";
+            (e.currentTarget as HTMLElement).style.boxShadow = "0 0 20px rgba(79,138,255,0.4), 0 4px 16px rgba(79,138,255,0.25)";
             (e.currentTarget as HTMLElement).style.filter = "brightness(1.1)";
           }}
           onMouseLeave={e => {
-            (e.currentTarget as HTMLElement).style.boxShadow = "0 2px 16px rgba(79,138,255,0.25)";
+            (e.currentTarget as HTMLElement).style.boxShadow = "0 1px 3px rgba(79,138,255,0.3), 0 4px 12px rgba(79,138,255,0.15), inset 0 1px 0 rgba(255,255,255,0.1)";
             (e.currentTarget as HTMLElement).style.filter = "brightness(1)";
           }}
         >
@@ -260,7 +267,7 @@ export function Sidebar() {
       </div>
 
       {/* ── Nav ──────────────────────────────────────────────────────────── */}
-      <nav aria-label="Main navigation" style={{ flex: 1, padding: "6px 8px", display: "flex", flexDirection: "column", gap: 2, overflowY: "auto" }}>
+      <nav aria-label="Main navigation" style={{ flex: 1, padding: "6px 8px", display: "flex", flexDirection: "column", gap: 2, overflowY: "auto", position: "relative" }}>
         {NAV_ITEMS.map((item) => {
           const isActive = item.exact
             ? pathname === item.href
@@ -273,7 +280,7 @@ export function Sidebar() {
               href={item.href}
               label={item.label}
               badge={item.badge}
-              icon={<Icon size={18} strokeWidth={isActive ? 2 : 1.5} style={{ color: isActive ? "#4F8AFF" : "#5C5C78", flexShrink: 0, transition: "color 0.12s" }} />}
+              icon={Icon}
               isActive={isActive}
               collapsed={collapsed}
               showLabels={showLabels}
@@ -291,7 +298,7 @@ export function Sidebar() {
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                 <div style={{
                   width: 32, height: 32, borderRadius: 9, flexShrink: 0,
-                  background: "linear-gradient(135deg, #4F8AFF 0%, #8B5CF6 100%)",
+                  background: "linear-gradient(135deg, #4F8AFF 0%, #7C6FF7 50%, #6366F1 100%)",
                   display: "flex", alignItems: "center", justifyContent: "center",
                   fontSize: 12, fontWeight: 700, color: "#fff",
                   overflow: "hidden",
@@ -325,10 +332,12 @@ export function Sidebar() {
                     display: "inline-flex", alignItems: "center", gap: 5,
                     fontSize: 10.5, fontWeight: 600, color: "#4F8AFF", textDecoration: "none",
                     padding: "3px 8px", borderRadius: 6,
-                    background: "rgba(79,138,255,0.06)", border: "1px solid rgba(79,138,255,0.12)",
+                    background: "rgba(79,138,255,0.06)", border: "1px solid rgba(79,138,255,0.15)",
+                    fontFamily: "var(--font-jetbrains), monospace",
+                    letterSpacing: "0.03em",
                   }}
-                  onMouseEnter={e => { e.currentTarget.style.background = "rgba(79,138,255,0.12)"; e.currentTarget.style.borderColor = "rgba(79,138,255,0.25)"; }}
-                  onMouseLeave={e => { e.currentTarget.style.background = "rgba(79,138,255,0.06)"; e.currentTarget.style.borderColor = "rgba(79,138,255,0.12)"; }}
+                  onMouseEnter={e => { e.currentTarget.style.background = "rgba(79,138,255,0.12)"; e.currentTarget.style.borderColor = "rgba(79,138,255,0.3)"; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = "rgba(79,138,255,0.06)"; e.currentTarget.style.borderColor = "rgba(79,138,255,0.15)"; }}
                 >
                   <TrendingUp size={10} />
                   {t('nav.upgrade')}
@@ -397,13 +406,13 @@ interface NavItemProps {
   href: string;
   label: string;
   badge?: string;
-  icon: React.ReactNode;
+  icon: React.ComponentType<{ size?: number; strokeWidth?: number; style?: React.CSSProperties }>;
   isActive: boolean;
   collapsed: boolean;
   showLabels: boolean;
 }
 
-function NavItem({ href, label, badge, icon, isActive, collapsed, showLabels }: NavItemProps) {
+function NavItem({ href, label, badge, icon: Icon, isActive, collapsed, showLabels }: NavItemProps) {
   const [hovered, setHovered] = useState(false);
 
   return (
@@ -423,8 +432,8 @@ function NavItem({ href, label, badge, icon, isActive, collapsed, showLabels }: 
         justifyContent: collapsed ? "center" : "flex-start",
         borderRadius: 8,
         background: isActive
-          ? "rgba(255,255,255,0.06)"
-          : (hovered ? "rgba(255,255,255,0.04)" : "transparent"),
+          ? "rgba(79,138,255,0.06)"
+          : (hovered ? "rgba(255,255,255,0.03)" : "transparent"),
         textDecoration: "none",
         transition: "all 150ms ease",
         overflow: "hidden",
@@ -437,26 +446,50 @@ function NavItem({ href, label, badge, icon, isActive, collapsed, showLabels }: 
           position: "absolute", left: 0, top: "50%", transform: "translateY(-50%)",
           width: 3, height: 20,
           background: "#4F8AFF",
+          boxShadow: "0 0 8px rgba(79,138,255,0.4)",
           borderTopRightRadius: 9999,
           borderBottomRightRadius: 9999,
           pointerEvents: "none",
         }} />
       )}
 
-      <span style={{ position: "relative", display: "flex" }}>{icon}</span>
+      {/* Icon with blue background when active */}
+      <span style={{
+        position: "relative",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        width: isActive ? 28 : "auto",
+        height: isActive ? 28 : "auto",
+        borderRadius: isActive ? 7 : 0,
+        background: isActive ? "rgba(27,79,255,0.2)" : "transparent",
+        flexShrink: 0,
+        transition: "all 0.15s ease",
+      }}>
+        <Icon
+          size={isActive ? 14 : 18}
+          strokeWidth={isActive ? 2.2 : 1.5}
+          style={{
+            color: isActive ? "#fff" : "#5C5C78",
+            flexShrink: 0,
+            transition: "color 0.12s",
+          }}
+        />
+      </span>
 
       {showLabels && (
         <>
           <span style={{
             flex: 1,
-            fontSize: 13,
+            fontSize: 12.5,
             fontWeight: isActive ? 600 : 400,
-            color: isActive ? "#F0F0F5" : (hovered ? "#9898B0" : "#5C5C78"),
+            color: isActive ? "#e2e8f0" : (hovered ? "#94a3b8" : "#5C5C78"),
             whiteSpace: "nowrap",
             overflow: "hidden",
             textOverflow: "ellipsis",
-            transition: "color 0.15s ease",
-            letterSpacing: "-0.01em",
+            transition: "color 0.15s ease, transform 0.15s ease",
+            letterSpacing: "0.01em",
+            transform: hovered && !isActive ? "translateX(2px)" : "translateX(0)",
           }}>
             {label}
           </span>

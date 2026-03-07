@@ -11,6 +11,7 @@ import { useWorkflowStore } from "@/stores/workflow-store";
 import { useRouter } from "next/navigation";
 import type { WorkflowTemplate } from "@/types/workflow";
 import { useLocale } from "@/hooks/useLocale";
+import { awardXP } from "@/lib/award-xp";
 
 // ─── Mock community data ──────────────────────────────────────────────────────
 
@@ -344,6 +345,7 @@ export default function CommunityPage() {
     if (!wf) return;
     loadFromTemplate(wf as WorkflowTemplate);
     toast.success(`"${wf.name}" ${t('toast.cloned')}`, { description: t('toast.openingCanvas') });
+    awardXP("template-cloned");
     router.push("/dashboard/canvas");
   };
 

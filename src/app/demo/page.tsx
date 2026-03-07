@@ -3,7 +3,7 @@
 import React, { useEffect, useRef } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
-import { Zap, ArrowRight, Play } from "lucide-react";
+import { ArrowRight, Play } from "lucide-react";
 import { WorkflowCanvas } from "@/components/canvas/WorkflowCanvas";
 import { useWorkflowStore } from "@/stores/workflow-store";
 import { useUIStore } from "@/stores/ui-store";
@@ -120,7 +120,8 @@ function DemoBanner({ hasRun }: { hasRun: boolean }) {
             justifyContent: "center",
           }}
         >
-          <Zap size={11} color="white" fill="white" />
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logo.svg" alt="" style={{ width: 14, height: 14, filter: "brightness(0) invert(1)" }} />
         </div>
         <span
           style={{ fontSize: 13, fontWeight: 700, color: "#F0F0F5" }}

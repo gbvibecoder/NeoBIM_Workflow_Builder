@@ -6,6 +6,7 @@ import type { WorkflowNode, WorkflowEdge, NodeStatus } from "@/types/nodes";
 import type { Workflow, WorkflowTemplate, CreationMode } from "@/types/workflow";
 import { generateId } from "@/lib/utils";
 import { api } from "@/lib/api";
+import { awardXP } from "@/lib/award-xp";
 
 interface HistoryEntry {
   nodes: WorkflowNode[];
@@ -285,6 +286,8 @@ export const useWorkflowStore = create<WorkflowState>()(
               ? { ...s.currentWorkflow, id: workflow.id }
               : null,
           }));
+          // Award XP for first workflow created (fire-and-forget)
+          awardXP("workflow-created");
           return workflow.id;
         }
       } catch (err) {

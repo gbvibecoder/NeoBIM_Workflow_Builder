@@ -872,6 +872,416 @@
 }
 
 /* ═══════════════════════════════════════════════════════════════════
+   PARAMETRIC BLUEPRINT — Dashboard Theme
+   "Like staring into a high-end architectural visualization terminal"
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ── Parametric color tokens ─────────────────────────────────────── */
+:root {
+  --pb-void:        #06080C;
+  --pb-surface:     #0C1018;
+  --pb-elevated:    #131923;
+  --pb-border:      #1E2A38;
+  --pb-border-glow: #1B4FFF;
+  --pb-blue:        #1B4FFF;
+  --pb-cyan:        #00D4FF;
+  --pb-teal:        #00E5B0;
+  --pb-amber:       #FFB340;
+  --pb-violet:      #8B5CF6;
+  --pb-text:        #F0F4FF;
+  --pb-text-sec:    #7A8BA0;
+  --pb-text-muted:  #3D5166;
+}
+
+/* ── Font families ───────────────────────────────────────────────── */
+.font-display {
+  font-family: var(--font-syne), "Syne", system-ui, sans-serif;
+}
+
+.font-mono-data {
+  font-family: var(--font-jetbrains), "JetBrains Mono", "SF Mono", monospace;
+}
+
+.font-body-dm {
+  font-family: var(--font-dm-sans), "DM Sans", system-ui, sans-serif;
+}
+
+/* ── Dashboard background — layered blueprint ────────────────────── */
+.dashboard-main {
+  position: relative;
+  background-color: var(--pb-void);
+}
+
+/* Layer 1: Blueprint grid */
+.dashboard-main::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background-image:
+    linear-gradient(var(--pb-border) 1px, transparent 1px),
+    linear-gradient(90deg, var(--pb-border) 1px, transparent 1px);
+  background-size: 40px 40px;
+  opacity: 0.4;
+}
+
+/* Layer 2: Radial glow top-left (blueprint blue) */
+.dashboard-main::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background:
+    radial-gradient(600px circle at 0% 0%, rgba(27,79,255,0.08), transparent 70%),
+    radial-gradient(400px circle at 100% 100%, rgba(0,229,176,0.05), transparent 70%);
+}
+
+.dashboard-main > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* ── Section label — Syne, all caps, tracked ─────────────────────── */
+.arch-section-label {
+  font-family: var(--font-syne), "Syne", sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: var(--pb-text-muted);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.arch-section-label::before {
+  content: "";
+  width: 20px;
+  height: 1px;
+  background: linear-gradient(90deg, var(--pb-blue), transparent);
+  flex-shrink: 0;
+}
+
+/* ── Stat card ───────────────────────────────────────────────────── */
+.arch-stat-card {
+  position: relative;
+  background: var(--pb-surface);
+  border: 1px solid var(--pb-border);
+  border-radius: 12px;
+  overflow: hidden;
+  transition: all 250ms cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: transform;
+}
+
+/* Top accent line (color set via inline --card-accent) */
+.arch-stat-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--card-accent, var(--pb-blue)), transparent);
+  pointer-events: none;
+}
+
+/* Corner glow */
+.arch-stat-card::after {
+  content: "";
+  position: absolute;
+  top: -30px;
+  right: -30px;
+  width: 80px;
+  height: 80px;
+  background: radial-gradient(circle, rgba(var(--card-accent-rgb, 27,79,255), 0.15), transparent 70%);
+  pointer-events: none;
+}
+
+.arch-stat-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(var(--card-accent-rgb, 27,79,255), 0.3);
+  box-shadow:
+    0 8px 32px rgba(var(--card-accent-rgb, 27,79,255), 0.12),
+    0 0 0 1px rgba(var(--card-accent-rgb, 27,79,255), 0.1);
+}
+
+/* ── Stat number — JetBrains Mono 52px readout ───────────────────── */
+.arch-stat-number {
+  font-family: var(--font-jetbrains), "JetBrains Mono", monospace;
+  font-size: 52px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  color: var(--pb-text);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Stat label — JetBrains Mono 10px caps ───────────────────────── */
+.arch-stat-label {
+  font-family: var(--font-jetbrains), "JetBrains Mono", monospace;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 2.5px;
+  text-transform: uppercase;
+  color: var(--pb-text-muted);
+}
+
+/* ── Icon box inside stat cards ──────────────────────────────────── */
+.arch-icon-box {
+  width: 42px;
+  height: 42px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all 300ms ease;
+  position: relative;
+}
+
+/* ── Quick action card — base ────────────────────────────────────── */
+.arch-action-card {
+  position: relative;
+  border-radius: 12px;
+  background: var(--pb-surface);
+  transition: all 250ms cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: transform;
+  overflow: hidden;
+  text-decoration: none;
+}
+
+.arch-action-card:hover {
+  transform: translateY(-2px);
+}
+
+.arch-action-card:hover .arch-icon-box {
+  transform: scale(1.1);
+}
+
+/* ── New Workflow card — dashed border ────────────────────────────── */
+.arch-card-dashed {
+  border: 1px dashed var(--pb-border);
+}
+
+.arch-card-dashed:hover {
+  border-style: solid;
+  border-color: var(--pb-blue);
+  background: rgba(27,79,255,0.04);
+}
+
+/* ── AI Prompt card — hero gradient border ────────────────────────── */
+.arch-card-ai {
+  border: 1px solid rgba(27,79,255,0.4);
+  background: linear-gradient(135deg, rgba(27,79,255,0.08), rgba(0,212,255,0.04));
+}
+
+.arch-card-ai:hover {
+  border-color: rgba(27,79,255,0.6);
+  box-shadow: 0 8px 32px rgba(27,79,255,0.15), 0 0 0 1px rgba(27,79,255,0.2);
+}
+
+/* AI badge glow */
+.arch-ai-badge {
+  background: rgba(27,79,255,0.2);
+  border: 1px solid rgba(27,79,255,0.5);
+  color: var(--pb-cyan);
+  box-shadow: 0 0 10px rgba(27,79,255,0.3);
+  font-family: var(--font-jetbrains), monospace;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border-radius: 20px;
+}
+
+/* ── Templates card — amber accent ───────────────────────────────── */
+.arch-card-templates {
+  border: 1px solid rgba(255,179,64,0.3);
+}
+
+.arch-card-templates:hover {
+  border-color: rgba(255,179,64,0.5);
+  box-shadow: 0 8px 32px rgba(255,179,64,0.1);
+}
+
+/* Popular badge pulse */
+@keyframes arch-pulse-amber {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+.arch-popular-badge {
+  background: rgba(255,179,64,0.15);
+  border: 1px solid rgba(255,179,64,0.4);
+  color: var(--pb-amber);
+  font-family: var(--font-jetbrains), monospace;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border-radius: 20px;
+  animation: arch-pulse-amber 2s infinite;
+}
+
+/* ── Plus icon rotation on hover ─────────────────────────────────── */
+.arch-plus-rotate {
+  transition: transform 0.3s ease;
+}
+
+.arch-card-dashed:hover .arch-plus-rotate {
+  transform: rotate(90deg);
+}
+
+/* ── Hero banner ─────────────────────────────────────────────────── */
+.arch-hero-banner {
+  position: relative;
+  border-radius: 14px;
+  border: 1px solid rgba(27,79,255,0.2);
+  background: linear-gradient(135deg, rgba(27,79,255,0.05) 0%, rgba(0,229,176,0.03) 100%);
+  overflow: hidden;
+  transition: all 300ms ease;
+}
+
+/* Blueprint pattern right side */
+.arch-hero-banner::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 40%;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(27,79,255,0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(27,79,255,0.08) 1px, transparent 1px);
+  background-size: 28px 28px;
+  mask-image: linear-gradient(90deg, transparent 0%, rgba(0,0,0,0.5) 100%);
+  -webkit-mask-image: linear-gradient(90deg, transparent 0%, rgba(0,0,0,0.5) 100%);
+}
+
+.arch-hero-banner:hover {
+  border-color: rgba(27,79,255,0.4);
+  box-shadow: 0 12px 40px rgba(27,79,255,0.1);
+}
+
+/* ── CTA button ──────────────────────────────────────────────────── */
+.arch-cta-btn {
+  background: linear-gradient(135deg, #1B4FFF, #00D4FF);
+  box-shadow: 0 0 20px rgba(27,79,255,0.35), 0 0 40px rgba(27,79,255,0.15);
+  border: none;
+  border-radius: 10px;
+  transition: all 300ms ease;
+}
+
+.arch-cta-btn:hover {
+  box-shadow: 0 0 30px rgba(27,79,255,0.5), 0 0 60px rgba(27,79,255,0.2);
+  transform: translateY(-2px) scale(1.02);
+}
+
+/* ── Shimmer badge animation ─────────────────────────────────────── */
+@keyframes arch-badge-shimmer {
+  0% { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+
+.arch-badge-shimmer {
+  background: linear-gradient(90deg, rgba(255,179,64,0.15) 0%, rgba(255,179,64,0.35) 50%, rgba(255,179,64,0.15) 100%);
+  background-size: 200% 100%;
+  animation: arch-badge-shimmer 2.5s ease-in-out infinite;
+}
+
+/* ── Dashboard scrollbar ─────────────────────────────────────────── */
+.dashboard-main::-webkit-scrollbar { width: 6px; }
+.dashboard-main::-webkit-scrollbar-track { background: transparent; }
+.dashboard-main::-webkit-scrollbar-thumb {
+  background: rgba(27,79,255,0.2);
+  border-radius: 3px;
+}
+.dashboard-main::-webkit-scrollbar-thumb:hover {
+  background: rgba(27,79,255,0.4);
+}
+
+/* ── Sidebar gradient border line ────────────────────────────────── */
+.arch-sidebar-border {
+  position: absolute;
+  top: 20%;
+  right: 0;
+  height: 60%;
+  width: 1px;
+  background: linear-gradient(180deg, transparent, var(--pb-blue), transparent);
+  pointer-events: none;
+}
+
+/* ── Selection color ─────────────────────────────────────────────── */
+::selection {
+  background: rgba(27,79,255,0.3);
+  color: var(--pb-text);
+}
+
+/* ── Beta badge pulse glow ───────────────────────────────────────── */
+@keyframes betaPulse {
+  0%, 100% { box-shadow: 0 0 6px rgba(245,158,11,0.15); }
+  50%      { box-shadow: 0 0 14px rgba(245,158,11,0.35); }
+}
+
+.beta-badge {
+  animation: betaPulse 2.5s ease-in-out infinite;
+}
+
+/* ── Gamified Dashboard Animations ──────────────────────────────── */
+
+@keyframes mission-active-pulse {
+  0%, 100% { border-color: rgba(79,138,255,0.15); box-shadow: 0 0 0 rgba(79,138,255,0); }
+  50%      { border-color: rgba(79,138,255,0.35); box-shadow: 0 0 16px rgba(79,138,255,0.1); }
+}
+
+@keyframes mission-progress-shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes event-dot-pulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50%      { transform: scale(1.6); opacity: 0.4; }
+}
+
+@keyframes loot-card-hover {
+  0%, 100% { transform: translateY(0); box-shadow: none; }
+  50%      { transform: translateY(-4px); box-shadow: 0 8px 24px rgba(245,158,11,0.12); }
+}
+
+@keyframes xp-ring-fill {
+  from { stroke-dashoffset: 251.2; }
+}
+
+@keyframes countdown-pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.6; }
+}
+
+.mission-card-active {
+  animation: mission-active-pulse 3s ease-in-out infinite;
+}
+
+.progress-shimmer {
+  background: linear-gradient(90deg, transparent 0%, rgba(79,138,255,0.15) 50%, transparent 100%);
+  background-size: 200% 100%;
+  animation: mission-progress-shimmer 2s linear infinite;
+}
+
+.event-dot {
+  animation: event-dot-pulse 1.5s ease-in-out infinite;
+}
+
+.loot-card:hover {
+  animation: loot-card-hover 0.4s ease-out forwards;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
    MOBILE RESPONSIVE STYLES
    ═══════════════════════════════════════════════════════════════════ */
 @import "../styles/mobile-responsive.css";
