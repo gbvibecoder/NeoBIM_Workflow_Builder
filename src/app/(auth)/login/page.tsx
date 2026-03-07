@@ -21,6 +21,7 @@ function LoginForm() {
   const [emailError, setEmailError] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [touched, setTouched] = useState({ email: false, password: false });
 
   function handleEmailChange(value: string) {
@@ -81,15 +82,17 @@ function LoginForm() {
   }
 
   async function handleGoogle() {
-    setLoading(true);
+    setGoogleLoading(true);
+    setError("");
     try {
-      // Clear any existing session to prevent NextAuth from auto-linking
-      // the new Google account to a previously signed-in user
+      // Clear any existing session FIRST to prevent NextAuth from
+      // auto-linking the Google account to a previously signed-in user
       await signOut({ redirect: false });
+      // Now initiate Google OAuth with a clean session
       await signIn("google", { callbackUrl });
     } catch {
       setError(t('auth.googleError'));
-      setLoading(false);
+      setGoogleLoading(false);
     }
   }
 
@@ -130,25 +133,39 @@ function LoginForm() {
         </p>
       </div>
 
-      {/* Google OAuth */}
+      {/* Google OAuth — completely separate from the credentials form */}
       <motion.button
+        type="button"
         whileHover={{ scale: 1.008 }}
         whileTap={{ scale: 0.995 }}
-        onClick={handleGoogle}
-        disabled={loading}
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          handleGoogle();
+        }}
+        disabled={loading || googleLoading}
         style={{
           width: "100%", padding: "10px 16px", height: 42,
           borderRadius: 10, border: "1px solid rgba(255,255,255,0.06)",
           background: "rgba(26,26,42,0.8)", color: "#E0E0EE",
           fontSize: 13, fontWeight: 500, cursor: "pointer",
           display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-          marginBottom: 22, opacity: loading ? 0.5 : 1,
+          marginBottom: 22, opacity: (loading || googleLoading) ? 0.5 : 1,
           transition: "all 0.2s ease",
           boxShadow: "0 1px 2px rgba(0,0,0,0.1), inset 0 1px 0 rgba(255,255,255,0.02)",
         }}
       >
-        <Chrome size={14} />
-        {t('auth.continueWithGoogle')}
+        {googleLoading ? (
+          <>
+            <Loader2 size={14} className="animate-spin" />
+            {t('auth.connecting')}
+          </>
+        ) : (
+          <>
+            <Chrome size={14} />
+            {t('auth.continueWithGoogle')}
+          </>
+        )}
       </motion.button>
 
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 22 }}>
@@ -268,16 +285,16 @@ function LoginForm() {
           whileHover={{ scale: 1.008 }}
           whileTap={{ scale: 0.995 }}
           type="submit"
-          disabled={loading || !!emailError}
+          disabled={loading || googleLoading || !!emailError}
           style={{
             width: "100%", padding: "11px", height: 44, borderRadius: 10, border: "none",
-            background: (loading || emailError)
+            background: (loading || googleLoading || emailError)
               ? "rgba(79,138,255,0.3)"
               : "linear-gradient(135deg, #4F8AFF 0%, #6366F1 100%)",
             color: "#fff", fontSize: 13.5, fontWeight: 600,
-            cursor: (loading || emailError) ? "not-allowed" : "pointer",
-            opacity: (loading || emailError) ? 0.5 : 1,
-            boxShadow: (loading || emailError)
+            cursor: (loading || googleLoading || emailError) ? "not-allowed" : "pointer",
+            opacity: (loading || googleLoading || emailError) ? 0.5 : 1,
+            boxShadow: (loading || googleLoading || emailError)
               ? "none"
               : "0 1px 3px rgba(79,138,255,0.3), 0 4px 12px rgba(79,138,255,0.15), inset 0 1px 0 rgba(255,255,255,0.1)",
             display: "flex", alignItems: "center", justifyContent: "center", gap: 8,

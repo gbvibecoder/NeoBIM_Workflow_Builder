@@ -14,9 +14,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   callbacks: {
     ...authConfig.callbacks,
     async signIn({ user }) {
-      // 🔥 TRACK LOGIN
-      if (user.id) {
-        await trackLogin(user.id);
+      try {
+        if (user.id) {
+          await trackLogin(user.id);
+        }
+      } catch {
+        // Never block sign-in if analytics fails
       }
       return true;
     },

@@ -16,16 +16,23 @@ export const authConfig = {
       return true;
     },
     session({ session, token }) {
-      if (token.sub && session.user) {
-        session.user.id = token.sub;
-      }
-      if (token.role && session.user) {
+      if (session.user) {
+        // Explicitly set ALL user fields from token — never rely on defaults
+        session.user.id = token.sub as string;
+        session.user.email = token.email as string;
+        session.user.name = (token.name as string) ?? null;
+        session.user.image = (token.picture as string) ?? null;
         (session.user as { role?: string }).role = token.role as string;
       }
       return session;
     },
     jwt({ token, user }) {
       if (user) {
+        // Force-overwrite token on every sign-in to prevent stale data
+        token.sub = user.id;
+        token.email = user.email;
+        token.name = user.name;
+        token.picture = user.image;
         token.role = (user as { role?: string }).role;
       }
       return token;
