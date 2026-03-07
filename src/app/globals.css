@@ -326,6 +326,105 @@
     animation: float 4s ease-in-out infinite;
   }
 
+  /* ── Blueprint grid — architectural background ───────────────── */
+  .blueprint-grid {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background-image:
+      /* Major grid lines */
+      linear-gradient(rgba(79, 138, 255, 0.08) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(79, 138, 255, 0.08) 1px, transparent 1px),
+      /* Minor grid lines */
+      linear-gradient(rgba(79, 138, 255, 0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(79, 138, 255, 0.03) 1px, transparent 1px);
+    background-size: 120px 120px, 120px 120px, 24px 24px, 24px 24px;
+    mask-image: radial-gradient(ellipse 80% 70% at 50% 45%, black 10%, transparent 70%);
+    -webkit-mask-image: radial-gradient(ellipse 80% 70% at 50% 45%, black 10%, transparent 70%);
+  }
+
+  /* ── Line draw animation for SVG paths ─────────────────────── */
+  @keyframes draw-line {
+    from { stroke-dashoffset: 1; }
+    to { stroke-dashoffset: 0; }
+  }
+
+  @keyframes draw-line-reverse {
+    from { stroke-dashoffset: 0; }
+    to { stroke-dashoffset: -1; }
+  }
+
+  /* ── Pulse glow on grid intersections ──────────────────────── */
+  @keyframes intersection-pulse {
+    0%, 100% { opacity: 0; transform: scale(0.5); }
+    50% { opacity: 1; transform: scale(1); }
+  }
+
+  /* ── Floating gradient orbs (larger, more visible) ─────────── */
+  @keyframes orb-drift-1 {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    25% { transform: translate(80px, -50px) scale(1.15); }
+    50% { transform: translate(-40px, 60px) scale(0.9); }
+    75% { transform: translate(-70px, -30px) scale(1.1); }
+  }
+
+  @keyframes orb-drift-2 {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    25% { transform: translate(-60px, 40px) scale(1.12); }
+    50% { transform: translate(50px, -70px) scale(0.88); }
+    75% { transform: translate(30px, 50px) scale(1.08); }
+  }
+
+  @keyframes orb-drift-3 {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    33% { transform: translate(50px, 60px) scale(1.1); }
+    66% { transform: translate(-70px, -40px) scale(0.92); }
+  }
+
+  .orb-drift-1 { animation: orb-drift-1 20s ease-in-out infinite; }
+  .orb-drift-2 { animation: orb-drift-2 25s ease-in-out infinite; }
+  .orb-drift-3 { animation: orb-drift-3 18s ease-in-out infinite; }
+
+  /* ── Noise texture overlay ──────────────────────────────────── */
+  .noise-texture {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 9999;
+    opacity: 0.035;
+    mix-blend-mode: overlay;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+    background-repeat: repeat;
+    background-size: 256px 256px;
+  }
+
+  /* ── Scanning beam (construction laser) ────────────────────── */
+  @keyframes scan-beam {
+    0% { top: -2px; opacity: 0; }
+    5% { opacity: 1; }
+    95% { opacity: 1; }
+    100% { top: 100%; opacity: 0; }
+  }
+
+  .scan-beam {
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent 0%, rgba(79, 138, 255, 0.4) 20%, rgba(139, 92, 246, 0.6) 50%, rgba(79, 138, 255, 0.4) 80%, transparent 100%);
+    box-shadow: 0 0 20px 4px rgba(79, 138, 255, 0.15), 0 0 60px 8px rgba(139, 92, 246, 0.08);
+    pointer-events: none;
+    animation: scan-beam 8s ease-in-out infinite;
+  }
+
+  /* ── Data flow dots on edges ────────────────────────────────── */
+  @keyframes flow-dot {
+    0% { offset-distance: 0%; opacity: 0; }
+    5% { opacity: 1; }
+    95% { opacity: 1; }
+    100% { offset-distance: 100%; opacity: 0; }
+  }
+
   /* ── Fade in up (CSS-only entrance) ──────────────────────────── */
   @keyframes fade-in-up {
     from { opacity: 0; transform: translateY(12px); }

@@ -275,6 +275,9 @@ export default function LandingPage() {
   return (
     <div style={{ minHeight: "100vh", background: "#07070D", color: "#F0F0F5", overflowX: "hidden", paddingBottom: 36 }}>
 
+      {/* ── Global noise texture overlay ─────────────────────────── */}
+      <div className="noise-texture" />
+
       {/* ── Navbar ─────────────────────────────────────────────────── */}
       <header>
         <nav style={{
@@ -351,15 +354,103 @@ export default function LandingPage() {
         >
           {/* Background atmospheric layers */}
           <div style={{ position: "absolute", inset: 0, pointerEvents: "none" }}>
-            {/* Central radial glow */}
+            {/* Blueprint architectural grid */}
+            <div className="blueprint-grid" />
+
+            {/* Scanning laser beam */}
+            <div className="scan-beam" />
+
+            {/* Central radial glow — stronger */}
             <div style={{
               position: "absolute", inset: 0,
-              background: "radial-gradient(ellipse 80% 60% at 50% 30%, rgba(79,138,255,0.08) 0%, transparent 60%), radial-gradient(ellipse 60% 40% at 30% 70%, rgba(139,92,246,0.05) 0%, transparent 50%), radial-gradient(ellipse 50% 50% at 80% 50%, rgba(59,130,246,0.04) 0%, transparent 50%)",
+              background: "radial-gradient(ellipse 80% 60% at 50% 30%, rgba(79,138,255,0.12) 0%, transparent 60%), radial-gradient(ellipse 60% 40% at 30% 70%, rgba(139,92,246,0.08) 0%, transparent 50%), radial-gradient(ellipse 50% 50% at 80% 50%, rgba(59,130,246,0.06) 0%, transparent 50%)",
             }} />
-            {/* Grid pattern */}
+
+            {/* Large floating gradient orbs */}
+            <div className="orb-drift-1" style={{
+              position: "absolute", top: "5%", left: "10%",
+              width: 500, height: 500, borderRadius: "50%",
+              background: "radial-gradient(circle, rgba(79,138,255,0.12) 0%, transparent 70%)",
+              filter: "blur(80px)",
+            }} />
+            <div className="orb-drift-2" style={{
+              position: "absolute", top: "25%", right: "5%",
+              width: 450, height: 450, borderRadius: "50%",
+              background: "radial-gradient(circle, rgba(139,92,246,0.1) 0%, transparent 70%)",
+              filter: "blur(70px)",
+            }} />
+            <div className="orb-drift-3" style={{
+              position: "absolute", bottom: "10%", left: "35%",
+              width: 400, height: 400, borderRadius: "50%",
+              background: "radial-gradient(circle, rgba(16,185,129,0.08) 0%, transparent 70%)",
+              filter: "blur(60px)",
+            }} />
+
+            {/* Animated SVG construction wireframe */}
+            <svg style={{ position: "absolute", inset: 0, width: "100%", height: "100%", opacity: 0.15 }} viewBox="0 0 1440 900" fill="none" preserveAspectRatio="xMidYMid slice">
+              {/* Building wireframe - left */}
+              <g opacity="0.6">
+                <path d="M120 700 L120 350 L220 300 L320 350 L320 700" stroke="rgba(79,138,255,0.5)" strokeWidth="0.8" strokeDasharray="4 4" pathLength="1" style={{ animation: "draw-line 4s ease-out forwards" }} />
+                <path d="M120 450 L320 450" stroke="rgba(79,138,255,0.3)" strokeWidth="0.5" strokeDasharray="4 4" />
+                <path d="M120 550 L320 550" stroke="rgba(79,138,255,0.3)" strokeWidth="0.5" strokeDasharray="4 4" />
+                <path d="M170 350 L170 700" stroke="rgba(79,138,255,0.2)" strokeWidth="0.5" strokeDasharray="3 6" />
+                <path d="M270 350 L270 700" stroke="rgba(79,138,255,0.2)" strokeWidth="0.5" strokeDasharray="3 6" />
+              </g>
+
+              {/* Building wireframe - right */}
+              <g opacity="0.5">
+                <path d="M1120 700 L1120 280 L1200 240 L1320 280 L1320 700" stroke="rgba(139,92,246,0.5)" strokeWidth="0.8" strokeDasharray="4 4" pathLength="1" style={{ animation: "draw-line 5s ease-out 1s forwards" }} />
+                <path d="M1120 400 L1320 400" stroke="rgba(139,92,246,0.3)" strokeWidth="0.5" strokeDasharray="4 4" />
+                <path d="M1120 500 L1320 500" stroke="rgba(139,92,246,0.3)" strokeWidth="0.5" strokeDasharray="4 4" />
+                <path d="M1120 600 L1320 600" stroke="rgba(139,92,246,0.3)" strokeWidth="0.5" strokeDasharray="4 4" />
+                <path d="M1220 280 L1220 700" stroke="rgba(139,92,246,0.2)" strokeWidth="0.5" strokeDasharray="3 6" />
+              </g>
+
+              {/* Crane wireframe — top right */}
+              <g opacity="0.4">
+                <path d="M1050 700 L1050 200 L1050 180 L900 180" stroke="rgba(245,158,11,0.5)" strokeWidth="0.8" strokeDasharray="5 5" pathLength="1" style={{ animation: "draw-line 6s ease-out 0.5s forwards" }} />
+                <path d="M1050 200 L1100 200" stroke="rgba(245,158,11,0.4)" strokeWidth="0.6" strokeDasharray="3 3" />
+                <path d="M900 180 L900 220" stroke="rgba(245,158,11,0.3)" strokeWidth="0.5" strokeDasharray="2 4" />
+                {/* Crane cables */}
+                <path d="M950 180 L950 280" stroke="rgba(245,158,11,0.2)" strokeWidth="0.4" strokeDasharray="2 6" />
+                <path d="M1000 180 L1000 250" stroke="rgba(245,158,11,0.2)" strokeWidth="0.4" strokeDasharray="2 6" />
+              </g>
+
+              {/* Dimension lines — bottom */}
+              <g opacity="0.35">
+                <path d="M200 750 L500 750" stroke="rgba(79,138,255,0.4)" strokeWidth="0.5" />
+                <path d="M200 740 L200 760" stroke="rgba(79,138,255,0.4)" strokeWidth="0.5" />
+                <path d="M500 740 L500 760" stroke="rgba(79,138,255,0.4)" strokeWidth="0.5" />
+                <text x="350" y="745" fill="rgba(79,138,255,0.3)" fontSize="8" textAnchor="middle" fontFamily="monospace">24.0m</text>
+              </g>
+              <g opacity="0.3">
+                <path d="M940 750 L1320 750" stroke="rgba(139,92,246,0.4)" strokeWidth="0.5" />
+                <path d="M940 740 L940 760" stroke="rgba(139,92,246,0.4)" strokeWidth="0.5" />
+                <path d="M1320 740 L1320 760" stroke="rgba(139,92,246,0.4)" strokeWidth="0.5" />
+                <text x="1130" y="745" fill="rgba(139,92,246,0.3)" fontSize="8" textAnchor="middle" fontFamily="monospace">32.0m</text>
+              </g>
+
+              {/* Isometric helper lines */}
+              <g opacity="0.15">
+                <line x1="0" y1="800" x2="600" y2="500" stroke="rgba(79,138,255,0.3)" strokeWidth="0.5" strokeDasharray="8 12" />
+                <line x1="1440" y1="800" x2="840" y2="500" stroke="rgba(139,92,246,0.3)" strokeWidth="0.5" strokeDasharray="8 12" />
+              </g>
+
+              {/* Grid intersection glow dots */}
+              {[
+                { cx: 120, cy: 350, delay: "0s" }, { cx: 320, cy: 350, delay: "0.3s" },
+                { cx: 1120, cy: 280, delay: "1s" }, { cx: 1320, cy: 280, delay: "1.3s" },
+                { cx: 1050, cy: 200, delay: "0.5s" }, { cx: 900, cy: 180, delay: "0.8s" },
+                { cx: 220, cy: 300, delay: "0.2s" }, { cx: 1200, cy: 240, delay: "1.2s" },
+              ].map((dot, i) => (
+                <circle key={i} cx={dot.cx} cy={dot.cy} r="2.5" fill="#4F8AFF" opacity="0" style={{ animation: `intersection-pulse 3s ease-in-out ${dot.delay} infinite` }} />
+              ))}
+            </svg>
+
+            {/* Dot grid pattern (subtle) */}
             <div style={{
-              position: "absolute", inset: 0, opacity: 0.3,
-              backgroundImage: "radial-gradient(circle, rgba(255,255,255,0.03) 1px, transparent 1px)",
+              position: "absolute", inset: 0, opacity: 0.35,
+              backgroundImage: "radial-gradient(circle, rgba(255,255,255,0.04) 1px, transparent 1px)",
               backgroundSize: "32px 32px",
             }} />
           </div>
@@ -523,7 +614,9 @@ export default function LandingPage() {
         }}>
           {/* Atmospheric glow */}
           <div style={{ position: "absolute", inset: 0, pointerEvents: "none" }}>
-            <div style={{ position: "absolute", top: "-20%", left: "50%", transform: "translateX(-50%)", width: "80%", height: "60%", background: "radial-gradient(ellipse, rgba(79,138,255,0.06) 0%, transparent 70%)" }} />
+            <div style={{ position: "absolute", top: "-20%", left: "50%", transform: "translateX(-50%)", width: "80%", height: "60%", background: "radial-gradient(ellipse, rgba(79,138,255,0.08) 0%, transparent 70%)" }} />
+            <div className="orb-drift-2" style={{ position: "absolute", top: "10%", right: "5%", width: 350, height: 350, borderRadius: "50%", background: "radial-gradient(circle, rgba(79,138,255,0.1) 0%, transparent 70%)", filter: "blur(60px)" }} />
+            <div className="orb-drift-3" style={{ position: "absolute", bottom: "5%", left: "8%", width: 280, height: 280, borderRadius: "50%", background: "radial-gradient(circle, rgba(139,92,246,0.08) 0%, transparent 70%)", filter: "blur(50px)" }} />
           </div>
 
           <div style={{ maxWidth: 1200, margin: "0 auto", position: "relative", zIndex: 1 }}>
@@ -615,7 +708,11 @@ export default function LandingPage() {
         {/* ── Features (glass cards with glow) ────────────────────── */}
         <section id="features" style={{ padding: "100px 48px", position: "relative", overflow: "hidden" }}>
           <div style={{ position: "absolute", inset: 0, pointerEvents: "none" }}>
-            <div style={{ position: "absolute", bottom: "0%", left: "20%", width: "60%", height: "50%", background: "radial-gradient(ellipse, rgba(139,92,246,0.05) 0%, transparent 70%)" }} />
+            {/* Blueprint grid (faded) */}
+            <div className="blueprint-grid" style={{ opacity: 0.4 }} />
+            <div style={{ position: "absolute", bottom: "0%", left: "20%", width: "60%", height: "50%", background: "radial-gradient(ellipse, rgba(139,92,246,0.08) 0%, transparent 70%)" }} />
+            <div className="orb-drift-1" style={{ position: "absolute", bottom: "10%", left: "5%", width: 380, height: 380, borderRadius: "50%", background: "radial-gradient(circle, rgba(139,92,246,0.1) 0%, transparent 70%)", filter: "blur(60px)" }} />
+            <div className="orb-drift-3" style={{ position: "absolute", top: "10%", right: "5%", width: 320, height: 320, borderRadius: "50%", background: "radial-gradient(circle, rgba(59,130,246,0.08) 0%, transparent 70%)", filter: "blur(50px)" }} />
           </div>
 
           <div style={{ maxWidth: 1200, margin: "0 auto", position: "relative", zIndex: 1 }}>
@@ -692,7 +789,9 @@ export default function LandingPage() {
           background: "linear-gradient(180deg, #07070D 0%, #0A0A16 50%, #07070D 100%)",
         }}>
           <div style={{ position: "absolute", inset: 0, pointerEvents: "none" }}>
-            <div style={{ position: "absolute", top: "10%", left: "50%", transform: "translateX(-50%)", width: "70%", height: "40%", background: "radial-gradient(ellipse, rgba(79,138,255,0.07) 0%, transparent 70%)" }} />
+            <div style={{ position: "absolute", top: "10%", left: "50%", transform: "translateX(-50%)", width: "70%", height: "40%", background: "radial-gradient(ellipse, rgba(79,138,255,0.1) 0%, transparent 70%)" }} />
+            <div className="orb-drift-3" style={{ position: "absolute", top: "5%", left: "8%", width: 320, height: 320, borderRadius: "50%", background: "radial-gradient(circle, rgba(16,185,129,0.1) 0%, transparent 70%)", filter: "blur(55px)" }} />
+            <div className="orb-drift-1" style={{ position: "absolute", bottom: "10%", right: "5%", width: 280, height: 280, borderRadius: "50%", background: "radial-gradient(circle, rgba(79,138,255,0.08) 0%, transparent 70%)", filter: "blur(50px)" }} />
           </div>
 
           <div style={{ maxWidth: 1200, margin: "0 auto", position: "relative", zIndex: 1 }}>
@@ -781,7 +880,10 @@ export default function LandingPage() {
         {/* ── How It Works (futuristic timeline) ───────────────────── */}
         <section id="community" style={{ padding: "100px 48px", position: "relative", overflow: "hidden" }}>
           <div style={{ position: "absolute", inset: 0, pointerEvents: "none" }}>
-            <div style={{ position: "absolute", top: "30%", left: "50%", transform: "translateX(-50%)", width: "50%", height: "40%", background: "radial-gradient(ellipse, rgba(139,92,246,0.06) 0%, transparent 70%)" }} />
+            <div className="blueprint-grid" style={{ opacity: 0.3 }} />
+            <div style={{ position: "absolute", top: "30%", left: "50%", transform: "translateX(-50%)", width: "50%", height: "40%", background: "radial-gradient(ellipse, rgba(139,92,246,0.08) 0%, transparent 70%)" }} />
+            <div className="orb-drift-1" style={{ position: "absolute", bottom: "5%", right: "5%", width: 320, height: 320, borderRadius: "50%", background: "radial-gradient(circle, rgba(245,158,11,0.08) 0%, transparent 70%)", filter: "blur(50px)" }} />
+            <div className="orb-drift-2" style={{ position: "absolute", top: "10%", left: "8%", width: 280, height: 280, borderRadius: "50%", background: "radial-gradient(circle, rgba(139,92,246,0.07) 0%, transparent 70%)", filter: "blur(45px)" }} />
           </div>
 
           <div style={{ maxWidth: 1200, margin: "0 auto", position: "relative", zIndex: 1 }}>
@@ -868,7 +970,9 @@ export default function LandingPage() {
           background: "linear-gradient(180deg, #07070D 0%, #0B0B13 100%)",
         }}>
           <div style={{ position: "absolute", inset: 0, pointerEvents: "none" }}>
-            <div style={{ position: "absolute", top: "20%", left: "50%", transform: "translateX(-50%)", width: "80%", height: "60%", background: "radial-gradient(ellipse, rgba(79,138,255,0.05) 0%, transparent 70%)" }} />
+            <div style={{ position: "absolute", top: "20%", left: "50%", transform: "translateX(-50%)", width: "80%", height: "60%", background: "radial-gradient(ellipse, rgba(79,138,255,0.08) 0%, transparent 70%)" }} />
+            <div className="orb-drift-2" style={{ position: "absolute", top: "5%", left: "5%", width: 350, height: 350, borderRadius: "50%", background: "radial-gradient(circle, rgba(79,138,255,0.1) 0%, transparent 70%)", filter: "blur(60px)" }} />
+            <div className="orb-drift-3" style={{ position: "absolute", bottom: "10%", right: "5%", width: 300, height: 300, borderRadius: "50%", background: "radial-gradient(circle, rgba(139,92,246,0.08) 0%, transparent 70%)", filter: "blur(50px)" }} />
           </div>
 
           <div style={{ maxWidth: 1200, margin: "0 auto", position: "relative", zIndex: 1 }}>
@@ -989,8 +1093,12 @@ export default function LandingPage() {
         }}>
           {/* Background glow */}
           <div style={{ position: "absolute", inset: 0, pointerEvents: "none" }}>
-            <div style={{ position: "absolute", bottom: "-20%", left: "50%", transform: "translateX(-50%)", width: "100%", height: "80%", background: "radial-gradient(ellipse 70% 60%, rgba(79,138,255,0.1) 0%, transparent 60%)" }} />
-            <div style={{ position: "absolute", bottom: "-10%", left: "30%", width: "40%", height: "60%", background: "radial-gradient(ellipse, rgba(139,92,246,0.06) 0%, transparent 70%)" }} />
+            <div className="blueprint-grid" style={{ opacity: 0.5 }} />
+            <div className="scan-beam" />
+            <div style={{ position: "absolute", bottom: "-20%", left: "50%", transform: "translateX(-50%)", width: "100%", height: "80%", background: "radial-gradient(ellipse 70% 60%, rgba(79,138,255,0.15) 0%, transparent 60%)" }} />
+            <div style={{ position: "absolute", bottom: "-10%", left: "30%", width: "40%", height: "60%", background: "radial-gradient(ellipse, rgba(139,92,246,0.1) 0%, transparent 70%)" }} />
+            <div className="orb-drift-1" style={{ position: "absolute", top: "5%", left: "15%", width: 400, height: 400, borderRadius: "50%", background: "radial-gradient(circle, rgba(79,138,255,0.12) 0%, transparent 70%)", filter: "blur(70px)" }} />
+            <div className="orb-drift-2" style={{ position: "absolute", bottom: "5%", right: "10%", width: 350, height: 350, borderRadius: "50%", background: "radial-gradient(circle, rgba(139,92,246,0.1) 0%, transparent 70%)", filter: "blur(60px)" }} />
           </div>
 
           <motion.div
