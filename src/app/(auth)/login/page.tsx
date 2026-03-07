@@ -16,10 +16,22 @@ function LoginForm() {
   const callbackUrl = searchParams.get("callbackUrl") ?? "/dashboard";
   const { t } = useLocale();
 
+  // Map NextAuth error codes to user-friendly messages
+  const authErrorParam = searchParams.get("error");
+  const authErrorMessages: Record<string, string> = {
+    OAuthAccountNotLinked: "This email is already registered with a password. Please sign in with your email and password instead.",
+    OAuthCallback: "Something went wrong with Google sign-in. Please try again.",
+    OAuthSignin: "Could not start Google sign-in. Please try again.",
+    Default: "An authentication error occurred. Please try again.",
+  };
+  const initialError = authErrorParam
+    ? authErrorMessages[authErrorParam] ?? authErrorMessages.Default
+    : "";
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [emailError, setEmailError] = useState("");
-  const [error, setError] = useState("");
+  const [error, setError] = useState(initialError);
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [touched, setTouched] = useState({ email: false, password: false });
@@ -118,7 +130,7 @@ function LoginForm() {
         <LanguageSwitcher />
       </div>
 
-      <div style={{ padding: "32px 36px 36px" }}>
+      <div className="auth-form-inner" style={{ padding: "32px 36px 36px" }}>
       {/* Header */}
       <div style={{ marginBottom: 28 }}>
         <h2 style={{ fontSize: 22, fontWeight: 700, color: "#F0F0F5", marginBottom: 6, letterSpacing: "-0.02em" }}>

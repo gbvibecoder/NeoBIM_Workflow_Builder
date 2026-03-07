@@ -54,14 +54,18 @@ export default function RegisterPage() {
         return;
       }
 
+      // Auto-login with the just-created account
       const signInRes = await signIn("credentials", {
-        email,
+        email: email.trim().toLowerCase(),
         password,
         redirect: false,
       });
 
       if (signInRes?.error) {
-        router.push("/login");
+        // Account was created but auto-login failed (e.g. DB replication lag).
+        // Show success and redirect to login so user can sign in manually.
+        setError("Account created successfully! Please sign in.");
+        setTimeout(() => router.push("/login"), 1500);
       } else {
         router.push("/dashboard");
         router.refresh();
@@ -118,7 +122,7 @@ export default function RegisterPage() {
         <LanguageSwitcher />
       </div>
 
-      <div style={{ padding: "32px 36px 36px" }}>
+      <div className="auth-form-inner" style={{ padding: "32px 36px 36px" }}>
       {/* Header */}
       <div style={{ marginBottom: 28 }}>
         <h2 style={{ fontSize: 22, fontWeight: 700, color: "#F0F0F5", marginBottom: 6, letterSpacing: "-0.02em" }}>

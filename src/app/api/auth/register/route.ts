@@ -28,9 +28,12 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Normalize email: lowercase + trim to prevent case-sensitive lookup mismatches
+    const normalizedEmail = email.trim().toLowerCase();
+
     // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
+    if (!emailRegex.test(normalizedEmail)) {
       return NextResponse.json(
         formatErrorResponse(FormErrors.INVALID_EMAIL),
         { status: 400 }
@@ -53,7 +56,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Check if email already exists
-    const existing = await prisma.user.findUnique({ where: { email } });
+    const existing = await prisma.user.findUnique({ where: { email: normalizedEmail } });
     if (existing) {
       return NextResponse.json(
         formatErrorResponse(AuthErrors.EMAIL_ALREADY_EXISTS),
@@ -65,12 +68,12 @@ export async function POST(req: NextRequest) {
     const hashedPassword = await bcrypt.hash(password, 12);
 
     const user = await prisma.user.create({
-      data: { name, email, password: hashedPassword },
+      data: { name, email: normalizedEmail, password: hashedPassword },
       select: { id: true, email: true, name: true },
     });
 
-    // 🔥 TRACK SIGNUP
-    await trackSignup(user.id, source);
+    // Fire-and-forget: don't block registration response on analytics
+    trackSignup(user.id, source).catch(() => {});
 
     return NextResponse.json({ user }, { status: 201 });
   } catch (error) {
