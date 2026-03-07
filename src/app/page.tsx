@@ -291,13 +291,12 @@ export default function LandingPage() {
         }}>
           <Link href="/" style={{ display: "flex", alignItems: "center", gap: 9, textDecoration: "none", marginRight: "auto" }}>
             <div style={{
-              width: 34, height: 34, borderRadius: 10,
-              background: "linear-gradient(135deg, #4F8AFF 0%, #6366F1 100%)",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              boxShadow: "0 2px 12px rgba(79,138,255,0.3)",
+              width: 34, height: 34, borderRadius: 10, overflow: "hidden",
+              boxShadow: "0 2px 12px rgba(79,138,255,0.2)",
+              flexShrink: 0,
             }}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/logo.svg" alt="BuildFlow" style={{ width: 22, height: 22 }} />
+              <img src="/buildflow_logo.png" alt="BuildFlow" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
             </div>
             <span style={{ fontSize: 18, fontWeight: 800, color: "#F0F0F5", letterSpacing: "-0.3px" }}>
               Build<span style={{ color: "#4F8AFF" }}>Flow</span>
@@ -1396,9 +1395,9 @@ export default function LandingPage() {
       }}>
         <div className="landing-footer" style={{ maxWidth: 1200, margin: "0 auto", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <div style={{ width: 24, height: 24, borderRadius: 6, background: "linear-gradient(135deg, #4F8AFF 0%, #6366F1 100%)", display: "flex", alignItems: "center", justifyContent: "center", padding: 3 }}>
+            <div style={{ width: 24, height: 24, borderRadius: 6, overflow: "hidden", flexShrink: 0 }}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/logo.svg" alt="" style={{ width: 18, height: 18 }} />
+              <img src="/buildflow_logo.png" alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
             </div>
             <span style={{ fontSize: 13, color: "#5C5C78", fontWeight: 600 }}>
               {t('landing.copyright')}

@@ -72,15 +72,14 @@ export function FloatingNav() {
       <Link
         href="/dashboard"
         style={{
-          width: 32, height: 32, borderRadius: "50%", flexShrink: 0,
-          background: "linear-gradient(135deg, #4F8AFF 0%, #7C6FF7 50%, #6366F1 100%)",
-          display: "flex", alignItems: "center", justifyContent: "center",
+          width: 32, height: 32, borderRadius: 10, flexShrink: 0,
+          overflow: "hidden",
           marginRight: 4,
           textDecoration: "none",
         }}
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/logo.svg" alt="BuildFlow" style={{ width: 20, height: 20 }} />
+        <img src="/buildflow_logo.png" alt="BuildFlow" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
       </Link>
 
       {/* Nav items */}

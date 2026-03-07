@@ -129,11 +129,8 @@ export const metadata: Metadata = {
   
   // Icons
   icons: {
-    icon: [
-      { url: "/favicon.ico", sizes: "32x32", type: "image/x-icon" },
-      { url: "/icon.svg", type: "image/svg+xml" },
-    ],
-    apple: { url: "/apple-touch-icon.png", sizes: "180x180" },
+    icon: "/favicon.ico",
+    apple: "/apple-touch-icon.png",
   },
   
   // Manifest
@@ -167,7 +164,7 @@ export default function RootLayout({
         url: siteUrl,
         logo: {
           "@type": "ImageObject",
-          url: `${siteUrl}/logo.png`,
+          url: `${siteUrl}/buildflow_logo.png`,
           width: 512,
           height: 512,
         },

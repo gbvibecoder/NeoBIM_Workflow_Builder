@@ -101,13 +101,12 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
         >
           <Link href="/" style={{ display: "inline-flex", alignItems: "center", gap: 10, textDecoration: "none", marginBottom: 48 }}>
             <div style={{
-              width: 34, height: 34, borderRadius: 9,
-              background: "linear-gradient(135deg, #4F8AFF 0%, #7C6FF7 50%, #6366F1 100%)",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              boxShadow: "0 4px 16px rgba(79,138,255,0.25), inset 0 1px 0 rgba(255,255,255,0.15)",
+              width: 36, height: 36, borderRadius: 10, overflow: "hidden",
+              boxShadow: "0 4px 16px rgba(79,138,255,0.2)",
+              flexShrink: 0,
             }}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/logo.svg" alt="BuildFlow" style={{ width: 22, height: 22 }} />
+              <img src="/buildflow_logo.png" alt="BuildFlow" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
             </div>
             <span style={{ fontSize: 19, fontWeight: 800, color: "#F0F0F5", letterSpacing: "-0.4px" }}>
               Build<span style={{ color: "#4F8AFF" }}>Flow</span>

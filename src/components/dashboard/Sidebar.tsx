@@ -180,7 +180,7 @@ export function Sidebar() {
           <Link href="/dashboard" className="sb-logo-link" style={{ display: "flex", alignItems: "center", gap: 11, textDecoration: "none", overflow: "hidden" }}>
             <div className="sb-logo-mark">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/logo.svg" alt="BuildFlow" style={{ width: 22, height: 22 }} />
+              <img src="/buildflow_logo.png" alt="BuildFlow" style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: 10 }} />
             </div>
             {showLabels && (
               <motion.div

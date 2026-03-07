@@ -1325,20 +1325,18 @@
 
 /* ── Logo mark ─────────────────────────────────────────────────── */
 .sb-logo-mark {
-  width: 32px;
-  height: 32px;
+  width: 34px;
+  height: 34px;
   border-radius: 10px;
   flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #3B6FE8 0%, #6366F1 60%, #8B5CF6 100%);
-  box-shadow:
-    0 2px 12px rgba(79,138,255,0.3),
-    0 0 0 1px rgba(79,138,255,0.15),
-    inset 0 1px 0 rgba(255,255,255,0.12);
+  background: transparent;
+  box-shadow: 0 2px 12px rgba(79,138,255,0.2);
   position: relative;
   transition: all 300ms ease;
+  overflow: hidden;
 }
 
 .sb-logo-link:hover .sb-logo-mark {
