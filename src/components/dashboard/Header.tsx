@@ -10,7 +10,7 @@ interface HeaderProps {
 export function Header({ title, subtitle }: HeaderProps) {
   return (
     <header
-      className="flex items-center justify-between px-6 border-b border-[rgba(255,255,255,0.06)]"
+      className="flex items-center justify-between px-6 border-b border-[rgba(255,255,255,0.06)] dashboard-header"
       style={{
         minHeight: 56,
         background: "linear-gradient(180deg, rgba(9,9,26,0.95) 0%, rgba(7,7,13,0.98) 100%)",
@@ -23,7 +23,7 @@ export function Header({ title, subtitle }: HeaderProps) {
           <div className="flex items-center gap-2.5">
             <h1 className="text-[20px] font-bold text-[#F0F0F5] tracking-[-0.02em]">{title}</h1>
             <span
-              className="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-[0.06em]"
+              className="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-[0.06em] beta-badge"
               style={{
                 background: "rgba(245,158,11,0.1)",
                 color: "#F59E0B",
@@ -46,7 +46,7 @@ export function Header({ title, subtitle }: HeaderProps) {
           style={{ boxShadow: "0 1px 2px rgba(0,0,0,0.1), inset 0 1px 0 rgba(255,255,255,0.02)" }}
         >
           <Search size={12} />
-          <span>Search...</span>
+          <span className="search-text">Search...</span>
           <div className="flex items-center gap-0.5 ml-2">
             <kbd
               className="rounded bg-[#1A1A2A] border border-[rgba(255,255,255,0.06)] px-1 text-[9px] text-[#3A3A50] flex items-center justify-center"

@@ -164,7 +164,7 @@ export default function SettingsPage() {
                   onChange={e => setOpenAiKey(e.target.value)}
                   placeholder="sk-..."
                   disabled={loadingKeys}
-                  className="w-full h-8 rounded-lg border border-[rgba(255,255,255,0.08)] bg-[rgba(7,7,13,0.8)] px-3 text-xs text-[#F0F0F5] placeholder:text-[#3A3A50] focus:outline-none focus:border-[#4F8AFF] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="settings-input w-full h-8 md:h-8 rounded-lg border border-[rgba(255,255,255,0.08)] bg-[rgba(7,7,13,0.8)] px-3 text-xs text-[#F0F0F5] placeholder:text-[#3A3A50] focus:outline-none focus:border-[#4F8AFF] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 />
                 <p className="text-[10px] text-[#3A3A50]">{t('settings.openaiUsage')}</p>
               </div>
@@ -177,7 +177,7 @@ export default function SettingsPage() {
                   onChange={e => setStabilityKey(e.target.value)}
                   placeholder="sk-..."
                   disabled={loadingKeys}
-                  className="w-full h-8 rounded-lg border border-[rgba(255,255,255,0.08)] bg-[rgba(7,7,13,0.8)] px-3 text-xs text-[#F0F0F5] placeholder:text-[#3A3A50] focus:outline-none focus:border-[#4F8AFF] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="settings-input w-full h-8 md:h-8 rounded-lg border border-[rgba(255,255,255,0.08)] bg-[rgba(7,7,13,0.8)] px-3 text-xs text-[#F0F0F5] placeholder:text-[#3A3A50] focus:outline-none focus:border-[#4F8AFF] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 />
                 <p className="text-[10px] text-[#3A3A50]">{t('settings.stabilityUsage')}</p>
               </div>

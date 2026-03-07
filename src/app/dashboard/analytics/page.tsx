@@ -119,7 +119,7 @@ export default function AnalyticsPage() {
   const avgDurationSec = (data.avgDurationMs / 1000).toFixed(1);
 
   return (
-    <div style={{ padding: "24px 32px", maxWidth: 1100, margin: "0 auto" }}>
+    <div className="analytics-page" style={{ padding: "24px 32px", maxWidth: 1100, margin: "0 auto" }}>
       {/* Header */}
       <div style={{ marginBottom: 24 }}>
         <h1 style={{ fontSize: 22, fontWeight: 700, color: "#F0F0F5", margin: "0 0 4px", letterSpacing: "-0.02em" }}>
@@ -131,7 +131,7 @@ export default function AnalyticsPage() {
       </div>
 
       {/* KPI Cards */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 24 }}>
+      <div className="analytics-kpi-grid" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 24 }}>
         <KPICard icon={<Workflow size={16} />} label={t('analytics.totalRuns')} value={String(data.totalExecutions)} color="#4F8AFF" />
         <KPICard icon={<CheckCircle2 size={16} />} label={t('analytics.successRate')} value={`${data.successRate}%`} color="#10B981" />
         <KPICard icon={<Clock size={16} />} label={t('analytics.avgDuration')} value={`${avgDurationSec}s`} color="#8B5CF6" />
@@ -139,7 +139,7 @@ export default function AnalyticsPage() {
       </div>
 
       {/* Charts Row */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 24 }}>
+      <div className="analytics-charts-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 24 }}>
         {/* Daily Executions */}
         <div style={{
           background: "linear-gradient(145deg, rgba(18,18,30,0.95), rgba(14,14,22,0.98))", border: "1px solid rgba(255,255,255,0.05)",

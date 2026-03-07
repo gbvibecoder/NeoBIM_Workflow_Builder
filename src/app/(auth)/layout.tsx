@@ -266,6 +266,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
 
       {/* Right Form Area */}
       <div
+        className="auth-form-area"
         style={{
           flex: 1,
           display: "flex",
@@ -274,6 +275,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
           padding: "40px",
           position: "relative",
           background: "#07070D",
+          minHeight: "100vh",
         }}
       >
         {/* Background effects for form side */}
@@ -300,15 +302,6 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
         </div>
         <div style={{ width: "100%", maxWidth: 420, position: "relative", zIndex: 1 }}>{children}</div>
       </div>
-
-      {/* Mobile responsive styles */}
-      <style jsx global>{`
-        @media (max-width: 968px) {
-          .auth-sidebar {
-            display: none !important;
-          }
-        }
-      `}</style>
     </div>
   );
 }

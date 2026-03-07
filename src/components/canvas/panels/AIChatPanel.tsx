@@ -337,7 +337,7 @@ export function AIChatPanel({ messages, onAddMessage, onClear, isOpen, onToggle 
             exit={{ x: 380, opacity: 0 }}
             transition={{ type: "spring", stiffness: 380, damping: 36 }}
             style={{
-              position: "absolute", right: 0, top: 0, bottom: 0, width: 380, zIndex: 25,
+              position: "absolute", right: 0, top: 0, bottom: 0, width: "min(380px, 100vw)", zIndex: 25,
               background: "rgba(6,6,12,0.95)",
               backdropFilter: "blur(32px) saturate(1.3)",
               WebkitBackdropFilter: "blur(32px) saturate(1.3)",

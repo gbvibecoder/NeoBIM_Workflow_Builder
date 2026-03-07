@@ -1,11 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 import { Monitor } from "lucide-react";
 
 const DISMISSED_KEY = "buildflow_mobile_gate_dismissed";
 
 export function MobileGate({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
   const [isSmall, setIsSmall] = useState(false);
   const [dismissed, setDismissed] = useState(
     () => typeof window !== "undefined" && sessionStorage.getItem(DISMISSED_KEY) === "1"
@@ -23,81 +25,89 @@ export function MobileGate({ children }: { children: React.ReactNode }) {
     setDismissed(true);
   };
 
-  if (isSmall && !dismissed) {
+  // Only show the gate on canvas page (workflow builder) which truly needs a large screen.
+  // All other pages (landing, auth, dashboard, settings, etc.) are now fully responsive.
+  const isCanvasPage = pathname === "/dashboard/canvas";
+
+  if (isSmall && !dismissed && isCanvasPage) {
     return (
-      <div
-        style={{
-          position: "fixed",
-          inset: 0,
-          background: "#0A0A0F",
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "center",
-          padding: 32,
-          zIndex: 9999,
-          textAlign: "center",
-          gap: 20,
-        }}
-        role="alert"
-        aria-live="polite"
-      >
+      <>
         <div
           style={{
-            width: 64,
-            height: 64,
-            borderRadius: 18,
-            background: "rgba(79,138,255,0.08)",
-            border: "1px solid rgba(79,138,255,0.2)",
+            position: "fixed",
+            inset: 0,
+            background: "rgba(10,10,15,0.95)",
             display: "flex",
+            flexDirection: "column",
             alignItems: "center",
             justifyContent: "center",
-            color: "#4F8AFF",
+            padding: 32,
+            zIndex: 9999,
+            textAlign: "center",
+            gap: 20,
           }}
+          role="alert"
+          aria-live="polite"
         >
-          <Monitor size={28} strokeWidth={1.5} />
-        </div>
-
-        <div style={{ maxWidth: 320 }}>
-          <h1
+          <div
             style={{
-              fontSize: 20,
-              fontWeight: 700,
-              color: "#F0F0F5",
-              marginBottom: 10,
-              lineHeight: 1.3,
+              width: 64,
+              height: 64,
+              borderRadius: 18,
+              background: "rgba(79,138,255,0.08)",
+              border: "1px solid rgba(79,138,255,0.2)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              color: "#4F8AFF",
             }}
           >
-            Desktop recommended
-          </h1>
-          <p
+            <Monitor size={28} strokeWidth={1.5} />
+          </div>
+
+          <div style={{ maxWidth: 320 }}>
+            <h1
+              style={{
+                fontSize: 20,
+                fontWeight: 700,
+                color: "#F0F0F5",
+                marginBottom: 10,
+                lineHeight: 1.3,
+              }}
+            >
+              Desktop recommended
+            </h1>
+            <p
+              style={{
+                fontSize: 14,
+                color: "#55556A",
+                lineHeight: 1.65,
+              }}
+            >
+              The workflow canvas works best on screens 1024px and wider.
+              You can still explore, but some canvas features may be limited.
+            </p>
+          </div>
+
+          <button
+            onClick={handleDismiss}
             style={{
+              padding: "12px 28px",
+              borderRadius: 10,
+              background: "linear-gradient(135deg, #4F8AFF 0%, #6366F1 100%)",
+              border: "none",
+              color: "white",
               fontSize: 14,
-              color: "#55556A",
-              lineHeight: 1.65,
+              fontWeight: 600,
+              cursor: "pointer",
+              minHeight: 44,
             }}
           >
-            BuildFlow is designed for screens 1024px and wider.
-            Open it on a desktop or laptop for the best experience.
-          </p>
+            Continue anyway
+          </button>
         </div>
-
-        <button
-          onClick={handleDismiss}
-          style={{
-            padding: "9px 22px",
-            borderRadius: 8,
-            background: "rgba(79,138,255,0.1)",
-            border: "1px solid rgba(79,138,255,0.3)",
-            color: "#4F8AFF",
-            fontSize: 13,
-            fontWeight: 500,
-            cursor: "pointer",
-          }}
-        >
-          Continue anyway
-        </button>
-      </div>
+        {children}
+      </>
     );
   }
 

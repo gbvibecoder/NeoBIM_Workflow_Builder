@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion } from "framer-motion";
@@ -20,6 +20,8 @@ import {
   History,
   CreditCard,
   BarChart3,
+  Menu,
+  X,
 } from "lucide-react";
 import { PREBUILT_WORKFLOWS } from "@/constants/prebuilt-workflows";
 import { useLocale } from "@/hooks/useLocale";
@@ -43,6 +45,43 @@ export function Sidebar() {
     { href: "/dashboard/settings",   label: t('nav.settings'),     icon: Settings },
   ];
   const [collapsed, setCollapsed] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+
+  // Detect mobile
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 769);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
+
+  // Close mobile sidebar on navigation
+  useEffect(() => {
+    if (isMobile) setMobileOpen(false);
+  }, [pathname, isMobile]);
+
+  // Close on ESC
+  useEffect(() => {
+    if (!mobileOpen) return;
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setMobileOpen(false);
+    };
+    document.addEventListener("keydown", handleEsc);
+    return () => document.removeEventListener("keydown", handleEsc);
+  }, [mobileOpen]);
+
+  // Prevent body scroll when mobile sidebar is open
+  useEffect(() => {
+    if (mobileOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => { document.body.style.overflow = ""; };
+  }, [mobileOpen]);
+
+  const closeMobile = useCallback(() => setMobileOpen(false), []);
 
   // Delay label appearance on expand so the sidebar opens first
   const [showLabels, setShowLabels] = useState(true);
@@ -54,9 +93,53 @@ export function Sidebar() {
   }, [collapsed]);
 
   return (
+    <>
+      {/* Mobile hamburger button */}
+      {isMobile && !mobileOpen && (
+        <button
+          className="mobile-menu-btn"
+          onClick={() => setMobileOpen(true)}
+          aria-label="Open menu"
+          style={{
+            position: "fixed",
+            top: 12,
+            left: 12,
+            zIndex: 9001,
+            width: 44,
+            height: 44,
+            borderRadius: 10,
+            border: "1px solid rgba(255,255,255,0.08)",
+            background: "rgba(6,6,12,0.95)",
+            backdropFilter: "blur(12px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            color: "#9898B0",
+            cursor: "pointer",
+          }}
+        >
+          <Menu size={20} />
+        </button>
+      )}
+
+      {/* Mobile overlay */}
+      {isMobile && mobileOpen && (
+        <div
+          className="sidebar-overlay sidebar-overlay-visible"
+          onClick={closeMobile}
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.6)",
+            zIndex: 8999,
+          }}
+        />
+      )}
+
     <motion.aside
-      animate={{ width: collapsed ? 56 : 232 }}
+      animate={{ width: isMobile ? 280 : (collapsed ? 56 : 232) }}
       transition={{ type: "spring", stiffness: 360, damping: 34 }}
+      className={`sidebar-desktop ${isMobile && mobileOpen ? "sidebar-open" : ""}`}
       style={{
         display: "flex",
         flexDirection: "column",
@@ -65,7 +148,14 @@ export function Sidebar() {
         borderRight: "1px solid rgba(255,255,255,0.06)",
         overflow: "hidden",
         flexShrink: 0,
-        position: "relative",
+        position: isMobile ? "fixed" : "relative",
+        zIndex: isMobile ? 9000 : undefined,
+        top: isMobile ? 0 : undefined,
+        left: isMobile ? 0 : undefined,
+        bottom: isMobile ? 0 : undefined,
+        transform: isMobile && !mobileOpen ? "translateX(-100%)" : "translateX(0)",
+        transition: isMobile ? "transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)" : undefined,
+        boxShadow: isMobile && mobileOpen ? "16px 0 48px rgba(0,0,0,0.5)" : undefined,
       }}
     >
       {/* Subtle atmospheric glow at top */}
@@ -104,8 +194,21 @@ export function Sidebar() {
           )}
         </Link>
 
-        {/* Collapse button */}
-        {showLabels && (
+        {/* Close button on mobile, collapse button on desktop */}
+        {isMobile ? (
+          <button
+            onClick={closeMobile}
+            aria-label="Close menu"
+            style={{
+              width: 32, height: 32, borderRadius: 8, border: "none",
+              background: "rgba(255,255,255,0.04)", cursor: "pointer", flexShrink: 0,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              color: "#9898B0", transition: "all 0.15s",
+            }}
+          >
+            <X size={16} />
+          </button>
+        ) : showLabels ? (
           <button
             onClick={() => { setCollapsed(true); setShowLabels(false); }}
             title={t('nav.collapseSidebar')}
@@ -121,7 +224,7 @@ export function Sidebar() {
           >
             <ChevronLeft size={13} />
           </button>
-        )}
+        ) : null}
       </div>
 
       {/* ── New Workflow button ───────────────────────────────────────────── */}
@@ -284,6 +387,7 @@ export function Sidebar() {
         </div>
       )}
     </motion.aside>
+    </>
   );
 }
 

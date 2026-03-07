@@ -513,7 +513,7 @@ export default function HistoryPage() {
 
       <main className="flex-1 overflow-y-auto p-6">
         {/* Stats bar */}
-        <div style={{ display: "flex", gap: 16, marginBottom: 24 }}>
+        <div className="history-stats-bar" style={{ display: "flex", gap: 16, marginBottom: 24 }}>
           {[
             { label: t('history.totalRuns'),  value: executions.length, color: "#4F8AFF" },
             { label: t('history.today'),       value: todayCount,         color: "#10B981" },
@@ -531,7 +531,7 @@ export default function HistoryPage() {
         </div>
 
         {/* Filters */}
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
+        <div className="history-filter-bar" style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
           <Filter size={12} style={{ color: "#55556A" }} />
           <span style={{ fontSize: 11, color: "#55556A" }}>{t('history.filter')}</span>
           {(["ALL", "SUCCESS", "FAILED", "RUNNING"] as const).map(s => {

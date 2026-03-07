@@ -139,7 +139,7 @@ export default function DashboardPage() {
         subtitle={`${t('dashboard.subtitle')} (${t('dashboard.beta')})`}
       />
 
-      <main className="flex-1 overflow-y-auto p-6 space-y-8">
+      <main className="flex-1 overflow-y-auto p-6 space-y-8 dashboard-main">
         {/* Stat Cards */}
         <div className="grid grid-cols-4 gap-4">
           {isLoading ? (
@@ -380,7 +380,7 @@ export default function DashboardPage() {
               }}
             />
 
-            <div className="relative flex items-start justify-between">
+            <div className="relative flex items-start justify-between dashboard-hero-cta">
               <div className="flex-1">
                 <div className="flex items-center gap-2.5 mb-3">
                   <div
@@ -431,7 +431,7 @@ export default function DashboardPage() {
                 </div>
               </div>
               <div
-                className="flex items-center gap-2 rounded-[10px] px-5 py-2.5 text-[13px] font-semibold text-white shrink-0 ml-8 transition-all duration-300 group-hover:shadow-[0_0_24px_rgba(79,138,255,0.3)] group-hover:-translate-y-0.5"
+                className="flex items-center gap-2 rounded-[10px] px-5 py-2.5 text-[13px] font-semibold text-white shrink-0 ml-8 transition-all duration-300 group-hover:shadow-[0_0_24px_rgba(79,138,255,0.3)] group-hover:-translate-y-0.5 dashboard-hero-cta-btn"
                 style={{
                   background: "linear-gradient(135deg, #4F8AFF 0%, #6366F1 100%)",
                   boxShadow: "0 2px 8px rgba(79,138,255,0.2), inset 0 1px 0 rgba(255,255,255,0.1)",

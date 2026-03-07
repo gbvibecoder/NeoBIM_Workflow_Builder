@@ -54,7 +54,7 @@ function RotatingPlaceholder({ items = PROMPT_EXAMPLES }: { items?: string[] }) 
       animate={{ opacity: 0.4, y: 0 }}
       exit={{ opacity: 0, y: -8 }}
       transition={{ duration: 0.4 }}
-      style={{ position: "absolute", left: 48, top: "50%", transform: "translateY(-50%)", pointerEvents: "none", fontSize: 15, color: "#5C5C78", whiteSpace: "nowrap" }}
+      style={{ position: "absolute", left: 48, top: "50%", transform: "translateY(-50%)", pointerEvents: "none", fontSize: 15, color: "#5C5C78", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", right: 16 }}
     >
       {items[index]}
     </motion.span>
@@ -71,6 +71,7 @@ function FloatingCard({ label, category, delay, style }: { label: string; catego
       initial={{ opacity: 0, scale: 0.9 }}
       animate={{ opacity: 1, scale: 1 }}
       transition={{ delay, duration: 0.6, ease: "easeOut" }}
+      className="landing-floating-card"
       style={{
         position: "absolute",
         background: "rgba(18,18,30,0.85)",
@@ -114,6 +115,7 @@ function SideToolbar() {
       initial={{ opacity: 0, x: -20 }}
       animate={{ opacity: 1, x: 0 }}
       transition={{ delay: 0.8, duration: 0.5 }}
+      className="landing-side-toolbar"
       style={{
         position: "absolute", left: 32, top: "50%", transform: "translateY(-50%)",
         background: "rgba(18,18,30,0.85)", backdropFilter: "blur(20px)",
@@ -146,6 +148,7 @@ function PromptCard({ labelText, quoteText }: { labelText?: string; quoteText?: 
       initial={{ opacity: 0, y: 20, rotate: -2 }}
       animate={{ opacity: 1, y: 0, rotate: -2 }}
       transition={{ delay: 1.0, duration: 0.6 }}
+      className="landing-prompt-card"
       style={{
         position: "absolute", left: 80, top: 100,
         background: "rgba(18,18,30,0.9)", backdropFilter: "blur(20px)",
@@ -218,7 +221,7 @@ const NEWS_ITEMS = [
 
 function NewsTicker({ items = NEWS_ITEMS, whatsNewLabel }: { items?: string[]; whatsNewLabel?: string }) {
   return (
-    <div style={{
+    <div className="landing-news-ticker" style={{
       position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 9000,
       height: 36, display: "flex", alignItems: "center",
       background: "rgba(7,7,13,0.95)", backdropFilter: "blur(12px)",
@@ -282,7 +285,7 @@ export default function LandingPage() {
       <header>
         <nav style={{
           display: "flex", alignItems: "center",
-          padding: "0 48px", height: 64,
+          padding: "0 max(16px, min(48px, 4vw))", height: 64,
           background: "transparent",
           position: "absolute", top: 0, left: 0, right: 0, zIndex: 100,
         }}>
@@ -300,7 +303,7 @@ export default function LandingPage() {
             </span>
           </Link>
 
-          <div style={{ display: "flex", alignItems: "center", gap: 32, marginRight: 32 }}>
+          <div className="landing-nav-links" style={{ display: "flex", alignItems: "center", gap: 32, marginRight: 32 }}>
             {[
               { label: t('landing.workflows'), href: '#workflows' },
               { label: t('landing.community'), href: '#community' },
@@ -319,9 +322,9 @@ export default function LandingPage() {
             ))}
           </div>
 
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <div className="landing-nav-cta" style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <LanguageSwitcher />
-            <Link href="/login" style={{
+            <Link href="/login" className="landing-login-link" style={{
               fontSize: 14, fontWeight: 600, color: "#F0F0F5",
               textDecoration: "none", padding: "8px 0",
             }}>
@@ -513,6 +516,7 @@ export default function LandingPage() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.5, duration: 0.6, ease: smoothEase }}
+              className="landing-prompt-bar"
               style={{
                 marginTop: 40, maxWidth: 640, margin: "40px auto 0",
                 display: "flex", alignItems: "center", gap: 0,
@@ -586,6 +590,7 @@ export default function LandingPage() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 1.2, duration: 0.6 }}
+            className="landing-partners"
             style={{
               position: "absolute", bottom: 48, left: 0, right: 0,
               display: "flex", justifyContent: "center", gap: 56,
@@ -608,7 +613,7 @@ export default function LandingPage() {
         </motion.section>
 
         {/* ── Core Capabilities — Workflow Pipeline Visual ────────── */}
-        <section style={{
+        <section className="landing-section" style={{
           padding: "120px 48px 80px", position: "relative", overflow: "hidden",
           background: "linear-gradient(180deg, #07070D 0%, #0A0A14 100%)",
         }}>
@@ -690,6 +695,7 @@ export default function LandingPage() {
               <motion.div
                 initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-40px" }}
                 variants={stagger}
+                className="landing-pipeline-grid"
                 style={{ display: "grid", gridTemplateColumns: "1fr 80px 1fr 80px 1fr", gap: 0, alignItems: "stretch", position: "relative", zIndex: 1 }}
               >
                 {[
@@ -740,7 +746,7 @@ export default function LandingPage() {
                       </motion.div>
                       {/* Wire connector between nodes */}
                       {i < 2 && (
-                        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", position: "relative" }}>
+                        <div className="landing-wire-connector" style={{ display: "flex", alignItems: "center", justifyContent: "center", position: "relative" }}>
                           <svg width="80" height="40" viewBox="0 0 80 40" fill="none">
                             <path d="M0 20 L80 20" stroke={`rgba(${hexToRgb(i === 0 ? "#8B5CF6" : "#10B981")}, 0.3)`} strokeWidth="2" className="wire-animate" style={{ animationDelay: `${i * 0.5}s` }} />
                             <circle cx="40" cy="20" r="4" fill={i === 0 ? "#8B5CF6" : "#10B981"}>
@@ -759,16 +765,16 @@ export default function LandingPage() {
         </section>
 
         {/* ── Built For Strip — Node Connection Bar ─────────────── */}
-        <div style={{
+        <div className="landing-section" style={{
           borderTop: "1px solid rgba(79,138,255,0.08)", borderBottom: "1px solid rgba(79,138,255,0.08)",
           padding: "24px 48px", position: "relative", overflow: "hidden",
           background: "linear-gradient(90deg, rgba(11,11,19,0.9), rgba(18,18,34,0.5), rgba(11,11,19,0.9))",
         }}>
           {/* Animated beam running across */}
           <div className="beam-accent" style={{ position: "absolute", top: 0, left: 0, right: 0 }} />
-          <div style={{ display: "flex", alignItems: "center", gap: 40, justifyContent: "center" }}>
+          <div className="landing-built-for" style={{ display: "flex", alignItems: "center", gap: 40, justifyContent: "center" }}>
             <span className="blueprint-annotation" style={{ whiteSpace: "nowrap", animation: "none", opacity: 0.6 }}>{t('landing.builtFor')}</span>
-            <div style={{ width: 1, height: 20, background: "rgba(79,138,255,0.15)" }} />
+            <div className="landing-built-for-divider" style={{ width: 1, height: 20, background: "rgba(79,138,255,0.15)" }} />
             <div style={{ display: "flex", gap: 32, flexWrap: "wrap", justifyContent: "center", alignItems: "center" }}>
               {useCases.map((c, i) => (
                 <React.Fragment key={c}>
@@ -787,7 +793,7 @@ export default function LandingPage() {
         </div>
 
         {/* ── Features — Interactive Node Graph ────────────────────── */}
-        <section id="features" style={{ padding: "120px 48px", position: "relative", overflow: "hidden" }}>
+        <section id="features" className="landing-section" style={{ padding: "120px 48px", position: "relative", overflow: "hidden" }}>
           {/* Background: blueprint + construction SVG */}
           <div style={{ position: "absolute", inset: 0, pointerEvents: "none" }}>
             <div className="blueprint-grid" style={{ opacity: 0.25 }} />
@@ -849,6 +855,7 @@ export default function LandingPage() {
               <motion.div
                 initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-40px" }}
                 variants={stagger}
+                className="landing-grid-3"
                 style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 32, position: "relative", zIndex: 1 }}
               >
                 {features.map((f, idx) => {
@@ -901,7 +908,7 @@ export default function LandingPage() {
         </section>
 
         {/* ── Workflow Showcase — Live Pipeline Demos ───────────────── */}
-        <section id="workflows" style={{
+        <section id="workflows" className="landing-section" style={{
           padding: "120px 48px", position: "relative", overflow: "hidden",
           background: "linear-gradient(180deg, #07070D 0%, #0A0A16 50%, #07070D 100%)",
         }}>
@@ -935,6 +942,7 @@ export default function LandingPage() {
             <motion.div
               initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-40px" }}
               variants={{ visible: { transition: { staggerChildren: 0.15 } } }}
+              className="landing-grid-3"
               style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 28 }}
             >
               {SHOWCASE.map(({ id, badge }) => {
@@ -997,7 +1005,7 @@ export default function LandingPage() {
         </section>
 
         {/* ── How It Works — Horizontal Pipeline ───────────────────── */}
-        <section id="community" style={{ padding: "120px 48px", position: "relative", overflow: "hidden" }}>
+        <section id="community" className="landing-section" style={{ padding: "120px 48px", position: "relative", overflow: "hidden" }}>
           <div style={{ position: "absolute", inset: 0, pointerEvents: "none" }}>
             <div className="blueprint-grid" style={{ opacity: 0.2 }} />
             {/* Large animated pipeline SVG */}
@@ -1042,6 +1050,7 @@ export default function LandingPage() {
             <motion.div
               initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-40px" }}
               variants={stagger}
+              className="landing-steps"
               style={{ display: "flex", alignItems: "center", gap: 0 }}
             >
               {[
@@ -1082,7 +1091,7 @@ export default function LandingPage() {
                     </motion.div>
                     {/* Animated wire connector */}
                     {i < 2 && (
-                      <div style={{ width: 60, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      <div className="landing-step-connector" style={{ width: 60, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
                         <svg width="60" height="40" viewBox="0 0 60 40" fill="none">
                           <path d="M0 20 L60 20" stroke={`rgba(${hexToRgb(i === 0 ? "#8B5CF6" : "#10B981")}, 0.3)`} strokeWidth="2" className="wire-animate" />
                           <circle r="5" fill={i === 0 ? "#8B5CF6" : "#10B981"}>
@@ -1100,7 +1109,7 @@ export default function LandingPage() {
         </section>
 
         {/* ── Pricing — Node-Style Plan Cards ──────────────────────── */}
-        <section id="pricing" style={{
+        <section id="pricing" className="landing-section" style={{
           padding: "120px 48px", position: "relative", overflow: "hidden",
           background: "linear-gradient(180deg, #07070D 0%, #0A0A14 50%, #07070D 100%)",
         }}>
@@ -1141,6 +1150,7 @@ export default function LandingPage() {
             <motion.div
               initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-40px" }}
               variants={{ visible: { transition: { staggerChildren: 0.12 } } }}
+              className="landing-grid-3"
               style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 24, alignItems: "start" }}
             >
               {/* FREE */}
@@ -1250,7 +1260,7 @@ export default function LandingPage() {
         </section>
 
         {/* ── Final CTA — Converging Pipeline ──────────────────────── */}
-        <section style={{
+        <section className="landing-section" style={{
           padding: "140px 48px", position: "relative", overflow: "hidden",
           textAlign: "center",
         }}>
@@ -1383,7 +1393,7 @@ export default function LandingPage() {
         padding: "32px 48px",
         background: "rgba(7,7,13,0.9)",
       }}>
-        <div style={{ maxWidth: 1200, margin: "0 auto", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <div className="landing-footer" style={{ maxWidth: 1200, margin: "0 auto", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <div style={{ width: 24, height: 24, borderRadius: 6, background: "linear-gradient(135deg, #4F8AFF 0%, #6366F1 100%)", display: "flex", alignItems: "center", justifyContent: "center" }}>
               <Zap size={11} color="white" fill="white" />

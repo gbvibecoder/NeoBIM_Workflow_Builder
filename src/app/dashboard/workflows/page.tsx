@@ -93,7 +93,7 @@ export default function WorkflowsPage() {
             </div>
 
             {/* Grid */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 16 }}>
+            <div className="workflows-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 16 }}>
               {workflows.map(wf => (
                 <div
                   key={wf.id}

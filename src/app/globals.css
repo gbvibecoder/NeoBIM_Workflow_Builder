@@ -725,13 +725,13 @@
 
   /* ── Sonner Toasts ──────────────────────────────────────────── */
 
-  /* Force 360px width */
+  /* Toast width — responsive, capped at 360px */
   [data-sonner-toaster] {
-    --width: 360px !important;
+    --width: min(360px, calc(100vw - 32px)) !important;
   }
 
   [data-sonner-toast] {
-    width: 360px !important;
+    width: min(360px, calc(100vw - 32px)) !important;
   }
 
   /* 3px left color bar per type */

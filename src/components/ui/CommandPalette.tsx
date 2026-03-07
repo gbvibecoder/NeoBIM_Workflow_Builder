@@ -247,7 +247,7 @@ export function CommandPalette() {
               top: "14vh",
               left: "50%",
               transform: "translateX(-50%)",
-              width: 560,
+              width: "min(560px, calc(100vw - 32px))",
               zIndex: 9999,
               background: "#12121A",
               borderRadius: 14,

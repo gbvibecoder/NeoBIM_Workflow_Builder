@@ -142,7 +142,9 @@ export default function TemplatesPage() {
       <main style={{ flex: 1, overflowY: "auto" }}>
 
         {/* ── Hero Section ────────────────────────────────────────────────── */}
-        <div style={{
+        <div
+          className="templates-hero"
+          style={{
           position: "relative", overflow: "hidden",
           minHeight: 180, display: "flex", alignItems: "center",
           padding: "0 32px",
@@ -166,7 +168,7 @@ export default function TemplatesPage() {
           </div>
 
           {/* Right decoration */}
-          <div style={{ flexShrink: 0, padding: "0 16px" }}>
+          <div className="templates-hero-deco" style={{ flexShrink: 0, padding: "0 16px" }}>
             <HeroDecoration />
           </div>
 
@@ -329,6 +331,7 @@ export default function TemplatesPage() {
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.15 }}
+                className="templates-grid"
                 style={{
                   display: "grid",
                   gridTemplateColumns: "repeat(3, 1fr)",

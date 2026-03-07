@@ -364,9 +364,10 @@ export default function CommunityPage() {
           background: "radial-gradient(ellipse at 60% 50%, rgba(139,92,246,0.06) 0%, transparent 60%), #0A0A0F",
           borderBottom: "1px solid #1A1A26",
           display: "flex", alignItems: "center", justifyContent: "space-between",
-        }}>
+        }}
+        className="community-hero">
           {/* Stats */}
-          <div style={{ display: "flex", gap: 32 }}>
+          <div className="community-stats" style={{ display: "flex", gap: 32 }}>
             {STATS.map(s => (
               <div key={s.labelKey} style={{ display: "flex", flexDirection: "column", gap: 2 }}>
                 <span style={{ fontSize: 22, fontWeight: 800, color: s.color, letterSpacing: "-0.02em" }}>{s.value}</span>
@@ -408,7 +409,7 @@ export default function CommunityPage() {
             flexWrap: "wrap", marginBottom: 20,
           }}>
             {/* Search */}
-            <div style={{ position: "relative", width: 300 }}>
+            <div className="community-search" style={{ position: "relative", width: 300 }}>
               <Search size={12} style={{
                 position: "absolute", left: 10, top: "50%",
                 transform: "translateY(-50%)", color: "#55556A",
@@ -537,7 +538,7 @@ export default function CommunityPage() {
               </button>
             </div>
           ) : (
-            <div style={{
+            <div className="community-grid" style={{
               display: "grid",
               gridTemplateColumns: "repeat(3, 1fr)",
               gap: 18,
