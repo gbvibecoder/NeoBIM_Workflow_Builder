@@ -425,6 +425,128 @@
     100% { offset-distance: 100%; opacity: 0; }
   }
 
+  /* ── Animated gradient border (rotating conic gradient) ────── */
+  @keyframes rotate-gradient {
+    0% { --angle: 0deg; }
+    100% { --angle: 360deg; }
+  }
+
+  @property --angle {
+    syntax: "<angle>";
+    initial-value: 0deg;
+    inherits: false;
+  }
+
+  .gradient-border-card {
+    position: relative;
+    border-radius: 20px;
+    overflow: hidden;
+  }
+
+  .gradient-border-card::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: 20px;
+    padding: 1px;
+    background: conic-gradient(from var(--angle), rgba(79,138,255,0.3), rgba(139,92,246,0.3), rgba(16,185,129,0.2), rgba(79,138,255,0.05), rgba(139,92,246,0.3), rgba(79,138,255,0.3));
+    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    mask-composite: exclude;
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    animation: rotate-gradient 6s linear infinite;
+    pointer-events: none;
+  }
+
+  .gradient-border-card:hover::before {
+    background: conic-gradient(from var(--angle), rgba(79,138,255,0.6), rgba(139,92,246,0.6), rgba(16,185,129,0.4), rgba(79,138,255,0.1), rgba(139,92,246,0.6), rgba(79,138,255,0.6));
+  }
+
+  /* ── Section wave dividers ─────────────────────────────────── */
+  .section-divider-wave {
+    position: absolute;
+    bottom: -1px;
+    left: 0;
+    right: 0;
+    height: 80px;
+    pointer-events: none;
+    z-index: 2;
+  }
+
+  .section-divider-wave-top {
+    position: absolute;
+    top: -1px;
+    left: 0;
+    right: 0;
+    height: 80px;
+    pointer-events: none;
+    z-index: 2;
+    transform: rotate(180deg);
+  }
+
+  /* ── Card shimmer sweep on hover ───────────────────────────── */
+  @keyframes shimmer-sweep {
+    0% { transform: translateX(-100%) skewX(-15deg); }
+    100% { transform: translateX(200%) skewX(-15deg); }
+  }
+
+  .card-shimmer {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .card-shimmer::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 50%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.03), transparent);
+    transform: translateX(-100%) skewX(-15deg);
+    pointer-events: none;
+    transition: none;
+  }
+
+  .card-shimmer:hover::after {
+    animation: shimmer-sweep 0.8s ease-out;
+  }
+
+  /* ── Animated step connector (horizontal line with dot) ───── */
+  @keyframes connector-flow {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+  }
+
+  .step-connector {
+    background: linear-gradient(90deg, transparent, rgba(79,138,255,0.4), rgba(139,92,246,0.4), transparent);
+    background-size: 200% 100%;
+    animation: connector-flow 3s linear infinite;
+  }
+
+  /* ── Glow text for section labels ──────────────────────────── */
+  .glow-label {
+    text-shadow: 0 0 20px currentColor, 0 0 40px currentColor;
+  }
+
+  /* ── Pulsing ring around icon boxes ────────────────────────── */
+  @keyframes ring-pulse {
+    0% { box-shadow: 0 0 0 0 rgba(var(--ring-color), 0.4); }
+    70% { box-shadow: 0 0 0 12px rgba(var(--ring-color), 0); }
+    100% { box-shadow: 0 0 0 0 rgba(var(--ring-color), 0); }
+  }
+
+  /* ── Perspective tilt on hover ─────────────────────────────── */
+  .tilt-card {
+    transition: transform 0.4s ease, box-shadow 0.4s ease;
+    transform-style: preserve-3d;
+    perspective: 1000px;
+  }
+
+  .tilt-card:hover {
+    transform: translateY(-8px) rotateX(2deg) rotateY(-2deg);
+  }
+
   /* ── Fade in up (CSS-only entrance) ──────────────────────────── */
   @keyframes fade-in-up {
     from { opacity: 0; transform: translateY(12px); }

@@ -609,26 +609,34 @@ export default function LandingPage() {
 
         {/* ── Core Capabilities ─────────────────────────────────────── */}
         <section style={{
-          padding: "80px 48px 100px", position: "relative", overflow: "hidden",
+          padding: "100px 48px 120px", position: "relative", overflow: "hidden",
           background: "linear-gradient(180deg, #07070D 0%, #0B0B13 100%)",
         }}>
+          {/* Wave divider top */}
+          <svg className="section-divider-wave-top" viewBox="0 0 1440 80" fill="none" preserveAspectRatio="none">
+            <path d="M0 80 Q360 0 720 40 Q1080 80 1440 20 L1440 80 L0 80Z" fill="#07070D" />
+            <path d="M0 80 Q360 0 720 40 Q1080 80 1440 20" stroke="rgba(79,138,255,0.1)" strokeWidth="0.5" fill="none" />
+          </svg>
+
           {/* Atmospheric glow */}
           <div style={{ position: "absolute", inset: 0, pointerEvents: "none" }}>
-            <div style={{ position: "absolute", top: "-20%", left: "50%", transform: "translateX(-50%)", width: "80%", height: "60%", background: "radial-gradient(ellipse, rgba(79,138,255,0.08) 0%, transparent 70%)" }} />
-            <div className="orb-drift-2" style={{ position: "absolute", top: "10%", right: "5%", width: 350, height: 350, borderRadius: "50%", background: "radial-gradient(circle, rgba(79,138,255,0.1) 0%, transparent 70%)", filter: "blur(60px)" }} />
-            <div className="orb-drift-3" style={{ position: "absolute", bottom: "5%", left: "8%", width: 280, height: 280, borderRadius: "50%", background: "radial-gradient(circle, rgba(139,92,246,0.08) 0%, transparent 70%)", filter: "blur(50px)" }} />
+            <div className="blueprint-grid" style={{ opacity: 0.25 }} />
+            <div style={{ position: "absolute", top: "-20%", left: "50%", transform: "translateX(-50%)", width: "80%", height: "60%", background: "radial-gradient(ellipse, rgba(79,138,255,0.1) 0%, transparent 70%)" }} />
+            <div className="orb-drift-2" style={{ position: "absolute", top: "10%", right: "5%", width: 400, height: 400, borderRadius: "50%", background: "radial-gradient(circle, rgba(79,138,255,0.12) 0%, transparent 70%)", filter: "blur(70px)" }} />
+            <div className="orb-drift-3" style={{ position: "absolute", bottom: "5%", left: "8%", width: 350, height: 350, borderRadius: "50%", background: "radial-gradient(circle, rgba(139,92,246,0.1) 0%, transparent 70%)", filter: "blur(60px)" }} />
+            <div className="scan-beam" />
           </div>
 
           <div style={{ maxWidth: 1200, margin: "0 auto", position: "relative", zIndex: 1 }}>
             <motion.div
               initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-60px" }}
               variants={fadeUp} transition={{ duration: 0.6, ease: smoothEase }}
-              style={{ textAlign: "center", marginBottom: 64 }}
+              style={{ textAlign: "center", marginBottom: 72 }}
             >
-              <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "3px", color: "#4F8AFF", marginBottom: 16, display: "block" }}>
+              <span className="glow-label" style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "3px", color: "#4F8AFF", marginBottom: 16, display: "block" }}>
                 {t('landing.coreCapabilities')}
               </span>
-              <h2 style={{ fontSize: "clamp(2rem, 4vw, 3rem)", fontWeight: 800, letterSpacing: "-0.03em", lineHeight: 1.1 }}>
+              <h2 style={{ fontSize: "clamp(2rem, 4vw, 3.2rem)", fontWeight: 800, letterSpacing: "-0.03em", lineHeight: 1.1 }}>
                 <span style={{ color: "#F0F0F5" }}>{t('landing.fromIdeaTo')} </span>
                 <span style={{ background: "linear-gradient(135deg, #7C6FF7, #C084FC)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>{t('landing.reality')}</span>
               </h2>
@@ -637,7 +645,7 @@ export default function LandingPage() {
             <motion.div
               initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-40px" }}
               variants={stagger}
-              style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 24 }}
+              style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 28 }}
             >
               {[
                 { icon: <Box size={28} />, color: "#3B82F6", title: t('landing.textTo3d'), description: t('landing.textTo3dDesc'), badge: t('landing.aiPoweredBadge') },
@@ -646,34 +654,23 @@ export default function LandingPage() {
               ].map(f => {
                 const rgb = hexToRgb(f.color);
                 return (
-                  <motion.div key={f.title} variants={fadeUp} transition={{ duration: 0.5, ease: smoothEase }} style={{
-                    background: "rgba(18,18,30,0.6)", backdropFilter: "blur(20px)",
-                    borderRadius: 20, border: "1px solid rgba(255,255,255,0.06)",
-                    padding: "36px 32px", cursor: "default", position: "relative", overflow: "hidden",
-                    transition: "border-color 0.3s, transform 0.3s, box-shadow 0.3s",
-                  }}
-                    onMouseEnter={e => {
-                      const el = e.currentTarget as HTMLElement;
-                      el.style.borderColor = `rgba(${rgb}, 0.4)`;
-                      el.style.transform = "translateY(-6px) scale(1.01)";
-                      el.style.boxShadow = `0 24px 48px rgba(0,0,0,0.4), 0 0 40px rgba(${rgb}, 0.12), inset 0 1px 0 rgba(255,255,255,0.05)`;
-                    }}
-                    onMouseLeave={e => {
-                      const el = e.currentTarget as HTMLElement;
-                      el.style.borderColor = "rgba(255,255,255,0.06)";
-                      el.style.transform = "translateY(0) scale(1)";
-                      el.style.boxShadow = "none";
+                  <motion.div key={f.title} variants={fadeUp} transition={{ duration: 0.5, ease: smoothEase }}
+                    className="gradient-border-card card-shimmer tilt-card"
+                    style={{
+                      background: "rgba(18,18,30,0.7)", backdropFilter: "blur(24px)",
+                      borderRadius: 20,
+                      padding: "40px 32px", cursor: "default", position: "relative", overflow: "hidden",
                     }}
                   >
-                    {/* Gradient orb background */}
-                    <div style={{ position: "absolute", top: -40, right: -40, width: 160, height: 160, borderRadius: "50%", background: `radial-gradient(circle, rgba(${rgb}, 0.08) 0%, transparent 70%)`, pointerEvents: "none" }} />
+                    {/* Gradient orb background — larger */}
+                    <div style={{ position: "absolute", top: -60, right: -60, width: 200, height: 200, borderRadius: "50%", background: `radial-gradient(circle, rgba(${rgb}, 0.12) 0%, transparent 70%)`, pointerEvents: "none" }} />
 
                     {f.badge && (
-                      <div style={{ position: "absolute", top: 20, right: 20, fontSize: 9, padding: "4px 12px", borderRadius: 20, background: `rgba(${rgb}, 0.12)`, border: `1px solid rgba(${rgb}, 0.25)`, color: f.color, fontWeight: 700, letterSpacing: "1px", textTransform: "uppercase" }}>
+                      <div style={{ position: "absolute", top: 20, right: 20, fontSize: 9, padding: "4px 12px", borderRadius: 20, background: `rgba(${rgb}, 0.15)`, border: `1px solid rgba(${rgb}, 0.3)`, color: f.color, fontWeight: 700, letterSpacing: "1px", textTransform: "uppercase", boxShadow: `0 0 12px rgba(${rgb}, 0.15)` }}>
                         {f.badge}
                       </div>
                     )}
-                    <div style={{ width: 64, height: 64, borderRadius: 18, marginBottom: 24, background: `linear-gradient(135deg, rgba(${rgb}, 0.15), rgba(${rgb}, 0.05))`, border: `1px solid rgba(${rgb}, 0.2)`, display: "flex", alignItems: "center", justifyContent: "center", color: f.color, boxShadow: `0 0 24px rgba(${rgb}, 0.1)` }}>
+                    <div style={{ width: 68, height: 68, borderRadius: 18, marginBottom: 28, background: `linear-gradient(135deg, rgba(${rgb}, 0.2), rgba(${rgb}, 0.06))`, border: `1px solid rgba(${rgb}, 0.25)`, display: "flex", alignItems: "center", justifyContent: "center", color: f.color, boxShadow: `0 0 30px rgba(${rgb}, 0.15), inset 0 0 20px rgba(${rgb}, 0.05)` }}>
                       {f.icon}
                     </div>
                     <h3 style={{ fontSize: 22, fontWeight: 800, color: "#F0F0F5", marginBottom: 12, letterSpacing: "-0.02em" }}>{f.title}</h3>
@@ -683,6 +680,12 @@ export default function LandingPage() {
               })}
             </motion.div>
           </div>
+
+          {/* Wave divider bottom */}
+          <svg className="section-divider-wave" viewBox="0 0 1440 80" fill="none" preserveAspectRatio="none">
+            <path d="M0 0 Q360 60 720 30 Q1080 0 1440 40 L1440 80 L0 80Z" fill="#0B0B13" />
+            <path d="M0 0 Q360 60 720 30 Q1080 0 1440 40" stroke="rgba(79,138,255,0.08)" strokeWidth="0.5" fill="none" />
+          </svg>
         </section>
 
         {/* ── Built For Strip ─────────────────────────────────────── */}
@@ -706,25 +709,25 @@ export default function LandingPage() {
         </div>
 
         {/* ── Features (glass cards with glow) ────────────────────── */}
-        <section id="features" style={{ padding: "100px 48px", position: "relative", overflow: "hidden" }}>
+        <section id="features" style={{ padding: "120px 48px", position: "relative", overflow: "hidden" }}>
           <div style={{ position: "absolute", inset: 0, pointerEvents: "none" }}>
-            {/* Blueprint grid (faded) */}
-            <div className="blueprint-grid" style={{ opacity: 0.4 }} />
-            <div style={{ position: "absolute", bottom: "0%", left: "20%", width: "60%", height: "50%", background: "radial-gradient(ellipse, rgba(139,92,246,0.08) 0%, transparent 70%)" }} />
-            <div className="orb-drift-1" style={{ position: "absolute", bottom: "10%", left: "5%", width: 380, height: 380, borderRadius: "50%", background: "radial-gradient(circle, rgba(139,92,246,0.1) 0%, transparent 70%)", filter: "blur(60px)" }} />
-            <div className="orb-drift-3" style={{ position: "absolute", top: "10%", right: "5%", width: 320, height: 320, borderRadius: "50%", background: "radial-gradient(circle, rgba(59,130,246,0.08) 0%, transparent 70%)", filter: "blur(50px)" }} />
+            <div className="blueprint-grid" style={{ opacity: 0.35 }} />
+            <div style={{ position: "absolute", bottom: "0%", left: "20%", width: "60%", height: "50%", background: "radial-gradient(ellipse, rgba(139,92,246,0.1) 0%, transparent 70%)" }} />
+            <div className="orb-drift-1" style={{ position: "absolute", bottom: "10%", left: "5%", width: 400, height: 400, borderRadius: "50%", background: "radial-gradient(circle, rgba(139,92,246,0.12) 0%, transparent 70%)", filter: "blur(70px)" }} />
+            <div className="orb-drift-3" style={{ position: "absolute", top: "10%", right: "5%", width: 350, height: 350, borderRadius: "50%", background: "radial-gradient(circle, rgba(59,130,246,0.1) 0%, transparent 70%)", filter: "blur(60px)" }} />
+            <div className="scan-beam" style={{ animationDelay: "4s" }} />
           </div>
 
           <div style={{ maxWidth: 1200, margin: "0 auto", position: "relative", zIndex: 1 }}>
             <motion.div
               initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-80px" }}
               variants={fadeUp} transition={{ duration: 0.6, ease: smoothEase }}
-              style={{ textAlign: "center", marginBottom: 64 }}
+              style={{ textAlign: "center", marginBottom: 72 }}
             >
-              <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "3px", color: "#8B5CF6", marginBottom: 16, display: "block" }}>
+              <span className="glow-label" style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "3px", color: "#8B5CF6", marginBottom: 16, display: "block" }}>
                 {t('landing.platform')}
               </span>
-              <h2 style={{ fontSize: "clamp(2rem, 4vw, 3rem)", fontWeight: 800, color: "#F0F0F5", letterSpacing: "-0.03em", lineHeight: 1.1, marginBottom: 16 }}>
+              <h2 style={{ fontSize: "clamp(2rem, 4vw, 3.2rem)", fontWeight: 800, color: "#F0F0F5", letterSpacing: "-0.03em", lineHeight: 1.1, marginBottom: 16 }}>
                 {t('landing.everythingYouNeed')}<br />
                 <span style={{ background: "linear-gradient(135deg, #4F8AFF, #A78BFA)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>{t('landing.automateAec')}</span>
               </h2>
@@ -736,34 +739,23 @@ export default function LandingPage() {
             <motion.div
               initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-40px" }}
               variants={stagger}
-              style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 24 }}
+              style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 28 }}
             >
               {features.map((f, idx) => {
                 const rgb = hexToRgb(f.color);
                 return (
-                  <motion.div key={f.title} variants={fadeUp} transition={{ duration: 0.5, ease: smoothEase }} style={{
-                    background: "rgba(18,18,30,0.6)", backdropFilter: "blur(20px)",
-                    borderRadius: 20, border: "1px solid rgba(255,255,255,0.06)",
-                    padding: "36px 28px", cursor: "default", position: "relative", overflow: "hidden",
-                    transition: "border-color 0.3s, transform 0.3s, box-shadow 0.3s",
-                  }}
-                    onMouseEnter={e => {
-                      const el = e.currentTarget as HTMLElement;
-                      el.style.borderColor = `rgba(${rgb}, 0.3)`;
-                      el.style.transform = "translateY(-6px)";
-                      el.style.boxShadow = `0 24px 48px rgba(0,0,0,0.4), 0 0 40px rgba(${rgb}, 0.1)`;
-                    }}
-                    onMouseLeave={e => {
-                      const el = e.currentTarget as HTMLElement;
-                      el.style.borderColor = "rgba(255,255,255,0.06)";
-                      el.style.transform = "translateY(0)";
-                      el.style.boxShadow = "none";
+                  <motion.div key={f.title} variants={fadeUp} transition={{ duration: 0.5, ease: smoothEase }}
+                    className="gradient-border-card card-shimmer tilt-card"
+                    style={{
+                      background: "rgba(18,18,30,0.7)", backdropFilter: "blur(24px)",
+                      borderRadius: 20,
+                      padding: "40px 28px", cursor: "default", position: "relative", overflow: "hidden",
                     }}
                   >
-                    {/* Decorative number */}
-                    <div style={{ position: "absolute", top: -8, right: 16, fontSize: 100, fontWeight: 900, color: f.color, opacity: 0.03, lineHeight: 1, userSelect: "none" }}>{idx + 1}</div>
+                    {/* Decorative number — more visible */}
+                    <div style={{ position: "absolute", top: -12, right: 16, fontSize: 120, fontWeight: 900, background: `linear-gradient(180deg, ${f.color}, transparent)`, WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text", opacity: 0.06, lineHeight: 1, userSelect: "none" }}>{idx + 1}</div>
 
-                    <div style={{ width: 60, height: 60, borderRadius: 16, marginBottom: 24, background: `linear-gradient(135deg, rgba(${rgb}, 0.15), rgba(${rgb}, 0.05))`, border: `1px solid rgba(${rgb}, 0.2)`, display: "flex", alignItems: "center", justifyContent: "center", color: f.color, boxShadow: `0 0 20px rgba(${rgb}, 0.1)` }}>
+                    <div style={{ width: 64, height: 64, borderRadius: 18, marginBottom: 28, background: `linear-gradient(135deg, rgba(${rgb}, 0.2), rgba(${rgb}, 0.06))`, border: `1px solid rgba(${rgb}, 0.25)`, display: "flex", alignItems: "center", justifyContent: "center", color: f.color, boxShadow: `0 0 30px rgba(${rgb}, 0.15), inset 0 0 20px rgba(${rgb}, 0.05)` }}>
                       {f.icon}
                     </div>
                     <h3 style={{ fontSize: 20, fontWeight: 800, color: "#F0F0F5", marginBottom: 12, letterSpacing: "-0.02em" }}>{f.title}</h3>
@@ -771,7 +763,7 @@ export default function LandingPage() {
                     <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
                       {f.bullets.map(b => (
                         <li key={b} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13, color: "#9898B0", marginBottom: 10 }}>
-                          <div style={{ width: 6, height: 6, borderRadius: "50%", background: f.color, flexShrink: 0, boxShadow: `0 0 8px ${f.color}` }} />
+                          <div style={{ width: 6, height: 6, borderRadius: "50%", background: f.color, flexShrink: 0, boxShadow: `0 0 10px ${f.color}` }} />
                           {b}
                         </li>
                       ))}
@@ -781,29 +773,40 @@ export default function LandingPage() {
               })}
             </motion.div>
           </div>
+
+          {/* Wave divider */}
+          <svg className="section-divider-wave" viewBox="0 0 1440 80" fill="none" preserveAspectRatio="none">
+            <path d="M0 20 Q360 70 720 35 Q1080 0 1440 50 L1440 80 L0 80Z" fill="#07070D" />
+            <path d="M0 20 Q360 70 720 35 Q1080 0 1440 50" stroke="rgba(139,92,246,0.08)" strokeWidth="0.5" fill="none" />
+          </svg>
         </section>
 
         {/* ── Workflow Showcase ────────────────────────────────────── */}
         <section id="workflows" style={{
-          padding: "100px 48px", position: "relative", overflow: "hidden",
+          padding: "120px 48px", position: "relative", overflow: "hidden",
           background: "linear-gradient(180deg, #07070D 0%, #0A0A16 50%, #07070D 100%)",
         }}>
+          <svg className="section-divider-wave-top" viewBox="0 0 1440 80" fill="none" preserveAspectRatio="none">
+            <path d="M0 80 Q480 10 720 50 Q960 80 1440 20 L1440 80 L0 80Z" fill="#07070D" />
+            <path d="M0 80 Q480 10 720 50 Q960 80 1440 20" stroke="rgba(16,185,129,0.08)" strokeWidth="0.5" fill="none" />
+          </svg>
+
           <div style={{ position: "absolute", inset: 0, pointerEvents: "none" }}>
             <div style={{ position: "absolute", top: "10%", left: "50%", transform: "translateX(-50%)", width: "70%", height: "40%", background: "radial-gradient(ellipse, rgba(79,138,255,0.1) 0%, transparent 70%)" }} />
-            <div className="orb-drift-3" style={{ position: "absolute", top: "5%", left: "8%", width: 320, height: 320, borderRadius: "50%", background: "radial-gradient(circle, rgba(16,185,129,0.1) 0%, transparent 70%)", filter: "blur(55px)" }} />
-            <div className="orb-drift-1" style={{ position: "absolute", bottom: "10%", right: "5%", width: 280, height: 280, borderRadius: "50%", background: "radial-gradient(circle, rgba(79,138,255,0.08) 0%, transparent 70%)", filter: "blur(50px)" }} />
+            <div className="orb-drift-3" style={{ position: "absolute", top: "5%", left: "8%", width: 380, height: 380, borderRadius: "50%", background: "radial-gradient(circle, rgba(16,185,129,0.12) 0%, transparent 70%)", filter: "blur(65px)" }} />
+            <div className="orb-drift-1" style={{ position: "absolute", bottom: "10%", right: "5%", width: 320, height: 320, borderRadius: "50%", background: "radial-gradient(circle, rgba(79,138,255,0.1) 0%, transparent 70%)", filter: "blur(55px)" }} />
           </div>
 
           <div style={{ maxWidth: 1200, margin: "0 auto", position: "relative", zIndex: 1 }}>
             <motion.div
               initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-80px" }}
               variants={fadeUp} transition={{ duration: 0.6, ease: smoothEase }}
-              style={{ textAlign: "center", marginBottom: 64 }}
+              style={{ textAlign: "center", marginBottom: 72 }}
             >
-              <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "3px", color: "#10B981", marginBottom: 16, display: "block" }}>
+              <span className="glow-label" style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "3px", color: "#10B981", marginBottom: 16, display: "block" }}>
                 {t('landing.templatesSection')}
               </span>
-              <h2 style={{ fontSize: "clamp(2rem, 4vw, 3rem)", fontWeight: 800, color: "#F0F0F5", letterSpacing: "-0.03em", lineHeight: 1.1 }}>
+              <h2 style={{ fontSize: "clamp(2rem, 4vw, 3.2rem)", fontWeight: 800, color: "#F0F0F5", letterSpacing: "-0.03em", lineHeight: 1.1 }}>
                 {t('landing.fromBrief')}<br />
                 <span style={{ background: "linear-gradient(135deg, #10B981, #34D399)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>{t('landing.inMinutes')}</span>
               </h2>
@@ -812,31 +815,21 @@ export default function LandingPage() {
             <motion.div
               initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-40px" }}
               variants={{ visible: { transition: { staggerChildren: 0.15 } } }}
-              style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 24 }}
+              style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 28 }}
             >
               {SHOWCASE.map(({ id, badge }) => {
                 const wf = PREBUILT_WORKFLOWS.find(w => w.id === id);
                 if (!wf) return null;
                 const nodes = wf.tileGraph.nodes.map(n => ({ label: n.data.label, category: n.data.category as string }));
                 return (
-                  <motion.div key={id} variants={fadeUp} transition={{ duration: 0.5, ease: smoothEase }} style={{
-                    background: "rgba(18,18,30,0.6)", backdropFilter: "blur(20px)",
-                    borderRadius: 20,
-                    border: badge ? "1px solid rgba(245,158,11,0.3)" : "1px solid rgba(255,255,255,0.06)",
-                    overflow: "hidden",
-                    transition: "border-color 0.3s, transform 0.3s, box-shadow 0.3s",
-                  }}
-                    onMouseEnter={e => {
-                      const el = e.currentTarget as HTMLElement;
-                      el.style.transform = "translateY(-6px) scale(1.01)";
-                      el.style.boxShadow = badge ? "0 24px 48px rgba(245,158,11,0.1), 0 0 40px rgba(245,158,11,0.05)" : "0 24px 48px rgba(0,0,0,0.4), 0 0 30px rgba(79,138,255,0.08)";
-                      if (!badge) el.style.borderColor = "rgba(79,138,255,0.2)";
-                    }}
-                    onMouseLeave={e => {
-                      const el = e.currentTarget as HTMLElement;
-                      el.style.transform = "translateY(0) scale(1)";
-                      el.style.boxShadow = "none";
-                      if (!badge) el.style.borderColor = "rgba(255,255,255,0.06)";
+                  <motion.div key={id} variants={fadeUp} transition={{ duration: 0.5, ease: smoothEase }}
+                    className={`card-shimmer tilt-card ${badge ? '' : 'gradient-border-card'}`}
+                    style={{
+                      background: "rgba(18,18,30,0.7)", backdropFilter: "blur(24px)",
+                      borderRadius: 20,
+                      border: badge ? "1.5px solid rgba(245,158,11,0.35)" : "none",
+                      overflow: "hidden",
+                      boxShadow: badge ? "0 0 40px rgba(245,158,11,0.06)" : "none",
                     }}
                   >
                     <div style={{
@@ -878,12 +871,17 @@ export default function LandingPage() {
         </section>
 
         {/* ── How It Works (futuristic timeline) ───────────────────── */}
-        <section id="community" style={{ padding: "100px 48px", position: "relative", overflow: "hidden" }}>
+        <section id="community" style={{ padding: "120px 48px", position: "relative", overflow: "hidden" }}>
+          <svg className="section-divider-wave-top" viewBox="0 0 1440 80" fill="none" preserveAspectRatio="none">
+            <path d="M0 80 Q360 20 720 60 Q1080 80 1440 30 L1440 80 L0 80Z" fill="#07070D" />
+            <path d="M0 80 Q360 20 720 60 Q1080 80 1440 30" stroke="rgba(245,158,11,0.08)" strokeWidth="0.5" fill="none" />
+          </svg>
+
           <div style={{ position: "absolute", inset: 0, pointerEvents: "none" }}>
             <div className="blueprint-grid" style={{ opacity: 0.3 }} />
-            <div style={{ position: "absolute", top: "30%", left: "50%", transform: "translateX(-50%)", width: "50%", height: "40%", background: "radial-gradient(ellipse, rgba(139,92,246,0.08) 0%, transparent 70%)" }} />
-            <div className="orb-drift-1" style={{ position: "absolute", bottom: "5%", right: "5%", width: 320, height: 320, borderRadius: "50%", background: "radial-gradient(circle, rgba(245,158,11,0.08) 0%, transparent 70%)", filter: "blur(50px)" }} />
-            <div className="orb-drift-2" style={{ position: "absolute", top: "10%", left: "8%", width: 280, height: 280, borderRadius: "50%", background: "radial-gradient(circle, rgba(139,92,246,0.07) 0%, transparent 70%)", filter: "blur(45px)" }} />
+            <div style={{ position: "absolute", top: "30%", left: "50%", transform: "translateX(-50%)", width: "50%", height: "40%", background: "radial-gradient(ellipse, rgba(139,92,246,0.1) 0%, transparent 70%)" }} />
+            <div className="orb-drift-1" style={{ position: "absolute", bottom: "5%", right: "5%", width: 350, height: 350, borderRadius: "50%", background: "radial-gradient(circle, rgba(245,158,11,0.1) 0%, transparent 70%)", filter: "blur(55px)" }} />
+            <div className="orb-drift-2" style={{ position: "absolute", top: "10%", left: "8%", width: 320, height: 320, borderRadius: "50%", background: "radial-gradient(circle, rgba(139,92,246,0.1) 0%, transparent 70%)", filter: "blur(50px)" }} />
           </div>
 
           <div style={{ maxWidth: 1200, margin: "0 auto", position: "relative", zIndex: 1 }}>
@@ -892,10 +890,10 @@ export default function LandingPage() {
               variants={fadeUp} transition={{ duration: 0.6, ease: smoothEase }}
               style={{ textAlign: "center", marginBottom: 64 }}
             >
-              <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "3px", color: "#F59E0B", marginBottom: 16, display: "block" }}>
+              <span className="glow-label" style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "3px", color: "#F59E0B", marginBottom: 16, display: "block" }}>
                 {t('landing.howItWorks')}
               </span>
-              <h2 style={{ fontSize: "clamp(2rem, 4vw, 3rem)", fontWeight: 800, color: "#F0F0F5", letterSpacing: "-0.03em", lineHeight: 1.1 }}>
+              <h2 style={{ fontSize: "clamp(2rem, 4vw, 3.2rem)", fontWeight: 800, color: "#F0F0F5", letterSpacing: "-0.03em", lineHeight: 1.1 }}>
                 {t('landing.threeSteps')}<br />
                 <span style={{ background: "linear-gradient(135deg, #F59E0B, #EF4444)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>{t('landing.launch')}</span>
               </h2>
@@ -914,23 +912,12 @@ export default function LandingPage() {
                 const rgb = hexToRgb(step.color);
                 return (
                   <React.Fragment key={step.num}>
-                    <motion.div variants={fadeUp} transition={{ duration: 0.5, ease: smoothEase }} style={{
-                      background: "rgba(18,18,30,0.6)", backdropFilter: "blur(20px)",
-                      borderRadius: 20, border: "1px solid rgba(255,255,255,0.06)",
-                      padding: "36px 28px", textAlign: "center", position: "relative", overflow: "hidden",
-                      transition: "border-color 0.3s, transform 0.3s, box-shadow 0.3s",
-                    }}
-                      onMouseEnter={e => {
-                        const el = e.currentTarget as HTMLElement;
-                        el.style.borderColor = `rgba(${rgb}, 0.3)`;
-                        el.style.transform = "translateY(-6px)";
-                        el.style.boxShadow = `0 24px 48px rgba(0,0,0,0.4), 0 0 30px rgba(${rgb}, 0.1)`;
-                      }}
-                      onMouseLeave={e => {
-                        const el = e.currentTarget as HTMLElement;
-                        el.style.borderColor = "rgba(255,255,255,0.06)";
-                        el.style.transform = "translateY(0)";
-                        el.style.boxShadow = "none";
+                    <motion.div variants={fadeUp} transition={{ duration: 0.5, ease: smoothEase }}
+                      className="gradient-border-card card-shimmer tilt-card"
+                      style={{
+                        background: "rgba(18,18,30,0.7)", backdropFilter: "blur(24px)",
+                        borderRadius: 20,
+                        padding: "40px 28px", textAlign: "center", position: "relative", overflow: "hidden",
                       }}
                     >
                       {/* Big step number */}
@@ -944,17 +931,16 @@ export default function LandingPage() {
                       <p style={{ fontSize: 14, color: "#9898B0", lineHeight: 1.7 }}>{step.desc}</p>
                     </motion.div>
                     {i < 2 && (
-                      <div style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
-                        <svg width="24" height="14" viewBox="0 0 24 14" fill="none">
-                          <defs>
-                            <linearGradient id={`arrow-grad-${i}`} x1="0" y1="7" x2="24" y2="7">
-                              <stop offset="0%" stopColor={[{ num: "01", color: "#3B82F6" }, { num: "02", color: "#8B5CF6" }][i]?.color ?? "#3B82F6"} stopOpacity="0.5" />
-                              <stop offset="100%" stopColor={[{ num: "02", color: "#8B5CF6" }, { num: "03", color: "#10B981" }][i]?.color ?? "#8B5CF6"} stopOpacity="0.5" />
-                            </linearGradient>
-                          </defs>
-                          <line x1="0" y1="7" x2="16" y2="7" stroke={`url(#arrow-grad-${i})`} strokeWidth="1.5" strokeDasharray="3 3" />
-                          <path d="M16 3 L22 7 L16 11" stroke={`url(#arrow-grad-${i})`} strokeWidth="1.5" fill="none" />
-                        </svg>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", position: "relative" }}>
+                        <div style={{ width: 32, height: 2, position: "relative", overflow: "hidden", borderRadius: 1 }}>
+                          <div className="step-connector" style={{ position: "absolute", inset: 0, borderRadius: 1 }} />
+                        </div>
+                        <div style={{
+                          width: 8, height: 8, borderRadius: "50%",
+                          background: i === 0 ? "#8B5CF6" : "#10B981",
+                          boxShadow: `0 0 12px ${i === 0 ? "#8B5CF6" : "#10B981"}`,
+                          flexShrink: 0,
+                        }} />
                       </div>
                     )}
                   </React.Fragment>
@@ -966,22 +952,28 @@ export default function LandingPage() {
 
         {/* ── Pricing (glass morphism) ─────────────────────────────── */}
         <section id="pricing" style={{
-          padding: "100px 48px", position: "relative", overflow: "hidden",
+          padding: "120px 48px", position: "relative", overflow: "hidden",
           background: "linear-gradient(180deg, #07070D 0%, #0B0B13 100%)",
         }}>
+          <svg className="section-divider-wave-top" viewBox="0 0 1440 80" fill="none" preserveAspectRatio="none">
+            <path d="M0 80 Q360 30 720 55 Q1080 80 1440 15 L1440 80 L0 80Z" fill="#07070D" />
+            <path d="M0 80 Q360 30 720 55 Q1080 80 1440 15" stroke="rgba(79,138,255,0.08)" strokeWidth="0.5" fill="none" />
+          </svg>
+
           <div style={{ position: "absolute", inset: 0, pointerEvents: "none" }}>
-            <div style={{ position: "absolute", top: "20%", left: "50%", transform: "translateX(-50%)", width: "80%", height: "60%", background: "radial-gradient(ellipse, rgba(79,138,255,0.08) 0%, transparent 70%)" }} />
-            <div className="orb-drift-2" style={{ position: "absolute", top: "5%", left: "5%", width: 350, height: 350, borderRadius: "50%", background: "radial-gradient(circle, rgba(79,138,255,0.1) 0%, transparent 70%)", filter: "blur(60px)" }} />
-            <div className="orb-drift-3" style={{ position: "absolute", bottom: "10%", right: "5%", width: 300, height: 300, borderRadius: "50%", background: "radial-gradient(circle, rgba(139,92,246,0.08) 0%, transparent 70%)", filter: "blur(50px)" }} />
+            <div className="blueprint-grid" style={{ opacity: 0.2 }} />
+            <div style={{ position: "absolute", top: "20%", left: "50%", transform: "translateX(-50%)", width: "80%", height: "60%", background: "radial-gradient(ellipse, rgba(79,138,255,0.1) 0%, transparent 70%)" }} />
+            <div className="orb-drift-2" style={{ position: "absolute", top: "5%", left: "5%", width: 400, height: 400, borderRadius: "50%", background: "radial-gradient(circle, rgba(79,138,255,0.12) 0%, transparent 70%)", filter: "blur(70px)" }} />
+            <div className="orb-drift-3" style={{ position: "absolute", bottom: "10%", right: "5%", width: 350, height: 350, borderRadius: "50%", background: "radial-gradient(circle, rgba(139,92,246,0.1) 0%, transparent 70%)", filter: "blur(60px)" }} />
           </div>
 
           <div style={{ maxWidth: 1200, margin: "0 auto", position: "relative", zIndex: 1 }}>
             <motion.div
               initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-80px" }}
               variants={fadeUp} transition={{ duration: 0.6, ease: smoothEase }}
-              style={{ textAlign: "center", marginBottom: 64 }}
+              style={{ textAlign: "center", marginBottom: 72 }}
             >
-              <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "3px", color: "#4F8AFF", marginBottom: 16, display: "block" }}>
+              <span className="glow-label" style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "3px", color: "#4F8AFF", marginBottom: 16, display: "block" }}>
                 {t('landing.pricingSection')}
               </span>
               <h2 style={{ fontSize: "clamp(2rem, 4vw, 3rem)", fontWeight: 800, color: "#F0F0F5", letterSpacing: "-0.03em", lineHeight: 1.1, marginBottom: 16 }}>
@@ -996,13 +988,15 @@ export default function LandingPage() {
               style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 24 }}
             >
               {/* FREE */}
-              <motion.div variants={fadeUp} transition={{ duration: 0.5, ease: smoothEase }} style={{
+              <motion.div variants={fadeUp} transition={{ duration: 0.5, ease: smoothEase }}
+                className="gradient-border-card card-shimmer tilt-card"
+                style={{
                 background: "rgba(18,18,30,0.6)", backdropFilter: "blur(20px)",
-                border: "1px solid rgba(255,255,255,0.06)", borderRadius: 20, padding: "36px 28px",
+                borderRadius: 20, padding: "36px 28px",
                 transition: "border-color 0.3s, transform 0.3s, box-shadow 0.3s",
               }}
-                onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.borderColor = "rgba(255,255,255,0.12)"; el.style.transform = "translateY(-4px)"; el.style.boxShadow = "0 20px 40px rgba(0,0,0,0.3)"; }}
-                onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.borderColor = "rgba(255,255,255,0.06)"; el.style.transform = "translateY(0)"; el.style.boxShadow = "none"; }}
+                onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.transform = "translateY(-4px)"; el.style.boxShadow = "0 20px 40px rgba(0,0,0,0.3)"; }}
+                onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.transform = "translateY(0)"; el.style.boxShadow = "none"; }}
               >
                 <div style={{ marginBottom: 24 }}>
                   <h3 style={{ fontSize: 22, fontWeight: 800, color: "#F0F0F5", marginBottom: 6 }}>{t('landing.free')}</h3>
@@ -1023,9 +1017,11 @@ export default function LandingPage() {
               </motion.div>
 
               {/* PRO */}
-              <motion.div variants={fadeUp} transition={{ duration: 0.5, ease: smoothEase }} style={{
+              <motion.div variants={fadeUp} transition={{ duration: 0.5, ease: smoothEase }}
+                className="gradient-border-card card-shimmer tilt-card"
+                style={{
                 background: "rgba(18,18,34,0.7)", backdropFilter: "blur(20px)",
-                border: "1.5px solid rgba(79,138,255,0.3)", borderRadius: 20, padding: "36px 28px",
+                borderRadius: 20, padding: "36px 28px",
                 position: "relative", overflow: "hidden",
                 boxShadow: "0 0 60px rgba(79,138,255,0.06), inset 0 1px 0 rgba(255,255,255,0.04)",
                 transition: "transform 0.3s, box-shadow 0.3s",
@@ -1058,13 +1054,15 @@ export default function LandingPage() {
               </motion.div>
 
               {/* ENTERPRISE */}
-              <motion.div variants={fadeUp} transition={{ duration: 0.5, ease: smoothEase }} style={{
+              <motion.div variants={fadeUp} transition={{ duration: 0.5, ease: smoothEase }}
+                className="gradient-border-card card-shimmer tilt-card"
+                style={{
                 background: "rgba(18,18,30,0.6)", backdropFilter: "blur(20px)",
-                border: "1px solid rgba(255,255,255,0.06)", borderRadius: 20, padding: "36px 28px",
+                borderRadius: 20, padding: "36px 28px",
                 transition: "border-color 0.3s, transform 0.3s, box-shadow 0.3s",
               }}
-                onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.borderColor = "rgba(139,92,246,0.2)"; el.style.transform = "translateY(-4px)"; el.style.boxShadow = "0 20px 40px rgba(0,0,0,0.3), 0 0 30px rgba(139,92,246,0.06)"; }}
-                onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.borderColor = "rgba(255,255,255,0.06)"; el.style.transform = "translateY(0)"; el.style.boxShadow = "none"; }}
+                onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.transform = "translateY(-4px)"; el.style.boxShadow = "0 20px 40px rgba(0,0,0,0.3), 0 0 30px rgba(139,92,246,0.06)"; }}
+                onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.transform = "translateY(0)"; el.style.boxShadow = "none"; }}
               >
                 <div style={{ marginBottom: 24 }}>
                   <h3 style={{ fontSize: 22, fontWeight: 800, color: "#F0F0F5", marginBottom: 6 }}>{t('landing.enterprise')}</h3>
@@ -1088,17 +1086,24 @@ export default function LandingPage() {
 
         {/* ── Final CTA (cinematic) ────────────────────────────────── */}
         <section style={{
-          padding: "120px 48px", position: "relative", overflow: "hidden",
+          padding: "140px 48px", position: "relative", overflow: "hidden",
           textAlign: "center",
+          background: "linear-gradient(180deg, #0B0B13 0%, #07070D 50%, #0A0A16 100%)",
         }}>
+          <svg className="section-divider-wave-top" viewBox="0 0 1440 80" fill="none" preserveAspectRatio="none">
+            <path d="M0 80 Q360 20 720 50 Q1080 80 1440 10 L1440 80 L0 80Z" fill="#0B0B13" />
+            <path d="M0 80 Q360 20 720 50 Q1080 80 1440 10" stroke="rgba(139,92,246,0.1)" strokeWidth="0.5" fill="none" />
+          </svg>
+
           {/* Background glow */}
           <div style={{ position: "absolute", inset: 0, pointerEvents: "none" }}>
-            <div className="blueprint-grid" style={{ opacity: 0.5 }} />
+            <div className="blueprint-grid" style={{ opacity: 0.35 }} />
             <div className="scan-beam" />
-            <div style={{ position: "absolute", bottom: "-20%", left: "50%", transform: "translateX(-50%)", width: "100%", height: "80%", background: "radial-gradient(ellipse 70% 60%, rgba(79,138,255,0.15) 0%, transparent 60%)" }} />
-            <div style={{ position: "absolute", bottom: "-10%", left: "30%", width: "40%", height: "60%", background: "radial-gradient(ellipse, rgba(139,92,246,0.1) 0%, transparent 70%)" }} />
-            <div className="orb-drift-1" style={{ position: "absolute", top: "5%", left: "15%", width: 400, height: 400, borderRadius: "50%", background: "radial-gradient(circle, rgba(79,138,255,0.12) 0%, transparent 70%)", filter: "blur(70px)" }} />
-            <div className="orb-drift-2" style={{ position: "absolute", bottom: "5%", right: "10%", width: 350, height: 350, borderRadius: "50%", background: "radial-gradient(circle, rgba(139,92,246,0.1) 0%, transparent 70%)", filter: "blur(60px)" }} />
+            <div style={{ position: "absolute", bottom: "-20%", left: "50%", transform: "translateX(-50%)", width: "100%", height: "80%", background: "radial-gradient(ellipse 70% 60%, rgba(79,138,255,0.18) 0%, transparent 60%)" }} />
+            <div style={{ position: "absolute", bottom: "-10%", left: "30%", width: "40%", height: "60%", background: "radial-gradient(ellipse, rgba(139,92,246,0.12) 0%, transparent 70%)" }} />
+            <div className="orb-drift-1" style={{ position: "absolute", top: "5%", left: "15%", width: 500, height: 500, borderRadius: "50%", background: "radial-gradient(circle, rgba(79,138,255,0.15) 0%, transparent 70%)", filter: "blur(80px)" }} />
+            <div className="orb-drift-2" style={{ position: "absolute", bottom: "5%", right: "10%", width: 450, height: 450, borderRadius: "50%", background: "radial-gradient(circle, rgba(139,92,246,0.12) 0%, transparent 70%)", filter: "blur(70px)" }} />
+            <div className="orb-drift-3" style={{ position: "absolute", top: "40%", left: "60%", width: 350, height: 350, borderRadius: "50%", background: "radial-gradient(circle, rgba(99,102,241,0.1) 0%, transparent 70%)", filter: "blur(60px)" }} />
           </div>
 
           <motion.div
@@ -1106,6 +1111,9 @@ export default function LandingPage() {
             variants={fadeUp} transition={{ duration: 0.6, ease: smoothEase }}
             style={{ maxWidth: 700, margin: "0 auto", position: "relative", zIndex: 1 }}
           >
+            <span className="glow-label" style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "3px", color: "#8B5CF6", marginBottom: 24, display: "block" }}>
+              {t('landing.getStarted')}
+            </span>
             <h2 style={{
               fontSize: "clamp(2.2rem, 5vw, 3.5rem)", fontWeight: 900,
               letterSpacing: "-0.03em", lineHeight: 1.1, marginBottom: 20,
@@ -1115,33 +1123,35 @@ export default function LandingPage() {
                 {t('landing.yourAecWorkflow')}
               </span>
             </h2>
-            <p style={{ fontSize: 17, color: "#7C7C96", marginBottom: 40, lineHeight: 1.7 }}>
+            <p style={{ fontSize: 17, color: "#7C7C96", marginBottom: 48, lineHeight: 1.7 }}>
               {t('landing.ctaSubtitle')}
             </p>
-            <Link href="/dashboard" style={{
-              display: "inline-flex", alignItems: "center", gap: 10,
-              padding: "16px 40px", borderRadius: 14,
-              background: "linear-gradient(135deg, #4F8AFF 0%, #6366F1 100%)",
-              color: "white", fontSize: 17, fontWeight: 700,
-              textDecoration: "none",
-              boxShadow: "0 0 0 1px rgba(79,138,255,0.3), 0 8px 32px rgba(79,138,255,0.3), 0 0 80px rgba(79,138,255,0.1)",
-              marginBottom: 20, transition: "all 200ms ease",
-            }}
-              onMouseEnter={e => {
-                const el = e.currentTarget as HTMLElement;
-                el.style.transform = "translateY(-2px) scale(1.02)";
-                el.style.boxShadow = "0 0 0 1px rgba(79,138,255,0.5), 0 12px 40px rgba(79,138,255,0.4), 0 0 100px rgba(79,138,255,0.15)";
+            <div className="gradient-border-card" style={{ display: "inline-block", borderRadius: 16, padding: 2 }}>
+              <Link href="/dashboard" style={{
+                display: "inline-flex", alignItems: "center", gap: 10,
+                padding: "18px 48px", borderRadius: 14,
+                background: "linear-gradient(135deg, #4F8AFF 0%, #6366F1 100%)",
+                color: "white", fontSize: 17, fontWeight: 700,
+                textDecoration: "none",
+                boxShadow: "0 0 0 1px rgba(79,138,255,0.3), 0 8px 32px rgba(79,138,255,0.3), 0 0 80px rgba(79,138,255,0.1)",
+                transition: "all 200ms ease",
               }}
-              onMouseLeave={e => {
-                const el = e.currentTarget as HTMLElement;
-                el.style.transform = "translateY(0) scale(1)";
-                el.style.boxShadow = "0 0 0 1px rgba(79,138,255,0.3), 0 8px 32px rgba(79,138,255,0.3), 0 0 80px rgba(79,138,255,0.1)";
-              }}
-            >
-              {t('landing.createFirstWorkflow')}
-              <ArrowRight size={18} />
-            </Link>
-            <div>
+                onMouseEnter={e => {
+                  const el = e.currentTarget as HTMLElement;
+                  el.style.transform = "translateY(-2px) scale(1.02)";
+                  el.style.boxShadow = "0 0 0 1px rgba(79,138,255,0.5), 0 12px 40px rgba(79,138,255,0.4), 0 0 100px rgba(79,138,255,0.15)";
+                }}
+                onMouseLeave={e => {
+                  const el = e.currentTarget as HTMLElement;
+                  el.style.transform = "translateY(0) scale(1)";
+                  el.style.boxShadow = "0 0 0 1px rgba(79,138,255,0.3), 0 8px 32px rgba(79,138,255,0.3), 0 0 80px rgba(79,138,255,0.1)";
+                }}
+              >
+                {t('landing.createFirstWorkflow')}
+                <ArrowRight size={18} />
+              </Link>
+            </div>
+            <div style={{ marginTop: 20 }}>
               <Link href="/dashboard/community" style={{
                 fontSize: 14, color: "#4F8AFF", textDecoration: "none",
                 display: "inline-flex", alignItems: "center", gap: 6,
