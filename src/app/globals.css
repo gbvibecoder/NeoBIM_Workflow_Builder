@@ -326,25 +326,59 @@
     animation: float 4s ease-in-out infinite;
   }
 
-  /* ── Animated gradient orbs ─────────────────────────────────── */
+  /* ── Blueprint grid — architectural background ───────────────── */
+  .blueprint-grid {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background-image:
+      /* Major grid lines */
+      linear-gradient(rgba(79, 138, 255, 0.08) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(79, 138, 255, 0.08) 1px, transparent 1px),
+      /* Minor grid lines */
+      linear-gradient(rgba(79, 138, 255, 0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(79, 138, 255, 0.03) 1px, transparent 1px);
+    background-size: 120px 120px, 120px 120px, 24px 24px, 24px 24px;
+    mask-image: radial-gradient(ellipse 80% 70% at 50% 45%, black 10%, transparent 70%);
+    -webkit-mask-image: radial-gradient(ellipse 80% 70% at 50% 45%, black 10%, transparent 70%);
+  }
+
+  /* ── Line draw animation for SVG paths ─────────────────────── */
+  @keyframes draw-line {
+    from { stroke-dashoffset: 1; }
+    to { stroke-dashoffset: 0; }
+  }
+
+  @keyframes draw-line-reverse {
+    from { stroke-dashoffset: 0; }
+    to { stroke-dashoffset: -1; }
+  }
+
+  /* ── Pulse glow on grid intersections ──────────────────────── */
+  @keyframes intersection-pulse {
+    0%, 100% { opacity: 0; transform: scale(0.5); }
+    50% { opacity: 1; transform: scale(1); }
+  }
+
+  /* ── Floating gradient orbs (larger, more visible) ─────────── */
   @keyframes orb-drift-1 {
     0%, 100% { transform: translate(0, 0) scale(1); }
-    25% { transform: translate(60px, -40px) scale(1.1); }
-    50% { transform: translate(-30px, 50px) scale(0.95); }
-    75% { transform: translate(-50px, -20px) scale(1.05); }
+    25% { transform: translate(80px, -50px) scale(1.15); }
+    50% { transform: translate(-40px, 60px) scale(0.9); }
+    75% { transform: translate(-70px, -30px) scale(1.1); }
   }
 
   @keyframes orb-drift-2 {
     0%, 100% { transform: translate(0, 0) scale(1); }
-    25% { transform: translate(-50px, 30px) scale(1.08); }
-    50% { transform: translate(40px, -60px) scale(0.92); }
-    75% { transform: translate(20px, 40px) scale(1.04); }
+    25% { transform: translate(-60px, 40px) scale(1.12); }
+    50% { transform: translate(50px, -70px) scale(0.88); }
+    75% { transform: translate(30px, 50px) scale(1.08); }
   }
 
   @keyframes orb-drift-3 {
     0%, 100% { transform: translate(0, 0) scale(1); }
-    33% { transform: translate(40px, 50px) scale(1.06); }
-    66% { transform: translate(-60px, -30px) scale(0.96); }
+    33% { transform: translate(50px, 60px) scale(1.1); }
+    66% { transform: translate(-70px, -40px) scale(0.92); }
   }
 
   .orb-drift-1 { animation: orb-drift-1 20s ease-in-out infinite; }
@@ -357,78 +391,38 @@
     inset: 0;
     pointer-events: none;
     z-index: 9999;
-    opacity: 0.025;
+    opacity: 0.035;
     mix-blend-mode: overlay;
     background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
     background-repeat: repeat;
     background-size: 256px 256px;
   }
 
-  /* ── Aurora / northern lights effect ────────────────────────── */
-  @keyframes aurora-shift {
-    0% { background-position: 0% 50%; }
-    50% { background-position: 100% 50%; }
-    100% { background-position: 0% 50%; }
+  /* ── Scanning beam (construction laser) ────────────────────── */
+  @keyframes scan-beam {
+    0% { top: -2px; opacity: 0; }
+    5% { opacity: 1; }
+    95% { opacity: 1; }
+    100% { top: 100%; opacity: 0; }
   }
 
-  .aurora-bg {
+  .scan-beam {
     position: absolute;
-    inset: 0;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent 0%, rgba(79, 138, 255, 0.4) 20%, rgba(139, 92, 246, 0.6) 50%, rgba(79, 138, 255, 0.4) 80%, transparent 100%);
+    box-shadow: 0 0 20px 4px rgba(79, 138, 255, 0.15), 0 0 60px 8px rgba(139, 92, 246, 0.08);
     pointer-events: none;
-    opacity: 0.4;
-    background: linear-gradient(
-      125deg,
-      rgba(79, 138, 255, 0) 0%,
-      rgba(79, 138, 255, 0.03) 15%,
-      rgba(139, 92, 246, 0.04) 30%,
-      rgba(79, 138, 255, 0) 45%,
-      rgba(16, 185, 129, 0.03) 60%,
-      rgba(139, 92, 246, 0.03) 75%,
-      rgba(79, 138, 255, 0) 100%
-    );
-    background-size: 300% 300%;
-    animation: aurora-shift 15s ease-in-out infinite;
+    animation: scan-beam 8s ease-in-out infinite;
   }
 
-  /* ── Animated mesh grid lines ───────────────────────────────── */
-  @keyframes grid-fade {
-    0%, 100% { opacity: 0.25; }
-    50% { opacity: 0.5; }
-  }
-
-  .animated-grid {
-    position: absolute;
-    inset: 0;
-    pointer-events: none;
-    background-image:
-      linear-gradient(rgba(79, 138, 255, 0.03) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(79, 138, 255, 0.03) 1px, transparent 1px);
-    background-size: 64px 64px;
-    mask-image: radial-gradient(ellipse 70% 50% at 50% 40%, black 20%, transparent 70%);
-    -webkit-mask-image: radial-gradient(ellipse 70% 50% at 50% 40%, black 20%, transparent 70%);
-    animation: grid-fade 8s ease-in-out infinite;
-  }
-
-  /* ── Floating particle dots ─────────────────────────────────── */
-  @keyframes particle-float-1 {
-    0%, 100% { transform: translateY(0) translateX(0); opacity: 0; }
-    10% { opacity: 0.6; }
-    90% { opacity: 0.6; }
-    50% { transform: translateY(-120px) translateX(30px); }
-  }
-
-  @keyframes particle-float-2 {
-    0%, 100% { transform: translateY(0) translateX(0); opacity: 0; }
-    10% { opacity: 0.4; }
-    90% { opacity: 0.4; }
-    50% { transform: translateY(-90px) translateX(-20px); }
-  }
-
-  @keyframes particle-float-3 {
-    0%, 100% { transform: translateY(0) translateX(0); opacity: 0; }
-    10% { opacity: 0.5; }
-    90% { opacity: 0.5; }
-    50% { transform: translateY(-150px) translateX(15px); }
+  /* ── Data flow dots on edges ────────────────────────────────── */
+  @keyframes flow-dot {
+    0% { offset-distance: 0%; opacity: 0; }
+    5% { opacity: 1; }
+    95% { opacity: 1; }
+    100% { offset-distance: 100%; opacity: 0; }
   }
 
   /* ── Fade in up (CSS-only entrance) ──────────────────────────── */
