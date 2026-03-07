@@ -61,8 +61,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Log successful request with remaining quota
-    if (process.env.NODE_ENV === "development") console.log("[execute-node] User " + userId + " (" + userRole + ") - Remaining: " + rateLimitResult.remaining + "/" + rateLimitResult.limit);
   } catch (error) {
     console.error("[execute-node] Rate limit check failed:", error);
     // If rate limiting fails, allow the request to proceed (fail open for better UX)

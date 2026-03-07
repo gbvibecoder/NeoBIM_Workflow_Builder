@@ -99,8 +99,9 @@ src/
   components/
     canvas/          # React Flow workflow canvas + node renderers
     dashboard/       # Dashboard UI components
-    billing/         # Upgrade modal, billing UI
-    landing/         # Landing page sections
+    ai/              # AI chat prompt input
+    community/       # Community workflow cards
+    ui/              # Shared UI components (command palette)
   hooks/             # Custom React hooks (useExecution, etc.)
   lib/               # Auth, DB, Stripe, analytics, rate limiting
   stores/            # Zustand state management

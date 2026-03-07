@@ -119,13 +119,6 @@ export const metadata: Metadata = {
     telephone: false,
   },
   
-  // Verification (add your verification codes here)
-  // verification: {
-  //   google: "your-google-verification-code",
-  //   yandex: "your-yandex-verification-code",
-  //   bing: "your-bing-verification-code",
-  // },
-  
   // Icons
   icons: {
     icon: "/favicon.ico",

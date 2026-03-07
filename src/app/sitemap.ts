@@ -66,25 +66,5 @@ export default function sitemap(): MetadataRoute.Sitemap {
       changeFrequency: 'monthly',
       priority: 0.3,
     },
-    // Add more public pages here as they're created
-    // Example:
-    // {
-    //   url: `${siteUrl}/blog`,
-    //   lastModified: currentDate,
-    //   changeFrequency: 'weekly',
-    //   priority: 0.7,
-    // },
-    // {
-    //   url: `${siteUrl}/pricing`,
-    //   lastModified: currentDate,
-    //   changeFrequency: 'monthly',
-    //   priority: 0.9,
-    // },
-    // {
-    //   url: `${siteUrl}/about`,
-    //   lastModified: currentDate,
-    //   changeFrequency: 'monthly',
-    //   priority: 0.6,
-    // },
   ];
 }

@@ -340,7 +340,6 @@ export function useExecution({ onLog }: UseExecutionOptions = {}) {
         if (artifact.metadata?.warnings && Array.isArray(artifact.metadata.warnings)) {
           for (const warning of artifact.metadata.warnings) {
             toast.warning(warning, { duration: 4000 });
-            // log("warning", warning); // Skipped - not a standard log type
           }
         }
 

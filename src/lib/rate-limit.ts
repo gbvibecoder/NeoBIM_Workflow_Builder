@@ -63,9 +63,6 @@ export async function checkRateLimit(
 ) {
   // Check if user is in admin list (bypasses rate limits)
   if (isAdminUser(userEmail)) {
-    if (process.env.NODE_ENV === "development") {
-      console.log("[rate-limit] Admin bypass for:", userEmail);
-    }
     return {
       success: true,
       limit: 999999,
