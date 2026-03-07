@@ -425,6 +425,285 @@
     100% { offset-distance: 100%; opacity: 0; }
   }
 
+  /* ── Animated gradient border (rotating conic gradient) ────── */
+  @keyframes rotate-gradient {
+    0% { --angle: 0deg; }
+    100% { --angle: 360deg; }
+  }
+
+  @property --angle {
+    syntax: "<angle>";
+    initial-value: 0deg;
+    inherits: false;
+  }
+
+  .gradient-border-card {
+    position: relative;
+    border-radius: 20px;
+    overflow: hidden;
+  }
+
+  .gradient-border-card::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: 20px;
+    padding: 1px;
+    background: conic-gradient(from var(--angle), rgba(79,138,255,0.3), rgba(139,92,246,0.3), rgba(16,185,129,0.2), rgba(79,138,255,0.05), rgba(139,92,246,0.3), rgba(79,138,255,0.3));
+    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    mask-composite: exclude;
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    animation: rotate-gradient 6s linear infinite;
+    pointer-events: none;
+  }
+
+  .gradient-border-card:hover::before {
+    background: conic-gradient(from var(--angle), rgba(79,138,255,0.6), rgba(139,92,246,0.6), rgba(16,185,129,0.4), rgba(79,138,255,0.1), rgba(139,92,246,0.6), rgba(79,138,255,0.6));
+  }
+
+  /* ── Section wave dividers ─────────────────────────────────── */
+  .section-divider-wave {
+    position: absolute;
+    bottom: -1px;
+    left: 0;
+    right: 0;
+    height: 80px;
+    pointer-events: none;
+    z-index: 2;
+  }
+
+  .section-divider-wave-top {
+    position: absolute;
+    top: -1px;
+    left: 0;
+    right: 0;
+    height: 80px;
+    pointer-events: none;
+    z-index: 2;
+    transform: rotate(180deg);
+  }
+
+  /* ── Card shimmer sweep on hover ───────────────────────────── */
+  @keyframes shimmer-sweep {
+    0% { transform: translateX(-100%) skewX(-15deg); }
+    100% { transform: translateX(200%) skewX(-15deg); }
+  }
+
+  .card-shimmer {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .card-shimmer::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 50%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.03), transparent);
+    transform: translateX(-100%) skewX(-15deg);
+    pointer-events: none;
+    transition: none;
+  }
+
+  .card-shimmer:hover::after {
+    animation: shimmer-sweep 0.8s ease-out;
+  }
+
+  /* ── Animated step connector (horizontal line with dot) ───── */
+  @keyframes connector-flow {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+  }
+
+  .step-connector {
+    background: linear-gradient(90deg, transparent, rgba(79,138,255,0.4), rgba(139,92,246,0.4), transparent);
+    background-size: 200% 100%;
+    animation: connector-flow 3s linear infinite;
+  }
+
+  /* ── Glow text for section labels ──────────────────────────── */
+  .glow-label {
+    text-shadow: 0 0 20px currentColor, 0 0 40px currentColor;
+  }
+
+  /* ── Pulsing ring around icon boxes ────────────────────────── */
+  @keyframes ring-pulse {
+    0% { box-shadow: 0 0 0 0 rgba(var(--ring-color), 0.4); }
+    70% { box-shadow: 0 0 0 12px rgba(var(--ring-color), 0); }
+    100% { box-shadow: 0 0 0 0 rgba(var(--ring-color), 0); }
+  }
+
+  /* ── Perspective tilt on hover ─────────────────────────────── */
+  .tilt-card {
+    transition: transform 0.4s ease, box-shadow 0.4s ease;
+    transform-style: preserve-3d;
+    perspective: 1000px;
+  }
+
+  .tilt-card:hover {
+    transform: translateY(-8px) rotateX(2deg) rotateY(-2deg);
+  }
+
+  /* ── Workflow Node Card (looks like actual node) ────────────── */
+  .node-card {
+    position: relative;
+    background: rgba(18,18,30,0.85);
+    backdrop-filter: blur(24px);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 16px;
+    overflow: visible;
+    transition: all 0.4s cubic-bezier(0.25,0.4,0.25,1);
+  }
+
+  .node-card::before {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: -6px;
+    transform: translateY(-50%);
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--node-port-color, #4F8AFF);
+    border: 2px solid rgba(18,18,30,0.9);
+    box-shadow: 0 0 12px var(--node-port-color, #4F8AFF);
+    z-index: 2;
+  }
+
+  .node-card::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    right: -6px;
+    transform: translateY(-50%);
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--node-port-color, #4F8AFF);
+    border: 2px solid rgba(18,18,30,0.9);
+    box-shadow: 0 0 12px var(--node-port-color, #4F8AFF);
+    z-index: 2;
+  }
+
+  .node-card:hover {
+    border-color: var(--node-port-color, rgba(79,138,255,0.3));
+    box-shadow: 0 0 40px rgba(79,138,255,0.08), 0 20px 60px rgba(0,0,0,0.3);
+    transform: translateY(-6px);
+  }
+
+  /* ── Animated wire connections (SVG dashed lines) ──────────── */
+  @keyframes wire-flow {
+    to { stroke-dashoffset: -40; }
+  }
+
+  .wire-animate {
+    stroke-dasharray: 8 12;
+    animation: wire-flow 2s linear infinite;
+  }
+
+  /* ── Data flow particles ───────────────────────────────────── */
+  @keyframes data-particle {
+    0% { offset-distance: 0%; opacity: 0; }
+    8% { opacity: 1; }
+    92% { opacity: 1; }
+    100% { offset-distance: 100%; opacity: 0; }
+  }
+
+  .data-particle {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #4F8AFF;
+    box-shadow: 0 0 12px #4F8AFF, 0 0 4px #4F8AFF;
+    position: absolute;
+    animation: data-particle 3s ease-in-out infinite;
+  }
+
+  /* ── Isometric grid background ─────────────────────────────── */
+  .isometric-grid {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.4;
+    background-image:
+      linear-gradient(30deg, rgba(79,138,255,0.06) 1px, transparent 1px),
+      linear-gradient(150deg, rgba(79,138,255,0.06) 1px, transparent 1px);
+    background-size: 48px 83px;
+    mask-image: radial-gradient(ellipse 80% 60% at 50% 50%, black 10%, transparent 65%);
+    -webkit-mask-image: radial-gradient(ellipse 80% 60% at 50% 50%, black 10%, transparent 65%);
+  }
+
+  /* ── Construction beam accent ──────────────────────────────── */
+  @keyframes beam-extend {
+    from { width: 0; }
+    to { width: 100%; }
+  }
+
+  .beam-accent {
+    height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(79,138,255,0.5), rgba(139,92,246,0.5), transparent);
+    animation: beam-extend 1.5s ease-out forwards;
+  }
+
+  /* ── Pipeline flow (vertical) ──────────────────────────────── */
+  @keyframes pipeline-flow-v {
+    to { stroke-dashoffset: -60; }
+  }
+
+  .pipeline-flow-v {
+    stroke-dasharray: 12 18;
+    animation: pipeline-flow-v 2.5s linear infinite;
+  }
+
+  /* ── Node type header bar ──────────────────────────────────── */
+  .node-header {
+    padding: 8px 16px;
+    border-radius: 12px 12px 0 0;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  /* ── Dimension annotation ──────────────────────────────────── */
+  .dimension-label {
+    font-family: "SF Mono", "Fira Code", monospace;
+    font-size: 9px;
+    letter-spacing: 1px;
+    fill: rgba(79,138,255,0.4);
+    text-transform: uppercase;
+  }
+
+  /* ── Floating blueprint annotation ─────────────────────────── */
+  @keyframes annotation-fade {
+    0%, 100% { opacity: 0.3; }
+    50% { opacity: 0.7; }
+  }
+
+  .blueprint-annotation {
+    font-family: "SF Mono", "Fira Code", monospace;
+    font-size: 9px;
+    color: rgba(79,138,255,0.35);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    animation: annotation-fade 4s ease-in-out infinite;
+  }
+
+  /* ── Section accent line ───────────────────────────────────── */
+  .accent-line {
+    width: 60px;
+    height: 3px;
+    border-radius: 2px;
+    background: linear-gradient(90deg, #4F8AFF, #8B5CF6);
+    margin: 0 auto 24px;
+  }
+
   /* ── Fade in up (CSS-only entrance) ──────────────────────────── */
   @keyframes fade-in-up {
     from { opacity: 0; transform: translateY(12px); }
