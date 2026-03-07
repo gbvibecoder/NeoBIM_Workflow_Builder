@@ -6,6 +6,8 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Mail, Lock, User, Chrome, Loader2 } from "lucide-react";
 import { motion } from "framer-motion";
+import { useLocale } from "@/hooks/useLocale";
+import { LanguageSwitcher } from "@/components/ui/LanguageSwitcher";
 
 function extractErrorMessage(err: unknown): string {
   if (!err) return "Something went wrong. Please try again.";
@@ -25,6 +27,7 @@ function extractErrorMessage(err: unknown): string {
 
 export default function RegisterPage() {
   const router = useRouter();
+  const { t } = useLocale();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -100,13 +103,17 @@ export default function RegisterPage() {
         boxShadow: "0 24px 64px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255,255,255,0.02) inset",
       }}
     >
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}>
+        <LanguageSwitcher />
+      </div>
+
       {/* Header */}
       <div style={{ marginBottom: 30 }}>
         <h2 style={{ fontSize: 22, fontWeight: 700, color: "#F0F0F5", marginBottom: 6, letterSpacing: "-0.02em" }}>
-          Create your account
+          {t('auth.createYourAccount')}
         </h2>
         <p style={{ fontSize: 13.5, color: "#6C6C8A" }}>
-          Start building amazing AEC workflows
+          {t('auth.startBuilding')}
         </p>
       </div>
 
@@ -128,12 +135,12 @@ export default function RegisterPage() {
         }}
       >
         <Chrome size={14} />
-        Continue with Google
+        {t('auth.continueWithGoogle')}
       </motion.button>
 
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 22 }}>
         <div style={{ flex: 1, height: 1, background: "rgba(255,255,255,0.04)" }} />
-        <span style={{ fontSize: 10.5, color: "#3A3A50", letterSpacing: "0.04em", textTransform: "uppercase" as const, fontWeight: 500 }}>or</span>
+        <span style={{ fontSize: 10.5, color: "#3A3A50", letterSpacing: "0.04em", textTransform: "uppercase" as const, fontWeight: 500 }}>{t('auth.or')}</span>
         <div style={{ flex: 1, height: 1, background: "rgba(255,255,255,0.04)" }} />
       </div>
 
@@ -145,7 +152,7 @@ export default function RegisterPage() {
           style={{ marginBottom: 14 }}
         >
           <label style={{ display: "block", fontSize: 12.5, fontWeight: 500, color: "#7C7C96", marginBottom: 6, letterSpacing: "-0.005em" }}>
-            Name (optional)
+            {t('auth.nameOptional')}
           </label>
           <div style={{ position: "relative" }}>
             <User size={13} style={{ position: "absolute", left: 13, top: "50%", transform: "translateY(-50%)", color: "#3A3A50" }} />
@@ -174,7 +181,7 @@ export default function RegisterPage() {
           style={{ marginBottom: 14 }}
         >
           <label style={{ display: "block", fontSize: 12.5, fontWeight: 500, color: "#7C7C96", marginBottom: 6, letterSpacing: "-0.005em" }}>
-            Email
+            {t('auth.email')}
           </label>
           <div style={{ position: "relative" }}>
             <Mail size={13} style={{ position: "absolute", left: 13, top: "50%", transform: "translateY(-50%)", color: "#3A3A50" }} />
@@ -204,7 +211,7 @@ export default function RegisterPage() {
           style={{ marginBottom: 22 }}
         >
           <label style={{ display: "block", fontSize: 12.5, fontWeight: 500, color: "#7C7C96", marginBottom: 6, letterSpacing: "-0.005em" }}>
-            Password
+            {t('auth.password')}
           </label>
           <div style={{ position: "relative" }}>
             <Lock size={13} style={{ position: "absolute", left: 13, top: "50%", transform: "translateY(-50%)", color: "#3A3A50" }} />
@@ -214,7 +221,7 @@ export default function RegisterPage() {
               onChange={e => setPassword(e.target.value)}
               required
               minLength={8}
-              placeholder="min 8 characters"
+              placeholder={t('auth.minChars')}
               style={inputStyle}
               onFocus={e => {
                 e.currentTarget.style.borderColor = "rgba(79,138,255,0.4)";
@@ -266,18 +273,18 @@ export default function RegisterPage() {
           {loading ? (
             <>
               <Loader2 size={14} className="animate-spin" />
-              Creating account...
+              {t('auth.creatingAccount')}
             </>
           ) : (
-            "Create account"
+            t('auth.createAccount')
           )}
         </motion.button>
       </form>
 
       <p style={{ textAlign: "center", fontSize: 12.5, color: "#5C5C78", marginTop: 24 }}>
-        Already have an account?{" "}
+        {t('auth.hasAccount')}{" "}
         <Link href="/login" style={{ color: "#4F8AFF", textDecoration: "none", fontWeight: 600, transition: "color 0.15s" }}>
-          Sign in
+          {t('auth.signIn')}
         </Link>
       </p>
     </motion.div>

@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import type { CreationMode } from "@/types/workflow";
 import { useWorkflowStore } from "@/stores/workflow-store";
+import { useLocale } from "@/hooks/useLocale";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -36,10 +37,10 @@ interface CanvasToolbarProps {
 
 // ─── Mode config ──────────────────────────────────────────────────────────────
 
-const MODE_CONFIG: Record<CreationMode, { label: string; icon: React.ReactNode; description: string }> = {
-  manual: { label: "Manual",    icon: <MousePointer2 size={12} />, description: "Drag-and-drop nodes"      },
-  prompt: { label: "AI Prompt", icon: <Sparkles size={12} />,      description: "Describe your workflow"  },
-  hybrid: { label: "Hybrid",    icon: <Layers size={12} />,        description: "AI + manual editing"     },
+const MODE_ICONS: Record<CreationMode, React.ReactNode> = {
+  manual: <MousePointer2 size={12} />,
+  prompt: <Sparkles size={12} />,
+  hybrid: <Layers size={12} />,
 };
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -123,6 +124,14 @@ export function CanvasToolbar({
   onToggleLibrary,
   onNameChange,
 }: CanvasToolbarProps) {
+  const { t } = useLocale();
+
+  const MODE_CONFIG: Record<CreationMode, { label: string; icon: React.ReactNode; description: string }> = {
+    manual: { label: t('canvas.manual'),    icon: MODE_ICONS.manual, description: t('canvas.manualDesc')    },
+    prompt: { label: t('canvas.aiPrompt'),  icon: MODE_ICONS.prompt, description: t('canvas.aiPromptDesc')  },
+    hybrid: { label: t('canvas.hybrid'),    icon: MODE_ICONS.hybrid, description: t('canvas.hybridDesc')    },
+  };
+
   const [showModeMenu, setShowModeMenu] = useState(false);
   const [showRunMenu, setShowRunMenu] = useState(false);
   const [isEditingName, setIsEditingName] = useState(false);
@@ -215,8 +224,8 @@ export function CanvasToolbar({
           {/* Library toggle */}
           <button
             onClick={onToggleLibrary}
-            title="Toggle node library"
-            aria-label="Toggle node library"
+            title={t('canvas.toggleNodeLibrary')}
+            aria-label={t('canvas.toggleNodeLibrary')}
             aria-pressed={isNodeLibraryOpen}
             style={{
               width: 30, height: 30, borderRadius: 7,
@@ -248,7 +257,7 @@ export function CanvasToolbar({
           <div style={{ position: "relative" }} ref={modeMenuRef}>
             <button
               onClick={() => setShowModeMenu(v => !v)}
-              aria-label={`Creation mode: ${currentMode.label}`}
+              aria-label={`${t('canvas.creationMode')}: ${currentMode.label}`}
               aria-expanded={showModeMenu}
               aria-haspopup="menu"
               style={{
@@ -323,8 +332,8 @@ export function CanvasToolbar({
           <Sep />
 
           {/* Undo / Redo */}
-          <TBBtn onClick={onUndo} icon={<Undo2 size={13} />} title="Undo (⌘Z)" />
-          <TBBtn onClick={onRedo} icon={<Redo2 size={13} />} title="Redo (⌘⇧Z)" />
+          <TBBtn onClick={onUndo} icon={<Undo2 size={13} />} title={`${t('canvas.undo')} (⌘Z)`} />
+          <TBBtn onClick={onRedo} icon={<Redo2 size={13} />} title={`${t('canvas.redo')} (⌘⇧Z)`} />
         </div>
 
         {/* ── Center — inline-editable name ───────────────────────────────── */}
@@ -362,7 +371,7 @@ export function CanvasToolbar({
                 setIsEditingName(true);
                 setTimeout(() => nameInputRef.current?.select(), 0);
               }}
-              title="Click to rename"
+              title={t('canvas.clickToRename')}
               style={{
                 display: "flex", alignItems: "center", gap: 5,
                 background: "transparent", border: "none", cursor: "text",
@@ -381,7 +390,7 @@ export function CanvasToolbar({
               <Pencil size={10} style={{ color: "#3A3A4E", flexShrink: 0 }} />
               {isDirty && (
                 <div
-                  title="Unsaved changes"
+                  title={t('canvas.unsavedChanges')}
                   style={{ width: 5, height: 5, borderRadius: "50%", background: "#F59E0B", flexShrink: 0 }}
                 />
               )}
@@ -393,9 +402,9 @@ export function CanvasToolbar({
         <div style={{ display: "flex", alignItems: "center", gap: 2 }}>
 
           {/* Zoom */}
-          <TBBtn onClick={onZoomOut} icon={<ZoomOut size={13} />} title="Zoom out" />
-          <TBBtn onClick={onZoomIn} icon={<ZoomIn size={13} />} title="Zoom in" />
-          <TBBtn onClick={onFitView} icon={<Maximize2 size={13} />} title="Fit to screen" />
+          <TBBtn onClick={onZoomOut} icon={<ZoomOut size={13} />} title={t('canvas.zoomOut')} />
+          <TBBtn onClick={onZoomIn} icon={<ZoomIn size={13} />} title={t('canvas.zoomIn')} />
+          <TBBtn onClick={onFitView} icon={<Maximize2 size={13} />} title={t('canvas.fitToScreen')} />
 
           <Sep />
 
@@ -418,17 +427,17 @@ export function CanvasToolbar({
             }}
           >
             <Sparkles size={11} />
-            AI
+            {t('canvas.ai')}
           </button>
 
           {/* Share */}
-          <TBBtn onClick={onShare} icon={<Share2 size={13} />} title="Share" />
+          <TBBtn onClick={onShare} icon={<Share2 size={13} />} title={t('canvas.share')} />
 
           {/* Save */}
           <button
             onClick={handleSave}
             disabled={(!isDirty && !savedFlash) || isSaving}
-            title="Save (⌘S)"
+            title={`${t('canvas.save')} (⌘S)`}
             style={{
               display: "flex", alignItems: "center", gap: 5,
               height: 36, padding: "0 16px", borderRadius: 8,
@@ -473,7 +482,7 @@ export function CanvasToolbar({
                 </motion.span>
               )}
             </AnimatePresence>
-            {isSaving ? "Saving…" : savedFlash ? "Saved" : "Save"}
+            {isSaving ? `${t('canvas.saving')}…` : savedFlash ? t('canvas.saved') : t('canvas.save')}
           </button>
 
           <Sep />
@@ -482,7 +491,7 @@ export function CanvasToolbar({
           {isExecuting ? (
             <button
               onClick={onStop}
-              title="Stop execution (Esc)"
+              title={`${t('canvas.stopExecution')} (Esc)`}
               style={{
                 display: "flex", alignItems: "center", gap: 7,
                 height: 36, padding: "0 20px", borderRadius: 10,
@@ -495,13 +504,13 @@ export function CanvasToolbar({
               onMouseLeave={e => { e.currentTarget.style.background = "#EF4444"; }}
             >
               <Square size={14} fill="white" />
-              Stop
+              {t('canvas.stop')}
             </button>
           ) : (
             <div style={{ display: "flex", position: "relative" }} ref={runMenuRef}>
               <button
                 onClick={onRun}
-                title="Run workflow (⌘↵)"
+                title={`${t('canvas.runWorkflow')} (⌘↵)`}
                 disabled={!isWorkflowReady}
                 style={{
                   display: "flex", alignItems: "center", gap: 8,
@@ -530,12 +539,12 @@ export function CanvasToolbar({
                 }}
               >
                 <Play size={16} fill="white" />
-                Run Workflow
+                {t('canvas.runWorkflow')}
               </button>
 
               <button
                 onClick={() => setShowRunMenu(v => !v)}
-                aria-label="More run options"
+                aria-label={t('canvas.moreRunOptions')}
                 aria-expanded={showRunMenu}
                 aria-haspopup="menu"
                 disabled={!isWorkflowReady}
@@ -573,9 +582,9 @@ export function CanvasToolbar({
                     }}
                   >
                     {[
-                      { label: "Run All Nodes",       sub: "Execute the full workflow"  },
-                      { label: "Run from Selection",  sub: "Start from selected node"   },
-                      { label: "Step Through",        sub: "Execute one node at a time" },
+                      { label: t('canvas.runAllNodes'),       sub: t('canvas.executeFullWorkflow')  },
+                      { label: t('canvas.runFromSelection'),  sub: t('canvas.startFromSelected')    },
+                      { label: t('canvas.stepThrough'),       sub: t('canvas.executeOneNode')       },
                     ].map(item => (
                       <button
                         key={item.label}
@@ -644,7 +653,7 @@ export function CanvasToolbar({
             }}
           >
             <Square size={16} fill="white" />
-            Stop Execution
+            {t('canvas.stopExecution')}
           </button>
         ) : (
           <button
@@ -674,12 +683,12 @@ export function CanvasToolbar({
             {isExecuting ? (
               <>
                 <Loader2 size={18} className="animate-spin" />
-                Running...
+                {t('canvas.running')}
               </>
             ) : (
               <>
                 <Play size={18} fill="white" />
-                Run Workflow
+                {t('canvas.runWorkflow')}
               </>
             )}
           </button>
@@ -711,7 +720,7 @@ export function CanvasToolbar({
             }}
           >
             <Layers3 size={14} />
-            Nodes
+            {t('canvas.nodes')}
           </button>
 
           <button
@@ -735,7 +744,7 @@ export function CanvasToolbar({
             }}
           >
             {isSaving ? <Loader2 size={14} className="animate-spin" /> : savedFlash ? <CheckCircle2 size={14} /> : <Save size={14} />}
-            {isSaving ? "Saving" : savedFlash ? "Saved" : "Save"}
+            {isSaving ? t('canvas.saving') : savedFlash ? t('canvas.saved') : t('canvas.save')}
           </button>
 
           <button
@@ -755,7 +764,7 @@ export function CanvasToolbar({
             }}
           >
             <Sparkles size={14} />
-            AI
+            {t('canvas.ai')}
           </button>
         </div>
       </motion.div>

@@ -10,6 +10,8 @@ import {
 } from "lucide-react";
 import { MiniWorkflowDiagram } from "@/components/shared/MiniWorkflowDiagram";
 import { PREBUILT_WORKFLOWS } from "@/constants/prebuilt-workflows";
+import { useLocale } from '@/hooks/useLocale';
+import { LanguageSwitcher } from '@/components/ui/LanguageSwitcher';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -39,12 +41,12 @@ const PROMPT_EXAMPLES = [
   "Design a facade optimization workflow with AI...",
 ];
 
-function RotatingPlaceholder() {
+function RotatingPlaceholder({ items = PROMPT_EXAMPLES }: { items?: string[] }) {
   const [index, setIndex] = useState(0);
   useEffect(() => {
-    const interval = setInterval(() => setIndex(i => (i + 1) % PROMPT_EXAMPLES.length), 3500);
+    const interval = setInterval(() => setIndex(i => (i + 1) % items.length), 3500);
     return () => clearInterval(interval);
-  }, []);
+  }, [items.length]);
   return (
     <motion.span
       key={index}
@@ -54,7 +56,7 @@ function RotatingPlaceholder() {
       transition={{ duration: 0.4 }}
       style={{ position: "absolute", left: 48, top: "50%", transform: "translateY(-50%)", pointerEvents: "none", fontSize: 15, color: "#5C5C78", whiteSpace: "nowrap" }}
     >
-      {PROMPT_EXAMPLES[index]}
+      {items[index]}
     </motion.span>
   );
 }
@@ -138,7 +140,7 @@ function SideToolbar() {
 
 // ─── Input Prompt Card ───────────────────────────────────────────────────────
 
-function PromptCard() {
+function PromptCard({ labelText, quoteText }: { labelText?: string; quoteText?: string }) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 20, rotate: -2 }}
@@ -153,10 +155,10 @@ function PromptCard() {
       }}
     >
       <div style={{ fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "2px", color: "#4F8AFF", marginBottom: 10 }}>
-        AI Prompt
+        {labelText ?? "AI Prompt"}
       </div>
       <p style={{ fontSize: 13, color: "#9898B0", lineHeight: 1.5, fontStyle: "italic" }}>
-        &ldquo;Create a workflow that takes a project brief, generates 3D massing, and renders a concept image.&rdquo;
+        {quoteText ?? "\u201CCreate a workflow that takes a project brief, generates 3D massing, and renders a concept image.\u201D"}
       </p>
       <div style={{ marginTop: 12, height: 3, borderRadius: 2, background: "rgba(79,138,255,0.15)", overflow: "hidden" }}>
         <motion.div
@@ -214,7 +216,7 @@ const NEWS_ITEMS = [
   "Real-time 3D massing preview",
 ];
 
-function NewsTicker() {
+function NewsTicker({ items = NEWS_ITEMS, whatsNewLabel }: { items?: string[]; whatsNewLabel?: string }) {
   return (
     <div style={{
       position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 9000,
@@ -230,7 +232,7 @@ function NewsTicker() {
         fontSize: 10, fontWeight: 700, color: "white", letterSpacing: "0.5px",
       }}>
         <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#10B981", animation: "glow-pulse 2s infinite" }} />
-        WHAT&apos;S NEW
+        {whatsNewLabel ?? "WHAT\u0027S NEW"}
       </div>
       <div style={{ overflow: "hidden", flex: 1, position: "relative" }}>
         <motion.div
@@ -238,7 +240,7 @@ function NewsTicker() {
           transition={{ duration: 30, repeat: Infinity, ease: "linear" }}
           style={{ display: "flex", gap: 0, whiteSpace: "nowrap" }}
         >
-          {[...NEWS_ITEMS, ...NEWS_ITEMS].map((item, i) => (
+          {[...items, ...items].map((item, i) => (
             <span key={i} style={{ fontSize: 12, color: "#9898B0", padding: "0 32px" }}>
               {item}
             </span>
@@ -252,10 +254,23 @@ function NewsTicker() {
 // ─── Main Page ───────────────────────────────────────────────────────────────
 
 export default function LandingPage() {
+  const { t, tArray } = useLocale();
   const heroRef = useRef<HTMLDivElement>(null);
   const { scrollYProgress } = useScroll({ target: heroRef, offset: ["start start", "end start"] });
   const heroOpacity = useTransform(scrollYProgress, [0, 0.5], [1, 0]);
   const heroScale = useTransform(scrollYProgress, [0, 0.5], [1, 0.95]);
+
+  const promptExamples = [t('landing.prompt1'), t('landing.prompt2'), t('landing.prompt3'), t('landing.prompt4')];
+
+  const newsItems = [t('landing.news1'), t('landing.news2'), t('landing.news3'), t('landing.news4'), t('landing.news5')];
+
+  const features = [
+    { icon: <LayoutGrid size={22} />, color: "#3B82F6", title: t('landing.visualBuilder'), description: t('landing.visualBuilderDesc'), bullets: [t('landing.visualBullet1'), t('landing.visualBullet2'), t('landing.visualBullet3')] },
+    { icon: <Sparkles size={22} />, color: "#8B5CF6", title: t('landing.aiPowered'), description: t('landing.aiPoweredDesc'), bullets: [t('landing.aiBullet1'), t('landing.aiBullet2'), t('landing.aiBullet3')] },
+    { icon: <Users size={22} />, color: "#10B981", title: t('landing.communityMarketplace'), description: t('landing.communityDesc'), bullets: [t('landing.communityBullet1'), t('landing.communityBullet2'), t('landing.communityBullet3')] },
+  ];
+
+  const useCases = [t('landing.archStudios'), t('landing.engTeams'), t('landing.bimConsultants'), t('landing.designAgencies'), t('landing.constructionTech')];
 
   return (
     <div style={{ minHeight: "100vh", background: "#07070D", color: "#F0F0F5", overflowX: "hidden", paddingBottom: 36 }}>
@@ -283,25 +298,31 @@ export default function LandingPage() {
           </Link>
 
           <div style={{ display: "flex", alignItems: "center", gap: 32, marginRight: 32 }}>
-            {["Workflows", "Community", "Docs", "Pricing"].map(l => (
-              <a key={l} href={`#${l.toLowerCase()}`} style={{
+            {[
+              { label: t('landing.workflows'), href: '#workflows' },
+              { label: t('landing.community'), href: '#community' },
+              { label: t('landing.docs'), href: '#docs' },
+              { label: t('landing.pricing'), href: '#pricing' },
+            ].map(l => (
+              <a key={l.href} href={l.href} style={{
                 fontSize: 14, color: "#9898B0", textDecoration: "none",
                 fontWeight: 500, transition: "color 0.2s",
               }}
                 onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = "#F0F0F5"; }}
                 onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = "#9898B0"; }}
               >
-                {l}
+                {l.label}
               </a>
             ))}
           </div>
 
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <LanguageSwitcher />
             <Link href="/login" style={{
               fontSize: 14, fontWeight: 600, color: "#F0F0F5",
               textDecoration: "none", padding: "8px 0",
             }}>
-              Login
+              {t('landing.login')}
             </Link>
             <Link href="/dashboard" style={{
               padding: "9px 22px", borderRadius: 10, fontSize: 14, fontWeight: 600,
@@ -309,7 +330,7 @@ export default function LandingPage() {
               textDecoration: "none",
               boxShadow: "0 2px 12px rgba(79,138,255,0.3)",
             }}>
-              Sign Up
+              {t('landing.signUp')}
             </Link>
           </div>
         </nav>
@@ -347,7 +368,7 @@ export default function LandingPage() {
           <SideToolbar />
 
           {/* Floating prompt card */}
-          <PromptCard />
+          <PromptCard labelText={t('landing.aiPrompt')} quoteText={t('landing.promptQuote')} />
 
           {/* Floating node cards */}
           <FloatingCard label="PDF Upload" category="input" delay={0.6} style={{ right: 80, top: 140, transform: "rotate(3deg)" }} />
@@ -369,17 +390,17 @@ export default function LandingPage() {
                 textTransform: "uppercase",
               }}>
                 <span style={{ color: "#F0F0F5", display: "block" }}>
-                  WORKFLOW
+                  {t('landing.heroLine1')}
                 </span>
                 <span style={{
                   display: "block",
                   background: "linear-gradient(135deg, #7C6FF7 0%, #A78BFA 40%, #C084FC 100%)",
                   WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text",
                 }}>
-                  AUTOMATION,
+                  {t('landing.heroLine2')}
                 </span>
                 <span style={{ color: "#F0F0F5", display: "block" }}>
-                  WITH PRECISION.
+                  {t('landing.heroLine3')}
                 </span>
               </h1>
             </motion.div>
@@ -393,8 +414,7 @@ export default function LandingPage() {
                 maxWidth: 600, margin: "32px auto 0", letterSpacing: "-0.005em",
               }}
             >
-              Professional no-code workflow builder for architects and AEC teams.
-              Turn project briefs into 3D concepts with AI-powered pipelines.
+              {t('landing.heroSubtitle')}
             </motion.p>
 
             {/* Prompt bar */}
@@ -417,7 +437,7 @@ export default function LandingPage() {
                 paddingLeft: 16,
               }}>
                 <Sparkles size={18} style={{ color: "#5C5C78", flexShrink: 0 }} />
-                <RotatingPlaceholder />
+                <RotatingPlaceholder items={promptExamples} />
               </div>
               <Link href="/dashboard" style={{
                 height: 56, padding: "0 28px",
@@ -437,7 +457,7 @@ export default function LandingPage() {
                 }}
               >
                 <Zap size={16} />
-                Get Started
+                {t('landing.getStarted')}
               </Link>
             </motion.div>
 
@@ -465,7 +485,7 @@ export default function LandingPage() {
                 }}
               >
                 <Calendar size={15} />
-                Book a demo
+                {t('landing.bookDemo')}
               </Link>
             </motion.div>
           </div>
@@ -513,11 +533,11 @@ export default function LandingPage() {
               style={{ textAlign: "center", marginBottom: 64 }}
             >
               <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "3px", color: "#4F8AFF", marginBottom: 16, display: "block" }}>
-                Core Capabilities
+                {t('landing.coreCapabilities')}
               </span>
               <h2 style={{ fontSize: "clamp(2rem, 4vw, 3rem)", fontWeight: 800, letterSpacing: "-0.03em", lineHeight: 1.1 }}>
-                <span style={{ color: "#F0F0F5" }}>From idea to </span>
-                <span style={{ background: "linear-gradient(135deg, #7C6FF7, #C084FC)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>reality</span>
+                <span style={{ color: "#F0F0F5" }}>{t('landing.fromIdeaTo')} </span>
+                <span style={{ background: "linear-gradient(135deg, #7C6FF7, #C084FC)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>{t('landing.reality')}</span>
               </h2>
             </motion.div>
 
@@ -527,9 +547,9 @@ export default function LandingPage() {
               style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 24 }}
             >
               {[
-                { icon: <Box size={28} />, color: "#3B82F6", title: "Text-to-3D", description: "Describe your building concept in plain English. Get parametric 3D massing models in seconds.", badge: "AI-Powered" },
-                { icon: <ImageIcon size={28} />, color: "#8B5CF6", title: "Instant Renders", description: "Generate photorealistic concept images with AI. Perfect for early-stage design presentations.", badge: "Fast" },
-                { icon: <FileCode size={28} />, color: "#10B981", title: "IFC Export (Beta)", description: "Basic IFC export in early development. Preview functionality available.", badge: "BIM-Ready" },
+                { icon: <Box size={28} />, color: "#3B82F6", title: t('landing.textTo3d'), description: t('landing.textTo3dDesc'), badge: t('landing.aiPoweredBadge') },
+                { icon: <ImageIcon size={28} />, color: "#8B5CF6", title: t('landing.instantRenders'), description: t('landing.instantRendersDesc'), badge: t('landing.fastBadge') },
+                { icon: <FileCode size={28} />, color: "#10B981", title: t('landing.ifcExport'), description: t('landing.ifcExportDesc'), badge: t('landing.bimReady') },
               ].map(f => {
                 const rgb = hexToRgb(f.color);
                 return (
@@ -579,10 +599,10 @@ export default function LandingPage() {
           display: "flex", alignItems: "center", justifyContent: "center",
         }}>
           <div style={{ display: "flex", alignItems: "center", gap: 40 }}>
-            <span style={{ fontSize: 11, color: "#3A3A50", whiteSpace: "nowrap", fontWeight: 600, textTransform: "uppercase", letterSpacing: "2px" }}>Built for</span>
+            <span style={{ fontSize: 11, color: "#3A3A50", whiteSpace: "nowrap", fontWeight: 600, textTransform: "uppercase", letterSpacing: "2px" }}>{t('landing.builtFor')}</span>
             <div style={{ width: 1, height: 16, background: "rgba(255,255,255,0.06)" }} />
             <div style={{ display: "flex", gap: 40, flexWrap: "wrap", justifyContent: "center" }}>
-              {USE_CASES.map(c => (
+              {useCases.map(c => (
                 <span key={c} style={{ fontSize: 14, fontWeight: 700, color: "#3A3A50", letterSpacing: "1.5px", textTransform: "uppercase", transition: "color 0.2s", cursor: "default" }}
                   onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = "#9898B0"; }}
                   onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = "#3A3A50"; }}
@@ -605,14 +625,14 @@ export default function LandingPage() {
               style={{ textAlign: "center", marginBottom: 64 }}
             >
               <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "3px", color: "#8B5CF6", marginBottom: 16, display: "block" }}>
-                Platform
+                {t('landing.platform')}
               </span>
               <h2 style={{ fontSize: "clamp(2rem, 4vw, 3rem)", fontWeight: 800, color: "#F0F0F5", letterSpacing: "-0.03em", lineHeight: 1.1, marginBottom: 16 }}>
-                Everything you need to<br />
-                <span style={{ background: "linear-gradient(135deg, #4F8AFF, #A78BFA)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>automate AEC workflows</span>
+                {t('landing.everythingYouNeed')}<br />
+                <span style={{ background: "linear-gradient(135deg, #4F8AFF, #A78BFA)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>{t('landing.automateAec')}</span>
               </h2>
               <p style={{ fontSize: 16, color: "#7C7C96", maxWidth: 520, margin: "0 auto", lineHeight: 1.7 }}>
-                Purpose-built for architects, engineers, and construction professionals.
+                {t('landing.purposeBuilt')}
               </p>
             </motion.div>
 
@@ -621,7 +641,7 @@ export default function LandingPage() {
               variants={stagger}
               style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 24 }}
             >
-              {FEATURES.map((f, idx) => {
+              {features.map((f, idx) => {
                 const rgb = hexToRgb(f.color);
                 return (
                   <motion.div key={f.title} variants={fadeUp} transition={{ duration: 0.5, ease: smoothEase }} style={{
@@ -682,11 +702,11 @@ export default function LandingPage() {
               style={{ textAlign: "center", marginBottom: 64 }}
             >
               <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "3px", color: "#10B981", marginBottom: 16, display: "block" }}>
-                Templates
+                {t('landing.templatesSection')}
               </span>
               <h2 style={{ fontSize: "clamp(2rem, 4vw, 3rem)", fontWeight: 800, color: "#F0F0F5", letterSpacing: "-0.03em", lineHeight: 1.1 }}>
-                From brief to building<br />
-                <span style={{ background: "linear-gradient(135deg, #10B981, #34D399)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>in minutes</span>
+                {t('landing.fromBrief')}<br />
+                <span style={{ background: "linear-gradient(135deg, #10B981, #34D399)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>{t('landing.inMinutes')}</span>
               </h2>
             </motion.div>
 
@@ -748,7 +768,7 @@ export default function LandingPage() {
                         onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "rgba(79,138,255,0.15)"; }}
                         onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "rgba(79,138,255,0.08)"; }}
                       >
-                        Try this workflow <ArrowRight size={13} />
+                        {t('landing.tryWorkflow')} <ArrowRight size={13} />
                       </Link>
                     </div>
                   </motion.div>
@@ -771,11 +791,11 @@ export default function LandingPage() {
               style={{ textAlign: "center", marginBottom: 64 }}
             >
               <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "3px", color: "#F59E0B", marginBottom: 16, display: "block" }}>
-                How It Works
+                {t('landing.howItWorks')}
               </span>
               <h2 style={{ fontSize: "clamp(2rem, 4vw, 3rem)", fontWeight: 800, color: "#F0F0F5", letterSpacing: "-0.03em", lineHeight: 1.1 }}>
-                Three steps to<br />
-                <span style={{ background: "linear-gradient(135deg, #F59E0B, #EF4444)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>launch</span>
+                {t('landing.threeSteps')}<br />
+                <span style={{ background: "linear-gradient(135deg, #F59E0B, #EF4444)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>{t('landing.launch')}</span>
               </h2>
             </motion.div>
 
@@ -785,9 +805,9 @@ export default function LandingPage() {
               style={{ display: "grid", gridTemplateColumns: "1fr 40px 1fr 40px 1fr", gap: 0, alignItems: "center" }}
             >
               {[
-                { num: "01", title: "Drag & Drop", desc: "Browse 31 nodes and drag them onto the infinite canvas", icon: <LayoutGrid size={24} />, color: "#3B82F6" },
-                { num: "02", title: "Connect", desc: "Link nodes together to define your data flow", icon: <Zap size={24} />, color: "#8B5CF6" },
-                { num: "03", title: "Run", desc: "Execute and see results appear in real time", icon: <Play size={24} />, color: "#10B981" },
+                { num: "01", title: t('landing.dragDrop'), desc: t('landing.dragDropDesc'), icon: <LayoutGrid size={24} />, color: "#3B82F6" },
+                { num: "02", title: t('landing.connect'), desc: t('landing.connectDesc'), icon: <Zap size={24} />, color: "#8B5CF6" },
+                { num: "03", title: t('landing.run'), desc: t('landing.runDesc'), icon: <Play size={24} />, color: "#10B981" },
               ].map((step, i) => {
                 const rgb = hexToRgb(step.color);
                 return (
@@ -858,12 +878,12 @@ export default function LandingPage() {
               style={{ textAlign: "center", marginBottom: 64 }}
             >
               <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "3px", color: "#4F8AFF", marginBottom: 16, display: "block" }}>
-                Pricing
+                {t('landing.pricingSection')}
               </span>
               <h2 style={{ fontSize: "clamp(2rem, 4vw, 3rem)", fontWeight: 800, color: "#F0F0F5", letterSpacing: "-0.03em", lineHeight: 1.1, marginBottom: 16 }}>
-                Simple, <span style={{ background: "linear-gradient(135deg, #4F8AFF, #A78BFA)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>transparent</span> pricing
+                {t('landing.simpleTransparent')}<span style={{ background: "linear-gradient(135deg, #4F8AFF, #A78BFA)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>{t('landing.transparent')}</span>{t('landing.pricingTitle')}
               </h2>
-              <p style={{ fontSize: 16, color: "#7C7C96" }}>Choose the plan that fits your workflow</p>
+              <p style={{ fontSize: 16, color: "#7C7C96" }}>{t('landing.choosePlan')}</p>
             </motion.div>
 
             <motion.div
@@ -881,20 +901,20 @@ export default function LandingPage() {
                 onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.borderColor = "rgba(255,255,255,0.06)"; el.style.transform = "translateY(0)"; el.style.boxShadow = "none"; }}
               >
                 <div style={{ marginBottom: 24 }}>
-                  <h3 style={{ fontSize: 22, fontWeight: 800, color: "#F0F0F5", marginBottom: 6 }}>Free</h3>
-                  <p style={{ fontSize: 13, color: "#7878A0" }}>Perfect for trying out workflows</p>
+                  <h3 style={{ fontSize: 22, fontWeight: 800, color: "#F0F0F5", marginBottom: 6 }}>{t('landing.free')}</h3>
+                  <p style={{ fontSize: 13, color: "#7878A0" }}>{t('landing.freeDesc')}</p>
                 </div>
                 <div style={{ marginBottom: 28 }}>
-                  <span style={{ fontSize: 48, fontWeight: 900, color: "#F0F0F5", letterSpacing: "-0.03em" }}>$0</span>
-                  <span style={{ fontSize: 15, color: "#5C5C78", marginLeft: 8 }}>/month</span>
+                  <span style={{ fontSize: 48, fontWeight: 900, color: "#F0F0F5", letterSpacing: "-0.03em" }}>{t('landing.freePrice')}</span>
+                  <span style={{ fontSize: 15, color: "#5C5C78", marginLeft: 8 }}>{t('landing.perMonth')}</span>
                 </div>
                 <Link href="/dashboard" style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "13px 24px", borderRadius: 12, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.03)", color: "#F0F0F5", fontSize: 14, fontWeight: 700, textDecoration: "none", marginBottom: 28, transition: "all 0.2s" }}
                   onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.06)"; }}
                   onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.03)"; }}
-                >Get Started</Link>
+                >{t('landing.getStarted')}</Link>
                 <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: 24 }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: "#5C5C78", marginBottom: 16, textTransform: "uppercase", letterSpacing: "1px" }}>Includes:</div>
-                  {["3 workflows", "10 executions/month", "Community templates", "Basic node library", "Community support"].map(f => (<div key={f} style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}><div style={{ width: 5, height: 5, borderRadius: "50%", background: "#4F8AFF", boxShadow: "0 0 6px #4F8AFF" }} /><span style={{ fontSize: 14, color: "#9898B0" }}>{f}</span></div>))}
+                  <div style={{ fontSize: 12, fontWeight: 700, color: "#5C5C78", marginBottom: 16, textTransform: "uppercase", letterSpacing: "1px" }}>{t('landing.includes')}</div>
+                  {tArray('landing.freeFeatures').map(f => (<div key={f} style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}><div style={{ width: 5, height: 5, borderRadius: "50%", background: "#4F8AFF", boxShadow: "0 0 6px #4F8AFF" }} /><span style={{ fontSize: 14, color: "#9898B0" }}>{f}</span></div>))}
                 </div>
               </motion.div>
 
@@ -911,25 +931,25 @@ export default function LandingPage() {
               >
                 {/* Glow orb */}
                 <div style={{ position: "absolute", top: -80, right: -80, width: 200, height: 200, borderRadius: "50%", background: "radial-gradient(circle, rgba(79,138,255,0.08) 0%, transparent 70%)", pointerEvents: "none" }} />
-                <div style={{ position: "absolute", top: -12, left: "50%", transform: "translateX(-50%)", padding: "5px 16px", borderRadius: 20, background: "linear-gradient(135deg, #4F8AFF, #6366F1)", fontSize: 10, fontWeight: 800, color: "white", letterSpacing: "1px", textTransform: "uppercase", boxShadow: "0 4px 16px rgba(79,138,255,0.4)" }}>Most Popular</div>
+                <div style={{ position: "absolute", top: -12, left: "50%", transform: "translateX(-50%)", padding: "5px 16px", borderRadius: 20, background: "linear-gradient(135deg, #4F8AFF, #6366F1)", fontSize: 10, fontWeight: 800, color: "white", letterSpacing: "1px", textTransform: "uppercase", boxShadow: "0 4px 16px rgba(79,138,255,0.4)" }}>{t('landing.mostPopular')}</div>
                 <div style={{ marginBottom: 24 }}>
-                  <h3 style={{ fontSize: 22, fontWeight: 800, color: "#F0F0F5", marginBottom: 6 }}>Pro</h3>
-                  <p style={{ fontSize: 13, color: "#7878A0" }}>For professionals & small teams</p>
+                  <h3 style={{ fontSize: 22, fontWeight: 800, color: "#F0F0F5", marginBottom: 6 }}>{t('landing.proTitle')}</h3>
+                  <p style={{ fontSize: 13, color: "#7878A0" }}>{t('landing.proDesc')}</p>
                 </div>
                 <div style={{ marginBottom: 28 }}>
                   <span style={{ fontSize: 48, fontWeight: 900, color: "#F0F0F5", letterSpacing: "-0.03em" }}>$29</span>
-                  <span style={{ fontSize: 15, color: "#5C5C78", marginLeft: 8 }}>/month</span>
+                  <span style={{ fontSize: 15, color: "#5C5C78", marginLeft: 8 }}>{t('landing.perMonth')}</span>
                 </div>
                 <div style={{ marginBottom: 24, padding: "10px 14px", borderRadius: 10, background: "rgba(16,185,129,0.08)", border: "1px solid rgba(16,185,129,0.2)" }}>
-                  <span style={{ fontSize: 12, color: "#10B981", fontWeight: 700 }}>Unlimited workflows + 500 executions/month</span>
+                  <span style={{ fontSize: 12, color: "#10B981", fontWeight: 700 }}>{t('landing.proHighlight')}</span>
                 </div>
                 <Link href="/dashboard" style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "13px 24px", borderRadius: 12, background: "linear-gradient(135deg, #4F8AFF 0%, #6366F1 100%)", color: "white", fontSize: 14, fontWeight: 700, textDecoration: "none", marginBottom: 28, boxShadow: "0 0 0 1px rgba(79,138,255,0.3), 0 4px 20px rgba(79,138,255,0.3)", transition: "all 0.2s" }}
                   onMouseEnter={e => { (e.currentTarget as HTMLElement).style.boxShadow = "0 0 0 1px rgba(79,138,255,0.5), 0 8px 30px rgba(79,138,255,0.4)"; }}
                   onMouseLeave={e => { (e.currentTarget as HTMLElement).style.boxShadow = "0 0 0 1px rgba(79,138,255,0.3), 0 4px 20px rgba(79,138,255,0.3)"; }}
-                >Start Free Trial</Link>
+                >{t('landing.startFreeTrial')}</Link>
                 <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: 24 }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: "#5C5C78", marginBottom: 16, textTransform: "uppercase", letterSpacing: "1px" }}>Everything in Free, plus:</div>
-                  {["Unlimited workflows", "500 executions/month", "All 31 premium nodes", "AI prompt generation", "Priority execution", "Email support"].map(f => (<div key={f} style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}><div style={{ width: 5, height: 5, borderRadius: "50%", background: "#4F8AFF", boxShadow: "0 0 6px #4F8AFF" }} /><span style={{ fontSize: 14, color: "#D0D0E0" }}>{f}</span></div>))}
+                  <div style={{ fontSize: 12, fontWeight: 700, color: "#5C5C78", marginBottom: 16, textTransform: "uppercase", letterSpacing: "1px" }}>{t('landing.proIncludes')}</div>
+                  {tArray('landing.proFeatures').map(f => (<div key={f} style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}><div style={{ width: 5, height: 5, borderRadius: "50%", background: "#4F8AFF", boxShadow: "0 0 6px #4F8AFF" }} /><span style={{ fontSize: 14, color: "#D0D0E0" }}>{f}</span></div>))}
                 </div>
               </motion.div>
 
@@ -943,19 +963,19 @@ export default function LandingPage() {
                 onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.borderColor = "rgba(255,255,255,0.06)"; el.style.transform = "translateY(0)"; el.style.boxShadow = "none"; }}
               >
                 <div style={{ marginBottom: 24 }}>
-                  <h3 style={{ fontSize: 22, fontWeight: 800, color: "#F0F0F5", marginBottom: 6 }}>Enterprise</h3>
-                  <p style={{ fontSize: 13, color: "#7878A0" }}>For large teams & organizations</p>
+                  <h3 style={{ fontSize: 22, fontWeight: 800, color: "#F0F0F5", marginBottom: 6 }}>{t('landing.enterprise')}</h3>
+                  <p style={{ fontSize: 13, color: "#7878A0" }}>{t('landing.enterpriseDesc')}</p>
                 </div>
                 <div style={{ marginBottom: 28 }}>
-                  <span style={{ fontSize: 36, fontWeight: 900, color: "#F0F0F5" }}>Custom</span>
+                  <span style={{ fontSize: 36, fontWeight: 900, color: "#F0F0F5" }}>{t('landing.custom')}</span>
                 </div>
                 <a href="mailto:sales@buildflow.com" style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "13px 24px", borderRadius: 12, border: "1px solid rgba(139,92,246,0.2)", background: "rgba(139,92,246,0.05)", color: "#F0F0F5", fontSize: 14, fontWeight: 700, textDecoration: "none", marginBottom: 28, transition: "all 0.2s" }}
                   onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "rgba(139,92,246,0.1)"; }}
                   onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "rgba(139,92,246,0.05)"; }}
-                >Contact Sales</a>
+                >{t('landing.contactSales')}</a>
                 <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: 24 }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: "#5C5C78", marginBottom: 16, textTransform: "uppercase", letterSpacing: "1px" }}>Everything in Pro, plus:</div>
-                  {["Unlimited executions", "SSO & SAML", "Dedicated support", "Custom integrations", "SLA guarantee", "On-premise deployment"].map(f => (<div key={f} style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}><div style={{ width: 5, height: 5, borderRadius: "50%", background: "#8B5CF6", boxShadow: "0 0 6px #8B5CF6" }} /><span style={{ fontSize: 14, color: "#9898B0" }}>{f}</span></div>))}
+                  <div style={{ fontSize: 12, fontWeight: 700, color: "#5C5C78", marginBottom: 16, textTransform: "uppercase", letterSpacing: "1px" }}>{t('landing.enterpriseIncludes')}</div>
+                  {tArray('landing.enterpriseFeatures').map(f => (<div key={f} style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}><div style={{ width: 5, height: 5, borderRadius: "50%", background: "#8B5CF6", boxShadow: "0 0 6px #8B5CF6" }} /><span style={{ fontSize: 14, color: "#9898B0" }}>{f}</span></div>))}
                 </div>
               </motion.div>
             </motion.div>
@@ -982,13 +1002,13 @@ export default function LandingPage() {
               fontSize: "clamp(2.2rem, 5vw, 3.5rem)", fontWeight: 900,
               letterSpacing: "-0.03em", lineHeight: 1.1, marginBottom: 20,
             }}>
-              <span style={{ color: "#F0F0F5" }}>Ready to transform</span><br />
+              <span style={{ color: "#F0F0F5" }}>{t('landing.readyToTransform')}</span><br />
               <span style={{ background: "linear-gradient(135deg, #4F8AFF 0%, #8B5CF6 50%, #C084FC 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>
-                your AEC workflow?
+                {t('landing.yourAecWorkflow')}
               </span>
             </h2>
             <p style={{ fontSize: 17, color: "#7C7C96", marginBottom: 40, lineHeight: 1.7 }}>
-              Free to start. No credit card required. Join thousands of architects already building smarter.
+              {t('landing.ctaSubtitle')}
             </p>
             <Link href="/dashboard" style={{
               display: "inline-flex", alignItems: "center", gap: 10,
@@ -1010,7 +1030,7 @@ export default function LandingPage() {
                 el.style.boxShadow = "0 0 0 1px rgba(79,138,255,0.3), 0 8px 32px rgba(79,138,255,0.3), 0 0 80px rgba(79,138,255,0.1)";
               }}
             >
-              Create Your First Workflow
+              {t('landing.createFirstWorkflow')}
               <ArrowRight size={18} />
             </Link>
             <div>
@@ -1022,7 +1042,7 @@ export default function LandingPage() {
                 onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = "#6B9FFF"; }}
                 onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = "#4F8AFF"; }}
               >
-                Or explore community workflows <ArrowRight size={14} />
+                {t('landing.exploreWorkflows')} <ArrowRight size={14} />
               </Link>
             </div>
           </motion.div>
@@ -1041,11 +1061,11 @@ export default function LandingPage() {
               <Zap size={11} color="white" fill="white" />
             </div>
             <span style={{ fontSize: 13, color: "#5C5C78", fontWeight: 600 }}>
-              © 2026 BuildFlow
+              {t('landing.copyright')}
             </span>
           </div>
           <div style={{ display: "flex", gap: 24 }}>
-            {["Privacy", "Terms", "Contact"].map(l => (
+            {[t('landing.privacy'), t('landing.terms'), t('landing.contact')].map(l => (
               <a key={l} href="#" style={{ fontSize: 12, color: "#5C5C78", textDecoration: "none", transition: "color 0.15s" }}
                 onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = "#9898B0"; }}
                 onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = "#5C5C78"; }}
@@ -1053,13 +1073,13 @@ export default function LandingPage() {
             ))}
           </div>
           <span style={{ fontSize: 11, color: "#3A3A50" }}>
-            Beta Product · Built for the AEC community
+            {t('landing.betaProduct')}
           </span>
         </div>
       </footer>
 
       {/* News Ticker */}
-      <NewsTicker />
+      <NewsTicker items={newsItems} whatsNewLabel={t('landing.whatsNew')} />
 
       {/* Mobile Responsive Styles */}
       <style jsx global>{`

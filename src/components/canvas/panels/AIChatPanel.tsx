@@ -11,6 +11,8 @@ import { generateId } from "@/lib/utils";
 import { toast } from "sonner";
 import { processWorkflowChat } from "@/services/ai-chat-service";
 import type { ChatAction } from "@/services/ai-chat-service";
+import { useLocale } from "@/hooks/useLocale";
+import type { TranslationKey } from "@/lib/i18n";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -51,12 +53,13 @@ function keywordFallback(
   addNode: (n: WorkflowNode) => void,
   addEdge: ReturnType<typeof useWorkflowStore.getState>["addEdge"],
   removeNode: (id: string) => void,
+  t: (key: TranslationKey) => string,
 ): string {
   const lower = message.toLowerCase();
 
   if (/\b(add|include|insert|append|put)\b/.test(lower)) {
     const found = fuzzyFindNode(message);
-    if (!found) return "I couldn't find that node. Try something like: \"Add IFC Exporter at the end\".";
+    if (!found) return t('aiChat.nodeNotFound');
     const lastNode = nodes[nodes.length - 1];
     const x = lastNode ? lastNode.position.x + 260 : 300;
     const y = lastNode ? lastNode.position.y : 200;
@@ -84,7 +87,7 @@ function keywordFallback(
 
   if (/\b(remove|delete|drop|take out)\b/.test(lower)) {
     const found = fuzzyFindNode(message);
-    if (!found) return "I couldn't find that node to remove.";
+    if (!found) return t('aiChat.nodeNotFoundRemove');
     const nodeToRemove = nodes.find(n => n.data.catalogueId === found.id);
     if (!nodeToRemove) return `**${found.name}** is not on the canvas.`;
     removeNode(nodeToRemove.id);
@@ -92,7 +95,7 @@ function keywordFallback(
   }
 
   if (/\b(explain|what does|how|describe)\b/.test(lower)) {
-    if (nodes.length === 0) return "Your canvas is empty. Add some nodes first!";
+    if (nodes.length === 0) return t('aiChat.canvasEmpty');
     const lines = nodes.map(n => `• **${n.data.label}** — ${n.data.inputs.length > 0 ? n.data.inputs.map(i => i.label).join(", ") : "no input"} → ${n.data.outputs.length > 0 ? n.data.outputs.map(o => o.label).join(", ") : "no output"}`);
     return `Your workflow has ${nodes.length} nodes:\n${lines.join("\n")}`;
   }
@@ -214,6 +217,7 @@ interface AIChatPanelProps {
 }
 
 export function AIChatPanel({ messages, onAddMessage, onClear, isOpen, onToggle }: AIChatPanelProps) {
+  const { t } = useLocale();
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -264,16 +268,16 @@ export function AIChatPanel({ messages, onAddMessage, onClear, isOpen, onToggle 
         }
       } catch {
         // Fallback to keyword matching
-        replyText = keywordFallback(text, nodes, addNode, addEdge, removeNode);
+        replyText = keywordFallback(text, nodes, addNode, addEdge, removeNode, t);
         if (!replyText) {
-          replyText = "I had trouble connecting to the AI. Try again, or use simpler commands like \"Add BOQ Exporter\".";
+          replyText = t('aiChat.connectionError');
         }
       }
     } else {
       // Keyword mode
-      replyText = keywordFallback(text, nodes, addNode, addEdge, removeNode);
+      replyText = keywordFallback(text, nodes, addNode, addEdge, removeNode, t);
       if (!replyText) {
-        replyText = `I can **add**, **remove**, or **explain** nodes. Try:\n• "Add IFC Exporter at the end"\n• "Remove the Image Generator"\n• "Explain my workflow"`;
+        replyText = t('aiChat.helpText');
       }
     }
 
@@ -282,7 +286,7 @@ export function AIChatPanel({ messages, onAddMessage, onClear, isOpen, onToggle 
     };
     onAddMessage(aiMsg);
     setIsTyping(false);
-  }, [input, isTyping, nodes, edges, addNode, addEdge, removeNode, onAddMessage, aiMode]);
+  }, [input, isTyping, nodes, edges, addNode, addEdge, removeNode, onAddMessage, aiMode, t]);
 
   const onKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     e.stopPropagation();
@@ -319,7 +323,7 @@ export function AIChatPanel({ messages, onAddMessage, onClear, isOpen, onToggle 
             <span style={{
               fontSize: 9, fontWeight: 600, writingMode: "vertical-rl",
               textOrientation: "mixed", letterSpacing: 1,
-            }}>AI CHAT</span>
+            }}>{t('aiChat.title')}</span>
           </motion.button>
         )}
       </AnimatePresence>
@@ -349,12 +353,12 @@ export function AIChatPanel({ messages, onAddMessage, onClear, isOpen, onToggle 
             }}>
               <Sparkles size={14} style={{ color: "#4F8AFF" }} />
               <span style={{ fontSize: 14, fontWeight: 600, color: "#F0F0F5", flex: 1 }}>
-                AI Assistant
+                {t('aiChat.aiAssistant')}
               </span>
               {/* GPT / Keyword toggle */}
               <button
                 onClick={() => setAiMode(m => m === "gpt" ? "keyword" : "gpt")}
-                title={aiMode === "gpt" ? "Using GPT-4o-mini (click for keyword mode)" : "Using keyword mode (click for GPT)"}
+                title={aiMode === "gpt" ? t('aiChat.usingGpt') : t('aiChat.usingKeyword')}
                 style={{
                   background: aiMode === "gpt" ? "rgba(79,138,255,0.15)" : "rgba(255,255,255,0.04)",
                   border: `1px solid ${aiMode === "gpt" ? "rgba(79,138,255,0.3)" : "rgba(255,255,255,0.06)"}`,
@@ -365,9 +369,9 @@ export function AIChatPanel({ messages, onAddMessage, onClear, isOpen, onToggle 
                 }}
               >
                 <Zap size={10} />
-                {aiMode === "gpt" ? "GPT" : "Basic"}
+                {aiMode === "gpt" ? t('aiChat.gpt') : t('aiChat.basic')}
               </button>
-              <button onClick={onClear} title="Clear chat" style={{
+              <button onClick={onClear} title={t('aiChat.clearChat')} style={{
                 background: "none", border: "none", cursor: "pointer",
                 color: "#3A3A50", padding: 4, borderRadius: 4,
               }}
@@ -396,23 +400,23 @@ export function AIChatPanel({ messages, onAddMessage, onClear, isOpen, onToggle 
                 }}>
                   <MessageSquare size={28} style={{ margin: "0 auto 10px", opacity: 0.3 }} />
                   <div style={{ fontWeight: 600, color: "#5C5C78", marginBottom: 6 }}>
-                    {aiMode === "gpt" ? "GPT-Powered Assistant" : "AI Workflow Assistant"}
+                    {aiMode === "gpt" ? t('aiChat.gptPowered') : t('aiChat.workflowAssistant')}
                   </div>
                   <div style={{ lineHeight: 1.5 }}>
                     {aiMode === "gpt" ? (
                       <>
-                        Ask me anything:<br />
-                        • &ldquo;Add cost estimation to this workflow&rdquo;<br />
-                        • &ldquo;What does this workflow do?&rdquo;<br />
-                        • &ldquo;Replace the image generator with a floor plan&rdquo;<br />
-                        • &ldquo;Suggest improvements&rdquo;
+                        {t('aiChat.askAnything')}<br />
+                        • &ldquo;{t('aiChat.suggestAddCost')}&rdquo;<br />
+                        • &ldquo;{t('aiChat.suggestExplain')}&rdquo;<br />
+                        • &ldquo;{t('aiChat.suggestReplace')}&rdquo;<br />
+                        • &ldquo;{t('aiChat.suggestImprove')}&rdquo;
                       </>
                     ) : (
                       <>
-                        Tell me what to change:<br />
-                        • &ldquo;Add an IFC Exporter&rdquo;<br />
-                        • &ldquo;Remove the Image Generator&rdquo;<br />
-                        • &ldquo;Explain my workflow&rdquo;
+                        {t('aiChat.tellMeWhatToChange')}<br />
+                        • &ldquo;{t('aiChat.suggestAddIfc')}&rdquo;<br />
+                        • &ldquo;{t('aiChat.suggestRemoveImg')}&rdquo;<br />
+                        • &ldquo;{t('aiChat.suggestExplainWf')}&rdquo;
                       </>
                     )}
                   </div>
@@ -471,7 +475,7 @@ export function AIChatPanel({ messages, onAddMessage, onClear, isOpen, onToggle 
                 onKeyDown={onKeyDown}
                 onMouseDown={e => e.stopPropagation()}
                 onClick={e => e.stopPropagation()}
-                placeholder="Ask anything about your workflow..."
+                placeholder={t('aiChat.placeholder')}
                 rows={2}
                 style={{
                   flex: 1, resize: "none", padding: "12px 16px",
@@ -498,7 +502,7 @@ export function AIChatPanel({ messages, onAddMessage, onClear, isOpen, onToggle 
               </button>
             </div>
             <div style={{ padding: "0 14px 8px", fontSize: 9, color: "rgba(255,255,255,0.08)" }}>
-              Enter to send · Shift+Enter for new line
+              {t('aiChat.enterToSend')}
             </div>
           </motion.div>
         )}

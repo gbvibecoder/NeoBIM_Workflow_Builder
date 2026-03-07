@@ -8,6 +8,7 @@ import { Header } from "@/components/dashboard/Header";
 import { WorkflowCard } from "@/components/community/WorkflowCard";
 import { PREBUILT_WORKFLOWS } from "@/constants/prebuilt-workflows";
 import { api } from "@/lib/api";
+import { useLocale } from "@/hooks/useLocale";
 
 // Skeleton loader for stat cards
 function StatCardSkeleton() {
@@ -67,6 +68,7 @@ const statIcons = [
 ];
 
 export default function DashboardPage() {
+  const { t } = useLocale();
   const featuredWorkflows = PREBUILT_WORKFLOWS.slice(0, 3);
   const [workflowCount, setWorkflowCount] = useState<number | null>(null);
   const [executionCount, setExecutionCount] = useState<number | null>(null);
@@ -96,32 +98,32 @@ export default function DashboardPage() {
 
   const stats = [
     {
-      label: "My Workflows",
+      label: t('dashboard.myWorkflows'),
       value: workflowCount === null ? "..." : workflowCount,
       color: "#4F8AFF",
       gradient: "linear-gradient(135deg, #4F8AFF 0%, #6B9FFF 100%)",
       href: "/dashboard/workflows",
-      trend: workflowCount !== null && workflowCount > 0 ? `${workflowCount} total` : null
+      trend: workflowCount !== null && workflowCount > 0 ? `${workflowCount} ${t('dashboard.total')}` : null
     },
     {
-      label: "Executions",
+      label: t('dashboard.executions'),
       value: executionCount === null ? "..." : executionCount,
       color: "#10B981",
       gradient: "linear-gradient(135deg, #10B981 0%, #34D399 100%)",
       href: "/dashboard/history",
-      trend: executionCount !== null && executionCount > 0 ? `${executionCount} total` : null
+      trend: executionCount !== null && executionCount > 0 ? `${executionCount} ${t('dashboard.total')}` : null
     },
     {
-      label: "Hours Saved",
+      label: t('dashboard.hoursSaved'),
       value: hoursSaved === 0 ? "..." : hoursSaved,
       suffix: "h",
       color: "#F59E0B",
       gradient: "linear-gradient(135deg, #F59E0B 0%, #FBBF24 100%)",
       href: "/dashboard/history",
-      trend: hoursSaved > 0 ? `~${hoursSaved}h estimated` : null
+      trend: hoursSaved > 0 ? `~${hoursSaved}h ${t('dashboard.estimated')}` : null
     },
     {
-      label: "Templates",
+      label: t('dashboard.templates'),
       value: PREBUILT_WORKFLOWS.length,
       color: "#8B5CF6",
       gradient: "linear-gradient(135deg, #8B5CF6 0%, #A78BFA 100%)",
@@ -133,8 +135,8 @@ export default function DashboardPage() {
   return (
     <div className="flex flex-col h-full overflow-hidden">
       <Header
-        title="Dashboard"
-        subtitle="Your no-code AEC workflow builder (Beta)"
+        title={t('dashboard.title')}
+        subtitle={`${t('dashboard.subtitle')} (${t('dashboard.beta')})`}
       />
 
       <main className="flex-1 overflow-y-auto p-6 space-y-8">
@@ -223,40 +225,40 @@ export default function DashboardPage() {
         >
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h2 className="text-[13px] font-semibold text-[#E0E0EE] tracking-[-0.01em]">Quick Actions</h2>
-              <p className="text-[11.5px] text-[#4A4A64] mt-0.5">Get started in seconds</p>
+              <h2 className="text-[13px] font-semibold text-[#E0E0EE] tracking-[-0.01em]">{t('dashboard.quickActions')}</h2>
+              <p className="text-[11.5px] text-[#4A4A64] mt-0.5">{t('dashboard.getStarted')}</p>
             </div>
             <div className="flex items-center gap-1.5 text-[11px] text-[#4A4A64]">
               <Sparkles size={10} className="text-[#F59E0B]" />
-              <span>Choose your path</span>
+              <span>{t('dashboard.choosePath')}</span>
             </div>
           </div>
 
           <div className="grid grid-cols-3 gap-3.5">
             {[
               {
-                title: "New Blank Workflow",
-                description: "Drag-and-drop nodes to build from scratch",
+                title: t('dashboard.newBlankWorkflow'),
+                description: t('dashboard.newBlankDesc'),
                 href: "/dashboard/workflows/new",
                 icon: <Plus size={19} strokeWidth={2.2} />,
                 color: "#4F8AFF",
                 badge: null,
               },
               {
-                title: "Use AI Prompt",
-                description: "Describe your workflow in plain English",
+                title: t('dashboard.useAiPrompt'),
+                description: t('dashboard.useAiPromptDesc'),
                 href: "/dashboard/workflows/new?mode=prompt",
                 icon: <Zap size={19} />,
                 color: "#8B5CF6",
-                badge: "AI",
+                badge: t('dashboard.ai'),
               },
               {
-                title: "Browse Templates",
-                description: "Start from a curated AEC workflow",
+                title: t('dashboard.browseTemplates'),
+                description: t('dashboard.browseTemplatesDesc'),
                 href: "/dashboard/templates",
                 icon: <GitFork size={19} />,
                 color: "#10B981",
-                badge: "Popular",
+                badge: t('dashboard.popular'),
               },
             ].map((action, index) => (
               <motion.div
@@ -324,14 +326,14 @@ export default function DashboardPage() {
         >
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h2 className="text-[13px] font-semibold text-[#E0E0EE] tracking-[-0.01em]">Featured Templates</h2>
-              <p className="text-[11.5px] text-[#4A4A64] mt-0.5">Ready-to-use AEC workflows</p>
+              <h2 className="text-[13px] font-semibold text-[#E0E0EE] tracking-[-0.01em]">{t('dashboard.featuredTemplates')}</h2>
+              <p className="text-[11.5px] text-[#4A4A64] mt-0.5">{t('dashboard.readyToUse')}</p>
             </div>
             <Link
               href="/dashboard/templates"
               className="flex items-center gap-1.5 text-[11.5px] text-[#4F8AFF] hover:text-[#6BA0FF] transition-colors group font-medium"
             >
-              View all
+              {t('dashboard.viewAll')}
               <ArrowRight size={10} className="group-hover:translate-x-0.5 transition-transform duration-300" />
             </Link>
           </div>
@@ -391,7 +393,7 @@ export default function DashboardPage() {
                     <Play size={10} className="text-[#4F8AFF] ml-0.5" fill="#4F8AFF" />
                   </div>
                   <span className="text-[10.5px] font-bold text-[#4F8AFF] uppercase tracking-[0.08em]">
-                    Hero Workflow
+                    {t('dashboard.heroWorkflow')}
                   </span>
                   <span
                     className="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-[0.05em]"
@@ -401,7 +403,7 @@ export default function DashboardPage() {
                       border: "1px solid rgba(245,158,11,0.2)",
                     }}
                   >
-                    Most Popular
+                    {t('dashboard.mostPopular')}
                   </span>
                 </div>
                 <h3 className="text-[18px] font-bold text-[#F0F0F5] mb-2 tracking-[-0.02em]">
@@ -436,7 +438,7 @@ export default function DashboardPage() {
                 }}
               >
                 <Play size={11} fill="white" />
-                <span>Try it now</span>
+                <span>{t('dashboard.tryItNow')}</span>
               </div>
             </div>
           </Link>

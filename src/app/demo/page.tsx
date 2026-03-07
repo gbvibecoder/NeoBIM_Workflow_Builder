@@ -9,6 +9,7 @@ import { useWorkflowStore } from "@/stores/workflow-store";
 import { useUIStore } from "@/stores/ui-store";
 import { useExecutionStore } from "@/stores/execution-store";
 import { PREBUILT_WORKFLOWS_MAP } from "@/constants/prebuilt-workflows";
+import { useLocale } from "@/hooks/useLocale";
 
 const DEMO_PROMPT =
   "7-story mixed-use building in Berlin. Ground floor retail, modern apartments above. Nordic minimalist style with timber accents and green rooftop.";
@@ -77,6 +78,7 @@ export default function DemoPage() {
 // ─── Demo Banner ────────────────────────────────────────────────────────────
 
 function DemoBanner({ hasRun }: { hasRun: boolean }) {
+  const { t } = useLocale();
   return (
     <motion.div
       initial={{ y: -60 }}
@@ -141,7 +143,7 @@ function DemoBanner({ hasRun }: { hasRun: boolean }) {
           letterSpacing: "0.5px",
         }}
       >
-        Live Demo
+        {t('demo.liveDemo')}
       </span>
 
       <span
@@ -153,8 +155,8 @@ function DemoBanner({ hasRun }: { hasRun: boolean }) {
         }}
       >
         {hasRun
-          ? "Workflow complete! Create an account to save your work and unlock all features."
-          : "Try the workflow builder — click Run to generate a building concept with AI."}
+          ? t('demo.complete')
+          : t('demo.subtitle')}
       </span>
 
       {/* CTA */}
@@ -185,7 +187,7 @@ function DemoBanner({ hasRun }: { hasRun: boolean }) {
                   "0 2px 10px rgba(79,138,255,0.25), inset 0 1px 0 rgba(255,255,255,0.1)",
               }}
             >
-              Create Free Account
+              {t('demo.createFreeAccount')}
               <ArrowRight size={12} />
             </Link>
           </motion.div>
@@ -211,7 +213,7 @@ function DemoBanner({ hasRun }: { hasRun: boolean }) {
               }}
             >
               <Play size={10} fill="#10B981" />
-              Hit Run in the toolbar
+              {t('demo.hitRun')}
             </span>
           </motion.div>
         )}

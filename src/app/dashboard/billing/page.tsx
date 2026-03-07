@@ -6,6 +6,7 @@ import { Header } from "@/components/dashboard/Header";
 import { useSession } from "next-auth/react";
 import { Check, Sparkles, Zap, Loader2 } from "lucide-react";
 import { api } from "@/lib/api";
+import { useLocale } from "@/hooks/useLocale";
 
 interface UsageStats {
   used: number;
@@ -14,6 +15,7 @@ interface UsageStats {
 }
 
 export default function BillingPage() {
+  const { t } = useLocale();
   const { data: session } = useSession();
   const [usage, setUsage] = useState<UsageStats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -94,58 +96,58 @@ export default function BillingPage() {
 
   const plans = [
     {
-      name: "Free",
+      name: t('billing.free'),
       price: "$0",
-      period: "forever",
-      description: "Perfect for exploring BuildFlow",
+      period: t('billing.forever'),
+      description: t('billing.freeDesc'),
       features: [
-        "3 workflow runs per day",
-        "Access to all node types",
-        "Community templates",
-        "Basic support",
+        t('billing.freeFeature1'),
+        t('billing.freeFeature2'),
+        t('billing.freeFeature3'),
+        t('billing.freeFeature4'),
       ],
-      cta: currentPlan === "Free" ? "Current Plan" : "Downgrade",
+      cta: currentPlan === "Free" ? t('billing.currentPlan') : t('billing.downgrade'),
       ctaDisabled: currentPlan === "Free",
       highlighted: false,
       color: "#7C7C96",
       planType: null,
     },
     {
-      name: "Pro",
+      name: t('billing.pro'),
       price: "$29",
-      period: "per month",
-      description: "Most popular for solo architects",
-      savings: "Unlimited workflows + priority execution",
+      period: t('billing.perMonth'),
+      description: t('billing.proDesc'),
+      savings: t('billing.proHighlight'),
       features: [
-        "Unlimited workflow runs",
-        "Priority execution queue",
-        "Advanced AI models",
-        "Priority support",
-        "API access",
-        "Custom templates",
+        t('billing.proFeature1'),
+        t('billing.proFeature2'),
+        t('billing.proFeature3'),
+        t('billing.proFeature4'),
+        t('billing.proFeature5'),
+        t('billing.proFeature6'),
       ],
-      cta: currentPlan === "Pro" ? "Current Plan" : "Upgrade to Pro",
+      cta: currentPlan === "Pro" ? t('billing.currentPlan') : t('billing.upgradeToPro'),
       ctaDisabled: currentPlan === "Pro",
       highlighted: true,
       color: "#4F8AFF",
       gradient: "linear-gradient(135deg, #4F8AFF 0%, #6366F1 100%)",
-      badge: "MOST POPULAR",
+      badge: t('billing.mostPopular'),
       planType: "PRO" as const,
     },
     {
-      name: "Team",
+      name: t('billing.team'),
       price: "$99",
-      period: "per month",
-      description: "Collaborate with your team",
+      period: t('billing.perMonth'),
+      description: t('billing.teamDesc'),
       features: [
-        "Everything in Pro",
-        "5 team seats included",
-        "Shared workflows & templates",
-        "Team analytics",
-        "SSO & SAML",
-        "Dedicated support",
+        t('billing.teamFeature1'),
+        t('billing.teamFeature2'),
+        t('billing.teamFeature3'),
+        t('billing.teamFeature4'),
+        t('billing.teamFeature5'),
+        t('billing.teamFeature6'),
       ],
-      cta: currentPlan === "Team" ? "Current Plan" : "Upgrade to Team",
+      cta: currentPlan === "Team" ? t('billing.currentPlan') : t('billing.upgradeToTeam'),
       ctaDisabled: currentPlan === "Team",
       highlighted: false,
       color: "#8B5CF6",
@@ -157,8 +159,8 @@ export default function BillingPage() {
   return (
     <div className="flex flex-col h-full overflow-hidden">
       <Header
-        title="Billing & Plans"
-        subtitle="Manage your subscription and usage"
+        title={t('billing.title')}
+        subtitle={t('billing.subtitle')}
       />
 
       <main className="flex-1 overflow-y-auto p-6 space-y-8">
@@ -191,22 +193,22 @@ export default function BillingPage() {
             </motion.div>
             <div className="flex-1">
               <div className="flex items-center gap-3 mb-2">
-                <h3 className="text-xl font-bold text-[#F0F0F5]">🏆 Hackathon Special</h3>
+                <h3 className="text-xl font-bold text-[#F0F0F5]">🏆 {t('billing.hackathonSpecial')}</h3>
                 <motion.span
                   animate={{ scale: [1, 1.1, 1] }}
                   transition={{ duration: 1.5, repeat: Infinity }}
                   className="px-3 py-1 rounded-full bg-gradient-to-r from-[#F59E0B] to-[#EF4444] text-white text-xs font-bold shadow-[0_4px_12px_rgba(245,158,11,0.4)]"
                 >
-                  50% OFF
+                  {t('billing.fiftyOff')}
                 </motion.span>
               </div>
               <p className="text-sm text-[#C0C0D0] mb-1">
-                First 100 users get <strong className="text-[#F0F0F5]">50% off Pro for 6 months</strong>. Limited time offer!
+                {t('billing.hackathonDesc')}
               </p>
               <div className="flex items-center gap-2 text-xs text-[#F59E0B]">
-                <span className="font-semibold">⏰ 47 spots remaining</span>
+                <span className="font-semibold">⏰ 47 {t('billing.spotsRemaining')}</span>
                 <span>•</span>
-                <span>Expires in 6 days</span>
+                <span>{t('billing.expiresIn')}</span>
               </div>
             </div>
             <button 
@@ -217,12 +219,12 @@ export default function BillingPage() {
               {upgradingTo === 'PRO' ? (
                 <>
                   <Loader2 size={16} className="animate-spin" />
-                  Processing...
+                  {t('billing.processing')}
                 </>
               ) : (
                 <>
                   <Zap size={16} fill="currentColor" />
-                  Claim Offer
+                  {t('billing.claimOffer')}
                 </>
               )}
             </button>
@@ -241,9 +243,9 @@ export default function BillingPage() {
           >
             <div className="flex items-start justify-between mb-5">
               <div>
-                <h3 className="text-lg font-bold text-[#F0F0F5] mb-1">Current Plan: Free</h3>
+                <h3 className="text-lg font-bold text-[#F0F0F5] mb-1">{t('billing.currentPlanFree')}</h3>
                 <p className="text-sm text-[#7C7C96]">
-                  {loading ? "Loading usage..." : `${usage?.used || 0} of ${usage?.limit || 3} runs used today`}
+                  {loading ? t('billing.loadingUsage') : `${usage?.used || 0} of ${usage?.limit || 3} ${t('billing.runsUsed')}`}
                 </p>
               </div>
               <div className="text-right">
@@ -251,7 +253,7 @@ export default function BillingPage() {
                   {loading ? "—" : `${usage?.used || 0}/${usage?.limit || 3}`}
                 </div>
                 <div className="text-xs text-[#7C7C96] mt-1">
-                  {loading ? "" : `Resets ${new Date(usage?.resetDate || "").toLocaleDateString()}`}
+                  {loading ? "" : `${t('billing.resets')} ${new Date(usage?.resetDate || "").toLocaleDateString()}`}
                 </div>
               </div>
             </div>
@@ -273,7 +275,7 @@ export default function BillingPage() {
                   <div className="flex items-center gap-2 p-3 rounded-lg bg-[rgba(239,68,68,0.08)] border border-[rgba(239,68,68,0.2)]">
                     <Zap size={16} className="text-[#EF4444]" />
                     <p className="text-sm text-[#EF4444] flex-1">
-                      You&apos;ve reached your daily limit. <strong>Upgrade to Pro for unlimited runs!</strong>
+                      {t('billing.dailyLimit')}
                     </p>
                   </div>
                 )}
@@ -295,14 +297,16 @@ export default function BillingPage() {
                 <Zap size={28} className="text-white" fill="white" />
               </div>
               <div className="flex-1">
-                <h3 className="text-xl font-bold text-[#F0F0F5] mb-1">Current Plan: {currentPlan}</h3>
-                <p className="text-sm text-[#C0C0D0]">Unlimited workflow runs. Build without limits!</p>
+                <h3 className="text-xl font-bold text-[#F0F0F5] mb-1">
+                  {currentPlan === "Pro" ? t('billing.currentPlanPro') : t('billing.currentPlanTeam')}
+                </h3>
+                <p className="text-sm text-[#C0C0D0]">{t('billing.unlimitedRuns')}</p>
               </div>
               <button
                 onClick={handleManageSubscription}
                 className="px-6 py-3 rounded-[10px] bg-[#16162A] text-[#F0F0F5] font-semibold text-sm hover:bg-[#2A2A3E] transition-colors border border-[rgba(255,255,255,0.05)]"
               >
-                Manage Billing
+                {t('billing.manageBilling')}
               </button>
             </div>
           </motion.div>
@@ -311,8 +315,8 @@ export default function BillingPage() {
         {/* Pricing Tiers */}
         <div>
           <div className="text-center mb-6">
-            <h2 className="text-2xl font-bold text-[#F0F0F5] mb-2">Choose Your Plan</h2>
-            <p className="text-sm text-[#7C7C96]">All plans include 14-day money-back guarantee</p>
+            <h2 className="text-2xl font-bold text-[#F0F0F5] mb-2">{t('billing.choosePlan')}</h2>
+            <p className="text-sm text-[#7C7C96]">{t('billing.moneyBack')}</p>
           </div>
 
           <div className="grid grid-cols-3 gap-6">
@@ -381,7 +385,7 @@ export default function BillingPage() {
                   {upgradingTo !== null && upgradingTo === plan.planType ? (
                     <>
                       <Loader2 size={16} className="animate-spin" />
-                      Processing...
+                      {t('billing.processing')}
                     </>
                   ) : (
                     plan.cta
@@ -399,9 +403,9 @@ export default function BillingPage() {
           transition={{ delay: 0.7 }}
         >
           <div className="text-center mb-6">
-            <h3 className="text-lg font-bold text-[#F0F0F5] mb-2">Built for AEC professionals</h3>
+            <h3 className="text-lg font-bold text-[#F0F0F5] mb-2">{t('billing.builtForAec')}</h3>
             <p className="text-sm text-[#7C7C96]">
-              31 specialized nodes, 7 ready-made templates, IFC/PDF/CSV export
+              {t('billing.builtForAecDesc')}
             </p>
           </div>
         </motion.div>

@@ -51,6 +51,7 @@ import type { WorkflowNodeData, NodeCategory } from "@/types/nodes";
 import type { WorkflowNode, WorkflowEdge } from "@/types/nodes";
 import { generateId } from "@/lib/utils";
 import Link from "next/link";
+import { useLocale } from "@/hooks/useLocale";
 
 // Register custom node and edge types (stable references outside component)
 const nodeTypes = { workflowNode: BaseNode };
@@ -111,6 +112,7 @@ interface EmptyStateProps {
 }
 
 function CanvasEmptyState({ onPromptMode }: EmptyStateProps) {
+  const { t } = useLocale();
   return (
     <motion.div
       initial={{ opacity: 0, scale: 0.96 }}
@@ -156,7 +158,7 @@ function CanvasEmptyState({ onPromptMode }: EmptyStateProps) {
           fontSize: 20, fontWeight: 600,
           color: "#F0F0F5", marginBottom: 8, lineHeight: 1.3,
         }}>
-          Build your first workflow
+          {t('canvas.emptyTitle')}
         </h2>
 
         {/* Subtitle */}
@@ -164,7 +166,7 @@ function CanvasEmptyState({ onPromptMode }: EmptyStateProps) {
           fontSize: 14, color: "#5C5C78",
           lineHeight: 1.6, marginBottom: 24, maxWidth: 320,
         }}>
-          Drag nodes from the library, or describe what you want with AI
+          {t('canvas.emptyDesc')}
         </p>
 
         {/* CTAs */}
@@ -190,7 +192,7 @@ function CanvasEmptyState({ onPromptMode }: EmptyStateProps) {
             }}
           >
             <BookOpen size={14} />
-            Browse Templates
+            {t('canvas.browseTemplates')}
           </Link>
           <button
             onClick={onPromptMode}
@@ -207,7 +209,7 @@ function CanvasEmptyState({ onPromptMode }: EmptyStateProps) {
             onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "#4F8AFF"; }}
           >
             <Sparkles size={14} />
-            Try AI Prompt
+            {t('canvas.tryAiPrompt')}
           </button>
         </div>
       </div>
@@ -424,7 +426,8 @@ function WorkflowCanvasInner({ workflowId: _workflowId }: WorkflowCanvasInnerPro
   }, [saveWorkflow, isDemoMode]);
   const handleShare = useCallback(() => { toast.info("Share feature coming soon", { duration: 2000 }); }, []);
 
-  const workflowName = currentWorkflow?.name ?? "Untitled Workflow";
+  const { t: tLocale } = useLocale();
+  const workflowName = currentWorkflow?.name ?? tLocale('canvas.untitledWorkflow');
 
   return (
     <div className="relative flex h-full w-full">

@@ -22,25 +22,26 @@ import {
   BarChart3,
 } from "lucide-react";
 import { PREBUILT_WORKFLOWS } from "@/constants/prebuilt-workflows";
-
-// ─── Nav items ───────────────────────────────────────────────────────────────
-
-const NAV_ITEMS = [
-  { href: "/dashboard",            label: "Dashboard",   icon: LayoutDashboard, exact: true },
-  { href: "/dashboard/workflows",  label: "My Workflows",icon: Workflow },
-  { href: "/dashboard/history",    label: "History",     icon: History },
-  { href: "/dashboard/analytics",  label: "Analytics",   icon: BarChart3 },
-  { href: "/dashboard/templates",  label: "Templates",   icon: BookOpen,  badge: String(PREBUILT_WORKFLOWS.length) },
-  { href: "/dashboard/community",  label: "Community",   icon: Globe },
-  { href: "/dashboard/billing",    label: "Billing",     icon: CreditCard },
-  { href: "/dashboard/settings",   label: "Settings",    icon: Settings },
-];
+import { useLocale } from "@/hooks/useLocale";
+import { LanguageSwitcher } from "@/components/ui/LanguageSwitcher";
 
 // ─── Sidebar ─────────────────────────────────────────────────────────────────
 
 export function Sidebar() {
+  const { t } = useLocale();
   const pathname    = usePathname();
   const { data: session } = useSession();
+
+  const NAV_ITEMS = [
+    { href: "/dashboard",            label: t('nav.dashboard'),    icon: LayoutDashboard, exact: true },
+    { href: "/dashboard/workflows",  label: t('nav.myWorkflows'),  icon: Workflow },
+    { href: "/dashboard/history",    label: t('nav.history'),      icon: History },
+    { href: "/dashboard/analytics",  label: t('nav.analytics'),    icon: BarChart3 },
+    { href: "/dashboard/templates",  label: t('nav.templates'),    icon: BookOpen,  badge: String(PREBUILT_WORKFLOWS.length) },
+    { href: "/dashboard/community",  label: t('nav.community'),    icon: Globe },
+    { href: "/dashboard/billing",    label: t('nav.billing'),      icon: CreditCard },
+    { href: "/dashboard/settings",   label: t('nav.settings'),     icon: Settings },
+  ];
   const [collapsed, setCollapsed] = useState(false);
 
   // Delay label appearance on expand so the sidebar opens first
@@ -107,8 +108,8 @@ export function Sidebar() {
         {showLabels && (
           <button
             onClick={() => { setCollapsed(true); setShowLabels(false); }}
-            title="Collapse sidebar"
-            aria-label="Collapse sidebar"
+            title={t('nav.collapseSidebar')}
+            aria-label={t('nav.collapseSidebar')}
             style={{
               width: 22, height: 22, borderRadius: 6, border: "none",
               background: "transparent", cursor: "pointer", flexShrink: 0,
@@ -151,7 +152,7 @@ export function Sidebar() {
           }}
         >
           <Plus size={14} strokeWidth={2.5} style={{ flexShrink: 0 }} />
-          {showLabels && <span>New Workflow</span>}
+          {showLabels && <span>{t('nav.newWorkflow')}</span>}
         </Link>
       </div>
 
@@ -210,6 +211,9 @@ export function Sidebar() {
                 </div>
               </div>
 
+              {/* Language switcher */}
+              <LanguageSwitcher />
+
               {/* Upgrade + Sign out row */}
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                 <Link
@@ -224,7 +228,7 @@ export function Sidebar() {
                   onMouseLeave={e => { e.currentTarget.style.background = "rgba(79,138,255,0.06)"; e.currentTarget.style.borderColor = "rgba(79,138,255,0.12)"; }}
                 >
                   <TrendingUp size={10} />
-                  Upgrade
+                  {t('nav.upgrade')}
                 </Link>
 
                 <button
@@ -238,7 +242,7 @@ export function Sidebar() {
                   onMouseLeave={e => { e.currentTarget.style.color = "#55556A"; e.currentTarget.style.background = "transparent"; }}
                 >
                   <LogOut size={10} />
-                  Sign out
+                  {t('nav.signOut')}
                 </button>
               </div>
             </div>
@@ -247,7 +251,7 @@ export function Sidebar() {
               href="/login"
               style={{ display: "block", textAlign: "center", fontSize: 12, color: "#4F8AFF", textDecoration: "none", padding: "6px", borderRadius: 8 }}
             >
-              Sign in
+              {t('nav.signIn')}
             </Link>
           )}
         </div>
@@ -258,8 +262,8 @@ export function Sidebar() {
         <div style={{ padding: "10px", borderTop: "1px solid rgba(255,255,255,0.06)", flexShrink: 0 }}>
           <button
             onClick={() => setCollapsed(false)}
-            title="Expand sidebar"
-            aria-label="Expand sidebar"
+            title={t('nav.expandSidebar')}
+            aria-label={t('nav.expandSidebar')}
             style={{
               width: "100%", display: "flex", alignItems: "center", justifyContent: "center",
               padding: "8px 0", borderRadius: 8, border: "none",

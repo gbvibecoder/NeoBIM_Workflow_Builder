@@ -12,6 +12,7 @@ import { NODE_CATALOGUE, NODES_BY_CATEGORY, CATEGORY_CONFIG } from "@/constants/
 import type { NodeCatalogueItem, NodeCategory, WorkflowNode, WorkflowNodeData } from "@/types/nodes";
 import { useWorkflowStore } from "@/stores/workflow-store";
 import { generateId } from "@/lib/utils";
+import { useLocale } from "@/hooks/useLocale";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -36,17 +37,12 @@ const LIVE_NODE_IDS = new Set(["TR-003", "GN-003", "TR-008", "EX-002"]);
 
 // ─── Filter chips ─────────────────────────────────────────────────────────────
 
-const FILTERS: { label: string; value: "all" | NodeCategory }[] = [
-  { label: "All",      value: "all"       },
-  { label: "Input",    value: "input"     },
-  { label: "AI",       value: "transform" },
-  { label: "Geometry", value: "generate"  },
-  { label: "Export",   value: "export"    },
-];
+const FILTER_VALUES: ("all" | NodeCategory)[] = ["all", "input", "transform", "generate", "export"];
 
 // ─── Tooltip ──────────────────────────────────────────────────────────────────
 
 function NodeTooltip({ node, anchorY, panelWidth }: { node: NodeCatalogueItem; anchorY: number; panelWidth: number }) {
+  const { t } = useLocale();
   const cfg = CATEGORY_CONFIG[node.category];
   const rgb = hexToRgb(cfg.color);
 
@@ -105,7 +101,7 @@ function NodeTooltip({ node, anchorY, panelWidth }: { node: NodeCatalogueItem; a
           {node.inputs.length > 0 && (
             <div>
               <div style={{ fontSize: 9, color: "#3A3A50", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 3 }}>
-                In
+                {t('canvas.in')}
               </div>
               {node.inputs.map(p => (
                 <div key={p.id} style={{ fontSize: 10, color: "#5C5C78" }}>{p.label}</div>
@@ -115,7 +111,7 @@ function NodeTooltip({ node, anchorY, panelWidth }: { node: NodeCatalogueItem; a
           {node.outputs.length > 0 && (
             <div>
               <div style={{ fontSize: 9, color: "#3A3A50", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 3 }}>
-                Out
+                {t('canvas.out')}
               </div>
               {node.outputs.map(p => (
                 <div key={p.id} style={{ fontSize: 10, color: "#5C5C78" }}>{p.label}</div>
@@ -156,6 +152,7 @@ interface NodeItemProps {
 function NodeItem({
   node, onDragStart, onAddToCenter, onTooltipShow, onTooltipHide, searchQuery,
 }: NodeItemProps) {
+  const { t } = useLocale();
   const [isHovered, setIsHovered] = useState(false);
   const cfg = CATEGORY_CONFIG[node.category];
   const rgb = hexToRgb(cfg.color);
@@ -251,14 +248,14 @@ function NodeItem({
               padding: "1px 4px", borderRadius: 3,
               background: "rgba(16,185,129,0.1)", border: "1px solid rgba(16,185,129,0.25)",
               flexShrink: 0,
-            }}>LIVE</span>
+            }}>{t('canvas.live')}</span>
           ) : (
             <span style={{
               fontSize: 8, fontWeight: 600, color: "#4a4a68",
               padding: "2px 6px", borderRadius: 4,
               background: "rgba(255,255,255,0.06)",
               flexShrink: 0, letterSpacing: "0.08em",
-            }}>PREVIEW</span>
+            }}>{t('canvas.preview')}</span>
           )}
         </div>
         <div style={{ fontSize: 10, color: "#3a3a50", fontFamily: "monospace", marginTop: 2 }}>
@@ -276,7 +273,7 @@ function NodeItem({
             exit={{ opacity: 0, scale: 0.6 }}
             transition={{ duration: 0.1 }}
             onClick={e => { e.stopPropagation(); onAddToCenter(node); }}
-            title="Add to canvas center"
+            title={t('canvas.addToCenter')}
             style={{
               width: 20, height: 20, borderRadius: 5, padding: 0,
               background: `rgba(${rgb}, 0.15)`,
@@ -393,6 +390,16 @@ const MAX_WIDTH = 420;
 const DEFAULT_WIDTH = 280;
 
 export function NodeLibraryPanel() {
+  const { t } = useLocale();
+
+  const FILTER_LABELS: Record<"all" | NodeCategory, string> = {
+    all: t('canvas.all'),
+    input: t('canvas.input'),
+    transform: t('canvas.ai'),
+    generate: t('canvas.geometry'),
+    export: t('canvas.export'),
+  };
+
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [panelWidth, setPanelWidth] = useState(DEFAULT_WIDTH);
   const [isResizing, setIsResizing] = useState(false);
@@ -571,7 +578,7 @@ export function NodeLibraryPanel() {
           })}
           <button
             onClick={() => setIsCollapsed(false)}
-            title="Expand library"
+            title={t('canvas.expandLibrary')}
             style={{
               marginTop: "auto", marginBottom: 12,
               width: 28, height: 28, borderRadius: 6,
@@ -593,14 +600,14 @@ export function NodeLibraryPanel() {
             borderBottom: "1px solid rgba(255,255,255,0.06)", flexShrink: 0,
           }}>
             <div>
-              <div style={{ fontSize: 13, fontWeight: 600, color: "#F0F0F5" }}>Node Library</div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: "#F0F0F5" }}>{t('canvas.nodeLibrary')}</div>
               <div style={{ fontSize: 10, color: "#3A3A50", marginTop: 2 }}>
-                {NODE_CATALOGUE.length} nodes · drag to canvas
+                {NODE_CATALOGUE.length} nodes · {t('canvas.dragToCanvas')}
               </div>
             </div>
             <button
               onClick={() => setIsCollapsed(true)}
-              title="Collapse panel"
+              title={t('canvas.collapsePanel')}
               style={{
                 width: 26, height: 26, borderRadius: 6, flexShrink: 0,
                 background: "transparent", border: "1px solid rgba(255,255,255,0.06)",
@@ -632,7 +639,7 @@ export function NodeLibraryPanel() {
                 type="text"
                 value={search}
                 onChange={e => setSearch(e.target.value)}
-                placeholder="Search nodes..."
+                placeholder={t('canvas.searchNodes')}
                 style={{
                   width: "100%", height: 36,
                   background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)",
@@ -665,16 +672,16 @@ export function NodeLibraryPanel() {
             display: "flex", gap: 4, padding: "8px 10px",
             borderBottom: "1px solid rgba(255,255,255,0.06)", flexShrink: 0,
           }}>
-            {FILTERS.map(f => {
-              const active = activeFilter === f.value;
-              const c = f.value === "all"
+            {FILTER_VALUES.map(value => {
+              const active = activeFilter === value;
+              const c = value === "all"
                 ? "#4F8AFF"
-                : CATEGORY_CONFIG[f.value as NodeCategory].color;
+                : CATEGORY_CONFIG[value as NodeCategory].color;
               const rgb = hexToRgb(c);
               return (
                 <button
-                  key={f.value}
-                  onClick={() => setActiveFilter(f.value)}
+                  key={value}
+                  onClick={() => setActiveFilter(value)}
                   style={{
                     padding: "4px 12px", borderRadius: 9999, whiteSpace: "nowrap", cursor: "pointer",
                     background: active ? `rgba(${rgb}, 0.15)` : "transparent",
@@ -684,7 +691,7 @@ export function NodeLibraryPanel() {
                     transition: "all 150ms ease",
                   }}
                 >
-                  {f.label}
+                  {FILTER_LABELS[value]}
                 </button>
               );
             })}
@@ -695,8 +702,8 @@ export function NodeLibraryPanel() {
             {isFiltering ? (
               displayNodes.length === 0 ? (
                 <div style={{ padding: "32px 16px", textAlign: "center" }}>
-                  <p style={{ fontSize: 12, color: "#5C5C78" }}>No nodes found</p>
-                  <p style={{ fontSize: 11, color: "#3A3A50", marginTop: 4 }}>Try a different search</p>
+                  <p style={{ fontSize: 12, color: "#5C5C78" }}>{t('canvas.noNodes')}</p>
+                  <p style={{ fontSize: 11, color: "#3A3A50", marginTop: 4 }}>{t('canvas.tryDifferent')}</p>
                 </div>
               ) : (
                 <div style={{ padding: "0 8px 8px" }}>

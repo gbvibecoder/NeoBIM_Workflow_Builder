@@ -7,11 +7,14 @@ import Link from "next/link";
 import { Mail, Lock, Chrome, Loader2, AlertCircle } from "lucide-react";
 import { motion } from "framer-motion";
 import { validateEmail } from "@/lib/form-validation";
+import { useLocale } from "@/hooks/useLocale";
+import { LanguageSwitcher } from "@/components/ui/LanguageSwitcher";
 
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const callbackUrl = searchParams.get("callbackUrl") ?? "/dashboard";
+  const { t } = useLocale();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -51,7 +54,7 @@ function LoginForm() {
     }
 
     if (!password || password.length === 0) {
-      setError("Please enter your password");
+      setError(t('auth.enterPassword'));
       return;
     }
 
@@ -65,13 +68,13 @@ function LoginForm() {
       });
 
       if (res?.error) {
-        setError("Invalid email or password. Please try again.");
+        setError(t('auth.invalidCredentials'));
       } else {
         router.push(callbackUrl);
         router.refresh();
       }
     } catch {
-      setError("Something went wrong. Please try again.");
+      setError(t('auth.genericError'));
     } finally {
       setLoading(false);
     }
@@ -82,7 +85,7 @@ function LoginForm() {
     try {
       await signIn("google", { callbackUrl });
     } catch {
-      setError("Google sign-in failed. Please try again.");
+      setError(t('auth.googleError'));
       setLoading(false);
     }
   }
@@ -100,13 +103,17 @@ function LoginForm() {
         boxShadow: "0 24px 64px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255,255,255,0.02) inset",
       }}
     >
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}>
+        <LanguageSwitcher />
+      </div>
+
       {/* Header */}
       <div style={{ marginBottom: 30 }}>
         <h2 style={{ fontSize: 22, fontWeight: 700, color: "#F0F0F5", marginBottom: 6, letterSpacing: "-0.02em" }}>
-          Welcome back
+          {t('auth.welcomeBack')}
         </h2>
         <p style={{ fontSize: 13.5, color: "#6C6C8A" }}>
-          Sign in to continue to BuildFlow
+          {t('auth.signInToContinue')}
         </p>
       </div>
 
@@ -128,12 +135,12 @@ function LoginForm() {
         }}
       >
         <Chrome size={14} />
-        Continue with Google
+        {t('auth.continueWithGoogle')}
       </motion.button>
 
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 22 }}>
         <div style={{ flex: 1, height: 1, background: "rgba(255,255,255,0.04)" }} />
-        <span style={{ fontSize: 10.5, color: "#3A3A50", letterSpacing: "0.04em", textTransform: "uppercase" as const, fontWeight: 500 }}>or email</span>
+        <span style={{ fontSize: 10.5, color: "#3A3A50", letterSpacing: "0.04em", textTransform: "uppercase" as const, fontWeight: 500 }}>{t('auth.orEmail')}</span>
         <div style={{ flex: 1, height: 1, background: "rgba(255,255,255,0.04)" }} />
       </div>
 
@@ -146,7 +153,7 @@ function LoginForm() {
           style={{ marginBottom: 14 }}
         >
           <label style={{ display: "block", fontSize: 12.5, fontWeight: 500, color: "#7C7C96", marginBottom: 6, letterSpacing: "-0.005em" }}>
-            Email
+            {t('auth.email')}
           </label>
           <div style={{ position: "relative" }}>
             <Mail size={13} style={{ position: "absolute", left: 13, top: "50%", transform: "translateY(-50%)", color: "#3A3A50" }} />
@@ -201,7 +208,7 @@ function LoginForm() {
           style={{ marginBottom: 22 }}
         >
           <label style={{ display: "block", fontSize: 12.5, fontWeight: 500, color: "#7C7C96", marginBottom: 6, letterSpacing: "-0.005em" }}>
-            Password
+            {t('auth.password')}
           </label>
           <div style={{ position: "relative" }}>
             <Lock size={13} style={{ position: "absolute", left: 13, top: "50%", transform: "translateY(-50%)", color: "#3A3A50" }} />
@@ -268,18 +275,18 @@ function LoginForm() {
           {loading ? (
             <>
               <Loader2 size={14} className="animate-spin" />
-              Signing in...
+              {t('auth.signingIn')}
             </>
           ) : (
-            "Sign in"
+            t('auth.signIn')
           )}
         </motion.button>
       </form>
 
       <p style={{ textAlign: "center", fontSize: 12.5, color: "#5C5C78", marginTop: 24 }}>
-        Don&apos;t have an account?{" "}
+        {t('auth.noAccount')}{" "}
         <Link href="/register" style={{ color: "#4F8AFF", textDecoration: "none", fontWeight: 600, transition: "color 0.15s" }}>
-          Create account
+          {t('auth.createAccount')}
         </Link>
       </p>
     </motion.div>
@@ -287,13 +294,14 @@ function LoginForm() {
 }
 
 export default function LoginPage() {
+  const { t } = useLocale();
   return (
     <Suspense fallback={
       <div style={{
         background: "rgba(18,18,30,0.95)", border: "1px solid rgba(255,255,255,0.05)", borderRadius: 16,
         padding: 28, textAlign: "center", fontSize: 13, color: "#5C5C78",
       }}>
-        Loading...
+        {t('auth.loading')}
       </div>
     }>
       <LoginForm />

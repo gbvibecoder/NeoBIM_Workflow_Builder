@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { Header } from "@/components/dashboard/Header";
 import { toast } from "sonner";
+import { useLocale } from "@/hooks/useLocale";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -63,12 +64,13 @@ function ArtifactIcon({ type }: { type: string }) {
 }
 
 function StatusBadge({ status }: { status: string }) {
+  const { t } = useLocale();
   const map: Record<string, { icon: React.ReactNode; color: string; label: string }> = {
-    SUCCESS: { icon: <CheckCircle2 size={12} />, color: "#10B981", label: "Completed" },
-    PARTIAL: { icon: <CheckCircle2 size={12} />, color: "#F59E0B", label: "Partial" },
-    FAILED:  { icon: <XCircle size={12} />,      color: "#EF4444", label: "Failed"    },
-    RUNNING: { icon: <Loader2 size={12} className="animate-spin" />, color: "#4F8AFF", label: "Running" },
-    PENDING: { icon: <Clock size={12} />,         color: "#55556A", label: "Pending"   },
+    SUCCESS: { icon: <CheckCircle2 size={12} />, color: "#10B981", label: t('history.completed') },
+    PARTIAL: { icon: <CheckCircle2 size={12} />, color: "#F59E0B", label: t('history.partial') },
+    FAILED:  { icon: <XCircle size={12} />,      color: "#EF4444", label: t('history.failed')    },
+    RUNNING: { icon: <Loader2 size={12} className="animate-spin" />, color: "#4F8AFF", label: t('history.running') },
+    PENDING: { icon: <Clock size={12} />,         color: "#55556A", label: t('history.pending')   },
   };
   const s = map[status] ?? map.PENDING;
   return (
@@ -127,6 +129,7 @@ interface DetailModalProps {
 }
 
 function DetailModal({ execution, onClose, onRerun }: DetailModalProps) {
+  const { t } = useLocale();
   const [expandedArtifact, setExpandedArtifact] = useState<string | null>(null);
 
   const groupedByNode = execution.artifacts.reduce<Record<string, Artifact[]>>((acc, a) => {
@@ -175,9 +178,9 @@ function DetailModal({ execution, onClose, onRerun }: DetailModalProps) {
             <div style={{ fontSize: 11, color: "#55556A", marginTop: 2, display: "flex", gap: 12 }}>
               <span>{new Date(execution.startedAt).toLocaleString()}</span>
               {duration(execution.startedAt, execution.completedAt) && (
-                <span>Duration: {duration(execution.startedAt, execution.completedAt)}</span>
+                <span>{t('history.duration')}: {duration(execution.startedAt, execution.completedAt)}</span>
               )}
-              <span>{execution.artifacts.length} artifacts</span>
+              <span>{execution.artifacts.length} {t('history.artifacts')}</span>
             </div>
           </div>
           <StatusBadge status={execution.status} />
@@ -187,7 +190,7 @@ function DetailModal({ execution, onClose, onRerun }: DetailModalProps) {
         <div style={{ overflowY: "auto", flex: 1, padding: "16px 20px" }}>
           {Object.keys(groupedByNode).length === 0 ? (
             <div style={{ textAlign: "center", color: "#55556A", fontSize: 13, padding: 32 }}>
-              No artifacts recorded for this execution.
+              {t('history.noArtifacts')}
             </div>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
@@ -249,14 +252,14 @@ function DetailModal({ execution, onClose, onRerun }: DetailModalProps) {
             padding: "7px 14px", borderRadius: 7, border: "1px solid #1E1E2E",
             background: "transparent", color: "#8888A0", fontSize: 12, cursor: "pointer",
           }}>
-            Close
+            {t('history.close')}
           </button>
           <button onClick={onRerun} style={{
             padding: "7px 14px", borderRadius: 7, border: "none",
             background: "#4F8AFF", color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer",
             display: "flex", alignItems: "center", gap: 6,
           }}>
-            <RefreshCw size={11} /> Re-run with same inputs
+            <RefreshCw size={11} /> {t('history.rerunWithInputs')}
           </button>
         </div>
       </motion.div>
@@ -275,6 +278,7 @@ interface ExecutionRowProps {
 }
 
 function ExecutionRow({ execution, onRerun, onViewDetails, compareSelected, onToggleCompare }: ExecutionRowProps) {
+  const { t } = useLocale();
   const router = useRouter();
   const dur = duration(execution.startedAt, execution.completedAt);
 
@@ -341,7 +345,7 @@ function ExecutionRow({ execution, onRerun, onViewDetails, compareSelected, onTo
                 background: "rgba(16,185,129,0.1)", border: "1px solid rgba(16,185,129,0.2)",
                 color: "#10B981",
               }}>
-                {execution.artifacts.length} artifacts
+                {execution.artifacts.length} {t('history.artifacts')}
               </span>
             )}
           </div>
@@ -351,7 +355,7 @@ function ExecutionRow({ execution, onRerun, onViewDetails, compareSelected, onTo
             <span style={{ display: "flex", alignItems: "center", gap: 3 }}>
               <Clock size={9} /> {relativeTime(execution.startedAt)}
             </span>
-            {dur && <span>Duration: {dur}</span>}
+            {dur && <span>{t('history.duration')} {dur}</span>}
           </div>
 
           {/* Input summary */}
@@ -379,7 +383,7 @@ function ExecutionRow({ execution, onRerun, onViewDetails, compareSelected, onTo
             onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = "#2A2A3E"; (e.currentTarget as HTMLElement).style.color = "#8888A0"; }}
             onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = "rgba(255,255,255,0.05)"; (e.currentTarget as HTMLElement).style.color = "#55556A"; }}
           >
-            <ExternalLink size={10} /> Open WF
+            <ExternalLink size={10} /> {t('history.openWf')}
           </button>
           <button
             onClick={() => onViewDetails(execution)}
@@ -391,7 +395,7 @@ function ExecutionRow({ execution, onRerun, onViewDetails, compareSelected, onTo
             onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.03)"; }}
             onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "transparent"; }}
           >
-            Details
+            {t('history.details')}
           </button>
           <button
             onClick={() => onRerun(execution)}
@@ -405,7 +409,7 @@ function ExecutionRow({ execution, onRerun, onViewDetails, compareSelected, onTo
             onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "rgba(79,138,255,0.18)"; }}
             onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "rgba(79,138,255,0.1)"; }}
           >
-            <RefreshCw size={10} /> Rerun
+            <RefreshCw size={10} /> {t('history.rerun')}
           </button>
         </div>
       </div>
@@ -430,6 +434,7 @@ function ExecutionRow({ execution, onRerun, onViewDetails, compareSelected, onTo
 // ─── Page ────────────────────────────────────────────────────────────────────
 
 export default function HistoryPage() {
+  const { t } = useLocale();
   const router = useRouter();
   const [executions, setExecutions] = useState<Execution[]>([]);
   const [loading, setLoading] = useState(true);
@@ -473,16 +478,16 @@ export default function HistoryPage() {
         throw new Error(`API returned ${res.status}`);
       }
     } catch (err) {
-      const errorMsg = err instanceof Error && err.name === 'AbortError' 
-        ? "Request timed out. Please try again."
-        : "Failed to load execution history";
+      const errorMsg = err instanceof Error && err.name === 'AbortError'
+        ? t('history.timeout')
+        : t('history.loadFailed');
       setError(errorMsg);
       toast.error(errorMsg);
       setExecutions([]);
     } finally {
       setLoading(false);
     }
-  }, [statusFilter]);
+  }, [statusFilter, t]);
 
   useEffect(() => { loadExecutions(); }, [loadExecutions]);
 
@@ -500,18 +505,18 @@ export default function HistoryPage() {
   return (
     <div className="flex flex-col h-full overflow-hidden">
       <Header
-        title="Execution History"
-        subtitle="Every workflow run with full results. Re-run anything with one click."
+        title={t('history.title')}
+        subtitle={t('history.subtitle')}
       />
 
       <main className="flex-1 overflow-y-auto p-6">
         {/* Stats bar */}
         <div style={{ display: "flex", gap: 16, marginBottom: 24 }}>
           {[
-            { label: "Total Runs",  value: executions.length, color: "#4F8AFF" },
-            { label: "Today",       value: todayCount,         color: "#10B981" },
-            { label: "Successful",  value: executions.filter(e => e.status === "SUCCESS").length, color: "#8B5CF6" },
-            { label: "Failed",      value: executions.filter(e => e.status === "FAILED").length,  color: "#EF4444" },
+            { label: t('history.totalRuns'),  value: executions.length, color: "#4F8AFF" },
+            { label: t('history.today'),       value: todayCount,         color: "#10B981" },
+            { label: t('history.successful'),  value: executions.filter(e => e.status === "SUCCESS").length, color: "#8B5CF6" },
+            { label: t('history.failed'),      value: executions.filter(e => e.status === "FAILED").length,  color: "#EF4444" },
           ].map(s => (
             <div key={s.label} style={{
               flex: 1, padding: "12px 16px", borderRadius: 10,
@@ -526,8 +531,15 @@ export default function HistoryPage() {
         {/* Filters */}
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
           <Filter size={12} style={{ color: "#55556A" }} />
-          <span style={{ fontSize: 11, color: "#55556A" }}>Filter:</span>
-          {["ALL", "SUCCESS", "FAILED", "RUNNING"].map(s => (
+          <span style={{ fontSize: 11, color: "#55556A" }}>{t('history.filter')}</span>
+          {(["ALL", "SUCCESS", "FAILED", "RUNNING"] as const).map(s => {
+            const filterLabels: Record<string, string> = {
+              ALL: t('history.all'),
+              SUCCESS: t('history.success'),
+              FAILED: t('history.failedFilter'),
+              RUNNING: t('history.runningFilter'),
+            };
+            return (
             <button
               key={s}
               onClick={() => setStatusFilter(s)}
@@ -539,9 +551,10 @@ export default function HistoryPage() {
                 transition: "all 0.1s",
               }}
             >
-              {s}
+              {filterLabels[s]}
             </button>
-          ))}
+            );
+          })}
           {compareIds.size === 2 && (
             <button
               onClick={() => {
@@ -554,7 +567,7 @@ export default function HistoryPage() {
                 background: "#4F8AFF", color: "#fff", fontSize: 11, fontWeight: 600, cursor: "pointer",
               }}
             >
-              <GitCompareArrows size={12} /> Compare Selected
+              <GitCompareArrows size={12} /> {t('history.compareSelected')}
             </button>
           )}
           <button
@@ -566,7 +579,7 @@ export default function HistoryPage() {
               background: "transparent", color: "#55556A", fontSize: 11, cursor: "pointer",
             }}
           >
-            <RefreshCw size={10} /> Refresh
+            <RefreshCw size={10} /> {t('history.refresh')}
           </button>
         </div>
 
@@ -574,7 +587,7 @@ export default function HistoryPage() {
         {loading ? (
           <div style={{ textAlign: "center", padding: 64, color: "#55556A", fontSize: 13 }}>
             <Loader2 size={24} className="animate-spin" style={{ margin: "0 auto 12px" }} />
-            Loading history…
+            {t('history.loadingHistory')}
           </div>
         ) : error ? (
           <div style={{
@@ -586,7 +599,7 @@ export default function HistoryPage() {
               {error}
             </div>
             <div style={{ fontSize: 12, color: "#55556A", marginBottom: 16 }}>
-              Check your connection and try again
+              {t('history.checkConnection')}
             </div>
             <button
               onClick={loadExecutions}
@@ -596,7 +609,7 @@ export default function HistoryPage() {
                 display: "inline-flex", alignItems: "center", gap: 6,
               }}
             >
-              <RefreshCw size={12} /> Retry
+              <RefreshCw size={12} /> {t('history.retry')}
             </button>
           </div>
         ) : executions.length === 0 ? (
@@ -606,10 +619,10 @@ export default function HistoryPage() {
           }}>
             <Zap size={32} style={{ margin: "0 auto 12px", opacity: 0.3 }} />
             <div style={{ fontSize: 15, fontWeight: 600, color: "#8888A0", marginBottom: 6, letterSpacing: "-0.01em" }}>
-              No executions yet
+              {t('history.noExecutions')}
             </div>
             <div style={{ fontSize: 12 }}>
-              Run a workflow to see history here.
+              {t('history.noExecutionsDesc')}
             </div>
           </div>
         ) : (

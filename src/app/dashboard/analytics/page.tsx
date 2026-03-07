@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { BarChart3, TrendingUp, CheckCircle2, XCircle, Clock, Workflow } from "lucide-react";
+import { useLocale } from "@/hooks/useLocale";
 import dynamic from "next/dynamic";
 
 // Dynamic import recharts to avoid SSR issues
@@ -72,6 +73,7 @@ interface AnalyticsData {
 // ─── Page ────────────────────────────────────────────────────────────────────
 
 export default function AnalyticsPage() {
+  const { t } = useLocale();
   const [data, setData] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -90,7 +92,7 @@ export default function AnalyticsPage() {
   if (loading) {
     return (
       <div style={{ padding: 32, color: "#7C7C96", fontSize: 13 }}>
-        Loading analytics...
+        {t('analytics.loading')}
       </div>
     );
   }
@@ -104,10 +106,10 @@ export default function AnalyticsPage() {
         }}>
           <BarChart3 size={40} style={{ color: "#3A3A50", margin: "0 auto 12px" }} />
           <h2 style={{ fontSize: 18, fontWeight: 700, color: "#F0F0F5", margin: "0 0 8px", letterSpacing: "-0.02em" }}>
-            {error ? "Unable to load analytics" : "No analytics data yet"}
+            {error ? t('analytics.loadError') : t('analytics.noData')}
           </h2>
           <p style={{ fontSize: 13, color: "#7C7C96", margin: 0 }}>
-            Run your first workflow to start seeing analytics here.
+            {t('analytics.noDataDesc')}
           </p>
         </div>
       </div>
@@ -121,19 +123,19 @@ export default function AnalyticsPage() {
       {/* Header */}
       <div style={{ marginBottom: 24 }}>
         <h1 style={{ fontSize: 22, fontWeight: 700, color: "#F0F0F5", margin: "0 0 4px", letterSpacing: "-0.02em" }}>
-          Analytics
+          {t('analytics.title')}
         </h1>
         <p style={{ fontSize: 13, color: "#7C7C96", margin: 0 }}>
-          Workflow execution insights over the last 7 days
+          {t('analytics.subtitle')}
         </p>
       </div>
 
       {/* KPI Cards */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 24 }}>
-        <KPICard icon={<Workflow size={16} />} label="Total Runs" value={String(data.totalExecutions)} color="#4F8AFF" />
-        <KPICard icon={<CheckCircle2 size={16} />} label="Success Rate" value={`${data.successRate}%`} color="#10B981" />
-        <KPICard icon={<Clock size={16} />} label="Avg Duration" value={`${avgDurationSec}s`} color="#8B5CF6" />
-        <KPICard icon={<XCircle size={16} />} label="Failed" value={String(data.failedCount)} color="#EF4444" />
+        <KPICard icon={<Workflow size={16} />} label={t('analytics.totalRuns')} value={String(data.totalExecutions)} color="#4F8AFF" />
+        <KPICard icon={<CheckCircle2 size={16} />} label={t('analytics.successRate')} value={`${data.successRate}%`} color="#10B981" />
+        <KPICard icon={<Clock size={16} />} label={t('analytics.avgDuration')} value={`${avgDurationSec}s`} color="#8B5CF6" />
+        <KPICard icon={<XCircle size={16} />} label={t('analytics.failed')} value={String(data.failedCount)} color="#EF4444" />
       </div>
 
       {/* Charts Row */}
@@ -144,12 +146,12 @@ export default function AnalyticsPage() {
           borderRadius: 12, padding: 20,
         }}>
           <h3 style={{ fontSize: 13, fontWeight: 600, color: "#F0F0F5", margin: "0 0 16px", letterSpacing: "-0.01em" }}>
-            Daily Executions
+            {t('analytics.dailyExecutions')}
           </h3>
           {data.dailyStats.some(d => d.total > 0) ? (
             <RechartsBarChart data={data.dailyStats} />
           ) : (
-            <EmptyChart text="No executions in the last 7 days" />
+            <EmptyChart text={t('analytics.noExecutions')} />
           )}
         </div>
 
@@ -159,7 +161,7 @@ export default function AnalyticsPage() {
           borderRadius: 12, padding: 20,
         }}>
           <h3 style={{ fontSize: 13, fontWeight: 600, color: "#F0F0F5", margin: "0 0 16px", letterSpacing: "-0.01em" }}>
-            Node Usage
+            {t('analytics.nodeUsage')}
           </h3>
           {data.nodeStats.length > 0 ? (
             <div style={{ display: "flex", gap: 16 }}>
@@ -181,7 +183,7 @@ export default function AnalyticsPage() {
               </div>
             </div>
           ) : (
-            <EmptyChart text="No node usage data" />
+            <EmptyChart text={t('analytics.noNodeUsage')} />
           )}
         </div>
       </div>
@@ -192,7 +194,7 @@ export default function AnalyticsPage() {
         borderRadius: 12, padding: 20,
       }}>
         <h3 style={{ fontSize: 13, fontWeight: 600, color: "#F0F0F5", margin: "0 0 16px", letterSpacing: "-0.01em" }}>
-          Most Used Workflows
+          {t('analytics.mostUsed')}
         </h3>
         {data.topWorkflows.length > 0 ? (
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -223,7 +225,7 @@ export default function AnalyticsPage() {
           </div>
         ) : (
           <div style={{ padding: "24px 0", textAlign: "center", fontSize: 12, color: "#7C7C96" }}>
-            No workflows have been run yet. Execute a workflow to see it here.
+            {t('analytics.noWorkflows')}
           </div>
         )}
       </div>

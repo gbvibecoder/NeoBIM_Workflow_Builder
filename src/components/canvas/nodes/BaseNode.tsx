@@ -7,6 +7,7 @@ import * as LucideIcons from "lucide-react";
 import { CheckCircle2, AlertCircle } from "lucide-react";
 import type { WorkflowNodeData, NodeCategory, NodeStatus } from "@/types/nodes";
 import { InputNodeContent } from "./InputNode";
+import { useLocale } from "@/hooks/useLocale";
 
 const INPUT_NODE_IDS = new Set(["IN-001","IN-002","IN-003","IN-004","IN-005","IN-006","IN-007"]);
 
@@ -132,6 +133,7 @@ function ProgressBar({ status, color }: { status: NodeStatus; color: string }) {
 type BaseNodeProps = NodeProps & { data: WorkflowNodeData };
 
 export const BaseNode = memo(function BaseNode({ id, data, selected }: BaseNodeProps) {
+  const { t } = useLocale();
   const [isHovered, setIsHovered] = useState(false);
   const prefersReduced = useReducedMotion();
 
@@ -284,7 +286,7 @@ export const BaseNode = memo(function BaseNode({ id, data, selected }: BaseNodeP
                 flexShrink: 0, letterSpacing: "0.08em",
                 textTransform: "uppercase" as const,
               }}>
-                INPUT
+                {t('execution.inputLabel')}
               </span>
             )}
             <AnimatePresence mode="wait">
@@ -381,7 +383,7 @@ export const BaseNode = memo(function BaseNode({ id, data, selected }: BaseNodeP
               <AlertCircle size={14} style={{ color: "#F87171", flexShrink: 0, marginTop: 1 }} />
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: 11, fontWeight: 600, color: "#F87171", marginBottom: 3 }}>
-                  Execution Error
+                  {t('execution.executionError')}
                 </div>
                 <div style={{ fontSize: 10, color: "#E0B4B4", lineHeight: 1.5 }}>
                   {errorMessage}

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronDown, Terminal, X } from "lucide-react";
+import { useLocale } from "@/hooks/useLocale";
 
 export interface LogEntry {
   timestamp: Date;
@@ -38,6 +39,7 @@ function fmt(d: Date) {
 }
 
 export function ExecutionLog({ entries, isRunning, onClose }: ExecutionLogProps) {
+  const { t } = useLocale();
   const [collapsed, setCollapsed] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -118,7 +120,7 @@ export function ExecutionLog({ entries, isRunning, onClose }: ExecutionLogProps)
             flex: 1,
           }}
         >
-          {isRunning ? "Executing\u2026" : "Execution Log"}
+          {isRunning ? t('execution.executing') : t('execution.log')}
         </span>
         <span
           style={{
@@ -145,7 +147,7 @@ export function ExecutionLog({ entries, isRunning, onClose }: ExecutionLogProps)
               e.stopPropagation();
               onClose();
             }}
-            title="Close log"
+            title={t('execution.closeLog')}
             style={{
               background: "none",
               border: "none",

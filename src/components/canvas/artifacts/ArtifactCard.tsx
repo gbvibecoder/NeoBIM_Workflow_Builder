@@ -12,6 +12,7 @@ const MassingViewer = dynamic(() => import("./MassingViewer"), {
 });
 
 import { formatBytes } from "@/lib/utils";
+import { useLocale } from "@/hooks/useLocale";
 import type {
   ExecutionArtifact,
   ArtifactType,
@@ -75,6 +76,7 @@ interface ArtifactCardProps {
 export function ArtifactCard({ artifact, nodeLabel, nodeCategory, onDismiss }: ArtifactCardProps) {
   const [collapsed, setCollapsed] = useState(false);
   const prefersReduced = useReducedMotion();
+  const { t } = useLocale();
 
   const accentColor = nodeCategory ? CATEGORY_COLOR[nodeCategory] : "#4F8AFF";
   const typeColor   = TYPE_COLOR[artifact.type] ?? "#4F8AFF";
@@ -112,7 +114,7 @@ export function ArtifactCard({ artifact, nodeLabel, nodeCategory, onDismiss }: A
           fontSize: 11, fontWeight: 600, color: "#E0E0EA",
           flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
         }}>
-          {nodeLabel ?? "Node Output"}
+          {nodeLabel ?? t('artifact.nodeOutput')}
         </span>
 
         {/* Type badge */}
@@ -213,6 +215,7 @@ class ArtifactErrorBoundary extends React.Component<
 // ─── Body renderers ───────────────────────────────────────────────────────────
 
 function TextBody({ data }: { data: TextArtifactData }) {
+  const { t } = useLocale();
   const [expanded, setExpanded] = useState(false);
   const text = data?.content ?? "";
   const isLong = text.length > 220;
@@ -234,7 +237,7 @@ function TextBody({ data }: { data: TextArtifactData }) {
             fontSize: 10, color: "#4F8AFF", cursor: "pointer", padding: 0,
           }}
         >
-          {expanded ? "Show less" : "Show more"}
+          {expanded ? t('artifact.showLess') : t('artifact.showMore')}
         </button>
       )}
     </div>
@@ -257,6 +260,7 @@ function JsonBody({ data }: { data: JsonArtifactData }) {
 }
 
 function ImageBody({ data }: { data: ImageArtifactData }) {
+  const { t } = useLocale();
   return (
     <div>
       <div style={{ position: "relative", height: 160, background: "#07070D" }}>
@@ -273,7 +277,7 @@ function ImageBody({ data }: { data: ImageArtifactData }) {
           />
         ) : (
           <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%" }}>
-            <span style={{ fontSize: 11, color: "#5C5C78" }}>No preview</span>
+            <span style={{ fontSize: 11, color: "#5C5C78" }}>{t('artifact.noPreview')}</span>
           </div>
         )}
       </div>
@@ -436,8 +440,9 @@ interface Massing3dData {
 }
 
 function Massing3dBody({ data }: { data: Massing3dData }) {
+  const { t } = useLocale();
   if (!data?.floors || !data?.height) {
-    return <div style={{ padding: "8px 14px", fontSize: 11, color: "#5C5C78" }}>No massing data</div>;
+    return <div style={{ padding: "8px 14px", fontSize: 11, color: "#5C5C78" }}>{t('artifact.noMassing')}</div>;
   }
   return (
     <div style={{ padding: "0 8px 10px 10px" }}>

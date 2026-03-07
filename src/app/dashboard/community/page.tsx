@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { useWorkflowStore } from "@/stores/workflow-store";
 import { useRouter } from "next/navigation";
 import type { WorkflowTemplate } from "@/types/workflow";
+import { useLocale } from "@/hooks/useLocale";
 
 // ─── Mock community data ──────────────────────────────────────────────────────
 
@@ -104,10 +105,10 @@ const ALL_COMMUNITY: CommunityWorkflow[] = [...BASE, ...EXTRA];
 
 const FILTER_CHIPS = ["All", "Concept", "BIM", "Analysis", "Visualization", "Cost"];
 const SORT_OPTIONS = [
-  { value: "popular",  label: "Most Popular",    icon: <TrendingUp size={10} /> },
-  { value: "rating",   label: "Highest Rated",   icon: <Star size={10} /> },
-  { value: "clones",   label: "Most Cloned",      icon: <GitFork size={10} /> },
-  { value: "newest",   label: "Newest",           icon: <Clock size={10} /> },
+  { value: "popular",  labelKey: "community.mostPopular" as const,   icon: <TrendingUp size={10} /> },
+  { value: "rating",   labelKey: "community.highestRated" as const,  icon: <Star size={10} /> },
+  { value: "clones",   labelKey: "community.mostCloned" as const,    icon: <GitFork size={10} /> },
+  { value: "newest",   labelKey: "community.newest" as const,        icon: <Clock size={10} /> },
 ];
 
 const CATEGORY_MAP: Record<string, string[]> = {
@@ -121,9 +122,9 @@ const CATEGORY_MAP: Record<string, string[]> = {
 // ─── Stats ────────────────────────────────────────────────────────────────────
 
 const STATS = [
-  { label: "Template Workflows",  value: String(PREBUILT_WORKFLOWS.length), color: "#4F8AFF" },
-  { label: "Node Types Available", value: "31",     color: "#10B981" },
-  { label: "Community",           value: "Beta",    color: "#8B5CF6" },
+  { labelKey: "community.templateWorkflows" as const, value: String(PREBUILT_WORKFLOWS.length), color: "#4F8AFF" },
+  { labelKey: "community.nodeTypes" as const,         value: "31",     color: "#10B981" },
+  { labelKey: "community.title" as const,             value: "Beta",    color: "#8B5CF6" },
 ];
 
 // ─── Publish Dialog ───────────────────────────────────────────────────────────
@@ -131,13 +132,14 @@ const STATS = [
 const TAG_OPTIONS = ["Concept", "BIM", "Visualization", "Analysis", "Cost", "Compliance", "Site", "Parametric"];
 
 function PublishDialog({ onClose }: { onClose: () => void }) {
+  const { t } = useLocale();
   const [title, setTitle]       = useState("");
   const [desc, setDesc]         = useState("");
   const [tags, setTags]         = useState<string[]>([]);
   const router = useRouter();
 
   const toggleTag = (tag: string) =>
-    setTags(prev => prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]);
+    setTags(prev => prev.includes(tag) ? prev.filter(tg => tg !== tag) : [...prev, tag]);
 
   const handlePublish = () => {
     if (!title.trim()) { toast.error("Title is required"); return; }
@@ -178,7 +180,7 @@ function PublishDialog({ onClose }: { onClose: () => void }) {
           padding: "16px 20px", borderBottom: "1px solid #1A1A26",
         }}>
           <span style={{ flex: 1, fontSize: 15, fontWeight: 700, color: "#F0F0F5", letterSpacing: "-0.02em" }}>
-            Publish to Community
+            {t('community.publishDialog')}
           </span>
           <button
             onClick={onClose}
@@ -199,7 +201,7 @@ function PublishDialog({ onClose }: { onClose: () => void }) {
         <div style={{ padding: "20px" }}>
           {/* Title */}
           <label style={{ fontSize: 11, fontWeight: 600, color: "#7C7C96", display: "block", marginBottom: 6 }}>
-            Title <span style={{ color: "#EF4444" }}>*</span>
+            {t('community.titleLabel')} <span style={{ color: "#EF4444" }}>*</span>
           </label>
           <input
             value={title}
@@ -219,12 +221,12 @@ function PublishDialog({ onClose }: { onClose: () => void }) {
 
           {/* Description */}
           <label style={{ fontSize: 11, fontWeight: 600, color: "#7C7C96", display: "block", marginBottom: 6 }}>
-            Description <span style={{ color: "#EF4444" }}>*</span>
+            {t('community.descriptionLabel')} <span style={{ color: "#EF4444" }}>*</span>
           </label>
           <textarea
             value={desc}
             onChange={e => setDesc(e.target.value)}
-            placeholder="Describe what your workflow does and who it's for..."
+            placeholder={t('community.descPlaceholder')}
             rows={3}
             style={{
               width: "100%", padding: "8px 12px",
@@ -241,7 +243,7 @@ function PublishDialog({ onClose }: { onClose: () => void }) {
 
           {/* Tags */}
           <label style={{ fontSize: 11, fontWeight: 600, color: "#7C7C96", display: "block", marginBottom: 8 }}>
-            Tags
+            {t('community.tagsLabel')}
           </label>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 20 }}>
             {TAG_OPTIONS.map(tag => {
@@ -278,7 +280,7 @@ function PublishDialog({ onClose }: { onClose: () => void }) {
               onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = "#2A2A3E"; }}
               onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = "rgba(255,255,255,0.05)"; }}
             >
-              Cancel
+              {t('community.cancel')}
             </button>
             <button
               onClick={handlePublish}
@@ -293,7 +295,7 @@ function PublishDialog({ onClose }: { onClose: () => void }) {
               onMouseEnter={e => { (e.currentTarget as HTMLElement).style.opacity = "0.87"; }}
               onMouseLeave={e => { (e.currentTarget as HTMLElement).style.opacity = "1"; }}
             >
-              Publish to Community
+              {t('community.publishBtn')}
             </button>
           </div>
         </div>
@@ -305,6 +307,7 @@ function PublishDialog({ onClose }: { onClose: () => void }) {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function CommunityPage() {
+  const { t } = useLocale();
   const [search, setSearch]       = useState("");
   const [activeFilter, setFilter] = useState("All");
   const [sortBy, setSortBy]       = useState("popular");
@@ -323,7 +326,7 @@ export default function CommunityPage() {
       list = list.filter(w =>
         w.name.toLowerCase().includes(q) ||
         w.description.toLowerCase().includes(q) ||
-        w.tags.some(t => t.toLowerCase().includes(q))
+        w.tags.some(tg => tg.toLowerCase().includes(q))
       );
     }
     if (activeFilter !== "All") {
@@ -344,13 +347,13 @@ export default function CommunityPage() {
     router.push("/dashboard/canvas");
   };
 
-  const currentSort = SORT_OPTIONS.find(o => o.value === sortBy)?.label ?? "Most Popular";
+  const currentSortKey = SORT_OPTIONS.find(o => o.value === sortBy)?.labelKey ?? "community.mostPopular" as const;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
       <Header
-        title="Community"
-        subtitle="Discover and clone workflows shared by AEC professionals worldwide"
+        title={t('community.title')}
+        subtitle={t('community.subtitle')}
       />
 
       <main style={{ flex: 1, overflowY: "auto" }}>
@@ -365,9 +368,9 @@ export default function CommunityPage() {
           {/* Stats */}
           <div style={{ display: "flex", gap: 32 }}>
             {STATS.map(s => (
-              <div key={s.label} style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+              <div key={s.labelKey} style={{ display: "flex", flexDirection: "column", gap: 2 }}>
                 <span style={{ fontSize: 22, fontWeight: 800, color: s.color, letterSpacing: "-0.02em" }}>{s.value}</span>
-                <span style={{ fontSize: 10, color: "#55556A" }}>{s.label}</span>
+                <span style={{ fontSize: 10, color: "#55556A" }}>{t(s.labelKey)}</span>
               </div>
             ))}
           </div>
@@ -393,7 +396,7 @@ export default function CommunityPage() {
             }}
           >
             <Upload size={13} />
-            Publish Your Workflow
+            {t('community.publishYour')}
           </button>
         </div>
 
@@ -413,7 +416,7 @@ export default function CommunityPage() {
               <input
                 value={search}
                 onChange={e => setSearch(e.target.value)}
-                placeholder="Search community workflows..."
+                placeholder={t('community.search')}
                 aria-label="Search community workflows"
                 style={{
                   width: "100%", paddingLeft: 32, paddingRight: 12,
@@ -432,6 +435,14 @@ export default function CommunityPage() {
             {/* Filter chips */}
             {FILTER_CHIPS.map(chip => {
               const isActive = chip === activeFilter;
+              const chipLabelMap: Record<string, string> = {
+                "All": "All",
+                "Concept": t('community.concept'),
+                "BIM": t('community.bim'),
+                "Analysis": t('community.analysis'),
+                "Visualization": t('community.visualization'),
+                "Cost": t('community.cost'),
+              };
               return (
                 <button
                   key={chip}
@@ -445,7 +456,7 @@ export default function CommunityPage() {
                     transition: "all 0.1s",
                   }}
                 >
-                  {chip}
+                  {chipLabelMap[chip] ?? chip}
                 </button>
               );
             })}
@@ -464,7 +475,7 @@ export default function CommunityPage() {
                 }}
               >
                 <span style={{ color: "#55556A" }}>Sort:</span>
-                <span style={{ color: "#C0C0D0" }}>{currentSort}</span>
+                <span style={{ color: "#C0C0D0" }}>{t(currentSortKey)}</span>
                 <ChevronDown size={11} style={{ color: "#55556A" }} />
               </button>
 
@@ -497,7 +508,7 @@ export default function CommunityPage() {
                         }}
                       >
                         {opt.icon}
-                        {opt.label}
+                        {t(opt.labelKey)}
                       </button>
                     ))}
                   </motion.div>
@@ -510,10 +521,10 @@ export default function CommunityPage() {
           {filtered.length === 0 ? (
             <div style={{ padding: "60px 0", textAlign: "center" }}>
               <p style={{ fontSize: 14, color: "#3A3A50", marginBottom: 8 }}>
-                No workflows matching &ldquo;{search}&rdquo;
+                {t('community.noMatching')} &ldquo;{search}&rdquo;
               </p>
               <p style={{ fontSize: 12, color: "#2A2A40", marginBottom: 12 }}>
-                Try different keywords or browse all workflows
+                {t('community.tryDifferent')}
               </p>
               <button
                 onClick={() => { setSearch(""); setFilter("All"); }}
@@ -522,7 +533,7 @@ export default function CommunityPage() {
                   border: "none", cursor: "pointer",
                 }}
               >
-                Clear search →
+                {t('community.clearSearch')}
               </button>
             </div>
           ) : (
@@ -541,7 +552,7 @@ export default function CommunityPage() {
                   publishedAt={wf.publishedAt}
                   ratingAvg={wf.ratingAvg}
                   cloneCount={wf.cloneCount}
-                  buttonLabel="Clone to My Workflows"
+                  buttonLabel={t('community.cloneToMy')}
                   index={i}
                 />
               ))}
