@@ -8,7 +8,7 @@ import {
   Loader2, CheckCircle2, Pencil,
 } from "lucide-react";
 import type { CreationMode } from "@/types/workflow";
-import { useWorkflowStore } from "@/stores/workflow-store";
+import { useWorkflowStore, isUntitledWorkflow } from "@/stores/workflow-store";
 import { useLocale } from "@/hooks/useLocale";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -142,18 +142,25 @@ export function CanvasToolbar({
   const runMenuRef = useRef<HTMLDivElement>(null);
   const nameInputRef = useRef<HTMLInputElement>(null);
 
+  const { openSaveModal } = useWorkflowStore();
+  const isUntitled = isUntitledWorkflow(workflowName);
+
   const handleSave = useCallback(() => {
+    if (isUntitled) {
+      openSaveModal();
+      return;
+    }
     onSave();
     setSavedFlash(true);
     setTimeout(() => setSavedFlash(false), 2000);
-  }, [onSave]);
+  }, [onSave, isUntitled, openSaveModal]);
 
   // Keep keyboard handler up-to-date without re-registering the listener
   const kbRef = useRef<(e: KeyboardEvent) => void>(null!);
   useEffect(() => {
     kbRef.current = (e: KeyboardEvent) => {
       const meta = e.metaKey || e.ctrlKey;
-      if (meta && e.key === "s") { e.preventDefault(); if (isDirty && !isSaving) handleSave(); }
+      if (meta && e.key === "s") { e.preventDefault(); if (!isSaving) handleSave(); }
       if (meta && e.key === "z" && !e.shiftKey) { e.preventDefault(); onUndo(); }
       if (meta && (e.key === "y" || (e.key === "z" && e.shiftKey))) { e.preventDefault(); onRedo(); }
       if (meta && e.key === "Enter") { e.preventDefault(); if (!isExecuting) onRun(); }
@@ -436,20 +443,23 @@ export function CanvasToolbar({
           {/* Save */}
           <button
             onClick={handleSave}
-            disabled={(!isDirty && !savedFlash) || isSaving}
-            title={`${t('canvas.save')} (⌘S)`}
+            disabled={(!isDirty && !savedFlash && !isUntitled) || isSaving}
+            title={isUntitled ? t('canvas.nameToSave') : `${t('canvas.save')} (⌘S)`}
             style={{
               display: "flex", alignItems: "center", gap: 5,
               height: 36, padding: "0 16px", borderRadius: 8,
               background: "transparent",
               border: savedFlash
                 ? "1px solid rgba(16,185,129,0.4)"
-                : isDirty ? "1px solid rgba(255,255,255,0.08)" : "1px solid transparent",
-              color: savedFlash ? "#10B981" : isDirty ? "#9898B0" : "#3A3A4E",
+                : isUntitled && isDirty
+                  ? "1px solid rgba(245,158,11,0.4)"
+                  : isDirty ? "1px solid rgba(255,255,255,0.08)" : "1px solid transparent",
+              color: savedFlash ? "#10B981" : isUntitled && isDirty ? "#F59E0B" : isDirty ? "#9898B0" : "#3A3A4E",
               fontSize: 13, fontWeight: 500,
-              cursor: isDirty || savedFlash ? "pointer" : "default",
+              cursor: isDirty || savedFlash || isUntitled ? "pointer" : "default",
               transition: "all 150ms ease",
-              opacity: !isDirty && !savedFlash && !isSaving ? 0.5 : 1,
+              opacity: !isDirty && !savedFlash && !isSaving && !isUntitled ? 0.5 : 1,
+              boxShadow: isUntitled && isDirty ? "0 0 12px rgba(245,158,11,0.15)" : "none",
             }}
             onMouseEnter={e => {
               if (isDirty && !savedFlash) {
@@ -725,7 +735,7 @@ export function CanvasToolbar({
 
           <button
             onClick={handleSave}
-            disabled={(!isDirty && !savedFlash) || isSaving}
+            disabled={(!isDirty && !savedFlash && !isUntitled) || isSaving}
             style={{
               display: "flex",
               alignItems: "center",
@@ -735,12 +745,14 @@ export function CanvasToolbar({
               background: "transparent",
               border: savedFlash
                 ? "1px solid rgba(16,185,129,0.4)"
-                : isDirty ? "1px solid rgba(255,255,255,0.08)" : "1px solid transparent",
-              color: savedFlash ? "#10B981" : isDirty ? "#F0F0F5" : "#3A3A4E",
+                : isUntitled && isDirty
+                  ? "1px solid rgba(245,158,11,0.4)"
+                  : isDirty ? "1px solid rgba(255,255,255,0.08)" : "1px solid transparent",
+              color: savedFlash ? "#10B981" : isUntitled && isDirty ? "#F59E0B" : isDirty ? "#F0F0F5" : "#3A3A4E",
               fontSize: 12,
               fontWeight: 500,
-              cursor: isDirty || savedFlash ? "pointer" : "default",
-              opacity: !isDirty && !savedFlash && !isSaving ? 0.5 : 1,
+              cursor: isDirty || savedFlash || isUntitled ? "pointer" : "default",
+              opacity: !isDirty && !savedFlash && !isSaving && !isUntitled ? 0.5 : 1,
             }}
           >
             {isSaving ? <Loader2 size={14} className="animate-spin" /> : savedFlash ? <CheckCircle2 size={14} /> : <Save size={14} />}

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { generateBuildingDescription, generateConceptImage, generateFloorPlan, parseBriefDocument, analyzeImage } from "@/services/openai";
+import { generateBuildingDescription, generateConceptImage, generateFloorPlan, parseBriefDocument, analyzeImage, enhanceArchitecturalPrompt } from "@/services/openai";
+import type { BuildingDescription } from "@/services/openai";
 import { analyzeSite } from "@/services/site-analysis";
 import { generateId } from "@/lib/utils";
 import type { ExecutionArtifact } from "@/types/execution";
@@ -15,7 +16,7 @@ import { APIError, UserErrors, formatErrorResponse } from "@/lib/user-errors";
 import { generatePDFBase64 } from "@/services/pdf-report-server";
 
 // Node IDs that have real implementations
-const REAL_NODE_IDS = new Set(["TR-001", "TR-003", "TR-004", "TR-012", "GN-003", "GN-004", "TR-007", "TR-008", "EX-002", "EX-003"]);
+const REAL_NODE_IDS = new Set(["TR-001", "TR-003", "TR-004", "TR-005", "TR-012", "GN-003", "GN-004", "TR-007", "TR-008", "EX-002", "EX-003"]);
 
 export async function POST(req: NextRequest) {
   const session = await auth();
@@ -298,13 +299,94 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
         createdAt: new Date(),
       };
 
+    } else if (catalogueId === "TR-005") {
+      // Style Prompt Composer — GPT-4o-mini enhanced DALL-E 3 prompt
+      const upstreamDescription = (inputData?._raw ?? inputData) as Partial<BuildingDescription>;
+      const viewType = ((inputData?.viewType as string) ?? "exterior") as "exterior" | "floor_plan" | "site_plan" | "interior";
+
+      const description: BuildingDescription = {
+        projectName: upstreamDescription.projectName ?? "Building",
+        buildingType: upstreamDescription.buildingType ?? "Mixed-Use",
+        floors: upstreamDescription.floors ?? 5,
+        totalArea: upstreamDescription.totalArea ?? 5000,
+        height: upstreamDescription.height,
+        footprint: upstreamDescription.footprint,
+        totalGFA: upstreamDescription.totalGFA,
+        program: upstreamDescription.program,
+        structure: upstreamDescription.structure ?? "Reinforced concrete",
+        facade: upstreamDescription.facade ?? "Glass and steel",
+        sustainabilityFeatures: upstreamDescription.sustainabilityFeatures ?? [],
+        programSummary: upstreamDescription.programSummary ?? "Mixed-use programme",
+        estimatedCost: upstreamDescription.estimatedCost ?? "TBD",
+        constructionDuration: upstreamDescription.constructionDuration ?? "18 months",
+        narrative: upstreamDescription.narrative ?? "",
+      };
+
+      const enhancedPrompt = await enhanceArchitecturalPrompt(
+        description,
+        viewType,
+        inputData?.style as string | undefined,
+        apiKey
+      );
+
+      artifact = {
+        id: generateId(),
+        executionId: executionId ?? "local",
+        tileInstanceId,
+        type: "text",
+        data: {
+          content: enhancedPrompt,
+          label: "Enhanced Architectural Prompt",
+        },
+        metadata: { model: "gpt-4o-mini", real: true },
+        createdAt: new Date(),
+      };
+
+      return NextResponse.json({
+        artifact,
+        output: { enhancedPrompt },
+      });
+
     } else if (catalogueId === "GN-003") {
       // Concept Image Generator — DALL-E 3
       const description = inputData?._raw ?? null;
       const prompt = inputData?.prompt ?? inputData?.content ?? "Modern mixed-use building, Nordic minimal style";
+      const viewType = ((inputData?.viewType as string) ?? "exterior") as "exterior" | "floor_plan" | "site_plan" | "interior";
+      const style = (inputData?.style as string) ?? "photorealistic architectural render";
 
-      const { url, revisedPrompt } = await generateConceptImage(
-        description ?? {
+      // Debug: trace what input GN-003 actually receives
+      console.log("[GN-003] Input keys:", Object.keys(inputData ?? {}));
+      console.log("[GN-003] _raw present:", !!description);
+      if (description) {
+        const d = description as Record<string, unknown>;
+        console.log("[GN-003] _raw.buildingType:", d.buildingType, "| floors:", d.floors, "| facade:", d.facade);
+      }
+      console.log("[GN-003] prompt (first 120 chars):", String(prompt).slice(0, 120));
+      console.log("[GN-003] viewType:", viewType, "| style:", style);
+
+      // If upstream TR-005 already enhanced the prompt, use it directly
+      const enhancedPrompt = inputData?.enhancedPrompt as string | undefined;
+
+      let url: string;
+      let revisedPrompt: string;
+
+      if (enhancedPrompt) {
+        console.log("[GN-003] Using pre-enhanced prompt from TR-005 (first 120 chars):", enhancedPrompt.slice(0, 120));
+        // TR-005 already produced the optimised prompt — pass directly to DALL-E 3
+        const result = await generateConceptImage(
+          enhancedPrompt,
+          style,
+          apiKey,
+          undefined,
+          undefined,
+          undefined,
+          viewType
+        );
+        url = result.url;
+        revisedPrompt = result.revisedPrompt;
+      } else {
+        // No upstream enhancer — pass BuildingDescription to generateConceptImage
+        const desc: BuildingDescription = description ?? {
           projectName: "Building",
           buildingType: "Mixed-Use",
           floors: 5,
@@ -315,10 +397,34 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
           programSummary: prompt,
           estimatedCost: "TBD",
           constructionDuration: "18 months",
-        },
-        "photorealistic architectural render, professional photography",
-        apiKey
-      );
+          narrative: "",
+        };
+
+        console.log("[GN-003] Using BuildingDescription:", {
+          projectName: desc.projectName,
+          buildingType: desc.buildingType,
+          floors: desc.floors,
+          facade: desc.facade?.slice(0, 60),
+          fromUpstream: !!description,
+        });
+
+        const result = await generateConceptImage(
+          desc,
+          style,
+          apiKey,
+          undefined,
+          undefined,
+          undefined,
+          viewType
+        );
+        url = result.url;
+        revisedPrompt = result.revisedPrompt;
+      }
+
+      console.log("[GN-003] DALL-E 3 result URL (first 80 chars):", url?.slice(0, 80));
+      console.log("[GN-003] Revised prompt (first 120 chars):", revisedPrompt?.slice(0, 120));
+
+      const viewLabel = viewType.replace("_", " ");
 
       artifact = {
         id: generateId(),
@@ -327,7 +433,7 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
         type: "image",
         data: {
           url,
-          label: "Concept Render (DALL-E 3)",
+          label: `${viewLabel.charAt(0).toUpperCase() + viewLabel.slice(1)} render`,
           style: revisedPrompt.substring(0, 100),
         },
         metadata: { model: "dall-e-3", real: true },

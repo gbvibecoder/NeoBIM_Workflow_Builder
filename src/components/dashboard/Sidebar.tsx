@@ -23,6 +23,7 @@ import {
   X,
   Sparkles,
   Crown,
+  FlaskConical,
 } from "lucide-react";
 import { PREBUILT_WORKFLOWS } from "@/constants/prebuilt-workflows";
 import { useLocale } from "@/hooks/useLocale";
@@ -47,6 +48,9 @@ export function Sidebar() {
     { href: "/dashboard/community", label: t("nav.community"), icon: Globe },
     { href: "/dashboard/billing",   label: t("nav.billing"),   icon: CreditCard },
     { href: "/dashboard/settings",  label: t("nav.settings"),  icon: Settings },
+    ...(process.env.NODE_ENV === "development"
+      ? [{ href: "/dashboard/test-results", label: "Test Suite", icon: FlaskConical }]
+      : []),
   ];
 
   const [collapsed, setCollapsed] = useState(false);

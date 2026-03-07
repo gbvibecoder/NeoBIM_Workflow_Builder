@@ -7,6 +7,7 @@ import * as LucideIcons from "lucide-react";
 import { CheckCircle2, AlertCircle } from "lucide-react";
 import type { WorkflowNodeData, NodeCategory, NodeStatus } from "@/types/nodes";
 import { InputNodeContent } from "./InputNode";
+import { ViewTypeSelect } from "./GenerateNodeContent";
 import { useLocale } from "@/hooks/useLocale";
 
 const INPUT_NODE_IDS = new Set(["IN-001","IN-002","IN-003","IN-004","IN-005","IN-006","IN-007"]);
@@ -332,6 +333,9 @@ export const BaseNode = memo(function BaseNode({ id, data, selected }: BaseNodeP
 
           {/* Row 2b: interactive input for all 7 input node types */}
           {isInput && <InputNodeContent nodeId={id} data={data} />}
+
+          {/* Row 2c: viewType select for GN-003 */}
+          {data.catalogueId === "GN-003" && <ViewTypeSelect nodeId={id} data={data} />}
 
           {/* Row 3: progress + time */}
           <div style={{ display: "flex", alignItems: "center", gap: 7, marginTop: 10 }}>

@@ -33,6 +33,7 @@ export interface NodeCatalogueItem {
   apiEngine: string;
   tags: string[];
   executionTime?: string; // e.g. "< 2s", "< 30s"
+  viewType?: string;     // default view type for image generation nodes
 }
 
 export interface WorkflowNode {

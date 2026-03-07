@@ -43,7 +43,8 @@ const ContextMenu = dynamic(
   { ssr: false }
 );
 
-import { useWorkflowStore } from "@/stores/workflow-store";
+import { useWorkflowStore, isUntitledWorkflow } from "@/stores/workflow-store";
+import { SaveWorkflowModal } from "./modals/SaveWorkflowModal";
 import { useExecutionStore } from "@/stores/execution-store";
 import { useUIStore } from "@/stores/ui-store";
 import { NODE_CATALOGUE_MAP, CATEGORY_CONFIG } from "@/constants/node-catalogue";
@@ -236,6 +237,7 @@ function WorkflowCanvasInner({ workflowId: _workflowId }: WorkflowCanvasInnerPro
     creationMode,
     addNode,
     removeNode,
+    removeEdge: removeStoreEdge,
     updateNode,
     addEdge: addStoreEdge,
     resetCanvas,
@@ -246,10 +248,25 @@ function WorkflowCanvasInner({ workflowId: _workflowId }: WorkflowCanvasInnerPro
     saveWorkflow,
     undo,
     redo,
+    isSaveModalOpen,
+    openSaveModal,
+    closeSaveModal,
   } = useWorkflowStore();
 
   const { artifacts, executionProgress, removeArtifact, clearArtifacts } = useExecutionStore();
   const { isNodeLibraryOpen, setPromptModeActive, isPromptModeActive, toggleNodeLibrary, isDemoMode } = useUIStore();
+
+  // Existing workflow names for duplicate detection in save modal
+  const [existingNames, setExistingNames] = useState<string[]>([]);
+  React.useEffect(() => {
+    if (isSaveModalOpen) {
+      import("@/lib/api").then(({ api }) =>
+        api.workflows.list().then(({ workflows }) =>
+          setExistingNames(workflows.map((w) => w.name))
+        ).catch(() => {})
+      );
+    }
+  }, [isSaveModalOpen]);
 
   // Chat / execution log state
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
@@ -352,8 +369,15 @@ function WorkflowCanvasInner({ workflowId: _workflowId }: WorkflowCanvasInnerPro
   );
 
   const handleEdgesChange = useCallback(
-    (changes: Parameters<typeof onEdgesChange>[0]) => { onEdgesChange(changes); markDirty(); },
-    [onEdgesChange, markDirty]
+    (changes: Parameters<typeof onEdgesChange>[0]) => {
+      onEdgesChange(changes);
+      markDirty();
+      // Sync keyboard/backspace edge deletions to Zustand store
+      changes.forEach(change => {
+        if (change.type === "remove") removeStoreEdge(change.id);
+      });
+    },
+    [onEdgesChange, markDirty, removeStoreEdge]
   );
 
   const onDrop = useCallback(
@@ -419,13 +443,27 @@ function WorkflowCanvasInner({ workflowId: _workflowId }: WorkflowCanvasInnerPro
       toast.info(tLocale('toast.demoSaveHint'), { duration: 3000 });
       return;
     }
+    if (isUntitledWorkflow(currentWorkflow?.name)) {
+      openSaveModal();
+      return;
+    }
     const id = await saveWorkflow();
     if (id) {
       toast.success(tLocale('toast.workflowSaved'), { duration: 2000 });
     } else {
       toast.error(tLocale('toast.saveFailed'));
     }
-  }, [saveWorkflow, isDemoMode, tLocale]);
+  }, [saveWorkflow, isDemoMode, currentWorkflow?.name, openSaveModal, tLocale]);
+
+  const handleSaveWithName = useCallback(async (newName: string) => {
+    closeSaveModal();
+    const id = await saveWorkflow(newName);
+    if (id) {
+      toast.success(`${tLocale('toast.workflowSaved')}: "${newName}"`, { duration: 2000 });
+    } else {
+      toast.error(tLocale('toast.saveFailed'));
+    }
+  }, [saveWorkflow, closeSaveModal, tLocale]);
   const handleShare = useCallback(() => { toast.info(tLocale('toast.shareComingSoon'), { duration: 2000 }); }, [tLocale]);
 
   const workflowName = currentWorkflow?.name ?? tLocale('canvas.untitledWorkflow');
@@ -475,10 +513,13 @@ function WorkflowCanvasInner({ workflowId: _workflowId }: WorkflowCanvasInnerPro
           onToggleLibrary={toggleNodeLibrary}
           onNameChange={async (newName: string) => {
             if (currentWorkflow) {
-              currentWorkflow.name = newName;
               markDirty();
-              await saveWorkflow(newName);
-              toast.success(`${tLocale('toast.renamedTo')} "${newName}"`, { duration: 2000 });
+              const id = await saveWorkflow(newName);
+              if (id) {
+                toast.success(`${tLocale('toast.renamedTo')} "${newName}"`, { duration: 2000 });
+              } else {
+                toast.error(tLocale('toast.saveFailed'));
+              }
             }
           }}
         />
@@ -757,6 +798,14 @@ function WorkflowCanvasInner({ workflowId: _workflowId }: WorkflowCanvasInnerPro
           )}
         </AnimatePresence>
       </div>
+
+      {/* Save workflow name modal */}
+      <SaveWorkflowModal
+        isOpen={isSaveModalOpen}
+        existingNames={existingNames}
+        onSave={handleSaveWithName}
+        onClose={closeSaveModal}
+      />
     </div>
   );
 }

@@ -54,6 +54,10 @@ export interface BuildingDescription {
   buildingType: string;
   floors: number;
   totalArea: number; // m²
+  height?: number; // metres
+  footprint?: number; // m²
+  totalGFA?: number; // m² gross floor area
+  program?: Array<{ space: string; area_m2?: number; floor?: string }>;
   structure: string;
   facade: string;
   sustainabilityFeatures: string[];
@@ -194,6 +198,65 @@ TARGET: 9/10 quality. Reference: architectural magazine features, design competi
   });
 }
 
+// ─── enhanceArchitecturalPrompt ────────────────────────────────────────────────
+
+export async function enhanceArchitecturalPrompt(
+  description: BuildingDescription,
+  viewType: "exterior" | "floor_plan" | "site_plan" | "interior",
+  style?: string,
+  apiKey?: string
+): Promise<string> {
+  try {
+    const client = getClient(apiKey);
+
+    const completion = await client.chat.completions.create({
+      model: "gpt-4o-mini",
+      response_format: { type: "json_object" },
+      temperature: 0.4,
+      messages: [
+        {
+          role: "system",
+          content: `You are an expert AEC visualization prompt engineer. Convert structured building data into precise, detailed DALL-E 3 prompts using proper architectural terminology.
+
+Use specific AEC vocabulary: floor count, facade materials, massing strategy, glazing ratio, setbacks, structural grid, floor-to-floor heights, podium/tower relationship, curtain wall systems, fenestration patterns, etc.
+
+For each view type, emphasize different aspects:
+- exterior: overall massing, facade expression, materiality, street presence, context
+- floor_plan: spatial layout, room proportions, circulation, structural grid, dimensions
+- site_plan: building footprint, setbacks, landscaping, access, parking, orientation
+- interior: spatial quality, ceiling heights, natural light, materials, furnishings
+
+Respond with JSON: { "prompt": "<the enhanced DALL-E 3 prompt>" }`,
+        },
+        {
+          role: "user",
+          content: `Create an optimised DALL-E 3 prompt for a ${viewType} view of this building:
+
+Building Type: ${description.buildingType}
+Floors: ${description.floors}
+Total GFA: ${description.totalGFA ?? description.totalArea} m²
+Height: ${description.height ?? description.floors * 3.5}m
+Footprint: ${description.footprint ?? Math.round(description.totalArea / description.floors)} m²
+Program: ${JSON.stringify(description.program ?? [{ space: description.programSummary }])}
+Style: ${style ?? "contemporary architectural"}
+View Type: ${viewType}
+Facade: ${description.facade}
+Structure: ${description.structure}`,
+        },
+      ],
+    });
+
+    const content = completion.choices[0]?.message?.content;
+    if (!content) throw new Error("Empty response from GPT-4o-mini");
+
+    const parsed = JSON.parse(content) as { prompt: string };
+    return parsed.prompt;
+  } catch (error) {
+    console.error("[enhanceArchitecturalPrompt] Falling back to basic prompt:", error);
+    return `Professional ${viewType.replace("_", " ")} architectural rendering of a ${description.floors}-story ${description.buildingType} with ${description.facade} facade. ${style ?? "Contemporary"} style. ${description.programSummary}. Photorealistic, high detail.`;
+  }
+}
+
 // ─── buildPhotorealisticPrompt ────────────────────────────────────────────────
 
 /**
@@ -276,24 +339,52 @@ Photorealistic architectural visualization, high detail, professional photograph
 // ─── generateConceptImage ─────────────────────────────────────────────────────
 
 export async function generateConceptImage(
-  description: BuildingDescription,
+  descriptionOrPrompt: BuildingDescription | string,
   style: string = "photorealistic architectural render",
   userApiKey?: string,
   location?: string,
   cameraAngle?: string,
-  timeOfDay?: string
+  timeOfDay?: string,
+  viewType: "exterior" | "floor_plan" | "site_plan" | "interior" = "exterior"
 ): Promise<{ url: string; revisedPrompt: string }> {
-  void style;
   return handleOpenAICall(async () => {
     const client = getClient(userApiKey);
 
-    // Build comprehensive photorealistic prompt (300-400 words)
-    const imagePrompt = buildPhotorealisticPrompt(
-      description,
-      location || "urban setting",
-      cameraAngle || "eye-level corner",
-      timeOfDay || "golden hour"
-    );
+    let imagePrompt: string;
+
+    if (typeof descriptionOrPrompt === "string") {
+      // Backward compatibility: plain string prompt
+      imagePrompt = descriptionOrPrompt;
+      console.log("[generateConceptImage] Using string prompt (first 120 chars):", imagePrompt.slice(0, 120));
+    } else {
+      // BuildingDescription object — enhance with GPT-4o-mini, then use photorealistic builder
+      console.log("[generateConceptImage] BuildingDescription received:", {
+        projectName: descriptionOrPrompt.projectName,
+        buildingType: descriptionOrPrompt.buildingType,
+        floors: descriptionOrPrompt.floors,
+        facade: descriptionOrPrompt.facade?.slice(0, 60),
+      });
+      try {
+        imagePrompt = await enhanceArchitecturalPrompt(
+          descriptionOrPrompt,
+          viewType,
+          style,
+          userApiKey
+        );
+        console.log("[generateConceptImage] Enhanced prompt (first 200 chars):", imagePrompt.slice(0, 200));
+      } catch (enhanceErr) {
+        console.error("[generateConceptImage] enhanceArchitecturalPrompt failed, using photorealistic fallback:", enhanceErr);
+        // Fallback to existing photorealistic prompt builder
+        imagePrompt = buildPhotorealisticPrompt(
+          descriptionOrPrompt,
+          location || "urban setting",
+          cameraAngle || "eye-level corner",
+          timeOfDay || "golden hour"
+        );
+      }
+    }
+
+    console.log("[generateConceptImage] Final DALL-E prompt length:", imagePrompt.length, "chars");
 
     const response = await client.images.generate({
       model: "dall-e-3",
@@ -301,6 +392,7 @@ export async function generateConceptImage(
       n: 1,
       size: "1024x1024",
       quality: "hd",
+      style: "natural",
     });
 
     const image = response.data?.[0];

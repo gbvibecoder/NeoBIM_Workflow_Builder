@@ -1,0 +1,11 @@
+{"id":"463c4a3d-b56e-4688-a6c8-834d9403de72","timestamp":"2026-03-07T06:47:27.938Z","userId":"cmmdh1l94000004l8v14nq5gu","eventName":"user_login"}
+{"id":"9b73762c-a6a4-4406-a78c-b47848f26f91","timestamp":"2026-03-07T07:39:52.291Z","userId":"cmmdh1l94000004l8v14nq5gu","eventName":"user_login"}
+{"id":"f8f6e8a4-ae83-47de-b991-9f1baf6b737f","timestamp":"2026-03-07T09:58:54.831Z","userId":"cmmdh1l94000004l8v14nq5gu","eventName":"user_login"}
+{"id":"2df01af3-8d92-4804-a482-8bfa691c8bd4","timestamp":"2026-03-07T10:10:55.949Z","userId":"cmmdh1l94000004l8v14nq5gu","eventName":"workflow_first_created","properties":{"workflowId":"cmmg5xsgg0003lyvb4yiaj07v"}}
+{"id":"72f47dde-9426-42ae-b6fd-189019f15dd1","timestamp":"2026-03-07T10:10:56.352Z","userId":"cmmdh1l94000004l8v14nq5gu","eventName":"workflow_created","properties":{"workflowId":"cmmg5xsgg0003lyvb4yiaj07v"}}
+{"id":"73243628-6d93-44ac-a97e-386867b887ab","timestamp":"2026-03-07T10:11:45.745Z","userId":"cmmdh1l94000004l8v14nq5gu","eventName":"rate_limit_free_tier","properties":{"endpoint":"execute-node","userRole":"FREE"}}
+{"id":"1aaeb94d-ef4e-40fc-9e1c-f85a50708282","timestamp":"2026-03-07T10:16:38.609Z","userId":"cmmdh1l94000004l8v14nq5gu","eventName":"user_login"}
+{"id":"243c8e69-9d24-43f3-8bb6-c241090aa913","timestamp":"2026-03-07T10:33:19.340Z","userId":"cmmdh1l94000004l8v14nq5gu","eventName":"user_login"}
+{"id":"8ec4503c-8ac0-45bf-8e37-e2aff35de8a5","timestamp":"2026-03-07T10:36:25.722Z","userId":"cmmdh1l94000004l8v14nq5gu","eventName":"workflow_created","properties":{"workflowId":"cmmg6ukv90004lyvb5hvjsy93"}}
+{"id":"7b4bfc19-82de-458f-bd65-827254b5bd0d","timestamp":"2026-03-07T16:34:52.972Z","userId":"cmmdh1l94000004l8v14nq5gu","eventName":"user_login"}
+{"id":"5d05a12f-4351-4d22-8d9b-b1e06065f94b","timestamp":"2026-03-07T19:33:06.178Z","userId":"cmmdh1l94000004l8v14nq5gu","eventName":"user_login"}

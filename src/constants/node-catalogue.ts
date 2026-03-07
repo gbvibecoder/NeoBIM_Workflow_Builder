@@ -152,7 +152,7 @@ export const NODE_CATALOGUE: NodeCatalogueItem[] = [
   {
     id: "TR-005",
     name: "Style Prompt Composer",
-    description: "Combine massing geometry with a style description for image generation",
+    description: "Converts structured building descriptions into optimised DALL-E 3 prompts using GPT-4o-mini and AEC-specific terminology",
     category: "transform",
     icon: "Wand2",
     inputs: [
@@ -163,9 +163,9 @@ export const NODE_CATALOGUE: NodeCatalogueItem[] = [
       { id: "prompt-out", label: "Composed Prompt", type: "text" },
       { id: "ctrl-out", label: "Control Image", type: "image" },
     ],
-    apiEngine: "Native",
-    tags: ["style", "prompt", "composition", "render", "visualization"],
-    executionTime: "< 5s",
+    apiEngine: "OpenAI GPT-4o-mini",
+    tags: ["style", "prompt", "composition", "render", "visualization", "live"],
+    executionTime: "< 8s",
   },
   {
     id: "TR-006",
@@ -308,7 +308,7 @@ export const NODE_CATALOGUE: NodeCatalogueItem[] = [
   {
     id: "GN-003",
     name: "Image Generator",
-    description: "Generate architectural concept images from massing + style prompt",
+    description: "Generate architectural concept images with 4 view types: exterior render, floor plan, site plan, interior view",
     category: "generate",
     icon: "Palette",
     inputs: [
@@ -316,9 +316,10 @@ export const NODE_CATALOGUE: NodeCatalogueItem[] = [
       { id: "prompt-in", label: "Style Prompt", type: "text" },
     ],
     outputs: [{ id: "images-out", label: "Concept Images", type: "image" }],
-    apiEngine: "OpenAI DALL·E / Stability AI",
-    tags: ["image", "render", "visualization", "concept", "ai"],
+    apiEngine: "OpenAI DALL·E 3",
+    tags: ["image", "render", "visualization", "concept", "ai", "exterior", "floor plan", "site plan", "interior"],
     executionTime: "2-3 min",
+    viewType: "exterior",
   },
   {
     id: "GN-004",
