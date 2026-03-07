@@ -1609,6 +1609,311 @@
 }
 
 /* ═══════════════════════════════════════════════════════════════════
+   DASHBOARD PAGE REDESIGN — Shared Styles
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ── Floating orbs ─────────────────────────────────────────────── */
+@keyframes dp-float1 {
+  0%   { transform: translate(0px, 0px) scale(1); }
+  100% { transform: translate(80px, 60px) scale(1.1); }
+}
+@keyframes dp-float2 {
+  0%   { transform: translate(0px, 0px) scale(1); }
+  100% { transform: translate(-60px, -80px) scale(0.9); }
+}
+@keyframes dp-floatNode {
+  0%   { transform: translateY(0px); }
+  100% { transform: translateY(-12px); }
+}
+@keyframes dp-dash {
+  0%   { stroke-dashoffset: 200; }
+  100% { stroke-dashoffset: 0; }
+}
+@keyframes dp-pulse {
+  0%, 100% { opacity: 0.5; transform: scale(1); }
+  50%      { opacity: 1; transform: scale(1.15); }
+}
+@keyframes dp-shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+@keyframes dp-countUp {
+  0%   { opacity: 0; transform: translateY(8px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+@keyframes dp-blink {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0; }
+}
+@keyframes dp-breathe {
+  0%, 100% { transform: scaleY(1); }
+  50%      { transform: scaleY(1.08); }
+}
+@keyframes dp-statusPulse {
+  0%, 100% { box-shadow: 0 0 0 0 currentColor; }
+  50%      { box-shadow: 0 0 0 4px transparent; }
+}
+@keyframes dp-scanRotate {
+  0%   { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* ── Glass card base ───────────────────────────────────────────── */
+.dp-glass-card {
+  background: rgba(18,18,30,0.6);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 16px;
+  padding: 24px;
+  position: relative;
+  overflow: hidden;
+  transition: border-color 250ms ease, transform 250ms ease, box-shadow 250ms ease;
+}
+.dp-glass-card:hover {
+  border-color: rgba(255,255,255,0.1);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+}
+.dp-glass-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(105deg, transparent 40%, rgba(255,255,255,0.02) 50%, transparent 60%);
+  transform: translateX(-100%);
+  transition: transform 600ms ease;
+  pointer-events: none;
+}
+.dp-glass-card:hover::after {
+  transform: translateX(200%);
+}
+
+/* ── Glass card accent line variants ───────────────────────────── */
+.dp-glass-card[data-accent="blue"]::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, #1B4FFF, #00D4FF);
+  border-radius: 2px 2px 0 0;
+}
+.dp-glass-card[data-accent="purple"]::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, #8B5CF6, #EC4899);
+  border-radius: 2px 2px 0 0;
+}
+.dp-glass-card[data-accent="green"]::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, #10B981, #34D399);
+  border-radius: 2px 2px 0 0;
+}
+.dp-glass-card[data-accent="red"]::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, #F87171, #FB923C);
+  border-radius: 2px 2px 0 0;
+}
+
+/* ── Stat number style ─────────────────────────────────────────── */
+.dp-stat-number {
+  font-family: var(--font-jetbrains), monospace;
+  font-size: 44px;
+  font-weight: 700;
+  line-height: 1;
+  color: #F0F0F5;
+  animation: dp-countUp 0.5s ease-out both;
+}
+
+/* ── Page background ───────────────────────────────────────────── */
+.dp-page-bg {
+  position: relative;
+  min-height: 100%;
+  background: #07080E;
+}
+.dp-page-bg .dp-orb1 {
+  position: fixed;
+  top: -100px; left: -100px;
+  width: 600px; height: 600px;
+  background: radial-gradient(circle, rgba(27,79,255,0.07) 0%, transparent 70%);
+  animation: dp-float1 20s ease-in-out infinite alternate;
+  pointer-events: none;
+  z-index: 0;
+}
+.dp-page-bg .dp-orb2 {
+  position: fixed;
+  bottom: -100px; right: -100px;
+  width: 500px; height: 500px;
+  background: radial-gradient(circle, rgba(139,92,246,0.05) 0%, transparent 70%);
+  animation: dp-float2 25s ease-in-out infinite alternate;
+  pointer-events: none;
+  z-index: 0;
+}
+.dp-page-bg .dp-grid {
+  position: fixed;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px);
+  background-size: 48px 48px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ── Filter button group ───────────────────────────────────────── */
+.dp-filter-group {
+  display: inline-flex;
+  background: rgba(12,12,20,0.8);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 10px;
+  padding: 4px;
+  gap: 2px;
+}
+.dp-filter-btn {
+  padding: 6px 16px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: rgba(255,255,255,0.3);
+  cursor: pointer;
+  transition: all 180ms ease;
+}
+.dp-filter-btn:hover {
+  color: rgba(255,255,255,0.6);
+  background: rgba(255,255,255,0.04);
+}
+.dp-filter-btn[data-active="true"][data-color="blue"] {
+  background: rgba(79,138,255,0.2);
+  color: #4F8AFF;
+  border-color: rgba(79,138,255,0.3);
+}
+.dp-filter-btn[data-active="true"][data-color="green"] {
+  background: rgba(52,211,153,0.2);
+  color: #34D399;
+  border-color: rgba(52,211,153,0.3);
+}
+.dp-filter-btn[data-active="true"][data-color="red"] {
+  background: rgba(248,113,113,0.2);
+  color: #F87171;
+  border-color: rgba(248,113,113,0.3);
+}
+.dp-filter-btn[data-active="true"][data-color="purple"] {
+  background: rgba(139,92,246,0.2);
+  color: #A78BFA;
+  border-color: rgba(139,92,246,0.3);
+}
+
+/* ── Shimmer skeleton ──────────────────────────────────────────── */
+.dp-skeleton {
+  background: linear-gradient(90deg,
+    rgba(255,255,255,0.03) 25%,
+    rgba(255,255,255,0.06) 50%,
+    rgba(255,255,255,0.03) 75%);
+  background-size: 200% 100%;
+  animation: dp-shimmer 2s infinite;
+  border-radius: 8px;
+}
+
+/* ── Execution row ─────────────────────────────────────────────── */
+.dp-exec-row {
+  background: rgba(18,18,30,0.5);
+  border: 1px solid rgba(255,255,255,0.05);
+  border-radius: 12px;
+  padding: 16px 20px;
+  transition: all 200ms ease;
+}
+.dp-exec-row:hover {
+  background: rgba(27,79,255,0.04);
+  border-color: rgba(27,79,255,0.15);
+  transform: translateX(2px);
+}
+
+/* ── Settings tab nav ──────────────────────────────────────────── */
+.dp-settings-tab {
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: rgba(255,255,255,0.4);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  text-align: left;
+  transition: all 180ms ease;
+}
+.dp-settings-tab:hover {
+  color: rgba(255,255,255,0.7);
+  background: rgba(255,255,255,0.04);
+}
+.dp-settings-tab[data-active="true"] {
+  color: #ffffff;
+  background: rgba(27,79,255,0.12);
+  border-color: rgba(27,79,255,0.2);
+}
+.dp-settings-tab[data-active="true"] svg {
+  color: #4F8AFF;
+  filter: drop-shadow(0 0 4px rgba(79,138,255,0.4));
+}
+
+/* ── Settings input ────────────────────────────────────────────── */
+.dp-settings-input {
+  width: 100%;
+  background: rgba(12,12,22,0.8);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 10px;
+  padding: 12px 16px;
+  font-family: var(--font-jetbrains), monospace;
+  font-size: 13px;
+  color: rgba(255,255,255,0.7);
+  outline: none;
+  transition: all 200ms ease;
+}
+.dp-settings-input:focus {
+  border-color: rgba(27,79,255,0.5);
+  box-shadow: 0 0 0 3px rgba(27,79,255,0.1);
+}
+.dp-settings-input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ── Blinking cursor ───────────────────────────────────────────── */
+.dp-cursor-blink::after {
+  content: '\25CB';
+  animation: dp-blink 1s infinite;
+  margin-left: 2px;
+  color: #4F8AFF;
+}
+
+/* ── Ghost bar chart ───────────────────────────────────────────── */
+.dp-ghost-bar {
+  background: rgba(79,138,255,0.06);
+  border: 1px solid rgba(79,138,255,0.1);
+  border-radius: 4px 4px 0 0;
+  animation: dp-breathe 3s ease-in-out infinite;
+}
+.dp-ghost-bar-green {
+  background: rgba(16,185,129,0.06);
+  border: 1px solid rgba(16,185,129,0.1);
+  border-radius: 4px 4px 0 0;
+  animation: dp-breathe 3s ease-in-out infinite;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
    MOBILE RESPONSIVE STYLES
    ═══════════════════════════════════════════════════════════════════ */
 @import "../styles/mobile-responsive.css";
