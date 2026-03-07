@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense, useState } from "react";
-import { signIn } from "next-auth/react";
+import { signIn, signOut } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Mail, Lock, Chrome, Loader2, AlertCircle } from "lucide-react";
@@ -83,6 +83,9 @@ function LoginForm() {
   async function handleGoogle() {
     setLoading(true);
     try {
+      // Clear any existing session to prevent NextAuth from auto-linking
+      // the new Google account to a previously signed-in user
+      await signOut({ redirect: false });
       await signIn("google", { callbackUrl });
     } catch {
       setError(t('auth.googleError'));
