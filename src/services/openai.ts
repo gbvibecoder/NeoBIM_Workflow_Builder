@@ -355,15 +355,8 @@ export async function generateConceptImage(
     if (typeof descriptionOrPrompt === "string") {
       // Backward compatibility: plain string prompt
       imagePrompt = descriptionOrPrompt;
-      console.log("[generateConceptImage] Using string prompt (first 120 chars):", imagePrompt.slice(0, 120));
     } else {
       // BuildingDescription object — enhance with GPT-4o-mini, then use photorealistic builder
-      console.log("[generateConceptImage] BuildingDescription received:", {
-        projectName: descriptionOrPrompt.projectName,
-        buildingType: descriptionOrPrompt.buildingType,
-        floors: descriptionOrPrompt.floors,
-        facade: descriptionOrPrompt.facade?.slice(0, 60),
-      });
       try {
         imagePrompt = await enhanceArchitecturalPrompt(
           descriptionOrPrompt,
@@ -371,7 +364,6 @@ export async function generateConceptImage(
           style,
           userApiKey
         );
-        console.log("[generateConceptImage] Enhanced prompt (first 200 chars):", imagePrompt.slice(0, 200));
       } catch (enhanceErr) {
         console.error("[generateConceptImage] enhanceArchitecturalPrompt failed, using photorealistic fallback:", enhanceErr);
         // Fallback to existing photorealistic prompt builder
@@ -383,8 +375,6 @@ export async function generateConceptImage(
         );
       }
     }
-
-    console.log("[generateConceptImage] Final DALL-E prompt length:", imagePrompt.length, "chars");
 
     const response = await client.images.generate({
       model: "dall-e-3",

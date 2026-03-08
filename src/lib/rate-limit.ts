@@ -11,20 +11,24 @@ try {
       url: process.env.UPSTASH_REDIS_REST_URL,
       token: process.env.UPSTASH_REDIS_REST_TOKEN,
     });
-  } else {
-    const redisUrl = process.env.REDIS_URL || "redis://localhost:6379";
-    const url = new URL(redisUrl.replace("redis://", "http://"));
-    
+  } else if (process.env.REDIS_URL) {
+    const url = new URL(process.env.REDIS_URL.replace("redis://", "http://"));
     redis = new Redis({
       url: `https://${url.host}`,
       token: url.password || "",
     });
+  } else {
+    console.warn("[rate-limit] No Redis configured — rate limiting may not persist across restarts");
+    redis = new Redis({
+      url: "https://placeholder.upstash.io",
+      token: "placeholder",
+    });
   }
 } catch (error) {
-  console.warn("[rate-limit] Failed to initialize Redis, using in-memory fallback:", error);
+  console.error("[rate-limit] Failed to initialize Redis:", error);
   redis = new Redis({
-    url: process.env.UPSTASH_REDIS_REST_URL || "http://localhost:8079",
-    token: process.env.UPSTASH_REDIS_REST_TOKEN || "",
+    url: process.env.UPSTASH_REDIS_REST_URL || "https://placeholder.upstash.io",
+    token: process.env.UPSTASH_REDIS_REST_TOKEN || "placeholder",
   });
 }
 
