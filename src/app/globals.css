@@ -1,52 +1,58 @@
 @import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Playfair+Display:ital,wght@0,400;1,700&display=swap');
 
 @layer base {
   :root {
     color-scheme: dark;
 
-    /* ── Background hierarchy (layered depth) ──────────────────── */
-    --bg-base: #07070D;
-    --bg-canvas: #0B0B13;
-    --bg-card: #12121E;
-    --bg-elevated: #1A1A2A;
-    --bg-hover: #1F1F32;
-    --bg-surface: #16162A;
+    /* ── Background hierarchy (Atelier dark) ───────────────────── */
+    --bg-base: #070809;
+    --bg-canvas: #090A0C;
+    --bg-card: #0A0C0E;
+    --bg-elevated: #101214;
+    --bg-hover: #151718;
+    --bg-surface: #0D0F11;
 
     /* ── Border hierarchy ─────────────────────────────────────── */
-    --border-subtle: rgba(255, 255, 255, 0.06);
-    --border-default: rgba(255, 255, 255, 0.10);
-    --border-hover: rgba(255, 255, 255, 0.14);
-    --border-focus: rgba(79, 138, 255, 0.5);
+    --border-subtle: rgba(184, 115, 51, 0.08);
+    --border-default: rgba(184, 115, 51, 0.15);
+    --border-hover: rgba(184, 115, 51, 0.25);
+    --border-focus: rgba(0, 245, 255, 0.5);
 
     /* ── Text hierarchy ───────────────────────────────────────── */
-    --text-primary: #F0F0F5;
-    --text-secondary: #9898B0;
-    --text-tertiary: #5C5C78;
-    --text-disabled: #3A3A50;
-    --text-ghost: #2A2A3E;
+    --text-primary: #E2E8F0;
+    --text-secondary: #8898A8;
+    --text-tertiary: #556070;
+    --text-disabled: #3A4450;
+    --text-ghost: #2A3040;
 
-    /* ── Accent ───────────────────────────────────────────────── */
-    --accent-blue: #4F8AFF;
-    --accent-blue-hover: #6B9FFF;
-    --accent-blue-muted: #3D6FCC;
-    --accent-blue-glow: rgba(79, 138, 255, 0.15);
-    --accent-gradient: linear-gradient(135deg, #4F8AFF, #6366F1);
-    --accent-gradient-vivid: linear-gradient(135deg, #5A95FF 0%, #7C6FF7 50%, #9F7AFF 100%);
+    /* ── Accent (Atelier copper/cyan/amber) ────────────────────── */
+    --accent-blue: #00F5FF;
+    --accent-blue-hover: #33F7FF;
+    --accent-blue-muted: #00C4CC;
+    --accent-blue-glow: rgba(0, 245, 255, 0.15);
+    --accent-gradient: linear-gradient(135deg, #B87333, #FFBF00);
+    --accent-gradient-vivid: linear-gradient(135deg, #B87333 0%, #FFBF00 50%, #00F5FF 100%);
+
+    /* ── Atelier palette ────────────────────────────────────────── */
+    --atelier-copper: #B87333;
+    --atelier-cyan: #00F5FF;
+    --atelier-amber: #FFBF00;
 
     /* ── Status ───────────────────────────────────────────────── */
     --status-success: #34D399;
     --status-warning: #FBBF24;
     --status-error: #F87171;
 
-    /* ── Node category ────────────────────────────────────────── */
-    --node-input: #3B82F6;
-    --node-input-glow: rgba(59, 130, 246, 0.12);
-    --node-transform: #8B5CF6;
-    --node-transform-glow: rgba(139, 92, 246, 0.12);
-    --node-generate: #10B981;
-    --node-generate-glow: rgba(16, 185, 129, 0.12);
-    --node-export: #F59E0B;
-    --node-export-glow: rgba(245, 158, 11, 0.12);
+    /* ── Node category (Atelier palette) ───────────────────────── */
+    --node-input: #00F5FF;
+    --node-input-glow: rgba(0, 245, 255, 0.12);
+    --node-transform: #B87333;
+    --node-transform-glow: rgba(184, 115, 51, 0.12);
+    --node-generate: #FFBF00;
+    --node-generate-glow: rgba(255, 191, 0, 0.12);
+    --node-export: #4FC3F7;
+    --node-export-glow: rgba(79, 195, 247, 0.12);
 
     /* ── Shadows (layered, realistic) ─────────────────────────── */
     --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.2);
@@ -1960,6 +1966,49 @@
 /* ── Architectural font utility ──────────────────────────────── */
 .arch-font {
   font-family: var(--font-space-grotesk, 'DM Sans', sans-serif);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   DIGITAL ATELIER — ANIMATIONS & UTILITIES
+   ═══════════════════════════════════════════════════════════════════ */
+
+@keyframes atelier-float-1 {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-6px); }
+}
+
+@keyframes atelier-float-2 {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-4px); }
+}
+
+@keyframes atelier-scan {
+  0% { top: 0%; }
+  100% { top: 100%; }
+}
+
+@keyframes atelier-flow {
+  from { stroke-dashoffset: 100; }
+  to { stroke-dashoffset: 0; }
+}
+
+@keyframes atelier-pulse {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 0.6; }
+}
+
+@keyframes atelier-glow-pulse {
+  0%, 100% { opacity: 0.03; }
+  50% { opacity: 0.08; }
+}
+
+/* Atelier font families */
+.font-atelier-serif {
+  font-family: 'Playfair Display', serif;
+}
+
+.font-atelier-mono {
+  font-family: 'Space Mono', monospace;
 }
 
 /* ═══════════════════════════════════════════════════════════════════

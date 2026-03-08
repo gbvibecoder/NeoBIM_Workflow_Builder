@@ -41,48 +41,39 @@ function portPercent(index: number, total: number): number {
 // ─── category colours ────────────────────────────────────────────────────────
 
 const CATEGORY_COLOR: Record<NodeCategory, string> = {
-  input:     "#3B82F6",
-  transform: "#8B5CF6",
-  generate:  "#10B981",
-  export:    "#F59E0B",
+  input:     "#00F5FF",
+  transform: "#B87333",
+  generate:  "#FFBF00",
+  export:    "#4FC3F7",
 };
 
 // ─── Category-specific background patterns ──────────────────────────────────
 
 const CATEGORY_BG: Record<NodeCategory, React.CSSProperties> = {
-  // Blueprint grid — thin blue lines like architect's drawing paper
+  // Subtle dot grid — Atelier style
   input: {
-    backgroundImage: [
-      'linear-gradient(rgba(59,130,246,0.06) 1px, transparent 1px)',
-      'linear-gradient(90deg, rgba(59,130,246,0.06) 1px, transparent 1px)',
-      'linear-gradient(rgba(59,130,246,0.025) 1px, transparent 1px)',
-      'linear-gradient(90deg, rgba(59,130,246,0.025) 1px, transparent 1px)',
-    ].join(', '),
-    backgroundSize: '40px 40px, 40px 40px, 10px 10px, 10px 10px',
+    backgroundImage: 'radial-gradient(circle, rgba(0,245,255,0.04) 0.5px, transparent 0.5px)',
+    backgroundSize: '12px 12px',
   },
-  // Diagonal data streams — neural/computational feel
+  // Diagonal copper streams
   transform: {
     backgroundImage: [
-      'repeating-linear-gradient(135deg, transparent, transparent 11px, rgba(139,92,246,0.035) 11px, rgba(139,92,246,0.035) 12px)',
-      'repeating-linear-gradient(45deg, transparent, transparent 15px, rgba(139,92,246,0.02) 15px, rgba(139,92,246,0.02) 16px)',
+      'repeating-linear-gradient(135deg, transparent, transparent 11px, rgba(184,115,51,0.04) 11px, rgba(184,115,51,0.04) 12px)',
+      'repeating-linear-gradient(45deg, transparent, transparent 15px, rgba(184,115,51,0.025) 15px, rgba(184,115,51,0.025) 16px)',
     ].join(', '),
   },
-  // Isometric grid — 3D spatial drafting feel
+  // Amber grid
   generate: {
     backgroundImage: [
-      'repeating-linear-gradient(30deg, transparent, transparent 13px, rgba(16,185,129,0.04) 13px, rgba(16,185,129,0.04) 14px)',
-      'repeating-linear-gradient(150deg, transparent, transparent 13px, rgba(16,185,129,0.04) 13px, rgba(16,185,129,0.04) 14px)',
-      'repeating-linear-gradient(90deg, transparent, transparent 11px, rgba(16,185,129,0.025) 11px, rgba(16,185,129,0.025) 12px)',
+      'linear-gradient(rgba(255,191,0,0.03) 1px, transparent 1px)',
+      'linear-gradient(90deg, rgba(255,191,0,0.03) 1px, transparent 1px)',
     ].join(', '),
+    backgroundSize: '10px 10px',
   },
-  // Paper stipple — finished document texture
+  // Light stipple
   export: {
-    backgroundImage: [
-      'radial-gradient(circle, rgba(245,158,11,0.025) 0.5px, transparent 0.5px)',
-      'radial-gradient(circle, rgba(245,158,11,0.015) 0.5px, transparent 0.5px)',
-    ].join(', '),
-    backgroundSize: '6px 6px, 10px 10px',
-    backgroundPosition: '0 0, 3px 3px',
+    backgroundImage: 'radial-gradient(circle, rgba(79,195,247,0.03) 0.5px, transparent 0.5px)',
+    backgroundSize: '8px 8px',
   },
 };
 
@@ -234,10 +225,10 @@ function NodeHandle({ port, handleType, position, topPct, color }: NodeHandlePro
       title={`${handleType === "source" ? "Output" : "Input"}: ${port.label}`}
       style={{
         top: `${topPct}%`,
-        width:  hovered ? 14 : 11,
-        height: hovered ? 14 : 11,
-        background: hovered ? color : "#0e0e1a",
-        border: `2px solid ${hovered ? color : `rgba(${rgb}, 0.4)`}`,
+        width:  hovered ? 12 : 9,
+        height: hovered ? 12 : 9,
+        background: hovered ? color : "#070809",
+        border: `1.5px solid ${hovered ? color : `rgba(${rgb}, 0.4)`}`,
         borderRadius: "50%",
         boxShadow: hovered
           ? `0 0 12px rgba(${rgb}, 0.6), 0 0 4px rgba(${rgb}, 0.3)`
@@ -260,10 +251,10 @@ function ProgressBar({ status, color }: { status: NodeStatus; color: string }) {
       style={{
         position: "absolute",
         left: 0, right: 0, bottom: 0,
-        height: 2,
+        height: 1,
         background: "rgba(255,255,255,0.03)",
-        borderBottomLeftRadius: 16,
-        borderBottomRightRadius: 16,
+        borderBottomLeftRadius: 4,
+        borderBottomRightRadius: 4,
         overflow: "hidden",
       }}
     >
@@ -307,7 +298,7 @@ function InlineResult({ artifact }: { artifact: ExecutionArtifact }) {
     return (
       <div style={{
         padding: "8px 0 2px",
-        borderTop: "1px solid rgba(255,255,255,0.06)",
+        borderTop: "1px solid rgba(184,115,51,0.1)",
         marginTop: 8,
       }}>
         {lines.map((line, i) => (
@@ -317,7 +308,9 @@ function InlineResult({ artifact }: { artifact: ExecutionArtifact }) {
             animate={{ opacity: 1 }}
             transition={{ delay: i * 0.08, duration: 0.3 }}
             style={{
-              fontSize: 10.5, color: "#8888A0", lineHeight: 1.5,
+              fontSize: 10.5, color: "rgba(255,255,255,0.5)", lineHeight: 1.5,
+              fontFamily: "'Space Mono', monospace",
+              fontStyle: "italic",
               overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
             }}
           >
@@ -325,7 +318,7 @@ function InlineResult({ artifact }: { artifact: ExecutionArtifact }) {
           </motion.div>
         ))}
         {text.split("\n").length > 4 && (
-          <div style={{ fontSize: 9, color: "#4F8AFF", marginTop: 2 }}>+{text.split("\n").length - 4} more lines</div>
+          <div style={{ fontSize: 9, color: "#00F5FF", marginTop: 2, fontFamily: "'Space Mono', monospace" }}>+{text.split("\n").length - 4} more lines</div>
         )}
       </div>
     );
@@ -339,7 +332,7 @@ function InlineResult({ artifact }: { artifact: ExecutionArtifact }) {
         gridTemplateColumns: "1fr 1fr",
         gap: 4,
         padding: "8px 0 2px",
-        borderTop: "1px solid rgba(255,255,255,0.06)",
+        borderTop: "1px solid rgba(184,115,51,0.1)",
         marginTop: 8,
       }}>
         {metrics.slice(0, 4).map((m, i) => (
@@ -349,16 +342,17 @@ function InlineResult({ artifact }: { artifact: ExecutionArtifact }) {
             animate={{ opacity: 1, scale: 1 }}
             transition={{ delay: i * 0.06, duration: 0.25 }}
             style={{
-              background: "rgba(255,255,255,0.03)",
-              borderRadius: 6, padding: "5px 7px",
+              background: "rgba(184,115,51,0.08)",
+              border: "1px solid rgba(184,115,51,0.15)",
+              borderRadius: 2, padding: "6px 10px",
               textAlign: "center",
             }}
           >
-            <div style={{ fontSize: 14, fontWeight: 700, color: "#F0F0F5", lineHeight: 1.1 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: "#FFBF00", lineHeight: 1.1, fontFamily: "'Space Mono', monospace" }}>
               {m.value}
-              {m.unit && <span style={{ fontSize: 8, color: "#5C5C78", marginLeft: 2 }}>{m.unit}</span>}
+              {m.unit && <span style={{ fontSize: 8, color: "rgba(255,255,255,0.4)", marginLeft: 2 }}>{m.unit}</span>}
             </div>
-            <div style={{ fontSize: 7.5, color: "#5C5C78", marginTop: 2, textTransform: "uppercase" as const, letterSpacing: "0.3px" }}>
+            <div style={{ fontSize: 7, color: "rgba(255,255,255,0.4)", marginTop: 2, textTransform: "uppercase" as const, letterSpacing: "0.1em", fontFamily: "'Space Mono', monospace" }}>
               {m.label}
             </div>
           </motion.div>
@@ -577,26 +571,23 @@ export const BaseNode = memo(function BaseNode({ id, data, selected }: BaseNodeP
           ["--cat-color" as string]: color,
           ["--cat-rgb" as string]: rgb,
           width: isInput ? 320 : 220,
-          background: "linear-gradient(145deg, rgba(10,12,22,0.94) 0%, rgba(6,8,16,0.97) 100%)",
+          background: "rgba(10, 12, 14, 0.75)",
           border: `1px solid ${outerBorderColor}`,
-          borderRadius: 16,
+          borderRadius: 4,
           boxShadow: [
             isHovered
-              ? `0 16px 48px rgba(0,0,0,0.65), 0 0 35px rgba(${rgb}, 0.1)`
+              ? `0 16px 48px rgba(0,0,0,0.65), 0 0 40px rgba(${rgb}, 0.1)`
               : `0 4px 24px rgba(0,0,0,0.5)`,
-            `inset 0 1px 0 rgba(255,255,255,0.06)`,
-            `inset 0 -1px 0 rgba(0,0,0,0.3)`,
             stateGlow,
-            generateDepth,
           ].filter(Boolean).join(", "),
-          backdropFilter: "blur(24px) saturate(1.4)",
-          WebkitBackdropFilter: "blur(24px) saturate(1.4)",
+          backdropFilter: "blur(40px) saturate(1.3)",
+          WebkitBackdropFilter: "blur(40px) saturate(1.3)",
           transform: isHovered && !selected
-            ? "translateY(-5px) scale(1.015)"
-            : "translateY(0) scale(1)",
-          transition: "all 0.35s cubic-bezier(0.34, 1.56, 0.64, 1)",
+            ? "translateY(-3px)"
+            : "translateY(0)",
+          transition: "all 0.6s cubic-bezier(0.4, 0, 0.2, 1)",
           animation: status === "idle" && !isHovered && !selected
-            ? "node-breathe 4s ease-in-out infinite"
+            ? "atelier-float-1 22s ease-in-out infinite"
             : "none",
           overflow: "visible",
           cursor: "pointer",
@@ -606,7 +597,7 @@ export const BaseNode = memo(function BaseNode({ id, data, selected }: BaseNodeP
         {/* ── Category-specific background pattern ── */}
         <div style={{
           position: "absolute", inset: 0,
-          borderRadius: 16, overflow: "hidden",
+          borderRadius: 4, overflow: "hidden",
           pointerEvents: "none", zIndex: 0,
           ...CATEGORY_BG[category],
         }} />
@@ -615,16 +606,32 @@ export const BaseNode = memo(function BaseNode({ id, data, selected }: BaseNodeP
         <div style={{
           position: "absolute",
           top: 0, left: 0, right: 0, height: 40,
-          borderRadius: "16px 16px 0 0",
-          background: `linear-gradient(180deg, rgba(${rgb}, 0.04) 0%, transparent 100%)`,
+          borderRadius: "4px 4px 0 0",
+          background: `linear-gradient(180deg, rgba(${rgb}, 0.05) 0%, transparent 100%)`,
           pointerEvents: "none", zIndex: 0,
+        }} />
+
+        {/* ── Scanning line (Atelier) ── */}
+        <div style={{
+          position: "absolute", left: 0, width: "100%", height: "1px",
+          background: `linear-gradient(90deg, transparent, rgba(${rgb}, 0.4), transparent)`,
+          animation: status === "running" ? "atelier-scan 1s linear infinite" : "atelier-scan 4s linear infinite",
+          opacity: 0.3, pointerEvents: "none", zIndex: 3,
+        }} />
+
+        {/* ── Glow behind node (Atelier) ── */}
+        <div style={{
+          position: "absolute", inset: "-30px",
+          background: `radial-gradient(ellipse, rgba(${rgb}, 0.06) 0%, transparent 70%)`,
+          filter: "blur(20px)", pointerEvents: "none", zIndex: -1,
+          animation: "atelier-pulse 6s ease-in-out infinite",
         }} />
 
         {/* ── Generate node — recessed depth effect via inner shadow overlay ── */}
         {category === "generate" && (
           <div style={{
             position: "absolute", inset: 0,
-            borderRadius: 16,
+            borderRadius: 4,
             boxShadow: "inset 0 3px 12px rgba(0,0,0,0.25), inset 0 -1px 4px rgba(0,0,0,0.1)",
             pointerEvents: "none", zIndex: 0,
           }} />
@@ -635,20 +642,20 @@ export const BaseNode = memo(function BaseNode({ id, data, selected }: BaseNodeP
           <div style={{
             position: "absolute",
             inset: 5,
-            borderRadius: 11,
-            border: "1px dashed rgba(245,158,11,0.08)",
+            borderRadius: 2,
+            border: `1px dashed rgba(${rgb}, 0.08)`,
             pointerEvents: "none", zIndex: 0,
           }} />
         )}
 
-        {/* ── Top glow line (full width, 2px) ── */}
+        {/* ── Top glow line (full width, 1px — architectural precision) ── */}
         <div style={{
           position: "absolute",
           top: -1, left: 0, right: 0,
-          height: 2,
-          background: `linear-gradient(90deg, transparent 5%, rgba(${rgb}, 0.5) 30%, rgba(${rgb}, 0.7) 50%, rgba(${rgb}, 0.5) 70%, transparent 95%)`,
-          borderTopLeftRadius: 16,
-          borderTopRightRadius: 16,
+          height: 1,
+          background: `linear-gradient(90deg, transparent 5%, rgba(${rgb}, 0.4) 30%, rgba(${rgb}, 0.6) 50%, rgba(${rgb}, 0.4) 70%, transparent 95%)`,
+          borderTopLeftRadius: 4,
+          borderTopRightRadius: 4,
           pointerEvents: "none",
         }} />
 
@@ -658,18 +665,18 @@ export const BaseNode = memo(function BaseNode({ id, data, selected }: BaseNodeP
         {/* ── Tick marks — scale ruler (input nodes only) ── */}
         {isInput && <TickMarks color={color} />}
 
-        {/* ── Left accent bar with gradient pulse + glow ── */}
+        {/* ── Left accent bar — glowing line that fades at top/bottom (Atelier) ── */}
         <div style={{
           position: "absolute",
-          left: 0, top: 12, bottom: 12,
+          left: 0, top: 0, bottom: 0,
           width: 2,
-          background: `linear-gradient(180deg, ${color} 0%, rgba(${rgb}, 0.15) 100%)`,
+          background: `linear-gradient(180deg, rgba(${rgb}, 0) 0%, ${color} 30%, ${color} 70%, rgba(${rgb}, 0) 100%)`,
           animation: "accent-pulse 3s ease-in-out infinite",
           zIndex: 1,
         }} />
         <div style={{
           position: "absolute",
-          left: -3, top: 12, bottom: 12,
+          left: -3, top: 0, bottom: 0,
           width: 8,
           background: `radial-gradient(ellipse at left, rgba(${rgb}, 0.12) 0%, transparent 80%)`,
           pointerEvents: "none",
@@ -684,7 +691,7 @@ export const BaseNode = memo(function BaseNode({ id, data, selected }: BaseNodeP
               style={{
                 position: "absolute",
                 inset: -4,
-                borderRadius: 20,
+                borderRadius: 8,
                 border: `2px solid rgba(${rgb}, 0.3)`,
                 pointerEvents: "none",
               }}
@@ -692,7 +699,7 @@ export const BaseNode = memo(function BaseNode({ id, data, selected }: BaseNodeP
             <motion.div
               style={{
                 position: "absolute", inset: 0,
-                borderRadius: 16, pointerEvents: "none",
+                borderRadius: 4, pointerEvents: "none",
               }}
               animate={{
                 boxShadow: [
@@ -714,7 +721,7 @@ export const BaseNode = memo(function BaseNode({ id, data, selected }: BaseNodeP
             transition={{ duration: 1.2, ease: "easeOut" }}
             style={{
               position: "absolute", inset: -2,
-              borderRadius: 16, pointerEvents: "none",
+              borderRadius: 4, pointerEvents: "none",
               background: "radial-gradient(circle, rgba(52, 211, 153, 0.3) 0%, transparent 70%)",
             }}
           />
@@ -727,64 +734,57 @@ export const BaseNode = memo(function BaseNode({ id, data, selected }: BaseNodeP
             transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
             style={{
               position: "absolute", inset: -2,
-              borderRadius: 16, pointerEvents: "none",
+              borderRadius: 4, pointerEvents: "none",
               background: "radial-gradient(circle, rgba(248, 113, 113, 0.25) 0%, transparent 70%)",
             }}
           />
         )}
 
         {/* ── Content ── */}
-        <div style={{ padding: "12px 14px 14px 18px", position: "relative", zIndex: 1 }}>
+        <div style={{ padding: "16px 18px 14px 18px", position: "relative", zIndex: 1 }}>
 
-          {/* Row 1: Diamond icon + name + status + INPUT badge */}
+          {/* Row 1: Icon + name + status + INPUT badge */}
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 2 }}>
-            {/* Diamond-shaped icon container */}
+            {/* Simple icon — no container, Atelier style */}
             <div style={{
-              width: 32, height: 32,
-              transform: "rotate(45deg)",
-              background: `linear-gradient(135deg, rgba(${rgb}, 0.15) 0%, rgba(${rgb}, 0.05) 100%)`,
-              border: `1px solid rgba(${rgb}, 0.25)`,
+              color,
               display: "flex", alignItems: "center", justifyContent: "center",
               flexShrink: 0,
-              boxShadow: `0 0 12px rgba(${rgb}, 0.08)`,
+              filter: `drop-shadow(0 0 6px rgba(${rgb}, 0.3))`,
+              animation: category === "transform" ? "spin-slow 8s linear infinite" : "none",
             }}>
-              <div style={{
-                transform: "rotate(-45deg)",
-                color,
-                display: "flex", alignItems: "center", justifyContent: "center",
-              }}>
-                {getIcon(data.icon, 16)}
-              </div>
+              {getIcon(data.icon, 16)}
             </div>
 
-            {/* Node name — Space Grotesk */}
+            {/* Node name — Playfair Display italic (Atelier) */}
             <span style={{
-              fontSize: 14,
-              fontWeight: 700,
-              color: "#e8e8f0",
-              letterSpacing: "-0.01em",
+              fontSize: 15,
+              fontWeight: 400,
+              fontStyle: "italic",
+              color,
+              letterSpacing: "0.05em",
               flex: 1,
               overflow: "hidden",
               textOverflow: "ellipsis",
               whiteSpace: "nowrap",
               lineHeight: 1.3,
-              fontFamily: "var(--font-space-grotesk, inherit)",
+              fontFamily: "'Playfair Display', serif",
             }}>
               {data.label}
             </span>
 
-            {/* INPUT badge — title block stamp */}
+            {/* INPUT badge — Atelier style */}
             {isInput && (
               <span style={{
-                fontSize: 8,
-                fontWeight: 600,
+                fontSize: 7,
+                fontWeight: 400,
                 color,
-                padding: "1px 6px",
-                border: `1px solid rgba(${rgb}, 0.3)`,
-                boxShadow: `inset 0 0 0 0.5px rgba(${rgb}, 0.12), 0 0 8px rgba(${rgb}, 0.08)`,
+                padding: "3px 8px",
+                background: `rgba(${rgb}, 0.15)`,
+                border: `1px solid rgba(${rgb}, 0.25)`,
                 letterSpacing: "0.15em",
                 textTransform: "uppercase" as const,
-                fontFamily: "var(--font-space-grotesk, inherit)",
+                fontFamily: "'Space Mono', monospace",
                 flexShrink: 0,
               }}>
                 {t('execution.inputLabel')}
@@ -843,19 +843,19 @@ export const BaseNode = memo(function BaseNode({ id, data, selected }: BaseNodeP
             </AnimatePresence>
           </div>
 
-          {/* Row 2: Subtitle (type label — uppercase, technical) */}
+          {/* Row 2: Subtitle — Space Mono, tiny, uppercase (Atelier) */}
           {typeLabel && (
             <div style={{
-              fontSize: 10,
-              color: "#4a4a68",
+              fontSize: 8,
+              color: `rgba(${rgb}, 0.5)`,
               marginTop: 4,
               lineHeight: 1.4,
               overflow: "hidden",
               textOverflow: "ellipsis",
               whiteSpace: "nowrap",
               textTransform: "uppercase" as const,
-              letterSpacing: "0.06em",
-              fontFamily: "var(--font-space-grotesk, inherit)",
+              letterSpacing: "0.1em",
+              fontFamily: "'Space Mono', monospace",
             }}>
               {typeLabel}
             </div>
@@ -874,19 +874,20 @@ export const BaseNode = memo(function BaseNode({ id, data, selected }: BaseNodeP
             {category === "generate" && <BuildingSection color={color} />}
             {category === "export" && <DocumentFold color={color} />}
             <div style={{ flex: 1 }} />
-            {/* Time pill */}
+            {/* Time pill — Atelier */}
             <span style={{
-              fontSize: 9,
-              color: "#6a6a88",
+              fontSize: 8,
+              color: "rgba(255,255,255,0.3)",
               whiteSpace: "nowrap",
               flexShrink: 0,
-              fontWeight: 500,
+              fontWeight: 400,
               padding: "2px 8px",
-              borderRadius: 3,
-              background: "rgba(255,255,255,0.03)",
-              border: "1px solid rgba(255,255,255,0.05)",
-              letterSpacing: "0.02em",
-              fontFamily: "var(--font-space-grotesk, inherit)",
+              borderRadius: 2,
+              background: "rgba(0,0,0,0.3)",
+              border: `1px solid rgba(${rgb}, 0.1)`,
+              letterSpacing: "0.05em",
+              fontFamily: "'Space Mono', monospace",
+              textTransform: "uppercase" as const,
             }}>
               {data.executionTime ?? "< 2s"}
             </span>
@@ -937,12 +938,12 @@ export const BaseNode = memo(function BaseNode({ id, data, selected }: BaseNodeP
               transform: "translateX(-50%)",
               marginTop: 8,
               padding: "8px 12px",
-              borderRadius: 8,
-              background: "rgba(30, 10, 10, 0.95)",
+              borderRadius: 4,
+              background: "rgba(10, 8, 8, 0.95)",
               border: "1px solid rgba(248, 113, 113, 0.4)",
               boxShadow: "0 8px 24px rgba(0,0,0,0.5)",
-              backdropFilter: "blur(12px)",
-              WebkitBackdropFilter: "blur(12px)",
+              backdropFilter: "blur(40px)",
+              WebkitBackdropFilter: "blur(40px)",
               maxWidth: 280,
               zIndex: 1000,
               pointerEvents: "none",

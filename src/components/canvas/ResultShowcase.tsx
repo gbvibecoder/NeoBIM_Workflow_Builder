@@ -176,12 +176,12 @@ export function ResultShowcase({ onClose }: ResultShowcaseProps) {
         right: "3%",
         width: "58%",
         height: "90%",
-        background: "linear-gradient(145deg, rgba(12,14,24,0.95), rgba(8,10,18,0.98))",
+        background: "linear-gradient(145deg, rgba(7,8,9,0.95), rgba(7,8,9,0.98))",
         backdropFilter: "blur(40px)",
         WebkitBackdropFilter: "blur(40px)",
-        borderRadius: 24,
-        border: "1px solid rgba(255,255,255,0.08)",
-        boxShadow: "0 32px 80px rgba(0,0,0,0.6), 0 0 40px rgba(79,138,255,0.05)",
+        borderRadius: 4,
+        border: "1px solid rgba(184,115,51,0.15)",
+        boxShadow: "0 32px 80px rgba(0,0,0,0.6), 0 0 40px rgba(0,245,255,0.05)",
         overflow: "auto",
         zIndex: 50,
       }}
@@ -245,7 +245,7 @@ export function ResultShowcase({ onClose }: ResultShowcaseProps) {
             animate={{ opacity: 1, scale: 1 }}
             transition={{ delay: 0.2, duration: 0.4 }}
             style={{
-              borderRadius: 16, overflow: "hidden",
+              borderRadius: 4, overflow: "hidden",
               marginBottom: 24,
               boxShadow: "0 8px 32px rgba(0,0,0,0.4)",
             }}
@@ -287,7 +287,7 @@ export function ResultShowcase({ onClose }: ResultShowcaseProps) {
                   style={{
                     background: "rgba(255,255,255,0.03)",
                     border: "1px solid rgba(255,255,255,0.06)",
-                    borderRadius: 12,
+                    borderRadius: 4,
                     padding: "14px 16px",
                     textAlign: "center",
                   }}
@@ -332,7 +332,7 @@ export function ResultShowcase({ onClose }: ResultShowcaseProps) {
                   style={{
                     display: "inline-flex", alignItems: "center", gap: 4,
                     background: "none", border: "none",
-                    color: "#4F8AFF", fontSize: 12, fontWeight: 500,
+                    color: "#00F5FF", fontSize: 12, fontWeight: 500,
                     cursor: "pointer", marginLeft: 8,
                   }}
                 >
@@ -360,7 +360,7 @@ export function ResultShowcase({ onClose }: ResultShowcaseProps) {
                 <div key={idx} style={{
                   background: "rgba(0,0,0,0.2)",
                   border: "1px solid rgba(255,255,255,0.04)",
-                  borderRadius: 12,
+                  borderRadius: 4,
                   overflow: "hidden",
                 }}>
                   <table style={{
@@ -398,7 +398,7 @@ export function ResultShowcase({ onClose }: ResultShowcaseProps) {
                     </tbody>
                   </table>
                   {rows.length > 8 && (
-                    <div style={{ padding: "8px 12px", fontSize: 10, color: "#4F8AFF" }}>
+                    <div style={{ padding: "8px 12px", fontSize: 10, color: "#00F5FF" }}>
                       +{rows.length - 8} more rows
                     </div>
                   )}
@@ -419,23 +419,23 @@ export function ResultShowcase({ onClose }: ResultShowcaseProps) {
               width: "100%",
               display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
               padding: "16px",
-              borderRadius: 14,
-              background: "linear-gradient(135deg, rgba(79,138,255,0.1), rgba(99,102,241,0.1))",
-              border: "1px solid rgba(79,138,255,0.25)",
-              color: "#4F8AFF",
+              borderRadius: 4,
+              background: "linear-gradient(135deg, rgba(0,245,255,0.1), rgba(184,115,51,0.1))",
+              border: "1px solid rgba(0,245,255,0.25)",
+              color: "#00F5FF",
               fontSize: 15, fontWeight: 600,
               cursor: "pointer",
               transition: "all 0.2s ease",
               marginBottom: 20,
             }}
             onMouseEnter={e => {
-              e.currentTarget.style.background = "linear-gradient(135deg, rgba(79,138,255,0.15), rgba(99,102,241,0.15))";
-              e.currentTarget.style.borderColor = "rgba(79,138,255,0.4)";
-              e.currentTarget.style.boxShadow = "0 0 30px rgba(79,138,255,0.1)";
+              e.currentTarget.style.background = "linear-gradient(135deg, rgba(0,245,255,0.15), rgba(184,115,51,0.15))";
+              e.currentTarget.style.borderColor = "rgba(0,245,255,0.4)";
+              e.currentTarget.style.boxShadow = "0 0 30px rgba(0,245,255,0.1)";
             }}
             onMouseLeave={e => {
-              e.currentTarget.style.background = "linear-gradient(135deg, rgba(79,138,255,0.1), rgba(99,102,241,0.1))";
-              e.currentTarget.style.borderColor = "rgba(79,138,255,0.25)";
+              e.currentTarget.style.background = "linear-gradient(135deg, rgba(0,245,255,0.1), rgba(184,115,51,0.1))";
+              e.currentTarget.style.borderColor = "rgba(0,245,255,0.25)";
               e.currentTarget.style.boxShadow = "none";
             }}
           >
@@ -502,7 +502,7 @@ export function ResultShowcase({ onClose }: ResultShowcaseProps) {
           }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-            <Zap size={11} style={{ color: "#F59E0B" }} />
+            <Zap size={11} style={{ color: "#FFBF00" }} />
             <span style={{ fontSize: 11, color: "#5C5C78" }}>
               {artifacts.size} artifacts generated
             </span>

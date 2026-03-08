@@ -33,21 +33,21 @@ import type { NodeCategory } from "@/types/nodes";
 // ─── Category → color ────────────────────────────────────────────────────────
 
 const CATEGORY_COLOR: Record<NodeCategory, string> = {
-  input:     "#3B82F6",
-  transform: "#8B5CF6",
-  generate:  "#10B981",
-  export:    "#F59E0B",
+  input:     "#00F5FF",
+  transform: "#B87333",
+  generate:  "#FFBF00",
+  export:    "#4FC3F7",
 };
 
 const TYPE_COLOR: Record<ArtifactType, string> = {
-  text:  "#4F8AFF",
-  json:  "#10B981",
-  image: "#8B5CF6",
-  kpi:   "#F59E0B",
-  table: "#06B6D4",
-  file:  "#F59E0B",
-  "3d":  "#F59E0B",
-  svg:   "#10B981",
+  text:  "#B87333",
+  json:  "#00F5FF",
+  image: "#B87333",
+  kpi:   "#FFBF00",
+  table: "#00F5FF",
+  file:  "#B87333",
+  "3d":  "#FFBF00",
+  svg:   "#00F5FF",
 };
 
 const TYPE_ICON: Record<ArtifactType, React.ReactNode> = {
@@ -94,13 +94,13 @@ export function ArtifactCard({ artifact, nodeLabel, nodeCategory, onDismiss }: A
       exit={{ opacity: 0, scale: 0.94, transition: { duration: prefersReduced ? 0 : 0.15 } }}
       transition={{ type: "spring", stiffness: 380, damping: 32, duration: prefersReduced ? 0 : undefined }}
       style={{
-        borderBottom: "1px solid rgba(255,255,255,0.06)",
+        borderBottom: "1px solid rgba(184,115,51,0.1)",
         borderLeft: `3px solid ${accentColor}`,
-        background: "rgba(12,12,24,0.95)",
-        backdropFilter: "blur(32px) saturate(1.3)",
-        WebkitBackdropFilter: "blur(32px) saturate(1.3)",
+        background: "rgba(7,8,9,0.95)",
+        backdropFilter: "blur(40px)",
+        WebkitBackdropFilter: "blur(40px)",
         overflow: "hidden",
-        boxShadow: "0 8px 32px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.03)",
+        boxShadow: "0 8px 32px rgba(0,0,0,0.4)",
         animation: prefersReduced ? "none" : "slide-up 0.4s ease-out",
       }}
     >
@@ -117,6 +117,7 @@ export function ArtifactCard({ artifact, nodeLabel, nodeCategory, onDismiss }: A
         {/* Node name */}
         <span style={{
           fontSize: 11, fontWeight: 600, color: "#E0E0EA",
+          fontFamily: "'Playfair Display', serif", fontStyle: "italic",
           flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
         }}>
           {nodeLabel ?? t('artifact.nodeOutput')}
@@ -128,6 +129,7 @@ export function ArtifactCard({ artifact, nodeLabel, nodeCategory, onDismiss }: A
           padding: "2px 8px", borderRadius: 6,
           background: `${typeColor}15`,
           fontSize: 9, fontWeight: 700, color: typeColor,
+          fontFamily: "'Space Mono', monospace",
           textTransform: "uppercase" as const, letterSpacing: "0.05em",
           flexShrink: 0,
         }}>
@@ -139,7 +141,7 @@ export function ArtifactCard({ artifact, nodeLabel, nodeCategory, onDismiss }: A
         <motion.div
           animate={{ rotate: collapsed ? -90 : 0 }}
           transition={{ duration: 0.15 }}
-          style={{ color: "#3A3A50", display: "flex", flexShrink: 0 }}
+          style={{ color: "rgba(184,115,51,0.4)", display: "flex", flexShrink: 0 }}
         >
           <ChevronDown size={12} />
         </motion.div>
@@ -229,7 +231,9 @@ function TextBody({ data }: { data: TextArtifactData }) {
   return (
     <div style={{ padding: "0 12px 10px 14px" }}>
       <p style={{
-        fontSize: 11, color: "#8888A0", lineHeight: 1.6,
+        fontSize: 11, color: "rgba(255,255,255,0.5)", lineHeight: 1.6,
+        fontFamily: "'Space Mono', monospace", fontStyle: "italic",
+        borderLeft: "2px solid rgba(184,115,51,0.3)", paddingLeft: "10px",
         whiteSpace: "pre-wrap", margin: 0,
       }}>
         {display}
@@ -239,7 +243,7 @@ function TextBody({ data }: { data: TextArtifactData }) {
           onClick={() => setExpanded(v => !v)}
           style={{
             marginTop: 6, background: "none", border: "none",
-            fontSize: 10, color: "#4F8AFF", cursor: "pointer", padding: 0,
+            fontSize: 10, color: "#00F5FF", cursor: "pointer", padding: 0,
           }}
         >
           {expanded ? t('artifact.showLess') : t('artifact.showMore')}
@@ -257,7 +261,7 @@ function JsonBody({ data }: { data: JsonArtifactData }) {
       background: "rgba(0,0,0,0.3)", borderRadius: 6, overflow: "auto",
       maxHeight: 180, padding: "8px 10px",
     }}>
-      <pre style={{ fontSize: 10, color: "#10B981", margin: 0, fontFamily: "monospace", lineHeight: 1.5 }}>
+      <pre style={{ fontSize: 10, color: "#00F5FF", margin: 0, fontFamily: "monospace", lineHeight: 1.5 }}>
         {json}
       </pre>
     </div>
@@ -311,12 +315,12 @@ function KpiBody({ data, accentColor }: { data: KpiArtifactData; accentColor: st
           borderRadius: 7, padding: "8px 10px",
         }}>
           <div style={{
-            fontSize: 20, fontWeight: 700, color: "#F0F0F5", lineHeight: 1.1,
+            fontSize: 20, fontWeight: 700, color: accentColor, fontFamily: "'Space Mono', monospace", lineHeight: 1.1,
           }}>
             {m.value}
             {m.unit && <span style={{ fontSize: 12, fontWeight: 400, color: "#5C5C78", marginLeft: 4 }}>{m.unit}</span>}
           </div>
-          <div style={{ fontSize: 10, color: "#3a3a50", marginTop: 4, textTransform: "uppercase" as const, letterSpacing: "0.05em" }}>
+          <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", marginTop: 4, fontFamily: "'Space Mono', monospace", textTransform: "uppercase" as const, letterSpacing: "0.1em" }}>
             {m.label}
           </div>
         </div>
@@ -346,13 +350,13 @@ function TableBody({ data }: { data: TableArtifactData }) {
       <div style={{ overflow: "auto", maxHeight: 200 }}>
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 10 }}>
           <thead>
-            <tr style={{ background: "rgba(0,0,0,0.3)", position: "sticky", top: 0, zIndex: 1 }}>
+            <tr style={{ background: "rgba(184,115,51,0.05)", position: "sticky", top: 0, zIndex: 1 }}>
               {displayHeaders.map((h, i) => (
                 <th key={i} style={{
                   padding: "5px 10px", textAlign: i >= 3 ? "right" : "left",
-                  color: "#5C5C78", fontWeight: 600, whiteSpace: "nowrap",
+                  color: "rgba(184,115,51,0.6)", fontWeight: 600, whiteSpace: "nowrap",
                   borderBottom: "1px solid rgba(255,255,255,0.06)",
-                  background: "rgba(0,0,0,0.3)",
+                  background: "rgba(184,115,51,0.05)",
                 }}>
                   {h}
                 </th>
@@ -364,7 +368,7 @@ function TableBody({ data }: { data: TableArtifactData }) {
               <tr key={i} style={{ borderBottom: "1px solid rgba(30,30,46,0.5)" }}>
                 {row.map((cell, j) => (
                   <td key={j} style={{
-                    padding: "5px 10px", color: "#8888A0", whiteSpace: "nowrap",
+                    padding: "5px 10px", color: "rgba(255,255,255,0.5)", whiteSpace: "nowrap",
                     textAlign: j >= 3 ? "right" : "left",
                     fontVariantNumeric: "tabular-nums",
                   }}>
@@ -387,7 +391,7 @@ function TableBody({ data }: { data: TableArtifactData }) {
             {rows.length} {t('artifact.lineItems')}{summary?.note ? ` · ${summary.note}` : ""}
           </span>
           {summary?.grandTotal != null && (
-            <span style={{ color: "#10B981", fontWeight: 700 }}>
+            <span style={{ color: "#FFBF00", fontWeight: 700 }}>
               {t('artifact.grandTotal')}: ${summary.grandTotal.toLocaleString()}
             </span>
           )}
@@ -431,9 +435,9 @@ function SvgBody({ data }: { data: SvgArtifactData }) {
             style={{
               padding: "4px 12px",
               borderRadius: 6,
-              background: viewMode === "2d" ? "rgba(16,185,129,0.15)" : "rgba(255,255,255,0.04)",
-              border: `1px solid ${viewMode === "2d" ? "rgba(16,185,129,0.3)" : "rgba(255,255,255,0.08)"}`,
-              color: viewMode === "2d" ? "#10B981" : "#5C5C78",
+              background: viewMode === "2d" ? "rgba(0,245,255,0.15)" : "rgba(255,255,255,0.04)",
+              border: `1px solid ${viewMode === "2d" ? "rgba(0,245,255,0.3)" : "rgba(255,255,255,0.08)"}`,
+              color: viewMode === "2d" ? "#00F5FF" : "#5C5C78",
               fontSize: 10,
               fontWeight: 600,
               cursor: "pointer",
@@ -447,9 +451,9 @@ function SvgBody({ data }: { data: SvgArtifactData }) {
             style={{
               padding: "4px 12px",
               borderRadius: 6,
-              background: viewMode === "3d" ? "rgba(79,138,255,0.15)" : "rgba(255,255,255,0.04)",
-              border: `1px solid ${viewMode === "3d" ? "rgba(79,138,255,0.3)" : "rgba(255,255,255,0.08)"}`,
-              color: viewMode === "3d" ? "#4F8AFF" : "#5C5C78",
+              background: viewMode === "3d" ? "rgba(255,191,0,0.15)" : "rgba(255,255,255,0.04)",
+              border: `1px solid ${viewMode === "3d" ? "rgba(255,191,0,0.3)" : "rgba(255,255,255,0.08)"}`,
+              color: viewMode === "3d" ? "#FFBF00" : "#5C5C78",
               fontSize: 10,
               fontWeight: 600,
               cursor: "pointer",
@@ -553,9 +557,9 @@ function Massing3dBody({ data }: { data: Massing3dData }) {
           style={{
             padding: "4px 12px",
             borderRadius: 6,
-            background: viewMode === "massing" ? "rgba(79,138,255,0.15)" : "rgba(255,255,255,0.04)",
-            border: `1px solid ${viewMode === "massing" ? "rgba(79,138,255,0.3)" : "rgba(255,255,255,0.08)"}`,
-            color: viewMode === "massing" ? "#4F8AFF" : "#5C5C78",
+            background: viewMode === "massing" ? "rgba(184,115,51,0.15)" : "rgba(255,255,255,0.04)",
+            border: `1px solid ${viewMode === "massing" ? "rgba(184,115,51,0.3)" : "rgba(255,255,255,0.08)"}`,
+            color: viewMode === "massing" ? "#B87333" : "#5C5C78",
             fontSize: 10,
             fontWeight: 600,
             cursor: "pointer",
@@ -569,9 +573,9 @@ function Massing3dBody({ data }: { data: Massing3dData }) {
           style={{
             padding: "4px 12px",
             borderRadius: 6,
-            background: viewMode === "floorplan" ? "rgba(16,185,129,0.15)" : "rgba(255,255,255,0.04)",
-            border: `1px solid ${viewMode === "floorplan" ? "rgba(16,185,129,0.3)" : "rgba(255,255,255,0.08)"}`,
-            color: viewMode === "floorplan" ? "#10B981" : "#5C5C78",
+            background: viewMode === "floorplan" ? "rgba(255,191,0,0.15)" : "rgba(255,255,255,0.04)",
+            border: `1px solid ${viewMode === "floorplan" ? "rgba(255,191,0,0.3)" : "rgba(255,255,255,0.08)"}`,
+            color: viewMode === "floorplan" ? "#FFBF00" : "#5C5C78",
             fontSize: 10,
             fontWeight: 600,
             cursor: "pointer",
@@ -605,8 +609,8 @@ function Massing3dBody({ data }: { data: Massing3dData }) {
         }}>
           {data.metrics.slice(0, 6).map((m, i) => (
             <div key={i} style={{
-              background: "rgba(79,138,255,0.06)",
-              border: "1px solid rgba(79,138,255,0.1)",
+              background: "rgba(184,115,51,0.08)",
+              border: "1px solid rgba(184,115,51,0.15)",
               borderRadius: 5, padding: "5px 7px", textAlign: "center",
             }}>
               <div style={{ fontSize: 13, fontWeight: 700, color: "#F0F0F5", lineHeight: 1.1 }}>
@@ -648,19 +652,19 @@ function FileBody({ data }: { data: FileArtifactData }) {
         style={{
           display: "flex", alignItems: "center", gap: 5,
           padding: "5px 10px", borderRadius: 6,
-          background: "rgba(79,138,255,0.08)",
-          border: "1px solid rgba(79,138,255,0.2)",
-          fontSize: 10, fontWeight: 500, color: "#4F8AFF",
+          background: "rgba(0,245,255,0.08)",
+          border: "1px solid rgba(0,245,255,0.2)",
+          fontSize: 10, fontWeight: 500, color: "#00F5FF",
           textDecoration: "none", flexShrink: 0,
           transition: "all 0.15s ease",
         }}
         onMouseEnter={e => {
-          (e.currentTarget as HTMLAnchorElement).style.background = "rgba(79,138,255,0.15)";
-          (e.currentTarget as HTMLAnchorElement).style.borderColor = "rgba(79,138,255,0.4)";
+          (e.currentTarget as HTMLAnchorElement).style.background = "rgba(0,245,255,0.15)";
+          (e.currentTarget as HTMLAnchorElement).style.borderColor = "rgba(0,245,255,0.4)";
         }}
         onMouseLeave={e => {
-          (e.currentTarget as HTMLAnchorElement).style.background = "rgba(79,138,255,0.08)";
-          (e.currentTarget as HTMLAnchorElement).style.borderColor = "rgba(79,138,255,0.2)";
+          (e.currentTarget as HTMLAnchorElement).style.background = "rgba(0,245,255,0.08)";
+          (e.currentTarget as HTMLAnchorElement).style.borderColor = "rgba(0,245,255,0.2)";
         }}
       >
         <Download size={10} />

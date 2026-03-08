@@ -47,7 +47,7 @@ function MenuItem({ label, icon, onClick, danger, disabled }: MenuItemProps) {
   const bg = disabled
     ? "transparent"
     : hovered
-      ? (danger ? "rgba(239,68,68,0.08)" : "rgba(79,138,255,0.07)")
+      ? (danger ? "rgba(239,68,68,0.08)" : "rgba(0,245,255,0.07)")
       : "transparent";
 
   return (
@@ -60,7 +60,7 @@ function MenuItem({ label, icon, onClick, danger, disabled }: MenuItemProps) {
         display: "flex", alignItems: "center", gap: 9,
         width: "100%", padding: "6px 12px",
         background: bg, border: "none", cursor: disabled ? "default" : "pointer",
-        borderLeft: hovered && !disabled ? `2px solid ${danger ? "#EF4444" : "#4F8AFF"}` : "2px solid transparent",
+        borderLeft: hovered && !disabled ? `2px solid ${danger ? "#EF4444" : "#00F5FF"}` : "2px solid transparent",
         transition: "background 0.08s, border-color 0.08s",
         opacity: disabled ? 0.35 : 1,
       }}
@@ -127,9 +127,9 @@ export function ContextMenu({
         left, top,
         width: menuW,
         zIndex: 9990,
-        background: "#13131D",
-        border: "1px solid #1E1E2E",
-        borderRadius: 10,
+        background: "rgba(7,8,9,0.92)",
+        border: "1px solid rgba(255,255,255,0.06)",
+        borderRadius: 4,
         boxShadow: "0 8px 32px rgba(0,0,0,0.6), 0 2px 8px rgba(0,0,0,0.4)",
         overflow: "hidden",
         padding: "4px 0",

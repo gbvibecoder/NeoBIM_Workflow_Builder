@@ -19,7 +19,7 @@ import { useUIStore } from "@/stores/ui-store";
 
 function hexToRgb(hex: string): string {
   const r = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-  if (!r) return "79, 138, 255";
+  if (!r) return "184, 115, 51";
   return `${parseInt(r[1], 16)}, ${parseInt(r[2], 16)}, ${parseInt(r[3], 16)}`;
 }
 
@@ -116,27 +116,29 @@ function PaletteItem({ node, onSelect, onDragStart, isHighlighted, searchQuery }
             fontSize: 13, fontWeight: 500, color: "#e8e8f0",
             overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
             flex: 1, lineHeight: 1.2,
+            fontFamily: "'Playfair Display', serif", fontStyle: "italic",
           }}>
             {highlightText(node.name)}
           </span>
           {LIVE_NODES.has(node.id) ? (
             <span style={{
-              fontSize: 7, fontWeight: 700, color: "#10B981",
+              fontSize: 7, fontWeight: 700, color: "#00F5FF",
               padding: "1px 4px", borderRadius: 3,
-              background: "rgba(16,185,129,0.1)", border: "1px solid rgba(16,185,129,0.2)",
+              background: "rgba(0,245,255,0.1)", border: "1px solid rgba(0,245,255,0.2)",
               flexShrink: 0,
             }}>LIVE</span>
           ) : (
             <span style={{
-              fontSize: 7, fontWeight: 700, color: "#F59E0B",
+              fontSize: 7, fontWeight: 700, color: "#B87333",
               padding: "1px 4px", borderRadius: 3,
-              background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.15)",
+              background: "rgba(184,115,51,0.08)", border: "1px solid rgba(184,115,51,0.15)",
               flexShrink: 0,
             }}>MOCK</span>
           )}
         </div>
         <div style={{
-          fontSize: 10, color: "#4a4a5a", marginTop: 1,
+          fontSize: 10, color: "rgba(255,255,255,0.3)", marginTop: 1,
+          fontFamily: "'Space Mono', monospace",
           overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
         }}>
           {node.description.slice(0, 60)}{node.description.length > 60 ? "..." : ""}
@@ -169,7 +171,7 @@ function PaletteNodeDetail({ node }: { node: NodeCatalogueItem }) {
         <div style={{ width: 6, height: 6, borderRadius: "50%", background: cfg.color }} />
         <span style={{ fontSize: 12, fontWeight: 600, color: "#F0F0F5" }}>{node.name}</span>
       </div>
-      <p style={{ fontSize: 11, color: "#8888A0", lineHeight: 1.5, marginBottom: 8 }}>
+      <p style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", lineHeight: 1.5, marginBottom: 8, fontFamily: "'Space Mono', monospace" }}>
         {node.description}
       </p>
       <div style={{ display: "flex", gap: 14, marginBottom: 8 }}>
@@ -188,7 +190,7 @@ function PaletteNodeDetail({ node }: { node: NodeCatalogueItem }) {
         }}>
           {node.inputs.length > 0 && (
             <div>
-              <div style={{ fontSize: 9, color: "#3A3A50", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 3 }}>
+              <div style={{ fontSize: 9, color: "rgba(184,115,51,0.4)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 3 }}>
                 {t('canvas.in')}
               </div>
               {node.inputs.map(p => (
@@ -198,7 +200,7 @@ function PaletteNodeDetail({ node }: { node: NodeCatalogueItem }) {
           )}
           {node.outputs.length > 0 && (
             <div>
-              <div style={{ fontSize: 9, color: "#3A3A50", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 3 }}>
+              <div style={{ fontSize: 9, color: "rgba(184,115,51,0.4)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 3 }}>
                 {t('canvas.out')}
               </div>
               {node.outputs.map(p => (
@@ -370,13 +372,13 @@ export function NodeLibraryPanel() {
           maxWidth: "calc(100vw - 40px)",
           maxHeight: "70vh",
           zIndex: 9999,
-          background: "rgba(12,12,20,0.97)",
-          border: "1px solid rgba(255,255,255,0.1)",
-          borderRadius: 16,
+          background: "rgba(7, 8, 9, 0.92)",
+          border: "1px solid rgba(184,115,51,0.2)",
+          borderRadius: 4,
           overflow: "hidden",
-          boxShadow: "0 24px 80px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.05), 0 0 60px rgba(79,138,255,0.08)",
-          backdropFilter: "blur(40px) saturate(1.4)",
-          WebkitBackdropFilter: "blur(40px) saturate(1.4)",
+          boxShadow: "0 24px 80px rgba(0,0,0,0.7), 0 0 0 1px rgba(184,115,51,0.08), 0 0 60px rgba(184,115,51,0.05)",
+          backdropFilter: "blur(40px)",
+          WebkitBackdropFilter: "blur(40px)",
           display: "flex", flexDirection: "column",
         }}
       >
@@ -385,7 +387,7 @@ export function NodeLibraryPanel() {
           <div style={{ position: "relative" }}>
             <Search size={15} style={{
               position: "absolute", left: 14, top: "50%",
-              transform: "translateY(-50%)", color: "#5C5C78", pointerEvents: "none",
+              transform: "translateY(-50%)", color: "rgba(184,115,51,0.5)", pointerEvents: "none",
             }} />
             <input
               ref={inputRef}
@@ -395,24 +397,28 @@ export function NodeLibraryPanel() {
               placeholder="Search nodes or type a command..."
               style={{
                 width: "100%", height: 46,
-                background: "rgba(255,255,255,0.04)",
-                border: "1px solid rgba(255,255,255,0.08)",
-                borderRadius: 12,
+                background: "transparent",
+                border: "none",
+                borderBottom: "1px solid rgba(184,115,51,0.2)",
+                borderRadius: 0,
                 paddingLeft: 40, paddingRight: search ? 36 : 14,
-                fontSize: 15, color: "#e8e8f0",
+                fontSize: 13, color: "#e8e8f0",
                 outline: "none", boxSizing: "border-box",
                 fontWeight: 400,
                 transition: "border-color 150ms ease",
+                fontFamily: "'Space Mono', monospace",
+                textTransform: "uppercase" as const,
+                letterSpacing: "0.05em",
               }}
-              onFocus={e => { e.currentTarget.style.borderColor = "rgba(79,138,255,0.35)"; }}
-              onBlur={e => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.08)"; }}
+              onFocus={e => { e.currentTarget.style.borderColor = "rgba(0,245,255,0.35)"; }}
+              onBlur={e => { e.currentTarget.style.borderBottom = "1px solid rgba(184,115,51,0.2)"; }}
             />
             {search && (
               <button
                 onClick={() => setSearch("")}
                 style={{
                   position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)",
-                  background: "rgba(255,255,255,0.06)", border: "none",
+                  background: "rgba(184,115,51,0.1)", border: "none",
                   width: 20, height: 20, borderRadius: 5,
                   color: "#5C5C78", cursor: "pointer",
                   display: "flex", alignItems: "center", justifyContent: "center",
@@ -427,11 +433,11 @@ export function NodeLibraryPanel() {
         {/* Filter chips */}
         <div style={{
           display: "flex", gap: 4, padding: "10px 16px 8px",
-          borderBottom: "1px solid rgba(255,255,255,0.06)", flexShrink: 0,
+          borderBottom: "1px solid rgba(184,115,51,0.1)", flexShrink: 0,
         }}>
           {FILTER_VALUES.map(value => {
             const active = activeFilter === value;
-            const c = value === "all" ? "#4F8AFF" : CATEGORY_CONFIG[value as NodeCategory].color;
+            const c = value === "all" ? "#B87333" : CATEGORY_CONFIG[value as NodeCategory].color;
             const rgb = hexToRgb(c);
             return (
               <button
@@ -444,6 +450,9 @@ export function NodeLibraryPanel() {
                   fontSize: 12, fontWeight: active ? 600 : 400,
                   color: active ? c : "#5C5C78",
                   transition: "all 120ms ease",
+                  fontFamily: "'Space Mono', monospace",
+                  textTransform: "uppercase" as const,
+                  letterSpacing: "0.05em",
                 }}
               >
                 {FILTER_LABELS[value]}
@@ -452,8 +461,8 @@ export function NodeLibraryPanel() {
           })}
           <div style={{ flex: 1 }} />
           <span style={{
-            fontSize: 10, color: "#3A3A50", alignSelf: "center",
-            fontFamily: "monospace",
+            fontSize: 10, color: "rgba(184,115,51,0.4)", alignSelf: "center",
+            fontFamily: "'Space Mono', monospace",
           }}>
             {displayNodes.length} nodes
           </span>
@@ -504,14 +513,14 @@ export function NodeLibraryPanel() {
         {/* Footer hint */}
         <div style={{
           padding: "8px 16px",
-          borderTop: "1px solid rgba(255,255,255,0.06)",
+          borderTop: "1px solid rgba(184,115,51,0.1)",
           display: "flex", gap: 16,
-          fontSize: 10, color: "#3A3A50",
+          fontSize: 10, color: "rgba(184,115,51,0.4)",
           flexShrink: 0,
         }}>
-          <span><kbd style={{ background: "rgba(255,255,255,0.06)", padding: "1px 5px", borderRadius: 3, fontSize: 9 }}>↑↓</kbd> navigate</span>
-          <span><kbd style={{ background: "rgba(255,255,255,0.06)", padding: "1px 5px", borderRadius: 3, fontSize: 9 }}>↵</kbd> add node</span>
-          <span><kbd style={{ background: "rgba(255,255,255,0.06)", padding: "1px 5px", borderRadius: 3, fontSize: 9 }}>esc</kbd> close</span>
+          <span><kbd style={{ background: "rgba(184,115,51,0.1)", padding: "1px 5px", borderRadius: 3, fontSize: 9 }}>↑↓</kbd> navigate</span>
+          <span><kbd style={{ background: "rgba(184,115,51,0.1)", padding: "1px 5px", borderRadius: 3, fontSize: 9 }}>↵</kbd> add node</span>
+          <span><kbd style={{ background: "rgba(184,115,51,0.1)", padding: "1px 5px", borderRadius: 3, fontSize: 9 }}>esc</kbd> close</span>
           <span style={{ marginLeft: "auto" }}>drag to canvas</span>
         </div>
       </motion.div>

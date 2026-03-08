@@ -47,7 +47,7 @@ const MODE_ICONS: Record<CreationMode, React.ReactNode> = {
 
 function Sep() {
   return (
-    <div style={{ width: 1, height: 18, background: "rgba(255,255,255,0.04)", margin: "0 6px", flexShrink: 0 }} />
+    <div style={{ width: 1, height: 18, background: "rgba(184,115,51,0.1)", margin: "0 6px", flexShrink: 0 }} />
   );
 }
 
@@ -69,19 +69,19 @@ function TBBtn({ onClick, icon, title, disabled }: TBBtnProps) {
         width: 32, height: 32, borderRadius: 8,
         display: "flex", alignItems: "center", justifyContent: "center",
         background: "transparent", border: "none",
-        color: "#5C5C78", cursor: disabled ? "not-allowed" : "pointer",
+        color: "rgba(255,255,255,0.3)", cursor: disabled ? "not-allowed" : "pointer",
         opacity: disabled ? 0.4 : 1,
         transition: "all 150ms ease",
       }}
       onMouseEnter={e => {
         if (!disabled) {
-          e.currentTarget.style.background = "rgba(255,255,255,0.06)";
-          e.currentTarget.style.color = "#F0F0F5";
+          e.currentTarget.style.background = "rgba(184,115,51,0.1)";
+          e.currentTarget.style.color = "#FFBF00";
         }
       }}
       onMouseLeave={e => {
         e.currentTarget.style.background = "transparent";
-        e.currentTarget.style.color = "#5C5C78";
+        e.currentTarget.style.color = "rgba(255,255,255,0.3)";
       }}
     >
       {icon}
@@ -93,10 +93,10 @@ function TBBtn({ onClick, icon, title, disabled }: TBBtnProps) {
 const pulseKeyframes = `
 @keyframes runButtonPulse {
   0%, 100% {
-    box-shadow: 0 2px 12px rgba(79, 138, 255, 0.25);
+    box-shadow: 0 2px 12px rgba(0, 245, 255, 0.25);
   }
   50% {
-    box-shadow: 0 2px 20px rgba(79, 138, 255, 0.45);
+    box-shadow: 0 2px 20px rgba(0, 245, 255, 0.45);
   }
 }
 `;
@@ -219,12 +219,12 @@ export function CanvasToolbar({
           height: 48,
           alignItems: "center", justifyContent: "space-between",
           padding: "0 14px",
-          border: "1px solid rgba(255,255,255,0.08)",
-          borderRadius: 16,
-          background: "rgba(8,8,15,0.88)",
-          backdropFilter: "blur(40px) saturate(1.4)",
-          WebkitBackdropFilter: "blur(40px) saturate(1.4)",
-          boxShadow: "0 4px 24px rgba(0,0,0,0.35), 0 1px 0 rgba(255,255,255,0.03) inset",
+          border: "1px solid rgba(184,115,51,0.2)",
+          borderRadius: 4,
+          background: "rgba(7, 8, 9, 0.85)",
+          backdropFilter: "blur(20px)",
+          WebkitBackdropFilter: "blur(20px)",
+          boxShadow: "0 4px 24px rgba(0,0,0,0.35)",
           gap: 4,
         }}
       >
@@ -240,21 +240,21 @@ export function CanvasToolbar({
             style={{
               width: 30, height: 30, borderRadius: 7,
               display: "flex", alignItems: "center", justifyContent: "center",
-              background: isNodeLibraryOpen ? "rgba(79,138,255,0.12)" : "transparent",
-              border: `1px solid ${isNodeLibraryOpen ? "rgba(79,138,255,0.3)" : "transparent"}`,
-              color: isNodeLibraryOpen ? "#4F8AFF" : "#55556A",
+              background: isNodeLibraryOpen ? "rgba(0,245,255,0.1)" : "transparent",
+              border: `1px solid ${isNodeLibraryOpen ? "rgba(0,245,255,0.3)" : "transparent"}`,
+              color: isNodeLibraryOpen ? "#00F5FF" : "rgba(255,255,255,0.3)",
               cursor: "pointer", transition: "all 0.15s ease",
             }}
             onMouseEnter={e => {
               if (!isNodeLibraryOpen) {
-                e.currentTarget.style.background = "#1A1A26";
-                e.currentTarget.style.color = "#F0F0F5";
+                e.currentTarget.style.background = "rgba(184,115,51,0.08)";
+                e.currentTarget.style.color = "#FFBF00";
               }
             }}
             onMouseLeave={e => {
               if (!isNodeLibraryOpen) {
                 e.currentTarget.style.background = "transparent";
-                e.currentTarget.style.color = "#55556A";
+                e.currentTarget.style.color = "rgba(255,255,255,0.3)";
               }
             }}
           >
@@ -281,7 +281,7 @@ export function CanvasToolbar({
               onMouseEnter={e => { e.currentTarget.style.background = "#1A1A26"; }}
               onMouseLeave={e => { if (!showModeMenu) e.currentTarget.style.background = "transparent"; }}
             >
-              <span style={{ color: "#4F8AFF", display: "flex" }}>{currentMode.icon}</span>
+              <span style={{ color: "#00F5FF", display: "flex" }}>{currentMode.icon}</span>
               <span style={{ fontSize: 12, fontWeight: 500 }}>{currentMode.label}</span>
               <ChevronDown size={9} style={{ color: "#55556A" }} />
             </button>
@@ -296,7 +296,7 @@ export function CanvasToolbar({
                   style={{
                     position: "absolute", top: "calc(100% + 4px)", left: 0,
                     width: 188, borderRadius: 10, overflow: "hidden",
-                    background: "#12121A", border: "1px solid #2A2A3E",
+                    background: "rgba(7,8,9,0.97)", border: "1px solid rgba(184,115,51,0.2)",
                     boxShadow: "0 8px 32px rgba(0,0,0,0.5)", zIndex: 50,
                   }}
                 >
@@ -313,18 +313,18 @@ export function CanvasToolbar({
                         style={{
                           width: "100%", display: "flex", alignItems: "flex-start", gap: 10,
                           padding: "9px 12px",
-                          background: active ? "#1A1A26" : "transparent",
+                          background: active ? "rgba(184,115,51,0.1)" : "transparent",
                           border: "none", cursor: "pointer", textAlign: "left",
                           transition: "background 0.1s",
                         }}
-                        onMouseEnter={e => { if (!active) e.currentTarget.style.background = "#161620"; }}
+                        onMouseEnter={e => { if (!active) e.currentTarget.style.background = "rgba(184,115,51,0.08)"; }}
                         onMouseLeave={e => { if (!active) e.currentTarget.style.background = "transparent"; }}
                       >
-                        <span style={{ color: active ? "#4F8AFF" : "#55556A", marginTop: 1, display: "flex" }}>
+                        <span style={{ color: active ? "#00F5FF" : "#55556A", marginTop: 1, display: "flex" }}>
                           {cfg.icon}
                         </span>
                         <div>
-                          <div style={{ fontSize: 12, fontWeight: 500, color: active ? "#4F8AFF" : "#F0F0F5" }}>
+                          <div style={{ fontSize: 12, fontWeight: 500, color: active ? "#00F5FF" : "#F0F0F5" }}>
                             {cfg.label}
                           </div>
                           <div style={{ fontSize: 10, color: "#55556A", marginTop: 1 }}>
@@ -364,7 +364,7 @@ export function CanvasToolbar({
               autoFocus
               style={{
                 background: "transparent", border: "none",
-                borderBottom: "1px solid #4F8AFF",
+                borderBottom: "1px solid #B87333",
                 color: "#F0F0F5", fontSize: 12, fontWeight: 500,
                 outline: "none", textAlign: "center",
                 minWidth: 80, maxWidth: 180, padding: "1px 2px",
@@ -398,7 +398,7 @@ export function CanvasToolbar({
               {isDirty && (
                 <div
                   title={t('canvas.unsavedChanges')}
-                  style={{ width: 5, height: 5, borderRadius: "50%", background: "#F59E0B", flexShrink: 0 }}
+                  style={{ width: 5, height: 5, borderRadius: "50%", background: "#FFBF00", flexShrink: 0 }}
                 />
               )}
             </button>
@@ -423,16 +423,16 @@ export function CanvasToolbar({
             style={{
               display: "flex", alignItems: "center", gap: 5,
               height: 36, padding: "0 16px", borderRadius: 8,
-              background: "rgba(255,255,255,0.06)",
-              border: "1px solid rgba(255,255,255,0.08)",
-              color: "#F0F0F5", fontSize: 14, fontWeight: 500,
+              background: "rgba(0,245,255,0.05)",
+              border: "1px solid rgba(0,245,255,0.2)",
+              color: "#00F5FF", fontSize: 14, fontWeight: 500,
               cursor: "pointer", transition: "all 150ms ease",
             }}
             onMouseEnter={e => {
-              e.currentTarget.style.background = "rgba(255,255,255,0.1)";
+              e.currentTarget.style.background = "rgba(0,245,255,0.1)";
             }}
             onMouseLeave={e => {
-              e.currentTarget.style.background = "rgba(255,255,255,0.06)";
+              e.currentTarget.style.background = "rgba(0,245,255,0.05)";
             }}
           >
             <Sparkles size={11} />
@@ -452,20 +452,20 @@ export function CanvasToolbar({
               height: 36, padding: "0 16px", borderRadius: 8,
               background: "transparent",
               border: savedFlash
-                ? "1px solid rgba(16,185,129,0.4)"
+                ? "1px solid rgba(52,211,153,0.4)"
                 : isUntitled && isDirty
-                  ? "1px solid rgba(245,158,11,0.4)"
-                  : isDirty ? "1px solid rgba(255,255,255,0.08)" : "1px solid transparent",
-              color: savedFlash ? "#10B981" : isUntitled && isDirty ? "#F59E0B" : isDirty ? "#9898B0" : "#3A3A4E",
+                  ? "1px solid rgba(184,115,51,0.3)"
+                  : isDirty ? "1px solid rgba(184,115,51,0.3)" : "1px solid transparent",
+              color: savedFlash ? "#10B981" : isUntitled && isDirty ? "#B87333" : isDirty ? "#B87333" : "#3A3A4E",
               fontSize: 13, fontWeight: 500,
               cursor: isDirty || savedFlash || isUntitled ? "pointer" : "default",
               transition: "all 150ms ease",
               opacity: !isDirty && !savedFlash && !isSaving && !isUntitled ? 0.5 : 1,
-              boxShadow: isUntitled && isDirty ? "0 0 12px rgba(245,158,11,0.15)" : "none",
+              boxShadow: isUntitled && isDirty ? "0 0 12px rgba(184,115,51,0.15)" : "none",
             }}
             onMouseEnter={e => {
               if (isDirty && !savedFlash) {
-                e.currentTarget.style.background = "rgba(255,255,255,0.06)";
+                e.currentTarget.style.background = "rgba(184,115,51,0.08)";
                 e.currentTarget.style.color = "#F0F0F5";
               }
             }}
@@ -529,28 +529,33 @@ export function CanvasToolbar({
                   height: 36, paddingLeft: 20, paddingRight: 16,
                   borderRadius: "10px 0 0 10px",
                   background: isWorkflowReady
-                    ? "linear-gradient(to right, #4F8AFF, #6366F1)"
-                    : "#2A2A3E",
-                  border: "none",
-                  color: "#fff", fontSize: 14, fontWeight: 600,
+                    ? "transparent"
+                    : "transparent",
+                  border: isWorkflowReady
+                    ? "1px solid rgba(0,245,255,0.4)"
+                    : "1px solid rgba(255,255,255,0.1)",
+                  color: isWorkflowReady ? "#00F5FF" : "rgba(255,255,255,0.3)",
+                  fontSize: 10, fontWeight: 600,
+                  fontFamily: "'Space Mono', monospace",
+                  letterSpacing: "0.15em",
+                  textTransform: "uppercase" as const,
                   cursor: isWorkflowReady ? "pointer" : "not-allowed",
                   transition: "all 200ms ease",
-                  boxShadow: isWorkflowReady ? "0 0 20px rgba(79,138,255,0.3)" : "none",
+                  boxShadow: "none",
                   opacity: isWorkflowReady ? 1 : 0.5,
-                  animation: isWorkflowReady ? "glow-pulse 3s ease-in-out infinite" : "none",
                 }}
                 onMouseEnter={e => {
                   if (isWorkflowReady) {
-                    e.currentTarget.style.filter = "brightness(1.1)";
-                    e.currentTarget.style.boxShadow = "0 0 35px rgba(79,138,255,0.5)";
+                    e.currentTarget.style.background = "rgba(0,245,255,0.1)";
+                    e.currentTarget.style.boxShadow = "0 0 20px rgba(0,245,255,0.1)";
                   }
                 }}
                 onMouseLeave={e => {
-                  e.currentTarget.style.filter = "brightness(1)";
-                  e.currentTarget.style.boxShadow = isWorkflowReady ? "0 0 20px rgba(79,138,255,0.3)" : "none";
+                  e.currentTarget.style.background = "transparent";
+                  e.currentTarget.style.boxShadow = "none";
                 }}
               >
-                <Play size={16} fill="white" />
+                <Play size={16} fill="currentColor" />
                 {t('canvas.runWorkflow')}
               </button>
 
@@ -564,16 +569,18 @@ export function CanvasToolbar({
                   display: "flex", alignItems: "center", justifyContent: "center",
                   width: 30, height: 36, padding: 0,
                   borderRadius: "0 10px 10px 0",
-                  background: isWorkflowReady ? "rgba(79,138,255,0.85)" : "#25253A",
-                  border: "none",
-                  borderLeft: "1px solid rgba(255,255,255,0.12)",
-                  color: "rgba(255,255,255,0.75)",
+                  background: isWorkflowReady ? "transparent" : "transparent",
+                  border: isWorkflowReady
+                    ? "1px solid rgba(0,245,255,0.4)"
+                    : "1px solid rgba(255,255,255,0.1)",
+                  borderLeft: "1px solid rgba(0,245,255,0.2)",
+                  color: isWorkflowReady ? "#00F5FF" : "rgba(255,255,255,0.3)",
                   cursor: isWorkflowReady ? "pointer" : "not-allowed",
                   transition: "background 0.15s ease",
                   opacity: isWorkflowReady ? 1 : 0.6,
                 }}
-                onMouseEnter={e => { if (isWorkflowReady) e.currentTarget.style.background = "#3472EB"; }}
-                onMouseLeave={e => { if (isWorkflowReady) e.currentTarget.style.background = "#3D7AFF"; }}
+                onMouseEnter={e => { if (isWorkflowReady) e.currentTarget.style.background = "rgba(0,245,255,0.1)"; }}
+                onMouseLeave={e => { if (isWorkflowReady) e.currentTarget.style.background = "transparent"; }}
               >
                 <ChevronDown size={12} />
               </button>
@@ -589,7 +596,7 @@ export function CanvasToolbar({
                     style={{
                       position: "absolute", top: "calc(100% + 4px)", right: 0,
                       width: 190, borderRadius: 10, overflow: "hidden",
-                      background: "#12121A", border: "1px solid #2A2A3E",
+                      background: "rgba(7,8,9,0.97)", border: "1px solid rgba(184,115,51,0.2)",
                       boxShadow: "0 8px 32px rgba(0,0,0,0.5)", zIndex: 50,
                     }}
                   >
@@ -607,7 +614,7 @@ export function CanvasToolbar({
                           border: "none", cursor: "pointer", textAlign: "left",
                           transition: "background 0.1s",
                         }}
-                        onMouseEnter={e => { e.currentTarget.style.background = "#1A1A26"; }}
+                        onMouseEnter={e => { e.currentTarget.style.background = "rgba(184,115,51,0.08)"; }}
                         onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}
                       >
                         <span style={{ fontSize: 12, fontWeight: 500, color: "#F0F0F5" }}>{item.label}</span>
@@ -635,10 +642,10 @@ export function CanvasToolbar({
           right: 0,
           zIndex: 50,
           padding: "12px 16px",
-          background: "rgba(7, 7, 13, 0.95)",
+          background: "rgba(7, 8, 9, 0.95)",
           backdropFilter: "blur(16px)",
           WebkitBackdropFilter: "blur(16px)",
-          borderTop: "1px solid rgba(255,255,255,0.08)",
+          borderTop: "1px solid rgba(184,115,51,0.15)",
           boxShadow: "0 -4px 24px rgba(0,0,0,0.3)",
         }}
       >
@@ -680,10 +687,12 @@ export function CanvasToolbar({
               justifyContent: "center",
               gap: 8,
               background: isWorkflowReady
-                ? "#4F8AFF"
-                : "#3A3A50",
-              border: "none",
-              color: "#fff",
+                ? "transparent"
+                : "transparent",
+              border: isWorkflowReady
+                ? "1px solid rgba(0,245,255,0.4)"
+                : "1px solid rgba(255,255,255,0.1)",
+              color: isWorkflowReady ? "#00F5FF" : "rgba(255,255,255,0.3)",
               fontSize: 16,
               fontWeight: 600,
               cursor: isWorkflowReady ? "pointer" : "not-allowed",
@@ -723,9 +732,9 @@ export function CanvasToolbar({
               gap: 4,
               padding: "6px 12px",
               borderRadius: 8,
-              background: isNodeLibraryOpen ? "rgba(79,138,255,0.12)" : "transparent",
-              border: `1px solid ${isNodeLibraryOpen ? "rgba(79,138,255,0.3)" : "rgba(255,255,255,0.08)"}`,
-              color: isNodeLibraryOpen ? "#4F8AFF" : "#F0F0F5",
+              background: isNodeLibraryOpen ? "rgba(0,245,255,0.1)" : "transparent",
+              border: `1px solid ${isNodeLibraryOpen ? "rgba(0,245,255,0.3)" : "rgba(255,255,255,0.08)"}`,
+              color: isNodeLibraryOpen ? "#00F5FF" : "#F0F0F5",
               fontSize: 12,
               fontWeight: 500,
               cursor: "pointer",
@@ -746,11 +755,11 @@ export function CanvasToolbar({
               borderRadius: 8,
               background: "transparent",
               border: savedFlash
-                ? "1px solid rgba(16,185,129,0.4)"
+                ? "1px solid rgba(52,211,153,0.4)"
                 : isUntitled && isDirty
-                  ? "1px solid rgba(245,158,11,0.4)"
-                  : isDirty ? "1px solid rgba(255,255,255,0.08)" : "1px solid transparent",
-              color: savedFlash ? "#10B981" : isUntitled && isDirty ? "#F59E0B" : isDirty ? "#F0F0F5" : "#3A3A4E",
+                  ? "1px solid rgba(184,115,51,0.3)"
+                  : isDirty ? "1px solid rgba(184,115,51,0.3)" : "1px solid transparent",
+              color: savedFlash ? "#10B981" : isUntitled && isDirty ? "#B87333" : isDirty ? "#B87333" : "#3A3A4E",
               fontSize: 12,
               fontWeight: 500,
               cursor: isDirty || savedFlash || isUntitled ? "pointer" : "default",
@@ -769,9 +778,9 @@ export function CanvasToolbar({
               gap: 4,
               padding: "6px 12px",
               borderRadius: 8,
-              background: "rgba(139,92,246,0.08)",
-              border: "1px solid rgba(139,92,246,0.2)",
-              color: "#8B5CF6",
+              background: "rgba(0,245,255,0.05)",
+              border: "1px solid rgba(0,245,255,0.2)",
+              color: "#00F5FF",
               fontSize: 12,
               fontWeight: 500,
               cursor: "pointer",

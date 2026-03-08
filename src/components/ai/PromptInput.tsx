@@ -15,16 +15,16 @@ import { awardXP } from "@/lib/award-xp";
 // ─── Config ───────────────────────────────────────────────────────────────────
 
 const CHIPS = [
-  { label: "PDF → Massing",    color: "#3B82F6", prompt: "I have a PDF project brief and want to generate a 3D massing model" },
-  { label: "IFC → BOQ",        color: "#8B5CF6", prompt: "Upload an IFC model, extract quantities, and export a bill of quantities" },
-  { label: "3 Variants",       color: "#10B981", prompt: "Generate 3 massing variants from a text description with metrics comparison" },
-  { label: "Image → Concept",  color: "#F59E0B", prompt: "Analyze a reference image and create a concept building matching its style" },
+  { label: "PDF → Massing",    color: "#00F5FF", prompt: "I have a PDF project brief and want to generate a 3D massing model" },
+  { label: "IFC → BOQ",        color: "#B87333", prompt: "Upload an IFC model, extract quantities, and export a bill of quantities" },
+  { label: "3 Variants",       color: "#FFBF00", prompt: "Generate 3 massing variants from a text description with metrics comparison" },
+  { label: "Image → Concept",  color: "#4FC3F7", prompt: "Analyze a reference image and create a concept building matching its style" },
   { label: "Full Pipeline",    color: "#06B6D4", prompt: "Create a full pipeline from PDF brief to IFC export and compliance report" },
   { label: "Compliance",       color: "#EF4444", prompt: "Check my IFC model for zoning compliance and generate a PDF report" },
 ];
 
 const CATEGORY_COLOR: Record<string, string> = {
-  input: "#3B82F6", transform: "#8B5CF6", generate: "#10B981", export: "#F59E0B",
+  input: "#00F5FF", transform: "#B87333", generate: "#FFBF00", export: "#4FC3F7",
 };
 
 const STEPS = ["thinking", "placing", "connecting"] as const;
@@ -124,7 +124,7 @@ export function PromptInput({ onClose }: PromptInputProps) {
 
     setPreviewNodes(nodes.map(n => ({
       label: n.data.label,
-      color: CATEGORY_COLOR[n.data.category] ?? "#4F8AFF",
+      color: CATEGORY_COLOR[n.data.category] ?? "#00F5FF",
     })));
 
     // Phase 2 — Placing
@@ -194,17 +194,17 @@ export function PromptInput({ onClose }: PromptInputProps) {
           position: "relative",
           width: "100%", maxWidth: 580,
           margin: "0 16px",
-          background: "#0E0E16",
-          border: "1px solid #2A2A3E",
-          borderRadius: 16,
+          background: "#070809",
+          border: "1px solid rgba(184,115,51,0.15)",
+          borderRadius: 4,
           overflow: "hidden",
-          boxShadow: "0 24px 64px rgba(0,0,0,0.65), 0 0 0 1px rgba(139,92,246,0.08)",
+          boxShadow: "0 24px 64px rgba(0,0,0,0.65), 0 0 0 1px rgba(184,115,51,0.08)",
         }}
       >
         {/* Top accent line */}
         <div style={{
           height: 2,
-          background: "linear-gradient(90deg, #4F8AFF 0%, #8B5CF6 50%, #4F8AFF 100%)",
+          background: "linear-gradient(90deg, #00F5FF 0%, #B87333 50%, #00F5FF 100%)",
         }} />
 
         {/* Header */}
@@ -215,8 +215,8 @@ export function PromptInput({ onClose }: PromptInputProps) {
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <div style={{
               width: 34, height: 34, borderRadius: 10,
-              background: "rgba(139,92,246,0.12)",
-              border: "1px solid rgba(139,92,246,0.22)",
+              background: "rgba(184,115,51,0.12)",
+              border: "1px solid rgba(184,115,51,0.22)",
               display: "flex", alignItems: "center", justifyContent: "center",
             }}>
               <motion.div
@@ -224,7 +224,7 @@ export function PromptInput({ onClose }: PromptInputProps) {
                 transition={{ duration: 1.4, repeat: (isGenerating && !prefersReduced) ? Infinity : 0, ease: "easeInOut" }}
                 style={{ display: "flex" }}
               >
-                <Sparkles size={16} style={{ color: "#8B5CF6" }} />
+                <Sparkles size={16} style={{ color: "#B87333" }} />
               </motion.div>
             </div>
             <div>
@@ -276,7 +276,7 @@ export function PromptInput({ onClose }: PromptInputProps) {
                   transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
                   style={{ display: "flex" }}
                 >
-                  <Loader2 size={13} style={{ color: "#8B5CF6" }} />
+                  <Loader2 size={13} style={{ color: "#B87333" }} />
                 </motion.div>
                 <span style={{ fontSize: 12, color: "#8888A0" }}>
                   {step ? STEP_LABELS[step] : ""}
@@ -285,7 +285,7 @@ export function PromptInput({ onClose }: PromptInputProps) {
 
               {/* Node preview area */}
               <div style={{
-                background: "#12121A", borderRadius: 10, padding: "14px 14px",
+                background: "rgba(10,12,14,0.7)", borderRadius: 4, padding: "14px 14px",
                 border: "1px solid #1E1E2E", minHeight: 88,
                 display: "flex", alignItems: "center",
               }}>
@@ -328,7 +328,7 @@ export function PromptInput({ onClose }: PromptInputProps) {
                       transition={{ duration: 0.25 }}
                       style={{
                         height: 5, borderRadius: 20,
-                        background: isDone ? "#8B5CF6" : isActive ? "#8B5CF6" : "#2A2A3E",
+                        background: isDone ? "#B87333" : isActive ? "#B87333" : "#2A2A3E",
                         opacity: isDone ? 0.5 : 1,
                       }}
                     />
@@ -358,7 +358,7 @@ export function PromptInput({ onClose }: PromptInputProps) {
                     rows={4}
                     autoFocus
                     style={{
-                      width: "100%", borderRadius: 10,
+                      width: "100%", borderRadius: 4,
                       border: "1px solid #2A2A3E",
                       background: "#0A0A0F",
                       padding: "12px 14px", paddingBottom: 30,
@@ -368,8 +368,8 @@ export function PromptInput({ onClose }: PromptInputProps) {
                       transition: "border-color 0.15s ease, box-shadow 0.15s ease",
                     }}
                     onFocus={e => {
-                      e.currentTarget.style.borderColor = "rgba(139,92,246,0.5)";
-                      e.currentTarget.style.boxShadow = "0 0 0 2px rgba(139,92,246,0.08)";
+                      e.currentTarget.style.borderColor = "rgba(184,115,51,0.5)";
+                      e.currentTarget.style.boxShadow = "0 0 0 2px rgba(184,115,51,0.08)";
                     }}
                     onBlur={e => {
                       e.currentTarget.style.borderColor = "#2A2A3E";
@@ -399,7 +399,7 @@ export function PromptInput({ onClose }: PromptInputProps) {
                       key={chip.label}
                       onClick={() => { setPrompt(chip.prompt); setTimeout(() => textareaRef.current?.focus(), 0); }}
                       style={{
-                        padding: "4px 10px", borderRadius: 20, cursor: "pointer",
+                        padding: "4px 10px", borderRadius: 4, cursor: "pointer",
                         background: `${chip.color}10`,
                         border: `1px solid ${chip.color}22`,
                         fontSize: 11, fontWeight: 500, color: chip.color,
@@ -427,16 +427,16 @@ export function PromptInput({ onClose }: PromptInputProps) {
                   disabled={!prompt.trim()}
                   style={{
                     width: "100%", padding: "11px 0",
-                    borderRadius: 10, border: "none",
+                    borderRadius: 4, border: "none",
                     background: prompt.trim()
-                      ? "linear-gradient(135deg, #4F8AFF 0%, #8B5CF6 100%)"
+                      ? "linear-gradient(135deg, #00F5FF 0%, #B87333 100%)"
                       : "#1A1A26",
                     color: prompt.trim() ? "#fff" : "#3A3A4E",
                     fontSize: 13, fontWeight: 600,
                     cursor: prompt.trim() ? "pointer" : "not-allowed",
                     display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
                     transition: "opacity 0.15s ease, box-shadow 0.15s ease",
-                    boxShadow: prompt.trim() ? "0 4px 20px rgba(79,138,255,0.25)" : "none",
+                    boxShadow: prompt.trim() ? "0 4px 20px rgba(0,245,255,0.25)" : "none",
                   }}
                   onMouseEnter={e => { if (prompt.trim()) e.currentTarget.style.opacity = "0.88"; }}
                   onMouseLeave={e => { e.currentTarget.style.opacity = "1"; }}

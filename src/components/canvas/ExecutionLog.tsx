@@ -19,8 +19,8 @@ interface ExecutionLogProps {
 }
 
 const TYPE_COLOR: Record<LogEntry["type"], string> = {
-  start:   "#4F8AFF",
-  running: "#F59E0B",
+  start:   "#00F5FF",
+  running: "#FFBF00",
   success: "#10B981",
   error:   "#EF4444",
   info:    "#5C5C78",
@@ -52,7 +52,7 @@ export function ExecutionLog({ entries, isRunning, onClose }: ExecutionLogProps)
   if (entries.length === 0 && !isRunning) return null;
 
   const statusColor = isRunning
-    ? "#F59E0B"
+    ? "#FFBF00"
     : entries[entries.length - 1]?.type === "error"
       ? "#EF4444"
       : "#10B981";
@@ -70,7 +70,7 @@ export function ExecutionLog({ entries, isRunning, onClose }: ExecutionLogProps)
         bottom: 16,
         left: 16,
         zIndex: 25,
-        borderRadius: expanded ? 14 : 24,
+        borderRadius: expanded ? 4 : 4,
         overflow: "hidden",
         background: "rgba(5, 5, 8, 0.92)",
         border: "1px solid rgba(255,255,255,0.06)",

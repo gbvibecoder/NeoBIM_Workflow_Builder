@@ -26,7 +26,7 @@ interface ChatMessage {
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 const COLORS: Record<NodeCategory, string> = {
-  input: "#3B82F6", transform: "#8B5CF6", generate: "#10B981", export: "#F59E0B",
+  input: "#00F5FF", transform: "#B87333", generate: "#FFBF00", export: "#4FC3F7",
 };
 
 // ─── Node catalogue helpers (keyword fallback) ───────────────────────────────
@@ -79,7 +79,7 @@ function keywordFallback(
         sourceHandle: lastNode.data.outputs[0]?.id ?? "output",
         target: newNode.id, targetHandle: newNode.data.inputs[0]?.id ?? "input",
         type: "animatedEdge",
-        data: { sourceColor: COLORS[lastNode.data.category as NodeCategory] ?? "#4F8AFF", targetColor: COLORS[found.category as NodeCategory] ?? "#4F8AFF" },
+        data: { sourceColor: COLORS[lastNode.data.category as NodeCategory] ?? "#00F5FF", targetColor: COLORS[found.category as NodeCategory] ?? "#00F5FF" },
       });
     }
     return `Added **${found.name}** to your workflow.`;
@@ -146,8 +146,8 @@ function applyActions(
           target: newNode.id, targetHandle: newNode.data.inputs[0]?.id ?? "input",
           type: "animatedEdge",
           data: {
-            sourceColor: COLORS[connectFrom.data.category as NodeCategory] ?? "#4F8AFF",
-            targetColor: COLORS[catalogueNode.category as NodeCategory] ?? "#4F8AFF",
+            sourceColor: COLORS[connectFrom.data.category as NodeCategory] ?? "#00F5FF",
+            targetColor: COLORS[catalogueNode.category as NodeCategory] ?? "#00F5FF",
           },
         });
       }
@@ -334,17 +334,17 @@ export function AIChatPanel({ messages, onAddMessage, onClear, isOpen, onToggle 
             style={{
               position: "absolute", right: 20, bottom: 20,
               zIndex: 25, padding: "10px 16px",
-              background: "rgba(12,12,24,0.92)", border: "1px solid rgba(79,138,255,0.2)",
-              borderRadius: 28,
-              cursor: "pointer", color: "#4F8AFF",
+              background: "rgba(7,8,9,0.92)", border: "1px solid rgba(0,245,255,0.2)",
+              borderRadius: 4,
+              cursor: "pointer", color: "#00F5FF",
               display: "flex", alignItems: "center", gap: 8,
-              boxShadow: "0 4px 20px rgba(0,0,0,0.4), 0 0 15px rgba(79,138,255,0.08)",
+              boxShadow: "0 4px 20px rgba(0,0,0,0.4), 0 0 15px rgba(0,245,255,0.08)",
               backdropFilter: "blur(20px)",
               WebkitBackdropFilter: "blur(20px)",
               transition: "all 0.2s ease",
             }}
-            onMouseEnter={e => { e.currentTarget.style.borderColor = "rgba(79,138,255,0.4)"; e.currentTarget.style.boxShadow = "0 4px 24px rgba(0,0,0,0.5), 0 0 25px rgba(79,138,255,0.12)"; }}
-            onMouseLeave={e => { e.currentTarget.style.borderColor = "rgba(79,138,255,0.2)"; e.currentTarget.style.boxShadow = "0 4px 20px rgba(0,0,0,0.4), 0 0 15px rgba(79,138,255,0.08)"; }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = "rgba(0,245,255,0.4)"; e.currentTarget.style.boxShadow = "0 4px 24px rgba(0,0,0,0.5), 0 0 25px rgba(0,245,255,0.12)"; }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = "rgba(0,245,255,0.2)"; e.currentTarget.style.boxShadow = "0 4px 20px rgba(0,0,0,0.4), 0 0 15px rgba(0,245,255,0.08)"; }}
           >
             <Sparkles size={14} />
             <span style={{ fontSize: 12, fontWeight: 600 }}>{t('aiChat.title')}</span>
@@ -367,11 +367,11 @@ export function AIChatPanel({ messages, onAddMessage, onClear, isOpen, onToggle 
               width: 380,
               height: minimized ? "auto" : 500,
               zIndex: 55,
-              background: "rgba(8,8,16,0.95)",
+              background: "rgba(7,8,9,0.95)",
               backdropFilter: "blur(40px) saturate(1.4)",
               WebkitBackdropFilter: "blur(40px) saturate(1.4)",
               border: "1px solid rgba(255,255,255,0.08)",
-              borderRadius: 20,
+              borderRadius: 4,
               display: "flex", flexDirection: "column",
               boxShadow: "0 16px 48px rgba(0,0,0,0.6), 0 0 1px rgba(255,255,255,0.04) inset",
               overflow: "hidden",
@@ -388,7 +388,7 @@ export function AIChatPanel({ messages, onAddMessage, onClear, isOpen, onToggle 
                 cursor: "grab", userSelect: "none",
               }}
             >
-              <Sparkles size={13} style={{ color: "#4F8AFF" }} />
+              <Sparkles size={13} style={{ color: "#00F5FF" }} />
               <span style={{ fontSize: 13, fontWeight: 600, color: "#F0F0F5", flex: 1 }}>
                 {t('aiChat.aiAssistant')}
               </span>
@@ -396,11 +396,11 @@ export function AIChatPanel({ messages, onAddMessage, onClear, isOpen, onToggle 
                 onClick={() => setAiMode(m => m === "gpt" ? "keyword" : "gpt")}
                 title={aiMode === "gpt" ? t('aiChat.usingGpt') : t('aiChat.usingKeyword')}
                 style={{
-                  background: aiMode === "gpt" ? "rgba(79,138,255,0.15)" : "rgba(255,255,255,0.04)",
-                  border: `1px solid ${aiMode === "gpt" ? "rgba(79,138,255,0.3)" : "rgba(255,255,255,0.06)"}`,
+                  background: aiMode === "gpt" ? "rgba(0,245,255,0.15)" : "rgba(255,255,255,0.04)",
+                  border: `1px solid ${aiMode === "gpt" ? "rgba(0,245,255,0.3)" : "rgba(255,255,255,0.06)"}`,
                   borderRadius: 5, padding: "2px 6px", cursor: "pointer",
                   display: "flex", alignItems: "center", gap: 3,
-                  color: aiMode === "gpt" ? "#4F8AFF" : "#5C5C78",
+                  color: aiMode === "gpt" ? "#00F5FF" : "#5C5C78",
                   fontSize: 10, fontWeight: 600,
                 }}
                 onMouseDown={e => e.stopPropagation()}
@@ -478,10 +478,10 @@ export function AIChatPanel({ messages, onAddMessage, onClear, isOpen, onToggle 
                     }}>
                       <div style={{
                         maxWidth: "85%", padding: "10px 14px",
-                        borderRadius: 14,
+                        borderRadius: 4,
                         ...(msg.role === "user"
-                          ? { borderBottomRightRadius: 4, background: "rgba(79,138,255,0.12)", border: "1px solid rgba(79,138,255,0.1)" }
-                          : { borderBottomLeftRadius: 4, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.04)" }
+                          ? { borderBottomRightRadius: 2, background: "rgba(0,245,255,0.12)", border: "1px solid rgba(0,245,255,0.1)" }
+                          : { borderBottomLeftRadius: 2, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.04)" }
                         ),
                         fontSize: 12, color: msg.role === "user" ? "#F0F0F5" : "#9898B0", lineHeight: 1.6,
                       }}>
@@ -527,7 +527,7 @@ export function AIChatPanel({ messages, onAddMessage, onClear, isOpen, onToggle 
                     rows={2}
                     style={{
                       flex: 1, resize: "none", padding: "10px 14px",
-                      borderRadius: 12, border: "1px solid rgba(255,255,255,0.06)",
+                      borderRadius: 4, border: "1px solid rgba(255,255,255,0.06)",
                       background: "rgba(255,255,255,0.03)", color: "#F0F0F5",
                       fontSize: 13, fontFamily: "inherit", outline: "none",
                       lineHeight: 1.5, maxHeight: 80, overflowY: "auto",
@@ -539,7 +539,7 @@ export function AIChatPanel({ messages, onAddMessage, onClear, isOpen, onToggle 
                     disabled={!input.trim() || isTyping}
                     style={{
                       width: 32, height: 32, borderRadius: 8, border: "none",
-                      background: input.trim() && !isTyping ? "#4F8AFF" : "rgba(255,255,255,0.06)",
+                      background: input.trim() && !isTyping ? "#00F5FF" : "rgba(255,255,255,0.06)",
                       color: input.trim() && !isTyping ? "#fff" : "#3A3A50",
                       cursor: input.trim() && !isTyping ? "pointer" : "default",
                       display: "flex", alignItems: "center", justifyContent: "center",

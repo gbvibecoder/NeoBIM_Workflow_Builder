@@ -42,10 +42,10 @@ export function TextPromptInput({ nodeId, data }: { nodeId: string; data: Workfl
         style={{
           width: "100%", resize: "none", boxSizing: "border-box",
           marginTop: 8, padding: "12px",
-          background: isEmpty ? "rgba(79,138,255,0.04)" : "rgba(0,0,0,0.3)",
-          borderRadius: 8,
+          background: isEmpty ? "rgba(0,245,255,0.04)" : "rgba(0,0,0,0.3)",
+          borderRadius: 4,
           border: isEmpty
-            ? "1px solid rgba(79,138,255,0.3)"
+            ? "1px solid rgba(0,245,255,0.3)"
             : "1px solid rgba(255,255,255,0.08)",
           color: "#F0F0F5", fontSize: 13, lineHeight: 1.5,
           fontFamily: "inherit", outline: "none",
@@ -177,22 +177,22 @@ export function FileUploadInput({ nodeId, data, accept, label, maxMB = 20, showP
           onDragOver={onDragOver}
           style={{
             marginTop: 8, padding: "10px 8px", borderRadius: 6, cursor: "pointer",
-            border: "1px dashed rgba(79,138,255,0.25)",
-            background: "rgba(79,138,255,0.03)",
+            border: "1px dashed rgba(0,245,255,0.25)",
+            background: "rgba(0,245,255,0.03)",
             textAlign: "center",
             transition: "all 0.15s",
           }}
           onMouseEnter={e => {
-            (e.currentTarget as HTMLElement).style.borderColor = "rgba(79,138,255,0.5)";
-            (e.currentTarget as HTMLElement).style.background = "rgba(79,138,255,0.07)";
+            (e.currentTarget as HTMLElement).style.borderColor = "rgba(0,245,255,0.5)";
+            (e.currentTarget as HTMLElement).style.background = "rgba(0,245,255,0.07)";
           }}
           onMouseLeave={e => {
-            (e.currentTarget as HTMLElement).style.borderColor = "rgba(79,138,255,0.25)";
-            (e.currentTarget as HTMLElement).style.background = "rgba(79,138,255,0.03)";
+            (e.currentTarget as HTMLElement).style.borderColor = "rgba(0,245,255,0.25)";
+            (e.currentTarget as HTMLElement).style.background = "rgba(0,245,255,0.03)";
           }}
         >
           <div style={{ fontSize: 9, color: "#55556A", lineHeight: 1.5 }}>
-            Drop {label} here or <span style={{ color: "#4F8AFF" }}>click to browse</span>
+            Drop {label} here or <span style={{ color: "#00F5FF" }}>click to browse</span>
           </div>
           <div style={{ fontSize: 8, color: "#3A3A4E", marginTop: 2 }}>
             {accept} · max {maxMB}MB
@@ -238,7 +238,7 @@ export function ParameterInput({ nodeId, data }: { nodeId: string; data: Workflo
 
   const inputStyle: React.CSSProperties = {
     width: "100%", boxSizing: "border-box",
-    padding: "6px 12px", borderRadius: 6,
+    padding: "6px 12px", borderRadius: 4,
     border: "1px solid rgba(255,255,255,0.08)",
     background: "rgba(0,0,0,0.3)", color: "#F0F0F5",
     fontSize: 13, outline: "none", fontFamily: "inherit",

@@ -78,8 +78,8 @@ export function OnboardingTour() {
               position: "fixed",
               bottom: 80, left: "50%", transform: "translateX(-50%)",
               zIndex: 101, width: 340,
-              background: "#12121A", border: "1px solid #2A2A3E",
-              borderRadius: 14, padding: "18px 20px",
+              background: "rgba(7,8,9,0.92)", border: "1px solid rgba(184,115,51,0.15)",
+              borderRadius: 4, padding: "18px 20px",
               boxShadow: "0 16px 48px rgba(0,0,0,0.6)",
               pointerEvents: "all",
             }}
@@ -99,7 +99,7 @@ export function OnboardingTour() {
             </button>
 
             {/* Step number */}
-            <div style={{ fontSize: 10, color: "#4F8AFF", fontWeight: 700, marginBottom: 6, letterSpacing: 1 }}>
+            <div style={{ fontSize: 10, color: "#00F5FF", fontWeight: 700, marginBottom: 6, letterSpacing: 1 }}>
               STEP {step + 1} OF {STEPS.length}
             </div>
 
@@ -115,9 +115,9 @@ export function OnboardingTour() {
 
             {/* Hint */}
             <div style={{
-              fontSize: 10, color: "#4F8AFF", padding: "5px 8px",
-              background: "rgba(79,138,255,0.07)", borderRadius: 6,
-              border: "1px solid rgba(79,138,255,0.15)", marginBottom: 16,
+              fontSize: 10, color: "#00F5FF", padding: "5px 8px",
+              background: "rgba(0,245,255,0.07)", borderRadius: 6,
+              border: "1px solid rgba(0,245,255,0.15)", marginBottom: 16,
             }}>
               {STEPS[step].hint}
             </div>
@@ -129,7 +129,7 @@ export function OnboardingTour() {
                 {STEPS.map((_, i) => (
                   <div key={i} style={{
                     width: 6, height: 6, borderRadius: "50%",
-                    background: i === step ? "#4F8AFF" : "#1E1E2E",
+                    background: i === step ? "#00F5FF" : "#1E1E2E",
                     transition: "background 0.2s",
                   }} />
                 ))}
@@ -149,7 +149,7 @@ export function OnboardingTour() {
                   onClick={next}
                   style={{
                     padding: "6px 14px", borderRadius: 7, border: "none",
-                    background: "#4F8AFF", color: "#fff",
+                    background: "#00F5FF", color: "#fff",
                     fontSize: 12, fontWeight: 600, cursor: "pointer",
                   }}
                 >

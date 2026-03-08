@@ -104,9 +104,9 @@ export function SaveWorkflowModal({
               width: "100%",
               maxWidth: 440,
               margin: "0 16px",
-              background: "#12121E",
-              border: "1px solid rgba(255,255,255,0.1)",
-              borderRadius: 16,
+              background: "rgba(7,8,9,0.92)",
+              border: "1px solid rgba(184,115,51,0.15)",
+              borderRadius: 4,
               padding: "24px",
               boxShadow:
                 "0 24px 64px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.04)",
@@ -126,15 +126,15 @@ export function SaveWorkflowModal({
                   style={{
                     width: 36,
                     height: 36,
-                    borderRadius: 10,
-                    background: "rgba(79,138,255,0.1)",
-                    border: "1px solid rgba(79,138,255,0.2)",
+                    borderRadius: 4,
+                    background: "rgba(0,245,255,0.1)",
+                    border: "1px solid rgba(0,245,255,0.2)",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
                   }}
                 >
-                  <Save size={16} style={{ color: "#4F8AFF" }} />
+                  <Save size={16} style={{ color: "#00F5FF" }} />
                 </div>
                 <div>
                   <h3
@@ -197,13 +197,13 @@ export function SaveWorkflowModal({
               placeholder="e.g. Residential Tower - Mumbai - Concept A"
               style={{
                 width: "100%",
-                background: "#1A1A2A",
+                background: "rgba(10,12,14,0.7)",
                 border: `1px solid ${
                   name.length > 0 && !isValid
                     ? "rgba(239,68,68,0.4)"
                     : "rgba(255,255,255,0.1)"
                 }`,
-                borderRadius: 10,
+                borderRadius: 4,
                 padding: "12px 16px",
                 fontSize: 14,
                 color: "#F0F0F5",
@@ -212,7 +212,7 @@ export function SaveWorkflowModal({
                 boxSizing: "border-box",
               }}
               onFocus={(e) => {
-                e.currentTarget.style.borderColor = "rgba(79,138,255,0.4)";
+                e.currentTarget.style.borderColor = "rgba(0,245,255,0.4)";
               }}
               onBlur={(e) => {
                 e.currentTarget.style.borderColor =
@@ -286,7 +286,7 @@ export function SaveWorkflowModal({
                 style={{
                   height: 40,
                   padding: "0 20px",
-                  borderRadius: 10,
+                  borderRadius: 4,
                   background: "transparent",
                   border: "1px solid rgba(255,255,255,0.1)",
                   color: "#9898B0",
@@ -312,9 +312,9 @@ export function SaveWorkflowModal({
                 style={{
                   height: 40,
                   padding: "0 24px",
-                  borderRadius: 10,
+                  borderRadius: 4,
                   background: isValid
-                    ? "linear-gradient(135deg, #4F8AFF 0%, #6366F1 100%)"
+                    ? "linear-gradient(135deg, #00F5FF 0%, #B87333 100%)"
                     : "#2A2A3E",
                   border: "none",
                   color: isValid ? "#fff" : "#5C5C78",
@@ -324,21 +324,21 @@ export function SaveWorkflowModal({
                   opacity: isValid ? 1 : 0.6,
                   transition: "all 0.15s ease",
                   boxShadow: isValid
-                    ? "0 4px 16px rgba(79,138,255,0.25)"
+                    ? "0 4px 16px rgba(0,245,255,0.25)"
                     : "none",
                 }}
                 onMouseEnter={(e) => {
                   if (isValid) {
                     e.currentTarget.style.filter = "brightness(1.1)";
                     e.currentTarget.style.boxShadow =
-                      "0 4px 24px rgba(79,138,255,0.4)";
+                      "0 4px 24px rgba(0,245,255,0.4)";
                   }
                 }}
                 onMouseLeave={(e) => {
                   e.currentTarget.style.filter = "brightness(1)";
                   if (isValid) {
                     e.currentTarget.style.boxShadow =
-                      "0 4px 16px rgba(79,138,255,0.25)";
+                      "0 4px 16px rgba(0,245,255,0.25)";
                   }
                 }}
               >

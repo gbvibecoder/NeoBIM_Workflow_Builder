@@ -131,8 +131,8 @@ export function Sidebar() {
           style={{
             position: "fixed", top: 12, left: 12, zIndex: 9001,
             width: 42, height: 42, borderRadius: 12,
-            border: "1px solid rgba(255,255,255,0.08)",
-            background: "rgba(7,8,14,0.92)",
+            border: "1px solid rgba(184,115,51,0.15)",
+            background: "rgba(7,8,9,0.92)",
             backdropFilter: "blur(16px)",
             display: "flex", alignItems: "center", justifyContent: "center",
             color: "rgba(255,255,255,0.5)", cursor: "pointer",
@@ -180,8 +180,8 @@ export function Sidebar() {
           transform: isMobile && !mobileOpen ? "translateX(-100%)" : "translateX(0)",
           transition: isMobile ? "transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)" : undefined,
           boxShadow: isMobile && mobileOpen ? "20px 0 60px rgba(0,0,0,0.6)" : undefined,
-          background: "#060810",
-          borderRight: "1px solid rgba(255,255,255,0.04)",
+          background: "#070809",
+          borderRight: "1px solid rgba(184,115,51,0.15)",
         }}
       >
         {/* Ambient background layers */}
@@ -191,7 +191,7 @@ export function Sidebar() {
         {/* Right edge glow line */}
         <div style={{
           position: "absolute", top: "15%", right: 0, height: "70%", width: 1,
-          background: "linear-gradient(180deg, transparent 0%, rgba(79,138,255,0.15) 30%, rgba(79,138,255,0.25) 50%, rgba(79,138,255,0.15) 70%, transparent 100%)",
+          background: "linear-gradient(180deg, transparent 0%, rgba(184,115,51,0.15) 30%, rgba(184,115,51,0.25) 50%, rgba(184,115,51,0.15) 70%, transparent 100%)",
           pointerEvents: "none", zIndex: 2,
         }} />
 
@@ -220,7 +220,7 @@ export function Sidebar() {
                   fontFamily: "var(--font-dm-sans), system-ui, sans-serif",
                 }}>
                   Build<span style={{
-                    background: "linear-gradient(135deg, #5B9AFF 0%, #818CF8 100%)",
+                    background: "linear-gradient(135deg, #FFBF00 0%, #B87333 100%)",
                     WebkitBackgroundClip: "text",
                     WebkitTextFillColor: "transparent",
                     backgroundClip: "text",
@@ -229,7 +229,7 @@ export function Sidebar() {
                 <span style={{
                   fontSize: 8, fontWeight: 600, letterSpacing: "2.5px",
                   textTransform: "uppercase" as const,
-                  color: "rgba(255,255,255,0.16)",
+                  color: "rgba(184,115,51,0.25)",
                   fontFamily: "var(--font-jetbrains), monospace",
                   marginTop: 3,
                 }}>
@@ -274,7 +274,7 @@ export function Sidebar() {
                 textDecoration: "none",
                 fontFamily: "var(--font-jetbrains), monospace",
                 fontSize: 12.5, fontWeight: 600, letterSpacing: "0.3px",
-                color: "white",
+                color: "#00F5FF",
                 whiteSpace: "nowrap",
               }}
             >
@@ -364,7 +364,7 @@ export function Sidebar() {
             {/* Top border gradient */}
             <div style={{
               height: 1,
-              background: "linear-gradient(90deg, transparent 0%, rgba(79,138,255,0.12) 30%, rgba(139,92,246,0.12) 70%, transparent 100%)",
+              background: "linear-gradient(90deg, transparent 0%, rgba(184,115,51,0.12) 30%, rgba(255,191,0,0.12) 70%, transparent 100%)",
             }} />
 
             <div style={{ padding: "14px 12px 12px" }}>
@@ -376,7 +376,7 @@ export function Sidebar() {
                     <div style={{
                       position: "absolute", left: 8, top: "50%", transform: "translateY(-50%)",
                       width: 40, height: 40, borderRadius: "50%",
-                      background: "radial-gradient(circle, rgba(79,138,255,0.15) 0%, transparent 70%)",
+                      background: "radial-gradient(circle, rgba(184,115,51,0.15) 0%, transparent 70%)",
                       pointerEvents: "none",
                     }} />
 
@@ -437,7 +437,7 @@ export function Sidebar() {
 
         {/* ── Expand button (collapsed) ───────────────────────────── */}
         {isEffectivelyCollapsed && (
-          <div style={{ padding: 8, borderTop: "1px solid rgba(255,255,255,0.04)", flexShrink: 0, position: "relative", zIndex: 1 }}>
+          <div style={{ padding: 8, borderTop: "1px solid rgba(184,115,51,0.1)", flexShrink: 0, position: "relative", zIndex: 1 }}>
             <button
               onClick={() => { setCollapsed(false); setHoverExpanded(false); }}
               title={t("nav.expandSidebar")}
@@ -496,7 +496,7 @@ function NavItem({ href, label, badge, icon: Icon, isActive, collapsed, showLabe
         {isActive && (
           <div style={{
             position: "absolute", inset: 0,
-            background: "radial-gradient(ellipse 120% 100% at 0% 50%, rgba(79,138,255,0.12) 0%, transparent 70%)",
+            background: "radial-gradient(ellipse 120% 100% at 0% 50%, rgba(0,245,255,0.12) 0%, transparent 70%)",
             pointerEvents: "none",
           }} />
         )}
@@ -509,11 +509,11 @@ function NavItem({ href, label, badge, icon: Icon, isActive, collapsed, showLabe
           width: isActive ? 3 : 2,
           borderRadius: "0 4px 4px 0",
           background: isActive
-            ? "linear-gradient(180deg, #5B9AFF, #818CF8)"
-            : "rgba(79,138,255,0.4)",
+            ? "linear-gradient(180deg, #00F5FF, #4FC3F7)"
+            : "rgba(184,115,51,0.4)",
           opacity: isActive ? 1 : (hovered ? 0.8 : 0),
           transition: "all 200ms cubic-bezier(0.4,0,0.2,1)",
-          boxShadow: isActive ? "0 0 12px rgba(79,138,255,0.5), 0 0 4px rgba(79,138,255,0.8)" : "none",
+          boxShadow: isActive ? "0 0 12px rgba(0,245,255,0.5), 0 0 4px rgba(0,245,255,0.8)" : "none",
           pointerEvents: "none",
         }} />
 
@@ -532,9 +532,9 @@ function NavItem({ href, label, badge, icon: Icon, isActive, collapsed, showLabe
             size={isActive ? 15 : 17}
             strokeWidth={isActive ? 2.2 : 1.6}
             style={{
-              color: isActive ? "#fff" : (hovered ? "rgba(255,255,255,0.75)" : "rgba(255,255,255,0.32)"),
+              color: isActive ? "#fff" : (hovered ? "rgba(255,255,255,0.7)" : "rgba(255,255,255,0.4)"),
               transition: "all 200ms ease",
-              filter: isActive ? "drop-shadow(0 0 4px rgba(91,154,255,0.5))" : "none",
+              filter: isActive ? "drop-shadow(0 0 4px rgba(0,245,255,0.5))" : "none",
             }}
           />
         </span>
@@ -545,7 +545,7 @@ function NavItem({ href, label, badge, icon: Icon, isActive, collapsed, showLabe
               flex: 1,
               fontSize: 13,
               fontWeight: isActive ? 600 : 450,
-              color: isActive ? "#EDF2FF" : (hovered ? "rgba(255,255,255,0.82)" : "rgba(255,255,255,0.4)"),
+              color: isActive ? "#E2E8F0" : (hovered ? "rgba(255,255,255,0.7)" : "rgba(255,255,255,0.4)"),
               whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
               transition: "all 200ms ease",
               letterSpacing: isActive ? "0.2px" : "0.1px",

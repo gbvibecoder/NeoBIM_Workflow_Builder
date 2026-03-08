@@ -59,10 +59,10 @@ const edgeTypes = { animatedEdge: AnimatedEdge };
 // ─── Mini workflow diagram for empty state ─────────────────────────────────
 
 const DEMO_NODES = [
-  { label: "PDF Upload",  color: "#3B82F6" },
-  { label: "Doc Parser",  color: "#8B5CF6" },
-  { label: "Massing Gen", color: "#10B981" },
-  { label: "IFC Export",  color: "#F59E0B" },
+  { label: "PDF Upload",  color: "#00F5FF" },
+  { label: "Doc Parser",  color: "#B87333" },
+  { label: "Massing Gen", color: "#FFBF00" },
+  { label: "IFC Export",  color: "#4FC3F7" },
 ];
 
 function MiniWorkflowDiagram() {
@@ -90,10 +90,10 @@ function MiniWorkflowDiagram() {
               display: "flex", alignItems: "center", gap: 0,
               margin: "0 3px",
             }}>
-              <div style={{ width: 14, height: 1, background: "rgba(79,138,255,0.3)" }} />
+              <div style={{ width: 14, height: 1, background: "rgba(184,115,51,0.3)" }} />
               <div style={{
                 width: 0, height: 0,
-                borderLeft: "4px solid rgba(79,138,255,0.3)",
+                borderLeft: "4px solid rgba(184,115,51,0.3)",
                 borderTop: "3px solid transparent",
                 borderBottom: "3px solid transparent",
               }} />
@@ -129,41 +129,45 @@ function CanvasEmptyState({ onPromptMode }: EmptyStateProps) {
         {/* Mini diagram preview */}
         <div style={{
           padding: "16px 20px",
-          borderRadius: 12,
-          background: "rgba(18, 18, 26, 0.7)",
-          border: "1px solid rgba(255,255,255,0.06)",
-          backdropFilter: "blur(12px)",
-          WebkitBackdropFilter: "blur(12px)",
+          borderRadius: 4,
+          background: "rgba(10, 12, 14, 0.7)",
+          border: "1px solid rgba(184,115,51,0.15)",
+          backdropFilter: "blur(40px)",
+          WebkitBackdropFilter: "blur(40px)",
           marginBottom: 24,
         }}>
           <MiniWorkflowDiagram />
-          <div style={{ fontSize: 9, color: "#3A3A50", textAlign: "center", marginTop: 4 }}>
+          <div style={{ fontSize: 9, color: "rgba(184,115,51,0.4)", textAlign: "center", marginTop: 4, fontFamily: "'Space Mono', monospace", textTransform: "uppercase" as const, letterSpacing: "0.1em" }}>
             {t('canvas.examplePipeline')}
           </div>
         </div>
 
         {/* Icon */}
         <div style={{
-          width: 52, height: 52, borderRadius: 14,
-          background: "rgba(79,138,255,0.08)",
-          border: "1px solid rgba(79,138,255,0.2)",
+          width: 52, height: 52, borderRadius: 4,
+          background: "rgba(184,115,51,0.08)",
+          border: "1px solid rgba(184,115,51,0.2)",
           display: "flex", alignItems: "center", justifyContent: "center",
           marginBottom: 16,
         }}>
-          <Layers3 size={22} style={{ color: "#4F8AFF" }} strokeWidth={1.5} />
+          <Layers3 size={22} style={{ color: "#B87333" }} strokeWidth={1.5} />
         </div>
 
         {/* Headline */}
         <h2 style={{
-          fontSize: 20, fontWeight: 600,
-          color: "#F0F0F5", marginBottom: 8, lineHeight: 1.3,
+          fontSize: 22, fontWeight: 400,
+          fontFamily: "'Playfair Display', serif",
+          fontStyle: "italic",
+          color: "#FFBF00", marginBottom: 8, lineHeight: 1.3,
+          letterSpacing: "0.05em",
         }}>
           {t('canvas.emptyTitle')}
         </h2>
 
         {/* Subtitle */}
         <p style={{
-          fontSize: 14, color: "#5C5C78",
+          fontSize: 12, color: "rgba(255,255,255,0.4)",
+          fontFamily: "'Space Mono', monospace",
           lineHeight: 1.6, marginBottom: 24, maxWidth: 320,
         }}>
           {t('canvas.emptyDesc')}
@@ -175,20 +179,23 @@ function CanvasEmptyState({ onPromptMode }: EmptyStateProps) {
             href="/dashboard/templates"
             style={{
               display: "flex", alignItems: "center", gap: 7,
-              padding: "9px 18px", borderRadius: 8,
-              border: "1px solid rgba(79,138,255,0.35)",
-              background: "rgba(79,138,255,0.06)",
-              fontSize: 13, fontWeight: 500, color: "#4F8AFF",
+              padding: "9px 18px", borderRadius: 4,
+              border: "1px solid rgba(184,115,51,0.4)",
+              background: "rgba(184,115,51,0.05)",
+              fontSize: 10, fontWeight: 400, color: "#B87333",
+              fontFamily: "'Space Mono', monospace",
+              textTransform: "uppercase" as const,
+              letterSpacing: "0.15em",
               textDecoration: "none",
               transition: "all 0.15s ease",
             }}
             onMouseEnter={(e) => {
-              (e.currentTarget as HTMLElement).style.background = "rgba(79,138,255,0.12)";
-              (e.currentTarget as HTMLElement).style.borderColor = "rgba(79,138,255,0.6)";
+              (e.currentTarget as HTMLElement).style.background = "rgba(184,115,51,0.12)";
+              (e.currentTarget as HTMLElement).style.borderColor = "rgba(184,115,51,0.6)";
             }}
             onMouseLeave={(e) => {
-              (e.currentTarget as HTMLElement).style.background = "rgba(79,138,255,0.06)";
-              (e.currentTarget as HTMLElement).style.borderColor = "rgba(79,138,255,0.35)";
+              (e.currentTarget as HTMLElement).style.background = "rgba(184,115,51,0.05)";
+              (e.currentTarget as HTMLElement).style.borderColor = "rgba(184,115,51,0.4)";
             }}
           >
             <BookOpen size={14} />
@@ -198,15 +205,18 @@ function CanvasEmptyState({ onPromptMode }: EmptyStateProps) {
             onClick={onPromptMode}
             style={{
               display: "flex", alignItems: "center", gap: 7,
-              padding: "9px 18px", borderRadius: 8,
-              background: "#4F8AFF",
-              border: "none",
-              fontSize: 13, fontWeight: 600, color: "#fff",
+              padding: "9px 18px", borderRadius: 4,
+              background: "transparent",
+              border: "1px solid rgba(0,245,255,0.4)",
+              fontSize: 10, fontWeight: 400, color: "#00F5FF",
+              fontFamily: "'Space Mono', monospace",
+              textTransform: "uppercase" as const,
+              letterSpacing: "0.15em",
               cursor: "pointer",
               transition: "all 0.15s ease",
             }}
-            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = "#3D7AFF"; }}
-            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "#4F8AFF"; }}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = "rgba(0,245,255,0.08)"; }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "transparent"; }}
           >
             <Sparkles size={14} />
             {t('canvas.tryAiPrompt')}
@@ -374,7 +384,7 @@ function WorkflowCanvasInner({ workflowId: _workflowId }: WorkflowCanvasInnerPro
     (connection: Connection) => {
       // Derive gradient colors from source/target node categories
       const CAT_COLORS: Record<string, string> = {
-        input: "#3B82F6", transform: "#8B5CF6", generate: "#10B981", export: "#F59E0B",
+        input: "#00F5FF", transform: "#B87333", generate: "#FFBF00", export: "#4FC3F7",
       };
       const srcNode = nodes.find(n => n.id === connection.source);
       const tgtNode = nodes.find(n => n.id === connection.target);
@@ -583,8 +593,8 @@ function WorkflowCanvasInner({ workflowId: _workflowId }: WorkflowCanvasInnerPro
                 transition={{ ease: "linear", duration: 0.4 }}
                 style={{
                   height: "100%",
-                  background: "linear-gradient(90deg, #4F8AFF 0%, #8B5CF6 100%)",
-                  boxShadow: "0 0 8px rgba(79,138,255,0.6)",
+                  background: "linear-gradient(90deg, #00F5FF 0%, #B87333 50%, #FFBF00 100%)",
+                  boxShadow: "0 0 8px rgba(0,245,255,0.6)",
                 }}
               />
             </motion.div>
@@ -593,15 +603,33 @@ function WorkflowCanvasInner({ workflowId: _workflowId }: WorkflowCanvasInnerPro
 
         {/* React Flow */}
         <div className="absolute inset-0">
-          {/* Atmospheric blue center glow — intensifies during execution */}
+          {/* Copper dot grid */}
+          <div
+            className="absolute inset-0 pointer-events-none"
+            style={{
+              zIndex: 0, opacity: 0.15,
+              backgroundImage: 'radial-gradient(circle, #B87333 0.8px, transparent 0.8px)',
+              backgroundSize: '60px 60px',
+            }}
+          />
+          {/* Warm atmospheric glow */}
           <div
             className="absolute inset-0 pointer-events-none"
             style={{
               zIndex: 0,
               background: isExecuting
-                ? 'radial-gradient(ellipse 80% 60% at 50% 40%, rgba(79,138,255,0.10) 0%, transparent 70%)'
-                : 'radial-gradient(ellipse 80% 60% at 50% 40%, rgba(79,138,255,0.04) 0%, transparent 70%)',
+                ? 'radial-gradient(ellipse 60% 50% at 50% 50%, rgba(184,115,51,0.10) 0%, transparent 70%)'
+                : 'radial-gradient(ellipse 60% 50% at 50% 50%, rgba(184,115,51,0.06) 0%, transparent 70%)',
+              animation: 'atelier-glow-pulse 8s ease-in-out infinite',
               transition: 'background 1s ease',
+            }}
+          />
+          {/* Cyan accent glow */}
+          <div
+            className="absolute inset-0 pointer-events-none"
+            style={{
+              zIndex: 0,
+              background: 'radial-gradient(circle at 15% 80%, rgba(0,245,255,0.04) 0%, transparent 40%)',
             }}
           />
           {/* Edge vignette — darkens corners for cinematic depth */}
@@ -609,7 +637,7 @@ function WorkflowCanvasInner({ workflowId: _workflowId }: WorkflowCanvasInnerPro
             className="absolute inset-0 pointer-events-none"
             style={{
               zIndex: 0,
-              background: 'radial-gradient(ellipse at center, transparent 30%, rgba(0,0,0,0.5) 100%)',
+              background: 'radial-gradient(ellipse at center, transparent 30%, rgba(0,0,0,0.55) 100%)',
             }}
           />
 
@@ -628,27 +656,20 @@ function WorkflowCanvasInner({ workflowId: _workflowId }: WorkflowCanvasInnerPro
             fitViewOptions={{ padding: 0.3 }}
             defaultEdgeOptions={{
               type: "animatedEdge",
-              style: { stroke: "#4F8AFF", strokeWidth: 2 },
+              style: { stroke: "#B87333", strokeWidth: 1.5 },
             }}
             minZoom={0.15}
             maxZoom={2.5}
             snapToGrid
             snapGrid={[16, 16]}
             connectionLineStyle={{
-              stroke: "#4F8AFF",
-              strokeWidth: 1.5,
-              strokeDasharray: "14 5 3 5",
-              opacity: 0.5,
+              stroke: "#B87333",
+              strokeWidth: 1,
+              strokeDasharray: "20 8",
+              opacity: 0.4,
             }}
             style={{
-              background: [
-                'linear-gradient(rgba(79,138,255,0.045) 1px, transparent 1px)',
-                'linear-gradient(90deg, rgba(79,138,255,0.045) 1px, transparent 1px)',
-                'linear-gradient(rgba(79,138,255,0.012) 1px, transparent 1px)',
-                'linear-gradient(90deg, rgba(79,138,255,0.012) 1px, transparent 1px)',
-                '#07070e',
-              ].join(', '),
-              backgroundSize: '100px 100px, 100px 100px, 20px 20px, 20px 20px',
+              background: '#070809',
             }}
           >
 
@@ -661,13 +682,13 @@ function WorkflowCanvasInner({ workflowId: _workflowId }: WorkflowCanvasInnerPro
                 const cfg = CATEGORY_CONFIG[d?.category as NodeCategory];
                 return cfg?.color ?? "rgba(255,255,255,0.08)";
               }}
-              maskColor="rgba(10,10,15,0.7)"
+              maskColor="rgba(7,8,9,0.7)"
               className="canvas-minimap"
               style={{
                 width: 120,
                 height: 80,
-                backgroundColor: "rgba(18,18,26,0.85)",
-                border: "1px solid rgba(255,255,255,0.04)",
+                backgroundColor: "rgba(10,12,14,0.85)",
+                border: "1px solid rgba(184,115,51,0.1)",
                 borderRadius: 8,
                 marginBottom: 16,
                 marginLeft: 16,
@@ -677,12 +698,12 @@ function WorkflowCanvasInner({ workflowId: _workflowId }: WorkflowCanvasInnerPro
             />
           </ReactFlow>
 
-          {/* Atmospheric blue glow — enhanced */}
+          {/* Atmospheric copper glow — enhanced */}
           <div
             className="absolute inset-0 pointer-events-none"
             style={{
               zIndex: 1,
-              background: 'radial-gradient(ellipse 80% 60% at 50% 40%, rgba(79,138,255,0.05) 0%, transparent 70%)',
+              background: 'radial-gradient(ellipse 80% 60% at 50% 40%, rgba(184,115,51,0.04) 0%, transparent 70%)',
             }}
           />
 
@@ -748,33 +769,34 @@ function WorkflowCanvasInner({ workflowId: _workflowId }: WorkflowCanvasInnerPro
           }}>
             {/* North arrow */}
             <svg width="16" height="24" viewBox="0 0 16 24" style={{ opacity: 0.25 }}>
-              <text x="8" y="6" textAnchor="middle" fill="#4a4a68" fontSize="6" fontWeight="600"
-                style={{ fontFamily: 'var(--font-space-grotesk, sans-serif)' }}>N</text>
-              <path d="M8 8 L11 16 L8 13.5 L5 16 Z" fill="#3A3A50" />
-              <line x1="8" y1="16" x2="8" y2="22" stroke="#3A3A50" strokeWidth="0.5" />
+              <text x="8" y="6" textAnchor="middle" fill="#B87333" fontSize="6" fontWeight="600"
+                style={{ fontFamily: "'Space Mono', monospace" }}>N</text>
+              <path d="M8 8 L11 16 L8 13.5 L5 16 Z" fill="#B8733340" />
+              <line x1="8" y1="16" x2="8" y2="22" stroke="#B8733340" strokeWidth="0.5" />
             </svg>
             {/* Title block */}
             <div style={{
               padding: '3px 8px',
-              border: '1px solid rgba(255,255,255,0.04)',
+              border: '1px solid rgba(184,115,51,0.15)',
               borderRadius: 2,
-              background: 'rgba(7,7,14,0.6)',
+              background: 'rgba(7,8,9,0.6)',
             }}>
               <div style={{
                 fontSize: 7,
-                color: '#2A2A3E',
+                color: 'rgba(184,115,51,0.4)',
                 fontWeight: 500,
-                letterSpacing: '0.08em',
-                fontFamily: 'var(--font-space-grotesk, sans-serif)',
+                letterSpacing: '0.12em',
+                fontFamily: "'Space Mono', monospace",
+                textTransform: 'uppercase' as const,
               }}>
-                BUILDFLOW &nbsp;|&nbsp; {workflowName}
+                DIGITAL ATELIER &nbsp;|&nbsp; {workflowName}
               </div>
               <div style={{
                 fontSize: 6,
-                color: '#1E1E30',
-                letterSpacing: '0.05em',
+                color: 'rgba(184,115,51,0.25)',
+                letterSpacing: '0.08em',
                 marginTop: 1,
-                fontFamily: 'var(--font-space-grotesk, sans-serif)',
+                fontFamily: "'Space Mono', monospace",
               }}>
                 SCALE: NTS
               </div>

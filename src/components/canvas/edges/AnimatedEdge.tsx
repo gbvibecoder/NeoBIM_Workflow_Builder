@@ -27,8 +27,8 @@ export const AnimatedEdge = memo(function AnimatedEdge({
   const [isHovered, setIsHovered] = useState(false);
 
   const edgeData = data as EdgeData | undefined;
-  const sourceColor = edgeData?.sourceColor ?? "#4F8AFF";
-  const targetColor = edgeData?.targetColor ?? "#4F8AFF";
+  const sourceColor = edgeData?.sourceColor ?? "#B87333";
+  const targetColor = edgeData?.targetColor ?? "#B87333";
   const isFlowing   = edgeData?.isFlowing   ?? false;
 
   const [edgePath] = getSmoothStepPath({
@@ -45,8 +45,8 @@ export const AnimatedEdge = memo(function AnimatedEdge({
 
   // Visual states
   const active     = selected || isHovered;
-  const strokeW    = isFlowing ? 2.5 : active ? 2 : 1.5;
-  const strokeOp   = isFlowing ? 1 : active ? 0.7 : 0.35;
+  const strokeW    = isFlowing ? 2 : active ? 1.5 : 1;
+  const strokeOp   = isFlowing ? 1 : active ? 0.6 : 0.3;
 
   return (
     <>
@@ -84,9 +84,9 @@ export const AnimatedEdge = memo(function AnimatedEdge({
           </stop>
         </linearGradient>
 
-        {/* Glow filter */}
+        {/* Glow filter — Atelier style */}
         <filter id={glowId} x="-50%" y="-50%" width="200%" height="200%">
-          <feGaussianBlur stdDeviation={active ? "3.5" : "2.5"} result="blur" />
+          <feGaussianBlur stdDeviation={active ? "4" : "3"} result="blur" />
           <feMerge>
             <feMergeNode in="blur" />
             <feMergeNode in="SourceGraphic" />
@@ -148,22 +148,35 @@ export const AnimatedEdge = memo(function AnimatedEdge({
         onMouseLeave={() => setIsHovered(false)}
       />
 
-      {/* Idle: architectural center-line dash pattern (long-short-long) */}
+      {/* Idle: Atelier braided dash pattern with flow animation */}
       {!isFlowing && (
-        <path
-          d={edgePath}
-          fill="none"
-          stroke={sourceColor}
-          strokeWidth={0.8}
-          strokeOpacity={active ? 0.35 : 0.12}
-          strokeDasharray="14 5 3 5"
-          strokeLinecap="round"
-          style={{
-            pointerEvents: "none",
-            transition: "stroke-opacity 0.25s ease",
-            animation: "archDashFlow 4s linear infinite",
-          }}
-        />
+        <>
+          {/* Primary dashed line */}
+          <path
+            d={edgePath}
+            fill="none"
+            stroke={sourceColor}
+            strokeWidth={0.8}
+            strokeOpacity={active ? 0.35 : 0.15}
+            strokeDasharray="20 10"
+            strokeLinecap="round"
+            style={{
+              pointerEvents: "none",
+              transition: "stroke-opacity 0.25s ease",
+              animation: "atelier-flow 3s linear infinite",
+            }}
+          />
+          {/* Subtle ghost line — barely visible */}
+          <path
+            d={edgePath}
+            fill="none"
+            stroke={targetColor}
+            strokeWidth={0.3}
+            strokeOpacity={active ? 0.15 : 0.06}
+            strokeLinecap="round"
+            style={{ pointerEvents: "none" }}
+          />
+        </>
       )}
 
       {/* Flowing: luminous particle with comet trail */}
@@ -218,9 +231,9 @@ export const AnimatedEdge = memo(function AnimatedEdge({
       )}
 
       <style>{`
-        @keyframes archDashFlow {
-          from { stroke-dashoffset: 0; }
-          to { stroke-dashoffset: -54; }
+        @keyframes atelier-flow {
+          from { stroke-dashoffset: 100; }
+          to { stroke-dashoffset: 0; }
         }
       `}</style>
     </>
