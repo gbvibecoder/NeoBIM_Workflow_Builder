@@ -15,13 +15,9 @@ import { generateId } from "@/lib/utils";
 import { useLocale } from "@/hooks/useLocale";
 import { useUIStore } from "@/stores/ui-store";
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+import { hexToRgb } from "@/lib/ui-constants";
 
-function hexToRgb(hex: string): string {
-  const r = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-  if (!r) return "184, 115, 51";
-  return `${parseInt(r[1], 16)}, ${parseInt(r[2], 16)}, ${parseInt(r[3], 16)}`;
-}
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function getIcon(name: string, size = 13): React.ReactNode {
   const icons = LucideIcons as unknown as Record<

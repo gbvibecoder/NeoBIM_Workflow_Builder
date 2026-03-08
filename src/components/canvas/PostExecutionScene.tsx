@@ -394,7 +394,6 @@ export default function PostExecutionScene({
       ? kpis.height / numFloors
       : 3.5;
     const totalHeight = numFloors * floorHeight;
-    console.log('Building floors:', numFloors, '| height:', totalHeight, '| kpis:', JSON.stringify(kpis));
     const wallThickness = 0.15;
 
     // Building bounds (footprint)

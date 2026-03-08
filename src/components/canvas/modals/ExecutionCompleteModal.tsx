@@ -6,7 +6,6 @@ import { CheckCircle2 } from "lucide-react";
 import { useUIStore } from "@/stores/ui-store";
 import {
   shareExecutionToTwitter,
-  shareExecutionToLinkedIn,
 } from "@/lib/share";
 
 // Inline SVG icons to avoid heavy lucide imports for brand marks
@@ -196,35 +195,6 @@ export function ExecutionCompleteModal({
                 }}
               >
                 <XIcon /> Share on X
-              </button>
-              <button
-                onClick={() => shareExecutionToLinkedIn()}
-                style={{
-                  flex: 1,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: 6,
-                  padding: "9px 0",
-                  borderRadius: 10,
-                  background: "transparent",
-                  border: "1px solid rgba(255,255,255,0.08)",
-                  color: "#9898B0",
-                  fontSize: 12,
-                  fontWeight: 500,
-                  cursor: "pointer",
-                  transition: "all 0.15s",
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = "rgba(255,255,255,0.06)";
-                  e.currentTarget.style.color = "#F0F0F5";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = "transparent";
-                  e.currentTarget.style.color = "#9898B0";
-                }}
-              >
-                <LinkedInIcon /> Share on LinkedIn
               </button>
             </div>
           </motion.div>
