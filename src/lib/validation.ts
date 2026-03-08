@@ -12,7 +12,7 @@ export interface ValidationResult {
 }
 
 /**
- * TR-003: Building Description Generator
+ * TR-003: Design Brief Analyzer
  */
 export function validateTR003Input(inputData: unknown): ValidationResult {
   const input = inputData as Record<string, unknown> | null | undefined;
@@ -46,11 +46,11 @@ export function validateTR003Input(inputData: unknown): ValidationResult {
 }
 
 /**
- * GN-003: Concept Image Generator
+ * GN-003: Concept Render Generator
  */
 export function validateGN003Input(inputData: unknown): ValidationResult {
   // GN-003 can accept either:
-  // 1. A full building description object from TR-003
+  // 1. A full building description object from TR-003 (via _raw)
   // 2. A simple prompt string
 
   if (!inputData) {
@@ -63,7 +63,8 @@ export function validateGN003Input(inputData: unknown): ValidationResult {
 
   const input = inputData as Record<string, unknown>;
 
-  // If it's a building description object, validate structure
+  // If it's a building description object, validate structure and return early
+  // (skip prompt length checks — content/prompt may carry long upstream text)
   if (input._raw || input.projectName) {
     const desc = (input._raw ?? input) as Record<string, unknown>;
     if (!desc.projectName && !desc.buildingType) {
@@ -73,9 +74,10 @@ export function validateGN003Input(inputData: unknown): ValidationResult {
         userError: UserErrors.INVALID_INPUT,
       };
     }
+    return { valid: true };
   }
 
-  // If it's a simple prompt, validate length
+  // If it's a simple prompt (no _raw), validate length
   const prompt = input?.prompt ?? input?.content;
   if (typeof prompt === "string") {
     if (prompt.trim().length < 10) {
@@ -85,10 +87,10 @@ export function validateGN003Input(inputData: unknown): ValidationResult {
         userError: UserErrors.PROMPT_TOO_SHORT,
       };
     }
-    if (prompt.length > 500) {
+    if (prompt.length > 4000) {
       return {
         valid: false,
-        error: "Prompt too long (max 500 chars)",
+        error: "Prompt too long (max 4000 chars)",
         userError: UserErrors.PROMPT_TOO_LONG,
       };
     }
@@ -191,7 +193,7 @@ export function validateEX002Input(inputData: unknown): ValidationResult {
 }
 
 /**
- * TR-001: Document Parser
+ * TR-001: Brief Parser
  */
 export function validateTR001Input(inputData: unknown): ValidationResult {
   // TR-001 accepts PDF data or text content — at least one must be present

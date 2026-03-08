@@ -320,10 +320,10 @@ function CompareContent() {
   }
 
   return (
-    <div style={{ display: "flex", gap: 16, padding: "0 24px 24px" }}>
+    <div className="compare-layout" style={{ display: "flex", gap: 16, padding: "0 24px 24px" }}>
       <ExecutionSide execution={leftExec} otherExecution={rightExec} />
       {/* Divider */}
-      <div style={{
+      <div className="compare-divider" style={{
         width: 1, background: "rgba(255,255,255,0.06)",
         alignSelf: "stretch", flexShrink: 0,
       }} />

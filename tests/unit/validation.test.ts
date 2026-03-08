@@ -10,7 +10,7 @@ import {
 } from '@/lib/validation';
 
 describe('Validation - CRITICAL PATH', () => {
-  describe('TR-003: Building Description Generator', () => {
+  describe('TR-003: Design Brief Analyzer', () => {
     it('should accept valid prompt (min 10 chars)', () => {
       const result = validateTR003Input({ prompt: 'Build a commercial office' });
       expect(result.valid).toBe(true);
@@ -40,7 +40,7 @@ describe('Validation - CRITICAL PATH', () => {
     });
   });
 
-  describe('GN-003: Concept Image Generator', () => {
+  describe('GN-003: Concept Render Generator', () => {
     it('should accept building description object with projectName', () => {
       const buildingDesc = {
         projectName: 'Commercial Office',

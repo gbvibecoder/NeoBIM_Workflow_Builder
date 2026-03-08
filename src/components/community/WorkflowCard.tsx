@@ -5,6 +5,7 @@ import { Star, GitFork, Zap, Clock, Crown, Share2 } from "lucide-react";
 import { shareTemplateToTwitter } from "@/lib/share";
 import { motion } from "framer-motion";
 import { MiniWorkflowDiagram } from "@/components/shared/MiniWorkflowDiagram";
+import { LIVE_NODES } from "@/constants/node-catalogue";
 import type { WorkflowTemplate } from "@/types/workflow";
 import type { NodeCategory } from "@/types/nodes";
 
@@ -104,6 +105,11 @@ export function WorkflowCard({
   index = 0,
 }: WorkflowCardProps) {
   const nodeCount       = workflow.tileGraph.nodes.length;
+  const catalogueIds = workflow.tileGraph.nodes.map(n => n.data.catalogueId).filter(Boolean);
+  const nonInputIds = catalogueIds.filter(id => !id.startsWith("IN-")); // Input nodes don't count
+  const liveCount = nonInputIds.filter(id => LIVE_NODES.has(id)).length;
+  const isFullyLive = nonInputIds.length > 0 && liveCount === nonInputIds.length;
+  const isPartiallyLive = liveCount > 0 && !isFullyLive;
   const complexityColor = COMPLEXITY_COLOR[workflow.complexity] ?? "#55556A";
   const catColor        = CATEGORY_COLOR[workflow.category ?? ""] ?? "#4F8AFF";
 
@@ -239,6 +245,15 @@ export function WorkflowCard({
           <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
             <AuthorAvatar name={authorName} size={20} />
             <span style={{ fontSize: 11, color: "#6B6B85" }}>{authorName}</span>
+            {authorName === "BuildFlow Team" && (
+              <span style={{
+                fontSize: 9, fontWeight: 700, color: "#10B981",
+                padding: "1px 5px", borderRadius: 3,
+                background: "rgba(16,185,129,0.1)",
+                border: "1px solid rgba(16,185,129,0.25)",
+                marginLeft: 4,
+              }}>Verified</span>
+            )}
             {publishedAt && (
               <span style={{ fontSize: 10, color: "#3A3A50", marginLeft: "auto" }}>{publishedAt}</span>
             )}
@@ -286,6 +301,29 @@ export function WorkflowCard({
               <div style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 10, color: "#3A3A50" }}>
                 <Clock size={9} />
                 {workflow.estimatedRunTime}
+              </div>
+            )}
+            {/* Live status badge */}
+            {isFullyLive && (
+              <div style={{
+                display: "flex", alignItems: "center", gap: 3,
+                fontSize: 9, fontWeight: 700, color: "#10B981",
+                padding: "1px 6px", borderRadius: 10,
+                background: "rgba(16,185,129,0.1)",
+                border: "1px solid rgba(16,185,129,0.2)",
+              }}>
+                Fully Live
+              </div>
+            )}
+            {isPartiallyLive && (
+              <div style={{
+                display: "flex", alignItems: "center", gap: 3,
+                fontSize: 9, fontWeight: 700, color: "#F59E0B",
+                padding: "1px 6px", borderRadius: 10,
+                background: "rgba(245,158,11,0.1)",
+                border: "1px solid rgba(245,158,11,0.2)",
+              }}>
+                Partially Live
               </div>
             )}
           </div>

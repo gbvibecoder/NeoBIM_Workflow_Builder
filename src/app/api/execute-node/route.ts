@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { generateBuildingDescription, generateConceptImage, generateFloorPlan, parseBriefDocument, analyzeImage } from "@/services/openai";
+import { generateBuildingDescription, generateConceptImage, generateFloorPlan, parseBriefDocument, analyzeImage, enhanceArchitecturalPrompt } from "@/services/openai";
+import type { BuildingDescription } from "@/services/openai";
 import { analyzeSite } from "@/services/site-analysis";
 import { generateId } from "@/lib/utils";
 import type { ExecutionArtifact } from "@/types/execution";
@@ -14,8 +15,48 @@ import { assertValidInput } from "@/lib/validation";
 import { APIError, UserErrors, formatErrorResponse } from "@/lib/user-errors";
 import { generatePDFBase64 } from "@/services/pdf-report-server";
 
+// Detect region/city from text for cost estimation
+function detectRegionFromText(text: string): string | null {
+  if (!text) return null;
+  const lower = text.toLowerCase();
+  const regionMap: Array<[string[], string]> = [
+    [["mumbai", "pune", "maharashtra"], "Mumbai, India"],
+    [["delhi", "ncr", "noida", "gurgaon"], "Delhi, India"],
+    [["bangalore", "bengaluru", "karnataka"], "Bangalore, India"],
+    [["chennai", "tamil nadu"], "Mumbai, India"],
+    [["hyderabad", "telangana"], "Bangalore, India"],
+    [["kolkata", "west bengal"], "Mumbai, India"],
+    [["london", "manchester", "birmingham", "edinburgh", "uk", "united kingdom"], "London, UK"],
+    [["new york", "manhattan", "brooklyn"], "New York City, NY (USA)"],
+    [["san francisco", "bay area"], "San Francisco, CA (USA)"],
+    [["los angeles", "la"], "Los Angeles, CA (USA)"],
+    [["chicago"], "Chicago, IL (USA)"],
+    [["houston", "texas", "dallas"], "Houston, TX (USA)"],
+    [["berlin", "hamburg"], "Berlin, Germany"],
+    [["munich", "münchen"], "Munich, Germany"],
+    [["paris", "lyon", "marseille", "france"], "Paris, France"],
+    [["amsterdam", "rotterdam", "netherlands"], "Amsterdam, Netherlands"],
+    [["tokyo", "osaka", "japan"], "Tokyo, Japan"],
+    [["dubai", "abu dhabi", "uae"], "Dubai, UAE"],
+    [["singapore"], "Singapore"],
+    [["sydney", "melbourne", "brisbane", "australia"], "Sydney, Australia"],
+    [["toronto", "vancouver", "montreal", "canada"], "Toronto, Canada"],
+    [["são paulo", "sao paulo", "rio", "brazil"], "São Paulo, Brazil"],
+    [["mexico city", "mexico"], "Mexico City, Mexico"],
+  ];
+  for (const [keywords, regionName] of regionMap) {
+    for (const kw of keywords) {
+      if (lower.includes(kw)) return regionName;
+    }
+  }
+  return null;
+}
+
 // Node IDs that have real implementations
-const REAL_NODE_IDS = new Set(["TR-001", "TR-003", "TR-004", "TR-012", "GN-003", "GN-004", "TR-007", "TR-008", "EX-002", "EX-003"]);
+const REAL_NODE_IDS = new Set(["TR-001", "TR-003", "TR-004", "TR-005", "TR-012", "GN-003", "GN-004", "TR-007", "TR-008", "EX-002", "EX-003"]);
+
+// Nodes that require OpenAI API calls
+const OPENAI_NODES = new Set(["TR-003", "TR-004", "TR-005", "TR-012", "GN-003", "GN-004"]);
 
 export async function POST(req: NextRequest) {
   const session = await auth();
@@ -61,11 +102,12 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Log successful request with remaining quota
-    if (process.env.NODE_ENV === "development") console.log("[execute-node] User " + userId + " (" + userRole + ") - Remaining: " + rateLimitResult.remaining + "/" + rateLimitResult.limit);
   } catch (error) {
     console.error("[execute-node] Rate limit check failed:", error);
-    // If rate limiting fails, allow the request to proceed (fail open for better UX)
+    return NextResponse.json(
+      formatErrorResponse({ title: "Service unavailable", message: "Rate limit service temporarily unavailable. Please try again in a moment.", code: "RATE_LIMIT_UNAVAILABLE" }),
+      { status: 503 }
+    );
   }
 
   const { catalogueId, executionId, tileInstanceId, inputData, userApiKey } = await req.json();
@@ -79,6 +121,14 @@ export async function POST(req: NextRequest) {
 
   const apiKey = userApiKey || undefined;
 
+    // Validate OpenAI key for nodes that need it
+    if (OPENAI_NODES.has(catalogueId) && !apiKey && !process.env.OPENAI_API_KEY) {
+      return NextResponse.json(
+        formatErrorResponse({ title: "API key required", message: "OpenAI API key not configured. Add your key in Settings or contact support.", code: "MISSING_API_KEY" }),
+        { status: 400 }
+      );
+    }
+
   try {
     // STEP 1: Validate input BEFORE hitting any APIs
     assertValidInput(catalogueId, inputData);
@@ -86,7 +136,7 @@ export async function POST(req: NextRequest) {
     let artifact: ExecutionArtifact;
 
     if (catalogueId === "TR-003") {
-      // Building Description Generator — GPT-4o-mini
+      // Design Brief Analyzer — GPT-4o-mini
       const prompt = inputData?.prompt ?? inputData?.content ?? "Modern mixed-use building";
       const description = await generateBuildingDescription(prompt, apiKey);
 
@@ -105,7 +155,7 @@ export async function POST(req: NextRequest) {
       };
 
     } else if (catalogueId === "TR-001") {
-      // Document Parser — PDF text extraction + GPT structuring
+      // Brief Parser — PDF text extraction + GPT structuring
       const rawText = inputData?.content ?? inputData?.prompt ?? inputData?.rawText ?? "";
       const pdfBase64 = inputData?.fileData ?? inputData?.buffer ?? null;
 
@@ -300,13 +350,83 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
         createdAt: new Date(),
       };
 
+    } else if (catalogueId === "TR-005") {
+      // Visualization Style Composer — GPT-4o-mini enhanced DALL-E 3 prompt
+      const upstreamDescription = (inputData?._raw ?? inputData) as Partial<BuildingDescription>;
+      const viewType = ((inputData?.viewType as string) ?? "exterior") as "exterior" | "floor_plan" | "site_plan" | "interior";
+
+      const description: BuildingDescription = {
+        projectName: upstreamDescription.projectName ?? "Building",
+        buildingType: upstreamDescription.buildingType ?? "Mixed-Use",
+        floors: upstreamDescription.floors ?? 5,
+        totalArea: upstreamDescription.totalArea ?? 5000,
+        height: upstreamDescription.height,
+        footprint: upstreamDescription.footprint,
+        totalGFA: upstreamDescription.totalGFA,
+        program: upstreamDescription.program,
+        structure: upstreamDescription.structure ?? "Reinforced concrete",
+        facade: upstreamDescription.facade ?? "Glass and steel",
+        sustainabilityFeatures: upstreamDescription.sustainabilityFeatures ?? [],
+        programSummary: upstreamDescription.programSummary ?? "Mixed-use programme",
+        estimatedCost: upstreamDescription.estimatedCost ?? "TBD",
+        constructionDuration: upstreamDescription.constructionDuration ?? "18 months",
+        narrative: upstreamDescription.narrative ?? "",
+      };
+
+      const enhancedPrompt = await enhanceArchitecturalPrompt(
+        description,
+        viewType,
+        inputData?.style as string | undefined,
+        apiKey
+      );
+
+      artifact = {
+        id: generateId(),
+        executionId: executionId ?? "local",
+        tileInstanceId,
+        type: "text",
+        data: {
+          content: enhancedPrompt,
+          label: "Enhanced Architectural Prompt",
+        },
+        metadata: { model: "gpt-4o-mini", real: true },
+        createdAt: new Date(),
+      };
+
+      return NextResponse.json({
+        artifact,
+        output: { enhancedPrompt },
+      });
+
     } else if (catalogueId === "GN-003") {
-      // Concept Image Generator — DALL-E 3
+      // Concept Render Generator — DALL-E 3
       const description = inputData?._raw ?? null;
       const prompt = inputData?.prompt ?? inputData?.content ?? "Modern mixed-use building, Nordic minimal style";
+      const viewType = ((inputData?.viewType as string) ?? "exterior") as "exterior" | "floor_plan" | "site_plan" | "interior";
+      const style = (inputData?.style as string) ?? "photorealistic architectural render";
 
-      const { url, revisedPrompt } = await generateConceptImage(
-        description ?? {
+      // If upstream TR-005 already enhanced the prompt, use it directly
+      const enhancedPrompt = inputData?.enhancedPrompt as string | undefined;
+
+      let url: string;
+      let revisedPrompt: string;
+
+      if (enhancedPrompt) {
+        // TR-005 already produced the optimised prompt — pass directly to DALL-E 3
+        const result = await generateConceptImage(
+          enhancedPrompt,
+          style,
+          apiKey,
+          undefined,
+          undefined,
+          undefined,
+          viewType
+        );
+        url = result.url;
+        revisedPrompt = result.revisedPrompt;
+      } else {
+        // No upstream enhancer — pass BuildingDescription to generateConceptImage
+        const desc: BuildingDescription = description ?? {
           projectName: "Building",
           buildingType: "Mixed-Use",
           floors: 5,
@@ -317,10 +437,23 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
           programSummary: prompt,
           estimatedCost: "TBD",
           constructionDuration: "18 months",
-        },
-        "photorealistic architectural render, professional photography",
-        apiKey
-      );
+          narrative: "",
+        };
+
+        const result = await generateConceptImage(
+          desc,
+          style,
+          apiKey,
+          undefined,
+          undefined,
+          undefined,
+          viewType
+        );
+        url = result.url;
+        revisedPrompt = result.revisedPrompt;
+      }
+
+      const viewLabel = viewType.replace("_", " ");
 
       artifact = {
         id: generateId(),
@@ -329,7 +462,7 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
         type: "image",
         data: {
           url,
-          label: "Concept Render (DALL-E 3)",
+          label: `${viewLabel.charAt(0).toUpperCase() + viewLabel.slice(1)} render`,
           style: revisedPrompt.substring(0, 100),
         },
         metadata: { model: "dall-e-3", real: true },
@@ -496,7 +629,12 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
       // BOQ Cost Mapper — Real unit rates with regional factors
       const elements = inputData?._elements ?? inputData?.elements ?? inputData?.rows ?? [];
       const region = inputData?.region ?? "USA (baseline)";
-      
+
+      // Detect region from upstream building description if not explicitly provided
+      const upstreamNarrative = inputData?.content ?? inputData?.narrative ?? "";
+      const detectedRegion = detectRegionFromText(region !== "USA (baseline)" ? region : upstreamNarrative);
+      const activeRegion = detectedRegion || region;
+
       const rows: string[][] = [];
       let hardCostSubtotal = 0;
       let estimatedItemsCount = 0;
@@ -513,7 +651,7 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
           // Apply regional factor
           const { adjustedRate } = applyRegionalFactor(
             unitRateData.baseRate,
-            region
+            activeRegion
           );
           
           const lineTotal = quantity * adjustedRate;
@@ -566,6 +704,8 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
       rows.push(["SOFT COSTS SUBTOTAL", "", "", "", `$${costSummary.softCosts.toFixed(2)}`]);
       rows.push(["", "", "", "", ""]);
       rows.push(["TOTAL PROJECT COST", "", "", "", `$${costSummary.totalCost.toFixed(2)}`]);
+      rows.push(["", "", "", "", ""]);
+      rows.push(["NOTE: Estimates are approximate and based on regional averages. Verify with local quantity surveyor.", "", "", "", ""]);
 
       const warnings = [];
       if (estimatedItemsCount > 0) {
@@ -574,7 +714,7 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
 
       // Build _boqData for EX-002 compatibility
       const boqLines = rows
-        .filter(r => r[0] && !["", "HARD COSTS SUBTOTAL", "SOFT COSTS", "SOFT COSTS SUBTOTAL", "TOTAL PROJECT COST"].includes(r[0]))
+        .filter(r => r[0] && !["", "HARD COSTS SUBTOTAL", "SOFT COSTS", "SOFT COSTS SUBTOTAL", "TOTAL PROJECT COST"].includes(r[0]) && !r[0].startsWith("NOTE:"))
         .map(r => ({
           division: "General",
           csiCode: "00 00 00",
@@ -597,14 +737,15 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
         tileInstanceId,
         type: "table",
         data: {
-          label: `Bill of Quantities (${region})`,
+          label: `Bill of Quantities (${activeRegion})`,
           headers: ["Description", "Unit", "Qty", "Rate", "Total"],
           rows,
           _currency: "USD",
           _totalCost: costSummary.totalCost,
           _hardCosts: costSummary.hardCosts,
           _softCosts: costSummary.softCosts,
-          _region: region,
+          _region: activeRegion,
+          content: `Total: $${costSummary.totalCost.toFixed(2)} (Hard: $${costSummary.hardCosts.toFixed(2)}, Soft: $${costSummary.softCosts.toFixed(2)}) | Region: ${activeRegion}`,
           _boqData: {
             lines: boqLines,
             subtotalMaterial: costSummary.hardCosts,

@@ -6,14 +6,34 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Mail, Lock, User, Chrome, Loader2 } from "lucide-react";
 import { motion } from "framer-motion";
+import { useLocale } from "@/hooks/useLocale";
+import { LanguageSwitcher } from "@/components/ui/LanguageSwitcher";
+
+function extractErrorMessage(err: unknown): string {
+  if (!err) return "Something went wrong. Please try again.";
+  if (typeof err === "string") return err;
+  if (typeof err === "object") {
+    const obj = err as Record<string, unknown>;
+    if (typeof obj.message === "string") return obj.message;
+    if (typeof obj.error === "string") return obj.error;
+    if (typeof obj.error === "object" && obj.error !== null) {
+      const nested = obj.error as Record<string, unknown>;
+      if (typeof nested.message === "string") return nested.message;
+    }
+    if (typeof obj.title === "string") return obj.title;
+  }
+  return "Something went wrong. Please try again.";
+}
 
 export default function RegisterPage() {
   const router = useRouter();
+  const { t } = useLocale();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -30,30 +50,42 @@ export default function RegisterPage() {
       const data = await res.json();
 
       if (!res.ok) {
-        setError(data.error ?? "Registration failed");
+        setError(extractErrorMessage(data.error ?? data));
         return;
       }
 
+      // Auto-login with the just-created account
       const signInRes = await signIn("credentials", {
-        email,
+        email: email.trim().toLowerCase(),
         password,
         redirect: false,
       });
 
       if (signInRes?.error) {
-        router.push("/login");
+        // Account was created but auto-login failed (e.g. DB replication lag).
+        // Show success and redirect to login so user can sign in manually.
+        setError("Account created successfully! Please sign in.");
+        setTimeout(() => router.push("/login"), 1500);
       } else {
         router.push("/dashboard");
         router.refresh();
       }
+    } catch (err) {
+      setError(extractErrorMessage(err));
     } finally {
       setLoading(false);
     }
   }
 
   async function handleGoogle() {
-    setLoading(true);
-    await signIn("google", { callbackUrl: "/dashboard" });
+    setGoogleLoading(true);
+    setError("");
+    try {
+      await signIn("google", { callbackUrl: "/dashboard" });
+    } catch (err) {
+      setError(extractErrorMessage(err));
+      setGoogleLoading(false);
+    }
   }
 
   const inputStyle = {
@@ -69,30 +101,49 @@ export default function RegisterPage() {
       initial={{ opacity: 0, y: 24 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+      className="node-card"
       style={{
-        background: "#0f1019",
-        border: "1px solid rgba(255,255,255,0.06)",
-        borderRadius: 16,
-        padding: "40px",
-        boxShadow: "0 24px 64px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255,255,255,0.02) inset",
-      }}
+        '--node-port-color': '#10B981',
+        background: "rgba(15,16,25,0.95)",
+        boxShadow: "0 24px 64px rgba(0, 0, 0, 0.5), 0 0 40px rgba(16,185,129,0.03)",
+      } as React.CSSProperties}
     >
+      {/* Node header */}
+      <div className="node-header" style={{
+        background: "linear-gradient(135deg, rgba(16,185,129,0.1), rgba(16,185,129,0.03))",
+        borderBottom: "1px solid rgba(16,185,129,0.08)",
+        borderRadius: "16px 16px 0 0",
+        justifyContent: "space-between",
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#10B981", boxShadow: "0 0 8px #10B981" }} />
+          <span style={{ color: "#10B981" }}>NEW ACCOUNT</span>
+        </div>
+        <LanguageSwitcher />
+      </div>
+
+      <div className="auth-form-inner" style={{ padding: "32px 36px 36px" }}>
       {/* Header */}
-      <div style={{ marginBottom: 30 }}>
+      <div style={{ marginBottom: 28 }}>
         <h2 style={{ fontSize: 22, fontWeight: 700, color: "#F0F0F5", marginBottom: 6, letterSpacing: "-0.02em" }}>
-          Create your account
+          {t('auth.createYourAccount')}
         </h2>
         <p style={{ fontSize: 13.5, color: "#6C6C8A" }}>
-          Start building amazing AEC workflows
+          {t('auth.startBuilding')}
         </p>
       </div>
 
-      {/* Google OAuth */}
+      {/* Google OAuth — completely separate from the credentials form */}
       <motion.button
+        type="button"
         whileHover={{ scale: 1.008 }}
         whileTap={{ scale: 0.995 }}
-        onClick={handleGoogle}
-        disabled={loading}
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          handleGoogle();
+        }}
+        disabled={loading || googleLoading}
         style={{
           width: "100%", padding: "10px 16px", height: 42,
           borderRadius: 10, border: "1px solid rgba(255,255,255,0.06)",
@@ -100,17 +151,26 @@ export default function RegisterPage() {
           fontSize: 13, fontWeight: 500, cursor: "pointer",
           display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
           marginBottom: 22, transition: "all 0.2s ease",
-          opacity: loading ? 0.5 : 1,
+          opacity: (loading || googleLoading) ? 0.5 : 1,
           boxShadow: "0 1px 2px rgba(0,0,0,0.1), inset 0 1px 0 rgba(255,255,255,0.02)",
         }}
       >
-        <Chrome size={14} />
-        Continue with Google
+        {googleLoading ? (
+          <>
+            <Loader2 size={14} className="animate-spin" />
+            {t('auth.connecting')}
+          </>
+        ) : (
+          <>
+            <Chrome size={14} />
+            {t('auth.continueWithGoogle')}
+          </>
+        )}
       </motion.button>
 
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 22 }}>
         <div style={{ flex: 1, height: 1, background: "rgba(255,255,255,0.04)" }} />
-        <span style={{ fontSize: 10.5, color: "#3A3A50", letterSpacing: "0.04em", textTransform: "uppercase" as const, fontWeight: 500 }}>or</span>
+        <span style={{ fontSize: 10.5, color: "#3A3A50", letterSpacing: "0.04em", textTransform: "uppercase" as const, fontWeight: 500 }}>{t('auth.or')}</span>
         <div style={{ flex: 1, height: 1, background: "rgba(255,255,255,0.04)" }} />
       </div>
 
@@ -122,7 +182,7 @@ export default function RegisterPage() {
           style={{ marginBottom: 14 }}
         >
           <label style={{ display: "block", fontSize: 12.5, fontWeight: 500, color: "#7C7C96", marginBottom: 6, letterSpacing: "-0.005em" }}>
-            Name (optional)
+            {t('auth.nameOptional')}
           </label>
           <div style={{ position: "relative" }}>
             <User size={13} style={{ position: "absolute", left: 13, top: "50%", transform: "translateY(-50%)", color: "#3A3A50" }} />
@@ -151,7 +211,7 @@ export default function RegisterPage() {
           style={{ marginBottom: 14 }}
         >
           <label style={{ display: "block", fontSize: 12.5, fontWeight: 500, color: "#7C7C96", marginBottom: 6, letterSpacing: "-0.005em" }}>
-            Email
+            {t('auth.email')}
           </label>
           <div style={{ position: "relative" }}>
             <Mail size={13} style={{ position: "absolute", left: 13, top: "50%", transform: "translateY(-50%)", color: "#3A3A50" }} />
@@ -181,7 +241,7 @@ export default function RegisterPage() {
           style={{ marginBottom: 22 }}
         >
           <label style={{ display: "block", fontSize: 12.5, fontWeight: 500, color: "#7C7C96", marginBottom: 6, letterSpacing: "-0.005em" }}>
-            Password
+            {t('auth.password')}
           </label>
           <div style={{ position: "relative" }}>
             <Lock size={13} style={{ position: "absolute", left: 13, top: "50%", transform: "translateY(-50%)", color: "#3A3A50" }} />
@@ -191,7 +251,7 @@ export default function RegisterPage() {
               onChange={e => setPassword(e.target.value)}
               required
               minLength={8}
-              placeholder="min 8 characters"
+              placeholder={t('auth.minChars')}
               style={inputStyle}
               onFocus={e => {
                 e.currentTarget.style.borderColor = "rgba(79,138,255,0.4)";
@@ -203,6 +263,9 @@ export default function RegisterPage() {
               }}
             />
           </div>
+              <p style={{ fontSize: 11, color: "#5C5C78", marginTop: 4, lineHeight: 1.4 }}>
+                Min 8 characters with uppercase, lowercase, and a number
+              </p>
         </motion.div>
 
         {error && (
@@ -216,7 +279,7 @@ export default function RegisterPage() {
               display: "flex", alignItems: "center", gap: 8,
             }}
           >
-            {error}
+            {String(error)}
           </motion.div>
         )}
 
@@ -224,16 +287,16 @@ export default function RegisterPage() {
           whileHover={{ scale: 1.008 }}
           whileTap={{ scale: 0.995 }}
           type="submit"
-          disabled={loading}
+          disabled={loading || googleLoading}
           style={{
             width: "100%", padding: "11px", height: 44,
             borderRadius: 10, border: "none",
-            background: loading
+            background: (loading || googleLoading)
               ? "rgba(79,138,255,0.3)"
               : "linear-gradient(135deg, #4F8AFF 0%, #6366F1 100%)",
-            color: "#fff", fontSize: 13.5, fontWeight: 600, cursor: loading ? "not-allowed" : "pointer",
-            opacity: loading ? 0.5 : 1, transition: "all 0.2s ease",
-            boxShadow: loading
+            color: "#fff", fontSize: 13.5, fontWeight: 600, cursor: (loading || googleLoading) ? "not-allowed" : "pointer",
+            opacity: (loading || googleLoading) ? 0.5 : 1, transition: "all 0.2s ease",
+            boxShadow: (loading || googleLoading)
               ? "none"
               : "0 1px 3px rgba(79,138,255,0.3), 0 4px 12px rgba(79,138,255,0.15), inset 0 1px 0 rgba(255,255,255,0.1)",
             display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
@@ -243,20 +306,21 @@ export default function RegisterPage() {
           {loading ? (
             <>
               <Loader2 size={14} className="animate-spin" />
-              Creating account...
+              {t('auth.creatingAccount')}
             </>
           ) : (
-            "Create account"
+            t('auth.createAccount')
           )}
         </motion.button>
       </form>
 
       <p style={{ textAlign: "center", fontSize: 12.5, color: "#5C5C78", marginTop: 24 }}>
-        Already have an account?{" "}
+        {t('auth.hasAccount')}{" "}
         <Link href="/login" style={{ color: "#4F8AFF", textDecoration: "none", fontWeight: 600, transition: "color 0.15s" }}>
-          Sign in
+          {t('auth.signIn')}
         </Link>
       </p>
+      </div>
     </motion.div>
   );
 }

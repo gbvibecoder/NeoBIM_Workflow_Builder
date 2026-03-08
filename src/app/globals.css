@@ -326,6 +326,384 @@
     animation: float 4s ease-in-out infinite;
   }
 
+  /* ── Blueprint grid — architectural background ───────────────── */
+  .blueprint-grid {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background-image:
+      /* Major grid lines */
+      linear-gradient(rgba(79, 138, 255, 0.08) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(79, 138, 255, 0.08) 1px, transparent 1px),
+      /* Minor grid lines */
+      linear-gradient(rgba(79, 138, 255, 0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(79, 138, 255, 0.03) 1px, transparent 1px);
+    background-size: 120px 120px, 120px 120px, 24px 24px, 24px 24px;
+    mask-image: radial-gradient(ellipse 80% 70% at 50% 45%, black 10%, transparent 70%);
+    -webkit-mask-image: radial-gradient(ellipse 80% 70% at 50% 45%, black 10%, transparent 70%);
+  }
+
+  /* ── Line draw animation for SVG paths ─────────────────────── */
+  @keyframes draw-line {
+    from { stroke-dashoffset: 1; }
+    to { stroke-dashoffset: 0; }
+  }
+
+  @keyframes draw-line-reverse {
+    from { stroke-dashoffset: 0; }
+    to { stroke-dashoffset: -1; }
+  }
+
+  /* ── Pulse glow on grid intersections ──────────────────────── */
+  @keyframes intersection-pulse {
+    0%, 100% { opacity: 0; transform: scale(0.5); }
+    50% { opacity: 1; transform: scale(1); }
+  }
+
+  /* ── Floating gradient orbs (larger, more visible) ─────────── */
+  @keyframes orb-drift-1 {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    25% { transform: translate(80px, -50px) scale(1.15); }
+    50% { transform: translate(-40px, 60px) scale(0.9); }
+    75% { transform: translate(-70px, -30px) scale(1.1); }
+  }
+
+  @keyframes orb-drift-2 {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    25% { transform: translate(-60px, 40px) scale(1.12); }
+    50% { transform: translate(50px, -70px) scale(0.88); }
+    75% { transform: translate(30px, 50px) scale(1.08); }
+  }
+
+  @keyframes orb-drift-3 {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    33% { transform: translate(50px, 60px) scale(1.1); }
+    66% { transform: translate(-70px, -40px) scale(0.92); }
+  }
+
+  .orb-drift-1 { animation: orb-drift-1 20s ease-in-out infinite; }
+  .orb-drift-2 { animation: orb-drift-2 25s ease-in-out infinite; }
+  .orb-drift-3 { animation: orb-drift-3 18s ease-in-out infinite; }
+
+  /* ── Noise texture overlay ──────────────────────────────────── */
+  .noise-texture {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 9999;
+    opacity: 0.035;
+    mix-blend-mode: overlay;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+    background-repeat: repeat;
+    background-size: 256px 256px;
+  }
+
+  /* ── Scanning beam (construction laser) ────────────────────── */
+  @keyframes scan-beam {
+    0% { top: -2px; opacity: 0; }
+    5% { opacity: 1; }
+    95% { opacity: 1; }
+    100% { top: 100%; opacity: 0; }
+  }
+
+  .scan-beam {
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent 0%, rgba(79, 138, 255, 0.4) 20%, rgba(139, 92, 246, 0.6) 50%, rgba(79, 138, 255, 0.4) 80%, transparent 100%);
+    box-shadow: 0 0 20px 4px rgba(79, 138, 255, 0.15), 0 0 60px 8px rgba(139, 92, 246, 0.08);
+    pointer-events: none;
+    animation: scan-beam 8s ease-in-out infinite;
+  }
+
+  /* ── Data flow dots on edges ────────────────────────────────── */
+  @keyframes flow-dot {
+    0% { offset-distance: 0%; opacity: 0; }
+    5% { opacity: 1; }
+    95% { opacity: 1; }
+    100% { offset-distance: 100%; opacity: 0; }
+  }
+
+  /* ── Animated gradient border (rotating conic gradient) ────── */
+  @keyframes rotate-gradient {
+    0% { --angle: 0deg; }
+    100% { --angle: 360deg; }
+  }
+
+  @property --angle {
+    syntax: "<angle>";
+    initial-value: 0deg;
+    inherits: false;
+  }
+
+  .gradient-border-card {
+    position: relative;
+    border-radius: 20px;
+    overflow: hidden;
+  }
+
+  .gradient-border-card::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: 20px;
+    padding: 1px;
+    background: conic-gradient(from var(--angle), rgba(79,138,255,0.3), rgba(139,92,246,0.3), rgba(16,185,129,0.2), rgba(79,138,255,0.05), rgba(139,92,246,0.3), rgba(79,138,255,0.3));
+    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    mask-composite: exclude;
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    animation: rotate-gradient 6s linear infinite;
+    pointer-events: none;
+  }
+
+  .gradient-border-card:hover::before {
+    background: conic-gradient(from var(--angle), rgba(79,138,255,0.6), rgba(139,92,246,0.6), rgba(16,185,129,0.4), rgba(79,138,255,0.1), rgba(139,92,246,0.6), rgba(79,138,255,0.6));
+  }
+
+  /* ── Section wave dividers ─────────────────────────────────── */
+  .section-divider-wave {
+    position: absolute;
+    bottom: -1px;
+    left: 0;
+    right: 0;
+    height: 80px;
+    pointer-events: none;
+    z-index: 2;
+  }
+
+  .section-divider-wave-top {
+    position: absolute;
+    top: -1px;
+    left: 0;
+    right: 0;
+    height: 80px;
+    pointer-events: none;
+    z-index: 2;
+    transform: rotate(180deg);
+  }
+
+  /* ── Card shimmer sweep on hover ───────────────────────────── */
+  @keyframes shimmer-sweep {
+    0% { transform: translateX(-100%) skewX(-15deg); }
+    100% { transform: translateX(200%) skewX(-15deg); }
+  }
+
+  .card-shimmer {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .card-shimmer::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 50%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.03), transparent);
+    transform: translateX(-100%) skewX(-15deg);
+    pointer-events: none;
+    transition: none;
+  }
+
+  .card-shimmer:hover::after {
+    animation: shimmer-sweep 0.8s ease-out;
+  }
+
+  /* ── Animated step connector (horizontal line with dot) ───── */
+  @keyframes connector-flow {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+  }
+
+  .step-connector {
+    background: linear-gradient(90deg, transparent, rgba(79,138,255,0.4), rgba(139,92,246,0.4), transparent);
+    background-size: 200% 100%;
+    animation: connector-flow 3s linear infinite;
+  }
+
+  /* ── Glow text for section labels ──────────────────────────── */
+  .glow-label {
+    text-shadow: 0 0 20px currentColor, 0 0 40px currentColor;
+  }
+
+  /* ── Pulsing ring around icon boxes ────────────────────────── */
+  @keyframes ring-pulse {
+    0% { box-shadow: 0 0 0 0 rgba(var(--ring-color), 0.4); }
+    70% { box-shadow: 0 0 0 12px rgba(var(--ring-color), 0); }
+    100% { box-shadow: 0 0 0 0 rgba(var(--ring-color), 0); }
+  }
+
+  /* ── Perspective tilt on hover ─────────────────────────────── */
+  .tilt-card {
+    transition: transform 0.4s ease, box-shadow 0.4s ease;
+    transform-style: preserve-3d;
+    perspective: 1000px;
+  }
+
+  .tilt-card:hover {
+    transform: translateY(-8px) rotateX(2deg) rotateY(-2deg);
+  }
+
+  /* ── Workflow Node Card (looks like actual node) ────────────── */
+  .node-card {
+    position: relative;
+    background: rgba(18,18,30,0.85);
+    backdrop-filter: blur(24px);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 16px;
+    overflow: visible;
+    transition: all 0.4s cubic-bezier(0.25,0.4,0.25,1);
+  }
+
+  .node-card::before {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: -6px;
+    transform: translateY(-50%);
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--node-port-color, #4F8AFF);
+    border: 2px solid rgba(18,18,30,0.9);
+    box-shadow: 0 0 12px var(--node-port-color, #4F8AFF);
+    z-index: 2;
+  }
+
+  .node-card::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    right: -6px;
+    transform: translateY(-50%);
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--node-port-color, #4F8AFF);
+    border: 2px solid rgba(18,18,30,0.9);
+    box-shadow: 0 0 12px var(--node-port-color, #4F8AFF);
+    z-index: 2;
+  }
+
+  .node-card:hover {
+    border-color: var(--node-port-color, rgba(79,138,255,0.3));
+    box-shadow: 0 0 40px rgba(79,138,255,0.08), 0 20px 60px rgba(0,0,0,0.3);
+    transform: translateY(-6px);
+  }
+
+  /* ── Animated wire connections (SVG dashed lines) ──────────── */
+  @keyframes wire-flow {
+    to { stroke-dashoffset: -40; }
+  }
+
+  .wire-animate {
+    stroke-dasharray: 8 12;
+    animation: wire-flow 2s linear infinite;
+  }
+
+  /* ── Data flow particles ───────────────────────────────────── */
+  @keyframes data-particle {
+    0% { offset-distance: 0%; opacity: 0; }
+    8% { opacity: 1; }
+    92% { opacity: 1; }
+    100% { offset-distance: 100%; opacity: 0; }
+  }
+
+  .data-particle {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #4F8AFF;
+    box-shadow: 0 0 12px #4F8AFF, 0 0 4px #4F8AFF;
+    position: absolute;
+    animation: data-particle 3s ease-in-out infinite;
+  }
+
+  /* ── Isometric grid background ─────────────────────────────── */
+  .isometric-grid {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.4;
+    background-image:
+      linear-gradient(30deg, rgba(79,138,255,0.06) 1px, transparent 1px),
+      linear-gradient(150deg, rgba(79,138,255,0.06) 1px, transparent 1px);
+    background-size: 48px 83px;
+    mask-image: radial-gradient(ellipse 80% 60% at 50% 50%, black 10%, transparent 65%);
+    -webkit-mask-image: radial-gradient(ellipse 80% 60% at 50% 50%, black 10%, transparent 65%);
+  }
+
+  /* ── Construction beam accent ──────────────────────────────── */
+  @keyframes beam-extend {
+    from { width: 0; }
+    to { width: 100%; }
+  }
+
+  .beam-accent {
+    height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(79,138,255,0.5), rgba(139,92,246,0.5), transparent);
+    animation: beam-extend 1.5s ease-out forwards;
+  }
+
+  /* ── Pipeline flow (vertical) ──────────────────────────────── */
+  @keyframes pipeline-flow-v {
+    to { stroke-dashoffset: -60; }
+  }
+
+  .pipeline-flow-v {
+    stroke-dasharray: 12 18;
+    animation: pipeline-flow-v 2.5s linear infinite;
+  }
+
+  /* ── Node type header bar ──────────────────────────────────── */
+  .node-header {
+    padding: 8px 16px;
+    border-radius: 12px 12px 0 0;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  /* ── Dimension annotation ──────────────────────────────────── */
+  .dimension-label {
+    font-family: "SF Mono", "Fira Code", monospace;
+    font-size: 9px;
+    letter-spacing: 1px;
+    fill: rgba(79,138,255,0.4);
+    text-transform: uppercase;
+  }
+
+  /* ── Floating blueprint annotation ─────────────────────────── */
+  @keyframes annotation-fade {
+    0%, 100% { opacity: 0.3; }
+    50% { opacity: 0.7; }
+  }
+
+  .blueprint-annotation {
+    font-family: "SF Mono", "Fira Code", monospace;
+    font-size: 9px;
+    color: rgba(79,138,255,0.35);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    animation: annotation-fade 4s ease-in-out infinite;
+  }
+
+  /* ── Section accent line ───────────────────────────────────── */
+  .accent-line {
+    width: 60px;
+    height: 3px;
+    border-radius: 2px;
+    background: linear-gradient(90deg, #4F8AFF, #8B5CF6);
+    margin: 0 auto 24px;
+  }
+
   /* ── Fade in up (CSS-only entrance) ──────────────────────────── */
   @keyframes fade-in-up {
     from { opacity: 0; transform: translateY(12px); }
@@ -347,13 +725,13 @@
 
   /* ── Sonner Toasts ──────────────────────────────────────────── */
 
-  /* Force 360px width */
+  /* Toast width — responsive, capped at 360px */
   [data-sonner-toaster] {
-    --width: 360px !important;
+    --width: min(360px, calc(100vw - 32px)) !important;
   }
 
   [data-sonner-toast] {
-    width: 360px !important;
+    width: min(360px, calc(100vw - 32px)) !important;
   }
 
   /* 3px left color bar per type */
@@ -491,6 +869,1060 @@
 
 .animate-breathe {
   animation: breathe 3s ease-in-out infinite;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   PARAMETRIC BLUEPRINT — Dashboard Theme
+   "Like staring into a high-end architectural visualization terminal"
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ── Parametric color tokens ─────────────────────────────────────── */
+:root {
+  --pb-void:        #06080C;
+  --pb-surface:     #0C1018;
+  --pb-elevated:    #131923;
+  --pb-border:      #1E2A38;
+  --pb-border-glow: #1B4FFF;
+  --pb-blue:        #1B4FFF;
+  --pb-cyan:        #00D4FF;
+  --pb-teal:        #00E5B0;
+  --pb-amber:       #FFB340;
+  --pb-violet:      #8B5CF6;
+  --pb-text:        #F0F4FF;
+  --pb-text-sec:    #7A8BA0;
+  --pb-text-muted:  #3D5166;
+}
+
+/* ── Font families ───────────────────────────────────────────────── */
+.font-display {
+  font-family: var(--font-syne), "Syne", system-ui, sans-serif;
+}
+
+.font-mono-data {
+  font-family: var(--font-jetbrains), "JetBrains Mono", "SF Mono", monospace;
+}
+
+.font-body-dm {
+  font-family: var(--font-dm-sans), "DM Sans", system-ui, sans-serif;
+}
+
+/* ── Dashboard background — layered blueprint ────────────────────── */
+.dashboard-main {
+  position: relative;
+  background-color: var(--pb-void);
+}
+
+/* Layer 1: Blueprint grid */
+.dashboard-main::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background-image:
+    linear-gradient(var(--pb-border) 1px, transparent 1px),
+    linear-gradient(90deg, var(--pb-border) 1px, transparent 1px);
+  background-size: 40px 40px;
+  opacity: 0.4;
+}
+
+/* Layer 2: Radial glow top-left (blueprint blue) */
+.dashboard-main::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background:
+    radial-gradient(600px circle at 0% 0%, rgba(27,79,255,0.08), transparent 70%),
+    radial-gradient(400px circle at 100% 100%, rgba(0,229,176,0.05), transparent 70%);
+}
+
+.dashboard-main > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* ── Section label — Syne, all caps, tracked ─────────────────────── */
+.arch-section-label {
+  font-family: var(--font-syne), "Syne", sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: var(--pb-text-muted);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.arch-section-label::before {
+  content: "";
+  width: 20px;
+  height: 1px;
+  background: linear-gradient(90deg, var(--pb-blue), transparent);
+  flex-shrink: 0;
+}
+
+/* ── Stat card ───────────────────────────────────────────────────── */
+.arch-stat-card {
+  position: relative;
+  background: var(--pb-surface);
+  border: 1px solid var(--pb-border);
+  border-radius: 12px;
+  overflow: hidden;
+  transition: all 250ms cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: transform;
+}
+
+/* Top accent line (color set via inline --card-accent) */
+.arch-stat-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--card-accent, var(--pb-blue)), transparent);
+  pointer-events: none;
+}
+
+/* Corner glow */
+.arch-stat-card::after {
+  content: "";
+  position: absolute;
+  top: -30px;
+  right: -30px;
+  width: 80px;
+  height: 80px;
+  background: radial-gradient(circle, rgba(var(--card-accent-rgb, 27,79,255), 0.15), transparent 70%);
+  pointer-events: none;
+}
+
+.arch-stat-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(var(--card-accent-rgb, 27,79,255), 0.3);
+  box-shadow:
+    0 8px 32px rgba(var(--card-accent-rgb, 27,79,255), 0.12),
+    0 0 0 1px rgba(var(--card-accent-rgb, 27,79,255), 0.1);
+}
+
+/* ── Stat number — JetBrains Mono 52px readout ───────────────────── */
+.arch-stat-number {
+  font-family: var(--font-jetbrains), "JetBrains Mono", monospace;
+  font-size: 52px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  color: var(--pb-text);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Stat label — JetBrains Mono 10px caps ───────────────────────── */
+.arch-stat-label {
+  font-family: var(--font-jetbrains), "JetBrains Mono", monospace;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 2.5px;
+  text-transform: uppercase;
+  color: var(--pb-text-muted);
+}
+
+/* ── Icon box inside stat cards ──────────────────────────────────── */
+.arch-icon-box {
+  width: 42px;
+  height: 42px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all 300ms ease;
+  position: relative;
+}
+
+/* ── Quick action card — base ────────────────────────────────────── */
+.arch-action-card {
+  position: relative;
+  border-radius: 12px;
+  background: var(--pb-surface);
+  transition: all 250ms cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: transform;
+  overflow: hidden;
+  text-decoration: none;
+}
+
+.arch-action-card:hover {
+  transform: translateY(-2px);
+}
+
+.arch-action-card:hover .arch-icon-box {
+  transform: scale(1.1);
+}
+
+/* ── New Workflow card — dashed border ────────────────────────────── */
+.arch-card-dashed {
+  border: 1px dashed var(--pb-border);
+}
+
+.arch-card-dashed:hover {
+  border-style: solid;
+  border-color: var(--pb-blue);
+  background: rgba(27,79,255,0.04);
+}
+
+/* ── AI Prompt card — hero gradient border ────────────────────────── */
+.arch-card-ai {
+  border: 1px solid rgba(27,79,255,0.4);
+  background: linear-gradient(135deg, rgba(27,79,255,0.08), rgba(0,212,255,0.04));
+}
+
+.arch-card-ai:hover {
+  border-color: rgba(27,79,255,0.6);
+  box-shadow: 0 8px 32px rgba(27,79,255,0.15), 0 0 0 1px rgba(27,79,255,0.2);
+}
+
+/* AI badge glow */
+.arch-ai-badge {
+  background: rgba(27,79,255,0.2);
+  border: 1px solid rgba(27,79,255,0.5);
+  color: var(--pb-cyan);
+  box-shadow: 0 0 10px rgba(27,79,255,0.3);
+  font-family: var(--font-jetbrains), monospace;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border-radius: 20px;
+}
+
+/* ── Templates card — amber accent ───────────────────────────────── */
+.arch-card-templates {
+  border: 1px solid rgba(255,179,64,0.3);
+}
+
+.arch-card-templates:hover {
+  border-color: rgba(255,179,64,0.5);
+  box-shadow: 0 8px 32px rgba(255,179,64,0.1);
+}
+
+/* Popular badge pulse */
+@keyframes arch-pulse-amber {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+.arch-popular-badge {
+  background: rgba(255,179,64,0.15);
+  border: 1px solid rgba(255,179,64,0.4);
+  color: var(--pb-amber);
+  font-family: var(--font-jetbrains), monospace;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border-radius: 20px;
+  animation: arch-pulse-amber 2s infinite;
+}
+
+/* ── Plus icon rotation on hover ─────────────────────────────────── */
+.arch-plus-rotate {
+  transition: transform 0.3s ease;
+}
+
+.arch-card-dashed:hover .arch-plus-rotate {
+  transform: rotate(90deg);
+}
+
+/* ── Hero banner ─────────────────────────────────────────────────── */
+.arch-hero-banner {
+  position: relative;
+  border-radius: 14px;
+  border: 1px solid rgba(27,79,255,0.2);
+  background: linear-gradient(135deg, rgba(27,79,255,0.05) 0%, rgba(0,229,176,0.03) 100%);
+  overflow: hidden;
+  transition: all 300ms ease;
+}
+
+/* Blueprint pattern right side */
+.arch-hero-banner::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 40%;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(27,79,255,0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(27,79,255,0.08) 1px, transparent 1px);
+  background-size: 28px 28px;
+  mask-image: linear-gradient(90deg, transparent 0%, rgba(0,0,0,0.5) 100%);
+  -webkit-mask-image: linear-gradient(90deg, transparent 0%, rgba(0,0,0,0.5) 100%);
+}
+
+.arch-hero-banner:hover {
+  border-color: rgba(27,79,255,0.4);
+  box-shadow: 0 12px 40px rgba(27,79,255,0.1);
+}
+
+/* ── CTA button ──────────────────────────────────────────────────── */
+.arch-cta-btn {
+  background: linear-gradient(135deg, #1B4FFF, #00D4FF);
+  box-shadow: 0 0 20px rgba(27,79,255,0.35), 0 0 40px rgba(27,79,255,0.15);
+  border: none;
+  border-radius: 10px;
+  transition: all 300ms ease;
+}
+
+.arch-cta-btn:hover {
+  box-shadow: 0 0 30px rgba(27,79,255,0.5), 0 0 60px rgba(27,79,255,0.2);
+  transform: translateY(-2px) scale(1.02);
+}
+
+/* ── Shimmer badge animation ─────────────────────────────────────── */
+@keyframes arch-badge-shimmer {
+  0% { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+
+.arch-badge-shimmer {
+  background: linear-gradient(90deg, rgba(255,179,64,0.15) 0%, rgba(255,179,64,0.35) 50%, rgba(255,179,64,0.15) 100%);
+  background-size: 200% 100%;
+  animation: arch-badge-shimmer 2.5s ease-in-out infinite;
+}
+
+/* ── Dashboard scrollbar ─────────────────────────────────────────── */
+.dashboard-main::-webkit-scrollbar { width: 6px; }
+.dashboard-main::-webkit-scrollbar-track { background: transparent; }
+.dashboard-main::-webkit-scrollbar-thumb {
+  background: rgba(27,79,255,0.2);
+  border-radius: 3px;
+}
+.dashboard-main::-webkit-scrollbar-thumb:hover {
+  background: rgba(27,79,255,0.4);
+}
+
+/* ── Sidebar gradient border line ────────────────────────────────── */
+.arch-sidebar-border {
+  position: absolute;
+  top: 20%;
+  right: 0;
+  height: 60%;
+  width: 1px;
+  background: linear-gradient(180deg, transparent, var(--pb-blue), transparent);
+  pointer-events: none;
+}
+
+/* ── Selection color ─────────────────────────────────────────────── */
+::selection {
+  background: rgba(27,79,255,0.3);
+  color: var(--pb-text);
+}
+
+/* ── Beta badge pulse glow ───────────────────────────────────────── */
+@keyframes betaPulse {
+  0%, 100% { box-shadow: 0 0 6px rgba(245,158,11,0.15); }
+  50%      { box-shadow: 0 0 14px rgba(245,158,11,0.35); }
+}
+
+.beta-badge {
+  animation: betaPulse 2.5s ease-in-out infinite;
+}
+
+/* ── Gamified Dashboard Animations ──────────────────────────────── */
+
+@keyframes mission-active-pulse {
+  0%, 100% { border-color: rgba(79,138,255,0.15); box-shadow: 0 0 0 rgba(79,138,255,0); }
+  50%      { border-color: rgba(79,138,255,0.35); box-shadow: 0 0 16px rgba(79,138,255,0.1); }
+}
+
+@keyframes mission-progress-shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes event-dot-pulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50%      { transform: scale(1.6); opacity: 0.4; }
+}
+
+@keyframes loot-card-hover {
+  0%, 100% { transform: translateY(0); box-shadow: none; }
+  50%      { transform: translateY(-4px); box-shadow: 0 8px 24px rgba(245,158,11,0.12); }
+}
+
+@keyframes xp-ring-fill {
+  from { stroke-dashoffset: 251.2; }
+}
+
+@keyframes countdown-pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.6; }
+}
+
+.mission-card-active {
+  animation: mission-active-pulse 3s ease-in-out infinite;
+}
+
+.progress-shimmer {
+  background: linear-gradient(90deg, transparent 0%, rgba(79,138,255,0.15) 50%, transparent 100%);
+  background-size: 200% 100%;
+  animation: mission-progress-shimmer 2s linear infinite;
+}
+
+.event-dot {
+  animation: event-dot-pulse 1.5s ease-in-out infinite;
+}
+
+.loot-card:hover {
+  animation: loot-card-hover 0.4s ease-out forwards;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   SIDEBAR — Premium Blueprint Aesthetic
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ── Ambient background ────────────────────────────────────────── */
+.sb-ambient {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background:
+    radial-gradient(ellipse 160% 50% at 0% 0%, rgba(79,138,255,0.06) 0%, transparent 60%),
+    radial-gradient(ellipse 120% 40% at 0% 100%, rgba(139,92,246,0.04) 0%, transparent 50%),
+    linear-gradient(180deg, #060810 0%, #070A12 40%, #060810 100%);
+}
+
+/* ── Scanning beam ─────────────────────────────────────────────── */
+@keyframes sb-scan {
+  0%   { top: -2%; opacity: 0; }
+  3%   { opacity: 1; }
+  97%  { opacity: 1; }
+  100% { top: 100%; opacity: 0; }
+}
+
+.sb-scanline {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  height: 1px;
+  z-index: 0;
+  background: linear-gradient(90deg,
+    transparent 0%,
+    rgba(79,138,255,0.2) 20%,
+    rgba(129,140,248,0.35) 50%,
+    rgba(79,138,255,0.2) 80%,
+    transparent 100%
+  );
+  box-shadow: 0 0 12px 2px rgba(79,138,255,0.08);
+  pointer-events: none;
+  animation: sb-scan 12s ease-in-out infinite;
+}
+
+/* ── Logo mark ─────────────────────────────────────────────────── */
+.sb-logo-mark {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  box-shadow: 0 2px 12px rgba(79,138,255,0.2);
+  position: relative;
+  transition: all 300ms ease;
+  overflow: hidden;
+}
+
+.sb-logo-link:hover .sb-logo-mark {
+  box-shadow:
+    0 4px 20px rgba(79,138,255,0.4),
+    0 0 0 1px rgba(79,138,255,0.25),
+    inset 0 1px 0 rgba(255,255,255,0.15);
+  transform: scale(1.04);
+}
+
+/* ── Icon button (collapse/close) ──────────────────────────────── */
+.sb-icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 7px;
+  border: none;
+  background: transparent;
+  color: rgba(255,255,255,0.15);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 180ms ease;
+}
+
+.sb-icon-btn:hover {
+  background: rgba(255,255,255,0.06);
+  color: rgba(255,255,255,0.55);
+}
+
+/* ── Blueprint divider ─────────────────────────────────────────── */
+.sb-divider-blueprint {
+  position: relative;
+  height: 1px;
+  margin: 0 14px;
+  background: linear-gradient(90deg,
+    rgba(79,138,255,0.2) 0%,
+    rgba(79,138,255,0.08) 30%,
+    rgba(255,255,255,0.04) 60%,
+    transparent 100%
+  );
+}
+
+.sb-divider-blueprint::before,
+.sb-divider-blueprint::after {
+  content: "";
+  position: absolute;
+  top: -2px;
+  width: 5px;
+  height: 5px;
+  border-radius: 1px;
+  background: rgba(79,138,255,0.25);
+}
+
+.sb-divider-blueprint::before { left: 0; }
+.sb-divider-blueprint::after { left: 20px; width: 3px; height: 3px; top: -1px; }
+
+.sb-divider-subtle {
+  height: 1px;
+  margin: 10px 20px;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.04), transparent);
+}
+
+/* ── Section label ─────────────────────────────────────────────── */
+.sb-section-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 18px 6px;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 2.5px;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.15);
+  font-family: var(--font-jetbrains), monospace;
+}
+
+.sb-section-tick {
+  width: 12px;
+  height: 1px;
+  background: linear-gradient(90deg, rgba(79,138,255,0.35), transparent);
+  flex-shrink: 0;
+}
+
+/* ── New Workflow button ───────────────────────────────────────── */
+.sb-new-btn {
+  position: relative;
+  background: linear-gradient(135deg, #2558E8 0%, #4F8AFF 50%, #38BDF8 100%);
+  background-size: 200% 200%;
+  animation: sb-btn-gradient 4s ease infinite;
+  box-shadow:
+    0 0 0 1px rgba(79,138,255,0.2),
+    0 4px 16px rgba(59,111,232,0.3),
+    inset 0 1px 0 rgba(255,255,255,0.12);
+  transition: all 250ms cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+.sb-new-btn:hover {
+  box-shadow:
+    0 0 0 1px rgba(79,138,255,0.4),
+    0 8px 28px rgba(59,111,232,0.45),
+    0 0 40px rgba(79,138,255,0.12),
+    inset 0 1px 0 rgba(255,255,255,0.15);
+}
+
+@keyframes sb-btn-gradient {
+  0%, 100% { background-position: 0% 50%; }
+  50%      { background-position: 100% 50%; }
+}
+
+/* ── Nav item ──────────────────────────────────────────────────── */
+.sb-nav-item {
+  transition: all 200ms cubic-bezier(0.4,0,0.2,1) !important;
+  background: transparent;
+  border: 1px solid transparent;
+}
+
+.sb-nav-item:hover:not(.sb-nav-active) {
+  background: rgba(255,255,255,0.025);
+}
+
+.sb-nav-active {
+  background: rgba(79,138,255,0.06) !important;
+  border-color: rgba(79,138,255,0.1) !important;
+}
+
+/* ── Icon container ────────────────────────────────────────────── */
+.sb-icon-wrap {
+  background: transparent;
+}
+
+.sb-icon-active {
+  background: rgba(79,138,255,0.18) !important;
+  box-shadow:
+    0 0 8px rgba(79,138,255,0.15),
+    inset 0 0 4px rgba(79,138,255,0.08);
+}
+
+/* ── Badge ─────────────────────────────────────────────────────── */
+.sb-badge {
+  font-size: 10px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  flex-shrink: 0;
+  margin-left: auto;
+  font-weight: 700;
+  font-family: var(--font-jetbrains), monospace;
+  background: rgba(139,92,246,0.12);
+  border: 1px solid rgba(139,92,246,0.2);
+  color: #A78BFA;
+  letter-spacing: 0.5px;
+  transition: all 200ms ease;
+}
+
+.sb-nav-active .sb-badge {
+  background: rgba(139,92,246,0.2);
+  border-color: rgba(139,92,246,0.35);
+}
+
+/* ── User card ─────────────────────────────────────────────────── */
+.sb-user-card {
+  position: relative;
+  background: rgba(255,255,255,0.02);
+  border: 1px solid rgba(255,255,255,0.05);
+  border-radius: 12px;
+  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  overflow: hidden;
+  transition: all 250ms ease;
+}
+
+.sb-user-card:hover {
+  background: rgba(255,255,255,0.035);
+  border-color: rgba(255,255,255,0.08);
+}
+
+/* ── Avatar ────────────────────────────────────────────────────── */
+.sb-avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #3B6FE8 0%, #7C6FF7 50%, #A855F7 100%);
+  font-size: 14px;
+  font-weight: 700;
+  color: white;
+  overflow: hidden;
+  position: relative;
+  z-index: 1;
+  box-shadow: 0 2px 8px rgba(79,138,255,0.2);
+}
+
+/* ── Upgrade button ────────────────────────────────────────────── */
+@keyframes sb-upgrade-shimmer {
+  0%   { left: -100%; }
+  100% { left: 200%; }
+}
+
+.sb-upgrade-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  padding: 9px 12px;
+  border-radius: 10px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: #F59E0B;
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(135deg, rgba(245,158,11,0.08) 0%, rgba(251,191,36,0.05) 100%);
+  border: 1px solid rgba(245,158,11,0.15);
+  transition: all 280ms ease;
+  font-family: var(--font-jetbrains), monospace;
+}
+
+.sb-upgrade-btn:hover {
+  background: linear-gradient(135deg, rgba(245,158,11,0.14) 0%, rgba(251,191,36,0.1) 100%);
+  border-color: rgba(245,158,11,0.35);
+  box-shadow:
+    0 0 20px rgba(245,158,11,0.08),
+    inset 0 0 12px rgba(245,158,11,0.04);
+  color: #FBBF24;
+}
+
+.sb-upgrade-shimmer {
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 60%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(245,158,11,0.08), transparent);
+  pointer-events: none;
+}
+
+.sb-upgrade-btn:hover .sb-upgrade-shimmer {
+  animation: sb-upgrade-shimmer 0.7s ease-out;
+}
+
+/* ── Sign out ──────────────────────────────────────────────────── */
+.sb-signout-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  padding: 6px;
+  border-radius: 8px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-size: 11px;
+  color: rgba(255,255,255,0.18);
+  transition: all 180ms ease;
+  font-family: inherit;
+}
+
+.sb-signout-btn:hover {
+  color: rgba(255,255,255,0.45);
+  background: rgba(255,255,255,0.03);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   DASHBOARD PAGE REDESIGN — Shared Styles
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ── Floating orbs ─────────────────────────────────────────────── */
+@keyframes dp-float1 {
+  0%   { transform: translate(0px, 0px) scale(1); }
+  100% { transform: translate(80px, 60px) scale(1.1); }
+}
+@keyframes dp-float2 {
+  0%   { transform: translate(0px, 0px) scale(1); }
+  100% { transform: translate(-60px, -80px) scale(0.9); }
+}
+@keyframes dp-floatNode {
+  0%   { transform: translateY(0px); }
+  100% { transform: translateY(-12px); }
+}
+@keyframes dp-dash {
+  0%   { stroke-dashoffset: 200; }
+  100% { stroke-dashoffset: 0; }
+}
+@keyframes dp-pulse {
+  0%, 100% { opacity: 0.5; transform: scale(1); }
+  50%      { opacity: 1; transform: scale(1.15); }
+}
+@keyframes dp-shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+@keyframes dp-countUp {
+  0%   { opacity: 0; transform: translateY(8px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+@keyframes dp-blink {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0; }
+}
+@keyframes dp-breathe {
+  0%, 100% { transform: scaleY(1); }
+  50%      { transform: scaleY(1.08); }
+}
+@keyframes dp-statusPulse {
+  0%, 100% { box-shadow: 0 0 0 0 currentColor; }
+  50%      { box-shadow: 0 0 0 4px transparent; }
+}
+@keyframes dp-scanRotate {
+  0%   { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* ── Glass card base ───────────────────────────────────────────── */
+.dp-glass-card {
+  background: rgba(18,18,30,0.6);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 16px;
+  padding: 24px;
+  position: relative;
+  overflow: hidden;
+  transition: border-color 250ms ease, transform 250ms ease, box-shadow 250ms ease;
+}
+.dp-glass-card:hover {
+  border-color: rgba(255,255,255,0.1);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+}
+.dp-glass-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(105deg, transparent 40%, rgba(255,255,255,0.02) 50%, transparent 60%);
+  transform: translateX(-100%);
+  transition: transform 600ms ease;
+  pointer-events: none;
+}
+.dp-glass-card:hover::after {
+  transform: translateX(200%);
+}
+
+/* ── Glass card accent line variants ───────────────────────────── */
+.dp-glass-card[data-accent="blue"]::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, #1B4FFF, #00D4FF);
+  border-radius: 2px 2px 0 0;
+}
+.dp-glass-card[data-accent="purple"]::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, #8B5CF6, #EC4899);
+  border-radius: 2px 2px 0 0;
+}
+.dp-glass-card[data-accent="green"]::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, #10B981, #34D399);
+  border-radius: 2px 2px 0 0;
+}
+.dp-glass-card[data-accent="red"]::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, #F87171, #FB923C);
+  border-radius: 2px 2px 0 0;
+}
+
+/* ── Stat number style ─────────────────────────────────────────── */
+.dp-stat-number {
+  font-family: var(--font-jetbrains), monospace;
+  font-size: 44px;
+  font-weight: 700;
+  line-height: 1;
+  color: #F0F0F5;
+  animation: dp-countUp 0.5s ease-out both;
+}
+
+/* ── Page background ───────────────────────────────────────────── */
+.dp-page-bg {
+  position: relative;
+  min-height: 100%;
+  background: #07080E;
+}
+.dp-page-bg .dp-orb1 {
+  position: fixed;
+  top: -100px; left: -100px;
+  width: 600px; height: 600px;
+  background: radial-gradient(circle, rgba(27,79,255,0.07) 0%, transparent 70%);
+  animation: dp-float1 20s ease-in-out infinite alternate;
+  pointer-events: none;
+  z-index: 0;
+}
+.dp-page-bg .dp-orb2 {
+  position: fixed;
+  bottom: -100px; right: -100px;
+  width: 500px; height: 500px;
+  background: radial-gradient(circle, rgba(139,92,246,0.05) 0%, transparent 70%);
+  animation: dp-float2 25s ease-in-out infinite alternate;
+  pointer-events: none;
+  z-index: 0;
+}
+.dp-page-bg .dp-grid {
+  position: fixed;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px);
+  background-size: 48px 48px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ── Filter button group ───────────────────────────────────────── */
+.dp-filter-group {
+  display: inline-flex;
+  background: rgba(12,12,20,0.8);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 10px;
+  padding: 4px;
+  gap: 2px;
+}
+.dp-filter-btn {
+  padding: 6px 16px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: rgba(255,255,255,0.3);
+  cursor: pointer;
+  transition: all 180ms ease;
+}
+.dp-filter-btn:hover {
+  color: rgba(255,255,255,0.6);
+  background: rgba(255,255,255,0.04);
+}
+.dp-filter-btn[data-active="true"][data-color="blue"] {
+  background: rgba(79,138,255,0.2);
+  color: #4F8AFF;
+  border-color: rgba(79,138,255,0.3);
+}
+.dp-filter-btn[data-active="true"][data-color="green"] {
+  background: rgba(52,211,153,0.2);
+  color: #34D399;
+  border-color: rgba(52,211,153,0.3);
+}
+.dp-filter-btn[data-active="true"][data-color="red"] {
+  background: rgba(248,113,113,0.2);
+  color: #F87171;
+  border-color: rgba(248,113,113,0.3);
+}
+.dp-filter-btn[data-active="true"][data-color="purple"] {
+  background: rgba(139,92,246,0.2);
+  color: #A78BFA;
+  border-color: rgba(139,92,246,0.3);
+}
+
+/* ── Shimmer skeleton ──────────────────────────────────────────── */
+.dp-skeleton {
+  background: linear-gradient(90deg,
+    rgba(255,255,255,0.03) 25%,
+    rgba(255,255,255,0.06) 50%,
+    rgba(255,255,255,0.03) 75%);
+  background-size: 200% 100%;
+  animation: dp-shimmer 2s infinite;
+  border-radius: 8px;
+}
+
+/* ── Execution row ─────────────────────────────────────────────── */
+.dp-exec-row {
+  background: rgba(18,18,30,0.5);
+  border: 1px solid rgba(255,255,255,0.05);
+  border-radius: 12px;
+  padding: 16px 20px;
+  transition: all 200ms ease;
+}
+.dp-exec-row:hover {
+  background: rgba(27,79,255,0.04);
+  border-color: rgba(27,79,255,0.15);
+  transform: translateX(2px);
+}
+
+/* ── Settings tab nav ──────────────────────────────────────────── */
+.dp-settings-tab {
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: rgba(255,255,255,0.4);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  text-align: left;
+  transition: all 180ms ease;
+}
+.dp-settings-tab:hover {
+  color: rgba(255,255,255,0.7);
+  background: rgba(255,255,255,0.04);
+}
+.dp-settings-tab[data-active="true"] {
+  color: #ffffff;
+  background: rgba(27,79,255,0.12);
+  border-color: rgba(27,79,255,0.2);
+}
+.dp-settings-tab[data-active="true"] svg {
+  color: #4F8AFF;
+  filter: drop-shadow(0 0 4px rgba(79,138,255,0.4));
+}
+
+/* ── Settings input ────────────────────────────────────────────── */
+.dp-settings-input {
+  width: 100%;
+  background: rgba(12,12,22,0.8);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 10px;
+  padding: 12px 16px;
+  font-family: var(--font-jetbrains), monospace;
+  font-size: 13px;
+  color: rgba(255,255,255,0.7);
+  outline: none;
+  transition: all 200ms ease;
+}
+.dp-settings-input:focus {
+  border-color: rgba(27,79,255,0.5);
+  box-shadow: 0 0 0 3px rgba(27,79,255,0.1);
+}
+.dp-settings-input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ── Blinking cursor ───────────────────────────────────────────── */
+.dp-cursor-blink::after {
+  content: '\25CB';
+  animation: dp-blink 1s infinite;
+  margin-left: 2px;
+  color: #4F8AFF;
+}
+
+/* ── Ghost bar chart ───────────────────────────────────────────── */
+.dp-ghost-bar {
+  background: rgba(79,138,255,0.06);
+  border: 1px solid rgba(79,138,255,0.1);
+  border-radius: 4px 4px 0 0;
+  animation: dp-breathe 3s ease-in-out infinite;
+}
+.dp-ghost-bar-green {
+  background: rgba(16,185,129,0.06);
+  border: 1px solid rgba(16,185,129,0.1);
+  border-radius: 4px 4px 0 0;
+  animation: dp-breathe 3s ease-in-out infinite;
+}
+
+/* Canvas minimap hover */
+.canvas-minimap:hover {
+  opacity: 0.8 !important;
+}
+
+/* Run button gradient animation */
+@keyframes gradient-shift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
 }
 
 /* ═══════════════════════════════════════════════════════════════════

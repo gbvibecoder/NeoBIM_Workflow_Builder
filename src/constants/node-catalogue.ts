@@ -97,8 +97,8 @@ export const NODE_CATALOGUE: NodeCatalogueItem[] = [
   // ============================================================
   {
     id: "TR-001",
-    name: "Document Parser",
-    description: "Extract text and layout blocks from PDF documents",
+    name: "Brief Parser",
+    description: "Extract requirements, constraints, and program data from uploaded project brief PDFs",
     category: "transform",
     icon: "ScanText",
     inputs: [{ id: "pdf-in", label: "PDF", type: "pdf" }],
@@ -121,8 +121,8 @@ export const NODE_CATALOGUE: NodeCatalogueItem[] = [
   },
   {
     id: "TR-003",
-    name: "Building Description Generator",
-    description: "Generate a human-readable building description from parameters",
+    name: "Design Brief Analyzer",
+    description: "AI-powered analysis that converts text briefs into structured building programs with areas, floors, and spatial requirements",
     category: "transform",
     icon: "Building2",
     inputs: [{ id: "json-in", label: "Requirements", type: "json" }],
@@ -151,8 +151,8 @@ export const NODE_CATALOGUE: NodeCatalogueItem[] = [
   },
   {
     id: "TR-005",
-    name: "Style Prompt Composer",
-    description: "Combine massing geometry with a style description for image generation",
+    name: "Visualization Style Composer",
+    description: "Compose architectural visualization parameters — style, materials, lighting, camera angle for DALL-E 3 rendering",
     category: "transform",
     icon: "Wand2",
     inputs: [
@@ -163,9 +163,9 @@ export const NODE_CATALOGUE: NodeCatalogueItem[] = [
       { id: "prompt-out", label: "Composed Prompt", type: "text" },
       { id: "ctrl-out", label: "Control Image", type: "image" },
     ],
-    apiEngine: "Native",
-    tags: ["style", "prompt", "composition", "render", "visualization"],
-    executionTime: "< 5s",
+    apiEngine: "OpenAI GPT-4o-mini",
+    tags: ["style", "prompt", "composition", "render", "visualization", "live"],
+    executionTime: "< 8s",
   },
   {
     id: "TR-006",
@@ -307,8 +307,8 @@ export const NODE_CATALOGUE: NodeCatalogueItem[] = [
   },
   {
     id: "GN-003",
-    name: "Image Generator",
-    description: "Generate architectural concept images from massing + style prompt",
+    name: "Concept Render Generator",
+    description: "Generate photorealistic architectural concept renders from building descriptions with 4 view types: exterior, floor plan, site plan, interior",
     category: "generate",
     icon: "Palette",
     inputs: [
@@ -316,9 +316,10 @@ export const NODE_CATALOGUE: NodeCatalogueItem[] = [
       { id: "prompt-in", label: "Style Prompt", type: "text" },
     ],
     outputs: [{ id: "images-out", label: "Concept Images", type: "image" }],
-    apiEngine: "OpenAI DALL·E / Stability AI",
-    tags: ["image", "render", "visualization", "concept", "ai"],
+    apiEngine: "OpenAI DALL·E 3",
+    tags: ["image", "render", "visualization", "concept", "ai", "exterior", "floor plan", "site plan", "interior"],
     executionTime: "2-3 min",
+    viewType: "exterior",
   },
   {
     id: "GN-004",
@@ -487,3 +488,6 @@ export const CATEGORY_CONFIG = {
     description: "File exports, reports, and delivery",
   },
 } as const;
+
+/** Nodes that use real API calls (not mock/sample data) */
+export const LIVE_NODES = new Set(['TR-003', 'TR-007', 'TR-008', 'GN-003', 'EX-002']);

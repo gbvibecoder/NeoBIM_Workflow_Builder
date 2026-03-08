@@ -3,448 +3,729 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { ArrowRight, Play, Zap, GitFork, Clock, Plus, TrendingUp, Sparkles, Layers, BarChart3, Timer, LayoutGrid } from "lucide-react";
-import { Header } from "@/components/dashboard/Header";
-import { WorkflowCard } from "@/components/community/WorkflowCard";
+import { toast } from "sonner";
+import {
+  CheckCircle2, Sparkles, Compass, Cable, Lock,
+  Megaphone, ChevronRight, Star, Clock, Zap,
+  FileText, Play,
+} from "lucide-react";
 import { PREBUILT_WORKFLOWS } from "@/constants/prebuilt-workflows";
-import { api } from "@/lib/api";
+import { RARITY_COLORS } from "@/lib/gamification";
 
-// Skeleton loader for stat cards
-function StatCardSkeleton() {
+// ─── Types ───────────────────────────────────────────────────────────────────
+interface DashboardData {
+  xp: number;
+  level: number;
+  progress: number;
+  xpInLevel: number;
+  xpForNext: number;
+  workflowCount: number;
+  executionCount: number;
+  missions: Array<{
+    id: string;
+    title: string;
+    description: string;
+    action: string;
+    href: string;
+    icon: string;
+    status: "completed" | "in_progress" | "locked";
+  }>;
+  blueprints: Array<{
+    workflowIndex: number;
+    rarity: string;
+    requiredLevel: number;
+    unlocked: boolean;
+  }>;
+  achievements: Array<{ action: string; xp: number; date: string }>;
+  flashEvent: {
+    key: string;
+    eventKey: string;
+    title: string;
+    description: string;
+    href: string;
+    completed: boolean;
+    msRemaining: number;
+  };
+  recentWorkflows: Array<{
+    id: string;
+    name: string;
+    updatedAt: string;
+    nodeCount: number;
+    executionCount: number;
+  }>;
+}
+
+// ─── Animation presets ────────────────────────────────────────────────────────
+const fadeUp = {
+  hidden: { opacity: 0, y: 20 },
+  visible: { opacity: 1, y: 0 },
+};
+const fadeRight = {
+  hidden: { opacity: 0, x: 30 },
+  visible: { opacity: 1, x: 0 },
+};
+const smoothEase: [number, number, number, number] = [0.22, 1, 0.36, 1];
+
+// ─── XP Ring ──────────────────────────────────────────────────────────────────
+function XPRing({ percent = 0, size = 44 }: { percent?: number; size?: number }) {
+  const r = (size - 6) / 2;
+  const circ = 2 * Math.PI * r;
+  const offset = circ - (percent / 100) * circ;
+
   return (
-    <div
-      className="rounded-[14px] border border-[rgba(255,255,255,0.05)] p-5 animate-pulse"
-      style={{
-        background: "linear-gradient(135deg, rgba(18,18,30,0.9) 0%, rgba(15,15,24,0.95) 100%)",
-      }}
-    >
-      <div className="flex items-start justify-between mb-4">
-        <div className="w-10 h-10 bg-[#1A1A2A] rounded-[10px]" />
-        <div className="w-3 h-3 bg-[#1A1A2A] rounded" />
-      </div>
-      <div className="w-20 h-9 bg-[#1A1A2A] rounded-lg mb-2" />
-      <div className="w-24 h-3 bg-[#1A1A2A] rounded" />
+    <svg width={size} height={size} style={{ transform: "rotate(-90deg)" }}>
+      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth={4} />
+      <motion.circle
+        cx={size / 2} cy={size / 2} r={r} fill="none"
+        stroke="#1B4FFF" strokeWidth={4} strokeLinecap="round"
+        strokeDasharray={circ}
+        initial={{ strokeDashoffset: circ }}
+        animate={{ strokeDashoffset: offset }}
+        transition={{ duration: 1.5, ease: [0.4, 0, 0.2, 1], delay: 0.3 }}
+      />
+    </svg>
+  );
+}
+
+// ─── Countdown Timer ──────────────────────────────────────────────────────────
+function CountdownTimer({ initialMs }: { initialMs: number }) {
+  const [seconds, setSeconds] = useState(Math.max(0, Math.floor(initialMs / 1000)));
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setSeconds(s => (s > 0 ? s - 1 : 0));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const h = String(Math.floor(seconds / 3600)).padStart(2, "0");
+  const m = String(Math.floor((seconds % 3600) / 60)).padStart(2, "0");
+  const s = String(seconds % 60).padStart(2, "0");
+
+  return (
+    <span className="font-mono-data" style={{ fontSize: 13, color: "#7C7C96", letterSpacing: "0.05em" }}>
+      {h}:{m}:{s}
+    </span>
+  );
+}
+
+// ─── Section Label ────────────────────────────────────────────────────────────
+function SectionLabel({ number, title, right }: { number: string; title: string; right?: React.ReactNode }) {
+  return (
+    <div className="flex items-center gap-3 mb-6">
+      <span style={{
+        display: "inline-flex", alignItems: "center", justifyContent: "center",
+        width: 28, height: 28, borderRadius: 6,
+        background: "rgba(27,79,255,0.12)", border: "1px solid rgba(27,79,255,0.25)",
+        fontSize: 12, fontWeight: 700, color: "#4F8AFF",
+        fontFamily: "var(--font-jetbrains), monospace",
+      }}>
+        {number}
+      </span>
+      <span style={{ fontSize: 18, fontWeight: 700, color: "#F0F0F5", letterSpacing: "-0.02em" }}>
+        {title}
+      </span>
+      <div style={{ flex: 1, height: 1, background: "linear-gradient(90deg, rgba(27,79,255,0.2), transparent)" }} />
+      {right}
     </div>
   );
 }
 
-// Animated counter component
-function AnimatedCounter({ value, suffix = "" }: { value: number | string; suffix?: string }) {
-  const [displayValue, setDisplayValue] = useState(0);
+// ─── Mission Icon helper ─────────────────────────────────────────────────────
+const MISSION_ICONS: Record<string, React.ReactNode> = {
+  check:    <CheckCircle2 size={22} />,
+  sparkles: <Sparkles size={22} />,
+  compass:  <Compass size={22} />,
+  cable:    <Cable size={22} />,
+};
 
-  useEffect(() => {
-    if (typeof value === "number") {
-      let start = 0;
-      const end = value;
-      const duration = 1000;
-      const stepTime = 30;
-      const steps = duration / stepTime;
-      const increment = end / steps;
+// ─── Blueprint display names ─────────────────────────────────────────────────
+const BLUEPRINT_NAMES: Record<number, { name: string; desc: string; image: string }> = {
+  0: {
+    name: "Volumetric Concept Engine",
+    desc: "A high-tier generator for rapid urban massing experiments.",
+    image: "https://images.unsplash.com/photo-1487958449943-2429e8be8625?w=600&q=80",
+  },
+  1: {
+    name: "PDF Brief Analyzer",
+    desc: "Automatically extract FAR and site limits from planning docs.",
+    image: "https://images.unsplash.com/photo-1504307651254-35680f356dfd?w=600&q=80",
+  },
+  2: {
+    name: "Neural Render Suite",
+    desc: "Turn wireframes into photoreal visualizations instantly.",
+    image: "https://images.unsplash.com/photo-1486325212027-8081e485255e?w=600&q=80",
+  },
+};
 
-      const timer = setInterval(() => {
-        start += increment;
-        if (start >= end) {
-          setDisplayValue(end);
-          clearInterval(timer);
-        } else {
-          setDisplayValue(Math.floor(start));
-        }
-      }, stepTime);
+// ─── Default data (shown when API fails or user is new) ──────────────────────
+const DEFAULT_DATA: DashboardData = {
+  xp: 0,
+  level: 1,
+  progress: 0,
+  xpInLevel: 0,
+  xpForNext: 500,
+  workflowCount: 0,
+  executionCount: 0,
+  missions: [
+    { id: "m1", title: "Initialize Node", description: "Create your first empty canvas to begin.", action: "workflow-created", href: "/dashboard/workflows/new", icon: "check", status: "in_progress" },
+    { id: "m2", title: "AI Whispering", description: "Generate a workflow using a natural prompt.", action: "ai-prompt-used", href: "/dashboard/workflows/new", icon: "sparkles", status: "locked" },
+    { id: "m3", title: "Pattern Hunter", description: "Browse and fork your first public template.", action: "template-cloned", href: "/dashboard/templates", icon: "compass", status: "locked" },
+    { id: "m4", title: "The Integrator", description: "Connect a 3rd party API node.", action: "render-generated", href: "/dashboard/workflows/new", icon: "cable", status: "locked" },
+  ],
+  blueprints: [
+    { workflowIndex: 0, rarity: "rare", requiredLevel: 1, unlocked: true },
+    { workflowIndex: 1, rarity: "epic", requiredLevel: 5, unlocked: false },
+    { workflowIndex: 2, rarity: "legendary", requiredLevel: 8, unlocked: false },
+  ],
+  achievements: [],
+  flashEvent: {
+    key: "run-3-workflows", eventKey: "run-3-workflows:fallback",
+    title: "Run 3 workflows today", description: "Execute three different workflows before midnight UTC.",
+    href: "/dashboard/workflows", completed: false, msRemaining: 43200000,
+  },
+  recentWorkflows: [],
+};
 
-      return () => clearInterval(timer);
-    }
-  }, [value]);
-
-  if (typeof value === "string") return <>{value}{suffix}</>;
-  return <>{displayValue}{suffix}</>;
-}
-
-const statIcons = [
-  <Layers key="layers" size={18} />,
-  <BarChart3 key="bar" size={18} />,
-  <Timer key="timer" size={18} />,
-  <LayoutGrid key="grid" size={18} />,
-];
-
+// ─── Main Page ────────────────────────────────────────────────────────────────
 export default function DashboardPage() {
-  const featuredWorkflows = PREBUILT_WORKFLOWS.slice(0, 3);
-  const [workflowCount, setWorkflowCount] = useState<number | null>(null);
-  const [executionCount, setExecutionCount] = useState<number | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-
-  const hoursSaved = executionCount !== null ? Math.round((executionCount * 0.5) * 10) / 10 : 0;
+  const [data, setData] = useState<DashboardData>(DEFAULT_DATA);
 
   useEffect(() => {
-    Promise.all([
-      api.workflows.list().then(({ workflows }) => setWorkflowCount(workflows.length)),
-      fetch("/api/executions")
-        .then(res => res.json())
-        .then(data => {
-          if (data.executions && Array.isArray(data.executions)) {
-            setExecutionCount(data.executions.length);
-          } else {
-            setExecutionCount(0);
-          }
-        })
-    ])
-      .catch(() => {
-        setWorkflowCount(0);
-        setExecutionCount(0);
+    const controller = new AbortController();
+    fetch("/api/user/dashboard-stats", { signal: controller.signal })
+      .then(r => {
+        if (!r.ok) throw new Error("API error");
+        return r.json();
       })
-      .finally(() => setIsLoading(false));
+      .then((d: DashboardData) => {
+        if (d && Array.isArray(d.missions)) {
+          setData(d);
+        }
+      })
+      .catch(() => {
+        // Use default data — dashboard already rendered
+      });
+    // Timeout: if API takes >5s, abort
+    const timeout = setTimeout(() => controller.abort(), 5000);
+    return () => { clearTimeout(timeout); controller.abort(); };
   }, []);
 
-  const stats = [
-    {
-      label: "My Workflows",
-      value: workflowCount === null ? "..." : workflowCount,
-      color: "#4F8AFF",
-      gradient: "linear-gradient(135deg, #4F8AFF 0%, #6B9FFF 100%)",
-      href: "/dashboard/workflows",
-      trend: workflowCount !== null && workflowCount > 0 ? `${workflowCount} total` : null
-    },
-    {
-      label: "Executions",
-      value: executionCount === null ? "..." : executionCount,
-      color: "#10B981",
-      gradient: "linear-gradient(135deg, #10B981 0%, #34D399 100%)",
-      href: "/dashboard/history",
-      trend: executionCount !== null && executionCount > 0 ? `${executionCount} total` : null
-    },
-    {
-      label: "Hours Saved",
-      value: hoursSaved === 0 ? "..." : hoursSaved,
-      suffix: "h",
-      color: "#F59E0B",
-      gradient: "linear-gradient(135deg, #F59E0B 0%, #FBBF24 100%)",
-      href: "/dashboard/history",
-      trend: hoursSaved > 0 ? `~${hoursSaved}h estimated` : null
-    },
-    {
-      label: "Templates",
-      value: PREBUILT_WORKFLOWS.length,
-      color: "#8B5CF6",
-      gradient: "linear-gradient(135deg, #8B5CF6 0%, #A78BFA 100%)",
-      href: "/dashboard/templates",
-      trend: `${PREBUILT_WORKFLOWS.length} available`
-    },
-  ];
+  const statusColor = (s: string) =>
+    s === "completed" ? "#00E676" : s === "in_progress" ? "#4F8AFF" : "#6B6B8A";
 
   return (
-    <div className="flex flex-col h-full overflow-hidden">
-      <Header
-        title="Dashboard"
-        subtitle="Your no-code AEC workflow builder (Beta)"
-      />
+    <div className="flex flex-col h-full overflow-hidden" style={{ background: "#0a0c10" }}>
+      {/* Subtle grid overlay */}
+      <div style={{
+        position: "fixed", inset: 0, pointerEvents: "none", zIndex: 0,
+        backgroundImage: "linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px)",
+        backgroundSize: "60px 60px",
+        opacity: 0.5,
+      }} />
 
-      <main className="flex-1 overflow-y-auto p-6 space-y-8">
-        {/* Stat Cards */}
-        <div className="grid grid-cols-4 gap-4">
-          {isLoading ? (
-            <>
-              <StatCardSkeleton />
-              <StatCardSkeleton />
-              <StatCardSkeleton />
-              <StatCardSkeleton />
-            </>
-          ) : (
-            stats.map((stat, index) => (
-              <motion.div
-                key={stat.label}
-                initial={{ opacity: 0, y: 24 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.08, duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-              >
-                <Link
-                  href={stat.href}
-                  className="group block relative rounded-[14px] border border-[rgba(255,255,255,0.06)] p-6 hover:border-[rgba(255,255,255,0.14)] transition-all duration-300 hover:-translate-y-1"
+      <main className="flex-1 overflow-y-auto relative" style={{ zIndex: 1 }}>
+        <div style={{ padding: "32px 40px 48px", width: "100%" }}>
+
+          {/* ── HEADER — Quest Log ─────────────────────────────────────── */}
+          <motion.div initial="hidden" animate="visible" variants={{ visible: { transition: { staggerChildren: 0.1 } } }}>
+            <div className="flex items-start justify-between mb-10">
+              <div>
+                <motion.div variants={fadeUp} transition={{ duration: 0.5, ease: smoothEase }}>
+                  <span style={{
+                    display: "inline-block", padding: "4px 12px", borderRadius: 4,
+                    background: "rgba(255,184,0,0.08)", border: "1px solid rgba(255,184,0,0.3)",
+                    fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase" as const,
+                    color: "#FFB800", marginBottom: 12,
+                    fontFamily: "var(--font-jetbrains), monospace",
+                  }}>
+                    SEASON 1: THE ARCHITECT&apos;S PATH
+                  </span>
+                </motion.div>
+
+                <motion.h1
+                  variants={fadeUp}
+                  transition={{ duration: 0.6, ease: smoothEase }}
                   style={{
-                    background: "linear-gradient(145deg, rgba(18,18,30,0.95) 0%, rgba(14,14,22,0.98) 100%)",
-                    boxShadow: "0 1px 3px rgba(0,0,0,0.12), 0 0 0 1px rgba(255,255,255,0.02) inset",
+                    fontSize: 48, fontWeight: 900, fontStyle: "italic",
+                    letterSpacing: "-1px", lineHeight: 1.05, marginBottom: 10,
+                    color: "#F0F0F5",
                   }}
                 >
-                  {/* Top gradient accent */}
-                  <div
-                    className="absolute top-0 left-4 right-4 h-[1.5px] rounded-b-full opacity-60 group-hover:opacity-100 transition-opacity"
-                    style={{ background: stat.gradient }}
-                  />
+                  QUEST LOG: <span style={{ color: "#00BFFF" }}>CORE SYSTEM</span>
+                </motion.h1>
 
-                  {/* Hover glow */}
-                  <div
-                    className="absolute inset-0 rounded-[14px] opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"
+                <motion.p
+                  variants={fadeUp}
+                  transition={{ duration: 0.5, ease: smoothEase }}
+                  style={{ fontSize: 15, color: "#5C5C78", maxWidth: 480 }}
+                >
+                  Your concept design workspace — from brief to 3D in minutes.
+                </motion.p>
+              </div>
+
+              {/* XP Level Card — REAL DATA */}
+              <motion.div
+                variants={fadeRight}
+                transition={{ duration: 0.6, ease: smoothEase }}
+                style={{
+                  background: "#0F1218",
+                  border: "1px solid rgba(255,255,255,0.1)",
+                  borderRadius: 12, padding: "16px 20px",
+                  display: "flex", alignItems: "center", gap: 14,
+                  flexShrink: 0,
+                }}
+              >
+                <div>
+                  <div className="font-mono-data" style={{ fontSize: 9, color: "#5C5C78", letterSpacing: "0.1em", textTransform: "uppercase" as const, marginBottom: 2 }}>
+                    XP LEVEL
+                  </div>
+                  <div style={{ fontSize: 28, fontWeight: 800, color: "#F0F0F5", letterSpacing: "-0.02em", lineHeight: 1 }}>
+                    LVL {String(data.level ?? 1).padStart(2, "0")}
+                  </div>
+                  <div className="font-mono-data" style={{ fontSize: 9, color: "#3A3A50", marginTop: 3 }}>
+                    {data.xpInLevel ?? 0} / {(data.xpForNext ?? 500) - ((data.level ?? 1) - 1) * 500} XP
+                  </div>
+                </div>
+                <div style={{ position: "relative", width: 44, height: 44 }}>
+                  <XPRing percent={data.progress} size={44} />
+                  <span style={{
+                    position: "absolute", inset: 0,
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    fontSize: 10, fontWeight: 700, color: "#9898B0",
+                    fontFamily: "var(--font-jetbrains), monospace",
+                  }}>
+                    {data.progress}%
+                  </span>
+                </div>
+              </motion.div>
+            </div>
+          </motion.div>
+
+          {/* ── SECTION 01 — Active Missions ───────────────────────────── */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.3, duration: 0.5 }}
+          >
+            <SectionLabel number="01" title="Active Missions" />
+          </motion.div>
+
+          <div className="grid grid-cols-4 gap-4 mb-14 relative">
+            {/* Connecting line behind cards */}
+            <div style={{
+              position: "absolute", top: "50%", left: 24, right: 24, height: 1,
+              background: "linear-gradient(90deg, rgba(0,230,118,0.15), rgba(27,79,255,0.15), rgba(107,107,138,0.08), rgba(107,107,138,0.04))",
+              zIndex: 0,
+            }} />
+
+            {(data.missions ?? []).map((mission, i) => {
+              const isCompleted = mission.status === "completed";
+              const isActive = mission.status === "in_progress";
+              const isLocked = mission.status === "locked";
+              const color = statusColor(mission.status);
+
+              return (
+                <motion.div
+                  key={mission.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.35 + i * 0.075, duration: 0.5, ease: smoothEase }}
+                  style={{ position: "relative", zIndex: 1 }}
+                >
+                  <Link
+                    href={isLocked ? "#" : mission.href}
+                    className={`block ${isActive ? "mission-card-active" : ""}`}
                     style={{
-                      background: `radial-gradient(ellipse at 50% -10%, ${stat.color}12, transparent 65%)`,
+                      background: "#0F1218",
+                      borderRadius: 12, padding: 20,
+                      border: isCompleted
+                        ? "1px solid rgba(0,230,118,0.3)"
+                        : isActive
+                          ? "1px solid rgba(27,79,255,0.5)"
+                          : "1px solid rgba(255,255,255,0.06)",
+                      boxShadow: isActive ? "0 0 20px rgba(27,79,255,0.15)" : "none",
+                      opacity: isLocked ? 0.5 : 1,
+                      textDecoration: "none",
+                      transition: "all 200ms ease",
+                      cursor: isLocked ? "not-allowed" : "pointer",
+                      height: "100%",
+                      display: "flex", flexDirection: "column" as const,
                     }}
-                  />
+                  >
+                    <div className="flex items-start justify-between mb-3">
+                      <div style={{
+                        width: 42, height: 42, borderRadius: 10,
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        background: isCompleted
+                          ? "rgba(0,230,118,0.12)"
+                          : isActive
+                            ? "rgba(27,79,255,0.12)"
+                            : "rgba(255,255,255,0.04)",
+                        color,
+                      }}>
+                        {isLocked ? <Lock size={18} style={{ color: "#6B6B8A" }} /> : MISSION_ICONS[mission.icon]}
+                      </div>
+                      <span className="font-mono-data" style={{
+                        fontSize: 9, fontWeight: 700, letterSpacing: "0.08em",
+                        textTransform: "uppercase" as const,
+                        color,
+                      }}>
+                        {isCompleted ? "COMPLETED" : isActive ? "IN PROGRESS" : "LOCKED"}
+                      </span>
+                    </div>
 
-                  <div className="relative">
-                    <div className="flex items-start justify-between mb-5">
-                      <div
-                        className="w-10 h-10 rounded-[10px] flex items-center justify-center transition-all duration-300 group-hover:scale-110 group-hover:shadow-lg"
+                    <div style={{ fontSize: 15, fontWeight: 600, color: "#F0F0F5", marginBottom: 4 }}>
+                      {mission.title}
+                    </div>
+                    <div style={{ fontSize: 12, color: "#5C5C78", lineHeight: 1.5, flex: 1 }}>
+                      {mission.description}
+                    </div>
+
+                    {isActive && (
+                      <div style={{
+                        marginTop: 12, height: 3, borderRadius: 2,
+                        background: "rgba(27,79,255,0.15)", overflow: "hidden",
+                      }}>
+                        <motion.div
+                          initial={{ width: 0 }}
+                          animate={{ width: "40%" }}
+                          transition={{ delay: 0.8, duration: 1, ease: "easeOut" }}
+                          className="progress-shimmer"
+                          style={{
+                            height: "100%", borderRadius: 2,
+                            background: "linear-gradient(90deg, #1B4FFF, #00BFFF)",
+                          }}
+                        />
+                      </div>
+                    )}
+                  </Link>
+                </motion.div>
+              );
+            })}
+          </div>
+
+          {/* ── SECTION 02 — Blueprint Vault ──────────────────────────── */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.65, duration: 0.5 }}
+          >
+            <SectionLabel
+              number="02"
+              title="Blueprint Vault"
+              right={
+                <Link href="/dashboard/templates" style={{
+                  fontSize: 12, fontWeight: 600, color: "#FFB800",
+                  textDecoration: "none", display: "flex", alignItems: "center", gap: 4,
+                }}>
+                  Full Vault <ChevronRight size={14} />
+                </Link>
+              }
+            />
+          </motion.div>
+
+          <div className="grid grid-cols-3 gap-5 mb-14">
+            {(data.blueprints ?? []).map((bp, i) => {
+              const meta = BLUEPRINT_NAMES[i] ?? { name: PREBUILT_WORKFLOWS[bp.workflowIndex]?.name ?? "Blueprint", desc: "", image: "" };
+              const rarityColor = RARITY_COLORS[bp.rarity] ?? "#6B7280";
+              const rarityLabel = `${bp.rarity.toUpperCase()} BLUEPRINT`;
+
+              return (
+                <motion.div
+                  key={bp.workflowIndex}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.7 + i * 0.1, duration: 0.5, ease: smoothEase }}
+                  className={bp.unlocked ? "loot-card" : ""}
+                  style={{
+                    background: "#0F1218",
+                    border: "1px solid rgba(255,255,255,0.07)",
+                    borderRadius: 12, overflow: "hidden",
+                    transition: "all 300ms ease",
+                  }}
+                >
+                  {/* Image area */}
+                  <div style={{
+                    height: 180, position: "relative", overflow: "hidden",
+                    backgroundImage: `url('${meta.image}')`,
+                    backgroundSize: "cover", backgroundPosition: "center",
+                  }}>
+                    {!bp.unlocked && (
+                      <div style={{
+                        position: "absolute", inset: 0,
+                        background: "rgba(10,12,16,0.75)",
+                        backdropFilter: "blur(4px)",
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                      }}>
+                        <Lock size={28} style={{ color: "#6B6B8A" }} />
+                      </div>
+                    )}
+                    {bp.unlocked && (
+                      <div style={{
+                        position: "absolute", top: 10, right: 10,
+                        padding: "4px 10px", borderRadius: 6,
+                        background: `rgba(${hexToRgb(rarityColor)}, 0.2)`, border: `1px solid rgba(${hexToRgb(rarityColor)}, 0.4)`,
+                        fontSize: 9, fontWeight: 700, letterSpacing: "0.06em",
+                        color: rarityColor, textTransform: "uppercase" as const,
+                        fontFamily: "var(--font-jetbrains), monospace",
+                      }}>
+                        UNLOCKED
+                      </div>
+                    )}
+                    <div style={{
+                      position: "absolute", bottom: 0, left: 0, right: 0, height: 60,
+                      background: "linear-gradient(transparent, #0F1218)",
+                    }} />
+                  </div>
+
+                  {/* Content */}
+                  <div style={{ padding: "14px 18px 18px" }}>
+                    <div style={{
+                      display: "flex", alignItems: "center", gap: 6, marginBottom: 6,
+                      fontSize: 10, fontWeight: 700, letterSpacing: "0.06em",
+                      color: rarityColor, textTransform: "uppercase" as const,
+                      fontFamily: "var(--font-jetbrains), monospace",
+                    }}>
+                      <Star size={10} fill={rarityColor} />
+                      {rarityLabel}
+                    </div>
+
+                    {!bp.unlocked && (
+                      <div className="font-mono-data" style={{
+                        fontSize: 9, color: "#5C5C78", letterSpacing: "0.05em",
+                        marginBottom: 4, textTransform: "uppercase" as const,
+                      }}>
+                        UNLOCK AT LVL {bp.requiredLevel}
+                      </div>
+                    )}
+
+                    <div style={{
+                      fontSize: 17, fontWeight: 700, fontStyle: "italic",
+                      color: bp.unlocked ? "#F0F0F5" : "#5C5C78",
+                      marginBottom: 6, letterSpacing: "-0.01em",
+                    }}>
+                      {meta.name}
+                    </div>
+                    <div style={{ fontSize: 12, color: "#5C5C78", lineHeight: 1.5, marginBottom: 14 }}>
+                      {meta.desc}
+                    </div>
+
+                    {bp.unlocked ? (
+                      <Link
+                        href="/dashboard/workflows/new"
                         style={{
-                          background: `linear-gradient(135deg, ${stat.color}18, ${stat.color}08)`,
-                          border: `1px solid ${stat.color}20`,
-                          color: stat.color,
-                          boxShadow: `0 0 0 0 ${stat.color}00`,
+                          display: "block", textAlign: "center",
+                          padding: "10px 16px", borderRadius: 8,
+                          background: rarityColor, color: "#0a0c10",
+                          fontSize: 12, fontWeight: 700, letterSpacing: "0.08em",
+                          textTransform: "uppercase" as const, textDecoration: "none",
+                          fontFamily: "var(--font-jetbrains), monospace",
+                          transition: "all 200ms ease",
                         }}
                       >
-                        {statIcons[index]}
-                      </div>
-                      <ArrowRight
-                        size={13}
-                        className="text-[#2A2A3E] group-hover:text-[#5C5C78] group-hover:translate-x-0.5 transition-all duration-300"
-                      />
-                    </div>
-
-                    <div className="text-[34px] font-bold text-[#F0F0F5] leading-none mb-1.5 tracking-[-0.03em] tabular-nums">
-                      <AnimatedCounter value={stat.value} suffix={stat.suffix || ""} />
-                    </div>
-
-                    <div className="text-[12.5px] font-medium text-[#6C6C8A] tracking-[-0.005em]">{stat.label}</div>
-
-                    {stat.trend && (
-                      <div className="flex items-center gap-1.5 mt-3 pt-3 border-t border-[rgba(255,255,255,0.04)]">
-                        <TrendingUp size={10} className="text-[#3A3A50]" />
-                        <span className="text-[10.5px] text-[#4A4A64]">{stat.trend}</span>
+                        USE BLUEPRINT
+                      </Link>
+                    ) : (
+                      <div style={{
+                        textAlign: "center", padding: "10px 16px", borderRadius: 8,
+                        background: "rgba(255,255,255,0.04)", color: "#3A3A50",
+                        fontSize: 12, fontWeight: 700, letterSpacing: "0.08em",
+                        textTransform: "uppercase" as const,
+                        fontFamily: "var(--font-jetbrains), monospace",
+                        cursor: "not-allowed",
+                      }}>
+                        LOCKED — LEVEL {bp.requiredLevel} REQUIRED
                       </div>
                     )}
                   </div>
-                </Link>
-              </motion.div>
-            ))
-          )}
-        </div>
-
-        {/* Quick Start Actions */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.35, duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-        >
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h2 className="text-[13px] font-semibold text-[#E0E0EE] tracking-[-0.01em]">Quick Actions</h2>
-              <p className="text-[11.5px] text-[#4A4A64] mt-0.5">Get started in seconds</p>
-            </div>
-            <div className="flex items-center gap-1.5 text-[11px] text-[#4A4A64]">
-              <Sparkles size={10} className="text-[#F59E0B]" />
-              <span>Choose your path</span>
-            </div>
+                </motion.div>
+              );
+            })}
           </div>
 
-          <div className="grid grid-cols-3 gap-3.5">
-            {[
-              {
-                title: "New Blank Workflow",
-                description: "Drag-and-drop nodes to build from scratch",
-                href: "/dashboard/workflows/new",
-                icon: <Plus size={19} strokeWidth={2.2} />,
-                color: "#4F8AFF",
-                badge: null,
-              },
-              {
-                title: "Use AI Prompt",
-                description: "Describe your workflow in plain English",
-                href: "/dashboard/workflows/new?mode=prompt",
-                icon: <Zap size={19} />,
-                color: "#8B5CF6",
-                badge: "AI",
-              },
-              {
-                title: "Browse Templates",
-                description: "Start from a curated AEC workflow",
-                href: "/dashboard/templates",
-                icon: <GitFork size={19} />,
-                color: "#10B981",
-                badge: "Popular",
-              },
-            ].map((action, index) => (
+          {/* ── SECTION 03 — Recent Activity ──────────────────────────── */}
+          {(data.recentWorkflows ?? []).length > 0 && (
+            <>
               <motion.div
-                key={action.title}
-                initial={{ opacity: 0, y: 16 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.45 + index * 0.08, duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.9, duration: 0.5 }}
               >
-                <Link
-                  href={action.href}
-                  className="group relative flex items-start gap-4 rounded-[13px] border border-[rgba(255,255,255,0.05)] p-5 transition-all duration-300 hover:-translate-y-0.5"
-                  style={{
-                    background: "linear-gradient(145deg, rgba(18,18,30,0.9) 0%, rgba(14,14,22,0.95) 100%)",
-                    boxShadow: "0 1px 2px rgba(0,0,0,0.08)",
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.borderColor = `${action.color}30`;
-                    e.currentTarget.style.boxShadow = `0 4px 20px rgba(0,0,0,0.2), 0 0 0 1px ${action.color}15`;
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.borderColor = "rgba(255,255,255,0.05)";
-                    e.currentTarget.style.boxShadow = "0 1px 2px rgba(0,0,0,0.08)";
-                  }}
-                >
-                  {action.badge && (
-                    <div className="absolute top-3.5 right-3.5 px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-[0.06em]"
+                <SectionLabel
+                  number="03"
+                  title="Recent Activity"
+                  right={
+                    <Link href="/dashboard/workflows" style={{
+                      fontSize: 12, fontWeight: 600, color: "#4F8AFF",
+                      textDecoration: "none", display: "flex", alignItems: "center", gap: 4,
+                    }}>
+                      All Workflows <ChevronRight size={14} />
+                    </Link>
+                  }
+                />
+              </motion.div>
+
+              <div className="grid grid-cols-3 gap-4 mb-14">
+                {(data.recentWorkflows ?? []).map((wf, i) => (
+                  <motion.div
+                    key={wf.id}
+                    initial={{ opacity: 0, y: 16 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.95 + i * 0.07, duration: 0.4, ease: smoothEase }}
+                  >
+                    <Link
+                      href={`/dashboard/canvas?id=${wf.id}`}
                       style={{
-                        background: `${action.color}12`,
-                        color: action.color,
-                        border: `1px solid ${action.color}20`,
+                        display: "block", textDecoration: "none",
+                        background: "#0F1218",
+                        border: "1px solid rgba(255,255,255,0.06)",
+                        borderRadius: 12, padding: "18px 20px",
+                        transition: "all 200ms ease",
                       }}
                     >
-                      {action.badge}
-                    </div>
-                  )}
+                      <div className="flex items-center gap-3 mb-3">
+                        <div style={{
+                          width: 36, height: 36, borderRadius: 8, flexShrink: 0,
+                          background: "rgba(79,138,255,0.08)", border: "1px solid rgba(79,138,255,0.15)",
+                          display: "flex", alignItems: "center", justifyContent: "center",
+                        }}>
+                          <FileText size={16} style={{ color: "#4F8AFF" }} />
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{
+                            fontSize: 14, fontWeight: 600, color: "#F0F0F5",
+                            overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                          }}>
+                            {wf.name}
+                          </div>
+                          <div className="font-mono-data" style={{ fontSize: 10, color: "#5C5C78" }}>
+                            {timeAgo(wf.updatedAt)}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <span className="font-mono-data" style={{ fontSize: 10, color: "#3A3A50", display: "flex", alignItems: "center", gap: 3 }}>
+                          <Zap size={10} style={{ color: "#4F8AFF" }} /> {wf.nodeCount} nodes
+                        </span>
+                        <span className="font-mono-data" style={{ fontSize: 10, color: "#3A3A50", display: "flex", alignItems: "center", gap: 3 }}>
+                          <Play size={9} style={{ color: "#10B981" }} /> {wf.executionCount} runs
+                        </span>
+                      </div>
+                      <div style={{
+                        marginTop: 12, textAlign: "center",
+                        padding: "7px 0", borderRadius: 6,
+                        background: "rgba(79,138,255,0.06)", border: "1px solid rgba(79,138,255,0.12)",
+                        fontSize: 11, fontWeight: 600, color: "#4F8AFF",
+                        fontFamily: "var(--font-jetbrains), monospace",
+                        letterSpacing: "0.03em",
+                      }}>
+                        Open
+                      </div>
+                    </Link>
+                  </motion.div>
+                ))}
+              </div>
+            </>
+          )}
 
-                  <div
-                    className="h-11 w-11 rounded-[10px] flex items-center justify-center flex-shrink-0 transition-all duration-300 group-hover:scale-105"
-                    style={{
-                      background: `linear-gradient(135deg, ${action.color}15, ${action.color}08)`,
-                      border: `1px solid ${action.color}20`,
-                      color: action.color,
-                    }}
-                  >
-                    {action.icon}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-[14px] font-semibold text-[#E0E0EE] group-hover:text-white transition-colors flex items-center gap-2 mb-1 tracking-[-0.01em]">
-                      {action.title}
-                      <ArrowRight size={11} className="opacity-0 -translate-x-1 group-hover:opacity-60 group-hover:translate-x-0 transition-all duration-300" />
-                    </div>
-                    <div className="text-[12.5px] text-[#6C6C8A] leading-relaxed">{action.description}</div>
-                  </div>
-                </Link>
-              </motion.div>
-            ))}
-          </div>
-        </motion.div>
-
-        {/* Featured Templates */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.7, duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-        >
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h2 className="text-[13px] font-semibold text-[#E0E0EE] tracking-[-0.01em]">Featured Templates</h2>
-              <p className="text-[11.5px] text-[#4A4A64] mt-0.5">Ready-to-use AEC workflows</p>
-            </div>
-            <Link
-              href="/dashboard/templates"
-              className="flex items-center gap-1.5 text-[11.5px] text-[#4F8AFF] hover:text-[#6BA0FF] transition-colors group font-medium"
-            >
-              View all
-              <ArrowRight size={10} className="group-hover:translate-x-0.5 transition-transform duration-300" />
-            </Link>
-          </div>
-
-          <div className="grid grid-cols-3 gap-4">
-            {featuredWorkflows.map((wf, i) => (
-              <WorkflowCard
-                key={wf.id}
-                workflow={wf}
-                href={`/dashboard/templates`}
-                showCloneButton
-                index={i}
-              />
-            ))}
-          </div>
-        </motion.div>
-
-        {/* Hero Workflow CTA */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.9, duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-        >
-          <Link
-            href="/dashboard/templates"
-            className="group block relative rounded-[16px] border border-[rgba(79,138,255,0.15)] p-7 overflow-hidden transition-all duration-500 hover:border-[rgba(79,138,255,0.35)]"
-            style={{
-              background: "linear-gradient(135deg, rgba(79,138,255,0.04) 0%, rgba(139,92,246,0.04) 50%, rgba(79,138,255,0.02) 100%)",
-              boxShadow: "0 1px 3px rgba(0,0,0,0.1), inset 0 1px 0 rgba(255,255,255,0.02)",
-            }}
+          {/* ── FLASH EVENT Banner ─────────────────────────────────────── */}
+          {data.flashEvent && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 1.0, duration: 0.5, ease: smoothEase }}
           >
-            {/* Atmospheric mesh gradient */}
-            <div className="absolute inset-0 opacity-30 group-hover:opacity-60 transition-opacity duration-700 pointer-events-none">
-              <div className="absolute inset-0" style={{
-                background: "radial-gradient(ellipse at 20% 50%, rgba(79,138,255,0.12), transparent 55%), radial-gradient(ellipse at 80% 80%, rgba(139,92,246,0.08), transparent 50%)",
-              }} />
-            </div>
-
-            {/* Animated shimmer line on hover */}
-            <div
-              className="absolute top-0 left-0 right-0 h-[1px] opacity-0 group-hover:opacity-100 transition-opacity duration-500"
+            <Link
+              href={data.flashEvent.href}
+              className="block"
               style={{
-                background: "linear-gradient(90deg, transparent, rgba(79,138,255,0.5) 50%, transparent)",
+                background: "#0F1218",
+                border: data.flashEvent.completed
+                  ? "1px solid rgba(0,230,118,0.3)"
+                  : "1px solid rgba(255,255,255,0.08)",
+                borderRadius: 16, padding: "24px 28px",
+                textDecoration: "none",
+                display: "flex", alignItems: "center", gap: 24,
+                transition: "all 200ms ease",
               }}
-            />
+            >
+              <div style={{
+                width: 64, height: 64, borderRadius: 14, flexShrink: 0,
+                background: data.flashEvent.completed ? "rgba(0,230,118,0.1)" : "rgba(27,79,255,0.1)",
+                border: data.flashEvent.completed ? "1px solid rgba(0,230,118,0.2)" : "1px solid rgba(27,79,255,0.2)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+              }}>
+                {data.flashEvent.completed
+                  ? <CheckCircle2 size={26} style={{ color: "#00E676" }} />
+                  : <Megaphone size={26} style={{ color: "#4F8AFF" }} />}
+              </div>
 
-            <div className="relative flex items-start justify-between">
-              <div className="flex-1">
-                <div className="flex items-center gap-2.5 mb-3">
-                  <div
-                    className="h-7 w-7 rounded-[8px] flex items-center justify-center"
-                    style={{
-                      background: "linear-gradient(135deg, rgba(79,138,255,0.2), rgba(99,102,241,0.15))",
-                      border: "1px solid rgba(79,138,255,0.2)",
-                    }}
-                  >
-                    <Play size={10} className="text-[#4F8AFF] ml-0.5" fill="#4F8AFF" />
-                  </div>
-                  <span className="text-[10.5px] font-bold text-[#4F8AFF] uppercase tracking-[0.08em]">
-                    Hero Workflow
+              <div style={{ flex: 1 }}>
+                <div className="flex items-center gap-3 mb-2">
+                  <span style={{ fontSize: 14, fontWeight: 700, fontStyle: "italic", color: data.flashEvent.completed ? "#00E676" : "#4F8AFF", letterSpacing: "0.02em" }}>
+                    {data.flashEvent.completed ? "EVENT COMPLETE" : "FLASH EVENT"}
                   </span>
-                  <span
-                    className="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-[0.05em]"
-                    style={{
-                      background: "linear-gradient(135deg, rgba(245,158,11,0.15), rgba(245,158,11,0.08))",
-                      color: "#F59E0B",
-                      border: "1px solid rgba(245,158,11,0.2)",
-                    }}
-                  >
-                    Most Popular
-                  </span>
+                  {!data.flashEvent.completed && (
+                    <>
+                      <span className="event-dot" style={{
+                        width: 6, height: 6, borderRadius: "50%",
+                        background: "#4F8AFF", display: "inline-block",
+                      }} />
+                      <span className="font-mono-data" style={{ fontSize: 11, color: "#5C5C78", letterSpacing: "0.04em", textTransform: "uppercase" as const }}>
+                        ENDING IN <CountdownTimer initialMs={data.flashEvent.msRemaining} />
+                      </span>
+                    </>
+                  )}
                 </div>
-                <h3 className="text-[18px] font-bold text-[#F0F0F5] mb-2 tracking-[-0.02em]">
-                  PDF Brief → Full Pipeline (Beta)
-                </h3>
-                <p className="text-[13px] text-[#7C7C96] max-w-2xl leading-[1.6] mb-4">
-                  The definitive end-to-end AEC workflow. Upload a project brief PDF and get extracted requirements, 3D massing variants, and concept renders in one automated pipeline. (IFC export in development)
-                </p>
-                <div className="flex items-center gap-4">
-                  <div className="flex items-center gap-1.5 text-[11.5px] text-[#5C5C78]">
-                    <Clock size={11} />
-                    <span>~3 minutes</span>
-                  </div>
-                  <div className="text-[11.5px] text-[#5C5C78]">6 nodes</div>
-                  <div
-                    className="px-2 py-0.5 rounded-full text-[10px] font-semibold"
-                    style={{
-                      background: "rgba(245,158,11,0.08)",
-                      color: "#F59E0B",
-                      border: "1px solid rgba(245,158,11,0.15)",
-                    }}
-                  >
-                    Advanced
-                  </div>
+                <div style={{ fontSize: 22, fontWeight: 700, fontStyle: "italic", color: "#F0F0F5", marginBottom: 4, letterSpacing: "-0.01em" }}>
+                  {data.flashEvent.title}
+                </div>
+                <div style={{ fontSize: 13, color: "#5C5C78", lineHeight: 1.5 }}>
+                  {data.flashEvent.description}
+                  {!data.flashEvent.completed && (
+                    <span style={{ color: "#FFB800", fontWeight: 600 }}> +500 XP</span>
+                  )}
                 </div>
               </div>
-              <div
-                className="flex items-center gap-2 rounded-[10px] px-5 py-2.5 text-[13px] font-semibold text-white shrink-0 ml-8 transition-all duration-300 group-hover:shadow-[0_0_24px_rgba(79,138,255,0.3)] group-hover:-translate-y-0.5"
-                style={{
-                  background: "linear-gradient(135deg, #4F8AFF 0%, #6366F1 100%)",
-                  boxShadow: "0 2px 8px rgba(79,138,255,0.2), inset 0 1px 0 rgba(255,255,255,0.1)",
-                }}
-              >
-                <Play size={11} fill="white" />
-                <span>Try it now</span>
-              </div>
-            </div>
-          </Link>
-        </motion.div>
 
-        {/* Bottom spacer */}
-        <div className="h-2" />
+              {!data.flashEvent.completed && (
+                <div style={{
+                  padding: "14px 28px", borderRadius: 8, flexShrink: 0,
+                  background: "#F0F0F5", color: "#0a0c10",
+                  fontSize: 13, fontWeight: 700, letterSpacing: "0.08em",
+                  textTransform: "uppercase" as const,
+                  fontFamily: "var(--font-jetbrains), monospace",
+                }}>
+                  START CHALLENGE
+                </div>
+              )}
+            </Link>
+          </motion.div>
+          )}
+
+        </div>
       </main>
     </div>
   );
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function hexToRgb(hex: string): string {
+  const r = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+  if (!r) return "79,138,255";
+  return `${parseInt(r[1], 16)}, ${parseInt(r[2], 16)}, ${parseInt(r[3], 16)}`;
+}
+
+function timeAgo(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "Just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  if (days < 7) return `${days}d ago`;
+  return new Date(iso).toLocaleDateString();
 }

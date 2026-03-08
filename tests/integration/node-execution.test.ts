@@ -5,7 +5,7 @@ describe('Node Execution - CRITICAL PATH', () => {
     vi.clearAllMocks();
   });
 
-  describe('TR-003: Building Description Generator', () => {
+  describe('TR-003: Design Brief Analyzer', () => {
     it('should generate building description from prompt', async () => {
       const input = {
         prompt: 'Design a modern 5-story commercial office building',
@@ -32,7 +32,7 @@ describe('Node Execution - CRITICAL PATH', () => {
     });
   });
 
-  describe('GN-003: Concept Image Generator', () => {
+  describe('GN-003: Concept Render Generator', () => {
     it('should generate image from building description', async () => {
       const input = {
         projectName: 'Modern Office',

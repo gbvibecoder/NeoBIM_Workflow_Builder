@@ -6,6 +6,28 @@ import type { WorkflowNode, WorkflowEdge, NodeStatus } from "@/types/nodes";
 import type { Workflow, WorkflowTemplate, CreationMode } from "@/types/workflow";
 import { generateId } from "@/lib/utils";
 import { api } from "@/lib/api";
+import { awardXP } from "@/lib/award-xp";
+
+/** Returns true if the workflow name is empty, whitespace, or the default "Untitled Workflow" */
+export function isUntitledWorkflow(name: string | null | undefined): boolean {
+  if (!name) return true;
+  const trimmed = name.trim();
+  return trimmed === "" || trimmed === "Untitled Workflow";
+}
+
+/** Prisma cuid() IDs are 25 chars starting with 'c'. Client generateId() produces 7-char random strings. */
+function isPersistedId(id: string | undefined | null): boolean {
+  if (!id) return false;
+  // Prisma cuid: 25 chars, starts with 'c'. Client IDs are 7 chars.
+  return id.length >= 20 && id.startsWith("c");
+}
+
+interface HistoryEntry {
+  nodes: WorkflowNode[];
+  edges: WorkflowEdge[];
+}
+
+const MAX_HISTORY = 50;
 
 interface WorkflowState {
   // Current workflow
@@ -14,6 +36,19 @@ interface WorkflowState {
   edges: WorkflowEdge[];
   isDirty: boolean;
   isSaving: boolean;
+
+  // Save modal
+  isSaveModalOpen: boolean;
+  pendingSaveName: string;
+
+  // Undo/Redo history
+  _history: HistoryEntry[];
+  _historyIndex: number;
+  _pushHistory: () => void;
+  undo: () => void;
+  redo: () => void;
+  canUndo: () => boolean;
+  canRedo: () => boolean;
 
   // Creation mode
   creationMode: CreationMode;
@@ -36,6 +71,11 @@ interface WorkflowState {
   setEdges: (edges: WorkflowEdge[]) => void;
   setEdgeFlowing: (sourceNodeId: string, flowing: boolean) => void;
 
+  // Save modal actions
+  openSaveModal: () => void;
+  closeSaveModal: () => void;
+  setPendingSaveName: (name: string) => void;
+
   // Persistence
   markDirty: () => void;
   markClean: () => void;
@@ -57,7 +97,52 @@ export const useWorkflowStore = create<WorkflowState>()(
     edges: [],
     isDirty: false,
     isSaving: false,
+    isSaveModalOpen: false,
+    pendingSaveName: "",
     creationMode: "manual",
+
+    // Undo/Redo
+    _history: [],
+    _historyIndex: -1,
+
+    _pushHistory: () => {
+      const { nodes, edges, _history, _historyIndex } = get();
+      const truncated = _history.slice(0, _historyIndex + 1);
+      const entry: HistoryEntry = {
+        nodes: JSON.parse(JSON.stringify(nodes)),
+        edges: JSON.parse(JSON.stringify(edges)),
+      };
+      const next = [...truncated, entry];
+      if (next.length > MAX_HISTORY) next.shift();
+      set({ _history: next, _historyIndex: next.length - 1 });
+    },
+
+    undo: () => {
+      const { _history, _historyIndex } = get();
+      if (_historyIndex <= 0) return;
+      const prev = _history[_historyIndex - 1];
+      set({
+        nodes: prev.nodes,
+        edges: prev.edges,
+        _historyIndex: _historyIndex - 1,
+        isDirty: true,
+      });
+    },
+
+    redo: () => {
+      const { _history, _historyIndex } = get();
+      if (_historyIndex >= _history.length - 1) return;
+      const next = _history[_historyIndex + 1];
+      set({
+        nodes: next.nodes,
+        edges: next.edges,
+        _historyIndex: _historyIndex + 1,
+        isDirty: true,
+      });
+    },
+
+    canUndo: () => get()._historyIndex > 0,
+    canRedo: () => get()._historyIndex < get()._history.length - 1,
 
     setCurrentWorkflow: (workflow) => {
       if (workflow) {
@@ -121,28 +206,34 @@ export const useWorkflowStore = create<WorkflowState>()(
 
     setCreationMode: (mode) => set({ creationMode: mode }),
 
-    addNode: (node) =>
+    addNode: (node) => {
+      get()._pushHistory();
       set((state) => ({
         nodes: [...state.nodes, node],
         isDirty: true,
-      })),
+      }));
+    },
 
-    removeNode: (nodeId) =>
+    removeNode: (nodeId) => {
+      get()._pushHistory();
       set((state) => ({
         nodes: state.nodes.filter((n) => n.id !== nodeId),
         edges: state.edges.filter(
           (e) => e.source !== nodeId && e.target !== nodeId
         ),
         isDirty: true,
-      })),
+      }));
+    },
 
-    updateNode: (nodeId, updates) =>
+    updateNode: (nodeId, updates) => {
+      get()._pushHistory();
       set((state) => ({
         nodes: state.nodes.map((n) =>
           n.id === nodeId ? { ...n, ...updates } : n
         ),
         isDirty: true,
-      })),
+      }));
+    },
 
     updateNodeStatus: (nodeId, status) =>
       set((state) => ({
@@ -153,21 +244,31 @@ export const useWorkflowStore = create<WorkflowState>()(
         ),
       })),
 
-    setNodes: (nodes) => set({ nodes, isDirty: true }),
+    setNodes: (nodes) => {
+      get()._pushHistory();
+      set({ nodes, isDirty: true });
+    },
 
-    addEdge: (edge) =>
+    addEdge: (edge) => {
+      get()._pushHistory();
       set((state) => ({
         edges: [...state.edges, edge],
         isDirty: true,
-      })),
+      }));
+    },
 
-    removeEdge: (edgeId) =>
+    removeEdge: (edgeId) => {
+      get()._pushHistory();
       set((state) => ({
         edges: state.edges.filter((e) => e.id !== edgeId),
         isDirty: true,
-      })),
+      }));
+    },
 
-    setEdges: (edges) => set({ edges, isDirty: true }),
+    setEdges: (edges) => {
+      get()._pushHistory();
+      set({ edges, isDirty: true });
+    },
 
     setEdgeFlowing: (sourceNodeId, flowing) =>
       set((state) => ({
@@ -177,6 +278,10 @@ export const useWorkflowStore = create<WorkflowState>()(
             : e
         ),
       })),
+
+    openSaveModal: () => set({ isSaveModalOpen: true }),
+    closeSaveModal: () => set({ isSaveModalOpen: false, pendingSaveName: "" }),
+    setPendingSaveName: (name) => set({ pendingSaveName: name }),
 
     markDirty: () => set({ isDirty: true }),
     markClean: () => set({ isDirty: false }),
@@ -188,16 +293,28 @@ export const useWorkflowStore = create<WorkflowState>()(
       set({ isSaving: true });
       try {
         const tileGraph = { nodes: state.nodes, edges: state.edges };
-        if (state.currentWorkflow?.id && !state.currentWorkflow.id.includes("-")) {
-          // Has a real DB id — update
-          await api.workflows.update(state.currentWorkflow.id, {
-            name: name ?? state.currentWorkflow.name,
+        const workflowId = state.currentWorkflow?.id;
+
+        if (isPersistedId(workflowId)) {
+          // Has a real DB id (Prisma cuid) — update existing workflow
+          await api.workflows.update(workflowId!, {
+            name: name ?? state.currentWorkflow!.name,
             tileGraph,
           });
-          set({ isDirty: false });
-          return state.currentWorkflow.id;
+          // Update name in store if changed
+          if (name && name !== state.currentWorkflow!.name) {
+            set((s) => ({
+              isDirty: false,
+              currentWorkflow: s.currentWorkflow
+                ? { ...s.currentWorkflow, name }
+                : null,
+            }));
+          } else {
+            set({ isDirty: false });
+          }
+          return workflowId!;
         } else {
-          // Create new
+          // No persisted ID — create new workflow in DB
           const { workflow } = await api.workflows.create({
             name: name ?? state.currentWorkflow?.name ?? "Untitled Workflow",
             description: state.currentWorkflow?.description ?? undefined,
@@ -207,9 +324,11 @@ export const useWorkflowStore = create<WorkflowState>()(
           set((s) => ({
             isDirty: false,
             currentWorkflow: s.currentWorkflow
-              ? { ...s.currentWorkflow, id: workflow.id }
+              ? { ...s.currentWorkflow, id: workflow.id, name: name ?? s.currentWorkflow.name }
               : null,
           }));
+          // Award XP for first workflow created (fire-and-forget)
+          awardXP("workflow-created");
           return workflow.id;
         }
       } catch (err) {

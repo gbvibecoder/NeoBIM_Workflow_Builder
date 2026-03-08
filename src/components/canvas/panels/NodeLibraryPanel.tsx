@@ -3,15 +3,17 @@
 import React, { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  Search, X, GripVertical, ChevronDown, ChevronLeft, ChevronRight, Plus, Clock, Tag,
+  Search, X, Plus, Clock, Tag,
 } from "lucide-react";
 import * as LucideIcons from "lucide-react";
 import { toast } from "sonner";
 import { useReactFlow } from "@xyflow/react";
-import { NODE_CATALOGUE, NODES_BY_CATEGORY, CATEGORY_CONFIG } from "@/constants/node-catalogue";
+import { NODE_CATALOGUE, CATEGORY_CONFIG, LIVE_NODES } from "@/constants/node-catalogue";
 import type { NodeCatalogueItem, NodeCategory, WorkflowNode, WorkflowNodeData } from "@/types/nodes";
 import { useWorkflowStore } from "@/stores/workflow-store";
 import { generateId } from "@/lib/utils";
+import { useLocale } from "@/hooks/useLocale";
+import { useUIStore } from "@/stores/ui-store";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -31,134 +33,24 @@ function getIcon(name: string, size = 13): React.ReactNode {
   return <LucideIcons.Box size={size} strokeWidth={1.5} />;
 }
 
-// ─── Live vs Preview badge ───────────────────────────────────────────────────
-const LIVE_NODE_IDS = new Set(["TR-003", "GN-003", "TR-008", "EX-002"]);
-
 // ─── Filter chips ─────────────────────────────────────────────────────────────
 
-const FILTERS: { label: string; value: "all" | NodeCategory }[] = [
-  { label: "All",      value: "all"       },
-  { label: "Input",    value: "input"     },
-  { label: "AI",       value: "transform" },
-  { label: "Geometry", value: "generate"  },
-  { label: "Export",   value: "export"    },
-];
+const FILTER_VALUES: ("all" | NodeCategory)[] = ["all", "input", "transform", "generate", "export"];
 
-// ─── Tooltip ──────────────────────────────────────────────────────────────────
+// ─── Palette Node Item ──────────────────────────────────────────────────────
 
-function NodeTooltip({ node, anchorY, panelWidth }: { node: NodeCatalogueItem; anchorY: number; panelWidth: number }) {
-  const cfg = CATEGORY_CONFIG[node.category];
-  const rgb = hexToRgb(cfg.color);
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, x: -6 }}
-      animate={{ opacity: 1, x: 0 }}
-      exit={{ opacity: 0, x: -6 }}
-      transition={{ duration: 0.15 }}
-      style={{
-        position: "fixed",
-        left: panelWidth + 16,
-        top: Math.max(8, Math.min(anchorY - 64, window.innerHeight - 260)),
-        width: 240,
-        background: "rgba(14, 14, 22, 0.97)",
-        border: `1px solid rgba(${rgb}, 0.25)`,
-        borderRadius: 10,
-        padding: "12px 14px",
-        boxShadow: "0 12px 40px rgba(0,0,0,0.65)",
-        backdropFilter: "blur(16px)",
-        WebkitBackdropFilter: "blur(16px)",
-        zIndex: 9999,
-        pointerEvents: "none",
-      }}
-    >
-      {/* Name + dot */}
-      <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 6 }}>
-        <div style={{ width: 6, height: 6, borderRadius: "50%", background: cfg.color, flexShrink: 0 }} />
-        <span style={{ fontSize: 12, fontWeight: 600, color: "#F0F0F5" }}>{node.name}</span>
-      </div>
-
-      {/* Description */}
-      <p style={{ fontSize: 11, color: "#8888A0", lineHeight: 1.5, marginBottom: 8 }}>
-        {node.description}
-      </p>
-
-      {/* Meta */}
-      <div style={{ display: "flex", gap: 14, marginBottom: 8 }}>
-        <span style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 10, color: "#5C5C78" }}>
-          <Clock size={9} />
-          {node.executionTime ?? "—"}
-        </span>
-        <span style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 10, color: "#5C5C78" }}>
-          <Tag size={9} />
-          {node.id}
-        </span>
-      </div>
-
-      {/* I/O */}
-      {(node.inputs.length > 0 || node.outputs.length > 0) && (
-        <div style={{
-          paddingTop: 8,
-          borderTop: "1px solid rgba(255,255,255,0.06)",
-          display: "flex", gap: 16, marginBottom: 8,
-        }}>
-          {node.inputs.length > 0 && (
-            <div>
-              <div style={{ fontSize: 9, color: "#3A3A50", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 3 }}>
-                In
-              </div>
-              {node.inputs.map(p => (
-                <div key={p.id} style={{ fontSize: 10, color: "#5C5C78" }}>{p.label}</div>
-              ))}
-            </div>
-          )}
-          {node.outputs.length > 0 && (
-            <div>
-              <div style={{ fontSize: 9, color: "#3A3A50", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 3 }}>
-                Out
-              </div>
-              {node.outputs.map(p => (
-                <div key={p.id} style={{ fontSize: 10, color: "#5C5C78" }}>{p.label}</div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Tags */}
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 3 }}>
-        {node.tags.slice(0, 4).map(tag => (
-          <span key={tag} style={{
-            padding: "1px 6px", borderRadius: 4,
-            background: `rgba(${rgb}, 0.08)`,
-            border: `1px solid rgba(${rgb}, 0.18)`,
-            fontSize: 9, color: cfg.color,
-          }}>
-            {tag}
-          </span>
-        ))}
-      </div>
-    </motion.div>
-  );
-}
-
-// ─── Node Item ────────────────────────────────────────────────────────────────
-
-interface NodeItemProps {
+interface PaletteItemProps {
   node: NodeCatalogueItem;
+  onSelect: (node: NodeCatalogueItem) => void;
   onDragStart: (e: React.DragEvent, nodeId: string) => void;
-  onAddToCenter: (node: NodeCatalogueItem) => void;
-  onTooltipShow: (node: NodeCatalogueItem, y: number) => void;
-  onTooltipHide: () => void;
+  isHighlighted: boolean;
   searchQuery?: string;
 }
 
-function NodeItem({
-  node, onDragStart, onAddToCenter, onTooltipShow, onTooltipHide, searchQuery,
-}: NodeItemProps) {
-  const [isHovered, setIsHovered] = useState(false);
+function PaletteItem({ node, onSelect, onDragStart, isHighlighted, searchQuery }: PaletteItemProps) {
   const cfg = CATEGORY_CONFIG[node.category];
   const rgb = hexToRgb(cfg.color);
+  const [hovered, setHovered] = useState(false);
 
   const highlightText = (text: string): React.ReactNode => {
     const q = searchQuery?.trim();
@@ -169,7 +61,7 @@ function NodeItem({
       <>
         {text.slice(0, idx)}
         <mark style={{
-          background: `rgba(${rgb}, 0.2)`, color: cfg.color,
+          background: `rgba(${rgb}, 0.25)`, color: cfg.color,
           borderRadius: 2, padding: "0 1px",
         }}>
           {text.slice(idx, idx + q.length)}
@@ -183,237 +75,184 @@ function NodeItem({
     <div
       draggable
       onDragStart={e => onDragStart(e, node.id)}
-      onMouseEnter={e => { setIsHovered(true); onTooltipShow(node, e.clientY); }}
-      onMouseLeave={() => { setIsHovered(false); onTooltipHide(); }}
+      onClick={() => onSelect(node)}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
       style={{
-        position: "relative",
         display: "flex",
         alignItems: "center",
-        gap: 12,
-        padding: "10px 12px",
-        cursor: "grab",
-        borderRadius: 8,
-        overflow: "hidden",
+        gap: 10,
+        padding: "9px 12px",
+        cursor: "pointer",
+        borderRadius: 10,
+        background: isHighlighted
+          ? `rgba(${rgb}, 0.1)`
+          : hovered
+            ? "rgba(255,255,255,0.03)"
+            : "transparent",
+        border: isHighlighted
+          ? `1px solid rgba(${rgb}, 0.2)`
+          : "1px solid transparent",
+        transition: "all 120ms ease",
         userSelect: "none",
-        transition: "all 150ms ease",
-        transform: "scale(1)",
       }}
-      onMouseDown={e => { (e.currentTarget as HTMLElement).style.transform = "scale(0.98)"; }}
-      onMouseUp={e => { (e.currentTarget as HTMLElement).style.transform = "scale(1)"; }}
     >
-      {/* Hover bg slides in from left */}
-      <motion.div
-        animate={{ scaleX: isHovered ? 1 : 0 }}
-        transition={{ duration: 0.15, ease: "easeOut" }}
-        style={{
-          position: "absolute",
-          inset: 0,
-          background: `rgba(${rgb}, 0.05)`,
-          transformOrigin: "left center",
-          borderRadius: 6,
-          pointerEvents: "none",
-        }}
-      />
-
-      {/* Grip */}
-      <GripVertical
-        size={10}
-        strokeWidth={1.5}
-        style={{ color: isHovered ? "#3A3A50" : "rgba(255,255,255,0.06)", flexShrink: 0, position: "relative" }}
-      />
-
-      {/* Icon circle */}
+      {/* Icon */}
       <div style={{
-        width: 32, height: 32, borderRadius: 8,
-        background: `${cfg.color}12`,
+        width: 30, height: 30, borderRadius: 8,
+        background: `rgba(${rgb}, 0.1)`,
         display: "flex", alignItems: "center", justifyContent: "center",
-        color: cfg.color, flexShrink: 0, position: "relative",
+        color: cfg.color, flexShrink: 0,
       }}>
         {getIcon(node.icon, 14)}
       </div>
 
       {/* Text */}
-      <div style={{ flex: 1, minWidth: 0, position: "relative" }}>
+      <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{
           display: "flex", alignItems: "center", gap: 5,
         }}>
           <span style={{
-            fontSize: 13, fontWeight: 500, color: "#e0e0ea",
+            fontSize: 13, fontWeight: 500, color: "#e8e8f0",
             overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-            lineHeight: 1.2, flex: 1,
-            transition: "color 150ms ease",
+            flex: 1, lineHeight: 1.2,
           }}>
             {highlightText(node.name)}
           </span>
-          {LIVE_NODE_IDS.has(node.id) ? (
+          {LIVE_NODES.has(node.id) ? (
             <span style={{
-              fontSize: 8, fontWeight: 700, color: "#10B981",
+              fontSize: 7, fontWeight: 700, color: "#10B981",
               padding: "1px 4px", borderRadius: 3,
-              background: "rgba(16,185,129,0.1)", border: "1px solid rgba(16,185,129,0.25)",
+              background: "rgba(16,185,129,0.1)", border: "1px solid rgba(16,185,129,0.2)",
               flexShrink: 0,
             }}>LIVE</span>
           ) : (
             <span style={{
-              fontSize: 8, fontWeight: 600, color: "#4a4a68",
-              padding: "2px 6px", borderRadius: 4,
-              background: "rgba(255,255,255,0.06)",
-              flexShrink: 0, letterSpacing: "0.08em",
-            }}>PREVIEW</span>
+              fontSize: 7, fontWeight: 700, color: "#F59E0B",
+              padding: "1px 4px", borderRadius: 3,
+              background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.15)",
+              flexShrink: 0,
+            }}>MOCK</span>
           )}
         </div>
-        <div style={{ fontSize: 10, color: "#3a3a50", fontFamily: "monospace", marginTop: 2 }}>
-          {node.id} · {node.executionTime ?? "—"}
+        <div style={{
+          fontSize: 10, color: "#4a4a5a", marginTop: 1,
+          overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+        }}>
+          {node.description.slice(0, 60)}{node.description.length > 60 ? "..." : ""}
         </div>
       </div>
 
-      {/* '+' add button */}
-      <AnimatePresence>
-        {isHovered && (
-          <motion.button
-            key="plus"
-            initial={{ opacity: 0, scale: 0.6 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.6 }}
-            transition={{ duration: 0.1 }}
-            onClick={e => { e.stopPropagation(); onAddToCenter(node); }}
-            title="Add to canvas center"
-            style={{
-              width: 20, height: 20, borderRadius: 5, padding: 0,
-              background: `rgba(${rgb}, 0.15)`,
-              border: `1px solid rgba(${rgb}, 0.3)`,
-              display: "flex", alignItems: "center", justifyContent: "center",
-              color: cfg.color, cursor: "pointer", flexShrink: 0, position: "relative",
-            }}
-          >
-            <Plus size={10} strokeWidth={2.5} />
-          </motion.button>
-        )}
-      </AnimatePresence>
+      {/* Category dot */}
+      <div style={{
+        width: 6, height: 6, borderRadius: "50%",
+        background: cfg.color, flexShrink: 0, opacity: 0.6,
+      }} />
     </div>
   );
 }
 
-// ─── Category Section ─────────────────────────────────────────────────────────
+// ─── Detail Tooltip (shows on hover in the palette) ──────────────────────────
 
-interface CategorySectionProps {
-  category: NodeCategory;
-  nodes: NodeCatalogueItem[];
-  isOpen: boolean;
-  onToggle: () => void;
-  onDragStart: (e: React.DragEvent, nodeId: string) => void;
-  onAddToCenter: (node: NodeCatalogueItem) => void;
-  onTooltipShow: (node: NodeCatalogueItem, y: number) => void;
-  onTooltipHide: () => void;
-}
-
-function CategorySection({
-  category, nodes, isOpen, onToggle,
-  onDragStart, onAddToCenter, onTooltipShow, onTooltipHide,
-}: CategorySectionProps) {
-  const cfg = CATEGORY_CONFIG[category];
+function PaletteNodeDetail({ node }: { node: NodeCatalogueItem }) {
+  const { t } = useLocale();
+  const cfg = CATEGORY_CONFIG[node.category];
   const rgb = hexToRgb(cfg.color);
 
   return (
-    <div style={{ marginBottom: 4 }}>
-      {/* Header */}
-      <button
-        onClick={onToggle}
-        style={{
-          width: "100%", display: "flex", alignItems: "center", gap: 8,
-          padding: "6px 12px",
-          background: "transparent", border: "none", cursor: "pointer",
-        }}
-      >
+    <div style={{
+      padding: "12px 14px",
+      borderTop: "1px solid rgba(255,255,255,0.06)",
+      background: "rgba(0,0,0,0.2)",
+    }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 6 }}>
+        <div style={{ width: 6, height: 6, borderRadius: "50%", background: cfg.color }} />
+        <span style={{ fontSize: 12, fontWeight: 600, color: "#F0F0F5" }}>{node.name}</span>
+      </div>
+      <p style={{ fontSize: 11, color: "#8888A0", lineHeight: 1.5, marginBottom: 8 }}>
+        {node.description}
+      </p>
+      <div style={{ display: "flex", gap: 14, marginBottom: 8 }}>
+        <span style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 10, color: "#5C5C78" }}>
+          <Clock size={9} /> {node.executionTime ?? "—"}
+        </span>
+        <span style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 10, color: "#5C5C78" }}>
+          <Tag size={9} /> {node.id}
+        </span>
+      </div>
+      {(node.inputs.length > 0 || node.outputs.length > 0) && (
         <div style={{
-          width: 6, height: 6, borderRadius: "50%",
-          background: cfg.color, flexShrink: 0,
-        }} />
-        <span style={{
-          fontSize: 10, fontWeight: 700, color: cfg.color,
-          textTransform: "uppercase" as const, letterSpacing: "0.15em", flex: 1,
-          textAlign: "left",
+          paddingTop: 8,
+          borderTop: "1px solid rgba(255,255,255,0.06)",
+          display: "flex", gap: 16,
         }}>
-          {cfg.label}
-        </span>
-        <span style={{
-          padding: "1px 7px", borderRadius: 20,
-          background: `rgba(${rgb}, 0.1)`,
-          fontSize: 10, fontWeight: 600, color: cfg.color,
-        }}>
-          {nodes.length}
-        </span>
-        <motion.div
-          animate={{ rotate: isOpen ? 0 : -90 }}
-          transition={{ duration: 0.2 }}
-          style={{ display: "flex", color: `rgba(${rgb}, 0.5)` }}
-        >
-          <ChevronDown size={12} strokeWidth={2} />
-        </motion.div>
-      </button>
-
-      {/* Separator */}
-      <div style={{
-        height: 1, background: `${cfg.color}15`,
-        marginLeft: 12, marginRight: 12,
-      }} />
-
-      {/* Nodes */}
-      <AnimatePresence initial={false}>
-        {isOpen && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.2, ease: "easeInOut" }}
-            style={{ overflow: "hidden" }}
-          >
-            <div style={{ padding: "4px 8px 4px" }}>
-              {nodes.map(node => (
-                <NodeItem
-                  key={node.id}
-                  node={node}
-                  onDragStart={onDragStart}
-                  onAddToCenter={onAddToCenter}
-                  onTooltipShow={onTooltipShow}
-                  onTooltipHide={onTooltipHide}
-                />
+          {node.inputs.length > 0 && (
+            <div>
+              <div style={{ fontSize: 9, color: "#3A3A50", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 3 }}>
+                {t('canvas.in')}
+              </div>
+              {node.inputs.map(p => (
+                <div key={p.id} style={{ fontSize: 10, color: "#5C5C78" }}>{p.label}</div>
               ))}
             </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+          )}
+          {node.outputs.length > 0 && (
+            <div>
+              <div style={{ fontSize: 9, color: "#3A3A50", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 3 }}>
+                {t('canvas.out')}
+              </div>
+              {node.outputs.map(p => (
+                <div key={p.id} style={{ fontSize: 10, color: "#5C5C78" }}>{p.label}</div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+      {node.tags.length > 0 && (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 3, marginTop: 8 }}>
+          {node.tags.slice(0, 5).map(tag => (
+            <span key={tag} style={{
+              padding: "1px 6px", borderRadius: 4,
+              background: `rgba(${rgb}, 0.08)`,
+              border: `1px solid rgba(${rgb}, 0.18)`,
+              fontSize: 9, color: cfg.color,
+            }}>
+              {tag}
+            </span>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
 
-// ─── Main Panel ───────────────────────────────────────────────────────────────
-
-const MIN_WIDTH = 240;
-const MAX_WIDTH = 420;
-const DEFAULT_WIDTH = 280;
+// ─── Main Command Palette ─────────────────────────────────────────────────────
 
 export function NodeLibraryPanel() {
-  const [isCollapsed, setIsCollapsed] = useState(false);
-  const [panelWidth, setPanelWidth] = useState(DEFAULT_WIDTH);
-  const [isResizing, setIsResizing] = useState(false);
+  const { t } = useLocale();
+
+  const FILTER_LABELS: Record<"all" | NodeCategory, string> = {
+    all: t('canvas.all'),
+    input: t('canvas.input'),
+    transform: t('canvas.ai'),
+    generate: t('canvas.geometry'),
+    export: t('canvas.export'),
+  };
+
   const [search, setSearch] = useState("");
-  const resizeStartX = useRef(0);
-  const resizeStartWidth = useRef(0);
   const [activeFilter, setActiveFilter] = useState<"all" | NodeCategory>("all");
-  const [openCategories, setOpenCategories] = useState<Record<NodeCategory, boolean>>({
-    input: true, transform: false, generate: false, export: false,
-  });
-  const [tooltip, setTooltip] = useState<{ node: NodeCatalogueItem; y: number } | null>(null);
-  const tooltipTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [highlightedIndex, setHighlightedIndex] = useState(0);
+  const [selectedNode, setSelectedNode] = useState<NodeCatalogueItem | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
 
   const { screenToFlowPosition } = useReactFlow();
   const { addNode } = useWorkflowStore();
+  const { toggleNodeLibrary } = useUIStore();
 
-  const handleAddToCenter = useCallback((item: NodeCatalogueItem) => {
-    const pw = isCollapsed ? 48 : 280;
-    const th = 52;
-    const cx = pw + (window.innerWidth - pw) / 2;
-    const cy = th + (window.innerHeight - th) / 2;
+  const handleAddNode = useCallback((item: NodeCatalogueItem) => {
+    const cx = window.innerWidth / 2;
+    const cy = window.innerHeight / 2;
     const position = screenToFlowPosition({ x: cx, y: cy });
     const newNode: WorkflowNode = {
       id: `${item.id}-${generateId()}`,
@@ -432,57 +271,13 @@ export function NodeLibraryPanel() {
     };
     addNode(newNode);
     toast.success(`Added: ${item.name}`, { duration: 2000 });
-  }, [isCollapsed, screenToFlowPosition, addNode]);
+    toggleNodeLibrary(); // close palette
+  }, [screenToFlowPosition, addNode, toggleNodeLibrary]);
 
   const handleDragStart = useCallback((e: React.DragEvent, nodeId: string) => {
     e.dataTransfer.setData("application/reactflow-nodeid", nodeId);
     e.dataTransfer.effectAllowed = "move";
   }, []);
-
-  const handleTooltipShow = useCallback((node: NodeCatalogueItem, y: number) => {
-    if (tooltipTimer.current) clearTimeout(tooltipTimer.current);
-    tooltipTimer.current = setTimeout(() => setTooltip({ node, y }), 500);
-  }, []);
-
-  const handleTooltipHide = useCallback(() => {
-    if (tooltipTimer.current) clearTimeout(tooltipTimer.current);
-    setTooltip(null);
-  }, []);
-
-  const handleResizeStart = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    setIsResizing(true);
-    resizeStartX.current = e.clientX;
-    resizeStartWidth.current = panelWidth;
-  }, [panelWidth]);
-
-  useEffect(() => {
-    if (!isResizing) return;
-
-    const handleMouseMove = (e: MouseEvent) => {
-      const delta = e.clientX - resizeStartX.current;
-      const newWidth = Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, resizeStartWidth.current + delta));
-      setPanelWidth(newWidth);
-    };
-
-    const handleMouseUp = () => {
-      setIsResizing(false);
-    };
-
-    document.addEventListener("mousemove", handleMouseMove);
-    document.addEventListener("mouseup", handleMouseUp);
-
-    return () => {
-      document.removeEventListener("mousemove", handleMouseMove);
-      document.removeEventListener("mouseup", handleMouseUp);
-    };
-  }, [isResizing]);
-
-  const toggleCategory = useCallback((cat: NodeCategory) => {
-    setOpenCategories(prev => ({ ...prev, [cat]: !prev[cat] }));
-  }, []);
-
-  const isFiltering = search.trim() !== "" || activeFilter !== "all";
 
   const displayNodes = useMemo(() => {
     let nodes = NODE_CATALOGUE;
@@ -499,243 +294,227 @@ export function NodeLibraryPanel() {
     return nodes;
   }, [search, activeFilter]);
 
-  return (
-    <motion.div
-      initial={{ x: -300, opacity: 0 }}
-      animate={{ x: 0, opacity: 1, width: isCollapsed ? 48 : panelWidth }}
-      exit={{ x: -300, opacity: 0 }}
-      transition={{ duration: 0.2, ease: "easeOut" }}
-      style={{
-        height: "100%",
-        background: "rgba(6,6,12,0.95)",
-        backdropFilter: "blur(32px) saturate(1.3)",
-        WebkitBackdropFilter: "blur(32px) saturate(1.3)",
-        borderRight: "1px solid rgba(255,255,255,0.06)",
-        display: "flex",
-        flexDirection: "column",
-        overflow: "hidden",
-        flexShrink: 0,
-      }}
-    >
-      {/* Resize handle */}
-      {!isCollapsed && (
-        <div
-          onMouseDown={handleResizeStart}
-          style={{
-            position: "absolute", top: 0, right: 0, bottom: 0,
-            width: 6,
-            cursor: "ew-resize",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            opacity: isResizing ? 1 : 0,
-            background: "rgba(79, 138, 255, 0.1)",
-            borderRight: isResizing ? "2px solid rgba(79, 138, 255, 0.4)" : "none",
-            transition: "opacity 0.15s ease, background 0.15s ease",
-            zIndex: 100,
-          }}
-          onMouseEnter={e => { e.currentTarget.style.opacity = "1"; }}
-          onMouseLeave={e => { if (!isResizing) e.currentTarget.style.opacity = "0"; }}
-        >
-          <div style={{
-            width: 3, height: 40, borderRadius: 2,
-            background: "rgba(79, 138, 255, 0.3)",
-            display: isResizing ? "block" : "none",
-          }} />
-        </div>
-      )}
+  // Reset highlight when results change
+  useEffect(() => {
+    setHighlightedIndex(0);
+    setSelectedNode(null);
+  }, [search, activeFilter]);
 
-      {isCollapsed ? (
-        // ── Icon-only strip ───────────────────────────────────────────────────
-        <div style={{
-          width: 48, height: "100%",
+  // Focus input on mount
+  useEffect(() => {
+    const timer = setTimeout(() => inputRef.current?.focus(), 50);
+    return () => clearTimeout(timer);
+  }, []);
+
+  // Keyboard navigation
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        toggleNodeLibrary();
+        return;
+      }
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        setHighlightedIndex(i => Math.min(i + 1, displayNodes.length - 1));
+      }
+      if (e.key === "ArrowUp") {
+        e.preventDefault();
+        setHighlightedIndex(i => Math.max(i - 1, 0));
+      }
+      if (e.key === "Enter" && displayNodes.length > 0) {
+        e.preventDefault();
+        handleAddNode(displayNodes[highlightedIndex]);
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [displayNodes, highlightedIndex, handleAddNode, toggleNodeLibrary]);
+
+  // Scroll highlighted item into view
+  useEffect(() => {
+    if (!listRef.current) return;
+    const items = listRef.current.children;
+    const item = items[highlightedIndex] as HTMLElement | undefined;
+    item?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }, [highlightedIndex]);
+
+  return (
+    <>
+      {/* Backdrop */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.15 }}
+        onClick={toggleNodeLibrary}
+        style={{
+          position: "fixed", inset: 0, zIndex: 9998,
+          background: "rgba(0,0,0,0.5)",
+          backdropFilter: "blur(4px)",
+          WebkitBackdropFilter: "blur(4px)",
+        }}
+      />
+
+      {/* Palette */}
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95, y: -10 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.95, y: -10 }}
+        transition={{ type: "spring", stiffness: 500, damping: 35 }}
+        style={{
+          position: "fixed",
+          top: "15%",
+          left: "50%",
+          transform: "translateX(-50%)",
+          width: 520,
+          maxWidth: "calc(100vw - 40px)",
+          maxHeight: "70vh",
+          zIndex: 9999,
+          background: "rgba(12,12,20,0.97)",
+          border: "1px solid rgba(255,255,255,0.1)",
+          borderRadius: 16,
+          overflow: "hidden",
+          boxShadow: "0 24px 80px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.05), 0 0 60px rgba(79,138,255,0.08)",
+          backdropFilter: "blur(40px) saturate(1.4)",
+          WebkitBackdropFilter: "blur(40px) saturate(1.4)",
           display: "flex", flexDirection: "column",
-          alignItems: "center", paddingTop: 12, gap: 8,
-        }}>
-          {(["input", "transform", "generate", "export"] as NodeCategory[]).map(cat => {
-            const cfg = CATEGORY_CONFIG[cat];
-            const firstNode = NODES_BY_CATEGORY[cat][0];
-            return (
-              <div
-                key={cat}
-                title={cfg.label}
+        }}
+      >
+        {/* Search input */}
+        <div style={{ padding: "16px 16px 0", flexShrink: 0 }}>
+          <div style={{ position: "relative" }}>
+            <Search size={15} style={{
+              position: "absolute", left: 14, top: "50%",
+              transform: "translateY(-50%)", color: "#5C5C78", pointerEvents: "none",
+            }} />
+            <input
+              ref={inputRef}
+              type="text"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Search nodes or type a command..."
+              style={{
+                width: "100%", height: 46,
+                background: "rgba(255,255,255,0.04)",
+                border: "1px solid rgba(255,255,255,0.08)",
+                borderRadius: 12,
+                paddingLeft: 40, paddingRight: search ? 36 : 14,
+                fontSize: 15, color: "#e8e8f0",
+                outline: "none", boxSizing: "border-box",
+                fontWeight: 400,
+                transition: "border-color 150ms ease",
+              }}
+              onFocus={e => { e.currentTarget.style.borderColor = "rgba(79,138,255,0.35)"; }}
+              onBlur={e => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.08)"; }}
+            />
+            {search && (
+              <button
+                onClick={() => setSearch("")}
                 style={{
-                  width: 32, height: 32, borderRadius: 8,
-                  background: `rgba(${hexToRgb(cfg.color)}, 0.1)`,
-                  border: `1px solid rgba(${hexToRgb(cfg.color)}, 0.2)`,
+                  position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)",
+                  background: "rgba(255,255,255,0.06)", border: "none",
+                  width: 20, height: 20, borderRadius: 5,
+                  color: "#5C5C78", cursor: "pointer",
                   display: "flex", alignItems: "center", justifyContent: "center",
-                  color: cfg.color,
                 }}
               >
-                {getIcon(firstNode?.icon ?? "Box", 13)}
-              </div>
-            );
-          })}
-          <button
-            onClick={() => setIsCollapsed(false)}
-            title="Expand library"
-            style={{
-              marginTop: "auto", marginBottom: 12,
-              width: 28, height: 28, borderRadius: 6,
-              background: "transparent", border: "1px solid rgba(255,255,255,0.08)",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              color: "#5C5C78", cursor: "pointer",
-            }}
-          >
-            <ChevronRight size={12} />
-          </button>
-        </div>
-      ) : (
-        // ── Full panel ────────────────────────────────────────────────────────
-        <>
-          {/* Header */}
-          <div style={{
-            display: "flex", alignItems: "center", justifyContent: "space-between",
-            padding: "12px 10px 12px 14px",
-            borderBottom: "1px solid rgba(255,255,255,0.06)", flexShrink: 0,
-          }}>
-            <div>
-              <div style={{ fontSize: 13, fontWeight: 600, color: "#F0F0F5" }}>Node Library</div>
-              <div style={{ fontSize: 10, color: "#3A3A50", marginTop: 2 }}>
-                {NODE_CATALOGUE.length} nodes · drag to canvas
-              </div>
-            </div>
-            <button
-              onClick={() => setIsCollapsed(true)}
-              title="Collapse panel"
-              style={{
-                width: 26, height: 26, borderRadius: 6, flexShrink: 0,
-                background: "transparent", border: "1px solid rgba(255,255,255,0.06)",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                color: "#5C5C78", cursor: "pointer",
-                transition: "background 0.15s ease, color 0.15s ease",
-              }}
-              onMouseEnter={e => {
-                e.currentTarget.style.background = "#1A1A2A";
-                e.currentTarget.style.color = "#F0F0F5";
-              }}
-              onMouseLeave={e => {
-                e.currentTarget.style.background = "transparent";
-                e.currentTarget.style.color = "#5C5C78";
-              }}
-            >
-              <ChevronLeft size={12} />
-            </button>
-          </div>
-
-          {/* Search */}
-          <div style={{ padding: "10px 10px 0", flexShrink: 0 }}>
-            <div style={{ position: "relative" }}>
-              <Search size={12} style={{
-                position: "absolute", left: 9, top: "50%",
-                transform: "translateY(-50%)", color: "#5C5C78", pointerEvents: "none",
-              }} />
-              <input
-                type="text"
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-                placeholder="Search nodes..."
-                style={{
-                  width: "100%", height: 36,
-                  background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)",
-                  borderRadius: 8, paddingLeft: 28, paddingRight: search ? 28 : 12,
-                  fontSize: 13, color: "#e8e8f0", outline: "none",
-                  boxSizing: "border-box",
-                  transition: "all 150ms ease",
-                }}
-                onFocus={e => { e.currentTarget.style.borderColor = "rgba(79,138,255,0.30)"; e.currentTarget.style.background = "rgba(255,255,255,0.04)"; }}
-                onBlur={e => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.06)"; e.currentTarget.style.background = "rgba(255,255,255,0.03)"; }}
-              />
-              {search && (
-                <button
-                  onClick={() => setSearch("")}
-                  style={{
-                    position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)",
-                    background: "transparent", border: "none",
-                    color: "#5C5C78", cursor: "pointer",
-                    display: "flex", alignItems: "center", padding: 0,
-                  }}
-                >
-                  <X size={10} />
-                </button>
-              )}
-            </div>
-          </div>
-
-          {/* Filter chips */}
-          <div style={{
-            display: "flex", gap: 4, padding: "8px 10px",
-            borderBottom: "1px solid rgba(255,255,255,0.06)", flexShrink: 0,
-          }}>
-            {FILTERS.map(f => {
-              const active = activeFilter === f.value;
-              const c = f.value === "all"
-                ? "#4F8AFF"
-                : CATEGORY_CONFIG[f.value as NodeCategory].color;
-              const rgb = hexToRgb(c);
-              return (
-                <button
-                  key={f.value}
-                  onClick={() => setActiveFilter(f.value)}
-                  style={{
-                    padding: "4px 12px", borderRadius: 9999, whiteSpace: "nowrap", cursor: "pointer",
-                    background: active ? `rgba(${rgb}, 0.15)` : "transparent",
-                    border: active ? `1px solid rgba(${rgb}, 0.2)` : "1px solid transparent",
-                    fontSize: 12, fontWeight: 500,
-                    color: active ? c : "#5C5C78",
-                    transition: "all 150ms ease",
-                  }}
-                >
-                  {f.label}
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Node list */}
-          <div style={{ flex: 1, overflowY: "auto", paddingTop: 4 }}>
-            {isFiltering ? (
-              displayNodes.length === 0 ? (
-                <div style={{ padding: "32px 16px", textAlign: "center" }}>
-                  <p style={{ fontSize: 12, color: "#5C5C78" }}>No nodes found</p>
-                  <p style={{ fontSize: 11, color: "#3A3A50", marginTop: 4 }}>Try a different search</p>
-                </div>
-              ) : (
-                <div style={{ padding: "0 8px 8px" }}>
-                  {displayNodes.map(node => (
-                    <NodeItem
-                      key={node.id}
-                      node={node}
-                      onDragStart={handleDragStart}
-                      onAddToCenter={handleAddToCenter}
-                      onTooltipShow={handleTooltipShow}
-                      onTooltipHide={handleTooltipHide}
-                      searchQuery={search}
-                    />
-                  ))}
-                </div>
-              )
-            ) : (
-              (["input", "transform", "generate", "export"] as NodeCategory[]).map(cat => (
-                <CategorySection
-                  key={cat}
-                  category={cat}
-                  nodes={NODES_BY_CATEGORY[cat]}
-                  isOpen={openCategories[cat]}
-                  onToggle={() => toggleCategory(cat)}
-                  onDragStart={handleDragStart}
-                  onAddToCenter={handleAddToCenter}
-                  onTooltipShow={handleTooltipShow}
-                  onTooltipHide={handleTooltipHide}
-                />
-              ))
+                <X size={10} />
+              </button>
             )}
           </div>
-        </>
-      )}
+        </div>
 
-      {/* Floating tooltip — fixed positioned, renders outside scroll container */}
-      <AnimatePresence>
-        {tooltip && <NodeTooltip node={tooltip.node} anchorY={tooltip.y} panelWidth={panelWidth} />}
-      </AnimatePresence>
-    </motion.div>
+        {/* Filter chips */}
+        <div style={{
+          display: "flex", gap: 4, padding: "10px 16px 8px",
+          borderBottom: "1px solid rgba(255,255,255,0.06)", flexShrink: 0,
+        }}>
+          {FILTER_VALUES.map(value => {
+            const active = activeFilter === value;
+            const c = value === "all" ? "#4F8AFF" : CATEGORY_CONFIG[value as NodeCategory].color;
+            const rgb = hexToRgb(c);
+            return (
+              <button
+                key={value}
+                onClick={() => setActiveFilter(value)}
+                style={{
+                  padding: "5px 14px", borderRadius: 9999, whiteSpace: "nowrap", cursor: "pointer",
+                  background: active ? `rgba(${rgb}, 0.12)` : "transparent",
+                  border: active ? `1px solid rgba(${rgb}, 0.2)` : "1px solid transparent",
+                  fontSize: 12, fontWeight: active ? 600 : 400,
+                  color: active ? c : "#5C5C78",
+                  transition: "all 120ms ease",
+                }}
+              >
+                {FILTER_LABELS[value]}
+              </button>
+            );
+          })}
+          <div style={{ flex: 1 }} />
+          <span style={{
+            fontSize: 10, color: "#3A3A50", alignSelf: "center",
+            fontFamily: "monospace",
+          }}>
+            {displayNodes.length} nodes
+          </span>
+        </div>
+
+        {/* Node list */}
+        <div
+          ref={listRef}
+          style={{
+            flex: 1, overflowY: "auto", padding: "6px 8px",
+            maxHeight: 360,
+          }}
+        >
+          {displayNodes.length === 0 ? (
+            <div style={{ padding: "32px 16px", textAlign: "center" }}>
+              <p style={{ fontSize: 13, color: "#5C5C78" }}>{t('canvas.noNodes')}</p>
+              <p style={{ fontSize: 11, color: "#3A3A50", marginTop: 4 }}>{t('canvas.tryDifferent')}</p>
+            </div>
+          ) : (
+            displayNodes.map((node, i) => (
+              <PaletteItem
+                key={node.id}
+                node={node}
+                onSelect={handleAddNode}
+                onDragStart={handleDragStart}
+                isHighlighted={i === highlightedIndex}
+                searchQuery={search}
+              />
+            ))
+          )}
+        </div>
+
+        {/* Selected node detail */}
+        <AnimatePresence>
+          {selectedNode && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.15 }}
+              style={{ overflow: "hidden" }}
+            >
+              <PaletteNodeDetail node={selectedNode} />
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Footer hint */}
+        <div style={{
+          padding: "8px 16px",
+          borderTop: "1px solid rgba(255,255,255,0.06)",
+          display: "flex", gap: 16,
+          fontSize: 10, color: "#3A3A50",
+          flexShrink: 0,
+        }}>
+          <span><kbd style={{ background: "rgba(255,255,255,0.06)", padding: "1px 5px", borderRadius: 3, fontSize: 9 }}>↑↓</kbd> navigate</span>
+          <span><kbd style={{ background: "rgba(255,255,255,0.06)", padding: "1px 5px", borderRadius: 3, fontSize: 9 }}>↵</kbd> add node</span>
+          <span><kbd style={{ background: "rgba(255,255,255,0.06)", padding: "1px 5px", borderRadius: 3, fontSize: 9 }}>esc</kbd> close</span>
+          <span style={{ marginLeft: "auto" }}>drag to canvas</span>
+        </div>
+      </motion.div>
+    </>
   );
 }

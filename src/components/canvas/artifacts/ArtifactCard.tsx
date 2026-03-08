@@ -11,7 +11,13 @@ const MassingViewer = dynamic(() => import("./MassingViewer"), {
   loading: () => <div style={{ height: 220, background: "#0D0D1A", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center" }}><span style={{ fontSize: 11, color: "#3A3A50" }}>Loading 3D viewer…</span></div>,
 });
 
+const FloorPlan3DViewer = dynamic(() => import("./FloorPlan3DViewer"), {
+  ssr: false,
+  loading: () => <div style={{ height: 400, background: "#07070e", borderRadius: 14, display: "flex", alignItems: "center", justifyContent: "center" }}><span style={{ fontSize: 11, color: "#3A3A50" }}>Loading 3D viewer…</span></div>,
+});
+
 import { formatBytes } from "@/lib/utils";
+import { useLocale } from "@/hooks/useLocale";
 import type {
   ExecutionArtifact,
   ArtifactType,
@@ -75,6 +81,7 @@ interface ArtifactCardProps {
 export function ArtifactCard({ artifact, nodeLabel, nodeCategory, onDismiss }: ArtifactCardProps) {
   const [collapsed, setCollapsed] = useState(false);
   const prefersReduced = useReducedMotion();
+  const { t } = useLocale();
 
   const accentColor = nodeCategory ? CATEGORY_COLOR[nodeCategory] : "#4F8AFF";
   const typeColor   = TYPE_COLOR[artifact.type] ?? "#4F8AFF";
@@ -112,7 +119,7 @@ export function ArtifactCard({ artifact, nodeLabel, nodeCategory, onDismiss }: A
           fontSize: 11, fontWeight: 600, color: "#E0E0EA",
           flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
         }}>
-          {nodeLabel ?? "Node Output"}
+          {nodeLabel ?? t('artifact.nodeOutput')}
         </span>
 
         {/* Type badge */}
@@ -141,7 +148,7 @@ export function ArtifactCard({ artifact, nodeLabel, nodeCategory, onDismiss }: A
         {onDismiss && (
           <button
             onClick={e => { e.stopPropagation(); onDismiss(); }}
-            aria-label="Dismiss"
+            aria-label={t('artifact.dismiss')}
             style={{
               width: 16, height: 16, borderRadius: 3, flexShrink: 0,
               background: "transparent", border: "none",
@@ -180,6 +187,22 @@ export function ArtifactCard({ artifact, nodeLabel, nodeCategory, onDismiss }: A
           </motion.div>
         )}
       </AnimatePresence>
+
+        {/* Type-specific disclaimer */}
+        {!collapsed && (artifact.type === "table" || artifact.type === "kpi") && !!artifact.metadata?.real && (
+          <div style={{ padding: "6px 14px 8px", borderTop: "1px solid rgba(255,255,255,0.03)" }}>
+            <p style={{ fontSize: 9, color: "#4A4A60", fontStyle: "italic", margin: 0 }}>
+              Cost estimates are approximate, based on regional averages.
+            </p>
+          </div>
+        )}
+        {!collapsed && artifact.type === "image" && (
+          <div style={{ padding: "6px 14px 8px", borderTop: "1px solid rgba(255,255,255,0.03)" }}>
+            <p style={{ fontSize: 9, color: "#4A4A60", fontStyle: "italic", margin: 0 }}>
+              AI-generated concept visualization. Not architecturally accurate.
+            </p>
+          </div>
+        )}
     </motion.div>
   );
 }
@@ -213,6 +236,7 @@ class ArtifactErrorBoundary extends React.Component<
 // ─── Body renderers ───────────────────────────────────────────────────────────
 
 function TextBody({ data }: { data: TextArtifactData }) {
+  const { t } = useLocale();
   const [expanded, setExpanded] = useState(false);
   const text = data?.content ?? "";
   const isLong = text.length > 220;
@@ -234,7 +258,7 @@ function TextBody({ data }: { data: TextArtifactData }) {
             fontSize: 10, color: "#4F8AFF", cursor: "pointer", padding: 0,
           }}
         >
-          {expanded ? "Show less" : "Show more"}
+          {expanded ? t('artifact.showLess') : t('artifact.showMore')}
         </button>
       )}
     </div>
@@ -257,6 +281,7 @@ function JsonBody({ data }: { data: JsonArtifactData }) {
 }
 
 function ImageBody({ data }: { data: ImageArtifactData }) {
+  const { t } = useLocale();
   return (
     <div>
       <div style={{ position: "relative", height: 160, background: "#07070D" }}>
@@ -273,7 +298,7 @@ function ImageBody({ data }: { data: ImageArtifactData }) {
           />
         ) : (
           <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%" }}>
-            <span style={{ fontSize: 11, color: "#5C5C78" }}>No preview</span>
+            <span style={{ fontSize: 11, color: "#5C5C78" }}>{t('artifact.noPreview')}</span>
           </div>
         )}
       </div>
@@ -317,6 +342,7 @@ function KpiBody({ data, accentColor }: { data: KpiArtifactData; accentColor: st
 }
 
 function TableBody({ data }: { data: TableArtifactData }) {
+  const { t } = useLocale();
   const headers = data?.headers ?? [];
   const rows = data?.rows ?? [];
   const isWide = headers.length > 6;
@@ -374,11 +400,11 @@ function TableBody({ data }: { data: TableArtifactData }) {
           fontSize: 10,
         }}>
           <span style={{ color: "#5C5C78" }}>
-            {rows.length} line items{summary?.note ? ` · ${summary.note}` : ""}
+            {rows.length} {t('artifact.lineItems')}{summary?.note ? ` · ${summary.note}` : ""}
           </span>
           {summary?.grandTotal != null && (
             <span style={{ color: "#10B981", fontWeight: 700 }}>
-              Grand Total: ${summary.grandTotal.toLocaleString()}
+              {t('artifact.grandTotal')}: ${summary.grandTotal.toLocaleString()}
             </span>
           )}
         </div>
@@ -397,28 +423,89 @@ interface SvgArtifactData {
 }
 
 function SvgBody({ data }: { data: SvgArtifactData }) {
+  const { t } = useLocale();
+  const [viewMode, setViewMode] = useState<"2d" | "3d">("2d");
   const svgHtml = data?.svg ?? "";
   const sanitizedSvg = useMemo(
     () => (typeof window !== "undefined" ? DOMPurify.sanitize(svgHtml, { USE_PROFILES: { svg: true, svgFilters: true } }) : ""),
     [svgHtml]
   );
 
+  const hasRooms = data?.roomList && data.roomList.length > 0;
+
   return (
     <div>
-      <div
-        style={{
-          background: "#FAFAFA",
-          borderRadius: 0,
-          overflow: "auto",
-          maxHeight: 240,
-          padding: 4,
-        }}
-        dangerouslySetInnerHTML={{ __html: sanitizedSvg }}
-      />
-      {data?.roomList && data.roomList.length > 0 && (
-        <div style={{ padding: "6px 14px 10px", fontSize: 10, color: "#5C5C78" }}>
-          {data.roomList.length} rooms · {data.totalArea ?? "?"} m² total
-          {data.floors ? ` · ${data.floors} floors` : ""}
+      {/* View mode toggle */}
+      {hasRooms && (
+        <div style={{
+          display: "flex",
+          gap: 4,
+          padding: "6px 12px 6px 14px",
+        }}>
+          <button
+            onClick={() => setViewMode("2d")}
+            style={{
+              padding: "4px 12px",
+              borderRadius: 6,
+              background: viewMode === "2d" ? "rgba(16,185,129,0.15)" : "rgba(255,255,255,0.04)",
+              border: `1px solid ${viewMode === "2d" ? "rgba(16,185,129,0.3)" : "rgba(255,255,255,0.08)"}`,
+              color: viewMode === "2d" ? "#10B981" : "#5C5C78",
+              fontSize: 10,
+              fontWeight: 600,
+              cursor: "pointer",
+              transition: "all 0.15s ease",
+            }}
+          >
+            2D Plan
+          </button>
+          <button
+            onClick={() => setViewMode("3d")}
+            style={{
+              padding: "4px 12px",
+              borderRadius: 6,
+              background: viewMode === "3d" ? "rgba(79,138,255,0.15)" : "rgba(255,255,255,0.04)",
+              border: `1px solid ${viewMode === "3d" ? "rgba(79,138,255,0.3)" : "rgba(255,255,255,0.08)"}`,
+              color: viewMode === "3d" ? "#4F8AFF" : "#5C5C78",
+              fontSize: 10,
+              fontWeight: 600,
+              cursor: "pointer",
+              transition: "all 0.15s ease",
+            }}
+          >
+            View in 3D
+          </button>
+        </div>
+      )}
+
+      {viewMode === "2d" ? (
+        <>
+          <div
+            style={{
+              background: "#FAFAFA",
+              borderRadius: 0,
+              overflow: "auto",
+              maxHeight: 240,
+              padding: 4,
+            }}
+            dangerouslySetInnerHTML={{ __html: sanitizedSvg }}
+          />
+          {hasRooms && (
+            <div style={{ padding: "6px 14px 10px", fontSize: 10, color: "#5C5C78" }}>
+              {data.roomList!.length} {t('artifact.rooms')} · {data.totalArea ?? "?"} m² {t('artifact.total')}
+              {data.floors ? ` · ${data.floors} ${t('artifact.floors')}` : ""}
+            </div>
+          )}
+        </>
+      ) : (
+        <div style={{ padding: "0 8px 10px 10px" }}>
+          <FloorPlan3DViewer
+            rooms={data.roomList!.map(r => ({
+              name: r.name,
+              area: r.area,
+            }))}
+            floors={data.floors}
+            buildingHeight={data.floors ? data.floors * 3.2 : undefined}
+          />
         </div>
       )}
     </div>
@@ -436,18 +523,97 @@ interface Massing3dData {
 }
 
 function Massing3dBody({ data }: { data: Massing3dData }) {
+  const { t } = useLocale();
+  const [viewMode, setViewMode] = useState<"massing" | "floorplan">("massing");
+
   if (!data?.floors || !data?.height) {
-    return <div style={{ padding: "8px 14px", fontSize: 11, color: "#5C5C78" }}>No massing data</div>;
+    return <div style={{ padding: "8px 14px", fontSize: 11, color: "#5C5C78" }}>{t('artifact.noMassing')}</div>;
   }
+
+  // Generate rooms from massing data for floor plan view
+  const massingRooms = useMemo(() => {
+    const fp = data.footprint ?? 500;
+    const perFloor = fp * 0.85; // usable area
+    const isMixed = data.buildingType?.toLowerCase().includes("mixed");
+    if (isMixed) {
+      return [
+        { name: "Retail Space", area: Math.round(fp * 0.6), type: "retail" },
+        { name: "Living Room", area: Math.round(perFloor * 0.3), type: "living" },
+        { name: "Bedroom 1", area: Math.round(perFloor * 0.18), type: "bedroom" },
+        { name: "Bedroom 2", area: Math.round(perFloor * 0.14), type: "bedroom" },
+        { name: "Kitchen", area: Math.round(perFloor * 0.15), type: "kitchen" },
+        { name: "Bathroom", area: Math.round(perFloor * 0.08), type: "bathroom" },
+        { name: "Hallway", area: Math.round(perFloor * 0.15), type: "hallway" },
+      ];
+    }
+    return [
+      { name: "Living Room", area: Math.round(perFloor * 0.3), type: "living" },
+      { name: "Bedroom 1", area: Math.round(perFloor * 0.2), type: "bedroom" },
+      { name: "Bedroom 2", area: Math.round(perFloor * 0.15), type: "bedroom" },
+      { name: "Kitchen", area: Math.round(perFloor * 0.15), type: "kitchen" },
+      { name: "Bathroom", area: Math.round(perFloor * 0.08), type: "bathroom" },
+      { name: "Hallway", area: Math.round(perFloor * 0.12), type: "hallway" },
+    ];
+  }, [data.footprint, data.buildingType]);
+
   return (
     <div style={{ padding: "0 8px 10px 10px" }}>
-      <MassingViewer
-        floors={data.floors}
-        height={data.height}
-        footprint={data.footprint ?? 500}
-        gfa={data.gfa ?? data.floors * (data.footprint ?? 500)}
-        buildingType={data.buildingType}
-      />
+      {/* Toggle buttons */}
+      <div style={{
+        display: "flex",
+        gap: 4,
+        marginBottom: 6,
+      }}>
+        <button
+          onClick={() => setViewMode("massing")}
+          style={{
+            padding: "4px 12px",
+            borderRadius: 6,
+            background: viewMode === "massing" ? "rgba(79,138,255,0.15)" : "rgba(255,255,255,0.04)",
+            border: `1px solid ${viewMode === "massing" ? "rgba(79,138,255,0.3)" : "rgba(255,255,255,0.08)"}`,
+            color: viewMode === "massing" ? "#4F8AFF" : "#5C5C78",
+            fontSize: 10,
+            fontWeight: 600,
+            cursor: "pointer",
+            transition: "all 0.15s ease",
+          }}
+        >
+          Massing
+        </button>
+        <button
+          onClick={() => setViewMode("floorplan")}
+          style={{
+            padding: "4px 12px",
+            borderRadius: 6,
+            background: viewMode === "floorplan" ? "rgba(16,185,129,0.15)" : "rgba(255,255,255,0.04)",
+            border: `1px solid ${viewMode === "floorplan" ? "rgba(16,185,129,0.3)" : "rgba(255,255,255,0.08)"}`,
+            color: viewMode === "floorplan" ? "#10B981" : "#5C5C78",
+            fontSize: 10,
+            fontWeight: 600,
+            cursor: "pointer",
+            transition: "all 0.15s ease",
+          }}
+        >
+          Floor Plan 3D
+        </button>
+      </div>
+
+      {viewMode === "massing" ? (
+        <MassingViewer
+          floors={data.floors}
+          height={data.height}
+          footprint={data.footprint ?? 500}
+          gfa={data.gfa ?? data.floors * (data.footprint ?? 500)}
+          buildingType={data.buildingType}
+        />
+      ) : (
+        <FloorPlan3DViewer
+          rooms={massingRooms}
+          floors={data.floors}
+          buildingHeight={data.height}
+        />
+      )}
+
       {data.metrics && data.metrics.length > 0 && (
         <div style={{
           display: "grid", gridTemplateColumns: "1fr 1fr 1fr",
@@ -475,6 +641,7 @@ function Massing3dBody({ data }: { data: Massing3dData }) {
 }
 
 function FileBody({ data }: { data: FileArtifactData }) {
+  const { t } = useLocale();
   return (
     <div style={{
       display: "flex", alignItems: "center", justifyContent: "space-between",
@@ -513,7 +680,7 @@ function FileBody({ data }: { data: FileArtifactData }) {
         }}
       >
         <Download size={10} />
-        Download
+        {t('artifact.download')}
       </a>
     </div>
   );

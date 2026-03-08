@@ -1,29 +1,38 @@
 import type { Metadata, Viewport } from "next";
-import { Inter, JetBrains_Mono } from "next/font/google";
+import { DM_Sans, JetBrains_Mono, Syne } from "next/font/google";
 import { Toaster } from "sonner";
 import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { MobileGate } from "@/components/MobileGate";
 import { SessionProvider } from "@/components/providers/SessionProvider";
 import "./globals.css";
+import "@/lib/env-check";
 
-const inter = Inter({
+const dmSans = DM_Sans({
   subsets: ["latin"],
-  variable: "--font-inter",
+  variable: "--font-dm-sans",
   display: "swap",
+  weight: ["400", "500", "600", "700"],
 });
 
 const jetbrains = JetBrains_Mono({
   subsets: ["latin"],
   variable: "--font-jetbrains",
   display: "swap",
-  weight: ["400", "500"],
+  weight: ["400", "500", "600", "700"],
+});
+
+const syne = Syne({
+  subsets: ["latin"],
+  variable: "--font-syne",
+  display: "swap",
+  weight: ["400", "500", "600", "700", "800"],
 });
 
 // 🔍 SEO OPTIMIZATION - Maximum Discoverability
 const siteUrl = process.env.NEXT_PUBLIC_APP_URL || "https://buildflow.vercel.app";
 const siteName = "BuildFlow";
-const siteDescription = "Build AI-powered AEC workflows visually. Drag-and-drop nodes to create pipelines from PDF briefs to 3D massing to concept renders — without writing code. Beta platform.";
+const siteDescription = "BuildFlow — AI-powered concept design tool for architects. Turn project briefs into 3D massing, renders, and cost estimates in minutes. A complement to Revit and Rhino for schematic design phase.";
 const siteKeywords = [
   // Primary keywords
   "AEC workflow builder",
@@ -119,13 +128,6 @@ export const metadata: Metadata = {
     telephone: false,
   },
   
-  // Verification (add your verification codes here)
-  // verification: {
-  //   google: "your-google-verification-code",
-  //   yandex: "your-yandex-verification-code",
-  //   bing: "your-bing-verification-code",
-  // },
-  
   // Icons
   icons: {
     icon: "/favicon.ico",
@@ -163,7 +165,7 @@ export default function RootLayout({
         url: siteUrl,
         logo: {
           "@type": "ImageObject",
-          url: `${siteUrl}/logo.png`,
+          url: `${siteUrl}/buildflow_logo.png`,
           width: 512,
           height: 512,
         },
@@ -242,7 +244,7 @@ export default function RootLayout({
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />
       </head>
-      <body className={`${inter.variable} ${jetbrains.variable} font-body antialiased bg-[#07070D] text-[#F0F0F5]`}>
+      <body className={`${dmSans.variable} ${jetbrains.variable} ${syne.variable} font-body antialiased`} style={{ background: "#06080C", color: "#F0F4FF" }}>
         <SessionProvider>
           <MobileGate>{children}</MobileGate>
         </SessionProvider>

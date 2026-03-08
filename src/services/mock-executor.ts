@@ -90,7 +90,7 @@ export async function executeNode(
         label: "Site Location",
       });
 
-    case "TR-001": // Document Parser
+    case "TR-001": // Brief Parser
       return mockArtifact(executionId, tileInstanceId, "text", {
         content: `PROJECT BRIEF — OSLO MIXED-USE DEVELOPMENT\n\nClient: Urban Properties AS\nSite: Former industrial lot, Bjørvika waterfront, Oslo\n\nPROGRAMME REQUIREMENTS:\n• Gross Floor Area: 4,800–5,200 m²\n• Floors: 5 above grade, 1 basement parking level\n• Ground floor: 600 m² retail/F&B\n• Floors 2–5: 48 residential units (mix of 1BR, 2BR, 3BR)\n\nCONSTRAINTS:\n• Max height: 22m above grade\n• Site setbacks: 3m all sides\n• Ground floor must be active frontage\n• BREEAM Excellent certification required`,
         label: "Extracted Document Text",
@@ -121,7 +121,7 @@ export async function executeNode(
         label: "Building Requirements",
       });
 
-    case "TR-003": { // Building Description Generator
+    case "TR-003": { // Design Brief Analyzer
       // Incorporate upstream prompt data so downstream nodes (GN-001) get accurate info
       const briefText = String(inputData?.content ?? inputData?.prompt ?? "");
       const fm = briefText.match(/(\d+)[\s-]*(?:stor(?:e?y|ies)|floor)/i);
@@ -143,7 +143,7 @@ export async function executeNode(
         label: "Image Analysis",
       });
 
-    case "TR-005": // Style Prompt Composer
+    case "TR-005": // Visualization Style Composer
       return mockArtifact(executionId, tileInstanceId, "image", {
         url: ARCHITECTURAL_IMAGES[1],
         label: "Style Reference (Control Image)",
@@ -383,7 +383,7 @@ export async function executeNode(
         ],
       });
 
-    case "GN-003": { // Image Generator
+    case "GN-003": { // Concept Render Generator
       // Use a deterministic seed based on upstream content for consistent results
       const imgPrompt = String(inputData?.content ?? inputData?.prompt ?? "architectural concept");
       const seed = imgPrompt.slice(0, 20).replace(/\s+/g, "-").toLowerCase() || "building";
@@ -400,13 +400,13 @@ export async function executeNode(
         svg: `<svg viewBox="0 0 800 600" xmlns="http://www.w3.org/2000/svg"><rect x="0" y="0" width="800" height="600" fill="#FAFAFA" stroke="#333" stroke-width="2"/><text x="400" y="30" text-anchor="middle" font-size="16" fill="#333" font-weight="bold">Mixed-Use — Typical Unit Plan</text><rect x="40" y="60" width="300" height="200" fill="#E8F5E9" stroke="#333" stroke-width="2"/><text x="190" y="165" text-anchor="middle" font-size="12" fill="#333">Living Room (35 m²)</text><rect x="340" y="60" width="200" height="120" fill="#E3F2FD" stroke="#333" stroke-width="2"/><text x="440" y="125" text-anchor="middle" font-size="12" fill="#333">Bedroom 1 (20 m²)</text><rect x="340" y="180" width="200" height="80" fill="#E3F2FD" stroke="#333" stroke-width="2"/><text x="440" y="225" text-anchor="middle" font-size="12" fill="#333">Bedroom 2 (15 m²)</text><rect x="540" y="60" width="220" height="100" fill="#FFF3E0" stroke="#333" stroke-width="2"/><text x="650" y="115" text-anchor="middle" font-size="12" fill="#333">Kitchen (18 m²)</text><rect x="540" y="160" width="110" height="100" fill="#F3E5F5" stroke="#333" stroke-width="2"/><text x="595" y="215" text-anchor="middle" font-size="12" fill="#333">Bath (8 m²)</text><rect x="650" y="160" width="110" height="100" fill="#ECEFF1" stroke="#333" stroke-width="1"/><text x="705" y="215" text-anchor="middle" font-size="12" fill="#333">Hall (7 m²)</text><rect x="40" y="260" width="720" height="40" fill="#ECEFF1" stroke="#333" stroke-width="1"/><text x="400" y="285" text-anchor="middle" font-size="12" fill="#333">Corridor (24 m²)</text><text x="750" y="580" text-anchor="end" font-size="10" fill="#999">0 — 5m — 10m</text><polygon points="750,50 745,70 755,70" fill="#333"/><text x="750" y="80" text-anchor="middle" font-size="10" fill="#333">N</text></svg>`,
         label: "Generated Floor Plan — Typical Floor",
         roomList: [
-          { name: "Living Room", area: 35, unit: "m²" },
-          { name: "Bedroom 1", area: 20, unit: "m²" },
-          { name: "Bedroom 2", area: 15, unit: "m²" },
-          { name: "Kitchen", area: 18, unit: "m²" },
-          { name: "Bathroom", area: 8, unit: "m²" },
-          { name: "Hall", area: 7, unit: "m²" },
-          { name: "Corridor", area: 24, unit: "m²" },
+          { name: "Living Room", area: 35, unit: "m²", x: -6.5, y: -4.5, width: 7.5, depth: 5.5, type: "living" },
+          { name: "Bedroom 1", area: 20, unit: "m²", x: 1.0, y: -4.5, width: 5.0, depth: 3.3, type: "bedroom" },
+          { name: "Bedroom 2", area: 15, unit: "m²", x: 1.0, y: -1.2, width: 5.0, depth: 2.2, type: "bedroom" },
+          { name: "Kitchen", area: 18, unit: "m²", x: 6.0, y: -4.5, width: 5.5, depth: 2.7, type: "kitchen" },
+          { name: "Bathroom", area: 8, unit: "m²", x: 6.0, y: -1.8, width: 2.7, depth: 2.8, type: "bathroom" },
+          { name: "Hall", area: 7, unit: "m²", x: 8.7, y: -1.8, width: 2.8, depth: 2.8, type: "hallway" },
+          { name: "Corridor", area: 24, unit: "m²", x: -6.5, y: 1.0, width: 18.0, depth: 1.1, type: "hallway" },
         ],
         totalArea: 127,
         floors: 5,

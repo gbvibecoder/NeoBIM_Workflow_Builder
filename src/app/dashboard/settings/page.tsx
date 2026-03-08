@@ -1,21 +1,303 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useSession } from "next-auth/react";
 import { toast } from "sonner";
-import { Header } from "@/components/dashboard/Header";
+import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
-import { User, Key, Shield, Save, Loader2, AlertCircle } from "lucide-react";
+import {
+  User, Key, Shield, Save, Loader2, AlertCircle,
+  CheckCircle2, Info, Crown, Star, Lock, Unlock,
+  Fingerprint, ScanLine, Cpu, Activity,
+} from "lucide-react";
+import { PageBackground } from "@/components/dashboard/PageBackground";
+import { useLocale } from "@/hooks/useLocale";
 
-export default function SettingsPage() {
-  const { data: session } = useSession();
+type SettingsTab = "profile" | "api-keys" | "plan";
+
+// ---- Hex ring scanner animation for profile ----
+function HexRing({ size = 88, color = "#1B4FFF" }: { size?: number; color?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 100 100" style={{ position: "absolute", inset: -12 }}>
+      <circle
+        cx="50" cy="50" r="46"
+        fill="none"
+        stroke={color}
+        strokeWidth="0.5"
+        strokeDasharray="4 6"
+        opacity={0.3}
+        style={{ animation: "dp-scanRotate 12s linear infinite" }}
+      />
+      <circle
+        cx="50" cy="50" r="42"
+        fill="none"
+        stroke={color}
+        strokeWidth="0.8"
+        strokeDasharray="12 8"
+        opacity={0.15}
+        style={{ animation: "dp-scanRotate 8s linear infinite reverse" }}
+      />
+      {/* Scanner sweep */}
+      <line
+        x1="50" y1="4" x2="50" y2="20"
+        stroke={color}
+        strokeWidth="1.5"
+        opacity={0.4}
+        style={{
+          transformOrigin: "50px 50px",
+          animation: "dp-scanRotate 4s linear infinite",
+        }}
+      />
+    </svg>
+  );
+}
+
+// ---- Typing text effect ----
+function TypeWriter({ text, delay = 0 }: { text: string; delay?: number }) {
+  const [displayed, setDisplayed] = useState("");
+  const [started, setStarted] = useState(false);
+
+  useEffect(() => {
+    const t1 = setTimeout(() => setStarted(true), delay);
+    return () => clearTimeout(t1);
+  }, [delay]);
+
+  useEffect(() => {
+    if (!started) return;
+    let i = 0;
+    const interval = setInterval(() => {
+      i++;
+      setDisplayed(text.slice(0, i));
+      if (i >= text.length) clearInterval(interval);
+    }, 30);
+    return () => clearInterval(interval);
+  }, [text, started]);
+
+  return (
+    <span>
+      {displayed}
+      {displayed.length < text.length && (
+        <span style={{ animation: "dp-blink 1s infinite", color: "#4F8AFF" }}>|</span>
+      )}
+    </span>
+  );
+}
+
+// ---- Security Status Bar ----
+function SecurityBar() {
+  return (
+    <div style={{
+      display: "flex", alignItems: "center", gap: 16,
+      padding: "8px 16px", borderRadius: 8,
+      background: "rgba(16,185,129,0.04)",
+      border: "1px solid rgba(16,185,129,0.1)",
+      marginBottom: 20,
+    }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+        <div style={{
+          width: 6, height: 6, borderRadius: "50%",
+          background: "#10B981",
+          boxShadow: "0 0 8px rgba(16,185,129,0.5)",
+          animation: "dp-statusPulse 2s ease-in-out infinite",
+          color: "#10B981",
+        }} />
+        <span style={{
+          fontSize: 10, fontWeight: 700, letterSpacing: "0.1em",
+          textTransform: "uppercase",
+          fontFamily: "var(--font-jetbrains), monospace",
+          color: "#10B981",
+        }}>
+          SECURE SESSION
+        </span>
+      </div>
+      <div style={{ flex: 1 }} />
+      <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+        <Lock size={10} style={{ color: "rgba(255,255,255,0.2)" }} />
+        <span style={{
+          fontSize: 9, color: "rgba(255,255,255,0.2)",
+          fontFamily: "var(--font-jetbrains), monospace",
+        }}>
+          AES-256 | TLS 1.3
+        </span>
+      </div>
+    </div>
+  );
+}
+
+// ---- Save Status Indicator ----
+function SaveStatus({ status }: { status: "idle" | "saving" | "saved" }) {
+  if (status === "idle") return null;
+  return (
+    <motion.div
+      initial={{ opacity: 0, x: 10 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0 }}
+      style={{
+        display: "flex", alignItems: "center", gap: 5,
+        fontSize: 11, fontWeight: 600,
+        color: status === "saving" ? "#8888A0" : "#10B981",
+      }}
+    >
+      {status === "saving" ? (
+        <Loader2 size={12} className="animate-spin" />
+      ) : (
+        <CheckCircle2 size={12} />
+      )}
+      {status === "saving" ? "Encrypting..." : "Vault sealed"}
+    </motion.div>
+  );
+}
+
+// ---- Profile Section — Identity Card ----
+function ProfileSection({ user, initials }: {
+  user: { name?: string | null; email?: string | null; image?: string | null } | undefined;
+  initials: string;
+}) {
+  const { t } = useLocale();
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5 }}
+      style={{ display: "flex", flexDirection: "column", gap: 20 }}
+    >
+      {/* Identity Card */}
+      <div
+        className="dp-glass-card"
+        data-accent="blue"
+        style={{ padding: 0, overflow: "hidden" }}
+      >
+        {/* Card header stripe */}
+        <div style={{
+          padding: "14px 24px",
+          background: "rgba(27,79,255,0.04)",
+          borderBottom: "1px solid rgba(27,79,255,0.08)",
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+        }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <Fingerprint size={14} style={{ color: "#4F8AFF" }} />
+            <span style={{
+              fontSize: 10, fontWeight: 700, letterSpacing: "0.12em",
+              textTransform: "uppercase", color: "#4F8AFF",
+              fontFamily: "var(--font-jetbrains), monospace",
+            }}>
+              IDENTITY VERIFIED
+            </span>
+          </div>
+          <div style={{
+            padding: "2px 8px", borderRadius: 4,
+            background: "rgba(16,185,129,0.1)",
+            border: "1px solid rgba(16,185,129,0.2)",
+          }}>
+            <span style={{
+              fontSize: 9, fontWeight: 700, color: "#10B981",
+              fontFamily: "var(--font-jetbrains), monospace",
+            }}>
+              ACTIVE
+            </span>
+          </div>
+        </div>
+
+        <div style={{ padding: "28px 24px", display: "flex", alignItems: "center", gap: 24 }}>
+          {/* Avatar with scan ring */}
+          <div style={{ position: "relative", flexShrink: 0 }}>
+            <HexRing />
+            <div style={{
+              width: 64, height: 64, borderRadius: "50%",
+              background: "linear-gradient(135deg, #1B4FFF, #8B5CF6)",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              fontSize: 24, fontWeight: 700, color: "#fff",
+              overflow: "hidden", position: "relative",
+              boxShadow: "0 0 32px rgba(27,79,255,0.2)",
+            }}>
+              {user?.image ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={user.image} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+              ) : (
+                initials
+              )}
+            </div>
+          </div>
+
+          {/* Identity info */}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{
+              fontSize: 22, fontWeight: 700, color: "#F0F0F5",
+              letterSpacing: "-0.02em", lineHeight: 1.2,
+            }}>
+              {user?.name ?? t('settings.user')}
+            </div>
+            <div style={{
+              fontSize: 13, color: "rgba(255,255,255,0.35)", marginTop: 4,
+              fontFamily: "var(--font-jetbrains), monospace",
+            }}>
+              {user?.email ?? "\u2014"}
+            </div>
+
+            {/* Clearance badge */}
+            <div style={{
+              display: "inline-flex", alignItems: "center", gap: 6,
+              marginTop: 12, padding: "4px 12px", borderRadius: 6,
+              background: "rgba(139,92,246,0.08)",
+              border: "1px solid rgba(139,92,246,0.15)",
+            }}>
+              <Shield size={11} style={{ color: "#A78BFA" }} />
+              <span style={{
+                fontSize: 10, fontWeight: 700, color: "#A78BFA",
+                letterSpacing: "0.08em",
+                fontFamily: "var(--font-jetbrains), monospace",
+              }}>
+                AUTHORIZED OPERATOR
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Card footer — session info */}
+        <div style={{
+          padding: "10px 24px",
+          borderTop: "1px solid rgba(255,255,255,0.04)",
+          display: "flex", gap: 24,
+        }}>
+          {[
+            { label: "SESSION", value: "Encrypted" },
+            { label: "PROTOCOL", value: "OAuth 2.0" },
+            { label: "STATUS", value: "Online", color: "#10B981" },
+          ].map((item) => (
+            <div key={item.label} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <span style={{
+                fontSize: 9, color: "rgba(255,255,255,0.2)",
+                fontFamily: "var(--font-jetbrains), monospace",
+                letterSpacing: "0.05em",
+              }}>
+                {item.label}:
+              </span>
+              <span style={{
+                fontSize: 9, color: item.color ?? "rgba(255,255,255,0.4)",
+                fontFamily: "var(--font-jetbrains), monospace",
+                fontWeight: 600,
+              }}>
+                {item.value}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
+// ---- API Keys Section — Access Vault ----
+function ApiKeysSection({ saveStatus, onSaveStatusChange }: {
+  saveStatus: "idle" | "saving" | "saved";
+  onSaveStatusChange: (s: "idle" | "saving" | "saved") => void;
+}) {
+  const { t } = useLocale();
   const [openAiKey, setOpenAiKey] = useState("");
   const [stabilityKey, setStabilityKey] = useState("");
-  const [savingKeys, setSavingKeys] = useState(false);
   const [loadingKeys, setLoadingKeys] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
-  // Load existing API keys
   useEffect(() => {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 10000);
@@ -32,9 +314,9 @@ export default function SettingsPage() {
         setLoadError(null);
       })
       .catch((err) => {
-        const errorMsg = err instanceof Error && err.name === 'AbortError' 
-          ? "Request timed out" 
-          : "Failed to load API keys";
+        const errorMsg = err instanceof Error && err.name === 'AbortError'
+          ? t('toast.requestTimeout')
+          : t('toast.loadKeysFailed');
         setLoadError(errorMsg);
         toast.error(errorMsg);
       })
@@ -44,10 +326,15 @@ export default function SettingsPage() {
       clearTimeout(timeoutId);
       controller.abort();
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function handleSaveKeys() {
-    setSavingKeys(true);
+    if (!openAiKey.trim() && !stabilityKey.trim()) {
+      toast.error(t('settings.enterAtLeastOne'));
+      return;
+    }
+    onSaveStatusChange("saving");
     try {
       const apiKeys: Record<string, string> = {};
       if (openAiKey.trim()) apiKeys.openai = openAiKey.trim();
@@ -65,19 +352,469 @@ export default function SettingsPage() {
       clearTimeout(timeoutId);
 
       if (res.ok) {
-        toast.success("API keys saved successfully!");
+        onSaveStatusChange("saved");
+        toast.success(t('settings.saveSuccess'));
+        setTimeout(() => onSaveStatusChange("idle"), 2000);
       } else {
         throw new Error(`API returned ${res.status}`);
       }
     } catch (err) {
-      const errorMsg = err instanceof Error && err.name === 'AbortError' 
-        ? "Request timed out" 
-        : "Failed to save API keys";
+      onSaveStatusChange("idle");
+      const errorMsg = err instanceof Error && err.name === 'AbortError'
+        ? t('toast.requestTimeout')
+        : t('settings.saveFailed');
       toast.error(errorMsg);
-    } finally {
-      setSavingKeys(false);
     }
   }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5 }}
+      style={{ display: "flex", flexDirection: "column", gap: 16 }}
+    >
+      {/* Vault Header */}
+      <div
+        className="dp-glass-card"
+        data-accent="purple"
+        style={{ padding: 0, overflow: "hidden" }}
+      >
+        <div style={{
+          padding: "14px 24px",
+          background: "rgba(139,92,246,0.04)",
+          borderBottom: "1px solid rgba(139,92,246,0.08)",
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+        }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <Lock size={14} style={{ color: "#A78BFA" }} />
+            <span style={{
+              fontSize: 10, fontWeight: 700, letterSpacing: "0.12em",
+              textTransform: "uppercase", color: "#A78BFA",
+              fontFamily: "var(--font-jetbrains), monospace",
+            }}>
+              ACCESS VAULT
+            </span>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <ScanLine size={12} style={{ color: "rgba(255,255,255,0.15)" }} />
+            <span style={{
+              fontSize: 9, color: "rgba(255,255,255,0.2)",
+              fontFamily: "var(--font-jetbrains), monospace",
+            }}>
+              ENCRYPTED STORAGE
+            </span>
+          </div>
+        </div>
+
+        <div style={{ padding: 24 }}>
+          {/* Security notice */}
+          <div style={{
+            display: "flex", alignItems: "center", gap: 10,
+            padding: "10px 14px", borderRadius: 8,
+            background: "rgba(27,79,255,0.04)",
+            border: "1px solid rgba(27,79,255,0.1)",
+            marginBottom: 24,
+          }}>
+            <Shield size={13} style={{ color: "#4F8AFF", flexShrink: 0 }} />
+            <span style={{
+              fontSize: 11, color: "rgba(255,255,255,0.4)", lineHeight: 1.5,
+              fontFamily: "var(--font-jetbrains), monospace",
+            }}>
+              <TypeWriter text="Keys encrypted at rest with AES-256-GCM. Zero-knowledge architecture." delay={300} />
+            </span>
+          </div>
+
+          {loadingKeys ? (
+            <div style={{
+              display: "flex", alignItems: "center", gap: 8,
+              color: "#55556A", fontSize: 12, padding: "20px 0",
+            }}>
+              <Loader2 size={14} className="animate-spin" />
+              <span style={{ fontFamily: "var(--font-jetbrains), monospace" }}>
+                {t('settings.loadingKeys')}
+              </span>
+            </div>
+          ) : loadError ? (
+            <div style={{
+              padding: 16, borderRadius: 10,
+              border: "1px solid rgba(239,68,68,0.2)",
+              background: "rgba(239,68,68,0.05)",
+              marginBottom: 20,
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
+                <AlertCircle size={14} style={{ color: "#F87171" }} />
+                <span style={{ fontSize: 12, fontWeight: 600, color: "#F87171" }}>{loadError}</span>
+              </div>
+              <p style={{ fontSize: 11, color: "#8888A0", margin: "0 0 8px" }}>
+                {t('settings.loadError')}
+              </p>
+              <button
+                onClick={() => window.location.reload()}
+                style={{
+                  fontSize: 11, color: "#4F8AFF", background: "none",
+                  border: "none", cursor: "pointer", padding: 0,
+                }}
+              >
+                {t('settings.tryAgain')}
+              </button>
+            </div>
+          ) : null}
+
+          <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+            {/* Access Code: OpenAI */}
+            <AccessCodeField
+              label={t('settings.openaiKey')}
+              value={openAiKey}
+              onChange={setOpenAiKey}
+              placeholder="sk-..."
+              disabled={loadingKeys}
+              hint={t('settings.openaiUsage')}
+              icon={<Cpu size={13} style={{ color: "#4F8AFF" }} />}
+              slotLabel="SLOT A"
+            />
+
+            {/* Access Code: Stability */}
+            <AccessCodeField
+              label={t('settings.stabilityKey')}
+              value={stabilityKey}
+              onChange={setStabilityKey}
+              placeholder="sk-..."
+              disabled={loadingKeys}
+              hint={t('settings.stabilityUsage')}
+              icon={<Activity size={13} style={{ color: "#8B5CF6" }} />}
+              slotLabel="SLOT B"
+            />
+
+            {/* Seal Vault button */}
+            <motion.button
+              onClick={handleSaveKeys}
+              disabled={saveStatus === "saving" || loadingKeys}
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              style={{
+                display: "inline-flex", alignItems: "center", gap: 10, alignSelf: "flex-start",
+                padding: "12px 28px", borderRadius: 10, border: "none",
+                background: saveStatus === "saved"
+                  ? "linear-gradient(135deg, #10B981, #059669)"
+                  : "linear-gradient(135deg, #1B4FFF, #8B5CF6)",
+                color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer",
+                letterSpacing: "0.03em",
+                boxShadow: saveStatus === "saved"
+                  ? "0 4px 20px rgba(16,185,129,0.3)"
+                  : "0 4px 20px rgba(27,79,255,0.3)",
+                transition: "all 200ms ease",
+                opacity: (saveStatus === "saving" || loadingKeys) ? 0.6 : 1,
+                fontFamily: "var(--font-jetbrains), monospace",
+              }}
+            >
+              {saveStatus === "saving" ? (
+                <><Loader2 size={14} className="animate-spin" /> ENCRYPTING...</>
+              ) : saveStatus === "saved" ? (
+                <><Lock size={14} /> VAULT SEALED</>
+              ) : (
+                <><Unlock size={14} /> {t('settings.saveApiKeys').toUpperCase()}</>
+              )}
+            </motion.button>
+          </div>
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
+// ---- Access Code Field ----
+function AccessCodeField({ label, value, onChange, placeholder, disabled, hint, icon, slotLabel }: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  placeholder: string;
+  disabled: boolean;
+  hint: string;
+  icon: React.ReactNode;
+  slotLabel: string;
+}) {
+  const [focused, setFocused] = useState(false);
+
+  return (
+    <div>
+      <div style={{
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+        marginBottom: 8,
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          {icon}
+          <label style={{
+            fontSize: 11, fontWeight: 700, color: "#8888A0",
+            textTransform: "uppercase", letterSpacing: "0.06em",
+            fontFamily: "var(--font-jetbrains), monospace",
+          }}>
+            {label}
+          </label>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <span style={{
+            fontSize: 9, color: "rgba(255,255,255,0.15)",
+            fontFamily: "var(--font-jetbrains), monospace",
+          }}>
+            {slotLabel}
+          </span>
+          {value ? (
+            <motion.div
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              style={{
+                width: 16, height: 16, borderRadius: 4,
+                background: "rgba(16,185,129,0.15)",
+                border: "1px solid rgba(16,185,129,0.3)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+              }}
+            >
+              <CheckCircle2 size={10} style={{ color: "#10B981" }} />
+            </motion.div>
+          ) : (
+            <div style={{
+              width: 16, height: 16, borderRadius: 4,
+              border: "1px dashed rgba(255,255,255,0.1)",
+            }} />
+          )}
+        </div>
+      </div>
+
+      <div style={{ position: "relative" }}>
+        <input
+          type="password"
+          value={value}
+          onChange={e => onChange(e.target.value)}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
+          placeholder={placeholder}
+          disabled={disabled}
+          className="dp-settings-input"
+          style={{
+            paddingLeft: 40,
+            borderColor: focused ? "rgba(139,92,246,0.4)" : undefined,
+            boxShadow: focused ? "0 0 0 3px rgba(139,92,246,0.08)" : undefined,
+          }}
+        />
+        <Key size={13} style={{
+          position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)",
+          color: focused ? "#A78BFA" : "rgba(255,255,255,0.15)",
+          transition: "color 200ms ease",
+        }} />
+      </div>
+      <p style={{
+        fontSize: 10, color: "#3A3A50", marginTop: 6,
+        fontFamily: "var(--font-jetbrains), monospace",
+      }}>
+        {hint}
+      </p>
+    </div>
+  );
+}
+
+// ---- Plan Section — Clearance Level ----
+function PlanSection({ userRole }: { userRole: string }) {
+  const { t } = useLocale();
+
+  const clearanceLevel = userRole === "FREE" ? "LEVEL 1" : userRole === "PRO" ? "LEVEL 2" : "LEVEL 3";
+  const clearanceColor = userRole === "FREE" ? "#F59E0B" : userRole === "PRO" ? "#4F8AFF" : "#A78BFA";
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5 }}
+      style={{ display: "flex", flexDirection: "column", gap: 16 }}
+    >
+      {/* Clearance Card */}
+      <div
+        className="dp-glass-card"
+        style={{
+          padding: 0, overflow: "hidden",
+          borderColor: `${clearanceColor}22`,
+        }}
+      >
+        {/* Clearance header */}
+        <div style={{
+          padding: "14px 24px",
+          background: `${clearanceColor}08`,
+          borderBottom: `1px solid ${clearanceColor}15`,
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+        }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <Crown size={14} style={{
+              color: "#FFB800",
+              filter: "drop-shadow(0 0 6px rgba(255,184,0,0.3))",
+            }} />
+            <span style={{
+              fontSize: 10, fontWeight: 700, letterSpacing: "0.12em",
+              textTransform: "uppercase", color: clearanceColor,
+              fontFamily: "var(--font-jetbrains), monospace",
+            }}>
+              CLEARANCE {clearanceLevel}
+            </span>
+          </div>
+          <div style={{
+            padding: "2px 8px", borderRadius: 4,
+            background: userRole !== "FREE" ? "rgba(16,185,129,0.1)" : "rgba(245,158,11,0.1)",
+            border: `1px solid ${userRole !== "FREE" ? "rgba(16,185,129,0.2)" : "rgba(245,158,11,0.2)"}`,
+          }}>
+            <span style={{
+              fontSize: 9, fontWeight: 700,
+              color: userRole !== "FREE" ? "#10B981" : "#F59E0B",
+              fontFamily: "var(--font-jetbrains), monospace",
+            }}>
+              {userRole !== "FREE" ? "GRANTED" : "RESTRICTED"}
+            </span>
+          </div>
+        </div>
+
+        <div style={{ padding: 24 }}>
+          {/* Plan info */}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <div>
+              <div style={{
+                fontSize: 24, fontWeight: 700, color: "#F0F0F5",
+                letterSpacing: "-0.02em",
+              }}>
+                {userRole === "FREE" ? t('settings.freePlan') : userRole === "PRO" ? t('settings.proPlan') : t('settings.teamPlan')}
+              </div>
+              <p style={{
+                fontSize: 13, color: "rgba(255,255,255,0.35)", marginTop: 4, marginBottom: 0,
+              }}>
+                {userRole === "FREE" ? t('settings.threeRunsPerDay') : t('settings.unlimitedRuns')}
+              </p>
+            </div>
+
+            {/* Decorative star */}
+            <div style={{ opacity: 0.12 }}>
+              <Star size={44} style={{ color: "#FFB800" }} />
+            </div>
+          </div>
+
+          {/* Usage metrics */}
+          {userRole !== "FREE" && (
+            <div style={{ marginTop: 24 }}>
+              <div style={{
+                display: "flex", alignItems: "center", justifyContent: "space-between",
+                marginBottom: 8,
+              }}>
+                <span style={{
+                  fontSize: 10, color: "rgba(255,255,255,0.3)",
+                  fontFamily: "var(--font-jetbrains), monospace",
+                  letterSpacing: "0.05em",
+                }}>
+                  API CAPACITY THIS CYCLE
+                </span>
+                <span style={{
+                  fontSize: 10, color: clearanceColor,
+                  fontFamily: "var(--font-jetbrains), monospace",
+                  fontWeight: 700,
+                }}>
+                  35%
+                </span>
+              </div>
+              <div style={{
+                width: "100%", height: 6, borderRadius: 3,
+                background: "rgba(255,255,255,0.04)",
+                overflow: "hidden",
+                position: "relative",
+              }}>
+                <motion.div
+                  initial={{ width: 0 }}
+                  animate={{ width: "35%" }}
+                  transition={{ delay: 0.5, duration: 1.2, ease: "easeOut" }}
+                  style={{
+                    height: "100%", borderRadius: 3,
+                    background: `linear-gradient(90deg, ${clearanceColor}, ${clearanceColor}88)`,
+                    boxShadow: `0 0 12px ${clearanceColor}40`,
+                  }}
+                />
+              </div>
+
+              {/* Sub-metrics */}
+              <div style={{
+                display: "flex", gap: 24, marginTop: 16,
+              }}>
+                {[
+                  { label: "CALLS", value: "1,247", max: "10,000" },
+                  { label: "TOKENS", value: "842K", max: "2M" },
+                  { label: "UPTIME", value: "99.9%", max: null },
+                ].map((m) => (
+                  <div key={m.label}>
+                    <div style={{
+                      fontSize: 9, color: "rgba(255,255,255,0.2)",
+                      fontFamily: "var(--font-jetbrains), monospace",
+                      letterSpacing: "0.05em", marginBottom: 4,
+                    }}>
+                      {m.label}
+                    </div>
+                    <div style={{ display: "flex", alignItems: "baseline", gap: 3 }}>
+                      <span style={{
+                        fontSize: 16, fontWeight: 700, color: "#F0F0F5",
+                        fontFamily: "var(--font-jetbrains), monospace",
+                      }}>
+                        {m.value}
+                      </span>
+                      {m.max && (
+                        <span style={{
+                          fontSize: 10, color: "rgba(255,255,255,0.15)",
+                          fontFamily: "var(--font-jetbrains), monospace",
+                        }}>
+                          / {m.max}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Upgrade / Status */}
+          <div style={{ marginTop: 24, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            {userRole === "FREE" ? (
+              <Link
+                href="/dashboard/billing"
+                style={{
+                  display: "inline-flex", alignItems: "center", gap: 8,
+                  padding: "11px 24px", borderRadius: 10,
+                  background: "linear-gradient(135deg, #4F8AFF, #8B5CF6)",
+                  color: "#fff", fontSize: 12, fontWeight: 700,
+                  textDecoration: "none",
+                  boxShadow: "0 4px 20px rgba(79,138,255,0.3)",
+                  transition: "all 200ms ease",
+                  letterSpacing: "0.05em",
+                  fontFamily: "var(--font-jetbrains), monospace",
+                }}
+              >
+                REQUEST HIGHER CLEARANCE
+              </Link>
+            ) : (
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <CheckCircle2 size={13} style={{ color: "#10B981" }} />
+                <span style={{
+                  fontSize: 11, color: "rgba(255,255,255,0.3)",
+                  fontFamily: "var(--font-jetbrains), monospace",
+                }}>
+                  Maximum clearance granted
+                </span>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
+// ---- Page ----
+export default function SettingsPage() {
+  const { t } = useLocale();
+  const { data: session } = useSession();
+  const [activeTab, setActiveTab] = useState<SettingsTab>("profile");
+  const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
 
   const user = session?.user;
   const userRole = (user as { role?: string } | undefined)?.role || "FREE";
@@ -85,151 +822,131 @@ export default function SettingsPage() {
     ? user.name.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2)
     : (user?.email?.[0] ?? "U").toUpperCase();
 
+  const tabs: Array<{ key: SettingsTab; label: string; icon: React.ReactNode; desc: string }> = [
+    { key: "profile",  label: t('settings.profile'),   icon: <Fingerprint size={16} />, desc: "Identity" },
+    { key: "api-keys", label: t('settings.apiKeys'),   icon: <Key size={16} />, desc: "Vault" },
+    { key: "plan",     label: t('settings.planUsage'),  icon: <Shield size={16} />, desc: "Clearance" },
+  ];
+
   return (
-    <div className="flex flex-col h-full overflow-hidden">
-      <Header title="Settings" subtitle="Manage your account and preferences" />
+    <div className="dp-page-bg" style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
+      <PageBackground />
 
-      <main className="flex-1 overflow-y-auto p-6">
-        <div className="max-w-2xl mx-auto space-y-6">
-          {/* Profile */}
-          <section className="rounded-xl border border-[rgba(255,255,255,0.05)] bg-[rgba(18,18,30,0.95)] overflow-hidden">
-            <div className="flex items-center gap-3 px-5 py-4 border-b border-[rgba(255,255,255,0.05)]">
-              <User size={15} className="text-[#4F8AFF]" />
-              <h2 className="text-sm font-semibold text-[#F0F0F5] tracking-[-0.01em]">Profile</h2>
-            </div>
-            <div className="p-5 space-y-4">
-              <div className="flex items-center gap-4">
-                <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-[#4F8AFF] to-[#8B5CF6] flex items-center justify-center text-lg font-bold text-white overflow-hidden">
-                  {user?.image ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={user.image} alt="" className="w-full h-full object-cover" />
-                  ) : (
-                    initials
-                  )}
-                </div>
-                <div>
-                  <div className="text-sm font-medium text-[#F0F0F5]">{user?.name ?? "User"}</div>
-                  <div className="text-xs text-[#5C5C78]">{user?.email ?? "—"}</div>
-                </div>
+      {/* Header */}
+      <header
+        className="flex items-center justify-between px-6 dashboard-header"
+        style={{
+          minHeight: 56,
+          background: "rgba(7,7,13,0.85)",
+          backdropFilter: "blur(16px)",
+          WebkitBackdropFilter: "blur(16px)",
+          borderBottom: "1px solid rgba(79,138,255,0.06)",
+          position: "relative", zIndex: 2,
+        }}
+      >
+        <div>
+          <div className="flex items-center gap-3">
+            <h1 style={{ fontSize: 22, fontWeight: 700, color: "#F0F0F5", letterSpacing: "-0.02em" }}>
+              {t('settings.title')}
+            </h1>
+            <span style={{
+              padding: "2px 8px", borderRadius: 20, fontSize: 9, fontWeight: 700,
+              letterSpacing: "0.08em", textTransform: "uppercase" as const,
+              color: "#F59E0B", border: "1px solid rgba(245,158,11,0.25)",
+              background: "rgba(245,158,11,0.06)",
+              fontFamily: "var(--font-jetbrains), monospace",
+            }}>
+              BETA
+            </span>
+          </div>
+          <p style={{ fontSize: 11, color: "#5C5C78", marginTop: 2, letterSpacing: "0.02em" }}>
+            {t('settings.subtitle')}
+          </p>
+        </div>
+        <AnimatePresence>
+          <SaveStatus status={saveStatus} />
+        </AnimatePresence>
+      </header>
+
+      <main style={{ flex: 1, overflowY: "auto", padding: "28px 32px", position: "relative", zIndex: 1 }}>
+        <div style={{ maxWidth: 960, margin: "0 auto" }}>
+          <SecurityBar />
+
+          <div style={{ display: "flex", gap: 24 }}>
+            {/* Tab Navigation — Control Panel Selector */}
+            <motion.div
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.4 }}
+              className="dp-glass-card"
+              style={{
+                width: 220, flexShrink: 0, padding: 8,
+                display: "flex", flexDirection: "column", gap: 2,
+                alignSelf: "flex-start", position: "sticky", top: 0,
+              }}
+            >
+              {/* Panel label */}
+              <div style={{
+                padding: "8px 14px 12px",
+                borderBottom: "1px solid rgba(255,255,255,0.04)",
+                marginBottom: 4,
+              }}>
+                <span style={{
+                  fontSize: 9, fontWeight: 700, letterSpacing: "0.12em",
+                  color: "rgba(255,255,255,0.2)",
+                  fontFamily: "var(--font-jetbrains), monospace",
+                }}>
+                  CONTROL PANEL
+                </span>
               </div>
-            </div>
-          </section>
 
-          {/* API Keys */}
-          <section className="rounded-xl border border-[rgba(255,255,255,0.05)] bg-[rgba(18,18,30,0.95)] overflow-hidden">
-            <div className="flex items-center gap-3 px-5 py-4 border-b border-[rgba(255,255,255,0.05)]">
-              <Key size={15} className="text-[#8B5CF6]" />
-              <h2 className="text-sm font-semibold text-[#F0F0F5] tracking-[-0.01em]">API Keys</h2>
-            </div>
-            <div className="p-5 space-y-4">
-              <p className="text-xs text-[#5C5C78] leading-relaxed">
-                Add your own API keys to use real AI execution. Keys are encrypted and stored securely.
-              </p>
-
-              {loadingKeys ? (
-                <div className="flex items-center gap-2 text-xs text-[#5C5C78] py-4">
-                  <Loader2 size={14} className="animate-spin" />
-                  Loading API keys…
-                </div>
-              ) : loadError ? (
-                <div className="p-4 rounded-lg border border-[rgba(239,68,68,0.2)] bg-[rgba(239,68,68,0.05)]">
-                  <div className="flex items-center gap-2 mb-2">
-                    <AlertCircle size={14} className="text-[#EF4444]" />
-                    <span className="text-xs font-semibold text-[#EF4444]">{loadError}</span>
+              {tabs.map((tab, i) => (
+                <motion.button
+                  key={tab.key}
+                  className="dp-settings-tab"
+                  data-active={activeTab === tab.key ? "true" : "false"}
+                  onClick={() => setActiveTab(tab.key)}
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: i * 0.1 }}
+                  style={{ flexDirection: "column", alignItems: "flex-start", gap: 2, padding: "12px 14px" }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, width: "100%" }}>
+                    {tab.icon}
+                    <span>{tab.label}</span>
                   </div>
-                  <p className="text-[10px] text-[#8888A0] mb-3">
-                    Unable to load your saved keys. You can still enter new keys below.
-                  </p>
-                  <button
-                    onClick={() => window.location.reload()}
-                    className="text-[10px] text-[#4F8AFF] hover:underline"
-                  >
-                    Try again
-                  </button>
-                </div>
-              ) : null}
-
-              <div className="space-y-1.5">
-                <label className="text-xs font-medium text-[#F0F0F5]">OpenAI API Key</label>
-                <input
-                  type="password"
-                  value={openAiKey}
-                  onChange={e => setOpenAiKey(e.target.value)}
-                  placeholder="sk-..."
-                  disabled={loadingKeys}
-                  className="w-full h-8 rounded-lg border border-[rgba(255,255,255,0.08)] bg-[rgba(7,7,13,0.8)] px-3 text-xs text-[#F0F0F5] placeholder:text-[#3A3A50] focus:outline-none focus:border-[#4F8AFF] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                />
-                <p className="text-[10px] text-[#3A3A50]">Used by: Building Description (TR-003) + Concept Image (GN-003)</p>
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-xs font-medium text-[#F0F0F5]">Stability AI Key</label>
-                <input
-                  type="password"
-                  value={stabilityKey}
-                  onChange={e => setStabilityKey(e.target.value)}
-                  placeholder="sk-..."
-                  disabled={loadingKeys}
-                  className="w-full h-8 rounded-lg border border-[rgba(255,255,255,0.08)] bg-[rgba(7,7,13,0.8)] px-3 text-xs text-[#F0F0F5] placeholder:text-[#3A3A50] focus:outline-none focus:border-[#4F8AFF] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                />
-                <p className="text-[10px] text-[#3A3A50]">Alternative for image generation</p>
-              </div>
-
-              <button
-                onClick={handleSaveKeys}
-                disabled={savingKeys || loadingKeys}
-                className="flex items-center gap-2 rounded-lg bg-[#4F8AFF] px-4 py-2 text-xs font-semibold text-white hover:bg-[#3D7AFF] transition-all disabled:opacity-60 disabled:cursor-not-allowed"
-              >
-                {savingKeys ? (
-                  <>
-                    <Loader2 size={11} className="animate-spin" />
-                    Saving…
-                  </>
-                ) : (
-                  <>
-                    <Save size={11} />
-                    Save API Keys
-                  </>
-                )}
-              </button>
-            </div>
-          </section>
-
-          {/* Plan */}
-          <section className="rounded-xl border border-[rgba(255,255,255,0.05)] bg-[rgba(18,18,30,0.95)] overflow-hidden">
-            <div className="flex items-center gap-3 px-5 py-4 border-b border-[rgba(255,255,255,0.05)]">
-              <Shield size={15} className="text-[#10B981]" />
-              <h2 className="text-sm font-semibold text-[#F0F0F5] tracking-[-0.01em]">Plan & Usage</h2>
-            </div>
-            <div className="p-5">
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <div className={`h-2 w-2 rounded-full ${userRole !== "FREE" ? "bg-[#4F8AFF]" : "bg-[#10B981]"}`} />
-                    <span className="text-sm font-bold text-[#F0F0F5]">
-                      {userRole === "FREE" ? "Free Plan" : userRole === "PRO" ? "Pro Plan" : "Team Plan"}
-                    </span>
-                  </div>
-                  <p className="text-xs text-[#5C5C78] mt-1">
-                    {userRole === "FREE" ? "3 runs per day" : "Unlimited runs"}
-                  </p>
-                </div>
-                {userRole === "FREE" && (
-                  <Link
-                    href="/dashboard/billing"
-                    className="rounded-lg bg-gradient-to-r from-[#4F8AFF] to-[#8B5CF6] px-4 py-2 text-xs font-semibold text-white hover:opacity-90 transition-opacity"
-                  >
-                    Upgrade to Pro
-                  </Link>
-                )}
-                {userRole !== "FREE" && (
-                  <span className="rounded-lg bg-[rgba(79,138,255,0.1)] border border-[rgba(79,138,255,0.2)] px-3 py-1.5 text-xs font-semibold text-[#4F8AFF]">
-                    Active
+                  <span style={{
+                    fontSize: 9, color: "rgba(255,255,255,0.15)",
+                    fontFamily: "var(--font-jetbrains), monospace",
+                    paddingLeft: 24,
+                  }}>
+                    {tab.desc}
                   </span>
+                </motion.button>
+              ))}
+            </motion.div>
+
+            {/* Content Panel */}
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <AnimatePresence mode="wait">
+                {activeTab === "profile" && (
+                  <motion.div key="profile" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} transition={{ duration: 0.3 }}>
+                    <ProfileSection user={user} initials={initials} />
+                  </motion.div>
                 )}
-              </div>
+                {activeTab === "api-keys" && (
+                  <motion.div key="api-keys" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} transition={{ duration: 0.3 }}>
+                    <ApiKeysSection saveStatus={saveStatus} onSaveStatusChange={setSaveStatus} />
+                  </motion.div>
+                )}
+                {activeTab === "plan" && (
+                  <motion.div key="plan" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} transition={{ duration: 0.3 }}>
+                    <PlanSection userRole={userRole} />
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
-          </section>
+          </div>
         </div>
       </main>
     </div>

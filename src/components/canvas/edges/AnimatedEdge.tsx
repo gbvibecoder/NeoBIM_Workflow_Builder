@@ -45,9 +45,8 @@ export const AnimatedEdge = memo(function AnimatedEdge({
 
   // Visual states
   const active     = selected || isHovered;
-  const strokeW    = isFlowing ? 3 : active ? 2.5 : 2;
+  const strokeW    = isFlowing ? 3 : active ? 2.5 : 1.8;
   const strokeOp   = isFlowing ? 1 : active ? 0.8 : 0.4;
-  const glowColor  = targetColor;
 
   return (
     <>
@@ -85,16 +84,16 @@ export const AnimatedEdge = memo(function AnimatedEdge({
           </stop>
         </linearGradient>
 
-        {/* Glow filter for hover/selected */}
+        {/* Glow filter — always applied for energy conduit effect */}
         <filter id={glowId} x="-50%" y="-50%" width="200%" height="200%">
-          <feGaussianBlur stdDeviation="4" result="blur" />
+          <feGaussianBlur stdDeviation={active ? "4" : "3"} result="blur" />
           <feMerge>
             <feMergeNode in="blur" />
             <feMergeNode in="SourceGraphic" />
           </feMerge>
         </filter>
 
-        {/* Arrowhead marker — target color */}
+        {/* Arrowhead marker — glows in target color */}
         <marker
           id={arrowId}
           viewBox="0 0 10 10"
@@ -107,7 +106,7 @@ export const AnimatedEdge = memo(function AnimatedEdge({
           <path
             d="M0,1 L9,5 L0,9 Z"
             fill={targetColor}
-            opacity={strokeOp}
+            opacity={active ? 0.9 : 0.7}
           />
         </marker>
       </defs>
@@ -123,22 +122,20 @@ export const AnimatedEdge = memo(function AnimatedEdge({
         onMouseLeave={() => setIsHovered(false)}
       />
 
-      {/* Outer glow halo (behind main line, only when active) */}
-      {active && (
-        <path
-          d={edgePath}
-          fill="none"
-          stroke={glowColor}
-          strokeWidth={strokeW + 6}
-          strokeOpacity={0.12}
-          strokeLinecap="round"
-          style={{
-            transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
-          }}
-        />
-      )}
+      {/* Outer glow halo (always visible, intensifies on hover) */}
+      <path
+        d={edgePath}
+        fill="none"
+        stroke={targetColor}
+        strokeWidth={strokeW + (active ? 6 : 4)}
+        strokeOpacity={active ? 0.12 : 0.04}
+        strokeLinecap="round"
+        style={{
+          transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+        }}
+      />
 
-      {/* Main edge with gradient stroke */}
+      {/* Main edge with gradient stroke + glow filter */}
       <path
         d={edgePath}
         fill="none"
@@ -147,7 +144,7 @@ export const AnimatedEdge = memo(function AnimatedEdge({
         strokeOpacity={strokeOp}
         strokeLinecap="round"
         markerEnd={`url(#${arrowId})`}
-        filter={active ? `url(#${glowId})` : undefined}
+        filter={`url(#${glowId})`}
         style={{
           transition: "all 0.25s cubic-bezier(0.4, 0, 0.2, 1)",
         }}
@@ -155,25 +152,25 @@ export const AnimatedEdge = memo(function AnimatedEdge({
         onMouseLeave={() => setIsHovered(false)}
       />
 
-      {/* Idle slow dash overlay — data-can-flow affordance */}
+      {/* Idle animated dashes — move along the edge */}
       {!isFlowing && (
         <path
           d={edgePath}
           fill="none"
           stroke={sourceColor}
-          strokeWidth={1.2}
-          strokeOpacity={active ? 0.45 : 0.18}
-          strokeDasharray="6 4"
+          strokeWidth={1}
+          strokeOpacity={active ? 0.4 : 0.15}
+          strokeDasharray="8 12"
           strokeLinecap="round"
-          className="edge-dash-idle"
           style={{
             pointerEvents: "none",
-            transition: "all 0.25s cubic-bezier(0.4, 0, 0.2, 1)",
+            transition: "stroke-opacity 0.25s ease",
+            animation: "edgeDashFlow 3s linear infinite",
           }}
         />
       )}
 
-      {/* Flowing: bright white dot travels the path */}
+      {/* Flowing: energy particles travel the path */}
       {isFlowing && (
         <>
           {/* Bright pulsing track overlay */}
@@ -184,34 +181,45 @@ export const AnimatedEdge = memo(function AnimatedEdge({
             strokeWidth={3}
             strokeOpacity={0.95}
             strokeLinecap="round"
+            filter={`url(#${glowId})`}
             style={{ pointerEvents: "none" }}
           />
-          {/* Travelling dot with tail */}
-          <g>
-            {/* Dot tail (gradient fade) */}
-            <circle r="3" fill={targetColor} opacity={0.4}>
-              <animateMotion
-                dur="1.4s"
-                repeatCount="indefinite"
-                calcMode="linear"
-                path={edgePath}
-                begin="0.15s"
-              />
-            </circle>
-            {/* Main dot */}
-            <circle r="4" fill="white" opacity={1} style={{
-              filter: `drop-shadow(0 0 6px ${targetColor})`,
-            }}>
-              <animateMotion
-                dur="1.4s"
-                repeatCount="indefinite"
-                calcMode="linear"
-                path={edgePath}
-              />
-            </circle>
-          </g>
+          {/* Multiple energy particles staggered along path */}
+          {[0, 0.33, 0.66].map((offset, i) => (
+            <g key={i}>
+              {/* Trailing glow */}
+              <circle r={2.5 - i * 0.3} fill={sourceColor} opacity={0.3}>
+                <animateMotion
+                  dur="1.6s"
+                  repeatCount="indefinite"
+                  calcMode="linear"
+                  path={edgePath}
+                  begin={`${offset + 0.1}s`}
+                />
+              </circle>
+              {/* Main particle */}
+              <circle r={3.5 - i * 0.4} fill="white" opacity={0.9 - i * 0.15} style={{
+                filter: `drop-shadow(0 0 ${6 - i}px ${targetColor})`,
+              }}>
+                <animateMotion
+                  dur="1.6s"
+                  repeatCount="indefinite"
+                  calcMode="linear"
+                  path={edgePath}
+                  begin={`${offset}s`}
+                />
+              </circle>
+            </g>
+          ))}
         </>
       )}
+
+      <style>{`
+        @keyframes edgeDashFlow {
+          from { stroke-dashoffset: 0; }
+          to { stroke-dashoffset: -40; }
+        }
+      `}</style>
     </>
   );
 });

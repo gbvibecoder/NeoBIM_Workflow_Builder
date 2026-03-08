@@ -7,17 +7,33 @@ import Link from "next/link";
 import { Mail, Lock, Chrome, Loader2, AlertCircle } from "lucide-react";
 import { motion } from "framer-motion";
 import { validateEmail } from "@/lib/form-validation";
+import { useLocale } from "@/hooks/useLocale";
+import { LanguageSwitcher } from "@/components/ui/LanguageSwitcher";
 
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const callbackUrl = searchParams.get("callbackUrl") ?? "/dashboard";
+  const { t } = useLocale();
+
+  // Map NextAuth error codes to user-friendly messages
+  const authErrorParam = searchParams.get("error");
+  const authErrorMessages: Record<string, string> = {
+    OAuthAccountNotLinked: "This email is already registered with a password. Please sign in with your email and password instead.",
+    OAuthCallback: "Something went wrong with Google sign-in. Please try again.",
+    OAuthSignin: "Could not start Google sign-in. Please try again.",
+    Default: "An authentication error occurred. Please try again.",
+  };
+  const initialError = authErrorParam
+    ? authErrorMessages[authErrorParam] ?? authErrorMessages.Default
+    : "";
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [emailError, setEmailError] = useState("");
-  const [error, setError] = useState("");
+  const [error, setError] = useState(initialError);
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [touched, setTouched] = useState({ email: false, password: false });
 
   function handleEmailChange(value: string) {
@@ -51,7 +67,7 @@ function LoginForm() {
     }
 
     if (!password || password.length === 0) {
-      setError("Please enter your password");
+      setError(t('auth.enterPassword'));
       return;
     }
 
@@ -65,25 +81,26 @@ function LoginForm() {
       });
 
       if (res?.error) {
-        setError("Invalid email or password. Please try again.");
+        setError(t('auth.invalidCredentials'));
       } else {
         router.push(callbackUrl);
         router.refresh();
       }
     } catch {
-      setError("Something went wrong. Please try again.");
+      setError(t('auth.genericError'));
     } finally {
       setLoading(false);
     }
   }
 
   async function handleGoogle() {
-    setLoading(true);
+    setGoogleLoading(true);
+    setError("");
     try {
       await signIn("google", { callbackUrl });
     } catch {
-      setError("Google sign-in failed. Please try again.");
-      setLoading(false);
+      setError(t('auth.googleError'));
+      setGoogleLoading(false);
     }
   }
 
@@ -92,48 +109,76 @@ function LoginForm() {
       initial={{ opacity: 0, y: 24 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+      className="node-card"
       style={{
-        background: "#0f1019",
-        border: "1px solid rgba(255,255,255,0.06)",
-        borderRadius: 16,
-        padding: "40px",
-        boxShadow: "0 24px 64px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255,255,255,0.02) inset",
-      }}
+        '--node-port-color': '#4F8AFF',
+        background: "rgba(15,16,25,0.95)",
+        boxShadow: "0 24px 64px rgba(0, 0, 0, 0.5), 0 0 40px rgba(79,138,255,0.03)",
+      } as React.CSSProperties}
     >
+      {/* Node header */}
+      <div className="node-header" style={{
+        background: "linear-gradient(135deg, rgba(79,138,255,0.1), rgba(99,102,241,0.04))",
+        borderBottom: "1px solid rgba(79,138,255,0.08)",
+        borderRadius: "16px 16px 0 0",
+        justifyContent: "space-between",
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#10B981", boxShadow: "0 0 8px #10B981" }} />
+          <span style={{ color: "#4F8AFF" }}>AUTHENTICATE</span>
+        </div>
+        <LanguageSwitcher />
+      </div>
+
+      <div className="auth-form-inner" style={{ padding: "32px 36px 36px" }}>
       {/* Header */}
-      <div style={{ marginBottom: 30 }}>
+      <div style={{ marginBottom: 28 }}>
         <h2 style={{ fontSize: 22, fontWeight: 700, color: "#F0F0F5", marginBottom: 6, letterSpacing: "-0.02em" }}>
-          Welcome back
+          {t('auth.welcomeBack')}
         </h2>
         <p style={{ fontSize: 13.5, color: "#6C6C8A" }}>
-          Sign in to continue to BuildFlow
+          {t('auth.signInToContinue')}
         </p>
       </div>
 
-      {/* Google OAuth */}
+      {/* Google OAuth — completely separate from the credentials form */}
       <motion.button
+        type="button"
         whileHover={{ scale: 1.008 }}
         whileTap={{ scale: 0.995 }}
-        onClick={handleGoogle}
-        disabled={loading}
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          handleGoogle();
+        }}
+        disabled={loading || googleLoading}
         style={{
           width: "100%", padding: "10px 16px", height: 42,
           borderRadius: 10, border: "1px solid rgba(255,255,255,0.06)",
           background: "rgba(26,26,42,0.8)", color: "#E0E0EE",
           fontSize: 13, fontWeight: 500, cursor: "pointer",
           display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-          marginBottom: 22, opacity: loading ? 0.5 : 1,
+          marginBottom: 22, opacity: (loading || googleLoading) ? 0.5 : 1,
           transition: "all 0.2s ease",
           boxShadow: "0 1px 2px rgba(0,0,0,0.1), inset 0 1px 0 rgba(255,255,255,0.02)",
         }}
       >
-        <Chrome size={14} />
-        Continue with Google
+        {googleLoading ? (
+          <>
+            <Loader2 size={14} className="animate-spin" />
+            {t('auth.connecting')}
+          </>
+        ) : (
+          <>
+            <Chrome size={14} />
+            {t('auth.continueWithGoogle')}
+          </>
+        )}
       </motion.button>
 
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 22 }}>
         <div style={{ flex: 1, height: 1, background: "rgba(255,255,255,0.04)" }} />
-        <span style={{ fontSize: 10.5, color: "#3A3A50", letterSpacing: "0.04em", textTransform: "uppercase" as const, fontWeight: 500 }}>or email</span>
+        <span style={{ fontSize: 10.5, color: "#3A3A50", letterSpacing: "0.04em", textTransform: "uppercase" as const, fontWeight: 500 }}>{t('auth.orEmail')}</span>
         <div style={{ flex: 1, height: 1, background: "rgba(255,255,255,0.04)" }} />
       </div>
 
@@ -146,7 +191,7 @@ function LoginForm() {
           style={{ marginBottom: 14 }}
         >
           <label style={{ display: "block", fontSize: 12.5, fontWeight: 500, color: "#7C7C96", marginBottom: 6, letterSpacing: "-0.005em" }}>
-            Email
+            {t('auth.email')}
           </label>
           <div style={{ position: "relative" }}>
             <Mail size={13} style={{ position: "absolute", left: 13, top: "50%", transform: "translateY(-50%)", color: "#3A3A50" }} />
@@ -201,7 +246,7 @@ function LoginForm() {
           style={{ marginBottom: 22 }}
         >
           <label style={{ display: "block", fontSize: 12.5, fontWeight: 500, color: "#7C7C96", marginBottom: 6, letterSpacing: "-0.005em" }}>
-            Password
+            {t('auth.password')}
           </label>
           <div style={{ position: "relative" }}>
             <Lock size={13} style={{ position: "absolute", left: 13, top: "50%", transform: "translateY(-50%)", color: "#3A3A50" }} />
@@ -248,16 +293,16 @@ function LoginForm() {
           whileHover={{ scale: 1.008 }}
           whileTap={{ scale: 0.995 }}
           type="submit"
-          disabled={loading || !!emailError}
+          disabled={loading || googleLoading || !!emailError}
           style={{
             width: "100%", padding: "11px", height: 44, borderRadius: 10, border: "none",
-            background: (loading || emailError)
+            background: (loading || googleLoading || emailError)
               ? "rgba(79,138,255,0.3)"
               : "linear-gradient(135deg, #4F8AFF 0%, #6366F1 100%)",
             color: "#fff", fontSize: 13.5, fontWeight: 600,
-            cursor: (loading || emailError) ? "not-allowed" : "pointer",
-            opacity: (loading || emailError) ? 0.5 : 1,
-            boxShadow: (loading || emailError)
+            cursor: (loading || googleLoading || emailError) ? "not-allowed" : "pointer",
+            opacity: (loading || googleLoading || emailError) ? 0.5 : 1,
+            boxShadow: (loading || googleLoading || emailError)
               ? "none"
               : "0 1px 3px rgba(79,138,255,0.3), 0 4px 12px rgba(79,138,255,0.15), inset 0 1px 0 rgba(255,255,255,0.1)",
             display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
@@ -268,32 +313,34 @@ function LoginForm() {
           {loading ? (
             <>
               <Loader2 size={14} className="animate-spin" />
-              Signing in...
+              {t('auth.signingIn')}
             </>
           ) : (
-            "Sign in"
+            t('auth.signIn')
           )}
         </motion.button>
       </form>
 
       <p style={{ textAlign: "center", fontSize: 12.5, color: "#5C5C78", marginTop: 24 }}>
-        Don&apos;t have an account?{" "}
+        {t('auth.noAccount')}{" "}
         <Link href="/register" style={{ color: "#4F8AFF", textDecoration: "none", fontWeight: 600, transition: "color 0.15s" }}>
-          Create account
+          {t('auth.createAccount')}
         </Link>
       </p>
+      </div>
     </motion.div>
   );
 }
 
 export default function LoginPage() {
+  const { t } = useLocale();
   return (
     <Suspense fallback={
       <div style={{
         background: "rgba(18,18,30,0.95)", border: "1px solid rgba(255,255,255,0.05)", borderRadius: 16,
         padding: 28, textAlign: "center", fontSize: 13, color: "#5C5C78",
       }}>
-        Loading...
+        {t('auth.loading')}
       </div>
     }>
       <LoginForm />

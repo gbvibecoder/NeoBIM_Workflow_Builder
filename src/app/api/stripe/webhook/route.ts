@@ -4,6 +4,12 @@ import { prisma } from '@/lib/db';
 import Stripe from 'stripe';
 
 export async function POST(req: NextRequest) {
+  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+  if (!webhookSecret) {
+    console.error('[STRIPE_WEBHOOK] STRIPE_WEBHOOK_SECRET not configured');
+    return NextResponse.json({ error: 'Server misconfiguration' }, { status: 500 });
+  }
+
   const body = await req.text();
   const signature = req.headers.get('stripe-signature');
 
@@ -18,11 +24,7 @@ export async function POST(req: NextRequest) {
   let event: Stripe.Event;
 
   try {
-    event = stripe.webhooks.constructEvent(
-      body,
-      signature,
-      process.env.STRIPE_WEBHOOK_SECRET!
-    );
+    event = stripe.webhooks.constructEvent(body, signature, webhookSecret);
   } catch (error) {
     console.error('[STRIPE_WEBHOOK] Webhook signature verification failed:', error);
     return NextResponse.json(
@@ -78,6 +80,29 @@ export async function POST(req: NextRequest) {
         console.error('[STRIPE_WEBHOOK] Payment failed for invoice:', invoice.id);
         
         // Optionally notify user about payment failure
+        break;
+      }
+
+      case 'customer.subscription.trial_will_end': {
+        const subscription = event.data.object as Stripe.Subscription;
+        console.info('[STRIPE_WEBHOOK] Trial ending soon for customer:', subscription.customer);
+        break;
+      }
+
+      case 'customer.updated': {
+        const customer = event.data.object as Stripe.Customer;
+        if (customer.email) {
+          const user = await prisma.user.findFirst({ where: { stripeCustomerId: customer.id } });
+          if (user && user.email !== customer.email) {
+            console.info('[STRIPE_WEBHOOK] Syncing email from Stripe:', { userId: user.id, newEmail: customer.email });
+          }
+        }
+        break;
+      }
+
+      case 'charge.refunded': {
+        const charge = event.data.object as Stripe.Charge;
+        console.info('[STRIPE_WEBHOOK] Charge refunded:', { chargeId: charge.id, amount: charge.amount_refunded });
         break;
       }
 

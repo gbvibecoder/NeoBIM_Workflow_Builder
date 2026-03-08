@@ -2,10 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { trackFirstWorkflow } from "@/lib/analytics";
-import { 
-  formatErrorResponse, 
+import { checkEndpointRateLimit } from "@/lib/rate-limit";
+import {
+  formatErrorResponse,
   UserErrors,
-  FormErrors 
+  FormErrors
 } from "@/lib/user-errors";
 
 // GET /api/workflows — list user's workflows
@@ -53,6 +54,11 @@ export async function POST(req: NextRequest) {
         formatErrorResponse(UserErrors.UNAUTHORIZED),
         { status: 401 }
       );
+    }
+
+    const rateLimit = await checkEndpointRateLimit(session.user.id, "workflows-create", 10, "1 m");
+    if (!rateLimit.success) {
+      return NextResponse.json(formatErrorResponse({ title: "Too many requests", message: "Please wait before creating more workflows.", code: "RATE_LIMITED" }), { status: 429 });
     }
 
     const body = await req.json();

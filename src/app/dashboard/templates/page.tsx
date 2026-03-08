@@ -10,6 +10,9 @@ import { toast } from "sonner";
 import { useWorkflowStore } from "@/stores/workflow-store";
 import { useRouter } from "next/navigation";
 import type { WorkflowTemplate } from "@/types/workflow";
+import { useLocale } from "@/hooks/useLocale";
+import type { TranslationKey } from "@/lib/i18n";
+import { awardXP } from "@/lib/award-xp";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -32,14 +35,23 @@ const CATEGORY_COLORS: Record<string, string> = {
   "Site Analysis":   "#10B981",
 };
 
-const SORT_OPTIONS = [
-  { value: "default", label: "Popular" },
-  { value: "simple",  label: "Simple first" },
-  { value: "advanced",label: "Advanced first" },
-  { value: "nodes",   label: "Fewest nodes" },
-];
+const SORT_OPTION_KEYS: Record<string, string> = {
+  default: "templates.popular",
+  simple: "templates.simpleFirst",
+  advanced: "templates.advancedFirst",
+  nodes: "templates.fewestNodes",
+};
 
 const COMPLEXITY_ORDER: Record<string, number> = { simple: 0, intermediate: 1, advanced: 2 };
+
+const CATEGORY_LABEL_KEYS: Record<string, TranslationKey> = {
+  "Concept Design": 'templates.categoryConceptDesign',
+  "Visualization": 'templates.categoryVisualization',
+  "BIM Export": 'templates.categoryBimExport',
+  "Cost Estimation": 'templates.categoryCostEstimation',
+  "Full Pipeline": 'templates.categoryFullPipeline',
+  "Site Analysis": 'templates.categorySiteAnalysis',
+};
 
 function hexToRgb(hex: string): string {
   const r = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
@@ -49,14 +61,16 @@ function hexToRgb(hex: string): string {
 
 // ─── Hero decoration (abstract workflow illustration) ─────────────────────────
 
-const DECO_NODES = [
-  { color: "#3B82F6", label: "Input" },
-  { color: "#8B5CF6", label: "AI" },
-  { color: "#10B981", label: "Gen" },
-  { color: "#F59E0B", label: "Export" },
+const DECO_NODE_COLORS = [
+  { color: "#3B82F6", key: "templates.inputLabel" },
+  { color: "#8B5CF6", key: "templates.aiLabel" },
+  { color: "#10B981", key: "templates.genLabel" },
+  { color: "#F59E0B", key: "templates.exportLabel" },
 ];
 
 function HeroDecoration() {
+  const { t } = useLocale();
+  const DECO_NODES = DECO_NODE_COLORS.map(n => ({ ...n, label: t(n.key as TranslationKey) }));
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 0, opacity: 0.6 }}>
       {DECO_NODES.map((n, i) => (
@@ -89,6 +103,7 @@ function HeroDecoration() {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function TemplatesPage() {
+  const { t } = useLocale();
   const [activeCategory, setActiveCategory] = useState("All");
   const [sortBy, setSortBy]       = useState("default");
   const [showSort, setShowSort]   = useState(false);
@@ -111,23 +126,27 @@ export default function TemplatesPage() {
     const template = PREBUILT_WORKFLOWS.find(w => w.id === id);
     if (!template) return;
     loadFromTemplate(template as WorkflowTemplate);
-    toast.success(`"${template.name}" cloned`, { description: "Opening in canvas…" });
+    toast.success(`"${template.name}" ${t('toast.cloned')}`, { description: t('toast.openingCanvas') });
+    awardXP("template-cloned");
     router.push("/dashboard/canvas");
   };
 
-  const currentSort = SORT_OPTIONS.find(o => o.value === sortBy)?.label ?? "Popular";
+  const SORT_OPTIONS = Object.entries(SORT_OPTION_KEYS).map(([value, key]) => ({ value, label: t(key as TranslationKey) }));
+  const currentSort = SORT_OPTIONS.find(o => o.value === sortBy)?.label ?? t('templates.popular');
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
       <Header
-        title="Workflow Templates"
-        subtitle={`${PREBUILT_WORKFLOWS.length} prebuilt AEC workflows ready to run`}
+        title={t('templates.title')}
+        subtitle={t('templates.subtitle')}
       />
 
       <main style={{ flex: 1, overflowY: "auto" }}>
 
         {/* ── Hero Section ────────────────────────────────────────────────── */}
-        <div style={{
+        <div
+          className="templates-hero"
+          style={{
           position: "relative", overflow: "hidden",
           minHeight: 180, display: "flex", alignItems: "center",
           padding: "0 32px",
@@ -140,18 +159,18 @@ export default function TemplatesPage() {
               fontSize: 10, fontWeight: 700, color: "#4F8AFF",
               textTransform: "uppercase", letterSpacing: "1.5px", marginBottom: 10,
             }}>
-              Start with a proven workflow
+              {t('templates.startWithProven')}
             </p>
             <h2 style={{ fontSize: 26, fontWeight: 800, color: "#F0F0F5", lineHeight: 1.2, marginBottom: 8, letterSpacing: "-0.02em" }}>
-              From brief to building<br />in minutes
+              {t('templates.fromBrief')}
             </h2>
             <p style={{ fontSize: 14, color: "#7C7C96", lineHeight: 1.6, maxWidth: 440 }}>
-              Pre-built by AEC experts. Clone, customize, and run in seconds — no configuration needed.
+              {t('templates.fromBriefDesc')}
             </p>
           </div>
 
           {/* Right decoration */}
-          <div style={{ flexShrink: 0, padding: "0 16px" }}>
+          <div className="templates-hero-deco" style={{ flexShrink: 0, padding: "0 16px" }}>
             <HeroDecoration />
           </div>
 
@@ -207,7 +226,7 @@ export default function TemplatesPage() {
                     }
                   }}
                 >
-                  {cat === "All" ? "All Workflows" : cat}
+                  {cat === "All" ? t('templates.allWorkflows') : (CATEGORY_LABEL_KEYS[cat] ? t(CATEGORY_LABEL_KEYS[cat]) : cat)}
                 </button>
               );
             })}
@@ -229,7 +248,7 @@ export default function TemplatesPage() {
                 onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = "#2A2A3E"; }}
                 onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = "#1E1E2E"; }}
               >
-                <span style={{ color: "#55556A" }}>Sort:</span>
+                <span style={{ color: "#55556A" }}>{t('templates.sort')}</span>
                 <span style={{ color: "#C0C0D0" }}>{currentSort}</span>
                 <ChevronDown size={11} style={{ color: "#55556A" }} />
               </button>
@@ -280,8 +299,8 @@ export default function TemplatesPage() {
 
           {/* ── Results count ────────────────────────────────────────────── */}
           <div style={{ marginBottom: 16, fontSize: 11, color: "#3A3A50" }}>
-            {filtered.length} template{filtered.length !== 1 ? "s" : ""}
-            {activeCategory !== "All" && ` in ${activeCategory}`}
+            {filtered.length} {filtered.length !== 1 ? t('templates.templates') : t('templates.template')}
+            {activeCategory !== "All" && ` ${t('templates.inCategory')} ${CATEGORY_LABEL_KEYS[activeCategory] ? t(CATEGORY_LABEL_KEYS[activeCategory]) : activeCategory}`}
           </div>
 
           {/* ── Grid ────────────────────────────────────────────────────── */}
@@ -295,7 +314,7 @@ export default function TemplatesPage() {
                 style={{ padding: "60px 0", textAlign: "center" }}
               >
                 <p style={{ fontSize: 14, color: "#3A3A50", marginBottom: 10 }}>
-                  No templates in this category
+                  {t('templates.noTemplates')}
                 </p>
                 <button
                   onClick={() => setActiveCategory("All")}
@@ -304,7 +323,7 @@ export default function TemplatesPage() {
                     border: "none", cursor: "pointer",
                   }}
                 >
-                  View all templates →
+                  {t('templates.viewAll')} →
                 </button>
               </motion.div>
             ) : (
@@ -314,6 +333,7 @@ export default function TemplatesPage() {
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.15 }}
+                className="templates-grid"
                 style={{
                   display: "grid",
                   gridTemplateColumns: "repeat(3, 1fr)",

@@ -10,6 +10,7 @@ import { generateId } from "@/lib/utils";
 import { toast } from "sonner";
 import type { WorkflowTemplate } from "@/types/workflow";
 import type { WorkflowNode, WorkflowEdge, NodeStatus } from "@/types/nodes";
+import { awardXP } from "@/lib/award-xp";
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
@@ -107,7 +108,7 @@ export function PromptInput({ onClose }: PromptInputProps) {
   const [previewNodes, setPreviewNodes] = useState<{ label: string; color: string }[]>([]);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  const { addNode, addEdge, resetCanvas } = useWorkflowStore();
+  const { addNode, addEdge, resetCanvas, updateNode } = useWorkflowStore();
   const { setPromptModeActive } = useUIStore();
 
   const handleSubmit = useCallback(async () => {
@@ -142,10 +143,24 @@ export function PromptInput({ onClose }: PromptInputProps) {
     }
     await new Promise(r => setTimeout(r, 200));
 
+    // Pass the user's prompt to the first input node (Text Prompt)
+    const firstInputNode = nodes.find(n => {
+      const catId = (n.data as Record<string, unknown>).catalogueId as string;
+      return catId === "IN-001";
+    });
+    if (firstInputNode) {
+      updateNode(firstInputNode.id, {
+        data: { ...firstInputNode.data, inputValue: prompt.trim() },
+      });
+    }
+
     toast.success(`Generated: "${template.name}"`, {
       description: `${nodes.length} nodes placed and connected`,
       duration: 4000,
     });
+
+    // Award XP for AI prompt usage (fire-and-forget)
+    awardXP("ai-prompt-used");
 
     setIsGenerating(false);
     setStep(null);

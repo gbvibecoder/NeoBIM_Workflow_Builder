@@ -7,12 +7,23 @@ import { useExecutionStore } from "@/stores/execution-store";
 import { useUIStore } from "@/stores/ui-store";
 import { executeNode as mockExecuteNode } from "@/services/mock-executor";
 import { generateId } from "@/lib/utils";
+import { awardXP } from "@/lib/award-xp";
 import type { Execution, ExecutionArtifact } from "@/types/execution";
 import type { WorkflowNode } from "@/types/nodes";
 import type { LogEntry } from "@/components/canvas/ExecutionLog";
 
-// Node IDs that have real API implementations
-const REAL_NODE_IDS = new Set(["TR-001", "TR-003", "TR-004", "TR-012", "GN-003", "GN-004", "TR-007", "TR-008", "EX-002", "EX-003"]);
+// All node IDs that have real API implementations on the server
+const REAL_NODE_IDS = new Set(["TR-001", "TR-003", "TR-004", "TR-005", "TR-012", "GN-003", "GN-004", "TR-007", "TR-008", "EX-002", "EX-003"]);
+
+// Live nodes — ALWAYS use real API execution regardless of NEXT_PUBLIC_ENABLE_MOCK_EXECUTION.
+// These are production-ready and should never fall through to mock when authenticated.
+const LIVE_NODE_IDS = new Set([
+  "TR-003",  // Design Brief Analyzer (GPT-4o-mini)
+  "TR-007",  // Quantity Extractor (web-ifc, no API key)
+  "TR-008",  // BOQ / Cost Mapper (cost database, no API key)
+  "GN-003",  // Concept Render Generator (DALL-E 3)
+  "EX-002",  // BOQ Spreadsheet Exporter (xlsx, no API key)
+]);
 
 interface APIErrorResponse {
   error: {
@@ -90,7 +101,17 @@ async function executeNode(
     return { ...artifact, createdAt: new Date() };
   }
 
-  if (useRealExecution && REAL_NODE_IDS.has(catalogueId)) {
+  // Determine if this node should use real API execution:
+  // - LIVE_NODE_IDS: always real (ignore mock flag) — these are production-ready
+  // - Other REAL_NODE_IDS: only real when mock flag is off
+  const shouldUseRealAPI = LIVE_NODE_IDS.has(catalogueId) || (useRealExecution && REAL_NODE_IDS.has(catalogueId));
+
+  if (shouldUseRealAPI) {
+    // Merge node-level config (e.g. viewType for GN-003/TR-005) into inputData
+    const nodeConfig: Record<string, unknown> = {};
+    const nd = node.data as Record<string, unknown>;
+    if (nd.viewType != null) nodeConfig.viewType = nd.viewType;
+
     const res = await fetch("/api/execute-node", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -98,22 +119,25 @@ async function executeNode(
         catalogueId,
         executionId,
         tileInstanceId: node.id,
-        inputData: previousArtifact?.data ?? { prompt: inputValue ?? "" },
+        inputData: {
+          ...(previousArtifact?.data as Record<string, unknown> ?? { prompt: inputValue ?? "" }),
+          ...nodeConfig,
+        },
       }),
     });
 
     if (!res.ok) {
-      const errorData = await res.json().catch(() => ({ 
-        error: { 
-          title: "Request failed", 
+      const errorData = await res.json().catch(() => ({
+        error: {
+          title: "Request failed",
           message: "Unable to complete request",
           code: "UNKNOWN"
         }
       })) as APIErrorResponse;
-      
+
       // Extract user-friendly error info
       const error = errorData.error;
-      
+
       // Special handling for 429 Rate Limit errors
       if (res.status === 429) {
         const rateLimitError = new Error(error.message);
@@ -340,7 +364,6 @@ export function useExecution({ onLog }: UseExecutionOptions = {}) {
         if (artifact.metadata?.warnings && Array.isArray(artifact.metadata.warnings)) {
           for (const warning of artifact.metadata.warnings) {
             toast.warning(warning, { duration: 4000 });
-            // log("warning", warning); // Skipped - not a standard log type
           }
         }
 
@@ -356,7 +379,7 @@ export function useExecution({ onLog }: UseExecutionOptions = {}) {
               title: String(artifact.type),
               data: artifact.data,
             }),
-          }).catch(() => {/* best-effort */});
+          }).catch((err) => { console.error("[useExecution] Failed to persist artifact:", err); });
         }
 
         // Animate outgoing edges as data flows to the next node
@@ -393,6 +416,12 @@ export function useExecution({ onLog }: UseExecutionOptions = {}) {
         }
 
         // Non-fatal error — fall back to mock execution and continue
+        console.error(`[${node.data.catalogueId} FALLBACK] Real execution failed, falling back to mock.`, {
+          catalogueId: node.data.catalogueId,
+          label: node.data.label,
+          error: errMsg,
+          isLiveNode: LIVE_NODE_IDS.has(node.data.catalogueId),
+        });
         log("error", `${node.data.label} failed — falling back to mock`, errMsg);
         toast.error(`${node.data.label}: using mock data`, {
           description: errMsg,
@@ -451,7 +480,7 @@ export function useExecution({ onLog }: UseExecutionOptions = {}) {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: hasError ? "PARTIAL" : "SUCCESS" }),
-      }).catch(() => {/* best-effort */});
+      }).catch((err) => { console.error("[useExecution] Failed to update execution status:", err); });
     }
 
     if (!hasError) {
@@ -459,6 +488,19 @@ export function useExecution({ onLog }: UseExecutionOptions = {}) {
         description: `${orderedNodes.length} nodes executed`,
         duration: 4000,
       });
+
+      // Award XP for workflow run (fire-and-forget)
+      awardXP("workflow-run");
+      awardXP("workflow-run-repeat");
+
+      // Check for special node achievements
+      const catalogueIds = new Set(orderedNodes.map(n => (n.data as { catalogueId: string }).catalogueId));
+      if (catalogueIds.has("GN-003")) {
+        awardXP("render-generated");
+      }
+      if (catalogueIds.has("TR-008") && catalogueIds.has("EX-002")) {
+        awardXP("boq-generated");
+      }
     }
   }, [
     nodes,

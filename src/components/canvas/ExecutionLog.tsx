@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronDown, Terminal, X } from "lucide-react";
+import { useLocale } from "@/hooks/useLocale";
 
 export interface LogEntry {
   timestamp: Date;
@@ -38,14 +39,15 @@ function fmt(d: Date) {
 }
 
 export function ExecutionLog({ entries, isRunning, onClose }: ExecutionLogProps) {
-  const [collapsed, setCollapsed] = useState(false);
+  const { t } = useLocale();
+  const [expanded, setExpanded] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!collapsed) {
+    if (expanded) {
       bottomRef.current?.scrollIntoView({ behavior: "smooth" });
     }
-  }, [entries, collapsed]);
+  }, [entries, expanded]);
 
   if (entries.length === 0 && !isRunning) return null;
 
@@ -55,45 +57,42 @@ export function ExecutionLog({ entries, isRunning, onClose }: ExecutionLogProps)
       ? "#EF4444"
       : "#10B981";
 
+  const latestEntry = entries[entries.length - 1];
+
   return (
     <motion.div
-      initial={{ y: 40, opacity: 0, scale: 0.96 }}
+      initial={{ y: 20, opacity: 0, scale: 0.95 }}
       animate={{ y: 0, opacity: 1, scale: 1 }}
-      exit={{ y: 40, opacity: 0, scale: 0.96 }}
-      transition={{ type: "spring", stiffness: 420, damping: 32 }}
+      exit={{ y: 20, opacity: 0, scale: 0.95 }}
+      transition={{ type: "spring", stiffness: 500, damping: 35 }}
       style={{
         position: "absolute",
         bottom: 16,
         left: 16,
         zIndex: 25,
-        width: collapsed ? 220 : 420,
-        maxWidth: "calc(100vw - 360px)",
-        borderRadius: 12,
+        borderRadius: expanded ? 14 : 24,
         overflow: "hidden",
-        background: "rgba(5, 5, 8, 0.95)",
+        background: "rgba(5, 5, 8, 0.92)",
         border: "1px solid rgba(255,255,255,0.06)",
-        backdropFilter: "blur(20px) saturate(1.3)",
-        WebkitBackdropFilter: "blur(20px) saturate(1.3)",
-        boxShadow:
-          "0 12px 40px rgba(0,0,0,0.45), 0 0 0 1px rgba(255,255,255,0.03) inset",
-        fontFamily:
-          "'JetBrains Mono', 'Fira Mono', 'Menlo', monospace",
-        transition: "width 0.25s cubic-bezier(0.4, 0, 0.2, 1)",
+        backdropFilter: "blur(24px) saturate(1.3)",
+        WebkitBackdropFilter: "blur(24px) saturate(1.3)",
+        boxShadow: "0 8px 32px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.03) inset",
+        fontFamily: "'JetBrains Mono', 'Fira Mono', 'Menlo', monospace",
+        transition: "border-radius 0.2s ease",
       }}
     >
-      {/* Title bar */}
+      {/* Pill header — always visible */}
       <div
-        onClick={() => setCollapsed((c) => !c)}
+        onClick={() => setExpanded(e => !e)}
         style={{
           display: "flex",
           alignItems: "center",
           gap: 8,
-          padding: "9px 12px",
-          borderBottom: collapsed
-            ? "none"
-            : "1px solid rgba(255,255,255,0.06)",
+          padding: expanded ? "9px 12px" : "7px 14px",
+          borderBottom: expanded ? "1px solid rgba(255,255,255,0.06)" : "none",
           cursor: "pointer",
           userSelect: "none",
+          minWidth: expanded ? 380 : 0,
         }}
       >
         <div
@@ -104,22 +103,29 @@ export function ExecutionLog({ entries, isRunning, onClose }: ExecutionLogProps)
             background: statusColor,
             boxShadow: `0 0 8px ${statusColor}60`,
             flexShrink: 0,
-            animation: isRunning
-              ? "logDotPulse 1.4s ease-in-out infinite"
-              : "none",
+            animation: isRunning ? "logDotPulse 1.4s ease-in-out infinite" : "none",
           }}
         />
-        <Terminal size={11} style={{ color: "#5C5C78", flexShrink: 0 }} />
-        <span
-          style={{
-            fontSize: 12,
+        {!expanded && latestEntry && (
+          <span style={{
+            fontSize: 11,
             color: "#5C5C78",
-            fontWeight: 500,
-            flex: 1,
-          }}
-        >
-          {isRunning ? "Executing\u2026" : "Execution Log"}
-        </span>
+            maxWidth: 220,
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+          }}>
+            {latestEntry.message}
+          </span>
+        )}
+        {expanded && (
+          <>
+            <Terminal size={11} style={{ color: "#5C5C78", flexShrink: 0 }} />
+            <span style={{ fontSize: 11, color: "#5C5C78", fontWeight: 500, flex: 1 }}>
+              {isRunning ? t('execution.executing') : t('execution.log')}
+            </span>
+          </>
+        )}
         <span
           style={{
             fontSize: 9,
@@ -133,11 +139,11 @@ export function ExecutionLog({ entries, isRunning, onClose }: ExecutionLogProps)
           {entries.length}
         </span>
         <motion.div
-          animate={{ rotate: collapsed ? -90 : 0 }}
+          animate={{ rotate: expanded ? 0 : -90 }}
           transition={{ duration: 0.15 }}
           style={{ color: "#3A3A50", display: "flex", flexShrink: 0 }}
         >
-          <ChevronDown size={12} />
+          <ChevronDown size={11} />
         </motion.div>
         {!isRunning && (
           <button
@@ -145,7 +151,7 @@ export function ExecutionLog({ entries, isRunning, onClose }: ExecutionLogProps)
               e.stopPropagation();
               onClose();
             }}
-            title="Close log"
+            title={t('execution.closeLog')}
             style={{
               background: "none",
               border: "none",
@@ -158,21 +164,17 @@ export function ExecutionLog({ entries, isRunning, onClose }: ExecutionLogProps)
               justifyContent: "center",
               flexShrink: 0,
             }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.color = "#EF4444";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.color = "#3A3A50";
-            }}
+            onMouseEnter={(e) => { e.currentTarget.style.color = "#EF4444"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.color = "#3A3A50"; }}
           >
-            <X size={12} />
+            <X size={11} />
           </button>
         )}
       </div>
 
-      {/* Log body */}
+      {/* Expanded log body */}
       <AnimatePresence>
-        {!collapsed && (
+        {expanded && (
           <motion.div
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: "auto", opacity: 1 }}
@@ -182,9 +184,9 @@ export function ExecutionLog({ entries, isRunning, onClose }: ExecutionLogProps)
           >
             <div
               style={{
-                maxHeight: 180,
+                maxHeight: 160,
                 overflowY: "auto",
-                padding: "8px 12px",
+                padding: "6px 12px",
                 display: "flex",
                 flexDirection: "column",
                 gap: 1,
@@ -202,18 +204,12 @@ export function ExecutionLog({ entries, isRunning, onClose }: ExecutionLogProps)
                   style={{
                     display: "flex",
                     gap: 8,
-                    fontSize: 11,
+                    fontSize: 10,
                     lineHeight: 1.6,
-                    padding: "2px 0",
+                    padding: "1px 0",
                   }}
                 >
-                  <span
-                    style={{
-                      color: "#2a2a3a",
-                      flexShrink: 0,
-                      fontWeight: 500,
-                    }}
-                  >
+                  <span style={{ color: "#2a2a3a", flexShrink: 0, fontWeight: 500 }}>
                     {fmt(entry.timestamp)}
                   </span>
                   <span

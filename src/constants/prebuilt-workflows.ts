@@ -5,7 +5,7 @@ export const PREBUILT_WORKFLOWS: WorkflowTemplate[] = [
     id: "wf-01",
     name: "Text Prompt → Concept Building",
     description:
-      "The fastest generative building workflow. Enter a text description and instantly get a building concept: a description card, 3D massing, and a concept render.",
+      "Enter a building idea in plain text → get a full building description, 3D massing model, and concept render in under a minute.",
     tags: ["concept", "visualization", "quick-start", "text-to-building"],
     category: "Concept Design",
     complexity: "simple",
@@ -35,7 +35,7 @@ export const PREBUILT_WORKFLOWS: WorkflowTemplate[] = [
           position: { x: 380, y: 200 },
           data: {
             catalogueId: "TR-003",
-            label: "Building Description Generator",
+            label: "Design Brief Analyzer",
             category: "transform",
             status: "idle",
             inputs: [{ id: "json-in", label: "Requirements", type: "json" }],
@@ -69,7 +69,7 @@ export const PREBUILT_WORKFLOWS: WorkflowTemplate[] = [
           position: { x: 940, y: 200 },
           data: {
             catalogueId: "GN-003",
-            label: "Image Generator",
+            label: "Concept Render Generator",
             category: "generate",
             status: "idle",
             inputs: [
@@ -92,7 +92,7 @@ export const PREBUILT_WORKFLOWS: WorkflowTemplate[] = [
     id: "wf-02",
     name: "PDF Brief → Massing",
     description:
-      "Turn documents into buildings. Upload a project brief PDF and get a 3D building massing with program cards showing extracted requirements.",
+      "Upload a PDF brief → get it parsed, analyzed, and visualized as a 3D massing model automatically.",
     tags: ["pdf", "brief", "massing", "requirements"],
     category: "Concept Design",
     complexity: "intermediate",
@@ -122,7 +122,7 @@ export const PREBUILT_WORKFLOWS: WorkflowTemplate[] = [
           position: { x: 380, y: 200 },
           data: {
             catalogueId: "TR-001",
-            label: "Document Parser",
+            label: "Brief Parser",
             category: "transform",
             status: "idle",
             inputs: [{ id: "pdf-in", label: "PDF", type: "pdf" }],
@@ -173,7 +173,7 @@ export const PREBUILT_WORKFLOWS: WorkflowTemplate[] = [
     id: "wf-03",
     name: "Massing → Concept Images",
     description:
-      "Visualize architecture without modeling. Take a 3D massing and generate stunning concept images in three distinct architectural styles.",
+      "Provide a reference image → get an AI-analyzed building concept with a matching render.",
     tags: ["visualization", "render", "styles", "concept"],
     category: "Visualization",
     complexity: "simple",
@@ -203,7 +203,7 @@ export const PREBUILT_WORKFLOWS: WorkflowTemplate[] = [
           position: { x: 380, y: 200 },
           data: {
             catalogueId: "TR-005",
-            label: "Style Prompt Composer",
+            label: "Visualization Style Composer",
             category: "transform",
             status: "idle",
             inputs: [
@@ -223,7 +223,7 @@ export const PREBUILT_WORKFLOWS: WorkflowTemplate[] = [
           position: { x: 660, y: 200 },
           data: {
             catalogueId: "GN-003",
-            label: "Image Generator",
+            label: "Concept Render Generator",
             category: "generate",
             status: "idle",
             inputs: [
@@ -246,7 +246,7 @@ export const PREBUILT_WORKFLOWS: WorkflowTemplate[] = [
     id: "wf-04",
     name: "Parameters → 3D Building",
     description:
-      "No-code parametric building generation. Set floors, height, and area then get an instantly updated 3D building model.",
+      "Start from a reference image → generate a 3D massing model that matches the building's proportions.",
     tags: ["parametric", "3d", "quick", "massing", "sliders"],
     category: "Concept Design",
     complexity: "simple",
@@ -297,7 +297,7 @@ export const PREBUILT_WORKFLOWS: WorkflowTemplate[] = [
     id: "wf-05",
     name: "Massing → IFC Export",
     description:
-      "BIM-compatible massing export (Coming Soon). Conceptual design only - not for construction documentation.",
+      "Create a 3D massing model from a reference image and export it as an IFC file for BIM software.",
     tags: ["ifc", "bim", "export", "bridge"],
     category: "BIM Export",
     complexity: "simple",
@@ -367,7 +367,7 @@ export const PREBUILT_WORKFLOWS: WorkflowTemplate[] = [
     id: "wf-09",
     name: "IFC → Quantity Takeoff → BOQ",
     description:
-      "⚠️ SAMPLE DATA - Conceptual quantity takeoff for demonstration. Not for construction bidding or engineering analysis. Verify all quantities with licensed professionals.",
+      "Upload a photo of a building → get IFC quantities extracted, costs mapped, and a downloadable BOQ spreadsheet.",
     tags: ["ifc", "qto", "boq", "cost", "quantities", "estimating"],
     category: "Cost Estimation",
     complexity: "intermediate",
@@ -445,7 +445,7 @@ export const PREBUILT_WORKFLOWS: WorkflowTemplate[] = [
     id: "wf-10",
     name: "PDF Brief → Full Pipeline",
     description:
-      "The Hero Workflow. Upload a project brief and get everything: extracted requirements, multiple massing variants, concept renders, and an IFC export — all in one pipeline.",
+      "From PDF brief → parsed data, 3D massing, concept render, and IFC export — a complete design pipeline.",
     tags: ["full-pipeline", "hero", "pdf", "massing", "renders", "ifc", "advanced"],
     category: "Full Pipeline",
     complexity: "advanced",
@@ -480,7 +480,7 @@ export const PREBUILT_WORKFLOWS: WorkflowTemplate[] = [
           position: { x: 380, y: 200 },
           data: {
             catalogueId: "TR-001",
-            label: "Document Parser",
+            label: "Brief Parser",
             category: "transform",
             status: "idle",
             inputs: [{ id: "pdf-in", label: "PDF", type: "pdf" }],
@@ -525,7 +525,7 @@ export const PREBUILT_WORKFLOWS: WorkflowTemplate[] = [
           position: { x: 1220, y: 100 },
           data: {
             catalogueId: "GN-003",
-            label: "Image Generator",
+            label: "Concept Render Generator",
             category: "generate",
             status: "idle",
             inputs: [
@@ -568,7 +568,7 @@ export const PREBUILT_WORKFLOWS: WorkflowTemplate[] = [
     id: "wf-11",
     name: "Text Prompt → Floor Plan",
     description:
-      "Generate a professional floor plan from a text description. Enter your building program and get an AI-generated schematic floor plan with room labels and areas.",
+      "Enter a text prompt → get a building description with a detailed SVG floor plan layout.",
     tags: ["floor-plan", "ai", "layout", "architecture", "quick-start"],
     category: "Concept Design",
     complexity: "simple",
@@ -598,7 +598,7 @@ export const PREBUILT_WORKFLOWS: WorkflowTemplate[] = [
           position: { x: 380, y: 200 },
           data: {
             catalogueId: "TR-003",
-            label: "Building Description Generator",
+            label: "Design Brief Analyzer",
             category: "transform",
             status: "idle",
             inputs: [{ id: "json-in", label: "Requirements", type: "json" }],
@@ -637,7 +637,7 @@ export const PREBUILT_WORKFLOWS: WorkflowTemplate[] = [
     id: "wf-12",
     name: "Text → Floor Plan + Render (Branching)",
     description:
-      "Generate both a floor plan AND a concept render from a single text description. Demonstrates branching workflows where one input feeds two parallel AI outputs.",
+      "Enter text → get a full building description, floor plan, and concept render — the most comprehensive quick-start workflow.",
     tags: ["floor-plan", "render", "branching", "ai", "concept"],
     category: "Concept Design",
     complexity: "intermediate",
@@ -667,7 +667,7 @@ export const PREBUILT_WORKFLOWS: WorkflowTemplate[] = [
           position: { x: 400, y: 250 },
           data: {
             catalogueId: "TR-003",
-            label: "Building Description Generator",
+            label: "Design Brief Analyzer",
             category: "transform",
             status: "idle",
             inputs: [{ id: "json-in", label: "Requirements", type: "json" }],
@@ -701,7 +701,7 @@ export const PREBUILT_WORKFLOWS: WorkflowTemplate[] = [
           position: { x: 740, y: 380 },
           data: {
             catalogueId: "GN-003",
-            label: "Image Generator",
+            label: "Concept Render Generator",
             category: "generate",
             status: "idle",
             inputs: [
@@ -724,7 +724,7 @@ export const PREBUILT_WORKFLOWS: WorkflowTemplate[] = [
     id: "wf-13",
     name: "Location → Site Analysis → Building Concept",
     description:
-      "Enter an address and get real climate data, solar analysis, and design implications — then generate a context-responsive building concept with AI.",
+      "Upload a site photo → get climate analysis, AI-written design brief, concept render, and massing — full site-to-concept pipeline.",
     tags: ["site-analysis", "climate", "solar", "location", "concept"],
     category: "Concept Design",
     complexity: "intermediate",
@@ -771,7 +771,7 @@ export const PREBUILT_WORKFLOWS: WorkflowTemplate[] = [
           position: { x: 660, y: 200 },
           data: {
             catalogueId: "TR-003",
-            label: "Building Description Generator",
+            label: "Design Brief Analyzer",
             category: "transform",
             status: "idle",
             inputs: [{ id: "json-in", label: "Requirements", type: "json" }],
@@ -788,7 +788,7 @@ export const PREBUILT_WORKFLOWS: WorkflowTemplate[] = [
           position: { x: 940, y: 200 },
           data: {
             catalogueId: "GN-003",
-            label: "Image Generator",
+            label: "Concept Render Generator",
             category: "generate",
             status: "idle",
             inputs: [

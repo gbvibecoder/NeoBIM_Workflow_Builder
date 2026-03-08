@@ -11,33 +11,40 @@ try {
       url: process.env.UPSTASH_REDIS_REST_URL,
       token: process.env.UPSTASH_REDIS_REST_TOKEN,
     });
-  } else {
-    const redisUrl = process.env.REDIS_URL || "redis://localhost:6379";
-    const url = new URL(redisUrl.replace("redis://", "http://"));
-    
+  } else if (process.env.REDIS_URL) {
+    const url = new URL(process.env.REDIS_URL.replace("redis://", "http://"));
     redis = new Redis({
       url: `https://${url.host}`,
       token: url.password || "",
     });
+  } else {
+    console.warn("[rate-limit] No Redis configured — rate limiting may not persist across restarts");
+    redis = new Redis({
+      url: "https://placeholder.upstash.io",
+      token: "placeholder",
+    });
   }
 } catch (error) {
-  console.warn("[rate-limit] Failed to initialize Redis, using in-memory fallback:", error);
+  console.error("[rate-limit] Failed to initialize Redis:", error);
   redis = new Redis({
-    url: process.env.UPSTASH_REDIS_REST_URL || "http://localhost:8079",
-    token: process.env.UPSTASH_REDIS_REST_TOKEN || "",
+    url: process.env.UPSTASH_REDIS_REST_URL || "https://placeholder.upstash.io",
+    token: process.env.UPSTASH_REDIS_REST_TOKEN || "placeholder",
   });
 }
 
+const FREE_TIER_LIMIT = parseInt(process.env.FREE_TIER_EXECUTIONS_PER_DAY || "3");
+const PRO_TIER_LIMIT = parseInt(process.env.PRO_TIER_EXECUTIONS_PER_DAY || "100");
+
 export const freeTierRateLimit = new Ratelimit({
   redis,
-  limiter: Ratelimit.slidingWindow(3, "1 d"),
+  limiter: Ratelimit.slidingWindow(FREE_TIER_LIMIT, "1 d"),
   analytics: true,
   prefix: "@upstash/ratelimit:execute-node:free",
 });
 
 export const proTierRateLimit = new Ratelimit({
   redis,
-  limiter: Ratelimit.slidingWindow(1000, "1 d"),
+  limiter: Ratelimit.slidingWindow(PRO_TIER_LIMIT, "1 d"),
   analytics: true,
   prefix: "@upstash/ratelimit:execute-node:pro",
 });
@@ -63,9 +70,6 @@ export async function checkRateLimit(
 ) {
   // Check if user is in admin list (bypasses rate limits)
   if (isAdminUser(userEmail)) {
-    if (process.env.NODE_ENV === "development") {
-      console.log("[rate-limit] Admin bypass for:", userEmail);
-    }
     return {
       success: true,
       limit: 999999,
@@ -85,9 +89,52 @@ export async function checkRateLimit(
 
 export function logRateLimitHit(userId: string, userRole: string, remaining: number) {
   console.warn("[RATE_LIMIT] User " + userId + " (" + userRole + ") hit rate limit. Remaining: " + remaining);
-  
+
   // 🔥 TRACK RATE LIMIT HIT
   if (remaining === 0) {
     trackRateLimitHit(userId, "execute-node", userRole);
+  }
+}
+
+// ─── Generic endpoint rate limiter ──────────────────────────────────────────
+
+const endpointLimiters = new Map<string, Ratelimit>();
+
+function getEndpointLimiter(endpoint: string, maxRequests: number, window: string): Ratelimit {
+  const key = `${endpoint}:${maxRequests}:${window}`;
+  if (!endpointLimiters.has(key)) {
+    endpointLimiters.set(key, new Ratelimit({
+      redis,
+      limiter: Ratelimit.slidingWindow(maxRequests, window as Parameters<typeof Ratelimit.slidingWindow>[1]),
+      analytics: true,
+      prefix: `@upstash/ratelimit:${endpoint}`,
+    }));
+  }
+  return endpointLimiters.get(key)!;
+}
+
+/**
+ * Generic rate limit check for any API endpoint.
+ * In development without Redis, logs a warning and allows the request.
+ */
+export async function checkEndpointRateLimit(
+  userId: string,
+  endpoint: string,
+  maxRequests: number = 20,
+  window: string = "1 m"
+): Promise<{ success: boolean; remaining: number }> {
+  try {
+    const limiter = getEndpointLimiter(endpoint, maxRequests, window);
+    const result = await limiter.limit(`${endpoint}:${userId}`);
+    return { success: result.success, remaining: result.remaining };
+  } catch (error) {
+    // In development without Redis configured, allow through with warning
+    if (process.env.NODE_ENV === "development") {
+      console.warn(`[rate-limit] Redis unavailable for ${endpoint}, allowing in dev mode:`, error);
+      return { success: true, remaining: 999 };
+    }
+    // In production, fail closed
+    console.error(`[rate-limit] Redis unavailable for ${endpoint}:`, error);
+    return { success: false, remaining: 0 };
   }
 }

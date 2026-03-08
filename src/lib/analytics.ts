@@ -82,9 +82,6 @@ export async function trackEvent(data: AnalyticsEventData): Promise<void> {
       await updateUserMetrics(data.userId);
     }
 
-    if (process.env.NODE_ENV === "development") {
-      if (process.env.NODE_ENV === "development") console.log("📊 Analytics:", data.eventName, data.userId);
-    }
   } catch (error) {
     console.error("Analytics error:", error);
   }
