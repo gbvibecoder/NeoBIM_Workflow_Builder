@@ -1246,16 +1246,16 @@
   50%      { opacity: 0.5; transform: scale(1.4); }
 }
 
-/* Scan beam for dashboard */
-.dashboard-scan-beam {
+/* Ambient node wave — subtle floating constellation across top */
+.dashboard-node-wave {
   position: absolute;
-  left: 0; right: 0;
-  height: 1px;
-  background: linear-gradient(90deg, transparent 0%, rgba(184,115,51,0.3) 20%, rgba(255,191,0,0.4) 50%, rgba(184,115,51,0.3) 80%, transparent 100%);
-  box-shadow: 0 0 20px 4px rgba(184,115,51,0.1), 0 0 60px 8px rgba(255,191,0,0.05);
-  animation: scan-beam 10s ease-in-out infinite;
+  top: 60px;
+  left: 5%;
+  right: 5%;
+  height: 80px;
   pointer-events: none;
-  z-index: 2;
+  z-index: 1;
+  opacity: 0.6;
 }
 
 /* Pipeline step active glow */

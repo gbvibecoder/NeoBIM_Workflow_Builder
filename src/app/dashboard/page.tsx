@@ -216,6 +216,88 @@ function SectionLabel({ number, title, right }: { number: string; title: string;
   );
 }
 
+// ─── Ambient Node Wave — subtle floating constellation ───────────────────────
+const WAVE_NODES = [
+  { cx: 8,  cy: 15, r: 2,   color: "#B87333", delay: 0 },
+  { cx: 22, cy: 8,  r: 1.5, color: "#4F8AFF", delay: 0.4 },
+  { cx: 38, cy: 18, r: 2,   color: "#8B5CF6", delay: 0.8 },
+  { cx: 52, cy: 6,  r: 1.5, color: "#10B981", delay: 1.2 },
+  { cx: 68, cy: 14, r: 2,   color: "#B87333", delay: 1.6 },
+  { cx: 82, cy: 9,  r: 1.5, color: "#4F8AFF", delay: 2.0 },
+  { cx: 94, cy: 16, r: 2,   color: "#F59E0B", delay: 2.4 },
+];
+
+const WAVE_EDGES: [number, number][] = [
+  [0, 1], [1, 2], [2, 3], [3, 4], [4, 5], [5, 6],
+];
+
+function AmbientNodeWave() {
+  return (
+    <svg
+      className="dashboard-node-wave"
+      viewBox="0 0 100 24"
+      preserveAspectRatio="none"
+    >
+      {/* Edges — faint lines between nodes */}
+      {WAVE_EDGES.map(([a, b], i) => (
+        <line
+          key={`we-${i}`}
+          x1={WAVE_NODES[a].cx} y1={WAVE_NODES[a].cy}
+          x2={WAVE_NODES[b].cx} y2={WAVE_NODES[b].cy}
+          stroke="rgba(184,115,51,0.08)"
+          strokeWidth="0.3"
+          strokeDasharray="1 2"
+        >
+          <animate
+            attributeName="opacity"
+            values="0.3;0.8;0.3"
+            dur={`${3 + i * 0.5}s`}
+            begin={`${i * 0.3}s`}
+            repeatCount="indefinite"
+          />
+        </line>
+      ))}
+
+      {/* Nodes — small dots with staggered wave pulse */}
+      {WAVE_NODES.map((n, i) => (
+        <g key={`wn-${i}`}>
+          {/* Outer ring — breathing */}
+          <circle
+            cx={n.cx} cy={n.cy} r={n.r * 2.5}
+            fill="none" stroke={n.color} strokeWidth="0.2"
+            opacity="0"
+          >
+            <animate
+              attributeName="opacity"
+              values="0;0.15;0"
+              dur="3s"
+              begin={`${n.delay}s`}
+              repeatCount="indefinite"
+            />
+            <animate
+              attributeName="r"
+              values={`${n.r * 2};${n.r * 3};${n.r * 2}`}
+              dur="3s"
+              begin={`${n.delay}s`}
+              repeatCount="indefinite"
+            />
+          </circle>
+          {/* Core dot */}
+          <circle cx={n.cx} cy={n.cy} r={n.r} fill={n.color} opacity="0.12">
+            <animate
+              attributeName="opacity"
+              values="0.08;0.25;0.08"
+              dur="3s"
+              begin={`${n.delay}s`}
+              repeatCount="indefinite"
+            />
+          </circle>
+        </g>
+      ))}
+    </svg>
+  );
+}
+
 // ─── Wire Connector SVG between cards ────────────────────────────────────────
 function WireConnector() {
   return (
@@ -288,8 +370,8 @@ export default function DashboardPage() {
       {/* ── Premium Background Layers ─────────────────────────── */}
       <PageBackground />
 
-      {/* Scanning beam */}
-      <div className="dashboard-scan-beam" />
+      {/* Ambient node wave */}
+      <AmbientNodeWave />
 
       {/* Noise texture overlay */}
       <div className="dashboard-noise" />
