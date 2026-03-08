@@ -53,10 +53,12 @@ export function Sidebar() {
       : []),
   ];
 
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(true);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [newBtnHover, setNewBtnHover] = useState(false);
+  const [hoverExpanded, setHoverExpanded] = useState(false);
+  const hoverTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth < 769);
@@ -92,15 +94,31 @@ export function Sidebar() {
 
   const closeMobile = useCallback(() => setMobileOpen(false), []);
 
-  const [showLabels, setShowLabels] = useState(true);
+  const [showLabels, setShowLabels] = useState(false);
   useEffect(() => {
-    if (!collapsed) {
-      const timer = setTimeout(() => setShowLabels(true), 130);
+    if (!collapsed || hoverExpanded) {
+      const timer = setTimeout(() => setShowLabels(true), 80);
       return () => clearTimeout(timer);
+    } else {
+      setShowLabels(false);
     }
-  }, [collapsed]);
+  }, [collapsed, hoverExpanded]);
 
-  const sidebarWidth = isMobile ? 272 : collapsed ? 62 : 248;
+  const isEffectivelyCollapsed = collapsed && !hoverExpanded;
+  const sidebarWidth = isMobile ? 272 : isEffectivelyCollapsed ? 56 : 248;
+
+  const handleSidebarEnter = useCallback(() => {
+    if (!collapsed || isMobile) return;
+    hoverTimerRef.current = setTimeout(() => setHoverExpanded(true), 150);
+  }, [collapsed, isMobile]);
+
+  const handleSidebarLeave = useCallback(() => {
+    if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
+    setHoverExpanded(false);
+  }, []);
+
+  // Compute showLabels from effective collapse state
+  const effectiveShowLabels = !isEffectivelyCollapsed && showLabels;
 
   return (
     <>
@@ -146,7 +164,9 @@ export function Sidebar() {
       <motion.aside
         initial={!isMobile ? { x: -16, opacity: 0 } : false}
         animate={{ width: sidebarWidth, x: 0, opacity: 1 }}
-        transition={{ type: "spring", stiffness: 320, damping: 30 }}
+        transition={{ type: "spring", stiffness: 400, damping: 32 }}
+        onMouseEnter={handleSidebarEnter}
+        onMouseLeave={handleSidebarLeave}
         className={`sidebar-desktop ${isMobile && mobileOpen ? "sidebar-open" : ""}`}
         style={{
           display: "flex", flexDirection: "column",
@@ -178,8 +198,8 @@ export function Sidebar() {
         {/* ── Logo ─────────────────────────────────────────────────── */}
         <div style={{
           display: "flex", alignItems: "center",
-          justifyContent: collapsed ? "center" : "space-between",
-          padding: collapsed ? "18px 0" : "20px 16px 18px 18px",
+          justifyContent: isEffectivelyCollapsed ? "center" : "space-between",
+          padding: isEffectivelyCollapsed ? "18px 0" : "20px 16px 18px 18px",
           minHeight: 72, flexShrink: 0, position: "relative", zIndex: 1,
         }}>
           <Link href="/dashboard" className="sb-logo-link" style={{ display: "flex", alignItems: "center", gap: 11, textDecoration: "none", overflow: "hidden" }}>
@@ -187,7 +207,7 @@ export function Sidebar() {
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src="/buildflow_logo.png" alt="BuildFlow" style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: 10 }} />
             </div>
-            {showLabels && (
+            {effectiveShowLabels && (
               <motion.div
                 initial={{ opacity: 0, x: -6 }}
                 animate={{ opacity: 1, x: 0 }}
@@ -223,7 +243,7 @@ export function Sidebar() {
             <button onClick={closeMobile} aria-label="Close menu" className="sb-icon-btn">
               <X size={15} />
             </button>
-          ) : showLabels ? (
+          ) : effectiveShowLabels ? (
             <button
               onClick={() => { setCollapsed(true); setShowLabels(false); }}
               title={t("nav.collapseSidebar")}
@@ -239,7 +259,7 @@ export function Sidebar() {
         <div className="sb-divider-blueprint" />
 
         {/* ── New Workflow ────────────────────────────────────────── */}
-        <div style={{ padding: collapsed ? "14px 8px" : "14px 14px", flexShrink: 0, position: "relative", zIndex: 1 }}>
+        <div style={{ padding: isEffectivelyCollapsed ? "14px 8px" : "14px 14px", flexShrink: 0, position: "relative", zIndex: 1 }}>
           <motion.div whileHover={{ scale: 1.015, y: -1 }} whileTap={{ scale: 0.975 }}>
             <Link
               href="/dashboard/workflows/new"
@@ -249,7 +269,7 @@ export function Sidebar() {
               style={{
                 display: "flex", alignItems: "center",
                 justifyContent: "center", gap: 8,
-                padding: collapsed ? "10px" : "10px 16px",
+                padding: isEffectivelyCollapsed ? "10px" : "10px 16px",
                 borderRadius: 10,
                 textDecoration: "none",
                 fontFamily: "var(--font-jetbrains), monospace",
@@ -266,7 +286,7 @@ export function Sidebar() {
                   transform: newBtnHover ? "rotate(90deg)" : "rotate(0deg)",
                 }}
               />
-              {showLabels && <span>{t("nav.newWorkflow")}</span>}
+              {effectiveShowLabels && <span>{t("nav.newWorkflow")}</span>}
             </Link>
           </motion.div>
         </div>
@@ -281,7 +301,7 @@ export function Sidebar() {
           }}
         >
           {/* Section label */}
-          {showLabels && (
+          {effectiveShowLabels && (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -300,8 +320,8 @@ export function Sidebar() {
                 <NavItem
                   key={item.href} href={item.href}
                   label={item.label} badge={item.badge} icon={item.icon}
-                  isActive={isActive} collapsed={collapsed}
-                  showLabels={showLabels} index={idx}
+                  isActive={isActive} collapsed={isEffectivelyCollapsed}
+                  showLabels={effectiveShowLabels} index={idx}
                 />
               );
             })}
@@ -311,7 +331,7 @@ export function Sidebar() {
           <div className="sb-divider-subtle" />
 
           {/* Section label */}
-          {showLabels && (
+          {effectiveShowLabels && (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -330,8 +350,8 @@ export function Sidebar() {
                 <NavItem
                   key={item.href} href={item.href}
                   label={item.label} icon={item.icon}
-                  isActive={isActive} collapsed={collapsed}
-                  showLabels={showLabels} index={idx + PRIMARY_NAV.length}
+                  isActive={isActive} collapsed={isEffectivelyCollapsed}
+                  showLabels={effectiveShowLabels} index={idx + PRIMARY_NAV.length}
                 />
               );
             })}
@@ -339,7 +359,7 @@ export function Sidebar() {
         </nav>
 
         {/* ── Bottom user section ─────────────────────────────────── */}
-        {showLabels && (
+        {effectiveShowLabels && (
           <div style={{ marginTop: "auto", flexShrink: 0, position: "relative", zIndex: 1 }}>
             {/* Top border gradient */}
             <div style={{
@@ -416,10 +436,10 @@ export function Sidebar() {
         )}
 
         {/* ── Expand button (collapsed) ───────────────────────────── */}
-        {collapsed && (
+        {isEffectivelyCollapsed && (
           <div style={{ padding: 8, borderTop: "1px solid rgba(255,255,255,0.04)", flexShrink: 0, position: "relative", zIndex: 1 }}>
             <button
-              onClick={() => setCollapsed(false)}
+              onClick={() => { setCollapsed(false); setHoverExpanded(false); }}
               title={t("nav.expandSidebar")}
               aria-label={t("nav.expandSidebar")}
               className="sb-icon-btn"

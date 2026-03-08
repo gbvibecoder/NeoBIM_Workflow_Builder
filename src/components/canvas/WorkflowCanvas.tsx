@@ -30,6 +30,7 @@ import { NodeLibraryPanel } from "./panels/NodeLibraryPanel";
 import { CanvasToolbar } from "./toolbar/CanvasToolbar";
 import { ArtifactCard } from "./artifacts/ArtifactCard";
 import { ExecutionLog } from "./ExecutionLog";
+import { ExecutionSummary } from "./ExecutionSummary";
 import { OnboardingTour } from "./OnboardingTour";
 import { AIChatPanel } from "./panels/AIChatPanel";
 import type { ChatMessage } from "./panels/AIChatPanel";
@@ -256,6 +257,20 @@ function WorkflowCanvasInner({ workflowId: _workflowId }: WorkflowCanvasInnerPro
   const { artifacts, executionProgress, removeArtifact, clearArtifacts } = useExecutionStore();
   const { isNodeLibraryOpen, setPromptModeActive, isPromptModeActive, toggleNodeLibrary, isDemoMode } = useUIStore();
 
+  // Spacebar opens command palette (only when not typing in an input)
+  React.useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      const isInput = target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable;
+      if (e.code === "Space" && !isInput && !isNodeLibraryOpen && !isPromptModeActive) {
+        e.preventDefault();
+        toggleNodeLibrary();
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [isNodeLibraryOpen, isPromptModeActive, toggleNodeLibrary]);
+
   // Existing workflow names for duplicate detection in save modal
   const [existingNames, setExistingNames] = useState<string[]>([]);
   React.useEffect(() => {
@@ -273,6 +288,12 @@ function WorkflowCanvasInner({ workflowId: _workflowId }: WorkflowCanvasInnerPro
   const [logEntries, setLogEntries] = useState<LogEntry[]>([]);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [showLog, setShowLog] = useState(false);
+  const [showSummary, setShowSummary] = useState(false);
+  const [summaryData, setSummaryData] = useState<{
+    totalNodes: number; successCount: number; errorCount: number;
+    totalTime: string; artifactCount: number;
+  } | null>(null);
+  const prevExecutingRef = useRef(false);
 
   const addLogEntry = useCallback((entry: LogEntry) => {
     setLogEntries(prev => [...prev, entry]);
@@ -280,6 +301,24 @@ function WorkflowCanvasInner({ workflowId: _workflowId }: WorkflowCanvasInnerPro
   }, []);
 
   const { runWorkflow, isExecuting } = useExecution({ onLog: addLogEntry });
+
+  // Show summary card when execution finishes
+  React.useEffect(() => {
+    if (prevExecutingRef.current && !isExecuting) {
+      // Execution just finished — build summary
+      const successNodes = storeNodes.filter(n => n.data.status === "success");
+      const errorNodes = storeNodes.filter(n => n.data.status === "error");
+      setSummaryData({
+        totalNodes: storeNodes.length,
+        successCount: successNodes.length,
+        errorCount: errorNodes.length,
+        totalTime: `${(logEntries.length * 0.4).toFixed(1)}s`,
+        artifactCount: artifacts.size,
+      });
+      setShowSummary(true);
+    }
+    prevExecutingRef.current = isExecuting;
+  }, [isExecuting, storeNodes, logEntries, artifacts]);
   const { t: tLocale } = useLocale();
 
   const [nodes, setNodes, onNodesChange] = useNodesState(storeNodes as unknown as Node[]);
@@ -480,7 +519,7 @@ function WorkflowCanvasInner({ workflowId: _workflowId }: WorkflowCanvasInnerPro
         )}
       </AnimatePresence>
 
-      {/* Node Library Panel */}
+      {/* Node Command Palette (floating overlay) */}
       <AnimatePresence>
         {isNodeLibraryOpen && <NodeLibraryPanel />}
       </AnimatePresence>
@@ -533,7 +572,7 @@ function WorkflowCanvasInner({ workflowId: _workflowId }: WorkflowCanvasInnerPro
               animate={{ opacity: 1 }}
               exit={{ opacity: 0, transition: { delay: 0.5 } }}
               style={{
-                position: "absolute", top: 52, left: 0, right: 0, height: 2, zIndex: 11,
+                position: "absolute", top: 0, left: 0, right: 0, height: 2, zIndex: 11,
                 background: "rgba(255,255,255,0.04)",
               }}
             >
@@ -551,7 +590,7 @@ function WorkflowCanvasInner({ workflowId: _workflowId }: WorkflowCanvasInnerPro
         </AnimatePresence>
 
         {/* React Flow */}
-        <div className="absolute inset-0 pt-13">
+        <div className="absolute inset-0">
           {/* Atmospheric blue center glow — rendered before ReactFlow for depth */}
           <div
             className="absolute inset-0 pointer-events-none"
@@ -674,13 +713,23 @@ function WorkflowCanvasInner({ workflowId: _workflowId }: WorkflowCanvasInnerPro
             )}
           </AnimatePresence>
 
-          {/* Execution log — slides up from bottom */}
+          {/* Execution log — minimal pill at bottom-left */}
           <AnimatePresence>
             {showLog && (
               <ExecutionLog
                 entries={logEntries}
                 isRunning={isExecuting}
                 onClose={() => { setShowLog(false); setLogEntries([]); }}
+              />
+            )}
+          </AnimatePresence>
+
+          {/* Post-execution summary card — centered at bottom */}
+          <AnimatePresence>
+            {showSummary && summaryData && !isExecuting && (
+              <ExecutionSummary
+                {...summaryData}
+                onDismiss={() => setShowSummary(false)}
               />
             )}
           </AnimatePresence>

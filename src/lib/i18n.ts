@@ -165,6 +165,9 @@ const en = {
   'execution.closeLog': 'Close log',
   'execution.inputLabel': 'INPUT',
   'execution.executionError': 'Execution Error',
+  'execution.completed': 'Workflow Complete',
+  'execution.completedWithErrors': 'Completed with Errors',
+  'execution.nodesSucceeded': 'nodes succeeded',
 
   // ===== HISTORY =====
   'history.title': 'Execution History',
@@ -726,6 +729,9 @@ const de: Record<keyof typeof en, string | string[]> = {
   'execution.closeLog': 'Protokoll schließen',
   'execution.inputLabel': 'EINGABE',
   'execution.executionError': 'Ausführungsfehler',
+  'execution.completed': 'Workflow abgeschlossen',
+  'execution.completedWithErrors': 'Mit Fehlern abgeschlossen',
+  'execution.nodesSucceeded': 'Knoten erfolgreich',
 
   // ===== HISTORY =====
   'history.title': 'Ausführungsverlauf',

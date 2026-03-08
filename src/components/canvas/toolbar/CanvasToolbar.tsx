@@ -210,19 +210,22 @@ export function CanvasToolbar({
 
   return (
     <>
-      {/* Desktop toolbar - ALWAYS VISIBLE - fixed at top (no longer hidden on narrow screens) */}
+      {/* Desktop toolbar - floating pill at top */}
       <div
         className="flex"
         style={{
-          position: "absolute", top: 0, left: 0, right: 0, zIndex: 1000,
+          position: "absolute", top: 12, left: "50%", transform: "translateX(-50%)",
+          zIndex: 1000,
           height: 48,
           alignItems: "center", justifyContent: "space-between",
-          padding: "0 16px",
-          borderBottom: "1px solid rgba(255,255,255,0.06)",
-          background: "rgba(8,8,15,0.90)",
-          backdropFilter: "blur(32px) saturate(1.3)",
-          WebkitBackdropFilter: "blur(32px) saturate(1.3)",
-          boxShadow: "0 1px 3px rgba(0,0,0,0.2), 0 4px 16px rgba(0,0,0,0.1)",
+          padding: "0 14px",
+          border: "1px solid rgba(255,255,255,0.08)",
+          borderRadius: 16,
+          background: "rgba(8,8,15,0.88)",
+          backdropFilter: "blur(40px) saturate(1.4)",
+          WebkitBackdropFilter: "blur(40px) saturate(1.4)",
+          boxShadow: "0 4px 24px rgba(0,0,0,0.35), 0 1px 0 rgba(255,255,255,0.03) inset",
+          gap: 4,
         }}
       >
         {/* ── Left group ──────────────────────────────────────────────────── */}
@@ -343,14 +346,10 @@ export function CanvasToolbar({
           <TBBtn onClick={onRedo} icon={<Redo2 size={13} />} title={`${t('canvas.redo')} (⌘⇧Z)`} />
         </div>
 
-        {/* ── Center — inline-editable name ───────────────────────────────── */}
-        <div
-          style={{
-            position: "absolute", left: "50%", transform: "translateX(-50%)",
-            display: "flex", alignItems: "center", gap: 5,
-            maxWidth: 300, minWidth: 80,
-          }}
-        >
+        <Sep />
+
+        {/* ── Center — inline-editable name ───────────────────────────── */}
+        <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
           {isEditingName ? (
             <input
               ref={nameInputRef}
@@ -366,9 +365,9 @@ export function CanvasToolbar({
               style={{
                 background: "transparent", border: "none",
                 borderBottom: "1px solid #4F8AFF",
-                color: "#F0F0F5", fontSize: 13, fontWeight: 500,
+                color: "#F0F0F5", fontSize: 12, fontWeight: 500,
                 outline: "none", textAlign: "center",
-                minWidth: 100, maxWidth: 260, padding: "1px 2px",
+                minWidth: 80, maxWidth: 180, padding: "1px 2px",
               }}
             />
           ) : (
@@ -380,21 +379,22 @@ export function CanvasToolbar({
               }}
               title={t('canvas.clickToRename')}
               style={{
-                display: "flex", alignItems: "center", gap: 5,
+                display: "flex", alignItems: "center", gap: 4,
                 background: "transparent", border: "none", cursor: "text",
                 padding: "3px 6px", borderRadius: 5,
-                maxWidth: 280, transition: "background 0.1s ease",
+                maxWidth: 180, transition: "background 0.1s ease",
               }}
-              onMouseEnter={e => { e.currentTarget.style.background = "#1A1A26"; }}
+              onMouseEnter={e => { e.currentTarget.style.background = "rgba(255,255,255,0.04)"; }}
               onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}
             >
               <span style={{
-                fontSize: 13, fontWeight: 500, color: "#F0F0F5",
+                fontSize: 12, fontWeight: 500, color: "#8888A0",
                 overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                maxWidth: 140,
               }}>
                 {workflowName}
               </span>
-              <Pencil size={10} style={{ color: "#3A3A4E", flexShrink: 0 }} />
+              <Pencil size={9} style={{ color: "#3A3A4E", flexShrink: 0 }} />
               {isDirty && (
                 <div
                   title={t('canvas.unsavedChanges')}
@@ -404,6 +404,8 @@ export function CanvasToolbar({
             </button>
           )}
         </div>
+
+        <Sep />
 
         {/* ── Right group ─────────────────────────────────────────────────── */}
         <div style={{ display: "flex", alignItems: "center", gap: 2 }}>

@@ -173,7 +173,7 @@ export const AnimatedEdge = memo(function AnimatedEdge({
         />
       )}
 
-      {/* Flowing: bright white dot travels the path */}
+      {/* Flowing: energy particles travel the path */}
       {isFlowing && (
         <>
           {/* Bright pulsing track overlay */}
@@ -186,30 +186,33 @@ export const AnimatedEdge = memo(function AnimatedEdge({
             strokeLinecap="round"
             style={{ pointerEvents: "none" }}
           />
-          {/* Travelling dot with tail */}
-          <g>
-            {/* Dot tail (gradient fade) */}
-            <circle r="3" fill={targetColor} opacity={0.4}>
-              <animateMotion
-                dur="1.4s"
-                repeatCount="indefinite"
-                calcMode="linear"
-                path={edgePath}
-                begin="0.15s"
-              />
-            </circle>
-            {/* Main dot */}
-            <circle r="4" fill="white" opacity={1} style={{
-              filter: `drop-shadow(0 0 6px ${targetColor})`,
-            }}>
-              <animateMotion
-                dur="1.4s"
-                repeatCount="indefinite"
-                calcMode="linear"
-                path={edgePath}
-              />
-            </circle>
-          </g>
+          {/* Multiple energy particles staggered along path */}
+          {[0, 0.33, 0.66].map((offset, i) => (
+            <g key={i}>
+              {/* Trailing glow */}
+              <circle r={2.5 - i * 0.3} fill={sourceColor} opacity={0.3}>
+                <animateMotion
+                  dur="1.6s"
+                  repeatCount="indefinite"
+                  calcMode="linear"
+                  path={edgePath}
+                  begin={`${offset + 0.1}s`}
+                />
+              </circle>
+              {/* Main particle */}
+              <circle r={3.5 - i * 0.4} fill="white" opacity={0.9 - i * 0.15} style={{
+                filter: `drop-shadow(0 0 ${6 - i}px ${targetColor})`,
+              }}>
+                <animateMotion
+                  dur="1.6s"
+                  repeatCount="indefinite"
+                  calcMode="linear"
+                  path={edgePath}
+                  begin={`${offset}s`}
+                />
+              </circle>
+            </g>
+          ))}
         </>
       )}
     </>

@@ -4,11 +4,13 @@ import React, { memo, useState } from "react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import * as LucideIcons from "lucide-react";
-import { CheckCircle2, AlertCircle } from "lucide-react";
+import { CheckCircle2, AlertCircle, Download, Maximize2 } from "lucide-react";
 import type { WorkflowNodeData, NodeCategory, NodeStatus } from "@/types/nodes";
 import { InputNodeContent } from "./InputNode";
 import { ViewTypeSelect } from "./GenerateNodeContent";
 import { useLocale } from "@/hooks/useLocale";
+import { useExecutionStore } from "@/stores/execution-store";
+import type { ExecutionArtifact } from "@/types/execution";
 
 const INPUT_NODE_IDS = new Set(["IN-001","IN-002","IN-003","IN-004","IN-005","IN-006","IN-007"]);
 
@@ -129,6 +131,228 @@ function ProgressBar({ status, color }: { status: NodeStatus; color: string }) {
   );
 }
 
+// ─── Inline Result Display ──────────────────────────────────────────────────
+
+function InlineResult({ artifact }: { artifact: ExecutionArtifact }) {
+  const d = artifact.data as Record<string, unknown>;
+
+  if (artifact.type === "text") {
+    const text = (d?.content as string) ?? "";
+    const lines = text.split("\n").slice(0, 4);
+    return (
+      <div style={{
+        padding: "8px 0 2px",
+        borderTop: "1px solid rgba(255,255,255,0.06)",
+        marginTop: 8,
+      }}>
+        {lines.map((line, i) => (
+          <motion.div
+            key={i}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: i * 0.08, duration: 0.3 }}
+            style={{
+              fontSize: 10.5, color: "#8888A0", lineHeight: 1.5,
+              overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+            }}
+          >
+            {line || "\u00A0"}
+          </motion.div>
+        ))}
+        {text.split("\n").length > 4 && (
+          <div style={{ fontSize: 9, color: "#4F8AFF", marginTop: 2 }}>+{text.split("\n").length - 4} more lines</div>
+        )}
+      </div>
+    );
+  }
+
+  if (artifact.type === "kpi") {
+    const metrics = (d?.metrics as Array<{ label: string; value: string | number; unit?: string }>) ?? [];
+    return (
+      <div style={{
+        display: "grid",
+        gridTemplateColumns: "1fr 1fr",
+        gap: 4,
+        padding: "8px 0 2px",
+        borderTop: "1px solid rgba(255,255,255,0.06)",
+        marginTop: 8,
+      }}>
+        {metrics.slice(0, 4).map((m, i) => (
+          <motion.div
+            key={i}
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: i * 0.06, duration: 0.25 }}
+            style={{
+              background: "rgba(255,255,255,0.03)",
+              borderRadius: 6, padding: "5px 7px",
+              textAlign: "center",
+            }}
+          >
+            <div style={{ fontSize: 14, fontWeight: 700, color: "#F0F0F5", lineHeight: 1.1 }}>
+              {m.value}
+              {m.unit && <span style={{ fontSize: 8, color: "#5C5C78", marginLeft: 2 }}>{m.unit}</span>}
+            </div>
+            <div style={{ fontSize: 7.5, color: "#5C5C78", marginTop: 2, textTransform: "uppercase" as const, letterSpacing: "0.3px" }}>
+              {m.label}
+            </div>
+          </motion.div>
+        ))}
+      </div>
+    );
+  }
+
+  if (artifact.type === "image") {
+    const url = d?.url as string;
+    return (
+      <div style={{
+        padding: "8px 0 2px",
+        borderTop: "1px solid rgba(255,255,255,0.06)",
+        marginTop: 8,
+      }}>
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.3 }}
+          style={{ position: "relative", borderRadius: 8, overflow: "hidden" }}
+        >
+          {url ? (
+            /* eslint-disable-next-line @next/next/no-img-element */
+            <img src={url} alt="Result" style={{ width: "100%", height: 90, objectFit: "cover", borderRadius: 8 }} />
+          ) : (
+            <div style={{ height: 60, background: "rgba(255,255,255,0.03)", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <span style={{ fontSize: 10, color: "#5C5C78" }}>No preview</span>
+            </div>
+          )}
+          <div style={{
+            position: "absolute", top: 6, right: 6,
+            width: 22, height: 22, borderRadius: 5,
+            background: "rgba(0,0,0,0.5)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+          }}>
+            <Maximize2 size={10} style={{ color: "rgba(255,255,255,0.6)" }} />
+          </div>
+        </motion.div>
+      </div>
+    );
+  }
+
+  if (artifact.type === "json") {
+    const json = d?.json as Record<string, unknown>;
+    const preview = json ? JSON.stringify(json, null, 1).slice(0, 120) : "{}";
+    return (
+      <div style={{
+        padding: "8px 0 2px",
+        borderTop: "1px solid rgba(255,255,255,0.06)",
+        marginTop: 8,
+      }}>
+        <motion.pre
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.3 }}
+          style={{
+            fontSize: 9, color: "#10B981", background: "rgba(0,0,0,0.2)",
+            borderRadius: 6, padding: "6px 8px", margin: 0,
+            fontFamily: "monospace", lineHeight: 1.4,
+            overflow: "hidden", maxHeight: 60,
+          }}
+        >
+          {preview}{preview.length >= 120 ? "..." : ""}
+        </motion.pre>
+      </div>
+    );
+  }
+
+  if (artifact.type === "table") {
+    const headers = (d?.headers as string[]) ?? [];
+    const rows = (d?.rows as string[][]) ?? [];
+    return (
+      <div style={{
+        padding: "8px 0 2px",
+        borderTop: "1px solid rgba(255,255,255,0.06)",
+        marginTop: 8,
+      }}>
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.3 }}
+          style={{
+            fontSize: 9, color: "#5C5C78",
+            background: "rgba(0,0,0,0.2)",
+            borderRadius: 6, padding: "6px 8px",
+            overflow: "hidden", maxHeight: 60,
+          }}
+        >
+          <div style={{ fontWeight: 600, color: "#8888A0" }}>{headers.slice(0, 4).join(" | ")}</div>
+          {rows.slice(0, 2).map((row, i) => (
+            <div key={i}>{row.slice(0, 4).join(" | ")}</div>
+          ))}
+          {rows.length > 2 && <div style={{ color: "#4F8AFF", marginTop: 2 }}>+{rows.length - 2} rows</div>}
+        </motion.div>
+      </div>
+    );
+  }
+
+  if (artifact.type === "file") {
+    const name = d?.name as string;
+    const size = d?.size as number;
+    return (
+      <div style={{
+        padding: "8px 0 2px",
+        borderTop: "1px solid rgba(255,255,255,0.06)",
+        marginTop: 8,
+      }}>
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.3 }}
+          style={{
+            display: "flex", alignItems: "center", gap: 8,
+            background: "rgba(0,0,0,0.2)",
+            borderRadius: 6, padding: "6px 8px",
+          }}
+        >
+          <Download size={11} style={{ color: "#4F8AFF", flexShrink: 0 }} />
+          <div style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 10, color: "#8888A0" }}>
+            {name}
+          </div>
+          <span style={{ fontSize: 9, color: "#3A3A50", flexShrink: 0 }}>
+            {size ? `${(size / 1024).toFixed(0)}KB` : ""}
+          </span>
+        </motion.div>
+      </div>
+    );
+  }
+
+  if (artifact.type === "svg" || artifact.type === "3d") {
+    return (
+      <div style={{
+        padding: "8px 0 2px",
+        borderTop: "1px solid rgba(255,255,255,0.06)",
+        marginTop: 8,
+      }}>
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.3 }}
+          style={{
+            display: "flex", alignItems: "center", justifyContent: "center",
+            background: "rgba(79,138,255,0.06)",
+            border: "1px solid rgba(79,138,255,0.15)",
+            borderRadius: 6, padding: "8px",
+            fontSize: 10, fontWeight: 500, color: "#4F8AFF",
+            cursor: "pointer",
+          }}
+        >
+          {artifact.type === "svg" ? "View Floor Plan" : "View 3D Model"}
+        </motion.div>
+      </div>
+    );
+  }
+
+  return null;
+}
+
 // ─── BaseNode ─────────────────────────────────────────────────────────────────
 
 type BaseNodeProps = NodeProps & { data: WorkflowNodeData };
@@ -137,12 +361,16 @@ export const BaseNode = memo(function BaseNode({ id, data, selected }: BaseNodeP
   const { t } = useLocale();
   const [isHovered, setIsHovered] = useState(false);
   const prefersReduced = useReducedMotion();
+  const [showResult, setShowResult] = useState(true);
 
   const category = data.category as NodeCategory;
   const status   = data.status   as NodeStatus;
   const color    = CATEGORY_COLOR[category];
   const rgb      = hexToRgb(color);
   const isInput  = INPUT_NODE_IDS.has(data.catalogueId);
+
+  // Get artifact for this node (for inline result display)
+  const artifact = useExecutionStore(s => s.artifacts.get(id));
 
   const borderColor =
     status === "error"   ? "#F87171" :
@@ -193,8 +421,9 @@ export const BaseNode = memo(function BaseNode({ id, data, selected }: BaseNodeP
             : `0 4px 24px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.04)${stateGlow ? `, ${stateGlow}` : ""}`,
           backdropFilter: "blur(32px) saturate(1.3)",
           WebkitBackdropFilter: "blur(32px) saturate(1.3)",
-          transform: isHovered && !selected ? "translateY(-2px)" : "translateY(0)",
+          transform: isHovered && !selected ? "translateY(-4px)" : "translateY(0)",
           transition: "all 200ms ease-out",
+          animation: status === "idle" && !isHovered && !selected ? "nodeBreathing 4s ease-in-out infinite" : "none",
           overflow: "hidden",
           cursor: "pointer",
           position: "relative",
@@ -344,6 +573,21 @@ export const BaseNode = memo(function BaseNode({ id, data, selected }: BaseNodeP
               {data.executionTime ?? "< 2s"}
             </span>
           </div>
+
+          {/* Row 4: Inline result (after execution) */}
+          <AnimatePresence>
+            {artifact && showResult && status === "success" && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: "auto", opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
+                style={{ overflow: "hidden" }}
+              >
+                <InlineResult artifact={artifact} />
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
 
         {/* Handles */}
@@ -414,6 +658,10 @@ export const BaseNode = memo(function BaseNode({ id, data, selected }: BaseNodeP
         @keyframes shimmer {
           0% { transform: translateX(-100%); }
           100% { transform: translateX(300%); }
+        }
+        @keyframes nodeBreathing {
+          0%, 100% { box-shadow: 0 4px 24px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.04); }
+          50% { box-shadow: 0 6px 28px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.06), 0 0 20px rgba(${rgb}, 0.08); }
         }
       `}</style>
     </>
