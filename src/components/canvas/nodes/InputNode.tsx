@@ -7,6 +7,7 @@
  */
 
 import React, { useRef, useCallback } from "react";
+import { toast } from "sonner";
 import { useWorkflowStore } from "@/stores/workflow-store";
 import type { WorkflowNodeData } from "@/types/nodes";
 
@@ -81,7 +82,7 @@ export function FileUploadInput({ nodeId, data, accept, label, maxMB = 20, showP
 
   const handleFile = useCallback((file: File) => {
     if (maxMB && file.size > maxMB * 1024 * 1024) {
-      alert(`File too large. Max ${maxMB}MB.`);
+      toast.error(`File too large. Max ${maxMB}MB.`);
       return;
     }
     inputFileStore.set(nodeId, file);

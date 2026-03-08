@@ -29,15 +29,11 @@ import type {
   JsonArtifactData,
 } from "@/types/execution";
 import type { NodeCategory } from "@/types/nodes";
+import { CATEGORY_COLORS, hexToRgb } from "@/lib/ui-constants";
 
 // ─── Category → color ────────────────────────────────────────────────────────
 
-const CATEGORY_COLOR: Record<NodeCategory, string> = {
-  input:     "#00F5FF",
-  transform: "#B87333",
-  generate:  "#FFBF00",
-  export:    "#4FC3F7",
-};
+const CATEGORY_COLOR = CATEGORY_COLORS;
 
 const TYPE_COLOR: Record<ArtifactType, string> = {
   text:  "#B87333",
@@ -61,11 +57,6 @@ const TYPE_ICON: Record<ArtifactType, React.ReactNode> = {
   svg:   <LayoutGrid size={9} />,
 };
 
-function hexToRgb(hex: string): string {
-  const r = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-  if (!r) return "79, 138, 255";
-  return `${parseInt(r[1], 16)}, ${parseInt(r[2], 16)}, ${parseInt(r[3], 16)}`;
-}
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 

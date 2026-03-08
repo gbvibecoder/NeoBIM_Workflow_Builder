@@ -23,11 +23,11 @@ interface ChatMessage {
   timestamp: Date;
 }
 
+import { CATEGORY_COLORS } from "@/lib/ui-constants";
+
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-const COLORS: Record<NodeCategory, string> = {
-  input: "#00F5FF", transform: "#B87333", generate: "#FFBF00", export: "#4FC3F7",
-};
+const COLORS = CATEGORY_COLORS;
 
 // ─── Node catalogue helpers (keyword fallback) ───────────────────────────────
 

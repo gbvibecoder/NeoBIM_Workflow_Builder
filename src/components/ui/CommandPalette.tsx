@@ -33,20 +33,11 @@ interface CommandSection {
   items: CommandItem[];
 }
 
+import { CATEGORY_COLORS, hexToRgb } from "@/lib/ui-constants";
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-const CATEGORY_COLOR: Record<string, string> = {
-  input:     "#3B82F6",
-  transform: "#8B5CF6",
-  generate:  "#10B981",
-  export:    "#F59E0B",
-};
-
-function hexToRgb(hex: string): string {
-  const r = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-  if (!r) return "79, 138, 255";
-  return `${parseInt(r[1], 16)}, ${parseInt(r[2], 16)}, ${parseInt(r[3], 16)}`;
-}
+const CATEGORY_COLOR = CATEGORY_COLORS;
 
 function matches(item: CommandItem, q: string): boolean {
   if (!q) return true;
