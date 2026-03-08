@@ -4,9 +4,6 @@ import React, { useCallback, useRef, useState } from "react";
 import { useExecution } from "@/hooks/useExecution";
 import {
   ReactFlow,
-  Background,
-  BackgroundVariant,
-  Controls,
   MiniMap,
   useNodesState,
   useEdgesState,
@@ -21,16 +18,16 @@ import {
 import "@xyflow/react/dist/style.css";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
-import { Layers3, Sparkles, BookOpen, X, FileDown } from "lucide-react";
+import { Layers3, Sparkles, BookOpen, X } from "lucide-react";
 
 import dynamic from "next/dynamic";
 import { BaseNode } from "./nodes/BaseNode";
 import { AnimatedEdge } from "./edges/AnimatedEdge";
 import { NodeLibraryPanel } from "./panels/NodeLibraryPanel";
 import { CanvasToolbar } from "./toolbar/CanvasToolbar";
-import { ArtifactCard } from "./artifacts/ArtifactCard";
+
 import { ExecutionLog } from "./ExecutionLog";
-import { ExecutionSummary } from "./ExecutionSummary";
+import { ResultShowcase } from "./ResultShowcase";
 import { OnboardingTour } from "./OnboardingTour";
 import { AIChatPanel } from "./panels/AIChatPanel";
 import type { ChatMessage } from "./panels/AIChatPanel";
@@ -254,7 +251,7 @@ function WorkflowCanvasInner({ workflowId: _workflowId }: WorkflowCanvasInnerPro
     closeSaveModal,
   } = useWorkflowStore();
 
-  const { artifacts, executionProgress, removeArtifact, clearArtifacts } = useExecutionStore();
+  const { artifacts, executionProgress, clearArtifacts } = useExecutionStore();
   const { isNodeLibraryOpen, setPromptModeActive, isPromptModeActive, toggleNodeLibrary, isDemoMode } = useUIStore();
 
   // Spacebar opens command palette (only when not typing in an input)
@@ -288,11 +285,7 @@ function WorkflowCanvasInner({ workflowId: _workflowId }: WorkflowCanvasInnerPro
   const [logEntries, setLogEntries] = useState<LogEntry[]>([]);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [showLog, setShowLog] = useState(false);
-  const [showSummary, setShowSummary] = useState(false);
-  const [summaryData, setSummaryData] = useState<{
-    totalNodes: number; successCount: number; errorCount: number;
-    totalTime: string; artifactCount: number;
-  } | null>(null);
+  const [showShowcase, setShowShowcase] = useState(false);
   const prevExecutingRef = useRef(false);
 
   const addLogEntry = useCallback((entry: LogEntry) => {
@@ -302,23 +295,17 @@ function WorkflowCanvasInner({ workflowId: _workflowId }: WorkflowCanvasInnerPro
 
   const { runWorkflow, isExecuting } = useExecution({ onLog: addLogEntry });
 
-  // Show summary card when execution finishes
+  // Show showcase when execution finishes
   React.useEffect(() => {
-    if (prevExecutingRef.current && !isExecuting) {
-      // Execution just finished — build summary
-      const successNodes = storeNodes.filter(n => n.data.status === "success");
-      const errorNodes = storeNodes.filter(n => n.data.status === "error");
-      setSummaryData({
-        totalNodes: storeNodes.length,
-        successCount: successNodes.length,
-        errorCount: errorNodes.length,
-        totalTime: `${(logEntries.length * 0.4).toFixed(1)}s`,
-        artifactCount: artifacts.size,
-      });
-      setShowSummary(true);
+    if (prevExecutingRef.current && !isExecuting && artifacts.size > 0) {
+      // Brief toast
+      toast.success("Workflow Complete", { duration: 2000 });
+      // Show grand reveal showcase after a short delay
+      const timer = setTimeout(() => setShowShowcase(true), 500);
+      return () => clearTimeout(timer);
     }
     prevExecutingRef.current = isExecuting;
-  }, [isExecuting, storeNodes, logEntries, artifacts]);
+  }, [isExecuting, artifacts]);
   const { t: tLocale } = useLocale();
 
   const [nodes, setNodes, onNodesChange] = useNodesState(storeNodes as unknown as Node[]);
@@ -326,6 +313,21 @@ function WorkflowCanvasInner({ workflowId: _workflowId }: WorkflowCanvasInnerPro
 
   React.useEffect(() => { setNodes(storeNodes as unknown as Node[]); }, [storeNodes, setNodes]);
   React.useEffect(() => { setEdges(storeEdges as Edge[]); }, [storeEdges, setEdges]);
+
+  // Fit view when nodes are loaded from template (batch node change)
+  const prevNodeCountRef = useRef(storeNodes.length);
+  React.useEffect(() => {
+    const prev = prevNodeCountRef.current;
+    const curr = storeNodes.length;
+    prevNodeCountRef.current = curr;
+    // Template load: many nodes appear at once (from 0 or very different count)
+    if (curr > 0 && Math.abs(curr - prev) >= 3) {
+      const timer = setTimeout(() => {
+        fitView({ padding: 0.3, duration: 800 });
+      }, 200);
+      return () => clearTimeout(timer);
+    }
+  }, [storeNodes.length, fitView]);
 
   // Context menu state
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
@@ -591,12 +593,15 @@ function WorkflowCanvasInner({ workflowId: _workflowId }: WorkflowCanvasInnerPro
 
         {/* React Flow */}
         <div className="absolute inset-0">
-          {/* Atmospheric blue center glow — rendered before ReactFlow for depth */}
+          {/* Atmospheric blue center glow — intensifies during execution */}
           <div
             className="absolute inset-0 pointer-events-none"
             style={{
               zIndex: 0,
-              background: 'radial-gradient(ellipse 80% 60% at 50% 40%, rgba(79,138,255,0.04) 0%, transparent 70%)',
+              background: isExecuting
+                ? 'radial-gradient(ellipse 80% 60% at 50% 40%, rgba(79,138,255,0.10) 0%, transparent 70%)'
+                : 'radial-gradient(ellipse 80% 60% at 50% 40%, rgba(79,138,255,0.04) 0%, transparent 70%)',
+              transition: 'background 1s ease',
             }}
           />
           {/* Edge vignette — darkens corners for cinematic depth */}
@@ -620,7 +625,7 @@ function WorkflowCanvasInner({ workflowId: _workflowId }: WorkflowCanvasInnerPro
             nodeTypes={nodeTypes}
             edgeTypes={edgeTypes}
             fitView
-            fitViewOptions={{ padding: 0.2 }}
+            fitViewOptions={{ padding: 0.3 }}
             defaultEdgeOptions={{
               type: "animatedEdge",
               style: { stroke: "#4F8AFF", strokeWidth: 2 },
@@ -635,40 +640,39 @@ function WorkflowCanvasInner({ workflowId: _workflowId }: WorkflowCanvasInnerPro
               strokeDasharray: "6 4",
               opacity: 0.7,
             }}
-            style={{ background: "#07070D" }}
+            style={{
+              background: [
+                'linear-gradient(rgba(79,138,255,0.03) 1px, transparent 1px)',
+                'linear-gradient(90deg, rgba(79,138,255,0.03) 1px, transparent 1px)',
+                'linear-gradient(rgba(79,138,255,0.015) 1px, transparent 1px)',
+                'linear-gradient(90deg, rgba(79,138,255,0.015) 1px, transparent 1px)',
+                '#07070e',
+              ].join(', '),
+              backgroundSize: '100px 100px, 100px 100px, 20px 20px, 20px 20px',
+            }}
           >
-            {/* Dot grid — refined spacing and brightness */}
-            <Background
-              variant={BackgroundVariant.Dots}
-              gap={24}
-              size={1}
-              color="rgba(255,255,255,0.035)"
-            />
 
-            {/* Styled controls — bottom-right, above minimap */}
-            <Controls
-              position="bottom-right"
-              style={{ marginBottom: 124, marginRight: 16 }}
-            />
-
-            {/* Styled minimap */}
+            {/* Minimap — bottom-left, compact, low opacity */}
             <MiniMap
-              position="bottom-right"
+              position="bottom-left"
               nodeStrokeWidth={0}
               nodeColor={(n) => {
                 const d = n.data as WorkflowNodeData;
                 const cfg = CATEGORY_CONFIG[d?.category as NodeCategory];
                 return cfg?.color ?? "rgba(255,255,255,0.08)";
               }}
-              maskColor="rgba(10,10,15,0.65)"
+              maskColor="rgba(10,10,15,0.7)"
+              className="canvas-minimap"
               style={{
-                width: 160,
-                height: 100,
-                backgroundColor: "rgba(18,18,26,0.92)",
-                border: "1px solid rgba(255,255,255,0.06)",
+                width: 120,
+                height: 80,
+                backgroundColor: "rgba(18,18,26,0.85)",
+                border: "1px solid rgba(255,255,255,0.04)",
                 borderRadius: 8,
                 marginBottom: 16,
-                marginRight: 16,
+                marginLeft: 16,
+                opacity: 0.4,
+                transition: "opacity 0.3s ease",
               }}
             />
           </ReactFlow>
@@ -724,13 +728,10 @@ function WorkflowCanvasInner({ workflowId: _workflowId }: WorkflowCanvasInnerPro
             )}
           </AnimatePresence>
 
-          {/* Post-execution summary card — centered at bottom */}
+          {/* Post-execution grand reveal showcase */}
           <AnimatePresence>
-            {showSummary && summaryData && !isExecuting && (
-              <ExecutionSummary
-                {...summaryData}
-                onDismiss={() => setShowSummary(false)}
-              />
+            {showShowcase && !isExecuting && artifacts.size > 0 && (
+              <ResultShowcase onClose={() => setShowShowcase(false)} />
             )}
           </AnimatePresence>
         </div>
@@ -744,108 +745,7 @@ function WorkflowCanvasInner({ workflowId: _workflowId }: WorkflowCanvasInnerPro
           onToggle={() => setIsChatOpen(o => !o)}
         />
 
-        {/* Artifact results panel */}
-        <AnimatePresence>
-          {artifacts.size > 0 && (
-            <motion.div
-              key="artifact-panel"
-              initial={{ opacity: 0, y: 20, scale: 0.97 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 16, scale: 0.97 }}
-              transition={{ type: "spring", stiffness: 380, damping: 32 }}
-              style={{
-                position: "absolute", bottom: 16, right: 16, zIndex: 20,
-                width: 320,
-                maxHeight: "calc(100vh - 100px)",
-                display: "flex", flexDirection: "column",
-                background: "rgba(8, 8, 16, 0.92)",
-                border: "1px solid rgba(255,255,255,0.08)",
-                borderRadius: 14,
-                overflow: "hidden",
-                backdropFilter: "blur(32px) saturate(1.3)",
-                WebkitBackdropFilter: "blur(32px) saturate(1.3)",
-                boxShadow: "0 16px 48px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.04)",
-              }}
-            >
-              {/* Panel header */}
-              <div style={{
-                display: "flex", alignItems: "center", gap: 7,
-                padding: "10px 12px",
-                borderBottom: "1px solid rgba(255,255,255,0.06)", flexShrink: 0,
-              }}>
-                <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#10B981", flexShrink: 0 }} />
-                <span style={{ fontSize: 12, fontWeight: 600, color: "#F0F0F5", flex: 1 }}>
-                  {tLocale('canvas.executionResults')}
-                </span>
-                <span style={{
-                  padding: "1px 6px", borderRadius: 10,
-                  background: "rgba(16,185,129,0.1)", border: "1px solid rgba(16,185,129,0.2)",
-                  fontSize: 10, fontWeight: 600, color: "#10B981",
-                }}>
-                  {artifacts.size}
-                </span>
-                <button
-                  onClick={async () => {
-                    const { generatePDFReport } = await import("@/services/pdf-report");
-                    const labels = new Map<string, string>();
-                    storeNodes.forEach(n => labels.set(n.id, n.data.label));
-                    await generatePDFReport({
-                      workflowName: workflowName,
-                      artifacts,
-                      nodeLabels: labels,
-                    });
-                    toast.success(tLocale('toast.pdfDownloaded'), { duration: 2000 });
-                  }}
-                  title={tLocale('canvas.downloadPdfReport')}
-                  style={{
-                    width: 22, height: 22, borderRadius: 5, flexShrink: 0,
-                    background: "transparent", border: "none",
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    color: "#3A3A50", cursor: "pointer",
-                    transition: "color 0.1s ease",
-                  }}
-                  onMouseEnter={e => { e.currentTarget.style.color = "#4F8AFF"; }}
-                  onMouseLeave={e => { e.currentTarget.style.color = "#3A3A50"; }}
-                >
-                  <FileDown size={12} />
-                </button>
-                <button
-                  onClick={clearArtifacts}
-                  title={tLocale('canvas.clearAllResults')}
-                  style={{
-                    width: 22, height: 22, borderRadius: 5, flexShrink: 0,
-                    background: "transparent", border: "none",
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    color: "#3A3A50", cursor: "pointer",
-                    transition: "color 0.1s ease",
-                  }}
-                  onMouseEnter={e => { e.currentTarget.style.color = "#EF4444"; }}
-                  onMouseLeave={e => { e.currentTarget.style.color = "#3A3A50"; }}
-                >
-                  <X size={12} />
-                </button>
-              </div>
-
-              {/* Scrollable card list */}
-              <div style={{ overflowY: "auto", flex: 1 }}>
-                <AnimatePresence initial={false}>
-                  {Array.from(artifacts.entries()).map(([tileId, artifact]) => {
-                    const node = storeNodes.find(n => n.id === tileId);
-                    return (
-                      <ArtifactCard
-                        key={tileId}
-                        artifact={artifact}
-                        nodeLabel={node?.data.label}
-                        nodeCategory={node?.data.category}
-                        onDismiss={() => removeArtifact(tileId)}
-                      />
-                    );
-                  })}
-                </AnimatePresence>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+        {/* Artifact results panel removed — results now display inside nodes */}
       </div>
 
       {/* Save workflow name modal */}

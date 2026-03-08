@@ -220,15 +220,40 @@ export function AIChatPanel({ messages, onAddMessage, onClear, isOpen, onToggle 
   const { t } = useLocale();
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
+  const [minimized, setMinimized] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [aiMode, setAiMode] = useState<"gpt" | "keyword">("gpt");
 
+  // Draggable state
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  const isDragging = useRef(false);
+  const dragStart = useRef({ x: 0, y: 0, ox: 0, oy: 0 });
+
+  const onDragHeaderDown = useCallback((e: React.MouseEvent) => {
+    isDragging.current = true;
+    dragStart.current = { x: e.clientX, y: e.clientY, ox: dragOffset.x, oy: dragOffset.y };
+    const onMove = (ev: MouseEvent) => {
+      if (!isDragging.current) return;
+      setDragOffset({
+        x: dragStart.current.ox + (ev.clientX - dragStart.current.x),
+        y: dragStart.current.oy + (ev.clientY - dragStart.current.y),
+      });
+    };
+    const onUp = () => {
+      isDragging.current = false;
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+    };
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+  }, [dragOffset]);
+
   const { nodes, edges, addNode, addEdge, removeNode } = useWorkflowStore();
 
   useEffect(() => {
-    if (isOpen) bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, isOpen]);
+    if (isOpen && !minimized) bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, isOpen, minimized]);
 
   const handleSend = useCallback(async () => {
     const text = input.trim();
@@ -302,60 +327,71 @@ export function AIChatPanel({ messages, onAddMessage, onClear, isOpen, onToggle 
       <AnimatePresence>
         {!isOpen && (
           <motion.button
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: 20 }}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 20 }}
             onClick={onToggle}
             style={{
-              position: "absolute", right: 0, top: "50%", transform: "translateY(-50%)",
-              zIndex: 25, padding: "10px 8px",
-              background: "#12121E", border: "1px solid rgba(255,255,255,0.08)",
-              borderRight: "none",
-              borderRadius: "8px 0 0 8px",
-              cursor: "pointer", color: "#8888A0",
-              display: "flex", flexDirection: "column", alignItems: "center", gap: 4,
-              boxShadow: "-4px 0 16px rgba(0,0,0,0.3)",
+              position: "absolute", right: 20, bottom: 20,
+              zIndex: 25, padding: "10px 16px",
+              background: "rgba(12,12,24,0.92)", border: "1px solid rgba(79,138,255,0.2)",
+              borderRadius: 28,
+              cursor: "pointer", color: "#4F8AFF",
+              display: "flex", alignItems: "center", gap: 8,
+              boxShadow: "0 4px 20px rgba(0,0,0,0.4), 0 0 15px rgba(79,138,255,0.08)",
+              backdropFilter: "blur(20px)",
+              WebkitBackdropFilter: "blur(20px)",
+              transition: "all 0.2s ease",
             }}
-            onMouseEnter={e => { (e.currentTarget).style.color = "#4F8AFF"; }}
-            onMouseLeave={e => { (e.currentTarget).style.color = "#8888A0"; }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = "rgba(79,138,255,0.4)"; e.currentTarget.style.boxShadow = "0 4px 24px rgba(0,0,0,0.5), 0 0 25px rgba(79,138,255,0.12)"; }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = "rgba(79,138,255,0.2)"; e.currentTarget.style.boxShadow = "0 4px 20px rgba(0,0,0,0.4), 0 0 15px rgba(79,138,255,0.08)"; }}
           >
             <Sparkles size={14} />
-            <span style={{
-              fontSize: 9, fontWeight: 600, writingMode: "vertical-rl",
-              textOrientation: "mixed", letterSpacing: 1,
-            }}>{t('aiChat.title')}</span>
+            <span style={{ fontSize: 12, fontWeight: 600 }}>{t('aiChat.title')}</span>
           </motion.button>
         )}
       </AnimatePresence>
 
-      {/* Panel */}
+      {/* Floating chat panel */}
       <AnimatePresence>
         {isOpen && (
           <motion.div
-            initial={{ x: 380, opacity: 0 }}
-            animate={{ x: 0, opacity: 1 }}
-            exit={{ x: 380, opacity: 0 }}
-            transition={{ type: "spring", stiffness: 380, damping: 36 }}
+            initial={{ opacity: 0, y: 40, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 40, scale: 0.95 }}
+            transition={{ type: "spring", stiffness: 400, damping: 30 }}
             style={{
-              position: "absolute", right: 0, top: 0, bottom: 0, width: "min(380px, 100vw)", zIndex: 25,
-              background: "rgba(6,6,12,0.95)",
-              backdropFilter: "blur(32px) saturate(1.3)",
-              WebkitBackdropFilter: "blur(32px) saturate(1.3)",
-              borderLeft: "1px solid rgba(255,255,255,0.06)",
+              position: "fixed",
+              bottom: 20,
+              right: 20,
+              width: 380,
+              height: minimized ? "auto" : 500,
+              zIndex: 55,
+              background: "rgba(8,8,16,0.95)",
+              backdropFilter: "blur(40px) saturate(1.4)",
+              WebkitBackdropFilter: "blur(40px) saturate(1.4)",
+              border: "1px solid rgba(255,255,255,0.08)",
+              borderRadius: 20,
               display: "flex", flexDirection: "column",
-              boxShadow: "-8px 0 32px rgba(0,0,0,0.5)",
+              boxShadow: "0 16px 48px rgba(0,0,0,0.6), 0 0 1px rgba(255,255,255,0.04) inset",
+              overflow: "hidden",
+              transform: `translate(${dragOffset.x}px, ${dragOffset.y}px)`,
             }}
           >
-            {/* Header */}
-            <div style={{
-              height: 48, padding: "0 16px", borderBottom: "1px solid rgba(255,255,255,0.06)",
-              display: "flex", alignItems: "center", gap: 8, flexShrink: 0,
-            }}>
-              <Sparkles size={14} style={{ color: "#4F8AFF" }} />
-              <span style={{ fontSize: 14, fontWeight: 600, color: "#F0F0F5", flex: 1 }}>
+            {/* Draggable header */}
+            <div
+              onMouseDown={onDragHeaderDown}
+              style={{
+                height: 44, padding: "0 14px",
+                borderBottom: minimized ? "none" : "1px solid rgba(255,255,255,0.06)",
+                display: "flex", alignItems: "center", gap: 8, flexShrink: 0,
+                cursor: "grab", userSelect: "none",
+              }}
+            >
+              <Sparkles size={13} style={{ color: "#4F8AFF" }} />
+              <span style={{ fontSize: 13, fontWeight: 600, color: "#F0F0F5", flex: 1 }}>
                 {t('aiChat.aiAssistant')}
               </span>
-              {/* GPT / Keyword toggle */}
               <button
                 onClick={() => setAiMode(m => m === "gpt" ? "keyword" : "gpt")}
                 title={aiMode === "gpt" ? t('aiChat.usingGpt') : t('aiChat.usingKeyword')}
@@ -367,6 +403,7 @@ export function AIChatPanel({ messages, onAddMessage, onClear, isOpen, onToggle 
                   color: aiMode === "gpt" ? "#4F8AFF" : "#5C5C78",
                   fontSize: 10, fontWeight: 600,
                 }}
+                onMouseDown={e => e.stopPropagation()}
               >
                 <Zap size={10} />
                 {aiMode === "gpt" ? t('aiChat.gpt') : t('aiChat.basic')}
@@ -374,136 +411,146 @@ export function AIChatPanel({ messages, onAddMessage, onClear, isOpen, onToggle 
               <button onClick={onClear} title={t('aiChat.clearChat')} style={{
                 background: "none", border: "none", cursor: "pointer",
                 color: "#3A3A50", padding: 4, borderRadius: 4,
-              }}
+              }} onMouseDown={e => e.stopPropagation()}
                 onMouseEnter={e => { e.currentTarget.style.color = "#5C5C78"; }}
                 onMouseLeave={e => { e.currentTarget.style.color = "#3A3A50"; }}
               >
-                <Trash2 size={12} />
+                <Trash2 size={11} />
+              </button>
+              <button onClick={() => setMinimized(m => !m)} style={{
+                background: "none", border: "none", cursor: "pointer",
+                color: "#3A3A50", padding: 4, borderRadius: 4,
+                fontSize: 14, lineHeight: 1,
+              }} onMouseDown={e => e.stopPropagation()}
+                onMouseEnter={e => { e.currentTarget.style.color = "#8888A0"; }}
+                onMouseLeave={e => { e.currentTarget.style.color = "#3A3A50"; }}
+              >
+                {minimized ? "+" : "−"}
               </button>
               <button onClick={onToggle} style={{
                 background: "none", border: "none", cursor: "pointer",
                 color: "#3A3A50", padding: 4, borderRadius: 4,
-              }}
+              }} onMouseDown={e => e.stopPropagation()}
                 onMouseEnter={e => { e.currentTarget.style.color = "#8888A0"; }}
                 onMouseLeave={e => { e.currentTarget.style.color = "#3A3A50"; }}
               >
-                <X size={13} />
+                <X size={12} />
               </button>
             </div>
 
-            {/* Messages */}
-            <div style={{ flex: 1, overflowY: "auto", padding: "12px 14px", display: "flex", flexDirection: "column", gap: 10 }}>
-              {messages.length === 0 && (
-                <div style={{
-                  textAlign: "center", padding: "32px 16px",
-                  color: "#3A3A50", fontSize: 12,
-                }}>
-                  <MessageSquare size={28} style={{ margin: "0 auto 10px", opacity: 0.3 }} />
-                  <div style={{ fontWeight: 600, color: "#5C5C78", marginBottom: 6 }}>
-                    {aiMode === "gpt" ? t('aiChat.gptPowered') : t('aiChat.workflowAssistant')}
-                  </div>
-                  <div style={{ lineHeight: 1.5 }}>
-                    {aiMode === "gpt" ? (
-                      <>
-                        {t('aiChat.askAnything')}<br />
-                        • &ldquo;{t('aiChat.suggestAddCost')}&rdquo;<br />
-                        • &ldquo;{t('aiChat.suggestExplain')}&rdquo;<br />
-                        • &ldquo;{t('aiChat.suggestReplace')}&rdquo;<br />
-                        • &ldquo;{t('aiChat.suggestImprove')}&rdquo;
-                      </>
-                    ) : (
-                      <>
-                        {t('aiChat.tellMeWhatToChange')}<br />
-                        • &ldquo;{t('aiChat.suggestAddIfc')}&rdquo;<br />
-                        • &ldquo;{t('aiChat.suggestRemoveImg')}&rdquo;<br />
-                        • &ldquo;{t('aiChat.suggestExplainWf')}&rdquo;
-                      </>
-                    )}
-                  </div>
-                </div>
-              )}
+            {/* Collapsible body */}
+            {!minimized && (
+              <>
+                {/* Messages */}
+                <div style={{ flex: 1, overflowY: "auto", padding: "10px 12px", display: "flex", flexDirection: "column", gap: 8 }}>
+                  {messages.length === 0 && (
+                    <div style={{
+                      textAlign: "center", padding: "28px 14px",
+                      color: "#3A3A50", fontSize: 11,
+                    }}>
+                      <MessageSquare size={24} style={{ margin: "0 auto 8px", opacity: 0.3 }} />
+                      <div style={{ fontWeight: 600, color: "#5C5C78", marginBottom: 6 }}>
+                        {aiMode === "gpt" ? t('aiChat.gptPowered') : t('aiChat.workflowAssistant')}
+                      </div>
+                      <div style={{ lineHeight: 1.5 }}>
+                        {aiMode === "gpt" ? (
+                          <>
+                            {t('aiChat.askAnything')}<br />
+                            • &ldquo;{t('aiChat.suggestAddCost')}&rdquo;<br />
+                            • &ldquo;{t('aiChat.suggestExplain')}&rdquo;<br />
+                            • &ldquo;{t('aiChat.suggestReplace')}&rdquo;
+                          </>
+                        ) : (
+                          <>
+                            {t('aiChat.tellMeWhatToChange')}<br />
+                            • &ldquo;{t('aiChat.suggestAddIfc')}&rdquo;<br />
+                            • &ldquo;{t('aiChat.suggestRemoveImg')}&rdquo;
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  )}
 
-              {messages.map(msg => (
-                <div key={msg.id} style={{
-                  display: "flex", flexDirection: "column",
-                  alignItems: msg.role === "user" ? "flex-end" : "flex-start", gap: 2,
-                }}>
-                  <div style={{
-                    maxWidth: "85%", padding: "12px 16px",
-                    borderRadius: 16,
-                    ...(msg.role === "user"
-                      ? { borderBottomRightRadius: 6, background: "rgba(79,138,255,0.15)", border: "1px solid rgba(79,138,255,0.1)" }
-                      : { borderBottomLeftRadius: 6, background: "#12121e", border: "1px solid rgba(255,255,255,0.04)" }
-                    ),
-                    fontSize: 13, color: msg.role === "user" ? "#F0F0F5" : "#9898B0", lineHeight: 1.6,
-                  }}>
-                    {renderMessage(msg.content)}
-                  </div>
-                  <span style={{ fontSize: 9, color: "#3A3A50" }}>
-                    {msg.timestamp.toTimeString().slice(0, 5)}
-                  </span>
-                </div>
-              ))}
-
-              {isTyping && (
-                <div style={{
-                  display: "flex", gap: 4, padding: "8px 11px",
-                  background: "rgba(255,255,255,0.04)", borderRadius: 10,
-                  border: "1px solid rgba(255,255,255,0.06)",
-                  width: "fit-content",
-                }}>
-                  {[0, 1, 2].map(i => (
-                    <div key={i} style={{
-                      width: 5, height: 5, borderRadius: "50%", background: "#5C5C78",
-                      animation: `dotPulse 1s ease-in-out ${i * 0.2}s infinite`,
-                    }} />
+                  {messages.map(msg => (
+                    <div key={msg.id} style={{
+                      display: "flex", flexDirection: "column",
+                      alignItems: msg.role === "user" ? "flex-end" : "flex-start", gap: 2,
+                    }}>
+                      <div style={{
+                        maxWidth: "85%", padding: "10px 14px",
+                        borderRadius: 14,
+                        ...(msg.role === "user"
+                          ? { borderBottomRightRadius: 4, background: "rgba(79,138,255,0.12)", border: "1px solid rgba(79,138,255,0.1)" }
+                          : { borderBottomLeftRadius: 4, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.04)" }
+                        ),
+                        fontSize: 12, color: msg.role === "user" ? "#F0F0F5" : "#9898B0", lineHeight: 1.6,
+                      }}>
+                        {renderMessage(msg.content)}
+                      </div>
+                      <span style={{ fontSize: 9, color: "#3A3A50" }}>
+                        {msg.timestamp.toTimeString().slice(0, 5)}
+                      </span>
+                    </div>
                   ))}
-                </div>
-              )}
-              <div ref={bottomRef} />
-            </div>
 
-            {/* Input */}
-            <div style={{
-              padding: "12px", borderTop: "1px solid rgba(255,255,255,0.06)", flexShrink: 0,
-              display: "flex", gap: 8, alignItems: "flex-end",
-            }}>
-              <textarea
-                ref={textareaRef}
-                value={input}
-                onChange={e => { setInput(e.target.value); e.stopPropagation(); }}
-                onKeyDown={onKeyDown}
-                onMouseDown={e => e.stopPropagation()}
-                onClick={e => e.stopPropagation()}
-                placeholder={t('aiChat.placeholder')}
-                rows={2}
-                style={{
-                  flex: 1, resize: "none", padding: "12px 16px",
-                  borderRadius: 12, border: "1px solid rgba(255,255,255,0.06)",
-                  background: "rgba(255,255,255,0.04)", color: "#F0F0F5",
-                  fontSize: 14, fontFamily: "inherit", outline: "none",
-                  lineHeight: 1.5, maxHeight: 80, overflowY: "auto",
-                  transition: "all 150ms ease",
-                }}
-              />
-              <button
-                onClick={handleSend}
-                disabled={!input.trim() || isTyping}
-                style={{
-                  width: 32, height: 32, borderRadius: 7, border: "none",
-                  background: input.trim() && !isTyping ? "#4F8AFF" : "rgba(255,255,255,0.06)",
-                  color: input.trim() && !isTyping ? "#fff" : "#3A3A50",
-                  cursor: input.trim() && !isTyping ? "pointer" : "default",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  flexShrink: 0, transition: "all 0.15s",
-                }}
-              >
-                <Send size={13} />
-              </button>
-            </div>
-            <div style={{ padding: "0 14px 8px", fontSize: 9, color: "rgba(255,255,255,0.08)" }}>
-              {t('aiChat.enterToSend')}
-            </div>
+                  {isTyping && (
+                    <div style={{
+                      display: "flex", gap: 4, padding: "8px 11px",
+                      background: "rgba(255,255,255,0.03)", borderRadius: 10,
+                      border: "1px solid rgba(255,255,255,0.04)",
+                      width: "fit-content",
+                    }}>
+                      {[0, 1, 2].map(i => (
+                        <div key={i} style={{
+                          width: 4, height: 4, borderRadius: "50%", background: "#5C5C78",
+                          animation: `dotPulse 1s ease-in-out ${i * 0.2}s infinite`,
+                        }} />
+                      ))}
+                    </div>
+                  )}
+                  <div ref={bottomRef} />
+                </div>
+
+                {/* Input */}
+                <div style={{
+                  padding: "10px 12px", borderTop: "1px solid rgba(255,255,255,0.06)", flexShrink: 0,
+                  display: "flex", gap: 8, alignItems: "flex-end",
+                }}>
+                  <textarea
+                    ref={textareaRef}
+                    value={input}
+                    onChange={e => { setInput(e.target.value); e.stopPropagation(); }}
+                    onKeyDown={onKeyDown}
+                    onMouseDown={e => e.stopPropagation()}
+                    onClick={e => e.stopPropagation()}
+                    placeholder={t('aiChat.placeholder')}
+                    rows={2}
+                    style={{
+                      flex: 1, resize: "none", padding: "10px 14px",
+                      borderRadius: 12, border: "1px solid rgba(255,255,255,0.06)",
+                      background: "rgba(255,255,255,0.03)", color: "#F0F0F5",
+                      fontSize: 13, fontFamily: "inherit", outline: "none",
+                      lineHeight: 1.5, maxHeight: 80, overflowY: "auto",
+                      transition: "all 150ms ease",
+                    }}
+                  />
+                  <button
+                    onClick={handleSend}
+                    disabled={!input.trim() || isTyping}
+                    style={{
+                      width: 32, height: 32, borderRadius: 8, border: "none",
+                      background: input.trim() && !isTyping ? "#4F8AFF" : "rgba(255,255,255,0.06)",
+                      color: input.trim() && !isTyping ? "#fff" : "#3A3A50",
+                      cursor: input.trim() && !isTyping ? "pointer" : "default",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      flexShrink: 0, transition: "all 0.15s",
+                    }}
+                  >
+                    <Send size={13} />
+                  </button>
+                </div>
+              </>
+            )}
           </motion.div>
         )}
       </AnimatePresence>

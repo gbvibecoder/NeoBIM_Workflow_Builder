@@ -406,56 +406,76 @@ export const BaseNode = memo(function BaseNode({ id, data, selected }: BaseNodeP
         onMouseLeave={() => setIsHovered(false)}
         style={{
           width: isInput ? 320 : 220,
-          background: "rgba(12,12,24,0.90)",
+          background: "linear-gradient(145deg, rgba(12,14,24,0.92) 0%, rgba(8,10,18,0.95) 100%)",
           border: `1px solid ${
             status === "error" ? "rgba(248,113,113,0.5)" :
             status === "success" ? "rgba(52,211,153,0.5)" :
             selected ? `rgba(${rgb}, 0.6)` :
-            isHovered ? "rgba(255,255,255,0.15)" :
-            isInput ? "rgba(255,255,255,0.12)" :
-            "rgba(255,255,255,0.08)"
+            isHovered ? `${color}55` :
+            `${color}35`
           }`,
-          borderRadius: 12,
+          borderRadius: 16,
           boxShadow: isHovered
-            ? `0 8px 40px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.04)${stateGlow ? `, ${stateGlow}` : ""}`
-            : `0 4px 24px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.04)${stateGlow ? `, ${stateGlow}` : ""}`,
-          backdropFilter: "blur(32px) saturate(1.3)",
-          WebkitBackdropFilter: "blur(32px) saturate(1.3)",
-          transform: isHovered && !selected ? "translateY(-4px)" : "translateY(0)",
-          transition: "all 200ms ease-out",
+            ? `0 12px 40px rgba(0,0,0,0.6), 0 0 30px rgba(${rgb}, 0.15), inset 0 1px 0 rgba(255,255,255,0.1)${stateGlow ? `, ${stateGlow}` : ""}`
+            : `0 4px 24px rgba(0,0,0,0.5), 0 0 1px ${color}40, inset 0 1px 0 rgba(255,255,255,0.06), inset 0 -1px 0 rgba(0,0,0,0.2)${stateGlow ? `, ${stateGlow}` : ""}`,
+          backdropFilter: "blur(24px) saturate(1.4)",
+          WebkitBackdropFilter: "blur(24px) saturate(1.4)",
+          transform: isHovered && !selected ? "translateY(-4px) scale(1.01)" : "translateY(0)",
+          transition: "all 0.3s cubic-bezier(0.22, 1, 0.36, 1)",
           animation: status === "idle" && !isHovered && !selected ? "nodeBreathing 4s ease-in-out infinite" : "none",
           overflow: "hidden",
           cursor: "pointer",
           position: "relative",
         }}
       >
+        {/* Top highlight line */}
+        <div style={{
+          position: "absolute", top: 0, left: "10%", right: "10%", height: 1,
+          background: `linear-gradient(90deg, transparent, ${color}50, transparent)`,
+        }} />
+
         {/* Left accent bar */}
         <div style={{
           position: "absolute",
           left: 0, top: 0, bottom: 0,
           width: 3,
-          borderTopLeftRadius: 12,
-          borderBottomLeftRadius: 12,
-          background: `linear-gradient(180deg, ${color}, ${color}AA)`,
-          boxShadow: `0 0 12px rgba(${rgb}, 0.4)`,
+          borderTopLeftRadius: 16,
+          borderBottomLeftRadius: 16,
+          background: `linear-gradient(180deg, ${color} 0%, ${color}20 100%)`,
+          boxShadow: `3px 0 15px rgba(${rgb}, 0.25), 6px 0 30px rgba(${rgb}, 0.1)`,
         }} />
 
-        {/* Running border pulse */}
+        {/* Running — outward ring pulse */}
         {status === "running" && (
-          <motion.div
-            style={{
-              position: "absolute", inset: 0,
-              borderRadius: 12, pointerEvents: "none",
-            }}
-            animate={{
-              boxShadow: [
-                `inset 0 0 0 1px rgba(${rgb}, 0.25)`,
-                `inset 0 0 0 1px rgba(${rgb}, 0.65)`,
-                `inset 0 0 0 1px rgba(${rgb}, 0.25)`,
-              ],
-            }}
-            transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut" }}
-          />
+          <>
+            <motion.div
+              style={{
+                position: "absolute", inset: -4,
+                borderRadius: 20, pointerEvents: "none",
+                border: `2px solid rgba(${rgb}, 0.3)`,
+              }}
+              animate={{
+                inset: [-4, -4, -4, -4],
+                opacity: [0.6, 0],
+                scale: [1, 1.08],
+              }}
+              transition={{ duration: 1.8, repeat: Infinity, ease: "easeOut" }}
+            />
+            <motion.div
+              style={{
+                position: "absolute", inset: 0,
+                borderRadius: 16, pointerEvents: "none",
+              }}
+              animate={{
+                boxShadow: [
+                  `inset 0 0 0 1px rgba(${rgb}, 0.25), 0 0 20px rgba(${rgb}, 0.1)`,
+                  `inset 0 0 0 1px rgba(${rgb}, 0.65), 0 0 35px rgba(${rgb}, 0.2)`,
+                  `inset 0 0 0 1px rgba(${rgb}, 0.25), 0 0 20px rgba(${rgb}, 0.1)`,
+                ],
+              }}
+              transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut" }}
+            />
+          </>
         )}
 
         {/* Success glow animation */}
@@ -466,7 +486,7 @@ export const BaseNode = memo(function BaseNode({ id, data, selected }: BaseNodeP
             transition={{ duration: 1.2, ease: "easeOut" }}
             style={{
               position: "absolute", inset: -2,
-              borderRadius: 12, pointerEvents: "none",
+              borderRadius: 16, pointerEvents: "none",
               background: "radial-gradient(circle, rgba(52, 211, 153, 0.3) 0%, transparent 70%)",
             }}
           />
@@ -481,7 +501,7 @@ export const BaseNode = memo(function BaseNode({ id, data, selected }: BaseNodeP
             transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
             style={{
               position: "absolute", inset: -2,
-              borderRadius: 12, pointerEvents: "none",
+              borderRadius: 16, pointerEvents: "none",
               background: "radial-gradient(circle, rgba(248, 113, 113, 0.25) 0%, transparent 70%)",
             }}
           />
@@ -493,8 +513,9 @@ export const BaseNode = memo(function BaseNode({ id, data, selected }: BaseNodeP
           {/* Row 1: icon + name + status + INPUT badge */}
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 1 }}>
             <div style={{
-              width: 30, height: 30, borderRadius: 8,
-              background: `${color}1A`,
+              width: 30, height: 30, borderRadius: 10,
+              background: `${color}15`,
+              boxShadow: `0 0 12px ${color}15`,
               display: "flex", alignItems: "center", justifyContent: "center",
               color, flexShrink: 0,
             }}>
@@ -511,9 +532,10 @@ export const BaseNode = memo(function BaseNode({ id, data, selected }: BaseNodeP
               <span style={{
                 fontSize: 9, fontWeight: 700, color: color,
                 padding: "2px 8px", borderRadius: 6,
-                background: `${color}18`,
-                border: `1px solid ${color}30`,
-                flexShrink: 0, letterSpacing: "0.08em",
+                background: `${color}25`,
+                border: `1px solid ${color}40`,
+                boxShadow: `0 0 8px ${color}15`,
+                flexShrink: 0, letterSpacing: "0.1em",
                 textTransform: "uppercase" as const,
               }}>
                 {t('execution.inputLabel')}

@@ -1913,6 +1913,11 @@
   animation: dp-breathe 3s ease-in-out infinite;
 }
 
+/* Canvas minimap hover */
+.canvas-minimap:hover {
+  opacity: 0.8 !important;
+}
+
 /* ═══════════════════════════════════════════════════════════════════
    MOBILE RESPONSIVE STYLES
    ═══════════════════════════════════════════════════════════════════ */
