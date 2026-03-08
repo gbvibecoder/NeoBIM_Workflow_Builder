@@ -1239,41 +1239,82 @@
 }
 
 
-/* ── Dashboard — Ambient & Interactive ──────────────────────────── */
+/* ── Dashboard Home — Premium ──────────────────────────────────── */
 
-@keyframes dashboard-orb-drift-1 {
-  0%, 100% { transform: translate(0, 0) scale(1); }
-  33%      { transform: translate(30px, -20px) scale(1.05); }
-  66%      { transform: translate(-15px, 15px) scale(0.97); }
-}
-@keyframes dashboard-orb-drift-2 {
-  0%, 100% { transform: translate(0, 0) scale(1); }
-  33%      { transform: translate(-25px, 20px) scale(1.03); }
-  66%      { transform: translate(20px, -10px) scale(0.95); }
-}
 @keyframes dashboard-pulse-dot {
   0%, 100% { opacity: 1; transform: scale(1); }
   50%      { opacity: 0.5; transform: scale(1.4); }
 }
 
-.dashboard-orb-1 {
-  animation: dashboard-orb-drift-1 22s ease-in-out infinite;
+/* Scan beam for dashboard */
+.dashboard-scan-beam {
+  position: absolute;
+  left: 0; right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent 0%, rgba(184,115,51,0.3) 20%, rgba(255,191,0,0.4) 50%, rgba(184,115,51,0.3) 80%, transparent 100%);
+  box-shadow: 0 0 20px 4px rgba(184,115,51,0.1), 0 0 60px 8px rgba(255,191,0,0.05);
+  animation: scan-beam 10s ease-in-out infinite;
+  pointer-events: none;
+  z-index: 2;
 }
-.dashboard-orb-2 {
-  animation: dashboard-orb-drift-2 18s ease-in-out infinite;
+
+/* Pipeline step active glow */
+.pipeline-step-active {
+  animation: border-glow-copper 2.5s ease-in-out infinite;
 }
-.dashboard-pulse-dot {
-  animation: dashboard-pulse-dot 2s ease-in-out infinite;
+@keyframes border-glow-copper {
+  0%, 100% { border-color: rgba(184,115,51,0.2); box-shadow: 0 0 0 rgba(184,115,51,0); }
+  50% { border-color: rgba(184,115,51,0.5); box-shadow: 0 0 20px rgba(184,115,51,0.12); }
+}
+
+/* Action card dashed hover */
+.dash-card-hover:hover {
+  border-style: solid !important;
+  border-color: rgba(184,115,51,0.4) !important;
+  background: rgba(184,115,51,0.04) !important;
+}
+.dash-card-hover:hover .dash-plus {
+  transform: rotate(90deg);
+}
+.dash-plus {
+  transition: transform 350ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* Template card port dots */
+.tmpl-card::before,
+.tmpl-card::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  transform: translateY(-50%);
+  border: 2px solid rgba(15,18,24,0.9);
+  z-index: 2;
+  transition: box-shadow 300ms ease;
+}
+.tmpl-card::before { left: -5px; background: var(--port-color, #B87333); box-shadow: 0 0 8px var(--port-color, #B87333); }
+.tmpl-card::after { right: -5px; background: var(--port-color, #B87333); box-shadow: 0 0 8px var(--port-color, #B87333); }
+
+/* Tip card hover */
+.dashboard-tip:hover {
+  border-color: rgba(184,115,51,0.3) !important;
+  box-shadow: 0 12px 40px rgba(184,115,51,0.08) !important;
+  transform: translateY(-2px);
+}
+
+/* Noise overlay for dashboard */
+.dashboard-noise {
+  position: fixed; inset: 0;
+  pointer-events: none; z-index: 9999;
+  opacity: 0.03; mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+  background-size: 256px 256px;
 }
 
 .dashboard-link-hover:hover {
   color: #FFBF00 !important;
-}
-
-.dashboard-tip-card:hover {
-  border-color: rgba(184,115,51,0.25) !important;
-  transform: translateY(-2px);
-  box-shadow: 0 8px 32px rgba(0,0,0,0.25), 0 0 20px rgba(184,115,51,0.06);
 }
 
 .dashboard-template-btn:hover {
