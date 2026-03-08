@@ -18,7 +18,7 @@ import {
 import "@xyflow/react/dist/style.css";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
-import { Layers3, Sparkles, BookOpen, X } from "lucide-react";
+import { Layers3, Sparkles, BookOpen } from "lucide-react";
 
 import dynamic from "next/dynamic";
 import { BaseNode } from "./nodes/BaseNode";
@@ -27,7 +27,6 @@ import { NodeLibraryPanel } from "./panels/NodeLibraryPanel";
 import { CanvasToolbar } from "./toolbar/CanvasToolbar";
 
 import { ExecutionLog } from "./ExecutionLog";
-import { ResultShowcase } from "./ResultShowcase";
 import { OnboardingTour } from "./OnboardingTour";
 import { AIChatPanel } from "./panels/AIChatPanel";
 import type { ChatMessage } from "./panels/AIChatPanel";
@@ -38,6 +37,12 @@ import { PromptInput } from "@/components/ai/PromptInput";
 // ContextMenu is right-click only — load lazily
 const ContextMenu = dynamic(
   () => import("./ContextMenu").then((m) => m.ContextMenu),
+  { ssr: false }
+);
+
+// Three.js scene — must be client-only
+const PostExecutionScene = dynamic(
+  () => import("./PostExecutionScene"),
   { ssr: false }
 );
 
@@ -239,6 +244,7 @@ function WorkflowCanvasInner({ workflowId: _workflowId }: WorkflowCanvasInnerPro
     updateNode,
     addEdge: addStoreEdge,
     resetCanvas,
+    setEdgeFlowing,
     isDirty,
     isSaving,
     markDirty,
@@ -285,7 +291,7 @@ function WorkflowCanvasInner({ workflowId: _workflowId }: WorkflowCanvasInnerPro
   const [logEntries, setLogEntries] = useState<LogEntry[]>([]);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [showLog, setShowLog] = useState(false);
-  const [showShowcase, setShowShowcase] = useState(false);
+  const [showPostExecution, setShowPostExecution] = useState(false);
   const prevExecutingRef = useRef(false);
 
   const addLogEntry = useCallback((entry: LogEntry) => {
@@ -295,18 +301,80 @@ function WorkflowCanvasInner({ workflowId: _workflowId }: WorkflowCanvasInnerPro
 
   const { runWorkflow, isExecuting } = useExecution({ onLog: addLogEntry });
 
-  // Show showcase when execution finishes
+  // Post-execution scene: edge wave → nodes slide left → 3D scene
   React.useEffect(() => {
     if (prevExecutingRef.current && !isExecuting && artifacts.size > 0) {
-      // Brief toast
       toast.success("Workflow Complete", { duration: 2000 });
-      // Show grand reveal showcase after a short delay
-      const timer = setTimeout(() => setShowShowcase(true), 500);
+
+      // Step 1: Edge completion wave (0.5s)
+      const edgeDelay = 500 / Math.max(storeNodes.length, 1);
+      storeNodes.forEach((node, i) => {
+        setTimeout(() => setEdgeFlowing(node.id, true), i * edgeDelay);
+        setTimeout(() => setEdgeFlowing(node.id, false), i * edgeDelay + 300);
+      });
+
+      // Step 2: Show post-execution scene (triggers CSS node slide)
+      const timer = setTimeout(() => setShowPostExecution(true), 700);
       return () => clearTimeout(timer);
     }
     prevExecutingRef.current = isExecuting;
-  }, [isExecuting, artifacts]);
+  }, [isExecuting, artifacts, storeNodes, setEdgeFlowing]);
   const { t: tLocale } = useLocale();
+
+  // Extract data from artifacts for 3D scene
+  const postExecData = React.useMemo(() => {
+    if (!showPostExecution) return null;
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let rooms: any[] = [];
+    const kpis: { floors?: number; gfa?: number; height?: number; footprint?: number } = {};
+    let description = "";
+
+    for (const artifact of artifacts.values()) {
+      if (artifact.type === "3d" || artifact.type === "svg") {
+        const d = artifact.data as Record<string, unknown>;
+        rooms = (d?.roomList as typeof rooms) ?? [];
+      }
+      if (artifact.type === "kpi") {
+        const d = artifact.data as Record<string, unknown>;
+        const metrics = (d?.metrics as Array<{ label: string; value: string | number }>) ?? [];
+        for (const m of metrics) {
+          const lab = m.label.toLowerCase();
+          if (lab.includes("floor")) kpis.floors = Number(m.value);
+          if (lab.includes("gfa") || lab.includes("gross")) kpis.gfa = Number(m.value);
+          if (lab.includes("height")) kpis.height = Number(m.value);
+          if (lab.includes("footprint")) kpis.footprint = Number(m.value);
+        }
+      }
+      if (artifact.type === "text") {
+        const d = artifact.data as Record<string, unknown>;
+        description = (d?.content as string) ?? "";
+      }
+    }
+
+    return {
+      rooms,
+      kpis,
+      description,
+      buildingName: currentWorkflow?.name ?? "Building Design",
+    };
+  }, [showPostExecution, artifacts, currentWorkflow?.name]);
+
+  const handleClosePostExecution = useCallback(() => {
+    setShowPostExecution(false);
+    setTimeout(() => fitView({ padding: 0.3, duration: 800 }), 1100);
+  }, [fitView]);
+
+  const handleGeneratePDF = useCallback(async () => {
+    const { generatePDFReport } = await import("@/services/pdf-report");
+    const labels = new Map<string, string>();
+    storeNodes.forEach(n => labels.set(n.id, n.data.label));
+    await generatePDFReport({
+      workflowName: currentWorkflow?.name ?? "Workflow Results",
+      artifacts,
+      nodeLabels: labels,
+    });
+  }, [storeNodes, currentWorkflow?.name, artifacts]);
 
   const [nodes, setNodes, onNodesChange] = useNodesState(storeNodes as unknown as Node[]);
   const [edges, setEdges, onEdgesChange] = useEdgesState(storeEdges as Edge[]);
@@ -591,8 +659,18 @@ function WorkflowCanvasInner({ workflowId: _workflowId }: WorkflowCanvasInnerPro
           )}
         </AnimatePresence>
 
-        {/* React Flow */}
-        <div className="absolute inset-0">
+        {/* React Flow — slides left when post-execution scene is active */}
+        <div
+          className="absolute inset-0"
+          style={{
+            transition: "transform 1s cubic-bezier(0.32, 0.72, 0, 1), opacity 1s ease, filter 1s ease",
+            transform: showPostExecution ? "scale(0.45)" : "none",
+            transformOrigin: "15% 50%",
+            opacity: showPostExecution ? 0.4 : 1,
+            filter: showPostExecution ? "blur(1px) brightness(0.6)" : "none",
+            pointerEvents: showPostExecution ? "none" : "auto",
+          }}
+        >
           {/* Atmospheric blue center glow — intensifies during execution */}
           <div
             className="absolute inset-0 pointer-events-none"
@@ -728,13 +806,37 @@ function WorkflowCanvasInner({ workflowId: _workflowId }: WorkflowCanvasInnerPro
             )}
           </AnimatePresence>
 
-          {/* Post-execution grand reveal showcase */}
-          <AnimatePresence>
-            {showShowcase && !isExecuting && artifacts.size > 0 && (
-              <ResultShowcase onClose={() => setShowShowcase(false)} />
-            )}
-          </AnimatePresence>
         </div>
+
+        {/* Post-execution 3D scene — overlays right 70% of canvas */}
+        <AnimatePresence>
+          {showPostExecution && !isExecuting && postExecData && (
+            <motion.div
+              key="post-exec-scene"
+              initial={{ opacity: 0, x: 40 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 40, transition: { duration: 0.5 } }}
+              transition={{ duration: 0.8, delay: 1.0 }}
+              style={{
+                position: "absolute",
+                top: 0,
+                right: 0,
+                bottom: 0,
+                width: "70%",
+                zIndex: 15,
+              }}
+            >
+              <PostExecutionScene
+                rooms={postExecData.rooms}
+                kpis={postExecData.kpis}
+                buildingDescription={postExecData.description}
+                buildingName={postExecData.buildingName}
+                onClose={handleClosePostExecution}
+                onGeneratePDF={handleGeneratePDF}
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* AI Chat Panel — floats on right edge */}
         <AIChatPanel
