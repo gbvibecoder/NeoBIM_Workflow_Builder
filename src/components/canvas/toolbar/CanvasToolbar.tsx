@@ -527,30 +527,36 @@ export function CanvasToolbar({
                 style={{
                   display: "flex", alignItems: "center", gap: 8,
                   height: 36, paddingLeft: 20, paddingRight: 16,
-                  borderRadius: "10px 0 0 10px",
+                  borderRadius: "12px 0 0 12px",
                   background: isWorkflowReady
-                    ? "linear-gradient(to right, #4F8AFF, #6366F1)"
+                    ? "linear-gradient(135deg, #4F8AFF 0%, #6366F1 50%, #4F8AFF 100%)"
                     : "#2A2A3E",
+                  backgroundSize: "200% 200%",
                   border: "none",
                   color: "#fff", fontSize: 14, fontWeight: 600,
                   cursor: isWorkflowReady ? "pointer" : "not-allowed",
                   transition: "all 200ms ease",
-                  boxShadow: isWorkflowReady ? "0 0 20px rgba(79,138,255,0.3)" : "none",
+                  boxShadow: isWorkflowReady
+                    ? "0 0 25px rgba(79,138,255,0.3), inset 0 1px 0 rgba(255,255,255,0.15)"
+                    : "none",
                   opacity: isWorkflowReady ? 1 : 0.5,
-                  animation: isWorkflowReady ? "glow-pulse 3s ease-in-out infinite" : "none",
+                  animation: isWorkflowReady ? "gradient-shift 3s ease infinite" : "none",
+                  whiteSpace: "nowrap",
                 }}
                 onMouseEnter={e => {
                   if (isWorkflowReady) {
                     e.currentTarget.style.filter = "brightness(1.1)";
-                    e.currentTarget.style.boxShadow = "0 0 35px rgba(79,138,255,0.5)";
+                    e.currentTarget.style.boxShadow = "0 0 35px rgba(79,138,255,0.5), inset 0 1px 0 rgba(255,255,255,0.2)";
                   }
                 }}
                 onMouseLeave={e => {
                   e.currentTarget.style.filter = "brightness(1)";
-                  e.currentTarget.style.boxShadow = isWorkflowReady ? "0 0 20px rgba(79,138,255,0.3)" : "none";
+                  e.currentTarget.style.boxShadow = isWorkflowReady
+                    ? "0 0 25px rgba(79,138,255,0.3), inset 0 1px 0 rgba(255,255,255,0.15)"
+                    : "none";
                 }}
               >
-                <Play size={16} fill="white" />
+                <Play size={14} fill="white" />
                 {t('canvas.runWorkflow')}
               </button>
 
@@ -563,7 +569,7 @@ export function CanvasToolbar({
                 style={{
                   display: "flex", alignItems: "center", justifyContent: "center",
                   width: 30, height: 36, padding: 0,
-                  borderRadius: "0 10px 10px 0",
+                  borderRadius: "0 12px 12px 0",
                   background: isWorkflowReady ? "rgba(79,138,255,0.85)" : "#25253A",
                   border: "none",
                   borderLeft: "1px solid rgba(255,255,255,0.12)",
