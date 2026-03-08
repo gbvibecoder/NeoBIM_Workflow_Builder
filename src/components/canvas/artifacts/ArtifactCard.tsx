@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo } from "react";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
-import { Download, ChevronDown, X, FileText, Image as ImageIcon, Database, BarChart2, Table2, File, LayoutGrid, Box } from "lucide-react";
+import { Download, ChevronDown, X, FileText, Image as ImageIcon, Database, BarChart2, Table2, File, LayoutGrid, Box, RefreshCw, Loader2 } from "lucide-react";
 import DOMPurify from "dompurify";
 import dynamic from "next/dynamic";
 
@@ -69,16 +69,57 @@ function hexToRgb(hex: string): string {
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
+// ─── Quality badge config ──────────────────────────────────────────────────
+
+interface QualityBadge {
+  label: string;
+  color: string;
+  bg: string;
+}
+
+function getQualityBadge(artifact: ExecutionArtifact): QualityBadge | null {
+  const meta = artifact.metadata ?? {};
+  const isReal = !!meta.real;
+  const isMock = !!meta.mock || meta.source === "mock";
+
+  if (isMock) {
+    return { label: "Sample Data", color: "#6B7280", bg: "rgba(107,114,128,0.12)" };
+  }
+
+  if (artifact.type === "image" && isReal) {
+    return { label: "AI Generated · Concept", color: "#3B82F6", bg: "rgba(59,130,246,0.12)" };
+  }
+
+  if (artifact.type === "table" && isReal) {
+    return { label: "AI Estimate · ±15-20%", color: "#F59E0B", bg: "rgba(245,158,11,0.12)" };
+  }
+
+  if ((artifact.type === "text" || artifact.type === "json" || artifact.type === "kpi") && isReal) {
+    return { label: "AI Generated · Review", color: "#8B5CF6", bg: "rgba(139,92,246,0.12)" };
+  }
+
+  if (artifact.type === "3d" || artifact.type === "svg") {
+    return { label: "AI Generated · Concept", color: "#3B82F6", bg: "rgba(59,130,246,0.12)" };
+  }
+
+  return null;
+}
+
+// ─── Props ────────────────────────────────────────────────────────────────────
+
 interface ArtifactCardProps {
   artifact: ExecutionArtifact;
   nodeLabel?: string;
   nodeCategory?: NodeCategory;
   onDismiss?: () => void;
+  onRegenerate?: () => void;
+  regenRemaining?: number;
+  isRegenerating?: boolean;
 }
 
 // ─── Main card ────────────────────────────────────────────────────────────────
 
-export function ArtifactCard({ artifact, nodeLabel, nodeCategory, onDismiss }: ArtifactCardProps) {
+export function ArtifactCard({ artifact, nodeLabel, nodeCategory, onDismiss, onRegenerate, regenRemaining, isRegenerating }: ArtifactCardProps) {
   const [collapsed, setCollapsed] = useState(false);
   const prefersReduced = useReducedMotion();
   const { t } = useLocale();
@@ -86,6 +127,8 @@ export function ArtifactCard({ artifact, nodeLabel, nodeCategory, onDismiss }: A
   const accentColor = nodeCategory ? CATEGORY_COLOR[nodeCategory] : "#4F8AFF";
   const typeColor   = TYPE_COLOR[artifact.type] ?? "#4F8AFF";
   const rgb         = hexToRgb(accentColor);
+  const qualityBadge = getQualityBadge(artifact);
+  const canRegenerate = onRegenerate && (regenRemaining === undefined || regenRemaining > 0);
 
   return (
     <motion.div
@@ -123,6 +166,21 @@ export function ArtifactCard({ artifact, nodeLabel, nodeCategory, onDismiss }: A
           {nodeLabel ?? t('artifact.nodeOutput')}
         </span>
 
+        {/* Quality badge */}
+        {qualityBadge && (
+          <span style={{
+            display: "flex", alignItems: "center", gap: 3,
+            padding: "2px 7px", borderRadius: 6,
+            background: qualityBadge.bg,
+            fontSize: 8, fontWeight: 600, color: qualityBadge.color,
+            letterSpacing: "0.02em",
+            flexShrink: 0,
+            whiteSpace: "nowrap",
+          }}>
+            {qualityBadge.label}
+          </span>
+        )}
+
         {/* Type badge */}
         <span style={{
           display: "flex", alignItems: "center", gap: 3,
@@ -136,6 +194,31 @@ export function ArtifactCard({ artifact, nodeLabel, nodeCategory, onDismiss }: A
           {TYPE_ICON[artifact.type]}
           {artifact.type}
         </span>
+
+        {/* Regenerate button */}
+        {canRegenerate && (
+          <button
+            onClick={e => { e.stopPropagation(); onRegenerate!(); }}
+            disabled={isRegenerating}
+            title={regenRemaining !== undefined ? `Regenerate (${regenRemaining} left)` : "Regenerate"}
+            style={{
+              display: "flex", alignItems: "center", gap: 3,
+              padding: "3px 8px", borderRadius: 6,
+              background: isRegenerating ? "rgba(79,138,255,0.15)" : "rgba(79,138,255,0.08)",
+              border: "1px solid rgba(79,138,255,0.2)",
+              fontSize: 9, fontWeight: 600, color: "#4F8AFF",
+              cursor: isRegenerating ? "not-allowed" : "pointer",
+              flexShrink: 0,
+              transition: "all 0.15s ease",
+              opacity: isRegenerating ? 0.7 : 1,
+            }}
+            onMouseEnter={e => { if (!isRegenerating) { e.currentTarget.style.background = "rgba(79,138,255,0.15)"; e.currentTarget.style.borderColor = "rgba(79,138,255,0.4)"; } }}
+            onMouseLeave={e => { if (!isRegenerating) { e.currentTarget.style.background = "rgba(79,138,255,0.08)"; e.currentTarget.style.borderColor = "rgba(79,138,255,0.2)"; } }}
+          >
+            {isRegenerating ? <Loader2 size={9} style={{ animation: "spin 1s linear infinite" }} /> : <RefreshCw size={9} />}
+            {regenRemaining !== undefined ? `${regenRemaining}` : ""}
+          </button>
+        )}
 
         {/* Chevron */}
         <motion.div
@@ -189,6 +272,22 @@ export function ArtifactCard({ artifact, nodeLabel, nodeCategory, onDismiss }: A
           </motion.div>
         )}
       </AnimatePresence>
+
+        {/* Type-specific disclaimer */}
+        {!collapsed && (artifact.type === "table" || artifact.type === "kpi") && !!artifact.metadata?.real && (
+          <div style={{ padding: "6px 14px 8px", borderTop: "1px solid rgba(255,255,255,0.03)" }}>
+            <p style={{ fontSize: 9, color: "#4A4A60", fontStyle: "italic", margin: 0 }}>
+              Cost estimates are approximate, based on regional averages.
+            </p>
+          </div>
+        )}
+        {!collapsed && artifact.type === "image" && (
+          <div style={{ padding: "6px 14px 8px", borderTop: "1px solid rgba(255,255,255,0.03)" }}>
+            <p style={{ fontSize: 9, color: "#4A4A60", fontStyle: "italic", margin: 0 }}>
+              AI-generated concept visualization. Not architecturally accurate.
+            </p>
+          </div>
+        )}
     </motion.div>
   );
 }
@@ -334,10 +433,14 @@ function TableBody({ data }: { data: TableArtifactData }) {
   const headers = data?.headers ?? [];
   const rows = data?.rows ?? [];
   const isWide = headers.length > 6;
-  const summary = (data as unknown as Record<string, unknown>)?.summary as { grandTotal?: number; currency?: string; note?: string } | undefined;
-  const content = (data as unknown as Record<string, unknown>)?.content as string | undefined;
+  const ext = data as unknown as Record<string, unknown>;
+  const summary = ext?.summary as { grandTotal?: number; currency?: string; note?: string } | undefined;
+  const content = ext?.content as string | undefined;
+  const totalCost = ext?._totalCost as number | undefined;
+  const disclaimer = ext?._disclaimer as string | undefined;
+  const projectType = ext?._projectType as string | undefined;
 
-  // For wide tables (BOQ), show simplified 5-column view
+  // For wide tables (BOQ with waste/M-L-E), show key columns
   const displayHeaders = isWide
     ? [headers[0], headers[2], headers[3], headers[4], headers[headers.length - 1]]
     : headers;
@@ -345,8 +448,17 @@ function TableBody({ data }: { data: TableArtifactData }) {
     ? rows.map(row => [row[0], row[2], row[3], row[4], row[row.length - 1]])
     : rows;
 
+  const isCostTable = !!(totalCost || disclaimer || (summary?.grandTotal != null));
+  const grandTotal = totalCost ?? summary?.grandTotal;
+
   return (
     <div style={{ margin: "0 0 10px" }}>
+      {/* Project type badge for cost tables */}
+      {isCostTable && projectType && (
+        <div style={{ padding: "4px 14px 2px", fontSize: 9, color: "#F59E0B", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+          {projectType} estimate · AACE Class 4
+        </div>
+      )}
       <div style={{ overflow: "auto", maxHeight: 200 }}>
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 10 }}>
           <thead>
@@ -380,7 +492,8 @@ function TableBody({ data }: { data: TableArtifactData }) {
           </tbody>
         </table>
       </div>
-      {(summary?.grandTotal != null || content) && (
+      {/* Footer: totals + line count */}
+      {(grandTotal != null || content) && (
         <div style={{
           padding: "6px 14px",
           borderTop: "1px solid rgba(255,255,255,0.08)",
@@ -390,11 +503,24 @@ function TableBody({ data }: { data: TableArtifactData }) {
           <span style={{ color: "#5C5C78" }}>
             {rows.length} {t('artifact.lineItems')}{summary?.note ? ` · ${summary.note}` : ""}
           </span>
-          {summary?.grandTotal != null && (
+          {grandTotal != null && (
             <span style={{ color: "#FFBF00", fontWeight: 700 }}>
-              {t('artifact.grandTotal')}: ${summary.grandTotal.toLocaleString()}
+              {t('artifact.grandTotal')}: ${grandTotal.toLocaleString()}
             </span>
           )}
+        </div>
+      )}
+      {/* Professional disclaimer for cost estimates */}
+      {isCostTable && (
+        <div style={{
+          padding: "5px 14px 8px",
+          borderTop: "1px solid rgba(255,255,255,0.04)",
+          fontSize: 8.5,
+          color: "#4A4A62",
+          lineHeight: 1.5,
+          fontStyle: "italic",
+        }}>
+          {disclaimer || "Preliminary estimate (±15-20% accuracy). Based on RSMeans 2024/2025. Valid 90 days. Not for contract pricing."}
         </div>
       )}
     </div>

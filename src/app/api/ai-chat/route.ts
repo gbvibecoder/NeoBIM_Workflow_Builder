@@ -1,12 +1,20 @@
 import { NextResponse } from "next/server";
 import OpenAI from "openai";
 import { auth } from "@/lib/auth";
+import { checkEndpointRateLimit } from "@/lib/rate-limit";
+import { safeErrorMessage } from "@/lib/safe-error";
 
 export async function POST(req: Request) {
   try {
     const session = await auth();
     if (!session?.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // Rate limit: 20 requests per minute
+    const rateLimit = await checkEndpointRateLimit(session.user.id, "ai-chat", 20, "1 m");
+    if (!rateLimit.success) {
+      return NextResponse.json({ error: "Too many requests. Please wait a moment." }, { status: 429 });
     }
 
     const body = (await req.json()) as { message?: string; systemPrompt?: string };
@@ -42,7 +50,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ reply });
   } catch (error: unknown) {
     console.error("[AI Chat]", error);
-    const msg = error instanceof Error ? error.message : "Internal server error";
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return NextResponse.json({ error: safeErrorMessage(error) }, { status: 500 });
   }
 }

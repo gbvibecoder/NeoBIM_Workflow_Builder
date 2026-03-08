@@ -2,15 +2,26 @@ import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/db";
 import { trackSignup } from "@/lib/analytics";
-import { 
-  formatErrorResponse, 
-  FormErrors, 
-  AuthErrors, 
-  UserErrors 
+import { checkEndpointRateLimit } from "@/lib/rate-limit";
+import {
+  formatErrorResponse,
+  FormErrors,
+  AuthErrors,
+  UserErrors
 } from "@/lib/user-errors";
 
 export async function POST(req: NextRequest) {
   try {
+    // Rate limit by IP (unauthenticated endpoint)
+    const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || req.headers.get("x-real-ip") || "unknown";
+    const rateLimit = await checkEndpointRateLimit(ip, "register", 5, "1 m");
+    if (!rateLimit.success) {
+      return NextResponse.json(
+        formatErrorResponse({ title: "Too many attempts", message: "Please wait before trying again.", code: "RATE_LIMITED" }),
+        { status: 429 }
+      );
+    }
+
     const { name, email, password, source } = await req.json();
 
     // Validate required fields
@@ -32,7 +43,7 @@ export async function POST(req: NextRequest) {
     const normalizedEmail = email.trim().toLowerCase();
 
     // Validate email format
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const emailRegex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*\.[a-zA-Z]{2,}$/;
     if (!emailRegex.test(normalizedEmail)) {
       return NextResponse.json(
         formatErrorResponse(FormErrors.INVALID_EMAIL),
@@ -51,6 +62,15 @@ export async function POST(req: NextRequest) {
     if (password.length > 128) {
       return NextResponse.json(
         formatErrorResponse({ title: "Password too long", message: "Password must be 128 characters or fewer.", code: "PASSWORD_TOO_LONG" }),
+        { status: 400 }
+      );
+    }
+
+    // Validate password complexity
+    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/;
+    if (!passwordRegex.test(password)) {
+      return NextResponse.json(
+        formatErrorResponse({ title: "Weak password", message: "Password must contain at least one uppercase letter, one lowercase letter, and one number.", code: "PASSWORD_WEAK" }),
         { status: 400 }
       );
     }

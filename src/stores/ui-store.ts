@@ -29,6 +29,10 @@ interface UIState {
   // Demo mode
   isDemoMode: boolean;
 
+  // Execution complete modal
+  showExecutionCompleteModal: boolean;
+  setShowExecutionCompleteModal: (show: boolean) => void;
+
   // Actions
   setActivePanel: (panel: PanelId) => void;
   toggleNodeLibrary: () => void;
@@ -65,6 +69,9 @@ export const useUIStore = create<UIState>()((set) => ({
   isGeneratingWorkflow: false,
 
   isDemoMode: false,
+
+  showExecutionCompleteModal: false,
+  setShowExecutionCompleteModal: (show) => set({ showExecutionCompleteModal: show }),
 
   setActivePanel: (panel) =>
     set({

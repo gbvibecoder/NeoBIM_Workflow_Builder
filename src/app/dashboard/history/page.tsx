@@ -7,8 +7,9 @@ import {
   Clock, CheckCircle2, XCircle, Loader2, RefreshCw,
   ChevronDown, ChevronUp, FileText, Image, Table2,
   ExternalLink, AlertCircle, GitCompareArrows,
-  ArrowRight, Activity,
+  ArrowRight, Activity, Share2,
 } from "lucide-react";
+import { shareHistoryToTwitter } from "@/lib/share";
 import { Header } from "@/components/dashboard/Header";
 import { PageBackground } from "@/components/dashboard/PageBackground";
 import { toast } from "sonner";
@@ -404,6 +405,15 @@ function ExecutionRow({ execution, onRerun, onViewDetails, compareSelected, onTo
               onMouseLeave={e => { e.currentTarget.style.background = "rgba(79,138,255,0.08)"; }}>
               <RefreshCw size={9} /> {t('history.rerun')}
             </button>
+            {execution.status === "SUCCESS" && (
+              <button onClick={e => { e.stopPropagation(); shareHistoryToTwitter(execution.workflow.name, execution.artifacts.length, dur ?? "—"); }}
+                title="Share on X"
+                style={{ padding: "5px 8px", borderRadius: 6, border: "1px solid rgba(255,255,255,0.06)", background: "transparent", color: "#44445A", fontSize: 10, cursor: "pointer", display: "flex", alignItems: "center", gap: 3, transition: "all 150ms" }}
+                onMouseEnter={e => { e.currentTarget.style.color = "#8888A0"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.12)"; }}
+                onMouseLeave={e => { e.currentTarget.style.color = "#44445A"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.06)"; }}>
+                <Share2 size={9} /> Share
+              </button>
+            )}
           </div>
         </div>
         {execution.artifacts.length > 0 && (

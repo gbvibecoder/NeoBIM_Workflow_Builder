@@ -9,7 +9,7 @@ const STORAGE_KEY = "buildflow_onboarded";
 const STEPS = [
   {
     title: "Your node library",
-    body: "31 AEC-specific nodes organized by category — Input, Transform, Generate, and Export. Drag any node onto the canvas to start building.",
+    body: "30+ design nodes organized by category — Input, Transform, Generate, and Export. Drag any node onto the canvas to start building.",
     hint: "← Drag nodes from here",
   },
   {

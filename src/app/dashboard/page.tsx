@@ -260,7 +260,7 @@ export default function DashboardPage() {
                   transition={{ duration: 0.5, ease: smoothEase }}
                   style={{ fontSize: 15, color: "#5C5C78", maxWidth: 480 }}
                 >
-                  Complete missions to unlock legendary parametric blueprints.
+                  Your concept design workspace — from brief to 3D in minutes.
                 </motion.p>
               </div>
 

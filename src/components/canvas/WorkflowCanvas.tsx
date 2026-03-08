@@ -19,6 +19,10 @@ import "@xyflow/react/dist/style.css";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { Layers3, Sparkles, BookOpen, X } from "lucide-react";
+import {
+  shareExecutionToTwitter,
+} from "@/lib/share";
+import { ExecutionCompleteModal } from "./modals/ExecutionCompleteModal";
 
 import dynamic from "next/dynamic";
 import { BaseNode } from "./nodes/BaseNode";
@@ -38,6 +42,12 @@ import { PromptInput } from "@/components/ai/PromptInput";
 // ContextMenu is right-click only — load lazily
 const ContextMenu = dynamic(
   () => import("./ContextMenu").then((m) => m.ContextMenu),
+  { ssr: false }
+);
+
+// Three.js scene — must be client-only
+const PostExecutionScene = dynamic(
+  () => import("./PostExecutionScene"),
   { ssr: false }
 );
 
@@ -249,6 +259,7 @@ function WorkflowCanvasInner({ workflowId: _workflowId }: WorkflowCanvasInnerPro
     updateNode,
     addEdge: addStoreEdge,
     resetCanvas,
+    setEdgeFlowing,
     isDirty,
     isSaving,
     markDirty,
@@ -262,7 +273,10 @@ function WorkflowCanvasInner({ workflowId: _workflowId }: WorkflowCanvasInnerPro
   } = useWorkflowStore();
 
   const { artifacts, executionProgress, clearArtifacts } = useExecutionStore();
-  const { isNodeLibraryOpen, setPromptModeActive, isPromptModeActive, toggleNodeLibrary, isDemoMode } = useUIStore();
+  const { isNodeLibraryOpen, setPromptModeActive, isPromptModeActive, toggleNodeLibrary, isDemoMode, setShowExecutionCompleteModal } = useUIStore();
+
+  // Execution timing for celebration modal
+  const executionStartRef = useRef<number | null>(null);
 
   // Spacebar opens command palette (only when not typing in an input)
   React.useEffect(() => {
@@ -296,6 +310,7 @@ function WorkflowCanvasInner({ workflowId: _workflowId }: WorkflowCanvasInnerPro
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [showLog, setShowLog] = useState(false);
   const [showShowcase, setShowShowcase] = useState(false);
+  const [showPostExecution, setShowPostExecution] = useState(false);
   const prevExecutingRef = useRef(false);
 
   const addLogEntry = useCallback((entry: LogEntry) => {
@@ -305,18 +320,82 @@ function WorkflowCanvasInner({ workflowId: _workflowId }: WorkflowCanvasInnerPro
 
   const { runWorkflow, isExecuting } = useExecution({ onLog: addLogEntry });
 
-  // Show showcase when execution finishes
+  // Show showcase when execution finishes + post-execution scene
   React.useEffect(() => {
     if (prevExecutingRef.current && !isExecuting && artifacts.size > 0) {
-      // Brief toast
       toast.success("Workflow Complete", { duration: 2000 });
+
+      // Edge completion wave
+      const edgeDelay = 500 / Math.max(storeNodes.length, 1);
+      storeNodes.forEach((node, i) => {
+        setTimeout(() => setEdgeFlowing(node.id, true), i * edgeDelay);
+        setTimeout(() => setEdgeFlowing(node.id, false), i * edgeDelay + 300);
+      });
+
       // Show grand reveal showcase after a short delay
       const timer = setTimeout(() => setShowShowcase(true), 500);
-      return () => clearTimeout(timer);
+      // Show post-execution scene
+      const timer2 = setTimeout(() => setShowPostExecution(true), 700);
+      return () => { clearTimeout(timer); clearTimeout(timer2); };
     }
     prevExecutingRef.current = isExecuting;
-  }, [isExecuting, artifacts]);
+  }, [isExecuting, artifacts, storeNodes, setEdgeFlowing]);
   const { t: tLocale } = useLocale();
+
+  // Extract data from artifacts for 3D scene
+  const postExecData = React.useMemo(() => {
+    if (!showPostExecution) return null;
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let rooms: any[] = [];
+    const kpis: { floors?: number; gfa?: number; height?: number; footprint?: number } = {};
+    let description = "";
+
+    for (const artifact of artifacts.values()) {
+      if (artifact.type === "3d" || artifact.type === "svg") {
+        const d = artifact.data as Record<string, unknown>;
+        rooms = (d?.roomList as typeof rooms) ?? [];
+      }
+      if (artifact.type === "kpi") {
+        const d = artifact.data as Record<string, unknown>;
+        const metrics = (d?.metrics as Array<{ label: string; value: string | number }>) ?? [];
+        for (const m of metrics) {
+          const lab = m.label.toLowerCase();
+          if (lab.includes("floor")) kpis.floors = Number(m.value);
+          if (lab.includes("gfa") || lab.includes("gross")) kpis.gfa = Number(m.value);
+          if (lab.includes("height")) kpis.height = Number(m.value);
+          if (lab.includes("footprint")) kpis.footprint = Number(m.value);
+        }
+      }
+      if (artifact.type === "text") {
+        const d = artifact.data as Record<string, unknown>;
+        description = (d?.content as string) ?? "";
+      }
+    }
+
+    return {
+      rooms,
+      kpis,
+      description,
+      buildingName: currentWorkflow?.name ?? "Building Design",
+    };
+  }, [showPostExecution, artifacts, currentWorkflow?.name]);
+
+  const handleClosePostExecution = useCallback(() => {
+    setShowPostExecution(false);
+    setTimeout(() => fitView({ padding: 0.3, duration: 800 }), 1100);
+  }, [fitView]);
+
+  const handleGeneratePDF = useCallback(async () => {
+    const { generatePDFReport } = await import("@/services/pdf-report");
+    const labels = new Map<string, string>();
+    storeNodes.forEach(n => labels.set(n.id, n.data.label));
+    await generatePDFReport({
+      workflowName: currentWorkflow?.name ?? "Workflow Results",
+      artifacts,
+      nodeLabels: labels,
+    });
+  }, [storeNodes, currentWorkflow?.name, artifacts]);
 
   const [nodes, setNodes, onNodesChange] = useNodesState(storeNodes as unknown as Node[]);
   const [edges, setEdges, onEdgesChange] = useEdgesState(storeEdges as Edge[]);
@@ -487,8 +566,15 @@ function WorkflowCanvasInner({ workflowId: _workflowId }: WorkflowCanvasInnerPro
       toast.error(tLocale('toast.noNodesError'), { duration: 3000 });
       return;
     }
+    executionStartRef.current = Date.now();
     await runWorkflow();
-  }, [runWorkflow, nodes, tLocale]);
+    // Show celebration modal on completion
+    const elapsed = executionStartRef.current ? Date.now() - executionStartRef.current : 0;
+    executionStartRef.current = null;
+    if (elapsed > 0) {
+      setShowExecutionCompleteModal(true);
+    }
+  }, [runWorkflow, nodes, tLocale, setShowExecutionCompleteModal]);
   const handleSave = useCallback(async () => {
     if (isDemoMode) {
       toast.info(tLocale('toast.demoSaveHint'), { duration: 3000 });
@@ -515,9 +601,18 @@ function WorkflowCanvasInner({ workflowId: _workflowId }: WorkflowCanvasInnerPro
       toast.error(tLocale('toast.saveFailed'));
     }
   }, [saveWorkflow, closeSaveModal, tLocale]);
-  const handleShare = useCallback(() => { toast.info(tLocale('toast.shareComingSoon'), { duration: 2000 }); }, [tLocale]);
-
   const workflowName = currentWorkflow?.name ?? tLocale('canvas.untitledWorkflow');
+
+  const handleShare = useCallback(() => {
+    shareExecutionToTwitter(workflowName, storeNodes.length);
+  }, [workflowName, storeNodes.length]);
+
+  // Compute duration text for celebration modal
+  const durationText = (() => {
+    if (!executionStartRef.current) return "a few seconds";
+    const ms = Date.now() - executionStartRef.current;
+    return ms < 1000 ? `${ms}ms` : `${(ms / 1000).toFixed(1)}s`;
+  })();
 
   return (
     <div className="relative flex h-full w-full">
@@ -601,8 +696,18 @@ function WorkflowCanvasInner({ workflowId: _workflowId }: WorkflowCanvasInnerPro
           )}
         </AnimatePresence>
 
-        {/* React Flow */}
-        <div className="absolute inset-0">
+        {/* React Flow — slides left when post-execution scene is active */}
+        <div
+          className="absolute inset-0"
+          style={{
+            transition: "transform 1s cubic-bezier(0.32, 0.72, 0, 1), opacity 1s ease, filter 1s ease",
+            transform: showPostExecution ? "scale(0.45)" : "none",
+            transformOrigin: "15% 50%",
+            opacity: showPostExecution ? 0.4 : 1,
+            filter: showPostExecution ? "blur(1px) brightness(0.6)" : "none",
+            pointerEvents: showPostExecution ? "none" : "auto",
+          }}
+        >
           {/* Copper dot grid */}
           <div
             className="absolute inset-0 pointer-events-none"
@@ -804,6 +909,36 @@ function WorkflowCanvasInner({ workflowId: _workflowId }: WorkflowCanvasInnerPro
           </div>
         </div>
 
+        {/* Post-execution 3D scene — overlays right 70% of canvas */}
+        <AnimatePresence>
+          {showPostExecution && !isExecuting && postExecData && (
+            <motion.div
+              key="post-exec-scene"
+              initial={{ opacity: 0, x: 40 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 40, transition: { duration: 0.5 } }}
+              transition={{ duration: 0.8, delay: 1.0 }}
+              style={{
+                position: "absolute",
+                top: 0,
+                right: 0,
+                bottom: 0,
+                width: "70%",
+                zIndex: 15,
+              }}
+            >
+              <PostExecutionScene
+                rooms={postExecData.rooms}
+                kpis={postExecData.kpis}
+                buildingDescription={postExecData.description}
+                buildingName={postExecData.buildingName}
+                onClose={handleClosePostExecution}
+                onGeneratePDF={handleGeneratePDF}
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {/* AI Chat Panel — floats on right edge */}
         <AIChatPanel
           messages={chatMessages}
@@ -814,6 +949,17 @@ function WorkflowCanvasInner({ workflowId: _workflowId }: WorkflowCanvasInnerPro
         />
 
         {/* Artifact results panel removed — results now display inside nodes */}
+
+        {/* Execution complete celebration modal */}
+        <ExecutionCompleteModal
+          workflowName={workflowName}
+          nodeCount={storeNodes.length}
+          artifactCount={artifacts.size}
+          durationText={durationText}
+          onViewResults={() => {
+            /* PostExecutionScene handles results display */
+          }}
+        />
       </div>
 
       {/* Save workflow name modal */}

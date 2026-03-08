@@ -4,7 +4,7 @@ import { detectOpenAIError, APIError } from "@/lib/user-errors";
 function getClient(userApiKey?: string): OpenAI {
   const key = userApiKey || process.env.OPENAI_API_KEY;
   if (!key) throw new Error("No OpenAI API key configured");
-  return new OpenAI({ apiKey: key });
+  return new OpenAI({ apiKey: key, timeout: 30000, maxRetries: 1 });
 }
 
 // ─── Error Handling ───────────────────────────────────────────────────────────
@@ -587,6 +587,122 @@ If information is not found in the text, omit the field. Be precise with numbers
       projectTitle: parsed.projectTitle || "Untitled Project",
       projectType: parsed.projectType || "unknown",
       rawText: text,
+    };
+  });
+}
+
+// ─── estimateCosts (QS AI Estimation) ───────────────────────────────────────
+
+export interface CostEstimateResult {
+  lineItems: Array<{
+    description: string;
+    csiDivision: string;
+    unit: string;
+    quantity: number;
+    unitRate: number;
+    totalCost: number;
+    confidence: "high" | "medium" | "low";
+  }>;
+  hardCostTotal: number;
+  softCostPercent: number;
+  contingencyPercent: number;
+  totalProjectCost: number;
+  costPerSF: number;
+  assumptions: string[];
+  exclusions: string[];
+  riskFactors: string[];
+}
+
+export async function estimateCosts(
+  buildingDescription: string,
+  totalAreaSF: number,
+  region: string = "USA",
+  projectType: string = "commercial",
+  userApiKey?: string
+): Promise<CostEstimateResult> {
+  return handleOpenAICall(async () => {
+    const client = getClient(userApiKey);
+
+    const completion = await client.chat.completions.create({
+      model: "gpt-4o-mini",
+      temperature: 0.2,
+      response_format: { type: "json_object" },
+      messages: [
+        {
+          role: "system",
+          content: `You are a Chartered Quantity Surveyor (MRICS) with 20+ years of experience in construction cost estimation. You provide AACE Class 4 preliminary estimates (±15-20% accuracy) based on RSMeans 2024/2025 data.
+
+CRITICAL RULES:
+1. Use REAL construction unit rates from RSMeans 2024/2025 — NEVER invent rates
+2. All rates in USD national average — regional adjustment applied separately
+3. Include ALL CSI MasterFormat divisions relevant to the building type
+4. Apply appropriate waste factors (7-15% depending on material)
+5. Be CONSERVATIVE — round UP, not down
+6. Break costs into Material / Labor / Equipment where possible
+7. Account for project complexity based on building type
+8. Include soft costs (design fees, permits, GC O&P, contingency)
+
+OUTPUT FORMAT (JSON):
+{
+  "lineItems": [
+    {
+      "description": "Concrete Foundations — cast-in-place, 4000 PSI",
+      "csiDivision": "03",
+      "unit": "CY",
+      "quantity": 250,
+      "unitRate": 185.00,
+      "totalCost": 46250,
+      "confidence": "high"
+    }
+  ],
+  "hardCostTotal": 0,
+  "softCostPercent": 37.5,
+  "contingencyPercent": 10,
+  "totalProjectCost": 0,
+  "costPerSF": 0,
+  "assumptions": ["..."],
+  "exclusions": ["Land acquisition", "FF&E", "Financing costs"],
+  "riskFactors": ["..."]
+}
+
+QUALITY STANDARD:
+- Every line item must have a specific CSI division
+- Quantities must be realistic for the described building
+- Unit rates must be within ±15% of RSMeans 2024 published rates
+- Total cost per SF must be reasonable for building type and region
+- Include 15-25 line items minimum for a complete estimate`,
+        },
+        {
+          role: "user",
+          content: `Provide a preliminary cost estimate for:
+
+Building: ${buildingDescription}
+Total Area: ${totalAreaSF.toLocaleString()} SF
+Region: ${region}
+Project Type: ${projectType}
+
+Generate a complete AACE Class 4 estimate with all major CSI divisions.`,
+        },
+      ],
+      max_tokens: 3000,
+    });
+
+    const content = completion.choices[0]?.message?.content;
+    if (!content) throw new Error("OpenAI returned empty response for cost estimation");
+
+    const result = JSON.parse(content) as CostEstimateResult;
+
+    // Validate and ensure required fields
+    return {
+      lineItems: result.lineItems ?? [],
+      hardCostTotal: result.hardCostTotal ?? 0,
+      softCostPercent: result.softCostPercent ?? 37.5,
+      contingencyPercent: result.contingencyPercent ?? 10,
+      totalProjectCost: result.totalProjectCost ?? 0,
+      costPerSF: result.costPerSF ?? (result.totalProjectCost ? Math.round(result.totalProjectCost / totalAreaSF) : 0),
+      assumptions: result.assumptions ?? [],
+      exclusions: result.exclusions ?? ["Land acquisition", "FF&E", "Financing costs"],
+      riskFactors: result.riskFactors ?? [],
     };
   });
 }
