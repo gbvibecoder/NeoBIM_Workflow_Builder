@@ -22,6 +22,11 @@ import "@xyflow/react/dist/style.css";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { Layers3, Sparkles, BookOpen, X, FileDown } from "lucide-react";
+import {
+  shareExecutionToTwitter,
+  shareExecutionToLinkedIn,
+} from "@/lib/share";
+import { ExecutionCompleteModal } from "./modals/ExecutionCompleteModal";
 
 import dynamic from "next/dynamic";
 import { BaseNode } from "./nodes/BaseNode";
@@ -244,7 +249,10 @@ function WorkflowCanvasInner({ workflowId: _workflowId }: WorkflowCanvasInnerPro
   } = useWorkflowStore();
 
   const { artifacts, executionProgress, removeArtifact, clearArtifacts } = useExecutionStore();
-  const { isNodeLibraryOpen, setPromptModeActive, isPromptModeActive, toggleNodeLibrary, isDemoMode } = useUIStore();
+  const { isNodeLibraryOpen, setPromptModeActive, isPromptModeActive, toggleNodeLibrary, isDemoMode, setShowExecutionCompleteModal } = useUIStore();
+
+  // Execution timing for celebration modal
+  const executionStartRef = useRef<number | null>(null);
 
   // Chat / execution log state
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
@@ -386,7 +394,16 @@ function WorkflowCanvasInner({ workflowId: _workflowId }: WorkflowCanvasInnerPro
     event.dataTransfer.dropEffect = "move";
   }, []);
 
-  const handleRun  = useCallback(async () => { await runWorkflow(); }, [runWorkflow]);
+  const handleRun  = useCallback(async () => {
+    executionStartRef.current = Date.now();
+    await runWorkflow();
+    // Show celebration modal on completion
+    const elapsed = executionStartRef.current ? Date.now() - executionStartRef.current : 0;
+    executionStartRef.current = null;
+    if (elapsed > 0) {
+      setShowExecutionCompleteModal(true);
+    }
+  }, [runWorkflow, setShowExecutionCompleteModal]);
   const handleSave = useCallback(async () => {
     if (isDemoMode) {
       toast.info("Create a free account to save workflows", { duration: 3000 });
@@ -399,9 +416,19 @@ function WorkflowCanvasInner({ workflowId: _workflowId }: WorkflowCanvasInnerPro
       toast.error("Save failed — check your connection");
     }
   }, [saveWorkflow, isDemoMode]);
-  const handleShare = useCallback(() => { toast.info("Share feature coming soon", { duration: 2000 }); }, []);
 
   const workflowName = currentWorkflow?.name ?? "Untitled Workflow";
+
+  const handleShare = useCallback(() => {
+    shareExecutionToTwitter(workflowName, storeNodes.length);
+  }, [workflowName, storeNodes.length]);
+
+  // Compute duration text for celebration modal
+  const durationText = (() => {
+    if (!executionStartRef.current) return "a few seconds";
+    const ms = Date.now() - executionStartRef.current;
+    return ms < 1000 ? `${ms}ms` : `${(ms / 1000).toFixed(1)}s`;
+  })();
 
   return (
     <div className="relative flex h-full w-full">
@@ -721,6 +748,17 @@ function WorkflowCanvasInner({ workflowId: _workflowId }: WorkflowCanvasInnerPro
             </motion.div>
           )}
         </AnimatePresence>
+
+        {/* Execution complete celebration modal */}
+        <ExecutionCompleteModal
+          workflowName={workflowName}
+          nodeCount={storeNodes.length}
+          artifactCount={artifacts.size}
+          durationText={durationText}
+          onViewResults={() => {
+            /* scroll to artifact panel — it's already visible */
+          }}
+        />
       </div>
     </div>
   );

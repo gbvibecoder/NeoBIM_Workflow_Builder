@@ -6,8 +6,9 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Clock, CheckCircle2, XCircle, Loader2, RefreshCw,
   ChevronDown, ChevronUp, FileText, Image, Table2,
-  Zap, Filter, ExternalLink, AlertCircle, GitCompareArrows,
+  Zap, Filter, ExternalLink, AlertCircle, GitCompareArrows, Share2,
 } from "lucide-react";
+import { shareHistoryToTwitter } from "@/lib/share";
 import { Header } from "@/components/dashboard/Header";
 import { toast } from "sonner";
 
@@ -407,6 +408,26 @@ function ExecutionRow({ execution, onRerun, onViewDetails, compareSelected, onTo
           >
             <RefreshCw size={10} /> Rerun
           </button>
+          {execution.status === "SUCCESS" && (
+            <button
+              onClick={() => shareHistoryToTwitter(
+                execution.workflow.name,
+                execution.artifacts.length,
+                dur ?? "—",
+              )}
+              title="Share on X"
+              style={{
+                padding: "5px 8px", borderRadius: 6, border: "1px solid #1E1E2E",
+                background: "transparent", color: "#55556A", fontSize: 10, cursor: "pointer",
+                display: "flex", alignItems: "center", gap: 4,
+                transition: "all 0.1s",
+              }}
+              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = "#2A2A3E"; (e.currentTarget as HTMLElement).style.color = "#8888A0"; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = "rgba(255,255,255,0.05)"; (e.currentTarget as HTMLElement).style.color = "#55556A"; }}
+            >
+              <Share2 size={10} /> Share
+            </button>
+          )}
         </div>
       </div>
 

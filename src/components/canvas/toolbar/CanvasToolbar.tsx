@@ -9,6 +9,11 @@ import {
 } from "lucide-react";
 import type { CreationMode } from "@/types/workflow";
 import { useWorkflowStore } from "@/stores/workflow-store";
+import {
+  shareWorkflowToTwitter,
+  shareWorkflowToLinkedIn,
+  copyShareLink,
+} from "@/lib/share";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -125,12 +130,14 @@ export function CanvasToolbar({
 }: CanvasToolbarProps) {
   const [showModeMenu, setShowModeMenu] = useState(false);
   const [showRunMenu, setShowRunMenu] = useState(false);
+  const [showShareMenu, setShowShareMenu] = useState(false);
   const [isEditingName, setIsEditingName] = useState(false);
   const [nameValue, setNameValue] = useState(workflowName);
   const [savedFlash, setSavedFlash] = useState(false);
 
   const modeMenuRef = useRef<HTMLDivElement>(null);
   const runMenuRef = useRef<HTMLDivElement>(null);
+  const shareMenuRef = useRef<HTMLDivElement>(null);
   const nameInputRef = useRef<HTMLInputElement>(null);
 
   const handleSave = useCallback(() => {
@@ -163,6 +170,7 @@ export function CanvasToolbar({
     const handler = (e: MouseEvent) => {
       if (modeMenuRef.current && !modeMenuRef.current.contains(e.target as Node)) setShowModeMenu(false);
       if (runMenuRef.current && !runMenuRef.current.contains(e.target as Node)) setShowRunMenu(false);
+      if (shareMenuRef.current && !shareMenuRef.current.contains(e.target as Node)) setShowShareMenu(false);
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
@@ -421,8 +429,52 @@ export function CanvasToolbar({
             AI
           </button>
 
-          {/* Share */}
-          <TBBtn onClick={onShare} icon={<Share2 size={13} />} title="Share" />
+          {/* Share dropdown */}
+          <div style={{ position: "relative" }} ref={shareMenuRef}>
+            <TBBtn
+              onClick={() => setShowShareMenu(v => !v)}
+              icon={<Share2 size={13} />}
+              title="Share"
+            />
+            <AnimatePresence>
+              {showShareMenu && (
+                <motion.div
+                  initial={{ opacity: 0, y: -4, scale: 0.97 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: -4, scale: 0.97 }}
+                  transition={{ duration: 0.12 }}
+                  style={{
+                    position: "absolute", top: "calc(100% + 4px)", right: 0,
+                    width: 180, borderRadius: 10, overflow: "hidden",
+                    background: "#12121A", border: "1px solid #2A2A3E",
+                    boxShadow: "0 8px 32px rgba(0,0,0,0.5)", zIndex: 50,
+                  }}
+                >
+                  {[
+                    { label: "Share on X", action: () => shareWorkflowToTwitter(workflowName) },
+                    { label: "Share on LinkedIn", action: () => shareWorkflowToLinkedIn() },
+                    { label: "Copy Link", action: () => copyShareLink() },
+                  ].map(item => (
+                    <button
+                      key={item.label}
+                      onClick={() => { item.action(); setShowShareMenu(false); }}
+                      style={{
+                        width: "100%", display: "flex", alignItems: "center", gap: 8,
+                        padding: "9px 12px", background: "transparent",
+                        border: "none", cursor: "pointer", textAlign: "left",
+                        fontSize: 12, fontWeight: 500, color: "#F0F0F5",
+                        transition: "background 0.1s",
+                      }}
+                      onMouseEnter={e => { e.currentTarget.style.background = "#1A1A26"; }}
+                      onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}
+                    >
+                      {item.label}
+                    </button>
+                  ))}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
 
           {/* Save */}
           <button
