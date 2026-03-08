@@ -22,9 +22,15 @@ export async function POST() {
       );
     }
 
+    const baseUrl = process.env.NEXTAUTH_URL;
+    if (!baseUrl) {
+      console.error('[stripe/portal] NEXTAUTH_URL is not configured');
+      return NextResponse.json({ error: 'Server configuration error' }, { status: 500 });
+    }
+
     const portalSession = await stripe.billingPortal.sessions.create({
       customer: user.stripeCustomerId,
-      return_url: `${process.env.NEXTAUTH_URL}/dashboard/billing`,
+      return_url: `${baseUrl}/dashboard/billing`,
     });
 
     return NextResponse.json({ url: portalSession.url });

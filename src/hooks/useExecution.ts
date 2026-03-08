@@ -112,17 +112,6 @@ async function executeNode(
     const nd = node.data as Record<string, unknown>;
     if (nd.viewType != null) nodeConfig.viewType = nd.viewType;
 
-    // Debug: trace data being sent to real API for live nodes
-    if (LIVE_NODE_IDS.has(catalogueId)) {
-      const upData = previousArtifact?.data as Record<string, unknown> | undefined;
-      console.log(`[useExecution] ${catalogueId} → REAL API (live node)`);
-      console.log(`[useExecution] ${catalogueId} upstream data keys:`, upData ? Object.keys(upData) : "none");
-      if (catalogueId === "GN-003") {
-        console.log("[useExecution] GN-003 _raw present:", !!upData?._raw);
-        console.log("[useExecution] GN-003 content (first 100 chars):", String(upData?.content ?? "").slice(0, 100));
-      }
-    }
-
     const res = await fetch("/api/execute-node", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -390,7 +379,7 @@ export function useExecution({ onLog }: UseExecutionOptions = {}) {
               title: String(artifact.type),
               data: artifact.data,
             }),
-          }).catch(() => {/* best-effort */});
+          }).catch((err) => { console.error("[useExecution] Failed to persist artifact:", err); });
         }
 
         // Animate outgoing edges as data flows to the next node
@@ -491,7 +480,7 @@ export function useExecution({ onLog }: UseExecutionOptions = {}) {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: hasError ? "PARTIAL" : "SUCCESS" }),
-      }).catch(() => {/* best-effort */});
+      }).catch((err) => { console.error("[useExecution] Failed to update execution status:", err); });
     }
 
     if (!hasError) {

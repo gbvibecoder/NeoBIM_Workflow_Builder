@@ -354,16 +354,6 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
       const viewType = ((inputData?.viewType as string) ?? "exterior") as "exterior" | "floor_plan" | "site_plan" | "interior";
       const style = (inputData?.style as string) ?? "photorealistic architectural render";
 
-      // Debug: trace what input GN-003 actually receives
-      console.log("[GN-003] Input keys:", Object.keys(inputData ?? {}));
-      console.log("[GN-003] _raw present:", !!description);
-      if (description) {
-        const d = description as Record<string, unknown>;
-        console.log("[GN-003] _raw.buildingType:", d.buildingType, "| floors:", d.floors, "| facade:", d.facade);
-      }
-      console.log("[GN-003] prompt (first 120 chars):", String(prompt).slice(0, 120));
-      console.log("[GN-003] viewType:", viewType, "| style:", style);
-
       // If upstream TR-005 already enhanced the prompt, use it directly
       const enhancedPrompt = inputData?.enhancedPrompt as string | undefined;
 
@@ -371,7 +361,6 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
       let revisedPrompt: string;
 
       if (enhancedPrompt) {
-        console.log("[GN-003] Using pre-enhanced prompt from TR-005 (first 120 chars):", enhancedPrompt.slice(0, 120));
         // TR-005 already produced the optimised prompt — pass directly to DALL-E 3
         const result = await generateConceptImage(
           enhancedPrompt,
@@ -400,14 +389,6 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
           narrative: "",
         };
 
-        console.log("[GN-003] Using BuildingDescription:", {
-          projectName: desc.projectName,
-          buildingType: desc.buildingType,
-          floors: desc.floors,
-          facade: desc.facade?.slice(0, 60),
-          fromUpstream: !!description,
-        });
-
         const result = await generateConceptImage(
           desc,
           style,
@@ -420,9 +401,6 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
         url = result.url;
         revisedPrompt = result.revisedPrompt;
       }
-
-      console.log("[GN-003] DALL-E 3 result URL (first 80 chars):", url?.slice(0, 80));
-      console.log("[GN-003] Revised prompt (first 120 chars):", revisedPrompt?.slice(0, 120));
 
       const viewLabel = viewType.replace("_", " ");
 
