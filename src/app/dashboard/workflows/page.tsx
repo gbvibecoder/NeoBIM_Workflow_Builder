@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Plus, Workflow, ArrowRight, Trash2, ExternalLink, Clock } from "lucide-react";
+import { Plus, Workflow, ArrowRight, Trash2, ExternalLink, Clock, Sparkles, Box, Image as ImageIcon } from "lucide-react";
 import { Header } from "@/components/dashboard/Header";
 import { api, type WorkflowSummary } from "@/lib/api";
 import { formatRelativeTime } from "@/lib/utils";
@@ -51,15 +51,15 @@ export default function WorkflowsPage() {
             <div style={{ fontSize: 13, color: "#5C5C78" }}>Loading workflows…</div>
           </div>
         ) : workflows.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-24 text-center">
+          <div className="flex flex-col items-center justify-center py-16 text-center">
             <div className="h-16 w-16 rounded-2xl border border-[rgba(255,255,255,0.08)] bg-[#12121E] flex items-center justify-center mb-5">
               <Workflow size={28} className="text-[#3A3A50]" strokeWidth={1} />
             </div>
-            <h3 className="text-base font-semibold text-[#F0F0F5] mb-2">No workflows yet</h3>
+            <h3 className="text-base font-semibold text-[#F0F0F5] mb-2">Try Your First Workflow</h3>
             <p className="text-sm text-[#5C5C78] max-w-sm leading-relaxed mb-6">
-              Create your first workflow by building one from scratch or cloning a prebuilt template.
+              Start with a template below, or build your own from scratch. Each workflow runs in under 2 minutes.
             </p>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 mb-8">
               <Link
                 href="/dashboard/workflows/new"
                 className="flex items-center gap-2 rounded-lg bg-[#4F8AFF] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#3D7AFF] transition-all"
@@ -74,6 +74,40 @@ export default function WorkflowsPage() {
                 Browse Templates
                 <ArrowRight size={13} />
               </Link>
+            </div>
+
+            {/* Quick-start template suggestions */}
+            <div style={{ width: "100%", maxWidth: 640 }}>
+              <p style={{ fontSize: 11, color: "#5C5C78", textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 600, marginBottom: 12 }}>
+                Popular starting points
+              </p>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
+                {[
+                  { label: "Brief → 3D Concept", desc: "Analyze a brief and generate 3D massing", icon: <Box size={16} className="text-[#8B5CF6]" />, color: "#8B5CF6" },
+                  { label: "Brief → Render", desc: "Go from project brief to AI concept render", icon: <ImageIcon size={16} className="text-[#10B981]" />, color: "#10B981" },
+                  { label: "Brief → Full Pipeline", desc: "Brief analysis, massing, render, and BOQ", icon: <Sparkles size={16} className="text-[#F59E0B]" />, color: "#F59E0B" },
+                ].map((tpl, i) => (
+                  <Link
+                    key={i}
+                    href="/dashboard/templates"
+                    style={{
+                      background: "#12121E",
+                      border: "1px solid rgba(255,255,255,0.06)",
+                      borderRadius: 10,
+                      padding: "14px 12px",
+                      textAlign: "left",
+                      textDecoration: "none",
+                      transition: "border-color 0.15s, background 0.15s",
+                    }}
+                    onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = `rgba(${tpl.color === "#8B5CF6" ? "139,92,246" : tpl.color === "#10B981" ? "16,185,129" : "245,158,11"},0.3)`; (e.currentTarget as HTMLElement).style.background = "#1A1A2A"; }}
+                    onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = "rgba(255,255,255,0.06)"; (e.currentTarget as HTMLElement).style.background = "#12121E"; }}
+                  >
+                    <div style={{ marginBottom: 8 }}>{tpl.icon}</div>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: "#E0E0EA", marginBottom: 4 }}>{tpl.label}</div>
+                    <div style={{ fontSize: 10, color: "#5C5C78", lineHeight: 1.4 }}>{tpl.desc}</div>
+                  </Link>
+                ))}
+              </div>
             </div>
           </div>
         ) : (

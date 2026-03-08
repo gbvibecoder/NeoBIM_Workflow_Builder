@@ -8,6 +8,7 @@ import { useUIStore } from "@/stores/ui-store";
 import { executeNode as mockExecuteNode } from "@/services/mock-executor";
 import { generateId } from "@/lib/utils";
 import { awardXP } from "@/lib/award-xp";
+import { trackWorkflowExecuted, trackNodeUsed, trackRegenerationUsed } from "@/lib/track";
 import type { Execution, ExecutionArtifact } from "@/types/execution";
 import type { WorkflowNode } from "@/types/nodes";
 import type { LogEntry } from "@/components/canvas/ExecutionLog";
@@ -272,6 +273,11 @@ export function useExecution({ onLog }: UseExecutionOptions = {}) {
     completeExecution,
     setProgress,
     isExecuting,
+    incrementRegenCount,
+    getRegenRemaining,
+    setRegeneratingNode,
+    regeneratingNodeId,
+    artifacts,
   } = useExecutionStore();
   
   const isDemoMode = useUIStore(s => s.isDemoMode);
@@ -359,6 +365,7 @@ export function useExecution({ onLog }: UseExecutionOptions = {}) {
 
         updateNodeStatus(node.id, "success");
         log("success", `${node.data.label} completed`, String(artifact.type));
+        trackNodeUsed(node.data.catalogueId, node.data.label);
 
         // Show warnings if any
         if (artifact.metadata?.warnings && Array.isArray(artifact.metadata.warnings)) {
@@ -483,6 +490,10 @@ export function useExecution({ onLog }: UseExecutionOptions = {}) {
       }).catch((err) => { console.error("[useExecution] Failed to update execution status:", err); });
     }
 
+    // Track workflow execution analytics
+    const catalogueIds = orderedNodes.map(n => (n.data as { catalogueId: string }).catalogueId);
+    trackWorkflowExecuted(orderedNodes.length, catalogueIds);
+
     if (!hasError) {
       toast.success("Workflow completed", {
         description: `${orderedNodes.length} nodes executed`,
@@ -494,11 +505,11 @@ export function useExecution({ onLog }: UseExecutionOptions = {}) {
       awardXP("workflow-run-repeat");
 
       // Check for special node achievements
-      const catalogueIds = new Set(orderedNodes.map(n => (n.data as { catalogueId: string }).catalogueId));
-      if (catalogueIds.has("GN-003")) {
+      const usedCatalogueIds = new Set(catalogueIds);
+      if (usedCatalogueIds.has("GN-003")) {
         awardXP("render-generated");
       }
-      if (catalogueIds.has("TR-008") && catalogueIds.has("EX-002")) {
+      if (usedCatalogueIds.has("TR-008") && usedCatalogueIds.has("EX-002")) {
         awardXP("boq-generated");
       }
     }
@@ -518,19 +529,55 @@ export function useExecution({ onLog }: UseExecutionOptions = {}) {
     log,
   ]);
 
+  const regenerateNode = useCallback(async (nodeId: string) => {
+    const node = nodes.find(n => n.id === nodeId) as WorkflowNode | undefined;
+    if (!node || isExecuting || regeneratingNodeId) return;
+
+    const remaining = getRegenRemaining(nodeId);
+    if (remaining <= 0) {
+      toast.error("Maximum regeneration attempts reached", { description: "You can regenerate each node up to 3 times per execution." });
+      return;
+    }
+
+    if (!incrementRegenCount(nodeId)) return;
+
+    setRegeneratingNode(nodeId);
+    updateNodeStatus(nodeId, "running");
+
+    const useReal = process.env.NEXT_PUBLIC_ENABLE_MOCK_EXECUTION !== "true";
+    const executionId = useExecutionStore.getState().currentExecution?.id ?? generateId();
+
+    try {
+      const upstreamArtifact = getUpstreamArtifact(nodeId, workflowEdges, artifacts);
+      const artifact = await executeNode(node, executionId, upstreamArtifact, useReal, isDemoMode);
+      addArtifact(nodeId, artifact);
+      updateNodeStatus(nodeId, "success");
+      trackRegenerationUsed(nodeId, node.data.catalogueId);
+      toast.success(`${node.data.label} regenerated`, { duration: 2000 });
+    } catch (error) {
+      const errMsg = error instanceof Error ? error.message : "Regeneration failed";
+      updateNodeStatus(nodeId, "error");
+      toast.error(`Regeneration failed: ${errMsg}`);
+    } finally {
+      setRegeneratingNode(null);
+    }
+  }, [nodes, isExecuting, regeneratingNodeId, workflowEdges, isDemoMode, getRegenRemaining, incrementRegenCount, setRegeneratingNode, updateNodeStatus, addArtifact, artifacts]);
+
   const resetExecution = useCallback(() => {
     nodes.forEach((node) => updateNodeStatus(node.id, "idle"));
   }, [nodes, updateNodeStatus]);
-  
+
   const clearRateLimitError = useCallback(() => {
     setRateLimitHit(null);
   }, []);
 
-  return { 
-    runWorkflow, 
-    resetExecution, 
-    isExecuting, 
-    rateLimitHit, 
-    clearRateLimitError 
+  return {
+    runWorkflow,
+    regenerateNode,
+    resetExecution,
+    isExecuting,
+    regeneratingNodeId,
+    rateLimitHit,
+    clearRateLimitError
   };
 }

@@ -512,15 +512,29 @@ export default function LandingPage() {
               {t('landing.heroSubtitle')}
             </motion.p>
             <motion.p
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.35, duration: 0.5, ease: smoothEase }}
+              style={{
+                fontSize: 16, lineHeight: 1.6,
+                maxWidth: 520, margin: "16px auto 0",
+                fontWeight: 600,
+                background: "linear-gradient(135deg, #10B981 0%, #34D399 100%)",
+                WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text",
+              }}
+            >
+              {t('landing.heroSecondary')}
+            </motion.p>
+            <motion.p
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ delay: 0.4, duration: 0.5 }}
               style={{
                 fontSize: 13, color: "#5C5C78", lineHeight: 1.6,
-                maxWidth: 500, margin: "12px auto 0", fontStyle: "italic",
+                maxWidth: 500, margin: "10px auto 0", fontStyle: "italic",
               }}
             >
-              {t('landing.positioningNote')}
+              {t('landing.heroTarget')}
             </motion.p>
 
             {/* Prompt bar */}

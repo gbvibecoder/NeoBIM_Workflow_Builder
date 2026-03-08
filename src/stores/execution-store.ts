@@ -17,6 +17,10 @@ interface ExecutionState {
   // Artifacts by tile instance ID
   artifacts: Map<string, ExecutionArtifact>;
 
+  // Regeneration tracking: nodeId → count (max 3)
+  regenerationCounts: Map<string, number>;
+  regeneratingNodeId: string | null;
+
   // Execution history
   history: Execution[];
 
@@ -29,6 +33,11 @@ interface ExecutionState {
   clearCurrentExecution: () => void;
   setProgress: (progress: number) => void;
 
+  // Regeneration
+  incrementRegenCount: (tileInstanceId: string) => boolean; // returns false if at max
+  getRegenRemaining: (tileInstanceId: string) => number;
+  setRegeneratingNode: (nodeId: string | null) => void;
+
   // History
   addToHistory: (execution: Execution) => void;
   clearHistory: () => void;
@@ -39,11 +48,15 @@ interface ExecutionState {
   clearArtifacts: () => void;
 }
 
+const MAX_REGENERATIONS = 3;
+
 export const useExecutionStore = create<ExecutionState>()((set, get) => ({
   currentExecution: null,
   isExecuting: false,
   executionProgress: 0,
   artifacts: new Map(),
+  regenerationCounts: new Map(),
+  regeneratingNodeId: null,
   history: [],
 
   startExecution: (execution) =>
@@ -52,6 +65,7 @@ export const useExecutionStore = create<ExecutionState>()((set, get) => ({
       isExecuting: true,
       executionProgress: 0,
       artifacts: new Map(),
+      regenerationCounts: new Map(),
     }),
 
   updateExecutionStatus: (status) =>
@@ -110,6 +124,22 @@ export const useExecutionStore = create<ExecutionState>()((set, get) => ({
     })),
 
   clearHistory: () => set({ history: [] }),
+
+  incrementRegenCount: (tileInstanceId) => {
+    const current = get().regenerationCounts.get(tileInstanceId) ?? 0;
+    if (current >= MAX_REGENERATIONS) return false;
+    const newCounts = new Map(get().regenerationCounts);
+    newCounts.set(tileInstanceId, current + 1);
+    set({ regenerationCounts: newCounts });
+    return true;
+  },
+
+  getRegenRemaining: (tileInstanceId) => {
+    const used = get().regenerationCounts.get(tileInstanceId) ?? 0;
+    return MAX_REGENERATIONS - used;
+  },
+
+  setRegeneratingNode: (nodeId) => set({ regeneratingNodeId: nodeId }),
 
   getArtifactForTile: (tileInstanceId) => {
     return get().artifacts.get(tileInstanceId);

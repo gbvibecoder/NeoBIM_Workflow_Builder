@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo } from "react";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
-import { Download, ChevronDown, X, FileText, Image as ImageIcon, Database, BarChart2, Table2, File, LayoutGrid, Box } from "lucide-react";
+import { Download, ChevronDown, X, FileText, Image as ImageIcon, Database, BarChart2, Table2, File, LayoutGrid, Box, RefreshCw, Loader2 } from "lucide-react";
 import DOMPurify from "dompurify";
 import dynamic from "next/dynamic";
 
@@ -69,16 +69,57 @@ function hexToRgb(hex: string): string {
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
+// ─── Quality badge config ──────────────────────────────────────────────────
+
+interface QualityBadge {
+  label: string;
+  color: string;
+  bg: string;
+}
+
+function getQualityBadge(artifact: ExecutionArtifact): QualityBadge | null {
+  const meta = artifact.metadata ?? {};
+  const isReal = !!meta.real;
+  const isMock = !!meta.mock || meta.source === "mock";
+
+  if (isMock) {
+    return { label: "Sample Data", color: "#6B7280", bg: "rgba(107,114,128,0.12)" };
+  }
+
+  if (artifact.type === "image" && isReal) {
+    return { label: "AI Generated · Concept", color: "#3B82F6", bg: "rgba(59,130,246,0.12)" };
+  }
+
+  if (artifact.type === "table" && isReal) {
+    return { label: "AI Estimate · ±15-20%", color: "#F59E0B", bg: "rgba(245,158,11,0.12)" };
+  }
+
+  if ((artifact.type === "text" || artifact.type === "json" || artifact.type === "kpi") && isReal) {
+    return { label: "AI Generated · Review", color: "#8B5CF6", bg: "rgba(139,92,246,0.12)" };
+  }
+
+  if (artifact.type === "3d" || artifact.type === "svg") {
+    return { label: "AI Generated · Concept", color: "#3B82F6", bg: "rgba(59,130,246,0.12)" };
+  }
+
+  return null;
+}
+
+// ─── Props ────────────────────────────────────────────────────────────────────
+
 interface ArtifactCardProps {
   artifact: ExecutionArtifact;
   nodeLabel?: string;
   nodeCategory?: NodeCategory;
   onDismiss?: () => void;
+  onRegenerate?: () => void;
+  regenRemaining?: number;
+  isRegenerating?: boolean;
 }
 
 // ─── Main card ────────────────────────────────────────────────────────────────
 
-export function ArtifactCard({ artifact, nodeLabel, nodeCategory, onDismiss }: ArtifactCardProps) {
+export function ArtifactCard({ artifact, nodeLabel, nodeCategory, onDismiss, onRegenerate, regenRemaining, isRegenerating }: ArtifactCardProps) {
   const [collapsed, setCollapsed] = useState(false);
   const prefersReduced = useReducedMotion();
   const { t } = useLocale();
@@ -86,6 +127,8 @@ export function ArtifactCard({ artifact, nodeLabel, nodeCategory, onDismiss }: A
   const accentColor = nodeCategory ? CATEGORY_COLOR[nodeCategory] : "#4F8AFF";
   const typeColor   = TYPE_COLOR[artifact.type] ?? "#4F8AFF";
   const rgb         = hexToRgb(accentColor);
+  const qualityBadge = getQualityBadge(artifact);
+  const canRegenerate = onRegenerate && (regenRemaining === undefined || regenRemaining > 0);
 
   return (
     <motion.div
@@ -122,6 +165,21 @@ export function ArtifactCard({ artifact, nodeLabel, nodeCategory, onDismiss }: A
           {nodeLabel ?? t('artifact.nodeOutput')}
         </span>
 
+        {/* Quality badge */}
+        {qualityBadge && (
+          <span style={{
+            display: "flex", alignItems: "center", gap: 3,
+            padding: "2px 7px", borderRadius: 6,
+            background: qualityBadge.bg,
+            fontSize: 8, fontWeight: 600, color: qualityBadge.color,
+            letterSpacing: "0.02em",
+            flexShrink: 0,
+            whiteSpace: "nowrap",
+          }}>
+            {qualityBadge.label}
+          </span>
+        )}
+
         {/* Type badge */}
         <span style={{
           display: "flex", alignItems: "center", gap: 3,
@@ -134,6 +192,31 @@ export function ArtifactCard({ artifact, nodeLabel, nodeCategory, onDismiss }: A
           {TYPE_ICON[artifact.type]}
           {artifact.type}
         </span>
+
+        {/* Regenerate button */}
+        {canRegenerate && (
+          <button
+            onClick={e => { e.stopPropagation(); onRegenerate!(); }}
+            disabled={isRegenerating}
+            title={regenRemaining !== undefined ? `Regenerate (${regenRemaining} left)` : "Regenerate"}
+            style={{
+              display: "flex", alignItems: "center", gap: 3,
+              padding: "3px 8px", borderRadius: 6,
+              background: isRegenerating ? "rgba(79,138,255,0.15)" : "rgba(79,138,255,0.08)",
+              border: "1px solid rgba(79,138,255,0.2)",
+              fontSize: 9, fontWeight: 600, color: "#4F8AFF",
+              cursor: isRegenerating ? "not-allowed" : "pointer",
+              flexShrink: 0,
+              transition: "all 0.15s ease",
+              opacity: isRegenerating ? 0.7 : 1,
+            }}
+            onMouseEnter={e => { if (!isRegenerating) { e.currentTarget.style.background = "rgba(79,138,255,0.15)"; e.currentTarget.style.borderColor = "rgba(79,138,255,0.4)"; } }}
+            onMouseLeave={e => { if (!isRegenerating) { e.currentTarget.style.background = "rgba(79,138,255,0.08)"; e.currentTarget.style.borderColor = "rgba(79,138,255,0.2)"; } }}
+          >
+            {isRegenerating ? <Loader2 size={9} style={{ animation: "spin 1s linear infinite" }} /> : <RefreshCw size={9} />}
+            {regenRemaining !== undefined ? `${regenRemaining}` : ""}
+          </button>
+        )}
 
         {/* Chevron */}
         <motion.div

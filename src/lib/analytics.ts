@@ -48,7 +48,14 @@ export type AnalyticsEvent =
   | "template_viewed"
   | "template_used"
   | "community_visited"
-  | "settings_updated";
+  | "settings_updated"
+
+  // Client-side tracking events
+  | "workflow_executed"
+  | "node_used"
+  | "feature_used"
+  | "template_loaded"
+  | "regeneration_used";
 
 export interface AnalyticsEventData {
   userId?: string;
