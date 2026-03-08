@@ -971,6 +971,7 @@ function WorkflowCanvasInner({ workflowId: _workflowId }: WorkflowCanvasInnerPro
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: 40, transition: { duration: 0.5 } }}
               transition={{ duration: 0.8, delay: 1.0 }}
+              onWheel={(e) => e.stopPropagation()}
               style={{
                 position: "absolute",
                 right: 16,

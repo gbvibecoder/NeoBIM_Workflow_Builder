@@ -352,6 +352,9 @@ export default function PostExecutionScene({
   const containerRef = useRef<HTMLDivElement>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
   const animFrameRef = useRef<number>(0);
+  const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
+  const controlsRef = useRef<OrbitControls | null>(null);
+  const sceneDataRef = useRef<{ totalHeight: number; centerX: number; centerZ: number }>({ totalHeight: 10, centerX: 0, centerZ: 0 });
 
   const buildScene = useCallback(() => {
     const container = containerRef.current;
@@ -414,19 +417,20 @@ export default function PostExecutionScene({
     // ── Scene ─────────────────────────────────────────────
     const scene = new THREE.Scene();
     scene.background = new THREE.Color("#070809");
-    scene.fog = new THREE.Fog("#070809", 40, 100);
+    scene.fog = new THREE.Fog("#070809", 60, 200);
 
-    // ── Camera ────────────────────────────────────────────
-    const camera = new THREE.PerspectiveCamera(45, w / h, 0.1, 300);
-    const topDownPos = new THREE.Vector3(centerX, 40, centerZ + 0.01);
-    const camDist = Math.max(maxDim, totalHeight) * 0.9;
+    // ── Camera (zoomed out to show entire building) ────────
+    const camera = new THREE.PerspectiveCamera(45, w / h, 0.1, 500);
+    const topDownPos = new THREE.Vector3(centerX, 50, centerZ + 0.01);
     const perspectivePos = new THREE.Vector3(
-      centerX + camDist * 0.7,
-      totalHeight * 0.5 + camDist * 0.4,
-      centerZ + camDist * 0.7
+      centerX + 40,
+      30,
+      centerZ + 40
     );
     camera.position.copy(topDownPos);
-    camera.lookAt(new THREE.Vector3(centerX, 0, centerZ));
+    camera.lookAt(new THREE.Vector3(centerX, totalHeight / 2, centerZ));
+    cameraRef.current = camera;
+    sceneDataRef.current = { totalHeight, centerX, centerZ };
 
     // ── Controls (enabled from start — full orbit/zoom/pan) ─
     const controls = new OrbitControls(camera, renderer.domElement);
@@ -436,11 +440,12 @@ export default function PostExecutionScene({
     controls.enableDamping = true;
     controls.dampingFactor = 0.05;
     controls.target.set(centerX, totalHeight / 2, centerZ);
-    controls.minDistance = 5;
-    controls.maxDistance = 100;
+    controls.minDistance = 10;
+    controls.maxDistance = 150;
     controls.autoRotate = true;
     controls.autoRotateSpeed = 0.5;
     controls.enabled = true;
+    controlsRef.current = controls;
 
     // ── Lighting (starts dim) ─────────────────────────────
     const ambient = new THREE.AmbientLight("#f0f0ff", 0.2);
@@ -820,10 +825,92 @@ export default function PostExecutionScene({
   if (kpis?.height) kpiPills.push({ label: `${kpis.height}m`, color: "#8B5CF6" });
   if (kpis?.footprint) kpiPills.push({ label: `${kpis.footprint} m\u00B2 footprint`, color: "#F59E0B" });
 
+  // ── Zoom control handlers ─────────────────────────────
+  const handleZoomIn = useCallback(() => {
+    const camera = cameraRef.current;
+    const controls = controlsRef.current;
+    if (!camera || !controls) return;
+    const dir = new THREE.Vector3().subVectors(camera.position, controls.target).normalize();
+    camera.position.addScaledVector(dir, -5);
+  }, []);
+
+  const handleZoomOut = useCallback(() => {
+    const camera = cameraRef.current;
+    const controls = controlsRef.current;
+    if (!camera || !controls) return;
+    const dir = new THREE.Vector3().subVectors(camera.position, controls.target).normalize();
+    camera.position.addScaledVector(dir, 5);
+  }, []);
+
+  const handleFitView = useCallback(() => {
+    const camera = cameraRef.current;
+    const controls = controlsRef.current;
+    if (!camera || !controls) return;
+    const { totalHeight: th, centerX: cx, centerZ: cz } = sceneDataRef.current;
+    camera.position.set(cx + 40, 30, cz + 40);
+    controls.target.set(cx, th / 2, cz);
+  }, []);
+
+  const zoomBtnStyle: React.CSSProperties = {
+    width: 32,
+    height: 32,
+    borderRadius: 4,
+    background: "rgba(10,12,14,0.8)",
+    border: "1px solid rgba(184,115,51,0.3)",
+    color: "#B87333",
+    fontSize: 16,
+    fontWeight: 600,
+    cursor: "pointer",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    transition: "all 0.15s ease",
+    padding: 0,
+    lineHeight: 1,
+  };
+
   return (
-    <div style={{ position: "relative", width: "100%", height: "100%", pointerEvents: "auto" }}>
+    <div
+      style={{ position: "relative", width: "100%", height: "100%", pointerEvents: "auto" }}
+      onWheel={(e) => e.stopPropagation()}
+    >
       {/* Three.js scene */}
       <div ref={containerRef} style={{ width: "100%", height: "100%", cursor: "grab", pointerEvents: "auto" }} />
+
+      {/* Zoom controls — top right */}
+      <div
+        style={{
+          position: "absolute",
+          top: 12,
+          right: 12,
+          display: "flex",
+          flexDirection: "column",
+          gap: 4,
+          zIndex: 11,
+        }}
+      >
+        <button
+          onClick={handleZoomIn}
+          style={zoomBtnStyle}
+          onMouseEnter={e => { e.currentTarget.style.background = "rgba(184,115,51,0.15)"; }}
+          onMouseLeave={e => { e.currentTarget.style.background = "rgba(10,12,14,0.8)"; }}
+          title="Zoom in"
+        >+</button>
+        <button
+          onClick={handleZoomOut}
+          style={zoomBtnStyle}
+          onMouseEnter={e => { e.currentTarget.style.background = "rgba(184,115,51,0.15)"; }}
+          onMouseLeave={e => { e.currentTarget.style.background = "rgba(10,12,14,0.8)"; }}
+          title="Zoom out"
+        >&minus;</button>
+        <button
+          onClick={handleFitView}
+          style={{ ...zoomBtnStyle, fontSize: 11 }}
+          onMouseEnter={e => { e.currentTarget.style.background = "rgba(184,115,51,0.15)"; }}
+          onMouseLeave={e => { e.currentTarget.style.background = "rgba(10,12,14,0.8)"; }}
+          title="Fit view"
+        >&#8718;</button>
+      </div>
 
       {/* Floating overlay at bottom */}
       <div
@@ -931,18 +1018,19 @@ export default function PostExecutionScene({
         </button>
       </div>
 
-      {/* Drag hint */}
+      {/* Drag hint — below zoom buttons */}
       <div
         style={{
           position: "absolute",
-          top: 12,
+          top: 120,
           right: 12,
           fontSize: 9,
           color: "rgba(255,255,255,0.2)",
           pointerEvents: "none",
+          textAlign: "right",
         }}
       >
-        Drag to orbit &middot; Scroll to zoom
+        Drag to orbit<br />Scroll to zoom
       </div>
     </div>
   );
