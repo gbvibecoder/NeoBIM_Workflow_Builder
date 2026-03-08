@@ -832,6 +832,7 @@ export default function PostExecutionScene({
     if (!camera || !controls) return;
     const dir = new THREE.Vector3().subVectors(camera.position, controls.target).normalize();
     camera.position.addScaledVector(dir, -5);
+    controls.update();
   }, []);
 
   const handleZoomOut = useCallback(() => {
@@ -840,6 +841,7 @@ export default function PostExecutionScene({
     if (!camera || !controls) return;
     const dir = new THREE.Vector3().subVectors(camera.position, controls.target).normalize();
     camera.position.addScaledVector(dir, 5);
+    controls.update();
   }, []);
 
   const handleFitView = useCallback(() => {
@@ -849,6 +851,7 @@ export default function PostExecutionScene({
     const { totalHeight: th, centerX: cx, centerZ: cz } = sceneDataRef.current;
     camera.position.set(cx + 40, 30, cz + 40);
     controls.target.set(cx, th / 2, cz);
+    controls.update();
   }, []);
 
   const zoomBtnStyle: React.CSSProperties = {
@@ -886,7 +889,8 @@ export default function PostExecutionScene({
           display: "flex",
           flexDirection: "column",
           gap: 4,
-          zIndex: 11,
+          zIndex: 50,
+          pointerEvents: "auto" as const,
         }}
       >
         <button
