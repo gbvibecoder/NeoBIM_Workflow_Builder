@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { checkEndpointRateLimit } from "@/lib/rate-limit";
 
 // GET /api/user/api-keys
 export async function GET() {
@@ -28,6 +29,11 @@ export async function PATCH(req: NextRequest) {
     const session = await auth();
     if (!session?.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const rateLimit = await checkEndpointRateLimit(session.user.id, "api-keys", 5, "1 m");
+    if (!rateLimit.success) {
+      return NextResponse.json({ error: "Too many requests. Please wait a moment." }, { status: 429 });
     }
 
     const { apiKeys } = await req.json();

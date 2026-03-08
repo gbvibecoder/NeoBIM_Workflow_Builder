@@ -19,6 +19,9 @@ const nextConfig: NextConfig = {
   
   // ⚡ PERFORMANCE: Optimize CSS
   experimental: {
+    serverActions: {
+      bodySizeLimit: "2mb",
+    },
     optimizePackageImports: [
       "lucide-react",
       "@radix-ui/react-dialog",

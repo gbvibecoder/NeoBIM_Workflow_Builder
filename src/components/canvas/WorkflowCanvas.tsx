@@ -847,7 +847,7 @@ function WorkflowCanvasInner({ workflowId: _workflowId }: WorkflowCanvasInnerPro
           onToggle={() => setIsChatOpen(o => !o)}
         />
 
-        {/* Artifact results panel removed — results now display inside nodes */}
+        {/* Artifact results panel removed — replaced by PostExecutionScene */}
       </div>
 
       {/* Save workflow name modal */}

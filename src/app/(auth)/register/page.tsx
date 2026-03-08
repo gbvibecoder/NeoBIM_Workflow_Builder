@@ -263,6 +263,9 @@ export default function RegisterPage() {
               }}
             />
           </div>
+              <p style={{ fontSize: 11, color: "#5C5C78", marginTop: 4, lineHeight: 1.4 }}>
+                Min 8 characters with uppercase, lowercase, and a number
+              </p>
         </motion.div>
 
         {error && (

@@ -300,6 +300,7 @@ export default function LandingPage() {
             </div>
             <span style={{ fontSize: 18, fontWeight: 800, color: "#F0F0F5", letterSpacing: "-0.3px" }}>
               Build<span style={{ color: "#4F8AFF" }}>Flow</span>
+              <span style={{ fontSize: 9, fontWeight: 600, color: "#F59E0B", background: "rgba(245,158,11,0.1)", border: "1px solid rgba(245,158,11,0.2)", padding: "1px 5px", borderRadius: 6, marginLeft: 6 }}>BETA</span>
             </span>
           </Link>
 
@@ -509,6 +510,17 @@ export default function LandingPage() {
               }}
             >
               {t('landing.heroSubtitle')}
+            </motion.p>
+            <motion.p
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.4, duration: 0.5 }}
+              style={{
+                fontSize: 13, color: "#5C5C78", lineHeight: 1.6,
+                maxWidth: 500, margin: "12px auto 0", fontStyle: "italic",
+              }}
+            >
+              {t('landing.positioningNote')}
             </motion.p>
 
             {/* Prompt bar */}
@@ -1416,6 +1428,24 @@ export default function LandingPage() {
           </span>
         </div>
       </footer>
+
+        {/* ── Trust Signals Footer ─────────────────────────────────── */}
+        <div style={{
+          padding: "32px 48px 48px",
+          textAlign: "center",
+          borderTop: "1px solid rgba(255,255,255,0.04)",
+        }}>
+          <div style={{ display: "flex", justifyContent: "center", gap: 32, flexWrap: "wrap", marginBottom: 16 }}>
+            {["Data encrypted in transit and at rest", "Built for AEC professionals", "Beta — actively developed"].map(signal => (
+              <span key={signal} style={{ fontSize: 11, color: "#3A3A50", fontWeight: 500 }}>
+                {signal}
+              </span>
+            ))}
+          </div>
+          <p style={{ fontSize: 11, color: "#2A2A3E" }}>
+            © {new Date().getFullYear()} BuildFlow. Concept design tool for architects and AEC teams.
+          </p>
+        </div>
 
       {/* News Ticker */}
       <NewsTicker items={newsItems} whatsNewLabel={t('landing.whatsNew')} />

@@ -83,7 +83,10 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
 
-    await prisma.workflow.delete({ where: { id } });
+    await prisma.$transaction([
+      prisma.execution.deleteMany({ where: { workflowId: id } }),
+      prisma.workflow.delete({ where: { id } }),
+    ]);
 
     return NextResponse.json({ success: true });
   } catch (error) {

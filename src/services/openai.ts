@@ -4,7 +4,7 @@ import { detectOpenAIError, APIError } from "@/lib/user-errors";
 function getClient(userApiKey?: string): OpenAI {
   const key = userApiKey || process.env.OPENAI_API_KEY;
   if (!key) throw new Error("No OpenAI API key configured");
-  return new OpenAI({ apiKey: key });
+  return new OpenAI({ apiKey: key, timeout: 30000, maxRetries: 1 });
 }
 
 // ─── Error Handling ───────────────────────────────────────────────────────────

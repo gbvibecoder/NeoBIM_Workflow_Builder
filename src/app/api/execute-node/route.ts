@@ -55,6 +55,9 @@ function detectRegionFromText(text: string): string | null {
 // Node IDs that have real implementations
 const REAL_NODE_IDS = new Set(["TR-001", "TR-003", "TR-004", "TR-005", "TR-012", "GN-003", "GN-004", "TR-007", "TR-008", "EX-002", "EX-003"]);
 
+// Nodes that require OpenAI API calls
+const OPENAI_NODES = new Set(["TR-003", "TR-004", "TR-005", "TR-012", "GN-003", "GN-004"]);
+
 export async function POST(req: NextRequest) {
   const session = await auth();
 
@@ -101,7 +104,10 @@ export async function POST(req: NextRequest) {
 
   } catch (error) {
     console.error("[execute-node] Rate limit check failed:", error);
-    // If rate limiting fails, allow the request to proceed (fail open for better UX)
+    return NextResponse.json(
+      formatErrorResponse({ title: "Service unavailable", message: "Rate limit service temporarily unavailable. Please try again in a moment.", code: "RATE_LIMIT_UNAVAILABLE" }),
+      { status: 503 }
+    );
   }
 
   const { catalogueId, executionId, tileInstanceId, inputData, userApiKey } = await req.json();
@@ -114,6 +120,14 @@ export async function POST(req: NextRequest) {
   }
 
   const apiKey = userApiKey || undefined;
+
+    // Validate OpenAI key for nodes that need it
+    if (OPENAI_NODES.has(catalogueId) && !apiKey && !process.env.OPENAI_API_KEY) {
+      return NextResponse.json(
+        formatErrorResponse({ title: "API key required", message: "OpenAI API key not configured. Add your key in Settings or contact support.", code: "MISSING_API_KEY" }),
+        { status: 400 }
+      );
+    }
 
   try {
     // STEP 1: Validate input BEFORE hitting any APIs

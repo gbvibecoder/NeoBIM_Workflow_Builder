@@ -45,7 +45,7 @@ export function Sidebar() {
   ];
 
   const SECONDARY_NAV = [
-    { href: "/dashboard/community", label: t("nav.community"), icon: Globe },
+    { href: "/dashboard/community", label: t("nav.community"), icon: Globe, badge: "Beta" },
     { href: "/dashboard/billing",   label: t("nav.billing"),   icon: CreditCard },
     { href: "/dashboard/settings",  label: t("nav.settings"),  icon: Settings },
     ...(process.env.NODE_ENV === "development"
@@ -349,7 +349,7 @@ export function Sidebar() {
               return (
                 <NavItem
                   key={item.href} href={item.href}
-                  label={item.label} icon={item.icon}
+                  label={item.label} badge={(item as { badge?: string }).badge} icon={item.icon}
                   isActive={isActive} collapsed={isEffectivelyCollapsed}
                   showLabels={effectiveShowLabels} index={idx + PRIMARY_NAV.length}
                 />

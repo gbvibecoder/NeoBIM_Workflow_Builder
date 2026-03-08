@@ -187,6 +187,22 @@ export function ArtifactCard({ artifact, nodeLabel, nodeCategory, onDismiss }: A
           </motion.div>
         )}
       </AnimatePresence>
+
+        {/* Type-specific disclaimer */}
+        {!collapsed && (artifact.type === "table" || artifact.type === "kpi") && !!artifact.metadata?.real && (
+          <div style={{ padding: "6px 14px 8px", borderTop: "1px solid rgba(255,255,255,0.03)" }}>
+            <p style={{ fontSize: 9, color: "#4A4A60", fontStyle: "italic", margin: 0 }}>
+              Cost estimates are approximate, based on regional averages.
+            </p>
+          </div>
+        )}
+        {!collapsed && artifact.type === "image" && (
+          <div style={{ padding: "6px 14px 8px", borderTop: "1px solid rgba(255,255,255,0.03)" }}>
+            <p style={{ fontSize: 9, color: "#4A4A60", fontStyle: "italic", margin: 0 }}>
+              AI-generated concept visualization. Not architecturally accurate.
+            </p>
+          </div>
+        )}
     </motion.div>
   );
 }
