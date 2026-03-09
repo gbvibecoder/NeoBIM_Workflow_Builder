@@ -1577,6 +1577,12 @@
   box-shadow: 0 2px 8px rgba(79,138,255,0.2);
 }
 
+/* ── Landing hero CTA shimmer ─────────────────────────────────── */
+@keyframes hero-btn-shimmer {
+  0%, 100% { transform: translateX(-120%); }
+  50% { transform: translateX(120%); }
+}
+
 /* ── Upgrade button ────────────────────────────────────────────── */
 @keyframes sb-upgrade-shimmer {
   0%   { left: -100%; }

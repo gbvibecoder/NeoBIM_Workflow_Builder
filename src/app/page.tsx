@@ -34,33 +34,6 @@ const smoothEase: [number, number, number, number] = [0.25, 0.4, 0.25, 1];
 
 // ─── Prompt placeholders ─────────────────────────────────────────────────────
 
-const PROMPT_EXAMPLES = [
-  "Generate a site analysis workflow for a coastal project...",
-  "Create a concept-to-render pipeline with IFC export...",
-  "Build a massing study from project brief to 3D model...",
-  "Design a facade optimization workflow with AI...",
-];
-
-function RotatingPlaceholder({ items = PROMPT_EXAMPLES }: { items?: string[] }) {
-  const [index, setIndex] = useState(0);
-  useEffect(() => {
-    const interval = setInterval(() => setIndex(i => (i + 1) % items.length), 3500);
-    return () => clearInterval(interval);
-  }, [items.length]);
-  return (
-    <motion.span
-      key={index}
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 0.4, y: 0 }}
-      exit={{ opacity: 0, y: -8 }}
-      transition={{ duration: 0.4 }}
-      style={{ position: "absolute", left: 48, top: "50%", transform: "translateY(-50%)", pointerEvents: "none", fontSize: 15, color: "#5C5C78", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", right: 16 }}
-    >
-      {items[index]}
-    </motion.span>
-  );
-}
-
 // ─── Floating Node Card ──────────────────────────────────────────────────────
 
 function FloatingCard({ label, category, delay, style }: { label: string; category: string; delay: number; style: React.CSSProperties }) {
@@ -304,7 +277,6 @@ export default function LandingPage() {
   const heroOpacity = useTransform(scrollYProgress, [0, 0.5], [1, 0]);
   const heroScale = useTransform(scrollYProgress, [0, 0.5], [1, 0.95]);
 
-  const promptExamples = [t('landing.prompt1'), t('landing.prompt2'), t('landing.prompt3'), t('landing.prompt4')];
 
   const newsItems = [t('landing.news1'), t('landing.news2'), t('landing.news3'), t('landing.news4'), t('landing.news5')];
 
@@ -713,49 +685,49 @@ export default function LandingPage() {
               {t('landing.heroSubtitle')}
             </motion.p>
 
-            {/* Prompt bar */}
+            {/* CTA Button */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.5, duration: 0.6, ease: smoothEase }}
-              className="landing-prompt-bar"
               style={{
-                marginTop: 40, maxWidth: 640, margin: "40px auto 0",
-                display: "flex", alignItems: "center", gap: 0,
-                position: "relative",
+                marginTop: 44, display: "flex", flexDirection: "column", alignItems: "center", gap: 16,
               }}
             >
-              <div style={{
-                flex: 1, position: "relative", height: 56,
-                background: "rgba(18,18,30,0.8)", backdropFilter: "blur(20px)",
-                border: "1px solid rgba(255,255,255,0.08)",
-                borderRadius: "14px 0 0 14px",
-                display: "flex", alignItems: "center",
-                paddingLeft: 16,
-              }}>
-                <Sparkles size={18} style={{ color: "#5C5C78", flexShrink: 0 }} />
-                <RotatingPlaceholder items={promptExamples} />
-              </div>
               <Link href="/dashboard" style={{
-                height: 56, padding: "0 28px",
-                background: "linear-gradient(135deg, #4F8AFF 0%, #6366F1 100%)",
-                borderRadius: "0 14px 14px 0",
-                display: "flex", alignItems: "center", gap: 8,
-                color: "white", fontSize: 15, fontWeight: 700,
-                textDecoration: "none", flexShrink: 0,
-                boxShadow: "0 0 30px rgba(79,138,255,0.3)",
-                transition: "all 0.2s",
+                position: "relative", overflow: "hidden",
+                height: 58, padding: "0 44px",
+                background: "linear-gradient(135deg, #00F5FF 0%, #4F8AFF 50%, #6366F1 100%)",
+                borderRadius: 14,
+                display: "inline-flex", alignItems: "center", gap: 10,
+                color: "#050510", fontSize: 16, fontWeight: 700,
+                textDecoration: "none", letterSpacing: "-0.01em",
+                boxShadow: "0 0 40px rgba(0,245,255,0.2), 0 0 80px rgba(79,138,255,0.15)",
+                transition: "all 0.3s ease",
               }}
                 onMouseEnter={e => {
-                  (e.currentTarget as HTMLElement).style.boxShadow = "0 0 40px rgba(79,138,255,0.5)";
+                  (e.currentTarget as HTMLElement).style.boxShadow = "0 0 50px rgba(0,245,255,0.35), 0 0 100px rgba(79,138,255,0.2)";
+                  (e.currentTarget as HTMLElement).style.transform = "translateY(-2px)";
                 }}
                 onMouseLeave={e => {
-                  (e.currentTarget as HTMLElement).style.boxShadow = "0 0 30px rgba(79,138,255,0.3)";
+                  (e.currentTarget as HTMLElement).style.boxShadow = "0 0 40px rgba(0,245,255,0.2), 0 0 80px rgba(79,138,255,0.15)";
+                  (e.currentTarget as HTMLElement).style.transform = "translateY(0)";
                 }}
               >
-                <Zap size={16} />
-                {t('landing.getStarted')}
+                <span style={{
+                  position: "absolute", inset: 0, pointerEvents: "none",
+                  background: "linear-gradient(105deg, transparent 40%, rgba(255,255,255,0.2) 50%, transparent 60%)",
+                  animation: "hero-btn-shimmer 3s ease-in-out infinite",
+                }} />
+                <Zap size={18} style={{ position: "relative" }} />
+                <span style={{ position: "relative" }}>{t('landing.getStarted')}</span>
               </Link>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <Sparkles size={12} style={{ color: "rgba(0,245,255,0.4)" }} />
+                <span style={{ fontSize: 12, color: "rgba(255,255,255,0.3)", letterSpacing: "0.02em" }}>
+                  AI-powered BIM workflow builder
+                </span>
+              </div>
             </motion.div>
 
             {/* Secondary CTA */}
