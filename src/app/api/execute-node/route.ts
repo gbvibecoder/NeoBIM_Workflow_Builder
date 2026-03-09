@@ -436,6 +436,7 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
         type: "text",
         data: {
           content: enhancedPrompt,
+          enhancedPrompt,
           label: "Enhanced Architectural Prompt",
         },
         metadata: { model: "gpt-4o-mini", real: true },

@@ -731,16 +731,17 @@ export const PREBUILT_WORKFLOWS: WorkflowTemplate[] = [
     id: "wf-15",
     name: "2D Floor Plan → Video Render",
     description:
-      "Upload a 2D floor plan image → AI analyzes the layout, generates a 3D massing model, composes visualization style, and produces a cinematic video walkthrough.",
+      "Upload a 2D floor plan image → AI analyzes the layout, generates a 3D massing model, composes visualization style, renders a photorealistic concept image, and produces a cinematic video walkthrough.",
     tags: ["floor-plan", "video", "walkthrough", "render", "3d", "animation"],
     category: "Visualization",
     complexity: "advanced",
-    estimatedRunTime: "~5 minutes",
+    estimatedRunTime: "~6 minutes",
     requiredInputs: ["2D floor plan image (scan, screenshot, or export)"],
     expectedOutputs: [
       "Floor plan analysis & extracted features",
       "3D massing model from plan",
       "Styled visualization prompt",
+      "Photorealistic concept render",
       "Cinematic MP4 video walkthrough",
     ],
     thumbnail: "https://picsum.photos/seed/wf15/600/400",
@@ -763,7 +764,7 @@ export const PREBUILT_WORKFLOWS: WorkflowTemplate[] = [
         {
           id: "n2",
           type: "workflowNode",
-          position: { x: 380, y: 200 },
+          position: { x: 350, y: 200 },
           data: {
             catalogueId: "TR-004",
             label: "Image Understanding",
@@ -780,7 +781,7 @@ export const PREBUILT_WORKFLOWS: WorkflowTemplate[] = [
         {
           id: "n3",
           type: "workflowNode",
-          position: { x: 660, y: 200 },
+          position: { x: 600, y: 200 },
           data: {
             catalogueId: "GN-001",
             label: "Massing Generator",
@@ -797,7 +798,7 @@ export const PREBUILT_WORKFLOWS: WorkflowTemplate[] = [
         {
           id: "n4",
           type: "workflowNode",
-          position: { x: 940, y: 200 },
+          position: { x: 850, y: 200 },
           data: {
             catalogueId: "TR-005",
             label: "Visualization Style Composer",
@@ -817,7 +818,24 @@ export const PREBUILT_WORKFLOWS: WorkflowTemplate[] = [
         {
           id: "n5",
           type: "workflowNode",
-          position: { x: 1220, y: 200 },
+          position: { x: 1100, y: 200 },
+          data: {
+            catalogueId: "GN-003",
+            label: "Concept Render Generator",
+            category: "generate",
+            status: "idle",
+            inputs: [
+              { id: "ctrl-in", label: "Control Image", type: "image" },
+              { id: "prompt-in", label: "Style Prompt", type: "text" },
+            ],
+            outputs: [{ id: "images-out", label: "Concept Images", type: "image" }],
+            icon: "Palette",
+          },
+        },
+        {
+          id: "n6",
+          type: "workflowNode",
+          position: { x: 1380, y: 200 },
           data: {
             catalogueId: "GN-009",
             label: "Video Walkthrough Generator",
@@ -837,8 +855,9 @@ export const PREBUILT_WORKFLOWS: WorkflowTemplate[] = [
         { id: "e2-3", source: "n2", sourceHandle: "feat-out", target: "n3", targetHandle: "req-in", type: "animatedEdge" },
         { id: "e3-4a", source: "n3", sourceHandle: "geo-out", target: "n4", targetHandle: "geo-in", type: "animatedEdge" },
         { id: "e2-4b", source: "n2", sourceHandle: "text-out", target: "n4", targetHandle: "text-in", type: "animatedEdge" },
-        { id: "e3-5a", source: "n3", sourceHandle: "geo-out", target: "n5", targetHandle: "geo-in", type: "animatedEdge" },
-        { id: "e4-5b", source: "n4", sourceHandle: "prompt-out", target: "n5", targetHandle: "style-in", type: "animatedEdge" },
+        { id: "e4-5", source: "n4", sourceHandle: "prompt-out", target: "n5", targetHandle: "prompt-in", type: "animatedEdge" },
+        { id: "e5-6", source: "n5", sourceHandle: "images-out", target: "n6", targetHandle: "geo-in", type: "animatedEdge" },
+        { id: "e2-6", source: "n2", sourceHandle: "text-out", target: "n6", targetHandle: "style-in", type: "animatedEdge" },
       ],
     },
   },

@@ -143,12 +143,16 @@ export async function executeNode(
         label: "Image Analysis",
       });
 
-    case "TR-005": // Visualization Style Composer
-      return mockArtifact(executionId, tileInstanceId, "image", {
-        url: ARCHITECTURAL_IMAGES[1],
-        label: "Style Reference (Control Image)",
+    case "TR-005": { // Visualization Style Composer
+      const styleDesc = String(inputData?.content ?? inputData?.prompt ?? "modern mixed-use building");
+      const enhancedPromptMock = `Ultra-photorealistic architectural exterior render of a ${styleDesc}, golden hour lighting, Nordic minimal style, 8K resolution, cinematic composition`;
+      return mockArtifact(executionId, tileInstanceId, "text", {
+        content: enhancedPromptMock,
+        enhancedPrompt: enhancedPromptMock,
+        label: "Enhanced Architectural Prompt",
         style: "Nordic Minimal",
       });
+    }
 
     case "TR-006": // Zoning Compliance
       return mockArtifact(executionId, tileInstanceId, "json", {
