@@ -20,6 +20,7 @@ import {
 import { assertValidInput } from "@/lib/validation";
 import { APIError, UserErrors, formatErrorResponse } from "@/lib/user-errors";
 import { generatePDFBase64 } from "@/services/pdf-report-server";
+import { reconstructHiFi3D, isMeshyConfigured } from "@/services/meshy-service";
 
 // Detect region/city from text for cost estimation
 function detectRegionFromText(text: string): string | null {
@@ -59,7 +60,7 @@ function detectRegionFromText(text: string): string | null {
 }
 
 // Node IDs that have real implementations
-const REAL_NODE_IDS = new Set(["TR-001", "TR-003", "TR-004", "TR-005", "TR-012", "GN-003", "GN-004", "GN-007", "GN-008", "TR-007", "TR-008", "EX-002", "EX-003"]);
+const REAL_NODE_IDS = new Set(["TR-001", "TR-003", "TR-004", "TR-005", "TR-012", "GN-003", "GN-004", "GN-007", "GN-008", "GN-010", "TR-007", "TR-008", "EX-002", "EX-003"]);
 
 // Nodes that require OpenAI API calls
 const OPENAI_NODES = new Set(["TR-003", "TR-004", "TR-005", "TR-012", "GN-003", "GN-004", "GN-008"]);
@@ -1323,6 +1324,78 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
           },
         },
         metadata: { engine: "fal-ai/sam-3", real: true, jobId: job.id },
+        createdAt: new Date(),
+      };
+
+    } else if (catalogueId === "GN-010") {
+      // ── Hi-Fi 3D Reconstructor ─────────────────────────────────────────
+      // Takes multi-view renders (from GN-003) + building description
+      // and reconstructs a hyper-detailed textured 3D mesh via Meshy API.
+
+      if (!isMeshyConfigured()) {
+        return NextResponse.json(
+          formatErrorResponse({
+            title: "Meshy API key required",
+            message: "MESHY_API_KEY is not configured. Add your Meshy API key to enable Hi-Fi 3D reconstruction.",
+            code: "MISSING_API_KEY",
+          }),
+          { status: 400 }
+        );
+      }
+
+      // Extract image URL from upstream GN-003 (concept renders)
+      const imageUrl =
+        (inputData?.url as string) ??
+        (inputData?.images_out as string) ??
+        (inputData?.imageUrl as string) ??
+        "";
+
+      if (!imageUrl) {
+        return NextResponse.json(
+          formatErrorResponse({
+            title: "No render image provided",
+            message: "GN-010 requires upstream concept render images. Connect a Concept Render Generator (GN-003) node.",
+            code: "NODE_001",
+          }),
+          { status: 400 }
+        );
+      }
+
+      // Extract building description for guidance
+      const description =
+        (inputData?.content as string) ??
+        (inputData?.description as string) ??
+        (inputData?.prompt as string) ??
+        "Architectural building";
+
+      const result = await reconstructHiFi3D({
+        imageUrl,
+        description,
+        topology: "quad",
+        targetPolycount: 30000,
+      });
+
+      artifact = {
+        id: generateId(),
+        executionId: executionId ?? "local",
+        tileInstanceId,
+        type: "3d",
+        data: {
+          glbUrl: result.glbUrl,
+          thumbnailUrl: result.thumbnailUrl,
+          textureUrls: result.textureUrls,
+          label: "Hi-Fi 3D Model (Meshy v4)",
+          content: description.slice(0, 200),
+          metadata: {
+            costUsd: result.costUsd,
+            durationMs: result.durationMs,
+            taskId: result.taskId,
+            pipeline: "multi-view renders → Meshy v4 → textured GLB",
+            topology: "quad",
+            polycount: 30000,
+          },
+        },
+        metadata: { engine: "meshy-v4", real: true, jobId: result.taskId },
         createdAt: new Date(),
       };
 

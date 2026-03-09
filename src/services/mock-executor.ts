@@ -547,6 +547,26 @@ export async function executeNode(
         },
       });
 
+    case "GN-010": { // Hi-Fi 3D Reconstructor — mock
+      const hifiDesc = String(inputData?.content ?? inputData?.description ?? "modern building");
+      const hifiSeed = hifiDesc.slice(0, 15).replace(/\s+/g, "-").toLowerCase() || "building";
+      return mockArtifact(executionId, tileInstanceId, "3d", {
+        glbUrl: "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/main/2.0/Box/glTF-Binary/Box.glb",
+        thumbnailUrl: `https://picsum.photos/seed/${hifiSeed}-3d/512/512`,
+        textureUrls: [],
+        label: "Hi-Fi 3D Model (Meshy v4) — Mock",
+        content: hifiDesc.slice(0, 200),
+        metadata: {
+          costUsd: 0.10,
+          durationMs: 45000,
+          taskId: `mock-meshy-${Date.now()}`,
+          pipeline: "multi-view renders → Meshy v4 → textured GLB",
+          topology: "quad",
+          polycount: 30000,
+        },
+      });
+    }
+
     case "GN-008": { // Text to 3D Generator — mock
       const t2dPrompt = String(inputData?.content ?? inputData?.prompt ?? "modern building");
       const t2dSeed = t2dPrompt.slice(0, 15).replace(/\s+/g, "-").toLowerCase() || "building";
