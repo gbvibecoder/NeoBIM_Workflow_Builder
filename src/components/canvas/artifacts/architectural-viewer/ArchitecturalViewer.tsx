@@ -34,10 +34,6 @@ export default function ArchitecturalViewer({ floors, height, footprint, buildin
     skyMesh: THREE.Mesh;
     clock: THREE.Clock;
     velocity: THREE.Vector3;
-    moveForward: boolean;
-    moveBackward: boolean;
-    moveLeft: boolean;
-    moveRight: boolean;
     raycaster: THREE.Raycaster;
     minimapRenderer: THREE.WebGLRenderer | null;
     minimapCamera: THREE.OrthographicCamera | null;
@@ -47,6 +43,9 @@ export default function ArchitecturalViewer({ floors, height, footprint, buildin
     camDist: number;
     camHeight: number;
     bldgHeight: number;
+    frameCount: number;
+    lastXrayState: boolean;
+    lastHoveredRoom: string | null;
   } | null>(null);
 
   const [viewMode, setViewMode] = useState<ViewMode>("orbit");
@@ -58,9 +57,9 @@ export default function ArchitecturalViewer({ floors, height, footprint, buildin
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isXray, setIsXray] = useState(false);
   const [hoveredRoom, setHoveredRoom] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   const viewModeRef = useRef(viewMode);
-  const timeRef = useRef(timeOfDay);
   const showLabelsRef = useRef(showLabels);
   const showMinimapRef = useRef(showMinimap);
   const isExplodedRef = useRef(isExploded);
@@ -68,26 +67,45 @@ export default function ArchitecturalViewer({ floors, height, footprint, buildin
   const isXrayRef = useRef(isXray);
 
   useEffect(() => { viewModeRef.current = viewMode; }, [viewMode]);
-  useEffect(() => { timeRef.current = timeOfDay; }, [timeOfDay]);
   useEffect(() => { showLabelsRef.current = showLabels; }, [showLabels]);
   useEffect(() => { showMinimapRef.current = showMinimap; }, [showMinimap]);
   useEffect(() => { isExplodedRef.current = isExploded; }, [isExploded]);
   useEffect(() => { isSectionRef.current = isSectionCut; }, [isSectionCut]);
   useEffect(() => { isXrayRef.current = isXray; }, [isXray]);
 
+  // Stable style ref to avoid unnecessary rebuilds
+  const styleRef = useRef(styleProp);
+  styleRef.current = styleProp;
+
   const buildScene = useCallback(() => {
     const container = containerRef.current;
     if (!container) return;
 
-    // Cleanup
+    setIsLoading(true);
+
+    // Cleanup previous scene thoroughly
     if (rendererRef.current) {
-      rendererRef.current.dispose();
       cancelAnimationFrame(animFrameRef.current);
-      while (container.firstChild) container.removeChild(container.firstChild);
+      rendererRef.current.dispose();
     }
+    if (sceneRef.current) {
+      const { scene, minimapRenderer } = sceneRef.current;
+      // Dispose all geometries and materials in the scene
+      scene.traverse((obj) => {
+        if (obj instanceof THREE.Mesh) {
+          obj.geometry?.dispose();
+          // Don't dispose shared materials here — disposeMaterials handles that
+        }
+      });
+      scene.clear();
+      minimapRenderer?.dispose();
+      sceneRef.current = null;
+    }
+    while (container.firstChild) container.removeChild(container.firstChild);
 
     const w = container.clientWidth;
     const h = container.clientHeight;
+    if (w === 0 || h === 0) return; // not visible yet
 
     // ─── Renderer ──────────────────────────────────────────────
     const renderer = new THREE.WebGLRenderer({
@@ -107,14 +125,16 @@ export default function ArchitecturalViewer({ floors, height, footprint, buildin
 
     // ─── Building dimensions (needed for camera/scene setup) ──
     const effectiveFloors = Math.min(floors, 12);
-    const floorH = 3.6; // must match getDefaultConfig().floorHeight
+    const floorH = 3.6;
     const bldgHeight = effectiveFloors * floorH;
     const camDist = Math.max(25, bldgHeight * 1.2);
     const camHeight = Math.max(15, bldgHeight * 0.6);
+    const fogNear = Math.max(40, camDist);
+    const fogFar = Math.max(150, camDist * 4);
 
     // ─── Scene ─────────────────────────────────────────────────
     const scene = new THREE.Scene();
-    scene.fog = new THREE.Fog(0x87CEEB, Math.max(40, camDist), Math.max(150, camDist * 4));
+    scene.fog = new THREE.Fog(0x87CEEB, fogNear, fogFar);
 
     // Sky dome
     const skyGeo = new THREE.SphereGeometry(Math.max(150, camDist * 4), 32, 16);
@@ -131,13 +151,17 @@ export default function ArchitecturalViewer({ floors, height, footprint, buildin
     // ─── Controls ──────────────────────────────────────────────
     const orbitControls = new OrbitControls(camera, renderer.domElement);
     orbitControls.enableDamping = true;
-    orbitControls.dampingFactor = 0.08;
+    orbitControls.dampingFactor = 0.06;
+    orbitControls.rotateSpeed = 0.6;
+    orbitControls.zoomSpeed = 0.8;
+    orbitControls.panSpeed = 0.5;
     orbitControls.target.set(0, bldgHeight * 0.4, 0);
     orbitControls.maxPolarAngle = Math.PI / 2.05;
     orbitControls.minDistance = 5;
     orbitControls.maxDistance = Math.max(80, camDist * 2);
     orbitControls.autoRotate = true;
-    orbitControls.autoRotateSpeed = 0.4;
+    orbitControls.autoRotateSpeed = 0.3;
+    orbitControls.enablePan = true;
 
     const fpControls = new PointerLockControls(camera, renderer.domElement);
     fpControls.addEventListener("lock", () => {
@@ -154,7 +178,6 @@ export default function ArchitecturalViewer({ floors, height, footprint, buildin
     const hemiLight = new THREE.HemisphereLight(0x87CEEB, 0x556633, 0.4);
     scene.add(hemiLight);
 
-    // Sun
     const sunLight = new THREE.DirectionalLight(0xFFEECC, 1.5);
     sunLight.position.set(25, 40, 20);
     sunLight.castShadow = true;
@@ -170,7 +193,6 @@ export default function ArchitecturalViewer({ floors, height, footprint, buildin
     sunLight.shadow.normalBias = 0.02;
     scene.add(sunLight);
 
-    // Fill light
     const fillLight = new THREE.DirectionalLight(0xAABBDD, 0.3);
     fillLight.position.set(-20, 25, -10);
     scene.add(fillLight);
@@ -179,7 +201,7 @@ export default function ArchitecturalViewer({ floors, height, footprint, buildin
     const mats = createMaterials();
 
     // ─── Building style (from prompt analysis) ────────────────
-    const buildingStyle: BuildingStyle = styleProp ?? {
+    const buildingStyle: BuildingStyle = styleRef.current ?? {
       glassHeavy: false,
       hasRiver: false,
       hasLake: false,
@@ -238,23 +260,21 @@ export default function ArchitecturalViewer({ floors, height, footprint, buildin
     pmremGen.dispose();
 
     // ─── Minimap ───────────────────────────────────────────────
-    const minimapSize = 180;
-    const minimapRenderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    const minimapSize = 160;
+    const minimapRenderer = new THREE.WebGLRenderer({ antialias: false, alpha: true });
     minimapRenderer.setSize(minimapSize, minimapSize);
     minimapRenderer.setPixelRatio(1);
-    minimapRenderer.domElement.style.position = "absolute";
-    minimapRenderer.domElement.style.bottom = "12px";
-    minimapRenderer.domElement.style.right = "12px";
-    minimapRenderer.domElement.style.borderRadius = "10px";
-    minimapRenderer.domElement.style.border = "2px solid rgba(255,255,255,0.2)";
-    minimapRenderer.domElement.style.pointerEvents = "none";
+    minimapRenderer.domElement.style.cssText =
+      "position:absolute;bottom:12px;right:12px;border-radius:10px;" +
+      "border:2px solid rgba(255,255,255,0.2);pointer-events:none;" +
+      "opacity:0;transition:opacity 0.5s ease;";
     container.appendChild(minimapRenderer.domElement);
 
     const bw = maxX - minX;
     const bd = maxZ - minZ;
     const mmS = Math.max(bw, bd) * 0.8;
-    const minimapCamera = new THREE.OrthographicCamera(-mmS, mmS, mmS, -mmS, 0.1, 100);
-    minimapCamera.position.set(0, 30, 0);
+    const minimapCamera = new THREE.OrthographicCamera(-mmS, mmS, mmS, -mmS, 0.1, 200);
+    minimapCamera.position.set(0, Math.max(50, bldgHeight + 20), 0);
     minimapCamera.lookAt(0, 0, 0);
 
     // ─── Section plane ─────────────────────────────────────────
@@ -308,27 +328,31 @@ export default function ArchitecturalViewer({ floors, height, footprint, buildin
     };
     renderer.domElement.addEventListener("click", onMouseClick);
 
-    // ─── Hover detection ───────────────────────────────────────
+    // ─── Throttled hover detection ──────────────────────────────
+    let hoverThrottleId: ReturnType<typeof setTimeout> | null = null;
     const onMouseMove = (e: MouseEvent) => {
-      if (viewModeRef.current !== "orbit") return;
+      if (viewModeRef.current !== "orbit" || hoverThrottleId) return;
+      hoverThrottleId = setTimeout(() => { hoverThrottleId = null; }, 50); // 20fps hover
+
       const rect = renderer.domElement.getBoundingClientRect();
       mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
       mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
       raycaster.setFromCamera(mouse, camera);
 
-      let found = false;
+      let foundRoom: string | null = null;
       for (const door of doors) {
         const intersects = raycaster.intersectObject(door.mesh, true);
         if (intersects.length > 0) {
-          setHoveredRoom(door.roomName);
-          renderer.domElement.style.cursor = "pointer";
-          found = true;
+          foundRoom = door.roomName;
           break;
         }
       }
-      if (!found) {
-        setHoveredRoom(null);
-        renderer.domElement.style.cursor = viewModeRef.current === "orbit" ? "grab" : "crosshair";
+
+      const sr = sceneRef.current;
+      if (sr && sr.lastHoveredRoom !== foundRoom) {
+        sr.lastHoveredRoom = foundRoom;
+        setHoveredRoom(foundRoom);
+        renderer.domElement.style.cursor = foundRoom ? "pointer" : "grab";
       }
     };
     renderer.domElement.addEventListener("mousemove", onMouseMove);
@@ -338,64 +362,73 @@ export default function ArchitecturalViewer({ floors, height, footprint, buildin
     sceneRef.current = {
       scene, camera, orbitControls, fpControls, doors, roomLabels, buildingGroup,
       sunLight, ambientLight, hemiLight, skyMesh, clock, velocity,
-      moveForward: false, moveBackward: false, moveLeft: false, moveRight: false,
       raycaster, minimapRenderer, minimapCamera,
       explodedOffset: 0, sectionPlane, sectionEnabled: false,
       camDist, camHeight, bldgHeight,
+      frameCount: 0, lastXrayState: false, lastHoveredRoom: null,
     };
 
     // ─── Cinematic intro ───────────────────────────────────────
     let introTime = 0;
-    const introDuration = 3.5;
-    const introStartPos = new THREE.Vector3(camDist * 1.5, camHeight * 1.3, camDist * 1.5);
+    const introDuration = 3.0;
+    const introStartPos = new THREE.Vector3(camDist * 1.4, camHeight * 1.2, camDist * 1.4);
     const introEndPos = new THREE.Vector3(camDist, camHeight, camDist);
     const introTarget = new THREE.Vector3(0, bldgHeight * 0.4, 0);
     camera.position.copy(introStartPos);
 
+    // Fade in loading complete
+    setIsLoading(false);
+    // Fade minimap in after intro
+    setTimeout(() => {
+      if (minimapRenderer.domElement) minimapRenderer.domElement.style.opacity = "1";
+    }, 800);
+
     // ─── Animate ───────────────────────────────────────────────
     const direction = new THREE.Vector3();
-    const fpMoveSpeed = 5;
+    const fpMoveSpeed = 6;
 
     function animate() {
       animFrameRef.current = requestAnimationFrame(animate);
-      const delta = Math.min(clock.getDelta(), 0.1);
+      const delta = Math.min(clock.getDelta(), 0.05); // cap to avoid jumps
       const sr = sceneRef.current;
       if (!sr) return;
+      sr.frameCount++;
 
       // ─── Cinematic intro sweep ─────────────────────────────
       if (introTime < introDuration && !fpControls.isLocked) {
         introTime += delta;
         const t = Math.min(introTime / introDuration, 1);
-        // Smooth ease-out
-        const ease = 1 - Math.pow(1 - t, 3);
+        const ease = 1 - Math.pow(1 - t, 4); // smooth quartic ease-out
         camera.position.lerpVectors(introStartPos, introEndPos, ease);
         camera.lookAt(introTarget);
         orbitControls.target.copy(introTarget);
       }
 
-      // ─── First-person movement ───────────────────────────
+      // ─── First-person movement (smooth acceleration) ────────
       if (fpControls.isLocked) {
-        velocity.x -= velocity.x * 8 * delta;
-        velocity.z -= velocity.z * 8 * delta;
+        const friction = 1 - Math.min(1, 10 * delta); // smooth deceleration
+        velocity.x *= friction;
+        velocity.z *= friction;
 
         direction.z = Number(moveState.forward) - Number(moveState.backward);
         direction.x = Number(moveState.right) - Number(moveState.left);
         direction.normalize();
 
-        if (moveState.forward || moveState.backward) velocity.z -= direction.z * fpMoveSpeed * delta;
-        if (moveState.left || moveState.right) velocity.x -= direction.x * fpMoveSpeed * delta;
+        const accel = fpMoveSpeed * delta;
+        if (moveState.forward || moveState.backward) velocity.z -= direction.z * accel;
+        if (moveState.left || moveState.right) velocity.x -= direction.x * accel;
 
-        fpControls.moveRight(-velocity.x * delta * 10);
-        fpControls.moveForward(-velocity.z * delta * 10);
+        fpControls.moveRight(-velocity.x);
+        fpControls.moveForward(-velocity.z);
 
-        // Keep camera at eye height
         camera.position.y = 1.7;
       }
 
-      // ─── Door animation ──────────────────────────────────
+      // ─── Door animation (smooth spring) ─────────────────────
       for (const door of doors) {
-        if (Math.abs(door.currentAngle - door.targetAngle) > 0.01) {
-          door.currentAngle += (door.targetAngle - door.currentAngle) * 5 * delta;
+        const diff = door.targetAngle - door.currentAngle;
+        if (Math.abs(diff) > 0.005) {
+          door.currentAngle += diff * Math.min(1, 6 * delta);
           door.pivot.rotation.y = door.currentAngle;
         }
       }
@@ -405,12 +438,15 @@ export default function ArchitecturalViewer({ floors, height, footprint, buildin
 
       // ─── Exploded view animation ─────────────────────────
       const targetExplode = isExplodedRef.current ? 4.0 : 0;
-      sr.explodedOffset += (targetExplode - sr.explodedOffset) * 3 * delta;
-      buildingGroup.traverse((child) => {
-        if (child.userData.floor !== undefined) {
-          child.position.y = child.userData.originalY + child.userData.floor * sr.explodedOffset;
-        }
-      });
+      const explodeDiff = targetExplode - sr.explodedOffset;
+      if (Math.abs(explodeDiff) > 0.01) {
+        sr.explodedOffset += explodeDiff * Math.min(1, 4 * delta);
+        buildingGroup.traverse((child) => {
+          if (child.userData.floor !== undefined) {
+            child.position.y = child.userData.originalY + child.userData.floor * sr.explodedOffset;
+          }
+        });
+      }
 
       // ─── Section cut ─────────────────────────────────────
       if (isSectionRef.current !== sr.sectionEnabled) {
@@ -418,15 +454,17 @@ export default function ArchitecturalViewer({ floors, height, footprint, buildin
         renderer.clippingPlanes = sr.sectionEnabled ? [sectionPlane] : [];
       }
 
-      // ─── X-ray wireframe mode ──────────────────────────
-      buildingGroup.traverse((child) => {
-        if (child instanceof THREE.Mesh && child.material) {
-          const mat = child.material as THREE.Material & { wireframe?: boolean };
-          if ("wireframe" in mat) {
-            mat.wireframe = isXrayRef.current;
+      // ─── X-ray wireframe mode (only toggle on change) ───
+      if (isXrayRef.current !== sr.lastXrayState) {
+        sr.lastXrayState = isXrayRef.current;
+        const wireframe = isXrayRef.current;
+        buildingGroup.traverse((child) => {
+          if (child instanceof THREE.Mesh && child.material) {
+            const mat = child.material as THREE.Material & { wireframe?: boolean };
+            if ("wireframe" in mat) mat.wireframe = wireframe;
           }
-        }
-      });
+        });
+      }
 
       // ─── Orbit controls update ───────────────────────────
       if (!fpControls.isLocked) {
@@ -436,24 +474,29 @@ export default function ArchitecturalViewer({ floors, height, footprint, buildin
       // ─── Render ──────────────────────────────────────────
       renderer.render(scene, camera);
 
-      // ─── Minimap ─────────────────────────────────────────
-      if (sr.minimapRenderer && sr.minimapCamera) {
+      // ─── Minimap (render every 6th frame for perf) ────────
+      if (sr.minimapRenderer && sr.minimapCamera && showMinimapRef.current && sr.frameCount % 6 === 0) {
+        sr.minimapRenderer.render(scene, sr.minimapCamera);
+      }
+      if (sr.minimapRenderer) {
         sr.minimapRenderer.domElement.style.display = showMinimapRef.current ? "block" : "none";
-        if (showMinimapRef.current) {
-          sr.minimapRenderer.render(scene, sr.minimapCamera);
-        }
       }
     }
     animate();
 
-    // ─── Resize ────────────────────────────────────────────────
+    // ─── Resize (debounced) ─────────────────────────────────────
+    let resizeTimer: ReturnType<typeof setTimeout>;
     const onResize = () => {
-      if (!container) return;
-      const nw = container.clientWidth;
-      const nh = container.clientHeight;
-      camera.aspect = nw / nh;
-      camera.updateProjectionMatrix();
-      renderer.setSize(nw, nh);
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(() => {
+        if (!container) return;
+        const nw = container.clientWidth;
+        const nh = container.clientHeight;
+        if (nw === 0 || nh === 0) return;
+        camera.aspect = nw / nh;
+        camera.updateProjectionMatrix();
+        renderer.setSize(nw, nh);
+      }, 100);
     };
     window.addEventListener("resize", onResize);
 
@@ -464,9 +507,17 @@ export default function ArchitecturalViewer({ floors, height, footprint, buildin
       renderer.domElement.removeEventListener("click", onMouseClick);
       renderer.domElement.removeEventListener("mousemove", onMouseMove);
       window.removeEventListener("resize", onResize);
+      clearTimeout(resizeTimer);
+      if (hoverThrottleId) clearTimeout(hoverThrottleId);
       cancelAnimationFrame(animFrameRef.current);
       fpControls.dispose();
       orbitControls.dispose();
+      // Dispose all geometries
+      scene.traverse((obj) => {
+        if (obj instanceof THREE.Mesh) {
+          obj.geometry?.dispose();
+        }
+      });
       renderer.dispose();
       minimapRenderer?.dispose();
       envTex.dispose();
@@ -488,6 +539,8 @@ export default function ArchitecturalViewer({ floors, height, footprint, buildin
     if (!sr) return;
 
     const { sunLight, ambientLight, hemiLight, skyMesh, scene } = sr;
+    const fogNear = Math.max(40, sr.camDist);
+    const fogFar = Math.max(150, sr.camDist * 4);
 
     switch (timeOfDay) {
       case "day":
@@ -498,7 +551,7 @@ export default function ArchitecturalViewer({ floors, height, footprint, buildin
         ambientLight.intensity = 0.5;
         hemiLight.color.set(0x87CEEB);
         hemiLight.groundColor.set(0x556633);
-        scene.fog = new THREE.Fog(0x87CEEB, 40, 120);
+        scene.fog = new THREE.Fog(0x87CEEB, fogNear, fogFar);
         updateSkyColors((skyMesh.material as THREE.MeshBasicMaterial), "day");
         if (rendererRef.current) rendererRef.current.toneMappingExposure = 1.2;
         break;
@@ -510,7 +563,7 @@ export default function ArchitecturalViewer({ floors, height, footprint, buildin
         ambientLight.intensity = 0.4;
         hemiLight.color.set(0xFF7744);
         hemiLight.groundColor.set(0x332211);
-        scene.fog = new THREE.Fog(0xFF9966, 40, 120);
+        scene.fog = new THREE.Fog(0xFF9966, fogNear, fogFar);
         updateSkyColors((skyMesh.material as THREE.MeshBasicMaterial), "sunset");
         if (rendererRef.current) rendererRef.current.toneMappingExposure = 1.0;
         break;
@@ -522,7 +575,7 @@ export default function ArchitecturalViewer({ floors, height, footprint, buildin
         ambientLight.intensity = 0.2;
         hemiLight.color.set(0x223355);
         hemiLight.groundColor.set(0x111122);
-        scene.fog = new THREE.Fog(0x0A0A1A, 20, 80);
+        scene.fog = new THREE.Fog(0x0A0A1A, Math.min(20, fogNear * 0.5), Math.min(80, fogFar * 0.5));
         updateSkyColors((skyMesh.material as THREE.MeshBasicMaterial), "night");
         if (rendererRef.current) rendererRef.current.toneMappingExposure = 0.6;
         break;
@@ -536,7 +589,6 @@ export default function ArchitecturalViewer({ floors, height, footprint, buildin
 
     if (viewMode === "orbit") {
       setViewMode("firstperson");
-      // Position camera inside the building
       sr.camera.position.set(0, 1.7, 2);
       sr.fpControls.lock();
       sr.orbitControls.autoRotate = false;
@@ -556,117 +608,144 @@ export default function ArchitecturalViewer({ floors, height, footprint, buildin
 
     if (!isFullscreen) {
       container.requestFullscreen?.();
-      setIsFullscreen(true);
     } else {
       document.exitFullscreen?.();
-      setIsFullscreen(false);
     }
   }, [isFullscreen]);
 
   useEffect(() => {
     const onFSChange = () => {
-      setIsFullscreen(!!document.fullscreenElement);
-      // Trigger resize
+      const isFull = !!document.fullscreenElement;
+      setIsFullscreen(isFull);
+      // Debounced resize
       setTimeout(() => {
         const sr = sceneRef.current;
         const container = containerRef.current;
         if (sr && container && rendererRef.current) {
           const nw = container.clientWidth;
           const nh = container.clientHeight;
-          sr.camera.aspect = nw / nh;
-          sr.camera.updateProjectionMatrix();
-          rendererRef.current.setSize(nw, nh);
+          if (nw > 0 && nh > 0) {
+            sr.camera.aspect = nw / nh;
+            sr.camera.updateProjectionMatrix();
+            rendererRef.current.setSize(nw, nh);
+          }
         }
-      }, 100);
+      }, 150);
     };
     document.addEventListener("fullscreenchange", onFSChange);
     return () => document.removeEventListener("fullscreenchange", onFSChange);
   }, []);
 
   return (
-    <div style={{ position: "relative" }}>
+    <div style={{ position: "relative", width: "100%", height: "100%" }}>
+      {/* Loading overlay */}
+      {isLoading && (
+        <div style={{
+          position: "absolute", inset: 0, zIndex: 20,
+          display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+          background: "#0D0D1A",
+          borderRadius: isFullscreen ? 0 : 12,
+        }}>
+          <div style={{
+            width: 36, height: 36, border: "3px solid rgba(79,138,255,0.2)",
+            borderTopColor: "#4F8AFF", borderRadius: "50%",
+            animation: "viewer-spin 0.8s linear infinite",
+          }} />
+          <div style={{ marginTop: 12, fontSize: 11, color: "rgba(255,255,255,0.4)", letterSpacing: "0.05em" }}>
+            Building 3D scene...
+          </div>
+        </div>
+      )}
+
       <div
         ref={containerRef}
         style={{
           width: "100%",
-          aspectRatio: isFullscreen ? undefined : "16 / 9",
+          height: isFullscreen ? "100vh" : "100%",
           minHeight: isFullscreen ? "100vh" : 320,
-          maxHeight: isFullscreen ? "100vh" : 500,
           borderRadius: isFullscreen ? 0 : 12,
           overflow: "hidden",
           cursor: viewMode === "orbit" ? "grab" : "crosshair",
           background: "#0D0D1A",
+          opacity: isLoading ? 0 : 1,
+          transition: "opacity 0.4s ease",
         }}
       />
 
       {/* ─── UI Overlay ────────────────────────────────────── */}
-      <div style={{
-        position: "absolute", top: 10, left: 10,
-        display: "flex", flexDirection: "column", gap: 6,
-        pointerEvents: "none",
-      }}>
-        {/* View mode toggle */}
-        <div style={{ display: "flex", gap: 4, pointerEvents: "all" }}>
-          <ToolbarBtn
-            active={viewMode === "orbit"}
-            onClick={() => { if (viewMode !== "orbit") toggleViewMode(); }}
-            label="Orbit"
-          />
-          <ToolbarBtn
-            active={viewMode === "firstperson"}
-            onClick={() => { if (viewMode !== "firstperson") toggleViewMode(); }}
-            label="Walk"
-          />
-        </div>
+      {!isLoading && (
+        <div style={{
+          position: "absolute", top: 10, left: 10,
+          display: "flex", flexDirection: "column", gap: 6,
+          pointerEvents: "none",
+          animation: "viewer-fade-in 0.6s ease 0.3s both",
+        }}>
+          {/* View mode toggle */}
+          <div style={{ display: "flex", gap: 4, pointerEvents: "all" }}>
+            <ToolbarBtn
+              active={viewMode === "orbit"}
+              onClick={() => { if (viewMode !== "orbit") toggleViewMode(); }}
+              label="Orbit"
+            />
+            <ToolbarBtn
+              active={viewMode === "firstperson"}
+              onClick={() => { if (viewMode !== "firstperson") toggleViewMode(); }}
+              label="Walk"
+            />
+          </div>
 
-        {/* Time of day */}
-        <div style={{ display: "flex", gap: 4, pointerEvents: "all" }}>
-          <ToolbarBtn active={timeOfDay === "day"} onClick={() => setTimeOfDay("day")} label="Day" />
-          <ToolbarBtn active={timeOfDay === "sunset"} onClick={() => setTimeOfDay("sunset")} label="Sunset" />
-          <ToolbarBtn active={timeOfDay === "night"} onClick={() => setTimeOfDay("night")} label="Night" />
-        </div>
+          {/* Time of day */}
+          <div style={{ display: "flex", gap: 4, pointerEvents: "all" }}>
+            <ToolbarBtn active={timeOfDay === "day"} onClick={() => setTimeOfDay("day")} label="Day" />
+            <ToolbarBtn active={timeOfDay === "sunset"} onClick={() => setTimeOfDay("sunset")} label="Sunset" />
+            <ToolbarBtn active={timeOfDay === "night"} onClick={() => setTimeOfDay("night")} label="Night" />
+          </div>
 
-        {/* Feature toggles */}
-        <div style={{ display: "flex", gap: 4, pointerEvents: "all" }}>
-          <ToolbarBtn active={showLabels} onClick={() => setShowLabels(v => !v)} label="Labels" />
-          <ToolbarBtn active={showMinimap} onClick={() => setShowMinimap(v => !v)} label="Map" />
-          <ToolbarBtn active={isExploded} onClick={() => setIsExploded(v => !v)} label="Explode" />
-          <ToolbarBtn active={isSectionCut} onClick={() => setIsSectionCut(v => !v)} label="Section" />
-          <ToolbarBtn active={isXray} onClick={() => setIsXray(v => !v)} label="X-Ray" />
+          {/* Feature toggles */}
+          <div style={{ display: "flex", gap: 4, pointerEvents: "all" }}>
+            <ToolbarBtn active={showLabels} onClick={() => setShowLabels(v => !v)} label="Labels" />
+            <ToolbarBtn active={showMinimap} onClick={() => setShowMinimap(v => !v)} label="Map" />
+            <ToolbarBtn active={isExploded} onClick={() => setIsExploded(v => !v)} label="Explode" />
+            <ToolbarBtn active={isSectionCut} onClick={() => setIsSectionCut(v => !v)} label="Section" />
+            <ToolbarBtn active={isXray} onClick={() => setIsXray(v => !v)} label="X-Ray" />
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Right side controls */}
-      <div style={{
-        position: "absolute", top: 10, right: 10,
-        display: "flex", flexDirection: "column", gap: 6,
-        alignItems: "flex-end",
-        pointerEvents: "none",
-      }}>
-        <div style={{ pointerEvents: "all" }}>
-          <ToolbarBtn active={isFullscreen} onClick={toggleFullscreen} label={isFullscreen ? "Exit" : "Full"} />
-        </div>
-
-        {/* Building info badge */}
+      {!isLoading && (
         <div style={{
-          background: "rgba(0,0,0,0.55)",
-          backdropFilter: "blur(10px)",
-          borderRadius: 8,
-          padding: "8px 12px",
-          border: "1px solid rgba(255,255,255,0.08)",
+          position: "absolute", top: 10, right: 10,
+          display: "flex", flexDirection: "column", gap: 6,
+          alignItems: "flex-end",
           pointerEvents: "none",
+          animation: "viewer-fade-in 0.6s ease 0.5s both",
         }}>
-          <div style={{ fontSize: 8, color: "rgba(255,255,255,0.35)", textTransform: "uppercase" as const, letterSpacing: "0.1em", marginBottom: 4 }}>
-            Building Info
+          <div style={{ pointerEvents: "all" }}>
+            <ToolbarBtn active={isFullscreen} onClick={toggleFullscreen} label={isFullscreen ? "Exit" : "Full"} />
           </div>
-          <div style={{ fontSize: 11, color: "#E0E0EA", fontWeight: 600 }}>
-            {floors}F · {height.toFixed(1)}m · {footprint} m²
-          </div>
-          <div style={{ fontSize: 9, color: "rgba(255,255,255,0.4)", marginTop: 2 }}>
-            {buildingType ?? "Mixed-Use"} · GFA {Math.round(floors * footprint * 0.98).toLocaleString()} m²
+
+          {/* Building info badge */}
+          <div style={{
+            background: "rgba(0,0,0,0.55)",
+            backdropFilter: "blur(10px)",
+            borderRadius: 8,
+            padding: "8px 12px",
+            border: "1px solid rgba(255,255,255,0.08)",
+            pointerEvents: "none",
+          }}>
+            <div style={{ fontSize: 8, color: "rgba(255,255,255,0.35)", textTransform: "uppercase" as const, letterSpacing: "0.1em", marginBottom: 4 }}>
+              Building Info
+            </div>
+            <div style={{ fontSize: 11, color: "#E0E0EA", fontWeight: 600 }}>
+              {floors}F · {height.toFixed(1)}m · {footprint} m²
+            </div>
+            <div style={{ fontSize: 9, color: "rgba(255,255,255,0.4)", marginTop: 2 }}>
+              {buildingType ?? "Mixed-Use"} · GFA {Math.round(floors * footprint * 0.98).toLocaleString()} m²
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Hovered room info */}
       {hoveredRoom && (
@@ -706,7 +785,7 @@ export default function ArchitecturalViewer({ floors, height, footprint, buildin
       )}
 
       {/* Bottom hint */}
-      {viewMode === "orbit" && !hoveredRoom && (
+      {viewMode === "orbit" && !hoveredRoom && !isLoading && (
         <div style={{
           position: "absolute", bottom: 8, left: 10,
           fontSize: 9, color: "rgba(255,255,255,0.3)",
@@ -715,6 +794,17 @@ export default function ArchitecturalViewer({ floors, height, footprint, buildin
           Drag to orbit · Scroll to zoom · Click doors to open
         </div>
       )}
+
+      {/* Keyframe animations */}
+      <style>{`
+        @keyframes viewer-spin {
+          to { transform: rotate(360deg); }
+        }
+        @keyframes viewer-fade-in {
+          from { opacity: 0; transform: translateY(-4px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
     </div>
   );
 }
@@ -779,11 +869,10 @@ function updateSkyColors(mat: THREE.MeshBasicMaterial, time: TimeOfDay) {
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, 512, 512);
 
-  // Stars for night sky
   if (time === "night") {
     for (let i = 0; i < 200; i++) {
       const x = Math.random() * 512;
-      const y = Math.random() * 300; // Mostly upper portion
+      const y = Math.random() * 300;
       const size = 0.5 + Math.random() * 1.5;
       const brightness = 0.3 + Math.random() * 0.7;
       ctx.fillStyle = `rgba(255, 255, 255, ${brightness})`;
@@ -791,7 +880,6 @@ function updateSkyColors(mat: THREE.MeshBasicMaterial, time: TimeOfDay) {
       ctx.arc(x, y, size, 0, Math.PI * 2);
       ctx.fill();
     }
-    // Moon
     const moonGrad = ctx.createRadialGradient(100, 80, 0, 100, 80, 20);
     moonGrad.addColorStop(0, "rgba(255, 255, 230, 0.9)");
     moonGrad.addColorStop(0.5, "rgba(255, 255, 220, 0.5)");
@@ -800,7 +888,6 @@ function updateSkyColors(mat: THREE.MeshBasicMaterial, time: TimeOfDay) {
     ctx.fillRect(80, 60, 40, 40);
   }
 
-  // Clouds for day/sunset
   if (time === "day" || time === "sunset") {
     const cloudColor = time === "day" ? "rgba(255,255,255,0.15)" : "rgba(255,200,150,0.12)";
     for (let i = 0; i < 6; i++) {
