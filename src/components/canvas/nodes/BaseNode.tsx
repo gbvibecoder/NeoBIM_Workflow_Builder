@@ -576,8 +576,8 @@ export const BaseNode = memo(function BaseNode({ id, data, selected }: BaseNodeP
               : `0 4px 24px rgba(0,0,0,0.5)`,
             stateGlow,
           ].filter(Boolean).join(", "),
-          backdropFilter: "blur(40px) saturate(1.3)",
-          WebkitBackdropFilter: "blur(40px) saturate(1.3)",
+          backdropFilter: "blur(12px) saturate(1.1)",
+          WebkitBackdropFilter: "blur(12px) saturate(1.1)",
           transform: isHovered && !selected
             ? "translateY(-3px)"
             : "translateY(0)",
@@ -938,8 +938,8 @@ export const BaseNode = memo(function BaseNode({ id, data, selected }: BaseNodeP
               background: "rgba(10, 8, 8, 0.95)",
               border: "1px solid rgba(248, 113, 113, 0.4)",
               boxShadow: "0 8px 24px rgba(0,0,0,0.5)",
-              backdropFilter: "blur(40px)",
-              WebkitBackdropFilter: "blur(40px)",
+              backdropFilter: "blur(12px)",
+              WebkitBackdropFilter: "blur(12px)",
               maxWidth: 280,
               zIndex: 1000,
               pointerEvents: "none",

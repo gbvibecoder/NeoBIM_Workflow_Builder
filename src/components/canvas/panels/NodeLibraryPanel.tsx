@@ -373,8 +373,8 @@ export function NodeLibraryPanel() {
           borderRadius: 4,
           overflow: "hidden",
           boxShadow: "0 24px 80px rgba(0,0,0,0.7), 0 0 0 1px rgba(184,115,51,0.08), 0 0 60px rgba(184,115,51,0.05)",
-          backdropFilter: "blur(40px)",
-          WebkitBackdropFilter: "blur(40px)",
+          backdropFilter: "blur(12px)",
+          WebkitBackdropFilter: "blur(12px)",
           display: "flex", flexDirection: "column",
         }}
       >

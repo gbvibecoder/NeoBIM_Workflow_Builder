@@ -141,8 +141,8 @@ function CanvasEmptyState({ onPromptMode }: EmptyStateProps) {
           borderRadius: 4,
           background: "rgba(10, 12, 14, 0.7)",
           border: "1px solid rgba(184,115,51,0.15)",
-          backdropFilter: "blur(40px)",
-          WebkitBackdropFilter: "blur(40px)",
+          backdropFilter: "blur(12px)",
+          WebkitBackdropFilter: "blur(12px)",
           marginBottom: 24,
         }}>
           <MiniWorkflowDiagram />

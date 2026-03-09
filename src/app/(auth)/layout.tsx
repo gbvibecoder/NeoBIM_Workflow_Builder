@@ -88,8 +88,8 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
           </svg>
 
           {/* Atmospheric orbs */}
-          <div className="orb-drift-1" style={{ position: "absolute", top: "10%", left: "5%", width: 400, height: 400, borderRadius: "50%", background: "radial-gradient(circle, rgba(79,138,255,0.08) 0%, transparent 70%)", filter: "blur(80px)" }} />
-          <div className="orb-drift-2" style={{ position: "absolute", bottom: "10%", right: "5%", width: 300, height: 300, borderRadius: "50%", background: "radial-gradient(circle, rgba(139,92,246,0.06) 0%, transparent 70%)", filter: "blur(60px)" }} />
+          <div className="orb-drift-1" style={{ position: "absolute", top: "10%", left: "5%", width: 400, height: 400, borderRadius: "50%", background: "radial-gradient(circle, rgba(79,138,255,0.08) 0%, transparent 70%)", filter: "blur(30px)" }} />
+          <div className="orb-drift-2" style={{ position: "absolute", bottom: "10%", right: "5%", width: 300, height: 300, borderRadius: "50%", background: "radial-gradient(circle, rgba(139,92,246,0.06) 0%, transparent 70%)", filter: "blur(20px)" }} />
         </div>
 
         {/* Logo */}

@@ -20,6 +20,8 @@ export default function ArchitecturalViewer({ floors, height, footprint, buildin
   const containerRef = useRef<HTMLDivElement>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
   const animFrameRef = useRef<number>(0);
+  const isVisibleRef = useRef(true);
+  const lastRenderTimeRef = useRef(0);
   const sceneRef = useRef<{
     scene: THREE.Scene;
     camera: THREE.PerspectiveCamera;
@@ -147,10 +149,10 @@ export default function ArchitecturalViewer({ floors, height, footprint, buildin
     renderer = new THREE.WebGLRenderer({
       antialias: true,
       alpha: false,
-      powerPreference: "high-performance",
+      powerPreference: "default",
     });
     renderer.setSize(w, h);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
     renderer.shadowMap.enabled = false;
     renderer.localClippingEnabled = true;
     container.appendChild(renderer.domElement);
@@ -409,8 +411,20 @@ export default function ArchitecturalViewer({ floors, height, footprint, buildin
     const direction = new THREE.Vector3();
     const fpMoveSpeed = 6;
 
+    // Target ~30 FPS (33ms per frame) instead of uncapped 60 FPS
+    const TARGET_FRAME_MS = 33;
+
     function animate() {
       animFrameRef.current = requestAnimationFrame(animate);
+
+      // Skip rendering when viewer is off-screen (IntersectionObserver)
+      if (!isVisibleRef.current) return;
+
+      // Throttle to ~30 FPS
+      const now = performance.now();
+      if (now - lastRenderTimeRef.current < TARGET_FRAME_MS) return;
+      lastRenderTimeRef.current = now;
+
       const delta = Math.min(clock.getDelta(), 0.05);
       const sr = sceneRef.current;
       if (!sr) return;
@@ -497,8 +511,8 @@ export default function ArchitecturalViewer({ floors, height, footprint, buildin
       // ─── Render ──────────────────────────────────────────
       renderer.render(scene, camera);
 
-      // ─── Minimap (render every 6th frame for perf) ────────
-      if (sr.minimapRenderer && sr.minimapCamera && showMinimapRef.current && sr.frameCount % 6 === 0) {
+      // ─── Minimap (render every 15th frame for perf) ────────
+      if (sr.minimapRenderer && sr.minimapCamera && showMinimapRef.current && sr.frameCount % 15 === 0) {
         sr.minimapRenderer.render(scene, sr.minimapCamera);
       }
       if (sr.minimapRenderer) {
@@ -559,6 +573,19 @@ export default function ArchitecturalViewer({ floors, height, footprint, buildin
     const cleanup = buildScene();
     return () => { cleanup?.(); };
   }, [buildScene]);
+
+  // ─── Pause rendering when viewer is off-screen ─────────────────────
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => { isVisibleRef.current = entry.isIntersecting; },
+      { threshold: 0.05 }
+    );
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, []);
 
   // ─── Time of Day Update ──────────────────────────────────────────
   useEffect(() => {

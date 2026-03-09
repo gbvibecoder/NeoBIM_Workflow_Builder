@@ -416,19 +416,19 @@ export default function LandingPage() {
               position: "absolute", top: "5%", left: "10%",
               width: 500, height: 500, borderRadius: "50%",
               background: "radial-gradient(circle, rgba(79,138,255,0.12) 0%, transparent 70%)",
-              filter: "blur(80px)",
+              filter: "blur(30px)",
             }} />
             <div className="orb-drift-2" style={{
               position: "absolute", top: "25%", right: "5%",
               width: 450, height: 450, borderRadius: "50%",
               background: "radial-gradient(circle, rgba(139,92,246,0.1) 0%, transparent 70%)",
-              filter: "blur(70px)",
+              filter: "blur(25px)",
             }} />
             <div className="orb-drift-3" style={{
               position: "absolute", bottom: "10%", left: "35%",
               width: 400, height: 400, borderRadius: "50%",
               background: "radial-gradient(circle, rgba(16,185,129,0.08) 0%, transparent 70%)",
-              filter: "blur(60px)",
+              filter: "blur(20px)",
             }} />
 
             {/* Animated SVG construction wireframe */}
@@ -858,7 +858,7 @@ export default function LandingPage() {
               <line x1="1240" y1="595" x2="1240" y2="605" stroke="rgba(16,185,129,0.15)" strokeWidth="0.5" />
               <text x="1070" y="618" className="dimension-label" textAnchor="middle">OUTPUT STAGE</text>
             </svg>
-            <div className="orb-drift-1" style={{ position: "absolute", top: "5%", left: "10%", width: 400, height: 400, borderRadius: "50%", background: "radial-gradient(circle, rgba(59,130,246,0.1) 0%, transparent 70%)", filter: "blur(80px)" }} />
+            <div className="orb-drift-1" style={{ position: "absolute", top: "5%", left: "10%", width: 400, height: 400, borderRadius: "50%", background: "radial-gradient(circle, rgba(59,130,246,0.1) 0%, transparent 70%)", filter: "blur(30px)" }} />
           </div>
 
           <div style={{ maxWidth: 1200, margin: "0 auto", position: "relative", zIndex: 1 }}>
@@ -1258,8 +1258,8 @@ export default function LandingPage() {
               <line x1="400" y1="100" x2="350" y2="150" stroke="rgba(79,138,255,0.04)" strokeWidth="0.5" />
               <line x1="580" y1="100" x2="560" y2="280" stroke="rgba(79,138,255,0.03)" strokeWidth="0.5" strokeDasharray="3 3" />
             </svg>
-            <div className="orb-drift-2" style={{ position: "absolute", bottom: "10%", left: "5%", width: 450, height: 450, borderRadius: "50%", background: "radial-gradient(circle, rgba(139,92,246,0.1) 0%, transparent 70%)", filter: "blur(80px)" }} />
-            <div className="orb-drift-3" style={{ position: "absolute", top: "10%", right: "5%", width: 400, height: 400, borderRadius: "50%", background: "radial-gradient(circle, rgba(59,130,246,0.08) 0%, transparent 70%)", filter: "blur(70px)" }} />
+            <div className="orb-drift-2" style={{ position: "absolute", bottom: "10%", left: "5%", width: 450, height: 450, borderRadius: "50%", background: "radial-gradient(circle, rgba(139,92,246,0.1) 0%, transparent 70%)", filter: "blur(30px)" }} />
+            <div className="orb-drift-3" style={{ position: "absolute", top: "10%", right: "5%", width: 400, height: 400, borderRadius: "50%", background: "radial-gradient(circle, rgba(59,130,246,0.08) 0%, transparent 70%)", filter: "blur(25px)" }} />
           </div>
 
           <div style={{ maxWidth: 1200, margin: "0 auto", position: "relative", zIndex: 1 }}>
@@ -1362,8 +1362,8 @@ export default function LandingPage() {
               <path d="M0 300 Q360 200 720 300 Q1080 400 1440 300" stroke="rgba(16,185,129,0.08)" strokeWidth="2" fill="none" />
               <path d="M0 300 Q360 200 720 300 Q1080 400 1440 300" stroke="rgba(16,185,129,0.15)" strokeWidth="1" fill="none" className="wire-animate" />
             </svg>
-            <div className="orb-drift-3" style={{ position: "absolute", top: "5%", left: "8%", width: 420, height: 420, borderRadius: "50%", background: "radial-gradient(circle, rgba(16,185,129,0.1) 0%, transparent 70%)", filter: "blur(70px)" }} />
-            <div className="orb-drift-1" style={{ position: "absolute", bottom: "10%", right: "5%", width: 350, height: 350, borderRadius: "50%", background: "radial-gradient(circle, rgba(79,138,255,0.08) 0%, transparent 70%)", filter: "blur(60px)" }} />
+            <div className="orb-drift-3" style={{ position: "absolute", top: "5%", left: "8%", width: 420, height: 420, borderRadius: "50%", background: "radial-gradient(circle, rgba(16,185,129,0.1) 0%, transparent 70%)", filter: "blur(25px)" }} />
+            <div className="orb-drift-1" style={{ position: "absolute", bottom: "10%", right: "5%", width: 350, height: 350, borderRadius: "50%", background: "radial-gradient(circle, rgba(79,138,255,0.08) 0%, transparent 70%)", filter: "blur(20px)" }} />
           </div>
 
           <div style={{ maxWidth: 1200, margin: "0 auto", position: "relative", zIndex: 1 }}>
@@ -1470,7 +1470,7 @@ export default function LandingPage() {
                 <animate attributeName="opacity" values="0;0.7;0.7;0" dur="4s" begin="2.6s" repeatCount="indefinite" />
               </circle>
             </svg>
-            <div className="orb-drift-1" style={{ position: "absolute", bottom: "5%", right: "5%", width: 400, height: 400, borderRadius: "50%", background: "radial-gradient(circle, rgba(245,158,11,0.08) 0%, transparent 70%)", filter: "blur(60px)" }} />
+            <div className="orb-drift-1" style={{ position: "absolute", bottom: "5%", right: "5%", width: 400, height: 400, borderRadius: "50%", background: "radial-gradient(circle, rgba(245,158,11,0.08) 0%, transparent 70%)", filter: "blur(20px)" }} />
           </div>
 
           <div style={{ maxWidth: 1100, margin: "0 auto", position: "relative", zIndex: 1 }}>
@@ -1570,8 +1570,8 @@ export default function LandingPage() {
               <line x1="940" y1="700" x2="1140" y2="700" stroke="rgba(139,92,246,0.1)" strokeWidth="0.5" />
               <text x="1040" y="720" className="dimension-label" textAnchor="middle">ENTERPRISE</text>
             </svg>
-            <div className="orb-drift-2" style={{ position: "absolute", top: "5%", left: "5%", width: 400, height: 400, borderRadius: "50%", background: "radial-gradient(circle, rgba(79,138,255,0.08) 0%, transparent 70%)", filter: "blur(70px)" }} />
-            <div className="orb-drift-3" style={{ position: "absolute", bottom: "10%", right: "5%", width: 350, height: 350, borderRadius: "50%", background: "radial-gradient(circle, rgba(139,92,246,0.08) 0%, transparent 70%)", filter: "blur(60px)" }} />
+            <div className="orb-drift-2" style={{ position: "absolute", top: "5%", left: "5%", width: 400, height: 400, borderRadius: "50%", background: "radial-gradient(circle, rgba(79,138,255,0.08) 0%, transparent 70%)", filter: "blur(25px)" }} />
+            <div className="orb-drift-3" style={{ position: "absolute", bottom: "10%", right: "5%", width: 350, height: 350, borderRadius: "50%", background: "radial-gradient(circle, rgba(139,92,246,0.08) 0%, transparent 70%)", filter: "blur(20px)" }} />
           </div>
 
           <div style={{ maxWidth: 1200, margin: "0 auto", position: "relative", zIndex: 1 }}>
@@ -1747,8 +1747,8 @@ export default function LandingPage() {
               <text x="100" y="485" className="dimension-label">GENERATE</text>
               <text x="1300" y="285" className="dimension-label">OUTPUT</text>
             </svg>
-            <div className="orb-drift-1" style={{ position: "absolute", top: "20%", left: "30%", width: 500, height: 500, borderRadius: "50%", background: "radial-gradient(circle, rgba(79,138,255,0.12) 0%, transparent 70%)", filter: "blur(80px)" }} />
-            <div className="orb-drift-2" style={{ position: "absolute", bottom: "10%", right: "20%", width: 400, height: 400, borderRadius: "50%", background: "radial-gradient(circle, rgba(139,92,246,0.1) 0%, transparent 70%)", filter: "blur(70px)" }} />
+            <div className="orb-drift-1" style={{ position: "absolute", top: "20%", left: "30%", width: 500, height: 500, borderRadius: "50%", background: "radial-gradient(circle, rgba(79,138,255,0.12) 0%, transparent 70%)", filter: "blur(30px)" }} />
+            <div className="orb-drift-2" style={{ position: "absolute", bottom: "10%", right: "20%", width: 400, height: 400, borderRadius: "50%", background: "radial-gradient(circle, rgba(139,92,246,0.1) 0%, transparent 70%)", filter: "blur(25px)" }} />
           </div>
 
           <motion.div

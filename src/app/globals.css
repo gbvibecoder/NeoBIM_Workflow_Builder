@@ -231,8 +231,8 @@
 
   .glass-heavy {
     background: rgba(12, 12, 22, 0.92);
-    backdrop-filter: blur(24px) saturate(1.4);
-    -webkit-backdrop-filter: blur(24px) saturate(1.4);
+    backdrop-filter: blur(12px) saturate(1.1);
+    -webkit-backdrop-filter: blur(12px) saturate(1.1);
     border: 1px solid rgba(255, 255, 255, 0.08);
   }
 
@@ -557,7 +557,7 @@
   .node-card {
     position: relative;
     background: rgba(18,18,30,0.85);
-    backdrop-filter: blur(24px);
+    backdrop-filter: blur(12px);
     border: 1px solid rgba(255,255,255,0.08);
     border-radius: 16px;
     overflow: visible;
@@ -2056,6 +2056,32 @@
 @keyframes skeleton-shimmer {
   0%   { background-position: 200% 0; }
   100% { background-position: -200% 0; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   STATIC PARTICLE ANIMATION (lightweight opacity-only, GPU-composited)
+   ═══════════════════════════════════════════════════════════════════ */
+.dp-static-particle {
+  animation: dp-particle-fade 6s ease-in-out infinite;
+  will-change: opacity;
+}
+
+@keyframes dp-particle-fade {
+  0%, 100% { opacity: 0.05; }
+  50% { opacity: 0.25; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   PREFERS-REDUCED-MOTION — kill ALL infinite animations for a11y + perf
+   ═══════════════════════════════════════════════════════════════════ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
 /* ═══════════════════════════════════════════════════════════════════
