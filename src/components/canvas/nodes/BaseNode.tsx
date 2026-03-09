@@ -10,6 +10,7 @@ import { InputNodeContent } from "./InputNode";
 import { ViewTypeSelect } from "./GenerateNodeContent";
 import { useLocale } from "@/hooks/useLocale";
 import { useExecutionStore } from "@/stores/execution-store";
+import { useUIStore } from "@/stores/ui-store";
 import type { ExecutionArtifact } from "@/types/execution";
 
 const INPUT_NODE_IDS = new Set(["IN-001","IN-002","IN-003","IN-004","IN-005","IN-006","IN-007"]);
@@ -280,7 +281,7 @@ function ProgressBar({ status, color }: { status: NodeStatus; color: string }) {
 
 // ─── Inline Result Display ──────────────────────────────────────────────────
 
-function InlineResult({ artifact }: { artifact: ExecutionArtifact }) {
+function InlineResult({ artifact, nodeId }: { artifact: ExecutionArtifact; nodeId: string }) {
   const d = artifact.data as Record<string, unknown>;
 
   if (artifact.type === "text") {
@@ -485,6 +486,10 @@ function InlineResult({ artifact }: { artifact: ExecutionArtifact }) {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.3 }}
+          onClick={(e) => {
+            e.stopPropagation();
+            useUIStore.getState().setArtifactViewerNodeId(nodeId);
+          }}
           style={{
             display: "flex", alignItems: "center", justifyContent: "center",
             background: "rgba(79,138,255,0.06)",
@@ -894,7 +899,7 @@ export const BaseNode = memo(function BaseNode({ id, data, selected }: BaseNodeP
                 transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
                 style={{ overflow: "hidden" }}
               >
-                <InlineResult artifact={artifact} />
+                <InlineResult artifact={artifact} nodeId={id} />
               </motion.div>
             )}
           </AnimatePresence>

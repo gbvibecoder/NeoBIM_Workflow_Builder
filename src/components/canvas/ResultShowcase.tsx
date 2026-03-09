@@ -10,10 +10,8 @@ import dynamic from "next/dynamic";
 import { useExecutionStore } from "@/stores/execution-store";
 import { useWorkflowStore } from "@/stores/workflow-store";
 import type { ExecutionArtifact } from "@/types/execution";
-import type { FloorPlanRoom } from "./artifacts/FloorPlan3DViewer";
-
-const FloorPlan3DViewer = dynamic(
-  () => import("./artifacts/FloorPlan3DViewer"),
+const ArchitecturalViewer = dynamic(
+  () => import("./artifacts/architectural-viewer/ArchitecturalViewer"),
   { ssr: false }
 );
 
@@ -95,9 +93,8 @@ export function ResultShowcase({ onClose }: ResultShowcaseProps) {
 
   // 3D model data
   const modelData = threeDArtifact || svgArtifact;
-  const modelRooms: FloorPlanRoom[] = modelData
-    ? ((modelData.data as Record<string, unknown>)?.roomList as FloorPlanRoom[]) ?? []
-    : [];
+  const modelDataObj = modelData ? (modelData.data as Record<string, unknown>) : null;
+  const hasModel = !!modelData;
 
   // File downloads
   const downloadFiles = fileArtifacts.map(a => {
@@ -124,7 +121,13 @@ export function ResultShowcase({ onClose }: ResultShowcaseProps) {
   }, [artifacts, nodes, projectTitle]);
 
   // 3D viewer fullscreen mode
-  if (show3DViewer) {
+  if (show3DViewer && modelDataObj) {
+    const floors = (modelDataObj.floors as number) ?? 5;
+    const height = (modelDataObj.height as number) ?? 21;
+    const footprint = (modelDataObj.footprint as number) ?? 500;
+    const gfa = (modelDataObj.gfa as number) ?? floors * footprint;
+    const buildingType = (modelDataObj.buildingType as string) ?? "Mixed-Use";
+
     return (
       <motion.div
         initial={{ opacity: 0 }}
@@ -142,7 +145,7 @@ export function ResultShowcase({ onClose }: ResultShowcaseProps) {
           borderBottom: "1px solid rgba(255,255,255,0.06)",
         }}>
           <span style={{ fontSize: 14, fontWeight: 600, color: "#F0F0F5" }}>
-            3D Floor Plan
+            3D Architectural Walkthrough
           </span>
           <button
             onClick={() => setShow3DViewer(false)}
@@ -158,7 +161,13 @@ export function ResultShowcase({ onClose }: ResultShowcaseProps) {
           </button>
         </div>
         <div style={{ flex: 1 }}>
-          <FloorPlan3DViewer rooms={modelRooms} />
+          <ArchitecturalViewer
+            floors={floors}
+            height={height}
+            footprint={footprint}
+            gfa={gfa}
+            buildingType={buildingType}
+          />
         </div>
       </motion.div>
     );
@@ -409,7 +418,7 @@ export function ResultShowcase({ onClose }: ResultShowcaseProps) {
         )}
 
         {/* 3D Model Button */}
-        {modelRooms.length > 0 && (
+        {hasModel && (
           <motion.button
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}

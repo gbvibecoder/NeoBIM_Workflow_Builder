@@ -50,6 +50,12 @@ const PostExecutionScene = dynamic(
   { ssr: false }
 );
 
+// Architectural 3D walkthrough viewer — client-only
+const ArchitecturalViewer = dynamic(
+  () => import("./artifacts/architectural-viewer/ArchitecturalViewer"),
+  { ssr: false }
+);
+
 import { useWorkflowStore, isUntitledWorkflow } from "@/stores/workflow-store";
 import { SaveWorkflowModal } from "./modals/SaveWorkflowModal";
 import { useExecutionStore } from "@/stores/execution-store";
@@ -231,6 +237,67 @@ function CanvasEmptyState({ onPromptMode }: EmptyStateProps) {
             {t('canvas.tryAiPrompt')}
           </button>
         </div>
+      </div>
+    </motion.div>
+  );
+}
+
+// ─── Fullscreen 3D Artifact Viewer ─────────────────────────────────────────
+
+function FullscreenArtifactViewer() {
+  const nodeId = useUIStore(s => s.artifactViewerNodeId);
+  const close = useUIStore(s => s.setArtifactViewerNodeId);
+  const artifact = useExecutionStore(s => nodeId ? s.artifacts.get(nodeId) : undefined);
+
+  if (!nodeId || !artifact) return null;
+
+  const d = artifact.data as Record<string, unknown>;
+  const floors = (d?.floors as number) ?? 5;
+  const height = (d?.height as number) ?? 21;
+  const footprint = (d?.footprint as number) ?? 500;
+  const gfa = (d?.gfa as number) ?? floors * footprint;
+  const buildingType = (d?.buildingType as string) ?? "Mixed-Use";
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      style={{
+        position: "absolute", inset: 0, zIndex: 60,
+        background: "rgba(4,4,8,0.98)",
+        display: "flex", flexDirection: "column",
+      }}
+    >
+      <div style={{
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+        padding: "12px 20px",
+        borderBottom: "1px solid rgba(255,255,255,0.06)",
+      }}>
+        <span style={{ fontSize: 14, fontWeight: 600, color: "#F0F0F5" }}>
+          3D Architectural Walkthrough
+        </span>
+        <button
+          onClick={() => close(null)}
+          style={{
+            display: "flex", alignItems: "center", gap: 6,
+            padding: "6px 14px", borderRadius: 8,
+            background: "rgba(255,255,255,0.06)", border: "none",
+            color: "#8888A0", fontSize: 12, fontWeight: 500,
+            cursor: "pointer",
+          }}
+        >
+          <X size={12} /> Close
+        </button>
+      </div>
+      <div style={{ flex: 1 }}>
+        <ArchitecturalViewer
+          floors={floors}
+          height={height}
+          footprint={footprint}
+          gfa={gfa}
+          buildingType={buildingType}
+        />
       </div>
     </motion.div>
   );
@@ -907,6 +974,9 @@ function WorkflowCanvasInner({ workflowId: _workflowId }: WorkflowCanvasInnerPro
               <ResultShowcase onClose={() => setShowShowcase(false)} />
             )}
           </AnimatePresence>
+
+          {/* Fullscreen 3D Architectural Viewer (opened from node "View 3D Model" button) */}
+          <FullscreenArtifactViewer />
 
           {/* ── Architectural title block — bottom right ── */}
           <div style={{

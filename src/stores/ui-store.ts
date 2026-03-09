@@ -33,6 +33,10 @@ interface UIState {
   showExecutionCompleteModal: boolean;
   setShowExecutionCompleteModal: (show: boolean) => void;
 
+  // Fullscreen artifact viewer (node id whose 3D artifact to show)
+  artifactViewerNodeId: string | null;
+  setArtifactViewerNodeId: (id: string | null) => void;
+
   // Actions
   setActivePanel: (panel: PanelId) => void;
   toggleNodeLibrary: () => void;
@@ -72,6 +76,9 @@ export const useUIStore = create<UIState>()((set) => ({
 
   showExecutionCompleteModal: false,
   setShowExecutionCompleteModal: (show) => set({ showExecutionCompleteModal: show }),
+
+  artifactViewerNodeId: null,
+  setArtifactViewerNodeId: (id) => set({ artifactViewerNodeId: id }),
 
   setActivePanel: (panel) =>
     set({
