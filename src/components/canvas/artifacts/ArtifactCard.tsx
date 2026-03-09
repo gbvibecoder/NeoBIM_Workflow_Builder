@@ -567,6 +567,7 @@ interface Massing3dData {
 
 function Massing3dBody({ data }: { data: Massing3dData }) {
   const { t } = useLocale();
+  const [show3D, setShow3D] = useState(false);
 
   if (!data?.floors || !data?.height) {
     return <div style={{ padding: "8px 14px", fontSize: 11, color: "#5C5C78" }}>{t('artifact.noMassing')}</div>;
@@ -574,14 +575,63 @@ function Massing3dBody({ data }: { data: Massing3dData }) {
 
   return (
     <div style={{ padding: "0 8px 10px 10px" }}>
-      <ArchitecturalViewer
-        floors={data.floors}
-        height={data.height}
-        footprint={data.footprint ?? 500}
-        gfa={data.gfa ?? data.floors * (data.footprint ?? 500)}
-        buildingType={data.buildingType}
-        style={data.style}
-      />
+      {/* Lazy-load 3D viewer — only mount WebGL when user clicks */}
+      {show3D ? (
+        <ArchitecturalViewer
+          floors={data.floors}
+          height={data.height}
+          footprint={data.footprint ?? 500}
+          gfa={data.gfa ?? data.floors * (data.footprint ?? 500)}
+          buildingType={data.buildingType}
+          style={data.style}
+        />
+      ) : (
+        <button
+          onClick={() => setShow3D(true)}
+          style={{
+            width: "100%", height: 200, borderRadius: 12,
+            background: "linear-gradient(145deg, #0D0D1A 0%, #111122 100%)",
+            border: "1px solid rgba(184,115,51,0.15)",
+            cursor: "pointer",
+            display: "flex", flexDirection: "column",
+            alignItems: "center", justifyContent: "center", gap: 12,
+            transition: "all 0.2s ease",
+          }}
+          onMouseEnter={e => {
+            e.currentTarget.style.borderColor = "rgba(184,115,51,0.35)";
+            e.currentTarget.style.background = "linear-gradient(145deg, #0F0F1E 0%, #131328 100%)";
+          }}
+          onMouseLeave={e => {
+            e.currentTarget.style.borderColor = "rgba(184,115,51,0.15)";
+            e.currentTarget.style.background = "linear-gradient(145deg, #0D0D1A 0%, #111122 100%)";
+          }}
+        >
+          {/* Isometric building icon */}
+          <svg width="56" height="56" viewBox="0 0 56 56" fill="none">
+            <path d="M14 42 L14 18 L28 10 L28 34 Z" fill="rgba(184,115,51,0.08)" stroke="rgba(184,115,51,0.25)" strokeWidth="0.8" />
+            <path d="M28 10 L42 18 L42 42 L28 34 Z" fill="rgba(184,115,51,0.04)" stroke="rgba(184,115,51,0.2)" strokeWidth="0.8" />
+            <path d="M14 18 L28 10 L42 18 L28 26 Z" fill="rgba(184,115,51,0.1)" stroke="rgba(184,115,51,0.3)" strokeWidth="0.8" />
+            {/* Floor lines */}
+            <line x1="14" y1="26" x2="28" y2="18" stroke="rgba(184,115,51,0.12)" strokeWidth="0.5" />
+            <line x1="14" y1="34" x2="28" y2="26" stroke="rgba(184,115,51,0.12)" strokeWidth="0.5" />
+            <line x1="28" y1="18" x2="42" y2="26" stroke="rgba(184,115,51,0.1)" strokeWidth="0.5" />
+            <line x1="28" y1="26" x2="42" y2="34" stroke="rgba(184,115,51,0.1)" strokeWidth="0.5" />
+          </svg>
+
+          <div style={{ textAlign: "center" }}>
+            <div style={{
+              fontSize: 12, fontWeight: 600, color: "rgba(184,115,51,0.7)",
+              marginBottom: 4, letterSpacing: "0.02em",
+            }}>
+              <Box size={12} style={{ display: "inline", verticalAlign: "-1px", marginRight: 5 }} />
+              Load 3D View
+            </div>
+            <div style={{ fontSize: 10, color: "#3A3A50" }}>
+              {data.floors}F · {data.height.toFixed(1)}m · {data.footprint} m²
+            </div>
+          </div>
+        </button>
+      )}
 
       {data.metrics && data.metrics.length > 0 && (
         <div style={{
