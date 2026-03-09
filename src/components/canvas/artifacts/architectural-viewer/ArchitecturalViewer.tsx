@@ -309,6 +309,9 @@ export default function ArchitecturalViewer({ floors, height, footprint, buildin
     envTex = pmremGen.fromScene(envScene, 0.04).texture;
     scene.environment = envTex;
     pmremGen.dispose();
+    // Reset render target — PMREMGenerator leaves an FBO bound which makes
+    // all subsequent MeshStandardMaterial draws write to the wrong target.
+    renderer.setRenderTarget(null);
 
     // ─── Minimap ───────────────────────────────────────────────
     const minimapSize = 160;

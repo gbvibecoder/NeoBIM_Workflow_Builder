@@ -761,10 +761,9 @@ export function buildBuilding(
   frameTop.position.set(0, 2.5, -buildingD / 2 - 0.03);
   scene.add(frameTop);
 
-  // Entrance light (range scales with building)
+  // Entrance light (no shadow — only sunlight casts shadows to keep shader simple)
   const entranceLight = new THREE.PointLight(0xFFE4B5, 0.8, Math.max(8, bldgHeight * 0.3));
   entranceLight.position.set(0, floorHeight * 0.8, -buildingD / 2 - 1);
-  entranceLight.castShadow = true;
   scene.add(entranceLight);
 
   // ─── Landscaping — Trees ─────────────────────────────────────
@@ -776,7 +775,7 @@ export function buildBuilding(
     scene.add(tree);
   }
 
-  // ─── Ground lights ──────────────────────────────────────────────
+  // ─── Ground bollards (visual only — no PointLights to keep PBR shader light) ──
   const lightPositions = [
     { x: -buildingW / 2 - 1, z: -buildingD / 2 - 1 },
     { x: buildingW / 2 + 1, z: -buildingD / 2 - 1 },
@@ -801,10 +800,6 @@ export function buildBuilding(
     );
     cap.position.set(lp.x, 0.82, lp.z);
     scene.add(cap);
-
-    const bl = new THREE.PointLight(0xFFE4B5, 0.3, 5);
-    bl.position.set(lp.x, 0.9, lp.z);
-    scene.add(bl);
   }
 
   // ─── Driveway ────────────────────────────────────────────────
