@@ -16,6 +16,11 @@ const FloorPlan3DViewer = dynamic(() => import("./FloorPlan3DViewer"), {
   loading: () => <div style={{ height: 400, background: "#07070e", borderRadius: 14, display: "flex", alignItems: "center", justifyContent: "center" }}><span style={{ fontSize: 11, color: "#3A3A50" }}>Loading 3D viewer…</span></div>,
 });
 
+const ArchitecturalViewer = dynamic(() => import("./architectural-viewer/ArchitecturalViewer"), {
+  ssr: false,
+  loading: () => <div style={{ height: 400, background: "#0D0D1A", borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "center" }}><span style={{ fontSize: 11, color: "#3A3A50" }}>Loading Architectural Viewer…</span></div>,
+});
+
 import { formatBytes } from "@/lib/utils";
 import { useLocale } from "@/hooks/useLocale";
 import type {
@@ -629,7 +634,7 @@ interface Massing3dData {
 
 function Massing3dBody({ data }: { data: Massing3dData }) {
   const { t } = useLocale();
-  const [viewMode, setViewMode] = useState<"massing" | "floorplan">("massing");
+  const [viewMode, setViewMode] = useState<"massing" | "floorplan" | "walkthrough">("massing");
 
   if (!data?.floors || !data?.height) {
     return <div style={{ padding: "8px 14px", fontSize: 11, color: "#5C5C78" }}>{t('artifact.noMassing')}</div>;
@@ -701,6 +706,22 @@ function Massing3dBody({ data }: { data: Massing3dData }) {
         >
           Floor Plan 3D
         </button>
+        <button
+          onClick={() => setViewMode("walkthrough")}
+          style={{
+            padding: "4px 12px",
+            borderRadius: 6,
+            background: viewMode === "walkthrough" ? "rgba(0,245,255,0.15)" : "rgba(255,255,255,0.04)",
+            border: `1px solid ${viewMode === "walkthrough" ? "rgba(0,245,255,0.3)" : "rgba(255,255,255,0.08)"}`,
+            color: viewMode === "walkthrough" ? "#00F5FF" : "#5C5C78",
+            fontSize: 10,
+            fontWeight: 600,
+            cursor: "pointer",
+            transition: "all 0.15s ease",
+          }}
+        >
+          Walkthrough 3D
+        </button>
       </div>
 
       {viewMode === "massing" ? (
@@ -711,11 +732,19 @@ function Massing3dBody({ data }: { data: Massing3dData }) {
           gfa={data.gfa ?? data.floors * (data.footprint ?? 500)}
           buildingType={data.buildingType}
         />
-      ) : (
+      ) : viewMode === "floorplan" ? (
         <FloorPlan3DViewer
           rooms={massingRooms}
           floors={data.floors}
           buildingHeight={data.height}
+        />
+      ) : (
+        <ArchitecturalViewer
+          floors={data.floors}
+          height={data.height}
+          footprint={data.footprint ?? 500}
+          gfa={data.gfa ?? data.floors * (data.footprint ?? 500)}
+          buildingType={data.buildingType}
         />
       )}
 
