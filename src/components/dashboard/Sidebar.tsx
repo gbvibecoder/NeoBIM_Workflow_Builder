@@ -369,14 +369,14 @@ export function Sidebar() {
 
             <div style={{ padding: "14px 12px 12px" }}>
               {session?.user ? (
-                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                  {/* User card */}
-                  <div className="sb-user-card">
+                <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+                  {/* User card — enhanced */}
+                  <div className="sb-user-card" style={{ borderRadius: "12px 12px 0 0", borderBottom: "none" }}>
                     {/* Ambient glow behind avatar */}
                     <div style={{
                       position: "absolute", left: 8, top: "50%", transform: "translateY(-50%)",
                       width: 40, height: 40, borderRadius: "50%",
-                      background: "radial-gradient(circle, rgba(184,115,51,0.15) 0%, transparent 70%)",
+                      background: "radial-gradient(circle, rgba(0,245,255,0.1) 0%, transparent 70%)",
                       pointerEvents: "none",
                     }} />
 
@@ -393,14 +393,14 @@ export function Sidebar() {
                     {/* Info */}
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{
-                        fontSize: 13, fontWeight: 600, color: "#E4E8F8",
+                        fontSize: 13, fontWeight: 700, color: "#E8ECF8",
                         overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
                         lineHeight: 1.3,
                       }}>
                         {session.user.name ?? "User"}
                       </div>
                       <div style={{
-                        fontSize: 10.5, color: "rgba(255,255,255,0.25)",
+                        fontSize: 10, color: "rgba(255,255,255,0.3)",
                         overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
                         fontFamily: "var(--font-jetbrains), monospace",
                         lineHeight: 1.4,
@@ -410,21 +410,43 @@ export function Sidebar() {
                     </div>
                   </div>
 
-                  {/* Language */}
-                  <LanguageSwitcher />
+                  {/* Quick actions row — language + sign out in one line */}
+                  <div style={{
+                    display: "flex", alignItems: "center", gap: 6,
+                    padding: "8px 12px",
+                    background: "rgba(255,255,255,0.02)",
+                    border: "1px solid rgba(255,255,255,0.05)",
+                    borderTop: "1px solid rgba(255,255,255,0.03)",
+                    borderRadius: "0 0 12px 12px",
+                  }}>
+                    <div style={{ flex: 1 }}>
+                      <LanguageSwitcher />
+                    </div>
+                    <button onClick={() => signOut({ callbackUrl: "/login" })}
+                      style={{
+                        display: "flex", alignItems: "center", gap: 4,
+                        padding: "5px 10px", borderRadius: 6,
+                        border: "1px solid rgba(255,255,255,0.06)",
+                        background: "rgba(255,255,255,0.02)",
+                        cursor: "pointer", transition: "all 0.15s ease",
+                        fontSize: 10, color: "rgba(255,255,255,0.3)", fontWeight: 500,
+                      }}
+                      onMouseEnter={e => { e.currentTarget.style.background = "rgba(239,68,68,0.08)"; e.currentTarget.style.borderColor = "rgba(239,68,68,0.2)"; e.currentTarget.style.color = "#EF4444"; }}
+                      onMouseLeave={e => { e.currentTarget.style.background = "rgba(255,255,255,0.02)"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.06)"; e.currentTarget.style.color = "rgba(255,255,255,0.3)"; }}
+                    >
+                      <LogOut size={10} />
+                      {t("nav.signOut")}
+                    </button>
+                  </div>
 
-                  {/* Upgrade */}
-                  <Link href="/dashboard/billing" className="sb-upgrade-btn" style={{ textDecoration: "none" }}>
-                    <span className="sb-upgrade-shimmer" />
-                    <Crown size={12} style={{ position: "relative", zIndex: 1 }} />
-                    <span style={{ position: "relative", zIndex: 1 }}>{t("nav.upgrade")}</span>
-                  </Link>
-
-                  {/* Sign out */}
-                  <button onClick={() => signOut({ callbackUrl: "/login" })} className="sb-signout-btn">
-                    <LogOut size={11} />
-                    {t("nav.signOut")}
-                  </button>
+                  {/* Upgrade — standalone with more space */}
+                  <div style={{ marginTop: 10 }}>
+                    <Link href="/dashboard/billing" className="sb-upgrade-btn" style={{ textDecoration: "none" }}>
+                      <span className="sb-upgrade-shimmer" />
+                      <Crown size={12} style={{ position: "relative", zIndex: 1 }} />
+                      <span style={{ position: "relative", zIndex: 1 }}>{t("nav.upgrade")}</span>
+                    </Link>
+                  </div>
                 </div>
               ) : (
                 <Link href="/login" style={{ display: "block", textAlign: "center", fontSize: 12, color: "#5B9AFF", textDecoration: "none", padding: 8, borderRadius: 8 }}>
