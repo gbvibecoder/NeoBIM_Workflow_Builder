@@ -333,6 +333,14 @@ const en = {
   'settings.unlimitedRuns': 'Unlimited runs',
   'settings.active': 'Active',
   'settings.upgradeToPro': 'Upgrade to Pro',
+  'settings.displayName': 'Display Name',
+  'settings.changeAvatar': 'Change photo',
+  'settings.removeAvatar': 'Remove photo',
+  'settings.saveProfile': 'Save Profile',
+  'settings.profileSaved': 'Profile updated successfully!',
+  'settings.profileSaveFailed': 'Failed to update profile',
+  'settings.imageTooLarge': 'Image is too large. Maximum 5MB.',
+  'settings.invalidImageType': 'Please select an image file (JPEG, PNG, WebP).',
 
   // ===== ANALYTICS =====
   'analytics.loading': 'Loading analytics...',
@@ -900,6 +908,14 @@ const de: Record<keyof typeof en, string | string[]> = {
   'settings.unlimitedRuns': 'Unbegrenzte Ausführungen',
   'settings.active': 'Aktiv',
   'settings.upgradeToPro': 'Auf Pro upgraden',
+  'settings.displayName': 'Anzeigename',
+  'settings.changeAvatar': 'Foto ändern',
+  'settings.removeAvatar': 'Foto entfernen',
+  'settings.saveProfile': 'Profil speichern',
+  'settings.profileSaved': 'Profil erfolgreich aktualisiert!',
+  'settings.profileSaveFailed': 'Profil konnte nicht aktualisiert werden',
+  'settings.imageTooLarge': 'Bild ist zu groß. Maximal 5MB.',
+  'settings.invalidImageType': 'Bitte wählen Sie eine Bilddatei (JPEG, PNG, WebP).',
 
   // ===== ANALYTICS =====
   'analytics.loading': 'Auswertungen werden geladen...',

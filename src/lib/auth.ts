@@ -19,21 +19,24 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         token.sub = user.id;
         token.email = user.email;
         token.name = user.name;
-        token.picture = user.image;
+        // Don't store data URLs in JWT (too large for cookies)
+        token.picture = user.image?.startsWith("data:") ? "uploaded" : (user.image ?? null);
         token.role = (user as { role?: string }).role;
       }
-      // On session update (e.g. after Stripe payment), refresh role from DB
+      // On session update (e.g. after profile save or Stripe payment), refresh from DB
       if (trigger === "update" && token.sub) {
         try {
           const dbUser = await prisma.user.findUnique({
             where: { id: token.sub },
-            select: { role: true },
+            select: { role: true, name: true, image: true },
           });
           if (dbUser) {
             token.role = dbUser.role;
+            token.name = dbUser.name;
+            token.picture = dbUser.image?.startsWith("data:") ? "uploaded" : (dbUser.image ?? null);
           }
         } catch {
-          // Keep existing token role if DB lookup fails
+          // Keep existing token data if DB lookup fails
         }
       }
       return token;

@@ -8,10 +8,11 @@ import Link from "next/link";
 import {
   User, Key, Shield, Save, Loader2, AlertCircle,
   CheckCircle2, Info, Crown, Star, Lock, Unlock,
-  Fingerprint, ScanLine, Cpu, Activity,
+  Fingerprint, ScanLine, Cpu, Activity, Camera, Trash2, Pencil,
 } from "lucide-react";
 import { PageBackground } from "@/components/dashboard/PageBackground";
 import { useLocale } from "@/hooks/useLocale";
+import { useAvatar } from "@/hooks/useAvatar";
 
 type SettingsTab = "profile" | "api-keys" | "plan";
 
@@ -148,12 +149,124 @@ function SaveStatus({ status }: { status: "idle" | "saving" | "saved" }) {
   );
 }
 
-// ---- Profile Section — Identity Card ----
-function ProfileSection({ user, initials }: {
+// ---- Profile Section — Identity Card (Editable) ----
+function ProfileSection({
+  user, initials, saveStatus, onSaveStatusChange, onSessionUpdate,
+}: {
   user: { name?: string | null; email?: string | null; image?: string | null } | undefined;
   initials: string;
+  saveStatus: "idle" | "saving" | "saved";
+  onSaveStatusChange: (s: "idle" | "saving" | "saved") => void;
+  onSessionUpdate: () => Promise<unknown>;
 }) {
   const { t } = useLocale();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [editName, setEditName] = useState(user?.name ?? "");
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const [isHoveringAvatar, setIsHoveringAvatar] = useState(false);
+  const [isEditingName, setIsEditingName] = useState(false);
+
+  // Fetch actual avatar (handles "uploaded" sentinel)
+  const loadedImage = useAvatar(user?.image);
+
+  // Sync name from session
+  useEffect(() => {
+    if (user?.name && !isEditingName) setEditName(user.name);
+  }, [user?.name, isEditingName]);
+
+  // The displayed image: preview (pending upload) > loaded (from API/session)
+  const displayImage = previewImage ?? loadedImage;
+  const hasImageToRemove = !!(previewImage || loadedImage);
+
+  const nameChanged = editName.trim() !== (user?.name ?? "");
+  const hasChanges = nameChanged || previewImage !== null;
+
+  function processImage(file: File) {
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error(t('settings.imageTooLarge'));
+      return;
+    }
+    if (!file.type.startsWith("image/")) {
+      toast.error(t('settings.invalidImageType'));
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        const TARGET = 200;
+        const size = Math.min(img.width, img.height);
+        const sx = (img.width - size) / 2;
+        const sy = (img.height - size) / 2;
+        canvas.width = TARGET;
+        canvas.height = TARGET;
+        const ctx = canvas.getContext("2d")!;
+        ctx.drawImage(img, sx, sy, size, size, 0, 0, TARGET, TARGET);
+        setPreviewImage(canvas.toDataURL("image/jpeg", 0.8));
+      };
+      img.src = e.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    processImage(file);
+    e.target.value = "";
+  }
+
+  async function handleRemoveAvatar() {
+    onSaveStatusChange("saving");
+    try {
+      const res = await fetch("/api/user/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ image: null }),
+      });
+      if (!res.ok) throw new Error();
+      setPreviewImage(null);
+      await onSessionUpdate();
+      onSaveStatusChange("saved");
+      toast.success(t('settings.profileSaved'));
+      setTimeout(() => onSaveStatusChange("idle"), 2000);
+    } catch {
+      onSaveStatusChange("idle");
+      toast.error(t('settings.profileSaveFailed'));
+    }
+  }
+
+  async function handleSave() {
+    onSaveStatusChange("saving");
+    try {
+      const payload: { name?: string; image?: string | null } = {};
+      if (nameChanged) payload.name = editName.trim();
+      if (previewImage) payload.image = previewImage;
+      if (Object.keys(payload).length === 0) return;
+
+      const res = await fetch("/api/user/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data?.error?.message ?? t('settings.profileSaveFailed'));
+      }
+
+      setPreviewImage(null);
+      setIsEditingName(false);
+      await onSessionUpdate();
+      onSaveStatusChange("saved");
+      toast.success(t('settings.profileSaved'));
+      setTimeout(() => onSaveStatusChange("idle"), 2000);
+    } catch (err) {
+      onSaveStatusChange("idle");
+      toast.error(err instanceof Error ? err.message : t('settings.profileSaveFailed'));
+    }
+  }
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -161,6 +274,15 @@ function ProfileSection({ user, initials }: {
       transition={{ duration: 0.5 }}
       style={{ display: "flex", flexDirection: "column", gap: 20 }}
     >
+      {/* Hidden file input */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/jpeg,image/png,image/webp"
+        onChange={handleFileSelect}
+        style={{ display: "none" }}
+      />
+
       {/* Identity Card */}
       <div
         className="dp-glass-card"
@@ -199,8 +321,14 @@ function ProfileSection({ user, initials }: {
         </div>
 
         <div style={{ padding: "28px 24px", display: "flex", alignItems: "center", gap: 24 }}>
-          {/* Avatar with scan ring */}
-          <div style={{ position: "relative", flexShrink: 0 }}>
+          {/* Avatar with scan ring — clickable */}
+          <div
+            style={{ position: "relative", flexShrink: 0, cursor: "pointer" }}
+            onMouseEnter={() => setIsHoveringAvatar(true)}
+            onMouseLeave={() => setIsHoveringAvatar(false)}
+            onClick={() => fileInputRef.current?.click()}
+            title={t('settings.changeAvatar')}
+          >
             <HexRing />
             <div style={{
               width: 64, height: 64, borderRadius: "50%",
@@ -209,24 +337,65 @@ function ProfileSection({ user, initials }: {
               fontSize: 24, fontWeight: 700, color: "#fff",
               overflow: "hidden", position: "relative",
               boxShadow: "0 0 32px rgba(27,79,255,0.2)",
+              transition: "box-shadow 0.2s",
+              ...(isHoveringAvatar ? { boxShadow: "0 0 48px rgba(27,79,255,0.4)" } : {}),
             }}>
-              {user?.image ? (
+              {displayImage ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={user.image} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                <img src={displayImage} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
               ) : (
                 initials
               )}
+              {/* Hover overlay */}
+              <div style={{
+                position: "absolute", inset: 0,
+                background: "rgba(0,0,0,0.5)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                opacity: isHoveringAvatar ? 1 : 0,
+                transition: "opacity 0.2s",
+                borderRadius: "50%",
+              }}>
+                <Camera size={20} style={{ color: "#fff" }} />
+              </div>
             </div>
           </div>
 
           {/* Identity info */}
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{
-              fontSize: 22, fontWeight: 700, color: "#F0F0F5",
-              letterSpacing: "-0.02em", lineHeight: 1.2,
-            }}>
-              {user?.name ?? t('settings.user')}
-            </div>
+            {/* Editable name */}
+            {isEditingName ? (
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <input
+                  type="text"
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Escape") { setIsEditingName(false); setEditName(user?.name ?? ""); } }}
+                  maxLength={100}
+                  autoFocus
+                  style={{
+                    fontSize: 20, fontWeight: 700, color: "#F0F0F5",
+                    letterSpacing: "-0.02em", lineHeight: 1.2,
+                    background: "rgba(255,255,255,0.04)",
+                    border: "1px solid rgba(79,138,255,0.3)",
+                    borderRadius: 8, padding: "6px 12px",
+                    outline: "none", width: "100%",
+                  }}
+                />
+              </div>
+            ) : (
+              <div
+                style={{
+                  display: "flex", alignItems: "center", gap: 8, cursor: "pointer",
+                  fontSize: 22, fontWeight: 700, color: "#F0F0F5",
+                  letterSpacing: "-0.02em", lineHeight: 1.2,
+                }}
+                onClick={() => setIsEditingName(true)}
+                title="Click to edit name"
+              >
+                {editName || user?.name || t('settings.user')}
+                <Pencil size={14} style={{ color: "rgba(255,255,255,0.25)", flexShrink: 0 }} />
+              </div>
+            )}
             <div style={{
               fontSize: 13, color: "rgba(255,255,255,0.35)", marginTop: 4,
               fontFamily: "var(--font-jetbrains), monospace",
@@ -234,53 +403,114 @@ function ProfileSection({ user, initials }: {
               {user?.email ?? "\u2014"}
             </div>
 
-            {/* Clearance badge */}
-            <div style={{
-              display: "inline-flex", alignItems: "center", gap: 6,
-              marginTop: 12, padding: "4px 12px", borderRadius: 6,
-              background: "rgba(139,92,246,0.08)",
-              border: "1px solid rgba(139,92,246,0.15)",
-            }}>
-              <Shield size={11} style={{ color: "#A78BFA" }} />
-              <span style={{
-                fontSize: 10, fontWeight: 700, color: "#A78BFA",
-                letterSpacing: "0.08em",
-                fontFamily: "var(--font-jetbrains), monospace",
+            {/* Action buttons row */}
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 14 }}>
+              {/* Clearance badge */}
+              <div style={{
+                display: "inline-flex", alignItems: "center", gap: 6,
+                padding: "4px 12px", borderRadius: 6,
+                background: "rgba(139,92,246,0.08)",
+                border: "1px solid rgba(139,92,246,0.15)",
               }}>
-                AUTHORIZED OPERATOR
-              </span>
+                <Shield size={11} style={{ color: "#A78BFA" }} />
+                <span style={{
+                  fontSize: 10, fontWeight: 700, color: "#A78BFA",
+                  letterSpacing: "0.08em",
+                  fontFamily: "var(--font-jetbrains), monospace",
+                }}>
+                  AUTHORIZED OPERATOR
+                </span>
+              </div>
+
+              {/* Remove avatar button */}
+              {hasImageToRemove && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); handleRemoveAvatar(); }}
+                  style={{
+                    display: "inline-flex", alignItems: "center", gap: 4,
+                    padding: "4px 10px", borderRadius: 6,
+                    background: "rgba(239,68,68,0.06)",
+                    border: "1px solid rgba(239,68,68,0.15)",
+                    color: "rgba(239,68,68,0.6)", fontSize: 10, fontWeight: 600,
+                    cursor: "pointer", transition: "all 0.2s",
+                    fontFamily: "var(--font-jetbrains), monospace",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = "rgba(239,68,68,0.12)";
+                    e.currentTarget.style.color = "#EF4444";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = "rgba(239,68,68,0.06)";
+                    e.currentTarget.style.color = "rgba(239,68,68,0.6)";
+                  }}
+                >
+                  <Trash2 size={10} />
+                  {t('settings.removeAvatar')}
+                </button>
+              )}
             </div>
           </div>
         </div>
 
-        {/* Card footer — session info */}
+        {/* Card footer — session info + save */}
         <div style={{
           padding: "10px 24px",
           borderTop: "1px solid rgba(255,255,255,0.04)",
-          display: "flex", gap: 24,
+          display: "flex", alignItems: "center", justifyContent: "space-between",
         }}>
-          {[
-            { label: "SESSION", value: "Encrypted" },
-            { label: "PROTOCOL", value: "OAuth 2.0" },
-            { label: "STATUS", value: "Online", color: "#10B981" },
-          ].map((item) => (
-            <div key={item.label} style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <span style={{
-                fontSize: 9, color: "rgba(255,255,255,0.2)",
+          <div style={{ display: "flex", gap: 24 }}>
+            {[
+              { label: "SESSION", value: "Encrypted" },
+              { label: "PROTOCOL", value: "OAuth 2.0" },
+              { label: "STATUS", value: "Online", color: "#10B981" },
+            ].map((item) => (
+              <div key={item.label} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{
+                  fontSize: 9, color: "rgba(255,255,255,0.2)",
+                  fontFamily: "var(--font-jetbrains), monospace",
+                  letterSpacing: "0.05em",
+                }}>
+                  {item.label}:
+                </span>
+                <span style={{
+                  fontSize: 9, color: item.color ?? "rgba(255,255,255,0.4)",
+                  fontFamily: "var(--font-jetbrains), monospace",
+                  fontWeight: 600,
+                }}>
+                  {item.value}
+                </span>
+              </div>
+            ))}
+          </div>
+
+          {/* Save button */}
+          {hasChanges && (
+            <motion.button
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              onClick={handleSave}
+              disabled={saveStatus === "saving"}
+              style={{
+                display: "inline-flex", alignItems: "center", gap: 6,
+                padding: "6px 16px", borderRadius: 8,
+                background: "linear-gradient(135deg, #1B4FFF, #4F8AFF)",
+                border: "1px solid rgba(79,138,255,0.3)",
+                color: "#fff", fontSize: 11, fontWeight: 700,
+                cursor: saveStatus === "saving" ? "wait" : "pointer",
                 fontFamily: "var(--font-jetbrains), monospace",
                 letterSpacing: "0.05em",
-              }}>
-                {item.label}:
-              </span>
-              <span style={{
-                fontSize: 9, color: item.color ?? "rgba(255,255,255,0.4)",
-                fontFamily: "var(--font-jetbrains), monospace",
-                fontWeight: 600,
-              }}>
-                {item.value}
-              </span>
-            </div>
-          ))}
+                opacity: saveStatus === "saving" ? 0.7 : 1,
+                transition: "opacity 0.2s",
+              }}
+            >
+              {saveStatus === "saving" ? (
+                <Loader2 size={12} style={{ animation: "spin 1s linear infinite" }} />
+              ) : (
+                <Save size={12} />
+              )}
+              {t('settings.saveProfile')}
+            </motion.button>
+          )}
         </div>
       </div>
     </motion.div>
@@ -812,7 +1042,7 @@ function PlanSection({ userRole }: { userRole: string }) {
 // ---- Page ----
 export default function SettingsPage() {
   const { t } = useLocale();
-  const { data: session } = useSession();
+  const { data: session, update: updateSession } = useSession();
   const [activeTab, setActiveTab] = useState<SettingsTab>("profile");
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
 
@@ -931,7 +1161,7 @@ export default function SettingsPage() {
               <AnimatePresence mode="wait">
                 {activeTab === "profile" && (
                   <motion.div key="profile" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} transition={{ duration: 0.3 }}>
-                    <ProfileSection user={user} initials={initials} />
+                    <ProfileSection user={user} initials={initials} saveStatus={saveStatus} onSaveStatusChange={setSaveStatus} onSessionUpdate={updateSession} />
                   </motion.div>
                 )}
                 {activeTab === "api-keys" && (

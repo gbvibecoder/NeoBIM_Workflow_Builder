@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import { PREBUILT_WORKFLOWS } from "@/constants/prebuilt-workflows";
 import { useLocale } from "@/hooks/useLocale";
+import { useAvatar } from "@/hooks/useAvatar";
 import { LanguageSwitcher } from "@/components/ui/LanguageSwitcher";
 
 // ─── Sidebar ─────────────────────────────────────────────────────────────────
@@ -35,6 +36,7 @@ export function Sidebar() {
   const { t } = useLocale();
   const pathname = usePathname();
   const { data: session } = useSession();
+  const avatarSrc = useAvatar(session?.user?.image);
 
   const PRIMARY_NAV = [
     { href: "/dashboard",           label: t("nav.dashboard"),   icon: LayoutDashboard, exact: true },
@@ -382,9 +384,9 @@ export function Sidebar() {
 
                     {/* Avatar */}
                     <div className="sb-avatar">
-                      {session.user.image ? (
+                      {avatarSrc ? (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img src={session.user.image} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                        <img src={avatarSrc} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                       ) : (
                         <span>{(session.user.name ?? session.user.email ?? "U")[0].toUpperCase()}</span>
                       )}
