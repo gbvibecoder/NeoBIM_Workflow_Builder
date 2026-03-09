@@ -427,7 +427,7 @@ export const NODE_CATALOGUE: NodeCatalogueItem[] = [
       { id: "style-in", label: "Style & Camera", type: "json" },
     ],
     outputs: [{ id: "video-out", label: "4K MP4 Video", type: "binary" }],
-    apiEngine: "Kling 3.0 Pro via fal.ai",
+    apiEngine: "Kling 3.0 Official API",
     tags: ["video", "walkthrough", "flythrough", "animation", "render", "cinematic", "4k"],
     executionTime: "3-8 min",
   },

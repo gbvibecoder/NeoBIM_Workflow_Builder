@@ -21,7 +21,7 @@ import { assertValidInput } from "@/lib/validation";
 import { APIError, UserErrors, formatErrorResponse } from "@/lib/user-errors";
 import { generatePDFBase64 } from "@/services/pdf-report-server";
 import { reconstructHiFi3D, isMeshyConfigured } from "@/services/meshy-service";
-import { generateWalkthroughVideo, buildArchitecturalVideoPrompt } from "@/services/video-service";
+import { generateWalkthroughVideo, buildArchitecturalMultiShot } from "@/services/video-service";
 
 // Detect region/city from text for cost estimation
 function detectRegionFromText(text: string): string | null {
@@ -1331,13 +1331,13 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
     } else if (catalogueId === "GN-009") {
       // ── Video Walkthrough Generator ────────────────────────────────────
       // Takes a concept render image (from GN-003) + building description
-      // and generates a cinematic 4K walkthrough video via Kling 3.0 Pro.
+      // and generates a cinematic walkthrough video via Kling 3.0 Official API.
 
-      if (!process.env.FAL_KEY) {
+      if (!process.env.KLING_ACCESS_KEY || !process.env.KLING_SECRET_KEY) {
         return NextResponse.json(
           formatErrorResponse({
-            title: "FAL_KEY required",
-            message: "FAL_KEY is not configured. Add your fal.ai API key to enable video generation.",
+            title: "Kling API keys required",
+            message: "KLING_ACCESS_KEY and KLING_SECRET_KEY are not configured. Get your keys from klingai.com/global/dev to enable video generation.",
             code: "MISSING_API_KEY",
           }),
           { status: 400 }
@@ -1362,19 +1362,19 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
         );
       }
 
-      // Build camera motion prompt from building description
+      // Build multi-shot camera prompts from building description
       const buildingDesc =
         (inputData?.content as string) ??
         (inputData?.description as string) ??
         (inputData?.prompt as string) ??
         "Modern architectural building";
 
-      const videoPrompt = buildArchitecturalVideoPrompt(buildingDesc);
+      const multiPrompt = buildArchitecturalMultiShot(buildingDesc);
 
       const videoResult = await generateWalkthroughVideo({
         imageUrl: renderImageUrl,
-        prompt: videoPrompt,
-        duration: "10",
+        multiPrompt,
+        duration: "15",
       });
 
       artifact = {
@@ -1387,18 +1387,18 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
           type: "MP4 Video (4K)",
           size: videoResult.fileSize,
           downloadUrl: videoResult.videoUrl,
-          label: "Cinematic 4K Walkthrough — Kling 3.0 Pro",
-          content: `${videoResult.durationSeconds}s cinematic 4K walkthrough — ${buildingDesc.slice(0, 100)}`,
+          label: `Cinematic Walkthrough — Kling 3.0 (${videoResult.shotCount} shots)`,
+          content: `${videoResult.durationSeconds}s cinematic multi-shot walkthrough — ${buildingDesc.slice(0, 100)}`,
           videoUrl: videoResult.videoUrl,
           durationSeconds: videoResult.durationSeconds,
           metadata: {
             costUsd: videoResult.costUsd,
             generationTimeMs: videoResult.generationTimeMs,
-            pipeline: "concept render → Kling 3.0 Pro → 4K MP4 video",
-            cameraPrompt: videoPrompt.slice(0, 300),
+            pipeline: "concept render → Kling 3.0 Official API (multi-shot) → MP4 video",
+            shotCount: videoResult.shotCount,
           },
         },
-        metadata: { engine: "kling-v3-pro", real: true, jobId: videoResult.id },
+        metadata: { engine: "kling-v3-official", real: true, jobId: videoResult.id },
         createdAt: new Date(),
       };
 

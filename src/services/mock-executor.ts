@@ -547,20 +547,21 @@ export async function executeNode(
         },
       });
 
-    case "GN-009": { // Video Walkthrough Generator — mock (Kling 3.0 Pro)
+    case "GN-009": { // Video Walkthrough Generator — mock (Kling 3.0 Official API)
       const vidDesc = String(inputData?.content ?? inputData?.description ?? "modern building");
       return mockArtifact(executionId, tileInstanceId, "file", {
         name: `walkthrough_${Date.now()}.mp4`,
-        type: "MP4 Video (4K)",
+        type: "MP4 Video",
         downloadUrl: "https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/360/Big_Buck_Bunny_360_10s_1MB.mp4",
-        label: "Cinematic 4K Walkthrough — Kling 3.0 Pro — Mock",
-        content: `10s cinematic 4K walkthrough — ${vidDesc.slice(0, 100)}`,
+        label: "Cinematic Walkthrough — Kling 3.0 (3 shots) — Mock",
+        content: `15s cinematic multi-shot walkthrough (3 camera angles) — ${vidDesc.slice(0, 100)}`,
         videoUrl: "https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/360/Big_Buck_Bunny_360_10s_1MB.mp4",
-        durationSeconds: 10,
+        durationSeconds: 15,
         metadata: {
-          costUsd: 2.24,
-          generationTimeMs: 120000,
-          pipeline: "concept render → Kling 3.0 Pro → 4K MP4 video",
+          costUsd: 1.50,
+          generationTimeMs: 180000,
+          shotCount: 3,
+          pipeline: "concept render → Kling 3.0 Official API (multi-shot) → MP4 video",
         },
       });
     }
