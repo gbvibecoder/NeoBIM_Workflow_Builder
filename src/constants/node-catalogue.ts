@@ -397,6 +397,22 @@ export const NODE_CATALOGUE: NodeCatalogueItem[] = [
     executionTime: "< 60s",
   },
 
+  {
+    id: "GN-009",
+    name: "Video Walkthrough Generator",
+    description: "Generate a cinematic video walkthrough/flythrough from 3D model or concept renders — camera path, lighting, and transitions auto-composed",
+    category: "generate",
+    icon: "Video",
+    inputs: [
+      { id: "geo-in", label: "3D Model / Renders", type: "geometry" },
+      { id: "style-in", label: "Style & Camera", type: "json" },
+    ],
+    outputs: [{ id: "video-out", label: "MP4 Video", type: "binary" }],
+    apiEngine: "Runway Gen-3 / Luma Dream Machine",
+    tags: ["video", "walkthrough", "flythrough", "animation", "render", "cinematic"],
+    executionTime: "2-5 min",
+  },
+
   // ============================================================
   // EXPORT / OUTPUT NODES (Amber)
   // ============================================================
