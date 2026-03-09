@@ -161,10 +161,12 @@ function ProfileSection({
 }) {
   const { t } = useLocale();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const processingRef = useRef(0); // generation counter to prevent race conditions
   const [editName, setEditName] = useState(user?.name ?? "");
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [isHoveringAvatar, setIsHoveringAvatar] = useState(false);
   const [isEditingName, setIsEditingName] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
 
   // Fetch actual avatar (handles "uploaded" sentinel)
   const loadedImage = useAvatar(user?.image);
@@ -190,10 +192,15 @@ function ProfileSection({
       toast.error(t('settings.invalidImageType'));
       return;
     }
+    // Increment generation counter — only the latest selection wins
+    const generation = ++processingRef.current;
+    setIsProcessing(true);
     const reader = new FileReader();
     reader.onload = (e) => {
+      if (processingRef.current !== generation) return; // stale
       const img = new Image();
       img.onload = () => {
+        if (processingRef.current !== generation) return; // stale
         const canvas = document.createElement("canvas");
         const TARGET = 200;
         const size = Math.min(img.width, img.height);
@@ -204,8 +211,19 @@ function ProfileSection({
         const ctx = canvas.getContext("2d")!;
         ctx.drawImage(img, sx, sy, size, size, 0, 0, TARGET, TARGET);
         setPreviewImage(canvas.toDataURL("image/jpeg", 0.8));
+        setIsProcessing(false);
+      };
+      img.onerror = () => {
+        if (processingRef.current !== generation) return;
+        setIsProcessing(false);
+        toast.error(t('settings.invalidImageType'));
       };
       img.src = e.target?.result as string;
+    };
+    reader.onerror = () => {
+      if (processingRef.current !== generation) return;
+      setIsProcessing(false);
+      toast.error(t('settings.profileSaveFailed'));
     };
     reader.readAsDataURL(file);
   }
@@ -225,15 +243,19 @@ function ProfileSection({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ image: null }),
       });
-      if (!res.ok) throw new Error();
+      if (!res.ok) {
+        let msg = t('settings.profileSaveFailed');
+        try { const d = await res.json(); msg = d?.error?.message ?? msg; } catch { /* non-JSON response */ }
+        throw new Error(msg);
+      }
       setPreviewImage(null);
       await onSessionUpdate();
       onSaveStatusChange("saved");
       toast.success(t('settings.profileSaved'));
       setTimeout(() => onSaveStatusChange("idle"), 2000);
-    } catch {
+    } catch (err) {
       onSaveStatusChange("idle");
-      toast.error(t('settings.profileSaveFailed'));
+      toast.error(err instanceof Error ? err.message : t('settings.profileSaveFailed'));
     }
   }
 
@@ -243,7 +265,10 @@ function ProfileSection({
       const payload: { name?: string; image?: string | null } = {};
       if (nameChanged) payload.name = editName.trim();
       if (previewImage) payload.image = previewImage;
-      if (Object.keys(payload).length === 0) return;
+      if (Object.keys(payload).length === 0) {
+        onSaveStatusChange("idle");
+        return;
+      }
 
       const res = await fetch("/api/user/profile", {
         method: "PATCH",
@@ -251,8 +276,9 @@ function ProfileSection({
         body: JSON.stringify(payload),
       });
       if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data?.error?.message ?? t('settings.profileSaveFailed'));
+        let msg = t('settings.profileSaveFailed');
+        try { const d = await res.json(); msg = d?.error?.message ?? msg; } catch { /* non-JSON response */ }
+        throw new Error(msg);
       }
 
       setPreviewImage(null);
@@ -489,17 +515,17 @@ function ProfileSection({
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
               onClick={handleSave}
-              disabled={saveStatus === "saving"}
+              disabled={saveStatus === "saving" || isProcessing}
               style={{
                 display: "inline-flex", alignItems: "center", gap: 6,
                 padding: "6px 16px", borderRadius: 8,
                 background: "linear-gradient(135deg, #1B4FFF, #4F8AFF)",
                 border: "1px solid rgba(79,138,255,0.3)",
                 color: "#fff", fontSize: 11, fontWeight: 700,
-                cursor: saveStatus === "saving" ? "wait" : "pointer",
+                cursor: (saveStatus === "saving" || isProcessing) ? "wait" : "pointer",
                 fontFamily: "var(--font-jetbrains), monospace",
                 letterSpacing: "0.05em",
-                opacity: saveStatus === "saving" ? 0.7 : 1,
+                opacity: (saveStatus === "saving" || isProcessing) ? 0.7 : 1,
                 transition: "opacity 0.2s",
               }}
             >

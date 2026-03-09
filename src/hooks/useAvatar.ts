@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 
 /**
  * Resolves the user's avatar image source.
@@ -11,19 +11,21 @@ export function useAvatar(sessionImage: string | null | undefined) {
   const directSrc = !isUploaded && sessionImage ? sessionImage : null;
   const [fetchedSrc, setFetchedSrc] = useState<string | null>(null);
 
-  const fetchAvatar = useCallback(() => {
+  useEffect(() => {
     if (!isUploaded) return;
+
+    let cancelled = false;
     fetch("/api/user/profile")
       .then((r) => r.json())
       .then((data) => {
-        if (data.image) setFetchedSrc(data.image);
+        if (!cancelled && data.image) setFetchedSrc(data.image);
       })
       .catch(() => {});
-  }, [isUploaded]);
 
-  useEffect(() => {
-    fetchAvatar();
-  }, [fetchAvatar]);
+    return () => {
+      cancelled = true;
+    };
+  }, [isUploaded]);
 
   return isUploaded ? fetchedSrc : directSrc;
 }
