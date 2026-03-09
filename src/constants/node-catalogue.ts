@@ -398,6 +398,25 @@ export const NODE_CATALOGUE: NodeCatalogueItem[] = [
   },
 
   {
+    id: "GN-010",
+    name: "Hi-Fi 3D Reconstructor",
+    description: "Reconstruct a hyper-detailed, textured 3D mesh (GLB/OBJ) from multi-view rendered images — produces ultra-realistic architectural models with materials, windows, and façade detail",
+    category: "generate",
+    icon: "Rotate3d",
+    inputs: [
+      { id: "images-in", label: "Multi-View Renders", type: "image" },
+      { id: "desc-in", label: "Building Description", type: "text" },
+    ],
+    outputs: [
+      { id: "glb-out", label: "Detailed 3D Model (GLB)", type: "geometry" },
+      { id: "preview-out", label: "360° Preview", type: "image" },
+    ],
+    apiEngine: "Meshy v4 / Tripo3D / Rodin Gen-2",
+    tags: ["3d", "reconstruction", "hi-fi", "mesh", "textured", "glb", "obj", "detailed", "ultra-realistic"],
+    executionTime: "2-4 min",
+  },
+
+  {
     id: "GN-009",
     name: "Video Walkthrough Generator",
     description: "Generate a cinematic video walkthrough/flythrough from 3D model or concept renders — camera path, lighting, and transitions auto-composed",
