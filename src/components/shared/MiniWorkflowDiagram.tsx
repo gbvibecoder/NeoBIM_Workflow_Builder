@@ -16,14 +16,9 @@ interface MiniWorkflowDiagramProps {
   animated?: boolean;
 }
 
-// ─── Colors ───────────────────────────────────────────────────────────────────
+import { CATEGORY_COLORS } from "@/lib/ui-constants";
 
-const CATEGORY_COLORS: Record<string, string> = {
-  input:     "#3B82F6",
-  transform: "#8B5CF6",
-  generate:  "#10B981",
-  export:    "#F59E0B",
-};
+// ─── Colors ───────────────────────────────────────────────────────────────────
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
@@ -50,7 +45,7 @@ export const MiniWorkflowDiagram = memo(function MiniWorkflowDiagram({
       overflow: "hidden",
     }}>
       {display.map((node, i) => {
-        const color = CATEGORY_COLORS[node.category] ?? "#4F8AFF";
+        const color = CATEGORY_COLORS[node.category as keyof typeof CATEGORY_COLORS] ?? "#4F8AFF";
         const firstWord = node.label.split(" ")[0] ?? node.label;
 
         return (

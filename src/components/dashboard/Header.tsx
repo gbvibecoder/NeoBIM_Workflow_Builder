@@ -16,7 +16,7 @@ export function Header({ title, subtitle }: HeaderProps) {
         background: "rgba(7,7,13,0.85)",
         backdropFilter: "blur(16px)",
         WebkitBackdropFilter: "blur(16px)",
-        borderBottom: "1px solid rgba(79,138,255,0.06)",
+        borderBottom: "1px solid rgba(184,115,51,0.06)",
       }}
     >
       <div>

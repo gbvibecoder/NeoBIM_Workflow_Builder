@@ -1239,53 +1239,88 @@
   animation: betaPulse 2.5s ease-in-out infinite;
 }
 
-/* ── Gamified Dashboard Animations ──────────────────────────────── */
 
-@keyframes mission-active-pulse {
-  0%, 100% { border-color: rgba(79,138,255,0.15); box-shadow: 0 0 0 rgba(79,138,255,0); }
-  50%      { border-color: rgba(79,138,255,0.35); box-shadow: 0 0 16px rgba(79,138,255,0.1); }
+/* ── Dashboard Home — Premium ──────────────────────────────────── */
+
+@keyframes dashboard-pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%      { opacity: 0.5; transform: scale(1.4); }
 }
 
-@keyframes mission-progress-shimmer {
-  0%   { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
+/* Ambient node wave — subtle floating constellation across top */
+.dashboard-node-wave {
+  position: absolute;
+  top: 60px;
+  left: 5%;
+  right: 5%;
+  height: 80px;
+  pointer-events: none;
+  z-index: 1;
+  opacity: 0.6;
 }
 
-@keyframes event-dot-pulse {
-  0%, 100% { transform: scale(1); opacity: 1; }
-  50%      { transform: scale(1.6); opacity: 0.4; }
+/* Pipeline step active glow */
+.pipeline-step-active {
+  animation: border-glow-copper 2.5s ease-in-out infinite;
+}
+@keyframes border-glow-copper {
+  0%, 100% { border-color: rgba(184,115,51,0.2); box-shadow: 0 0 0 rgba(184,115,51,0); }
+  50% { border-color: rgba(184,115,51,0.5); box-shadow: 0 0 20px rgba(184,115,51,0.12); }
 }
 
-@keyframes loot-card-hover {
-  0%, 100% { transform: translateY(0); box-shadow: none; }
-  50%      { transform: translateY(-4px); box-shadow: 0 8px 24px rgba(245,158,11,0.12); }
+/* Action card dashed hover */
+.dash-card-hover:hover {
+  border-style: solid !important;
+  border-color: rgba(184,115,51,0.4) !important;
+  background: rgba(184,115,51,0.04) !important;
+}
+.dash-card-hover:hover .dash-plus {
+  transform: rotate(90deg);
+}
+.dash-plus {
+  transition: transform 350ms cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
-@keyframes xp-ring-fill {
-  from { stroke-dashoffset: 251.2; }
+/* Template card port dots */
+.tmpl-card::before,
+.tmpl-card::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  transform: translateY(-50%);
+  border: 2px solid rgba(15,18,24,0.9);
+  z-index: 2;
+  transition: box-shadow 300ms ease;
+}
+.tmpl-card::before { left: -5px; background: var(--port-color, #B87333); box-shadow: 0 0 8px var(--port-color, #B87333); }
+.tmpl-card::after { right: -5px; background: var(--port-color, #B87333); box-shadow: 0 0 8px var(--port-color, #B87333); }
+
+/* Tip card hover */
+.dashboard-tip:hover {
+  border-color: rgba(184,115,51,0.3) !important;
+  box-shadow: 0 12px 40px rgba(184,115,51,0.08) !important;
+  transform: translateY(-2px);
 }
 
-@keyframes countdown-pulse {
-  0%, 100% { opacity: 1; }
-  50%      { opacity: 0.6; }
+/* Noise overlay for dashboard */
+.dashboard-noise {
+  position: fixed; inset: 0;
+  pointer-events: none; z-index: 9999;
+  opacity: 0.03; mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+  background-size: 256px 256px;
 }
 
-.mission-card-active {
-  animation: mission-active-pulse 3s ease-in-out infinite;
+.dashboard-link-hover:hover {
+  color: #FFBF00 !important;
 }
 
-.progress-shimmer {
-  background: linear-gradient(90deg, transparent 0%, rgba(79,138,255,0.15) 50%, transparent 100%);
-  background-size: 200% 100%;
-  animation: mission-progress-shimmer 2s linear infinite;
-}
-
-.event-dot {
-  animation: event-dot-pulse 1.5s ease-in-out infinite;
-}
-
-.loot-card:hover {
-  animation: loot-card-hover 0.4s ease-out forwards;
+.dashboard-template-btn:hover {
+  box-shadow: 0 4px 20px rgba(184,115,51,0.35) !important;
+  filter: brightness(1.1);
 }
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -2017,6 +2052,11 @@
   0% { background-position: 0% 50%; }
   50% { background-position: 100% 50%; }
   100% { background-position: 0% 50%; }
+}
+
+@keyframes skeleton-shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
 }
 
 /* ═══════════════════════════════════════════════════════════════════

@@ -234,7 +234,7 @@ export function Sidebar() {
                   fontFamily: "var(--font-jetbrains), monospace",
                   marginTop: 3,
                 }}>
-                  PARAMETRIC BLUEPRINT
+                  DESIGN WORKSPACE
                 </span>
               </motion.div>
             )}

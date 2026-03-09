@@ -10,17 +10,14 @@ import { InputNodeContent } from "./InputNode";
 import { ViewTypeSelect } from "./GenerateNodeContent";
 import { useLocale } from "@/hooks/useLocale";
 import { useExecutionStore } from "@/stores/execution-store";
+import { useUIStore } from "@/stores/ui-store";
 import type { ExecutionArtifact } from "@/types/execution";
 
 const INPUT_NODE_IDS = new Set(["IN-001","IN-002","IN-003","IN-004","IN-005","IN-006","IN-007"]);
 
-// ─── helpers ────────────────────────────────────────────────────────────────
+import { CATEGORY_COLORS, hexToRgb } from "@/lib/ui-constants";
 
-function hexToRgb(hex: string): string {
-  const r = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-  if (!r) return "79, 138, 255";
-  return `${parseInt(r[1], 16)}, ${parseInt(r[2], 16)}, ${parseInt(r[3], 16)}`;
-}
+// ─── helpers ────────────────────────────────────────────────────────────────
 
 function getIcon(name: string, size = 14): React.ReactNode {
   const icons = LucideIcons as unknown as Record<
@@ -40,12 +37,7 @@ function portPercent(index: number, total: number): number {
 
 // ─── category colours ────────────────────────────────────────────────────────
 
-const CATEGORY_COLOR: Record<NodeCategory, string> = {
-  input:     "#00F5FF",
-  transform: "#B87333",
-  generate:  "#FFBF00",
-  export:    "#4FC3F7",
-};
+const CATEGORY_COLOR = CATEGORY_COLORS;
 
 // ─── Category-specific background patterns ──────────────────────────────────
 
@@ -289,7 +281,7 @@ function ProgressBar({ status, color }: { status: NodeStatus; color: string }) {
 
 // ─── Inline Result Display ──────────────────────────────────────────────────
 
-function InlineResult({ artifact }: { artifact: ExecutionArtifact }) {
+function InlineResult({ artifact, nodeId }: { artifact: ExecutionArtifact; nodeId: string }) {
   const d = artifact.data as Record<string, unknown>;
 
   if (artifact.type === "text") {
@@ -494,6 +486,10 @@ function InlineResult({ artifact }: { artifact: ExecutionArtifact }) {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.3 }}
+          onClick={(e) => {
+            e.stopPropagation();
+            useUIStore.getState().setArtifactViewerNodeId(nodeId);
+          }}
           style={{
             display: "flex", alignItems: "center", justifyContent: "center",
             background: "rgba(79,138,255,0.06)",
@@ -903,7 +899,7 @@ export const BaseNode = memo(function BaseNode({ id, data, selected }: BaseNodeP
                 transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
                 style={{ overflow: "hidden" }}
               >
-                <InlineResult artifact={artifact} />
+                <InlineResult artifact={artifact} nodeId={id} />
               </motion.div>
             )}
           </AnimatePresence>

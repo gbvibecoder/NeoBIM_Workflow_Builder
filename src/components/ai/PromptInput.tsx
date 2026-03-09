@@ -23,9 +23,9 @@ const CHIPS = [
   { label: "Compliance",       color: "#EF4444", prompt: "Check my IFC model for zoning compliance and generate a PDF report" },
 ];
 
-const CATEGORY_COLOR: Record<string, string> = {
-  input: "#00F5FF", transform: "#B87333", generate: "#FFBF00", export: "#4FC3F7",
-};
+import { CATEGORY_COLORS } from "@/lib/ui-constants";
+
+const CATEGORY_COLOR = CATEGORY_COLORS;
 
 const STEPS = ["thinking", "placing", "connecting"] as const;
 type GenerationStep = typeof STEPS[number];

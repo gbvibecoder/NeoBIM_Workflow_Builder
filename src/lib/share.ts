@@ -18,11 +18,6 @@ export function shareExecutionToTwitter(workflowName: string, nodeCount: number)
   openPopup(`https://twitter.com/intent/tweet?text=${text}`);
 }
 
-export function shareExecutionToLinkedIn() {
-  const url = encodeURIComponent(SITE_URL);
-  openPopup(`https://www.linkedin.com/sharing/share-offsite/?url=${url}`);
-}
-
 // ── Workflow share (before execution) ────────────────────────────────────────
 
 export function shareWorkflowToTwitter(workflowName: string) {
@@ -33,11 +28,6 @@ export function shareWorkflowToTwitter(workflowName: string) {
     `Try it free: ${SITE_URL}`
   );
   openPopup(`https://twitter.com/intent/tweet?text=${text}`);
-}
-
-export function shareWorkflowToLinkedIn() {
-  const url = encodeURIComponent(SITE_URL);
-  openPopup(`https://www.linkedin.com/sharing/share-offsite/?url=${url}`);
 }
 
 // ── Template share ───────────────────────────────────────────────────────────

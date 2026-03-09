@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Star, GitFork, Zap, Clock, Crown, Share2 } from "lucide-react";
+import { Star, GitFork, Zap, Clock, Crown, Share2, Building2, Ruler, Layers } from "lucide-react";
 import { shareTemplateToTwitter } from "@/lib/share";
 import { motion } from "framer-motion";
 import { MiniWorkflowDiagram } from "@/components/shared/MiniWorkflowDiagram";
@@ -27,11 +27,16 @@ const CATEGORY_COLOR: Record<string, string> = {
   "Site Analysis":    "#10B981",
 };
 
-function hexToRgb(hex: string): string {
-  const r = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-  if (!r) return "79, 138, 255";
-  return `${parseInt(r[1], 16)}, ${parseInt(r[2], 16)}, ${parseInt(r[3], 16)}`;
-}
+const CATEGORY_ICON: Record<string, React.ReactNode> = {
+  "Concept Design":   <Building2 size={8} />,
+  "Visualization":    <Layers size={8} />,
+  "BIM Export":       <Layers size={8} />,
+  "Cost Estimation":  <Ruler size={8} />,
+  "Full Pipeline":    <Building2 size={8} />,
+  "Site Analysis":    <Layers size={8} />,
+};
+
+import { hexToRgb } from "@/lib/ui-constants";
 
 // Avatar from initials
 function AuthorAvatar({ name, size = 22 }: { name: string; size?: number }) {
@@ -74,6 +79,31 @@ function StarRating({ rating }: { rating: number }) {
   );
 }
 
+// Blueprint-style grid overlay for the card top section
+function CardBlueprintOverlay({ color }: { color: string }) {
+  return (
+    <div style={{ position: "absolute", inset: 0, pointerEvents: "none", overflow: "hidden" }}>
+      {/* Subtle grid */}
+      <div style={{
+        position: "absolute", inset: 0,
+        backgroundImage: `
+          linear-gradient(rgba(${hexToRgb(color)},0.03) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(${hexToRgb(color)},0.03) 1px, transparent 1px)
+        `,
+        backgroundSize: "20px 20px",
+      }} />
+      {/* Corner bracket top-left */}
+      <svg style={{ position: "absolute", top: 6, left: 6 }} width="10" height="10" viewBox="0 0 10 10" fill="none">
+        <path d="M0 4 L0 0 L4 0" stroke={`rgba(${hexToRgb(color)},0.15)`} strokeWidth="0.5" />
+      </svg>
+      {/* Corner bracket bottom-right */}
+      <svg style={{ position: "absolute", bottom: 6, right: 6 }} width="10" height="10" viewBox="0 0 10 10" fill="none">
+        <path d="M6 10 L10 10 L10 6" stroke={`rgba(${hexToRgb(color)},0.15)`} strokeWidth="0.5" />
+      </svg>
+    </div>
+  );
+}
+
 // ─── Props ───────────────────────────────────────────────────────────────────
 
 interface WorkflowCardProps {
@@ -112,6 +142,7 @@ export function WorkflowCard({
   const isPartiallyLive = liveCount > 0 && !isFullyLive;
   const complexityColor = COMPLEXITY_COLOR[workflow.complexity] ?? "#55556A";
   const catColor        = CATEGORY_COLOR[workflow.category ?? ""] ?? "#4F8AFF";
+  const catIcon         = CATEGORY_ICON[workflow.category ?? ""];
 
   const diagramNodes = workflow.tileGraph.nodes.map(n => ({
     label:    n.data.label,
@@ -123,28 +154,34 @@ export function WorkflowCard({
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.22, delay: index * 0.04, ease: "easeOut" }}
-      whileHover={{ y: -3, transition: { duration: 0.15 } }}
+      whileHover={{ y: -4, transition: { duration: 0.2 } }}
       style={{
         borderRadius: 14,
         border: isFeatured
-          ? "1px solid rgba(245,158,11,0.4)"
-          : "1px solid rgba(255,255,255,0.06)",
-        background: "linear-gradient(145deg, rgba(18,18,30,0.95), rgba(14,14,22,0.98))",
+          ? "1px solid rgba(245,158,11,0.35)"
+          : "1px solid rgba(255,255,255,0.05)",
+        background: "linear-gradient(165deg, rgba(16,16,28,0.98), rgba(10,10,18,0.99))",
         overflow: "hidden",
         cursor: "default",
         position: "relative",
         boxShadow: isFeatured
-          ? "0 0 24px rgba(245,158,11,0.08)"
-          : "0 1px 3px rgba(0,0,0,0.1)",
+          ? "0 0 30px rgba(245,158,11,0.06), 0 4px 16px rgba(0,0,0,0.2)"
+          : "0 2px 8px rgba(0,0,0,0.15)",
         transition: "border-color 0.2s, box-shadow 0.2s",
       }}
       onMouseEnter={e => {
-        if (!isFeatured) (e.currentTarget as HTMLElement).style.borderColor = "rgba(255,255,255,0.12)";
+        if (!isFeatured) {
+          (e.currentTarget as HTMLElement).style.borderColor = `rgba(${hexToRgb(catColor)},0.2)`;
+          (e.currentTarget as HTMLElement).style.boxShadow = `0 4px 20px rgba(0,0,0,0.25), 0 0 30px rgba(${hexToRgb(catColor)},0.04)`;
+        }
         const shareBtn = e.currentTarget.querySelector(".workflow-card-share") as HTMLElement | null;
         if (shareBtn) shareBtn.style.opacity = "1";
       }}
       onMouseLeave={e => {
-        if (!isFeatured) (e.currentTarget as HTMLElement).style.borderColor = "rgba(255,255,255,0.06)";
+        if (!isFeatured) {
+          (e.currentTarget as HTMLElement).style.borderColor = "rgba(255,255,255,0.05)";
+          (e.currentTarget as HTMLElement).style.boxShadow = "0 2px 8px rgba(0,0,0,0.15)";
+        }
         const shareBtn = e.currentTarget.querySelector(".workflow-card-share") as HTMLElement | null;
         if (shareBtn) shareBtn.style.opacity = "0";
       }}
@@ -155,8 +192,8 @@ export function WorkflowCard({
           position: "absolute", top: 8, right: 8, zIndex: 10,
           display: "flex", alignItems: "center", gap: 4,
           padding: "3px 8px", borderRadius: 20,
-          background: "rgba(245,158,11,0.15)",
-          border: "1px solid rgba(245,158,11,0.35)",
+          background: "rgba(245,158,11,0.12)",
+          border: "1px solid rgba(245,158,11,0.3)",
           fontSize: 9, fontWeight: 700, color: "#F59E0B",
           letterSpacing: "0.4px",
         }}>
@@ -165,19 +202,22 @@ export function WorkflowCard({
         </div>
       )}
 
-      {/* Top: Mini diagram */}
+      {/* Top: Mini diagram with blueprint overlay */}
       <div style={{
         height: 130,
-        background: "#0B0B13",
-        borderBottom: "1px solid rgba(255,255,255,0.05)",
+        background: `linear-gradient(180deg, rgba(${hexToRgb(catColor)},0.02) 0%, #09090F 100%)`,
+        borderBottom: `1px solid rgba(${hexToRgb(catColor)},0.06)`,
         position: "relative",
         overflow: "hidden",
       }}>
-        {/* Category accent top bar */}
+        {/* Blueprint grid overlay */}
+        <CardBlueprintOverlay color={catColor} />
+
+        {/* Category accent top bar — gradient */}
         <div style={{
           position: "absolute", top: 0, left: 0, right: 0, height: 2,
-          background: catColor,
-          opacity: 0.7,
+          background: `linear-gradient(90deg, ${catColor}, rgba(${hexToRgb(catColor)},0.2))`,
+          opacity: 0.6,
         }} />
 
         <MiniWorkflowDiagram nodes={diagramNodes} size="md" animated />
@@ -193,49 +233,53 @@ export function WorkflowCard({
             position: "absolute", top: 8, right: isFeatured ? 90 : 8,
             width: 26, height: 26, borderRadius: 7,
             display: "flex", alignItems: "center", justifyContent: "center",
-            background: "rgba(0,0,0,0.5)", border: "1px solid rgba(255,255,255,0.1)",
-            color: "#8888A0", cursor: "pointer",
+            background: "rgba(0,0,0,0.5)", border: "1px solid rgba(255,255,255,0.08)",
+            color: "#6B6B85", cursor: "pointer",
             opacity: 0, transition: "opacity 0.15s, color 0.15s",
+            backdropFilter: "blur(8px)",
           }}
           className="workflow-card-share"
           onMouseEnter={e => { e.currentTarget.style.color = "#4F8AFF"; }}
-          onMouseLeave={e => { e.currentTarget.style.color = "#8888A0"; }}
+          onMouseLeave={e => { e.currentTarget.style.color = "#6B6B85"; }}
         >
           <Share2 size={11} />
         </button>
 
-        {/* Category chip */}
+        {/* Category chip with icon */}
         <div style={{
           position: "absolute", bottom: 8, left: 8,
-          fontSize: 9, padding: "2px 7px", borderRadius: 10,
-          background: `rgba(${hexToRgb(catColor)}, 0.12)`,
-          border: `1px solid rgba(${hexToRgb(catColor)}, 0.25)`,
+          fontSize: 9, padding: "3px 8px", borderRadius: 6,
+          background: `rgba(${hexToRgb(catColor)}, 0.1)`,
+          border: `1px solid rgba(${hexToRgb(catColor)}, 0.2)`,
           color: catColor, fontWeight: 600, textTransform: "uppercase" as const,
           letterSpacing: "0.4px",
+          display: "flex", alignItems: "center", gap: 4,
+          backdropFilter: "blur(4px)",
         }}>
+          {catIcon}
           {workflow.category}
         </div>
       </div>
 
       {/* Bottom: Content */}
-      <div style={{ padding: "13px 14px 12px" }}>
+      <div style={{ padding: "14px 16px 13px" }}>
         {/* Title */}
         <h3 style={{
-          fontSize: 15, fontWeight: 600, color: "#F0F0F5",
+          fontSize: 14, fontWeight: 650, color: "#F0F0F5",
           overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-          marginBottom: 5,
+          marginBottom: 6, letterSpacing: "-0.01em",
         }}>
           {workflow.name}
         </h3>
 
         {/* Description */}
         <p style={{
-          fontSize: 12, color: "#7C7C96", lineHeight: 1.5,
+          fontSize: 12, color: "#6B6B85", lineHeight: 1.55,
           display: "-webkit-box",
           WebkitLineClamp: 2,
           WebkitBoxOrient: "vertical" as const,
           overflow: "hidden",
-          margin: "0 0 9px",
+          margin: "0 0 10px",
         }}>
           {workflow.description}
         </p>
@@ -276,7 +320,7 @@ export function WorkflowCard({
         {/* Meta row */}
         <div style={{
           display: "flex", alignItems: "center", justifyContent: "space-between",
-          paddingTop: 9, borderTop: "1px solid rgba(255,255,255,0.06)",
+          paddingTop: 10, borderTop: "1px solid rgba(255,255,255,0.04)",
         }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             {/* Complexity */}
@@ -288,17 +332,26 @@ export function WorkflowCard({
               <div style={{
                 width: 5, height: 5, borderRadius: "50%",
                 background: complexityColor, flexShrink: 0,
+                boxShadow: `0 0 6px ${complexityColor}40`,
               }} />
               {workflow.complexity}
             </div>
             {/* Node count */}
-            <div style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 10, color: "#3A3A50" }}>
-              <Zap size={9} style={{ color: "#4F8AFF" }} />
+            <div style={{
+              display: "flex", alignItems: "center", gap: 3,
+              fontSize: 10, color: "#3A3A50",
+              fontFamily: "monospace",
+            }}>
+              <Zap size={9} style={{ color: "rgba(79,138,255,0.5)" }} />
               {nodeCount} nodes
             </div>
             {/* Time */}
             {workflow.estimatedRunTime && (
-              <div style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 10, color: "#3A3A50" }}>
+              <div style={{
+                display: "flex", alignItems: "center", gap: 3,
+                fontSize: 10, color: "#3A3A50",
+                fontFamily: "monospace",
+              }}>
                 <Clock size={9} />
                 {workflow.estimatedRunTime}
               </div>
@@ -309,8 +362,8 @@ export function WorkflowCard({
                 display: "flex", alignItems: "center", gap: 3,
                 fontSize: 9, fontWeight: 700, color: "#10B981",
                 padding: "1px 6px", borderRadius: 10,
-                background: "rgba(16,185,129,0.1)",
-                border: "1px solid rgba(16,185,129,0.2)",
+                background: "rgba(16,185,129,0.08)",
+                border: "1px solid rgba(16,185,129,0.15)",
               }}>
                 Fully Live
               </div>
@@ -320,8 +373,8 @@ export function WorkflowCard({
                 display: "flex", alignItems: "center", gap: 3,
                 fontSize: 9, fontWeight: 700, color: "#F59E0B",
                 padding: "1px 6px", borderRadius: 10,
-                background: "rgba(245,158,11,0.1)",
-                border: "1px solid rgba(245,158,11,0.2)",
+                background: "rgba(245,158,11,0.08)",
+                border: "1px solid rgba(245,158,11,0.15)",
               }}>
                 Partially Live
               </div>
@@ -333,20 +386,22 @@ export function WorkflowCard({
             <button
               onClick={() => onClone(workflow.id)}
               style={{
-                padding: "4px 10px", borderRadius: 6,
-                background: "rgba(79,138,255,0.1)",
-                border: "1px solid rgba(79,138,255,0.2)",
-                fontSize: 10, fontWeight: 600, color: "#4F8AFF",
-                cursor: "pointer", transition: "all 0.12s",
+                padding: "5px 12px", borderRadius: 6,
+                background: `rgba(${hexToRgb(catColor)},0.08)`,
+                border: `1px solid rgba(${hexToRgb(catColor)},0.15)`,
+                fontSize: 10, fontWeight: 600, color: catColor,
+                cursor: "pointer", transition: "all 0.15s ease",
                 flexShrink: 0,
               }}
               onMouseEnter={e => {
-                (e.currentTarget as HTMLElement).style.background = "rgba(79,138,255,0.18)";
-                (e.currentTarget as HTMLElement).style.borderColor = "rgba(79,138,255,0.4)";
+                (e.currentTarget as HTMLElement).style.background = `rgba(${hexToRgb(catColor)},0.15)`;
+                (e.currentTarget as HTMLElement).style.borderColor = `rgba(${hexToRgb(catColor)},0.35)`;
+                (e.currentTarget as HTMLElement).style.transform = "scale(1.02)";
               }}
               onMouseLeave={e => {
-                (e.currentTarget as HTMLElement).style.background = "rgba(79,138,255,0.1)";
-                (e.currentTarget as HTMLElement).style.borderColor = "rgba(79,138,255,0.2)";
+                (e.currentTarget as HTMLElement).style.background = `rgba(${hexToRgb(catColor)},0.08)`;
+                (e.currentTarget as HTMLElement).style.borderColor = `rgba(${hexToRgb(catColor)},0.15)`;
+                (e.currentTarget as HTMLElement).style.transform = "scale(1)";
               }}
             >
               {buttonLabel}

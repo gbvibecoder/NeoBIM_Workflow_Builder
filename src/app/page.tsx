@@ -197,6 +197,47 @@ const FEATURES = [
   },
 ];
 
+// ─── Animated Number (count-up on scroll) ───────────────────────────────────
+
+function AnimatedNumber({ value, decimals = 0, suffix = '', prefix = '', color }: { value: number; decimals?: number; suffix?: string; prefix?: string; color: string }) {
+  const [display, setDisplay] = useState(0);
+  const ref = useRef<HTMLDivElement>(null);
+  const [inView, setInView] = useState(false);
+
+  useEffect(() => {
+    if (!ref.current) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => { if (entry.isIntersecting) setInView(true); },
+      { threshold: 0.5 },
+    );
+    observer.observe(ref.current);
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (!inView) return;
+    const duration = 1500;
+    const start = performance.now();
+    const animate = (now: number) => {
+      const progress = Math.min((now - start) / duration, 1);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      setDisplay(eased * value);
+      if (progress < 1) requestAnimationFrame(animate);
+    };
+    requestAnimationFrame(animate);
+  }, [inView, value]);
+
+  const formatted = decimals > 0
+    ? display.toFixed(decimals)
+    : Math.floor(display).toLocaleString();
+
+  return (
+    <div ref={ref} style={{ fontSize: 32, fontWeight: 800, color, fontFamily: '"SF Mono", "Fira Code", monospace', letterSpacing: '-0.02em' }}>
+      {prefix}{formatted}{suffix}
+    </div>
+  );
+}
+
 const USE_CASES = ["Architecture Studios", "Engineering Teams", "BIM Consultants", "Design Agencies", "Construction Tech"];
 
 const SHOWCASE = [
@@ -470,6 +511,166 @@ export default function LandingPage() {
           <FloatingCard label="Massing Gen" category="generate" delay={0.9} style={{ right: 120, bottom: 200, transform: "rotate(-2deg)" }} />
           <FloatingCard label="Image Render" category="generate" delay={1.2} style={{ left: 140, bottom: 160, transform: "rotate(1deg)" }} />
 
+          {/* ── Product Output Fragment Panels ────────────────────── */}
+
+          {/* Panel A: Mini Floor Plan (top-right) */}
+          <motion.div
+            className="hidden md:block"
+            initial={{ opacity: 0, y: 30, rotate: 2 }}
+            animate={{ opacity: 1, y: 0, rotate: 2 }}
+            transition={{ delay: 1.4, duration: 0.8, ease: smoothEase }}
+            style={{
+              position: 'absolute', top: '8%', right: '6%',
+              width: 260, borderRadius: 14, overflow: 'hidden',
+              background: 'rgba(18,18,30,0.88)', backdropFilter: 'blur(20px)',
+              border: '1px solid rgba(59,130,246,0.2)',
+              boxShadow: '0 16px 48px rgba(0,0,0,0.5), 0 0 20px rgba(59,130,246,0.06)',
+              zIndex: 5,
+            }}
+          >
+            <div style={{ padding: '10px 14px 6px', display: 'flex', alignItems: 'center', gap: 6, borderBottom: '1px solid rgba(59,130,246,0.1)' }}>
+              <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#3B82F6', boxShadow: '0 0 6px #3B82F6' }} />
+              <span style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1.5px', color: '#3B82F6' }}>Floor Plan</span>
+            </div>
+            <div style={{ padding: '12px 14px' }}>
+              <svg width="100%" height="140" viewBox="0 0 230 140" fill="none" style={{ display: 'block' }}>
+                {/* Outer boundary */}
+                <rect x="10" y="10" width="170" height="110" stroke="rgba(59,130,246,0.5)" strokeWidth="1.2" fill="none" />
+                {/* Horizontal partition */}
+                <line x1="10" y1="65" x2="120" y2="65" stroke="rgba(59,130,246,0.4)" strokeWidth="1" />
+                {/* Vertical partition */}
+                <line x1="120" y1="10" x2="120" y2="120" stroke="rgba(59,130,246,0.4)" strokeWidth="1" />
+                {/* Kitchen partition */}
+                <line x1="120" y1="75" x2="180" y2="75" stroke="rgba(59,130,246,0.3)" strokeWidth="0.8" />
+                {/* Door arcs */}
+                <path d="M75 65 A12 12 0 0 1 75 53" stroke="rgba(0,245,255,0.4)" strokeWidth="0.6" fill="none" />
+                <path d="M120 40 A10 10 0 0 0 130 40" stroke="rgba(0,245,255,0.4)" strokeWidth="0.6" fill="none" />
+                {/* Room labels */}
+                <text x="55" y="42" fill="rgba(59,130,246,0.7)" fontSize="8" fontFamily="monospace" textAnchor="middle">Living</text>
+                <text x="55" y="52" fill="rgba(59,130,246,0.4)" fontSize="7" fontFamily="monospace" textAnchor="middle">35 m²</text>
+                <text x="55" y="98" fill="rgba(59,130,246,0.7)" fontSize="8" fontFamily="monospace" textAnchor="middle">Bed</text>
+                <text x="55" y="108" fill="rgba(59,130,246,0.4)" fontSize="7" fontFamily="monospace" textAnchor="middle">20 m²</text>
+                <text x="148" y="42" fill="rgba(59,130,246,0.7)" fontSize="8" fontFamily="monospace" textAnchor="middle">Kitchen</text>
+                <text x="148" y="52" fill="rgba(59,130,246,0.4)" fontSize="7" fontFamily="monospace" textAnchor="middle">18 m²</text>
+                <text x="148" y="102" fill="rgba(59,130,246,0.7)" fontSize="8" fontFamily="monospace" textAnchor="middle">Bath</text>
+                <text x="148" y="112" fill="rgba(59,130,246,0.4)" fontSize="7" fontFamily="monospace" textAnchor="middle">6 m²</text>
+                {/* Dimension: width */}
+                <line x1="10" y1="130" x2="180" y2="130" stroke="rgba(0,245,255,0.3)" strokeWidth="0.5" />
+                <line x1="10" y1="127" x2="10" y2="133" stroke="rgba(0,245,255,0.3)" strokeWidth="0.5" />
+                <line x1="180" y1="127" x2="180" y2="133" stroke="rgba(0,245,255,0.3)" strokeWidth="0.5" />
+                <text x="95" y="138" fill="rgba(0,245,255,0.5)" fontSize="7" fontFamily="monospace" textAnchor="middle">8.5m</text>
+                {/* Dimension: height */}
+                <line x1="195" y1="10" x2="195" y2="120" stroke="rgba(0,245,255,0.3)" strokeWidth="0.5" />
+                <line x1="192" y1="10" x2="198" y2="10" stroke="rgba(0,245,255,0.3)" strokeWidth="0.5" />
+                <line x1="192" y1="120" x2="198" y2="120" stroke="rgba(0,245,255,0.3)" strokeWidth="0.5" />
+                <text x="210" y="70" fill="rgba(0,245,255,0.5)" fontSize="7" fontFamily="monospace" textAnchor="middle">6.2m</text>
+              </svg>
+            </div>
+          </motion.div>
+
+          {/* Panel B: Mini BOQ / Cost Table (bottom-left) */}
+          <motion.div
+            className="hidden md:block"
+            initial={{ opacity: 0, y: 30, rotate: -3 }}
+            animate={{ opacity: 1, y: 0, rotate: -3 }}
+            transition={{ delay: 1.6, duration: 0.8, ease: smoothEase }}
+            style={{
+              position: 'absolute', bottom: '18%', left: '4%',
+              width: 270, borderRadius: 14, overflow: 'hidden',
+              background: 'rgba(18,18,30,0.88)', backdropFilter: 'blur(20px)',
+              border: '1px solid rgba(245,158,11,0.2)',
+              boxShadow: '0 16px 48px rgba(0,0,0,0.5), 0 0 20px rgba(245,158,11,0.06)',
+              zIndex: 5,
+            }}
+          >
+            <div style={{ padding: '10px 14px 6px', display: 'flex', alignItems: 'center', gap: 6, borderBottom: '1px solid rgba(245,158,11,0.1)' }}>
+              <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#F59E0B', boxShadow: '0 0 6px #F59E0B' }} />
+              <span style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1.5px', color: '#F59E0B' }}>Cost Estimate</span>
+              <span style={{ marginLeft: 'auto', fontSize: 7, color: 'rgba(245,158,11,0.4)', fontFamily: 'monospace' }}>CSI</span>
+            </div>
+            <div style={{ padding: '8px 10px', fontFamily: '"SF Mono", "Fira Code", monospace', fontSize: 9 }}>
+              {/* Header */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 40px 55px', gap: 4, padding: '4px 4px 6px', borderBottom: '1px solid rgba(245,158,11,0.08)', color: '#5C5C78', fontSize: 7, textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+                <span>Description</span><span style={{ textAlign: 'right' }}>Qty</span><span style={{ textAlign: 'right' }}>Total</span>
+              </div>
+              {/* Rows */}
+              {[
+                { desc: 'Concrete Slab 4"', qty: '2,400 SF', total: '$16,800' },
+                { desc: 'Struct. Steel W12', qty: '84k LB', total: '$210,000' },
+                { desc: 'Vinyl Window 3×4', qty: '48 EA', total: '$22,800' },
+                { desc: 'Drywall 5/8" Type X', qty: '6,200 SF', total: '$27,900' },
+              ].map((row, i) => (
+                <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 40px 55px', gap: 4, padding: '5px 4px', borderBottom: '1px solid rgba(245,158,11,0.04)', color: '#9898B0' }}>
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row.desc}</span>
+                  <span style={{ textAlign: 'right', color: '#5C5C78', fontSize: 8 }}>{row.qty}</span>
+                  <span style={{ textAlign: 'right', color: '#F59E0B' }}>{row.total}</span>
+                </div>
+              ))}
+              {/* Subtotal */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 55px', gap: 4, padding: '6px 4px 2px', borderTop: '1px solid rgba(245,158,11,0.15)', marginTop: 2 }}>
+                <span style={{ color: '#9898B0', fontWeight: 700, fontSize: 8 }}>SUBTOTAL</span>
+                <span style={{ textAlign: 'right', color: '#FFBF00', fontWeight: 700 }}>$277,500</span>
+              </div>
+            </div>
+          </motion.div>
+
+          {/* Panel C: Isometric 3D Wireframe Massing (bottom-right) */}
+          <motion.div
+            className="hidden md:block"
+            initial={{ opacity: 0, y: 30, rotate: 1 }}
+            animate={{ opacity: 1, y: 0, rotate: 1 }}
+            transition={{ delay: 1.8, duration: 0.8, ease: smoothEase }}
+            style={{
+              position: 'absolute', bottom: '15%', right: '10%',
+              width: 240, borderRadius: 14, overflow: 'hidden',
+              background: 'rgba(18,18,30,0.88)', backdropFilter: 'blur(20px)',
+              border: '1px solid rgba(16,185,129,0.2)',
+              boxShadow: '0 16px 48px rgba(0,0,0,0.5), 0 0 20px rgba(16,185,129,0.06)',
+              zIndex: 5,
+            }}
+          >
+            <div style={{ padding: '10px 14px 6px', display: 'flex', alignItems: 'center', gap: 6, borderBottom: '1px solid rgba(16,185,129,0.1)' }}>
+              <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#10B981', boxShadow: '0 0 6px #10B981' }} />
+              <span style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1.5px', color: '#10B981' }}>3D Massing</span>
+            </div>
+            <div style={{ padding: '12px 14px 8px' }}>
+              <svg width="100%" height="120" viewBox="0 0 200 120" fill="none" style={{ display: 'block' }}>
+                {/* Isometric building — top face */}
+                <polygon points="100,10 155,32 100,54 45,32" stroke="rgba(16,185,129,0.6)" strokeWidth="0.8" fill="rgba(16,185,129,0.04)" />
+                {/* Left face */}
+                <polygon points="45,32 100,54 100,98 45,76" stroke="rgba(16,185,129,0.4)" strokeWidth="0.8" fill="rgba(16,185,129,0.02)" />
+                {/* Right face */}
+                <polygon points="155,32 100,54 100,98 155,76" stroke="rgba(16,185,129,0.5)" strokeWidth="0.8" fill="rgba(16,185,129,0.03)" />
+                {/* Floor lines — left face */}
+                <line x1="45" y1="43" x2="100" y2="65" stroke="rgba(16,185,129,0.15)" strokeWidth="0.5" strokeDasharray="2 3" />
+                <line x1="45" y1="54" x2="100" y2="76" stroke="rgba(16,185,129,0.15)" strokeWidth="0.5" strokeDasharray="2 3" />
+                <line x1="45" y1="65" x2="100" y2="87" stroke="rgba(16,185,129,0.15)" strokeWidth="0.5" strokeDasharray="2 3" />
+                {/* Floor lines — right face */}
+                <line x1="155" y1="43" x2="100" y2="65" stroke="rgba(16,185,129,0.15)" strokeWidth="0.5" strokeDasharray="2 3" />
+                <line x1="155" y1="54" x2="100" y2="76" stroke="rgba(16,185,129,0.15)" strokeWidth="0.5" strokeDasharray="2 3" />
+                <line x1="155" y1="65" x2="100" y2="87" stroke="rgba(16,185,129,0.15)" strokeWidth="0.5" strokeDasharray="2 3" />
+                {/* Height dimension */}
+                <line x1="168" y1="32" x2="168" y2="76" stroke="rgba(16,185,129,0.3)" strokeWidth="0.5" />
+                <line x1="165" y1="32" x2="171" y2="32" stroke="rgba(16,185,129,0.3)" strokeWidth="0.5" />
+                <line x1="165" y1="76" x2="171" y2="76" stroke="rgba(16,185,129,0.3)" strokeWidth="0.5" />
+                <text x="178" y="57" fill="rgba(16,185,129,0.5)" fontSize="7" fontFamily="monospace">21m</text>
+                {/* Width dimension */}
+                <line x1="45" y1="86" x2="100" y2="108" stroke="rgba(16,185,129,0.25)" strokeWidth="0.5" />
+                <line x1="43" y1="83" x2="47" y2="89" stroke="rgba(16,185,129,0.25)" strokeWidth="0.5" />
+                <line x1="98" y1="105" x2="102" y2="111" stroke="rgba(16,185,129,0.25)" strokeWidth="0.5" />
+                <text x="60" y="105" fill="rgba(16,185,129,0.5)" fontSize="7" fontFamily="monospace">24m</text>
+              </svg>
+              {/* KPI strip */}
+              <div style={{ display: 'flex', justifyContent: 'center', gap: 10, marginTop: 4 }}>
+                <span style={{ fontSize: 9, color: '#10B981', fontFamily: 'monospace', fontWeight: 600 }}>12F</span>
+                <span style={{ fontSize: 9, color: 'rgba(16,185,129,0.3)' }}>·</span>
+                <span style={{ fontSize: 9, color: '#10B981', fontFamily: 'monospace', fontWeight: 600 }}>8,400 m²</span>
+                <span style={{ fontSize: 9, color: 'rgba(16,185,129,0.3)' }}>·</span>
+                <span style={{ fontSize: 9, color: '#10B981', fontFamily: 'monospace', fontWeight: 600 }}>FAR 3.2</span>
+              </div>
+            </div>
+          </motion.div>
+
           {/* Main hero content */}
           <div style={{ position: "relative", zIndex: 30, textAlign: "center", maxWidth: 1000, padding: "0 48px" }}>
             <motion.div
@@ -478,7 +679,7 @@ export default function LandingPage() {
               transition={{ duration: 0.8, ease: smoothEase }}
             >
               <h1 style={{
-                fontSize: "clamp(3.5rem, 8vw, 7rem)",
+                fontSize: "clamp(2.5rem, 5.5vw, 5rem)",
                 fontWeight: 900, lineHeight: 0.95,
                 letterSpacing: "-0.04em",
                 marginBottom: 0,
@@ -510,31 +711,6 @@ export default function LandingPage() {
               }}
             >
               {t('landing.heroSubtitle')}
-            </motion.p>
-            <motion.p
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.35, duration: 0.5, ease: smoothEase }}
-              style={{
-                fontSize: 16, lineHeight: 1.6,
-                maxWidth: 520, margin: "16px auto 0",
-                fontWeight: 600,
-                background: "linear-gradient(135deg, #10B981 0%, #34D399 100%)",
-                WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text",
-              }}
-            >
-              {t('landing.heroSecondary')}
-            </motion.p>
-            <motion.p
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.4, duration: 0.5 }}
-              style={{
-                fontSize: 13, color: "#5C5C78", lineHeight: 1.6,
-                maxWidth: 500, margin: "10px auto 0", fontStyle: "italic",
-              }}
-            >
-              {t('landing.heroTarget')}
             </motion.p>
 
             {/* Prompt bar */}
@@ -817,6 +993,247 @@ export default function LandingPage() {
           </div>
           <div className="beam-accent" style={{ position: "absolute", bottom: 0, left: 0, right: 0 }} />
         </div>
+
+        {/* ── AEC Proof Points ─────────────────────────────────────── */}
+        <motion.div
+          className="landing-section landing-stats-row"
+          initial="hidden" whileInView="visible" viewport={{ once: true, margin: '-40px' }}
+          variants={stagger}
+          style={{
+            display: 'flex', justifyContent: 'center', gap: 32, flexWrap: 'wrap',
+            padding: '48px 48px',
+            background: 'linear-gradient(180deg, #0A0A14, #07070D)',
+          }}
+        >
+          {[
+            { value: 12400, decimals: 0, suffix: '', prefix: '', label: 'm² designed this month', color: '#B87333' },
+            { value: 847, decimals: 0, suffix: '', prefix: '', label: 'workflows executed', color: '#00F5FF' },
+            { value: 31, decimals: 0, suffix: '', prefix: '', label: 'AEC-specific nodes', color: '#FFBF00' },
+            { value: 2.4, decimals: 1, suffix: 'M', prefix: '€', label: 'estimated this week', color: '#B87333' },
+          ].map((stat, i) => (
+            <React.Fragment key={stat.label}>
+              <motion.div variants={fadeUp} transition={{ duration: 0.5, delay: i * 0.1, ease: smoothEase }} style={{ textAlign: 'center', minWidth: 120 }}>
+                <AnimatedNumber value={stat.value} decimals={stat.decimals} suffix={stat.suffix} prefix={stat.prefix} color={stat.color} />
+                <div style={{ fontSize: 10, color: '#5C5C78', textTransform: 'uppercase', letterSpacing: '0.15em', marginTop: 4 }}>{stat.label}</div>
+              </motion.div>
+              {i < 3 && (
+                <div style={{ width: 1, alignSelf: 'stretch', background: 'linear-gradient(180deg, transparent, rgba(184,115,51,0.3), transparent)' }} />
+              )}
+            </React.Fragment>
+          ))}
+        </motion.div>
+
+        {/* ── Workflow Pipeline Showcase — WF-01 Visual ─────────────── */}
+        <section className="landing-section" style={{
+          padding: '80px 48px', position: 'relative', overflow: 'hidden',
+          background: 'linear-gradient(180deg, #07070D 0%, #0A0A14 100%)',
+        }}>
+          <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
+            <div className="blueprint-grid" style={{ opacity: 0.15 }} />
+          </div>
+
+          <div style={{ maxWidth: 1100, margin: '0 auto', position: 'relative', zIndex: 1 }}>
+            <motion.div
+              initial="hidden" whileInView="visible" viewport={{ once: true, margin: '-60px' }}
+              variants={fadeUp} transition={{ duration: 0.6, ease: smoothEase }}
+              style={{ textAlign: 'center', marginBottom: 56 }}
+            >
+              <span className="blueprint-annotation" style={{ marginBottom: 16, display: 'block', color: 'rgba(184,115,51,0.6)' }}>
+                REAL WORKFLOW
+              </span>
+              <div className="accent-line" style={{ background: 'linear-gradient(90deg, #B87333, #F59E0B)' }} />
+              <h2 style={{ fontSize: 'clamp(1.8rem, 3.5vw, 2.8rem)', fontWeight: 900, color: '#F0F0F5', letterSpacing: '-0.04em', lineHeight: 1.1 }}>
+                See What a Pipeline<br />
+                <span style={{ background: 'linear-gradient(135deg, #B87333, #F59E0B)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>Actually Produces</span>
+              </h2>
+            </motion.div>
+
+            {/* 4-step pipeline: Text Brief → AI Analysis → 3D Massing → Concept Render */}
+            <motion.div
+              initial="hidden" whileInView="visible" viewport={{ once: true, margin: '-40px' }}
+              variants={stagger}
+              className="landing-pipeline-showcase"
+              style={{ display: 'flex', alignItems: 'stretch', gap: 0, justifyContent: 'center' }}
+            >
+              {[
+                {
+                  step: '01', label: 'Text Brief', category: 'input', color: '#3B82F6',
+                  icon: <FileCode size={22} />,
+                  preview: '"Mixed-use tower, 12 floors, retail podium, residential above, coastal site..."',
+                  previewType: 'text' as const,
+                },
+                {
+                  step: '02', label: 'AI Analysis', category: 'transform', color: '#8B5CF6',
+                  icon: <Sparkles size={22} />,
+                  preview: 'GFA: 8,400 m² · FAR: 3.2 · Units: 96 · Parking: 120',
+                  previewType: 'kpi' as const,
+                },
+                {
+                  step: '03', label: '3D Massing', category: 'generate', color: '#10B981',
+                  icon: <Box size={22} />,
+                  preview: '◻ ◻ ◻ ◻ ◻\n◻ ◻ ◻ ◻ ◻\n◻ ◻ ◻ ◻ ◻\n▣ ▣ ▣ ▣ ▣',
+                  previewType: 'wireframe' as const,
+                },
+                {
+                  step: '04', label: 'Concept Render', category: 'export', color: '#F59E0B',
+                  icon: <ImageIcon size={22} />,
+                  preview: '🏗 Final render exported',
+                  previewType: 'render' as const,
+                },
+              ].map((item, i) => {
+                const rgb = hexToRgb(item.color);
+                return (
+                  <React.Fragment key={item.step}>
+                    <motion.div variants={fadeUp} transition={{ duration: 0.5, delay: i * 0.12, ease: smoothEase }}
+                      className="node-card"
+                      style={{
+                        flex: 1, minWidth: 0, '--node-port-color': item.color,
+                      } as React.CSSProperties}
+                    >
+                      <div className="node-header" style={{
+                        background: `linear-gradient(135deg, rgba(${rgb}, 0.15), rgba(${rgb}, 0.04))`,
+                        borderBottom: `1px solid rgba(${rgb}, 0.12)`,
+                        borderRadius: '16px 16px 0 0',
+                      }}>
+                        <div style={{ width: 8, height: 8, borderRadius: '50%', background: item.color, boxShadow: `0 0 8px ${item.color}` }} />
+                        <span style={{ color: item.color }}>{item.category.toUpperCase()}</span>
+                        <span style={{ marginLeft: 'auto', fontSize: 9, color: 'rgba(255,255,255,0.3)', fontFamily: 'monospace' }}>#{item.step}</span>
+                      </div>
+                      <div style={{ padding: '20px 16px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+                          <div style={{
+                            width: 40, height: 40, borderRadius: 10,
+                            background: `linear-gradient(135deg, rgba(${rgb}, 0.2), rgba(${rgb}, 0.06))`,
+                            border: `1px solid rgba(${rgb}, 0.2)`,
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            color: item.color, flexShrink: 0,
+                          }}>
+                            {item.icon}
+                          </div>
+                          <h3 style={{ fontSize: 15, fontWeight: 800, color: '#F0F0F5', letterSpacing: '-0.02em' }}>{item.label}</h3>
+                        </div>
+                        {/* Preview content */}
+                        <div style={{
+                          padding: '12px',
+                          borderRadius: 8,
+                          background: 'rgba(7,7,13,0.6)',
+                          border: `1px solid rgba(${rgb}, 0.08)`,
+                          minHeight: 64,
+                        }}>
+                          {item.previewType === 'text' && (
+                            <div style={{ fontFamily: '"SF Mono", "Fira Code", monospace', fontSize: 10, color: '#9898B0', lineHeight: 1.6 }}>
+                              <div style={{ color: '#3B82F6', fontSize: 8, marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.1em' }}>PROJECT BRIEF</div>
+                              <div>&quot;Mixed-use tower, 12 floors,</div>
+                              <div>retail podium + residential,</div>
+                              <div>coastal site, 2,800 m² lot&quot;</div>
+                              <motion.span
+                                animate={{ opacity: [1, 0] }}
+                                transition={{ duration: 0.8, repeat: Infinity }}
+                                style={{ display: 'inline-block', width: 6, height: 12, background: '#3B82F6', marginLeft: 2, verticalAlign: 'middle' }}
+                              />
+                            </div>
+                          )}
+                          {item.previewType === 'kpi' && (
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1, background: `rgba(${rgb}, 0.06)`, borderRadius: 4, overflow: 'hidden' }}>
+                              {[
+                                { label: 'GFA', value: '8,400', unit: 'm²' },
+                                { label: 'FAR', value: '3.2', unit: '' },
+                                { label: 'Units', value: '96', unit: 'apt' },
+                                { label: 'Parking', value: '120', unit: 'spots' },
+                              ].map(kpi => (
+                                <div key={kpi.label} style={{ textAlign: 'center', padding: '8px 4px', background: 'rgba(7,7,13,0.8)' }}>
+                                  <div style={{ fontSize: 15, fontWeight: 800, color: item.color, fontFamily: '"SF Mono", "Fira Code", monospace' }}>{kpi.value}</div>
+                                  <div style={{ fontSize: 7, color: '#5C5C78', textTransform: 'uppercase', letterSpacing: '0.1em', marginTop: 2 }}>
+                                    {kpi.label}{kpi.unit && <span style={{ color: 'rgba(255,255,255,0.2)', marginLeft: 3 }}>{kpi.unit}</span>}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                          {item.previewType === 'wireframe' && (
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                              <svg width="100%" height="80" viewBox="0 0 160 90" fill="none" style={{ maxWidth: 160 }}>
+                                {/* Isometric building */}
+                                <polygon points="80,8 130,28 80,48 30,28" stroke="rgba(16,185,129,0.6)" strokeWidth="0.8" fill="rgba(16,185,129,0.04)" />
+                                <polygon points="30,28 80,48 80,82 30,62" stroke="rgba(16,185,129,0.4)" strokeWidth="0.8" fill="rgba(16,185,129,0.02)" />
+                                <polygon points="130,28 80,48 80,82 130,62" stroke="rgba(16,185,129,0.5)" strokeWidth="0.8" fill="rgba(16,185,129,0.03)" />
+                                {/* Floor lines */}
+                                <line x1="30" y1="39" x2="80" y2="59" stroke="rgba(16,185,129,0.2)" strokeWidth="0.5" strokeDasharray="2 3" />
+                                <line x1="30" y1="50" x2="80" y2="70" stroke="rgba(16,185,129,0.2)" strokeWidth="0.5" strokeDasharray="2 3" />
+                                <line x1="130" y1="39" x2="80" y2="59" stroke="rgba(16,185,129,0.2)" strokeWidth="0.5" strokeDasharray="2 3" />
+                                <line x1="130" y1="50" x2="80" y2="70" stroke="rgba(16,185,129,0.2)" strokeWidth="0.5" strokeDasharray="2 3" />
+                                {/* Height dimension */}
+                                <line x1="142" y1="28" x2="142" y2="62" stroke="rgba(16,185,129,0.3)" strokeWidth="0.5" />
+                                <line x1="139" y1="28" x2="145" y2="28" stroke="rgba(16,185,129,0.3)" strokeWidth="0.5" />
+                                <line x1="139" y1="62" x2="145" y2="62" stroke="rgba(16,185,129,0.3)" strokeWidth="0.5" />
+                                <text x="150" y="48" fill="rgba(16,185,129,0.5)" fontSize="6" fontFamily="monospace">21m</text>
+                              </svg>
+                              <div style={{ display: 'flex', gap: 8, marginTop: 2 }}>
+                                <span style={{ fontSize: 8, color: '#10B981', fontFamily: 'monospace' }}>12F</span>
+                                <span style={{ fontSize: 8, color: 'rgba(16,185,129,0.4)' }}>·</span>
+                                <span style={{ fontSize: 8, color: '#10B981', fontFamily: 'monospace' }}>8,400 m²</span>
+                              </div>
+                            </div>
+                          )}
+                          {item.previewType === 'render' && (
+                            <div style={{ textAlign: 'center', position: 'relative' }}>
+                              <div style={{
+                                width: '100%', height: 56, borderRadius: 6,
+                                background: 'linear-gradient(135deg, rgba(245,158,11,0.15) 0%, rgba(239,68,68,0.08) 40%, rgba(139,92,246,0.1) 100%)',
+                                border: '1px solid rgba(245,158,11,0.15)',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                position: 'relative', overflow: 'hidden',
+                              }}>
+                                <motion.div
+                                  animate={{ x: ['-100%', '200%'] }}
+                                  transition={{ duration: 2.5, repeat: Infinity, ease: 'linear' }}
+                                  style={{
+                                    position: 'absolute', top: 0, bottom: 0, width: '30%',
+                                    background: 'linear-gradient(90deg, transparent, rgba(245,158,11,0.1), transparent)',
+                                  }}
+                                />
+                                <span style={{
+                                  fontSize: 8, fontWeight: 700, letterSpacing: '0.15em',
+                                  color: '#F59E0B', textTransform: 'uppercase',
+                                  padding: '3px 8px', borderRadius: 4,
+                                  background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.2)',
+                                  position: 'relative', zIndex: 1,
+                                }}>AI RENDER</span>
+                              </div>
+                              <div style={{ display: 'flex', justifyContent: 'center', gap: 8, marginTop: 6 }}>
+                                <span style={{ fontSize: 8, color: '#5C5C78', fontFamily: 'monospace' }}>2048×1024</span>
+                                <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.15)' }}>·</span>
+                                <span style={{ fontSize: 8, color: '#5C5C78', fontFamily: 'monospace' }}>HDR</span>
+                                <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.15)' }}>·</span>
+                                <span style={{ fontSize: 8, color: '#F59E0B', fontFamily: 'monospace' }}>DALL-E 3</span>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </motion.div>
+                    {/* Animated dashed connector */}
+                    {i < 3 && (
+                      <div className="landing-pipeline-connector" style={{ width: 48, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <svg width="48" height="40" viewBox="0 0 48 40" fill="none">
+                          <line x1="0" y1="20" x2="48" y2="20"
+                            stroke={`rgba(${hexToRgb(item.color)}, 0.3)`}
+                            strokeWidth="2" strokeDasharray="4 4"
+                            className="wire-animate"
+                          />
+                          <polygon
+                            points="40,14 48,20 40,26"
+                            fill={`rgba(${hexToRgb(item.color)}, 0.4)`}
+                          />
+                        </svg>
+                      </div>
+                    )}
+                  </React.Fragment>
+                );
+              })}
+            </motion.div>
+          </div>
+        </section>
 
         {/* ── Features — Interactive Node Graph ────────────────────── */}
         <section id="features" className="landing-section" style={{ padding: "120px 48px", position: "relative", overflow: "hidden" }}>

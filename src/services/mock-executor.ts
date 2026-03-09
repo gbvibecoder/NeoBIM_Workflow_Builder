@@ -331,32 +331,154 @@ export async function executeNode(
 
     case "GN-001": { // Massing Generator
       // Parse upstream data for floor count and building description
-      // Check json field (from TR-002), then text content, then defaults
       const jsonData = inputData?.json as Record<string, unknown> | undefined;
       const upstreamText = String(inputData?.content ?? inputData?.prompt ?? "");
+      const promptLower = upstreamText.toLowerCase();
 
-      const floors = (() => {
+      // ── Floor count: explicit → typology-inferred → default ──
+      const rawFloors = (() => {
         if (jsonData?.floors) return Number(jsonData.floors);
         if (inputData?._raw && typeof inputData._raw === "object" && (inputData._raw as Record<string, unknown>).floors)
           return Number((inputData._raw as Record<string, unknown>).floors);
-        const fm = upstreamText.match(/(\d+)[\s-]*(?:stor(?:e?y|ies)|floor)/i);
+        // Match: "12 floor", "12-storey", "12 story", "12-level", "12 stories", "12 floors"
+        const fm = upstreamText.match(/(\d+)[\s-]*(?:stor(?:e?y|ies)|floors?|levels?)/i);
         if (fm) return parseInt(fm[1], 10);
+        // Typology-based inference
+        if (/skyscraper|super\s*tall/i.test(promptLower)) return 30;
+        if (/high[\s-]?rise/i.test(promptLower)) return 15;
+        if (/mid[\s-]?rise/i.test(promptLower)) return 8;
+        if (/low[\s-]?rise/i.test(promptLower)) return 3;
+        if (/villa|bungalow|cottage|cabin|tiny\s*house/i.test(promptLower)) return 1;
+        if (/duplex|townhouse|maisonette|row\s*house/i.test(promptLower)) return 2;
+        if (/warehouse|industrial|factory|depot/i.test(promptLower)) return 2;
+        if (/museum|gallery|library|theater|theatre/i.test(promptLower)) return 3;
+        if (/school|university|campus|academy/i.test(promptLower)) return 3;
+        if (/hospital|medical\s*center|clinic/i.test(promptLower)) return 6;
+        if (/hotel|resort|inn/i.test(promptLower)) return 8;
+        if (/\btower\b/i.test(promptLower)) return 12;
         return 5;
       })();
+      const floors = Math.max(1, Math.min(rawFloors, 30));
 
-      const heightPerFloor = 4.2;
+      // ── Parse prompt for building style hints ──────────────────
+      const glassHeavy = /glass|glazed|curtain\s*wall|transparent|crystal/i.test(promptLower);
+      const hasRiver = /river|riverside|canal|creek/i.test(promptLower);
+      const hasLake = /lake|lakeside|pond/i.test(promptLower);
+      const hasWaterfront = /waterfront/i.test(promptLower);
+      const isModern = /modern|contemporary|minimal|sleek|futuristic|parametric/i.test(promptLower);
+      const isTower = /\btower\b|skyscraper|high[\s-]?rise/i.test(promptLower) || floors >= 10;
+
+      // Material
+      type ExtMat = "glass" | "concrete" | "brick" | "wood" | "steel" | "stone" | "terracotta" | "mixed";
+      const exteriorMaterial: ExtMat =
+        glassHeavy ? "glass" :
+        /concrete|brutalist|exposed\s*concrete/i.test(promptLower) ? "concrete" :
+        /brick|masonry|red\s*brick/i.test(promptLower) ? "brick" :
+        /wood|timber|clt|cross[\s-]?laminated/i.test(promptLower) ? "wood" :
+        /steel|metal|corten|cor[\s-]?ten|alumi?n[iu]um/i.test(promptLower) ? "steel" :
+        /stone|limestone|granite|sandstone|marble/i.test(promptLower) ? "stone" :
+        /terracotta|terra[\s-]?cotta|clay/i.test(promptLower) ? "terracotta" : "mixed";
+
+      // Environment
+      type Env = "urban" | "suburban" | "waterfront" | "park" | "desert" | "coastal" | "mountain" | "campus";
+      const environment: Env =
+        (hasRiver || hasLake || hasWaterfront) ? "waterfront" :
+        /coastal|beachfront|beach|seaside|oceanfront/i.test(promptLower) ? "coastal" :
+        /mountain|hillside|alpine|hilltop/i.test(promptLower) ? "mountain" :
+        /campus|university|school\s+grounds/i.test(promptLower) ? "campus" :
+        /urban|city|downtown|metropolitan|cbd/i.test(promptLower) ? "urban" :
+        /park|garden|green|botanical/i.test(promptLower) ? "park" :
+        /desert|arid|dry/i.test(promptLower) ? "desert" : "suburban";
+
+      // Usage
+      type Use = "residential" | "office" | "mixed" | "commercial" | "hotel" | "educational" | "healthcare" | "cultural" | "industrial" | "civic";
+      const usage: Use =
+        /office|corporate|workspace|coworking/i.test(promptLower) ? "office" :
+        /hotel|hospitality|resort|inn|boutique\s*hotel/i.test(promptLower) ? "hotel" :
+        /residential|apartment|housing|home|condo|flat|dwelling/i.test(promptLower) ? "residential" :
+        /commercial|retail|shop|mall|market/i.test(promptLower) ? "commercial" :
+        /school|university|campus|educational|academy|classroom/i.test(promptLower) ? "educational" :
+        /hospital|clinic|medical|healthcare|ward/i.test(promptLower) ? "healthcare" :
+        /museum|gallery|library|theater|theatre|concert|cultural|exhibition/i.test(promptLower) ? "cultural" :
+        /warehouse|industrial|factory|workshop|depot|storage/i.test(promptLower) ? "industrial" :
+        /civic|government|courthouse|city\s*hall|municipal/i.test(promptLower) ? "civic" : "mixed";
+
+      // Typology
+      type Typo = "tower" | "slab" | "courtyard" | "villa" | "warehouse" | "podium-tower" | "generic";
+      const typology: Typo =
+        /courtyard/i.test(promptLower) ? "courtyard" :
+        /villa|bungalow|house|cottage/i.test(promptLower) ? "villa" :
+        /warehouse|industrial|factory/i.test(promptLower) ? "warehouse" :
+        /podium.*tower|tower.*podium/i.test(promptLower) ? "podium-tower" :
+        (floors >= 15 || /\btower\b|skyscraper/i.test(promptLower)) ? "tower" :
+        "generic";
+
+      // Facade pattern
+      type Facade = "curtain-wall" | "punched-window" | "ribbon-window" | "brise-soleil" | "none";
+      const facadePattern: Facade =
+        glassHeavy ? "curtain-wall" :
+        /brise[\s-]?soleil|louv/i.test(promptLower) ? "brise-soleil" :
+        /ribbon\s*window/i.test(promptLower) ? "ribbon-window" :
+        /brick|stone|traditional|masonry/i.test(promptLower) ? "punched-window" : "none";
+
+      // Floor height override by usage
+      const floorHeightOverride =
+        /warehouse|industrial|factory/i.test(promptLower) ? 5.0 :
+        /museum|gallery|cultural|exhibition/i.test(promptLower) ? 4.5 :
+        /commercial|retail|mall/i.test(promptLower) ? 4.2 :
+        /office|corporate/i.test(promptLower) ? 3.8 :
+        /residential|apartment|housing/i.test(promptLower) ? 3.0 :
+        3.6;
+
+      // ── Dynamic footprint based on typology and floors ─────────
+      const footprint = (() => {
+        if (jsonData?.footprint_m2) return Math.round(Number(jsonData.footprint_m2));
+        if (/villa|cottage|cabin/i.test(promptLower)) return 120 + Math.round(Math.random() * 80);
+        if (/duplex|townhouse/i.test(promptLower)) return 100 + Math.round(Math.random() * 60);
+        if (/warehouse|industrial|factory/i.test(promptLower)) return 800 + Math.round(Math.random() * 400);
+        if (/museum|gallery/i.test(promptLower)) return 600 + Math.round(Math.random() * 300);
+        if (/school|university/i.test(promptLower)) return 500 + Math.round(Math.random() * 300);
+        if (/hospital/i.test(promptLower)) return 700 + Math.round(Math.random() * 400);
+        if (/skyscraper|super\s*tall/i.test(promptLower)) return 400 + Math.round(Math.random() * 200);
+        // General: taller buildings → smaller footprints
+        if (floors >= 15) return 350 + Math.round(Math.random() * 150);
+        if (floors >= 8) return 450 + Math.round(Math.random() * 200);
+        if (floors >= 4) return 500 + Math.round(Math.random() * 200);
+        return 400 + Math.round(Math.random() * 200);
+      })();
+
+      const heightPerFloor = floorHeightOverride;
       const height = (floors * heightPerFloor).toFixed(1);
-      const footprint = 567;
       const totalGFA = jsonData?.total_gfa_m2 ? Number(jsonData.total_gfa_m2) : undefined;
       const gfa = totalGFA ?? Math.round(floors * footprint * 0.98);
+
+      const buildingType = jsonData?.building_type as string ??
+        (isTower ? `${usage.charAt(0).toUpperCase() + usage.slice(1)} Tower` :
+         `${usage.charAt(0).toUpperCase() + usage.slice(1)} Building`);
+
+      const style = {
+        glassHeavy,
+        hasRiver: hasRiver || hasWaterfront,
+        hasLake,
+        isModern: isModern || glassHeavy,
+        isTower,
+        exteriorMaterial,
+        environment,
+        usage,
+        promptText: upstreamText,
+        typology,
+        facadePattern,
+        floorHeightOverride,
+        maxFloorCap: 30,
+      };
+
       return mockArtifact(executionId, tileInstanceId, "3d", {
-        // 3D massing viewer data
         floors,
         height: parseFloat(height),
         footprint,
         gfa,
-        buildingType: jsonData?.building_type as string ?? "Mixed-Use",
-        // KPI metrics (also displayed below the 3D viewer)
+        buildingType,
+        style,
         metrics: [
           { label: "GFA", value: gfa.toLocaleString(), unit: "m²" },
           { label: "Height", value: height, unit: "m" },
@@ -365,7 +487,6 @@ export async function executeNode(
           { label: "Footprint", value: String(footprint), unit: "m²" },
           { label: "Plot Ratio", value: (gfa / 1050).toFixed(2), unit: "FAR" },
         ],
-        // Pass through upstream text data so downstream nodes (GN-003) can read it
         content: inputData?.content ?? inputData?.prompt
           ?? (jsonData ? `${floors}-storey ${jsonData.building_type ?? "mixed-use"} building, ${gfa.toLocaleString()} m² GFA` : "Modern mixed-use building"),
         prompt: inputData?.prompt ?? inputData?.content
@@ -544,33 +665,11 @@ export async function executeNode(
 
 function getNodeDelay(catalogueId: string): number {
   const delays: Record<string, number> = {
-    "IN-001": 500,
-    "IN-002": 800,
-    "IN-003": 600,
-    "IN-004": 1200,
-    "IN-005": 300,
-    "IN-006": 900,
-    "TR-001": 2500,
-    "TR-002": 3000,
-    "TR-003": 2000,
-    "TR-004": 2500,
-    "TR-005": 1500,
-    "TR-006": 3500,
-    "TR-007": 2800,
-    "TR-008": 2200,
-    "TR-009": 2500,
-    "TR-010": 3000,
-    "TR-012": 2000,
-    "GN-001": 3500,
-    "GN-002": 5000,
-    "GN-003": 4000,
-    "GN-004": 4500,
-    "GN-008": 5000,
-    "EX-001": 2500,
-    "EX-002": 1800,
-    "EX-003": 2200,
-    "EX-004": 2000,
-    "EX-006": 1500,
+    "IN-001": 200, "IN-002": 300, "IN-003": 250, "IN-004": 500, "IN-005": 150, "IN-006": 400,
+    "TR-001": 800, "TR-002": 1000, "TR-003": 700, "TR-004": 800, "TR-005": 500, "TR-006": 1200,
+    "TR-007": 900, "TR-008": 700, "TR-009": 800, "TR-010": 1000, "TR-012": 700,
+    "GN-001": 1200, "GN-002": 1800, "GN-003": 1400, "GN-004": 1600, "GN-008": 1800,
+    "EX-001": 800, "EX-002": 600, "EX-003": 700, "EX-004": 700, "EX-006": 500,
   };
-  return delays[catalogueId] ?? 2000;
+  return delays[catalogueId] ?? 600;
 }

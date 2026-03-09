@@ -38,6 +38,10 @@ interface UIState {
   requestAddNode: (catalogueId: string) => void;
   clearPendingNodeAdd: () => void;
 
+  // Fullscreen artifact viewer (node id whose 3D artifact to show)
+  artifactViewerNodeId: string | null;
+  setArtifactViewerNodeId: (id: string | null) => void;
+
   // Actions
   setActivePanel: (panel: PanelId) => void;
   toggleNodeLibrary: () => void;
@@ -81,6 +85,9 @@ export const useUIStore = create<UIState>()((set) => ({
   pendingNodeAdd: null,
   requestAddNode: (catalogueId) => set({ pendingNodeAdd: catalogueId }),
   clearPendingNodeAdd: () => set({ pendingNodeAdd: null }),
+
+  artifactViewerNodeId: null,
+  setArtifactViewerNodeId: (id) => set({ artifactViewerNodeId: id }),
 
   setActivePanel: (panel) =>
     set({

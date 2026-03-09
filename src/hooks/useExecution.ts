@@ -56,7 +56,7 @@ async function executeNode(
   // For input nodes, pass through the user's actual typed/selected value
   // instead of using the mock executor (which returns hardcoded placeholder text)
   if (INPUT_NODE_IDS.has(catalogueId)) {
-    await new Promise(r => setTimeout(r, 400)); // brief delay for UX
+    await new Promise(r => setTimeout(r, 150)); // brief delay for UX
     const nodeData = node.data as Record<string, unknown>;
     const fileData = nodeData.fileData as string | undefined;
     const fileName = nodeData.fileName as string | undefined;
@@ -283,7 +283,11 @@ function getUpstreamArtifact(
 }
 
 export function useExecution({ onLog }: UseExecutionOptions = {}) {
-  const { nodes, edges: workflowEdges, currentWorkflow, updateNodeStatus, setEdgeFlowing } = useWorkflowStore();
+  const nodes = useWorkflowStore(s => s.nodes);
+  const workflowEdges = useWorkflowStore(s => s.edges);
+  const currentWorkflow = useWorkflowStore(s => s.currentWorkflow);
+  const updateNodeStatus = useWorkflowStore(s => s.updateNodeStatus);
+  const setEdgeFlowing = useWorkflowStore(s => s.setEdgeFlowing);
   const {
     startExecution,
     addTileResult,

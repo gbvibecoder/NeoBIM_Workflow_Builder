@@ -3,17 +3,15 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  X, ChevronDown, ChevronUp, Download, FileDown,
+  ChevronDown, ChevronUp, Download, FileDown,
   Box, Maximize2, CheckCircle2, Zap,
 } from "lucide-react";
 import dynamic from "next/dynamic";
 import { useExecutionStore } from "@/stores/execution-store";
 import { useWorkflowStore } from "@/stores/workflow-store";
 import type { ExecutionArtifact } from "@/types/execution";
-import type { FloorPlanRoom } from "./artifacts/FloorPlan3DViewer";
-
-const FloorPlan3DViewer = dynamic(
-  () => import("./artifacts/FloorPlan3DViewer"),
+const ArchitecturalViewer = dynamic(
+  () => import("./artifacts/architectural-viewer/ArchitecturalViewer"),
   { ssr: false }
 );
 
@@ -95,9 +93,8 @@ export function ResultShowcase({ onClose }: ResultShowcaseProps) {
 
   // 3D model data
   const modelData = threeDArtifact || svgArtifact;
-  const modelRooms: FloorPlanRoom[] = modelData
-    ? ((modelData.data as Record<string, unknown>)?.roomList as FloorPlanRoom[]) ?? []
-    : [];
+  const modelDataObj = modelData ? (modelData.data as Record<string, unknown>) : null;
+  const hasModel = !!modelData;
 
   // File downloads
   const downloadFiles = fileArtifacts.map(a => {
@@ -124,7 +121,14 @@ export function ResultShowcase({ onClose }: ResultShowcaseProps) {
   }, [artifacts, nodes, projectTitle]);
 
   // 3D viewer fullscreen mode
-  if (show3DViewer) {
+  if (show3DViewer && modelDataObj) {
+    const floors = (modelDataObj.floors as number) ?? 5;
+    const height = (modelDataObj.height as number) ?? 21;
+    const footprint = (modelDataObj.footprint as number) ?? 500;
+    const gfa = (modelDataObj.gfa as number) ?? floors * footprint;
+    const buildingType = (modelDataObj.buildingType as string) ?? "Mixed-Use";
+    const styleData = modelDataObj.style as Record<string, unknown> | undefined;
+
     return (
       <motion.div
         initial={{ opacity: 0 }}
@@ -142,23 +146,49 @@ export function ResultShowcase({ onClose }: ResultShowcaseProps) {
           borderBottom: "1px solid rgba(255,255,255,0.06)",
         }}>
           <span style={{ fontSize: 14, fontWeight: 600, color: "#F0F0F5" }}>
-            3D Floor Plan
+            3D Architectural Walkthrough
           </span>
           <button
             onClick={() => setShow3DViewer(false)}
             style={{
-              display: "flex", alignItems: "center", gap: 6,
-              padding: "6px 14px", borderRadius: 8,
-              background: "rgba(255,255,255,0.06)", border: "none",
-              color: "#8888A0", fontSize: 12, fontWeight: 500,
-              cursor: "pointer",
+              display: "flex", alignItems: "center", gap: 8,
+              padding: "8px 18px", borderRadius: 8,
+              background: "rgba(255,255,255,0.06)",
+              border: "1px solid rgba(255,255,255,0.08)",
+              color: "#B0B0C5", fontSize: 13, fontWeight: 500,
+              cursor: "pointer", transition: "all 0.15s ease",
             }}
+            onMouseEnter={e => { e.currentTarget.style.background = "rgba(255,255,255,0.1)"; e.currentTarget.style.color = "#F0F0F5"; }}
+            onMouseLeave={e => { e.currentTarget.style.background = "rgba(255,255,255,0.06)"; e.currentTarget.style.color = "#B0B0C5"; }}
           >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>
             Back to Results
           </button>
         </div>
         <div style={{ flex: 1 }}>
-          <FloorPlan3DViewer rooms={modelRooms} />
+          <ArchitecturalViewer
+            floors={floors}
+            height={height}
+            footprint={footprint}
+            gfa={gfa}
+            buildingType={buildingType}
+            style={styleData ? {
+              glassHeavy: !!styleData.glassHeavy,
+              hasRiver: !!styleData.hasRiver,
+              hasLake: !!styleData.hasLake,
+              isModern: !!styleData.isModern,
+              isTower: !!styleData.isTower,
+              exteriorMaterial: (styleData.exteriorMaterial as string) ?? "mixed",
+              environment: (styleData.environment as string) ?? "suburban",
+              usage: (styleData.usage as string) ?? "mixed",
+              promptText: (styleData.promptText as string) ?? "",
+              typology: (styleData.typology as string) ?? "generic",
+              facadePattern: (styleData.facadePattern as string) ?? "none",
+              floorHeightOverride: styleData.floorHeightOverride ? Number(styleData.floorHeightOverride) : undefined,
+              maxFloorCap: Number(styleData.maxFloorCap ?? 30),
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            } as any : undefined}
+          />
         </div>
       </motion.div>
     );
@@ -166,45 +196,49 @@ export function ResultShowcase({ onClose }: ResultShowcaseProps) {
 
   return (
     <motion.div
-      initial={{ opacity: 0, x: 40, scale: 0.97 }}
-      animate={{ opacity: 1, x: 0, scale: 1 }}
-      exit={{ opacity: 0, x: 40, scale: 0.97 }}
-      transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
       style={{
         position: "absolute",
-        top: "5%",
-        right: "3%",
-        width: "58%",
-        height: "90%",
-        background: "linear-gradient(145deg, rgba(7,8,9,0.95), rgba(7,8,9,0.98))",
-        backdropFilter: "blur(40px)",
-        WebkitBackdropFilter: "blur(40px)",
-        borderRadius: 4,
-        border: "1px solid rgba(184,115,51,0.15)",
-        boxShadow: "0 32px 80px rgba(0,0,0,0.6), 0 0 40px rgba(0,245,255,0.05)",
+        inset: 0,
+        background: "linear-gradient(145deg, rgba(7,8,9,0.98), rgba(7,8,9,1))",
         overflow: "auto",
-        zIndex: 50,
+        zIndex: 55,
       }}
     >
-      {/* Close button */}
-      <button
-        onClick={onClose}
-        style={{
-          position: "sticky", top: 16, float: "right",
-          marginRight: 16, marginTop: 16,
-          width: 32, height: 32, borderRadius: 8,
-          background: "rgba(255,255,255,0.06)", border: "none",
-          display: "flex", alignItems: "center", justifyContent: "center",
-          color: "#5C5C78", cursor: "pointer", zIndex: 10,
-          transition: "all 0.15s ease",
-        }}
-        onMouseEnter={e => { e.currentTarget.style.background = "rgba(255,255,255,0.1)"; e.currentTarget.style.color = "#F0F0F5"; }}
-        onMouseLeave={e => { e.currentTarget.style.background = "rgba(255,255,255,0.06)"; e.currentTarget.style.color = "#5C5C78"; }}
-      >
-        <X size={14} />
-      </button>
+      {/* Top bar with Back button */}
+      <div style={{
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+        padding: "14px 24px",
+        borderBottom: "1px solid rgba(255,255,255,0.06)",
+        position: "sticky", top: 0, zIndex: 10,
+        background: "rgba(7,8,9,0.95)",
+        backdropFilter: "blur(20px)",
+      }}>
+        <button
+          onClick={onClose}
+          style={{
+            display: "flex", alignItems: "center", gap: 8,
+            padding: "8px 18px", borderRadius: 8,
+            background: "rgba(255,255,255,0.06)",
+            border: "1px solid rgba(255,255,255,0.08)",
+            color: "#B0B0C5", fontSize: 13, fontWeight: 500,
+            cursor: "pointer", transition: "all 0.15s ease",
+          }}
+          onMouseEnter={e => { e.currentTarget.style.background = "rgba(255,255,255,0.1)"; e.currentTarget.style.color = "#F0F0F5"; }}
+          onMouseLeave={e => { e.currentTarget.style.background = "rgba(255,255,255,0.06)"; e.currentTarget.style.color = "#B0B0C5"; }}
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>
+          Back to Workflow
+        </button>
+        <span style={{ fontSize: 13, fontWeight: 500, color: "#5C5C78" }}>
+          Workflow Results
+        </span>
+      </div>
 
-      <div style={{ padding: "32px 32px 24px" }}>
+      <div style={{ padding: "32px 48px 24px", maxWidth: 900, margin: "0 auto" }}>
 
         {/* Status badge */}
         <motion.div
@@ -409,7 +443,7 @@ export function ResultShowcase({ onClose }: ResultShowcaseProps) {
         )}
 
         {/* 3D Model Button */}
-        {modelRooms.length > 0 && (
+        {hasModel && (
           <motion.button
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
@@ -457,35 +491,35 @@ export function ResultShowcase({ onClose }: ResultShowcaseProps) {
           <button
             onClick={handleGeneratePDF}
             style={{
-              display: "flex", alignItems: "center", gap: 6,
-              padding: "8px 16px", borderRadius: 8,
+              display: "flex", alignItems: "center", gap: 7,
+              padding: "10px 20px", borderRadius: 8,
               background: "rgba(255,255,255,0.04)",
               border: "1px solid rgba(255,255,255,0.06)",
-              color: "#8888A0", fontSize: 12, fontWeight: 500,
+              color: "#8888A0", fontSize: 13, fontWeight: 500,
               cursor: "pointer", transition: "all 0.15s ease",
             }}
             onMouseEnter={e => { e.currentTarget.style.background = "rgba(255,255,255,0.08)"; e.currentTarget.style.color = "#F0F0F5"; }}
             onMouseLeave={e => { e.currentTarget.style.background = "rgba(255,255,255,0.04)"; e.currentTarget.style.color = "#8888A0"; }}
           >
-            <FileDown size={12} /> PDF Report
+            <FileDown size={14} /> PDF Report
           </button>
           {downloadFiles.map((f, i) => (
             <button
               key={i}
               style={{
-                display: "flex", alignItems: "center", gap: 6,
-                padding: "8px 16px", borderRadius: 8,
+                display: "flex", alignItems: "center", gap: 7,
+                padding: "10px 20px", borderRadius: 8,
                 background: "rgba(255,255,255,0.04)",
                 border: "1px solid rgba(255,255,255,0.06)",
-                color: "#8888A0", fontSize: 12, fontWeight: 500,
+                color: "#8888A0", fontSize: 13, fontWeight: 500,
                 cursor: "pointer", transition: "all 0.15s ease",
               }}
               onMouseEnter={e => { e.currentTarget.style.background = "rgba(255,255,255,0.08)"; e.currentTarget.style.color = "#F0F0F5"; }}
               onMouseLeave={e => { e.currentTarget.style.background = "rgba(255,255,255,0.04)"; e.currentTarget.style.color = "#8888A0"; }}
             >
-              <Download size={12} />
+              <Download size={14} />
               {f.name}
-              {f.size > 0 && <span style={{ fontSize: 10, color: "#3A3A50" }}>{(f.size / 1024).toFixed(0)}KB</span>}
+              {f.size > 0 && <span style={{ fontSize: 11, color: "#3A3A50" }}>{(f.size / 1024).toFixed(0)}KB</span>}
             </button>
           ))}
         </motion.div>

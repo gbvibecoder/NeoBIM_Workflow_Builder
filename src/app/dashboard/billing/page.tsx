@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import { Header } from "@/components/dashboard/Header";
 import { useSession } from "next-auth/react";
 import { Check, Sparkles, Zap, Loader2 } from "lucide-react";
+import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { useLocale } from "@/hooks/useLocale";
 
@@ -74,8 +75,7 @@ export default function BillingPage() {
         throw new Error(data.error || 'Failed to create checkout session');
       }
     } catch (error) {
-      console.error('Checkout error:', error);
-      alert('Failed to start checkout. Please try again.');
+      toast.error('Failed to start checkout. Please try again.');
     } finally {
       setUpgradingTo(null);
     }
@@ -89,8 +89,7 @@ export default function BillingPage() {
         window.location.href = data.url;
       }
     } catch (error) {
-      console.error('Portal error:', error);
-      alert('Failed to open billing portal.');
+      toast.error('Failed to open billing portal.');
     }
   };
 

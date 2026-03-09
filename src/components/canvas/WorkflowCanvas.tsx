@@ -22,7 +22,6 @@ import { Layers3, Sparkles, BookOpen, X } from "lucide-react";
 import {
   shareExecutionToTwitter,
 } from "@/lib/share";
-import { ExecutionCompleteModal } from "./modals/ExecutionCompleteModal";
 
 import dynamic from "next/dynamic";
 import { BaseNode } from "./nodes/BaseNode";
@@ -45,9 +44,9 @@ const ContextMenu = dynamic(
   { ssr: false }
 );
 
-// Three.js scene — must be client-only
-const PostExecutionScene = dynamic(
-  () => import("./PostExecutionScene"),
+// Architectural 3D walkthrough viewer — client-only
+const ArchitecturalViewer = dynamic(
+  () => import("./artifacts/architectural-viewer/ArchitecturalViewer"),
   { ssr: false }
 );
 
@@ -237,6 +236,84 @@ function CanvasEmptyState({ onPromptMode }: EmptyStateProps) {
   );
 }
 
+// ─── Fullscreen 3D Artifact Viewer ─────────────────────────────────────────
+
+function FullscreenArtifactViewer() {
+  const nodeId = useUIStore(s => s.artifactViewerNodeId);
+  const close = useUIStore(s => s.setArtifactViewerNodeId);
+  const artifact = useExecutionStore(s => nodeId ? s.artifacts.get(nodeId) : undefined);
+
+  if (!nodeId || !artifact) return null;
+
+  const d = artifact.data as Record<string, unknown>;
+  const floors = (d?.floors as number) ?? 5;
+  const height = (d?.height as number) ?? 21;
+  const footprint = (d?.footprint as number) ?? 500;
+  const gfa = (d?.gfa as number) ?? floors * footprint;
+  const buildingType = (d?.buildingType as string) ?? "Mixed-Use";
+  const style = d?.style as Record<string, unknown> | undefined;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      style={{
+        position: "absolute", inset: 0, zIndex: 60,
+        background: "rgba(4,4,8,0.98)",
+        display: "flex", flexDirection: "column",
+      }}
+    >
+      <div style={{
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+        padding: "12px 20px",
+        borderBottom: "1px solid rgba(255,255,255,0.06)",
+      }}>
+        <span style={{ fontSize: 14, fontWeight: 600, color: "#F0F0F5" }}>
+          3D Architectural Walkthrough
+        </span>
+        <button
+          onClick={() => close(null)}
+          style={{
+            display: "flex", alignItems: "center", gap: 6,
+            padding: "6px 14px", borderRadius: 8,
+            background: "rgba(255,255,255,0.06)", border: "none",
+            color: "#8888A0", fontSize: 12, fontWeight: 500,
+            cursor: "pointer",
+          }}
+        >
+          <X size={12} /> Close
+        </button>
+      </div>
+      <div style={{ flex: 1 }}>
+        <ArchitecturalViewer
+          floors={floors}
+          height={height}
+          footprint={footprint}
+          gfa={gfa}
+          buildingType={buildingType}
+          style={style ? {
+            glassHeavy: !!style.glassHeavy,
+            hasRiver: !!style.hasRiver,
+            hasLake: !!style.hasLake,
+            isModern: !!style.isModern,
+            isTower: !!style.isTower,
+            exteriorMaterial: (style.exteriorMaterial as string) ?? "mixed",
+            environment: (style.environment as string) ?? "suburban",
+            usage: (style.usage as string) ?? "mixed",
+            promptText: (style.promptText as string) ?? "",
+            typology: (style.typology as string) ?? "generic",
+            facadePattern: (style.facadePattern as string) ?? "none",
+            floorHeightOverride: style.floorHeightOverride ? Number(style.floorHeightOverride) : undefined,
+            maxFloorCap: Number(style.maxFloorCap ?? 30),
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          } as any : undefined}
+        />
+      </div>
+    </motion.div>
+  );
+}
+
 // ─── Inner Canvas ──────────────────────────────────────────────────────────
 
 interface WorkflowCanvasInnerProps {
@@ -324,7 +401,6 @@ function WorkflowCanvasInner({ workflowId: _workflowId }: WorkflowCanvasInnerPro
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [showLog, setShowLog] = useState(false);
   const [showShowcase, setShowShowcase] = useState(false);
-  const [showPostExecution, setShowPostExecution] = useState(false);
   const prevExecutingRef = useRef(false);
 
   const addLogEntry = useCallback((entry: LogEntry) => {
@@ -348,68 +424,11 @@ function WorkflowCanvasInner({ workflowId: _workflowId }: WorkflowCanvasInnerPro
 
       // Show grand reveal showcase after a short delay
       const timer = setTimeout(() => setShowShowcase(true), 500);
-      // Show post-execution scene
-      const timer2 = setTimeout(() => setShowPostExecution(true), 700);
-      return () => { clearTimeout(timer); clearTimeout(timer2); };
+      return () => { clearTimeout(timer); };
     }
     prevExecutingRef.current = isExecuting;
   }, [isExecuting, artifacts, storeNodes, setEdgeFlowing]);
   const { t: tLocale } = useLocale();
-
-  // Extract data from artifacts for 3D scene
-  const postExecData = React.useMemo(() => {
-    if (!showPostExecution) return null;
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let rooms: any[] = [];
-    const kpis: { floors?: number; gfa?: number; height?: number; footprint?: number } = {};
-    let description = "";
-
-    for (const artifact of artifacts.values()) {
-      if (artifact.type === "3d" || artifact.type === "svg") {
-        const d = artifact.data as Record<string, unknown>;
-        rooms = (d?.roomList as typeof rooms) ?? [];
-      }
-      if (artifact.type === "kpi") {
-        const d = artifact.data as Record<string, unknown>;
-        const metrics = (d?.metrics as Array<{ label: string; value: string | number }>) ?? [];
-        for (const m of metrics) {
-          const lab = m.label.toLowerCase();
-          if (lab.includes("floor")) kpis.floors = Number(m.value);
-          if (lab.includes("gfa") || lab.includes("gross")) kpis.gfa = Number(m.value);
-          if (lab.includes("height")) kpis.height = Number(m.value);
-          if (lab.includes("footprint")) kpis.footprint = Number(m.value);
-        }
-      }
-      if (artifact.type === "text") {
-        const d = artifact.data as Record<string, unknown>;
-        description = (d?.content as string) ?? "";
-      }
-    }
-
-    return {
-      rooms,
-      kpis,
-      description,
-      buildingName: currentWorkflow?.name ?? "Building Design",
-    };
-  }, [showPostExecution, artifacts, currentWorkflow?.name]);
-
-  const handleClosePostExecution = useCallback(() => {
-    setShowPostExecution(false);
-    setTimeout(() => fitView({ padding: 0.3, duration: 800 }), 1100);
-  }, [fitView]);
-
-  const handleGeneratePDF = useCallback(async () => {
-    const { generatePDFReport } = await import("@/services/pdf-report");
-    const labels = new Map<string, string>();
-    storeNodes.forEach(n => labels.set(n.id, n.data.label));
-    await generatePDFReport({
-      workflowName: currentWorkflow?.name ?? "Workflow Results",
-      artifacts,
-      nodeLabels: labels,
-    });
-  }, [storeNodes, currentWorkflow?.name, artifacts]);
 
   const [nodes, setNodes, onNodesChange] = useNodesState(storeNodes as unknown as Node[]);
   const [edges, setEdges, onEdgesChange] = useEdgesState(storeEdges as Edge[]);
@@ -591,13 +610,8 @@ function WorkflowCanvasInner({ workflowId: _workflowId }: WorkflowCanvasInnerPro
     }
     executionStartRef.current = Date.now();
     await runWorkflow();
-    // Show celebration modal on completion
-    const elapsed = executionStartRef.current ? Date.now() - executionStartRef.current : 0;
     executionStartRef.current = null;
-    if (elapsed > 0) {
-      setShowExecutionCompleteModal(true);
-    }
-  }, [runWorkflow, nodes, tLocale, setShowExecutionCompleteModal]);
+  }, [runWorkflow, nodes, tLocale]);
   const handleSave = useCallback(async () => {
     if (isDemoMode) {
       toast.info(tLocale('toast.demoSaveHint'), { duration: 3000 });
@@ -716,15 +730,9 @@ function WorkflowCanvasInner({ workflowId: _workflowId }: WorkflowCanvasInnerPro
           )}
         </AnimatePresence>
 
-        {/* React Flow — slides left when post-execution scene is active */}
+        {/* React Flow canvas */}
         <div
           className="absolute inset-0"
-          style={{
-            transition: "opacity 0.8s ease, filter 0.8s ease",
-            opacity: showPostExecution ? 0.6 : 1,
-            filter: showPostExecution ? "brightness(0.7)" : "none",
-            pointerEvents: showPostExecution ? "none" : "auto",
-          }}
         >
           {/* Architectural grid — major lines every 100px, minor every 20px */}
           <div
@@ -892,6 +900,9 @@ function WorkflowCanvasInner({ workflowId: _workflowId }: WorkflowCanvasInnerPro
             )}
           </AnimatePresence>
 
+          {/* Fullscreen 3D Architectural Viewer (opened from node "View 3D Model" button) */}
+          <FullscreenArtifactViewer />
+
           {/* ── Architectural title block — bottom right ── */}
           <div style={{
             position: 'absolute',
@@ -941,36 +952,6 @@ function WorkflowCanvasInner({ workflowId: _workflowId }: WorkflowCanvasInnerPro
         </div>
 
         {/* Post-execution 3D scene — overlays right 70% of canvas */}
-        <AnimatePresence>
-          {showPostExecution && !isExecuting && postExecData && (
-            <motion.div
-              key="post-exec-scene"
-              initial={{ opacity: 0, x: 40 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: 40, transition: { duration: 0.5 } }}
-              transition={{ duration: 0.8, delay: 1.0 }}
-              style={{
-                position: "absolute",
-                top: 0,
-                right: 0,
-                bottom: 0,
-                width: "65%",
-                height: "100%",
-                zIndex: 40,
-              }}
-            >
-              <PostExecutionScene
-                rooms={postExecData.rooms}
-                kpis={postExecData.kpis}
-                buildingDescription={postExecData.description}
-                buildingName={postExecData.buildingName}
-                onClose={handleClosePostExecution}
-                onGeneratePDF={handleGeneratePDF}
-              />
-            </motion.div>
-          )}
-        </AnimatePresence>
-
         {/* AI Chat Panel — floats on right edge */}
         <AIChatPanel
           messages={chatMessages}
@@ -982,16 +963,7 @@ function WorkflowCanvasInner({ workflowId: _workflowId }: WorkflowCanvasInnerPro
 
         {/* Artifact results panel removed — results now display inside nodes */}
 
-        {/* Execution complete celebration modal */}
-        <ExecutionCompleteModal
-          workflowName={workflowName}
-          nodeCount={storeNodes.length}
-          artifactCount={artifacts.size}
-          durationText={durationText}
-          onViewResults={() => {
-            /* PostExecutionScene handles results display */
-          }}
-        />
+        {/* Execution complete modal removed — bottom status bar already shows completion */}
       </div>
 
       {/* Save workflow name modal */}
