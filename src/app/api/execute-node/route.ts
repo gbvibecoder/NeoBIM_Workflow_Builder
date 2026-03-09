@@ -21,6 +21,7 @@ import { assertValidInput } from "@/lib/validation";
 import { APIError, UserErrors, formatErrorResponse } from "@/lib/user-errors";
 import { generatePDFBase64 } from "@/services/pdf-report-server";
 import { reconstructHiFi3D, isMeshyConfigured } from "@/services/meshy-service";
+import { generateWalkthroughVideo, buildArchitecturalVideoPrompt } from "@/services/video-service";
 
 // Detect region/city from text for cost estimation
 function detectRegionFromText(text: string): string | null {
@@ -60,7 +61,7 @@ function detectRegionFromText(text: string): string | null {
 }
 
 // Node IDs that have real implementations
-const REAL_NODE_IDS = new Set(["TR-001", "TR-003", "TR-004", "TR-005", "TR-012", "GN-003", "GN-004", "GN-007", "GN-008", "GN-010", "TR-007", "TR-008", "EX-002", "EX-003"]);
+const REAL_NODE_IDS = new Set(["TR-001", "TR-003", "TR-004", "TR-005", "TR-012", "GN-003", "GN-004", "GN-007", "GN-008", "GN-009", "GN-010", "TR-007", "TR-008", "EX-002", "EX-003"]);
 
 // Nodes that require OpenAI API calls
 const OPENAI_NODES = new Set(["TR-003", "TR-004", "TR-005", "TR-012", "GN-003", "GN-004", "GN-008"]);
@@ -1324,6 +1325,79 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
           },
         },
         metadata: { engine: "fal-ai/sam-3", real: true, jobId: job.id },
+        createdAt: new Date(),
+      };
+
+    } else if (catalogueId === "GN-009") {
+      // ── Video Walkthrough Generator ────────────────────────────────────
+      // Takes a concept render image (from GN-003) + building description
+      // and generates a cinematic walkthrough video via Kling 2.1 (fal.ai).
+
+      if (!process.env.FAL_KEY) {
+        return NextResponse.json(
+          formatErrorResponse({
+            title: "FAL_KEY required",
+            message: "FAL_KEY is not configured. Add your fal.ai API key to enable video generation.",
+            code: "MISSING_API_KEY",
+          }),
+          { status: 400 }
+        );
+      }
+
+      // Extract render image URL from upstream GN-003
+      const renderImageUrl =
+        (inputData?.url as string) ??
+        (inputData?.images_out as string) ??
+        (inputData?.imageUrl as string) ??
+        "";
+
+      if (!renderImageUrl) {
+        return NextResponse.json(
+          formatErrorResponse({
+            title: "No render image provided",
+            message: "GN-009 requires an upstream concept render. Connect a Concept Render Generator (GN-003) node.",
+            code: "NODE_001",
+          }),
+          { status: 400 }
+        );
+      }
+
+      // Build camera motion prompt from building description
+      const buildingDesc =
+        (inputData?.content as string) ??
+        (inputData?.description as string) ??
+        (inputData?.prompt as string) ??
+        "Modern architectural building";
+
+      const videoPrompt = buildArchitecturalVideoPrompt(buildingDesc);
+
+      const videoResult = await generateWalkthroughVideo({
+        imageUrl: renderImageUrl,
+        prompt: videoPrompt,
+        duration: "5",
+      });
+
+      artifact = {
+        id: generateId(),
+        executionId: executionId ?? "local",
+        tileInstanceId,
+        type: "file",
+        data: {
+          name: `walkthrough_${Date.now()}.mp4`,
+          type: "MP4 Video",
+          downloadUrl: videoResult.videoUrl,
+          label: "Cinematic Walkthrough Video",
+          content: `${videoResult.durationSeconds}s cinematic walkthrough — ${buildingDesc.slice(0, 100)}`,
+          videoUrl: videoResult.videoUrl,
+          durationSeconds: videoResult.durationSeconds,
+          metadata: {
+            costUsd: videoResult.costUsd,
+            generationTimeMs: videoResult.generationTimeMs,
+            pipeline: "concept render → Kling 2.1 → MP4 video",
+            cameraPrompt: videoPrompt.slice(0, 200),
+          },
+        },
+        metadata: { engine: "kling-v2.1-standard", real: true, jobId: videoResult.id },
         createdAt: new Date(),
       };
 

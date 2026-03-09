@@ -427,7 +427,7 @@ export const NODE_CATALOGUE: NodeCatalogueItem[] = [
       { id: "style-in", label: "Style & Camera", type: "json" },
     ],
     outputs: [{ id: "video-out", label: "MP4 Video", type: "binary" }],
-    apiEngine: "Runway Gen-3 / Luma Dream Machine",
+    apiEngine: "Kling 2.1 via fal.ai",
     tags: ["video", "walkthrough", "flythrough", "animation", "render", "cinematic"],
     executionTime: "2-5 min",
   },
@@ -558,7 +558,7 @@ export const CATEGORY_CONFIG = {
 } as const;
 
 /** Nodes that use real API calls (not mock/sample data) */
-export const LIVE_NODES = new Set(['TR-003', 'TR-007', 'TR-008', 'GN-003', 'GN-007', 'GN-008', 'GN-010', 'EX-002']);
+export const LIVE_NODES = new Set(['TR-003', 'TR-007', 'TR-008', 'GN-003', 'GN-007', 'GN-008', 'GN-009', 'GN-010', 'EX-002']);
 
 // Mark isLive on catalogue items at module init
 for (const node of NODE_CATALOGUE) {

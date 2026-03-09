@@ -547,6 +547,24 @@ export async function executeNode(
         },
       });
 
+    case "GN-009": { // Video Walkthrough Generator — mock
+      const vidDesc = String(inputData?.content ?? inputData?.description ?? "modern building");
+      return mockArtifact(executionId, tileInstanceId, "file", {
+        name: `walkthrough_${Date.now()}.mp4`,
+        type: "MP4 Video",
+        downloadUrl: "https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/360/Big_Buck_Bunny_360_10s_1MB.mp4",
+        label: "Cinematic Walkthrough Video — Mock",
+        content: `5s cinematic walkthrough — ${vidDesc.slice(0, 100)}`,
+        videoUrl: "https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/360/Big_Buck_Bunny_360_10s_1MB.mp4",
+        durationSeconds: 5,
+        metadata: {
+          costUsd: 0.28,
+          generationTimeMs: 30000,
+          pipeline: "concept render → Kling 2.1 → MP4 video",
+        },
+      });
+    }
+
     case "GN-010": { // Hi-Fi 3D Reconstructor — mock
       const hifiDesc = String(inputData?.content ?? inputData?.description ?? "modern building");
       const hifiSeed = hifiDesc.slice(0, 15).replace(/\s+/g, "-").toLowerCase() || "building";
