@@ -644,7 +644,7 @@ export default function TemplatesPage() {
                     workflow={wf}
                     showCloneButton
                     onClone={handleUse}
-                    isFeatured={wf.id === "wf-10"}
+                    isFeatured={wf.id === "wf-14"}
                     index={i}
                   />
                 ))}
