@@ -331,10 +331,18 @@ ${parsed.keyRequirements?.length ? `KEY REQUIREMENTS:\n${parsed.keyRequirements.
 
       const analysis = await analyzeImage(base64Data, mimeType, apiKey);
 
+      const roomsText = analysis.rooms?.length
+        ? `\nROOMS:\n${analysis.rooms.map(r => `• ${r.name} (${r.dimensions})`).join("\n")}`
+        : "";
+      const layoutText = analysis.layoutDescription
+        ? `\nLAYOUT: ${analysis.layoutDescription}`
+        : "";
+
       const descriptionText = `IMAGE ANALYSIS — ${analysis.buildingType}
 
 Style: ${analysis.style}
 Estimated Floors: ${analysis.floors}
+${analysis.isFloorPlan ? "Type: 2D Floor Plan" : ""}
 
 ${analysis.description}
 
@@ -343,6 +351,7 @@ FACADE: ${analysis.facade}
 MASSING: ${analysis.massing}
 
 SITE: ${analysis.siteRelationship}
+${roomsText}${layoutText}
 
 KEY FEATURES:
 ${analysis.features.map(f => `• ${f}`).join("\n")}`;
@@ -364,6 +373,11 @@ ${analysis.features.map(f => `• ${f}`).join("\n")}`;
         console.warn("[TR-004] R2 upload of source image failed:", r2Err);
       }
 
+      // Build roomInfo string from extracted rooms for downstream nodes (GN-009)
+      const extractedRoomInfo = analysis.rooms?.length
+        ? analysis.rooms.map(r => `${r.name} (${r.dimensions})`).join(", ")
+        : "";
+
       artifact = {
         id: generateId(),
         executionId: executionId ?? "local",
@@ -374,6 +388,10 @@ ${analysis.features.map(f => `• ${f}`).join("\n")}`;
           label: `Image Analysis: ${analysis.buildingType}`,
           prompt: analysis.description,
           _raw: analysis,
+          // Pass room data for downstream GN-009
+          ...(analysis.isFloorPlan && { isFloorPlan: true }),
+          ...(extractedRoomInfo && { roomInfo: extractedRoomInfo }),
+          ...(analysis.layoutDescription && { layoutDescription: analysis.layoutDescription }),
           // Pass the original image through so downstream nodes can use it
           ...(sourceImageUrl && { imageUrl: sourceImageUrl, url: sourceImageUrl }),
           ...(typeof mimeType === "string" && { mimeType }),
@@ -1513,15 +1531,30 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
         }
       }
 
-      // Build video from building description (from upstream TR-003 or fallback)
+      // Build video from building description (from upstream TR-004 or fallback)
       const buildingDesc =
         (inputData?.content as string) ??
         (inputData?.description as string) ??
         (inputData?.prompt as string) ??
         "Modern architectural building";
 
-      console.log("[KLING] Step 3: renderImageUrl resolved:", renderImageUrl ? renderImageUrl.slice(0, 120) : "EMPTY");
-      console.log("[KLING] Step 3: isFloorPlan:", isFloorPlanInput, "buildingDesc length:", buildingDesc.length);
+      // Pick up roomInfo from TR-004 output (GPT-4o extracted rooms) or SVG roomList
+      if (!roomInfo && inputData?.roomInfo && typeof inputData.roomInfo === "string") {
+        roomInfo = inputData.roomInfo as string;
+        console.log("[GN-009] roomInfo from TR-004 (GPT-4o):", roomInfo.slice(0, 300));
+      }
+
+      // Also pick up layoutDescription from TR-004
+      const layoutDescription = (inputData?.layoutDescription as string) ?? "";
+
+      console.log("===== GENERIC FLOOR PLAN DEBUG =====");
+      console.log("[GN-009] All inputData keys:", Object.keys(inputData ?? {}));
+      console.log("[GN-009] buildingDescription:", JSON.stringify(buildingDesc)?.slice(0, 800));
+      console.log("[GN-009] roomInfo:", JSON.stringify(roomInfo)?.slice(0, 800));
+      console.log("[GN-009] layoutDescription:", JSON.stringify(layoutDescription)?.slice(0, 500));
+      console.log("[GN-009] isFloorPlan:", isFloorPlanInput);
+      console.log("[GN-009] renderImageUrl resolved:", renderImageUrl ? renderImageUrl.slice(0, 120) : "EMPTY");
+      console.log("====================================");
 
       // ── Kling is the ONLY video generation path (no Three.js fallback) ──
       if (!renderImageUrl) {
@@ -1555,8 +1588,9 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
         if (isFloorPlanInput) {
           // ── SINGLE 10s video for floor plans (continuous exterior→interior shot) ──
           console.log("[GN-009] Function: submitSingleWalkthrough (floor plan → single 10s continuous shot)");
+          console.log("[GN-009] buildFloorPlanCombinedPrompt args — buildingDesc length:", buildingDesc?.length, "roomInfo length:", roomInfo?.length);
           const combinedPrompt = buildFloorPlanCombinedPrompt(buildingDesc, roomInfo);
-          console.log("[GN-009] Combined prompt:", combinedPrompt);
+          console.log("[GN-009] FINAL PROMPT SENT TO KLING:", combinedPrompt?.slice(0, 1500));
 
           const submitted = await submitSingleWalkthrough(renderImageUrl, combinedPrompt, "pro");
 

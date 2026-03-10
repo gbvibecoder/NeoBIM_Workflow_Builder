@@ -718,6 +718,12 @@ export interface ImageAnalysis {
   facade: string;
   massing: string;
   siteRelationship: string;
+  /** true when the image is a 2D floor plan / blueprint */
+  isFloorPlan?: boolean;
+  /** Rooms extracted from a floor plan, e.g. [{name:"Kitchen",dimensions:"3.2m x 2.5m"}] */
+  rooms?: { name: string; dimensions: string }[];
+  /** Spatial layout description for floor plans */
+  layoutDescription?: string;
 }
 
 export async function analyzeImage(
@@ -736,15 +742,32 @@ export async function analyzeImage(
           role: "system",
           content: `You are a senior architect analyzing an image. Describe what you see in precise architectural terms. Output JSON with these fields:
 {
-  "buildingType": "Mixed-Use Tower|Residential Block|...",
+  "buildingType": "Mixed-Use Tower|Residential Block|2D Floor Plan|...",
   "floors": <number>,
   "style": "Contemporary Nordic|...",
   "features": ["feature1", "feature2"],
   "description": "Detailed 3-4 paragraph architectural description...",
   "facade": "Description of facade treatment, materials, openings...",
   "massing": "Description of building massing, setbacks, volumes...",
-  "siteRelationship": "How the building relates to its context..."
+  "siteRelationship": "How the building relates to its context...",
+  "isFloorPlan": true/false,
+  "rooms": [{"name": "Living Room", "dimensions": "3.6m x 4.2m"}, ...],
+  "layoutDescription": "Spatial relationships between rooms..."
 }
+
+IMPORTANT — If the image is a 2D architectural floor plan, blueprint, or layout drawing:
+- Set "isFloorPlan" to true
+- Set "buildingType" to describe the building type shown in the plan (e.g. "2-Bedroom Apartment", "3BHK Residential Unit")
+- Extract EVERY room name and its dimensions exactly as labeled in the plan into the "rooms" array
+- In "layoutDescription", describe: which rooms are adjacent/connected, where the main entrance is, overall building shape, wall/door/window positions
+- In "description", provide a comprehensive architectural description of the floor plan layout
+- In "massing", describe the overall footprint shape and approximate total area
+
+If the image is NOT a floor plan (e.g. a building photo, render, or 3D view):
+- Set "isFloorPlan" to false
+- Set "rooms" to an empty array []
+- Set "layoutDescription" to ""
+
 Be specific about dimensions, proportions, materials, and spatial relationships. If the image is not architectural, set buildingType to "Not Architectural" and describe what you see.`,
         },
         {
@@ -778,6 +801,9 @@ Be specific about dimensions, proportions, materials, and spatial relationships.
       facade: result.facade || "",
       massing: result.massing || "",
       siteRelationship: result.siteRelationship || "",
+      isFloorPlan: result.isFloorPlan ?? false,
+      rooms: result.rooms ?? [],
+      layoutDescription: result.layoutDescription ?? "",
     };
   });
 }
