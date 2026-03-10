@@ -347,12 +347,14 @@ function TableView({ table, index }: { table: TableDataItem; index: number }) {
             width: "100%",
             padding: "8px",
             background: "none",
-            border: "none",
+            borderTop: `1px solid ${COLORS.GLASS_BORDER}`,
+            borderLeft: "none",
+            borderRight: "none",
+            borderBottom: "none",
             color: COLORS.CYAN,
             fontSize: 11,
             fontWeight: 500,
             cursor: "pointer",
-            borderTop: `1px solid ${COLORS.GLASS_BORDER}`,
           }}
         >
           {showAll ? t('showcase.showLess') : `${t('showcase.showAllRows')} ${table.rows.length} ${t('showcase.rows')}`}

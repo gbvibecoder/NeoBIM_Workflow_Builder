@@ -357,6 +357,9 @@ function WorkflowCanvasInner({ workflowId: urlWorkflowId }: WorkflowCanvasInnerP
 
   const { artifacts, executionProgress, clearArtifacts, restoreArtifactsFromDB } = useExecutionStore();
 
+  // ─── Loading state: prevent empty-canvas flash while workflow loads from DB ──
+  const [isLoadingWorkflow, setIsLoadingWorkflow] = useState(!!urlWorkflowId);
+
   // ─── Auto-save debounce for persisted workflows ────────────────────
   const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   React.useEffect(() => {
@@ -372,6 +375,12 @@ function WorkflowCanvasInner({ workflowId: urlWorkflowId }: WorkflowCanvasInnerP
       saveWorkflow().then((id) => {
         if (id) {
           console.info("[auto-save] Workflow saved:", id);
+          // Update URL with ?id= so page refresh can restore this workflow
+          if (!urlWorkflowId && typeof window !== "undefined") {
+            const url = new URL(window.location.href);
+            url.searchParams.set("id", id);
+            window.history.replaceState({}, "", url.toString());
+          }
         }
       });
     }, 3000); // 3-second debounce
@@ -381,23 +390,11 @@ function WorkflowCanvasInner({ workflowId: urlWorkflowId }: WorkflowCanvasInnerP
     };
   }, [isDirty, currentWorkflow?.id, isSaving, saveWorkflow]);
 
-  // ─── Load workflow from URL ?id= param ────────────────────────────
-  const loadedUrlIdRef = useRef<string | null>(null);
-  React.useEffect(() => {
-    if (!urlWorkflowId) return;
-    // Don't re-load if already loaded this ID or already viewing it
-    if (loadedUrlIdRef.current === urlWorkflowId) return;
-    if (currentWorkflow?.id === urlWorkflowId) {
-      loadedUrlIdRef.current = urlWorkflowId;
-      return;
-    }
-    loadedUrlIdRef.current = urlWorkflowId;
-    loadWorkflow(urlWorkflowId).then(() => {
-      // Fit view after workflow loads
-      setTimeout(() => fitView({ padding: 0.3, duration: 600 }), 300);
-
-      // Restore latest execution results from DB
-      fetch(`/api/executions?workflowId=${urlWorkflowId}&limit=1`)
+  // ─── Restore execution artifacts from DB ─────────────────────────
+  const restoreExecutionArtifacts = useCallback((wfId: string) => {
+    // Small delay to ensure workflow nodes are populated in Zustand before we set statuses
+    setTimeout(() => {
+      fetch(`/api/executions?workflowId=${wfId}&limit=1`)
         .then(res => res.ok ? res.json() : null)
         .then((data: { executions?: Array<{
           id: string; status: string; startedAt: string; completedAt?: string | null;
@@ -419,8 +416,43 @@ function WorkflowCanvasInner({ workflowId: urlWorkflowId }: WorkflowCanvasInnerP
           }
         })
         .catch(() => { /* Non-fatal — execution restore is best-effort */ });
+    }, 100);
+  }, [restoreArtifactsFromDB]);
+
+  // ─── Load workflow from URL ?id= param ────────────────────────────
+  const loadedUrlIdRef = useRef<string | null>(null);
+  const artifactsRestoredRef = useRef(false);
+  React.useEffect(() => {
+    if (!urlWorkflowId) {
+      setIsLoadingWorkflow(false);
+      return;
+    }
+    // Don't re-load if already loaded this ID
+    if (loadedUrlIdRef.current === urlWorkflowId) return;
+    if (currentWorkflow?.id === urlWorkflowId) {
+      loadedUrlIdRef.current = urlWorkflowId;
+      setIsLoadingWorkflow(false);
+      // Workflow already in Zustand but artifacts may be lost on refresh — restore once
+      if (!artifactsRestoredRef.current) {
+        artifactsRestoredRef.current = true;
+        restoreExecutionArtifacts(urlWorkflowId);
+      }
+      return;
+    }
+    setIsLoadingWorkflow(true);
+    loadedUrlIdRef.current = urlWorkflowId;
+    loadWorkflow(urlWorkflowId).then(() => {
+      setIsLoadingWorkflow(false);
+      // Fit view after workflow loads
+      setTimeout(() => fitView({ padding: 0.3, duration: 600 }), 300);
+
+      // Restore latest execution results from DB
+      artifactsRestoredRef.current = true;
+      restoreExecutionArtifacts(urlWorkflowId);
+    }).catch(() => {
+      setIsLoadingWorkflow(false);
     });
-  }, [urlWorkflowId, currentWorkflow?.id, loadWorkflow, fitView, restoreArtifactsFromDB]);
+  }, [urlWorkflowId, currentWorkflow?.id, loadWorkflow, fitView, restoreExecutionArtifacts]);
   const { isNodeLibraryOpen, setPromptModeActive, isPromptModeActive, toggleNodeLibrary, isDemoMode, setShowExecutionCompleteModal, pendingNodeAdd, clearPendingNodeAdd } = useUIStore();
 
   // Execution timing for celebration modal
@@ -940,9 +972,29 @@ function WorkflowCanvasInner({ workflowId: urlWorkflowId }: WorkflowCanvasInnerP
             )}
           </AnimatePresence>
 
-          {/* Empty state (outside ReactFlow for proper centering + AnimatePresence) */}
+          {/* Loading state — show while workflow is being restored from DB */}
           <AnimatePresence>
-            {nodes.length === 0 && (
+            {isLoadingWorkflow && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0, transition: { duration: 0.2 } }}
+                className="absolute inset-0 flex items-center justify-center pointer-events-none"
+                style={{ zIndex: 5 }}
+              >
+                <div className="flex flex-col items-center gap-3">
+                  <div className="h-6 w-6 animate-spin rounded-full border-2 border-[#B87333]/20 border-t-[#B87333]" />
+                  <span style={{ fontSize: 11, color: "rgba(184,115,51,0.5)", fontFamily: "'Space Mono', monospace", letterSpacing: "0.1em", textTransform: "uppercase" as const }}>
+                    Restoring workflow...
+                  </span>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Empty state — only show if not loading a workflow from DB */}
+          <AnimatePresence>
+            {nodes.length === 0 && !isLoadingWorkflow && (
               <CanvasEmptyState onPromptMode={() => setPromptModeActive(true)} />
             )}
           </AnimatePresence>

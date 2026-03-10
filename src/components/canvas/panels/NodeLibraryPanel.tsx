@@ -394,7 +394,7 @@ export function NodeLibraryPanel() {
               style={{
                 width: "100%", height: 46,
                 background: "transparent",
-                border: "none",
+                borderTop: "none", borderLeft: "none", borderRight: "none",
                 borderBottom: "1px solid rgba(184,115,51,0.2)",
                 borderRadius: 0,
                 paddingLeft: 40, paddingRight: search ? 36 : 14,

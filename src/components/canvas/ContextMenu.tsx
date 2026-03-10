@@ -59,7 +59,8 @@ function MenuItem({ label, icon, onClick, danger, disabled }: MenuItemProps) {
       style={{
         display: "flex", alignItems: "center", gap: 9,
         width: "100%", padding: "6px 12px",
-        background: bg, border: "none", cursor: disabled ? "default" : "pointer",
+        background: bg, borderTop: "none", borderRight: "none", borderBottom: "none",
+        cursor: disabled ? "default" : "pointer",
         borderLeft: hovered && !disabled ? `2px solid ${danger ? "#EF4444" : "#00F5FF"}` : "2px solid transparent",
         transition: "background 0.08s, border-color 0.08s",
         opacity: disabled ? 0.35 : 1,

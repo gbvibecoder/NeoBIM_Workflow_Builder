@@ -37,6 +37,8 @@ export function RightNodePanel() {
           flexShrink: 0,
           pointerEvents: "auto",
           background: "rgba(7, 8, 9, 0.85)",
+          borderTop: "none",
+          borderBottom: "none",
           borderLeft: "1px solid rgba(184,115,51,0.15)",
           borderRight: isOpen ? "1px solid rgba(184,115,51,0.1)" : "none",
           display: "flex",
@@ -50,10 +52,6 @@ export function RightNodePanel() {
           backdropFilter: "blur(16px)",
           WebkitBackdropFilter: "blur(16px)",
           padding: 0,
-          border: "none",
-          borderLeftWidth: 1,
-          borderLeftStyle: "solid",
-          borderLeftColor: "rgba(184,115,51,0.15)",
         }}
       >
         {/* Arrow icon */}

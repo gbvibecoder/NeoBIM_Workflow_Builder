@@ -417,8 +417,10 @@ export function Sidebar() {
                     display: "flex", alignItems: "center", gap: 6,
                     padding: "8px 12px",
                     background: "rgba(255,255,255,0.02)",
-                    border: "1px solid rgba(255,255,255,0.05)",
                     borderTop: "1px solid rgba(255,255,255,0.03)",
+                    borderRight: "1px solid rgba(255,255,255,0.05)",
+                    borderBottom: "1px solid rgba(255,255,255,0.05)",
+                    borderLeft: "1px solid rgba(255,255,255,0.05)",
                     borderRadius: "0 0 12px 12px",
                   }}>
                     <div style={{ flex: 1 }}>

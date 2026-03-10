@@ -370,7 +370,8 @@ export function CanvasToolbar({
               maxLength={80}
               autoFocus
               style={{
-                background: "transparent", border: "none",
+                background: "transparent",
+                borderTop: "none", borderLeft: "none", borderRight: "none",
                 borderBottom: "1px solid #B87333",
                 color: "#F0F0F5", fontSize: 12, fontWeight: 500,
                 outline: "none", textAlign: "center",
@@ -620,7 +621,13 @@ export function CanvasToolbar({
                   width: 30, height: 36, padding: 0,
                   borderRadius: "0 10px 10px 0",
                   background: isWorkflowReady ? "transparent" : "transparent",
-                  border: isWorkflowReady
+                  borderTop: isWorkflowReady
+                    ? "1px solid rgba(0,245,255,0.4)"
+                    : "1px solid rgba(255,255,255,0.1)",
+                  borderRight: isWorkflowReady
+                    ? "1px solid rgba(0,245,255,0.4)"
+                    : "1px solid rgba(255,255,255,0.1)",
+                  borderBottom: isWorkflowReady
                     ? "1px solid rgba(0,245,255,0.4)"
                     : "1px solid rgba(255,255,255,0.1)",
                   borderLeft: "1px solid rgba(0,245,255,0.2)",

@@ -365,7 +365,7 @@ function CommandRow({ item, isSelected, onClick, onHover }: CommandRowProps) {
         display: "flex", alignItems: "center", gap: 10,
         width: "100%", padding: "7px 16px",
         background: isSelected ? "rgba(79,138,255,0.07)" : "transparent",
-        border: "none",
+        borderTop: "none", borderRight: "none", borderBottom: "none",
         borderLeft: isSelected ? "2px solid #4F8AFF" : "2px solid transparent",
         cursor: "pointer", textAlign: "left",
         transition: "background 0.08s, border-color 0.08s",

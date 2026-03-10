@@ -601,10 +601,35 @@ export function useExecution({ onLog }: UseExecutionOptions = {}) {
 
     toast.success("Workflow running…", { duration: 2000 });
 
-    // Persist execution to DB if workflow is saved (skip in demo mode)
+    // Auto-save workflow before execution so results can be persisted to DB
     let dbExecutionId: string | null = null;
-    const workflowId = currentWorkflow?.id;
-    if (!isDemoMode && workflowId && workflowId !== "unsaved") {
+    let workflowId = currentWorkflow?.id;
+    const isPersisted = workflowId && workflowId.length >= 20 && workflowId.startsWith("c");
+
+    if (!isDemoMode && !isPersisted) {
+      // Workflow not yet saved — save it first so we have a DB ID for execution records
+      try {
+        const { saveWorkflow } = useWorkflowStore.getState();
+        const savedId = await saveWorkflow();
+        if (savedId) {
+          workflowId = savedId;
+          log("info", "Workflow auto-saved before execution", savedId);
+          // Update URL so refresh can restore this workflow
+          if (typeof window !== "undefined") {
+            const url = new URL(window.location.href);
+            if (!url.searchParams.has("id")) {
+              url.searchParams.set("id", savedId);
+              window.history.replaceState({}, "", url.toString());
+            }
+          }
+        }
+      } catch {
+        // Non-fatal — continue with execution even if save fails
+      }
+    }
+
+    // Persist execution to DB if workflow is saved (skip in demo mode)
+    if (!isDemoMode && workflowId && workflowId.length >= 20 && workflowId.startsWith("c")) {
       try {
         const res = await fetch("/api/executions", {
           method: "POST",

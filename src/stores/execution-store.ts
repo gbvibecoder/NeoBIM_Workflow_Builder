@@ -1,6 +1,7 @@
 "use client";
 
 import { create } from "zustand";
+import { useWorkflowStore } from "@/stores/workflow-store";
 import type {
   Execution,
   ExecutionArtifact,
@@ -212,8 +213,10 @@ export const useExecutionStore = create<ExecutionState>()((set, get) => ({
 
   restoreArtifactsFromDB: (dbArtifacts, executionMeta) => {
     const newArtifacts = new Map<string, ExecutionArtifact>();
+    const restoredNodeIds: string[] = [];
     for (const art of dbArtifacts) {
       const nodeId = art.tileInstanceId || art.nodeId;
+      restoredNodeIds.push(nodeId);
       newArtifacts.set(nodeId, {
         id: `restored-${nodeId}`,
         executionId: executionMeta?.id ?? "restored",
@@ -247,5 +250,11 @@ export const useExecutionStore = create<ExecutionState>()((set, get) => ({
     }
 
     set(updates);
+
+    // Also restore node statuses on the canvas so nodes show green checkmarks
+    const { updateNodeStatus } = useWorkflowStore.getState();
+    for (const nodeId of restoredNodeIds) {
+      updateNodeStatus(nodeId, "success");
+    }
   },
 }));
