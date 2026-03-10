@@ -27,7 +27,8 @@ const POLL_INTERVAL_MS = 8_000;     // 8 seconds between status checks
 const JWT_EXPIRY_SECONDS = 1800;
 
 // Model names in priority order — try best first, fall back
-const MODELS = ["kling-v2-6", "kling-v2-1-master", "kling-v2-1", "kling-v1-6"] as const;
+// kling-v3-0 / kling-v3-0-omni may be available on newer API versions (Kling 3.0 Omni)
+const MODELS = ["kling-v3-0", "kling-v3-0-omni", "kling-v2-6", "kling-v2-1-master", "kling-v2-1", "kling-v1-6"] as const;
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -259,7 +260,7 @@ async function createTask(
 
       // cfg_scale only supported on v1.x models
       if (modelName.startsWith("kling-v1")) {
-        body.cfg_scale = 0.5;
+        body.cfg_scale = 0.7;
       }
 
       console.log("[CREATE] EXACT Kling API request body:", JSON.stringify({
@@ -272,7 +273,7 @@ async function createTask(
         body,
       });
 
-      console.log(`[CREATE] ✅ Task created with ${modelName}! taskId=${result.data.task_id}`);
+      console.log(`[KLING] ✅ Task created with MODEL: ${modelName}, taskId=${result.data.task_id}`);
       console.log("[CREATE] Full API response:", JSON.stringify(result));
       console.log("========== createTask END ==========");
       return result;
@@ -592,36 +593,11 @@ export function buildCombinedWalkthroughPrompt(buildingDescription: string): str
  * Exterior orbit + interior walkthrough in one continuous shot.
  * Same philosophy: don't describe the building, just describe camera movement.
  */
-export function buildFloorPlanCombinedPrompt(buildingDescription: string, roomInfo?: string): string {
-  // Dynamic room data from GPT-4o — different for every floor plan
-  let roomDetails = "";
-  if (roomInfo) {
-    roomDetails = ` The floor plan analysis identified these rooms and layout: ${roomInfo.slice(0, 500)}. Reconstruct every room with exact proportions and wall positions as described.`;
-  }
-  if (buildingDescription && buildingDescription !== "Modern architectural building") {
-    roomDetails += ` Additional context: ${buildingDescription.slice(0, 300)}.`;
-  }
-
-  return (
-    "Use the provided 2D floor plan image as the only source of truth and convert it into an accurate BIM-style 3D architectural model following AEC standards. " +
-    "CRITICAL ACCURACY REQUIREMENTS: " +
-    "- Every wall must be placed exactly where it appears in the floor plan image " +
-    "- Room sizes and proportions must match the labeled dimensions " +
-    "- Door and window positions must match exactly " +
-    "- The number of rooms, their shapes, and their relative positions must be identical to the plan " +
-    "- Do not add, remove, or relocate any walls, rooms, doors, or windows " +
-    "- Wall thicknesses and corridor widths must match the plan " +
-    roomDetails + " " +
-    "Generate a 10-second ultra-realistic 3D architectural walkthrough video in one continuous camera movement. " +
-    "First 2-3 seconds: top-down aerial view showing the complete 3D model from above — the layout must visibly match the original 2D floor plan. " +
-    "Camera then smoothly descends and enters the building through the main entrance. " +
-    "Remaining 7-8 seconds: smooth first-person interior walkthrough following a natural path through every room shown in the plan. " +
-    "Each room is furnished appropriately for its function (bedrooms with beds, kitchens with counters, living rooms with sofas, bathrooms with fixtures, dining areas with tables). " +
-    "Cinematic smooth camera movement, realistic materials (hardwood floors, painted walls, glass windows, stone countertops), " +
-    "global illumination, natural daylight through windows, warm interior lighting. " +
-    "High-end real estate architectural visualization quality. " +
-    "The final 3D result must strictly and accurately represent the provided 2D floor plan — wall positions are the highest priority."
-  );
+export function buildFloorPlanCombinedPrompt(_buildingDescription: string, _roomInfo?: string): string {
+  // EXACT prompt that produces great results on OpenArt with Kling 3.0.
+  // The image itself carries all floor plan information — Kling reads it visually.
+  // Do NOT append roomInfo, buildingDescription, or any dynamic data.
+  return "Use the provided 2D floor plan as the only source of truth and convert it into an accurate BIM-style 3D architectural model following AEC standards. Strictly interpret walls, doors, windows, room layout, scale, and spatial relationships exactly as shown, without inventing or modifying any spaces. Generate a 15-second ultra-realistic 3D architectural walkthrough video. First 5 seconds: exterior views showing front, sides, back, and a top view of the building derived from the floor plan footprint. Next 10 seconds: smooth interior walkthrough covering all spaces shown in the plan, following a natural circulation path. Use cinematic camera movement, realistic materials, global illumination, natural lighting, and architectural visualization quality. Ensure the final result is a high-end real estate style 3D render that strictly matches the provided 2D floor plan.";
 }
 
 /**
@@ -690,7 +666,7 @@ async function createTextToVideoTask(
       };
 
       if (modelName.startsWith("kling-v1")) {
-        body.cfg_scale = 0.5;
+        body.cfg_scale = 0.7;
       }
 
       const result = await klingFetch(KLING_TEXT2VIDEO_PATH, {
@@ -946,7 +922,7 @@ export async function submitSingleWalkthrough(
   prompt: string,
   mode: "std" | "pro" = "pro",
 ): Promise<SubmittedSingleVideoTask> {
-  const negativePrompt = "blur, distortion, low quality, warped geometry, melting walls, deformed architecture, shaky camera, noise, artifacts, morphing surfaces, bent lines, wobbly structure, jittery motion, flickering textures, plastic appearance, fisheye distortion, floating objects, wireframe, cartoon, sketch, low polygon, unrealistic proportions, text overlay, watermark, oversaturated colors, CGI look, video game graphics, toy model, miniature, tilt-shift, abstract, surreal, people walking, cars moving, birds flying, lens flare";
+  const negativePrompt = "blur, distortion, low quality, noise, artifacts, cartoon, sketch, watermark";
 
   console.log("[GN-009] submitSingleWalkthrough: Submitting SINGLE 10s walkthrough");
   console.log("[GN-009] Image type:", imageUrl?.startsWith("http") ? "URL" : "base64", "length:", imageUrl?.length);
