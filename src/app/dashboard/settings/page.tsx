@@ -745,22 +745,27 @@ function ApiKeysSection({ saveStatus, onSaveStatusChange }: {
             {/* Seal Vault button */}
             <motion.button
               onClick={handleSaveKeys}
-              disabled={saveStatus === "saving" || loadingKeys}
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
+              disabled={saveStatus === "saving" || loadingKeys || (!openAiKey.trim() && !stabilityKey.trim())}
+              whileHover={(!openAiKey.trim() && !stabilityKey.trim()) ? {} : { scale: 1.02 }}
+              whileTap={(!openAiKey.trim() && !stabilityKey.trim()) ? {} : { scale: 0.98 }}
               style={{
                 display: "inline-flex", alignItems: "center", gap: 10, alignSelf: "flex-start",
                 padding: "12px 28px", borderRadius: 10, border: "none",
                 background: saveStatus === "saved"
                   ? "linear-gradient(135deg, #10B981, #059669)"
-                  : "linear-gradient(135deg, #1B4FFF, #8B5CF6)",
-                color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer",
+                  : (!openAiKey.trim() && !stabilityKey.trim())
+                    ? "linear-gradient(135deg, #374151, #4B5563)"
+                    : "linear-gradient(135deg, #1B4FFF, #8B5CF6)",
+                color: "#fff", fontSize: 13, fontWeight: 700,
+                cursor: (!openAiKey.trim() && !stabilityKey.trim()) ? "not-allowed" : "pointer",
                 letterSpacing: "0.03em",
                 boxShadow: saveStatus === "saved"
                   ? "0 4px 20px rgba(16,185,129,0.3)"
-                  : "0 4px 20px rgba(27,79,255,0.3)",
+                  : (!openAiKey.trim() && !stabilityKey.trim())
+                    ? "none"
+                    : "0 4px 20px rgba(27,79,255,0.3)",
                 transition: "all 200ms ease",
-                opacity: (saveStatus === "saving" || loadingKeys) ? 0.6 : 1,
+                opacity: (saveStatus === "saving" || loadingKeys || (!openAiKey.trim() && !stabilityKey.trim())) ? 0.5 : 1,
                 fontFamily: "var(--font-jetbrains), monospace",
               }}
             >
