@@ -5,7 +5,7 @@ import type { BuildingDescription } from "@/services/openai";
 import { analyzeSite } from "@/services/site-analysis";
 import { generateId } from "@/lib/utils";
 import type { ExecutionArtifact } from "@/types/execution";
-import { checkRateLimit, logRateLimitHit, isExecutionAlreadyCounted } from "@/lib/rate-limit";
+import { checkRateLimit, logRateLimitHit, isExecutionAlreadyCounted, isAdminUser } from "@/lib/rate-limit";
 import {
   findUnitRate,
   applyRegionalFactor,
@@ -84,48 +84,54 @@ export async function POST(req: NextRequest) {
   // Parse body first so we can use executionId for rate limit dedup
   const { catalogueId, executionId, tileInstanceId, inputData, userApiKey } = await req.json();
 
-  // Apply rate limiting — count once per workflow execution, not per node
-  // If this executionId was already counted, skip the rate limit check
-  try {
-    const alreadyCounted = executionId
-      ? await isExecutionAlreadyCounted(userId, executionId)
-      : false;
+  // Admin users bypass ALL rate limiting — check before any Redis calls
+  const userEmail = session.user.email || "";
+  const isAdmin = isAdminUser(userEmail) ||
+    userRole === "PLATFORM_ADMIN" ||
+    userRole === "TEAM_ADMIN";
 
-    if (!alreadyCounted) {
-      const userEmail = session.user.email || "";
-      const rateLimitResult = await checkRateLimit(userId, userRole, userEmail);
+  if (!isAdmin) {
+    // Apply rate limiting — count once per workflow execution, not per node
+    try {
+      const alreadyCounted = executionId
+        ? await isExecutionAlreadyCounted(userId, executionId)
+        : false;
 
-      if (!rateLimitResult.success) {
-        const resetDate = new Date(rateLimitResult.reset);
-        const hoursUntilReset = Math.ceil((resetDate.getTime() - Date.now()) / (1000 * 60 * 60));
+      if (!alreadyCounted) {
+        const rateLimitResult = await checkRateLimit(userId, userRole, userEmail);
 
-        // Log the rate limit hit
-        logRateLimitHit(userId, userRole, rateLimitResult.remaining);
+        if (!rateLimitResult.success) {
+          const resetDate = new Date(rateLimitResult.reset);
+          const hoursUntilReset = Math.ceil((resetDate.getTime() - Date.now()) / (1000 * 60 * 60));
 
-        const rateLimitError = userRole === "FREE"
-          ? UserErrors.RATE_LIMIT_FREE(hoursUntilReset)
-          : UserErrors.RATE_LIMIT_PRO(Math.ceil(hoursUntilReset * 60));
+          // Log the rate limit hit
+          logRateLimitHit(userId, userRole, rateLimitResult.remaining);
 
-        return NextResponse.json(
-          formatErrorResponse(rateLimitError),
-          {
-            status: 429,
-            headers: {
-              "X-RateLimit-Limit": rateLimitResult.limit.toString(),
-              "X-RateLimit-Remaining": rateLimitResult.remaining.toString(),
-              "X-RateLimit-Reset": rateLimitResult.reset.toString(),
+          const rateLimitError = userRole === "FREE"
+            ? UserErrors.RATE_LIMIT_FREE(hoursUntilReset)
+            : UserErrors.RATE_LIMIT_PRO(Math.ceil(hoursUntilReset * 60));
+
+          return NextResponse.json(
+            formatErrorResponse(rateLimitError),
+            {
+              status: 429,
+              headers: {
+                "X-RateLimit-Limit": rateLimitResult.limit.toString(),
+                "X-RateLimit-Remaining": rateLimitResult.remaining.toString(),
+                "X-RateLimit-Reset": rateLimitResult.reset.toString(),
+              }
             }
-          }
-        );
+          );
+        }
       }
-    }
 
-  } catch (error) {
-    console.error("[execute-node] Rate limit check failed:", error);
-    return NextResponse.json(
-      formatErrorResponse({ title: "Service unavailable", message: "Rate limit service temporarily unavailable. Please try again in a moment.", code: "RATE_LIMIT_UNAVAILABLE" }),
-      { status: 503 }
-    );
+    } catch (error) {
+      console.error("[execute-node] Rate limit check failed:", error);
+      return NextResponse.json(
+        formatErrorResponse({ title: "Service unavailable", message: "Rate limit service temporarily unavailable. Please try again in a moment.", code: "RATE_LIMIT_UNAVAILABLE" }),
+        { status: 503 }
+      );
+    }
   }
 
   if (!REAL_NODE_IDS.has(catalogueId)) {

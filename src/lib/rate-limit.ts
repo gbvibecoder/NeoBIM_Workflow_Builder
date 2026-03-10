@@ -32,7 +32,7 @@ try {
   });
 }
 
-const FREE_TIER_LIMIT = parseInt(process.env.FREE_TIER_EXECUTIONS_PER_DAY || "3");
+const FREE_TIER_LIMIT = parseInt(process.env.FREE_TIER_EXECUTIONS_PER_DAY || "10");
 const PRO_TIER_LIMIT = parseInt(process.env.PRO_TIER_EXECUTIONS_PER_DAY || "100");
 
 export const freeTierRateLimit = new Ratelimit({
@@ -53,7 +53,7 @@ export const proTierRateLimit = new Ratelimit({
  * Check if user is an admin (bypasses rate limits)
  * Reads from ADMIN_EMAILS environment variable (comma-separated list)
  */
-function isAdminUser(userEmail?: string): boolean {
+export function isAdminUser(userEmail?: string): boolean {
   if (!userEmail) return false;
   
   const adminEmails = process.env.ADMIN_EMAILS;
