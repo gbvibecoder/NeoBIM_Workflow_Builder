@@ -66,7 +66,8 @@ const nextConfig: NextConfig = {
               style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
               img-src 'self' blob: data: https://oaidalleapiprodscus.blob.core.windows.net https://picsum.photos https://images.unsplash.com https://lh3.googleusercontent.com https://*.vercel.app;
               font-src 'self' https://fonts.gstatic.com;
-              connect-src 'self' https://api.openai.com https://api.stability.ai https://*.upstash.io https://api.stripe.com;
+              media-src 'self' blob: data: https://*.klingai.com https://*.kuaishou.com https://*.ksyun.com https://*.ks-cdn.com https://*.kscampus.com https://*;
+              connect-src 'self' https://api.openai.com https://api.stability.ai https://*.upstash.io https://api.stripe.com https://api.klingai.com https://*.klingai.com https://*.fal.ai https://fal.run;
               frame-src 'self' https://js.stripe.com;
               object-src 'none';
               base-uri 'self';

@@ -1,4 +1,7 @@
-{"id":"d0eb6af4-dc24-47da-b67f-acac74bfd686","timestamp":"2026-03-09T08:43:40.197Z","userId":"cmmdh1l94000004l8v14nq5gu","eventName":"user_login"}
-{"id":"c1227e5a-c0fd-4b3f-9a70-d4c55f04b09a","timestamp":"2026-03-09T09:33:35.844Z","userId":"cmmdh1l94000004l8v14nq5gu","eventName":"user_login"}
-{"id":"b25dad2c-c727-43a2-b955-606d5355993d","timestamp":"2026-03-09T09:37:09.638Z","userId":"cmmdh1l94000004l8v14nq5gu","eventName":"user_login"}
-{"id":"e7f0022a-aed0-44be-801f-51327a579402","timestamp":"2026-03-09T12:42:57.203Z","userId":"cmmdh1l94000004l8v14nq5gu","eventName":"user_login"}
+{"id":"490c8be1-394e-4e4c-a764-7fc114521bd0","timestamp":"2026-03-09T10:04:42.589Z","userId":"cmmdh1l94000004l8v14nq5gu","eventName":"user_login"}
+{"id":"d291fa48-9ec3-4bb6-b84a-8da360e02d4d","timestamp":"2026-03-09T10:07:57.607Z","userId":"cmmdh1l94000004l8v14nq5gu","eventName":"user_login"}
+{"id":"97e18656-0a69-48c4-8143-580586185054","timestamp":"2026-03-09T10:27:37.328Z","userId":"cmmdh1l94000004l8v14nq5gu","eventName":"node_used","properties":{"catalogueId":"IN-001","nodeLabel":"Text Prompt"}}
+{"id":"175b1d44-6d44-4e5a-96bd-fd2e04ae81a5","timestamp":"2026-03-09T10:27:50.320Z","userId":"cmmdh1l94000004l8v14nq5gu","eventName":"node_used","properties":{"catalogueId":"TR-003","nodeLabel":"Design Brief Analyzer"}}
+{"id":"1ffc8d07-e0b6-4ac3-b289-9d021481238a","timestamp":"2026-03-09T10:27:51.520Z","userId":"cmmdh1l94000004l8v14nq5gu","eventName":"node_used","properties":{"catalogueId":"GN-001","nodeLabel":"Massing Generator"}}
+{"id":"1ec176ef-e4ce-4acd-ad10-edd8d238ea53","timestamp":"2026-03-09T10:28:15.070Z","userId":"cmmdh1l94000004l8v14nq5gu","eventName":"node_used","properties":{"catalogueId":"GN-003","nodeLabel":"Concept Render Generator"}}
+{"id":"e4b4dd95-bf51-43a6-9310-c542e8fadf60","timestamp":"2026-03-09T10:28:15.070Z","userId":"cmmdh1l94000004l8v14nq5gu","eventName":"workflow_executed","properties":{"nodeCount":4,"catalogueIds":["IN-001","TR-003","GN-001","GN-003"]}}

@@ -34,6 +34,7 @@ export function MediaTab({ data, onExpandVideo }: MediaTabProps) {
               autoPlay
               muted
               playsInline
+              crossOrigin="anonymous"
               src={data.videoData.videoUrl}
               style={{
                 width: "100%",

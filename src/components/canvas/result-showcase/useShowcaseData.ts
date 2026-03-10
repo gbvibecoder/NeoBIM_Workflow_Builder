@@ -28,6 +28,13 @@ export interface FileDownload {
   downloadUrl?: string;
 }
 
+export interface VideoSegmentInfo {
+  videoUrl: string;
+  downloadUrl: string;
+  durationSeconds: number;
+  label: string;
+}
+
 export interface VideoInfo {
   videoUrl: string;
   downloadUrl: string;
@@ -37,6 +44,7 @@ export interface VideoInfo {
   pipeline?: string;
   costUsd?: number;
   nodeId: string;
+  segments?: VideoSegmentInfo[];
 }
 
 export interface ProceduralModelData {
@@ -181,6 +189,15 @@ export function useShowcaseData(): ShowcaseData {
     if (videoArtifact) {
       const d = asRecord(videoArtifact.data);
       const meta = asRecord(d.metadata);
+      // Parse segments if available (dual video: exterior + interior)
+      const rawSegments = d.segments as Array<Record<string, unknown>> | undefined;
+      const segments: VideoSegmentInfo[] | undefined = rawSegments?.map(s => ({
+        videoUrl: (s.videoUrl as string) ?? "",
+        downloadUrl: (s.downloadUrl as string) ?? (s.videoUrl as string) ?? "",
+        durationSeconds: (s.durationSeconds as number) ?? 5,
+        label: (s.label as string) ?? "Segment",
+      }));
+
       videoData = {
         videoUrl: (d.videoUrl as string) ?? "",
         downloadUrl: (d.downloadUrl as string) ?? (d.videoUrl as string) ?? "",
@@ -190,6 +207,7 @@ export function useShowcaseData(): ShowcaseData {
         pipeline: (d.pipeline as string) ?? (meta.pipeline as string),
         costUsd: (d.costUsd as number) ?? (meta.costUsd as number) ?? undefined,
         nodeId: videoArtifact.tileInstanceId,
+        segments,
       };
     }
 

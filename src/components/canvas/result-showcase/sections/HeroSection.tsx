@@ -1,5 +1,6 @@
 "use client";
 
+import { useRef, useState, useCallback } from "react";
 import { motion } from "framer-motion";
 import { Play, Maximize2 } from "lucide-react";
 import { useLocale } from "@/hooks/useLocale";
@@ -14,6 +15,21 @@ interface HeroSectionProps {
 
 export function HeroSection({ videoData, heroImageUrl, onExpandVideo }: HeroSectionProps) {
   const { t } = useLocale();
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [segmentIndex, setSegmentIndex] = useState(0);
+
+  const segments = videoData?.segments;
+  const hasSegments = segments && segments.length > 1;
+  const currentUrl = hasSegments ? segments[segmentIndex]?.videoUrl : videoData?.videoUrl;
+
+  const handleVideoEnded = useCallback(() => {
+    if (hasSegments && segmentIndex < segments.length - 1) {
+      setSegmentIndex(prev => prev + 1);
+    } else if (hasSegments) {
+      setSegmentIndex(0); // loop back
+    }
+  }, [hasSegments, segments, segmentIndex]);
+
   if (!videoData?.videoUrl && !heroImageUrl) return null;
 
   return (
@@ -29,13 +45,17 @@ export function HeroSection({ videoData, heroImageUrl, onExpandVideo }: HeroSect
         background: "#000",
       }}
     >
-      {videoData?.videoUrl ? (
+      {currentUrl ? (
         <video
+          ref={videoRef}
+          key={currentUrl}
           autoPlay
           muted
-          loop
+          loop={!hasSegments}
           playsInline
-          src={videoData.videoUrl}
+          crossOrigin="anonymous"
+          src={currentUrl}
+          onEnded={handleVideoEnded}
           style={{
             width: "100%",
             height: "100%",
@@ -61,6 +81,31 @@ export function HeroSection({ videoData, heroImageUrl, onExpandVideo }: HeroSect
         />
       ) : null}
 
+      {/* Segment indicator */}
+      {hasSegments && (
+        <div style={{
+          position: "absolute", top: 12, left: 12,
+          display: "flex", gap: 4,
+        }}>
+          {segments.map((seg, i) => (
+            <button
+              key={i}
+              onClick={() => setSegmentIndex(i)}
+              style={{
+                padding: "3px 8px", borderRadius: 4,
+                background: i === segmentIndex ? "rgba(0,245,255,0.2)" : "rgba(0,0,0,0.6)",
+                border: `1px solid ${i === segmentIndex ? "rgba(0,245,255,0.4)" : "rgba(255,255,255,0.1)"}`,
+                color: i === segmentIndex ? COLORS.CYAN : "#999",
+                fontSize: 9, fontWeight: 600, cursor: "pointer",
+                fontFamily: "'Space Mono', monospace",
+              }}
+            >
+              {seg.label} ({seg.durationSeconds}s)
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* Gradient overlay */}
       <div
         style={{
@@ -84,7 +129,7 @@ export function HeroSection({ videoData, heroImageUrl, onExpandVideo }: HeroSect
                 {t('showcase.cinematicWalkthrough')}
               </span>
               <span style={{ fontSize: 10, color: COLORS.TEXT_MUTED }}>
-                {videoData.durationSeconds}s · {videoData.shotCount} shots
+                {videoData.durationSeconds}s · {hasSegments ? `${segments.length} parts` : `${videoData.shotCount} shots`}
               </span>
             </div>
             <button

@@ -16,6 +16,17 @@ export interface ValidationResult {
  */
 export function validateTR003Input(inputData: unknown): ValidationResult {
   const input = inputData as Record<string, unknown> | null | undefined;
+
+  // Accept structured JSON data from upstream TR-002 (has building_type, floors, etc.)
+  if (input?.building_type || input?.buildingType || input?.floors || input?.total_gfa || input?.totalArea) {
+    return { valid: true };
+  }
+
+  // Accept any object with reasonable content
+  if (input && typeof input === "object" && Object.keys(input).length >= 2) {
+    return { valid: true };
+  }
+
   const prompt = input?.prompt ?? input?.content ?? "";
 
   if (typeof prompt !== "string") {
@@ -34,10 +45,10 @@ export function validateTR003Input(inputData: unknown): ValidationResult {
     };
   }
 
-  if (prompt.length > 500) {
+  if (prompt.length > 2500) {
     return {
       valid: false,
-      error: "Prompt too long (max 500 chars)",
+      error: "Prompt too long (max 2500 chars)",
       userError: UserErrors.PROMPT_TOO_LONG,
     };
   }
