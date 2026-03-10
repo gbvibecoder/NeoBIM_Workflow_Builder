@@ -263,6 +263,37 @@ async function createTask(
         body.cfg_scale = 0.7;
       }
 
+      // ===== IMAGE DEBUG =====
+      console.log("===== IMAGE DEBUG =====");
+      console.log("[IMAGE] Type:", typeof imageUrl);
+      console.log("[IMAGE] Starts with http:", imageUrl?.startsWith("http"));
+      console.log("[IMAGE] Starts with data:", imageUrl?.startsWith("data:"));
+      console.log("[IMAGE] Starts with /9j/:", imageUrl?.startsWith("/9j/")); // JPEG base64 signature
+      console.log("[IMAGE] Starts with iVBOR:", imageUrl?.startsWith("iVBOR")); // PNG base64 signature
+      console.log("[IMAGE] First 100 chars:", imageUrl?.slice(0, 100));
+      console.log("[IMAGE] Total length:", imageUrl?.length);
+
+      // Check if it's valid base64
+      if (!imageUrl?.startsWith("http")) {
+        try {
+          const cleanBase64 = imageUrl.replace(/^data:image\/\w+;base64,/, "");
+          const buffer = Buffer.from(cleanBase64, "base64");
+          console.log("[IMAGE] Decoded buffer size:", buffer.length, "bytes");
+          console.log("[IMAGE] Decoded size in KB:", Math.round(buffer.length / 1024), "KB");
+          // Check magic bytes
+          console.log("[IMAGE] Magic bytes:", buffer[0]?.toString(16), buffer[1]?.toString(16));
+          console.log("[IMAGE] Is JPEG:", buffer[0] === 0xFF && buffer[1] === 0xD8);
+          console.log("[IMAGE] Is PNG:", buffer[0] === 0x89 && buffer[1] === 0x50);
+        } catch (e) {
+          console.log("[IMAGE] ❌ FAILED TO DECODE BASE64:", e);
+        }
+      }
+
+      // Log the EXACT image field being sent to Kling
+      console.log("[IMAGE] Kling 'image' field first 80 chars:", body.image?.slice(0, 80));
+      console.log("[IMAGE] Kling 'image' field length:", body.image?.length);
+      console.log("========================");
+
       console.log("[CREATE] EXACT Kling API request body:", JSON.stringify({
         ...body,
         image: body.image?.length > 100 ? body.image?.slice(0, 50) + "...[truncated, total=" + body.image.length + "]" : body.image,

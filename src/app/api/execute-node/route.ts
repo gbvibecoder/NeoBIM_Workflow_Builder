@@ -1551,7 +1551,12 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
       if (inputData?.fileData && typeof inputData.fileData === "string") {
         const imgMime = (inputData.mimeType as string) ?? "image/jpeg";
         const rawFileData = inputData.fileData as string;
+
+        console.log("[IMAGE-STRIP] Before strip — first 80 chars:", rawFileData?.slice(0, 80));
+        console.log("[IMAGE-STRIP] Has data: prefix:", rawFileData?.startsWith("data:"));
         const cleanBase64 = rawFileData.startsWith("data:") ? rawFileData.split(",")[1] ?? rawFileData : rawFileData;
+        console.log("[IMAGE-STRIP] After strip — first 80 chars:", cleanBase64?.slice(0, 80));
+        console.log("[IMAGE-STRIP] Length before:", rawFileData?.length, "→ after:", cleanBase64?.length);
 
         console.log("[KLING] Step 2: Clean base64 length:", cleanBase64.length, "mime:", imgMime);
 
@@ -1575,11 +1580,23 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
           console.warn("[KLING] Step 2a: R2 upload failed:", r2Err);
         }
 
-        // FIX F: Send raw base64 directly to Kling (skip temp-image entirely)
+        // FIX G: Store in Upstash Redis and send public URL to Kling (like OpenArt does).
+        // OpenArt uploads to CDN and gives Kling a URL — base64 may cause Kling to ignore the image.
         if (!renderImageUrl) {
-          console.log("[KLING] Step 2b: Sending base64 DIRECTLY to Kling (Fix F — no temp-image URL)");
-          renderImageUrl = cleanBase64;
-          console.log("[KLING] Step 2b: Using raw base64, length:", cleanBase64.length);
+          try {
+            const { storeImage, getTempImageUrl, isLocalhost } = await import("@/lib/temp-image-store");
+            if (!isLocalhost()) {
+              const imageId = await storeImage(cleanBase64, imgMime);
+              renderImageUrl = getTempImageUrl(imageId);
+              console.log("[KLING] Step 2b: FIX G — Stored in Redis, serving via URL:", renderImageUrl);
+            } else {
+              console.warn("[KLING] Step 2b: localhost detected — Kling cannot fetch. Falling back to base64.");
+              renderImageUrl = cleanBase64;
+            }
+          } catch (redisErr) {
+            console.warn("[KLING] Step 2b: Redis store failed, falling back to base64:", redisErr);
+            renderImageUrl = cleanBase64;
+          }
         }
 
         isFloorPlanInput = true;
@@ -1608,11 +1625,23 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
             }
           }
 
-          // FIX F: Send PNG base64 directly to Kling (skip temp-image)
+          // FIX G: Store PNG in Redis and send public URL (like OpenArt CDN approach)
           if (!renderImageUrl) {
-            console.log("[KLING] Step 2 (SVG): Sending PNG base64 DIRECTLY to Kling (Fix F)");
-            renderImageUrl = pngBuffer.toString("base64");
-            console.log("[KLING] Step 2 (SVG): Using raw base64, length:", renderImageUrl.length);
+            try {
+              const { storeImage, getTempImageUrl, isLocalhost } = await import("@/lib/temp-image-store");
+              if (!isLocalhost()) {
+                const pngBase64 = pngBuffer.toString("base64");
+                const imageId = await storeImage(pngBase64, "image/png");
+                renderImageUrl = getTempImageUrl(imageId);
+                console.log("[KLING] Step 2 (SVG): FIX G — Stored PNG in Redis, URL:", renderImageUrl);
+              } else {
+                console.warn("[KLING] Step 2 (SVG): localhost — falling back to base64");
+                renderImageUrl = pngBuffer.toString("base64");
+              }
+            } catch (redisErr) {
+              console.warn("[KLING] Step 2 (SVG): Redis store failed, falling back to base64:", redisErr);
+              renderImageUrl = pngBuffer.toString("base64");
+            }
           }
           isFloorPlanInput = true;
         } catch (svgErr) {
