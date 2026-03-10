@@ -228,7 +228,7 @@ async function pollVideoGeneration(
           description: status.failureMessage ?? "Unknown error",
           duration: 6000,
         });
-        clearVideoProgressFn(nodeId);
+        // Keep the "failed" state visible — don't clear it
         return;
       }
 
@@ -287,7 +287,7 @@ async function pollVideoGeneration(
     failureMessage: "Video generation timed out after 10 minutes",
   });
   toast.error("Video generation timed out", { duration: 6000 });
-  clearVideoProgressFn(nodeId);
+  // Keep the "failed" state visible — don't clear it
 }
 
 /** Client-side Three.js walkthrough rendering */
@@ -370,7 +370,7 @@ async function renderClientWalkthrough(
       description: err instanceof Error ? err.message : "Unknown error",
       duration: 6000,
     });
-    clearVideoProgressFn(nodeId);
+    // Don't clear progress — keep the "failed" state visible so the user sees the error
   }
 }
 

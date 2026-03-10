@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useCallback, useRef, useState } from "react";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { useExecution } from "@/hooks/useExecution";
 import {
   ReactFlow,
@@ -1070,7 +1071,9 @@ function WorkflowCanvasInner({ workflowId: urlWorkflowId }: WorkflowCanvasInnerP
           <FullscreenArtifactViewer />
 
           {/* Fullscreen Video Player (opened from node video thumbnail or expand button) */}
-          <FullscreenVideoPlayer />
+          <ErrorBoundary fallback={null} showHomeButton={false}>
+            <FullscreenVideoPlayer />
+          </ErrorBoundary>
 
           {/* ── Architectural title block — bottom right ── */}
           <div style={{

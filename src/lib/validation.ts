@@ -45,10 +45,10 @@ export function validateTR003Input(inputData: unknown): ValidationResult {
     };
   }
 
-  if (prompt.length > 2500) {
+  if (prompt.length > 2000) {
     return {
       valid: false,
-      error: "Prompt too long (max 2500 chars)",
+      error: "Prompt too long (max 2000 chars)",
       userError: UserErrors.PROMPT_TOO_LONG,
     };
   }

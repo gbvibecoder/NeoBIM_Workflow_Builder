@@ -5,7 +5,7 @@ import type { BuildingDescription } from "@/services/openai";
 import { analyzeSite } from "@/services/site-analysis";
 import { generateId } from "@/lib/utils";
 import type { ExecutionArtifact } from "@/types/execution";
-import { checkRateLimit, logRateLimitHit } from "@/lib/rate-limit";
+import { checkRateLimit, logRateLimitHit, isExecutionAlreadyCounted } from "@/lib/rate-limit";
 import {
   findUnitRate,
   applyRegionalFactor,
@@ -81,34 +81,43 @@ export async function POST(req: NextRequest) {
   const userId: string = session.user.id;
   const userRole = (session.user as { role?: string }).role as "FREE" | "PRO" | "TEAM_ADMIN" | "PLATFORM_ADMIN" || "FREE";
 
-  // Apply rate limiting
+  // Parse body first so we can use executionId for rate limit dedup
+  const { catalogueId, executionId, tileInstanceId, inputData, userApiKey } = await req.json();
+
+  // Apply rate limiting — count once per workflow execution, not per node
+  // If this executionId was already counted, skip the rate limit check
   try {
+    const alreadyCounted = executionId
+      ? await isExecutionAlreadyCounted(userId, executionId)
+      : false;
 
-    const userEmail = session.user.email || "";
-    const rateLimitResult = await checkRateLimit(userId, userRole, userEmail);
+    if (!alreadyCounted) {
+      const userEmail = session.user.email || "";
+      const rateLimitResult = await checkRateLimit(userId, userRole, userEmail);
 
-    if (!rateLimitResult.success) {
-      const resetDate = new Date(rateLimitResult.reset);
-      const hoursUntilReset = Math.ceil((resetDate.getTime() - Date.now()) / (1000 * 60 * 60));
+      if (!rateLimitResult.success) {
+        const resetDate = new Date(rateLimitResult.reset);
+        const hoursUntilReset = Math.ceil((resetDate.getTime() - Date.now()) / (1000 * 60 * 60));
 
-      // Log the rate limit hit
-      logRateLimitHit(userId, userRole, rateLimitResult.remaining);
+        // Log the rate limit hit
+        logRateLimitHit(userId, userRole, rateLimitResult.remaining);
 
-      const rateLimitError = userRole === "FREE"
-        ? UserErrors.RATE_LIMIT_FREE(hoursUntilReset)
-        : UserErrors.RATE_LIMIT_PRO(Math.ceil(hoursUntilReset * 60));
+        const rateLimitError = userRole === "FREE"
+          ? UserErrors.RATE_LIMIT_FREE(hoursUntilReset)
+          : UserErrors.RATE_LIMIT_PRO(Math.ceil(hoursUntilReset * 60));
 
-      return NextResponse.json(
-        formatErrorResponse(rateLimitError),
-        { 
-          status: 429,
-          headers: {
-            "X-RateLimit-Limit": rateLimitResult.limit.toString(),
-            "X-RateLimit-Remaining": rateLimitResult.remaining.toString(),
-            "X-RateLimit-Reset": rateLimitResult.reset.toString(),
+        return NextResponse.json(
+          formatErrorResponse(rateLimitError),
+          {
+            status: 429,
+            headers: {
+              "X-RateLimit-Limit": rateLimitResult.limit.toString(),
+              "X-RateLimit-Remaining": rateLimitResult.remaining.toString(),
+              "X-RateLimit-Reset": rateLimitResult.reset.toString(),
+            }
           }
-        }
-      );
+        );
+      }
     }
 
   } catch (error) {
@@ -118,8 +127,6 @@ export async function POST(req: NextRequest) {
       { status: 503 }
     );
   }
-
-  const { catalogueId, executionId, tileInstanceId, inputData, userApiKey } = await req.json();
 
   if (!REAL_NODE_IDS.has(catalogueId)) {
     return NextResponse.json(

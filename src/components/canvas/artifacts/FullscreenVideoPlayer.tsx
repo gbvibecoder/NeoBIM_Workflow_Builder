@@ -58,7 +58,6 @@ export function FullscreenVideoPlayer() {
   const pipeline = typeof d?.pipeline === "string" ? d.pipeline : "Kling 3.0";
   const costUsd = typeof d?.costUsd === "number" ? d.costUsd : null;
 
-  // eslint-disable-next-line react-hooks/rules-of-hooks
   useEffect(() => {
     if (!isOpen) {
       setCurrentSegmentIndex(0);
@@ -79,12 +78,25 @@ export function FullscreenVideoPlayer() {
     }
   };
 
-  // Auto-play on segment change
-  // eslint-disable-next-line react-hooks/rules-of-hooks
+  // Auto-play on segment change — wait for loadedmetadata before play
   useEffect(() => {
-    if (videoRef.current && hasSegments && isPlaying) {
-      videoRef.current.load();
-      videoRef.current.play().catch(() => {});
+    const video = videoRef.current;
+    if (!video || !hasSegments || !isPlaying) return;
+
+    video.load();
+
+    const onReady = () => {
+      video.play().catch((err) => {
+        console.warn("[FullscreenVideoPlayer] Auto-play blocked:", err.message);
+      });
+    };
+
+    // If metadata already loaded, play immediately; otherwise wait
+    if (video.readyState >= 1) {
+      onReady();
+    } else {
+      video.addEventListener("loadedmetadata", onReady, { once: true });
+      return () => video.removeEventListener("loadedmetadata", onReady);
     }
   }, [currentSegmentIndex, hasSegments, isPlaying]);
 

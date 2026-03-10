@@ -345,19 +345,26 @@ function setupEnvironment(scene: THREE.Scene, _buildingHeight: number) {
   scene.add(ground);
 
   // Simple env map for reflections
-  const pmremGenerator = new THREE.PMREMGenerator(
-    new THREE.WebGLRenderer({ canvas: document.createElement("canvas") }),
-  );
-  const envScene = new THREE.Scene();
-  envScene.background = new THREE.Color(0x87ceeb);
+  let tempRenderer: THREE.WebGLRenderer | null = null;
+  try {
+    tempRenderer = new THREE.WebGLRenderer({ canvas: document.createElement("canvas") });
+    const pmremGenerator = new THREE.PMREMGenerator(tempRenderer);
+    const envScene = new THREE.Scene();
+    envScene.background = new THREE.Color(0x87ceeb);
 
-  // Gradient hemisphere for the env map
-  const envHemi = new THREE.HemisphereLight(0x87ceeb, 0xffd4a0, 1);
-  envScene.add(envHemi);
+    // Gradient hemisphere for the env map
+    const envHemi = new THREE.HemisphereLight(0x87ceeb, 0xffd4a0, 1);
+    envScene.add(envHemi);
 
-  const envMap = pmremGenerator.fromScene(envScene, 0.04).texture;
-  scene.environment = envMap;
-  pmremGenerator.dispose();
+    const envMap = pmremGenerator.fromScene(envScene, 0.04).texture;
+    scene.environment = envMap;
+    pmremGenerator.dispose();
+  } catch (e) {
+    console.warn("[walkthrough] PMREM env map failed, skipping:", e);
+  } finally {
+    // Always dispose the temp renderer to avoid WebGL context leak
+    tempRenderer?.dispose();
+  }
 
   return { groundMat };
 }
@@ -480,9 +487,30 @@ export async function renderWalkthrough(
   report(10, PHASE_LABELS[0]);
 
   // ── Recording Setup ──
+  if (typeof canvas.captureStream !== "function") {
+    throw new Error("Browser does not support canvas.captureStream() — try Chrome or Edge");
+  }
   const stream = canvas.captureStream(FPS);
+
+  // Detect best supported codec with fallback chain
+  const codecCandidates = [
+    "video/webm;codecs=vp9",
+    "video/webm;codecs=vp8",
+    "video/webm",
+  ];
+  let mimeType = "";
+  for (const candidate of codecCandidates) {
+    if (typeof MediaRecorder !== "undefined" && MediaRecorder.isTypeSupported(candidate)) {
+      mimeType = candidate;
+      break;
+    }
+  }
+  if (!mimeType) {
+    throw new Error("Browser does not support WebM video recording — try Chrome or Edge");
+  }
+
   const mediaRecorder = new MediaRecorder(stream, {
-    mimeType: "video/webm;codecs=vp9",
+    mimeType,
     videoBitsPerSecond: 5_000_000,
   });
   const chunks: Blob[] = [];
@@ -490,69 +518,87 @@ export async function renderWalkthrough(
     if (e.data.size > 0) chunks.push(e.data);
   };
 
-  const recordingDone = new Promise<Blob>((resolve) => {
+  const recordingDone = new Promise<Blob>((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      reject(new Error("Video recording timed out"));
+    }, (DURATION + 30) * 1000); // Duration + 30s grace period
+
     mediaRecorder.onstop = () => {
+      clearTimeout(timeout);
       resolve(new Blob(chunks, { type: "video/webm" }));
+    };
+    mediaRecorder.onerror = (event) => {
+      clearTimeout(timeout);
+      reject(new Error(`MediaRecorder error: ${(event as ErrorEvent).message || "unknown"}`));
     };
   });
 
   mediaRecorder.start();
 
   // ── Frame-by-Frame Render Loop ──
-  for (let frame = 0; frame < TOTAL_FRAMES; frame++) {
-    const t = frame / TOTAL_FRAMES; // normalized time 0→1
+  try {
+    for (let frame = 0; frame < TOTAL_FRAMES; frame++) {
+      const t = frame / TOTAL_FRAMES; // normalized time 0→1
 
-    // Determine which phase we're in
-    let phaseIndex = 0;
-    let localT = 0;
-    for (let p = 0; p < PHASE_BOUNDS.length; p++) {
-      if (t >= PHASE_BOUNDS[p].start && t < PHASE_BOUNDS[p].end) {
-        phaseIndex = p;
-        localT = (t - PHASE_BOUNDS[p].start) / (PHASE_BOUNDS[p].end - PHASE_BOUNDS[p].start);
-        break;
+      // Determine which phase we're in
+      let phaseIndex = 0;
+      let localT = 0;
+      for (let p = 0; p < PHASE_BOUNDS.length; p++) {
+        if (t >= PHASE_BOUNDS[p].start && t < PHASE_BOUNDS[p].end) {
+          phaseIndex = p;
+          localT = (t - PHASE_BOUNDS[p].start) / (PHASE_BOUNDS[p].end - PHASE_BOUNDS[p].start);
+          break;
+        }
+      }
+      if (t >= PHASE_BOUNDS[3].start) {
+        phaseIndex = 3;
+        localT = (t - PHASE_BOUNDS[3].start) / (PHASE_BOUNDS[3].end - PHASE_BOUNDS[3].start);
+      }
+
+      // Smooth easing
+      const easedT = smoothstep(localT);
+
+      // Guard against NaN from spline interpolation
+      const safeT = Number.isFinite(easedT) ? Math.min(easedT, 0.999) : 0;
+
+      // Position camera along the current spline
+      const pos = splines[phaseIndex].getPointAt(safeT);
+      camera.position.copy(pos);
+
+      // Look-at target
+      const target = getCameraTarget(phaseIndex, easedT, buildingWidth, buildingDepth, buildingHeight);
+      camera.lookAt(target);
+
+      // Phase 4: Section cut - animate clipping plane rising with camera
+      if (phaseIndex === 3) {
+        const cutHeight = THREE.MathUtils.lerp(floorHeight, buildingHeight * 0.9, easedT);
+        sectionPlane.constant = cutHeight;
+        renderer.clippingPlanes = [sectionPlane];
+      } else {
+        renderer.clippingPlanes = [];
+      }
+
+      // Phase transition: adjust bloom for interior
+      if (phaseIndex >= 2) {
+        bloomPass.strength = THREE.MathUtils.lerp(0.3, 0.5, (phaseIndex === 3) ? easedT : localT * 0.5);
+      }
+
+      // Render frame
+      composer.render();
+
+      // Report progress
+      const percent = 10 + (t * 88); // 10-98%
+      report(percent, PHASE_LABELS[phaseIndex]);
+
+      // Yield to browser to avoid blocking
+      if (frame % 3 === 0) {
+        await yieldFrame();
       }
     }
-    if (t >= PHASE_BOUNDS[3].start) {
-      phaseIndex = 3;
-      localT = (t - PHASE_BOUNDS[3].start) / (PHASE_BOUNDS[3].end - PHASE_BOUNDS[3].start);
-    }
-
-    // Smooth easing
-    const easedT = smoothstep(localT);
-
-    // Position camera along the current spline
-    const pos = splines[phaseIndex].getPointAt(Math.min(easedT, 0.999));
-    camera.position.copy(pos);
-
-    // Look-at target
-    const target = getCameraTarget(phaseIndex, easedT, buildingWidth, buildingDepth, buildingHeight);
-    camera.lookAt(target);
-
-    // Phase 4: Section cut - animate clipping plane rising with camera
-    if (phaseIndex === 3) {
-      const cutHeight = THREE.MathUtils.lerp(floorHeight, buildingHeight * 0.9, easedT);
-      sectionPlane.constant = cutHeight;
-      renderer.clippingPlanes = [sectionPlane];
-    } else {
-      renderer.clippingPlanes = [];
-    }
-
-    // Phase transition: adjust bloom for interior
-    if (phaseIndex >= 2) {
-      bloomPass.strength = THREE.MathUtils.lerp(0.3, 0.5, (phaseIndex === 3) ? easedT : localT * 0.5);
-    }
-
-    // Render frame
-    composer.render();
-
-    // Report progress
-    const percent = 10 + (t * 88); // 10-98%
-    report(percent, PHASE_LABELS[phaseIndex]);
-
-    // Yield to browser to avoid blocking
-    if (frame % 3 === 0) {
-      await yieldFrame();
-    }
+  } catch (renderErr) {
+    // Ensure mediaRecorder is stopped even on frame loop error
+    try { mediaRecorder.stop(); } catch { /* already stopped */ }
+    throw renderErr;
   }
 
   // ── Finalize ──
