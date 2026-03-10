@@ -137,11 +137,48 @@ export async function executeNode(
       });
     }
 
-    case "TR-004": // Image Understanding
+    case "TR-004": { // Image Understanding
+      // Parse upstream content for hints about building type
+      const imgContent = String(inputData?.content ?? inputData?.prompt ?? "");
+      const imgLower = imgContent.toLowerCase();
+
+      // Infer building characteristics from the image description or user text
+      const imgFloors = (() => {
+        const m = imgContent.match(/(\d+)[\s-]*(?:stor(?:e?y|ies)|floors?|levels?)/i);
+        if (m) return parseInt(m[1], 10);
+        if (/high[\s-]?rise|tower|skyscraper/i.test(imgLower)) return 12;
+        if (/mid[\s-]?rise/i.test(imgLower)) return 6;
+        if (/villa|house|bungalow/i.test(imgLower)) return 2;
+        return 5;
+      })();
+
+      const imgBuildingType = /office|corporate/i.test(imgLower) ? "Office Building"
+        : /hotel|resort/i.test(imgLower) ? "Hotel"
+        : /school|university/i.test(imgLower) ? "Educational Facility"
+        : /hospital|medical/i.test(imgLower) ? "Healthcare Facility"
+        : /warehouse|industrial/i.test(imgLower) ? "Industrial Building"
+        : "Mixed-Use Residential";
+
+      const imgStyle = /modern|contemporary|minimal/i.test(imgLower) ? "Contemporary Nordic / Scandinavian minimalism"
+        : /classical|traditional|heritage/i.test(imgLower) ? "Classical European"
+        : /brutalist|concrete/i.test(imgLower) ? "Brutalist Concrete"
+        : "Contemporary Nordic / Scandinavian minimalism";
+
       return mockArtifact(executionId, tileInstanceId, "text", {
-        content: `IMAGE ANALYSIS — Design Intent Extraction\n\nDetected style: Contemporary Nordic / Scandinavian minimalism\nPredominant palette: White/cream render, natural timber, large glazing\nBuilding typology: Low-to-mid rise urban residential (est. 4-6 storeys)\nFacade character: Rhythmic fenestration, clean horizontal lines, minimal ornamentation\nGround floor: Active frontage with retail/cafe evident\nLandscape integration: Strong connection to street level\nAtmosphere: Calm, dignified, community-facing\n\nSuggested style prompts: "Nordic minimal architecture, white rendered facade, timber brise-soleil, human-scale streetscape, soft natural light"`,
-        label: "Image Analysis",
+        content: `IMAGE ANALYSIS — Design Intent Extraction\n\nDetected style: ${imgStyle}\nPredominant palette: White/cream render, natural timber, large glazing\nBuilding typology: ${imgBuildingType} (est. ${imgFloors} storeys)\nFacade character: Rhythmic fenestration, clean horizontal lines, minimal ornamentation\nGround floor: Active frontage with retail/cafe evident\nLandscape integration: Strong connection to street level\nAtmosphere: Calm, dignified, community-facing\n\nSuggested style prompts: "Nordic minimal architecture, white rendered facade, timber brise-soleil, human-scale streetscape, soft natural light"`,
+        label: `Image Analysis: ${imgBuildingType}`,
+        prompt: `${imgFloors}-storey ${imgBuildingType.toLowerCase()}, ${imgStyle.toLowerCase()}, rhythmic fenestration, active ground floor retail`,
+        _raw: {
+          buildingType: imgBuildingType,
+          floors: imgFloors,
+          style: imgStyle,
+          features: ["glazing", "timber accents", "active frontage", "clean lines"],
+          facade: "Rhythmic fenestration, clean horizontal lines, minimal ornamentation",
+          massing: `${imgFloors}-storey ${imgBuildingType.toLowerCase()} with rectangular footprint`,
+          description: `${imgFloors}-storey ${imgBuildingType.toLowerCase()} with ${imgStyle.toLowerCase()} aesthetic`,
+        },
       });
+    }
 
     case "TR-005": { // Visualization Style Composer
       const styleDesc = String(inputData?.content ?? inputData?.prompt ?? "modern mixed-use building");
