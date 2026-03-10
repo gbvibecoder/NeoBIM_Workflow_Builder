@@ -6,10 +6,10 @@ import {
   ChevronDown, ChevronUp, Box, Film, FileDown,
   Layers, Clock, Cpu, Sparkles, FileText, Image as ImageIcon,
   Video, BarChart3, Table2, Code2, File, Zap,
-  Building2, Ruler, MapPin, Shield,
+  Building2, Ruler, MapPin, Shield, CheckCircle,
 } from "lucide-react";
 import { useLocale } from "@/hooks/useLocale";
-import { COLORS, CATEGORY_COLORS } from "../constants";
+import { COLORS } from "../constants";
 import { HeroSection } from "../sections/HeroSection";
 import { KpiStrip } from "../sections/KpiStrip";
 import { PipelineViz } from "../sections/PipelineViz";
@@ -121,6 +121,95 @@ export function OverviewTab({ data, onExpandVideo, onNavigateTab }: OverviewTabP
         </div>
       </div>
 
+      {/* ── Execution Details Banner ──────────────────────────────────── */}
+      <motion.div
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.1 }}
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 16,
+          padding: "12px 18px",
+          background: `linear-gradient(135deg, ${COLORS.CYAN}06, ${COLORS.EMERALD}04)`,
+          border: `1px solid ${COLORS.CYAN}15`,
+          borderRadius: 10,
+        }}
+      >
+        <div style={{
+          width: 32,
+          height: 32,
+          borderRadius: 8,
+          background: `${COLORS.EMERALD}15`,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          color: COLORS.EMERALD,
+          flexShrink: 0,
+        }}>
+          <CheckCircle size={16} />
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{
+            fontSize: 12,
+            fontWeight: 600,
+            color: COLORS.TEXT_PRIMARY,
+          }}>
+            {t('showcase.executionComplete')}
+          </div>
+          <div style={{
+            fontSize: 10,
+            color: COLORS.TEXT_MUTED,
+            marginTop: 1,
+          }}>
+            {new Date(data.executionMeta.executedAt).toLocaleDateString("en-US", {
+              month: "short", day: "numeric", year: "numeric",
+            })} at {new Date(data.executionMeta.executedAt).toLocaleTimeString("en-US", {
+              hour: "2-digit", minute: "2-digit",
+            })}
+          </div>
+        </div>
+        {data.executionMeta.durationMs != null && (
+          <div style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 4,
+            padding: "4px 10px",
+            borderRadius: 6,
+            background: "rgba(255,255,255,0.04)",
+          }}>
+            <Clock size={10} style={{ color: COLORS.TEXT_MUTED }} />
+            <span style={{ fontSize: 10, color: COLORS.TEXT_MUTED, fontWeight: 500 }}>
+              {data.executionMeta.durationMs < 1000
+                ? `${data.executionMeta.durationMs}ms`
+                : `${(data.executionMeta.durationMs / 1000).toFixed(1)}s`}
+            </span>
+          </div>
+        )}
+        <div style={{
+          display: "flex",
+          gap: 12,
+        }}>
+          <div style={{ textAlign: "center" }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: COLORS.TEXT_PRIMARY, fontVariantNumeric: "tabular-nums" }}>
+              {data.successNodes}/{data.totalNodes}
+            </div>
+            <div style={{ fontSize: 8, color: COLORS.TEXT_MUTED, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+              {t('showcase.nodesPassed')}
+            </div>
+          </div>
+          <div style={{ width: 1, background: COLORS.GLASS_BORDER }} />
+          <div style={{ textAlign: "center" }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: COLORS.TEXT_PRIMARY, fontVariantNumeric: "tabular-nums" }}>
+              {data.totalArtifacts}
+            </div>
+            <div style={{ fontSize: 8, color: COLORS.TEXT_MUTED, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+              {t('showcase.artifactsGenerated')}
+            </div>
+          </div>
+        </div>
+      </motion.div>
+
       {/* ── Deliverables Grid ────────────────────────────────────────────── */}
       <motion.div
         initial={{ opacity: 0, y: 12 }}
@@ -139,12 +228,29 @@ export function OverviewTab({ data, onExpandVideo, onNavigateTab }: OverviewTabP
             const labelKey = ARTIFACT_LABEL_KEYS[item.type];
             const typeLabel = labelKey ? t(labelKey) : item.type;
 
+            // Map artifact types to their corresponding tabs
+            const tabMapping: Record<string, TabId> = {
+              text: "data",
+              image: "media",
+              video: "media",
+              svg: "media",
+              kpi: "data",
+              table: "data",
+              json: "data",
+              "3d": "model",
+              file: "export",
+            };
+            const targetTab = tabMapping[item.type] ?? "export";
+
             return (
-              <motion.div
+              <motion.button
                 key={`${item.type}-${i}`}
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.2 + i * 0.04 }}
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => onNavigateTab(targetTab)}
                 style={{
                   background: COLORS.GLASS_BG,
                   border: `1px solid ${COLORS.GLASS_BORDER}`,
@@ -152,14 +258,17 @@ export function OverviewTab({ data, onExpandVideo, onNavigateTab }: OverviewTabP
                   padding: "14px 16px",
                   position: "relative",
                   overflow: "hidden",
-                  cursor: "default",
-                  transition: "border-color 0.2s ease",
+                  cursor: "pointer",
+                  transition: "all 0.2s ease",
+                  textAlign: "left",
                 }}
                 onMouseEnter={e => {
                   e.currentTarget.style.borderColor = `${color}40`;
+                  e.currentTarget.style.boxShadow = `0 0 20px ${color}10`;
                 }}
                 onMouseLeave={e => {
                   e.currentTarget.style.borderColor = COLORS.GLASS_BORDER;
+                  e.currentTarget.style.boxShadow = "none";
                 }}
               >
                 {/* Top accent line */}
@@ -189,7 +298,7 @@ export function OverviewTab({ data, onExpandVideo, onNavigateTab }: OverviewTabP
                   }}>
                     {icon}
                   </div>
-                  <div style={{ minWidth: 0 }}>
+                  <div style={{ minWidth: 0, flex: 1 }}>
                     <div style={{
                       fontSize: 11,
                       fontWeight: 600,
@@ -210,8 +319,15 @@ export function OverviewTab({ data, onExpandVideo, onNavigateTab }: OverviewTabP
                       {item.label}
                     </div>
                   </div>
+                  <svg
+                    width="12" height="12" viewBox="0 0 24 24" fill="none"
+                    stroke={COLORS.TEXT_MUTED} strokeWidth="2"
+                    style={{ flexShrink: 0, opacity: 0.4 }}
+                  >
+                    <path d="M9 18l6-6-6-6" />
+                  </svg>
                 </div>
-              </motion.div>
+              </motion.button>
             );
           })}
         </div>
@@ -380,7 +496,7 @@ export function OverviewTab({ data, onExpandVideo, onNavigateTab }: OverviewTabP
       </div>
 
       {/* ── AEC Ambient Footer ───────────────────────────────────────────── */}
-      <AECFooter data={data} />
+      <AECFooter />
     </div>
   );
 }
@@ -580,7 +696,7 @@ function deriveTechStack(data: ShowcaseData): TechItem[] {
 
 // ─── AEC Ambient Footer ─────────────────────────────────────────────────────
 
-function AECFooter({ data }: { data: ShowcaseData }) {
+function AECFooter() {
   const { t } = useLocale();
   const aecFacts = [
     { icon: <Building2 size={13} />, text: t('showcase.aecGrade') },

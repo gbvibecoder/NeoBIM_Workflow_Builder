@@ -79,11 +79,22 @@ export interface ComplianceItem {
   detail?: string;
 }
 
+export interface ExecutionMeta {
+  executedAt: string;
+  completedAt: string | null;
+  durationMs: number | null;
+  status: string;
+  workflowId: string | null;
+}
+
 export interface ShowcaseData {
   projectTitle: string;
   totalArtifacts: number;
   successNodes: number;
   totalNodes: number;
+
+  // Execution metadata
+  executionMeta: ExecutionMeta;
 
   // Categorized artifacts
   textContent: string;
@@ -129,12 +140,27 @@ function asRecord(data: unknown): Record<string, unknown> {
 
 export function useShowcaseData(): ShowcaseData {
   const artifacts = useExecutionStore(s => s.artifacts);
+  const currentExecution = useExecutionStore(s => s.currentExecution);
   const nodes = useWorkflowStore(s => s.nodes);
   const currentWorkflow = useWorkflowStore(s => s.currentWorkflow);
 
   return useMemo(() => {
     const projectTitle = currentWorkflow?.name ?? "Workflow Results";
     const successNodes = nodes.filter(n => n.data.status === "success").length;
+
+    // Execution metadata
+    const startedAt = currentExecution?.startedAt ?? currentExecution?.createdAt;
+    const completedAt = currentExecution?.completedAt;
+    const durationMs = startedAt && completedAt
+      ? new Date(completedAt).getTime() - new Date(startedAt).getTime()
+      : null;
+    const executionMeta: ExecutionMeta = {
+      executedAt: startedAt ? new Date(startedAt).toISOString() : new Date().toISOString(),
+      completedAt: completedAt ? new Date(completedAt).toISOString() : null,
+      durationMs,
+      status: currentExecution?.status ?? "success",
+      workflowId: currentExecution?.workflowId ?? currentWorkflow?.id ?? null,
+    };
 
     // ── Text ──
     const textArtifact = findByType(artifacts, "text");
@@ -304,6 +330,7 @@ export function useShowcaseData(): ShowcaseData {
       totalArtifacts: artifacts.size,
       successNodes,
       totalNodes: nodes.length,
+      executionMeta,
       textContent,
       heroImageUrl,
       allImageUrls,
@@ -319,5 +346,5 @@ export function useShowcaseData(): ShowcaseData {
       costBreakdown,
       complianceItems,
     };
-  }, [artifacts, nodes, currentWorkflow]);
+  }, [artifacts, nodes, currentWorkflow, currentExecution]);
 }
