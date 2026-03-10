@@ -589,19 +589,36 @@ export async function executeNode(
       });
 
     case "GN-009": { // Video Walkthrough Generator — client-side Three.js rendering
-      const vidDesc = String(inputData?.content ?? inputData?.description ?? "modern building");
-      // Extract building config from upstream GN-001 data
-      const upstreamFloors = Number(inputData?.floors) || 5;
-      const upstreamFloorHeight = Number(inputData?.height) / upstreamFloors || 3.6;
-      const upstreamFootprint = Number(inputData?.footprint) || 600;
-      const upstreamBuildingType = String(inputData?.buildingType ?? "modern office building");
+      // Use original PDF text (_raw.rawText) as source of truth when available
+      const mockRaw = (inputData?._raw ?? null) as Record<string, unknown> | null;
+      const mockOriginalText = (mockRaw?.rawText as string) ?? null;
+      const vidDesc = mockOriginalText ?? String(inputData?.content ?? inputData?.description ?? "modern building");
+      const upstreamFloors = Number(mockRaw?.floors ?? inputData?.floors) || 5;
+      const upstreamTotalArea = Number(mockRaw?.totalArea ?? inputData?.totalArea) || 0;
+      const upstreamHeight = Number(mockRaw?.height ?? inputData?.height) || 0;
+      const upstreamFloorHeight = upstreamHeight > 0 ? upstreamHeight / upstreamFloors : 3.6;
+      const upstreamFootprint = Number(mockRaw?.footprint ?? inputData?.footprint) || (upstreamTotalArea > 0 ? Math.round(upstreamTotalArea / upstreamFloors) : 600);
+      const upstreamBuildingType = String(mockRaw?.buildingType ?? inputData?.buildingType ?? "modern office building");
+      const upstreamFacade = String(mockRaw?.facade ?? inputData?.facade ?? "");
+
+      // Infer style from building description for richer 3D rendering
+      const facadeLower = upstreamFacade.toLowerCase();
+      const descLower = vidDesc.toLowerCase();
+      const typeLower = upstreamBuildingType.toLowerCase();
+      const extMat = facadeLower.includes("glass") || facadeLower.includes("glazed") ? "glass" as const
+        : facadeLower.includes("brick") ? "brick" as const
+        : facadeLower.includes("timber") || facadeLower.includes("wood") ? "wood" as const
+        : facadeLower.includes("steel") || facadeLower.includes("metal") ? "steel" as const
+        : facadeLower.includes("stone") ? "stone" as const
+        : facadeLower.includes("concrete") || facadeLower.includes("render") ? "concrete" as const
+        : "mixed" as const;
 
       return mockArtifact(executionId, tileInstanceId, "video", {
         name: `walkthrough_${Date.now()}.webm`,
         videoUrl: "", // empty — will be populated after client-side rendering
         downloadUrl: "",
         label: "AEC Cinematic Walkthrough — 15s Three.js Render",
-        content: `15s AEC walkthrough: drone pull-in → orbit → interior → section rise — ${vidDesc.slice(0, 100)}`,
+        content: `15s AEC walkthrough: 5s exterior drone orbit + 10s interior flythrough — ${vidDesc.slice(0, 100)}`,
         durationSeconds: 15,
         shotCount: 4,
         pipeline: "Three.js client-side → WebM video",
@@ -612,7 +629,23 @@ export async function executeNode(
           floorHeight: upstreamFloorHeight,
           footprint: upstreamFootprint,
           buildingType: upstreamBuildingType,
-          style: inputData?.style as string | undefined,
+          style: {
+            glassHeavy: facadeLower.includes("glass") || facadeLower.includes("glazed"),
+            hasRiver: descLower.includes("river") || descLower.includes("waterfront"),
+            hasLake: descLower.includes("lake"),
+            isModern: descLower.includes("modern") || descLower.includes("contemporary") || !descLower.includes("traditional"),
+            isTower: upstreamFloors > 8,
+            exteriorMaterial: extMat,
+            environment: (descLower.includes("urban") || descLower.includes("city")) ? "urban" : "suburban",
+            usage: typeLower.includes("residential") || typeLower.includes("apartment") ? "residential"
+              : typeLower.includes("hotel") ? "hotel"
+              : typeLower.includes("mixed") ? "mixed"
+              : "office",
+            promptText: vidDesc.slice(0, 200),
+            typology: upstreamFloors > 8 ? "tower" : upstreamFloors <= 3 ? "villa" : "slab",
+            facadePattern: facadeLower.includes("curtain") ? "curtain-wall" : "punched-window",
+            maxFloorCap: 30,
+          },
         },
       });
     }

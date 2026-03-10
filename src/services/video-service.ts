@@ -616,6 +616,210 @@ export function buildArchitecturalMultiShot(
   return [{ prompt: buildArchitecturalVideoPrompt(buildingDescription), duration: 10 }];
 }
 
+// ─── Text-to-Video (no image required) ──────────────────────────────────────
+
+const KLING_TEXT2VIDEO_PATH = "/v1/videos/text2video";
+
+/**
+ * Create a Kling text-to-video task, trying model names in priority order.
+ * Used when no upstream render image is available (e.g. PDF → summary → video).
+ */
+async function createTextToVideoTask(
+  prompt: string,
+  negativePrompt: string,
+  duration: "5" | "10",
+  aspectRatio: string,
+  mode: string,
+): Promise<KlingTaskResponse> {
+  const errors: string[] = [];
+
+  for (const modelName of MODELS) {
+    try {
+      console.log(`[Video] Text2Video trying model: ${modelName}, mode: ${mode}, duration: ${duration}s`);
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const body: Record<string, any> = {
+        model_name: modelName,
+        prompt: prompt.slice(0, 2500),
+        negative_prompt: negativePrompt.slice(0, 2500),
+        aspect_ratio: aspectRatio,
+        mode,
+        duration,
+      };
+
+      if (modelName.startsWith("kling-v1")) {
+        body.cfg_scale = 0.5;
+      }
+
+      const result = await klingFetch(KLING_TEXT2VIDEO_PATH, {
+        method: "POST",
+        body,
+      });
+
+      console.log(`[Video] Text2Video task created with ${modelName}! taskId=${result.data.task_id}`);
+      return result;
+    } catch (err) {
+      const msg = (err as Error).message;
+      errors.push(`${modelName}: ${msg}`);
+      console.warn(`[Video] Text2Video ${modelName} failed: ${msg}`);
+    }
+  }
+
+  throw new VideoServiceError(
+    `All Kling text2video models failed:\n${errors.join("\n")}`,
+    500,
+    false
+  );
+}
+
+export interface SubmittedTextVideoTasks {
+  exteriorTaskId: string;
+  interiorTaskId: string;
+  buildingDescription: string;
+  submittedAt: number;
+  pipeline: "text2video";
+}
+
+/**
+ * Submit dual text-to-video tasks to Kling API (5s exterior + 10s interior).
+ * No image required — generates ultra-realistic video directly from text description.
+ */
+export async function submitDualTextToVideo(
+  buildingDescription: string,
+  mode: "std" | "pro" = "pro",
+): Promise<SubmittedTextVideoTasks> {
+  const negativePrompt = "blur, distortion, low quality, warped geometry, melting walls, deformed architecture, shaky camera, noise, artifacts, morphing surfaces, bent lines, wobbly structure, jittery motion, flickering textures, plastic appearance, fisheye distortion, floating objects";
+
+  const exteriorPrompt = buildExteriorTextPrompt(buildingDescription);
+  const interiorPrompt = buildInteriorTextPrompt(buildingDescription);
+
+  console.log("[Video] Submitting DUAL text2video tasks (non-blocking)");
+  console.log("[Video] Input description length:", buildingDescription.length, "chars");
+  console.log("[Video] Exterior prompt length:", exteriorPrompt.length, "chars");
+  console.log("[Video] Exterior prompt (first 500):", exteriorPrompt.slice(0, 500));
+  console.log("[Video] Interior prompt length:", interiorPrompt.length, "chars");
+
+  const [exteriorResult, interiorResult] = await Promise.all([
+    createTextToVideoTask(exteriorPrompt, negativePrompt, "5", "16:9", mode),
+    createTextToVideoTask(interiorPrompt, negativePrompt, "10", "16:9", mode),
+  ]);
+
+  const result = {
+    exteriorTaskId: exteriorResult.data.task_id,
+    interiorTaskId: interiorResult.data.task_id,
+    buildingDescription,
+    submittedAt: Date.now(),
+    pipeline: "text2video" as const,
+  };
+
+  console.log("[Video] Text2Video tasks submitted!", {
+    exteriorTaskId: result.exteriorTaskId,
+    interiorTaskId: result.interiorTaskId,
+  });
+
+  return result;
+}
+
+/**
+ * Check status of dual text-to-video tasks.
+ */
+export async function checkDualTextVideoStatus(
+  exteriorTaskId: string,
+  interiorTaskId: string,
+): Promise<VideoTaskStatus> {
+  const [extResult, intResult] = await Promise.all([
+    klingFetch(`${KLING_TEXT2VIDEO_PATH}/${exteriorTaskId}`, { method: "GET" }),
+    klingFetch(`${KLING_TEXT2VIDEO_PATH}/${interiorTaskId}`, { method: "GET" }),
+  ]);
+
+  const extStatus = extResult.data.task_status as VideoTaskStatus["exteriorStatus"];
+  const intStatus = intResult.data.task_status as VideoTaskStatus["interiorStatus"];
+
+  const extUrl = extResult.data.task_result?.videos?.[0]?.url ?? null;
+  const intUrl = intResult.data.task_result?.videos?.[0]?.url ?? null;
+
+  const statusToProgress = (s: string) =>
+    s === "succeed" ? 100 : s === "processing" ? 50 : s === "submitted" ? 10 : 0;
+
+  const extProgress = statusToProgress(extStatus);
+  const intProgress = statusToProgress(intStatus);
+  const progress = Math.round(extProgress * 0.33 + intProgress * 0.67);
+
+  const hasFailed = extStatus === "failed" || intStatus === "failed";
+  const isComplete = extStatus === "succeed" && intStatus === "succeed";
+
+  let failureMessage: string | null = null;
+  if (extStatus === "failed") {
+    failureMessage = `Exterior video failed: ${extResult.data.task_status_msg ?? "Unknown error"}`;
+  } else if (intStatus === "failed") {
+    failureMessage = `Interior video failed: ${intResult.data.task_status_msg ?? "Unknown error"}`;
+  }
+
+  console.log("[Video] Text2Video status check:", {
+    exterior: extStatus,
+    interior: intStatus,
+    progress,
+    isComplete,
+  });
+
+  return {
+    exteriorStatus: extStatus,
+    interiorStatus: intStatus,
+    exteriorVideoUrl: extUrl,
+    interiorVideoUrl: intUrl,
+    progress,
+    isComplete,
+    hasFailed,
+    failureMessage,
+  };
+}
+
+// ─── Text-to-Video Prompt Builders ──────────────────────────────────────────
+// The PDF summary is the ONLY source of truth. We append a BIM-standard
+// instruction to ensure the AI generates the building EXACTLY as described
+// in the uploaded PDF — no invented elements.
+// Kling API limit: 2500 chars per prompt.
+
+/** Max chars reserved for the PDF summary (leaving room for the ~570 char instruction + suffix) */
+const SUMMARY_MAX_CHARS = 1900;
+
+/**
+ * The BIM instruction appended to the PDF summary.
+ * This tells the AI to treat the summary as the sole source of truth.
+ */
+const BIM_INSTRUCTION =
+  "Use the provided text description as the only source of truth and generate an accurate BIM-style 3D architectural model following AEC industry standards. " +
+  "Interpret the text to construct the building's layout, structure, rooms, dimensions, materials, and architectural features exactly as described, without adding elements not mentioned in the text. " +
+  "Use physically accurate proportions, realistic materials, global illumination, natural lighting, and cinematic camera movement to produce a high-end real estate style architectural visualization strictly based on the provided text description.";
+
+/**
+ * Build exterior prompt for text-to-video (5 seconds).
+ * Uses the PDF summary as the ONLY source of truth.
+ */
+function buildExteriorTextPrompt(buildingDescription: string): string {
+  const summary = buildingDescription.slice(0, SUMMARY_MAX_CHARS);
+
+  return (
+    `${summary}\n\n` +
+    `${BIM_INSTRUCTION}\n\n` +
+    "Cinematic exterior views including front, sides, back, and top view of the building."
+  ).slice(0, 2500);
+}
+
+/**
+ * Build interior prompt for text-to-video (10 seconds).
+ * Uses the PDF summary as the ONLY source of truth.
+ */
+function buildInteriorTextPrompt(buildingDescription: string): string {
+  const summary = buildingDescription.slice(0, SUMMARY_MAX_CHARS);
+
+  return (
+    `${summary}\n\n` +
+    `${BIM_INSTRUCTION}\n\n` +
+    "Smooth interior walkthrough showcasing all spaces described in the text, following a natural circulation path."
+  ).slice(0, 2500);
+}
+
 // ─── Non-Blocking Submit + Status Check ──────────────────────────────────────
 
 export interface SubmittedVideoTasks {

@@ -22,7 +22,7 @@ import { APIError, UserErrors, formatErrorResponse } from "@/lib/user-errors";
 import { generatePDFBase64 } from "@/services/pdf-report-server";
 import { uploadBase64ToR2 } from "@/lib/r2";
 import { reconstructHiFi3D, isMeshyConfigured } from "@/services/meshy-service";
-import { submitDualWalkthrough } from "@/services/video-service";
+import { submitDualWalkthrough, submitDualTextToVideo } from "@/services/video-service";
 import {
   logWorkflowStart, logRateLimit, logNodeStart, logNodeSuccess,
   logNodeError, logValidationError, logInfo,
@@ -243,13 +243,21 @@ export async function POST(req: NextRequest) {
 
       let extractedText = typeof rawText === "string" ? rawText : "";
 
+      console.log("[TR-001] rawText from inputData:", typeof rawText, "length:", typeof rawText === "string" ? rawText.length : 0);
+      console.log("[TR-001] pdfBase64 present:", !!pdfBase64, "type:", typeof pdfBase64, "length:", typeof pdfBase64 === "string" ? pdfBase64.length : 0);
+
       // If we have actual PDF data (base64), extract text from it
       if (pdfBase64 && typeof pdfBase64 === "string") {
         try {
+          // Import from lib/ directly to avoid pdf-parse v1 test-runner bug
+          // (index.js tries to open ./test/data/05-versions-space.pdf when !module.parent)
           // eslint-disable-next-line @typescript-eslint/no-require-imports
-          const pdfParse = require("pdf-parse") as (buf: Buffer) => Promise<{ text: string }>;
+          const pdfParse = require("pdf-parse/lib/pdf-parse.js") as (buf: Buffer) => Promise<{ text: string; numpages: number; info: Record<string, unknown> }>;
           const buffer = Buffer.from(pdfBase64, "base64");
+          console.log("[TR-001] PDF buffer size:", buffer.length, "bytes");
           const pdfData = await pdfParse(buffer);
+          console.log("[TR-001] pdf-parse result — pages:", pdfData.numpages, "text length:", pdfData.text?.length ?? 0);
+          console.log("[TR-001] Extracted text (first 300):", pdfData.text?.slice(0, 300));
           extractedText = pdfData.text || "";
         } catch (parseErr) {
           console.error("[TR-001] PDF parsing failed:", parseErr);
@@ -257,7 +265,10 @@ export async function POST(req: NextRequest) {
         }
       }
 
+      console.log("[TR-001] Final extractedText length:", extractedText.trim().length, "chars");
+
       if (!extractedText || extractedText.trim().length < 20) {
+        console.error("[TR-001] Text too short or empty — returning 400. Text:", JSON.stringify(extractedText.slice(0, 100)));
         return NextResponse.json(
           formatErrorResponse({
             title: "No document content",
@@ -293,6 +304,10 @@ ${parsed.sustainability ? `SUSTAINABILITY: ${parsed.sustainability}` : ""}
 ${parsed.designIntent ? `DESIGN INTENT: ${parsed.designIntent}` : ""}
 
 ${parsed.keyRequirements?.length ? `KEY REQUIREMENTS:\n${parsed.keyRequirements.map(r => `• ${r}`).join("\n")}` : ""}`;
+
+      console.log("[TR-001] Parsed brief — rawText length:", parsed.rawText?.length ?? 0, "chars");
+      console.log("[TR-001] rawText first 300 chars:", parsed.rawText?.slice(0, 300));
+      console.log("[TR-001] projectTitle:", parsed.projectTitle);
 
       artifact = {
         id: generateId(),
@@ -1398,17 +1413,101 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
 
     } else if (catalogueId === "GN-009") {
       // ── Video Walkthrough Generator ────────────────────────────────────
-      // Takes a concept render image (from GN-003) + building description
-      // and generates a cinematic walkthrough video via Kling 3.0 Official API.
+      // Generates a cinematic walkthrough video. Supports three paths:
+      // 1. Image-to-video via Kling API (when upstream GN-003 provides a render image)
+      // 2. Text-to-video via Kling API (when no image, e.g. PDF → video pipeline)
+      // 3. Three.js client-side fallback (when no Kling keys configured)
 
-      if (!process.env.KLING_ACCESS_KEY || !process.env.KLING_SECRET_KEY) {
-        // Fallback to client-side Three.js rendering when Kling keys are not configured
-        const buildingDesc = (inputData?.content as string) ?? (inputData?.description as string) ?? "Modern architectural building";
-        const upFloors = Number(inputData?.floors) || 5;
-        const upFloorHeight = Number(inputData?.height) / upFloors || 3.6;
-        const upFootprint = Number(inputData?.footprint) || 600;
-        const upBuildingType = String(inputData?.buildingType ?? "modern office building");
+      // Extract building description from upstream data.
+      // IMPORTANT: For the PDF → video pipeline, we use the ORIGINAL PDF text
+      // (preserved in _raw.rawText by TR-001) as the sole source of truth.
+      // This ensures the video matches exactly what the user uploaded in the PDF.
+      const raw = (inputData?._raw ?? null) as Record<string, unknown> | null;
 
+      // Priority: original PDF text (_raw.rawText) > formatted content > fallback
+      // _raw.rawText is the original text extracted from the PDF by TR-001,
+      // before any GPT rewriting. This is critical for faithful video generation.
+      const originalPdfText = (raw?.rawText as string) ?? null;
+      const buildingDesc = originalPdfText
+        ?? (inputData?.content as string)
+        ?? (inputData?.description as string)
+        ?? (inputData?.prompt as string)
+        ?? "Modern architectural building";
+      const upFloors = Number(raw?.floors ?? inputData?.floors) || 5;
+      const upTotalArea = Number(raw?.totalArea ?? inputData?.totalArea) || 0;
+      const upHeight = Number(raw?.height ?? inputData?.height) || 0;
+      const upFloorHeight = upHeight > 0 ? upHeight / upFloors : 3.6;
+      const upFootprint = Number(raw?.footprint ?? inputData?.footprint) || (upTotalArea > 0 ? Math.round(upTotalArea / upFloors) : 600);
+      const upBuildingType = String(raw?.buildingType ?? inputData?.buildingType ?? "modern office building");
+      const upFacade = String(raw?.facade ?? inputData?.facade ?? "");
+      const upStructure = String(raw?.structure ?? inputData?.structure ?? "");
+      const upNarrative = String(raw?.narrative ?? "");
+
+      // Map facade description to exteriorMaterial for Three.js BuildingStyle
+      function inferExteriorMaterial(facade: string): "glass" | "concrete" | "brick" | "wood" | "steel" | "stone" | "terracotta" | "mixed" {
+        const f = facade.toLowerCase();
+        if (f.includes("glass") || f.includes("curtain wall") || f.includes("glazed")) return "glass";
+        if (f.includes("brick") || f.includes("masonry")) return "brick";
+        if (f.includes("timber") || f.includes("wood") || f.includes("clt")) return "wood";
+        if (f.includes("steel") || f.includes("corten") || f.includes("metal")) return "steel";
+        if (f.includes("stone") || f.includes("limestone") || f.includes("marble")) return "stone";
+        if (f.includes("terracotta") || f.includes("clay")) return "terracotta";
+        if (f.includes("concrete") || f.includes("render") || f.includes("stucco")) return "concrete";
+        return "mixed";
+      }
+
+      // Map buildingType to usage category
+      function inferUsage(bt: string): "residential" | "office" | "mixed" | "commercial" | "hotel" | "educational" | "healthcare" | "cultural" | "industrial" | "civic" {
+        const t = bt.toLowerCase();
+        if (t.includes("residential") || t.includes("apartment") || t.includes("housing")) return "residential";
+        if (t.includes("office") || t.includes("workplace") || t.includes("corporate")) return "office";
+        if (t.includes("hotel") || t.includes("hospitality")) return "hotel";
+        if (t.includes("school") || t.includes("university") || t.includes("education")) return "educational";
+        if (t.includes("hospital") || t.includes("clinic") || t.includes("health")) return "healthcare";
+        if (t.includes("museum") || t.includes("gallery") || t.includes("cultural") || t.includes("theater")) return "cultural";
+        if (t.includes("retail") || t.includes("shop") || t.includes("commercial")) return "commercial";
+        if (t.includes("industrial") || t.includes("warehouse") || t.includes("factory")) return "industrial";
+        if (t.includes("mixed")) return "mixed";
+        return "office";
+      }
+
+      // Map to facade pattern
+      function inferFacadePattern(facade: string): "curtain-wall" | "punched-window" | "ribbon-window" | "brise-soleil" | "none" {
+        const f = facade.toLowerCase();
+        if (f.includes("curtain") || f.includes("glazed")) return "curtain-wall";
+        if (f.includes("ribbon")) return "ribbon-window";
+        if (f.includes("brise") || f.includes("louvre") || f.includes("louver")) return "brise-soleil";
+        if (f.includes("punch")) return "punched-window";
+        return "curtain-wall";
+      }
+
+      // Build a rich BuildingStyle from the PDF-extracted description
+      const inferredStyle = {
+        glassHeavy: upFacade.toLowerCase().includes("glass") || upFacade.toLowerCase().includes("glazed"),
+        hasRiver: buildingDesc.toLowerCase().includes("river") || buildingDesc.toLowerCase().includes("waterfront"),
+        hasLake: buildingDesc.toLowerCase().includes("lake"),
+        isModern: buildingDesc.toLowerCase().includes("modern") || buildingDesc.toLowerCase().includes("contemporary") || !buildingDesc.toLowerCase().includes("traditional"),
+        isTower: upFloors > 8,
+        exteriorMaterial: inferExteriorMaterial(upFacade),
+        environment: (buildingDesc.toLowerCase().includes("urban") || buildingDesc.toLowerCase().includes("city")) ? "urban" as const : "suburban" as const,
+        usage: inferUsage(upBuildingType),
+        promptText: upNarrative || buildingDesc.slice(0, 200),
+        typology: (upFloors > 8 ? "tower" : upFloors <= 3 ? "villa" : "slab") as "tower" | "slab" | "villa",
+        facadePattern: inferFacadePattern(upFacade),
+        maxFloorCap: 30,
+      };
+
+      // Check if an upstream render image is available (from GN-003)
+      const renderImageUrl =
+        (inputData?.url as string) ??
+        (inputData?.images_out as string) ??
+        (inputData?.imageUrl as string) ??
+        "";
+
+      const hasKlingKeys = !!(process.env.KLING_ACCESS_KEY && process.env.KLING_SECRET_KEY);
+
+      if (!hasKlingKeys) {
+        // No Kling API keys — fall back to Three.js client-side rendering
         artifact = {
           id: generateId(),
           executionId: executionId ?? "local",
@@ -1419,7 +1518,7 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
             videoUrl: "",
             downloadUrl: "",
             label: "AEC Cinematic Walkthrough — 15s Three.js Render",
-            content: `15s AEC walkthrough: drone pull-in → orbit → interior → section rise — ${buildingDesc.slice(0, 100)}`,
+            content: `15s AEC walkthrough: 5s exterior drone orbit + 10s interior flythrough — ${buildingDesc.slice(0, 100)}`,
             durationSeconds: 15,
             shotCount: 4,
             pipeline: "Three.js client-side → WebM video",
@@ -1430,79 +1529,100 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
               floorHeight: upFloorHeight,
               footprint: upFootprint,
               buildingType: upBuildingType,
+              style: inferredStyle,
             },
           },
           metadata: { engine: "threejs-client", real: false },
           createdAt: new Date(),
         };
-
-      } else {
-
-      // Extract render image URL from upstream GN-003
-      const renderImageUrl =
-        (inputData?.url as string) ??
-        (inputData?.images_out as string) ??
-        (inputData?.imageUrl as string) ??
-        "";
-
-      if (!renderImageUrl) {
-        return NextResponse.json(
-          formatErrorResponse({
-            title: "No render image provided",
-            message: "GN-009 requires an upstream concept render. Connect a Concept Render Generator (GN-003) node.",
-            code: "NODE_001",
-          }),
-          { status: 400 }
+      } else if (renderImageUrl) {
+        // ── Kling image-to-video path ──
+        // Upstream GN-003 provided a render image — use it for video generation
+        const submitted = await submitDualWalkthrough(
+          renderImageUrl,
+          buildingDesc,
+          "pro",
         );
+
+        artifact = {
+          id: generateId(),
+          executionId: executionId ?? "local",
+          tileInstanceId,
+          type: "video",
+          data: {
+            name: `walkthrough_${generateId()}.mp4`,
+            videoUrl: "",
+            downloadUrl: "",
+            label: "AEC Cinematic Walkthrough — 15s (generating...)",
+            content: `15s AEC walkthrough: 5s fast exterior + 10s detailed interior — ${buildingDesc.slice(0, 100)}`,
+            durationSeconds: 15,
+            shotCount: 2,
+            pipeline: "concept render → Kling Official API (pro, image2video) → 2× MP4 video",
+            costUsd: 1.50,
+            segments: [],
+            videoGenerationStatus: "processing",
+            videoPipeline: "image2video",
+            exteriorTaskId: submitted.exteriorTaskId,
+            interiorTaskId: submitted.interiorTaskId,
+            generationProgress: 0,
+          },
+          metadata: {
+            engine: "kling-official",
+            real: true,
+            videoPipeline: "image2video",
+            exteriorTaskId: submitted.exteriorTaskId,
+            interiorTaskId: submitted.interiorTaskId,
+            submittedAt: submitted.submittedAt,
+          },
+          createdAt: new Date(),
+        };
+      } else {
+        // ── Kling text-to-video path ──
+        // No render image available (e.g. PDF → video pipeline).
+        // Generate ultra-realistic video directly from the ORIGINAL PDF text.
+        console.log("[GN-009] Text2Video — using original PDF text as source of truth");
+        console.log("[GN-009] Source:", originalPdfText ? "rawText from PDF" : "fallback content");
+        console.log("[GN-009] Prompt length:", buildingDesc.length, "chars");
+        console.log("[GN-009] First 200 chars:", buildingDesc.slice(0, 200));
+
+        const submitted = await submitDualTextToVideo(
+          buildingDesc,
+          "pro",
+        );
+
+        artifact = {
+          id: generateId(),
+          executionId: executionId ?? "local",
+          tileInstanceId,
+          type: "video",
+          data: {
+            name: `walkthrough_${generateId()}.mp4`,
+            videoUrl: "",
+            downloadUrl: "",
+            label: "AEC Cinematic Walkthrough — 15s (generating from PDF summary...)",
+            content: `15s ultra-realistic walkthrough: 5s exterior orbit + 10s interior flythrough — ${buildingDesc.slice(0, 100)}`,
+            durationSeconds: 15,
+            shotCount: 2,
+            pipeline: "PDF summary → Kling Official API (pro, text2video) → 2× MP4 video",
+            costUsd: 1.50,
+            segments: [],
+            videoGenerationStatus: "processing",
+            videoPipeline: "text2video",
+            exteriorTaskId: submitted.exteriorTaskId,
+            interiorTaskId: submitted.interiorTaskId,
+            generationProgress: 0,
+          },
+          metadata: {
+            engine: "kling-official",
+            real: true,
+            videoPipeline: "text2video",
+            exteriorTaskId: submitted.exteriorTaskId,
+            interiorTaskId: submitted.interiorTaskId,
+            submittedAt: submitted.submittedAt,
+          },
+          createdAt: new Date(),
+        };
       }
-
-      // Build video from building description (from upstream TR-003 or fallback)
-      const buildingDesc =
-        (inputData?.content as string) ??
-        (inputData?.description as string) ??
-        (inputData?.prompt as string) ??
-        "Modern architectural building";
-
-      // Submit both video tasks to Kling API (non-blocking — returns task IDs immediately)
-      const submitted = await submitDualWalkthrough(
-        renderImageUrl,
-        buildingDesc,
-        "pro",
-      );
-
-      // Return a "generating" artifact with task IDs — frontend will poll for progress
-      artifact = {
-        id: generateId(),
-        executionId: executionId ?? "local",
-        tileInstanceId,
-        type: "video",
-        data: {
-          name: `walkthrough_${generateId()}.mp4`,
-          videoUrl: "",  // Will be filled when generation completes
-          downloadUrl: "",
-          label: "AEC Cinematic Walkthrough — 15s (generating...)",
-          content: `15s AEC walkthrough: 5s fast exterior + 10s detailed interior — ${buildingDesc.slice(0, 100)}`,
-          durationSeconds: 15,
-          shotCount: 2,
-          pipeline: "concept render → Kling Official API (pro, dual) → 2× MP4 video",
-          costUsd: 1.50,
-          segments: [],
-          // Video generation state — frontend uses these to poll
-          videoGenerationStatus: "processing",
-          exteriorTaskId: submitted.exteriorTaskId,
-          interiorTaskId: submitted.interiorTaskId,
-          generationProgress: 0,
-        },
-        metadata: {
-          engine: "kling-official",
-          real: true,
-          exteriorTaskId: submitted.exteriorTaskId,
-          interiorTaskId: submitted.interiorTaskId,
-          submittedAt: submitted.submittedAt,
-        },
-        createdAt: new Date(),
-      };
-      } // end else (Kling API path)
 
     } else if (catalogueId === "GN-010") {
       // ── Hi-Fi 3D Reconstructor ─────────────────────────────────────────

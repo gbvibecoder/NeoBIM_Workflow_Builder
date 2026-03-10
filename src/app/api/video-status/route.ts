@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { checkDualVideoStatus } from "@/services/video-service";
+import { checkDualVideoStatus, checkDualTextVideoStatus } from "@/services/video-service";
 import { formatErrorResponse } from "@/lib/user-errors";
 
 /**
- * GET /api/video-status?exteriorTaskId=X&interiorTaskId=Y
+ * GET /api/video-status?exteriorTaskId=X&interiorTaskId=Y&pipeline=image2video|text2video
  *
  * Polls the Kling API for the status of both video generation tasks.
+ * Supports both image2video and text2video pipelines.
  * Returns progress percentage (0-100) and video URLs when complete.
  */
 export async function GET(req: NextRequest) {
@@ -22,6 +23,7 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const exteriorTaskId = searchParams.get("exteriorTaskId");
   const interiorTaskId = searchParams.get("interiorTaskId");
+  const pipeline = searchParams.get("pipeline") ?? "image2video";
 
   if (!exteriorTaskId || !interiorTaskId) {
     return NextResponse.json(
@@ -35,7 +37,9 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const status = await checkDualVideoStatus(exteriorTaskId, interiorTaskId);
+    const status = pipeline === "text2video"
+      ? await checkDualTextVideoStatus(exteriorTaskId, interiorTaskId)
+      : await checkDualVideoStatus(exteriorTaskId, interiorTaskId);
 
     return NextResponse.json({
       ...status,
