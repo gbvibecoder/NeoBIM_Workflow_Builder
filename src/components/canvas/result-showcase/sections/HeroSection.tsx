@@ -2,7 +2,7 @@
 
 import { useRef, useState, useCallback } from "react";
 import { motion } from "framer-motion";
-import { Play, Maximize2, Loader2 } from "lucide-react";
+import { Play, Maximize2, Loader2, Download, RefreshCw } from "lucide-react";
 import { useLocale } from "@/hooks/useLocale";
 import { useExecutionStore } from "@/stores/execution-store";
 import { COLORS } from "../constants";
@@ -12,11 +12,12 @@ interface HeroSectionProps {
   videoData: VideoInfo | null;
   heroImageUrl: string | null;
   onExpandVideo: () => void;
+  onRetryVideo?: () => void;
 }
 
 const RENDER_PHASES = ["Exterior Pull-in", "Building Orbit", "Interior Walkthrough", "Section Rise"];
 
-export function HeroSection({ videoData, heroImageUrl, onExpandVideo }: HeroSectionProps) {
+export function HeroSection({ videoData, heroImageUrl, onExpandVideo, onRetryVideo }: HeroSectionProps) {
   const { t } = useLocale();
   const videoRef = useRef<HTMLVideoElement>(null);
   const [segmentIndex, setSegmentIndex] = useState(0);
@@ -182,6 +183,29 @@ export function HeroSection({ videoData, heroImageUrl, onExpandVideo }: HeroSect
               {videoGenProgress.failureMessage ?? "An error occurred during video rendering. Please try again."}
             </div>
           </div>
+          {onRetryVideo && (
+            <button
+              onClick={onRetryVideo}
+              style={{
+                marginTop: 4, padding: "8px 20px", borderRadius: 8,
+                background: "rgba(0,245,255,0.12)", border: "1px solid rgba(0,245,255,0.3)",
+                color: COLORS.CYAN, fontSize: 12, fontWeight: 600,
+                cursor: "pointer", display: "flex", alignItems: "center", gap: 6,
+                transition: "all 0.15s ease",
+              }}
+              onMouseEnter={e => {
+                e.currentTarget.style.background = "rgba(0,245,255,0.2)";
+                e.currentTarget.style.boxShadow = "0 0 16px rgba(0,245,255,0.15)";
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.background = "rgba(0,245,255,0.12)";
+                e.currentTarget.style.boxShadow = "none";
+              }}
+            >
+              <RefreshCw size={12} />
+              Retry Video
+            </button>
+          )}
         </div>
       ) : heroImageUrl ? (
         // eslint-disable-next-line @next/next/no-img-element
@@ -250,34 +274,53 @@ export function HeroSection({ videoData, heroImageUrl, onExpandVideo }: HeroSect
                 {videoData.durationSeconds}s · {hasSegments ? `${segments.length} parts` : `${videoData.shotCount} shots`}
               </span>
             </div>
-            <button
-              onClick={onExpandVideo}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 5,
-                padding: "5px 12px",
-                borderRadius: 6,
-                background: "rgba(0,245,255,0.15)",
-                border: "1px solid rgba(0,245,255,0.3)",
-                color: COLORS.CYAN,
-                fontSize: 11,
-                fontWeight: 600,
-                cursor: "pointer",
-                transition: "all 0.15s ease",
-              }}
-              onMouseEnter={e => {
-                e.currentTarget.style.background = "rgba(0,245,255,0.25)";
-                e.currentTarget.style.boxShadow = "0 0 16px rgba(0,245,255,0.15)";
-              }}
-              onMouseLeave={e => {
-                e.currentTarget.style.background = "rgba(0,245,255,0.15)";
-                e.currentTarget.style.boxShadow = "none";
-              }}
-            >
-              <Maximize2 size={10} />
-              {t('showcase.fullscreen')}
-            </button>
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              {videoData.downloadUrl && (
+                <a href={videoData.downloadUrl} download style={{ textDecoration: "none" }}>
+                  <button
+                    style={{
+                      display: "flex", alignItems: "center", gap: 5,
+                      padding: "5px 12px", borderRadius: 6,
+                      background: "rgba(0,245,255,0.15)", border: "1px solid rgba(0,245,255,0.3)",
+                      color: COLORS.CYAN, fontSize: 11, fontWeight: 600,
+                      cursor: "pointer", transition: "all 0.15s ease",
+                    }}
+                    onMouseEnter={e => {
+                      e.currentTarget.style.background = "rgba(0,245,255,0.25)";
+                      e.currentTarget.style.boxShadow = "0 0 16px rgba(0,245,255,0.15)";
+                    }}
+                    onMouseLeave={e => {
+                      e.currentTarget.style.background = "rgba(0,245,255,0.15)";
+                      e.currentTarget.style.boxShadow = "none";
+                    }}
+                  >
+                    <Download size={10} />
+                    Download
+                  </button>
+                </a>
+              )}
+              <button
+                onClick={onExpandVideo}
+                style={{
+                  display: "flex", alignItems: "center", gap: 5,
+                  padding: "5px 12px", borderRadius: 6,
+                  background: "rgba(0,245,255,0.15)", border: "1px solid rgba(0,245,255,0.3)",
+                  color: COLORS.CYAN, fontSize: 11, fontWeight: 600,
+                  cursor: "pointer", transition: "all 0.15s ease",
+                }}
+                onMouseEnter={e => {
+                  e.currentTarget.style.background = "rgba(0,245,255,0.25)";
+                  e.currentTarget.style.boxShadow = "0 0 16px rgba(0,245,255,0.15)";
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.background = "rgba(0,245,255,0.15)";
+                  e.currentTarget.style.boxShadow = "none";
+                }}
+              >
+                <Maximize2 size={10} />
+                {t('showcase.fullscreen')}
+              </button>
+            </div>
           </>
         )}
       </div>

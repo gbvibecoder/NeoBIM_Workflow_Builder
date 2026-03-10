@@ -31,6 +31,9 @@ interface ExecutionState {
   // Artifacts by tile instance ID
   artifacts: Map<string, ExecutionArtifact>;
 
+  // Previous execution artifacts — for cache-hit detection on re-run
+  previousArtifacts: Map<string, ExecutionArtifact>;
+
   // Video generation progress per node (for background video generation)
   videoGenProgress: Map<string, VideoGenerationState>;
 
@@ -93,6 +96,7 @@ export const useExecutionStore = create<ExecutionState>()((set, get) => ({
   executionProgress: 0,
   isRateLimited: false,
   artifacts: new Map(),
+  previousArtifacts: new Map(),
   videoGenProgress: new Map(),
   regenerationCounts: new Map(),
   regeneratingNodeId: null,
@@ -101,15 +105,17 @@ export const useExecutionStore = create<ExecutionState>()((set, get) => ({
   setRateLimited: (value) => set({ isRateLimited: value }),
 
   startExecution: (execution) =>
-    set({
+    set((state) => ({
       currentExecution: execution,
       isExecuting: true,
       executionProgress: 0,
       isRateLimited: false, // reset on new execution
+      // Snapshot current artifacts for cache-hit detection on re-run
+      previousArtifacts: new Map(state.artifacts),
       artifacts: new Map(),
       videoGenProgress: new Map(),
       regenerationCounts: new Map(),
-    }),
+    })),
 
   updateExecutionStatus: (status) =>
     set((state) => ({

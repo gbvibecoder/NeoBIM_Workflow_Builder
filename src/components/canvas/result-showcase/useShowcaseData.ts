@@ -192,15 +192,15 @@ export function useShowcaseData(): ShowcaseData {
       // Parse segments if available (dual video: exterior + interior)
       const rawSegments = d.segments as Array<Record<string, unknown>> | undefined;
       const segments: VideoSegmentInfo[] | undefined = rawSegments?.map(s => ({
-        videoUrl: (s.videoUrl as string) ?? "",
-        downloadUrl: (s.downloadUrl as string) ?? (s.videoUrl as string) ?? "",
+        videoUrl: (s.persistedUrl as string) ?? (s.videoUrl as string) ?? "",
+        downloadUrl: (s.persistedUrl as string) ?? (s.downloadUrl as string) ?? (s.videoUrl as string) ?? "",
         durationSeconds: (s.durationSeconds as number) ?? 5,
         label: (s.label as string) ?? "Segment",
       }));
 
       videoData = {
-        videoUrl: (d.videoUrl as string) ?? "",
-        downloadUrl: (d.downloadUrl as string) ?? (d.videoUrl as string) ?? "",
+        videoUrl: (d.persistedUrl as string) ?? (d.videoUrl as string) ?? "",
+        downloadUrl: (d.persistedUrl as string) ?? (d.downloadUrl as string) ?? (d.videoUrl as string) ?? "",
         name: (d.name as string) ?? "walkthrough.mp4",
         durationSeconds: (d.durationSeconds as number) ?? 15,
         shotCount: (d.shotCount as number) ?? (meta.shotCount as number) ?? 3,

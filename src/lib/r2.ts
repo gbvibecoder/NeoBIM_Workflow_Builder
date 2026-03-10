@@ -119,6 +119,49 @@ export async function uploadToR2(
   }
 }
 
+const MAX_VIDEO_SIZE = 50 * 1024 * 1024; // 50MB for videos
+
+/**
+ * Upload a video file to R2 under the `videos/` prefix.
+ * Max 50MB. Returns a permanent URL.
+ */
+export async function uploadVideoToR2(
+  fileBuffer: Buffer,
+  filename: string,
+): Promise<UploadResult | UploadError> {
+  const client = getClient();
+  if (!client) return { success: false, error: "R2 not configured" };
+  if (fileBuffer.length > MAX_VIDEO_SIZE) {
+    return { success: false, error: `Video exceeds ${MAX_VIDEO_SIZE / 1024 / 1024}MB limit` };
+  }
+
+  const now = new Date();
+  const datePath = `${now.getFullYear()}/${String(now.getMonth() + 1).padStart(2, "0")}/${String(now.getDate()).padStart(2, "0")}`;
+  const uniqueId = Math.random().toString(36).slice(2, 10);
+  const key = `videos/${datePath}/${uniqueId}-${filename}`;
+
+  try {
+    await client.send(
+      new PutObjectCommand({
+        Bucket: BUCKET_NAME,
+        Key: key,
+        Body: fileBuffer,
+        ContentType: "video/mp4",
+        Metadata: { "uploaded-at": now.toISOString() },
+      }),
+    );
+
+    const url = PUBLIC_URL
+      ? `${PUBLIC_URL}/${key}`
+      : `https://${BUCKET_NAME}.${ACCOUNT_ID}.r2.cloudflarestorage.com/${key}`;
+
+    return { success: true, url, key, size: fileBuffer.length };
+  } catch (err) {
+    console.error("[R2] Video upload failed:", err);
+    return { success: false, error: String(err) };
+  }
+}
+
 /**
  * Upload a base64 data URI to R2.
  * Extracts the binary from the data URI, uploads it, returns a permanent URL.

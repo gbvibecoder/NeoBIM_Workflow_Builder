@@ -175,6 +175,47 @@ async function executeNode(
 }
 
 const FLOW_DURATION_MS = 1600;
+
+/** Simple string hash for cache comparison (not cryptographic) */
+function simpleHash(str: string): string {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    const ch = str.charCodeAt(i);
+    hash = ((hash << 5) - hash) + ch;
+    hash |= 0;
+  }
+  return hash.toString(36);
+}
+
+/** Fire-and-forget: download video from Kling and persist to R2 */
+async function persistVideoToR2(
+  videoUrl: string,
+  filename: string,
+  nodeId: string,
+  addArtifactFn: (nodeId: string, artifact: ExecutionArtifact) => void,
+  currentArtifact: ExecutionArtifact,
+) {
+  try {
+    const res = await fetch("/api/persist-video", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ videoUrl, filename }),
+    });
+    if (!res.ok) {
+      console.warn("[persist-video] Failed:", res.status);
+      return;
+    }
+    const { persistedUrl } = await res.json();
+    if (persistedUrl) {
+      // Update artifact with persisted URL
+      const data = { ...(currentArtifact.data as Record<string, unknown>), persistedUrl };
+      addArtifactFn(nodeId, { ...currentArtifact, data });
+      console.log("[persist-video] Video persisted to R2:", persistedUrl);
+    }
+  } catch (err) {
+    console.warn("[persist-video] Error (non-fatal):", err);
+  }
+}
 const VIDEO_POLL_INTERVAL_MS = 6_000; // Poll every 6 seconds
 const VIDEO_POLL_TIMEOUT_MS = 600_000; // 10 minute timeout
 
@@ -267,6 +308,14 @@ async function pollVideoGeneration(
 
         addArtifactFn(nodeId, finalArtifact);
         clearVideoProgressFn(nodeId);
+
+        // Persist videos to R2 (fire-and-forget — don't block playback)
+        if (status.exteriorVideoUrl) {
+          persistVideoToR2(status.exteriorVideoUrl, `exterior-${nodeId}.mp4`, nodeId, addArtifactFn, finalArtifact).catch(() => {});
+        }
+        if (status.interiorVideoUrl) {
+          persistVideoToR2(status.interiorVideoUrl, `interior-${nodeId}.mp4`, nodeId, addArtifactFn, finalArtifact).catch(() => {});
+        }
 
         toast.success("Video walkthrough ready!", {
           description: "15s AEC cinematic walkthrough generated successfully",
@@ -663,8 +712,50 @@ export function useExecution({ onLog }: UseExecutionOptions = {}) {
       try {
         // Get upstream data from connected nodes (via edges), not just previous in array
         const upstreamArtifact = getUpstreamArtifact(node.id, workflowEdges, artifactMap);
+
+        // ── Cache check for image nodes (GN-003) — reuse DALL-E render if upstream unchanged ──
+        const nodeCatalogueId = (node.data as { catalogueId: string }).catalogueId;
+        if (nodeCatalogueId === "GN-003") {
+          const prevArtifacts = useExecutionStore.getState().previousArtifacts;
+          const prevArtifact = prevArtifacts.get(node.id);
+          if (prevArtifact && prevArtifact.type === "image") {
+            const prevHash = (prevArtifact.metadata as Record<string, unknown>)?._upstreamHash as string | undefined;
+            const curHash = simpleHash(
+              JSON.stringify(upstreamArtifact?.data ?? {}) +
+              String((node.data as Record<string, unknown>).viewType ?? "exterior"),
+            );
+            if (prevHash && prevHash === curHash) {
+              log("info", `${node.data.label} — reusing cached render (same input)`, "cache-hit");
+              toast.info(`${node.data.label}: reusing cached render`, { duration: 2000 });
+              artifactMap.set(node.id, prevArtifact);
+              addArtifact(node.id, prevArtifact);
+              addTileResult({
+                tileInstanceId: node.id,
+                catalogueId: node.data.catalogueId,
+                status: "success",
+                startedAt: new Date(),
+                completedAt: new Date(),
+                artifact: prevArtifact,
+              });
+              updateNodeStatus(node.id, "success");
+              setEdgeFlowing(node.id, true);
+              setTimeout(() => setEdgeFlowing(node.id, false), FLOW_DURATION_MS);
+              continue;
+            }
+          }
+        }
+
         const artifact = await executeNode(node, executionId, upstreamArtifact, useReal, isDemoMode);
         artifactMap.set(node.id, artifact);
+
+        // Stamp upstream hash on image artifacts for future cache detection
+        if (nodeCatalogueId === "GN-003" && artifact.type === "image") {
+          const upHash = simpleHash(
+            JSON.stringify(upstreamArtifact?.data ?? {}) +
+            String((node.data as Record<string, unknown>).viewType ?? "exterior"),
+          );
+          artifact.metadata = { ...artifact.metadata, _upstreamHash: upHash };
+        }
 
         addArtifact(node.id, artifact);
         addTileResult({
@@ -981,3 +1072,8 @@ export function useExecution({ onLog }: UseExecutionOptions = {}) {
     clearRateLimitError,
   };
 }
+
+// ─── Exported wrappers for retry from ResultShowcase ────────────────────────
+
+export { pollVideoGeneration as retryPollVideoGeneration };
+export { renderClientWalkthrough as retryRenderClientWalkthrough };

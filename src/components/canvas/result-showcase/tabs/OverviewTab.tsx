@@ -9,6 +9,7 @@ import {
   Building2, Ruler, MapPin, Shield, CheckCircle,
 } from "lucide-react";
 import { useLocale } from "@/hooks/useLocale";
+import { useExecutionStore } from "@/stores/execution-store";
 import { COLORS } from "../constants";
 import { HeroSection } from "../sections/HeroSection";
 import { KpiStrip } from "../sections/KpiStrip";
@@ -22,6 +23,7 @@ interface OverviewTabProps {
   data: ShowcaseData;
   onExpandVideo: () => void;
   onNavigateTab: (tab: TabId) => void;
+  onRetryVideo?: () => void;
 }
 
 // ─── Artifact type icon map ──────────────────────────────────────────────────
@@ -62,7 +64,7 @@ const ARTIFACT_LABEL_KEYS: Record<string, TranslationKey> = {
   file: "showcase.typeExportFile",
 };
 
-export function OverviewTab({ data, onExpandVideo, onNavigateTab }: OverviewTabProps) {
+export function OverviewTab({ data, onExpandVideo, onNavigateTab, onRetryVideo }: OverviewTabProps) {
   const { t } = useLocale();
   const [descExpanded, setDescExpanded] = useState(false);
   const descLines = data.textContent.split("\n");
@@ -101,6 +103,7 @@ export function OverviewTab({ data, onExpandVideo, onNavigateTab }: OverviewTabP
               videoData={data.videoData}
               heroImageUrl={data.heroImageUrl}
               onExpandVideo={onExpandVideo}
+              onRetryVideo={onRetryVideo}
             />
           </div>
         )}
@@ -431,15 +434,32 @@ export function OverviewTab({ data, onExpandVideo, onNavigateTab }: OverviewTabP
                     {tech.name}
                   </span>
                 </div>
-                <span style={{
-                  fontSize: 9,
-                  color: COLORS.TEXT_MUTED,
-                  padding: "2px 8px",
-                  borderRadius: 4,
-                  background: "rgba(255,255,255,0.03)",
-                }}>
-                  {tech.role}
-                </span>
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  {tech.statusBadge && (
+                    <span
+                      style={{
+                        fontSize: 8, fontWeight: 700,
+                        padding: "2px 6px", borderRadius: 4,
+                        background: `${tech.statusBadge.badgeColor}15`,
+                        color: tech.statusBadge.badgeColor,
+                        textTransform: "uppercase", letterSpacing: "0.04em",
+                        cursor: tech.statusBadge.link ? "pointer" : "default",
+                      }}
+                      onClick={() => { if (tech.statusBadge?.link) window.open(tech.statusBadge.link, "_blank"); }}
+                    >
+                      {tech.statusBadge.text}
+                    </span>
+                  )}
+                  <span style={{
+                    fontSize: 9,
+                    color: COLORS.TEXT_MUTED,
+                    padding: "2px 8px",
+                    borderRadius: 4,
+                    background: "rgba(255,255,255,0.03)",
+                  }}>
+                    {tech.role}
+                  </span>
+                </div>
               </motion.div>
             ))}
           </div>
@@ -659,18 +679,43 @@ interface TechItem {
   name: string;
   role: string;
   color: string;
+  statusBadge?: { text: string; badgeColor: string; link?: string };
 }
 
 function deriveTechStack(data: ShowcaseData): TechItem[] {
   const techs: TechItem[] = [];
   const seen = new Set<string>();
 
-  const add = (name: string, role: string, color: string) => {
+  const add = (name: string, role: string, color: string, statusBadge?: TechItem["statusBadge"]) => {
     if (!seen.has(name)) {
       seen.add(name);
-      techs.push({ name, role, color });
+      techs.push({ name, role, color, statusBadge });
     }
   };
+
+  // Derive Kling status from video artifact
+  let klingBadge: TechItem["statusBadge"] | undefined;
+  if (data.videoData?.nodeId) {
+    const videoArtifact = useExecutionStore.getState().artifacts.get(data.videoData.nodeId);
+    if (videoArtifact) {
+      const meta = (videoArtifact.metadata ?? {}) as Record<string, unknown>;
+      const artData = (videoArtifact.data ?? {}) as Record<string, unknown>;
+      if (meta.engine === "kling-official" && artData.videoGenerationStatus === "complete") {
+        klingBadge = { text: "Active", badgeColor: COLORS.EMERALD };
+      } else if (meta.engine === "kling-official" && artData.videoGenerationStatus === "processing") {
+        klingBadge = { text: "Generating", badgeColor: COLORS.AMBER };
+      } else if (meta.engine === "threejs-client") {
+        klingBadge = { text: "Fallback", badgeColor: COLORS.TEXT_MUTED };
+      }
+    }
+    // Check videoGenProgress for balance errors
+    const progressStates = useExecutionStore.getState().videoGenProgress;
+    for (const [, state] of progressStates) {
+      if (state.status === "failed" && state.failureMessage?.toLowerCase().includes("balance")) {
+        klingBadge = { text: "No Credits", badgeColor: "#ff5050", link: "https://klingai.com" };
+      }
+    }
+  }
 
   data.pipelineSteps.forEach(step => {
     const cat = step.category;
@@ -681,7 +726,7 @@ function deriveTechStack(data: ShowcaseData): TechItem[] {
     if (step.label.includes("Massing")) add("Procedural Engine", "3D geometry", COLORS.AMBER);
     if (step.label.includes("Style") || step.label.includes("Composer")) add("GPT-4o mini", "Prompt engineering", "#8B5CF6");
     if (step.label.includes("Concept Render")) add("DALL-E 3", "Image generation", COLORS.EMERALD);
-    if (step.label.includes("Video") || step.label.includes("Walkthrough")) add("Kling 3.0", "Video synthesis", COLORS.CYAN);
+    if (step.label.includes("Video") || step.label.includes("Walkthrough")) add("Kling 3.0", "Video synthesis", COLORS.CYAN, klingBadge);
     if (step.label.includes("3D Recon")) add("Meshy v4", "3D reconstruction", COLORS.AMBER);
     if (step.label.includes("Floor Plan Gen")) add("GPT-4o + SVG", "Plan generation", "#14B8A6");
     if (step.label.includes("Quantity") || step.label.includes("BOQ")) add("web-ifc Parser", "BIM extraction", "#F59E0B");
