@@ -82,7 +82,7 @@ export function OverviewTab({ data, onExpandVideo, onNavigateTab }: OverviewTabP
   const techStack = deriveTechStack(data);
 
   const hasKpis = data.kpiMetrics.length > 0;
-  const hasHero = !!data.videoData?.videoUrl || !!data.heroImageUrl;
+  const hasHero = !!data.videoData || !!data.heroImageUrl;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
