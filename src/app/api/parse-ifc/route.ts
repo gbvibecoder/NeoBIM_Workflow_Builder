@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { checkEndpointRateLimit } from "@/lib/rate-limit";
 import { safeErrorMessage } from "@/lib/safe-error";
+import { uploadIFCToR2 } from "@/lib/r2";
 
 export const maxDuration = 60; // Vercel: allow 60s for WASM parsing
 
@@ -55,11 +56,19 @@ export async function POST(req: NextRequest) {
     const buffer = new Uint8Array(await file.arrayBuffer());
     const result = await parseIFCBuffer(buffer, file.name);
 
+    // Upload IFC to R2 for 3-day session persistence (fire-and-forget, non-blocking)
+    let ifcUrl: string | null = null;
+    const r2Result = await uploadIFCToR2(buffer, file.name).catch(() => null);
+    if (r2Result) {
+      ifcUrl = r2Result.url;
+    }
+
     return NextResponse.json({
       result,
       meta: {
         fileSize: `${(file.size / (1024 * 1024)).toFixed(1)} MB`,
         fileName: file.name,
+        ifcUrl, // R2 URL for re-download within 3 days (null if R2 not configured)
       },
     });
   } catch (err) {
