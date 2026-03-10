@@ -4,7 +4,7 @@ import { useState } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Mail, Lock, User, Chrome, Loader2 } from "lucide-react";
+import { Mail, Lock, User, Chrome, Loader2, Eye, EyeOff } from "lucide-react";
 import { motion } from "framer-motion";
 import { useLocale } from "@/hooks/useLocale";
 import { LanguageSwitcher } from "@/components/ui/LanguageSwitcher";
@@ -44,6 +44,7 @@ export default function RegisterPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
 
@@ -266,13 +267,13 @@ export default function RegisterPage() {
           <div style={{ position: "relative" }}>
             <Lock size={13} style={{ position: "absolute", left: 13, top: "50%", transform: "translateY(-50%)", color: "#3A3A50" }} />
             <input
-              type="password"
+              type={showPassword ? "text" : "password"}
               value={password}
               onChange={e => setPassword(e.target.value)}
               required
               minLength={8}
               placeholder={t('auth.minChars')}
-              style={inputStyle}
+              style={{ ...inputStyle, paddingRight: 40 }}
               onFocus={e => {
                 e.currentTarget.style.borderColor = "rgba(79,138,255,0.4)";
                 e.currentTarget.style.boxShadow = "0 0 0 3px rgba(79,138,255,0.08)";
@@ -282,6 +283,23 @@ export default function RegisterPage() {
                 e.currentTarget.style.boxShadow = "none";
               }}
             />
+            <button
+              type="button"
+              tabIndex={0}
+              aria-label={showPassword ? "Hide password" : "Show password"}
+              onClick={() => setShowPassword(v => !v)}
+              style={{
+                position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)",
+                background: "none", border: "none", padding: 4,
+                cursor: "pointer", color: "#3A3A50",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                opacity: 0.7, transition: "opacity 0.15s ease",
+              }}
+              onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.opacity = "1"; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.opacity = "0.7"; }}
+            >
+              {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+            </button>
           </div>
               <p style={{ fontSize: 11, color: "#5C5C78", marginTop: 4, lineHeight: 1.4 }}>
                 Min 8 characters with uppercase, lowercase, and a number

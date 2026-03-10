@@ -4,7 +4,7 @@ import { Suspense, useState } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { Mail, Lock, Chrome, Loader2, AlertCircle } from "lucide-react";
+import { Mail, Lock, Chrome, Loader2, AlertCircle, Eye, EyeOff } from "lucide-react";
 import { motion } from "framer-motion";
 import { validateEmail } from "@/lib/form-validation";
 import { useLocale } from "@/hooks/useLocale";
@@ -37,6 +37,7 @@ function LoginForm() {
   const [error, setError] = useState(initialError);
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [touched, setTouched] = useState({ email: false, password: false });
 
   function handleEmailChange(value: string) {
@@ -254,7 +255,7 @@ function LoginForm() {
           <div style={{ position: "relative" }}>
             <Lock size={13} style={{ position: "absolute", left: 13, top: "50%", transform: "translateY(-50%)", color: "#3A3A50" }} />
             <input
-              type="password"
+              type={showPassword ? "text" : "password"}
               value={password}
               onChange={e => { setPassword(e.target.value); setError(""); }}
               onBlur={handlePasswordBlur}
@@ -265,13 +266,30 @@ function LoginForm() {
               required
               placeholder="••••••••"
               style={{
-                width: "100%", padding: "10px 14px 10px 36px", height: 44,
+                width: "100%", padding: "10px 40px 10px 36px", height: 44,
                 borderRadius: 10, border: "1px solid rgba(255,255,255,0.06)",
                 background: "#08080f", color: "#F0F0F5",
                 fontSize: 14, outline: "none", boxSizing: "border-box",
                 transition: "border-color 0.2s, box-shadow 0.2s",
               }}
             />
+            <button
+              type="button"
+              tabIndex={0}
+              aria-label={showPassword ? "Hide password" : "Show password"}
+              onClick={() => setShowPassword(v => !v)}
+              style={{
+                position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)",
+                background: "none", border: "none", padding: 4,
+                cursor: "pointer", color: "#3A3A50",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                opacity: 0.7, transition: "opacity 0.15s ease",
+              }}
+              onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.opacity = "1"; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.opacity = "0.7"; }}
+            >
+              {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+            </button>
           </div>
         </motion.div>
 
