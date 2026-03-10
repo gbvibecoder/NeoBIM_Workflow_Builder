@@ -356,7 +356,7 @@ function WorkflowCanvasInner({ workflowId: urlWorkflowId }: WorkflowCanvasInnerP
     closeSaveModal,
   } = useWorkflowStore();
 
-  const { artifacts, executionProgress, clearArtifacts, restoreArtifactsFromDB } = useExecutionStore();
+  const { artifacts, executionProgress, clearArtifacts, clearCurrentExecution, restoreArtifactsFromDB } = useExecutionStore();
 
   // ─── Loading state: prevent empty-canvas flash while workflow loads from DB ──
   const [isLoadingWorkflow, setIsLoadingWorkflow] = useState(!!urlWorkflowId);
@@ -425,6 +425,9 @@ function WorkflowCanvasInner({ workflowId: urlWorkflowId }: WorkflowCanvasInnerP
   const artifactsRestoredRef = useRef(false);
   React.useEffect(() => {
     if (!urlWorkflowId) {
+      // New/empty canvas — clear any stale execution results from a previous workflow
+      clearArtifacts();
+      clearCurrentExecution();
       setIsLoadingWorkflow(false);
       return;
     }
@@ -440,6 +443,9 @@ function WorkflowCanvasInner({ workflowId: urlWorkflowId }: WorkflowCanvasInnerP
       }
       return;
     }
+    // Switching to a different workflow — clear old execution results first
+    clearArtifacts();
+    clearCurrentExecution();
     setIsLoadingWorkflow(true);
     loadedUrlIdRef.current = urlWorkflowId;
     loadWorkflow(urlWorkflowId).then(() => {
@@ -447,13 +453,13 @@ function WorkflowCanvasInner({ workflowId: urlWorkflowId }: WorkflowCanvasInnerP
       // Fit view after workflow loads
       setTimeout(() => fitView({ padding: 0.3, duration: 600 }), 300);
 
-      // Restore latest execution results from DB
+      // Restore latest execution results from DB for THIS workflow
       artifactsRestoredRef.current = true;
       restoreExecutionArtifacts(urlWorkflowId);
     }).catch(() => {
       setIsLoadingWorkflow(false);
     });
-  }, [urlWorkflowId, currentWorkflow?.id, loadWorkflow, fitView, restoreExecutionArtifacts]);
+  }, [urlWorkflowId, currentWorkflow?.id, loadWorkflow, fitView, restoreExecutionArtifacts, clearArtifacts, clearCurrentExecution]);
   const { isNodeLibraryOpen, setPromptModeActive, isPromptModeActive, toggleNodeLibrary, isDemoMode, setShowExecutionCompleteModal, pendingNodeAdd, clearPendingNodeAdd } = useUIStore();
 
   // Execution timing for celebration modal
