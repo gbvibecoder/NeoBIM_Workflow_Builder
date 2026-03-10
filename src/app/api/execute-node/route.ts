@@ -1427,13 +1427,48 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
 
       } else {
 
-      // ── Detect floor plan SVG input (from GN-004 upstream) ──
+      // ── Resolve the SOURCE IMAGE for Kling (priority order) ──
       let renderImageUrl = "";
       let isFloorPlanInput = false;
       let roomInfo = "";
 
-      if (inputData?.svg && typeof inputData.svg === "string") {
-        // Floor plan detected — convert SVG to PNG and upload to R2
+      // ── Priority 1: Direct image upload from IN-003 (original user file) ──
+      // This is the user's ORIGINAL uploaded floor plan / photo.
+      // Always prefer it over derived URLs from intermediate nodes (TR-004 etc.)
+      // so Kling receives the actual source image, not a re-hosted copy that
+      // might lose context or fail silently.
+      if (inputData?.fileData && typeof inputData.fileData === "string") {
+        const imgMime = (inputData.mimeType as string) ?? "image/jpeg";
+        const raw = inputData.fileData as string;
+        const cleanBase64 = raw.startsWith("data:") ? raw.split(",")[1] ?? raw : raw;
+
+        // Upload to R2 for a proper URL (Kling works best with URLs, not data URIs)
+        try {
+          const { uploadToR2, isR2Configured } = await import("@/lib/r2");
+          if (isR2Configured()) {
+            const ext = imgMime.includes("png") ? "png" : "jpg";
+            const imgBuffer = Buffer.from(cleanBase64, "base64");
+            const uploadResult = await uploadToR2(imgBuffer, `floorplan-upload-${generateId()}.${ext}`, imgMime);
+            if (uploadResult.success) {
+              renderImageUrl = uploadResult.url;
+              console.log("[GN-009] Original uploaded image → R2 for Kling:", renderImageUrl);
+            }
+          }
+        } catch (r2Err) {
+          console.warn("[GN-009] R2 upload of original image failed:", r2Err);
+        }
+
+        // Fallback to data URI if R2 unavailable
+        if (!renderImageUrl) {
+          renderImageUrl = raw.startsWith("data:") ? raw : `data:${imgMime};base64,${raw}`;
+          console.log("[GN-009] Using base64 data URI directly for Kling (size:", raw.length, "chars)");
+        }
+
+        isFloorPlanInput = true;
+      }
+
+      // ── Priority 2: Floor plan SVG from GN-004 ──
+      if (!renderImageUrl && inputData?.svg && typeof inputData.svg === "string") {
         console.log("[GN-009] Floor plan SVG detected, converting to PNG for Kling...");
         try {
           const sharp = (await import("sharp")).default;
@@ -1462,28 +1497,13 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
         }
       }
 
-      // Fallback: extract render image URL from upstream GN-003 or TR-004
+      // ── Priority 3: URL from upstream (GN-003 concept render or TR-004 R2 upload) ──
       if (!renderImageUrl) {
         renderImageUrl =
           (inputData?.url as string) ??
           (inputData?.images_out as string) ??
           (inputData?.imageUrl as string) ??
           "";
-      }
-
-      // Fallback: if we have base64 image data (from IN-003 upload), use it directly
-      // Kling API accepts base64 data URIs in the "image" field — no need for R2 or temp files
-      if (!renderImageUrl && inputData?.fileData && typeof inputData.fileData === "string") {
-        const imgMime = (inputData.mimeType as string) ?? "image/jpeg";
-        const raw = inputData.fileData as string;
-        // Ensure it's a proper data URI — Kling accepts data:image/...;base64,...
-        if (raw.startsWith("data:")) {
-          renderImageUrl = raw;
-        } else {
-          renderImageUrl = `data:${imgMime};base64,${raw}`;
-        }
-        isFloorPlanInput = true;
-        console.log("[GN-009] Using base64 data URI directly for Kling (size:", raw.length, "chars)");
       }
 
       // Build video from building description (from upstream TR-003 or fallback)
@@ -1506,7 +1526,7 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
           );
 
           const pipelineLabel = isFloorPlanInput
-            ? "floor plan SVG → PNG → Kling Official API (pro, dual) → ffmpeg concat → MP4"
+            ? "floor plan image → Kling Official API (pro, dual) → ffmpeg concat → MP4"
             : "concept render → Kling Official API (pro, dual) → ffmpeg concat → MP4";
           const walkthroughLabel = isFloorPlanInput
             ? "Floor Plan → Cinematic Walkthrough — 15s (generating...)"
