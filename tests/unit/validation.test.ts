@@ -22,8 +22,8 @@ describe('Validation - CRITICAL PATH', () => {
       expect(result.error).toContain('too short');
     });
 
-    it('should reject prompt > 500 chars', () => {
-      const longPrompt = 'A'.repeat(501);
+    it('should reject prompt > 2000 chars', () => {
+      const longPrompt = 'A'.repeat(2001);
       const result = validateTR003Input({ prompt: longPrompt });
       expect(result.valid).toBe(false);
       expect(result.error).toContain('too long');

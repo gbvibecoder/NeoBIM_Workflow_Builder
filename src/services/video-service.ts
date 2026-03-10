@@ -148,24 +148,31 @@ async function klingFetch(
   });
 
   if (!res.ok) {
-    const text = await res.text().catch(() => "Unknown error");
-    console.error("[Video] Kling HTTP error", { status: res.status, path, body: text.slice(0, 500) });
-    throw new VideoServiceError(
-      `Kling API HTTP ${res.status}: ${text.slice(0, 300)}`,
-      res.status,
-      res.status >= 500
-    );
+    // Try parsing JSON body first (Kling returns JSON even on 429)
+    let errorMessage = `Kling API HTTP ${res.status}`;
+    try {
+      const errData = await res.json();
+      if (errData?.code === 1102) {
+        errorMessage = "Kling account balance is empty — please top up your Kling AI account at klingai.com to generate professional videos";
+      } else if (errData?.message) {
+        errorMessage = `Kling API error: ${errData.message} (code ${errData.code})`;
+      }
+    } catch {
+      const text = await res.text().catch(() => "Unknown error");
+      errorMessage = `Kling API HTTP ${res.status}: ${text.slice(0, 300)}`;
+    }
+    console.error("[Video] Kling HTTP error", { status: res.status, path, errorMessage });
+    throw new VideoServiceError(errorMessage, res.status, res.status >= 500);
   }
 
   const data = (await res.json()) as KlingTaskResponse;
 
   if (data.code !== 0) {
     console.error("[Video] Kling API error", { code: data.code, message: data.message, requestId: data.request_id });
-    throw new VideoServiceError(
-      `Kling API error: ${data.message} (code ${data.code})`,
-      400,
-      false
-    );
+    const msg = data.code === 1102
+      ? "Kling account balance is empty — please top up your Kling AI account at klingai.com"
+      : `Kling API error: ${data.message} (code ${data.code})`;
+    throw new VideoServiceError(msg, 400, false);
   }
 
   return data;
@@ -227,9 +234,17 @@ async function createTask(
 ): Promise<KlingTaskResponse> {
   const errors: string[] = [];
 
+  console.log("========== createTask START ==========");
+  console.log("[CREATE] image type:", imageUrl?.startsWith("http") ? "URL" : "base64");
+  console.log("[CREATE] image length:", imageUrl?.length);
+  console.log("[CREATE] prompt (FULL):", prompt);
+  console.log("[CREATE] duration:", duration);
+  console.log("[CREATE] mode:", mode);
+  console.log("[CREATE] aspectRatio:", aspectRatio);
+
   for (const modelName of MODELS) {
     try {
-      console.log(`[Video] Trying model: ${modelName}, mode: ${mode}, duration: ${duration}s`);
+      console.log(`[CREATE] Trying model: ${modelName}`);
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const body: Record<string, any> = {
@@ -247,12 +262,19 @@ async function createTask(
         body.cfg_scale = 0.5;
       }
 
+      console.log("[CREATE] EXACT Kling API request body:", JSON.stringify({
+        ...body,
+        image: body.image?.length > 100 ? body.image?.slice(0, 50) + "...[truncated, total=" + body.image.length + "]" : body.image,
+      }));
+
       const result = await klingFetch(KLING_IMAGE2VIDEO_PATH, {
         method: "POST",
         body,
       });
 
-      console.log(`[Video] Task created with ${modelName}! taskId=${result.data.task_id}`);
+      console.log(`[CREATE] ✅ Task created with ${modelName}! taskId=${result.data.task_id}`);
+      console.log("[CREATE] Full API response:", JSON.stringify(result));
+      console.log("========== createTask END ==========");
       return result;
     } catch (err) {
       const msg = (err as Error).message;
@@ -383,7 +405,7 @@ export async function generateDualWalkthrough(
   buildingDescription: string,
   mode: "std" | "pro" = "pro",
 ): Promise<DualVideoResult> {
-  const negativePrompt = "blur, distortion, low quality, warped geometry, melting walls, deformed architecture, shaky camera, noise, artifacts, morphing surfaces, bent lines, wobbly structure, jittery motion, flickering textures, plastic appearance, fisheye distortion, floating objects";
+  const negativePrompt = "blur, distortion, low quality, warped geometry, melting walls, deformed architecture, shaky camera, noise, artifacts, morphing surfaces, bent lines, wobbly structure, jittery motion, flickering textures, plastic appearance, fisheye distortion, floating objects, wireframe, cartoon, sketch, low polygon, unrealistic proportions, text overlay, watermark, oversaturated colors, CGI look, video game graphics, toy model, miniature, tilt-shift, abstract, surreal, people walking, cars moving, birds flying, lens flare";
 
   const exteriorPrompt = buildExteriorPrompt(buildingDescription);
   const interiorPrompt = buildInteriorPrompt(buildingDescription);
@@ -424,185 +446,186 @@ export async function generateDualWalkthrough(
   };
 }
 
-// ─── Prompt Builders ────────────────────────────────────────────────────────
-
-function detectBuildingType(desc: string) {
-  const lower = desc.toLowerCase();
-  const isHighrise =
-    /(\d{2,})\s*(?:stor|floor)/i.test(lower) ||
-    lower.includes("tower") ||
-    lower.includes("skyscraper");
-  const isResidential =
-    lower.includes("villa") ||
-    lower.includes("house") ||
-    lower.includes("residential");
-  const hasGlass =
-    lower.includes("glass") ||
-    lower.includes("curtain wall") ||
-    lower.includes("glazing");
-  return { isHighrise, isResidential, hasGlass };
-}
+// ─── Prompt Builders (PDF / Concept Render → Video) ─────────────────────────
 
 /**
- * Build prompt for Part 1 (5s): Fast-paced exterior — all four elevations + top-down aerial.
+ * Build prompt for Part 1 (5s): Cinematic exterior views of the building.
+ * Philosophy: use the text description as source of truth, don't over-describe
+ * the building — Kling sees the concept render image. We only tell it HOW
+ * the video should look (camera movement, rendering style).
+ *
+ * Scene timeline:
+ *   0s–1s: Front elevation approach
+ *   1s–3s: Side elevations — left and right orbit
+ *   3s–4s: Back elevation
+ *   4s–5s: Top-down aerial view
  */
 export function buildExteriorPrompt(buildingDescription: string): string {
-  const desc = buildingDescription.slice(0, 600);
-  const { isHighrise, hasGlass } = detectBuildingType(desc);
-
-  const materialNote = hasGlass
-    ? "Glass curtain wall facades with realistic reflections of sky and surrounding context."
-    : "All cladding materials, structural joints, and facade details clearly visible with photorealistic accuracy.";
-
-  if (isHighrise) {
-    return (
-      `Ultra photorealistic fast-paced 3D AEC model showcase of: ${desc.slice(0, 200)}. ` +
-      "FAST dynamic camera orbit: starts from the south elevation showing the full tower facade and structural grid, " +
-      "rapidly sweeps to the east side revealing the service core and secondary entrance, " +
-      "continues orbiting past the north rear facade showing MEP risers and loading bay, " +
-      "swings to the west elevation with balcony details and fire escape routes, " +
-      "then dramatically rises to a top-down aerial plan view showing complete roofline, HVAC plant rooms, green roof areas, and full site plan with access roads and landscaping. " +
-      `${materialNote} ` +
-      "Golden hour lighting with long dramatic shadows, 4K cinematic, perfectly steady smooth camera, " +
-      "razor-sharp geometry showing every structural member and facade panel, " +
-      "professional AEC visualization, no distortion."
-    );
-  }
+  const desc = buildingDescription.slice(0, 800);
 
   return (
-    `Ultra photorealistic fast-paced 3D AEC model showcase of: ${desc.slice(0, 200)}. ` +
-    "FAST dynamic camera orbit: starts from the front facade showing main entrance canopy, structural columns, and ground floor retail frontage, " +
-    "rapidly sweeps to the left side showing secondary elevation and service access, " +
-    "continues past the rear showing back-of-house areas and parking entry, " +
-    "orbits to the right side revealing landscaped setback and emergency exits, " +
-    "then rises to dramatic bird's-eye top-down view showing complete roof plan, mechanical penthouses, solar panels, drainage, landscaping, and surrounding streets. " +
-    `${materialNote} ` +
-    "Golden hour lighting with long shadows, 4K cinematic, perfectly steady smooth camera, " +
-    "razor-sharp geometry, professional AEC visualization, no distortion."
+    `Use the provided text description as the only source of truth and generate an accurate BIM-style 3D architectural model following AEC industry standards. ` +
+    `Interpret the text to construct the building's layout, structure, rooms, dimensions, materials, and architectural features exactly as described. ` +
+    `Do not add elements, rooms, or features not mentioned in the text. ` +
+    `The rendered building must visually match the provided concept image. ` +
+    `Building description: ${desc.slice(0, 350)}. ` +
+    "Cinematic exterior views (5 seconds): " +
+    "Camera starts at the front elevation — slow cinematic dolly toward the building entrance, " +
+    "showing the complete front façade with accurate proportions. " +
+    "Camera smoothly orbits to the side elevations, revealing the building's depth, massing, and façade details. " +
+    "Continues to the back elevation showing rear façade and service areas. " +
+    "Camera rises on a sweeping crane shot to a dramatic top-down aerial perspective — " +
+    "complete roof plan visible with accurate building footprint. " +
+    "Physically accurate proportions, realistic materials, global illumination, " +
+    "natural lighting with soft shadows, cinematic smooth camera movement, " +
+    "high-end real-estate style architectural visualization, " +
+    "8K resolution, V-Ray/Corona render quality, no distortion, no artifacts."
   );
 }
 
 /**
- * Build prompt for Part 2 (10s): Detailed AEC interior walkthrough — lobby, corridors,
- * structural elements, MEP visible, materials, and spatial flow.
+ * Build prompt for Part 2 (10s): Smooth interior walkthrough showcasing
+ * all spaces described in the text, following natural circulation.
+ * Same philosophy: trust the input image + text, describe camera movement only.
+ *
+ * Scene timeline:
+ *   0s–2s: Camera enters through main entrance into lobby/foyer
+ *   2s–10s: Smooth walkthrough through all described interior spaces
  */
 export function buildInteriorPrompt(buildingDescription: string): string {
-  const desc = buildingDescription.slice(0, 600);
-  const { isHighrise, isResidential } = detectBuildingType(desc);
-
-  if (isHighrise) {
-    return (
-      `Ultra photorealistic detailed AEC interior walkthrough of: ${desc.slice(0, 200)}. ` +
-      "Camera slowly enters through the grand double-height lobby showing the reception desk, exposed concrete columns with steel base plates, polished terrazzo flooring with expansion joints, " +
-      "reveals the elevator bank with stainless steel doors and floor indicator panels, " +
-      "glides past the fire-rated stairwell enclosure and accessible ramp, " +
-      "enters the main corridor showing suspended acoustic ceiling tiles, recessed LED downlights, fire sprinkler heads, and smoke detectors, " +
-      "pauses at the exposed structural transfer beam showing reinforcement details, " +
-      "enters a typical office floor revealing the open plan workspace with raised access floor, cable trays visible below ceiling, floor-to-ceiling curtain wall mullions, " +
-      "continues past the MEP riser cupboard with visible ductwork and cable ladders, " +
-      "then slowly approaches the window wall revealing panoramic city views through the high-performance glazing. " +
-      "Warm interior lighting blended with abundant natural daylight, real material textures showing concrete formwork marks, brushed steel, timber veneers, " +
-      "4K cinematic quality, perfectly steady ultra-smooth camera glide, " +
-      "professional AEC interior visualization, no distortion."
-    );
-  }
-
-  if (isResidential) {
-    return (
-      `Ultra photorealistic detailed AEC interior walkthrough of: ${desc.slice(0, 200)}. ` +
-      "Camera slowly enters through the front door showing the solid timber door frame and electronic lock, " +
-      "reveals the entrance hall with coat storage, tiled floor with underfloor heating registers, and ceiling-mounted smoke detector, " +
-      "glides into the open-plan living room showing the double-height space, exposed timber ceiling joists, engineered hardwood flooring, " +
-      "reveals floor-to-ceiling windows with triple-glazed units and integrated blinds, " +
-      "pans across the built-in joinery with concealed ventilation grilles and recessed lighting tracks, " +
-      "moves through to the kitchen revealing stone countertops, integrated appliances, splashback tiling, pendant lights over the island, " +
-      "passes the dining area with feature pendant and acoustic wall panels, " +
-      "then exits through sliding glass doors onto the terrace showing the outdoor living space, drainage channel, timber decking, and planters with the garden beyond. " +
-      "Warm interior lighting with soft morning sunlight streaming through windows casting shadows on surfaces, high-end material finishes throughout, " +
-      "4K cinematic quality, perfectly steady ultra-smooth camera glide, " +
-      "professional AEC interior visualization, no distortion."
-    );
-  }
+  const desc = buildingDescription.slice(0, 800);
 
   return (
-    `Ultra photorealistic detailed AEC interior walkthrough of: ${desc.slice(0, 200)}. ` +
-    "Camera slowly enters through the main entrance showing the revolving door mechanism, entrance matwell, and security turnstiles, " +
-    "reveals the spacious lobby with high ceilings, exposed structural columns, polished concrete floor, and feature reception desk, " +
-    "glides through the reception area showing wayfinding signage, fire extinguisher recesses, and accessible call points, " +
-    "enters the main corridor revealing suspended ceiling grid with integrated services — LED panels, sprinkler heads, CCTV domes, and air diffusers, " +
-    "passes a glazed meeting room showing acoustic glass partitions and cable management below the raised floor, " +
-    "continues past the open office area with workstations, task lighting, and exposed ceiling showing painted ductwork and cable trays, " +
-    "pauses at the breakout space showing the kitchenette, acoustic baffles, and living wall planter, " +
-    "then slowly approaches the large windows showing the exterior view through high-performance glazing with visible mullion profiles. " +
-    "Warm interior lighting blended with natural daylight, real material textures — concrete, timber, steel, and glass, " +
-    "4K cinematic quality, perfectly steady ultra-smooth camera glide, " +
-    "professional AEC interior visualization, no distortion."
+    `Smooth interior walkthrough of the building strictly matching the provided text description and concept image. ` +
+    `Show only the spaces, rooms, and features mentioned in the text — do not add rooms or areas not described. ` +
+    `Building description: ${desc.slice(0, 350)}. ` +
+    "Interior walkthrough (10 seconds): " +
+    "Camera enters the building through the main entrance. " +
+    "Smooth first-person walkthrough following a natural circulation path — " +
+    "showcasing all spaces described in the text in the correct layout order. " +
+    "Each space is furnished consistently with its described function. " +
+    "Camera showcases spatial flow, room proportions, ceiling heights, and connectivity between spaces. " +
+    "Natural light streaming through windows, door positions and wall layouts matching the description. " +
+    "Physically accurate proportions, realistic materials " +
+    "(hardwood floors, stone countertops, painted walls, glass partitions, metal fixtures), " +
+    "global illumination, natural lighting blended with warm interior light, " +
+    "cinematic smooth camera movement, high-end real-estate style architectural visualization, " +
+    "8K resolution, V-Ray/Corona render quality, no distortion, no artifacts."
+  );
+}
+
+// ─── Floor Plan → Video Prompts ──────────────────────────────────────────────
+
+/**
+ * Build prompt for floor plan exterior (5s): Camera orbits the building formed
+ * from the 2D floor plan image. We DON'T describe the building — Kling sees
+ * the floor plan image and converts it. We only describe HOW the video looks.
+ *
+ * Scene timeline:
+ *   0s–1s: Front elevation — camera approaches the building from the front
+ *   1s–2s: Left side — camera orbits to reveal the left elevation
+ *   2s–3s: Back elevation — camera continues orbit showing the rear
+ *   3s–4s: Right side — camera orbits to the right elevation
+ *   4s–5s: Top-down — camera rises to a dramatic aerial roof perspective
+ */
+export function buildFloorPlanExteriorPrompt(_buildingDescription: string, _roomInfo?: string): string {
+  return (
+    "Use the provided 2D floor plan as the only source of truth and convert it into an accurate BIM-style 3D architectural model following AEC standards. " +
+    "Strictly interpret walls, doors, windows, room layout, scale, and spatial relationships exactly as shown, without inventing or modifying any spaces. " +
+    "Generate an ultra-realistic 3D architectural exterior view. " +
+    "Show exterior views including front elevation approach and top-down aerial view of the building derived from the floor plan footprint. " +
+    "Use cinematic camera movement, realistic materials, global illumination, natural lighting, and architectural visualization quality. " +
+    "Ensure the final result is a high-end real estate style 3D render that strictly matches the provided 2D floor plan."
+  );
+}
+
+/**
+ * Build prompt for floor plan interior (10s): Camera enters the building
+ * and walks through rooms exactly as laid out in the floor plan.
+ * We only describe HOW the video looks — Kling reads the floor plan image.
+ *
+ * Scene timeline:
+ *   0s–2s: Camera enters the building through the main entrance
+ *   2s–10s: First-person walkthrough following natural circulation paths,
+ *           showcasing every room visible in the floor plan with furniture
+ *           consistent with each room type
+ */
+export function buildFloorPlanInteriorPrompt(_buildingDescription: string, _roomInfo?: string): string {
+  return (
+    "Use the provided 2D floor plan as the only source of truth and convert it into an accurate BIM-style 3D architectural model following AEC standards. " +
+    "Strictly interpret walls, doors, windows, room layout, scale, and spatial relationships exactly as shown, without inventing or modifying any spaces. " +
+    "Generate an ultra-realistic 3D architectural interior walkthrough. " +
+    "Smooth interior walkthrough covering all spaces shown in the plan, following a natural circulation path. " +
+    "Use cinematic camera movement, realistic materials, global illumination, natural lighting, and architectural visualization quality. " +
+    "Ensure the final result is a high-end real estate style 3D render that strictly matches the provided 2D floor plan."
+  );
+}
+
+// ─── Combined Single-Video Prompts (10s, no segments) ────────────────────────
+
+/**
+ * Combined walkthrough prompt for concept render input (fallback single 10s video).
+ * Exterior views + interior entry in one continuous shot.
+ * Same philosophy: trust the input, describe camera movement only.
+ */
+export function buildCombinedWalkthroughPrompt(buildingDescription: string): string {
+  const desc = buildingDescription.slice(0, 800);
+
+  return (
+    `Use the provided text description as the only source of truth and generate an accurate BIM-style 3D architectural model. ` +
+    `Interpret the text exactly as described, without adding elements not mentioned. ` +
+    `Building description: ${desc.slice(0, 400)}. ` +
+    "Single continuous camera movement. " +
+    "Camera starts with cinematic exterior views — front elevation approach, " +
+    "orbiting around the building showing all sides, rising to a top-down aerial view. " +
+    "Camera descends and enters the building through the main entrance — " +
+    "smooth first-person walkthrough following natural circulation paths, " +
+    "showcasing all spaces described in the text. " +
+    "Physically accurate proportions, realistic materials, global illumination, " +
+    "natural lighting, cinematic smooth camera, high-end real-estate quality, " +
+    "8K resolution, V-Ray/Corona render quality, no distortion, no artifacts."
+  );
+}
+
+/**
+ * Combined floor plan prompt for a single 10s video (fallback if dual isn't used).
+ * Exterior orbit + interior walkthrough in one continuous shot.
+ * Same philosophy: don't describe the building, just describe camera movement.
+ */
+export function buildFloorPlanCombinedPrompt(_buildingDescription: string, _roomInfo?: string): string {
+  return (
+    "Use the provided 2D floor plan as the only source of truth and convert it into an accurate BIM-style 3D architectural model following AEC standards. " +
+    "Strictly interpret walls, doors, windows, room layout, scale, and spatial relationships exactly as shown, without inventing or modifying any spaces. " +
+    "Generate a 10-second ultra-realistic 3D architectural walkthrough video in one continuous camera movement. " +
+    "First 2-3 seconds: exterior view showing the front elevation and a brief top-down aerial view of the building derived from the floor plan footprint. " +
+    "Camera then smoothly descends and enters through the main entrance. " +
+    "Remaining 7-8 seconds: smooth interior walkthrough covering all spaces shown in the plan, following a natural circulation path through each room. " +
+    "Use cinematic camera movement, realistic materials, global illumination, natural lighting, and architectural visualization quality. " +
+    "Ensure the final result is a high-end real estate style 3D render that strictly matches the provided 2D floor plan."
   );
 }
 
 /**
  * Build a cinematic AEC walkthrough prompt from the building description.
- * Single-video fallback: fast exterior views → detailed interior walkthrough.
- * Kept under 2500 chars (Kling API limit).
+ * Legacy single-video fallback — kept for backward compatibility.
  */
 export function buildArchitecturalVideoPrompt(
   buildingDescription: string
 ): string {
   const desc = buildingDescription.slice(0, 800);
-  const lower = desc.toLowerCase();
-
-  const isHighrise =
-    /(\d{2,})\s*(?:stor|floor)/i.test(lower) ||
-    lower.includes("tower") ||
-    lower.includes("skyscraper");
-  const isResidential =
-    lower.includes("villa") ||
-    lower.includes("house") ||
-    lower.includes("residential");
-  const hasGlass =
-    lower.includes("glass") ||
-    lower.includes("curtain wall") ||
-    lower.includes("glazing");
-
-  const materialNote = hasGlass
-    ? "Glass curtain wall facades show realistic reflections of sky and surroundings."
-    : "All cladding, structural joints, and facade materials clearly visible with photorealistic detail.";
-
-  let cameraMotion: string;
-
-  if (isHighrise) {
-    cameraMotion =
-      "Camera starts at street level showing the tower's full front facade, structural grid, and entrance canopy, " +
-      "rapidly orbits showing all four elevations, " +
-      "rises to an aerial top-down view showing roofline with HVAC plant rooms and green roof, " +
-      "then descends and enters through the main lobby for a detailed interior walkthrough " +
-      "showing reception desk, exposed columns, elevator banks, corridors with suspended ceilings and sprinklers, " +
-      "office floor with raised access flooring, and panoramic views through curtain wall glazing.";
-  } else if (isResidential) {
-    cameraMotion =
-      "Camera starts from the garden showing the full side view and structural facade, " +
-      "rapidly orbits to show all elevations, " +
-      "rises to a bird's eye top-down view showing roofline and site layout, " +
-      "then descends through the front door into a detailed interior walkthrough " +
-      "through entrance hall, open-plan living with exposed timber joists, kitchen with stone countertops, " +
-      "and out through sliding doors onto the terrace with outdoor living space.";
-  } else {
-    cameraMotion =
-      "Camera starts showing the building's full front facade and main entrance, " +
-      "rapidly orbits to reveal all elevations and service areas, " +
-      "rises to an aerial top-down view showing the complete site plan, " +
-      "then descends and enters through the main entrance for a detailed interior walkthrough " +
-      "through the lobby, past structural columns, through corridors with visible MEP services, " +
-      "into office spaces and meeting rooms, approaching the windows.";
-  }
 
   return (
-    `Ultra photorealistic cinematic AEC architectural walkthrough of: ${desc.slice(0, 250)}. ` +
-    `${cameraMotion} ` +
-    `${materialNote} ` +
-    "Golden hour warm lighting, 4K cinematic quality, perfectly steady smooth camera movement, " +
-    "solid precise building geometry showing structural members and real material textures, " +
-    "professional AEC visualization quality."
+    `Use the provided text description as the only source of truth and generate an accurate BIM-style 3D architectural model following AEC industry standards. ` +
+    `Interpret the text exactly as described, without adding elements not mentioned. ` +
+    `Building description: ${desc.slice(0, 300)}. ` +
+    "Create an ultra-realistic 3D architectural walkthrough video. " +
+    "Cinematic exterior views including front, sides, back, and top view of the building. " +
+    "Then smooth interior walkthrough showcasing all spaces described in the text, " +
+    "following a natural circulation path. " +
+    "Physically accurate proportions, realistic materials, global illumination, " +
+    "natural lighting, cinematic smooth camera movement, " +
+    "high-end real-estate style architectural visualization, " +
+    "8K resolution, no distortion, no artifacts."
   );
 }
 
@@ -830,26 +853,52 @@ export interface SubmittedVideoTasks {
 }
 
 /**
- * Submit both video generation tasks to Kling API and return immediately
- * with the task IDs (no polling/waiting).
+ * Submit TWO video generation tasks to Kling API (5s exterior + 10s interior)
+ * and return immediately with the task IDs.
+ *
+ * After both complete, the frontend calls /api/concat-videos to stitch them
+ * into a single seamless 15s MP4 with a crossfade transition.
+ *
+ * When `options.isFloorPlan` is true, uses floor-plan-specific prompts.
  */
 export async function submitDualWalkthrough(
   imageUrl: string,
   buildingDescription: string,
   mode: "std" | "pro" = "pro",
+  options?: { isFloorPlan?: boolean; roomInfo?: string },
 ): Promise<SubmittedVideoTasks> {
-  const negativePrompt = "blur, distortion, low quality, warped geometry, melting walls, deformed architecture, shaky camera, noise, artifacts, morphing surfaces, bent lines, wobbly structure, jittery motion, flickering textures, plastic appearance, fisheye distortion, floating objects";
+  console.log("========== submitDualWalkthrough START ==========");
+  console.log("[DUAL] imageUrl type:", imageUrl?.startsWith("http") ? "URL" : "base64");
+  console.log("[DUAL] imageUrl length:", imageUrl?.length);
+  console.log("[DUAL] buildingDescription:", buildingDescription?.slice(0, 200));
+  console.log("[DUAL] mode:", mode);
+  console.log("[DUAL] isFloorPlan:", options?.isFloorPlan);
+  console.log("[DUAL] roomInfo:", options?.roomInfo?.slice(0, 200) || "NONE");
 
-  const exteriorPrompt = buildExteriorPrompt(buildingDescription);
-  const interiorPrompt = buildInteriorPrompt(buildingDescription);
+  const negativePrompt = "blur, distortion, low quality, warped geometry, melting walls, deformed architecture, shaky camera, noise, artifacts, morphing surfaces, bent lines, wobbly structure, jittery motion, flickering textures, plastic appearance, fisheye distortion, floating objects, wireframe, cartoon, sketch, low polygon, unrealistic proportions, text overlay, watermark, oversaturated colors, CGI look, video game graphics, toy model, miniature, tilt-shift, abstract, surreal, people walking, cars moving, birds flying, lens flare";
 
-  console.log("[Video] Submitting DUAL walkthrough tasks (non-blocking)");
+  const exteriorPrompt = options?.isFloorPlan
+    ? buildFloorPlanExteriorPrompt(buildingDescription, options.roomInfo)
+    : buildExteriorPrompt(buildingDescription);
+  const interiorPrompt = options?.isFloorPlan
+    ? buildFloorPlanInteriorPrompt(buildingDescription, options.roomInfo)
+    : buildInteriorPrompt(buildingDescription);
+
+  console.log("[DUAL] exteriorPrompt (FULL):", exteriorPrompt);
+  console.log("[DUAL] interiorPrompt (FULL):", interiorPrompt);
+  console.log("[DUAL] About to submit TWO tasks in parallel...");
+  console.log("[DUAL] Exterior: duration=5, Interior: duration=10");
 
   // Submit both tasks in parallel — don't poll, return task IDs immediately
   const [exteriorResult, interiorResult] = await Promise.all([
     createTask(imageUrl, exteriorPrompt, negativePrompt, "5", "16:9", mode),
     createTask(imageUrl, interiorPrompt, negativePrompt, "10", "16:9", mode),
   ]);
+
+  console.log("[DUAL] Both tasks submitted!");
+  console.log("[DUAL] Exterior task ID:", exteriorResult.data.task_id);
+  console.log("[DUAL] Interior task ID:", interiorResult.data.task_id);
+  console.log("========== submitDualWalkthrough END ==========");
 
   const result = {
     exteriorTaskId: exteriorResult.data.task_id,
@@ -858,12 +907,65 @@ export async function submitDualWalkthrough(
     submittedAt: Date.now(),
   };
 
-  console.log("[Video] Tasks submitted!", {
-    exteriorTaskId: result.exteriorTaskId,
-    interiorTaskId: result.interiorTaskId,
-  });
-
   return result;
+}
+
+// ─── Single Video Submission (floor plans) ──────────────────────────────────
+
+export interface SubmittedSingleVideoTask {
+  taskId: string;
+  submittedAt: number;
+}
+
+/**
+ * Submit a SINGLE 10s video task to Kling API and return immediately.
+ * Used for floor plans where a continuous shot (exterior + interior) is needed
+ * to maintain building consistency.
+ */
+export async function submitSingleWalkthrough(
+  imageUrl: string,
+  prompt: string,
+  mode: "std" | "pro" = "pro",
+): Promise<SubmittedSingleVideoTask> {
+  const negativePrompt = "blur, distortion, low quality, warped geometry, melting walls, deformed architecture, shaky camera, noise, artifacts, morphing surfaces, bent lines, wobbly structure, jittery motion, flickering textures, plastic appearance, fisheye distortion, floating objects, wireframe, cartoon, sketch, low polygon, unrealistic proportions, text overlay, watermark, oversaturated colors, CGI look, video game graphics, toy model, miniature, tilt-shift, abstract, surreal, people walking, cars moving, birds flying, lens flare";
+
+  console.log("[GN-009] submitSingleWalkthrough: Submitting SINGLE 10s walkthrough");
+  console.log("[GN-009] Image type:", imageUrl?.startsWith("http") ? "URL" : "base64", "length:", imageUrl?.length);
+  console.log("[GN-009] Prompt:", prompt);
+
+  const result = await createTask(imageUrl, prompt, negativePrompt, "10", "16:9", mode);
+
+  console.log("[GN-009] Single task submitted! taskId:", result.data.task_id);
+  return { taskId: result.data.task_id, submittedAt: Date.now() };
+}
+
+/**
+ * Check status of a single video task. Non-blocking single check.
+ */
+export async function checkSingleVideoStatus(taskId: string): Promise<{
+  status: "submitted" | "processing" | "succeed" | "failed";
+  videoUrl: string | null;
+  progress: number;
+  isComplete: boolean;
+  hasFailed: boolean;
+  failureMessage: string | null;
+}> {
+  const result = await klingFetch(`${KLING_IMAGE2VIDEO_PATH}/${taskId}`, { method: "GET" });
+
+  const taskStatus = result.data.task_status as "submitted" | "processing" | "succeed" | "failed";
+  const videoUrl = result.data.task_result?.videos?.[0]?.url ?? null;
+
+  const progress = taskStatus === "succeed" ? 100 : taskStatus === "processing" ? 50 : taskStatus === "submitted" ? 10 : 0;
+  const hasFailed = taskStatus === "failed";
+  const isComplete = taskStatus === "succeed";
+
+  const failureMessage = hasFailed
+    ? (result.data.task_status_msg ?? "Unknown error")
+    : null;
+
+  console.log("[Video] Single task status:", { taskId, taskStatus, progress, videoUrl: videoUrl?.slice(0, 80) });
+
+  return { status: taskStatus, videoUrl, progress, isComplete, hasFailed, failureMessage };
 }
 
 export interface VideoTaskStatus {

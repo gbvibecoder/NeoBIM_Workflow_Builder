@@ -55,11 +55,24 @@ export function VideoBody({ data: rawData, nodeId }: VideoBodyProps) {
     }
   }, [hasSegments, currentSegmentIndex, segments.length]);
 
-  // Auto-play when segment changes
+  // Auto-play when segment changes — wait for loadedmetadata before play
   useEffect(() => {
-    if (videoRef.current && hasSegments && isPlaying) {
-      videoRef.current.load();
-      videoRef.current.play().catch(() => {});
+    const video = videoRef.current;
+    if (!video || !hasSegments || !isPlaying) return;
+
+    video.load();
+
+    const onReady = () => {
+      video.play().catch((err) => {
+        console.warn("[VideoBody] Auto-play blocked:", err.message);
+      });
+    };
+
+    if (video.readyState >= 1) {
+      onReady();
+    } else {
+      video.addEventListener("loadedmetadata", onReady, { once: true });
+      return () => video.removeEventListener("loadedmetadata", onReady);
     }
   }, [currentSegmentIndex, hasSegments, isPlaying]);
 

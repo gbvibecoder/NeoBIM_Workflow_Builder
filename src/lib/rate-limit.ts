@@ -53,7 +53,7 @@ export const proTierRateLimit = new Ratelimit({
  * Check if user is an admin (bypasses rate limits)
  * Reads from ADMIN_EMAILS environment variable (comma-separated list)
  */
-function isAdminUser(userEmail?: string): boolean {
+export function isAdminUser(userEmail?: string): boolean {
   if (!userEmail) return false;
   
   const adminEmails = process.env.ADMIN_EMAILS;
@@ -93,6 +93,31 @@ export function logRateLimitHit(userId: string, userRole: string, remaining: num
   // 🔥 TRACK RATE LIMIT HIT
   if (remaining === 0) {
     trackRateLimitHit(userId, "execute-node", userRole);
+  }
+}
+
+// ─── Per-workflow dedup (count rate limit once per workflow, not per node) ──
+
+/**
+ * Check if this workflow execution has already been counted for rate limiting.
+ * Returns true if already counted (skip rate limit), false if first time (count it).
+ * Uses a Redis key with 24h TTL to track seen execution IDs.
+ */
+export async function isExecutionAlreadyCounted(
+  userId: string,
+  executionId: string,
+): Promise<boolean> {
+  if (!executionId) return false; // No executionId means count every time
+  try {
+    const key = `exec-seen:${userId}:${executionId}`;
+    const exists = await redis.get(key);
+    if (exists) return true;
+    // Mark as seen with 24h TTL
+    await redis.set(key, "1", { ex: 86400 });
+    return false;
+  } catch {
+    // On Redis error, don't dedup — count the request
+    return false;
   }
 }
 

@@ -158,3 +158,9 @@
 {"id":"e0a7dfd9-236d-4c99-9c4f-8f02b2afc95b","timestamp":"2026-03-10T21:52:50.674Z","userId":"cmmdh1l94000004l8v14nq5gu","eventName":"workflow_executed","properties":{"nodeCount":3,"catalogueIds":["IN-002","TR-001","GN-009"]}}
 {"id":"09410671-91ef-48a9-93c9-defc4fd2bacb","timestamp":"2026-03-10T21:52:50.674Z","userId":"cmmdh1l94000004l8v14nq5gu","eventName":"node_used","properties":{"catalogueId":"GN-009","nodeLabel":"Video Walkthrough Generator"}}
 {"id":"652d5703-a0b2-4db7-b534-5267f62dec40","timestamp":"2026-03-10T22:08:07.119Z","userId":"cmmdh1l94000004l8v14nq5gu","eventName":"user_login"}
+{"id":"00efbfd1-aca7-4c97-a67d-da4a7c3201d3","timestamp":"2026-03-10T22:10:35.155Z","userId":"cmmdh1l94000004l8v14nq5gu","eventName":"workflow_created","properties":{"workflowId":"cmml5ytqk0002d0vbax1j2ea4"}}
+{"id":"db8b60a3-54f6-47a3-bf86-8acb2eecdd03","timestamp":"2026-03-10T22:10:37.659Z","userId":"cmmdh1l94000004l8v14nq5gu","eventName":"execution_started","properties":{"executionId":"cmml5yw500003d0vbjoha97kw"}}
+{"id":"a60cb798-d9cb-4c67-ac20-4349e2e317f2","timestamp":"2026-03-10T22:10:39.285Z","userId":"cmmdh1l94000004l8v14nq5gu","eventName":"node_used","properties":{"catalogueId":"IN-002","nodeLabel":"PDF Upload"}}
+{"id":"6d96a7c2-c018-49e9-92cf-65f5a159e523","timestamp":"2026-03-10T22:10:45.884Z","userId":"cmmdh1l94000004l8v14nq5gu","eventName":"node_used","properties":{"catalogueId":"GN-009","nodeLabel":"Video Walkthrough Generator"}}
+{"id":"4a1390a9-0c98-4f85-9f17-722cc4bc4035","timestamp":"2026-03-10T22:10:45.884Z","userId":"cmmdh1l94000004l8v14nq5gu","eventName":"node_used","properties":{"catalogueId":"TR-001","nodeLabel":"Brief Parser"}}
+{"id":"98d88e56-d87b-4737-81a6-aa8957541dd2","timestamp":"2026-03-10T22:10:45.884Z","userId":"cmmdh1l94000004l8v14nq5gu","eventName":"workflow_executed","properties":{"nodeCount":3,"catalogueIds":["IN-002","TR-001","GN-009"]}}
