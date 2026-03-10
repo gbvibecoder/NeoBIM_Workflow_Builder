@@ -6,6 +6,7 @@ import { useWorkflowStore } from "@/stores/workflow-store";
 import { useExecutionStore } from "@/stores/execution-store";
 import { useUIStore } from "@/stores/ui-store";
 import { executeNode as mockExecuteNode } from "@/services/mock-executor";
+import { inputFileStore } from "@/components/canvas/nodes/InputNode";
 import { generateId } from "@/lib/utils";
 import { awardXP } from "@/lib/award-xp";
 import { trackWorkflowExecuted, trackNodeUsed, trackRegenerationUsed } from "@/lib/track";
@@ -19,6 +20,7 @@ const REAL_NODE_IDS = new Set(["TR-001", "TR-003", "TR-004", "TR-005", "TR-012",
 // Live nodes — ALWAYS use real API execution regardless of NEXT_PUBLIC_ENABLE_MOCK_EXECUTION.
 // These are production-ready and should never fall through to mock when authenticated.
 const LIVE_NODE_IDS = new Set([
+  "TR-001",  // Brief Parser — MUST be live to extract actual PDF text (mock returns hardcoded data)
   "TR-003",  // Design Brief Analyzer (GPT-4o-mini)
   "TR-007",  // Quantity Extractor (web-ifc, no API key)
   "TR-008",  // BOQ / Cost Mapper (cost database, no API key)
@@ -60,9 +62,26 @@ async function executeNode(
   if (INPUT_NODE_IDS.has(catalogueId)) {
     await new Promise(r => setTimeout(r, 150)); // brief delay for UX
     const nodeData = node.data as Record<string, unknown>;
-    const fileData = nodeData.fileData as string | undefined;
-    const fileName = nodeData.fileName as string | undefined;
-    const mimeType = nodeData.mimeType as string | undefined;
+    let fileData = nodeData.fileData as string | undefined;
+    let fileName = nodeData.fileName as string | undefined;
+    let mimeType = nodeData.mimeType as string | undefined;
+
+    // Read from inputFileStore (where FileUploadInput stores the actual File object)
+    // and convert to base64 so it can be sent to the server API
+    const fileObj = inputFileStore.get(node.id);
+    if (fileObj && !fileData) {
+      console.log(`[INPUT] Converting file "${fileObj.name}" (${fileObj.size} bytes) to base64`);
+      const arrayBuffer = await fileObj.arrayBuffer();
+      const bytes = new Uint8Array(arrayBuffer);
+      let binary = "";
+      for (let i = 0; i < bytes.length; i++) {
+        binary += String.fromCharCode(bytes[i]);
+      }
+      fileData = btoa(binary);
+      fileName = fileObj.name;
+      mimeType = fileObj.type || "application/pdf";
+      console.log(`[INPUT] base64 length: ${fileData.length} chars`);
+    }
 
     return {
       id: generateId(),
@@ -107,7 +126,10 @@ async function executeNode(
   // Determine if this node should use real API execution:
   // - LIVE_NODE_IDS: always real (ignore mock flag) — these are production-ready
   // - Other REAL_NODE_IDS: only real when mock flag is off
-  const shouldUseRealAPI = LIVE_NODE_IDS.has(catalogueId) || (useRealExecution && REAL_NODE_IDS.has(catalogueId));
+  const isLive = LIVE_NODE_IDS.has(catalogueId);
+  const shouldUseRealAPI = isLive || (useRealExecution && REAL_NODE_IDS.has(catalogueId));
+
+  console.log(`[executeNode] ${catalogueId} → isLive=${isLive}, useReal=${useRealExecution}, shouldUseRealAPI=${shouldUseRealAPI}`);
 
   if (shouldUseRealAPI) {
     // Merge node-level config (e.g. viewType for GN-003/TR-005) into inputData
@@ -162,6 +184,12 @@ async function executeNode(
 
     const { artifact } = await res.json() as { artifact: ExecutionArtifact };
     return { ...artifact, createdAt: new Date() };
+  }
+
+  // SAFETY: LIVE nodes must NEVER use mock data — throw if we somehow got here
+  if (LIVE_NODE_IDS.has(catalogueId)) {
+    console.error(`[${catalogueId}] BUG: Live node reached mock fallback! This should never happen.`);
+    throw new Error(`${catalogueId} requires real API execution but no API path was available. Check server configuration.`);
   }
 
   // Fall back to mock — pass upstream data so mocks can reflect user input
@@ -322,6 +350,7 @@ async function pollVideoGeneration(
   clearVideoProgressFn: (nodeId: string) => void,
   currentArtifactData: Record<string, unknown>,
   executionId: string,
+  videoPipeline: "image2video" | "text2video" = "image2video",
 ): Promise<void> {
   const deadline = Date.now() + VIDEO_POLL_TIMEOUT_MS;
 
@@ -342,7 +371,7 @@ async function pollVideoGeneration(
     try {
       console.log("[POLL] Checking video status...");
       const res = await fetch(
-        `/api/video-status?exteriorTaskId=${encodeURIComponent(exteriorTaskId)}&interiorTaskId=${encodeURIComponent(interiorTaskId)}`
+        `/api/video-status?exteriorTaskId=${encodeURIComponent(exteriorTaskId)}&interiorTaskId=${encodeURIComponent(interiorTaskId)}&pipeline=${videoPipeline}`
       );
 
       if (!res.ok) {
@@ -479,7 +508,7 @@ async function renderClientWalkthrough(
       floorHeight?: number;
       footprint?: number;
       buildingType?: string;
-      style?: string;
+      style?: Record<string, unknown>;
     } | undefined;
 
     const result = await renderWalkthrough({
@@ -487,6 +516,7 @@ async function renderClientWalkthrough(
       floorHeight: buildingConfig?.floorHeight ?? 3.6,
       footprint: buildingConfig?.footprint ?? 600,
       buildingType: buildingConfig?.buildingType,
+      style: buildingConfig?.style,
       onProgress: (percent, phase) => {
         setVideoProgressFn(nodeId, {
           progress: percent,
@@ -737,10 +767,10 @@ export function useExecution({ onLog }: UseExecutionOptions = {}) {
           return;
         }
       }
-      // File upload nodes: must have a file selected
+      // File upload nodes: must have a file selected (check both node.data and inputFileStore)
       if (["IN-002", "IN-003", "IN-005", "IN-006"].includes(catalogueId)) {
         const nd = node.data as Record<string, unknown>;
-        if (!nd.fileData && !nd.inputValue) {
+        if (!nd.fileData && !nd.inputValue && !inputFileStore.has(node.id)) {
           toast.error(`Please upload a file to the "${node.data.label}" node before running`);
           return;
         }
@@ -942,10 +972,13 @@ export function useExecution({ onLog }: UseExecutionOptions = {}) {
             artData.exteriorTaskId &&
             artData.interiorTaskId
           ) {
-            // Dual video path (concept renders): poll both tasks
-            log("info", "Dual video generation started — polling for progress");
+            // Dual video path (concept renders): poll both tasks via Kling API
+            const pipeline = (artData.videoPipeline as string) === "text2video" ? "text2video" as const : "image2video" as const;
+            log("info", `Dual video generation started in background (${pipeline}) — polling for progress`);
             toast.info("Video generating in background...", {
-              description: "15s AEC walkthrough — you'll be notified when it's ready",
+              description: pipeline === "text2video"
+                ? "15s ultra-realistic walkthrough from PDF summary — you'll be notified when it's ready"
+                : "15s AEC walkthrough — you'll be notified when it's ready",
               duration: 5000,
             });
 
@@ -958,6 +991,7 @@ export function useExecution({ onLog }: UseExecutionOptions = {}) {
               clearVideoGenProgress,
               artData,
               executionId,
+              pipeline,
             ).catch(err => {
               console.error("[Video Poll] Unhandled error:", err);
             });
@@ -1045,15 +1079,21 @@ export function useExecution({ onLog }: UseExecutionOptions = {}) {
           break;
         }
 
-        // GN-009 (Video Walkthrough): do NOT fall back to mock — Kling is the only path.
-        // Show the error directly so the user knows what went wrong.
-        if (node.data.catalogueId === "GN-009") {
+        // LIVE nodes must NEVER fall back to mock — they hard-fail so the user
+        // sees the real error instead of getting silent garbage data.
+        // This covers GN-009 (Video Walkthrough / Kling), TR-001 (Brief Parser), and all other LIVE nodes.
+        if (LIVE_NODE_IDS.has(node.data.catalogueId)) {
           hasError = true;
           updateNodeStatus(node.id, "error");
+          console.error(`[${node.data.catalogueId} LIVE-FAIL] Real execution failed — NO mock fallback for live nodes.`, {
+            catalogueId: node.data.catalogueId,
+            label: node.data.label,
+            error: errMsg,
+          });
           log("error", `${node.data.label} failed`, errMsg);
-          toast.error(errTitle, {
+          toast.error(errTitle || `${node.data.label} failed`, {
             description: errMsg,
-            duration: 6000,
+            duration: 8000,
           });
           addTileResult({
             tileInstanceId: node.id,
@@ -1063,15 +1103,14 @@ export function useExecution({ onLog }: UseExecutionOptions = {}) {
             completedAt: new Date(),
             errorMessage: errMsg,
           });
-          continue;
+          break;
         }
 
-        // Non-fatal error — fall back to mock execution and continue
+        // Non-fatal error for non-LIVE nodes — fall back to mock execution and continue
         console.error(`[${node.data.catalogueId} FALLBACK] Real execution failed, falling back to mock.`, {
           catalogueId: node.data.catalogueId,
           label: node.data.label,
           error: errMsg,
-          isLiveNode: LIVE_NODE_IDS.has(node.data.catalogueId),
         });
         log("error", `${node.data.label} failed — falling back to mock`, errMsg);
         toast.error(`${node.data.label}: using mock data`, {

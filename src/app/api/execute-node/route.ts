@@ -22,7 +22,11 @@ import { APIError, UserErrors, formatErrorResponse } from "@/lib/user-errors";
 import { generatePDFBase64 } from "@/services/pdf-report-server";
 import { uploadBase64ToR2 } from "@/lib/r2";
 import { reconstructHiFi3D, isMeshyConfigured } from "@/services/meshy-service";
-import { submitDualWalkthrough, submitSingleWalkthrough, buildFloorPlanCombinedPrompt } from "@/services/video-service";
+import { submitDualWalkthrough, submitDualTextToVideo, submitSingleWalkthrough, buildFloorPlanCombinedPrompt } from "@/services/video-service";
+import {
+  logWorkflowStart, logRateLimit, logNodeStart, logNodeSuccess,
+  logNodeError, logValidationError, logInfo,
+} from "@/lib/workflow-logger";
 
 // Detect region/city from text for cost estimation
 function detectRegionFromText(text: string): string | null {
@@ -67,6 +71,18 @@ const REAL_NODE_IDS = new Set(["TR-001", "TR-003", "TR-004", "TR-005", "TR-012",
 // Nodes that require OpenAI API calls
 const OPENAI_NODES = new Set(["TR-003", "TR-004", "TR-005", "TR-012", "GN-003", "GN-004", "GN-008"]);
 
+// In-memory set of executionIds that have already been rate-limited this run.
+// This ensures we count rate limit once per workflow execution, not once per node.
+// Entries auto-expire after 10 minutes to prevent memory leaks.
+const rateLimitedExecutions = new Map<string, number>();
+
+function cleanupRateLimitCache() {
+  const tenMinutesAgo = Date.now() - 10 * 60 * 1000;
+  for (const [key, ts] of rateLimitedExecutions) {
+    if (ts < tenMinutesAgo) rateLimitedExecutions.delete(key);
+  }
+}
+
 export async function POST(req: NextRequest) {
   const session = await auth();
 
@@ -80,24 +96,34 @@ export async function POST(req: NextRequest) {
 
   const userId: string = session.user.id;
   const userRole = (session.user as { role?: string }).role as "FREE" | "PRO" | "TEAM_ADMIN" | "PLATFORM_ADMIN" || "FREE";
+  const userEmail = session.user.email || "";
 
-  // Parse body first so we can use executionId for rate limit dedup
+  // Parse body first so we can read executionId for rate-limit deduplication
   const { catalogueId, executionId, tileInstanceId, inputData, userApiKey } = await req.json();
+  const nodeStartTime = Date.now();
+
+  // ── Detailed file logging (dev only) ──
+  await logWorkflowStart(executionId, userId, userRole, userEmail);
+  await logNodeStart(executionId, catalogueId, tileInstanceId, inputData);
 
   // Admin users bypass ALL rate limiting — check before any Redis calls
-  const userEmail = session.user.email || "";
   const isAdmin = isAdminUser(userEmail) ||
     userRole === "PLATFORM_ADMIN" ||
     userRole === "TEAM_ADMIN";
 
   if (!isAdmin) {
-    // Apply rate limiting — count once per workflow execution, not per node
+    // Apply rate limiting — count once per workflow execution, not per node.
+    // The first node in a workflow run consumes the rate limit slot.
+    // Subsequent nodes in the same execution (same executionId) pass through.
     try {
       const alreadyCounted = executionId
         ? await isExecutionAlreadyCounted(userId, executionId)
         : false;
 
       if (!alreadyCounted) {
+        // Cleanup stale entries periodically
+        if (rateLimitedExecutions.size > 500) cleanupRateLimitCache();
+
         const rateLimitResult = await checkRateLimit(userId, userRole, userEmail);
 
         if (!rateLimitResult.success) {
@@ -106,6 +132,10 @@ export async function POST(req: NextRequest) {
 
           // Log the rate limit hit
           logRateLimitHit(userId, userRole, rateLimitResult.remaining);
+          await logRateLimit(executionId, false, {
+            remaining: rateLimitResult.remaining, limit: rateLimitResult.limit,
+            reset: rateLimitResult.reset, userRole,
+          });
 
           const rateLimitError = userRole === "FREE"
             ? UserErrors.RATE_LIMIT_FREE(hoursUntilReset)
@@ -123,18 +153,32 @@ export async function POST(req: NextRequest) {
             }
           );
         }
+
+        await logRateLimit(executionId, true, {
+          remaining: rateLimitResult.remaining, limit: rateLimitResult.limit,
+          reset: rateLimitResult.reset, userRole,
+        });
+
+        // Mark this execution as rate-limited so subsequent nodes skip the check
+        if (executionId) {
+          rateLimitedExecutions.set(`${userId}:${executionId}`, Date.now());
+        }
       }
 
     } catch (error) {
       console.error("[execute-node] Rate limit check failed:", error);
+      await logNodeError(executionId, catalogueId, tileInstanceId, error, Date.now() - nodeStartTime);
       return NextResponse.json(
         formatErrorResponse({ title: "Service unavailable", message: "Rate limit service temporarily unavailable. Please try again in a moment.", code: "RATE_LIMIT_UNAVAILABLE" }),
         { status: 503 }
       );
     }
+  } else {
+    await logRateLimit(executionId, true, { skipped: true, userRole });
   }
 
   if (!REAL_NODE_IDS.has(catalogueId)) {
+    await logValidationError(executionId, catalogueId, `Node ${catalogueId} not in REAL_NODE_IDS`);
     return NextResponse.json(
       formatErrorResponse(UserErrors.NODE_NOT_IMPLEMENTED(catalogueId)),
       { status: 400 }
@@ -207,13 +251,21 @@ export async function POST(req: NextRequest) {
 
       let extractedText = typeof rawText === "string" ? rawText : "";
 
+      console.log("[TR-001] rawText from inputData:", typeof rawText, "length:", typeof rawText === "string" ? rawText.length : 0);
+      console.log("[TR-001] pdfBase64 present:", !!pdfBase64, "type:", typeof pdfBase64, "length:", typeof pdfBase64 === "string" ? pdfBase64.length : 0);
+
       // If we have actual PDF data (base64), extract text from it
       if (pdfBase64 && typeof pdfBase64 === "string") {
         try {
+          // Import from lib/ directly to avoid pdf-parse v1 test-runner bug
+          // (index.js tries to open ./test/data/05-versions-space.pdf when !module.parent)
           // eslint-disable-next-line @typescript-eslint/no-require-imports
-          const pdfParse = require("pdf-parse") as (buf: Buffer) => Promise<{ text: string }>;
+          const pdfParse = require("pdf-parse/lib/pdf-parse.js") as (buf: Buffer) => Promise<{ text: string; numpages: number; info: Record<string, unknown> }>;
           const buffer = Buffer.from(pdfBase64, "base64");
+          console.log("[TR-001] PDF buffer size:", buffer.length, "bytes");
           const pdfData = await pdfParse(buffer);
+          console.log("[TR-001] pdf-parse result — pages:", pdfData.numpages, "text length:", pdfData.text?.length ?? 0);
+          console.log("[TR-001] Extracted text (first 300):", pdfData.text?.slice(0, 300));
           extractedText = pdfData.text || "";
         } catch (parseErr) {
           console.error("[TR-001] PDF parsing failed:", parseErr);
@@ -221,7 +273,10 @@ export async function POST(req: NextRequest) {
         }
       }
 
+      console.log("[TR-001] Final extractedText length:", extractedText.trim().length, "chars");
+
       if (!extractedText || extractedText.trim().length < 20) {
+        console.error("[TR-001] Text too short or empty — returning 400. Text:", JSON.stringify(extractedText.slice(0, 100)));
         return NextResponse.json(
           formatErrorResponse({
             title: "No document content",
@@ -257,6 +312,10 @@ ${parsed.sustainability ? `SUSTAINABILITY: ${parsed.sustainability}` : ""}
 ${parsed.designIntent ? `DESIGN INTENT: ${parsed.designIntent}` : ""}
 
 ${parsed.keyRequirements?.length ? `KEY REQUIREMENTS:\n${parsed.keyRequirements.map(r => `• ${r}`).join("\n")}` : ""}`;
+
+      console.log("[TR-001] Parsed brief — rawText length:", parsed.rawText?.length ?? 0, "chars");
+      console.log("[TR-001] rawText first 300 chars:", parsed.rawText?.slice(0, 300));
+      console.log("[TR-001] projectTitle:", parsed.projectTitle);
 
       artifact = {
         id: generateId(),
@@ -1382,8 +1441,68 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
 
     } else if (catalogueId === "GN-009") {
       // ── Video Walkthrough Generator ────────────────────────────────────
-      // Takes a concept render image (from GN-003) + building description
-      // and generates a cinematic walkthrough video via Kling 3.0 Official API.
+      // Generates a cinematic walkthrough video. Supports three paths:
+      // 1. Image-to-video via Kling API (when upstream GN-003 provides a render image)
+      // 2. Text-to-video via Kling API (when no image, e.g. PDF → video pipeline)
+      // 3. Three.js client-side fallback (when no Kling keys configured)
+
+      // Extract building description from upstream data.
+      // IMPORTANT: For the PDF → video pipeline, we use the ORIGINAL PDF text
+      // (preserved in _raw.rawText by TR-001) as the sole source of truth.
+      // This ensures the video matches exactly what the user uploaded in the PDF.
+      const raw = (inputData?._raw ?? null) as Record<string, unknown> | null;
+
+      // Priority: original PDF text (_raw.rawText) > formatted content > fallback
+      // _raw.rawText is the original text extracted from the PDF by TR-001,
+      // before any GPT rewriting. This is critical for faithful video generation.
+      const originalPdfText = (raw?.rawText as string) ?? null;
+      const upFloors = Number(raw?.floors ?? inputData?.floors) || 5;
+      const upTotalArea = Number(raw?.totalArea ?? inputData?.totalArea) || 0;
+      const upHeight = Number(raw?.height ?? inputData?.height) || 0;
+      const upFloorHeight = upHeight > 0 ? upHeight / upFloors : 3.6;
+      const upFootprint = Number(raw?.footprint ?? inputData?.footprint) || (upTotalArea > 0 ? Math.round(upTotalArea / upFloors) : 600);
+      const upBuildingType = String(raw?.buildingType ?? inputData?.buildingType ?? "modern office building");
+      const upFacade = String(raw?.facade ?? inputData?.facade ?? "");
+      const upStructure = String(raw?.structure ?? inputData?.structure ?? "");
+      const upNarrative = String(raw?.narrative ?? "");
+
+      // Map facade description to exteriorMaterial for Three.js BuildingStyle
+      function inferExteriorMaterial(facade: string): "glass" | "concrete" | "brick" | "wood" | "steel" | "stone" | "terracotta" | "mixed" {
+        const f = facade.toLowerCase();
+        if (f.includes("glass") || f.includes("curtain wall") || f.includes("glazed")) return "glass";
+        if (f.includes("brick") || f.includes("masonry")) return "brick";
+        if (f.includes("timber") || f.includes("wood") || f.includes("clt")) return "wood";
+        if (f.includes("steel") || f.includes("corten") || f.includes("metal")) return "steel";
+        if (f.includes("stone") || f.includes("limestone") || f.includes("marble")) return "stone";
+        if (f.includes("terracotta") || f.includes("clay")) return "terracotta";
+        if (f.includes("concrete") || f.includes("render") || f.includes("stucco")) return "concrete";
+        return "mixed";
+      }
+
+      // Map buildingType to usage category
+      function inferUsage(bt: string): "residential" | "office" | "mixed" | "commercial" | "hotel" | "educational" | "healthcare" | "cultural" | "industrial" | "civic" {
+        const t = bt.toLowerCase();
+        if (t.includes("residential") || t.includes("apartment") || t.includes("housing")) return "residential";
+        if (t.includes("office") || t.includes("workplace") || t.includes("corporate")) return "office";
+        if (t.includes("hotel") || t.includes("hospitality")) return "hotel";
+        if (t.includes("school") || t.includes("university") || t.includes("education")) return "educational";
+        if (t.includes("hospital") || t.includes("clinic") || t.includes("health")) return "healthcare";
+        if (t.includes("museum") || t.includes("gallery") || t.includes("cultural") || t.includes("theater")) return "cultural";
+        if (t.includes("retail") || t.includes("shop") || t.includes("commercial")) return "commercial";
+        if (t.includes("industrial") || t.includes("warehouse") || t.includes("factory")) return "industrial";
+        if (t.includes("mixed")) return "mixed";
+        return "office";
+      }
+
+      // Map to facade pattern
+      function inferFacadePattern(facade: string): "curtain-wall" | "punched-window" | "ribbon-window" | "brise-soleil" | "none" {
+        const f = facade.toLowerCase();
+        if (f.includes("curtain") || f.includes("glazed")) return "curtain-wall";
+        if (f.includes("ribbon")) return "ribbon-window";
+        if (f.includes("brise") || f.includes("louvre") || f.includes("louver")) return "brise-soleil";
+        if (f.includes("punch")) return "punched-window";
+        return "curtain-wall";
+      }
 
       console.log("========== GN-009 VIDEO WALKTHROUGH START ==========");
       console.log("[GN-009] All input keys:", Object.keys(inputData ?? {}));
@@ -1398,19 +1517,7 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
       console.log("[GN-009] mimeType:", inputData?.mimeType);
       console.log("[GN-009] KLING_ACCESS_KEY set:", !!process.env.KLING_ACCESS_KEY, "KLING_SECRET_KEY set:", !!process.env.KLING_SECRET_KEY);
 
-      if (!process.env.KLING_ACCESS_KEY || !process.env.KLING_SECRET_KEY) {
-        console.error("[GN-009] ❌ KLING KEYS MISSING — cannot generate video");
-        return NextResponse.json(
-          formatErrorResponse({
-            title: "Kling API keys required",
-            message: "KLING_ACCESS_KEY and KLING_SECRET_KEY must be configured to generate video walkthroughs. Add them to your .env.local file.",
-            code: "MISSING_API_KEY",
-          }),
-          { status: 400 }
-        );
-      }
-
-      {
+      const hasKlingKeys = !!(process.env.KLING_ACCESS_KEY && process.env.KLING_SECRET_KEY);
 
       // ── Resolve the SOURCE IMAGE for Kling (priority order) ──
       let renderImageUrl = "";
@@ -1425,8 +1532,8 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
       // Kling's image field accepts both URLs and base64 encoded strings.
       if (inputData?.fileData && typeof inputData.fileData === "string") {
         const imgMime = (inputData.mimeType as string) ?? "image/jpeg";
-        const raw = inputData.fileData as string;
-        const cleanBase64 = raw.startsWith("data:") ? raw.split(",")[1] ?? raw : raw;
+        const rawFileData = inputData.fileData as string;
+        const cleanBase64 = rawFileData.startsWith("data:") ? rawFileData.split(",")[1] ?? rawFileData : rawFileData;
 
         console.log("[KLING] Step 2: Clean base64 length:", cleanBase64.length, "mime:", imgMime);
 
@@ -1441,7 +1548,7 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
             const uploadResult = await uploadToR2(imgBuffer, `floorplan-upload-${generateId()}.${ext}`, imgMime);
             if (uploadResult.success) {
               renderImageUrl = uploadResult.url;
-              console.log("[KLING] Step 2a: ✅ R2 upload succeeded:", renderImageUrl);
+              console.log("[KLING] Step 2a: R2 upload succeeded:", renderImageUrl);
             }
           } else {
             console.log("[KLING] Step 2a: R2 not configured, skipping");
@@ -1454,7 +1561,7 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
         if (!renderImageUrl) {
           console.log("[KLING] Step 2b: Sending base64 DIRECTLY to Kling (Fix F — no temp-image URL)");
           renderImageUrl = cleanBase64;
-          console.log("[KLING] Step 2b: ✅ Using raw base64, length:", cleanBase64.length);
+          console.log("[KLING] Step 2b: Using raw base64, length:", cleanBase64.length);
         }
 
         isFloorPlanInput = true;
@@ -1477,7 +1584,7 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
             const uploadResult = await uploadToR2(pngBuffer, `floorplan-${generateId()}.png`, "image/png");
             if (uploadResult.success) {
               renderImageUrl = uploadResult.url;
-              console.log("[KLING] Step 2 (SVG): ✅ R2 upload:", renderImageUrl);
+              console.log("[KLING] Step 2 (SVG): R2 upload:", renderImageUrl);
             } else {
               console.warn("[KLING] Step 2 (SVG): R2 upload failed:", uploadResult.error);
             }
@@ -1487,11 +1594,11 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
           if (!renderImageUrl) {
             console.log("[KLING] Step 2 (SVG): Sending PNG base64 DIRECTLY to Kling (Fix F)");
             renderImageUrl = pngBuffer.toString("base64");
-            console.log("[KLING] Step 2 (SVG): ✅ Using raw base64, length:", renderImageUrl.length);
+            console.log("[KLING] Step 2 (SVG): Using raw base64, length:", renderImageUrl.length);
           }
           isFloorPlanInput = true;
         } catch (svgErr) {
-          console.warn("[KLING] Step 2 (SVG): ❌ SVG→PNG conversion failed:", svgErr);
+          console.warn("[KLING] Step 2 (SVG): SVG->PNG conversion failed:", svgErr);
         }
 
         // Extract room info for richer prompts
@@ -1514,143 +1621,227 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
       }
 
       // Build video from building description (from upstream TR-003 or fallback)
-      const buildingDesc =
-        (inputData?.content as string) ??
-        (inputData?.description as string) ??
-        (inputData?.prompt as string) ??
-        "Modern architectural building";
+      // Use original PDF text (_raw.rawText) as source of truth when available
+      const buildingDesc = originalPdfText
+        ?? (inputData?.content as string)
+        ?? (inputData?.description as string)
+        ?? (inputData?.prompt as string)
+        ?? "Modern architectural building";
 
       console.log("[KLING] Step 3: renderImageUrl resolved:", renderImageUrl ? renderImageUrl.slice(0, 120) : "EMPTY");
       console.log("[KLING] Step 3: isFloorPlan:", isFloorPlanInput, "buildingDesc length:", buildingDesc.length);
 
-      // ── Kling is the ONLY video generation path (no Three.js fallback) ──
-      if (!renderImageUrl) {
-        console.error("[KLING] ❌ No source image available — cannot call Kling");
-        return NextResponse.json(
-          formatErrorResponse({
-            title: "No source image for video",
-            message: "No image was found for video generation. Ensure an Image Upload (IN-003) node is connected and has a file uploaded.",
-            code: "NODE_001",
-          }),
-          { status: 400 }
-        );
-      }
+      if (!hasKlingKeys) {
+        // ── No Kling API keys — fall back to Three.js client-side rendering ──
+        // Build a rich BuildingStyle from the PDF-extracted description
+        const inferredStyle = {
+          glassHeavy: upFacade.toLowerCase().includes("glass") || upFacade.toLowerCase().includes("glazed"),
+          hasRiver: buildingDesc.toLowerCase().includes("river") || buildingDesc.toLowerCase().includes("waterfront"),
+          hasLake: buildingDesc.toLowerCase().includes("lake"),
+          isModern: buildingDesc.toLowerCase().includes("modern") || buildingDesc.toLowerCase().includes("contemporary") || !buildingDesc.toLowerCase().includes("traditional"),
+          isTower: upFloors > 8,
+          exteriorMaterial: inferExteriorMaterial(upFacade),
+          environment: (buildingDesc.toLowerCase().includes("urban") || buildingDesc.toLowerCase().includes("city")) ? "urban" as const : "suburban" as const,
+          usage: inferUsage(upBuildingType),
+          promptText: upNarrative || buildingDesc.slice(0, 200),
+          typology: (upFloors > 8 ? "tower" : upFloors <= 3 ? "villa" : "slab") as "tower" | "slab" | "villa",
+          facadePattern: inferFacadePattern(upFacade),
+          maxFloorCap: 30,
+        };
 
-      // Detect if image is base64 (Fix F) vs URL
-      const isBase64Direct = !renderImageUrl.startsWith("http");
-      if (!isBase64Direct && (renderImageUrl.includes("localhost") || renderImageUrl.includes("127.0.0.1"))) {
-        console.warn("[KLING] ⚠️  Image URL is localhost — Kling API cannot access this.");
-        console.warn("[KLING]    To fix: deploy to a public URL, or use ngrok to tunnel localhost.");
-      }
-
-      console.log("[GN-009] About to call video function:");
-      console.log("[GN-009] Image being passed (first 100 chars):", renderImageUrl?.slice(0, 100));
-      console.log("[GN-009] Image type:", renderImageUrl?.startsWith("http") ? "URL" : renderImageUrl?.startsWith("data:") ? "data URI" : "raw base64");
-      console.log("[GN-009] Image total length:", renderImageUrl?.length);
-      console.log("[GN-009] Mode: pro");
-      console.log("[GN-009] isFloorPlan flag:", isFloorPlanInput);
-      console.log("[GN-009] buildingDesc (first 200 chars):", buildingDesc?.slice(0, 200));
-
-      try {
-        if (isFloorPlanInput) {
-          // ── SINGLE 10s video for floor plans (continuous exterior→interior shot) ──
-          console.log("[GN-009] Function: submitSingleWalkthrough (floor plan → single 10s continuous shot)");
-          const combinedPrompt = buildFloorPlanCombinedPrompt(buildingDesc, roomInfo);
-          console.log("[GN-009] Combined prompt:", combinedPrompt);
-
-          const submitted = await submitSingleWalkthrough(renderImageUrl, combinedPrompt, "pro");
-
-          console.log("[GN-009] Single task submitted! taskId:", submitted.taskId);
-
-          artifact = {
-            id: generateId(),
-            executionId: executionId ?? "local",
-            tileInstanceId,
-            type: "video",
-            data: {
-              name: `walkthrough_${generateId()}.mp4`,
-              videoUrl: "",
-              downloadUrl: "",
-              label: "Floor Plan → Cinematic Walkthrough — 10s (generating...)",
-              content: `10s AEC walkthrough: exterior + interior in one continuous shot — ${buildingDesc.slice(0, 100)}`,
-              durationSeconds: 10,
-              shotCount: 1,
-              pipeline: "floor plan image → Kling Official API (pro, single 10s) → MP4",
-              costUsd: 1.00,
-              videoGenerationStatus: "processing",
-              taskId: submitted.taskId,
-              generationProgress: 0,
-              isFloorPlanInput: true,
+        artifact = {
+          id: generateId(),
+          executionId: executionId ?? "local",
+          tileInstanceId,
+          type: "video",
+          data: {
+            name: `walkthrough_${generateId()}.webm`,
+            videoUrl: "",
+            downloadUrl: "",
+            label: "AEC Cinematic Walkthrough — 15s Three.js Render",
+            content: `15s AEC walkthrough: 5s exterior drone orbit + 10s interior flythrough — ${buildingDesc.slice(0, 100)}`,
+            durationSeconds: 15,
+            shotCount: 4,
+            pipeline: "Three.js client-side → WebM video",
+            costUsd: 0,
+            videoGenerationStatus: "client-rendering",
+            _buildingConfig: {
+              floors: upFloors,
+              floorHeight: upFloorHeight,
+              footprint: upFootprint,
+              buildingType: upBuildingType,
+              style: inferredStyle,
             },
-            metadata: {
-              engine: "kling-official",
-              real: true,
-              taskId: submitted.taskId,
-              submittedAt: submitted.submittedAt,
-              isFloorPlanInput: true,
-            },
-            createdAt: new Date(),
-          };
-          console.log("[GN-009] Artifact data.taskId:", submitted.taskId);
-          console.log("[GN-009] Artifact data.durationSeconds: 10");
-        } else {
-          // ── DUAL video for non-floor-plan (concept renders) ──
-          console.log("[GN-009] Function: submitDualWalkthrough (concept render → dual 5s+10s)");
-          const submitted = await submitDualWalkthrough(renderImageUrl, buildingDesc, "pro");
-
-          console.log("[GN-009] Dual tasks submitted! exterior:", submitted.exteriorTaskId, "interior:", submitted.interiorTaskId);
-
-          artifact = {
-            id: generateId(),
-            executionId: executionId ?? "local",
-            tileInstanceId,
-            type: "video",
-            data: {
-              name: `walkthrough_${generateId()}.mp4`,
-              videoUrl: "",
-              downloadUrl: "",
-              label: "AEC Cinematic Walkthrough — 15s (generating...)",
-              content: `15s AEC walkthrough: 5s exterior + 10s interior — ${buildingDesc.slice(0, 100)}`,
-              durationSeconds: 15,
-              shotCount: 2,
-              pipeline: "concept render → Kling Official API (pro, dual) → MP4",
-              costUsd: 1.50,
-              videoGenerationStatus: "processing",
-              exteriorTaskId: submitted.exteriorTaskId,
-              interiorTaskId: submitted.interiorTaskId,
-              generationProgress: 0,
-              isFloorPlanInput: false,
-            },
-            metadata: {
-              engine: "kling-official",
-              real: true,
-              exteriorTaskId: submitted.exteriorTaskId,
-              interiorTaskId: submitted.interiorTaskId,
-              submittedAt: submitted.submittedAt,
-              isFloorPlanInput: false,
-            },
-            createdAt: new Date(),
-          };
+          },
+          metadata: { engine: "threejs-client", real: false },
+          createdAt: new Date(),
+        };
+      } else if (renderImageUrl) {
+        // ── Kling image-to-video path (has a source image) ──
+        // Detect if image is base64 (Fix F) vs URL
+        const isBase64Direct = !renderImageUrl.startsWith("http");
+        if (!isBase64Direct && (renderImageUrl.includes("localhost") || renderImageUrl.includes("127.0.0.1"))) {
+          console.warn("[KLING] Image URL is localhost — Kling API cannot access this.");
+          console.warn("[KLING]    To fix: deploy to a public URL, or use ngrok to tunnel localhost.");
         }
-        console.log("========== GN-009 VIDEO WALKTHROUGH END ==========");
-      } catch (klingErr) {
-        const errMsg = klingErr instanceof Error ? klingErr.message : String(klingErr);
-        console.error("[GN-009] ❌ Kling API failed:", errMsg);
 
-        const isLocal = !isBase64Direct && (renderImageUrl.includes("localhost") || renderImageUrl.includes("127.0.0.1"));
-        const userMessage = isLocal
-          ? "Kling cannot access the image because the app is running on localhost. Deploy the app to a public URL, or use ngrok to tunnel localhost (e.g. ngrok http 3000)."
-          : `Kling video generation failed: ${errMsg}`;
+        console.log("[GN-009] About to call video function:");
+        console.log("[GN-009] Image being passed (first 100 chars):", renderImageUrl?.slice(0, 100));
+        console.log("[GN-009] Image type:", renderImageUrl?.startsWith("http") ? "URL" : renderImageUrl?.startsWith("data:") ? "data URI" : "raw base64");
+        console.log("[GN-009] Image total length:", renderImageUrl?.length);
+        console.log("[GN-009] Mode: pro");
+        console.log("[GN-009] isFloorPlan flag:", isFloorPlanInput);
+        console.log("[GN-009] buildingDesc (first 200 chars):", buildingDesc?.slice(0, 200));
 
-        return NextResponse.json(
-          formatErrorResponse({
-            title: "Video generation failed",
-            message: userMessage,
-            code: "OPENAI_001",
-          }),
-          { status: 502 }
+        try {
+          if (isFloorPlanInput) {
+            // ── SINGLE 10s video for floor plans (continuous exterior→interior shot) ──
+            console.log("[GN-009] Function: submitSingleWalkthrough (floor plan → single 10s continuous shot)");
+            const combinedPrompt = buildFloorPlanCombinedPrompt(buildingDesc, roomInfo);
+            console.log("[GN-009] Combined prompt:", combinedPrompt);
+
+            const submitted = await submitSingleWalkthrough(renderImageUrl, combinedPrompt, "pro");
+
+            console.log("[GN-009] Single task submitted! taskId:", submitted.taskId);
+
+            artifact = {
+              id: generateId(),
+              executionId: executionId ?? "local",
+              tileInstanceId,
+              type: "video",
+              data: {
+                name: `walkthrough_${generateId()}.mp4`,
+                videoUrl: "",
+                downloadUrl: "",
+                label: "Floor Plan -> Cinematic Walkthrough — 10s (generating...)",
+                content: `10s AEC walkthrough: exterior + interior in one continuous shot — ${buildingDesc.slice(0, 100)}`,
+                durationSeconds: 10,
+                shotCount: 1,
+                pipeline: "floor plan image → Kling Official API (pro, single 10s) → MP4",
+                costUsd: 1.00,
+                videoGenerationStatus: "processing",
+                taskId: submitted.taskId,
+                generationProgress: 0,
+                isFloorPlanInput: true,
+              },
+              metadata: {
+                engine: "kling-official",
+                real: true,
+                taskId: submitted.taskId,
+                submittedAt: submitted.submittedAt,
+                isFloorPlanInput: true,
+              },
+              createdAt: new Date(),
+            };
+            console.log("[GN-009] Artifact data.taskId:", submitted.taskId);
+            console.log("[GN-009] Artifact data.durationSeconds: 10");
+          } else {
+            // ── DUAL video for non-floor-plan (concept renders) ──
+            console.log("[GN-009] Function: submitDualWalkthrough (concept render → dual 5s+10s)");
+            const submitted = await submitDualWalkthrough(renderImageUrl, buildingDesc, "pro");
+
+            console.log("[GN-009] Dual tasks submitted! exterior:", submitted.exteriorTaskId, "interior:", submitted.interiorTaskId);
+
+            artifact = {
+              id: generateId(),
+              executionId: executionId ?? "local",
+              tileInstanceId,
+              type: "video",
+              data: {
+                name: `walkthrough_${generateId()}.mp4`,
+                videoUrl: "",
+                downloadUrl: "",
+                label: "AEC Cinematic Walkthrough — 15s (generating...)",
+                content: `15s AEC walkthrough: 5s exterior + 10s interior — ${buildingDesc.slice(0, 100)}`,
+                durationSeconds: 15,
+                shotCount: 2,
+                pipeline: "concept render → Kling Official API (pro, image2video) → 2x MP4 video",
+                costUsd: 1.50,
+                segments: [],
+                videoGenerationStatus: "processing",
+                videoPipeline: "image2video",
+                exteriorTaskId: submitted.exteriorTaskId,
+                interiorTaskId: submitted.interiorTaskId,
+                generationProgress: 0,
+                isFloorPlanInput: false,
+              },
+              metadata: {
+                engine: "kling-official",
+                real: true,
+                videoPipeline: "image2video",
+                exteriorTaskId: submitted.exteriorTaskId,
+                interiorTaskId: submitted.interiorTaskId,
+                submittedAt: submitted.submittedAt,
+                isFloorPlanInput: false,
+              },
+              createdAt: new Date(),
+            };
+          }
+          console.log("========== GN-009 VIDEO WALKTHROUGH END ==========");
+        } catch (klingErr) {
+          const errMsg = klingErr instanceof Error ? klingErr.message : String(klingErr);
+          console.error("[GN-009] Kling API failed:", errMsg);
+
+          const isLocal = !isBase64Direct && (renderImageUrl.includes("localhost") || renderImageUrl.includes("127.0.0.1"));
+          const userMessage = isLocal
+            ? "Kling cannot access the image because the app is running on localhost. Deploy the app to a public URL, or use ngrok to tunnel localhost (e.g. ngrok http 3000)."
+            : `Kling video generation failed: ${errMsg}`;
+
+          return NextResponse.json(
+            formatErrorResponse({
+              title: "Video generation failed",
+              message: userMessage,
+              code: "OPENAI_001",
+            }),
+            { status: 502 }
+          );
+        }
+      } else {
+        // ── Kling text-to-video path ──
+        // No render image available (e.g. PDF → video pipeline).
+        // Generate ultra-realistic video directly from the ORIGINAL PDF text.
+        console.log("[GN-009] Text2Video — using original PDF text as source of truth");
+        console.log("[GN-009] Source:", originalPdfText ? "rawText from PDF" : "fallback content");
+        console.log("[GN-009] Prompt length:", buildingDesc.length, "chars");
+        console.log("[GN-009] First 200 chars:", buildingDesc.slice(0, 200));
+
+        const submitted = await submitDualTextToVideo(
+          buildingDesc,
+          "pro",
         );
-      }
+
+        artifact = {
+          id: generateId(),
+          executionId: executionId ?? "local",
+          tileInstanceId,
+          type: "video",
+          data: {
+            name: `walkthrough_${generateId()}.mp4`,
+            videoUrl: "",
+            downloadUrl: "",
+            label: "AEC Cinematic Walkthrough — 15s (generating from PDF summary...)",
+            content: `15s ultra-realistic walkthrough: 5s exterior orbit + 10s interior flythrough — ${buildingDesc.slice(0, 100)}`,
+            durationSeconds: 15,
+            shotCount: 2,
+            pipeline: "PDF summary → Kling Official API (pro, text2video) → 2x MP4 video",
+            costUsd: 1.50,
+            segments: [],
+            videoGenerationStatus: "processing",
+            videoPipeline: "text2video",
+            exteriorTaskId: submitted.exteriorTaskId,
+            interiorTaskId: submitted.interiorTaskId,
+            generationProgress: 0,
+          },
+          metadata: {
+            engine: "kling-official",
+            real: true,
+            videoPipeline: "text2video",
+            exteriorTaskId: submitted.exteriorTaskId,
+            interiorTaskId: submitted.interiorTaskId,
+            submittedAt: submitted.submittedAt,
+          },
+          createdAt: new Date(),
+        };
       }
 
     } else if (catalogueId === "GN-010") {
@@ -1732,6 +1923,9 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
       );
     }
 
+    await logNodeSuccess(executionId, catalogueId, tileInstanceId, Date.now() - nodeStartTime, {
+      type: artifact.type, dataKeys: Object.keys(artifact.data ?? {}),
+    });
     return NextResponse.json({ artifact });
   } catch (err) {
     // Handle APIError (user-friendly errors)
@@ -1740,16 +1934,18 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
         code: err.userError.code,
         message: err.userError.message,
       });
+      await logNodeError(executionId, catalogueId, tileInstanceId, err, Date.now() - nodeStartTime);
       return NextResponse.json(
         formatErrorResponse(err.userError),
         { status: err.statusCode }
       );
     }
-    
+
     // Handle generic errors
     const message = err instanceof Error ? err.message : "Execution failed";
     console.error("[execute-node] " + catalogueId + ":", message, err);
-    
+    await logNodeError(executionId, catalogueId, tileInstanceId, err, Date.now() - nodeStartTime);
+
     return NextResponse.json(
       formatErrorResponse(UserErrors.INTERNAL_ERROR, message),
       { status: 500 }
