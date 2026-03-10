@@ -769,14 +769,13 @@ export interface SubmittedVideoTasks {
 }
 
 /**
- * Submit a SINGLE 10s video generation task to Kling API and return immediately.
- * Produces one smooth continuous video (no multi-shot segments).
+ * Submit TWO video generation tasks to Kling API (5s exterior + 10s interior)
+ * and return immediately with the task IDs.
  *
- * When `options.isFloorPlan` is true, uses a floor-plan-specific combined prompt
- * that describes a 2D plan → 3D building transformation + interior walkthrough.
+ * After both complete, the frontend calls /api/concat-videos to stitch them
+ * into a single seamless 15s MP4 with a crossfade transition.
  *
- * Returns the same task ID for both exterior/interior fields for backward compat
- * with the existing polling infrastructure.
+ * When `options.isFloorPlan` is true, uses floor-plan-specific prompts.
  */
 export async function submitDualWalkthrough(
   imageUrl: string,
@@ -786,26 +785,34 @@ export async function submitDualWalkthrough(
 ): Promise<SubmittedVideoTasks> {
   const negativePrompt = "blur, distortion, low quality, warped geometry, melting walls, deformed architecture, shaky camera, noise, artifacts, morphing surfaces, bent lines, wobbly structure, jittery motion, flickering textures, plastic appearance, fisheye distortion, floating objects, wireframe, cartoon, sketch, low polygon, unrealistic proportions, text overlay, watermark, oversaturated colors, CGI look, video game graphics, toy model, miniature, tilt-shift, abstract, surreal, people walking, cars moving, birds flying, lens flare";
 
-  // Single combined prompt covering full exterior → interior journey
-  const prompt = options?.isFloorPlan
-    ? buildFloorPlanCombinedPrompt(buildingDescription, options.roomInfo)
-    : buildCombinedWalkthroughPrompt(buildingDescription);
+  const exteriorPrompt = options?.isFloorPlan
+    ? buildFloorPlanExteriorPrompt(buildingDescription, options.roomInfo)
+    : buildExteriorPrompt(buildingDescription);
+  const interiorPrompt = options?.isFloorPlan
+    ? buildFloorPlanInteriorPrompt(buildingDescription, options.roomInfo)
+    : buildInteriorPrompt(buildingDescription);
 
-  console.log(`[Video] Submitting SINGLE 10s walkthrough task${options?.isFloorPlan ? " [FLOOR PLAN MODE]" : ""}`);
+  console.log(`[Video] Submitting DUAL walkthrough tasks (5s + 10s)${options?.isFloorPlan ? " [FLOOR PLAN MODE]" : ""}`);
 
-  // Submit ONE 10s task — one smooth continuous video
-  const result = await createTask(imageUrl, prompt, negativePrompt, "10", "16:9", mode);
-  const taskId = result.data.task_id;
+  // Submit both tasks in parallel — don't poll, return task IDs immediately
+  const [exteriorResult, interiorResult] = await Promise.all([
+    createTask(imageUrl, exteriorPrompt, negativePrompt, "5", "16:9", mode),
+    createTask(imageUrl, interiorPrompt, negativePrompt, "10", "16:9", mode),
+  ]);
 
-  console.log("[Video] Task submitted!", { taskId });
-
-  // Return same ID for both fields (backward compat with polling infrastructure)
-  return {
-    exteriorTaskId: taskId,
-    interiorTaskId: taskId,
+  const result = {
+    exteriorTaskId: exteriorResult.data.task_id,
+    interiorTaskId: interiorResult.data.task_id,
     buildingDescription,
     submittedAt: Date.now(),
   };
+
+  console.log("[Video] Tasks submitted!", {
+    exteriorTaskId: result.exteriorTaskId,
+    interiorTaskId: result.interiorTaskId,
+  });
+
+  return result;
 }
 
 export interface VideoTaskStatus {
@@ -820,30 +827,18 @@ export interface VideoTaskStatus {
 }
 
 /**
- * Check the status of video task(s). Returns progress percentage
+ * Check the status of both video tasks. Returns progress percentage
  * and video URLs when available. Non-blocking single check.
- *
- * Handles single-video mode (both IDs are the same) — only queries once.
  */
 export async function checkDualVideoStatus(
   exteriorTaskId: string,
   interiorTaskId: string,
 ): Promise<VideoTaskStatus> {
-  const isSingleMode = exteriorTaskId === interiorTaskId;
-
-  let extResult, intResult;
-
-  if (isSingleMode) {
-    // Single video mode — query once
-    extResult = await klingFetch(`${KLING_IMAGE2VIDEO_PATH}/${exteriorTaskId}`, { method: "GET" });
-    intResult = extResult; // Same task
-  } else {
-    // Dual mode (legacy) — query both
-    [extResult, intResult] = await Promise.all([
-      klingFetch(`${KLING_IMAGE2VIDEO_PATH}/${exteriorTaskId}`, { method: "GET" }),
-      klingFetch(`${KLING_IMAGE2VIDEO_PATH}/${interiorTaskId}`, { method: "GET" }),
-    ]);
-  }
+  // Check both tasks in parallel
+  const [extResult, intResult] = await Promise.all([
+    klingFetch(`${KLING_IMAGE2VIDEO_PATH}/${exteriorTaskId}`, { method: "GET" }),
+    klingFetch(`${KLING_IMAGE2VIDEO_PATH}/${interiorTaskId}`, { method: "GET" }),
+  ]);
 
   const extStatus = extResult.data.task_status as VideoTaskStatus["exteriorStatus"];
   const intStatus = intResult.data.task_status as VideoTaskStatus["interiorStatus"];
@@ -851,7 +846,7 @@ export async function checkDualVideoStatus(
   const extUrl = extResult.data.task_result?.videos?.[0]?.url ?? null;
   const intUrl = intResult.data.task_result?.videos?.[0]?.url ?? null;
 
-  // Progress: single mode = 100% weight on one task
+  // Calculate progress: exterior = 33% weight (5s), interior = 67% weight (10s)
   const statusToProgress = (s: string) =>
     s === "succeed" ? 100 : s === "processing" ? 50 : s === "submitted" ? 10 : 0;
 

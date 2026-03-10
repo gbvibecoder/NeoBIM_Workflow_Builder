@@ -41,8 +41,8 @@ export async function GET(req: NextRequest) {
       ...status,
       // Include cost estimate when complete
       ...(status.isComplete && {
-        costUsd: 10 * 0.10, // single 10s video
-        totalDurationSeconds: 10,
+        costUsd: 5 * 0.10 + 10 * 0.10, // 5s exterior + 10s interior
+        totalDurationSeconds: 15,
       }),
     });
   } catch (error) {

@@ -1466,11 +1466,11 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
           );
 
           const pipelineLabel = isFloorPlanInput
-            ? "floor plan SVG → PNG → Kling Official API (pro) → MP4 video"
-            : "concept render → Kling Official API (pro) → MP4 video";
+            ? "floor plan SVG → PNG → Kling Official API (pro, dual) → ffmpeg concat → MP4"
+            : "concept render → Kling Official API (pro, dual) → ffmpeg concat → MP4";
           const walkthroughLabel = isFloorPlanInput
-            ? "Floor Plan → Cinematic Walkthrough — 10s (generating...)"
-            : "AEC Cinematic Walkthrough — 10s (generating...)";
+            ? "Floor Plan → Cinematic Walkthrough — 15s (generating...)"
+            : "AEC Cinematic Walkthrough — 15s (generating...)";
 
           // Return a "generating" artifact with task IDs — frontend will poll for progress
           artifact = {
@@ -1483,11 +1483,11 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
               videoUrl: "",  // Will be filled when generation completes
               downloadUrl: "",
               label: walkthroughLabel,
-              content: `10s AEC walkthrough: exterior approach → orbit → interior entry — ${buildingDesc.slice(0, 100)}`,
-              durationSeconds: 10,
+              content: `15s AEC walkthrough: 5s exterior + 10s interior stitched — ${buildingDesc.slice(0, 100)}`,
+              durationSeconds: 15,
               shotCount: 1,
               pipeline: pipelineLabel,
-              costUsd: 1.00,
+              costUsd: 1.50,
               // Video generation state — frontend uses these to poll
               videoGenerationStatus: "processing",
               exteriorTaskId: submitted.exteriorTaskId,
@@ -1498,7 +1498,8 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
             metadata: {
               engine: "kling-official",
               real: true,
-              taskId: submitted.exteriorTaskId,
+              exteriorTaskId: submitted.exteriorTaskId,
+              interiorTaskId: submitted.interiorTaskId,
               submittedAt: submitted.submittedAt,
               isFloorPlanInput,
             },

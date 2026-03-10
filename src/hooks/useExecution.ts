@@ -274,8 +274,43 @@ async function pollVideoGeneration(
       }
 
       if (status.isComplete) {
-        // Single continuous video — no segments
-        const videoUrl = status.exteriorVideoUrl ?? status.interiorVideoUrl ?? "";
+        // Both clips ready — stitch into one 15s video via ffmpeg
+        setVideoProgressFn(nodeId, {
+          progress: 90,
+          status: "processing",
+          exteriorTaskId,
+          interiorTaskId,
+          failureMessage: undefined,
+        });
+
+        let finalVideoUrl = status.exteriorVideoUrl ?? "";
+        let persistedUrl: string | undefined;
+
+        if (status.exteriorVideoUrl && status.interiorVideoUrl) {
+          try {
+            console.log("[Video Poll] Stitching 5s + 10s into single 15s MP4...");
+            const concatRes = await fetch("/api/concat-videos", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                exteriorUrl: status.exteriorVideoUrl,
+                interiorUrl: status.interiorVideoUrl,
+                filename: `walkthrough-${nodeId}.mp4`,
+              }),
+            });
+
+            if (concatRes.ok) {
+              const concatData = await concatRes.json();
+              finalVideoUrl = concatData.videoUrl;
+              persistedUrl = concatData.videoUrl; // Already on R2
+              console.log("[Video Poll] Stitched 15s video ready:", finalVideoUrl);
+            } else {
+              console.warn("[Video Poll] Concat failed, using exterior clip as fallback");
+            }
+          } catch (concatErr) {
+            console.warn("[Video Poll] Concat error, using exterior clip:", concatErr);
+          }
+        }
 
         const finalArtifact: ExecutionArtifact = {
           id: `video-${nodeId}`,
@@ -284,12 +319,13 @@ async function pollVideoGeneration(
           type: "video",
           data: {
             ...currentArtifactData,
-            videoUrl,
-            downloadUrl: videoUrl,
-            label: "AEC Cinematic Walkthrough — 10s",
+            videoUrl: finalVideoUrl,
+            downloadUrl: finalVideoUrl,
+            persistedUrl,
+            label: "AEC Cinematic Walkthrough — 15s",
             videoGenerationStatus: "complete",
             generationProgress: 100,
-            durationSeconds: 10,
+            durationSeconds: 15,
             shotCount: 1,
           },
           metadata: { engine: "kling-official", real: true },
@@ -299,13 +335,13 @@ async function pollVideoGeneration(
         addArtifactFn(nodeId, finalArtifact);
         clearVideoProgressFn(nodeId);
 
-        // Persist video to R2 (fire-and-forget — don't block playback)
-        if (videoUrl) {
-          persistVideoToR2(videoUrl, `walkthrough-${nodeId}.mp4`, nodeId, addArtifactFn, finalArtifact).catch(() => {});
+        // If concat didn't already persist to R2, persist the exterior clip
+        if (!persistedUrl && finalVideoUrl) {
+          persistVideoToR2(finalVideoUrl, `walkthrough-${nodeId}.mp4`, nodeId, addArtifactFn, finalArtifact).catch(() => {});
         }
 
         toast.success("Video walkthrough ready!", {
-          description: "10s cinematic walkthrough generated successfully",
+          description: "15s cinematic walkthrough generated successfully",
           duration: 5000,
         });
         return;
@@ -769,7 +805,7 @@ export function useExecution({ onLog }: UseExecutionOptions = {}) {
             // Kling API path: poll server for progress
             log("info", "Video generation started in background — polling for progress");
             toast.info("Video generating in background...", {
-              description: "10s AEC walkthrough — you'll be notified when it's ready",
+              description: "15s AEC walkthrough — you'll be notified when it's ready",
               duration: 5000,
             });
 
