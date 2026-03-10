@@ -97,7 +97,15 @@ export interface VideoArtifactData {
   /** Multi-segment videos (e.g., 5s exterior + 10s interior) */
   segments?: VideoSegment[];
   /** Background generation status */
-  videoGenerationStatus?: "processing" | "complete" | "failed";
+  videoGenerationStatus?: "processing" | "complete" | "failed" | "client-rendering";
+  /** Building config for client-side Three.js rendering */
+  _buildingConfig?: {
+    floors: number;
+    floorHeight: number;
+    footprint: number;
+    buildingType?: string;
+    style?: string;
+  };
   exteriorTaskId?: string;
   interiorTaskId?: string;
   generationProgress?: number;

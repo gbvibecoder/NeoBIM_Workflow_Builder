@@ -19,9 +19,13 @@ export function VideoBody({ data, nodeId }: VideoBodyProps) {
   // Check if video is still generating
   const artData = data as unknown as Record<string, unknown>;
   const isGenerating = artData?.videoGenerationStatus === "processing" ||
-    (videoGenProgress && videoGenProgress.status === "processing");
+    artData?.videoGenerationStatus === "client-rendering" ||
+    (videoGenProgress && (videoGenProgress.status === "processing" || videoGenProgress.status === "rendering"));
+  const isClientRendering = artData?.videoGenerationStatus === "client-rendering" ||
+    videoGenProgress?.status === "rendering";
   const isFailed = videoGenProgress?.status === "failed";
   const progress = videoGenProgress?.progress ?? (artData?.generationProgress as number) ?? 0;
+  const currentPhase = videoGenProgress?.phase;
 
   const segments: VideoSegment[] = data?.segments ?? [];
   const hasSegments = segments.length > 1;
@@ -127,7 +131,9 @@ export function VideoBody({ data, nodeId }: VideoBodyProps) {
           }}>
             {isFailed
               ? (videoGenProgress?.failureMessage ?? "Unknown error")
-              : "15s AEC walkthrough (exterior + interior)"
+              : isClientRendering
+                ? `Three.js walkthrough${currentPhase ? ` — ${currentPhase}` : ""}`
+                : "15s AEC walkthrough (exterior + interior)"
             }
           </div>
 
@@ -160,33 +166,58 @@ export function VideoBody({ data, nodeId }: VideoBodyProps) {
             </div>
           )}
 
-          {/* Segment status indicators */}
+          {/* Phase/Segment status indicators */}
           {!isFailed && (
             <div style={{
               display: "flex",
-              gap: 6,
+              gap: 4,
               justifyContent: "center",
+              flexWrap: "wrap",
             }}>
-              <span style={{
-                padding: "2px 6px", borderRadius: 3,
-                background: progress >= 33 ? "rgba(0,245,255,0.1)" : "rgba(255,255,255,0.03)",
-                border: `1px solid ${progress >= 33 ? "rgba(0,245,255,0.2)" : "rgba(255,255,255,0.06)"}`,
-                fontSize: 8, fontWeight: 500,
-                color: progress >= 33 ? "#00F5FF" : "#3C3C50",
-                fontFamily: "'Space Mono', monospace",
-              }}>
-                Exterior 5s {progress >= 33 ? (progress >= 50 ? "done" : "...") : "queued"}
-              </span>
-              <span style={{
-                padding: "2px 6px", borderRadius: 3,
-                background: progress >= 67 ? "rgba(139,92,246,0.1)" : "rgba(255,255,255,0.03)",
-                border: `1px solid ${progress >= 67 ? "rgba(139,92,246,0.2)" : "rgba(255,255,255,0.06)"}`,
-                fontSize: 8, fontWeight: 500,
-                color: progress >= 67 ? "#8B5CF6" : "#3C3C50",
-                fontFamily: "'Space Mono', monospace",
-              }}>
-                Interior 10s {progress >= 67 ? (progress >= 90 ? "done" : "...") : "queued"}
-              </span>
+              {isClientRendering ? (
+                // 4-phase indicators for Three.js client rendering
+                ["Exterior Pull-in", "Building Orbit", "Interior Walkthrough", "Section Rise"].map((phase) => {
+                  const phases = ["Exterior Pull-in", "Building Orbit", "Interior Walkthrough", "Section Rise"];
+                  const isActive = currentPhase === phase;
+                  const isPast = phases.indexOf(phase) < phases.indexOf(currentPhase ?? "");
+                  return (
+                    <span key={phase} style={{
+                      padding: "2px 6px", borderRadius: 3,
+                      background: isActive ? "rgba(0,245,255,0.1)" : isPast ? "rgba(139,92,246,0.06)" : "rgba(255,255,255,0.03)",
+                      border: `1px solid ${isActive ? "rgba(0,245,255,0.2)" : isPast ? "rgba(139,92,246,0.15)" : "rgba(255,255,255,0.06)"}`,
+                      fontSize: 7, fontWeight: 500,
+                      color: isActive ? "#00F5FF" : isPast ? "#8B5CF6" : "#3C3C50",
+                      fontFamily: "'Space Mono', monospace",
+                    }}>
+                      {phase} {isPast ? "✓" : isActive ? "..." : ""}
+                    </span>
+                  );
+                })
+              ) : (
+                // 2-segment indicators for Kling API
+                <>
+                  <span style={{
+                    padding: "2px 6px", borderRadius: 3,
+                    background: progress >= 33 ? "rgba(0,245,255,0.1)" : "rgba(255,255,255,0.03)",
+                    border: `1px solid ${progress >= 33 ? "rgba(0,245,255,0.2)" : "rgba(255,255,255,0.06)"}`,
+                    fontSize: 8, fontWeight: 500,
+                    color: progress >= 33 ? "#00F5FF" : "#3C3C50",
+                    fontFamily: "'Space Mono', monospace",
+                  }}>
+                    Exterior 5s {progress >= 33 ? (progress >= 50 ? "done" : "...") : "queued"}
+                  </span>
+                  <span style={{
+                    padding: "2px 6px", borderRadius: 3,
+                    background: progress >= 67 ? "rgba(139,92,246,0.1)" : "rgba(255,255,255,0.03)",
+                    border: `1px solid ${progress >= 67 ? "rgba(139,92,246,0.2)" : "rgba(255,255,255,0.06)"}`,
+                    fontSize: 8, fontWeight: 500,
+                    color: progress >= 67 ? "#8B5CF6" : "#3C3C50",
+                    fontFamily: "'Space Mono', monospace",
+                  }}>
+                    Interior 10s {progress >= 67 ? (progress >= 90 ? "done" : "...") : "queued"}
+                  </span>
+                </>
+              )}
             </div>
           )}
         </div>
@@ -357,7 +388,7 @@ export function VideoBody({ data, nodeId }: VideoBodyProps) {
           fontSize: 9, fontWeight: 500, color: "#8B5CF6",
           fontFamily: "'Space Mono', monospace",
         }}>
-          Kling 3.0
+          {data?.pipeline?.includes("Three.js") ? "Three.js" : "Kling 3.0"}
         </span>
 
         {/* Cost badge */}

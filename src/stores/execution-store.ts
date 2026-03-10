@@ -10,7 +10,8 @@ import type {
 
 export interface VideoGenerationState {
   progress: number; // 0-100
-  status: "submitting" | "processing" | "complete" | "failed";
+  status: "submitting" | "processing" | "rendering" | "complete" | "failed";
+  phase?: string; // Current rendering phase label (e.g., "Exterior Pull-in")
   exteriorTaskId?: string;
   interiorTaskId?: string;
   failureMessage?: string;

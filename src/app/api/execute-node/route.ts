@@ -1353,15 +1353,41 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
       // and generates a cinematic walkthrough video via Kling 3.0 Official API.
 
       if (!process.env.KLING_ACCESS_KEY || !process.env.KLING_SECRET_KEY) {
-        return NextResponse.json(
-          formatErrorResponse({
-            title: "Kling API keys required",
-            message: "KLING_ACCESS_KEY and KLING_SECRET_KEY are not configured. Get your keys from klingai.com/global/dev to enable video generation.",
-            code: "MISSING_API_KEY",
-          }),
-          { status: 400 }
-        );
-      }
+        // Fallback to client-side Three.js rendering when Kling keys are not configured
+        const buildingDesc = (inputData?.content as string) ?? (inputData?.description as string) ?? "Modern architectural building";
+        const upFloors = Number(inputData?.floors) || 5;
+        const upFloorHeight = Number(inputData?.height) / upFloors || 3.6;
+        const upFootprint = Number(inputData?.footprint) || 600;
+        const upBuildingType = String(inputData?.buildingType ?? "modern office building");
+
+        artifact = {
+          id: generateId(),
+          executionId: executionId ?? "local",
+          tileInstanceId,
+          type: "video",
+          data: {
+            name: `walkthrough_${generateId()}.webm`,
+            videoUrl: "",
+            downloadUrl: "",
+            label: "AEC Cinematic Walkthrough — 15s Three.js Render",
+            content: `15s AEC walkthrough: drone pull-in → orbit → interior → section rise — ${buildingDesc.slice(0, 100)}`,
+            durationSeconds: 15,
+            shotCount: 4,
+            pipeline: "Three.js client-side → WebM video",
+            costUsd: 0,
+            videoGenerationStatus: "client-rendering",
+            _buildingConfig: {
+              floors: upFloors,
+              floorHeight: upFloorHeight,
+              footprint: upFootprint,
+              buildingType: upBuildingType,
+            },
+          },
+          metadata: { engine: "threejs-client", real: false },
+          createdAt: new Date(),
+        };
+
+      } else {
 
       // Extract render image URL from upstream GN-003
       const renderImageUrl =
@@ -1427,6 +1453,7 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
         },
         createdAt: new Date(),
       };
+      } // end else (Kling API path)
 
     } else if (catalogueId === "GN-010") {
       // ── Hi-Fi 3D Reconstructor ─────────────────────────────────────────

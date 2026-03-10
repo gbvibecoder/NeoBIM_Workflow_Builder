@@ -290,6 +290,90 @@ async function pollVideoGeneration(
   clearVideoProgressFn(nodeId);
 }
 
+/** Client-side Three.js walkthrough rendering */
+async function renderClientWalkthrough(
+  nodeId: string,
+  artifactData: Record<string, unknown>,
+  executionId: string,
+  addArtifactFn: (nodeId: string, artifact: ExecutionArtifact) => void,
+  setVideoProgressFn: (nodeId: string, state: { progress: number; status: "submitting" | "processing" | "rendering" | "complete" | "failed"; phase?: string; failureMessage?: string }) => void,
+  clearVideoProgressFn: (nodeId: string) => void,
+): Promise<void> {
+  setVideoProgressFn(nodeId, {
+    progress: 0,
+    status: "rendering",
+    phase: "Initializing",
+  });
+
+  try {
+    // Dynamic import for code splitting
+    const { renderWalkthrough } = await import("@/services/walkthrough-renderer");
+
+    const buildingConfig = artifactData._buildingConfig as {
+      floors?: number;
+      floorHeight?: number;
+      footprint?: number;
+      buildingType?: string;
+      style?: string;
+    } | undefined;
+
+    const result = await renderWalkthrough({
+      floors: buildingConfig?.floors ?? 5,
+      floorHeight: buildingConfig?.floorHeight ?? 3.6,
+      footprint: buildingConfig?.footprint ?? 600,
+      buildingType: buildingConfig?.buildingType,
+      onProgress: (percent, phase) => {
+        setVideoProgressFn(nodeId, {
+          progress: percent,
+          status: percent >= 100 ? "complete" : "rendering",
+          phase,
+        });
+      },
+    });
+
+    // Build the final artifact with the rendered video blob URL
+    const finalArtifact: ExecutionArtifact = {
+      id: `video-${nodeId}`,
+      executionId,
+      tileInstanceId: nodeId,
+      type: "video",
+      data: {
+        ...artifactData,
+        videoUrl: result.blobUrl,
+        downloadUrl: result.blobUrl,
+        label: "AEC Cinematic Walkthrough — 15s Three.js Render",
+        videoGenerationStatus: "complete",
+        generationProgress: 100,
+        durationSeconds: result.durationSeconds,
+        pipeline: `Three.js client-side → WebM (${result.resolution.width}x${result.resolution.height}, ${result.fps}fps, ${(result.fileSizeBytes / 1024 / 1024).toFixed(1)}MB)`,
+      },
+      metadata: { engine: "threejs-client", real: false },
+      createdAt: new Date(),
+    };
+
+    addArtifactFn(nodeId, finalArtifact);
+    clearVideoProgressFn(nodeId);
+
+    toast.success("Video walkthrough ready!", {
+      description: `15s AEC walkthrough rendered (${(result.fileSizeBytes / 1024 / 1024).toFixed(1)}MB)`,
+      duration: 5000,
+    });
+  } catch (err) {
+    console.error("[Client Render] Failed:", err);
+    setVideoProgressFn(nodeId, {
+      progress: 0,
+      status: "failed",
+      phase: "Error",
+      failureMessage: err instanceof Error ? err.message : "Rendering failed",
+    });
+    toast.error("Video rendering failed", {
+      description: err instanceof Error ? err.message : "Unknown error",
+      duration: 6000,
+    });
+    clearVideoProgressFn(nodeId);
+  }
+}
+
 interface UseExecutionOptions {
   onLog?: (entry: LogEntry) => void;
 }
@@ -571,33 +655,59 @@ export function useExecution({ onLog }: UseExecutionOptions = {}) {
         log("success", `${node.data.label} completed`, String(artifact.type));
         trackNodeUsed(node.data.catalogueId, node.data.label);
 
-        // If this is a video node with background generation, start polling
+        // If this is a video node with background generation, start polling or client rendering
         const artData = artifact.data as Record<string, unknown> | undefined;
-        if (
-          artifact.type === "video" &&
-          artData?.videoGenerationStatus === "processing" &&
-          artData?.exteriorTaskId &&
-          artData?.interiorTaskId
-        ) {
-          log("info", "Video generation started in background — polling for progress");
-          toast.info("Video generating in background...", {
-            description: "15s AEC walkthrough — you'll be notified when it's ready",
-            duration: 5000,
-          });
+        if (artifact.type === "video" && artData?.videoGenerationStatus) {
+          if (
+            artData.videoGenerationStatus === "processing" &&
+            artData.exteriorTaskId &&
+            artData.interiorTaskId
+          ) {
+            // Kling API path: poll server for progress
+            log("info", "Video generation started in background — polling for progress");
+            toast.info("Video generating in background...", {
+              description: "15s AEC walkthrough — you'll be notified when it's ready",
+              duration: 5000,
+            });
 
-          // Fire-and-forget: poll in background, don't block the workflow
-          pollVideoGeneration(
-            node.id,
-            artData.exteriorTaskId as string,
-            artData.interiorTaskId as string,
-            addArtifact,
-            setVideoGenProgress,
-            clearVideoGenProgress,
-            artData,
-            executionId,
-          ).catch(err => {
-            console.error("[Video Poll] Unhandled error:", err);
-          });
+            pollVideoGeneration(
+              node.id,
+              artData.exteriorTaskId as string,
+              artData.interiorTaskId as string,
+              addArtifact,
+              setVideoGenProgress,
+              clearVideoGenProgress,
+              artData,
+              executionId,
+            ).catch(err => {
+              console.error("[Video Poll] Unhandled error:", err);
+            });
+          } else if (artData.videoGenerationStatus === "client-rendering") {
+            // Three.js client-side rendering path
+            log("info", "Starting client-side Three.js walkthrough rendering");
+            toast.info("Rendering 15s walkthrough...", {
+              description: "Three.js AEC cinematic walkthrough — rendering in your browser",
+              duration: 5000,
+            });
+
+            // Fire-and-forget: render in background
+            renderClientWalkthrough(
+              node.id,
+              artData,
+              executionId,
+              addArtifact,
+              setVideoGenProgress,
+              clearVideoGenProgress,
+            ).catch(err => {
+              console.error("[Client Render] Unhandled error:", err);
+              setVideoGenProgress(node.id, {
+                progress: 0,
+                status: "failed",
+                phase: "Error",
+                failureMessage: err instanceof Error ? err.message : "Rendering failed",
+              });
+            });
+          }
         }
 
         // Show warnings if any

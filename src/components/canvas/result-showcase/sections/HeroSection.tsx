@@ -2,8 +2,9 @@
 
 import { useRef, useState, useCallback } from "react";
 import { motion } from "framer-motion";
-import { Play, Maximize2 } from "lucide-react";
+import { Play, Maximize2, Loader2 } from "lucide-react";
 import { useLocale } from "@/hooks/useLocale";
+import { useExecutionStore } from "@/stores/execution-store";
 import { COLORS } from "../constants";
 import type { VideoInfo } from "../useShowcaseData";
 
@@ -13,10 +14,18 @@ interface HeroSectionProps {
   onExpandVideo: () => void;
 }
 
+const RENDER_PHASES = ["Exterior Pull-in", "Building Orbit", "Interior Walkthrough", "Section Rise"];
+
 export function HeroSection({ videoData, heroImageUrl, onExpandVideo }: HeroSectionProps) {
   const { t } = useLocale();
   const videoRef = useRef<HTMLVideoElement>(null);
   const [segmentIndex, setSegmentIndex] = useState(0);
+
+  // Check for video generation progress
+  const videoGenProgress = useExecutionStore(s => {
+    if (!videoData?.nodeId) return null;
+    return s.videoGenProgress.get(videoData.nodeId) ?? null;
+  });
 
   const segments = videoData?.segments;
   const hasSegments = segments && segments.length > 1;
@@ -30,7 +39,9 @@ export function HeroSection({ videoData, heroImageUrl, onExpandVideo }: HeroSect
     }
   }, [hasSegments, segments, segmentIndex]);
 
-  if (!videoData?.videoUrl && !heroImageUrl) return null;
+  const isGenerating = videoGenProgress && (videoGenProgress.status === "rendering" || videoGenProgress.status === "processing" || videoGenProgress.status === "submitting");
+
+  if (!videoData?.videoUrl && !heroImageUrl && !isGenerating) return null;
 
   return (
     <motion.div
@@ -65,6 +76,83 @@ export function HeroSection({ videoData, heroImageUrl, onExpandVideo }: HeroSect
             display: "block",
           }}
         />
+      ) : isGenerating ? (
+        /* ── Video Generation Progress ── */
+        <div style={{
+          width: "100%",
+          minHeight: 280,
+          maxHeight: 400,
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 20,
+          background: "linear-gradient(135deg, #0a0a0f 0%, #111122 100%)",
+        }}>
+          <motion.div
+            animate={{ rotate: 360 }}
+            transition={{ repeat: Infinity, duration: 2, ease: "linear" }}
+          >
+            <Loader2 size={32} style={{ color: COLORS.CYAN }} />
+          </motion.div>
+
+          <div style={{ textAlign: "center" }}>
+            <div style={{ fontSize: 14, fontWeight: 600, color: COLORS.TEXT_PRIMARY, marginBottom: 4 }}>
+              Rendering Walkthrough
+            </div>
+            <div style={{ fontSize: 11, color: COLORS.TEXT_MUTED }}>
+              {videoGenProgress.phase ?? "Initializing"} — {videoGenProgress.progress}%
+            </div>
+          </div>
+
+          {/* Progress bar */}
+          <div style={{
+            width: "70%",
+            maxWidth: 320,
+            height: 6,
+            borderRadius: 3,
+            background: "rgba(255,255,255,0.08)",
+            overflow: "hidden",
+          }}>
+            <motion.div
+              initial={{ width: "0%" }}
+              animate={{ width: `${videoGenProgress.progress}%` }}
+              transition={{ duration: 0.3 }}
+              style={{
+                height: "100%",
+                borderRadius: 3,
+                background: `linear-gradient(90deg, ${COLORS.CYAN}, #00d4ff)`,
+                boxShadow: `0 0 8px ${COLORS.CYAN}40`,
+              }}
+            />
+          </div>
+
+          {/* Phase indicators */}
+          <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
+            {RENDER_PHASES.map((phase) => {
+              const isActive = videoGenProgress.phase === phase;
+              const isPast = RENDER_PHASES.indexOf(phase) < RENDER_PHASES.indexOf(videoGenProgress.phase ?? "");
+              return (
+                <div
+                  key={phase}
+                  style={{
+                    fontSize: 8,
+                    fontWeight: 600,
+                    padding: "3px 8px",
+                    borderRadius: 4,
+                    background: isActive ? `${COLORS.CYAN}20` : isPast ? "rgba(255,255,255,0.06)" : "rgba(255,255,255,0.03)",
+                    border: `1px solid ${isActive ? `${COLORS.CYAN}40` : "rgba(255,255,255,0.06)"}`,
+                    color: isActive ? COLORS.CYAN : isPast ? COLORS.TEXT_MUTED : "rgba(255,255,255,0.2)",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.05em",
+                  }}
+                >
+                  {phase}
+                </div>
+              );
+            })}
+          </div>
+        </div>
       ) : heroImageUrl ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img

@@ -551,23 +551,32 @@ export async function executeNode(
         },
       });
 
-    case "GN-009": { // Video Walkthrough Generator — mock (Kling Official API)
+    case "GN-009": { // Video Walkthrough Generator — client-side Three.js rendering
       const vidDesc = String(inputData?.content ?? inputData?.description ?? "modern building");
-      const mockVidUrl = "https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/360/Big_Buck_Bunny_360_10s_1MB.mp4";
+      // Extract building config from upstream GN-001 data
+      const upstreamFloors = Number(inputData?.floors) || 5;
+      const upstreamFloorHeight = Number(inputData?.height) / upstreamFloors || 3.6;
+      const upstreamFootprint = Number(inputData?.footprint) || 600;
+      const upstreamBuildingType = String(inputData?.buildingType ?? "modern office building");
+
       return mockArtifact(executionId, tileInstanceId, "video", {
-        name: `walkthrough_${Date.now()}.mp4`,
-        videoUrl: mockVidUrl,
-        downloadUrl: mockVidUrl,
-        label: "AEC Cinematic Walkthrough — 15s (exterior + interior) — Mock",
-        content: `15s AEC walkthrough: 5s fast exterior (all elevations + aerial) + 10s detailed interior walkthrough — ${vidDesc.slice(0, 100)}`,
+        name: `walkthrough_${Date.now()}.webm`,
+        videoUrl: "", // empty — will be populated after client-side rendering
+        downloadUrl: "",
+        label: "AEC Cinematic Walkthrough — 15s Three.js Render",
+        content: `15s AEC walkthrough: drone pull-in → orbit → interior → section rise — ${vidDesc.slice(0, 100)}`,
         durationSeconds: 15,
-        shotCount: 2,
-        pipeline: "concept render → Kling Official API (pro, dual) → 2× MP4 video",
-        costUsd: 1.50,
-        segments: [
-          { videoUrl: mockVidUrl, downloadUrl: mockVidUrl, durationSeconds: 5, label: "Exterior — All Elevations & Aerial" },
-          { videoUrl: mockVidUrl, downloadUrl: mockVidUrl, durationSeconds: 10, label: "Interior AEC Walkthrough" },
-        ],
+        shotCount: 4,
+        pipeline: "Three.js client-side → WebM video",
+        costUsd: 0,
+        videoGenerationStatus: "client-rendering" as const,
+        _buildingConfig: {
+          floors: upstreamFloors,
+          floorHeight: upstreamFloorHeight,
+          footprint: upstreamFootprint,
+          buildingType: upstreamBuildingType,
+          style: inputData?.style as string | undefined,
+        },
       });
     }
 
