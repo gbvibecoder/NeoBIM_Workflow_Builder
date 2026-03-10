@@ -50,6 +50,22 @@ interface ExecutionState {
   getArtifactForTile: (tileInstanceId: string) => ExecutionArtifact | undefined;
   removeArtifact: (tileInstanceId: string) => void;
   clearArtifacts: () => void;
+
+  // Restore artifacts from DB (after loading a workflow)
+  restoreArtifactsFromDB: (dbArtifacts: Array<{
+    tileInstanceId: string;
+    nodeId: string;
+    type: string;
+    data: Record<string, unknown>;
+    nodeLabel?: string | null;
+    title?: string;
+    createdAt?: string;
+  }>, executionMeta?: {
+    id: string;
+    status: string;
+    startedAt: string;
+    completedAt?: string | null;
+  }) => void;
 }
 
 const MAX_REGENERATIONS = 3;
@@ -161,4 +177,43 @@ export const useExecutionStore = create<ExecutionState>()((set, get) => ({
     }),
 
   clearArtifacts: () => set({ artifacts: new Map() }),
+
+  restoreArtifactsFromDB: (dbArtifacts, executionMeta) => {
+    const newArtifacts = new Map<string, ExecutionArtifact>();
+    for (const art of dbArtifacts) {
+      const nodeId = art.tileInstanceId || art.nodeId;
+      newArtifacts.set(nodeId, {
+        id: `restored-${nodeId}`,
+        executionId: executionMeta?.id ?? "restored",
+        tileInstanceId: nodeId,
+        type: art.type as ExecutionArtifact["type"],
+        data: art.data,
+        metadata: { restored: true },
+        createdAt: art.createdAt ? new Date(art.createdAt) : new Date(),
+      });
+    }
+
+    const updates: Partial<ExecutionState> = { artifacts: newArtifacts };
+
+    // Restore execution metadata if provided
+    if (executionMeta) {
+      updates.currentExecution = {
+        id: executionMeta.id,
+        workflowId: "",
+        userId: "",
+        status: executionMeta.status === "SUCCESS" ? "success"
+          : executionMeta.status === "PARTIAL" ? "partial"
+          : executionMeta.status === "FAILED" ? "failed"
+          : "success",
+        startedAt: new Date(executionMeta.startedAt),
+        completedAt: executionMeta.completedAt ? new Date(executionMeta.completedAt) : undefined,
+        tileResults: [],
+        createdAt: new Date(executionMeta.startedAt),
+      };
+      updates.isExecuting = false;
+      updates.executionProgress = 100;
+    }
+
+    set(updates);
+  },
 }));

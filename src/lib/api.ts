@@ -23,6 +23,17 @@ export type WorkflowDetail = {
   updatedAt: string;
 };
 
+export type ExecutionArtifactSummary = {
+  id: string;
+  type: string;
+  data: Record<string, unknown>;
+  tileInstanceId: string;
+  nodeId: string;
+  nodeLabel: string | null;
+  title: string;
+  createdAt: string;
+};
+
 export type ExecutionSummary = {
   startedAt: string;
   id: string;
@@ -30,6 +41,8 @@ export type ExecutionSummary = {
   workflowId: string;
   createdAt: string;
   updatedAt: string;
+  completedAt?: string | null;
+  artifacts?: ExecutionArtifactSummary[];
   _count?: { artifacts: number };
 };
 
@@ -96,10 +109,11 @@ export const api = {
   },
 
   executions: {
-    list: (options?: { limit?: number; status?: string }) => {
+    list: (options?: { limit?: number; status?: string; workflowId?: string }) => {
       const params = new URLSearchParams();
       if (options?.limit) params.set("limit", String(options.limit));
       if (options?.status) params.set("status", options.status);
+      if (options?.workflowId) params.set("workflowId", options.workflowId);
       const query = params.toString();
       return apiFetch<{ executions: ExecutionSummary[] }>(
         `/api/executions${query ? `?${query}` : ""}`

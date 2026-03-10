@@ -326,8 +326,7 @@ interface WorkflowCanvasInnerProps {
   workflowId?: string;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-function WorkflowCanvasInner({ workflowId: _workflowId }: WorkflowCanvasInnerProps) {
+function WorkflowCanvasInner({ workflowId: urlWorkflowId }: WorkflowCanvasInnerProps) {
   const { fitView, screenToFlowPosition, zoomIn, zoomOut } = useReactFlow();
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
 
@@ -348,6 +347,7 @@ function WorkflowCanvasInner({ workflowId: _workflowId }: WorkflowCanvasInnerPro
     markDirty,
     setCreationMode,
     saveWorkflow,
+    loadWorkflow,
     undo,
     redo,
     isSaveModalOpen,
@@ -355,7 +355,72 @@ function WorkflowCanvasInner({ workflowId: _workflowId }: WorkflowCanvasInnerPro
     closeSaveModal,
   } = useWorkflowStore();
 
-  const { artifacts, executionProgress, clearArtifacts } = useExecutionStore();
+  const { artifacts, executionProgress, clearArtifacts, restoreArtifactsFromDB } = useExecutionStore();
+
+  // ─── Auto-save debounce for persisted workflows ────────────────────
+  const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  React.useEffect(() => {
+    // Only auto-save if: dirty, has a persisted DB id, not currently saving, not executing, not demo
+    const wfId = currentWorkflow?.id;
+    const isPersisted = wfId && wfId.length >= 20 && wfId.startsWith("c");
+    if (!isDirty || !isPersisted || isSaving) return;
+
+    // Clear previous timer
+    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+
+    autoSaveTimerRef.current = setTimeout(() => {
+      saveWorkflow().then((id) => {
+        if (id) {
+          console.info("[auto-save] Workflow saved:", id);
+        }
+      });
+    }, 3000); // 3-second debounce
+
+    return () => {
+      if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    };
+  }, [isDirty, currentWorkflow?.id, isSaving, saveWorkflow]);
+
+  // ─── Load workflow from URL ?id= param ────────────────────────────
+  const loadedUrlIdRef = useRef<string | null>(null);
+  React.useEffect(() => {
+    if (!urlWorkflowId) return;
+    // Don't re-load if already loaded this ID or already viewing it
+    if (loadedUrlIdRef.current === urlWorkflowId) return;
+    if (currentWorkflow?.id === urlWorkflowId) {
+      loadedUrlIdRef.current = urlWorkflowId;
+      return;
+    }
+    loadedUrlIdRef.current = urlWorkflowId;
+    loadWorkflow(urlWorkflowId).then(() => {
+      // Fit view after workflow loads
+      setTimeout(() => fitView({ padding: 0.3, duration: 600 }), 300);
+
+      // Restore latest execution results from DB
+      fetch(`/api/executions?workflowId=${urlWorkflowId}&limit=1`)
+        .then(res => res.ok ? res.json() : null)
+        .then((data: { executions?: Array<{
+          id: string; status: string; startedAt: string; completedAt?: string | null;
+          artifacts?: Array<{
+            tileInstanceId: string; nodeId: string; type: string;
+            data: Record<string, unknown>; nodeLabel?: string | null;
+            title?: string; createdAt?: string;
+          }>;
+        }> } | null) => {
+          if (!data?.executions?.length) return;
+          const latest = data.executions[0];
+          if (latest.artifacts && latest.artifacts.length > 0) {
+            restoreArtifactsFromDB(latest.artifacts, {
+              id: latest.id,
+              status: latest.status,
+              startedAt: latest.startedAt,
+              completedAt: latest.completedAt,
+            });
+          }
+        })
+        .catch(() => { /* Non-fatal — execution restore is best-effort */ });
+    });
+  }, [urlWorkflowId, currentWorkflow?.id, loadWorkflow, fitView, restoreArtifactsFromDB]);
   const { isNodeLibraryOpen, setPromptModeActive, isPromptModeActive, toggleNodeLibrary, isDemoMode, setShowExecutionCompleteModal, pendingNodeAdd, clearPendingNodeAdd } = useUIStore();
 
   // Execution timing for celebration modal
@@ -614,10 +679,21 @@ function WorkflowCanvasInner({ workflowId: _workflowId }: WorkflowCanvasInnerPro
       toast.error(tLocale('toast.noNodesError'), { duration: 3000 });
       return;
     }
+
+    // #2: Auto-save unsaved workflow before execution (so execution can persist to DB)
+    const wfId = currentWorkflow?.id;
+    const isPersisted = wfId && wfId.length >= 20 && wfId.startsWith("c");
+    if (!isPersisted && !isDemoMode) {
+      const savedId = await saveWorkflow();
+      if (savedId) {
+        toast.success(tLocale('toast.workflowSaved'), { duration: 2000 });
+      }
+    }
+
     executionStartRef.current = Date.now();
     await runWorkflow();
     executionStartRef.current = null;
-  }, [runWorkflow, nodes, tLocale]);
+  }, [runWorkflow, nodes, tLocale, currentWorkflow?.id, isDemoMode, saveWorkflow]);
   const handleSave = useCallback(async () => {
     if (isDemoMode) {
       toast.info(tLocale('toast.demoSaveHint'), { duration: 3000 });
@@ -886,6 +962,55 @@ function WorkflowCanvasInner({ workflowId: _workflowId }: WorkflowCanvasInnerPro
           <AnimatePresence>
             {showShowcase && !isExecuting && artifacts.size > 0 && (
               <ResultShowcase onClose={() => setShowShowcase(false)} />
+            )}
+          </AnimatePresence>
+
+          {/* "View Results" floating button — visible when showcase is closed but artifacts exist */}
+          <AnimatePresence>
+            {!showShowcase && !isExecuting && artifacts.size > 0 && (
+              <motion.button
+                key="view-results-fab"
+                initial={{ opacity: 0, y: 20, scale: 0.9 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 10, scale: 0.9 }}
+                transition={{ duration: 0.25, ease: "easeOut" }}
+                onClick={() => setShowShowcase(true)}
+                style={{
+                  position: "absolute",
+                  bottom: 20,
+                  left: "50%",
+                  transform: "translateX(-50%)",
+                  zIndex: 12,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  padding: "10px 20px",
+                  borderRadius: 12,
+                  background: "linear-gradient(135deg, rgba(0,245,255,0.12), rgba(184,115,51,0.08))",
+                  border: "1px solid rgba(0,245,255,0.25)",
+                  backdropFilter: "blur(12px)",
+                  WebkitBackdropFilter: "blur(12px)",
+                  color: "#00F5FF",
+                  fontSize: 12,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  boxShadow: "0 4px 24px rgba(0,0,0,0.4), 0 0 20px rgba(0,245,255,0.08)",
+                }}
+                whileHover={{ scale: 1.03, boxShadow: "0 4px 30px rgba(0,0,0,0.5), 0 0 30px rgba(0,245,255,0.15)" }}
+                whileTap={{ scale: 0.97 }}
+              >
+                <Sparkles size={14} />
+                {tLocale('showcase.viewResults') ?? "View Results"}
+                <span style={{
+                  padding: "2px 6px",
+                  borderRadius: 6,
+                  background: "rgba(0,245,255,0.12)",
+                  fontSize: 10,
+                  fontWeight: 700,
+                }}>
+                  {artifacts.size}
+                </span>
+              </motion.button>
             )}
           </AnimatePresence>
 
