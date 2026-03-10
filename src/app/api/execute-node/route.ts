@@ -20,6 +20,7 @@ import {
 import { assertValidInput } from "@/lib/validation";
 import { APIError, UserErrors, formatErrorResponse } from "@/lib/user-errors";
 import { generatePDFBase64 } from "@/services/pdf-report-server";
+import { uploadBase64ToR2 } from "@/lib/r2";
 import { reconstructHiFi3D, isMeshyConfigured } from "@/services/meshy-service";
 import { generateWalkthroughVideo, buildArchitecturalMultiShot } from "@/services/video-service";
 
@@ -1125,6 +1126,13 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
       const dataUri = "data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64," + base64;
       const filename = `BuildFlow_BOQ_${dateStr}.xlsx`;
 
+      // Upload to R2 (falls back to base64 data URI if R2 unavailable)
+      const downloadUrl = await uploadBase64ToR2(
+        dataUri,
+        filename,
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      );
+
       artifact = {
         id: generateId(),
         executionId: executionId ?? "local",
@@ -1134,7 +1142,7 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
           name: filename,
           type: "XLSX Spreadsheet",
           size: xlsxBuffer.length,
-          downloadUrl: dataUri,
+          downloadUrl,
           label: "BOQ Export (Professional Excel)",
           content: `BOQ Export: ${boqLines.length} line items across 4 sheets. Grand Total: $${(boqData?.grandTotal ?? 0).toLocaleString()}. ${COST_DISCLAIMERS.accuracy}`,
         },
@@ -1202,6 +1210,9 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
       const { base64, fileSize } = generatePDFBase64(workflowName, upstreamArtifacts);
       const filename = `BuildFlow_Report_${new Date().toISOString().split("T")[0]}.pdf`;
 
+      // Upload to R2 (falls back to base64 data URI if R2 unavailable)
+      const downloadUrl = await uploadBase64ToR2(base64, filename, "application/pdf");
+
       artifact = {
         id: generateId(),
         executionId: executionId ?? "local",
@@ -1211,7 +1222,7 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
           name: filename,
           type: "PDF Report",
           size: fileSize,
-          downloadUrl: base64,
+          downloadUrl,
           label: `Execution Report (${upstreamArtifacts.length} sections)`,
           content: `Professional PDF report with ${upstreamArtifacts.length} sections from workflow execution`,
         },
