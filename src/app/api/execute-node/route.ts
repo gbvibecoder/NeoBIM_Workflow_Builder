@@ -1471,24 +1471,19 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
           "";
       }
 
-      // Fallback: if we have base64 image data (from IN-003 upload), convert to URL
+      // Fallback: if we have base64 image data (from IN-003 upload), use it directly
+      // Kling API accepts base64 data URIs in the "image" field — no need for R2 or temp files
       if (!renderImageUrl && inputData?.fileData && typeof inputData.fileData === "string") {
-        try {
-          console.log("[GN-009] Base64 image detected from upload, converting to R2 URL...");
-          const { uploadBase64ToR2, isR2Configured } = await import("@/lib/r2");
-          if (isR2Configured()) {
-            const imgMime = (inputData.mimeType as string) ?? "image/jpeg";
-            const ext = imgMime.includes("png") ? "png" : "jpg";
-            const r2Url = await uploadBase64ToR2(inputData.fileData as string, `upload-${generateId()}.${ext}`, imgMime);
-            if (r2Url && r2Url.startsWith("http")) {
-              renderImageUrl = r2Url;
-              isFloorPlanInput = true; // uploaded floor plan image
-              console.log("[GN-009] Uploaded image to R2:", renderImageUrl);
-            }
-          }
-        } catch (uploadErr) {
-          console.warn("[GN-009] Base64→R2 upload failed:", uploadErr);
+        const imgMime = (inputData.mimeType as string) ?? "image/jpeg";
+        const raw = inputData.fileData as string;
+        // Ensure it's a proper data URI — Kling accepts data:image/...;base64,...
+        if (raw.startsWith("data:")) {
+          renderImageUrl = raw;
+        } else {
+          renderImageUrl = `data:${imgMime};base64,${raw}`;
         }
+        isFloorPlanInput = true;
+        console.log("[GN-009] Using base64 data URI directly for Kling (size:", raw.length, "chars)");
       }
 
       // Build video from building description (from upstream TR-003 or fallback)
