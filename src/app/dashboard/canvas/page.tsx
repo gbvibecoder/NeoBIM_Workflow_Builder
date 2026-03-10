@@ -2,6 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 
 // ─── Lazy Load Heavy Canvas Component ─────────────────────────────
 // @xyflow/react is 260KB - only load when user navigates to canvas
@@ -21,6 +22,9 @@ const WorkflowCanvas = dynamic(
 );
 
 export default function CanvasPage() {
+  const searchParams = useSearchParams();
+  const workflowId = searchParams.get("id") ?? undefined;
+
   return (
     <Suspense
       fallback={
@@ -29,7 +33,7 @@ export default function CanvasPage() {
         </div>
       }
     >
-      <WorkflowCanvas />
+      <WorkflowCanvas workflowId={workflowId} />
     </Suspense>
   );
 }
