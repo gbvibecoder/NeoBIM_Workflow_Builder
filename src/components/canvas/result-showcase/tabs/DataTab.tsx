@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { motion } from "framer-motion";
-import { ChevronRight, ChevronDown } from "lucide-react";
+import { ChevronRight, ChevronDown, Download, Copy, Check, Table2, BarChart3, Code2 } from "lucide-react";
 import { useLocale } from "@/hooks/useLocale";
 import { COLORS } from "../constants";
 import { KpiStrip } from "../sections/KpiStrip";
@@ -21,7 +21,11 @@ export function DataTab({ data }: DataTabProps) {
       {/* Full KPI Dashboard */}
       {data.kpiMetrics.length > 0 && (
         <section>
-          <SectionTitle>{t('showcase.kpiTitle')}</SectionTitle>
+          <SectionHeader
+            icon={<BarChart3 size={14} />}
+            title={t('showcase.kpiTitle')}
+            subtitle={`${data.kpiMetrics.length} metrics`}
+          />
           <KpiStrip metrics={data.kpiMetrics} maxItems={20} />
         </section>
       )}
@@ -29,6 +33,10 @@ export function DataTab({ data }: DataTabProps) {
       {/* Cost Breakdown */}
       {data.costBreakdown && (
         <section>
+          <SectionHeader
+            icon={<BarChart3 size={14} />}
+            title={t('showcase.costBreakdown')}
+          />
           <CostBreakdownBars items={data.costBreakdown} />
         </section>
       )}
@@ -36,6 +44,10 @@ export function DataTab({ data }: DataTabProps) {
       {/* Compliance */}
       {data.complianceItems && (
         <section>
+          <SectionHeader
+            icon={<Check size={14} />}
+            title={t('showcase.complianceChecks')}
+          />
           <ComplianceBadges items={data.complianceItems} />
         </section>
       )}
@@ -43,7 +55,11 @@ export function DataTab({ data }: DataTabProps) {
       {/* Tables */}
       {data.tableData.length > 0 && (
         <section>
-          <SectionTitle>{t('showcase.tables')}</SectionTitle>
+          <SectionHeader
+            icon={<Table2 size={14} />}
+            title={t('showcase.tables')}
+            subtitle={`${data.tableData.length} tables · ${data.tableData.reduce((s, t) => s + t.rows.length, 0)} total rows`}
+          />
           <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
             {data.tableData.map((table, idx) => (
               <TableView key={idx} table={table} index={idx} />
@@ -55,7 +71,11 @@ export function DataTab({ data }: DataTabProps) {
       {/* JSON Explorer */}
       {data.jsonData.length > 0 && (
         <section>
-          <SectionTitle>{t('showcase.structuredData')}</SectionTitle>
+          <SectionHeader
+            icon={<Code2 size={14} />}
+            title={t('showcase.structuredData')}
+            subtitle={`${data.jsonData.length} datasets`}
+          />
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
             {data.jsonData.map((item, idx) => (
               <JsonExplorer key={idx} label={item.label} json={item.json} />
@@ -63,6 +83,69 @@ export function DataTab({ data }: DataTabProps) {
           </div>
         </section>
       )}
+
+      {/* Empty state */}
+      {data.kpiMetrics.length === 0 && data.tableData.length === 0 && data.jsonData.length === 0 && (
+        <div style={{
+          padding: 60,
+          textAlign: "center",
+          color: COLORS.TEXT_MUTED,
+          fontSize: 13,
+        }}>
+          {t('showcase.noDataAvailable')}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Section Header ─────────────────────────────────────────────────────────
+
+function SectionHeader({
+  icon,
+  title,
+  subtitle,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  subtitle?: string;
+}) {
+  return (
+    <div style={{
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+      marginBottom: 14,
+    }}>
+      <div style={{
+        color: COLORS.CYAN,
+        display: "flex",
+        alignItems: "center",
+      }}>
+        {icon}
+      </div>
+      <span style={{
+        fontSize: 14,
+        fontWeight: 700,
+        color: COLORS.TEXT_PRIMARY,
+      }}>
+        {title}
+      </span>
+      {subtitle && (
+        <span style={{
+          fontSize: 10,
+          color: COLORS.TEXT_MUTED,
+          marginLeft: 4,
+        }}>
+          {subtitle}
+        </span>
+      )}
+      <div style={{
+        flex: 1,
+        height: 1,
+        marginLeft: 12,
+        background: `linear-gradient(90deg, ${COLORS.GLASS_BORDER}, transparent)`,
+      }} />
     </div>
   );
 }
@@ -73,6 +156,30 @@ function TableView({ table, index }: { table: TableDataItem; index: number }) {
   const { t } = useLocale();
   const [showAll, setShowAll] = useState(false);
   const visibleRows = showAll ? table.rows : table.rows.slice(0, 15);
+
+  const handleExportCSV = useCallback(() => {
+    const csvRows = [
+      table.headers.join(","),
+      ...table.rows.map(row =>
+        row.map(cell => {
+          const str = String(cell);
+          return str.includes(",") || str.includes('"')
+            ? `"${str.replace(/"/g, '""')}"`
+            : str;
+        }).join(",")
+      ),
+    ];
+    const csvContent = csvRows.join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${table.label ?? `table_${index + 1}`}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, [table, index]);
 
   // Compute grand total if last column looks numeric
   let grandTotal: number | null = null;
@@ -99,17 +206,51 @@ function TableView({ table, index }: { table: TableDataItem; index: number }) {
         overflow: "hidden",
       }}
     >
-      {table.label && (
-        <div style={{
-          padding: "10px 16px",
-          fontSize: 11,
-          fontWeight: 600,
-          color: COLORS.TEXT_SECONDARY,
-          borderBottom: `1px solid ${COLORS.GLASS_BORDER}`,
-        }}>
-          {table.label}
+      {/* Table header with export button */}
+      <div style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        padding: "10px 16px",
+        borderBottom: `1px solid ${COLORS.GLASS_BORDER}`,
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          {table.label && (
+            <span style={{ fontSize: 11, fontWeight: 600, color: COLORS.TEXT_SECONDARY }}>
+              {table.label}
+            </span>
+          )}
+          <span style={{ fontSize: 9, color: COLORS.TEXT_MUTED }}>
+            {table.rows.length} {t('showcase.rows')} × {table.headers.length} cols
+          </span>
         </div>
-      )}
+        <button
+          onClick={handleExportCSV}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 4,
+            padding: "4px 8px",
+            borderRadius: 5,
+            background: `${COLORS.CYAN}10`,
+            border: `1px solid ${COLORS.CYAN}20`,
+            color: COLORS.CYAN,
+            fontSize: 9,
+            fontWeight: 600,
+            cursor: "pointer",
+            transition: "all 0.15s",
+          }}
+          onMouseEnter={e => {
+            e.currentTarget.style.background = `${COLORS.CYAN}20`;
+          }}
+          onMouseLeave={e => {
+            e.currentTarget.style.background = `${COLORS.CYAN}10`;
+          }}
+        >
+          <Download size={10} />
+          {t('showcase.exportCsv')}
+        </button>
+      </div>
 
       <div style={{ overflowX: "auto" }}>
         <table style={{
@@ -149,6 +290,13 @@ function TableView({ table, index }: { table: TableDataItem; index: number }) {
                 key={ri}
                 style={{
                   background: ri % 2 === 0 ? "transparent" : "rgba(255,255,255,0.01)",
+                  transition: "background 0.15s",
+                }}
+                onMouseEnter={e => {
+                  e.currentTarget.style.background = "rgba(0,245,255,0.02)";
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.background = ri % 2 === 0 ? "transparent" : "rgba(255,255,255,0.01)";
                 }}
               >
                 {(row as (string | number)[]).map((cell, ci) => (
@@ -178,6 +326,7 @@ function TableView({ table, index }: { table: TableDataItem; index: number }) {
                       fontWeight: 700,
                       color: COLORS.TEXT_PRIMARY,
                       fontSize: 12,
+                      background: "rgba(0,245,255,0.03)",
                     }}
                   >
                     {i === 0 ? t('showcase.total') : i === table.headers.length - 1
@@ -218,6 +367,26 @@ function TableView({ table, index }: { table: TableDataItem; index: number }) {
 function JsonExplorer({ label, json }: { label: string; json: Record<string, unknown> }) {
   const { t } = useLocale();
   const [expanded, setExpanded] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = useCallback(() => {
+    navigator.clipboard.writeText(JSON.stringify(json, null, 2)).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }, [json]);
+
+  const handleDownload = useCallback(() => {
+    const blob = new Blob([JSON.stringify(json, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${label.replace(/\s+/g, "_").toLowerCase()}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, [json, label]);
 
   return (
     <div style={{
@@ -226,29 +395,78 @@ function JsonExplorer({ label, json }: { label: string; json: Record<string, unk
       borderRadius: 10,
       overflow: "hidden",
     }}>
-      <button
-        onClick={() => setExpanded(v => !v)}
-        style={{
-          width: "100%",
-          display: "flex",
-          alignItems: "center",
-          gap: 8,
-          padding: "12px 16px",
-          background: "none",
-          border: "none",
-          color: COLORS.TEXT_PRIMARY,
-          fontSize: 12,
-          fontWeight: 600,
-          cursor: "pointer",
-          textAlign: "left",
-        }}
-      >
-        {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-        {label}
-        <span style={{ fontSize: 10, color: COLORS.TEXT_MUTED, fontWeight: 400 }}>
-          {Object.keys(json).length} {t('showcase.keys')}
-        </span>
-      </button>
+      <div style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        padding: "12px 16px",
+      }}>
+        <button
+          onClick={() => setExpanded(v => !v)}
+          style={{
+            flex: 1,
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            background: "none",
+            border: "none",
+            color: COLORS.TEXT_PRIMARY,
+            fontSize: 12,
+            fontWeight: 600,
+            cursor: "pointer",
+            textAlign: "left",
+            padding: 0,
+          }}
+        >
+          {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+          {label}
+          <span style={{ fontSize: 10, color: COLORS.TEXT_MUTED, fontWeight: 400 }}>
+            {Object.keys(json).length} {t('showcase.keys')}
+          </span>
+        </button>
+
+        {/* Action buttons */}
+        <div style={{ display: "flex", gap: 4 }}>
+          <button
+            onClick={handleCopy}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 3,
+              padding: "3px 7px",
+              borderRadius: 4,
+              background: "rgba(255,255,255,0.04)",
+              border: `1px solid ${COLORS.GLASS_BORDER}`,
+              color: copied ? COLORS.EMERALD : COLORS.TEXT_MUTED,
+              fontSize: 9,
+              cursor: "pointer",
+            }}
+            title={t('showcase.copyJson')}
+          >
+            {copied ? <Check size={10} /> : <Copy size={10} />}
+            {copied ? t('showcase.copied') : t('showcase.copyJson')}
+          </button>
+          <button
+            onClick={handleDownload}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 3,
+              padding: "3px 7px",
+              borderRadius: 4,
+              background: "rgba(255,255,255,0.04)",
+              border: `1px solid ${COLORS.GLASS_BORDER}`,
+              color: COLORS.TEXT_MUTED,
+              fontSize: 9,
+              cursor: "pointer",
+            }}
+            title={t('showcase.downloadJson')}
+          >
+            <Download size={10} />
+            JSON
+          </button>
+        </div>
+      </div>
 
       {expanded && (
         <div style={{
@@ -273,7 +491,7 @@ function JsonTree({ data, depth }: { data: unknown; depth: number }) {
   if (typeof data !== "object") {
     const color = typeof data === "string" ? COLORS.EMERALD
       : typeof data === "number" ? COLORS.AMBER
-      : typeof data === "boolean" ? COLORS.VIOLET
+      : typeof data === "boolean" ? "#8B5CF6"
       : COLORS.TEXT_SECONDARY;
     return (
       <span style={{ color, fontSize: 11 }}>
@@ -332,19 +550,6 @@ function JsonTree({ data, depth }: { data: unknown; depth: number }) {
           </div>
         );
       })}
-    </div>
-  );
-}
-
-function SectionTitle({ children }: { children: React.ReactNode }) {
-  return (
-    <div style={{
-      fontSize: 13,
-      fontWeight: 600,
-      color: COLORS.TEXT_PRIMARY,
-      marginBottom: 14,
-    }}>
-      {children}
     </div>
   );
 }
