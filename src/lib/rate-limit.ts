@@ -32,7 +32,7 @@ try {
   });
 }
 
-const FREE_TIER_LIMIT = parseInt(process.env.FREE_TIER_EXECUTIONS_PER_DAY || "3");
+const FREE_TIER_LIMIT = parseInt(process.env.FREE_TIER_EXECUTIONS_PER_DAY || "10");
 const PRO_TIER_LIMIT = parseInt(process.env.PRO_TIER_EXECUTIONS_PER_DAY || "100");
 
 export const freeTierRateLimit = new Ratelimit({

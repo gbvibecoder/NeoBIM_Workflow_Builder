@@ -41,6 +41,7 @@ coverage/
 
 # Logs
 *.log
+logs/
 
 # Generated files (AI tools, reports, scripts)
 *.sh

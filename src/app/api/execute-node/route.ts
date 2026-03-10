@@ -23,6 +23,10 @@ import { generatePDFBase64 } from "@/services/pdf-report-server";
 import { uploadBase64ToR2 } from "@/lib/r2";
 import { reconstructHiFi3D, isMeshyConfigured } from "@/services/meshy-service";
 import { submitDualWalkthrough } from "@/services/video-service";
+import {
+  logWorkflowStart, logRateLimit, logNodeStart, logNodeSuccess,
+  logNodeError, logValidationError, logInfo,
+} from "@/lib/workflow-logger";
 
 // Detect region/city from text for cost estimation
 function detectRegionFromText(text: string): string | null {
@@ -67,6 +71,18 @@ const REAL_NODE_IDS = new Set(["TR-001", "TR-003", "TR-004", "TR-005", "TR-012",
 // Nodes that require OpenAI API calls
 const OPENAI_NODES = new Set(["TR-003", "TR-004", "TR-005", "TR-012", "GN-003", "GN-004", "GN-008"]);
 
+// In-memory set of executionIds that have already been rate-limited this run.
+// This ensures we count rate limit once per workflow execution, not once per node.
+// Entries auto-expire after 10 minutes to prevent memory leaks.
+const rateLimitedExecutions = new Map<string, number>();
+
+function cleanupRateLimitCache() {
+  const tenMinutesAgo = Date.now() - 10 * 60 * 1000;
+  for (const [key, ts] of rateLimitedExecutions) {
+    if (ts < tenMinutesAgo) rateLimitedExecutions.delete(key);
+  }
+}
+
 export async function POST(req: NextRequest) {
   const session = await auth();
 
@@ -80,48 +96,81 @@ export async function POST(req: NextRequest) {
 
   const userId: string = session.user.id;
   const userRole = (session.user as { role?: string }).role as "FREE" | "PRO" | "TEAM_ADMIN" | "PLATFORM_ADMIN" || "FREE";
+  const userEmail = session.user.email || "";
 
-  // Apply rate limiting
-  try {
+  // Parse body first so we can read executionId for rate-limit deduplication
+  const { catalogueId, executionId, tileInstanceId, inputData, userApiKey } = await req.json();
+  const nodeStartTime = Date.now();
 
-    const userEmail = session.user.email || "";
-    const rateLimitResult = await checkRateLimit(userId, userRole, userEmail);
+  // ── Detailed file logging (dev only) ──
+  await logWorkflowStart(executionId, userId, userRole, userEmail);
+  await logNodeStart(executionId, catalogueId, tileInstanceId, inputData);
 
-    if (!rateLimitResult.success) {
-      const resetDate = new Date(rateLimitResult.reset);
-      const hoursUntilReset = Math.ceil((resetDate.getTime() - Date.now()) / (1000 * 60 * 60));
+  // Apply rate limiting — count once per workflow execution, not per node.
+  // The first node in a workflow run consumes the rate limit slot.
+  // Subsequent nodes in the same execution (same executionId) pass through.
+  const rateLimitKey = `${userId}:${executionId}`;
+  const alreadyCounted = executionId && rateLimitedExecutions.has(rateLimitKey);
 
-      // Log the rate limit hit
-      logRateLimitHit(userId, userRole, rateLimitResult.remaining);
+  if (!alreadyCounted) {
+    try {
+      // Cleanup stale entries periodically
+      if (rateLimitedExecutions.size > 500) cleanupRateLimitCache();
 
-      const rateLimitError = userRole === "FREE"
-        ? UserErrors.RATE_LIMIT_FREE(hoursUntilReset)
-        : UserErrors.RATE_LIMIT_PRO(Math.ceil(hoursUntilReset * 60));
+      const rateLimitResult = await checkRateLimit(userId, userRole, userEmail);
 
-      return NextResponse.json(
-        formatErrorResponse(rateLimitError),
-        { 
-          status: 429,
-          headers: {
-            "X-RateLimit-Limit": rateLimitResult.limit.toString(),
-            "X-RateLimit-Remaining": rateLimitResult.remaining.toString(),
-            "X-RateLimit-Reset": rateLimitResult.reset.toString(),
+      if (!rateLimitResult.success) {
+        const resetDate = new Date(rateLimitResult.reset);
+        const hoursUntilReset = Math.ceil((resetDate.getTime() - Date.now()) / (1000 * 60 * 60));
+
+        // Log the rate limit hit
+        logRateLimitHit(userId, userRole, rateLimitResult.remaining);
+        await logRateLimit(executionId, false, {
+          remaining: rateLimitResult.remaining, limit: rateLimitResult.limit,
+          reset: rateLimitResult.reset, userRole,
+        });
+
+        const rateLimitError = userRole === "FREE"
+          ? UserErrors.RATE_LIMIT_FREE(hoursUntilReset)
+          : UserErrors.RATE_LIMIT_PRO(Math.ceil(hoursUntilReset * 60));
+
+        return NextResponse.json(
+          formatErrorResponse(rateLimitError),
+          {
+            status: 429,
+            headers: {
+              "X-RateLimit-Limit": rateLimitResult.limit.toString(),
+              "X-RateLimit-Remaining": rateLimitResult.remaining.toString(),
+              "X-RateLimit-Reset": rateLimitResult.reset.toString(),
+            }
           }
-        }
+        );
+      }
+
+      await logRateLimit(executionId, true, {
+        remaining: rateLimitResult.remaining, limit: rateLimitResult.limit,
+        reset: rateLimitResult.reset, userRole,
+      });
+
+      // Mark this execution as rate-limited so subsequent nodes skip the check
+      if (executionId) {
+        rateLimitedExecutions.set(rateLimitKey, Date.now());
+      }
+
+    } catch (error) {
+      console.error("[execute-node] Rate limit check failed:", error);
+      await logNodeError(executionId, catalogueId, tileInstanceId, error, Date.now() - nodeStartTime);
+      return NextResponse.json(
+        formatErrorResponse({ title: "Service unavailable", message: "Rate limit service temporarily unavailable. Please try again in a moment.", code: "RATE_LIMIT_UNAVAILABLE" }),
+        { status: 503 }
       );
     }
-
-  } catch (error) {
-    console.error("[execute-node] Rate limit check failed:", error);
-    return NextResponse.json(
-      formatErrorResponse({ title: "Service unavailable", message: "Rate limit service temporarily unavailable. Please try again in a moment.", code: "RATE_LIMIT_UNAVAILABLE" }),
-      { status: 503 }
-    );
+  } else {
+    await logRateLimit(executionId, true, { skipped: true, userRole });
   }
 
-  const { catalogueId, executionId, tileInstanceId, inputData, userApiKey } = await req.json();
-
   if (!REAL_NODE_IDS.has(catalogueId)) {
+    await logValidationError(executionId, catalogueId, `Node ${catalogueId} not in REAL_NODE_IDS`);
     return NextResponse.json(
       formatErrorResponse(UserErrors.NODE_NOT_IMPLEMENTED(catalogueId)),
       { status: 400 }
@@ -1534,6 +1583,9 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
       );
     }
 
+    await logNodeSuccess(executionId, catalogueId, tileInstanceId, Date.now() - nodeStartTime, {
+      type: artifact.type, dataKeys: Object.keys(artifact.data ?? {}),
+    });
     return NextResponse.json({ artifact });
   } catch (err) {
     // Handle APIError (user-friendly errors)
@@ -1542,16 +1594,18 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
         code: err.userError.code,
         message: err.userError.message,
       });
+      await logNodeError(executionId, catalogueId, tileInstanceId, err, Date.now() - nodeStartTime);
       return NextResponse.json(
         formatErrorResponse(err.userError),
         { status: err.statusCode }
       );
     }
-    
+
     // Handle generic errors
     const message = err instanceof Error ? err.message : "Execution failed";
     console.error("[execute-node] " + catalogueId + ":", message, err);
-    
+    await logNodeError(executionId, catalogueId, tileInstanceId, err, Date.now() - nodeStartTime);
+
     return NextResponse.json(
       formatErrorResponse(UserErrors.INTERNAL_ERROR, message),
       { status: 500 }
