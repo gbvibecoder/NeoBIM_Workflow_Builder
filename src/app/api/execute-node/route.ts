@@ -83,6 +83,9 @@ function cleanupRateLimitCache() {
   }
 }
 
+// Allow up to 120s for heavy GPT-4o vision + 3D generation chains
+export const maxDuration = 120;
+
 export async function POST(req: NextRequest) {
   const session = await auth();
 

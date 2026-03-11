@@ -168,6 +168,62 @@ export async function executeNode(
         content: `IMAGE ANALYSIS — Design Intent Extraction\n\nDetected style: ${imgStyle}\nPredominant palette: White/cream render, natural timber, large glazing\nBuilding typology: ${imgBuildingType} (est. ${imgFloors} storeys)\nFacade character: Rhythmic fenestration, clean horizontal lines, minimal ornamentation\nGround floor: Active frontage with retail/cafe evident\nLandscape integration: Strong connection to street level\nAtmosphere: Calm, dignified, community-facing\n\nSuggested style prompts: "Nordic minimal architecture, white rendered facade, timber brise-soleil, human-scale streetscape, soft natural light"`,
         label: `Image Analysis: ${imgBuildingType}`,
         prompt: `${imgFloors}-storey ${imgBuildingType.toLowerCase()}, ${imgStyle.toLowerCase()}, rhythmic fenestration, active ground floor retail`,
+        isFloorPlan: true,
+        roomInfo: "Living Room (5.0m x 4.0m), Kitchen (3.5m x 3.0m), Bedroom 1 (4.0m x 3.5m), Bedroom 2 (3.5m x 3.0m), Bathroom (2.5m x 2.0m), Hallway (5.0m x 1.5m)",
+        layoutDescription: "Rectangular floor plan with central hallway. Living room and kitchen on the south side, bedrooms on the north, bathroom adjacent to hallway.",
+        richRooms: [
+          { name: "Living Room", dimensions: "5.0m x 4.0m", position: "south-west", connections: ["Kitchen", "Hallway"], doors: ["east wall to hallway"], windows: ["south wall", "west wall"], furniture: ["L-shaped sofa", "coffee table", "TV unit", "rug"] },
+          { name: "Kitchen", dimensions: "3.5m x 3.0m", position: "south-east", connections: ["Living Room", "Hallway"], doors: ["north wall to hallway"], windows: ["south wall"], furniture: ["kitchen island", "cabinets", "dining table for 4"] },
+          { name: "Bedroom 1", dimensions: "4.0m x 3.5m", position: "north-west", connections: ["Hallway"], doors: ["south wall to hallway"], windows: ["north wall", "west wall"], furniture: ["double bed", "wardrobe", "nightstand"] },
+          { name: "Bedroom 2", dimensions: "3.5m x 3.0m", position: "north-east", connections: ["Hallway"], doors: ["south wall to hallway"], windows: ["north wall"], furniture: ["single bed", "desk", "bookshelf"] },
+          { name: "Bathroom", dimensions: "2.5m x 2.0m", position: "center-east", connections: ["Hallway"], doors: ["west wall to hallway"], windows: ["east wall"], furniture: ["bathtub", "sink", "toilet"] },
+          { name: "Hallway", dimensions: "5.0m x 1.5m", position: "center", connections: ["Living Room", "Kitchen", "Bedroom 1", "Bedroom 2", "Bathroom"], doors: ["all rooms"], windows: [], furniture: ["shoe rack", "coat hooks"] },
+        ],
+        footprint: { shape: "Rectangular", width: "12", depth: "8" },
+        circulation: "Central east-west hallway connects all rooms. Living areas to the south, private rooms to the north.",
+        geometry: {
+          footprint: { width: 12, depth: 8 },
+          wallHeight: 3.0,
+          walls: [
+            { start: [0, 0], end: [12, 0], thickness: 0.2, type: "exterior" },
+            { start: [12, 0], end: [12, 8], thickness: 0.2, type: "exterior" },
+            { start: [12, 8], end: [0, 8], thickness: 0.2, type: "exterior" },
+            { start: [0, 8], end: [0, 0], thickness: 0.2, type: "exterior" },
+            { start: [0, 4.0], end: [5.0, 4.0], thickness: 0.15, type: "interior" },
+            { start: [5.0, 0], end: [5.0, 4.0], thickness: 0.15, type: "interior" },
+            { start: [5.0, 4.0], end: [5.0, 5.5], thickness: 0.15, type: "interior" },
+            { start: [5.0, 5.5], end: [12, 5.5], thickness: 0.15, type: "interior" },
+            { start: [5.0, 5.5], end: [0, 5.5], thickness: 0.15, type: "interior" },
+            { start: [8.5, 0], end: [8.5, 4.0], thickness: 0.15, type: "interior" },
+            { start: [8.5, 4.0], end: [12, 4.0], thickness: 0.15, type: "interior" },
+          ],
+          doors: [
+            { position: [2.5, 4.0], width: 0.9, wallId: 4, type: "single" },
+            { position: [5.0, 2.0], width: 0.9, wallId: 5, type: "single" },
+            { position: [5.0, 5.0], width: 0.9, wallId: 6, type: "single" },
+            { position: [7.0, 5.5], width: 0.9, wallId: 7, type: "single" },
+            { position: [3.0, 5.5], width: 0.9, wallId: 8, type: "single" },
+            { position: [8.5, 2.0], width: 0.9, wallId: 9, type: "single" },
+          ],
+          windows: [
+            { position: [2.5, 0], width: 1.5, height: 1.2, sillHeight: 0.9 },
+            { position: [7.0, 0], width: 1.5, height: 1.2, sillHeight: 0.9 },
+            { position: [10.5, 0], width: 1.2, height: 1.2, sillHeight: 0.9 },
+            { position: [0, 2.0], width: 1.5, height: 1.2, sillHeight: 0.9 },
+            { position: [0, 7.0], width: 1.5, height: 1.2, sillHeight: 0.9 },
+            { position: [12, 2.0], width: 1.0, height: 1.0, sillHeight: 1.0 },
+            { position: [6.0, 8], width: 1.5, height: 1.2, sillHeight: 0.9 },
+            { position: [10.0, 8], width: 1.5, height: 1.2, sillHeight: 0.9 },
+          ],
+          rooms: [
+            { name: "Living Room", center: [2.5, 6.75], width: 5.0, depth: 4.0, type: "living" },
+            { name: "Kitchen", center: [8.5, 6.75], width: 3.5, depth: 3.0, type: "kitchen" },
+            { name: "Bedroom 1", center: [2.5, 2.0], width: 4.0, depth: 3.5, type: "bedroom" },
+            { name: "Bedroom 2", center: [10.25, 2.0], width: 3.5, depth: 3.0, type: "bedroom" },
+            { name: "Bathroom", center: [10.25, 4.75], width: 2.5, depth: 2.0, type: "bathroom" },
+            { name: "Hallway", center: [6.5, 4.75], width: 5.0, depth: 1.5, type: "hallway" },
+          ],
+        },
         _raw: {
           buildingType: imgBuildingType,
           floors: imgFloors,
@@ -176,6 +232,7 @@ export async function executeNode(
           facade: "Rhythmic fenestration, clean horizontal lines, minimal ornamentation",
           massing: `${imgFloors}-storey ${imgBuildingType.toLowerCase()} with rectangular footprint`,
           description: `${imgFloors}-storey ${imgBuildingType.toLowerCase()} with ${imgStyle.toLowerCase()} aesthetic`,
+          isFloorPlan: true,
         },
       });
     }
@@ -667,6 +724,28 @@ export async function executeNode(
           topology: "quad",
           polycount: 30000,
         },
+      });
+    }
+
+    case "GN-011": { // Interactive 3D Viewer — mock
+      // Build from geometry data if available (e.g. from TR-004 mock with geometry)
+      const geoData = inputData?.geometry ?? (inputData?._raw as Record<string, unknown> | undefined)?.geometry;
+      const rooms011 = inputData?.richRooms ?? inputData?.rooms ?? [];
+      const fp011 = inputData?.footprint as Record<string, unknown> | undefined;
+      const mockRoomCount = Array.isArray(rooms011) ? rooms011.length : 6;
+      const mockHtml = `<!DOCTYPE html><html><head><title>3D Floor Plan Viewer (Mock)</title><style>body{margin:0;background:#07070D;color:#fff;font-family:system-ui;display:flex;align-items:center;justify-content:center;height:100vh;flex-direction:column}h2{color:#4F8AFF}p{color:#888;max-width:400px;text-align:center}</style></head><body><h2>Interactive 3D Viewer</h2><p>Mock mode — ${mockRoomCount} rooms detected. Connect to a real TR-004 node with a floor plan image to see the full interactive 3D model with walk mode, room highlighting, and furniture.</p><p style="color:#4F8AFF;margin-top:2rem">Rooms: ${Array.isArray(rooms011) ? rooms011.map((r: Record<string, unknown>) => r.name).join(", ") : "Living Room, Kitchen, Bedroom 1, Bedroom 2, Bathroom, Hallway"}</p></body></html>`;
+
+      return mockArtifact(executionId, tileInstanceId, "file", {
+        content: mockHtml,
+        url: "",
+        downloadUrl: "",
+        fileName: `floorplan-3d-mock-${Date.now()}.html`,
+        label: `Interactive 3D Floor Plan (Mock — ${mockRoomCount} rooms)`,
+        mimeType: "text/html",
+        viewerType: "html-iframe",
+        roomCount: mockRoomCount,
+        hasGeometry: !!geoData,
+        footprint: fp011 ? `${fp011.width ?? 12}m x ${fp011.depth ?? 8}m` : "12m x 8m",
       });
     }
 

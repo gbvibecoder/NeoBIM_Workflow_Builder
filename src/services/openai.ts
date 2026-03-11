@@ -784,12 +784,13 @@ export async function analyzeImage(
 
     const checkContent = quickCheck.choices[0]?.message?.content;
     const isFloorPlan = checkContent ? (JSON.parse(checkContent) as { isFloorPlan?: boolean }).isFloorPlan === true : false;
+    console.log(`[analyzeImage] Phase 1 done — isFloorPlan: ${isFloorPlan}, using model: ${isFloorPlan ? "gpt-4o" : "gpt-4o-mini"}`);
 
     // ── Phase 2: Deep analysis ──
     // Floor plans get GPT-4o for rich room-by-room extraction + render prompts.
     // Non-floor-plans use GPT-4o-mini (cheaper, sufficient for building photos).
     const model = isFloorPlan ? "gpt-4o" : "gpt-4o-mini";
-    const maxTokens = isFloorPlan ? 3000 : 1500;
+    const maxTokens = isFloorPlan ? 4500 : 1500;
 
     const systemPrompt = isFloorPlan
       ? `You are an expert architectural analyst. Analyze this 2D floor plan image and extract a detailed room-by-room description.
@@ -882,6 +883,9 @@ CRITICAL RULES:
 
 Be specific about dimensions, proportions, materials, and spatial relationships. If the image is not architectural, set buildingType to "Not Architectural" and describe what you see.`;
 
+    // Floor plan analysis with GPT-4o needs more time (geometry extraction is heavy)
+    const requestTimeout = isFloorPlan ? 90000 : 30000;
+
     const completion = await client.chat.completions.create({
       model,
       response_format: { type: "json_object" },
@@ -890,18 +894,18 @@ Be specific about dimensions, proportions, materials, and spatial relationships.
         {
           role: "user",
           content: [
-            { type: "image_url", image_url: { url: imageDataUrl } },
+            { type: "image_url", image_url: { url: imageDataUrl, detail: isFloorPlan ? "high" : "auto" } },
             {
               type: "text",
               text: isFloorPlan
-                ? "Analyze this floor plan. Extract every room, generate exterior and interior render prompts."
+                ? "Analyze this floor plan. Extract every room, generate exterior and interior render prompts, and extract precise wall/door/window geometry coordinates."
                 : "Analyze this image in architectural terms. Describe the building, its style, materials, and spatial qualities.",
             },
           ],
         },
       ],
       max_tokens: maxTokens,
-    });
+    }, { timeout: requestTimeout });
 
     const content = completion.choices[0]?.message?.content;
     if (!content) throw new Error("OpenAI returned empty response for image analysis");
