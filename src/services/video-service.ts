@@ -21,7 +21,7 @@ import { generateId } from "@/lib/utils";
 
 const KLING_BASE_URL = "https://api.klingai.com";
 const KLING_IMAGE2VIDEO_PATH = "/v1/videos/image2video";
-const KLING_OMNI_PATH = "/v1/videos/omni";
+const KLING_OMNI_PATH = "/v1/videos/omni-video";
 const COST_PER_SECOND = 0.10;
 const REQUEST_TIMEOUT_MS = 600_000; // 10 minutes
 const POLL_INTERVAL_MS = 8_000;     // 8 seconds between status checks
@@ -970,10 +970,14 @@ export async function submitSingleWalkthrough(
 // ─── Kling 3.0 Omni Endpoint ────────────────────────────────────────────────
 
 /**
- * Create a task via the Kling 3.0 Omni endpoint (/v1/videos/omni).
- * Omni uses `omni_version` instead of `model_name`, `image_1` instead of `image`,
- * and references images in the prompt via `@image_1`.
- * Supports flexible 3-15s duration.
+ * Create a task via the Kling 3.0 Omni endpoint (POST /v1/videos/omni-video).
+ *
+ * Key differences from /v1/videos/image2video:
+ *   - model_name: "kling-v3-omni"
+ *   - Image via `image_list: [{ image_url }]` (not a single `image` field)
+ *   - Prompt references images with `@image_1`
+ *   - Duration: "5"–"15" (flexible, not just 5 or 10)
+ *   - Same JWT auth
  */
 async function createOmniTask(
   imageUrl: string,
@@ -985,28 +989,35 @@ async function createOmniTask(
 ): Promise<KlingTaskResponse> {
   console.log("========== createOmniTask START ==========");
   console.log("[OMNI] Trying Kling 3.0 via", KLING_OMNI_PATH);
+  console.log("[OMNI] model_name: kling-v3-omni");
   console.log("[OMNI] duration:", duration, "mode:", mode, "aspect:", aspectRatio);
 
   const body = {
-    omni_version: "v3",
-    image_1: imageUrl,
+    model_name: "kling-v3-omni",
     prompt: `${prompt.slice(0, 2450)} @image_1`,
     negative_prompt: negativePrompt.slice(0, 2500),
+    image_list: [
+      { image_url: imageUrl },
+    ],
     aspect_ratio: aspectRatio,
     mode,
     duration,
+    callback_url: "",
+    external_task_id: "",
   };
 
   console.log("[OMNI] Request body (image truncated):", JSON.stringify({
     ...body,
-    image_1: body.image_1?.length > 100
-      ? body.image_1.slice(0, 50) + "...[truncated, total=" + body.image_1.length + "]"
-      : body.image_1,
+    image_list: body.image_list.map(img => ({
+      image_url: img.image_url?.length > 100
+        ? img.image_url.slice(0, 50) + "...[truncated, total=" + img.image_url.length + "]"
+        : img.image_url,
+    })),
   }));
 
   const result = await klingFetch(KLING_OMNI_PATH, { method: "POST", body });
 
-  console.error("[KLING-MODEL] SUCCESS: omni-v3 (Kling 3.0 Omni)", "duration:", duration, "mode:", mode);
+  console.error("[KLING-MODEL] SUCCESS: kling-v3-omni (Kling 3.0 Omni)", "duration:", duration, "mode:", mode);
   console.log("[OMNI] Task created! taskId:", result.data.task_id);
   console.log("========== createOmniTask END ==========");
   return result;
