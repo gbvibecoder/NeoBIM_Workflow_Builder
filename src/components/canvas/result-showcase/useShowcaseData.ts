@@ -65,7 +65,16 @@ export interface GlbModelData {
   topology?: string;
 }
 
-export type Model3DData = ProceduralModelData | GlbModelData;
+export interface HtmlIframeModelData {
+  kind: "html-iframe";
+  url: string;
+  content: string;
+  label: string;
+  roomCount?: number;
+  wallCount?: number;
+}
+
+export type Model3DData = ProceduralModelData | GlbModelData | HtmlIframeModelData;
 
 export interface PipelineStep {
   nodeId: string;
@@ -263,15 +272,30 @@ export function useShowcaseData(): ShowcaseData {
       }
     }
 
+    // ── HTML Iframe Viewers (GN-011 Interactive 3D Viewer) ──
+    const fileArtifactsAll = findAllByType(artifacts, "file");
+    const htmlIframeArtifact = fileArtifactsAll.find(a => asRecord(a.data)?.viewerType === "html-iframe");
+    if (!model3dData && htmlIframeArtifact) {
+      const d = asRecord(htmlIframeArtifact.data);
+      model3dData = {
+        kind: "html-iframe",
+        url: (d.url as string) ?? "",
+        content: (d.content as string) ?? "",
+        label: (d.label as string) ?? "Interactive 3D Viewer",
+        roomCount: d.roomCount as number | undefined,
+        wallCount: d.wallCount as number | undefined,
+      };
+    }
+
     // ── Files ──
-    const fileArtifacts = findAllByType(artifacts, "file");
+    const fileArtifacts = fileArtifactsAll;
     const fileDownloads: FileDownload[] = fileArtifacts.map(a => {
       const d = asRecord(a.data);
       return {
-        name: (d.name as string) ?? "file",
+        name: (d.fileName as string) ?? (d.name as string) ?? "file",
         type: (d.type as string) ?? "",
         size: (d.size as number) ?? 0,
-        downloadUrl: d.downloadUrl as string | undefined,
+        downloadUrl: (d.downloadUrl as string) ?? (d.url as string) ?? undefined,
       };
     });
 

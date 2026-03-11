@@ -226,10 +226,13 @@ export function OverviewTab({ data, onExpandVideo, onNavigateTab, onRetryVideo }
           gap: 10,
         }}>
           {artifactBreakdown.map((item, i) => {
-            const color = ARTIFACT_COLORS[item.type] ?? COLORS.TEXT_MUTED;
-            const icon = ARTIFACT_ICONS[item.type] ?? <File size={16} />;
-            const labelKey = ARTIFACT_LABEL_KEYS[item.type];
-            const typeLabel = labelKey ? t(labelKey) : item.type;
+            // Check if this is an interactive 3D viewer (html-iframe file)
+            const isInteractive3D = item.type === "file" && data.model3dData?.kind === "html-iframe" &&
+              item.label.toLowerCase().includes("3d");
+
+            const color = isInteractive3D ? "#00F5FF" : (ARTIFACT_COLORS[item.type] ?? COLORS.TEXT_MUTED);
+            const icon = isInteractive3D ? <Box size={16} /> : (ARTIFACT_ICONS[item.type] ?? <File size={16} />);
+            const typeLabel = isInteractive3D ? "3D Model" : (ARTIFACT_LABEL_KEYS[item.type] ? t(ARTIFACT_LABEL_KEYS[item.type]) : item.type);
 
             // Map artifact types to their corresponding tabs
             const tabMapping: Record<string, TabId> = {
@@ -243,7 +246,7 @@ export function OverviewTab({ data, onExpandVideo, onNavigateTab, onRetryVideo }
               "3d": "model",
               file: "export",
             };
-            const targetTab = tabMapping[item.type] ?? "export";
+            const targetTab = isInteractive3D ? "model" as TabId : (tabMapping[item.type] ?? "export");
 
             return (
               <motion.button
@@ -480,8 +483,8 @@ export function OverviewTab({ data, onExpandVideo, onNavigateTab, onRetryVideo }
             {data.model3dData && (
               <QuickActionButton
                 icon={<Box size={14} />}
-                label={t('showcase.view3dModel')}
-                description={t('showcase.interactiveMassing')}
+                label={data.model3dData.kind === "html-iframe" ? "Explore 3D Model" : t('showcase.view3dModel')}
+                description={data.model3dData.kind === "html-iframe" ? "Interactive walkthrough with WASD controls" : t('showcase.interactiveMassing')}
                 color={COLORS.CYAN}
                 onClick={() => onNavigateTab("model")}
               />
@@ -731,6 +734,8 @@ function deriveTechStack(data: ShowcaseData): TechItem[] {
     if (step.label.includes("Video") || step.label.includes("Walkthrough")) add(klingModelName, "Video synthesis", COLORS.CYAN, klingBadge);
     if (step.label.includes("3D Recon")) add("Meshy v4", "3D reconstruction", COLORS.AMBER);
     if (step.label.includes("Floor Plan Gen")) add("GPT-4o + SVG", "Plan generation", "#14B8A6");
+    if (step.label.includes("Interactive 3D") || step.label.includes("3D Viewer")) add("Three.js r128", "3D visualization", COLORS.CYAN);
+    if (step.label.includes("Floor Plan Anal")) add("GPT-4o", "Vision analysis", "#8B5CF6");
     if (step.label.includes("Quantity") || step.label.includes("BOQ")) add("web-ifc Parser", "BIM extraction", "#F59E0B");
   });
 

@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import dynamic from "next/dynamic";
 import { useLocale } from "@/hooks/useLocale";
 import { COLORS } from "../constants";
-import type { ShowcaseData, ProceduralModelData, GlbModelData } from "../useShowcaseData";
+import type { ShowcaseData, ProceduralModelData, GlbModelData, HtmlIframeModelData } from "../useShowcaseData";
 
 const ArchitecturalViewer = dynamic(
   () => import("../../artifacts/architectural-viewer/ArchitecturalViewer"),
@@ -48,6 +48,9 @@ export function ModelTab({ data }: ModelTabProps) {
         )}
         {model?.kind === "glb" && (
           <GlbViewer model={model} />
+        )}
+        {model?.kind === "html-iframe" && (
+          <HtmlIframeViewer model={model} />
         )}
         {!model && data.svgContent && (
           <div style={{
@@ -107,6 +110,17 @@ export function ModelTab({ data }: ModelTabProps) {
               ...(model.polycount ? [{ label: t('showcase.specPolycount'), value: model.polycount.toLocaleString() }] : []),
               ...(model.topology ? [{ label: t('showcase.specTopology'), value: model.topology }] : []),
               { label: t('showcase.specRenderer'), value: t('showcase.threejs') },
+            ]} />
+          )}
+
+          {model.kind === "html-iframe" && (
+            <SpecGrid specs={[
+              { label: "Format", value: "Interactive HTML" },
+              ...(model.roomCount ? [{ label: "Rooms", value: String(model.roomCount) }] : []),
+              ...(model.wallCount ? [{ label: "Walls", value: String(model.wallCount) }] : []),
+              { label: "Renderer", value: "Three.js r128" },
+              { label: "Controls", value: "Orbit + Walk" },
+              { label: "Features", value: "WASD, hover, labels" },
             ]} />
           )}
         </motion.div>
@@ -170,6 +184,58 @@ function GlbViewer({ model }: { model: GlbModelData }) {
         glbUrl={model.glbUrl}
         height={typeof window !== "undefined" ? window.innerHeight - 180 : 600}
       />
+    </div>
+  );
+}
+
+function HtmlIframeViewer({ model }: { model: HtmlIframeModelData }) {
+  // Prefer URL if available (R2-uploaded), otherwise use inline content via srcdoc
+  const hasUrl = model.url && model.url.startsWith("http");
+
+  return (
+    <div style={{ width: "100%", height: "100%", position: "relative", borderRadius: 12, overflow: "hidden" }}>
+      {hasUrl ? (
+        <iframe
+          src={model.url}
+          title={model.label}
+          style={{
+            width: "100%",
+            height: "100%",
+            border: "none",
+            borderRadius: 12,
+            background: "#07070D",
+          }}
+          allow="fullscreen"
+          sandbox="allow-scripts allow-same-origin"
+        />
+      ) : model.content ? (
+        <iframe
+          srcDoc={model.content}
+          title={model.label}
+          style={{
+            width: "100%",
+            height: "100%",
+            border: "none",
+            borderRadius: 12,
+            background: "#07070D",
+          }}
+          allow="fullscreen"
+          sandbox="allow-scripts allow-same-origin"
+        />
+      ) : (
+        <div style={{
+          width: "100%",
+          height: "100%",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          background: "#07070D",
+          color: COLORS.TEXT_MUTED,
+          fontSize: 13,
+        }}>
+          No 3D viewer content available
+        </div>
+      )}
     </div>
   );
 }
