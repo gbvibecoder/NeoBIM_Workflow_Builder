@@ -1034,23 +1034,22 @@ export async function submitFloorPlanWalkthrough(
 ): Promise<SubmittedSingleVideoTask & { usedOmni: boolean; durationSeconds: number }> {
   const negativePrompt = "blur, distortion, low quality, warped geometry, melting walls, deformed architecture, shaky camera, noise, artifacts, morphing surfaces, bent lines, wobbly structure, jittery motion, flickering textures, plastic appearance, fisheye distortion, floating objects, wireframe, cartoon, sketch, watermark";
 
-  // ── Attempt 1: Kling 3.0 Omni (better quality, 12s flexible duration) ──
-  try {
-    console.log("[GN-009] ═══ Trying Kling 3.0 Omni endpoint FIRST ═══");
-    const result = await createOmniTask(imageUrl, prompt, negativePrompt, "12", "16:9", mode);
-    console.log("[GN-009] Kling 3.0 Omni succeeded! taskId:", result.data.task_id);
-    return { taskId: result.data.task_id, submittedAt: Date.now(), usedOmni: true, durationSeconds: 12 };
-  } catch (err) {
-    const msg = (err as Error).message;
-    console.error("[KLING-MODEL] FAILED: omni-v3 (Kling 3.0)", "error:", msg.slice(0, 200));
-    console.warn("[GN-009] Kling 3.0 Omni unavailable — falling back to v2.6 standard endpoint");
-  }
+  // ── Omni attempt DISABLED — test separately via src/scripts/test-omni.ts ──
+  // TODO: Re-enable once Omni endpoint is confirmed working
+  // try {
+  //   console.log("[GN-009] ═══ Trying Kling 3.0 Omni endpoint FIRST ═══");
+  //   const result = await createOmniTask(imageUrl, prompt, negativePrompt, "12", "16:9", mode);
+  //   console.log("[GN-009] Kling 3.0 Omni succeeded! taskId:", result.data.task_id);
+  //   return { taskId: result.data.task_id, submittedAt: Date.now(), usedOmni: true, durationSeconds: 12 };
+  // } catch (err) {
+  //   const msg = (err as Error).message;
+  //   console.error("[KLING-MODEL] FAILED: omni-v3 (Kling 3.0)", "error:", msg.slice(0, 200));
+  //   console.warn("[GN-009] Kling 3.0 Omni unavailable — falling back to v2.6 standard endpoint");
+  // }
+  // await new Promise(r => setTimeout(r, 2000));
 
-  // ── Rate-limit guard: wait 2s before hitting the same API again ──
-  await new Promise(r => setTimeout(r, 2000));
-
-  // ── Attempt 2: Fallback to v2.6 on /v1/videos/image2video (10s) ──
-  console.log("[GN-009] ═══ Fallback: v2.6 via /v1/videos/image2video ═══");
+  // ── Direct to v2.6 on /v1/videos/image2video (10s) ──
+  console.log("[GN-009] ═══ Using v2.6 via /v1/videos/image2video ═══");
   const result = await createTask(imageUrl, prompt, negativePrompt, "10", "16:9", mode);
   console.log("[GN-009] v2.6 fallback succeeded! taskId:", result.data.task_id);
   return { taskId: result.data.task_id, submittedAt: Date.now(), usedOmni: false, durationSeconds: 10 };
