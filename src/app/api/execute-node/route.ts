@@ -1548,8 +1548,11 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
       // ── Priority 1: Direct image upload from IN-003 (original user file) ──
       // FIX F: Send base64 directly to Kling API — no temp-image URL needed.
       // Kling's image field accepts both URLs and base64 encoded strings.
-      if (inputData?.fileData && typeof inputData.fileData === "string") {
-        const imgMime = (inputData.mimeType as string) ?? "image/jpeg";
+      // Skip non-image files (PDFs, docs) — they should use text2video path instead.
+      const inputMimeType = (inputData?.mimeType as string) ?? "";
+      const isImageFile = inputMimeType.startsWith("image/") || !inputMimeType;
+      if (inputData?.fileData && typeof inputData.fileData === "string" && isImageFile) {
+        const imgMime = inputMimeType || "image/jpeg";
         const raw = inputData.fileData as string;
         const cleanBase64 = raw.startsWith("data:") ? raw.split(",")[1] ?? raw : raw;
 

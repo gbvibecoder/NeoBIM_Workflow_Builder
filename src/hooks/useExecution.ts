@@ -901,11 +901,13 @@ export function useExecution({ onLog }: UseExecutionOptions = {}) {
           if (!upData.fileData && !upData.url && !upData.imageUrl) {
             for (const [, art] of artifactMap) {
               const d = art.data as Record<string, unknown>;
-              if (d?.fileData && typeof d.fileData === "string") {
+              const artMime = (d?.mimeType as string) ?? "";
+              // Only inject actual image files — skip PDFs/docs (they use text2video path)
+              if (d?.fileData && typeof d.fileData === "string" && artMime.startsWith("image/")) {
                 upData.fileData = d.fileData;
                 if (d.mimeType) upData.mimeType = d.mimeType;
                 if (d.fileName) upData.fileName = d.fileName;
-                console.log("[Execution] Injected fileData into GN-009 from upstream input node");
+                console.log("[Execution] Injected image fileData into GN-009 (mime:", artMime, ")");
                 break;
               }
               if (d?.imageUrl && typeof d.imageUrl === "string") {
