@@ -1546,31 +1546,49 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
       console.log("[KLING] Step 1: url present:", !!(inputData?.url), "imageUrl present:", !!(inputData?.imageUrl), "svg present:", !!(inputData?.svg));
 
       // ── Priority 1: Direct image upload from IN-003 (original user file) ──
-      // Send base64 with data URI prefix directly to Kling API.
-      // Kling accepts "Base64 encoding or URL" — URL approach failed
-      // ("Something went wrong when we tried to get the contents of the file"),
-      // so we use base64 data URI format instead.
+      // FIX F: Send base64 directly to Kling API — no temp-image URL needed.
+      // Kling's image field accepts both URLs and base64 encoded strings.
       if (inputData?.fileData && typeof inputData.fileData === "string") {
         const imgMime = (inputData.mimeType as string) ?? "image/jpeg";
-        const rawFileData = inputData.fileData as string;
+        const raw = inputData.fileData as string;
+        const cleanBase64 = raw.startsWith("data:") ? raw.split(",")[1] ?? raw : raw;
 
-        // Strip any existing data URI prefix to get raw base64
-        const cleanBase64 = rawFileData.startsWith("data:") ? rawFileData.split(",")[1] ?? rawFileData : rawFileData;
+        console.log("[KLING] Step 2: Clean base64 length:", cleanBase64.length, "mime:", imgMime);
 
-        // Re-add a clean data URI prefix — Kling expects this format for base64
-        const mimeForPrefix = imgMime.includes("png") ? "image/png" : "image/jpeg";
-        renderImageUrl = `data:${mimeForPrefix};base64,${cleanBase64}`;
+        // Strategy: R2 URL (if configured) → raw base64 directly to Kling
+        // Try R2 first (if configured) — a URL is fastest for Kling
+        try {
+          const { uploadToR2, isR2Configured } = await import("@/lib/r2");
+          if (isR2Configured()) {
+            console.log("[KLING] Step 2a: R2 is configured, uploading...");
+            const ext = imgMime.includes("png") ? "png" : "jpg";
+            const imgBuffer = Buffer.from(cleanBase64, "base64");
+            const uploadResult = await uploadToR2(imgBuffer, `floorplan-upload-${generateId()}.${ext}`, imgMime);
+            if (uploadResult.success) {
+              renderImageUrl = uploadResult.url;
+              console.log("[KLING] Step 2a: R2 upload succeeded:", renderImageUrl);
+            }
+          } else {
+            console.log("[KLING] Step 2a: R2 not configured, skipping");
+          }
+        } catch (r2Err) {
+          console.warn("[KLING] Step 2a: R2 upload failed:", r2Err);
+        }
 
-        console.log("[GN-009] Sending image as data URI, length:", renderImageUrl.length);
-        console.log("[GN-009] Image starts with:", renderImageUrl.slice(0, 40));
+        // FIX F: Send raw base64 directly to Kling (skip temp-image entirely)
+        if (!renderImageUrl) {
+          console.log("[KLING] Step 2b: Sending base64 DIRECTLY to Kling (Fix F — no temp-image URL)");
+          renderImageUrl = cleanBase64;
+          console.log("[KLING] Step 2b: Using raw base64, length:", cleanBase64.length);
+        }
 
         isFloorPlanInput = true;
       }
 
       // ── Priority 2: Floor plan SVG from GN-004 ──
-      // Convert SVG→PNG, then send as base64 data URI directly to Kling.
+      // FIX F: Convert SVG→PNG, then send base64 directly to Kling.
       if (!renderImageUrl && inputData?.svg && typeof inputData.svg === "string") {
-        console.log("[GN-009] SVG detected, converting to PNG for Kling...");
+        console.log("[KLING] Step 2 (SVG): Floor plan SVG detected, converting to PNG...");
         try {
           const sharp = (await import("sharp")).default;
           const pngBuffer = await sharp(Buffer.from(inputData.svg))
@@ -1578,15 +1596,27 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
             .png({ quality: 90 })
             .toBuffer();
 
-          const pngBase64 = pngBuffer.toString("base64");
-          renderImageUrl = `data:image/png;base64,${pngBase64}`;
+          // Try R2 first (if configured)
+          const { uploadToR2, isR2Configured } = await import("@/lib/r2");
+          if (isR2Configured()) {
+            const uploadResult = await uploadToR2(pngBuffer, `floorplan-${generateId()}.png`, "image/png");
+            if (uploadResult.success) {
+              renderImageUrl = uploadResult.url;
+              console.log("[KLING] Step 2 (SVG): R2 upload:", renderImageUrl);
+            } else {
+              console.warn("[KLING] Step 2 (SVG): R2 upload failed:", uploadResult.error);
+            }
+          }
 
-          console.log("[GN-009] Sending image as data URI, length:", renderImageUrl.length);
-          console.log("[GN-009] Image starts with:", renderImageUrl.slice(0, 40));
-
+          // FIX F: Send PNG base64 directly to Kling (skip temp-image)
+          if (!renderImageUrl) {
+            console.log("[KLING] Step 2 (SVG): Sending PNG base64 DIRECTLY to Kling (Fix F)");
+            renderImageUrl = pngBuffer.toString("base64");
+            console.log("[KLING] Step 2 (SVG): Using raw base64, length:", renderImageUrl.length);
+          }
           isFloorPlanInput = true;
         } catch (svgErr) {
-          console.warn("[GN-009] SVG->PNG conversion failed:", svgErr);
+          console.warn("[KLING] Step 2 (SVG): SVG→PNG conversion failed:", svgErr);
         }
 
         // Extract room info for richer prompts
