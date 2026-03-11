@@ -247,6 +247,9 @@ async function persistVideoToR2(
 const VIDEO_POLL_INTERVAL_MS = 6_000; // Poll every 6 seconds
 const VIDEO_POLL_TIMEOUT_MS = 600_000; // 10 minute timeout
 
+/** Track which task IDs were created via the Omni endpoint — bypasses artifact data serialization */
+const omniTaskIds = new Set<string>();
+
 /** Poll /api/video-status for a SINGLE video task (floor plans) */
 async function pollSingleVideoGeneration(
   nodeId: string,
@@ -269,8 +272,10 @@ async function pollSingleVideoGeneration(
     await new Promise(r => setTimeout(r, VIDEO_POLL_INTERVAL_MS));
 
     try {
-      console.log("[POLL] Checking single video status...", useOmniPolling ? "(Omni v3)" : "(v2.x)");
-      const res = await fetch(`/api/video-status?taskId=${encodeURIComponent(taskId)}${useOmniPolling ? "&omni=true" : ""}`);
+      // Check both the explicit param AND the module-level Set
+      const isOmni = useOmniPolling || omniTaskIds.has(taskId);
+      console.log("[POLL] Checking single video status — omniParam:", useOmniPolling, "inSet:", omniTaskIds.has(taskId), "final:", isOmni);
+      const res = await fetch(`/api/video-status?taskId=${encodeURIComponent(taskId)}&omni=${isOmni}`);
 
       if (!res.ok) {
         console.error("[POLL] HTTP error:", res.status);
@@ -961,11 +966,14 @@ export function useExecution({ onLog }: UseExecutionOptions = {}) {
               duration: 5000,
             });
 
-            const omniFlag = artData.usedOmni === true;
-            console.log("[POLL] Starting single video poll — usedOmni:", artData.usedOmni, "omniFlag:", omniFlag);
+            // Register Omni tasks in module-level Set (survives any serialization issues)
+            const taskIdStr = artData.taskId as string;
+            const omniFlag = !!(artData.usedOmni);
+            if (omniFlag) omniTaskIds.add(taskIdStr);
+            console.error("[POLL] Starting single video poll — taskId:", taskIdStr, "usedOmni:", artData.usedOmni, "omniFlag:", omniFlag, "inSet:", omniTaskIds.has(taskIdStr));
             pollSingleVideoGeneration(
               node.id,
-              artData.taskId as string,
+              taskIdStr,
               addArtifact,
               setVideoGenProgress,
               clearVideoGenProgress,

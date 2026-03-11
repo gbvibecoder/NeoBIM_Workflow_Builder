@@ -60,3 +60,9 @@
 {"id":"e24282e6-6631-4d65-aafb-864e4727abf6","timestamp":"2026-03-11T08:32:33.123Z","userId":"cmmav32p2000004jmbi8nukwf","eventName":"node_used","properties":{"catalogueId":"TR-004","nodeLabel":"Image Understanding"}}
 {"id":"9b63b118-f990-4d52-87e6-1041a3e6b8ca","timestamp":"2026-03-11T08:32:37.814Z","userId":"cmmav32p2000004jmbi8nukwf","eventName":"node_used","properties":{"catalogueId":"GN-009","nodeLabel":"Video Walkthrough Generator"}}
 {"id":"fc969a6a-5791-46cc-8420-00906bab36b7","timestamp":"2026-03-11T08:32:37.814Z","userId":"cmmav32p2000004jmbi8nukwf","eventName":"workflow_executed","properties":{"nodeCount":3,"catalogueIds":["IN-003","TR-004","GN-009"]}}
+{"id":"40e90ad5-330f-4882-9845-a46d358e127c","timestamp":"2026-03-11T08:44:55.797Z","userId":"cmmav32p2000004jmbi8nukwf","eventName":"workflow_created","properties":{"workflowId":"cmmlsmkhy0000czl8up9au3oq"}}
+{"id":"8e5fea38-64ad-477a-ad79-4ae1a9e19f4e","timestamp":"2026-03-11T08:45:01.698Z","userId":"cmmav32p2000004jmbi8nukwf","eventName":"execution_started","properties":{"executionId":"cmmlsmqhn0001czl8sit7qf8d"}}
+{"id":"c51ba906-31d0-4a6b-be19-bcdf8badcf11","timestamp":"2026-03-11T08:45:03.430Z","userId":"cmmav32p2000004jmbi8nukwf","eventName":"node_used","properties":{"catalogueId":"IN-003","nodeLabel":"Image Upload"}}
+{"id":"0af8a8c9-ef89-41c7-aa71-e1674a2aa2c8","timestamp":"2026-03-11T08:45:14.727Z","userId":"cmmav32p2000004jmbi8nukwf","eventName":"node_used","properties":{"catalogueId":"TR-004","nodeLabel":"Image Understanding"}}
+{"id":"98af1009-56ee-4854-8446-f9c8473e9b95","timestamp":"2026-03-11T08:45:16.001Z","userId":"cmmav32p2000004jmbi8nukwf","eventName":"node_used","properties":{"catalogueId":"GN-009","nodeLabel":"Video Walkthrough Generator"}}
+{"id":"a620e1e2-647e-405e-8988-8abfb11a548a","timestamp":"2026-03-11T08:45:16.001Z","userId":"cmmav32p2000004jmbi8nukwf","eventName":"workflow_executed","properties":{"nodeCount":3,"catalogueIds":["IN-003","TR-004","GN-009"]}}
