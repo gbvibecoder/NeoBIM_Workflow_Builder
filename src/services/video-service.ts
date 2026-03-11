@@ -235,23 +235,15 @@ async function createTask(
 ): Promise<KlingTaskResponse> {
   const errors: string[] = [];
 
-  console.log("========== createTask START ==========");
-  console.log("[CREATE] image type:", imageUrl?.startsWith("http") ? "URL" : "base64");
-  console.log("[CREATE] image length:", imageUrl?.length);
-  console.log("[CREATE] prompt (FULL):", prompt);
-  console.log("[CREATE] duration:", duration);
-  console.log("[CREATE] mode:", mode);
-  console.log("[CREATE] aspectRatio:", aspectRatio);
+  console.log("[KLING] createTask: duration=%s mode=%s models=%s", duration, mode, MODELS.join(","));
 
   for (const modelName of MODELS) {
     try {
-      console.log(`[CREATE] Trying model: ${modelName}`);
-
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const body: Record<string, any> = {
         model_name: modelName,
         image: imageUrl,
-        prompt: prompt.slice(0, 2500), // API max 2500 chars
+        prompt: prompt.slice(0, 2500),
         negative_prompt: negativePrompt.slice(0, 2500),
         aspect_ratio: aspectRatio,
         mode,
@@ -263,57 +255,18 @@ async function createTask(
         body.cfg_scale = 0.7;
       }
 
-      // ===== IMAGE DEBUG =====
-      console.log("===== IMAGE DEBUG =====");
-      console.log("[IMAGE] Type:", typeof imageUrl);
-      console.log("[IMAGE] Starts with http:", imageUrl?.startsWith("http"));
-      console.log("[IMAGE] Starts with data:", imageUrl?.startsWith("data:"));
-      console.log("[IMAGE] Starts with /9j/:", imageUrl?.startsWith("/9j/")); // JPEG base64 signature
-      console.log("[IMAGE] Starts with iVBOR:", imageUrl?.startsWith("iVBOR")); // PNG base64 signature
-      console.log("[IMAGE] First 100 chars:", imageUrl?.slice(0, 100));
-      console.log("[IMAGE] Total length:", imageUrl?.length);
-
-      // Check if it's valid base64
-      if (!imageUrl?.startsWith("http")) {
-        try {
-          const cleanBase64 = imageUrl.replace(/^data:image\/\w+;base64,/, "");
-          const buffer = Buffer.from(cleanBase64, "base64");
-          console.log("[IMAGE] Decoded buffer size:", buffer.length, "bytes");
-          console.log("[IMAGE] Decoded size in KB:", Math.round(buffer.length / 1024), "KB");
-          // Check magic bytes
-          console.log("[IMAGE] Magic bytes:", buffer[0]?.toString(16), buffer[1]?.toString(16));
-          console.log("[IMAGE] Is JPEG:", buffer[0] === 0xFF && buffer[1] === 0xD8);
-          console.log("[IMAGE] Is PNG:", buffer[0] === 0x89 && buffer[1] === 0x50);
-        } catch (e) {
-          console.log("[IMAGE] ❌ FAILED TO DECODE BASE64:", e);
-        }
-      }
-
-      // Log the EXACT image field being sent to Kling
-      console.log("[IMAGE] Kling 'image' field first 80 chars:", body.image?.slice(0, 80));
-      console.log("[IMAGE] Kling 'image' field length:", body.image?.length);
-      console.log("========================");
-
-      console.log("[CREATE] EXACT Kling API request body:", JSON.stringify({
-        ...body,
-        image: body.image?.length > 100 ? body.image?.slice(0, 50) + "...[truncated, total=" + body.image.length + "]" : body.image,
-      }));
-
       const result = await klingFetch(KLING_IMAGE2VIDEO_PATH, {
         method: "POST",
         body,
       });
 
-      console.log(`[KLING] ✅ Task created with MODEL: ${modelName}, taskId=${result.data.task_id}`);
       console.error("[KLING-MODEL] SUCCESS:", modelName, "duration:", duration, "mode:", mode);
-      console.log("[CREATE] Full API response:", JSON.stringify(result));
-      console.log("========== createTask END ==========");
+      console.log("[KLING] Task created: model=%s taskId=%s", modelName, result.data.task_id);
       return result;
     } catch (err) {
       const msg = (err as Error).message;
       errors.push(`${modelName}: ${msg}`);
       console.error("[KLING-MODEL] FAILED:", modelName, "error:", msg.slice(0, 100));
-      console.warn(`[Video] ${modelName} failed: ${msg}`);
     }
   }
 
@@ -895,13 +848,7 @@ export async function submitDualWalkthrough(
   mode: "std" | "pro" = "pro",
   options?: { isFloorPlan?: boolean; roomInfo?: string },
 ): Promise<SubmittedVideoTasks> {
-  console.log("========== submitDualWalkthrough START ==========");
-  console.log("[DUAL] imageUrl type:", imageUrl?.startsWith("http") ? "URL" : "base64");
-  console.log("[DUAL] imageUrl length:", imageUrl?.length);
-  console.log("[DUAL] buildingDescription:", buildingDescription?.slice(0, 200));
-  console.log("[DUAL] mode:", mode);
-  console.log("[DUAL] isFloorPlan:", options?.isFloorPlan);
-  console.log("[DUAL] roomInfo:", options?.roomInfo?.slice(0, 200) || "NONE");
+  console.log("[DUAL] submitDualWalkthrough: mode=%s isFloorPlan=%s", mode, options?.isFloorPlan);
 
   const negativePrompt = "blur, distortion, low quality, warped geometry, melting walls, deformed architecture, shaky camera, noise, artifacts, morphing surfaces, bent lines, wobbly structure, jittery motion, flickering textures, plastic appearance, fisheye distortion, floating objects, wireframe, cartoon, sketch, low polygon, unrealistic proportions, text overlay, watermark, oversaturated colors, CGI look, video game graphics, toy model, miniature, tilt-shift, abstract, surreal, people walking, cars moving, birds flying, lens flare";
 
@@ -912,21 +859,13 @@ export async function submitDualWalkthrough(
     ? buildFloorPlanInteriorPrompt(buildingDescription, options.roomInfo)
     : buildInteriorPrompt(buildingDescription);
 
-  console.log("[DUAL] exteriorPrompt (FULL):", exteriorPrompt);
-  console.log("[DUAL] interiorPrompt (FULL):", interiorPrompt);
-  console.log("[DUAL] About to submit TWO tasks in parallel...");
-  console.log("[DUAL] Exterior: duration=5, Interior: duration=10");
-
   // Submit both tasks in parallel — don't poll, return task IDs immediately
   const [exteriorResult, interiorResult] = await Promise.all([
     createTask(imageUrl, exteriorPrompt, negativePrompt, "5", "16:9", mode),
     createTask(imageUrl, interiorPrompt, negativePrompt, "10", "16:9", mode),
   ]);
 
-  console.log("[DUAL] Both tasks submitted!");
-  console.log("[DUAL] Exterior task ID:", exteriorResult.data.task_id);
-  console.log("[DUAL] Interior task ID:", interiorResult.data.task_id);
-  console.log("========== submitDualWalkthrough END ==========");
+  console.log("[DUAL] Tasks submitted: exterior=%s interior=%s", exteriorResult.data.task_id, interiorResult.data.task_id);
 
   const result = {
     exteriorTaskId: exteriorResult.data.task_id,
@@ -987,10 +926,7 @@ async function createOmniTask(
   aspectRatio: string,
   mode: string,
 ): Promise<KlingTaskResponse> {
-  console.log("========== createOmniTask START ==========");
-  console.log("[OMNI] Trying Kling 3.0 via", KLING_OMNI_PATH);
-  console.log("[OMNI] model_name: kling-v3-omni");
-  console.log("[OMNI] duration:", duration, "mode:", mode, "aspect:", aspectRatio);
+  console.log("[OMNI] createOmniTask: duration=%s mode=%s", duration, mode);
 
   const body = {
     model_name: "kling-v3-omni",
@@ -1006,20 +942,10 @@ async function createOmniTask(
     external_task_id: "",
   };
 
-  console.log("[OMNI] Request body (image truncated):", JSON.stringify({
-    ...body,
-    image_list: body.image_list.map(img => ({
-      image_url: img.image_url?.length > 100
-        ? img.image_url.slice(0, 50) + "...[truncated, total=" + img.image_url.length + "]"
-        : img.image_url,
-    })),
-  }));
-
   const result = await klingFetch(KLING_OMNI_PATH, { method: "POST", body });
 
   console.error("[KLING-MODEL] SUCCESS: kling-v3-omni (Kling 3.0 Omni)", "duration:", duration, "mode:", mode);
-  console.log("[OMNI] Task created! taskId:", result.data.task_id);
-  console.log("========== createOmniTask END ==========");
+  console.log("[OMNI] Task created: taskId=%s", result.data.task_id);
   return result;
 }
 
@@ -1034,25 +960,18 @@ export async function submitFloorPlanWalkthrough(
 ): Promise<SubmittedSingleVideoTask & { usedOmni: boolean; durationSeconds: number }> {
   const negativePrompt = "blur, distortion, low quality, warped geometry, melting walls, deformed architecture, shaky camera, noise, artifacts, morphing surfaces, bent lines, wobbly structure, jittery motion, flickering textures, plastic appearance, fisheye distortion, floating objects, wireframe, cartoon, sketch, watermark";
 
-  // ── Attempt 1: Kling 3.0 Omni (confirmed working — 12s, pro quality) ──
+  // ── Attempt 1: Kling 3.0 Omni (12s, pro quality) ──
   try {
-    console.log("[GN-009] ═══ Trying Kling 3.0 Omni endpoint FIRST ═══");
     const result = await createOmniTask(imageUrl, prompt, negativePrompt, "12", "16:9", mode);
-    console.log("[GN-009] Kling 3.0 Omni succeeded! taskId:", result.data.task_id);
     return { taskId: result.data.task_id, submittedAt: Date.now(), usedOmni: true, durationSeconds: 12 };
   } catch (err) {
     const msg = (err as Error).message;
     console.error("[KLING-MODEL] FAILED: omni-v3 (Kling 3.0)", "error:", msg.slice(0, 200));
-    console.warn("[GN-009] Kling 3.0 Omni failed — falling back to v2.6 standard endpoint");
+    console.warn("[GN-009] Omni failed, falling back to v2.6");
   }
 
-  // ── Rate-limit guard: wait 2s before hitting the API again ──
-  await new Promise(r => setTimeout(r, 2000));
-
   // ── Attempt 2: Fallback to v2.6 on /v1/videos/image2video (10s) ──
-  console.log("[GN-009] ═══ Fallback: v2.6 via /v1/videos/image2video ═══");
   const result = await createTask(imageUrl, prompt, negativePrompt, "10", "16:9", mode);
-  console.log("[GN-009] v2.6 fallback succeeded! taskId:", result.data.task_id);
   return { taskId: result.data.task_id, submittedAt: Date.now(), usedOmni: false, durationSeconds: 10 };
 }
 
