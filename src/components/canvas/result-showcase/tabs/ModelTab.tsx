@@ -155,7 +155,7 @@ export function ModelTab({ data }: ModelTabProps) {
 
   // Non-floor-plan models (procedural, glb, svg)
   return (
-    <div style={{
+    <div className="model-tab-container" style={{
       display: "flex", gap: 0, height: "100%", minHeight: 500,
       background: "#08080F", borderRadius: 16,
       overflow: "hidden", border: "1px solid rgba(255,255,255,0.04)",
@@ -178,6 +178,7 @@ export function ModelTab({ data }: ModelTabProps) {
       {/* Legacy sidebar for non-floor-plan models */}
       {model && (
         <motion.div
+          className="model-tab-sidebar"
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
           style={{
@@ -300,7 +301,7 @@ function FloorPlanLayout({
   }, []);
 
   return (
-    <div style={{
+    <div className="model-tab-container" style={{
       display: "flex",
       height: "calc(100vh - 140px)",
       background: "#08080F",
@@ -494,6 +495,7 @@ function FloorPlanLayout({
 
       {/* ═══ SIDEBAR: ROOM EXPLORER ═══ */}
       <motion.div
+        className="model-tab-sidebar"
         initial={{ opacity: 0, x: 20 }}
         animate={{ opacity: 1, x: 0 }}
         transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}

@@ -93,7 +93,7 @@ export function OverviewTab({ data, onExpandVideo, onNavigateTab, onRetryVideo }
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
 
       {/* ── Top Row: Hero + Right Panel ──────────────────────────────────── */}
-      <div style={{
+      <div className="overview-top-grid" style={{
         display: "grid",
         gridTemplateColumns: hasHero ? "3fr 2fr" : "1fr",
         gap: 20,
@@ -129,6 +129,7 @@ export function OverviewTab({ data, onExpandVideo, onNavigateTab, onRetryVideo }
 
       {/* ── Execution Details Banner ──────────────────────────────────── */}
       <motion.div
+        className="overview-exec-banner"
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1 }}
@@ -223,7 +224,7 @@ export function OverviewTab({ data, onExpandVideo, onNavigateTab, onRetryVideo }
         transition={{ delay: 0.15 }}
       >
         <SectionHeader icon={<Layers size={13} />} title={t('showcase.deliverables')} />
-        <div style={{
+        <div className="overview-deliverables-grid" style={{
           display: "grid",
           gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))",
           gap: 10,
@@ -393,7 +394,7 @@ export function OverviewTab({ data, onExpandVideo, onNavigateTab, onRetryVideo }
       )}
 
       {/* ── Bottom Row: Tech Stack + Quick Actions ───────────────────────── */}
-      <div style={{
+      <div className="overview-bottom-grid" style={{
         display: "grid",
         gridTemplateColumns: "1fr 1fr",
         gap: 16,
@@ -760,6 +761,7 @@ function AECFooter() {
 
   return (
     <motion.div
+      className="overview-footer"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ delay: 0.5 }}

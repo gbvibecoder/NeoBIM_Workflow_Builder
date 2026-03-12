@@ -807,9 +807,18 @@
 
 /* ─── GLOBAL — PREVENT OVERFLOW EVERYWHERE ─────────────────────── */
 @media (max-width: 768px) {
-  /* All SVGs that might be wider than viewport */
+  /* All SVGs that might be wider than viewport — EXCLUDE React Flow */
   svg {
     max-width: 100% !important;
+  }
+
+  /* React Flow needs unconstrained SVGs for edge rendering */
+  .react-flow svg,
+  .react-flow__edges,
+  .react-flow__edge path,
+  .react-flow__edge svg,
+  .react-flow__viewport svg {
+    max-width: none !important;
   }
 
   /* Prevent fixed-width containers from overflowing */
@@ -982,5 +991,201 @@
 
   .node-card:hover {
     transform: none !important;
+  }
+}
+
+/* ─── CANVAS — HIDE RIGHT NODE PANEL ON MOBILE ──────────────── */
+@media (max-width: 768px) {
+  .right-node-panel {
+    display: none !important;
+  }
+}
+
+/* ─── CANVAS — EXECUTION LOG MOBILE ─────────────────────────── */
+@media (max-width: 768px) {
+  .execution-log-container {
+    left: 8px !important;
+    right: 8px !important;
+    bottom: 120px !important;
+    max-width: calc(100vw - 16px) !important;
+  }
+
+  .execution-log-container > div:first-child {
+    min-width: 0 !important;
+  }
+}
+
+/* ─── CANVAS — VIEW RESULTS FAB ABOVE MOBILE TOOLBAR ────────── */
+@media (max-width: 768px) {
+  .view-results-fab {
+    bottom: 130px !important;
+  }
+}
+
+/* ─── TEMPLATES PAGE — HERO MOBILE ──────────────────────────── */
+@media (max-width: 768px) {
+  .templates-hero-title {
+    font-size: 22px !important;
+    line-height: 1.25 !important;
+  }
+
+  .templates-stats-bar {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    flex-wrap: nowrap !important;
+    gap: 0 !important;
+  }
+
+  .templates-stats-bar > div {
+    flex-shrink: 0 !important;
+    min-width: 0 !important;
+    padding: 6px 10px !important;
+  }
+
+  .templates-stats-bar > div span {
+    white-space: nowrap !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .templates-hero-title {
+    font-size: 18px !important;
+  }
+}
+
+/* ─── RESULT SHOWCASE — HEADER MOBILE ────────────────────────── */
+@media (max-width: 768px) {
+  .showcase-header {
+    padding: 8px 12px !important;
+    gap: 6px !important;
+  }
+
+  /* Left group: Back button + title */
+  .showcase-header > div:first-child {
+    gap: 6px !important;
+    min-width: 0 !important;
+    flex: 1 !important;
+    overflow: hidden !important;
+  }
+
+  /* Back button — compact */
+  .showcase-header > div:first-child > button {
+    padding: 6px 10px !important;
+    font-size: 11px !important;
+    gap: 4px !important;
+  }
+
+  /* Title — allow truncation at narrower width */
+  .showcase-header h1 {
+    font-size: 11px !important;
+    max-width: 80px !important;
+  }
+
+  /* Complete badge — smaller */
+  .showcase-header [style*="borderRadius: 12"] {
+    padding: 1px 5px !important;
+  }
+
+  /* Right stats — compact */
+  .showcase-header > div:last-child {
+    gap: 6px !important;
+    flex-shrink: 0 !important;
+  }
+
+  .showcase-header > div:last-child span {
+    font-size: 9px !important;
+  }
+}
+
+/* ─── RESULT SHOWCASE — TAB CONTENT PADDING MOBILE ───────────── */
+@media (max-width: 768px) {
+  .showcase-tab-content {
+    padding: 16px !important;
+  }
+}
+
+/* ─── OVERVIEW TAB — MOBILE LAYOUT ──────────────────────────── */
+@media (max-width: 768px) {
+  /* Top row: stack hero + KPIs vertically */
+  .overview-top-grid {
+    grid-template-columns: 1fr !important;
+    min-height: auto !important;
+    gap: 16px !important;
+  }
+
+  /* Execution banner: wrap items */
+  .overview-exec-banner {
+    flex-wrap: wrap !important;
+    gap: 10px !important;
+    padding: 10px 14px !important;
+  }
+
+  .overview-exec-banner > div:last-child {
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+  }
+
+  /* Deliverables: smaller minimum for mobile */
+  .overview-deliverables-grid {
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)) !important;
+    gap: 8px !important;
+  }
+
+  /* Bottom row: stack tech + quick actions */
+  .overview-bottom-grid {
+    grid-template-columns: 1fr !important;
+    gap: 14px !important;
+  }
+
+  /* Footer: wrap AEC facts */
+  .overview-footer {
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+  }
+
+  .overview-footer > div:first-child {
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+  }
+}
+
+/* ─── MODEL TAB — MOBILE LAYOUT ─────────────────────────────── */
+@media (max-width: 768px) {
+  /* Stack viewer and sidebar vertically */
+  .model-tab-container {
+    flex-direction: column !important;
+    height: auto !important;
+    min-height: auto !important;
+  }
+
+  /* Viewer takes full width, minimum height */
+  .model-tab-container > div:first-child {
+    min-height: 350px !important;
+    height: 50vh !important;
+  }
+
+  /* Sidebar: full width below viewer */
+  .model-tab-sidebar {
+    width: 100% !important;
+    max-height: 40vh !important;
+    border-left: none !important;
+    border-top: 1px solid rgba(255,255,255,0.06) !important;
+  }
+
+  /* Floor plan toolbar: wrap buttons */
+  .model-tab-container [style*="position: absolute"][style*="bottom: 20"] {
+    flex-wrap: wrap !important;
+    gap: 4px !important;
+    padding: 4px !important;
+  }
+
+  .model-tab-container [style*="position: absolute"][style*="bottom: 20"] button {
+    padding: 6px 10px !important;
+    font-size: 11px !important;
+  }
+
+  /* Hide controls hint on mobile */
+  .model-tab-container [style*="position: absolute"][style*="bottom: 24"][style*="left: 16"] {
+    display: none !important;
   }
 }

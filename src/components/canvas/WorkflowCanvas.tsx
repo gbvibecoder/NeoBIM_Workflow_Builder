@@ -1044,6 +1044,7 @@ function WorkflowCanvasInner({ workflowId: urlWorkflowId }: WorkflowCanvasInnerP
           <AnimatePresence>
             {!showShowcase && !isExecuting && artifacts.size > 0 && (
               <motion.button
+                className="view-results-fab"
                 key="view-results-fab"
                 initial={{ opacity: 0, y: 20, scale: 0.9 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}

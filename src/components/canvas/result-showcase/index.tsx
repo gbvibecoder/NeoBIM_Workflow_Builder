@@ -221,7 +221,7 @@ export function ResultShowcase({ onClose }: ResultShowcaseProps) {
       />
 
       {/* Tab Content */}
-      <div style={{
+      <div className="showcase-tab-content" style={{
         flex: 1,
         overflow: resolvedTab === "model" ? "hidden" : "auto",
         padding: resolvedTab === "model" ? "0" : "24px 32px",

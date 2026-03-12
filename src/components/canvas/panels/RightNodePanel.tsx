@@ -17,6 +17,7 @@ export function RightNodePanel() {
 
   return (
     <div
+      className="right-node-panel"
       style={{
         position: "absolute",
         top: 0,
