@@ -9,6 +9,7 @@ import { motion } from "framer-motion";
 import { validateEmail } from "@/lib/form-validation";
 import { useLocale } from "@/hooks/useLocale";
 import { LanguageSwitcher } from "@/components/ui/LanguageSwitcher";
+import { trackLead } from "@/lib/meta-pixel";
 
 function LoginForm() {
   const router = useRouter();
@@ -87,6 +88,7 @@ function LoginForm() {
       if (res?.error) {
         setError(t('auth.invalidCredentials'));
       } else {
+        trackLead({ content_name: "email_login" });
         router.push(callbackUrl);
         router.refresh();
       }

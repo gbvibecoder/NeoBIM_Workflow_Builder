@@ -8,6 +8,7 @@ import { Mail, Lock, User, Chrome, Loader2, Eye, EyeOff } from "lucide-react";
 import { motion } from "framer-motion";
 import { useLocale } from "@/hooks/useLocale";
 import { LanguageSwitcher } from "@/components/ui/LanguageSwitcher";
+import { trackCompleteRegistration, trackLead } from "@/lib/meta-pixel";
 const EMAIL_REGEX = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*\.[a-zA-Z]{2,}$/;
 const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/;
 
@@ -82,6 +83,8 @@ export default function RegisterPage() {
         redirect: false,
       });
 
+      trackCompleteRegistration({ content_name: "email_signup" });
+
       if (signInRes?.error) {
         // Account was created but auto-login failed (e.g. DB replication lag).
         // Show success and redirect to login so user can sign in manually.
@@ -102,6 +105,7 @@ export default function RegisterPage() {
     setGoogleLoading(true);
     setError("");
     try {
+      trackCompleteRegistration({ content_name: "google_signup" });
       await signIn("google", { callbackUrl: "/dashboard" });
     } catch (err) {
       setError(extractErrorMessage(err));

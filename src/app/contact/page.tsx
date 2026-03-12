@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { motion, useScroll, useTransform } from "framer-motion";
 import { useRef, useState } from "react";
+import { trackContact } from "@/lib/meta-pixel";
 import {
   Mail,
   MessageSquare,
@@ -99,6 +100,7 @@ export default function ContactPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSending(true);
+    trackContact({ content_name: formState.subject || "contact_form" });
     // Simulate sending
     await new Promise((r) => setTimeout(r, 1500));
     setSending(false);

@@ -51,8 +51,8 @@ const nextConfig: NextConfig = {
   async headers() {
     // unsafe-eval is required for Next.js dev mode HMR but not needed in production
     const scriptSrc = isDev
-      ? "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://js.stripe.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com"
-      : "script-src 'self' 'unsafe-inline' https://js.stripe.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com";
+      ? "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://js.stripe.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://connect.facebook.net"
+      : "script-src 'self' 'unsafe-inline' https://js.stripe.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://connect.facebook.net";
 
     return [
       {
@@ -64,10 +64,10 @@ const nextConfig: NextConfig = {
               default-src 'self';
               ${scriptSrc};
               style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
-              img-src 'self' blob: data: https://oaidalleapiprodscus.blob.core.windows.net https://picsum.photos https://images.unsplash.com https://lh3.googleusercontent.com https://*.vercel.app;
+              img-src 'self' blob: data: https://oaidalleapiprodscus.blob.core.windows.net https://picsum.photos https://images.unsplash.com https://lh3.googleusercontent.com https://*.vercel.app https://www.facebook.com;
               font-src 'self' https://fonts.gstatic.com;
               media-src 'self' blob: data: https://*.klingai.com https://*.kuaishou.com https://*.ksyun.com https://*.ks-cdn.com https://*.kscampus.com https://*;
-              connect-src 'self' https://api.openai.com https://api.stability.ai https://*.upstash.io https://api.stripe.com https://api.klingai.com https://*.klingai.com https://*.fal.ai https://fal.run;
+              connect-src 'self' https://api.openai.com https://api.stability.ai https://*.upstash.io https://api.stripe.com https://api.klingai.com https://*.klingai.com https://*.fal.ai https://fal.run https://www.facebook.com https://connect.facebook.net;
               frame-src 'self' blob: https://js.stripe.com;
               object-src 'none';
               base-uri 'self';

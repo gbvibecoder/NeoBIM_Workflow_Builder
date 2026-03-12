@@ -13,6 +13,7 @@ import { MiniWorkflowDiagram } from "@/components/shared/MiniWorkflowDiagram";
 import { PREBUILT_WORKFLOWS } from "@/constants/prebuilt-workflows";
 import { useLocale } from '@/hooks/useLocale';
 import type { TranslationKey } from '@/lib/i18n';
+import { trackLead } from '@/lib/meta-pixel';
 import { LanguageSwitcher } from '@/components/ui/LanguageSwitcher';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -581,6 +582,7 @@ export default function LandingPage() {
   const handleRequestSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!requestForm.name || !requestForm.discipline || !requestForm.problem || !requestForm.email) return;
+    trackLead({ content_name: "workflow_request", content_category: requestForm.discipline });
     const newReq: WorkflowRequest = {
       id: `req-${Date.now()}`,
       name: requestForm.name,
