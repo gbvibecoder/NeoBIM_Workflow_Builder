@@ -391,7 +391,186 @@ ${parsed.keyRequirements?.length ? `KEY REQUIREMENTS:\n${parsed.keyRequirements.
         );
       }
 
-      const analysis = await analyzeImage(base64Data, mimeType, apiKey);
+      // ── Floor Plan Analysis Pipeline ──
+      // Step 1: Quick classify with GPT-4o-mini (cheap)
+      // Step 2: If floor plan → Potrace pixel tracing + GPT-4o room labeling (primary)
+      // Step 3: If Potrace fails → fall back to Sharp pixel detection + GPT-4o labeling
+      let analysis = await analyzeImage(base64Data, mimeType, apiKey);
+
+      if (analysis.isFloorPlan && base64Data) {
+        // ── PRIMARY: Potrace pixel tracing + GPT-4o labeling ──
+        let traceSucceeded = false;
+        try {
+          console.log("[TR-004] Starting Potrace + GPT-4o hybrid analysis...");
+          const { traceFloorPlanToSVG } = await import("@/services/floor-plan-tracer");
+          const imageBuffer = Buffer.from(base64Data as string, "base64");
+          const trace = await traceFloorPlanToSVG(imageBuffer);
+
+          console.log(`[TR-004] Potrace: ${trace.wallSegments.length} walls, ${trace.enclosedRegions.length} regions`);
+
+          // Save debug SVG
+          try {
+            const fs = await import("fs");
+            const path = await import("path");
+            fs.writeFileSync(path.join(process.cwd(), "public", "debug-floor-plan.svg"), trace.svg);
+            console.log("[TR-004] SVG saved to public/debug-floor-plan.svg");
+          } catch { /* ignore */ }
+
+          if (trace.enclosedRegions.length >= 1) {
+            // GPT-4o labels the rooms Potrace found
+            const { labelFloorPlanRooms } = await import("@/services/openai");
+            const labels = await labelFloorPlanRooms(
+              base64Data as string,
+              typeof mimeType === "string" ? mimeType : "image/jpeg",
+              trace.enclosedRegions,
+              trace.width,
+              trace.height,
+              apiKey,
+            );
+
+            console.log(`[TR-004] GPT-4o labeled: ${labels.rooms.length} rooms, building ${labels.buildingWidthMeters}x${labels.buildingDepthMeters}m`);
+
+            const bw = labels.buildingWidthMeters || 10;
+            const bd = labels.buildingDepthMeters || 8;
+            const pxPerMeterX = trace.width / bw;
+            const pxPerMeterY = trace.height / bd;
+
+            // Convert pixel regions → meter-space rooms
+            const tracedRooms = labels.rooms.map(label => {
+              const region = trace.enclosedRegions.find(r => r.id === label.regionId);
+              if (!region) return null;
+              return {
+                name: label.name,
+                type: label.type,
+                width: label.widthMeters || +(region.bounds.width / pxPerMeterX).toFixed(2),
+                depth: label.depthMeters || +(region.bounds.height / pxPerMeterY).toFixed(2),
+                x: +(region.bounds.x / pxPerMeterX).toFixed(2),
+                y: +(region.bounds.y / pxPerMeterY).toFixed(2),
+                adjacentRooms: [] as string[],
+              };
+            }).filter((r): r is NonNullable<typeof r> => r !== null);
+
+            // Convert wall segments px → meters
+            const tracedWalls = trace.wallSegments.map(w => ({
+              start: [w.x1 / pxPerMeterX, w.y1 / pxPerMeterY] as [number, number],
+              end: [w.x2 / pxPerMeterX, w.y2 / pxPerMeterY] as [number, number],
+              thickness: Math.max(w.thickness / pxPerMeterX, 0.1),
+              type: "exterior" as const,
+            }));
+
+            // Auto-detect adjacency
+            for (let i = 0; i < tracedRooms.length; i++) {
+              for (let j = i + 1; j < tracedRooms.length; j++) {
+                const a = tracedRooms[i], b = tracedRooms[j];
+                const ax2 = a.x + a.width, ay2 = a.y + a.depth;
+                const bx2 = b.x + b.width, by2 = b.y + b.depth;
+                const hOverlap = Math.min(ax2, bx2) - Math.max(a.x, b.x);
+                const vOverlap = Math.min(ay2, by2) - Math.max(a.y, b.y);
+                const hGap = Math.min(Math.abs(ax2 - b.x), Math.abs(bx2 - a.x));
+                const vGap = Math.min(Math.abs(ay2 - b.y), Math.abs(by2 - a.y));
+                if ((hOverlap > 0.3 && hGap < 0.8) || (vOverlap > 0.3 && vGap < 0.8)) {
+                  a.adjacentRooms.push(b.name);
+                  b.adjacentRooms.push(a.name);
+                }
+              }
+            }
+
+            if (tracedRooms.length >= 1) {
+              analysis.geometry = {
+                buildingWidth: bw,
+                buildingDepth: bd,
+                buildingShape: "rectangular",
+                walls: tracedWalls,
+                rows: [],
+                rooms: tracedRooms,
+              };
+              traceSucceeded = true;
+              console.log(`[TR-004] ✓ Potrace+GPT-4o: ${tracedRooms.length} rooms, ${tracedWalls.length} walls, ${bw.toFixed(1)}m × ${bd.toFixed(1)}m`);
+              tracedRooms.forEach(r => console.log(`  ${r.name} (${r.type}): ${r.width}x${r.depth}m at (${r.x},${r.y})`));
+            }
+          }
+        } catch (traceErr) {
+          console.warn("[TR-004] Potrace+GPT-4o failed, falling back to Sharp:", traceErr);
+        }
+
+        // ── FALLBACK: Sharp pixel detection + GPT-4o labeling ──
+        if (!traceSucceeded) {
+          try {
+            const { detectFloorPlanGeometry } = await import("@/services/floor-plan-detector");
+            const sharpResult = await detectFloorPlanGeometry(
+              base64Data as string,
+              typeof mimeType === "string" ? mimeType : "image/jpeg",
+              analysis.footprint ? {
+                estimatedFootprintMeters: {
+                  width: parseFloat(String(analysis.footprint.width)) || 14,
+                  depth: parseFloat(String(analysis.footprint.depth)) || 10,
+                },
+              } : undefined,
+            );
+
+            console.log(`[TR-004] Sharp detection: ${sharpResult.geometry.walls.length} walls, ${sharpResult.geometry.rooms.length} rooms, confidence: ${sharpResult.confidence.toFixed(2)}`);
+
+            const useSharp = sharpResult.confidence >= 0.4
+              && sharpResult.geometry.walls.length >= 3
+              && sharpResult.geometry.rooms.length >= 2;
+
+            if (useSharp) {
+              const { labelDetectedRooms } = await import("@/services/openai");
+              const labels = await labelDetectedRooms({
+                roomCenters: sharpResult.geometry.rooms.map(r => ({
+                  center: r.center,
+                  width: r.width,
+                  depth: r.depth,
+                })),
+                imageBase64: base64Data as string,
+                mimeType: typeof mimeType === "string" ? mimeType : "image/jpeg",
+              }, apiKey);
+
+              const mergedRooms = sharpResult.geometry.rooms.map((room, i) => {
+                const label = labels.rooms.find(l => l.index === i);
+                return {
+                  ...room,
+                  name: label?.name ?? room.name,
+                  type: (label?.type ?? room.type) as import("@/types/floor-plan").FloorPlanRoomType,
+                  width: label?.refinedWidth ?? room.width,
+                  depth: label?.refinedDepth ?? room.depth,
+                };
+              });
+
+              const sharpFp = labels.footprint ?? sharpResult.geometry.footprint;
+              const sharpRows: Array<Array<{ name: string; type: string; width: number; depth: number }>> = [];
+              let sharpRow: Array<{ name: string; type: string; width: number; depth: number }> = [];
+              for (const rm of mergedRooms) {
+                sharpRow.push({ name: rm.name, type: rm.type as string, width: rm.width, depth: rm.depth });
+                if (sharpRow.length >= 3) { sharpRows.push(sharpRow); sharpRow = []; }
+              }
+              if (sharpRow.length > 0) sharpRows.push(sharpRow);
+              let sharpY = 0;
+              const sharpRooms: Array<{ name: string; type: string; width: number; depth: number; x: number; y: number; adjacentRooms: string[] | undefined }> = [];
+              for (const row of sharpRows) {
+                const rowDepth = Math.max(...row.map(r => r.depth));
+                let sharpX = 0;
+                for (const rm of row) {
+                  sharpRooms.push({ name: rm.name, type: rm.type, width: rm.width, depth: rowDepth, x: sharpX, y: sharpY, adjacentRooms: undefined });
+                  sharpX += rm.width;
+                }
+                sharpY += rowDepth;
+              }
+              analysis.geometry = {
+                buildingWidth: sharpFp.width,
+                buildingDepth: sharpFp.depth,
+                rooms: sharpRooms,
+              };
+
+              console.log(`[TR-004] Fallback: sharp+GPT hybrid: ${mergedRooms.length} rooms`);
+            } else {
+              console.log("[TR-004] Sharp confidence too low, using GPT-4o geometry as-is");
+            }
+          } catch (sharpErr) {
+            console.warn("[TR-004] Sharp detection also failed, using GPT-4o geometry as-is:", sharpErr);
+          }
+        }
+      }
 
       const roomsText = analysis.rooms?.length
         ? `\nROOMS:\n${analysis.rooms.map(r => `• ${r.name} (${r.dimensions})`).join("\n")}`
@@ -466,7 +645,7 @@ ${analysis.features.map(f => `• ${f}`).join("\n")}`;
           // Geometric data for GN-011 Interactive 3D Viewer
           ...(analysis.geometry && { geometry: analysis.geometry }),
         },
-        metadata: { model: analysis.isFloorPlan ? "gpt-4o" : "gpt-4o-mini", real: true },
+        metadata: { model: analysis.isFloorPlan ? (process.env.ANTHROPIC_API_KEY ? "claude-sonnet" : "gpt-4o") : "gpt-4o-mini", real: true },
         createdAt: new Date(),
       };
 
@@ -1974,136 +2153,296 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
     } else if (catalogueId === "GN-011") {
       // ── Interactive 3D Viewer ────────────────────────────────────────────
       // Generates a self-contained Three.js HTML file from floor plan geometry.
-      // No AI calls — purely programmatic 3D construction.
+      // Uses absolute x,y positions from GPT-4o → rooms tile together with no gaps.
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const geometryData = (inputData?.geometry ?? (inputData?._raw as Record<string, unknown>)?.geometry ?? null) as Record<string, unknown> | null;
+      const rawGeometry = (inputData?.geometry ?? (inputData?._raw as Record<string, unknown>)?.geometry ?? null) as Record<string, unknown> | null;
 
-      if (!geometryData || !Array.isArray(geometryData.walls) || !Array.isArray(geometryData.rooms)) {
-        // Fallback: construct basic geometry from rooms + footprint if available
-        const rooms = (inputData?.richRooms ?? inputData?.rooms ?? []) as Array<Record<string, unknown>>;
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const fp = (inputData?.footprint ?? (inputData?._raw as Record<string, unknown>)?.footprint) as Record<string, unknown> | undefined;
+      type LayoutRoom = { name: string; type: string; width: number; depth: number; x: number; y: number; adjacentRooms?: string[]; polygon?: [number, number][]; area?: number };
 
-        if (!rooms.length) {
-          return NextResponse.json(
-            formatErrorResponse({
-              title: "No floor plan geometry",
-              message: "GN-011 requires floor plan geometry data from TR-004 (Floor Plan Analyzer). Make sure to connect a TR-004 node upstream and upload a 2D floor plan image.",
-              code: "NODE_001",
-            }),
-            { status: 400 }
-          );
-        }
-
-        // Build minimal geometry from rooms data
-        const fallbackRooms = rooms.map((r) => ({
-          name: String(r.name ?? "Room"),
-          center: Array.isArray(r.center) ? r.center as [number, number] : [0, 0] as [number, number],
-          width: Number(r.width ?? 3),
-          depth: Number(r.depth ?? 3),
-          type: String(r.type ?? "other") as import("@/types/floor-plan").FloorPlanRoomType,
-        }));
-
-        const fpW = Number(fp?.width ?? fp?.depth ?? 14);
-        const fpD = Number(fp?.depth ?? fp?.width ?? 9);
-
-        const fallbackGeometry = {
-          footprint: { width: fpW, depth: fpD },
-          wallHeight: 3.0,
-          walls: [
-            { start: [0, 0] as [number, number], end: [fpW, 0] as [number, number], thickness: 0.2, type: "exterior" as const },
-            { start: [fpW, 0] as [number, number], end: [fpW, fpD] as [number, number], thickness: 0.2, type: "exterior" as const },
-            { start: [fpW, fpD] as [number, number], end: [0, fpD] as [number, number], thickness: 0.2, type: "exterior" as const },
-            { start: [0, fpD] as [number, number], end: [0, 0] as [number, number], thickness: 0.2, type: "exterior" as const },
-          ],
-          doors: [] as Array<{ position: [number, number]; width: number; wallId: number; type: "single" }>,
-          windows: [] as Array<{ position: [number, number]; width: number; height: number; sillHeight: number }>,
-          rooms: fallbackRooms,
-        };
-
-        const { buildFloorPlan3D } = await import("@/services/threejs-builder");
-        const html = buildFloorPlan3D(fallbackGeometry);
-
-        let viewerUrl = "";
-        try {
-          const { isR2Configured } = await import("@/lib/r2");
-          if (isR2Configured()) {
-            const r2Result = await uploadBase64ToR2(
-              Buffer.from(html, "utf-8").toString("base64"),
-              `3d-viewer-${generateId()}.html`,
-              "text/html"
-            );
-            if (r2Result && r2Result.startsWith("http")) viewerUrl = r2Result;
-          }
-        } catch (r2Err) {
-          console.warn("[GN-011] R2 upload failed:", r2Err);
-        }
-
-        artifact = {
-          id: generateId(),
-          executionId: executionId ?? "local",
-          tileInstanceId,
-          type: "html",
-          data: {
-            html,
-            label: "Interactive 3D Floor Plan (fallback geometry)",
-            width: "100%",
-            height: "600px",
-            // Download info
-            fileName: `floorplan-3d-${generateId()}.html`,
-            downloadUrl: viewerUrl || undefined,
-            mimeType: "text/html",
-            roomCount: fallbackRooms.length,
-          },
-          metadata: { engine: "threejs-r128", real: true, fallback: true },
-          createdAt: new Date(),
-        };
-      } else {
-        // Full geometry available from GPT-4o
-        const { buildFloorPlan3D } = await import("@/services/threejs-builder");
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const html = buildFloorPlan3D(geometryData as any);
-
-        let viewerUrl = "";
-        try {
-          const { isR2Configured } = await import("@/lib/r2");
-          if (isR2Configured()) {
-            const r2Result = await uploadBase64ToR2(
-              Buffer.from(html, "utf-8").toString("base64"),
-              `3d-viewer-${generateId()}.html`,
-              "text/html"
-            );
-            if (r2Result && r2Result.startsWith("http")) viewerUrl = r2Result;
-          }
-        } catch (r2Err) {
-          console.warn("[GN-011] R2 upload failed:", r2Err);
-        }
-
-        const roomCount = Array.isArray(geometryData.rooms) ? geometryData.rooms.length : 0;
-        const wallCount = Array.isArray(geometryData.walls) ? geometryData.walls.length : 0;
-
-        artifact = {
-          id: generateId(),
-          executionId: executionId ?? "local",
-          tileInstanceId,
-          type: "html",
-          data: {
-            html,
-            label: `Interactive 3D Floor Plan — ${roomCount} rooms, ${wallCount} walls`,
-            width: "100%",
-            height: "600px",
-            // Download info
-            fileName: `floorplan-3d-${generateId()}.html`,
-            downloadUrl: viewerUrl || undefined,
-            mimeType: "text/html",
-            roomCount,
-            wallCount,
-          },
-          metadata: { engine: "threejs-r128", real: true },
-          createdAt: new Date(),
-        };
+      // Guess room type from name
+      function guessType(name: string): string {
+        const n = name.toLowerCase();
+        if (n.includes("living") || n.includes("lounge") || n.includes("drawing")) return "living";
+        if (n.includes("bed") || n.includes("master")) return "bedroom";
+        if (n.includes("kitchen") || n.includes("pantry")) return "kitchen";
+        if (n.includes("dining") || n.includes("nook")) return "dining";
+        if (n.includes("bath") || n.includes("toilet") || n.includes("wc") || n.includes("powder")) return "bathroom";
+        if (n.includes("verand") || n.includes("porch")) return "veranda";
+        if (n.includes("balcon")) return "balcony";
+        if (n.includes("hall") || n.includes("corridor") || n.includes("lobby")) return "hallway";
+        if (n.includes("passage") || n.includes("foyer")) return "passage";
+        if (n.includes("office") || n.includes("study") || n.includes("den")) return "office";
+        if (n.includes("store") || n.includes("storage")) return "storage";
+        if (n.includes("closet") || n.includes("wardrobe")) return "closet";
+        if (n.includes("utility") || n.includes("laundry")) return "utility";
+        if (n.includes("patio") || n.includes("terrace") || n.includes("deck")) return "patio";
+        if (n.includes("entrance") || n.includes("entry")) return "entrance";
+        if (n.includes("stair") || n.includes("steps")) return "staircase";
+        return "other";
       }
+
+      // ── Convert row-based layout to positioned rooms ──
+      function rowsToPositions(rows: Array<Array<Record<string, unknown>>>): { rooms: LayoutRoom[]; width: number; depth: number } {
+        const result: LayoutRoom[] = [];
+        let currentY = 0;
+        let maxRowWidth = 0;
+
+        for (const row of rows) {
+          if (!Array.isArray(row) || row.length === 0) continue;
+          // Row height = max depth of rooms in this row
+          const rowDepth = Math.max(...row.map(r => Math.max(1.0, Number(r.depth ?? 3))));
+          let currentX = 0;
+
+          for (const room of row) {
+            const w = Math.max(1.0, Number(room.width ?? 3));
+            const name = String(room.name ?? "Room");
+            result.push({
+              name,
+              type: String(room.type ?? guessType(name)),
+              width: w,
+              depth: rowDepth,
+              x: currentX,
+              y: currentY,
+              adjacentRooms: Array.isArray(room.adjacentRooms) ? (room.adjacentRooms as string[]) : undefined,
+            });
+            currentX += w;
+          }
+
+          if (currentX > maxRowWidth) maxRowWidth = currentX;
+          currentY += rowDepth;
+        }
+
+        return { rooms: result, width: maxRowWidth, depth: currentY };
+      }
+
+      const layoutRooms: LayoutRoom[] = [];
+      let bW = Number(rawGeometry?.buildingWidth ?? 14);
+      let bD = Number(rawGeometry?.buildingDepth ?? 10);
+
+      // ── Priority 1: Row-based layout from GPT-4o (most reliable) ──
+      const rawRows = rawGeometry?.rows as Array<Array<Record<string, unknown>>> | undefined;
+      if (Array.isArray(rawRows) && rawRows.length > 0) {
+        console.log(`[GN-011] Using ROW-BASED layout: ${rawRows.length} rows`);
+        const result = rowsToPositions(rawRows);
+        for (const rm of result.rooms) layoutRooms.push(rm);
+        // Derive building size from actual room positions (more reliable than GPT-4o's estimate)
+        bW = result.width;
+        bD = result.depth;
+      }
+
+      // ── Priority 2: Legacy x,y positioned rooms ──
+      if (layoutRooms.length === 0) {
+        const rawRooms = (rawGeometry?.rooms ?? []) as Array<Record<string, unknown>>;
+        for (let idx = 0; idx < rawRooms.length; idx++) {
+          const r = rawRooms[idx];
+          const hasXY = r.x !== undefined && r.y !== undefined;
+          const name = String(r.name ?? "Room");
+          layoutRooms.push({
+            name,
+            type: String(r.type ?? guessType(name)),
+            width: Math.max(1.0, Number(r.width ?? 3)),
+            depth: Math.max(1.0, Number(r.depth ?? 3)),
+            x: hasXY ? Number(r.x) : Number(r.col ?? (idx % 3)) * 3.5,
+            y: hasXY ? Number(r.y) : Number(r.row ?? Math.floor(idx / 3)) * 3.5,
+            adjacentRooms: Array.isArray(r.adjacentRooms) ? (r.adjacentRooms as string[]) :
+                           Array.isArray(r.connections) ? (r.connections as string[]) : undefined,
+            polygon: Array.isArray(r.polygon) ? (r.polygon as [number, number][]) : undefined,
+            area: typeof r.area === "number" ? r.area : undefined,
+          });
+        }
+      }
+
+      // ── Priority 3: Reconstruct from richRooms/rooms (no geometry at all) ──
+      if (layoutRooms.length === 0) {
+        const basicRooms = (inputData?.rooms ?? []) as Array<Record<string, unknown>>;
+        const richRoomsArr = (inputData?.richRooms ?? []) as Array<Record<string, unknown>>;
+        const fallbackSource = richRoomsArr.length > basicRooms.length ? richRoomsArr : basicRooms;
+
+        if (fallbackSource.length > 0) {
+          console.warn(`[GN-011] No geometry — reconstructing from ${fallbackSource.length} rooms`);
+          // Build rows: 3 rooms per row
+          const fakeRows: Array<Array<Record<string, unknown>>> = [];
+          let currentRow: Array<Record<string, unknown>> = [];
+          for (const fr of fallbackSource) {
+            const name = String(fr.name ?? "Room");
+            const dimStr = String(fr.dimensions ?? "");
+            const dimMatch = dimStr.match(/(\d+\.?\d*)\s*m?\s*[x×X]\s*(\d+\.?\d*)/i);
+            currentRow.push({
+              name,
+              type: String(fr.type ?? guessType(name)),
+              width: dimMatch ? Math.max(1.0, parseFloat(dimMatch[1])) : 3,
+              depth: dimMatch ? Math.max(1.0, parseFloat(dimMatch[2])) : 3,
+              adjacentRooms: Array.isArray(fr.connections) ? fr.connections : undefined,
+            });
+            if (currentRow.length >= 3) { fakeRows.push(currentRow); currentRow = []; }
+          }
+          if (currentRow.length > 0) fakeRows.push(currentRow);
+          const result = rowsToPositions(fakeRows);
+          for (const rm of result.rooms) layoutRooms.push(rm);
+          bW = result.width;
+          bD = result.depth;
+        }
+      }
+
+      // ── Priority 4: Hardcoded fallback (only when everything fails) ──
+      if (layoutRooms.length < 2) {
+        console.warn(`[GN-011] Only ${layoutRooms.length} rooms — using hardcoded fallback`);
+        layoutRooms.length = 0;
+        const fallbackRows = [
+          [
+            { name: "Veranda", type: "veranda", width: 1.8, depth: 3.6, adjacentRooms: ["Living Room"] },
+            { name: "Living Room", type: "living", width: 3.2, depth: 3.6, adjacentRooms: ["Veranda", "Dining", "Hallway"] },
+            { name: "Dining", type: "dining", width: 3.2, depth: 3.6, adjacentRooms: ["Living Room", "Kitchen"] },
+            { name: "Kitchen", type: "kitchen", width: 3.2, depth: 3.6, adjacentRooms: ["Dining"] },
+          ],
+          [
+            { name: "Hallway", type: "hallway", width: 11.4, depth: 1.5, adjacentRooms: ["Living Room", "Bedroom 3", "Bedroom 2", "Bedroom 1"] },
+          ],
+          [
+            { name: "Bedroom 3", type: "bedroom", width: 4.1, depth: 3.5, adjacentRooms: ["Hallway"] },
+            { name: "Bath", type: "bathroom", width: 2.0, depth: 3.5, adjacentRooms: ["Hallway"] },
+            { name: "Bedroom 2", type: "bedroom", width: 3.0, depth: 3.5, adjacentRooms: ["Hallway"] },
+            { name: "Bedroom 1", type: "bedroom", width: 2.3, depth: 3.5, adjacentRooms: ["Hallway"] },
+          ],
+        ];
+        const result = rowsToPositions(fallbackRows as unknown as Array<Array<Record<string, unknown>>>);
+        for (const rm of result.rooms) layoutRooms.push(rm);
+        bW = result.width;
+        bD = result.depth;
+      }
+
+      // ── Edge snapping: close small gaps between rooms ──
+      function snapEdges(rooms: LayoutRoom[]) {
+        const TOL = 0.4;
+        for (let i = 0; i < rooms.length; i++) {
+          for (let j = i + 1; j < rooms.length; j++) {
+            const a = rooms[i], b = rooms[j];
+            const gapH = b.x - (a.x + a.width);
+            if (gapH > 0.01 && gapH < TOL) a.width += gapH;
+            const gapH2 = a.x - (b.x + b.width);
+            if (gapH2 > 0.01 && gapH2 < TOL) b.width += gapH2;
+            const gapV = b.y - (a.y + a.depth);
+            if (gapV > 0.01 && gapV < TOL) a.depth += gapV;
+            const gapV2 = a.y - (b.y + b.depth);
+            if (gapV2 > 0.01 && gapV2 < TOL) b.depth += gapV2;
+          }
+        }
+      }
+      snapEdges(layoutRooms);
+
+      // Compute actual building size from placed rooms
+      let maxX = 0, maxZ = 0;
+      for (const rm of layoutRooms) {
+        const rx = rm.x + rm.width;
+        const rz = rm.y + rm.depth;
+        if (rx > maxX) maxX = rx;
+        if (rz > maxZ) maxZ = rz;
+      }
+      const finalW = Math.max(bW, maxX);
+      const finalD = Math.max(bD, maxZ);
+
+      console.log(`[GN-011] ${layoutRooms.length} rooms, building ${finalW.toFixed(1)}x${finalD.toFixed(1)}m`);
+      for (const rm of layoutRooms) {
+        console.log(`  ${rm.name}: x=${rm.x.toFixed(1)} y=${rm.y.toFixed(1)} ${rm.width.toFixed(1)}x${rm.depth.toFixed(1)}m (${rm.type})`);
+      }
+
+      // Build FloorPlanGeometry — center derived from x,y
+      const fpRooms = layoutRooms.map((rm) => ({
+        name: rm.name,
+        center: [rm.x + rm.width / 2, rm.y + rm.depth / 2] as [number, number],
+        width: rm.width,
+        depth: rm.depth,
+        type: rm.type as import("@/types/floor-plan").FloorPlanRoomType,
+        x: rm.x,
+        y: rm.y,
+        adjacentRooms: rm.adjacentRooms,
+        polygon: rm.polygon,
+        area: rm.area,
+      }));
+
+      // Walls: use SVG-parsed walls if available, otherwise generate perimeter
+      const geometryWalls = rawGeometry?.walls as Array<{ start: [number, number]; end: [number, number]; thickness: number; type: "exterior" | "interior" }> | undefined;
+      const fpWalls: Array<{ start: [number, number]; end: [number, number]; thickness: number; type: "exterior" | "interior" }> =
+        (Array.isArray(geometryWalls) && geometryWalls.length > 4)
+          ? geometryWalls
+          : [
+              { start: [0, 0], end: [finalW, 0], thickness: 0.2, type: "exterior" },
+              { start: [finalW, 0], end: [finalW, finalD], thickness: 0.2, type: "exterior" },
+              { start: [finalW, finalD], end: [0, finalD], thickness: 0.2, type: "exterior" },
+              { start: [0, finalD], end: [0, 0], thickness: 0.2, type: "exterior" },
+            ];
+
+      // Pass through building shape + outline for non-rectangular buildings
+      const buildingShape = rawGeometry?.buildingShape as string | undefined;
+      const buildingOutline = rawGeometry?.buildingOutline as [number, number][] | undefined;
+
+      const fpGeometry: import("@/types/floor-plan").FloorPlanGeometry = {
+        footprint: { width: finalW, depth: finalD },
+        wallHeight: 2.8,
+        walls: fpWalls,
+        doors: [],
+        windows: [],
+        rooms: fpRooms,
+        ...(buildingShape && { buildingShape }),
+        ...(buildingOutline && { buildingOutline }),
+      };
+
+      const { buildFloorPlan3D } = await import("@/services/threejs-builder");
+
+      // Fetch source image for image-as-floor approach
+      let sourceImageDataUrl = "";
+      const sourceImgUrl = inputData?.imageUrl ?? inputData?.url;
+      if (sourceImgUrl && typeof sourceImgUrl === "string" && sourceImgUrl.startsWith("http")) {
+        try {
+          const imgResp = await fetch(sourceImgUrl);
+          const imgBuf = Buffer.from(await imgResp.arrayBuffer());
+          const imgMime = imgResp.headers.get("content-type") || "image/jpeg";
+          sourceImageDataUrl = `data:${imgMime};base64,${imgBuf.toString("base64")}`;
+          console.log(`[GN-011] Fetched source image: ${(imgBuf.length / 1024).toFixed(0)}KB`);
+        } catch (imgErr) {
+          console.warn("[GN-011] Failed to fetch source image for 3D floor:", imgErr);
+        }
+      }
+
+      const html = buildFloorPlan3D(fpGeometry, sourceImageDataUrl || undefined);
+
+      let viewerUrl = "";
+      try {
+        const { isR2Configured } = await import("@/lib/r2");
+        if (isR2Configured()) {
+          const r2Result = await uploadBase64ToR2(
+            Buffer.from(html, "utf-8").toString("base64"),
+            `3d-viewer-${generateId()}.html`,
+            "text/html"
+          );
+          if (r2Result && r2Result.startsWith("http")) viewerUrl = r2Result;
+        }
+      } catch (r2Err) {
+        console.warn("[GN-011] R2 upload failed:", r2Err);
+      }
+
+      artifact = {
+        id: generateId(),
+        executionId: executionId ?? "local",
+        tileInstanceId,
+        type: "html",
+        data: {
+          html,
+          label: `Interactive 3D Floor Plan — ${fpRooms.length} rooms`,
+          width: "100%",
+          height: "600px",
+          fileName: `floorplan-3d-${generateId()}.html`,
+          downloadUrl: viewerUrl || undefined,
+          mimeType: "text/html",
+          roomCount: fpRooms.length,
+          wallCount: fpWalls.length,
+          floorPlanGeometry: fpGeometry,
+          sourceImageUrl: inputData?.imageUrl ?? inputData?.url ?? undefined,
+        },
+        metadata: { engine: "threejs-r128", real: true },
+        createdAt: new Date(),
+      };
 
     } else {
       return NextResponse.json(

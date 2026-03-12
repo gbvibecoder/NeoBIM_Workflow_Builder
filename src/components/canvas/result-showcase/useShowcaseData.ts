@@ -72,9 +72,21 @@ export interface HtmlIframeModelData {
   label: string;
   roomCount?: number;
   wallCount?: number;
+  geometry?: import("@/types/floor-plan").FloorPlanGeometry;
 }
 
-export type Model3DData = ProceduralModelData | GlbModelData | HtmlIframeModelData;
+export interface FloorPlanEditorData {
+  kind: "floor-plan-editor";
+  geometry: import("@/types/floor-plan").FloorPlanGeometry;
+  sourceImageUrl: string;
+  url: string;
+  content: string;
+  label: string;
+  roomCount?: number;
+  wallCount?: number;
+}
+
+export type Model3DData = ProceduralModelData | GlbModelData | HtmlIframeModelData | FloorPlanEditorData;
 
 export interface PipelineStep {
   nodeId: string;
@@ -276,14 +288,31 @@ export function useShowcaseData(): ShowcaseData {
     const htmlArtifact = findByType(artifacts, "html");
     if (!model3dData && htmlArtifact) {
       const d = asRecord(htmlArtifact.data);
-      model3dData = {
-        kind: "html-iframe",
-        url: (d.downloadUrl as string) ?? "",
-        content: (d.html as string) ?? "",
-        label: (d.label as string) ?? "Interactive 3D Viewer",
-        roomCount: d.roomCount as number | undefined,
-        wallCount: d.wallCount as number | undefined,
-      };
+      const hasEditorData = d.floorPlanGeometry && d.sourceImageUrl;
+
+      if (hasEditorData) {
+        // Floor Plan Editor mode — geometry + source image available
+        model3dData = {
+          kind: "floor-plan-editor",
+          geometry: d.floorPlanGeometry as import("@/types/floor-plan").FloorPlanGeometry,
+          sourceImageUrl: d.sourceImageUrl as string,
+          url: (d.downloadUrl as string) ?? "",
+          content: (d.html as string) ?? "",
+          label: (d.label as string) ?? "Floor Plan Editor",
+          roomCount: d.roomCount as number | undefined,
+          wallCount: d.wallCount as number | undefined,
+        };
+      } else {
+        model3dData = {
+          kind: "html-iframe",
+          url: (d.downloadUrl as string) ?? "",
+          content: (d.html as string) ?? "",
+          label: (d.label as string) ?? "Interactive 3D Viewer",
+          roomCount: d.roomCount as number | undefined,
+          wallCount: d.wallCount as number | undefined,
+          geometry: d.floorPlanGeometry as import("@/types/floor-plan").FloorPlanGeometry | undefined,
+        };
+      }
     }
 
     // ── Files ──

@@ -1,5 +1,6 @@
 import OpenAI from "openai";
 import { detectOpenAIError, APIError } from "@/lib/user-errors";
+import type { FloorPlanRoomType } from "@/types/floor-plan";
 
 function getClient(userApiKey?: string): OpenAI {
   const key = userApiKey || process.env.OPENAI_API_KEY;
@@ -742,14 +743,43 @@ export interface ImageAnalysis {
   exteriorPrompt?: string;
   /** DALL-E optimized interior description (best room) */
   interiorPrompt?: string;
-  /** Precise geometric data for 3D reconstruction (GN-011) */
+  /** Geometric data for 3D reconstruction (GN-011) */
   geometry?: {
-    footprint: { width: number; depth: number };
-    wallHeight: number;
-    walls: Array<{ start: [number, number]; end: [number, number]; thickness: number; type: "exterior" | "interior" }>;
-    doors: Array<{ position: [number, number]; width: number; wallId: number; type: "single" | "double" | "sliding" }>;
-    windows: Array<{ position: [number, number]; width: number; height: number; sillHeight: number }>;
-    rooms: Array<{ name: string; center: [number, number]; width: number; depth: number; type: string }>;
+    buildingWidth: number;
+    buildingDepth: number;
+    /** Building shape classification */
+    buildingShape?: string;
+    /** For non-rectangular buildings: outline vertices in meters [[x,y], ...] */
+    buildingOutline?: [number, number][];
+    /** Row-based layout (preferred): array of rows, each row = array of rooms left-to-right */
+    rows?: Array<Array<{
+      name: string;
+      type: string;
+      width: number;
+      depth: number;
+      adjacentRooms?: string[];
+    }>>;
+    /** Absolute x,y positioned rooms */
+    rooms: Array<{
+      name: string;
+      type: string;
+      width: number;
+      depth: number;
+      x: number;
+      y: number;
+      adjacentRooms?: string[];
+      /** Polygon vertices [[x,y], ...] from SVG parsing */
+      polygon?: [number, number][];
+      /** Area in m² */
+      area?: number;
+    }>;
+    /** Wall segments from SVG parsing */
+    walls?: Array<{
+      start: [number, number];
+      end: [number, number];
+      thickness: number;
+      type: "exterior" | "interior";
+    }>;
   };
 }
 
@@ -790,20 +820,60 @@ export async function analyzeImage(
     // Floor plans get GPT-4o for rich room-by-room extraction + render prompts.
     // Non-floor-plans use GPT-4o-mini (cheaper, sufficient for building photos).
     const model = isFloorPlan ? "gpt-4o" : "gpt-4o-mini";
-    const maxTokens = isFloorPlan ? 4500 : 1500;
+    const maxTokens = isFloorPlan ? 5000 : 1500;
 
     const systemPrompt = isFloorPlan
-      ? `You are an expert architectural analyst. Analyze this 2D floor plan image and extract a detailed room-by-room description.
+      ? `You are an expert architectural floor plan analyst. Extract the EXACT room layout from a 2D floor plan image.
 
-Output JSON with ALL of these fields:
+STEP 1 — IDENTIFY ROOMS:
+Look at the image carefully. List ONLY rooms you can ACTUALLY SEE as enclosed areas.
+- Read room labels/names directly from the image text
+- If a room has no label, name it by furniture symbols inside it
+- Do NOT invent rooms. If you see 4, output 4. If 10, output 10.
+- Studios may have 2-3 rooms, small flats 4-5, houses 8-12. ALL are valid.
+
+STEP 2 — READ DIMENSIONS:
+- Look for dimension text on or near each room ("3.2M X 3.6M", "11' x 13'4", "208 sq ft")
+- Use EXACTLY the dimensions shown. Do NOT inflate or round up.
+- Imperial → meters: 1 foot = 0.3048m, 1 inch = 0.0254m
+- Sq ft without dimensions → estimate width/depth to match area
+- No dimensions visible → estimate from proportions relative to rooms that DO have dimensions
+
+STEP 3 — ORGANIZE INTO ROWS (CRITICAL):
+Describe the layout as horizontal ROWS from TOP to BOTTOM of the plan.
+Within each row, list rooms from LEFT to RIGHT.
+
+Rules:
+- Each room appears in EXACTLY ONE row
+- Within a row, rooms sit side by side (left to right)
+- Rooms in the same row should have SIMILAR depth (use the deepest room's depth for the row)
+- Rows stack vertically: top row first, bottom row last
+- A hallway/corridor that spans the width = its own row
+- Include ALL rooms in exactly one row
+
+Example: A 3BHK flat with Veranda left, Living/Dining/Kitchen across the top, Hallway in middle, Bedrooms at bottom:
+"rows": [
+  [{"name":"Veranda","type":"veranda","width":1.8,"depth":3.6},{"name":"Living Room","type":"living","width":3.2,"depth":3.6},{"name":"Dining","type":"dining","width":3.2,"depth":3.6},{"name":"Kitchen","type":"kitchen","width":3.2,"depth":3.6}],
+  [{"name":"Hallway","type":"hallway","width":11.4,"depth":1.5}],
+  [{"name":"Bedroom 3","type":"bedroom","width":4.1,"depth":3.5},{"name":"Bath","type":"bathroom","width":2.0,"depth":3.5},{"name":"Bedroom 2","type":"bedroom","width":3.0,"depth":3.5},{"name":"Bedroom 1","type":"bedroom","width":2.3,"depth":3.5}]
+]
+
+ACCURACY RULES (MANDATORY):
+1. Output ONLY rooms visible in the image. NEVER invent extra rooms.
+2. Use dimension text from image EXACTLY.
+3. The "rooms" array, "richRooms" array, and geometry must have the SAME rooms.
+4. Room types: living|bedroom|kitchen|dining|bathroom|hallway|veranda|balcony|entrance|passage|utility|storage|closet|office|patio|staircase|other
+5. adjacentRooms = rooms sharing a wall or connected by a door.
+
+Output JSON:
 {
-  "buildingType": "e.g. 2-Bedroom Apartment, 3BHK Residential Unit",
+  "buildingType": "e.g. 1BHK Studio / 3BHK Residential Unit",
   "floors": 1,
   "style": "e.g. Modern Minimalist",
   "features": ["feature1", "feature2"],
-  "description": "Comprehensive architectural description of the layout",
-  "facade": "Infer facade from plan context (modern, traditional, etc.)",
-  "massing": "Overall footprint shape and approximate total area",
+  "description": "Comprehensive architectural description",
+  "facade": "Infer facade from plan context",
+  "massing": "Overall footprint shape and total area",
   "siteRelationship": "Orientation and context if visible",
   "isFloorPlan": true,
   "rooms": [{"name": "Living Room", "dimensions": "3.6m x 4.2m"}, ...],
@@ -813,59 +883,38 @@ Output JSON with ALL of these fields:
       "name": "Living Room",
       "dimensions": "3.2m x 3.6m",
       "position": "upper-left",
-      "connections": ["Veranda", "Dining", "Hallway"],
-      "doors": ["south wall to hallway", "west wall to veranda"],
+      "connections": ["Kitchen", "Hallway"],
+      "doors": ["south wall to hallway"],
       "windows": ["north wall"],
-      "furniture": ["L-shaped sofa", "coffee table", "rug"]
+      "furniture": ["sofa", "coffee table"]
     }
   ],
-  "footprint": { "shape": "L-shaped", "width": "14m", "depth": "9m" },
-  "circulation": "Central hallway connects upper wing to lower wing...",
-  "exteriorPrompt": "Ultra-photorealistic architectural exterior render of: [describe the complete building exterior inferred from the floor plan — shape, facade materials, roof type, entrance, landscaping]. Shot from a 30-degree elevated angle showing the full building. Golden hour lighting, soft shadows, V-Ray render quality, 8K resolution, architectural photography. No people, no cars.",
-  "interiorPrompt": "Ultra-photorealistic interior architectural render of: [describe the most impressive room — dimensions, flooring, walls, furniture, lighting, windows]. Wide-angle lens, eye-level perspective from the doorway looking in. Natural daylight, warm color temperature, V-Ray global illumination quality, Dezeen magazine photography style. No people."
-}
-
-ALSO extract precise geometric data for 3D reconstruction in a "geometry" field:
-{
+  "footprint": { "shape": "rectangular", "width": "12.7", "depth": "8.6" },
+  "circulation": "How rooms connect...",
+  "exteriorPrompt": "Ultra-photorealistic architectural exterior render of: [describe building]. 30-degree elevated angle. Golden hour, V-Ray quality, 8K. No people.",
+  "interiorPrompt": "Ultra-photorealistic interior render of: [describe best room]. Wide-angle, eye-level. Natural daylight. No people.",
   "geometry": {
-    "footprint": { "width": 14.0, "depth": 9.0 },
-    "wallHeight": 3.0,
-    "walls": [
-      { "start": [0, 0], "end": [14, 0], "thickness": 0.2, "type": "exterior" },
-      { "start": [6.4, 0], "end": [6.4, 5.4], "thickness": 0.15, "type": "interior" }
-    ],
-    "doors": [
-      { "position": [3.2, 5.4], "width": 0.9, "wallId": 5, "type": "single" }
-    ],
-    "windows": [
-      { "position": [7, 0], "width": 1.5, "height": 1.2, "sillHeight": 0.9 }
-    ],
-    "rooms": [
-      { "name": "Living Room", "center": [1.6, 1.8], "width": 3.2, "depth": 3.6, "type": "living" }
+    "buildingWidth": 12.7,
+    "buildingDepth": 8.6,
+    "rows": [
+      [
+        {"name": "Veranda", "type": "veranda", "width": 1.8, "depth": 3.6, "adjacentRooms": ["Living Room"]},
+        {"name": "Living Room", "type": "living", "width": 3.2, "depth": 3.6, "adjacentRooms": ["Veranda", "Dining", "Hallway"]},
+        {"name": "Dining", "type": "dining", "width": 3.2, "depth": 3.6, "adjacentRooms": ["Living Room", "Kitchen"]},
+        {"name": "Kitchen", "type": "kitchen", "width": 3.2, "depth": 3.6, "adjacentRooms": ["Dining"]}
+      ],
+      [
+        {"name": "Hallway", "type": "hallway", "width": 11.4, "depth": 1.5, "adjacentRooms": ["Living Room", "Bedroom 3", "Bedroom 2", "Bedroom 1"]}
+      ],
+      [
+        {"name": "Bedroom 3", "type": "bedroom", "width": 4.1, "depth": 3.5, "adjacentRooms": ["Hallway"]},
+        {"name": "Bath", "type": "bathroom", "width": 2.0, "depth": 3.5, "adjacentRooms": ["Hallway"]},
+        {"name": "Bedroom 2", "type": "bedroom", "width": 3.0, "depth": 3.5, "adjacentRooms": ["Hallway"]},
+        {"name": "Bedroom 1", "type": "bedroom", "width": 3.6, "depth": 3.5, "adjacentRooms": ["Hallway"]}
+      ]
     ]
   }
-}
-
-GEOMETRY RULES:
-- Use a coordinate system with origin at the TOP-LEFT corner of the floor plan
-- X axis goes LEFT to RIGHT (meters), Y axis goes TOP to BOTTOM (meters)
-- Read ALL dimension labels from the plan to determine actual measurements
-- If dimensions aren't labeled, estimate proportionally from the overall footprint
-- Trace ALL exterior walls as line segments forming the perimeter
-- Trace ALL interior partition walls as separate segments
-- Exterior wall thickness: 0.2m, interior: 0.15m
-- Doors: position is the center of the door on its wall, wallId is the index in the walls array
-- Windows: position is the center, default height 1.2m, default sillHeight 0.9m
-- Rooms: center is the geometric center [x, y], type is one of: living, bedroom, kitchen, dining, bathroom, veranda, hallway, storage, office, other
-- wallHeight defaults to 3.0m unless the plan indicates otherwise
-
-CRITICAL RULES:
-- Extract EVERY room with exact dimensions from labels
-- For richRooms, analyze position (upper-left, center, etc.), door/window locations, and infer appropriate furniture
-- The exteriorPrompt must describe a complete building exterior that matches the floor plan footprint
-- The interiorPrompt must describe the largest/most impressive living space from the plan
-- The geometry field must have accurate wall coordinates that form a closed perimeter
-- Be specific about materials, proportions, and spatial relationships`
+}`
       : `You are a senior architect analyzing an image. Describe what you see in precise architectural terms. Output JSON with these fields:
 {
   "buildingType": "Mixed-Use Tower|Residential Block|...",
@@ -898,7 +947,7 @@ Be specific about dimensions, proportions, materials, and spatial relationships.
             {
               type: "text",
               text: isFloorPlan
-                ? "Analyze this floor plan. Extract every room, generate exterior and interior render prompts, and extract precise wall/door/window geometry coordinates."
+                ? "Analyze this floor plan. List EVERY SINGLE ROOM — including bathrooms, closets, hallways, verandas, passages, and utility areas. Each room MUST appear in both the 'rooms' array AND the 'geometry.rooms' array with name, type, width, depth, x, y, and adjacentRooms. Use absolute x,y positions in meters from the building's top-left corner. Rooms must tile together with NO GAPS. A typical home has 8-12 rooms."
                 : "Analyze this image in architectural terms. Describe the building, its style, materials, and spatial qualities.",
             },
           ],
@@ -934,4 +983,315 @@ Be specific about dimensions, proportions, materials, and spatial relationships.
       geometry: result.geometry ?? undefined,
     };
   });
+}
+
+// ─── Room Labeling (GPT-4o, used after sharp pixel detection) ──────────────
+
+export interface RoomLabelingInput {
+  roomCenters: Array<{ center: [number, number]; width: number; depth: number }>;
+  imageBase64: string;
+  mimeType: string;
+}
+
+export interface RoomLabelingResult {
+  rooms: Array<{
+    index: number;
+    name: string;
+    type: FloorPlanRoomType;
+    refinedWidth?: number;
+    refinedDepth?: number;
+  }>;
+  footprint?: { width: number; depth: number };
+}
+
+/**
+ * GPT-4o labels detected room regions from pixel analysis.
+ * Much cheaper than full geometry extraction — only asks for names/types.
+ */
+export async function labelDetectedRooms(
+  input: RoomLabelingInput,
+  userApiKey?: string,
+): Promise<RoomLabelingResult> {
+  const client = getClient(userApiKey);
+
+  const roomList = input.roomCenters
+    .map((r, i) => `  Room ${i}: center=(${r.center[0].toFixed(1)}, ${r.center[1].toFixed(1)}), approx ${r.width.toFixed(1)}m × ${r.depth.toFixed(1)}m`)
+    .join("\n");
+
+  const systemPrompt = `You are an architectural floor plan reader. You will be shown a 2D floor plan image along with room regions detected by computer vision. Your job is to READ the text labels visible on the floor plan and assign each detected room a name and type.
+
+Room types: living, bedroom, kitchen, dining, bathroom, veranda, hallway, storage, office, other.
+
+Respond ONLY with a JSON object:
+{
+  "rooms": [
+    { "index": 0, "name": "Living Room", "type": "living" },
+    ...
+  ],
+  "footprint": { "width": <meters>, "depth": <meters> }
+}
+
+If you can read dimension text on the plan (e.g. "3.2M × 3.6M"), add "refinedWidth" and "refinedDepth" in meters for that room.
+If you cannot determine a room's name from the image, use a reasonable guess based on its size and position (e.g. small rooms near bedrooms → bathroom).`;
+
+  const userPrompt = `I used computer vision to detect these room regions on the attached floor plan:\n${roomList}\n\nPlease read the room name labels visible in the image and assign name + type to each detected room. Also estimate the overall footprint in meters if possible.`;
+
+  return handleOpenAICall(async () => {
+    const response = await client.chat.completions.create({
+      model: "gpt-4o",
+      max_tokens: 800,
+      temperature: 0.1,
+      messages: [
+        { role: "system", content: systemPrompt },
+        {
+          role: "user",
+          content: [
+            { type: "text", text: userPrompt },
+            {
+              type: "image_url",
+              image_url: {
+                url: `data:${input.mimeType};base64,${input.imageBase64}`,
+                detail: "high",
+              },
+            },
+          ],
+        },
+      ],
+    }, { timeout: 45_000 });
+
+    const raw = response.choices[0]?.message?.content ?? "{}";
+    const cleaned = raw.replace(/```json\s*/g, "").replace(/```\s*/g, "").trim();
+
+    try {
+      const parsed = JSON.parse(cleaned);
+      return {
+        rooms: (parsed.rooms ?? []).map((r: Record<string, unknown>, i: number) => ({
+          index: typeof r.index === "number" ? r.index : i,
+          name: String(r.name ?? `Room ${i + 1}`),
+          type: (String(r.type ?? "other")) as FloorPlanRoomType,
+          refinedWidth: typeof r.refinedWidth === "number" ? r.refinedWidth : undefined,
+          refinedDepth: typeof r.refinedDepth === "number" ? r.refinedDepth : undefined,
+        })),
+        footprint: parsed.footprint ?? undefined,
+      };
+    } catch {
+      // If GPT response isn't valid JSON, return generic labels
+      return {
+        rooms: input.roomCenters.map((_, i) => ({
+          index: i,
+          name: `Room ${i + 1}`,
+          type: "other" as FloorPlanRoomType,
+        })),
+      };
+    }
+  });
+}
+
+// ─── GPT-4o SVG Floor Plan Analysis ──────────────────────────────────────────
+
+export async function analyzeFloorPlanSVG(
+  imageBase64: string,
+  mimeType: string = "image/jpeg",
+  userApiKey?: string
+) {
+  const client = getClient(userApiKey);
+
+  console.log("[GPT-4o SVG] Generating SVG floor plan...");
+
+  const response = await client.chat.completions.create({
+    model: "gpt-4o",
+    max_tokens: 8000,
+    messages: [
+      {
+        role: "user",
+        content: [
+          {
+            type: "image_url",
+            image_url: { url: `data:${mimeType};base64,${imageBase64}` },
+          },
+          {
+            type: "text",
+            text: `Look at this floor plan image. Recreate it as an SVG drawing.
+
+The SVG must be a FAITHFUL reproduction of the floor plan layout.
+Use a coordinate system where 1 unit = 1 meter.
+
+Read dimension labels from the image to determine exact sizes.
+If imperial (feet/inches), convert to meters (1 foot = 0.3048m).
+If no dimensions, estimate from typical room sizes.
+
+SVG RULES:
+
+1. viewBox="0 0 {widthMeters} {depthMeters}"
+
+2. BUILDING OUTLINE: A <polygon> with id="building-outline" class="outline"
+   - For rectangular: 4-point polygon
+   - For irregular: polygon with all vertices
+
+3. ROOMS: For EACH room, a <rect> or <polygon> with:
+   - class="room"
+   - data-name="{room label}" (e.g., "Living Room")
+   - data-type="{type}" (living|dining|kitchen|bedroom|bathroom|balcony|hallway|entrance|veranda|staircase|utility|storage|other)
+   - For rectangular rooms: use <rect x="..." y="..." width="..." height="..." class="room" data-name="..." data-type="..."/>
+   - For non-rectangular rooms: use <polygon points="x1,y1 x2,y2 ..." class="room" data-name="..." data-type="..."/>
+   - fill based on type: living=#D4A574, kitchen=#E8E0D8, bedroom=#C4956A, bathroom=#B8C8D8, balcony=#8B9F7B, hallway=#C5C0B8, other=#CCBBAA
+
+4. WALLS: For each wall segment, a <line> with:
+   - class="wall exterior" or class="wall interior"
+   - x1, y1, x2, y2 (ALL must be valid numbers, no undefined)
+   - stroke="#333" stroke-width="0.2" (exterior) or "0.12" (interior)
+
+5. Room labels: <text> with class="label" at room center
+
+CRITICAL RULES:
+- ALL coordinates in meters (1 SVG unit = 1 meter)
+- Room shapes must EXACTLY fill the building outline — no gaps
+- Adjacent rooms share edges — coordinates must match exactly
+- Only include rooms clearly visible in the image
+- ALL <line> elements MUST have valid numeric x1, y1, x2, y2
+- Use <rect> for rectangular rooms, <polygon> only for non-rectangular
+
+OUTPUT ONLY THE SVG. Start with <svg, end with </svg>. No explanation. No markdown.`,
+          },
+        ],
+      },
+    ],
+  });
+
+  const svgText = response.choices[0]?.message?.content?.trim() || "";
+
+  // Clean up SVG
+  let svgContent = svgText;
+  if (svgContent.includes("```")) {
+    svgContent = svgContent.replace(/```[a-z]*\n?/gi, "").replace(/```/g, "").trim();
+  }
+  const svgStart = svgContent.indexOf("<svg");
+  if (svgStart > 0) svgContent = svgContent.substring(svgStart);
+  const svgEnd = svgContent.lastIndexOf("</svg>");
+  if (svgEnd > 0) svgContent = svgContent.substring(0, svgEnd + 6);
+
+  if (!svgContent.startsWith("<svg")) {
+    throw new Error("GPT-4o did not return valid SVG");
+  }
+
+  console.log(`[GPT-4o SVG] SVG size: ${svgContent.length} chars`);
+  console.log("[GPT-4o SVG] First 300 chars:", svgContent.substring(0, 300));
+
+  // Save SVG for debugging
+  try {
+    const fs = await import("fs");
+    const path = await import("path");
+    fs.writeFileSync(path.join(process.cwd(), "public", "debug-floor-plan.svg"), svgContent);
+    console.log("[GPT-4o SVG] Saved to public/debug-floor-plan.svg");
+  } catch {
+    console.log("[GPT-4o SVG] Could not save debug file");
+  }
+
+  // Parse SVG using existing parser
+  const { parseSVGtoFloorPlan } = await import("./claude-vision");
+  const result = parseSVGtoFloorPlan(svgContent);
+  result.svgContent = svgContent;
+
+  console.log(`[GPT-4o SVG] Parsed: ${result.rooms.length} rooms, ${result.walls?.length ?? 0} walls`);
+  for (const r of result.rooms) {
+    console.log(`  ${r.name} (${r.type}): ${r.width}x${r.depth}m polygon:${r.polygon?.length ?? 0}pts area=${r.area}m²`);
+  }
+
+  return result;
+}
+
+// ─── GPT-4o Room Labeler (for Potrace pipeline) ─────────────────────────────
+
+/**
+ * Takes Potrace-detected regions + original image → GPT-4o labels the rooms.
+ * GPT-4o only reads text and classifies — geometry comes from pixel tracing.
+ */
+export async function labelFloorPlanRooms(
+  imageBase64: string,
+  mimeType: string,
+  regions: Array<{
+    id: number;
+    bounds: { x: number; y: number; width: number; height: number };
+    center: { x: number; y: number };
+    area: number;
+  }>,
+  imageWidth: number,
+  imageHeight: number,
+  userApiKey?: string,
+): Promise<{
+  buildingWidthMeters: number;
+  buildingDepthMeters: number;
+  rooms: Array<{
+    regionId: number;
+    name: string;
+    type: string;
+    widthMeters: number;
+    depthMeters: number;
+  }>;
+}> {
+  const client = getClient(userApiKey);
+
+  const regionDescriptions = regions
+    .map(
+      (r) =>
+        `Region ${r.id}: position (${Math.round(r.center.x)}px, ${Math.round(r.center.y)}px), ` +
+        `size ${Math.round(r.bounds.width)}x${Math.round(r.bounds.height)}px, ` +
+        `at ${Math.round((r.center.x / imageWidth) * 100)}% from left, ${Math.round((r.center.y / imageHeight) * 100)}% from top`,
+    )
+    .join("\n");
+
+  const response = await client.chat.completions.create({
+    model: "gpt-4o",
+    max_tokens: 2000,
+    response_format: { type: "json_object" },
+    messages: [
+      {
+        role: "user",
+        content: [
+          {
+            type: "image_url",
+            image_url: { url: `data:${mimeType};base64,${imageBase64}` },
+          },
+          {
+            type: "text",
+            text: `I detected these enclosed regions in this floor plan using computer vision:
+
+${regionDescriptions}
+
+Image size: ${imageWidth} x ${imageHeight} pixels
+
+For each region, tell me:
+1. What room is it? Read the label text from the image.
+2. What type? (living|dining|kitchen|bedroom|bathroom|balcony|hallway|entrance|veranda|staircase|utility|storage|other)
+3. Real-world dimensions in meters. Read dimension labels from image. Convert feet/inches to meters if needed.
+
+Also give the total building width and depth in meters.
+
+RULES:
+- Match each region ID to the room at that position in the image
+- Read dimension text directly from the image
+- Only label regions that are clearly rooms — skip tiny artifacts
+- If a region doesn't match any room, skip it
+
+JSON response:
+{
+  "buildingWidthMeters": 13.0,
+  "buildingDepthMeters": 9.0,
+  "rooms": [
+    { "regionId": 0, "name": "Living Room", "type": "living", "widthMeters": 3.2, "depthMeters": 3.6 }
+  ]
+}`,
+          },
+        ],
+      },
+    ],
+  });
+
+  const text = response.choices[0]?.message?.content?.trim() || "{}";
+  try {
+    return JSON.parse(text);
+  } catch {
+    console.error("[labelFloorPlanRooms] Failed to parse JSON:", text.substring(0, 200));
+    return { buildingWidthMeters: 10, buildingDepthMeters: 8, rooms: [] };
+  }
 }

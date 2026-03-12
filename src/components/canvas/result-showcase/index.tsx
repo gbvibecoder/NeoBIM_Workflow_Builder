@@ -23,7 +23,16 @@ interface ResultShowcaseProps {
 export function ResultShowcase({ onClose }: ResultShowcaseProps) {
   const data = useShowcaseData();
   const [activeTab, setActiveTab] = useState<TabId>("overview");
+  const hasAutoSwitched = useRef(false);
   const setVideoPlayerNodeId = useUIStore(s => s.setVideoPlayerNodeId);
+
+  // Auto-switch to "model" tab when 3D model becomes available
+  useEffect(() => {
+    if (!hasAutoSwitched.current && data.model3dData && data.availableTabs.includes("model")) {
+      setActiveTab("model");
+      hasAutoSwitched.current = true;
+    }
+  }, [data.model3dData, data.availableTabs]);
 
   const handleExpandVideo = () => {
     if (data.videoData?.nodeId) {
@@ -214,8 +223,8 @@ export function ResultShowcase({ onClose }: ResultShowcaseProps) {
       {/* Tab Content */}
       <div style={{
         flex: 1,
-        overflow: "auto",
-        padding: "24px 32px",
+        overflow: resolvedTab === "model" ? "hidden" : "auto",
+        padding: resolvedTab === "model" ? "0" : "24px 32px",
       }}>
         <AnimatePresence mode="wait">
           <motion.div
@@ -224,6 +233,7 @@ export function ResultShowcase({ onClose }: ResultShowcaseProps) {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -8 }}
             transition={{ duration: 0.2 }}
+            style={resolvedTab === "model" ? { height: "100%" } : undefined}
           >
             {resolvedTab === "overview" && (
               <OverviewTab

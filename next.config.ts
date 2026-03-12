@@ -51,8 +51,8 @@ const nextConfig: NextConfig = {
   async headers() {
     // unsafe-eval is required for Next.js dev mode HMR but not needed in production
     const scriptSrc = isDev
-      ? "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://js.stripe.com https://cdn.jsdelivr.net"
-      : "script-src 'self' 'unsafe-inline' https://js.stripe.com https://cdn.jsdelivr.net";
+      ? "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://js.stripe.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com"
+      : "script-src 'self' 'unsafe-inline' https://js.stripe.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com";
 
     return [
       {
@@ -68,7 +68,7 @@ const nextConfig: NextConfig = {
               font-src 'self' https://fonts.gstatic.com;
               media-src 'self' blob: data: https://*.klingai.com https://*.kuaishou.com https://*.ksyun.com https://*.ks-cdn.com https://*.kscampus.com https://*;
               connect-src 'self' https://api.openai.com https://api.stability.ai https://*.upstash.io https://api.stripe.com https://api.klingai.com https://*.klingai.com https://*.fal.ai https://fal.run;
-              frame-src 'self' https://js.stripe.com;
+              frame-src 'self' blob: https://js.stripe.com;
               object-src 'none';
               base-uri 'self';
               form-action 'self';

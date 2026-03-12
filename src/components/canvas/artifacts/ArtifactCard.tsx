@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { Download, ChevronDown, X, FileText, Image as ImageIcon, Database, BarChart2, Table2, File, LayoutGrid, Box, RefreshCw, Loader2, Video } from "lucide-react";
 import DOMPurify from "dompurify";
@@ -774,11 +774,22 @@ function HtmlBody({ data }: { data: HtmlArtifactData }) {
   const downloadUrl = data?.downloadUrl;
   const fileName = data?.fileName ?? "3d-model.html";
 
+  // Use blob URL to bypass parent CSP restrictions on external scripts
+  const blobUrl = useMemo(() => {
+    if (htmlString) {
+      return URL.createObjectURL(new Blob([htmlString], { type: "text/html" }));
+    }
+    return null;
+  }, [htmlString]);
+  useEffect(() => {
+    return () => { if (blobUrl) URL.revokeObjectURL(blobUrl); };
+  }, [blobUrl]);
+
   return (
     <div style={{ padding: "0 8px 10px 10px" }}>
-      {htmlString ? (
+      {blobUrl ? (
         <iframe
-          srcDoc={htmlString}
+          src={blobUrl}
           style={{
             width: data?.width || "100%",
             height: data?.height || "500px",

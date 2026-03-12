@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, TrendingUp, Star, GitFork, Clock, Upload, X, ChevronDown } from "lucide-react";
+import { Search, TrendingUp, Star, GitFork, Clock, MessageSquarePlus, X, ChevronDown } from "lucide-react";
 import { Header } from "@/components/dashboard/Header";
 import { WorkflowCard } from "@/components/community/WorkflowCard";
 import { PREBUILT_WORKFLOWS } from "@/constants/prebuilt-workflows";
@@ -128,24 +128,27 @@ const STATS = [
   { labelKey: "community.title" as const,             value: "Beta",    color: "#8B5CF6" },
 ];
 
-// ─── Publish Dialog ───────────────────────────────────────────────────────────
+// ─── Request Dialog ───────────────────────────────────────────────────────────
 
-const TAG_OPTIONS = ["Concept", "BIM", "Visualization", "Analysis", "Cost", "Compliance", "Site", "Parametric"];
+const CATEGORY_OPTIONS = ["Concept", "BIM", "Visualization", "Analysis", "Cost", "Compliance", "Site", "Parametric"];
 
-function PublishDialog({ onClose }: { onClose: () => void }) {
+const PRIORITY_OPTIONS = [
+  { value: "nice", labelKey: "community.priorityNice" as const },
+  { value: "need", labelKey: "community.priorityNeed" as const },
+  { value: "urgent", labelKey: "community.priorityUrgent" as const },
+] as const;
+
+function RequestDialog({ onClose }: { onClose: () => void }) {
   const { t } = useLocale();
   const [title, setTitle]       = useState("");
   const [desc, setDesc]         = useState("");
-  const [tags, setTags]         = useState<string[]>([]);
-  const router = useRouter();
+  const [category, setCategory] = useState("");
+  const [priority, setPriority] = useState("nice");
 
-  const toggleTag = (tag: string) =>
-    setTags(prev => prev.includes(tag) ? prev.filter(tg => tg !== tag) : [...prev, tag]);
-
-  const handlePublish = () => {
+  const handleSubmit = () => {
     if (!title.trim()) { toast.error(t('toast.titleRequired')); return; }
     if (!desc.trim())  { toast.error(t('toast.descRequired')); return; }
-    toast.info("Community publishing is coming soon! Your workflow details have been noted.", { duration: 4000 });
+    toast.success(t('community.requestSubmitted'), { duration: 4000 });
     onClose();
   };
 
@@ -180,7 +183,7 @@ function PublishDialog({ onClose }: { onClose: () => void }) {
           padding: "16px 20px", borderBottom: "1px solid #1A1A26",
         }}>
           <span style={{ flex: 1, fontSize: 15, fontWeight: 700, color: "#F0F0F5", letterSpacing: "-0.02em" }}>
-            {t('community.publishDialog')}
+            {t('community.requestDialog')}
           </span>
           <button
             onClick={onClose}
@@ -199,14 +202,15 @@ function PublishDialog({ onClose }: { onClose: () => void }) {
 
         {/* Form */}
         <div style={{ padding: "20px" }}>
-          {/* Beta notice */}
+          {/* Request notice */}
           <div style={{
             padding: "10px 14px", borderRadius: 8, marginBottom: 16,
-            background: "rgba(245,158,11,0.06)", border: "1px solid rgba(245,158,11,0.15)",
-            fontSize: 12, color: "#F59E0B", lineHeight: 1.5,
+            background: "rgba(79,138,255,0.06)", border: "1px solid rgba(79,138,255,0.15)",
+            fontSize: 12, color: "#8B9ECF", lineHeight: 1.5,
           }}>
-            Community publishing is in beta. Your workflow will be queued for review before appearing publicly.
+            {t('community.requestNotice')}
           </div>
+
           {/* Title */}
           <label style={{ fontSize: 11, fontWeight: 600, color: "#7C7C96", display: "block", marginBottom: 6 }}>
             {t('community.titleLabel')} <span style={{ color: "#EF4444" }}>*</span>
@@ -249,17 +253,17 @@ function PublishDialog({ onClose }: { onClose: () => void }) {
             onBlur={e => { (e.currentTarget as HTMLElement).style.borderColor = "rgba(255,255,255,0.05)"; }}
           />
 
-          {/* Tags */}
+          {/* Category */}
           <label style={{ fontSize: 11, fontWeight: 600, color: "#7C7C96", display: "block", marginBottom: 8 }}>
-            {t('community.tagsLabel')}
+            {t('community.categoryLabel')}
           </label>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 20 }}>
-            {TAG_OPTIONS.map(tag => {
-              const active = tags.includes(tag);
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 16 }}>
+            {CATEGORY_OPTIONS.map(cat => {
+              const active = category === cat;
               return (
                 <button
-                  key={tag}
-                  onClick={() => toggleTag(tag)}
+                  key={cat}
+                  onClick={() => setCategory(active ? "" : cat)}
                   style={{
                     padding: "4px 10px", borderRadius: 20, cursor: "pointer",
                     fontSize: 11, fontWeight: 500,
@@ -269,7 +273,33 @@ function PublishDialog({ onClose }: { onClose: () => void }) {
                     transition: "all 0.1s",
                   }}
                 >
-                  {tag}
+                  {cat}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Priority */}
+          <label style={{ fontSize: 11, fontWeight: 600, color: "#7C7C96", display: "block", marginBottom: 8 }}>
+            {t('community.priorityLabel')}
+          </label>
+          <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
+            {PRIORITY_OPTIONS.map(opt => {
+              const active = priority === opt.value;
+              return (
+                <button
+                  key={opt.value}
+                  onClick={() => setPriority(opt.value)}
+                  style={{
+                    padding: "5px 12px", borderRadius: 8, cursor: "pointer",
+                    fontSize: 11, fontWeight: 600,
+                    background: active ? "rgba(79,138,255,0.12)" : "#12121E",
+                    border: active ? "1px solid rgba(79,138,255,0.3)" : "1px solid #1E1E2E",
+                    color: active ? "#4F8AFF" : "#7C7C96",
+                    transition: "all 0.1s",
+                  }}
+                >
+                  {t(opt.labelKey)}
                 </button>
               );
             })}
@@ -291,7 +321,7 @@ function PublishDialog({ onClose }: { onClose: () => void }) {
               {t('community.cancel')}
             </button>
             <button
-              onClick={handlePublish}
+              onClick={handleSubmit}
               style={{
                 padding: "8px 18px", borderRadius: 8, cursor: "pointer",
                 fontSize: 12, fontWeight: 600, color: "white",
@@ -303,7 +333,7 @@ function PublishDialog({ onClose }: { onClose: () => void }) {
               onMouseEnter={e => { (e.currentTarget as HTMLElement).style.opacity = "0.87"; }}
               onMouseLeave={e => { (e.currentTarget as HTMLElement).style.opacity = "1"; }}
             >
-              {t('community.publishBtn')}
+              {t('community.requestBtn')}
             </button>
           </div>
         </div>
@@ -320,7 +350,7 @@ export default function CommunityPage() {
   const [activeFilter, setFilter] = useState("All");
   const [sortBy, setSortBy]       = useState("popular");
   const [showSort, setShowSort]   = useState(false);
-  const [showPublish, setPublish] = useState(false);
+  const [showRequest, setShowRequest] = useState(false);
 
   const { loadFromTemplate } = useWorkflowStore();
   const router = useRouter();
@@ -401,7 +431,7 @@ export default function CommunityPage() {
 
           {/* Publish button */}
           <button
-            onClick={() => setPublish(true)}
+            onClick={() => setShowRequest(true)}
             style={{
               display: "flex", alignItems: "center", gap: 7,
               padding: "8px 16px", borderRadius: 8, cursor: "pointer",
@@ -419,8 +449,8 @@ export default function CommunityPage() {
               (e.currentTarget as HTMLElement).style.borderColor = "rgba(79,138,255,0.2)";
             }}
           >
-            <Upload size={13} />
-            {t('community.publishYour')}
+            <MessageSquarePlus size={13} />
+            {t('community.requestYour')}
           </button>
         </div>
 
@@ -585,9 +615,9 @@ export default function CommunityPage() {
         </div>
       </main>
 
-      {/* Publish Dialog */}
+      {/* Request Dialog */}
       <AnimatePresence>
-        {showPublish && <PublishDialog onClose={() => setPublish(false)} />}
+        {showRequest && <RequestDialog onClose={() => setShowRequest(false)} />}
       </AnimatePresence>
     </div>
   );

@@ -2724,11 +2724,15 @@ export default function LandingPage() {
             </span>
           </div>
           <div style={{ display: "flex", gap: 24 }}>
-            {[t('landing.privacy'), t('landing.terms'), t('landing.contact')].map(l => (
-              <a key={l} href="#" style={{ fontSize: 12, color: "#5C5C78", textDecoration: "none", transition: "color 0.15s" }}
+            {[
+              { label: t('landing.privacy'), href: '/privacy' },
+              { label: t('landing.terms'), href: '/terms' },
+              { label: t('landing.contact'), href: '/contact' },
+            ].map(l => (
+              <Link key={l.href} href={l.href} style={{ fontSize: 12, color: "#5C5C78", textDecoration: "none", transition: "color 0.15s" }}
                 onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = "#9898B0"; }}
                 onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = "#5C5C78"; }}
-              >{l}</a>
+              >{l.label}</Link>
             ))}
           </div>
           <span style={{ fontSize: 11, color: "#3A3A50" }}>

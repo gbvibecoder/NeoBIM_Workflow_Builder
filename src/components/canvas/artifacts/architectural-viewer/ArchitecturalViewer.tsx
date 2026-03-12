@@ -142,6 +142,7 @@ export default function ArchitecturalViewer({ floors, height, footprint, buildin
     let onMouseMove: ((e: MouseEvent) => void) | null = null;
     let onResize: (() => void) | null = null;
     let resizeTimer: ReturnType<typeof setTimeout>;
+    let mountResizeTimer: ReturnType<typeof setTimeout>;
     let hoverThrottleId: ReturnType<typeof setTimeout> | null = null;
 
     try {
@@ -407,6 +408,21 @@ export default function ArchitecturalViewer({ floors, height, footprint, buildin
       if (minimapRenderer.domElement) minimapRenderer.domElement.style.opacity = "1";
     }, 800);
 
+    // Force immediate render + delayed resize to fix blank canvas on first load
+    renderer.render(scene, camera);
+    mountResizeTimer = setTimeout(() => {
+      if (container) {
+        const mw = container.clientWidth;
+        const mh = container.clientHeight;
+        if (mw > 0 && mh > 0) {
+          camera.aspect = mw / mh;
+          camera.updateProjectionMatrix();
+          renderer.setSize(mw, mh);
+          renderer.render(scene, camera);
+        }
+      }
+    }, 200);
+
     // ─── Animate ───────────────────────────────────────────────
     const direction = new THREE.Vector3();
     const fpMoveSpeed = 6;
@@ -551,6 +567,7 @@ export default function ArchitecturalViewer({ floors, height, footprint, buildin
       if (onMouseMove && rendererRef.current) rendererRef.current.domElement.removeEventListener("mousemove", onMouseMove);
       if (onResize) window.removeEventListener("resize", onResize);
       clearTimeout(resizeTimer!);
+      clearTimeout(mountResizeTimer);
       if (hoverThrottleId) clearTimeout(hoverThrottleId);
       cancelAnimationFrame(animFrameRef.current);
       try {

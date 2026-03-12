@@ -18,7 +18,7 @@ interface UIState {
   canvasZoom: number;
 
   // Modal states
-  isPublishDialogOpen: boolean;
+  isRequestDialogOpen: boolean;
   isNewWorkflowDialogOpen: boolean;
   isPromptModeActive: boolean;
 
@@ -55,7 +55,7 @@ interface UIState {
   setSelectedNodeIds: (ids: string[]) => void;
   setCanvasZoom: (zoom: number) => void;
 
-  setPublishDialogOpen: (open: boolean) => void;
+  setRequestDialogOpen: (open: boolean) => void;
   setNewWorkflowDialogOpen: (open: boolean) => void;
   setPromptModeActive: (active: boolean) => void;
 
@@ -74,7 +74,7 @@ export const useUIStore = create<UIState>()((set) => ({
   selectedNodeIds: [],
   canvasZoom: 1,
 
-  isPublishDialogOpen: false,
+  isRequestDialogOpen: false,
   isNewWorkflowDialogOpen: false,
   isPromptModeActive: false,
 
@@ -125,7 +125,7 @@ export const useUIStore = create<UIState>()((set) => ({
   setSelectedNodeIds: (ids) => set({ selectedNodeIds: ids }),
   setCanvasZoom: (zoom) => set({ canvasZoom: zoom }),
 
-  setPublishDialogOpen: (open) => set({ isPublishDialogOpen: open }),
+  setRequestDialogOpen: (open) => set({ isRequestDialogOpen: open }),
   setNewWorkflowDialogOpen: (open) => set({ isNewWorkflowDialogOpen: open }),
   setPromptModeActive: (active) => set({ isPromptModeActive: active }),
 
