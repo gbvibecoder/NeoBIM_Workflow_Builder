@@ -207,7 +207,7 @@ export default function BillingPage() {
             className="absolute inset-0"
           />
           
-          <div className="relative z-10 flex items-center gap-5">
+          <div className="relative z-10 flex items-center gap-5 billing-hackathon-inner">
             <motion.div
               animate={{ rotate: [0, 10, -10, 0], scale: [1, 1.1, 1] }}
               transition={{ duration: 2, repeat: Infinity }}

@@ -346,7 +346,7 @@ function ProfileSection({
           </div>
         </div>
 
-        <div style={{ padding: "28px 24px", display: "flex", alignItems: "center", gap: 24 }}>
+        <div className="settings-identity-layout" style={{ padding: "28px 24px", display: "flex", alignItems: "center", gap: 24 }}>
           {/* Avatar with scan ring — clickable */}
           <div
             style={{ position: "relative", flexShrink: 0, cursor: "pointer" }}
@@ -414,6 +414,7 @@ function ProfileSection({
                   display: "flex", alignItems: "center", gap: 8, cursor: "pointer",
                   fontSize: 22, fontWeight: 700, color: "#F0F0F5",
                   letterSpacing: "-0.02em", lineHeight: 1.2,
+                  overflowWrap: "break-word", wordBreak: "break-word",
                 }}
                 onClick={() => setIsEditingName(true)}
                 title="Click to edit name"
@@ -425,12 +426,13 @@ function ProfileSection({
             <div style={{
               fontSize: 13, color: "rgba(255,255,255,0.35)", marginTop: 4,
               fontFamily: "var(--font-jetbrains), monospace",
+              overflowWrap: "break-word", wordBreak: "break-all",
             }}>
               {user?.email ?? "\u2014"}
             </div>
 
             {/* Action buttons row */}
-            <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 14 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 14, flexWrap: "wrap" }}>
               {/* Clearance badge */}
               <div style={{
                 display: "inline-flex", alignItems: "center", gap: 6,
@@ -1129,17 +1131,17 @@ export default function SettingsPage() {
         </AnimatePresence>
       </header>
 
-      <main style={{ flex: 1, overflowY: "auto", padding: "28px 32px", position: "relative", zIndex: 1 }}>
+      <main className="settings-main-padding" style={{ flex: 1, overflowY: "auto", padding: "28px 32px", position: "relative", zIndex: 1 }}>
         <div style={{ maxWidth: 960, margin: "0 auto" }}>
           <SecurityBar />
 
-          <div style={{ display: "flex", gap: 24 }}>
+          <div className="settings-layout" style={{ display: "flex", gap: 24 }}>
             {/* Tab Navigation — Control Panel Selector */}
             <motion.div
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.4 }}
-              className="dp-glass-card"
+              className="dp-glass-card settings-sidebar"
               style={{
                 width: 220, flexShrink: 0, padding: 8,
                 display: "flex", flexDirection: "column", gap: 2,

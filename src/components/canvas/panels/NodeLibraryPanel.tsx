@@ -359,6 +359,7 @@ export function NodeLibraryPanel() {
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.95, y: -10 }}
         transition={{ type: "spring", stiffness: 500, damping: 35 }}
+        className="node-library-panel"
         style={{
           position: "fixed",
           top: "15%",

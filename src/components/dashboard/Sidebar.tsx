@@ -98,15 +98,15 @@ export function Sidebar() {
 
   const [showLabels, setShowLabels] = useState(false);
   useEffect(() => {
-    if (!collapsed || hoverExpanded) {
+    if (!collapsed || hoverExpanded || isMobile) {
       const timer = setTimeout(() => setShowLabels(true), 80);
       return () => clearTimeout(timer);
     } else {
       setShowLabels(false);
     }
-  }, [collapsed, hoverExpanded]);
+  }, [collapsed, hoverExpanded, isMobile]);
 
-  const isEffectivelyCollapsed = collapsed && !hoverExpanded;
+  const isEffectivelyCollapsed = isMobile ? false : (collapsed && !hoverExpanded);
   const sidebarWidth = isMobile ? 272 : isEffectivelyCollapsed ? 56 : 248;
 
   const handleSidebarEnter = useCallback(() => {

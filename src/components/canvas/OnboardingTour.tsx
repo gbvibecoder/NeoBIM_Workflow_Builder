@@ -74,10 +74,11 @@ export function OnboardingTour() {
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.94 }}
             transition={{ type: "spring", stiffness: 360, damping: 30 }}
+            className="onboarding-tooltip"
             style={{
               position: "fixed",
               bottom: 80, left: "50%", transform: "translateX(-50%)",
-              zIndex: 101, width: 340,
+              zIndex: 101, width: 340, maxWidth: "calc(100vw - 32px)",
               background: "rgba(7,8,9,0.92)", border: "1px solid rgba(184,115,51,0.15)",
               borderRadius: 4, padding: "18px 20px",
               boxShadow: "0 16px 48px rgba(0,0,0,0.6)",

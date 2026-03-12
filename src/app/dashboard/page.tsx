@@ -377,7 +377,7 @@ export default function DashboardPage() {
       <div className="dashboard-noise" />
 
       <main className="flex-1 overflow-y-auto relative" style={{ zIndex: 1 }}>
-        <div style={{ maxWidth: 1200, margin: "0 auto", padding: "36px 48px 64px", width: "100%" }}>
+        <div className="dashboard-home-container" style={{ maxWidth: 1200, margin: "0 auto", width: "100%" }}>
 
           {/* ════════════════════════════════════════════════════════════
               HEADER — Design Studio
@@ -387,7 +387,7 @@ export default function DashboardPage() {
             animate="visible"
             variants={{ visible: { transition: { staggerChildren: 0.1 } } }}
           >
-            <div className="flex items-start justify-between mb-12" style={{ gap: 24 }}>
+            <div className="flex items-start justify-between mb-12 dashboard-hero-header" style={{ gap: 24 }}>
               <div style={{ flex: 1 }}>
                 {/* Blueprint annotation */}
                 <motion.div
@@ -446,6 +446,7 @@ export default function DashboardPage() {
 
               {/* ── Stat Cards ────────────────────────────────────────── */}
               <motion.div
+                className="dashboard-stat-cards"
                 variants={fadeRight}
                 transition={{ duration: 0.6, ease: smoothEase }}
                 style={{ display: "flex", gap: 14, flexShrink: 0 }}
@@ -490,7 +491,7 @@ export default function DashboardPage() {
             <SectionLabel number="01" title="Quick Actions" />
           </motion.div>
 
-          <div className="flex items-stretch gap-0 mb-16">
+          <div className="flex items-stretch gap-0 mb-16 dashboard-quick-actions">
             {/* Card A: New Workflow */}
             <motion.div
               initial={{ opacity: 0, y: 24 }}
@@ -645,7 +646,7 @@ export default function DashboardPage() {
             <SectionLabel number="02" title="Your Pipeline" />
           </motion.div>
 
-          <div className="flex items-stretch gap-0 mb-16">
+          <div className="flex items-stretch gap-0 mb-16 dashboard-pipeline-steps">
             {(data.missions ?? []).map((mission, i) => {
               const isCompleted = mission.status === "completed";
               const isActive = mission.status === "in_progress";

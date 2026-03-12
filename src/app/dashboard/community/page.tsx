@@ -454,7 +454,7 @@ export default function CommunityPage() {
           </button>
         </div>
 
-        <div style={{ padding: "16px 24px" }}>
+        <div className="community-content" style={{ padding: "16px 24px" }}>
 
           {/* ── Search + Filter bar ──────────────────────────────────────── */}
           <div style={{

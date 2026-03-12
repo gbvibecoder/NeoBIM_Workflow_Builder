@@ -360,6 +360,7 @@ export function AIChatPanel({ messages, onAddMessage, onClear, isOpen, onToggle 
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 40, scale: 0.95 }}
             transition={{ type: "spring", stiffness: 400, damping: 30 }}
+            className="ai-chat-panel-floating"
             style={{
               position: "fixed",
               bottom: 20,

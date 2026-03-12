@@ -434,7 +434,7 @@ export default function TemplatesPage() {
           </div>
         </div>
 
-        <div style={{ padding: "24px 28px 40px" }}>
+        <div className="templates-content" style={{ padding: "24px 28px 40px" }}>
 
           {/* ── Filter bar ──────────────────────────────────────────────── */}
           <div style={{
