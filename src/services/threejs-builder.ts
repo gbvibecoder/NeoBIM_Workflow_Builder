@@ -64,12 +64,8 @@ var isNonRect=D.buildingOutline&&D.buildingOutline.length>=3&&D.buildingShape&&D
 var IMG_SRC="${sourceImage ?? ''}";
 var HAS_IMG=IMG_SRC.length>10;
 var HAS_SVG_WALLS=D.walls&&D.walls.length>4;
-var MODEL_BASE="${modelBase ?? ''}";
-if(!MODEL_BASE){try{MODEL_BASE=window.location.origin==='null'?'':window.location.origin}catch(e){}}
-if(!MODEL_BASE){try{MODEL_BASE=document.referrer?new URL(document.referrer).origin:''}catch(e){}}
-// Same-origin proxy avoids CORS issues; Next.js rewrites /r2-models/* → R2 CDN
-var MODEL_CDN=MODEL_BASE+"/r2-models";
-var HAS_MODELS=MODEL_BASE.length>2;
+var MODEL_CDN="https://pub-27d9a7371b6d47ff94fee1a3228f1720.r2.dev/models";
+var HAS_MODELS=true;
 var CX=BW/2,CZ=BD/2,MXD=Math.max(BW,BD);
 
 // ─── Inline OrbitControls ─────────────────────────────────────────────────────
@@ -385,19 +381,6 @@ function updateLoadBar(){
   loadingBar.textContent='Loading furniture: '+done+'/'+gltfTotal+' ('+Math.round(done/gltfTotal*100)+'%)';
 }
 
-// Probe which models exist on CDN (fast HEAD requests)
-var MODEL_FILES=['sofa','coffee-table','potted-plant','floor-lamp','tv-unit','bed','nightstand','dining-table','dining-chair','fridge','toilet','bathroom-vanity','office-desk','office-chair'];
-if(gltfLoader){
-  MODEL_FILES.forEach(function(id){
-    var url=MODEL_CDN+'/'+id+'.glb';
-    var xhr=new XMLHttpRequest();
-    xhr.open('HEAD',url,true);
-    xhr.onload=function(){modelAvailable[id]=(xhr.status>=200&&xhr.status<400);console.log('[GLTF] Probe '+id+': '+(modelAvailable[id]?'found':'missing'))};
-    xhr.onerror=function(){modelAvailable[id]=false};
-    xhr.send();
-  });
-}
-
 // Target heights (meters) for auto-scaling AI-generated models
 var MODEL_TARGET_H={
   'sofa':0.85,'coffee-table':0.45,'potted-plant':0.7,'floor-lamp':1.7,
@@ -410,7 +393,6 @@ function loadGLTF(filename,targetX,targetZ,targetW,targetD,rotY){
   var id=filename.replace('.glb','');
   if(!gltfLoader){return}
   var url=MODEL_CDN+'/'+filename;
-  if(modelAvailable[id]===false){return}
   gltfTotal++;
   updateLoadBar();
 
