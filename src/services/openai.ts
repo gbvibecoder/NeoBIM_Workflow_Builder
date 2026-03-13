@@ -2,10 +2,10 @@ import OpenAI from "openai";
 import { detectOpenAIError, APIError } from "@/lib/user-errors";
 import type { FloorPlanRoomType } from "@/types/floor-plan";
 
-function getClient(userApiKey?: string): OpenAI {
+function getClient(userApiKey?: string, timeout?: number): OpenAI {
   const key = userApiKey || process.env.OPENAI_API_KEY;
   if (!key) throw new Error("No OpenAI API key configured");
-  return new OpenAI({ apiKey: key, timeout: 30000, maxRetries: 1 });
+  return new OpenAI({ apiKey: key, timeout: timeout ?? 30000, maxRetries: 1 });
 }
 
 // ─── Error Handling ───────────────────────────────────────────────────────────
@@ -398,7 +398,7 @@ export async function generateConceptImage(
   viewType: "exterior" | "floor_plan" | "site_plan" | "interior" = "exterior"
 ): Promise<{ url: string; revisedPrompt: string }> {
   return handleOpenAICall(async () => {
-    const client = getClient(userApiKey);
+    const client = getClient(userApiKey, 60000); // 60s — DALL-E 3 HD images take longer
 
     let imagePrompt: string;
 
@@ -1322,7 +1322,7 @@ export async function generateFloorPlanRender(
     userApiKey?: string;
   },
 ): Promise<{ imageUrl: string; revisedPrompt: string }> {
-  const client = getClient(options?.userApiKey);
+  const client = getClient(options?.userApiKey, 60000); // 60s — DALL-E 3 HD images take longer
   const style = options?.style ?? "modern";
 
   const roomList = rooms

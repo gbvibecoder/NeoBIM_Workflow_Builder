@@ -2586,6 +2586,8 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
       }
 
       // ── DALL-E 3 Photorealistic Render (non-blocking) ──
+      // Use same key resolution as TR-004: user key → env var fallback
+      const renderApiKey = apiKey || process.env.OPENAI_API_KEY || undefined;
       let aiRenderUrl = "";
       try {
         const { generateFloorPlanRender } = await import("@/services/openai");
@@ -2593,11 +2595,11 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
           name: r.name, type: r.type, width: r.width, depth: r.depth,
         }));
         console.log(`[GN-011] Generating DALL-E 3 photorealistic render for ${renderRooms.length} rooms...`);
-        console.log(`[GN-011] API key present: ${!!apiKey}, key prefix: ${apiKey ? apiKey.substring(0, 8) + "..." : "NONE"}`);
+        console.log(`[GN-011] API key present: ${!!renderApiKey}, source: ${apiKey ? "user" : process.env.OPENAI_API_KEY ? "env" : "NONE"}, key prefix: ${renderApiKey ? renderApiKey.substring(0, 8) + "..." : "NONE"}`);
         const renderResult = await generateFloorPlanRender(
           renderRooms,
           { width: fpGeometry.footprint.width, depth: fpGeometry.footprint.depth },
-          { userApiKey: apiKey },
+          { userApiKey: renderApiKey },
         );
         aiRenderUrl = renderResult.imageUrl;
         console.log(`[GN-011] DALL-E render ready: ${aiRenderUrl ? aiRenderUrl.substring(0, 60) + "..." : "EMPTY"} (${(aiRenderUrl.length / 1024).toFixed(0)}KB)`);
