@@ -797,7 +797,7 @@ function HtmlBody({ data }: { data: HtmlArtifactData }) {
             borderRadius: 8,
             background: "#07070D",
           }}
-          sandbox="allow-scripts allow-same-origin"
+          sandbox="allow-scripts allow-same-origin allow-pointer-lock"
           title={data?.label ?? "Interactive 3D Model"}
         />
       ) : (

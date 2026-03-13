@@ -67,7 +67,7 @@ const nextConfig: NextConfig = {
               img-src 'self' blob: data: https://oaidalleapiprodscus.blob.core.windows.net https://picsum.photos https://images.unsplash.com https://lh3.googleusercontent.com https://*.vercel.app https://www.facebook.com;
               font-src 'self' https://fonts.gstatic.com;
               media-src 'self' blob: data: https://*.klingai.com https://*.kuaishou.com https://*.ksyun.com https://*.ks-cdn.com https://*.kscampus.com https://*;
-              connect-src 'self' https://api.openai.com https://api.stability.ai https://*.upstash.io https://api.stripe.com https://api.klingai.com https://*.klingai.com https://*.fal.ai https://fal.run https://www.facebook.com https://connect.facebook.net;
+              connect-src 'self' https://api.openai.com https://api.stability.ai https://*.upstash.io https://api.stripe.com https://api.klingai.com https://*.klingai.com https://*.fal.ai https://fal.run https://www.facebook.com https://connect.facebook.net https://pub-27d9a7371b6d47ff94fee1a3228f1720.r2.dev;
               frame-src 'self' blob: https://js.stripe.com;
               object-src 'none';
               base-uri 'self';
@@ -120,6 +120,16 @@ const nextConfig: NextConfig = {
             value: 'public, max-age=31536000, immutable',
           },
         ],
+      },
+    ];
+  },
+
+  // Proxy R2 CDN models through same origin to avoid CORS issues in iframe
+  async rewrites() {
+    return [
+      {
+        source: '/r2-models/:path*',
+        destination: 'https://pub-27d9a7371b6d47ff94fee1a3228f1720.r2.dev/models/:path*',
       },
     ];
   },

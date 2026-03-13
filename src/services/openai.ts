@@ -839,8 +839,16 @@ STEP 2 — READ DIMENSIONS:
 - Sq ft without dimensions → estimate width/depth to match area
 - No dimensions visible → estimate from proportions relative to rooms that DO have dimensions
 
-STEP 3 — ORGANIZE INTO ROWS (CRITICAL):
-Describe the layout as horizontal ROWS from TOP to BOTTOM of the plan.
+STEP 3 — LOCATE EACH ROOM'S POSITION (CRITICAL):
+For EACH room, provide its position in the image as a percentage:
+- "positionLeftPercent": percentage from the LEFT edge of the image to the room's LEFT wall (0 = far left, 100 = far right)
+- "positionTopPercent": percentage from the TOP edge of the image to the room's TOP wall (0 = top, 100 = bottom)
+
+Look at the image carefully. If a room's left wall is about 1/5 from the left edge, positionLeftPercent ≈ 20. If its top wall is near the top, positionTopPercent ≈ 5.
+Be precise — use the wall positions you can actually see.
+
+STEP 4 — ORGANIZE INTO ROWS (for compatibility):
+Also describe the layout as horizontal ROWS from TOP to BOTTOM of the plan.
 Within each row, list rooms from LEFT to RIGHT.
 
 Rules:
@@ -853,9 +861,9 @@ Rules:
 
 Example: A 3BHK flat with Veranda left, Living/Dining/Kitchen across the top, Hallway in middle, Bedrooms at bottom:
 "rows": [
-  [{"name":"Veranda","type":"veranda","width":1.8,"depth":3.6},{"name":"Living Room","type":"living","width":3.2,"depth":3.6},{"name":"Dining","type":"dining","width":3.2,"depth":3.6},{"name":"Kitchen","type":"kitchen","width":3.2,"depth":3.6}],
-  [{"name":"Hallway","type":"hallway","width":11.4,"depth":1.5}],
-  [{"name":"Bedroom 3","type":"bedroom","width":4.1,"depth":3.5},{"name":"Bath","type":"bathroom","width":2.0,"depth":3.5},{"name":"Bedroom 2","type":"bedroom","width":3.0,"depth":3.5},{"name":"Bedroom 1","type":"bedroom","width":2.3,"depth":3.5}]
+  [{"name":"Veranda","type":"veranda","width":1.8,"depth":3.6,"positionLeftPercent":2,"positionTopPercent":5},{"name":"Living Room","type":"living","width":3.2,"depth":3.6,"positionLeftPercent":15,"positionTopPercent":5},{"name":"Dining","type":"dining","width":3.2,"depth":3.6,"positionLeftPercent":40,"positionTopPercent":5},{"name":"Kitchen","type":"kitchen","width":3.2,"depth":3.6,"positionLeftPercent":65,"positionTopPercent":5}],
+  [{"name":"Hallway","type":"hallway","width":11.4,"depth":1.5,"positionLeftPercent":2,"positionTopPercent":42}],
+  [{"name":"Bedroom 3","type":"bedroom","width":4.1,"depth":3.5,"positionLeftPercent":2,"positionTopPercent":58},{"name":"Bath","type":"bathroom","width":2.0,"depth":3.5,"positionLeftPercent":34,"positionTopPercent":58},{"name":"Bedroom 2","type":"bedroom","width":3.0,"depth":3.5,"positionLeftPercent":50,"positionTopPercent":58},{"name":"Bedroom 1","type":"bedroom","width":3.6,"depth":3.5,"positionLeftPercent":75,"positionTopPercent":58}]
 ]
 
 ACCURACY RULES (MANDATORY):
@@ -898,19 +906,19 @@ Output JSON:
     "buildingDepth": 8.6,
     "rows": [
       [
-        {"name": "Veranda", "type": "veranda", "width": 1.8, "depth": 3.6, "adjacentRooms": ["Living Room"]},
-        {"name": "Living Room", "type": "living", "width": 3.2, "depth": 3.6, "adjacentRooms": ["Veranda", "Dining", "Hallway"]},
-        {"name": "Dining", "type": "dining", "width": 3.2, "depth": 3.6, "adjacentRooms": ["Living Room", "Kitchen"]},
-        {"name": "Kitchen", "type": "kitchen", "width": 3.2, "depth": 3.6, "adjacentRooms": ["Dining"]}
+        {"name": "Veranda", "type": "veranda", "width": 1.8, "depth": 3.6, "positionLeftPercent": 2, "positionTopPercent": 5, "adjacentRooms": ["Living Room"]},
+        {"name": "Living Room", "type": "living", "width": 3.2, "depth": 3.6, "positionLeftPercent": 15, "positionTopPercent": 5, "adjacentRooms": ["Veranda", "Dining", "Hallway"]},
+        {"name": "Dining", "type": "dining", "width": 3.2, "depth": 3.6, "positionLeftPercent": 40, "positionTopPercent": 5, "adjacentRooms": ["Living Room", "Kitchen"]},
+        {"name": "Kitchen", "type": "kitchen", "width": 3.2, "depth": 3.6, "positionLeftPercent": 65, "positionTopPercent": 5, "adjacentRooms": ["Dining"]}
       ],
       [
-        {"name": "Hallway", "type": "hallway", "width": 11.4, "depth": 1.5, "adjacentRooms": ["Living Room", "Bedroom 3", "Bedroom 2", "Bedroom 1"]}
+        {"name": "Hallway", "type": "hallway", "width": 11.4, "depth": 1.5, "positionLeftPercent": 2, "positionTopPercent": 42, "adjacentRooms": ["Living Room", "Bedroom 3", "Bedroom 2", "Bedroom 1"]}
       ],
       [
-        {"name": "Bedroom 3", "type": "bedroom", "width": 4.1, "depth": 3.5, "adjacentRooms": ["Hallway"]},
-        {"name": "Bath", "type": "bathroom", "width": 2.0, "depth": 3.5, "adjacentRooms": ["Hallway"]},
-        {"name": "Bedroom 2", "type": "bedroom", "width": 3.0, "depth": 3.5, "adjacentRooms": ["Hallway"]},
-        {"name": "Bedroom 1", "type": "bedroom", "width": 3.6, "depth": 3.5, "adjacentRooms": ["Hallway"]}
+        {"name": "Bedroom 3", "type": "bedroom", "width": 4.1, "depth": 3.5, "positionLeftPercent": 2, "positionTopPercent": 58, "adjacentRooms": ["Hallway"]},
+        {"name": "Bath", "type": "bathroom", "width": 2.0, "depth": 3.5, "positionLeftPercent": 34, "positionTopPercent": 58, "adjacentRooms": ["Hallway"]},
+        {"name": "Bedroom 2", "type": "bedroom", "width": 3.0, "depth": 3.5, "positionLeftPercent": 50, "positionTopPercent": 58, "adjacentRooms": ["Hallway"]},
+        {"name": "Bedroom 1", "type": "bedroom", "width": 3.6, "depth": 3.5, "positionLeftPercent": 75, "positionTopPercent": 58, "adjacentRooms": ["Hallway"]}
       ]
     ]
   }

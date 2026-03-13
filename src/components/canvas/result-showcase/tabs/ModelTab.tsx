@@ -56,7 +56,8 @@ export function ModelTab({ data }: ModelTabProps) {
 
   const handleGenerate3D = useCallback(async (geometry: FloorPlanGeometry) => {
     const { buildFloorPlan3D } = await import("@/services/threejs-builder");
-    setGeneratedHtml(buildFloorPlan3D(geometry));
+    const modelBase = typeof window !== "undefined" ? window.location.origin : "";
+    setGeneratedHtml(buildFloorPlan3D(geometry, undefined, modelBase));
     setViewMode("3d");
   }, []);
 
@@ -239,6 +240,7 @@ function FloorPlanLayout({
   const [showLabels, setShowLabels] = useState(true);
   const [selectedRoom, setSelectedRoom] = useState<string | null>(null);
   const [showAiRender, setShowAiRender] = useState(false);
+  const [isWalking, setIsWalking] = useState(false);
   const iframeReadyRef = useRef(false);
 
   // ── sendCommand: direct contentWindow.buildflowControls calls ──
@@ -255,6 +257,8 @@ function FloorPlanLayout({
         case "setPerspective": ctrl.perspective(); break;
         case "toggleLabels": ctrl.toggleLabels(); break;
         case "reset": ctrl.reset(); break;
+        case "walk": ctrl.walk(); break;
+        case "exitWalk": ctrl.exitWalk(); break;
         case "focusRoom": ctrl.focusRoom(payload?.x, payload?.z, payload?.size); break;
       }
       return;
@@ -278,6 +282,8 @@ function FloorPlanLayout({
             case "setPerspective": c.perspective(); break;
             case "toggleLabels": c.toggleLabels(); break;
             case "reset": c.reset(); break;
+            case "walk": c.walk(); break;
+            case "exitWalk": c.exitWalk(); break;
             case "focusRoom": c.focusRoom(payload?.x, payload?.z, payload?.size); break;
           }
         } else {
@@ -294,6 +300,9 @@ function FloorPlanLayout({
     const handler = (ev: MessageEvent) => {
       if (ev.data?.type === 'buildflow-ready') {
         iframeReadyRef.current = true;
+      }
+      if (ev.data?.type === 'walkModeChanged') {
+        setIsWalking(!!ev.data.walking);
       }
     };
     window.addEventListener('message', handler);
@@ -407,8 +416,9 @@ function FloorPlanLayout({
             boxShadow: "0 8px 32px rgba(0,0,0,0.6)",
           }}>
             {([
-              { id: "orbit", label: "Orbit", active: activeView === "perspective" && !showAiRender, disabled: false },
-              { id: "top", label: "Top", active: activeView === "top" && !showAiRender, disabled: false },
+              { id: "orbit", label: "Orbit", active: activeView === "perspective" && !showAiRender && !isWalking, disabled: false },
+              { id: "top", label: "Top", active: activeView === "top" && !showAiRender && !isWalking, disabled: false },
+              { id: "walk", label: "Walk", active: isWalking, disabled: false },
               { id: "labels", label: "Labels", active: showLabels, disabled: false },
               { id: "reset", label: "Reset", active: false, disabled: false },
               { id: "airender", label: aiRenderUrl ? "AI Render" : "AI Render...", active: showAiRender, disabled: !aiRenderUrl },
@@ -422,12 +432,27 @@ function FloorPlanLayout({
                     setShowAiRender(v => !v);
                   } else if (btn.id === "orbit") {
                     setShowAiRender(false);
+                    setIsWalking(false);
                     setActiveView("perspective");
+                    sendCommand("exitWalk");
                     sendCommand("setPerspective");
                   } else if (btn.id === "top") {
                     setShowAiRender(false);
+                    setIsWalking(false);
                     setActiveView("top");
+                    sendCommand("exitWalk");
                     sendCommand("setTopView");
+                  } else if (btn.id === "walk") {
+                    setShowAiRender(false);
+                    if (isWalking) {
+                      setIsWalking(false);
+                      sendCommand("exitWalk");
+                      setActiveView("perspective");
+                      sendCommand("setPerspective");
+                    } else {
+                      setIsWalking(true);
+                      sendCommand("walk");
+                    }
                   } else if (btn.id === "labels") {
                     setShowLabels(v => !v);
                     sendCommand("toggleLabels");
@@ -442,18 +467,24 @@ function FloorPlanLayout({
                     ? "rgba(255,255,255,0.02)"
                     : btn.id === "airender"
                       ? (btn.active ? "linear-gradient(135deg, rgba(139,92,246,0.3), rgba(236,72,153,0.3))" : "rgba(139,92,246,0.08)")
-                      : (btn.active ? "rgba(79,138,255,0.25)" : "rgba(255,255,255,0.04)"),
+                      : btn.id === "walk"
+                        ? (btn.active ? "rgba(16,185,129,0.25)" : "rgba(16,185,129,0.08)")
+                        : (btn.active ? "rgba(79,138,255,0.25)" : "rgba(255,255,255,0.04)"),
                   border: btn.disabled
                     ? "1px solid rgba(255,255,255,0.04)"
                     : btn.id === "airender"
                       ? (btn.active ? "1px solid rgba(139,92,246,0.6)" : "1px solid rgba(139,92,246,0.2)")
-                      : (btn.active ? "1px solid rgba(79,138,255,0.5)" : "1px solid rgba(255,255,255,0.06)"),
+                      : btn.id === "walk"
+                        ? (btn.active ? "1px solid rgba(16,185,129,0.6)" : "1px solid rgba(16,185,129,0.2)")
+                        : (btn.active ? "1px solid rgba(79,138,255,0.5)" : "1px solid rgba(255,255,255,0.06)"),
                   borderRadius: 10, padding: "8px 18px",
                   color: btn.disabled
                     ? "#3A3A4A"
                     : btn.id === "airender"
                       ? (btn.active ? "#D8B4FE" : "#A78BFA")
-                      : (btn.active ? "#6CB4FF" : "#7A7A90"),
+                      : btn.id === "walk"
+                        ? (btn.active ? "#6EE7B7" : "#10B981")
+                        : (btn.active ? "#6CB4FF" : "#7A7A90"),
                   fontSize: 12, fontWeight: btn.active ? 600 : 500,
                   cursor: btn.disabled ? "not-allowed" : "pointer",
                   opacity: btn.disabled ? 0.5 : 1,
@@ -855,7 +886,7 @@ function HtmlIframeViewer({
           pointerEvents: "auto",
         }}
         allow="fullscreen"
-        sandbox="allow-scripts allow-same-origin allow-downloads"
+        sandbox="allow-scripts allow-same-origin allow-downloads allow-pointer-lock"
       />
     </div>
   );

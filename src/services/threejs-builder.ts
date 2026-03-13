@@ -12,7 +12,7 @@
 
 import type { FloorPlanGeometry } from "@/types/floor-plan";
 
-export function buildFloorPlan3D(data: FloorPlanGeometry, sourceImage?: string): string {
+export function buildFloorPlan3D(data: FloorPlanGeometry, sourceImage?: string, modelBase?: string): string {
   const jsonData = JSON.stringify(data);
   const totalArea = data.rooms
     .reduce((s, r) => s + (r.area ?? r.width * r.depth), 0)
@@ -47,6 +47,15 @@ window.addEventListener("message",function(ev){
 });
 <\/script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js" onerror="document.title='CDN_FAIL';console.error('[IFRAME] Three.js CDN failed to load')"><\/script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/EffectComposer.js"><\/script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/RenderPass.js"><\/script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"><\/script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/ShaderPass.js"><\/script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/CopyShader.js"><\/script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/LuminosityHighPassShader.js"><\/script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/FXAAShader.js"><\/script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"><\/script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/PointerLockControls.js"><\/script>
 <script>
 "use strict";
 var D=${jsonData};
@@ -55,6 +64,12 @@ var isNonRect=D.buildingOutline&&D.buildingOutline.length>=3&&D.buildingShape&&D
 var IMG_SRC="${sourceImage ?? ''}";
 var HAS_IMG=IMG_SRC.length>10;
 var HAS_SVG_WALLS=D.walls&&D.walls.length>4;
+var MODEL_BASE="${modelBase ?? ''}";
+if(!MODEL_BASE){try{MODEL_BASE=window.location.origin==='null'?'':window.location.origin}catch(e){}}
+if(!MODEL_BASE){try{MODEL_BASE=document.referrer?new URL(document.referrer).origin:''}catch(e){}}
+// Same-origin proxy avoids CORS issues; Next.js rewrites /r2-models/* → R2 CDN
+var MODEL_CDN=MODEL_BASE+"/r2-models";
+var HAS_MODELS=MODEL_BASE.length>2;
 var CX=BW/2,CZ=BD/2,MXD=Math.max(BW,BD);
 
 // ─── Inline OrbitControls ─────────────────────────────────────────────────────
@@ -107,95 +122,238 @@ camera.lookAt(CX,0,CZ);
 var renderer=new THREE.WebGLRenderer({antialias:true,alpha:false});
 renderer.setSize(innerWidth,innerHeight);
 renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.physicallyCorrectLights=true;
 renderer.shadowMap.enabled=true;
 renderer.shadowMap.type=THREE.PCFSoftShadowMap;
 renderer.toneMapping=THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure=1.4;
+renderer.toneMappingExposure=1.1;
 renderer.outputEncoding=THREE.sRGBEncoding;
 document.body.appendChild(renderer.domElement);
 var controls=new THREE.OrbitControls(camera,renderer.domElement);
 controls.target.set(CX,0,CZ);
 
+// ─── HDR-Quality Environment Map (procedural sky dome) ───────────────────────
+(function(){
+  var pmremGen=new THREE.PMREMGenerator(renderer);
+  var envScene=new THREE.Scene();
+  // Sky dome with gradient — simulates real sky + ground for reflections
+  var skyGeo=new THREE.SphereGeometry(50,32,32);
+  var skyC=document.createElement('canvas');skyC.width=512;skyC.height=256;
+  var skyCtx=skyC.getContext('2d');
+  var skyGrad=skyCtx.createLinearGradient(0,0,0,256);
+  skyGrad.addColorStop(0,'#87CEEB');
+  skyGrad.addColorStop(0.35,'#B0D4E8');
+  skyGrad.addColorStop(0.48,'#E8DCC8');
+  skyGrad.addColorStop(0.52,'#D8C8A8');
+  skyGrad.addColorStop(0.65,'#C0B090');
+  skyGrad.addColorStop(1,'#8A7A68');
+  skyCtx.fillStyle=skyGrad;skyCtx.fillRect(0,0,512,256);
+  // Add a bright sun spot
+  var sunGrad=skyCtx.createRadialGradient(350,80,0,350,80,60);
+  sunGrad.addColorStop(0,'rgba(255,250,230,0.6)');
+  sunGrad.addColorStop(0.3,'rgba(255,240,200,0.2)');
+  sunGrad.addColorStop(1,'rgba(255,240,200,0)');
+  skyCtx.fillStyle=sunGrad;skyCtx.fillRect(290,20,120,120);
+  var skyTx=new THREE.CanvasTexture(skyC);
+  skyTx.mapping=THREE.EquirectangularReflectionMapping;
+  var skyMt=new THREE.MeshBasicMaterial({map:skyTx,side:THREE.BackSide});
+  envScene.add(new THREE.Mesh(skyGeo,skyMt));
+  // Add directional light into env scene for specular highlights
+  var envSun=new THREE.DirectionalLight(0xFFE8C0,3);
+  envSun.position.set(5,10,-3);envScene.add(envSun);
+  envScene.add(new THREE.AmbientLight(0xD0E0F0,0.6));
+  var envMap=pmremGen.fromScene(envScene,0).texture;
+  scene.environment=envMap;
+  pmremGen.dispose();
+  console.log('[BUILDER] Procedural HDR environment map applied');
+})();
+
 // ─── Lights (warm key + cool fill + sky hemisphere) ──────────────────────────
-scene.add(new THREE.AmbientLight(0xFFF5E8,.55));
-var sun=new THREE.DirectionalLight(0xFFECCC,1.5);
+scene.add(new THREE.AmbientLight(0xFFF5E8,.6));
+var sun=new THREE.DirectionalLight(0xFFECCC,2.5);
 sun.position.set(BW+6,22,-4);sun.castShadow=true;
 sun.shadow.mapSize.set(4096,4096);
 var sc=sun.shadow.camera;sc.left=-35;sc.right=35;sc.top=35;sc.bottom=-35;sc.near=1;sc.far=70;
 sun.shadow.bias=-.0002;sun.shadow.normalBias=.02;scene.add(sun);
-var fill=new THREE.DirectionalLight(0xC0D8F0,.45);
+var fill=new THREE.DirectionalLight(0xC0D8F0,.8);
 fill.position.set(-10,15,BD+6);scene.add(fill);
-var rim=new THREE.DirectionalLight(0xE0C8F0,.15);
+var rim=new THREE.DirectionalLight(0xE0C8F0,.25);
 rim.position.set(CX,-2,CZ-MXD);scene.add(rim);
-scene.add(new THREE.HemisphereLight(0xC0D8F0,0x8A7A60,.5));
+scene.add(new THREE.HemisphereLight(0xC0D8F0,0x8A7A60,.7));
 
-// ─── Texture Generators (512x512 floor, 256x256 plaster) ────────────────────
+// ─── Anisotropic Filtering ───────────────────────────────────────────────────
+var maxAniso=renderer.capabilities.getMaxAnisotropy();
+console.log('[BUILDER] Max anisotropy:',maxAniso);
+
+// ─── High-Quality Procedural Textures (1024x1024) ───────────────────────────
+function shiftHex(hex,amt){
+  var r=Math.max(0,Math.min(255,((hex>>16)&0xff)+amt));
+  var g=Math.max(0,Math.min(255,((hex>>8)&0xff)+amt));
+  var b=Math.max(0,Math.min(255,(hex&0xff)+amt));
+  return 'rgb('+r+','+g+','+b+')';
+}
+
 function makeFloorTex(type,hex){
-  var S=512,c=document.createElement("canvas");c.width=S;c.height=S;
+  var S=1024,c=document.createElement("canvas");c.width=S;c.height=S;
   var g=c.getContext("2d");
   var R=(hex>>16)&0xff,G=(hex>>8)&0xff,B=hex&0xff;
   g.fillStyle="rgb("+R+","+G+","+B+")";g.fillRect(0,0,S,S);
+
   if(type==="wood"){
-    // Plank rows
-    for(var y=0;y<S;y+=40){
-      var v=Math.random()*20-10;
-      g.fillStyle="rgba("+(v>0?200:60)+","+(v>0?160:40)+","+(v>0?100:20)+","+(Math.abs(v)/200)+")";
-      g.fillRect(0,y,S,38);
-      // Plank gap
-      g.fillStyle="rgba(30,15,5,0.25)";g.fillRect(0,y,S,1.5);
-      // Fine grain lines
-      for(var gi=0;gi<14;gi++){
-        var gy=y+2+Math.random()*36;
+    var plankH=Math.floor(S/6);
+    var baseColors=[[R,G,B],[R+12,G+8,B+4],[R-10,G-8,B-6],[R+5,G-2,B-4],[R-5,G+5,B+2]];
+    for(var row=0;row<6;row++){
+      var stagger=(row%2)*(S*0.35);
+      var pw=S*0.5+Math.random()*S*0.3;
+      for(var px=-pw;px<S+pw;px+=pw){
+        var bc=baseColors[Math.floor(Math.random()*baseColors.length)];
+        var pGrad=g.createLinearGradient(px+stagger,0,px+stagger+pw,0);
+        pGrad.addColorStop(0,'rgb('+bc[0]+','+bc[1]+','+bc[2]+')');
+        pGrad.addColorStop(0.3,'rgb('+(bc[0]+8)+','+(bc[1]+5)+','+(bc[2]+2)+')');
+        pGrad.addColorStop(0.7,'rgb('+(bc[0]-5)+','+(bc[1]-3)+','+(bc[2]-2)+')');
+        pGrad.addColorStop(1,'rgb('+bc[0]+','+bc[1]+','+bc[2]+')');
+        g.fillStyle=pGrad;
+        g.fillRect(px+stagger+1,row*plankH+1.5,pw-2,plankH-3);
+        // Vertical plank-end gap
+        g.fillStyle='rgba(25,12,4,0.3)';
+        g.fillRect(px+stagger,row*plankH,1.5,plankH);
+      }
+      // Horizontal plank gap
+      g.fillStyle='rgba(20,8,2,0.5)';
+      g.fillRect(0,row*plankH,S,2);
+      // Wavy grain lines
+      for(var gi=0;gi<35;gi++){
+        var gy=row*plankH+3+Math.random()*(plankH-6);
         var gAlpha=0.02+Math.random()*0.06;
-        g.fillStyle="rgba(60,35,12,"+gAlpha+")";
-        g.fillRect(0,gy,S,0.8);
+        g.strokeStyle='rgba(50,28,10,'+gAlpha+')';
+        g.lineWidth=0.5+Math.random()*0.8;
+        g.beginPath();
+        g.moveTo(0,gy);
+        for(var gx=0;gx<S;gx+=25){
+          g.lineTo(gx,gy+Math.sin(gx*0.04+row)*1.5+(Math.random()-0.5)*1.2);
+        }
+        g.stroke();
       }
-      // Subtle knot (rare)
-      if(Math.random()<0.15){
-        var kx=40+Math.random()*(S-80),ky=y+10+Math.random()*18;
-        g.beginPath();g.arc(kx,ky,3+Math.random()*4,0,Math.PI*2);
-        g.fillStyle="rgba(50,28,8,0.2)";g.fill();
-      }
-    }
-    // Vertical stagger lines (plank ends)
-    for(var vl=0;vl<4;vl++){
-      var vlx=S*.2+Math.random()*S*.6;
-      for(var vly=0;vly<S;vly+=80){
-        g.fillStyle="rgba(30,15,5,0.18)";g.fillRect(vlx,vly+Math.random()*20,1.5,40);
+      // Knots with radial gradient
+      if(Math.random()<0.2){
+        var kx=80+Math.random()*(S-160),ky=row*plankH+plankH*0.35+Math.random()*plankH*0.3;
+        var kr=6+Math.random()*10;
+        var kGrad=g.createRadialGradient(kx,ky,0,kx,ky,kr);
+        kGrad.addColorStop(0,'rgba(50,30,12,0.4)');
+        kGrad.addColorStop(0.6,'rgba(70,45,22,0.2)');
+        kGrad.addColorStop(1,'rgba(0,0,0,0)');
+        g.fillStyle=kGrad;
+        g.beginPath();g.arc(kx,ky,kr,0,Math.PI*2);g.fill();
+        // Ring around knot
+        g.strokeStyle='rgba(50,30,12,0.12)';g.lineWidth=1.5;
+        g.beginPath();g.arc(kx,ky,kr+3,0,Math.PI*2);g.stroke();
       }
     }
   }else if(type==="tile"){
-    var ts=42;g.strokeStyle="rgba(0,0,0,0.14)";g.lineWidth=1.5;
+    var ts=Math.floor(S/8);
     for(var tx=0;tx<S;tx+=ts)for(var ty=0;ty<S;ty+=ts){
-      var tv=Math.random()*12-6;
-      g.fillStyle="rgb("+Math.max(0,Math.min(255,R+tv))+","+Math.max(0,Math.min(255,G+tv))+","+Math.max(0,Math.min(255,B+tv))+")";
-      g.fillRect(tx+1,ty+1,ts-2,ts-2);
-      g.strokeRect(tx,ty,ts,ts);
+      var tv=Math.random()*14-7;
+      var tR=Math.max(0,Math.min(255,R+tv)),tG=Math.max(0,Math.min(255,G+tv)),tB=Math.max(0,Math.min(255,B+tv));
+      g.fillStyle='rgb('+tR+','+tG+','+tB+')';
+      g.fillRect(tx+2,ty+2,ts-4,ts-4);
+      // Surface micro-texture
+      for(var tn=0;tn<12;tn++){
+        g.fillStyle='rgba(0,0,0,'+(Math.random()*0.025)+')';
+        g.fillRect(tx+Math.random()*ts,ty+Math.random()*ts,2+Math.random()*2,1+Math.random()*2);
+      }
     }
+    // Grout lines
+    g.strokeStyle='rgba(0,0,0,0.18)';g.lineWidth=2;
+    for(var tlx=0;tlx<=S;tlx+=ts){g.beginPath();g.moveTo(tlx,0);g.lineTo(tlx,S);g.stroke()}
+    for(var tly=0;tly<=S;tly+=ts){g.beginPath();g.moveTo(0,tly);g.lineTo(S,tly);g.stroke()}
   }else if(type==="mosaic"){
-    var ms=16;for(var mx=0;mx<S;mx+=ms)for(var my=0;my<S;my+=ms){
-      var mv=Math.random()*30-15;
-      g.fillStyle="rgb("+Math.max(0,Math.min(255,R+mv))+","+Math.max(0,Math.min(255,G+mv))+","+Math.max(0,Math.min(255,B+mv))+")";
-      g.fillRect(mx,my,ms-1,ms-1);
+    var ms=Math.floor(S/32);
+    for(var mx=0;mx<S;mx+=ms)for(var my=0;my<S;my+=ms){
+      var mv=Math.random()*35-17;
+      g.fillStyle='rgb('+Math.max(0,Math.min(255,R+mv))+','+Math.max(0,Math.min(255,G+mv))+','+Math.max(0,Math.min(255,B+mv))+')';
+      g.fillRect(mx+0.5,my+0.5,ms-1,ms-1);
     }
+    g.strokeStyle='rgba(0,0,0,0.12)';g.lineWidth=1;
+    for(var mlx=0;mlx<=S;mlx+=ms){g.beginPath();g.moveTo(mlx,0);g.lineTo(mlx,S);g.stroke()}
+    for(var mly=0;mly<=S;mly+=ms){g.beginPath();g.moveTo(0,mly);g.lineTo(S,mly);g.stroke()}
   }else if(type==="stone"){
-    for(var si=0;si<20;si++){
-      var sx2=Math.random()*(S-60),sy2=Math.random()*(S-50),sw=30+Math.random()*50,sh=25+Math.random()*35;
-      var sv=Math.random()*25-12;
-      g.fillStyle="rgb("+Math.max(0,Math.min(255,R+sv))+","+Math.max(0,Math.min(255,G+sv))+","+Math.max(0,Math.min(255,B+sv))+")";
-      g.fillRect(sx2,sy2,sw,sh);
-      g.strokeStyle="rgba(0,0,0,0.1)";g.strokeRect(sx2,sy2,sw,sh);
+    for(var si=0;si<40;si++){
+      var sx2=Math.random()*(S-80),sy2=Math.random()*(S-60),sw2=40+Math.random()*70,sh2=30+Math.random()*50;
+      var sv=Math.random()*28-14;
+      g.fillStyle='rgb('+Math.max(0,Math.min(255,R+sv))+','+Math.max(0,Math.min(255,G+sv))+','+Math.max(0,Math.min(255,B+sv))+')';
+      g.fillRect(sx2,sy2,sw2,sh2);
+      g.strokeStyle='rgba(0,0,0,0.12)';g.lineWidth=1.5;g.strokeRect(sx2,sy2,sw2,sh2);
+      // Surface noise per stone
+      for(var sn=0;sn<8;sn++){g.fillStyle='rgba(0,0,0,'+(Math.random()*0.03)+')';g.fillRect(sx2+Math.random()*sw2,sy2+Math.random()*sh2,3,2)}
     }
   }else{
-    for(var nx=0;nx<S;nx+=6)for(var ny=0;ny<S;ny+=6){g.fillStyle="rgba(0,0,0,"+(Math.random()*.035)+")";g.fillRect(nx,ny,6,6)}
+    // Concrete with noise
+    for(var nx=0;nx<S;nx+=4)for(var ny=0;ny<S;ny+=4){g.fillStyle='rgba(0,0,0,'+(Math.random()*.04)+')';g.fillRect(nx,ny,4,4)}
+    for(var cn=0;cn<400;cn++){g.fillStyle='rgba(0,0,0,'+(Math.random()*0.025)+')';g.fillRect(Math.random()*S,Math.random()*S,3+Math.random()*4,2+Math.random()*3)}
   }
-  var t=new THREE.CanvasTexture(c);t.wrapS=t.wrapT=THREE.RepeatWrapping;return t;
+  var t=new THREE.CanvasTexture(c);
+  t.wrapS=t.wrapT=THREE.RepeatWrapping;
+  t.encoding=THREE.sRGBEncoding;
+  t.anisotropy=maxAniso;
+  return t;
 }
+
 function makePlasterTex(){
-  var c=document.createElement("canvas");c.width=256;c.height=256;
-  var g=c.getContext("2d");g.fillStyle="#E8E0D4";g.fillRect(0,0,256,256);
-  for(var i=0;i<800;i++){g.fillStyle="rgba(0,0,0,"+(Math.random()*.04)+")";g.fillRect(Math.random()*256,Math.random()*256,2+Math.random()*3,1+Math.random()*2)}
-  var t=new THREE.CanvasTexture(c);t.wrapS=t.wrapT=THREE.RepeatWrapping;return t;
+  var S=512,c=document.createElement("canvas");c.width=S;c.height=S;
+  var g=c.getContext("2d");
+  g.fillStyle="#F0E8DC";g.fillRect(0,0,S,S);
+  // Plaster micro-texture — varied warm tones
+  for(var i=0;i<3000;i++){
+    var v=230+Math.floor(Math.random()*20-10);
+    g.fillStyle='rgb('+v+','+(v-3)+','+(v-8)+')';
+    g.fillRect(Math.random()*S,Math.random()*S,1+Math.random()*2.5,1+Math.random()*2);
+  }
+  // Subtle trowel marks
+  for(var tm=0;tm<8;tm++){
+    g.strokeStyle='rgba(0,0,0,'+(0.01+Math.random()*0.02)+')';
+    g.lineWidth=0.8+Math.random()*1.5;
+    g.beginPath();
+    var tmx=Math.random()*S,tmy=Math.random()*S;
+    g.moveTo(tmx,tmy);
+    for(var ts=0;ts<6;ts++){tmx+=Math.random()*80-40;tmy+=Math.random()*60-20;g.lineTo(tmx,tmy)}
+    g.stroke();
+  }
+  var t=new THREE.CanvasTexture(c);
+  t.wrapS=t.wrapT=THREE.RepeatWrapping;
+  t.repeat.set(3,6);
+  t.encoding=THREE.sRGBEncoding;
+  return t;
+}
+
+function makeMarbleTex(){
+  var S=1024,c=document.createElement("canvas");c.width=S;c.height=S;
+  var g=c.getContext("2d");
+  g.fillStyle="#EDE5D8";g.fillRect(0,0,S,S);
+  // Marble veins
+  for(var v=0;v<18;v++){
+    g.strokeStyle='rgba(180,170,155,'+(0.08+Math.random()*0.14)+')';
+    g.lineWidth=0.8+Math.random()*3;
+    g.beginPath();
+    var vx=Math.random()*S,vy=Math.random()*S;
+    g.moveTo(vx,vy);
+    for(var vs=0;vs<60;vs++){vx+=(Math.random()-0.5)*35;vy+=(Math.random()-0.3)*25;g.lineTo(vx,vy)}
+    g.stroke();
+    // Fine secondary veins
+    if(Math.random()<0.4){
+      g.strokeStyle='rgba(190,180,165,'+(0.04+Math.random()*0.06)+')';
+      g.lineWidth=0.3+Math.random();
+      g.beginPath();g.moveTo(vx,vy);
+      for(var vs2=0;vs2<20;vs2++){vx+=(Math.random()-0.5)*25;vy+=(Math.random()-0.5)*20;g.lineTo(vx,vy)}
+      g.stroke();
+    }
+  }
+  // Subtle warm noise
+  for(var mn=0;mn<2000;mn++){g.fillStyle='rgba(200,190,180,'+(Math.random()*0.04)+')';g.fillRect(Math.random()*S,Math.random()*S,2,2)}
+  var t=new THREE.CanvasTexture(c);
+  t.wrapS=t.wrapT=THREE.RepeatWrapping;
+  t.encoding=THREE.sRGBEncoding;
+  t.anisotropy=maxAniso;
+  return t;
 }
 
 // ─── Color / texture maps ────────────────────────────────────────────────────
@@ -209,26 +367,180 @@ function addAt(m,x,y,z){m.position.set(x,y,z);scene.add(m);return m}
 function addGrp(g,x,y,z){g.position.set(x,y,z);scene.add(g);return g}
 function cyl(rt,rb,h,seg,mat){var m=new THREE.Mesh(new THREE.CylinderGeometry(rt,rb,h,seg||12),mat);m.castShadow=true;return m}
 
+// ─── GLTF Model Loader (real 3D furniture from R2 CDN) ──────────────────────
+var gltfLoader=typeof THREE.GLTFLoader!=='undefined'?new THREE.GLTFLoader():null;
+var modelCache={};
+var modelAvailable={};
+var gltfTotal=0,gltfLoaded=0,gltfFailed=0;
+
+// Loading progress UI
+var loadingBar=document.createElement('div');
+loadingBar.style.cssText='position:fixed;bottom:60px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.8);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);color:#E0E0E0;padding:8px 20px;border-radius:10px;font-family:Inter,system-ui,sans-serif;font-size:12px;z-index:100;display:none;border:1px solid rgba(79,138,255,0.2);';
+document.body.appendChild(loadingBar);
+function updateLoadBar(){
+  if(gltfTotal===0){loadingBar.style.display='none';return}
+  var done=gltfLoaded+gltfFailed;
+  if(done>=gltfTotal){loadingBar.textContent='Furniture loaded ('+gltfLoaded+'/'+gltfTotal+')';setTimeout(function(){loadingBar.style.display='none'},2500);return}
+  loadingBar.style.display='block';
+  loadingBar.textContent='Loading furniture: '+done+'/'+gltfTotal+' ('+Math.round(done/gltfTotal*100)+'%)';
+}
+
+// Probe which models exist on CDN (fast HEAD requests)
+var MODEL_FILES=['sofa','coffee-table','potted-plant','floor-lamp','tv-unit','bed','nightstand','dining-table','dining-chair','fridge','toilet','bathroom-vanity','office-desk','office-chair'];
+if(gltfLoader){
+  MODEL_FILES.forEach(function(id){
+    var url=MODEL_CDN+'/'+id+'.glb';
+    var xhr=new XMLHttpRequest();
+    xhr.open('HEAD',url,true);
+    xhr.onload=function(){modelAvailable[id]=(xhr.status>=200&&xhr.status<400);console.log('[GLTF] Probe '+id+': '+(modelAvailable[id]?'found':'missing'))};
+    xhr.onerror=function(){modelAvailable[id]=false};
+    xhr.send();
+  });
+}
+
+// Target heights (meters) for auto-scaling AI-generated models
+var MODEL_TARGET_H={
+  'sofa':0.85,'coffee-table':0.45,'potted-plant':0.7,'floor-lamp':1.7,
+  'tv-unit':0.5,'bed':0.6,'nightstand':0.55,'dining-table':0.75,
+  'dining-chair':0.85,'fridge':1.8,'toilet':0.42,'bathroom-vanity':0.85,
+  'office-desk':0.75,'office-chair':1.1
+};
+
+function loadGLTF(filename,targetX,targetZ,targetW,targetD,rotY){
+  var id=filename.replace('.glb','');
+  if(!gltfLoader){return}
+  var url=MODEL_CDN+'/'+filename;
+  if(modelAvailable[id]===false){return}
+  gltfTotal++;
+  updateLoadBar();
+
+  // Helper to place a model scene node
+  function placeModel(m,s,yOff){
+    m.scale.set(s,s,s);
+    m.position.set(targetX,yOff,targetZ);
+    if(rotY)m.rotation.y=rotY;
+    m.traverse(function(ch){
+      if(ch.isMesh){
+        ch.castShadow=true;ch.receiveShadow=true;
+        if(ch.material){ch.material.envMapIntensity=0.4;ch.material.needsUpdate=true}
+      }
+    });
+    scene.add(m);
+  }
+
+  // Clone from cache if available
+  if(modelCache[id]){
+    var cd=modelCache[id];
+    var clone=cd.model.clone();
+    // Re-scale to fit this specific target area
+    var fitS=Math.min(targetW/Math.max(cd.rawW,0.01),targetD/Math.max(cd.rawD,0.01))*0.85;
+    var thS=(MODEL_TARGET_H[id]||1.0)/Math.max(cd.rawH,0.01);
+    var s=Math.min(fitS,thS);
+    var yOff=-cd.bboxMinY*s;
+    placeModel(clone,s,yOff);
+    gltfLoaded++;
+    updateLoadBar();
+    return;
+  }
+
+  gltfLoader.load(url,function(gltf){
+    var m=gltf.scene;
+    var bbox=new THREE.Box3().setFromObject(m);
+    var sz=bbox.getSize(new THREE.Vector3());
+    var ctr=bbox.getCenter(new THREE.Vector3());
+
+    // Cache raw dimensions
+    modelCache[id]={model:m.clone(),rawW:sz.x,rawH:sz.y,rawD:sz.z,bboxMinY:bbox.min.y};
+
+    // Auto-scale: fit within target area AND target height
+    var fitS=Math.min(targetW/Math.max(sz.x,0.01),targetD/Math.max(sz.z,0.01))*0.85;
+    var thS=(MODEL_TARGET_H[id]||1.0)/Math.max(sz.y,0.01);
+    var s=Math.min(fitS,thS);
+    s=Math.max(0.0001,s);
+    var yOff=-bbox.min.y*s;
+
+    placeModel(m,s,yOff);
+    gltfLoaded++;
+    updateLoadBar();
+    console.log('[GLTF] Loaded '+filename+' (raw:'+sz.x.toFixed(1)+'x'+sz.y.toFixed(1)+'x'+sz.z.toFixed(1)+' scale:'+s.toFixed(4)+') ['+gltfLoaded+'/'+gltfTotal+']');
+  },function(p){
+    if(p.total>0&&p.loaded>0){var pct=Math.round(p.loaded/p.total*100);if(pct%25===0)console.log('[GLTF] '+id+' '+pct+'%')}
+  },function(){
+    console.log('[GLTF] '+filename+' not found on CDN');
+    modelAvailable[id]=false;
+    gltfFailed++;
+    updateLoadBar();
+  });
+}
+
+// Room-type → GLTF model definitions
+// rx,rz = position as fraction of room; wF,dF = size as fraction of room
+var ROOM_MODELS={
+  living:[
+    {file:'sofa.glb',rx:0.5,rz:0.25,wF:0.6,dF:0.3,rot:0},
+    {file:'coffee-table.glb',rx:0.5,rz:0.5,wF:0.25,dF:0.2,rot:0},
+    {file:'tv-unit.glb',rx:0.5,rz:0.85,wF:0.4,dF:0.15,rot:Math.PI},
+    {file:'potted-plant.glb',rx:0.88,rz:0.12,wF:0.1,dF:0.1,rot:0},
+    {file:'floor-lamp.glb',rx:0.12,rz:0.12,wF:0.08,dF:0.08,rot:0},
+  ],
+  studio:[
+    {file:'sofa.glb',rx:0.5,rz:0.25,wF:0.55,dF:0.3,rot:0},
+    {file:'coffee-table.glb',rx:0.5,rz:0.5,wF:0.22,dF:0.18,rot:0},
+    {file:'potted-plant.glb',rx:0.85,rz:0.85,wF:0.1,dF:0.1,rot:0},
+  ],
+  bedroom:[
+    {file:'bed.glb',rx:0.5,rz:0.4,wF:0.55,dF:0.6,rot:0},
+    {file:'nightstand.glb',rx:0.88,rz:0.25,wF:0.12,dF:0.12,rot:0},
+    {file:'potted-plant.glb',rx:0.12,rz:0.85,wF:0.08,dF:0.08,rot:0},
+  ],
+  dining:[
+    {file:'dining-table.glb',rx:0.5,rz:0.5,wF:0.5,dF:0.4,rot:0},
+    {file:'dining-chair.glb',rx:0.25,rz:0.5,wF:0.15,dF:0.15,rot:Math.PI/2},
+    {file:'dining-chair.glb',rx:0.75,rz:0.5,wF:0.15,dF:0.15,rot:-Math.PI/2},
+    {file:'dining-chair.glb',rx:0.5,rz:0.25,wF:0.15,dF:0.15,rot:0},
+    {file:'dining-chair.glb',rx:0.5,rz:0.75,wF:0.15,dF:0.15,rot:Math.PI},
+  ],
+  kitchen:[
+    {file:'fridge.glb',rx:0.85,rz:0.15,wF:0.2,dF:0.2,rot:0},
+  ],
+  bathroom:[
+    {file:'toilet.glb',rx:0.7,rz:0.3,wF:0.15,dF:0.2,rot:-Math.PI/2},
+    {file:'bathroom-vanity.glb',rx:0.3,rz:0.12,wF:0.35,dF:0.15,rot:0},
+  ],
+  office:[
+    {file:'office-desk.glb',rx:0.5,rz:0.35,wF:0.45,dF:0.25,rot:0},
+    {file:'office-chair.glb',rx:0.5,rz:0.6,wF:0.15,dF:0.15,rot:Math.PI},
+    {file:'potted-plant.glb',rx:0.88,rz:0.85,wF:0.08,dF:0.08,rot:0},
+  ],
+  hallway:[
+    {file:'potted-plant.glb',rx:0.85,rz:0.5,wF:0.08,dF:0.08,rot:0},
+  ],
+  veranda:[
+    {file:'potted-plant.glb',rx:0.2,rz:0.3,wF:0.1,dF:0.1,rot:0},
+    {file:'potted-plant.glb',rx:0.8,rz:0.7,wF:0.1,dF:0.1,rot:0},
+  ],
+};
+
 // ─── Shared Materials ────────────────────────────────────────────────────────
 var MAT={
-  oak:new THREE.MeshStandardMaterial({color:0x5D4037,roughness:.5,metalness:.02}),
-  walnut:new THREE.MeshStandardMaterial({color:0x4A2C0A,roughness:.55,metalness:.02}),
-  darkWood:new THREE.MeshStandardMaterial({color:0x2A1A0E,roughness:.5,metalness:.03}),
-  fabric:new THREE.MeshStandardMaterial({color:0x2C3E50,roughness:.92,metalness:0}),
-  linen:new THREE.MeshStandardMaterial({color:0xECF0F1,roughness:.95,metalness:0}),
-  pillow:new THREE.MeshStandardMaterial({color:0xF5F5F0,roughness:.9,metalness:0}),
-  ceramic:new THREE.MeshStandardMaterial({color:0xFAFAFA,roughness:.1,metalness:.02}),
-  chrome:new THREE.MeshStandardMaterial({color:0xD0D0D0,roughness:.06,metalness:.88}),
-  marble:new THREE.MeshStandardMaterial({color:0xE8E0D0,roughness:.12,metalness:.05}),
-  cabinet:new THREE.MeshStandardMaterial({color:0x1A2332,roughness:.6,metalness:.02}),
-  leather:new THREE.MeshStandardMaterial({color:0x3E2723,roughness:.75,metalness:.02}),
-  steel:new THREE.MeshStandardMaterial({color:0xB8B8C0,roughness:.18,metalness:.55}),
-  mirror:new THREE.MeshStandardMaterial({color:0xB0C4DE,roughness:.02,metalness:.8}),
-  glass:new THREE.MeshStandardMaterial({color:0xD8E8F0,roughness:.05,metalness:.1,transparent:true,opacity:.3}),
-  accentRed:new THREE.MeshStandardMaterial({color:0xC0392B,roughness:.88,metalness:0}),
-  accentBlue:new THREE.MeshStandardMaterial({color:0x2980B9,roughness:.88,metalness:0}),
-  plantGreen:new THREE.MeshStandardMaterial({color:0x27AE60,roughness:.8,metalness:0}),
-  potBrown:new THREE.MeshStandardMaterial({color:0x6B4226,roughness:.7,metalness:.02}),
+  oak:new THREE.MeshStandardMaterial({color:0x5D4037,roughness:.5,metalness:.02,envMapIntensity:.2}),
+  walnut:new THREE.MeshStandardMaterial({color:0x4A2C0A,roughness:.55,metalness:.02,envMapIntensity:.2}),
+  darkWood:new THREE.MeshStandardMaterial({color:0x2A1A0E,roughness:.5,metalness:.03,envMapIntensity:.15}),
+  fabric:new THREE.MeshStandardMaterial({color:0x2C3E50,roughness:.92,metalness:0,envMapIntensity:.05}),
+  linen:new THREE.MeshStandardMaterial({color:0xECF0F1,roughness:.95,metalness:0,envMapIntensity:.05}),
+  pillow:new THREE.MeshStandardMaterial({color:0xF5F5F0,roughness:.9,metalness:0,envMapIntensity:.05}),
+  ceramic:new THREE.MeshStandardMaterial({color:0xFAFAFA,roughness:.1,metalness:.02,envMapIntensity:.6}),
+  chrome:new THREE.MeshStandardMaterial({color:0xD0D0D0,roughness:.06,metalness:.9,envMapIntensity:1.0}),
+  marble:new THREE.MeshStandardMaterial({map:makeMarbleTex(),color:0xE8E0D0,roughness:.12,metalness:.05,envMapIntensity:.5}),
+  cabinet:new THREE.MeshStandardMaterial({color:0x1A2332,roughness:.6,metalness:.02,envMapIntensity:.1}),
+  leather:new THREE.MeshStandardMaterial({color:0x3E2723,roughness:.75,metalness:.02,envMapIntensity:.1}),
+  steel:new THREE.MeshStandardMaterial({color:0xB8B8C0,roughness:.18,metalness:.6,envMapIntensity:.8}),
+  mirror:new THREE.MeshStandardMaterial({color:0xB0C4DE,roughness:.02,metalness:.85,envMapIntensity:1.0}),
+  glass:new THREE.MeshStandardMaterial({color:0xD8E8F0,roughness:.05,metalness:.1,transparent:true,opacity:.3,envMapIntensity:.8}),
+  accentRed:new THREE.MeshStandardMaterial({color:0xC0392B,roughness:.88,metalness:0,envMapIntensity:.05}),
+  accentBlue:new THREE.MeshStandardMaterial({color:0x2980B9,roughness:.88,metalness:0,envMapIntensity:.05}),
+  plantGreen:new THREE.MeshStandardMaterial({color:0x27AE60,roughness:.8,metalness:0,envMapIntensity:.05}),
+  potBrown:new THREE.MeshStandardMaterial({color:0x6B4226,roughness:.7,metalness:.02,envMapIntensity:.08}),
 };
 
 // ─── Furniture Creators ──────────────────────────────────────────────────────
@@ -497,6 +809,25 @@ var gridSize=Math.ceil(Math.max(BW,BD)/2)*2+8;
 var grid=new THREE.GridHelper(gridSize,gridSize,0x1E1E30,0x1E1E30);
 grid.position.set(CX,-.14,CZ);grid.material.opacity=0.25;grid.material.transparent=true;scene.add(grid);
 
+// ─── Contact Shadow (soft radial shadow under building) ──────────────────────
+(function(){
+  var shC=document.createElement('canvas');shC.width=512;shC.height=512;
+  var shCtx=shC.getContext('2d');
+  var shGrad=shCtx.createRadialGradient(256,256,0,256,256,256);
+  shGrad.addColorStop(0,'rgba(0,0,0,0.3)');
+  shGrad.addColorStop(0.4,'rgba(0,0,0,0.18)');
+  shGrad.addColorStop(0.7,'rgba(0,0,0,0.06)');
+  shGrad.addColorStop(1,'rgba(0,0,0,0)');
+  shCtx.fillStyle=shGrad;shCtx.fillRect(0,0,512,512);
+  var shTex=new THREE.CanvasTexture(shC);
+  var shPlane=new THREE.Mesh(
+    new THREE.PlaneGeometry(BW+4,BD+4),
+    new THREE.MeshBasicMaterial({map:shTex,transparent:true,depthWrite:false})
+  );
+  shPlane.rotation.x=-Math.PI/2;shPlane.position.set(CX,-.145,CZ);
+  scene.add(shPlane);
+})();
+
 // ─── Building floor / image texture ─────────────────────────────────────────
 if(HAS_IMG){
 var imgLoader=new THREE.TextureLoader();imgLoader.load(IMG_SRC,function(tex){tex.minFilter=THREE.LinearFilter;tex.magFilter=THREE.LinearFilter;
@@ -556,7 +887,7 @@ D.rooms.forEach(function(r){
     for(var pi=1;pi<r.polygon.length;pi++) roomShape.lineTo(r.polygon[pi][0],-r.polygon[pi][1]);
     roomShape.closePath();
     var fTex=makeFloorTex(TT[r.type]||"concrete",FC[r.type]||0xC0B8A8);
-    fTex.repeat.set(w/3,d/3);
+    fTex.repeat.set(w/2,d/2);
     fl=new THREE.Mesh(new THREE.ShapeGeometry(roomShape),new THREE.MeshStandardMaterial({map:fTex,roughness:.7,side:THREE.DoubleSide}));
     fl.rotation.x=-Math.PI/2;fl.position.y=.005;fl.receiveShadow=true;
   }else if(HAS_IMG){
@@ -564,7 +895,7 @@ D.rooms.forEach(function(r){
     fl.rotation.x=-Math.PI/2;fl.position.set(cx,.005,cz);fl.receiveShadow=true;
   }else{
     var fTex2=makeFloorTex(TT[r.type]||"concrete",FC[r.type]||0xC0B8A8);
-    fTex2.repeat.set(w/3,d/3);
+    fTex2.repeat.set(w/2,d/2);
     fl=new THREE.Mesh(new THREE.PlaneGeometry(w-.04,d-.04),new THREE.MeshStandardMaterial({map:fTex2,roughness:.7}));
     fl.rotation.x=-Math.PI/2;fl.position.set(cx,.005,cz);fl.receiveShadow=true;
   }
@@ -620,24 +951,32 @@ D.rooms.forEach(function(r){
   lS.scale.set(3.4*labelScale,1.04*labelScale,1);
   scene.add(lS);labels.push(lS);
 
-  // ─── Furniture ─────────────────────────────────────────────────────────────
+  // ─── Furniture (GLTF models with procedural fallback) ─────────────────────
   if(Math.min(w,d)<1.6)return;
 
+  // Try GLTF models for this room type (loads async from R2 CDN)
+  var rModels=ROOM_MODELS[r.type];
+  if(rModels&&gltfLoader){
+    rModels.forEach(function(md){
+      loadGLTF(md.file,rx+w*md.rx,ry+d*md.rz,w*md.wF,d*md.dF,md.rot);
+    });
+  }
+
+  // Always add procedural furniture as well — GLTF loading is async,
+  // and if models aren't available the scene still looks furnished.
+  // When GLTF models DO load, they overlay (slight duplication is OK
+  // since real models obscure the simpler procedural ones underneath).
+
   if(r.type==="living"||r.type==="studio"){
-    // Sofa (facing center)
     var sofaW=Math.min(1.8,w*.45);
     var sofa=createSofa(sofaW,.7);
     addGrp(sofa,cx,0,cz-d*.22);
-    // Coffee table (hairpin legs)
     var ct=createCoffeeTable(Math.min(.7,w*.25),Math.min(.45,d*.15));
     addGrp(ct,cx,0,cz+.15);
-    // TV console (low dark box)
     addAt(box(Math.min(w*.4,1.2),.3,.28,MAT.darkWood),cx,.15,cz+d*.3);
-    // Rug under seating area
     var rugW=Math.min(w*.55,2.0),rugD=Math.min(d*.35,1.4);
     var rug=createRug(rugW,rugD,"persian");
     rug.position.set(cx,.007,cz);scene.add(rug);
-    // Plant in corner
     if(w>2.2){
       var pot=cyl(.1,.08,.18,8,MAT.potBrown);pot.position.set(cx+w*.35,.09,cz-d*.35);scene.add(pot);
       var leaves=new THREE.Mesh(new THREE.SphereGeometry(.18,8,8),MAT.plantGreen);
@@ -645,32 +984,26 @@ D.rooms.forEach(function(r){
     }
   }
   if(r.type==="bedroom"){
-    // Bed with headboard and pillows
     var bedW=Math.min(1.5,w*.45),bedD=Math.min(1.9,d*.5);
     var bed=createBed(bedW,bedD);
     addGrp(bed,cx,0,cz);
-    // Nightstand(s)
     if(w>2.5){
       var ns=createNightstand();addGrp(ns,cx+bedW/2+.3,0,cz-bedD/2+.25);
     }
     if(w>3.2){
       var ns2=createNightstand();addGrp(ns2,cx-bedW/2-.3,0,cz-bedD/2+.25);
     }
-    // Bedroom rug
     var bRug=createRug(Math.min(w*.5,1.8),Math.min(d*.3,1.0),"minimal");
     bRug.position.set(cx,.007,cz+bedD/2+.2);scene.add(bRug);
-    // Wall art (picture frame above bed)
     var artFrame=box(.5,.4,.02,new THREE.MeshStandardMaterial({color:0x1A1A1A,roughness:.3}));
     artFrame.position.set(cx,1.6,cz-bedD/2+.02);scene.add(artFrame);
     var artCanvas=box(.44,.34,.01,new THREE.MeshStandardMaterial({color:0x3498DB,roughness:.85}));
     artCanvas.position.set(cx,1.6,cz-bedD/2+.035);scene.add(artCanvas);
   }
   if(r.type==="dining"){
-    // Dining table with legs
     var tW2=Math.min(1.2,w*.4),tD2=Math.min(.8,d*.3);
     var table=createDiningTable(tW2,tD2);
     addGrp(table,cx,0,cz);
-    // 4 chairs around table
     var chairOff=.45;
     var c1=createChair(0);addGrp(c1,cx-tW2*.35,0,cz-tD2/2-chairOff);
     var c2=createChair(0);addGrp(c2,cx+tW2*.35,0,cz-tD2/2-chairOff);
@@ -678,24 +1011,19 @@ D.rooms.forEach(function(r){
     var c4=createChair(Math.PI);addGrp(c4,cx+tW2*.35,0,cz+tD2/2+chairOff);
   }
   if(r.type==="kitchen"){
-    // Counter with marble top, backsplash, sink, burners, handles
     var kW=Math.min(w*.6,2.2),kD=.52;
     var counter=createKitchenCounter(kW,kD);
     addGrp(counter,cx,0,cz-d*.3);
-    // Fridge (tall stainless steel)
     if(w>2.2){
       var fridge=createFridge();
       addGrp(fridge,cx+kW/2+.5,0,cz-d*.3);
     }
   }
   if(r.type==="bathroom"){
-    // Toilet with tank, seat rim, flush handle
     var toilet=createToilet();
     addGrp(toilet,cx+w*.2,0,cz-d*.25);
-    // Vanity with sink, faucet, mirror
     var vanity=createVanity(Math.min(.55,w*.3));
     addGrp(vanity,cx-w*.15,0,cz+d*.2);
-    // Mirror
     if(d>1.8){
       addAt(box(Math.min(.55,w*.3),.45,.02,MAT.mirror),cx-w*.15,1.35,cz+d*.35);
     }
@@ -738,6 +1066,19 @@ D.rooms.forEach(function(r){
     addAt(box(.03,WH,.03,MAT.steel),cx-stepW/2-.05,WH/2,cz-d/2);
     addAt(box(.03,WH,.03,MAT.steel),cx-stepW/2-.05,WH/2,cz+d/2);
     addAt(box(.03,.03,d,MAT.oak),cx-stepW/2-.05,WH-.03,cz);
+  }
+  // ─── Plants in every room > 6m² ─────────────────────────────────────────────
+  if(area>6&&r.type!=="staircase"&&r.type!=="bathroom"){
+    var ptPot=cyl(.09,.07,.16,8,MAT.potBrown);
+    ptPot.position.set(cx+w*.38,.08,cz+d*.38);scene.add(ptPot);
+    var ptLeaves=new THREE.Mesh(new THREE.SphereGeometry(.16,8,6),MAT.plantGreen);
+    ptLeaves.position.set(cx+w*.38,.28,cz+d*.38);ptLeaves.castShadow=true;scene.add(ptLeaves);
+    if(area>12){
+      var ptPot2=cyl(.07,.055,.13,8,MAT.potBrown);
+      ptPot2.position.set(cx-w*.36,.065,cz-d*.36);scene.add(ptPot2);
+      var ptLeaves2=new THREE.Mesh(new THREE.SphereGeometry(.12,6,6),MAT.plantGreen);
+      ptLeaves2.position.set(cx-w*.36,.22,cz-d*.36);ptLeaves2.castShadow=true;scene.add(ptLeaves2);
+    }
   }
 });
 
@@ -943,8 +1284,8 @@ for(var ci=0;ci<D.walls.length;ci++){
 }
 
 // ─── Window Glass Panes (on exterior walls) ──────────────────────────────────
-var winMat=new THREE.MeshStandardMaterial({color:0xA0C8E8,roughness:.02,metalness:.1,transparent:true,opacity:.25,side:THREE.DoubleSide});
-var winFrameMat=new THREE.MeshStandardMaterial({color:0x2A2A2A,roughness:.4,metalness:.3});
+var winMat=new THREE.MeshStandardMaterial({color:0xA0C8E8,roughness:.02,metalness:.1,transparent:true,opacity:.25,side:THREE.DoubleSide,envMapIntensity:.8});
+var winFrameMat=new THREE.MeshStandardMaterial({color:0x2A2A2A,roughness:.4,metalness:.3,envMapIntensity:.4});
 var winH=0.9,winBottom=1.0,winW=0.7;
 
 function addWindow(wx,wz,rot){
@@ -1013,6 +1354,97 @@ function toggleLabels(){
   for(var li=0;li<labels.length;li++){labels[li].visible=labelsOn}
 }
 
+// ─── First-Person Walkthrough (WASD + Mouse) ────────────────────────────────
+var isWalking=false;
+var fpCamera=camera.clone();
+fpCamera.position.set(CX,1.6,CZ);
+var fpControls=null;
+try{fpControls=new THREE.PointerLockControls(fpCamera,renderer.domElement)}catch(e){console.log('[WALK] PointerLockControls not available')}
+var moveF=false,moveB=false,moveL=false,moveR=false;
+var walkVel=new THREE.Vector3();
+var walkDir=new THREE.Vector3();
+var walkClock=new THREE.Clock();
+
+// Walk overlay
+var walkOvl=document.createElement('div');
+walkOvl.style.cssText='display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,0.85);color:white;padding:24px 36px;border-radius:14px;font-family:Inter,system-ui,sans-serif;text-align:center;z-index:9999;pointer-events:none;border:1px solid rgba(79,138,255,0.3);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);';
+walkOvl.innerHTML='<div style="font-size:18px;font-weight:700;margin-bottom:8px;color:#6EA0FF">First-Person Walkthrough</div><div style="font-size:13px;color:#8A8AA8;line-height:1.5">WASD to move &middot; Mouse to look &middot; ESC to exit</div>';
+document.body.appendChild(walkOvl);
+
+// Crosshair
+var crosshair=document.createElement('div');
+crosshair.style.cssText='display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);width:20px;height:20px;z-index:50;pointer-events:none;';
+crosshair.innerHTML='<svg width="20" height="20"><circle cx="10" cy="10" r="3" fill="none" stroke="rgba(255,255,255,0.5)" stroke-width="1"/><line x1="10" y1="2" x2="10" y2="7" stroke="rgba(255,255,255,0.3)" stroke-width="1"/><line x1="10" y1="13" x2="10" y2="18" stroke="rgba(255,255,255,0.3)" stroke-width="1"/><line x1="2" y1="10" x2="7" y2="10" stroke="rgba(255,255,255,0.3)" stroke-width="1"/><line x1="13" y1="10" x2="18" y2="10" stroke="rgba(255,255,255,0.3)" stroke-width="1"/></svg>';
+document.body.appendChild(crosshair);
+
+function enterWalkMode(){
+  if(!fpControls)return;
+  isWalking=true;
+  fpCamera.position.set(CX,1.6,CZ);
+  fpCamera.rotation.set(0,0,0);
+  controls.enabled=false;
+  fpControls.lock();
+  walkOvl.style.display='block';
+  crosshair.style.display='block';
+  setTimeout(function(){walkOvl.style.display='none'},3000);
+  console.log('[WALK] Entered first-person mode');
+  try{parent.postMessage({type:'walkModeChanged',walking:true},'*')}catch(e){}
+}
+function exitWalkMode(){
+  isWalking=false;
+  moveF=moveB=moveL=moveR=false;
+  walkVel.set(0,0,0);
+  if(fpControls&&fpControls.isLocked)fpControls.unlock();
+  controls.enabled=true;
+  crosshair.style.display='none';
+  walkOvl.style.display='none';
+  console.log('[WALK] Exited first-person mode');
+  try{parent.postMessage({type:'walkModeChanged',walking:false},'*')}catch(e){}
+}
+if(fpControls){
+  fpControls.addEventListener('lock',function(){isWalking=true});
+  fpControls.addEventListener('unlock',function(){
+    isWalking=false;moveF=moveB=moveL=moveR=false;walkVel.set(0,0,0);
+    controls.enabled=true;crosshair.style.display='none';
+    try{parent.postMessage({type:'walkModeChanged',walking:false},'*')}catch(e){}
+  });
+}
+document.addEventListener('keydown',function(e){
+  if(!isWalking)return;
+  switch(e.code){
+    case 'KeyW':case 'ArrowUp':moveF=true;break;
+    case 'KeyS':case 'ArrowDown':moveB=true;break;
+    case 'KeyA':case 'ArrowLeft':moveL=true;break;
+    case 'KeyD':case 'ArrowRight':moveR=true;break;
+    case 'Escape':exitWalkMode();break;
+  }
+});
+document.addEventListener('keyup',function(e){
+  switch(e.code){
+    case 'KeyW':case 'ArrowUp':moveF=false;break;
+    case 'KeyS':case 'ArrowDown':moveB=false;break;
+    case 'KeyA':case 'ArrowLeft':moveL=false;break;
+    case 'KeyD':case 'ArrowRight':moveR=false;break;
+  }
+});
+function updateWalk(){
+  if(!isWalking||!fpControls||!fpControls.isLocked)return;
+  var dt=Math.min(walkClock.getDelta(),0.1);
+  var speed=3.5;
+  walkVel.x-=walkVel.x*10.0*dt;
+  walkVel.z-=walkVel.z*10.0*dt;
+  walkDir.z=Number(moveF)-Number(moveB);
+  walkDir.x=Number(moveR)-Number(moveL);
+  walkDir.normalize();
+  if(moveF||moveB)walkVel.z-=walkDir.z*speed*dt;
+  if(moveL||moveR)walkVel.x-=walkDir.x*speed*dt;
+  fpControls.moveRight(-walkVel.x*dt*50);
+  fpControls.moveForward(-walkVel.z*dt*50);
+  fpCamera.position.y=1.6;
+  fpCamera.position.x=Math.max(0.3,Math.min(BW-0.3,fpCamera.position.x));
+  fpCamera.position.z=Math.max(0.3,Math.min(BD-0.3,fpCamera.position.z));
+}
+
 // ─── PostMessage API (parent controls this iframe) ──────────────────────────
 function handleCmd(d){
   switch(d.type){
@@ -1024,6 +1456,8 @@ function handleCmd(d){
       break;
     case "toggleLabels": toggleLabels(); break;
     case "reset": resetCam(); break;
+    case "walk": enterWalkMode(); break;
+    case "exitWalk": exitWalkMode(); break;
     case "screenshot":
       renderer.render(scene,camera);
       var a=document.createElement("a");a.download="buildflow-3d.png";
@@ -1058,6 +1492,8 @@ window.buildflowControls={
   },
   toggleLabels:function(){toggleLabels()},
   reset:function(){resetCam()},
+  walk:function(){enterWalkMode()},
+  exitWalk:function(){exitWalkMode()},
   screenshot:function(){
     renderer.render(scene,camera);
     var a2=document.createElement("a");a2.download="buildflow-3d.png";
@@ -1112,22 +1548,83 @@ renderer.domElement.addEventListener("click",function(){
   }
 });
 
+// ─── Post-Processing Pipeline ─────────────────────────────────────────────────
+var composer=new THREE.EffectComposer(renderer);
+var renderPass=new THREE.RenderPass(scene,camera);
+composer.addPass(renderPass);
+
+// Bloom (soft glow on bright surfaces)
+var bloomPass=new THREE.UnrealBloomPass(
+  new THREE.Vector2(innerWidth,innerHeight),
+  0.15,0.4,0.85
+);
+composer.addPass(bloomPass);
+
+// Color grading (warm tint + contrast + vignette)
+var colorGradeShader={
+  uniforms:{
+    tDiffuse:{value:null},
+    brightness:{value:0.02},
+    contrast:{value:0.08},
+    warmth:{value:0.06},
+    vignette:{value:0.3}
+  },
+  vertexShader:'varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}',
+  fragmentShader:[
+    'uniform sampler2D tDiffuse;',
+    'uniform float brightness;uniform float contrast;uniform float warmth;uniform float vignette;',
+    'varying vec2 vUv;',
+    'void main(){',
+    '  vec4 color=texture2D(tDiffuse,vUv);',
+    '  color.rgb+=brightness;',
+    '  color.rgb=(color.rgb-0.5)*(1.0+contrast)+0.5;',
+    '  color.r+=warmth*0.8;color.g+=warmth*0.4;color.b-=warmth*0.2;',
+    '  vec2 center=vUv-0.5;float dist=length(center);',
+    '  color.rgb*=1.0-vignette*dist*dist*2.0;',
+    '  gl_FragColor=color;',
+    '}'
+  ].join('\\n')
+};
+var colorPass=new THREE.ShaderPass(colorGradeShader);
+composer.addPass(colorPass);
+
+// FXAA (anti-aliasing — smoother edges)
+var fxaaPass=null;
+try{
+  fxaaPass=new THREE.ShaderPass(THREE.FXAAShader);
+  fxaaPass.uniforms['resolution'].value.set(1/innerWidth,1/innerHeight);
+  composer.addPass(fxaaPass);
+}catch(e){console.log('[POST] FXAA not available:',e.message)}
+
 // ─── Animate ─────────────────────────────────────────────────────────────────
 function animate(){
   requestAnimationFrame(animate);
-  if(cAnim){
-    var t=Math.min(1,(Date.now()-cAnim.t0)/cAnim.d);
-    var e2=easeOut(t);
-    camera.position.lerpVectors(cAnim.sp,cAnim.ep,e2);
-    controls.target.lerpVectors(cAnim.st,cAnim.et,e2);
-    camera.lookAt(controls.target);
-    if(t>=1){cAnim=null;controls.update()}
+  if(isWalking){
+    updateWalk();
+    renderPass.camera=fpCamera;
+    composer.render();
+    renderPass.camera=camera;
+  }else{
+    if(cAnim){
+      var t=Math.min(1,(Date.now()-cAnim.t0)/cAnim.d);
+      var e2=easeOut(t);
+      camera.position.lerpVectors(cAnim.sp,cAnim.ep,e2);
+      controls.target.lerpVectors(cAnim.st,cAnim.et,e2);
+      camera.lookAt(controls.target);
+      if(t>=1){cAnim=null;controls.update()}
+    }
+    composer.render();
   }
-  renderer.render(scene,camera);
 }
 console.log("[IFRAME] Three.js scene initialized. Rooms:",D.rooms.length,"Labels:",labels.length);
 animate();
-addEventListener("resize",function(){camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)});
+addEventListener("resize",function(){
+  var w2=innerWidth,h2=innerHeight;
+  camera.aspect=w2/h2;camera.updateProjectionMatrix();
+  fpCamera.aspect=w2/h2;fpCamera.updateProjectionMatrix();
+  renderer.setSize(w2,h2);composer.setSize(w2,h2);
+  if(fxaaPass)fxaaPass.uniforms['resolution'].value.set(1/w2,1/h2);
+});
 <\/script>
 </body>
 </html>`;

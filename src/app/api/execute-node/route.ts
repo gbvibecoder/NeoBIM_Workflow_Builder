@@ -426,7 +426,7 @@ ${parsed.keyRequirements?.length ? `KEY REQUIREMENTS:\n${parsed.keyRequirements.
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ image: base64Data }),
-          signal: AbortSignal.timeout(30000),
+          signal: AbortSignal.timeout(5000),
         });
         if (mlResponse.ok) {
           const mlResult = await mlResponse.json();
@@ -2314,13 +2314,82 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
       let bW = Number(rawGeometry?.buildingWidth ?? 14);
       let bD = Number(rawGeometry?.buildingDepth ?? 10);
 
-      // ── Priority 1: Row-based layout from GPT-4o (most reliable) ──
+      // ── Priority 0: GPT-4o ACCURATE positions (percentage-based) ──
+      // If rooms have positionLeftPercent/positionTopPercent, convert to meters.
+      // This is far more accurate than the row-based grid layout.
       const rawRows = rawGeometry?.rows as Array<Array<Record<string, unknown>>> | undefined;
-      if (Array.isArray(rawRows) && rawRows.length > 0) {
+      const allRoomsFlat: Array<Record<string, unknown>> = [];
+      if (Array.isArray(rawRows)) {
+        for (const row of rawRows) {
+          if (Array.isArray(row)) for (const rm of row) allRoomsFlat.push(rm);
+        }
+      }
+      const hasPercentPositions = allRoomsFlat.length > 0 &&
+        allRoomsFlat.filter(r => typeof r.positionLeftPercent === "number" && typeof r.positionTopPercent === "number").length >= allRoomsFlat.length * 0.6;
+
+      if (hasPercentPositions) {
+        console.log(`[GN-011] Using GPT-4o ACCURATE positions (${allRoomsFlat.length} rooms with percentage coordinates)`);
+        for (const r of allRoomsFlat) {
+          const name = String(r.name ?? "Room");
+          const w = Math.max(1.0, Number(r.width ?? 3));
+          const d = Math.max(1.0, Number(r.depth ?? 3));
+          const leftPct = Number(r.positionLeftPercent ?? 0);
+          const topPct = Number(r.positionTopPercent ?? 0);
+          const x = Math.round(((leftPct / 100) * bW) * 100) / 100;
+          const y = Math.round(((topPct / 100) * bD) * 100) / 100;
+          layoutRooms.push({
+            name,
+            type: String(r.type ?? guessType(name)),
+            width: w,
+            depth: d,
+            x,
+            y,
+            adjacentRooms: Array.isArray(r.adjacentRooms) ? (r.adjacentRooms as string[]) : undefined,
+          });
+        }
+
+        // ── Overlap resolution: nudge overlapping rooms apart ──
+        for (let i = 0; i < layoutRooms.length; i++) {
+          for (let j = i + 1; j < layoutRooms.length; j++) {
+            const a = layoutRooms[i], b = layoutRooms[j];
+            const overlapX = Math.min(a.x + a.width, b.x + b.width) - Math.max(a.x, b.x);
+            const overlapY = Math.min(a.y + a.depth, b.y + b.depth) - Math.max(a.y, b.y);
+            if (overlapX > 0.2 && overlapY > 0.2) {
+              console.log(`[GN-011] Overlap: ${a.name} & ${b.name} (${overlapX.toFixed(1)}×${overlapY.toFixed(1)}m) — nudging`);
+              const smaller = (a.width * a.depth) < (b.width * b.depth) ? a : b;
+              const larger = smaller === a ? b : a;
+              if (overlapX < overlapY) {
+                smaller.x = smaller.x < larger.x
+                  ? larger.x - smaller.width - 0.15
+                  : larger.x + larger.width + 0.15;
+              } else {
+                smaller.y = smaller.y < larger.y
+                  ? larger.y - smaller.depth - 0.15
+                  : larger.y + larger.depth + 0.15;
+              }
+            }
+          }
+        }
+
+        // Clamp rooms within building bounds
+        for (const rm of layoutRooms) {
+          rm.x = Math.max(0, Math.min(rm.x, bW - rm.width));
+          rm.y = Math.max(0, Math.min(rm.y, bD - rm.depth));
+        }
+
+        // Log positions for debugging
+        console.log("[GN-011] Room positions (accurate):");
+        for (const rm of layoutRooms) {
+          const origR = allRoomsFlat.find(r => r.name === rm.name);
+          console.log(`  ${rm.name}: x=${rm.x.toFixed(1)} y=${rm.y.toFixed(1)} ${rm.width}×${rm.depth}m (from ${origR?.positionLeftPercent ?? "?"}%, ${origR?.positionTopPercent ?? "?"}%)`);
+        }
+      }
+
+      // ── Priority 1: Row-based layout from GPT-4o (fallback) ──
+      if (layoutRooms.length === 0 && Array.isArray(rawRows) && rawRows.length > 0) {
         console.log(`[GN-011] Using ROW-BASED layout: ${rawRows.length} rows`);
         const result = rowsToPositions(rawRows);
         for (const rm of result.rooms) layoutRooms.push(rm);
-        // Derive building size from actual room positions (more reliable than GPT-4o's estimate)
         bW = result.width;
         bD = result.depth;
       }

@@ -35,6 +35,9 @@ next-env.d.ts
 *.bak
 *.bak[0-9]*
 
+# 3D models (served from R2 CDN via proxy, not git)
+public/models/*.glb
+
 # Test artifacts
 coverage/
 *.swp
