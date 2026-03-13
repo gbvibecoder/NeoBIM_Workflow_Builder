@@ -49,10 +49,8 @@ const nextConfig: NextConfig = {
   },
 
   async headers() {
-    // unsafe-eval is required for Next.js dev mode HMR but not needed in production
-    const scriptSrc = isDev
-      ? "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://js.stripe.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://connect.facebook.net"
-      : "script-src 'self' 'unsafe-inline' https://js.stripe.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://connect.facebook.net";
+    // unsafe-eval needed for Three.js shader compilation (new Function()) in blob: iframe
+    const scriptSrc = "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://js.stripe.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://connect.facebook.net blob: data:";
 
     return [
       {
@@ -61,14 +59,15 @@ const nextConfig: NextConfig = {
           {
             key: 'Content-Security-Policy',
             value: `
-              default-src 'self';
+              default-src 'self' blob: data:;
               ${scriptSrc};
               style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
               img-src 'self' blob: data: https://oaidalleapiprodscus.blob.core.windows.net https://picsum.photos https://images.unsplash.com https://lh3.googleusercontent.com https://*.vercel.app https://www.facebook.com;
-              font-src 'self' https://fonts.gstatic.com;
+              font-src 'self' https://fonts.gstatic.com data:;
               media-src 'self' blob: data: https://*.klingai.com https://*.kuaishou.com https://*.ksyun.com https://*.ks-cdn.com https://*.kscampus.com https://*;
-              connect-src 'self' https://api.openai.com https://api.stability.ai https://*.upstash.io https://api.stripe.com https://api.klingai.com https://*.klingai.com https://*.fal.ai https://fal.run https://www.facebook.com https://connect.facebook.net https://pub-27d9a7371b6d47ff94fee1a3228f1720.r2.dev;
+              connect-src 'self' blob: data: https://api.openai.com https://api.stability.ai https://*.upstash.io https://api.stripe.com https://api.klingai.com https://*.klingai.com https://*.fal.ai https://fal.run https://www.facebook.com https://connect.facebook.net https://pub-27d9a7371b6d47ff94fee1a3228f1720.r2.dev;
               frame-src 'self' blob: https://js.stripe.com;
+              worker-src 'self' blob:;
               object-src 'none';
               base-uri 'self';
               form-action 'self';
