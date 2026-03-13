@@ -23,13 +23,13 @@ export const PREBUILT_WORKFLOWS: WorkflowTemplate[] = [
     id: "wf-01",
     name: "Text Prompt → Concept Building",
     description:
-      "Enter a building idea in plain text → get a full building description, 3D massing model, and concept render in under a minute.",
-    tags: ["concept", "visualization", "quick-start", "text-to-building"],
+      "Enter a building idea in plain text → get a full building description and AI-generated 3D massing model powered by 3D AI Studio.",
+    tags: ["concept", "visualization", "quick-start", "text-to-building", "3d-ai"],
     category: "Concept Design",
     complexity: "simple",
-    estimatedRunTime: "~45 seconds",
+    estimatedRunTime: "~90 seconds",
     requiredInputs: ["Text description of your building concept"],
-    expectedOutputs: ["Building description card", "3D massing model", "Concept architectural image"],
+    expectedOutputs: ["Building description card", "AI-generated 3D massing model", "Building KPIs"],
     thumbnail: "https://picsum.photos/seed/wf01/600/400",
     tileGraph: {
       nodes: [
@@ -81,28 +81,10 @@ export const PREBUILT_WORKFLOWS: WorkflowTemplate[] = [
             icon: "Box",
           },
         },
-        {
-          id: "n4",
-          type: "workflowNode",
-          position: { x: X4, y: Y },
-          data: {
-            catalogueId: "GN-003",
-            label: "Concept Render Generator",
-            category: "generate",
-            status: "idle",
-            inputs: [
-              { id: "ctrl-in", label: "Control Image", type: "image" },
-              { id: "prompt-in", label: "Style Prompt", type: "text" },
-            ],
-            outputs: [{ id: "images-out", label: "Concept Images", type: "image" }],
-            icon: "Palette",
-          },
-        },
       ],
       edges: [
         { id: "e1-2", source: "n1", sourceHandle: "text-out", target: "n2", targetHandle: "json-in", type: "animatedEdge" },
         { id: "e2-3", source: "n2", sourceHandle: "prog-out", target: "n3", targetHandle: "req-in", type: "animatedEdge" },
-        { id: "e3-4", source: "n3", sourceHandle: "geo-out", target: "n4", targetHandle: "ctrl-in", type: "animatedEdge" },
       ],
     },
   },

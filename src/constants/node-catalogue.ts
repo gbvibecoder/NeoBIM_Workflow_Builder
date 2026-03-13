@@ -275,7 +275,7 @@ export const NODE_CATALOGUE: NodeCatalogueItem[] = [
   {
     id: "GN-001",
     name: "Massing Generator",
-    description: "Generate BIM-compatible 3D massing models from building description or parameters",
+    description: "Generate AI-powered 3D massing models from building description using Text-to-3D",
     category: "generate",
     icon: "Box",
     inputs: [{ id: "req-in", label: "Requirements", type: "json" }],
@@ -283,9 +283,9 @@ export const NODE_CATALOGUE: NodeCatalogueItem[] = [
       { id: "geo-out", label: "3D Massing", type: "geometry" },
       { id: "kpi-out", label: "KPIs", type: "json" },
     ],
-    apiEngine: "Rhino.Compute",
-    tags: ["massing", "3d", "geometry", "building", "volume"],
-    executionTime: "2-3 min",
+    apiEngine: "3D AI Studio",
+    tags: ["massing", "3d", "geometry", "building", "volume", "ai", "text-to-3d"],
+    executionTime: "2-5 min",
   },
   {
     id: "GN-002",

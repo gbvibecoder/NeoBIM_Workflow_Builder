@@ -23,6 +23,7 @@ import { generatePDFBase64 } from "@/services/pdf-report-server";
 import { uploadBase64ToR2 } from "@/lib/r2";
 import { reconstructHiFi3D, isMeshyConfigured } from "@/services/meshy-service";
 import { generateMassingGeometry } from "@/services/massing-generator";
+import { generate3DModel, is3DAIConfigured, calculateKPIs, type BuildingRequirements } from "@/services/threedai-studio";
 import { generateIFCFile } from "@/services/ifc-exporter";
 import { submitDualWalkthrough, submitDualTextToVideo, submitSingleWalkthrough, submitFloorPlanWalkthrough, buildFloorPlanCombinedPrompt } from "@/services/video-service";
 import {
@@ -105,8 +106,8 @@ function cleanupRateLimitCache() {
   }
 }
 
-// Allow up to 120s for heavy GPT-4o vision + 3D generation chains
-export const maxDuration = 120;
+// Allow up to 180s for heavy GPT-4o vision + 3D AI Studio generation + conversion chains
+export const maxDuration = 180;
 
 export async function POST(req: NextRequest) {
   const session = await auth();
@@ -247,6 +248,9 @@ export async function POST(req: NextRequest) {
           content: formatBuildingDescription(description),
           label: "Building Description (AI Generated)",
           _raw: description,
+          // Preserve the user's original prompt text so GN-001 can use it directly
+          // for 3D AI Studio instead of relying only on extracted parameters.
+          _originalPrompt: prompt,
         },
         metadata: { model: "gpt-4o-mini", real: true },
         createdAt: new Date(),
@@ -2635,12 +2639,20 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
       };
 
     } else if (catalogueId === "GN-001") {
-      // ── Massing Generator ──────────────────────────────────────────────
-      // Takes building description from TR-003 and generates real 3D geometry.
-      // TR-003 outputs: { content: "formatted text", _raw: BuildingDescription }
-      // BuildingDescription has: floors, totalArea, footprint?, totalGFA?, height?, buildingType, projectName
+      // ── Massing Generator (3D AI Studio — Text-to-3D) ────────────────
+      // Takes building description from TR-003 and generates a real AI 3D model.
+      // Primary: 3D AI Studio Text-to-3D API → GLB model
+      // Fallback: procedural massing-generator (if API key not configured)
       const rawData = (inputData?._raw ?? inputData) as Record<string, unknown>;
-      const textContent = String(inputData?.content ?? inputData?.prompt ?? "");
+      // Prefer the user's original prompt (preserved through TR-003) over the
+      // formatted/summarized content. This ensures rich architectural descriptions
+      // pass through to 3D AI Studio without being reduced to generic parameters.
+      const rawOriginal = inputData?._originalPrompt;
+      const originalPrompt = (typeof rawOriginal === "string" && rawOriginal.length > 0) ? rawOriginal : "";
+      const textContent = originalPrompt || (() => {
+        const c = inputData?.content ?? inputData?.prompt;
+        return (typeof c === "string" && c.length > 0) ? c : "";
+      })();
 
       // Helper: extract a number from text using regex patterns
       const extractFromText = (patterns: RegExp[], fallback: number): number => {
@@ -2654,15 +2666,16 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
         return fallback;
       };
 
-      // Extract floors: from _raw (BuildingDescription.floors) or text
+      // Extract floors
       const rawFloors = Number(rawData?.floors ?? rawData?.number_of_floors ?? 0);
       const floors = rawFloors > 0 ? rawFloors : extractFromText([
         /(\d+)\s*(?:floors?|stor(?:ey|ies)|levels?)/i,
         /(\d+)[-\s]?stor(?:ey|y)/i,
       ], 5);
 
-      // Extract footprint: BuildingDescription uses "footprint" (optional), "totalArea" (always present)
-      const rawFootprint = Number(rawData?.footprint_m2 ?? rawData?.footprint ?? 0);
+      // Extract footprint — skip object footprints (handled separately at line 2724)
+      const rawFpValue = rawData?.footprint_m2 ?? (typeof rawData?.footprint === "number" ? rawData.footprint : 0);
+      const rawFootprint = Number(rawFpValue) || 0;
       const rawTotalArea = Number(rawData?.totalArea ?? rawData?.total_area ?? 0);
       const computedFootprint = rawFootprint > 0
         ? rawFootprint
@@ -2674,72 +2687,174 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
               /floor\s*(?:area|plate)[:\s]*(\d[\d,]*)/i,
             ], 500);
 
-      // Extract building type
-      const buildingType = String(
-        rawData?.buildingType ?? rawData?.building_type ?? rawData?.projectType
-        ?? extractBuildingTypeFromText(textContent)
-        ?? "Mixed-Use Building"
-      );
+      // Extract building type — avoid String(undefined) producing "undefined"
+      const rawBuildingType = rawData?.buildingType ?? rawData?.building_type ?? rawData?.projectType;
+      const buildingType = (typeof rawBuildingType === "string" && rawBuildingType.length > 0)
+        ? rawBuildingType
+        : (extractBuildingTypeFromText(textContent) ?? "Mixed-Use Building");
 
       // Extract GFA
       const rawGFA = Number(rawData?.totalGFA ?? rawData?.total_gfa_m2 ?? rawData?.gfa ?? 0);
       const gfa = rawGFA > 0 ? rawGFA : (rawTotalArea > 0 ? rawTotalArea : undefined);
 
-      // Extract height
+      // Extract height, style, materials, features from raw data
       const rawHeight = Number(rawData?.height ?? 0);
       const height = rawHeight > 0 ? rawHeight : undefined;
 
-      const massingInput = {
-        floors,
-        footprint_m2: computedFootprint,
-        building_type: buildingType,
-        total_gfa_m2: gfa,
-        height,
-        content: textContent,
-        prompt: String(inputData?.prompt ?? textContent),
-      };
-
       console.log("[GN-001] rawData keys:", Object.keys(rawData ?? {}));
-      console.log("[GN-001] massingInput:", JSON.stringify(massingInput, null, 2));
 
-      const geometry = generateMassingGeometry(massingInput);
+      if (is3DAIConfigured()) {
+        // ── PRIMARY PATH: 3D AI Studio Text-to-3D ──
+        console.log("[GN-001] Using 3D AI Studio Text-to-3D API");
 
-      console.log("[GN-001] geometry result:", { floors: geometry.floors, height: geometry.totalHeight, footprint: geometry.footprintArea, gfa: geometry.gfa, buildingType: geometry.buildingType });
+        const requirements: BuildingRequirements = {
+          buildingType,
+          floors,
+          floorToFloorHeight: Number(rawData?.floorToFloorHeight ?? rawData?.floor_height ?? 3.5),
+          height,
+          style: (typeof (rawData?.style ?? rawData?.architecturalStyle) === "string") ? String(rawData?.style ?? rawData?.architecturalStyle) : "",
+          massing: (typeof (rawData?.massing ?? rawData?.massingType) === "string") ? String(rawData?.massing ?? rawData?.massingType) : "",
+          materials: Array.isArray(rawData?.materials) ? rawData.materials as string[] : undefined,
+          footprint_m2: computedFootprint,
+          features: Array.isArray(rawData?.features) ? rawData.features as string[] : undefined,
+          context: (rawData?.context ?? undefined) as BuildingRequirements["context"],
+          siteArea: Number(rawData?.siteArea ?? rawData?.site_area ?? 0) || undefined,
+          total_gfa_m2: gfa,
+          content: textContent,
+          prompt: String(inputData?.prompt ?? textContent),
+        };
 
-      artifact = {
-        id: generateId(),
-        executionId: executionId ?? "local",
-        tileInstanceId,
-        type: "3d",
-        data: {
-          floors: geometry.floors,
-          height: geometry.totalHeight,
-          footprint: geometry.footprintArea,
-          gfa: geometry.gfa,
-          buildingType: geometry.buildingType,
-          metrics: geometry.metrics,
-          content: massingInput.content || `${geometry.floors}-storey ${geometry.buildingType}, ${geometry.gfa.toLocaleString()} m² GFA`,
-          prompt: massingInput.prompt || massingInput.content,
-          _geometry: geometry,
-          _raw: rawData,
-          style: {
-            glassHeavy: false,
-            hasRiver: false,
-            hasLake: false,
-            isModern: true,
-            isTower: geometry.floors >= 10,
-            exteriorMaterial: "mixed" as const,
-            environment: "urban" as const,
-            usage: "mixed" as const,
-            typology: geometry.floors >= 15 ? "tower" as const : "generic" as const,
-            facadePattern: "none" as const,
-            floorHeightOverride: geometry.totalHeight / geometry.floors,
-            maxFloorCap: 30,
+        // If footprint is an object (from structured input)
+        if (rawData?.footprint && typeof rawData.footprint === "object") {
+          const fp = rawData.footprint as Record<string, unknown>;
+          requirements.footprint = {
+            shape: String(fp.shape ?? "rectangular"),
+            width: Number(fp.width ?? 0) || undefined,
+            depth: Number(fp.depth ?? 0) || undefined,
+            area: Number(fp.area ?? 0) || undefined,
+          };
+        }
+
+        console.log("[GN-001] requirements:", JSON.stringify(requirements, null, 2));
+
+        let result;
+        try {
+          result = await generate3DModel(requirements);
+        } catch (genErr) {
+          const genMsg = genErr instanceof Error ? genErr.message : String(genErr);
+          console.error("[GN-001] generate3DModel FAILED:", genMsg, genErr);
+          throw new Error(`3D model generation failed: ${genMsg}`);
+        }
+
+        console.log("[GN-001] 3D AI Studio result:", {
+          taskId: result.taskId,
+          glbUrl: result.glbUrl?.slice(0, 80),
+          generationTimeMs: result.metadata.generationTimeMs,
+          pollAttempts: result.metadata.pollAttempts,
+        });
+
+        // Build KPI metrics array for display
+        const kpis = result.kpis;
+        const metrics = [
+          { label: "Gross Floor Area", value: kpis.grossFloorArea.toLocaleString(), unit: "m²" },
+          { label: "Net Floor Area", value: kpis.netFloorArea.toLocaleString(), unit: "m²" },
+          { label: "Efficiency", value: String(kpis.efficiency), unit: "%" },
+          { label: "Building Height", value: String(kpis.totalHeight), unit: "m" },
+          { label: "Floors", value: String(kpis.floors), unit: "" },
+          { label: "Footprint Area", value: kpis.footprintArea.toLocaleString(), unit: "m²" },
+          { label: "Estimated Volume", value: kpis.estimatedVolume.toLocaleString(), unit: "m³" },
+          { label: "Facade Area", value: kpis.facadeArea.toLocaleString(), unit: "m²" },
+          { label: "S/V Ratio", value: String(kpis.surfaceToVolumeRatio), unit: "" },
+          { label: "Structural Grid", value: kpis.structuralGrid, unit: "" },
+          { label: "Est. EUI", value: String(kpis.sustainability.estimatedEUI), unit: kpis.sustainability.euiUnit },
+          { label: "Daylight Potential", value: kpis.sustainability.daylightPotential, unit: "" },
+          ...(kpis.floorAreaRatio !== null ? [{ label: "Floor Area Ratio", value: String(kpis.floorAreaRatio), unit: "" }] : []),
+          ...(kpis.siteCoverage !== null ? [{ label: "Site Coverage", value: String(kpis.siteCoverage), unit: "%" }] : []),
+        ];
+
+        artifact = {
+          id: generateId(),
+          executionId: executionId ?? "local",
+          tileInstanceId,
+          type: "3d",
+          data: {
+            glbUrl: result.glbUrl,
+            thumbnailUrl: result.thumbnailUrl,
+            floors: kpis.floors,
+            height: kpis.totalHeight,
+            footprint: kpis.footprintArea,
+            gfa: kpis.grossFloorArea,
+            buildingType: kpis.buildingType,
+            metrics,
+            content: textContent || `${kpis.floors}-storey ${kpis.buildingType}, ${kpis.grossFloorArea.toLocaleString()} m² GFA`,
+            prompt: result.prompt,
+            kpis,
+            _raw: rawData,
           },
-        },
-        metadata: { engine: "massing-generator", real: true },
-        createdAt: new Date(),
-      };
+          metadata: {
+            engine: "3daistudio",
+            model: result.metadata.model,
+            real: true,
+            taskId: result.taskId,
+            generationTimeMs: result.metadata.generationTimeMs,
+          },
+          createdAt: new Date(),
+        };
+      } else {
+        // ── FALLBACK: Procedural massing generator ──
+        console.log("[GN-001] THREEDAI_API_KEY not set, falling back to procedural massing generator");
+
+        const massingInput = {
+          floors,
+          footprint_m2: computedFootprint,
+          building_type: buildingType,
+          total_gfa_m2: gfa,
+          height,
+          content: textContent,
+          prompt: String(inputData?.prompt ?? textContent),
+        };
+
+        console.log("[GN-001] massingInput:", JSON.stringify(massingInput, null, 2));
+
+        const geometry = generateMassingGeometry(massingInput);
+
+        console.log("[GN-001] geometry result:", { floors: geometry.floors, height: geometry.totalHeight, footprint: geometry.footprintArea, gfa: geometry.gfa, buildingType: geometry.buildingType });
+
+        artifact = {
+          id: generateId(),
+          executionId: executionId ?? "local",
+          tileInstanceId,
+          type: "3d",
+          data: {
+            floors: geometry.floors,
+            height: geometry.totalHeight,
+            footprint: geometry.footprintArea,
+            gfa: geometry.gfa,
+            buildingType: geometry.buildingType,
+            metrics: geometry.metrics,
+            content: massingInput.content || `${geometry.floors}-storey ${geometry.buildingType}, ${geometry.gfa.toLocaleString()} m² GFA`,
+            prompt: massingInput.prompt || massingInput.content,
+            _geometry: geometry,
+            _raw: rawData,
+            style: {
+              glassHeavy: false,
+              hasRiver: false,
+              hasLake: false,
+              isModern: true,
+              isTower: geometry.floors >= 10,
+              exteriorMaterial: "mixed" as const,
+              environment: "urban" as const,
+              usage: "mixed" as const,
+              typology: geometry.floors >= 15 ? "tower" as const : "generic" as const,
+              facadePattern: "none" as const,
+              floorHeightOverride: geometry.totalHeight / geometry.floors,
+              maxFloorCap: 30,
+            },
+          },
+          metadata: { engine: "massing-generator", real: true },
+          createdAt: new Date(),
+        };
+      }
 
     } else if (catalogueId === "EX-001") {
       // ── IFC Exporter ──────────────────────────────────────────────────
@@ -2927,13 +3042,20 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
       );
     }
 
-    // Handle generic errors
+    // Handle generic errors — surface the real message so users can debug
     const message = err instanceof Error ? err.message : "Execution failed";
     console.error("[execute-node] " + catalogueId + ":", message, err);
     await logNodeError(executionId, catalogueId, tileInstanceId, err, Date.now() - nodeStartTime);
 
     return NextResponse.json(
-      formatErrorResponse(UserErrors.INTERNAL_ERROR, message),
+      {
+        error: {
+          title: `${catalogueId} failed`,
+          message,
+          code: "SYS_001",
+          action: "Try Again",
+        },
+      },
       { status: 500 }
     );
   }

@@ -139,19 +139,31 @@ async function executeNode(
     const nd = node.data as Record<string, unknown>;
     if (nd.viewType != null) nodeConfig.viewType = nd.viewType;
 
-    const res = await fetch("/api/execute-node", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        catalogueId,
-        executionId,
-        tileInstanceId: node.id,
-        inputData: {
-          ...(previousArtifact?.data as Record<string, unknown> ?? { prompt: inputValue ?? "" }),
-          ...nodeConfig,
-        },
-      }),
-    });
+    // Long-running nodes (3D generation, video) need extended timeout
+    const LONG_RUNNING_NODES = new Set(["GN-001", "GN-009", "GN-010"]);
+    const timeoutMs = LONG_RUNNING_NODES.has(catalogueId) ? 300_000 : 120_000; // 5min vs 2min
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+    let res: Response;
+    try {
+      res = await fetch("/api/execute-node", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        signal: controller.signal,
+        body: JSON.stringify({
+          catalogueId,
+          executionId,
+          tileInstanceId: node.id,
+          inputData: {
+            ...(previousArtifact?.data as Record<string, unknown> ?? { prompt: inputValue ?? "" }),
+            ...nodeConfig,
+          },
+        }),
+      });
+    } finally {
+      clearTimeout(timeoutId);
+    }
 
     if (!res.ok) {
       const errorData = await res.json().catch(() => ({
@@ -1061,7 +1073,26 @@ export function useExecution({ onLog }: UseExecutionOptions = {}) {
       } catch (error) {
         const errRecord = error as unknown as Record<string, unknown>;
         const errTitle = (errRecord.title as string) || "Error";
-        const errMsg = error instanceof Error ? error.message : "Unknown error";
+        // Robust error message extraction — handles Error instances, plain objects, and strings
+        let errMsg: string;
+        if (error instanceof Error) {
+          errMsg = error.message || error.name || String(error);
+        } else if (typeof error === "string") {
+          errMsg = error;
+        } else if (error && typeof error === "object") {
+          errMsg = (error as Record<string, unknown>).message as string
+            || (error as Record<string, unknown>).error as string
+            || JSON.stringify(error);
+        } else {
+          errMsg = "Unknown error";
+        }
+        // Catch fetch aborts (dev server timeout / connection reset)
+        if (error instanceof TypeError && errMsg === "Failed to fetch") {
+          errMsg = "Server connection lost — the request may have timed out. Check the terminal for server-side errors.";
+        }
+        if (error instanceof DOMException && error.name === "AbortError") {
+          errMsg = "Request was aborted — server may have timed out for long-running AI generation.";
+        }
         const errAction = errRecord.action as string | undefined;
         const errActionUrl = errRecord.actionUrl as string | undefined;
 
@@ -1094,11 +1125,7 @@ export function useExecution({ onLog }: UseExecutionOptions = {}) {
         if (LIVE_NODE_IDS.has(node.data.catalogueId)) {
           hasError = true;
           updateNodeStatus(node.id, "error");
-          console.error(`[${node.data.catalogueId} LIVE-FAIL] Real execution failed — NO mock fallback for live nodes.`, {
-            catalogueId: node.data.catalogueId,
-            label: node.data.label,
-            error: errMsg,
-          });
+          console.error(`[${node.data.catalogueId} LIVE-FAIL] Real execution failed — NO mock fallback for live nodes. Error: ${errMsg}`, error);
           log("error", `${node.data.label} failed`, errMsg);
           toast.error(errTitle || `${node.data.label} failed`, {
             description: errMsg,
