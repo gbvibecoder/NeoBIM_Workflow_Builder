@@ -18,7 +18,7 @@
  *   - Pro + PBR: 80 credits → ~40 models/month
  */
 
-import { getAllMeshyPrompts } from "./furniture-catalog";
+import { getAllAIPrompts } from "./furniture-catalog";
 
 // ─── 3D AI Studio Configuration ─────────────────────────────────────────────
 
@@ -236,7 +236,7 @@ export async function generateAllFurniture(
   onProgress?: (job: GenerationJob, index: number, total: number) => void
 ): Promise<BatchResult> {
   const startTime = Date.now();
-  const allPrompts = getAllMeshyPrompts(); // reuse same catalog format
+  const allPrompts = getAllAIPrompts(); // reuse same catalog format
 
   // Check which models already exist
   const existing = await checkExistingModels(allPrompts.map((p) => p.file));

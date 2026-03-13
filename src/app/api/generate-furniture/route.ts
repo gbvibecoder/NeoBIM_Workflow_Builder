@@ -21,7 +21,7 @@ import {
   generateSingleFurniture,
   isFurnitureGenerationAvailable,
 } from "@/services/furniture-generator";
-import { getAllMeshyPrompts } from "@/services/furniture-catalog";
+import { getAllAIPrompts } from "@/services/furniture-catalog";
 
 export async function POST(request: Request) {
   // Auth: require PLATFORM_ADMIN
@@ -60,7 +60,7 @@ export async function POST(request: Request) {
 
   // Dry run — list what needs generating + cost estimate
   if (dryRun) {
-    const prompts = getAllMeshyPrompts();
+    const prompts = getAllAIPrompts();
     const creditsPerItem = edition === "pro" ? 80 : 55; // base + PBR
     return NextResponse.json({
       total: prompts.length,
@@ -80,7 +80,7 @@ export async function POST(request: Request) {
 
   // Single model generation
   if (singleFile) {
-    const prompts = getAllMeshyPrompts();
+    const prompts = getAllAIPrompts();
     const match = prompts.find((p) => p.file === singleFile);
     if (!match) {
       return NextResponse.json(
@@ -135,7 +135,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const prompts = getAllMeshyPrompts();
+  const prompts = getAllAIPrompts();
   const configured = isFurnitureGenerationAvailable();
 
   return NextResponse.json({
