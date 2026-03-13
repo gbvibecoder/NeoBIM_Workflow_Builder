@@ -38,7 +38,7 @@ canvas{display:block}
 </style>
 </head>
 <body>
-<div id="bf-dbg" style="position:fixed;top:4px;left:4px;z-index:9999;background:rgba(79,138,255,0.85);color:#fff;padding:3px 8px;font-size:9px;border-radius:4px;pointer-events:none;font-family:monospace;letter-spacing:.5px">BUILDER v4.0</div>
+<div id="bf-dbg" style="position:fixed;top:4px;left:4px;z-index:9999;background:rgba(79,138,255,0.85);color:#fff;padding:3px 8px;font-size:9px;border-radius:4px;pointer-events:none;font-family:monospace;letter-spacing:.5px">BUILDER v5.0 FLAT</div>
 <div id="tip"><div class="tn" id="tN"></div><div class="td" id="tD"></div></div>
 <script>
 // Early message queue — captures commands while Three.js CDN loads
@@ -191,120 +191,20 @@ scene.add(new THREE.HemisphereLight(0xFFF5E8,0xA89070,.9));
 var maxAniso=renderer.capabilities.getMaxAnisotropy();
 console.log('[BUILDER] Max anisotropy:',maxAniso);
 
-// ─── High-Quality Procedural Textures (1024x1024) ───────────────────────────
+// ─── Texture helpers (kept minimal — floors use flat solid colors) ───────────
 function shiftHex(hex,amt){
   var r=Math.max(0,Math.min(255,((hex>>16)&0xff)+amt));
   var g=Math.max(0,Math.min(255,((hex>>8)&0xff)+amt));
   var b=Math.max(0,Math.min(255,(hex&0xff)+amt));
   return 'rgb('+r+','+g+','+b+')';
 }
-
+// Legacy stub — returns flat solid color canvas (no planks, no stripes, nothing)
 function makeFloorTex(type,hex){
-  var S=1024,c=document.createElement("canvas");c.width=S;c.height=S;
+  var S=4,c=document.createElement("canvas");c.width=S;c.height=S;
   var g=c.getContext("2d");
   var R=(hex>>16)&0xff,G=(hex>>8)&0xff,B=hex&0xff;
   g.fillStyle="rgb("+R+","+G+","+B+")";g.fillRect(0,0,S,S);
-
-  if(type==="wood"){
-    var plankH=Math.floor(S/12);
-    var baseColors=[[R,G,B],[R+12,G+8,B+4],[R-10,G-8,B-6],[R+5,G-2,B-4],[R-5,G+5,B+2],[R+8,G+10,B+6],[R-6,G+3,B-2]];
-    for(var row=0;row<12;row++){
-      plankH=Math.floor(S/12)+Math.floor(Math.random()*18-9);
-      var stagger=(row%3)*(S*0.22)+Math.random()*S*0.08;
-      var pw=S*0.35+Math.random()*S*0.3;
-      for(var px=-pw;px<S+pw;px+=pw){
-        var bc=baseColors[Math.floor(Math.random()*baseColors.length)];
-        var pGrad=g.createLinearGradient(px+stagger,0,px+stagger+pw,0);
-        pGrad.addColorStop(0,'rgb('+bc[0]+','+bc[1]+','+bc[2]+')');
-        pGrad.addColorStop(0.3,'rgb('+(bc[0]+8)+','+(bc[1]+5)+','+(bc[2]+2)+')');
-        pGrad.addColorStop(0.7,'rgb('+(bc[0]-5)+','+(bc[1]-3)+','+(bc[2]-2)+')');
-        pGrad.addColorStop(1,'rgb('+bc[0]+','+bc[1]+','+bc[2]+')');
-        g.fillStyle=pGrad;
-        g.fillRect(px+stagger+1,row*plankH+1.5,pw-2,plankH-3);
-        // Vertical plank-end gap (subtle)
-        g.fillStyle='rgba(25,12,4,0.12)';
-        g.fillRect(px+stagger,row*plankH,1,plankH);
-      }
-      // Horizontal plank gap (beveled edge — dark then light highlight)
-      g.fillStyle='rgba(20,8,2,0.12)';
-      g.fillRect(0,row*plankH,S,1);
-      g.fillStyle='rgba(255,240,220,0.03)';
-      g.fillRect(0,row*plankH+1,S,1);
-      // Wavy grain lines (very subtle)
-      for(var gi=0;gi<20;gi++){
-        var gy=row*plankH+3+Math.random()*(plankH-6);
-        var gAlpha=0.01+Math.random()*0.03;
-        g.strokeStyle='rgba(50,28,10,'+gAlpha+')';
-        g.lineWidth=0.3+Math.random()*0.5;
-        g.beginPath();
-        g.moveTo(0,gy);
-        for(var gx=0;gx<S;gx+=25){
-          g.lineTo(gx,gy+Math.sin(gx*0.04+row)*1.5+(Math.random()-0.5)*1.2);
-        }
-        g.stroke();
-      }
-      // Knots with radial gradient
-      if(Math.random()<0.2){
-        var kx=80+Math.random()*(S-160),ky=row*plankH+plankH*0.35+Math.random()*plankH*0.3;
-        var kr=6+Math.random()*10;
-        var kGrad=g.createRadialGradient(kx,ky,0,kx,ky,kr);
-        kGrad.addColorStop(0,'rgba(50,30,12,0.4)');
-        kGrad.addColorStop(0.6,'rgba(70,45,22,0.2)');
-        kGrad.addColorStop(1,'rgba(0,0,0,0)');
-        g.fillStyle=kGrad;
-        g.beginPath();g.arc(kx,ky,kr,0,Math.PI*2);g.fill();
-        // Ring around knot
-        g.strokeStyle='rgba(50,30,12,0.12)';g.lineWidth=1.5;
-        g.beginPath();g.arc(kx,ky,kr+3,0,Math.PI*2);g.stroke();
-      }
-    }
-  }else if(type==="tile"){
-    var ts=Math.floor(S/8);
-    for(var tx=0;tx<S;tx+=ts)for(var ty=0;ty<S;ty+=ts){
-      var tv=Math.random()*14-7;
-      var tR=Math.max(0,Math.min(255,R+tv)),tG=Math.max(0,Math.min(255,G+tv)),tB=Math.max(0,Math.min(255,B+tv));
-      g.fillStyle='rgb('+tR+','+tG+','+tB+')';
-      g.fillRect(tx+2,ty+2,ts-4,ts-4);
-      // Surface micro-texture
-      for(var tn=0;tn<12;tn++){
-        g.fillStyle='rgba(0,0,0,'+(Math.random()*0.025)+')';
-        g.fillRect(tx+Math.random()*ts,ty+Math.random()*ts,2+Math.random()*2,1+Math.random()*2);
-      }
-    }
-    // Grout lines (subtle)
-    g.strokeStyle='rgba(0,0,0,0.08)';g.lineWidth=1;
-    for(var tlx=0;tlx<=S;tlx+=ts){g.beginPath();g.moveTo(tlx,0);g.lineTo(tlx,S);g.stroke()}
-    for(var tly=0;tly<=S;tly+=ts){g.beginPath();g.moveTo(0,tly);g.lineTo(S,tly);g.stroke()}
-  }else if(type==="mosaic"){
-    var ms=Math.floor(S/32);
-    for(var mx=0;mx<S;mx+=ms)for(var my=0;my<S;my+=ms){
-      var mv=Math.random()*35-17;
-      g.fillStyle='rgb('+Math.max(0,Math.min(255,R+mv))+','+Math.max(0,Math.min(255,G+mv))+','+Math.max(0,Math.min(255,B+mv))+')';
-      g.fillRect(mx+0.5,my+0.5,ms-1,ms-1);
-    }
-    g.strokeStyle='rgba(0,0,0,0.06)';g.lineWidth=0.5;
-    for(var mlx=0;mlx<=S;mlx+=ms){g.beginPath();g.moveTo(mlx,0);g.lineTo(mlx,S);g.stroke()}
-    for(var mly=0;mly<=S;mly+=ms){g.beginPath();g.moveTo(0,mly);g.lineTo(S,mly);g.stroke()}
-  }else if(type==="stone"){
-    for(var si=0;si<40;si++){
-      var sx2=Math.random()*(S-80),sy2=Math.random()*(S-60),sw2=40+Math.random()*70,sh2=30+Math.random()*50;
-      var sv=Math.random()*28-14;
-      g.fillStyle='rgb('+Math.max(0,Math.min(255,R+sv))+','+Math.max(0,Math.min(255,G+sv))+','+Math.max(0,Math.min(255,B+sv))+')';
-      g.fillRect(sx2,sy2,sw2,sh2);
-      g.strokeStyle='rgba(0,0,0,0.06)';g.lineWidth=0.8;g.strokeRect(sx2,sy2,sw2,sh2);
-      // Surface noise per stone
-      for(var sn=0;sn<8;sn++){g.fillStyle='rgba(0,0,0,'+(Math.random()*0.03)+')';g.fillRect(sx2+Math.random()*sw2,sy2+Math.random()*sh2,3,2)}
-    }
-  }else{
-    // Concrete with noise
-    for(var nx=0;nx<S;nx+=4)for(var ny=0;ny<S;ny+=4){g.fillStyle='rgba(0,0,0,'+(Math.random()*.04)+')';g.fillRect(nx,ny,4,4)}
-    for(var cn=0;cn<400;cn++){g.fillStyle='rgba(0,0,0,'+(Math.random()*0.025)+')';g.fillRect(Math.random()*S,Math.random()*S,3+Math.random()*4,2+Math.random()*3)}
-  }
-  var t=new THREE.CanvasTexture(c);
-  t.wrapS=t.wrapT=THREE.RepeatWrapping;
-  t.encoding=THREE.sRGBEncoding;
-  t.anisotropy=maxAniso;
-  return t;
+  var t=new THREE.CanvasTexture(c);t.wrapS=t.wrapT=THREE.RepeatWrapping;return t;
 }
 
 function makePlasterTex(){
@@ -421,155 +321,6 @@ function makePBRFloor(type,hex,rw,rd){
   }
   // Stone / concrete: flat solid color
   return new THREE.MeshStandardMaterial({color:hex,roughness:0.75,metalness:0.02,envMapIntensity:0.2});
-}
-
-// ─── VERTICAL-PLANK WOOD FLOOR (diffuse + normal) ─────────────────────────
-function makeWoodFloorPBR(hex){
-  var S=1024,c=document.createElement('canvas');c.width=S;c.height=S;
-  var g=c.getContext('2d');
-  var R=(hex>>16)&0xff,G=(hex>>8)&0xff,B=hex&0xff;
-  // Solid warm base
-  g.fillStyle='rgb('+R+','+G+','+B+')';g.fillRect(0,0,S,S);
-
-  // VERTICAL planks — ~30px wide (~10cm at texture scale)
-  var PW=30+Math.floor(Math.random()*6); // plank width in pixels
-  var nPlanks=Math.ceil(S/PW);
-  var xP=0;
-  for(var pi=0;pi<nPlanks;pi++){
-    var pw=PW+Math.floor(Math.random()*4-2);
-    if(xP+pw>S)pw=S-xP;
-    // Each plank: base color ± tiny variation (max 6 RGB units)
-    var dv=Math.floor(Math.random()*12-6);
-    var pR=Math.max(0,Math.min(255,R+dv));
-    var pG=Math.max(0,Math.min(255,G+Math.floor(dv*0.8)));
-    var pB=Math.max(0,Math.min(255,B+Math.floor(dv*0.5)));
-    // Subtle lengthwise gradient (top slightly lighter than bottom)
-    var pg=g.createLinearGradient(0,0,0,S);
-    pg.addColorStop(0,'rgb('+Math.min(255,pR+3)+','+Math.min(255,pG+2)+','+Math.min(255,pB+1)+')');
-    pg.addColorStop(0.5,'rgb('+pR+','+pG+','+pB+')');
-    pg.addColorStop(1,'rgb('+Math.max(0,pR-2)+','+Math.max(0,pG-1)+','+pB+')');
-    g.fillStyle=pg;
-    g.fillRect(xP,0,pw,S);
-
-    // Vertical grain lines along each plank (very subtle)
-    for(var vg=0;vg<3;vg++){
-      var vx=xP+3+Math.random()*(pw-6);
-      g.strokeStyle='rgba(0,0,0,0.015)';g.lineWidth=0.4;
-      g.beginPath();g.moveTo(vx,0);
-      for(var vy=0;vy<S;vy+=20){g.lineTo(vx+Math.sin(vy*0.008+pi)*0.5,vy)}
-      g.stroke();
-    }
-
-    // Horizontal end-joints (staggered per plank, 2-3 per plank height)
-    var jointY=200+Math.floor(Math.random()*300);
-    while(jointY<S){
-      g.fillStyle='rgba(0,0,0,0.02)';g.fillRect(xP,jointY,pw,1);
-      jointY+=300+Math.floor(Math.random()*250);
-    }
-
-    // 1px dark gap between planks
-    g.fillStyle='rgba(40,25,10,0.06)';g.fillRect(xP+pw-1,0,1,S);
-
-    xP+=pw;
-  }
-
-  // Rare knot (1-2 per texture)
-  for(var ki=0;ki<2;ki++){
-    if(Math.random()<0.25){
-      var kx=40+Math.random()*(S-80),ky=40+Math.random()*(S-80),kr=2+Math.random()*3;
-      var kgr=g.createRadialGradient(kx,ky,0,kx,ky,kr);
-      kgr.addColorStop(0,'rgba(80,50,20,0.08)');kgr.addColorStop(1,'rgba(0,0,0,0)');
-      g.fillStyle=kgr;g.beginPath();g.arc(kx,ky,kr,0,Math.PI*2);g.fill();
-    }
-  }
-
-  var diffTex=new THREE.CanvasTexture(c);
-  diffTex.wrapS=diffTex.wrapT=THREE.RepeatWrapping;
-  diffTex.encoding=THREE.sRGBEncoding;diffTex.anisotropy=maxAniso;
-
-  // Normal map: groove indentations at plank edges
-  var nC=document.createElement('canvas');nC.width=S;nC.height=S;
-  var ng=nC.getContext('2d');
-  // Flat normal base (128,128,255 = pointing straight up)
-  ng.fillStyle='rgb(128,128,255)';ng.fillRect(0,0,S,S);
-  // Plank edge grooves: left edge gets red<128 (tilted left), right edge gets red>128 (tilted right)
-  xP=0;
-  for(var ni=0;ni<nPlanks;ni++){
-    var npw=PW+Math.floor(Math.random()*4-2);
-    if(xP+npw>S)npw=S-xP;
-    // Left edge of plank: normal tilts left (red channel < 128)
-    ng.fillStyle='rgb(108,128,255)';ng.fillRect(xP,0,2,S);
-    // Right edge: normal tilts right (red channel > 128)
-    ng.fillStyle='rgb(148,128,255)';ng.fillRect(xP+npw-2,0,2,S);
-    xP+=npw;
-  }
-  var nTex=new THREE.CanvasTexture(nC);
-  nTex.wrapS=nTex.wrapT=THREE.RepeatWrapping;nTex.anisotropy=maxAniso;
-
-  return {diffuse:diffTex,normal:nTex};
-}
-
-// ─── TILE FLOOR (diffuse + normal) ────────────────────────────────────────
-function makeTileFloorPBR(hex){
-  var S=512,c=document.createElement('canvas');c.width=S;c.height=S;
-  var g=c.getContext('2d');
-  var R=(hex>>16)&0xff,G=(hex>>8)&0xff,B=hex&0xff;
-  g.fillStyle='rgb('+R+','+G+','+B+')';g.fillRect(0,0,S,S);
-  var ts=S/8; // 8x8 grid = 64px tiles
-  // Fill each tile with tiny color variation
-  for(var tx=0;tx<8;tx++)for(var ty=0;ty<8;ty++){
-    var tv=Math.floor(Math.random()*8-4);
-    var tR=Math.max(0,Math.min(255,R+tv)),tG=Math.max(0,Math.min(255,G+tv)),tB=Math.max(0,Math.min(255,B+tv));
-    g.fillStyle='rgb('+tR+','+tG+','+tB+')';
-    g.fillRect(tx*ts+1,ty*ts+1,ts-2,ts-2);
-    // Subtle surface noise per tile
-    for(var tn=0;tn<6;tn++){
-      g.fillStyle='rgba(0,0,0,'+(Math.random()*0.015)+')';
-      g.fillRect(tx*ts+Math.random()*ts,ty*ts+Math.random()*ts,2+Math.random()*3,1+Math.random()*2);
-    }
-  }
-  // Grout lines
-  g.fillStyle='rgba(0,0,0,0.08)';
-  for(var gx=0;gx<=S;gx+=ts)g.fillRect(gx-1,0,2,S);
-  for(var gy=0;gy<=S;gy+=ts)g.fillRect(0,gy-1,S,2);
-
-  var diffTex=new THREE.CanvasTexture(c);
-  diffTex.wrapS=diffTex.wrapT=THREE.RepeatWrapping;
-  diffTex.encoding=THREE.sRGBEncoding;diffTex.anisotropy=maxAniso;
-
-  // Normal map: indentations at grout lines
-  var nC=document.createElement('canvas');nC.width=S;nC.height=S;
-  var ng=nC.getContext('2d');
-  ng.fillStyle='rgb(128,128,255)';ng.fillRect(0,0,S,S);
-  for(var gx2=0;gx2<=S;gx2+=ts){
-    ng.fillStyle='rgb(108,128,240)';ng.fillRect(gx2-1,0,1,S);
-    ng.fillStyle='rgb(148,128,240)';ng.fillRect(gx2+1,0,1,S);
-  }
-  for(var gy2=0;gy2<=S;gy2+=ts){
-    ng.fillStyle='rgb(128,108,240)';ng.fillRect(0,gy2-1,S,1);
-    ng.fillStyle='rgb(128,148,240)';ng.fillRect(0,gy2+1,S,1);
-  }
-  var nTex=new THREE.CanvasTexture(nC);
-  nTex.wrapS=nTex.wrapT=THREE.RepeatWrapping;nTex.anisotropy=maxAniso;
-
-  return {diffuse:diffTex,normal:nTex};
-}
-
-// ─── STONE FLOOR (diffuse only) ──────────────────────────────────────────
-function makeStoneFloorTex(hex){
-  var S=512,c=document.createElement('canvas');c.width=S;c.height=S;
-  var g=c.getContext('2d');
-  var R=(hex>>16)&0xff,G=(hex>>8)&0xff,B=hex&0xff;
-  g.fillStyle='rgb('+R+','+G+','+B+')';g.fillRect(0,0,S,S);
-  for(var si=0;si<30;si++){
-    var sx2=Math.random()*(S-60),sy2=Math.random()*(S-40),sw2=40+Math.random()*60,sh2=30+Math.random()*40;
-    var sV=Math.random()*10-5;
-    g.fillStyle='rgb('+Math.max(0,Math.min(255,R+sV))+','+Math.max(0,Math.min(255,G+sV))+','+Math.max(0,Math.min(255,B+sV))+')';
-    g.fillRect(sx2,sy2,sw2,sh2);
-    g.strokeStyle='rgba(0,0,0,0.025)';g.lineWidth=0.5;g.strokeRect(sx2,sy2,sw2,sh2);
-  }
-  for(var cn=0;cn<400;cn++){g.fillStyle='rgba(0,0,0,'+(Math.random()*0.015)+')';g.fillRect(Math.random()*S,Math.random()*S,2+Math.random()*3,1+Math.random()*2)}
-  var t=new THREE.CanvasTexture(c);t.wrapS=t.wrapT=THREE.RepeatWrapping;t.encoding=THREE.sRGBEncoding;t.anisotropy=maxAniso;return t;
 }
 
 // ─── PBR Wall Material ────────────────────────────────────────────────────
