@@ -41,7 +41,7 @@ const WORKFLOWS: PipelineWorkflow[] = [
     totalFloors: 10,
     status: "in-development",
     statusLabel: "In Development",
-    targetDate: "APR 2026",
+    targetDate: "14 MAR 2026",
     color: "#4F8AFF",
     secondaryColor: "#6366F1",
     nodeId: "WF-01",
@@ -56,7 +56,7 @@ const WORKFLOWS: PipelineWorkflow[] = [
     totalFloors: 10,
     status: "research",
     statusLabel: "Research Phase",
-    targetDate: "MAY 2026",
+    targetDate: "15 MAR 2026",
     color: "#8B5CF6",
     secondaryColor: "#A78BFA",
     nodeId: "WF-02",
@@ -71,7 +71,7 @@ const WORKFLOWS: PipelineWorkflow[] = [
     totalFloors: 10,
     status: "planned",
     statusLabel: "Planned",
-    targetDate: "JUN 2026",
+    targetDate: "16 MAR 2026",
     color: "#10B981",
     secondaryColor: "#34D399",
     nodeId: "WF-03",
@@ -1061,7 +1061,7 @@ export function PipelineSection() {
             </div>
             <span style={{ fontSize: 14, fontWeight: 600, color: "#9898B0", lineHeight: 1.4 }}>
               <span style={{ color: "#4F8AFF", fontWeight: 700 }}>Text to Conceptual Building</span>
-              {" "}— our flagship pipeline — arriving April 2026
+              {" "}— our flagship pipeline — arriving tomorrow
             </span>
           </div>
         </motion.div>
