@@ -409,94 +409,184 @@ function albedoToNormal(albedoCanvas,str){
   hx.putImageData(hD,0,0);
   return heightToNormal(hC,str);
 }
-// Create floor material: wood gets smooth texture only (no normal map), tiles get subtle normal
+// ─── Floor Material Factory ────────────────────────────────────────────────
 function makePBRFloor(type,hex,rw,rd){
-  var diffuse=makeFloorTexV2(type,hex);
-  diffuse.repeat.set(rw/2.5,rd/2.5);
-  var rough=type==='wood'?0.55:type==='tile'?0.35:type==='mosaic'?0.3:0.75;
   if(type==='wood'){
-    // Wood: clean smooth material, NO normal map — avoids stripe amplification
-    return new THREE.MeshStandardMaterial({map:diffuse,roughness:rough,metalness:0.02,envMapIntensity:0.3});
+    // Wood: VERTICAL planks with dedicated normal map from plank edges
+    var wRes=makeWoodFloorPBR(hex);
+    wRes.diffuse.repeat.set(rw/2,rd/2);
+    wRes.normal.repeat.set(rw/2,rd/2);
+    return new THREE.MeshStandardMaterial({map:wRes.diffuse,normalMap:wRes.normal,normalScale:new THREE.Vector2(0.4,0.4),roughness:0.55,metalness:0.0,envMapIntensity:0.3});
   }
-  // Tile/stone: subtle normal map
-  var nCanvas=albedoToNormal(diffuse.image,type==='tile'?0.5:0.3);
-  var nTex=new THREE.CanvasTexture(nCanvas);
-  nTex.wrapS=nTex.wrapT=THREE.RepeatWrapping;
-  nTex.repeat.copy(diffuse.repeat);nTex.anisotropy=maxAniso;
-  return new THREE.MeshStandardMaterial({map:diffuse,normalMap:nTex,normalScale:new THREE.Vector2(0.2,0.2),roughness:rough,metalness:0.02,envMapIntensity:0.3});
+  if(type==='tile'){
+    var tRes=makeTileFloorPBR(hex);
+    tRes.diffuse.repeat.set(rw/1.8,rd/1.8);
+    tRes.normal.repeat.set(rw/1.8,rd/1.8);
+    return new THREE.MeshStandardMaterial({map:tRes.diffuse,normalMap:tRes.normal,normalScale:new THREE.Vector2(0.3,0.3),roughness:0.3,metalness:0.02,envMapIntensity:0.4});
+  }
+  // Stone / concrete fallback
+  var diffuse=makeStoneFloorTex(hex);
+  diffuse.repeat.set(rw/2.5,rd/2.5);
+  return new THREE.MeshStandardMaterial({map:diffuse,roughness:0.75,metalness:0.02,envMapIntensity:0.2});
 }
-// Create PBR wall material: plaster diffuse + normal
+
+// ─── VERTICAL-PLANK WOOD FLOOR (diffuse + normal) ─────────────────────────
+function makeWoodFloorPBR(hex){
+  var S=1024,c=document.createElement('canvas');c.width=S;c.height=S;
+  var g=c.getContext('2d');
+  var R=(hex>>16)&0xff,G=(hex>>8)&0xff,B=hex&0xff;
+  // Solid warm base
+  g.fillStyle='rgb('+R+','+G+','+B+')';g.fillRect(0,0,S,S);
+
+  // VERTICAL planks — ~30px wide (~10cm at texture scale)
+  var PW=30+Math.floor(Math.random()*6); // plank width in pixels
+  var nPlanks=Math.ceil(S/PW);
+  var xP=0;
+  for(var pi=0;pi<nPlanks;pi++){
+    var pw=PW+Math.floor(Math.random()*4-2);
+    if(xP+pw>S)pw=S-xP;
+    // Each plank: base color ± tiny variation (max 6 RGB units)
+    var dv=Math.floor(Math.random()*12-6);
+    var pR=Math.max(0,Math.min(255,R+dv));
+    var pG=Math.max(0,Math.min(255,G+Math.floor(dv*0.8)));
+    var pB=Math.max(0,Math.min(255,B+Math.floor(dv*0.5)));
+    // Subtle lengthwise gradient (top slightly lighter than bottom)
+    var pg=g.createLinearGradient(0,0,0,S);
+    pg.addColorStop(0,'rgb('+Math.min(255,pR+3)+','+Math.min(255,pG+2)+','+Math.min(255,pB+1)+')');
+    pg.addColorStop(0.5,'rgb('+pR+','+pG+','+pB+')');
+    pg.addColorStop(1,'rgb('+Math.max(0,pR-2)+','+Math.max(0,pG-1)+','+pB+')');
+    g.fillStyle=pg;
+    g.fillRect(xP,0,pw,S);
+
+    // Vertical grain lines along each plank (very subtle)
+    for(var vg=0;vg<3;vg++){
+      var vx=xP+3+Math.random()*(pw-6);
+      g.strokeStyle='rgba(0,0,0,0.015)';g.lineWidth=0.4;
+      g.beginPath();g.moveTo(vx,0);
+      for(var vy=0;vy<S;vy+=20){g.lineTo(vx+Math.sin(vy*0.008+pi)*0.5,vy)}
+      g.stroke();
+    }
+
+    // Horizontal end-joints (staggered per plank, 2-3 per plank height)
+    var jointY=200+Math.floor(Math.random()*300);
+    while(jointY<S){
+      g.fillStyle='rgba(0,0,0,0.02)';g.fillRect(xP,jointY,pw,1);
+      jointY+=300+Math.floor(Math.random()*250);
+    }
+
+    // 1px dark gap between planks
+    g.fillStyle='rgba(40,25,10,0.06)';g.fillRect(xP+pw-1,0,1,S);
+
+    xP+=pw;
+  }
+
+  // Rare knot (1-2 per texture)
+  for(var ki=0;ki<2;ki++){
+    if(Math.random()<0.25){
+      var kx=40+Math.random()*(S-80),ky=40+Math.random()*(S-80),kr=2+Math.random()*3;
+      var kgr=g.createRadialGradient(kx,ky,0,kx,ky,kr);
+      kgr.addColorStop(0,'rgba(80,50,20,0.08)');kgr.addColorStop(1,'rgba(0,0,0,0)');
+      g.fillStyle=kgr;g.beginPath();g.arc(kx,ky,kr,0,Math.PI*2);g.fill();
+    }
+  }
+
+  var diffTex=new THREE.CanvasTexture(c);
+  diffTex.wrapS=diffTex.wrapT=THREE.RepeatWrapping;
+  diffTex.encoding=THREE.sRGBEncoding;diffTex.anisotropy=maxAniso;
+
+  // Normal map: groove indentations at plank edges
+  var nC=document.createElement('canvas');nC.width=S;nC.height=S;
+  var ng=nC.getContext('2d');
+  // Flat normal base (128,128,255 = pointing straight up)
+  ng.fillStyle='rgb(128,128,255)';ng.fillRect(0,0,S,S);
+  // Plank edge grooves: left edge gets red<128 (tilted left), right edge gets red>128 (tilted right)
+  xP=0;
+  for(var ni=0;ni<nPlanks;ni++){
+    var npw=PW+Math.floor(Math.random()*4-2);
+    if(xP+npw>S)npw=S-xP;
+    // Left edge of plank: normal tilts left (red channel < 128)
+    ng.fillStyle='rgb(108,128,255)';ng.fillRect(xP,0,2,S);
+    // Right edge: normal tilts right (red channel > 128)
+    ng.fillStyle='rgb(148,128,255)';ng.fillRect(xP+npw-2,0,2,S);
+    xP+=npw;
+  }
+  var nTex=new THREE.CanvasTexture(nC);
+  nTex.wrapS=nTex.wrapT=THREE.RepeatWrapping;nTex.anisotropy=maxAniso;
+
+  return {diffuse:diffTex,normal:nTex};
+}
+
+// ─── TILE FLOOR (diffuse + normal) ────────────────────────────────────────
+function makeTileFloorPBR(hex){
+  var S=512,c=document.createElement('canvas');c.width=S;c.height=S;
+  var g=c.getContext('2d');
+  var R=(hex>>16)&0xff,G=(hex>>8)&0xff,B=hex&0xff;
+  g.fillStyle='rgb('+R+','+G+','+B+')';g.fillRect(0,0,S,S);
+  var ts=S/8; // 8x8 grid = 64px tiles
+  // Fill each tile with tiny color variation
+  for(var tx=0;tx<8;tx++)for(var ty=0;ty<8;ty++){
+    var tv=Math.floor(Math.random()*8-4);
+    var tR=Math.max(0,Math.min(255,R+tv)),tG=Math.max(0,Math.min(255,G+tv)),tB=Math.max(0,Math.min(255,B+tv));
+    g.fillStyle='rgb('+tR+','+tG+','+tB+')';
+    g.fillRect(tx*ts+1,ty*ts+1,ts-2,ts-2);
+    // Subtle surface noise per tile
+    for(var tn=0;tn<6;tn++){
+      g.fillStyle='rgba(0,0,0,'+(Math.random()*0.015)+')';
+      g.fillRect(tx*ts+Math.random()*ts,ty*ts+Math.random()*ts,2+Math.random()*3,1+Math.random()*2);
+    }
+  }
+  // Grout lines
+  g.fillStyle='rgba(0,0,0,0.08)';
+  for(var gx=0;gx<=S;gx+=ts)g.fillRect(gx-1,0,2,S);
+  for(var gy=0;gy<=S;gy+=ts)g.fillRect(0,gy-1,S,2);
+
+  var diffTex=new THREE.CanvasTexture(c);
+  diffTex.wrapS=diffTex.wrapT=THREE.RepeatWrapping;
+  diffTex.encoding=THREE.sRGBEncoding;diffTex.anisotropy=maxAniso;
+
+  // Normal map: indentations at grout lines
+  var nC=document.createElement('canvas');nC.width=S;nC.height=S;
+  var ng=nC.getContext('2d');
+  ng.fillStyle='rgb(128,128,255)';ng.fillRect(0,0,S,S);
+  for(var gx2=0;gx2<=S;gx2+=ts){
+    ng.fillStyle='rgb(108,128,240)';ng.fillRect(gx2-1,0,1,S);
+    ng.fillStyle='rgb(148,128,240)';ng.fillRect(gx2+1,0,1,S);
+  }
+  for(var gy2=0;gy2<=S;gy2+=ts){
+    ng.fillStyle='rgb(128,108,240)';ng.fillRect(0,gy2-1,S,1);
+    ng.fillStyle='rgb(128,148,240)';ng.fillRect(0,gy2+1,S,1);
+  }
+  var nTex=new THREE.CanvasTexture(nC);
+  nTex.wrapS=nTex.wrapT=THREE.RepeatWrapping;nTex.anisotropy=maxAniso;
+
+  return {diffuse:diffTex,normal:nTex};
+}
+
+// ─── STONE FLOOR (diffuse only) ──────────────────────────────────────────
+function makeStoneFloorTex(hex){
+  var S=512,c=document.createElement('canvas');c.width=S;c.height=S;
+  var g=c.getContext('2d');
+  var R=(hex>>16)&0xff,G=(hex>>8)&0xff,B=hex&0xff;
+  g.fillStyle='rgb('+R+','+G+','+B+')';g.fillRect(0,0,S,S);
+  for(var si=0;si<30;si++){
+    var sx2=Math.random()*(S-60),sy2=Math.random()*(S-40),sw2=40+Math.random()*60,sh2=30+Math.random()*40;
+    var sV=Math.random()*10-5;
+    g.fillStyle='rgb('+Math.max(0,Math.min(255,R+sV))+','+Math.max(0,Math.min(255,G+sV))+','+Math.max(0,Math.min(255,B+sV))+')';
+    g.fillRect(sx2,sy2,sw2,sh2);
+    g.strokeStyle='rgba(0,0,0,0.025)';g.lineWidth=0.5;g.strokeRect(sx2,sy2,sw2,sh2);
+  }
+  for(var cn=0;cn<400;cn++){g.fillStyle='rgba(0,0,0,'+(Math.random()*0.015)+')';g.fillRect(Math.random()*S,Math.random()*S,2+Math.random()*3,1+Math.random()*2)}
+  var t=new THREE.CanvasTexture(c);t.wrapS=t.wrapT=THREE.RepeatWrapping;t.encoding=THREE.sRGBEncoding;t.anisotropy=maxAniso;return t;
+}
+
+// ─── PBR Wall Material ────────────────────────────────────────────────────
 function makePBRWall(isExt){
   var diff=makePlasterTex();
-  var nCanvas=albedoToNormal(diff.image,1.5);
+  var nCanvas=albedoToNormal(diff.image,1.2);
   var nTex=new THREE.CanvasTexture(nCanvas);
   nTex.wrapS=nTex.wrapT=THREE.RepeatWrapping;
   nTex.repeat.copy(diff.repeat);
-  return new THREE.MeshStandardMaterial({map:diff,normalMap:nTex,normalScale:new THREE.Vector2(0.35,0.35),color:isExt?0xEDE5D8:0xF2EDE4,roughness:isExt?0.78:0.82,metalness:0.01,envMapIntensity:0.15});
-}
-
-// ─── Clean Floor Texture (V3 — smooth uniform wood, barely visible planks) ───
-function makeFloorTexV2(type,hex){
-  var S=1024,c=document.createElement("canvas");c.width=S;c.height=S;
-  var g=c.getContext("2d");
-  var R=(hex>>16)&0xff,G=(hex>>8)&0xff,B=hex&0xff;
-  g.fillStyle="rgb("+R+","+G+","+B+")";g.fillRect(0,0,S,S);
-  if(type==="wood"){
-    // Smooth warm wood: fill entire canvas uniformly, then add VERY subtle grain
-    // No distinct plank rows — from dollhouse view, hardwood looks like a warm solid surface
-    // 1) Gentle warm noise for natural wood feel
-    for(var ni=0;ni<3000;ni++){
-      var nv=Math.random()*3-1.5;
-      var nR=Math.max(0,Math.min(255,R+nv)),nG=Math.max(0,Math.min(255,G+nv*0.8)),nB=Math.max(0,Math.min(255,B+nv*0.6));
-      g.fillStyle='rgba('+Math.round(nR)+','+Math.round(nG)+','+Math.round(nB)+',0.3)';
-      g.fillRect(Math.random()*S,Math.random()*S,4+Math.random()*8,2+Math.random()*3);
-    }
-    // 2) Very faint horizontal grain lines (natural wood direction)
-    for(var gi=0;gi<40;gi++){
-      var gy=Math.random()*S;
-      g.strokeStyle='rgba(0,0,0,0.008)';g.lineWidth=0.3+Math.random()*0.3;
-      g.beginPath();g.moveTo(0,gy);
-      for(var gx=0;gx<S;gx+=40){g.lineTo(gx,gy+Math.sin(gx*0.015+gi)*0.6)}
-      g.stroke();
-    }
-    // 3) Barely visible plank seams (horizontal lines every ~85px)
-    var plankH=85;
-    for(var py=plankH;py<S;py+=plankH){
-      g.fillStyle='rgba(0,0,0,0.018)';g.fillRect(0,py,S,1);
-    }
-    // 4) Barely visible vertical end-joints (staggered)
-    for(var row=0;row<Math.ceil(S/plankH);row++){
-      var stg=(row%3)*S*0.33+Math.random()*S*0.05;
-      var jw=S*0.4+Math.random()*S*0.25;
-      for(var jx=stg;jx<S;jx+=jw){
-        g.fillStyle='rgba(0,0,0,0.012)';g.fillRect(jx,row*plankH,1,plankH);
-      }
-    }
-    // 5) Rare subtle knots
-    if(Math.random()<0.3){
-      var kx=100+Math.random()*(S-200),ky=100+Math.random()*(S-200),kr=3+Math.random()*4;
-      var kg=g.createRadialGradient(kx,ky,0,kx,ky,kr);
-      kg.addColorStop(0,'rgba(60,35,15,0.06)');kg.addColorStop(1,'rgba(0,0,0,0)');
-      g.fillStyle=kg;g.beginPath();g.arc(kx,ky,kr,0,Math.PI*2);g.fill();
-    }
-  }else if(type==="tile"){
-    var ts=Math.floor(S/8);
-    for(var tx=0;tx<S;tx+=ts)for(var ty=0;ty<S;ty+=ts){
-      var tv=Math.random()*8-4;
-      g.fillStyle='rgb('+Math.max(0,Math.min(255,R+tv))+','+Math.max(0,Math.min(255,G+tv))+','+Math.max(0,Math.min(255,B+tv))+')';
-      g.fillRect(tx+1,ty+1,ts-2,ts-2);
-    }
-    g.strokeStyle='rgba(0,0,0,0.05)';g.lineWidth=1;
-    for(var tlx=0;tlx<=S;tlx+=ts){g.beginPath();g.moveTo(tlx,0);g.lineTo(tlx,S);g.stroke()}
-    for(var tly=0;tly<=S;tly+=ts){g.beginPath();g.moveTo(0,tly);g.lineTo(S,tly);g.stroke()}
-  }else if(type==="stone"){
-    for(var si=0;si<30;si++){var sx2=Math.random()*(S-60),sy2=Math.random()*(S-40),sw2=40+Math.random()*60,sh2=30+Math.random()*40;
-      var sV=Math.random()*14-7;g.fillStyle='rgb('+Math.max(0,Math.min(255,R+sV))+','+Math.max(0,Math.min(255,G+sV))+','+Math.max(0,Math.min(255,B+sV))+')';
-      g.fillRect(sx2,sy2,sw2,sh2);g.strokeStyle='rgba(0,0,0,0.03)';g.lineWidth=0.5;g.strokeRect(sx2,sy2,sw2,sh2);}
-  }else{
-    for(var cnx=0;cnx<S;cnx+=4)for(var cny=0;cny<S;cny+=4){g.fillStyle='rgba(0,0,0,'+(Math.random()*0.02)+')';g.fillRect(cnx,cny,4,4)}
-  }
-  var t=new THREE.CanvasTexture(c);t.wrapS=t.wrapT=THREE.RepeatWrapping;t.encoding=THREE.sRGBEncoding;t.anisotropy=maxAniso;return t;
+  return new THREE.MeshStandardMaterial({map:diff,normalMap:nTex,normalScale:new THREE.Vector2(0.3,0.3),color:isExt?0xEDE5D8:0xF2EDE4,roughness:isExt?0.78:0.82,metalness:0.01,envMapIntensity:0.15});
 }
 
 // ─── Color / texture maps ────────────────────────────────────────────────────
