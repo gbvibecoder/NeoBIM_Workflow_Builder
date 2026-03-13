@@ -25,6 +25,7 @@ export function buildFloorPlan3D(data: FloorPlanGeometry, sourceImage?: string, 
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src * 'unsafe-inline' 'unsafe-eval' blob: data:; connect-src * blob: data:; img-src * blob: data:; script-src * 'unsafe-inline' 'unsafe-eval' blob: data:; style-src * 'unsafe-inline'; worker-src * blob:;">
 <title>BuildFlow \u2014 3D Floor Plan</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
