@@ -230,18 +230,18 @@ const PARTNER_LOGOS = ["BUILT FOR AEC", "COMPLEMENT TO REVIT & RHINO", "NO CAD N
 // ─── Community Social Proof Data ────────────────────────────────────────────
 
 const COMMUNITY_WORKFLOWS = [
-  { name: "MEP Coordination Clash Review", builder: "Sarah M.", role: "MEP Lead", firm: "Arup", discipline: "MEP", phase: "RIBA Stage 4", uses: 342, duplicated: 89, color: "#3B82F6" },
-  { name: "Pre-Commencement Condition Discharge", builder: "James T.", role: "Project Manager", firm: "Mace Group", discipline: "Planning", phase: "Stage 5", uses: 218, duplicated: 56, color: "#8B5CF6" },
-  { name: "RIBA Stage 4 Drawing Issue Workflow", builder: "Priya K.", role: "BIM Manager", firm: "Foster + Partners", discipline: "Architecture", phase: "RIBA Stage 4", uses: 567, duplicated: 134, color: "#10B981" },
-  { name: "Structural Steel Takeoff & BOQ", builder: "Marcus W.", role: "QS Engineer", firm: "Turner & Townsend", discipline: "Structures", phase: "Stage 3–4", uses: 421, duplicated: 97, color: "#F59E0B" },
-  { name: "Façade Panel Schedule Generator", builder: "Lena H.", role: "Façade Engineer", firm: "Schüco", discipline: "Envelope", phase: "Detail Design", uses: 189, duplicated: 43, color: "#EF4444" },
-  { name: "Site Logistics & Crane Reach Analysis", builder: "David C.", role: "Site Manager", firm: "Laing O'Rourke", discipline: "Construction", phase: "Pre-Construction", uses: 305, duplicated: 71, color: "#06B6D4" },
-  { name: "Embodied Carbon Reporting Pipeline", builder: "Amara O.", role: "Sustainability Lead", firm: "BDP", discipline: "Sustainability", phase: "RIBA Stage 2–3", uses: 478, duplicated: 112, color: "#22C55E" },
-  { name: "Automated Clash Detection & Resolution", builder: "Tom R.", role: "BIM Coordinator", firm: "Multiplex", discipline: "BIM Coordination", phase: "Stage 4", uses: 623, duplicated: 158, color: "#A855F7" },
-  { name: "Client Presentation Deck Generator", builder: "Nina S.", role: "Design Director", firm: "Zaha Hadid Architects", discipline: "Design Management", phase: "RIBA Stage 2", uses: 284, duplicated: 67, color: "#EC4899" },
-  { name: "NBS Specification Writer & Mapper", builder: "George L.", role: "Specification Manager", firm: "Gleeds", discipline: "Specifications", phase: "Stage 3–4", uses: 196, duplicated: 51, color: "#14B8A6" },
-  { name: "Construction Phasing Sequence Planner", builder: "Rachel K.", role: "Planning Manager", firm: "Balfour Beatty", discipline: "Construction Planning", phase: "Pre-Construction", uses: 347, duplicated: 82, color: "#F97316" },
-  { name: "As-Built vs Design Comparison", builder: "Ahmed B.", role: "QA Lead", firm: "WSP", discipline: "Quality Assurance", phase: "Stage 5–6", uses: 259, duplicated: 63, color: "#0EA5E9" },
+  { name: "MEP Coordination Clash Review", builder: "Sarah M.", role: "MEP Lead", firm: "Arup", discipline: "MEP", phase: "RIBA Stage 4", uses: 342, duplicated: 89, color: "#3B82F6", lastRun: 1 },
+  { name: "Pre-Commencement Condition Discharge", builder: "James T.", role: "Project Manager", firm: "Mace Group", discipline: "Planning", phase: "Stage 5", uses: 218, duplicated: 56, color: "#8B5CF6", lastRun: 3 },
+  { name: "RIBA Stage 4 Drawing Issue Workflow", builder: "Priya K.", role: "BIM Manager", firm: "Foster + Partners", discipline: "Architecture", phase: "RIBA Stage 4", uses: 567, duplicated: 134, color: "#10B981", lastRun: 0 },
+  { name: "Structural Steel Takeoff & BOQ", builder: "Marcus W.", role: "QS Engineer", firm: "Turner & Townsend", discipline: "Structures", phase: "Stage 3–4", uses: 421, duplicated: 97, color: "#F59E0B", lastRun: 2 },
+  { name: "Façade Panel Schedule Generator", builder: "Lena H.", role: "Façade Engineer", firm: "Schüco", discipline: "Envelope", phase: "Detail Design", uses: 189, duplicated: 43, color: "#EF4444", lastRun: 5 },
+  { name: "Site Logistics & Crane Reach Analysis", builder: "David C.", role: "Site Manager", firm: "Laing O'Rourke", discipline: "Construction", phase: "Pre-Construction", uses: 305, duplicated: 71, color: "#06B6D4", lastRun: 1 },
+  { name: "Embodied Carbon Reporting Pipeline", builder: "Amara O.", role: "Sustainability Lead", firm: "BDP", discipline: "Sustainability", phase: "RIBA Stage 2–3", uses: 478, duplicated: 112, color: "#22C55E", lastRun: 0 },
+  { name: "Automated Clash Detection & Resolution", builder: "Tom R.", role: "BIM Coordinator", firm: "Multiplex", discipline: "BIM Coordination", phase: "Stage 4", uses: 623, duplicated: 158, color: "#A855F7", lastRun: 0 },
+  { name: "Client Presentation Deck Generator", builder: "Nina S.", role: "Design Director", firm: "Zaha Hadid Architects", discipline: "Design Management", phase: "RIBA Stage 2", uses: 284, duplicated: 67, color: "#EC4899", lastRun: 4 },
+  { name: "NBS Specification Writer & Mapper", builder: "George L.", role: "Specification Manager", firm: "Gleeds", discipline: "Specifications", phase: "Stage 3–4", uses: 196, duplicated: 51, color: "#14B8A6", lastRun: 6 },
+  { name: "Construction Phasing Sequence Planner", builder: "Rachel K.", role: "Planning Manager", firm: "Balfour Beatty", discipline: "Construction Planning", phase: "Pre-Construction", uses: 347, duplicated: 82, color: "#F97316", lastRun: 2 },
+  { name: "As-Built vs Design Comparison", builder: "Ahmed B.", role: "QA Lead", firm: "WSP", discipline: "Quality Assurance", phase: "Stage 5–6", uses: 259, duplicated: 63, color: "#0EA5E9", lastRun: 3 },
 ];
 
 // ─── Workflow Request Seed Data ─────────────────────────────────────────────
@@ -256,27 +256,44 @@ interface WorkflowRequest {
   createdAt: string;
 }
 
+/** Generate a date string N days ago from today */
+function daysAgo(n: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() - n);
+  return d.toISOString().split("T")[0];
+}
+
+/** Show relative time like "2d ago", "1w ago" */
+function relativeDate(dateStr: string): string {
+  const diff = Math.floor((Date.now() - new Date(dateStr).getTime()) / 86400000);
+  if (diff === 0) return "today";
+  if (diff === 1) return "1d ago";
+  if (diff < 7) return `${diff}d ago`;
+  if (diff < 14) return "1w ago";
+  return `${Math.floor(diff / 7)}w ago`;
+}
+
 const SEED_REQUESTS: WorkflowRequest[] = [
-  { id: "req-001", name: "Acoustic Performance Assessment", discipline: "Building Physics", problem: "Need automated reverberation time calculations from room geometry and material specifications for compliance with BB93 and ADE.", email: "hidden", votes: 47, createdAt: "2026-03-08" },
-  { id: "req-002", name: "Fire Escape Route Compliance Check", discipline: "Fire Safety", problem: "Automated travel distance and exit width verification against Approved Document B from IFC model geometry.", email: "hidden", votes: 83, createdAt: "2026-03-07" },
-  { id: "req-003", name: "Daylight Factor Analysis Pipeline", discipline: "Environmental Design", problem: "Generate daylight factor reports from IFC model with automated window-to-floor ratios and Part L compliance checks.", email: "hidden", votes: 61, createdAt: "2026-03-09" },
-  { id: "req-004", name: "Embodied Carbon Calculator", discipline: "Sustainability", problem: "Calculate whole-life carbon from material schedules against RICS methodology and LETI 2030 targets.", email: "hidden", votes: 129, createdAt: "2026-03-06" },
-  { id: "req-005", name: "Accessibility Audit Workflow", discipline: "Inclusive Design", problem: "Check corridor widths, door clearances, and ramp gradients against Part M and BS 8300 requirements from BIM model.", email: "hidden", votes: 35, createdAt: "2026-03-10" },
-  { id: "req-006", name: "Thermal Bridging Analysis", discipline: "Building Physics", problem: "Automated Psi-value calculations at wall-floor-roof junctions from construction details, with SAP compliance output for Part L submissions.", email: "hidden", votes: 94, createdAt: "2026-03-05" },
-  { id: "req-007", name: "HVAC Duct Sizing Pipeline", discipline: "MEP Engineering", problem: "Automated duct sizing from room-by-room heat load calculations with pressure drop verification and CIBSE Guide C compliance.", email: "hidden", votes: 76, createdAt: "2026-03-06" },
-  { id: "req-008", name: "Structural Loading Assessment", discipline: "Structural Engineering", problem: "Calculate imposed, dead, and wind loads per floor from IFC geometry with automated load combination tables per BS EN 1990.", email: "hidden", votes: 112, createdAt: "2026-03-04" },
-  { id: "req-009", name: "Rainwater Harvesting Calculator", discipline: "Sustainability", problem: "Size rainwater collection systems from roof area and local rainfall data with BREEAM Wat 01 credit calculation.", email: "hidden", votes: 38, createdAt: "2026-03-11" },
-  { id: "req-010", name: "Material Schedule & BOQ Generator", discipline: "Quantity Surveying", problem: "Extract material quantities from IFC model and generate formatted BOQ with NRM2-compliant cost categories.", email: "hidden", votes: 156, createdAt: "2026-03-03" },
-  { id: "req-011", name: "Parking Layout Optimizer", discipline: "Urban Planning", problem: "Generate optimal parking layouts from site boundary geometry with turning circle verification and minimum bay dimensions per local authority standards.", email: "hidden", votes: 42, createdAt: "2026-03-09" },
-  { id: "req-012", name: "Wind Load Analysis Pipeline", discipline: "Structural Engineering", problem: "Automated wind pressure calculations from building geometry and location data per BS EN 1991-1-4 with zone pressure coefficients.", email: "hidden", votes: 68, createdAt: "2026-03-07" },
-  { id: "req-013", name: "Lift Traffic Analysis", discipline: "Building Services", problem: "Calculate required lift numbers, speeds, and waiting times from building population data with BCO compliance verification.", email: "hidden", votes: 29, createdAt: "2026-03-12" },
-  { id: "req-014", name: "Condensation Risk Assessment", discipline: "Building Physics", problem: "Automated interstitial condensation analysis at wall build-ups with dewpoint tracking and BS 5250 compliance reporting.", email: "hidden", votes: 55, createdAt: "2026-03-08" },
-  { id: "req-015", name: "Flood Risk Assessment Pipeline", discipline: "Environmental", problem: "Generate flood risk reports from site coordinates with EA flood zone mapping, surface water analysis, and SuDS sizing calculations.", email: "hidden", votes: 73, createdAt: "2026-03-06" },
-  { id: "req-016", name: "Noise Impact Assessment", discipline: "Acoustics", problem: "Automated noise level predictions from site layout and source data with BS 8233 and ProPG compliance assessment for planning applications.", email: "hidden", votes: 44, createdAt: "2026-03-10" },
-  { id: "req-017", name: "Staircase Compliance Checker", discipline: "Building Regulations", problem: "Verify stair dimensions, handrail heights, and going/rise ratios against Approved Document K with automated markup of non-compliant elements.", email: "hidden", votes: 87, createdAt: "2026-03-05" },
-  { id: "req-018", name: "Waste Management Plan Generator", discipline: "Construction", problem: "Generate site waste management plans from project BIM data with material categorization, recycling targets, and SWMP compliance documentation.", email: "hidden", votes: 31, createdAt: "2026-03-11" },
-  { id: "req-019", name: "Roof Drainage & Loading Calculator", discipline: "Structures", problem: "Calculate roof drainage requirements and ponding loads from roof geometry with outlet sizing per BS EN 12056-3.", email: "hidden", votes: 52, createdAt: "2026-03-09" },
-  { id: "req-020", name: "Thermal Comfort Analysis (PPD/PMV)", discipline: "Environmental Design", problem: "Predict thermal comfort indices from room geometry, glazing ratios, and HVAC setpoints with CIBSE Guide A compliance for overheating risk.", email: "hidden", votes: 66, createdAt: "2026-03-07" },
+  { id: "req-001", name: "Acoustic Performance Assessment", discipline: "Building Physics", problem: "Need automated reverberation time calculations from room geometry and material specifications for compliance with BB93 and ADE.", email: "hidden", votes: 47, createdAt: daysAgo(6) },
+  { id: "req-002", name: "Fire Escape Route Compliance Check", discipline: "Fire Safety", problem: "Automated travel distance and exit width verification against Approved Document B from IFC model geometry.", email: "hidden", votes: 83, createdAt: daysAgo(7) },
+  { id: "req-003", name: "Daylight Factor Analysis Pipeline", discipline: "Environmental Design", problem: "Generate daylight factor reports from IFC model with automated window-to-floor ratios and Part L compliance checks.", email: "hidden", votes: 61, createdAt: daysAgo(5) },
+  { id: "req-004", name: "Embodied Carbon Calculator", discipline: "Sustainability", problem: "Calculate whole-life carbon from material schedules against RICS methodology and LETI 2030 targets.", email: "hidden", votes: 129, createdAt: daysAgo(8) },
+  { id: "req-005", name: "Accessibility Audit Workflow", discipline: "Inclusive Design", problem: "Check corridor widths, door clearances, and ramp gradients against Part M and BS 8300 requirements from BIM model.", email: "hidden", votes: 35, createdAt: daysAgo(4) },
+  { id: "req-006", name: "Thermal Bridging Analysis", discipline: "Building Physics", problem: "Automated Psi-value calculations at wall-floor-roof junctions from construction details, with SAP compliance output for Part L submissions.", email: "hidden", votes: 94, createdAt: daysAgo(9) },
+  { id: "req-007", name: "HVAC Duct Sizing Pipeline", discipline: "MEP Engineering", problem: "Automated duct sizing from room-by-room heat load calculations with pressure drop verification and CIBSE Guide C compliance.", email: "hidden", votes: 76, createdAt: daysAgo(8) },
+  { id: "req-008", name: "Structural Loading Assessment", discipline: "Structural Engineering", problem: "Calculate imposed, dead, and wind loads per floor from IFC geometry with automated load combination tables per BS EN 1990.", email: "hidden", votes: 112, createdAt: daysAgo(10) },
+  { id: "req-009", name: "Rainwater Harvesting Calculator", discipline: "Sustainability", problem: "Size rainwater collection systems from roof area and local rainfall data with BREEAM Wat 01 credit calculation.", email: "hidden", votes: 38, createdAt: daysAgo(3) },
+  { id: "req-010", name: "Material Schedule & BOQ Generator", discipline: "Quantity Surveying", problem: "Extract material quantities from IFC model and generate formatted BOQ with NRM2-compliant cost categories.", email: "hidden", votes: 156, createdAt: daysAgo(11) },
+  { id: "req-011", name: "Parking Layout Optimizer", discipline: "Urban Planning", problem: "Generate optimal parking layouts from site boundary geometry with turning circle verification and minimum bay dimensions per local authority standards.", email: "hidden", votes: 42, createdAt: daysAgo(5) },
+  { id: "req-012", name: "Wind Load Analysis Pipeline", discipline: "Structural Engineering", problem: "Automated wind pressure calculations from building geometry and location data per BS EN 1991-1-4 with zone pressure coefficients.", email: "hidden", votes: 68, createdAt: daysAgo(7) },
+  { id: "req-013", name: "Lift Traffic Analysis", discipline: "Building Services", problem: "Calculate required lift numbers, speeds, and waiting times from building population data with BCO compliance verification.", email: "hidden", votes: 29, createdAt: daysAgo(2) },
+  { id: "req-014", name: "Condensation Risk Assessment", discipline: "Building Physics", problem: "Automated interstitial condensation analysis at wall build-ups with dewpoint tracking and BS 5250 compliance reporting.", email: "hidden", votes: 55, createdAt: daysAgo(6) },
+  { id: "req-015", name: "Flood Risk Assessment Pipeline", discipline: "Environmental", problem: "Generate flood risk reports from site coordinates with EA flood zone mapping, surface water analysis, and SuDS sizing calculations.", email: "hidden", votes: 73, createdAt: daysAgo(8) },
+  { id: "req-016", name: "Noise Impact Assessment", discipline: "Acoustics", problem: "Automated noise level predictions from site layout and source data with BS 8233 and ProPG compliance assessment for planning applications.", email: "hidden", votes: 44, createdAt: daysAgo(4) },
+  { id: "req-017", name: "Staircase Compliance Checker", discipline: "Building Regulations", problem: "Verify stair dimensions, handrail heights, and going/rise ratios against Approved Document K with automated markup of non-compliant elements.", email: "hidden", votes: 87, createdAt: daysAgo(9) },
+  { id: "req-018", name: "Waste Management Plan Generator", discipline: "Construction", problem: "Generate site waste management plans from project BIM data with material categorization, recycling targets, and SWMP compliance documentation.", email: "hidden", votes: 31, createdAt: daysAgo(3) },
+  { id: "req-019", name: "Roof Drainage & Loading Calculator", discipline: "Structures", problem: "Calculate roof drainage requirements and ponding loads from roof geometry with outlet sizing per BS EN 12056-3.", email: "hidden", votes: 52, createdAt: daysAgo(5) },
+  { id: "req-020", name: "Thermal Comfort Analysis (PPD/PMV)", discipline: "Environmental Design", problem: "Predict thermal comfort indices from room geometry, glazing ratios, and HVAC setpoints with CIBSE Guide A compliance for overheating risk.", email: "hidden", votes: 66, createdAt: daysAgo(7) },
 ];
 
 // ─── News Ticker ─────────────────────────────────────────────────────────────
@@ -602,15 +619,31 @@ export default function LandingPage() {
     });
   };
 
-  const handleRequestSubmit = (e: React.FormEvent) => {
+  const handleRequestSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!requestForm.name || !requestForm.discipline || !requestForm.problem || !requestForm.email) return;
+    if (!requestForm.name.trim() || !requestForm.discipline.trim() || !requestForm.problem.trim() || !requestForm.email.trim()) return;
+    // Basic email validation
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(requestForm.email)) return;
+
     trackLead({ content_name: "workflow_request", content_category: requestForm.discipline });
+
+    // Persist to backend (fire-and-forget — works even if API doesn't exist yet)
+    fetch("/api/workflow-requests", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: requestForm.name.trim(),
+        discipline: requestForm.discipline.trim(),
+        problem: requestForm.problem.trim(),
+        email: requestForm.email.trim(),
+      }),
+    }).catch(() => {});
+
     const newReq: WorkflowRequest = {
       id: `req-${Date.now()}`,
-      name: requestForm.name,
-      discipline: requestForm.discipline,
-      problem: requestForm.problem,
+      name: requestForm.name.trim(),
+      discipline: requestForm.discipline.trim(),
+      problem: requestForm.problem.trim(),
       email: "hidden",
       votes: 1,
       createdAt: new Date().toISOString().split('T')[0],
@@ -620,6 +653,12 @@ export default function LandingPage() {
       try { localStorage.setItem("buildflow-workflow-requests", JSON.stringify({ requests: next, voted: [...requestVoted] })); } catch { /* ignore */ }
       return next;
     });
+    // Store submitted emails separately for later backend sync
+    try {
+      const emails = JSON.parse(localStorage.getItem("buildflow-request-emails") || "[]");
+      emails.push({ email: requestForm.email.trim(), name: requestForm.name.trim(), discipline: requestForm.discipline.trim(), ts: Date.now() });
+      localStorage.setItem("buildflow-request-emails", JSON.stringify(emails));
+    } catch { /* ignore */ }
     setRequestForm({ name: '', discipline: '', problem: '', email: '' });
     setRequestSubmitted(true);
     setTimeout(() => setRequestSubmitted(false), 4000);
@@ -2007,6 +2046,16 @@ export default function LandingPage() {
                             <span style={{ fontSize: 9, color: "#5C5C78" }}>cloned</span>
                           </div>
                         </div>
+                        <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                          <div style={{
+                            width: 6, height: 6, borderRadius: "50%",
+                            background: wf.lastRun === 0 ? "#10B981" : wf.lastRun <= 2 ? "#F59E0B" : "#5C5C78",
+                            boxShadow: wf.lastRun === 0 ? "0 0 6px #10B981" : "none",
+                          }} />
+                          <span style={{ fontSize: 9, color: wf.lastRun === 0 ? "#10B981" : "#5C5C78", fontFamily: "monospace" }}>
+                            {wf.lastRun === 0 ? "Active today" : `${wf.lastRun}d ago`}
+                          </span>
+                        </div>
                       </div>
 
                       {/* Progress bar */}
@@ -2070,12 +2119,12 @@ export default function LandingPage() {
               }}
             >
               {[
-                { label: "Active Builders", value: "2,840+", color: "#10B981" },
-                { label: "Workflows Shared", value: "720+", color: "#06B6D4" },
-                { label: "Total Executions", value: "128,000+", color: "#F59E0B" },
+                { label: "Active Builders", value: 2840, suffix: "+", color: "#10B981" },
+                { label: "Workflows Shared", value: 720, suffix: "+", color: "#06B6D4" },
+                { label: "Total Executions", value: 128, suffix: "K+", color: "#F59E0B" },
               ].map(stat => (
                 <div key={stat.label} style={{ textAlign: "center" }}>
-                  <div style={{ fontSize: 20, fontWeight: 800, color: stat.color, fontFamily: '"SF Mono", "Fira Code", monospace' }}>{stat.value}</div>
+                  <AnimatedNumber value={stat.value} suffix={stat.suffix} color={stat.color} />
                   <div style={{ fontSize: 10, color: "#5C5C78", textTransform: "uppercase", letterSpacing: "0.15em", marginTop: 2 }}>{stat.label}</div>
                 </div>
               ))}
@@ -2410,7 +2459,7 @@ export default function LandingPage() {
                                   background: "rgba(79,138,255,0.1)", color: "#4F8AFF",
                                   border: "1px solid rgba(79,138,255,0.2)",
                                 }}>{req.discipline}</span>
-                                <span style={{ fontSize: 10, color: "#3A3A50", fontFamily: "monospace" }}>{req.createdAt}</span>
+                                <span style={{ fontSize: 10, color: "#3A3A50", fontFamily: "monospace" }}>{relativeDate(req.createdAt)}</span>
                               </div>
                               <p style={{
                                 fontSize: 12, color: "#7C7C96", lineHeight: 1.5, margin: 0,
