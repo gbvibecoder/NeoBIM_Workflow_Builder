@@ -2237,16 +2237,18 @@ export default function LandingPage() {
                   exit={{ opacity: 0, y: -16 }}
                   transition={{ duration: 0.35, ease: smoothEase }}
                 >
-                  <motion.div
-                    initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-40px" }}
-                    variants={{ visible: { transition: { staggerChildren: 0.08 } } }}
+                  <div
                     className="landing-social-proof-grid"
                     style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 20 }}
                   >
                     {(showAllCommunity ? COMMUNITY_WORKFLOWS : COMMUNITY_WORKFLOWS.slice(0, 6)).map((wf, i) => {
                       const rgb = hexToRgb(wf.color);
                       return (
-                        <motion.div key={wf.name} variants={fadeUp} transition={{ duration: 0.5, delay: i * 0.06, ease: smoothEase }}
+                        <motion.div key={wf.name}
+                          initial={{ opacity: 0, y: 24 }}
+                          whileInView={{ opacity: 1, y: 0 }}
+                          viewport={{ once: true, margin: "-40px" }}
+                          transition={{ duration: 0.5, delay: (i % 6) * 0.08, ease: smoothEase }}
                           style={{
                             borderRadius: 16, overflow: "hidden", cursor: "pointer",
                             background: "rgba(14,14,24,0.85)",
@@ -2366,7 +2368,7 @@ export default function LandingPage() {
                         </motion.div>
                       );
                     })}
-                  </motion.div>
+                  </div>
 
                   {/* Show More / Show Less toggle */}
                   <div style={{ textAlign: "center", marginTop: 32 }}>
