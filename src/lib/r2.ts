@@ -14,6 +14,7 @@
 import {
   S3Client,
   PutObjectCommand,
+  GetObjectCommand,
   DeleteObjectCommand,
   ListObjectsV2Command,
   PutBucketCorsCommand,
@@ -439,6 +440,91 @@ export async function getBucketCors(): Promise<unknown> {
     return result.CORSRules;
   } catch {
     return null;
+  }
+}
+
+// ─── Chunked Upload (bypasses Vercel 4.5MB body limit) ────────────────────
+
+/**
+ * Upload a temp chunk to R2 under `temp/{uploadId}/chunk-{index}`.
+ * Each chunk should be ≤ 4MB. Assembled later by `assembleAndUploadVideo`.
+ */
+export async function uploadTempChunk(
+  uploadId: string,
+  chunkIndex: number,
+  buffer: Buffer,
+): Promise<{ success: boolean; error?: string }> {
+  const client = getClient();
+  if (!client) return { success: false, error: "R2 not configured" };
+
+  const key = `temp/${uploadId}/chunk-${String(chunkIndex).padStart(4, "0")}`;
+
+  try {
+    await client.send(
+      new PutObjectCommand({
+        Bucket: BUCKET_NAME,
+        Key: key,
+        Body: buffer,
+        ContentType: "application/octet-stream",
+      }),
+    );
+    return { success: true };
+  } catch (err) {
+    console.error("[R2] Chunk upload failed:", err);
+    return { success: false, error: String(err) };
+  }
+}
+
+/**
+ * Download all temp chunks, concatenate, and upload as a single video.
+ * Cleans up temp chunks afterward (fire-and-forget).
+ */
+export async function assembleAndUploadVideo(
+  uploadId: string,
+  totalChunks: number,
+  filename: string,
+): Promise<UploadResult | UploadError> {
+  const client = getClient();
+  if (!client) return { success: false, error: "R2 not configured" };
+
+  // Download all chunks in parallel
+  const chunkPromises = Array.from({ length: totalChunks }, async (_, i) => {
+    const key = `temp/${uploadId}/chunk-${String(i).padStart(4, "0")}`;
+    const result = await client.send(
+      new GetObjectCommand({ Bucket: BUCKET_NAME, Key: key }),
+    );
+    const bytes = await result.Body?.transformToByteArray();
+    if (!bytes) throw new Error(`Empty chunk ${i}`);
+    return Buffer.from(bytes);
+  });
+
+  let chunks: Buffer[];
+  try {
+    chunks = await Promise.all(chunkPromises);
+  } catch (err) {
+    console.error("[R2] Chunk download failed:", err);
+    return { success: false, error: `Failed to read chunks: ${err}` };
+  }
+
+  const fullBuffer = Buffer.concat(chunks);
+  const result = await uploadVideoToR2(fullBuffer, filename);
+
+  // Clean up temp chunks (fire-and-forget)
+  cleanupTempChunks(client, uploadId, totalChunks).catch(() => {});
+
+  return result;
+}
+
+async function cleanupTempChunks(
+  client: S3Client,
+  uploadId: string,
+  totalChunks: number,
+): Promise<void> {
+  for (let i = 0; i < totalChunks; i++) {
+    const key = `temp/${uploadId}/chunk-${String(i).padStart(4, "0")}`;
+    try {
+      await client.send(new DeleteObjectCommand({ Bucket: BUCKET_NAME, Key: key }));
+    } catch { /* best-effort cleanup */ }
   }
 }
 

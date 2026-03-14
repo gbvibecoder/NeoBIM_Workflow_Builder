@@ -425,6 +425,7 @@ function UploadModal({
   const [uploading, setUploading] = useState(false);
   const [uploadStatus, setUploadStatus] = useState<"idle" | "success" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState("");
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [dragOver, setDragOver] = useState(false);
   const [duration, setDuration] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -465,23 +466,22 @@ function UploadModal({
   const handleSubmit = async () => {
     if (!file || !title.trim() || uploading) return;
 
+    const CHUNK_SIZE = 4 * 1024 * 1024; // 4MB per chunk (under Vercel 4.5MB limit)
+
     setUploading(true);
     setUploadStatus("idle");
     setErrorMsg("");
+    setUploadProgress(0);
 
     try {
-      // Step 1: Get presigned upload URL from our API
-      const urlRes = await fetch("/api/community-videos/upload-url", {
+      // Step 1: Init chunked upload
+      const initRes = await fetch("/api/community-videos/upload-init", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          filename: file.name,
-          contentType: file.type || "video/mp4",
-          fileSize: file.size,
-        }),
+        body: JSON.stringify({ filename: file.name, fileSize: file.size }),
       });
 
-      if (urlRes.status === 401) {
+      if (initRes.status === 401) {
         setErrorMsg("Please sign in to upload. Redirecting...");
         setUploadStatus("error");
         setTimeout(() => {
@@ -490,37 +490,56 @@ function UploadModal({
         return;
       }
 
-      if (!urlRes.ok) {
-        const data = await urlRes.json().catch(() => ({}));
-        throw new Error(data?.error?.message || `Failed to prepare upload (${urlRes.status})`);
+      if (!initRes.ok) {
+        const data = await initRes.json().catch(() => ({}));
+        throw new Error(data?.error?.message || `Init failed (${initRes.status})`);
       }
 
-      const { uploadUrl, publicUrl } = await urlRes.json();
+      const { uploadId } = await initRes.json();
 
-      // Step 2: Upload file directly to R2 via presigned URL (bypasses Vercel body limit)
-      const abortCtrl = new AbortController();
-      const uploadTimeout = setTimeout(() => abortCtrl.abort(), 5 * 60 * 1000); // 5 min timeout
+      // Step 2: Upload file in chunks
+      const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
 
-      try {
-        const putRes = await fetch(uploadUrl, {
+      for (let i = 0; i < totalChunks; i++) {
+        const start = i * CHUNK_SIZE;
+        const end = Math.min(start + CHUNK_SIZE, file.size);
+        const chunk = file.slice(start, end);
+
+        const chunkRes = await fetch("/api/community-videos/upload-chunk", {
           method: "PUT",
-          headers: { "Content-Type": file.type || "video/mp4" },
-          body: file,
-          signal: abortCtrl.signal,
+          headers: {
+            "Content-Type": "application/octet-stream",
+            "x-upload-id": uploadId,
+            "x-chunk-index": String(i),
+          },
+          body: chunk,
         });
 
-        if (!putRes.ok) {
-          const status = putRes.status;
-          if (status === 403) {
-            throw new Error("Upload rejected — presigned URL expired or invalid. Please try again.");
-          }
-          throw new Error(`Direct upload failed (${status})`);
+        if (!chunkRes.ok) {
+          const data = await chunkRes.json().catch(() => ({}));
+          throw new Error(data?.error?.message || `Chunk ${i + 1}/${totalChunks} failed`);
         }
-      } finally {
-        clearTimeout(uploadTimeout);
+
+        setUploadProgress(Math.round(((i + 1) / totalChunks) * 75));
       }
 
-      // Step 3: Create DB record with the public URL
+      // Step 3: Assemble on server
+      setUploadProgress(80);
+      const completeRes = await fetch("/api/community-videos/upload-complete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ uploadId, totalChunks, filename: file.name }),
+      });
+
+      if (!completeRes.ok) {
+        const data = await completeRes.json().catch(() => ({}));
+        throw new Error(data?.error?.message || `Assembly failed (${completeRes.status})`);
+      }
+
+      const { publicUrl } = await completeRes.json();
+      setUploadProgress(90);
+
+      // Step 4: Create DB record
       const res = await fetch("/api/community-videos", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -535,10 +554,10 @@ function UploadModal({
 
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        const msg = data?.error?.message || data?.details || `Save failed (${res.status})`;
-        throw new Error(msg);
+        throw new Error(data?.error?.message || data?.details || `Save failed (${res.status})`);
       }
 
+      setUploadProgress(100);
       setUploadStatus("success");
       setTimeout(() => {
         onUploaded();
@@ -546,14 +565,7 @@ function UploadModal({
       }, 1200);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Upload failed";
-      const isAbort = err instanceof DOMException && err.name === "AbortError";
-      if (isAbort) {
-        setErrorMsg("Upload timed out — file may be too large for your connection. Try a shorter video.");
-      } else if (msg === "Failed to fetch" || msg.includes("NetworkError") || msg.includes("network")) {
-        setErrorMsg("Network error — check your connection and try again.");
-      } else {
-        setErrorMsg(msg);
-      }
+      setErrorMsg(msg);
       setUploadStatus("error");
     } finally {
       setUploading(false);
@@ -889,6 +901,33 @@ function UploadModal({
             }}>
               <CheckCircle size={14} color={C.green} />
               <span style={{ fontSize: 11, color: C.green }}>Video uploaded successfully!</span>
+            </div>
+          )}
+
+          {/* Upload progress bar */}
+          {uploading && uploadProgress > 0 && (
+            <div style={{ marginBottom: 12 }}>
+              <div style={{
+                display: "flex", justifyContent: "space-between",
+                fontSize: 10, color: C.muted, marginBottom: 4,
+              }}>
+                <span>{uploadProgress < 75 ? "Uploading chunks…" : uploadProgress < 90 ? "Assembling…" : "Saving…"}</span>
+                <span>{uploadProgress}%</span>
+              </div>
+              <div style={{
+                width: "100%", height: 4, borderRadius: 2,
+                background: "rgba(255,255,255,0.06)", overflow: "hidden",
+              }}>
+                <motion.div
+                  initial={{ width: 0 }}
+                  animate={{ width: `${uploadProgress}%` }}
+                  transition={{ duration: 0.3 }}
+                  style={{
+                    height: "100%", borderRadius: 2,
+                    background: `linear-gradient(90deg, ${C.cyan}, ${C.green})`,
+                  }}
+                />
+              </div>
             </div>
           )}
 
