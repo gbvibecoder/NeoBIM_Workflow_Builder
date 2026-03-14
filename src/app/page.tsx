@@ -236,6 +236,12 @@ const COMMUNITY_WORKFLOWS = [
   { name: "Structural Steel Takeoff & BOQ", builder: "Marcus W.", role: "QS Engineer", firm: "Turner & Townsend", discipline: "Structures", phase: "Stage 3–4", uses: 421, duplicated: 97, color: "#F59E0B" },
   { name: "Façade Panel Schedule Generator", builder: "Lena H.", role: "Façade Engineer", firm: "Schüco", discipline: "Envelope", phase: "Detail Design", uses: 189, duplicated: 43, color: "#EF4444" },
   { name: "Site Logistics & Crane Reach Analysis", builder: "David C.", role: "Site Manager", firm: "Laing O'Rourke", discipline: "Construction", phase: "Pre-Construction", uses: 305, duplicated: 71, color: "#06B6D4" },
+  { name: "Embodied Carbon Reporting Pipeline", builder: "Amara O.", role: "Sustainability Lead", firm: "BDP", discipline: "Sustainability", phase: "RIBA Stage 2–3", uses: 478, duplicated: 112, color: "#22C55E" },
+  { name: "Automated Clash Detection & Resolution", builder: "Tom R.", role: "BIM Coordinator", firm: "Multiplex", discipline: "BIM Coordination", phase: "Stage 4", uses: 623, duplicated: 158, color: "#A855F7" },
+  { name: "Client Presentation Deck Generator", builder: "Nina S.", role: "Design Director", firm: "Zaha Hadid Architects", discipline: "Design Management", phase: "RIBA Stage 2", uses: 284, duplicated: 67, color: "#EC4899" },
+  { name: "NBS Specification Writer & Mapper", builder: "George L.", role: "Specification Manager", firm: "Gleeds", discipline: "Specifications", phase: "Stage 3–4", uses: 196, duplicated: 51, color: "#14B8A6" },
+  { name: "Construction Phasing Sequence Planner", builder: "Rachel K.", role: "Planning Manager", firm: "Balfour Beatty", discipline: "Construction Planning", phase: "Pre-Construction", uses: 347, duplicated: 82, color: "#F97316" },
+  { name: "As-Built vs Design Comparison", builder: "Ahmed B.", role: "QA Lead", firm: "WSP", discipline: "Quality Assurance", phase: "Stage 5–6", uses: 259, duplicated: 63, color: "#0EA5E9" },
 ];
 
 // ─── Workflow Request Seed Data ─────────────────────────────────────────────
@@ -256,6 +262,21 @@ const SEED_REQUESTS: WorkflowRequest[] = [
   { id: "req-003", name: "Daylight Factor Analysis Pipeline", discipline: "Environmental Design", problem: "Generate daylight factor reports from IFC model with automated window-to-floor ratios and Part L compliance checks.", email: "hidden", votes: 61, createdAt: "2026-03-09" },
   { id: "req-004", name: "Embodied Carbon Calculator", discipline: "Sustainability", problem: "Calculate whole-life carbon from material schedules against RICS methodology and LETI 2030 targets.", email: "hidden", votes: 129, createdAt: "2026-03-06" },
   { id: "req-005", name: "Accessibility Audit Workflow", discipline: "Inclusive Design", problem: "Check corridor widths, door clearances, and ramp gradients against Part M and BS 8300 requirements from BIM model.", email: "hidden", votes: 35, createdAt: "2026-03-10" },
+  { id: "req-006", name: "Thermal Bridging Analysis", discipline: "Building Physics", problem: "Automated Psi-value calculations at wall-floor-roof junctions from construction details, with SAP compliance output for Part L submissions.", email: "hidden", votes: 94, createdAt: "2026-03-05" },
+  { id: "req-007", name: "HVAC Duct Sizing Pipeline", discipline: "MEP Engineering", problem: "Automated duct sizing from room-by-room heat load calculations with pressure drop verification and CIBSE Guide C compliance.", email: "hidden", votes: 76, createdAt: "2026-03-06" },
+  { id: "req-008", name: "Structural Loading Assessment", discipline: "Structural Engineering", problem: "Calculate imposed, dead, and wind loads per floor from IFC geometry with automated load combination tables per BS EN 1990.", email: "hidden", votes: 112, createdAt: "2026-03-04" },
+  { id: "req-009", name: "Rainwater Harvesting Calculator", discipline: "Sustainability", problem: "Size rainwater collection systems from roof area and local rainfall data with BREEAM Wat 01 credit calculation.", email: "hidden", votes: 38, createdAt: "2026-03-11" },
+  { id: "req-010", name: "Material Schedule & BOQ Generator", discipline: "Quantity Surveying", problem: "Extract material quantities from IFC model and generate formatted BOQ with NRM2-compliant cost categories.", email: "hidden", votes: 156, createdAt: "2026-03-03" },
+  { id: "req-011", name: "Parking Layout Optimizer", discipline: "Urban Planning", problem: "Generate optimal parking layouts from site boundary geometry with turning circle verification and minimum bay dimensions per local authority standards.", email: "hidden", votes: 42, createdAt: "2026-03-09" },
+  { id: "req-012", name: "Wind Load Analysis Pipeline", discipline: "Structural Engineering", problem: "Automated wind pressure calculations from building geometry and location data per BS EN 1991-1-4 with zone pressure coefficients.", email: "hidden", votes: 68, createdAt: "2026-03-07" },
+  { id: "req-013", name: "Lift Traffic Analysis", discipline: "Building Services", problem: "Calculate required lift numbers, speeds, and waiting times from building population data with BCO compliance verification.", email: "hidden", votes: 29, createdAt: "2026-03-12" },
+  { id: "req-014", name: "Condensation Risk Assessment", discipline: "Building Physics", problem: "Automated interstitial condensation analysis at wall build-ups with dewpoint tracking and BS 5250 compliance reporting.", email: "hidden", votes: 55, createdAt: "2026-03-08" },
+  { id: "req-015", name: "Flood Risk Assessment Pipeline", discipline: "Environmental", problem: "Generate flood risk reports from site coordinates with EA flood zone mapping, surface water analysis, and SuDS sizing calculations.", email: "hidden", votes: 73, createdAt: "2026-03-06" },
+  { id: "req-016", name: "Noise Impact Assessment", discipline: "Acoustics", problem: "Automated noise level predictions from site layout and source data with BS 8233 and ProPG compliance assessment for planning applications.", email: "hidden", votes: 44, createdAt: "2026-03-10" },
+  { id: "req-017", name: "Staircase Compliance Checker", discipline: "Building Regulations", problem: "Verify stair dimensions, handrail heights, and going/rise ratios against Approved Document K with automated markup of non-compliant elements.", email: "hidden", votes: 87, createdAt: "2026-03-05" },
+  { id: "req-018", name: "Waste Management Plan Generator", discipline: "Construction", problem: "Generate site waste management plans from project BIM data with material categorization, recycling targets, and SWMP compliance documentation.", email: "hidden", votes: 31, createdAt: "2026-03-11" },
+  { id: "req-019", name: "Roof Drainage & Loading Calculator", discipline: "Structures", problem: "Calculate roof drainage requirements and ponding loads from roof geometry with outlet sizing per BS EN 12056-3.", email: "hidden", votes: 52, createdAt: "2026-03-09" },
+  { id: "req-020", name: "Thermal Comfort Analysis (PPD/PMV)", discipline: "Environmental Design", problem: "Predict thermal comfort indices from room geometry, glazing ratios, and HVAC setpoints with CIBSE Guide A compliance for overheating risk.", email: "hidden", votes: 66, createdAt: "2026-03-07" },
 ];
 
 // ─── News Ticker ─────────────────────────────────────────────────────────────
@@ -556,6 +577,7 @@ export default function LandingPage() {
   const [requestVoted, setRequestVoted] = useState<Set<string>>(new Set());
   const [requestForm, setRequestForm] = useState({ name: '', discipline: '', problem: '', email: '' });
   const [requestSubmitted, setRequestSubmitted] = useState(false);
+  const [showAllCommunity, setShowAllCommunity] = useState(false);
 
   useEffect(() => {
     try {
@@ -1930,7 +1952,7 @@ export default function LandingPage() {
               className="landing-social-proof-grid"
               style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 20 }}
             >
-              {COMMUNITY_WORKFLOWS.map((wf, i) => {
+              {(showAllCommunity ? COMMUNITY_WORKFLOWS : COMMUNITY_WORKFLOWS.slice(0, 6)).map((wf, i) => {
                 const rgb = hexToRgb(wf.color);
                 return (
                   <motion.div key={wf.name} variants={fadeUp} transition={{ duration: 0.5, delay: i * 0.06, ease: smoothEase }}
@@ -1991,7 +2013,7 @@ export default function LandingPage() {
                       <div style={{ marginTop: 10, height: 3, borderRadius: 2, background: "rgba(255,255,255,0.04)", overflow: "hidden" }}>
                         <motion.div
                           initial={{ width: 0 }}
-                          whileInView={{ width: `${Math.min((wf.uses / 600) * 100, 100)}%` }}
+                          whileInView={{ width: `${Math.min((wf.uses / 700) * 100, 100)}%` }}
                           viewport={{ once: true }}
                           transition={{ duration: 1.2, ease: smoothEase, delay: 0.3 + i * 0.1 }}
                           style={{ height: "100%", borderRadius: 2, background: `linear-gradient(90deg, ${wf.color}, rgba(${rgb}, 0.3))` }}
@@ -2001,6 +2023,40 @@ export default function LandingPage() {
                   </motion.div>
                 );
               })}
+            </motion.div>
+
+            {/* Show More / Show Less toggle */}
+            <motion.div
+              initial="hidden" whileInView="visible" viewport={{ once: true }}
+              variants={fadeUp} transition={{ duration: 0.4, ease: smoothEase, delay: 0.2 }}
+              style={{ textAlign: "center", marginTop: 32 }}
+            >
+              <button
+                onClick={() => setShowAllCommunity(prev => !prev)}
+                style={{
+                  padding: "12px 28px", borderRadius: 12, cursor: "pointer",
+                  fontSize: 13, fontWeight: 600, letterSpacing: "0.5px",
+                  background: "rgba(16,185,129,0.08)",
+                  border: "1px solid rgba(16,185,129,0.2)",
+                  color: "#10B981",
+                  display: "inline-flex", alignItems: "center", gap: 8,
+                  transition: "all 0.3s",
+                }}
+                onMouseEnter={e => {
+                  e.currentTarget.style.background = "rgba(16,185,129,0.15)";
+                  e.currentTarget.style.borderColor = "rgba(16,185,129,0.35)";
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.background = "rgba(16,185,129,0.08)";
+                  e.currentTarget.style.borderColor = "rgba(16,185,129,0.2)";
+                }}
+              >
+                {showAllCommunity ? (
+                  <>Show Less <ChevronUp size={14} /></>
+                ) : (
+                  <>View All {COMMUNITY_WORKFLOWS.length} Workflows <ChevronDown size={14} /></>
+                )}
+              </button>
             </motion.div>
 
             {/* Community stat bar */}
@@ -2014,9 +2070,9 @@ export default function LandingPage() {
               }}
             >
               {[
-                { label: "Active Builders", value: "1,240+", color: "#10B981" },
-                { label: "Workflows Shared", value: "380+", color: "#06B6D4" },
-                { label: "Total Executions", value: "52,000+", color: "#F59E0B" },
+                { label: "Active Builders", value: "2,840+", color: "#10B981" },
+                { label: "Workflows Shared", value: "720+", color: "#06B6D4" },
+                { label: "Total Executions", value: "128,000+", color: "#F59E0B" },
               ].map(stat => (
                 <div key={stat.label} style={{ textAlign: "center" }}>
                   <div style={{ fontSize: 20, fontWeight: 800, color: stat.color, fontFamily: '"SF Mono", "Fira Code", monospace' }}>{stat.value}</div>
@@ -2316,7 +2372,7 @@ export default function LandingPage() {
                     <span style={{ marginLeft: "auto", fontSize: 9, color: "#5C5C78", fontFamily: "monospace" }}>{workflowRequests.length} briefs</span>
                   </div>
 
-                  <div style={{ padding: "8px 0", maxHeight: 460, overflowY: "auto" }}>
+                  <div style={{ padding: "8px 0", maxHeight: 560, overflowY: "auto", scrollbarWidth: "thin", scrollbarColor: "rgba(245,158,11,0.2) transparent" }}>
                     {[...workflowRequests].sort((a, b) => b.votes - a.votes).map((req, i) => {
                       const hasVoted = requestVoted.has(req.id);
                       return (
