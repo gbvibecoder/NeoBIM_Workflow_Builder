@@ -41,6 +41,7 @@ let _client: S3Client | null = null;
 function getClient(): S3Client | null {
   if (!ACCOUNT_ID || !ACCESS_KEY_ID || !SECRET_ACCESS_KEY) return null;
   if (!_client) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     _client = new S3Client({
       region: "auto",
       endpoint: `https://${ACCOUNT_ID}.r2.cloudflarestorage.com`,
@@ -49,7 +50,10 @@ function getClient(): S3Client | null {
         accessKeyId: ACCESS_KEY_ID,
         secretAccessKey: SECRET_ACCESS_KEY,
       },
-    });
+      // Disable default CRC32 checksum — R2 doesn't support x-amz-sdk-checksum-algorithm
+      requestChecksumCalculation: "WHEN_REQUIRED",
+      responseChecksumValidation: "WHEN_REQUIRED",
+    } as any);
   }
   return _client;
 }
@@ -195,7 +199,13 @@ export async function createPresignedUploadUrl(
       ContentType: contentType,
     });
 
-    const uploadUrl = await getSignedUrl(client, command, { expiresIn });
+    const rawUrl = await getSignedUrl(client, command, { expiresIn });
+
+    // Route through our domain's /r2-upload proxy (next.config.ts rewrite)
+    // to eliminate CORS — browser sees same-origin, Vercel proxies to R2.
+    const r2Base = `https://${ACCOUNT_ID}.r2.cloudflarestorage.com/${BUCKET_NAME}/`;
+    const uploadUrl = rawUrl.replace(r2Base, "/r2-upload/");
+
     const publicUrl = PUBLIC_URL
       ? `${PUBLIC_URL}/${key}`
       : `https://${BUCKET_NAME}.${ACCOUNT_ID}.r2.cloudflarestorage.com/${key}`;

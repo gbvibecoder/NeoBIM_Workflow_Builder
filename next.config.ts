@@ -2,6 +2,8 @@ import type { NextConfig } from "next";
 
 const isDev = process.env.NODE_ENV === 'development';
 const R2_CDN_BASE = process.env.R2_PUBLIC_URL || "https://pub-27d9a7371b6d47ff94fee1a3228f1720.r2.dev";
+const R2_ACCOUNT_ID = process.env.R2_ACCOUNT_ID || "";
+const R2_BUCKET = process.env.R2_BUCKET_NAME || process.env.R2_BUCKET || "buildflow-files";
 
 const nextConfig: NextConfig = {
   // ⚡ PERFORMANCE: Image optimization
@@ -124,7 +126,7 @@ const nextConfig: NextConfig = {
     ];
   },
 
-  // Proxy R2 CDN models through same origin to avoid CORS issues in iframe
+  // Proxy R2 through same origin to avoid CORS issues
   async rewrites() {
     return [
       {
@@ -135,6 +137,11 @@ const nextConfig: NextConfig = {
         source: '/r2-textures/:path*',
         destination: `${R2_CDN_BASE}/textures/:path*`,
       },
+      // Proxy presigned URL uploads through our domain → eliminates CORS entirely
+      ...(R2_ACCOUNT_ID ? [{
+        source: '/r2-upload/:path*',
+        destination: `https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com/${R2_BUCKET}/:path*`,
+      }] : []),
     ];
   },
 };
