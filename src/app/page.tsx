@@ -1029,9 +1029,9 @@ export default function LandingPage() {
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src="/buildflow_logo.png" alt="BuildFlow" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
             </div>
-            <span style={{ fontSize: 18, fontWeight: 800, color: "#F0F0F5", letterSpacing: "-0.3px" }}>
+            <span className="landing-logo-text" style={{ fontSize: 18, fontWeight: 800, color: "#F0F0F5", letterSpacing: "-0.3px" }}>
               Build<span style={{ color: "#4F8AFF" }}>Flow</span>
-              <span style={{ fontSize: 9, fontWeight: 600, color: "#F59E0B", background: "rgba(245,158,11,0.1)", border: "1px solid rgba(245,158,11,0.2)", padding: "1px 5px", borderRadius: 6, marginLeft: 6 }}>{t('dashboard.beta')}</span>
+              <span className="landing-beta-badge" style={{ fontSize: 9, fontWeight: 600, color: "#F59E0B", background: "rgba(245,158,11,0.1)", border: "1px solid rgba(245,158,11,0.2)", padding: "1px 5px", borderRadius: 6, marginLeft: 6 }}>{t('dashboard.beta')}</span>
             </span>
           </Link>
 
@@ -1080,10 +1080,10 @@ export default function LandingPage() {
             }}>
               {t('landing.login')}
             </Link>
-            <Link href="/dashboard" style={{
+            <Link href="/dashboard" className="landing-signup-link" style={{
               padding: "9px 22px", borderRadius: 10, fontSize: 14, fontWeight: 600,
               color: "white", background: "linear-gradient(135deg, #4F8AFF 0%, #6366F1 100%)",
-              textDecoration: "none",
+              textDecoration: "none", whiteSpace: "nowrap",
               boxShadow: "0 2px 12px rgba(79,138,255,0.3)",
             }}>
               {t('landing.signUp')}
@@ -1430,7 +1430,7 @@ export default function LandingPage() {
                 marginTop: 44, display: "flex", flexDirection: "column", alignItems: "center", gap: 16,
               }}
             >
-              <Link href="/dashboard" style={{
+              <Link href="/dashboard" className="landing-hero-cta" style={{
                 position: "relative", overflow: "hidden",
                 height: 58, padding: "0 44px",
                 background: "linear-gradient(135deg, #00F5FF 0%, #4F8AFF 50%, #6366F1 100%)",
@@ -3518,8 +3518,35 @@ export default function LandingPage() {
           .landing-login-link {
             display: none !important;
           }
+          .landing-nav-cta {
+            gap: 6px !important;
+          }
+          .landing-demos-link {
+            font-size: 11px !important;
+            padding: 4px 10px !important;
+            white-space: nowrap !important;
+          }
+          .landing-signup-link {
+            font-size: 12px !important;
+            padding: 7px 14px !important;
+          }
+          .landing-beta-badge {
+            display: none !important;
+          }
+          .lang-switcher {
+            padding: 5px 8px !important;
+            gap: 4px !important;
+          }
+          .lang-switcher span:last-child {
+            display: none !important;
+          }
 
           /* ── Hero ── */
+          .landing-hero-cta {
+            height: 50px !important;
+            padding: 0 28px !important;
+            font-size: 15px !important;
+          }
           .landing-side-toolbar,
           .landing-prompt-card,
           .landing-floating-card {
@@ -3552,6 +3579,10 @@ export default function LandingPage() {
           }
           .landing-built-for-divider {
             display: none !important;
+          }
+          .landing-built-for span {
+            font-size: 10px !important;
+            letter-spacing: 1px !important;
           }
 
           /* ── Stats Row ── */
@@ -3692,6 +3723,19 @@ export default function LandingPage() {
 
         /* ─── Small phones: 480px and below ───────────────────── */
         @media (max-width: 480px) {
+          /* ── Navbar ── */
+          .landing-logo-text {
+            display: none !important;
+          }
+          .landing-demos-link {
+            font-size: 10px !important;
+            padding: 4px 8px !important;
+          }
+          .landing-signup-link {
+            font-size: 11px !important;
+            padding: 6px 12px !important;
+          }
+
           h1 {
             font-size: 1.7rem !important;
           }
@@ -3712,6 +3756,15 @@ export default function LandingPage() {
 
         /* ─── Min 320px safety ─────────────────────────────────── */
         @media (max-width: 360px) {
+          /* ── Navbar ── */
+          .landing-demos-link {
+            display: none !important;
+          }
+          .landing-signup-link {
+            font-size: 11px !important;
+            padding: 6px 10px !important;
+          }
+
           h1 {
             font-size: 1.5rem !important;
             letter-spacing: -0.02em !important;
