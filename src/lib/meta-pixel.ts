@@ -43,4 +43,9 @@ export function trackViewContent(params?: Record<string, string | number | boole
   fbq("track", "ViewContent", params);
 }
 
+/** Track a register page view */
+export function trackRegisterPageView() {
+  fbq("trackCustom", "ViewRegisterPage");
+}
+
 export { META_PIXEL_ID };
