@@ -123,7 +123,7 @@ function DemoBanner({ hasRun }: { hasRun: boolean }) {
             }}
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/buildflow_logo.png" alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+            <img src="/buildflow_logo.png" alt="BuildFlow" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
           </div>
           <span
             style={{ fontSize: 13, fontWeight: 700, color: "#F0F0F5" }}

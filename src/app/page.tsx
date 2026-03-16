@@ -17,6 +17,7 @@ import type { TranslationKey } from '@/lib/i18n';
 import { trackLead } from '@/lib/meta-pixel';
 import { LanguageSwitcher } from '@/components/ui/LanguageSwitcher';
 import { PipelineSection } from '@/components/landing/PipelineSection';
+import { NewsletterSignup } from '@/components/landing/NewsletterSignup';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -3407,6 +3408,26 @@ export default function LandingPage() {
         </section>
       </main>
 
+      {/* ── Newsletter Signup ────────────────────────────────────────── */}
+      <section style={{
+        padding: "60px 48px",
+        borderTop: "1px solid rgba(255,255,255,0.04)",
+        background: "rgba(7,7,13,0.95)",
+        textAlign: "center",
+      }}>
+        <div style={{ maxWidth: 500, margin: "0 auto" }}>
+          <h3 style={{ fontSize: 18, fontWeight: 700, color: "#F0F0F5", marginBottom: 8 }}>
+            Stay in the loop
+          </h3>
+          <p style={{ fontSize: 13, color: "#7C7C96", marginBottom: 24 }}>
+            Get product updates, AEC workflow tips, and early access to new features.
+          </p>
+          <div style={{ display: "flex", justifyContent: "center" }}>
+            <NewsletterSignup />
+          </div>
+        </div>
+      </section>
+
       {/* ── Footer ─────────────────────────────────────────────────── */}
       <footer className="landing-footer-wrapper" style={{
         borderTop: "1px solid rgba(255,255,255,0.04)",
@@ -3417,7 +3438,7 @@ export default function LandingPage() {
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <div style={{ width: 30, height: 30, borderRadius: 8, overflow: "hidden", flexShrink: 0 }}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/buildflow_logo.png" alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+              <img src="/buildflow_logo.png" alt="BuildFlow" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
             </div>
             <span style={{ fontSize: 13, color: "#5C5C78", fontWeight: 600 }}>
               {t('landing.copyright')}

@@ -8,6 +8,7 @@ import { MobileGate } from "@/components/MobileGate";
 import { SessionProvider } from "@/components/providers/SessionProvider";
 import { TrackingScripts } from "@/components/TrackingScripts";
 import { CookieConsent } from "@/components/CookieConsent";
+import { UTMCapture } from "@/components/UTMCapture";
 import "./globals.css";
 import "@/lib/env-check";
 
@@ -281,6 +282,7 @@ export default function RootLayout({
         {/* 🔥 VERCEL ANALYTICS */}
         <Analytics />
         <SpeedInsights />
+        <UTMCapture />
         <CookieConsent />
       </body>
     </html>

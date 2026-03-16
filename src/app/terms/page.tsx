@@ -505,7 +505,7 @@ export default function TermsPage() {
             >
               <img
                 src="/buildflow_logo.png"
-                alt=""
+                alt="BuildFlow"
                 style={{ width: "100%", height: "100%", objectFit: "cover" }}
               />
             </div>

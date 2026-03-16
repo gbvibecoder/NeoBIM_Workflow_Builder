@@ -1221,7 +1221,7 @@ export default function WorkflowShowcasePage() {
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <div style={{ width: 24, height: 24, borderRadius: 6, overflow: "hidden", flexShrink: 0 }}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/buildflow_logo.png" alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+              <img src="/buildflow_logo.png" alt="BuildFlow" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
             </div>
             <span style={{ fontSize: 11, color: C.dim, fontWeight: 600 }}>&copy; 2026 BuildFlow</span>
           </div>
