@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { checkEndpointRateLimit } from "@/lib/rate-limit";
 import { formatErrorResponse, UserErrors } from "@/lib/user-errors";
 
 export async function GET() {
@@ -8,6 +9,12 @@ export async function GET() {
     const session = await auth();
     if (!session?.user?.id) {
       return NextResponse.json(formatErrorResponse(UserErrors.UNAUTHORIZED), { status: 401 });
+    }
+
+    // Rate limit: 20 analytics queries per user per minute
+    const rateLimit = await checkEndpointRateLimit(session.user.id, "user-analytics", 20, "1 m");
+    if (!rateLimit.success) {
+      return NextResponse.json(formatErrorResponse({ title: "Too many requests", message: "Please try again later.", code: "RATE_001" }), { status: 429 });
     }
 
     const userId = session.user.id;

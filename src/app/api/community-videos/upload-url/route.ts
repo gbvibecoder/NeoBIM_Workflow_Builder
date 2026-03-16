@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { createPresignedUploadUrl, ensureBucketCors } from "@/lib/r2";
+import { checkEndpointRateLimit } from "@/lib/rate-limit";
 import { formatErrorResponse, UserErrors } from "@/lib/user-errors";
 
 // Auto-ensure CORS on first presigned URL request (self-healing)
@@ -30,6 +31,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         formatErrorResponse(UserErrors.UNAUTHORIZED),
         { status: 401 },
+      );
+    }
+
+    // Rate limit: 20 presigned URLs per user per hour
+    const rateLimit = await checkEndpointRateLimit(session.user.id, "upload-url", 20, "1 h");
+    if (!rateLimit.success) {
+      return NextResponse.json(
+        formatErrorResponse({ title: "Too many requests", message: "Please wait before uploading more.", code: "RATE_001" }),
+        { status: 429 },
       );
     }
 

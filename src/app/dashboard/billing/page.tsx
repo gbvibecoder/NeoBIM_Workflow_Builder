@@ -9,6 +9,7 @@ import { Check, Sparkles, Zap, Loader2, CheckCircle2, XCircle } from "lucide-rea
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { useLocale } from "@/hooks/useLocale";
+import { trackPurchase } from "@/lib/meta-pixel";
 
 interface UsageStats {
   used: number;
@@ -37,6 +38,8 @@ export default function BillingPage() {
         icon: <CheckCircle2 size={18} />,
         duration: 5000,
       });
+      // Fire Meta Pixel purchase event for ad conversion tracking
+      trackPurchase({ content_name: "BuildFlow Pro", currency: "USD", value: 29 });
       // Refresh session to pick up new role from DB
       updateSession();
       // Clean URL

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { checkEndpointRateLimit, getClientIp } from "@/lib/rate-limit";
 
 /**
  * Proxy endpoint for GLB files from external sources that lack CORS headers.
@@ -24,6 +25,13 @@ function isAllowedDomain(hostname: string): boolean {
 }
 
 export async function GET(req: NextRequest) {
+  // Rate limit: 20 proxy requests per IP per minute
+  const ip = getClientIp(req);
+  const rateLimit = await checkEndpointRateLimit(ip, "proxy-glb", 20, "1 m");
+  if (!rateLimit.success) {
+    return NextResponse.json({ error: "Too many requests" }, { status: 429 });
+  }
+
   const url = req.nextUrl.searchParams.get("url");
 
   if (!url) {

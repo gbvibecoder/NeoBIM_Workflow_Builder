@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
+import { checkEndpointRateLimit } from "@/lib/rate-limit";
 import { formatErrorResponse, UserErrors } from "@/lib/user-errors";
 import { assembleAndUploadVideo } from "@/lib/r2";
 
@@ -13,6 +14,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         formatErrorResponse(UserErrors.UNAUTHORIZED),
         { status: 401 },
+      );
+    }
+
+    // Rate limit: 5 completions per user per hour
+    const rl = await checkEndpointRateLimit(session.user.id, "upload-complete", 5, "1 h");
+    if (!rl.success) {
+      return NextResponse.json(
+        formatErrorResponse({ title: "Too many requests", message: "Please wait before completing more uploads.", code: "RATE_001" }),
+        { status: 429 },
       );
     }
 

@@ -7,6 +7,7 @@ import {
   Upload, Heart, Eye, Clock, Film, Trash2,
   CloudUpload, CheckCircle, AlertCircle,
 } from "lucide-react";
+import { toast } from "sonner";
 
 // ─── Design Tokens (matching page tokens) ────────────────────────────────────
 
@@ -163,27 +164,38 @@ function CommunityVideoCard({
   const handleLike = (e: React.MouseEvent) => {
     e.stopPropagation();
     try {
+      const isUnlike = liked;
       const likes: string[] = JSON.parse(localStorage.getItem("cv-likes") || "[]");
-      if (liked) {
+
+      // Optimistic UI update
+      if (isUnlike) {
         localStorage.setItem("cv-likes", JSON.stringify(likes.filter(id => id !== video.id)));
         setLiked(false);
         setLikeCount(c => c - 1);
-        fetch(`/api/community-videos/${video.id}/like`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ action: "unlike" }),
-        }).catch(() => {});
       } else {
         likes.push(video.id);
         localStorage.setItem("cv-likes", JSON.stringify(likes));
         setLiked(true);
         setLikeCount(c => c + 1);
-        fetch(`/api/community-videos/${video.id}/like`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ action: "like" }),
-        }).catch(() => {});
       }
+
+      fetch(`/api/community-videos/${video.id}/like`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: isUnlike ? "unlike" : "like" }),
+      }).then(res => {
+        if (res.status === 401) {
+          // Revert optimistic update
+          if (isUnlike) { setLiked(true); setLikeCount(c => c + 1); }
+          else {
+            setLiked(false); setLikeCount(c => c - 1);
+            localStorage.setItem("cv-likes", JSON.stringify(
+              JSON.parse(localStorage.getItem("cv-likes") || "[]").filter((id: string) => id !== video.id)
+            ));
+          }
+          toast("Sign in to like videos", { duration: 3000 });
+        }
+      }).catch(() => {});
     } catch { /* ignore */ }
   };
 

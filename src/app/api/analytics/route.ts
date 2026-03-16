@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getDashboardMetrics, generateDailyReport, trackEvent } from "@/lib/analytics";
 import { auth } from "@/lib/auth";
+import { checkEndpointRateLimit, getClientIp } from "@/lib/rate-limit";
 import { formatErrorResponse, UserErrors, AuthErrors } from "@/lib/user-errors";
 
 // Client-side event ingestion (fire-and-forget from browser)
@@ -8,6 +9,14 @@ export async function POST(req: Request) {
   try {
     const session = await auth();
     const userId = session?.user?.id;
+
+    // Rate limit: 30 event batches per user/IP per minute
+    const limitKey = userId || getClientIp(req);
+    const rateLimit = await checkEndpointRateLimit(limitKey, "analytics-ingest", 30, "1 m");
+    if (!rateLimit.success) {
+      return NextResponse.json({ ok: false }, { status: 429 });
+    }
+
     const body = await req.json();
     const events = body?.events;
 

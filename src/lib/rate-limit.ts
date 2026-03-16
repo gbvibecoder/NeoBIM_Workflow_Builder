@@ -126,6 +126,14 @@ export async function isExecutionAlreadyCounted(
 
 // ─── Generic endpoint rate limiter ──────────────────────────────────────────
 
+/**
+ * Extract client IP from request headers (for IP-based rate limiting on public endpoints).
+ */
+export function getClientIp(req: Request | { headers: { get(name: string): string | null } }): string {
+  const forwarded = req.headers.get("x-forwarded-for");
+  return forwarded?.split(",")[0]?.trim() || "anonymous";
+}
+
 const endpointLimiters = new Map<string, Ratelimit>();
 
 function getEndpointLimiter(endpoint: string, maxRequests: number, window: string): Ratelimit {
