@@ -53,7 +53,7 @@ const nextConfig: NextConfig = {
 
   async headers() {
     // unsafe-eval needed for Three.js shader compilation (new Function()) in blob: iframe
-    const scriptSrc = "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://js.stripe.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://connect.facebook.net blob: data:";
+    const scriptSrc = "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://js.stripe.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://connect.facebook.net https://www.googletagmanager.com https://www.google-analytics.com blob: data:";
 
     return [
       {
@@ -65,10 +65,10 @@ const nextConfig: NextConfig = {
               default-src 'self' blob: data:;
               ${scriptSrc};
               style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
-              img-src 'self' blob: data: https://oaidalleapiprodscus.blob.core.windows.net https://picsum.photos https://images.unsplash.com https://lh3.googleusercontent.com https://*.vercel.app https://www.facebook.com;
+              img-src 'self' blob: data: https://oaidalleapiprodscus.blob.core.windows.net https://picsum.photos https://images.unsplash.com https://lh3.googleusercontent.com https://*.vercel.app https://www.facebook.com https://www.google-analytics.com https://www.googletagmanager.com;
               font-src 'self' https://fonts.gstatic.com data:;
               media-src 'self' blob: data: https://*.klingai.com https://*.kuaishou.com https://*.ksyun.com https://*.ks-cdn.com https://*.kscampus.com https://*;
-              connect-src 'self' blob: data: https://api.openai.com https://api.stability.ai https://*.upstash.io https://api.stripe.com https://api.klingai.com https://*.klingai.com https://*.fal.ai https://fal.run https://www.facebook.com https://connect.facebook.net https://*.r2.cloudflarestorage.com ${R2_CDN_BASE};
+              connect-src 'self' blob: data: https://api.openai.com https://api.stability.ai https://*.upstash.io https://api.stripe.com https://api.klingai.com https://*.klingai.com https://*.fal.ai https://fal.run https://www.facebook.com https://connect.facebook.net https://*.r2.cloudflarestorage.com https://www.google-analytics.com https://analytics.google.com https://*.google-analytics.com https://*.googletagmanager.com ${R2_CDN_BASE};
               frame-src 'self' blob: https://js.stripe.com;
               worker-src 'self' blob:;
               object-src 'none';
