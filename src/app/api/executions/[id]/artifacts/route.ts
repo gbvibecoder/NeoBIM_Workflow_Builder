@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { checkEndpointRateLimit } from "@/lib/rate-limit";
 import { formatErrorResponse, UserErrors } from "@/lib/user-errors";
 
 type Params = { params: Promise<{ id: string }> };
@@ -11,6 +12,12 @@ export async function POST(req: NextRequest, { params }: Params) {
     const session = await auth();
     if (!session?.user?.id) {
       return NextResponse.json(formatErrorResponse(UserErrors.UNAUTHORIZED), { status: 401 });
+    }
+
+    // Rate limit: 60 artifacts per user per minute (called during multi-node execution)
+    const rl = await checkEndpointRateLimit(session.user.id, "artifacts-append", 60, "1 m");
+    if (!rl.success) {
+      return NextResponse.json(formatErrorResponse({ title: "Too many requests", message: "Please try again later.", code: "RATE_001" }), { status: 429 });
     }
 
     const { id: executionId } = await params;

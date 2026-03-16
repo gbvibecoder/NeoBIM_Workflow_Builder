@@ -1,7 +1,15 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { checkEndpointRateLimit, getClientIp } from "@/lib/rate-limit";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  // Rate limit: 30 health checks per IP per minute
+  const ip = getClientIp(req);
+  const rateLimit = await checkEndpointRateLimit(ip, "health", 30, "1 m");
+  if (!rateLimit.success) {
+    return NextResponse.json({ error: "Too many requests" }, { status: 429 });
+  }
+
   const checks = {
     status: "ok" as "ok" | "degraded",
     timestamp: new Date().toISOString(),

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { checkEndpointRateLimit } from "@/lib/rate-limit";
 import {
   formatErrorResponse,
   UserErrors,
@@ -17,6 +18,15 @@ export async function DELETE(
       return NextResponse.json(
         formatErrorResponse(UserErrors.UNAUTHORIZED),
         { status: 401 },
+      );
+    }
+
+    // Rate limit: 5 deletes per user per hour
+    const rateLimit = await checkEndpointRateLimit(session.user.id, "community-video-delete", 5, "1 h");
+    if (!rateLimit.success) {
+      return NextResponse.json(
+        formatErrorResponse({ title: "Too many requests", message: "Please wait before deleting more videos.", code: "RATE_001" }),
+        { status: 429 },
       );
     }
 

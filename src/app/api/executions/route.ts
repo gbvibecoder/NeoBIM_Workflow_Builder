@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { trackFirstExecution } from "@/lib/analytics";
+import { checkEndpointRateLimit } from "@/lib/rate-limit";
 import type { ExecutionStatus } from "@prisma/client";
 import { formatErrorResponse, UserErrors } from "@/lib/user-errors";
 
@@ -11,6 +12,12 @@ export async function GET(req: NextRequest) {
     const session = await auth();
     if (!session?.user?.id) {
       return NextResponse.json(formatErrorResponse(UserErrors.UNAUTHORIZED), { status: 401 });
+    }
+
+    // Rate limit: 30 reads per user per minute
+    const rl = await checkEndpointRateLimit(session.user.id, "executions-list", 30, "1 m");
+    if (!rl.success) {
+      return NextResponse.json(formatErrorResponse({ title: "Too many requests", message: "Please try again later.", code: "RATE_001" }), { status: 429 });
     }
 
     const { searchParams } = new URL(req.url);
@@ -61,6 +68,12 @@ export async function POST(req: NextRequest) {
     const session = await auth();
     if (!session?.user?.id) {
       return NextResponse.json(formatErrorResponse(UserErrors.UNAUTHORIZED), { status: 401 });
+    }
+
+    // Rate limit: 20 creates per user per minute
+    const rl = await checkEndpointRateLimit(session.user.id, "executions-create", 20, "1 m");
+    if (!rl.success) {
+      return NextResponse.json(formatErrorResponse({ title: "Too many requests", message: "Please try again later.", code: "RATE_001" }), { status: 429 });
     }
 
     const { workflowId, inputSummary } = await req.json();

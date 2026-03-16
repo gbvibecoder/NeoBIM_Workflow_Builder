@@ -48,4 +48,9 @@ export function trackRegisterPageView() {
   fbq("track", "ViewRegisterPage");
 }
 
+/** Track a successful purchase/subscription */
+export function trackPurchase(params?: Record<string, string | number | boolean>) {
+  fbq("track", "Purchase", params);
+}
+
 export { META_PIXEL_ID };

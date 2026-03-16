@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getImage } from "@/lib/temp-image-store";
+import { checkEndpointRateLimit, getClientIp } from "@/lib/rate-limit";
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -26,6 +27,13 @@ export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  // Rate limit: 60 reads per IP per minute
+  const ip = getClientIp(_req);
+  const rateLimit = await checkEndpointRateLimit(ip, "temp-image-read", 60, "1 m");
+  if (!rateLimit.success) {
+    return NextResponse.json({ error: "Too many requests" }, { status: 429, headers: CORS_HEADERS });
+  }
+
   const { id } = await params;
   console.log("[temp-image] GET:", id);
 

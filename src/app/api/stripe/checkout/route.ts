@@ -2,9 +2,10 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { stripe } from '@/lib/stripe';
 import { prisma } from '@/lib/db';
-import { 
-  formatErrorResponse, 
-  UserErrors, 
+import { checkEndpointRateLimit } from "@/lib/rate-limit";
+import {
+  formatErrorResponse,
+  UserErrors,
   BillingErrors,
   FormErrors
 } from '@/lib/user-errors';
@@ -17,6 +18,12 @@ export async function POST(req: Request) {
         formatErrorResponse(UserErrors.UNAUTHORIZED),
         { status: 401 }
       );
+    }
+
+    // Rate limit: 5 checkout attempts per user per minute
+    const rateLimit = await checkEndpointRateLimit(session.user.id!, "stripe-checkout", 5, "1 m");
+    if (!rateLimit.success) {
+      return NextResponse.json(formatErrorResponse({ title: "Too many requests", message: "Please wait before trying again.", code: "RATE_001" }), { status: 429 });
     }
 
     const { plan } = await req.json();

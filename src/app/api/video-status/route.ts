@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { checkDualVideoStatus, checkDualTextVideoStatus, checkSingleVideoStatus } from "@/services/video-service";
+import { checkEndpointRateLimit } from "@/lib/rate-limit";
 import { formatErrorResponse } from "@/lib/user-errors";
 
 /**
@@ -19,6 +20,15 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(
       formatErrorResponse({ title: "Unauthorized", message: "Please sign in.", code: "AUTH_001" }),
       { status: 401 }
+    );
+  }
+
+  // Rate limit: 30 polls per user per minute
+  const rateLimit = await checkEndpointRateLimit(session.user.id, "video-status", 30, "1 m");
+  if (!rateLimit.success) {
+    return NextResponse.json(
+      formatErrorResponse({ title: "Too many requests", message: "Please slow down polling.", code: "RATE_001" }),
+      { status: 429 }
     );
   }
 

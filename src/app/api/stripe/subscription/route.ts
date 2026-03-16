@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { stripe, isSubscriptionActive } from '@/lib/stripe';
+import { checkEndpointRateLimit } from "@/lib/rate-limit";
 import { formatErrorResponse, UserErrors } from "@/lib/user-errors";
 
 export async function GET() {
@@ -9,6 +10,12 @@ export async function GET() {
     const session = await auth();
     if (!session?.user?.email) {
       return NextResponse.json(formatErrorResponse(UserErrors.UNAUTHORIZED), { status: 401 });
+    }
+
+    // Rate limit: 10 subscription checks per user per minute
+    const rateLimit = await checkEndpointRateLimit(session.user.id!, "stripe-subscription", 10, "1 m");
+    if (!rateLimit.success) {
+      return NextResponse.json(formatErrorResponse({ title: "Too many requests", message: "Please try again later.", code: "RATE_001" }), { status: 429 });
     }
 
     const user = await prisma.user.findUnique({
