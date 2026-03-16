@@ -44,6 +44,9 @@ public/videos/*.mp4
 # Test artifacts
 coverage/
 *.swp
+test-results/
+playwright-report/
+blob-report/
 
 # Logs
 *.log

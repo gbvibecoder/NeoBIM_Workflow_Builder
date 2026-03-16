@@ -30,6 +30,7 @@ describe("SAM 3D Service", () => {
 
   it("should call fal.subscribe with correct parameters", async () => {
     const mockResponse = {
+      requestId: "mock-req-1",
       data: {
         mesh: {
           url: "https://fal.ai/output/model.glb",
@@ -75,6 +76,7 @@ describe("SAM 3D Service", () => {
 
   it("should cache successful results", async () => {
     const mockResponse = {
+      requestId: "mock-req-cache",
       data: {
         mesh: { url: "https://fal.ai/output/model.glb", file_size: 512 },
         seed: 99,
@@ -102,6 +104,7 @@ describe("SAM 3D Service", () => {
   it("should retry on 5xx errors", async () => {
     const serverError = Object.assign(new Error("Server error"), { status: 500 });
     const successResponse = {
+      requestId: "mock-req-retry",
       data: {
         mesh: { url: "https://fal.ai/output/retry.glb", file_size: 256 },
         seed: 1,
@@ -126,6 +129,7 @@ describe("SAM 3D Service", () => {
 
   it("should include text prompt when provided", async () => {
     const mockResponse = {
+      requestId: "mock-req-prompt",
       data: {
         mesh: { url: "https://fal.ai/output/prompted.glb", file_size: 128 },
         seed: 7,
