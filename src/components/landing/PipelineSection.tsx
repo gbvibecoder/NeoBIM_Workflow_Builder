@@ -43,7 +43,7 @@ function getWorkflows(t: (key: TranslationKey) => string): PipelineWorkflow[] {
       totalFloors: 10,
       status: "in-development",
       statusLabel: t('landing.pipelineStatusDev'),
-      targetDate: "14 MAR 2026",
+      targetDate: t('landing.targetDate1'),
       color: "#4F8AFF",
       secondaryColor: "#6366F1",
       nodeId: "WF-01",
@@ -57,7 +57,7 @@ function getWorkflows(t: (key: TranslationKey) => string): PipelineWorkflow[] {
       totalFloors: 10,
       status: "research",
       statusLabel: t('landing.pipelineStatusResearch'),
-      targetDate: "15 MAR 2026",
+      targetDate: t('landing.targetDate2'),
       color: "#8B5CF6",
       secondaryColor: "#A78BFA",
       nodeId: "WF-02",
@@ -71,7 +71,7 @@ function getWorkflows(t: (key: TranslationKey) => string): PipelineWorkflow[] {
       totalFloors: 10,
       status: "planned",
       statusLabel: t('landing.pipelineStatusPlanned'),
-      targetDate: "16 MAR 2026",
+      targetDate: t('landing.targetDate3'),
       color: "#10B981",
       secondaryColor: "#34D399",
       nodeId: "WF-03",
@@ -371,6 +371,7 @@ function SceneBuildingToIfc({ color, progress }: { color: string; progress: numb
 // ─── Mini Architectural Scene: 2D Plan → 3D Render ──────────────────────────
 
 function SceneFloorPlanTo3d({ color }: { color: string }) {
+  const { t } = useLocale();
   const rgb = hexToRgb(color);
 
   return (
@@ -398,10 +399,10 @@ function SceneFloorPlanTo3d({ color }: { color: string }) {
         <path d="M35 40 A8 8 0 0 1 35 32" stroke={`rgba(${rgb}, 0.3)`} strokeWidth="0.6" fill="none" />
         <path d="M55 22 A6 6 0 0 0 61 22" stroke={`rgba(${rgb}, 0.3)`} strokeWidth="0.6" fill="none" />
         {/* Room labels */}
-        <text x="22" y="24" fill={`rgba(${rgb}, 0.5)`} fontSize="7" fontFamily="monospace" textAnchor="middle">Living</text>
-        <text x="22" y="62" fill={`rgba(${rgb}, 0.5)`} fontSize="7" fontFamily="monospace" textAnchor="middle">Bed</text>
-        <text x="72" y="30" fill={`rgba(${rgb}, 0.5)`} fontSize="7" fontFamily="monospace" textAnchor="middle">Kitchen</text>
-        <text x="72" y="70" fill={`rgba(${rgb}, 0.4)`} fontSize="6" fontFamily="monospace" textAnchor="middle">Bath</text>
+        <text x="22" y="24" fill={`rgba(${rgb}, 0.5)`} fontSize="7" fontFamily="monospace" textAnchor="middle">{t('landing.roomLiving')}</text>
+        <text x="22" y="62" fill={`rgba(${rgb}, 0.5)`} fontSize="7" fontFamily="monospace" textAnchor="middle">{t('landing.roomBed')}</text>
+        <text x="72" y="30" fill={`rgba(${rgb}, 0.5)`} fontSize="7" fontFamily="monospace" textAnchor="middle">{t('landing.roomKitchen')}</text>
+        <text x="72" y="70" fill={`rgba(${rgb}, 0.4)`} fontSize="6" fontFamily="monospace" textAnchor="middle">{t('landing.roomBath')}</text>
         {/* Dimension line */}
         <line x1="0" y1="90" x2="90" y2="90" stroke={`rgba(${rgb}, 0.25)`} strokeWidth="0.5" />
         <line x1="0" y1="87" x2="0" y2="93" stroke={`rgba(${rgb}, 0.25)`} strokeWidth="0.5" />
@@ -575,6 +576,7 @@ function WorkflowCard({
   index: number;
   isFlagship?: boolean;
 }) {
+  const { t } = useLocale();
   const rgb = hexToRgb(workflow.color);
   const [isHovered, setIsHovered] = useState(false);
   const Scene = SCENES[index];
@@ -681,7 +683,7 @@ function WorkflowCard({
               color: workflow.color, letterSpacing: "1px",
               border: `1px solid rgba(${rgb}, 0.2)`,
             }}>
-              FLAGSHIP
+              {t('landing.flagship')}
             </span>
           )}
         </div>
@@ -740,7 +742,7 @@ function WorkflowCard({
         }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
             <span style={{ fontSize: 10, fontWeight: 700, color: "#5C5C78", textTransform: "uppercase", letterSpacing: "1px" }}>
-              Progress
+              {t('landing.progress')}
             </span>
             <AnimatedPercent value={workflow.progress} color={workflow.color} />
           </div>
@@ -776,13 +778,13 @@ function WorkflowCard({
               fontSize: 9, fontWeight: 600, color: `rgba(${rgb}, 0.5)`,
               fontFamily: "'JetBrains Mono', monospace",
             }}>
-              {workflow.floors}/{workflow.totalFloors} milestones
+              {workflow.floors}/{workflow.totalFloors} {t('landing.milestones')}
             </span>
             <span style={{
               fontSize: 9, fontWeight: 600, color: "#3A3A50",
               fontFamily: "'JetBrains Mono', monospace",
             }}>
-              {workflow.status === "in-development" ? "Targeting beta" : workflow.status === "research" ? "Prototyping" : "Scoping"}
+              {workflow.status === "in-development" ? t('landing.targetingBeta') : workflow.status === "research" ? t('landing.prototyping') : t('landing.scoping')}
             </span>
           </div>
         </div>
@@ -811,6 +813,7 @@ function WorkflowCard({
 // ─── Atmospheric Background ─────────────────────────────────────────────────
 
 function AtmosphericBackground() {
+  const { t } = useLocale();
   return (
     <div style={{ position: "absolute", inset: 0, pointerEvents: "none", overflow: "hidden" }}>
       {/* Dot grid — structural pattern */}
@@ -857,7 +860,7 @@ function AtmosphericBackground() {
           <line x1="120" y1="760" x2="1320" y2="760" stroke="#4F8AFF" strokeWidth="0.8" />
           <line x1="120" y1="754" x2="120" y2="766" stroke="#4F8AFF" strokeWidth="0.8" />
           <line x1="1320" y1="754" x2="1320" y2="766" stroke="#4F8AFF" strokeWidth="0.8" />
-          <text x="720" y="780" fill="#4F8AFF" fontSize="9" fontFamily="monospace" textAnchor="middle">PIPELINE SPAN — 3 WORKFLOWS</text>
+          <text x="720" y="780" fill="#4F8AFF" fontSize="9" fontFamily="monospace" textAnchor="middle">{t('landing.pipelineSpan')}</text>
         </g>
 
         {/* Animated scan line */}
@@ -889,6 +892,7 @@ function AtmosphericBackground() {
 
 function SectionTitle() {
   const ref = useRef<HTMLDivElement>(null);
+  const { t } = useLocale();
   const inView = useInView(ref, { once: true, margin: "-60px" });
 
   return (
@@ -922,7 +926,7 @@ function SectionTitle() {
             letterSpacing: "2.5px", color: "#4F8AFF",
             fontFamily: "'JetBrains Mono', monospace",
           }}>
-            The Pipeline
+            {t('landing.thePipeline')}
           </span>
         </div>
         <motion.div
@@ -938,12 +942,12 @@ function SectionTitle() {
         fontSize: "clamp(2.2rem, 4.5vw, 3.8rem)", fontWeight: 900,
         letterSpacing: "-0.04em", lineHeight: 1.05, margin: "0 0 20px",
       }}>
-        <span style={{ color: "#F0F0F5" }}>What We&apos;re{" "}</span>
+        <span style={{ color: "#F0F0F5" }}>{t('landing.whatWereBuilding')}{" "}</span>
         <span style={{
           background: "linear-gradient(135deg, #4F8AFF 0%, #8B5CF6 40%, #C084FC 80%, #10B981 100%)",
           WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text",
         }}>
-          Building Next
+          {t('landing.buildingNext')}
         </span>
       </h2>
 
@@ -952,7 +956,7 @@ function SectionTitle() {
         fontSize: "clamp(0.875rem, 2.5vw, 1.0625rem)", color: "#9898B0", lineHeight: 1.7, maxWidth: "min(600px, 100%)",
         margin: "0 auto", letterSpacing: "-0.005em",
       }}>
-        Three AI-powered workflow pipelines in active development — from text description to BIM-ready deliverables.
+        {t('landing.pipelineSubtitle')}
       </p>
 
       {/* Decorative dimension annotation below subtitle */}
@@ -965,7 +969,7 @@ function SectionTitle() {
           fontSize: 8, fontWeight: 600, color: "#5C5C78", letterSpacing: "2px",
           fontFamily: "'JetBrains Mono', monospace", textTransform: "uppercase",
         }}>
-          Input → Process → Output
+          {t('landing.inputProcessOutput')}
         </span>
         <div style={{ width: 40, height: 1, background: "rgba(16,185,129,0.3)" }} />
       </div>
@@ -1064,7 +1068,7 @@ export function PipelineSection() {
             </div>
             <span style={{ fontSize: 14, fontWeight: 600, color: "#9898B0", lineHeight: 1.4 }}>
               <span style={{ color: "#4F8AFF", fontWeight: 700 }}>{t('landing.pipeline1Title')}</span>
-              {" "}— our flagship pipeline — arriving tomorrow
+              {" "}{t('landing.flagshipArriving')}
             </span>
           </div>
         </motion.div>

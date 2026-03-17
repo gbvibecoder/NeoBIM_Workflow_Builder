@@ -123,6 +123,7 @@ function SideToolbar() {
 // ─── Input Prompt Card ───────────────────────────────────────────────────────
 
 function PromptCard({ labelText, quoteText }: { labelText?: string; quoteText?: string }) {
+  const { t } = useLocale();
   return (
     <motion.div
       initial={{ opacity: 0, y: 20, rotate: -2 }}
@@ -138,10 +139,10 @@ function PromptCard({ labelText, quoteText }: { labelText?: string; quoteText?: 
       }}
     >
       <div style={{ fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "2px", color: "#4F8AFF", marginBottom: 10 }}>
-        {labelText ?? "AI Prompt"}
+        {labelText ?? t('landing.aiPromptDefault')}
       </div>
       <p style={{ fontSize: 13, color: "#9898B0", lineHeight: 1.5, fontStyle: "italic" }}>
-        {quoteText ?? "\u201CCreate a workflow that takes a project brief, generates 3D massing, and renders a concept image.\u201D"}
+        {quoteText ?? t('landing.promptQuoteDefault')}
       </p>
       <div style={{ marginTop: 12, height: 3, borderRadius: 2, background: "rgba(79,138,255,0.15)", overflow: "hidden" }}>
         <motion.div
@@ -195,7 +196,6 @@ function AnimatedNumber({ value, decimals = 0, suffix = '', prefix = '', color }
   );
 }
 
-const USE_CASES = ["Architecture Studios", "Engineering Teams", "BIM Consultants", "Design Agencies", "Construction Tech"];
 
 const SHOWCASE = [
   { id: "wf-01", badge: null },
@@ -210,22 +210,23 @@ const PARTNER_LOGO_KEYS = ['landing.builtForAecBadge', 'landing.complementBadge'
 // ─── Community Social Proof Data ────────────────────────────────────────────
 
 const COMMUNITY_WORKFLOWS = [
-  { name: "MEP Coordination Clash Review", builder: "Sarah M.", role: "MEP Lead", firm: "Arup", discipline: "MEP", phase: "RIBA Stage 4", uses: 342, duplicated: 89, color: "#3B82F6", lastRun: 1, preview: "mep" as const },
-  { name: "Pre-Commencement Condition Discharge", builder: "James T.", role: "Project Manager", firm: "Mace Group", discipline: "Planning", phase: "Stage 5", uses: 218, duplicated: 56, color: "#8B5CF6", lastRun: 3, preview: "planning" as const },
-  { name: "RIBA Stage 4 Drawing Issue Workflow", builder: "Priya K.", role: "BIM Manager", firm: "Foster + Partners", discipline: "Architecture", phase: "RIBA Stage 4", uses: 567, duplicated: 134, color: "#10B981", lastRun: 0, preview: "architecture" as const },
-  { name: "Structural Steel Takeoff & BOQ", builder: "Marcus W.", role: "QS Engineer", firm: "Turner & Townsend", discipline: "Structures", phase: "Stage 3–4", uses: 421, duplicated: 97, color: "#F59E0B", lastRun: 2, preview: "structural" as const },
-  { name: "Façade Panel Schedule Generator", builder: "Lena H.", role: "Façade Engineer", firm: "Schüco", discipline: "Envelope", phase: "Detail Design", uses: 189, duplicated: 43, color: "#EF4444", lastRun: 5, preview: "facade" as const },
-  { name: "Site Logistics & Crane Reach Analysis", builder: "David C.", role: "Site Manager", firm: "Laing O'Rourke", discipline: "Construction", phase: "Pre-Construction", uses: 305, duplicated: 71, color: "#06B6D4", lastRun: 1, preview: "construction" as const },
-  { name: "Embodied Carbon Reporting Pipeline", builder: "Amara O.", role: "Sustainability Lead", firm: "BDP", discipline: "Sustainability", phase: "RIBA Stage 2–3", uses: 478, duplicated: 112, color: "#22C55E", lastRun: 0, preview: "sustainability" as const },
-  { name: "Automated Clash Detection & Resolution", builder: "Tom R.", role: "BIM Coordinator", firm: "Multiplex", discipline: "BIM Coordination", phase: "Stage 4", uses: 623, duplicated: 158, color: "#A855F7", lastRun: 0, preview: "bim" as const },
-  { name: "Client Presentation Deck Generator", builder: "Nina S.", role: "Design Director", firm: "Zaha Hadid Architects", discipline: "Design Management", phase: "RIBA Stage 2", uses: 284, duplicated: 67, color: "#EC4899", lastRun: 4, preview: "design" as const },
-  { name: "NBS Specification Writer & Mapper", builder: "George L.", role: "Specification Manager", firm: "Gleeds", discipline: "Specifications", phase: "Stage 3–4", uses: 196, duplicated: 51, color: "#14B8A6", lastRun: 6, preview: "specs" as const },
-  { name: "Construction Phasing Sequence Planner", builder: "Rachel K.", role: "Planning Manager", firm: "Balfour Beatty", discipline: "Construction Planning", phase: "Pre-Construction", uses: 347, duplicated: 82, color: "#F97316", lastRun: 2, preview: "phasing" as const },
-  { name: "As-Built vs Design Comparison", builder: "Ahmed B.", role: "QA Lead", firm: "WSP", discipline: "Quality Assurance", phase: "Stage 5–6", uses: 259, duplicated: 63, color: "#0EA5E9", lastRun: 3, preview: "qa" as const },
+  { nameKey: "landing.cw1Name" as const, builder: "Sarah M.", roleKey: "landing.cw1Role" as const, firm: "Arup", disciplineKey: "landing.cw1Discipline" as const, phaseKey: "landing.cw1Phase" as const, uses: 342, duplicated: 89, color: "#3B82F6", lastRun: 1, preview: "mep" as const },
+  { nameKey: "landing.cw2Name" as const, builder: "James T.", roleKey: "landing.cw2Role" as const, firm: "Mace Group", disciplineKey: "landing.cw2Discipline" as const, phaseKey: "landing.cw2Phase" as const, uses: 218, duplicated: 56, color: "#8B5CF6", lastRun: 3, preview: "planning" as const },
+  { nameKey: "landing.cw3Name" as const, builder: "Priya K.", roleKey: "landing.cw3Role" as const, firm: "Foster + Partners", disciplineKey: "landing.cw3Discipline" as const, phaseKey: "landing.cw3Phase" as const, uses: 567, duplicated: 134, color: "#10B981", lastRun: 0, preview: "architecture" as const },
+  { nameKey: "landing.cw4Name" as const, builder: "Marcus W.", roleKey: "landing.cw4Role" as const, firm: "Turner & Townsend", disciplineKey: "landing.cw4Discipline" as const, phaseKey: "landing.cw4Phase" as const, uses: 421, duplicated: 97, color: "#F59E0B", lastRun: 2, preview: "structural" as const },
+  { nameKey: "landing.cw5Name" as const, builder: "Lena H.", roleKey: "landing.cw5Role" as const, firm: "Schüco", disciplineKey: "landing.cw5Discipline" as const, phaseKey: "landing.cw5Phase" as const, uses: 189, duplicated: 43, color: "#EF4444", lastRun: 5, preview: "facade" as const },
+  { nameKey: "landing.cw6Name" as const, builder: "David C.", roleKey: "landing.cw6Role" as const, firm: "Laing O'Rourke", disciplineKey: "landing.cw6Discipline" as const, phaseKey: "landing.cw6Phase" as const, uses: 305, duplicated: 71, color: "#06B6D4", lastRun: 1, preview: "construction" as const },
+  { nameKey: "landing.cw7Name" as const, builder: "Amara O.", roleKey: "landing.cw7Role" as const, firm: "BDP", disciplineKey: "landing.cw7Discipline" as const, phaseKey: "landing.cw7Phase" as const, uses: 478, duplicated: 112, color: "#22C55E", lastRun: 0, preview: "sustainability" as const },
+  { nameKey: "landing.cw8Name" as const, builder: "Tom R.", roleKey: "landing.cw8Role" as const, firm: "Multiplex", disciplineKey: "landing.cw8Discipline" as const, phaseKey: "landing.cw8Phase" as const, uses: 623, duplicated: 158, color: "#A855F7", lastRun: 0, preview: "bim" as const },
+  { nameKey: "landing.cw9Name" as const, builder: "Nina S.", roleKey: "landing.cw9Role" as const, firm: "Zaha Hadid Architects", disciplineKey: "landing.cw9Discipline" as const, phaseKey: "landing.cw9Phase" as const, uses: 284, duplicated: 67, color: "#EC4899", lastRun: 4, preview: "design" as const },
+  { nameKey: "landing.cw10Name" as const, builder: "George L.", roleKey: "landing.cw10Role" as const, firm: "Gleeds", disciplineKey: "landing.cw10Discipline" as const, phaseKey: "landing.cw10Phase" as const, uses: 196, duplicated: 51, color: "#14B8A6", lastRun: 6, preview: "specs" as const },
+  { nameKey: "landing.cw11Name" as const, builder: "Rachel K.", roleKey: "landing.cw11Role" as const, firm: "Balfour Beatty", disciplineKey: "landing.cw11Discipline" as const, phaseKey: "landing.cw11Phase" as const, uses: 347, duplicated: 82, color: "#F97316", lastRun: 2, preview: "phasing" as const },
+  { nameKey: "landing.cw12Name" as const, builder: "Ahmed B.", roleKey: "landing.cw12Role" as const, firm: "WSP", disciplineKey: "landing.cw12Discipline" as const, phaseKey: "landing.cw12Phase" as const, uses: 259, duplicated: 63, color: "#0EA5E9", lastRun: 3, preview: "qa" as const },
 ];
 
 /* ── Procedural SVG preview for each workflow type ──────────────────────── */
 function WorkflowPreviewSVG({ type, color, rgb }: { type: string; color: string; rgb: string }) {
+  const { t } = useLocale();
   const w = 320, h = 140;
   const shared = { width: w, height: h, viewBox: `0 0 ${w} ${h}`, fill: "none", xmlns: "http://www.w3.org/2000/svg" };
 
@@ -251,7 +252,7 @@ function WorkflowPreviewSVG({ type, color, rgb }: { type: string; color: string;
         <text x="280" y="28" fontSize="7" fill={`rgba(${rgb},0.5)`} fontFamily="monospace">HVAC-01</text>
         <text x="280" y="60" fontSize="7" fill={`rgba(${rgb},0.5)`} fontFamily="monospace">PIPE-03</text>
         <text x="280" y="92" fontSize="7" fill={`rgba(${rgb},0.5)`} fontFamily="monospace">ELEC-02</text>
-        <text x="260" y="128" fontSize="8" fill={`rgba(${rgb},0.3)`} fontFamily="monospace">2 clashes found</text>
+        <text x="260" y="128" fontSize="8" fill={`rgba(${rgb},0.3)`} fontFamily="monospace">{t('landing.svgClashesFound')}</text>
       </svg>
     );
     case "planning": return (
@@ -271,7 +272,7 @@ function WorkflowPreviewSVG({ type, color, rgb }: { type: string; color: string;
         ))}
         {/* Status badge */}
         <rect x="200" y="24" width="90" height="22" rx="6" fill={`rgba(${rgb},0.1)`} stroke={`rgba(${rgb},0.2)`} strokeWidth="1"/>
-        <text x="245" y="39" textAnchor="middle" fontSize="8" fill={color} fontWeight="600">3/4 COMPLETE</text>
+        <text x="245" y="39" textAnchor="middle" fontSize="8" fill={color} fontWeight="600">{t('landing.svgComplete34')}</text>
         {/* Progress arc */}
         <circle cx="245" cy="85" r="28" fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="4"/>
         <circle cx="245" cy="85" r="28" fill="none" stroke={color} strokeWidth="4" strokeDasharray="132" strokeDashoffset="33" strokeLinecap="round" opacity="0.6" transform="rotate(-90 245 85)"/>
@@ -354,10 +355,10 @@ function WorkflowPreviewSVG({ type, color, rgb }: { type: string; color: string;
           );
         }))}
         {/* Schedule legend */}
-        <text x="280" y="26" fontSize="6" fill={`rgba(${rgb},0.3)`} fontFamily="monospace">28 panels</text>
-        <text x="280" y="38" fontSize="6" fill={`rgba(${rgb},0.3)`} fontFamily="monospace">CW system</text>
+        <text x="280" y="26" fontSize="6" fill={`rgba(${rgb},0.3)`} fontFamily="monospace">{t('landing.svgPanels')}</text>
+        <text x="280" y="38" fontSize="6" fill={`rgba(${rgb},0.3)`} fontFamily="monospace">{t('landing.svgCwSystem')}</text>
         <rect x="278" y="48" width="8" height="8" rx="1" fill={`rgba(${rgb},0.15)`} stroke={color} strokeWidth="1"/>
-        <text x="290" y="55" fontSize="5" fill={`rgba(${rgb},0.4)`}>Review</text>
+        <text x="290" y="55" fontSize="5" fill={`rgba(${rgb},0.4)`}>{t('landing.svgReview')}</text>
       </svg>
     );
     case "construction": return (
@@ -379,10 +380,10 @@ function WorkflowPreviewSVG({ type, color, rgb }: { type: string; color: string;
         <path d="M20 100 L40 85 L80 90 L130 80" fill="none" stroke={`rgba(${rgb},0.3)`} strokeWidth="1.5" strokeDasharray="3 2"/>
         {/* Legend */}
         <rect x="238" y="20" width="70" height="60" rx="4" fill="rgba(255,255,255,0.02)" stroke={`rgba(${rgb},0.1)`} strokeWidth="0.5"/>
-        <text x="248" y="35" fontSize="6" fill={`rgba(${rgb},0.4)`} fontFamily="monospace">Tower Crane</text>
-        <text x="248" y="47" fontSize="6" fill={`rgba(${rgb},0.4)`} fontFamily="monospace">Reach: 55m</text>
-        <text x="248" y="59" fontSize="6" fill={`rgba(${rgb},0.4)`} fontFamily="monospace">Capacity: 12t</text>
-        <text x="248" y="71" fontSize="6" fill={`rgba(${rgb},0.4)`} fontFamily="monospace">Coverage: 94%</text>
+        <text x="248" y="35" fontSize="6" fill={`rgba(${rgb},0.4)`} fontFamily="monospace">{t('landing.svgTowerCrane')}</text>
+        <text x="248" y="47" fontSize="6" fill={`rgba(${rgb},0.4)`} fontFamily="monospace">{t('landing.svgReach')}</text>
+        <text x="248" y="59" fontSize="6" fill={`rgba(${rgb},0.4)`} fontFamily="monospace">{t('landing.svgCapacity')}</text>
+        <text x="248" y="71" fontSize="6" fill={`rgba(${rgb},0.4)`} fontFamily="monospace">{t('landing.svgCoverage')}</text>
       </svg>
     );
     case "sustainability": return (
@@ -408,7 +409,7 @@ function WorkflowPreviewSVG({ type, color, rgb }: { type: string; color: string;
         <text x="272" y="64" fontSize="7" fill={`rgba(${rgb},0.4)`} fontFamily="monospace">kgCO₂e/m²</text>
         {/* Trend indicator */}
         <path d="M275 80 L290 72 L305 76" fill="none" stroke={color} strokeWidth="1.5" opacity="0.4"/>
-        <text x="272" y="100" fontSize="6" fill={`rgba(${rgb},0.3)`} fontFamily="monospace">↓ 12% vs baseline</text>
+        <text x="272" y="100" fontSize="6" fill={`rgba(${rgb},0.3)`} fontFamily="monospace">{t('landing.svgVsBaseline')}</text>
       </svg>
     );
     case "bim": return (
@@ -427,12 +428,12 @@ function WorkflowPreviewSVG({ type, color, rgb }: { type: string; color: string;
         <text x="150" y="79" textAnchor="middle" fontSize="8" fill="#F59E0B" fontWeight="700">!</text>
         {/* Stats */}
         <rect x="210" y="20" width="90" height="95" rx="6" fill="rgba(255,255,255,0.02)" stroke={`rgba(${rgb},0.1)`} strokeWidth="0.5"/>
-        <text x="220" y="38" fontSize="7" fill="#EF4444" fontFamily="monospace">● 3 Critical</text>
-        <text x="220" y="52" fontSize="7" fill="#F59E0B" fontFamily="monospace">● 7 Warning</text>
-        <text x="220" y="66" fontSize="7" fill="#10B981" fontFamily="monospace">● 42 Passed</text>
+        <text x="220" y="38" fontSize="7" fill="#EF4444" fontFamily="monospace">{t('landing.svgCritical')}</text>
+        <text x="220" y="52" fontSize="7" fill="#F59E0B" fontFamily="monospace">{t('landing.svgWarning')}</text>
+        <text x="220" y="66" fontSize="7" fill="#10B981" fontFamily="monospace">{t('landing.svgPassed')}</text>
         <line x1="218" y1="76" x2="292" y2="76" stroke={`rgba(${rgb},0.1)`} strokeWidth="0.5"/>
         <text x="220" y="90" fontSize="8" fill={color} fontWeight="600">96.2%</text>
-        <text x="220" y="102" fontSize="6" fill={`rgba(${rgb},0.4)`} fontFamily="monospace">Pass Rate</text>
+        <text x="220" y="102" fontSize="6" fill={`rgba(${rgb},0.4)`} fontFamily="monospace">{t('landing.svgPassRate')}</text>
       </svg>
     );
     case "design": return (
@@ -453,7 +454,7 @@ function WorkflowPreviewSVG({ type, color, rgb }: { type: string; color: string;
         {/* Slide 3 */}
         <rect x="250" y="25" width="55" height="36" rx="3" fill={`rgba(${rgb},0.04)`} stroke={`rgba(${rgb},0.1)`} strokeWidth="0.5"/>
         {/* Page indicator */}
-        <text x="160" y="110" textAnchor="middle" fontSize="8" fill={`rgba(${rgb},0.3)`} fontFamily="monospace">12 slides · 3 renders · PDF ready</text>
+        <text x="160" y="110" textAnchor="middle" fontSize="8" fill={`rgba(${rgb},0.3)`} fontFamily="monospace">{t('landing.svgSlides')}</text>
         {/* Dots */}
         {[0,1,2,3,4].map(i => (
           <circle key={i} cx={140+i*10} cy="122" r="2.5" fill={i===0?color:`rgba(${rgb},0.15)`}/>
@@ -485,7 +486,7 @@ function WorkflowPreviewSVG({ type, color, rgb }: { type: string; color: string;
         <text x="242" y="56" fontSize="6" fill={`rgba(${rgb},0.4)`} fontFamily="monospace">Uniclass Pr_40</text>
         <rect x="232" y="68" width="70" height="18" rx="3" fill={`rgba(${rgb},0.08)`} stroke={`rgba(${rgb},0.15)`} strokeWidth="0.5"/>
         <text x="242" y="80" fontSize="6" fill={`rgba(${rgb},0.4)`} fontFamily="monospace">IFC IfcWall</text>
-        <text x="255" y="110" fontSize="7" fill={`rgba(${rgb},0.3)`} fontFamily="monospace">3 mapped</text>
+        <text x="255" y="110" fontSize="7" fill={`rgba(${rgb},0.3)`} fontFamily="monospace">{t('landing.svgMapped')}</text>
       </svg>
     );
     case "phasing": return (
@@ -494,11 +495,11 @@ function WorkflowPreviewSVG({ type, color, rgb }: { type: string; color: string;
         <rect width={w} height={h} fill="url(#pha-g)"/>
         {/* Gantt chart */}
         {[
-          { y: 20, x: 30, w: 80, label: "Excavation", opacity: 0.25 },
-          { y: 40, x: 70, w: 100, label: "Substructure", opacity: 0.3 },
-          { y: 60, x: 120, w: 90, label: "Superstructure", opacity: 0.2 },
-          { y: 80, x: 170, w: 70, label: "Envelope", opacity: 0.15 },
-          { y: 100, x: 200, w: 80, label: "Fit-out", opacity: 0.12 },
+          { y: 20, x: 30, w: 80, label: t('landing.svgExcavation'), opacity: 0.25 },
+          { y: 40, x: 70, w: 100, label: t('landing.svgSubstructure'), opacity: 0.3 },
+          { y: 60, x: 120, w: 90, label: t('landing.svgSuperstructure'), opacity: 0.2 },
+          { y: 80, x: 170, w: 70, label: t('landing.svgEnvelope'), opacity: 0.15 },
+          { y: 100, x: 200, w: 80, label: t('landing.svgFitOut'), opacity: 0.12 },
         ].map(bar => (
           <g key={bar.label}>
             <rect x={bar.x} y={bar.y} width={bar.w} height="14" rx="3" fill={`rgba(${rgb},${bar.opacity})`} stroke={`rgba(${rgb},0.15)`} strokeWidth="0.5"/>
@@ -506,12 +507,12 @@ function WorkflowPreviewSVG({ type, color, rgb }: { type: string; color: string;
           </g>
         ))}
         {/* Timeline markers */}
-        {["Wk 1", "Wk 8", "Wk 16", "Wk 24", "Wk 32"].map((label, i) => (
+        {[t('landing.svgWk1'), t('landing.svgWk8'), t('landing.svgWk16'), t('landing.svgWk24'), t('landing.svgWk32')].map((label, i) => (
           <text key={i} x={30+i*60} y={130} fontSize="5" fill={`rgba(${rgb},0.2)`} fontFamily="monospace">{label}</text>
         ))}
         {/* Today marker */}
         <line x1="150" y1="12" x2="150" y2="120" stroke={color} strokeWidth="1" strokeDasharray="3 2" opacity="0.4"/>
-        <text x="150" y="10" textAnchor="middle" fontSize="6" fill={color} fontWeight="600">TODAY</text>
+        <text x="150" y="10" textAnchor="middle" fontSize="6" fill={color} fontWeight="600">{t('landing.svgToday')}</text>
       </svg>
     );
     case "qa": return (
@@ -520,12 +521,12 @@ function WorkflowPreviewSVG({ type, color, rgb }: { type: string; color: string;
         <rect width={w} height={h} fill="url(#qa-g)"/>
         {/* Design overlay */}
         <rect x="20" y="15" width="120" height="80" rx="4" fill={`rgba(${rgb},0.06)`} stroke={`rgba(${rgb},0.15)`} strokeWidth="1"/>
-        <text x="80" y="10" textAnchor="middle" fontSize="7" fill={`rgba(${rgb},0.3)`} fontWeight="600">DESIGN</text>
+        <text x="80" y="10" textAnchor="middle" fontSize="7" fill={`rgba(${rgb},0.3)`} fontWeight="600">{t('landing.svgDesign')}</text>
         <rect x="30" y="28" width="40" height="30" rx="2" fill={`rgba(${rgb},0.1)`}/>
         <rect x="78" y="28" width="50" height="20" rx="2" fill={`rgba(${rgb},0.08)`}/>
         {/* As-built overlay */}
         <rect x="160" y="15" width="120" height="80" rx="4" fill="rgba(16,185,129,0.04)" stroke="rgba(16,185,129,0.15)" strokeWidth="1"/>
-        <text x="220" y="10" textAnchor="middle" fontSize="7" fill="rgba(16,185,129,0.3)" fontWeight="600">AS-BUILT</text>
+        <text x="220" y="10" textAnchor="middle" fontSize="7" fill="rgba(16,185,129,0.3)" fontWeight="600">{t('landing.svgAsBuilt')}</text>
         <rect x="170" y="28" width="42" height="32" rx="2" fill="rgba(16,185,129,0.08)"/>
         <rect x="220" y="28" width="48" height="20" rx="2" fill="rgba(16,185,129,0.06)"/>
         {/* Comparison arrows */}
@@ -535,14 +536,14 @@ function WorkflowPreviewSVG({ type, color, rgb }: { type: string; color: string;
         <text x="190" y="48" textAnchor="middle" fontSize="6" fill="#F59E0B">Δ</text>
         {/* Result */}
         <rect x="60" y="105" width="180" height="24" rx="6" fill={`rgba(${rgb},0.06)`} stroke={`rgba(${rgb},0.12)`} strokeWidth="0.5"/>
-        <text x="80" y="120" fontSize="8" fill={color} fontWeight="600">97.3% Match</text>
-        <text x="200" y="120" fontSize="7" fill="rgba(245,158,11,0.5)" fontFamily="monospace">2 deviations</text>
+        <text x="80" y="120" fontSize="8" fill={color} fontWeight="600">{t('landing.svgMatch')}</text>
+        <text x="200" y="120" fontSize="7" fill="rgba(245,158,11,0.5)" fontFamily="monospace">{t('landing.svgDeviations')}</text>
       </svg>
     );
     default: return (
       <svg {...shared}>
         <rect width={w} height={h} fill={`rgba(${rgb},0.05)`}/>
-        <text x={w/2} y={h/2} textAnchor="middle" fontSize="12" fill={`rgba(${rgb},0.3)`}>Preview</text>
+        <text x={w/2} y={h/2} textAnchor="middle" fontSize="12" fill={`rgba(${rgb},0.3)`}>{t('landing.svgPreview')}</text>
       </svg>
     );
   }
@@ -568,49 +569,49 @@ function daysAgo(n: number): string {
 }
 
 /** Show relative time like "2d ago", "1w ago" */
-function relativeDate(dateStr: string): string {
+function relativeDate(dateStr: string, tr?: (key: TranslationKey) => string): string {
   const diff = Math.floor((Date.now() - new Date(dateStr).getTime()) / 86400000);
-  if (diff === 0) return "today";
-  if (diff === 1) return "1d ago";
-  if (diff < 7) return `${diff}d ago`;
-  if (diff < 14) return "1w ago";
-  return `${Math.floor(diff / 7)}w ago`;
+  if (!tr) {
+    if (diff === 0) return "today";
+    if (diff === 1) return "1d ago";
+    if (diff < 7) return `${diff}d ago`;
+    if (diff < 14) return "1w ago";
+    return `${Math.floor(diff / 7)}w ago`;
+  }
+  if (diff === 0) return tr('landing.timeToday');
+  if (diff === 1) return tr('landing.time1DayAgo');
+  if (diff < 7) return tr('landing.timeDaysAgo').replace('{n}', String(diff));
+  if (diff < 14) return tr('landing.time1WeekAgo');
+  return tr('landing.timeWeeksAgo').replace('{n}', String(Math.floor(diff / 7)));
 }
 
 const SEED_REQUESTS: WorkflowRequest[] = [
-  { id: "req-001", name: "Acoustic Performance Assessment", discipline: "Building Physics", problem: "Need automated reverberation time calculations from room geometry and material specifications for compliance with BB93 and ADE.", email: "hidden", votes: 47, createdAt: daysAgo(6) },
-  { id: "req-002", name: "Fire Escape Route Compliance Check", discipline: "Fire Safety", problem: "Automated travel distance and exit width verification against Approved Document B from IFC model geometry.", email: "hidden", votes: 83, createdAt: daysAgo(7) },
-  { id: "req-003", name: "Daylight Factor Analysis Pipeline", discipline: "Environmental Design", problem: "Generate daylight factor reports from IFC model with automated window-to-floor ratios and Part L compliance checks.", email: "hidden", votes: 61, createdAt: daysAgo(5) },
-  { id: "req-004", name: "Embodied Carbon Calculator", discipline: "Sustainability", problem: "Calculate whole-life carbon from material schedules against RICS methodology and LETI 2030 targets.", email: "hidden", votes: 129, createdAt: daysAgo(8) },
-  { id: "req-005", name: "Accessibility Audit Workflow", discipline: "Inclusive Design", problem: "Check corridor widths, door clearances, and ramp gradients against Part M and BS 8300 requirements from BIM model.", email: "hidden", votes: 35, createdAt: daysAgo(4) },
-  { id: "req-006", name: "Thermal Bridging Analysis", discipline: "Building Physics", problem: "Automated Psi-value calculations at wall-floor-roof junctions from construction details, with SAP compliance output for Part L submissions.", email: "hidden", votes: 94, createdAt: daysAgo(9) },
-  { id: "req-007", name: "HVAC Duct Sizing Pipeline", discipline: "MEP Engineering", problem: "Automated duct sizing from room-by-room heat load calculations with pressure drop verification and CIBSE Guide C compliance.", email: "hidden", votes: 76, createdAt: daysAgo(8) },
-  { id: "req-008", name: "Structural Loading Assessment", discipline: "Structural Engineering", problem: "Calculate imposed, dead, and wind loads per floor from IFC geometry with automated load combination tables per BS EN 1990.", email: "hidden", votes: 112, createdAt: daysAgo(10) },
-  { id: "req-009", name: "Rainwater Harvesting Calculator", discipline: "Sustainability", problem: "Size rainwater collection systems from roof area and local rainfall data with BREEAM Wat 01 credit calculation.", email: "hidden", votes: 38, createdAt: daysAgo(3) },
-  { id: "req-010", name: "Material Schedule & BOQ Generator", discipline: "Quantity Surveying", problem: "Extract material quantities from IFC model and generate formatted BOQ with NRM2-compliant cost categories.", email: "hidden", votes: 156, createdAt: daysAgo(11) },
-  { id: "req-011", name: "Parking Layout Optimizer", discipline: "Urban Planning", problem: "Generate optimal parking layouts from site boundary geometry with turning circle verification and minimum bay dimensions per local authority standards.", email: "hidden", votes: 42, createdAt: daysAgo(5) },
-  { id: "req-012", name: "Wind Load Analysis Pipeline", discipline: "Structural Engineering", problem: "Automated wind pressure calculations from building geometry and location data per BS EN 1991-1-4 with zone pressure coefficients.", email: "hidden", votes: 68, createdAt: daysAgo(7) },
-  { id: "req-013", name: "Lift Traffic Analysis", discipline: "Building Services", problem: "Calculate required lift numbers, speeds, and waiting times from building population data with BCO compliance verification.", email: "hidden", votes: 29, createdAt: daysAgo(2) },
-  { id: "req-014", name: "Condensation Risk Assessment", discipline: "Building Physics", problem: "Automated interstitial condensation analysis at wall build-ups with dewpoint tracking and BS 5250 compliance reporting.", email: "hidden", votes: 55, createdAt: daysAgo(6) },
-  { id: "req-015", name: "Flood Risk Assessment Pipeline", discipline: "Environmental", problem: "Generate flood risk reports from site coordinates with EA flood zone mapping, surface water analysis, and SuDS sizing calculations.", email: "hidden", votes: 73, createdAt: daysAgo(8) },
-  { id: "req-016", name: "Noise Impact Assessment", discipline: "Acoustics", problem: "Automated noise level predictions from site layout and source data with BS 8233 and ProPG compliance assessment for planning applications.", email: "hidden", votes: 44, createdAt: daysAgo(4) },
-  { id: "req-017", name: "Staircase Compliance Checker", discipline: "Building Regulations", problem: "Verify stair dimensions, handrail heights, and going/rise ratios against Approved Document K with automated markup of non-compliant elements.", email: "hidden", votes: 87, createdAt: daysAgo(9) },
-  { id: "req-018", name: "Waste Management Plan Generator", discipline: "Construction", problem: "Generate site waste management plans from project BIM data with material categorization, recycling targets, and SWMP compliance documentation.", email: "hidden", votes: 31, createdAt: daysAgo(3) },
-  { id: "req-019", name: "Roof Drainage & Loading Calculator", discipline: "Structures", problem: "Calculate roof drainage requirements and ponding loads from roof geometry with outlet sizing per BS EN 12056-3.", email: "hidden", votes: 52, createdAt: daysAgo(5) },
-  { id: "req-020", name: "Thermal Comfort Analysis (PPD/PMV)", discipline: "Environmental Design", problem: "Predict thermal comfort indices from room geometry, glazing ratios, and HVAC setpoints with CIBSE Guide A compliance for overheating risk.", email: "hidden", votes: 66, createdAt: daysAgo(7) },
+  { id: "req-001", name: "landing.sr1Name", discipline: "landing.sr1Discipline", problem: "landing.sr1Problem", email: "hidden", votes: 47, createdAt: daysAgo(6) },
+  { id: "req-002", name: "landing.sr2Name", discipline: "landing.sr2Discipline", problem: "landing.sr2Problem", email: "hidden", votes: 83, createdAt: daysAgo(7) },
+  { id: "req-003", name: "landing.sr3Name", discipline: "landing.sr3Discipline", problem: "landing.sr3Problem", email: "hidden", votes: 61, createdAt: daysAgo(5) },
+  { id: "req-004", name: "landing.sr4Name", discipline: "landing.sr4Discipline", problem: "landing.sr4Problem", email: "hidden", votes: 129, createdAt: daysAgo(8) },
+  { id: "req-005", name: "landing.sr5Name", discipline: "landing.sr5Discipline", problem: "landing.sr5Problem", email: "hidden", votes: 35, createdAt: daysAgo(4) },
+  { id: "req-006", name: "landing.sr6Name", discipline: "landing.sr6Discipline", problem: "landing.sr6Problem", email: "hidden", votes: 94, createdAt: daysAgo(9) },
+  { id: "req-007", name: "landing.sr7Name", discipline: "landing.sr7Discipline", problem: "landing.sr7Problem", email: "hidden", votes: 76, createdAt: daysAgo(8) },
+  { id: "req-008", name: "landing.sr8Name", discipline: "landing.sr8Discipline", problem: "landing.sr8Problem", email: "hidden", votes: 112, createdAt: daysAgo(10) },
+  { id: "req-009", name: "landing.sr9Name", discipline: "landing.sr9Discipline", problem: "landing.sr9Problem", email: "hidden", votes: 38, createdAt: daysAgo(3) },
+  { id: "req-010", name: "landing.sr10Name", discipline: "landing.sr10Discipline", problem: "landing.sr10Problem", email: "hidden", votes: 156, createdAt: daysAgo(11) },
+  { id: "req-011", name: "landing.sr11Name", discipline: "landing.sr11Discipline", problem: "landing.sr11Problem", email: "hidden", votes: 42, createdAt: daysAgo(5) },
+  { id: "req-012", name: "landing.sr12Name", discipline: "landing.sr12Discipline", problem: "landing.sr12Problem", email: "hidden", votes: 68, createdAt: daysAgo(7) },
+  { id: "req-013", name: "landing.sr13Name", discipline: "landing.sr13Discipline", problem: "landing.sr13Problem", email: "hidden", votes: 29, createdAt: daysAgo(2) },
+  { id: "req-014", name: "landing.sr14Name", discipline: "landing.sr14Discipline", problem: "landing.sr14Problem", email: "hidden", votes: 55, createdAt: daysAgo(6) },
+  { id: "req-015", name: "landing.sr15Name", discipline: "landing.sr15Discipline", problem: "landing.sr15Problem", email: "hidden", votes: 73, createdAt: daysAgo(8) },
+  { id: "req-016", name: "landing.sr16Name", discipline: "landing.sr16Discipline", problem: "landing.sr16Problem", email: "hidden", votes: 44, createdAt: daysAgo(4) },
+  { id: "req-017", name: "landing.sr17Name", discipline: "landing.sr17Discipline", problem: "landing.sr17Problem", email: "hidden", votes: 87, createdAt: daysAgo(9) },
+  { id: "req-018", name: "landing.sr18Name", discipline: "landing.sr18Discipline", problem: "landing.sr18Problem", email: "hidden", votes: 31, createdAt: daysAgo(3) },
+  { id: "req-019", name: "landing.sr19Name", discipline: "landing.sr19Discipline", problem: "landing.sr19Problem", email: "hidden", votes: 52, createdAt: daysAgo(5) },
+  { id: "req-020", name: "landing.sr20Name", discipline: "landing.sr20Discipline", problem: "landing.sr20Problem", email: "hidden", votes: 66, createdAt: daysAgo(7) },
 ];
 
 // ─── News Ticker ─────────────────────────────────────────────────────────────
 
-const NEWS_ITEMS = [
-  "New: AI design workflow generation v2.0 is live",
-  "7 live AI nodes + 24 preview nodes available",
-  "Perfect for schematic design phase",
-  "A complement to Revit and Rhino, not a replacement",
-  "No coding or CAD experience required",
-];
 
-function NewsTicker({ items = NEWS_ITEMS, whatsNewLabel }: { items?: string[]; whatsNewLabel?: string }) {
+function NewsTicker({ items, whatsNewLabel }: { items?: string[]; whatsNewLabel?: string }) {
   return (
     <div className="landing-news-ticker" style={{
       position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 9000,
@@ -626,7 +627,7 @@ function NewsTicker({ items = NEWS_ITEMS, whatsNewLabel }: { items?: string[]; w
         fontSize: 10, fontWeight: 700, color: "white", letterSpacing: "0.5px",
       }}>
         <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#10B981", animation: "glow-pulse 2s infinite" }} />
-        {whatsNewLabel ?? "WHAT\u0027S NEW"}
+        {whatsNewLabel ?? "WHAT'S NEW"}
       </div>
       <div style={{ overflow: "hidden", flex: 1, position: "relative" }}>
         <motion.div
@@ -634,7 +635,7 @@ function NewsTicker({ items = NEWS_ITEMS, whatsNewLabel }: { items?: string[]; w
           transition={{ duration: 30, repeat: Infinity, ease: "linear" }}
           style={{ display: "flex", gap: 0, whiteSpace: "nowrap" }}
         >
-          {[...items, ...items].map((item, i) => (
+          {[...(items ?? []), ...(items ?? [])].map((item, i) => (
             <span key={i} style={{ fontSize: 12, color: "#9898B0", padding: "0 32px" }}>
               {item}
             </span>
@@ -904,9 +905,9 @@ export default function LandingPage() {
   // ─── Video Showcase state ───────────────────────────────────────────────────
   const SHOWCASE_R2 = "https://pub-27d9a7371b6d47ff94fee1a3228f1720.r2.dev/workflow-demos";
   const DEMO_VIDEOS = [
-    { id: "wv-01", title: "Text Prompt → Concept Building", subtitle: "From brief to 3D in 90 seconds", category: "Concept Design", duration: "1:32", url: `${SHOWCASE_R2}/text-to-concept-building.mp4`, nodes: ["Text Prompt", "Brief Analyzer", "Massing Generator"], spec: "3 Nodes · AI-Powered · ~90s", previewStart: 105 },
-    { id: "wv-02", title: "2D Floor Plan → Interactive 3D Model", subtitle: "ML-powered spatial intelligence", category: "Floor Plans", duration: "2:45", url: `${SHOWCASE_R2}/floorplan-to-3d-model.mp4`, nodes: ["Image Upload", "Floor Plan Analyzer", "3D Model Builder"], spec: "3 Nodes · ML Vision · ~120s", previewStart: 110 },
-    { id: "wv-03", title: "3D Model Visualization", subtitle: "Interactive architectural 3D models", category: "Visualization", duration: "1:45", url: "/videos/3d%20model.mp4", nodes: ["Building Data", "3D Engine", "Model Viewer"], spec: "3 Nodes · WebGL · ~45s", previewStart: 5 },
+    { id: "wv-01", title: t('landing.demoVideo1Title'), subtitle: t('landing.demoVideo1Subtitle'), category: t('landing.demoVideo1Category'), duration: "1:32", url: `${SHOWCASE_R2}/text-to-concept-building.mp4`, nodes: [t('landing.demoVideo1Node1'), t('landing.demoVideo1Node2'), t('landing.demoVideo1Node3')], spec: t('landing.demoVideo1Spec'), previewStart: 105 },
+    { id: "wv-02", title: t('landing.demoVideo2Title'), subtitle: t('landing.demoVideo2Subtitle'), category: t('landing.demoVideo2Category'), duration: "2:45", url: `${SHOWCASE_R2}/floorplan-to-3d-model.mp4`, nodes: [t('landing.demoVideo2Node1'), t('landing.demoVideo2Node2'), t('landing.demoVideo2Node3')], spec: t('landing.demoVideo2Spec'), previewStart: 110 },
+    { id: "wv-03", title: t('landing.demoVideo3Title'), subtitle: t('landing.demoVideo3Subtitle'), category: t('landing.demoVideo3Category'), duration: "1:45", url: "/videos/3d%20model.mp4", nodes: [t('landing.demoVideo3Node1'), t('landing.demoVideo3Node2'), t('landing.demoVideo3Node3')], spec: t('landing.demoVideo3Spec'), previewStart: 5 },
   ];
   interface LandingVideo { id: string; title: string; category: string; videoUrl: string; duration: string | null; views: number; likes: number; author: { name: string | null; image: string | null } }
   const [communityVideos, setCommunityVideos] = useState<LandingVideo[]>([]);
@@ -1259,9 +1260,9 @@ export default function LandingPage() {
                 <text x="55" y="52" fill="rgba(59,130,246,0.4)" fontSize="7" fontFamily="monospace" textAnchor="middle">35 m²</text>
                 <text x="55" y="98" fill="rgba(59,130,246,0.7)" fontSize="8" fontFamily="monospace" textAnchor="middle">{t('landing.bed')}</text>
                 <text x="55" y="108" fill="rgba(59,130,246,0.4)" fontSize="7" fontFamily="monospace" textAnchor="middle">20 m²</text>
-                <text x="148" y="42" fill="rgba(59,130,246,0.7)" fontSize="8" fontFamily="monospace" textAnchor="middle">Kitchen</text>
+                <text x="148" y="42" fill="rgba(59,130,246,0.7)" fontSize="8" fontFamily="monospace" textAnchor="middle">{t('landing.kitchen')}</text>
                 <text x="148" y="52" fill="rgba(59,130,246,0.4)" fontSize="7" fontFamily="monospace" textAnchor="middle">18 m²</text>
-                <text x="148" y="102" fill="rgba(59,130,246,0.7)" fontSize="8" fontFamily="monospace" textAnchor="middle">Bath</text>
+                <text x="148" y="102" fill="rgba(59,130,246,0.7)" fontSize="8" fontFamily="monospace" textAnchor="middle">{t('landing.bath')}</text>
                 <text x="148" y="112" fill="rgba(59,130,246,0.4)" fontSize="7" fontFamily="monospace" textAnchor="middle">6 m²</text>
                 {/* Dimension: width */}
                 <line x1="10" y1="130" x2="180" y2="130" stroke="rgba(0,245,255,0.3)" strokeWidth="0.5" />
@@ -1294,20 +1295,20 @@ export default function LandingPage() {
           >
             <div style={{ padding: '10px 14px 6px', display: 'flex', alignItems: 'center', gap: 6, borderBottom: '1px solid rgba(245,158,11,0.1)' }}>
               <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#F59E0B', boxShadow: '0 0 6px #F59E0B' }} />
-              <span style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1.5px', color: '#F59E0B' }}>Cost Estimate</span>
+              <span style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1.5px', color: '#F59E0B' }}>{t('landing.costEstimate')}</span>
               <span style={{ marginLeft: 'auto', fontSize: 7, color: 'rgba(245,158,11,0.4)', fontFamily: 'monospace' }}>CSI</span>
             </div>
             <div style={{ padding: '8px 10px', fontFamily: '"SF Mono", "Fira Code", monospace', fontSize: 9 }}>
               {/* Header */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 40px 55px', gap: 4, padding: '4px 4px 6px', borderBottom: '1px solid rgba(245,158,11,0.08)', color: '#5C5C78', fontSize: 7, textTransform: 'uppercase', letterSpacing: '0.1em' }}>
-                <span>Description</span><span style={{ textAlign: 'right' }}>Qty</span><span style={{ textAlign: 'right' }}>Total</span>
+                <span>{t('landing.description')}</span><span style={{ textAlign: 'right' }}>{t('landing.qty')}</span><span style={{ textAlign: 'right' }}>{t('landing.total')}</span>
               </div>
               {/* Rows */}
               {[
-                { desc: 'Concrete Slab 4"', qty: '2,400 SF', total: '$16,800' },
-                { desc: 'Struct. Steel W12', qty: '84k LB', total: '$210,000' },
-                { desc: 'Vinyl Window 3×4', qty: '48 EA', total: '$22,800' },
-                { desc: 'Drywall 5/8" Type X', qty: '6,200 SF', total: '$27,900' },
+                { desc: t('landing.boqDesc1'), qty: t('landing.boqQty1'), total: '$16,800' },
+                { desc: t('landing.boqDesc2'), qty: t('landing.boqQty2'), total: '$210,000' },
+                { desc: t('landing.boqDesc3'), qty: t('landing.boqQty3'), total: '$22,800' },
+                { desc: t('landing.boqDesc4'), qty: t('landing.boqQty4'), total: '$27,900' },
               ].map((row, i) => (
                 <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 40px 55px', gap: 4, padding: '5px 4px', borderBottom: '1px solid rgba(245,158,11,0.04)', color: '#9898B0' }}>
                   <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row.desc}</span>
@@ -1317,7 +1318,7 @@ export default function LandingPage() {
               ))}
               {/* Subtotal */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 55px', gap: 4, padding: '6px 4px 2px', borderTop: '1px solid rgba(245,158,11,0.15)', marginTop: 2 }}>
-                <span style={{ color: '#9898B0', fontWeight: 700, fontSize: 8 }}>SUBTOTAL</span>
+                <span style={{ color: '#9898B0', fontWeight: 700, fontSize: 8 }}>{t('landing.subtotal')}</span>
                 <span style={{ textAlign: 'right', color: '#FFBF00', fontWeight: 700 }}>$277,500</span>
               </div>
             </div>
@@ -1340,7 +1341,7 @@ export default function LandingPage() {
           >
             <div style={{ padding: '10px 14px 6px', display: 'flex', alignItems: 'center', gap: 6, borderBottom: '1px solid rgba(16,185,129,0.1)' }}>
               <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#10B981', boxShadow: '0 0 6px #10B981' }} />
-              <span style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1.5px', color: '#10B981' }}>3D Massing</span>
+              <span style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1.5px', color: '#10B981' }}>{t('landing.3dMassing')}</span>
             </div>
             <div style={{ padding: '12px 14px 8px' }}>
               <svg width="100%" height="120" viewBox="0 0 200 120" fill="none" style={{ display: 'block' }}>
@@ -1462,7 +1463,7 @@ export default function LandingPage() {
               <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                 <Sparkles size={12} style={{ color: "rgba(0,245,255,0.4)" }} />
                 <span style={{ fontSize: 12, color: "rgba(255,255,255,0.3)", letterSpacing: "0.02em" }}>
-                  AI-powered BIM workflow builder
+                  {t('landing.aiPoweredBim')}
                 </span>
               </div>
             </motion.div>
@@ -1545,7 +1546,7 @@ export default function LandingPage() {
                 }}
               >
                 <Users size={15} />
-                Explore Community
+                {t('landing.exploreCommunity')}
                 <ChevronDown size={14} style={{ opacity: 0.6 }} />
               </a>
             </motion.div>
@@ -1569,7 +1570,7 @@ export default function LandingPage() {
               color: "rgba(16,185,129,0.4)",
               fontFamily: '"SF Mono", "Fira Code", monospace',
             }}>
-              scroll
+              {t('landing.scroll')}
             </span>
             <motion.div
               animate={{ y: [0, 6, 0] }}
@@ -1656,15 +1657,15 @@ export default function LandingPage() {
               <line x1="200" y1="600" x2="540" y2="600" stroke="rgba(79,138,255,0.15)" strokeWidth="0.5" />
               <line x1="200" y1="595" x2="200" y2="605" stroke="rgba(79,138,255,0.15)" strokeWidth="0.5" />
               <line x1="540" y1="595" x2="540" y2="605" stroke="rgba(79,138,255,0.15)" strokeWidth="0.5" />
-              <text x="370" y="618" className="dimension-label" textAnchor="middle">INPUT STAGE</text>
+              <text x="370" y="618" className="dimension-label" textAnchor="middle">{t('landing.svgInputStage')}</text>
               <line x1="600" y1="600" x2="840" y2="600" stroke="rgba(139,92,246,0.15)" strokeWidth="0.5" />
               <line x1="600" y1="595" x2="600" y2="605" stroke="rgba(139,92,246,0.15)" strokeWidth="0.5" />
               <line x1="840" y1="595" x2="840" y2="605" stroke="rgba(139,92,246,0.15)" strokeWidth="0.5" />
-              <text x="720" y="618" className="dimension-label" textAnchor="middle">PROCESS STAGE</text>
+              <text x="720" y="618" className="dimension-label" textAnchor="middle">{t('landing.svgProcessStage')}</text>
               <line x1="900" y1="600" x2="1240" y2="600" stroke="rgba(16,185,129,0.15)" strokeWidth="0.5" />
               <line x1="900" y1="595" x2="900" y2="605" stroke="rgba(16,185,129,0.15)" strokeWidth="0.5" />
               <line x1="1240" y1="595" x2="1240" y2="605" stroke="rgba(16,185,129,0.15)" strokeWidth="0.5" />
-              <text x="1070" y="618" className="dimension-label" textAnchor="middle">OUTPUT STAGE</text>
+              <text x="1070" y="618" className="dimension-label" textAnchor="middle">{t('landing.svgOutputStage')}</text>
             </svg>
             <div className="orb-drift-1" style={{ position: "absolute", top: "5%", left: "10%", width: 400, height: 400, borderRadius: "50%", background: "radial-gradient(circle, rgba(59,130,246,0.1) 0%, transparent 70%)", filter: "blur(30px)" }} />
           </div>
@@ -1814,10 +1815,10 @@ export default function LandingPage() {
           }}
         >
           {[
-            { value: 12400, decimals: 0, suffix: '', prefix: '', label: 'm² designed this month', color: '#B87333' },
-            { value: 847, decimals: 0, suffix: '', prefix: '', label: 'workflows executed', color: '#00F5FF' },
-            { value: 31, decimals: 0, suffix: '', prefix: '', label: 'AEC-specific nodes', color: '#FFBF00' },
-            { value: 2.4, decimals: 1, suffix: 'M', prefix: '€', label: 'estimated this week', color: '#B87333' },
+            { value: 12400, decimals: 0, suffix: '', prefix: '', label: t('landing.statDesigned'), color: '#B87333' },
+            { value: 847, decimals: 0, suffix: '', prefix: '', label: t('landing.statExecuted'), color: '#00F5FF' },
+            { value: 31, decimals: 0, suffix: '', prefix: '', label: t('landing.statNodes'), color: '#FFBF00' },
+            { value: 2.4, decimals: 1, suffix: 'M', prefix: '€', label: t('landing.statEstimated'), color: '#B87333' },
           ].map((stat, i) => (
             <React.Fragment key={stat.label}>
               <motion.div variants={fadeUp} transition={{ duration: 0.5, delay: i * 0.1, ease: smoothEase }} style={{ textAlign: 'center', minWidth: 120 }}>
@@ -1847,12 +1848,12 @@ export default function LandingPage() {
               style={{ textAlign: 'center', marginBottom: 56 }}
             >
               <span className="blueprint-annotation" style={{ marginBottom: 16, display: 'block', color: 'rgba(184,115,51,0.6)' }}>
-                REAL WORKFLOW
+                {t('landing.realWorkflow')}
               </span>
               <div className="accent-line" style={{ background: 'linear-gradient(90deg, #B87333, #F59E0B)' }} />
               <h2 style={{ fontSize: 'clamp(1.8rem, 3.5vw, 2.8rem)', fontWeight: 900, color: '#F0F0F5', letterSpacing: '-0.04em', lineHeight: 1.1 }}>
-                See What a Pipeline<br />
-                <span style={{ background: 'linear-gradient(135deg, #B87333, #F59E0B)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>Actually Produces</span>
+                {t('landing.seeWhatPipeline')}<br />
+                <span style={{ background: 'linear-gradient(135deg, #B87333, #F59E0B)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>{t('landing.actuallyProduces')}</span>
               </h2>
             </motion.div>
 
@@ -1865,25 +1866,25 @@ export default function LandingPage() {
             >
               {[
                 {
-                  step: '01', label: 'Text Brief', category: 'input', color: '#3B82F6',
+                  step: '01', label: t('landing.textBrief'), category: 'input', color: '#3B82F6',
                   icon: <FileCode size={22} />,
                   preview: '"Mixed-use tower, 12 floors, retail podium, residential above, coastal site..."',
                   previewType: 'text' as const,
                 },
                 {
-                  step: '02', label: 'AI Analysis', category: 'transform', color: '#8B5CF6',
+                  step: '02', label: t('landing.aiAnalysis'), category: 'transform', color: '#8B5CF6',
                   icon: <Sparkles size={22} />,
                   preview: 'GFA: 8,400 m² · FAR: 3.2 · Units: 96 · Parking: 120',
                   previewType: 'kpi' as const,
                 },
                 {
-                  step: '03', label: '3D Massing', category: 'generate', color: '#10B981',
+                  step: '03', label: t('landing.3dMassingStep'), category: 'generate', color: '#10B981',
                   icon: <Box size={22} />,
                   preview: '◻ ◻ ◻ ◻ ◻\n◻ ◻ ◻ ◻ ◻\n◻ ◻ ◻ ◻ ◻\n▣ ▣ ▣ ▣ ▣',
                   previewType: 'wireframe' as const,
                 },
                 {
-                  step: '04', label: 'Concept Render', category: 'export', color: '#F59E0B',
+                  step: '04', label: t('landing.conceptRender'), category: 'export', color: '#F59E0B',
                   icon: <ImageIcon size={22} />,
                   preview: '🏗 Final render exported',
                   previewType: 'render' as const,
@@ -1930,10 +1931,10 @@ export default function LandingPage() {
                         }}>
                           {item.previewType === 'text' && (
                             <div style={{ fontFamily: '"SF Mono", "Fira Code", monospace', fontSize: 10, color: '#9898B0', lineHeight: 1.6 }}>
-                              <div style={{ color: '#3B82F6', fontSize: 8, marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.1em' }}>PROJECT BRIEF</div>
-                              <div>&quot;Mixed-use tower, 12 floors,</div>
-                              <div>retail podium + residential,</div>
-                              <div>coastal site, 2,800 m² lot&quot;</div>
+                              <div style={{ color: '#3B82F6', fontSize: 8, marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.1em' }}>{t('landing.projectBrief')}</div>
+                              <div>{t('landing.briefExample1')}</div>
+                              <div>{t('landing.briefExample2')}</div>
+                              <div>{t('landing.briefExample3')}</div>
                               <motion.span
                                 animate={{ opacity: [1, 0] }}
                                 transition={{ duration: 0.8, repeat: Infinity }}
@@ -1946,8 +1947,8 @@ export default function LandingPage() {
                               {[
                                 { label: 'GFA', value: '8,400', unit: 'm²' },
                                 { label: 'FAR', value: '3.2', unit: '' },
-                                { label: 'Units', value: '96', unit: 'apt' },
-                                { label: 'Parking', value: '120', unit: 'spots' },
+                                { label: t('landing.kpiUnits'), value: '96', unit: t('landing.kpiApt') },
+                                { label: t('landing.kpiParking'), value: '120', unit: t('landing.kpiSpots') },
                               ].map(kpi => (
                                 <div key={kpi.label} style={{ textAlign: 'center', padding: '8px 4px', background: 'rgba(7,7,13,0.8)' }}>
                                   <div style={{ fontSize: 15, fontWeight: 800, color: item.color, fontFamily: '"SF Mono", "Fira Code", monospace' }}>{kpi.value}</div>
@@ -2006,7 +2007,7 @@ export default function LandingPage() {
                                   padding: '3px 8px', borderRadius: 4,
                                   background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.2)',
                                   position: 'relative', zIndex: 1,
-                                }}>AI RENDER</span>
+                                }}>{t('landing.aiRender')}</span>
                               </div>
                               <div style={{ display: 'flex', justifyContent: 'center', gap: 8, marginTop: 6 }}>
                                 <span style={{ fontSize: 8, color: '#5C5C78', fontFamily: 'monospace' }}>2048×1024</span>
@@ -2086,6 +2087,10 @@ export default function LandingPage() {
               {SHOWCASE.map(({ id, badge }) => {
                 const wf = PREBUILT_WORKFLOWS.find(w => w.id === id);
                 if (!wf) return null;
+                const showcaseNameKey = `landing.showcase${id.replace('-', '').replace('wf', 'Wf')}Name` as TranslationKey;
+                const showcaseTimeKey = `landing.showcase${id.replace('-', '').replace('wf', 'Wf')}Time` as TranslationKey;
+                const wfName = t(showcaseNameKey);
+                const wfTime = t(showcaseTimeKey);
                 const nodes = wf.tileGraph.nodes.map(n => ({ label: n.data.label, category: n.data.category as string }));
                 return (
                   <motion.div key={id} variants={fadeUp} transition={{ duration: 0.5, ease: smoothEase }}
@@ -2102,10 +2107,10 @@ export default function LandingPage() {
                       borderRadius: "16px 16px 0 0",
                     }}>
                       <div style={{ width: 8, height: 8, borderRadius: "50%", background: badge ? "#F59E0B" : "#10B981", boxShadow: `0 0 8px ${badge ? "#F59E0B" : "#10B981"}` }} />
-                      <span style={{ color: badge ? "#F59E0B" : "#10B981" }}>WORKFLOW</span>
+                      <span style={{ color: badge ? "#F59E0B" : "#10B981" }}>{t('landing.workflowLabel')}</span>
                       {badge && (
                         <span style={{ marginLeft: "auto", fontSize: 8, padding: "2px 8px", borderRadius: 10, background: "linear-gradient(135deg, #F59E0B, #EF4444)", color: "white", fontWeight: 700 }}>
-                          {badge}
+                          {badge === "MOST POPULAR" ? t('landing.mostPopularBadge') : badge}
                         </span>
                       )}
                     </div>
@@ -2118,9 +2123,9 @@ export default function LandingPage() {
                       <MiniWorkflowDiagram nodes={nodes} size="md" animated />
                     </div>
                     <div style={{ padding: "20px 24px" }}>
-                      <h3 style={{ fontSize: 16, fontWeight: 700, color: "#F0F0F5", marginBottom: 8 }}>{wf.name}</h3>
+                      <h3 style={{ fontSize: 16, fontWeight: 700, color: "#F0F0F5", marginBottom: 8 }}>{wfName}</h3>
                       <p style={{ fontSize: 12, color: "#5C5C78", lineHeight: 1.5, marginBottom: 14, fontFamily: "monospace" }}>
-                        {wf.tileGraph.nodes.length} nodes · {wf.estimatedRunTime}
+                        {t('landing.nodesCount').replace('{n}', String(wf.tileGraph.nodes.length))} · {wfTime}
                       </p>
                       <Link href="/dashboard/templates" style={{
                         fontSize: 13, fontWeight: 600, color: "#10B981", textDecoration: "none",
@@ -2162,17 +2167,17 @@ export default function LandingPage() {
               style={{ textAlign: "center", marginBottom: 48 }}
             >
               <span className="blueprint-annotation" style={{ marginBottom: 16, display: "block", color: "rgba(16,185,129,0.5)" }}>
-                COMMUNITY HUB
+                {t('landing.communityHub')}
               </span>
               <div className="accent-line" style={{ background: "linear-gradient(90deg, #10B981, #F59E0B)" }} />
               <h2 style={{ fontSize: "clamp(2rem, 4vw, 3rem)", fontWeight: 900, color: "#F0F0F5", letterSpacing: "-0.04em", lineHeight: 1.1 }}>
-                Built by the{" "}
-                <span style={{ background: "linear-gradient(135deg, #10B981, #06B6D4)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>Community</span>
-                {", "}Shaped by{" "}
-                <span style={{ background: "linear-gradient(135deg, #F59E0B, #B87333)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>Your Votes</span>
+                {t('landing.builtByCommunity')}{" "}
+                <span style={{ background: "linear-gradient(135deg, #10B981, #06B6D4)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>{t('landing.communityWord')}</span>
+                {", "}{t('landing.shapedBy')}{" "}
+                <span style={{ background: "linear-gradient(135deg, #F59E0B, #B87333)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>{t('landing.yourVotes')}</span>
               </h2>
               <p style={{ fontSize: 16, color: "#7C7C96", maxWidth: 580, margin: "16px auto 0", lineHeight: 1.7 }}>
-                Explore proven workflows from AEC professionals, or vote on what we build next. This is your platform.
+                {t('landing.communityHubDesc')}
               </p>
             </motion.div>
 
@@ -2188,9 +2193,9 @@ export default function LandingPage() {
               className="landing-community-stats"
             >
               {[
-                { label: "Active Builders", value: 2840, suffix: "+", color: "#10B981" },
-                { label: "Workflows Shared", value: 720, suffix: "+", color: "#06B6D4" },
-                { label: "Total Executions", value: 128, suffix: "K+", color: "#F59E0B" },
+                { label: t('landing.activeBuilders'), value: 2840, suffix: "+", color: "#10B981" },
+                { label: t('landing.workflowsShared'), value: 720, suffix: "+", color: "#06B6D4" },
+                { label: t('landing.totalExecutions'), value: 128, suffix: "K+", color: "#F59E0B" },
                 { label: t('landing.roadmap.totalVotes'), value: totalVotes, suffix: "", color: "#F59E0B" },
                 { label: t('landing.roadmap.itemsApproved'), value: ROADMAP_ITEMS.filter(i => i.status === "approved" || i.status === "in-progress").length, suffix: "", color: "#10B981" },
               ].map(stat => (
@@ -2212,8 +2217,8 @@ export default function LandingPage() {
                 background: "rgba(18,18,30,0.8)", border: "1px solid rgba(255,255,255,0.06)",
               }}>
                 {([
-                  { key: "built" as const, label: "What Others Built", icon: <Building2 size={14} />, color: "#10B981" },
-                  { key: "vote" as const, label: "Vote on What\u2019s Next", icon: <ClipboardList size={14} />, color: "#F59E0B" },
+                  { key: "built" as const, label: t('landing.whatOthersBuilt'), icon: <Building2 size={14} />, color: "#10B981" },
+                  { key: "vote" as const, label: t('landing.voteOnWhatsNext'), icon: <ClipboardList size={14} />, color: "#F59E0B" },
                 ]).map(tab => {
                   const isActive = communityTab === tab.key;
                   return (
@@ -2282,7 +2287,7 @@ export default function LandingPage() {
                     {(showAllCommunity ? COMMUNITY_WORKFLOWS : COMMUNITY_WORKFLOWS.slice(0, 6)).map((wf, i) => {
                       const rgb = hexToRgb(wf.color);
                       return (
-                        <motion.div key={wf.name}
+                        <motion.div key={wf.nameKey}
                           initial={{ opacity: 0, y: 24 }}
                           whileInView={{ opacity: 1, y: 0 }}
                           viewport={{ once: true, margin: "-40px" }}
@@ -2318,7 +2323,7 @@ export default function LandingPage() {
                               border: `1px solid rgba(${rgb}, 0.2)`,
                             }}>
                               <div style={{ width: 6, height: 6, borderRadius: "50%", background: wf.color, boxShadow: `0 0 6px ${wf.color}` }} />
-                              <span style={{ fontSize: 9, fontWeight: 700, color: wf.color, letterSpacing: "0.08em", textTransform: "uppercase" }}>{wf.discipline}</span>
+                              <span style={{ fontSize: 9, fontWeight: 700, color: wf.color, letterSpacing: "0.08em", textTransform: "uppercase" }}>{t(wf.disciplineKey)}</span>
                             </div>
                             {/* Phase badge (top right) */}
                             <div style={{
@@ -2326,7 +2331,7 @@ export default function LandingPage() {
                               padding: "4px 8px", borderRadius: 6,
                               background: "rgba(0,0,0,0.5)", backdropFilter: "blur(8px)",
                             }}>
-                              <span style={{ fontSize: 8, color: "rgba(255,255,255,0.4)", fontFamily: "monospace", letterSpacing: "0.06em" }}>{wf.phase}</span>
+                              <span style={{ fontSize: 8, color: "rgba(255,255,255,0.4)", fontFamily: "monospace", letterSpacing: "0.06em" }}>{t(wf.phaseKey)}</span>
                             </div>
                             {/* Active indicator (bottom right) */}
                             {wf.lastRun === 0 && (
@@ -2337,7 +2342,7 @@ export default function LandingPage() {
                                 background: "rgba(16,185,129,0.15)", border: "1px solid rgba(16,185,129,0.25)",
                               }}>
                                 <div style={{ width: 5, height: 5, borderRadius: "50%", background: "#10B981", boxShadow: "0 0 6px #10B981" }} />
-                                <span style={{ fontSize: 8, fontWeight: 600, color: "#10B981" }}>Live</span>
+                                <span style={{ fontSize: 8, fontWeight: 600, color: "#10B981" }}>{t('landing.live')}</span>
                               </div>
                             )}
                             {/* Gradient overlay at bottom */}
@@ -2349,7 +2354,7 @@ export default function LandingPage() {
 
                           {/* ── Card Content ── */}
                           <div style={{ padding: "16px 18px 14px" }}>
-                            <h4 style={{ fontSize: 14, fontWeight: 700, color: "#F0F0F5", margin: "0 0 12px", lineHeight: 1.35, letterSpacing: "-0.01em" }}>{wf.name}</h4>
+                            <h4 style={{ fontSize: 14, fontWeight: 700, color: "#F0F0F5", margin: "0 0 12px", lineHeight: 1.35, letterSpacing: "-0.01em" }}>{t(wf.nameKey)}</h4>
 
                             {/* Builder row */}
                             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
@@ -2364,7 +2369,7 @@ export default function LandingPage() {
                               </div>
                               <div style={{ minWidth: 0 }}>
                                 <div style={{ fontSize: 11, fontWeight: 600, color: "#E0E0EC" }}>{wf.builder}</div>
-                                <div style={{ fontSize: 9, color: "#5C5C78", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{wf.role} · {wf.firm}</div>
+                                <div style={{ fontSize: 9, color: "#5C5C78", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t(wf.roleKey)} · {wf.firm}</div>
                               </div>
                             </div>
 
@@ -2378,17 +2383,17 @@ export default function LandingPage() {
                                 <div style={{ display: "flex", alignItems: "center", gap: 3 }}>
                                   <Star size={10} style={{ color: wf.color }} />
                                   <span style={{ fontSize: 11, fontWeight: 700, color: "#F0F0F5", fontFamily: "monospace" }}>{wf.uses.toLocaleString()}</span>
-                                  <span style={{ fontSize: 8, color: "#5C5C78" }}>runs</span>
+                                  <span style={{ fontSize: 8, color: "#5C5C78" }}>{t('landing.runs')}</span>
                                 </div>
                                 <div style={{ width: 1, height: 12, background: "rgba(255,255,255,0.06)" }} />
                                 <div style={{ display: "flex", alignItems: "center", gap: 3 }}>
                                   <Copy size={9} style={{ color: "#5C5C78" }} />
                                   <span style={{ fontSize: 11, fontWeight: 600, color: "#9898B0", fontFamily: "monospace" }}>{wf.duplicated}</span>
-                                  <span style={{ fontSize: 8, color: "#5C5C78" }}>cloned</span>
+                                  <span style={{ fontSize: 8, color: "#5C5C78" }}>{t('landing.cloned')}</span>
                                 </div>
                               </div>
                               {wf.lastRun > 0 && (
-                                <span style={{ fontSize: 8, color: "#5C5C78", fontFamily: "monospace" }}>{wf.lastRun}d ago</span>
+                                <span style={{ fontSize: 8, color: "#5C5C78", fontFamily: "monospace" }}>{wf.lastRun}{t('landing.dAgo')}</span>
                               )}
                             </div>
 
@@ -2431,9 +2436,9 @@ export default function LandingPage() {
                       }}
                     >
                       {showAllCommunity ? (
-                        <>Show Less <ChevronUp size={14} /></>
+                        <>{t('landing.showLess')} <ChevronUp size={14} /></>
                       ) : (
-                        <>View All {COMMUNITY_WORKFLOWS.length} Workflows <ChevronDown size={14} /></>
+                        <>{t('landing.viewAllWorkflows').replace('{count}', String(COMMUNITY_WORKFLOWS.length))} <ChevronDown size={14} /></>
                       )}
                     </button>
                   </div>
@@ -2524,7 +2529,7 @@ export default function LandingPage() {
               <line x1="40" y1="0" x2="40" y2="300" stroke="#00F5FF" strokeWidth="0.5" strokeDasharray="4 4" />
               <line x1="36" y1="0" x2="44" y2="0" stroke="#00F5FF" strokeWidth="0.5" />
               <line x1="36" y1="300" x2="44" y2="300" stroke="#00F5FF" strokeWidth="0.5" />
-              <text x="50" y="155" fill="#00F5FF" fontSize="7" fontFamily="monospace" transform="rotate(-90, 50, 155)">SCREENING ROOM</text>
+              <text x="50" y="155" fill="#00F5FF" fontSize="7" fontFamily="monospace" transform="rotate(-90, 50, 155)">{t('landing.screeningRoom')}</text>
             </svg>
           </div>
 
@@ -2536,17 +2541,17 @@ export default function LandingPage() {
               style={{ textAlign: "center", marginBottom: 56 }}
             >
               <span className="blueprint-annotation" style={{ marginBottom: 16, display: "block", color: "rgba(0,245,255,0.5)" }}>
-                SCREENING ROOM
+                {t('landing.screeningRoom')}
               </span>
               <div className="accent-line" style={{ background: "linear-gradient(90deg, #00F5FF, #8B5CF6)" }} />
               <h2 style={{ fontSize: "clamp(2rem, 4vw, 3rem)", fontWeight: 900, color: "#F0F0F5", letterSpacing: "-0.04em", lineHeight: 1.1 }}>
-                Watch Workflows{" "}
+                {t('landing.watchWorkflows')}{" "}
                 <span style={{ background: "linear-gradient(135deg, #00F5FF, #8B5CF6)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>
-                  Come to Life
+                  {t('landing.comeToLife')}
                 </span>
               </h2>
               <p style={{ fontSize: 16, color: "#7C7C96", maxWidth: 560, margin: "16px auto 0", lineHeight: 1.7 }}>
-                Platform demos and community builds — see real AEC pipelines in action, then share yours.
+                {t('landing.screeningRoomDesc')}
               </p>
             </motion.div>
 
@@ -2601,7 +2606,7 @@ export default function LandingPage() {
                     <div style={{ position: "absolute", top: 16, left: 16, display: "flex", alignItems: "center", gap: 8 }}>
                       <div style={{ padding: "4px 10px", borderRadius: 8, background: "rgba(0,0,0,0.7)", backdropFilter: "blur(12px)", border: `1px solid rgba(${r}, 0.3)`, display: "flex", alignItems: "center", gap: 6 }}>
                         <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#10B981", boxShadow: "0 0 8px #10B981", animation: "pulse 2s ease infinite" }} />
-                        <span style={{ fontSize: 9, fontWeight: 700, color: "#10B981", letterSpacing: "0.1em" }}>FEATURED</span>
+                        <span style={{ fontSize: 9, fontWeight: 700, color: "#10B981", letterSpacing: "0.1em" }}>{t('landing.featured')}</span>
                       </div>
                       <div style={{ padding: "4px 8px", borderRadius: 6, background: "rgba(0,0,0,0.6)", backdropFilter: "blur(8px)", border: `1px solid rgba(${r}, 0.2)` }}>
                         <span style={{ fontSize: 8, fontWeight: 600, color, letterSpacing: "0.06em", textTransform: "uppercase" }}>{d.category}</span>
@@ -2739,9 +2744,9 @@ export default function LandingPage() {
               {/* Stats */}
               <div style={{ display: "flex", alignItems: "center", gap: 24, flexWrap: "wrap" }}>
                 {[
-                  { icon: <Film size={14} />, label: "Platform Demos", value: "7", color: "#00F5FF" },
-                  { icon: <Users size={14} />, label: "Community Videos", value: communityVideos.length > 0 ? communityVideos.length + "+" : "New", color: "#8B5CF6" },
-                  { icon: <Eye size={14} />, label: "Total Views", value: communityVideos.length > 0 ? communityVideos.reduce((s, v) => s + v.views, 0).toLocaleString() : "—", color: "#F59E0B" },
+                  { icon: <Film size={14} />, label: t('landing.platformDemos'), value: "7", color: "#00F5FF" },
+                  { icon: <Users size={14} />, label: t('landing.communityVideos'), value: communityVideos.length > 0 ? communityVideos.length + "+" : t('landing.new'), color: "#8B5CF6" },
+                  { icon: <Eye size={14} />, label: t('landing.totalViews'), value: communityVideos.length > 0 ? communityVideos.reduce((s, v) => s + v.views, 0).toLocaleString() : "—", color: "#F59E0B" },
                 ].map(stat => (
                   <div key={stat.label} style={{ display: "flex", alignItems: "center", gap: 8 }}>
                     <div style={{ color: stat.color, opacity: 0.7 }}>{stat.icon}</div>
@@ -2767,7 +2772,7 @@ export default function LandingPage() {
                   onMouseEnter={e => { const el = e.currentTarget; el.style.background = "linear-gradient(135deg, rgba(0,245,255,0.18), rgba(139,92,246,0.14))"; el.style.boxShadow = "0 0 24px rgba(0,245,255,0.12)"; }}
                   onMouseLeave={e => { const el = e.currentTarget; el.style.background = "linear-gradient(135deg, rgba(0,245,255,0.1), rgba(139,92,246,0.08))"; el.style.boxShadow = "none"; }}
                 >
-                  Watch All Demos <ArrowRight size={14} />
+                  {t('landing.watchAllDemos')} <ArrowRight size={14} />
                 </Link>
                 <Link
                   href="/workflows"
@@ -2784,7 +2789,7 @@ export default function LandingPage() {
                   onMouseLeave={e => { const el = e.currentTarget; el.style.color = "#9898B0"; el.style.borderColor = "rgba(255,255,255,0.08)"; }}
                 >
                   <Upload size={13} />
-                  Share Your Build
+                  {t('landing.shareYourBuild')}
                 </Link>
               </div>
             </motion.div>
@@ -2810,15 +2815,15 @@ export default function LandingPage() {
               style={{ textAlign: "center", marginBottom: 56 }}
             >
               <span className="blueprint-annotation" style={{ marginBottom: 16, display: "block", color: "rgba(184,115,51,0.6)" }}>
-                WORKFLOW BRIEF
+                {t('landing.workflowBrief')}
               </span>
               <div className="accent-line" style={{ background: "linear-gradient(90deg, #B87333, #F59E0B)" }} />
               <h2 style={{ fontSize: "clamp(2rem, 4vw, 3rem)", fontWeight: 900, color: "#F0F0F5", letterSpacing: "-0.04em", lineHeight: 1.1 }}>
-                Request a{" "}
-                <span style={{ background: "linear-gradient(135deg, #B87333, #F59E0B)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>Workflow</span>
+                {t('landing.requestA')}{" "}
+                <span style={{ background: "linear-gradient(135deg, #B87333, #F59E0B)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>{t('landing.workflow')}</span>
               </h2>
               <p style={{ fontSize: 16, color: "#7C7C96", maxWidth: 560, margin: "16px auto 0", lineHeight: 1.7 }}>
-                Tell us what workflow your practice needs. We build the most requested ones first. Your brief goes live so others can back the same idea.
+                {t('landing.workflowBriefDesc')}
               </p>
             </motion.div>
 
@@ -2836,20 +2841,20 @@ export default function LandingPage() {
                     borderRadius: "16px 16px 0 0",
                   }}>
                     <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#B87333", boxShadow: "0 0 8px #B87333" }} />
-                    <span style={{ color: "#B87333" }}>SUBMIT YOUR BRIEF</span>
+                    <span style={{ color: "#B87333" }}>{t('landing.submitYourBrief')}</span>
                   </div>
 
                   <form onSubmit={handleRequestSubmit} style={{ padding: "24px 24px 20px" }}>
                     {/* Workflow Name */}
                     <div style={{ marginBottom: 16 }}>
                       <label style={{ display: "block", fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "1.5px", color: "#5C5C78", marginBottom: 6, fontFamily: "monospace" }}>
-                        Workflow Name
+                        {t('landing.workflowName')}
                       </label>
                       <input
                         type="text"
                         value={requestForm.name}
                         onChange={e => setRequestForm(prev => ({ ...prev, name: e.target.value }))}
-                        placeholder="e.g. Acoustic Performance Assessment"
+                        placeholder={t('landing.workflowNamePlaceholder')}
                         style={{
                           width: "100%", padding: "12px 14px", borderRadius: 10, fontSize: 14,
                           background: "rgba(7,7,13,0.8)", border: "1px solid rgba(184,115,51,0.15)",
@@ -2864,13 +2869,13 @@ export default function LandingPage() {
                     {/* Industry / Discipline */}
                     <div style={{ marginBottom: 16 }}>
                       <label style={{ display: "block", fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "1.5px", color: "#5C5C78", marginBottom: 6, fontFamily: "monospace" }}>
-                        Discipline / Industry
+                        {t('landing.disciplineIndustry')}
                       </label>
                       <input
                         type="text"
                         value={requestForm.discipline}
                         onChange={e => setRequestForm(prev => ({ ...prev, discipline: e.target.value }))}
-                        placeholder="e.g. Structural Engineering, MEP, Planning"
+                        placeholder={t('landing.disciplinePlaceholder')}
                         style={{
                           width: "100%", padding: "12px 14px", borderRadius: 10, fontSize: 14,
                           background: "rgba(7,7,13,0.8)", border: "1px solid rgba(184,115,51,0.15)",
@@ -2885,12 +2890,12 @@ export default function LandingPage() {
                     {/* Problem it solves */}
                     <div style={{ marginBottom: 16 }}>
                       <label style={{ display: "block", fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "1.5px", color: "#5C5C78", marginBottom: 6, fontFamily: "monospace" }}>
-                        What Problem Does It Solve?
+                        {t('landing.whatProblem')}
                       </label>
                       <textarea
                         value={requestForm.problem}
                         onChange={e => setRequestForm(prev => ({ ...prev, problem: e.target.value }))}
-                        placeholder="Describe the workflow you need and why it matters to your practice..."
+                        placeholder={t('landing.problemPlaceholder')}
                         rows={3}
                         style={{
                           width: "100%", padding: "12px 14px", borderRadius: 10, fontSize: 14,
@@ -2907,7 +2912,7 @@ export default function LandingPage() {
                     {/* Email */}
                     <div style={{ marginBottom: 20 }}>
                       <label style={{ display: "block", fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "1.5px", color: "#5C5C78", marginBottom: 6, fontFamily: "monospace" }}>
-                        Your Email (we notify you when it&apos;s built)
+                        {t('landing.yourEmail')}
                       </label>
                       <input
                         type="email"
@@ -2941,11 +2946,11 @@ export default function LandingPage() {
                       }}
                     >
                       {requestSubmitted ? (
-                        <>Brief Submitted Successfully</>
+                        <>{t('landing.briefSubmitted')}</>
                       ) : (
                         <>
                           <Send size={15} />
-                          Submit Workflow Brief
+                          {t('landing.submitBrief')}
                         </>
                       )}
                     </button>
@@ -2965,8 +2970,8 @@ export default function LandingPage() {
                     borderRadius: "16px 16px 0 0",
                   }}>
                     <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#10B981", boxShadow: "0 0 8px #10B981", animation: "glow-pulse 2s infinite" }} />
-                    <span style={{ color: "#F59E0B" }}>LIVE COMMUNITY FEED</span>
-                    <span style={{ marginLeft: "auto", fontSize: 9, color: "#5C5C78", fontFamily: "monospace" }}>{workflowRequests.length} briefs</span>
+                    <span style={{ color: "#F59E0B" }}>{t('landing.liveFeed')}</span>
+                    <span style={{ marginLeft: "auto", fontSize: 9, color: "#5C5C78", fontFamily: "monospace" }}>{workflowRequests.length} {t('landing.briefs')}</span>
                   </div>
 
                   <div style={{ padding: "8px 0", maxHeight: 560, overflowY: "auto", scrollbarWidth: "thin", scrollbarColor: "rgba(245,158,11,0.2) transparent" }}>
@@ -2999,20 +3004,20 @@ export default function LandingPage() {
 
                             {/* Content */}
                             <div style={{ flex: 1, minWidth: 0 }}>
-                              <h5 style={{ fontSize: 14, fontWeight: 700, color: "#F0F0F5", margin: "0 0 4px", lineHeight: 1.3 }}>{req.name}</h5>
+                              <h5 style={{ fontSize: 14, fontWeight: 700, color: "#F0F0F5", margin: "0 0 4px", lineHeight: 1.3 }}>{req.name.startsWith('landing.') ? t(req.name as TranslationKey) : req.name}</h5>
                               <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
                                 <span style={{
                                   fontSize: 9, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.5px",
                                   padding: "2px 6px", borderRadius: 4,
                                   background: "rgba(79,138,255,0.1)", color: "#4F8AFF",
                                   border: "1px solid rgba(79,138,255,0.2)",
-                                }}>{req.discipline}</span>
-                                <span style={{ fontSize: 10, color: "#3A3A50", fontFamily: "monospace" }}>{relativeDate(req.createdAt)}</span>
+                                }}>{req.discipline.startsWith('landing.') ? t(req.discipline as TranslationKey) : req.discipline}</span>
+                                <span style={{ fontSize: 10, color: "#3A3A50", fontFamily: "monospace" }}>{relativeDate(req.createdAt, t)}</span>
                               </div>
                               <p style={{
                                 fontSize: 12, color: "#7C7C96", lineHeight: 1.5, margin: 0,
                                 display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden",
-                              }}>{req.problem}</p>
+                              }}>{req.problem.startsWith('landing.') ? t(req.problem as TranslationKey) : req.problem}</p>
                             </div>
                           </div>
                         </div>
@@ -3093,7 +3098,7 @@ export default function LandingPage() {
                         borderRadius: "16px 16px 0 0",
                       }}>
                         <div style={{ width: 8, height: 8, borderRadius: "50%", background: step.color, boxShadow: `0 0 8px ${step.color}` }} />
-                        <span style={{ color: step.color }}>STEP {step.num}</span>
+                        <span style={{ color: step.color }}>{t('landing.step')} {step.num}</span>
                       </div>
                       <div style={{ padding: "32px 24px", textAlign: "center" }}>
                         <div style={{
@@ -3142,11 +3147,11 @@ export default function LandingPage() {
               <path d="M200 400 Q720 300 1240 400" stroke="rgba(79,138,255,0.1)" strokeWidth="1.5" fill="none" className="wire-animate" />
               {/* Dimension lines */}
               <line x1="300" y1="700" x2="500" y2="700" stroke="rgba(79,138,255,0.1)" strokeWidth="0.5" />
-              <text x="400" y="720" className="dimension-label" textAnchor="middle">STARTER</text>
+              <text x="400" y="720" className="dimension-label" textAnchor="middle">{t('landing.svgStarter')}</text>
               <line x1="600" y1="700" x2="840" y2="700" stroke="rgba(79,138,255,0.15)" strokeWidth="0.5" />
-              <text x="720" y="720" className="dimension-label" textAnchor="middle">PROFESSIONAL</text>
+              <text x="720" y="720" className="dimension-label" textAnchor="middle">{t('landing.svgProfessional')}</text>
               <line x1="940" y1="700" x2="1140" y2="700" stroke="rgba(139,92,246,0.1)" strokeWidth="0.5" />
-              <text x="1040" y="720" className="dimension-label" textAnchor="middle">ENTERPRISE</text>
+              <text x="1040" y="720" className="dimension-label" textAnchor="middle">{t('landing.svgEnterprise')}</text>
             </svg>
             <div className="orb-drift-2" style={{ position: "absolute", top: "5%", left: "5%", width: 400, height: 400, borderRadius: "50%", background: "radial-gradient(circle, rgba(79,138,255,0.08) 0%, transparent 70%)", filter: "blur(25px)" }} />
             <div className="orb-drift-3" style={{ position: "absolute", bottom: "10%", right: "5%", width: 350, height: 350, borderRadius: "50%", background: "radial-gradient(circle, rgba(139,92,246,0.08) 0%, transparent 70%)", filter: "blur(20px)" }} />
@@ -3364,10 +3369,10 @@ export default function LandingPage() {
                 <animate attributeName="opacity" values="0;1;1;0" dur="2.5s" begin="2.5s" repeatCount="indefinite" />
               </circle>
               {/* Labels */}
-              <text x="100" y="85" className="dimension-label">INPUT</text>
-              <text x="100" y="285" className="dimension-label">PROCESS</text>
-              <text x="100" y="485" className="dimension-label">GENERATE</text>
-              <text x="1300" y="285" className="dimension-label">OUTPUT</text>
+              <text x="100" y="85" className="dimension-label">{t('landing.svgInput')}</text>
+              <text x="100" y="285" className="dimension-label">{t('landing.svgProcess')}</text>
+              <text x="100" y="485" className="dimension-label">{t('landing.svgGenerate')}</text>
+              <text x="1300" y="285" className="dimension-label">{t('landing.svgOutput')}</text>
             </svg>
             <div className="orb-drift-1" style={{ position: "absolute", top: "20%", left: "30%", width: 500, height: 500, borderRadius: "50%", background: "radial-gradient(circle, rgba(79,138,255,0.12) 0%, transparent 70%)", filter: "blur(30px)" }} />
             <div className="orb-drift-2" style={{ position: "absolute", bottom: "10%", right: "20%", width: 400, height: 400, borderRadius: "50%", background: "radial-gradient(circle, rgba(139,92,246,0.1) 0%, transparent 70%)", filter: "blur(25px)" }} />
@@ -3408,7 +3413,7 @@ export default function LandingPage() {
                 justifyContent: "center",
               }}>
                 <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#10B981", boxShadow: "0 0 8px #10B981" }} />
-                <span style={{ color: "#10B981" }}>READY TO EXECUTE</span>
+                <span style={{ color: "#10B981" }}>{t('landing.readyToExecute')}</span>
               </div>
               <div style={{ padding: "24px 32px" }}>
                 <Link href="/dashboard" style={{
@@ -3461,10 +3466,10 @@ export default function LandingPage() {
       }}>
         <div style={{ maxWidth: 500, margin: "0 auto" }}>
           <h3 style={{ fontSize: 18, fontWeight: 700, color: "#F0F0F5", marginBottom: 8 }}>
-            Stay in the loop
+            {t('landing.stayInLoop')}
           </h3>
           <p style={{ fontSize: 13, color: "#7C7C96", marginBottom: 24 }}>
-            Get product updates, AEC workflow tips, and early access to new features.
+            {t('landing.stayInLoopDesc')}
           </p>
           <div style={{ display: "flex", justifyContent: "center" }}>
             <NewsletterSignup />
@@ -3513,7 +3518,7 @@ export default function LandingPage() {
           borderTop: "1px solid rgba(255,255,255,0.04)",
         }}>
           <div style={{ display: "flex", justifyContent: "center", gap: 32, flexWrap: "wrap", marginBottom: 16 }}>
-            {["Data encrypted in transit and at rest", "Built for AEC professionals", "Beta — actively developed"].map(signal => (
+            {[t('landing.trustEncrypted'), t('landing.trustBuiltForAec'), t('landing.trustBeta')].map(signal => (
               <span key={signal} style={{ fontSize: 11, color: "#3A3A50", fontWeight: 500 }}>
                 {signal}
               </span>

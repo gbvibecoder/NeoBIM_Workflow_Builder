@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useSyncExternalStore } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { usePathname } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
@@ -143,22 +143,29 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const [hoverExpanded, setHoverExpanded] = useState(false);
   const hoverTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Auth check via useSyncExternalStore
-  const cookieValue = useSyncExternalStore(
-    (cb) => { const id = setInterval(cb, 1000); return () => clearInterval(id); },
-    () => document.cookie,
-    () => "",
-  );
-
-  const authenticated = cookieValue
-    ? cookieValue.includes(`${ADMIN_COOKIE_NAME}=`)
-    : null;
+  // Auth check via server-side API (httponly cookie can't be read from JS)
+  const [authenticated, setAuthenticated] = useState<boolean | null>(null);
 
   useEffect(() => {
-    if (cookieValue && !authenticated) {
-      window.location.href = "/login";
-    }
-  }, [cookieValue, authenticated]);
+    let cancelled = false;
+    fetch("/api/admin", { credentials: "same-origin" })
+      .then(res => {
+        if (cancelled) return;
+        if (res.ok) {
+          setAuthenticated(true);
+        } else {
+          setAuthenticated(false);
+          window.location.href = "/login";
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setAuthenticated(false);
+          window.location.href = "/login";
+        }
+      });
+    return () => { cancelled = true; };
+  }, [pathname]);
 
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth < 769);

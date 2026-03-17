@@ -3,6 +3,7 @@
 import { useEffect } from 'react';
 import { AlertTriangle } from 'lucide-react';
 import Link from 'next/link';
+import { useLocale } from '@/hooks';
 
 export default function Error({
   error,
@@ -11,6 +12,8 @@ export default function Error({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  const { t } = useLocale();
+
   useEffect(() => {
     console.error('[App Error]', error);
   }, [error]);
@@ -23,13 +26,13 @@ export default function Error({
         </div>
 
         <h1 className="text-2xl font-semibold text-white mb-2">
-          Something went wrong
+          {t('error.somethingWrong')}
         </h1>
         <p className="text-sm text-zinc-400 mb-8">
-          We&apos;ve been notified and are looking into it.
+          {t('error.notifiedDesc')}
           {error.digest && (
             <span className="block mt-1 text-xs text-zinc-500">
-              Error ID: {error.digest}
+              {t('error.errorId')} {error.digest}
             </span>
           )}
         </p>
@@ -39,13 +42,13 @@ export default function Error({
             onClick={reset}
             className="px-5 py-2.5 text-sm font-medium rounded-xl bg-white text-black hover:bg-zinc-200 transition-colors"
           >
-            Try Again
+            {t('error.tryAgain')}
           </button>
           <Link
             href="/dashboard"
             className="px-5 py-2.5 text-sm font-medium rounded-xl border border-zinc-700 text-zinc-300 hover:bg-zinc-800 transition-colors"
           >
-            Go to Dashboard
+            {t('error.goToDashboard')}
           </Link>
         </div>
       </div>

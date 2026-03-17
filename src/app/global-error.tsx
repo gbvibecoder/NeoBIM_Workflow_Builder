@@ -2,6 +2,7 @@
 
 import * as Sentry from "@sentry/nextjs";
 import { useEffect } from 'react';
+import { useLocale } from '@/hooks';
 
 export default function GlobalError({
   error,
@@ -10,6 +11,8 @@ export default function GlobalError({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  const { t } = useLocale();
+
   useEffect(() => {
     Sentry.captureException(error);
     console.error('[Global Error]', error);
@@ -48,13 +51,13 @@ export default function GlobalError({
           </div>
 
           <h1 style={{ fontSize: '22px', fontWeight: 600, marginBottom: '8px' }}>
-            Something went wrong
+            {t('globalError.somethingWrong')}
           </h1>
           <p style={{ fontSize: '14px', color: '#a1a1aa', marginBottom: '32px' }}>
-            A critical error occurred. Please reload the page.
+            {t('globalError.criticalDesc')}
             {error.digest && (
               <span style={{ display: 'block', marginTop: '4px', fontSize: '12px', color: '#71717a' }}>
-                Error ID: {error.digest}
+                {t('globalError.errorId')} {error.digest}
               </span>
             )}
           </p>
@@ -72,7 +75,7 @@ export default function GlobalError({
               cursor: 'pointer',
             }}
           >
-            Reload
+            {t('globalError.reload')}
           </button>
         </div>
       </body>

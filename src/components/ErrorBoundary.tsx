@@ -3,6 +3,7 @@
 import React from "react";
 import { AlertTriangle, RotateCcw, Home, MessageSquare } from "lucide-react";
 import Link from "next/link";
+import { t as translate, getLocaleFromStorage } from "@/lib/i18n";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -63,6 +64,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
 
     const isDev = process.env.NODE_ENV === "development";
     const { showHomeButton = true, showSupportButton = false } = this.props;
+    const locale = typeof window !== 'undefined' ? getLocaleFromStorage() : 'en';
 
     return (
       <div
@@ -97,10 +99,10 @@ export class ErrorBoundary extends React.Component<Props, State> {
 
         <div style={{ textAlign: "center", maxWidth: 420 }}>
           <h2 style={{ fontSize: 18, fontWeight: 600, marginBottom: 10, color: "#F0F0F5" }}>
-            Oops! Something went wrong
+            {translate('errorBoundary.title', locale)}
           </h2>
           <p style={{ fontSize: 14, color: "#9898B0", lineHeight: 1.6, marginBottom: 6 }}>
-            {this.state.error?.message || "An unexpected error occurred in the application."}
+            {this.state.error?.message || translate('errorBoundary.fallbackDesc', locale)}
           </p>
           
           {isDev && this.state.error?.stack && (
@@ -118,7 +120,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
               overflow: "auto",
             }}>
               <summary style={{ cursor: "pointer", marginBottom: 8, fontWeight: 600 }}>
-                Stack Trace (Dev Only)
+                {translate('errorBoundary.stackTrace', locale)}
               </summary>
               <pre style={{ whiteSpace: "pre-wrap", margin: 0 }}>
                 {this.state.error.stack}
@@ -156,7 +158,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
             }}
           >
             <RotateCcw size={14} strokeWidth={2} />
-            Reload and try again
+            {translate('errorBoundary.reload', locale)}
           </button>
 
           <div style={{ display: "flex", gap: 8, width: "100%" }}>
@@ -182,7 +184,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
                 }}
               >
                 <Home size={13} strokeWidth={1.5} />
-                Go home
+                {translate('errorBoundary.goHome', locale)}
               </Link>
             )}
 
@@ -207,7 +209,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
                 }}
               >
                 <MessageSquare size={13} strokeWidth={1.5} />
-                Copy error
+                {translate('errorBoundary.copyError', locale)}
               </button>
             )}
           </div>
@@ -219,7 +221,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
           marginTop: 8,
           textAlign: "center",
         }}>
-          If this keeps happening, please contact support with the error details above.
+          {translate('errorBoundary.supportMsg', locale)}
         </p>
       </div>
     );

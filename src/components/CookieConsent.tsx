@@ -2,8 +2,10 @@
 
 import { useState, useEffect } from "react";
 import { getTrackingConsent, setTrackingConsent } from "@/lib/cookie-consent";
+import { useLocale } from "@/hooks";
 
 export function CookieConsent() {
+  const { t } = useLocale();
   const [show, setShow] = useState(false);
 
   useEffect(() => {
@@ -48,9 +50,9 @@ export function CookieConsent() {
       }}
     >
       <p style={{ flex: 1, color: "#C0C0D0", fontSize: 13, lineHeight: 1.5, margin: 0 }}>
-        We use cookies for analytics and to improve your experience.{" "}
+        {t('cookie.message')}{" "}
         <a href="/privacy" style={{ color: "#4F8AFF", textDecoration: "underline" }}>
-          Privacy Policy
+          {t('cookie.privacyPolicy')}
         </a>
       </p>
       <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
@@ -67,7 +69,7 @@ export function CookieConsent() {
             cursor: "pointer",
           }}
         >
-          Reject
+          {t('cookie.reject')}
         </button>
         <button
           onClick={handleAccept}
@@ -82,7 +84,7 @@ export function CookieConsent() {
             cursor: "pointer",
           }}
         >
-          Accept
+          {t('cookie.accept')}
         </button>
       </div>
       <style>{`

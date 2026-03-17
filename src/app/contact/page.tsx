@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { motion, useScroll, useTransform } from "framer-motion";
 import { useRef, useState } from "react";
+import { useLocale } from "@/hooks";
 import { trackContact } from "@/lib/meta-pixel";
 import {
   Mail,
@@ -28,57 +29,21 @@ const fadeUp = {
 
 const smoothEase: [number, number, number, number] = [0.25, 0.4, 0.25, 1];
 
-const contactChannels = [
-  {
-    icon: Mail,
-    color: "#4F8AFF",
-    title: "Email Us",
-    description: "For general inquiries and partnership opportunities",
-    detail: "hello@buildflow.app",
-    href: "mailto:hello@buildflow.app",
-  },
-  {
-    icon: Headphones,
-    color: "#10B981",
-    title: "Technical Support",
-    description: "Bug reports, feature requests, and platform issues",
-    detail: "support@buildflow.app",
-    href: "mailto:support@buildflow.app",
-  },
-  {
-    icon: Building2,
-    color: "#8B5CF6",
-    title: "Enterprise & Sales",
-    description: "Custom deployments, team plans, and volume licensing",
-    detail: "sales@buildflow.app",
-    href: "mailto:sales@buildflow.app",
-  },
-  {
-    icon: FileQuestion,
-    color: "#F59E0B",
-    title: "Legal & Privacy",
-    description: "Data requests, GDPR inquiries, and legal matters",
-    detail: "legal@buildflow.app",
-    href: "mailto:legal@buildflow.app",
-  },
-];
-
-const officeInfo = [
-  {
-    icon: MapPin,
-    label: "Location",
-    value: "Berlin, Germany",
-    sub: "Heart of Europe's AEC tech hub",
-  },
-  {
-    icon: Clock,
-    label: "Business Hours",
-    value: "Mon - Fri, 9:00 - 18:00 CET",
-    sub: "We respond within 24 hours",
-  },
-];
-
 export default function ContactPage() {
+  const { t } = useLocale();
+
+  const contactChannels = [
+    { icon: Mail, color: "#4F8AFF", title: t('contact.channelEmailTitle'), description: t('contact.channelEmailDesc'), detail: "hello@buildflow.app", href: "mailto:hello@buildflow.app" },
+    { icon: Headphones, color: "#10B981", title: t('contact.channelSupportTitle'), description: t('contact.channelSupportDesc'), detail: "support@buildflow.app", href: "mailto:support@buildflow.app" },
+    { icon: Building2, color: "#8B5CF6", title: t('contact.channelSalesTitle'), description: t('contact.channelSalesDesc'), detail: "sales@buildflow.app", href: "mailto:sales@buildflow.app" },
+    { icon: FileQuestion, color: "#F59E0B", title: t('contact.channelLegalTitle'), description: t('contact.channelLegalDesc'), detail: "legal@buildflow.app", href: "mailto:legal@buildflow.app" },
+  ];
+
+  const officeInfo = [
+    { icon: MapPin, label: t('contact.locationLabel'), value: t('contact.locationValue'), sub: t('contact.locationSub') },
+    { icon: Clock, label: t('contact.hoursLabel'), value: t('contact.hoursValue'), sub: t('contact.hoursSub') },
+  ];
+
   const heroRef = useRef<HTMLDivElement>(null);
   const { scrollYProgress } = useScroll({
     target: heroRef,
@@ -201,7 +166,7 @@ export default function ContactPage() {
           }}
         >
           <ArrowLeft size={14} />
-          Back to Home
+          {t('contact.backToHome')}
         </Link>
       </nav>
 
@@ -269,7 +234,7 @@ export default function ContactPage() {
               className="blueprint-annotation"
               style={{ marginBottom: 16, display: "block" }}
             >
-              GET IN TOUCH WITH OUR TEAM
+              {t('contact.heroAnnotation')}
             </span>
             <div className="accent-line" />
 
@@ -308,7 +273,7 @@ export default function ContactPage() {
                   backgroundClip: "text",
                 }}
               >
-                Contact Us
+                {t('contact.title')}
               </span>
             </h1>
             <p
@@ -320,9 +285,7 @@ export default function ContactPage() {
                 margin: "0 auto",
               }}
             >
-              Whether you&apos;re an architect exploring BIM automation, an
-              engineering firm scaling workflows, or a construction team going
-              digital — we&apos;re here to help.
+              {t('contact.heroDesc')}
             </p>
           </motion.div>
         </div>
@@ -453,7 +416,7 @@ export default function ContactPage() {
                   boxShadow: "0 0 8px #10B981",
                 }}
               />
-              <span style={{ color: "#4F8AFF" }}>CONTACT FORM</span>
+              <span style={{ color: "#4F8AFF" }}>{t('contact.formHeader')}</span>
               <span
                 style={{
                   marginLeft: "auto",
@@ -465,7 +428,7 @@ export default function ContactPage() {
                   fontWeight: 600,
                 }}
               >
-                ONLINE
+                {t('contact.formOnline')}
               </span>
             </div>
 
@@ -500,7 +463,7 @@ export default function ContactPage() {
                       marginBottom: 10,
                     }}
                   >
-                    Message Sent
+                    {t('contact.messageSent')}
                   </h3>
                   <p
                     style={{
@@ -511,9 +474,7 @@ export default function ContactPage() {
                       margin: "0 auto",
                     }}
                   >
-                    Thank you for reaching out. Our team typically responds
-                    within 24 hours on business days. We look forward to
-                    connecting with you.
+                    {t('contact.messageSentDesc')}
                   </p>
                   <button
                     onClick={() => {
@@ -538,7 +499,7 @@ export default function ContactPage() {
                       transition: "all 0.2s",
                     }}
                   >
-                    Send Another Message
+                    {t('contact.sendAnother')}
                   </button>
                 </motion.div>
               ) : (
@@ -568,7 +529,7 @@ export default function ContactPage() {
                       />
                       <input
                         type="text"
-                        placeholder="Your name"
+                        placeholder={t('contact.namePlaceholder')}
                         required
                         value={formState.name}
                         onChange={(e) =>
@@ -596,7 +557,7 @@ export default function ContactPage() {
                       />
                       <input
                         type="email"
-                        placeholder="Email address"
+                        placeholder={t('contact.emailPlaceholder')}
                         required
                         value={formState.email}
                         onChange={(e) =>
@@ -628,7 +589,7 @@ export default function ContactPage() {
                     />
                     <input
                       type="text"
-                      placeholder="Subject — e.g. BIM workflow integration"
+                      placeholder={t('contact.subjectPlaceholder')}
                       required
                       value={formState.subject}
                       onChange={(e) =>
@@ -658,7 +619,7 @@ export default function ContactPage() {
                       }}
                     />
                     <textarea
-                      placeholder="Tell us about your project, team size, and how BuildFlow can help your AEC workflows..."
+                      placeholder={t('contact.messagePlaceholder')}
                       required
                       value={formState.message}
                       onChange={(e) =>
@@ -707,12 +668,12 @@ export default function ContactPage() {
                             animation: "spin 1s linear infinite",
                           }}
                         />
-                        Sending...
+                        {t('contact.sending')}
                       </>
                     ) : (
                       <>
                         <Send size={16} />
-                        Send Message
+                        {t('contact.sendMessage')}
                       </>
                     )}
                   </motion.button>
@@ -754,7 +715,7 @@ export default function ContactPage() {
                     boxShadow: "0 0 8px #10B981",
                   }}
                 />
-                <span style={{ color: "#10B981" }}>OFFICE</span>
+                <span style={{ color: "#10B981" }}>{t('contact.officeHeader')}</span>
               </div>
               <div style={{ padding: "20px 24px" }}>
                 {officeInfo.map((info, i) => (
@@ -845,21 +806,21 @@ export default function ContactPage() {
                     boxShadow: "0 0 8px #F59E0B",
                   }}
                 />
-                <span style={{ color: "#F59E0B" }}>QUICK ANSWERS</span>
+                <span style={{ color: "#F59E0B" }}>{t('contact.faqHeader')}</span>
               </div>
               <div style={{ padding: "20px 24px" }}>
                 {[
                   {
-                    q: "What file formats are supported?",
-                    a: "IFC (2x3, 4), PDF floor plans, and common image formats.",
+                    q: t('contact.faq1Q'),
+                    a: t('contact.faq1A'),
                   },
                   {
-                    q: "Is there a free tier?",
-                    a: "Yes — 3 workflow executions per day, no credit card required.",
+                    q: t('contact.faq2Q'),
+                    a: t('contact.faq2A'),
                   },
                   {
-                    q: "Can I self-host BuildFlow?",
-                    a: "Enterprise self-hosting is on our roadmap. Contact sales for early access.",
+                    q: t('contact.faq3Q'),
+                    a: t('contact.faq3A'),
                   },
                 ].map((faq, i) => (
                   <div
@@ -932,14 +893,14 @@ export default function ContactPage() {
             <span
               style={{ fontSize: 13, color: "#5C5C78", fontWeight: 600 }}
             >
-              &copy; 2026 BuildFlow
+              {t('contact.footerCopyright')}
             </span>
           </div>
           <div style={{ display: "flex", gap: 24 }}>
             {[
-              { label: "Privacy", href: "/privacy" },
-              { label: "Terms", href: "/terms" },
-              { label: "Contact", href: "/contact" },
+              { label: t('contact.footerPrivacy'), href: "/privacy" },
+              { label: t('contact.footerTerms'), href: "/terms" },
+              { label: t('contact.footerContact'), href: "/contact" },
             ].map((l) => (
               <Link
                 key={l.href}
@@ -956,7 +917,7 @@ export default function ContactPage() {
             ))}
           </div>
           <span style={{ fontSize: 11, color: "#3A3A50" }}>
-            Beta Product &middot; Built for the AEC community
+            {t('contact.footerBeta')}
           </span>
         </div>
       </footer>

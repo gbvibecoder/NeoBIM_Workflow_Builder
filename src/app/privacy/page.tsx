@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { motion, useScroll, useTransform } from "framer-motion";
 import { useRef } from "react";
+import { useLocale } from "@/hooks";
 import {
   Shield,
   Lock,
@@ -23,86 +24,18 @@ const fadeUp = {
 
 const smoothEase: [number, number, number, number] = [0.25, 0.4, 0.25, 1];
 
-const sections = [
-  {
-    id: "01",
-    icon: Eye,
-    color: "#4F8AFF",
-    title: "Information We Collect",
-    content: [
-      "When you create a BuildFlow account, we collect your name, email address, and authentication credentials. For Google OAuth sign-ins, we receive your public profile information as authorized by you.",
-      "As you use our platform, we collect workflow data, BIM model metadata, and execution logs to provide and improve our services. We process IFC file headers and structural data — your actual building models are never stored permanently on our servers.",
-      "We automatically collect usage analytics including page views, feature interactions, and performance metrics to optimize the platform experience for AEC professionals.",
-    ],
-  },
-  {
-    id: "02",
-    icon: Server,
-    color: "#8B5CF6",
-    title: "How We Use Your Data",
-    content: [
-      "Your workflow configurations and execution results are used solely to deliver the BuildFlow service. We leverage aggregated, anonymized usage patterns to improve our AI-powered node recommendations and workflow templates.",
-      "BIM data processed through our pipeline (IFC parsing, floor plan analysis, 3D generation) is handled in-memory and transmitted via encrypted channels. Processed artifacts are stored in your account and can be deleted at any time.",
-      "We never sell your data to third parties. We may share anonymized, aggregate statistics about AEC workflow patterns to contribute to industry research.",
-    ],
-  },
-  {
-    id: "03",
-    icon: Lock,
-    color: "#10B981",
-    title: "Data Security",
-    content: [
-      "All data is encrypted in transit using TLS 1.3 and at rest using AES-256 encryption. Our infrastructure is hosted on enterprise-grade cloud platforms with SOC 2 Type II compliance.",
-      "Authentication credentials are hashed using bcrypt with 12 rounds of salting. Session tokens are cryptographically signed and rotated regularly. We enforce Content Security Policy (CSP) headers and sanitize all user inputs.",
-      "Access to production systems is restricted to authorized personnel with multi-factor authentication. We conduct regular security audits and penetration testing to maintain the highest standards of data protection.",
-    ],
-  },
-  {
-    id: "04",
-    icon: FileText,
-    color: "#F59E0B",
-    title: "Cookies & Tracking",
-    content: [
-      "We use essential cookies for authentication session management and user preferences (such as language selection). These are strictly necessary for the platform to function.",
-      "Analytics cookies help us understand how AEC professionals interact with our workflow builder. You can opt out of non-essential tracking through your account settings without affecting core functionality.",
-      "We do not use third-party advertising cookies or cross-site tracking pixels. Your browsing activity within BuildFlow stays within BuildFlow.",
-    ],
-  },
-  {
-    id: "05",
-    icon: UserCheck,
-    color: "#4F8AFF",
-    title: "Your Rights & Controls",
-    content: [
-      "You have the right to access, export, correct, or delete your personal data at any time. Use the Settings panel in your dashboard to manage your data, or contact us directly for assistance.",
-      "You can request a complete export of your workflows, execution history, and artifacts in standard formats (JSON, CSV). Account deletion is permanent and irreversible — all associated data is purged within 30 days.",
-      "For users in the European Economic Area, we comply with GDPR requirements including data portability, the right to be forgotten, and lawful basis for processing.",
-    ],
-  },
-  {
-    id: "06",
-    icon: Globe,
-    color: "#8B5CF6",
-    title: "International Data Transfers",
-    content: [
-      "BuildFlow operates globally to serve AEC teams worldwide. Your data may be processed in data centers located in the United States and European Union, with appropriate safeguards in place.",
-      "We rely on Standard Contractual Clauses (SCCs) and adequacy decisions for international data transfers, ensuring your data receives equivalent protection regardless of where it is processed.",
-    ],
-  },
-  {
-    id: "07",
-    icon: RefreshCw,
-    color: "#10B981",
-    title: "Updates to This Policy",
-    content: [
-      "We may update this Privacy Policy to reflect changes in our practices or applicable regulations. Material changes will be communicated via email and an in-app notification at least 30 days before taking effect.",
-      "Your continued use of BuildFlow after changes become effective constitutes acceptance of the revised policy. We encourage you to review this page periodically.",
-      "Last updated: March 2026. For questions about this policy, contact us at privacy@buildflow.app.",
-    ],
-  },
-];
-
 export default function PrivacyPage() {
+  const { t } = useLocale();
+
+  const sections = [
+    { id: "01", icon: Eye, color: "#4F8AFF", title: t('privacy.section01Title'), content: [t('privacy.section01P1'), t('privacy.section01P2'), t('privacy.section01P3')] },
+    { id: "02", icon: Server, color: "#8B5CF6", title: t('privacy.section02Title'), content: [t('privacy.section02P1'), t('privacy.section02P2'), t('privacy.section02P3')] },
+    { id: "03", icon: Lock, color: "#10B981", title: t('privacy.section03Title'), content: [t('privacy.section03P1'), t('privacy.section03P2'), t('privacy.section03P3')] },
+    { id: "04", icon: FileText, color: "#F59E0B", title: t('privacy.section04Title'), content: [t('privacy.section04P1'), t('privacy.section04P2'), t('privacy.section04P3')] },
+    { id: "05", icon: UserCheck, color: "#4F8AFF", title: t('privacy.section05Title'), content: [t('privacy.section05P1'), t('privacy.section05P2'), t('privacy.section05P3')] },
+    { id: "06", icon: Globe, color: "#8B5CF6", title: t('privacy.section06Title'), content: [t('privacy.section06P1'), t('privacy.section06P2')] },
+    { id: "07", icon: RefreshCw, color: "#10B981", title: t('privacy.section07Title'), content: [t('privacy.section07P1'), t('privacy.section07P2'), t('privacy.section07P3')] },
+  ];
   const heroRef = useRef<HTMLDivElement>(null);
   const { scrollYProgress } = useScroll({
     target: heroRef,
@@ -184,7 +117,7 @@ export default function PrivacyPage() {
           }}
         >
           <ArrowLeft size={14} />
-          Back to Home
+          {t('privacy.backToHome')}
         </Link>
       </nav>
 
@@ -253,7 +186,7 @@ export default function PrivacyPage() {
               className="blueprint-annotation"
               style={{ marginBottom: 16, display: "block" }}
             >
-              DATA PROTECTION & COMPLIANCE
+              {t('privacy.heroAnnotation')}
             </span>
             <div className="accent-line" />
 
@@ -292,7 +225,7 @@ export default function PrivacyPage() {
                   backgroundClip: "text",
                 }}
               >
-                Privacy Policy
+                {t('privacy.title')}
               </span>
             </h1>
             <p
@@ -304,9 +237,7 @@ export default function PrivacyPage() {
                 margin: "0 auto",
               }}
             >
-              How BuildFlow protects your data, respects your privacy, and keeps
-              your AEC workflows secure. Built with the same precision we bring
-              to building information modeling.
+              {t('privacy.heroDesc')}
             </p>
           </motion.div>
 
@@ -324,9 +255,9 @@ export default function PrivacyPage() {
             }}
           >
             {[
-              { label: "TLS 1.3 Encrypted", icon: Lock },
-              { label: "GDPR Compliant", icon: Shield },
-              { label: "AEC-Grade Security", icon: Building2 },
+              { label: t('privacy.badgeTls'), icon: Lock },
+              { label: t('privacy.badgeGdpr'), icon: Shield },
+              { label: t('privacy.badgeAec'), icon: Building2 },
             ].map((badge) => (
               <div
                 key={badge.label}
@@ -391,7 +322,7 @@ export default function PrivacyPage() {
                   }}
                 />
                 <span style={{ color: section.color }}>
-                  SECTION {section.id}
+                  {t('privacy.sectionLabel')} {section.id}
                 </span>
                 <span
                   style={{
@@ -462,8 +393,8 @@ export default function PrivacyPage() {
           }}
         >
           <p style={{ fontSize: 13, color: "#7C7C96", lineHeight: 1.7 }}>
-            This Privacy Policy is effective as of <strong style={{ color: "#9898B0" }}>March 1, 2026</strong>.
-            If you have any questions, reach out to us at{" "}
+            {t('privacy.effectiveDate')} <strong style={{ color: "#9898B0" }}>{t('privacy.effectiveDateValue')}</strong>.
+            {' '}{t('privacy.effectiveDatePost')}{" "}
             <a
               href="mailto:privacy@buildflow.app"
               style={{ color: "#4F8AFF", textDecoration: "none" }}
@@ -512,14 +443,14 @@ export default function PrivacyPage() {
             <span
               style={{ fontSize: 13, color: "#5C5C78", fontWeight: 600 }}
             >
-              &copy; 2026 BuildFlow
+              {t('contact.footerCopyright')}
             </span>
           </div>
           <div style={{ display: "flex", gap: 24 }}>
             {[
-              { label: "Privacy", href: "/privacy" },
-              { label: "Terms", href: "/terms" },
-              { label: "Contact", href: "/contact" },
+              { label: t('contact.footerPrivacy'), href: "/privacy" },
+              { label: t('contact.footerTerms'), href: "/terms" },
+              { label: t('contact.footerContact'), href: "/contact" },
             ].map((l) => (
               <Link
                 key={l.href}
@@ -536,7 +467,7 @@ export default function PrivacyPage() {
             ))}
           </div>
           <span style={{ fontSize: 11, color: "#3A3A50" }}>
-            Beta Product &middot; Built for the AEC community
+            {t('contact.footerBeta')}
           </span>
         </div>
       </footer>

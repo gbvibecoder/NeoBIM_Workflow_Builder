@@ -8,7 +8,7 @@ import { useSession } from "next-auth/react";
 import {
   Check, Sparkles, Zap, Loader2, CheckCircle2, XCircle,
   Video, Box, Image, Crown, Building2, Users, ArrowRight,
-  Shield, Ruler,
+  Shield, Ruler, ArrowUpRight, ArrowDownRight, X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
@@ -43,8 +43,16 @@ export default function BillingPage() {
   const [loading, setLoading] = useState(true);
   const [upgradingTo, setUpgradingTo] = useState<string | null>(null);
   const [hoveredPlan, setHoveredPlan] = useState<string | null>(null);
+  const [confirmModal, setConfirmModal] = useState<{
+    plan: string;
+    planName: string;
+    type: 'upgrade' | 'downgrade';
+    prorationAmount?: number;
+    loading: boolean;
+  } | null>(null);
 
   const userRole = (session?.user as { role?: string })?.role || "FREE";
+  const hasSubscription = userRole !== "FREE";
   const currentPlan = userRole === "FREE" ? "Free" : userRole === "MINI" ? "Mini" : userRole === "STARTER" ? "Starter" : userRole === "PRO" ? "Pro" : "Team";
 
   // Handle success/cancel redirects from Stripe
@@ -112,9 +120,43 @@ export default function BillingPage() {
   }, [userRole]);
 
   const handleUpgrade = async (plan: 'MINI' | 'STARTER' | 'PRO' | 'TEAM_ADMIN') => {
+    const planKey = plan === 'TEAM_ADMIN' ? 'TEAM' : plan;
+
+    if (hasSubscription) {
+      // Existing subscriber → show confirmation modal with proration preview
+      const planNames: Record<string, string> = { MINI: 'Mini', STARTER: 'Starter', PRO: 'Pro', TEAM_ADMIN: 'Team' };
+      const newTierIndex = TIER_ORDER.indexOf(planNames[plan] || 'Free');
+      const currentTierIndex = TIER_ORDER.indexOf(currentPlan);
+      const type = newTierIndex > currentTierIndex ? 'upgrade' : 'downgrade';
+
+      setConfirmModal({ plan: planKey, planName: planNames[plan] || plan, type, loading: true });
+
+      // Fetch proration preview for upgrades
+      if (type === 'upgrade') {
+        try {
+          const res = await fetch('/api/stripe/preview-proration', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ plan: planKey }),
+          });
+          const data = await res.json();
+          if (res.ok) {
+            setConfirmModal(prev => prev ? { ...prev, prorationAmount: data.immediateCharge, loading: false } : null);
+          } else {
+            setConfirmModal(prev => prev ? { ...prev, loading: false } : null);
+          }
+        } catch {
+          setConfirmModal(prev => prev ? { ...prev, loading: false } : null);
+        }
+      } else {
+        setConfirmModal(prev => prev ? { ...prev, loading: false } : null);
+      }
+      return;
+    }
+
+    // New subscriber → checkout flow
     setUpgradingTo(plan);
     try {
-      const planKey = plan === 'MINI' ? 'MINI' : plan === 'STARTER' ? 'STARTER' : plan === 'PRO' ? 'PRO' : 'TEAM';
       const res = await fetch('/api/stripe/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -128,6 +170,34 @@ export default function BillingPage() {
       }
     } catch {
       toast.error(t('billing.checkoutFailed'));
+    } finally {
+      setUpgradingTo(null);
+    }
+  };
+
+  const handleConfirmPlanChange = async () => {
+    if (!confirmModal) return;
+    setUpgradingTo(confirmModal.plan as 'MINI' | 'STARTER' | 'PRO' | 'TEAM_ADMIN');
+    setConfirmModal(null);
+    try {
+      const res = await fetch('/api/stripe/update-subscription', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plan: confirmModal.plan }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        const msg = data.type === 'upgrade'
+          ? t('billing.planUpgraded')
+          : t('billing.planDowngraded');
+        toast.success(msg, { icon: <CheckCircle2 size={18} />, duration: 5000 });
+        await updateSession();
+        window.location.reload();
+      } else {
+        throw new Error(data.error?.message || 'Plan change failed');
+      }
+    } catch {
+      toast.error(t('billing.planChangeFailed'));
     } finally {
       setUpgradingTo(null);
     }
@@ -691,6 +761,110 @@ export default function BillingPage() {
           </div>
         </motion.div>
       </main>
+
+      {/* ── Plan Change Confirmation Modal ── */}
+      <AnimatePresence>
+        {confirmModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4"
+            style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)' }}
+            onClick={() => setConfirmModal(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              transition={{ type: 'spring', stiffness: 300, damping: 25 }}
+              onClick={(e) => e.stopPropagation()}
+              className="relative w-full max-w-md rounded-2xl border border-[rgba(255,255,255,0.08)] bg-[#111120] p-8 shadow-2xl"
+            >
+              <button
+                onClick={() => setConfirmModal(null)}
+                className="absolute top-4 right-4 p-1 rounded-lg text-[#7C7C96] hover:text-[#F0F0F5] hover:bg-[rgba(255,255,255,0.05)] transition-colors"
+              >
+                <X size={18} />
+              </button>
+
+              <div className="text-center mb-6">
+                <div
+                  className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4"
+                  style={{
+                    background: confirmModal.type === 'upgrade'
+                      ? 'linear-gradient(135deg, rgba(79,138,255,0.15), rgba(99,102,241,0.15))'
+                      : 'linear-gradient(135deg, rgba(245,158,11,0.15), rgba(239,68,68,0.15))',
+                    border: confirmModal.type === 'upgrade'
+                      ? '1px solid rgba(79,138,255,0.2)'
+                      : '1px solid rgba(245,158,11,0.2)',
+                  }}
+                >
+                  {confirmModal.type === 'upgrade'
+                    ? <ArrowUpRight size={24} className="text-[#4F8AFF]" />
+                    : <ArrowDownRight size={24} className="text-[#F59E0B]" />
+                  }
+                </div>
+                <h3 className="text-xl font-bold text-[#F0F0F5] mb-2">
+                  {confirmModal.type === 'upgrade' ? t('billing.confirmUpgrade') : t('billing.confirmDowngrade')}
+                </h3>
+                <p className="text-sm text-[#9898B0]">
+                  {currentPlan} → <strong className="text-[#4F8AFF]">{confirmModal.planName}</strong>
+                </p>
+              </div>
+
+              {/* Proration info */}
+              {confirmModal.type === 'upgrade' && (
+                <div className="rounded-xl bg-[rgba(79,138,255,0.04)] border border-[rgba(79,138,255,0.1)] p-4 mb-6">
+                  {confirmModal.loading ? (
+                    <div className="flex items-center justify-center gap-2 text-sm text-[#9898B0]">
+                      <Loader2 size={14} className="animate-spin" />
+                      {t('billing.calculatingProration')}
+                    </div>
+                  ) : (
+                    <div className="text-center">
+                      <div className="text-xs text-[#7C7C96] mb-1">{t('billing.immediateCharge')}</div>
+                      <div className="text-2xl font-bold text-[#F0F0F5]">
+                        ₹{(confirmModal.prorationAmount || 0).toFixed(2)}
+                      </div>
+                      <div className="text-xs text-[#55556A] mt-1">{t('billing.proratedAmount')}</div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {confirmModal.type === 'downgrade' && (
+                <div className="rounded-xl bg-[rgba(245,158,11,0.04)] border border-[rgba(245,158,11,0.1)] p-4 mb-6">
+                  <p className="text-xs text-[#9898B0] text-center">
+                    {t('billing.downgradeNote')}
+                  </p>
+                </div>
+              )}
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setConfirmModal(null)}
+                  className="flex-1 py-3 rounded-xl text-sm font-semibold text-[#9898B0] bg-[#16162A] hover:bg-[#1E1E34] border border-[rgba(255,255,255,0.06)] transition-colors"
+                >
+                  {t('billing.cancel')}
+                </button>
+                <button
+                  onClick={handleConfirmPlanChange}
+                  disabled={confirmModal.loading}
+                  className="flex-1 py-3 rounded-xl text-sm font-bold text-white transition-all disabled:opacity-50"
+                  style={{
+                    background: confirmModal.type === 'upgrade'
+                      ? 'linear-gradient(135deg, #4F8AFF, #6366F1)'
+                      : 'linear-gradient(135deg, #F59E0B, #EF4444)',
+                  }}
+                >
+                  {confirmModal.type === 'upgrade' ? t('billing.confirmUpgradeBtn') : t('billing.confirmDowngradeBtn')}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <style jsx global>{`
         @keyframes shimmer {

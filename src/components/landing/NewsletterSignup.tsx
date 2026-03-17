@@ -2,11 +2,13 @@
 
 import { useState } from "react";
 import { Mail, ArrowRight, Check, Loader2 } from "lucide-react";
+import { useLocale } from "@/hooks/useLocale";
 
 export function NewsletterSignup() {
   const [email, setEmail] = useState("");
   const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState("");
+  const { t } = useLocale();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -24,14 +26,14 @@ export function NewsletterSignup() {
 
       if (!res.ok) {
         const data = await res.json();
-        throw new Error(data.error || "Failed to subscribe");
+        throw new Error(data.error || t('landing.failedToSubscribe'));
       }
 
       setStatus("success");
       setEmail("");
     } catch (err) {
       setStatus("error");
-      setErrorMsg(err instanceof Error ? err.message : "Something went wrong");
+      setErrorMsg(err instanceof Error ? err.message : t('landing.somethingWentWrong'));
     }
   };
 
@@ -45,7 +47,7 @@ export function NewsletterSignup() {
       }}>
         <Check size={18} style={{ color: "#10B981" }} />
         <span style={{ fontSize: 14, color: "#10B981", fontWeight: 500 }}>
-          You're subscribed! We'll keep you updated.
+          {t('landing.subscribedSuccess')}
         </span>
       </div>
     );
@@ -109,7 +111,7 @@ export function NewsletterSignup() {
           {status === "loading" ? (
             <Loader2 size={14} style={{ animation: "spin 1s linear infinite" }} />
           ) : (
-            <>Subscribe <ArrowRight size={14} /></>
+            <>{t('landing.subscribe')} <ArrowRight size={14} /></>
           )}
         </button>
       </div>
@@ -119,7 +121,7 @@ export function NewsletterSignup() {
         </p>
       )}
       <p style={{ fontSize: 11, color: "#556070", marginTop: 10, paddingLeft: 4 }}>
-        No spam, ever. Unsubscribe anytime.
+        {t('landing.noSpam')}
       </p>
     </form>
   );

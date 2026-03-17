@@ -3,10 +3,12 @@
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { Monitor } from "lucide-react";
+import { useLocale } from "@/hooks";
 
 const DISMISSED_KEY = "buildflow_mobile_gate_dismissed";
 
 export function MobileGate({ children }: { children: React.ReactNode }) {
+  const { t } = useLocale();
   const pathname = usePathname();
   const [isSmall, setIsSmall] = useState(false);
   const [dismissed, setDismissed] = useState(
@@ -75,7 +77,7 @@ export function MobileGate({ children }: { children: React.ReactNode }) {
                 lineHeight: 1.3,
               }}
             >
-              Desktop recommended
+              {t('mobile.desktopRecommended')}
             </h1>
             <p
               style={{
@@ -84,8 +86,7 @@ export function MobileGate({ children }: { children: React.ReactNode }) {
                 lineHeight: 1.65,
               }}
             >
-              The workflow canvas works best on screens 1024px and wider.
-              You can still explore, but some canvas features may be limited.
+              {t('mobile.desc')}
             </p>
           </div>
 
@@ -103,7 +104,7 @@ export function MobileGate({ children }: { children: React.ReactNode }) {
               minHeight: 44,
             }}
           >
-            Continue anyway
+            {t('mobile.continueAnyway')}
           </button>
         </div>
         {children}

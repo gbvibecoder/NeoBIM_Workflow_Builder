@@ -86,6 +86,7 @@ function TypeWriter({ text, delay = 0 }: { text: string; delay?: number }) {
 
 // ---- Security Status Bar ----
 function SecurityBar() {
+  const { t } = useLocale();
   return (
     <div style={{
       display: "flex", alignItems: "center", gap: 16,
@@ -108,7 +109,7 @@ function SecurityBar() {
           fontFamily: "var(--font-jetbrains), monospace",
           color: "#10B981",
         }}>
-          SECURE SESSION
+          {t('settings.secureSession')}
         </span>
       </div>
       <div style={{ flex: 1 }} />
@@ -118,7 +119,7 @@ function SecurityBar() {
           fontSize: 9, color: "rgba(255,255,255,0.2)",
           fontFamily: "var(--font-jetbrains), monospace",
         }}>
-          AES-256 | TLS 1.3
+          {t('settings.encryption')}
         </span>
       </div>
     </div>
@@ -127,6 +128,7 @@ function SecurityBar() {
 
 // ---- Save Status Indicator ----
 function SaveStatus({ status }: { status: "idle" | "saving" | "saved" }) {
+  const { t } = useLocale();
   if (status === "idle") return null;
   return (
     <motion.div
@@ -144,7 +146,7 @@ function SaveStatus({ status }: { status: "idle" | "saving" | "saved" }) {
       ) : (
         <CheckCircle2 size={12} />
       )}
-      {status === "saving" ? "Encrypting..." : "Vault sealed"}
+      {status === "saving" ? t('settings.encrypting') : t('settings.vaultSealed')}
     </motion.div>
   );
 }
