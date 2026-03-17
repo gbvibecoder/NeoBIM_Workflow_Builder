@@ -64,23 +64,26 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(formatErrorResponse({ title: "Too many requests", message: "Please wait before creating more workflows.", code: "RATE_LIMITED" }), { status: 429 });
     }
 
-    // ── Enforce maxWorkflows limit for FREE users ──────────────────
+    // ── Enforce maxWorkflows limit for FREE/MINI/STARTER users ──────────
     const user = await prisma.user.findUnique({
       where: { id: session.user.id },
       select: { role: true, email: true },
     });
 
     const userRole = user?.role ?? "FREE";
-    if (userRole === "FREE" && !isAdminUser(user?.email ?? undefined)) {
-      const maxWorkflows = STRIPE_PLANS.FREE.limits.maxWorkflows;
-      const currentCount = await prisma.workflow.count({
-        where: { ownerId: session.user.id },
-      });
-      if (currentCount >= maxWorkflows) {
-        return NextResponse.json(
-          formatErrorResponse(UserErrors.WORKFLOW_LIMIT_REACHED(maxWorkflows)),
-          { status: 403 }
-        );
+    if ((userRole === "FREE" || userRole === "MINI" || userRole === "STARTER") && !isAdminUser(user?.email ?? undefined)) {
+      const planLimits = userRole === "STARTER" ? STRIPE_PLANS.STARTER.limits : userRole === "MINI" ? STRIPE_PLANS.MINI.limits : STRIPE_PLANS.FREE.limits;
+      const maxWorkflows = planLimits.maxWorkflows;
+      if (maxWorkflows > 0) {
+        const currentCount = await prisma.workflow.count({
+          where: { ownerId: session.user.id },
+        });
+        if (currentCount >= maxWorkflows) {
+          return NextResponse.json(
+            formatErrorResponse(UserErrors.WORKFLOW_LIMIT_REACHED(maxWorkflows)),
+            { status: 403 }
+          );
+        }
       }
     }
 

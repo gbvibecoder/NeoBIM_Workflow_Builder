@@ -1,11 +1,15 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { Header } from "@/components/dashboard/Header";
 import { useSession } from "next-auth/react";
-import { Check, Sparkles, Zap, Loader2, CheckCircle2, XCircle } from "lucide-react";
+import {
+  Check, Sparkles, Zap, Loader2, CheckCircle2, XCircle,
+  Video, Box, Image, Crown, Building2, Users, ArrowRight,
+  Shield, Ruler,
+} from "lucide-react";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { useLocale } from "@/hooks/useLocale";
@@ -17,6 +21,20 @@ interface UsageStats {
   resetDate: string;
 }
 
+/* ── Blueprint grid SVG pattern (AEC aesthetic) ── */
+const BlueprintGrid = ({ color, opacity = 0.04 }: { color: string; opacity?: number }) => (
+  <svg className="absolute inset-0 w-full h-full pointer-events-none" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <pattern id={`bp-${color.replace('#','')}`} width="40" height="40" patternUnits="userSpaceOnUse">
+        <path d="M 40 0 L 0 0 0 40" fill="none" stroke={color} strokeWidth="0.5" opacity={opacity} />
+      </pattern>
+    </defs>
+    <rect width="100%" height="100%" fill={`url(#bp-${color.replace('#','')})`} />
+  </svg>
+);
+
+const TIER_ORDER = ["Free", "Mini", "Starter", "Pro", "Team"];
+
 export default function BillingPage() {
   const { t } = useLocale();
   const { data: session, update: updateSession } = useSession();
@@ -24,9 +42,10 @@ export default function BillingPage() {
   const [usage, setUsage] = useState<UsageStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [upgradingTo, setUpgradingTo] = useState<string | null>(null);
+  const [hoveredPlan, setHoveredPlan] = useState<string | null>(null);
 
   const userRole = (session?.user as { role?: string })?.role || "FREE";
-  const currentPlan = userRole === "FREE" ? "Free" : userRole === "PRO" ? "Pro" : "Team";
+  const currentPlan = userRole === "FREE" ? "Free" : userRole === "MINI" ? "Mini" : userRole === "STARTER" ? "Starter" : userRole === "PRO" ? "Pro" : "Team";
 
   // Handle success/cancel redirects from Stripe
   useEffect(() => {
@@ -38,11 +57,31 @@ export default function BillingPage() {
         icon: <CheckCircle2 size={18} />,
         duration: 5000,
       });
-      // Fire Meta Pixel purchase event for ad conversion tracking
-      trackPurchase({ content_name: "BuildFlow Pro", currency: "USD", value: 29 });
-      // Refresh session to pick up new role from DB
-      updateSession();
-      // Clean URL
+      trackPurchase({ content_name: "BuildFlow Subscription", currency: "INR" });
+
+      const syncSubscription = async (attempt = 1): Promise<void> => {
+        try {
+          const res = await fetch('/api/stripe/subscription', { method: 'POST' });
+          const data = await res.json();
+          if (data.synced) {
+            console.info('[billing] Subscription synced:', data.role);
+            await updateSession();
+            window.location.reload();
+          } else if (data.reason === 'no_active_subscription' && attempt < 3) {
+            setTimeout(() => syncSubscription(attempt + 1), attempt * 2000);
+          } else {
+            await updateSession();
+          }
+        } catch {
+          if (attempt < 3) {
+            setTimeout(() => syncSubscription(attempt + 1), attempt * 2000);
+          } else {
+            await updateSession();
+          }
+        }
+      };
+
+      setTimeout(() => syncSubscription(1), 2000);
       window.history.replaceState({}, "", "/dashboard/billing");
     } else if (canceled === "true") {
       toast.error(t('billing.checkoutCanceled'), {
@@ -56,54 +95,39 @@ export default function BillingPage() {
   useEffect(() => {
     api.executions.list({ limit: 1000 })
       .then(({ executions }) => {
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        
-        const todayExecutions = executions.filter(e => {
-          const startDate = new Date(e.startedAt);
-          startDate.setHours(0, 0, 0, 0);
-          return startDate.getTime() === today.getTime();
-        });
-
-        const limit = userRole === "FREE" ? 3 : 1000;
-        const tomorrow = new Date(today);
-        tomorrow.setDate(tomorrow.getDate() + 1);
-
-        setUsage({
-          used: todayExecutions.length,
-          limit,
-          resetDate: tomorrow.toISOString(),
-        });
+        const now = new Date();
+        const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+        const monthExecutions = executions.filter(e => new Date(e.startedAt) >= monthStart);
+        const limitMap: Record<string, number> = { FREE: 5, MINI: 10, STARTER: 30, PRO: 100 };
+        const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+        setUsage({ used: monthExecutions.length, limit: limitMap[userRole] || 1000, resetDate: nextMonth.toISOString() });
       })
       .catch(() => {
-        setUsage({
-          used: 0,
-          limit: userRole === "FREE" ? 3 : 1000,
-          resetDate: new Date(Date.now() + 86400000).toISOString(),
-        });
+        const now = new Date();
+        const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+        const limitMap: Record<string, number> = { FREE: 5, MINI: 10, STARTER: 30, PRO: 100 };
+        setUsage({ used: 0, limit: limitMap[userRole] || 1000, resetDate: nextMonth.toISOString() });
       })
       .finally(() => setLoading(false));
   }, [userRole]);
 
-  const handleUpgrade = async (plan: 'PRO' | 'TEAM_ADMIN') => {
+  const handleUpgrade = async (plan: 'MINI' | 'STARTER' | 'PRO' | 'TEAM_ADMIN') => {
     setUpgradingTo(plan);
     try {
-      const planKey = plan === 'PRO' ? 'PRO' : 'TEAM';
-
+      const planKey = plan === 'MINI' ? 'MINI' : plan === 'STARTER' ? 'STARTER' : plan === 'PRO' ? 'PRO' : 'TEAM';
       const res = await fetch('/api/stripe/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ plan: planKey }),
       });
-
       const data = await res.json();
       if (data.url) {
         window.location.href = data.url;
       } else {
         throw new Error(data.error || 'Failed to create checkout session');
       }
-    } catch (error) {
-      toast.error('Failed to start checkout. Please try again.');
+    } catch {
+      toast.error(t('billing.checkoutFailed'));
     } finally {
       setUpgradingTo(null);
     }
@@ -113,37 +137,79 @@ export default function BillingPage() {
     try {
       const res = await fetch('/api/stripe/portal', { method: 'POST' });
       const data = await res.json();
-      if (data.url) {
-        window.location.href = data.url;
-      }
-    } catch (error) {
-      toast.error('Failed to open billing portal.');
+      if (data.url) { window.location.href = data.url; }
+    } catch {
+      toast.error(t('billing.portalFailed'));
     }
   };
 
-  const plans = [
+  const currentIndex = TIER_ORDER.indexOf(currentPlan);
+
+  const plans = useMemo(() => {
+    const _isUpgrade = (planName: string) => TIER_ORDER.indexOf(planName) > currentIndex;
+    return [
     {
-      name: t('billing.free'),
-      price: "$0",
-      period: t('billing.forever'),
-      description: t('billing.freeDesc'),
+      name: t('billing.mini'),
+      tier: "Mini",
+      price: "99",
+      period: t('billing.perMonth'),
+      description: t('billing.miniDesc'),
+      icon: <Ruler size={20} />,
       features: [
-        t('billing.freeFeature1'),
-        t('billing.freeFeature2'),
-        t('billing.freeFeature3'),
-        t('billing.freeFeature4'),
+        t('billing.miniFeature1'),
+        t('billing.miniFeature2'),
+        t('billing.miniFeature3'),
+        t('billing.miniFeature4'),
+        t('billing.miniFeature5'),
       ],
-      cta: currentPlan === "Free" ? t('billing.currentPlan') : t('billing.downgrade'),
-      ctaDisabled: currentPlan === "Free",
+      nodeCredits: [
+        { icon: <Video size={13} />, label: t('billing.videoCredits'), value: "0" },
+        { icon: <Box size={13} />, label: t('billing.modelCredits'), value: "0" },
+        { icon: <Image size={13} />, label: t('billing.renderCredits'), value: "2" },
+      ],
+      cta: currentPlan === "Mini" ? t('billing.currentPlan') : _isUpgrade("Mini") ? t('billing.upgradeToMini') : t('billing.downgrade'),
+      ctaDisabled: currentPlan === "Mini",
       highlighted: false,
-      color: "#7C7C96",
-      planType: null,
+      color: "#F59E0B",
+      colorRgb: "245,158,11",
+      gradient: "linear-gradient(135deg, #F59E0B 0%, #FBBF24 100%)",
+      planType: "MINI",
+    },
+    {
+      name: t('billing.starter'),
+      tier: "Starter",
+      price: "799",
+      period: t('billing.perMonth'),
+      description: t('billing.starterDesc'),
+      icon: <Building2 size={20} />,
+      features: [
+        t('billing.starterFeature1'),
+        t('billing.starterFeature2'),
+        t('billing.starterFeature3'),
+        t('billing.starterFeature4'),
+        t('billing.starterFeature5'),
+        t('billing.starterFeature6'),
+      ],
+      nodeCredits: [
+        { icon: <Video size={13} />, label: t('billing.videoCredits'), value: "2" },
+        { icon: <Box size={13} />, label: t('billing.modelCredits'), value: "3" },
+        { icon: <Image size={13} />, label: t('billing.renderCredits'), value: "10" },
+      ],
+      cta: currentPlan === "Starter" ? t('billing.currentPlan') : _isUpgrade("Starter") ? t('billing.upgradeToStarter') : t('billing.downgrade'),
+      ctaDisabled: currentPlan === "Starter",
+      highlighted: false,
+      color: "#10B981",
+      colorRgb: "16,185,129",
+      gradient: "linear-gradient(135deg, #10B981 0%, #34D399 100%)",
+      planType: "STARTER",
     },
     {
       name: t('billing.pro'),
-      price: "$29",
+      tier: "Pro",
+      price: "1,999",
       period: t('billing.perMonth'),
       description: t('billing.proDesc'),
+      icon: <Crown size={20} />,
       savings: t('billing.proHighlight'),
       features: [
         t('billing.proFeature1'),
@@ -153,19 +219,27 @@ export default function BillingPage() {
         t('billing.proFeature5'),
         t('billing.proFeature6'),
       ],
-      cta: currentPlan === "Pro" ? t('billing.currentPlan') : t('billing.upgradeToPro'),
+      nodeCredits: [
+        { icon: <Video size={13} />, label: t('billing.videoCredits'), value: "5" },
+        { icon: <Box size={13} />, label: t('billing.modelCredits'), value: "10" },
+        { icon: <Image size={13} />, label: t('billing.renderCredits'), value: "30" },
+      ],
+      cta: currentPlan === "Pro" ? t('billing.currentPlan') : _isUpgrade("Pro") ? t('billing.upgradeToPro') : t('billing.downgrade'),
       ctaDisabled: currentPlan === "Pro",
       highlighted: true,
       color: "#4F8AFF",
+      colorRgb: "79,138,255",
       gradient: "linear-gradient(135deg, #4F8AFF 0%, #6366F1 100%)",
       badge: t('billing.mostPopular'),
-      planType: "PRO" as const,
+      planType: "PRO",
     },
     {
       name: t('billing.team'),
-      price: "$99",
+      tier: "Team",
+      price: "4,999",
       period: t('billing.perMonth'),
       description: t('billing.teamDesc'),
+      icon: <Users size={20} />,
       features: [
         t('billing.teamFeature1'),
         t('billing.teamFeature2'),
@@ -174,14 +248,20 @@ export default function BillingPage() {
         t('billing.teamFeature5'),
         t('billing.teamFeature6'),
       ],
-      cta: currentPlan === "Team" ? t('billing.currentPlan') : t('billing.upgradeToTeam'),
+      nodeCredits: [
+        { icon: <Video size={13} />, label: t('billing.videoCredits'), value: "15" },
+        { icon: <Box size={13} />, label: t('billing.modelCredits'), value: "30" },
+        { icon: <Image size={13} />, label: t('billing.renderCredits'), value: "\u221E" },
+      ],
+      cta: currentPlan === "Team" ? t('billing.currentPlan') : _isUpgrade("Team") ? t('billing.upgradeToTeam') : t('billing.downgrade'),
       ctaDisabled: currentPlan === "Team",
       highlighted: false,
       color: "#8B5CF6",
+      colorRgb: "139,92,246",
       gradient: "linear-gradient(135deg, #8B5CF6 0%, #A78BFA 100%)",
-      planType: "TEAM_ADMIN" as const,
+      planType: "TEAM_ADMIN",
     },
-  ];
+  ];}, [currentPlan, currentIndex, t]);
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
@@ -191,126 +271,124 @@ export default function BillingPage() {
       />
 
       <main className="flex-1 overflow-y-auto p-6 space-y-8">
-        {/* Hackathon Banner - More Prominent */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="relative rounded-[16px] border-2 border-[#F59E0B] bg-gradient-to-r from-[#F59E0B15] via-[#EF444415] to-[#F59E0B15] p-6 overflow-hidden"
-        >
-          {/* Animated gradient background */}
-          <motion.div
-            animate={{
-              background: [
-                "radial-gradient(circle at 20% 50%, rgba(245,158,11,0.15), transparent 50%)",
-                "radial-gradient(circle at 80% 50%, rgba(239,68,68,0.15), transparent 50%)",
-                "radial-gradient(circle at 20% 50%, rgba(245,158,11,0.15), transparent 50%)",
-              ],
-            }}
-            transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
-            className="absolute inset-0"
-          />
-          
-          <div className="relative z-10 flex items-center gap-5 billing-hackathon-inner">
-            <motion.div
-              animate={{ rotate: [0, 10, -10, 0], scale: [1, 1.1, 1] }}
-              transition={{ duration: 2, repeat: Infinity }}
-              className="w-16 h-16 rounded-[14px] bg-gradient-to-br from-[#F59E0B] to-[#EF4444] flex items-center justify-center shadow-[0_8px_24px_rgba(245,158,11,0.4)]"
-            >
-              <Sparkles size={28} className="text-white" />
-            </motion.div>
-            <div className="flex-1">
-              <div className="flex items-center gap-3 mb-2">
-                <h3 className="text-xl font-bold text-[#F0F0F5]">🏆 {t('billing.hackathonSpecial')}</h3>
-                <motion.span
-                  animate={{ scale: [1, 1.1, 1] }}
-                  transition={{ duration: 1.5, repeat: Infinity }}
-                  className="px-3 py-1 rounded-full bg-gradient-to-r from-[#F59E0B] to-[#EF4444] text-white text-xs font-bold shadow-[0_4px_12px_rgba(245,158,11,0.4)]"
-                >
-                  {t('billing.fiftyOff')}
-                </motion.span>
-              </div>
-              <p className="text-sm text-[#C0C0D0] mb-1">
-                {t('billing.hackathonDesc')}
-              </p>
-              <div className="flex items-center gap-2 text-xs text-[#F59E0B]">
-                <span className="font-semibold">⏰ Limited-time offer</span>
-              </div>
-            </div>
-            <button 
-              onClick={() => handleUpgrade('PRO')}
-              disabled={upgradingTo === 'PRO'}
-              className="px-7 py-3 rounded-[10px] bg-gradient-to-r from-[#F59E0B] to-[#EF4444] text-white font-bold text-sm hover:shadow-[0_0_30px_rgba(245,158,11,0.5)] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-            >
-              {upgradingTo === 'PRO' ? (
-                <>
-                  <Loader2 size={16} className="animate-spin" />
-                  {t('billing.processing')}
-                </>
-              ) : (
-                <>
-                  <Zap size={16} fill="currentColor" />
-                  {t('billing.claimOffer')}
-                </>
-              )}
-            </button>
-          </div>
-        </motion.div>
 
-        {/* Security section removed for security best practices */}
-
-        {/* Current Usage (if FREE) */}
+        {/* ── Launch Offer Banner — FREE users only ── */}
         {userRole === "FREE" && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-            className="rounded-[16px] border border-[rgba(255,255,255,0.05)] bg-[#111120] p-6"
+            className="relative rounded-[16px] border-2 border-[#F59E0B] bg-gradient-to-r from-[#F59E0B15] via-[#EF444415] to-[#F59E0B15] p-6 overflow-hidden"
           >
-            <div className="flex items-start justify-between mb-5">
-              <div>
-                <h3 className="text-lg font-bold text-[#F0F0F5] mb-1">{t('billing.currentPlanFree')}</h3>
-                <p className="text-sm text-[#7C7C96]">
-                  {loading ? t('billing.loadingUsage') : `${usage?.used || 0} of ${usage?.limit || 3} ${t('billing.runsUsed')}`}
-                </p>
-              </div>
-              <div className="text-right">
-                <div className="text-3xl font-bold text-[#4F8AFF]">
-                  {loading ? "—" : `${usage?.used || 0}/${usage?.limit || 3}`}
-                </div>
-                <div className="text-xs text-[#7C7C96] mt-1">
-                  {loading ? "" : `${t('billing.resets')} ${new Date(usage?.resetDate || "").toLocaleDateString()}`}
-                </div>
-              </div>
-            </div>
-
-            {!loading && usage && (
-              <div className="space-y-3">
-                <div className="h-3 bg-[#16162A] rounded-full overflow-hidden relative">
-                  <motion.div
-                    initial={{ width: 0 }}
-                    animate={{ width: `${Math.min((usage.used / usage.limit) * 100, 100)}%` }}
-                    transition={{ duration: 0.8, ease: "easeOut" }}
-                    className="h-full bg-gradient-to-r from-[#4F8AFF] to-[#8B5CF6] relative"
+            <motion.div
+              animate={{
+                background: [
+                  "radial-gradient(circle at 20% 50%, rgba(245,158,11,0.15), transparent 50%)",
+                  "radial-gradient(circle at 80% 50%, rgba(239,68,68,0.15), transparent 50%)",
+                  "radial-gradient(circle at 20% 50%, rgba(245,158,11,0.15), transparent 50%)",
+                ],
+              }}
+              transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
+              className="absolute inset-0"
+            />
+            <div className="relative z-10 flex items-center gap-5 billing-hackathon-inner">
+              <motion.div
+                animate={{ rotate: [0, 10, -10, 0], scale: [1, 1.1, 1] }}
+                transition={{ duration: 2, repeat: Infinity }}
+                className="w-16 h-16 rounded-[14px] bg-gradient-to-br from-[#F59E0B] to-[#EF4444] flex items-center justify-center shadow-[0_8px_24px_rgba(245,158,11,0.4)]"
+              >
+                <Sparkles size={28} className="text-white" />
+              </motion.div>
+              <div className="flex-1">
+                <div className="flex items-center gap-3 mb-2">
+                  <h3 className="text-xl font-bold text-[#F0F0F5]">{t('billing.launchOffer')}</h3>
+                  <motion.span
+                    animate={{ scale: [1, 1.1, 1] }}
+                    transition={{ duration: 1.5, repeat: Infinity }}
+                    className="px-3 py-1 rounded-full bg-gradient-to-r from-[#F59E0B] to-[#EF4444] text-white text-xs font-bold shadow-[0_4px_12px_rgba(245,158,11,0.4)]"
                   >
-                    {/* Shimmer effect */}
-                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-shimmer" />
-                  </motion.div>
+                    {t('billing.earlyBird')}
+                  </motion.span>
                 </div>
-                {usage.used >= usage.limit && (
-                  <div className="flex items-center gap-2 p-3 rounded-lg bg-[rgba(239,68,68,0.08)] border border-[rgba(239,68,68,0.2)]">
-                    <Zap size={16} className="text-[#EF4444]" />
-                    <p className="text-sm text-[#EF4444] flex-1">
-                      {t('billing.dailyLimit')}
-                    </p>
-                  </div>
-                )}
+                <p className="text-sm text-[#C0C0D0]">{t('billing.launchOfferDesc')}</p>
               </div>
-            )}
+              <button
+                onClick={() => handleUpgrade('MINI')}
+                disabled={upgradingTo === 'MINI'}
+                className="px-7 py-3 rounded-[10px] bg-gradient-to-r from-[#F59E0B] to-[#EF4444] text-white font-bold text-sm hover:shadow-[0_0_30px_rgba(245,158,11,0.5)] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                {upgradingTo === 'MINI' ? (
+                  <><Loader2 size={16} className="animate-spin" />{t('billing.processing')}</>
+                ) : (
+                  <><Zap size={16} fill="currentColor" />{t('billing.startAt99')}</>
+                )}
+              </button>
+            </div>
           </motion.div>
         )}
 
-        {/* Pro/Team Current Plan */}
-        {userRole !== "FREE" && (
+        {/* ── Current Usage Card ── */}
+        {(userRole === "FREE" || userRole === "MINI" || userRole === "STARTER" || userRole === "PRO") && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.15 }}
+            className="relative rounded-[16px] border border-[rgba(255,255,255,0.06)] bg-[#111120] p-6 overflow-hidden"
+          >
+            <BlueprintGrid color="#4F8AFF" opacity={0.03} />
+            <div className="relative z-10">
+              <div className="flex items-start justify-between mb-5">
+                <div>
+                  <div className="flex items-center gap-3 mb-1">
+                    <h3 className="text-lg font-bold text-[#F0F0F5]">{t('billing.currentPlanLabel')}: {currentPlan}</h3>
+                    {userRole !== "FREE" && (
+                      <button
+                        onClick={handleManageSubscription}
+                        className="px-3 py-1 rounded-lg text-[11px] font-medium text-[#9898B0] bg-[#16162A] hover:bg-[#2A2A3E] border border-[rgba(255,255,255,0.05)] transition-colors"
+                      >
+                        {t('billing.manageBilling')}
+                      </button>
+                    )}
+                  </div>
+                  <p className="text-sm text-[#7C7C96]">
+                    {loading ? t('billing.loadingUsage') : `${usage?.used || 0} of ${usage?.limit || 5} ${t('billing.runsUsed')}`}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <div className="text-3xl font-bold text-[#4F8AFF]">
+                    {loading ? "\u2014" : `${usage?.used || 0}/${usage?.limit || 5}`}
+                  </div>
+                  <div className="text-xs text-[#7C7C96] mt-1">
+                    {loading ? "" : `${t('billing.resets')} ${new Date(usage?.resetDate || "").toLocaleDateString()}`}
+                  </div>
+                </div>
+              </div>
+
+              {!loading && usage && (
+                <div className="space-y-3">
+                  <div className="h-3 bg-[#16162A] rounded-full overflow-hidden relative">
+                    <motion.div
+                      initial={{ width: 0 }}
+                      animate={{ width: `${Math.min((usage.used / usage.limit) * 100, 100)}%` }}
+                      transition={{ duration: 0.8, ease: "easeOut" }}
+                      className="h-full bg-gradient-to-r from-[#4F8AFF] to-[#8B5CF6] relative"
+                    >
+                      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-shimmer" />
+                    </motion.div>
+                  </div>
+                  {usage.used >= usage.limit && (
+                    <div className="flex items-center gap-2 p-3 rounded-lg bg-[rgba(239,68,68,0.08)] border border-[rgba(239,68,68,0.2)]">
+                      <Zap size={16} className="text-[#EF4444]" />
+                      <p className="text-sm text-[#EF4444] flex-1">{t('billing.monthlyLimit')}</p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </motion.div>
+        )}
+
+        {/* ── Team Current Plan ── */}
+        {(userRole === "TEAM_ADMIN" || userRole === "PLATFORM_ADMIN") && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -322,9 +400,7 @@ export default function BillingPage() {
                 <Zap size={28} className="text-white" fill="white" />
               </div>
               <div className="flex-1">
-                <h3 className="text-xl font-bold text-[#F0F0F5] mb-1">
-                  {currentPlan === "Pro" ? t('billing.currentPlanPro') : t('billing.currentPlanTeam')}
-                </h3>
+                <h3 className="text-xl font-bold text-[#F0F0F5] mb-1">{t('billing.currentPlanTeam')}</h3>
                 <p className="text-sm text-[#C0C0D0]">{t('billing.unlimitedRuns')}</p>
               </div>
               <button
@@ -337,105 +413,283 @@ export default function BillingPage() {
           </motion.div>
         )}
 
-        {/* Pricing Tiers */}
+        {/* ── Pricing Section ── */}
         <div>
-          <div className="text-center mb-6">
+          {/* Section header with free tier note */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+            className="text-center mb-8"
+          >
             <h2 className="text-2xl font-bold text-[#F0F0F5] mb-2">{t('billing.choosePlan')}</h2>
-            <p className="text-sm text-[#7C7C96]">{t('billing.moneyBack')}</p>
-          </div>
+            <p className="text-sm text-[#7C7C96] mb-3">{t('billing.moneyBack')}</p>
+            {/* Free tier mention */}
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[#16162A] border border-[rgba(255,255,255,0.05)]">
+              <Shield size={14} className="text-[#7C7C96]" />
+              <span className="text-xs text-[#9898B0]">
+                {t('billing.freeTierNote')}
+              </span>
+            </div>
+          </motion.div>
 
-          <div className="billing-plans grid grid-cols-3 gap-6">
-            {plans.map((plan, index) => (
-              <motion.div
-                key={plan.name}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.3 + index * 0.1 }}
-                className={`rounded-[16px] border p-7 transition-all hover:-translate-y-1 relative ${
-                  plan.highlighted
-                    ? "border-[#4F8AFF] bg-gradient-to-b from-[#4F8AFF08] to-[#12121E] shadow-[0_0_30px_rgba(79,138,255,0.15)]"
-                    : "border-[rgba(255,255,255,0.05)] bg-[#111120]"
-                }`}
-                style={plan.highlighted ? { borderTopWidth: 3 } : {}}
-              >
-                {/* Badge */}
-                {plan.badge && (
-                  <motion.div
-                    initial={{ scale: 0 }}
-                    animate={{ scale: 1 }}
-                    transition={{ delay: 0.5 + index * 0.1, type: "spring" }}
-                    className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full text-white text-[10px] font-bold tracking-wider"
-                    style={{ background: plan.gradient }}
-                  >
-                    {plan.badge}
-                  </motion.div>
-                )}
+          {/* ── 4-column pricing grid ── */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+            {plans.map((plan, index) => {
+              const isActive = plan.ctaDisabled;
+              const isHovered = hoveredPlan === plan.tier;
 
-                <div className="mb-5">
-                  <h3 className="text-xl font-bold text-[#F0F0F5] mb-1">{plan.name}</h3>
-                  <p className="text-xs text-[#7C7C96]">{plan.description}</p>
-                </div>
-
-                <div className="mb-5">
-                  <div className="flex items-baseline gap-2 mb-1">
-                    <span className="text-5xl font-bold text-[#F0F0F5]">{plan.price}</span>
-                    <span className="text-sm text-[#7C7C96]">/{plan.period.split(' ')[1] || plan.period}</span>
-                  </div>
-                  {plan.savings && (
-                    <div className="text-xs text-[#10B981] font-semibold">{plan.savings}</div>
-                  )}
-                </div>
-
-                <ul className="space-y-3 mb-6">
-                  {plan.features.map((feature, idx) => (
-                    <li key={idx} className="flex items-start gap-2.5 text-sm">
-                      <Check size={16} className="text-[#10B981] mt-0.5 flex-shrink-0" strokeWidth={3} />
-                      <span className="text-[#C0C0D0]">{feature}</span>
-                    </li>
-                  ))}
-                </ul>
-
-                <button
-                  disabled={plan.ctaDisabled || upgradingTo !== null}
-                  onClick={() => plan.planType && handleUpgrade(plan.planType)}
-                  className={`w-full py-3.5 rounded-[10px] font-bold text-sm transition-all flex items-center justify-center gap-2 ${
-                    plan.ctaDisabled || upgradingTo !== null
-                      ? "bg-[#16162A] text-[#55556A] cursor-not-allowed"
+              return (
+                <motion.div
+                  key={plan.tier}
+                  initial={{ opacity: 0, y: 30 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.25 + index * 0.1, type: "spring", stiffness: 200, damping: 20 }}
+                  onMouseEnter={() => setHoveredPlan(plan.tier)}
+                  onMouseLeave={() => setHoveredPlan(null)}
+                  className="relative rounded-[20px] border overflow-hidden transition-all duration-300"
+                  style={{
+                    borderColor: isActive
+                      ? plan.color
                       : plan.highlighted
-                      ? "text-white hover:shadow-[0_0_30px_rgba(79,138,255,0.4)]"
-                      : "bg-[#16162A] text-[#F0F0F5] hover:bg-[#2A2A3E] border border-[rgba(255,255,255,0.05)]"
-                  }`}
-                  style={plan.highlighted && !plan.ctaDisabled && upgradingTo === null ? { background: plan.gradient } : {}}
+                      ? `rgba(${plan.colorRgb},0.4)`
+                      : "rgba(255,255,255,0.06)",
+                    borderWidth: isActive || plan.highlighted ? 2 : 1,
+                    background: "#0D0D1A",
+                    transform: isHovered ? "translateY(-6px)" : "translateY(0)",
+                    boxShadow: isActive
+                      ? `0 8px 40px rgba(${plan.colorRgb},0.15), 0 0 0 1px rgba(${plan.colorRgb},0.1)`
+                      : isHovered
+                      ? `0 20px 60px rgba(0,0,0,0.4), 0 0 30px rgba(${plan.colorRgb},0.08)`
+                      : "0 4px 20px rgba(0,0,0,0.2)",
+                  }}
                 >
-                  {upgradingTo !== null && upgradingTo === plan.planType ? (
-                    <>
-                      <Loader2 size={16} className="animate-spin" />
-                      {t('billing.processing')}
-                    </>
-                  ) : (
-                    plan.cta
-                  )}
-                </button>
-              </motion.div>
-            ))}
+                  {/* Blueprint grid overlay */}
+                  <BlueprintGrid color={plan.color} opacity={isHovered ? 0.06 : 0.03} />
+
+                  {/* Top accent line */}
+                  <div
+                    className="absolute top-0 left-0 right-0 h-[3px]"
+                    style={{ background: plan.gradient }}
+                  />
+
+                  {/* Animated glow on hover */}
+                  <AnimatePresence>
+                    {isHovered && (
+                      <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        transition={{ duration: 0.3 }}
+                        className="absolute inset-0 pointer-events-none"
+                        style={{
+                          background: `radial-gradient(ellipse at 50% 0%, rgba(${plan.colorRgb},0.08) 0%, transparent 60%)`,
+                        }}
+                      />
+                    )}
+                  </AnimatePresence>
+
+                  {/* Badge */}
+                  {isActive ? (
+                    <motion.div
+                      initial={{ scale: 0, y: -10 }}
+                      animate={{ scale: 1, y: 0 }}
+                      transition={{ delay: 0.4 + index * 0.1, type: "spring", stiffness: 300 }}
+                      className="absolute -top-[1px] left-1/2 -translate-x-1/2 z-20"
+                    >
+                      <div
+                        className="px-4 py-1.5 rounded-b-lg text-white text-[10px] font-bold tracking-[0.15em] uppercase flex items-center gap-1.5"
+                        style={{ background: plan.gradient }}
+                      >
+                        <CheckCircle2 size={11} />
+                        {t('billing.activePlan').toUpperCase()}
+                      </div>
+                    </motion.div>
+                  ) : plan.badge ? (
+                    <motion.div
+                      initial={{ scale: 0, y: -10 }}
+                      animate={{ scale: 1, y: 0 }}
+                      transition={{ delay: 0.4 + index * 0.1, type: "spring", stiffness: 300 }}
+                      className="absolute -top-[1px] left-1/2 -translate-x-1/2 z-20"
+                    >
+                      <div
+                        className="px-4 py-1.5 rounded-b-lg text-white text-[10px] font-bold tracking-[0.15em] uppercase flex items-center gap-1.5"
+                        style={{ background: plan.gradient }}
+                      >
+                        <Sparkles size={11} />
+                        {plan.badge}
+                      </div>
+                    </motion.div>
+                  ) : null}
+
+                  {/* Card content */}
+                  <div className="relative z-10 p-6 pt-7">
+                    {/* Plan icon + name */}
+                    <div className="flex items-center gap-3 mb-4">
+                      <motion.div
+                        animate={isActive ? { rotate: [0, 5, -5, 0] } : {}}
+                        transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+                        className="w-10 h-10 rounded-xl flex items-center justify-center"
+                        style={{
+                          background: `linear-gradient(135deg, rgba(${plan.colorRgb},0.15) 0%, rgba(${plan.colorRgb},0.05) 100%)`,
+                          border: `1px solid rgba(${plan.colorRgb},0.2)`,
+                        }}
+                      >
+                        <span style={{ color: plan.color }}>{plan.icon}</span>
+                      </motion.div>
+                      <div>
+                        <h3 className="text-lg font-bold text-[#F0F0F5]">{plan.name}</h3>
+                        <p className="text-[11px] text-[#7C7C96]">{plan.description}</p>
+                      </div>
+                    </div>
+
+                    {/* Price */}
+                    <div className="mb-5">
+                      <div className="flex items-baseline gap-1">
+                        <span className="text-[13px] font-medium text-[#7C7C96]">\u20B9</span>
+                        <motion.span
+                          className="text-4xl font-extrabold text-[#F0F0F5] tracking-tight"
+                          style={isActive ? { color: plan.color } : {}}
+                        >
+                          {plan.price}
+                        </motion.span>
+                        <span className="text-xs text-[#55556A] ml-1">/ {t('billing.perMonthShort')}</span>
+                      </div>
+                      {plan.savings && (
+                        <motion.div
+                          initial={{ opacity: 0, x: -10 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: 0.6 }}
+                          className="mt-1.5 text-xs font-semibold"
+                          style={{ color: plan.color }}
+                        >
+                          {plan.savings}
+                        </motion.div>
+                      )}
+                    </div>
+
+                    {/* AI Credits */}
+                    <div
+                      className="mb-5 p-3 rounded-xl"
+                      style={{
+                        background: `linear-gradient(135deg, rgba(${plan.colorRgb},0.04) 0%, rgba(${plan.colorRgb},0.01) 100%)`,
+                        border: `1px solid rgba(${plan.colorRgb},0.08)`,
+                      }}
+                    >
+                      <div className="text-[10px] font-bold text-[#5C5C78] mb-2.5 uppercase tracking-[0.12em]">
+                        {t('billing.aiCredits')}
+                      </div>
+                      <div className="space-y-2">
+                        {plan.nodeCredits.map((credit, idx) => (
+                          <div key={idx} className="flex items-center justify-between text-xs">
+                            <div className="flex items-center gap-1.5 text-[#9898B0]">
+                              {credit.icon}
+                              <span>{credit.label}</span>
+                            </div>
+                            <span
+                              className="font-bold"
+                              style={{
+                                color: credit.value === "0"
+                                  ? "#3A3A50"
+                                  : credit.value === "\u221E"
+                                  ? "#10B981"
+                                  : plan.color,
+                              }}
+                            >
+                              {credit.value === "0" ? "\u2014" : credit.value}
+                              {credit.value !== "0" && credit.value !== "\u221E" ? "/mo" : ""}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Features */}
+                    <ul className="space-y-2.5 mb-6">
+                      {plan.features.map((feature, idx) => (
+                        <motion.li
+                          key={idx}
+                          initial={{ opacity: 0, x: -8 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: 0.35 + index * 0.1 + idx * 0.04 }}
+                          className="flex items-start gap-2.5 text-xs"
+                        >
+                          <div
+                            className="w-4 h-4 rounded-full flex items-center justify-center mt-0.5 flex-shrink-0"
+                            style={{ background: `rgba(${plan.colorRgb},0.12)` }}
+                          >
+                            <Check size={10} style={{ color: plan.color }} strokeWidth={3} />
+                          </div>
+                          <span className="text-[#C0C0D0]">{feature}</span>
+                        </motion.li>
+                      ))}
+                    </ul>
+
+                    {/* CTA Button */}
+                    <motion.button
+                      whileHover={!isActive && upgradingTo === null ? { scale: 1.02 } : {}}
+                      whileTap={!isActive && upgradingTo === null ? { scale: 0.98 } : {}}
+                      disabled={isActive || upgradingTo !== null}
+                      onClick={() => plan.planType && handleUpgrade(plan.planType as 'MINI' | 'STARTER' | 'PRO' | 'TEAM_ADMIN')}
+                      className="w-full py-3.5 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2"
+                      style={
+                        isActive
+                          ? {
+                              background: `rgba(${plan.colorRgb},0.08)`,
+                              border: `1px solid rgba(${plan.colorRgb},0.2)`,
+                              color: plan.color,
+                              cursor: "default",
+                            }
+                          : plan.highlighted && upgradingTo === null
+                          ? {
+                              background: plan.gradient,
+                              color: "#fff",
+                              boxShadow: `0 4px 20px rgba(${plan.colorRgb},0.3)`,
+                            }
+                          : {
+                              background: "#16162A",
+                              color: "#F0F0F5",
+                              border: "1px solid rgba(255,255,255,0.06)",
+                            }
+                      }
+                    >
+                      {upgradingTo === plan.planType ? (
+                        <><Loader2 size={16} className="animate-spin" />{t('billing.processing')}</>
+                      ) : isActive ? (
+                        <><CheckCircle2 size={15} />{plan.cta}</>
+                      ) : (
+                        <>
+                          {plan.cta}
+                          <ArrowRight size={14} style={{ opacity: 0.6 }} />
+                        </>
+                      )}
+                    </motion.button>
+                  </div>
+                </motion.div>
+              );
+            })}
           </div>
         </div>
 
-        {/* Product highlights */}
+        {/* ── Built for AEC section ── */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.7 }}
+          className="relative rounded-[16px] border border-[rgba(255,255,255,0.04)] bg-[#0D0D1A] p-8 overflow-hidden"
         >
-          <div className="text-center mb-6">
+          <BlueprintGrid color="#4F8AFF" opacity={0.025} />
+          <div className="relative z-10 text-center">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[rgba(79,138,255,0.08)] border border-[rgba(79,138,255,0.15)] mb-4">
+              <Building2 size={12} className="text-[#4F8AFF]" />
+              <span className="text-[10px] font-bold text-[#4F8AFF] uppercase tracking-wider">{t('billing.aecSubtitle')}</span>
+            </div>
             <h3 className="text-lg font-bold text-[#F0F0F5] mb-2">{t('billing.builtForAec')}</h3>
-            <p className="text-sm text-[#7C7C96]">
+            <p className="text-sm text-[#7C7C96] max-w-lg mx-auto">
               {t('billing.builtForAecDesc')}
             </p>
           </div>
         </motion.div>
-
-        {/* FAQ section removed */}
       </main>
 
       <style jsx global>{`

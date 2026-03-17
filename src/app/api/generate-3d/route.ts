@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
   }
 
   const userId: string = session.user.id;
-  const userRole = (session.user as { role?: string }).role as "FREE" | "PRO" | "TEAM_ADMIN" | "PLATFORM_ADMIN" || "FREE";
+  const userRole = (session.user as { role?: string }).role as "FREE" | "MINI" | "STARTER" | "PRO" | "TEAM_ADMIN" | "PLATFORM_ADMIN" || "FREE";
 
   // Rate limiting
   try {
@@ -29,12 +29,16 @@ export async function POST(req: NextRequest) {
 
     if (!rateLimitResult.success) {
       const resetDate = new Date(rateLimitResult.reset);
-      const hoursUntilReset = Math.ceil((resetDate.getTime() - Date.now()) / (1000 * 60 * 60));
+      const daysUntilReset = Math.ceil((resetDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
       logRateLimitHit(userId, userRole, rateLimitResult.remaining);
 
       const rateLimitError = userRole === "FREE"
-        ? UserErrors.RATE_LIMIT_FREE(hoursUntilReset)
-        : UserErrors.RATE_LIMIT_PRO(Math.ceil(hoursUntilReset * 60));
+        ? UserErrors.RATE_LIMIT_FREE(daysUntilReset)
+        : userRole === "MINI"
+        ? UserErrors.RATE_LIMIT_MINI(daysUntilReset)
+        : userRole === "STARTER"
+        ? UserErrors.RATE_LIMIT_STARTER(daysUntilReset)
+        : UserErrors.RATE_LIMIT_PRO(daysUntilReset);
 
       return NextResponse.json(
         formatErrorResponse(rateLimitError),

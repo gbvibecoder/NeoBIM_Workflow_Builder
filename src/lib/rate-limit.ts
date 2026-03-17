@@ -35,19 +35,35 @@ try {
   });
 }
 
-const FREE_TIER_LIMIT = parseInt(process.env.FREE_TIER_EXECUTIONS_PER_DAY || "10");
-const PRO_TIER_LIMIT = parseInt(process.env.PRO_TIER_EXECUTIONS_PER_DAY || "100");
+const FREE_TIER_LIMIT = parseInt(process.env.FREE_TIER_EXECUTIONS_PER_MONTH || "5");
+const MINI_TIER_LIMIT = parseInt(process.env.MINI_TIER_EXECUTIONS_PER_MONTH || "10");
+const STARTER_TIER_LIMIT = parseInt(process.env.STARTER_TIER_EXECUTIONS_PER_MONTH || "30");
+const PRO_TIER_LIMIT = parseInt(process.env.PRO_TIER_EXECUTIONS_PER_MONTH || "100");
 
 export const freeTierRateLimit = new Ratelimit({
   redis,
-  limiter: Ratelimit.slidingWindow(FREE_TIER_LIMIT, "1 d"),
+  limiter: Ratelimit.slidingWindow(FREE_TIER_LIMIT, "30 d"),
   analytics: true,
   prefix: "@upstash/ratelimit:execute-node:free",
 });
 
+export const miniTierRateLimit = new Ratelimit({
+  redis,
+  limiter: Ratelimit.slidingWindow(MINI_TIER_LIMIT, "30 d"),
+  analytics: true,
+  prefix: "@upstash/ratelimit:execute-node:mini",
+});
+
+export const starterTierRateLimit = new Ratelimit({
+  redis,
+  limiter: Ratelimit.slidingWindow(STARTER_TIER_LIMIT, "30 d"),
+  analytics: true,
+  prefix: "@upstash/ratelimit:execute-node:starter",
+});
+
 export const proTierRateLimit = new Ratelimit({
   redis,
-  limiter: Ratelimit.slidingWindow(PRO_TIER_LIMIT, "1 d"),
+  limiter: Ratelimit.slidingWindow(PRO_TIER_LIMIT, "30 d"),
   analytics: true,
   prefix: "@upstash/ratelimit:execute-node:pro",
 });
@@ -58,17 +74,17 @@ export const proTierRateLimit = new Ratelimit({
  */
 export function isAdminUser(userEmail?: string): boolean {
   if (!userEmail) return false;
-  
+
   const adminEmails = process.env.ADMIN_EMAILS;
   if (!adminEmails) return false;
-  
+
   const adminList = adminEmails.split(',').map(email => email.trim().toLowerCase());
   return adminList.includes(userEmail.toLowerCase());
 }
 
 export async function checkRateLimit(
   userId: string,
-  userRole: "FREE" | "PRO" | "TEAM_ADMIN" | "PLATFORM_ADMIN",
+  userRole: "FREE" | "MINI" | "STARTER" | "PRO" | "TEAM_ADMIN" | "PLATFORM_ADMIN",
   userEmail?: string
 ) {
   // Check if user is in admin list (bypasses rate limits)
@@ -82,9 +98,28 @@ export async function checkRateLimit(
     };
   }
 
+  // Team/Platform admins bypass execution rate limits
+  if (userRole === "TEAM_ADMIN" || userRole === "PLATFORM_ADMIN") {
+    return {
+      success: true,
+      limit: 999999,
+      remaining: 999999,
+      reset: Date.now() + 86400000,
+      pending: Promise.resolve(),
+    };
+  }
+
   // Apply role-based rate limiting
-  if (userRole === "PRO" || userRole === "TEAM_ADMIN" || userRole === "PLATFORM_ADMIN") {
+  if (userRole === "PRO") {
     return await proTierRateLimit.limit(userId);
+  }
+
+  if (userRole === "STARTER") {
+    return await starterTierRateLimit.limit(userId);
+  }
+
+  if (userRole === "MINI") {
+    return await miniTierRateLimit.limit(userId);
   }
 
   return await freeTierRateLimit.limit(userId);
@@ -93,9 +128,60 @@ export async function checkRateLimit(
 export function logRateLimitHit(userId: string, userRole: string, remaining: number) {
   console.warn("[RATE_LIMIT] User " + userId + " (" + userRole + ") hit rate limit. Remaining: " + remaining);
 
-  // 🔥 TRACK RATE LIMIT HIT
   if (remaining === 0) {
     trackRateLimitHit(userId, "execute-node", userRole);
+  }
+}
+
+// ─── Per-node-type metered limits (video, 3D, renders) ──────────────────────
+
+/**
+ * Check and enforce per-node-type monthly limits.
+ * Uses atomic Redis INCR with monthly key auto-expiry.
+ * Returns { allowed, used, limit }.
+ */
+export async function checkNodeTypeLimit(
+  userId: string,
+  nodeType: "video" | "3d" | "render",
+  limit: number
+): Promise<{ allowed: boolean; used: number; limit: number }> {
+  // Unlimited
+  if (limit < 0) return { allowed: true, used: 0, limit: -1 };
+
+  // Blocked (limit = 0)
+  if (limit === 0) return { allowed: false, used: 0, limit: 0 };
+
+  try {
+    const now = new Date();
+    const monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const key = `node-limit:${userId}:${nodeType}:${monthKey}`;
+
+    // Atomic increment
+    const newCount = await redis.incr(key);
+
+    // Set TTL on first increment so key auto-cleans after month ends
+    if (newCount === 1) {
+      const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+      const ttl = Math.ceil((endOfMonth.getTime() - now.getTime()) / 1000) + 86400; // +1 day buffer
+      await redis.expire(key, ttl);
+    }
+
+    // Over limit — roll back the increment
+    if (newCount > limit) {
+      await redis.decr(key);
+      return { allowed: false, used: limit, limit };
+    }
+
+    return { allowed: true, used: newCount, limit };
+  } catch (error) {
+    // In development without Redis, allow through
+    if (process.env.NODE_ENV === "development") {
+      console.warn(`[rate-limit] Redis unavailable for node-type ${nodeType}, allowing in dev mode:`, error);
+      return { allowed: true, used: 0, limit };
+    }
+    // In production, fail closed
+    console.error(`[rate-limit] Node-type limit check failed for ${nodeType}:`, error);
+    return { allowed: false, used: 0, limit };
   }
 }
 
@@ -104,7 +190,7 @@ export function logRateLimitHit(userId: string, userRole: string, remaining: num
 /**
  * Check if this workflow execution has already been counted for rate limiting.
  * Returns true if already counted (skip rate limit), false if first time (count it).
- * Uses a Redis key with 24h TTL to track seen execution IDs.
+ * Uses a Redis key with 30-day TTL to track seen execution IDs.
  */
 export async function isExecutionAlreadyCounted(
   userId: string,
@@ -115,8 +201,8 @@ export async function isExecutionAlreadyCounted(
     const key = `exec-seen:${userId}:${executionId}`;
     const exists = await redis.get(key);
     if (exists) return true;
-    // Mark as seen with 24h TTL
-    await redis.set(key, "1", { ex: 86400 });
+    // Mark as seen with 30-day TTL (matches monthly window)
+    await redis.set(key, "1", { ex: 2592000 });
     return false;
   } catch {
     // On Redis error, don't dedup — count the request

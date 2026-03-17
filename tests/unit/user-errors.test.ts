@@ -86,46 +86,46 @@ describe("UserErrors — Factory Functions", () => {
   });
 
   describe("RATE_LIMIT_FREE", () => {
-    it("should show hours until reset", () => {
+    it("should show days until reset", () => {
       const error = UserErrors.RATE_LIMIT_FREE(12);
       expect(error.code).toBe("RATE_001");
-      expect(error.message).toContain("12 hours");
-      expect(error.action).toBe("Upgrade to Pro");
+      expect(error.message).toContain("12 days");
+      expect(error.action).toBe("Upgrade to Mini");
       expect(error.actionUrl).toBe("/dashboard/billing");
     });
 
-    it("should use singular hour for 1", () => {
+    it("should use singular day for 1", () => {
       const error = UserErrors.RATE_LIMIT_FREE(1);
-      expect(error.message).toContain("1 hour");
-      expect(error.message).not.toContain("1 hours");
+      expect(error.message).toContain("1 day");
+      expect(error.message).not.toContain("1 days");
     });
 
-    it("should use plural hours for > 1", () => {
+    it("should use plural days for > 1", () => {
       const error = UserErrors.RATE_LIMIT_FREE(5);
-      expect(error.message).toContain("5 hours");
+      expect(error.message).toContain("5 days");
     });
   });
 
   describe("RATE_LIMIT_PRO", () => {
-    it("should show minutes until reset", () => {
+    it("should show days until reset", () => {
       const error = UserErrors.RATE_LIMIT_PRO(5);
       expect(error.code).toBe("RATE_002");
-      expect(error.message).toContain("5 minutes");
+      expect(error.message).toContain("5 days");
     });
 
-    it("should use singular minute for 1", () => {
+    it("should use singular day for 1", () => {
       const error = UserErrors.RATE_LIMIT_PRO(1);
-      expect(error.message).toContain("1 minute");
-      expect(error.message).not.toContain("1 minutes");
+      expect(error.message).toContain("1 day");
+      expect(error.message).not.toContain("1 days");
     });
   });
 
   describe("WORKFLOW_LIMIT_REACHED", () => {
     it("should include limit number", () => {
-      const error = UserErrors.WORKFLOW_LIMIT_REACHED(5);
+      const error = UserErrors.WORKFLOW_LIMIT_REACHED(2);
       expect(error.code).toBe("BILL_004");
-      expect(error.message).toContain("5");
-      expect(error.action).toBe("Upgrade to Pro");
+      expect(error.message).toContain("2");
+      expect(error.action).toBe("Upgrade your plan");
     });
   });
 

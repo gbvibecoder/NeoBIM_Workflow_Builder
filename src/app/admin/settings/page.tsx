@@ -1643,7 +1643,7 @@ function RateLimitsTab() {
           accentColor={COLORS.amber}
           delay={0.05}
         >
-          <DetailRow label={t('admin.settings.freeTier')} value={t('admin.settings.freeExecDay')} />
+          <DetailRow label={t('admin.settings.freeTier')} value={t('admin.settings.freeExecMonth')} />
           <DetailRow label={t('admin.settings.proTier')} value={t('admin.settings.proExecDay')} />
           <DetailRow label={t('admin.settings.slidingWindow')} value="Upstash Redis" />
           <DetailRow label={t('admin.settings.adminBypass')} value={t('admin.settings.enabled')} statusColor={COLORS.green} />

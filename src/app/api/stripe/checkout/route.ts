@@ -26,11 +26,19 @@ export async function POST(req: Request) {
       return NextResponse.json(formatErrorResponse({ title: "Too many requests", message: "Please wait before trying again.", code: "RATE_001" }), { status: 429 });
     }
 
-    const { plan } = await req.json();
+    let plan: string;
+    try {
+      ({ plan } = await req.json());
+    } catch {
+      return NextResponse.json(
+        formatErrorResponse({ title: "Invalid request", message: "Invalid request body.", code: "FORM_001" }),
+        { status: 400 }
+      );
+    }
 
     // Validate plan (accept both 'TEAM' and 'TEAM_ADMIN' from frontend)
     const normalizedPlan = plan === 'TEAM' ? 'TEAM_ADMIN' : plan;
-    if (!normalizedPlan || !['PRO', 'TEAM_ADMIN'].includes(normalizedPlan)) {
+    if (!normalizedPlan || !['MINI', 'STARTER', 'PRO', 'TEAM_ADMIN'].includes(normalizedPlan)) {
       return NextResponse.json(
         formatErrorResponse(FormErrors.REQUIRED_FIELD("plan")),
         { status: 400 }
@@ -38,9 +46,13 @@ export async function POST(req: Request) {
     }
 
     // Resolve priceId server-side from env
-    const priceId = normalizedPlan === 'PRO'
+    const priceId = normalizedPlan === 'MINI'
+      ? process.env.STRIPE_MINI_PRICE_ID
+      : normalizedPlan === 'STARTER'
+      ? process.env.STRIPE_STARTER_PRICE_ID
+      : normalizedPlan === 'PRO'
       ? process.env.STRIPE_PRICE_ID
-      : process.env.STRIPE_TEAM_PRICE_ID ?? process.env.STRIPE_PRICE_ID;
+      : process.env.STRIPE_TEAM_PRICE_ID;
     if (!priceId) {
       return NextResponse.json(
         formatErrorResponse({
@@ -55,7 +67,7 @@ export async function POST(req: Request) {
     // Get user from DB
     const user = await prisma.user.findUnique({
       where: { email: session.user.email },
-      select: { id: true, stripeCustomerId: true, email: true, name: true },
+      select: { id: true, stripeCustomerId: true, stripeSubscriptionId: true, email: true, name: true },
     });
 
     if (!user) {
@@ -68,6 +80,20 @@ export async function POST(req: Request) {
           actionUrl: "/api/auth/signout",
         }),
         { status: 404 }
+      );
+    }
+
+    // Guard against duplicate subscriptions
+    if (user.stripeSubscriptionId) {
+      return NextResponse.json(
+        formatErrorResponse({
+          title: "Subscription already active",
+          message: "You already have an active subscription. Please use the billing portal to change plans.",
+          code: "BILL_001",
+          action: "Manage Subscription",
+          actionUrl: "/dashboard/billing",
+        }),
+        { status: 400 }
       );
     }
 
@@ -100,6 +126,16 @@ export async function POST(req: Request) {
       }
     }
 
+    // Validate NEXTAUTH_URL
+    const baseUrl = process.env.NEXTAUTH_URL;
+    if (!baseUrl) {
+      console.error('[stripe/checkout] NEXTAUTH_URL is not configured');
+      return NextResponse.json(
+        formatErrorResponse({ title: "Server configuration error", message: "A server configuration is missing. Please contact support.", code: "NET_001" }),
+        { status: 500 }
+      );
+    }
+
     // Create checkout session
     try {
       // Auto-apply coupon if configured, otherwise allow promo code input
@@ -110,8 +146,8 @@ export async function POST(req: Request) {
         mode: 'subscription',
         payment_method_types: ['card'],
         line_items: [{ price: priceId, quantity: 1 }],
-        success_url: `${process.env.NEXTAUTH_URL}/dashboard/billing?success=true`,
-        cancel_url: `${process.env.NEXTAUTH_URL}/dashboard/billing?canceled=true`,
+        success_url: `${baseUrl}/dashboard/billing?success=true`,
+        cancel_url: `${baseUrl}/dashboard/billing?canceled=true`,
         ...(defaultCoupon
           ? { discounts: [{ coupon: defaultCoupon }] }
           : { allow_promotion_codes: true }),

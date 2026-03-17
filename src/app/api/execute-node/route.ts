@@ -5,7 +5,8 @@ import type { BuildingDescription } from "@/services/openai";
 import { analyzeSite } from "@/services/site-analysis";
 import { generateId } from "@/lib/utils";
 import type { ExecutionArtifact } from "@/types/execution";
-import { checkRateLimit, logRateLimitHit, isExecutionAlreadyCounted, isAdminUser } from "@/lib/rate-limit";
+import { checkRateLimit, logRateLimitHit, isExecutionAlreadyCounted, isAdminUser, checkNodeTypeLimit } from "@/lib/rate-limit";
+import { VIDEO_NODES, MODEL_3D_NODES, RENDER_NODES, getNodeTypeLimits } from "@/lib/stripe";
 import {
   findUnitRate,
   applyRegionalFactor,
@@ -122,7 +123,7 @@ export async function POST(req: NextRequest) {
   }
 
   const userId: string = session.user.id;
-  const userRole = (session.user as { role?: string }).role as "FREE" | "PRO" | "TEAM_ADMIN" | "PLATFORM_ADMIN" || "FREE";
+  const userRole = (session.user as { role?: string }).role as "FREE" | "MINI" | "STARTER" | "PRO" | "TEAM_ADMIN" | "PLATFORM_ADMIN" || "FREE";
   const userEmail = session.user.email || "";
 
   // Parse body first so we can read executionId for rate-limit deduplication
@@ -155,7 +156,9 @@ export async function POST(req: NextRequest) {
 
         if (!rateLimitResult.success) {
           const resetDate = new Date(rateLimitResult.reset);
-          const hoursUntilReset = Math.ceil((resetDate.getTime() - Date.now()) / (1000 * 60 * 60));
+          const msUntilReset = resetDate.getTime() - Date.now();
+          const daysUntilReset = Math.ceil(msUntilReset / (1000 * 60 * 60 * 24));
+          const hoursUntilReset = Math.ceil(msUntilReset / (1000 * 60 * 60));
 
           // Log the rate limit hit
           logRateLimitHit(userId, userRole, rateLimitResult.remaining);
@@ -165,8 +168,12 @@ export async function POST(req: NextRequest) {
           });
 
           const rateLimitError = userRole === "FREE"
-            ? UserErrors.RATE_LIMIT_FREE(hoursUntilReset)
-            : UserErrors.RATE_LIMIT_PRO(Math.ceil(hoursUntilReset * 60));
+            ? UserErrors.RATE_LIMIT_FREE(daysUntilReset)
+            : userRole === "MINI"
+            ? UserErrors.RATE_LIMIT_MINI(daysUntilReset)
+            : userRole === "STARTER"
+            ? UserErrors.RATE_LIMIT_STARTER(daysUntilReset)
+            : UserErrors.RATE_LIMIT_PRO(daysUntilReset);
 
           return NextResponse.json(
             formatErrorResponse(rateLimitError),
@@ -202,6 +209,42 @@ export async function POST(req: NextRequest) {
     }
   } else {
     await logRateLimit(executionId, true, { skipped: true, userRole });
+  }
+
+  // ── Per-node-type metered limits (video, 3D, renders) ──
+  // Enforced server-side for all users including admins' direct node runs
+  if (!isAdmin) {
+    const nodeLimits = getNodeTypeLimits(userRole);
+
+    if (VIDEO_NODES.has(catalogueId)) {
+      const result = await checkNodeTypeLimit(userId, "video", nodeLimits.videoPerMonth);
+      if (!result.allowed) {
+        return NextResponse.json(
+          formatErrorResponse(UserErrors.VIDEO_LIMIT_REACHED(nodeLimits.videoPerMonth)),
+          { status: 429 }
+        );
+      }
+    }
+
+    if (MODEL_3D_NODES.has(catalogueId)) {
+      const result = await checkNodeTypeLimit(userId, "3d", nodeLimits.modelsPerMonth);
+      if (!result.allowed) {
+        return NextResponse.json(
+          formatErrorResponse(UserErrors.MODEL_3D_LIMIT_REACHED(nodeLimits.modelsPerMonth)),
+          { status: 429 }
+        );
+      }
+    }
+
+    if (RENDER_NODES.has(catalogueId)) {
+      const result = await checkNodeTypeLimit(userId, "render", nodeLimits.rendersPerMonth);
+      if (!result.allowed) {
+        return NextResponse.json(
+          formatErrorResponse(UserErrors.RENDER_LIMIT_REACHED(nodeLimits.rendersPerMonth)),
+          { status: 429 }
+        );
+      }
+    }
   }
 
   if (!REAL_NODE_IDS.has(catalogueId)) {

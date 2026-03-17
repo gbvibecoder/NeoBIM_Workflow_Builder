@@ -941,12 +941,12 @@ function PlanSection({ userRole }: { userRole: string }) {
                 fontSize: 24, fontWeight: 700, color: "#F0F0F5",
                 letterSpacing: "-0.02em",
               }}>
-                {userRole === "FREE" ? t('settings.freePlan') : userRole === "PRO" ? t('settings.proPlan') : t('settings.teamPlan')}
+                {userRole === "FREE" ? t('settings.freePlan') : userRole === "MINI" ? t('settings.miniPlan') : userRole === "STARTER" ? t('settings.starterPlan') : userRole === "PRO" ? t('settings.proPlan') : t('settings.teamPlan')}
               </div>
               <p style={{
                 fontSize: 13, color: "rgba(255,255,255,0.35)", marginTop: 4, marginBottom: 0,
               }}>
-                {userRole === "FREE" ? t('settings.threeRunsPerDay') : t('settings.unlimitedRuns')}
+                {userRole === "FREE" ? t('settings.freeRunsPerMonth') : userRole === "MINI" ? t('settings.miniRunsPerMonth') : userRole === "STARTER" ? t('settings.starterRunsPerMonth') : userRole === "PRO" ? t('settings.proRunsPerMonth') : t('settings.unlimitedRuns')}
               </p>
             </div>
 

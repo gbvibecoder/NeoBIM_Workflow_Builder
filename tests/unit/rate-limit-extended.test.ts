@@ -161,7 +161,7 @@ describe("Rate Limit — isExecutionAlreadyCounted", () => {
     expect(mockRedisSet).toHaveBeenCalledWith(
       "exec-seen:user-1:exec-123",
       "1",
-      { ex: 86400 }
+      { ex: 2592000 }
     );
   });
 

@@ -39,7 +39,7 @@ npx prisma db push       # Push schema changes to DB
 
 **Node catalogue:** `src/constants/node-catalogue.ts` defines all available workflow nodes with categories: input (blue), transform (purple), generate (green), export (amber). IDs follow pattern: `IN-001`, `TR-001`, `GE-001`, `EX-001`.
 
-**Rate limiting:** Upstash Redis sliding window — 3/day (FREE), 100/day (PRO). Admin emails bypass limits. Logic in `src/lib/rate-limit.ts`.
+**Rate limiting:** Upstash Redis sliding window — 5/month (FREE), 10/month (MINI), 30/month (STARTER), 100/month (PRO). TEAM_ADMIN/PLATFORM_ADMIN bypass limits. Admin emails bypass limits. Per-node-type metered limits (video, 3D, render) use atomic Redis INCR with monthly auto-expiry. Logic in `src/lib/rate-limit.ts`.
 
 ### Source Layout
 
@@ -84,7 +84,7 @@ src/
 
 Schema: `prisma/schema.prisma`. All models use CUID IDs and `@@map()` for snake_case table names.
 
-Key models: `User` (roles: FREE/PRO/TEAM_ADMIN/PLATFORM_ADMIN, Stripe fields, XP/level), `Workflow` (tileGraph JSON for edges+nodes), `TileInstance` (node on canvas), `Execution` (status: PENDING/RUNNING/SUCCESS/PARTIAL/FAILED), `Artifact` (output types: TEXT/JSON/IMAGE/THREE_D/FILE/TABLE/KPI), `CommunityPublication`, `Review`.
+Key models: `User` (roles: FREE/MINI/STARTER/PRO/TEAM_ADMIN/PLATFORM_ADMIN, Stripe fields, XP/level), `Workflow` (tileGraph JSON for edges+nodes), `TileInstance` (node on canvas), `Execution` (status: PENDING/RUNNING/SUCCESS/PARTIAL/FAILED), `Artifact` (output types: TEXT/JSON/IMAGE/THREE_D/FILE/TABLE/KPI), `CommunityPublication`, `Review`.
 
 ### Type Conventions
 

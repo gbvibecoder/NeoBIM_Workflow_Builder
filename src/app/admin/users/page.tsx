@@ -10,7 +10,7 @@ import {
 import { useLocale } from "@/hooks/useLocale";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-type UserRole = "FREE" | "PRO" | "TEAM_ADMIN" | "PLATFORM_ADMIN";
+type UserRole = "FREE" | "MINI" | "STARTER" | "PRO" | "TEAM_ADMIN" | "PLATFORM_ADMIN";
 
 interface ApiUser {
   id: string;
@@ -39,6 +39,8 @@ const PAGE_SIZE = 20;
 
 const ROLE_BADGE: Record<UserRole, { bg: string; color: string; border: string }> = {
   FREE:           { bg: "rgba(92,92,120,0.12)", color: "#9898B0", border: "rgba(92,92,120,0.15)" },
+  MINI:           { bg: "rgba(245,158,11,0.10)", color: "#F59E0B", border: "rgba(245,158,11,0.18)" },
+  STARTER:        { bg: "rgba(16,185,129,0.10)", color: "#10B981", border: "rgba(16,185,129,0.18)" },
   PRO:            { bg: "rgba(184,115,51,0.10)", color: "#FFBF00", border: "rgba(184,115,51,0.18)" },
   TEAM_ADMIN:     { bg: "rgba(79,138,255,0.10)", color: "#4F8AFF", border: "rgba(79,138,255,0.18)" },
   PLATFORM_ADMIN: { bg: "rgba(0,245,255,0.08)", color: "#00F5FF", border: "rgba(0,245,255,0.15)" },
@@ -46,6 +48,8 @@ const ROLE_BADGE: Record<UserRole, { bg: string; color: string; border: string }
 
 const ROLE_ICON: Record<UserRole, React.ReactNode> = {
   FREE:           null,
+  MINI:           <Star size={9} />,
+  STARTER:        <Zap size={9} />,
   PRO:            <Star size={9} />,
   TEAM_ADMIN:     <Users size={9} />,
   PLATFORM_ADMIN: <Shield size={9} />,
@@ -575,6 +579,8 @@ export default function AdminUsersPage() {
             >
               <option value="ALL" style={{ background: "#070809" }}>{t('admin.users.allRoles')}</option>
               <option value="FREE" style={{ background: "#070809" }}>FREE</option>
+              <option value="MINI" style={{ background: "#070809" }}>MINI</option>
+              <option value="STARTER" style={{ background: "#070809" }}>STARTER</option>
               <option value="PRO" style={{ background: "#070809" }}>PRO</option>
               <option value="TEAM_ADMIN" style={{ background: "#070809" }}>TEAM_ADMIN</option>
               <option value="PLATFORM_ADMIN" style={{ background: "#070809" }}>PLATFORM_ADMIN</option>
@@ -930,6 +936,8 @@ export default function AdminUsersPage() {
                             }}
                           >
                             <option value="FREE" style={{ background: "#070809" }}>FREE</option>
+                            <option value="MINI" style={{ background: "#070809" }}>MINI</option>
+                            <option value="STARTER" style={{ background: "#070809" }}>STARTER</option>
                             <option value="PRO" style={{ background: "#070809" }}>PRO</option>
                             <option value="TEAM_ADMIN" style={{ background: "#070809" }}>TEAM_ADMIN</option>
                             <option value="PLATFORM_ADMIN" style={{ background: "#070809" }}>PLATFORM_ADMIN</option>

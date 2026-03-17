@@ -3170,9 +3170,9 @@ export default function LandingPage() {
 
             <motion.div
               initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-40px" }}
-              variants={{ visible: { transition: { staggerChildren: 0.12 } } }}
-              className="landing-grid-3"
-              style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 24, alignItems: "start" }}
+              variants={{ visible: { transition: { staggerChildren: 0.1 } } }}
+              className="landing-grid-5"
+              style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 16, alignItems: "start" }}
             >
               {/* FREE */}
               <motion.div variants={fadeUp} transition={{ duration: 0.5, ease: smoothEase }}
@@ -3185,27 +3185,95 @@ export default function LandingPage() {
                   borderRadius: "16px 16px 0 0",
                 }}>
                   <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#4F8AFF", boxShadow: "0 0 8px #4F8AFF" }} />
-                  <span style={{ color: "#4F8AFF" }}>FREE TIER</span>
+                  <span style={{ color: "#4F8AFF" }}>FREE</span>
                 </div>
-                <div style={{ padding: "28px 24px" }}>
-                  <h3 style={{ fontSize: 22, fontWeight: 800, color: "#F0F0F5", marginBottom: 6 }}>{t('landing.free')}</h3>
-                  <p style={{ fontSize: 13, color: "#7878A0", marginBottom: 24 }}>{t('landing.freeDesc')}</p>
-                  <div style={{ marginBottom: 28 }}>
-                    <span style={{ fontSize: 48, fontWeight: 900, color: "#F0F0F5", letterSpacing: "-0.03em" }}>{t('landing.freePrice')}</span>
-                    <span style={{ fontSize: 15, color: "#5C5C78", marginLeft: 8 }}>{t('landing.perMonth')}</span>
+                <div style={{ padding: "24px 20px" }}>
+                  <h3 style={{ fontSize: 20, fontWeight: 800, color: "#F0F0F5", marginBottom: 6 }}>{t('landing.free')}</h3>
+                  <p style={{ fontSize: 12, color: "#7878A0", marginBottom: 20 }}>{t('landing.freeDesc')}</p>
+                  <div style={{ marginBottom: 24 }}>
+                    <span style={{ fontSize: 40, fontWeight: 900, color: "#F0F0F5", letterSpacing: "-0.03em" }}>{t('landing.freePrice')}</span>
+                    <span style={{ fontSize: 14, color: "#5C5C78", marginLeft: 6 }}>{t('landing.perMonth')}</span>
                   </div>
-                  <Link href="/dashboard" style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "13px 24px", borderRadius: 12, border: "1px solid rgba(79,138,255,0.15)", background: "rgba(79,138,255,0.05)", color: "#F0F0F5", fontSize: 14, fontWeight: 700, textDecoration: "none", marginBottom: 28, transition: "all 0.2s" }}
-                    onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.background = "rgba(79,138,255,0.1)"; el.style.boxShadow = "0 0 20px rgba(79,138,255,0.1)"; }}
-                    onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.background = "rgba(79,138,255,0.05)"; el.style.boxShadow = "none"; }}
+                  <Link href="/dashboard" style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "12px 20px", borderRadius: 12, border: "1px solid rgba(79,138,255,0.15)", background: "rgba(79,138,255,0.05)", color: "#F0F0F5", fontSize: 13, fontWeight: 700, textDecoration: "none", marginBottom: 24, transition: "all 0.2s" }}
+                    onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.background = "rgba(79,138,255,0.1)"; }}
+                    onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.background = "rgba(79,138,255,0.05)"; }}
                   >{t('landing.getStarted')}</Link>
-                  <div style={{ borderTop: "1px solid rgba(79,138,255,0.08)", paddingTop: 20 }}>
-                    <div style={{ fontSize: 10, fontWeight: 700, color: "#5C5C78", marginBottom: 14, textTransform: "uppercase", letterSpacing: "1.5px", fontFamily: "monospace" }}>{t('landing.includes')}</div>
-                    {tArray('landing.freeFeatures').map(f => (<div key={f} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}><div style={{ width: 16, height: 16, borderRadius: 4, background: "rgba(79,138,255,0.08)", border: "1px solid rgba(79,138,255,0.15)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><div style={{ width: 4, height: 4, borderRadius: "50%", background: "#4F8AFF" }} /></div><span style={{ fontSize: 13, color: "#9898B0" }}>{f}</span></div>))}
+                  <div style={{ borderTop: "1px solid rgba(79,138,255,0.08)", paddingTop: 16 }}>
+                    <div style={{ fontSize: 9, fontWeight: 700, color: "#5C5C78", marginBottom: 12, textTransform: "uppercase", letterSpacing: "1.5px", fontFamily: "monospace" }}>{t('landing.includes')}</div>
+                    {tArray('landing.freeFeatures').map(f => (<div key={f} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}><div style={{ width: 14, height: 14, borderRadius: 3, background: "rgba(79,138,255,0.08)", border: "1px solid rgba(79,138,255,0.15)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><div style={{ width: 3, height: 3, borderRadius: "50%", background: "#4F8AFF" }} /></div><span style={{ fontSize: 12, color: "#9898B0" }}>{f}</span></div>))}
                   </div>
                 </div>
               </motion.div>
 
-              {/* PRO */}
+              {/* MINI */}
+              <motion.div variants={fadeUp} transition={{ duration: 0.5, ease: smoothEase }}
+                className="node-card"
+                style={{ '--node-port-color': '#F59E0B' } as React.CSSProperties}
+              >
+                <div className="node-header" style={{
+                  background: "linear-gradient(135deg, rgba(245,158,11,0.1), rgba(245,158,11,0.03))",
+                  borderBottom: "1px solid rgba(245,158,11,0.12)",
+                  borderRadius: "16px 16px 0 0",
+                }}>
+                  <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#F59E0B", boxShadow: "0 0 8px #F59E0B" }} />
+                  <span style={{ color: "#F59E0B" }}>MINI</span>
+                </div>
+                <div style={{ padding: "20px 16px" }}>
+                  <h3 style={{ fontSize: 18, fontWeight: 800, color: "#F0F0F5", marginBottom: 4 }}>{t('landing.miniTitle')}</h3>
+                  <p style={{ fontSize: 11, color: "#7878A0", marginBottom: 16 }}>{t('landing.miniDesc')}</p>
+                  <div style={{ marginBottom: 14 }}>
+                    <span style={{ fontSize: 36, fontWeight: 900, color: "#F0F0F5", letterSpacing: "-0.03em" }}>{t('landing.miniPrice')}</span>
+                    <span style={{ fontSize: 12, color: "#5C5C78", marginLeft: 4 }}>{t('landing.perMonth')}</span>
+                  </div>
+                  <div style={{ marginBottom: 16, padding: "6px 10px", borderRadius: 8, background: "rgba(245,158,11,0.06)", border: "1px solid rgba(245,158,11,0.15)" }}>
+                    <span style={{ fontSize: 10, color: "#F59E0B", fontWeight: 700 }}>{t('landing.miniHighlight')}</span>
+                  </div>
+                  <Link href="/dashboard" style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "10px 16px", borderRadius: 12, background: "linear-gradient(135deg, #F59E0B 0%, #FBBF24 100%)", color: "white", fontSize: 12, fontWeight: 700, textDecoration: "none", marginBottom: 20, boxShadow: "0 4px 16px rgba(245,158,11,0.25)", transition: "all 0.2s" }}
+                    onMouseEnter={e => { (e.currentTarget as HTMLElement).style.boxShadow = "0 6px 24px rgba(245,158,11,0.35)"; }}
+                    onMouseLeave={e => { (e.currentTarget as HTMLElement).style.boxShadow = "0 4px 16px rgba(245,158,11,0.25)"; }}
+                  >{t('landing.startFreeTrial')}</Link>
+                  <div style={{ borderTop: "1px solid rgba(245,158,11,0.08)", paddingTop: 14 }}>
+                    <div style={{ fontSize: 8, fontWeight: 700, color: "#5C5C78", marginBottom: 10, textTransform: "uppercase", letterSpacing: "1.5px", fontFamily: "monospace" }}>{t('landing.miniIncludes')}</div>
+                    {tArray('landing.miniFeatures').map(f => (<div key={f} style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}><div style={{ width: 12, height: 12, borderRadius: 3, background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.15)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><div style={{ width: 3, height: 3, borderRadius: "50%", background: "#F59E0B" }} /></div><span style={{ fontSize: 11, color: "#9898B0" }}>{f}</span></div>))}
+                  </div>
+                </div>
+              </motion.div>
+
+              {/* STARTER */}
+              <motion.div variants={fadeUp} transition={{ duration: 0.5, ease: smoothEase }}
+                className="node-card"
+                style={{ '--node-port-color': '#10B981' } as React.CSSProperties}
+              >
+                <div className="node-header" style={{
+                  background: "linear-gradient(135deg, rgba(16,185,129,0.1), rgba(16,185,129,0.03))",
+                  borderBottom: "1px solid rgba(16,185,129,0.12)",
+                  borderRadius: "16px 16px 0 0",
+                }}>
+                  <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#10B981", boxShadow: "0 0 8px #10B981" }} />
+                  <span style={{ color: "#10B981" }}>STARTER</span>
+                </div>
+                <div style={{ padding: "24px 20px" }}>
+                  <h3 style={{ fontSize: 20, fontWeight: 800, color: "#F0F0F5", marginBottom: 6 }}>{t('landing.starterTitle')}</h3>
+                  <p style={{ fontSize: 12, color: "#7878A0", marginBottom: 20 }}>{t('landing.starterDesc')}</p>
+                  <div style={{ marginBottom: 16 }}>
+                    <span style={{ fontSize: 40, fontWeight: 900, color: "#F0F0F5", letterSpacing: "-0.03em" }}>{t('landing.starterPrice')}</span>
+                    <span style={{ fontSize: 14, color: "#5C5C78", marginLeft: 6 }}>{t('landing.perMonth')}</span>
+                  </div>
+                  <div style={{ marginBottom: 20, padding: "8px 12px", borderRadius: 8, background: "rgba(16,185,129,0.06)", border: "1px solid rgba(16,185,129,0.15)" }}>
+                    <span style={{ fontSize: 11, color: "#10B981", fontWeight: 700 }}>{t('landing.starterHighlight')}</span>
+                  </div>
+                  <Link href="/dashboard" style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "12px 20px", borderRadius: 12, background: "linear-gradient(135deg, #10B981 0%, #34D399 100%)", color: "white", fontSize: 13, fontWeight: 700, textDecoration: "none", marginBottom: 24, boxShadow: "0 4px 16px rgba(16,185,129,0.25)", transition: "all 0.2s" }}
+                    onMouseEnter={e => { (e.currentTarget as HTMLElement).style.boxShadow = "0 6px 24px rgba(16,185,129,0.35)"; }}
+                    onMouseLeave={e => { (e.currentTarget as HTMLElement).style.boxShadow = "0 4px 16px rgba(16,185,129,0.25)"; }}
+                  >{t('landing.startFreeTrial')}</Link>
+                  <div style={{ borderTop: "1px solid rgba(16,185,129,0.08)", paddingTop: 16 }}>
+                    <div style={{ fontSize: 9, fontWeight: 700, color: "#5C5C78", marginBottom: 12, textTransform: "uppercase", letterSpacing: "1.5px", fontFamily: "monospace" }}>{t('landing.starterIncludes')}</div>
+                    {tArray('landing.starterFeatures').map(f => (<div key={f} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}><div style={{ width: 14, height: 14, borderRadius: 3, background: "rgba(16,185,129,0.08)", border: "1px solid rgba(16,185,129,0.15)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><div style={{ width: 3, height: 3, borderRadius: "50%", background: "#10B981" }} /></div><span style={{ fontSize: 12, color: "#B0B0C8" }}>{f}</span></div>))}
+                  </div>
+                </div>
+              </motion.div>
+
+              {/* PRO — Most Popular */}
               <motion.div variants={fadeUp} transition={{ duration: 0.5, ease: smoothEase }}
                 className="node-card"
                 style={{
@@ -3221,28 +3289,28 @@ export default function LandingPage() {
                   borderRadius: "15px 15px 0 0",
                 }}>
                   <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#4F8AFF", boxShadow: "0 0 8px #4F8AFF" }} />
-                  <span style={{ color: "#4F8AFF" }}>PRO TIER</span>
+                  <span style={{ color: "#4F8AFF" }}>PRO</span>
                   <span style={{ marginLeft: "auto", fontSize: 8, padding: "2px 8px", borderRadius: 10, background: "linear-gradient(135deg, #4F8AFF, #6366F1)", color: "white", fontWeight: 700 }}>
                     {t('landing.mostPopular')}
                   </span>
                 </div>
-                <div style={{ padding: "28px 24px" }}>
-                  <h3 style={{ fontSize: 22, fontWeight: 800, color: "#F0F0F5", marginBottom: 6 }}>{t('landing.proTitle')}</h3>
-                  <p style={{ fontSize: 13, color: "#7878A0", marginBottom: 24 }}>{t('landing.proDesc')}</p>
-                  <div style={{ marginBottom: 20 }}>
-                    <span style={{ fontSize: 48, fontWeight: 900, color: "#F0F0F5", letterSpacing: "-0.03em" }}>$29</span>
-                    <span style={{ fontSize: 15, color: "#5C5C78", marginLeft: 8 }}>{t('landing.perMonth')}</span>
+                <div style={{ padding: "24px 20px" }}>
+                  <h3 style={{ fontSize: 20, fontWeight: 800, color: "#F0F0F5", marginBottom: 6 }}>{t('landing.proTitle')}</h3>
+                  <p style={{ fontSize: 12, color: "#7878A0", marginBottom: 20 }}>{t('landing.proDesc')}</p>
+                  <div style={{ marginBottom: 16 }}>
+                    <span style={{ fontSize: 40, fontWeight: 900, color: "#F0F0F5", letterSpacing: "-0.03em" }}>{t('landing.proPrice')}</span>
+                    <span style={{ fontSize: 14, color: "#5C5C78", marginLeft: 6 }}>{t('landing.perMonth')}</span>
                   </div>
-                  <div style={{ marginBottom: 24, padding: "10px 14px", borderRadius: 10, background: "rgba(16,185,129,0.06)", border: "1px solid rgba(16,185,129,0.15)" }}>
-                    <span style={{ fontSize: 12, color: "#10B981", fontWeight: 700 }}>{t('landing.proHighlight')}</span>
+                  <div style={{ marginBottom: 20, padding: "8px 12px", borderRadius: 8, background: "rgba(16,185,129,0.06)", border: "1px solid rgba(16,185,129,0.15)" }}>
+                    <span style={{ fontSize: 11, color: "#10B981", fontWeight: 700 }}>{t('landing.proHighlight')}</span>
                   </div>
-                  <Link href="/dashboard" style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "14px 24px", borderRadius: 12, background: "linear-gradient(135deg, #4F8AFF 0%, #6366F1 100%)", color: "white", fontSize: 14, fontWeight: 700, textDecoration: "none", marginBottom: 28, boxShadow: "0 4px 20px rgba(79,138,255,0.3)", transition: "all 0.2s" }}
-                    onMouseEnter={e => { (e.currentTarget as HTMLElement).style.boxShadow = "0 8px 30px rgba(79,138,255,0.4)"; (e.currentTarget as HTMLElement).style.transform = "translateY(-2px)"; }}
-                    onMouseLeave={e => { (e.currentTarget as HTMLElement).style.boxShadow = "0 4px 20px rgba(79,138,255,0.3)"; (e.currentTarget as HTMLElement).style.transform = "translateY(0)"; }}
+                  <Link href="/dashboard" style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "12px 20px", borderRadius: 12, background: "linear-gradient(135deg, #4F8AFF 0%, #6366F1 100%)", color: "white", fontSize: 13, fontWeight: 700, textDecoration: "none", marginBottom: 24, boxShadow: "0 4px 20px rgba(79,138,255,0.3)", transition: "all 0.2s" }}
+                    onMouseEnter={e => { (e.currentTarget as HTMLElement).style.boxShadow = "0 8px 30px rgba(79,138,255,0.4)"; }}
+                    onMouseLeave={e => { (e.currentTarget as HTMLElement).style.boxShadow = "0 4px 20px rgba(79,138,255,0.3)"; }}
                   >{t('landing.startFreeTrial')}</Link>
-                  <div style={{ borderTop: "1px solid rgba(79,138,255,0.1)", paddingTop: 20 }}>
-                    <div style={{ fontSize: 10, fontWeight: 700, color: "#5C5C78", marginBottom: 14, textTransform: "uppercase", letterSpacing: "1.5px", fontFamily: "monospace" }}>{t('landing.proIncludes')}</div>
-                    {tArray('landing.proFeatures').map(f => (<div key={f} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}><div style={{ width: 16, height: 16, borderRadius: 4, background: "rgba(79,138,255,0.1)", border: "1px solid rgba(79,138,255,0.2)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><div style={{ width: 4, height: 4, borderRadius: "50%", background: "#4F8AFF" }} /></div><span style={{ fontSize: 13, color: "#D0D0E0" }}>{f}</span></div>))}
+                  <div style={{ borderTop: "1px solid rgba(79,138,255,0.1)", paddingTop: 16 }}>
+                    <div style={{ fontSize: 9, fontWeight: 700, color: "#5C5C78", marginBottom: 12, textTransform: "uppercase", letterSpacing: "1.5px", fontFamily: "monospace" }}>{t('landing.proIncludes')}</div>
+                    {tArray('landing.proFeatures').map(f => (<div key={f} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}><div style={{ width: 14, height: 14, borderRadius: 3, background: "rgba(79,138,255,0.1)", border: "1px solid rgba(79,138,255,0.2)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><div style={{ width: 3, height: 3, borderRadius: "50%", background: "#4F8AFF" }} /></div><span style={{ fontSize: 12, color: "#D0D0E0" }}>{f}</span></div>))}
                   </div>
                 </div>
               </motion.div>
@@ -3260,19 +3328,19 @@ export default function LandingPage() {
                   <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#8B5CF6", boxShadow: "0 0 8px #8B5CF6" }} />
                   <span style={{ color: "#8B5CF6" }}>ENTERPRISE</span>
                 </div>
-                <div style={{ padding: "28px 24px" }}>
-                  <h3 style={{ fontSize: 22, fontWeight: 800, color: "#F0F0F5", marginBottom: 6 }}>{t('landing.enterprise')}</h3>
-                  <p style={{ fontSize: 13, color: "#7878A0", marginBottom: 24 }}>{t('landing.enterpriseDesc')}</p>
-                  <div style={{ marginBottom: 28 }}>
-                    <span style={{ fontSize: 36, fontWeight: 900, color: "#F0F0F5" }}>{t('landing.custom')}</span>
+                <div style={{ padding: "24px 20px" }}>
+                  <h3 style={{ fontSize: 20, fontWeight: 800, color: "#F0F0F5", marginBottom: 6 }}>{t('landing.enterprise')}</h3>
+                  <p style={{ fontSize: 12, color: "#7878A0", marginBottom: 20 }}>{t('landing.enterpriseDesc')}</p>
+                  <div style={{ marginBottom: 24 }}>
+                    <span style={{ fontSize: 32, fontWeight: 900, color: "#F0F0F5" }}>{t('landing.custom')}</span>
                   </div>
-                  <a href="mailto:sales@buildflow.com" style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "13px 24px", borderRadius: 12, border: "1px solid rgba(139,92,246,0.2)", background: "rgba(139,92,246,0.05)", color: "#F0F0F5", fontSize: 14, fontWeight: 700, textDecoration: "none", marginBottom: 28, transition: "all 0.2s" }}
-                    onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.background = "rgba(139,92,246,0.1)"; el.style.boxShadow = "0 0 20px rgba(139,92,246,0.1)"; }}
-                    onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.background = "rgba(139,92,246,0.05)"; el.style.boxShadow = "none"; }}
+                  <a href="mailto:sales@buildflow.com" style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "12px 20px", borderRadius: 12, border: "1px solid rgba(139,92,246,0.2)", background: "rgba(139,92,246,0.05)", color: "#F0F0F5", fontSize: 13, fontWeight: 700, textDecoration: "none", marginBottom: 24, transition: "all 0.2s" }}
+                    onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.background = "rgba(139,92,246,0.1)"; }}
+                    onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.background = "rgba(139,92,246,0.05)"; }}
                   >{t('landing.contactSales')}</a>
-                  <div style={{ borderTop: "1px solid rgba(139,92,246,0.08)", paddingTop: 20 }}>
-                    <div style={{ fontSize: 10, fontWeight: 700, color: "#5C5C78", marginBottom: 14, textTransform: "uppercase", letterSpacing: "1.5px", fontFamily: "monospace" }}>{t('landing.enterpriseIncludes')}</div>
-                    {tArray('landing.enterpriseFeatures').map(f => (<div key={f} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}><div style={{ width: 16, height: 16, borderRadius: 4, background: "rgba(139,92,246,0.08)", border: "1px solid rgba(139,92,246,0.15)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><div style={{ width: 4, height: 4, borderRadius: "50%", background: "#8B5CF6" }} /></div><span style={{ fontSize: 13, color: "#9898B0" }}>{f}</span></div>))}
+                  <div style={{ borderTop: "1px solid rgba(139,92,246,0.08)", paddingTop: 16 }}>
+                    <div style={{ fontSize: 9, fontWeight: 700, color: "#5C5C78", marginBottom: 12, textTransform: "uppercase", letterSpacing: "1.5px", fontFamily: "monospace" }}>{t('landing.enterpriseIncludes')}</div>
+                    {tArray('landing.enterpriseFeatures').map(f => (<div key={f} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}><div style={{ width: 14, height: 14, borderRadius: 3, background: "rgba(139,92,246,0.08)", border: "1px solid rgba(139,92,246,0.15)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><div style={{ width: 3, height: 3, borderRadius: "50%", background: "#8B5CF6" }} /></div><span style={{ fontSize: 12, color: "#9898B0" }}>{f}</span></div>))}
                   </div>
                 </div>
               </motion.div>
@@ -3495,6 +3563,9 @@ export default function LandingPage() {
           .landing-grid-3 {
             grid-template-columns: 1fr 1fr !important;
           }
+          .landing-grid-5 {
+            grid-template-columns: 1fr 1fr 1fr !important;
+          }
           .landing-social-proof-grid {
             grid-template-columns: 1fr 1fr !important;
           }
@@ -3635,6 +3706,10 @@ export default function LandingPage() {
 
           /* ── All 3-column grids ── */
           .landing-grid-3 {
+            grid-template-columns: 1fr !important;
+            gap: 16px !important;
+          }
+          .landing-grid-5 {
             grid-template-columns: 1fr !important;
             gap: 16px !important;
           }

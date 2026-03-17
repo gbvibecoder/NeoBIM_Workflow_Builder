@@ -40,17 +40,21 @@ export async function POST(req: NextRequest) {
     switch (event.type) {
       case 'checkout.session.completed': {
         const session = event.data.object as Stripe.Checkout.Session;
-        
+
         // Handle successful checkout
         if (session.mode === 'subscription' && session.customer) {
-          const subscription = await stripe.subscriptions.retrieve(
-            session.subscription as string
-          );
+          const subscriptionId = typeof session.subscription === 'string'
+            ? session.subscription
+            : session.subscription?.id;
+          if (!subscriptionId) break;
 
-          await updateUserSubscription(
-            session.customer as string,
-            subscription
-          );
+          const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+
+          const customerId = typeof session.customer === 'string'
+            ? session.customer
+            : session.customer.id;
+
+          await updateUserSubscription(customerId, subscription);
         }
         break;
       }
@@ -58,13 +62,19 @@ export async function POST(req: NextRequest) {
       case 'customer.subscription.created':
       case 'customer.subscription.updated': {
         const subscription = event.data.object as Stripe.Subscription;
-        await updateUserSubscription(subscription.customer as string, subscription);
+        const customerId = typeof subscription.customer === 'string'
+          ? subscription.customer
+          : subscription.customer.id;
+        await updateUserSubscription(customerId, subscription);
         break;
       }
 
       case 'customer.subscription.deleted': {
         const subscription = event.data.object as Stripe.Subscription;
-        await cancelUserSubscription(subscription.customer as string);
+        const customerId = typeof subscription.customer === 'string'
+          ? subscription.customer
+          : subscription.customer.id;
+        await cancelUserSubscription(customerId);
         break;
       }
 
@@ -125,6 +135,31 @@ async function updateUserSubscription(
   stripeCustomerId: string,
   subscription: Stripe.Subscription
 ) {
+  // Only grant paid role for active/trialing; downgrade for all other statuses
+  const paidStatuses: Stripe.Subscription.Status[] = ['active', 'trialing'];
+  if (!paidStatuses.includes(subscription.status)) {
+    console.info('[STRIPE_WEBHOOK] Non-active subscription status, downgrading to FREE:', {
+      customerId: stripeCustomerId,
+      subscriptionId: subscription.id,
+      status: subscription.status,
+    });
+
+    const user = await prisma.user.findFirst({ where: { stripeCustomerId } });
+    if (!user) {
+      console.error('[STRIPE_WEBHOOK] User not found for customer:', stripeCustomerId);
+      return;
+    }
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        stripeSubscriptionId: subscription.id,
+        role: 'FREE',
+      },
+    });
+    return;
+  }
+
   const user = await prisma.user.findFirst({
     where: { stripeCustomerId },
   });
@@ -136,22 +171,42 @@ async function updateUserSubscription(
 
   const priceId = subscription.items.data[0]?.price.id;
   const plan = getPlanByPriceId(priceId);
+  const currentPeriodEnd = subscription.items.data[0]?.current_period_end
+    ?? Math.floor(Date.now() / 1000);
 
-  await prisma.user.update({
-    where: { id: user.id },
-    data: {
-      stripeSubscriptionId: subscription.id,
-      stripePriceId: priceId,
-      stripeCurrentPeriodEnd: new Date((subscription as unknown as { current_period_end: number }).current_period_end * 1000),
-      role: plan,
-    },
-  });
-
-  console.info('[STRIPE_WEBHOOK] Updated user subscription:', {
+  console.info('[STRIPE_WEBHOOK] Attempting role update:', {
     userId: user.id,
-    plan,
+    priceId,
+    resolvedPlan: plan,
     subscriptionId: subscription.id,
+    subscriptionStatus: subscription.status,
   });
+
+  try {
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        stripeSubscriptionId: subscription.id,
+        stripePriceId: priceId,
+        stripeCurrentPeriodEnd: new Date(currentPeriodEnd * 1000),
+        role: plan,
+      },
+    });
+
+    console.info('[STRIPE_WEBHOOK] Successfully updated user subscription:', {
+      userId: user.id,
+      plan,
+      subscriptionId: subscription.id,
+    });
+  } catch (dbError) {
+    console.error('[STRIPE_WEBHOOK] CRITICAL: DB update failed! User paid but role not updated.', {
+      userId: user.id,
+      priceId,
+      plan,
+      error: dbError instanceof Error ? dbError.message : String(dbError),
+    });
+    throw dbError; // Re-throw so Stripe retries the webhook
+  }
 }
 
 async function cancelUserSubscription(stripeCustomerId: string) {

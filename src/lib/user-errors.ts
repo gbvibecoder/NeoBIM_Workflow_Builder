@@ -58,18 +58,63 @@ export const UserErrors = {
   }),
 
   // Rate Limiting
-  RATE_LIMIT_FREE: (resetHours: number): UserError => ({
-    title: "Daily limit reached",
-    message: `Free tier: 3 executions per day. Resets in ${resetHours} hour${resetHours === 1 ? "" : "s"}.`,
+  RATE_LIMIT_FREE: (resetDays: number): UserError => ({
+    title: "Monthly limit reached",
+    message: `Free tier: 5 executions per month. Resets in ${resetDays} day${resetDays === 1 ? "" : "s"}.`,
+    action: "Upgrade to Mini",
+    actionUrl: "/dashboard/billing",
+    code: "RATE_001",
+  }),
+
+  RATE_LIMIT_MINI: (resetDays: number): UserError => ({
+    title: "Monthly limit reached",
+    message: `Mini plan: 10 executions per month. Resets in ${resetDays} day${resetDays === 1 ? "" : "s"}.`,
+    action: "Upgrade to Starter",
+    actionUrl: "/dashboard/billing",
+    code: "RATE_001",
+  }),
+
+  RATE_LIMIT_STARTER: (resetDays: number): UserError => ({
+    title: "Monthly limit reached",
+    message: `Starter plan: 30 executions per month. Resets in ${resetDays} day${resetDays === 1 ? "" : "s"}.`,
     action: "Upgrade to Pro",
     actionUrl: "/dashboard/billing",
     code: "RATE_001",
   }),
 
-  RATE_LIMIT_PRO: (resetMinutes: number): UserError => ({
-    title: "Rate limit exceeded",
-    message: `Too many requests. Please wait ${resetMinutes} minute${resetMinutes === 1 ? "" : "s"} and try again.`,
+  RATE_LIMIT_PRO: (resetDays: number): UserError => ({
+    title: "Monthly limit reached",
+    message: `Pro plan: 100 executions per month. Resets in ${resetDays} day${resetDays === 1 ? "" : "s"}.`,
     code: "RATE_002",
+  }),
+
+  // Node-type limits (video, 3D, renders)
+  VIDEO_LIMIT_REACHED: (limit: number): UserError => ({
+    title: "Video generation limit reached",
+    message: limit === 0
+      ? "Video walkthroughs are not available on your current plan."
+      : `You've used all ${limit} video generations this month.`,
+    action: limit === 0 ? "Upgrade Plan" : "Upgrade Plan",
+    actionUrl: "/dashboard/billing",
+    code: "RATE_003",
+  }),
+
+  MODEL_3D_LIMIT_REACHED: (limit: number): UserError => ({
+    title: "3D model limit reached",
+    message: limit === 0
+      ? "AI 3D models are not available on your current plan."
+      : `You've used all ${limit} 3D model generations this month.`,
+    action: limit === 0 ? "Upgrade to Starter" : "Upgrade Plan",
+    actionUrl: "/dashboard/billing",
+    code: "RATE_004",
+  }),
+
+  RENDER_LIMIT_REACHED: (limit: number): UserError => ({
+    title: "Render limit reached",
+    message: `You've used all ${limit} concept renders this month.`,
+    action: "Upgrade Plan",
+    actionUrl: "/dashboard/billing",
+    code: "RATE_005",
   }),
 
   // OpenAI Errors
@@ -125,8 +170,8 @@ export const UserErrors = {
   // Workflow limits
   WORKFLOW_LIMIT_REACHED: (limit: number): UserError => ({
     title: "Workflow limit reached",
-    message: `Free plan allows up to ${limit} workflows. Upgrade to Pro for unlimited workflows.`,
-    action: "Upgrade to Pro",
+    message: `Your plan allows up to ${limit} workflows.`,
+    action: "Upgrade your plan",
     actionUrl: "/dashboard/billing",
     code: "BILL_004",
   }),
@@ -370,7 +415,7 @@ export async function handleAPIError(error: unknown): Promise<UserError> {
   }
 
   if (err?.status === 429 || err?.statusCode === 429) {
-    return UserErrors.RATE_LIMIT_FREE(24); // Default to 24h
+    return UserErrors.RATE_LIMIT_FREE(30); // Default to 30 days
   }
 
   if (err?.status === 403 || err?.statusCode === 403) {

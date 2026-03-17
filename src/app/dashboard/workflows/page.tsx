@@ -69,8 +69,9 @@ export default function WorkflowsPage() {
   }), [t]);
 
   const userRole = (session?.user as { role?: string })?.role || "FREE";
-  const maxWorkflows = STRIPE_PLANS.FREE.limits.maxWorkflows;
-  const isAtLimit = userRole === "FREE" && workflows.length >= maxWorkflows;
+  const planLimits = userRole === "TEAM_ADMIN" || userRole === "PLATFORM_ADMIN" ? STRIPE_PLANS.TEAM.limits : userRole === "PRO" ? STRIPE_PLANS.PRO.limits : userRole === "STARTER" ? STRIPE_PLANS.STARTER.limits : userRole === "MINI" ? STRIPE_PLANS.MINI.limits : STRIPE_PLANS.FREE.limits;
+  const maxWorkflows = planLimits.maxWorkflows;
+  const isAtLimit = (userRole === "FREE" || userRole === "MINI" || userRole === "STARTER") && maxWorkflows > 0 && workflows.length >= maxWorkflows;
 
   const handleNewWorkflow = useCallback(() => {
     if (isAtLimit) {

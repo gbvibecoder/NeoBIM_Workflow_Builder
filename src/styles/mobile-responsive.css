@@ -171,6 +171,12 @@
     gap: 16px !important;
   }
 
+  /* 5-column grids (pricing) become single column */
+  .landing-grid-5 {
+    grid-template-columns: 1fr !important;
+    gap: 16px !important;
+  }
+
   /* Pipeline grids (1fr 80px 1fr 80px 1fr) become 1fr */
   .landing-pipeline-grid {
     grid-template-columns: 1fr !important;
@@ -477,6 +483,11 @@
 
   .grid.grid-cols-3 {
     grid-template-columns: repeat(2, 1fr) !important;
+  }
+
+  /* 5-column pricing grid: 3+2 on tablet */
+  .landing-grid-5 {
+    grid-template-columns: repeat(3, 1fr) !important;
   }
 }
 

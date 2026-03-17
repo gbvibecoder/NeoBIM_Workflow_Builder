@@ -209,6 +209,8 @@ model WorkflowClone {
 
 enum UserRole {
   FREE
+  MINI
+  STARTER
   PRO
   TEAM_ADMIN
   PLATFORM_ADMIN

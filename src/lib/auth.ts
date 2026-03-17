@@ -7,6 +7,12 @@ import { prisma } from "@/lib/db";
 import { authConfig } from "@/lib/auth.config";
 import { trackLogin } from "@/lib/analytics";
 
+// Throttle DB role lookups: refresh at most once per 60 seconds per user.
+// This avoids a DB query on every single authenticated request while still
+// catching subscription changes (webhook, manual fix) within ~1 minute.
+const roleRefreshCache = new Map<string, number>();
+const ROLE_REFRESH_INTERVAL_MS = 60_000; // 60 seconds
+
 export const { handlers, auth, signIn, signOut } = NextAuth({
   ...authConfig,
   adapter: PrismaAdapter(prisma),
@@ -23,20 +29,34 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         token.picture = user.image?.startsWith("data:") ? "uploaded" : (user.image ?? null);
         token.role = (user as { role?: string }).role;
       }
-      // On session update (e.g. after profile save or Stripe payment), refresh from DB
-      if (trigger === "update" && token.sub) {
-        try {
-          const dbUser = await prisma.user.findUnique({
-            where: { id: token.sub },
-            select: { role: true, name: true, image: true },
-          });
-          if (dbUser) {
-            token.role = dbUser.role;
-            token.name = dbUser.name;
-            token.picture = dbUser.image?.startsWith("data:") ? "uploaded" : (dbUser.image ?? null);
+      // Refresh role from DB so subscription changes are reflected without sign-out.
+      // Throttled to once per 60s to avoid excessive DB queries. Explicit session
+      // updates (trigger === "update") always bypass the throttle.
+      if (token.sub) {
+        const now = Date.now();
+        const lastRefresh = roleRefreshCache.get(token.sub) ?? 0;
+        const shouldRefresh = trigger === "update" || (now - lastRefresh) > ROLE_REFRESH_INTERVAL_MS;
+
+        if (shouldRefresh) {
+          try {
+            const dbUser = await prisma.user.findUnique({
+              where: { id: token.sub },
+              select: trigger === "update"
+                ? { role: true, name: true, image: true }
+                : { role: true },
+            });
+            if (dbUser) {
+              token.role = dbUser.role;
+              if (trigger === "update") {
+                token.name = (dbUser as { name?: string | null }).name;
+                const img = (dbUser as { image?: string | null }).image;
+                token.picture = img?.startsWith("data:") ? "uploaded" : (img ?? null);
+              }
+              roleRefreshCache.set(token.sub, now);
+            }
+          } catch {
+            // Keep existing token data if DB lookup fails
           }
-        } catch {
-          // Keep existing token data if DB lookup fails
         }
       }
       return token;
