@@ -64,6 +64,8 @@ interface AdminStats {
   topNodes: TopNode[];
   recentActivity: ActivityItem[];
   mrr: number;
+  paidByRole: Record<string, number>;
+  paidTotal: number;
   feedback: {
     total: number;
     byStatus: Record<string, number>;
@@ -1142,18 +1144,18 @@ export default function AdminDashboardPage() {
           label={t('admin.dash.totalUsers')}
           value={stats.users.total}
           accentColor={COLORS.cyan}
-          subValue={`${stats.users.newThisMonth} new`}
-          subLabel="this month"
+          subValue={`${stats.users.newThisMonth} ${t('admin.dash.new')}`}
+          subLabel={t('admin.dash.thisMonth')}
           delay={0.05}
         />
         <KPICard
           icon={<DollarSign size={16} />}
           label={t('admin.dash.totalMrr')}
           value={stats.mrr}
-          prefix="$"
+          prefix="₹"
           accentColor={COLORS.copper}
-          subValue={`${stats.users.byRole?.PRO || 0} PRO`}
-          subLabel="subscribers"
+          subValue={`${stats.paidTotal} ${t('admin.dash.paid')}`}
+          subLabel={t('admin.dash.subscribers')}
           delay={0.1}
         />
         <KPICard
@@ -1171,8 +1173,8 @@ export default function AdminDashboardPage() {
           suffix="%"
           decimals={1}
           accentColor={COLORS.success}
-          subValue={`${(stats.executions.byStatus?.SUCCESS || 0).toLocaleString()} passed`}
-          subLabel={`of ${stats.executions.total.toLocaleString()}`}
+          subValue={`${(stats.executions.byStatus?.SUCCESS || 0).toLocaleString()} ${t('admin.dash.passed')}`}
+          subLabel={`${t('admin.dash.of')} ${stats.executions.total.toLocaleString()}`}
           delay={0.2}
         />
       </div>

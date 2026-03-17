@@ -29,6 +29,8 @@ interface AdminStats {
     dailySignups: { date: string; count: number }[];
   };
   mrr: number;
+  paidByRole: Record<string, number>;
+  paidTotal: number;
   executions: {
     total: number;
     successRate: number;
@@ -632,7 +634,8 @@ export default function AdminBillingPage() {
   const mrr = stats.mrr;
   const arr = mrr * 12;
   const totalUsers = stats.users.total;
-  const arpu = totalUsers > 0 ? Math.round((mrr / totalUsers) * 100) / 100 : 0;
+  const paidTotal = stats.paidTotal;
+  const arpu = paidTotal > 0 ? Math.round((mrr / paidTotal) * 100) / 100 : 0;
   const byRole = stats.users.byRole;
 
   const planRoles: { label: string; key: string; color: string }[] = [
@@ -723,7 +726,7 @@ export default function AdminBillingPage() {
           value={mrr}
           prefix="₹"
           color="#B87333"
-          subtext={`${(byRole["MINI"] ?? 0) + (byRole["STARTER"] ?? 0) + (byRole["PRO"] ?? 0) + (byRole["TEAM_ADMIN"] ?? 0)} paid ${t('admin.billing.users')}`}
+          subtext={`${paidTotal} paid ${t('admin.billing.users')}`}
           delay={0.05}
         />
         <KPICard
@@ -738,7 +741,7 @@ export default function AdminBillingPage() {
         <KPICard
           icon={<Users size={15} />}
           label={t('admin.billing.paidUsers')}
-          value={(byRole["MINI"] ?? 0) + (byRole["STARTER"] ?? 0) + (byRole["PRO"] ?? 0) + (byRole["TEAM_ADMIN"] ?? 0)}
+          value={paidTotal}
           color="#00F5FF"
           subtext={`${totalUsers.toLocaleString()} ${t('admin.billing.users')}`}
           delay={0.15}
@@ -750,7 +753,7 @@ export default function AdminBillingPage() {
           prefix="₹"
           decimals={2}
           color="#4F8AFF"
-          subtext={`MRR / ${totalUsers.toLocaleString()} ${t('admin.billing.users')}`}
+          subtext={`MRR / ${paidTotal.toLocaleString()} ${t('admin.billing.paidUsers')}`}
           delay={0.2}
         />
       </div>

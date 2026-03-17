@@ -70,7 +70,10 @@ export async function GET() {
     prisma.feedback.groupBy({ by: ["status"], _count: true }),
     prisma.feedback.groupBy({ by: ["type"], _count: true }),
     prisma.user.findMany({
-      where: { role: { in: ["MINI", "STARTER", "PRO", "TEAM_ADMIN"] } },
+      where: {
+        role: { in: ["MINI", "STARTER", "PRO", "TEAM_ADMIN"] },
+        stripeSubscriptionId: { not: null },
+      },
       select: { role: true },
     }),
   ]);
@@ -101,9 +104,13 @@ export async function GET() {
   const successCount = executionsByStatus.find((s) => s.status === "SUCCESS")?._count ?? 0;
   const successRate = totalExecutions > 0 ? successCount / totalExecutions : 0;
 
-  // Calculate MRR from all paid tiers (INR prices)
+  // Calculate MRR from paid tiers with active subscriptions (INR prices)
   const PLAN_PRICES: Record<string, number> = { MINI: 99, STARTER: 799, PRO: 1999, TEAM_ADMIN: 4999 };
   const mrr = paidUsersCount.reduce((sum, u) => sum + (PLAN_PRICES[u.role] || 0), 0);
+
+  // Count active subscribers per role
+  const paidRoles: Record<string, number> = {};
+  paidUsersCount.forEach((u) => { paidRoles[u.role] = (paidRoles[u.role] || 0) + 1; });
 
   const roles: Record<string, number> = {};
   roleDistribution.forEach((r) => { roles[r.role] = r._count; });
@@ -160,6 +167,8 @@ export async function GET() {
       createdAt: a.createdAt.toISOString(),
     })),
     mrr,
+    paidByRole: paidRoles,
+    paidTotal: paidUsersCount.length,
     feedback: {
       total: feedbackCounts.reduce((s, f) => s + f._count, 0),
       byStatus: feedbackStatusMap,
