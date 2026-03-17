@@ -408,7 +408,7 @@ export default function CommunityPage() {
           marginBottom: 16,
           margin: "16px 24px 0",
         }}>
-          All shared workflows are community-contributed. Workflows marked <span style={{ color: "#10B981", fontWeight: 600 }}>Verified</span> have been tested by our team.
+          {t('community.disclaimer')} <span style={{ color: "#10B981", fontWeight: 600 }}>{t('community.disclaimerVerified')}</span> {t('community.disclaimerEnd')}
         </div>
 
         {/* ── Compact Hero ────────────────────────────────────────────────── */}

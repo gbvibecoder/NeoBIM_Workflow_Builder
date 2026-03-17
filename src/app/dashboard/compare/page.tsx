@@ -4,6 +4,8 @@ import { useEffect, useState, useCallback, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { ArrowLeft, ArrowUp, ArrowDown, Minus, CheckCircle2, XCircle, Clock, FileText, Table2, Image as ImageIcon } from "lucide-react";
 import { Header } from "@/components/dashboard/Header";
+import { useLocale } from "@/hooks/useLocale";
+import type { TranslationKey } from "@/lib/i18n";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -66,6 +68,7 @@ function duration(start: string, end: string | null) {
 // ─── Side Panel ──────────────────────────────────────────────────────────────
 
 function ExecutionSide({ execution, otherExecution }: { execution: Execution; otherExecution?: Execution }) {
+  const { t } = useLocale();
   const statusColor: Record<string, string> = {
     SUCCESS: "#10B981", FAILED: "#EF4444", PARTIAL: "#F59E0B", RUNNING: "#4F8AFF",
   };
@@ -131,7 +134,7 @@ function ExecutionSide({ execution, otherExecution }: { execution: Execution; ot
             padding: "14px 16px", marginBottom: 12,
           }}>
             <div style={{ fontSize: 11, fontWeight: 600, color: "#8888A0", marginBottom: 10, display: "flex", alignItems: "center", gap: 6 }}>
-              <Table2 size={11} /> {artifact.nodeLabel ?? "Metrics"}
+              <Table2 size={11} /> {artifact.nodeLabel ?? t('compare.metrics')}
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
               {metrics.map((m, i) => {
@@ -171,7 +174,7 @@ function ExecutionSide({ execution, otherExecution }: { execution: Execution; ot
             padding: "14px 16px", marginBottom: 12,
           }}>
             <div style={{ fontSize: 11, fontWeight: 600, color: "#8888A0", marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
-              <FileText size={11} /> {artifact.nodeLabel ?? "Description"}
+              <FileText size={11} /> {artifact.nodeLabel ?? t('compare.description')}
             </div>
             <div style={{
               fontSize: 11, color: "#8888A0", lineHeight: 1.6,
@@ -192,7 +195,7 @@ function ExecutionSide({ execution, otherExecution }: { execution: Execution; ot
           overflow: "hidden", marginBottom: 12,
         }}>
           <div style={{ fontSize: 11, fontWeight: 600, color: "#8888A0", padding: "10px 16px", display: "flex", alignItems: "center", gap: 6 }}>
-            <ImageIcon size={11} /> {artifact.nodeLabel ?? "Render"}
+            <ImageIcon size={11} /> {artifact.nodeLabel ?? t('compare.render')}
           </div>
           {typeof artifact.data?.url === "string" && (
             /* eslint-disable-next-line @next/next/no-img-element */
@@ -217,14 +220,14 @@ function ExecutionSide({ execution, otherExecution }: { execution: Execution; ot
             padding: "14px 16px", marginBottom: 12,
           }}>
             <div style={{ fontSize: 11, fontWeight: 600, color: "#8888A0", marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
-              <Table2 size={11} /> {artifact.nodeLabel ?? "Table"}
+              <Table2 size={11} /> {artifact.nodeLabel ?? t('compare.table')}
             </div>
             <div style={{ fontSize: 10, color: "#5C5C78" }}>
-              {rows.length} rows, {headers.length} columns
+              {rows.length} {t('compare.rows')}, {headers.length} {t('compare.columns')}
             </div>
             {summary?.grandTotal != null && (
               <div style={{ marginTop: 6, fontSize: 13, fontWeight: 700, color: "#10B981" }}>
-                Total: ${summary.grandTotal.toLocaleString()}
+                {t('compare.total')}: ${summary.grandTotal.toLocaleString()}
               </div>
             )}
           </div>
@@ -239,7 +242,7 @@ function ExecutionSide({ execution, otherExecution }: { execution: Execution; ot
           padding: "14px 16px", marginBottom: 12,
         }}>
           <div style={{ fontSize: 11, fontWeight: 600, color: "#8888A0", display: "flex", alignItems: "center", gap: 6 }}>
-            <FileText size={11} /> {String(artifact.data?.name ?? artifact.data?.fileName ?? "File")}
+            <FileText size={11} /> {String(artifact.data?.name ?? artifact.data?.fileName ?? t('compare.file'))}
           </div>
         </div>
       ))}
@@ -249,7 +252,7 @@ function ExecutionSide({ execution, otherExecution }: { execution: Execution; ot
           padding: 32, textAlign: "center", color: "#3A3A50", fontSize: 12,
           background: "#12121E", borderRadius: 10, border: "1px solid rgba(255,255,255,0.06)",
         }}>
-          No artifacts recorded
+          {t('compare.noArtifacts')}
         </div>
       )}
     </div>
@@ -259,6 +262,7 @@ function ExecutionSide({ execution, otherExecution }: { execution: Execution; ot
 // ─── Compare Content (with searchParams) ────────────────────────────────────
 
 function CompareContent() {
+  const { t } = useLocale();
   const searchParams = useSearchParams();
   const router = useRouter();
   const leftId = searchParams.get("left");
@@ -269,9 +273,13 @@ function CompareContent() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const errorTwoIds = t('compare.errorTwoIds');
+  const errorLoadBoth = t('compare.errorLoadBoth');
+  const errorFailed = t('compare.errorFailed');
+
   const loadExecutions = useCallback(async () => {
     if (!leftId || !rightId) {
-      setError("Two execution IDs are required");
+      setError(errorTwoIds);
       setLoading(false);
       return;
     }
@@ -282,29 +290,29 @@ function CompareContent() {
         fetch(`/api/executions/${rightId}`).then(r => r.ok ? r.json() : null),
       ]);
       if (!left || !right) {
-        setError("Could not load one or both executions");
+        setError(errorLoadBoth);
       } else {
         setLeftExec((left as { execution: Execution }).execution ?? left as Execution);
         setRightExec((right as { execution: Execution }).execution ?? right as Execution);
       }
     } catch {
-      setError("Failed to load executions");
+      setError(errorFailed);
     } finally {
       setLoading(false);
     }
-  }, [leftId, rightId]);
+  }, [leftId, rightId, errorTwoIds, errorLoadBoth, errorFailed]);
 
   useEffect(() => { loadExecutions(); }, [loadExecutions]);
 
   if (loading) {
-    return <div style={{ padding: 48, textAlign: "center", color: "#5C5C78" }}>Loading comparison...</div>;
+    return <div style={{ padding: 48, textAlign: "center", color: "#5C5C78" }}>{t('compare.loading')}</div>;
   }
 
   if (error || !leftExec || !rightExec) {
     return (
       <div style={{ padding: 48, textAlign: "center" }}>
         <div style={{ fontSize: 15, fontWeight: 600, color: "#EF4444", marginBottom: 8 }}>
-          {error ?? "Unable to load executions"}
+          {error ?? t('compare.errorUnable')}
         </div>
         <button
           onClick={() => router.push("/dashboard/history")}
@@ -313,7 +321,7 @@ function CompareContent() {
             background: "#4F8AFF", color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer",
           }}
         >
-          Back to History
+          {t('compare.backToHistory')}
         </button>
       </div>
     );
@@ -335,13 +343,14 @@ function CompareContent() {
 // ─── Page ────────────────────────────────────────────────────────────────────
 
 export default function ComparePage() {
+  const { t } = useLocale();
   const router = useRouter();
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
       <Header
-        title="Compare Executions"
-        subtitle="Side-by-side comparison of two workflow runs"
+        title={t('compare.title')}
+        subtitle={t('compare.subtitle')}
       />
 
       <div style={{ padding: "12px 24px 0" }}>
@@ -354,12 +363,12 @@ export default function ComparePage() {
             marginBottom: 16,
           }}
         >
-          <ArrowLeft size={11} /> Back to History
+          <ArrowLeft size={11} /> {t('compare.backToHistory')}
         </button>
       </div>
 
       <main className="flex-1 overflow-y-auto">
-        <Suspense fallback={<div style={{ padding: 48, textAlign: "center", color: "#5C5C78" }}>Loading...</div>}>
+        <Suspense fallback={<div style={{ padding: 48, textAlign: "center", color: "#5C5C78" }}>{t('compare.loadingShort' as TranslationKey)}</div>}>
           <CompareContent />
         </Suspense>
       </main>

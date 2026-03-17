@@ -448,7 +448,7 @@ function ProfileSection({
                   letterSpacing: "0.08em",
                   fontFamily: "var(--font-jetbrains), monospace",
                 }}>
-                  AUTHORIZED OPERATOR
+                  {t('settings.authorizedOperator')}
                 </span>
               </div>
 
@@ -490,9 +490,9 @@ function ProfileSection({
         }}>
           <div style={{ display: "flex", gap: 24 }}>
             {[
-              { label: "SESSION", value: "Encrypted" },
-              { label: "PROTOCOL", value: "OAuth 2.0" },
-              { label: "STATUS", value: "Online", color: "#10B981" },
+              { label: t('settings.session'), value: t('settings.encrypted') },
+              { label: t('settings.protocol'), value: "OAuth 2.0" },
+              { label: t('settings.statusLabel'), value: t('settings.online'), color: "#10B981" },
             ].map((item) => (
               <div key={item.label} style={{ display: "flex", alignItems: "center", gap: 6 }}>
                 <span style={{
@@ -774,9 +774,9 @@ function ApiKeysSection({ saveStatus, onSaveStatusChange }: {
               }}
             >
               {saveStatus === "saving" ? (
-                <><Loader2 size={14} className="animate-spin" /> ENCRYPTING...</>
+                <><Loader2 size={14} className="animate-spin" /> {t('settings.encrypting')}</>
               ) : saveStatus === "saved" ? (
-                <><Lock size={14} /> VAULT SEALED</>
+                <><Lock size={14} /> {t('settings.vaultSealed')}</>
               ) : (
                 <><Unlock size={14} /> {t('settings.saveApiKeys').toUpperCase()}</>
               )}
@@ -1054,7 +1054,7 @@ function PlanSection({ userRole }: { userRole: string }) {
                   fontFamily: "var(--font-jetbrains), monospace",
                 }}
               >
-                REQUEST HIGHER CLEARANCE
+                {t('settings.requestClearance')}
               </Link>
             ) : (
               <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -1063,7 +1063,7 @@ function PlanSection({ userRole }: { userRole: string }) {
                   fontSize: 11, color: "rgba(255,255,255,0.3)",
                   fontFamily: "var(--font-jetbrains), monospace",
                 }}>
-                  Maximum clearance granted
+                  {t('settings.maxClearance')}
                 </span>
               </div>
             )}
@@ -1088,9 +1088,9 @@ export default function SettingsPage() {
     : (user?.email?.[0] ?? "U").toUpperCase();
 
   const tabs: Array<{ key: SettingsTab; label: string; icon: React.ReactNode; desc: string }> = [
-    { key: "profile",  label: t('settings.profile'),   icon: <Fingerprint size={16} />, desc: "Identity" },
-    { key: "api-keys", label: t('settings.apiKeys'),   icon: <Key size={16} />, desc: "Vault" },
-    { key: "plan",     label: t('settings.planUsage'),  icon: <Shield size={16} />, desc: "Clearance" },
+    { key: "profile",  label: t('settings.profile'),   icon: <Fingerprint size={16} />, desc: t('settings.tabIdentity') },
+    { key: "api-keys", label: t('settings.apiKeys'),   icon: <Key size={16} />, desc: t('settings.tabVault') },
+    { key: "plan",     label: t('settings.planUsage'),  icon: <Shield size={16} />, desc: t('settings.tabClearance') },
   ];
 
   return (
@@ -1161,7 +1161,7 @@ export default function SettingsPage() {
                   color: "rgba(255,255,255,0.2)",
                   fontFamily: "var(--font-jetbrains), monospace",
                 }}>
-                  CONTROL PANEL
+                  {t('settings.controlPanel')}
                 </span>
               </div>
 

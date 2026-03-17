@@ -260,10 +260,10 @@ function BlueprintGrid() {
 // ─── AEC Stats Bar ──────────────────────────────────────────────────────────
 
 const AEC_STATS = [
-  { value: PREBUILT_WORKFLOWS.length.toString(), label: "Workflows", icon: <Layers size={13} /> },
-  { value: "5", label: "Disciplines", icon: <HardHat size={13} /> },
-  { value: "31", label: "Node Types", icon: <Building2 size={13} /> },
-  { value: "IFC", label: "Native Export", icon: <Compass size={13} /> },
+  { value: PREBUILT_WORKFLOWS.length.toString(), labelKey: "templates.statWorkflows" as const, icon: <Layers size={13} /> },
+  { value: "5", labelKey: "templates.statDisciplines" as const, icon: <HardHat size={13} /> },
+  { value: "31", labelKey: "templates.statNodeTypes" as const, icon: <Building2 size={13} /> },
+  { value: "IFC", labelKey: "templates.statNativeExport" as const, icon: <Compass size={13} /> },
 ];
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
@@ -410,7 +410,7 @@ export default function TemplatesPage() {
             >
               {AEC_STATS.map((stat, i) => (
                 <div
-                  key={stat.label}
+                  key={stat.labelKey}
                   style={{
                     display: "flex", alignItems: "center", gap: 8,
                     padding: "8px 16px",
@@ -434,7 +434,7 @@ export default function TemplatesPage() {
                       fontSize: 10, color: "#4A4A60", marginLeft: 5,
                       textTransform: "uppercase", letterSpacing: "0.5px",
                     }}>
-                      {stat.label}
+                      {t(stat.labelKey)}
                     </span>
                   </div>
                 </div>

@@ -11,6 +11,8 @@ import {
 import { PREBUILT_WORKFLOWS } from "@/constants/prebuilt-workflows";
 import { MiniWorkflowDiagram } from "@/components/shared/MiniWorkflowDiagram";
 import { PageBackground } from "@/components/dashboard/PageBackground";
+import { useLocale } from "@/hooks/useLocale";
+import type { TranslationKey } from "@/lib/i18n";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 interface DashboardData {
@@ -341,6 +343,7 @@ function PipelineConnector({ fromColor, toColor }: { fromColor: string; toColor:
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 export default function DashboardPage() {
+  const { t } = useLocale();
   const [data, setData] = useState<DashboardData>(DEFAULT_DATA);
 
   useEffect(() => {
@@ -400,7 +403,7 @@ export default function DashboardPage() {
                     color: "rgba(184,115,51,0.4)", marginBottom: 12,
                   }}
                 >
-                  WORKSPACE / HOME
+                  {t('dash.workspaceHome')}
                 </motion.div>
 
                 <motion.h1
@@ -411,14 +414,14 @@ export default function DashboardPage() {
                     letterSpacing: "-1.5px", lineHeight: 1.1, marginBottom: 12,
                   }}
                 >
-                  <span style={{ color: "#E2E8F0" }}>Design </span>
+                  <span style={{ color: "#E2E8F0" }}>{t('dash.designStudio')} </span>
                   <span style={{
                     background: "linear-gradient(135deg, #B87333 0%, #FFBF00 100%)",
                     WebkitBackgroundClip: "text",
                     WebkitTextFillColor: "transparent",
                     backgroundClip: "text",
                   }}>
-                    Studio
+                    {t('dash.studioHighlight')}
                   </span>
                 </motion.h1>
 
@@ -427,7 +430,7 @@ export default function DashboardPage() {
                   transition={{ duration: 0.5, ease: smoothEase }}
                   style={{ fontSize: 15, color: "#8898A8", maxWidth: 420, lineHeight: 1.6 }}
                 >
-                  Your concept design workspace — from brief to 3D in minutes.
+                  {t('dash.subtitle')}
                 </motion.p>
 
                 {/* Accent line with beam-extend animation */}
@@ -452,7 +455,7 @@ export default function DashboardPage() {
                 style={{ display: "flex", gap: 14, flexShrink: 0 }}
               >
                 <StatCard
-                  label="Workflows"
+                  label={t('dash.workflows')}
                   value={data.workflowCount}
                   icon={<Workflow size={15} />}
                   color="#B87333"
@@ -460,7 +463,7 @@ export default function DashboardPage() {
                   delay={0.3}
                 />
                 <StatCard
-                  label="Executions"
+                  label={t('dash.executions')}
                   value={data.executionCount}
                   icon={<Activity size={15} />}
                   color="#00F5FF"
@@ -468,7 +471,7 @@ export default function DashboardPage() {
                   delay={0.4}
                 />
                 <StatCard
-                  label="Success"
+                  label={t('dash.success')}
                   value={successRate}
                   icon={<CheckCircle2 size={15} />}
                   color="#34D399"
@@ -488,7 +491,7 @@ export default function DashboardPage() {
             animate={{ opacity: 1 }}
             transition={{ delay: 0.3, duration: 0.5 }}
           >
-            <SectionLabel number="01" title="Quick Actions" />
+            <SectionLabel number="01" title={t('dash.quickActions')} />
           </motion.div>
 
           <div className="flex items-stretch gap-0 mb-16 dashboard-quick-actions">
@@ -530,10 +533,10 @@ export default function DashboardPage() {
                   <ArrowRight size={16} style={{ color: "#556070" }} />
                 </div>
                 <div style={{ fontSize: 16, fontWeight: 700, color: "#E2E8F0", marginBottom: 6 }}>
-                  Create New Workflow
+                  {t('dash.createWorkflow')}
                 </div>
                 <div style={{ fontSize: 12, color: "#8898A8", lineHeight: 1.55, flex: 1 }}>
-                  Start from scratch with a blank canvas
+                  {t('dash.createWorkflowDesc')}
                 </div>
               </Link>
             </motion.div>
@@ -572,13 +575,13 @@ export default function DashboardPage() {
                   }}>
                     <Sparkles size={22} />
                   </div>
-                  <span className="arch-ai-badge">AI POWERED</span>
+                  <span className="arch-ai-badge">{t('dash.aiPowered')}</span>
                 </div>
                 <div style={{ fontSize: 16, fontWeight: 700, color: "#E2E8F0", marginBottom: 6 }}>
-                  AI Generate
+                  {t('dash.aiGenerate')}
                 </div>
                 <div style={{ fontSize: 12, color: "#8898A8", lineHeight: 1.55, flex: 1 }}>
-                  Describe your pipeline in plain English
+                  {t('dash.aiGenerateDesc')}
                 </div>
               </Link>
             </motion.div>
@@ -626,10 +629,10 @@ export default function DashboardPage() {
                   </span>
                 </div>
                 <div style={{ fontSize: 16, fontWeight: 700, color: "#E2E8F0", marginBottom: 6 }}>
-                  Browse Templates
+                  {t('dash.browseTemplates')}
                 </div>
                 <div style={{ fontSize: 12, color: "#8898A8", lineHeight: 1.55, flex: 1 }}>
-                  Fork a pre-built workflow template
+                  {t('dash.browseTemplatesDesc')}
                 </div>
               </Link>
             </motion.div>
@@ -643,7 +646,7 @@ export default function DashboardPage() {
             animate={{ opacity: 1 }}
             transition={{ delay: 0.55, duration: 0.5 }}
           >
-            <SectionLabel number="02" title="Your Pipeline" />
+            <SectionLabel number="02" title={t('dash.yourPipeline')} />
           </motion.div>
 
           <div className="flex items-stretch gap-0 mb-16 dashboard-pipeline-steps">
@@ -712,7 +715,7 @@ export default function DashboardPage() {
                           letterSpacing: "1.5px", textTransform: "uppercase",
                           fontFamily: "var(--font-jetbrains), monospace",
                         }}>
-                          STEP {stepNum}
+                          {t('dash.step')} {stepNum}
                         </span>
                         {isCompleted && <CheckCircle2 size={12} style={{ color: "#34D399", marginLeft: "auto" }} />}
                       </div>
@@ -733,10 +736,10 @@ export default function DashboardPage() {
                           </div>
                           <div style={{ flex: 1 }}>
                             <div style={{ fontSize: 13, fontWeight: 650, color: "#E2E8F0", marginBottom: 4 }}>
-                              {mission.title}
+                              {t(`dash.mission${i + 1}Title` as TranslationKey)}
                             </div>
                             <div style={{ fontSize: 11, color: "#8898A8", lineHeight: 1.5 }}>
-                              {mission.description}
+                              {t(`dash.mission${i + 1}Desc` as TranslationKey)}
                             </div>
                           </div>
                         </div>
@@ -748,7 +751,7 @@ export default function DashboardPage() {
                             fontSize: 11, fontWeight: 600, color: "#B87333",
                             fontFamily: "var(--font-jetbrains), monospace",
                           }}>
-                            Get started <ArrowRight size={12} />
+                            {t('dash.getStarted')} <ArrowRight size={12} />
                           </div>
                         )}
                       </div>
@@ -797,14 +800,14 @@ export default function DashboardPage() {
           >
             <SectionLabel
               number="03"
-              title="Design Templates"
+              title={t('dash.designTemplates')}
               right={
                 <Link href="/dashboard/templates" className="dashboard-link-hover" style={{
                   fontSize: 12, fontWeight: 600, color: "#B87333",
                   textDecoration: "none", display: "flex", alignItems: "center", gap: 4,
                   transition: "all 200ms ease",
                 }}>
-                  All Templates <ChevronRight size={14} />
+                  {t('dash.allTemplates')} <ChevronRight size={14} />
                 </Link>
               }
             />
@@ -854,14 +857,14 @@ export default function DashboardPage() {
               >
                 <SectionLabel
                   number="04"
-                  title="Recent Activity"
+                  title={t('dash.recentActivity')}
                   right={
                     <Link href="/dashboard/workflows" className="dashboard-link-hover" style={{
                       fontSize: 12, fontWeight: 600, color: "#B87333",
                       textDecoration: "none", display: "flex", alignItems: "center", gap: 4,
                       transition: "all 200ms ease",
                     }}>
-                      All Workflows <ChevronRight size={14} />
+                      {t('dash.allWorkflows')} <ChevronRight size={14} />
                     </Link>
                   }
                 />
@@ -912,7 +915,7 @@ export default function DashboardPage() {
                             {wf.name}
                           </div>
                           <div className="font-mono-data" style={{ fontSize: 10, color: "#556070" }}>
-                            {timeAgo(wf.updatedAt)}
+                            {timeAgo(wf.updatedAt, t)}
                           </div>
                         </div>
                       </div>
@@ -921,10 +924,10 @@ export default function DashboardPage() {
                       <div style={{ padding: "14px 18px 16px" }}>
                         <div className="flex items-center gap-4 mb-2">
                           <span className="font-mono-data" style={{ fontSize: 10, color: "#556070", display: "flex", alignItems: "center", gap: 4 }}>
-                            <Zap size={10} style={{ color: "#B87333" }} /> {wf.nodeCount} nodes
+                            <Zap size={10} style={{ color: "#B87333" }} /> {wf.nodeCount} {t('dash.nodes')}
                           </span>
                           <span className="font-mono-data" style={{ fontSize: 10, color: "#556070", display: "flex", alignItems: "center", gap: 4 }}>
-                            <Play size={9} style={{ color: "#34D399" }} /> {wf.executionCount} runs
+                            <Play size={9} style={{ color: "#34D399" }} /> {wf.executionCount} {t('dash.runs')}
                           </span>
                         </div>
 
@@ -938,7 +941,7 @@ export default function DashboardPage() {
                           fontFamily: "var(--font-jetbrains), monospace",
                           letterSpacing: "0.04em",
                         }}>
-                          Open Workflow
+                          {t('dash.openWorkflow')}
                         </div>
                       </div>
                     </Link>
@@ -1001,10 +1004,10 @@ export default function DashboardPage() {
 
                 <div style={{ flex: 1, position: "relative", zIndex: 1 }}>
                   <div style={{ fontSize: 14, fontWeight: 600, color: "#E2E8F0", marginBottom: 3 }}>
-                    {data.flashEvent.title}
+                    {t('dash.flashTitle')}
                   </div>
                   <div style={{ fontSize: 13, color: "#8898A8", lineHeight: 1.5 }}>
-                    {data.flashEvent.description}
+                    {t('dash.flashDesc')}
                   </div>
                 </div>
 
@@ -1106,6 +1109,7 @@ function TemplateCard({ unlocked, name, desc, category, categoryColor, diagramNo
   categoryColor: string;
   diagramNodes: Array<{ label: string; category: string }>;
 }) {
+  const { t } = useLocale();
   const [hovered, setHovered] = useState(false);
 
   return (
@@ -1162,7 +1166,7 @@ function TemplateCard({ unlocked, name, desc, category, categoryColor, diagramNo
           }}>
             <Lock size={24} style={{ color: "#556070" }} />
             <span className="font-mono-data" style={{ fontSize: 9, color: "#556070", letterSpacing: "0.1em" }}>
-              PRO TEMPLATE
+              {t('dash.proTemplate')}
             </span>
           </div>
         )}
@@ -1224,7 +1228,7 @@ function TemplateCard({ unlocked, name, desc, category, categoryColor, diagramNo
               boxShadow: "0 2px 12px rgba(184,115,51,0.2)",
             }}
           >
-            Use Template <ArrowRight size={13} />
+            {t('dash.useTemplate')} <ArrowRight size={13} />
           </Link>
         ) : (
           <div style={{
@@ -1237,6 +1241,7 @@ function TemplateCard({ unlocked, name, desc, category, categoryColor, diagramNo
             display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
           }}>
             <Crown size={12} /> PRO
+
           </div>
         )}
       </div>
@@ -1246,15 +1251,24 @@ function TemplateCard({ unlocked, name, desc, category, categoryColor, diagramNo
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function timeAgo(iso: string): string {
+function timeAgo(iso: string, tr?: (key: TranslationKey) => string): string {
   const diff = Date.now() - new Date(iso).getTime();
   const mins = Math.floor(diff / 60000);
-  if (mins < 1) return "Just now";
-  if (mins < 60) return `${mins}m ago`;
+  if (!tr) {
+    if (mins < 1) return "Just now";
+    if (mins < 60) return `${mins}m ago`;
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return `${hrs}h ago`;
+    const days = Math.floor(hrs / 24);
+    if (days < 7) return `${days}d ago`;
+    return new Date(iso).toLocaleDateString();
+  }
+  if (mins < 1) return tr('dash.justNow');
+  if (mins < 60) return tr('dash.mAgo').replace('{n}', String(mins));
   const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
+  if (hrs < 24) return tr('dash.hAgo').replace('{n}', String(hrs));
   const days = Math.floor(hrs / 24);
-  if (days < 7) return `${days}d ago`;
+  if (days < 7) return tr('dash.dAgo').replace('{n}', String(days));
   return new Date(iso).toLocaleDateString();
 }
 
