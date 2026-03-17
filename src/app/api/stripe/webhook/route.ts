@@ -177,10 +177,17 @@ async function updateUserSubscription(
       return;
     }
 
+    // For terminal statuses, clear all subscription fields so the user can re-subscribe.
+    // For past_due, keep fields so Stripe can retry and webhook can re-activate.
+    const terminalStatuses: string[] = ['canceled', 'incomplete_expired', 'unpaid'];
+    const isTerminal = terminalStatuses.includes(subscription.status);
+
     await prisma.user.update({
       where: { id: user.id },
       data: {
-        stripeSubscriptionId: subscription.id,
+        stripeSubscriptionId: isTerminal ? null : subscription.id,
+        stripePriceId: isTerminal ? null : undefined,
+        stripeCurrentPeriodEnd: isTerminal ? null : undefined,
         role: 'FREE',
       },
     });
@@ -214,6 +221,20 @@ async function updateUserSubscription(
   const currentPeriodEnd = firstItem?.current_period_end
     ?? (sub as unknown as { current_period_end?: number }).current_period_end
     ?? Math.floor(Date.now() / 1000);
+
+  // CRITICAL: If a paid subscription resolves to FREE, something is wrong with price ID mapping
+  if (plan === 'FREE' && priceId) {
+    console.error('[STRIPE_WEBHOOK] CRITICAL: Paid subscription resolved to FREE role!', {
+      userId: user.id,
+      priceId,
+      subscriptionId: sub.id,
+      subscriptionStatus: sub.status,
+      envMini: process.env.STRIPE_MINI_PRICE_ID,
+      envStarter: process.env.STRIPE_STARTER_PRICE_ID,
+      envPro: process.env.STRIPE_PRICE_ID,
+      envTeam: process.env.STRIPE_TEAM_PRICE_ID,
+    });
+  }
 
   console.info('[STRIPE_WEBHOOK] Attempting role update:', {
     userId: user.id,

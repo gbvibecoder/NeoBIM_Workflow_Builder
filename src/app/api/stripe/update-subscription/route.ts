@@ -185,18 +185,31 @@ export async function POST(req: Request) {
           effectiveImmediately: true,
         });
       } else {
-        // Downgrade: schedule at period end (no immediate charge/refund)
-        await stripe.subscriptions.update(subscription.id, {
+        // Downgrade: change price immediately, no proration (no refund for remaining period)
+        const updatedSubscription = await stripe.subscriptions.update(subscription.id, {
           items: [{ id: currentItemId, price: newPriceId }],
           proration_behavior: 'none',
         });
 
-        // DB role will update via webhook when next period starts
-        // For now, just log it
-        console.info('[stripe/update-sub] Downgrade scheduled:', {
+        // Update DB immediately — webhook will also fire but both resolve to same role
+        const newRole = getPlanByPriceId(newPriceId);
+        const firstItem = updatedSubscription.items?.data?.[0];
+        const currentPeriodEnd = firstItem?.current_period_end
+          ?? Math.floor(Date.now() / 1000);
+
+        await prisma.user.update({
+          where: { id: user.id },
+          data: {
+            role: newRole,
+            stripePriceId: newPriceId,
+            stripeCurrentPeriodEnd: new Date(currentPeriodEnd * 1000),
+          },
+        });
+
+        console.info('[stripe/update-sub] Downgrade applied:', {
           userId: user.id,
           from: user.role,
-          to: normalizedPlan,
+          to: newRole,
           subscriptionId: subscription.id,
         });
 
@@ -210,8 +223,7 @@ export async function POST(req: Request) {
           type: 'downgrade',
           newRole: normalizedPlan,
           previousRole: user.role,
-          effectiveImmediately: false,
-          message: 'Your plan will change at the end of the current billing period.',
+          effectiveImmediately: true,
         });
       }
     } catch (stripeError) {

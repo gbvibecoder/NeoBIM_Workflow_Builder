@@ -83,18 +83,41 @@ export async function POST(req: Request) {
       );
     }
 
-    // Guard against duplicate subscriptions
+    // Guard against duplicate subscriptions — but allow re-subscription if old one is dead
     if (user.stripeSubscriptionId) {
-      return NextResponse.json(
-        formatErrorResponse({
-          title: "Subscription already active",
-          message: "You already have an active subscription. Please use the billing portal to change plans.",
-          code: "BILL_001",
-          action: "Manage Subscription",
-          actionUrl: "/dashboard/billing",
-        }),
-        { status: 400 }
-      );
+      try {
+        const existingSub = await stripe.subscriptions.retrieve(user.stripeSubscriptionId);
+        if (['active', 'trialing', 'past_due'].includes(existingSub.status)) {
+          // Subscription is alive — user should use the billing portal to change plans
+          return NextResponse.json(
+            formatErrorResponse({
+              title: "Subscription already active",
+              message: "You already have an active subscription. Please use the billing portal to change plans.",
+              code: "BILL_001",
+              action: "Manage Subscription",
+              actionUrl: "/dashboard/billing",
+            }),
+            { status: 400 }
+          );
+        }
+        // Subscription is dead (canceled, incomplete_expired, unpaid) — clear stale data
+        console.info('[stripe/checkout] Clearing stale subscription:', {
+          userId: user.id,
+          oldSubId: user.stripeSubscriptionId,
+          oldStatus: existingSub.status,
+        });
+        await prisma.user.update({
+          where: { id: user.id },
+          data: { stripeSubscriptionId: null, stripePriceId: null, stripeCurrentPeriodEnd: null },
+        });
+      } catch {
+        // Can't verify old subscription (deleted on Stripe?) — clear stale data
+        console.warn('[stripe/checkout] Could not verify subscription, clearing:', user.stripeSubscriptionId);
+        await prisma.user.update({
+          where: { id: user.id },
+          data: { stripeSubscriptionId: null, stripePriceId: null, stripeCurrentPeriodEnd: null },
+        });
+      }
     }
 
     // Create or get Stripe customer

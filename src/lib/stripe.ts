@@ -129,13 +129,30 @@ export const STRIPE_PLANS = {
 } as const;
 
 // Helper to get plan by price ID (returns Prisma UserRole enum)
+// Uses both cached STRIPE_PLANS and runtime env var re-read as fallback
+// to guard against module-init race conditions where env vars aren't yet available.
 export function getPlanByPriceId(priceId: string | null): 'FREE' | 'MINI' | 'STARTER' | 'PRO' | 'TEAM_ADMIN' {
   if (!priceId) return 'FREE';
+
+  // Primary: check against STRIPE_PLANS (cached at module init)
   if (priceId === STRIPE_PLANS.MINI.priceId) return 'MINI';
   if (priceId === STRIPE_PLANS.STARTER.priceId) return 'STARTER';
   if (priceId === STRIPE_PLANS.PRO.priceId) return 'PRO';
-  if (priceId === STRIPE_PLANS.TEAM.priceId) return 'TEAM_ADMIN'; // Map TEAM to TEAM_ADMIN
-  console.error(`[stripe] getPlanByPriceId: unrecognized priceId "${priceId}" — falling back to FREE`);
+  if (priceId === STRIPE_PLANS.TEAM.priceId) return 'TEAM_ADMIN';
+
+  // Fallback: re-read env vars at call time (handles cold-start edge cases)
+  if (priceId === process.env.STRIPE_MINI_PRICE_ID) return 'MINI';
+  if (priceId === process.env.STRIPE_STARTER_PRICE_ID) return 'STARTER';
+  if (priceId === process.env.STRIPE_PRICE_ID) return 'PRO';
+  if (priceId === process.env.STRIPE_TEAM_PRICE_ID) return 'TEAM_ADMIN';
+
+  console.error('[stripe] getPlanByPriceId: UNRECOGNIZED priceId — user paid but plan cannot be resolved!', {
+    priceId,
+    envMini: process.env.STRIPE_MINI_PRICE_ID ? 'set' : 'MISSING',
+    envStarter: process.env.STRIPE_STARTER_PRICE_ID ? 'set' : 'MISSING',
+    envPro: process.env.STRIPE_PRICE_ID ? 'set' : 'MISSING',
+    envTeam: process.env.STRIPE_TEAM_PRICE_ID ? 'set' : 'MISSING',
+  });
   return 'FREE';
 }
 

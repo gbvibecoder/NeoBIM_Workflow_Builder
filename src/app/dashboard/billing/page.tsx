@@ -71,20 +71,30 @@ export default function BillingPage() {
         try {
           const res = await fetch('/api/stripe/subscription', { method: 'POST' });
           const data = await res.json();
+          console.info('[billing] Sync attempt', attempt, '→', data);
+
           if (data.synced) {
+            // Subscription was updated in DB — refresh session and reload
             console.info('[billing] Subscription synced:', data.role);
             await updateSession();
             window.location.reload();
-          } else if (data.reason === 'no_active_subscription' && attempt < 3) {
+          } else if (data.reason === 'no_active_subscription' && attempt < 5) {
+            // Webhook hasn't processed yet — retry with back-off
             setTimeout(() => syncSubscription(attempt + 1), attempt * 2000);
           } else {
+            // already_synced or max retries — always refresh session + reload
+            // This ensures the page reflects the DB state even if webhook
+            // updated the role before our sync call ran.
             await updateSession();
+            window.location.reload();
           }
         } catch {
-          if (attempt < 3) {
+          if (attempt < 5) {
             setTimeout(() => syncSubscription(attempt + 1), attempt * 2000);
           } else {
+            // Final fallback — force refresh so JWT callback reads DB
             await updateSession();
+            window.location.reload();
           }
         }
       };

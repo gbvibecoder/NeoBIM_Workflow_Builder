@@ -115,15 +115,28 @@ export async function POST() {
     try {
       // Check existing subscription ID first
       if (user.stripeSubscriptionId) {
-        const sub = await stripe.subscriptions.retrieve(user.stripeSubscriptionId);
-        if (sub.status === 'active' || sub.status === 'trialing') {
-          activeSubscription = {
-            id: sub.id,
-            priceId: sub.items?.data?.[0]?.price?.id,
-            currentPeriodEnd: sub.items?.data?.[0]?.current_period_end
-              ?? (sub as unknown as { current_period_end?: number }).current_period_end
-              ?? Math.floor(Date.now() / 1000),
-          };
+        try {
+          const sub = await stripe.subscriptions.retrieve(user.stripeSubscriptionId);
+          if (sub.status === 'active' || sub.status === 'trialing') {
+            activeSubscription = {
+              id: sub.id,
+              priceId: sub.items?.data?.[0]?.price?.id,
+              currentPeriodEnd: sub.items?.data?.[0]?.current_period_end
+                ?? (sub as unknown as { current_period_end?: number }).current_period_end
+                ?? Math.floor(Date.now() / 1000),
+            };
+          }
+        } catch (retrieveError) {
+          // Subscription was deleted on Stripe — clear stale data from DB
+          console.warn('[STRIPE_SYNC] Stored subscription not found on Stripe, clearing:', {
+            userId: user.id,
+            staleSubId: user.stripeSubscriptionId,
+            error: retrieveError instanceof Error ? retrieveError.message : String(retrieveError),
+          });
+          await prisma.user.update({
+            where: { id: user.id },
+            data: { stripeSubscriptionId: null, stripePriceId: null, stripeCurrentPeriodEnd: null },
+          });
         }
       }
 
@@ -173,6 +186,15 @@ export async function POST() {
 
     // Map price ID to plan role
     const newRole = getPlanByPriceId(activeSubscription.priceId);
+
+    // CRITICAL: If an active paid subscription resolves to FREE, log it clearly
+    if (newRole === 'FREE' && activeSubscription.priceId) {
+      console.error('[STRIPE_SYNC] CRITICAL: Active subscription resolved to FREE!', {
+        userId: user.id,
+        priceId: activeSubscription.priceId,
+        subscriptionId: activeSubscription.id,
+      });
+    }
 
     // Only update if role is different (or subscription details are different)
     if (user.role !== newRole || user.stripeSubscriptionId !== activeSubscription.id) {
