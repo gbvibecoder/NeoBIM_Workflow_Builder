@@ -616,7 +616,7 @@ export default function BillingPage() {
                     {/* Price */}
                     <div className="mb-5">
                       <div className="flex items-baseline gap-1">
-                        <span className="text-[13px] font-medium text-[#7C7C96]">\u20B9</span>
+                        <span className="text-[13px] font-medium text-[#7C7C96]">₹</span>
                         <motion.span
                           className="text-4xl font-extrabold text-[#F0F0F5] tracking-tight"
                           style={isActive ? { color: plan.color } : {}}
