@@ -3165,46 +3165,22 @@ export default function LandingPage() {
               <h2 style={{ fontSize: "clamp(2.2rem, 4.5vw, 3.5rem)", fontWeight: 900, color: "#F0F0F5", letterSpacing: "-0.04em", lineHeight: 1.05, marginBottom: 16 }}>
                 {t('landing.simpleTransparent')}<span style={{ background: "linear-gradient(135deg, #4F8AFF, #A78BFA)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>{t('landing.transparent')}</span>{t('landing.pricingTitle')}
               </h2>
-              <p style={{ fontSize: 16, color: "#7C7C96" }}>{t('landing.choosePlan')}</p>
+              <p style={{ fontSize: 16, color: "#7C7C96", marginBottom: 12 }}>{t('landing.choosePlan')}</p>
+              {/* Free tier note */}
+              <div style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "8px 20px", borderRadius: 100, background: "rgba(79,138,255,0.04)", border: "1px solid rgba(79,138,255,0.1)" }}>
+                <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#4F8AFF", boxShadow: "0 0 6px rgba(79,138,255,0.5)" }} />
+                <span style={{ fontSize: 13, color: "#9898B0" }}>
+                  {t('billing.freeTierNote')}
+                </span>
+              </div>
             </motion.div>
 
             <motion.div
               initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-40px" }}
               variants={{ visible: { transition: { staggerChildren: 0.1 } } }}
-              className="landing-grid-5"
-              style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 16, alignItems: "start" }}
+              className="landing-grid-4"
+              style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 20, alignItems: "start" }}
             >
-              {/* FREE */}
-              <motion.div variants={fadeUp} transition={{ duration: 0.5, ease: smoothEase }}
-                className="node-card"
-                style={{ '--node-port-color': '#4F8AFF' } as React.CSSProperties}
-              >
-                <div className="node-header" style={{
-                  background: "linear-gradient(135deg, rgba(79,138,255,0.08), rgba(79,138,255,0.02))",
-                  borderBottom: "1px solid rgba(79,138,255,0.1)",
-                  borderRadius: "16px 16px 0 0",
-                }}>
-                  <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#4F8AFF", boxShadow: "0 0 8px #4F8AFF" }} />
-                  <span style={{ color: "#4F8AFF" }}>FREE</span>
-                </div>
-                <div style={{ padding: "24px 20px" }}>
-                  <h3 style={{ fontSize: 20, fontWeight: 800, color: "#F0F0F5", marginBottom: 6 }}>{t('landing.free')}</h3>
-                  <p style={{ fontSize: 12, color: "#7878A0", marginBottom: 20 }}>{t('landing.freeDesc')}</p>
-                  <div style={{ marginBottom: 24 }}>
-                    <span style={{ fontSize: 40, fontWeight: 900, color: "#F0F0F5", letterSpacing: "-0.03em" }}>{t('landing.freePrice')}</span>
-                    <span style={{ fontSize: 14, color: "#5C5C78", marginLeft: 6 }}>{t('landing.perMonth')}</span>
-                  </div>
-                  <Link href="/dashboard" style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "12px 20px", borderRadius: 12, border: "1px solid rgba(79,138,255,0.15)", background: "rgba(79,138,255,0.05)", color: "#F0F0F5", fontSize: 13, fontWeight: 700, textDecoration: "none", marginBottom: 24, transition: "all 0.2s" }}
-                    onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.background = "rgba(79,138,255,0.1)"; }}
-                    onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.background = "rgba(79,138,255,0.05)"; }}
-                  >{t('landing.getStarted')}</Link>
-                  <div style={{ borderTop: "1px solid rgba(79,138,255,0.08)", paddingTop: 16 }}>
-                    <div style={{ fontSize: 9, fontWeight: 700, color: "#5C5C78", marginBottom: 12, textTransform: "uppercase", letterSpacing: "1.5px", fontFamily: "monospace" }}>{t('landing.includes')}</div>
-                    {tArray('landing.freeFeatures').map(f => (<div key={f} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}><div style={{ width: 14, height: 14, borderRadius: 3, background: "rgba(79,138,255,0.08)", border: "1px solid rgba(79,138,255,0.15)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><div style={{ width: 3, height: 3, borderRadius: "50%", background: "#4F8AFF" }} /></div><span style={{ fontSize: 12, color: "#9898B0" }}>{f}</span></div>))}
-                  </div>
-                </div>
-              </motion.div>
-
               {/* MINI */}
               <motion.div variants={fadeUp} transition={{ duration: 0.5, ease: smoothEase }}
                 className="node-card"
@@ -3563,8 +3539,8 @@ export default function LandingPage() {
           .landing-grid-3 {
             grid-template-columns: 1fr 1fr !important;
           }
-          .landing-grid-5 {
-            grid-template-columns: 1fr 1fr 1fr !important;
+          .landing-grid-4 {
+            grid-template-columns: 1fr 1fr !important;
           }
           .landing-social-proof-grid {
             grid-template-columns: 1fr 1fr !important;
@@ -3709,7 +3685,7 @@ export default function LandingPage() {
             grid-template-columns: 1fr !important;
             gap: 16px !important;
           }
-          .landing-grid-5 {
+          .landing-grid-4 {
             grid-template-columns: 1fr !important;
             gap: 16px !important;
           }

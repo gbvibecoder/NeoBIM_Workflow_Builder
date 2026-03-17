@@ -171,8 +171,8 @@
     gap: 16px !important;
   }
 
-  /* 5-column grids (pricing) become single column */
-  .landing-grid-5 {
+  /* 4-column grids (pricing) become single column */
+  .landing-grid-4 {
     grid-template-columns: 1fr !important;
     gap: 16px !important;
   }
@@ -485,9 +485,9 @@
     grid-template-columns: repeat(2, 1fr) !important;
   }
 
-  /* 5-column pricing grid: 3+2 on tablet */
-  .landing-grid-5 {
-    grid-template-columns: repeat(3, 1fr) !important;
+  /* 4-column pricing grid: 2x2 on tablet */
+  .landing-grid-4 {
+    grid-template-columns: repeat(2, 1fr) !important;
   }
 }
 
