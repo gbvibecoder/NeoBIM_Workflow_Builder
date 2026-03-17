@@ -1123,6 +1123,7 @@ const en = {
 
   // ===== AUTH PAGES (additional) =====
   'auth.authenticate': 'AUTHENTICATE',
+  'auth.user': 'User',
   'auth.newAccount': 'NEW ACCOUNT',
   'auth.forgotPassword': 'Forgot password? Contact',
   'auth.contactSupport': 'support',
@@ -2325,6 +2326,7 @@ const de: Record<keyof typeof en, string | string[]> = {
 
   // ===== AUTH PAGES (additional) =====
   'auth.authenticate': 'AUTHENTIFIZIEREN',
+  'auth.user': 'Benutzer',
   'auth.newAccount': 'NEUES KONTO',
   'auth.forgotPassword': 'Passwort vergessen? Kontaktieren Sie',
   'auth.contactSupport': 'Support',
