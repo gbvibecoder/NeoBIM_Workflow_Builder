@@ -7,6 +7,7 @@ import {
   BarChart3, Activity, AlertTriangle, Clock, Loader2, XCircle,
 } from "lucide-react";
 import dynamic from "next/dynamic";
+import { useLocale } from "@/hooks/useLocale";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 interface DailyExecution {
@@ -63,27 +64,6 @@ const CATEGORY_COLORS: Record<string, string> = {
   export: "#F59E0B",
 };
 
-const CATEGORY_LABELS: Record<string, string> = {
-  input: "Input",
-  transform: "Transform",
-  generate: "Generate",
-  export: "Export",
-};
-
-const STATUS_CONFIG: Record<string, { color: string; icon: React.ReactNode; label: string }> = {
-  SUCCESS: { color: COLORS.success, icon: <CheckCircle size={14} />, label: "Success" },
-  FAILED: { color: COLORS.error, icon: <XCircle size={14} />, label: "Failed" },
-  PARTIAL: { color: COLORS.warning, icon: <AlertTriangle size={14} />, label: "Partial" },
-  PENDING: { color: COLORS.textSecondary, icon: <Clock size={14} />, label: "Pending" },
-  RUNNING: { color: COLORS.cyan, icon: <Loader2 size={14} />, label: "Running" },
-};
-
-const COMPLEXITY_CONFIG: Record<string, { color: string; label: string; description: string }> = {
-  SIMPLE: { color: COLORS.success, label: "Simple", description: "1-3 nodes" },
-  INTERMEDIATE: { color: COLORS.amber, label: "Intermediate", description: "4-7 nodes" },
-  ADVANCED: { color: COLORS.error, label: "Advanced", description: "8+ nodes" },
-};
-
 const smoothEase: [number, number, number, number] = [0.25, 0.4, 0.25, 1];
 
 const cardStyle: React.CSSProperties = {
@@ -102,7 +82,7 @@ const ExecutionTrendChart = dynamic(
     import("recharts").then((mod) => {
       const { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } = mod;
       return {
-        default: ({ data }: { data: DailyExecution[] }) => (
+        default: ({ data, successLabel, failedLabel }: { data: DailyExecution[]; successLabel: string; failedLabel: string }) => (
           <ResponsiveContainer width="100%" height={280}>
             <BarChart data={data} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
               <defs>
@@ -158,8 +138,8 @@ const ExecutionTrendChart = dynamic(
                   </span>
                 )}
               />
-              <Bar dataKey="success" name="Success" fill="url(#successGrad)" stackId="exec" radius={[0, 0, 0, 0]} />
-              <Bar dataKey="failed" name="Failed" fill="url(#failedGrad)" stackId="exec" radius={[3, 3, 0, 0]} />
+              <Bar dataKey="success" name={successLabel} fill="url(#successGrad)" stackId="exec" radius={[0, 0, 0, 0]} />
+              <Bar dataKey="failed" name={failedLabel} fill="url(#failedGrad)" stackId="exec" radius={[3, 3, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         ),
@@ -229,6 +209,9 @@ function KPICard({
           letterSpacing: "1.2px",
           fontWeight: 600,
           fontFamily: monoFont,
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          whiteSpace: "nowrap",
         }}>
           {label}
         </span>
@@ -275,7 +258,7 @@ function SectionCard({
 }
 
 // ─── Node Usage Row ─────────────────────────────────────────────────────────
-function NodeUsageRow({ node, maxCount, index }: { node: TopNode; maxCount: number; index: number }) {
+function NodeUsageRow({ node, maxCount, index, categoryLabel }: { node: TopNode; maxCount: number; index: number; categoryLabel: string }) {
   const pct = maxCount > 0 ? (node.count / maxCount) * 100 : 0;
   const color = CATEGORY_COLORS[node.category] || COLORS.blue;
 
@@ -321,7 +304,7 @@ function NodeUsageRow({ node, maxCount, index }: { node: TopNode; maxCount: numb
         whiteSpace: "nowrap",
         flexShrink: 0,
       }}>
-        {CATEGORY_LABELS[node.category] || node.category}
+        {categoryLabel}
       </span>
 
       {/* Usage Bar */}
@@ -380,7 +363,7 @@ function SkeletonPulse({ width, height, borderRadius = 8 }: { width: string | nu
 
 function LoadingSkeleton() {
   return (
-    <div style={{ padding: "24px 28px 48px", maxWidth: 1280, margin: "0 auto" }}>
+    <div className="admin-workflows-page" style={{ padding: "24px 28px 48px", maxWidth: 1280, margin: "0 auto" }}>
       {/* Header skeleton */}
       <div style={{ marginBottom: 28 }}>
         <SkeletonPulse width={120} height={12} borderRadius={4} />
@@ -444,9 +427,31 @@ function LoadingSkeleton() {
 
 // ─── Page ───────────────────────────────────────────────────────────────────
 export default function AdminWorkflowsPage() {
+  const { t } = useLocale();
   const [data, setData] = useState<StatsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const CATEGORY_LABELS: Record<string, string> = {
+    input: t('admin.wf.catInput'),
+    transform: t('admin.wf.catTransform'),
+    generate: t('admin.wf.catGenerate'),
+    export: t('admin.wf.catExport'),
+  };
+
+  const STATUS_CONFIG: Record<string, { color: string; icon: React.ReactNode; label: string }> = {
+    SUCCESS: { color: COLORS.success, icon: <CheckCircle size={14} />, label: t('admin.statusSuccess') },
+    FAILED: { color: COLORS.error, icon: <XCircle size={14} />, label: t('admin.statusFailed') },
+    PARTIAL: { color: COLORS.warning, icon: <AlertTriangle size={14} />, label: t('admin.statusPartial') },
+    PENDING: { color: COLORS.textSecondary, icon: <Clock size={14} />, label: t('admin.statusPending') },
+    RUNNING: { color: COLORS.cyan, icon: <Loader2 size={14} />, label: t('admin.statusRunning') },
+  };
+
+  const COMPLEXITY_CONFIG: Record<string, { color: string; label: string; description: string }> = {
+    SIMPLE: { color: COLORS.success, label: t('admin.wf.simple'), description: t('admin.wf.simpleDesc') },
+    INTERMEDIATE: { color: COLORS.amber, label: t('admin.wf.intermediate'), description: t('admin.wf.intermediateDesc') },
+    ADVANCED: { color: COLORS.error, label: t('admin.wf.advanced'), description: t('admin.wf.advancedDesc') },
+  };
 
   useEffect(() => {
     async function fetchStats() {
@@ -518,7 +523,7 @@ export default function AdminWorkflowsPage() {
   const complexityEntries = Object.entries(workflows.byComplexity);
 
   return (
-    <div style={{ padding: "24px 28px 48px", maxWidth: 1280, margin: "0 auto" }}>
+    <div className="admin-workflows-page" style={{ padding: "24px 28px 48px", maxWidth: 1280, margin: "0 auto" }}>
       {/* ── Page Header ─────────────────────────────────────────────── */}
       <motion.div
         initial={{ opacity: 0, y: -12 }}
@@ -542,7 +547,7 @@ export default function AdminWorkflowsPage() {
             textTransform: "uppercase",
             fontFamily: monoFont,
           }}>
-            Pipeline Intelligence
+            {t('admin.wf.sectionLabel')}
           </span>
         </div>
         <h1 style={{
@@ -553,10 +558,10 @@ export default function AdminWorkflowsPage() {
           fontFamily: headingFont,
           letterSpacing: "-0.02em",
         }}>
-          Workflow Analytics
+          {t('admin.wf.title')}
         </h1>
         <p style={{ fontSize: 13, color: COLORS.textMuted, margin: "4px 0 0" }}>
-          Real-time execution performance, node usage, and workflow distribution
+          {t('admin.wf.subtitle')}
         </p>
       </motion.div>
 
@@ -564,21 +569,21 @@ export default function AdminWorkflowsPage() {
       <div className="wf-kpi-grid" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14, marginBottom: 24 }}>
         <KPICard
           icon={<Workflow size={15} />}
-          label="Total Workflows"
+          label={t('admin.wf.totalWorkflows')}
           value={workflows.total}
           color={COLORS.blue}
           delay={0.05}
         />
         <KPICard
           icon={<Zap size={15} />}
-          label="Total Executions"
+          label={t('admin.wf.totalExecutions')}
           value={executions.total}
           color={COLORS.copper}
           delay={0.1}
         />
         <KPICard
           icon={<CheckCircle size={15} />}
-          label="Success Rate"
+          label={t('admin.wf.successRate')}
           value={executions.successRate}
           suffix="%"
           decimals={1}
@@ -587,7 +592,7 @@ export default function AdminWorkflowsPage() {
         />
         <KPICard
           icon={<Globe size={15} />}
-          label="Published Workflows"
+          label={t('admin.wf.published')}
           value={workflows.published}
           color={COLORS.cyan}
           delay={0.2}
@@ -597,12 +602,16 @@ export default function AdminWorkflowsPage() {
       {/* ── Execution Trend Chart ───────────────────────────────────── */}
       <div style={{ marginBottom: 20 }}>
         <SectionCard
-          title="Execution Trend"
-          subtitle="Daily executions over the last 30 days (success vs failed, stacked)"
+          title={t('admin.wf.executionTrend')}
+          subtitle={t('admin.wf.executionTrendSub')}
           delay={0.25}
           accentColor={COLORS.copper}
         >
-          <ExecutionTrendChart data={executions.dailyExecutions} />
+          <ExecutionTrendChart
+            data={executions.dailyExecutions}
+            successLabel={t('admin.dash.success')}
+            failedLabel={t('admin.dash.failed')}
+          />
         </SectionCard>
       </div>
 
@@ -610,19 +619,25 @@ export default function AdminWorkflowsPage() {
       <div className="wf-mid-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 20 }}>
         {/* Node Usage Breakdown */}
         <SectionCard
-          title="Node Usage Breakdown"
-          subtitle="Top node types by usage count"
+          title={t('admin.wf.nodeUsage')}
+          subtitle={t('admin.wf.nodeUsageSub')}
           delay={0.35}
           accentColor={COLORS.cyan}
         >
           {topNodes.length === 0 ? (
             <p style={{ fontSize: 12, color: COLORS.textMuted, fontFamily: monoFont, textAlign: "center", padding: "40px 0" }}>
-              No node usage data available
+              {t('admin.wf.noData')}
             </p>
           ) : (
             <>
               {topNodes.map((node, i) => (
-                <NodeUsageRow key={node.tileType} node={node} maxCount={maxNodeCount} index={i} />
+                <NodeUsageRow
+                  key={node.tileType}
+                  node={node}
+                  maxCount={maxNodeCount}
+                  index={i}
+                  categoryLabel={CATEGORY_LABELS[node.category] || node.category}
+                />
               ))}
 
               {/* Category Legend */}
@@ -630,8 +645,8 @@ export default function AdminWorkflowsPage() {
                 {Object.entries(CATEGORY_COLORS).map(([cat, color]) => (
                   <div key={cat} style={{ display: "flex", alignItems: "center", gap: 6 }}>
                     <div style={{ width: 8, height: 8, borderRadius: 3, background: color, opacity: 0.8 }} />
-                    <span style={{ fontSize: 10, color: COLORS.textMuted, fontFamily: monoFont, textTransform: "capitalize" }}>
-                      {cat}
+                    <span style={{ fontSize: 10, color: COLORS.textMuted, fontFamily: monoFont }}>
+                      {CATEGORY_LABELS[cat] || cat}
                     </span>
                   </div>
                 ))}
@@ -644,12 +659,12 @@ export default function AdminWorkflowsPage() {
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           {/* Complexity Distribution */}
           <SectionCard
-            title="Complexity Distribution"
-            subtitle="Workflows by complexity level"
+            title={t('admin.wf.complexity')}
+            subtitle={t('admin.wf.complexitySub')}
             delay={0.4}
             accentColor={COLORS.amber}
           >
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
+            <div className="wf-complexity-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
               {(["SIMPLE", "INTERMEDIATE", "ADVANCED"] as const).map((level, i) => {
                 const config = COMPLEXITY_CONFIG[level];
                 const count = complexityEntries.find(([k]) => k === level)?.[1] ?? 0;
@@ -713,8 +728,8 @@ export default function AdminWorkflowsPage() {
 
           {/* Execution Status Breakdown */}
           <SectionCard
-            title="Execution Status Breakdown"
-            subtitle="Counts by execution status"
+            title={t('admin.wf.statusBreakdown')}
+            subtitle={t('admin.wf.statusBreakdownSub')}
             delay={0.5}
             accentColor={COLORS.success}
           >
@@ -766,6 +781,9 @@ export default function AdminWorkflowsPage() {
                       textTransform: "uppercase",
                       letterSpacing: "0.6px",
                       marginTop: 4,
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
                     }}>
                       {config.label}
                     </div>
@@ -782,6 +800,7 @@ export default function AdminWorkflowsPage() {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.8, duration: 0.5, ease: smoothEase }}
+        className="wf-footer"
         style={{
           display: "flex",
           alignItems: "center",
@@ -794,14 +813,14 @@ export default function AdminWorkflowsPage() {
           border: `1px solid ${COLORS.cardBorder}`,
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
           <Activity size={13} style={{ color: COLORS.textMuted }} />
           <span style={{ fontSize: 11, color: COLORS.textMuted, fontFamily: monoFont }}>
-            {workflows.templates.toLocaleString()} templates
+            {workflows.templates.toLocaleString()} {t('admin.wf.templates')}
           </span>
           <span style={{ color: COLORS.textMuted, fontSize: 10 }}>|</span>
           <span style={{ fontSize: 11, color: COLORS.textMuted, fontFamily: monoFont }}>
-            {topNodes.length} active node types
+            {topNodes.length} {t('admin.wf.activeNodes')}
           </span>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -809,7 +828,7 @@ export default function AdminWorkflowsPage() {
           <span style={{ fontSize: 11, color: COLORS.textSecondary, fontFamily: monoFont, fontWeight: 600 }}>
             {executions.total.toLocaleString()}
           </span>
-          <span style={{ fontSize: 10, color: COLORS.textMuted }}>total executions</span>
+          <span style={{ fontSize: 10, color: COLORS.textMuted }}>{t('admin.wf.totalExec')}</span>
         </div>
       </motion.div>
 
@@ -821,8 +840,13 @@ export default function AdminWorkflowsPage() {
           .wf-status-grid { grid-template-columns: repeat(3, 1fr) !important; }
         }
         @media (max-width: 768px) {
+          .admin-workflows-page { padding: 16px 14px 32px !important; }
           .wf-kpi-grid { grid-template-columns: 1fr !important; }
-          .wf-status-grid { grid-template-columns: repeat(2, 1fr) !important; }
+          .wf-status-grid { grid-template-columns: 1fr !important; }
+          .wf-complexity-grid { grid-template-columns: 1fr !important; }
+        }
+        @media (max-width: 480px) {
+          .wf-status-grid { grid-template-columns: 1fr !important; }
         }
       `}</style>
     </div>

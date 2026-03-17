@@ -18,6 +18,7 @@ import {
   Download,
 } from "lucide-react";
 import dynamic from "next/dynamic";
+import { useLocale } from "@/hooks/useLocale";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -134,7 +135,7 @@ const UserGrowthChart = dynamic(
         ResponsiveContainer,
       } = mod;
       return {
-        default: ({ data }: { data: DailySignup[] }) => (
+        default: ({ data, signupsLabel }: { data: DailySignup[]; signupsLabel?: string }) => (
           <ResponsiveContainer width="100%" height={280}>
             <AreaChart
               data={data}
@@ -176,12 +177,12 @@ const UserGrowthChart = dynamic(
                 contentStyle={TOOLTIP_STYLE}
                 labelStyle={{ color: COLORS.textPrimary, marginBottom: 4 }}
                 labelFormatter={(label) => formatDate(String(label))}
-                formatter={(value) => [String(value), "Signups"]}
+                formatter={(value) => [String(value), signupsLabel || "Signups"]}
               />
               <Area
                 type="monotone"
                 dataKey="count"
-                name="Signups"
+                name={signupsLabel || "Signups"}
                 stroke={COLORS.cyan}
                 strokeWidth={2}
                 fill="url(#cyanGrad)"
@@ -216,7 +217,7 @@ const ExecutionTrendsChart = dynamic(
       type ExecDayPayload = DailyExecution & { successRatePct: number };
 
       return {
-        default: ({ data }: { data: DailyExecution[] }) => {
+        default: ({ data, totalExecLabel, successRateLabel }: { data: DailyExecution[]; totalExecLabel?: string; successRateLabel?: string }) => {
           const enriched: ExecDayPayload[] = data.map((d) => ({
             ...d,
             successRatePct:
@@ -224,6 +225,9 @@ const ExecutionTrendsChart = dynamic(
                 ? Math.round((d.success / d.total) * 1000) / 10
                 : 0,
           }));
+
+          const srLabel = successRateLabel || "Success Rate";
+          const teLabel = totalExecLabel || "Total Executions";
 
           return (
             <ResponsiveContainer width="100%" height={280}>
@@ -276,7 +280,7 @@ const ExecutionTrendsChart = dynamic(
                   labelStyle={{ color: COLORS.textPrimary, marginBottom: 4 }}
                   labelFormatter={(label) => formatDate(String(label))}
                   formatter={(value, name) => {
-                    if (name === "Success Rate") return [`${value}%`, String(name)];
+                    if (name === srLabel) return [`${value}%`, String(name)];
                     return [String(value), String(name)];
                   }}
                 />
@@ -290,7 +294,7 @@ const ExecutionTrendsChart = dynamic(
                 <Bar
                   yAxisId="left"
                   dataKey="total"
-                  name="Total Executions"
+                  name={teLabel}
                   fill={COLORS.blue}
                   fillOpacity={0.5}
                   radius={[4, 4, 0, 0]}
@@ -300,7 +304,7 @@ const ExecutionTrendsChart = dynamic(
                   yAxisId="right"
                   type="monotone"
                   dataKey="successRatePct"
-                  name="Success Rate"
+                  name={srLabel}
                   stroke={COLORS.success}
                   strokeWidth={2}
                   dot={false}
@@ -568,7 +572,7 @@ function KpiCard({
           marginBottom: 14,
         }}
       >
-        <div style={{ color, opacity: 0.8 }}>{icon}</div>
+        <div style={{ color, opacity: 0.8, flexShrink: 0 }}>{icon}</div>
         <span
           style={{
             fontSize: 9,
@@ -577,6 +581,9 @@ function KpiCard({
             letterSpacing: "1px",
             fontWeight: 600,
             fontFamily: FONTS.mono,
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
           }}
         >
           {label}
@@ -863,6 +870,7 @@ function HealthMetric({
 // ─── Page ───────────────────────────────────────────────────────────────────
 
 export default function AdminAnalyticsPage() {
+  const { t } = useLocale();
   const [data, setData] = useState<StatsResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -917,7 +925,7 @@ export default function AdminAnalyticsPage() {
           fontSize: 14,
         }}
       >
-        {error || "Failed to load analytics data."}
+        {error || t('admin.analytics.errorLoad')}
       </div>
     );
   }
@@ -944,6 +952,7 @@ export default function AdminAnalyticsPage() {
 
   return (
     <div
+      className="analytics-page"
       style={{
         padding: "24px 28px 48px",
         maxWidth: 1280,
@@ -956,7 +965,7 @@ export default function AdminAnalyticsPage() {
         initial={{ opacity: 0, y: -12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4, ease: smoothEase }}
-        style={{ marginBottom: 28, display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}
+        style={{ marginBottom: 28, display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 12 }}
       >
         <div>
           <div
@@ -981,7 +990,7 @@ export default function AdminAnalyticsPage() {
                 fontFamily: FONTS.mono,
               }}
             >
-              Platform Analytics
+              {t('admin.analytics.sectionLabel')}
             </span>
           </div>
           <h1
@@ -994,7 +1003,7 @@ export default function AdminAnalyticsPage() {
               letterSpacing: "-0.02em",
             }}
           >
-            Analytics & Reports
+            {t('admin.analytics.title')}
           </h1>
           <p
             style={{
@@ -1004,11 +1013,10 @@ export default function AdminAnalyticsPage() {
               fontFamily: FONTS.heading,
             }}
           >
-            Real-time platform metrics, user growth, execution trends, and
-            feedback overview
+            {t('admin.analytics.subtitle')}
           </p>
         </div>
-        <div style={{ display: "flex", gap: 8, flexShrink: 0, marginTop: 4 }}>
+        <div className="analytics-header-actions" style={{ display: "flex", gap: 8, flexShrink: 0, marginTop: 4 }}>
           <button
             onClick={() => downloadExport("users")}
             disabled={!!exportingType}
@@ -1027,6 +1035,7 @@ export default function AdminAnalyticsPage() {
               gap: 6,
               opacity: exportingType && exportingType !== "users" ? 0.5 : 1,
               transition: "background 0.2s",
+              whiteSpace: "nowrap",
             }}
             onMouseEnter={(e) => {
               if (!exportingType) (e.currentTarget as HTMLButtonElement).style.background = "rgba(0,245,255,0.12)";
@@ -1050,7 +1059,7 @@ export default function AdminAnalyticsPage() {
             ) : (
               <Download size={13} />
             )}
-            Export Users CSV
+            {t('admin.analytics.exportUsers')}
           </button>
           <button
             onClick={() => downloadExport("executions")}
@@ -1070,6 +1079,7 @@ export default function AdminAnalyticsPage() {
               gap: 6,
               opacity: exportingType && exportingType !== "executions" ? 0.5 : 1,
               transition: "background 0.2s",
+              whiteSpace: "nowrap",
             }}
             onMouseEnter={(e) => {
               if (!exportingType) (e.currentTarget as HTMLButtonElement).style.background = "rgba(0,245,255,0.12)";
@@ -1093,7 +1103,7 @@ export default function AdminAnalyticsPage() {
             ) : (
               <Download size={13} />
             )}
-            Export Executions CSV
+            {t('admin.analytics.exportExec')}
           </button>
         </div>
       </motion.div>
@@ -1109,28 +1119,28 @@ export default function AdminAnalyticsPage() {
         }}
       >
         <KpiCard
-          label="Total Users"
+          label={t('admin.analytics.totalUsers')}
           value={data.users.total.toLocaleString()}
           icon={<Users size={15} />}
           color={COLORS.cyan}
           delay={0.05}
         />
         <KpiCard
-          label="Active This Week"
+          label={t('admin.analytics.activeWeek')}
           value={data.users.activeThisWeek.toLocaleString()}
           icon={<Activity size={15} />}
           color={COLORS.amber}
           delay={0.1}
         />
         <KpiCard
-          label="New This Month"
+          label={t('admin.analytics.newMonth')}
           value={data.users.newThisMonth.toLocaleString()}
           icon={<UserPlus size={15} />}
           color={COLORS.copper}
           delay={0.15}
         />
         <KpiCard
-          label="Conversion Rate"
+          label={t('admin.analytics.conversionRate')}
           value={formatPct(conversionRate)}
           icon={<TrendingUp size={15} />}
           color={COLORS.success}
@@ -1141,24 +1151,24 @@ export default function AdminAnalyticsPage() {
       {/* ── User Growth Chart ────────────────────────────────────────── */}
       <div style={{ marginBottom: 20 }}>
         <SectionCard
-          title="User Growth"
-          subtitle="Daily signups over the last 30 days"
+          title={t('admin.analytics.userGrowth')}
+          subtitle={t('admin.analytics.userGrowthSub')}
           delay={0.25}
           accentColor={COLORS.cyan}
         >
-          <UserGrowthChart data={data.users.dailySignups} />
+          <UserGrowthChart data={data.users.dailySignups} signupsLabel={t('admin.analytics.signups')} />
         </SectionCard>
       </div>
 
       {/* ── Execution Trends Chart ───────────────────────────────────── */}
       <div style={{ marginBottom: 20 }}>
         <SectionCard
-          title="Execution Trends"
-          subtitle="Total executions and success rate over the last 30 days"
+          title={t('admin.analytics.execTrends')}
+          subtitle={t('admin.analytics.execTrendsSub')}
           delay={0.35}
           accentColor={COLORS.blue}
         >
-          <ExecutionTrendsChart data={data.executions.dailyExecutions} />
+          <ExecutionTrendsChart data={data.executions.dailyExecutions} totalExecLabel={t('admin.analytics.totalExecLabel')} successRateLabel={t('admin.analytics.successRateLabel')} />
         </SectionCard>
       </div>
 
@@ -1174,8 +1184,8 @@ export default function AdminAnalyticsPage() {
       >
         {/* Role Distribution */}
         <SectionCard
-          title="Role Distribution"
-          subtitle={`${data.users.total.toLocaleString()} total users across ${roleData.length} roles`}
+          title={t('admin.analytics.roleDist')}
+          subtitle={`${data.users.total.toLocaleString()} ${t('admin.analytics.totalUsersAcross')} ${roleData.length} ${t('admin.analytics.roles')}`}
           delay={0.4}
           accentColor={COLORS.blue}
         >
@@ -1184,8 +1194,8 @@ export default function AdminAnalyticsPage() {
 
         {/* Feedback Summary */}
         <SectionCard
-          title="Feedback Summary"
-          subtitle={`${data.feedback.total} total feedback items`}
+          title={t('admin.analytics.feedbackSummary')}
+          subtitle={`${data.feedback.total} ${t('admin.analytics.totalFeedback')}`}
           delay={0.45}
           accentColor={COLORS.amber}
         >
@@ -1197,21 +1207,21 @@ export default function AdminAnalyticsPage() {
             }}
           >
             <FeedbackCard
-              label="Bug Reports"
+              label={t('admin.analytics.bugReports')}
               count={bugCount}
               icon={<Bug size={16} />}
               color={COLORS.error}
               delay={0.5}
             />
             <FeedbackCard
-              label="Feature Requests"
+              label={t('admin.analytics.featureRequests')}
               count={featureCount}
               icon={<Lightbulb size={16} />}
               color={COLORS.amber}
               delay={0.55}
             />
             <FeedbackCard
-              label="Suggestions"
+              label={t('admin.analytics.suggestions')}
               count={suggestionCount}
               icon={<MessageSquare size={16} />}
               color={COLORS.cyan}
@@ -1223,8 +1233,8 @@ export default function AdminAnalyticsPage() {
 
       {/* ── Platform Health ───────────────────────────────────────────── */}
       <SectionCard
-        title="Platform Health"
-        subtitle="Key performance indicators derived from real usage data"
+        title={t('admin.analytics.platformHealth')}
+        subtitle={t('admin.analytics.platformHealthSub')}
         delay={0.55}
         accentColor={COLORS.success}
       >
@@ -1237,42 +1247,42 @@ export default function AdminAnalyticsPage() {
           }}
         >
           <HealthMetric
-            label="Execution Success Rate"
+            label={t('admin.analytics.execSuccessRate')}
             value={formatPct(data.executions.successRate)}
             icon={<CheckCircle2 size={15} />}
             color={COLORS.success}
             delay={0.6}
           />
           <HealthMetric
-            label="Avg Executions / User"
+            label={t('admin.analytics.avgExecUser')}
             value={avgExecsPerUser.toFixed(1)}
             icon={<Zap size={15} />}
             color={COLORS.cyan}
             delay={0.65}
           />
           <HealthMetric
-            label="Avg Workflows / User"
+            label={t('admin.analytics.avgWfUser')}
             value={avgWorkflowsPerUser.toFixed(1)}
             icon={<BarChart3 size={15} />}
             color={COLORS.blue}
             delay={0.7}
           />
           <HealthMetric
-            label="Total Executions"
+            label={t('admin.analytics.totalExec')}
             value={data.executions.total.toLocaleString()}
             icon={<Activity size={15} />}
             color={COLORS.amber}
             delay={0.75}
           />
           <HealthMetric
-            label="Failed Executions"
+            label={t('admin.analytics.failedExec')}
             value={(data.executions.byStatus["FAILED"] || 0).toLocaleString()}
             icon={<XCircle size={15} />}
             color={COLORS.error}
             delay={0.8}
           />
           <HealthMetric
-            label="Pending Executions"
+            label={t('admin.analytics.pendingExec')}
             value={(data.executions.byStatus["PENDING"] || 0).toLocaleString()}
             icon={<Clock size={15} />}
             color={COLORS.warning}
@@ -1292,9 +1302,14 @@ export default function AdminAnalyticsPage() {
           .analytics-health-grid { grid-template-columns: 1fr !important; }
         }
         @media (max-width: 768px) {
+          .analytics-page { padding: 16px 14px 32px !important; }
           .analytics-kpi-row { grid-template-columns: 1fr !important; }
           .analytics-bottom-grid { grid-template-columns: 1fr !important; }
           .analytics-health-grid { grid-template-columns: 1fr !important; }
+        }
+        @media (max-width: 640px) {
+          .analytics-header-actions { width: 100% !important; }
+          .analytics-header-actions button { flex: 1 !important; justify-content: center !important; }
         }
       `}</style>
     </div>

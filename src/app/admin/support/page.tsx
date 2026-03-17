@@ -7,6 +7,7 @@ import {
   Bug, Lightbulb, Sparkles, X, ExternalLink, Image as ImageIcon,
   Loader2, Inbox, Clock, CheckCircle2, Download,
 } from "lucide-react";
+import { useLocale } from "@/hooks/useLocale";
 
 // ─── Types ──────────────────────────────────────────────────────────────
 type FeedbackType = "BUG" | "FEATURE" | "SUGGESTION";
@@ -44,34 +45,28 @@ interface FeedbackResponse {
 // ─── Constants ──────────────────────────────────────────────────────────
 const smoothEase: [number, number, number, number] = [0.25, 0.4, 0.25, 1];
 
-const TYPE_CONFIG: Record<FeedbackType, { label: string; color: string; icon: React.ReactNode }> = {
-  BUG: { label: "Bug", color: "#F87171", icon: <Bug size={11} /> },
-  FEATURE: { label: "Feature", color: "#4F8AFF", icon: <Lightbulb size={11} /> },
-  SUGGESTION: { label: "Suggestion", color: "#FBBF24", icon: <Sparkles size={11} /> },
+const STATUS_COLORS: Record<FeedbackStatus, string> = {
+  NEW: "#00F5FF",
+  REVIEWING: "#4F8AFF",
+  PLANNED: "#8B5CF6",
+  IN_PROGRESS: "#FFBF00",
+  DONE: "#34D399",
+  DECLINED: "#6B7280",
 };
 
-const STATUS_CONFIG: Record<FeedbackStatus, { label: string; color: string }> = {
-  NEW: { label: "New", color: "#00F5FF" },
-  REVIEWING: { label: "Reviewing", color: "#4F8AFF" },
-  PLANNED: { label: "Planned", color: "#8B5CF6" },
-  IN_PROGRESS: { label: "In Progress", color: "#FFBF00" },
-  DONE: { label: "Done", color: "#34D399" },
-  DECLINED: { label: "Declined", color: "#6B7280" },
+const TYPE_COLORS: Record<FeedbackType, string> = {
+  BUG: "#F87171",
+  FEATURE: "#4F8AFF",
+  SUGGESTION: "#FBBF24",
+};
+
+const TYPE_ICONS: Record<FeedbackType, React.ReactNode> = {
+  BUG: <Bug size={11} />,
+  FEATURE: <Lightbulb size={11} />,
+  SUGGESTION: <Sparkles size={11} />,
 };
 
 const STATUS_KEYS: FeedbackStatus[] = ["NEW", "REVIEWING", "PLANNED", "IN_PROGRESS", "DONE", "DECLINED"];
-
-const STATUS_TABS: { key: FeedbackStatus | "ALL"; label: string }[] = [
-  { key: "ALL", label: "All" },
-  ...STATUS_KEYS.map((k) => ({ key: k, label: STATUS_CONFIG[k].label })),
-];
-
-const TYPE_TABS: { key: FeedbackType | "ALL"; label: string }[] = [
-  { key: "ALL", label: "All" },
-  { key: "BUG", label: "Bug" },
-  { key: "FEATURE", label: "Feature" },
-  { key: "SUGGESTION", label: "Suggestion" },
-];
 
 // ─── Helpers ────────────────────────────────────────────────────────────
 function timeAgo(iso: string): string {
@@ -155,8 +150,9 @@ function ListSkeleton() {
 }
 
 // ─── Type Badge ─────────────────────────────────────────────────────────
-function TypeBadge({ type }: { type: FeedbackType }) {
-  const cfg = TYPE_CONFIG[type];
+function TypeBadge({ type, label }: { type: FeedbackType; label: string }) {
+  const color = TYPE_COLORS[type];
+  const icon = TYPE_ICONS[type];
   return (
     <div
       style={{
@@ -165,30 +161,30 @@ function TypeBadge({ type }: { type: FeedbackType }) {
         gap: 4,
         padding: "3px 8px",
         borderRadius: 6,
-        background: `${cfg.color}14`,
-        border: `1px solid ${cfg.color}22`,
+        background: `${color}14`,
+        border: `1px solid ${color}22`,
       }}
     >
-      <span style={{ color: cfg.color, display: "flex" }}>{cfg.icon}</span>
+      <span style={{ color, display: "flex" }}>{icon}</span>
       <span
         style={{
           fontSize: 9,
           fontWeight: 600,
-          color: cfg.color,
+          color,
           textTransform: "uppercase",
           letterSpacing: "0.5px",
           fontFamily: "var(--font-jetbrains), monospace",
         }}
       >
-        {cfg.label}
+        {label}
       </span>
     </div>
   );
 }
 
 // ─── Status Badge ───────────────────────────────────────────────────────
-function StatusBadge({ status }: { status: FeedbackStatus }) {
-  const cfg = STATUS_CONFIG[status];
+function StatusBadge({ status, label }: { status: FeedbackStatus; label: string }) {
+  const color = STATUS_COLORS[status];
   return (
     <div
       style={{
@@ -197,8 +193,8 @@ function StatusBadge({ status }: { status: FeedbackStatus }) {
         gap: 5,
         padding: "3px 8px",
         borderRadius: 6,
-        background: `${cfg.color}14`,
-        border: `1px solid ${cfg.color}22`,
+        background: `${color}14`,
+        border: `1px solid ${color}22`,
       }}
     >
       <div
@@ -206,19 +202,19 @@ function StatusBadge({ status }: { status: FeedbackStatus }) {
           width: 6,
           height: 6,
           borderRadius: "50%",
-          background: cfg.color,
-          boxShadow: `0 0 6px ${cfg.color}66`,
+          background: color,
+          boxShadow: `0 0 6px ${color}66`,
         }}
       />
       <span
         style={{
           fontSize: 9,
           fontWeight: 600,
-          color: cfg.color,
+          color,
           fontFamily: "var(--font-jetbrains), monospace",
         }}
       >
-        {cfg.label}
+        {label}
       </span>
     </div>
   );
@@ -230,11 +226,17 @@ function FeedbackListItem({
   isActive,
   onClick,
   index,
+  typeLabel,
+  statusLabel,
+  anonymousLabel,
 }: {
   item: FeedbackItem;
   isActive: boolean;
   onClick: () => void;
   index: number;
+  typeLabel: string;
+  statusLabel: string;
+  anonymousLabel: string;
 }) {
   return (
     <motion.div
@@ -242,6 +244,7 @@ function FeedbackListItem({
       animate={{ opacity: 1, x: 0 }}
       transition={{ delay: 0.08 + index * 0.025, duration: 0.35, ease: smoothEase }}
       onClick={onClick}
+      className="feedback-list-item"
       style={{
         padding: "14px 18px",
         borderBottom: "1px solid rgba(255,255,255,0.03)",
@@ -263,7 +266,7 @@ function FeedbackListItem({
           marginBottom: 6,
         }}
       >
-        <TypeBadge type={item.type} />
+        <TypeBadge type={item.type} label={typeLabel} />
         <span
           style={{
             fontSize: 9,
@@ -313,9 +316,9 @@ function FeedbackListItem({
             whiteSpace: "nowrap",
           }}
         >
-          {item.user.name || "Anonymous"}
+          {item.user.name || anonymousLabel}
         </span>
-        <StatusBadge status={item.status} />
+        <StatusBadge status={item.status} label={statusLabel} />
       </div>
     </motion.div>
   );
@@ -326,10 +329,12 @@ function StatusDropdown({
   currentStatus,
   onChangeStatus,
   isUpdating,
+  statusLabels,
 }: {
   currentStatus: FeedbackStatus;
   onChangeStatus: (s: FeedbackStatus) => void;
   isUpdating: boolean;
+  statusLabels: Record<string, string>;
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -344,7 +349,8 @@ function StatusDropdown({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const cfg = STATUS_CONFIG[currentStatus];
+  const color = STATUS_COLORS[currentStatus];
+  const label = statusLabels[currentStatus] || currentStatus;
 
   return (
     <div ref={dropdownRef} style={{ position: "relative" }}>
@@ -357,9 +363,9 @@ function StatusDropdown({
           gap: 6,
           padding: "7px 14px",
           borderRadius: 10,
-          background: `${cfg.color}14`,
-          border: `1px solid ${cfg.color}22`,
-          color: cfg.color,
+          background: `${color}14`,
+          border: `1px solid ${color}22`,
+          color,
           cursor: isUpdating ? "wait" : "pointer",
           fontSize: 11,
           fontWeight: 600,
@@ -376,12 +382,12 @@ function StatusDropdown({
               width: 7,
               height: 7,
               borderRadius: "50%",
-              background: cfg.color,
-              boxShadow: `0 0 6px ${cfg.color}66`,
+              background: color,
+              boxShadow: `0 0 6px ${color}66`,
             }}
           />
         )}
-        <span>{cfg.label}</span>
+        <span>{label}</span>
         <ChevronDown
           size={12}
           style={{
@@ -413,7 +419,7 @@ function StatusDropdown({
             }}
           >
             {STATUS_KEYS.map((s) => {
-              const sc = STATUS_CONFIG[s];
+              const sc = STATUS_COLORS[s];
               const isActive = s === currentStatus;
               return (
                 <button
@@ -432,7 +438,7 @@ function StatusDropdown({
                     background: isActive ? "rgba(255,255,255,0.04)" : "transparent",
                     border: "none",
                     cursor: "pointer",
-                    color: sc.color,
+                    color: sc,
                     fontSize: 11,
                     fontWeight: 600,
                     fontFamily: "var(--font-jetbrains), monospace",
@@ -452,11 +458,11 @@ function StatusDropdown({
                       width: 7,
                       height: 7,
                       borderRadius: "50%",
-                      background: sc.color,
-                      boxShadow: `0 0 6px ${sc.color}44`,
+                      background: sc,
+                      boxShadow: `0 0 6px ${sc}44`,
                     }}
                   />
-                  <span>{sc.label}</span>
+                  <span>{statusLabels[s] || s}</span>
                   {isActive && (
                     <CheckCircle2 size={10} style={{ marginLeft: "auto", opacity: 0.7 }} />
                   )}
@@ -477,12 +483,24 @@ function FeedbackDetail({
   onStatusChange,
   isOverlay,
   isUpdating,
+  statusLabels,
+  typeLabels,
+  labels,
 }: {
   item: FeedbackItem;
   onClose: () => void;
   onStatusChange: (id: string, status: FeedbackStatus) => void;
   isOverlay: boolean;
   isUpdating: boolean;
+  statusLabels: Record<string, string>;
+  typeLabels: Record<string, string>;
+  labels: {
+    status: string;
+    description: string;
+    screenshot: string;
+    category: string;
+    anonymous: string;
+  };
 }) {
   const content = (
     <motion.div
@@ -519,8 +537,8 @@ function FeedbackDetail({
           }}
         >
           <div style={{ flex: 1, marginRight: 12 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-              <TypeBadge type={item.type} />
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>
+              <TypeBadge type={item.type} label={typeLabels[item.type] || item.type} />
               {item.category && (
                 <span
                   style={{
@@ -640,7 +658,7 @@ function FeedbackDetail({
                 fontFamily: "var(--font-dm-sans), sans-serif",
               }}
             >
-              {item.user.name || "Anonymous"}
+              {item.user.name || labels.anonymous}
             </div>
             <div
               style={{
@@ -678,13 +696,14 @@ function FeedbackDetail({
                 fontFamily: "var(--font-jetbrains), monospace",
               }}
             >
-              Status
+              {labels.status}
             </span>
           </div>
           <StatusDropdown
             currentStatus={item.status}
             onChangeStatus={(s) => onStatusChange(item.id, s)}
             isUpdating={isUpdating}
+            statusLabels={statusLabels}
           />
         </div>
       </div>
@@ -710,7 +729,7 @@ function FeedbackDetail({
               marginBottom: 8,
             }}
           >
-            Description
+            {labels.description}
           </div>
           <p
             style={{
@@ -740,7 +759,7 @@ function FeedbackDetail({
                 marginBottom: 8,
               }}
             >
-              Screenshot
+              {labels.screenshot}
             </div>
             <a
               href={item.screenshotUrl}
@@ -846,7 +865,7 @@ function FeedbackDetail({
               gap: 6,
             }}
           >
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
               <Clock size={11} style={{ color: "#5C5C78" }} />
               <span
                 style={{
@@ -876,7 +895,7 @@ function FeedbackDetail({
                 ({timeAgo(item.createdAt)})
               </span>
             </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
               <Clock size={11} style={{ color: "#5C5C78" }} />
               <span
                 style={{
@@ -939,8 +958,8 @@ function FeedbackDetail({
           transition={{ duration: 0.25, ease: smoothEase }}
           onClick={(e) => e.stopPropagation()}
           style={{
-            width: "100%",
-            maxWidth: 640,
+            width: "min(90vw, 700px)",
+            maxWidth: 700,
             height: "min(85vh, 700px)",
             display: "flex",
             flexDirection: "column",
@@ -957,6 +976,7 @@ function FeedbackDetail({
 
 // ─── Page ───────────────────────────────────────────────────────────────
 export default function AdminSupportPage() {
+  const { t } = useLocale();
   const [data, setData] = useState<FeedbackResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -968,6 +988,36 @@ export default function AdminSupportPage() {
   const [isMobile, setIsMobile] = useState(false);
   const [exportingType, setExportingType] = useState<string | null>(null);
   const limit = 20;
+
+  // ── i18n label maps ──
+  const STATUS_LABELS: Record<string, string> = {
+    ALL: t('admin.support.all'),
+    NEW: t('admin.support.new'),
+    REVIEWING: t('admin.support.reviewing'),
+    PLANNED: t('admin.support.planned'),
+    IN_PROGRESS: t('admin.support.inProgress'),
+    DONE: t('admin.support.done'),
+    DECLINED: t('admin.support.declined'),
+  };
+
+  const TYPE_LABELS: Record<string, string> = {
+    ALL: t('admin.support.all'),
+    BUG: t('admin.support.bug'),
+    FEATURE: t('admin.support.feature'),
+    SUGGESTION: t('admin.support.suggestion'),
+  };
+
+  const STATUS_TABS: { key: FeedbackStatus | "ALL"; label: string }[] = [
+    { key: "ALL", label: STATUS_LABELS.ALL },
+    ...STATUS_KEYS.map((k) => ({ key: k, label: STATUS_LABELS[k] })),
+  ];
+
+  const TYPE_TABS: { key: FeedbackType | "ALL"; label: string }[] = [
+    { key: "ALL", label: TYPE_LABELS.ALL },
+    { key: "BUG", label: TYPE_LABELS.BUG },
+    { key: "FEATURE", label: TYPE_LABELS.FEATURE },
+    { key: "SUGGESTION", label: TYPE_LABELS.SUGGESTION },
+  ];
 
   async function downloadExport(type: string) {
     if (exportingType) return;
@@ -1053,13 +1103,14 @@ export default function AdminSupportPage() {
   const statusCounts = data?.statusCounts ?? {};
 
   return (
-    <div style={{ padding: "24px 28px 48px", maxWidth: 1440, margin: "0 auto" }}>
+    <div className="admin-support-page" style={{ padding: "24px 28px 48px", maxWidth: 1440, margin: "0 auto" }}>
       {/* ── Page Header ── */}
       <motion.div
         initial={{ opacity: 0, y: -12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4, ease: smoothEase }}
-        style={{ marginBottom: 24, display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}
+        className="support-header"
+        style={{ marginBottom: 24, display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 12 }}
       >
         <div>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
@@ -1088,7 +1139,7 @@ export default function AdminSupportPage() {
                 letterSpacing: "-0.02em",
               }}
             >
-              Feedback & Support
+              {t('admin.support.title')}
             </h1>
             {!loading && (
               <motion.span
@@ -1105,7 +1156,7 @@ export default function AdminSupportPage() {
             )}
           </div>
         </div>
-        <div style={{ flexShrink: 0, marginTop: 4 }}>
+        <div className="support-export-btn" style={{ flexShrink: 0, marginTop: 4 }}>
           <button
             onClick={() => downloadExport("feedback")}
             disabled={!!exportingType}
@@ -1123,6 +1174,7 @@ export default function AdminSupportPage() {
               alignItems: "center",
               gap: 6,
               transition: "background 0.2s",
+              whiteSpace: "nowrap",
             }}
             onMouseEnter={(e) => {
               if (!exportingType) (e.currentTarget as HTMLButtonElement).style.background = "rgba(0,245,255,0.12)";
@@ -1146,7 +1198,7 @@ export default function AdminSupportPage() {
             ) : (
               <Download size={13} />
             )}
-            Export Feedback CSV
+            {t('admin.support.exportFeedback')} CSV
           </button>
         </div>
       </motion.div>
@@ -1159,13 +1211,14 @@ export default function AdminSupportPage() {
         style={{ marginBottom: 12 }}
       >
         <div
-          className="feedback-status-tabs"
+          className="feedback-status-tabs support-filters"
           style={{
             display: "flex",
             alignItems: "center",
             gap: 4,
             overflowX: "auto",
             paddingBottom: 4,
+            flexWrap: "wrap",
           }}
         >
           {STATUS_TABS.map((tab) => {
@@ -1173,7 +1226,7 @@ export default function AdminSupportPage() {
             const tabColor =
               tab.key === "ALL"
                 ? "#F0F0F5"
-                : STATUS_CONFIG[tab.key as FeedbackStatus]?.color ?? "#F0F0F5";
+                : STATUS_COLORS[tab.key as FeedbackStatus] ?? "#F0F0F5";
             const count =
               tab.key === "ALL"
                 ? totalCount
@@ -1183,6 +1236,7 @@ export default function AdminSupportPage() {
               <button
                 key={tab.key}
                 onClick={() => setStatusFilter(tab.key as FeedbackStatus | "ALL")}
+                className="support-filter-btn"
                 style={{
                   padding: "7px 14px",
                   borderRadius: 10,
@@ -1238,10 +1292,12 @@ export default function AdminSupportPage() {
         style={{ marginBottom: 16 }}
       >
         <div
+          className="support-filters"
           style={{
             display: "flex",
             alignItems: "center",
             gap: 4,
+            flexWrap: "wrap",
           }}
         >
           <span
@@ -1255,19 +1311,20 @@ export default function AdminSupportPage() {
               marginRight: 6,
             }}
           >
-            Type
+            {t('admin.support.type')}
           </span>
           {TYPE_TABS.map((tab) => {
             const isActive = typeFilter === tab.key;
             const tabColor =
               tab.key === "ALL"
                 ? "#9898B0"
-                : TYPE_CONFIG[tab.key as FeedbackType]?.color ?? "#9898B0";
+                : TYPE_COLORS[tab.key as FeedbackType] ?? "#9898B0";
 
             return (
               <button
                 key={tab.key}
                 onClick={() => setTypeFilter(tab.key as FeedbackType | "ALL")}
+                className="support-filter-btn"
                 style={{
                   padding: "5px 12px",
                   borderRadius: 8,
@@ -1391,18 +1448,20 @@ export default function AdminSupportPage() {
                   color: "#9898B0",
                   fontFamily: "var(--font-dm-sans), sans-serif",
                   marginBottom: 4,
+                  textAlign: "center",
                 }}
               >
-                No feedback yet
+                {t('admin.support.noFeedback')}
               </span>
               <span
                 style={{
                   fontSize: 11,
                   color: "#5C5C78",
                   fontFamily: "var(--font-jetbrains), monospace",
+                  textAlign: "center",
                 }}
               >
-                Feedback submitted by users will appear here
+                {t('admin.support.subtitle')}
               </span>
             </div>
           ) : (
@@ -1415,6 +1474,9 @@ export default function AdminSupportPage() {
                     isActive={selectedId === item.id}
                     onClick={() => setSelectedId(item.id)}
                     index={i}
+                    typeLabel={TYPE_LABELS[item.type] || item.type}
+                    statusLabel={STATUS_LABELS[item.status] || item.status}
+                    anonymousLabel={t('admin.support.anonymous')}
                   />
                 ))}
               </div>
@@ -1460,7 +1522,7 @@ export default function AdminSupportPage() {
                       fontVariantNumeric: "tabular-nums",
                     }}
                   >
-                    {page} / {data.totalPages}
+                    {t('admin.page')} {page} {t('admin.of')} {data.totalPages}
                   </span>
                   <button
                     onClick={() => setPage((p) => Math.min(data.totalPages, p + 1))}
@@ -1500,6 +1562,15 @@ export default function AdminSupportPage() {
                   onStatusChange={handleStatusChange}
                   isOverlay={false}
                   isUpdating={updatingId === selectedItem.id}
+                  statusLabels={STATUS_LABELS}
+                  typeLabels={TYPE_LABELS}
+                  labels={{
+                    status: t('admin.support.status'),
+                    description: t('admin.support.description'),
+                    screenshot: t('admin.support.screenshot'),
+                    category: t('admin.support.category'),
+                    anonymous: t('admin.support.anonymous'),
+                  }}
                 />
               ) : (
                 <motion.div
@@ -1528,7 +1599,7 @@ export default function AdminSupportPage() {
                       color: "#9898B0",
                     }}
                   >
-                    Select feedback to view details
+                    {t('admin.support.feedbackDetails')}
                   </span>
                   <span
                     style={{
@@ -1557,6 +1628,15 @@ export default function AdminSupportPage() {
               onStatusChange={handleStatusChange}
               isOverlay={true}
               isUpdating={updatingId === selectedItem.id}
+              statusLabels={STATUS_LABELS}
+              typeLabels={TYPE_LABELS}
+              labels={{
+                status: t('admin.support.status'),
+                description: t('admin.support.description'),
+                screenshot: t('admin.support.screenshot'),
+                category: t('admin.support.category'),
+                anonymous: t('admin.support.anonymous'),
+              }}
             />
           )}
         </AnimatePresence>
@@ -1582,8 +1662,16 @@ export default function AdminSupportPage() {
           .feedback-main-layout { height: calc(100vh - 380px) !important; }
         }
         @media (max-width: 768px) {
+          .admin-support-page { padding: 16px 14px 32px !important; }
           .feedback-status-tabs { flex-wrap: wrap; }
           .feedback-main-layout { height: calc(100vh - 420px) !important; min-height: 400px !important; }
+          .support-filter-btn { padding: 6px 10px !important; font-size: 11px !important; }
+          .support-export-btn { width: 100%; }
+          .support-export-btn button { width: 100%; justify-content: center; }
+        }
+        @media (max-width: 640px) {
+          .support-export-btn { width: 100%; }
+          .support-export-btn button { width: 100%; justify-content: center; }
         }
         .feedback-list-panel::-webkit-scrollbar { width: 4px; }
         .feedback-list-panel::-webkit-scrollbar-track { background: transparent; }

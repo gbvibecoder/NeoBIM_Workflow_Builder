@@ -7,6 +7,7 @@ import {
   Download, Users, Filter, Shield, Star, Zap, Trash2, AlertTriangle,
   X, Loader2, CreditCard,
 } from "lucide-react";
+import { useLocale } from "@/hooks/useLocale";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type UserRole = "FREE" | "PRO" | "TEAM_ADMIN" | "PLATFORM_ADMIN";
@@ -144,11 +145,12 @@ function SkeletonRow({ index }: { index: number }) {
 }
 
 // ─── Delete Confirm Modal ─────────────────────────────────────────────────────
-function DeleteConfirmModal({ user, onConfirm, onCancel, isDeleting }: {
+function DeleteConfirmModal({ user, onConfirm, onCancel, isDeleting, t }: {
   user: ApiUser;
   onConfirm: () => void;
   onCancel: () => void;
   isDeleting: boolean;
+  t: (key: string) => string;
 }) {
   return (
     <motion.div
@@ -191,12 +193,12 @@ function DeleteConfirmModal({ user, onConfirm, onCancel, isDeleting }: {
               fontSize: 16, fontWeight: 700, color: "#F0F0F5", margin: 0,
               fontFamily: "var(--font-dm-sans), sans-serif",
             }}>
-              Delete User
+              {t('admin.users.deleteTitle')}
             </h3>
             <p style={{
               fontSize: 12, color: "#9898B0", margin: "2px 0 0",
             }}>
-              This action cannot be undone.
+              {t('admin.users.deleteWarning')}
             </p>
           </div>
         </div>
@@ -208,12 +210,12 @@ function DeleteConfirmModal({ user, onConfirm, onCancel, isDeleting }: {
           marginBottom: 24,
         }}>
           <p style={{ fontSize: 13, color: "#9898B0", margin: 0, lineHeight: 1.6 }}>
-            You are about to permanently delete{" "}
+            {t('admin.users.deleteConfirmText')}{" "}
             <strong style={{ color: "#F0F0F5" }}>{user.name || user.email || "this user"}</strong>
             {user.email && user.name && (
               <span style={{ color: "#5C5C78" }}> ({user.email})</span>
             )}
-            . All associated workflows, executions, and data will be removed.
+            {t('admin.users.deleteDataWarning')}
           </p>
         </div>
 
@@ -232,7 +234,7 @@ function DeleteConfirmModal({ user, onConfirm, onCancel, isDeleting }: {
               opacity: isDeleting ? 0.5 : 1,
             }}
           >
-            Cancel
+            {t('admin.cancel')}
           </button>
           <button
             onClick={onConfirm}
@@ -251,12 +253,12 @@ function DeleteConfirmModal({ user, onConfirm, onCancel, isDeleting }: {
             {isDeleting ? (
               <>
                 <Loader2 size={14} style={{ animation: "spin 1s linear infinite" }} />
-                Deleting...
+                {t('admin.users.deleting')}
               </>
             ) : (
               <>
                 <Trash2 size={14} />
-                Delete User
+                {t('admin.users.deleteTitle')}
               </>
             )}
           </button>
@@ -268,6 +270,8 @@ function DeleteConfirmModal({ user, onConfirm, onCancel, isDeleting }: {
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 export default function AdminUsersPage() {
+  const { t } = useLocale();
+
   // ── State ─────────────────────────────────────────────────────────────────
   const [users, setUsers] = useState<ApiUser[]>([]);
   const [total, setTotal] = useState(0);
@@ -450,7 +454,7 @@ export default function AdminUsersPage() {
   const showingEnd = Math.min(page * PAGE_SIZE, total);
 
   return (
-    <div style={{ padding: "24px 28px 48px", maxWidth: 1400, margin: "0 auto" }}>
+    <div className="admin-users-page" style={{ padding: "24px 28px 48px", maxWidth: 1400, margin: "0 auto" }}>
       {/* ── Delete confirm modal ──────────────────────────────────────── */}
       <AnimatePresence>
         {deleteTarget && (
@@ -459,6 +463,7 @@ export default function AdminUsersPage() {
             onConfirm={handleDeleteConfirm}
             onCancel={() => { if (!isDeleting) setDeleteTarget(null); }}
             isDeleting={isDeleting}
+            t={t as (key: string) => string}
           />
         )}
       </AnimatePresence>
@@ -477,7 +482,7 @@ export default function AdminUsersPage() {
             letterSpacing: "2.5px", textTransform: "uppercase",
             fontFamily: "var(--font-jetbrains), monospace",
           }}>
-            Platform Users
+            {t('admin.users.sectionLabel')}
           </span>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
@@ -485,7 +490,7 @@ export default function AdminUsersPage() {
             fontSize: 24, fontWeight: 700, color: "#F0F0F5", margin: 0,
             fontFamily: "var(--font-dm-sans), sans-serif", letterSpacing: "-0.02em",
           }}>
-            Users
+            {t('admin.users.title')}
           </h1>
           <span style={{
             display: "inline-flex", alignItems: "center",
@@ -500,7 +505,7 @@ export default function AdminUsersPage() {
           </span>
         </div>
         <p style={{ fontSize: 13, color: "#5C5C78", margin: "4px 0 0", fontFamily: "var(--font-dm-sans), sans-serif" }}>
-          Manage, filter, and export your user base across all roles and subscription tiers
+          {t('admin.users.subtitle')}
         </p>
       </motion.div>
 
@@ -526,7 +531,7 @@ export default function AdminUsersPage() {
         }}>
           <Search size={14} style={{ color: "#5C5C78", flexShrink: 0 }} />
           <input
-            placeholder="Search by name or email..."
+            placeholder={t('admin.users.searchPlaceholder')}
             value={search}
             onChange={e => setSearch(e.target.value)}
             style={{
@@ -568,7 +573,7 @@ export default function AdminUsersPage() {
                 appearance: "none", paddingRight: 16,
               }}
             >
-              <option value="ALL" style={{ background: "#070809" }}>All Roles</option>
+              <option value="ALL" style={{ background: "#070809" }}>{t('admin.users.allRoles')}</option>
               <option value="FREE" style={{ background: "#070809" }}>FREE</option>
               <option value="PRO" style={{ background: "#070809" }}>PRO</option>
               <option value="TEAM_ADMIN" style={{ background: "#070809" }}>TEAM_ADMIN</option>
@@ -598,7 +603,7 @@ export default function AdminUsersPage() {
           onMouseLeave={e => { e.currentTarget.style.background = "rgba(0,245,255,0.08)"; }}
         >
           <Download size={13} />
-          Export CSV
+          {t('admin.users.exportCsv')}
         </button>
       </motion.div>
 
@@ -672,10 +677,10 @@ export default function AdminUsersPage() {
             <thead>
               <tr style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
                 <th style={{ padding: "14px 16px", textAlign: "left" }}>
-                  <SortHeader field="name" label="User" sortField={sortField} sortDir={sortDir} onSort={handleSort} />
+                  <SortHeader field="name" label={t('admin.users.name')} sortField={sortField} sortDir={sortDir} onSort={handleSort} />
                 </th>
                 <th style={{ padding: "14px 12px", textAlign: "left" }}>
-                  <SortHeader field="role" label="Role" sortField={sortField} sortDir={sortDir} onSort={handleSort} />
+                  <SortHeader field="role" label={t('admin.users.role')} sortField={sortField} sortDir={sortDir} onSort={handleSort} />
                 </th>
                 <th style={{ padding: "14px 12px", textAlign: "right" }}>
                   <span style={{
@@ -683,7 +688,7 @@ export default function AdminUsersPage() {
                     letterSpacing: "2.5px", color: "#5C5C78",
                     fontFamily: "var(--font-jetbrains), monospace",
                   }}>
-                    Workflows
+                    {t('admin.users.workflows')}
                   </span>
                 </th>
                 <th style={{ padding: "14px 12px", textAlign: "right" }} className="col-executions">
@@ -692,11 +697,11 @@ export default function AdminUsersPage() {
                     letterSpacing: "2.5px", color: "#5C5C78",
                     fontFamily: "var(--font-jetbrains), monospace",
                   }}>
-                    Executions
+                    {t('admin.users.executions')}
                   </span>
                 </th>
                 <th style={{ padding: "14px 12px", textAlign: "right" }} className="col-xp">
-                  <SortHeader field="xp" label="XP / Level" align="right" sortField={sortField} sortDir={sortDir} onSort={handleSort} />
+                  <SortHeader field="xp" label={t('admin.users.xpLevel')} align="right" sortField={sortField} sortDir={sortDir} onSort={handleSort} />
                 </th>
                 <th style={{ padding: "14px 12px", textAlign: "left" }} className="col-sub">
                   <span style={{
@@ -704,11 +709,11 @@ export default function AdminUsersPage() {
                     letterSpacing: "2.5px", color: "#5C5C78",
                     fontFamily: "var(--font-jetbrains), monospace",
                   }}>
-                    Subscription
+                    {t('admin.users.subscription')}
                   </span>
                 </th>
                 <th style={{ padding: "14px 12px", textAlign: "left" }} className="col-joined">
-                  <SortHeader field="createdAt" label="Joined" sortField={sortField} sortDir={sortDir} onSort={handleSort} />
+                  <SortHeader field="createdAt" label={t('admin.users.joined')} sortField={sortField} sortDir={sortDir} onSort={handleSort} />
                 </th>
                 <th style={{ padding: "14px 16px", textAlign: "center" }}>
                   <span style={{
@@ -716,7 +721,7 @@ export default function AdminUsersPage() {
                     letterSpacing: "2.5px", color: "#5C5C78",
                     fontFamily: "var(--font-jetbrains), monospace",
                   }}>
-                    Actions
+                    {t('admin.users.actions')}
                   </span>
                 </th>
               </tr>
@@ -732,10 +737,10 @@ export default function AdminUsersPage() {
                     }}>
                       <Users size={36} style={{ color: "#5C5C78", marginBottom: 14, opacity: 0.4 }} />
                       <div style={{ fontSize: 15, color: "#9898B0", fontWeight: 600, fontFamily: "var(--font-dm-sans), sans-serif" }}>
-                        No users found
+                        {t('admin.users.noUsers')}
                       </div>
                       <div style={{ fontSize: 12, color: "#5C5C78", marginTop: 4 }}>
-                        Try adjusting your search or filters
+                        {t('admin.users.adjustFilters')}
                       </div>
                     </div>
                   </td>
@@ -787,7 +792,7 @@ export default function AdminUsersPage() {
                             whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
                             maxWidth: 200, lineHeight: 1.3,
                           }}>
-                            {user.name || "Unnamed"}
+                            {user.name || t('admin.users.unnamed')}
                           </div>
                           <div style={{
                             fontSize: 10, color: "#5C5C78",
@@ -795,7 +800,7 @@ export default function AdminUsersPage() {
                             whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
                             maxWidth: 200,
                           }}>
-                            {user.email || "No email"}
+                            {user.email || t('admin.users.noEmail')}
                           </div>
                         </div>
                       </div>
@@ -853,7 +858,7 @@ export default function AdminUsersPage() {
                           fontSize: 9, color: "#5C5C78",
                           fontFamily: "var(--font-jetbrains), monospace",
                         }}>
-                          Lv. {user.level}
+                          {t('admin.users.level')} {user.level}
                         </span>
                       </div>
                     </td>
@@ -868,7 +873,7 @@ export default function AdminUsersPage() {
                               fontSize: 11, color: "#34D399", fontWeight: 600,
                               fontFamily: "var(--font-jetbrains), monospace",
                             }}>
-                              Active
+                              {t('admin.users.active')}
                             </span>
                           </div>
                           {user.stripeCurrentPeriodEnd && (
@@ -885,7 +890,7 @@ export default function AdminUsersPage() {
                           fontSize: 11, color: "#5C5C78",
                           fontFamily: "var(--font-jetbrains), monospace",
                         }}>
-                          None
+                          {t('admin.users.none')}
                         </span>
                       )}
                     </td>
@@ -991,8 +996,8 @@ export default function AdminUsersPage() {
               fontSize: 11, color: "#5C5C78",
               fontFamily: "var(--font-jetbrains), monospace",
             }}>
-              {total === 0 ? "No results" : (
-                <>Showing {showingStart}&ndash;{showingEnd} of {total.toLocaleString()} users</>
+              {total === 0 ? t('admin.users.noResults') : (
+                <>{t('admin.users.showing')} {showingStart}&ndash;{showingEnd} {t('admin.of')} {total.toLocaleString()} {t('admin.users.users')}</>
               )}
             </span>
 
@@ -1092,12 +1097,17 @@ export default function AdminUsersPage() {
         }
 
         @media (max-width: 768px) {
+          .admin-users-page {
+            padding: 16px 14px 32px !important;
+          }
           .col-executions,
-          .col-joined {
+          .col-joined,
+          .col-xp,
+          .col-sub {
             display: none !important;
           }
           .users-table {
-            min-width: 500px !important;
+            min-width: 0 !important;
           }
           .users-toolbar {
             flex-direction: column !important;
@@ -1109,6 +1119,19 @@ export default function AdminUsersPage() {
           .users-pagination {
             flex-direction: column !important;
             gap: 10px !important;
+          }
+        }
+
+        @media (max-width: 640px) {
+          .users-toolbar {
+            flex-wrap: wrap !important;
+          }
+          .users-toolbar > * {
+            flex: 1 1 auto !important;
+          }
+          .users-toolbar > div:first-child {
+            max-width: 100% !important;
+            width: 100% !important;
           }
         }
       `}</style>

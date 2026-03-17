@@ -9,6 +9,8 @@ import {
   RefreshCw, Download,
 } from "lucide-react";
 import dynamic from "next/dynamic";
+import { useLocale } from "@/hooks/useLocale";
+import type { TranslationKey } from "@/lib/i18n";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface DailySignup {
@@ -107,7 +109,7 @@ const SignupAreaChart = dynamic(
     import("recharts").then((mod) => {
       const { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } = mod;
       return {
-        default: ({ data }: { data: DailySignup[] }) => (
+        default: ({ data, signupsLabel }: { data: DailySignup[]; signupsLabel?: string }) => (
           <ResponsiveContainer width="100%" height={260}>
             <AreaChart data={data} margin={{ top: 8, right: 12, left: -14, bottom: 4 }}>
               <defs>
@@ -137,7 +139,7 @@ const SignupAreaChart = dynamic(
                 contentStyle={tooltipStyle}
                 labelStyle={{ color: COLORS.textPrimary, fontWeight: 600, marginBottom: 4 }}
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                formatter={(v: any) => [String(v), "Signups"]}
+                formatter={(v: any) => [String(v), signupsLabel || "Signups"]}
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 labelFormatter={(label: any) => {
                   const d = new Date(String(label) + "T00:00:00");
@@ -166,7 +168,7 @@ const ExecutionTrendChart = dynamic(
     import("recharts").then((mod) => {
       const { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } = mod;
       return {
-        default: ({ data }: { data: DailyExecution[] }) => (
+        default: ({ data, successLabel, failedLabel }: { data: DailyExecution[]; successLabel?: string; failedLabel?: string }) => (
           <ResponsiveContainer width="100%" height={260}>
             <AreaChart data={data} margin={{ top: 8, right: 12, left: -14, bottom: 4 }}>
               <defs>
@@ -212,7 +214,7 @@ const ExecutionTrendChart = dynamic(
                 stroke={COLORS.amber}
                 strokeWidth={1.5}
                 fill="url(#execSuccessGrad)"
-                name="Success"
+                name={successLabel || "Success"}
               />
               <Area
                 type="monotone"
@@ -221,7 +223,7 @@ const ExecutionTrendChart = dynamic(
                 stroke={COLORS.error}
                 strokeWidth={1.5}
                 fill="url(#execFailedGrad)"
-                name="Failed"
+                name={failedLabel || "Failed"}
               />
             </AreaChart>
           </ResponsiveContainer>
@@ -350,7 +352,7 @@ function KPICard({
       />
 
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
-        <div style={{ color: accentColor, opacity: 0.8 }}>{icon}</div>
+        <div style={{ color: accentColor, opacity: 0.8, flexShrink: 0 }}>{icon}</div>
         <span
           style={{
             fontSize: 9,
@@ -359,6 +361,9 @@ function KPICard({
             letterSpacing: "2.5px",
             fontWeight: 600,
             fontFamily: "var(--font-jetbrains), monospace",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
           }}
         >
           {label}
@@ -480,37 +485,37 @@ function SectionCard({
 }
 
 // ─── Status badge ─────────────────────────────────────────────────────────────
-function StatusBadge({ status }: { status: string }) {
+function StatusBadge({ status, t }: { status: string; t: (key: TranslationKey) => string }) {
   const config: Record<string, { bg: string; color: string; icon: React.ReactNode; label: string }> = {
     SUCCESS: {
       bg: "rgba(52,211,153,0.1)",
       color: COLORS.success,
       icon: <CheckCircle2 size={10} />,
-      label: "Success",
+      label: t('admin.statusSuccess'),
     },
     FAILED: {
       bg: "rgba(248,113,113,0.1)",
       color: COLORS.error,
       icon: <XCircle size={10} />,
-      label: "Failed",
+      label: t('admin.statusFailed'),
     },
     RUNNING: {
       bg: "rgba(59,130,246,0.1)",
       color: COLORS.info,
       icon: <Clock size={10} />,
-      label: "Running",
+      label: t('admin.statusRunning'),
     },
     PENDING: {
       bg: "rgba(251,191,36,0.1)",
       color: COLORS.warning,
       icon: <Clock size={10} />,
-      label: "Pending",
+      label: t('admin.statusPending'),
     },
     PARTIAL: {
       bg: "rgba(251,191,36,0.1)",
       color: COLORS.warning,
       icon: <AlertTriangle size={10} />,
-      label: "Partial",
+      label: t('admin.statusPartial'),
     },
   };
 
@@ -553,7 +558,7 @@ function formatTimeAgo(iso: string): string {
 }
 
 // ─── Activity Row ─────────────────────────────────────────────────────────────
-function ActivityRow({ item, index }: { item: ActivityItem; index: number }) {
+function ActivityRow({ item, index, t }: { item: ActivityItem; index: number; t: (key: TranslationKey) => string }) {
   const timeAgo = useMemo(() => formatTimeAgo(item.createdAt), [item.createdAt]);
   const initials = useMemo(() => {
     const parts = (item.userName || "?").split(" ");
@@ -644,7 +649,7 @@ function ActivityRow({ item, index }: { item: ActivityItem; index: number }) {
 
       {/* Status + time */}
       <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4, flexShrink: 0 }}>
-        <StatusBadge status={item.status} />
+        <StatusBadge status={item.status} t={t} />
         <span
           style={{
             fontSize: 9,
@@ -907,6 +912,7 @@ async function downloadExport(type: "users" | "executions") {
 }
 
 export default function AdminDashboardPage() {
+  const { t } = useLocale();
   const [stats, setStats] = useState<AdminStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -972,13 +978,13 @@ export default function AdminDashboardPage() {
   const totalExecsLast30 = stats.executions.dailyExecutions.reduce((s, d) => s + d.total, 0);
 
   return (
-    <div style={{ padding: "24px 28px 48px", maxWidth: 1280, margin: "0 auto" }}>
+    <div className="admin-dash-page" style={{ padding: "24px 28px 48px", maxWidth: 1280, margin: "0 auto" }}>
       {/* ── Page Header ──────────────────────────────────────────────────── */}
       <motion.div
         initial={{ opacity: 0, y: -12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4, ease: smoothEase }}
-        style={{ marginBottom: 28, display: "flex", alignItems: "flex-start", justifyContent: "space-between", flexWrap: "wrap", gap: 16 }}
+        style={{ marginBottom: 28, display: "flex", alignItems: "flex-start", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}
       >
         <div>
           <h1
@@ -991,7 +997,7 @@ export default function AdminDashboardPage() {
               letterSpacing: "-0.02em",
             }}
           >
-            Overview
+            {t('admin.dash.title')}
           </h1>
           <p style={{ fontSize: 13, color: COLORS.textMuted, margin: "6px 0 0" }}>
             {dateStr}
@@ -1053,72 +1059,76 @@ export default function AdminDashboardPage() {
           </button>
 
           {/* Export buttons */}
-          <button
-            onClick={() => downloadExport("users")}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 6,
-              padding: "6px 12px",
-              borderRadius: 8,
-              border: `1px solid ${COLORS.cardBorder}`,
-              background: COLORS.cardBg,
-              backdropFilter: COLORS.cardBlur,
-              color: COLORS.textSecondary,
-              fontSize: 11,
-              fontWeight: 600,
-              fontFamily: "var(--font-jetbrains), monospace",
-              cursor: "pointer",
-              transition: "all 0.15s ease",
-              whiteSpace: "nowrap",
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.borderColor = `${COLORS.cyan}44`;
-              e.currentTarget.style.color = COLORS.cyan;
-              e.currentTarget.style.background = `${COLORS.cyan}10`;
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.borderColor = COLORS.cardBorder;
-              e.currentTarget.style.color = COLORS.textSecondary;
-              e.currentTarget.style.background = COLORS.cardBg;
-            }}
-          >
-            <Download size={12} />
-            Export Users
-          </button>
-          <button
-            onClick={() => downloadExport("executions")}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 6,
-              padding: "6px 12px",
-              borderRadius: 8,
-              border: `1px solid ${COLORS.cardBorder}`,
-              background: COLORS.cardBg,
-              backdropFilter: COLORS.cardBlur,
-              color: COLORS.textSecondary,
-              fontSize: 11,
-              fontWeight: 600,
-              fontFamily: "var(--font-jetbrains), monospace",
-              cursor: "pointer",
-              transition: "all 0.15s ease",
-              whiteSpace: "nowrap",
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.borderColor = `${COLORS.amber}44`;
-              e.currentTarget.style.color = COLORS.amber;
-              e.currentTarget.style.background = `${COLORS.amber}10`;
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.borderColor = COLORS.cardBorder;
-              e.currentTarget.style.color = COLORS.textSecondary;
-              e.currentTarget.style.background = COLORS.cardBg;
-            }}
-          >
-            <Download size={12} />
-            Export Executions
-          </button>
+          <div className="admin-dash-export-btns" style={{ display: "flex", gap: 8 }}>
+            <button
+              onClick={() => downloadExport("users")}
+              className="admin-dash-export-btn"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                padding: "6px 12px",
+                borderRadius: 8,
+                border: `1px solid ${COLORS.cardBorder}`,
+                background: COLORS.cardBg,
+                backdropFilter: COLORS.cardBlur,
+                color: COLORS.textSecondary,
+                fontSize: 11,
+                fontWeight: 600,
+                fontFamily: "var(--font-jetbrains), monospace",
+                cursor: "pointer",
+                transition: "all 0.15s ease",
+                whiteSpace: "nowrap",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.borderColor = `${COLORS.cyan}44`;
+                e.currentTarget.style.color = COLORS.cyan;
+                e.currentTarget.style.background = `${COLORS.cyan}10`;
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.borderColor = COLORS.cardBorder;
+                e.currentTarget.style.color = COLORS.textSecondary;
+                e.currentTarget.style.background = COLORS.cardBg;
+              }}
+            >
+              <Download size={12} />
+              {t('admin.dash.exportUsers')}
+            </button>
+            <button
+              onClick={() => downloadExport("executions")}
+              className="admin-dash-export-btn"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                padding: "6px 12px",
+                borderRadius: 8,
+                border: `1px solid ${COLORS.cardBorder}`,
+                background: COLORS.cardBg,
+                backdropFilter: COLORS.cardBlur,
+                color: COLORS.textSecondary,
+                fontSize: 11,
+                fontWeight: 600,
+                fontFamily: "var(--font-jetbrains), monospace",
+                cursor: "pointer",
+                transition: "all 0.15s ease",
+                whiteSpace: "nowrap",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.borderColor = `${COLORS.amber}44`;
+                e.currentTarget.style.color = COLORS.amber;
+                e.currentTarget.style.background = `${COLORS.amber}10`;
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.borderColor = COLORS.cardBorder;
+                e.currentTarget.style.color = COLORS.textSecondary;
+                e.currentTarget.style.background = COLORS.cardBg;
+              }}
+            >
+              <Download size={12} />
+              {t('admin.dash.exportExec')}
+            </button>
+          </div>
         </div>
       </motion.div>
 
@@ -1129,7 +1139,7 @@ export default function AdminDashboardPage() {
       >
         <KPICard
           icon={<Users size={16} />}
-          label="Total Users"
+          label={t('admin.dash.totalUsers')}
           value={stats.users.total}
           accentColor={COLORS.cyan}
           subValue={`${stats.users.newThisMonth} new`}
@@ -1138,7 +1148,7 @@ export default function AdminDashboardPage() {
         />
         <KPICard
           icon={<DollarSign size={16} />}
-          label="MRR"
+          label={t('admin.dash.totalMrr')}
           value={stats.mrr}
           prefix="$"
           accentColor={COLORS.copper}
@@ -1148,15 +1158,15 @@ export default function AdminDashboardPage() {
         />
         <KPICard
           icon={<Zap size={16} />}
-          label="Total Executions"
-          value={stats.executions.total}
+          label={t('admin.dash.activeWeek')}
+          value={stats.users.activeThisWeek}
           accentColor={COLORS.amber}
-          subValue={`${totalExecsLast30.toLocaleString()} last 30d`}
+          subValue={`${totalExecsLast30.toLocaleString()} ${t('admin.dash.last30')}`}
           delay={0.15}
         />
         <KPICard
           icon={<CheckCircle2 size={16} />}
-          label="Success Rate"
+          label={t('admin.dash.successRate')}
           value={stats.executions.successRate}
           suffix="%"
           decimals={1}
@@ -1173,8 +1183,8 @@ export default function AdminDashboardPage() {
         style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 20 }}
       >
         <SectionCard
-          title="User Signups"
-          subtitle="Last 30 days"
+          title={t('admin.dash.userGrowth')}
+          subtitle={t('admin.dash.userGrowthSub')}
           delay={0.3}
           accentColor={COLORS.cyan}
           headerRight={
@@ -1188,17 +1198,17 @@ export default function AdminDashboardPage() {
                   fontFamily: "var(--font-jetbrains), monospace",
                 }}
               >
-                {totalSignupsLast30.toLocaleString()} total
+                {totalSignupsLast30.toLocaleString()} {t('admin.dash.total')}
               </span>
             </div>
           }
         >
-          <SignupAreaChart data={stats.users.dailySignups} />
+          <SignupAreaChart data={stats.users.dailySignups} signupsLabel={t('admin.dash.signups')} />
         </SectionCard>
 
         <SectionCard
-          title="Execution Trend"
-          subtitle="Success vs Failed (stacked)"
+          title={t('admin.dash.executionVolume')}
+          subtitle={t('admin.dash.executionVolumeSub')}
           delay={0.35}
           accentColor={COLORS.amber}
           headerRight={
@@ -1206,19 +1216,19 @@ export default function AdminDashboardPage() {
               <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
                 <div style={{ width: 8, height: 8, borderRadius: 2, background: COLORS.amber, opacity: 0.7 }} />
                 <span style={{ fontSize: 10, color: COLORS.textMuted, fontFamily: "var(--font-jetbrains), monospace" }}>
-                  Success
+                  {t('admin.dash.success')}
                 </span>
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
                 <div style={{ width: 8, height: 8, borderRadius: 2, background: COLORS.error, opacity: 0.7 }} />
                 <span style={{ fontSize: 10, color: COLORS.textMuted, fontFamily: "var(--font-jetbrains), monospace" }}>
-                  Failed
+                  {t('admin.dash.failed')}
                 </span>
               </div>
             </div>
           }
         >
-          <ExecutionTrendChart data={stats.executions.dailyExecutions} />
+          <ExecutionTrendChart data={stats.executions.dailyExecutions} successLabel={t('admin.dash.success')} failedLabel={t('admin.dash.failed')} />
         </SectionCard>
       </div>
 
@@ -1229,8 +1239,8 @@ export default function AdminDashboardPage() {
       >
         {/* Recent Activity Feed */}
         <SectionCard
-          title="Recent Activity"
-          subtitle={`Latest ${stats.recentActivity.length} executions`}
+          title={t('admin.dash.recentActivity')}
+          subtitle={t('admin.dash.recentActivitySub')}
           delay={0.4}
           accentColor={COLORS.blue}
         >
@@ -1251,11 +1261,11 @@ export default function AdminDashboardPage() {
                   fontSize: 12,
                 }}
               >
-                No recent activity
+                {t('admin.dash.noActivity')}
               </div>
             ) : (
               stats.recentActivity.map((item, i) => (
-                <ActivityRow key={item.id} item={item} index={i} />
+                <ActivityRow key={item.id} item={item} index={i} t={t} />
               ))
             )}
           </div>
@@ -1263,8 +1273,8 @@ export default function AdminDashboardPage() {
 
         {/* Top Node Types */}
         <SectionCard
-          title="Top Node Types"
-          subtitle={`${stats.topNodes.length} most used nodes`}
+          title={t('admin.dash.topNodes')}
+          subtitle={t('admin.dash.topNodesSub')}
           delay={0.45}
           accentColor={COLORS.copper}
         >
@@ -1396,8 +1406,13 @@ export default function AdminDashboardPage() {
           .admin-charts-grid { grid-template-columns: 1fr !important; }
           .admin-bottom-grid { grid-template-columns: 1fr !important; }
         }
+        @media (max-width: 768px) {
+          .admin-dash-page { padding: 16px 14px 32px !important; }
+        }
         @media (max-width: 640px) {
           .admin-kpi-grid { grid-template-columns: 1fr !important; }
+          .admin-dash-export-btns { width: 100% !important; }
+          .admin-dash-export-btn { flex: 1 !important; justify-content: center !important; }
         }
       `}</style>
     </div>

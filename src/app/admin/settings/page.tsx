@@ -13,6 +13,7 @@ import {
   AlertTriangle, X, Check, Clock,
   ScrollText, RefreshCw,
 } from "lucide-react";
+import { useLocale } from "@/hooks/useLocale";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 type Tab = "platform" | "accounts" | "auditlog" | "limits" | "session";
@@ -79,16 +80,16 @@ const ROLE_COLORS: Record<string, string> = {
 };
 
 // ─── Audit Action Config ────────────────────────────────────────────────────
-const ACTION_CONFIG: Record<string, { color: string; icon: React.ReactNode; label: string }> = {
-  ADMIN_LOGIN:             { color: COLORS.green,  icon: <LogIn size={13} />,      label: "Login" },
-  ADMIN_LOGOUT:            { color: COLORS.textMuted, icon: <LogOut size={13} />,   label: "Logout" },
-  ADMIN_CREATED:           { color: COLORS.blue,   icon: <UserPlus size={13} />,    label: "Admin Created" },
-  ADMIN_UPDATED:           { color: COLORS.amber,  icon: <Pencil size={13} />,      label: "Admin Updated" },
-  ADMIN_DELETED:           { color: COLORS.red,    icon: <Trash2 size={13} />,      label: "Admin Deleted" },
-  USER_ROLE_CHANGED:       { color: COLORS.amber,  icon: <UserCheck size={13} />,   label: "Role Changed" },
-  USER_DELETED:            { color: COLORS.red,    icon: <UserMinus size={13} />,   label: "User Deleted" },
-  FEEDBACK_STATUS_CHANGED: { color: COLORS.amber,  icon: <FileText size={13} />,    label: "Feedback Updated" },
-  DATA_EXPORTED:           { color: COLORS.purple, icon: <Download size={13} />,     label: "Data Exported" },
+const ACTION_CONFIG: Record<string, { color: string; icon: React.ReactNode }> = {
+  ADMIN_LOGIN:             { color: COLORS.green,  icon: <LogIn size={13} /> },
+  ADMIN_LOGOUT:            { color: COLORS.textMuted, icon: <LogOut size={13} /> },
+  ADMIN_CREATED:           { color: COLORS.blue,   icon: <UserPlus size={13} /> },
+  ADMIN_UPDATED:           { color: COLORS.amber,  icon: <Pencil size={13} /> },
+  ADMIN_DELETED:           { color: COLORS.red,    icon: <Trash2 size={13} /> },
+  USER_ROLE_CHANGED:       { color: COLORS.amber,  icon: <UserCheck size={13} /> },
+  USER_DELETED:            { color: COLORS.red,    icon: <UserMinus size={13} /> },
+  FEEDBACK_STATUS_CHANGED: { color: COLORS.amber,  icon: <FileText size={13} /> },
+  DATA_EXPORTED:           { color: COLORS.purple, icon: <Download size={13} /> },
 };
 
 // ─── Date Formatting ────────────────────────────────────────────────────────
@@ -362,7 +363,7 @@ function RoleBadge({ role }: { role: string }) {
 }
 
 // ─── Active Status Badge ────────────────────────────────────────────────────
-function ActiveBadge({ active }: { active: boolean }) {
+function ActiveBadge({ active, activeLabel, inactiveLabel }: { active: boolean; activeLabel?: string; inactiveLabel?: string }) {
   const color = active ? COLORS.green : COLORS.red;
   return (
     <span style={{
@@ -379,15 +380,15 @@ function ActiveBadge({ active }: { active: boolean }) {
         background: color,
         boxShadow: `0 0 6px ${color}50`,
       }} />
-      {active ? "Active" : "Inactive"}
+      {active ? (activeLabel || "Active") : (inactiveLabel || "Inactive")}
     </span>
   );
 }
 
 // ─── Confirm Dialog ─────────────────────────────────────────────────────────
-function ConfirmDialog({ title, message, confirmLabel, confirmColor, onConfirm, onCancel }: {
+function ConfirmDialog({ title, message, confirmLabel, confirmColor, cancelLabel, onConfirm, onCancel }: {
   title: string; message: string; confirmLabel: string; confirmColor: string;
-  onConfirm: () => void; onCancel: () => void;
+  cancelLabel?: string; onConfirm: () => void; onCancel: () => void;
 }) {
   return (
     <motion.div
@@ -457,7 +458,7 @@ function ConfirmDialog({ title, message, confirmLabel, confirmColor, onConfirm, 
             onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.08)"; }}
             onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.04)"; }}
           >
-            Cancel
+            {cancelLabel || "Cancel"}
           </button>
           <button
             onClick={onConfirm}
@@ -484,6 +485,7 @@ function ConfirmDialog({ title, message, confirmLabel, confirmColor, onConfirm, 
 function PlatformInfoTab({ stats, loading }: {
   stats: PlatformStats | null; loading: boolean;
 }) {
+  const { t } = useLocale();
   const proUsers = stats?.users?.byRole?.PRO ?? 0;
 
   return (
@@ -493,7 +495,7 @@ function PlatformInfoTab({ stats, loading }: {
       }}>
         <InfoCard
           icon={<Users size={16} />}
-          label="Total Users"
+          label={t('admin.settings.totalUsers')}
           value={loading ? "" : (stats?.users?.total ?? 0).toLocaleString()}
           accentColor={COLORS.cyan}
           delay={0.05}
@@ -501,7 +503,7 @@ function PlatformInfoTab({ stats, loading }: {
         />
         <InfoCard
           icon={<Crown size={16} />}
-          label="PRO Users"
+          label={t('admin.settings.proUsers')}
           value={loading ? "" : proUsers.toLocaleString()}
           accentColor={COLORS.amber}
           delay={0.1}
@@ -509,7 +511,7 @@ function PlatformInfoTab({ stats, loading }: {
         />
         <InfoCard
           icon={<LayoutGrid size={16} />}
-          label="Total Workflows"
+          label={t('admin.settings.totalWorkflows')}
           value={loading ? "" : (stats?.workflows?.total ?? 0).toLocaleString()}
           accentColor={COLORS.copper}
           delay={0.15}
@@ -517,7 +519,7 @@ function PlatformInfoTab({ stats, loading }: {
         />
         <InfoCard
           icon={<Play size={16} />}
-          label="Total Executions"
+          label={t('admin.settings.totalExecutions')}
           value={loading ? "" : (stats?.executions?.total ?? 0).toLocaleString()}
           accentColor={COLORS.green}
           delay={0.2}
@@ -529,27 +531,27 @@ function PlatformInfoTab({ stats, loading }: {
         display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14,
       }}>
         <SectionCard
-          title="Environment"
+          title={t('admin.settings.environment')}
           icon={<Server size={15} />}
           accentColor={COLORS.cyan}
           delay={0.25}
         >
           <DetailRow label="Node.js" value={typeof process !== "undefined" ? process.version || "v20.x" : "v20.x"} />
-          <DetailRow label="Framework" value="Next.js 16 (App Router)" />
-          <DetailRow label="Runtime" value="Edge + Node.js" />
-          <DetailRow label="TypeScript" value="5.x (Strict)" />
+          <DetailRow label={t('admin.settings.framework')} value="Next.js 16 (App Router)" />
+          <DetailRow label={t('admin.settings.runtime')} value="Edge + Node.js" />
+          <DetailRow label={t('admin.settings.typescript')} value="5.x (Strict)" />
         </SectionCard>
 
         <SectionCard
-          title="Infrastructure"
+          title={t('admin.settings.infrastructure')}
           icon={<Database size={15} />}
           accentColor={COLORS.green}
           delay={0.3}
         >
-          <DetailRow label="Database" value="Connected" statusColor={COLORS.green} />
-          <DetailRow label="Provider" value="Neon PostgreSQL" />
-          <DetailRow label="ORM" value="Prisma 7" />
-          <DetailRow label="Auth" value="NextAuth v5 (Google + Credentials)" />
+          <DetailRow label={t('admin.settings.database')} value={t('admin.settings.connected')} statusColor={COLORS.green} />
+          <DetailRow label={t('admin.settings.provider')} value="Neon PostgreSQL" />
+          <DetailRow label={t('admin.settings.orm')} value="Prisma 7" />
+          <DetailRow label={t('admin.settings.authLabel')} value="NextAuth v5 (Google + Credentials)" />
         </SectionCard>
       </div>
     </div>
@@ -560,6 +562,7 @@ function PlatformInfoTab({ stats, loading }: {
 function CreateAdminForm({ onCreated, onCancel }: {
   onCreated: () => void; onCancel: () => void;
 }) {
+  const { t } = useLocale();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [displayName, setDisplayName] = useState("");
@@ -662,7 +665,7 @@ function CreateAdminForm({ onCreated, onCancel }: {
               fontSize: 14, fontWeight: 700, color: COLORS.textPrimary,
               fontFamily: "var(--font-dm-sans), sans-serif",
             }}>
-              Create Admin Account
+              {t('admin.settings.createAccount')}
             </span>
           </div>
           <button
@@ -686,7 +689,7 @@ function CreateAdminForm({ onCreated, onCancel }: {
           marginBottom: 16,
         }}>
           <div>
-            <label style={labelStyle}>Display Name</label>
+            <label style={labelStyle}>{t('admin.settings.displayName')}</label>
             <input
               type="text"
               placeholder="e.g. John Admin"
@@ -698,7 +701,7 @@ function CreateAdminForm({ onCreated, onCancel }: {
             />
           </div>
           <div>
-            <label style={labelStyle}>Username</label>
+            <label style={labelStyle}>{t('admin.settings.usernameField')}</label>
             <input
               type="text"
               placeholder="e.g. john_admin"
@@ -710,7 +713,7 @@ function CreateAdminForm({ onCreated, onCancel }: {
             />
           </div>
           <div>
-            <label style={labelStyle}>Password</label>
+            <label style={labelStyle}>{t('admin.settings.passwordField')}</label>
             <div style={{ position: "relative" }}>
               <input
                 type={showPassword ? "text" : "password"}
@@ -737,7 +740,7 @@ function CreateAdminForm({ onCreated, onCancel }: {
             </div>
           </div>
           <div>
-            <label style={labelStyle}>Role</label>
+            <label style={labelStyle}>{t('admin.settings.roleField')}</label>
             <select
               value={role}
               onChange={(e) => setRole(e.target.value)}
@@ -750,9 +753,9 @@ function CreateAdminForm({ onCreated, onCancel }: {
                 backgroundPosition: "right 12px center",
               }}
             >
-              <option value="ADMIN" style={{ background: "#0E0F14" }}>Admin</option>
-              <option value="SUPER_ADMIN" style={{ background: "#0E0F14" }}>Super Admin</option>
-              <option value="VIEWER" style={{ background: "#0E0F14" }}>Viewer</option>
+              <option value="ADMIN" style={{ background: "#0E0F14" }}>{t('admin.settings.adminRole')}</option>
+              <option value="SUPER_ADMIN" style={{ background: "#0E0F14" }}>{t('admin.settings.superAdmin')}</option>
+              <option value="VIEWER" style={{ background: "#0E0F14" }}>{t('admin.settings.viewerRole')}</option>
             </select>
           </div>
         </div>
@@ -789,7 +792,7 @@ function CreateAdminForm({ onCreated, onCancel }: {
               fontFamily: "var(--font-dm-sans), sans-serif",
             }}
           >
-            Cancel
+            {t('admin.cancel')}
           </button>
           <button
             onClick={handleSubmit}
@@ -808,7 +811,7 @@ function CreateAdminForm({ onCreated, onCancel }: {
             onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(0,245,255,0.1)"; }}
           >
             <Check size={14} />
-            {submitting ? "Creating..." : "Create Account"}
+            {submitting ? t('admin.settings.creating') : t('admin.settings.createAccount')}
           </button>
         </div>
       </div>
@@ -820,6 +823,7 @@ function CreateAdminForm({ onCreated, onCancel }: {
 function EditAdminRow({ account, onSaved, onCancel }: {
   account: AdminAccount; onSaved: () => void; onCancel: () => void;
 }) {
+  const { t } = useLocale();
   const [role, setRole] = useState(account.role);
   const [isActive, setIsActive] = useState(account.isActive);
   const [saving, setSaving] = useState(false);
@@ -880,9 +884,9 @@ function EditAdminRow({ account, onSaved, onCancel }: {
           backgroundPosition: "right 8px center",
         }}
       >
-        <option value="SUPER_ADMIN" style={{ background: "#0E0F14" }}>Super Admin</option>
-        <option value="ADMIN" style={{ background: "#0E0F14" }}>Admin</option>
-        <option value="VIEWER" style={{ background: "#0E0F14" }}>Viewer</option>
+        <option value="SUPER_ADMIN" style={{ background: "#0E0F14" }}>{t('admin.settings.superAdmin')}</option>
+        <option value="ADMIN" style={{ background: "#0E0F14" }}>{t('admin.settings.adminRole')}</option>
+        <option value="VIEWER" style={{ background: "#0E0F14" }}>{t('admin.settings.viewerRole')}</option>
       </select>
 
       <button
@@ -896,7 +900,7 @@ function EditAdminRow({ account, onSaved, onCancel }: {
           fontFamily: "var(--font-jetbrains), monospace",
         }}
       >
-        {isActive ? "Active" : "Inactive"}
+        {isActive ? t('admin.settings.activeLabel') : t('admin.settings.inactiveLabel')}
       </button>
 
       <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
@@ -911,7 +915,7 @@ function EditAdminRow({ account, onSaved, onCancel }: {
             fontFamily: "var(--font-dm-sans), sans-serif",
           }}
         >
-          Cancel
+          {t('admin.cancel')}
         </button>
         <button
           onClick={handleSave}
@@ -928,7 +932,7 @@ function EditAdminRow({ account, onSaved, onCancel }: {
           }}
         >
           <Check size={12} />
-          {saving ? "Saving..." : "Save"}
+          {saving ? t('admin.settings.saving') : t('admin.save')}
         </button>
       </div>
     </motion.div>
@@ -937,6 +941,7 @@ function EditAdminRow({ account, onSaved, onCancel }: {
 
 // ─── Admin Accounts Tab ─────────────────────────────────────────────────────
 function AdminAccountsTab({ session }: { session: AdminSession | null }) {
+  const { t } = useLocale();
   const [accounts, setAccounts] = useState<AdminAccount[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -1046,7 +1051,7 @@ function AdminAccountsTab({ session }: { session: AdminSession | null }) {
             onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(0,245,255,0.08)"; }}
           >
             <UserPlus size={14} />
-            Create Admin
+            {t('admin.settings.createAccount')}
           </button>
         )}
       </motion.div>
@@ -1119,7 +1124,7 @@ function AdminAccountsTab({ session }: { session: AdminSession | null }) {
                       {account.displayName}
                     </span>
                     <RoleBadge role={account.role} />
-                    <ActiveBadge active={account.isActive} />
+                    <ActiveBadge active={account.isActive} activeLabel={t('admin.settings.activeLabel')} inactiveLabel={t('admin.settings.inactiveLabel')} />
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
                     <span style={{
@@ -1136,7 +1141,7 @@ function AdminAccountsTab({ session }: { session: AdminSession | null }) {
                       <Clock size={10} />
                       {account.lastLoginAt
                         ? formatRelativeDate(account.lastLoginAt)
-                        : "Never logged in"
+                        : t('admin.settings.neverLoggedIn')
                       }
                     </span>
                   </div>
@@ -1207,7 +1212,7 @@ function AdminAccountsTab({ session }: { session: AdminSession | null }) {
           color: COLORS.textMuted, fontSize: 13,
           fontFamily: "var(--font-dm-sans), sans-serif",
         }}>
-          No admin accounts found.
+          {t('admin.settings.noAccounts')}
         </div>
       )}
 
@@ -1215,10 +1220,11 @@ function AdminAccountsTab({ session }: { session: AdminSession | null }) {
       <AnimatePresence>
         {deleteTarget && (
           <ConfirmDialog
-            title="Delete Admin Account"
-            message={`Are you sure you want to permanently delete the account "${deleteTarget.displayName}" (@${deleteTarget.username})? This action cannot be undone.`}
-            confirmLabel={deleting ? "Deleting..." : "Delete Account"}
+            title={t('admin.delete')}
+            message={t('admin.settings.confirmDeleteAdmin')}
+            confirmLabel={deleting ? t('admin.delete') + "..." : t('admin.delete')}
             confirmColor={COLORS.red}
+            cancelLabel={t('admin.cancel')}
             onConfirm={handleDelete}
             onCancel={() => setDeleteTarget(null)}
           />
@@ -1230,6 +1236,7 @@ function AdminAccountsTab({ session }: { session: AdminSession | null }) {
 
 // ─── Audit Log Tab ──────────────────────────────────────────────────────────
 function AuditLogTab() {
+  const { t } = useLocale();
   const [logs, setLogs] = useState<AuditLogEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
@@ -1238,17 +1245,29 @@ function AuditLogTab() {
   const [actionFilter, setActionFilter] = useState("");
   const fetchRef = useRef(false);
 
+  const ACTION_LABELS: Record<string, string> = {
+    ADMIN_LOGIN: t('admin.settings.login'),
+    ADMIN_LOGOUT: t('admin.settings.logout'),
+    ADMIN_CREATED: t('admin.settings.accountCreated'),
+    ADMIN_UPDATED: t('admin.settings.accountUpdated'),
+    ADMIN_DELETED: t('admin.settings.accountDeleted'),
+    USER_ROLE_CHANGED: t('admin.settings.roleChanged'),
+    USER_DELETED: t('admin.settings.userDeleted'),
+    FEEDBACK_STATUS_CHANGED: t('admin.settings.statusChanged'),
+    DATA_EXPORTED: t('admin.settings.dataExported'),
+  };
+
   const AUDIT_ACTIONS = [
-    { value: "", label: "All Actions" },
-    { value: "ADMIN_LOGIN", label: "Admin Login" },
-    { value: "ADMIN_LOGOUT", label: "Admin Logout" },
-    { value: "ADMIN_CREATED", label: "Admin Created" },
-    { value: "ADMIN_UPDATED", label: "Admin Updated" },
-    { value: "ADMIN_DELETED", label: "Admin Deleted" },
-    { value: "USER_ROLE_CHANGED", label: "User Role Changed" },
-    { value: "USER_DELETED", label: "User Deleted" },
-    { value: "FEEDBACK_STATUS_CHANGED", label: "Feedback Status Changed" },
-    { value: "DATA_EXPORTED", label: "Data Exported" },
+    { value: "", label: t('admin.settings.allActions') },
+    { value: "ADMIN_LOGIN", label: ACTION_LABELS.ADMIN_LOGIN },
+    { value: "ADMIN_LOGOUT", label: ACTION_LABELS.ADMIN_LOGOUT },
+    { value: "ADMIN_CREATED", label: ACTION_LABELS.ADMIN_CREATED },
+    { value: "ADMIN_UPDATED", label: ACTION_LABELS.ADMIN_UPDATED },
+    { value: "ADMIN_DELETED", label: ACTION_LABELS.ADMIN_DELETED },
+    { value: "USER_ROLE_CHANGED", label: ACTION_LABELS.USER_ROLE_CHANGED },
+    { value: "USER_DELETED", label: ACTION_LABELS.USER_DELETED },
+    { value: "FEEDBACK_STATUS_CHANGED", label: ACTION_LABELS.FEEDBACK_STATUS_CHANGED },
+    { value: "DATA_EXPORTED", label: ACTION_LABELS.DATA_EXPORTED },
   ];
 
   const fetchLogs = useCallback(async (p: number, action?: string) => {
@@ -1288,12 +1307,16 @@ function AuditLogTab() {
   }, [fetchLogs]);
 
   const getActionConfig = useCallback((action: string) => {
-    return ACTION_CONFIG[action] || {
+    const config = ACTION_CONFIG[action] || {
       color: COLORS.textMuted,
       icon: <FileText size={13} />,
-      label: action.replace(/_/g, " "),
     };
-  }, []);
+    return {
+      ...config,
+      label: ACTION_LABELS[action] || action.replace(/_/g, " "),
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [t]);
 
   const formatDetails = useCallback((entry: AuditLogEntry): string => {
     const d = entry.details;
@@ -1398,7 +1421,7 @@ function AuditLogTab() {
             color: COLORS.textMuted, fontSize: 13,
             fontFamily: "var(--font-dm-sans), sans-serif",
           }}>
-            No audit log entries found.
+            {t('admin.settings.noAuditLogs')}
           </div>
         ) : (
           logs.map((entry, index) => {
@@ -1455,7 +1478,7 @@ function AuditLogTab() {
                       fontSize: 12, fontWeight: 600, color: COLORS.textPrimary,
                       fontFamily: "var(--font-dm-sans), sans-serif",
                     }}>
-                      {entry.admin?.displayName || "System"}
+                      {entry.admin?.displayName || t('admin.settings.system')}
                     </span>
 
                     {/* Target info */}
@@ -1544,7 +1567,6 @@ function AuditLogTab() {
             }}
           >
             <ChevronLeft size={14} />
-            Previous
           </button>
 
           <div style={{
@@ -1598,7 +1620,6 @@ function AuditLogTab() {
               fontFamily: "var(--font-dm-sans), sans-serif",
             }}
           >
-            Next
             <ChevronRight size={14} />
           </button>
         </motion.div>
@@ -1609,46 +1630,48 @@ function AuditLogTab() {
 
 // ─── Rate Limits Tab ────────────────────────────────────────────────────────
 function RateLimitsTab() {
+  const { t } = useLocale();
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
       <div className="settings-limits-grid" style={{
         display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14,
       }}>
         <SectionCard
-          title="Execution Limits"
+          title={t('admin.settings.executionLimits')}
           icon={<Zap size={15} />}
           accentColor={COLORS.amber}
           delay={0.05}
         >
-          <DetailRow label="FREE Tier" value="3 executions / day" />
-          <DetailRow label="PRO Tier" value="100 executions / day" />
-          <DetailRow label="Sliding Window" value="Upstash Redis" />
-          <DetailRow label="Admin Bypass" value="Enabled" statusColor={COLORS.green} />
+          <DetailRow label={t('admin.settings.freeTier')} value={t('admin.settings.freeExecDay')} />
+          <DetailRow label={t('admin.settings.proTier')} value={t('admin.settings.proExecDay')} />
+          <DetailRow label={t('admin.settings.slidingWindow')} value="Upstash Redis" />
+          <DetailRow label={t('admin.settings.adminBypass')} value={t('admin.settings.enabled')} statusColor={COLORS.green} />
         </SectionCard>
 
         <SectionCard
-          title="Upload & API"
+          title={t('admin.settings.uploadApi')}
           icon={<Upload size={15} />}
           accentColor={COLORS.copper}
           delay={0.1}
         >
-          <DetailRow label="Body Limit" value="2 MB" />
-          <DetailRow label="AI Provider" value="OpenAI GPT-4o" />
-          <DetailRow label="Vision Model" value="Claude Sonnet 4.6" />
-          <DetailRow label="3D Generation" value="Meshy API" />
+          <DetailRow label={t('admin.settings.bodyLimit')} value="2 MB" />
+          <DetailRow label={t('admin.settings.aiProvider')} value="OpenAI GPT-4o" />
+          <DetailRow label={t('admin.settings.visionModel')} value="Claude Sonnet 4.6" />
+          <DetailRow label={t('admin.settings.threeDGen')} value="Meshy API" />
         </SectionCard>
       </div>
 
       <SectionCard
-        title="Tier Comparison"
+        title={t('admin.settings.tierComparison')}
         icon={<Shield size={15} />}
         accentColor={COLORS.cyan}
         delay={0.15}
       >
-        <div style={{
+        <div className="settings-tier-table" style={{
           display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 0,
         }}>
-          {["Feature", "FREE", "PRO"].map((h, i) => (
+          {[t('admin.settings.featureCol'), "FREE", "PRO"].map((h, i) => (
             <div key={h} style={{
               padding: "10px 0",
               borderBottom: "1px solid rgba(255,255,255,0.06)",
@@ -1661,10 +1684,10 @@ function RateLimitsTab() {
             </div>
           ))}
           {[
-            ["Daily Executions", "3", "100"],
-            ["Workflow Slots", "5", "Unlimited"],
-            ["Community Access", "View Only", "Full"],
-            ["Priority Support", "\u2014", "Yes"],
+            [t('admin.settings.dailyExec'), "3", "100"],
+            [t('admin.settings.wfSlots'), "5", t('admin.settings.unlimited')],
+            [t('admin.settings.communityAccess'), t('admin.settings.viewOnly'), t('admin.settings.fullAccess')],
+            [t('admin.settings.prioritySupport'), "\u2014", "Yes"],
           ].map(([feature, free, pro]) => (
             [feature, free, pro].map((cell, i) => (
               <div key={`${feature}-${i}`} style={{
@@ -1698,12 +1721,12 @@ function RateLimitsTab() {
           fontSize: 12, color: COLORS.textSecondary, lineHeight: 1.5,
           fontFamily: "var(--font-dm-sans), sans-serif",
         }}>
-          Rate limits are configured in code via <code style={{
+          {t('admin.settings.rateLimitNote')} <code style={{
             fontSize: 11, padding: "1px 6px", borderRadius: 4,
             background: "rgba(255,255,255,0.05)",
             fontFamily: "var(--font-jetbrains), monospace",
             color: COLORS.amber,
-          }}>src/lib/rate-limit.ts</code>. Contact engineering to modify.
+          }}>src/lib/rate-limit.ts</code>. {t('admin.settings.contactEng')}
         </span>
       </motion.div>
     </div>
@@ -1712,6 +1735,7 @@ function RateLimitsTab() {
 
 // ─── Admin Session Tab ──────────────────────────────────────────────────────
 function AdminSessionTab() {
+  const { t } = useLocale();
   const router = useRouter();
   const [ending, setEnding] = useState(false);
   const [regenerating, setRegenerating] = useState(false);
@@ -1734,26 +1758,26 @@ function AdminSessionTab() {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
       <SectionCard
-        title="Current Session"
+        title={t('admin.settings.currentSession')}
         icon={<Key size={15} />}
         accentColor={COLORS.cyan}
         delay={0.05}
       >
-        <DetailRow label="Authenticated As" value="buildflow_admin" />
-        <DetailRow label="Cookie Name" value="bf_admin_session" />
-        <DetailRow label="Session Expiry" value="7 days" />
-        <DetailRow label="Session Status" value="Active" statusColor={COLORS.green} />
+        <DetailRow label={t('admin.settings.authenticatedAs')} value="buildflow_admin" />
+        <DetailRow label={t('admin.settings.cookieName')} value="bf_admin_session" />
+        <DetailRow label={t('admin.settings.sessionExpiry')} value={t('admin.settings.sevenDays')} />
+        <DetailRow label={t('admin.settings.sessionStatus')} value={t('admin.settings.activeStatus')} statusColor={COLORS.green} />
       </SectionCard>
 
       <SectionCard
-        title="Credentials"
+        title={t('admin.settings.credentialsSection')}
         icon={<Shield size={15} />}
         accentColor={COLORS.copper}
         delay={0.1}
       >
-        <DetailRow label="Username" value="buildflow_admin" />
-        <DetailRow label="Password" value="Admin@***" />
-        <DetailRow label="Auth Method" value="Cookie-based (Beta)" />
+        <DetailRow label={t('admin.settings.username')} value="buildflow_admin" />
+        <DetailRow label={t('admin.settings.password')} value="Admin@***" />
+        <DetailRow label={t('admin.settings.authMethod')} value={t('admin.settings.cookieBased')} />
 
         <div style={{
           marginTop: 14, padding: "12px 16px", borderRadius: 10,
@@ -1764,14 +1788,14 @@ function AdminSessionTab() {
             fontSize: 12, color: COLORS.textSecondary, lineHeight: 1.5,
             fontFamily: "var(--font-dm-sans), sans-serif",
           }}>
-            Admin credentials are configured in code at{" "}
+            {t('admin.settings.credentialNote')}{" "}
             <code style={{
               fontSize: 11, padding: "1px 6px", borderRadius: 4,
               background: "rgba(255,255,255,0.05)",
               fontFamily: "var(--font-jetbrains), monospace",
               color: COLORS.copper,
             }}>src/lib/admin-auth.ts</code>.
-            Not production-grade — for internal use during beta only.
+            {" "}{t('admin.settings.betaNote')}
           </span>
         </div>
       </SectionCard>
@@ -1781,6 +1805,7 @@ function AdminSessionTab() {
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.15, duration: 0.4, ease: smoothEase }}
+        className="settings-session-actions"
         style={{ display: "flex", gap: 12 }}
       >
         <button
@@ -1803,7 +1828,7 @@ function AdminSessionTab() {
           <RefreshCw size={15} style={{
             animation: regenerating ? "spin 0.8s linear infinite" : "none",
           }} />
-          {regenerating ? "Regenerating..." : "Regenerate Session"}
+          {regenerating ? t('admin.settings.regenerating') : t('admin.settings.regenerateSession')}
         </button>
 
         <button
@@ -1824,7 +1849,7 @@ function AdminSessionTab() {
           onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(239,68,68,0.08)"; }}
         >
           <LogOut size={15} />
-          {ending ? "Ending Session..." : "End Session"}
+          {ending ? t('admin.settings.endingSession') : t('admin.settings.endSession')}
         </button>
       </motion.div>
     </div>
@@ -1881,6 +1906,7 @@ function LoadingSkeleton() {
 
 // ─── Page ───────────────────────────────────────────────────────────────────
 export default function AdminSettingsPage() {
+  const { t } = useLocale();
   const [activeTab, setActiveTab] = useState<Tab>("platform");
   const [stats, setStats] = useState<PlatformStats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -1911,15 +1937,15 @@ export default function AdminSettingsPage() {
   }, []);
 
   const tabs: { key: Tab; label: string; icon: React.ReactNode }[] = [
-    { key: "platform",  label: "Platform Info",   icon: <Server size={15} /> },
-    { key: "accounts",  label: "Admin Accounts",  icon: <Users size={15} /> },
-    { key: "auditlog",  label: "Audit Log",       icon: <ScrollText size={15} /> },
-    { key: "limits",    label: "Rate Limits",      icon: <Shield size={15} /> },
-    { key: "session",   label: "Admin Session",    icon: <Key size={15} /> },
+    { key: "platform",  label: t('admin.settings.tabPlatform'),    icon: <Server size={15} /> },
+    { key: "accounts",  label: t('admin.settings.tabAccounts'),    icon: <Users size={15} /> },
+    { key: "auditlog",  label: t('admin.settings.tabAuditLog'),    icon: <ScrollText size={15} /> },
+    { key: "limits",    label: t('admin.settings.tabRateLimits'),  icon: <Shield size={15} /> },
+    { key: "session",   label: t('admin.settings.tabSession'),     icon: <Key size={15} /> },
   ];
 
   return (
-    <div style={{ padding: "24px 28px 48px", maxWidth: 1100, margin: "0 auto" }}>
+    <div className="admin-settings-page" style={{ padding: "24px 28px 48px", maxWidth: 1100, margin: "0 auto" }}>
       {/* Page Header */}
       <motion.div
         initial={{ opacity: 0, y: -12 }}
@@ -1938,7 +1964,7 @@ export default function AdminSettingsPage() {
             letterSpacing: "1.5px", textTransform: "uppercase",
             fontFamily: "var(--font-jetbrains), monospace",
           }}>
-            Configuration
+            {t('admin.settings.sectionLabel')}
           </span>
         </div>
         <h1 style={{
@@ -1946,13 +1972,13 @@ export default function AdminSettingsPage() {
           fontFamily: "var(--font-dm-sans), sans-serif",
           letterSpacing: "-0.02em",
         }}>
-          Platform Settings
+          {t('admin.settings.title')}
         </h1>
         <p style={{
           fontSize: 13, color: COLORS.textMuted, margin: "4px 0 0",
           fontFamily: "var(--font-dm-sans), sans-serif",
         }}>
-          Platform configuration, admin accounts, audit logs, rate limits, and session management
+          {t('admin.settings.subtitle')}
         </p>
       </motion.div>
 
@@ -2017,9 +2043,19 @@ export default function AdminSettingsPage() {
           }
         }
         @media (max-width: 768px) {
+          .admin-settings-page {
+            padding: 16px 14px 32px !important;
+          }
           .settings-tabs {
             flex-wrap: wrap !important;
             width: 100% !important;
+          }
+          .settings-tabs button {
+            flex: 1 1 auto !important;
+            min-width: 0 !important;
+            padding: 8px 12px !important;
+            font-size: 11px !important;
+            justify-content: center !important;
           }
           .settings-info-grid {
             grid-template-columns: 1fr !important;
@@ -2032,6 +2068,20 @@ export default function AdminSettingsPage() {
           }
           .settings-create-form-grid {
             grid-template-columns: 1fr !important;
+          }
+        }
+        @media (max-width: 640px) {
+          .settings-session-actions {
+            flex-direction: column !important;
+          }
+        }
+        @media (max-width: 480px) {
+          .settings-tabs button {
+            font-size: 10px !important;
+            padding: 7px 8px !important;
+          }
+          .settings-tier-table {
+            font-size: 11px !important;
           }
         }
       `}</style>

@@ -13,6 +13,7 @@ import {
   Info,
 } from "lucide-react";
 import dynamic from "next/dynamic";
+import { useLocale } from "@/hooks/useLocale";
 
 const smoothEase: [number, number, number, number] = [0.25, 0.4, 0.25, 1];
 const PRO_PRICE = 29;
@@ -237,6 +238,9 @@ function KPICard({
             letterSpacing: "1px",
             fontWeight: 600,
             fontFamily: "var(--font-jetbrains), monospace",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
           }}
         >
           {label}
@@ -563,6 +567,7 @@ function formatCurrency(value: number): string {
 // ─── Page ────────────────────────────────────────────────────────────────────
 
 export default function AdminBillingPage() {
+  const { t } = useLocale();
   const [stats, setStats] = useState<AdminStats | null>(null);
   const [proUsers, setProUsers] = useState<ProUser[]>([]);
   const [proTotal, setProTotal] = useState(0);
@@ -618,7 +623,7 @@ export default function AdminBillingPage() {
             cursor: "pointer",
           }}
         >
-          Retry
+          {t('admin.billing.retry')}
         </button>
       </div>
     );
@@ -644,7 +649,7 @@ export default function AdminBillingPage() {
   }));
 
   return (
-    <div style={{ padding: "24px 28px 48px", maxWidth: 1280, margin: "0 auto" }}>
+    <div className="admin-billing-page" style={{ padding: "24px 28px 48px", maxWidth: 1280, margin: "0 auto" }}>
       {/* ── Page Header ───────────────────────────────────────────────────── */}
       <motion.div
         initial={{ opacity: 0, y: -12 }}
@@ -680,7 +685,7 @@ export default function AdminBillingPage() {
               fontFamily: "var(--font-jetbrains), monospace",
             }}
           >
-            Financial Overview
+            {t('admin.billing.sectionLabel')}
           </span>
         </div>
         <h1
@@ -693,10 +698,10 @@ export default function AdminBillingPage() {
             letterSpacing: "-0.02em",
           }}
         >
-          Revenue & Billing
+          {t('admin.billing.title')}
         </h1>
         <p style={{ fontSize: 13, color: "#5C5C78", margin: "4px 0 0" }}>
-          Live subscription metrics and PRO subscriber details
+          {t('admin.billing.subtitle')}
         </p>
       </motion.div>
 
@@ -712,38 +717,38 @@ export default function AdminBillingPage() {
       >
         <KPICard
           icon={<CircleDollarSign size={15} />}
-          label="Monthly Recurring Revenue"
+          label={t('admin.billing.mrr')}
           value={mrr}
           prefix="$"
           color="#B87333"
-          subtext={`${byRole["PRO"] ?? 0} PRO users x ${formatCurrency(PRO_PRICE)}/mo`}
+          subtext={`${byRole["PRO"] ?? 0} PRO ${t('admin.billing.users')} x ${formatCurrency(PRO_PRICE)}/mo`}
           delay={0.05}
         />
         <KPICard
           icon={<DollarSign size={15} />}
-          label="Annual Recurring Revenue"
+          label={t('admin.billing.arr')}
           value={arr}
           prefix="$"
           color="#FFBF00"
-          subtext={`${formatCurrency(mrr)} MRR x 12 months`}
+          subtext={`${formatCurrency(mrr)} MRR x 12`}
           delay={0.1}
         />
         <KPICard
           icon={<Users size={15} />}
-          label="PRO Users"
+          label={t('admin.billing.proUsers')}
           value={byRole["PRO"] ?? 0}
           color="#00F5FF"
-          subtext={`${totalUsers.toLocaleString()} total users`}
+          subtext={`${totalUsers.toLocaleString()} ${t('admin.billing.users')}`}
           delay={0.15}
         />
         <KPICard
           icon={<BarChart3 size={15} />}
-          label="Avg Revenue Per User"
+          label={t('admin.billing.arpu')}
           value={arpu}
           prefix="$"
           decimals={2}
           color="#4F8AFF"
-          subtext={`MRR / ${totalUsers.toLocaleString()} users`}
+          subtext={`MRR / ${totalUsers.toLocaleString()} ${t('admin.billing.users')}`}
           delay={0.2}
         />
       </div>
@@ -760,8 +765,8 @@ export default function AdminBillingPage() {
       >
         {/* Plan Breakdown List */}
         <SectionCard
-          title="Plan Distribution"
-          subtitle={`${totalUsers.toLocaleString()} total users across all plans`}
+          title={t('admin.billing.planDist')}
+          subtitle={`${totalUsers.toLocaleString()} ${t('admin.billing.users')}`}
           delay={0.3}
           accentColor="#00F5FF"
         >
@@ -779,8 +784,8 @@ export default function AdminBillingPage() {
 
         {/* Bar Chart */}
         <SectionCard
-          title="Users by Plan"
-          subtitle="Visual breakdown"
+          title={t('admin.billing.usersByPlan')}
+          subtitle={t('admin.billing.visualBreakdown')}
           delay={0.35}
           accentColor="#FFBF00"
         >
@@ -790,13 +795,14 @@ export default function AdminBillingPage() {
 
       {/* ── PRO Subscribers Table ─────────────────────────────────────────── */}
       <SectionCard
-        title="PRO Subscribers"
-        subtitle={`${proTotal} active PRO subscriptions`}
+        title={t('admin.billing.proSubscribers')}
+        subtitle={`${proTotal} ${t('admin.billing.users')}`}
         delay={0.5}
         accentColor="#B87333"
       >
         {/* Table header */}
         <div
+          className="billing-sub-header"
           style={{
             display: "grid",
             gridTemplateColumns: "1.5fr 1.8fr 130px 90px 90px 120px",
@@ -807,10 +813,18 @@ export default function AdminBillingPage() {
             marginBottom: 4,
           }}
         >
-          {["Name", "Email", "Sub. End", "Workflows", "Executions", "Joined"].map(
+          {[
+            { key: 'name', label: t('admin.billing.name') },
+            { key: 'email', label: t('admin.billing.email') },
+            { key: 'sub', label: t('admin.billing.subEnd') },
+            { key: 'wf', label: t('admin.billing.workflows') },
+            { key: 'exec', label: t('admin.billing.executions') },
+            { key: 'joined', label: t('admin.billing.joined') },
+          ].map(
             (h) => (
               <span
-                key={h}
+                key={h.key}
+                className={`billing-col-${h.key}`}
                 style={{
                   fontSize: 9,
                   color: "#5C5C78",
@@ -820,7 +834,7 @@ export default function AdminBillingPage() {
                   fontFamily: "var(--font-jetbrains), monospace",
                 }}
               >
-                {h}
+                {h.label}
               </span>
             )
           )}
@@ -837,12 +851,13 @@ export default function AdminBillingPage() {
                 fontSize: 13,
               }}
             >
-              No PRO subscribers found
+              {t('admin.billing.noSubscribers')}
             </div>
           )}
           {proUsers.map((user, i) => (
             <motion.div
               key={user.id}
+              className="billing-sub-row"
               initial={{ opacity: 0, x: -8 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{
@@ -870,6 +885,7 @@ export default function AdminBillingPage() {
             >
               {/* Name */}
               <div
+                className="billing-col-name"
                 style={{
                   display: "flex",
                   alignItems: "center",
@@ -921,12 +937,13 @@ export default function AdminBillingPage() {
                     fontFamily: "var(--font-dm-sans), sans-serif",
                   }}
                 >
-                  {user.name || "Unnamed"}
+                  {user.name || t('admin.users.unnamed')}
                 </span>
               </div>
 
               {/* Email */}
               <span
+                className="billing-col-email"
                 style={{
                   fontSize: 11,
                   color: "#9898B0",
@@ -940,7 +957,7 @@ export default function AdminBillingPage() {
               </span>
 
               {/* Subscription End */}
-              <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+              <div className="billing-col-sub" style={{ display: "flex", alignItems: "center", gap: 5 }}>
                 <Calendar size={11} style={{ color: "#5C5C78", flexShrink: 0 }} />
                 <span
                   style={{
@@ -960,7 +977,7 @@ export default function AdminBillingPage() {
               </div>
 
               {/* Workflows */}
-              <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+              <div className="billing-col-wf" style={{ display: "flex", alignItems: "center", gap: 5 }}>
                 <Workflow size={11} style={{ color: "#5C5C78" }} />
                 <span
                   style={{
@@ -975,7 +992,7 @@ export default function AdminBillingPage() {
               </div>
 
               {/* Executions */}
-              <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+              <div className="billing-col-exec" style={{ display: "flex", alignItems: "center", gap: 5 }}>
                 <Zap size={11} style={{ color: "#5C5C78" }} />
                 <span
                   style={{
@@ -991,6 +1008,7 @@ export default function AdminBillingPage() {
 
               {/* Joined */}
               <span
+                className="billing-col-joined"
                 style={{
                   fontSize: 11,
                   color: "#5C5C78",
@@ -1028,8 +1046,7 @@ export default function AdminBillingPage() {
             fontFamily: "var(--font-dm-sans), sans-serif",
           }}
         >
-          Revenue estimates based on <strong style={{ color: "#B87333" }}>${PRO_PRICE}/mo</strong> PRO plan pricing.
-          Data sourced from live database records.
+          {t('admin.billing.revenueNote')}
         </span>
       </motion.div>
 
@@ -1048,7 +1065,22 @@ export default function AdminBillingPage() {
           .billing-dist-grid { grid-template-columns: 1fr !important; }
         }
         @media (max-width: 768px) {
+          .admin-billing-page {
+            padding: 16px 14px 32px !important;
+          }
           .billing-kpi-grid { grid-template-columns: 1fr !important; }
+          .billing-sub-header { display: none !important; }
+          .billing-sub-row {
+            display: flex !important;
+            flex-wrap: wrap !important;
+            padding: 14px !important;
+            gap: 6px !important;
+            border-bottom: 1px solid rgba(255,255,255,0.04) !important;
+          }
+          .billing-col-name { flex: 1 1 100% !important; font-size: 14px !important; font-weight: 600 !important; }
+          .billing-col-email { flex: 1 1 100% !important; font-size: 12px !important; }
+          .billing-col-sub, .billing-col-wf, .billing-col-exec { display: none !important; }
+          .billing-col-joined { flex: 1 1 100% !important; }
         }
       `}</style>
     </div>

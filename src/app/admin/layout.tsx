@@ -10,22 +10,24 @@ import {
   LogOut, Shield, Menu, X,
 } from "lucide-react";
 import { ADMIN_COOKIE_NAME } from "@/lib/admin-auth";
+import { useLocale } from "@/hooks/useLocale";
+import type { TranslationKey } from "@/lib/i18n";
 
 // ─── Navigation ──────────────────────────────────────────────────────────────
 const NAV_ITEMS = [
-  { href: "/admin/dashboard", label: "Overview",  icon: LayoutDashboard },
-  { href: "/admin/users",     label: "Users",     icon: Users },
-  { href: "/admin/billing",   label: "Revenue",   icon: CreditCard },
-  { href: "/admin/workflows", label: "Workflows",  icon: Workflow },
-  { href: "/admin/analytics", label: "Analytics",  icon: BarChart3 },
-  { href: "/admin/support",   label: "Feedback",   icon: MessageSquareHeart },
-  { href: "/admin/settings",  label: "Settings",   icon: Settings },
+  { href: "/admin/dashboard", labelKey: "admin.nav.overview" as const, icon: LayoutDashboard },
+  { href: "/admin/users",     labelKey: "admin.nav.users" as const,    icon: Users },
+  { href: "/admin/billing",   labelKey: "admin.nav.revenue" as const,  icon: CreditCard },
+  { href: "/admin/workflows", labelKey: "admin.nav.workflows" as const, icon: Workflow },
+  { href: "/admin/analytics", labelKey: "admin.nav.analytics" as const, icon: BarChart3 },
+  { href: "/admin/support",   labelKey: "admin.nav.feedback" as const,  icon: MessageSquareHeart },
+  { href: "/admin/settings",  labelKey: "admin.nav.settings" as const,  icon: Settings },
 ] as const;
 
-function getBreadcrumbs(pathname: string) {
-  const crumbs = [{ label: "Admin", href: "/admin/dashboard" }];
+function getBreadcrumbs(pathname: string, t: (key: TranslationKey) => string) {
+  const crumbs = [{ label: t("admin.badge"), href: "/admin/dashboard" }];
   const item = NAV_ITEMS.find((n) => n.href === pathname);
-  if (item) crumbs.push({ label: item.label, href: item.href });
+  if (item) crumbs.push({ label: t(item.labelKey), href: item.href });
   return crumbs;
 }
 
@@ -134,6 +136,7 @@ function NavItem({
 // ─── Layout ──────────────────────────────────────────────────────────────────
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const { t, locale, setLocale } = useLocale();
   const [collapsed, setCollapsed] = useState(true);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
@@ -228,7 +231,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     );
   }
 
-  const breadcrumbs = getBreadcrumbs(pathname);
+  const breadcrumbs = getBreadcrumbs(pathname, t);
 
   return (
     <div style={{ display: "flex", minHeight: "100vh", background: "#070809" }}>
@@ -236,7 +239,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       {isMobile && !mobileOpen && (
         <button
           onClick={() => setMobileOpen(true)}
-          aria-label="Open menu"
+          aria-label={t("admin.openMenu")}
           style={{
             position: "fixed", top: 12, left: 12, zIndex: 9001,
             width: 42, height: 42, borderRadius: 12,
@@ -341,7 +344,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                     color: "rgba(184,115,51,0.25)",
                     fontFamily: "var(--font-jetbrains), monospace",
                   }}>
-                    Admin
+                    {t("admin.badge")}
                   </span>
                   <Shield size={8} style={{ color: "rgba(0,245,255,0.4)" }} />
                 </div>
@@ -350,13 +353,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           </Link>
 
           {isMobile ? (
-            <button onClick={closeMobile} aria-label="Close menu" className="sb-icon-btn">
+            <button onClick={closeMobile} aria-label={t("admin.closeMenu")} className="sb-icon-btn">
               <X size={15} />
             </button>
           ) : effectiveShowLabels ? (
             <button
               onClick={() => { setCollapsed(true); setShowLabels(false); }}
-              aria-label="Collapse sidebar"
+              aria-label={t("admin.collapseSidebar")}
               className="sb-icon-btn"
             >
               <ChevronLeft size={13} />
@@ -381,7 +384,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               className="sb-section-label"
             >
               <span className="sb-section-tick" />
-              Platform
+              {t("admin.sectionPlatform")}
             </motion.div>
           )}
 
@@ -392,7 +395,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 <NavItem
                   key={item.href}
                   href={item.href}
-                  label={item.label}
+                  label={t(item.labelKey)}
                   icon={item.icon}
                   isActive={isActive}
                   collapsed={isEffectivelyCollapsed}
@@ -436,14 +439,15 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                     overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
                     lineHeight: 1.3,
                   }}>
-                    Admin
+                    {t("admin.badge")}
                   </div>
                   <div style={{
                     fontSize: 10, color: "rgba(255,255,255,0.3)",
                     fontFamily: "var(--font-jetbrains), monospace",
                     lineHeight: 1.4,
+                    overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
                   }}>
-                    Platform Manager
+                    {t("admin.platformManager")}
                   </div>
                 </div>
               </div>
@@ -458,12 +462,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                   background: "rgba(255,255,255,0.02)",
                   cursor: "pointer", transition: "all 0.15s ease",
                   fontSize: 11, color: "rgba(255,255,255,0.3)", fontWeight: 500,
+                  whiteSpace: "nowrap",
                 }}
                 onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(239,68,68,0.08)"; e.currentTarget.style.borderColor = "rgba(239,68,68,0.2)"; e.currentTarget.style.color = "#EF4444"; }}
                 onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.02)"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.06)"; e.currentTarget.style.color = "rgba(255,255,255,0.3)"; }}
               >
                 <LogOut size={11} />
-                Sign out
+                {t("admin.signOut")}
               </button>
             </div>
           </div>
@@ -474,7 +479,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <div style={{ padding: 8, borderTop: "1px solid rgba(184,115,51,0.1)", flexShrink: 0, position: "relative", zIndex: 1 }}>
             <button
               onClick={() => { setCollapsed(false); setHoverExpanded(false); }}
-              aria-label="Expand sidebar"
+              aria-label={t("admin.expandSidebar")}
               className="sb-icon-btn"
               style={{ width: "100%", justifyContent: "center", padding: "8px 0" }}
             >
@@ -487,17 +492,20 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       {/* ── Main Content ──────────────────────────────────────────────── */}
       <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
         {/* Top header */}
-        <header style={{
-          position: "sticky", top: 0, zIndex: 100,
-          minHeight: 56, display: "flex", alignItems: "center",
-          padding: "0 24px", gap: 16,
-          background: "rgba(7,7,13,0.85)",
-          backdropFilter: "blur(16px)",
-          WebkitBackdropFilter: "blur(16px)",
-          borderBottom: "1px solid rgba(184,115,51,0.06)",
-        }}>
+        <header
+          className="admin-header"
+          style={{
+            position: "sticky", top: 0, zIndex: 100,
+            minHeight: 56, display: "flex", alignItems: "center",
+            padding: "0 24px", gap: 16,
+            background: "rgba(7,7,13,0.85)",
+            backdropFilter: "blur(16px)",
+            WebkitBackdropFilter: "blur(16px)",
+            borderBottom: "1px solid rgba(184,115,51,0.06)",
+          }}
+        >
           {/* Breadcrumbs */}
-          <div style={{ display: "flex", alignItems: "center", gap: 8, flex: 1 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flex: 1, minWidth: 0 }}>
             {breadcrumbs.map((crumb, i) => (
               <React.Fragment key={`${i}-${crumb.href}`}>
                 {i > 0 && (
@@ -511,12 +519,44 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                     textDecoration: "none",
                     fontFamily: "var(--font-jetbrains), monospace",
                     letterSpacing: "0.02em",
+                    ...(i === breadcrumbs.length - 1 ? {
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap" as const,
+                      maxWidth: "40vw",
+                    } : {}),
                   }}
                 >
                   {crumb.label}
                 </Link>
               </React.Fragment>
             ))}
+          </div>
+
+          {/* Language switcher */}
+          <div style={{
+            display: "flex", alignItems: "center",
+            borderRadius: 20, overflow: "hidden",
+            border: "1px solid rgba(255,255,255,0.08)",
+            background: "rgba(255,255,255,0.02)",
+            flexShrink: 0,
+          }}>
+            <button onClick={() => setLocale("en")} style={{
+              padding: "3px 10px", fontSize: 10, fontWeight: 600,
+              border: "none", cursor: "pointer",
+              background: locale === "en" ? "rgba(0,245,255,0.12)" : "transparent",
+              color: locale === "en" ? "#00F5FF" : "rgba(255,255,255,0.3)",
+              fontFamily: "var(--font-jetbrains), monospace",
+              letterSpacing: "0.5px",
+            }}>EN</button>
+            <button onClick={() => setLocale("de")} style={{
+              padding: "3px 10px", fontSize: 10, fontWeight: 600,
+              border: "none", cursor: "pointer",
+              background: locale === "de" ? "rgba(0,245,255,0.12)" : "transparent",
+              color: locale === "de" ? "#00F5FF" : "rgba(255,255,255,0.3)",
+              fontFamily: "var(--font-jetbrains), monospace",
+              letterSpacing: "0.5px",
+            }}>DE</button>
           </div>
 
           {/* Admin badge */}
@@ -528,8 +568,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             border: "1px solid rgba(184,115,51,0.25)",
             background: "rgba(184,115,51,0.06)",
             fontFamily: "var(--font-jetbrains), monospace",
+            flexShrink: 0,
+            whiteSpace: "nowrap",
           }}>
-            Admin
+            {t("admin.badge")}
           </span>
 
           {/* Shield avatar */}
@@ -538,6 +580,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             border: "1px solid rgba(0,245,255,0.15)",
             background: "linear-gradient(135deg, rgba(0,245,255,0.08), rgba(184,115,51,0.05))",
             display: "flex", alignItems: "center", justifyContent: "center",
+            flexShrink: 0,
           }}>
             <Shield size={14} style={{ color: "#00F5FF" }} />
           </div>
@@ -559,6 +602,15 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           </AnimatePresence>
         </main>
       </div>
+
+      {/* Mobile responsive styles */}
+      <style>{`
+        @media (max-width: 768px) {
+          .admin-header {
+            padding: 0 12px !important;
+          }
+        }
+      `}</style>
     </div>
   );
 }
