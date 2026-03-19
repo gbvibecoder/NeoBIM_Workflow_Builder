@@ -299,7 +299,7 @@ export async function executeNode(
           e.quantity.toString(), e.unit,
         ]),
         _elements: qtoElements, // Required for TR-008 compatibility
-        content: `Parsed 1,319 elements across 11 categories from 5 storeys — net area accounts for ${totalOpeningArea.toFixed(0)} m² of openings`,
+        content: `⚠️ DEMO DATA — not from a real IFC file. Sample: 1,319 elements across 11 categories from 5 storeys — net area accounts for ${totalOpeningArea.toFixed(0)} m² of openings`,
       });
     }
 

@@ -291,8 +291,8 @@ export const PREBUILT_WORKFLOWS: WorkflowTemplate[] = [
     category: "Cost Estimation",
     complexity: "intermediate",
     estimatedRunTime: "~90 seconds",
-    requiredInputs: ["IFC model file"],
-    expectedOutputs: ["Quantities table by element category", "BOQ with unit prices and totals", "Downloadable XLSX/CSV"],
+    requiredInputs: ["IFC model file", "Project location (optional — for regional pricing)"],
+    expectedOutputs: ["Quantities table by element category", "BOQ with unit prices in local currency", "Downloadable XLSX/CSV"],
     thumbnail: "https://picsum.photos/seed/wf09/600/400",
     tileGraph: {
       nodes: [
@@ -308,6 +308,20 @@ export const PREBUILT_WORKFLOWS: WorkflowTemplate[] = [
             inputs: [],
             outputs: [{ id: "ifc-out", label: "IFC Model", type: "ifc" }],
             icon: "Box",
+          },
+        },
+        {
+          id: "n5",
+          type: "workflowNode",
+          position: { x: X1, y: Y + 220 },
+          data: {
+            catalogueId: "IN-006",
+            label: "Location Input",
+            category: "input",
+            status: "idle",
+            inputs: [],
+            outputs: [{ id: "geo-out", label: "GeoJSON", type: "geojson" }],
+            icon: "MapPin",
           },
         },
         {
@@ -356,6 +370,7 @@ export const PREBUILT_WORKFLOWS: WorkflowTemplate[] = [
       edges: [
         { id: "e1-2", source: "n1", sourceHandle: "ifc-out", target: "n2", targetHandle: "ifc-in", type: "animatedEdge" },
         { id: "e2-3", source: "n2", sourceHandle: "qty-out", target: "n3", targetHandle: "qty-in", type: "animatedEdge" },
+        { id: "e5-3", source: "n5", sourceHandle: "geo-out", target: "n3", targetHandle: "qty-in", type: "animatedEdge" },
         { id: "e3-4", source: "n3", sourceHandle: "boq-out", target: "n4", targetHandle: "boq-in", type: "animatedEdge" },
       ],
     },

@@ -88,6 +88,26 @@ export function FileUploadInput({ nodeId, data, accept, label, maxMB = 20, showP
       toast.error(`${t('input.fileTooLarge')} ${maxMB}MB.`);
       return;
     }
+    // Validate file extension matches the accepted types
+    if (accept) {
+      const allowedExts = accept.split(",").map(e => e.trim().toLowerCase());
+      const fileExt = "." + file.name.split(".").pop()?.toLowerCase();
+      if (!allowedExts.includes(fileExt)) {
+        const isIfc = allowedExts.includes(".ifc");
+        toast.error(
+          isIfc
+            ? "This file is not an IFC file"
+            : `Unsupported file type`,
+          {
+            description: isIfc
+              ? `You uploaded "${file.name}" — this workflow requires a Building Information Model (.ifc) file exported from BIM software like Revit, ArchiCAD, or Tekla. Please upload a valid .ifc file to continue.`
+              : `"${file.name}" is not supported here. Please upload a ${allowedExts.map(e => e.replace(".", ".").toUpperCase()).join(" or ")} file.`,
+            duration: 8000,
+          }
+        );
+        return;
+      }
+    }
     inputFileStore.set(nodeId, file);
     const currentNode = useWorkflowStore.getState().nodes.find(n => n.id === nodeId);
     if (!currentNode) return;
@@ -314,38 +334,198 @@ export function ParameterInput({ nodeId, data }: { nodeId: string; data: Workflo
 
 // ─── Location Input (IN-006) ─────────────────────────────────────────────────
 
+const LOCATION_COUNTRIES = [
+  { label: "USA", code: "US", currency: "USD", symbol: "$" },
+  { label: "India", code: "IN", currency: "INR", symbol: "₹" },
+  { label: "UK", code: "GB", currency: "GBP", symbol: "£" },
+  { label: "UAE", code: "AE", currency: "AED", symbol: "د.إ" },
+  { label: "Australia", code: "AU", currency: "AUD", symbol: "A$" },
+  { label: "Canada", code: "CA", currency: "CAD", symbol: "C$" },
+  { label: "Germany", code: "DE", currency: "EUR", symbol: "€" },
+  { label: "Saudi Arabia", code: "SA", currency: "SAR", symbol: "﷼" },
+  { label: "Singapore", code: "SG", currency: "SGD", symbol: "S$" },
+  { label: "Japan", code: "JP", currency: "JPY", symbol: "¥" },
+  { label: "China", code: "CN", currency: "CNY", symbol: "¥" },
+  { label: "Brazil", code: "BR", currency: "BRL", symbol: "R$" },
+  { label: "France", code: "FR", currency: "EUR", symbol: "€" },
+  { label: "South Korea", code: "KR", currency: "KRW", symbol: "₩" },
+  { label: "Mexico", code: "MX", currency: "MXN", symbol: "$" },
+  { label: "Qatar", code: "QA", currency: "QAR", symbol: "﷼" },
+  { label: "Nigeria", code: "NG", currency: "NGN", symbol: "₦" },
+  { label: "South Africa", code: "ZA", currency: "ZAR", symbol: "R" },
+];
+
+const selectStyle: React.CSSProperties = {
+  width: "100%", boxSizing: "border-box" as const,
+  padding: "5px 6px", borderRadius: 4,
+  border: "1px solid rgba(255,255,255,0.07)",
+  background: "rgba(0,0,0,0.4)", color: "#C0C0D0",
+  fontSize: 10, outline: "none", fontFamily: "inherit",
+  cursor: "pointer",
+};
+
+const inputStyle: React.CSSProperties = {
+  ...selectStyle, cursor: "text",
+};
+
+const labelStyle: React.CSSProperties = {
+  fontSize: 9, color: "#3A3A4E", marginBottom: 2, display: "block",
+};
+
 export function LocationInput({ nodeId, data }: { nodeId: string; data: WorkflowNodeData }) {
   const updateNode = useWorkflowStore(s => s.updateNode);
-  const t = useLocale(s => s.t);
-  const value = (data.inputValue as string) ?? "";
 
-  const onChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+  // Parse stored JSON or default
+  const stored = useMemo(() => {
+    try {
+      const raw = data.inputValue as string;
+      if (raw && raw.startsWith("{")) return JSON.parse(raw);
+    } catch { /* ignore */ }
+    return { country: "", state: "", city: "", currency: "", escalation: "6", contingency: "10", months: "6" };
+  }, [data.inputValue]);
+
+  const update = useCallback((patch: Record<string, string>) => {
     const currentNode = useWorkflowStore.getState().nodes.find(n => n.id === nodeId);
     if (!currentNode) return;
-    updateNode(nodeId, { data: { ...currentNode.data, inputValue: e.target.value } });
+    const prev = (() => {
+      try {
+        const raw = (currentNode.data as Record<string, unknown>).inputValue as string;
+        if (raw && raw.startsWith("{")) return JSON.parse(raw);
+      } catch { /* ignore */ }
+      return { country: "", state: "", city: "", currency: "", escalation: "6", contingency: "10", months: "6" };
+    })();
+    const next = { ...prev, ...patch };
+    updateNode(nodeId, { data: { ...currentNode.data, inputValue: JSON.stringify(next) } });
   }, [nodeId, updateNode]);
 
+  // Lazy-load location data to avoid importing at module level
+  const locationData = useMemo(() => {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const mod = require("@/constants/regional-factors");
+      return {
+        states: (mod.STATES_BY_COUNTRY ?? {}) as Record<string, string[]>,
+        citiesByState: (mod.CITIES_BY_STATE ?? {}) as Record<string, Record<string, string[]>>,
+        citiesDirect: (mod.CITIES_DIRECT ?? {}) as Record<string, string[]>,
+      };
+    } catch {
+      return { states: {}, citiesByState: {}, citiesDirect: {} };
+    }
+  }, []);
+
+  const countryCode = LOCATION_COUNTRIES.find(c => c.label === stored.country)?.code || "";
+  const hasStates = countryCode && Object.keys(locationData.states[countryCode] || []).length > 0;
+  const stateList = hasStates ? (locationData.states[countryCode] || []) : [];
+  const hasCitiesDirect = !hasStates && countryCode && (locationData.citiesDirect[countryCode] || []).length > 0;
+
+  // Get cities: from state-based lookup OR direct country list
+  const cityList = useMemo(() => {
+    if (!countryCode) return [];
+    if (hasStates && stored.state) {
+      const stateCities = locationData.citiesByState[countryCode]?.[stored.state];
+      return stateCities || [];
+    }
+    if (hasCitiesDirect) {
+      return locationData.citiesDirect[countryCode] || [];
+    }
+    return [];
+  }, [countryCode, stored.state, hasStates, hasCitiesDirect, locationData]);
+
+  const onCountryChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
+    const country = e.target.value;
+    const entry = LOCATION_COUNTRIES.find(c => c.label === country);
+    update({ country, currency: entry?.currency || "", state: "", city: "" });
+  }, [update]);
+
+  const onStateChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
+    update({ state: e.target.value, city: "" }); // Reset city when state changes
+  }, [update]);
+
+  const hasLocation = !!stored.country;
+
   return (
-    <div className="nodrag nowheel nopan" onMouseDown={stopAll} onClick={stopAll} onKeyDown={stopAll}>
-      <div style={{ position: "relative", marginTop: 8 }}>
-        <span style={{
-          position: "absolute", left: 7, top: "50%", transform: "translateY(-50%)",
-          fontSize: 10, color: "#3A3A4E",
-        }}>📍</span>
-        <input
-          type="text"
-          value={value}
-          onChange={onChange}
-          placeholder={t('input.locationPlaceholder')}
-          style={{
-            width: "100%", boxSizing: "border-box",
-            padding: "6px 8px 6px 22px", borderRadius: 6,
-            border: "1px solid rgba(255,255,255,0.07)",
-            background: "rgba(0,0,0,0.3)", color: "#C0C0D0",
-            fontSize: 10, outline: "none", fontFamily: "inherit",
-          }}
-        />
+    <div className="nodrag nowheel nopan" onMouseDown={stopAll} onClick={stopAll} onKeyDown={stopAll}
+      style={{ marginTop: 6, display: "flex", flexDirection: "column", gap: 5 }}>
+      {/* Country */}
+      <div>
+        <label style={labelStyle}>Country</label>
+        <select value={stored.country || ""} onChange={onCountryChange} style={selectStyle}>
+          <option value="">Select country...</option>
+          {LOCATION_COUNTRIES.map(c => (
+            <option key={c.code} value={c.label}>{c.label}</option>
+          ))}
+        </select>
       </div>
+      {/* State dropdown (only for countries with states) */}
+      {hasLocation && hasStates && (
+        <div>
+          <label style={labelStyle}>State / Region</label>
+          <select value={stored.state || ""} onChange={onStateChange} style={selectStyle}>
+            <option value="">Select state...</option>
+            {stateList.map(s => (
+              <option key={s} value={s}>{s}</option>
+            ))}
+          </select>
+        </div>
+      )}
+      {/* City dropdown */}
+      {hasLocation && cityList.length > 0 && (
+        <div>
+          <label style={labelStyle}>City</label>
+          <select value={stored.city || ""} onChange={e => update({ city: e.target.value })} style={selectStyle}>
+            <option value="">Select city...</option>
+            {cityList.map(c => (
+              <option key={c} value={c}>{c}</option>
+            ))}
+          </select>
+        </div>
+      )}
+      {/* Fallback: show city text input if no dropdown data */}
+      {hasLocation && cityList.length === 0 && (hasStates ? !!stored.state : true) && (
+        <div>
+          <label style={labelStyle}>City</label>
+          <input type="text" value={stored.city || ""} placeholder="Enter city name"
+            onChange={e => update({ city: e.target.value })} style={inputStyle} />
+        </div>
+      )}
+      {/* Currency */}
+      {hasLocation && (
+        <div>
+          <label style={labelStyle}>Currency</label>
+          <select value={stored.currency || ""} onChange={e => update({ currency: e.target.value })} style={selectStyle}>
+            {[...new Set(LOCATION_COUNTRIES.map(c => c.currency))].map(cur => {
+              const entry = LOCATION_COUNTRIES.find(c => c.currency === cur);
+              return <option key={cur} value={cur}>{entry?.symbol} {cur}</option>;
+            })}
+          </select>
+        </div>
+      )}
+      {/* Project Cost Settings */}
+      {hasLocation && (
+        <div style={{ display: "flex", gap: 4, marginTop: 2 }}>
+          <div style={{ flex: 1 }}>
+            <label style={labelStyle}>Escalation %/yr</label>
+            <input type="number" value={stored.escalation ?? "6"} min={0} max={20} step={0.5}
+              onChange={e => update({ escalation: e.target.value })} style={inputStyle} />
+          </div>
+          <div style={{ flex: 1 }}>
+            <label style={labelStyle}>Contingency %</label>
+            <input type="number" value={stored.contingency ?? "10"} min={0} max={30} step={1}
+              onChange={e => update({ contingency: e.target.value })} style={inputStyle} />
+          </div>
+          <div style={{ flex: 1 }}>
+            <label style={labelStyle}>Months</label>
+            <input type="number" value={stored.months ?? "6"} min={0} max={36} step={1}
+              onChange={e => update({ months: e.target.value })} style={inputStyle} />
+          </div>
+        </div>
+      )}
+      {/* Summary */}
+      {hasLocation && stored.city && (
+        <div style={{ fontSize: 9, color: "#00F5FF", opacity: 0.7, textAlign: "center", marginTop: 2 }}>
+          📍 {stored.city}{stored.state ? ", " + stored.state : ""}, {stored.country} ({stored.currency})
+        </div>
+      )}
     </div>
   );
 }

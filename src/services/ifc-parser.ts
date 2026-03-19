@@ -28,6 +28,8 @@ import {
   IFCFOOTING,
   IFCPROJECT,
   IFCRELDEFINESBYPROPERTIES,
+  IFCRELCONTAINEDINSPATIALSTRUCTURE,
+  IFCRELVOIDSELEMENT,
 } from "web-ifc";
 
 // ============================================================================
@@ -55,12 +57,18 @@ export interface QuantityData {
   [key: string]: unknown;
 }
 
+export interface MaterialLayer {
+  name: string;
+  thickness: number; // meters
+}
+
 export interface IFCElementData {
   id: string;
   type: string;
   name: string;
   storey: string;
   material: string;
+  materialLayers?: MaterialLayer[];
   quantities: QuantityData;
   properties?: Record<string, unknown>;
 }
@@ -542,6 +550,321 @@ function extractQuantities(
   return quantities;
 }
 
+// ============================================================================
+// GEOMETRIC QUANTITY FALLBACK — compute from shape representation
+// Activates PER ELEMENT when Qto property sets are missing or incomplete
+// ============================================================================
+
+function computeGeometricQuantities(
+  ifcAPI: IfcAPI,
+  modelID: number,
+  expressID: number,
+  ifcType: string,
+  quantities: QuantityData
+): void {
+  // Only fall back if Qto gave us nothing useful
+  const hasArea = (quantities.area?.gross ?? 0) > 0;
+  const hasVolume = (quantities.volume?.base ?? 0) > 0;
+  if (hasArea && hasVolume) return;
+
+  try {
+    const element = ifcAPI.GetLine(modelID, expressID, false);
+    if (!element?.Representation?.value) return;
+
+    const prodShape = ifcAPI.GetLine(modelID, element.Representation.value, false);
+    if (!prodShape?.Representations) return;
+
+    const reps = Array.isArray(prodShape.Representations)
+      ? prodShape.Representations
+      : [prodShape.Representations];
+
+    for (const repRef of reps) {
+      const repId = repRef?.value;
+      if (typeof repId !== "number") continue;
+
+      const rep = ifcAPI.GetLine(modelID, repId, false);
+      if (!rep?.Items) continue;
+
+      const items = Array.isArray(rep.Items) ? rep.Items : [rep.Items];
+
+      for (const itemRef of items) {
+        const itemId = itemRef?.value;
+        if (typeof itemId !== "number") continue;
+
+        const item = ifcAPI.GetLine(modelID, itemId, false);
+        if (!item || item.Depth?.value == null) continue;
+
+        // IFCEXTRUDEDAREASOLID: profile extruded along a direction
+        const depth = Number(item.Depth.value);
+        if (depth <= 0) continue;
+
+        const profileRef = item.SweptArea?.value;
+        if (typeof profileRef !== "number") continue;
+
+        const profile = ifcAPI.GetLine(modelID, profileRef, false);
+        if (!profile) continue;
+
+        const { area: profileArea, xDim, yDim } =
+          computeProfileMetrics(ifcAPI, modelID, profile);
+
+        if (profileArea <= 0) continue;
+
+        // Volume = profileArea × depth
+        if (!hasVolume) {
+          if (!quantities.volume) quantities.volume = { base: 0, withWaste: 0, unit: "m³" };
+          quantities.volume.base = profileArea * depth;
+        }
+
+        // Quantities depend on element type
+        if (ifcType === "IfcWall" || ifcType === "IfcWallStandardCase") {
+          // Walls: XDim = length, YDim = thickness, depth = height
+          if (!hasArea && xDim > 0) {
+            if (!quantities.area) quantities.area = { unit: "m²" };
+            quantities.area.gross = xDim * depth; // lateral area (one side)
+            quantities.area.net = quantities.area.gross;
+          }
+          if (xDim > 0) quantities.length = xDim;
+          if (yDim > 0) {
+            quantities.thickness = yDim;
+            quantities.width = yDim;
+          }
+          quantities.height = depth;
+        } else if (ifcType === "IfcSlab" || ifcType === "IfcRoof" || ifcType === "IfcCovering") {
+          // Slabs/roofs: profile = footprint, depth = thickness
+          if (!hasArea) {
+            if (!quantities.area) quantities.area = { unit: "m²" };
+            quantities.area.gross = profileArea; // footprint area
+            quantities.area.net = profileArea;
+          }
+          quantities.thickness = depth;
+        } else if (ifcType === "IfcColumn" || ifcType === "IfcBeam") {
+          // Columns/beams: profile = cross-section, depth = height/length
+          quantities.height = depth;
+        } else if (ifcType === "IfcFooting") {
+          // Footings: profile = footprint, depth = thickness
+          if (!hasArea) {
+            if (!quantities.area) quantities.area = { unit: "m²" };
+            quantities.area.gross = profileArea;
+            quantities.area.net = profileArea;
+          }
+          quantities.thickness = depth;
+        }
+
+        return; // Found geometry, done with this element
+      }
+    }
+  } catch {
+    // Geometry extraction failed — silently fall back to count-only
+  }
+}
+
+/**
+ * Compute area, perimeter, xDim, yDim from an IFC profile definition.
+ * Handles: RectangleProfileDef, CircleProfileDef, CircleHollowProfileDef,
+ *          ArbitraryClosedProfileDef (polyline via shoelace formula).
+ */
+function computeProfileMetrics(
+  ifcAPI: IfcAPI,
+  modelID: number,
+  profile: Record<string, unknown>
+): { area: number; perimeter: number; xDim: number; yDim: number } {
+
+  // IFCRECTANGLEPROFILEDEF(XDim, YDim)
+  const xEntry = profile.XDim as { value?: number } | undefined;
+  const yEntry = profile.YDim as { value?: number } | undefined;
+  if (xEntry?.value != null && yEntry?.value != null) {
+    const x = Number(xEntry.value);
+    const y = Number(yEntry.value);
+    return { area: x * y, perimeter: 2 * (x + y), xDim: x, yDim: y };
+  }
+
+  // IFCCIRCLEPROFILEDEF / IFCCIRCLEHOLLOWPROFILEDEF
+  const rEntry = profile.Radius as { value?: number } | undefined;
+  if (rEntry?.value != null) {
+    const r = Number(rEntry.value);
+    const tEntry = profile.WallThickness as { value?: number } | undefined;
+    if (tEntry?.value != null) {
+      // Hollow circle
+      const t = Number(tEntry.value);
+      const rInner = r - t;
+      return {
+        area: Math.PI * (r * r - rInner * rInner),
+        perimeter: 2 * Math.PI * r,
+        xDim: 2 * r,
+        yDim: 2 * r,
+      };
+    }
+    // Solid circle
+    return {
+      area: Math.PI * r * r,
+      perimeter: 2 * Math.PI * r,
+      xDim: 2 * r,
+      yDim: 2 * r,
+    };
+  }
+
+  // IFCARBITRARYCLOSEDPROFILEDEF(OuterCurve) — polyline → shoelace formula
+  const outerCurveEntry = profile.OuterCurve as { value?: number } | undefined;
+  if (outerCurveEntry?.value != null) {
+    try {
+      const curve = ifcAPI.GetLine(modelID, Number(outerCurveEntry.value), false);
+      if (curve?.Points) {
+        const pointRefs = Array.isArray(curve.Points) ? curve.Points : [curve.Points];
+        const coords: [number, number][] = [];
+
+        for (const ptRef of pointRefs) {
+          const ptId = (ptRef as { value?: number })?.value;
+          if (typeof ptId !== "number") continue;
+          const pt = ifcAPI.GetLine(modelID, ptId, false);
+          if (pt?.Coordinates) {
+            const rawCoords = Array.isArray(pt.Coordinates) ? pt.Coordinates : [];
+            const c = rawCoords.map((v: { value: number } | number) =>
+              typeof v === "object" && v !== null ? Number(v.value) : Number(v)
+            );
+            if (c.length >= 2) coords.push([c[0], c[1]]);
+          }
+        }
+
+        if (coords.length >= 3) {
+          let area = 0;
+          let perim = 0;
+          for (let i = 0; i < coords.length; i++) {
+            const j = (i + 1) % coords.length;
+            area += coords[i][0] * coords[j][1];
+            area -= coords[j][0] * coords[i][1];
+            const dx = coords[j][0] - coords[i][0];
+            const dy = coords[j][1] - coords[i][1];
+            perim += Math.sqrt(dx * dx + dy * dy);
+          }
+          return { area: Math.abs(area) / 2, perimeter: perim, xDim: 0, yDim: 0 };
+        }
+      }
+    } catch {
+      // Polyline parsing failed
+    }
+  }
+
+  return { area: 0, perimeter: 0, xDim: 0, yDim: 0 };
+}
+
+/**
+ * Resolve material name from an IfcMaterial, IfcMaterialLayerSet,
+ * IfcMaterialLayerSetUsage, IfcMaterialList, or IfcMaterialProfileSet.
+ */
+function resolveMaterialName(
+  ifcAPI: IfcAPI,
+  modelID: number,
+  matId: number
+): string {
+  try {
+    const mat = ifcAPI.GetLine(modelID, matId, false);
+    if (!mat) return "";
+
+    // IfcMaterial → direct Name
+    if (mat.Name?.value && typeof mat.Name.value === "string") {
+      return mat.Name.value;
+    }
+
+    // IfcMaterialLayerSet → join layer material names
+    if (mat.MaterialLayers) {
+      const layers = Array.isArray(mat.MaterialLayers) ? mat.MaterialLayers : [mat.MaterialLayers];
+      const names: string[] = [];
+      for (const layerRef of layers) {
+        const layerId = (layerRef as { value?: number })?.value;
+        if (typeof layerId !== "number") continue;
+        const layer = ifcAPI.GetLine(modelID, layerId, false);
+        const matRef = layer?.Material?.value;
+        if (typeof matRef === "number") {
+          const layerMat = ifcAPI.GetLine(modelID, matRef, false);
+          if (layerMat?.Name?.value) names.push(layerMat.Name.value);
+        }
+      }
+      if (names.length > 0) return names.join(" / ");
+    }
+
+    // IfcMaterialLayerSetUsage → unwrap to IfcMaterialLayerSet
+    if (mat.ForLayerSet?.value != null) {
+      return resolveMaterialName(ifcAPI, modelID, mat.ForLayerSet.value);
+    }
+
+    // IfcMaterialProfileSet → first profile's material
+    if (mat.MaterialProfiles) {
+      const profiles = Array.isArray(mat.MaterialProfiles) ? mat.MaterialProfiles : [mat.MaterialProfiles];
+      for (const profRef of profiles) {
+        const profId = (profRef as { value?: number })?.value;
+        if (typeof profId !== "number") continue;
+        const prof = ifcAPI.GetLine(modelID, profId, false);
+        const profMatRef = prof?.Material?.value;
+        if (typeof profMatRef === "number") {
+          const profMat = ifcAPI.GetLine(modelID, profMatRef, false);
+          if (profMat?.Name?.value) return profMat.Name.value;
+        }
+      }
+    }
+
+    // IfcMaterialList → first material
+    if (mat.Materials) {
+      const materials = Array.isArray(mat.Materials) ? mat.Materials : [mat.Materials];
+      for (const mRef of materials) {
+        const mId = (mRef as { value?: number })?.value;
+        if (typeof mId !== "number") continue;
+        const m = ifcAPI.GetLine(modelID, mId, false);
+        if (m?.Name?.value) return m.Name.value;
+      }
+    }
+
+    return "";
+  } catch {
+    return "";
+  }
+}
+
+/**
+ * Resolve material layers from an IfcMaterialLayerSet or IfcMaterialLayerSetUsage.
+ * Returns individual layers with name + thickness for per-layer BOQ decomposition.
+ */
+function resolveMaterialLayers(
+  ifcAPI: IfcAPI,
+  modelID: number,
+  matId: number
+): MaterialLayer[] {
+  try {
+    const mat = ifcAPI.GetLine(modelID, matId, false);
+    if (!mat) return [];
+
+    // IfcMaterialLayerSetUsage → unwrap to IfcMaterialLayerSet
+    if (mat.ForLayerSet?.value != null) {
+      return resolveMaterialLayers(ifcAPI, modelID, mat.ForLayerSet.value);
+    }
+
+    // IfcMaterialLayerSet → extract each layer
+    if (mat.MaterialLayers) {
+      const layers = Array.isArray(mat.MaterialLayers) ? mat.MaterialLayers : [mat.MaterialLayers];
+      const result: MaterialLayer[] = [];
+      for (const layerRef of layers) {
+        const layerId = (layerRef as { value?: number })?.value;
+        if (typeof layerId !== "number") continue;
+        const layer = ifcAPI.GetLine(modelID, layerId, false);
+        const thickness = Number(layer?.LayerThickness?.value ?? 0);
+        const matRef = layer?.Material?.value;
+        let name = "Unknown";
+        if (typeof matRef === "number") {
+          const layerMat = ifcAPI.GetLine(modelID, matRef, false);
+          if (layerMat?.Name?.value) name = layerMat.Name.value;
+        }
+        if (thickness > 0) {
+          result.push({ name, thickness });
+        }
+      }
+      return result;
+    }
+
+    return [];
+  } catch {
+    return [];
+  }
+}
+
 function getMaterialName(
   ifcAPI: IfcAPI,
   modelID: number,
@@ -558,13 +881,6 @@ function getMaterialName(
   }
 }
 
-function getStoreyName(): string {
-  try {
-    return "Unassigned";
-  } catch {
-    return "Unassigned";
-  }
-}
 
 // ============================================================================
 // MAIN PARSER
@@ -581,8 +897,11 @@ export async function parseIFCBuffer(
   const warnings: string[] = [];
   const errors: string[] = [];
 
-  // Initialize web-ifc API
+  // Initialize web-ifc API with correct WASM path for Next.js
   const ifcAPI = new IfcAPI();
+  const path = await import("path");
+  const wasmDir = path.resolve(process.cwd(), "node_modules", "web-ifc") + "/";
+  ifcAPI.SetWasmPath(wasmDir, true);
   await ifcAPI.Init();
 
   // Open model
@@ -638,39 +957,96 @@ export async function parseIFCBuffer(
     }
   }
 
+  // Build element → storey lookup via IfcRelContainedInSpatialStructure
+  const elementStoreyLookup = new Map<number, string>();
+  try {
+    const relContIds = ifcAPI.GetLineIDsWithType(modelID, IFCRELCONTAINEDINSPATIALSTRUCTURE);
+    for (let i = 0; i < relContIds.size(); i++) {
+      try {
+        const rel = ifcAPI.GetLine(modelID, relContIds.get(i), false);
+        const storeyRef = rel?.RelatingStructure?.value;
+        if (typeof storeyRef !== "number") continue;
+        const storeyName = storeyMap.get(storeyRef) || "Unassigned";
+        const relatedElements = rel?.RelatedElements;
+        const refs = Array.isArray(relatedElements) ? relatedElements : [relatedElements];
+        for (const ref of refs) {
+          const elId = (ref as { value?: number })?.value;
+          if (typeof elId === "number") elementStoreyLookup.set(elId, storeyName);
+        }
+      } catch { /* skip malformed relationship */ }
+    }
+  } catch {
+    warnings.push("Failed to build storey lookup from spatial containment");
+  }
+
+  // Build element → material lookup via IfcRelAssociatesMaterial
+  const elementMaterialLookup = new Map<number, string>();
+  const elementMaterialLayersLookup = new Map<number, MaterialLayer[]>();
+  try {
+    const IFCRELASSOCIATESMATERIAL = 2655215786;
+    const relMatIds = ifcAPI.GetLineIDsWithType(modelID, IFCRELASSOCIATESMATERIAL);
+    for (let i = 0; i < relMatIds.size(); i++) {
+      try {
+        const rel = ifcAPI.GetLine(modelID, relMatIds.get(i), false);
+        const matRef = rel?.RelatingMaterial?.value;
+        if (typeof matRef !== "number") continue;
+        const matName = resolveMaterialName(ifcAPI, modelID, matRef);
+        const layers = resolveMaterialLayers(ifcAPI, modelID, matRef);
+        if (!matName) continue;
+        const relatedObjects = rel?.RelatedObjects;
+        const refs = Array.isArray(relatedObjects) ? relatedObjects : [relatedObjects];
+        for (const ref of refs) {
+          const elId = (ref as { value?: number })?.value;
+          if (typeof elId === "number") {
+            elementMaterialLookup.set(elId, matName);
+            if (layers.length > 0) elementMaterialLayersLookup.set(elId, layers);
+          }
+        }
+      } catch { /* skip */ }
+    }
+  } catch {
+    warnings.push("Failed to build material lookup");
+  }
+
   // Build property lookup once (O(n) instead of O(n²))
   const propertyLookup = buildPropertyLookup(ifcAPI, modelID, warnings);
 
-  // Track opening areas per wall for net area deduction
-  // First pass: collect total opening area from doors + windows
-  let totalDoorArea = 0;
-  let totalWindowArea = 0;
-  let doorCount = 0;
-  let windowCount = 0;
+  // Build per-wall opening area lookup via IfcRelVoidsElement → IfcOpeningElement
+  // This gives precise per-element net area deduction instead of aggregate distribution
+  const wallOpeningAreaLookup = new Map<number, number>();
+  let totalOpeningArea = 0;
 
   try {
-    const doorIds = ifcAPI.GetLineIDsWithType(modelID, IFCDOOR);
-    doorCount = doorIds.size();
-    for (let i = 0; i < doorCount; i++) {
+    const relVoidIds = ifcAPI.GetLineIDsWithType(modelID, IFCRELVOIDSELEMENT);
+    for (let i = 0; i < relVoidIds.size(); i++) {
       try {
-        const doorQ = extractQuantities(ifcAPI, modelID, doorIds.get(i), "IfcDoor", propertyLookup);
-        totalDoorArea += doorQ.area?.gross || (doorQ.width && doorQ.height ? doorQ.width * doorQ.height : 1.89); // default 0.9m × 2.1m
+        const rel = ifcAPI.GetLine(modelID, relVoidIds.get(i), false);
+        const wallId = rel?.RelatingBuildingElement?.value;
+        const openingId = rel?.RelatedOpeningElement?.value;
+        if (typeof wallId !== "number" || typeof openingId !== "number") continue;
+
+        // Compute opening area from geometry
+        let openingArea = 0;
+        try {
+          const openingQ = extractQuantities(ifcAPI, modelID, openingId, "IfcOpeningElement", propertyLookup);
+          computeGeometricQuantities(ifcAPI, modelID, openingId, "IfcOpeningElement", openingQ);
+          openingArea = openingQ.area?.gross ?? (openingQ.width && openingQ.height ? openingQ.width * openingQ.height : 0);
+        } catch { /* skip */ }
+
+        if (openingArea > 0) {
+          wallOpeningAreaLookup.set(wallId, (wallOpeningAreaLookup.get(wallId) || 0) + openingArea);
+          totalOpeningArea += openingArea;
+        }
       } catch { /* skip */ }
     }
-  } catch { /* skip */ }
+  } catch {
+    warnings.push("Failed to build per-wall opening lookup");
+  }
 
-  try {
-    const windowIds = ifcAPI.GetLineIDsWithType(modelID, IFCWINDOW);
-    windowCount = windowIds.size();
-    for (let i = 0; i < windowCount; i++) {
-      try {
-        const winQ = extractQuantities(ifcAPI, modelID, windowIds.get(i), "IfcWindow", propertyLookup);
-        totalWindowArea += winQ.area?.gross || (winQ.width && winQ.height ? winQ.width * winQ.height : 2.4); // default 1.2m × 2.0m
-      } catch { /* skip */ }
-    }
-  } catch { /* skip */ }
-
-  const totalOpeningArea = totalDoorArea + totalWindowArea;
+  // Count doors and windows for metadata (used in summary)
+  const doorCount = (() => { try { return ifcAPI.GetLineIDsWithType(modelID, IFCDOOR).size(); } catch { return 0; } })();
+  const windowCount = (() => { try { return ifcAPI.GetLineIDsWithType(modelID, IFCWINDOW).size(); } catch { return 0; } })();
+  void doorCount; void windowCount; // available for future use in summary
 
   // Extract elements by type
   const elementsByDivision = new Map<string, Map<string, IFCElementData[]>>();
@@ -693,9 +1069,27 @@ export async function parseIFCBuffer(
         const globalId = element?.GlobalId?.value || `TEMP_${expressID}`;
         const name = element?.Name?.value || `${label}-${i + 1}`;
 
-        const materialName = getMaterialName(ifcAPI, modelID, expressID);
+        const materialName = elementMaterialLookup.get(expressID) || getMaterialName(ifcAPI, modelID, expressID);
         const csiMapping = getCSIMapping(label, materialName);
         const quantities = extractQuantities(ifcAPI, modelID, expressID, label, propertyLookup);
+
+        // Geometric fallback: compute area/volume from shape representation
+        // when Qto property sets are missing or incomplete
+        computeGeometricQuantities(ifcAPI, modelID, expressID, label, quantities);
+
+        // Per-wall opening deduction: deduct opening area from THIS wall's gross area
+        if ((label === "IfcWall" || label === "IfcWallStandardCase") && wallOpeningAreaLookup.has(expressID)) {
+          const wallOpening = wallOpeningAreaLookup.get(expressID)!;
+          quantities.openingArea = wallOpening;
+          if (quantities.area?.gross) {
+            quantities.area.net = Math.max(0, quantities.area.gross - wallOpening);
+          }
+          // Also deduct volume if wall thickness is known
+          if (quantities.volume?.base && quantities.thickness && quantities.area?.gross && quantities.area.gross > 0) {
+            const openingVolume = wallOpening * quantities.thickness;
+            quantities.volume.base = Math.max(0, quantities.volume.base - openingVolume);
+          }
+        }
 
         // Apply waste factor to volume
         if (quantities.volume) {
@@ -703,14 +1097,19 @@ export async function parseIFCBuffer(
             quantities.volume.base * (1 + csiMapping.wasteFactor / 100);
         }
 
-        const storeyName = getStoreyName();
+        const storeyName = elementStoreyLookup.get(expressID) || "Unassigned";
+        // Increment storey element count
+        const storeyEntry = buildingStoreys.find(s => s.name === storeyName);
+        if (storeyEntry) storeyEntry.elementCount++;
 
+        const layers = elementMaterialLayersLookup.get(expressID);
         const elementData: IFCElementData = {
           id: globalId,
           type: label,
           name,
           storey: storeyName,
           material: materialName,
+          materialLayers: layers && layers.length > 1 ? layers : undefined,
           quantities,
         };
 

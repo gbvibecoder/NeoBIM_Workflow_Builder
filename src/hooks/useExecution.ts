@@ -44,7 +44,7 @@ interface APIErrorResponse {
 }
 
 // Input node IDs whose user-supplied value should pass through directly
-const INPUT_NODE_IDS = new Set(["IN-001", "IN-002", "IN-003", "IN-005", "IN-006"]);
+const INPUT_NODE_IDS = new Set(["IN-001", "IN-002", "IN-003", "IN-004", "IN-005", "IN-006"]);
 
 // Demo-allowed node IDs (routed to /api/demo/execute)
 const DEMO_NODE_IDS = new Set(["TR-003", "GN-003"]);
@@ -68,10 +68,13 @@ async function executeNode(
     let fileName = nodeData.fileName as string | undefined;
     let mimeType = nodeData.mimeType as string | undefined;
 
+    console.log(`[INPUT] ${catalogueId} node.id=${node.id}: nodeData.fileData=${!!fileData} (len=${fileData?.length ?? 0}), inputFileStore has file=${inputFileStore.has(node.id)}, inputValue="${inputValue}"`);
+
     // Read from inputFileStore (where FileUploadInput stores the actual File object)
-    // and convert to base64 so it can be sent to the server API
+    // and convert to base64 so it can be sent to the server API.
+    // Always prefer the live File object over stale nodeData.fileData (which may not persist across saves)
     const fileObj = inputFileStore.get(node.id);
-    if (fileObj && !fileData) {
+    if (fileObj) {
       console.log(`[INPUT] Converting file "${fileObj.name}" (${fileObj.size} bytes) to base64`);
       const arrayBuffer = await fileObj.arrayBuffer();
       const bytes = new Uint8Array(arrayBuffer);
@@ -84,6 +87,8 @@ async function executeNode(
       mimeType = fileObj.type || "application/pdf";
       console.log(`[INPUT] base64 length: ${fileData.length} chars`);
     }
+
+    console.log(`[INPUT] ${catalogueId} artifact will include: fileData=${!!fileData} (len=${fileData?.length ?? 0}), fileName=${fileName}`);
 
     return {
       id: generateId(),
@@ -147,6 +152,11 @@ async function executeNode(
 
     let res: Response;
     try {
+      const inputData = {
+        ...(previousArtifact?.data as Record<string, unknown> ?? { prompt: inputValue ?? "" }),
+        ...nodeConfig,
+      };
+      console.log(`[API] ${catalogueId}: sending inputData keys=[${Object.keys(inputData).join(",")}], has fileData=${!!inputData.fileData}, fileData len=${typeof inputData.fileData === "string" ? inputData.fileData.length : "N/A"}`);
       res = await fetch("/api/execute-node", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -155,10 +165,7 @@ async function executeNode(
           catalogueId,
           executionId,
           tileInstanceId: node.id,
-          inputData: {
-            ...(previousArtifact?.data as Record<string, unknown> ?? { prompt: inputValue ?? "" }),
-            ...nodeConfig,
-          },
+          inputData,
         }),
       });
     } finally {
@@ -785,11 +792,60 @@ export function useExecution({ onLog }: UseExecutionOptions = {}) {
         }
       }
       // File upload nodes: must have a file selected (check both node.data and inputFileStore)
-      if (["IN-002", "IN-003", "IN-005", "IN-006"].includes(catalogueId)) {
+      if (["IN-002", "IN-003", "IN-004", "IN-005", "IN-006"].includes(catalogueId)) {
         const nd = node.data as Record<string, unknown>;
         if (!nd.fileData && !nd.inputValue && !inputFileStore.has(node.id)) {
           toast.error(`Please upload a file to the "${node.data.label}" node before running`);
           return;
+        }
+      }
+      // IFC Upload (IN-004): validate file is actually an IFC file before running
+      if (catalogueId === "IN-004") {
+        const nd = node.data as Record<string, unknown>;
+        // Get filename from node data OR inputFileStore (covers all upload paths)
+        const fileObj = inputFileStore.get(node.id);
+        const fileName = (
+          (nd.inputValue as string) || (nd.fileName as string) || fileObj?.name || ""
+        ).toLowerCase().trim();
+
+        // Check 1: File extension must be .ifc
+        if (fileName && !fileName.endsWith(".ifc")) {
+          const displayName = nd.inputValue || nd.fileName || fileObj?.name || "Unknown file";
+          toast.error("Invalid file type — please upload a valid IFC file (.ifc)", {
+            description: `"${displayName}" is not an IFC file. The IFC → BOQ workflow requires a Building Information Model in IFC format (ISO 16739).`,
+            duration: 8000,
+          });
+          return;
+        }
+
+        // Check 2: If no filename at all but a file exists, warn about missing extension
+        if (!fileName && (nd.fileData || fileObj)) {
+          toast.error("Cannot determine file type — please re-upload a valid .ifc file", {
+            duration: 6000,
+          });
+          return;
+        }
+
+        // Check 3: Validate IFC header in base64 data (catches renamed non-IFC files)
+        const fileData = nd.fileData as string | undefined;
+        if (fileData && fileData.length >= 20) {
+          try {
+            // Align slice to 4-char base64 boundary for safe atob decode
+            const sliceLen = Math.min(fileData.length, 40);
+            const aligned = sliceLen - (sliceLen % 4);
+            if (aligned >= 4) {
+              const headerBytes = atob(fileData.slice(0, aligned));
+              if (!headerBytes.startsWith("ISO-10303-21")) {
+                toast.error("Invalid IFC file — this file does not contain valid IFC data", {
+                  description: "The uploaded file does not have a valid IFC header (ISO-10303-21). It may have been renamed from another format. Please upload a genuine BIM model in IFC format.",
+                  duration: 8000,
+                });
+                return;
+              }
+            }
+          } catch {
+            // base64 decode failed — likely corrupted data, let server handle
+          }
         }
       }
     }

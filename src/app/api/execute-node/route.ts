@@ -991,47 +991,73 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
 
     } else if (catalogueId === "TR-007") {
       // Quantity Extractor — Real IFC parsing with net area calculations
-      const ifcData = inputData?.ifcData ?? inputData?.content ?? null;
+      console.log(`[TR-007] inputData keys: ${Object.keys(inputData ?? {}).join(", ")}`);
+      console.log(`[TR-007] has fileData: ${!!inputData?.fileData}, type: ${typeof inputData?.fileData}, length: ${typeof inputData?.fileData === "string" ? (inputData.fileData as string).length : "N/A"}`);
+      console.log(`[TR-007] has ifcData: ${!!inputData?.ifcData}`);
+      let ifcData: Record<string, unknown> | null = (inputData?.ifcData as Record<string, unknown>) ?? null;
+
+      // IN-004 pass-through sends fileData as a base64 string — decode to buffer
+      if (!ifcData && inputData?.fileData && typeof inputData.fileData === "string") {
+        try {
+          const binaryStr = atob(inputData.fileData as string);
+          const bytes = new Uint8Array(binaryStr.length);
+          for (let i = 0; i < binaryStr.length; i++) {
+            bytes[i] = binaryStr.charCodeAt(i);
+          }
+          ifcData = { buffer: Array.from(bytes) };
+          console.log(`[TR-007] Decoded base64 fileData → ${bytes.length} bytes`);
+        } catch (e) {
+          console.error("[TR-007] Failed to decode base64 fileData:", e);
+        }
+      }
 
       const rows: string[][] = [];
       const elements: Array<{
         description: string; category: string; quantity: number; unit: string;
         grossArea?: number; netArea?: number; openingArea?: number; totalVolume?: number;
+        storey?: string; elementCount?: number;
+        materialLayers?: Array<{name: string; thickness: number}>;
       }> = [];
-      let usedFallback = false;
       let parseSummary = "";
 
       if (ifcData && typeof ifcData === "object" && ifcData.buffer) {
         // Real IFC file uploaded - parse it
         try {
           const { parseIFCBuffer } = await import("@/services/ifc-parser");
-          const buffer = new Uint8Array(ifcData.buffer);
+          const buffer = new Uint8Array(ifcData.buffer as ArrayLike<number>);
           const parseResult = await parseIFCBuffer(buffer, "uploaded.ifc");
 
-          // Aggregate elements by type across divisions
+          // Aggregate elements by type + storey for per-floor BOQ breakdown
           const typeAggregates = new Map<string, {
-            count: number; grossArea: number; netArea: number; openingArea: number; volume: number; divisionName: string;
+            count: number; grossArea: number; netArea: number; openingArea: number; volume: number;
+            divisionName: string; storey: string; elementType: string;
+            materialLayers?: Array<{name: string; thickness: number}>;
           }>();
 
           for (const division of parseResult.divisions) {
             for (const category of division.categories) {
               for (const element of category.elements) {
-                const key = element.type;
+                const key = `${element.type}|${element.storey}`;
                 const existing = typeAggregates.get(key) || {
-                  count: 0, grossArea: 0, netArea: 0, openingArea: 0, volume: 0, divisionName: division.name,
+                  count: 0, grossArea: 0, netArea: 0, openingArea: 0, volume: 0,
+                  divisionName: division.name, storey: element.storey, elementType: element.type,
                 };
                 existing.count += element.quantities.count ?? 1;
                 existing.grossArea += element.quantities.area?.gross ?? 0;
                 existing.netArea += element.quantities.area?.net ?? 0;
                 existing.openingArea += element.quantities.openingArea ?? 0;
                 existing.volume += element.quantities.volume?.base ?? 0;
+                // Capture material layers from first element with layers
+                if (!existing.materialLayers && element.materialLayers && element.materialLayers.length > 1) {
+                  existing.materialLayers = element.materialLayers;
+                }
                 typeAggregates.set(key, existing);
               }
             }
           }
 
-          for (const [ifcType, agg] of typeAggregates) {
-            const description = ifcType.replace("Ifc", "");
+          for (const [, agg] of typeAggregates) {
+            const description = agg.elementType.replace("Ifc", "");
             const primaryQty = agg.grossArea > 0 ? agg.grossArea : agg.volume > 0 ? agg.volume : agg.count;
             const unit = agg.grossArea > 0 ? "m²" : agg.volume > 0 ? "m³" : "EA";
 
@@ -1051,57 +1077,28 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
               netArea: agg.netArea || undefined,
               openingArea: agg.openingArea || undefined,
               totalVolume: agg.volume || undefined,
+              storey: agg.storey,
+              elementCount: agg.count,
+              materialLayers: agg.materialLayers,
             });
           }
 
           parseSummary = `Parsed ${parseResult.summary.processedElements} of ${parseResult.summary.totalElements} elements from ${parseResult.summary.buildingStoreys} storeys (${parseResult.meta.ifcSchema})`;
         } catch (parseError) {
           console.error("[TR-007] IFC parsing failed:", parseError);
-          usedFallback = true;
         }
-      } else {
-        usedFallback = true;
       }
 
-      // Fallback: provide realistic quantities with net area if no IFC or parsing failed
+      // No fallback — if parsing produced zero elements, return a clear error
       if (rows.length === 0) {
-        usedFallback = true;
-        // Opening areas: 96 windows × 2.4 m² + 58 doors × 1.89 m² = ~340 m²
-        const totalOpenings = 96 * 2.4 + 58 * 1.89;
-        const extWallOpenings = Math.round(totalOpenings * 0.7 * 100) / 100;
-        const intWallOpenings = Math.round(totalOpenings * 0.3 * 100) / 100;
-        const fallbackData = [
-          { desc: "External Walls", cat: "Walls", qty: 1240, unit: "m²", grossArea: 1240, openingArea: extWallOpenings, netArea: 1240 - extWallOpenings, volume: 248 },
-          { desc: "Internal Walls", cat: "Walls", qty: 2890, unit: "m²", grossArea: 2890, openingArea: intWallOpenings, netArea: 2890 - intWallOpenings, volume: 433.5 },
-          { desc: "Floor Slabs", cat: "Slabs", qty: 2400, unit: "m²", grossArea: 2400, openingArea: 0, netArea: 2400, volume: 480 },
-          { desc: "Roof Slab", cat: "Slabs", qty: 605, unit: "m²", grossArea: 605, openingArea: 0, netArea: 605, volume: 60.5 },
-          { desc: "Windows", cat: "Openings", qty: 96, unit: "EA", grossArea: 230.4, openingArea: 0, netArea: 230.4, volume: 0 },
-          { desc: "Doors", cat: "Openings", qty: 58, unit: "EA", grossArea: 109.62, openingArea: 0, netArea: 109.62, volume: 0 },
-          { desc: "Columns", cat: "Structure", qty: 20, unit: "EA", grossArea: 0, openingArea: 0, netArea: 0, volume: 18 },
-          { desc: "Beams", cat: "Structure", qty: 85, unit: "EA", grossArea: 0, openingArea: 0, netArea: 0, volume: 42.5 },
-          { desc: "Stairs", cat: "Stairs", qty: 2, unit: "EA", grossArea: 30, openingArea: 0, netArea: 30, volume: 18 },
-          { desc: "Footings", cat: "Footings", qty: 8, unit: "EA", grossArea: 0, openingArea: 0, netArea: 0, volume: 19.2 },
-        ];
-
-        for (const item of fallbackData) {
-          rows.push([
-            item.cat, item.desc,
-            item.grossArea.toString(), item.openingArea.toString(),
-            item.netArea.toFixed(2), item.volume.toString(),
-            item.qty.toString(), item.unit,
-          ]);
-          elements.push({
-            description: item.desc,
-            category: item.cat,
-            quantity: item.qty,
-            unit: item.unit,
-            grossArea: item.grossArea || undefined,
-            netArea: item.netArea || undefined,
-            openingArea: item.openingArea || undefined,
-            totalVolume: item.volume || undefined,
-          });
-        }
-        parseSummary = `Sample data: 10 element types — net area accounts for ${totalOpenings.toFixed(0)} m² of openings`;
+        return NextResponse.json(
+          formatErrorResponse({
+            title: "IFC parsing failed",
+            message: "IFC parsing produced no elements. Please upload a valid IFC file with building elements (walls, slabs, columns, etc.).",
+            code: "NODE_001",
+          }),
+          { status: 422 }
+        );
       }
 
       artifact = {
@@ -1119,7 +1116,6 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
         metadata: {
           model: "ifc-parser-v2",
           real: true,
-          warnings: usedFallback ? ["Using sample quantities (no IFC file provided or parsing failed)"] : undefined,
         },
         createdAt: new Date(),
       };
@@ -1128,14 +1124,64 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
     } else if (catalogueId === "TR-008") {
       // BOQ Cost Mapper — Professional QS-grade with waste, M/L/E breakdown, escalation, project type
       const elements = inputData?._elements ?? inputData?.elements ?? inputData?.rows ?? [];
-      const region = inputData?.region ?? "USA (baseline)";
       const buildingDescription = inputData?.buildingDescription ?? inputData?.content ?? inputData?.prompt ?? "";
-      const escalationMonths = inputData?.escalationMonths ?? 6;
+      let escalationMonths = Number(inputData?.escalationMonths ?? 6);
+      let escalationRate = 0.06;
+      let contingencyPct = 0.10;
 
-      // Detect region from upstream building description if not explicitly provided
-      const upstreamNarrative = inputData?.content ?? inputData?.narrative ?? "";
-      const detectedRegion = detectRegionFromText(region !== "USA (baseline)" ? region : (typeof upstreamNarrative === "string" ? upstreamNarrative : ""));
-      const activeRegion = detectedRegion || region;
+      // ── Location-aware pricing (from IN-006 Location Input or text detection) ──
+      // IN-006 stores JSON in inputData.content/prompt: { country, state, city, currency }
+      let locationData: { country?: string; state?: string; city?: string; currency?: string; escalation?: string; contingency?: string; months?: string } | null = null;
+      for (const field of [inputData?.content, inputData?.prompt, inputData?.region, inputData?.location]) {
+        if (typeof field === "string" && field.startsWith("{")) {
+          try { locationData = JSON.parse(field); break; } catch { /* not JSON */ }
+        }
+      }
+
+      // Import regional factors
+      const { resolveProjectLocation } = await import("@/constants/regional-factors");
+
+      let activeRegion = "USA (baseline)";
+      let regionWasAutoDetected = true;
+      let locationFactor = 1.0;
+      let currencySymbol = "$";
+      let currencyCode = "USD";
+      let exchangeRate = 1.0;
+      let locationLabel = "";
+
+      if (locationData?.country) {
+        // Structured location from IN-006
+        const loc = resolveProjectLocation(
+          locationData.country,
+          locationData.state || "",
+          locationData.city || "",
+          locationData.currency
+        );
+        activeRegion = `${loc.city || loc.state || loc.country} (${loc.country})`;
+        locationFactor = loc.combinedFactor;
+        currencySymbol = loc.currencySymbol;
+        currencyCode = loc.currency;
+        exchangeRate = loc.exchangeRate;
+        regionWasAutoDetected = false;
+        locationLabel = `${loc.city ? loc.city + ", " : ""}${loc.state ? loc.state + ", " : ""}${loc.country}`;
+        // Read user-configurable escalation/contingency/months from location data
+        if (locationData.escalation != null) escalationRate = Number(locationData.escalation) / 100;
+        if (locationData.contingency != null) contingencyPct = Number(locationData.contingency) / 100;
+        if (locationData.months != null) escalationMonths = Number(locationData.months);
+        console.log(`[TR-008] Location: ${locationLabel}, factor=${loc.combinedFactor.toFixed(3)}, currency=${currencyCode}, escalation=${(escalationRate*100).toFixed(1)}%/yr, contingency=${(contingencyPct*100).toFixed(0)}%, months=${escalationMonths}`);
+      } else {
+        // Fall back to text-based region detection
+        const regionInput = inputData?.region ?? inputData?.location ?? "USA (baseline)";
+        const upstreamNarrative = inputData?.content ?? inputData?.narrative ?? "";
+        const explicitRegion = regionInput !== "USA (baseline)" ? regionInput : "";
+        const detectedRegion = detectRegionFromText(
+          typeof explicitRegion === "string" && explicitRegion
+            ? explicitRegion
+            : (typeof upstreamNarrative === "string" ? upstreamNarrative : "")
+        );
+        activeRegion = (typeof detectedRegion === "string" && detectedRegion) || (typeof regionInput === "string" ? regionInput : "USA (baseline)");
+        regionWasAutoDetected = !detectedRegion && regionInput === "USA (baseline)";
+      }
 
       // Detect project type from description
       const projectTypeInfo = detectProjectType(typeof buildingDescription === "string" ? buildingDescription : "commercial");
@@ -1155,53 +1201,121 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
         quantity: number; wasteFactor: number; adjustedQty: number;
         materialRate: number; laborRate: number; equipmentRate: number; unitRate: number;
         materialCost: number; laborCost: number; equipmentCost: number; totalCost: number;
+        storey?: string; elementCount?: number;
       }> = [];
 
-      // Process each element
+      // Expand elements with material layers into separate line items per layer
+      const expandedElements: typeof elements = [];
       for (const elem of elements) {
+        const layers = typeof elem === "object" ? (elem as Record<string, unknown>).materialLayers as Array<{name: string; thickness: number}> | undefined : undefined;
+        if (layers && layers.length > 1 && typeof elem === "object") {
+          const baseArea = Number((elem as Record<string, unknown>).grossArea ?? (elem as Record<string, unknown>).quantity ?? 0);
+          for (const layer of layers) {
+            expandedElements.push({
+              ...elem,
+              description: `${layer.name} (${Math.round(layer.thickness * 1000)}mm)`,
+              quantity: baseArea, // area same for all layers
+              unit: "m²",
+              grossArea: baseArea,
+              totalVolume: baseArea * layer.thickness,
+              materialLayers: undefined, // don't re-expand
+            });
+          }
+        } else {
+          expandedElements.push(elem);
+        }
+      }
+
+      // Process each element (may include expanded material layers)
+      for (const elem of expandedElements) {
         const description = typeof elem === "string" ? elem : elem.description ?? elem[0];
         const quantity = typeof elem === "object" ? (Number(elem.quantity) || Number(elem[2]) || 1) : 1;
+        const sourceUnit = typeof elem === "object" ? ((elem as Record<string, unknown>).unit as string ?? "EA") : "EA";
+        const sourceVolume = typeof elem === "object" ? Number((elem as Record<string, unknown>).totalVolume ?? 0) : 0;
+        const sourceArea = typeof elem === "object" ? Number((elem as Record<string, unknown>).grossArea ?? 0) : 0;
+        const elemCategory = typeof elem === "object" ? ((elem as Record<string, unknown>).category as string ?? "") : "";
+        const elemStorey = typeof elem === "object" ? ((elem as Record<string, unknown>).storey as string ?? "") : "";
+        const elemCount = typeof elem === "object" ? Number((elem as Record<string, unknown>).elementCount ?? 0) : 0;
 
-        const unitRateData = findUnitRate(description);
+        // Build specific search: try "Concrete Wall" before generic "Wall"
+        // Material/category context from TR-007 helps disambiguate rate matching
+        const specificDesc = elemCategory && !description.toLowerCase().includes(elemCategory.toLowerCase())
+          ? `${elemCategory} ${description}`
+          : description;
+        const unitRateData = findUnitRate(specificDesc) || findUnitRate(description);
 
         if (unitRateData && unitRateData.category === "hard") {
-          const lineItem = calculateLineItemCost(unitRateData, quantity, activeRegion, projectTypeInfo.type);
+          // Select correct quantity and convert metric → imperial to match rate unit
+          const rateU = unitRateData.unit.toUpperCase();
+          let convertedQty = quantity;
+          let displayUnit = unitRateData.unit;
 
-          hardCostSubtotal += lineItem.lineTotal;
-          totalMaterial += lineItem.materialCost;
-          totalLabor += lineItem.laborCost;
-          totalEquipment += lineItem.equipmentCost;
+          if (rateU === "CY" && sourceVolume > 0) {
+            // Rate expects volume in CY — use totalVolume (m³ → CY)
+            convertedQty = Math.round(sourceVolume * 1.30795 * 100) / 100;
+          } else if (rateU === "CY" && (sourceUnit === "m³" || sourceUnit === "m3")) {
+            convertedQty = Math.round(quantity * 1.30795 * 100) / 100;
+          } else if ((rateU === "SF" || rateU === "SFCA") && sourceArea > 0) {
+            // Rate expects area in SF — use grossArea (m² → SF)
+            convertedQty = Math.round(sourceArea * 10.7639 * 100) / 100;
+          } else if ((rateU === "SF" || rateU === "SFCA") && (sourceUnit === "m²" || sourceUnit === "m2")) {
+            convertedQty = Math.round(quantity * 10.7639 * 100) / 100;
+          } else if (rateU === "LF" && sourceUnit === "m") {
+            convertedQty = Math.round(quantity * 3.28084 * 100) / 100;
+          } else if (rateU === "TON" && sourceVolume > 0) {
+            // Steel: m³ → tonnage (7850 kg/m³ density)
+            convertedQty = Math.round(sourceVolume * 7.85 * 100) / 100;
+            displayUnit = "ton";
+          }
 
+          const lineItem = calculateLineItemCost(unitRateData, convertedQty, activeRegion, projectTypeInfo.type);
+
+          // Apply location-based factor (country × city tier) and convert currency
+          const lf = locationFactor; // 1.0 for USA baseline
+          const fx = exchangeRate;   // 1.0 for USD
+          const cs = currencySymbol; // "$" for USD
+          const adjRate = Math.round(lineItem.adjustedRate * lf * fx * 100) / 100;
+          const matCost = Math.round(lineItem.materialCost * lf * fx * 100) / 100;
+          const labCost = Math.round(lineItem.laborCost * lf * fx * 100) / 100;
+          const eqpCost = Math.round(lineItem.equipmentCost * lf * fx * 100) / 100;
+          const lineTot = Math.round(lineItem.lineTotal * lf * fx * 100) / 100;
+
+          hardCostSubtotal += lineTot;
+          totalMaterial += matCost;
+          totalLabor += labCost;
+          totalEquipment += eqpCost;
 
           rows.push([
             description,
-            unitRateData.unit,
-            quantity.toFixed(2),
+            displayUnit,
+            convertedQty.toFixed(2),
             `${(lineItem.wasteFactor * 100).toFixed(0)}%`,
             lineItem.totalQty.toFixed(2),
-            `$${lineItem.adjustedRate.toFixed(2)}`,
-            `$${lineItem.materialCost.toFixed(2)}`,
-            `$${lineItem.laborCost.toFixed(2)}`,
-            `$${lineItem.equipmentCost.toFixed(2)}`,
-            `$${lineItem.lineTotal.toFixed(2)}`,
+            `${cs}${adjRate.toFixed(2)}`,
+            `${cs}${matCost.toFixed(2)}`,
+            `${cs}${labCost.toFixed(2)}`,
+            `${cs}${eqpCost.toFixed(2)}`,
+            `${cs}${lineTot.toFixed(2)}`,
           ]);
 
           boqLines.push({
             division: unitRateData.subcategory,
             csiCode: "00 00 00",
             description,
-            unit: unitRateData.unit,
-            quantity,
+            unit: displayUnit,
+            quantity: convertedQty,
             wasteFactor: lineItem.wasteFactor,
             adjustedQty: lineItem.totalQty,
-            materialRate: Math.round(lineItem.adjustedRate * getCostBreakdown(unitRateData.subcategory).material * 100) / 100,
-            laborRate: Math.round(lineItem.adjustedRate * getCostBreakdown(unitRateData.subcategory).labor * 100) / 100,
-            equipmentRate: Math.round(lineItem.adjustedRate * getCostBreakdown(unitRateData.subcategory).equipment * 100) / 100,
-            unitRate: lineItem.adjustedRate,
-            materialCost: lineItem.materialCost,
-            laborCost: lineItem.laborCost,
-            equipmentCost: lineItem.equipmentCost,
-            totalCost: lineItem.lineTotal,
+            materialRate: Math.round(adjRate * getCostBreakdown(unitRateData.subcategory).material * 100) / 100,
+            laborRate: Math.round(adjRate * getCostBreakdown(unitRateData.subcategory).labor * 100) / 100,
+            equipmentRate: Math.round(adjRate * getCostBreakdown(unitRateData.subcategory).equipment * 100) / 100,
+            unitRate: adjRate,
+            materialCost: matCost,
+            laborCost: labCost,
+            equipmentCost: eqpCost,
+            totalCost: lineTot,
+            storey: elemStorey || undefined,
+            elementCount: elemCount || undefined,
           });
         } else {
           // Fallback for unknown items — estimate with default waste
@@ -1249,43 +1363,167 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
         }
       }
 
+      // ── Derived quantities: Formwork, Rebar, Finishing ──
+      const { DERIVED_RATES } = await import("@/constants/regional-factors");
+      const derivedLines: typeof boqLines = [];
+
+      // Aggregate source quantities by storey for derived items
+      for (const elem of expandedElements) {
+        if (typeof elem !== "object") continue;
+        const e = elem as Record<string, unknown>;
+        const st = (e.storey as string) || "";
+        const desc = (e.description as string) || "";
+        const area = Number(e.grossArea ?? 0);
+        const vol = Number(e.totalVolume ?? 0);
+        const descLower = desc.toLowerCase();
+
+        const applyDerived = (name: string, baseQty: number, rateUSD: number, dUnit: string, source: string) => {
+          if (baseQty <= 0) return;
+          const adjRate = Math.round(rateUSD * locationFactor * exchangeRate * 100) / 100;
+          const waste = 0.05;
+          const adjQty = Math.round(baseQty * (1 + waste) * 100) / 100;
+          const total = Math.round(adjQty * adjRate * 100) / 100;
+          const breakdown = { material: 0.45, labor: 0.50, equipment: 0.05 };
+          const matC = Math.round(total * breakdown.material * 100) / 100;
+          const labC = Math.round(total * breakdown.labor * 100) / 100;
+          const eqpC = Math.round(total * breakdown.equipment * 100) / 100;
+          hardCostSubtotal += total;
+          totalMaterial += matC; totalLabor += labC; totalEquipment += eqpC;
+          derivedLines.push({
+            division: source, csiCode: "00 00 00",
+            description: name, unit: dUnit,
+            quantity: Math.round(baseQty * 100) / 100, wasteFactor: waste, adjustedQty: adjQty,
+            materialRate: Math.round(adjRate * breakdown.material * 100) / 100,
+            laborRate: Math.round(adjRate * breakdown.labor * 100) / 100,
+            equipmentRate: Math.round(adjRate * breakdown.equipment * 100) / 100,
+            unitRate: adjRate, materialCost: matC, laborCost: labC, equipmentCost: eqpC, totalCost: total,
+            storey: st || undefined, elementCount: undefined,
+          });
+        };
+
+        // Formwork
+        if (descLower.includes("wall")) {
+          applyDerived(`Formwork — ${desc}`, area * 2, DERIVED_RATES.formwork.wall.rate, "m²", "Formwork (Measured)");
+          applyDerived(`Rebar — ${desc} (Est.)`, vol * DERIVED_RATES.rebar.wall.kgPerM3, DERIVED_RATES.rebar.wall.rate, "kg", "Rebar (Estimated)");
+          applyDerived(`Plastering — ${desc}`, area * 2, DERIVED_RATES.finishing.plastering.rate, "m²", "Finishing (Measured)");
+        } else if (descLower.includes("slab")) {
+          applyDerived(`Formwork — ${desc}`, area, DERIVED_RATES.formwork.slab.rate, "m²", "Formwork (Measured)");
+          applyDerived(`Rebar — ${desc} (Est.)`, vol * DERIVED_RATES.rebar.slab.kgPerM3, DERIVED_RATES.rebar.slab.rate, "kg", "Rebar (Estimated)");
+          applyDerived(`Ceiling Plaster — ${desc}`, area, DERIVED_RATES.finishing.ceilingPlaster.rate, "m²", "Finishing (Measured)");
+        } else if (descLower.includes("column")) {
+          // Column formwork = circumference × height (for circular); approximated
+          const colHeight = Number(e.totalVolume ?? 0) > 0 ? 3.5 : 0; // default 3.5m
+          const colRadius = vol > 0 && colHeight > 0 ? Math.sqrt(vol / (Math.PI * colHeight)) : 0.3;
+          const colFormworkArea = 2 * Math.PI * colRadius * colHeight * Number(e.elementCount ?? 1);
+          applyDerived(`Formwork — ${desc}`, colFormworkArea, DERIVED_RATES.formwork.column.rate, "m²", "Formwork (Measured)");
+          applyDerived(`Rebar — ${desc} (Est.)`, vol * DERIVED_RATES.rebar.column.kgPerM3, DERIVED_RATES.rebar.column.rate, "kg", "Rebar (Estimated)");
+        }
+      }
+
+      // Add derived lines to boqLines
+      boqLines.push(...derivedLines);
+
+      // Rebuild rows grouped by storey (if storey data available)
+      const hasStoreyData = boqLines.some(l => l.storey && l.storey !== "Unassigned");
+      if (hasStoreyData) {
+        // Clear inline rows and rebuild grouped
+        rows.length = 0;
+        const storeyOrder = [...new Set(boqLines.filter(l => l.storey).map(l => l.storey!))];
+        // Add lines without storey first
+        const unassigned = boqLines.filter(l => !l.storey || l.storey === "Unassigned");
+        const cs0 = currencySymbol;
+
+        for (const storey of storeyOrder) {
+          const storeyLines = boqLines.filter(l => l.storey === storey);
+          if (storeyLines.length === 0) continue;
+
+          rows.push([`── ${storey.toUpperCase()} ──`, "", "", "", "", "", "", "", "", ""]);
+
+          let storeyTotal = 0;
+          for (const l of storeyLines) {
+            const countLabel = l.elementCount ? ` (${l.elementCount} nr)` : "";
+            rows.push([
+              `  ${l.description}${countLabel}`, l.unit, l.quantity.toFixed(2),
+              `${(l.wasteFactor * 100).toFixed(0)}%`, l.adjustedQty.toFixed(2),
+              `${cs0}${l.unitRate.toFixed(2)}`,
+              `${cs0}${l.materialCost.toFixed(2)}`, `${cs0}${l.laborCost.toFixed(2)}`,
+              `${cs0}${l.equipmentCost.toFixed(2)}`, `${cs0}${l.totalCost.toFixed(2)}`,
+            ]);
+            storeyTotal += l.totalCost;
+          }
+          rows.push([`  ${storey} Subtotal`, "", "", "", "", "", "", "", "", `${cs0}${storeyTotal.toFixed(2)}`]);
+          rows.push(["", "", "", "", "", "", "", "", "", ""]);
+        }
+
+        // Unassigned items
+        for (const l of unassigned) {
+          rows.push([
+            l.description, l.unit, l.quantity.toFixed(2),
+            `${(l.wasteFactor * 100).toFixed(0)}%`, l.adjustedQty.toFixed(2),
+            `${cs0}${l.unitRate.toFixed(2)}`,
+            `${cs0}${l.materialCost.toFixed(2)}`, `${cs0}${l.laborCost.toFixed(2)}`,
+            `${cs0}${l.equipmentCost.toFixed(2)}`, `${cs0}${l.totalCost.toFixed(2)}`,
+          ]);
+        }
+      }
+
       // Hard costs subtotal row
+      const cs = currencySymbol;
       rows.push(["", "", "", "", "", "", "", "", "", ""]);
-      rows.push(["HARD COSTS SUBTOTAL", "", "", "", "", "", `$${totalMaterial.toFixed(2)}`, `$${totalLabor.toFixed(2)}`, `$${totalEquipment.toFixed(2)}`, `$${hardCostSubtotal.toFixed(2)}`]);
+      rows.push(["HARD COSTS SUBTOTAL", "", "", "", "", "", `${cs}${totalMaterial.toFixed(2)}`, `${cs}${totalLabor.toFixed(2)}`, `${cs}${totalEquipment.toFixed(2)}`, `${cs}${hardCostSubtotal.toFixed(2)}`]);
 
       // Project type multiplier info
       if (projectTypeInfo.multiplier !== 1.0) {
         rows.push([`Project Type: ${projectTypeInfo.type} (${projectTypeInfo.multiplier}x)`, "", "", "", "", "", "", "", "", "Applied"]);
       }
 
+      // Location factor info
+      if (locationFactor !== 1.0) {
+        rows.push([`Location: ${locationLabel} (${locationFactor.toFixed(2)}x)`, "", "", "", "", "", "", "", "", "Applied"]);
+      }
+
       // Escalation
-      const escalation = calculateEscalation(hardCostSubtotal, 0.06, escalationMonths);
+      const escalation = calculateEscalation(hardCostSubtotal, escalationRate, escalationMonths);
       rows.push(["", "", "", "", "", "", "", "", "", ""]);
-      rows.push([`Cost Escalation (${escalation.annualRate * 100}%/yr, ${escalation.months}mo)`, "", "", "", "", "", "", "", "", `$${escalation.amount.toFixed(2)}`]);
+      rows.push([`Cost Escalation (${escalation.annualRate * 100}%/yr, ${escalation.months}mo)`, "", "", "", "", "", "", "", "", `${cs}${escalation.amount.toFixed(2)}`]);
 
       const hardCostWithEscalation = hardCostSubtotal + escalation.amount;
-      rows.push(["HARD COSTS + ESCALATION", "", "", "", "", "", "", "", "", `$${hardCostWithEscalation.toFixed(2)}`]);
+      rows.push(["HARD COSTS + ESCALATION", "", "", "", "", "", "", "", "", `${cs}${hardCostWithEscalation.toFixed(2)}`]);
 
       // Soft costs
-      const costSummary = calculateTotalCost(hardCostWithEscalation, true, true);
+      const costSummary = calculateTotalCost(hardCostWithEscalation, true, contingencyPct > 0);
+      // Override contingency percentage if user specified a custom value
+      if (contingencyPct !== 0.10) {
+        const contingencyItem = costSummary.breakdown.find(b => b.item === "Contingency");
+        if (contingencyItem) {
+          const oldAmt = contingencyItem.amount;
+          contingencyItem.amount = Math.round(hardCostWithEscalation * contingencyPct * 100) / 100;
+          contingencyItem.percentage = Math.round(contingencyPct * 100 * 10) / 10;
+          costSummary.softCosts += contingencyItem.amount - oldAmt;
+          costSummary.totalCost += contingencyItem.amount - oldAmt;
+        }
+      }
       rows.push(["", "", "", "", "", "", "", "", "", ""]);
       rows.push(["SOFT COSTS", "", "", "", "", "", "", "", "", ""]);
 
       for (const softItem of costSummary.breakdown) {
         rows.push([
           softItem.item, "%", softItem.percentage.toString(), "", "", "", "", "", "",
-          `$${softItem.amount.toFixed(2)}`,
+          `${cs}${softItem.amount.toFixed(2)}`,
         ]);
       }
 
       rows.push(["", "", "", "", "", "", "", "", "", ""]);
-      rows.push(["SOFT COSTS SUBTOTAL", "", "", "", "", "", "", "", "", `$${costSummary.softCosts.toFixed(2)}`]);
+      rows.push(["SOFT COSTS SUBTOTAL", "", "", "", "", "", "", "", "", `${cs}${costSummary.softCosts.toFixed(2)}`]);
       rows.push(["", "", "", "", "", "", "", "", "", ""]);
-      rows.push(["TOTAL PROJECT COST", "", "", "", "", "", "", "", "", `$${costSummary.totalCost.toFixed(2)}`]);
+      rows.push(["TOTAL PROJECT COST", "", "", "", "", "", "", "", "", `${cs}${costSummary.totalCost.toFixed(2)}`]);
       rows.push(["", "", "", "", "", "", "", "", "", ""]);
       rows.push([COST_DISCLAIMERS.accuracy, "", "", "", "", "", "", "", "", ""]);
 
       const warnings: string[] = [];
+      if (regionWasAutoDetected) {
+        warnings.push("No project location specified — using USA baseline rates. Provide a region/location for accurate regional pricing.");
+      }
       if (estimatedItemsCount > 0) {
         warnings.push(`${estimatedItemsCount} items used estimated rates (not in cost database)`);
       }
@@ -1299,16 +1537,18 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
           label: `Bill of Quantities — ${projectTypeInfo.type} (${activeRegion})`,
           headers,
           rows,
-          _currency: "USD",
+          _currency: currencyCode,
+          _currencySymbol: currencySymbol,
           _totalCost: costSummary.totalCost,
           _hardCosts: hardCostWithEscalation,
           _softCosts: costSummary.softCosts,
           _escalation: escalation.amount,
           _region: activeRegion,
+          _locationFactor: locationFactor,
           _projectType: projectTypeInfo.type,
           _projectMultiplier: projectTypeInfo.multiplier,
           _disclaimer: COST_DISCLAIMERS.full,
-          content: `Total: $${costSummary.totalCost.toFixed(2)} (Hard: $${costSummary.hardCosts.toFixed(2)}, Soft: $${costSummary.softCosts.toFixed(2)}) | Region: ${activeRegion} | Type: ${projectTypeInfo.type}`,
+          content: `Total: ${cs}${costSummary.totalCost.toFixed(2)} ${currencyCode} (Hard: ${cs}${costSummary.hardCosts.toFixed(2)}, Soft: ${cs}${costSummary.softCosts.toFixed(2)}) | Region: ${activeRegion} | Type: ${projectTypeInfo.type}`,
           _boqData: {
             lines: boqLines,
             subtotalMaterial: Math.round(totalMaterial * 100) / 100,
@@ -1346,6 +1586,8 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
       const boqSummary = (inputData?.summary ?? {}) as Record<string, unknown>;
       const boqLines = boqData?.lines ?? [];
       const dateStr = new Date().toISOString().split("T")[0];
+      const currencyCode = String(inputData?._currency ?? "USD");
+      const currencySymbol = String(inputData?._currencySymbol ?? "$");
 
       const wb = XLSX.utils.book_new();
 
@@ -1412,7 +1654,7 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
         ["COST ESCALATION"],
         ["", `Annual rate: 6%`],
         ["", `Months to construction: 6`],
-        ["", `Escalation amount: $${escalationAmt.toLocaleString()}`],
+        ["", `Escalation amount: ${currencySymbol}${escalationAmt.toLocaleString()}`],
         [""],
         ["EXCLUSIONS"],
         ["", "Land acquisition costs"],
@@ -1445,45 +1687,78 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
           "Material Cost", "Labor Cost", "Equip Cost", "Total Cost",
         ];
 
-        // Group by division for subtotals
-        const divisionGroups = new Map<string, typeof boqLines>();
-        for (const line of boqLines) {
-          const div = line.division || "General";
-          if (!divisionGroups.has(div)) divisionGroups.set(div, []);
-          divisionGroups.get(div)!.push(line);
-        }
-
+        // Group by storey (if available), then by division within each storey
+        const hasStoreys = boqLines.some(l => (l as Record<string, unknown>).storey && (l as Record<string, unknown>).storey !== "Unassigned");
         const boqTableRows: (string | number)[][] = [];
-        for (const [divName, lines] of divisionGroups) {
-          // Division header
-          boqTableRows.push([divName.toUpperCase(), "", "", "", "", "", "", "", "", "", "", "", "", ""]);
 
-          let divMaterial = 0, divLabor = 0, divEquip = 0, divTotal = 0;
-          for (const l of lines) {
-            const wastePercent = l.wasteFactor ? `${(l.wasteFactor * 100).toFixed(0)}%` : "—";
-            const adjQty = l.adjustedQty ?? l.quantity;
+        if (hasStoreys) {
+          // Storey-grouped layout
+          const storeyOrder = [...new Set(boqLines.filter(l => (l as Record<string, unknown>).storey).map(l => (l as Record<string, unknown>).storey as string))];
+
+          for (const storey of storeyOrder) {
+            const storeyLines = boqLines.filter(l => (l as Record<string, unknown>).storey === storey);
+            if (storeyLines.length === 0) continue;
+
+            // Storey header
+            boqTableRows.push([storey.toUpperCase(), "", "", "", "", "", "", "", "", "", "", "", "", ""]);
+
+            let storeyMat = 0, storeyLab = 0, storeyEqp = 0, storeyTot = 0;
+            for (const l of storeyLines) {
+              const wastePercent = l.wasteFactor ? `${(l.wasteFactor * 100).toFixed(0)}%` : "—";
+              const adjQty = l.adjustedQty ?? l.quantity;
+              const countLabel = (l as Record<string, unknown>).elementCount ? ` (${(l as Record<string, unknown>).elementCount} nr)` : "";
+              boqTableRows.push([
+                "", `${l.description}${countLabel}`, l.unit,
+                l.quantity, wastePercent, adjQty,
+                l.materialRate, l.laborRate, l.equipmentRate, l.unitRate,
+                l.materialCost, l.laborCost, l.equipmentCost, l.totalCost,
+              ]);
+              storeyMat += l.materialCost; storeyLab += l.laborCost;
+              storeyEqp += l.equipmentCost; storeyTot += l.totalCost;
+            }
+
             boqTableRows.push([
-              "", l.description, l.unit,
-              l.quantity, wastePercent, adjQty,
-              l.materialRate, l.laborRate, l.equipmentRate, l.unitRate,
-              l.materialCost, l.laborCost, l.equipmentCost, l.totalCost,
+              "", `${storey} Subtotal`, "", "", "", "",
+              "", "", "", "",
+              Math.round(storeyMat * 100) / 100, Math.round(storeyLab * 100) / 100,
+              Math.round(storeyEqp * 100) / 100, Math.round(storeyTot * 100) / 100,
             ]);
-            divMaterial += l.materialCost;
-            divLabor += l.laborCost;
-            divEquip += l.equipmentCost;
-            divTotal += l.totalCost;
+            boqTableRows.push(["", "", "", "", "", "", "", "", "", "", "", "", "", ""]);
+          }
+        } else {
+          // Flat division-grouped layout (backward compatible)
+          const divisionGroups = new Map<string, typeof boqLines>();
+          for (const line of boqLines) {
+            const div = line.division || "General";
+            if (!divisionGroups.has(div)) divisionGroups.set(div, []);
+            divisionGroups.get(div)!.push(line);
           }
 
-          // Division subtotal
-          boqTableRows.push([
-            "", `${divName} Subtotal`, "", "", "", "",
-            "", "", "", "",
-            Math.round(divMaterial * 100) / 100,
-            Math.round(divLabor * 100) / 100,
-            Math.round(divEquip * 100) / 100,
-            Math.round(divTotal * 100) / 100,
-          ]);
-          boqTableRows.push(["", "", "", "", "", "", "", "", "", "", "", "", "", ""]);
+          for (const [divName, lines] of divisionGroups) {
+            boqTableRows.push([divName.toUpperCase(), "", "", "", "", "", "", "", "", "", "", "", "", ""]);
+
+            let divMaterial = 0, divLabor = 0, divEquip = 0, divTotal = 0;
+            for (const l of lines) {
+              const wastePercent = l.wasteFactor ? `${(l.wasteFactor * 100).toFixed(0)}%` : "—";
+              const adjQty = l.adjustedQty ?? l.quantity;
+              boqTableRows.push([
+                "", l.description, l.unit,
+                l.quantity, wastePercent, adjQty,
+                l.materialRate, l.laborRate, l.equipmentRate, l.unitRate,
+                l.materialCost, l.laborCost, l.equipmentCost, l.totalCost,
+              ]);
+              divMaterial += l.materialCost; divLabor += l.laborCost;
+              divEquip += l.equipmentCost; divTotal += l.totalCost;
+            }
+
+            boqTableRows.push([
+              "", `${divName} Subtotal`, "", "", "", "",
+              "", "", "", "",
+              Math.round(divMaterial * 100) / 100, Math.round(divLabor * 100) / 100,
+              Math.round(divEquip * 100) / 100, Math.round(divTotal * 100) / 100,
+            ]);
+            boqTableRows.push(["", "", "", "", "", "", "", "", "", "", "", "", "", ""]);
+          }
         }
 
         // Grand subtotal
@@ -1542,7 +1817,7 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
         ["Project Type:", `${projectType} (${projectMultiplier}x)`],
         ["Region:", String(inputData?._region ?? "USA (baseline)")],
         [""],
-        ["COST BREAKDOWN BY TYPE", "", "Amount (USD)", "% of Hard Costs"],
+        ["COST BREAKDOWN BY TYPE", "", `Amount (${currencyCode})`, "% of Hard Costs"],
         ["Material Costs", "", boqData?.subtotalMaterial ?? 0, hardTotal > 0 ? `${(((boqData?.subtotalMaterial ?? 0) / hardTotal) * 100).toFixed(1)}%` : "—"],
         ["Labor Costs", "", boqData?.subtotalLabor ?? 0, hardTotal > 0 ? `${(((boqData?.subtotalLabor ?? 0) / hardTotal) * 100).toFixed(1)}%` : "—"],
         ["Equipment Costs", "", boqData?.subtotalEquipment ?? 0, hardTotal > 0 ? `${(((boqData?.subtotalEquipment ?? 0) / hardTotal) * 100).toFixed(1)}%` : "—"],
@@ -1593,7 +1868,7 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
           size: xlsxBuffer.length,
           downloadUrl,
           label: "BOQ Export (Professional Excel)",
-          content: `BOQ Export: ${boqLines.length} line items across 4 sheets. Grand Total: $${(boqData?.grandTotal ?? 0).toLocaleString()}. ${COST_DISCLAIMERS.accuracy}`,
+          content: `BOQ Export: ${boqLines.length} line items across 4 sheets. Grand Total: ${currencySymbol}${(boqData?.grandTotal ?? 0).toLocaleString()} ${currencyCode}. ${COST_DISCLAIMERS.accuracy}`,
         },
         metadata: { real: true },
         createdAt: new Date(),
