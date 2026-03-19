@@ -1,5 +1,6 @@
 # Dependencies
 node_modules/
+temp_folder/
 .pnp
 .pnp.js
 

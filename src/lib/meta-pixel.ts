@@ -1,6 +1,6 @@
 /** Meta Pixel (Facebook Pixel) helper utilities */
 
-const META_PIXEL_ID = "1610192840132710";
+const META_PIXEL_ID = "2072969213494487";
 
 declare global {
   interface Window {
