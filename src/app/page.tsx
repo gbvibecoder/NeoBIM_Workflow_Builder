@@ -1050,7 +1050,7 @@ export default function LandingPage() {
             ))}
           </div>
 
-          <div className="landing-nav-cta" style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
+          <div className="landing-nav-cta" style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0, marginLeft: "auto" }}>
             <LanguageSwitcher />
             <Link href="/login" className="landing-signup-link" style={{
               padding: "9px 22px", borderRadius: 10, fontSize: 14, fontWeight: 600,
