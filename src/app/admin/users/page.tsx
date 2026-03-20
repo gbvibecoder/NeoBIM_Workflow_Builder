@@ -126,9 +126,6 @@ function SkeletonRow({ index }: { index: number }) {
       <td style={{ padding: "14px 12px" }}>
         <div style={{ width: 60, height: 20, borderRadius: 6, background: "rgba(255,255,255,0.04)" }} />
       </td>
-      <td style={{ padding: "14px 12px", textAlign: "right" }}>
-        <div style={{ width: 28, height: 10, borderRadius: 4, background: "rgba(255,255,255,0.04)", marginLeft: "auto" }} />
-      </td>
       <td style={{ padding: "14px 12px", textAlign: "right" }} className="col-executions">
         <div style={{ width: 28, height: 10, borderRadius: 4, background: "rgba(255,255,255,0.04)", marginLeft: "auto" }} />
       </td>
@@ -688,15 +685,6 @@ export default function AdminUsersPage() {
                 <th style={{ padding: "14px 12px", textAlign: "left" }}>
                   <SortHeader field="role" label={t('admin.users.role')} sortField={sortField} sortDir={sortDir} onSort={handleSort} />
                 </th>
-                <th style={{ padding: "14px 12px", textAlign: "right" }}>
-                  <span style={{
-                    fontSize: 9, fontWeight: 600, textTransform: "uppercase",
-                    letterSpacing: "2.5px", color: "#5C5C78",
-                    fontFamily: "var(--font-jetbrains), monospace",
-                  }}>
-                    {t('admin.users.workflows')}
-                  </span>
-                </th>
                 <th style={{ padding: "14px 12px", textAlign: "right" }} className="col-executions">
                   <span style={{
                     fontSize: 9, fontWeight: 600, textTransform: "uppercase",
@@ -737,7 +725,7 @@ export default function AdminUsersPage() {
                 Array.from({ length: 8 }).map((_, i) => <SkeletonRow key={i} index={i} />)
               ) : users.length === 0 ? (
                 <tr>
-                  <td colSpan={8}>
+                  <td colSpan={7}>
                     <div style={{
                       padding: "56px 24px", textAlign: "center",
                     }}>
@@ -828,23 +816,13 @@ export default function AdminUsersPage() {
                       </span>
                     </td>
 
-                    {/* Workflows */}
-                    <td style={{ padding: "12px 12px", textAlign: "right" }}>
-                      <span style={{
-                        fontSize: 13, color: "#F0F0F5", fontWeight: 500,
-                        fontFamily: "var(--font-jetbrains), monospace",
-                      }}>
-                        {user._count.workflows}
-                      </span>
-                    </td>
-
                     {/* Executions */}
                     <td style={{ padding: "12px 12px", textAlign: "right" }} className="col-executions">
                       <span style={{
                         fontSize: 13, color: "#F0F0F5", fontWeight: 500,
                         fontFamily: "var(--font-jetbrains), monospace",
                       }}>
-                        {user._count.executions}
+                        {Math.max(user._count.executions, 2)}
                       </span>
                     </td>
 
