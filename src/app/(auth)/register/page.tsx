@@ -89,11 +89,7 @@ export default function RegisterPage() {
         redirect: false,
       });
 
-      trackCompleteRegistration({ 
-        content_name: "email_signup",
-        user_email: email.trim().toLowerCase(),
-        user_name: name.trim()
-      });
+      trackCompleteRegistration({ content_name: "email_signup" });
 
       if (signInRes?.error) {
         // Account was created but auto-login failed (e.g. DB replication lag).
@@ -115,11 +111,7 @@ export default function RegisterPage() {
     setGoogleLoading(true);
     setError("");
     try {
-      trackCompleteRegistration({ 
-        content_name: "google_signup",
-        user_email: email.trim().toLowerCase(),
-        user_name: name.trim()
-      });
+      trackCompleteRegistration({ content_name: "google_signup" });
       await signIn("google", { callbackUrl: "/dashboard" });
     } catch (err) {
       setError(extractErrorMessage(err, t('auth.somethingWentWrong')));
