@@ -1570,6 +1570,213 @@ export default function LandingPage() {
           </motion.div>
         </motion.section>
 
+        {/* ── Video Showcase — Screening Room ──────────────────────── */}
+        <section id="videos" className="landing-section" style={{
+          padding: "120px 48px", position: "relative", overflow: "hidden",
+          background: "linear-gradient(180deg, #07070D 0%, #090912 50%, #07070D 100%)",
+        }}>
+          {/* Background */}
+          <div style={{ position: "absolute", inset: 0, pointerEvents: "none" }}>
+            <div className="blueprint-grid" style={{ opacity: 0.12 }} />
+            <svg style={{ position: "absolute", top: 0, left: 0, width: "100%", height: 40, opacity: 0.06 }} viewBox="0 0 1440 40" preserveAspectRatio="none">
+              {Array.from({ length: 36 }).map((_, i) => (
+                <rect key={i} x={i * 40 + 12} y="12" width="16" height="16" rx="3" fill="none" stroke="#00F5FF" strokeWidth="1" />
+              ))}
+            </svg>
+            <svg style={{ position: "absolute", bottom: 0, left: 0, width: "100%", height: 40, opacity: 0.06 }} viewBox="0 0 1440 40" preserveAspectRatio="none">
+              {Array.from({ length: 36 }).map((_, i) => (
+                <rect key={i} x={i * 40 + 12} y="12" width="16" height="16" rx="3" fill="none" stroke="#00F5FF" strokeWidth="1" />
+              ))}
+            </svg>
+            <svg style={{ position: "absolute", top: -60, left: "50%", transform: "translateX(-50%)", width: 800, height: 400, opacity: 0.04 }} viewBox="0 0 800 400" fill="none">
+              <path d="M400 0 L100 400 L700 400 Z" fill="url(#proj-grad)" />
+              <defs>
+                <linearGradient id="proj-grad" x1="400" y1="0" x2="400" y2="400" gradientUnits="userSpaceOnUse">
+                  <stop offset="0%" stopColor="#00F5FF" />
+                  <stop offset="100%" stopColor="transparent" />
+                </linearGradient>
+              </defs>
+            </svg>
+            <div className="orb-drift-1" style={{ position: "absolute", top: "5%", left: "5%", width: 450, height: 450, borderRadius: "50%", background: "radial-gradient(circle, rgba(0,245,255,0.07) 0%, transparent 70%)", filter: "blur(30px)" }} />
+            <div className="orb-drift-2" style={{ position: "absolute", bottom: "5%", right: "8%", width: 380, height: 380, borderRadius: "50%", background: "radial-gradient(circle, rgba(139,92,246,0.06) 0%, transparent 70%)", filter: "blur(25px)" }} />
+            <svg style={{ position: "absolute", top: 80, right: 40, opacity: 0.06 }} width="80" height="300" viewBox="0 0 80 300" fill="none">
+              <line x1="40" y1="0" x2="40" y2="300" stroke="#00F5FF" strokeWidth="0.5" strokeDasharray="4 4" />
+              <line x1="36" y1="0" x2="44" y2="0" stroke="#00F5FF" strokeWidth="0.5" />
+              <line x1="36" y1="300" x2="44" y2="300" stroke="#00F5FF" strokeWidth="0.5" />
+              <text x="50" y="155" fill="#00F5FF" fontSize="7" fontFamily="monospace" transform="rotate(-90, 50, 155)">{t('landing.screeningRoom')}</text>
+            </svg>
+          </div>
+
+          <div style={{ maxWidth: 1200, margin: "0 auto", position: "relative", zIndex: 1 }}>
+            <motion.div
+              initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-80px" }}
+              variants={fadeUp} transition={{ duration: 0.6, ease: smoothEase }}
+              style={{ textAlign: "center", marginBottom: 56 }}
+            >
+              <span className="blueprint-annotation" style={{ marginBottom: 16, display: "block", color: "rgba(0,245,255,0.5)" }}>
+                {t('landing.screeningRoom')}
+              </span>
+              <div className="accent-line" style={{ background: "linear-gradient(90deg, #00F5FF, #8B5CF6)" }} />
+              <h2 style={{ fontSize: "clamp(2rem, 4vw, 3rem)", fontWeight: 900, color: "#F0F0F5", letterSpacing: "-0.04em", lineHeight: 1.1 }}>
+                {t('landing.watchWorkflows')}{" "}
+                <span style={{ background: "linear-gradient(135deg, #00F5FF, #8B5CF6)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>
+                  {t('landing.comeToLife')}
+                </span>
+              </h2>
+              <p style={{ fontSize: 16, color: "#7C7C96", maxWidth: 560, margin: "16px auto 0", lineHeight: 1.7 }}>
+                {t('landing.screeningRoomDesc')}
+              </p>
+            </motion.div>
+
+            <motion.div
+              ref={videoSectionRef}
+              initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-40px" }}
+              variants={stagger}
+              className="landing-video-bento"
+              style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gridTemplateRows: "1fr 1fr", gap: 16, height: 520 }}
+            >
+              {(() => {
+                const d = DEMO_VIDEOS[0];
+                const color = "#4F8AFF";
+                const r = hexToRgb(color);
+                return (
+                  <motion.div key={d.id} variants={fadeUp} transition={{ duration: 0.5, ease: smoothEase }} onClick={() => window.open("/workflows", "_self")}
+                    style={{ gridColumn: "1 / 3", gridRow: "1 / 3", borderRadius: 20, overflow: "hidden", cursor: "pointer", position: "relative", background: `linear-gradient(145deg, rgba(${r}, 0.04), rgba(14,14,24,0.95))`, border: `1px solid rgba(${r}, 0.12)`, transition: "all 0.5s cubic-bezier(0.25,0.4,0.25,1)" }}>
+                    <video ref={el => { videoRefs.current[d.id] = el; }} src={d.url} muted playsInline onLoadedMetadata={e => { const v = e.currentTarget; v.currentTime = d.previewStart; }} onEnded={e => { const v = e.currentTarget; v.currentTime = d.previewStart; v.play().catch(() => {}); }} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                    <motion.div animate={{ y: ["-100%", "200%"] }} transition={{ duration: 4, repeat: Infinity, ease: "linear" }} style={{ position: "absolute", top: 0, left: 0, right: 0, height: "30%", pointerEvents: "none", background: "linear-gradient(180deg, transparent, rgba(0,245,255,0.03), transparent)" }} />
+                    <svg style={{ position: "absolute", top: 0, left: 0, pointerEvents: "none" }} width={20} height={20}><path d="M0 20 L0 0 L20 0" stroke={color} strokeWidth="1.5" fill="none" opacity={0.3} /></svg>
+                    <svg style={{ position: "absolute", top: 0, right: 0, pointerEvents: "none" }} width={20} height={20}><path d="M0 0 L20 0 L20 20" stroke={color} strokeWidth="1.5" fill="none" opacity={0.3} /></svg>
+                    <svg style={{ position: "absolute", bottom: 0, left: 0, pointerEvents: "none" }} width={20} height={20}><path d="M0 0 L0 20 L20 20" stroke={color} strokeWidth="1.5" fill="none" opacity={0.3} /></svg>
+                    <svg style={{ position: "absolute", bottom: 0, right: 0, pointerEvents: "none" }} width={20} height={20}><path d="M20 0 L20 20 L0 20" stroke={color} strokeWidth="1.5" fill="none" opacity={0.3} /></svg>
+                    <div style={{ position: "absolute", top: 16, left: 16, display: "flex", alignItems: "center", gap: 8 }}>
+                      <div style={{ padding: "4px 10px", borderRadius: 8, background: "rgba(0,0,0,0.7)", backdropFilter: "blur(12px)", border: `1px solid rgba(${r}, 0.3)`, display: "flex", alignItems: "center", gap: 6 }}>
+                        <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#10B981", boxShadow: "0 0 8px #10B981", animation: "pulse 2s ease infinite" }} />
+                        <span style={{ fontSize: 9, fontWeight: 700, color: "#10B981", letterSpacing: "0.1em" }}>{t('landing.featured')}</span>
+                      </div>
+                      <div style={{ padding: "4px 8px", borderRadius: 6, background: "rgba(0,0,0,0.6)", backdropFilter: "blur(8px)", border: `1px solid rgba(${r}, 0.2)` }}>
+                        <span style={{ fontSize: 8, fontWeight: 600, color, letterSpacing: "0.06em", textTransform: "uppercase" }}>{d.category}</span>
+                      </div>
+                    </div>
+                    <div style={{ position: "absolute", top: 16, right: 16, padding: "4px 8px", borderRadius: 6, background: "rgba(0,0,0,0.7)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", gap: 4 }}>
+                      <Film size={10} color="#8898AA" />
+                      <span style={{ fontSize: 10, color: "#8898AA", fontFamily: "monospace" }}>{d.duration}</span>
+                    </div>
+                    <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: "60px 24px 20px", background: "linear-gradient(transparent, rgba(7,7,13,0.95))" }}>
+                      <h3 style={{ fontSize: 20, fontWeight: 800, color: "#F0F0F5", marginBottom: 4, letterSpacing: "-0.02em" }}>{d.title}</h3>
+                      <p style={{ fontSize: 13, color: "#00F5FF", fontWeight: 600, marginBottom: 8 }}>{d.subtitle}</p>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                        {d.nodes.map((n, ni) => (
+                          <React.Fragment key={n}>
+                            <span style={{ fontSize: 9, fontWeight: 600, color: "#9898B0", padding: "3px 8px", borderRadius: 4, background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)", fontFamily: "monospace", letterSpacing: "0.04em", textTransform: "uppercase" }}>{n}</span>
+                            {ni < d.nodes.length - 1 && <span style={{ fontSize: 10, color: "#3A3A50" }}>→</span>}
+                          </React.Fragment>
+                        ))}
+                        <span style={{ fontSize: 9, color: "#5C5C78", marginLeft: 8, fontFamily: "monospace" }}>{d.spec}</span>
+                      </div>
+                    </div>
+                  </motion.div>
+                );
+              })()}
+
+              {(() => {
+                const d = DEMO_VIDEOS[1];
+                const color = "#06B6D4";
+                const r = hexToRgb(color);
+                return (
+                  <motion.div key={d.id} variants={fadeUp} transition={{ duration: 0.5, delay: 0.1, ease: smoothEase }} onClick={() => window.open("/workflows", "_self")}
+                    style={{ gridColumn: "3", gridRow: "1", borderRadius: 16, overflow: "hidden", cursor: "pointer", position: "relative", background: `linear-gradient(145deg, rgba(${r}, 0.04), rgba(14,14,24,0.95))`, border: `1px solid rgba(${r}, 0.1)`, transition: "all 0.4s cubic-bezier(0.25,0.4,0.25,1)" }}>
+                    <video ref={el => { videoRefs.current[d.id] = el; }} src={d.url} muted playsInline onLoadedMetadata={e => { const v = e.currentTarget; v.currentTime = d.previewStart; }} onEnded={e => { const v = e.currentTarget; v.currentTime = d.previewStart; v.play().catch(() => {}); }} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                    <motion.div animate={{ y: ["-100%", "200%"] }} transition={{ duration: 3, repeat: Infinity, ease: "linear", delay: 0.5 }} style={{ position: "absolute", top: 0, left: 0, right: 0, height: "40%", pointerEvents: "none", background: "linear-gradient(180deg, transparent, rgba(0,245,255,0.04), transparent)" }} />
+                    <svg style={{ position: "absolute", top: 0, left: 0, pointerEvents: "none" }} width={14} height={14}><path d="M0 14 L0 0 L14 0" stroke={color} strokeWidth="1" fill="none" opacity={0.25} /></svg>
+                    <svg style={{ position: "absolute", bottom: 0, right: 0, pointerEvents: "none" }} width={14} height={14}><path d="M14 0 L14 14 L0 14" stroke={color} strokeWidth="1" fill="none" opacity={0.25} /></svg>
+                    <div style={{ position: "absolute", top: 10, left: 10, display: "flex", alignItems: "center", gap: 6 }}>
+                      <div style={{ padding: "3px 7px", borderRadius: 5, background: "rgba(0,0,0,0.7)", backdropFilter: "blur(8px)", border: `1px solid rgba(${r}, 0.25)`, display: "flex", alignItems: "center", gap: 5 }}>
+                        <div style={{ width: 5, height: 5, borderRadius: "50%", background: color, boxShadow: `0 0 6px ${color}` }} />
+                        <span style={{ fontSize: 7, fontWeight: 700, color, letterSpacing: "0.1em" }}>{d.category.toUpperCase()}</span>
+                      </div>
+                    </div>
+                    <div style={{ position: "absolute", top: 10, right: 10, padding: "3px 7px", borderRadius: 5, background: "rgba(0,0,0,0.65)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", gap: 3 }}>
+                      <Film size={9} color="#8898AA" />
+                      <span style={{ fontSize: 9, color: "#8898AA", fontFamily: "monospace" }}>{d.duration}</span>
+                    </div>
+                    <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: "32px 14px 12px", background: "linear-gradient(transparent, rgba(7,7,13,0.95))" }}>
+                      <p style={{ fontSize: 12, fontWeight: 700, color: "#F0F0F5", marginBottom: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{d.title}</p>
+                      <p style={{ fontSize: 10, color, fontWeight: 600 }}>{d.subtitle}</p>
+                    </div>
+                  </motion.div>
+                );
+              })()}
+
+              {(() => {
+                const d = DEMO_VIDEOS[2];
+                const color = "#8B5CF6";
+                const r = hexToRgb(color);
+                return (
+                  <motion.div key={d.id} variants={fadeUp} transition={{ duration: 0.5, delay: 0.2, ease: smoothEase }} onClick={() => window.open("/workflows", "_self")}
+                    style={{ gridColumn: "3", gridRow: "2", borderRadius: 16, overflow: "hidden", cursor: "pointer", position: "relative", background: `linear-gradient(145deg, rgba(${r}, 0.04), rgba(14,14,24,0.95))`, border: `1px solid rgba(${r}, 0.1)`, transition: "all 0.4s cubic-bezier(0.25,0.4,0.25,1)" }}>
+                    <video ref={el => { videoRefs.current[d.id] = el; }} src={d.url} muted playsInline onLoadedMetadata={e => { const v = e.currentTarget; v.currentTime = d.previewStart; }} onEnded={e => { const v = e.currentTarget; v.currentTime = d.previewStart; v.play().catch(() => {}); }} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                    <motion.div animate={{ y: ["-100%", "200%"] }} transition={{ duration: 3, repeat: Infinity, ease: "linear", delay: 1 }} style={{ position: "absolute", top: 0, left: 0, right: 0, height: "40%", pointerEvents: "none", background: "linear-gradient(180deg, transparent, rgba(0,245,255,0.04), transparent)" }} />
+                    <svg style={{ position: "absolute", top: 0, left: 0, pointerEvents: "none" }} width={14} height={14}><path d="M0 14 L0 0 L14 0" stroke={color} strokeWidth="1" fill="none" opacity={0.25} /></svg>
+                    <svg style={{ position: "absolute", bottom: 0, right: 0, pointerEvents: "none" }} width={14} height={14}><path d="M14 0 L14 14 L0 14" stroke={color} strokeWidth="1" fill="none" opacity={0.25} /></svg>
+                    <div style={{ position: "absolute", top: 10, left: 10, display: "flex", alignItems: "center", gap: 6 }}>
+                      <div style={{ padding: "3px 7px", borderRadius: 5, background: "rgba(0,0,0,0.7)", backdropFilter: "blur(8px)", border: `1px solid rgba(${r}, 0.25)`, display: "flex", alignItems: "center", gap: 5 }}>
+                        <div style={{ width: 5, height: 5, borderRadius: "50%", background: color, boxShadow: `0 0 6px ${color}` }} />
+                        <span style={{ fontSize: 7, fontWeight: 700, color, letterSpacing: "0.1em" }}>{d.category.toUpperCase()}</span>
+                      </div>
+                    </div>
+                    <div style={{ position: "absolute", top: 10, right: 10, padding: "3px 7px", borderRadius: 5, background: "rgba(0,0,0,0.65)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", gap: 3 }}>
+                      <Film size={9} color="#8898AA" />
+                      <span style={{ fontSize: 9, color: "#8898AA", fontFamily: "monospace" }}>{d.duration}</span>
+                    </div>
+                    <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: "32px 14px 12px", background: "linear-gradient(transparent, rgba(7,7,13,0.95))" }}>
+                      <p style={{ fontSize: 12, fontWeight: 700, color: "#F0F0F5", marginBottom: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{d.title}</p>
+                      <p style={{ fontSize: 10, color, fontWeight: 600 }}>{d.subtitle}</p>
+                    </div>
+                  </motion.div>
+                );
+              })()}
+            </motion.div>
+
+            {/* Bottom strip: stats + CTAs */}
+            <motion.div
+              initial="hidden" whileInView="visible" viewport={{ once: true }}
+              variants={fadeUp} transition={{ duration: 0.5, delay: 0.3, ease: smoothEase }}
+              className="landing-video-bottom"
+              style={{ marginTop: 20, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "20px 28px", borderRadius: 16, background: "rgba(14,14,24,0.7)", border: "1px solid rgba(0,245,255,0.08)", backdropFilter: "blur(12px)", flexWrap: "wrap", gap: 16 }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 24, flexWrap: "wrap" }}>
+                {[
+                  { icon: <Film size={14} />, label: t('landing.platformDemos'), value: "7", color: "#00F5FF" },
+                  { icon: <Users size={14} />, label: t('landing.communityVideos'), value: communityVideos.length > 0 ? communityVideos.length + "+" : t('landing.new'), color: "#8B5CF6" },
+                  { icon: <Eye size={14} />, label: t('landing.totalViews'), value: communityVideos.length > 0 ? communityVideos.reduce((s, v) => s + v.views, 0).toLocaleString() : "—", color: "#F59E0B" },
+                ].map(stat => (
+                  <div key={stat.label} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <div style={{ color: stat.color, opacity: 0.7 }}>{stat.icon}</div>
+                    <span style={{ fontSize: 18, fontWeight: 800, color: stat.color, fontFamily: "monospace", letterSpacing: "-0.02em" }}>{stat.value}</span>
+                    <span style={{ fontSize: 10, color: "#5C5C78", textTransform: "uppercase", letterSpacing: "0.08em" }}>{stat.label}</span>
+                  </div>
+                ))}
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                <Link href="/demo" style={{ display: "flex", alignItems: "center", gap: 7, padding: "10px 20px", borderRadius: 10, background: "linear-gradient(135deg, rgba(0,245,255,0.1), rgba(139,92,246,0.08))", border: "1px solid rgba(0,245,255,0.2)", color: "#00F5FF", fontSize: 13, fontWeight: 700, textDecoration: "none", transition: "all 0.2s", whiteSpace: "nowrap" }}
+                  onMouseEnter={e => { const el = e.currentTarget; el.style.background = "linear-gradient(135deg, rgba(0,245,255,0.18), rgba(139,92,246,0.14))"; el.style.boxShadow = "0 0 24px rgba(0,245,255,0.12)"; }}
+                  onMouseLeave={e => { const el = e.currentTarget; el.style.background = "linear-gradient(135deg, rgba(0,245,255,0.1), rgba(139,92,246,0.08))"; el.style.boxShadow = "none"; }}
+                >
+                  <Play size={13} />
+                  {t('landing.tryDemo')}
+                </Link>
+                <Link href="/book-demo" style={{ display: "flex", alignItems: "center", gap: 7, padding: "10px 20px", borderRadius: 10, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", color: "#9898B0", fontSize: 13, fontWeight: 600, textDecoration: "none", transition: "all 0.2s", whiteSpace: "nowrap" }}
+                  onMouseEnter={e => { const el = e.currentTarget; el.style.color = "#F0F0F5"; el.style.borderColor = "rgba(255,255,255,0.15)"; }}
+                  onMouseLeave={e => { const el = e.currentTarget; el.style.color = "#9898B0"; el.style.borderColor = "rgba(255,255,255,0.08)"; }}
+                >
+                  <Calendar size={13} />
+                  {t('landing.bookDemo')}
+                </Link>
+              </div>
+            </motion.div>
+          </div>
+        </section>
+
         {/* ── Coming Soon — Workflow Pipeline ─────────────────────── */}
         <PipelineSection />
 
@@ -2440,310 +2647,6 @@ export default function LandingPage() {
                 </motion.div>
               )}
             </AnimatePresence>
-          </div>
-        </section>
-
-        {/* ── Video Showcase — Screening Room ──────────────────────── */}
-        <section id="videos" className="landing-section" style={{
-          padding: "120px 48px", position: "relative", overflow: "hidden",
-          background: "linear-gradient(180deg, #07070D 0%, #090912 50%, #07070D 100%)",
-        }}>
-          {/* Background */}
-          <div style={{ position: "absolute", inset: 0, pointerEvents: "none" }}>
-            <div className="blueprint-grid" style={{ opacity: 0.12 }} />
-            {/* Film reel sprocket holes — top */}
-            <svg style={{ position: "absolute", top: 0, left: 0, width: "100%", height: 40, opacity: 0.06 }} viewBox="0 0 1440 40" preserveAspectRatio="none">
-              {Array.from({ length: 36 }).map((_, i) => (
-                <rect key={i} x={i * 40 + 12} y="12" width="16" height="16" rx="3" fill="none" stroke="#00F5FF" strokeWidth="1" />
-              ))}
-            </svg>
-            {/* Film reel sprocket holes — bottom */}
-            <svg style={{ position: "absolute", bottom: 0, left: 0, width: "100%", height: 40, opacity: 0.06 }} viewBox="0 0 1440 40" preserveAspectRatio="none">
-              {Array.from({ length: 36 }).map((_, i) => (
-                <rect key={i} x={i * 40 + 12} y="12" width="16" height="16" rx="3" fill="none" stroke="#00F5FF" strokeWidth="1" />
-              ))}
-            </svg>
-            {/* Projection cone */}
-            <svg style={{ position: "absolute", top: -60, left: "50%", transform: "translateX(-50%)", width: 800, height: 400, opacity: 0.04 }} viewBox="0 0 800 400" fill="none">
-              <path d="M400 0 L100 400 L700 400 Z" fill="url(#proj-grad)" />
-              <defs>
-                <linearGradient id="proj-grad" x1="400" y1="0" x2="400" y2="400" gradientUnits="userSpaceOnUse">
-                  <stop offset="0%" stopColor="#00F5FF" />
-                  <stop offset="100%" stopColor="transparent" />
-                </linearGradient>
-              </defs>
-            </svg>
-            <div className="orb-drift-1" style={{ position: "absolute", top: "5%", left: "5%", width: 450, height: 450, borderRadius: "50%", background: "radial-gradient(circle, rgba(0,245,255,0.07) 0%, transparent 70%)", filter: "blur(30px)" }} />
-            <div className="orb-drift-2" style={{ position: "absolute", bottom: "5%", right: "8%", width: 380, height: 380, borderRadius: "50%", background: "radial-gradient(circle, rgba(139,92,246,0.06) 0%, transparent 70%)", filter: "blur(25px)" }} />
-            <svg style={{ position: "absolute", top: 80, right: 40, opacity: 0.06 }} width="80" height="300" viewBox="0 0 80 300" fill="none">
-              <line x1="40" y1="0" x2="40" y2="300" stroke="#00F5FF" strokeWidth="0.5" strokeDasharray="4 4" />
-              <line x1="36" y1="0" x2="44" y2="0" stroke="#00F5FF" strokeWidth="0.5" />
-              <line x1="36" y1="300" x2="44" y2="300" stroke="#00F5FF" strokeWidth="0.5" />
-              <text x="50" y="155" fill="#00F5FF" fontSize="7" fontFamily="monospace" transform="rotate(-90, 50, 155)">{t('landing.screeningRoom')}</text>
-            </svg>
-          </div>
-
-          <div style={{ maxWidth: 1200, margin: "0 auto", position: "relative", zIndex: 1 }}>
-            {/* Section Header */}
-            <motion.div
-              initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-80px" }}
-              variants={fadeUp} transition={{ duration: 0.6, ease: smoothEase }}
-              style={{ textAlign: "center", marginBottom: 56 }}
-            >
-              <span className="blueprint-annotation" style={{ marginBottom: 16, display: "block", color: "rgba(0,245,255,0.5)" }}>
-                {t('landing.screeningRoom')}
-              </span>
-              <div className="accent-line" style={{ background: "linear-gradient(90deg, #00F5FF, #8B5CF6)" }} />
-              <h2 style={{ fontSize: "clamp(2rem, 4vw, 3rem)", fontWeight: 900, color: "#F0F0F5", letterSpacing: "-0.04em", lineHeight: 1.1 }}>
-                {t('landing.watchWorkflows')}{" "}
-                <span style={{ background: "linear-gradient(135deg, #00F5FF, #8B5CF6)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>
-                  {t('landing.comeToLife')}
-                </span>
-              </h2>
-              <p style={{ fontSize: 16, color: "#7C7C96", maxWidth: 560, margin: "16px auto 0", lineHeight: 1.7 }}>
-                {t('landing.screeningRoomDesc')}
-              </p>
-            </motion.div>
-
-            {/* Bento Video Grid */}
-            <motion.div
-              ref={videoSectionRef}
-              initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-40px" }}
-              variants={stagger}
-              className="landing-video-bento"
-              style={{
-                display: "grid",
-                gridTemplateColumns: "1fr 1fr 1fr",
-                gridTemplateRows: "1fr 1fr",
-                gap: 16,
-                height: 520,
-              }}
-            >
-              {/* ── Featured: Text Prompt → Concept Building (wv-01) ── */}
-              {(() => {
-                const d = DEMO_VIDEOS[0];
-                const color = "#4F8AFF";
-                const r = hexToRgb(color);
-                return (
-                  <motion.div
-                    key={d.id}
-                    variants={fadeUp} transition={{ duration: 0.5, ease: smoothEase }}
-                    onClick={() => window.open("/workflows", "_self")}
-                    style={{
-                      gridColumn: "1 / 3", gridRow: "1 / 3",
-                      borderRadius: 20, overflow: "hidden", cursor: "pointer",
-                      position: "relative",
-                      background: `linear-gradient(145deg, rgba(${r}, 0.04), rgba(14,14,24,0.95))`,
-                      border: `1px solid rgba(${r}, 0.12)`,
-                      transition: "all 0.5s cubic-bezier(0.25,0.4,0.25,1)",
-                    }}
-                  >
-                    <video
-                      ref={el => { videoRefs.current[d.id] = el; }}
-                      src={d.url} muted playsInline
-                      onLoadedMetadata={e => { const v = e.currentTarget; v.currentTime = d.previewStart; }}
-                      onEnded={e => { const v = e.currentTarget; v.currentTime = d.previewStart; v.play().catch(() => {}); }}
-                      style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
-                    />
-                    {/* Scan line */}
-                    <motion.div animate={{ y: ["-100%", "200%"] }} transition={{ duration: 4, repeat: Infinity, ease: "linear" }} style={{ position: "absolute", top: 0, left: 0, right: 0, height: "30%", pointerEvents: "none", background: "linear-gradient(180deg, transparent, rgba(0,245,255,0.03), transparent)" }} />
-                    {/* Corner marks */}
-                    <svg style={{ position: "absolute", top: 0, left: 0, pointerEvents: "none" }} width={20} height={20}><path d="M0 20 L0 0 L20 0" stroke={color} strokeWidth="1.5" fill="none" opacity={0.3} /></svg>
-                    <svg style={{ position: "absolute", top: 0, right: 0, pointerEvents: "none" }} width={20} height={20}><path d="M0 0 L20 0 L20 20" stroke={color} strokeWidth="1.5" fill="none" opacity={0.3} /></svg>
-                    <svg style={{ position: "absolute", bottom: 0, left: 0, pointerEvents: "none" }} width={20} height={20}><path d="M0 0 L0 20 L20 20" stroke={color} strokeWidth="1.5" fill="none" opacity={0.3} /></svg>
-                    <svg style={{ position: "absolute", bottom: 0, right: 0, pointerEvents: "none" }} width={20} height={20}><path d="M20 0 L20 20 L0 20" stroke={color} strokeWidth="1.5" fill="none" opacity={0.3} /></svg>
-                    {/* Badges */}
-                    <div style={{ position: "absolute", top: 16, left: 16, display: "flex", alignItems: "center", gap: 8 }}>
-                      <div style={{ padding: "4px 10px", borderRadius: 8, background: "rgba(0,0,0,0.7)", backdropFilter: "blur(12px)", border: `1px solid rgba(${r}, 0.3)`, display: "flex", alignItems: "center", gap: 6 }}>
-                        <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#10B981", boxShadow: "0 0 8px #10B981", animation: "pulse 2s ease infinite" }} />
-                        <span style={{ fontSize: 9, fontWeight: 700, color: "#10B981", letterSpacing: "0.1em" }}>{t('landing.featured')}</span>
-                      </div>
-                      <div style={{ padding: "4px 8px", borderRadius: 6, background: "rgba(0,0,0,0.6)", backdropFilter: "blur(8px)", border: `1px solid rgba(${r}, 0.2)` }}>
-                        <span style={{ fontSize: 8, fontWeight: 600, color, letterSpacing: "0.06em", textTransform: "uppercase" }}>{d.category}</span>
-                      </div>
-                    </div>
-                    {/* Duration */}
-                    <div style={{ position: "absolute", top: 16, right: 16, padding: "4px 8px", borderRadius: 6, background: "rgba(0,0,0,0.7)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", gap: 4 }}>
-                      <Film size={10} color="#8898AA" />
-                      <span style={{ fontSize: 10, color: "#8898AA", fontFamily: "monospace" }}>{d.duration}</span>
-                    </div>
-                    {/* Bottom info */}
-                    <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: "60px 24px 20px", background: "linear-gradient(transparent, rgba(7,7,13,0.95))" }}>
-                      <h3 style={{ fontSize: 20, fontWeight: 800, color: "#F0F0F5", marginBottom: 4, letterSpacing: "-0.02em" }}>{d.title}</h3>
-                      <p style={{ fontSize: 13, color: "#00F5FF", fontWeight: 600, marginBottom: 8 }}>{d.subtitle}</p>
-                      {/* Pipeline nodes */}
-                      <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-                        {d.nodes.map((n, ni) => (
-                          <React.Fragment key={n}>
-                            <span style={{ fontSize: 9, fontWeight: 600, color: "#9898B0", padding: "3px 8px", borderRadius: 4, background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)", fontFamily: "monospace", letterSpacing: "0.04em", textTransform: "uppercase" }}>{n}</span>
-                            {ni < d.nodes.length - 1 && <span style={{ fontSize: 10, color: "#3A3A50" }}>→</span>}
-                          </React.Fragment>
-                        ))}
-                        <span style={{ fontSize: 9, color: "#5C5C78", marginLeft: 8, fontFamily: "monospace" }}>{d.spec}</span>
-                      </div>
-                    </div>
-                  </motion.div>
-                );
-              })()}
-
-              {/* ── Side top: 2D Floor Plan → Interactive 3D Model (wv-02) ── */}
-              {(() => {
-                const d = DEMO_VIDEOS[1];
-                const color = "#06B6D4";
-                const r = hexToRgb(color);
-                return (
-                  <motion.div
-                    key={d.id}
-                    variants={fadeUp} transition={{ duration: 0.5, delay: 0.1, ease: smoothEase }}
-                    onClick={() => window.open("/workflows", "_self")}
-                    style={{ gridColumn: "3", gridRow: "1", borderRadius: 16, overflow: "hidden", cursor: "pointer", position: "relative", background: `linear-gradient(145deg, rgba(${r}, 0.04), rgba(14,14,24,0.95))`, border: `1px solid rgba(${r}, 0.1)`, transition: "all 0.4s cubic-bezier(0.25,0.4,0.25,1)" }}
-                  >
-                    <video
-                      ref={el => { videoRefs.current[d.id] = el; }}
-                      src={d.url} muted playsInline
-                      onLoadedMetadata={e => { const v = e.currentTarget; v.currentTime = d.previewStart; }}
-                      onEnded={e => { const v = e.currentTarget; v.currentTime = d.previewStart; v.play().catch(() => {}); }}
-                      style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
-                    />
-                    <motion.div animate={{ y: ["-100%", "200%"] }} transition={{ duration: 3, repeat: Infinity, ease: "linear", delay: 0.5 }} style={{ position: "absolute", top: 0, left: 0, right: 0, height: "40%", pointerEvents: "none", background: "linear-gradient(180deg, transparent, rgba(0,245,255,0.04), transparent)" }} />
-                    {/* Corner marks */}
-                    <svg style={{ position: "absolute", top: 0, left: 0, pointerEvents: "none" }} width={14} height={14}><path d="M0 14 L0 0 L14 0" stroke={color} strokeWidth="1" fill="none" opacity={0.25} /></svg>
-                    <svg style={{ position: "absolute", bottom: 0, right: 0, pointerEvents: "none" }} width={14} height={14}><path d="M14 0 L14 14 L0 14" stroke={color} strokeWidth="1" fill="none" opacity={0.25} /></svg>
-                    {/* Category badge */}
-                    <div style={{ position: "absolute", top: 10, left: 10, display: "flex", alignItems: "center", gap: 6 }}>
-                      <div style={{ padding: "3px 7px", borderRadius: 5, background: "rgba(0,0,0,0.7)", backdropFilter: "blur(8px)", border: `1px solid rgba(${r}, 0.25)`, display: "flex", alignItems: "center", gap: 5 }}>
-                        <div style={{ width: 5, height: 5, borderRadius: "50%", background: color, boxShadow: `0 0 6px ${color}` }} />
-                        <span style={{ fontSize: 7, fontWeight: 700, color, letterSpacing: "0.1em" }}>{d.category.toUpperCase()}</span>
-                      </div>
-                    </div>
-                    {/* Duration */}
-                    <div style={{ position: "absolute", top: 10, right: 10, padding: "3px 7px", borderRadius: 5, background: "rgba(0,0,0,0.65)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", gap: 3 }}>
-                      <Film size={9} color="#8898AA" />
-                      <span style={{ fontSize: 9, color: "#8898AA", fontFamily: "monospace" }}>{d.duration}</span>
-                    </div>
-                    {/* Bottom info */}
-                    <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: "32px 14px 12px", background: "linear-gradient(transparent, rgba(7,7,13,0.95))" }}>
-                      <p style={{ fontSize: 12, fontWeight: 700, color: "#F0F0F5", marginBottom: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{d.title}</p>
-                      <p style={{ fontSize: 10, color, fontWeight: 600 }}>{d.subtitle}</p>
-                    </div>
-                  </motion.div>
-                );
-              })()}
-
-              {/* ── Side bottom: 3D Model Visualization (wv-03) ── */}
-              {(() => {
-                const d = DEMO_VIDEOS[2];
-                const color = "#8B5CF6";
-                const r = hexToRgb(color);
-                return (
-                  <motion.div
-                    key={d.id}
-                    variants={fadeUp} transition={{ duration: 0.5, delay: 0.2, ease: smoothEase }}
-                    onClick={() => window.open("/workflows", "_self")}
-                    style={{ gridColumn: "3", gridRow: "2", borderRadius: 16, overflow: "hidden", cursor: "pointer", position: "relative", background: `linear-gradient(145deg, rgba(${r}, 0.04), rgba(14,14,24,0.95))`, border: `1px solid rgba(${r}, 0.1)`, transition: "all 0.4s cubic-bezier(0.25,0.4,0.25,1)" }}
-                  >
-                    <video
-                      ref={el => { videoRefs.current[d.id] = el; }}
-                      src={d.url} muted playsInline
-                      onLoadedMetadata={e => { const v = e.currentTarget; v.currentTime = d.previewStart; }}
-                      onEnded={e => { const v = e.currentTarget; v.currentTime = d.previewStart; v.play().catch(() => {}); }}
-                      style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
-                    />
-                    <motion.div animate={{ y: ["-100%", "200%"] }} transition={{ duration: 3, repeat: Infinity, ease: "linear", delay: 1 }} style={{ position: "absolute", top: 0, left: 0, right: 0, height: "40%", pointerEvents: "none", background: "linear-gradient(180deg, transparent, rgba(0,245,255,0.04), transparent)" }} />
-                    <svg style={{ position: "absolute", top: 0, left: 0, pointerEvents: "none" }} width={14} height={14}><path d="M0 14 L0 0 L14 0" stroke={color} strokeWidth="1" fill="none" opacity={0.25} /></svg>
-                    <svg style={{ position: "absolute", bottom: 0, right: 0, pointerEvents: "none" }} width={14} height={14}><path d="M14 0 L14 14 L0 14" stroke={color} strokeWidth="1" fill="none" opacity={0.25} /></svg>
-                    {/* Category badge */}
-                    <div style={{ position: "absolute", top: 10, left: 10, display: "flex", alignItems: "center", gap: 6 }}>
-                      <div style={{ padding: "3px 7px", borderRadius: 5, background: "rgba(0,0,0,0.7)", backdropFilter: "blur(8px)", border: `1px solid rgba(${r}, 0.25)`, display: "flex", alignItems: "center", gap: 5 }}>
-                        <div style={{ width: 5, height: 5, borderRadius: "50%", background: color, boxShadow: `0 0 6px ${color}` }} />
-                        <span style={{ fontSize: 7, fontWeight: 700, color, letterSpacing: "0.1em" }}>{d.category.toUpperCase()}</span>
-                      </div>
-                    </div>
-                    {/* Duration */}
-                    <div style={{ position: "absolute", top: 10, right: 10, padding: "3px 7px", borderRadius: 5, background: "rgba(0,0,0,0.65)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", gap: 3 }}>
-                      <Film size={9} color="#8898AA" />
-                      <span style={{ fontSize: 9, color: "#8898AA", fontFamily: "monospace" }}>{d.duration}</span>
-                    </div>
-                    {/* Bottom info */}
-                    <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: "32px 14px 12px", background: "linear-gradient(transparent, rgba(7,7,13,0.95))" }}>
-                      <p style={{ fontSize: 12, fontWeight: 700, color: "#F0F0F5", marginBottom: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{d.title}</p>
-                      <p style={{ fontSize: 10, color, fontWeight: 600 }}>{d.subtitle}</p>
-                    </div>
-                  </motion.div>
-                );
-              })()}
-            </motion.div>
-
-            {/* Bottom strip: stats + CTAs */}
-            <motion.div
-              initial="hidden" whileInView="visible" viewport={{ once: true }}
-              variants={fadeUp} transition={{ duration: 0.5, delay: 0.3, ease: smoothEase }}
-              className="landing-video-bottom"
-              style={{
-                marginTop: 20,
-                display: "flex", alignItems: "center", justifyContent: "space-between",
-                padding: "20px 28px",
-                borderRadius: 16,
-                background: "rgba(14,14,24,0.7)",
-                border: "1px solid rgba(0,245,255,0.08)",
-                backdropFilter: "blur(12px)",
-                flexWrap: "wrap",
-                gap: 16,
-              }}
-            >
-              {/* Stats */}
-              <div style={{ display: "flex", alignItems: "center", gap: 24, flexWrap: "wrap" }}>
-                {[
-                  { icon: <Film size={14} />, label: t('landing.platformDemos'), value: "7", color: "#00F5FF" },
-                  { icon: <Users size={14} />, label: t('landing.communityVideos'), value: communityVideos.length > 0 ? communityVideos.length + "+" : t('landing.new'), color: "#8B5CF6" },
-                  { icon: <Eye size={14} />, label: t('landing.totalViews'), value: communityVideos.length > 0 ? communityVideos.reduce((s, v) => s + v.views, 0).toLocaleString() : "—", color: "#F59E0B" },
-                ].map(stat => (
-                  <div key={stat.label} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <div style={{ color: stat.color, opacity: 0.7 }}>{stat.icon}</div>
-                    <span style={{ fontSize: 18, fontWeight: 800, color: stat.color, fontFamily: "monospace", letterSpacing: "-0.02em" }}>{stat.value}</span>
-                    <span style={{ fontSize: 10, color: "#5C5C78", textTransform: "uppercase", letterSpacing: "0.08em" }}>{stat.label}</span>
-                  </div>
-                ))}
-              </div>
-
-              {/* CTAs */}
-              <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-                <Link
-                  href="/demo"
-                  style={{
-                    display: "flex", alignItems: "center", gap: 7,
-                    padding: "10px 20px", borderRadius: 10,
-                    background: "linear-gradient(135deg, rgba(0,245,255,0.1), rgba(139,92,246,0.08))",
-                    border: "1px solid rgba(0,245,255,0.2)",
-                    color: "#00F5FF", fontSize: 13, fontWeight: 700,
-                    textDecoration: "none", transition: "all 0.2s",
-                    whiteSpace: "nowrap",
-                  }}
-                  onMouseEnter={e => { const el = e.currentTarget; el.style.background = "linear-gradient(135deg, rgba(0,245,255,0.18), rgba(139,92,246,0.14))"; el.style.boxShadow = "0 0 24px rgba(0,245,255,0.12)"; }}
-                  onMouseLeave={e => { const el = e.currentTarget; el.style.background = "linear-gradient(135deg, rgba(0,245,255,0.1), rgba(139,92,246,0.08))"; el.style.boxShadow = "none"; }}
-                >
-                  <Play size={13} />
-                  {t('landing.tryDemo')}
-                </Link>
-                <Link
-                  href="/book-demo"
-                  style={{
-                    display: "flex", alignItems: "center", gap: 7,
-                    padding: "10px 20px", borderRadius: 10,
-                    background: "rgba(255,255,255,0.03)",
-                    border: "1px solid rgba(255,255,255,0.08)",
-                    color: "#9898B0", fontSize: 13, fontWeight: 600,
-                    textDecoration: "none", transition: "all 0.2s",
-                    whiteSpace: "nowrap",
-                  }}
-                  onMouseEnter={e => { const el = e.currentTarget; el.style.color = "#F0F0F5"; el.style.borderColor = "rgba(255,255,255,0.15)"; }}
-                  onMouseLeave={e => { const el = e.currentTarget; el.style.color = "#9898B0"; el.style.borderColor = "rgba(255,255,255,0.08)"; }}
-                >
-                  <Calendar size={13} />
-                  {t('landing.bookDemo')}
-                </Link>
-              </div>
-            </motion.div>
           </div>
         </section>
 
