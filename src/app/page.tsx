@@ -1022,9 +1022,9 @@ export default function LandingPage() {
           background: "transparent",
           position: "absolute", top: 0, left: 0, right: 0, zIndex: 100,
         }}>
-          <Link href="/" className="landing-logo-link" style={{ display: "flex", alignItems: "center", gap: 9, textDecoration: "none", marginRight: "auto" }}>
+          <Link href="/" className="landing-logo-link" style={{ display: "flex", alignItems: "center", gap: 9, textDecoration: "none", flexShrink: 0 }}>
             <div className="landing-logo-icon" style={{
-              width: 40, height: 40, borderRadius: 12, overflow: "hidden",
+              width: 46, height: 46, borderRadius: 13, overflow: "hidden",
               boxShadow: "0 2px 12px rgba(79,138,255,0.2)",
               flexShrink: 0,
             }}>
@@ -1037,58 +1037,28 @@ export default function LandingPage() {
             </span>
           </Link>
 
-          <div className="landing-nav-links" style={{ display: "flex", alignItems: "center", gap: 32, marginRight: 32 }}>
+          <div className="landing-nav-links" style={{ display: "flex", alignItems: "center", gap: 8, flex: 1, justifyContent: "center" }}>
             {[
-              { label: t('landing.workflows'), href: '#workflows' },
+              { label: t('landing.features'), href: '#how-it-works' },
               { label: t('landing.community'), href: '#community' },
-              { label: t('landing.request'), href: '#request-workflow' },
               { label: t('landing.pricing'), href: '#pricing' },
+              { label: t('landing.blog'), href: '/blog' },
             ].map(l => (
-              <a key={l.href} href={l.href} style={{
-                fontSize: 14, color: "#9898B0", textDecoration: "none",
-                fontWeight: 500, transition: "color 0.2s",
-              }}
-                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = "#F0F0F5"; }}
-                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = "#9898B0"; }}
-              >
+              <a key={l.href} href={l.href} className="landing-nav-item">
                 {l.label}
               </a>
             ))}
           </div>
 
-          <div className="landing-nav-cta" style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <Link href="/workflows" className="landing-demos-link" style={{
-              fontSize: 13, fontWeight: 700, textDecoration: "none",
-              color: "#00F5FF",
-              padding: "5px 14px", borderRadius: 8,
-              background: "rgba(0,245,255,0.06)",
-              border: "1px solid rgba(0,245,255,0.15)",
-              display: "flex", alignItems: "center", gap: 6,
-              transition: "all 0.2s",
-              letterSpacing: "0.3px",
-            }}>
-              <span style={{
-                width: 6, height: 6, borderRadius: "50%",
-                background: "#00F5FF",
-                boxShadow: "0 0 8px #00F5FF",
-                animation: "glow-pulse 2s infinite",
-              }} />
-              {t('landing.watchDemos')}
-            </Link>
+          <div className="landing-nav-cta" style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
             <LanguageSwitcher />
-            <Link href="/login" className="landing-login-link" style={{
-              fontSize: 14, fontWeight: 600, color: "#F0F0F5",
-              textDecoration: "none", padding: "8px 0",
-            }}>
-              {t('landing.login')}
-            </Link>
-            <Link href="/dashboard" className="landing-signup-link" style={{
+            <Link href="/login" className="landing-signup-link" style={{
               padding: "9px 22px", borderRadius: 10, fontSize: 14, fontWeight: 600,
               color: "white", background: "linear-gradient(135deg, #4F8AFF 0%, #6366F1 100%)",
               textDecoration: "none", whiteSpace: "nowrap",
               boxShadow: "0 2px 12px rgba(79,138,255,0.3)",
             }}>
-              {t('landing.signUp')}
+              {t('landing.login')}
             </Link>
           </div>
         </nav>
@@ -1475,13 +1445,13 @@ export default function LandingPage() {
               transition={{ delay: 0.7, duration: 0.5 }}
               style={{ marginTop: 16, display: "flex", justifyContent: "center", gap: 16, flexWrap: "wrap" }}
             >
-              <Link href="/demo" style={{
-                display: "flex", alignItems: "center", gap: 8,
-                padding: "10px 20px", borderRadius: 10,
-                border: "1px solid rgba(0,245,255,0.2)", background: "rgba(0,245,255,0.05)",
-                color: "#00F5FF", fontSize: 14, fontWeight: 600,
-                textDecoration: "none", transition: "all 0.25s",
-              }}
+              <Link href="/workflows" style={{
+                  display: "flex", alignItems: "center", gap: 8,
+                  padding: "10px 20px", borderRadius: 10,
+                  border: "1px solid rgba(0,245,255,0.2)", background: "rgba(0,245,255,0.05)",
+                  color: "#00F5FF", fontSize: 14, fontWeight: 600,
+                  textDecoration: "none", transition: "all 0.25s",
+                }}
                 onMouseEnter={e => {
                   const el = e.currentTarget as HTMLElement;
                   el.style.background = "rgba(0,245,255,0.12)";
@@ -1496,27 +1466,7 @@ export default function LandingPage() {
                 }}
               >
                 <Play size={15} />
-                {t('landing.tryDemo')}
-              </Link>
-
-              <Link href="/book-demo" style={{
-                display: "flex", alignItems: "center", gap: 8,
-                padding: "10px 20px", borderRadius: 10,
-                border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.02)",
-                color: "#F0F0F5", fontSize: 14, fontWeight: 600,
-                textDecoration: "none", transition: "all 0.15s",
-              }}
-                onMouseEnter={e => {
-                  (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.05)";
-                  (e.currentTarget as HTMLElement).style.borderColor = "rgba(255,255,255,0.15)";
-                }}
-                onMouseLeave={e => {
-                  (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.02)";
-                  (e.currentTarget as HTMLElement).style.borderColor = "rgba(255,255,255,0.08)";
-                }}
-              >
-                <Calendar size={15} />
-                {t('landing.bookDemo')}
+                {t('landing.watchDemos')}
               </Link>
 
               {/* Explore Community CTA */}
@@ -2757,9 +2707,9 @@ export default function LandingPage() {
               </div>
 
               {/* CTAs */}
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
                 <Link
-                  href="/workflows"
+                  href="/demo"
                   style={{
                     display: "flex", alignItems: "center", gap: 7,
                     padding: "10px 20px", borderRadius: 10,
@@ -2772,10 +2722,11 @@ export default function LandingPage() {
                   onMouseEnter={e => { const el = e.currentTarget; el.style.background = "linear-gradient(135deg, rgba(0,245,255,0.18), rgba(139,92,246,0.14))"; el.style.boxShadow = "0 0 24px rgba(0,245,255,0.12)"; }}
                   onMouseLeave={e => { const el = e.currentTarget; el.style.background = "linear-gradient(135deg, rgba(0,245,255,0.1), rgba(139,92,246,0.08))"; el.style.boxShadow = "none"; }}
                 >
-                  {t('landing.watchAllDemos')} <ArrowRight size={14} />
+                  <Play size={13} />
+                  {t('landing.tryDemo')}
                 </Link>
                 <Link
-                  href="/workflows"
+                  href="/book-demo"
                   style={{
                     display: "flex", alignItems: "center", gap: 7,
                     padding: "10px 20px", borderRadius: 10,
@@ -2788,8 +2739,8 @@ export default function LandingPage() {
                   onMouseEnter={e => { const el = e.currentTarget; el.style.color = "#F0F0F5"; el.style.borderColor = "rgba(255,255,255,0.15)"; }}
                   onMouseLeave={e => { const el = e.currentTarget; el.style.color = "#9898B0"; el.style.borderColor = "rgba(255,255,255,0.08)"; }}
                 >
-                  <Upload size={13} />
-                  {t('landing.shareYourBuild')}
+                  <Calendar size={13} />
+                  {t('landing.bookDemo')}
                 </Link>
               </div>
             </motion.div>
@@ -3539,8 +3490,47 @@ export default function LandingPage() {
           50% { opacity: 0.4; }
         }
 
+        /* ── Nav link items ── */
+        .landing-nav-item {
+          font-size: 13px;
+          color: #7A7A98;
+          text-decoration: none;
+          font-weight: 500;
+          padding: 6px 16px;
+          border-radius: 8px;
+          transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+          position: relative;
+          letter-spacing: 0.2px;
+        }
+        .landing-nav-item::after {
+          content: '';
+          position: absolute;
+          bottom: 0;
+          left: 50%;
+          transform: translateX(-50%) scaleX(0);
+          width: 20px;
+          height: 2px;
+          background: linear-gradient(90deg, #4F8AFF, #6366F1);
+          border-radius: 1px;
+          transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .landing-nav-item:hover {
+          color: #E0E0F0;
+          background: rgba(79, 138, 255, 0.06);
+        }
+        .landing-nav-item:hover::after {
+          transform: translateX(-50%) scaleX(1);
+        }
+
         /* ─── Tablet: 769px – 1024px ───────────────────────────── */
         @media (max-width: 1024px) {
+          .landing-nav-links {
+            gap: 4px !important;
+          }
+          .landing-nav-item {
+            font-size: 12px !important;
+            padding: 5px 10px !important;
+          }
           .landing-grid-3 {
             grid-template-columns: 1fr 1fr !important;
           }
@@ -3588,9 +3578,6 @@ export default function LandingPage() {
           .landing-nav-links {
             display: none !important;
           }
-          .landing-login-link {
-            display: none !important;
-          }
           .landing-logo-icon {
             width: 32px !important;
             height: 32px !important;
@@ -3599,25 +3586,13 @@ export default function LandingPage() {
             font-size: 15px !important;
           }
           .landing-nav-cta {
-            gap: 6px !important;
-          }
-          .landing-demos-link {
-            font-size: 11px !important;
-            padding: 4px 10px !important;
-            white-space: nowrap !important;
+            gap: 8px !important;
           }
           .landing-signup-link {
             font-size: 12px !important;
-            padding: 7px 14px !important;
+            padding: 7px 16px !important;
           }
           .landing-beta-badge {
-            display: none !important;
-          }
-          .lang-switcher {
-            padding: 5px 8px !important;
-            gap: 4px !important;
-          }
-          .lang-switcher span:last-child {
             display: none !important;
           }
 
@@ -3813,10 +3788,6 @@ export default function LandingPage() {
         /* ─── Small phones: 480px and below ───────────────────── */
         @media (max-width: 480px) {
           /* ── Navbar ── */
-          .landing-demos-link {
-            font-size: 10px !important;
-            padding: 4px 8px !important;
-          }
           .landing-signup-link {
             font-size: 11px !important;
             padding: 6px 12px !important;
@@ -3844,9 +3815,6 @@ export default function LandingPage() {
         @media (max-width: 360px) {
           /* ── Navbar ── */
           .landing-logo-text {
-            display: none !important;
-          }
-          .landing-demos-link {
             display: none !important;
           }
           .landing-signup-link {

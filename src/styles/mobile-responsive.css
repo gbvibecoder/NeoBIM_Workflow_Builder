@@ -106,13 +106,12 @@
     font-size: 11px !important;
   }
 
-  /* Language switcher — icon only on very small screens */
+  /* Language switcher — icon only on small screens */
   .landing-nav-cta .lang-switcher {
-    padding: 5px 6px !important;
-    gap: 0 !important;
+    padding: 6px 10px !important;
   }
 
-  .landing-nav-cta .lang-switcher span:last-child {
+  .landing-nav-cta .lang-switcher .lang-switcher-label {
     display: none !important;
   }
 }
