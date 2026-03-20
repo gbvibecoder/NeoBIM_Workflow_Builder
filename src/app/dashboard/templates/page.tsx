@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronDown, Building2, Ruler, Compass, HardHat, Layers, PenTool, Triangle } from "lucide-react";
+import { ChevronDown, Building2, Ruler, Compass, HardHat, Layers, PenTool, Triangle, Lock, Crown, Lightbulb, ArrowRight, MessageSquare } from "lucide-react";
 import { Header } from "@/components/dashboard/Header";
 import { WorkflowCard } from "@/components/community/WorkflowCard";
 import { PREBUILT_WORKFLOWS } from "@/constants/prebuilt-workflows";
@@ -52,6 +52,15 @@ const SORT_OPTION_KEYS: Record<string, string> = {
 };
 
 const COMPLEXITY_ORDER: Record<string, number> = { simple: 0, intermediate: 1, advanced: 2 };
+
+// Templates that use expensive API nodes (render, video, 3D model) — locked for FREE users
+const LOCKED_IDS = new Set(["wf-03", "wf-12", "wf-14", "wf-15", "wf-16", "wf-17"]);
+
+// Quick start templates (simple, fast output)
+const QUICK_START_IDS = ["wf-01", "wf-04", "wf-11"];
+
+// Core pipelines (the main value props — 3D, IFC, BOQ, 2D)
+const CORE_IDS = ["wf-09", "wf-05", "wf-17", "wf-14", "wf-16", "wf-18"];
 
 const CATEGORY_LABEL_KEYS: Record<string, TranslationKey> = {
   "Concept Design": 'templates.categoryConceptDesign',
@@ -273,7 +282,16 @@ export default function TemplatesPage() {
   const [activeCategory, setActiveCategory] = useState("All");
   const [sortBy, setSortBy]       = useState("default");
   const [showSort, setShowSort]   = useState(false);
+  const [userRole, setUserRole]   = useState("FREE");
   const sortRef = useRef<HTMLDivElement>(null);
+
+  // Fetch user role
+  useEffect(() => {
+    fetch("/api/user/dashboard-stats")
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d?.userRole) setUserRole(d.userRole); })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (!showSort) return;
@@ -596,7 +614,7 @@ export default function TemplatesPage() {
             }} />
           </div>
 
-          {/* ── Grid ────────────────────────────────────────────────────── */}
+          {/* ── Grid — Organized by sections ─────────────────────────── */}
           <AnimatePresence mode="wait">
             {filtered.length === 0 ? (
               <motion.div
@@ -604,67 +622,270 @@ export default function TemplatesPage() {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                style={{
-                  padding: "80px 0", textAlign: "center",
-                }}
+                style={{ padding: "80px 0", textAlign: "center" }}
               >
                 <div style={{
                   width: 48, height: 48, borderRadius: 12,
-                  background: "rgba(59,130,246,0.06)",
-                  border: "1px solid rgba(59,130,246,0.1)",
+                  background: "rgba(59,130,246,0.06)", border: "1px solid rgba(59,130,246,0.1)",
                   display: "flex", alignItems: "center", justifyContent: "center",
                   margin: "0 auto 16px",
                 }}>
                   <Building2 size={20} style={{ color: "rgba(59,130,246,0.3)" }} />
                 </div>
-                <p style={{ fontSize: 14, color: "#3A3A50", marginBottom: 12 }}>
-                  {t('templates.noTemplates')}
-                </p>
+                <p style={{ fontSize: 14, color: "#3A3A50", marginBottom: 12 }}>{t('templates.noTemplates')}</p>
                 <button
                   onClick={() => setActiveCategory("All")}
                   style={{
                     fontSize: 12, color: "#4F8AFF", background: "rgba(79,138,255,0.08)",
                     border: "1px solid rgba(79,138,255,0.15)",
-                    padding: "6px 16px", borderRadius: 6,
-                    cursor: "pointer", transition: "all 0.15s",
-                  }}
-                  onMouseEnter={e => {
-                    (e.currentTarget as HTMLElement).style.background = "rgba(79,138,255,0.15)";
-                  }}
-                  onMouseLeave={e => {
-                    (e.currentTarget as HTMLElement).style.background = "rgba(79,138,255,0.08)";
+                    padding: "6px 16px", borderRadius: 6, cursor: "pointer",
                   }}
                 >
                   {t('templates.viewAll')}
                 </button>
               </motion.div>
-            ) : (
-              <motion.div
-                key={activeCategory}
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.15 }}
-                className="templates-grid"
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(3, 1fr)",
-                  gap: 20,
-                }}
-              >
-                {filtered.map((wf, i) => (
-                  <WorkflowCard
-                    key={wf.id}
-                    workflow={wf}
-                    showCloneButton
-                    onClone={handleUse}
-                    isFeatured={wf.id === "wf-14"}
-                    index={i}
-                  />
-                ))}
-              </motion.div>
-            )}
+            ) : (() => {
+              // Split filtered into sections
+              const quickStart = filtered.filter(w => QUICK_START_IDS.includes(w.id));
+              const core = filtered.filter(w => CORE_IDS.includes(w.id) && !QUICK_START_IDS.includes(w.id));
+              const rest = filtered.filter(w => !QUICK_START_IDS.includes(w.id) && !CORE_IDS.includes(w.id));
+              const isFiltered = activeCategory !== "All";
+
+              const handleCardClick = (wf: WorkflowTemplate) => {
+                if (LOCKED_IDS.has(wf.id) && userRole === "FREE") {
+                  toast.error("Upgrade your plan to unlock this workflow", {
+                    description: "This template uses 3D, render, or video nodes that require a paid plan.",
+                    action: { label: "Upgrade", onClick: () => router.push("/dashboard/billing") },
+                  });
+                  return;
+                }
+                handleUse(wf.id);
+              };
+
+              const renderSection = (
+                title: string,
+                subtitle: string,
+                icon: React.ReactNode,
+                color: string,
+                rgb: string,
+                workflows: WorkflowTemplate[],
+                baseIndex: number,
+              ) => {
+                if (workflows.length === 0) return null;
+                return (
+                  <div style={{ marginBottom: 40 }}>
+                    {/* Section header */}
+                    <motion.div
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.4, ease: "easeOut" }}
+                      style={{
+                        display: "flex", alignItems: "center", gap: 12,
+                        marginBottom: 20, paddingBottom: 14,
+                        borderBottom: `1px solid rgba(${rgb}, 0.08)`,
+                      }}
+                    >
+                      <div style={{
+                        width: 36, height: 36, borderRadius: 10,
+                        background: `rgba(${rgb}, 0.08)`, border: `1px solid rgba(${rgb}, 0.15)`,
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        color,
+                      }}>
+                        {icon}
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 15, fontWeight: 700, color: "#E2E8F0", letterSpacing: "-0.02em" }}>
+                          {title}
+                        </div>
+                        <div style={{ fontSize: 11, color: "#556070", marginTop: 2 }}>
+                          {subtitle}
+                        </div>
+                      </div>
+                      {/* Accent line */}
+                      <div style={{ flex: 1, height: 1, background: `linear-gradient(90deg, rgba(${rgb}, 0.1), transparent)`, marginLeft: 8 }} />
+                    </motion.div>
+
+                    {/* Cards grid */}
+                    <div className="templates-grid" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 20 }}>
+                      {workflows.map((wf, i) => {
+                        const isLocked = LOCKED_IDS.has(wf.id) && userRole === "FREE";
+                        return (
+                          <div
+                            key={wf.id}
+                            onClick={() => handleCardClick(wf)}
+                            style={{
+                              cursor: "pointer",
+                              position: "relative",
+                            }}
+                          >
+                            <WorkflowCard
+                              workflow={wf}
+                              showCloneButton
+                              onClone={handleUse}
+                              isFeatured={wf.id === "wf-14"}
+                              index={baseIndex + i}
+                            />
+                            {/* Lock overlay for expensive templates */}
+                            {isLocked && (
+                              <div style={{
+                                position: "absolute", inset: 0, zIndex: 10,
+                                borderRadius: 14,
+                                background: "rgba(8,10,18,0.5)",
+                                backdropFilter: "blur(2px)",
+                                display: "flex", flexDirection: "column",
+                                alignItems: "center", justifyContent: "center", gap: 8,
+                                cursor: "pointer",
+                              }}>
+                                <div style={{
+                                  display: "flex", alignItems: "center", gap: 6,
+                                  padding: "8px 18px", borderRadius: 12,
+                                  background: "rgba(245,158,11,0.1)", border: "1px solid rgba(245,158,11,0.2)",
+                                  backdropFilter: "blur(8px)",
+                                }}>
+                                  <Lock size={13} style={{ color: "#F59E0B" }} />
+                                  <span style={{ fontSize: 11, fontWeight: 700, color: "#F59E0B", fontFamily: "var(--font-jetbrains), monospace" }}>
+                                    PRO
+                                  </span>
+                                </div>
+                                <span style={{ fontSize: 10, color: "#8898A8" }}>Click to upgrade</span>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              };
+
+              return (
+                <motion.div
+                  key={activeCategory}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.15 }}
+                >
+                  {isFiltered ? (
+                    /* When filtered by category, show flat grid */
+                    <div className="templates-grid" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 20 }}>
+                      {filtered.map((wf, i) => {
+                        const isLocked = LOCKED_IDS.has(wf.id) && userRole === "FREE";
+                        return (
+                          <div key={wf.id} onClick={() => handleCardClick(wf)} style={{ cursor: "pointer", position: "relative" }}>
+                            <WorkflowCard workflow={wf} showCloneButton onClone={handleUse} isFeatured={wf.id === "wf-14"} index={i} />
+                            {isLocked && (
+                              <div style={{
+                                position: "absolute", inset: 0, zIndex: 10, borderRadius: 14,
+                                background: "rgba(8,10,18,0.5)", backdropFilter: "blur(2px)",
+                                display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8,
+                                cursor: "pointer",
+                              }}>
+                                <div style={{
+                                  display: "flex", alignItems: "center", gap: 6,
+                                  padding: "8px 18px", borderRadius: 12,
+                                  background: "rgba(245,158,11,0.1)", border: "1px solid rgba(245,158,11,0.2)",
+                                }}>
+                                  <Lock size={13} style={{ color: "#F59E0B" }} />
+                                  <span style={{ fontSize: 11, fontWeight: 700, color: "#F59E0B", fontFamily: "var(--font-jetbrains), monospace" }}>PRO</span>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    /* When showing all, organize into 3 sections */
+                    <>
+                      {renderSection(
+                        "Quick Start",
+                        "Get your first output in under 2 minutes",
+                        <Lightbulb size={18} />,
+                        "#10B981", "16,185,129",
+                        quickStart, 0,
+                      )}
+                      {renderSection(
+                        "Core Pipelines",
+                        "3D models, IFC exports, BOQ generation — the workflows that change everything",
+                        <Building2 size={18} />,
+                        "#4F8AFF", "79,138,255",
+                        core, quickStart.length,
+                      )}
+                      {renderSection(
+                        "Explore More",
+                        "Branching workflows, site analysis, and creative pipelines",
+                        <Compass size={18} />,
+                        "#8B5CF6", "139,92,246",
+                        rest, quickStart.length + core.length,
+                      )}
+                    </>
+                  )}
+                </motion.div>
+              );
+            })()}
           </AnimatePresence>
+
+          {/* ── Footer — Suggest a Workflow ───────────────────────────── */}
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.5, ease: "easeOut" }}
+            style={{
+              marginTop: 40, padding: "32px 28px",
+              borderRadius: 18,
+              background: "linear-gradient(135deg, rgba(79,138,255,0.04), rgba(139,92,246,0.03))",
+              border: "1px solid rgba(79,138,255,0.08)",
+              display: "flex", alignItems: "center", gap: 20,
+              position: "relative", overflow: "hidden",
+            }}
+          >
+            {/* Blueprint grid bg */}
+            <div style={{
+              position: "absolute", inset: 0, pointerEvents: "none",
+              backgroundImage: "linear-gradient(rgba(79,138,255,0.02) 1px, transparent 1px), linear-gradient(90deg, rgba(79,138,255,0.02) 1px, transparent 1px)",
+              backgroundSize: "28px 28px",
+              maskImage: "linear-gradient(90deg, transparent 0%, rgba(0,0,0,0.3) 100%)",
+              WebkitMaskImage: "linear-gradient(90deg, transparent 0%, rgba(0,0,0,0.3) 100%)",
+            }} />
+
+            <div style={{
+              width: 46, height: 46, borderRadius: 12, flexShrink: 0,
+              background: "rgba(79,138,255,0.08)", border: "1px solid rgba(79,138,255,0.12)",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              position: "relative", zIndex: 1,
+            }}>
+              <MessageSquare size={20} style={{ color: "#4F8AFF" }} />
+            </div>
+
+            <div style={{ flex: 1, position: "relative", zIndex: 1 }}>
+              <div style={{ fontSize: 15, fontWeight: 700, color: "#E2E8F0", marginBottom: 3, letterSpacing: "-0.02em" }}>
+                We&apos;re building new workflows every week
+              </div>
+              <div style={{ fontSize: 12, color: "#6B7A8D", lineHeight: 1.6 }}>
+                Tell us what workflow template you&apos;d love to see. Your feedback shapes what we build next.
+              </div>
+            </div>
+
+            <a
+              href="#request-workflow"
+              onClick={e => { e.preventDefault(); router.push("/dashboard/feedback"); }}
+              style={{
+                display: "flex", alignItems: "center", gap: 6,
+                padding: "10px 22px", borderRadius: 10, flexShrink: 0,
+                background: "rgba(79,138,255,0.08)", border: "1px solid rgba(79,138,255,0.15)",
+                color: "#4F8AFF", fontSize: 12, fontWeight: 700,
+                textDecoration: "none",
+                fontFamily: "var(--font-jetbrains), monospace",
+                transition: "all 0.2s",
+                position: "relative", zIndex: 1,
+                cursor: "pointer",
+              }}
+            >
+              Suggest a Workflow <ArrowRight size={13} />
+            </a>
+          </motion.div>
         </div>
       </main>
     </div>
