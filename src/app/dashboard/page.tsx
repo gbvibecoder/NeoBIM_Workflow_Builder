@@ -205,12 +205,45 @@ export default function DashboardPage() {
               border: "1px solid rgba(79,138,255,0.08)",
               minHeight: 300,
             }}
+            className="dash-glow-border"
           >
             {/* Blueprint grid */}
             <div style={{
               position: "absolute", inset: 0, pointerEvents: "none",
               backgroundImage: "linear-gradient(rgba(79,138,255,0.025) 1px, transparent 1px), linear-gradient(90deg, rgba(79,138,255,0.025) 1px, transparent 1px)",
               backgroundSize: "48px 48px",
+            }} />
+
+            {/* Floating particles */}
+            <div className="dash-particles">
+              {[
+                { x: "8%", y: "20%", size: 3, color: "#4F8AFF", delay: "0s" },
+                { x: "25%", y: "70%", size: 2, color: "#8B5CF6", delay: "1.5s" },
+                { x: "45%", y: "15%", size: 4, color: "#10B981", delay: "3s" },
+                { x: "65%", y: "80%", size: 2, color: "#F59E0B", delay: "4.5s" },
+                { x: "90%", y: "30%", size: 3, color: "#06B6D4", delay: "2s" },
+                { x: "35%", y: "45%", size: 2, color: "#EC4899", delay: "5.5s" },
+              ].map((p, i) => (
+                <div key={i} className="dash-particle" style={{
+                  left: p.x, top: p.y, width: p.size, height: p.size,
+                  background: p.color, boxShadow: `0 0 ${p.size * 3}px ${p.color}60`,
+                  animationDelay: p.delay, animationDuration: `${6 + i * 0.8}s`,
+                }} />
+              ))}
+            </div>
+
+            {/* Gradient mesh */}
+            <div style={{
+              position: "absolute", top: "-20%", right: "-10%", width: 400, height: 400,
+              borderRadius: "50%", pointerEvents: "none",
+              background: "radial-gradient(circle, rgba(79,138,255,0.06) 0%, transparent 70%)",
+              filter: "blur(40px)",
+            }} />
+            <div style={{
+              position: "absolute", bottom: "-30%", left: "10%", width: 350, height: 350,
+              borderRadius: "50%", pointerEvents: "none",
+              background: "radial-gradient(circle, rgba(139,92,246,0.04) 0%, transparent 70%)",
+              filter: "blur(30px)",
             }} />
 
             {/* AEC Orbit */}
@@ -295,13 +328,14 @@ export default function DashboardPage() {
                 transition={{ delay: 0.55, duration: 0.5, ease: smoothEase }}
                 style={{ display: "flex", gap: 12, flexWrap: "wrap" }}
               >
-                <Link href="/dashboard/workflows/new" style={{
+                <Link href="/dashboard/workflows/new" className="dash-cta-primary" style={{
                   display: "flex", alignItems: "center", gap: 8,
                   padding: "12px 28px", borderRadius: 12,
                   background: "linear-gradient(135deg, #4F8AFF, #6366F1)",
                   color: "#fff", fontSize: 14, fontWeight: 700,
                   textDecoration: "none",
                   boxShadow: "0 4px 24px rgba(79,138,255,0.25)",
+                  transition: "all 0.3s ease",
                 }}>
                   <Plus size={16} /> {t('dash.startBuilding')}
                 </Link>
@@ -340,7 +374,7 @@ export default function DashboardPage() {
               }}>
                 <Play size={10} /> {t('dash.seeItInAction')}
               </span>
-              <h2 style={{ fontSize: "clamp(24px, 3.5vw, 38px)", fontWeight: 800, color: "#F0F0F5", letterSpacing: "-0.04em", lineHeight: 1.15, marginBottom: 12 }}>
+              <h2 className="dash-shimmer-text" style={{ fontSize: "clamp(24px, 3.5vw, 38px)", fontWeight: 800, letterSpacing: "-0.04em", lineHeight: 1.15, marginBottom: 12 }}>
                 {t('dash.impactLine')}
               </h2>
               <p style={{ fontSize: 15, color: "#6B7A8D", maxWidth: 500, margin: "0 auto", lineHeight: 1.7 }}>
@@ -362,7 +396,7 @@ export default function DashboardPage() {
                     border: `1px solid rgba(${vc.rgb}, 0.12)`,
                     transition: "all 350ms cubic-bezier(0.25, 0.4, 0.25, 1)",
                   }}
-                  className="dash-card-hover"
+                  className="dash-card-hover dash-video-card"
                 >
                   {/* Video preview */}
                   <div style={{ position: "relative", height: 200, overflow: "hidden" }}>
@@ -386,8 +420,17 @@ export default function DashboardPage() {
                       {vc.duration}
                     </div>
                     {/* Corner accents */}
-                    <svg style={{ position: "absolute", top: 0, left: 0, pointerEvents: "none" }} width={14} height={14}>
-                      <path d={`M0 14 L0 0 L14 0`} stroke={vc.color} strokeWidth="1" fill="none" opacity={0.3} />
+                    <svg style={{ position: "absolute", top: 0, left: 0, pointerEvents: "none" }} width={16} height={16}>
+                      <path d="M0 16 L0 0 L16 0" stroke={vc.color} strokeWidth="1.5" fill="none" opacity={0.4} />
+                    </svg>
+                    <svg style={{ position: "absolute", top: 0, right: 0, pointerEvents: "none" }} width={16} height={16}>
+                      <path d="M0 0 L16 0 L16 16" stroke={vc.color} strokeWidth="1.5" fill="none" opacity={0.4} />
+                    </svg>
+                    <svg style={{ position: "absolute", bottom: 0, left: 0, pointerEvents: "none" }} width={16} height={16}>
+                      <path d="M0 0 L0 16 L16 16" stroke={vc.color} strokeWidth="1.5" fill="none" opacity={0.2} />
+                    </svg>
+                    <svg style={{ position: "absolute", bottom: 0, right: 0, pointerEvents: "none" }} width={16} height={16}>
+                      <path d="M16 0 L16 16 L0 16" stroke={vc.color} strokeWidth="1.5" fill="none" opacity={0.2} />
                     </svg>
                   </div>
 
@@ -440,6 +483,9 @@ export default function DashboardPage() {
             </div>
           </motion.div>
 
+          {/* Section divider */}
+          <div className="dash-section-divider" />
+
           {/* ══════════════════════════════════════════════════════════════
               SECTION 3 — PROBLEM → SOLUTION
               ══════════════════════════════════════════════════════════════ */}
@@ -470,10 +516,11 @@ export default function DashboardPage() {
             <div className="grid gap-6 dashboard-problem-grid" style={{ gridTemplateColumns: "1fr 1fr", position: "relative", zIndex: 1 }}>
               {/* Old Way */}
               <motion.div variants={fadeUp} transition={{ duration: 0.5, ease: smoothEase }}>
-                <div style={{
-                  padding: "24px", borderRadius: 16,
+                <div className="dash-problem-card dash-problem-old" style={{
+                  padding: "24px 24px 24px 28px", borderRadius: 16,
                   background: "rgba(239,68,68,0.03)",
                   border: "1px solid rgba(239,68,68,0.08)",
+                  backdropFilter: "blur(12px)",
                 }}>
                   <div style={{ fontSize: 10, fontWeight: 700, color: "#EF4444", letterSpacing: "0.15em", marginBottom: 20, fontFamily: "var(--font-jetbrains), monospace" }}>
                     {t('dash.oldWay')}
@@ -500,10 +547,11 @@ export default function DashboardPage() {
 
               {/* New Way */}
               <motion.div variants={fadeUp} transition={{ duration: 0.5, delay: 0.15, ease: smoothEase }}>
-                <div style={{
-                  padding: "24px", borderRadius: 16,
+                <div className="dash-problem-card dash-problem-new" style={{
+                  padding: "24px 24px 24px 28px", borderRadius: 16,
                   background: "rgba(16,185,129,0.03)",
                   border: "1px solid rgba(16,185,129,0.08)",
+                  backdropFilter: "blur(12px)",
                 }}>
                   <div style={{ fontSize: 10, fontWeight: 700, color: "#10B981", letterSpacing: "0.15em", marginBottom: 20, fontFamily: "var(--font-jetbrains), monospace" }}>
                     {t('dash.newWay')}
@@ -529,6 +577,9 @@ export default function DashboardPage() {
               </motion.div>
             </div>
           </motion.div>
+
+          {/* Section divider */}
+          <div className="dash-section-divider" />
 
           {/* ══════════════════════════════════════════════════════════════
               SECTION 4 — NODE SHOWCASE
@@ -579,13 +630,14 @@ export default function DashboardPage() {
                       cursor: "pointer",
                       transition: "all 300ms ease",
                     }}
-                    className="dash-card-hover"
+                    className="dash-node-card"
                   >
-                    <div style={{
+                    <div className="dash-node-icon" style={{
                       width: 42, height: 42, borderRadius: 11,
                       background: `${node.color}12`, border: `1px solid ${node.color}20`,
                       display: "flex", alignItems: "center", justifyContent: "center",
                       color: node.color,
+                      transition: "all 0.3s ease",
                     }}>
                       {node.icon}
                     </div>
@@ -604,6 +656,9 @@ export default function DashboardPage() {
               })}
             </div>
           </motion.div>
+
+          {/* Section divider */}
+          <div className="dash-section-divider" />
 
           {/* ══════════════════════════════════════════════════════════════
               SECTION 5 — READY CTA
@@ -709,9 +764,204 @@ export default function DashboardPage() {
         </div>
       </main>
 
-      {/* Hide scrollbar on node scroll */}
+      {/* ── Visual Effects System ─────────────────────────────── */}
       <style jsx global>{`
+        /* Scrollbar hide */
         .dashboard-node-scroll::-webkit-scrollbar { display: none; }
+
+        /* ── Card hover effects ── */
+        .dash-card-hover {
+          position: relative;
+        }
+        .dash-card-hover::before {
+          content: '';
+          position: absolute;
+          inset: 0;
+          border-radius: inherit;
+          opacity: 0;
+          transition: opacity 0.4s ease;
+          background: linear-gradient(135deg, rgba(79,138,255,0.04), rgba(139,92,246,0.02));
+          pointer-events: none;
+          z-index: 0;
+        }
+        .dash-card-hover:hover::before {
+          opacity: 1;
+        }
+        .dash-card-hover:hover {
+          transform: translateY(-4px) !important;
+          box-shadow: 0 20px 60px rgba(0,0,0,0.3), 0 0 30px rgba(79,138,255,0.05) !important;
+          border-color: rgba(79,138,255,0.2) !important;
+        }
+
+        /* ── Video card scan line ── */
+        .dash-video-card::after {
+          content: '';
+          position: absolute;
+          top: 0; left: 0; right: 0;
+          height: 40%;
+          pointer-events: none;
+          background: linear-gradient(180deg, transparent, rgba(0,245,255,0.02), transparent);
+          animation: dash-scanline 4s linear infinite;
+          z-index: 2;
+        }
+        @keyframes dash-scanline {
+          0% { transform: translateY(-100%); }
+          100% { transform: translateY(300%); }
+        }
+
+        /* ── Glowing border animation ── */
+        .dash-glow-border {
+          position: relative;
+        }
+        .dash-glow-border::after {
+          content: '';
+          position: absolute;
+          inset: -1px;
+          border-radius: inherit;
+          padding: 1px;
+          background: linear-gradient(135deg, rgba(79,138,255,0.3), rgba(139,92,246,0.2), rgba(16,185,129,0.2), rgba(245,158,11,0.2));
+          background-size: 300% 300%;
+          animation: dash-border-flow 6s ease infinite;
+          mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+          -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+          mask-composite: exclude;
+          -webkit-mask-composite: xor;
+          pointer-events: none;
+          opacity: 0.6;
+        }
+        @keyframes dash-border-flow {
+          0% { background-position: 0% 50%; }
+          50% { background-position: 100% 50%; }
+          100% { background-position: 0% 50%; }
+        }
+
+        /* ── Floating particles ── */
+        .dash-particles {
+          position: absolute;
+          inset: 0;
+          pointer-events: none;
+          overflow: hidden;
+        }
+        .dash-particle {
+          position: absolute;
+          border-radius: 50%;
+          animation: dash-float 8s ease-in-out infinite;
+        }
+        @keyframes dash-float {
+          0%, 100% { transform: translateY(0) translateX(0); opacity: 0.3; }
+          25% { transform: translateY(-20px) translateX(10px); opacity: 0.7; }
+          50% { transform: translateY(-10px) translateX(-5px); opacity: 0.4; }
+          75% { transform: translateY(-25px) translateX(8px); opacity: 0.6; }
+        }
+
+        /* ── Pulse glow on hero CTA ── */
+        .dash-cta-primary {
+          position: relative;
+          overflow: hidden;
+        }
+        .dash-cta-primary::after {
+          content: '';
+          position: absolute;
+          top: 50%; left: 50%;
+          width: 120%; height: 120%;
+          transform: translate(-50%, -50%);
+          background: radial-gradient(circle, rgba(79,138,255,0.2), transparent 70%);
+          animation: dash-cta-pulse 3s ease-in-out infinite;
+          pointer-events: none;
+        }
+        @keyframes dash-cta-pulse {
+          0%, 100% { opacity: 0; transform: translate(-50%, -50%) scale(0.8); }
+          50% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+        }
+
+        /* ── Text shimmer effect ── */
+        .dash-shimmer-text {
+          background: linear-gradient(90deg, #F0F0F5 0%, #4F8AFF 40%, #8B5CF6 60%, #F0F0F5 100%);
+          background-size: 200% auto;
+          -webkit-background-clip: text;
+          background-clip: text;
+          -webkit-text-fill-color: transparent;
+          animation: dash-shimmer 4s linear infinite;
+        }
+        @keyframes dash-shimmer {
+          0% { background-position: 200% center; }
+          100% { background-position: -200% center; }
+        }
+
+        /* ── Node card hover glow ── */
+        .dash-node-card:hover {
+          transform: translateY(-6px) scale(1.02) !important;
+          box-shadow: 0 12px 40px rgba(0,0,0,0.3) !important;
+        }
+        .dash-node-card:hover .dash-node-icon {
+          box-shadow: 0 0 20px currentColor !important;
+          transform: scale(1.1);
+          transition: all 0.3s ease;
+        }
+
+        /* ── Section divider with animated gradient ── */
+        .dash-section-divider {
+          height: 1px;
+          background: linear-gradient(90deg, transparent, rgba(79,138,255,0.15), rgba(139,92,246,0.1), transparent);
+          margin: 0 auto 48px;
+          max-width: 600px;
+          position: relative;
+        }
+        .dash-section-divider::after {
+          content: '';
+          position: absolute;
+          top: -2px; left: 50%; transform: translateX(-50%);
+          width: 40px; height: 5px; border-radius: 3px;
+          background: linear-gradient(90deg, #4F8AFF, #8B5CF6);
+          box-shadow: 0 0 12px rgba(79,138,255,0.3);
+        }
+
+        /* ── Orbit container breathing ── */
+        .dashboard-orbit-container {
+          animation: dash-orbit-breathe 6s ease-in-out infinite;
+        }
+        @keyframes dash-orbit-breathe {
+          0%, 100% { opacity: 0.7; transform: translateY(-50%) scale(1); }
+          50% { opacity: 1; transform: translateY(-50%) scale(1.05); }
+        }
+
+        /* ── Problem card animated accent ── */
+        .dash-problem-card {
+          position: relative;
+          overflow: hidden;
+        }
+        .dash-problem-card::before {
+          content: '';
+          position: absolute;
+          top: 0; left: 0; bottom: 0; width: 3px;
+          border-radius: 0 4px 4px 0;
+        }
+        .dash-problem-old::before {
+          background: linear-gradient(180deg, #EF4444, rgba(239,68,68,0.2));
+        }
+        .dash-problem-new::before {
+          background: linear-gradient(180deg, #10B981, rgba(16,185,129,0.2));
+          box-shadow: 0 0 12px rgba(16,185,129,0.2);
+        }
+
+        /* ── Ready CTA section floating elements ── */
+        .dash-ready-section {
+          position: relative;
+        }
+        .dash-ready-section::before {
+          content: '';
+          position: absolute;
+          top: -50%; left: -10%;
+          width: 300px; height: 300px;
+          border-radius: 50%;
+          background: radial-gradient(circle, rgba(79,138,255,0.06), transparent 70%);
+          animation: dash-ready-orb 8s ease-in-out infinite;
+          pointer-events: none;
+        }
+        @keyframes dash-ready-orb {
+          0%, 100% { transform: translate(0, 0); }
+          50% { transform: translate(30px, 20px); }
+        }
       `}</style>
     </div>
   );
