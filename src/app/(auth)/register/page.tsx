@@ -82,24 +82,18 @@ export default function RegisterPage() {
         return;
       }
 
-      // Auto-login with the just-created account
-      const signInRes = await signIn("credentials", {
-        email: email.trim().toLowerCase(),
-        password,
-        redirect: false,
+      trackCompleteRegistration({
+        content_name: "email_signup",
+        user_email: email.trim().toLowerCase(),
+        user_name: name.trim()
       });
 
-      trackCompleteRegistration({ content_name: "email_signup" });
-
-      if (signInRes?.error) {
-        // Account was created but auto-login failed (e.g. DB replication lag).
-        // Show success and redirect to login so user can sign in manually.
-        setError(t('auth.accountCreated'));
-        setTimeout(() => router.push("/login"), 1500);
-      } else {
-        router.push("/dashboard");
-        router.refresh();
-      }
+      // Auto-login and redirect to dashboard
+      await signIn("credentials", {
+        email: email.trim().toLowerCase(),
+        password,
+        callbackUrl: "/dashboard",
+      });
     } catch (err) {
       setError(extractErrorMessage(err, t('auth.somethingWentWrong')));
     } finally {
