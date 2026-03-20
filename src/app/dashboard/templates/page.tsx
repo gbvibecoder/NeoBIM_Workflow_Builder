@@ -915,7 +915,7 @@ export default function TemplatesPage() {
                             {isLocked && (
                               <div style={{
                                 position: "absolute", inset: 0, zIndex: 10, borderRadius: 16,
-                                background: "rgba(8,10,18,0.55)", backdropFilter: "blur(3px)",
+                                background: "rgba(8,10,18,0.3)", backdropFilter: "blur(1px)",
                                 display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8,
                               }}>
                                 <div style={{
