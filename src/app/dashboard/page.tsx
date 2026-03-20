@@ -173,7 +173,7 @@ export default function DashboardPage() {
   const firstName = data.userName?.split(" ")[0] ?? "";
   const role = data.userRole ?? "FREE";
   const planLimit = PLAN_LIMITS[role] ?? 5;
-  const used = Math.max(data.executionCount, 2);
+  const used = data.executionCount;
   const usagePercent = Math.min((used / planLimit) * 100, 100);
 
   // Video card titles/subtitles/nodes from i18n
