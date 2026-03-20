@@ -31,7 +31,7 @@ export async function GET() {
       await Promise.all([
         prisma.user.findUnique({
           where: { id: userId },
-          select: { xp: true, level: true },
+          select: { xp: true, level: true, name: true },
         }),
         prisma.userAchievement.findMany({
           where: { userId },
@@ -96,6 +96,7 @@ export async function GET() {
     });
 
     const response = NextResponse.json({
+      userName: user?.name ?? null,
       xp,
       level,
       progress,
