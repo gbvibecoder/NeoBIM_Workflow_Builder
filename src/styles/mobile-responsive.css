@@ -958,6 +958,22 @@
     scroll-snap-align: start !important;
   }
 
+  /* Capability grid: single column on mobile */
+  .dashboard-capability-grid {
+    grid-template-columns: 1fr !important;
+    gap: 12px !important;
+    margin-bottom: 32px !important;
+  }
+
+  /* Stat pills: wrap on mobile */
+  .dashboard-stat-pills {
+    gap: 8px !important;
+  }
+
+  .dashboard-stat-pills > div {
+    padding: 6px 12px !important;
+  }
+
   /* Quick Actions: vertical stack, hide wire connectors */
   .dashboard-quick-actions {
     flex-direction: column !important;

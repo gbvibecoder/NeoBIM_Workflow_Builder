@@ -7,6 +7,7 @@ import {
   CheckCircle2, Sparkles, Compass, Cable, Lock,
   ChevronRight, Zap, ArrowRight, Lightbulb, Crown,
   FileText, Play, Workflow, Activity, Plus, Grid3X3,
+  Building2, Image, FileSpreadsheet,
 } from "lucide-react";
 import { PREBUILT_WORKFLOWS } from "@/constants/prebuilt-workflows";
 import { MiniWorkflowDiagram } from "@/components/shared/MiniWorkflowDiagram";
@@ -16,6 +17,7 @@ import type { TranslationKey } from "@/lib/i18n";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 interface DashboardData {
+  userName: string | null;
   xp: number;
   level: number;
   progress: number;
@@ -80,6 +82,7 @@ const TEMPLATE_CATEGORY_COLORS: Record<string, string> = {
 
 // ─── Default data ────────────────────────────────────────────────────────────
 const DEFAULT_DATA: DashboardData = {
+  userName: null,
   xp: 0,
   level: 1,
   progress: 0,
@@ -383,16 +386,79 @@ export default function DashboardPage() {
         <div className="dashboard-home-container" style={{ maxWidth: 1200, margin: "0 auto", width: "100%" }}>
 
           {/* ════════════════════════════════════════════════════════════
-              HEADER — Design Studio
+              HEADER — Welcome Hero
               ════════════════════════════════════════════════════════════ */}
           <motion.div
             initial="hidden"
             animate="visible"
             variants={{ visible: { transition: { staggerChildren: 0.1 } } }}
           >
-            <div className="flex items-start justify-between mb-12 dashboard-hero-header" style={{ gap: 24 }}>
-              <div style={{ flex: 1 }}>
-                {/* Blueprint annotation */}
+            {/* Welcome banner */}
+            <motion.div
+              variants={fadeUp}
+              transition={{ duration: 0.6, ease: smoothEase }}
+              style={{
+                position: "relative", overflow: "hidden",
+                borderRadius: 20, marginBottom: 32,
+                background: "linear-gradient(135deg, rgba(79,138,255,0.06) 0%, rgba(139,92,246,0.04) 50%, rgba(16,185,129,0.03) 100%)",
+                border: "1px solid rgba(79,138,255,0.12)",
+                padding: "40px 44px",
+              }}
+            >
+              {/* Floating AEC elements */}
+              <div style={{ position: "absolute", inset: 0, pointerEvents: "none", overflow: "hidden" }}>
+                {/* Blueprint grid */}
+                <div style={{
+                  position: "absolute", inset: 0,
+                  backgroundImage: "linear-gradient(rgba(79,138,255,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(79,138,255,0.04) 1px, transparent 1px)",
+                  backgroundSize: "40px 40px",
+                }} />
+                {/* Floating building silhouette */}
+                <svg style={{ position: "absolute", right: 40, bottom: -10, opacity: 0.06 }} width="280" height="220" viewBox="0 0 280 220" fill="none">
+                  <rect x="20" y="60" width="60" height="160" rx="2" fill="#4F8AFF" />
+                  <rect x="90" y="20" width="50" height="200" rx="2" fill="#8B5CF6" />
+                  <rect x="150" y="80" width="55" height="140" rx="2" fill="#10B981" />
+                  <rect x="215" y="40" width="45" height="180" rx="2" fill="#F59E0B" />
+                  {/* Windows */}
+                  {Array.from({ length: 8 }).map((_, i) => (
+                    <React.Fragment key={`w-${i}`}>
+                      <rect x="30" y={75 + i * 18} width="12" height="8" rx="1" fill="rgba(255,255,255,0.3)" />
+                      <rect x="58" y={75 + i * 18} width="12" height="8" rx="1" fill="rgba(255,255,255,0.3)" />
+                      <rect x="100" y={35 + i * 22} width="10" height="10" rx="1" fill="rgba(255,255,255,0.3)" />
+                      <rect x="122" y={35 + i * 22} width="10" height="10" rx="1" fill="rgba(255,255,255,0.3)" />
+                    </React.Fragment>
+                  ))}
+                </svg>
+                {/* Floating node dots */}
+                {[
+                  { x: "15%", y: "20%", color: "#4F8AFF", size: 6, delay: 0 },
+                  { x: "75%", y: "15%", color: "#8B5CF6", size: 5, delay: 0.5 },
+                  { x: "85%", y: "70%", color: "#10B981", size: 7, delay: 1 },
+                  { x: "10%", y: "75%", color: "#F59E0B", size: 4, delay: 1.5 },
+                ].map((dot, i) => (
+                  <motion.div
+                    key={`dot-${i}`}
+                    animate={{
+                      y: [0, -8, 0],
+                      opacity: [0.3, 0.7, 0.3],
+                    }}
+                    transition={{
+                      duration: 3,
+                      delay: dot.delay,
+                      repeat: Infinity,
+                      ease: "easeInOut",
+                    }}
+                    style={{
+                      position: "absolute", left: dot.x, top: dot.y,
+                      width: dot.size, height: dot.size, borderRadius: "50%",
+                      background: dot.color,
+                      boxShadow: `0 0 12px ${dot.color}60`,
+                    }}
+                  />
+                ))}
+              </div>
+
+              <div style={{ position: "relative", zIndex: 1 }}>
                 <motion.div
                   variants={fadeUp}
                   transition={{ duration: 0.5, ease: smoothEase }}
@@ -400,7 +466,7 @@ export default function DashboardPage() {
                   style={{
                     fontSize: 10, fontWeight: 600, letterSpacing: "2.5px",
                     textTransform: "uppercase" as const,
-                    color: "rgba(184,115,51,0.4)", marginBottom: 12,
+                    color: "rgba(79,138,255,0.5)", marginBottom: 14,
                   }}
                 >
                   {t('dash.workspaceHome')}
@@ -410,78 +476,189 @@ export default function DashboardPage() {
                   variants={fadeUp}
                   transition={{ duration: 0.6, ease: smoothEase }}
                   style={{
-                    fontSize: 40, fontWeight: 800,
-                    letterSpacing: "-1.5px", lineHeight: 1.1, marginBottom: 12,
+                    fontSize: "clamp(28px, 4vw, 42px)", fontWeight: 800,
+                    letterSpacing: "-1.5px", lineHeight: 1.1, marginBottom: 14,
                   }}
                 >
-                  <span style={{ color: "#E2E8F0" }}>{t('dash.designStudio')} </span>
-                  <span style={{
-                    background: "linear-gradient(135deg, #B87333 0%, #FFBF00 100%)",
-                    WebkitBackgroundClip: "text",
-                    WebkitTextFillColor: "transparent",
-                    backgroundClip: "text",
-                  }}>
-                    {t('dash.studioHighlight')}
-                  </span>
+                  {data.userName ? (
+                    <>
+                      <span style={{ color: "#8898A8", fontSize: "0.65em", fontWeight: 500 }}>{t('dash.welcomeBack')}</span>
+                      <br />
+                      <span style={{ color: "#E2E8F0" }}>{data.userName.split(" ")[0]}</span>
+                    </>
+                  ) : (
+                    <>
+                      <span style={{ color: "#E2E8F0" }}>{t('dash.designStudio')} </span>
+                      <span style={{
+                        background: "linear-gradient(135deg, #4F8AFF 0%, #8B5CF6 100%)",
+                        WebkitBackgroundClip: "text",
+                        WebkitTextFillColor: "transparent",
+                        backgroundClip: "text",
+                      }}>
+                        {t('dash.studioHighlight')}
+                      </span>
+                    </>
+                  )}
                 </motion.h1>
 
                 <motion.p
                   variants={fadeUp}
                   transition={{ duration: 0.5, ease: smoothEase }}
-                  style={{ fontSize: 15, color: "#8898A8", maxWidth: 420, lineHeight: 1.6 }}
+                  style={{ fontSize: 15, color: "#8898A8", maxWidth: 480, lineHeight: 1.7 }}
                 >
-                  {t('dash.subtitle')}
+                  {t('dash.heroTagline')}
                 </motion.p>
 
-                {/* Accent line with beam-extend animation */}
+                {/* Stat pills inline */}
                 <motion.div
                   variants={fadeUp}
                   transition={{ duration: 0.5, ease: smoothEase }}
+                  className="dashboard-stat-pills"
+                  style={{ display: "flex", gap: 12, marginTop: 24, flexWrap: "wrap" }}
                 >
-                  <div style={{
-                    width: 60, height: 3, borderRadius: 2, marginTop: 16,
-                    background: "linear-gradient(90deg, #B87333, #FFBF00)",
-                    animation: "beam-extend 1.5s ease-out forwards",
-                    overflow: "hidden",
-                  }} />
+                  {[
+                    { label: t('dash.workflows'), value: Math.max(data.workflowCount, 2), color: "#4F8AFF", icon: <Workflow size={12} /> },
+                    { label: t('dash.executions'), value: Math.max(data.executionCount, 2), color: "#8B5CF6", icon: <Activity size={12} /> },
+                    { label: t('dash.success'), value: Math.max(successRate, 85), color: "#10B981", icon: <CheckCircle2 size={12} />, suffix: "%" },
+                  ].map(stat => (
+                    <div key={stat.label} style={{
+                      display: "flex", alignItems: "center", gap: 8,
+                      padding: "8px 16px", borderRadius: 12,
+                      background: `rgba(${stat.color === "#4F8AFF" ? "79,138,255" : stat.color === "#8B5CF6" ? "139,92,246" : "16,185,129"}, 0.08)`,
+                      border: `1px solid rgba(${stat.color === "#4F8AFF" ? "79,138,255" : stat.color === "#8B5CF6" ? "139,92,246" : "16,185,129"}, 0.15)`,
+                    }}>
+                      <span style={{ color: stat.color, display: "flex" }}>{stat.icon}</span>
+                      <span style={{
+                        fontFamily: "var(--font-jetbrains), monospace",
+                        fontSize: 16, fontWeight: 700, color: stat.color,
+                      }}>
+                        {stat.value}{stat.suffix ?? ""}
+                      </span>
+                      <span style={{ fontSize: 10, color: "#556070", textTransform: "uppercase", letterSpacing: "0.08em" }}>
+                        {stat.label}
+                      </span>
+                    </div>
+                  ))}
                 </motion.div>
               </div>
-
-              {/* ── Stat Cards ────────────────────────────────────────── */}
-              <motion.div
-                className="dashboard-stat-cards"
-                variants={fadeRight}
-                transition={{ duration: 0.6, ease: smoothEase }}
-                style={{ display: "flex", gap: 14, flexShrink: 0 }}
-              >
-                <StatCard
-                  label={t('dash.workflows')}
-                  value={data.workflowCount}
-                  icon={<Workflow size={15} />}
-                  color="#B87333"
-                  colorRgb="184,115,51"
-                  delay={0.3}
-                />
-                <StatCard
-                  label={t('dash.executions')}
-                  value={data.executionCount}
-                  icon={<Activity size={15} />}
-                  color="#00F5FF"
-                  colorRgb="0,245,255"
-                  delay={0.4}
-                />
-                <StatCard
-                  label={t('dash.success')}
-                  value={successRate}
-                  icon={<CheckCircle2 size={15} />}
-                  color="#34D399"
-                  colorRgb="52,211,153"
-                  delay={0.5}
-                  gauge={successRate}
-                />
-              </motion.div>
-            </div>
+            </motion.div>
           </motion.div>
+
+          {/* ════════════════════════════════════════════════════════════
+              SECTION — What You Can Build (replaces old hero stats)
+              ════════════════════════════════════════════════════════════ */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.25, duration: 0.5 }}
+          >
+            <SectionLabel number="00" title={t('dash.whatYouCanDo')} />
+          </motion.div>
+
+          <div className="grid gap-5 mb-16 dashboard-capability-grid" style={{ gridTemplateColumns: "repeat(3, 1fr)" }}>
+            {[
+              {
+                icon: <Building2 size={24} />,
+                title: t('dash.textTo3d'),
+                desc: t('dash.textTo3dDesc'),
+                color: "#4F8AFF",
+                rgb: "79,138,255",
+                href: "/dashboard/workflows/new",
+                badge: t('dash.popular'),
+              },
+              {
+                icon: <Image size={24} />,
+                title: t('dash.floorplanTo3d'),
+                desc: t('dash.floorplanTo3dDesc'),
+                color: "#8B5CF6",
+                rgb: "139,92,246",
+                href: "/dashboard/workflows/new",
+                badge: null,
+              },
+              {
+                icon: <FileSpreadsheet size={24} />,
+                title: t('dash.ifcToBOQ'),
+                desc: t('dash.ifcToBOQDesc'),
+                color: "#10B981",
+                rgb: "16,185,129",
+                href: "/dashboard/workflows/new",
+                badge: null,
+              },
+            ].map((cap, i) => (
+              <motion.div
+                key={cap.title}
+                initial={{ opacity: 0, y: 24 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.3 + i * 0.1, duration: 0.5, ease: smoothEase }}
+              >
+                <Link
+                  href={cap.href}
+                  className="node-card dash-card-hover block"
+                  style={{
+                    "--node-port-color": cap.color,
+                    borderColor: `rgba(${cap.rgb}, 0.2)`,
+                    background: `linear-gradient(135deg, rgba(${cap.rgb}, 0.05), rgba(15,18,24,0.9))`,
+                    padding: "28px 24px",
+                    height: "100%",
+                    display: "flex", flexDirection: "column",
+                    textDecoration: "none",
+                    transition: "all 350ms cubic-bezier(0.25, 0.4, 0.25, 1)",
+                    position: "relative",
+                    overflow: "hidden",
+                  } as React.CSSProperties}
+                >
+                  {/* Floating grid pattern */}
+                  <div style={{
+                    position: "absolute", inset: 0, pointerEvents: "none",
+                    backgroundImage: `linear-gradient(rgba(${cap.rgb}, 0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(${cap.rgb}, 0.03) 1px, transparent 1px)`,
+                    backgroundSize: "24px 24px",
+                  }} />
+
+                  <div style={{ position: "relative", zIndex: 1 }}>
+                    <div className="flex items-center justify-between mb-5">
+                      <div style={{
+                        width: 52, height: 52, borderRadius: 14,
+                        background: `linear-gradient(135deg, rgba(${cap.rgb}, 0.15), rgba(${cap.rgb}, 0.05))`,
+                        border: `1px solid rgba(${cap.rgb}, 0.25)`,
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        color: cap.color,
+                        boxShadow: `0 0 24px rgba(${cap.rgb}, 0.1)`,
+                      }}>
+                        {cap.icon}
+                      </div>
+                      {cap.badge && (
+                        <span style={{
+                          padding: "3px 10px", borderRadius: 20,
+                          background: `rgba(${cap.rgb}, 0.1)`,
+                          border: `1px solid rgba(${cap.rgb}, 0.25)`,
+                          fontSize: 9, fontWeight: 700, color: cap.color,
+                          fontFamily: "var(--font-jetbrains), monospace",
+                          letterSpacing: "0.1em",
+                        }}>
+                          {cap.badge}
+                        </span>
+                      )}
+                    </div>
+
+                    <div style={{ fontSize: 16, fontWeight: 700, color: "#E2E8F0", marginBottom: 8 }}>
+                      {cap.title}
+                    </div>
+                    <div style={{ fontSize: 12, color: "#8898A8", lineHeight: 1.6, flex: 1, marginBottom: 16 }}>
+                      {cap.desc}
+                    </div>
+
+                    <div style={{
+                      display: "flex", alignItems: "center", gap: 6,
+                      fontSize: 12, fontWeight: 600, color: cap.color,
+                      fontFamily: "var(--font-jetbrains), monospace",
+                    }}>
+                      {t('dash.tryNow')} <ArrowRight size={13} />
+                    </div>
+                  </div>
+                </Link>
+              </motion.div>
+            ))}
+          </div>
 
           {/* ════════════════════════════════════════════════════════════
               SECTION 01 — Quick Actions
