@@ -1042,7 +1042,7 @@ export default function LandingPage() {
               { label: t('landing.features'), href: '#how-it-works' },
               { label: t('landing.community'), href: '#community' },
               { label: t('landing.pricing'), href: '#pricing' },
-              { label: t('landing.blog'), href: '#request-workflow' },
+              { label: t('landing.blog'), href: '/blog' },
             ].map(l => (
               <a key={l.href} href={l.href} className="landing-nav-item">
                 {l.label}
