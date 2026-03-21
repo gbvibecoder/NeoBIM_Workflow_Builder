@@ -88,16 +88,91 @@ export function OverviewTab({ data, onExpandVideo, onNavigateTab, onRetryVideo }
 
   const hasKpis = data.kpiMetrics.length > 0;
   const hasHero = !!data.videoData || !!data.heroImageUrl;
+  const hasFloorPlan = !!data.svgContent;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+
+      {/* ── Floor Plan Hero (when SVG exists — primary deliverable) ──── */}
+      {hasFloorPlan && (
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+        >
+          <motion.button
+            whileHover={{ scale: 1.002 }}
+            whileTap={{ scale: 0.998 }}
+            onClick={() => onNavigateTab("media")}
+            style={{
+              position: "relative",
+              width: "100%",
+              background: "#FFFFFF",
+              border: `1px solid ${COLORS.GLASS_BORDER}`,
+              borderRadius: 14,
+              overflow: "hidden",
+              cursor: "pointer",
+              padding: 0,
+            }}
+          >
+            {/* SVG rendered at full width */}
+            <div
+              style={{
+                maxHeight: 380,
+                overflow: "hidden",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                padding: 20,
+              }}
+              dangerouslySetInnerHTML={{ __html: data.svgContent! }}
+            />
+            {/* Bottom fade + CTA */}
+            <div style={{
+              position: "absolute",
+              bottom: 0,
+              left: 0,
+              right: 0,
+              padding: "40px 20px 14px",
+              background: "linear-gradient(transparent, rgba(7,8,9,0.9) 70%)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <div style={{
+                  width: 28, height: 28, borderRadius: 7,
+                  background: `${COLORS.CYAN}18`,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                }}>
+                  <Layers size={13} style={{ color: COLORS.CYAN }} />
+                </div>
+                <span style={{
+                  fontSize: 12, fontWeight: 600, color: COLORS.TEXT_PRIMARY,
+                }}>
+                  {t('showcase.typeFloorPlan')}
+                </span>
+              </div>
+              <span style={{
+                display: "flex", alignItems: "center", gap: 4,
+                fontSize: 11, fontWeight: 600, color: COLORS.CYAN,
+              }}>
+                {t('showcase.viewFullFloorPlan')}
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={COLORS.CYAN} strokeWidth="2">
+                  <path d="M9 18l6-6-6-6" />
+                </svg>
+              </span>
+            </div>
+          </motion.button>
+        </motion.div>
+      )}
 
       {/* ── Top Row: Hero + Right Panel ──────────────────────────────────── */}
       <div className="overview-top-grid" style={{
         display: "grid",
         gridTemplateColumns: hasHero ? "3fr 2fr" : "1fr",
         gap: 20,
-        minHeight: 320,
+        minHeight: hasHero ? 320 : undefined,
       }}>
         {/* Left: Hero Media */}
         {hasHero && (
@@ -340,70 +415,6 @@ export function OverviewTab({ data, onExpandVideo, onNavigateTab, onRetryVideo }
           })}
         </div>
       </motion.div>
-
-      {/* ── Floor Plan Preview (if SVG exists) ─────────────────────────── */}
-      {data.svgContent && (
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-        >
-          <SectionHeader icon={<Layers size={13} />} title={t('showcase.typeFloorPlan')} />
-          <motion.button
-            whileHover={{ scale: 1.005 }}
-            whileTap={{ scale: 0.995 }}
-            onClick={() => onNavigateTab("media")}
-            style={{
-              position: "relative",
-              width: "100%",
-              background: "#FFFFFF",
-              border: `1px solid ${COLORS.GLASS_BORDER}`,
-              borderRadius: 12,
-              overflow: "hidden",
-              cursor: "pointer",
-              padding: 0,
-            }}
-          >
-            {/* SVG Preview — scaled to fit */}
-            <div
-              style={{
-                maxHeight: 280,
-                overflow: "hidden",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                padding: 16,
-              }}
-              dangerouslySetInnerHTML={{ __html: data.svgContent }}
-            />
-            {/* Fade overlay + CTA */}
-            <div style={{
-              position: "absolute",
-              bottom: 0,
-              left: 0,
-              right: 0,
-              padding: "32px 16px 12px",
-              background: "linear-gradient(transparent, rgba(7,8,9,0.85) 60%)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: 6,
-            }}>
-              <span style={{
-                fontSize: 11,
-                fontWeight: 600,
-                color: COLORS.CYAN,
-                letterSpacing: "0.03em",
-              }}>
-                {t('showcase.viewFullFloorPlan')}
-              </span>
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={COLORS.CYAN} strokeWidth="2">
-                <path d="M9 18l6-6-6-6" />
-              </svg>
-            </div>
-          </motion.button>
-        </motion.div>
-      )}
 
       {/* ── Description ──────────────────────────────────────────────────── */}
       {data.textContent && (
