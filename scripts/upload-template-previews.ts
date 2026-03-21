@@ -62,7 +62,7 @@ async function upload() {
           Bucket: BUCKET_NAME,
           Key: video.r2Key,
           Body: buffer,
-          ContentType: "video/mp4",
+          ContentType: video.r2Key.endsWith(".jpg") || video.r2Key.endsWith(".jpeg") ? "image/jpeg" : video.r2Key.endsWith(".png") ? "image/png" : "video/mp4",
           CacheControl: "public, max-age=31536000, immutable",
         })
       );
