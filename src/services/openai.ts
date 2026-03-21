@@ -465,39 +465,141 @@ export async function generateFloorPlan(
     const floors = d.floors ?? 5;
     const totalArea = d.totalArea ?? 2500;
     const typology = d.buildingType ?? "Mixed-Use";
-    const program = d.programSummary ?? "offices and residential units";
+    const floorPlate = Math.round(totalArea / floors);
+
+    // Build detailed program from structured data if available, else fallback
+    let programDetail: string;
+    if (d.program && Array.isArray(d.program) && d.program.length > 0) {
+      programDetail = d.program
+        .map((p) => `${p.space}${p.area_m2 ? ` (${p.area_m2} m²)` : ""}${p.floor ? ` [${p.floor}]` : ""}`)
+        .join(", ");
+    } else {
+      programDetail = d.programSummary ?? "offices and residential units";
+    }
 
     const completion = await client.chat.completions.create({
-      model: "gpt-4o-mini",
+      model: "gpt-4o",
       response_format: { type: "json_object" },
       messages: [
         {
           role: "system",
-          content: `You are an architectural floor plan generator. Given building specifications, produce a JSON response with:
-1. "svg" — a complete SVG string (viewBox="0 0 800 600") of a schematic floor plan showing rooms with labels.
-2. "roomList" — array of { name, area (m²), unit: "m²" } for each room.
-3. "totalArea" — total floor area in m².
-4. "floors" — number of floors.
+          content: `You are an expert architectural floor plan designer with deep knowledge of building codes, spatial planning, and professional architectural drawing conventions.
 
-SVG RULES:
-- viewBox="0 0 800 600"
-- Use rect for rooms, line/polyline for walls
-- Fill rooms with light pastel colors: #E8F5E9 (living), #E3F2FD (bedrooms), #FFF3E0 (kitchen), #F3E5F5 (bathroom), #ECEFF1 (corridor), #FFF9C4 (office), #FFEBEE (retail)
-- Stroke: #333 for walls (stroke-width 2), #999 for internal partitions (stroke-width 1)
-- Add text labels (font-size 12, fill #333) centered in each room with room name and area
-- Show door arcs as small quarter-circle paths (stroke #666, fill none)
-- Include a north arrow indicator (top-right)
-- Include a scale bar at the bottom (e.g., "0 — 5m — 10m")
-- Title text at top: "[Building Type] — Typical Floor Plan"
-- Use professional architectural drawing conventions
-- NO embedded images, NO external references
-- Keep it clean, readable, and architecturally plausible
+TASK: Generate a precise, code-compliant schematic floor plan as SVG. The plan must look like a real architectural drawing — clean geometry, proper wall thicknesses, realistic room proportions, and correct spatial relationships.
 
-Generate a TYPICAL FLOOR plan — the most representative floor. Show realistic room proportions.`,
+RESPOND WITH JSON containing:
+1. "svg" — complete SVG string (viewBox="0 0 800 600")
+2. "roomList" — array of { name, area (m²), unit: "m²" }
+3. "totalArea" — total floor area in m²
+4. "floors" — number of floors
+
+═══════════════════════════════════════════════
+ARCHITECTURAL STANDARDS (MUST FOLLOW)
+═══════════════════════════════════════════════
+
+MINIMUM ROOM DIMENSIONS (width × depth):
+• Bedroom (single): 3.0m × 3.6m (≥ 10 m²), must have exterior wall for window
+• Bedroom (double/master): 3.6m × 4.2m (≥ 14 m²), must have exterior wall
+• Living room: 4.0m × 4.5m (≥ 18 m²)
+• Kitchen: 2.4m × 3.0m (≥ 7 m²), or 3.0m × 3.6m if eat-in
+• Bathroom: 1.8m × 2.4m (≥ 4 m²)
+• WC/half-bath: 1.2m × 1.8m (≥ 2.2 m²)
+• Dining: 3.0m × 3.6m (≥ 10 m²)
+• Home office: 2.4m × 3.0m (≥ 7 m²)
+• Hallway/corridor: ≥ 1.2m wide (1.5m for main circulation)
+• Stairwell: ≥ 2.4m × 3.0m
+• Office (commercial): 3.0m × 3.6m per workstation cluster
+• Open-plan office: minimum 6m depth from window wall
+• Retail: minimum 4.5m depth, 3.5m clear height
+• Meeting room: 3.0m × 4.0m minimum
+
+WALL THICKNESS:
+• Exterior walls: 300mm (draw as double line or thick stroke-width 4)
+• Interior load-bearing walls: 200mm (stroke-width 3)
+• Partition walls: 100mm (stroke-width 1.5)
+
+DOORS:
+• Standard door: 0.9m wide opening
+• Bathroom door: 0.8m wide opening
+• Main entry: 1.0m wide (or 1.2m double door)
+• Draw doors as quarter-circle arcs showing swing direction
+• Doors must be on walls, not floating
+
+CIRCULATION RULES:
+• Every room must be accessible — no dead-end rooms without doors
+• Hallway area should be 10-15% of total floor area (not more than 20%)
+• Main entry leads to a hallway or foyer, not directly into bedrooms
+• Bedrooms accessed from hallway, NOT through other bedrooms
+
+SPATIAL RELATIONSHIPS (adjacency rules):
+• Kitchen adjacent to dining area (shared wall or open connection)
+• Living room near entry with best views/largest windows
+• Bedrooms clustered together, away from noisy areas
+• Bathrooms near bedrooms (shared plumbing wall preferred)
+• Service areas (kitchen, laundry, bathrooms) share plumbing walls when possible
+• Wet rooms (kitchen, bathrooms) can be interior; bedrooms/living must be on exterior walls
+
+STRUCTURAL GRID:
+• Column grid typically 6m × 6m to 8m × 8m for commercial
+• Residential: load-bearing walls at 4-6m spacing
+• Columns shown as small filled squares (200mm × 200mm) at grid intersections
+
+═══════════════════════════════════════════════
+SVG DRAWING CONVENTIONS
+═══════════════════════════════════════════════
+
+COORDINATE SYSTEM:
+• viewBox="0 0 800 600"
+• Leave 40px margin on all sides for labels/dimensions
+• Drawing area: x=40 to x=760, y=50 to y=540
+• Scale: calculate pixels-per-meter so floor plate fits within drawing area
+• All rooms must tile together with NO gaps and NO overlaps
+
+DRAWING ELEMENTS:
+• Exterior walls: <rect> or <path> with stroke="#222" stroke-width="4" fill="none" for the building outline
+• Interior walls: <line> or <path> with stroke="#333" stroke-width="2"
+• Partition walls: <line> with stroke="#666" stroke-width="1"
+• Room fills: <rect> with pastel fills INSIDE wall boundaries:
+  - Living/dining: #E8F5E9 (soft green)
+  - Bedrooms: #E3F2FD (soft blue)
+  - Kitchen: #FFF3E0 (soft orange)
+  - Bathroom/WC: #F3E5F5 (soft purple)
+  - Hallway/corridor: #ECEFF1 (light grey)
+  - Office: #FFF9C4 (soft yellow)
+  - Retail: #FFEBEE (soft pink)
+  - Stairwell: #E0E0E0 (grey) with diagonal hatch lines
+  - Balcony/terrace: no fill, dashed outline
+• Room labels: <text> centered in room, font-size="11", fill="#333", font-family="Arial, sans-serif"
+  Format: "Room Name" on first line, "XX m²" on second line (use dy="14" for second line)
+• Doors: quarter-circle arc <path> with stroke="#555" stroke-width="1" fill="none"
+  Arc radius = door width. Place ON the wall with a gap in the wall line.
+• Windows: small rectangle gaps in exterior walls, filled with #B3E5FC (light blue)
+  Standard window: 1.2m wide. Draw as 3 parallel lines across wall gap.
+
+ANNOTATIONS:
+• Title: top-center, font-size="16", font-weight="bold" — "[Building Type] — Typical Floor Plan"
+• North arrow: top-right corner, simple triangle pointing up with "N" label
+• Scale bar: bottom-center, show "0  2  4  6  8  10m" with tick marks
+• Room dimensions: small font-size="8" dimension text along room edges where space allows
+• Grid lines: thin dashed lines (#DDD, stroke-dasharray="4 4") at structural grid spacing
+
+QUALITY CHECKLIST:
+✓ All rooms tile together — no gaps between walls
+✓ Building outline is a single continuous perimeter
+✓ Every room has at least one door drawn on its wall
+✓ Room areas in roomList approximately match their drawn proportions
+✓ Total room areas sum to approximately the floor plate area (±10%)
+✓ No room is smaller than its minimum standard
+✓ Windows appear on exterior walls only
+✓ The plan looks like something a licensed architect would produce`,
         },
         {
           role: "user",
-          content: `Generate a floor plan for: ${floors}-story ${typology}, total area ${totalArea} m². Program: ${program}. Floor plate: ~${Math.round(totalArea / floors)} m² per floor.`,
+          content: `Design a floor plan for a ${floors}-story ${typology}.
+Total building area: ${totalArea} m². Floor plate area: ~${floorPlate} m² per floor.
+Program: ${programDetail}.
+
+Generate the MOST REPRESENTATIVE typical floor plan. The room areas in your roomList MUST sum to approximately ${floorPlate} m² (the per-floor area, not total building area).`,
         },
       ],
     });
@@ -507,9 +609,25 @@ Generate a TYPICAL FLOOR plan — the most representative floor. Show realistic 
 
     const result = JSON.parse(content) as FloorPlanResult;
 
-    // Ensure SVG has valid structure
+    // Validate SVG structure
     if (!result.svg || !result.svg.includes("<svg")) {
       throw new Error("Generated response does not contain valid SVG");
+    }
+
+    // Validate room list sanity
+    if (result.roomList && result.roomList.length > 0) {
+      const roomAreaSum = result.roomList.reduce((sum, r) => sum + (r.area ?? 0), 0);
+      // Warn but don't fail — AI output is approximate
+      if (roomAreaSum > 0 && (roomAreaSum < floorPlate * 0.5 || roomAreaSum > floorPlate * 2)) {
+        console.warn(
+          `[GN-004] Room area sum (${roomAreaSum} m²) significantly differs from floor plate (${floorPlate} m²). Normalizing.`
+        );
+        // Normalize room areas to match floor plate
+        const scale = floorPlate / roomAreaSum;
+        for (const room of result.roomList) {
+          room.area = Math.round(room.area * scale * 10) / 10;
+        }
+      }
     }
 
     return {

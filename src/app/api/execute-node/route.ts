@@ -969,7 +969,7 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
         createdAt: new Date(),
       };
     } else if (catalogueId === "GN-004") {
-      // Floor Plan Generator — GPT-4o-mini SVG generation
+      // Floor Plan Generator — GPT-4o SVG generation
       const description = inputData?._raw ?? inputData ?? {};
       const floorPlan = await generateFloorPlan(description, apiKey);
 
@@ -985,7 +985,7 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
           totalArea: floorPlan.totalArea,
           floors: floorPlan.floors,
         },
-        metadata: { model: "gpt-4o-mini", real: true },
+        metadata: { model: "gpt-4o", real: true },
         createdAt: new Date(),
       };
 
