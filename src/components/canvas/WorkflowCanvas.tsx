@@ -721,8 +721,12 @@ function WorkflowCanvasInner({ workflowId: urlWorkflowId }: WorkflowCanvasInnerP
       const catId = data.catalogueId as string;
       return catId?.startsWith("IN-");
     });
+    // Nodes with built-in defaults don't need explicit inputValue
+    const NODES_WITH_DEFAULTS = new Set(["IN-005", "IN-006"]); // Parameter Input, Location Input
     const hasEmptyInput = inputNodes.some((n) => {
       const data = n.data as Record<string, unknown>;
+      const catId = data.catalogueId as string;
+      if (NODES_WITH_DEFAULTS.has(catId)) return false; // has defaults, always valid
       const val = (data.inputValue as string) ?? "";
       return val.trim() === "";
     });
