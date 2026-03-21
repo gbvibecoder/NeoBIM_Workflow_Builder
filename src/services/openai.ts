@@ -454,6 +454,253 @@ export interface FloorPlanResult {
   floors: number;
 }
 
+// ─── Room type detection & colors ───────────────────────────────────────────
+
+interface RoomDef { name: string; area: number; type: string; }
+
+const ROOM_COLORS: Record<string, string> = {
+  living: "#E8F5E9", dining: "#E8F5E9", kitchen: "#FFF3E0",
+  bedroom: "#E3F2FD", master: "#E3F2FD", bathroom: "#F3E5F5",
+  wc: "#F3E5F5", toilet: "#F3E5F5", hallway: "#ECEFF1",
+  corridor: "#ECEFF1", foyer: "#ECEFF1", entry: "#ECEFF1",
+  office: "#FFF9C4", study: "#FFF9C4", stair: "#E0E0E0",
+  balcony: "#F5F5F5", terrace: "#F5F5F5", laundry: "#F3E5F5",
+  storage: "#ECEFF1", retail: "#FFEBEE", meeting: "#FFF9C4",
+  default: "#F5F5F5",
+};
+
+function detectRoomType(name: string): string {
+  const n = name.toLowerCase();
+  if (n.includes("master") || n.includes("main bed")) return "master";
+  if (n.includes("bed")) return "bedroom";
+  if (n.includes("living") || n.includes("lounge") || n.includes("family")) return "living";
+  if (n.includes("dining")) return "dining";
+  if (n.includes("kitchen")) return "kitchen";
+  if (n.includes("bath") || n.includes("shower")) return "bathroom";
+  if (n.includes("wc") || n.includes("toilet") || n.includes("powder")) return "wc";
+  if (n.includes("hall") || n.includes("corridor") || n.includes("passage")) return "hallway";
+  if (n.includes("foyer") || n.includes("entry") || n.includes("lobby")) return "entry";
+  if (n.includes("office") || n.includes("study") || n.includes("work")) return "office";
+  if (n.includes("stair")) return "stair";
+  if (n.includes("balcon") || n.includes("terrace") || n.includes("deck")) return "balcony";
+  if (n.includes("laundry") || n.includes("utility")) return "laundry";
+  if (n.includes("storage") || n.includes("closet") || n.includes("pantry")) return "storage";
+  if (n.includes("retail") || n.includes("shop")) return "retail";
+  if (n.includes("meeting") || n.includes("conference")) return "meeting";
+  return "default";
+}
+
+function isExteriorRoom(type: string): boolean {
+  return ["bedroom", "master", "living", "dining", "office"].includes(type);
+}
+
+// ─── Squarified Treemap Layout ──────────────────────────────────────────────
+
+interface LayoutRect { x: number; y: number; w: number; h: number; room: RoomDef; }
+
+function layoutTreemap(rooms: RoomDef[], x: number, y: number, w: number, h: number): LayoutRect[] {
+  if (rooms.length === 0) return [];
+  if (rooms.length === 1) {
+    return [{ x, y, w, h, room: rooms[0] }];
+  }
+
+  const totalArea = rooms.reduce((s, r) => s + r.area, 0);
+  const sorted = [...rooms].sort((a, b) => b.area - a.area);
+
+  // Split into two groups for best aspect ratio
+  let bestSplit = 1;
+  let bestRatio = Infinity;
+  let sumA = 0;
+
+  for (let i = 0; i < sorted.length - 1; i++) {
+    sumA += sorted[i].area;
+    const sumB = totalArea - sumA;
+    const ratioA = sumA / totalArea;
+
+    // Calculate aspect ratio of the split
+    const isHorizontalSplit = w >= h;
+    let aspect: number;
+    if (isHorizontalSplit) {
+      const wA = w * ratioA;
+      const wB = w - wA;
+      aspect = Math.max(wA / h, h / wA) + Math.max(wB / h, h / wB);
+    } else {
+      const hA = h * ratioA;
+      const hB = h - hA;
+      aspect = Math.max(w / hA, hA / w) + Math.max(w / hB, hB / w);
+    }
+
+    if (aspect < bestRatio) {
+      bestRatio = aspect;
+      bestSplit = i + 1;
+    }
+  }
+
+  const groupA = sorted.slice(0, bestSplit);
+  const groupB = sorted.slice(bestSplit);
+  const areaA = groupA.reduce((s, r) => s + r.area, 0);
+  const ratio = areaA / totalArea;
+
+  if (w >= h) {
+    // Split vertically
+    const wA = w * ratio;
+    return [
+      ...layoutTreemap(groupA, x, y, wA, h),
+      ...layoutTreemap(groupB, x + wA, y, w - wA, h),
+    ];
+  } else {
+    // Split horizontally
+    const hA = h * ratio;
+    return [
+      ...layoutTreemap(groupA, x, y, w, hA),
+      ...layoutTreemap(groupB, x, y + hA, w, h - hA),
+    ];
+  }
+}
+
+// ─── SVG Renderer ───────────────────────────────────────────────────────────
+
+function renderFloorPlanSvg(
+  rects: LayoutRect[],
+  title: string,
+  pxPerMeter: number,
+  planW: number,
+  planH: number,
+  ox: number,
+  oy: number,
+): string {
+  const parts: string[] = [];
+
+  parts.push(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600">`);
+  parts.push(`<rect width="800" height="600" fill="white"/>`);
+
+  // Title
+  parts.push(`<text x="400" y="28" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="bold" fill="#222">${escSvg(title)}</text>`);
+
+  // Building outline (thick exterior wall)
+  parts.push(`<rect x="${ox}" y="${oy}" width="${planW}" height="${planH}" fill="none" stroke="#222" stroke-width="4"/>`);
+
+  // Room fills + labels + interior walls
+  for (const r of rects) {
+    const color = ROOM_COLORS[r.room.type] ?? ROOM_COLORS.default;
+    const cx = r.x + r.w / 2;
+    const cy = r.y + r.h / 2;
+    const roomWidthM = r.w / pxPerMeter;
+    const roomHeightM = r.h / pxPerMeter;
+
+    // Room fill
+    parts.push(`<rect x="${r.x}" y="${r.y}" width="${r.w}" height="${r.h}" fill="${color}" stroke="#444" stroke-width="1.5"/>`);
+
+    // Room label (name + area)
+    const fontSize = Math.min(12, Math.max(8, Math.min(r.w, r.h) / 5));
+    parts.push(`<text x="${cx}" y="${cy - 4}" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="${fontSize}" font-weight="600" fill="#333">${escSvg(r.room.name)}</text>`);
+    parts.push(`<text x="${cx}" y="${cy + fontSize}" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="${Math.max(7, fontSize - 2)}" fill="#666">${r.room.area} m²</text>`);
+
+    // Dimension annotations (width × height in meters along edges)
+    if (r.w > 50 && r.h > 40) {
+      parts.push(`<text x="${cx}" y="${r.y + 10}" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="7" fill="#999">${roomWidthM.toFixed(1)}m</text>`);
+      parts.push(`<text x="${r.x + 8}" y="${cy}" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="7" fill="#999" transform="rotate(-90 ${r.x + 8} ${cy})">${roomHeightM.toFixed(1)}m</text>`);
+    }
+
+    // Door arc — place on the longest wall that is shared with another room
+    const doorR = Math.min(18, Math.min(r.w, r.h) * 0.3);
+    const isOnLeft = Math.abs(r.x - ox) < 2;
+    const isOnTop = Math.abs(r.y - oy) < 2;
+    // Door on bottom wall (default), or top if room is at bottom edge
+    const isOnBottom = Math.abs((r.y + r.h) - (oy + planH)) < 2;
+
+    if (r.room.type !== "balcony" && r.room.type !== "terrace") {
+      let dx: number, dy: number, sweep: string;
+      if (!isOnBottom && r.h > 30) {
+        // Door on bottom wall
+        dx = r.x + 12;
+        dy = r.y + r.h;
+        // Gap in wall
+        parts.push(`<line x1="${dx}" y1="${dy}" x2="${dx + doorR}" y2="${dy}" stroke="white" stroke-width="3"/>`);
+        // Arc
+        parts.push(`<path d="M ${dx} ${dy} A ${doorR} ${doorR} 0 0 1 ${dx + doorR} ${dy - doorR}" fill="none" stroke="#555" stroke-width="1"/>`);
+        // Swing line
+        parts.push(`<line x1="${dx}" y1="${dy}" x2="${dx}" y2="${dy - doorR}" stroke="#555" stroke-width="0.5" stroke-dasharray="3 2"/>`);
+      } else if (!isOnTop && r.h > 30) {
+        // Door on top wall
+        dx = r.x + 12;
+        dy = r.y;
+        parts.push(`<line x1="${dx}" y1="${dy}" x2="${dx + doorR}" y2="${dy}" stroke="white" stroke-width="3"/>`);
+        parts.push(`<path d="M ${dx} ${dy} A ${doorR} ${doorR} 0 0 0 ${dx + doorR} ${dy + doorR}" fill="none" stroke="#555" stroke-width="1"/>`);
+        parts.push(`<line x1="${dx}" y1="${dy}" x2="${dx}" y2="${dy + doorR}" stroke="#555" stroke-width="0.5" stroke-dasharray="3 2"/>`);
+      } else if (!isOnLeft && r.w > 30) {
+        // Door on left wall
+        dx = r.x;
+        dy = r.y + 12;
+        parts.push(`<line x1="${dx}" y1="${dy}" x2="${dx}" y2="${dy + doorR}" stroke="white" stroke-width="3"/>`);
+        parts.push(`<path d="M ${dx} ${dy} A ${doorR} ${doorR} 0 0 0 ${dx + doorR} ${dy + doorR}" fill="none" stroke="#555" stroke-width="1"/>`);
+        parts.push(`<line x1="${dx}" y1="${dy}" x2="${dx + doorR}" y2="${dy}" stroke="#555" stroke-width="0.5" stroke-dasharray="3 2"/>`);
+      }
+    }
+
+    // Windows on exterior walls (for habitable rooms)
+    if (isExteriorRoom(r.room.type)) {
+      const winW = Math.min(r.w * 0.4, 30);
+      const winH = 4;
+      // Check which edges are on the building perimeter and add window there
+      if (Math.abs(r.x - ox) < 2) {
+        // Left exterior wall
+        const wy = r.y + r.h / 2 - winW / 2;
+        parts.push(`<rect x="${r.x - 1}" y="${wy}" width="${winH}" height="${winW}" fill="#B3E5FC" stroke="#81D4FA" stroke-width="0.5"/>`);
+        parts.push(`<line x1="${r.x + 1}" y1="${wy}" x2="${r.x + 1}" y2="${wy + winW}" stroke="#4FC3F7" stroke-width="0.5"/>`);
+      }
+      if (Math.abs((r.x + r.w) - (ox + planW)) < 2) {
+        // Right exterior wall
+        const wy = r.y + r.h / 2 - winW / 2;
+        parts.push(`<rect x="${r.x + r.w - winH + 1}" y="${wy}" width="${winH}" height="${winW}" fill="#B3E5FC" stroke="#81D4FA" stroke-width="0.5"/>`);
+        parts.push(`<line x1="${r.x + r.w - 1}" y1="${wy}" x2="${r.x + r.w - 1}" y2="${wy + winW}" stroke="#4FC3F7" stroke-width="0.5"/>`);
+      }
+      if (Math.abs(r.y - oy) < 2) {
+        // Top exterior wall
+        const wx = r.x + r.w / 2 - winW / 2;
+        parts.push(`<rect x="${wx}" y="${r.y - 1}" width="${winW}" height="${winH}" fill="#B3E5FC" stroke="#81D4FA" stroke-width="0.5"/>`);
+        parts.push(`<line x1="${wx}" y1="${r.y + 1}" x2="${wx + winW}" y2="${r.y + 1}" stroke="#4FC3F7" stroke-width="0.5"/>`);
+      }
+      if (Math.abs((r.y + r.h) - (oy + planH)) < 2) {
+        // Bottom exterior wall
+        const wx = r.x + r.w / 2 - winW / 2;
+        parts.push(`<rect x="${wx}" y="${r.y + r.h - winH + 1}" width="${winW}" height="${winH}" fill="#B3E5FC" stroke="#81D4FA" stroke-width="0.5"/>`);
+        parts.push(`<line x1="${wx}" y1="${r.y + r.h - 1}" x2="${wx + winW}" y2="${r.y + r.h - 1}" stroke="#4FC3F7" stroke-width="0.5"/>`);
+      }
+    }
+  }
+
+  // Re-draw building outline on top so it's crisp
+  parts.push(`<rect x="${ox}" y="${oy}" width="${planW}" height="${planH}" fill="none" stroke="#222" stroke-width="4"/>`);
+
+  // North arrow (top-right)
+  const nx = 760, ny = 55;
+  parts.push(`<polygon points="${nx},${ny - 18} ${nx - 6},${ny} ${nx + 6},${ny}" fill="#333"/>`);
+  parts.push(`<text x="${nx}" y="${ny + 12}" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="11" font-weight="bold" fill="#333">N</text>`);
+
+  // Scale bar (bottom-center)
+  const sbY = 580;
+  const sbX = 300;
+  const metersToDraw = Math.min(10, Math.ceil(planW / pxPerMeter));
+  const sbLen = metersToDraw * pxPerMeter;
+  parts.push(`<line x1="${sbX}" y1="${sbY}" x2="${sbX + sbLen}" y2="${sbY}" stroke="#333" stroke-width="1.5"/>`);
+  for (let m = 0; m <= metersToDraw; m += 2) {
+    const tx = sbX + m * pxPerMeter;
+    parts.push(`<line x1="${tx}" y1="${sbY - 4}" x2="${tx}" y2="${sbY + 4}" stroke="#333" stroke-width="1"/>`);
+    parts.push(`<text x="${tx}" y="${sbY + 14}" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="8" fill="#666">${m}</text>`);
+  }
+  parts.push(`<text x="${sbX + sbLen + 8}" y="${sbY + 4}" font-family="Arial, Helvetica, sans-serif" font-size="8" fill="#666">m</text>`);
+
+  parts.push(`</svg>`);
+  return parts.join("\n");
+}
+
+function escSvg(s: string): string {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+// ─── Main generateFloorPlan function ────────────────────────────────────────
+
 export async function generateFloorPlan(
   description: BuildingDescription | Record<string, unknown>,
   userApiKey?: string
@@ -467,7 +714,7 @@ export async function generateFloorPlan(
     const typology = d.buildingType ?? "Mixed-Use";
     const floorPlate = Math.round(totalArea / floors);
 
-    // Build detailed program from structured data if available, else fallback
+    // Build detailed program from structured data if available
     let programDetail: string;
     if (d.program && Array.isArray(d.program) && d.program.length > 0) {
       programDetail = d.program
@@ -477,137 +724,43 @@ export async function generateFloorPlan(
       programDetail = d.programSummary ?? "offices and residential units";
     }
 
+    // ── Step 1: Ask AI for room program ONLY (no SVG) ───────────────
     const completion = await client.chat.completions.create({
       model: "gpt-4o",
       response_format: { type: "json_object" },
       messages: [
         {
           role: "system",
-          content: `You are an expert architectural floor plan designer with deep knowledge of building codes, spatial planning, and professional architectural drawing conventions.
+          content: `You are an expert architectural space planner. Given a building brief, generate a room program for ONE typical floor.
 
-TASK: Generate a precise, code-compliant schematic floor plan as SVG. The plan must look like a real architectural drawing — clean geometry, proper wall thicknesses, realistic room proportions, and correct spatial relationships.
+RESPOND WITH JSON:
+{
+  "rooms": [
+    { "name": "Living Room", "area": 22, "type": "living" },
+    { "name": "Kitchen", "area": 10, "type": "kitchen" },
+    ...
+  ],
+  "title": "2BHK Residential Apartment — Typical Floor Plan"
+}
 
-RESPOND WITH JSON containing:
-1. "svg" — complete SVG string (viewBox="0 0 800 600")
-2. "roomList" — array of { name, area (m²), unit: "m²" }
-3. "totalArea" — total floor area in m²
-4. "floors" — number of floors
-
-═══════════════════════════════════════════════
-ARCHITECTURAL STANDARDS (MUST FOLLOW)
-═══════════════════════════════════════════════
-
-MINIMUM ROOM DIMENSIONS (width × depth):
-• Bedroom (single): 3.0m × 3.6m (≥ 10 m²), must have exterior wall for window
-• Bedroom (double/master): 3.6m × 4.2m (≥ 14 m²), must have exterior wall
-• Living room: 4.0m × 4.5m (≥ 18 m²)
-• Kitchen: 2.4m × 3.0m (≥ 7 m²), or 3.0m × 3.6m if eat-in
-• Bathroom: 1.8m × 2.4m (≥ 4 m²)
-• WC/half-bath: 1.2m × 1.8m (≥ 2.2 m²)
-• Dining: 3.0m × 3.6m (≥ 10 m²)
-• Home office: 2.4m × 3.0m (≥ 7 m²)
-• Hallway/corridor: ≥ 1.2m wide (1.5m for main circulation)
-• Stairwell: ≥ 2.4m × 3.0m
-• Office (commercial): 3.0m × 3.6m per workstation cluster
-• Open-plan office: minimum 6m depth from window wall
-• Retail: minimum 4.5m depth, 3.5m clear height
-• Meeting room: 3.0m × 4.0m minimum
-
-WALL THICKNESS:
-• Exterior walls: 300mm (draw as double line or thick stroke-width 4)
-• Interior load-bearing walls: 200mm (stroke-width 3)
-• Partition walls: 100mm (stroke-width 1.5)
-
-DOORS:
-• Standard door: 0.9m wide opening
-• Bathroom door: 0.8m wide opening
-• Main entry: 1.0m wide (or 1.2m double door)
-• Draw doors as quarter-circle arcs showing swing direction
-• Doors must be on walls, not floating
-
-CIRCULATION RULES:
-• Every room must be accessible — no dead-end rooms without doors
-• Hallway area should be 10-15% of total floor area (not more than 20%)
-• Main entry leads to a hallway or foyer, not directly into bedrooms
-• Bedrooms accessed from hallway, NOT through other bedrooms
-
-SPATIAL RELATIONSHIPS (adjacency rules):
-• Kitchen adjacent to dining area (shared wall or open connection)
-• Living room near entry with best views/largest windows
-• Bedrooms clustered together, away from noisy areas
-• Bathrooms near bedrooms (shared plumbing wall preferred)
-• Service areas (kitchen, laundry, bathrooms) share plumbing walls when possible
-• Wet rooms (kitchen, bathrooms) can be interior; bedrooms/living must be on exterior walls
-
-STRUCTURAL GRID:
-• Column grid typically 6m × 6m to 8m × 8m for commercial
-• Residential: load-bearing walls at 4-6m spacing
-• Columns shown as small filled squares (200mm × 200mm) at grid intersections
-
-═══════════════════════════════════════════════
-SVG DRAWING CONVENTIONS
-═══════════════════════════════════════════════
-
-COORDINATE SYSTEM:
-• viewBox="0 0 800 600"
-• Leave 40px margin on all sides for labels/dimensions
-• Drawing area: x=40 to x=760, y=50 to y=540
-• Scale: calculate pixels-per-meter so floor plate fits within drawing area
-• All rooms must tile together with NO gaps and NO overlaps
-
-DRAWING ELEMENTS:
-• Exterior walls: <rect> or <path> with stroke="#222" stroke-width="4" fill="none" for the building outline
-• Interior walls: <line> or <path> with stroke="#333" stroke-width="2"
-• Partition walls: <line> with stroke="#666" stroke-width="1"
-• Room fills: <rect> with pastel fills INSIDE wall boundaries:
-  - Living/dining: #E8F5E9 (soft green)
-  - Bedrooms: #E3F2FD (soft blue)
-  - Kitchen: #FFF3E0 (soft orange)
-  - Bathroom/WC: #F3E5F5 (soft purple)
-  - Hallway/corridor: #ECEFF1 (light grey)
-  - Office: #FFF9C4 (soft yellow)
-  - Retail: #FFEBEE (soft pink)
-  - Stairwell: #E0E0E0 (grey) with diagonal hatch lines
-  - Balcony/terrace: no fill, dashed outline
-• Room labels: <text> centered in room, font-size="11", fill="#333", font-family="Arial, sans-serif"
-  Format: "Room Name" on first line, "XX m²" on second line (use dy="14" for second line)
-• Doors: quarter-circle arc <path> with stroke="#555" stroke-width="1" fill="none"
-  Arc radius = door width. Place ON the wall with a gap in the wall line.
-• Windows: small rectangle gaps in exterior walls, filled with #B3E5FC (light blue)
-  Standard window: 1.2m wide. Draw as 3 parallel lines across wall gap.
-
-ANNOTATIONS:
-• Title: top-center, font-size="16", font-weight="bold" — "[Building Type] — Typical Floor Plan"
-• North arrow: top-right corner, simple triangle pointing up with "N" label
-• Scale bar: bottom-center, show "0  2  4  6  8  10m" with tick marks
-• Room dimensions: small font-size="8" dimension text along room edges where space allows
-• Grid lines: thin dashed lines (#DDD, stroke-dasharray="4 4") at structural grid spacing
-
-QUALITY CHECKLIST:
-✓ All rooms tile together — no gaps between walls
-✓ Building outline is a single continuous perimeter
-✓ Every room has at least one door drawn on its wall
-✓ Room areas in roomList approximately match their drawn proportions
-✓ Total room areas sum to approximately the floor plate area (±10%)
-✓ No room is smaller than its minimum standard
-✓ Windows appear on exterior walls only
-✓ The plan looks like something a licensed architect would produce`,
+RULES:
+- "area" is in m². Room areas MUST sum to approximately the floor plate area given.
+- "type" must be one of: living, dining, kitchen, bedroom, master, bathroom, wc, hallway, corridor, entry, office, study, stair, balcony, laundry, storage, retail, meeting
+- Include a hallway/corridor (10-15% of floor area) for circulation
+- Include at least one bathroom per 2 bedrooms
+- Kitchen must be separate or clearly defined
+- Include an entry/foyer for residential
+- Respect minimum areas: bedroom ≥ 10m², master ≥ 14m², living ≥ 18m², kitchen ≥ 7m², bathroom ≥ 4m², wc ≥ 2.2m², hallway ≥ 5m²
+- For residential: typical room count is 1BHK (4-5 rooms), 2BHK (6-7 rooms), 3BHK (8-10 rooms)
+- Title should describe the building type and floor plan type`,
         },
         {
           role: "user",
-          content: `Design a floor plan for a ${floors}-story ${typology}.
+          content: `Generate a room program for a ${floors}-story ${typology}.
 Total building area: ${totalArea} m². Floor plate area: ~${floorPlate} m² per floor.
 Program: ${programDetail}.
 
-Generate the MOST REPRESENTATIVE typical floor plan. The room areas in your roomList MUST sum to approximately ${floorPlate} m² (the per-floor area, not total building area).
-
-CRITICAL REMINDERS:
-- Every room MUST have at least one door drawn as a quarter-circle arc on its wall
-- NO empty/dead space — rooms must tile together tightly with shared walls
-- Draw wall gaps where doors are (break the wall line, add the door arc)
-- Include at least one window per habitable room (mark on exterior walls)
-- The floor plan should fill the SVG canvas — use the full drawing area (x=40 to x=760, y=50 to y=540)
-- Label every room clearly with name + area in m²`,
+Room areas MUST sum to approximately ${floorPlate} m².`,
         },
       ],
     });
@@ -615,93 +768,56 @@ CRITICAL REMINDERS:
     const content = completion.choices[0]?.message?.content;
     if (!content) throw new Error("OpenAI returned empty response for floor plan");
 
-    const result = JSON.parse(content) as FloorPlanResult;
+    const aiResult = JSON.parse(content) as {
+      rooms: Array<{ name: string; area: number; type?: string }>;
+      title?: string;
+    };
 
-    // Validate SVG structure
-    if (!result.svg || !result.svg.includes("<svg")) {
-      throw new Error("Generated response does not contain valid SVG");
+    if (!aiResult.rooms || aiResult.rooms.length === 0) {
+      throw new Error("AI returned no rooms for floor plan");
     }
 
-    // Post-process: clean up and enhance the SVG
-    result.svg = cleanupFloorPlanSvg(result.svg);
+    // ── Step 2: Normalize room areas to match floor plate ───────────
+    const rooms: RoomDef[] = aiResult.rooms.map(r => ({
+      name: r.name,
+      area: r.area,
+      type: r.type ?? detectRoomType(r.name),
+    }));
 
-    // Validate room list sanity
-    if (result.roomList && result.roomList.length > 0) {
-      const roomAreaSum = result.roomList.reduce((sum, r) => sum + (r.area ?? 0), 0);
-      // Warn but don't fail — AI output is approximate
-      if (roomAreaSum > 0 && (roomAreaSum < floorPlate * 0.5 || roomAreaSum > floorPlate * 2)) {
-        console.warn(
-          `[GN-004] Room area sum (${roomAreaSum} m²) significantly differs from floor plate (${floorPlate} m²). Normalizing.`
-        );
-        // Normalize room areas to match floor plate
-        const scale = floorPlate / roomAreaSum;
-        for (const room of result.roomList) {
-          room.area = Math.round(room.area * scale * 10) / 10;
-        }
+    const roomAreaSum = rooms.reduce((s, r) => s + r.area, 0);
+    if (roomAreaSum > 0 && Math.abs(roomAreaSum - floorPlate) > floorPlate * 0.05) {
+      const scale = floorPlate / roomAreaSum;
+      for (const room of rooms) {
+        room.area = Math.round(room.area * scale * 10) / 10;
       }
     }
 
-    return {
-      svg: result.svg,
-      roomList: result.roomList ?? [],
-      totalArea: result.totalArea ?? totalArea,
-      floors: result.floors ?? floors,
-    };
+    // ── Step 3: Deterministic layout via treemap ────────────────────
+    // Calculate floor plate dimensions (roughly 4:3 aspect ratio)
+    const aspect = 1.33;
+    const fpWidthM = Math.sqrt(floorPlate * aspect);
+    const fpHeightM = floorPlate / fpWidthM;
+
+    // SVG drawing area
+    const margin = 50;
+    const drawW = 700;
+    const drawH = 490;
+    const pxPerMeter = Math.min(drawW / fpWidthM, drawH / fpHeightM);
+    const planW = fpWidthM * pxPerMeter;
+    const planH = fpHeightM * pxPerMeter;
+    const ox = margin + (drawW - planW) / 2;
+    const oy = margin + (drawH - planH) / 2;
+
+    const rects = layoutTreemap(rooms, ox, oy, planW, planH);
+
+    // ── Step 4: Render SVG deterministically ────────────────────────
+    const title = aiResult.title ?? `${typology} — Typical Floor Plan`;
+    const svg = renderFloorPlanSvg(rects, title, pxPerMeter, planW, planH, ox, oy);
+
+    const roomList = rooms.map(r => ({ name: r.name, area: r.area, unit: "m²" }));
+
+    return { svg, roomList, totalArea, floors };
   });
-}
-
-/**
- * Post-process AI-generated floor plan SVG to fix common issues:
- * - Ensure viewBox is present and correct
- * - Add missing xmlns attribute
- * - Ensure proper font-family fallbacks
- * - Fix empty/broken stroke attributes
- * - Add a clean white background rect if missing
- * - Ensure wall strokes are visible (minimum stroke-width)
- */
-function cleanupFloorPlanSvg(svg: string): string {
-  let cleaned = svg;
-
-  // 1. Ensure xmlns attribute
-  if (!cleaned.includes('xmlns=')) {
-    cleaned = cleaned.replace('<svg', '<svg xmlns="http://www.w3.org/2000/svg"');
-  }
-
-  // 2. Ensure viewBox exists
-  if (!cleaned.includes('viewBox')) {
-    cleaned = cleaned.replace('<svg', '<svg viewBox="0 0 800 600"');
-  }
-
-  // 3. Add white background if no background rect exists near the start
-  const hasBackground = /fill=["']#[fF]{3,6}["']/.test(cleaned.slice(0, 500)) ||
-                        /fill=["']white["']/.test(cleaned.slice(0, 500));
-  if (!hasBackground) {
-    // Insert a white background rect right after the opening <svg> tag
-    cleaned = cleaned.replace(
-      /(<svg[^>]*>)/,
-      '$1<rect width="100%" height="100%" fill="white"/>'
-    );
-  }
-
-  // 4. Fix font-family for cross-platform rendering
-  cleaned = cleaned.replace(
-    /font-family=["']([^"']*)["']/g,
-    'font-family="Arial, Helvetica, sans-serif"'
-  );
-
-  // 5. Fix zero or missing stroke-width on wall elements (stroke="#333" or "#222")
-  cleaned = cleaned.replace(
-    /stroke=["'](#[23]{3,6})["']\s+stroke-width=["']0["']/g,
-    'stroke="$1" stroke-width="2"'
-  );
-
-  // 6. Remove any accidental script tags (security)
-  cleaned = cleaned.replace(/<script[\s\S]*?<\/script>/gi, '');
-
-  // 7. Remove any external references (xlink:href to URLs)
-  cleaned = cleaned.replace(/xlink:href=["']https?:\/\/[^"']*["']/g, '');
-
-  return cleaned;
 }
 
 
