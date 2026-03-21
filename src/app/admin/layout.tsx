@@ -282,9 +282,16 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
       {/* ── Sidebar ───────────────────────────────────────────────────── */}
       <motion.aside
-        initial={!isMobile ? { x: -16, opacity: 0 } : false}
-        animate={{ width: sidebarWidth, x: 0, opacity: 1 }}
-        transition={{ type: "spring", stiffness: 400, damping: 32 }}
+        initial={isMobile ? { x: -280 } : { x: -16, opacity: 0 }}
+        animate={{
+          width: sidebarWidth,
+          x: isMobile ? (mobileOpen ? 0 : -280) : 0,
+          opacity: 1,
+        }}
+        transition={isMobile
+          ? { type: "tween", duration: 0.3, ease: [0.4, 0, 0.2, 1] }
+          : { type: "spring", stiffness: 400, damping: 32 }
+        }
         onMouseEnter={handleSidebarEnter}
         onMouseLeave={handleSidebarLeave}
         style={{
@@ -296,8 +303,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           zIndex: isMobile ? 9000 : 10,
           left: isMobile ? 0 : undefined,
           bottom: isMobile ? 0 : undefined,
-          transform: isMobile && !mobileOpen ? "translateX(-100%)" : "translateX(0)",
-          transition: isMobile ? "transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)" : undefined,
           boxShadow: isMobile && mobileOpen ? "20px 0 60px rgba(0,0,0,0.6)" : undefined,
           background: "#070809",
           borderRight: "1px solid rgba(184,115,51,0.15)",
