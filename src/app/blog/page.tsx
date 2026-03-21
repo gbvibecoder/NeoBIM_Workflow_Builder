@@ -1,13 +1,13 @@
 "use client";
 
-import React, { useRef, useEffect, useState } from "react";
-import { motion, useScroll, useTransform, useInView, useMotionValue, animate } from "framer-motion";
+import React, { useRef, useEffect, useState, useCallback } from "react";
+import { motion, useScroll, useTransform, useInView, useMotionValue, useSpring, animate } from "framer-motion";
 import Link from "next/link";
 import {
   ArrowLeft, ArrowRight, Clock, Building2, Layers, FileSpreadsheet,
   Cpu, FileText, Box, Palette, PenTool, Mail, Image as ImageIcon,
   MonitorPlay, Zap, ChevronDown, BarChart3, AlertTriangle, CheckCircle2,
-  Timer, Quote,
+  Timer, Quote, Hash,
 } from "lucide-react";
 
 // ─── Constants ──────────────────────────────────────────────────────────────
@@ -29,6 +29,353 @@ const COLORS = {
   textTertiary: "#5C5C78",
   border: "rgba(255,255,255,0.06)",
 };
+
+// ─── Table of Contents sections ─────────────────────────────────────────────
+
+const TOC_SECTIONS = [
+  { id: "dirty-secret", label: "The Dirty Secret" },
+  { id: "eleven-tools", label: "11 Tools" },
+  { id: "where-hours-go", label: "Where Hours Go" },
+  { id: "the-fix", label: "The Fix" },
+  { id: "in-practice", label: "In Practice" },
+  { id: "beyond-time", label: "Beyond Time" },
+  { id: "bigger-picture", label: "Bigger Picture" },
+  { id: "my-firm", label: "What I'd Tell My Firm" },
+];
+
+// ─── Isometric Building (self-constructing in hero) ─────────────────────────
+
+function IsometricBuilding() {
+  return (
+    <div style={{
+      position: "absolute", right: "8%", bottom: "12%",
+      width: 220, height: 320, pointerEvents: "none",
+      opacity: 0.35,
+    }}
+    className="blog-iso-building"
+    >
+      <svg viewBox="0 0 220 320" fill="none" xmlns="http://www.w3.org/2000/svg">
+        {/* Foundation */}
+        <motion.path
+          d="M110 290 L200 240 L200 250 L110 300 L20 250 L20 240 Z"
+          fill={`${COLORS.blue}15`}
+          stroke={`${COLORS.blue}40`}
+          strokeWidth={0.5}
+          initial={{ opacity: 0, pathLength: 0 }}
+          animate={{ opacity: 1, pathLength: 1 }}
+          transition={{ delay: 0.8, duration: 0.6 }}
+        />
+        {/* Floors building up */}
+        {Array.from({ length: 8 }).map((_, i) => {
+          const y = 250 - i * 28;
+          const floorDelay = 1.0 + i * 0.15;
+          return (
+            <React.Fragment key={i}>
+              {/* Left face */}
+              <motion.path
+                d={`M20 ${y} L110 ${y - 50} L110 ${y - 22} L20 ${y + 28} Z`}
+                fill={`${i % 2 === 0 ? COLORS.blue : COLORS.purple}08`}
+                stroke={`${i % 2 === 0 ? COLORS.blue : COLORS.purple}30`}
+                strokeWidth={0.5}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: floorDelay, duration: 0.4, ease: smoothEase }}
+              />
+              {/* Right face */}
+              <motion.path
+                d={`M200 ${y} L110 ${y - 50} L110 ${y - 22} L200 ${y + 28} Z`}
+                fill={`${i % 2 === 0 ? COLORS.purple : COLORS.blue}06`}
+                stroke={`${i % 2 === 0 ? COLORS.purple : COLORS.blue}25`}
+                strokeWidth={0.5}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: floorDelay + 0.05, duration: 0.4, ease: smoothEase }}
+              />
+              {/* Windows on left */}
+              {[0.3, 0.5, 0.7].map((wx, wi) => (
+                <motion.rect
+                  key={`wl-${i}-${wi}`}
+                  x={20 + (110 - 20) * wx - 4}
+                  y={y - 50 * wx + 8}
+                  width={6} height={10}
+                  fill={`${COLORS.amber}${Math.random() > 0.5 ? "30" : "12"}`}
+                  rx={1}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: floorDelay + 0.3 + wi * 0.05, duration: 0.3 }}
+                />
+              ))}
+            </React.Fragment>
+          );
+        })}
+        {/* Roof */}
+        <motion.path
+          d="M110 26 L200 76 L110 46 L20 76 Z"
+          fill={`${COLORS.green}10`}
+          stroke={`${COLORS.green}35`}
+          strokeWidth={0.5}
+          initial={{ opacity: 0, y: 15 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 2.5, duration: 0.5, ease: smoothEase }}
+        />
+        {/* Crane line */}
+        <motion.line
+          x1={160} y1={10} x2={160} y2={80}
+          stroke={`${COLORS.amber}25`}
+          strokeWidth={1}
+          strokeDasharray="3 3"
+          initial={{ pathLength: 0 }}
+          animate={{ pathLength: 1 }}
+          transition={{ delay: 2.0, duration: 1.0 }}
+        />
+        <motion.line
+          x1={130} y1={10} x2={190} y2={10}
+          stroke={`${COLORS.amber}25`}
+          strokeWidth={1}
+          initial={{ pathLength: 0 }}
+          animate={{ pathLength: 1 }}
+          transition={{ delay: 2.0, duration: 0.8 }}
+        />
+      </svg>
+    </div>
+  );
+}
+
+// ─── Blueprint Section Divider ──────────────────────────────────────────────
+
+function BlueprintDivider({ color = COLORS.blue }: { color?: string }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const inView = useInView(ref, { once: true, margin: "-40px" });
+
+  return (
+    <div ref={ref} style={{ margin: "64px 0 56px", position: "relative", height: 32 }}>
+      <svg width="100%" height="32" style={{ overflow: "visible" }}>
+        {/* Main dimension line */}
+        <motion.line
+          x1="0" y1="16" x2="100%" y2="16"
+          stroke={`${color}20`}
+          strokeWidth={0.5}
+          initial={{ pathLength: 0 }}
+          animate={inView ? { pathLength: 1 } : {}}
+          transition={{ duration: 1.2, ease: smoothEase }}
+        />
+        {/* Left tick */}
+        <motion.line
+          x1="0" y1="8" x2="0" y2="24"
+          stroke={`${color}35`}
+          strokeWidth={0.5}
+          initial={{ opacity: 0 }}
+          animate={inView ? { opacity: 1 } : {}}
+          transition={{ delay: 0.3, duration: 0.3 }}
+        />
+        {/* Right tick */}
+        <motion.line
+          x1="100%" y1="8" x2="100%" y2="24"
+          stroke={`${color}35`}
+          strokeWidth={0.5}
+          initial={{ opacity: 0 }}
+          animate={inView ? { opacity: 1 } : {}}
+          transition={{ delay: 0.8, duration: 0.3 }}
+        />
+        {/* Center diamond */}
+        <motion.path
+          d="M 50% 10 L 53% 16 L 50% 22 L 47% 16 Z"
+          fill={`${color}15`}
+          stroke={`${color}35`}
+          strokeWidth={0.5}
+          initial={{ opacity: 0, scale: 0 }}
+          animate={inView ? { opacity: 1, scale: 1 } : {}}
+          transition={{ delay: 0.6, duration: 0.4 }}
+          style={{ transformOrigin: "50% 16px" }}
+        />
+        {/* Dimension marks */}
+        {[0.25, 0.5, 0.75].map((pos, i) => (
+          <motion.line
+            key={i}
+            x1={`${pos * 100}%`} y1="12"
+            x2={`${pos * 100}%`} y2="20"
+            stroke={`${color}25`}
+            strokeWidth={0.5}
+            initial={{ opacity: 0 }}
+            animate={inView ? { opacity: 1 } : {}}
+            transition={{ delay: 0.4 + i * 0.1, duration: 0.3 }}
+          />
+        ))}
+      </svg>
+    </div>
+  );
+}
+
+// ─── Floating AEC Symbols (parallax depth) ──────────────────────────────────
+
+const AEC_SYMBOLS = [
+  // Beams, columns, walls — architectural notation marks
+  { svg: "M0 8 L16 8 M0 4 L0 12 M16 4 L16 12", label: "DIM", x: "5%", y: "20%", size: 18, color: COLORS.blue, speed: 0.3 },
+  { svg: "M2 2 L14 2 L14 14 L2 14 Z M5 14 L5 2 M11 14 L11 2", label: "GRID", x: "92%", y: "35%", size: 16, color: COLORS.purple, speed: 0.5 },
+  { svg: "M8 0 L8 16 M0 8 L16 8 M3 3 L13 13 M13 3 L3 13", label: "+", x: "88%", y: "60%", size: 14, color: COLORS.green, speed: 0.2 },
+  { svg: "M2 14 L8 2 L14 14 Z", label: "A", x: "7%", y: "55%", size: 16, color: COLORS.amber, speed: 0.4 },
+  { svg: "M0 12 L4 4 L8 12 L12 4 L16 12", label: "W", x: "95%", y: "80%", size: 14, color: COLORS.cyan, speed: 0.35 },
+  { svg: "M4 0 L4 16 L12 16 L12 0", label: "COL", x: "3%", y: "80%", size: 15, color: COLORS.blue, speed: 0.45 },
+];
+
+function FloatingAECSymbols() {
+  const { scrollYProgress } = useScroll();
+
+  return (
+    <div className="pointer-events-none fixed inset-0 z-[1] hidden lg:block" aria-hidden>
+      {AEC_SYMBOLS.map((sym, i) => {
+        // eslint-disable-next-line react-hooks/rules-of-hooks
+        const y = useTransform(scrollYProgress, [0, 1], [0, sym.speed * -300]);
+        return (
+          <motion.div
+            key={i}
+            style={{
+              position: "absolute",
+              left: sym.x,
+              top: sym.y,
+              y,
+              opacity: 0.12,
+            }}
+          >
+            <svg width={sym.size} height={sym.size} viewBox="0 0 16 16">
+              <path d={sym.svg} fill="none" stroke={sym.color} strokeWidth={1} strokeLinecap="round" />
+            </svg>
+            <div style={{
+              fontSize: 7, color: sym.color, textAlign: "center",
+              marginTop: 2, fontFamily: "var(--font-jetbrains, monospace)",
+              letterSpacing: "0.08em", opacity: 0.7,
+            }}>
+              {sym.label}
+            </div>
+          </motion.div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ─── Sticky Table of Contents ───────────────────────────────────────────────
+
+function TableOfContents() {
+  const [activeSection, setActiveSection] = useState<string>("");
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            setActiveSection(entry.target.id);
+          }
+        }
+      },
+      { rootMargin: "-20% 0px -70% 0px" }
+    );
+
+    for (const section of TOC_SECTIONS) {
+      const el = document.getElementById(section.id);
+      if (el) observer.observe(el);
+    }
+
+    return () => observer.disconnect();
+  }, []);
+
+  const handleClick = useCallback((id: string) => {
+    document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, []);
+
+  return (
+    <motion.nav
+      initial={{ opacity: 0, x: -20 }}
+      animate={{ opacity: 1, x: 0 }}
+      transition={{ delay: 1.5, duration: 0.6 }}
+      className="blog-toc"
+      style={{
+        position: "fixed",
+        left: 24,
+        top: "50%",
+        transform: "translateY(-50%)",
+        zIndex: 50,
+        display: "flex",
+        flexDirection: "column",
+        gap: 2,
+      }}
+    >
+      {TOC_SECTIONS.map((section) => {
+        const isActive = activeSection === section.id;
+        return (
+          <button
+            key={section.id}
+            onClick={() => handleClick(section.id)}
+            style={{
+              display: "flex", alignItems: "center", gap: 8,
+              padding: "6px 10px", borderRadius: 8,
+              background: isActive ? `${COLORS.blue}12` : "transparent",
+              border: "none", cursor: "pointer",
+              transition: "all 0.2s",
+              textAlign: "left",
+            }}
+          >
+            <div style={{
+              width: 3, height: isActive ? 18 : 8, borderRadius: 2,
+              background: isActive ? COLORS.blue : `${COLORS.textTertiary}40`,
+              transition: "all 0.3s ease",
+            }} />
+            <span style={{
+              fontSize: 10, fontWeight: isActive ? 600 : 400,
+              color: isActive ? COLORS.blue : COLORS.textTertiary,
+              letterSpacing: "0.02em",
+              transition: "all 0.2s",
+              whiteSpace: "nowrap",
+              maxWidth: isActive ? 120 : 0,
+              overflow: "hidden",
+              opacity: isActive ? 1 : 0,
+            }}>
+              {section.label}
+            </span>
+          </button>
+        );
+      })}
+    </motion.nav>
+  );
+}
+
+// ─── Architectural Grid Number (section label) ──────────────────────────────
+
+function SectionLabel({ number, text }: { number: string; text: string }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const inView = useInView(ref, { once: true, margin: "-80px" });
+
+  return (
+    <motion.div
+      ref={ref}
+      initial={{ opacity: 0, x: -20 }}
+      animate={inView ? { opacity: 1, x: 0 } : {}}
+      transition={{ duration: 0.5, ease: smoothEase }}
+      style={{
+        display: "inline-flex", alignItems: "center", gap: 10,
+        marginBottom: 16,
+      }}
+    >
+      <div style={{
+        width: 28, height: 28, borderRadius: 8,
+        border: `1px solid ${COLORS.blue}25`,
+        background: `${COLORS.blue}08`,
+        display: "flex", alignItems: "center", justifyContent: "center",
+        fontSize: 11, fontWeight: 700, color: COLORS.blue,
+        fontFamily: "var(--font-jetbrains, monospace)",
+      }}>
+        {number}
+      </div>
+      <span style={{
+        fontSize: 10, color: COLORS.textTertiary,
+        letterSpacing: "0.12em", textTransform: "uppercase",
+        fontFamily: "var(--font-jetbrains, monospace)",
+      }}>
+        {text}
+      </span>
+    </motion.div>
+  );
+}
 
 // ─── The 11 tools from the article ─────────────────────────────────────────
 
@@ -628,6 +975,8 @@ export default function BlogArticle() {
       <div style={{ background: COLORS.bg, color: COLORS.textPrimary, minHeight: "100vh" }}>
         <ReadingProgress />
         <BlogParticles />
+        <FloatingAECSymbols />
+        <TableOfContents />
 
         {/* Blueprint grid */}
         <div
@@ -782,6 +1131,9 @@ export default function BlogArticle() {
               </div>
             </motion.div>
 
+            {/* Isometric building animation */}
+            <IsometricBuilding />
+
             {/* Scroll indicator */}
             <motion.div
               initial={{ opacity: 0 }}
@@ -832,10 +1184,13 @@ export default function BlogArticle() {
           </Reveal>
 
           {/* ── SECTION: DIRTY SECRET ── */}
+          <BlueprintDivider color={COLORS.blue} />
+          <div id="dirty-secret" style={{ scrollMarginTop: 80 }} />
           <Reveal>
+            <SectionLabel number="01" text="Industry Reality" />
             <h2 style={{
               fontSize: 28, fontWeight: 800, color: COLORS.textPrimary,
-              letterSpacing: "-1px", marginTop: 72, marginBottom: 24,
+              letterSpacing: "-1px", marginBottom: 24,
               lineHeight: 1.2,
             }}>
               The Dirty Secret Nobody Talks About at AEC Conferences
@@ -900,10 +1255,13 @@ export default function BlogArticle() {
           </div>
 
           {/* ── SECTION: 11 TOOLS ── */}
+          <BlueprintDivider color={COLORS.purple} />
+          <div id="eleven-tools" style={{ scrollMarginTop: 80 }} />
           <Reveal>
+            <SectionLabel number="02" text="Tool Fragmentation" />
             <h2 style={{
               fontSize: 28, fontWeight: 800, color: COLORS.textPrimary,
-              letterSpacing: "-1px", marginTop: 72, marginBottom: 24,
+              letterSpacing: "-1px", marginBottom: 24,
               lineHeight: 1.2,
             }}>
               I Counted the Tools Once. I Stopped at Eleven.
@@ -939,10 +1297,13 @@ export default function BlogArticle() {
           </PullQuote>
 
           {/* ── SECTION: WHERE HOURS GO ── */}
+          <BlueprintDivider color={COLORS.red} />
+          <div id="where-hours-go" style={{ scrollMarginTop: 80 }} />
           <Reveal>
+            <SectionLabel number="03" text="Time Analysis" />
             <h2 style={{
               fontSize: 28, fontWeight: 800, color: COLORS.textPrimary,
-              letterSpacing: "-1px", marginTop: 72, marginBottom: 24,
+              letterSpacing: "-1px", marginBottom: 24,
               lineHeight: 1.2,
             }}>
               Where the Hours Actually Go
@@ -1039,10 +1400,13 @@ export default function BlogArticle() {
           </PullQuote>
 
           {/* ── SECTION: THE FIX ── */}
+          <BlueprintDivider color={COLORS.green} />
+          <div id="the-fix" style={{ scrollMarginTop: 80 }} />
           <Reveal>
+            <SectionLabel number="04" text="The Solution" />
             <h2 style={{
               fontSize: 28, fontWeight: 800, color: COLORS.textPrimary,
-              letterSpacing: "-1px", marginTop: 72, marginBottom: 24,
+              letterSpacing: "-1px", marginBottom: 24,
               lineHeight: 1.2,
             }}>
               So What Would It Look Like If You Actually Fixed This?
@@ -1092,10 +1456,13 @@ export default function BlogArticle() {
           </Reveal>
 
           {/* ── SECTION: IN PRACTICE ── */}
+          <BlueprintDivider color={COLORS.amber} />
+          <div id="in-practice" style={{ scrollMarginTop: 80 }} />
           <Reveal>
+            <SectionLabel number="05" text="Workflow Templates" />
             <h2 style={{
               fontSize: 28, fontWeight: 800, color: COLORS.textPrimary,
-              letterSpacing: "-1px", marginTop: 72, marginBottom: 24,
+              letterSpacing: "-1px", marginBottom: 24,
               lineHeight: 1.2,
             }}>
               What This Actually Looks Like in Practice
@@ -1148,10 +1515,13 @@ export default function BlogArticle() {
           </div>
 
           {/* ── SECTION: BEYOND TIME ── */}
+          <BlueprintDivider color={COLORS.cyan} />
+          <div id="beyond-time" style={{ scrollMarginTop: 80 }} />
           <Reveal>
+            <SectionLabel number="06" text="Design Quality" />
             <h2 style={{
               fontSize: 28, fontWeight: 800, color: COLORS.textPrimary,
-              letterSpacing: "-1px", marginTop: 72, marginBottom: 24,
+              letterSpacing: "-1px", marginBottom: 24,
               lineHeight: 1.2,
             }}>
               Why This Matters Beyond Saving Time
@@ -1203,10 +1573,13 @@ export default function BlogArticle() {
           </Reveal>
 
           {/* ── SECTION: BIGGER PICTURE ── */}
+          <BlueprintDivider color={COLORS.purple} />
+          <div id="bigger-picture" style={{ scrollMarginTop: 80 }} />
           <Reveal>
+            <SectionLabel number="07" text="Industry Transformation" />
             <h2 style={{
               fontSize: 28, fontWeight: 800, color: COLORS.textPrimary,
-              letterSpacing: "-1px", marginTop: 72, marginBottom: 24,
+              letterSpacing: "-1px", marginBottom: 24,
               lineHeight: 1.2,
             }}>
               The Bigger Picture
@@ -1248,10 +1621,13 @@ export default function BlogArticle() {
           </Reveal>
 
           {/* ── SECTION: WHAT I'D TELL MY FIRM ── */}
+          <BlueprintDivider color={COLORS.blue} />
+          <div id="my-firm" style={{ scrollMarginTop: 80 }} />
           <Reveal>
+            <SectionLabel number="08" text="Action Plan" />
             <h2 style={{
               fontSize: 28, fontWeight: 800, color: COLORS.textPrimary,
-              letterSpacing: "-1px", marginTop: 72, marginBottom: 24,
+              letterSpacing: "-1px", marginBottom: 24,
               lineHeight: 1.2,
             }}>
               What I&apos;d Tell My Firm
@@ -1406,6 +1782,14 @@ export default function BlogArticle() {
 
       {/* ── Responsive styles ── */}
       <style>{`
+        /* TOC hidden below 1280px */
+        @media (max-width: 1280px) {
+          .blog-toc { display: none !important; }
+        }
+        /* Isometric building hidden on small screens */
+        @media (max-width: 768px) {
+          .blog-iso-building { display: none !important; }
+        }
         @media (max-width: 640px) {
           article { padding-left: 16px !important; padding-right: 16px !important; }
           article p { font-size: 15px !important; }
