@@ -792,7 +792,8 @@ export function useExecution({ onLog }: UseExecutionOptions = {}) {
         }
       }
       // File upload nodes: must have a file selected (check both node.data and inputFileStore)
-      if (["IN-002", "IN-003", "IN-004", "IN-005", "IN-006"].includes(catalogueId)) {
+      // IN-005 (Parameter Input) and IN-006 (Location Input) have built-in defaults — not file upload nodes
+      if (["IN-002", "IN-003", "IN-004"].includes(catalogueId)) {
         const nd = node.data as Record<string, unknown>;
         if (!nd.fileData && !nd.inputValue && !inputFileStore.has(node.id)) {
           toast.error(`Please upload a file to the "${node.data.label}" node before running`);
