@@ -414,7 +414,7 @@ export function useShowcaseData(): ShowcaseData {
     if (tableData.length > 0 || jsonData.length > 0 || kpiMetrics.length > 0) {
       availableTabs.push("data");
     }
-    if (model3dData || svgContent) {
+    if (model3dData) {
       availableTabs.push("model");
     }
     availableTabs.push("export"); // always present
