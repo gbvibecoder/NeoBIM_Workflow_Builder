@@ -271,8 +271,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             onClick={closeMobile}
             style={{
               position: "fixed", inset: 0,
-              background: "rgba(0,0,0,0.65)",
-              backdropFilter: "blur(4px)",
+              background: "rgba(0,0,0,0.82)",
+              backdropFilter: "blur(8px)",
+              WebkitBackdropFilter: "blur(8px)",
               zIndex: 8999,
             }}
           />
@@ -497,7 +498,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       </motion.aside>
 
       {/* ── Main Content ──────────────────────────────────────────────── */}
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
+      <div className="admin-main-content" style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0, overflow: "hidden" }}>
         {/* Top header */}
         <header
           className="admin-header"
@@ -541,7 +542,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           </div>
 
           {/* Language switcher */}
-          <div style={{
+          <div className="admin-lang-switcher" style={{
             display: "flex", alignItems: "center",
             borderRadius: 20, overflow: "hidden",
             border: "1px solid rgba(255,255,255,0.08)",
@@ -567,7 +568,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           </div>
 
           {/* Admin badge */}
-          <span style={{
+          <span className="admin-badge-pill" style={{
             padding: "2px 8px", borderRadius: 20,
             fontSize: 9, fontWeight: 700, letterSpacing: "0.08em",
             textTransform: "uppercase" as const,
@@ -594,7 +595,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </header>
 
         {/* Page content */}
-        <main style={{ flex: 1, overflow: "auto", background: "#070809" }}>
+        <main style={{ flex: 1, overflow: "auto", overflowX: "hidden", background: "#070809" }}>
           <AnimatePresence mode="wait">
             <motion.div
               key={pathname}
@@ -614,7 +615,24 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       <style>{`
         @media (max-width: 768px) {
           .admin-header {
-            padding: 0 12px !important;
+            padding: 0 12px 0 56px !important;
+            min-height: 48px !important;
+            gap: 8px !important;
+          }
+          .admin-header .admin-lang-switcher {
+            display: none !important;
+          }
+          .admin-main-content {
+            overflow-x: hidden !important;
+          }
+        }
+        @media (max-width: 480px) {
+          .admin-header {
+            padding: 0 8px 0 56px !important;
+            gap: 6px !important;
+          }
+          .admin-badge-pill {
+            display: none !important;
           }
         }
       `}</style>
