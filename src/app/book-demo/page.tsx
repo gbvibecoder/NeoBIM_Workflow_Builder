@@ -91,7 +91,7 @@ function DemoVideoPlayer() {
 
       <video
         ref={videoRef}
-        src="/videos/Demo.mp4"
+        src="https://pub-27d9a7371b6d47ff94fee1a3228f1720.r2.dev/workflow-demos/floor-plan-demo.mp4"
         muted={muted}
         playsInline
         onTimeUpdate={handleTimeUpdate}
