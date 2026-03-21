@@ -83,7 +83,7 @@ const TEMPLATE_PREVIEWS: Record<string, { type: "video"; url: string; start: num
   "wf-03": { type: "svg", output: "render" },
   "wf-04": { type: "video", url: `${R2}/parameters-to-3d-building.mp4`, start: 20 },
   "wf-05": { type: "video", url: `${R2}/ifc-exporter.mp4`, start: 120 },
-  "wf-09": { type: "svg", output: "boq" },
+  "wf-09": { type: "video", url: `${R2}/boq-result.mp4`, start: 45 },
   "wf-11": { type: "video", url: `${R2}/text-prompt-to-floor-plan.mp4`, start: 22 },
   "wf-12": { type: "video", url: `${R2}/text-to-concept-building.mp4`, start: 108 },
   "wf-13": { type: "svg", output: "map" },

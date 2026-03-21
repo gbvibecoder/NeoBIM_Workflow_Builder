@@ -35,14 +35,9 @@ const client = new S3Client({
 
 const VIDEOS = [
   {
-    localPath: "Copy of Parameters → 3D Building 2026-03-21T05-43-10-989Z.mp4",
-    r2Key: "workflow-demos/parameters-to-3d-building.mp4",
-    label: "Parameters → 3D Building",
-  },
-  {
-    localPath: "Copy of Text Prompt → Floor Plan 2026-03-21T07-50-00-380Z.mp4",
-    r2Key: "workflow-demos/text-prompt-to-floor-plan.mp4",
-    label: "Text Prompt → Floor Plan",
+    localPath: "BOQ Results 2026-03-21T11-37-45-724Z.mp4",
+    r2Key: "workflow-demos/boq-result.mp4",
+    label: "BOQ Result",
   },
 ];
 
