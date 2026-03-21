@@ -41,10 +41,10 @@ export function Sidebar() {
 
   const PRIMARY_NAV = [
     { href: "/dashboard",           label: t("nav.dashboard"),   icon: LayoutDashboard, exact: true },
+    { href: "/dashboard/templates", label: t("nav.templates"),   icon: BookOpen, badge: String(PREBUILT_WORKFLOWS.length) },
     { href: "/dashboard/workflows", label: t("nav.myWorkflows"), icon: Workflow },
     { href: "/dashboard/history",   label: t("nav.history"),     icon: History },
     { href: "/dashboard/analytics", label: t("nav.analytics"),   icon: BarChart3 },
-    { href: "/dashboard/templates", label: t("nav.templates"),   icon: BookOpen, badge: String(PREBUILT_WORKFLOWS.length) },
   ];
 
   const SECONDARY_NAV = [
