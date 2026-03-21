@@ -81,10 +81,10 @@ const R2 = "https://pub-27d9a7371b6d47ff94fee1a3228f1720.r2.dev/workflow-demos";
 const TEMPLATE_PREVIEWS: Record<string, { type: "video"; url: string; start: number } | { type: "svg"; output: string }> = {
   "wf-01": { type: "video", url: `${R2}/text-to-concept-building.mp4`, start: 105 },
   "wf-03": { type: "svg", output: "render" },
-  "wf-04": { type: "video", url: `${R2}/parameters-to-3d-building.mp4`, start: 0 },
+  "wf-04": { type: "video", url: `${R2}/parameters-to-3d-building.mp4`, start: 20 },
   "wf-05": { type: "svg", output: "ifc" },
   "wf-09": { type: "svg", output: "boq" },
-  "wf-11": { type: "video", url: `${R2}/text-prompt-to-floor-plan.mp4`, start: 0 },
+  "wf-11": { type: "video", url: `${R2}/text-prompt-to-floor-plan.mp4`, start: 22 },
   "wf-12": { type: "video", url: `${R2}/text-to-concept-building.mp4`, start: 108 },
   "wf-13": { type: "svg", output: "map" },
   "wf-14": { type: "video", url: `${R2}/3d-model-preview.mp4`, start: 0 },
