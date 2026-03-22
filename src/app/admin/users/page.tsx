@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Search, ChevronUp, ChevronDown, ChevronLeft, ChevronRight,
   Download, Users, Filter, Shield, Star, Zap, Trash2, AlertTriangle,
-  X, Loader2, CreditCard,
+  X, Loader2, CreditCard, FolderKanban,
 } from "lucide-react";
 import { useLocale } from "@/hooks/useLocale";
 
@@ -55,7 +55,7 @@ const ROLE_ICON: Record<UserRole, React.ReactNode> = {
   PLATFORM_ADMIN: <Shield size={9} />,
 };
 
-type SortField = "createdAt" | "name" | "email" | "role" | "xp" | "level";
+type SortField = "createdAt" | "name" | "email" | "role" | "xp" | "level" | "workflows" | "executions";
 type SortOrder = "asc" | "desc";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -125,6 +125,9 @@ function SkeletonRow({ index }: { index: number }) {
       </td>
       <td style={{ padding: "14px 12px" }}>
         <div style={{ width: 60, height: 20, borderRadius: 6, background: "rgba(255,255,255,0.04)" }} />
+      </td>
+      <td style={{ padding: "14px 12px", textAlign: "right" }} className="col-workflows">
+        <div style={{ width: 28, height: 10, borderRadius: 4, background: "rgba(255,255,255,0.04)", marginLeft: "auto" }} />
       </td>
       <td style={{ padding: "14px 12px", textAlign: "right" }} className="col-executions">
         <div style={{ width: 28, height: 10, borderRadius: 4, background: "rgba(255,255,255,0.04)", marginLeft: "auto" }} />
@@ -685,14 +688,11 @@ export default function AdminUsersPage() {
                 <th style={{ padding: "14px 12px", textAlign: "left" }}>
                   <SortHeader field="role" label={t('admin.users.role')} sortField={sortField} sortDir={sortDir} onSort={handleSort} />
                 </th>
+                <th style={{ padding: "14px 12px", textAlign: "right" }} className="col-workflows">
+                  <SortHeader field="workflows" label={t('admin.users.workflows')} align="right" sortField={sortField} sortDir={sortDir} onSort={handleSort} />
+                </th>
                 <th style={{ padding: "14px 12px", textAlign: "right" }} className="col-executions">
-                  <span style={{
-                    fontSize: 9, fontWeight: 600, textTransform: "uppercase",
-                    letterSpacing: "2.5px", color: "#5C5C78",
-                    fontFamily: "var(--font-jetbrains), monospace",
-                  }}>
-                    {t('admin.users.executions')}
-                  </span>
+                  <SortHeader field="executions" label={t('admin.users.executions')} align="right" sortField={sortField} sortDir={sortDir} onSort={handleSort} />
                 </th>
                 <th style={{ padding: "14px 12px", textAlign: "right" }} className="col-xp">
                   <SortHeader field="xp" label={t('admin.users.xpLevel')} align="right" sortField={sortField} sortDir={sortDir} onSort={handleSort} />
@@ -725,7 +725,7 @@ export default function AdminUsersPage() {
                 Array.from({ length: 8 }).map((_, i) => <SkeletonRow key={i} index={i} />)
               ) : users.length === 0 ? (
                 <tr>
-                  <td colSpan={7}>
+                  <td colSpan={8}>
                     <div style={{
                       padding: "56px 24px", textAlign: "center",
                     }}>
@@ -814,6 +814,19 @@ export default function AdminUsersPage() {
                         {ROLE_ICON[user.role]}
                         {user.role}
                       </span>
+                    </td>
+
+                    {/* Workflows */}
+                    <td style={{ padding: "12px 12px", textAlign: "right" }} className="col-workflows">
+                      <div style={{ display: "flex", alignItems: "center", gap: 5, justifyContent: "flex-end" }}>
+                        <FolderKanban size={11} style={{ color: "#A78BFA" }} />
+                        <span style={{
+                          fontSize: 13, color: "#F0F0F5", fontWeight: 500,
+                          fontFamily: "var(--font-jetbrains), monospace",
+                        }}>
+                          {user._count.workflows}
+                        </span>
+                      </div>
                     </td>
 
                     {/* Executions */}
@@ -1078,7 +1091,7 @@ export default function AdminUsersPage() {
             display: none !important;
           }
           .users-table {
-            min-width: 680px !important;
+            min-width: 720px !important;
           }
         }
 
@@ -1086,6 +1099,7 @@ export default function AdminUsersPage() {
           .admin-users-page {
             padding: 16px 14px 32px !important;
           }
+          .col-workflows,
           .col-executions,
           .col-joined,
           .col-xp,
