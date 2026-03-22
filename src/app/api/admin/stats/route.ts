@@ -9,6 +9,13 @@ export async function GET() {
   const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
   const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
 
+  // Delta period boundaries
+  const todayStart = new Date(now);
+  todayStart.setHours(0, 0, 0, 0);
+  const yesterdayStart = new Date(todayStart.getTime() - 24 * 60 * 60 * 1000);
+  const thisWeekStart = new Date(todayStart.getTime() - todayStart.getDay() * 24 * 60 * 60 * 1000);
+  const lastWeekStart = new Date(thisWeekStart.getTime() - 7 * 24 * 60 * 60 * 1000);
+
   // Run all queries in parallel
   const [
     totalUsers,
@@ -27,6 +34,23 @@ export async function GET() {
     feedbackCounts,
     feedbackByType,
     paidUsersCount,
+    // Delta queries
+    usersToday,
+    usersYesterday,
+    usersThisWeek,
+    usersLastWeek,
+    workflowsToday,
+    workflowsYesterday,
+    workflowsThisWeek,
+    workflowsLastWeek,
+    execsToday,
+    execsYesterday,
+    execsThisWeek,
+    execsLastWeek,
+    feedbackToday,
+    feedbackYesterday,
+    feedbackThisWeek,
+    feedbackLastWeek,
   ] = await Promise.all([
     prisma.user.count(),
     prisma.user.groupBy({ by: ["role"], _count: true }),
@@ -79,6 +103,27 @@ export async function GET() {
       },
       select: { role: true },
     }),
+    // ── Delta queries ───────────────────────────────────────────────────
+    // Users
+    prisma.user.count({ where: { createdAt: { gte: todayStart } } }),
+    prisma.user.count({ where: { createdAt: { gte: yesterdayStart, lt: todayStart } } }),
+    prisma.user.count({ where: { createdAt: { gte: thisWeekStart } } }),
+    prisma.user.count({ where: { createdAt: { gte: lastWeekStart, lt: thisWeekStart } } }),
+    // Workflows
+    prisma.workflow.count({ where: { createdAt: { gte: todayStart } } }),
+    prisma.workflow.count({ where: { createdAt: { gte: yesterdayStart, lt: todayStart } } }),
+    prisma.workflow.count({ where: { createdAt: { gte: thisWeekStart } } }),
+    prisma.workflow.count({ where: { createdAt: { gte: lastWeekStart, lt: thisWeekStart } } }),
+    // Executions
+    prisma.execution.count({ where: { createdAt: { gte: todayStart } } }),
+    prisma.execution.count({ where: { createdAt: { gte: yesterdayStart, lt: todayStart } } }),
+    prisma.execution.count({ where: { createdAt: { gte: thisWeekStart } } }),
+    prisma.execution.count({ where: { createdAt: { gte: lastWeekStart, lt: thisWeekStart } } }),
+    // Feedback
+    prisma.feedback.count({ where: { createdAt: { gte: todayStart } } }),
+    prisma.feedback.count({ where: { createdAt: { gte: yesterdayStart, lt: todayStart } } }),
+    prisma.feedback.count({ where: { createdAt: { gte: thisWeekStart } } }),
+    prisma.feedback.count({ where: { createdAt: { gte: lastWeekStart, lt: thisWeekStart } } }),
   ]);
 
   // Group signups by day
@@ -176,6 +221,13 @@ export async function GET() {
       total: feedbackCounts.reduce((s, f) => s + f._count, 0),
       byStatus: feedbackStatusMap,
       byType: feedbackTypeMap,
+    },
+    // ── Deltas (today vs yesterday, this week vs last week) ──────────
+    deltas: {
+      users:      { today: usersToday,     yesterday: usersYesterday,     thisWeek: usersThisWeek,     lastWeek: usersLastWeek },
+      workflows:  { today: workflowsToday, yesterday: workflowsYesterday, thisWeek: workflowsThisWeek, lastWeek: workflowsLastWeek },
+      executions: { today: execsToday,     yesterday: execsYesterday,     thisWeek: execsThisWeek,     lastWeek: execsLastWeek },
+      feedback:   { today: feedbackToday,  yesterday: feedbackYesterday,  thisWeek: feedbackThisWeek,  lastWeek: feedbackLastWeek },
     },
   });
 }

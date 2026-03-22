@@ -41,6 +41,13 @@ interface ActivityItem {
   createdAt: string;
 }
 
+interface DeltaPeriod {
+  today: number;
+  yesterday: number;
+  thisWeek: number;
+  lastWeek: number;
+}
+
 interface AdminStats {
   users: {
     total: number;
@@ -70,6 +77,12 @@ interface AdminStats {
     total: number;
     byStatus: Record<string, number>;
     byType: Record<string, number>;
+  };
+  deltas: {
+    users: DeltaPeriod;
+    workflows: DeltaPeriod;
+    executions: DeltaPeriod;
+    feedback: DeltaPeriod;
   };
 }
 
@@ -280,6 +293,36 @@ function CountUp({
   );
 }
 
+// ─── Delta Badge ─────────────────────────────────────────────────────────────
+function DeltaBadge({ value, label }: { value: number; label: string }) {
+  if (value === 0) return null;
+  const isPositive = value > 0;
+  const color = isPositive ? COLORS.success : COLORS.error;
+  return (
+    <span
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 2,
+        padding: "2px 6px",
+        borderRadius: 6,
+        background: `${color}15`,
+        border: `1px solid ${color}25`,
+        fontSize: 10,
+        fontWeight: 700,
+        fontFamily: "var(--font-jetbrains), monospace",
+        color,
+        letterSpacing: "0.02em",
+        whiteSpace: "nowrap",
+      }}
+      title={label}
+    >
+      {isPositive ? "+" : ""}{value}
+      <span style={{ fontSize: 8, opacity: 0.7, fontWeight: 500, marginLeft: 1 }}>{label}</span>
+    </span>
+  );
+}
+
 // ─── KPI Card ─────────────────────────────────────────────────────────────────
 function KPICard({
   icon,
@@ -292,6 +335,9 @@ function KPICard({
   subValue,
   subLabel,
   delay,
+  deltaDay,
+  deltaWeek,
+  deltaLabels,
 }: {
   icon: React.ReactNode;
   label: string;
@@ -303,6 +349,9 @@ function KPICard({
   subValue?: string;
   subLabel?: string;
   delay: number;
+  deltaDay?: number;
+  deltaWeek?: number;
+  deltaLabels?: { day: string; week: string };
 }) {
   const [hovered, setHovered] = useState(false);
 
@@ -372,7 +421,16 @@ function KPICard({
         </span>
       </div>
 
-      <CountUp value={value} prefix={prefix} suffix={suffix} decimals={decimals} />
+      <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
+        <CountUp value={value} prefix={prefix} suffix={suffix} decimals={decimals} />
+        {/* Delta badges */}
+        {(deltaDay !== undefined || deltaWeek !== undefined) && (
+          <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+            {deltaDay !== undefined && <DeltaBadge value={deltaDay} label={deltaLabels?.day || "1d"} />}
+            {deltaWeek !== undefined && <DeltaBadge value={deltaWeek} label={deltaLabels?.week || "7d"} />}
+          </div>
+        )}
+      </div>
 
       {subValue && (
         <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 12 }}>
@@ -1147,6 +1205,9 @@ export default function AdminDashboardPage() {
           subValue={`${stats.users.newThisMonth} ${t('admin.dash.new')}`}
           subLabel={t('admin.dash.thisMonth')}
           delay={0.05}
+          deltaDay={stats.deltas?.users ? stats.deltas.users.today - stats.deltas.users.yesterday : undefined}
+          deltaWeek={stats.deltas?.users ? stats.deltas.users.thisWeek - stats.deltas.users.lastWeek : undefined}
+          deltaLabels={{ day: t('admin.dash.vsYesterday'), week: t('admin.dash.vsLastWeek') }}
         />
         <KPICard
           icon={<DollarSign size={16} />}
@@ -1165,6 +1226,9 @@ export default function AdminDashboardPage() {
           accentColor={COLORS.amber}
           subValue={`${totalExecsLast30.toLocaleString()} ${t('admin.dash.last30')}`}
           delay={0.15}
+          deltaDay={stats.deltas?.executions ? stats.deltas.executions.today - stats.deltas.executions.yesterday : undefined}
+          deltaWeek={stats.deltas?.executions ? stats.deltas.executions.thisWeek - stats.deltas.executions.lastWeek : undefined}
+          deltaLabels={{ day: t('admin.dash.vsYesterday'), week: t('admin.dash.vsLastWeek') }}
         />
         <KPICard
           icon={<CheckCircle2 size={16} />}
