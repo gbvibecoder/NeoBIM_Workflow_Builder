@@ -250,12 +250,32 @@ function FullscreenArtifactViewer() {
   if (!nodeId || !artifact) return null;
 
   const d = artifact.data as Record<string, unknown>;
-  const floors = (d?.floors as number) ?? 5;
-  const height = (d?.height as number) ?? 21;
-  const footprint = (d?.footprint as number) ?? 500;
-  const gfa = (d?.gfa as number) ?? floors * footprint;
-  const buildingType = (d?.buildingType as string) ?? "Mixed-Use";
+  const rawData = (d?._raw as Record<string, unknown>) ?? {};
+  const floors = (d?.floors as number) ?? (rawData.floors as number) ?? 2;
+  const totalArea = (d?.totalArea as number) ?? (rawData.totalArea as number) ?? 200;
+  const height = (d?.height as number) ?? (rawData.height as number) ?? floors * 3.0;
+  const footprint = (d?.footprint as number) ?? (rawData.footprint as number) ?? Math.round(totalArea / Math.max(floors, 1));
+  const gfa = (d?.gfa as number) ?? totalArea;
+  const buildingType = (d?.buildingType as string) ?? (rawData.buildingType as string) ?? "Residential";
   const style = d?.style as Record<string, unknown> | undefined;
+
+  // Extract room data from GN-004 output for accurate 3D labels
+  const geometry = d?.geometry as Record<string, unknown> | undefined;
+  const roomListData = (d?.roomList ?? geometry?.rooms ?? []) as Array<Record<string, unknown>>;
+  const rooms = roomListData.length > 0 ? roomListData.map((r, i) => {
+    const area = Number(r.area ?? 10);
+    const w = Number(r.width ?? Math.sqrt(area * 1.2));
+    const dep = Number(r.depth ?? area / w);
+    return {
+      name: String(r.name ?? `Room ${i + 1}`),
+      type: String(r.type ?? "living"),
+      area,
+      width: w,
+      depth: dep,
+      x: Number(r.x ?? (i % 3) * (w + 0.2)),
+      z: Number(r.z ?? r.y ?? Math.floor(i / 3) * (dep + 0.2)),
+    };
+  }) : undefined;
 
   return (
     <motion.div
@@ -296,6 +316,7 @@ function FullscreenArtifactViewer() {
           footprint={footprint}
           gfa={gfa}
           buildingType={buildingType}
+          rooms={rooms}
           style={style ? {
             glassHeavy: !!style.glassHeavy,
             hasRiver: !!style.hasRiver,

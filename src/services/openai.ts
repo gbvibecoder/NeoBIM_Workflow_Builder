@@ -449,9 +449,10 @@ export async function generateConceptImage(
 
 export interface FloorPlanResult {
   svg: string;
-  roomList: Array<{ name: string; area: number; unit: string }>;
+  roomList: Array<{ name: string; area: number; unit: string; floor?: string }>;
   totalArea: number;
   floors: number;
+  perFloorRooms?: Array<{ floorLabel: string; rooms: Array<{ name: string; area: number; type: string }> }>;
 }
 
 // ─── Room type detection & colors ───────────────────────────────────────────
@@ -491,7 +492,7 @@ function detectRoomType(name: string): string {
 }
 
 function isExteriorRoom(type: string): boolean {
-  return ["bedroom", "master", "living", "dining", "office"].includes(type);
+  return ["bedroom", "master", "living", "dining", "office", "kitchen", "study"].includes(type);
 }
 
 // ─── Squarified Treemap Layout ──────────────────────────────────────────────
@@ -699,6 +700,182 @@ function escSvg(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
+// ─── Multi-floor SVG Renderer ────────────────────────────────────────────
+
+function renderMultiFloorSvg(
+  floorLayouts: Array<{ label: string; rooms: RoomDef[]; rects: LayoutRect[] }>,
+  title: string,
+  pxPerMeter: number,
+  planW: number,
+  planH: number,
+  svgW: number,
+  svgH: number,
+  margin: number,
+  gap: number,
+): string {
+  const parts: string[] = [];
+  parts.push(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${svgW} ${svgH}">`);
+  parts.push(`<rect width="${svgW}" height="${svgH}" fill="white"/>`);
+
+  // Title
+  parts.push(`<text x="${svgW / 2}" y="24" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="bold" fill="#222">${escSvg(title)}</text>`);
+
+  // Layout floors in a grid: up to 2 per row
+  const floorsPerRow = Math.min(floorLayouts.length, 2);
+  const floorSlotW = (svgW - margin * 2 - gap * (floorsPerRow - 1)) / floorsPerRow;
+
+  for (let fi = 0; fi < floorLayouts.length; fi++) {
+    const floor = floorLayouts[fi];
+    const col = fi % floorsPerRow;
+    const row = Math.floor(fi / floorsPerRow);
+
+    // Offset for this floor
+    const ox = margin + col * (floorSlotW + gap) + (floorSlotW - planW) / 2;
+    const oy = 45 + row * (planH + 70) + 20;
+
+    // Floor label
+    parts.push(`<text x="${ox + planW / 2}" y="${oy - 6}" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="bold" fill="#444">${escSvg(floor.label)}</text>`);
+
+    // Building outline (thick exterior wall)
+    parts.push(`<rect x="${ox}" y="${oy}" width="${planW}" height="${planH}" fill="none" stroke="#222" stroke-width="4"/>`);
+
+    // Room fills + labels + interior walls
+    for (const r of floor.rects) {
+      const rx = r.x + ox;
+      const ry = r.y + oy;
+      const color = ROOM_COLORS[r.room.type] ?? ROOM_COLORS.default;
+      const cx = rx + r.w / 2;
+      const cy = ry + r.h / 2;
+      const roomWidthM = r.w / pxPerMeter;
+      const roomHeightM = r.h / pxPerMeter;
+
+      // Room fill
+      parts.push(`<rect x="${rx}" y="${ry}" width="${r.w}" height="${r.h}" fill="${color}" stroke="#444" stroke-width="1.5"/>`);
+
+      // Room label (name + area)
+      const fontSize = Math.min(11, Math.max(7, Math.min(r.w, r.h) / 5));
+      parts.push(`<text x="${cx}" y="${cy - 3}" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="${fontSize}" font-weight="600" fill="#333">${escSvg(r.room.name)}</text>`);
+      parts.push(`<text x="${cx}" y="${cy + fontSize}" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="${Math.max(6, fontSize - 2)}" fill="#666">${r.room.area} m²</text>`);
+
+      // Dimension annotations
+      if (r.w > 40 && r.h > 35) {
+        parts.push(`<text x="${cx}" y="${ry + 9}" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="6" fill="#999">${roomWidthM.toFixed(1)}m</text>`);
+        parts.push(`<text x="${rx + 7}" y="${cy}" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="6" fill="#999" transform="rotate(-90 ${rx + 7} ${cy})">${roomHeightM.toFixed(1)}m</text>`);
+      }
+
+      // Door arc
+      const doorR = Math.min(15, Math.min(r.w, r.h) * 0.25);
+      const isOnLeft = Math.abs(r.x) < 2;
+      const isOnBottom = Math.abs((r.y + r.h) - planH) < 2;
+      const isOnTop = Math.abs(r.y) < 2;
+
+      if (r.room.type !== "balcony" && r.room.type !== "terrace") {
+        if (!isOnBottom && r.h > 25) {
+          const dx = rx + 10;
+          const dy = ry + r.h;
+          parts.push(`<line x1="${dx}" y1="${dy}" x2="${dx + doorR}" y2="${dy}" stroke="white" stroke-width="3"/>`);
+          parts.push(`<path d="M ${dx} ${dy} A ${doorR} ${doorR} 0 0 1 ${dx + doorR} ${dy - doorR}" fill="none" stroke="#555" stroke-width="1"/>`);
+        } else if (!isOnTop && r.h > 25) {
+          const dx = rx + 10;
+          const dy = ry;
+          parts.push(`<line x1="${dx}" y1="${dy}" x2="${dx + doorR}" y2="${dy}" stroke="white" stroke-width="3"/>`);
+          parts.push(`<path d="M ${dx} ${dy} A ${doorR} ${doorR} 0 0 0 ${dx + doorR} ${dy + doorR}" fill="none" stroke="#555" stroke-width="1"/>`);
+        } else if (!isOnLeft && r.w > 25) {
+          const dx = rx;
+          const dy = ry + 10;
+          parts.push(`<line x1="${dx}" y1="${dy}" x2="${dx}" y2="${dy + doorR}" stroke="white" stroke-width="3"/>`);
+          parts.push(`<path d="M ${dx} ${dy} A ${doorR} ${doorR} 0 0 0 ${dx + doorR} ${dy + doorR}" fill="none" stroke="#555" stroke-width="1"/>`);
+        }
+      }
+
+      // Windows on exterior walls (for habitable rooms)
+      if (isExteriorRoom(r.room.type)) {
+        const winW = Math.min(r.w * 0.35, 24);
+        const winH = 3;
+        if (Math.abs(r.x) < 2) {
+          const wy = ry + r.h / 2 - winW / 2;
+          parts.push(`<rect x="${rx - 1}" y="${wy}" width="${winH}" height="${winW}" fill="#B3E5FC" stroke="#81D4FA" stroke-width="0.5"/>`);
+        }
+        if (Math.abs((r.x + r.w) - planW) < 2) {
+          const wy = ry + r.h / 2 - winW / 2;
+          parts.push(`<rect x="${rx + r.w - winH + 1}" y="${wy}" width="${winH}" height="${winW}" fill="#B3E5FC" stroke="#81D4FA" stroke-width="0.5"/>`);
+        }
+        if (Math.abs(r.y) < 2) {
+          const wx = rx + r.w / 2 - winW / 2;
+          parts.push(`<rect x="${wx}" y="${ry - 1}" width="${winW}" height="${winH}" fill="#B3E5FC" stroke="#81D4FA" stroke-width="0.5"/>`);
+        }
+        if (Math.abs((r.y + r.h) - planH) < 2) {
+          const wx = rx + r.w / 2 - winW / 2;
+          parts.push(`<rect x="${wx}" y="${ry + r.h - winH + 1}" width="${winW}" height="${winH}" fill="#B3E5FC" stroke="#81D4FA" stroke-width="0.5"/>`);
+        }
+      }
+
+      // Stair indicator (diagonal lines for staircase rooms)
+      if (r.room.type === "stair") {
+        const steps = Math.floor(r.h / 6);
+        for (let s = 0; s < Math.max(steps, 4); s++) {
+          const sy = ry + (s + 0.5) * (r.h / Math.max(steps, 4));
+          parts.push(`<line x1="${rx + 2}" y1="${sy}" x2="${rx + r.w - 2}" y2="${sy}" stroke="#999" stroke-width="0.5"/>`);
+        }
+        // Arrow indicating up direction
+        const arrowX = rx + r.w / 2;
+        const arrowY1 = ry + r.h - 8;
+        const arrowY2 = ry + 8;
+        parts.push(`<line x1="${arrowX}" y1="${arrowY1}" x2="${arrowX}" y2="${arrowY2}" stroke="#666" stroke-width="1"/>`);
+        parts.push(`<polygon points="${arrowX},${arrowY2} ${arrowX - 3},${arrowY2 + 5} ${arrowX + 3},${arrowY2 + 5}" fill="#666"/>`);
+      }
+    }
+
+    // Re-draw building outline on top
+    parts.push(`<rect x="${ox}" y="${oy}" width="${planW}" height="${planH}" fill="none" stroke="#222" stroke-width="4"/>`);
+
+    // Area summary under each floor
+    const totalFloorArea = floor.rooms.reduce((s, r) => s + r.area, 0);
+    parts.push(`<text x="${ox + planW / 2}" y="${oy + planH + 14}" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="8" fill="#888">Total: ${Math.round(totalFloorArea)} m² — ${floor.rooms.length} rooms</text>`);
+  }
+
+  // North arrow (top-right)
+  const nx = svgW - 30, ny = 45;
+  parts.push(`<polygon points="${nx},${ny - 14} ${nx - 5},${ny} ${nx + 5},${ny}" fill="#333"/>`);
+  parts.push(`<text x="${nx}" y="${ny + 10}" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="bold" fill="#333">N</text>`);
+
+  // Scale bar (bottom-center)
+  const sbY = svgH - 15;
+  const sbX = svgW / 2 - 60;
+  const metersToDraw = Math.min(8, Math.ceil(planW / pxPerMeter));
+  const sbLen = metersToDraw * pxPerMeter;
+  parts.push(`<line x1="${sbX}" y1="${sbY}" x2="${sbX + sbLen}" y2="${sbY}" stroke="#333" stroke-width="1.5"/>`);
+  for (let m = 0; m <= metersToDraw; m += 2) {
+    const tx = sbX + m * pxPerMeter;
+    parts.push(`<line x1="${tx}" y1="${sbY - 3}" x2="${tx}" y2="${sbY + 3}" stroke="#333" stroke-width="1"/>`);
+    parts.push(`<text x="${tx}" y="${sbY + 12}" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="7" fill="#666">${m}</text>`);
+  }
+  parts.push(`<text x="${sbX + sbLen + 6}" y="${sbY + 3}" font-family="Arial, Helvetica, sans-serif" font-size="7" fill="#666">m</text>`);
+
+  parts.push(`</svg>`);
+  return parts.join("\n");
+}
+
+// ─── Detect if user prompt describes per-floor room requirements ─────────
+
+function hasPerFloorRequirements(d: Partial<BuildingDescription>): boolean {
+  // Check if program entries have floor assignments
+  if (d.program && Array.isArray(d.program) && d.program.length > 0) {
+    const withFloors = d.program.filter(p => p.floor && p.floor.trim().length > 0);
+    if (withFloors.length >= 2) {
+      const uniqueFloors = new Set(withFloors.map(p => p.floor!.toLowerCase()));
+      if (uniqueFloors.size >= 2) return true;
+    }
+  }
+  // Check programSummary or narrative for per-floor descriptions
+  const text = `${d.programSummary ?? ""} ${d.narrative ?? ""}`.toLowerCase();
+  if ((text.includes("ground floor") || text.includes("first floor") || text.includes("upper floor") || text.includes("second floor"))
+    && (text.includes("bedroom") || text.includes("kitchen") || text.includes("hall") || text.includes("living"))) {
+    return true;
+  }
+  return false;
+}
+
 // ─── Main generateFloorPlan function ────────────────────────────────────────
 
 export async function generateFloorPlan(
@@ -709,9 +886,9 @@ export async function generateFloorPlan(
     const client = getClient(userApiKey);
 
     const d = description as Partial<BuildingDescription>;
-    const floors = d.floors ?? 5;
+    const floors = d.floors ?? 2;
     const totalArea = d.totalArea ?? 2500;
-    const typology = d.buildingType ?? "Mixed-Use";
+    const typology = d.buildingType ?? "Residential";
     const floorPlate = Math.round(totalArea / floors);
 
     // Build detailed program from structured data if available
@@ -721,8 +898,21 @@ export async function generateFloorPlan(
         .map((p) => `${p.space}${p.area_m2 ? ` (${p.area_m2} m²)` : ""}${p.floor ? ` [${p.floor}]` : ""}`)
         .join(", ");
     } else {
-      programDetail = d.programSummary ?? "offices and residential units";
+      programDetail = d.programSummary ?? "residential rooms";
     }
+
+    // Also capture the original user prompt/narrative for better context
+    const narrativeContext = d.narrative ?? "";
+    const programSummaryContext = d.programSummary ?? "";
+
+    // ── Detect multi-floor building with distinct per-floor layouts ──
+    const isMultiFloor = floors >= 2 && hasPerFloorRequirements(d);
+
+    if (isMultiFloor) {
+      return generateMultiFloorPlan(client, d, floors, totalArea, typology, programDetail, narrativeContext, programSummaryContext);
+    }
+
+    // ── Single floor plan generation ────────────────────────────────
 
     // ── Step 1: Ask AI for room program ONLY (no SVG) ───────────────
     const completion = await client.chat.completions.create({
@@ -731,36 +921,42 @@ export async function generateFloorPlan(
       messages: [
         {
           role: "system",
-          content: `You are an expert architectural space planner. Given a building brief, generate a room program for ONE typical floor.
+          content: `You are an expert residential and architectural space planner. Given a building brief, generate a precise room program.
+
+CRITICAL: You MUST follow the user's room requirements EXACTLY:
+- If user says "1 hall, 2 bedrooms, kitchen, toilet, bathroom" → output EXACTLY those rooms, no more, no less
+- Do NOT add rooms the user didn't ask for (no "manager office", "break room", "lobby" etc.)
+- Do NOT rename rooms — use the user's exact names (e.g., "Hall" not "Living Room" if user said "hall")
+- If user says "toilet" include a toilet (type: "wc"). If user says "bathroom" include a bathroom (type: "bathroom"). These are DIFFERENT rooms.
+- Include a staircase (type: "stair") ONLY if user mentions stairs or the building has multiple floors
 
 RESPOND WITH JSON:
 {
   "rooms": [
-    { "name": "Living Room", "area": 22, "type": "living" },
+    { "name": "Hall", "area": 22, "type": "living" },
     { "name": "Kitchen", "area": 10, "type": "kitchen" },
     ...
   ],
-  "title": "2BHK Residential Apartment — Typical Floor Plan"
+  "title": "Residential Ground Floor Plan"
 }
 
 RULES:
 - "area" is in m². Room areas MUST sum to approximately the floor plate area given.
 - "type" must be one of: living, dining, kitchen, bedroom, master, bathroom, wc, hallway, corridor, entry, office, study, stair, balcony, laundry, storage, retail, meeting
-- Include a hallway/corridor (10-15% of floor area) for circulation
-- Include at least one bathroom per 2 bedrooms
-- Kitchen must be separate or clearly defined
-- Include an entry/foyer for residential
-- Respect minimum areas: bedroom ≥ 10m², master ≥ 14m², living ≥ 18m², kitchen ≥ 7m², bathroom ≥ 4m², wc ≥ 2.2m², hallway ≥ 5m²
-- For residential: typical room count is 1BHK (4-5 rooms), 2BHK (6-7 rooms), 3BHK (8-10 rooms)
-- Title should describe the building type and floor plan type`,
+- Use type "wc" for toilet, type "bathroom" for bathroom/shower
+- Use type "living" for hall/living room/drawing room
+- Respect minimum areas: bedroom ≥ 10m², living/hall ≥ 15m², kitchen ≥ 7m², bathroom ≥ 4m², wc ≥ 2.5m², stair ≥ 4m²
+- Title should describe the floor plan accurately`,
         },
         {
           role: "user",
-          content: `Generate a room program for a ${floors}-story ${typology}.
-Total building area: ${totalArea} m². Floor plate area: ~${floorPlate} m² per floor.
-Program: ${programDetail}.
+          content: `Generate a room program for: ${typology}.
+Total area: ${totalArea} m². Floor plate area: ~${floorPlate} m² per floor.
+Program requirements: ${programDetail}.
+${narrativeContext ? `\nAdditional context:\n${narrativeContext.substring(0, 500)}` : ""}
+${programSummaryContext ? `\nSummary: ${programSummaryContext}` : ""}
 
-Room areas MUST sum to approximately ${floorPlate} m².`,
+IMPORTANT: Room areas MUST sum to approximately ${floorPlate} m². Follow the user's room list EXACTLY.`,
         },
       ],
     });
@@ -793,12 +989,10 @@ Room areas MUST sum to approximately ${floorPlate} m².`,
     }
 
     // ── Step 3: Deterministic layout via treemap ────────────────────
-    // Calculate floor plate dimensions (roughly 4:3 aspect ratio)
     const aspect = 1.33;
     const fpWidthM = Math.sqrt(floorPlate * aspect);
     const fpHeightM = floorPlate / fpWidthM;
 
-    // SVG drawing area
     const margin = 50;
     const drawW = 700;
     const drawH = 490;
@@ -811,13 +1005,159 @@ Room areas MUST sum to approximately ${floorPlate} m².`,
     const rects = layoutTreemap(rooms, ox, oy, planW, planH);
 
     // ── Step 4: Render SVG deterministically ────────────────────────
-    const title = aiResult.title ?? `${typology} — Typical Floor Plan`;
+    const title = aiResult.title ?? `${typology} — Floor Plan`;
     const svg = renderFloorPlanSvg(rects, title, pxPerMeter, planW, planH, ox, oy);
 
     const roomList = rooms.map(r => ({ name: r.name, area: r.area, unit: "m²" }));
 
     return { svg, roomList, totalArea, floors };
   });
+}
+
+// ─── Multi-floor plan generation ────────────────────────────────────────────
+
+async function generateMultiFloorPlan(
+  client: ReturnType<typeof getClient>,
+  d: Partial<BuildingDescription>,
+  floors: number,
+  totalArea: number,
+  typology: string,
+  programDetail: string,
+  narrativeContext: string,
+  programSummaryContext: string,
+): Promise<FloorPlanResult> {
+  const floorPlate = Math.round(totalArea / floors);
+
+  // ── Step 1: Ask AI for per-floor room programs ──────────────────
+  const completion = await client.chat.completions.create({
+    model: "gpt-4o",
+    response_format: { type: "json_object" },
+    messages: [
+      {
+        role: "system",
+        content: `You are an expert residential floor plan architect. Given a building brief with per-floor requirements, generate SEPARATE room programs for EACH floor.
+
+CRITICAL RULES — FOLLOW THE USER'S REQUIREMENTS EXACTLY:
+- If user says "ground floor: 1 hall, 2 bedrooms, kitchen, toilet, bathroom" → output EXACTLY those rooms for ground floor
+- If user says "first floor: 2 bedrooms, 1 toilet" → output EXACTLY those rooms for first floor
+- Do NOT add rooms the user didn't ask for (no "manager office", "reception", "lobby", "break room")
+- Do NOT rename rooms — use the user's exact names (e.g., "Hall" not "Living Room" if user said "hall")
+- If user mentions "stairs" or building has multiple floors, add a "Staircase" room on EACH floor
+- "toilet" → type "wc", "bathroom" → type "bathroom" (these are different!)
+- "hall" → type "living"
+
+RESPOND WITH JSON:
+{
+  "floors": [
+    {
+      "floorLabel": "Ground Floor",
+      "rooms": [
+        { "name": "Hall", "area": 18, "type": "living" },
+        { "name": "Bedroom 1", "area": 12, "type": "bedroom" },
+        { "name": "Kitchen", "area": 9, "type": "kitchen" },
+        { "name": "Staircase", "area": 5, "type": "stair" }
+      ]
+    },
+    {
+      "floorLabel": "First Floor",
+      "rooms": [
+        { "name": "Bedroom 3", "area": 14, "type": "bedroom" },
+        { "name": "Staircase", "area": 5, "type": "stair" }
+      ]
+    }
+  ],
+  "title": "Residential Duplex — 1089 sq ft"
+}
+
+RULES:
+- "area" is in m². Each floor's rooms MUST sum to approximately the floor plate area.
+- "type" must be one of: living, dining, kitchen, bedroom, master, bathroom, wc, hallway, corridor, entry, office, study, stair, balcony, laundry, storage, retail, meeting
+- Respect minimum areas: bedroom ≥ 10m², living/hall ≥ 15m², kitchen ≥ 7m², bathroom ≥ 4m², wc ≥ 2.5m², stair ≥ 4m²
+- Number the floors correctly: Ground Floor, First Floor, Second Floor, etc.
+- If user mentions windows/doors → every habitable room gets windows (this is handled in SVG rendering, just include the rooms)
+- Staircase should be in the SAME position on each floor (same area, same type)`,
+      },
+      {
+        role: "user",
+        content: `Generate per-floor room programs for: ${typology} (${floors} floors).
+Total building area: ${totalArea} m². Floor plate area: ~${floorPlate} m² per floor.
+Program requirements: ${programDetail}.
+${narrativeContext ? `\nProject description:\n${narrativeContext.substring(0, 800)}` : ""}
+${programSummaryContext ? `\nSummary: ${programSummaryContext}` : ""}
+
+IMPORTANT: Each floor's rooms MUST sum to approximately ${floorPlate} m². Follow the user's per-floor room list EXACTLY.`,
+      },
+    ],
+  });
+
+  const content = completion.choices[0]?.message?.content;
+  if (!content) throw new Error("OpenAI returned empty response for multi-floor plan");
+
+  const aiResult = JSON.parse(content) as {
+    floors: Array<{ floorLabel: string; rooms: Array<{ name: string; area: number; type?: string }> }>;
+    title?: string;
+  };
+
+  if (!aiResult.floors || aiResult.floors.length === 0) {
+    throw new Error("AI returned no floors for multi-floor plan");
+  }
+
+  // ── Step 2: Normalize and layout each floor ─────────────────────
+  const floorLayouts: Array<{ label: string; rooms: RoomDef[]; rects: LayoutRect[] }> = [];
+
+  // Calculate common dimensions for all floors (same footprint)
+  const aspect = 1.33;
+  const fpWidthM = Math.sqrt(floorPlate * aspect);
+  const fpHeightM = floorPlate / fpWidthM;
+
+  // SVG dimensions: side-by-side floors
+  const floorCount = aiResult.floors.length;
+  const gap = 40; // px gap between floors
+  const totalSvgW = 800 * Math.min(floorCount, 2); // max 2 side by side
+  const svgH = floorCount > 2 ? 1100 : 600;
+  const margin = 40;
+  const floorDrawW = (totalSvgW - margin * 2 - gap * (Math.min(floorCount, 2) - 1)) / Math.min(floorCount, 2);
+  const floorDrawH = floorCount > 2 ? 420 : 460;
+  const pxPerMeter = Math.min(floorDrawW / fpWidthM, floorDrawH / fpHeightM);
+  const planW = fpWidthM * pxPerMeter;
+  const planH = fpHeightM * pxPerMeter;
+
+  for (const floor of aiResult.floors) {
+    const rooms: RoomDef[] = floor.rooms.map(r => ({
+      name: r.name,
+      area: r.area,
+      type: r.type ?? detectRoomType(r.name),
+    }));
+
+    // Normalize areas
+    const roomAreaSum = rooms.reduce((s, r) => s + r.area, 0);
+    if (roomAreaSum > 0 && Math.abs(roomAreaSum - floorPlate) > floorPlate * 0.1) {
+      const scale = floorPlate / roomAreaSum;
+      for (const room of rooms) {
+        room.area = Math.round(room.area * scale * 10) / 10;
+      }
+    }
+
+    // Layout with treemap (positions calculated per floor, adjusted later)
+    const rects = layoutTreemap(rooms, 0, 0, planW, planH);
+    floorLayouts.push({ label: floor.floorLabel, rooms, rects });
+  }
+
+  // ── Step 3: Render multi-floor SVG ──────────────────────────────
+  const title = aiResult.title ?? `${typology} — ${floors}-Floor Plan`;
+  const svg = renderMultiFloorSvg(floorLayouts, title, pxPerMeter, planW, planH, totalSvgW, svgH, margin, gap);
+
+  // Flatten room lists with floor labels
+  const roomList = floorLayouts.flatMap(fl =>
+    fl.rooms.map(r => ({ name: r.name, area: r.area, unit: "m²", floor: fl.label }))
+  );
+
+  const perFloorRooms = floorLayouts.map(fl => ({
+    floorLabel: fl.label,
+    rooms: fl.rooms.map(r => ({ name: r.name, area: r.area, type: r.type })),
+  }));
+
+  return { svg, roomList, totalArea, floors, perFloorRooms };
 }
 
 
