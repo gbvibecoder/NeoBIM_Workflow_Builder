@@ -27,8 +27,16 @@ export async function GET(req: Request) {
     where.role = role;
   }
 
-  const allowedSorts = ["createdAt", "name", "email", "role", "xp", "level"];
+  const allowedSorts = ["createdAt", "name", "email", "role", "xp", "level", "workflows", "executions"];
   const sortField = allowedSorts.includes(sort) ? sort : "createdAt";
+
+  // Relation-count sorts use a different Prisma orderBy shape
+  const orderBy =
+    sortField === "workflows"
+      ? { workflows: { _count: order } }
+      : sortField === "executions"
+        ? { executions: { _count: order } }
+        : { [sortField]: order };
 
   const [users, total] = await Promise.all([
     prisma.user.findMany({
@@ -48,7 +56,8 @@ export async function GET(req: Request) {
         createdAt: true,
         _count: { select: { workflows: true, executions: true } },
       },
-      orderBy: { [sortField]: order },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      orderBy: orderBy as any,
       skip: (page - 1) * limit,
       take: limit,
     }),
