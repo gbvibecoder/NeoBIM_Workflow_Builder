@@ -101,11 +101,28 @@ model Workflow {
   executions   Execution[]
   tiles        TileInstance[]
   clones       WorkflowClone[]
+  versions     WorkflowVersion[]
   owner        User                   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
 
   @@index([ownerId])
   @@index([isTemplate])
   @@map("workflows")
+}
+
+model WorkflowVersion {
+  id           String   @id @default(cuid())
+  workflowId   String
+  version      Int
+  name         String
+  description  String?
+  tileGraph    Json
+  createdAt    DateTime @default(now())
+  createdBy    String
+  workflow     Workflow  @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+
+  @@unique([workflowId, version])
+  @@index([workflowId])
+  @@map("workflow_versions_history")
 }
 
 model TileInstance {

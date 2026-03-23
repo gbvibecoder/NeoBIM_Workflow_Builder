@@ -56,6 +56,39 @@ export async function PUT(req: NextRequest, { params }: Params) {
       return NextResponse.json(formatErrorResponse({ title: "Not found", message: "Workflow not found.", code: "NODE_001" }), { status: 404 });
     }
 
+    // Save current state as a version snapshot before overwriting
+    if (tileGraph !== undefined) {
+      try {
+        await prisma.workflowVersion.create({
+          data: {
+            workflowId: id,
+            version: existing.version,
+            name: existing.name,
+            description: existing.description,
+            tileGraph: existing.tileGraph as object,
+            createdBy: session.user.id,
+          },
+        });
+
+        // Clean up old versions (fire-and-forget — non-critical)
+        prisma.workflowVersion.findMany({
+          where: { workflowId: id },
+          orderBy: { version: "desc" },
+          skip: 20,
+          select: { id: true },
+        }).then(old => {
+          if (old.length > 0) {
+            prisma.workflowVersion.deleteMany({
+              where: { id: { in: old.map(v => v.id) } },
+            }).catch(() => {});
+          }
+        }).catch(() => {});
+      } catch (err) {
+        // Log but don't block save — duplicate version key means concurrent save, which is OK
+        console.warn("[workflows/PUT] Version snapshot failed (may be concurrent save):", err);
+      }
+    }
+
     const workflow = await prisma.workflow.update({
       where: { id },
       data: {

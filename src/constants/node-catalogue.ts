@@ -269,6 +269,43 @@ export const NODE_CATALOGUE: NodeCatalogueItem[] = [
     executionTime: "< 20s",
   },
 
+  // ── Control Flow / Branching ──
+  {
+    id: "TR-013",
+    name: "Condition Router",
+    description: "Route data based on a condition — send output to the 'true' or 'false' path based on a rule you define",
+    category: "transform",
+    icon: "GitBranch",
+    inputs: [
+      { id: "data-in", label: "Data", type: "any" },
+      { id: "condition-in", label: "Condition", type: "text" },
+    ],
+    outputs: [
+      { id: "true-out", label: "True Path", type: "any" },
+      { id: "false-out", label: "False Path", type: "any" },
+    ],
+    apiEngine: "Native",
+    tags: ["condition", "if", "branch", "router", "logic", "filter"],
+    executionTime: "< 1s",
+  },
+  {
+    id: "TR-014",
+    name: "Data Merge",
+    description: "Combine outputs from multiple nodes into a single unified result for downstream processing",
+    category: "transform",
+    icon: "GitMerge",
+    inputs: [
+      { id: "input-a", label: "Input A", type: "any" },
+      { id: "input-b", label: "Input B", type: "any" },
+    ],
+    outputs: [
+      { id: "merged-out", label: "Merged", type: "json" },
+    ],
+    apiEngine: "Native",
+    tags: ["merge", "combine", "join", "aggregate"],
+    executionTime: "< 1s",
+  },
+
   // ============================================================
   // GENERATE / GEOMETRY NODES (Green)
   // ============================================================

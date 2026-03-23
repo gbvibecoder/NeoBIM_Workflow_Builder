@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
@@ -14,7 +15,7 @@ import { PageBackground } from "@/components/dashboard/PageBackground";
 import { useLocale } from "@/hooks/useLocale";
 import { useAvatar } from "@/hooks/useAvatar";
 
-type SettingsTab = "profile" | "api-keys" | "plan";
+type SettingsTab = "profile" | "api-keys" | "plan" | "security";
 
 // ---- Hex ring scanner animation for profile ----
 function HexRing({ size = 88, color = "#1B4FFF" }: { size?: number; color?: string }) {
@@ -1074,6 +1075,167 @@ function PlanSection({ userRole }: { userRole: string }) {
   );
 }
 
+// ---- Security Section ----
+function SecuritySection({ userEmail }: { userEmail: string }) {
+  const { t } = useLocale();
+  const router = useRouter();
+
+  // Password change state
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [changingPassword, setChangingPassword] = useState(false);
+
+  // Account deletion state
+  const [deleteConfirmation, setDeleteConfirmation] = useState("");
+  const [deletePassword, setDeletePassword] = useState("");
+  const [deleting, setDeleting] = useState(false);
+
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (newPassword !== confirmPassword) {
+      toast.error(t('settings.passwordsDoNotMatch'));
+      return;
+    }
+    setChangingPassword(true);
+    try {
+      const res = await fetch("/api/user/change-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ currentPassword, newPassword }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.error || t('settings.passwordChangeFailed'));
+      } else {
+        toast.success(t('settings.passwordChanged'));
+        setCurrentPassword(""); setNewPassword(""); setConfirmPassword("");
+      }
+    } catch {
+      toast.error(t('settings.networkError'));
+    } finally {
+      setChangingPassword(false);
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    if (deleteConfirmation !== "DELETE") {
+      toast.error(t('settings.typeDeleteToConfirm'));
+      return;
+    }
+    setDeleting(true);
+    try {
+      const res = await fetch("/api/user/delete-account", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ confirmation: "DELETE", password: deletePassword }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.error || t('settings.deleteFailed'));
+      } else {
+        toast.success(t('settings.accountDeleted'));
+        router.push("/");
+      }
+    } catch {
+      toast.error(t('settings.networkError'));
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const inputStyle = {
+    width: "100%", padding: "10px 14px", borderRadius: 10,
+    background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)",
+    color: "#F0F0F5", fontSize: 13, outline: "none", boxSizing: "border-box" as const,
+  };
+
+  return (
+    <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+        {/* Password Change */}
+        <div className="dp-glass-card" style={{ padding: 24, borderRadius: 16 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20 }}>
+            <div style={{ width: 36, height: 36, borderRadius: 10, background: "rgba(79,138,255,0.08)", border: "1px solid rgba(79,138,255,0.15)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <Lock size={16} style={{ color: "#4F8AFF" }} />
+            </div>
+            <div>
+              <h3 style={{ fontSize: 15, fontWeight: 600, color: "#F0F0F5" }}>{t('settings.changePassword')}</h3>
+              <p style={{ fontSize: 11, color: "#5C5C78" }}>{t('settings.changePasswordDesc')}</p>
+            </div>
+          </div>
+
+          <form onSubmit={handleChangePassword} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            <div>
+              <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: "#5C5C78", marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.5px" }}>{t('settings.currentPassword')}</label>
+              <input type="password" value={currentPassword} onChange={e => setCurrentPassword(e.target.value)} required style={inputStyle} />
+            </div>
+            <div>
+              <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: "#5C5C78", marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.5px" }}>{t('settings.newPassword')}</label>
+              <input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} required minLength={8} style={inputStyle} />
+            </div>
+            <div>
+              <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: "#5C5C78", marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.5px" }}>{t('settings.confirmNewPassword')}</label>
+              <input type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} required style={inputStyle} />
+            </div>
+            <button type="submit" disabled={changingPassword || !currentPassword || !newPassword || !confirmPassword} style={{
+              padding: "10px 20px", borderRadius: 10, border: "none", cursor: changingPassword ? "wait" : "pointer",
+              background: "linear-gradient(135deg, #4F8AFF 0%, #6366F1 100%)", color: "#fff", fontSize: 13, fontWeight: 600,
+              opacity: (!currentPassword || !newPassword || !confirmPassword) ? 0.5 : 1,
+              display: "flex", alignItems: "center", justifyContent: "center", gap: 6, alignSelf: "flex-start",
+            }}>
+              {changingPassword ? <Loader2 size={14} style={{ animation: "spin 1s linear infinite" }} /> : <Lock size={14} />}
+              {changingPassword ? t('settings.saving') : t('settings.changePassword')}
+            </button>
+          </form>
+        </div>
+
+        {/* Danger Zone */}
+        <div className="dp-glass-card" style={{ padding: 24, borderRadius: 16, border: "1px solid rgba(239,68,68,0.15)" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
+            <div style={{ width: 36, height: 36, borderRadius: 10, background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.15)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <AlertCircle size={16} style={{ color: "#EF4444" }} />
+            </div>
+            <div>
+              <h3 style={{ fontSize: 15, fontWeight: 600, color: "#EF4444" }}>{t('settings.dangerZone')}</h3>
+              <p style={{ fontSize: 11, color: "#5C5C78" }}>{t('settings.dangerZoneDesc')}</p>
+            </div>
+          </div>
+
+          <div style={{ padding: 16, borderRadius: 10, background: "rgba(239,68,68,0.04)", border: "1px solid rgba(239,68,68,0.08)", marginBottom: 16 }}>
+            <p style={{ fontSize: 12, color: "#9898B0", lineHeight: 1.6, marginBottom: 8 }}>
+              {t('settings.deleteWarning')}
+            </p>
+            <p style={{ fontSize: 11, color: "#5C5C78" }}>
+              {t('settings.deleteAccountEmail')}: <strong style={{ color: "#9898B0" }}>{userEmail}</strong>
+            </p>
+          </div>
+
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <div>
+              <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: "#5C5C78", marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.5px" }}>{t('settings.typeDelete')}</label>
+              <input type="text" value={deleteConfirmation} onChange={e => setDeleteConfirmation(e.target.value)} placeholder="DELETE" style={{ ...inputStyle, borderColor: deleteConfirmation === "DELETE" ? "rgba(239,68,68,0.4)" : undefined }} />
+            </div>
+            <div>
+              <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: "#5C5C78", marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.5px" }}>{t('settings.confirmWithPassword')}</label>
+              <input type="password" value={deletePassword} onChange={e => setDeletePassword(e.target.value)} placeholder={t('settings.yourPassword')} style={inputStyle} />
+            </div>
+            <button onClick={handleDeleteAccount} disabled={deleting || deleteConfirmation !== "DELETE"} style={{
+              padding: "10px 20px", borderRadius: 10, border: "none", cursor: deleting ? "wait" : "pointer",
+              background: deleteConfirmation === "DELETE" ? "#EF4444" : "rgba(239,68,68,0.2)", color: "#fff", fontSize: 13, fontWeight: 600,
+              opacity: deleteConfirmation !== "DELETE" ? 0.5 : 1,
+              display: "flex", alignItems: "center", justifyContent: "center", gap: 6, alignSelf: "flex-start",
+            }}>
+              {deleting ? <Loader2 size={14} style={{ animation: "spin 1s linear infinite" }} /> : <Trash2 size={14} />}
+              {deleting ? t('settings.deleting') : t('settings.deleteAccount')}
+            </button>
+          </div>
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
 // ---- Page ----
 export default function SettingsPage() {
   const { t } = useLocale();
@@ -1091,6 +1253,7 @@ export default function SettingsPage() {
     { key: "profile",  label: t('settings.profile'),   icon: <Fingerprint size={16} />, desc: t('settings.tabIdentity') },
     { key: "api-keys", label: t('settings.apiKeys'),   icon: <Key size={16} />, desc: t('settings.tabVault') },
     { key: "plan",     label: t('settings.planUsage'),  icon: <Shield size={16} />, desc: t('settings.tabClearance') },
+    { key: "security", label: t('settings.security'),  icon: <Lock size={16} />, desc: t('settings.tabSecurity') },
   ];
 
   return (
@@ -1207,6 +1370,11 @@ export default function SettingsPage() {
                 {activeTab === "plan" && (
                   <motion.div key="plan" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} transition={{ duration: 0.3 }}>
                     <PlanSection userRole={userRole} />
+                  </motion.div>
+                )}
+                {activeTab === "security" && (
+                  <motion.div key="security" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} transition={{ duration: 0.3 }}>
+                    <SecuritySection userEmail={user?.email || ""} />
                   </motion.div>
                 )}
               </AnimatePresence>

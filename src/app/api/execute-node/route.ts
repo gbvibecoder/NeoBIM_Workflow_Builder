@@ -3392,6 +3392,51 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
         createdAt: new Date(),
       };
 
+    } else if (catalogueId === "TR-013") {
+      // ── Condition Router ──────────────────────────────────────
+      const conditionText = (inputData?.condition as string) || (inputData?.content as string) || "true";
+      const dataStr = typeof inputData === "string" ? inputData : JSON.stringify(inputData || {});
+      const conditionMet = conditionText.toLowerCase() === "true" || dataStr.toLowerCase().includes(conditionText.toLowerCase());
+
+      artifact = {
+        id: `art_${tileInstanceId}_${Date.now()}`,
+        executionId,
+        tileInstanceId,
+        type: "json",
+        data: {
+          result: conditionMet ? (inputData || {}) : null,
+          conditionMet,
+          condition: conditionText,
+          outputPort: conditionMet ? "true-out" : "false-out",
+          summary: `Condition "${conditionText}" evaluated to ${conditionMet}`,
+        },
+        metadata: { engine: "condition-router", real: true, conditionMet },
+        createdAt: new Date(),
+      };
+
+    } else if (catalogueId === "TR-014") {
+      // ── Data Merge ────────────────────────────────────────────
+      const mergedData: Record<string, unknown> = {};
+      if (inputData && typeof inputData === "object") {
+        Object.entries(inputData).forEach(([key, value]) => {
+          mergedData[key] = value;
+        });
+      }
+
+      artifact = {
+        id: `art_${tileInstanceId}_${Date.now()}`,
+        executionId,
+        tileInstanceId,
+        type: "json",
+        data: {
+          merged: mergedData,
+          inputCount: Object.keys(mergedData).length,
+          summary: `Merged ${Object.keys(mergedData).length} field(s) into a single dataset`,
+        },
+        metadata: { engine: "data-merge", real: true, inputCount: Object.keys(mergedData).length },
+        createdAt: new Date(),
+      };
+
     } else {
       return NextResponse.json(
         formatErrorResponse(UserErrors.NODE_NOT_IMPLEMENTED(catalogueId)),
