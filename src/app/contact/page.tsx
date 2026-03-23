@@ -20,6 +20,8 @@ import {
   User,
   AtSign,
   AlignLeft,
+  Instagram,
+  Linkedin,
 } from "lucide-react";
 
 const fadeUp = {
@@ -792,6 +794,54 @@ export default function ContactPage() {
               </div>
             </motion.div>
 
+            {/* Social Links card */}
+            <motion.div
+              className="node-card"
+              style={{ "--node-port-color": "#E1306C" } as React.CSSProperties}
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true, margin: "-40px" }}
+              variants={fadeUp}
+              transition={{ duration: 0.5, delay: 0.12, ease: smoothEase }}
+            >
+              <div
+                className="node-header"
+                style={{
+                  background: "linear-gradient(135deg, rgba(225,48,108,0.1), rgba(225,48,108,0.03))",
+                  borderBottom: "1px solid rgba(225,48,108,0.08)",
+                }}
+              >
+                <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#E1306C", boxShadow: "0 0 8px #E1306C" }} />
+                <span style={{ color: "#E1306C" }}>{t('contact.socialHeader')}</span>
+              </div>
+              <div style={{ padding: "20px 24px", display: "flex", gap: 12 }}>
+                {[
+                  { icon: Instagram, href: "https://www.instagram.com/buildflow_live/", label: "Instagram", color: "#E1306C" },
+                  { icon: Linkedin, href: "https://www.linkedin.com/in/buildflow/", label: "LinkedIn", color: "#0A66C2" },
+                  { icon: Mail, href: "mailto:buildflow786@gmail.com", label: "Email", color: "#4F8AFF" },
+                ].map(s => (
+                  <a
+                    key={s.label}
+                    href={s.href}
+                    target={s.href.startsWith("mailto:") ? undefined : "_blank"}
+                    rel={s.href.startsWith("mailto:") ? undefined : "noopener noreferrer"}
+                    aria-label={s.label}
+                    style={{
+                      flex: 1, padding: "14px 12px", borderRadius: 10,
+                      background: `${s.color}08`, border: `1px solid ${s.color}15`,
+                      display: "flex", flexDirection: "column", alignItems: "center", gap: 8,
+                      textDecoration: "none", transition: "all 0.2s",
+                    }}
+                    onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = `${s.color}15`; }}
+                    onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = `${s.color}08`; }}
+                  >
+                    <s.icon size={20} color={s.color} />
+                    <span style={{ fontSize: 11, color: "#9898B0", fontWeight: 600 }}>{s.label}</span>
+                  </a>
+                ))}
+              </div>
+            </motion.div>
+
             {/* FAQ card */}
             <motion.div
               className="node-card"
@@ -933,9 +983,21 @@ export default function ContactPage() {
               </Link>
             ))}
           </div>
-          <span style={{ fontSize: 11, color: "#3A3A50" }}>
-            {t('contact.footerBeta')}
-          </span>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            {[
+              { icon: Instagram, href: "https://www.instagram.com/buildflow_live/", label: "Instagram", color: "#E1306C" },
+              { icon: Linkedin, href: "https://www.linkedin.com/in/buildflow/", label: "LinkedIn", color: "#0A66C2" },
+              { icon: Mail, href: "mailto:buildflow786@gmail.com", label: "Email", color: "#4F8AFF" },
+            ].map(s => (
+              <a key={s.label} href={s.href} target={s.href.startsWith("mailto:") ? undefined : "_blank"} rel={s.href.startsWith("mailto:") ? undefined : "noopener noreferrer"} aria-label={s.label}
+                style={{ width: 30, height: 30, borderRadius: 8, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", display: "flex", alignItems: "center", justifyContent: "center", color: "#5C5C78", transition: "all 0.2s", textDecoration: "none" }}
+                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = s.color; }}
+                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = "#5C5C78"; }}
+              >
+                <s.icon size={13} />
+              </a>
+            ))}
+          </div>
         </div>
       </footer>
 
