@@ -58,6 +58,12 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Account not found." }, { status: 400 });
     }
 
+    // Invalidate all sessions for this user
+    const user = await prisma.user.findUnique({ where: { email: normalizedEmail }, select: { id: true } });
+    if (user) {
+      await prisma.session.deleteMany({ where: { userId: user.id } }).catch(() => {});
+    }
+
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("[reset-password] Error:", error);

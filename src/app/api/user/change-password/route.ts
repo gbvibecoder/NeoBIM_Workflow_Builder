@@ -56,6 +56,11 @@ export async function POST(req: Request) {
       data: { password: hashedPassword },
     });
 
+    // Invalidate all other sessions so compromised sessions are kicked out
+    await prisma.session.deleteMany({
+      where: { userId: session.user.id },
+    }).catch(() => {});
+
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("[change-password] Error:", error);

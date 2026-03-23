@@ -2,9 +2,7 @@
 
 import { motion } from "framer-motion";
 import { useLocale } from "@/hooks/useLocale";
-
-const fadeUp = { hidden: { opacity: 0, y: 24 }, visible: { opacity: 1, y: 0 } };
-const smoothEase: [number, number, number, number] = [0.25, 0.4, 0.25, 1];
+import { fadeUp, smoothEase } from "./landing-helpers";
 
 export function FAQSection() {
   const { t } = useLocale();

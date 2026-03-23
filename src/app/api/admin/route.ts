@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { validateAdminCredentials, getAdminSessionCookie } from "@/lib/admin-auth";
 import { getAdminSession, unauthorizedResponse, logAudit } from "@/lib/admin-server";
+import { checkEndpointRateLimit } from "@/lib/rate-limit";
 
 /** GET /api/admin — return current admin session info */
 export async function GET() {
@@ -12,6 +13,12 @@ export async function GET() {
 
 export async function POST(req: Request) {
   try {
+    const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+    const rl = await checkEndpointRateLimit(ip, "admin-login", 5, "15 m");
+    if (!rl.success) {
+      return NextResponse.json({ error: "Too many login attempts. Please wait." }, { status: 429 });
+    }
+
     const { username, password } = await req.json();
 
     const admin = await validateAdminCredentials(username, password);

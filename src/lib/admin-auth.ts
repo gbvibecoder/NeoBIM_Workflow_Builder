@@ -58,7 +58,8 @@ export async function validateAdminCredentials(
 /** Build Set-Cookie header value for admin session */
 export function getAdminSessionCookie(adminId: string, sessionToken: string): string {
   const value = `${adminId}:${sessionToken}`;
-  return `${ADMIN_COOKIE_NAME}=${value}; path=/; max-age=${SESSION_MAX_AGE}; samesite=strict; httponly`;
+  const securePart = process.env.NODE_ENV === "production" ? "; secure" : "";
+  return `${ADMIN_COOKIE_NAME}=${value}; path=/; max-age=${SESSION_MAX_AGE}; samesite=strict; httponly${securePart}`;
 }
 
 /** Parse cookie value into adminId and sessionToken */

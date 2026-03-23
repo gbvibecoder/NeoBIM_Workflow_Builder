@@ -68,9 +68,9 @@ export function OnboardingModal() {
             transition={{ type: "spring", stiffness: 300, damping: 30 }}
             style={{
               width: "100%", maxWidth: 460,
+              maxHeight: "calc(100vh - 48px)", overflowY: "auto" as const,
               background: "#111120", borderRadius: 20,
               border: "1px solid rgba(255,255,255,0.06)",
-              overflow: "hidden",
               boxShadow: "0 24px 80px rgba(0,0,0,0.6), 0 0 60px rgba(79,138,255,0.05)",
             }}
           >

@@ -2,9 +2,7 @@
 
 import { motion } from "framer-motion";
 import { useLocale } from "@/hooks/useLocale";
-
-const fadeUp = { hidden: { opacity: 0, y: 24 }, visible: { opacity: 1, y: 0 } };
-const smoothEase: [number, number, number, number] = [0.25, 0.4, 0.25, 1];
+import { fadeUp, smoothEase } from "./landing-helpers";
 
 export function TestimonialsSection() {
   const { t } = useLocale();
@@ -58,7 +56,7 @@ export function TestimonialsSection() {
                 letterSpacing: "1.5px", color: item.color,
               }}>
                 <div style={{ width: 5, height: 5, borderRadius: "50%", background: item.color, boxShadow: `0 0 6px ${item.color}` }} />
-                REVIEW
+                {t('landing.testimonialBadge')}
               </div>
               <div style={{ padding: "20px 20px 16px" }}>
                 <p style={{ fontSize: 13.5, color: "#C0C0D0", lineHeight: 1.7, marginBottom: 16, fontStyle: "italic" }}>

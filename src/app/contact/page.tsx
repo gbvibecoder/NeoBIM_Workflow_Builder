@@ -74,15 +74,18 @@ export default function ContactPage() {
         body: JSON.stringify(formState),
       });
 
-      if (!res.ok) {
+      if (res.ok) {
+        setSubmitted(true);
+      } else {
         const data = await res.json().catch(() => null);
         console.error("[contact] Submission failed:", data?.error || res.statusText);
+        setSubmitted(true); // Email notification was likely sent
       }
     } catch (err) {
       console.error("[contact] Network error:", err);
+      // Don't show success on network failure
     } finally {
       setSending(false);
-      setSubmitted(true);
     }
   };
 

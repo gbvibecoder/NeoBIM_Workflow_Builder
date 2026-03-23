@@ -1079,6 +1079,15 @@ function PlanSection({ userRole }: { userRole: string }) {
 function SecuritySection({ userEmail }: { userEmail: string }) {
   const { t } = useLocale();
   const router = useRouter();
+  const [isOAuthUser, setIsOAuthUser] = useState(false);
+
+  // Detect if user signed in via OAuth (no password set)
+  useEffect(() => {
+    fetch("/api/user/profile").then(r => r.json()).then(data => {
+      // If profile API exposes hasPassword, use it; otherwise we'll detect on first password change attempt
+      if (data?.isOAuthOnly) setIsOAuthUser(true);
+    }).catch(() => {});
+  }, []);
 
   // Password change state
   const [currentPassword, setCurrentPassword] = useState("");
@@ -1155,15 +1164,16 @@ function SecuritySection({ userEmail }: { userEmail: string }) {
       <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
         {/* Password Change */}
         <div className="dp-glass-card" style={{ padding: 24, borderRadius: 16 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: isOAuthUser ? 0 : 20 }}>
             <div style={{ width: 36, height: 36, borderRadius: 10, background: "rgba(79,138,255,0.08)", border: "1px solid rgba(79,138,255,0.15)", display: "flex", alignItems: "center", justifyContent: "center" }}>
               <Lock size={16} style={{ color: "#4F8AFF" }} />
             </div>
             <div>
               <h3 style={{ fontSize: 15, fontWeight: 600, color: "#F0F0F5" }}>{t('settings.changePassword')}</h3>
-              <p style={{ fontSize: 11, color: "#5C5C78" }}>{t('settings.changePasswordDesc')}</p>
+              <p style={{ fontSize: 11, color: "#5C5C78" }}>{isOAuthUser ? t('settings.oauthPasswordNote') : t('settings.changePasswordDesc')}</p>
             </div>
           </div>
+          {!isOAuthUser && <>
 
           <form onSubmit={handleChangePassword} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
             <div>
@@ -1188,6 +1198,7 @@ function SecuritySection({ userEmail }: { userEmail: string }) {
               {changingPassword ? t('settings.saving') : t('settings.changePassword')}
             </button>
           </form>
+          </>}
         </div>
 
         {/* Danger Zone */}

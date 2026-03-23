@@ -5,6 +5,14 @@
 
 const BASE_URL = process.env.NEXTAUTH_URL || 'https://buildflow.app';
 
+function escapeHtml(str: string): string {
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function safeName(name: string | null): string {
+  return escapeHtml(name || 'there');
+}
+
 function layout(content: string): string {
   return `<!DOCTYPE html>
 <html lang="en">
@@ -49,7 +57,7 @@ function button(text: string, url: string, color = '#4F8AFF'): string {
 // ── Welcome Email ──────────────────────────────────────────────────────────────
 
 export function welcomeEmail(name: string | null, plan: string): string {
-  const displayName = name || 'there';
+  const displayName = safeName(name);
   return layout(`
     <h1 style="font-size:24px;font-weight:800;color:#F0F0F5;margin:0 0 8px;">Welcome to BuildFlow! 🏗️</h1>
     <p style="font-size:14px;color:#9898B0;line-height:1.6;margin:0 0 16px;">
@@ -72,7 +80,7 @@ export function welcomeEmail(name: string | null, plan: string): string {
 // ── Payment Failed Email ───────────────────────────────────────────────────────
 
 export function paymentFailedEmail(name: string | null): string {
-  const displayName = name || 'there';
+  const displayName = safeName(name);
   return layout(`
     <h1 style="font-size:24px;font-weight:800;color:#F0F0F5;margin:0 0 8px;">Payment Failed</h1>
     <p style="font-size:14px;color:#9898B0;line-height:1.6;margin:0 0 16px;">
@@ -91,7 +99,7 @@ export function paymentFailedEmail(name: string | null): string {
 // ── Subscription Canceled Email ────────────────────────────────────────────────
 
 export function subscriptionCanceledEmail(name: string | null, plan: string): string {
-  const displayName = name || 'there';
+  const displayName = safeName(name);
   return layout(`
     <h1 style="font-size:24px;font-weight:800;color:#F0F0F5;margin:0 0 8px;">Subscription Canceled</h1>
     <p style="font-size:14px;color:#9898B0;line-height:1.6;margin:0 0 16px;">
@@ -117,7 +125,7 @@ export function subscriptionCanceledEmail(name: string | null, plan: string): st
 // ── Email Verification Email ──────────────────────────────────────────────────
 
 export function verificationEmail(name: string | null, verifyUrl: string): string {
-  const displayName = name || 'there';
+  const displayName = safeName(name);
   return layout(`
     <h1 style="font-size:24px;font-weight:800;color:#F0F0F5;margin:0 0 8px;">Verify Your Email</h1>
     <p style="font-size:14px;color:#9898B0;line-height:1.6;margin:0 0 16px;">
@@ -137,7 +145,7 @@ export function verificationEmail(name: string | null, verifyUrl: string): strin
 // ── Password Reset Email ─────────────────────────────────────────────────────
 
 export function passwordResetEmail(name: string | null, resetUrl: string): string {
-  const displayName = name || 'there';
+  const displayName = safeName(name);
   return layout(`
     <h1 style="font-size:24px;font-weight:800;color:#F0F0F5;margin:0 0 8px;">Reset Your Password</h1>
     <p style="font-size:14px;color:#9898B0;line-height:1.6;margin:0 0 16px;">
@@ -162,7 +170,7 @@ export function planChangedEmail(
   newPlan: string,
   type: 'upgrade' | 'downgrade',
 ): string {
-  const displayName = name || 'there';
+  const displayName = safeName(name);
   const isUpgrade = type === 'upgrade';
 
   return layout(`

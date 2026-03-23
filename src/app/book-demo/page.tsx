@@ -275,16 +275,17 @@ export default function BookDemoPage() {
         body: JSON.stringify(formData),
       });
 
-      if (!res.ok) {
+      if (res.ok) {
+        trackLead({ content_name: "book_demo", value: 1 });
+        setSubmitted(true);
+      } else {
         const data = await res.json().catch(() => null);
         console.error("[book-demo] Submission failed:", data?.error || res.statusText);
+        setSubmitted(true); // Still show success — email notification was likely sent
       }
-
-      trackLead({ content_name: "book_demo", value: 1 });
-      setSubmitted(true);
     } catch (err) {
       console.error("[book-demo] Network error:", err);
-      setSubmitted(true);
+      // Don't show success on network failure — user should retry
     } finally {
       setSubmitting(false);
     }

@@ -27,18 +27,18 @@ function ResetPasswordForm() {
     setError("");
 
     if (password !== confirmPassword) {
-      setError("${t('auth.passwordsDoNotMatch')}");
+      setError(t('auth.passwordsDoNotMatch'));
       return;
     }
 
     if (password.length < 8) {
-      setError("${t('auth.passwordMinLength')}");
+      setError(t('auth.passwordMinLength'));
       return;
     }
 
     const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/;
     if (!passwordRegex.test(password)) {
-      setError("${t('auth.passwordRequirements')}");
+      setError(t('auth.passwordRequirements'));
       return;
     }
 
@@ -54,12 +54,12 @@ function ResetPasswordForm() {
       const data = await res.json();
 
       if (!res.ok) {
-        setError(data?.error || "${t('auth.somethingWentWrong')}");
+        setError(data?.error || t('auth.somethingWentWrong'));
       } else {
         setSuccess(true);
       }
     } catch {
-      setError("${t('auth.networkError')}");
+      setError(t('auth.networkError'));
     } finally {
       setLoading(false);
     }

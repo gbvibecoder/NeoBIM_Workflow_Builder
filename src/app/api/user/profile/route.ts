@@ -17,13 +17,14 @@ export async function GET() {
 
     const user = await prisma.user.findUnique({
       where: { id: session.user.id },
-      select: { name: true, email: true, image: true },
+      select: { name: true, email: true, image: true, password: true },
     });
 
     const response = NextResponse.json({
       name: user?.name ?? null,
       email: user?.email ?? null,
       image: user?.image ?? null,
+      isOAuthOnly: !user?.password,
     });
     response.headers.set("Cache-Control", "private, max-age=30");
     return response;
