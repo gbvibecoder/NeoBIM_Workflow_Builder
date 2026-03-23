@@ -523,12 +523,9 @@ function LoginForm() {
 
         {/* Forgot password hint */}
         <div style={{ textAlign: "right", marginBottom: 14 }}>
-          <span style={{ fontSize: 11.5, color: "#5C5C78" }}>
-            {t('auth.forgotPassword')}{" "}
-            <a href="mailto:support@neobim.io" style={{ color: "#4F8AFF", textDecoration: "none" }}>
-              {t('auth.contactSupport')}
-            </a>
-          </span>
+          <a href="/forgot-password" style={{ fontSize: 11.5, color: "#4F8AFF", textDecoration: "none" }}>
+            {t('auth.forgotPassword')}
+          </a>
         </div>
 
         {/* Form-level error */}

@@ -14,7 +14,7 @@ import { MiniWorkflowDiagram } from "@/components/shared/MiniWorkflowDiagram";
 import { PREBUILT_WORKFLOWS } from "@/constants/prebuilt-workflows";
 import { useLocale } from '@/hooks/useLocale';
 import type { TranslationKey } from '@/lib/i18n';
-import { trackLead } from '@/lib/meta-pixel';
+import { trackLead, trackViewContent } from '@/lib/meta-pixel';
 import { LanguageSwitcher } from '@/components/ui/LanguageSwitcher';
 import { PipelineSection } from '@/components/landing/PipelineSection';
 import { NewsletterSignup } from '@/components/landing/NewsletterSignup';
@@ -1413,6 +1413,7 @@ export default function LandingPage() {
                 boxShadow: "0 0 40px rgba(0,245,255,0.2), 0 0 80px rgba(79,138,255,0.15)",
                 transition: "all 0.3s ease",
               }}
+                onClick={() => trackLead({ content_name: "hero_cta_get_started" })}
                 onMouseEnter={e => {
                   (e.currentTarget as HTMLElement).style.boxShadow = "0 0 50px rgba(0,245,255,0.35), 0 0 100px rgba(79,138,255,0.2)";
                   (e.currentTarget as HTMLElement).style.transform = "translateY(-2px)";
@@ -2988,6 +2989,81 @@ export default function LandingPage() {
           </div>
         </section>
 
+        {/* ── Testimonials — Social Proof ────────────────────────────── */}
+        <section className="landing-section" style={{
+          padding: "100px 48px", position: "relative", overflow: "hidden",
+        }}>
+          <div style={{ maxWidth: 1200, margin: "0 auto", position: "relative", zIndex: 1 }}>
+            <motion.div
+              initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-80px" }}
+              variants={fadeUp} transition={{ duration: 0.6, ease: smoothEase }}
+              style={{ textAlign: "center", marginBottom: 64 }}
+            >
+              <span className="blueprint-annotation" style={{ marginBottom: 16, display: "block" }}>
+                {t('landing.testimonialSection')}
+              </span>
+              <div className="accent-line" />
+              <h2 style={{ fontSize: "clamp(2rem, 4vw, 3rem)", fontWeight: 900, color: "#F0F0F5", letterSpacing: "-0.04em", lineHeight: 1.1, marginBottom: 12 }}>
+                {t('landing.trustedBy')}<span style={{ background: "linear-gradient(135deg, #10B981, #4F8AFF)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>{t('landing.aecTeams')}</span>
+              </h2>
+              <p style={{ fontSize: 15, color: "#7C7C96", maxWidth: 500, margin: "0 auto" }}>
+                {t('landing.testimonialDesc')}
+              </p>
+            </motion.div>
+
+            <div className="testimonial-grid" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 20 }}>
+              {([
+                { name: "Arjun Mehta", role: t('landing.testimonial1Role'), company: "DesignStudio Mumbai", quote: t('landing.testimonial1Quote'), color: "#4F8AFF" },
+                { name: "Sarah Chen", role: t('landing.testimonial2Role'), company: "Foster+Lam Architects", quote: t('landing.testimonial2Quote'), color: "#10B981" },
+                { name: "Marcus Weber", role: t('landing.testimonial3Role'), company: "BauDigital GmbH", quote: t('landing.testimonial3Quote'), color: "#8B5CF6" },
+                { name: "Priya Sharma", role: t('landing.testimonial4Role'), company: "GreenBuild Consulting", quote: t('landing.testimonial4Quote'), color: "#F59E0B" },
+                { name: "James Okafor", role: t('landing.testimonial5Role'), company: "UrbanEdge Design", quote: t('landing.testimonial5Quote'), color: "#00F5FF" },
+              ] as const).map((item, i) => (
+                <motion.div
+                  key={item.name}
+                  className="node-card"
+                  style={{ '--node-port-color': item.color } as React.CSSProperties}
+                  initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-40px" }}
+                  variants={fadeUp}
+                  transition={{ duration: 0.5, delay: i * 0.08, ease: smoothEase }}
+                >
+                  <div style={{
+                    padding: "5px 14px", borderRadius: "16px 16px 0 0",
+                    background: `linear-gradient(135deg, ${item.color}15, ${item.color}05)`,
+                    borderBottom: `1px solid ${item.color}12`,
+                    display: "flex", alignItems: "center", gap: 6,
+                    fontSize: 8, fontWeight: 700, textTransform: "uppercase" as const,
+                    letterSpacing: "1.5px", color: item.color,
+                  }}>
+                    <div style={{ width: 5, height: 5, borderRadius: "50%", background: item.color, boxShadow: `0 0 6px ${item.color}` }} />
+                    REVIEW
+                  </div>
+                  <div style={{ padding: "20px 20px 16px" }}>
+                    <p style={{ fontSize: 13.5, color: "#C0C0D0", lineHeight: 1.7, marginBottom: 16, fontStyle: "italic" }}>
+                      &ldquo;{item.quote}&rdquo;
+                    </p>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      <div style={{
+                        width: 36, height: 36, borderRadius: 10,
+                        background: `linear-gradient(135deg, ${item.color}30, ${item.color}10)`,
+                        border: `1px solid ${item.color}20`,
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        fontSize: 14, fontWeight: 700, color: item.color,
+                      }}>
+                        {item.name.split(" ").map(n => n[0]).join("")}
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: "#F0F0F5" }}>{item.name}</div>
+                        <div style={{ fontSize: 11, color: "#5C5C78" }}>{item.role}, {item.company}</div>
+                      </div>
+                    </div>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+          </div>
+        </section>
+
         {/* ── Pricing — Node-Style Plan Cards ──────────────────────── */}
         <section id="pricing" className="landing-section" style={{
           padding: "120px 48px", position: "relative", overflow: "hidden",
@@ -3064,6 +3140,7 @@ export default function LandingPage() {
                     <span style={{ fontSize: 10, color: "#F59E0B", fontWeight: 700 }}>{t('landing.miniHighlight')}</span>
                   </div>
                   <Link href="/dashboard" style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "10px 16px", borderRadius: 12, background: "linear-gradient(135deg, #F59E0B 0%, #FBBF24 100%)", color: "white", fontSize: 12, fontWeight: 700, textDecoration: "none", marginBottom: 20, boxShadow: "0 4px 16px rgba(245,158,11,0.25)", transition: "all 0.2s" }}
+                    onClick={() => trackViewContent({ content_name: "pricing_cta_mini" })}
                     onMouseEnter={e => { (e.currentTarget as HTMLElement).style.boxShadow = "0 6px 24px rgba(245,158,11,0.35)"; }}
                     onMouseLeave={e => { (e.currentTarget as HTMLElement).style.boxShadow = "0 4px 16px rgba(245,158,11,0.25)"; }}
                   >{t('landing.startFreeTrial')}</Link>
@@ -3098,6 +3175,7 @@ export default function LandingPage() {
                     <span style={{ fontSize: 11, color: "#10B981", fontWeight: 700 }}>{t('landing.starterHighlight')}</span>
                   </div>
                   <Link href="/dashboard" style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "12px 20px", borderRadius: 12, background: "linear-gradient(135deg, #10B981 0%, #34D399 100%)", color: "white", fontSize: 13, fontWeight: 700, textDecoration: "none", marginBottom: 24, boxShadow: "0 4px 16px rgba(16,185,129,0.25)", transition: "all 0.2s" }}
+                    onClick={() => trackViewContent({ content_name: "pricing_cta_starter" })}
                     onMouseEnter={e => { (e.currentTarget as HTMLElement).style.boxShadow = "0 6px 24px rgba(16,185,129,0.35)"; }}
                     onMouseLeave={e => { (e.currentTarget as HTMLElement).style.boxShadow = "0 4px 16px rgba(16,185,129,0.25)"; }}
                   >{t('landing.startFreeTrial')}</Link>
@@ -3140,6 +3218,7 @@ export default function LandingPage() {
                     <span style={{ fontSize: 11, color: "#10B981", fontWeight: 700 }}>{t('landing.proHighlight')}</span>
                   </div>
                   <Link href="/dashboard" style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "12px 20px", borderRadius: 12, background: "linear-gradient(135deg, #4F8AFF 0%, #6366F1 100%)", color: "white", fontSize: 13, fontWeight: 700, textDecoration: "none", marginBottom: 24, boxShadow: "0 4px 20px rgba(79,138,255,0.3)", transition: "all 0.2s" }}
+                    onClick={() => trackViewContent({ content_name: "pricing_cta_pro" })}
                     onMouseEnter={e => { (e.currentTarget as HTMLElement).style.boxShadow = "0 8px 30px rgba(79,138,255,0.4)"; }}
                     onMouseLeave={e => { (e.currentTarget as HTMLElement).style.boxShadow = "0 4px 20px rgba(79,138,255,0.3)"; }}
                   >{t('landing.startFreeTrial')}</Link>
@@ -3475,8 +3554,18 @@ export default function LandingPage() {
           }
         }
 
+        /* ─── Testimonials responsive ─────────────────────────── */
+        @media (max-width: 960px) {
+          .testimonial-grid {
+            grid-template-columns: repeat(2, 1fr) !important;
+          }
+        }
+
         /* ─── Mobile: 768px and below ──────────────────────────── */
         @media (max-width: 768px) {
+          .testimonial-grid {
+            grid-template-columns: 1fr !important;
+          }
           /* ── Navbar ── */
           .landing-nav-links {
             display: none !important;

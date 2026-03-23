@@ -114,6 +114,46 @@ export function subscriptionCanceledEmail(name: string | null, plan: string): st
   `);
 }
 
+// ── Email Verification Email ──────────────────────────────────────────────────
+
+export function verificationEmail(name: string | null, verifyUrl: string): string {
+  const displayName = name || 'there';
+  return layout(`
+    <h1 style="font-size:24px;font-weight:800;color:#F0F0F5;margin:0 0 8px;">Verify Your Email</h1>
+    <p style="font-size:14px;color:#9898B0;line-height:1.6;margin:0 0 16px;">
+      Hey ${displayName}, thanks for signing up for BuildFlow!
+      Please verify your email address to secure your account.
+    </p>
+    <div style="background:rgba(16,185,129,0.06);border:1px solid rgba(16,185,129,0.12);border-radius:12px;padding:20px;margin:20px 0;text-align:center;">
+      <div style="font-size:12px;color:#10B981;font-weight:600;margin-bottom:4px;">This link expires in 24 hours</div>
+    </div>
+    ${button('Verify Email Address', verifyUrl, '#10B981')}
+    <p style="font-size:12px;color:#55556A;line-height:1.5;margin-top:24px;">
+      If you didn't create an account, you can safely ignore this email.
+    </p>
+  `);
+}
+
+// ── Password Reset Email ─────────────────────────────────────────────────────
+
+export function passwordResetEmail(name: string | null, resetUrl: string): string {
+  const displayName = name || 'there';
+  return layout(`
+    <h1 style="font-size:24px;font-weight:800;color:#F0F0F5;margin:0 0 8px;">Reset Your Password</h1>
+    <p style="font-size:14px;color:#9898B0;line-height:1.6;margin:0 0 16px;">
+      Hey ${displayName}, we received a request to reset your password.
+      Click the button below to choose a new password.
+    </p>
+    <div style="background:rgba(245,158,11,0.06);border:1px solid rgba(245,158,11,0.12);border-radius:12px;padding:20px;margin:20px 0;text-align:center;">
+      <div style="font-size:12px;color:#F59E0B;font-weight:600;margin-bottom:4px;">This link expires in 1 hour</div>
+    </div>
+    ${button('Reset Password', resetUrl, '#4F8AFF')}
+    <p style="font-size:12px;color:#55556A;line-height:1.5;margin-top:24px;">
+      If you didn't request a password reset, you can safely ignore this email. Your password will remain unchanged.
+    </p>
+  `);
+}
+
 // ── Plan Changed Email ─────────────────────────────────────────────────────────
 
 export function planChangedEmail(

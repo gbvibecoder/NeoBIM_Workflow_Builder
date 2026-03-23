@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Mail, ArrowRight, Check, Loader2 } from "lucide-react";
 import { useLocale } from "@/hooks/useLocale";
+import { trackLead } from "@/lib/meta-pixel";
 
 export function NewsletterSignup() {
   const [email, setEmail] = useState("");
@@ -30,6 +31,7 @@ export function NewsletterSignup() {
       }
 
       setStatus("success");
+      trackLead({ content_name: "newsletter_signup" });
       setEmail("");
     } catch (err) {
       setStatus("error");

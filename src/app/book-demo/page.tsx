@@ -11,6 +11,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { useLocale } from "@/hooks/useLocale";
+import { trackLead } from "@/lib/meta-pixel";
 
 // ─── Design tokens (matching landing page) ──────────────────────────────────
 
@@ -279,6 +280,7 @@ export default function BookDemoPage() {
         console.error("[book-demo] Submission failed:", data?.error || res.statusText);
       }
 
+      trackLead({ content_name: "book_demo", value: 1 });
       setSubmitted(true);
     } catch (err) {
       console.error("[book-demo] Network error:", err);
