@@ -174,7 +174,7 @@ export async function POST(req: Request) {
 
         // Send plan changed email (fire-and-forget)
         if (user.email) {
-          sendPlanChangedEmail(user.email, user.name, user.role, newRole, 'upgrade').catch(() => {});
+          sendPlanChangedEmail(user.email, user.name, user.role, newRole, 'upgrade').catch((err) => console.error("[webhook] Failed to send plan changed email:", err));
         }
 
         return NextResponse.json({
@@ -215,7 +215,7 @@ export async function POST(req: Request) {
 
         // Send plan changed email (fire-and-forget)
         if (user.email) {
-          sendPlanChangedEmail(user.email, user.name, user.role, normalizedPlan, 'downgrade').catch(() => {});
+          sendPlanChangedEmail(user.email, user.name, user.role, normalizedPlan, 'downgrade').catch((err) => console.error("[webhook] Failed to send plan changed email:", err));
         }
 
         return NextResponse.json({

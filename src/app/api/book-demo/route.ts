@@ -63,7 +63,7 @@ export async function POST(req: Request) {
       company,
       role,
       message,
-    }).catch(() => {});
+    }).catch((err) => console.error("[book-demo] Failed to send notification email", err));
 
     return NextResponse.json({ success: true });
   } catch (error) {

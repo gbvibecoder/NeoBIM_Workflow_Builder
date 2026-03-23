@@ -59,7 +59,7 @@ export async function POST(req: Request) {
     // Invalidate all other sessions so compromised sessions are kicked out
     await prisma.session.deleteMany({
       where: { userId: session.user.id },
-    }).catch(() => {});
+    }).catch((err) => console.error("[change-password] Failed to invalidate other sessions:", err));
 
     return NextResponse.json({ success: true });
   } catch (error) {

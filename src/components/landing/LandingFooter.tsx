@@ -15,12 +15,12 @@ export function LandingFooter() {
 
   return (
     <>
-      <footer className="landing-footer-wrapper" style={{
+      <footer className="landing-footer-wrapper landing-section" style={{
         borderTop: "1px solid rgba(255,255,255,0.04)",
         padding: "32px 48px",
         background: "rgba(7,7,13,0.9)",
       }}>
-        <div className="landing-footer" style={{ maxWidth: 1200, margin: "0 auto", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <div className="landing-footer" style={{ maxWidth: 1200, margin: "0 auto", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 16 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <div style={{ width: 30, height: 30, borderRadius: 8, overflow: "hidden", flexShrink: 0 }}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -36,9 +36,11 @@ export function LandingFooter() {
               { label: t('landing.terms'), href: '/terms' },
               { label: t('landing.contact'), href: '/contact' },
             ].map(l => (
-              <Link key={l.href} href={l.href} style={{ fontSize: 12, color: "#5C5C78", textDecoration: "none", transition: "color 0.15s" }}
+              <Link key={l.href} href={l.href} style={{ fontSize: 12, color: "#5C5C78", textDecoration: "none", transition: "color 0.15s", padding: "8px 4px" }}
                 onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = "#9898B0"; }}
                 onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = "#5C5C78"; }}
+                onFocus={e => { (e.currentTarget as HTMLElement).style.color = "#9898B0"; }}
+                onBlur={e => { (e.currentTarget as HTMLElement).style.color = "#5C5C78"; }}
               >{l.label}</Link>
             ))}
           </div>
@@ -51,7 +53,7 @@ export function LandingFooter() {
                 rel={s.href.startsWith("mailto:") ? undefined : "noopener noreferrer"}
                 aria-label={s.label}
                 style={{
-                  width: 32, height: 32, borderRadius: 8,
+                  width: 44, height: 44, borderRadius: 8,
                   background: "rgba(255,255,255,0.03)",
                   border: "1px solid rgba(255,255,255,0.06)",
                   display: "flex", alignItems: "center", justifyContent: "center",
@@ -59,6 +61,8 @@ export function LandingFooter() {
                 }}
                 onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = s.color; (e.currentTarget as HTMLElement).style.borderColor = `${s.color}30`; }}
                 onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = "#5C5C78"; (e.currentTarget as HTMLElement).style.borderColor = "rgba(255,255,255,0.06)"; }}
+                onFocus={e => { (e.currentTarget as HTMLElement).style.color = s.color; (e.currentTarget as HTMLElement).style.borderColor = `${s.color}30`; }}
+                onBlur={e => { (e.currentTarget as HTMLElement).style.color = "#5C5C78"; (e.currentTarget as HTMLElement).style.borderColor = "rgba(255,255,255,0.06)"; }}
               >
                 <s.icon size={14} />
               </a>
@@ -68,19 +72,19 @@ export function LandingFooter() {
       </footer>
 
       {/* Trust Signals */}
-      <div style={{
+      <div className="landing-section" style={{
         padding: "32px 48px 48px",
         textAlign: "center",
         borderTop: "1px solid rgba(255,255,255,0.04)",
       }}>
         <div style={{ display: "flex", justifyContent: "center", gap: 32, flexWrap: "wrap", marginBottom: 16 }}>
           {[t('landing.trustEncrypted'), t('landing.trustBuiltForAec'), t('landing.trustBeta')].map(signal => (
-            <span key={signal} style={{ fontSize: 11, color: "#3A3A50", fontWeight: 500 }}>
+            <span key={signal} style={{ fontSize: 11, color: "#6B6B80", fontWeight: 500 }}>
               {signal}
             </span>
           ))}
         </div>
-        <p style={{ fontSize: 11, color: "#2A2A3E" }}>
+        <p style={{ fontSize: 11, color: "#5C5C78" }}>
           {t('landing.copyrightFull').replace('{year}', String(new Date().getFullYear()))}
         </p>
       </div>

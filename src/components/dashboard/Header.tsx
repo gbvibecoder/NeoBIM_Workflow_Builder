@@ -54,7 +54,8 @@ export function Header({ title, subtitle }: HeaderProps) {
       <div className="flex items-center gap-2">
         {/* Search — opens CommandPalette (⌘K) */}
         <button
-          className="h-[34px] flex items-center gap-2 px-3.5 text-xs transition-all"
+          className="h-[44px] flex items-center gap-2 px-3.5 text-xs transition-all"
+          aria-label={t('nav.searchPlaceholder')}
           style={{
             borderRadius: 20,
             border: "1px solid rgba(255,255,255,0.06)",
@@ -73,6 +74,14 @@ export function Header({ title, subtitle }: HeaderProps) {
             e.currentTarget.style.boxShadow = "0 0 12px rgba(79,138,255,0.08)";
           }}
           onMouseLeave={e => {
+            e.currentTarget.style.borderColor = "rgba(255,255,255,0.06)";
+            e.currentTarget.style.boxShadow = "none";
+          }}
+          onFocus={e => {
+            e.currentTarget.style.borderColor = "rgba(79,138,255,0.3)";
+            e.currentTarget.style.boxShadow = "0 0 12px rgba(79,138,255,0.08)";
+          }}
+          onBlur={e => {
             e.currentTarget.style.borderColor = "rgba(255,255,255,0.06)";
             e.currentTarget.style.boxShadow = "none";
           }}
@@ -120,7 +129,8 @@ export function Header({ title, subtitle }: HeaderProps) {
         {/* Avatar — navigates to settings */}
         <button
           onClick={() => router.push("/dashboard/settings")}
-          className="h-[34px] w-[34px] flex items-center justify-center transition-all cursor-pointer"
+          className="h-[44px] w-[44px] flex items-center justify-center transition-all cursor-pointer"
+          aria-label={t('nav.settings')}
           style={{
             borderRadius: 10,
             border: "1px solid rgba(79,138,255,0.15)",
@@ -135,8 +145,16 @@ export function Header({ title, subtitle }: HeaderProps) {
             e.currentTarget.style.borderColor = "rgba(79,138,255,0.15)";
             e.currentTarget.style.color = "#5C5C78";
           }}
+          onFocus={e => {
+            e.currentTarget.style.borderColor = "rgba(79,138,255,0.3)";
+            e.currentTarget.style.color = "#e2e8f0";
+          }}
+          onBlur={e => {
+            e.currentTarget.style.borderColor = "rgba(79,138,255,0.15)";
+            e.currentTarget.style.color = "#5C5C78";
+          }}
         >
-          <User size={14} />
+          <User size={16} />
         </button>
       </div>
     </header>

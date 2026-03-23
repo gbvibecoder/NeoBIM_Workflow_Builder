@@ -131,7 +131,7 @@ export async function POST(req: Request) {
 
     // Send welcome email (fire-and-forget)
     if (user.email) {
-      sendWelcomeEmail(user.email, user.name, newRole).catch(() => {});
+      sendWelcomeEmail(user.email, user.name, newRole).catch((err) => console.error("[webhook] Failed to send welcome email:", err));
     }
 
     return NextResponse.json({
