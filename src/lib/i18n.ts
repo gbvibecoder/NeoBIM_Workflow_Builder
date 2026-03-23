@@ -374,6 +374,10 @@ const en = {
   'billing.stripeDesc': 'Visa, Mastercard, Amex — powered by Stripe',
   'billing.securePayment': 'All payments are encrypted and secure. Cancel anytime.',
 
+  // ===== RATE LIMIT =====
+  'rateLimit.viewAllPlans': 'View all plans',
+  'rateLimit.upgradeReassurance': 'Upgrade takes effect immediately · Cancel anytime',
+
   // ===== SETTINGS =====
   'settings.title': 'Settings',
   'settings.subtitle': 'Manage your account and preferences',
@@ -2757,6 +2761,10 @@ const de: Record<keyof typeof en, string | string[]> = {
   'billing.internationalCards': 'Internationale Karten',
   'billing.stripeDesc': 'Visa, Mastercard, Amex — powered by Stripe',
   'billing.securePayment': 'Alle Zahlungen sind verschlüsselt und sicher. Jederzeit kündbar.',
+
+  // ===== RATE LIMIT =====
+  'rateLimit.viewAllPlans': 'Alle Tarife anzeigen',
+  'rateLimit.upgradeReassurance': 'Upgrade sofort wirksam · Jederzeit kündbar',
 
   // ===== SETTINGS =====
   'settings.title': 'Einstellungen',

@@ -56,6 +56,7 @@ import { FullscreenVideoPlayer } from "./artifacts/FullscreenVideoPlayer";
 
 import { useWorkflowStore, isUntitledWorkflow } from "@/stores/workflow-store";
 import { SaveWorkflowModal } from "./modals/SaveWorkflowModal";
+import { RateLimitUpgradeModal } from "./modals/RateLimitUpgradeModal";
 import { useExecutionStore } from "@/stores/execution-store";
 import { useUIStore } from "@/stores/ui-store";
 import { NODE_CATALOGUE_MAP, CATEGORY_CONFIG } from "@/constants/node-catalogue";
@@ -534,7 +535,7 @@ function WorkflowCanvasInner({ workflowId: urlWorkflowId }: WorkflowCanvasInnerP
     setShowLog(true);
   }, []);
 
-  const { runWorkflow, isExecuting } = useExecution({ onLog: addLogEntry });
+  const { runWorkflow, isExecuting, rateLimitHit, clearRateLimitError } = useExecution({ onLog: addLogEntry });
 
   // Show showcase when execution finishes + post-execution scene
   React.useEffect(() => {
@@ -1124,6 +1125,12 @@ function WorkflowCanvasInner({ workflowId: urlWorkflowId }: WorkflowCanvasInnerP
         existingNames={existingNames}
         onSave={handleSaveWithName}
         onClose={closeSaveModal}
+      />
+
+      {/* Rate limit upgrade modal */}
+      <RateLimitUpgradeModal
+        rateLimitHit={rateLimitHit}
+        onDismiss={clearRateLimitError}
       />
     </div>
   );
