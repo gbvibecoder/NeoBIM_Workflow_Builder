@@ -36,6 +36,8 @@ export function TabBar({ availableTabs, activeTab, onTabChange }: TabBarProps) {
 
   return (
     <div
+      role="tablist"
+      aria-label={t('showcase.tabOverview')}
       style={{
         display: "flex",
         alignItems: "center",
@@ -56,6 +58,9 @@ export function TabBar({ availableTabs, activeTab, onTabChange }: TabBarProps) {
         return (
           <button
             key={tab.id}
+            role="tab"
+            aria-selected={isActive}
+            tabIndex={isActive ? 0 : -1}
             onClick={() => onTabChange(tab.id)}
             style={{
               position: "relative",

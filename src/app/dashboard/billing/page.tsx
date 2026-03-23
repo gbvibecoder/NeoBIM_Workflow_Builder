@@ -529,7 +529,7 @@ export default function BillingPage() {
                     {userRole !== "FREE" && (
                       <button
                         onClick={handleManageSubscription}
-                        className="px-3 py-1 rounded-lg text-[11px] font-medium text-[#9898B0] bg-[#16162A] hover:bg-[#2A2A3E] border border-[rgba(255,255,255,0.05)] transition-colors"
+                        className="px-3 py-1 rounded-lg text-xs font-medium text-[#9898B0] bg-[#16162A] hover:bg-[#2A2A3E] border border-[rgba(255,255,255,0.05)] transition-colors"
                       >
                         {t('billing.manageBilling')}
                       </button>
@@ -684,7 +684,7 @@ export default function BillingPage() {
                       className="absolute -top-[1px] left-1/2 -translate-x-1/2 z-20"
                     >
                       <div
-                        className="px-4 py-1.5 rounded-b-lg text-white text-[10px] font-bold tracking-[0.15em] uppercase flex items-center gap-1.5"
+                        className="px-4 py-1.5 rounded-b-lg text-white text-[11px] font-bold tracking-[0.15em] uppercase flex items-center gap-1.5"
                         style={{ background: plan.gradient }}
                       >
                         <CheckCircle2 size={11} />
@@ -699,7 +699,7 @@ export default function BillingPage() {
                       className="absolute -top-[1px] left-1/2 -translate-x-1/2 z-20"
                     >
                       <div
-                        className="px-4 py-1.5 rounded-b-lg text-white text-[10px] font-bold tracking-[0.15em] uppercase flex items-center gap-1.5"
+                        className="px-4 py-1.5 rounded-b-lg text-white text-[11px] font-bold tracking-[0.15em] uppercase flex items-center gap-1.5"
                         style={{ background: plan.gradient }}
                       >
                         <Sparkles size={11} />
@@ -725,7 +725,7 @@ export default function BillingPage() {
                       </motion.div>
                       <div>
                         <h3 className="text-lg font-bold text-[#F0F0F5]">{plan.name}</h3>
-                        <p className="text-[11px] text-[#7C7C96]">{plan.description}</p>
+                        <p className="text-xs text-[#7C7C96]">{plan.description}</p>
                       </div>
                     </div>
 
@@ -762,7 +762,7 @@ export default function BillingPage() {
                         border: `1px solid rgba(${plan.colorRgb},0.08)`,
                       }}
                     >
-                      <div className="text-[10px] font-bold text-[#5C5C78] mb-2.5 uppercase tracking-[0.12em]">
+                      <div className="text-[11px] font-bold text-[#5C5C78] mb-2.5 uppercase tracking-[0.12em]">
                         {t('billing.aiCredits')}
                       </div>
                       <div className="space-y-2">
@@ -868,7 +868,7 @@ export default function BillingPage() {
           <div className="relative z-10 text-center">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[rgba(79,138,255,0.08)] border border-[rgba(79,138,255,0.15)] mb-4">
               <Building2 size={12} className="text-[#4F8AFF]" />
-              <span className="text-[10px] font-bold text-[#4F8AFF] uppercase tracking-wider">{t('billing.aecSubtitle')}</span>
+              <span className="text-[11px] font-bold text-[#4F8AFF] uppercase tracking-wider">{t('billing.aecSubtitle')}</span>
             </div>
             <h3 className="text-lg font-bold text-[#F0F0F5] mb-2">{t('billing.builtForAec')}</h3>
             <p className="text-sm text-[#7C7C96] max-w-lg mx-auto">
@@ -1030,7 +1030,7 @@ export default function BillingPage() {
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-0.5">
                       <span className="text-sm font-bold text-[#F0F0F5]">UPI / Google Pay / PhonePe</span>
-                      <span className="px-2 py-0.5 rounded-full bg-[rgba(16,185,129,0.15)] text-[10px] font-bold text-[#10B981]">
+                      <span className="px-2 py-0.5 rounded-full bg-[rgba(16,185,129,0.15)] text-[11px] font-bold text-[#10B981]">
                         {t('billing.recommended')}
                       </span>
                     </div>
@@ -1056,7 +1056,7 @@ export default function BillingPage() {
                 </button>
               </div>
 
-              <p className="text-center text-[10px] text-[#55556A] mt-4">
+              <p className="text-center text-[11px] text-[#55556A] mt-4">
                 {t('billing.securePayment')}
               </p>
             </motion.div>

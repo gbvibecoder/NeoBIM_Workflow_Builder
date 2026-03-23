@@ -391,6 +391,7 @@ export function NodeLibraryPanel() {
               type="text"
               value={search}
               onChange={e => setSearch(e.target.value)}
+              aria-label={t('canvas.searchNodesCommand')}
               placeholder={t('canvas.searchNodesCommand')}
               style={{
                 width: "100%", height: 46,

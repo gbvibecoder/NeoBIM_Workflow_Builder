@@ -524,6 +524,7 @@ export function AIChatPanel({ messages, onAddMessage, onClear, isOpen, onToggle 
                     onKeyDown={onKeyDown}
                     onMouseDown={e => e.stopPropagation()}
                     onClick={e => e.stopPropagation()}
+                    aria-label={t('aiChat.placeholder')}
                     placeholder={t('aiChat.placeholder')}
                     rows={2}
                     style={{

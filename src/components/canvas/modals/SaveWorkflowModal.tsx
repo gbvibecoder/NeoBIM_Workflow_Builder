@@ -40,11 +40,28 @@ export function SaveWorkflowModal({
     }
   }, [isOpen]);
 
-  // Escape to close
+  const modalRef = useRef<HTMLDivElement>(null);
+
+  // Escape to close + focus trap
   useEffect(() => {
     if (!isOpen) return;
     const handler = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") { onClose(); return; }
+      if (e.key === "Tab" && modalRef.current) {
+        const focusable = modalRef.current.querySelectorAll<HTMLElement>(
+          'button, [href], input, textarea, select, [tabindex]:not([tabindex="-1"])'
+        );
+        if (focusable.length === 0) return;
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
     };
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
@@ -96,7 +113,11 @@ export function SaveWorkflowModal({
           }}
         >
           <motion.div
+            ref={modalRef}
             key="save-modal-card"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="save-modal-title"
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.95 }}
@@ -140,6 +161,7 @@ export function SaveWorkflowModal({
                 </div>
                 <div>
                   <h3
+                    id="save-modal-title"
                     style={{
                       fontSize: 18,
                       fontWeight: 600,
@@ -164,6 +186,7 @@ export function SaveWorkflowModal({
               </div>
               <button
                 onClick={onClose}
+                aria-label="Close"
                 style={{
                   width: 30,
                   height: 30,
