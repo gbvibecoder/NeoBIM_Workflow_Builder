@@ -66,10 +66,24 @@ export default function ContactPage() {
     e.preventDefault();
     setSending(true);
     trackContact({ content_name: formState.subject || "contact_form" });
-    // Simulate sending
-    await new Promise((r) => setTimeout(r, 1500));
-    setSending(false);
-    setSubmitted(true);
+
+    try {
+      const res = await fetch("/api/contact", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(formState),
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        console.error("[contact] Submission failed:", data?.error || res.statusText);
+      }
+    } catch (err) {
+      console.error("[contact] Network error:", err);
+    } finally {
+      setSending(false);
+      setSubmitted(true);
+    }
   };
 
   const inputStyle = (field: string) => ({

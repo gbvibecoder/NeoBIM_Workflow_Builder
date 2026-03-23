@@ -87,6 +87,57 @@ export async function sendSubscriptionCanceledEmail(email: string, name: string 
   });
 }
 
+// ── Inbound lead notification (book-demo, contact forms) ──────────────────────
+
+const TEAM_NOTIFICATION_EMAIL = process.env.TEAM_NOTIFICATION_EMAIL || 'hello@buildflow.app';
+
+export async function sendInboundLeadNotification(data: {
+  type: string;
+  name: string;
+  email: string;
+  phone?: string;
+  company?: string;
+  role?: string;
+  subject?: string;
+  message?: string;
+}): Promise<void> {
+  const rows = [
+    `<tr><td style="padding:6px 12px;color:#9898B0;font-size:13px;font-weight:600;">Name</td><td style="padding:6px 12px;color:#F0F0F5;font-size:13px;">${escapeHtml(data.name)}</td></tr>`,
+    `<tr><td style="padding:6px 12px;color:#9898B0;font-size:13px;font-weight:600;">Email</td><td style="padding:6px 12px;color:#F0F0F5;font-size:13px;"><a href="mailto:${escapeHtml(data.email)}" style="color:#4F8AFF;">${escapeHtml(data.email)}</a></td></tr>`,
+  ];
+  if (data.phone) rows.push(`<tr><td style="padding:6px 12px;color:#9898B0;font-size:13px;font-weight:600;">Phone</td><td style="padding:6px 12px;color:#F0F0F5;font-size:13px;">${escapeHtml(data.phone)}</td></tr>`);
+  if (data.company) rows.push(`<tr><td style="padding:6px 12px;color:#9898B0;font-size:13px;font-weight:600;">Company</td><td style="padding:6px 12px;color:#F0F0F5;font-size:13px;">${escapeHtml(data.company)}</td></tr>`);
+  if (data.role) rows.push(`<tr><td style="padding:6px 12px;color:#9898B0;font-size:13px;font-weight:600;">Role</td><td style="padding:6px 12px;color:#F0F0F5;font-size:13px;">${escapeHtml(data.role)}</td></tr>`);
+  if (data.subject) rows.push(`<tr><td style="padding:6px 12px;color:#9898B0;font-size:13px;font-weight:600;">Subject</td><td style="padding:6px 12px;color:#F0F0F5;font-size:13px;">${escapeHtml(data.subject)}</td></tr>`);
+  if (data.message) rows.push(`<tr><td style="padding:6px 12px;color:#9898B0;font-size:13px;font-weight:600;" colspan="2">Message</td></tr><tr><td colspan="2" style="padding:6px 12px;color:#F0F0F5;font-size:13px;line-height:1.6;white-space:pre-wrap;">${escapeHtml(data.message)}</td></tr>`);
+
+  const html = `<!DOCTYPE html><html><body style="margin:0;padding:20px;background:#0A0A14;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+    <div style="max-width:560px;margin:0 auto;background:#111120;border-radius:12px;border:1px solid rgba(255,255,255,0.06);overflow:hidden;">
+      <div style="padding:20px 24px;background:linear-gradient(135deg,rgba(79,138,255,0.1),rgba(99,102,241,0.05));border-bottom:1px solid rgba(255,255,255,0.06);">
+        <div style="font-size:16px;font-weight:700;color:#F0F0F5;">New ${escapeHtml(data.type)}</div>
+        <div style="font-size:12px;color:#9898B0;margin-top:4px;">${new Date().toUTCString()}</div>
+      </div>
+      <div style="padding:16px 12px;">
+        <table width="100%" cellpadding="0" cellspacing="0">${rows.join('')}</table>
+      </div>
+    </div>
+  </body></html>`;
+
+  await sendEmail({
+    to: TEAM_NOTIFICATION_EMAIL,
+    subject: `[BuildFlow] New ${data.type}: ${data.name} (${data.company || data.email})`,
+    html,
+  });
+}
+
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
 export async function sendPlanChangedEmail(
   email: string,
   name: string | null,
