@@ -1,42 +1,44 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { checkEndpointRateLimit } from "@/lib/rate-limit";
 
 export async function POST(req: Request) {
   try {
+    const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+    const rl = await checkEndpointRateLimit(ip, "verify-email", 10, "15 m");
+    if (!rl.success) {
+      return NextResponse.json({ error: "Too many requests." }, { status: 429 });
+    }
+
     const { token, email } = await req.json();
     const normalizedEmail = typeof email === "string" ? email.trim().toLowerCase() : "";
 
-    if (!token || !normalizedEmail) {
+    if (typeof token !== "string" || !token || !normalizedEmail) {
       return NextResponse.json({ error: "Missing required fields." }, { status: 400 });
     }
 
-    const verificationToken = await prisma.verificationToken.findFirst({
+    // Atomic delete-first: consume token in a single operation to prevent race conditions
+    const deleted = await prisma.verificationToken.delete({
       where: {
-        identifier: `verify:${normalizedEmail}`,
-        token,
+        identifier_token: {
+          identifier: `verify:${normalizedEmail}`,
+          token,
+        },
       },
-    });
+    }).catch(() => null);
 
-    if (!verificationToken) {
+    if (!deleted) {
       return NextResponse.json({ error: "Invalid or expired verification link." }, { status: 400 });
     }
 
-    if (verificationToken.expires < new Date()) {
-      await prisma.verificationToken.delete({
-        where: { identifier_token: { identifier: verificationToken.identifier, token } },
-      });
+    if (deleted.expires < new Date()) {
       return NextResponse.json({ error: "Verification link has expired. Please request a new one." }, { status: 400 });
     }
 
     // Mark email as verified
-    await prisma.user.update({
+    await prisma.user.updateMany({
       where: { email: normalizedEmail },
       data: { emailVerified: new Date() },
-    });
-
-    // Delete used token
-    await prisma.verificationToken.delete({
-      where: { identifier_token: { identifier: verificationToken.identifier, token } },
     });
 
     return NextResponse.json({ success: true });

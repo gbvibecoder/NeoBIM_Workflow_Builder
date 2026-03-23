@@ -5,10 +5,12 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import { CheckCircle, XCircle, Loader2 } from "lucide-react";
+import { useLocale } from "@/hooks/useLocale";
 
 const smoothEase: [number, number, number, number] = [0.22, 1, 0.36, 1];
 
 function VerifyEmailContent() {
+  const { t } = useLocale();
   const searchParams = useSearchParams();
   const token = searchParams.get("token") || "";
   const email = searchParams.get("email") || "";
@@ -19,7 +21,7 @@ function VerifyEmailContent() {
   useEffect(() => {
     if (!token || !email) {
       setStatus("error");
-      setErrorMsg("Invalid verification link.");
+      setErrorMsg(t('auth.invalidVerificationLink'));
       return;
     }
 
@@ -34,14 +36,14 @@ function VerifyEmailContent() {
           setStatus("success");
         } else {
           setStatus("error");
-          setErrorMsg(data?.error || "Verification failed.");
+          setErrorMsg(data?.error || t('auth.verificationFailed'));
         }
       })
       .catch(() => {
         setStatus("error");
-        setErrorMsg("Network error. Please try again.");
+        setErrorMsg(t('auth.networkError'));
       });
-  }, [token, email]);
+  }, [token, email, t]);
 
   if (status === "loading") {
     return (
@@ -51,7 +53,7 @@ function VerifyEmailContent() {
         style={{ textAlign: "center", padding: "40px 0" }}
       >
         <Loader2 size={32} style={{ color: "#4F8AFF", animation: "spin 1s linear infinite", marginBottom: 16 }} />
-        <p style={{ fontSize: 14, color: "#7C7C96" }}>Verifying your email...</p>
+        <p style={{ fontSize: 14, color: "#7C7C96" }}>{t('auth.verifyingEmail')}</p>
         <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
       </motion.div>
     );
@@ -73,10 +75,10 @@ function VerifyEmailContent() {
           <CheckCircle size={28} style={{ color: "#10B981" }} />
         </div>
         <h1 style={{ fontSize: 22, fontWeight: 700, color: "#F0F0F5", marginBottom: 10 }}>
-          Email verified
+          {t('auth.emailVerified')}
         </h1>
         <p style={{ fontSize: 14, color: "#7C7C96", lineHeight: 1.6, marginBottom: 24 }}>
-          Your email has been successfully verified. You can now access all features.
+          {t('auth.emailVerifiedDesc')}
         </p>
         <Link href="/dashboard" style={{
           display: "inline-flex", alignItems: "center", gap: 6,
@@ -84,7 +86,7 @@ function VerifyEmailContent() {
           background: "linear-gradient(135deg, #4F8AFF 0%, #6366F1 100%)",
           color: "#fff", fontSize: 13, fontWeight: 600, textDecoration: "none",
         }}>
-          Go to Dashboard
+          {t('auth.goToDashboard')}
         </Link>
       </motion.div>
     );
@@ -105,7 +107,7 @@ function VerifyEmailContent() {
         <XCircle size={28} style={{ color: "#EF4444" }} />
       </div>
       <h1 style={{ fontSize: 22, fontWeight: 700, color: "#F0F0F5", marginBottom: 10 }}>
-        Verification failed
+        {t('auth.verificationFailed')}
       </h1>
       <p style={{ fontSize: 14, color: "#7C7C96", lineHeight: 1.6, marginBottom: 24 }}>
         {errorMsg}
@@ -116,7 +118,7 @@ function VerifyEmailContent() {
         border: "1px solid rgba(79,138,255,0.2)", background: "rgba(79,138,255,0.06)",
         color: "#4F8AFF", fontSize: 13, fontWeight: 600, textDecoration: "none",
       }}>
-        Go to Dashboard
+        {t('auth.goToDashboard')}
       </Link>
     </motion.div>
   );
@@ -124,7 +126,7 @@ function VerifyEmailContent() {
 
 export default function VerifyEmailPage() {
   return (
-    <Suspense fallback={<div style={{ color: "#7C7C96", textAlign: "center", padding: 40 }}>Loading...</div>}>
+    <Suspense fallback={<div style={{ color: "#7C7C96", textAlign: "center", padding: 40 }}>...</div>}>
       <VerifyEmailContent />
     </Suspense>
   );

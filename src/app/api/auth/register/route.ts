@@ -109,8 +109,8 @@ export async function POST(req: NextRequest) {
     }).then(() => {
       const baseUrl = process.env.NEXTAUTH_URL || "https://buildflow.app";
       const verifyUrl = `${baseUrl}/verify-email?token=${verifyToken}&email=${encodeURIComponent(normalizedEmail)}`;
-      sendVerificationEmail(normalizedEmail, name, verifyUrl).catch(() => {});
-    }).catch(() => {});
+      sendVerificationEmail(normalizedEmail, name, verifyUrl).catch(err => console.warn("[register] Failed to send verification email:", err));
+    }).catch(err => console.warn("[register] Failed to create verification token:", err));
 
     return NextResponse.json({ user }, { status: 201 });
   } catch (error) {

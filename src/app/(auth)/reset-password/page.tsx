@@ -5,10 +5,12 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import { Lock, ArrowLeft, CheckCircle, Loader2, Eye, EyeOff } from "lucide-react";
+import { useLocale } from "@/hooks/useLocale";
 
 const smoothEase: [number, number, number, number] = [0.22, 1, 0.36, 1];
 
 function ResetPasswordForm() {
+  const { t } = useLocale();
   const searchParams = useSearchParams();
   const token = searchParams.get("token") || "";
   const email = searchParams.get("email") || "";
@@ -25,18 +27,18 @@ function ResetPasswordForm() {
     setError("");
 
     if (password !== confirmPassword) {
-      setError("Passwords do not match.");
+      setError("${t('auth.passwordsDoNotMatch')}");
       return;
     }
 
     if (password.length < 8) {
-      setError("Password must be at least 8 characters.");
+      setError("${t('auth.passwordMinLength')}");
       return;
     }
 
     const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/;
     if (!passwordRegex.test(password)) {
-      setError("Password must contain uppercase, lowercase, and a number.");
+      setError("${t('auth.passwordRequirements')}");
       return;
     }
 
@@ -52,12 +54,12 @@ function ResetPasswordForm() {
       const data = await res.json();
 
       if (!res.ok) {
-        setError(data?.error || "Something went wrong.");
+        setError(data?.error || "${t('auth.somethingWentWrong')}");
       } else {
         setSuccess(true);
       }
     } catch {
-      setError("Network error. Please try again.");
+      setError("${t('auth.networkError')}");
     } finally {
       setLoading(false);
     }
@@ -72,10 +74,10 @@ function ResetPasswordForm() {
         style={{ textAlign: "center" }}
       >
         <h1 style={{ fontSize: 22, fontWeight: 700, color: "#F0F0F5", marginBottom: 10 }}>
-          Invalid reset link
+          {t('auth.invalidResetLink')}
         </h1>
         <p style={{ fontSize: 14, color: "#7C7C96", lineHeight: 1.6, marginBottom: 24 }}>
-          This password reset link is invalid or has expired. Please request a new one.
+          {t('auth.invalidResetLinkDesc')}
         </p>
         <Link href="/forgot-password" style={{
           display: "inline-flex", alignItems: "center", gap: 6,
@@ -83,7 +85,7 @@ function ResetPasswordForm() {
           background: "linear-gradient(135deg, #4F8AFF 0%, #6366F1 100%)",
           color: "#fff", fontSize: 13, fontWeight: 600, textDecoration: "none",
         }}>
-          Request new link
+          {t('auth.requestNewLink')}
         </Link>
       </motion.div>
     );
@@ -105,10 +107,10 @@ function ResetPasswordForm() {
           <CheckCircle size={28} style={{ color: "#10B981" }} />
         </div>
         <h1 style={{ fontSize: 22, fontWeight: 700, color: "#F0F0F5", marginBottom: 10 }}>
-          Password reset successful
+          {t('auth.passwordResetSuccess')}
         </h1>
         <p style={{ fontSize: 14, color: "#7C7C96", lineHeight: 1.6, marginBottom: 24 }}>
-          Your password has been updated. You can now sign in with your new password.
+          {t('auth.passwordResetSuccessDesc')}
         </p>
         <Link href="/login" style={{
           display: "inline-flex", alignItems: "center", gap: 6,
@@ -116,7 +118,7 @@ function ResetPasswordForm() {
           background: "linear-gradient(135deg, #4F8AFF 0%, #6366F1 100%)",
           color: "#fff", fontSize: 13, fontWeight: 600, textDecoration: "none",
         }}>
-          Sign in
+          {t('auth.signIn')}
         </Link>
       </motion.div>
     );
@@ -129,15 +131,15 @@ function ResetPasswordForm() {
       transition={{ duration: 0.5, ease: smoothEase }}
     >
       <h1 style={{ fontSize: 24, fontWeight: 700, color: "#F0F0F5", marginBottom: 6 }}>
-        Choose a new password
+        {t('auth.chooseNewPassword')}
       </h1>
       <p style={{ fontSize: 13.5, color: "#7C7C96", marginBottom: 28, lineHeight: 1.5 }}>
-        Enter your new password below. Must be at least 8 characters with uppercase, lowercase, and a number.
+        {t('auth.chooseNewPasswordDesc')}
       </p>
 
       <form onSubmit={handleSubmit}>
         <label style={{ display: "block", fontSize: 12.5, fontWeight: 500, color: "#7C7C96", marginBottom: 6 }}>
-          New password
+          {t('auth.newPassword')}
         </label>
         <div style={{ position: "relative", marginBottom: 16 }}>
           <Lock size={13} style={{ position: "absolute", left: 13, top: "50%", transform: "translateY(-50%)", color: "#3A3A50" }} />
@@ -145,7 +147,7 @@ function ResetPasswordForm() {
             type={showPassword ? "text" : "password"}
             value={password}
             onChange={(e) => { setPassword(e.target.value); setError(""); }}
-            placeholder="New password"
+            placeholder={t('auth.newPassword')}
             required
             style={{
               width: "100%", padding: "12px 40px 12px 38px", borderRadius: 12,
@@ -166,7 +168,7 @@ function ResetPasswordForm() {
         </div>
 
         <label style={{ display: "block", fontSize: 12.5, fontWeight: 500, color: "#7C7C96", marginBottom: 6 }}>
-          Confirm password
+          {t('auth.confirmPassword')}
         </label>
         <div style={{ position: "relative", marginBottom: 16 }}>
           <Lock size={13} style={{ position: "absolute", left: 13, top: "50%", transform: "translateY(-50%)", color: "#3A3A50" }} />
@@ -174,7 +176,7 @@ function ResetPasswordForm() {
             type={showPassword ? "text" : "password"}
             value={confirmPassword}
             onChange={(e) => { setConfirmPassword(e.target.value); setError(""); }}
-            placeholder="Confirm new password"
+            placeholder={t('auth.confirmNewPassword')}
             required
             style={{
               width: "100%", padding: "12px 14px 12px 38px", borderRadius: 12,
@@ -208,7 +210,7 @@ function ResetPasswordForm() {
           }}
         >
           {loading ? <Loader2 size={16} style={{ animation: "spin 1s linear infinite" }} /> : null}
-          {loading ? "Resetting..." : "Reset password"}
+          {loading ? t('auth.resetting') : t('auth.resetPassword')}
         </button>
       </form>
 
@@ -218,7 +220,7 @@ function ResetPasswordForm() {
           fontSize: 13, color: "#5C5C78", textDecoration: "none",
         }}>
           <ArrowLeft size={13} />
-          Back to login
+          {t('auth.backToLogin')}
         </Link>
       </div>
 
@@ -229,7 +231,7 @@ function ResetPasswordForm() {
 
 export default function ResetPasswordPage() {
   return (
-    <Suspense fallback={<div style={{ color: "#7C7C96", textAlign: "center", padding: 40 }}>Loading...</div>}>
+    <Suspense fallback={<div style={{ color: "#7C7C96", textAlign: "center", padding: 40 }}>...</div>}>
       <ResetPasswordForm />
     </Suspense>
   );

@@ -1,40 +1,24 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { Sparkles, Workflow, Layout, ArrowRight, X } from "lucide-react";
+import { useLocale } from "@/hooks/useLocale";
 
 const STORAGE_KEY = "buildflow_dashboard_onboarded";
 
-const STEPS = [
-  {
-    icon: Sparkles,
-    color: "#4F8AFF",
-    title: "Welcome to BuildFlow",
-    desc: "Your no-code platform for automating AEC workflows — from briefs to renders, BOQs to 3D models.",
-    detail: "Drag nodes onto a canvas, connect them, and hit Run.",
-  },
-  {
-    icon: Workflow,
-    color: "#10B981",
-    title: "Start with a template",
-    desc: "Choose from ready-made workflows to generate massing models, concept renders, or cost reports in minutes.",
-    detail: "Templates are pre-configured — just upload your brief or IFC file.",
-  },
-  {
-    icon: Layout,
-    color: "#8B5CF6",
-    title: "Build your own workflow",
-    desc: "Combine 30+ AI-powered nodes to create custom pipelines tailored to your project needs.",
-    detail: "Open the canvas, drag nodes from the library, connect inputs to outputs, and run.",
-  },
-];
-
 export function OnboardingModal() {
+  const { t } = useLocale();
   const router = useRouter();
   const [visible, setVisible] = useState(false);
   const [step, setStep] = useState(0);
+
+  const STEPS = useMemo(() => [
+    { icon: Sparkles, color: "#4F8AFF", title: t('onboarding.welcomeTitle'), desc: t('onboarding.welcomeDesc'), detail: t('onboarding.welcomeDetail') },
+    { icon: Workflow, color: "#10B981", title: t('onboarding.templatesTitle'), desc: t('onboarding.templatesDesc'), detail: t('onboarding.templatesDetail') },
+    { icon: Layout, color: "#8B5CF6", title: t('onboarding.buildTitle'), desc: t('onboarding.buildDesc'), detail: t('onboarding.buildDetail') },
+  ], [t]);
 
   useEffect(() => {
     if (typeof window !== "undefined" && !localStorage.getItem(STORAGE_KEY)) {
@@ -100,7 +84,7 @@ export function OnboardingModal() {
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 <div style={{ width: 6, height: 6, borderRadius: "50%", background: current.color, boxShadow: `0 0 8px ${current.color}` }} />
                 <span style={{ fontSize: 10, fontWeight: 700, color: current.color, textTransform: "uppercase", letterSpacing: "1.5px" }}>
-                  Step {step + 1} of {STEPS.length}
+                  {step + 1} {t('onboarding.stepOf')} {STEPS.length}
                 </span>
               </div>
               <button
@@ -175,7 +159,7 @@ export function OnboardingModal() {
                     color: "#7C7C96", fontSize: 13, fontWeight: 500, cursor: "pointer",
                   }}
                 >
-                  Skip
+                  {t('onboarding.skip')}
                 </button>
                 <button
                   onClick={handleNext}
@@ -187,7 +171,7 @@ export function OnboardingModal() {
                     boxShadow: `0 0 16px ${current.color}30`,
                   }}
                 >
-                  {step < STEPS.length - 1 ? "Next" : "Explore Templates"}
+                  {step < STEPS.length - 1 ? t('onboarding.next') : t('onboarding.exploreTemplates')}
                   <ArrowRight size={14} />
                 </button>
               </div>

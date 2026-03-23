@@ -14,12 +14,12 @@ export async function POST(req: Request) {
     const { token, email, password } = await req.json();
     const normalizedEmail = typeof email === "string" ? email.trim().toLowerCase() : "";
 
-    if (!token || !normalizedEmail || !password) {
+    if (typeof token !== "string" || !token || !normalizedEmail || typeof password !== "string" || !password) {
       return NextResponse.json({ error: "Missing required fields." }, { status: 400 });
     }
 
-    if (typeof password !== "string" || password.length < 8) {
-      return NextResponse.json({ error: "Password must be at least 8 characters." }, { status: 400 });
+    if (password.length < 8 || password.length > 128) {
+      return NextResponse.json({ error: "Password must be between 8 and 128 characters." }, { status: 400 });
     }
 
     const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/;
@@ -29,36 +29,34 @@ export async function POST(req: Request) {
       }, { status: 400 });
     }
 
-    // Find and validate token
-    const verificationToken = await prisma.verificationToken.findFirst({
+    // Atomic delete-first: consume token in a single operation to prevent race conditions
+    const deleted = await prisma.verificationToken.delete({
       where: {
-        identifier: `reset:${normalizedEmail}`,
-        token,
+        identifier_token: {
+          identifier: `reset:${normalizedEmail}`,
+          token,
+        },
       },
-    });
+    }).catch(() => null);
 
-    if (!verificationToken) {
+    if (!deleted) {
       return NextResponse.json({ error: "Invalid or expired reset link." }, { status: 400 });
     }
 
-    if (verificationToken.expires < new Date()) {
-      await prisma.verificationToken.delete({
-        where: { identifier_token: { identifier: verificationToken.identifier, token } },
-      });
+    if (deleted.expires < new Date()) {
       return NextResponse.json({ error: "Reset link has expired. Please request a new one." }, { status: 400 });
     }
 
     // Update password
     const hashedPassword = await bcrypt.hash(password, 12);
-    await prisma.user.update({
+    const updated = await prisma.user.updateMany({
       where: { email: normalizedEmail },
       data: { password: hashedPassword },
     });
 
-    // Delete used token
-    await prisma.verificationToken.delete({
-      where: { identifier_token: { identifier: verificationToken.identifier, token } },
-    });
+    if (updated.count === 0) {
+      return NextResponse.json({ error: "Account not found." }, { status: 400 });
+    }
 
     return NextResponse.json({ success: true });
   } catch (error) {

@@ -4,10 +4,12 @@ import { useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { Mail, ArrowLeft, CheckCircle, Loader2 } from "lucide-react";
+import { useLocale } from "@/hooks/useLocale";
 
 const smoothEase: [number, number, number, number] = [0.22, 1, 0.36, 1];
 
 export default function ForgotPasswordPage() {
+  const { t } = useLocale();
   const [email, setEmail] = useState("");
   const [sent, setSent] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -27,12 +29,12 @@ export default function ForgotPasswordPage() {
 
       if (!res.ok) {
         const data = await res.json().catch(() => null);
-        setError(data?.error || "Something went wrong. Please try again.");
+        setError(data?.error || t('auth.somethingWentWrong'));
       } else {
         setSent(true);
       }
     } catch {
-      setError("Network error. Please try again.");
+      setError(t('auth.networkError'));
     } finally {
       setLoading(false);
     }
@@ -54,18 +56,17 @@ export default function ForgotPasswordPage() {
           <CheckCircle size={28} style={{ color: "#10B981" }} />
         </div>
         <h1 style={{ fontSize: 22, fontWeight: 700, color: "#F0F0F5", marginBottom: 10 }}>
-          Check your email
+          {t('auth.checkYourEmail')}
         </h1>
         <p style={{ fontSize: 14, color: "#7C7C96", lineHeight: 1.6, marginBottom: 24 }}>
-          If an account exists for <strong style={{ color: "#9898B0" }}>{email}</strong>,
-          we&apos;ve sent a password reset link. Check your inbox and spam folder.
+          {t('auth.resetEmailSent')} <strong style={{ color: "#9898B0" }}>{email}</strong>{t('auth.resetEmailSentSuffix')}
         </p>
         <Link href="/login" style={{
           display: "inline-flex", alignItems: "center", gap: 6,
           fontSize: 13, color: "#4F8AFF", textDecoration: "none",
         }}>
           <ArrowLeft size={14} />
-          Back to login
+          {t('auth.backToLogin')}
         </Link>
       </motion.div>
     );
@@ -78,15 +79,15 @@ export default function ForgotPasswordPage() {
       transition={{ duration: 0.5, ease: smoothEase }}
     >
       <h1 style={{ fontSize: 24, fontWeight: 700, color: "#F0F0F5", marginBottom: 6 }}>
-        Reset your password
+        {t('auth.resetYourPassword')}
       </h1>
       <p style={{ fontSize: 13.5, color: "#7C7C96", marginBottom: 28, lineHeight: 1.5 }}>
-        Enter the email address associated with your account and we&apos;ll send you a link to reset your password.
+        {t('auth.resetPasswordDesc')}
       </p>
 
       <form onSubmit={handleSubmit}>
         <label style={{ display: "block", fontSize: 12.5, fontWeight: 500, color: "#7C7C96", marginBottom: 6 }}>
-          Email address
+          {t('auth.emailAddress')}
         </label>
         <div style={{ position: "relative", marginBottom: 16 }}>
           <Mail size={13} style={{ position: "absolute", left: 13, top: "50%", transform: "translateY(-50%)", color: "#3A3A50" }} />
@@ -129,7 +130,7 @@ export default function ForgotPasswordPage() {
           }}
         >
           {loading ? <Loader2 size={16} style={{ animation: "spin 1s linear infinite" }} /> : null}
-          {loading ? "Sending..." : "Send reset link"}
+          {loading ? t('auth.sending') : t('auth.sendResetLink')}
         </button>
       </form>
 
@@ -139,7 +140,7 @@ export default function ForgotPasswordPage() {
           fontSize: 13, color: "#5C5C78", textDecoration: "none",
         }}>
           <ArrowLeft size={13} />
-          Back to login
+          {t('auth.backToLogin')}
         </Link>
       </div>
 
