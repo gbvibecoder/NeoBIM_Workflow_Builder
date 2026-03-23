@@ -60,7 +60,7 @@ export const UserErrors = {
   // Rate Limiting
   RATE_LIMIT_FREE: (resetDays: number): UserError => ({
     title: "Monthly limit reached",
-    message: `Free tier: 5 executions per month. Resets in ${resetDays} day${resetDays === 1 ? "" : "s"}.`,
+    message: `Free tier: 3 executions per month. Resets in ${resetDays} day${resetDays === 1 ? "" : "s"}.`,
     action: "Upgrade to Mini",
     actionUrl: "/dashboard/billing",
     code: "RATE_001",

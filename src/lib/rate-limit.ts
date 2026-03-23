@@ -42,7 +42,7 @@ try {
   });
 }
 
-const FREE_TIER_LIMIT = parseInt(process.env.FREE_TIER_EXECUTIONS_PER_MONTH || "5");
+const FREE_TIER_LIMIT = parseInt(process.env.FREE_TIER_EXECUTIONS_PER_MONTH || "3");
 const MINI_TIER_LIMIT = parseInt(process.env.MINI_TIER_EXECUTIONS_PER_MONTH || "10");
 const STARTER_TIER_LIMIT = parseInt(process.env.STARTER_TIER_EXECUTIONS_PER_MONTH || "30");
 const PRO_TIER_LIMIT = parseInt(process.env.PRO_TIER_EXECUTIONS_PER_MONTH || "100");
