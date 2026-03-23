@@ -2,7 +2,7 @@ User-agent: *
 Allow: /
 Disallow: /dashboard/
 Disallow: /api/
-Disallow: /demo/
+Allow: /demo/
 Disallow: /_next/
 
 Sitemap: https://trybuildflow.in/sitemap.xml

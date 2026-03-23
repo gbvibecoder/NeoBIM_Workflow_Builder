@@ -1055,15 +1055,26 @@ export default function LandingPage() {
             ))}
           </div>
 
-          <div className="landing-nav-cta" style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0, marginLeft: "auto" }}>
+          <div className="landing-nav-cta" style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0, marginLeft: "auto" }}>
             <LanguageSwitcher />
-            <Link href="/login" className="landing-signup-link" style={{
-              padding: "9px 22px", borderRadius: 10, fontSize: 14, fontWeight: 600,
+            <Link href="/login" className="landing-login-link" style={{
+              padding: "9px 18px", borderRadius: 10, fontSize: 13, fontWeight: 600,
+              color: "#9898B0", background: "transparent",
+              border: "1px solid rgba(255,255,255,0.08)",
+              textDecoration: "none", whiteSpace: "nowrap",
+              transition: "all 0.2s",
+            }}>
+              {t('landing.login')}
+            </Link>
+            <Link href="/register" className="landing-signup-link" style={{
+              padding: "9px 22px", borderRadius: 10, fontSize: 13, fontWeight: 600,
               color: "white", background: "linear-gradient(135deg, #4F8AFF 0%, #6366F1 100%)",
               textDecoration: "none", whiteSpace: "nowrap",
               boxShadow: "0 2px 12px rgba(79,138,255,0.3)",
-            }}>
-              {t('landing.login')}
+            }}
+              onClick={() => trackLead({ content_name: "nav_cta_sign_up" })}
+            >
+              {t('landing.signUpFree')}
             </Link>
           </div>
         </nav>
@@ -1407,7 +1418,7 @@ export default function LandingPage() {
                 marginTop: 44, display: "flex", flexDirection: "column", alignItems: "center", gap: 16,
               }}
             >
-              <Link href="/dashboard" className="landing-hero-cta" style={{
+              <Link href="/register" className="landing-hero-cta" style={{
                 position: "relative", overflow: "hidden",
                 height: 58, padding: "0 44px",
                 background: "linear-gradient(135deg, #00F5FF 0%, #4F8AFF 50%, #6366F1 100%)",
@@ -1505,6 +1516,38 @@ export default function LandingPage() {
                 {t('landing.exploreCommunity')}
                 <ChevronDown size={14} style={{ opacity: 0.6 }} />
               </a>
+            </motion.div>
+
+            {/* Demo link */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.85, duration: 0.5 }}
+              style={{ marginTop: 12, textAlign: "center" }}
+            >
+              <Link href="/demo" style={{
+                fontSize: 13, color: "rgba(255,255,255,0.35)", textDecoration: "none",
+                transition: "color 0.2s",
+              }}
+                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = "rgba(255,255,255,0.6)"; }}
+                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = "rgba(255,255,255,0.35)"; }}
+              >
+                {t('landing.tryDemoNoAccount')} →
+              </Link>
+            </motion.div>
+
+            {/* Trust signals */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.95, duration: 0.5 }}
+              style={{ marginTop: 20, display: "flex", gap: 20, flexWrap: "wrap", justifyContent: "center" }}
+            >
+              {[t('landing.trustNoCreditCard'), t('landing.trustCancelAnytime'), t('landing.trustUsedByAec')].map(signal => (
+                <span key={signal} style={{ fontSize: 12, color: "rgba(255,255,255,0.25)", display: "flex", alignItems: "center", gap: 5 }}>
+                  <span style={{ color: "#10B981", fontSize: 14 }}>✓</span> {signal}
+                </span>
+              ))}
             </motion.div>
           </div>
 

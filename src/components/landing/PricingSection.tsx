@@ -78,7 +78,7 @@ export function PricingSection() {
                 onMouseLeave={e => { (e.currentTarget as HTMLElement).style.boxShadow = "0 4px 16px rgba(245,158,11,0.25)"; }}
                 onFocus={e => { (e.currentTarget as HTMLElement).style.boxShadow = "0 6px 24px rgba(245,158,11,0.35)"; }}
                 onBlur={e => { (e.currentTarget as HTMLElement).style.boxShadow = "0 4px 16px rgba(245,158,11,0.25)"; }}
-              >{t('landing.startFreeTrial')}</Link>
+              >{t('landing.getStartedFree')}</Link>
               <div style={{ borderTop: "1px solid rgba(245,158,11,0.08)", paddingTop: 14 }}>
                 <div style={{ fontSize: 8, fontWeight: 700, color: "#5C5C78", marginBottom: 10, textTransform: "uppercase", letterSpacing: "1.5px", fontFamily: "monospace" }}>{t('landing.miniIncludes')}</div>
                 {tArray('landing.miniFeatures').map(f => (<div key={f} style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}><div style={{ width: 12, height: 12, borderRadius: 3, background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.15)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><div style={{ width: 3, height: 3, borderRadius: "50%", background: "#F59E0B" }} /></div><span style={{ fontSize: 11, color: "#9898B0" }}>{f}</span></div>))}
@@ -108,7 +108,7 @@ export function PricingSection() {
                 onMouseLeave={e => { (e.currentTarget as HTMLElement).style.boxShadow = "0 4px 16px rgba(16,185,129,0.25)"; }}
                 onFocus={e => { (e.currentTarget as HTMLElement).style.boxShadow = "0 6px 24px rgba(16,185,129,0.35)"; }}
                 onBlur={e => { (e.currentTarget as HTMLElement).style.boxShadow = "0 4px 16px rgba(16,185,129,0.25)"; }}
-              >{t('landing.startFreeTrial')}</Link>
+              >{t('landing.startNow')}</Link>
               <div style={{ borderTop: "1px solid rgba(16,185,129,0.08)", paddingTop: 16 }}>
                 <div style={{ fontSize: 9, fontWeight: 700, color: "#5C5C78", marginBottom: 12, textTransform: "uppercase", letterSpacing: "1.5px", fontFamily: "monospace" }}>{t('landing.starterIncludes')}</div>
                 {tArray('landing.starterFeatures').map(f => (<div key={f} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}><div style={{ width: 14, height: 14, borderRadius: 3, background: "rgba(16,185,129,0.08)", border: "1px solid rgba(16,185,129,0.15)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><div style={{ width: 3, height: 3, borderRadius: "50%", background: "#10B981" }} /></div><span style={{ fontSize: 12, color: "#B0B0C8" }}>{f}</span></div>))}
@@ -139,7 +139,7 @@ export function PricingSection() {
                 onMouseLeave={e => { (e.currentTarget as HTMLElement).style.boxShadow = "0 4px 20px rgba(79,138,255,0.3)"; }}
                 onFocus={e => { (e.currentTarget as HTMLElement).style.boxShadow = "0 8px 30px rgba(79,138,255,0.4)"; }}
                 onBlur={e => { (e.currentTarget as HTMLElement).style.boxShadow = "0 4px 20px rgba(79,138,255,0.3)"; }}
-              >{t('landing.startFreeTrial')}</Link>
+              >{t('landing.startNow')}</Link>
               <div style={{ borderTop: "1px solid rgba(79,138,255,0.1)", paddingTop: 16 }}>
                 <div style={{ fontSize: 9, fontWeight: 700, color: "#5C5C78", marginBottom: 12, textTransform: "uppercase", letterSpacing: "1.5px", fontFamily: "monospace" }}>{t('landing.proIncludes')}</div>
                 {tArray('landing.proFeatures').map(f => (<div key={f} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}><div style={{ width: 14, height: 14, borderRadius: 3, background: "rgba(79,138,255,0.1)", border: "1px solid rgba(79,138,255,0.2)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><div style={{ width: 3, height: 3, borderRadius: "50%", background: "#4F8AFF" }} /></div><span style={{ fontSize: 12, color: "#D0D0E0" }}>{f}</span></div>))}
