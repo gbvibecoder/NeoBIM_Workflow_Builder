@@ -2,6 +2,7 @@ import React from "react";
 import { Sidebar } from "@/components/dashboard/Sidebar";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { CommandPaletteLoader } from "@/components/ui/CommandPaletteLoader";
+import { OnboardingModal } from "@/components/dashboard/OnboardingModal";
 
 export default function DashboardLayout({
   children,
@@ -17,6 +18,7 @@ export default function DashboardLayout({
         </div>
       </ErrorBoundary>
       <CommandPaletteLoader />
+      <OnboardingModal />
     </div>
   );
 }

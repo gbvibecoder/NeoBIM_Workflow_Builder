@@ -4,6 +4,8 @@ import {
   paymentFailedEmail,
   subscriptionCanceledEmail,
   planChangedEmail,
+  verificationEmail,
+  passwordResetEmail,
 } from './email-templates';
 
 // Initialize Resend — uses placeholder during build
@@ -60,6 +62,22 @@ async function sendEmail({
 }
 
 // ── Event-specific senders ─────────────────────────────────────────────────────
+
+export async function sendVerificationEmail(email: string, name: string | null, verifyUrl: string): Promise<void> {
+  await sendEmail({
+    to: email,
+    subject: 'Verify your email — BuildFlow',
+    html: verificationEmail(name, verifyUrl),
+  });
+}
+
+export async function sendPasswordResetEmail(email: string, name: string | null, resetUrl: string): Promise<void> {
+  await sendEmail({
+    to: email,
+    subject: 'Reset your password — BuildFlow',
+    html: passwordResetEmail(name, resetUrl),
+  });
+}
 
 export async function sendWelcomeEmail(email: string, name: string | null, role: string): Promise<void> {
   const plan = planDisplayName(role);

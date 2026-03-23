@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
+import crypto from "crypto";
 import { prisma } from "@/lib/db";
 import { trackSignup } from "@/lib/analytics";
 import { checkEndpointRateLimit } from "@/lib/rate-limit";
+import { sendVerificationEmail } from "@/services/email";
 import {
   formatErrorResponse,
   FormErrors,
@@ -94,6 +96,21 @@ export async function POST(req: NextRequest) {
 
     // Fire-and-forget: don't block registration response on analytics
     trackSignup(user.id, source).catch(err => console.warn("[analytics]", err));
+
+    // Send verification email (fire-and-forget)
+    const verifyToken = crypto.randomBytes(32).toString("hex");
+    const verifyExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+    prisma.verificationToken.create({
+      data: {
+        identifier: `verify:${normalizedEmail}`,
+        token: verifyToken,
+        expires: verifyExpires,
+      },
+    }).then(() => {
+      const baseUrl = process.env.NEXTAUTH_URL || "https://buildflow.app";
+      const verifyUrl = `${baseUrl}/verify-email?token=${verifyToken}&email=${encodeURIComponent(normalizedEmail)}`;
+      sendVerificationEmail(normalizedEmail, name, verifyUrl).catch(() => {});
+    }).catch(() => {});
 
     return NextResponse.json({ user }, { status: 201 });
   } catch (error) {
