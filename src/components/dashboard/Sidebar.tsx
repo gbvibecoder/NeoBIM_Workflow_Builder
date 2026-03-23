@@ -109,7 +109,7 @@ export function Sidebar() {
   }, [collapsed, hoverExpanded, isMobile]);
 
   const isEffectivelyCollapsed = isMobile ? false : (collapsed && !hoverExpanded);
-  const sidebarWidth = isMobile ? 272 : isEffectivelyCollapsed ? 56 : 248;
+  const sidebarWidth = isMobile ? Math.min(272, (typeof window !== "undefined" ? window.innerWidth : 360) - 48) : isEffectivelyCollapsed ? 56 : 248;
 
   const handleSidebarEnter = useCallback(() => {
     if (!collapsed || isMobile) return;
@@ -134,7 +134,7 @@ export function Sidebar() {
           aria-label="Open menu"
           style={{
             position: "fixed", top: 12, left: 12, zIndex: 9001,
-            width: 42, height: 42, borderRadius: 12,
+            width: 44, height: 44, borderRadius: 12,
             border: "1px solid rgba(184,115,51,0.15)",
             background: "rgba(7,8,9,0.92)",
             backdropFilter: "blur(16px)",

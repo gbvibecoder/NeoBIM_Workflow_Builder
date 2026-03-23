@@ -76,6 +76,8 @@ export function PricingSection() {
                 onClick={() => trackViewContent({ content_name: "pricing_cta_mini" })}
                 onMouseEnter={e => { (e.currentTarget as HTMLElement).style.boxShadow = "0 6px 24px rgba(245,158,11,0.35)"; }}
                 onMouseLeave={e => { (e.currentTarget as HTMLElement).style.boxShadow = "0 4px 16px rgba(245,158,11,0.25)"; }}
+                onFocus={e => { (e.currentTarget as HTMLElement).style.boxShadow = "0 6px 24px rgba(245,158,11,0.35)"; }}
+                onBlur={e => { (e.currentTarget as HTMLElement).style.boxShadow = "0 4px 16px rgba(245,158,11,0.25)"; }}
               >{t('landing.startFreeTrial')}</Link>
               <div style={{ borderTop: "1px solid rgba(245,158,11,0.08)", paddingTop: 14 }}>
                 <div style={{ fontSize: 8, fontWeight: 700, color: "#5C5C78", marginBottom: 10, textTransform: "uppercase", letterSpacing: "1.5px", fontFamily: "monospace" }}>{t('landing.miniIncludes')}</div>
@@ -104,6 +106,8 @@ export function PricingSection() {
                 onClick={() => trackViewContent({ content_name: "pricing_cta_starter" })}
                 onMouseEnter={e => { (e.currentTarget as HTMLElement).style.boxShadow = "0 6px 24px rgba(16,185,129,0.35)"; }}
                 onMouseLeave={e => { (e.currentTarget as HTMLElement).style.boxShadow = "0 4px 16px rgba(16,185,129,0.25)"; }}
+                onFocus={e => { (e.currentTarget as HTMLElement).style.boxShadow = "0 6px 24px rgba(16,185,129,0.35)"; }}
+                onBlur={e => { (e.currentTarget as HTMLElement).style.boxShadow = "0 4px 16px rgba(16,185,129,0.25)"; }}
               >{t('landing.startFreeTrial')}</Link>
               <div style={{ borderTop: "1px solid rgba(16,185,129,0.08)", paddingTop: 16 }}>
                 <div style={{ fontSize: 9, fontWeight: 700, color: "#5C5C78", marginBottom: 12, textTransform: "uppercase", letterSpacing: "1.5px", fontFamily: "monospace" }}>{t('landing.starterIncludes')}</div>
@@ -133,6 +137,8 @@ export function PricingSection() {
                 onClick={() => trackViewContent({ content_name: "pricing_cta_pro" })}
                 onMouseEnter={e => { (e.currentTarget as HTMLElement).style.boxShadow = "0 8px 30px rgba(79,138,255,0.4)"; }}
                 onMouseLeave={e => { (e.currentTarget as HTMLElement).style.boxShadow = "0 4px 20px rgba(79,138,255,0.3)"; }}
+                onFocus={e => { (e.currentTarget as HTMLElement).style.boxShadow = "0 8px 30px rgba(79,138,255,0.4)"; }}
+                onBlur={e => { (e.currentTarget as HTMLElement).style.boxShadow = "0 4px 20px rgba(79,138,255,0.3)"; }}
               >{t('landing.startFreeTrial')}</Link>
               <div style={{ borderTop: "1px solid rgba(79,138,255,0.1)", paddingTop: 16 }}>
                 <div style={{ fontSize: 9, fontWeight: 700, color: "#5C5C78", marginBottom: 12, textTransform: "uppercase", letterSpacing: "1.5px", fontFamily: "monospace" }}>{t('landing.proIncludes')}</div>
@@ -156,6 +162,8 @@ export function PricingSection() {
               <a href="mailto:sales@buildflow.com" style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "12px 20px", borderRadius: 12, border: "1px solid rgba(139,92,246,0.2)", background: "rgba(139,92,246,0.05)", color: "#F0F0F5", fontSize: 13, fontWeight: 700, textDecoration: "none", marginBottom: 24, transition: "all 0.2s" }}
                 onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.background = "rgba(139,92,246,0.1)"; }}
                 onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.background = "rgba(139,92,246,0.05)"; }}
+                onFocus={e => { const el = e.currentTarget as HTMLElement; el.style.background = "rgba(139,92,246,0.1)"; }}
+                onBlur={e => { const el = e.currentTarget as HTMLElement; el.style.background = "rgba(139,92,246,0.05)"; }}
               >{t('landing.contactSales')}</a>
               <div style={{ borderTop: "1px solid rgba(139,92,246,0.08)", paddingTop: 16 }}>
                 <div style={{ fontSize: 9, fontWeight: 700, color: "#5C5C78", marginBottom: 12, textTransform: "uppercase", letterSpacing: "1.5px", fontFamily: "monospace" }}>{t('landing.enterpriseIncludes')}</div>

@@ -80,9 +80,9 @@ export async function PUT(req: NextRequest, { params }: Params) {
           if (old.length > 0) {
             prisma.workflowVersion.deleteMany({
               where: { id: { in: old.map(v => v.id) } },
-            }).catch(() => {});
+            }).catch((err) => console.error("[workflows] Failed to cleanup old versions", err));
           }
-        }).catch(() => {});
+        }).catch((err) => console.error("[workflows] Failed to cleanup old versions", err));
       } catch (err) {
         // Log but don't block save — duplicate version key means concurrent save, which is OK
         console.warn("[workflows/PUT] Version snapshot failed (may be concurrent save):", err);

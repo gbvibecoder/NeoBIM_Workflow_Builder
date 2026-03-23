@@ -70,7 +70,7 @@ function TBBtn({ onClick, icon, title, disabled }: TBBtnProps) {
       title={title}
       aria-label={title}
       style={{
-        width: 32, height: 32, borderRadius: 8,
+        width: 44, height: 44, borderRadius: 8,
         display: "flex", alignItems: "center", justifyContent: "center",
         background: "transparent", border: "none",
         color: "rgba(255,255,255,0.55)", cursor: disabled ? "not-allowed" : "pointer",
@@ -84,6 +84,16 @@ function TBBtn({ onClick, icon, title, disabled }: TBBtnProps) {
         }
       }}
       onMouseLeave={e => {
+        e.currentTarget.style.background = "transparent";
+        e.currentTarget.style.color = "rgba(255,255,255,0.55)";
+      }}
+      onFocus={e => {
+        if (!disabled) {
+          e.currentTarget.style.background = "rgba(255,255,255,0.06)";
+          e.currentTarget.style.color = "rgba(255,255,255,0.9)";
+        }
+      }}
+      onBlur={e => {
         e.currentTarget.style.background = "transparent";
         e.currentTarget.style.color = "rgba(255,255,255,0.55)";
       }}
@@ -224,7 +234,7 @@ export function CanvasToolbar({
             aria-label={t('canvas.toggleNodeLibrary')}
             aria-pressed={isNodeLibraryOpen}
             style={{
-              width: 32, height: 32, borderRadius: 8,
+              width: 44, height: 44, borderRadius: 8,
               display: "flex", alignItems: "center", justifyContent: "center",
               background: isNodeLibraryOpen ? "rgba(0,245,255,0.10)" : "transparent",
               border: isNodeLibraryOpen ? "1px solid rgba(0,245,255,0.25)" : "1px solid transparent",

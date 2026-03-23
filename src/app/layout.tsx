@@ -85,6 +85,10 @@ export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   alternates: {
     canonical: "/",
+    languages: {
+      "en": "/",
+      "de": "/",
+    },
   },
   
   // Robots
@@ -182,10 +186,8 @@ export default function RootLayout({
         },
         description: siteDescription,
         sameAs: [
-          // Add your social media profiles here
-          // "https://twitter.com/buildflow",
-          // "https://linkedin.com/company/buildflow",
-          // "https://github.com/buildflow",
+          "https://www.instagram.com/buildflow_live/",
+          "https://www.linkedin.com/in/buildflow/",
         ],
       },
       // WebSite Schema
@@ -278,7 +280,7 @@ export default function RootLayout({
               background: "#12121E",
               border: "1px solid rgba(255, 255, 255, 0.06)",
               color: "#F0F0F5",
-              fontSize: "12.5px",
+              fontSize: "14px",
               fontFamily: "var(--font-inter), sans-serif",
               borderRadius: "12px",
               boxShadow: "0 16px 48px rgba(0,0,0,0.35), 0 4px 16px rgba(0,0,0,0.25)",

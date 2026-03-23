@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
 import { validateAdminCredentials, getAdminSessionCookie } from "@/lib/admin-auth";
 import { getAdminSession, unauthorizedResponse, logAudit } from "@/lib/admin-server";
 import { checkEndpointRateLimit } from "@/lib/rate-limit";
@@ -30,14 +29,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
     }
 
-    // Get the fresh session token
-    const freshAdmin = await prisma.adminAccount.findUnique({
-      where: { id: admin.id },
-      select: { sessionToken: true },
-    });
-
-    const sessionToken = freshAdmin?.sessionToken ?? "";
-
+    // admin.sessionToken is the raw token (DB stores a bcrypt hash of it)
     await logAudit(admin.id, "ADMIN_LOGIN", "admin", admin.id, {
       username: admin.username,
       success: true,
@@ -47,7 +39,7 @@ export async function POST(req: Request) {
       success: true,
       admin: { id: admin.id, displayName: admin.displayName, role: admin.role },
     });
-    response.headers.set("Set-Cookie", getAdminSessionCookie(admin.id, sessionToken));
+    response.headers.set("Set-Cookie", getAdminSessionCookie(admin.id, admin.sessionToken));
     return response;
   } catch {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });

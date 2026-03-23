@@ -61,7 +61,7 @@ export async function POST(req: Request) {
     // Invalidate all sessions for this user
     const user = await prisma.user.findUnique({ where: { email: normalizedEmail }, select: { id: true } });
     if (user) {
-      await prisma.session.deleteMany({ where: { userId: user.id } }).catch(() => {});
+      await prisma.session.deleteMany({ where: { userId: user.id } }).catch((err) => console.error("[reset-password] Failed to invalidate sessions", err));
     }
 
     return NextResponse.json({ success: true });

@@ -93,7 +93,7 @@ export async function POST(req: NextRequest) {
             select: { email: true, name: true },
           });
           if (user?.email) {
-            sendPaymentFailedEmail(user.email, user.name).catch(() => {});
+            sendPaymentFailedEmail(user.email, user.name).catch((err) => console.error("[webhook] Failed to send payment failed email:", err));
           }
         }
         break;
@@ -186,7 +186,7 @@ async function activateSubscription(subscription: {
 
   // Send welcome email on first activation
   if (previousRole === 'FREE' && user.email) {
-    sendWelcomeEmail(user.email, user.name, newRole).catch(() => {});
+    sendWelcomeEmail(user.email, user.name, newRole).catch((err) => console.error("[webhook] Failed to send welcome email:", err));
   }
 }
 
@@ -220,7 +220,7 @@ async function cancelSubscription(subscription: { id: string }) {
   });
 
   if (user.email) {
-    sendSubscriptionCanceledEmail(user.email, user.name, previousRole).catch(() => {});
+    sendSubscriptionCanceledEmail(user.email, user.name, previousRole).catch((err) => console.error("[webhook] Failed to send subscription canceled email:", err));
   }
 }
 

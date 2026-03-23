@@ -76,7 +76,7 @@ export async function POST(req: NextRequest) {
             select: { email: true, name: true, role: true },
           });
           if (checkoutUser?.email) {
-            sendWelcomeEmail(checkoutUser.email, checkoutUser.name, checkoutUser.role).catch(() => {});
+            sendWelcomeEmail(checkoutUser.email, checkoutUser.name, checkoutUser.role).catch((err) => console.error("[webhook] Failed to send welcome email:", err));
           }
         }
         break;
@@ -123,7 +123,7 @@ export async function POST(req: NextRequest) {
             select: { email: true, name: true },
           });
           if (failedUser?.email) {
-            sendPaymentFailedEmail(failedUser.email, failedUser.name).catch(() => {});
+            sendPaymentFailedEmail(failedUser.email, failedUser.name).catch((err) => console.error("[webhook] Failed to send payment failed email:", err));
           }
         }
         break;
@@ -274,7 +274,7 @@ async function updateUserSubscription(
     if (previousRole !== plan && user.email) {
       const TIER_ORDER = ['FREE', 'MINI', 'STARTER', 'PRO', 'TEAM_ADMIN'];
       const type = TIER_ORDER.indexOf(plan) > TIER_ORDER.indexOf(previousRole) ? 'upgrade' : 'downgrade';
-      sendPlanChangedEmail(user.email, user.name, previousRole, plan, type).catch(() => {});
+      sendPlanChangedEmail(user.email, user.name, previousRole, plan, type).catch((err) => console.error("[webhook] Failed to send plan changed email:", err));
     }
   } catch (dbError) {
     console.error('[STRIPE_WEBHOOK] CRITICAL: DB update failed! User paid but role not updated.', {
@@ -314,6 +314,6 @@ async function cancelUserSubscription(stripeCustomerId: string) {
 
   // Send cancellation email (fire-and-forget)
   if (user.email) {
-    sendSubscriptionCanceledEmail(user.email, user.name, previousRole).catch(() => {});
+    sendSubscriptionCanceledEmail(user.email, user.name, previousRole).catch((err) => console.error("[webhook] Failed to send subscription canceled email:", err));
   }
 }

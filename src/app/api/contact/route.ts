@@ -60,7 +60,7 @@ export async function POST(req: Request) {
       email,
       subject,
       message,
-    }).catch(() => {});
+    }).catch((err) => console.error("[contact] Failed to send notification email", err));
 
     return NextResponse.json({ success: true });
   } catch (error) {
