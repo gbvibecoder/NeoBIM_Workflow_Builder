@@ -9,6 +9,7 @@ import {
   sendSubscriptionCanceledEmail,
   sendPlanChangedEmail,
 } from '@/services/email';
+import { checkWebhookIdempotency } from '@/lib/webhook-idempotency';
 
 export async function POST(req: NextRequest) {
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
@@ -41,6 +42,13 @@ export async function POST(req: NextRequest) {
   }
 
   console.info('[STRIPE_WEBHOOK] Event received:', event.type);
+
+  // Idempotency: skip already-processed events
+  const isDuplicate = await checkWebhookIdempotency('stripe', event.id);
+  if (isDuplicate) {
+    console.info('[STRIPE_WEBHOOK] Duplicate event skipped:', event.id);
+    return NextResponse.json({ received: true, duplicate: true });
+  }
 
   try {
     switch (event.type) {

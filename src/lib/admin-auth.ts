@@ -6,11 +6,9 @@ import crypto from "crypto";
 export const ADMIN_COOKIE_NAME = "bf_admin_session";
 const SESSION_MAX_AGE = 60 * 60 * 24 * 7; // 7 days
 
-// Legacy fallback credentials (used only if no DB admin accounts exist)
+// Default credentials used to seed the first admin account if none exist
 const LEGACY_USERNAME = "buildflow_admin";
 const LEGACY_PASSWORD = "Admin@123";
-// Keep for client-side layout auth check (useSyncExternalStore)
-export const ADMIN_SESSION_TOKEN = "bf_admin_authenticated_2026";
 
 // ─── DB-backed Admin Auth ────────────────────────────────────────────────────
 
@@ -76,16 +74,6 @@ export async function validateAdminSession(
 ): Promise<{ id: string; username: string; displayName: string; role: string } | null> {
   const parsed = parseAdminCookie(cookieValue);
   if (!parsed) {
-    // Legacy token check for backward compatibility
-    if (cookieValue === ADMIN_SESSION_TOKEN) {
-      await ensureDefaultAdmin();
-      const admin = await prisma.adminAccount.findFirst({
-        where: { isActive: true },
-        select: { id: true, username: true, displayName: true, role: true },
-        orderBy: { createdAt: "asc" },
-      });
-      return admin;
-    }
     return null;
   }
 

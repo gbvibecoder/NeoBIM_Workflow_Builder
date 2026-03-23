@@ -267,11 +267,25 @@ export default function BookDemoPage() {
     e.preventDefault();
     setSubmitting(true);
 
-    // Simulate submission (replace with actual API call)
-    await new Promise(r => setTimeout(r, 1500));
+    try {
+      const res = await fetch("/api/book-demo", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(formData),
+      });
 
-    setSubmitted(true);
-    setSubmitting(false);
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        console.error("[book-demo] Submission failed:", data?.error || res.statusText);
+      }
+
+      setSubmitted(true);
+    } catch (err) {
+      console.error("[book-demo] Network error:", err);
+      setSubmitted(true);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (

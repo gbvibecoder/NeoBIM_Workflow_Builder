@@ -7,6 +7,7 @@ import {
   sendPaymentFailedEmail,
   sendSubscriptionCanceledEmail,
 } from '@/services/email';
+import { checkWebhookIdempotency } from '@/lib/webhook-idempotency';
 
 export async function POST(req: NextRequest) {
   const body = await req.text();
@@ -32,7 +33,15 @@ export async function POST(req: NextRequest) {
   }
 
   const eventType = event.event as string;
-  console.info('[RAZORPAY_WEBHOOK] Event received:', eventType);
+  const eventId = event.event_id || `${eventType}_${Date.now()}`;
+  console.info('[RAZORPAY_WEBHOOK] Event received:', eventType, eventId);
+
+  // Idempotency: skip already-processed events
+  const isDuplicate = await checkWebhookIdempotency('razorpay', eventId);
+  if (isDuplicate) {
+    console.info('[RAZORPAY_WEBHOOK] Duplicate event skipped:', eventId);
+    return NextResponse.json({ received: true, duplicate: true });
+  }
 
   try {
     switch (eventType) {
