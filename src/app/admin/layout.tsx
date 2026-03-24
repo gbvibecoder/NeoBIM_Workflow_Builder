@@ -145,9 +145,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const hoverTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Auth check via server-side API (httponly cookie can't be read from JS)
-  const [authenticated, setAuthenticated] = useState<boolean | null>(null);
+  // Skip auth check on /admin/login to avoid redirect loops
+  const isLoginPage = pathname === "/admin/login";
+  const [authenticated, setAuthenticated] = useState<boolean | null>(isLoginPage ? true : null);
 
   useEffect(() => {
+    if (isLoginPage) return; // Don't auth-check the login page itself
     let cancelled = false;
     fetch("/api/admin", { credentials: "same-origin" })
       .then(res => {
@@ -156,17 +159,17 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           setAuthenticated(true);
         } else {
           setAuthenticated(false);
-          window.location.href = "/login";
+          window.location.href = "/admin/login";
         }
       })
       .catch(() => {
         if (!cancelled) {
           setAuthenticated(false);
-          window.location.href = "/login";
+          window.location.href = "/admin/login";
         }
       });
     return () => { cancelled = true; };
-  }, [pathname]);
+  }, [pathname, isLoginPage]);
 
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth < 769);
@@ -218,7 +221,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   function handleLogout() {
     document.cookie = `${ADMIN_COOKIE_NAME}=; path=/; max-age=0`;
-    window.location.href = "/login";
+    window.location.href = "/admin/login";
   }
 
   // Loading state
@@ -237,6 +240,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       </div>
     );
+  }
+
+  // Admin login page renders without sidebar/header chrome
+  if (isLoginPage) {
+    return <>{children}</>;
   }
 
   const breadcrumbs = getBreadcrumbs(pathname, t);

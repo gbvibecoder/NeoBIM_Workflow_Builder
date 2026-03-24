@@ -1744,7 +1744,7 @@ function AdminSessionTab() {
     setEnding(true);
     document.cookie = "bf_admin_session=; path=/; max-age=0; samesite=strict";
     await new Promise((r) => setTimeout(r, 600));
-    router.push("/login");
+    router.push("/admin/login");
   }, [router]);
 
   const handleRegenerateSession = useCallback(async () => {
@@ -1752,7 +1752,7 @@ function AdminSessionTab() {
     // Clear old session and redirect to login to generate a fresh DB-backed session
     document.cookie = "bf_admin_session=; path=/; max-age=0; samesite=strict";
     await new Promise((r) => setTimeout(r, 400));
-    router.push("/login");
+    router.push("/admin/login");
   }, [router]);
 
   return (

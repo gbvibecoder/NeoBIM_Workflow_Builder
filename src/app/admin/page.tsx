@@ -12,7 +12,7 @@ export default function AdminRootPage() {
     if (cookies.includes(`${ADMIN_COOKIE_NAME}=`)) {
       window.location.href = "/admin/dashboard";
     } else {
-      window.location.href = "/login";
+      window.location.href = "/admin/login";
     }
   }, [router]);
 
