@@ -1380,6 +1380,7 @@ export function useExecution({ onLog }: UseExecutionOptions = {}) {
     isRateLimited,
     regeneratingNodeId,
     rateLimitHit,
+    setRateLimitHit,
     clearRateLimitError,
   };
 }

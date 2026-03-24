@@ -56,7 +56,7 @@ import { FullscreenVideoPlayer } from "./artifacts/FullscreenVideoPlayer";
 
 import { useWorkflowStore, isUntitledWorkflow } from "@/stores/workflow-store";
 import { SaveWorkflowModal } from "./modals/SaveWorkflowModal";
-import { RateLimitUpgradeModal } from "./modals/RateLimitUpgradeModal";
+import { ExecutionBlockModal } from "./modals/ExecutionBlockModal";
 import { useExecutionStore } from "@/stores/execution-store";
 import { useUIStore } from "@/stores/ui-store";
 import { NODE_CATALOGUE_MAP, CATEGORY_CONFIG } from "@/constants/node-catalogue";
@@ -556,7 +556,7 @@ function WorkflowCanvasInner({ workflowId: urlWorkflowId }: WorkflowCanvasInnerP
     setShowLog(true);
   }, []);
 
-  const { runWorkflow, isExecuting, rateLimitHit, clearRateLimitError } = useExecution({ onLog: addLogEntry });
+  const { runWorkflow, isExecuting, rateLimitHit, setRateLimitHit, clearRateLimitError } = useExecution({ onLog: addLogEntry });
 
   // Show showcase when execution finishes + post-execution scene
   React.useEffect(() => {
@@ -761,7 +761,35 @@ function WorkflowCanvasInner({ workflowId: urlWorkflowId }: WorkflowCanvasInnerP
       return;
     }
 
-    // #2: Auto-save unsaved workflow before execution (so execution can persist to DB)
+    // #2: Pre-execution eligibility check (show popup BEFORE execution, never errors in log)
+    if (!isDemoMode) {
+      try {
+        const catalogueIds = nodes.map((n) => (n.data as Record<string, unknown>).catalogueId as string).filter(Boolean);
+        const eligRes = await fetch("/api/check-execution-eligibility", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ catalogueIds }),
+        });
+        if (eligRes.ok) {
+          const eligibility = await eligRes.json();
+          if (!eligibility.canExecute && eligibility.blocks?.length > 0) {
+            // Show the first blocking reason as a popup
+            const block = eligibility.blocks[0];
+            setRateLimitHit({
+              title: block.title,
+              message: block.message,
+              action: block.action,
+              actionUrl: block.actionUrl,
+            });
+            return;
+          }
+        }
+      } catch {
+        // Pre-check failed — don't block execution, let backend handle it
+      }
+    }
+
+    // #3: Auto-save unsaved workflow before execution (so execution can persist to DB)
     const wfId = currentWorkflow?.id;
     const isPersisted = wfId && wfId.length >= 20 && wfId.startsWith("c");
     if (!isPersisted && !isDemoMode) {
@@ -774,7 +802,7 @@ function WorkflowCanvasInner({ workflowId: urlWorkflowId }: WorkflowCanvasInnerP
     executionStartRef.current = Date.now();
     await runWorkflow();
     executionStartRef.current = null;
-  }, [runWorkflow, nodes, tLocale, currentWorkflow?.id, isDemoMode, saveWorkflow]);
+  }, [runWorkflow, nodes, tLocale, currentWorkflow?.id, isDemoMode, saveWorkflow, setRateLimitHit]);
   const handleSave = useCallback(async () => {
     if (isDemoMode) {
       toast.info(tLocale('toast.demoSaveHint'), { duration: 3000 });
@@ -1148,8 +1176,8 @@ function WorkflowCanvasInner({ workflowId: urlWorkflowId }: WorkflowCanvasInnerP
         onClose={closeSaveModal}
       />
 
-      {/* Rate limit upgrade modal */}
-      <RateLimitUpgradeModal
+      {/* Pre-execution block modal (rate limit, email verification, node limits) */}
+      <ExecutionBlockModal
         rateLimitHit={rateLimitHit}
         onDismiss={clearRateLimitError}
       />
