@@ -128,7 +128,7 @@ export default function AdminLoginPage() {
                 display: "block", fontSize: 12.5, fontWeight: 500,
                 color: "#7C7C96", marginBottom: 6,
               }}>
-                Username
+                Email
               </label>
               <div style={{ position: "relative" }}>
                 <Shield size={13} style={{
@@ -136,11 +136,11 @@ export default function AdminLoginPage() {
                   transform: "translateY(-50%)", color: "#3A3A50",
                 }} />
                 <input
-                  type="text"
+                  type="email"
                   value={username}
                   onChange={e => { setUsername(e.target.value); setError(""); }}
-                  placeholder="Admin username"
-                  autoComplete="username"
+                  placeholder="admin@example.com"
+                  autoComplete="email"
                   style={{
                     width: "100%", padding: "10px 14px 10px 36px", height: 44,
                     borderRadius: 10, border: "1px solid rgba(255,255,255,0.06)",
