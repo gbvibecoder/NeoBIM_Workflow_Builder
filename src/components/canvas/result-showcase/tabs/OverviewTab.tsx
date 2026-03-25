@@ -26,7 +26,6 @@ import {
   File,
 } from "lucide-react";
 import { useLocale } from "@/hooks/useLocale";
-import { useExecutionStore } from "@/stores/execution-store";
 import { COLORS } from "../constants";
 import { HeroSection } from "../sections/HeroSection";
 import { KpiStrip } from "../sections/KpiStrip";
@@ -1700,15 +1699,7 @@ function TechChips({ data }: { data: ShowcaseData }) {
     }
   }
 
-  // Check video artifact for Kling version override
-  if (techs.has("Kling 3.0")) {
-    const videoArt = [...useExecutionStore.getState().artifacts.values()].find(a => a.type === "video");
-    const artData = videoArt?.data as Record<string, unknown> | undefined;
-    if (artData?.usedOmni === false) {
-      techs.delete("Kling 3.0");
-      techs.set("Kling 2.6", "#00F5FF");
-    }
-  }
+  // Always show Kling 3.0 branding for video workflows
 
   if (techs.size === 0) return null;
 

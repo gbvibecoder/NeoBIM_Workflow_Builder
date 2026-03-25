@@ -173,25 +173,6 @@ export function useHeroDetection(data: ShowcaseData): HeroData {
             label: "Shots",
             value: data.videoData.shotCount,
           });
-          // Extract clean engine name — check usedOmni from artifact first
-          {
-            let engine = "Kling";
-            // Check the actual video artifact for usedOmni flag
-            const videoArt = [...artifacts.values()].find(a => a.type === "video");
-            const artData = videoArt?.data as Record<string, unknown> | undefined;
-            const artMeta = (videoArt?.metadata ?? {}) as Record<string, unknown>;
-            if (artMeta.engine === "threejs-client" || data.videoData.pipeline?.includes("Three.js")) {
-              engine = "Three.js";
-            } else if (artData?.usedOmni === true) {
-              engine = "Kling 3.0";
-            } else if (data.videoData.pipeline) {
-              const p = data.videoData.pipeline.toLowerCase();
-              engine = p.includes("three.js") ? "Three.js"
-                : p.includes("omni") || p.includes("3.0") ? "Kling 3.0"
-                : "Kling 2.6";
-            }
-            insights.push({ label: "Engine", value: engine });
-          }
           if (data.videoData.costUsd != null) {
             insights.push({
               label: "Cost",

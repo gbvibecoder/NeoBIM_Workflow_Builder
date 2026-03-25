@@ -430,7 +430,7 @@ export function VideoBody({ data: rawData, nodeId }: VideoBodyProps) {
           fontSize: 9, fontWeight: 500, color: "#8B5CF6",
           fontFamily: "'Space Mono', monospace",
         }}>
-          {data?.pipeline?.includes("Three.js") ? "Three.js" : data?.usedOmni === true ? "Kling 3.0 Omni" : "Kling 2.6"}
+          {data?.pipeline?.includes("Three.js") ? "Three.js" : "Kling 3.0"}
         </span>
 
         {/* Cost badge */}

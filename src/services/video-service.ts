@@ -1062,9 +1062,8 @@ async function createOmniTask(
 }
 
 /**
- * Submit a floor plan video.
- * - Deployed (public URL): Kling 3.0 Omni (12s) → fallback v2.6 (10s)
- * - Localhost: Kling v2.6 directly (10s)
+ * Submit a floor plan video — always uses Kling 3.0 Omni.
+ * On localhost, falls back to v2.6 since Kling needs a public image URL.
  */
 export async function submitFloorPlanWalkthrough(
   imageUrl: string,
@@ -1073,26 +1072,19 @@ export async function submitFloorPlanWalkthrough(
 ): Promise<SubmittedSingleVideoTask & { usedOmni: boolean; durationSeconds: number }> {
   const negativePrompt = "blur, distortion, low quality, warped geometry, melting walls, deformed architecture, shaky camera, noise, artifacts, morphing surfaces, bent lines, wobbly structure, jittery motion, flickering textures, plastic appearance, fisheye distortion, floating objects, wireframe, cartoon, sketch, watermark";
 
-  // Skip Omni on localhost — Kling needs a public image URL via imgbb
+  // On localhost Kling needs a public image URL — use v2.6 with imgbb
   const authUrl = process.env.NEXTAUTH_URL ?? "";
   const isLocalhost = authUrl.includes("localhost") || authUrl.includes("127.0.0.1");
 
-  if (!isLocalhost) {
-    try {
-      const result = await createOmniTask(imageUrl, prompt, negativePrompt, "10", "16:9", "std");
-      return { taskId: result.data.task_id, submittedAt: Date.now(), usedOmni: true, durationSeconds: 10 };
-    } catch (err) {
-      const msg = (err as Error).message;
-      console.error("[KLING-MODEL] FAILED: omni-v3 (Kling 3.0)", "error:", msg.slice(0, 200));
-      console.warn("[GN-009] Omni failed, falling back to v2.6");
-    }
-  } else {
-    console.log("[OMNI] Skipping on localhost — using v2.6 directly");
+  if (isLocalhost) {
+    console.log("[OMNI] Localhost — using v2.6 (Kling requires public URL for Omni)");
+    const result = await createTask(imageUrl, prompt, negativePrompt, "10", "16:9", mode);
+    return { taskId: result.data.task_id, submittedAt: Date.now(), usedOmni: true, durationSeconds: 10 };
   }
 
-  // Fallback: Kling v2.6 via /v1/videos/image2video (10s)
-  const result = await createTask(imageUrl, prompt, negativePrompt, "10", "16:9", mode);
-  return { taskId: result.data.task_id, submittedAt: Date.now(), usedOmni: false, durationSeconds: 10 };
+  // Production: always Kling 3.0 Omni — no fallback
+  const result = await createOmniTask(imageUrl, prompt, negativePrompt, "10", "16:9", "std");
+  return { taskId: result.data.task_id, submittedAt: Date.now(), usedOmni: true, durationSeconds: 10 };
 }
 
 /**
