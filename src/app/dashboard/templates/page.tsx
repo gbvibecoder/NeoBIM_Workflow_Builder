@@ -461,7 +461,7 @@ export default function TemplatesPage() {
           <BlueprintGrid />
 
           {/* Left content */}
-          <div style={{ flex: 1, minWidth: 0, zIndex: 1 }}>
+          <div className="templates-hero-content" style={{ flex: 1, minWidth: 0, zIndex: 1 }}>
             {/* Section marker */}
             <motion.div
               initial={{ opacity: 0, x: -10 }}
@@ -508,6 +508,7 @@ export default function TemplatesPage() {
             </motion.h2>
 
             <motion.p
+              className="templates-hero-subtitle"
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.2 }}
@@ -1185,6 +1186,7 @@ export default function TemplatesPage() {
 
           {/* ── Footer — Suggest a Workflow ───────────────────────────── */}
           <motion.div
+            className="templates-suggest-footer"
             initial={{ opacity: 0, y: 16 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
