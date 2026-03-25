@@ -539,60 +539,51 @@ export function buildInteriorPrompt(buildingDescription: string): string {
 // ─── Building Photo → Renovation/New-Life Video Prompts ─────────────────────
 
 /**
- * Build prompt for Part 1 (5s): Exterior transformation — the old/existing building
- * transforms into a renovated, polished, modern version with extensions.
- * Kling sees the original building photo and generates a video showing it
- * upgraded with new facades, modern materials, landscaping, and extensions.
+ * Build prompt for Part 1 (5s): Cinematic exterior of the DALL-E renovated building.
+ * The input image is already a polished renovation render from DALL-E 3.
+ * Kling just needs to create smooth camera movement around it.
  */
 export function buildRenovationExteriorPrompt(buildingDescription: string): string {
-  const desc = buildingDescription.slice(0, 600);
+  const desc = buildingDescription.slice(0, 400);
 
   return (
-    `The provided image shows an existing building. Generate a cinematic architectural visualization video ` +
-    `that reimagines and transforms this exact building into a beautifully RENOVATED, MODERNIZED version — ` +
-    `preserving the original structure's footprint and form but upgrading it with: ` +
-    `new contemporary facade materials (clean render, glass curtain walls, composite cladding, stone accents), ` +
-    `modern window systems, elegant entrance canopy, fresh landscaping with mature trees and pathway lighting, ` +
-    `rooftop terrace or green roof extension, clean geometric extensions that complement the original massing. ` +
-    `Building analysis: ${desc.slice(0, 300)}. ` +
-    "Cinematic exterior transformation sequence (5 seconds): " +
-    "Camera starts with a wide establishing shot showing the building in its renovated glory — " +
-    "pristine new facade with premium materials catching golden hour light. " +
-    "Slow cinematic dolly toward the main entrance, revealing upgraded details — new cladding, modern glazing, designer lighting. " +
-    "Camera smoothly orbits to reveal side elevations with seamless modern extensions and lush landscaping. " +
-    "Final sweeping crane shot rises to show the full renovated building with any rooftop additions and surrounding landscape improvements. " +
-    "The building must look TRANSFORMED — same recognizable form but dramatically upgraded with contemporary materials, " +
-    "clean lines, professional lighting design, and premium finishes. " +
-    "Photorealistic architectural visualization, golden hour warm lighting, global illumination, " +
-    "cinematic smooth camera, 8K resolution, V-Ray/Corona render quality, no distortion, no artifacts."
+    `Cinematic architectural exterior walkthrough of this beautifully renovated modern building. ` +
+    `The building has been completely transformed with new contemporary facades, modern glazing, ` +
+    `rooftop extension, and professional landscaping. Building: ${desc.slice(0, 250)}. ` +
+    "Exterior cinematic sequence (5 seconds): " +
+    "Camera starts with a wide establishing shot — slow dramatic approach toward the building, " +
+    "showing the full renovated facade with premium materials catching golden hour sunlight. " +
+    "Smooth dolly-in toward the main entrance revealing new cladding, modern windows, designer entrance canopy. " +
+    "Camera orbits smoothly to the side, revealing the building's depth and the new rooftop extension against the sky. " +
+    "Final sweeping upward crane shot showing the complete renovated building with landscaping and sky. " +
+    "Physically accurate architecture, photorealistic materials, golden hour lighting, " +
+    "cinematic smooth camera, 8K architectural visualization, no distortion."
   );
 }
 
 /**
- * Build prompt for Part 2 (10s): Interior transformation — walkthrough showing
- * the renovated interior with modern finishes, new spatial flow, and premium materials.
+ * Build prompt for Part 2 (10s): Interior walkthrough of the renovated building.
+ * Describes a luxury renovated interior since DALL-E rendered the exterior.
  */
 export function buildRenovationInteriorPrompt(buildingDescription: string): string {
-  const desc = buildingDescription.slice(0, 600);
+  const desc = buildingDescription.slice(0, 400);
 
   return (
-    `The provided image shows an existing building. Generate a cinematic interior walkthrough video ` +
-    `showing the COMPLETELY RENOVATED interior of this building — transformed with modern, premium finishes. ` +
-    `Building analysis: ${desc.slice(0, 300)}. ` +
-    "Interior renovation walkthrough (10 seconds): " +
-    "Camera enters through a redesigned modern entrance — new glass doors, polished lobby with contemporary reception desk. " +
-    "Smooth first-person walkthrough revealing fully renovated interiors: " +
-    "open-plan living spaces with floor-to-ceiling windows flooding rooms with natural light, " +
-    "premium materials throughout — engineered hardwood floors, quartz countertops, designer tile work, " +
-    "modern kitchen with integrated appliances and island counter, " +
-    "elegant bathrooms with walk-in rain showers and floating vanities, " +
-    "smart home lighting with layered ambient, task, and accent illumination, " +
-    "contemporary furniture and curated art pieces suggesting luxury living. " +
-    "Each space flows naturally into the next through wide passages and glass partitions. " +
-    "The interior must feel TRANSFORMED — bright, spacious, premium, and thoroughly modernized " +
-    "while maintaining the original building's spatial structure. " +
-    "Photorealistic architectural visualization, natural light blended with warm designer interior lighting, " +
-    "cinematic smooth camera movement, 8K resolution, V-Ray/Corona render quality, no distortion, no artifacts."
+    `Cinematic interior walkthrough of a completely renovated modern building. ` +
+    `The building exterior was fully renovated — now show the premium interior spaces. ` +
+    `Building: ${desc.slice(0, 250)}. ` +
+    "Interior walkthrough (10 seconds): " +
+    "Camera enters through the redesigned modern entrance — glass doors open into a bright double-height lobby " +
+    "with polished concrete floors, designer pendant lights, and a reception area. " +
+    "Smooth walkthrough through renovated open-plan spaces: " +
+    "floor-to-ceiling windows flooding rooms with natural light, " +
+    "premium finishes — engineered hardwood floors, natural stone feature walls, " +
+    "modern kitchen with marble island and integrated appliances, " +
+    "spacious living areas with contemporary furniture and curated artwork, " +
+    "elegant bathroom with walk-in rain shower and floating vanity. " +
+    "Each space flows naturally through wide glass-partitioned passages. " +
+    "Warm interior lighting blended with natural daylight, " +
+    "photorealistic materials, cinematic smooth camera, 8K quality, no distortion."
   );
 }
 

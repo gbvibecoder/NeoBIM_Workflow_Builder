@@ -2343,14 +2343,27 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
       // Also pick up layoutDescription from TR-004
       const layoutDescription = (inputData?.layoutDescription as string) ?? "";
 
-      logger.debug("===== GENERIC FLOOR PLAN DEBUG =====");
+      // Fallback renovation detection: if we have building photo data (fileData from IN-008)
+      // and it's not a floor plan, treat it as renovation even if isMultiImage flag was lost in merge
+      if (!isRenovationInput && !isFloorPlanInput && inputData?.fileData && typeof inputData.fileData === "string") {
+        const fMime = (inputData?.mimeType as string) ?? "";
+        if (fMime.startsWith("image/") || !fMime) {
+          isRenovationInput = true;
+          logger.debug("[GN-009] Fallback: detected building photo fileData → enabling renovation mode");
+        }
+      }
+
+      logger.debug("===== GN-009 VIDEO DEBUG =====");
       logger.debug("[GN-009] All inputData keys:", Object.keys(inputData ?? {}));
       logger.debug("[GN-009] buildingDescription:", JSON.stringify(buildingDesc)?.slice(0, 800));
       logger.debug("[GN-009] roomInfo:", JSON.stringify(roomInfo)?.slice(0, 800));
       logger.debug("[GN-009] layoutDescription:", JSON.stringify(layoutDescription)?.slice(0, 500));
       logger.debug("[GN-009] isFloorPlan:", isFloorPlanInput);
+      logger.debug("[GN-009] isRenovation:", isRenovationInput);
+      logger.debug("[GN-009] isMultiImage:", !!(inputData?.isMultiImage));
+      logger.debug("[GN-009] fileDataArray:", !!(inputData?.fileDataArray));
       logger.debug("[GN-009] renderImageUrl resolved:", renderImageUrl ? renderImageUrl.slice(0, 120) : "EMPTY");
-      logger.debug("====================================");
+      logger.debug("==============================");
 
       if (!hasKlingKeys) {
         // ── No Kling API keys — fall back to Three.js client-side rendering ──
@@ -2475,31 +2488,55 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
             let klingSourceImage = renderImageUrl;
             let renovationRenderUrl: string | undefined;
 
-            if (isRenovationInput && apiKey) {
+            // Use env OPENAI_API_KEY as fallback when user doesn't have a personal key
+            const dalleKey = apiKey || process.env.OPENAI_API_KEY || undefined;
+            if (isRenovationInput && dalleKey) {
               logger.debug("[GN-009] Renovation: Generating DALL-E 3 renovation render before Kling video...");
+              logger.debug("[GN-009] Building description for DALL-E:", buildingDesc.slice(0, 500));
+
+              // Extract key info from TR-004 analysis for a precise renovation prompt
+              const rawAnalysis = (inputData?._raw ?? null) as Record<string, unknown> | null;
+              const buildingType = String(rawAnalysis?.buildingType ?? upBuildingType ?? "building");
+              const origFloors = Number(rawAnalysis?.floors ?? upFloors) || 4;
+              const origStyle = String(rawAnalysis?.style ?? "");
+              const origFacade = String(rawAnalysis?.facade ?? upFacade ?? "");
+              const origMassing = String(rawAnalysis?.massing ?? "");
+              const origFeatures = (rawAnalysis?.features as string[] ?? []).join(", ");
+
               try {
                 const renovationPrompt =
-                  `Photorealistic architectural visualization of a COMPLETELY RENOVATED and MODERNIZED building. ` +
-                  `The original building from the reference has this analysis: ${buildingDesc.slice(0, 400)}. ` +
-                  `Transform this building into a stunning, contemporary renovated version: ` +
-                  `- Keep the same basic building form, proportions, and number of floors ` +
-                  `- Replace ALL old/damaged/weathered surfaces with pristine new materials ` +
-                  `- New facade: clean white render or light stone cladding combined with dark metal/glass accents ` +
-                  `- Modern floor-to-ceiling window systems replacing old windows ` +
-                  `- Elegant ground-floor entrance with glass canopy and designer lighting ` +
-                  `- Add a contemporary rooftop extension with glass balustrades and a green terrace ` +
-                  `- Professional landscaping: mature trees, ornamental grasses, pathway lighting, clean sidewalks ` +
-                  `- Remove all scaffolding, construction barriers, and visual clutter ` +
-                  `- Golden hour lighting, dramatic sky, the building looks brand new and premium ` +
-                  `Style: high-end real-estate marketing render, V-Ray quality, 8K resolution, ` +
-                  `photorealistic materials, global illumination, architectural photography composition. ` +
-                  `The building must be RECOGNIZABLY the same structure but DRAMATICALLY upgraded — ` +
-                  `like a before/after renovation reveal.`;
+                  `Ultra-photorealistic architectural exterior render of a BEAUTIFULLY RENOVATED ${origFloors}-storey ${buildingType}. ` +
+                  `ORIGINAL BUILDING: ${origStyle} style, ${origFloors} floors. ${origFacade ? `Original facade: ${origFacade.slice(0, 150)}.` : ""} ` +
+                  `${origMassing ? `Massing: ${origMassing.slice(0, 100)}.` : ""} ${origFeatures ? `Features: ${origFeatures.slice(0, 100)}.` : ""} ` +
+                  `\n\nNOW SHOW THIS SAME BUILDING COMPLETELY TRANSFORMED with a stunning renovation and modern extension: ` +
+                  `FACADE RENOVATION: All old/weathered surfaces replaced with pristine materials — ` +
+                  `combination of smooth white render, natural stone cladding, and dark charcoal metal panels. ` +
+                  `Large modern floor-to-ceiling aluminum-framed windows with low-E glass replacing every old window. ` +
+                  `Clean horizontal lines, shadow gaps between material zones, concealed drainage. ` +
+                  `GROUND FLOOR: Redesigned entrance with a dramatic glass and steel canopy, ` +
+                  `full-height glazed lobby visible from outside, designer pendant lighting, polished stone threshold. ` +
+                  `Modern retail or cafe frontage with frameless glass shopfronts. ` +
+                  `ROOFTOP EXTENSION: Add one extra floor as a contemporary glass-and-steel penthouse addition ` +
+                  `with floor-to-ceiling curtain wall glazing, rooftop terrace with glass balustrades, ` +
+                  `green planting boxes, and lounge seating visible from street level. ` +
+                  `LANDSCAPING: Professionally landscaped surroundings — ` +
+                  `paved pedestrian plaza with granite pavers, mature deciduous trees, ` +
+                  `ornamental grasses in corten steel planters, recessed LED pathway lighting, ` +
+                  `clean new sidewalks, bicycle parking, no construction barriers or clutter. ` +
+                  `LIGHTING: Golden hour (late afternoon) warm sunlight hitting the facade at 30° angle, ` +
+                  `interior lights glowing warmly through windows, subtle blue sky with wispy clouds. ` +
+                  `CAMERA: Eye-level perspective from across the street, slight upward angle showing the full building ` +
+                  `including the new rooftop extension against the sky. ` +
+                  `QUALITY: Photorealistic V-Ray/Corona architectural visualization, 8K resolution, ` +
+                  `physically-based materials with accurate reflections, global illumination, ` +
+                  `high-end real-estate marketing photography quality. ` +
+                  `The building must look BRAND NEW, PREMIUM, and DRAMATICALLY TRANSFORMED — ` +
+                  `a showcase renovation that gives new life to the original structure.`;
 
                 const dalleResult = await generateConceptImage(
                   renovationPrompt,
                   "photorealistic architectural renovation render",
-                  apiKey,
+                  dalleKey,
                   undefined,
                   undefined,
                   undefined,
