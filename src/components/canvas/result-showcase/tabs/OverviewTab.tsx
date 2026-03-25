@@ -26,6 +26,7 @@ import {
   File,
 } from "lucide-react";
 import { useLocale } from "@/hooks/useLocale";
+import { useExecutionStore } from "@/stores/execution-store";
 import { COLORS } from "../constants";
 import { HeroSection } from "../sections/HeroSection";
 import { KpiStrip } from "../sections/KpiStrip";
@@ -195,6 +196,9 @@ export function OverviewTab({
 
       {/* ═══ COMPACT EXECUTION BANNER ═══ */}
       <CompactBanner data={data} />
+
+      {/* ═══ TECH STACK — compact inline chips ═══ */}
+      <TechChips data={data} />
 
       {/* ═══ SUPPORTING RESULTS ═══ */}
       <SupportingCards
@@ -1537,13 +1541,16 @@ function InsightStripSection({ insights }: { insights: InsightMetric[] }) {
             <div
               className="insight-value"
               style={{
-                fontSize: 28,
-                fontWeight: 800,
+                fontSize: !isNumeric && String(m.value).length > 12 ? 16 : 28,
+                fontWeight: !isNumeric && String(m.value).length > 12 ? 700 : 800,
                 color: COLORS.TEXT_PRIMARY,
                 lineHeight: 1.1,
                 fontVariantNumeric: "tabular-nums",
                 marginBottom: 6,
                 letterSpacing: "-0.02em",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
               }}
             >
               {isNumeric ? (
@@ -1661,6 +1668,87 @@ function CompactBanner({ data }: { data: ShowcaseData }) {
           {data.successNodes}/{data.totalNodes} {t("showcase.nodes")}
         </div>
       </div>
+    </motion.div>
+  );
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// ── TECH STACK CHIPS ────────────────────────────────────────────────────────
+// ═════════════════════════════════════════════════════════════════════════════
+
+const TECH_MAP: Array<{ keywords: string[]; name: string; color: string }> = [
+  { keywords: ["brief", "analyzer", "understanding", "parser", "extractor"], name: "GPT-4o", color: "#8B5CF6" },
+  { keywords: ["massing"], name: "3D AI Studio", color: "#FFBF00" },
+  { keywords: ["concept render", "dall"], name: "DALL-E 3", color: "#10B981" },
+  { keywords: ["video", "walkthrough"], name: "Kling 3.0", color: "#00F5FF" },
+  { keywords: ["3d recon", "hi-fi"], name: "Meshy v4", color: "#F59E0B" },
+  { keywords: ["floor plan gen"], name: "GPT-4o + SVG", color: "#14B8A6" },
+  { keywords: ["interactive 3d", "3d viewer"], name: "Three.js", color: "#00F5FF" },
+  { keywords: ["quantity", "boq"], name: "web-ifc", color: "#F59E0B" },
+  { keywords: ["ifc export"], name: "IFC4", color: "#3B82F6" },
+  { keywords: ["site", "gis", "location"], name: "Google Maps", color: "#4FC3F7" },
+];
+
+function TechChips({ data }: { data: ShowcaseData }) {
+  const techs = new Map<string, string>(); // name → color
+  for (const step of data.pipelineSteps) {
+    const label = step.label.toLowerCase();
+    for (const t of TECH_MAP) {
+      if (t.keywords.some(kw => label.includes(kw))) {
+        techs.set(t.name, t.color);
+      }
+    }
+  }
+
+  // Check video artifact for Kling version override
+  if (techs.has("Kling 3.0")) {
+    const videoArt = [...useExecutionStore.getState().artifacts.values()].find(a => a.type === "video");
+    const artData = videoArt?.data as Record<string, unknown> | undefined;
+    if (artData?.usedOmni === false) {
+      techs.delete("Kling 3.0");
+      techs.set("Kling 2.6", "#00F5FF");
+    }
+  }
+
+  if (techs.size === 0) return null;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ delay: 0.45 }}
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        flexWrap: "wrap",
+      }}
+    >
+      <span style={{
+        fontSize: 10, fontWeight: 600, color: COLORS.TEXT_MUTED,
+        textTransform: "uppercase", letterSpacing: "0.06em",
+        marginRight: 4,
+      }}>
+        Powered by
+      </span>
+      {[...techs.entries()].map(([name, color]) => (
+        <span
+          key={name}
+          style={{
+            display: "inline-flex", alignItems: "center", gap: 5,
+            padding: "3px 10px", borderRadius: 6,
+            background: `${color}08`, border: `1px solid ${color}20`,
+            fontSize: 10, fontWeight: 600, color,
+            letterSpacing: "0.02em",
+          }}
+        >
+          <span style={{
+            width: 5, height: 5, borderRadius: "50%",
+            background: color, boxShadow: `0 0 6px ${color}50`,
+          }} />
+          {name}
+        </span>
+      ))}
     </motion.div>
   );
 }
