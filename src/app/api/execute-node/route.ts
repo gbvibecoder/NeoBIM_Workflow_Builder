@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { generateBuildingDescription, generateConceptImage, generateFloorPlan, parseBriefDocument, analyzeImage, enhanceArchitecturalPrompt } from "@/services/openai";
+import { generateBuildingDescription, generateConceptImage, generateRenovationRender, generateFloorPlan, parseBriefDocument, analyzeImage, enhanceArchitecturalPrompt } from "@/services/openai";
 import type { BuildingDescription } from "@/services/openai";
 import { analyzeSite } from "@/services/site-analysis";
 import { generateId } from "@/lib/utils";
@@ -2490,68 +2490,41 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
 
             // Use env OPENAI_API_KEY as fallback when user doesn't have a personal key
             const dalleKey = apiKey || process.env.OPENAI_API_KEY || undefined;
-            if (isRenovationInput && dalleKey) {
-              logger.debug("[GN-009] Renovation: Generating DALL-E 3 renovation render before Kling video...");
-              logger.debug("[GN-009] Building description for DALL-E:", buildingDesc.slice(0, 500));
 
-              // Extract key info from TR-004 analysis for a precise renovation prompt
-              const rawAnalysis = (inputData?._raw ?? null) as Record<string, unknown> | null;
-              const buildingType = String(rawAnalysis?.buildingType ?? upBuildingType ?? "building");
-              const origFloors = Number(rawAnalysis?.floors ?? upFloors) || 4;
-              const origStyle = String(rawAnalysis?.style ?? "");
-              const origFacade = String(rawAnalysis?.facade ?? upFacade ?? "");
-              const origMassing = String(rawAnalysis?.massing ?? "");
-              const origFeatures = (rawAnalysis?.features as string[] ?? []).join(", ");
+            // Get the original building photo base64 for GPT-4o vision
+            // This is the actual image the user uploaded — GPT-4o will SEE it
+            // and write a DALL-E prompt that preserves the exact building geometry.
+            const originalPhotoBase64 = (inputData?.fileData as string) ?? "";
+            const originalPhotoMime = (inputData?.mimeType as string) ?? "image/jpeg";
+
+            if (isRenovationInput && dalleKey && originalPhotoBase64) {
+              logger.debug("[GN-009] Renovation: GPT-4o will analyze the ACTUAL photo → write DALL-E prompt → render");
+              logger.debug("[GN-009] Original photo base64 length:", originalPhotoBase64.length);
+              logger.debug("[GN-009] Building analysis:", buildingDesc.slice(0, 300));
 
               try {
-                const renovationPrompt =
-                  `Ultra-photorealistic architectural exterior render of a BEAUTIFULLY RENOVATED ${origFloors}-storey ${buildingType}. ` +
-                  `ORIGINAL BUILDING: ${origStyle} style, ${origFloors} floors. ${origFacade ? `Original facade: ${origFacade.slice(0, 150)}.` : ""} ` +
-                  `${origMassing ? `Massing: ${origMassing.slice(0, 100)}.` : ""} ${origFeatures ? `Features: ${origFeatures.slice(0, 100)}.` : ""} ` +
-                  `\n\nNOW SHOW THIS SAME BUILDING COMPLETELY TRANSFORMED with a stunning renovation and modern extension: ` +
-                  `FACADE RENOVATION: All old/weathered surfaces replaced with pristine materials — ` +
-                  `combination of smooth white render, natural stone cladding, and dark charcoal metal panels. ` +
-                  `Large modern floor-to-ceiling aluminum-framed windows with low-E glass replacing every old window. ` +
-                  `Clean horizontal lines, shadow gaps between material zones, concealed drainage. ` +
-                  `GROUND FLOOR: Redesigned entrance with a dramatic glass and steel canopy, ` +
-                  `full-height glazed lobby visible from outside, designer pendant lighting, polished stone threshold. ` +
-                  `Modern retail or cafe frontage with frameless glass shopfronts. ` +
-                  `ROOFTOP EXTENSION: Add one extra floor as a contemporary glass-and-steel penthouse addition ` +
-                  `with floor-to-ceiling curtain wall glazing, rooftop terrace with glass balustrades, ` +
-                  `green planting boxes, and lounge seating visible from street level. ` +
-                  `LANDSCAPING: Professionally landscaped surroundings — ` +
-                  `paved pedestrian plaza with granite pavers, mature deciduous trees, ` +
-                  `ornamental grasses in corten steel planters, recessed LED pathway lighting, ` +
-                  `clean new sidewalks, bicycle parking, no construction barriers or clutter. ` +
-                  `LIGHTING: Golden hour (late afternoon) warm sunlight hitting the facade at 30° angle, ` +
-                  `interior lights glowing warmly through windows, subtle blue sky with wispy clouds. ` +
-                  `CAMERA: Eye-level perspective from across the street, slight upward angle showing the full building ` +
-                  `including the new rooftop extension against the sky. ` +
-                  `QUALITY: Photorealistic V-Ray/Corona architectural visualization, 8K resolution, ` +
-                  `physically-based materials with accurate reflections, global illumination, ` +
-                  `high-end real-estate marketing photography quality. ` +
-                  `The building must look BRAND NEW, PREMIUM, and DRAMATICALLY TRANSFORMED — ` +
-                  `a showcase renovation that gives new life to the original structure.`;
-
-                const dalleResult = await generateConceptImage(
-                  renovationPrompt,
-                  "photorealistic architectural renovation render",
+                // Step 1: GPT-4o SEES the building photo → writes precise DALL-E prompt
+                // Step 2: DALL-E 3 renders the renovated version from that prompt
+                // The result looks like the SAME building but completely renovated.
+                const dalleResult = await generateRenovationRender(
+                  originalPhotoBase64.startsWith("data:") ? originalPhotoBase64.split(",")[1] ?? originalPhotoBase64 : originalPhotoBase64,
+                  buildingDesc,
+                  originalPhotoMime,
                   dalleKey,
-                  undefined,
-                  undefined,
-                  undefined,
-                  "exterior"
                 );
 
                 if (dalleResult.url) {
                   renovationRenderUrl = dalleResult.url;
                   klingSourceImage = dalleResult.url;
-                  logger.debug("[GN-009] Renovation render generated! URL:", dalleResult.url.slice(0, 100));
+                  logger.debug("[GN-009] Renovation render SUCCESS! URL:", dalleResult.url.slice(0, 100));
+                  logger.debug("[GN-009] GPT-4o renovation prompt:", dalleResult.renovationPrompt.slice(0, 200));
                 }
               } catch (dalleErr) {
-                // Non-fatal — fall back to original image
-                console.warn("[GN-009] DALL-E renovation render failed, using original photo:", dalleErr);
+                // Non-fatal — fall back to original image for Kling
+                console.warn("[GN-009] Renovation render failed, falling back to original photo:", dalleErr);
               }
+            } else if (isRenovationInput) {
+              logger.debug("[GN-009] Renovation skipped — missing:", !dalleKey ? "OPENAI_API_KEY" : "originalPhotoBase64");
             }
 
             const submitted = await submitDualWalkthrough(klingSourceImage, buildingDesc, "pro", {

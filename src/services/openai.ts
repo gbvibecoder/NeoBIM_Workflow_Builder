@@ -445,6 +445,98 @@ export async function generateConceptImage(
   });
 }
 
+// ─── generateRenovationRender ─────────────────────────────────────────────────
+//
+// Two-step pipeline that produces a DALL-E 3 renovation render faithful to the
+// original building photo:
+//   Step 1: GPT-4o SEES the photo and writes a hyper-detailed DALL-E prompt
+//           that captures the exact geometry, proportions, window patterns, etc.
+//   Step 2: DALL-E 3 renders the renovated version from that prompt.
+
+export async function generateRenovationRender(
+  imageBase64: string,
+  buildingAnalysis: string,
+  mimeType: string = "image/jpeg",
+  userApiKey?: string,
+): Promise<{ url: string; revisedPrompt: string; renovationPrompt: string }> {
+  return handleOpenAICall(async () => {
+    const client = getClient(userApiKey, 90000); // 90s timeout for 2 API calls
+    const imageDataUrl = `data:${mimeType};base64,${imageBase64}`;
+
+    // ── Step 1: GPT-4o vision → hyper-detailed renovation prompt ──
+    // GPT-4o CAN see the image — it describes the exact building, then writes
+    // a DALL-E prompt that preserves the building's form but applies renovation.
+    const promptGeneration = await client.chat.completions.create({
+      model: "gpt-4o",
+      temperature: 0.3,
+      messages: [
+        {
+          role: "system",
+          content: `You are an expert architectural visualization artist. You will receive a photo of an existing building.
+
+Your task: Write a DALL-E 3 image generation prompt that produces a photorealistic render of THIS EXACT SAME BUILDING but COMPLETELY RENOVATED with modern materials and an extension.
+
+CRITICAL RULES:
+1. PRESERVE the exact building geometry: same number of floors, same footprint shape, same proportions, same window grid pattern (rows × columns), same roof form.
+2. DESCRIBE the building's geometry in extreme detail so DALL-E reproduces the SAME structure: "X-storey rectangular building with Y windows across and Z bays deep, flat/pitched roof, L-shaped/rectangular plan..."
+3. ONLY change the surface treatment: replace old/damaged materials with new premium ones.
+4. Add a 1-storey contemporary glass rooftop extension.
+5. Upgrade the ground floor entrance.
+6. Add landscaping around the base.
+
+Your output must be a SINGLE paragraph — the raw DALL-E prompt (no labels, no markdown, no explanation). Start directly with the architectural description.
+
+Include these elements in order:
+- Exact building form (floors, proportions, window pattern, plan shape)
+- New facade materials (white render + stone + dark metal accents)
+- New window systems (same grid, modern aluminum frames, floor-to-ceiling)
+- New ground floor (glass entrance, retail/cafe frontage)
+- Rooftop extension (glass penthouse, terrace, planters)
+- Landscaping (trees, granite pavers, lighting)
+- Photographic quality (golden hour, eye-level, V-Ray quality)`,
+        },
+        {
+          role: "user",
+          content: [
+            { type: "image_url", image_url: { url: imageDataUrl, detail: "high" } },
+            {
+              type: "text",
+              text: `Here is the building photo. The analysis says: ${buildingAnalysis.slice(0, 500)}\n\nWrite the DALL-E 3 prompt for a renovated version of THIS EXACT building. Preserve its exact geometry and proportions.`,
+            },
+          ],
+        },
+      ],
+      max_tokens: 1000,
+    });
+
+    const renovationPrompt = promptGeneration.choices[0]?.message?.content;
+    if (!renovationPrompt) throw new Error("GPT-4o returned empty renovation prompt");
+
+    console.log("[RenovationRender] GPT-4o prompt (first 300 chars):", renovationPrompt.slice(0, 300));
+
+    // ── Step 2: DALL-E 3 renders the renovated building ──
+    const response = await client.images.generate({
+      model: "dall-e-3",
+      prompt: renovationPrompt,
+      n: 1,
+      size: "1024x1024",
+      quality: "hd",
+      style: "natural",
+    });
+
+    const image = response.data?.[0];
+    if (!image?.url) throw new Error("No image URL in DALL-E renovation response");
+
+    console.log("[RenovationRender] DALL-E 3 render complete:", image.url.slice(0, 80));
+
+    return {
+      url: image.url,
+      revisedPrompt: image.revised_prompt ?? renovationPrompt,
+      renovationPrompt,
+    };
+  });
+}
+
 // ─── generateFloorPlan (GN-004) ─────────────────────────────────────────────
 
 export interface FloorPlanResult {
