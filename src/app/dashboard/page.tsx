@@ -195,9 +195,9 @@ export default function DashboardPage() {
 
   // Map video demos to their matching prebuilt workflow IDs
   const VIDEO_TO_TEMPLATE: Record<string, string> = {
-    "dv-1": "wf-01", // Text to Concept Building
+    "dv-1": "wf-18", // Text to Concept Building + IFC
     "dv-2": "wf-17", // Floor Plan to 3D
-    "dv-3": "wf-04", // Parameters to 3D Building
+    "dv-3": "wf-05", // Parameters to 3D Building + IFC
   };
 
   // Video card titles/subtitles/nodes from i18n
@@ -541,7 +541,7 @@ export default function DashboardPage() {
 
                     {/* Try this workflow button */}
                     <button
-                      onClick={() => openTemplate(VIDEO_TO_TEMPLATE[vc.id] ?? "wf-01")}
+                      onClick={() => openTemplate(VIDEO_TO_TEMPLATE[vc.id] ?? "wf-18")}
                       style={{
                         display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
                         padding: "9px 16px", borderRadius: 10, width: "100%",
@@ -600,7 +600,7 @@ export default function DashboardPage() {
 
             <div className="grid gap-4 mb-10 dashboard-template-grid" style={{ gridTemplateColumns: "repeat(3, 1fr)" }}>
               {PREBUILT_WORKFLOWS
-                .filter(w => !["wf-03", "wf-12", "wf-14", "wf-15", "wf-16", "wf-17"].includes(w.id))
+                .filter(w => !["wf-03", "wf-12", "wf-14", "wf-16", "wf-17"].includes(w.id))
                 .slice(0, 6)
                 .map((wf, i) => {
                   const catColors: Record<string, string> = {
@@ -694,7 +694,7 @@ export default function DashboardPage() {
 
             <div className="grid gap-4 mb-8 dashboard-template-grid" style={{ gridTemplateColumns: "repeat(3, 1fr)" }}>
               {PREBUILT_WORKFLOWS
-                .filter(w => ["wf-03", "wf-12", "wf-14", "wf-15", "wf-16", "wf-17"].includes(w.id))
+                .filter(w => ["wf-03", "wf-12", "wf-14", "wf-16", "wf-17"].includes(w.id))
                 .map((wf, i) => {
                   const catColors: Record<string, string> = {
                     "Concept Design": "#3B82F6", "Visualization": "#10B981",

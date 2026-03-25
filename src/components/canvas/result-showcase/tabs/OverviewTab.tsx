@@ -1,23 +1,42 @@
 "use client";
 
-import { useState } from "react";
-import { motion } from "framer-motion";
+import { useState, useMemo, useRef, useCallback, useEffect } from "react";
+import DOMPurify from "dompurify";
+import { motion, AnimatePresence } from "framer-motion";
 import {
-  ChevronDown, ChevronUp, Box, Film, FileDown,
-  Layers, Clock, Cpu, Sparkles, FileText, Image as ImageIcon,
-  Video, BarChart3, Table2, Code2, File, Zap,
-  Building2, Ruler, MapPin, Shield, CheckCircle,
+  Plus,
+  Minus,
+  Maximize2,
+  Download,
+  X,
+  Box,
+  Film,
+  FileText,
+  Image as ImageIcon,
+  Table2,
+  Code2,
+  Layers,
+  Clock,
+  CheckCircle,
+  ChevronDown,
+  ChevronUp,
+  ArrowRight,
+  ExternalLink,
+  BarChart3,
+  File,
 } from "lucide-react";
 import { useLocale } from "@/hooks/useLocale";
-import { useExecutionStore } from "@/stores/execution-store";
 import { COLORS } from "../constants";
 import { HeroSection } from "../sections/HeroSection";
 import { KpiStrip } from "../sections/KpiStrip";
 import { PipelineViz } from "../sections/PipelineViz";
 import { AnimatedNumber } from "../sections/AnimatedNumber";
+import { useHeroDetection } from "../useHeroDetection";
 import type { ShowcaseData } from "../useShowcaseData";
 import type { TabId } from "../constants";
-import type { TranslationKey } from "@/lib/i18n";
+import type { HeroType, InsightMetric, FloorPlanMeta, RoomInfo } from "../useHeroDetection";
+
+// ─── Props ───────────────────────────────────────────────────────────────────
 
 interface OverviewTabProps {
   data: ShowcaseData;
@@ -26,12 +45,1634 @@ interface OverviewTabProps {
   onRetryVideo?: () => void;
 }
 
-// ─── Artifact type icon map ──────────────────────────────────────────────────
+// ─── Ease constant ───────────────────────────────────────────────────────────
+const EASE_OUT: [number, number, number, number] = [0.22, 1, 0.36, 1];
+
+// ─── Main Component ──────────────────────────────────────────────────────────
+
+export function OverviewTab({
+  data,
+  onExpandVideo,
+  onNavigateTab,
+  onRetryVideo,
+}: OverviewTabProps) {
+  const { t } = useLocale();
+  const hero = useHeroDetection(data);
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 28 }}>
+      {/* ── Responsive Styles ── */}
+      <style>{`
+        @media (max-width: 768px) {
+          .fp-hero-layout {
+            flex-direction: column !important;
+            min-height: 40vh !important;
+            max-height: none !important;
+          }
+          .fp-room-sidebar {
+            width: 100% !important;
+            max-height: 220px !important;
+            border-radius: 12px !important;
+          }
+          .fp-svg-viewer {
+            border-radius: 12px !important;
+          }
+          .fp-bottom-right {
+            flex-direction: column !important;
+            gap: 4px !important;
+          }
+          .fp-bottom-right button {
+            font-size: 10px !important;
+            padding: 6px 10px !important;
+          }
+          .insight-grid {
+            grid-template-columns: repeat(2, 1fr) !important;
+          }
+          .supporting-grid {
+            grid-template-columns: 1fr !important;
+          }
+          .model3d-hero {
+            min-height: 240px !important;
+          }
+          .model3d-specs {
+            gap: 16px !important;
+            flex-wrap: wrap !important;
+            justify-content: center !important;
+          }
+          .compact-banner {
+            flex-wrap: wrap !important;
+            gap: 8px !important;
+          }
+          .compact-banner-right {
+            margin-left: 0 !important;
+            width: 100% !important;
+            justify-content: flex-start !important;
+            padding-left: 26px !important;
+          }
+          .image-overlay-controls {
+            flex-direction: column !important;
+            align-items: flex-start !important;
+            padding: 24px 12px 12px !important;
+          }
+          .image-overlay-controls > span {
+            font-size: 11px !important;
+          }
+          .image-overlay-btns {
+            width: 100% !important;
+          }
+          .image-overlay-btns a,
+          .image-overlay-btns button {
+            flex: 1 !important;
+            justify-content: center !important;
+          }
+          .lightbox-overlay {
+            padding: 16px !important;
+          }
+          .table-hero-header {
+            flex-direction: column !important;
+            align-items: flex-start !important;
+            gap: 8px !important;
+          }
+        }
+        @media (max-width: 480px) {
+          .fp-hero-layout {
+            min-height: 35vh !important;
+          }
+          .insight-grid {
+            grid-template-columns: 1fr 1fr !important;
+            gap: 8px !important;
+          }
+          .insight-card {
+            padding: 12px 14px !important;
+          }
+          .insight-value {
+            font-size: 22px !important;
+          }
+        }
+      `}</style>
+
+      {/* ═══ HERO: Primary Result ═══ */}
+      {hero.type === "floor-plan" && data.svgContent && (
+        <FloorPlanHero
+          svgContent={data.svgContent}
+          meta={hero.floorPlanMeta}
+          onNavigateTab={onNavigateTab}
+          has3DEditor={!!data.model3dData}
+        />
+      )}
+
+      {hero.type === "video" && (
+        <VideoHero
+          data={data}
+          onExpandVideo={onExpandVideo}
+          onRetryVideo={onRetryVideo}
+        />
+      )}
+
+      {hero.type === "3d-model" && data.model3dData && (
+        <Model3DHero
+          model3dData={data.model3dData}
+          onNavigateTab={onNavigateTab}
+        />
+      )}
+
+      {hero.type === "image" && (
+        <ImageHero imageUrls={data.allImageUrls} />
+      )}
+
+      {hero.type === "table" && (
+        <TableHero tableData={data.tableData} />
+      )}
+
+      {hero.type === "text" && <TextHero textContent={data.textContent} />}
+
+      {/* ═══ INSIGHT STRIP: Meaningful metrics ═══ */}
+      {data.kpiMetrics.length > 0 ? (
+        <KpiStrip metrics={data.kpiMetrics} maxItems={8} />
+      ) : hero.insights.length > 0 ? (
+        <InsightStripSection insights={hero.insights} />
+      ) : null}
+
+      {/* ═══ COMPACT EXECUTION BANNER ═══ */}
+      <CompactBanner data={data} />
+
+      {/* ═══ SUPPORTING RESULTS ═══ */}
+      <SupportingCards
+        data={data}
+        heroType={hero.type}
+        onNavigateTab={onNavigateTab}
+      />
+
+      {/* ═══ PIPELINE VISUALIZATION ═══ */}
+      {data.pipelineSteps.length > 1 && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.5 }}
+        >
+          <SectionLabel title={t("showcase.pipelineTitle")} />
+          <PipelineViz steps={data.pipelineSteps} />
+        </motion.div>
+      )}
+    </div>
+  );
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// ── FLOOR PLAN HERO ─────────────────────────────────────────────────────────
+// ═════════════════════════════════════════════════════════════════════════════
+
+function FloorPlanHero({
+  svgContent,
+  meta,
+  onNavigateTab,
+  has3DEditor,
+}: {
+  svgContent: string;
+  meta: FloorPlanMeta | null;
+  onNavigateTab: (tab: TabId) => void;
+  has3DEditor?: boolean;
+}) {
+  const [zoom, setZoom] = useState(1);
+  const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const dragStartRef = useRef({ x: 0, y: 0, panX: 0, panY: 0 });
+  const svgContainerRef = useRef<HTMLDivElement>(null);
+
+  const sanitizedSvg = useMemo(
+    () =>
+      typeof window !== "undefined"
+        ? DOMPurify.sanitize(svgContent, {
+            USE_PROFILES: { svg: true, svgFilters: true },
+          })
+        : "",
+    [svgContent],
+  );
+
+  // Make SVG responsive after render
+  useEffect(() => {
+    if (!svgContainerRef.current) return;
+    const svgEl = svgContainerRef.current.querySelector("svg");
+    if (svgEl) {
+      svgEl.style.width = "100%";
+      svgEl.style.height = "auto";
+      svgEl.style.maxHeight = "100%";
+      svgEl.style.display = "block";
+    }
+  }, [sanitizedSvg]);
+
+  // Non-passive wheel handler for zoom
+  useEffect(() => {
+    const el = svgContainerRef.current?.parentElement;
+    if (!el) return;
+
+    const handler = (e: WheelEvent) => {
+      e.preventDefault();
+      const delta = e.deltaY > 0 ? -0.15 : 0.15;
+      setZoom((prev) => Math.min(Math.max(prev + delta, 0.4), 5));
+    };
+
+    el.addEventListener("wheel", handler, { passive: false });
+    return () => el.removeEventListener("wheel", handler);
+  }, []);
+
+  const handleMouseDown = useCallback(
+    (e: React.MouseEvent) => {
+      if (e.button !== 0) return;
+      setIsDragging(true);
+      dragStartRef.current = {
+        x: e.clientX,
+        y: e.clientY,
+        panX: panOffset.x,
+        panY: panOffset.y,
+      };
+    },
+    [panOffset],
+  );
+
+  const handleMouseMove = useCallback(
+    (e: React.MouseEvent) => {
+      if (!isDragging) return;
+      setPanOffset({
+        x: dragStartRef.current.panX + (e.clientX - dragStartRef.current.x),
+        y: dragStartRef.current.panY + (e.clientY - dragStartRef.current.y),
+      });
+    },
+    [isDragging],
+  );
+
+  const handleMouseUp = useCallback(() => setIsDragging(false), []);
+
+  const resetView = useCallback(() => {
+    setZoom(1);
+    setPanOffset({ x: 0, y: 0 });
+  }, []);
+
+  const handleDownloadSvg = useCallback(() => {
+    const blob = new Blob([svgContent], { type: "image/svg+xml" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "floor_plan.svg";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, [svgContent]);
+
+  // Touch support for mobile zoom/pan
+  const touchRef = useRef<{
+    x: number;
+    y: number;
+    panX: number;
+    panY: number;
+    dist?: number;
+  } | null>(null);
+
+  const handleTouchStart = useCallback(
+    (e: React.TouchEvent) => {
+      if (e.touches.length === 1) {
+        touchRef.current = {
+          x: e.touches[0].clientX,
+          y: e.touches[0].clientY,
+          panX: panOffset.x,
+          panY: panOffset.y,
+        };
+      } else if (e.touches.length === 2) {
+        const dist = Math.hypot(
+          e.touches[0].clientX - e.touches[1].clientX,
+          e.touches[0].clientY - e.touches[1].clientY,
+        );
+        touchRef.current = {
+          x: 0,
+          y: 0,
+          panX: panOffset.x,
+          panY: panOffset.y,
+          dist,
+        };
+      }
+    },
+    [panOffset],
+  );
+
+  const handleTouchMove = useCallback(
+    (e: React.TouchEvent) => {
+      if (!touchRef.current) return;
+      e.preventDefault();
+      if (e.touches.length === 1) {
+        setPanOffset({
+          x:
+            touchRef.current.panX +
+            (e.touches[0].clientX - touchRef.current.x),
+          y:
+            touchRef.current.panY +
+            (e.touches[0].clientY - touchRef.current.y),
+        });
+      } else if (e.touches.length === 2 && touchRef.current.dist) {
+        const dist = Math.hypot(
+          e.touches[0].clientX - e.touches[1].clientX,
+          e.touches[0].clientY - e.touches[1].clientY,
+        );
+        const scale = dist / touchRef.current.dist;
+        setZoom((prev) => Math.min(Math.max(prev * scale, 0.4), 5));
+        touchRef.current.dist = dist;
+      }
+    },
+    [],
+  );
+
+  const handleTouchEnd = useCallback(() => {
+    touchRef.current = null;
+  }, []);
+
+  const hasRoomSidebar = meta && meta.rooms.length > 0;
+
+  return (
+    <motion.div
+      className="fp-hero-layout"
+      initial={{ opacity: 0, scale: 0.97 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ duration: 0.5, ease: EASE_OUT }}
+      style={{
+        display: "flex",
+        gap: 16,
+        minHeight: "55vh",
+        maxHeight: "75vh",
+      }}
+    >
+      {/* ── SVG Viewer ── */}
+      <div
+        className="fp-svg-viewer"
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={handleMouseUp}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        style={{
+          flex: 1,
+          background: "#FFFFFF",
+          borderRadius: 16,
+          overflow: "hidden",
+          position: "relative",
+          cursor: isDragging ? "grabbing" : "grab",
+          boxShadow: "0 8px 40px rgba(0,0,0,0.35)",
+          border: "1px solid rgba(255,255,255,0.06)",
+          userSelect: "none",
+        }}
+      >
+        <div
+          ref={svgContainerRef}
+          style={{
+            transform: `translate(${panOffset.x}px, ${panOffset.y}px) scale(${zoom})`,
+            transformOrigin: "center center",
+            transition: isDragging ? "none" : "transform 0.2s ease-out",
+            padding: 24,
+            minHeight: "100%",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+          dangerouslySetInnerHTML={{ __html: sanitizedSvg }}
+        />
+
+        {/* Zoom Controls — bottom left */}
+        <div
+          style={{
+            position: "absolute",
+            bottom: 16,
+            left: 16,
+            display: "flex",
+            gap: 2,
+            background: "rgba(0,0,0,0.72)",
+            borderRadius: 10,
+            padding: 4,
+            backdropFilter: "blur(12px)",
+            border: "1px solid rgba(255,255,255,0.1)",
+            boxShadow: "0 4px 16px rgba(0,0,0,0.3)",
+          }}
+        >
+          <ZoomBtn
+            onClick={() => setZoom((z) => Math.min(z + 0.25, 5))}
+            title="Zoom in"
+          >
+            <Plus size={14} />
+          </ZoomBtn>
+          <ZoomBtn
+            onClick={() => setZoom((z) => Math.max(z - 0.25, 0.4))}
+            title="Zoom out"
+          >
+            <Minus size={14} />
+          </ZoomBtn>
+          <div
+            style={{
+              width: 1,
+              background: "rgba(255,255,255,0.15)",
+              margin: "4px 2px",
+            }}
+          />
+          <ZoomBtn onClick={resetView} title="Fit to view">
+            <Maximize2 size={13} />
+          </ZoomBtn>
+        </div>
+
+        {/* Right Controls — bottom right */}
+        <div
+          className="fp-bottom-right"
+          style={{
+            position: "absolute",
+            bottom: 16,
+            right: 16,
+            display: "flex",
+            gap: 6,
+          }}
+        >
+          <button
+            onClick={handleDownloadSvg}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 5,
+              padding: "7px 14px",
+              borderRadius: 8,
+              background: "rgba(0,0,0,0.72)",
+              border: "1px solid rgba(255,255,255,0.1)",
+              color: "#fff",
+              fontSize: 11,
+              fontWeight: 600,
+              cursor: "pointer",
+              backdropFilter: "blur(12px)",
+              boxShadow: "0 4px 16px rgba(0,0,0,0.3)",
+              transition: "all 0.15s ease",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = "rgba(0,0,0,0.85)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = "rgba(0,0,0,0.72)";
+            }}
+          >
+            <Download size={12} />
+            Download SVG
+          </button>
+          {has3DEditor && (
+            <button
+              onClick={() => onNavigateTab("model")}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 5,
+                padding: "7px 14px",
+                borderRadius: 8,
+                background: `rgba(0,245,255,0.12)`,
+                border: `1px solid rgba(0,245,255,0.25)`,
+                color: COLORS.CYAN,
+                fontSize: 11,
+                fontWeight: 600,
+                cursor: "pointer",
+                backdropFilter: "blur(12px)",
+                boxShadow: "0 4px 16px rgba(0,0,0,0.3)",
+                transition: "all 0.15s ease",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = "rgba(0,245,255,0.2)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = "rgba(0,245,255,0.12)";
+              }}
+            >
+              <Box size={12} />
+              Open 3D Editor
+            </button>
+          )}
+        </div>
+
+        {/* Zoom Level Badge */}
+        <AnimatePresence>
+          {zoom !== 1 && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.8 }}
+              style={{
+                position: "absolute",
+                top: 12,
+                right: 12,
+                padding: "4px 10px",
+                borderRadius: 6,
+                background: "rgba(0,0,0,0.65)",
+                color: "#fff",
+                fontSize: 11,
+                fontWeight: 700,
+                backdropFilter: "blur(8px)",
+                fontVariantNumeric: "tabular-nums",
+              }}
+            >
+              {Math.round(zoom * 100)}%
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+
+      {/* ── Room Details Sidebar ── */}
+      {hasRoomSidebar && (
+        <RoomSidebar
+          rooms={meta.rooms}
+          totalArea={meta.totalArea}
+          floors={meta.floors}
+        />
+      )}
+    </motion.div>
+  );
+}
+
+// ── Zoom Button ──
+
+function ZoomBtn({
+  onClick,
+  children,
+  title,
+}: {
+  onClick: () => void;
+  children: React.ReactNode;
+  title?: string;
+}) {
+  return (
+    <button
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick();
+      }}
+      title={title}
+      style={{
+        width: 32,
+        height: 32,
+        borderRadius: 6,
+        background: "transparent",
+        border: "none",
+        color: "#fff",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        cursor: "pointer",
+        transition: "background 0.15s",
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.background = "rgba(255,255,255,0.12)";
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.background = "transparent";
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
+// ── Room Sidebar ──
+
+function RoomSidebar({
+  rooms,
+  totalArea,
+  floors,
+}: {
+  rooms: RoomInfo[];
+  totalArea: number;
+  floors: number;
+}) {
+  return (
+    <motion.div
+      className="fp-room-sidebar"
+      initial={{ opacity: 0, x: 20 }}
+      animate={{ opacity: 1, x: 0 }}
+      transition={{ delay: 0.3, duration: 0.4, ease: EASE_OUT }}
+      style={{
+        width: 240,
+        flexShrink: 0,
+        background: "rgba(255,255,255,0.03)",
+        border: `1px solid ${COLORS.GLASS_BORDER}`,
+        borderRadius: 14,
+        display: "flex",
+        flexDirection: "column",
+        overflow: "hidden",
+      }}
+    >
+      {/* Header */}
+      <div
+        style={{
+          padding: "14px 16px 10px",
+          borderBottom: `1px solid ${COLORS.GLASS_BORDER}`,
+        }}
+      >
+        <div
+          style={{
+            fontSize: 10,
+            fontWeight: 700,
+            color: COLORS.TEXT_MUTED,
+            textTransform: "uppercase",
+            letterSpacing: "0.08em",
+          }}
+        >
+          Room Details
+        </div>
+      </div>
+
+      {/* Room List */}
+      <div
+        style={{
+          flex: 1,
+          overflowY: "auto",
+          padding: "8px 12px",
+        }}
+      >
+        {rooms.map((room, i) => {
+          const color = getRoomColor(room.name);
+          return (
+            <motion.div
+              key={`${room.name}-${i}`}
+              initial={{ opacity: 0, x: 10 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.35 + i * 0.025, duration: 0.3 }}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                padding: "7px 8px",
+                borderRadius: 6,
+                marginBottom: 2,
+                transition: "background 0.15s",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = "rgba(255,255,255,0.04)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = "transparent";
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  minWidth: 0,
+                }}
+              >
+                <div
+                  style={{
+                    width: 8,
+                    height: 8,
+                    borderRadius: 2,
+                    background: color,
+                    flexShrink: 0,
+                    boxShadow: `0 0 6px ${color}40`,
+                  }}
+                />
+                <span
+                  style={{
+                    fontSize: 11,
+                    color: COLORS.TEXT_SECONDARY,
+                    fontWeight: 500,
+                    whiteSpace: "nowrap",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                  }}
+                >
+                  {room.name}
+                </span>
+              </div>
+              <span
+                style={{
+                  fontSize: 11,
+                  color: COLORS.TEXT_PRIMARY,
+                  fontWeight: 600,
+                  fontVariantNumeric: "tabular-nums",
+                  flexShrink: 0,
+                  marginLeft: 8,
+                }}
+              >
+                {room.area} m²
+              </span>
+            </motion.div>
+          );
+        })}
+      </div>
+
+      {/* Footer Totals */}
+      <div
+        style={{
+          padding: "12px 16px",
+          borderTop: `1px solid ${COLORS.GLASS_BORDER}`,
+          background: "rgba(0,245,255,0.02)",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            marginBottom: 4,
+          }}
+        >
+          <span
+            style={{
+              fontSize: 11,
+              color: COLORS.TEXT_MUTED,
+              fontWeight: 600,
+            }}
+          >
+            Total
+          </span>
+          <span
+            style={{
+              fontSize: 16,
+              fontWeight: 800,
+              color: COLORS.TEXT_PRIMARY,
+              fontVariantNumeric: "tabular-nums",
+            }}
+          >
+            {Math.round(totalArea)} m²
+          </span>
+        </div>
+        <div
+          style={{
+            fontSize: 10,
+            color: COLORS.TEXT_MUTED,
+          }}
+        >
+          {rooms.length} rooms · {floors} {floors === 1 ? "floor" : "floors"}
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// ── VIDEO HERO ──────────────────────────────────────────────────────────────
+// ═════════════════════════════════════════════════════════════════════════════
+
+function VideoHero({
+  data,
+  onExpandVideo,
+  onRetryVideo,
+}: {
+  data: ShowcaseData;
+  onExpandVideo: () => void;
+  onRetryVideo?: () => void;
+}) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.97 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ duration: 0.5, ease: EASE_OUT }}
+    >
+      <HeroSection
+        videoData={data.videoData}
+        heroImageUrl={data.heroImageUrl}
+        onExpandVideo={onExpandVideo}
+        onRetryVideo={onRetryVideo}
+      />
+    </motion.div>
+  );
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// ── 3D MODEL HERO ───────────────────────────────────────────────────────────
+// ═════════════════════════════════════════════════════════════════════════════
+
+function Model3DHero({
+  model3dData,
+  onNavigateTab,
+}: {
+  model3dData: NonNullable<ShowcaseData["model3dData"]>;
+  onNavigateTab: (tab: TabId) => void;
+}) {
+  const { t } = useLocale();
+  const isProcedural = model3dData.kind === "procedural";
+
+  return (
+    <motion.div
+      className="model3d-hero"
+      initial={{ opacity: 0, scale: 0.97 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ duration: 0.5, ease: EASE_OUT }}
+      onClick={() => onNavigateTab("model")}
+      style={{
+        position: "relative",
+        minHeight: 320,
+        borderRadius: 16,
+        overflow: "hidden",
+        cursor: "pointer",
+        background: "linear-gradient(145deg, #0D0E12 0%, #141520 50%, #0D0E12 100%)",
+        border: `1px solid ${COLORS.GLASS_BORDER}`,
+        boxShadow: "0 8px 40px rgba(0,0,0,0.4)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        flexDirection: "column",
+        gap: 24,
+        transition: "border-color 0.3s, box-shadow 0.3s",
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.borderColor = `${COLORS.AMBER}40`;
+        e.currentTarget.style.boxShadow = `0 8px 60px ${COLORS.AMBER}12`;
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.borderColor = COLORS.GLASS_BORDER;
+        e.currentTarget.style.boxShadow = "0 8px 40px rgba(0,0,0,0.4)";
+      }}
+    >
+      {/* Animated grid background */}
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          backgroundImage: `
+            linear-gradient(${COLORS.AMBER}08 1px, transparent 1px),
+            linear-gradient(90deg, ${COLORS.AMBER}08 1px, transparent 1px)
+          `,
+          backgroundSize: "40px 40px",
+          opacity: 0.5,
+        }}
+      />
+
+      {/* Icon */}
+      <motion.div
+        animate={{ rotateY: [0, 360] }}
+        transition={{ repeat: Infinity, duration: 8, ease: "linear" }}
+        style={{
+          width: 80,
+          height: 80,
+          borderRadius: 20,
+          background: `${COLORS.AMBER}12`,
+          border: `1px solid ${COLORS.AMBER}25`,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          color: COLORS.AMBER,
+          position: "relative",
+          zIndex: 1,
+        }}
+      >
+        <Box size={36} />
+      </motion.div>
+
+      {/* Title */}
+      <div style={{ textAlign: "center", position: "relative", zIndex: 1 }}>
+        <div
+          style={{
+            fontSize: 18,
+            fontWeight: 700,
+            color: COLORS.TEXT_PRIMARY,
+            marginBottom: 6,
+          }}
+        >
+          {isProcedural
+            ? `${(model3dData as { buildingType: string }).buildingType} — ${(model3dData as { floors: number }).floors} Floors`
+            : t("showcase.explore3dModel")}
+        </div>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+            justifyContent: "center",
+            color: COLORS.CYAN,
+            fontSize: 13,
+            fontWeight: 600,
+          }}
+        >
+          {t("showcase.explore3dModel")}
+          <ArrowRight size={14} />
+        </div>
+      </div>
+
+      {/* Specs strip */}
+      {isProcedural && (
+        <div
+          className="model3d-specs"
+          style={{
+            display: "flex",
+            gap: 24,
+            position: "relative",
+            zIndex: 1,
+          }}
+        >
+          {[
+            {
+              label: t("showcase.specHeight"),
+              value: `${(model3dData as { height: number }).height}m`,
+            },
+            {
+              label: t("showcase.specFootprint"),
+              value: `${(model3dData as { footprint: number }).footprint} m²`,
+            },
+            {
+              label: t("showcase.specGfa"),
+              value: `${(model3dData as { gfa: number }).gfa} m²`,
+            },
+          ].map((spec) => (
+            <div key={spec.label} style={{ textAlign: "center" }}>
+              <div
+                style={{
+                  fontSize: 16,
+                  fontWeight: 700,
+                  color: COLORS.TEXT_PRIMARY,
+                  fontVariantNumeric: "tabular-nums",
+                }}
+              >
+                {spec.value}
+              </div>
+              <div
+                style={{
+                  fontSize: 9,
+                  color: COLORS.TEXT_MUTED,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.06em",
+                  fontWeight: 600,
+                }}
+              >
+                {spec.label}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </motion.div>
+  );
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// ── IMAGE HERO ──────────────────────────────────────────────────────────────
+// ═════════════════════════════════════════════════════════════════════════════
+
+function ImageHero({ imageUrls }: { imageUrls: string[] }) {
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+
+  // Clamp activeIndex if imageUrls shrinks
+  const clampedIndex = Math.min(activeIndex, Math.max(imageUrls.length - 1, 0));
+  const mainUrl = imageUrls[clampedIndex] ?? imageUrls[0];
+
+  // Add ESC key handler for lightbox
+  useEffect(() => {
+    if (!lightboxUrl) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setLightboxUrl(null);
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [lightboxUrl]);
+
+  return (
+    <>
+      <motion.div
+        initial={{ opacity: 0, scale: 0.97 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ duration: 0.5, ease: EASE_OUT }}
+        style={{ display: "flex", flexDirection: "column", gap: 12 }}
+      >
+        {/* Main Image */}
+        <div
+          style={{
+            borderRadius: 16,
+            overflow: "hidden",
+            position: "relative",
+            boxShadow: "0 8px 40px rgba(0,0,0,0.4)",
+            border: "1px solid rgba(255,255,255,0.06)",
+            cursor: "zoom-in",
+          }}
+          onClick={() => setLightboxUrl(mainUrl)}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={mainUrl}
+            alt={`Concept Render ${clampedIndex + 1}`}
+            style={{
+              width: "100%",
+              height: "auto",
+              minHeight: 300,
+              maxHeight: "60vh",
+              objectFit: "cover",
+              display: "block",
+              transition: "transform 0.4s ease",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.transform = "scale(1.02)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = "scale(1)";
+            }}
+          />
+
+          {/* Overlay controls */}
+          <div
+            className="image-overlay-controls"
+            style={{
+              position: "absolute",
+              bottom: 0,
+              left: 0,
+              right: 0,
+              padding: "40px 20px 16px",
+              background: "linear-gradient(transparent, rgba(0,0,0,0.8))",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+            }}
+          >
+            <span
+              style={{
+                fontSize: 13,
+                fontWeight: 600,
+                color: "rgba(255,255,255,0.9)",
+              }}
+            >
+              Concept Render{" "}
+              {imageUrls.length > 1 ? `${clampedIndex + 1}` : ""}
+            </span>
+            <div className="image-overlay-btns" style={{ display: "flex", gap: 6 }}>
+              <a
+                href={mainUrl}
+                download={`render_${clampedIndex + 1}.png`}
+                onClick={(e) => e.stopPropagation()}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 5,
+                  padding: "6px 14px",
+                  borderRadius: 6,
+                  background: "rgba(0,0,0,0.5)",
+                  border: "1px solid rgba(255,255,255,0.15)",
+                  color: "#fff",
+                  fontSize: 11,
+                  fontWeight: 600,
+                  textDecoration: "none",
+                  cursor: "pointer",
+                }}
+              >
+                <Download size={12} />
+                Download
+              </a>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setLightboxUrl(mainUrl);
+                }}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 5,
+                  padding: "6px 14px",
+                  borderRadius: 6,
+                  background: "rgba(0,245,255,0.15)",
+                  border: "1px solid rgba(0,245,255,0.3)",
+                  color: COLORS.CYAN,
+                  fontSize: 11,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                }}
+              >
+                <ExternalLink size={12} />
+                Fullscreen
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Thumbnail strip */}
+        {imageUrls.length > 1 && (
+          <div style={{ display: "flex", gap: 8, justifyContent: "center" }}>
+            {imageUrls.map((url, i) => (
+              <motion.button
+                key={url}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => setActiveIndex(i)}
+                style={{
+                  width: 64,
+                  height: 44,
+                  borderRadius: 8,
+                  overflow: "hidden",
+                  border:
+                    i === clampedIndex
+                      ? `2px solid ${COLORS.CYAN}`
+                      : "2px solid rgba(255,255,255,0.08)",
+                  padding: 0,
+                  cursor: "pointer",
+                  opacity: i === clampedIndex ? 1 : 0.5,
+                  transition: "all 0.2s ease",
+                  background: "none",
+                }}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={url}
+                  alt={`Thumb ${i + 1}`}
+                  style={{
+                    width: "100%",
+                    height: "100%",
+                    objectFit: "cover",
+                    display: "block",
+                  }}
+                />
+              </motion.button>
+            ))}
+          </div>
+        )}
+      </motion.div>
+
+      {/* Lightbox */}
+      <AnimatePresence>
+        {lightboxUrl && (
+          <motion.div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Image preview"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setLightboxUrl(null)}
+            style={{
+              position: "fixed",
+              inset: 0,
+              zIndex: 200,
+              background: "rgba(0,0,0,0.94)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              cursor: "zoom-out",
+              padding: "clamp(16px, 4vw, 40px)",
+            }}
+          >
+            <button
+              onClick={() => setLightboxUrl(null)}
+              style={{
+                position: "absolute",
+                top: 20,
+                right: 20,
+                background: "rgba(255,255,255,0.1)",
+                border: "none",
+                borderRadius: 8,
+                padding: 8,
+                color: "#fff",
+                cursor: "pointer",
+              }}
+            >
+              <X size={20} />
+            </button>
+            <motion.img
+              initial={{ scale: 0.92 }}
+              animate={{ scale: 1 }}
+              src={lightboxUrl}
+              alt="Full view"
+              style={{
+                maxWidth: "92vw",
+                maxHeight: "88vh",
+                objectFit: "contain",
+                borderRadius: 8,
+              }}
+              onClick={(e) => e.stopPropagation()}
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </>
+  );
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// ── TABLE HERO ──────────────────────────────────────────────────────────────
+// ═════════════════════════════════════════════════════════════════════════════
+
+function TableHero({ tableData }: { tableData: ShowcaseData["tableData"] }) {
+  if (tableData.length === 0) return null;
+  const table = tableData[0];
+  const previewRows = table.rows.slice(0, 8);
+
+  // Compute grand total
+  let grandTotal: number | null = null;
+  if (table.rows.length > 0) {
+    const lastColIdx = table.headers.length - 1;
+    const vals = table.rows.map((r) => {
+      const v = r[lastColIdx];
+      return typeof v === "number" ? v : parseFloat(String(v).replace(/[,$]/g, ""));
+    });
+    if (vals.every((v) => !isNaN(v))) {
+      grandTotal = vals.reduce((a, b) => a + b, 0);
+    }
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5, ease: EASE_OUT }}
+      style={{
+        borderRadius: 16,
+        overflow: "hidden",
+        border: `1px solid ${COLORS.GLASS_BORDER}`,
+        boxShadow: "0 8px 40px rgba(0,0,0,0.3)",
+      }}
+    >
+      {/* Header */}
+      <div
+        className="table-hero-header"
+        style={{
+          padding: "14px 20px",
+          background: "rgba(0,245,255,0.03)",
+          borderBottom: `1px solid ${COLORS.GLASS_BORDER}`,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          <Table2 size={16} style={{ color: COLORS.CYAN }} />
+          <span
+            style={{
+              fontSize: 14,
+              fontWeight: 700,
+              color: COLORS.TEXT_PRIMARY,
+            }}
+          >
+            {table.label ?? "Data Table"}
+          </span>
+          <span style={{ fontSize: 10, color: COLORS.TEXT_MUTED }}>
+            {table.rows.length} rows × {table.headers.length} cols
+          </span>
+        </div>
+        {grandTotal !== null && (
+          <div
+            style={{
+              fontSize: 18,
+              fontWeight: 800,
+              color: COLORS.CYAN,
+              fontVariantNumeric: "tabular-nums",
+            }}
+          >
+            {grandTotal.toLocaleString(undefined, {
+              maximumFractionDigits: 2,
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Table Preview */}
+      <div style={{ overflowX: "auto" }}>
+        <table
+          style={{
+            width: "100%",
+            borderCollapse: "collapse",
+            fontSize: 11,
+            color: COLORS.TEXT_SECONDARY,
+          }}
+        >
+          <thead>
+            <tr>
+              {table.headers.map((h, i) => (
+                <th
+                  key={i}
+                  style={{
+                    padding: "10px 14px",
+                    textAlign: "left",
+                    fontWeight: 600,
+                    color: "#B0B0C5",
+                    borderBottom: `1px solid ${COLORS.GLASS_BORDER}`,
+                    fontSize: 10,
+                    textTransform: "uppercase",
+                    letterSpacing: "0.05em",
+                    background: "rgba(7,8,9,0.95)",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {h}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {previewRows.map((row, ri) => (
+              <tr
+                key={ri}
+                style={{
+                  background:
+                    ri % 2 === 0
+                      ? "transparent"
+                      : "rgba(255,255,255,0.01)",
+                }}
+              >
+                {(row as (string | number)[]).map((cell, ci) => (
+                  <td
+                    key={ci}
+                    style={{
+                      padding: "8px 14px",
+                      borderBottom: "1px solid rgba(255,255,255,0.03)",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {cell}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {table.rows.length > 8 && (
+        <div
+          style={{
+            padding: "10px 20px",
+            textAlign: "center",
+            borderTop: `1px solid ${COLORS.GLASS_BORDER}`,
+            fontSize: 11,
+            color: COLORS.CYAN,
+            fontWeight: 600,
+          }}
+        >
+          +{table.rows.length - 8} more rows — view in Data tab
+        </div>
+      )}
+    </motion.div>
+  );
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// ── TEXT HERO ────────────────────────────────────────────────────────────────
+// ═════════════════════════════════════════════════════════════════════════════
+
+function TextHero({ textContent }: { textContent: string }) {
+  const { t } = useLocale();
+  const [expanded, setExpanded] = useState(false);
+  const lines = textContent.split("\n");
+  const preview = lines.slice(0, 8).join("\n");
+  const hasMore = lines.length > 8;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5, ease: EASE_OUT }}
+      style={{
+        background: COLORS.GLASS_BG,
+        border: `1px solid ${COLORS.GLASS_BORDER}`,
+        borderRadius: 16,
+        padding: "24px 28px",
+        position: "relative",
+        overflow: "hidden",
+        minHeight: 200,
+      }}
+    >
+      <CornerMarks />
+
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          marginBottom: 16,
+        }}
+      >
+        <FileText size={16} style={{ color: COLORS.CYAN }} />
+        <span
+          style={{
+            fontSize: 14,
+            fontWeight: 700,
+            color: COLORS.TEXT_PRIMARY,
+          }}
+        >
+          {t("showcase.projectBrief")}
+        </span>
+      </div>
+
+      <div
+        style={{
+          fontSize: 13,
+          color: COLORS.TEXT_SECONDARY,
+          lineHeight: 1.8,
+          whiteSpace: "pre-wrap",
+        }}
+      >
+        {expanded ? textContent : preview}
+        {hasMore && (
+          <button
+            onClick={() => setExpanded((e) => !e)}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 4,
+              background: "none",
+              border: "none",
+              color: COLORS.CYAN,
+              fontSize: 12,
+              fontWeight: 600,
+              cursor: "pointer",
+              marginLeft: 8,
+            }}
+          >
+            {expanded
+              ? t("showcase.showLess")
+              : `${t("showcase.showMoreLines")} (+${lines.length - 8} ${t("showcase.lines")})`}
+            {expanded ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
+          </button>
+        )}
+      </div>
+    </motion.div>
+  );
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// ── INSIGHT STRIP (for derived metrics, when no KPIs from pipeline) ─────
+// ═════════════════════════════════════════════════════════════════════════════
+
+function InsightStripSection({ insights }: { insights: InsightMetric[] }) {
+  if (insights.length === 0) return null;
+
+  const cols = Math.min(insights.length, 4);
+
+  return (
+    <motion.div
+      className="insight-grid"
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.3, duration: 0.4 }}
+      style={{
+        display: "grid",
+        gridTemplateColumns: `repeat(${cols}, 1fr)`,
+        gap: 10,
+      }}
+    >
+      {insights.map((m, i) => {
+        const numericValue =
+          typeof m.value === "number" ? m.value : parseFloat(String(m.value));
+        const isNumeric = !isNaN(numericValue);
+
+        return (
+          <motion.div
+            className="insight-card"
+            key={`${m.label}-${i}`}
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.35 + i * 0.06 }}
+            style={{
+              background: COLORS.GLASS_BG,
+              border: `1px solid ${COLORS.GLASS_BORDER}`,
+              borderRadius: 12,
+              padding: "16px 18px",
+              position: "relative",
+              overflow: "hidden",
+            }}
+          >
+            {/* Top glow line */}
+            <div
+              style={{
+                position: "absolute",
+                top: 0,
+                left: "15%",
+                right: "15%",
+                height: 1,
+                background: `linear-gradient(90deg, transparent, ${COLORS.CYAN}33, transparent)`,
+              }}
+            />
+
+            <div
+              className="insight-value"
+              style={{
+                fontSize: 28,
+                fontWeight: 800,
+                color: COLORS.TEXT_PRIMARY,
+                lineHeight: 1.1,
+                fontVariantNumeric: "tabular-nums",
+                marginBottom: 6,
+                letterSpacing: "-0.02em",
+              }}
+            >
+              {isNumeric ? (
+                <AnimatedNumber
+                  value={numericValue}
+                  duration={1200 + i * 200}
+                  decimals={numericValue % 1 !== 0 ? 1 : 0}
+                />
+              ) : (
+                m.value
+              )}
+              {m.unit && (
+                <span
+                  style={{
+                    fontSize: 12,
+                    color: COLORS.TEXT_MUTED,
+                    marginLeft: 4,
+                    fontWeight: 400,
+                  }}
+                >
+                  {m.unit}
+                </span>
+              )}
+            </div>
+
+            <div
+              style={{
+                fontSize: 10,
+                color: COLORS.TEXT_MUTED,
+                textTransform: "uppercase",
+                letterSpacing: "0.08em",
+                fontWeight: 600,
+              }}
+            >
+              {m.label}
+            </div>
+          </motion.div>
+        );
+      })}
+    </motion.div>
+  );
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// ── COMPACT EXECUTION BANNER ────────────────────────────────────────────────
+// ═════════════════════════════════════════════════════════════════════════════
+
+function CompactBanner({ data }: { data: ShowcaseData }) {
+  const { t } = useLocale();
+
+  return (
+    <motion.div
+      className="compact-banner"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ delay: 0.4 }}
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 16,
+        padding: "10px 16px",
+        background: `linear-gradient(135deg, ${COLORS.EMERALD}05, ${COLORS.CYAN}03)`,
+        border: `1px solid ${COLORS.EMERALD}15`,
+        borderRadius: 10,
+      }}
+    >
+      <CheckCircle size={14} style={{ color: COLORS.EMERALD, flexShrink: 0 }} />
+      <span
+        style={{
+          fontSize: 11,
+          color: COLORS.TEXT_SECONDARY,
+          fontWeight: 500,
+        }}
+      >
+        {t("showcase.executionComplete")}
+        {data.executionMeta.executedAt && !isNaN(new Date(data.executionMeta.executedAt).getTime()) && (
+          <>
+            {" · "}
+            {new Date(data.executionMeta.executedAt).toLocaleDateString("en-US", {
+              month: "short",
+              day: "numeric",
+            })}{" "}
+            {new Date(data.executionMeta.executedAt).toLocaleTimeString("en-US", {
+              hour: "2-digit",
+              minute: "2-digit",
+            })}
+          </>
+        )}
+      </span>
+
+      <div className="compact-banner-right" style={{ marginLeft: "auto", display: "flex", gap: 12 }}>
+        {data.executionMeta.durationMs != null && (
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 4,
+              fontSize: 10,
+              color: COLORS.TEXT_MUTED,
+            }}
+          >
+            <Clock size={10} />
+            {data.executionMeta.durationMs < 1000
+              ? `${data.executionMeta.durationMs}ms`
+              : `${(data.executionMeta.durationMs / 1000).toFixed(1)}s`}
+          </div>
+        )}
+        <div
+          style={{
+            fontSize: 10,
+            color: COLORS.TEXT_MUTED,
+            fontVariantNumeric: "tabular-nums",
+          }}
+        >
+          {data.successNodes}/{data.totalNodes} {t("showcase.nodes")}
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// ── SUPPORTING RESULTS CARDS ────────────────────────────────────────────────
+// ═════════════════════════════════════════════════════════════════════════════
 
 const ARTIFACT_ICONS: Record<string, React.ReactNode> = {
   text: <FileText size={16} />,
   image: <ImageIcon size={16} />,
-  video: <Video size={16} />,
+  video: <Film size={16} />,
   "3d": <Box size={16} />,
   html: <Box size={16} />,
   kpi: <BarChart3 size={16} />,
@@ -54,861 +1695,332 @@ const ARTIFACT_COLORS: Record<string, string> = {
   file: "#64748B",
 };
 
-const ARTIFACT_LABEL_KEYS: Record<string, TranslationKey> = {
-  text: "showcase.typeDocument",
-  image: "showcase.typeRender",
-  video: "showcase.typeWalkthrough",
-  "3d": "showcase.type3dModel",
-  html: "showcase.type3dModel",
-  kpi: "showcase.typeMetrics",
-  table: "showcase.typeDataTable",
-  json: "showcase.typeStructuredData",
-  svg: "showcase.typeFloorPlan",
-  file: "showcase.typeExportFile",
+const TAB_FOR_TYPE: Record<string, TabId> = {
+  text: "data",
+  image: "media",
+  video: "media",
+  svg: "media",
+  kpi: "data",
+  table: "data",
+  json: "data",
+  "3d": "model",
+  html: "model",
+  file: "export",
 };
 
-export function OverviewTab({ data, onExpandVideo, onNavigateTab, onRetryVideo }: OverviewTabProps) {
-  const { t } = useLocale();
-  const [descExpanded, setDescExpanded] = useState(false);
-  const descLines = data.textContent.split("\n");
-  const shortDesc = descLines.slice(0, 4).join("\n");
-  const hasLongDesc = descLines.length > 4;
+// Map hero type to its artifact type so we can skip it in supporting cards
+const HERO_ARTIFACT_TYPES: Record<HeroType, string[]> = {
+  "floor-plan": ["svg"],
+  video: ["video"],
+  "3d-model": ["3d", "html"],
+  image: ["image"],
+  table: ["table"],
+  text: ["text"],
+  generic: [],
+};
 
-  // Compute artifact type breakdown
-  const artifactBreakdown = data.pipelineSteps
-    .filter(s => s.artifactType)
-    .map(s => ({
+function SupportingCards({
+  data,
+  heroType,
+  onNavigateTab,
+}: {
+  data: ShowcaseData;
+  heroType: HeroType;
+  onNavigateTab: (tab: TabId) => void;
+}) {
+  const { t } = useLocale();
+
+  // Build list of supporting items (skip the hero artifact type)
+  const heroTypes = HERO_ARTIFACT_TYPES[heroType];
+  const items = data.pipelineSteps
+    .filter(
+      (s) => s.artifactType && !heroTypes.includes(s.artifactType),
+    )
+    .map((s) => ({
       type: s.artifactType!,
       label: s.label,
-      nodeCategory: s.category,
+      category: s.category,
+      targetTab: (TAB_FOR_TYPE[s.artifactType!] ?? "export") as TabId,
     }));
 
-  // Derive tech stack from pipeline
-  const techStack = deriveTechStack(data, t);
+  // Deduplicate by type (show unique types only)
+  const seen = new Set<string>();
+  const uniqueItems = items.filter((item) => {
+    const key = `${item.type}-${item.targetTab}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 
-  const hasKpis = data.kpiMetrics.length > 0;
-  const hasHero = !!data.videoData || !!data.heroImageUrl;
-  const hasFloorPlan = !!data.svgContent;
+  if (uniqueItems.length === 0) return null;
+
+  // Always add export card at the end
+  const hasExportCard = uniqueItems.some((i) => i.targetTab === "export");
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-
-      {/* ── Floor Plan Hero (when SVG exists — primary deliverable) ──── */}
-      {hasFloorPlan && (
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-        >
-          <motion.button
-            whileHover={{ scale: 1.002 }}
-            whileTap={{ scale: 0.998 }}
-            onClick={() => onNavigateTab("media")}
-            style={{
-              position: "relative",
-              width: "100%",
-              background: "#FFFFFF",
-              border: `1px solid ${COLORS.GLASS_BORDER}`,
-              borderRadius: 14,
-              overflow: "hidden",
-              cursor: "pointer",
-              padding: 0,
-            }}
-          >
-            {/* SVG rendered at full width */}
-            <div
-              style={{
-                maxHeight: 380,
-                overflow: "hidden",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                padding: 20,
-              }}
-              dangerouslySetInnerHTML={{ __html: data.svgContent! }}
-            />
-            {/* Bottom fade + CTA */}
-            <div style={{
-              position: "absolute",
-              bottom: 0,
-              left: 0,
-              right: 0,
-              padding: "40px 20px 14px",
-              background: "linear-gradient(transparent, rgba(7,8,9,0.9) 70%)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-            }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <div style={{
-                  width: 28, height: 28, borderRadius: 7,
-                  background: `${COLORS.CYAN}18`,
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                }}>
-                  <Layers size={13} style={{ color: COLORS.CYAN }} />
-                </div>
-                <span style={{
-                  fontSize: 12, fontWeight: 600, color: COLORS.TEXT_PRIMARY,
-                }}>
-                  {t('showcase.typeFloorPlan')}
-                </span>
-              </div>
-              <span style={{
-                display: "flex", alignItems: "center", gap: 4,
-                fontSize: 11, fontWeight: 600, color: COLORS.CYAN,
-              }}>
-                {t('showcase.viewFullFloorPlan')}
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={COLORS.CYAN} strokeWidth="2">
-                  <path d="M9 18l6-6-6-6" />
-                </svg>
-              </span>
-            </div>
-          </motion.button>
-        </motion.div>
-      )}
-
-      {/* ── Top Row: Hero + Right Panel ──────────────────────────────────── */}
-      <div className="overview-top-grid" style={{
-        display: "grid",
-        gridTemplateColumns: hasHero ? "3fr 2fr" : "1fr",
-        gap: 20,
-        minHeight: hasHero ? 320 : undefined,
-      }}>
-        {/* Left: Hero Media */}
-        {hasHero && (
-          <div style={{ minWidth: 0 }}>
-            <HeroSection
-              videoData={data.videoData}
-              heroImageUrl={data.heroImageUrl}
-              onExpandVideo={onExpandVideo}
-              onRetryVideo={onRetryVideo}
-            />
-          </div>
-        )}
-
-        {/* Right: KPIs or Project Info */}
-        <div style={{
-          display: "flex",
-          flexDirection: "column",
-          gap: 12,
-          minWidth: 0,
-        }}>
-          {hasKpis ? (
-            <KpiStrip metrics={data.kpiMetrics} maxItems={6} compact />
-          ) : (
-            <ExecutionSummaryPanel data={data} />
-          )}
-          <PipelineViz steps={data.pipelineSteps} />
-        </div>
-      </div>
-
-      {/* ── Execution Details Banner ──────────────────────────────────── */}
-      <motion.div
-        className="overview-exec-banner"
-        initial={{ opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.1 }}
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.45 }}
+    >
+      <SectionLabel title="Also Generated" />
+      <div
+        className="supporting-grid"
         style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 16,
-          padding: "12px 18px",
-          background: `linear-gradient(135deg, ${COLORS.CYAN}06, ${COLORS.EMERALD}04)`,
-          border: `1px solid ${COLORS.CYAN}15`,
-          borderRadius: 10,
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))",
+          gap: 10,
         }}
       >
-        <div style={{
-          width: 32,
-          height: 32,
-          borderRadius: 8,
-          background: `${COLORS.EMERALD}15`,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          color: COLORS.EMERALD,
-          flexShrink: 0,
-        }}>
-          <CheckCircle size={16} />
-        </div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{
-            fontSize: 12,
-            fontWeight: 600,
-            color: COLORS.TEXT_PRIMARY,
-          }}>
-            {t('showcase.executionComplete')}
-          </div>
-          <div style={{
-            fontSize: 10,
-            color: COLORS.TEXT_MUTED,
-            marginTop: 1,
-          }}>
-            {new Date(data.executionMeta.executedAt).toLocaleDateString("en-US", {
-              month: "short", day: "numeric", year: "numeric",
-            })} at {new Date(data.executionMeta.executedAt).toLocaleTimeString("en-US", {
-              hour: "2-digit", minute: "2-digit",
-            })}
-          </div>
-        </div>
-        {data.executionMeta.durationMs != null && (
-          <div style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 4,
-            padding: "4px 10px",
-            borderRadius: 6,
-            background: "rgba(255,255,255,0.04)",
-          }}>
-            <Clock size={10} style={{ color: COLORS.TEXT_MUTED }} />
-            <span style={{ fontSize: 10, color: COLORS.TEXT_MUTED, fontWeight: 500 }}>
-              {data.executionMeta.durationMs < 1000
-                ? `${data.executionMeta.durationMs}ms`
-                : `${(data.executionMeta.durationMs / 1000).toFixed(1)}s`}
-            </span>
-          </div>
-        )}
-        <div style={{
-          display: "flex",
-          gap: 12,
-        }}>
-          <div style={{ textAlign: "center" }}>
-            <div style={{ fontSize: 14, fontWeight: 700, color: COLORS.TEXT_PRIMARY, fontVariantNumeric: "tabular-nums" }}>
-              {data.successNodes}/{data.totalNodes}
-            </div>
-            <div style={{ fontSize: 8, color: COLORS.TEXT_MUTED, textTransform: "uppercase", letterSpacing: "0.05em" }}>
-              {t('showcase.nodesPassed')}
-            </div>
-          </div>
-          <div style={{ width: 1, background: COLORS.GLASS_BORDER }} />
-          <div style={{ textAlign: "center" }}>
-            <div style={{ fontSize: 14, fontWeight: 700, color: COLORS.TEXT_PRIMARY, fontVariantNumeric: "tabular-nums" }}>
-              {data.totalArtifacts}
-            </div>
-            <div style={{ fontSize: 8, color: COLORS.TEXT_MUTED, textTransform: "uppercase", letterSpacing: "0.05em" }}>
-              {t('showcase.artifactsGenerated')}
-            </div>
-          </div>
-        </div>
-      </motion.div>
+        {uniqueItems.map((item, i) => {
+          const color = ARTIFACT_COLORS[item.type] ?? COLORS.TEXT_MUTED;
+          const icon = ARTIFACT_ICONS[item.type] ?? <File size={16} />;
+          const typeLabel =
+            item.type === "text"
+              ? t("showcase.typeDocument")
+              : item.type === "image"
+                ? t("showcase.typeRender")
+                : item.type === "json"
+                  ? t("showcase.typeStructuredData")
+                  : item.type === "kpi"
+                    ? t("showcase.typeMetrics")
+                    : item.type === "table"
+                      ? t("showcase.typeDataTable")
+                      : item.type === "svg"
+                        ? t("showcase.typeFloorPlan")
+                        : item.type === "3d" || item.type === "html"
+                          ? t("showcase.type3dModel")
+                          : item.type === "video"
+                            ? t("showcase.typeWalkthrough")
+                            : item.type === "file"
+                              ? t("showcase.typeExportFile")
+                              : item.type;
 
-      {/* ── Deliverables Grid ────────────────────────────────────────────── */}
-      <motion.div
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.15 }}
-      >
-        <SectionHeader icon={<Layers size={13} />} title={t('showcase.deliverables')} />
-        <div className="overview-deliverables-grid" style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))",
-          gap: 10,
-        }}>
-          {artifactBreakdown.map((item, i) => {
-            const color = ARTIFACT_COLORS[item.type] ?? COLORS.TEXT_MUTED;
-            const icon = ARTIFACT_ICONS[item.type] ?? <File size={16} />;
-            const labelKey = ARTIFACT_LABEL_KEYS[item.type];
-            const typeLabel = labelKey ? t(labelKey) : item.type;
-
-            // Map artifact types to their corresponding tabs
-            const tabMapping: Record<string, TabId> = {
-              text: "data",
-              image: "media",
-              video: "media",
-              svg: "media",
-              kpi: "data",
-              table: "data",
-              json: "data",
-              "3d": "model",
-              html: "model",
-              file: "export",
-            };
-            const targetTab = tabMapping[item.type] ?? "export";
-
-            return (
-              <motion.button
-                key={`${item.type}-${i}`}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.2 + i * 0.04 }}
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={() => onNavigateTab(targetTab)}
+          return (
+            <motion.button
+              key={`${item.type}-${i}`}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.5 + i * 0.04 }}
+              whileHover={{ scale: 1.02, y: -2 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={() => onNavigateTab(item.targetTab)}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 12,
+                padding: "14px 16px",
+                borderRadius: 12,
+                background: COLORS.GLASS_BG,
+                border: `1px solid ${COLORS.GLASS_BORDER}`,
+                cursor: "pointer",
+                transition: "border-color 0.2s, box-shadow 0.2s",
+                textAlign: "left",
+                position: "relative",
+                overflow: "hidden",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.borderColor = `${color}40`;
+                e.currentTarget.style.boxShadow = `0 4px 20px ${color}10`;
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.borderColor = COLORS.GLASS_BORDER;
+                e.currentTarget.style.boxShadow = "none";
+              }}
+            >
+              {/* Top accent */}
+              <div
                 style={{
-                  background: COLORS.GLASS_BG,
-                  border: `1px solid ${COLORS.GLASS_BORDER}`,
-                  borderRadius: 10,
-                  padding: "14px 16px",
-                  position: "relative",
-                  overflow: "hidden",
-                  cursor: "pointer",
-                  transition: "all 0.2s ease",
-                  textAlign: "left",
-                }}
-                onMouseEnter={e => {
-                  e.currentTarget.style.borderColor = `${color}40`;
-                  e.currentTarget.style.boxShadow = `0 0 20px ${color}10`;
-                }}
-                onMouseLeave={e => {
-                  e.currentTarget.style.borderColor = COLORS.GLASS_BORDER;
-                  e.currentTarget.style.boxShadow = "none";
-                }}
-              >
-                {/* Top accent line */}
-                <div style={{
                   position: "absolute",
                   top: 0,
                   left: 0,
                   right: 0,
                   height: 2,
                   background: `linear-gradient(90deg, ${color}60, transparent)`,
-                }} />
-                <div style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 10,
-                }}>
-                  <div style={{
-                    width: 32,
-                    height: 32,
-                    borderRadius: 8,
-                    background: `${color}12`,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    color,
-                    flexShrink: 0,
-                  }}>
-                    {icon}
-                  </div>
-                  <div style={{ minWidth: 0, flex: 1 }}>
-                    <div style={{
-                      fontSize: 11,
-                      fontWeight: 600,
-                      color: COLORS.TEXT_PRIMARY,
-                      whiteSpace: "nowrap",
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                    }}>
-                      {typeLabel}
-                    </div>
-                    <div style={{
-                      fontSize: 9,
-                      color: COLORS.TEXT_MUTED,
-                      whiteSpace: "nowrap",
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                    }}>
-                      {item.label}
-                    </div>
-                  </div>
-                  <svg
-                    width="12" height="12" viewBox="0 0 24 24" fill="none"
-                    stroke={COLORS.TEXT_MUTED} strokeWidth="2"
-                    style={{ flexShrink: 0, opacity: 0.4 }}
-                  >
-                    <path d="M9 18l6-6-6-6" />
-                  </svg>
-                </div>
-              </motion.button>
-            );
-          })}
-        </div>
-      </motion.div>
+                }}
+              />
 
-      {/* ── Description ──────────────────────────────────────────────────── */}
-      {data.textContent && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.25 }}
-        >
-          <SectionHeader icon={<FileText size={13} />} title={t('showcase.projectBrief')} />
-          <div
-            style={{
-              background: COLORS.GLASS_BG,
-              border: `1px solid ${COLORS.GLASS_BORDER}`,
-              borderRadius: 10,
-              padding: "18px 22px",
-              position: "relative",
-              overflow: "hidden",
-            }}
-          >
-            {/* Blueprint corner marks */}
-            <CornerMarks />
-            <div style={{
-              fontSize: 13,
-              color: COLORS.TEXT_SECONDARY,
-              lineHeight: 1.75,
-              whiteSpace: "pre-wrap",
-            }}>
-              {descExpanded ? data.textContent : shortDesc}
-              {hasLongDesc && (
-                <button
-                  onClick={() => setDescExpanded(e => !e)}
-                  style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: 4,
-                    background: "none",
-                    border: "none",
-                    color: COLORS.CYAN,
-                    fontSize: 12,
-                    fontWeight: 500,
-                    cursor: "pointer",
-                    marginLeft: 8,
-                  }}
-                >
-                  {descExpanded ? t('showcase.showLess') : `${t('showcase.showMoreLines')} (+${descLines.length - 4} ${t('showcase.lines')})`}
-                  {descExpanded ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
-                </button>
-              )}
-            </div>
-          </div>
-        </motion.div>
-      )}
-
-      {/* ── Bottom Row: Tech Stack + Quick Actions ───────────────────────── */}
-      <div className="overview-bottom-grid" style={{
-        display: "grid",
-        gridTemplateColumns: "1fr 1fr",
-        gap: 16,
-      }}>
-        {/* Tech Stack */}
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
-        >
-          <SectionHeader icon={<Cpu size={13} />} title={t('showcase.technologyStack')} />
-          <div style={{
-            background: COLORS.GLASS_BG,
-            border: `1px solid ${COLORS.GLASS_BORDER}`,
-            borderRadius: 10,
-            padding: "16px 18px",
-            display: "flex",
-            flexDirection: "column",
-            gap: 10,
-          }}>
-            {techStack.map((tech, i) => (
-              <motion.div
-                key={tech.name}
-                initial={{ opacity: 0, x: -8 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.35 + i * 0.04 }}
+              <div
                 style={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: 10,
+                  background: `${color}12`,
                   display: "flex",
                   alignItems: "center",
-                  justifyContent: "space-between",
+                  justifyContent: "center",
+                  color,
+                  flexShrink: 0,
                 }}
               >
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <div style={{
-                    width: 6,
-                    height: 6,
-                    borderRadius: "50%",
-                    background: tech.color,
-                    boxShadow: `0 0 8px ${tech.color}40`,
-                  }} />
-                  <span style={{ fontSize: 11, color: COLORS.TEXT_SECONDARY, fontWeight: 500 }}>
-                    {tech.name}
-                  </span>
-                </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                  {tech.statusBadge && (
-                    <span
-                      style={{
-                        fontSize: 8, fontWeight: 700,
-                        padding: "2px 6px", borderRadius: 4,
-                        background: `${tech.statusBadge.badgeColor}15`,
-                        color: tech.statusBadge.badgeColor,
-                        textTransform: "uppercase", letterSpacing: "0.04em",
-                        cursor: tech.statusBadge.link ? "pointer" : "default",
-                      }}
-                      onClick={() => { if (tech.statusBadge?.link) window.open(tech.statusBadge.link, "_blank"); }}
-                    >
-                      {tech.statusBadge.text}
-                    </span>
-                  )}
-                  <span style={{
-                    fontSize: 9,
-                    color: COLORS.TEXT_MUTED,
-                    padding: "2px 8px",
-                    borderRadius: 4,
-                    background: "rgba(255,255,255,0.03)",
-                  }}>
-                    {tech.role}
-                  </span>
-                </div>
-              </motion.div>
-            ))}
-          </div>
-        </motion.div>
-
-        {/* Quick Actions + AEC Info */}
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
-        >
-          <SectionHeader icon={<Zap size={13} />} title={t('showcase.quickActions')} />
-          <div style={{
-            display: "flex",
-            flexDirection: "column",
-            gap: 8,
-          }}>
-            {data.model3dData && (
-              <QuickActionButton
-                icon={<Box size={14} />}
-                label={data.model3dData.kind === "html-iframe" ? t('showcase.explore3dModel') : t('showcase.view3dModel')}
-                description={data.model3dData.kind === "html-iframe" ? t('showcase.interactiveWasd') : t('showcase.interactiveMassing')}
-                color={COLORS.CYAN}
-                onClick={() => onNavigateTab("model")}
-              />
-            )}
-            {data.videoData && (
-              <QuickActionButton
-                icon={<Film size={14} />}
-                label={t('showcase.watchWalkthrough')}
-                description={`${data.videoData.durationSeconds}s · ${data.videoData.shotCount} ${t('showcase.shots').toLowerCase()}`}
-                color={COLORS.VIOLET}
-                onClick={onExpandVideo}
-              />
-            )}
-            {data.allImageUrls.length > 0 && (
-              <QuickActionButton
-                icon={<ImageIcon size={14} />}
-                label={t('showcase.viewRenders')}
-                description={`${data.allImageUrls.length} ${data.allImageUrls.length > 1 ? t('showcase.conceptRenders') : t('showcase.conceptRender')}`}
-                color={COLORS.EMERALD}
-                onClick={() => onNavigateTab("media")}
-              />
-            )}
-            <QuickActionButton
-              icon={<FileDown size={14} />}
-              label={t('showcase.downloadCenter')}
-              description={t('showcase.pdfVideoFiles')}
-              color={COLORS.AMBER}
-              onClick={() => onNavigateTab("export")}
-            />
-          </div>
-        </motion.div>
-      </div>
-
-      {/* ── AEC Ambient Footer ───────────────────────────────────────────── */}
-      <AECFooter />
-    </div>
-  );
-}
-
-// ─── Execution Summary Panel (shown when no KPIs) ───────────────────────────
-
-function ExecutionSummaryPanel({ data }: { data: ShowcaseData }) {
-  const { t } = useLocale();
-  const stats = [
-    {
-      icon: <Layers size={16} />,
-      label: t('showcase.statsArtifacts'),
-      value: data.totalArtifacts,
-      color: COLORS.CYAN,
-    },
-    {
-      icon: <Sparkles size={16} />,
-      label: t('showcase.statsNodesRun'),
-      value: data.successNodes,
-      suffix: `/ ${data.totalNodes}`,
-      color: COLORS.EMERALD,
-    },
-    {
-      icon: <Clock size={16} />,
-      label: t('showcase.statsPipeline'),
-      value: data.pipelineSteps.length,
-      suffix: ` ${t('showcase.statsSteps')}`,
-      color: COLORS.AMBER,
-    },
-  ];
-
-  // Count artifact types
-  const typeCounts: Record<string, number> = {};
-  data.pipelineSteps.forEach(s => {
-    if (s.artifactType) {
-      typeCounts[s.artifactType] = (typeCounts[s.artifactType] ?? 0) + 1;
-    }
-  });
-
-  return (
-    <div style={{
-      display: "flex",
-      flexDirection: "column",
-      gap: 10,
-      height: "100%",
-    }}>
-      {/* Stats cards */}
-      {stats.map((stat, i) => (
-        <motion.div
-          key={stat.label}
-          initial={{ opacity: 0, x: 15 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: 0.1 + i * 0.06 }}
-          style={{
-            background: COLORS.GLASS_BG,
-            border: `1px solid ${COLORS.GLASS_BORDER}`,
-            borderRadius: 10,
-            padding: "14px 16px",
-            display: "flex",
-            alignItems: "center",
-            gap: 12,
-            position: "relative",
-            overflow: "hidden",
-          }}
-        >
-          <div style={{
-            position: "absolute",
-            left: 0,
-            top: 0,
-            bottom: 0,
-            width: 3,
-            borderRadius: "0 2px 2px 0",
-            background: stat.color,
-          }} />
-          <div style={{
-            width: 36,
-            height: 36,
-            borderRadius: 8,
-            background: `${stat.color}10`,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            color: stat.color,
-            flexShrink: 0,
-          }}>
-            {stat.icon}
-          </div>
-          <div>
-            <div style={{
-              fontSize: 22,
-              fontWeight: 700,
-              color: COLORS.TEXT_PRIMARY,
-              lineHeight: 1.1,
-              fontVariantNumeric: "tabular-nums",
-            }}>
-              <AnimatedNumber value={stat.value} duration={1000 + i * 300} />
-              {stat.suffix && (
-                <span style={{ fontSize: 11, color: COLORS.TEXT_MUTED, fontWeight: 400, marginLeft: 3 }}>
-                  {stat.suffix}
-                </span>
-              )}
-            </div>
-            <div style={{
-              fontSize: 10,
-              color: COLORS.TEXT_MUTED,
-              textTransform: "uppercase",
-              letterSpacing: "0.06em",
-              fontWeight: 500,
-            }}>
-              {stat.label}
-            </div>
-          </div>
-        </motion.div>
-      ))}
-
-      {/* Artifact type mini-bar */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 0.4 }}
-        style={{
-          display: "flex",
-          gap: 6,
-          flexWrap: "wrap",
-          marginTop: 2,
-        }}
-      >
-        {Object.entries(typeCounts).map(([type, count]) => {
-          const color = ARTIFACT_COLORS[type] ?? COLORS.TEXT_MUTED;
-          return (
-            <div
-              key={type}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 4,
-                padding: "3px 8px",
-                borderRadius: 6,
-                background: `${color}10`,
-                border: `1px solid ${color}20`,
-              }}
-            >
-              <div style={{ color, display: "flex" }}>
-                {ARTIFACT_ICONS[type] ?? <File size={10} />}
+                {icon}
               </div>
-              <span style={{ fontSize: 9, color, fontWeight: 600 }}>
-                {count} {ARTIFACT_LABEL_KEYS[type] ? t(ARTIFACT_LABEL_KEYS[type]) : type}
-              </span>
-            </div>
+
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <div
+                  style={{
+                    fontSize: 12,
+                    fontWeight: 600,
+                    color: COLORS.TEXT_PRIMARY,
+                    whiteSpace: "nowrap",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                  }}
+                >
+                  {typeLabel}
+                </div>
+                <div
+                  style={{
+                    fontSize: 10,
+                    color: COLORS.TEXT_MUTED,
+                    whiteSpace: "nowrap",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                  }}
+                >
+                  {item.label}
+                </div>
+              </div>
+
+              <ArrowRight
+                size={14}
+                style={{
+                  color: COLORS.TEXT_MUTED,
+                  opacity: 0.4,
+                  flexShrink: 0,
+                }}
+              />
+            </motion.button>
           );
         })}
-      </motion.div>
-    </div>
-  );
-}
 
-// ─── Tech Stack Derivation ──────────────────────────────────────────────────
-
-interface TechItem {
-  name: string;
-  role: string;
-  color: string;
-  statusBadge?: { text: string; badgeColor: string; link?: string };
-}
-
-function deriveTechStack(data: ShowcaseData, t: (key: TranslationKey) => string): TechItem[] {
-  const techs: TechItem[] = [];
-  const seen = new Set<string>();
-
-  const add = (name: string, role: string, color: string, statusBadge?: TechItem["statusBadge"]) => {
-    if (!seen.has(name)) {
-      seen.add(name);
-      techs.push({ name, role, color, statusBadge });
-    }
-  };
-
-  // Derive Kling status and model name from video artifact
-  let klingBadge: TechItem["statusBadge"] | undefined;
-  let klingModelName = "Kling 2.6";
-  if (data.videoData?.nodeId) {
-    const videoArtifact = useExecutionStore.getState().artifacts.get(data.videoData.nodeId);
-    if (videoArtifact) {
-      const meta = (videoArtifact.metadata ?? {}) as Record<string, unknown>;
-      const artData = (videoArtifact.data ?? {}) as Record<string, unknown>;
-      klingModelName = artData.usedOmni === true ? "Kling 3.0 Omni" : "Kling 2.6";
-      if (meta.engine === "kling-official" && artData.videoGenerationStatus === "complete") {
-        klingBadge = { text: t("showcase.active"), badgeColor: COLORS.EMERALD };
-      } else if (meta.engine === "kling-official" && artData.videoGenerationStatus === "processing") {
-        klingBadge = { text: t("showcase.generatingStatus"), badgeColor: COLORS.AMBER };
-      } else if (meta.engine === "threejs-client") {
-        klingBadge = { text: t("showcase.fallback"), badgeColor: COLORS.TEXT_MUTED };
-      }
-    }
-    // Check videoGenProgress for balance errors
-    const progressStates = useExecutionStore.getState().videoGenProgress;
-    for (const [, state] of progressStates) {
-      if (state.status === "failed" && state.failureMessage?.toLowerCase().includes("balance")) {
-        klingBadge = { text: t("showcase.noCredits"), badgeColor: "#ff5050", link: "https://klingai.com" };
-      }
-    }
-  }
-
-  data.pipelineSteps.forEach(step => {
-    const cat = step.category;
-    if (cat === "input") add(t("showcase.techUserInput"), "Data source", "#64748B");
-    if (step.label.includes("Brief") || step.label.includes("Analyzer") || step.label.includes("Understanding") || step.label.includes("Parser") || step.label.includes("Extractor")) {
-      add(t("showcase.techGpt4o"), "AI analysis", "#8B5CF6");
-    }
-    if (step.label.includes("Massing")) add(t("showcase.techProceduralEngine"), "3D geometry", COLORS.AMBER);
-    if (step.label.includes("Style") || step.label.includes("Composer")) add(t("showcase.techGpt4o"), "Prompt engineering", "#8B5CF6");
-    if (step.label.includes("Concept Render")) add(t("showcase.techDalle3"), "Image generation", COLORS.EMERALD);
-    if (step.label.includes("Video") || step.label.includes("Walkthrough")) add(klingModelName, "Video synthesis", COLORS.CYAN, klingBadge);
-    if (step.label.includes("3D Recon")) add(t("showcase.techMeshy"), "3D reconstruction", COLORS.AMBER);
-    if (step.label.includes("Floor Plan Gen")) add(t("showcase.techSvg"), "Plan generation", "#14B8A6");
-    if (step.label.includes("Interactive 3D") || step.label.includes("3D Viewer")) add(t("showcase.techThreejs"), "3D visualization", COLORS.CYAN);
-    if (step.label.includes("Floor Plan Anal")) add("GPT-4o", "Vision analysis", "#8B5CF6");
-    if (step.label.includes("Quantity") || step.label.includes("BOQ")) add(t("showcase.techWebIfc"), "BIM extraction", "#F59E0B");
-  });
-
-  if (techs.length === 0) {
-    add(t("showcase.neobimEngine"), "Workflow orchestration", COLORS.CYAN);
-  }
-
-  return techs;
-}
-
-// ─── AEC Ambient Footer ─────────────────────────────────────────────────────
-
-function AECFooter() {
-  const { t } = useLocale();
-  const aecFacts = [
-    { icon: <Building2 size={13} />, text: t('showcase.aecGrade') },
-    { icon: <Shield size={13} />, text: t('showcase.enterpriseReady') },
-    { icon: <Ruler size={13} />, text: t('showcase.dimensionallyAccurate') },
-    { icon: <MapPin size={13} />, text: t('showcase.contextAware') },
-  ];
-
-  return (
-    <motion.div
-      className="overview-footer"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ delay: 0.5 }}
-      style={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        padding: "14px 0",
-        borderTop: `1px solid ${COLORS.GLASS_BORDER}`,
-      }}
-    >
-      <div style={{ display: "flex", gap: 20 }}>
-        {aecFacts.map((fact, i) => (
-          <motion.div
-            key={fact.text}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.55 + i * 0.05 }}
+        {/* Export card */}
+        {!hasExportCard && (
+          <motion.button
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.5 + uniqueItems.length * 0.04 }}
+            whileHover={{ scale: 1.02, y: -2 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={() => onNavigateTab("export")}
             style={{
               display: "flex",
               alignItems: "center",
-              gap: 6,
-              color: COLORS.TEXT_MUTED,
-              fontSize: 10,
+              gap: 12,
+              padding: "14px 16px",
+              borderRadius: 12,
+              background: COLORS.GLASS_BG,
+              border: `1px solid ${COLORS.GLASS_BORDER}`,
+              cursor: "pointer",
+              transition: "border-color 0.2s, box-shadow 0.2s",
+              textAlign: "left",
+              position: "relative",
+              overflow: "hidden",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.borderColor = `${COLORS.AMBER}40`;
+              e.currentTarget.style.boxShadow = `0 4px 20px ${COLORS.AMBER}10`;
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.borderColor = COLORS.GLASS_BORDER;
+              e.currentTarget.style.boxShadow = "none";
             }}
           >
-            <span style={{ opacity: 0.5, display: "flex" }}>{fact.icon}</span>
-            {fact.text}
-          </motion.div>
-        ))}
-      </div>
-      <div style={{ fontSize: 9, color: COLORS.TEXT_MUTED, opacity: 0.5 }}>
-        {t('showcase.neobimEngineVersion')}
+            <div
+              style={{
+                position: "absolute",
+                top: 0,
+                left: 0,
+                right: 0,
+                height: 2,
+                background: `linear-gradient(90deg, ${COLORS.AMBER}60, transparent)`,
+              }}
+            />
+            <div
+              style={{
+                width: 36,
+                height: 36,
+                borderRadius: 10,
+                background: `${COLORS.AMBER}12`,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                color: COLORS.AMBER,
+                flexShrink: 0,
+              }}
+            >
+              <Download size={16} />
+            </div>
+            <div style={{ minWidth: 0, flex: 1 }}>
+              <div
+                style={{
+                  fontSize: 12,
+                  fontWeight: 600,
+                  color: COLORS.TEXT_PRIMARY,
+                }}
+              >
+                {t("showcase.downloadCenter")}
+              </div>
+              <div style={{ fontSize: 10, color: COLORS.TEXT_MUTED }}>
+                {t("showcase.pdfVideoFiles")}
+              </div>
+            </div>
+            <ArrowRight
+              size={14}
+              style={{
+                color: COLORS.TEXT_MUTED,
+                opacity: 0.4,
+                flexShrink: 0,
+              }}
+            />
+          </motion.button>
+        )}
       </div>
     </motion.div>
   );
 }
 
-// ─── Section Header ─────────────────────────────────────────────────────────
+// ═════════════════════════════════════════════════════════════════════════════
+// ── HELPERS ─────────────────────────────────────────────────────────────────
+// ═════════════════════════════════════════════════════════════════════════════
 
-function SectionHeader({ icon, title }: { icon: React.ReactNode; title: string }) {
+function SectionLabel({ title }: { title: string }) {
   return (
-    <div style={{
-      display: "flex",
-      alignItems: "center",
-      gap: 6,
-      marginBottom: 10,
-    }}>
-      <span style={{ color: COLORS.TEXT_MUTED, display: "flex" }}>{icon}</span>
-      <span style={{
-        fontSize: 11,
-        fontWeight: 600,
-        color: COLORS.TEXT_SECONDARY,
-        textTransform: "uppercase",
-        letterSpacing: "0.06em",
-      }}>
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        marginBottom: 12,
+      }}
+    >
+      <span
+        style={{
+          fontSize: 11,
+          fontWeight: 700,
+          color: COLORS.TEXT_MUTED,
+          textTransform: "uppercase",
+          letterSpacing: "0.08em",
+        }}
+      >
         {title}
       </span>
-      <div style={{
-        flex: 1,
-        height: 1,
-        marginLeft: 8,
-        background: `linear-gradient(90deg, ${COLORS.GLASS_BORDER}, transparent)`,
-      }} />
+      <div
+        style={{
+          flex: 1,
+          height: 1,
+          background: `linear-gradient(90deg, ${COLORS.GLASS_BORDER}, transparent)`,
+        }}
+      />
     </div>
   );
 }
 
-// ─── Blueprint Corner Marks ─────────────────────────────────────────────────
-
 function CornerMarks() {
-  const markStyle = (top: boolean, left: boolean): React.CSSProperties => ({
+  const markStyle = (
+    top: boolean,
+    left: boolean,
+  ): React.CSSProperties => ({
     position: "absolute",
     [top ? "top" : "bottom"]: 6,
     [left ? "left" : "right"]: 6,
@@ -919,8 +2031,12 @@ function CornerMarks() {
     borderWidth: 0,
     ...(top && left ? { borderTopWidth: 1, borderLeftWidth: 1 } : {}),
     ...(top && !left ? { borderTopWidth: 1, borderRightWidth: 1 } : {}),
-    ...(!top && left ? { borderBottomWidth: 1, borderLeftWidth: 1 } : {}),
-    ...(!top && !left ? { borderBottomWidth: 1, borderRightWidth: 1 } : {}),
+    ...(!top && left
+      ? { borderBottomWidth: 1, borderLeftWidth: 1 }
+      : {}),
+    ...(!top && !left
+      ? { borderBottomWidth: 1, borderRightWidth: 1 }
+      : {}),
   });
 
   return (
@@ -933,79 +2049,19 @@ function CornerMarks() {
   );
 }
 
-// ─── Quick Action Button ────────────────────────────────────────────────────
-
-function QuickActionButton({
-  icon,
-  label,
-  description,
-  color,
-  onClick,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  description?: string;
-  color: string;
-  onClick: () => void;
-}) {
-  return (
-    <motion.button
-      whileHover={{ scale: 1.01 }}
-      whileTap={{ scale: 0.99 }}
-      onClick={onClick}
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 12,
-        padding: "12px 16px",
-        borderRadius: 10,
-        background: COLORS.GLASS_BG,
-        border: `1px solid ${COLORS.GLASS_BORDER}`,
-        color: COLORS.TEXT_PRIMARY,
-        fontSize: 12,
-        fontWeight: 500,
-        cursor: "pointer",
-        transition: "all 0.15s ease",
-        textAlign: "left",
-        width: "100%",
-      }}
-      onMouseEnter={e => {
-        e.currentTarget.style.borderColor = `${color}40`;
-        e.currentTarget.style.boxShadow = `0 0 20px ${color}08`;
-      }}
-      onMouseLeave={e => {
-        e.currentTarget.style.borderColor = COLORS.GLASS_BORDER;
-        e.currentTarget.style.boxShadow = "none";
-      }}
-    >
-      <div style={{
-        width: 34,
-        height: 34,
-        borderRadius: 8,
-        background: `${color}10`,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        color,
-        flexShrink: 0,
-      }}>
-        {icon}
-      </div>
-      <div>
-        <div style={{ fontWeight: 600, fontSize: 12 }}>{label}</div>
-        {description && (
-          <div style={{ fontSize: 10, color: COLORS.TEXT_MUTED, marginTop: 1 }}>
-            {description}
-          </div>
-        )}
-      </div>
-      <svg
-        width="14" height="14" viewBox="0 0 24 24" fill="none"
-        stroke={COLORS.TEXT_MUTED} strokeWidth="2"
-        style={{ marginLeft: "auto", flexShrink: 0, opacity: 0.5 }}
-      >
-        <path d="M9 18l6-6-6-6" />
-      </svg>
-    </motion.button>
-  );
+function getRoomColor(name: string): string {
+  const n = name.toLowerCase();
+  if (n.includes("bedroom") || n.includes("bed")) return "#6366F1";
+  if (n.includes("kitchen")) return "#F59E0B";
+  if (n.includes("bathroom") || n.includes("bath")) return "#14B8A6";
+  if (n.includes("living")) return "#10B981";
+  if (n.includes("wc") || n.includes("toilet")) return "#64748B";
+  if (n.includes("stair")) return "#8B5CF6";
+  if (n.includes("balcony") || n.includes("terrace")) return "#06B6D4";
+  if (n.includes("hall") || n.includes("corridor")) return "#A1A1AA";
+  if (n.includes("dining")) return "#E11D48";
+  if (n.includes("office") || n.includes("study")) return "#2563EB";
+  if (n.includes("laundry")) return "#7C3AED";
+  if (n.includes("storage") || n.includes("closet")) return "#78716C";
+  return "#00F5FF";
 }

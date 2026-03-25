@@ -30,7 +30,7 @@ export function ShowcaseHeader({
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
-        padding: "10px 20px",
+        padding: "10px clamp(12px, 3vw, 20px)",
         borderBottom: `1px solid ${COLORS.GLASS_BORDER}`,
         background: "rgba(10,12,16,0.92)",
         backdropFilter: "blur(24px)",

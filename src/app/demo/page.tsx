@@ -28,7 +28,7 @@ export default function DemoPage() {
     setDemoMode(true);
     clearArtifacts();
 
-    const template = PREBUILT_WORKFLOWS_MAP.get("wf-01");
+    const template = PREBUILT_WORKFLOWS_MAP.get("wf-18");
     if (template) {
       loadFromTemplate(template);
     }

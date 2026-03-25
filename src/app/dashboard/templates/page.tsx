@@ -53,10 +53,10 @@ const SORT_OPTION_KEYS: Record<string, string> = {
 const COMPLEXITY_ORDER: Record<string, number> = { simple: 0, intermediate: 1, advanced: 2 };
 
 // Templates that use expensive API nodes (render, video, 3D model) — locked for FREE users
-const LOCKED_IDS = new Set(["wf-03", "wf-12", "wf-14", "wf-15", "wf-16", "wf-17"]);
+const LOCKED_IDS = new Set(["wf-03", "wf-12", "wf-14", "wf-16", "wf-17"]);
 
 // Quick start templates (simple, fast output)
-const QUICK_START_IDS = ["wf-01", "wf-04", "wf-11"];
+const QUICK_START_IDS = ["wf-18", "wf-05", "wf-11"];
 
 // Core pipelines (the main value props — 3D, IFC, BOQ, 2D)
 const CORE_IDS = ["wf-09", "wf-05", "wf-17", "wf-14", "wf-16", "wf-18"];
@@ -79,19 +79,16 @@ function hexToRgb(hex: string): string {
 // ─── Video/image preview mapping for template cards ─────────────────────────
 const R2 = "https://pub-27d9a7371b6d47ff94fee1a3228f1720.r2.dev/workflow-demos";
 const TEMPLATE_PREVIEWS: Record<string, { type: "video"; url: string; start: number } | { type: "svg"; output: string } | { type: "image"; url: string }> = {
-  "wf-01": { type: "video", url: `${R2}/text-to-concept-building.mp4`, start: 105 },
   "wf-03": { type: "svg", output: "render" },
-  "wf-04": { type: "video", url: `${R2}/parameters-to-3d-building.mp4`, start: 20 },
   "wf-05": { type: "video", url: `${R2}/ifc-exporter.mp4`, start: 120 },
   "wf-09": { type: "video", url: `${R2}/boq-result.mp4`, start: 45 },
-  "wf-11": { type: "video", url: `${R2}/text-prompt-to-floor-plan.mp4`, start: 22 },
-  "wf-12": { type: "video", url: `${R2}/text-to-concept-building.mp4`, start: 108 },
+  "wf-11": { type: "video", url: `${R2}/text-prompt-to-floor-plan.mp4`, start: 28 },
+  "wf-12": { type: "video", url: `${R2}/text-to-concept-building.mp4`, start: 132 },
   "wf-13": { type: "image", url: `${R2}/site-analysis-preview.jpg` },
   "wf-14": { type: "video", url: `${R2}/floorplan-to-3d-video.mp4`, start: 65 },
-  "wf-15": { type: "video", url: `${R2}/floorplan-to-3d-video.mp4`, start: 65 },
   "wf-16": { type: "video", url: `${R2}/floorplan-to-3d-video.mp4`, start: 65 },
   "wf-17": { type: "video", url: `${R2}/floor-plan-demo.mp4`, start: 100 },
-  "wf-18": { type: "video", url: `${R2}/ifc-exporter.mp4`, start: 120 },
+  "wf-18": { type: "video", url: `${R2}/text-to-concept-building.mp4`, start: 132 },
 };
 
 // SVG output type illustrations
