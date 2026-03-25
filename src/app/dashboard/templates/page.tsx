@@ -815,101 +815,133 @@ export default function TemplatesPage() {
                         const catRgb = hexToRgb(catColor);
                         const preview = TEMPLATE_PREVIEWS[wf.id];
                         const nodeCount = wf.tileGraph.nodes.length;
+
+                        // Output type badges derived from expectedOutputs
+                        const outputBadges: Array<{ label: string; color: string }> = [];
+                        const eo = (wf.expectedOutputs ?? []).join(" ").toLowerCase();
+                        if (eo.includes("floor plan") || eo.includes("svg")) outputBadges.push({ label: "Floor Plan", color: "#14B8A6" });
+                        if (eo.includes("3d") || eo.includes("massing") || eo.includes("interactive")) outputBadges.push({ label: "3D Model", color: "#FFBF00" });
+                        if (eo.includes("render") || eo.includes("image") || eo.includes("concept")) outputBadges.push({ label: "Render", color: "#10B981" });
+                        if (eo.includes("video") || eo.includes("walkthrough") || eo.includes("cinematic")) outputBadges.push({ label: "Video", color: "#8B5CF6" });
+                        if (eo.includes("ifc") || eo.includes("bim")) outputBadges.push({ label: "IFC", color: "#3B82F6" });
+                        if (eo.includes("boq") || eo.includes("xlsx") || eo.includes("spreadsheet") || eo.includes("quantities")) outputBadges.push({ label: "BOQ", color: "#F59E0B" });
+                        if (eo.includes("description") || eo.includes("analysis") || eo.includes("brief")) outputBadges.push({ label: "Report", color: "#64748B" });
+
                         return (
                           <motion.div
                             key={wf.id}
+                            className="template-card"
                             initial={{ opacity: 0, y: 16 }}
                             animate={{ opacity: 1, y: 0 }}
-                            transition={{ duration: 0.25, delay: (baseIndex + i) * 0.04, ease: "easeOut" }}
-                            whileHover={{ y: -5, transition: { duration: 0.2 } }}
+                            transition={{ duration: 0.3, delay: (baseIndex + i) * 0.05, ease: "easeOut" }}
+                            whileHover={{ y: -6, transition: { duration: 0.25 } }}
                             onClick={() => handleCardClick(wf)}
                             style={{
                               cursor: "pointer", position: "relative",
                               borderRadius: 16, overflow: "hidden",
-                              background: "linear-gradient(165deg, rgba(16,16,28,0.98), rgba(10,10,18,0.99))",
-                              border: `1px solid rgba(${catRgb}, 0.08)`,
-                              boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
-                              transition: "border-color 0.2s, box-shadow 0.2s",
+                              background: "linear-gradient(165deg, rgba(18,19,32,0.98), rgba(12,13,22,0.99))",
+                              border: `1px solid rgba(${catRgb}, 0.12)`,
+                              boxShadow: "0 2px 12px rgba(0,0,0,0.2)",
+                              transition: "border-color 0.25s, box-shadow 0.25s, transform 0.25s",
                             }}
                             onMouseEnter={e => {
-                              (e.currentTarget as HTMLElement).style.borderColor = `rgba(${catRgb},0.2)`;
-                              (e.currentTarget as HTMLElement).style.boxShadow = `0 8px 30px rgba(0,0,0,0.3), 0 0 20px rgba(${catRgb},0.04)`;
+                              (e.currentTarget as HTMLElement).style.borderColor = `rgba(${catRgb},0.35)`;
+                              (e.currentTarget as HTMLElement).style.boxShadow = `0 12px 40px rgba(0,0,0,0.4), 0 0 30px rgba(${catRgb},0.08)`;
                             }}
                             onMouseLeave={e => {
-                              (e.currentTarget as HTMLElement).style.borderColor = `rgba(${catRgb},0.08)`;
-                              (e.currentTarget as HTMLElement).style.boxShadow = "0 2px 8px rgba(0,0,0,0.15)";
+                              (e.currentTarget as HTMLElement).style.borderColor = `rgba(${catRgb},0.12)`;
+                              (e.currentTarget as HTMLElement).style.boxShadow = "0 2px 12px rgba(0,0,0,0.2)";
                             }}
                           >
-                            {/* Preview area */}
-                            <div style={{ position: "relative", height: 160, overflow: "hidden", background: `rgba(${catRgb}, 0.02)` }}>
+                            {/* Preview area — taller for better visibility */}
+                            <div className="template-card-preview" style={{ position: "relative", height: 200, overflow: "hidden", background: `rgba(${catRgb}, 0.03)` }}>
                               {/* Top accent line */}
-                              <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, background: `linear-gradient(90deg, ${catColor}, ${catColor}40)`, zIndex: 3 }} />
+                              <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, background: `linear-gradient(90deg, ${catColor}, ${catColor}60, transparent)`, zIndex: 3 }} />
 
                               {preview?.type === "video" ? (
                                 <video
                                   src={preview.url} muted playsInline
                                   onLoadedMetadata={e => { e.currentTarget.currentTime = preview.start; }}
                                   onMouseEnter={e => { e.currentTarget.play().catch(() => {}); }}
-                                  onMouseLeave={e => { e.currentTarget.pause(); }}
-                                  style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                                  onMouseLeave={e => { e.currentTarget.pause(); e.currentTarget.currentTime = preview.start; }}
+                                  className="template-card-video"
+                                  style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", transition: "transform 0.4s ease" }}
                                 />
                               ) : preview?.type === "image" ? (
+                                /* eslint-disable-next-line @next/next/no-img-element */
                                 <img
                                   src={preview.url}
                                   alt={wf.name}
                                   loading="lazy"
-                                  style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                                  className="template-card-img"
+                                  style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", transition: "transform 0.4s ease" }}
                                 />
                               ) : preview?.type === "svg" ? (
-                                <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+                                <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
                                   <OutputPreviewSVG output={preview.output} color={catColor} />
                                 </div>
                               ) : (
                                 <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                                  <Building2 size={32} style={{ color: `rgba(${catRgb}, 0.15)` }} />
+                                  <Building2 size={36} style={{ color: `rgba(${catRgb}, 0.2)` }} />
                                 </div>
                               )}
 
-                              {/* Bottom gradient fade */}
-                              <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: "40%", background: "linear-gradient(transparent, rgba(10,10,18,0.95))", pointerEvents: "none" }} />
+                              {/* Bottom gradient — shorter, less aggressive */}
+                              <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: "35%", background: "linear-gradient(transparent, rgba(12,13,22,0.9))", pointerEvents: "none" }} />
 
-                              {/* Corner marks */}
-                              <svg style={{ position: "absolute", top: 0, left: 0, pointerEvents: "none" }} width={12} height={12}><path d="M0 12 L0 0 L12 0" stroke={catColor} strokeWidth="1" fill="none" opacity={0.3} /></svg>
-                              <svg style={{ position: "absolute", top: 0, right: 0, pointerEvents: "none" }} width={12} height={12}><path d="M0 0 L12 0 L12 12" stroke={catColor} strokeWidth="1" fill="none" opacity={0.3} /></svg>
-
-                              {/* Category badge */}
+                              {/* Category badge — top left for better visibility */}
                               <div style={{
-                                position: "absolute", bottom: 10, left: 12, zIndex: 2,
-                                display: "inline-flex", alignItems: "center", gap: 4,
-                                padding: "3px 8px", borderRadius: 6,
-                                background: "rgba(0,0,0,0.6)", backdropFilter: "blur(8px)",
-                                border: `1px solid rgba(${catRgb}, 0.2)`,
+                                position: "absolute", top: 10, left: 10, zIndex: 2,
+                                display: "inline-flex", alignItems: "center", gap: 5,
+                                padding: "4px 10px", borderRadius: 8,
+                                background: "rgba(0,0,0,0.65)", backdropFilter: "blur(12px)",
+                                border: `1px solid rgba(${catRgb}, 0.25)`,
                               }}>
-                                {CATEGORY_ICONS[wf.category] && <span style={{ color: catColor, display: "flex", opacity: 0.8 }}>{CATEGORY_ICONS[wf.category]}</span>}
-                                <span style={{ fontSize: 8, fontWeight: 700, color: catColor, letterSpacing: "0.08em", textTransform: "uppercase" }}>
+                                {CATEGORY_ICONS[wf.category] && <span style={{ color: catColor, display: "flex" }}>{CATEGORY_ICONS[wf.category]}</span>}
+                                <span style={{ fontSize: 9, fontWeight: 700, color: catColor, letterSpacing: "0.06em", textTransform: "uppercase" }}>
                                   {wf.category}
                                 </span>
                               </div>
+
+                              {/* Output type badges — bottom right */}
+                              {outputBadges.length > 0 && (
+                                <div style={{
+                                  position: "absolute", bottom: 10, right: 10, zIndex: 2,
+                                  display: "flex", gap: 4, flexWrap: "wrap", justifyContent: "flex-end",
+                                }}>
+                                  {outputBadges.slice(0, 3).map(b => (
+                                    <span key={b.label} style={{
+                                      fontSize: 8, fontWeight: 700, color: b.color,
+                                      padding: "3px 7px", borderRadius: 5,
+                                      background: "rgba(0,0,0,0.6)", backdropFilter: "blur(8px)",
+                                      border: `1px solid ${b.color}30`,
+                                      letterSpacing: "0.04em", textTransform: "uppercase",
+                                    }}>
+                                      {b.label}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
                             </div>
 
-                            {/* Content */}
-                            <div style={{ padding: "14px 16px 16px" }}>
-                              <div style={{ fontSize: 14, fontWeight: 700, color: "#E2E8F0", marginBottom: 5, letterSpacing: "-0.02em", lineHeight: 1.3 }}>
+                            {/* Content — brighter, more readable */}
+                            <div style={{ padding: "16px 18px 18px" }}>
+                              <div style={{ fontSize: 15, fontWeight: 700, color: "#F1F5F9", marginBottom: 6, letterSpacing: "-0.02em", lineHeight: 1.35 }}>
                                 {wf.name}
                               </div>
-                              <div style={{ fontSize: 11, color: "#6B7A8D", lineHeight: 1.55, marginBottom: 12, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const, overflow: "hidden" }}>
+                              <div style={{ fontSize: 12, color: "#8B9DB5", lineHeight: 1.6, marginBottom: 14, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const, overflow: "hidden" }}>
                                 {wf.description}
                               </div>
 
-                              {/* Meta row */}
-                              <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 10, color: "#556070", fontFamily: "var(--font-jetbrains), monospace" }}>
-                                <span style={{ display: "flex", alignItems: "center", gap: 3 }}>
-                                  <span style={{ width: 5, height: 5, borderRadius: "50%", background: wf.complexity === "simple" ? "#10B981" : "#F59E0B" }} />
+                              {/* Meta row — brighter, more visible */}
+                              <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 11, color: "#7B8FA3", fontFamily: "var(--font-jetbrains), monospace" }}>
+                                <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                                  <span style={{ width: 6, height: 6, borderRadius: "50%", background: wf.complexity === "simple" ? "#10B981" : "#F59E0B", boxShadow: wf.complexity === "simple" ? "0 0 6px #10B98140" : "0 0 6px #F59E0B40" }} />
                                   {wf.complexity === "simple" ? t('dash.simpleLabel') : t('dash.advancedLabel')}
                                 </span>
-                                <span style={{ color: "#333" }}>•</span>
+                                <span style={{ color: "#3D4A5C" }}>·</span>
                                 <span>{nodeCount} {t('dash.nodes')}</span>
-                                <span style={{ color: "#333" }}>•</span>
+                                <span style={{ color: "#3D4A5C" }}>·</span>
                                 <span>{wf.estimatedRunTime}</span>
                               </div>
                             </div>
@@ -918,13 +950,13 @@ export default function TemplatesPage() {
                             {isLocked && (
                               <div style={{
                                 position: "absolute", inset: 0, zIndex: 10, borderRadius: 16,
-                                background: "rgba(8,10,18,0.3)", backdropFilter: "blur(1px)",
+                                background: "rgba(8,10,18,0.35)", backdropFilter: "blur(2px)",
                                 display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8,
                               }}>
                                 <div style={{
                                   display: "flex", alignItems: "center", gap: 6,
                                   padding: "8px 20px", borderRadius: 12,
-                                  background: "rgba(245,158,11,0.1)", border: "1px solid rgba(245,158,11,0.2)",
+                                  background: "rgba(245,158,11,0.12)", border: "1px solid rgba(245,158,11,0.25)",
                                   backdropFilter: "blur(8px)",
                                 }}>
                                   <Lock size={13} style={{ color: "#F59E0B" }} />
@@ -937,6 +969,14 @@ export default function TemplatesPage() {
                         );
                       })}
                     </div>
+
+                    {/* Card hover styles */}
+                    <style>{`
+                      .template-card:hover .template-card-video,
+                      .template-card:hover .template-card-img {
+                        transform: scale(1.05);
+                      }
+                    `}</style>
                   </div>
                 );
               };
