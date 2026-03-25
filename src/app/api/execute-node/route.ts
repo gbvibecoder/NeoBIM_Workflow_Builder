@@ -822,7 +822,21 @@ ${analysis.features.map(f => `• ${f}`).join("\n")}`;
 
     } else if (catalogueId === "TR-012") {
       // Site Analysis — real geographic + climate data from free APIs
-      const address = inputData?.content ?? inputData?.prompt ?? inputData?.address ?? "";
+      // Location Input (IN-006) sends structured JSON like {"country":"India","state":"Maharashtra","city":"Pune",...}
+      // Extract a geocodable address from it, or fall back to raw string
+      let address = inputData?.content ?? inputData?.prompt ?? inputData?.address ?? "";
+      if (typeof address === "string" && address.trim().startsWith("{")) {
+        try {
+          const locJson = JSON.parse(address.trim()) as Record<string, string>;
+          const parts = [locJson.city, locJson.state, locJson.country].filter(Boolean);
+          if (parts.length > 0) address = parts.join(", ");
+        } catch { /* not valid JSON, use as-is */ }
+      }
+      // Also handle when inputData itself has city/state/country fields directly
+      if ((!address || address.trim().startsWith("{")) && (inputData?.city || inputData?.state || inputData?.country)) {
+        const parts = [inputData.city, inputData.state, inputData.country].filter(Boolean);
+        if (parts.length > 0) address = parts.join(", ");
+      }
 
       if (!address || typeof address !== "string" || address.trim().length < 3) {
         return NextResponse.json(
