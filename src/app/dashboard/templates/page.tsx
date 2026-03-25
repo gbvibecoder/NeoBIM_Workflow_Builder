@@ -776,36 +776,62 @@ export default function TemplatesPage() {
               ) => {
                 if (workflows.length === 0) return null;
                 return (
-                  <div style={{ marginBottom: 40 }}>
+                  <div style={{ marginBottom: 48, scrollMarginTop: 80 }}>
+                    {/* Wavy SVG section divider */}
+                    <svg viewBox="0 0 1200 40" preserveAspectRatio="none" style={{ width: "100%", height: 32, display: "block", marginBottom: 20, opacity: 0.5 }}>
+                      <defs>
+                        <linearGradient id={`wave-grad-${rgb.replace(/,/g,"")}`} x1="0%" y1="0%" x2="100%" y2="0%">
+                          <stop offset="0%" stopColor={color} stopOpacity="0" />
+                          <stop offset="30%" stopColor={color} stopOpacity="0.3" />
+                          <stop offset="70%" stopColor={color} stopOpacity="0.3" />
+                          <stop offset="100%" stopColor={color} stopOpacity="0" />
+                        </linearGradient>
+                      </defs>
+                      <path d="M0,28 C200,10 400,35 600,20 C800,5 1000,30 1200,18" stroke={`url(#wave-grad-${rgb.replace(/,/g,"")})`} strokeWidth="1.5" fill="none">
+                        <animate attributeName="d" dur="6s" repeatCount="indefinite" values="M0,28 C200,10 400,35 600,20 C800,5 1000,30 1200,18;M0,18 C200,32 400,12 600,28 C800,15 1000,35 1200,22;M0,28 C200,10 400,35 600,20 C800,5 1000,30 1200,18" />
+                      </path>
+                      <path d="M0,22 C200,35 400,15 600,28 C800,12 1000,32 1200,20" stroke={`url(#wave-grad-${rgb.replace(/,/g,"")})`} strokeWidth="0.8" fill="none" opacity="0.4">
+                        <animate attributeName="d" dur="8s" repeatCount="indefinite" values="M0,22 C200,35 400,15 600,28 C800,12 1000,32 1200,20;M0,30 C200,15 400,32 600,18 C800,30 1000,12 1200,25;M0,22 C200,35 400,15 600,28 C800,12 1000,32 1200,20" />
+                      </path>
+                    </svg>
+
                     {/* Section header */}
                     <motion.div
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.4, ease: "easeOut" }}
+                      initial={{ opacity: 0, y: 12 }}
+                      whileInView={{ opacity: 1, y: 0 }}
+                      viewport={{ once: true, margin: "-40px" }}
+                      transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
                       style={{
-                        display: "flex", alignItems: "center", gap: 12,
-                        marginBottom: 20, paddingBottom: 14,
-                        borderBottom: `1px solid rgba(${rgb}, 0.08)`,
+                        display: "flex", alignItems: "center", gap: 14,
+                        marginBottom: 24,
                       }}
                     >
                       <div style={{
-                        width: 36, height: 36, borderRadius: 10,
-                        background: `rgba(${rgb}, 0.08)`, border: `1px solid rgba(${rgb}, 0.15)`,
+                        width: 40, height: 40, borderRadius: 12,
+                        background: `linear-gradient(135deg, rgba(${rgb}, 0.12), rgba(${rgb}, 0.04))`,
+                        border: `1px solid rgba(${rgb}, 0.2)`,
                         display: "flex", alignItems: "center", justifyContent: "center",
                         color,
+                        boxShadow: `0 0 20px rgba(${rgb}, 0.08)`,
                       }}>
                         {icon}
                       </div>
-                      <div>
-                        <div style={{ fontSize: 15, fontWeight: 700, color: "#E2E8F0", letterSpacing: "-0.02em" }}>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 16, fontWeight: 700, color: "#F1F5F9", letterSpacing: "-0.02em" }}>
                           {title}
                         </div>
-                        <div style={{ fontSize: 11, color: "#556070", marginTop: 2 }}>
+                        <div style={{ fontSize: 12, color: "#6B7A8D", marginTop: 2 }}>
                           {subtitle}
                         </div>
                       </div>
-                      {/* Accent line */}
-                      <div style={{ flex: 1, height: 1, background: `linear-gradient(90deg, rgba(${rgb}, 0.1), transparent)`, marginLeft: 8 }} />
+                      {/* Workflow count pill */}
+                      <div style={{
+                        padding: "4px 12px", borderRadius: 20,
+                        background: `rgba(${rgb}, 0.06)`, border: `1px solid rgba(${rgb}, 0.12)`,
+                        fontSize: 11, fontWeight: 600, color, fontVariantNumeric: "tabular-nums",
+                      }}>
+                        {workflows.length}
+                      </div>
                     </motion.div>
 
                     {/* Cards grid */}
@@ -834,9 +860,10 @@ export default function TemplatesPage() {
                           <motion.div
                             key={wf.id}
                             className="template-card"
-                            initial={{ opacity: 0, y: 20 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ duration: 0.35, delay: (baseIndex + i) * 0.06, ease: [0.22, 1, 0.36, 1] }}
+                            initial={{ opacity: 0, y: 24 }}
+                            whileInView={{ opacity: 1, y: 0 }}
+                            viewport={{ once: true, margin: "-60px" }}
+                            transition={{ duration: 0.4, delay: i * 0.08, ease: [0.22, 1, 0.36, 1] }}
                             whileHover={{ y: -8, transition: { duration: 0.3, ease: [0.22, 1, 0.36, 1] } }}
                             onClick={() => handleCardClick(wf)}
                             style={{
@@ -861,7 +888,7 @@ export default function TemplatesPage() {
 
                             {/* ── Preview area ── */}
                             <div className="template-card-preview" style={{
-                              position: "relative", height: 200, overflow: "hidden",
+                              position: "relative", height: 240, overflow: "hidden",
                               background: `linear-gradient(180deg, rgba(${catRgb}, 0.05) 0%, rgba(${catRgb}, 0.01) 100%)`,
                             }}>
                               {/* Accent top border with glow */}
@@ -964,7 +991,7 @@ export default function TemplatesPage() {
 
                               {/* Pipeline mini-flow */}
                               {pipelineSteps.length >= 2 && (
-                                <div style={{
+                                <div className="card-pipeline-flow" style={{
                                   display: "flex", alignItems: "center", gap: 6,
                                   marginBottom: 10, padding: "6px 10px",
                                   borderRadius: 8, background: "rgba(255,255,255,0.02)",
@@ -1034,8 +1061,11 @@ export default function TemplatesPage() {
                       })}
                     </div>
 
-                    {/* Card interaction styles */}
+                    {/* Card interaction styles + smooth scroll + mobile */}
                     <style>{`
+                      /* Smooth scroll */
+                      html { scroll-behavior: smooth; }
+
                       /* Preview zoom on hover */
                       .template-card:hover .template-card-video,
                       .template-card:hover .template-card-img {
@@ -1071,6 +1101,30 @@ export default function TemplatesPage() {
                       }
                       .template-card:hover .card-shine::before {
                         left: 120%;
+                      }
+
+                      /* ── Mobile responsive ── */
+                      @media (max-width: 768px) {
+                        .template-card-preview {
+                          height: 180px !important;
+                        }
+                        .template-card .card-cta-overlay {
+                          display: none !important;
+                        }
+                        .card-pipeline-flow {
+                          overflow-x: auto !important;
+                          -webkit-overflow-scrolling: touch !important;
+                        }
+                      }
+                      @media (max-width: 480px) {
+                        .template-card-preview {
+                          height: 160px !important;
+                        }
+                      }
+                      @media (min-width: 769px) and (max-width: 1024px) {
+                        .template-card-preview {
+                          height: 200px !important;
+                        }
                       }
                     `}</style>
                   </div>
