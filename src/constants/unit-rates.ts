@@ -64,6 +64,10 @@ export const IFC_TO_CSI_MAP: Record<string, string[]> = {
   IfcCurtainWall: ["08-51-13.10", "05-31-13.25"],
   IfcRailing: ["05-12-23.10"],
   IfcSpace: ["09-91-13.10", "09-65-13.10"],
+  // Proxy elements (Allplan, Tekla, precast) — default to concrete, overridden by material
+  IfcBuildingElementProxy: ["03-30-53.40"],
+  IfcMember: ["05-12-23.10"],
+  IfcPlate: ["05-31-13.25"],
 };
 
 // Material-aware CSI overrides: when IFC material name contains these keywords,
@@ -97,6 +101,13 @@ const MATERIAL_CSI_OVERRIDES: Record<string, Record<string, string[]>> = {
     concrete: ["03-30-53.40", "09-65-13.10"],            // Concrete slab + flooring
     timber:   ["06-16-23.10", "09-65-13.10"],            // Plywood + flooring
     wood:     ["06-16-23.10", "09-65-13.10"],
+  },
+  IfcBuildingElementProxy: {
+    steel:    ["05-12-23.10"],
+    concrete: ["03-30-53.40"],
+    brick:    ["04-22-10.15"],
+    timber:   ["06-11-10.10"],
+    wood:     ["06-11-10.10"],
   },
 };
 

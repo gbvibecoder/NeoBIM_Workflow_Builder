@@ -142,6 +142,30 @@ export const IS1200_MAPPINGS: IS1200Mapping[] = [
     is1200PartName: "Flooring",
     defaultRateCodes: ["IS1200-P13-VIT-TILE"],
   },
+  // Proxy elements (Allplan, Tekla, precast exports) — default to concrete
+  {
+    ifcType: "IfcBuildingElementProxy",
+    is1200Part: "Part 2",
+    is1200PartName: "Concrete Work (Proxy Element)",
+    defaultRateCodes: ["IS1200-P2-RCC-WALL"],
+    materialOverrides: {
+      brick:    ["IS1200-P3-BRICK-230"],
+      block:    ["IS1200-P3-BLOCK-200"],
+      steel:    ["IS1200-P7-STRUCT-STEEL"],
+    },
+  },
+  {
+    ifcType: "IfcMember",
+    is1200Part: "Part 7",
+    is1200PartName: "Structural Steel",
+    defaultRateCodes: ["IS1200-P7-STRUCT-STEEL"],
+  },
+  {
+    ifcType: "IfcPlate",
+    is1200Part: "Part 7",
+    is1200PartName: "Structural Steel",
+    defaultRateCodes: ["IS1200-P7-STRUCT-STEEL"],
+  },
 ];
 
 // ─── CPWD DSR 2023-24 Rate Database (INR) ───────────────────────────────────

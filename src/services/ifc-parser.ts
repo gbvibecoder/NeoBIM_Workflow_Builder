@@ -26,6 +26,10 @@ import {
   IFCCOVERING,
   IFCROOF,
   IFCFOOTING,
+  IFCBUILDINGELEMENTPROXY,
+  IFCMEMBER,
+  IFCPLATE,
+  IFCCURTAINWALL,
   IFCPROJECT,
   IFCRELDEFINESBYPROPERTIES,
   IFCRELCONTAINEDINSPATIALSTRUCTURE,
@@ -275,6 +279,36 @@ function getCSIMapping(
       codeName: "Metal Railings",
       wasteFactor: DEFAULT_WASTE_FACTORS["05"],
     },
+    // IfcBuildingElementProxy — generic catch-all used by Allplan, Tekla, precast exports
+    // Infer division from material name if possible, default to Concrete (most common)
+    IfcBuildingElementProxy: material.includes("steel")
+      ? { division: "05", divisionName: "Metals", code: "05 12 00", codeName: "Structural Steel Framing", wasteFactor: DEFAULT_WASTE_FACTORS["05"] }
+      : material.includes("timber") || material.includes("wood")
+        ? { division: "06", divisionName: "Wood, Plastics, and Composites", code: "06 10 00", codeName: "Rough Carpentry", wasteFactor: DEFAULT_WASTE_FACTORS["06"] }
+        : material.includes("brick") || material.includes("block") || material.includes("masonry")
+          ? { division: "04", divisionName: "Masonry", code: "04 20 00", codeName: "Unit Masonry", wasteFactor: DEFAULT_WASTE_FACTORS["04"] }
+          : { division: "03", divisionName: "Concrete", code: "03 30 00", codeName: "Cast-in-Place Concrete (Proxy Element)", wasteFactor: DEFAULT_WASTE_FACTORS["03"] },
+    IfcMember: {
+      division: "05",
+      divisionName: "Metals",
+      code: "05 12 00",
+      codeName: "Structural Steel Members",
+      wasteFactor: DEFAULT_WASTE_FACTORS["05"],
+    },
+    IfcPlate: {
+      division: "05",
+      divisionName: "Metals",
+      code: "05 50 00",
+      codeName: "Metal Fabrications",
+      wasteFactor: DEFAULT_WASTE_FACTORS["05"],
+    },
+    IfcCurtainWall: {
+      division: "08",
+      divisionName: "Openings",
+      code: "08 44 00",
+      codeName: "Curtain Wall and Glazed Assemblies",
+      wasteFactor: DEFAULT_WASTE_FACTORS["08"],
+    },
   };
 
   return (
@@ -305,6 +339,14 @@ const IFC_TYPES = [
   { typeId: IFCCOVERING, label: "IfcCovering" },
   { typeId: IFCROOF, label: "IfcRoof" },
   { typeId: IFCFOOTING, label: "IfcFooting" },
+  // Common in Allplan, Tekla, precast exports — elements not fitting standard types
+  { typeId: IFCBUILDINGELEMENTPROXY, label: "IfcBuildingElementProxy" },
+  // Structural members (steel connections, bracing, purlins)
+  { typeId: IFCMEMBER, label: "IfcMember" },
+  // Plates (steel plates, panels, cladding sheets)
+  { typeId: IFCPLATE, label: "IfcPlate" },
+  // Curtain walls (glass facades)
+  { typeId: IFCCURTAINWALL, label: "IfcCurtainWall" },
 ];
 
 // ============================================================================
