@@ -1474,7 +1474,18 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
         materialRate: number; laborRate: number; equipmentRate: number; unitRate: number;
         materialCost: number; laborCost: number; equipmentCost: number; totalCost: number;
         storey?: string; elementCount?: number;
+        is1200Code?: string; // IS 1200 code for Indian projects
       }> = [];
+
+      // ── IS 1200 Indian Standard: Use native CPWD rates for Indian projects ──
+      const isIndianProject = locationData?.country?.toLowerCase() === "india"
+        || currencyCode === "INR"
+        || locationLabel.toLowerCase().includes("india");
+      let is1200Module: typeof import("@/constants/is1200-rates") | null = null;
+      if (isIndianProject) {
+        is1200Module = await import("@/constants/is1200-rates");
+        console.log("[TR-008] Indian project detected — using IS 1200 codes + CPWD DSR rates in INR");
+      }
 
       // Expand elements with material layers into separate line items per layer
       const expandedElements: typeof elements = [];
@@ -1509,6 +1520,92 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
         const elemStorey = typeof elem === "object" ? ((elem as Record<string, unknown>).storey as string ?? "") : "";
         const elemCount = typeof elem === "object" ? Number((elem as Record<string, unknown>).elementCount ?? 0) : 0;
 
+        // ── IS 1200 path: use native Indian rates (INR) for Indian projects ──
+        if (is1200Module && isIndianProject) {
+          // Determine IFC type from description (TR-007 strips "Ifc" prefix)
+          const ifcType = "Ifc" + description.replace(/\s+/g, "");
+          const materialHint = elemCategory || description;
+          const is1200Rates = is1200Module.getIS1200RatesForElement(ifcType, materialHint);
+          const is1200Label = is1200Module.getIS1200PartLabel(ifcType, materialHint);
+
+          if (is1200Rates.length > 0) {
+            for (const rate of is1200Rates) {
+              // Determine quantity based on rate unit (already in metric — no conversion needed)
+              let qty: number;
+              if (rate.unit === "EA") {
+                qty = elemCount || quantity;
+              } else if (rate.unit === "m²") {
+                qty = sourceArea > 0 ? sourceArea : quantity;
+              } else if (rate.unit === "m³") {
+                qty = sourceVolume > 0 ? sourceVolume : quantity;
+              } else if (rate.unit === "kg") {
+                // Rebar/steel: kg from volume × density or count × estimate
+                qty = sourceVolume > 0 ? sourceVolume * 150 : quantity * 50; // rough steel estimate
+              } else if (rate.unit === "Rmt") {
+                qty = quantity; // linear measure
+              } else {
+                qty = quantity;
+              }
+
+              const wasteFactor = is1200Module.getIS1200Rate(rate.is1200Code)
+                ? (({ "Concrete": 0.07, "Steel": 0.10, "Masonry": 0.08, "Finishes": 0.12, "Doors & Windows": 0.03 })[rate.subcategory] ?? 0.08)
+                : 0.08;
+              const adjQty = Math.round(qty * (1 + wasteFactor) * 100) / 100;
+
+              // Apply city tier factor (within India) but NOT country factor (rates already in INR)
+              const cityFactor = locationData?.city
+                ? (({ metro: 1.15, city: 0.95, town: 0.80, rural: 0.70 } as Record<string, number>)[
+                    (() => { const c = (locationData.city || "").toLowerCase(); return ["mumbai","delhi","bangalore","bengaluru","chennai","hyderabad","kolkata"].includes(c) ? "metro" : ["pune","ahmedabad","jaipur","lucknow","chandigarh","kochi","indore","nagpur","surat"].includes(c) ? "city" : "town"; })()
+                  ] ?? 1.0)
+                : 1.0;
+
+              const adjRate = Math.round(rate.rate * cityFactor * 100) / 100;
+              const matCost = Math.round(adjQty * rate.material * cityFactor * 100) / 100;
+              const labCost = Math.round(adjQty * rate.labour * cityFactor * 100) / 100;
+              const eqpCost = Math.round(adjQty * (rate.rate - rate.material - rate.labour) * cityFactor * 100) / 100;
+              const lineTot = Math.round(adjQty * adjRate * 100) / 100;
+
+              hardCostSubtotal += lineTot;
+              totalMaterial += matCost;
+              totalLabor += labCost;
+              totalEquipment += Math.max(0, eqpCost);
+
+              const countLabel = elemCount ? ` (${elemCount} nr)` : "";
+              rows.push([
+                `${rate.description}${countLabel}`, rate.unit, qty.toFixed(2),
+                `${(wasteFactor * 100).toFixed(0)}%`, adjQty.toFixed(2),
+                `₹${adjRate.toFixed(2)}`,
+                `₹${matCost.toFixed(2)}`, `₹${labCost.toFixed(2)}`,
+                `₹${Math.max(0, eqpCost).toFixed(2)}`, `₹${lineTot.toFixed(2)}`,
+              ]);
+
+              boqLines.push({
+                division: is1200Label,
+                csiCode: rate.is1200Code,
+                description: `${rate.description}${countLabel}`,
+                unit: rate.unit,
+                quantity: qty,
+                wasteFactor,
+                adjustedQty: adjQty,
+                materialRate: Math.round(rate.material * cityFactor * 100) / 100,
+                laborRate: Math.round(rate.labour * cityFactor * 100) / 100,
+                equipmentRate: Math.round((rate.rate - rate.material - rate.labour) * cityFactor * 100) / 100,
+                unitRate: adjRate,
+                materialCost: matCost,
+                laborCost: labCost,
+                equipmentCost: Math.max(0, eqpCost),
+                totalCost: lineTot,
+                storey: elemStorey || undefined,
+                elementCount: elemCount || undefined,
+                is1200Code: rate.is1200Code,
+              });
+            }
+            continue; // Skip the USD rate path for this element
+          }
+          // If no IS 1200 rate found, fall through to USD path below
+        }
+
+        // ── Standard path: USD rates with regional factor conversion ──
         // Build specific search: try "Concrete Wall" before generic "Wall"
         // Material/category context from TR-007 helps disambiguate rate matching
         const specificDesc = elemCategory && !description.toLowerCase().includes(elemCategory.toLowerCase())
@@ -1807,7 +1904,7 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
         tileInstanceId,
         type: "table",
         data: {
-          label: `Bill of Quantities — ${projectTypeInfo.type} (${activeRegion})`,
+          label: `Bill of Quantities${isIndianProject ? " (IS 1200 / CPWD DSR)" : ""} — ${projectTypeInfo.type} (${activeRegion})`,
           headers,
           rows,
           _currency: currencyCode,
@@ -1953,12 +2050,21 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
 
       // ─── Sheet 3: Bill of Quantities (Enhanced) ─────────────────────────
       if (boqLines.length > 0) {
-        const boqHeaders = [
-          "Division", "Description", "Unit",
-          "Base Qty", "Waste %", "Adj Qty",
-          "Material Rate", "Labor Rate", "Equip Rate", "Unit Rate",
-          "Material Cost", "Labor Cost", "Equip Cost", "Total Cost",
-        ];
+        // Add IS 1200 code column for Indian projects
+        const hasIS1200 = boqLines.some(l => (l as Record<string, unknown>).is1200Code);
+        const boqHeaders = hasIS1200
+          ? [
+              "IS 1200 Code", "Division", "Description", "Unit",
+              "Base Qty", "Waste %", "Adj Qty",
+              "Material Rate", "Labor Rate", "Equip Rate", "Unit Rate",
+              "Material Cost", "Labor Cost", "Equip Cost", "Total Cost",
+            ]
+          : [
+              "Division", "Description", "Unit",
+              "Base Qty", "Waste %", "Adj Qty",
+              "Material Rate", "Labor Rate", "Equip Rate", "Unit Rate",
+              "Material Cost", "Labor Cost", "Equip Cost", "Total Cost",
+            ];
 
         // Group by storey (if available), then by division within each storey
         const hasStoreys = boqLines.some(l => (l as Record<string, unknown>).storey && (l as Record<string, unknown>).storey !== "Unassigned");
@@ -1973,19 +2079,22 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
             if (storeyLines.length === 0) continue;
 
             // Storey header
-            boqTableRows.push([storey.toUpperCase(), "", "", "", "", "", "", "", "", "", "", "", "", ""]);
+            const emptyRow = hasIS1200 ? ["", "", "", "", "", "", "", "", "", "", "", "", "", "", ""] : ["", "", "", "", "", "", "", "", "", "", "", "", "", ""];
+            boqTableRows.push([storey.toUpperCase(), ...emptyRow.slice(1)]);
 
             let storeyMat = 0, storeyLab = 0, storeyEqp = 0, storeyTot = 0;
             for (const l of storeyLines) {
               const wastePercent = l.wasteFactor ? `${(l.wasteFactor * 100).toFixed(0)}%` : "—";
               const adjQty = l.adjustedQty ?? l.quantity;
               const countLabel = (l as Record<string, unknown>).elementCount ? ` (${(l as Record<string, unknown>).elementCount} nr)` : "";
-              boqTableRows.push([
+              const baseRow = [
                 "", `${l.description}${countLabel}`, l.unit,
                 l.quantity, wastePercent, adjQty,
                 l.materialRate, l.laborRate, l.equipmentRate, l.unitRate,
                 l.materialCost, l.laborCost, l.equipmentCost, l.totalCost,
-              ]);
+              ];
+              if (hasIS1200) baseRow.unshift((l as Record<string, unknown>).is1200Code as string ?? "");
+              boqTableRows.push(baseRow);
               storeyMat += l.materialCost; storeyLab += l.laborCost;
               storeyEqp += l.equipmentCost; storeyTot += l.totalCost;
             }

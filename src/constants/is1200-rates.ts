@@ -1,0 +1,456 @@
+/**
+ * IS 1200 — Indian Standard Method of Measurement of Building & Civil Engineering Works
+ *
+ * Codes and rates based on:
+ * - IS 1200 (Parts 1-24) code structure
+ * - CPWD Delhi Schedule of Rates (DSR) 2023-24
+ * - CPWD Analysis of Rates for Delhi 2023-24
+ *
+ * Rates are in INR (Indian Rupees), applicable as national average.
+ * City/state factors from regional-factors.ts are applied on top.
+ *
+ * These rates are used INSTEAD OF converted USD rates when project location is India,
+ * because native Indian rates are more accurate than US rates × 0.28 factor.
+ */
+
+// ─── Types ──────────────────────────────────────────────────────────────────
+
+export interface IS1200Rate {
+  is1200Part: string;      // e.g. "Part 2" (Concrete Work)
+  is1200Code: string;      // e.g. "IS1200-P2-001"
+  description: string;
+  unit: string;            // Indian units: m², m³, kg, Rmt (running metre), EA, LS
+  rate: number;            // INR per unit (CPWD DSR 2023-24 basis)
+  material: number;        // Material component in INR
+  labour: number;          // Labour component in INR
+  subcategory: string;     // For waste factor lookup
+  notes?: string;
+}
+
+export interface IS1200Mapping {
+  ifcType: string;
+  is1200Part: string;
+  is1200PartName: string;
+  defaultRateCodes: string[];    // IS1200 rate codes to apply
+  materialOverrides?: Record<string, string[]>; // material keyword → rate codes
+}
+
+// ─── IS 1200 Code Mapping (IFC Type → IS 1200 Part) ────────────────────────
+
+export const IS1200_MAPPINGS: IS1200Mapping[] = [
+  {
+    ifcType: "IfcWall",
+    is1200Part: "Part 2",
+    is1200PartName: "Concrete Work",
+    defaultRateCodes: ["IS1200-P2-RCC-WALL", "IS1200-P8-PLASTER", "IS1200-P10-PAINT"],
+    materialOverrides: {
+      brick:    ["IS1200-P3-BRICK-230", "IS1200-P8-PLASTER", "IS1200-P10-PAINT"],
+      block:    ["IS1200-P3-BLOCK-200", "IS1200-P8-PLASTER", "IS1200-P10-PAINT"],
+      aac:      ["IS1200-P3-AAC-200", "IS1200-P8-PLASTER", "IS1200-P10-PAINT"],
+      stone:    ["IS1200-P4-STONE-WALL", "IS1200-P8-PLASTER"],
+      glass:    ["IS1200-P24-CURTAIN-WALL"],
+      gypsum:   ["IS1200-P2-DRYWALL", "IS1200-P10-PAINT"],
+      drywall:  ["IS1200-P2-DRYWALL", "IS1200-P10-PAINT"],
+    },
+  },
+  {
+    ifcType: "IfcWallStandardCase",
+    is1200Part: "Part 2",
+    is1200PartName: "Concrete Work",
+    defaultRateCodes: ["IS1200-P2-RCC-WALL", "IS1200-P8-PLASTER", "IS1200-P10-PAINT"],
+    materialOverrides: {
+      brick:    ["IS1200-P3-BRICK-230", "IS1200-P8-PLASTER", "IS1200-P10-PAINT"],
+      block:    ["IS1200-P3-BLOCK-200", "IS1200-P8-PLASTER", "IS1200-P10-PAINT"],
+    },
+  },
+  {
+    ifcType: "IfcSlab",
+    is1200Part: "Part 2",
+    is1200PartName: "Concrete Work",
+    defaultRateCodes: ["IS1200-P2-RCC-SLAB", "IS1200-P13-VIT-TILE"],
+  },
+  {
+    ifcType: "IfcColumn",
+    is1200Part: "Part 2",
+    is1200PartName: "Concrete Work",
+    defaultRateCodes: ["IS1200-P2-RCC-COLUMN"],
+    materialOverrides: {
+      steel: ["IS1200-P7-STRUCT-STEEL"],
+    },
+  },
+  {
+    ifcType: "IfcBeam",
+    is1200Part: "Part 2",
+    is1200PartName: "Concrete Work",
+    defaultRateCodes: ["IS1200-P2-RCC-BEAM"],
+    materialOverrides: {
+      steel: ["IS1200-P7-STRUCT-STEEL"],
+    },
+  },
+  {
+    ifcType: "IfcStair",
+    is1200Part: "Part 2",
+    is1200PartName: "Concrete Work",
+    defaultRateCodes: ["IS1200-P2-RCC-STAIR"],
+  },
+  {
+    ifcType: "IfcFooting",
+    is1200Part: "Part 2",
+    is1200PartName: "Concrete Work",
+    defaultRateCodes: ["IS1200-P2-PCC-FOOTING", "IS1200-P2-RCC-FOOTING"],
+  },
+  {
+    ifcType: "IfcDoor",
+    is1200Part: "Part 9",
+    is1200PartName: "Metal Work (Doors & Windows)",
+    defaultRateCodes: ["IS1200-P9-FLUSH-DOOR"],
+    materialOverrides: {
+      steel: ["IS1200-P9-STEEL-DOOR"],
+      metal: ["IS1200-P9-STEEL-DOOR"],
+    },
+  },
+  {
+    ifcType: "IfcWindow",
+    is1200Part: "Part 24",
+    is1200PartName: "Aluminium Work",
+    defaultRateCodes: ["IS1200-P24-ALUM-WINDOW"],
+    materialOverrides: {
+      upvc: ["IS1200-P24-UPVC-WINDOW"],
+    },
+  },
+  {
+    ifcType: "IfcRoof",
+    is1200Part: "Part 12",
+    is1200PartName: "Roofing",
+    defaultRateCodes: ["IS1200-P2-RCC-SLAB", "IS1200-P21-WATERPROOF", "IS1200-P13-TERRACE-TILE"],
+  },
+  {
+    ifcType: "IfcCurtainWall",
+    is1200Part: "Part 24",
+    is1200PartName: "Aluminium Work",
+    defaultRateCodes: ["IS1200-P24-CURTAIN-WALL"],
+  },
+  {
+    ifcType: "IfcRailing",
+    is1200Part: "Part 9",
+    is1200PartName: "Metal Work",
+    defaultRateCodes: ["IS1200-P9-MS-RAILING"],
+  },
+  {
+    ifcType: "IfcCovering",
+    is1200Part: "Part 13",
+    is1200PartName: "Flooring",
+    defaultRateCodes: ["IS1200-P13-VIT-TILE"],
+  },
+];
+
+// ─── CPWD DSR 2023-24 Rate Database (INR) ───────────────────────────────────
+
+export const IS1200_RATES: IS1200Rate[] = [
+  // ── Part 2: Concrete Work ──────────────────────────────────────────────
+  {
+    is1200Part: "Part 2", is1200Code: "IS1200-P2-PCC-FOOTING",
+    description: "PCC M15 (1:2:4) in foundation & plinth",
+    unit: "m³", rate: 5800, material: 4200, labour: 1600,
+    subcategory: "Concrete",
+    notes: "Plain cement concrete, incl. curing",
+  },
+  {
+    is1200Part: "Part 2", is1200Code: "IS1200-P2-RCC-FOOTING",
+    description: "RCC M25 in foundation (excl. steel)",
+    unit: "m³", rate: 7200, material: 5400, labour: 1800,
+    subcategory: "Concrete",
+    notes: "Reinforced cement concrete, incl. centering & shuttering",
+  },
+  {
+    is1200Part: "Part 2", is1200Code: "IS1200-P2-RCC-COLUMN",
+    description: "RCC M25 in columns (excl. steel)",
+    unit: "m³", rate: 8500, material: 5800, labour: 2700,
+    subcategory: "Concrete",
+    notes: "Incl. centering, shuttering, curing. Excl. reinforcement.",
+  },
+  {
+    is1200Part: "Part 2", is1200Code: "IS1200-P2-RCC-BEAM",
+    description: "RCC M25 in beams & lintels (excl. steel)",
+    unit: "m³", rate: 8200, material: 5600, labour: 2600,
+    subcategory: "Concrete",
+    notes: "Incl. centering, shuttering, curing. Excl. reinforcement.",
+  },
+  {
+    is1200Part: "Part 2", is1200Code: "IS1200-P2-RCC-SLAB",
+    description: "RCC M25 in slabs (excl. steel)",
+    unit: "m³", rate: 7800, material: 5500, labour: 2300,
+    subcategory: "Concrete",
+    notes: "Incl. centering, shuttering, curing. Excl. reinforcement.",
+  },
+  {
+    is1200Part: "Part 2", is1200Code: "IS1200-P2-RCC-WALL",
+    description: "RCC M25 in walls (excl. steel)",
+    unit: "m³", rate: 8000, material: 5600, labour: 2400,
+    subcategory: "Concrete",
+    notes: "Incl. centering, shuttering, curing. Excl. reinforcement.",
+  },
+  {
+    is1200Part: "Part 2", is1200Code: "IS1200-P2-RCC-STAIR",
+    description: "RCC M25 in waist slab of staircase (excl. steel)",
+    unit: "m³", rate: 9500, material: 6200, labour: 3300,
+    subcategory: "Concrete",
+    notes: "Complex formwork, incl. nosing & tread finishing",
+  },
+  {
+    is1200Part: "Part 2", is1200Code: "IS1200-P2-DRYWALL",
+    description: "Gypsum board partition (75mm stud, single layer each side)",
+    unit: "m²", rate: 850, material: 650, labour: 200,
+    subcategory: "Finishes",
+  },
+
+  // ── Part 3: Brick Work ─────────────────────────────────────────────────
+  {
+    is1200Part: "Part 3", is1200Code: "IS1200-P3-BRICK-230",
+    description: "Brick masonry 230mm thick in CM 1:6 (one brick wall)",
+    unit: "m²", rate: 1250, material: 850, labour: 400,
+    subcategory: "Masonry",
+    notes: "First class bricks, cement mortar 1:6. Per m² of wall face.",
+  },
+  {
+    is1200Part: "Part 3", is1200Code: "IS1200-P3-BRICK-115",
+    description: "Brick masonry 115mm thick in CM 1:4 (half brick wall)",
+    unit: "m²", rate: 680, material: 450, labour: 230,
+    subcategory: "Masonry",
+  },
+  {
+    is1200Part: "Part 3", is1200Code: "IS1200-P3-BLOCK-200",
+    description: "Concrete block masonry 200mm thick in CM 1:6",
+    unit: "m²", rate: 950, material: 680, labour: 270,
+    subcategory: "Masonry",
+    notes: "400×200×200mm solid concrete blocks",
+  },
+  {
+    is1200Part: "Part 3", is1200Code: "IS1200-P3-AAC-200",
+    description: "AAC block masonry 200mm thick with polymer mortar",
+    unit: "m²", rate: 1100, material: 850, labour: 250,
+    subcategory: "Masonry",
+    notes: "Autoclaved aerated concrete blocks, lightweight",
+  },
+
+  // ── Part 4: Stone Masonry ──────────────────────────────────────────────
+  {
+    is1200Part: "Part 4", is1200Code: "IS1200-P4-STONE-WALL",
+    description: "Random rubble stone masonry in CM 1:6",
+    unit: "m³", rate: 4800, material: 3200, labour: 1600,
+    subcategory: "Masonry",
+  },
+
+  // ── Part 6: Reinforcement Steel ────────────────────────────────────────
+  {
+    is1200Part: "Part 6", is1200Code: "IS1200-P6-REBAR-500",
+    description: "TMT reinforcement bars Fe 500 (cutting, bending, placing, tying)",
+    unit: "kg", rate: 72, material: 58, labour: 14,
+    subcategory: "Steel",
+    notes: "Incl. binding wire @ 8kg/MT. CPWD DSR 2023-24.",
+  },
+
+  // ── Part 7: Structural Steel ───────────────────────────────────────────
+  {
+    is1200Part: "Part 7", is1200Code: "IS1200-P7-STRUCT-STEEL",
+    description: "Structural steel work in built-up sections (fabrication + erection)",
+    unit: "kg", rate: 120, material: 85, labour: 35,
+    subcategory: "Steel",
+    notes: "Incl. cutting, welding, bolting, one coat primer, erection",
+  },
+
+  // ── Part 8: Plastering ─────────────────────────────────────────────────
+  {
+    is1200Part: "Part 8", is1200Code: "IS1200-P8-PLASTER",
+    description: "Cement plaster 12mm thick in CM 1:6 (internal walls)",
+    unit: "m²", rate: 195, material: 120, labour: 75,
+    subcategory: "Finishes",
+    notes: "Single coat, smooth finish, incl. curing",
+  },
+  {
+    is1200Part: "Part 8", is1200Code: "IS1200-P8-PLASTER-EXT",
+    description: "Cement plaster 20mm thick in CM 1:4 (external walls)",
+    unit: "m²", rate: 280, material: 175, labour: 105,
+    subcategory: "Finishes",
+    notes: "Two coat (12mm + 8mm), sand-faced finish",
+  },
+
+  // ── Part 9: Metal Work (Doors, Windows, Grilles) ──────────────────────
+  {
+    is1200Part: "Part 9", is1200Code: "IS1200-P9-FLUSH-DOOR",
+    description: "Flush door shutter 35mm thick (commercial ply) with frame",
+    unit: "EA", rate: 8500, material: 6500, labour: 2000,
+    subcategory: "Doors & Windows",
+    notes: "900×2100mm, incl. sal wood frame, hinges, tower bolt, aldrops",
+  },
+  {
+    is1200Part: "Part 9", is1200Code: "IS1200-P9-STEEL-DOOR",
+    description: "MS pressed steel door frame with shutter",
+    unit: "EA", rate: 12000, material: 9500, labour: 2500,
+    subcategory: "Doors & Windows",
+    notes: "900×2100mm, incl. frame, hinges, tower bolt, primer coat",
+  },
+  {
+    is1200Part: "Part 9", is1200Code: "IS1200-P9-MS-RAILING",
+    description: "MS railing with round/square bars and flats",
+    unit: "Rmt", rate: 1800, material: 1350, labour: 450,
+    subcategory: "Steel",
+    notes: "1050mm high, incl. primer + enamel paint",
+  },
+
+  // ── Part 10: Painting ──────────────────────────────────────────────────
+  {
+    is1200Part: "Part 10", is1200Code: "IS1200-P10-PAINT",
+    description: "Acrylic emulsion paint (2 coats over primer) on plastered surface",
+    unit: "m²", rate: 72, material: 42, labour: 30,
+    subcategory: "Finishes",
+    notes: "Asian Paints Tractor Emulsion or equivalent. Incl. primer.",
+  },
+  {
+    is1200Part: "Part 10", is1200Code: "IS1200-P10-PAINT-EXT",
+    description: "Exterior weather coat paint (2 coats) on plastered surface",
+    unit: "m²", rate: 95, material: 58, labour: 37,
+    subcategory: "Finishes",
+    notes: "Asian Paints Apex or equivalent. UV + moisture resistant.",
+  },
+
+  // ── Part 13: Flooring ──────────────────────────────────────────────────
+  {
+    is1200Part: "Part 13", is1200Code: "IS1200-P13-VIT-TILE",
+    description: "Vitrified tile flooring 600×600mm with CM 1:4 bedding",
+    unit: "m²", rate: 950, material: 720, labour: 230,
+    subcategory: "Finishes",
+    notes: "Double charge vitrified tiles, incl. grouting",
+  },
+  {
+    is1200Part: "Part 13", is1200Code: "IS1200-P13-TERRACE-TILE",
+    description: "Terracotta/Kota stone tile on terrace over WP treatment",
+    unit: "m²", rate: 750, material: 520, labour: 230,
+    subcategory: "Finishes",
+  },
+  {
+    is1200Part: "Part 13", is1200Code: "IS1200-P13-MARBLE",
+    description: "Marble flooring (Makrana/Rajnagar white) with CM bedding",
+    unit: "m²", rate: 1800, material: 1400, labour: 400,
+    subcategory: "Finishes",
+  },
+
+  // ── Part 21: Waterproofing ─────────────────────────────────────────────
+  {
+    is1200Part: "Part 21", is1200Code: "IS1200-P21-WATERPROOF",
+    description: "Waterproofing treatment to terrace/roof (bitumen-based membrane)",
+    unit: "m²", rate: 320, material: 230, labour: 90,
+    subcategory: "Waterproofing",
+    notes: "APP modified bitumen membrane, torch applied",
+  },
+
+  // ── Part 24: Aluminium Work ────────────────────────────────────────────
+  {
+    is1200Part: "Part 24", is1200Code: "IS1200-P24-ALUM-WINDOW",
+    description: "Aluminium sliding window with 5mm clear glass",
+    unit: "m²", rate: 4500, material: 3800, labour: 700,
+    subcategory: "Doors & Windows",
+    notes: "Anodised aluminium section, incl. hardware, rubber gaskets",
+  },
+  {
+    is1200Part: "Part 24", is1200Code: "IS1200-P24-UPVC-WINDOW",
+    description: "UPVC sliding window with 5mm clear glass",
+    unit: "m²", rate: 3800, material: 3200, labour: 600,
+    subcategory: "Doors & Windows",
+  },
+  {
+    is1200Part: "Part 24", is1200Code: "IS1200-P24-CURTAIN-WALL",
+    description: "Aluminium curtain wall glazing system (DGU 6+12+6mm)",
+    unit: "m²", rate: 8500, material: 7200, labour: 1300,
+    subcategory: "Doors & Windows",
+    notes: "Structural silicone glazing, double glazed unit",
+  },
+];
+
+// ─── Derived Indian Rates (Formwork, Rebar, Finishing per element type) ──
+
+export const INDIAN_DERIVED_RATES = {
+  formwork: {
+    slab:   { rate: 380, unit: "m²", notes: "Centering & shuttering for RCC slab" },
+    beam:   { rate: 420, unit: "m²", notes: "Centering & shuttering for RCC beam" },
+    column: { rate: 480, unit: "m²", notes: "Centering & shuttering for RCC column" },
+    wall:   { rate: 400, unit: "m²", notes: "Centering & shuttering for RCC wall" },
+    stair:  { rate: 550, unit: "m²", notes: "Centering & shuttering for staircase" },
+  },
+  rebar: {
+    // Typical reinforcement kg/m³ of concrete (IS 456 guidance)
+    slab:   { kgPerM3: 90,  rate: 72, notes: "Avg 80-120 kg/m³ for slabs" },
+    beam:   { kgPerM3: 160, rate: 72, notes: "Avg 120-200 kg/m³ for beams" },
+    column: { kgPerM3: 200, rate: 72, notes: "Avg 150-250 kg/m³ for columns" },
+    wall:   { kgPerM3: 50,  rate: 72, notes: "Avg 30-70 kg/m³ for RCC walls" },
+    footing:{ kgPerM3: 80,  rate: 72, notes: "Avg 60-100 kg/m³ for footings" },
+    stair:  { kgPerM3: 130, rate: 72, notes: "Avg 100-150 kg/m³ for stairs" },
+  },
+};
+
+// ─── Lookup Functions ────────────────────────────────────────────────────────
+
+const rateIndex = new Map<string, IS1200Rate>();
+for (const rate of IS1200_RATES) {
+  rateIndex.set(rate.is1200Code, rate);
+}
+
+/** Get a specific IS 1200 rate by code */
+export function getIS1200Rate(code: string): IS1200Rate | undefined {
+  return rateIndex.get(code);
+}
+
+/** Get IS 1200 mapping for an IFC element type */
+export function getIS1200Mapping(ifcType: string): IS1200Mapping | undefined {
+  return IS1200_MAPPINGS.find(m => m.ifcType === ifcType);
+}
+
+/**
+ * Get applicable IS 1200 rates for an IFC element, optionally using material name.
+ * Returns rates in INR, ready to use for Indian projects.
+ */
+export function getIS1200RatesForElement(
+  ifcType: string,
+  materialName?: string
+): IS1200Rate[] {
+  const mapping = getIS1200Mapping(ifcType);
+  if (!mapping) return [];
+
+  // Try material-specific codes first
+  if (materialName && mapping.materialOverrides) {
+    const matLower = materialName.toLowerCase();
+    for (const [keyword, codes] of Object.entries(mapping.materialOverrides)) {
+      if (matLower.includes(keyword)) {
+        return codes.map(c => rateIndex.get(c)).filter(Boolean) as IS1200Rate[];
+      }
+    }
+  }
+
+  // Fall back to default codes
+  return mapping.defaultRateCodes
+    .map(c => rateIndex.get(c))
+    .filter(Boolean) as IS1200Rate[];
+}
+
+/**
+ * Get the IS 1200 Part code string for an IFC element type.
+ * Used in BOQ display: "IS 1200 Part 2" instead of CSI "03 30 00"
+ */
+export function getIS1200PartLabel(ifcType: string, materialName?: string): string {
+  const mapping = getIS1200Mapping(ifcType);
+  if (!mapping) return "—";
+
+  // Check for material-based part override
+  if (materialName) {
+    const matLower = materialName.toLowerCase();
+    if (matLower.includes("brick") || matLower.includes("block") || matLower.includes("aac")) {
+      return "IS 1200 Part 3 — Brick/Block Work";
+    }
+    if (matLower.includes("stone")) return "IS 1200 Part 4 — Stone Masonry";
+    if (matLower.includes("steel") && (ifcType === "IfcColumn" || ifcType === "IfcBeam")) {
+      return "IS 1200 Part 7 — Structural Steel";
+    }
+  }
+
+  return `IS 1200 ${mapping.is1200Part} — ${mapping.is1200PartName}`;
+}

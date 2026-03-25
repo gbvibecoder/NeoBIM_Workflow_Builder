@@ -938,23 +938,37 @@ export async function parseIFCBuffer(
   const storeyMap = new Map<number, string>();
   const buildingStoreys: BuildingStorey[] = [];
 
+  // First pass: collect all storey elevations
+  const storeyElevations: Array<{ id: number; name: string; elevation: number }> = [];
   for (let i = 0; i < storeyCount; i++) {
     const storeyID = storeyIDs.get(i);
     try {
       const storey = ifcAPI.GetLine(modelID, storeyID, false);
       const name = storey?.Name?.value || `Level ${i + 1}`;
       const elevation = storey?.Elevation?.value || 0;
-
-      storeyMap.set(storeyID, name);
-      buildingStoreys.push({
-        name,
-        elevation,
-        height: 3.0,
-        elementCount: 0,
-      });
+      storeyElevations.push({ id: storeyID, name, elevation });
     } catch {
       warnings.push(`Failed to parse storey ${storeyID}`);
     }
+  }
+
+  // Sort by elevation ascending to compute inter-storey heights
+  storeyElevations.sort((a, b) => a.elevation - b.elevation);
+
+  for (let i = 0; i < storeyElevations.length; i++) {
+    const s = storeyElevations[i];
+    // Height = difference to next storey elevation, or 3.0m for top storey
+    const height = i < storeyElevations.length - 1
+      ? Math.max(storeyElevations[i + 1].elevation - s.elevation, 2.4)
+      : 3.0; // top storey defaults to 3.0m
+
+    storeyMap.set(s.id, s.name);
+    buildingStoreys.push({
+      name: s.name,
+      elevation: s.elevation,
+      height: Math.round(height * 100) / 100,
+      elementCount: 0,
+    });
   }
 
   // Build element → storey lookup via IfcRelContainedInSpatialStructure
@@ -1212,9 +1226,14 @@ export async function parseIFCBuffer(
   // Sort divisions by code
   divisions.sort((a, b) => a.code.localeCompare(b.code));
 
-  // Calculate summary
-  const grossFloorArea = buildingStoreys.reduce((sum) => sum + 0, 0);
-  const totalConcrete = divisions.find((d) => d.code === "03")?.totalVolume;
+  // Calculate summary — GFA from slab gross areas (floor slabs, not roof)
+  const slabDivision = divisions.find((d) => d.code === "03");
+  const slabGrossArea = slabDivision?.categories
+    .flatMap(c => c.elements)
+    .filter(e => e.type === "IfcSlab")
+    .reduce((sum, e) => sum + (e.quantities.area?.gross ?? 0), 0) ?? 0;
+  const grossFloorArea = slabGrossArea > 0 ? slabGrossArea : buildingStoreys.reduce((sum, s) => sum + (s.height > 0 ? 1 : 0), 0) * 100; // fallback estimate
+  const totalConcrete = slabDivision?.totalVolume;
   const totalMasonry = divisions.find((d) => d.code === "04")?.totalArea;
 
   // Close model
