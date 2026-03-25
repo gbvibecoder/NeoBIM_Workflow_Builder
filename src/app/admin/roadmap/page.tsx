@@ -5,9 +5,9 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Sparkles, Brain, AlertTriangle, Zap, Clock, CheckCircle2,
   Circle, ArrowRight, ChevronDown, ChevronRight, RefreshCw,
-  Bug, Lightbulb, Wrench, Server, Code2, Palette, Flame,
+  Bug, Lightbulb, Wrench, Server, Code2, Palette,
   Target, TrendingUp, Users, BarChart3, MessageSquare,
-  ArrowUpRight, Pause, X, Trophy, Calendar, Loader2,
+  ArrowUpRight, Pause, X, Trophy, Calendar, Play,
 } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -87,7 +87,7 @@ const CATEGORY_CONFIG: Record<string, { icon: typeof Bug; color: string; label: 
 
 const STATUS_CONFIG: Record<string, { icon: typeof Circle; color: string; bg: string; label: string }> = {
   todo: { icon: Circle, color: "#8898A8", bg: "rgba(136,152,168,0.08)", label: "To Do" },
-  "in-progress": { icon: Loader2, color: "#FFBF00", bg: "rgba(255,191,0,0.08)", label: "In Progress" },
+  "in-progress": { icon: Play, color: "#FFBF00", bg: "rgba(255,191,0,0.08)", label: "In Progress" },
   done: { icon: CheckCircle2, color: "#34D399", bg: "rgba(52,211,153,0.08)", label: "Done" },
   deferred: { icon: Pause, color: "#B87333", bg: "rgba(184,115,51,0.08)", label: "Deferred" },
   dropped: { icon: X, color: "#556070", bg: "rgba(85,96,112,0.08)", label: "Dropped" },
@@ -109,6 +109,157 @@ function GlowOrb({ color, size, top, left, delay = 0 }: { color: string; size: n
         filter: "blur(40px)", pointerEvents: "none",
       }}
     />
+  );
+}
+
+// ─── AEC Architectural Illustration ───────────────────────────────────────────
+
+function BlueprintBuilding() {
+  return (
+    <svg width="280" height="200" viewBox="0 0 280 200" fill="none" style={{ opacity: 0.6 }}>
+      {/* Ground line */}
+      <line x1="10" y1="180" x2="270" y2="180" stroke="rgba(184,115,51,0.2)" strokeWidth="1" strokeDasharray="4 3" />
+      {/* Main building */}
+      <motion.rect
+        x="60" y="40" width="80" height="140" rx="2"
+        stroke="rgba(0,245,255,0.25)" strokeWidth="1" fill="rgba(0,245,255,0.02)"
+        initial={{ scaleY: 0, originY: 1 }}
+        animate={{ scaleY: 1 }}
+        transition={{ duration: 1.2, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
+        style={{ transformOrigin: "70px 180px" }}
+      />
+      {/* Second tower */}
+      <motion.rect
+        x="160" y="70" width="60" height="110" rx="2"
+        stroke="rgba(184,115,51,0.25)" strokeWidth="1" fill="rgba(184,115,51,0.02)"
+        initial={{ scaleY: 0 }}
+        animate={{ scaleY: 1 }}
+        transition={{ duration: 1, delay: 0.5, ease: [0.16, 1, 0.3, 1] }}
+        style={{ transformOrigin: "190px 180px" }}
+      />
+      {/* Floor lines */}
+      {[60, 80, 100, 120, 140, 160].map((y, i) => (
+        <motion.line
+          key={`floor-${i}`}
+          x1="62" y1={y} x2="138" y2={y}
+          stroke="rgba(0,245,255,0.1)" strokeWidth="0.5"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.8 + i * 0.1 }}
+        />
+      ))}
+      {[85, 105, 125, 145, 165].map((y, i) => (
+        <motion.line
+          key={`floor2-${i}`}
+          x1="162" y1={y} x2="218" y2={y}
+          stroke="rgba(184,115,51,0.1)" strokeWidth="0.5"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 1 + i * 0.1 }}
+        />
+      ))}
+      {/* Windows */}
+      {[50, 70, 90, 110, 130, 150].map((y, i) => (
+        <React.Fragment key={`win-${i}`}>
+          <motion.rect
+            x="72" y={y + 2} width="8" height="12" rx="1"
+            fill="rgba(0,245,255,0.08)" stroke="rgba(0,245,255,0.15)" strokeWidth="0.5"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: [0.3, 0.8, 0.3] }}
+            transition={{ duration: 3, repeat: Infinity, delay: i * 0.4 }}
+          />
+          <motion.rect
+            x="90" y={y + 2} width="8" height="12" rx="1"
+            fill="rgba(0,245,255,0.05)" stroke="rgba(0,245,255,0.12)" strokeWidth="0.5"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: [0.5, 0.2, 0.5] }}
+            transition={{ duration: 4, repeat: Infinity, delay: i * 0.3 + 0.5 }}
+          />
+          <motion.rect
+            x="108" y={y + 2} width="8" height="12" rx="1"
+            fill="rgba(255,191,0,0.06)" stroke="rgba(255,191,0,0.12)" strokeWidth="0.5"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: [0.2, 0.6, 0.2] }}
+            transition={{ duration: 3.5, repeat: Infinity, delay: i * 0.5 + 1 }}
+          />
+        </React.Fragment>
+      ))}
+      {/* Crane */}
+      <motion.g
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 1.5 }}
+      >
+        <line x1="240" y1="180" x2="240" y2="20" stroke="rgba(255,191,0,0.2)" strokeWidth="1.5" />
+        <line x1="200" y1="20" x2="265" y2="20" stroke="rgba(255,191,0,0.2)" strokeWidth="1.5" />
+        <line x1="240" y1="20" x2="200" y2="35" stroke="rgba(255,191,0,0.15)" strokeWidth="0.8" />
+        {/* Crane hook with subtle swing */}
+        <motion.g
+          animate={{ rotate: [-2, 2, -2] }}
+          transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+          style={{ transformOrigin: "210px 20px" }}
+        >
+          <line x1="210" y1="20" x2="210" y2="55" stroke="rgba(255,191,0,0.15)" strokeWidth="0.8" />
+          <rect x="205" y="55" width="10" height="6" rx="1" fill="rgba(255,191,0,0.1)" stroke="rgba(255,191,0,0.2)" strokeWidth="0.5" />
+        </motion.g>
+      </motion.g>
+      {/* Dimension lines */}
+      <motion.g
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 0.4 }}
+        transition={{ delay: 2 }}
+      >
+        <line x1="45" y1="40" x2="45" y2="180" stroke="rgba(184,115,51,0.15)" strokeWidth="0.5" strokeDasharray="2 2" />
+        <line x1="42" y1="40" x2="48" y2="40" stroke="rgba(184,115,51,0.15)" strokeWidth="0.5" />
+        <line x1="42" y1="180" x2="48" y2="180" stroke="rgba(184,115,51,0.15)" strokeWidth="0.5" />
+        <text x="30" y="115" fill="rgba(184,115,51,0.2)" fontSize="6" fontFamily="var(--font-jetbrains)" textAnchor="middle" transform="rotate(-90, 30, 115)">140m</text>
+      </motion.g>
+    </svg>
+  );
+}
+
+function IsometricGrid() {
+  return (
+    <svg width="100%" height="100%" style={{ position: "absolute", inset: 0, pointerEvents: "none", opacity: 0.3 }}>
+      <defs>
+        <pattern id="iso-grid" width="40" height="40" patternUnits="userSpaceOnUse">
+          <path d="M 40 0 L 0 20 M 0 20 L 40 40" stroke="rgba(184,115,51,0.04)" strokeWidth="0.5" fill="none" />
+        </pattern>
+      </defs>
+      <rect width="100%" height="100%" fill="url(#iso-grid)" />
+    </svg>
+  );
+}
+
+function ConstructionParticles() {
+  return (
+    <div style={{ position: "absolute", inset: 0, pointerEvents: "none", overflow: "hidden" }}>
+      {[...Array(6)].map((_, i) => (
+        <motion.div
+          key={i}
+          animate={{
+            y: [-20, -200 - i * 50],
+            x: [0, (i % 2 === 0 ? 30 : -30)],
+            opacity: [0, 0.6, 0],
+          }}
+          transition={{
+            duration: 6 + i * 2,
+            repeat: Infinity,
+            delay: i * 1.5,
+            ease: "easeOut",
+          }}
+          style={{
+            position: "absolute",
+            bottom: 0,
+            left: `${15 + i * 15}%`,
+            width: 2,
+            height: 2,
+            borderRadius: "50%",
+            background: ["#FFBF00", "#00F5FF", "#B87333", "#34D399", "#FFBF00", "#00F5FF"][i],
+          }}
+        />
+      ))}
+    </div>
   );
 }
 
@@ -266,7 +417,7 @@ function TaskCard({ task, onStatusChange }: {
           >
             {React.createElement(STATUS_CONFIG[task.status]?.icon ?? Circle, {
               size: 10,
-              ...(task.status === "in-progress" ? { className: "animate-spin" } : {}),
+              ...(task.status === "in-progress" ? { style: { color: "#FFBF00" } } : {}),
             })}
             {STATUS_CONFIG[task.status]?.label ?? task.status}
             <ChevronDown size={9} />
@@ -407,7 +558,7 @@ function KanbanColumn({ status, tasks, onStatusChange }: {
         {React.createElement(cfg.icon, {
           size: 14,
           style: { color: cfg.color },
-          ...(status === "in-progress" ? { className: "animate-spin" } : {}),
+          ...(status === "in-progress" ? { style: { color: "#FFBF00" } } : {}),
         })}
         <span style={{
           fontSize: 12, fontWeight: 700, color: cfg.color,
@@ -433,12 +584,21 @@ function KanbanColumn({ status, tasks, onStatusChange }: {
         </AnimatePresence>
         {tasks.length === 0 && (
           <div style={{
-            padding: 24, textAlign: "center",
-            borderRadius: 12, border: "1px dashed rgba(184,115,51,0.1)",
-            color: "#3A4450", fontSize: 11,
+            padding: "28px 20px", textAlign: "center",
+            borderRadius: 12, border: "1px dashed rgba(184,115,51,0.12)",
+            color: "#3A4450", fontSize: 10,
             fontFamily: "var(--font-jetbrains)",
+            background: "rgba(255,255,255,0.005)",
+            position: "relative", overflow: "hidden",
           }}>
-            No tasks
+            <div style={{
+              position: "absolute", inset: 0, pointerEvents: "none", opacity: 0.3,
+              backgroundImage: "repeating-linear-gradient(90deg, transparent, transparent 19px, rgba(184,115,51,0.04) 19px, rgba(184,115,51,0.04) 20px)",
+            }} />
+            <span style={{ position: "relative" }}>
+              {status === "done" ? "Tasks move here on completion" :
+               status === "in-progress" ? "Start working on tasks" : "No tasks"}
+            </span>
           </div>
         )}
       </div>
@@ -583,12 +743,16 @@ export default function RoadmapPage() {
         <GlowOrb color="rgba(184,115,51,0.15)" size={400} top="-5%" left="60%" delay={0} />
         <GlowOrb color="rgba(0,245,255,0.08)" size={300} top="40%" left="-5%" delay={2} />
         <GlowOrb color="rgba(255,191,0,0.06)" size={350} top="70%" left="80%" delay={4} />
+        {/* Isometric grid overlay */}
+        <IsometricGrid />
         {/* Blueprint grid */}
         <div style={{
           position: "absolute", inset: 0,
           backgroundImage: "radial-gradient(circle, rgba(184,115,51,0.03) 1px, transparent 1px)",
           backgroundSize: "32px 32px",
         }} />
+        {/* Floating construction particles */}
+        <ConstructionParticles />
       </div>
 
       <div style={{ position: "relative", zIndex: 1, padding: "28px 32px 48px", maxWidth: 1440, margin: "0 auto" }}>
@@ -623,8 +787,18 @@ export default function RoadmapPage() {
           <div style={{
             display: "flex", alignItems: "flex-start", justifyContent: "space-between",
             flexWrap: "wrap", gap: 16, marginBottom: 24,
+            position: "relative",
           }}>
-            <div>
+            {/* AEC Building illustration — right side, behind controls */}
+            <div style={{
+              position: "absolute", right: 0, top: -40,
+              pointerEvents: "none", zIndex: 0,
+              opacity: 0.4,
+            }}>
+              <BlueprintBuilding />
+            </div>
+
+            <div style={{ position: "relative", zIndex: 1 }}>
               <h1 style={{
                 fontSize: 32, fontWeight: 800, color: "#F0F2FF",
                 margin: 0, lineHeight: 1.2,
@@ -640,6 +814,13 @@ export default function RoadmapPage() {
                   Roadmap
                 </span>
               </h1>
+              <p style={{
+                fontSize: 11, color: "#3A4450", margin: "4px 0 0",
+                fontFamily: "var(--font-jetbrains)",
+                letterSpacing: "0.05em",
+              }}>
+                AI-POWERED SPRINT PLANNING FOR AEC TEAMS
+              </p>
               {roadmap && (
                 <p style={{
                   fontSize: 13, color: "#556070", margin: "6px 0 0",
@@ -807,7 +988,7 @@ export default function RoadmapPage() {
                   AI Agent is analyzing your platform...
                 </h3>
                 <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                  {["Reading all feedback items", "Analyzing execution patterns", "Studying growth metrics", "Generating prioritized tasks"].map((step, i) => (
+                  {["Scanning all user feedback & bug reports", "Analyzing execution health & error patterns", "Evaluating tech stack: Kling AI, Meshy, OpenAI, i18n coverage", "Studying growth metrics & subscription conversion", "Generating prioritized sprint tasks"].map((step, i) => (
                     <motion.div
                       key={step}
                       initial={{ opacity: 0, x: -10 }}
@@ -840,39 +1021,62 @@ export default function RoadmapPage() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             style={{
-              padding: "64px 32px", borderRadius: 20, textAlign: "center",
+              padding: "48px 32px 64px", borderRadius: 20, textAlign: "center",
               background: "rgba(10,12,14,0.6)",
               border: "1px solid rgba(184,115,51,0.1)",
+              position: "relative", overflow: "hidden",
             }}
           >
+            {/* Background architectural pattern */}
+            <div style={{
+              position: "absolute", inset: 0, pointerEvents: "none",
+              backgroundImage: `
+                repeating-linear-gradient(0deg, transparent, transparent 39px, rgba(184,115,51,0.03) 39px, rgba(184,115,51,0.03) 40px),
+                repeating-linear-gradient(90deg, transparent, transparent 39px, rgba(184,115,51,0.03) 39px, rgba(184,115,51,0.03) 40px)
+              `,
+            }} />
+            {/* Building illustration */}
+            <div style={{ display: "flex", justifyContent: "center", marginBottom: 16, position: "relative" }}>
+              <BlueprintBuilding />
+            </div>
             <motion.div
               animate={{ y: [0, -8, 0] }}
               transition={{ duration: 3, repeat: Infinity }}
             >
-              <Sparkles size={48} style={{ color: "#B87333", margin: "0 auto 16px" }} />
+              <Sparkles size={36} style={{ color: "#B87333", margin: "0 auto 12px" }} />
             </motion.div>
-            <h2 style={{ fontSize: 24, fontWeight: 800, color: "#E2E8F0", margin: "0 0 8px" }}>
+            <h2 style={{ fontSize: 24, fontWeight: 800, color: "#E2E8F0", margin: "0 0 6px", position: "relative" }}>
               No Roadmap Yet
             </h2>
-            <p style={{ fontSize: 14, color: "#556070", margin: "0 0 24px", maxWidth: 480, marginInline: "auto" }}>
-              Hit the generate button to let the AI CTO Agent analyze all your feedback, metrics,
-              and platform data to create this week&apos;s prioritized roadmap.
+            <p style={{
+              fontSize: 11, color: "#3A4450", margin: "0 0 4px",
+              fontFamily: "var(--font-jetbrains)", letterSpacing: "0.1em",
+              textTransform: "uppercase" as const, position: "relative",
+            }}>
+              YOUR AI CTO IS READY TO ANALYZE
+            </p>
+            <p style={{ fontSize: 14, color: "#556070", margin: "8px 0 28px", maxWidth: 520, marginInline: "auto", position: "relative", lineHeight: 1.7 }}>
+              The agent will deep-analyze all user feedback, platform metrics, tech stack health,
+              service quality, i18n coverage, subscription data, and error patterns to generate
+              a prioritized weekly sprint plan.
             </p>
             <motion.button
-              whileHover={{ scale: 1.03 }}
+              whileHover={{ scale: 1.03, boxShadow: "0 8px 40px rgba(184,115,51,0.4), 0 0 60px rgba(184,115,51,0.15)" }}
               whileTap={{ scale: 0.97 }}
               onClick={handleGenerate}
               style={{
                 display: "inline-flex", alignItems: "center", gap: 10,
-                padding: "14px 28px", borderRadius: 14,
+                padding: "14px 32px", borderRadius: 14,
                 background: "linear-gradient(135deg, #B87333, #FFBF00)",
                 color: "#0A0C0E", fontSize: 15, fontWeight: 800,
                 border: "none", cursor: "pointer",
                 fontFamily: "var(--font-dm-sans)",
                 boxShadow: "0 4px 24px rgba(184,115,51,0.3), 0 0 48px rgba(184,115,51,0.1)",
+                position: "relative",
+                transition: "box-shadow 0.3s ease",
               }}
             >
-              <Sparkles size={18} />
+              <Brain size={18} />
               Generate Your First Roadmap
             </motion.button>
           </motion.div>
@@ -904,7 +1108,7 @@ export default function RoadmapPage() {
             )}
 
             {/* ── AI Insight + Risk + Quick Wins row ─────────────────────────── */}
-            <div style={{
+            <div className="roadmap-insight-grid" style={{
               display: "grid",
               gridTemplateColumns: "1fr 1fr 1fr",
               gap: 16, marginBottom: 24,
@@ -1248,20 +1452,24 @@ export default function RoadmapPage() {
           0%, 100% { opacity: 1; }
           50% { opacity: 0.4; }
         }
-        .animate-spin {
-          animation: spin 1.5s linear infinite;
+        @keyframes shimmer-line {
+          0% { transform: translateX(-100%); }
+          100% { transform: translateX(200%); }
         }
-        @keyframes spin {
-          to { transform: rotate(360deg); }
-        }
-        @media (max-width: 1024px) {
-          div[style*="gridTemplateColumns: \"1fr 1fr 1fr\""] {
+        @media (max-width: 1200px) {
+          .roadmap-insight-grid {
             grid-template-columns: 1fr !important;
           }
         }
         @media (max-width: 768px) {
-          div[style*="maxWidth: 1440"] {
+          .roadmap-container {
             padding: 16px !important;
+          }
+          .roadmap-kanban {
+            flex-direction: column !important;
+          }
+          .roadmap-kanban > div {
+            max-width: 100% !important;
           }
         }
       `}</style>
