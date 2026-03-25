@@ -2343,13 +2343,14 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
       // Also pick up layoutDescription from TR-004
       const layoutDescription = (inputData?.layoutDescription as string) ?? "";
 
-      // Fallback renovation detection: if we have building photo data (fileData from IN-008)
-      // and it's not a floor plan, treat it as renovation even if isMultiImage flag was lost in merge
-      if (!isRenovationInput && !isFloorPlanInput && inputData?.fileData && typeof inputData.fileData === "string") {
-        const fMime = (inputData?.mimeType as string) ?? "";
-        if (fMime.startsWith("image/") || !fMime) {
+      // Fallback renovation detection: if we have building photo data specifically from IN-008
+      // (identified by isMultiImage or fileDataArray flags) and it's not a floor plan.
+      // DO NOT match IN-003 single image uploads — those use standard prompts.
+      if (!isRenovationInput && !isFloorPlanInput) {
+        const hasMultiImageMarker = !!(inputData?.isMultiImage) || !!(inputData?.fileDataArray);
+        if (hasMultiImageMarker) {
           isRenovationInput = true;
-          logger.debug("[GN-009] Fallback: detected building photo fileData → enabling renovation mode");
+          logger.debug("[GN-009] Fallback: detected IN-008 multi-image markers → enabling renovation mode");
         }
       }
 
