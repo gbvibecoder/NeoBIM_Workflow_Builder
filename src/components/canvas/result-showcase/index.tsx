@@ -226,7 +226,7 @@ export function ResultShowcase({ onClose }: ResultShowcaseProps) {
       <div className="showcase-tab-content" style={{
         flex: 1,
         overflow: resolvedTab === "model" ? "hidden" : "auto",
-        padding: resolvedTab === "model" ? "0" : "24px 32px",
+        padding: resolvedTab === "model" ? "0" : "24px clamp(12px, 3vw, 32px)",
       }}>
         <AnimatePresence mode="wait">
           <motion.div
