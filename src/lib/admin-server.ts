@@ -47,7 +47,9 @@ export type AuditAction =
   | "USER_ROLE_CHANGED"
   | "USER_DELETED"
   | "FEEDBACK_STATUS_CHANGED"
-  | "DATA_EXPORTED";
+  | "DATA_EXPORTED"
+  | "ROADMAP_GENERATED"
+  | "ROADMAP_TASK_UPDATED";
 
 /** Log an admin action to the audit trail */
 export async function logAudit(
