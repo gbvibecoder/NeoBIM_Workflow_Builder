@@ -19,6 +19,8 @@ export interface TableDataItem {
   headers: string[];
   rows: (string | number)[][];
   label?: string;
+  tileInstanceId?: string; // For quantity override support
+  isQuantityTable?: boolean; // True for TR-007 output tables
 }
 
 export interface FileDownload {
@@ -249,10 +251,14 @@ export function useShowcaseData(): ShowcaseData {
     const tableArtifacts = findAllByType(artifacts, "table");
     const tableData: TableDataItem[] = tableArtifacts.map(a => {
       const d = asRecord(a.data);
+      const label = d.label as string | undefined;
+      const isQuantityTable = label?.toLowerCase().includes("extracted quantities") ?? false;
       return {
         headers: (d.headers as string[]) ?? [],
         rows: (d.rows as (string | number)[][]) ?? [],
-        label: d.label as string | undefined,
+        label,
+        tileInstanceId: a.tileInstanceId,
+        isQuantityTable,
       };
     });
 

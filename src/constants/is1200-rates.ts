@@ -139,8 +139,23 @@ export const IS1200_MAPPINGS: IS1200Mapping[] = [
   {
     ifcType: "IfcCovering",
     is1200Part: "Part 13",
-    is1200PartName: "Flooring",
+    is1200PartName: "Flooring / Finishes",
     defaultRateCodes: ["IS1200-P13-VIT-TILE"],
+    materialOverrides: {
+      marble:   ["IS1200-P13-MARBLE"],
+      granite:  ["IS1200-P13-GRANITE"],
+      wood:     ["IS1200-P13-WOOD-FLOOR"],
+      timber:   ["IS1200-P13-WOOD-FLOOR"],
+      parquet:  ["IS1200-P13-WOOD-FLOOR"],
+      epoxy:    ["IS1200-P13-EPOXY"],
+      carpet:   ["IS1200-P13-CARPET"],
+      gypsum:   ["IS1200-P13-GYPSUM-CEILING"],
+      grid:     ["IS1200-P13-GRID-CEILING"],
+      mineral:  ["IS1200-P13-GRID-CEILING"],
+      acp:      ["IS1200-P13-ACP-CLADDING"],
+      aluminium: ["IS1200-P13-ACP-CLADDING"],
+      stone:    ["IS1200-P13-STONE-CLADDING"],
+    },
   },
   // Proxy elements (Allplan, Tekla, precast exports) — default to concrete
   {
@@ -357,6 +372,64 @@ export const IS1200_RATES: IS1200Rate[] = [
     description: "Marble flooring (Makrana/Rajnagar white) with CM bedding",
     unit: "m²", rate: 1800, material: 1400, labour: 400,
     subcategory: "Finishes",
+  },
+
+  // ── Part 13 (continued): Additional flooring, ceiling, and cladding ─────
+  {
+    is1200Part: "Part 13", is1200Code: "IS1200-P13-GRANITE",
+    description: "Granite flooring (polished, 18mm) with CM bedding",
+    unit: "m²", rate: 2200, material: 1750, labour: 450,
+    subcategory: "Finishes",
+    notes: "South Indian granite, mirror polish. Incl. grouting.",
+  },
+  {
+    is1200Part: "Part 13", is1200Code: "IS1200-P13-WOOD-FLOOR",
+    description: "Wooden flooring (engineered/laminate, 8-12mm)",
+    unit: "m²", rate: 1800, material: 1450, labour: 350,
+    subcategory: "Finishes",
+    notes: "Engineered wood or premium laminate. Incl. underlay and finishing.",
+  },
+  {
+    is1200Part: "Part 13", is1200Code: "IS1200-P13-EPOXY",
+    description: "Epoxy flooring (self-leveling, 2-3mm coat)",
+    unit: "m²", rate: 850, material: 620, labour: 230,
+    subcategory: "Finishes",
+    notes: "Industrial/commercial grade epoxy. Incl. primer coat.",
+  },
+  {
+    is1200Part: "Part 13", is1200Code: "IS1200-P13-CARPET",
+    description: "Carpet tile flooring (commercial grade, 6mm)",
+    unit: "m²", rate: 1200, material: 950, labour: 250,
+    subcategory: "Finishes",
+    notes: "Interface/Shaw equivalent. Incl. adhesive and finishing.",
+  },
+  {
+    is1200Part: "Part 13", is1200Code: "IS1200-P13-GYPSUM-CEILING",
+    description: "Gypsum board false ceiling with GI framework",
+    unit: "m²", rate: 450, material: 320, labour: 130,
+    subcategory: "Finishes",
+    notes: "12.5mm gypsum board, suspended GI grid. Incl. putty + paint.",
+  },
+  {
+    is1200Part: "Part 13", is1200Code: "IS1200-P13-GRID-CEILING",
+    description: "Grid/mineral fiber false ceiling (T-bar system)",
+    unit: "m²", rate: 380, material: 260, labour: 120,
+    subcategory: "Finishes",
+    notes: "Armstrong/USG equivalent, 600×600mm tiles.",
+  },
+  {
+    is1200Part: "Part 13", is1200Code: "IS1200-P13-ACP-CLADDING",
+    description: "ACP (Aluminium Composite Panel) cladding with SS subframe",
+    unit: "m²", rate: 1800, material: 1400, labour: 400,
+    subcategory: "Finishes",
+    notes: "4mm ACP panel, SS 304 subframe. Incl. weather sealant.",
+  },
+  {
+    is1200Part: "Part 13", is1200Code: "IS1200-P13-STONE-CLADDING",
+    description: "Natural stone cladding (dry-fix with SS anchors)",
+    unit: "m²", rate: 2200, material: 1700, labour: 500,
+    subcategory: "Finishes",
+    notes: "20-25mm stone veneer, SS anchor system. Excl. waterproofing.",
   },
 
   // ── Part 21: Waterproofing ─────────────────────────────────────────────

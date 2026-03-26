@@ -71,6 +71,13 @@ interface ExecutionState {
   removeArtifact: (tileInstanceId: string) => void;
   clearArtifacts: () => void;
 
+  // Quantity overrides: tileInstanceId → Map<rowIndex, overrideValue>
+  // Allows users to correct TR-007 quantities before passing to TR-008
+  quantityOverrides: Map<string, Map<number, number>>;
+  setQuantityOverride: (tileInstanceId: string, rowIndex: number, value: number) => void;
+  clearQuantityOverrides: (tileInstanceId: string) => void;
+  getQuantityOverrides: (tileInstanceId: string) => Map<number, number>;
+
   // Restore artifacts from DB (after loading a workflow)
   restoreArtifactsFromDB: (dbArtifacts: Array<{
     tileInstanceId: string;
@@ -101,6 +108,7 @@ export const useExecutionStore = create<ExecutionState>()((set, get) => ({
   regenerationCounts: new Map(),
   regeneratingNodeId: null,
   history: [],
+  quantityOverrides: new Map(),
 
   setRateLimited: (value) => set({ isRateLimited: value }),
 
@@ -216,6 +224,26 @@ export const useExecutionStore = create<ExecutionState>()((set, get) => ({
     }),
 
   clearArtifacts: () => set({ artifacts: new Map() }),
+
+  setQuantityOverride: (tileInstanceId, rowIndex, value) =>
+    set((state) => {
+      const newOverrides = new Map(state.quantityOverrides);
+      const tileOverrides = new Map(newOverrides.get(tileInstanceId) ?? new Map());
+      tileOverrides.set(rowIndex, value);
+      newOverrides.set(tileInstanceId, tileOverrides);
+      return { quantityOverrides: newOverrides };
+    }),
+
+  clearQuantityOverrides: (tileInstanceId) =>
+    set((state) => {
+      const newOverrides = new Map(state.quantityOverrides);
+      newOverrides.delete(tileInstanceId);
+      return { quantityOverrides: newOverrides };
+    }),
+
+  getQuantityOverrides: (tileInstanceId) => {
+    return get().quantityOverrides.get(tileInstanceId) ?? new Map();
+  },
 
   restoreArtifactsFromDB: (dbArtifacts, executionMeta) => {
     const newArtifacts = new Map<string, ExecutionArtifact>();

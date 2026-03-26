@@ -430,7 +430,7 @@ export function LocationInput({ nodeId, data }: { nodeId: string; data: Workflow
       const raw = data.inputValue as string;
       if (raw && raw.startsWith("{")) return JSON.parse(raw);
     } catch { /* ignore */ }
-    return { country: "", state: "", city: "", currency: "", escalation: "6", contingency: "10", months: "6" };
+    return { country: "", state: "", city: "", currency: "", escalation: "6", contingency: "10", months: "6", soilType: "", plotArea: "" };
   }, [data.inputValue]);
 
   const update = useCallback((patch: Record<string, string>) => {
@@ -441,7 +441,7 @@ export function LocationInput({ nodeId, data }: { nodeId: string; data: Workflow
         const raw = (currentNode.data as Record<string, unknown>).inputValue as string;
         if (raw && raw.startsWith("{")) return JSON.parse(raw);
       } catch { /* ignore */ }
-      return { country: "", state: "", city: "", currency: "", escalation: "6", contingency: "10", months: "6" };
+      return { country: "", state: "", city: "", currency: "", escalation: "6", contingency: "10", months: "6", soilType: "", plotArea: "" };
     })();
     const next = { ...prev, ...patch };
     updateNode(nodeId, { data: { ...currentNode.data, inputValue: JSON.stringify(next) } });
@@ -566,6 +566,26 @@ export function LocationInput({ nodeId, data }: { nodeId: string; data: Workflow
             <label style={labelStyle}>Months</label>
             <input type="number" value={stored.months ?? "6"} min={0} max={36} step={1}
               onChange={e => update({ months: e.target.value })} style={inputStyle} />
+          </div>
+        </div>
+      )}
+      {/* Site conditions */}
+      {hasLocation && (
+        <div style={{ display: "flex", gap: 4, marginTop: 2 }}>
+          <div style={{ flex: 1 }}>
+            <label style={labelStyle}>Soil type</label>
+            <select value={stored.soilType || ""} onChange={e => update({ soilType: e.target.value })} style={selectStyle}>
+              <option value="">Auto (from floors)</option>
+              <option value="hard_rock">Hard Rock</option>
+              <option value="medium">Medium Soil</option>
+              <option value="soft_clay">Soft Clay</option>
+              <option value="waterlogged">Waterlogged</option>
+            </select>
+          </div>
+          <div style={{ flex: 1 }}>
+            <label style={labelStyle}>Plot area m²</label>
+            <input type="number" value={stored.plotArea || ""} placeholder="Optional" min={0} max={100000} step={10}
+              onChange={e => update({ plotArea: e.target.value })} style={inputStyle} />
           </div>
         </div>
       )}

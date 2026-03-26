@@ -477,6 +477,10 @@ export function parseIFCText(text: string): TextParseResult {
               grossArea += (profile.xDim * ext.depth) / 1_000_000; // length × height in m²
               height = ext.depth / 1000;
               thickness = profile.yDim / 1000;
+            } else if (normalizedType === "IFCCURTAINWALL") {
+              // Curtain wall: length × height (like a wall but no thickness)
+              grossArea += (profile.xDim * ext.depth) / 1_000_000;
+              height = ext.depth / 1000;
             } else if (normalizedType === "IFCSLAB" || normalizedType === "IFCROOF") {
               grossArea += pArea;
               thickness = depth;
@@ -508,7 +512,10 @@ export function parseIFCText(text: string): TextParseResult {
                   volume += pArea * depth;
                   if (!grossArea) {
                     const normalizedType = elemType.replace("STANDARDCASE", "");
-                    if (normalizedType.includes("WALL")) {
+                    if (normalizedType === "IFCCURTAINWALL") {
+                      grossArea = (profile.xDim * ext.depth) / 1_000_000;
+                      height = ext.depth / 1000;
+                    } else if (normalizedType.includes("WALL")) {
                       grossArea = (profile.xDim * ext.depth) / 1_000_000;
                       height = ext.depth / 1000;
                       thickness = profile.yDim / 1000;
@@ -587,6 +594,21 @@ export function parseIFCText(text: string): TextParseResult {
     }
 
     // ── Members/Plates: estimate from element count if no geometry ──
+    // Curtain wall fallback: if no geometry extracted, try Pset Height × Width
+    // or estimate from storey height × typical panel width
+    if (grossArea === 0 && elemType === "IFCCURTAINWALL") {
+      const cwProps = elementProperties.get(elemId);
+      const cwHeight = Number(cwProps?.Height ?? cwProps?.OverallHeight ?? 0);
+      const cwWidth = Number(cwProps?.Width ?? cwProps?.OverallWidth ?? cwProps?.Length ?? 0);
+      if (cwHeight > 0 && cwWidth > 0) {
+        // Pset values may be in mm
+        const h = cwHeight > 100 ? cwHeight / 1000 : cwHeight;
+        const w = cwWidth > 100 ? cwWidth / 1000 : cwWidth;
+        grossArea = h * w;
+        height = h;
+      }
+    }
+
     // IfcMember (steel bracing, purlins) and IfcPlate (steel panels) often use
     // IfcMappedItem or IfcFacetedBrep which the text parser can't extract.
     // Mark these as count-based rather than showing 0 area.

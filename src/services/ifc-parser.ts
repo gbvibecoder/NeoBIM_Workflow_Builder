@@ -569,10 +569,23 @@ function extractQuantities(
     // Ensure area struct exists for area-based element types
     if (
       (ifcType === "IfcWall" || ifcType === "IfcWallStandardCase" || ifcType === "IfcSlab" ||
-        ifcType === "IfcRoof" || ifcType === "IfcCovering") &&
+        ifcType === "IfcRoof" || ifcType === "IfcCovering" || ifcType === "IfcCurtainWall") &&
       !quantities.area
     ) {
       quantities.area = { gross: 0, net: 0, unit: "m²" };
+    }
+
+    // For curtain walls: try height × width or length × height if available
+    if (ifcType === "IfcCurtainWall" && !(quantities.area?.gross)) {
+      if (quantities.height && quantities.width) {
+        if (!quantities.area) quantities.area = { unit: "m²" };
+        quantities.area.gross = quantities.height * quantities.width;
+        quantities.area.net = quantities.area.gross;
+      } else if (quantities.height && quantities.length) {
+        if (!quantities.area) quantities.area = { unit: "m²" };
+        quantities.area.gross = quantities.height * quantities.length;
+        quantities.area.net = quantities.area.gross;
+      }
     }
 
     // Ensure volume struct exists for volume-based element types
@@ -620,6 +633,12 @@ function computeGeometricQuantities(
       ? prodShape.Representations
       : [prodShape.Representations];
 
+    // Track bounding box for curtain wall fallback
+    let bbMinX = Infinity, bbMaxX = -Infinity;
+    let bbMinY = Infinity, bbMaxY = -Infinity;
+    let bbMinZ = Infinity, bbMaxZ = -Infinity;
+    let foundExtrusion = false;
+
     for (const repRef of reps) {
       const repId = repRef?.value;
       if (typeof repId !== "number") continue;
@@ -634,65 +653,154 @@ function computeGeometricQuantities(
         if (typeof itemId !== "number") continue;
 
         const item = ifcAPI.GetLine(modelID, itemId, false);
-        if (!item || item.Depth?.value == null) continue;
+        if (!item) continue;
 
-        // IFCEXTRUDEDAREASOLID: profile extruded along a direction
-        const depth = Number(item.Depth.value);
-        if (depth <= 0) continue;
+        // ── Strategy 1: IfcExtrudedAreaSolid (standard walls, slabs, columns) ──
+        if (item.Depth?.value != null) {
+          const depth = Number(item.Depth.value);
+          if (depth <= 0) continue;
 
-        const profileRef = item.SweptArea?.value;
-        if (typeof profileRef !== "number") continue;
+          const profileRef = item.SweptArea?.value;
+          if (typeof profileRef !== "number") continue;
 
-        const profile = ifcAPI.GetLine(modelID, profileRef, false);
-        if (!profile) continue;
+          const profile = ifcAPI.GetLine(modelID, profileRef, false);
+          if (!profile) continue;
 
-        const { area: profileArea, xDim, yDim } =
-          computeProfileMetrics(ifcAPI, modelID, profile);
+          const { area: profileArea, xDim, yDim } =
+            computeProfileMetrics(ifcAPI, modelID, profile);
 
-        if (profileArea <= 0) continue;
+          if (profileArea <= 0) continue;
 
-        // Volume = profileArea × depth
-        if (!hasVolume) {
-          if (!quantities.volume) quantities.volume = { base: 0, withWaste: 0, unit: "m³" };
-          quantities.volume.base = profileArea * depth;
+          foundExtrusion = true;
+
+          // Volume = profileArea × depth
+          if (!hasVolume) {
+            if (!quantities.volume) quantities.volume = { base: 0, withWaste: 0, unit: "m³" };
+            quantities.volume.base = profileArea * depth;
+          }
+
+          // Quantities depend on element type
+          if (ifcType === "IfcWall" || ifcType === "IfcWallStandardCase") {
+            if (!hasArea && xDim > 0) {
+              if (!quantities.area) quantities.area = { unit: "m²" };
+              quantities.area.gross = xDim * depth;
+              quantities.area.net = quantities.area.gross;
+            }
+            if (xDim > 0) quantities.length = xDim;
+            if (yDim > 0) {
+              quantities.thickness = yDim;
+              quantities.width = yDim;
+            }
+            quantities.height = depth;
+          } else if (ifcType === "IfcSlab" || ifcType === "IfcRoof" || ifcType === "IfcCovering") {
+            if (!hasArea) {
+              if (!quantities.area) quantities.area = { unit: "m²" };
+              quantities.area.gross = profileArea;
+              quantities.area.net = profileArea;
+            }
+            quantities.thickness = depth;
+          } else if (ifcType === "IfcCurtainWall") {
+            // Curtain wall with extrusion: profile = cross-section, depth = height
+            if (!hasArea && xDim > 0) {
+              if (!quantities.area) quantities.area = { unit: "m²" };
+              quantities.area.gross = xDim * depth;
+              quantities.area.net = quantities.area.gross;
+            }
+            quantities.height = depth;
+            if (xDim > 0) quantities.length = xDim;
+          } else if (ifcType === "IfcColumn" || ifcType === "IfcBeam") {
+            quantities.height = depth;
+          } else if (ifcType === "IfcFooting") {
+            if (!hasArea) {
+              if (!quantities.area) quantities.area = { unit: "m²" };
+              quantities.area.gross = profileArea;
+              quantities.area.net = profileArea;
+            }
+            quantities.thickness = depth;
+          }
+
+          return; // Found geometry, done
         }
 
-        // Quantities depend on element type
-        if (ifcType === "IfcWall" || ifcType === "IfcWallStandardCase") {
-          // Walls: XDim = length, YDim = thickness, depth = height
-          if (!hasArea && xDim > 0) {
-            if (!quantities.area) quantities.area = { unit: "m²" };
-            quantities.area.gross = xDim * depth; // lateral area (one side)
-            quantities.area.net = quantities.area.gross;
+        // ── Strategy 2: Bounding box (IfcBoundingBox) — fallback for complex geometry ──
+        // Curtain walls often use IfcFacetedBrep or decomposed geometry
+        if (item.Corner?.value != null || item.XDim?.value != null) {
+          const xd = Number(item.XDim?.value ?? 0);
+          const yd = Number(item.YDim?.value ?? 0);
+          const zd = Number(item.ZDim?.value ?? 0);
+          if (xd > 0 && yd > 0 && zd > 0) {
+            bbMinX = 0; bbMaxX = xd;
+            bbMinY = 0; bbMaxY = yd;
+            bbMinZ = 0; bbMaxZ = zd;
           }
-          if (xDim > 0) quantities.length = xDim;
-          if (yDim > 0) {
-            quantities.thickness = yDim;
-            quantities.width = yDim;
-          }
-          quantities.height = depth;
-        } else if (ifcType === "IfcSlab" || ifcType === "IfcRoof" || ifcType === "IfcCovering") {
-          // Slabs/roofs: profile = footprint, depth = thickness
-          if (!hasArea) {
-            if (!quantities.area) quantities.area = { unit: "m²" };
-            quantities.area.gross = profileArea; // footprint area
-            quantities.area.net = profileArea;
-          }
-          quantities.thickness = depth;
-        } else if (ifcType === "IfcColumn" || ifcType === "IfcBeam") {
-          // Columns/beams: profile = cross-section, depth = height/length
-          quantities.height = depth;
-        } else if (ifcType === "IfcFooting") {
-          // Footings: profile = footprint, depth = thickness
-          if (!hasArea) {
-            if (!quantities.area) quantities.area = { unit: "m²" };
-            quantities.area.gross = profileArea;
-            quantities.area.net = profileArea;
-          }
-          quantities.thickness = depth;
         }
 
-        return; // Found geometry, done with this element
+        // ── Strategy 3: IfcMappedItem — follow the mapping source ──
+        if (item.MappingSource?.value != null) {
+          try {
+            const mapSource = ifcAPI.GetLine(modelID, item.MappingSource.value, false);
+            if (mapSource?.MappedRepresentation?.value) {
+              const mappedRep = ifcAPI.GetLine(modelID, mapSource.MappedRepresentation.value, false);
+              if (mappedRep?.Items) {
+                const mappedItems = Array.isArray(mappedRep.Items) ? mappedRep.Items : [mappedRep.Items];
+                for (const mRef of mappedItems) {
+                  const mId = mRef?.value;
+                  if (typeof mId !== "number") continue;
+                  const mappedItem = ifcAPI.GetLine(modelID, mId, false);
+                  if (mappedItem?.Depth?.value != null) {
+                    const mDepth = Number(mappedItem.Depth.value);
+                    const mProfileRef = mappedItem.SweptArea?.value;
+                    if (typeof mProfileRef === "number" && mDepth > 0) {
+                      const mProfile = ifcAPI.GetLine(modelID, mProfileRef, false);
+                      if (mProfile) {
+                        const { area: mArea, xDim: mX } = computeProfileMetrics(ifcAPI, modelID, mProfile);
+                        if (mArea > 0 && ifcType === "IfcCurtainWall" && mX > 0) {
+                          if (!quantities.area) quantities.area = { unit: "m²" };
+                          quantities.area.gross = mX * mDepth;
+                          quantities.area.net = quantities.area.gross;
+                          quantities.height = mDepth;
+                          quantities.length = mX;
+                          return;
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          } catch { /* skip mapped item errors */ }
+        }
+      }
+    }
+
+    // ── Strategy 4: Bounding box fallback for curtain walls ──
+    // If no extrusion found, use bounding box dimensions
+    if (!foundExtrusion && ifcType === "IfcCurtainWall" && !hasArea) {
+      if (bbMaxZ > bbMinZ && (bbMaxX > bbMinX || bbMaxY > bbMinY)) {
+        const height = bbMaxZ - bbMinZ;
+        const spanX = bbMaxX - bbMinX;
+        const spanY = bbMaxY - bbMinY;
+        // Curtain wall area = height × longer horizontal span
+        const span = Math.max(spanX, spanY);
+        if (span > 0 && height > 0) {
+          if (!quantities.area) quantities.area = { unit: "m²" };
+          quantities.area.gross = span * height;
+          quantities.area.net = quantities.area.gross;
+          quantities.height = height;
+          quantities.length = span;
+          return;
+        }
+      }
+
+      // ── Strategy 5: Use height × width from Qto if we got them but no area ──
+      if (quantities.height && quantities.width) {
+        if (!quantities.area) quantities.area = { unit: "m²" };
+        quantities.area.gross = quantities.height * quantities.width;
+        quantities.area.net = quantities.area.gross;
+      } else if (quantities.height && quantities.length) {
+        if (!quantities.area) quantities.area = { unit: "m²" };
+        quantities.area.gross = quantities.height * quantities.length;
+        quantities.area.net = quantities.area.gross;
       }
     }
   } catch {
@@ -1159,6 +1267,14 @@ export async function parseIFCBuffer(
         if (storeyEntry) storeyEntry.elementCount++;
 
         const layers = elementMaterialLayersLookup.get(expressID);
+
+        // Read PredefinedType for IfcCovering to distinguish FLOORING/CEILING/CLADDING/ROOFING
+        let coveringProperties: Record<string, unknown> | undefined;
+        if (label === "IfcCovering" && element?.PredefinedType?.value) {
+          const pType = String(element.PredefinedType.value).toUpperCase();
+          coveringProperties = { PredefinedType: pType };
+        }
+
         const elementData: IFCElementData = {
           id: globalId,
           type: label,
@@ -1167,6 +1283,7 @@ export async function parseIFCBuffer(
           material: materialName,
           materialLayers: layers && layers.length > 1 ? layers : undefined,
           quantities,
+          ...(coveringProperties ? { properties: coveringProperties } : {}),
         };
 
         // Organize by division and category
@@ -1186,6 +1303,64 @@ export async function parseIFCBuffer(
         failedElements++;
         warnings.push(`Failed to process ${label} element ${expressID}`);
       }
+    }
+  }
+
+  // ── Post-processing: distribute unaccounted door/window area to walls by storey ──
+  // Mirrors the text parser's fallback: for walls with zero IfcRelVoidsElement
+  // deductions, proportionally distribute door/window area from the same storey.
+  // This catches IFC exports that don't create explicit void relationships.
+  {
+    const doorAreaByStorey = new Map<string, number>();
+    const deductedByStorey = new Map<string, number>();
+    const wallsByStorey = new Map<string, IFCElementData[]>();
+
+    // Collect all elements from all divisions
+    for (const [, categoriesMap] of elementsByDivision) {
+      for (const [, elems] of categoriesMap) {
+        for (const elem of elems) {
+          const s = elem.storey;
+          if (elem.type === "IfcDoor" || elem.type === "IfcWindow") {
+            const doorArea = elem.quantities.area?.gross ?? (elem.quantities.width && elem.quantities.height ? elem.quantities.width * elem.quantities.height : 0);
+            if (doorArea > 0) {
+              doorAreaByStorey.set(s, (doorAreaByStorey.get(s) ?? 0) + doorArea);
+            }
+          }
+          if ((elem.type === "IfcWall" || elem.type === "IfcWallStandardCase") && (elem.quantities.area?.gross ?? 0) > 0) {
+            if (!wallsByStorey.has(s)) wallsByStorey.set(s, []);
+            wallsByStorey.get(s)!.push(elem);
+            deductedByStorey.set(s, (deductedByStorey.get(s) ?? 0) + (elem.quantities.openingArea ?? 0));
+          }
+        }
+      }
+    }
+
+    for (const [storey, totalDoorArea] of doorAreaByStorey) {
+      const alreadyDeducted = deductedByStorey.get(storey) ?? 0;
+      const remaining = totalDoorArea - alreadyDeducted;
+      if (remaining <= 0) continue;
+
+      const walls = wallsByStorey.get(storey) ?? [];
+      const undeductedWalls = walls.filter(w => (w.quantities.openingArea ?? 0) === 0);
+      if (undeductedWalls.length === 0) continue;
+
+      const totalWallArea = undeductedWalls.reduce((sum, w) => sum + (w.quantities.area?.gross ?? 0), 0);
+      if (totalWallArea <= 0) continue;
+
+      for (const wall of undeductedWalls) {
+        const wallGross = wall.quantities.area?.gross ?? 0;
+        const share = (wallGross / totalWallArea) * remaining;
+        wall.quantities.openingArea = Math.round(share * 100) / 100;
+        if (wall.quantities.area?.gross) {
+          wall.quantities.area.net = Math.max(0, wall.quantities.area.gross - share);
+        }
+        // Deduct opening volume if thickness known
+        if (wall.quantities.volume?.base && wall.quantities.thickness) {
+          wall.quantities.volume.base = Math.max(0, wall.quantities.volume.base - share * wall.quantities.thickness);
+        }
+      }
+
+      warnings.push(`Storey "${storey}": distributed ${remaining.toFixed(1)}m² of unlinked door/window area across ${undeductedWalls.length} walls (IfcRelVoidsElement fallback).`);
     }
   }
 

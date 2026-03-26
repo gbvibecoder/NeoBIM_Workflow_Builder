@@ -91,7 +91,7 @@ function extractBuildingTypeFromText(text: string): string | null {
 }
 
 // Node IDs that have real implementations
-const REAL_NODE_IDS = new Set(["TR-001", "TR-003", "TR-004", "TR-005", "TR-012", "GN-001", "GN-003", "GN-004", "GN-007", "GN-008", "GN-009", "GN-010", "GN-011", "TR-007", "TR-008", "EX-001", "EX-002", "EX-003"]);
+const REAL_NODE_IDS = new Set(["TR-001", "TR-003", "TR-004", "TR-005", "TR-012", "GN-001", "GN-003", "GN-004", "GN-007", "GN-008", "GN-009", "GN-010", "GN-011", "TR-007", "TR-008", "TR-015", "EX-001", "EX-002", "EX-003"]);
 
 // Nodes that require OpenAI API calls
 const OPENAI_NODES = new Set(["TR-003", "TR-004", "TR-005", "TR-012", "GN-003", "GN-004", "GN-008"]);
@@ -1326,15 +1326,21 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
             count: number; grossArea: number; netArea: number; openingArea: number; volume: number;
             divisionName: string; storey: string; elementType: string;
             materialLayers?: Array<{name: string; thickness: number}>;
+            coveringType?: string;
           }>();
 
           for (const division of parseResult.divisions) {
             for (const category of division.categories) {
               for (const element of category.elements) {
-                const key = `${element.type}|${element.storey}`;
+                // IfcCovering: use PredefinedType in key to distinguish flooring/ceiling/cladding
+                const coveringType = element.type === "IfcCovering" && (element as unknown as Record<string, unknown>).properties
+                  ? String(((element as unknown as Record<string, unknown>).properties as Record<string, unknown>)?.PredefinedType ?? "")
+                  : "";
+                const key = `${element.type}${coveringType ? ":" + coveringType : ""}|${element.storey}`;
                 const existing = typeAggregates.get(key) || {
                   count: 0, grossArea: 0, netArea: 0, openingArea: 0, volume: 0,
                   divisionName: division.name, storey: element.storey, elementType: element.type,
+                  coveringType,
                 };
                 existing.count += element.quantities.count ?? 1;
                 existing.grossArea += element.quantities.area?.gross ?? 0;
@@ -1350,7 +1356,12 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
           }
 
           for (const [, agg] of typeAggregates) {
-            const description = agg.elementType.replace("Ifc", "");
+            let description = agg.elementType.replace("Ifc", "");
+            // Add covering subtype for display
+            if (agg.coveringType) {
+              const ctLabel: Record<string, string> = { FLOORING: "Flooring", CEILING: "Ceiling", CLADDING: "Cladding", ROOFING: "Roof Covering" };
+              description = ctLabel[agg.coveringType] ?? `Covering (${agg.coveringType})`;
+            }
             const primaryQty = agg.grossArea > 0 ? agg.grossArea : agg.volume > 0 ? agg.volume : agg.count;
             const unit = agg.grossArea > 0 ? "m²" : agg.volume > 0 ? "m³" : "EA";
             rows.push([agg.divisionName, description, agg.grossArea.toFixed(2), agg.openingArea.toFixed(2), agg.netArea.toFixed(2), agg.volume.toFixed(2), primaryQty.toFixed(2), unit]);
@@ -1359,6 +1370,7 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
               grossArea: agg.grossArea || undefined, netArea: agg.netArea || undefined,
               openingArea: agg.openingArea || undefined, totalVolume: agg.volume || undefined,
               storey: agg.storey, elementCount: agg.count, materialLayers: agg.materialLayers,
+              ...(agg.coveringType ? { coveringType: agg.coveringType } : {}),
             });
           }
 
@@ -1396,22 +1408,26 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
             count: number; grossArea: number; netArea: number; openingArea: number; volume: number;
             divisionName: string; storey: string; elementType: string;
             materialLayers?: Array<{name: string; thickness: number}>;
+            coveringType?: string;
           }>();
 
           for (const division of parseResult.divisions) {
             for (const category of division.categories) {
               for (const element of category.elements) {
-                const key = `${element.type}|${element.storey}`;
+                const coveringType = element.type === "IfcCovering" && (element as unknown as Record<string, unknown>).properties
+                  ? String(((element as unknown as Record<string, unknown>).properties as Record<string, unknown>)?.PredefinedType ?? "")
+                  : "";
+                const key = `${element.type}${coveringType ? ":" + coveringType : ""}|${element.storey}`;
                 const existing = typeAggregates.get(key) || {
                   count: 0, grossArea: 0, netArea: 0, openingArea: 0, volume: 0,
                   divisionName: division.name, storey: element.storey, elementType: element.type,
+                  coveringType,
                 };
                 existing.count += element.quantities.count ?? 1;
                 existing.grossArea += element.quantities.area?.gross ?? 0;
                 existing.netArea += element.quantities.area?.net ?? 0;
                 existing.openingArea += element.quantities.openingArea ?? 0;
                 existing.volume += element.quantities.volume?.base ?? 0;
-                // Capture material layers from first element with layers
                 if (!existing.materialLayers && element.materialLayers && element.materialLayers.length > 1) {
                   existing.materialLayers = element.materialLayers;
                 }
@@ -1421,7 +1437,11 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
           }
 
           for (const [, agg] of typeAggregates) {
-            const description = agg.elementType.replace("Ifc", "");
+            let description = agg.elementType.replace("Ifc", "");
+            if (agg.coveringType) {
+              const ctLabel: Record<string, string> = { FLOORING: "Flooring", CEILING: "Ceiling", CLADDING: "Cladding", ROOFING: "Roof Covering" };
+              description = ctLabel[agg.coveringType] ?? `Covering (${agg.coveringType})`;
+            }
             const primaryQty = agg.grossArea > 0 ? agg.grossArea : agg.volume > 0 ? agg.volume : agg.count;
             const unit = agg.grossArea > 0 ? "m²" : agg.volume > 0 ? "m³" : "EA";
 
@@ -1444,6 +1464,7 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
               storey: agg.storey,
               elementCount: agg.count,
               materialLayers: agg.materialLayers,
+              ...(agg.coveringType ? { coveringType: agg.coveringType } : {}),
             });
           }
 
@@ -1500,7 +1521,7 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
 
       // ── Location-aware pricing (from IN-006 Location Input or text detection) ──
       // IN-006 stores JSON in inputData.content/prompt: { country, state, city, currency }
-      let locationData: { country?: string; state?: string; city?: string; currency?: string; escalation?: string; contingency?: string; months?: string } | null = null;
+      let locationData: { country?: string; state?: string; city?: string; currency?: string; escalation?: string; contingency?: string; months?: string; soilType?: string; plotArea?: string } | null = null;
       for (const field of [inputData?.content, inputData?.prompt, inputData?.region, inputData?.location]) {
         if (typeof field === "string" && field.startsWith("{")) {
           try { locationData = JSON.parse(field); break; } catch { /* not JSON */ }
@@ -1955,8 +1976,11 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
       const cityTierForProv = indianPricing?.cityTier ?? "city";
 
       const mepSums = estimateMEPCosts(gfaForProvisional, projectTypeInfo.type, floorCountForProv, cityTierForProv, isIndianProject);
-      const foundSums = estimateFoundationCosts(gfaForProvisional, floorCountForProv, projectTypeInfo.type, cityTierForProv, isIndianProject);
-      const extSums = estimateExternalWorksCosts(gfaForProvisional, floorCountForProv, cityTierForProv, isIndianProject);
+      // Extract soil type and plot area from location data
+      const soilType = locationData?.soilType as string | undefined;
+      const plotArea = locationData?.plotArea ? Number(locationData.plotArea) : undefined;
+      const foundSums = estimateFoundationCosts(gfaForProvisional, floorCountForProv, projectTypeInfo.type, cityTierForProv, isIndianProject, soilType || undefined);
+      const extSums = estimateExternalWorksCosts(gfaForProvisional, floorCountForProv, cityTierForProv, isIndianProject, (plotArea && plotArea > 0) ? plotArea : undefined);
 
       const allProvisional = [...foundSums, ...mepSums, ...extSums];
       let provisionalTotal = 0;
@@ -1989,12 +2013,39 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
       }
       console.log(`[TR-008] Added ${allProvisional.length} provisional sums: ₹${provisionalTotal.toLocaleString()}`);
 
-      // ── Quantity Sanity Checker (results added to warnings array after it's declared below) ──
+      // ── Quantity Sanity Checker ──
       const sanitizedElements = elements.map((e: unknown) => {
         const el = e as Record<string, unknown>;
         return { description: String(el.description ?? ""), grossArea: Number(el.grossArea ?? 0), totalVolume: Number(el.totalVolume ?? 0), elementCount: Number(el.elementCount ?? 0), storey: String(el.storey ?? "") };
       });
       const quantityWarnings = checkQuantitySanity(sanitizedElements, gfaForProvisional, floorCountForProv);
+
+      // ── Market Intelligence: fetch live prices if available ──
+      let marketData: Awaited<ReturnType<typeof import("@/services/market-intelligence").fetchMarketPrices>> | null = null;
+      let marketAdjustments: Awaited<ReturnType<typeof import("@/services/market-intelligence").computeMarketAdjustments>> | null = null;
+      if (isIndianProject && locationData?.city && process.env.ANTHROPIC_API_KEY) {
+        try {
+          const { fetchMarketPrices, computeMarketAdjustments } = await import("@/services/market-intelligence");
+          marketData = await fetchMarketPrices(
+            locationData.city,
+            locationData.state || "",
+            projectTypeInfo.type
+          );
+          marketAdjustments = computeMarketAdjustments(marketData);
+          console.log(`[TR-008] Market Intelligence: ${marketData.agent_status} — steel adj: ${marketAdjustments.steelAdjustment}x, cement adj: ${marketAdjustments.cementAdjustment}x`);
+        } catch (miErr) {
+          console.error("[TR-008] Market Intelligence failed (non-fatal):", miErr);
+        }
+      }
+
+      // ── Rate Benchmark Validator ──
+      const { validateBenchmark } = await import("@/services/boq-intelligence");
+      const benchmarkResult = validateBenchmark(
+        hardCostSubtotal,
+        gfaForProvisional,
+        projectTypeInfo.type,
+        indianPricing?.cityTier ?? cityTierForProv
+      );
 
       // Rebuild rows grouped by storey (if storey data available)
       const hasStoreyData = boqLines.some(l => l.storey && l.storey !== "Unassigned");
@@ -2107,6 +2158,21 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
       if (provisionalTotal > 0) {
         warnings.push(`${allProvisional.length} provisional sums included for MEP, foundation, and external works (₹${provisionalTotal.toLocaleString()}). These are estimates — engage specialist consultants for detailed pricing.`);
       }
+      // Add benchmark validation result
+      if (benchmarkResult.severity !== "ok") {
+        warnings.unshift(benchmarkResult.message); // Put at top for visibility
+      }
+      // Add market intelligence notes
+      if (marketAdjustments?.priceNotes?.length) {
+        for (const note of marketAdjustments.priceNotes) {
+          warnings.push(`📊 ${note}`);
+        }
+      }
+      if (marketData?.agent_notes?.length) {
+        for (const note of marketData.agent_notes) {
+          warnings.push(`ℹ️ ${note}`);
+        }
+      }
 
       artifact = {
         id: generateId(),
@@ -2140,6 +2206,25 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
             grandTotal: costSummary.totalCost,
             disclaimer: COST_DISCLAIMERS.full,
           },
+          _benchmark: benchmarkResult,
+          ...(marketData && { _marketIntelligence: {
+            status: marketData.agent_status,
+            steel: `₹${marketData.steel_per_tonne.value.toLocaleString()}/tonne (${marketData.steel_per_tonne.confidence})`,
+            cement: `₹${marketData.cement_per_bag.value}/bag ${marketData.cement_per_bag.brand} (${marketData.cement_per_bag.confidence})`,
+            sand: `₹${marketData.sand_per_cft.value}/cft ${marketData.sand_per_cft.type} (${marketData.sand_per_cft.confidence})`,
+            steelPerTonne: marketData.steel_per_tonne.value,
+            steelSource: marketData.steel_per_tonne.source,
+            steelConfidence: marketData.steel_per_tonne.confidence,
+            cementPerBag: marketData.cement_per_bag.value,
+            cementBrand: marketData.cement_per_bag.brand,
+            cementSource: marketData.cement_per_bag.source,
+            cementConfidence: marketData.cement_per_bag.confidence,
+            sources: marketData.sources_summary,
+            fetchedAt: marketData.fetched_at,
+            searchCount: marketData.search_count,
+            durationMs: marketData.duration_ms,
+            fallbacksUsed: marketData.fallbacks_used,
+          }}),
         },
         metadata: {
           model: isIndianProject ? "is1200-cpwd-v2" : "cost-database-v2",
@@ -2155,6 +2240,156 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
               adjustmentNotes: indianPricing.notes,
             },
           }),
+          benchmark: {
+            costPerM2: benchmarkResult.costPerM2,
+            rangeLow: benchmarkResult.benchmarkLow,
+            rangeHigh: benchmarkResult.benchmarkHigh,
+            status: benchmarkResult.status,
+            severity: benchmarkResult.severity,
+            message: benchmarkResult.message,
+          },
+          ...(marketData && {
+            marketIntelligence: {
+              status: marketData.agent_status,
+              steel: `₹${marketData.steel_per_tonne.value.toLocaleString()}/tonne (${marketData.steel_per_tonne.confidence})`,
+              cement: `₹${marketData.cement_per_bag.value}/bag ${marketData.cement_per_bag.brand} (${marketData.cement_per_bag.confidence})`,
+              sand: `₹${marketData.sand_per_cft.value}/cft ${marketData.sand_per_cft.type} (${marketData.sand_per_cft.confidence})`,
+              // Numeric values for Excel integration
+              steelPerTonne: marketData.steel_per_tonne.value,
+              steelSource: marketData.steel_per_tonne.source,
+              steelConfidence: marketData.steel_per_tonne.confidence,
+              cementPerBag: marketData.cement_per_bag.value,
+              cementBrand: marketData.cement_per_bag.brand,
+              cementSource: marketData.cement_per_bag.source,
+              cementConfidence: marketData.cement_per_bag.confidence,
+              sandPerCft: marketData.sand_per_cft.value,
+              sandType: marketData.sand_per_cft.type,
+              sandSource: marketData.sand_per_cft.source,
+              sources: marketData.sources_summary,
+              fetchedAt: marketData.fetched_at,
+              searchCount: marketData.search_count,
+              durationMs: marketData.duration_ms,
+              fallbacksUsed: marketData.fallbacks_used,
+            },
+          }),
+        },
+        createdAt: new Date(),
+      };
+
+    } else if (catalogueId === "TR-015") {
+      // Market Intelligence Agent — live construction material prices via web search
+      const { fetchMarketPrices, computeMarketAdjustments } = await import("@/services/market-intelligence");
+
+      // Extract location from input
+      let miCity = "Mumbai";
+      let miState = "Maharashtra";
+      let miBuildingType = "commercial";
+      for (const field of [inputData?.content, inputData?.prompt, inputData?.location]) {
+        if (typeof field === "string" && field.startsWith("{")) {
+          try {
+            const loc = JSON.parse(field);
+            if (loc.city) miCity = loc.city;
+            if (loc.state) miState = loc.state;
+            if (loc.buildingType) miBuildingType = loc.buildingType;
+            break;
+          } catch { /* not JSON */ }
+        } else if (typeof field === "string" && field.length > 2) {
+          // Try "City, State" format
+          const parts = field.split(",").map(s => s.trim());
+          if (parts.length >= 2) {
+            miCity = parts[0];
+            miState = parts[1];
+          } else if (parts[0]) {
+            miCity = parts[0];
+          }
+        }
+      }
+      if (inputData?.buildingType) miBuildingType = String(inputData.buildingType);
+
+      console.log(`[TR-015] Market Intelligence: ${miCity}, ${miState} — ${miBuildingType}`);
+
+      const marketData = await fetchMarketPrices(miCity, miState, miBuildingType);
+      const adjustments = computeMarketAdjustments(marketData);
+      const durationSec = (marketData.duration_ms / 1000).toFixed(1);
+
+      // Build a transparent, formatted table output
+      const miHeaders = ["Material", "Price", "Source", "Date", "Confidence"];
+      const miRows: string[][] = [
+        [
+          "TMT Steel Fe500",
+          `₹${marketData.steel_per_tonne.value.toLocaleString()}/tonne`,
+          marketData.steel_per_tonne.source,
+          marketData.steel_per_tonne.date,
+          marketData.steel_per_tonne.confidence,
+        ],
+        [
+          `Cement (${marketData.cement_per_bag.brand || "OPC 53"})`,
+          `₹${marketData.cement_per_bag.value}/bag (50kg)`,
+          marketData.cement_per_bag.source,
+          marketData.cement_per_bag.date,
+          marketData.cement_per_bag.confidence,
+        ],
+        [
+          `Sand (${marketData.sand_per_cft.type || "M-sand"})`,
+          `₹${marketData.sand_per_cft.value}/cft`,
+          marketData.sand_per_cft.source,
+          marketData.sand_per_cft.date,
+          marketData.sand_per_cft.confidence,
+        ],
+        [
+          `Benchmark — ${miBuildingType}`,
+          `₹${marketData.benchmark_per_sqft.range_low.toLocaleString()}-${marketData.benchmark_per_sqft.range_high.toLocaleString()}/m²`,
+          marketData.benchmark_per_sqft.source,
+          new Date().toISOString().split("T")[0],
+          marketData.benchmark_per_sqft.value > 0 ? "MEDIUM" : "LOW",
+        ],
+      ];
+
+      // Build the formatted text report
+      const reportLines = [
+        `Market Intelligence Report — ${miCity}, ${miState} (${new Date().toLocaleDateString("en-IN", { month: "long", year: "numeric" })})`,
+        "",
+        "STEEL",
+        `  Fe500 TMT: ₹${marketData.steel_per_tonne.value.toLocaleString()}/tonne`,
+        `  Source: ${marketData.steel_per_tonne.source} — ${marketData.steel_per_tonne.confidence} confidence`,
+        "",
+        "CEMENT",
+        `  ${marketData.cement_per_bag.brand}: ₹${marketData.cement_per_bag.value}/bag`,
+        `  Source: ${marketData.cement_per_bag.source} — ${marketData.cement_per_bag.confidence} confidence`,
+        "",
+        "SAND",
+        `  ${marketData.sand_per_cft.type}: ₹${marketData.sand_per_cft.value}/cft`,
+        `  Source: ${marketData.sand_per_cft.source} — ${marketData.sand_per_cft.confidence} confidence`,
+        "",
+        "BENCHMARK",
+        `  ${miBuildingType} construction ${miCity}: ₹${marketData.benchmark_per_sqft.range_low.toLocaleString()}-${marketData.benchmark_per_sqft.range_high.toLocaleString()}/m²`,
+        `  Source: ${marketData.benchmark_per_sqft.source}`,
+        "",
+        `Searches run: ${marketData.search_count} | Time: ${durationSec}s | Fallbacks used: ${marketData.fallbacks_used}`,
+        ...(marketData.sources_summary.length > 0 ? ["", "Sources:", ...marketData.sources_summary.map(s => `  ${s}`)] : []),
+        ...(marketData.agent_notes.length > 0 ? ["", "Notes:", ...marketData.agent_notes.map(n => `  ${n}`)] : []),
+      ];
+
+      artifact = {
+        id: generateId(),
+        executionId: executionId ?? "local",
+        tileInstanceId,
+        type: "table",
+        data: {
+          label: `Market Intelligence — ${miCity}, ${miState} (${new Date().toLocaleDateString("en-IN")})`,
+          headers: miHeaders,
+          rows: miRows,
+          content: reportLines.join("\n"),
+          _marketData: marketData,
+          _adjustments: adjustments,
+        },
+        metadata: {
+          model: "claude-web-search-agent",
+          real: true,
+          agent_status: marketData.agent_status,
+          search_count: marketData.search_count,
+          duration_ms: marketData.duration_ms,
+          fallbacks_used: marketData.fallbacks_used,
         },
         createdAt: new Date(),
       };
@@ -2188,6 +2423,23 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
       const pricingMeta = (inputData as Record<string, unknown>)?._pricingIntelligence ?? (inputData as Record<string, unknown>)?.pricingIntelligence;
       const pricingInfo = pricingMeta as Record<string, unknown> | undefined;
 
+      // Extract market intelligence + benchmark data from upstream TR-008 metadata
+      // Try both _marketIntelligence (from _boqData flow) and marketIntelligence (from metadata)
+      const upstreamMI = ((inputData as Record<string, unknown>)?._marketIntelligence
+        ?? (inputData as Record<string, unknown>)?.marketIntelligence) as Record<string, unknown> | undefined;
+      const upstreamBenchmark = ((inputData as Record<string, unknown>)?._benchmark
+        ?? (inputData as Record<string, unknown>)?.benchmark) as Record<string, unknown> | undefined;
+
+      // Extract numeric market prices for populating Excel cells
+      const liveSteelPrice = upstreamMI ? Number(upstreamMI.steelPerTonne ?? 0) : 0;
+      const liveCementPrice = upstreamMI ? Number(upstreamMI.cementPerBag ?? 0) : 0;
+      const liveCementBrand = upstreamMI ? String(upstreamMI.cementBrand ?? "") : "";
+      const liveSteelSource = upstreamMI ? String(upstreamMI.steelSource ?? "") : "";
+      const liveCementSource = upstreamMI ? String(upstreamMI.cementSource ?? "") : "";
+      const liveSteelConf = upstreamMI ? String(upstreamMI.steelConfidence ?? "") : "";
+      const liveCementConf = upstreamMI ? String(upstreamMI.cementConfidence ?? "") : "";
+      const hasLivePrices = liveSteelPrice > 0 || liveCementPrice > 0;
+
       const wb = XLSX.utils.book_new();
 
       // ═══════════════════════════════════════════════════════════════════════
@@ -2203,29 +2455,79 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
         ["Date:", dateStr, "", ""],
         ["Prepared By:", "BuildFlow (trybuildflow.in)", "", ""],
         [""],
+      ];
+
+      // ── Benchmark validation (prominent if warning) ──
+      if (upstreamBenchmark) {
+        const bSeverity = String(upstreamBenchmark.severity ?? "ok");
+        if (bSeverity !== "ok") {
+          cpRows.push(["BENCHMARK VALIDATION", "", "", ""]);
+          cpRows.push([String(upstreamBenchmark.message ?? ""), "", "", ""]);
+          cpRows.push([`Cost/m²: ₹${upstreamBenchmark.costPerM2 ?? "N/A"}`, "", `Range: ₹${upstreamBenchmark.rangeLow ?? "?"} – ₹${upstreamBenchmark.rangeHigh ?? "?"}`, ""]);
+          cpRows.push([""]);
+        }
+      }
+
+      // ── Market intelligence prices with sources ──
+      if (upstreamMI) {
+        const miDuration = Number(upstreamMI.durationMs ?? 0);
+        const miSearches = Number(upstreamMI.searchCount ?? 0);
+        const miFallbacks = Number(upstreamMI.fallbacksUsed ?? 0);
+        cpRows.push(["LIVE MARKET PRICES (AI web-search agent)", "", "", ""]);
+        cpRows.push(["Steel:", String(upstreamMI.steel ?? "N/A"), "Source:", String(upstreamMI.steelSource ?? "N/A")]);
+        cpRows.push(["Cement:", String(upstreamMI.cement ?? "N/A"), "Source:", String(upstreamMI.cementSource ?? "N/A")]);
+        cpRows.push(["Sand:", String(upstreamMI.sand ?? "N/A"), "", ""]);
+        cpRows.push([
+          `Agent: ${String(upstreamMI.status ?? "N/A")}`,
+          `Searches: ${miSearches}`,
+          `Time: ${(miDuration / 1000).toFixed(1)}s`,
+          `Fallbacks: ${miFallbacks}`,
+        ]);
+        cpRows.push([`Fetched: ${String(upstreamMI.fetchedAt ?? dateStr).split("T")[0]}`, "", "", ""]);
+        // Sources list
+        const sources = upstreamMI.sources as string[] | undefined;
+        if (sources && sources.length > 0) {
+          cpRows.push(["Sources:", "", "", ""]);
+          for (const src of sources.slice(0, 5)) {
+            cpRows.push([`  ${src}`, "", "", ""]);
+          }
+        }
+        cpRows.push([""]);
+      }
+
+      // Use live prices if available, otherwise fall back to static defaults
+      const cementDefault = liveCementPrice > 0 ? liveCementPrice : 390;
+      const cementBrandDefault = liveCementBrand || "UltraTech";
+      const steelDefault = liveSteelPrice > 0 ? liveSteelPrice : 72000;
+
+      cpRows.push(
         // ── Cement pricing ──
         ["CEMENT PRICING", "", "Price/Bag (50kg)", "₹/m³ concrete"],
-        ["Selected Brand:", "UltraTech", 390, null], // C11 = price, D11 = formula
-        ["", "", "", ""],
+        [`Selected Brand:`, cementBrandDefault, cementDefault, null], // C = price, D = formula
+        hasLivePrices && liveCementPrice > 0
+          ? [`  Source: ${liveCementSource}`, `${liveCementConf} confidence`, "", ""]
+          : ["", "", "", ""],
         ["Available Brands:", "Price/Bag", "", ""],
-        ["UltraTech", 390, "", ""],
-        ["Ambuja", 380, "", ""],
-        ["ACC", 375, "", ""],
-        ["Shree Cement", 370, "", ""],
-        ["JK Cement", 365, "", ""],
-        ["Dalmia", 360, "", ""],
+        ["UltraTech", liveCementPrice > 0 ? Math.round(cementDefault * 1.03) : 390, "", ""],
+        ["Ambuja", liveCementPrice > 0 ? Math.round(cementDefault * 0.97) : 380, "", ""],
+        ["ACC", liveCementPrice > 0 ? Math.round(cementDefault * 0.96) : 375, "", ""],
+        ["Shree Cement", liveCementPrice > 0 ? Math.round(cementDefault * 0.95) : 370, "", ""],
+        ["JK Cement", liveCementPrice > 0 ? Math.round(cementDefault * 0.93) : 365, "", ""],
+        ["Dalmia", liveCementPrice > 0 ? Math.round(cementDefault * 0.92) : 360, "", ""],
         [""],
         // ── Steel pricing ──
         ["STEEL PRICING (TMT Fe500)", "", "₹/Tonne", "₹/kg"],
-        ["Selected Supplier:", "Tata Tiscon", 72000, null], // C22 = price, D22 = formula
-        ["", "", "", ""],
+        ["Selected Supplier:", "Tata Tiscon", steelDefault, null], // C = price, D = formula
+        hasLivePrices && liveSteelPrice > 0
+          ? [`  Source: ${liveSteelSource}`, `${liveSteelConf} confidence`, "", ""]
+          : ["", "", "", ""],
         ["Available Suppliers:", "₹/Tonne", "", ""],
-        ["Tata Tiscon", 72000, "", ""],
-        ["SAIL", 68000, "", ""],
-        ["JSW Neosteel", 70000, "", ""],
-        ["Kamdhenu", 66000, "", ""],
-        ["Shyam Steel", 65000, "", ""],
-        ["Local / Unbranded", 62000, "", ""],
+        ["Tata Tiscon", liveSteelPrice > 0 ? steelDefault : 72000, "", ""],
+        ["SAIL", liveSteelPrice > 0 ? Math.round(steelDefault * 0.94) : 68000, "", ""],
+        ["JSW Neosteel", liveSteelPrice > 0 ? Math.round(steelDefault * 0.97) : 70000, "", ""],
+        ["Kamdhenu", liveSteelPrice > 0 ? Math.round(steelDefault * 0.92) : 66000, "", ""],
+        ["Shyam Steel", liveSteelPrice > 0 ? Math.round(steelDefault * 0.90) : 65000, "", ""],
+        ["Local / Unbranded", liveSteelPrice > 0 ? Math.round(steelDefault * 0.86) : 62000, "", ""],
         [""],
         // ── Adjustments ──
         ["PROJECT ADJUSTMENTS", "", "Value", ""],
@@ -2251,13 +2553,27 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
         ["Painter:", "", 650, ""],
         ["Electrician:", "", 1000, ""],
         ["Plumber:", "", 850, ""],
-      ];
+      );
 
-      // Set formula for cement ₹/m³: price_per_bag × 6.5 bags/m³
-      // D11 = C11 * 6.5
+      // Find actual row indices for cement and steel "Selected" rows (dynamic due to market intel/benchmark sections)
       const cpSheet = XLSX.utils.aoa_to_sheet(cpRows);
-      cpSheet["D11"] = { t: "n", f: "C11*6.5", v: 390 * 6.5 };
-      cpSheet["D22"] = { t: "n", f: "C22/1000", v: 72 };
+      for (let ri = 0; ri < cpRows.length; ri++) {
+        const row = cpRows[ri];
+        if (!row || !row[0]) continue;
+        const cell0 = String(row[0]);
+        // Cement: "Selected Brand:" row — set D column formula: price × 6.5 bags/m³
+        if (cell0 === "Selected Brand:") {
+          const excelRow = ri + 1; // Excel is 1-indexed
+          const cPrice = Number(row[2]) || cementDefault;
+          cpSheet[`D${excelRow}`] = { t: "n", f: `C${excelRow}*6.5`, v: cPrice * 6.5 };
+        }
+        // Steel: "Selected Supplier:" row — set D column formula: price/1000 for ₹/kg
+        if (cell0 === "Selected Supplier:") {
+          const excelRow = ri + 1;
+          const sPrice = Number(row[2]) || steelDefault;
+          cpSheet[`D${excelRow}`] = { t: "n", f: `C${excelRow}/1000`, v: sPrice / 1000 };
+        }
+      }
       cpSheet["!cols"] = [{ wch: 28 }, { wch: 22 }, { wch: 16 }, { wch: 35 }];
       XLSX.utils.book_append_sheet(wb, cpSheet, "Control Panel");
 

@@ -281,6 +281,21 @@ export const NODE_CATALOGUE: NodeCatalogueItem[] = [
     executionTime: "< 20s",
   },
 
+  {
+    id: "TR-015",
+    name: "Market Intelligence Agent",
+    description: "AI agent that researches live construction material prices (steel, cement, sand) via web search — returns sourced, timestamped prices for BOQ accuracy",
+    category: "transform",
+    icon: "TrendingUp",
+    inputs: [
+      { id: "location-in", label: "Location", type: "json" },
+    ],
+    outputs: [{ id: "prices-out", label: "Market Prices JSON", type: "json" }],
+    apiEngine: "Anthropic Claude + Web Search",
+    tags: ["market", "prices", "steel", "cement", "live", "research", "agent", "intelligence"],
+    executionTime: "< 30s",
+  },
+
   // ── Control Flow / Branching ──
   {
     id: "TR-013",
@@ -625,7 +640,7 @@ export const CATEGORY_CONFIG = {
 } as const;
 
 /** Nodes that use real API calls (not mock/sample data) */
-export const LIVE_NODES = new Set(['TR-003', 'TR-007', 'TR-008', 'GN-001', 'GN-003', 'GN-007', 'GN-008', 'GN-009', 'GN-010', 'EX-001', 'EX-002']);
+export const LIVE_NODES = new Set(['TR-003', 'TR-007', 'TR-008', 'TR-015', 'GN-001', 'GN-003', 'GN-007', 'GN-008', 'GN-009', 'GN-010', 'EX-001', 'EX-002']);
 
 // Mark isLive on catalogue items at module init
 for (const node of NODE_CATALOGUE) {

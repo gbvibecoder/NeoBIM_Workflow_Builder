@@ -2,8 +2,9 @@
 
 import { useState, useCallback } from "react";
 import { motion } from "framer-motion";
-import { ChevronRight, ChevronDown, Download, Copy, Check, Table2, BarChart3, Code2 } from "lucide-react";
+import { ChevronRight, ChevronDown, Download, Copy, Check, Table2, BarChart3, Code2, Pencil } from "lucide-react";
 import { useLocale } from "@/hooks/useLocale";
+import { useExecutionStore } from "@/stores/execution-store";
 import { COLORS } from "../constants";
 import { KpiStrip } from "../sections/KpiStrip";
 import { CostBreakdownBars } from "../sections/CostBreakdownBars";
@@ -155,6 +156,17 @@ function SectionHeader({
 function TableView({ table, index }: { table: TableDataItem; index: number }) {
   const { t } = useLocale();
   const [showAll, setShowAll] = useState(false);
+  const [editingCell, setEditingCell] = useState<{ row: number; col: number } | null>(null);
+  const setQuantityOverride = useExecutionStore(s => s.setQuantityOverride);
+  const quantityOverrides = useExecutionStore(s =>
+    table.tileInstanceId ? s.quantityOverrides.get(table.tileInstanceId) : undefined
+  );
+
+  // Determine which column is the "Qty" column for override support
+  const qtyColIndex = table.isQuantityTable
+    ? table.headers.findIndex(h => h === "Qty" || h.toLowerCase() === "qty")
+    : -1;
+
   const visibleRows = showAll ? table.rows : table.rows.slice(0, 15);
 
   const handleExportCSV = useCallback(() => {
@@ -299,18 +311,67 @@ function TableView({ table, index }: { table: TableDataItem; index: number }) {
                   e.currentTarget.style.background = ri % 2 === 0 ? "transparent" : "rgba(255,255,255,0.01)";
                 }}
               >
-                {(row as (string | number)[]).map((cell, ci) => (
-                  <td
-                    key={ci}
-                    style={{
-                      padding: "8px 14px",
-                      borderBottom: "1px solid rgba(255,255,255,0.03)",
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    {cell}
-                  </td>
-                ))}
+                {(row as (string | number)[]).map((cell, ci) => {
+                  const isEditableQty = qtyColIndex >= 0 && ci === qtyColIndex && table.tileInstanceId;
+                  const overrideValue = isEditableQty && quantityOverrides?.get(ri);
+                  const displayValue = overrideValue !== undefined ? overrideValue : cell;
+                  const isEditing = editingCell?.row === ri && editingCell?.col === ci;
+                  const isOverridden = overrideValue !== undefined;
+
+                  return (
+                    <td
+                      key={ci}
+                      style={{
+                        padding: "8px 14px",
+                        borderBottom: "1px solid rgba(255,255,255,0.03)",
+                        whiteSpace: "nowrap",
+                        ...(isOverridden ? { background: "rgba(255,191,0,0.08)", color: "#FFBF00" } : {}),
+                      }}
+                    >
+                      {isEditing ? (
+                        <input
+                          type="number"
+                          defaultValue={String(displayValue)}
+                          autoFocus
+                          style={{
+                            width: 80, padding: "2px 4px", borderRadius: 3,
+                            border: "1px solid rgba(0,245,255,0.3)", background: "rgba(0,0,0,0.6)",
+                            color: "#FFBF00", fontSize: 11, fontFamily: "inherit", outline: "none",
+                          }}
+                          onBlur={(e) => {
+                            const val = parseFloat(e.target.value);
+                            if (!isNaN(val) && val > 0 && table.tileInstanceId) {
+                              setQuantityOverride(table.tileInstanceId, ri, val);
+                            }
+                            setEditingCell(null);
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                            if (e.key === "Escape") setEditingCell(null);
+                          }}
+                        />
+                      ) : (
+                        <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                          {displayValue}
+                          {isEditableQty && (
+                            <Pencil
+                              size={9}
+                              style={{ opacity: 0.3, cursor: "pointer", flexShrink: 0 }}
+                              onClick={(e) => { e.stopPropagation(); setEditingCell({ row: ri, col: ci }); }}
+                              onMouseEnter={(e) => { (e.target as SVGElement).style.opacity = "0.8"; }}
+                              onMouseLeave={(e) => { (e.target as SVGElement).style.opacity = "0.3"; }}
+                            />
+                          )}
+                          {isOverridden && (
+                            <span style={{ fontSize: 8, color: "#FFBF00", opacity: 0.6 }} title={`Original: ${cell}`}>
+                              (was {cell})
+                            </span>
+                          )}
+                        </span>
+                      )}
+                    </td>
+                  );
+                })}
               </tr>
             ))}
           </tbody>

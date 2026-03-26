@@ -247,6 +247,34 @@ async function executeNode(
         ...nodeConfig,
       };
 
+      // Apply user quantity overrides from TR-007 → TR-008 flow
+      // If the user edited quantities in the TR-007 result table, apply those
+      // corrections to the _elements array before sending to TR-008
+      if (catalogueId === "TR-008" && inputData._elements && Array.isArray(inputData._elements)) {
+        const upstreamTileId = previousArtifact?.tileInstanceId;
+        if (upstreamTileId) {
+          const overrides = useExecutionStore.getState().getQuantityOverrides(upstreamTileId);
+          if (overrides.size > 0) {
+            const elements = [...inputData._elements] as Array<Record<string, unknown>>;
+            for (const [rowIdx, newQty] of overrides) {
+              if (rowIdx >= 0 && rowIdx < elements.length) {
+                const elem = { ...elements[rowIdx] };
+                elem.quantity = newQty;
+                // Also update grossArea if quantity was area-based
+                if (elem.unit === "m²" && elem.grossArea) {
+                  elem.grossArea = newQty;
+                } else if (elem.unit === "m³" && elem.totalVolume) {
+                  elem.totalVolume = newQty;
+                }
+                elements[rowIdx] = elem;
+              }
+            }
+            inputData._elements = elements;
+            console.log(`[TR-008] Applied ${overrides.size} user quantity override(s) from TR-007`);
+          }
+        }
+      }
+
       // ══════════════════════════════════════════════════════════════════════
       // TR-007 SPECIAL HANDLING: Large IFC files CANNOT go through execute-node
       // because Vercel's 4.5MB body limit will reject the ~28MB base64 payload.
