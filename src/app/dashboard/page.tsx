@@ -199,7 +199,7 @@ export default function DashboardPage() {
     "dv-1": "wf-03", // Text to Concept Building + IFC
     "dv-2": "wf-05", // Floor Plan to 3D
     "dv-3": "wf-04", // Parameters to 3D Building + IFC
-    "dv-4": "wf-03", // Image to Renovation Video
+    "dv-4": "wf-11", // Building Photo to Renovation Video
   };
 
   // Video card titles/subtitles/nodes from i18n
@@ -471,12 +471,17 @@ export default function DashboardPage() {
                   key={vc.id}
                   variants={fadeUp}
                   transition={{ duration: 0.5, delay: i * 0.1, ease: smoothEase }}
+                  onClick={() => openTemplate(VIDEO_TO_TEMPLATE[vc.id] ?? "wf-03")}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => { if (e.key === "Enter") openTemplate(VIDEO_TO_TEMPLATE[vc.id] ?? "wf-03"); }}
                   style={{
                     position: "relative", overflow: "hidden",
                     borderRadius: 18,
                     background: "rgba(10,12,22,0.9)",
                     border: `1px solid rgba(${vc.rgb}, 0.12)`,
                     transition: "all 350ms cubic-bezier(0.25, 0.4, 0.25, 1)",
+                    cursor: "pointer",
                   }}
                   className="dash-card-hover dash-video-card"
                 >
@@ -542,23 +547,21 @@ export default function DashboardPage() {
                       ))}
                     </div>
 
-                    {/* Try this workflow button */}
-                    <button
-                      onClick={() => openTemplate(VIDEO_TO_TEMPLATE[vc.id] ?? "wf-03")}
+                    {/* Try this workflow button (visual only — whole card is clickable) */}
+                    <div
                       style={{
                         display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
                         padding: "9px 16px", borderRadius: 10, width: "100%",
                         background: `rgba(${vc.rgb}, 0.08)`,
                         border: `1px solid rgba(${vc.rgb}, 0.15)`,
                         color: vc.color, fontSize: 11, fontWeight: 700,
-                        cursor: "pointer",
                         fontFamily: "var(--font-jetbrains), monospace",
                         letterSpacing: "0.03em",
                         transition: "all 0.2s",
                       }}
                     >
                       {t('dash.tryThisWorkflow')} <ArrowRight size={12} />
-                    </button>
+                    </div>
                   </div>
                 </motion.div>
               ))}
