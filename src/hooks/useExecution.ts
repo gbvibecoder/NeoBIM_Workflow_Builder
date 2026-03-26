@@ -717,9 +717,11 @@ async function pollVideoGeneration(
         });
 
         // Build segments array for sequential playback (no server-side concat needed)
+        const isRenovation = !!(currentArtifactData?.isRenovation);
+        const exteriorDuration = isRenovation ? 10 : 5;
         const segments: { videoUrl: string; downloadUrl: string; durationSeconds: number; label: string }[] = [];
         if (status.exteriorVideoUrl) {
-          segments.push({ videoUrl: status.exteriorVideoUrl, downloadUrl: status.exteriorVideoUrl, durationSeconds: 5, label: "Exterior — 5s" });
+          segments.push({ videoUrl: status.exteriorVideoUrl, downloadUrl: status.exteriorVideoUrl, durationSeconds: exteriorDuration, label: `Exterior — ${exteriorDuration}s` });
         }
         if (status.interiorVideoUrl) {
           segments.push({ videoUrl: status.interiorVideoUrl, downloadUrl: status.interiorVideoUrl, durationSeconds: 10, label: "Interior — 10s" });

@@ -527,6 +527,55 @@ ${parsed.keyRequirements?.length ? `KEY REQUIREMENTS:\n${parsed.keyRequirements.
       logger.debug("[TR-004] Step 2: Getting rooms from GPT-4o...");
       let analysis = await analyzeImage(base64Data, mimeType, apiKey);
 
+      // ── Multi-image enhancement: analyze ALL uploaded photos for comprehensive building description ──
+      // When user uploads multiple building photos (via IN-008), each shows a different angle.
+      // GPT-4o-mini sees ALL images together and produces a comprehensive description covering
+      // every angle, facade, side, roofline, and context — so the renovation video shows the FULL building.
+      const multiImages = (inputData?.fileDataArray as string[]) ?? [];
+      const multiMimes = (inputData?.mimeTypes as string[]) ?? [];
+      if (!analysis.isFloorPlan && multiImages.length > 1) {
+        try {
+          logger.debug(`[TR-004] Multi-image: enhancing analysis with ${multiImages.length} photos`);
+          const { getClient } = await import("@/services/openai");
+          const multiClient = getClient(apiKey);
+
+          // Build content blocks with ALL images
+          const imageBlocks: Array<{ type: "image_url"; image_url: { url: string } }> = multiImages.map((img, i) => {
+            const mime = multiMimes[i] ?? "image/jpeg";
+            const clean = img.startsWith("data:") ? img : `data:${mime};base64,${img}`;
+            return { type: "image_url" as const, image_url: { url: clean } };
+          });
+
+          const multiAnalysis = await multiClient.chat.completions.create({
+            model: "gpt-4o-mini",
+            temperature: 0.3,
+            messages: [
+              {
+                role: "system",
+                content: `You are a senior architect. You are given ${multiImages.length} photographs of the SAME building taken from different angles. Describe the COMPLETE building by combining observations from ALL photos. Cover: overall shape and massing, number of floors, full facade on every visible side, materials, window patterns, roof type, entrance locations, surrounding context (street, trees, neighboring buildings). Be specific about dimensions, proportions, and spatial relationships between building sections.`,
+              },
+              {
+                role: "user",
+                content: [
+                  ...imageBlocks,
+                  { type: "text" as const, text: `These are ${multiImages.length} photos of the same building from different angles. Describe the COMPLETE building — every side, every section, full roofline, all architectural details. What does the full building look like when you walk around it?` },
+                ],
+              },
+            ],
+            max_tokens: 2000,
+          }, { timeout: 30000 });
+
+          const multiDesc = multiAnalysis.choices[0]?.message?.content;
+          if (multiDesc) {
+            // Enhance the original description with multi-angle observations
+            analysis.description = `${analysis.description}\n\nCOMPLETE BUILDING (from ${multiImages.length} angles):\n${multiDesc}`;
+            logger.debug(`[TR-004] Multi-image analysis added ${multiDesc.length} chars`);
+          }
+        } catch (multiErr) {
+          console.warn("[TR-004] Multi-image enhancement failed (non-fatal):", multiErr);
+        }
+      }
+
       if (analysis.isFloorPlan && base64Data) {
         // ── PRIMARY: Potrace pixel tracing + GPT-4o labeling ──
         let traceSucceeded = false;
@@ -810,6 +859,8 @@ ${analysis.features.map(f => `• ${f}`).join("\n")}`;
           ...(analysis.interiorPrompt && { interiorPrompt: analysis.interiorPrompt }),
           // Geometric data for GN-011 Interactive 3D Viewer
           ...(analysis.geometry && { geometry: analysis.geometry }),
+          // Pass multi-image data through for downstream GN-009 (renovation needs all angles)
+          ...(multiImages.length > 1 && { fileDataArray: multiImages, mimeTypes: multiMimes, isMultiImage: true }),
         },
         metadata: {
           model: analysis.isFloorPlan
@@ -3437,21 +3488,51 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
             // Use env OPENAI_API_KEY as fallback when user doesn't have a personal key
             const dalleKey = apiKey || process.env.OPENAI_API_KEY || undefined;
 
-            // Get the original building photo base64 for GPT-4o vision
-            // This is the actual image the user uploaded — GPT-4o will SEE it
-            // and write a DALL-E prompt that preserves the exact building geometry.
-            const originalPhotoBase64 = (inputData?.fileData as string) ?? "";
-            const originalPhotoMime = (inputData?.mimeType as string) ?? "image/jpeg";
+            // ── Multi-image: pick the WIDEST image (shows the most of the building) ──
+            // Users upload multiple photos from different angles; the widest one typically
+            // captures the full facade. Use sharp to compare aspect ratios.
+            const allImages = (inputData?.fileDataArray as string[]) ?? [];
+            const allMimes = (inputData?.mimeTypes as string[]) ?? [];
+            let bestPhotoBase64 = (inputData?.fileData as string) ?? "";
+            let bestPhotoMime = (inputData?.mimeType as string) ?? "image/jpeg";
+
+            if (allImages.length > 1) {
+              try {
+                const sharp = (await import("sharp")).default;
+                let bestWidth = 0;
+                let bestRatio = 0;
+                for (let i = 0; i < allImages.length; i++) {
+                  const imgBuf = Buffer.from(
+                    allImages[i].startsWith("data:") ? allImages[i].split(",")[1] ?? allImages[i] : allImages[i],
+                    "base64",
+                  );
+                  const meta = await sharp(imgBuf).metadata();
+                  const w = meta.width ?? 0;
+                  const h = meta.height ?? 1;
+                  const ratio = w / h;
+                  // Prefer widest aspect ratio (panoramic) or largest width
+                  if (ratio > bestRatio || (ratio === bestRatio && w > bestWidth)) {
+                    bestRatio = ratio;
+                    bestWidth = w;
+                    bestPhotoBase64 = allImages[i];
+                    bestPhotoMime = allMimes[i] ?? "image/jpeg";
+                  }
+                }
+                logger.debug(`[GN-009] Multi-image: picked widest image (ratio ${bestRatio.toFixed(2)}, ${bestWidth}px) from ${allImages.length} photos`);
+              } catch (sharpErr) {
+                logger.debug("[GN-009] Sharp dimension check failed, using first image:", sharpErr);
+              }
+            }
+
+            const originalPhotoBase64 = bestPhotoBase64;
+            const originalPhotoMime = bestPhotoMime;
 
             if (isRenovationInput && dalleKey && originalPhotoBase64) {
-              logger.debug("[GN-009] Renovation: GPT-4o will analyze the ACTUAL photo → write DALL-E prompt → render");
+              logger.debug("[GN-009] Renovation: GPT-image-1 will edit the ACTUAL photo → renovation render");
               logger.debug("[GN-009] Original photo base64 length:", originalPhotoBase64.length);
               logger.debug("[GN-009] Building analysis:", buildingDesc.slice(0, 300));
 
               try {
-                // Step 1: GPT-4o SEES the building photo → writes precise DALL-E prompt
-                // Step 2: DALL-E 3 renders the renovated version from that prompt
-                // The result looks like the SAME building but completely renovated.
                 const dalleResult = await generateRenovationRender(
                   originalPhotoBase64.startsWith("data:") ? originalPhotoBase64.split(",")[1] ?? originalPhotoBase64 : originalPhotoBase64,
                   buildingDesc,
@@ -3463,7 +3544,7 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
                   renovationRenderUrl = dalleResult.url;
                   klingSourceImage = dalleResult.url;
                   logger.debug("[GN-009] Renovation render SUCCESS! URL:", dalleResult.url.slice(0, 100));
-                  logger.debug("[GN-009] GPT-4o renovation prompt:", dalleResult.renovationPrompt.slice(0, 200));
+                  logger.debug("[GN-009] GPT-image-1 renovation prompt:", dalleResult.renovationPrompt.slice(0, 200));
                 }
               } catch (dalleErr) {
                 // Non-fatal — fall back to original image for Kling
@@ -3479,14 +3560,17 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
 
             logger.debug("[GN-009] Dual tasks submitted! exterior:", submitted.exteriorTaskId, "interior:", submitted.interiorTaskId);
 
+            const renovationDuration = 20; // 10s exterior + 10s interior
+            const standardDuration = 15; // 5s exterior + 10s interior
+            const totalDuration = isRenovationInput ? renovationDuration : standardDuration;
             const videoLabel = isRenovationInput
-              ? "Building Renovation Walkthrough — 15s (generating...)"
-              : "AEC Cinematic Walkthrough — 15s (generating...)";
+              ? `Building Renovation Walkthrough — ${totalDuration}s (generating...)`
+              : `AEC Cinematic Walkthrough — ${totalDuration}s (generating...)`;
             const videoContent = isRenovationInput
-              ? `15s renovation walkthrough: 5s exterior transformation + 10s renovated interior — ${buildingDesc.slice(0, 100)}`
-              : `15s AEC walkthrough: 5s exterior + 10s interior — ${buildingDesc.slice(0, 100)}`;
+              ? `${totalDuration}s renovation walkthrough: 10s exterior sweep + 10s renovated interior — ${buildingDesc.slice(0, 100)}`
+              : `${totalDuration}s AEC walkthrough: 5s exterior + 10s interior — ${buildingDesc.slice(0, 100)}`;
             const videoPipelineLabel = isRenovationInput
-              ? "building photo → DALL-E 3 renovation render → Kling Official API (pro, image2video) → 2x MP4 video"
+              ? "building photo → gpt-image-1 renovation render → Kling Official API (pro, image2video) → 2x MP4 video"
               : "concept render → Kling Official API (pro, image2video) → 2x MP4 video";
 
             artifact = {
@@ -3500,10 +3584,10 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
                 downloadUrl: "",
                 label: videoLabel,
                 content: videoContent,
-                durationSeconds: 15,
+                durationSeconds: totalDuration,
                 shotCount: 2,
                 pipeline: videoPipelineLabel,
-                costUsd: isRenovationInput ? 1.54 : 1.50, // +$0.04 for DALL-E 3 HD render
+                costUsd: isRenovationInput ? 2.04 : 1.50, // 10s+10s for renovation, 5s+10s standard
                 segments: [],
                 videoGenerationStatus: "processing",
                 videoPipeline: "image2video",

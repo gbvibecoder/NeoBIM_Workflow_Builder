@@ -427,7 +427,7 @@ export async function generateDualWalkthrough(
   buildingDescription: string,
   mode: "std" | "pro" = "pro",
 ): Promise<DualVideoResult> {
-  const negativePrompt = "blur, distortion, low quality, warped geometry, melting walls, deformed architecture, shaky camera, noise, artifacts, morphing surfaces, bent lines, wobbly structure, jittery motion, flickering textures, plastic appearance, fisheye distortion, floating objects, wireframe, cartoon, sketch, low polygon, unrealistic proportions, text overlay, watermark, oversaturated colors, CGI look, video game graphics, toy model, miniature, tilt-shift, abstract, surreal, people walking, cars moving, birds flying, lens flare";
+  const negativePrompt = "zoom in, close-up, tight shot, cropped building, partial view, dolly forward, approach, moving closer, blur, distortion, low quality, warped geometry, melting walls, deformed architecture, shaky camera, noise, artifacts, morphing surfaces, bent lines, wobbly structure, jittery motion, flickering textures, plastic appearance, fisheye distortion, floating objects, wireframe, cartoon, sketch, low polygon, unrealistic proportions, text overlay, watermark, oversaturated colors, CGI look, video game graphics, toy model, miniature, tilt-shift, abstract, surreal, people walking, cars moving, birds flying, lens flare";
 
   const exteriorPrompt = buildExteriorPrompt(buildingDescription);
   const interiorPrompt = buildInteriorPrompt(buildingDescription);
@@ -547,17 +547,19 @@ export function buildRenovationExteriorPrompt(buildingDescription: string): stri
   const desc = buildingDescription.slice(0, 400);
 
   return (
-    `Cinematic architectural exterior walkthrough of this beautifully renovated modern building. ` +
-    `The building has been completely transformed with new contemporary facades, modern glazing, ` +
-    `rooftop extension, and professional landscaping. Building: ${desc.slice(0, 250)}. ` +
-    "Exterior cinematic sequence (5 seconds): " +
-    "Camera starts with a wide establishing shot — slow dramatic approach toward the building, " +
-    "showing the full renovated facade with premium materials catching golden hour sunlight. " +
-    "Smooth dolly-in toward the main entrance revealing new cladding, modern windows, designer entrance canopy. " +
-    "Camera orbits smoothly to the side, revealing the building's depth and the new rooftop extension against the sky. " +
-    "Final sweeping upward crane shot showing the complete renovated building with landscaping and sky. " +
-    "Physically accurate architecture, photorealistic materials, golden hour lighting, " +
-    "cinematic smooth camera, 8K architectural visualization, no distortion."
+    `Fast-paced cinematic exterior sweep of this beautifully restored building with pristine walls. ` +
+    `Show the ENTIRE building from end to end. NEVER zoom in, NEVER move closer. ` +
+    `Building: ${desc.slice(0, 250)}. ` +
+    "CAMERA: FAST, dynamic LEFT-TO-RIGHT tracking shot that rapidly sweeps across the ENTIRE building. " +
+    "Start from far left corner — quickly pan across the full facade — end at the far right corner. " +
+    "The camera moves BRISKLY at high speed, covering the complete building width in the first 6 seconds. " +
+    "Then a quick upward tilt revealing the roofline and sky, followed by a fast reverse sweep RIGHT-TO-LEFT " +
+    "showing the building again from a slightly different angle. " +
+    "Fast, energetic camera movement — like a professional drone flyby. " +
+    "Wide-angle lens, camera far back showing full height from roofline to ground. " +
+    "All wall surfaces perfectly smooth, freshly painted, flawless. " +
+    "DO NOT zoom in, DO NOT move forward — only fast lateral and tilt movements. " +
+    "Ultra-realistic photography, natural daylight, real street scene, cinematic speed."
   );
 }
 
@@ -569,21 +571,21 @@ export function buildRenovationInteriorPrompt(buildingDescription: string): stri
   const desc = buildingDescription.slice(0, 400);
 
   return (
-    `Cinematic interior walkthrough of a completely renovated modern building. ` +
-    `The building exterior was fully renovated — now show the premium interior spaces. ` +
+    `Fast-paced cinematic interior walkthrough of a beautifully restored building. ` +
+    `The building has been renovated while keeping its original character. ` +
     `Building: ${desc.slice(0, 250)}. ` +
-    "Interior walkthrough (10 seconds): " +
-    "Camera enters through the redesigned modern entrance — glass doors open into a bright double-height lobby " +
-    "with polished concrete floors, designer pendant lights, and a reception area. " +
-    "Smooth walkthrough through renovated open-plan spaces: " +
-    "floor-to-ceiling windows flooding rooms with natural light, " +
-    "premium finishes — engineered hardwood floors, natural stone feature walls, " +
-    "modern kitchen with marble island and integrated appliances, " +
-    "spacious living areas with contemporary furniture and curated artwork, " +
-    "elegant bathroom with walk-in rain shower and floating vanity. " +
-    "Each space flows naturally through wide glass-partitioned passages. " +
-    "Warm interior lighting blended with natural daylight, " +
-    "photorealistic materials, cinematic smooth camera, 8K quality, no distortion."
+    "Interior walkthrough (10 seconds) — FAST camera movement, cover many rooms quickly: " +
+    "Camera rushes through the restored main entrance into a bright lobby — quick pan showing " +
+    "polished floors, fresh paint, modern lighting. " +
+    "Camera moves BRISKLY through multiple rooms in rapid succession — " +
+    "quickly passing through corridors, sweeping through large open spaces with tall windows, " +
+    "fast glide through a renovated office or living area, quick turn into a modern kitchen, " +
+    "rapid pass through an elegant bathroom, then fast track down a long hallway. " +
+    "Cover as many rooms and spaces as possible — the camera never stops or lingers. " +
+    "Each room gets 1-2 seconds before moving to the next. " +
+    "Energetic, dynamic movement like a real estate showcase video. " +
+    "Natural daylight through windows, warm interior lighting, " +
+    "ultra-realistic photography, fast smooth cinematic camera, no distortion."
   );
 }
 
@@ -936,7 +938,7 @@ export async function submitDualWalkthrough(
 ): Promise<SubmittedVideoTasks> {
   console.log("[DUAL] submitDualWalkthrough: mode=%s isFloorPlan=%s isRenovation=%s", mode, options?.isFloorPlan, options?.isRenovation);
 
-  const negativePrompt = "blur, distortion, low quality, warped geometry, melting walls, deformed architecture, shaky camera, noise, artifacts, morphing surfaces, bent lines, wobbly structure, jittery motion, flickering textures, plastic appearance, fisheye distortion, floating objects, wireframe, cartoon, sketch, low polygon, unrealistic proportions, text overlay, watermark, oversaturated colors, CGI look, video game graphics, toy model, miniature, tilt-shift, abstract, surreal, people walking, cars moving, birds flying, lens flare";
+  const negativePrompt = "zoom in, close-up, tight shot, cropped building, partial view, dolly forward, approach, moving closer, blur, distortion, low quality, warped geometry, melting walls, deformed architecture, shaky camera, noise, artifacts, morphing surfaces, bent lines, wobbly structure, jittery motion, flickering textures, plastic appearance, fisheye distortion, floating objects, wireframe, cartoon, sketch, low polygon, unrealistic proportions, text overlay, watermark, oversaturated colors, CGI look, video game graphics, toy model, miniature, tilt-shift, abstract, surreal, people walking, cars moving, birds flying, lens flare";
 
   // Building photos from IN-008 → renovation prompts (transform old to new)
   // Concept renders from GN-003 → standard prompts (match the render)
@@ -952,8 +954,11 @@ export async function submitDualWalkthrough(
       : buildInteriorPrompt(buildingDescription);
 
   // Submit both tasks in parallel — don't poll, return task IDs immediately
+  // Renovation exterior gets 10s (needs time to pan across full building)
+  // Non-renovation keeps 5s exterior + 10s interior
+  const exteriorDuration = options?.isRenovation ? "10" : "5";
   const [exteriorResult, interiorResult] = await Promise.all([
-    createTask(imageUrl, exteriorPrompt, negativePrompt, "5", "16:9", mode),
+    createTask(imageUrl, exteriorPrompt, negativePrompt, exteriorDuration, "16:9", mode),
     createTask(imageUrl, interiorPrompt, negativePrompt, "10", "16:9", mode),
   ]);
 

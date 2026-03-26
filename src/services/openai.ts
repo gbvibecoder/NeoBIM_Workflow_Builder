@@ -2,7 +2,7 @@ import OpenAI from "openai";
 import { detectOpenAIError, APIError } from "@/lib/user-errors";
 import type { FloorPlanRoomType } from "@/types/floor-plan";
 
-function getClient(userApiKey?: string, timeout?: number): OpenAI {
+export function getClient(userApiKey?: string, timeout?: number): OpenAI {
   const key = userApiKey || process.env.OPENAI_API_KEY;
   if (!key) throw new Error("No OpenAI API key configured");
   return new OpenAI({ apiKey: key, timeout: timeout ?? 30000, maxRetries: 1 });
@@ -1032,28 +1032,18 @@ export async function generateRenovationRender(
 
     // Craft the renovation prompt — gpt-image-1 will SEE the actual building
     // and modify it while preserving structure, proportions, and geometry.
+    // Keep the prompt SHORT — gpt-image-1 with input_fidelity:"high" already preserves structure.
+    // Long, detailed prompts confuse the model and cause reframing/cropping.
     const renovationPrompt =
-      `Transform this existing building into a beautifully RENOVATED, MODERNIZED version. ` +
-      `CRITICAL: Keep the EXACT SAME building structure — same number of floors, same width, ` +
-      `same proportions, same window positions, same overall shape and massing. ` +
-      `Do NOT change the building's form or create a different building. ` +
-      `\n\nRENOVATION CHANGES to apply to this exact building: ` +
-      `1. FACADE: Replace all old, cracked, weathered, peeling surfaces with pristine new materials — ` +
-      `smooth white render combined with natural stone cladding accents and dark charcoal metal panels. ` +
-      `Clean, fresh, brand-new facade surfaces with no damage or weathering. ` +
-      `2. WINDOWS: Replace all existing windows with modern aluminum-framed double-glazed units ` +
-      `in the SAME positions and SAME grid pattern — just new, clean, contemporary frames. ` +
-      `3. GROUND FLOOR: Upgrade the entrance with a modern glass canopy, clean glass doors, ` +
-      `designer lighting, and polished stone threshold. Modern retail/cafe glass shopfront at street level. ` +
-      `4. ROOFTOP: Add a contemporary glass-and-steel penthouse extension on top — ` +
-      `one extra floor with curtain wall glazing, rooftop terrace with glass balustrades and green planters. ` +
-      `5. SURROUNDINGS: Remove all scaffolding, fencing, barriers, and construction clutter. ` +
-      `Add professional landscaping — mature trees, ornamental planters, clean new sidewalks, ` +
-      `recessed pathway lighting, pedestrian-friendly plaza. ` +
-      `6. LIGHTING: Golden hour warm sunlight, interior lights glowing through windows, dramatic sky. ` +
-      `\nBuilding analysis: ${buildingAnalysis.slice(0, 600)} ` +
-      `\nStyle: Photorealistic high-end architectural visualization, V-Ray quality, ` +
-      `the building must be RECOGNIZABLY the same structure but dramatically upgraded and polished.`;
+      `Restore this building to BRAND NEW condition. Keep the EXACT same framing, angle, composition. ` +
+      `Do NOT crop, zoom, or reframe. Output must show the same view as input. ` +
+      `IMPORTANT: Remove ALL imperfections — every scratch, crack, stain, tear, peeling paint, ` +
+      `discoloration, water damage, graffiti, moss, mold, rust, chipping. ` +
+      `Every wall surface must be PERFECTLY SMOOTH, freshly painted, and flawless — like a brand new building. ` +
+      `No visible damage of any kind. Pristine, polished, immaculate surfaces throughout. ` +
+      `Clean sparkling windows (same positions and sizes). Fresh, well-maintained surroundings. ` +
+      `The building must look like it was just built yesterday — but keep the same architecture and style. ` +
+      `Ultra-realistic photograph, not a render.`;
 
     console.log("[RenovationRender] Using gpt-image-1 images.edit with actual building photo");
     console.log("[RenovationRender] Image size:", imageBuffer.length, "bytes, type:", mimeType);
@@ -1061,14 +1051,29 @@ export async function generateRenovationRender(
 
     // Use gpt-image-1 images.edit — this model SEES the input image and edits it
     // input_fidelity: "high" ensures the output closely matches the input structure
-    const response = await client.images.edit({
-      model: "gpt-image-1",
-      image: imageFile,
-      prompt: renovationPrompt,
-      size: "1024x1024",
-      quality: "high",
-      input_fidelity: "high",
-    });
+    // Use "auto" size to preserve the original photo's aspect ratio (avoids cropping wide shots)
+    // Fallback to 1536x1024 if auto is not supported
+    let response;
+    try {
+      response = await client.images.edit({
+        model: "gpt-image-1",
+        image: imageFile,
+        prompt: renovationPrompt,
+        size: "auto" as "1024x1024",
+        quality: "high",
+        input_fidelity: "high",
+      });
+    } catch (autoErr) {
+      console.warn("[RenovationRender] 'auto' size not supported, falling back to 1536x1024:", autoErr);
+      response = await client.images.edit({
+        model: "gpt-image-1",
+        image: imageFile,
+        prompt: renovationPrompt,
+        size: "1536x1024" as "1024x1024",
+        quality: "high",
+        input_fidelity: "high",
+      });
+    }
 
     const image = response.data?.[0];
     if (!image?.url && !image?.b64_json) throw new Error("No image in gpt-image-1 renovation response");
