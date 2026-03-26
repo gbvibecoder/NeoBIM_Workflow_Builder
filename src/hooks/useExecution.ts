@@ -112,6 +112,28 @@ async function executeNode(
       };
     }
 
+    // ── IFC files with pre-parsed data: pass parsed result, NOT raw file ──
+    const ifcParsed = nodeData.ifcParsed as Record<string, unknown> | undefined;
+    if (catalogueId === "IN-004" && ifcParsed) {
+      console.log("[IN-004] Using pre-parsed IFC data (client-side parsed)");
+      return {
+        id: generateId(),
+        executionId,
+        tileInstanceId: node.id,
+        type: "text",
+        data: {
+          content: inputValue ?? "",
+          prompt: inputValue ?? "",
+          label: "IFC Model (parsed)",
+          fileName: nodeData.fileName as string ?? inputValue ?? "model.ifc",
+          ifcParsed, // Pre-parsed result — TR-007 uses this directly
+          // Do NOT include fileData — it would be 28MB and break Vercel
+        },
+        metadata: { source: "user-input", parser: "ifc-text-parser" },
+        createdAt: new Date(),
+      };
+    }
+
     // ── Single-file input nodes (IN-001..IN-007) ──
     let fileData = nodeData.fileData as string | undefined;
     let fileName = nodeData.fileName as string | undefined;
@@ -119,9 +141,9 @@ async function executeNode(
 
     // Read from inputFileStore (where FileUploadInput stores the actual File object)
     // and convert to base64 so it can be sent to the server API.
-    // Always prefer the live File object over stale nodeData.fileData (which may not persist across saves)
+    // For IFC files, skip base64 conversion — they should be parsed client-side
     const fileObj = inputFileStore.get(node.id);
-    if (fileObj) {
+    if (fileObj && !(catalogueId === "IN-004" && fileObj.name.toLowerCase().endsWith(".ifc"))) {
       const arrayBuffer = await fileObj.arrayBuffer();
       const bytes = new Uint8Array(arrayBuffer);
       let binary = "";
@@ -131,6 +153,33 @@ async function executeNode(
       fileData = btoa(binary);
       fileName = fileObj.name;
       mimeType = fileObj.type || "application/pdf";
+    } else if (fileObj && catalogueId === "IN-004") {
+      // IFC file in inputFileStore but no ifcParsed — parse now
+      console.log("[IN-004] IFC file in store but not pre-parsed — parsing now");
+      try {
+        const text = await fileObj.text();
+        const { parseIFCText } = await import("@/services/ifc-text-parser");
+        const result = parseIFCText(text);
+        return {
+          id: generateId(),
+          executionId,
+          tileInstanceId: node.id,
+          type: "text",
+          data: {
+            content: inputValue ?? "",
+            prompt: inputValue ?? "",
+            label: "IFC Model (parsed)",
+            fileName: fileObj.name,
+            ifcParsed: result,
+          },
+          metadata: { source: "user-input", parser: "ifc-text-parser" },
+          createdAt: new Date(),
+        };
+      } catch (parseErr) {
+        console.error("[IN-004] Failed to parse IFC:", parseErr);
+        // Fall through to fileData path
+        fileName = fileObj.name;
+      }
     }
 
     return {
