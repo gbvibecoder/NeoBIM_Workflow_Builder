@@ -356,19 +356,22 @@ async function executeNode(
           const elements: Array<Record<string, unknown>> = [];
 
           for (const [, agg] of typeAggregates) {
-            const description = agg.elementType.replace("Ifc", "");
+            const typeName = agg.elementType.replace("Ifc", "").replace("StandardCase", "").replace("BuildingElementProxy", "Proxy Element");
+            // Include storey and count in description for QS clarity
+            const storeyLabel = agg.storey && agg.storey !== "Unassigned" ? ` — ${agg.storey}` : "";
+            const description = `${typeName}${storeyLabel}`;
             const primaryQty = agg.grossArea > 0 ? agg.grossArea : agg.volume > 0 ? agg.volume : agg.count;
             const unit = agg.grossArea > 0 ? "m²" : agg.volume > 0 ? "m³" : "EA";
 
             rows.push([
-              agg.divisionName, description,
+              agg.divisionName, `${description} (${agg.count} nr)`,
               agg.grossArea.toFixed(2), agg.openingArea.toFixed(2),
               agg.netArea.toFixed(2), agg.volume.toFixed(2),
               primaryQty.toFixed(2), unit,
             ]);
 
             elements.push({
-              description, category: agg.divisionName,
+              description: `${description} (${agg.count} nr)`, category: agg.divisionName,
               quantity: primaryQty, unit,
               grossArea: agg.grossArea || undefined, netArea: agg.netArea || undefined,
               openingArea: agg.openingArea || undefined, totalVolume: agg.volume || undefined,

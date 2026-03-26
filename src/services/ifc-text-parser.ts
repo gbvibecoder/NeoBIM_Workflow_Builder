@@ -283,6 +283,30 @@ export function parseIFCText(text: string): TextParseResult {
     }
   }
 
+  // ── Extract door/window dimensions from IfcPropertySingleValue ──
+  // Doors/windows often have OverallWidth/OverallHeight in property sets
+  const propSingleValues = new Map<number, Map<string, number>>();
+  const propSetRegex = /^#(\d+)=\s*IFCPROPERTYSET\('[^']*',#\d+,'([^']*)'[^,]*,\(([^)]+)\)\)/gmi;
+  let propSetMatch;
+  while ((propSetMatch = propSetRegex.exec(text)) !== null) {
+    const propIds = [...propSetMatch[3].matchAll(/#(\d+)/g)].map(m => parseInt(m[1]));
+    for (const pid of propIds) {
+      // Will link to property values below
+    }
+  }
+
+  // Extract OverallWidth, OverallHeight, Width, Height from property values
+  // These come from IfcDoor/IfcWindow direct attributes or from Pset_*Common
+  const dimRegex = /^#(\d+)=\s*IFCPROPERTYSINGLEVALUE\('(Width|Height|OverallWidth|OverallHeight)'[^,]*,[^,]*,IFCPOSITIVELENGTHMEASURE\(([0-9.e+-]+)\)/gmi;
+  const propDimensions = new Map<number, { name: string; value: number }>();
+  let dimMatch;
+  while ((dimMatch = dimRegex.exec(text)) !== null) {
+    propDimensions.set(parseInt(dimMatch[1]), {
+      name: dimMatch[2],
+      value: parseFloat(dimMatch[3]),
+    });
+  }
+
   // ── Extract building elements ──
   const elements: TextParseElement[] = [];
   const elementPattern = ELEMENT_TYPES.join("|");
@@ -383,6 +407,28 @@ export function parseIFCText(text: string): TextParseResult {
           }
         }
       }
+    }
+
+    // ── Door/Window: estimate area from typical dimensions if no geometry ──
+    if (grossArea === 0 && (elemType === "IFCDOOR" || elemType === "IFCWINDOW")) {
+      // Try to get dimensions from the element name (common format: "Door:900x2100")
+      const dimFromName = elemName.match(/(\d{3,4})\s*[x×]\s*(\d{3,4})/);
+      if (dimFromName) {
+        const w = parseInt(dimFromName[1]) / 1000; // mm → m
+        const h = parseInt(dimFromName[2]) / 1000;
+        grossArea = w * h;
+      } else {
+        // Use standard defaults: door = 0.9×2.1 = 1.89m², window = 1.2×1.5 = 1.8m²
+        grossArea = elemType === "IFCDOOR" ? 1.89 : 1.80;
+      }
+    }
+
+    // ── Members/Plates: estimate from element count if no geometry ──
+    // IfcMember (steel bracing, purlins) and IfcPlate (steel panels) often use
+    // IfcMappedItem or IfcFacetedBrep which the text parser can't extract.
+    // Mark these as count-based rather than showing 0 area.
+    if (grossArea === 0 && volume === 0 && (elemType === "IFCMEMBER" || elemType === "IFCPLATE")) {
+      // Don't set grossArea — let them be counted as EA
     }
 
     // Normalize type name: IFCWALLSTANDARDCASE → IfcWallStandardCase
