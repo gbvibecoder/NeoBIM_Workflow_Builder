@@ -166,7 +166,7 @@ For each, find the most recent price with a verifiable source.`;
       system: systemPrompt,
       tools: [
         {
-          type: "web_search_20250305",
+          type: "web_search_20260209",
           name: "web_search",
           max_uses: 8,
         },
@@ -277,14 +277,12 @@ For each, find the most recent price with a verifiable source.`;
     }
 
   } catch (err) {
-    // Capture detailed error info from Anthropic API errors
-    let msg = err instanceof Error ? err.message : String(err);
-    const apiErr = err as { status?: number; error?: { type?: string; message?: string } };
-    if (apiErr.status && apiErr.error) {
-      msg = `API ${apiErr.status}: ${apiErr.error.type} — ${apiErr.error.message}`;
-    }
+    // Anthropic SDK APIError has: .status, .message (pre-formatted), .error (raw JSON body)
+    const msg = err instanceof Error ? err.message : String(err);
     result.agent_notes.push(`Market intelligence agent error: ${msg}`);
     console.error("[Market Intelligence] Agent error:", msg);
+    // Log full error body for debugging
+    try { console.error("[Market Intelligence] Error body:", JSON.stringify((err as { error?: unknown }).error ?? err)); } catch { /* skip */ }
     // Graceful degradation — result already has static fallbacks
   }
 
