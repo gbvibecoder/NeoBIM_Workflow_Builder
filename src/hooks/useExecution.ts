@@ -960,10 +960,17 @@ function getUpstreamArtifact(
     if (artifact) {
       if (!firstArtifact) firstArtifact = artifact;
       if (artifact.data && typeof artifact.data === "object") {
+        const dataKeys = Object.keys(artifact.data as Record<string, unknown>).filter(k => k.startsWith("_"));
+        console.log(`[merge] Node ${nodeId} ← source ${edge.source}: _keys=[${dataKeys.join(",")}] type=${artifact.type}`);
         Object.assign(mergedData, artifact.data);
       }
+    } else {
+      console.warn(`[merge] Node ${nodeId} ← source ${edge.source}: NO ARTIFACT FOUND in map`);
     }
   }
+
+  const mergedUnderscoreKeys = Object.keys(mergedData).filter(k => k.startsWith("_"));
+  console.log(`[merge] Final merged for ${nodeId}: _keys=[${mergedUnderscoreKeys.join(",")}]`);
 
   if (!firstArtifact) return null;
 

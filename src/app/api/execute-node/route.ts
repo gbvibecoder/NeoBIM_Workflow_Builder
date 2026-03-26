@@ -111,6 +111,7 @@ function cleanupRateLimitCache() {
 // Allow up to 180s for heavy GPT-4o vision + 3D AI Studio generation + conversion chains
 export const maxDuration = 180;
 
+
 export async function POST(req: NextRequest) {
   const session = await auth();
 
@@ -1614,6 +1615,15 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
 
     } else if (catalogueId === "TR-008") {
       // BOQ Cost Mapper — Professional QS-grade with waste, M/L/E breakdown, escalation, project type
+      // Diagnostic: what keys does TR-008 actually receive from upstream merge?
+      const inputKeys = Object.keys(inputData ?? {});
+      console.log(`[TR-008] Input keys (${inputKeys.length}): ${inputKeys.filter(k => k.startsWith("_")).join(", ")}`);
+      console.log(`[TR-008] _marketData: ${typeof inputData?._marketData} (${!!inputData?._marketData}), _elements: ${typeof inputData?._elements} (${!!inputData?._elements})`);
+      // If _marketData is missing, check if market data is nested under a different key
+      if (!inputData?._marketData) {
+        const mKeys = inputKeys.filter(k => k.toLowerCase().includes("market") || k.toLowerCase().includes("price") || k.toLowerCase().includes("steel"));
+        if (mKeys.length > 0) console.log(`[TR-008] Possible market data under: ${mKeys.join(", ")}`);
+      }
       const elements = inputData?._elements ?? inputData?.elements ?? inputData?.rows ?? [];
       const buildingDescription = inputData?.buildingDescription ?? inputData?.content ?? inputData?.prompt ?? "";
       let escalationMonths = Number(inputData?.escalationMonths ?? 6);
