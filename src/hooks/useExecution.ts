@@ -315,8 +315,13 @@ async function executeNode(
           const summary = (parseResult as Record<string, unknown>).summary as Record<string, unknown> ?? {};
           const meta = (parseResult as Record<string, unknown>).meta as Record<string, unknown> ?? {};
 
-          const rows: string[][] = [];
-          const elements: Array<Record<string, unknown>> = [];
+          // ── Aggregate elements by type + storey (QS-standard grouping) ──
+          // A QS wants "Walls — Ground Floor: 245 m²", not 69 individual wall rows
+          const typeAggregates = new Map<string, {
+            count: number; grossArea: number; netArea: number; openingArea: number; volume: number;
+            divisionName: string; storey: string; elementType: string;
+            materialLayers?: Array<{ name: string; thickness: number }>;
+          }>();
 
           for (const division of divisions) {
             const categories = (division.categories ?? []) as Array<Record<string, unknown>>;
@@ -327,34 +332,49 @@ async function executeNode(
                 const quantities = (element.quantities ?? {}) as Record<string, unknown>;
                 const area = quantities.area as Record<string, unknown> | undefined;
                 const volume = quantities.volume as Record<string, unknown> | undefined;
-                const grossArea = Number(area?.gross ?? 0);
-                const netArea = Number(area?.net ?? 0);
-                const openingArea = Number(quantities.openingArea ?? 0);
-                const vol = Number(volume?.base ?? 0);
-                const count = Number(quantities.count ?? 1);
                 const storey = (element.storey as string) ?? "Unassigned";
 
-                const description = type.replace("Ifc", "");
-                const primaryQty = grossArea > 0 ? grossArea : vol > 0 ? vol : count;
-                const unit = grossArea > 0 ? "m²" : vol > 0 ? "m³" : "EA";
-
-                rows.push([
-                  (division.name as string) ?? "", description,
-                  grossArea.toFixed(2), openingArea.toFixed(2),
-                  netArea.toFixed(2), vol.toFixed(2),
-                  primaryQty.toFixed(2), unit,
-                ]);
-
-                elements.push({
-                  description, category: (division.name as string) ?? "",
-                  quantity: primaryQty, unit,
-                  grossArea: grossArea || undefined, netArea: netArea || undefined,
-                  openingArea: openingArea || undefined, totalVolume: vol || undefined,
-                  storey, elementCount: count,
-                  materialLayers: element.materialLayers,
-                });
+                const key = `${type}|${storey}`;
+                const existing = typeAggregates.get(key) || {
+                  count: 0, grossArea: 0, netArea: 0, openingArea: 0, volume: 0,
+                  divisionName: (division.name as string) ?? "", storey, elementType: type,
+                };
+                existing.count += Number(quantities.count ?? 1);
+                existing.grossArea += Number(area?.gross ?? 0);
+                existing.netArea += Number(area?.net ?? 0);
+                existing.openingArea += Number(quantities.openingArea ?? 0);
+                existing.volume += Number(volume?.base ?? 0);
+                if (!existing.materialLayers && element.materialLayers) {
+                  existing.materialLayers = element.materialLayers as Array<{ name: string; thickness: number }>;
+                }
+                typeAggregates.set(key, existing);
               }
             }
+          }
+
+          const rows: string[][] = [];
+          const elements: Array<Record<string, unknown>> = [];
+
+          for (const [, agg] of typeAggregates) {
+            const description = agg.elementType.replace("Ifc", "");
+            const primaryQty = agg.grossArea > 0 ? agg.grossArea : agg.volume > 0 ? agg.volume : agg.count;
+            const unit = agg.grossArea > 0 ? "m²" : agg.volume > 0 ? "m³" : "EA";
+
+            rows.push([
+              agg.divisionName, description,
+              agg.grossArea.toFixed(2), agg.openingArea.toFixed(2),
+              agg.netArea.toFixed(2), agg.volume.toFixed(2),
+              primaryQty.toFixed(2), unit,
+            ]);
+
+            elements.push({
+              description, category: agg.divisionName,
+              quantity: primaryQty, unit,
+              grossArea: agg.grossArea || undefined, netArea: agg.netArea || undefined,
+              openingArea: agg.openingArea || undefined, totalVolume: agg.volume || undefined,
+              storey: agg.storey, elementCount: agg.count,
+              materialLayers: agg.materialLayers,
+            });
           }
 
           const parseSummary = `Parsed ${summary.processedElements ?? "?"} of ${summary.totalElements ?? "?"} elements from ${summary.buildingStoreys ?? "?"} storeys (${meta.ifcSchema ?? "IFC"})`;

@@ -1667,9 +1667,9 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
               totalLabor += labCost;
               totalEquipment += Math.max(0, eqpCost);
 
-              const countLabel = elemCount ? ` (${elemCount} nr)` : "";
+              // Note: do NOT add countLabel here — it's added in the storey-grouped display
               rows.push([
-                `${rate.description}${countLabel}`, rate.unit, qty.toFixed(2),
+                rate.description, rate.unit, qty.toFixed(2),
                 `${(wasteFactor * 100).toFixed(0)}%`, adjQty.toFixed(2),
                 `₹${adjRate.toFixed(2)}`,
                 `₹${matCost.toFixed(2)}`, `₹${labCost.toFixed(2)}`,
@@ -1679,7 +1679,7 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
               boqLines.push({
                 division: is1200Label,
                 csiCode: rate.is1200Code,
-                description: `${rate.description}${countLabel}`,
+                description: rate.description,
                 unit: rate.unit,
                 quantity: qty,
                 wasteFactor,
@@ -1831,10 +1831,23 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
       }
 
       // ── Derived quantities: Formwork, Rebar, Finishing ──
+      // For Indian projects, use CPWD rates directly with IS 1200 codes.
+      // For non-Indian, use DERIVED_RATES from regional-factors.ts.
       const { DERIVED_RATES } = await import("@/constants/regional-factors");
       const derivedLines: typeof boqLines = [];
 
-      // Aggregate source quantities by storey for derived items
+      // IS 1200 codes for derived quantities
+      const DERIVED_IS1200: Record<string, { code: string; division: string }> = {
+        "formwork-wall":    { code: "IS1200-P5-FW-WALL", division: "IS 1200 Part 5 — Formwork" },
+        "formwork-slab":    { code: "IS1200-P5-FW-SLAB", division: "IS 1200 Part 5 — Formwork" },
+        "formwork-column":  { code: "IS1200-P5-FW-COL", division: "IS 1200 Part 5 — Formwork" },
+        "formwork-beam":    { code: "IS1200-P5-FW-BEAM", division: "IS 1200 Part 5 — Formwork" },
+        "rebar":            { code: "IS1200-P6-REBAR-500", division: "IS 1200 Part 6 — Reinforcement" },
+        "plastering":       { code: "IS1200-P8-PLASTER", division: "IS 1200 Part 8 — Plastering" },
+        "ceiling-plaster":  { code: "IS1200-P8-PLASTER", division: "IS 1200 Part 8 — Plastering" },
+        "painting":         { code: "IS1200-P10-PAINT", division: "IS 1200 Part 10 — Painting" },
+      };
+
       for (const elem of expandedElements) {
         if (typeof elem !== "object") continue;
         const e = elem as Record<string, unknown>;
@@ -1844,9 +1857,24 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
         const vol = Number(e.totalVolume ?? 0);
         const descLower = desc.toLowerCase();
 
-        const applyDerived = (name: string, baseQty: number, rateUSD: number, dUnit: string, source: string) => {
+        const applyDerived = (name: string, baseQty: number, rateUSD: number, dUnit: string, source: string, is1200Key: string) => {
           if (baseQty <= 0) return;
-          const adjRate = Math.round(rateUSD * locationFactor * exchangeRate * 100) / 100;
+          // For Indian projects, use CPWD rate directly if available
+          let adjRate: number;
+          if (isIndianProject && is1200Key === "rebar" && is1200Module) {
+            const rebarRate = is1200Module.getIS1200Rate("IS1200-P6-REBAR-500");
+            adjRate = rebarRate ? rebarRate.rate : Math.round(rateUSD * locationFactor * exchangeRate * 100) / 100;
+          } else if (isIndianProject && is1200Key.startsWith("formwork") && is1200Module) {
+            // Use CPWD formwork rates (already in INR)
+            const fwRates: Record<string, number> = { "formwork-wall": 400, "formwork-slab": 380, "formwork-column": 480, "formwork-beam": 420 };
+            adjRate = fwRates[is1200Key] ?? Math.round(rateUSD * locationFactor * exchangeRate * 100) / 100;
+          } else if (isIndianProject && (is1200Key === "plastering" || is1200Key === "ceiling-plaster") && is1200Module) {
+            const plastRate = is1200Module.getIS1200Rate("IS1200-P8-PLASTER");
+            adjRate = plastRate ? plastRate.rate : Math.round(rateUSD * locationFactor * exchangeRate * 100) / 100;
+          } else {
+            adjRate = Math.round(rateUSD * locationFactor * exchangeRate * 100) / 100;
+          }
+
           const waste = 0.05;
           const adjQty = Math.round(baseQty * (1 + waste) * 100) / 100;
           const total = Math.round(adjQty * adjRate * 100) / 100;
@@ -1856,8 +1884,11 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
           const eqpC = Math.round(total * breakdown.equipment * 100) / 100;
           hardCostSubtotal += total;
           totalMaterial += matC; totalLabor += labC; totalEquipment += eqpC;
+
+          const is1200Info = isIndianProject ? DERIVED_IS1200[is1200Key] : null;
           derivedLines.push({
-            division: source, csiCode: "00 00 00",
+            division: is1200Info?.division ?? source,
+            csiCode: is1200Info?.code ?? "00 00 00",
             description: name, unit: dUnit,
             quantity: Math.round(baseQty * 100) / 100, wasteFactor: waste, adjustedQty: adjQty,
             materialRate: Math.round(adjRate * breakdown.material * 100) / 100,
@@ -1865,25 +1896,24 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
             equipmentRate: Math.round(adjRate * breakdown.equipment * 100) / 100,
             unitRate: adjRate, materialCost: matC, laborCost: labC, equipmentCost: eqpC, totalCost: total,
             storey: st || undefined, elementCount: undefined,
+            is1200Code: is1200Info?.code,
           });
         };
 
-        // Formwork
         if (descLower.includes("wall")) {
-          applyDerived(`Formwork — ${desc}`, area * 2, DERIVED_RATES.formwork.wall.rate, "m²", "Formwork (Measured)");
-          applyDerived(`Rebar — ${desc} (Est.)`, vol * DERIVED_RATES.rebar.wall.kgPerM3, DERIVED_RATES.rebar.wall.rate, "kg", "Rebar (Estimated)");
-          applyDerived(`Plastering — ${desc}`, area * 2, DERIVED_RATES.finishing.plastering.rate, "m²", "Finishing (Measured)");
+          applyDerived(`Formwork — ${desc}`, area * 2, DERIVED_RATES.formwork.wall.rate, "m²", "Formwork (Measured)", "formwork-wall");
+          applyDerived(`Rebar — ${desc} (Est.)`, vol * DERIVED_RATES.rebar.wall.kgPerM3, DERIVED_RATES.rebar.wall.rate, "kg", "Rebar (Estimated)", "rebar");
+          applyDerived(`Plastering — ${desc}`, area * 2, DERIVED_RATES.finishing.plastering.rate, "m²", "Finishing (Measured)", "plastering");
         } else if (descLower.includes("slab")) {
-          applyDerived(`Formwork — ${desc}`, area, DERIVED_RATES.formwork.slab.rate, "m²", "Formwork (Measured)");
-          applyDerived(`Rebar — ${desc} (Est.)`, vol * DERIVED_RATES.rebar.slab.kgPerM3, DERIVED_RATES.rebar.slab.rate, "kg", "Rebar (Estimated)");
-          applyDerived(`Ceiling Plaster — ${desc}`, area, DERIVED_RATES.finishing.ceilingPlaster.rate, "m²", "Finishing (Measured)");
+          applyDerived(`Formwork — ${desc}`, area, DERIVED_RATES.formwork.slab.rate, "m²", "Formwork (Measured)", "formwork-slab");
+          applyDerived(`Rebar — ${desc} (Est.)`, vol * DERIVED_RATES.rebar.slab.kgPerM3, DERIVED_RATES.rebar.slab.rate, "kg", "Rebar (Estimated)", "rebar");
+          applyDerived(`Ceiling Plaster — ${desc}`, area, DERIVED_RATES.finishing.ceilingPlaster.rate, "m²", "Finishing (Measured)", "ceiling-plaster");
         } else if (descLower.includes("column")) {
-          // Column formwork = circumference × height (for circular); approximated
-          const colHeight = Number(e.totalVolume ?? 0) > 0 ? 3.5 : 0; // default 3.5m
+          const colHeight = Number(e.totalVolume ?? 0) > 0 ? 3.5 : 0;
           const colRadius = vol > 0 && colHeight > 0 ? Math.sqrt(vol / (Math.PI * colHeight)) : 0.3;
           const colFormworkArea = 2 * Math.PI * colRadius * colHeight * Number(e.elementCount ?? 1);
-          applyDerived(`Formwork — ${desc}`, colFormworkArea, DERIVED_RATES.formwork.column.rate, "m²", "Formwork (Measured)");
-          applyDerived(`Rebar — ${desc} (Est.)`, vol * DERIVED_RATES.rebar.column.kgPerM3, DERIVED_RATES.rebar.column.rate, "kg", "Rebar (Estimated)");
+          applyDerived(`Formwork — ${desc}`, colFormworkArea, DERIVED_RATES.formwork.column.rate, "m²", "Formwork (Measured)", "formwork-column");
+          applyDerived(`Rebar — ${desc} (Est.)`, vol * DERIVED_RATES.rebar.column.kgPerM3, DERIVED_RATES.rebar.column.rate, "kg", "Rebar (Estimated)", "rebar");
         }
       }
 
