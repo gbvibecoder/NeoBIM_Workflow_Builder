@@ -2,12 +2,11 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { Search, Command, LogOut, Gift, Copy, Check, ChevronDown, Globe, Settings } from "lucide-react";
+import { Search, Command, LogOut, Gift, Copy, Check, ChevronDown, Settings } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
 import { useLocale } from "@/hooks/useLocale";
 import { useAvatar } from "@/hooks/useAvatar";
-import { LanguageSwitcher } from "@/components/ui/LanguageSwitcher";
 import { toast } from "sonner";
 
 interface HeaderProps {
@@ -17,7 +16,7 @@ interface HeaderProps {
 
 export function Header({ title, subtitle }: HeaderProps) {
   const router = useRouter();
-  const { t } = useLocale();
+  const { t, locale, setLocale } = useLocale();
   const { data: session } = useSession();
   const avatarSrc = useAvatar(session?.user?.image);
   const [profileOpen, setProfileOpen] = useState(false);
@@ -64,7 +63,6 @@ export function Header({ title, subtitle }: HeaderProps) {
 
   const copyReferral = async () => {
     if (!referralCode) {
-      // Generate one
       try {
         const res = await fetch("/api/referral", { method: "POST" });
         if (res.ok) {
@@ -90,32 +88,33 @@ export function Header({ title, subtitle }: HeaderProps) {
 
   return (
     <header
-      className="flex items-center justify-between px-6 dashboard-header"
+      className="flex items-center justify-between px-5 dashboard-header"
       style={{
-        minHeight: 56,
-        marginTop: 6,
-        background: "rgba(10,12,20,0.75)",
+        minHeight: 52,
+        marginTop: 4,
+        background: "rgba(10,12,20,0.8)",
         backdropFilter: "blur(20px)",
         WebkitBackdropFilter: "blur(20px)",
         borderBottom: "1px solid rgba(255,255,255,0.06)",
       }}
     >
-      <div>
+      {/* Left — Title */}
+      <div style={{ minWidth: 0 }}>
         {title && (
-          <div className="flex items-center gap-3">
-            <h1 style={{ fontSize: 22, fontWeight: 700, color: "#F0F0F5", letterSpacing: "-0.02em" }}>{title}</h1>
+          <div className="flex items-center gap-2.5">
+            <h1 style={{ fontSize: 18, fontWeight: 700, color: "#F0F0F5", letterSpacing: "-0.02em" }}>{title}</h1>
             <span
               className="beta-badge"
               style={{
-                padding: "2px 8px",
+                padding: "2px 7px",
                 borderRadius: 20,
-                fontSize: 9,
+                fontSize: 8,
                 fontWeight: 700,
                 letterSpacing: "0.08em",
                 textTransform: "uppercase" as const,
-                color: "#F59E0B",
-                border: "1px solid rgba(245,158,11,0.25)",
-                background: "rgba(245,158,11,0.06)",
+                color: "#FFBF00",
+                border: "1px solid rgba(255,191,0,0.2)",
+                background: "rgba(255,191,0,0.06)",
                 fontFamily: "var(--font-jetbrains), monospace",
               }}
             >
@@ -124,109 +123,125 @@ export function Header({ title, subtitle }: HeaderProps) {
           </div>
         )}
         {subtitle && (
-          <p className="font-mono-data" style={{ fontSize: 11, color: "#7C7C96", marginTop: 2, letterSpacing: "0.02em" }}>{subtitle}</p>
+          <p className="font-mono-data" style={{ fontSize: 11, color: "#5C5C78", marginTop: 1, letterSpacing: "0.02em" }}>{subtitle}</p>
         )}
       </div>
 
-      <div className="flex items-center gap-3">
-        {/* Search — opens CommandPalette (⌘K) */}
+      {/* Right — Actions */}
+      <div className="flex items-center gap-2.5">
+        {/* Search */}
         <button
-          className="h-[40px] flex items-center gap-2 px-3.5 text-xs transition-all"
+          className="h-[36px] flex items-center gap-2 px-3 text-xs transition-all"
           aria-label={t('nav.searchPlaceholder')}
           style={{
-            borderRadius: 12,
-            border: "1px solid rgba(255,255,255,0.08)",
-            background: "rgba(255,255,255,0.04)",
-            color: "#7C7C96",
+            borderRadius: 10,
+            border: "1px solid rgba(255,255,255,0.07)",
+            background: "rgba(255,255,255,0.03)",
+            color: "#6B7A8D",
             fontFamily: "var(--font-jetbrains), monospace",
             fontSize: 11,
-            letterSpacing: "0.02em",
           }}
           onClick={() => {
             document.dispatchEvent(new KeyboardEvent("keydown", { key: "k", metaKey: true, bubbles: true }));
           }}
           onMouseEnter={e => {
-            e.currentTarget.style.borderColor = "rgba(79,138,255,0.3)";
-            e.currentTarget.style.background = "rgba(255,255,255,0.06)";
+            e.currentTarget.style.borderColor = "rgba(255,191,0,0.25)";
+            e.currentTarget.style.background = "rgba(255,255,255,0.05)";
           }}
           onMouseLeave={e => {
-            e.currentTarget.style.borderColor = "rgba(255,255,255,0.08)";
-            e.currentTarget.style.background = "rgba(255,255,255,0.04)";
+            e.currentTarget.style.borderColor = "rgba(255,255,255,0.07)";
+            e.currentTarget.style.background = "rgba(255,255,255,0.03)";
           }}
         >
-          <Search size={13} />
+          <Search size={12} />
           <span className="search-text">{t('nav.searchPlaceholder')}</span>
-          <div className="flex items-center gap-0.5 ml-2">
-            <kbd
-              className="rounded"
-              style={{
-                background: "rgba(255,255,255,0.06)",
-                border: "1px solid rgba(255,255,255,0.08)",
-                padding: "1px 5px",
-                fontSize: 9,
-                color: "#5C5C78",
-                minWidth: 18,
-                height: 18,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <Command size={8} />
+          <div className="flex items-center gap-0.5 ml-1.5">
+            <kbd className="rounded" style={{
+              background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.07)",
+              padding: "1px 4px", fontSize: 8, color: "#4A5568",
+              minWidth: 16, height: 16, display: "flex", alignItems: "center", justifyContent: "center",
+            }}>
+              <Command size={7} />
             </kbd>
-            <kbd
-              className="rounded"
-              style={{
-                background: "rgba(255,255,255,0.06)",
-                border: "1px solid rgba(255,255,255,0.08)",
-                padding: "1px 5px",
-                fontSize: 9,
-                color: "#5C5C78",
-                minWidth: 18,
-                height: 18,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
+            <kbd className="rounded" style={{
+              background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.07)",
+              padding: "1px 4px", fontSize: 8, color: "#4A5568",
+              minWidth: 16, height: 16, display: "flex", alignItems: "center", justifyContent: "center",
+            }}>
               K
             </kbd>
           </div>
         </button>
 
-        {/* ── Profile dropdown ─────────────────────────────────── */}
+        {/* Language toggle — directly on navbar */}
+        <button
+          className="header-lang-btn"
+          onClick={() => setLocale(locale === "en" ? "de" : "en")}
+          title={locale === "en" ? "Auf Deutsch wechseln" : "Switch to English"}
+          style={{
+            display: "flex", alignItems: "center", justifyContent: "center",
+            height: 36, minWidth: 42, padding: "0 10px",
+            borderRadius: 10,
+            border: "1px solid rgba(255,255,255,0.07)",
+            background: "rgba(255,255,255,0.03)",
+            color: "#8898AA",
+            fontSize: 11, fontWeight: 700,
+            cursor: "pointer",
+            fontFamily: "var(--font-jetbrains), monospace",
+            letterSpacing: "0.5px",
+            transition: "all 0.2s ease",
+          }}
+          onMouseEnter={e => {
+            e.currentTarget.style.borderColor = "rgba(255,191,0,0.25)";
+            e.currentTarget.style.color = "#FFBF00";
+            e.currentTarget.style.background = "rgba(255,191,0,0.06)";
+          }}
+          onMouseLeave={e => {
+            e.currentTarget.style.borderColor = "rgba(255,255,255,0.07)";
+            e.currentTarget.style.color = "#8898AA";
+            e.currentTarget.style.background = "rgba(255,255,255,0.03)";
+          }}
+        >
+          {locale === "en" ? "EN" : "DE"}
+        </button>
+
+        {/* Thin separator */}
+        <div style={{ width: 1, height: 20, background: "rgba(255,255,255,0.06)" }} />
+
+        {/* Profile dropdown */}
         <div style={{ position: "relative" }}>
           <button
             ref={triggerRef}
             onClick={() => { updatePosition(); setProfileOpen(!profileOpen); }}
             className="flex items-center gap-2 transition-all"
             style={{
-              padding: "5px 10px 5px 5px",
-              borderRadius: 12,
-              border: profileOpen ? "1px solid rgba(79,138,255,0.3)" : "1px solid rgba(255,255,255,0.08)",
-              background: profileOpen ? "rgba(79,138,255,0.08)" : "rgba(255,255,255,0.04)",
+              padding: "3px 8px 3px 3px",
+              borderRadius: 10,
+              border: profileOpen ? "1px solid rgba(255,191,0,0.3)" : "1px solid rgba(255,255,255,0.07)",
+              background: profileOpen ? "rgba(255,191,0,0.06)" : "rgba(255,255,255,0.03)",
               cursor: "pointer",
               transition: "all 0.2s ease",
             }}
             onMouseEnter={e => {
               if (!profileOpen) {
-                e.currentTarget.style.borderColor = "rgba(255,255,255,0.15)";
-                e.currentTarget.style.background = "rgba(255,255,255,0.06)";
+                e.currentTarget.style.borderColor = "rgba(255,255,255,0.12)";
+                e.currentTarget.style.background = "rgba(255,255,255,0.05)";
               }
             }}
             onMouseLeave={e => {
               if (!profileOpen) {
-                e.currentTarget.style.borderColor = "rgba(255,255,255,0.08)";
-                e.currentTarget.style.background = "rgba(255,255,255,0.04)";
+                e.currentTarget.style.borderColor = "rgba(255,255,255,0.07)";
+                e.currentTarget.style.background = "rgba(255,255,255,0.03)";
               }
             }}
           >
             {/* Avatar */}
             <div style={{
               width: 30, height: 30, borderRadius: 8, overflow: "hidden",
-              background: "linear-gradient(135deg, rgba(79,138,255,0.2), rgba(139,92,246,0.2))",
+              background: "linear-gradient(135deg, rgba(255,191,0,0.15), rgba(255,191,0,0.08))",
+              border: "1px solid rgba(255,191,0,0.12)",
               display: "flex", alignItems: "center", justifyContent: "center",
-              fontSize: 12, fontWeight: 700, color: "#E2E8F0",
+              fontSize: 12, fontWeight: 700, color: "#FFBF00",
               flexShrink: 0,
             }}>
               {avatarSrc ? (
@@ -242,14 +257,14 @@ export function Header({ title, subtitle }: HeaderProps) {
             }}>
               {userName.split(" ")[0]}
             </span>
-            <ChevronDown size={12} style={{
+            <ChevronDown size={11} style={{
               color: "#5C5C78",
               transition: "transform 0.2s",
               transform: profileOpen ? "rotate(180deg)" : "rotate(0deg)",
             }} />
           </button>
 
-          {/* Dropdown menu — rendered via portal to escape overflow:hidden */}
+          {/* Dropdown — portal */}
           {profileOpen && createPortal(
             <div
               ref={dropdownRef}
@@ -257,25 +272,26 @@ export function Header({ title, subtitle }: HeaderProps) {
                 position: "fixed",
                 top: dropdownPos.top,
                 right: dropdownPos.right,
-                width: 260, borderRadius: 14,
+                width: 240, borderRadius: 12,
                 background: "rgba(14,16,24,0.98)",
                 backdropFilter: "blur(24px)",
                 border: "1px solid rgba(255,255,255,0.08)",
-                boxShadow: "0 16px 48px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.03)",
+                boxShadow: "0 12px 40px rgba(0,0,0,0.5)",
                 zIndex: 9999, overflow: "hidden",
               }}
             >
               {/* User info */}
               <div style={{
-                padding: "14px 16px",
+                padding: "12px 14px",
                 borderBottom: "1px solid rgba(255,255,255,0.05)",
                 display: "flex", alignItems: "center", gap: 10,
               }}>
                 <div style={{
-                  width: 36, height: 36, borderRadius: 10, overflow: "hidden",
-                  background: "linear-gradient(135deg, rgba(79,138,255,0.2), rgba(139,92,246,0.2))",
+                  width: 32, height: 32, borderRadius: 8, overflow: "hidden",
+                  background: "linear-gradient(135deg, rgba(255,191,0,0.15), rgba(255,191,0,0.08))",
+                  border: "1px solid rgba(255,191,0,0.12)",
                   display: "flex", alignItems: "center", justifyContent: "center",
-                  fontSize: 14, fontWeight: 700, color: "#E2E8F0", flexShrink: 0,
+                  fontSize: 13, fontWeight: 700, color: "#FFBF00", flexShrink: 0,
                 }}>
                   {avatarSrc ? (
                     // eslint-disable-next-line @next/next/no-img-element
@@ -285,24 +301,23 @@ export function Header({ title, subtitle }: HeaderProps) {
                   )}
                 </div>
                 <div style={{ minWidth: 0, flex: 1 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: "#E2E8F0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: "#E2E8F0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                     {userName}
                   </div>
-                  <div style={{ fontSize: 10, color: "#5C5C78", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontFamily: "var(--font-jetbrains), monospace" }}>
+                  <div style={{ fontSize: 9, color: "#5C5C78", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontFamily: "var(--font-jetbrains), monospace" }}>
                     {userEmail}
                   </div>
                 </div>
               </div>
 
               {/* Menu items */}
-              <div style={{ padding: "6px" }}>
+              <div style={{ padding: "4px" }}>
                 {/* Settings */}
                 <button
                   onClick={() => { setProfileOpen(false); router.push("/dashboard/settings"); }}
-                  className="header-dropdown-item"
                   style={{
-                    display: "flex", alignItems: "center", gap: 10, width: "100%",
-                    padding: "9px 12px", borderRadius: 8,
+                    display: "flex", alignItems: "center", gap: 8, width: "100%",
+                    padding: "8px 10px", borderRadius: 8,
                     background: "transparent", border: "none",
                     color: "#9898B0", fontSize: 12, fontWeight: 500,
                     cursor: "pointer", transition: "all 0.15s",
@@ -310,28 +325,16 @@ export function Header({ title, subtitle }: HeaderProps) {
                   onMouseEnter={e => { e.currentTarget.style.background = "rgba(255,255,255,0.04)"; e.currentTarget.style.color = "#E2E8F0"; }}
                   onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "#9898B0"; }}
                 >
-                  <Settings size={14} />
+                  <Settings size={13} />
                   Settings
                 </button>
-
-                {/* Language */}
-                <div style={{
-                  display: "flex", alignItems: "center", gap: 10,
-                  padding: "9px 12px", borderRadius: 8,
-                }}>
-                  <Globe size={14} style={{ color: "#9898B0", flexShrink: 0 }} />
-                  <div style={{ flex: 1 }}>
-                    <LanguageSwitcher />
-                  </div>
-                </div>
 
                 {/* Referral */}
                 <button
                   onClick={copyReferral}
-                  className="header-dropdown-item"
                   style={{
-                    display: "flex", alignItems: "center", gap: 10, width: "100%",
-                    padding: "9px 12px", borderRadius: 8,
+                    display: "flex", alignItems: "center", gap: 8, width: "100%",
+                    padding: "8px 10px", borderRadius: 8,
                     background: "transparent", border: "none",
                     color: referralCopied ? "#10B981" : "#9898B0",
                     fontSize: 12, fontWeight: 500,
@@ -340,22 +343,21 @@ export function Header({ title, subtitle }: HeaderProps) {
                   onMouseEnter={e => { if (!referralCopied) { e.currentTarget.style.background = "rgba(16,185,129,0.06)"; e.currentTarget.style.color = "#10B981"; } }}
                   onMouseLeave={e => { if (!referralCopied) { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "#9898B0"; } }}
                 >
-                  {referralCopied ? <Check size={14} /> : <Gift size={14} />}
+                  {referralCopied ? <Check size={13} /> : <Gift size={13} />}
                   <span style={{ flex: 1, textAlign: "left" }}>
                     {referralCopied ? "Link Copied!" : "Refer & Earn"}
                   </span>
-                  {!referralCopied && <Copy size={11} style={{ color: "#5C5C78" }} />}
+                  {!referralCopied && <Copy size={10} style={{ color: "#5C5C78" }} />}
                 </button>
               </div>
 
               {/* Sign out */}
-              <div style={{ padding: "0 6px 6px", borderTop: "1px solid rgba(255,255,255,0.04)" }}>
+              <div style={{ padding: "0 4px 4px", borderTop: "1px solid rgba(255,255,255,0.04)" }}>
                 <button
                   onClick={() => signOut({ callbackUrl: "/login" })}
-                  className="header-dropdown-item"
                   style={{
-                    display: "flex", alignItems: "center", gap: 10, width: "100%",
-                    padding: "9px 12px", borderRadius: 8, marginTop: 6,
+                    display: "flex", alignItems: "center", gap: 8, width: "100%",
+                    padding: "8px 10px", borderRadius: 8, marginTop: 4,
                     background: "transparent", border: "none",
                     color: "#9898B0", fontSize: 12, fontWeight: 500,
                     cursor: "pointer", transition: "all 0.15s",
@@ -363,7 +365,7 @@ export function Header({ title, subtitle }: HeaderProps) {
                   onMouseEnter={e => { e.currentTarget.style.background = "rgba(239,68,68,0.06)"; e.currentTarget.style.color = "#EF4444"; }}
                   onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "#9898B0"; }}
                 >
-                  <LogOut size={14} />
+                  <LogOut size={13} />
                   Sign out
                 </button>
               </div>
