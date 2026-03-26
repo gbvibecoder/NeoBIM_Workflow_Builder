@@ -219,220 +219,121 @@ export default function DashboardPage() {
         <div className="dashboard-home-container" style={{ maxWidth: 1200, margin: "0 auto", width: "100%" }}>
 
           {/* ══════════════════════════════════════════════════════════════
-              SECTION 1 — WELCOME HERO (Cinematic)
+              SECTION 1 — WELCOME HERO (Compact)
               ══════════════════════════════════════════════════════════════ */}
           <motion.div
-            initial={{ opacity: 0, y: 30 }}
+            initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, ease: smoothEase }}
+            transition={{ duration: 0.6, ease: smoothEase }}
             className="dash-hero-main"
             style={{
               position: "relative", overflow: "hidden",
-              borderRadius: 28, marginBottom: 32,
-              minHeight: 220,
+              borderRadius: 20, marginBottom: 28,
             }}
           >
-            {/* ── Multi-layer background ── */}
-            {/* Base gradient */}
+            {/* Background */}
             <div style={{
               position: "absolute", inset: 0,
-              background: "linear-gradient(160deg, #080a14 0%, #0d1020 40%, #0a0e1c 70%, #0c0f1f 100%)",
+              background: "linear-gradient(135deg, #0c0e18 0%, #101420 50%, #0e1018 100%)",
             }} />
-            {/* Animated gradient mesh — 3 slow-moving orbs */}
+            {/* Yellow glow accent */}
             <motion.div
-              animate={{ x: [0, 30, -10, 0], y: [0, -20, 10, 0] }}
-              transition={{ duration: 15, repeat: Infinity, ease: "easeInOut" }}
+              animate={{ x: [0, 20, -10, 0], y: [0, -10, 5, 0] }}
+              transition={{ duration: 12, repeat: Infinity, ease: "easeInOut" }}
               style={{
-                position: "absolute", top: "-30%", right: "-5%", width: 500, height: 500,
+                position: "absolute", top: "-40%", right: "5%", width: 300, height: 300,
                 borderRadius: "50%", pointerEvents: "none",
-                background: "radial-gradient(circle, rgba(79,138,255,0.1) 0%, transparent 60%)",
-                filter: "blur(60px)",
-              }}
-            />
-            <motion.div
-              animate={{ x: [0, -20, 15, 0], y: [0, 15, -10, 0] }}
-              transition={{ duration: 18, repeat: Infinity, ease: "easeInOut", delay: 3 }}
-              style={{
-                position: "absolute", bottom: "-20%", left: "5%", width: 400, height: 400,
-                borderRadius: "50%", pointerEvents: "none",
-                background: "radial-gradient(circle, rgba(139,92,246,0.07) 0%, transparent 60%)",
+                background: "radial-gradient(circle, rgba(255,191,0,0.08) 0%, transparent 60%)",
                 filter: "blur(50px)",
               }}
             />
-            <motion.div
-              animate={{ x: [0, 15, -15, 0], y: [0, -10, 20, 0] }}
-              transition={{ duration: 20, repeat: Infinity, ease: "easeInOut", delay: 6 }}
-              style={{
-                position: "absolute", top: "20%", left: "40%", width: 300, height: 300,
-                borderRadius: "50%", pointerEvents: "none",
-                background: "radial-gradient(circle, rgba(16,185,129,0.05) 0%, transparent 60%)",
-                filter: "blur(45px)",
-              }}
-            />
-
-            {/* Blueprint grid with fade mask */}
-            <div style={{
-              position: "absolute", inset: 0, pointerEvents: "none",
-              backgroundImage: "linear-gradient(rgba(79,138,255,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(79,138,255,0.03) 1px, transparent 1px)",
-              backgroundSize: "48px 48px",
-              maskImage: "radial-gradient(ellipse 70% 80% at 30% 50%, black 30%, transparent 80%)",
-              WebkitMaskImage: "radial-gradient(ellipse 70% 80% at 30% 50%, black 30%, transparent 80%)",
-            }} />
-
-            {/* Floating particles */}
-            <div className="dash-particles">
-              {[
-                { x: "8%", y: "18%", size: 3, color: "#4F8AFF", delay: "0s" },
-                { x: "22%", y: "72%", size: 2, color: "#8B5CF6", delay: "1.5s" },
-                { x: "48%", y: "12%", size: 3, color: "#10B981", delay: "3s" },
-                { x: "62%", y: "82%", size: 2, color: "#F59E0B", delay: "4.5s" },
-                { x: "88%", y: "25%", size: 2, color: "#06B6D4", delay: "2s" },
-                { x: "32%", y: "50%", size: 2, color: "#EC4899", delay: "5.5s" },
-                { x: "75%", y: "55%", size: 3, color: "#4F8AFF", delay: "7s" },
-                { x: "55%", y: "35%", size: 2, color: "#8B5CF6", delay: "3.5s" },
-              ].map((p, i) => (
-                <div key={i} className="dash-particle" style={{
-                  left: p.x, top: p.y, width: p.size, height: p.size,
-                  background: p.color, boxShadow: `0 0 ${p.size * 4}px ${p.color}50`,
-                  animationDelay: p.delay, animationDuration: `${7 + i * 0.6}s`,
-                }} />
-              ))}
-            </div>
-
-            {/* AEC Orbit */}
-            <AECOrbit />
-
-            {/* ── Top accent line ── */}
+            {/* Top accent line — yellow */}
             <div style={{
               position: "absolute", top: 0, left: 0, right: 0, height: 2,
-              background: "linear-gradient(90deg, transparent 5%, rgba(79,138,255,0.4) 20%, rgba(139,92,246,0.3) 50%, rgba(16,185,129,0.2) 80%, transparent 95%)",
+              background: "linear-gradient(90deg, transparent 10%, rgba(255,191,0,0.5) 40%, rgba(255,191,0,0.3) 60%, transparent 90%)",
               pointerEvents: "none",
             }} />
 
-            {/* ── Content ── */}
-            <div style={{ position: "relative", zIndex: 1, padding: "32px 40px 28px", maxWidth: 620 }} className="dashboard-hero-content">
-              {/* Plan + Usage row */}
-              <motion.div
-                initial={{ opacity: 0, y: -8 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.25, duration: 0.5, ease: smoothEase }}
-                style={{
-                  display: "inline-flex", alignItems: "center", gap: 12,
-                  padding: "6px 6px 6px 14px", borderRadius: 24,
-                  background: "rgba(255,255,255,0.03)",
-                  border: "1px solid rgba(255,255,255,0.06)",
-                  backdropFilter: "blur(12px)",
-                  marginBottom: 16,
-                }}
-              >
-                <span style={{
-                  display: "inline-flex", alignItems: "center", gap: 5,
-                  fontSize: 10, fontWeight: 700, letterSpacing: "0.1em",
-                  color: role === "FREE" ? "#4F8AFF" : "#F59E0B",
-                  fontFamily: "var(--font-jetbrains), monospace",
-                }}>
-                  {role === "FREE" ? <Zap size={10} /> : <Crown size={10} />}
-                  {role}
-                </span>
-                <div style={{ width: 1, height: 14, background: "rgba(255,255,255,0.08)" }} />
-                <span style={{ fontSize: 11, color: "#556070" }}>
-                  {used}/{effectiveLimit} {t('dash.workflowsUsed')}
-                  {bonus > 0 && (
-                    <span style={{ color: "#10B981", marginLeft: 4, fontSize: 10 }}>
-                      (+{bonus})
-                    </span>
+            {/* Content */}
+            <div style={{ position: "relative", zIndex: 1, padding: "20px 32px 18px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 20, flexWrap: "wrap" }} className="dashboard-hero-content">
+              <div style={{ flex: 1, minWidth: 200 }}>
+                {/* Greeting — full name, yellow accent */}
+                <motion.h1
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.2, duration: 0.5, ease: smoothEase }}
+                  style={{ fontSize: "clamp(20px, 3vw, 28px)", fontWeight: 800, letterSpacing: "-0.5px", lineHeight: 1.2, marginBottom: 4 }}
+                >
+                  {data.userName ? (
+                    <>
+                      <span style={{ color: "#6B7A8D", fontWeight: 500, fontSize: "0.65em" }}>
+                        {t('dash.welcomeBack')}{" "}
+                      </span>
+                      <span style={{ color: "#FFBF00" }}>{data.userName}</span>
+                    </>
+                  ) : (
+                    <span style={{ color: "#FFBF00" }}>{t('dash.welcomeNew')}</span>
                   )}
-                </span>
-                {/* Mini progress ring */}
-                <svg width="22" height="22" viewBox="0 0 22 22" style={{ flexShrink: 0 }}>
-                  <circle cx="11" cy="11" r="9" fill="none" stroke="rgba(255,255,255,0.04)" strokeWidth="2" />
-                  <motion.circle
-                    cx="11" cy="11" r="9" fill="none"
-                    stroke={usagePercent > 80 ? "#EF4444" : "#4F8AFF"}
-                    strokeWidth="2" strokeLinecap="round"
-                    strokeDasharray={`${2 * Math.PI * 9}`}
-                    initial={{ strokeDashoffset: 2 * Math.PI * 9 }}
-                    animate={{ strokeDashoffset: 2 * Math.PI * 9 * (1 - usagePercent / 100) }}
-                    transition={{ delay: 0.8, duration: 1.2, ease: smoothEase }}
-                    transform="rotate(-90 11 11)"
-                  />
-                </svg>
-              </motion.div>
+                </motion.h1>
 
-              {/* Greeting — big, bold, gradient */}
-              <motion.h1
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.35, duration: 0.7, ease: smoothEase }}
-                style={{ fontSize: "clamp(26px, 4vw, 40px)", fontWeight: 800, letterSpacing: "-1.5px", lineHeight: 1.1, marginBottom: 10 }}
-              >
-                {firstName ? (
-                  <>
-                    <span style={{ color: "#4A5568", fontSize: "0.5em", fontWeight: 400, display: "block", marginBottom: 6, letterSpacing: "0px" }}>
-                      {t('dash.welcomeBack')}
-                    </span>
-                    <span className="dash-shimmer-text">{firstName}</span>
-                    <span style={{
-                      background: "linear-gradient(135deg, #4F8AFF, #8B5CF6)",
-                      WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text",
-                    }}>.</span>
-                  </>
-                ) : (
-                  <>
-                    <span className="dash-shimmer-text">{t('dash.welcomeNew')}</span>
-                  </>
-                )}
-              </motion.h1>
+                <motion.p
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 0.35, duration: 0.4 }}
+                  style={{ fontSize: 13, color: "#556070", lineHeight: 1.5 }}
+                >
+                  {t('dash.letsCreate')}
+                </motion.p>
+              </div>
 
-              <motion.p
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.45, duration: 0.5, ease: smoothEase }}
-                style={{ fontSize: 15, color: "#6B7A8D", lineHeight: 1.5, marginBottom: 20, maxWidth: 420 }}
-              >
-                {t('dash.letsCreate')}
-              </motion.p>
-
-              {/* CTAs */}
+              {/* Right side — plan badge + CTAs */}
               <motion.div
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.55, duration: 0.5, ease: smoothEase }}
-                style={{ display: "flex", gap: 14, flexWrap: "wrap", alignItems: "center" }}
+                initial={{ opacity: 0, x: 10 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.3, duration: 0.5 }}
+                style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}
               >
+                {/* Plan pill */}
+                <div style={{
+                  display: "inline-flex", alignItems: "center", gap: 8,
+                  padding: "5px 5px 5px 12px", borderRadius: 20,
+                  background: "rgba(255,255,255,0.03)",
+                  border: "1px solid rgba(255,191,0,0.12)",
+                }}>
+                  <span style={{
+                    display: "inline-flex", alignItems: "center", gap: 4,
+                    fontSize: 9, fontWeight: 700, letterSpacing: "0.1em",
+                    color: "#FFBF00",
+                    fontFamily: "var(--font-jetbrains), monospace",
+                  }}>
+                    {role === "FREE" ? <Zap size={9} /> : <Crown size={9} />}
+                    {role}
+                  </span>
+                  <div style={{ width: 1, height: 12, background: "rgba(255,255,255,0.06)" }} />
+                  <span style={{ fontSize: 10, color: "#556070", fontFamily: "var(--font-jetbrains), monospace" }}>
+                    {used}/{effectiveLimit}
+                  </span>
+                </div>
+
                 <Link href="/dashboard/workflows/new" className="dash-cta-primary" style={{
-                  display: "flex", alignItems: "center", gap: 8,
-                  padding: "11px 26px", borderRadius: 12,
-                  background: "linear-gradient(135deg, #4F8AFF 0%, #6366F1 50%, #8B5CF6 100%)",
-                  backgroundSize: "200% 200%",
-                  color: "#fff", fontSize: 14, fontWeight: 700,
+                  display: "flex", alignItems: "center", gap: 6,
+                  padding: "8px 18px", borderRadius: 10,
+                  background: "#FFBF00",
+                  color: "#0a0c10", fontSize: 12, fontWeight: 700,
                   textDecoration: "none",
-                  boxShadow: "0 4px 28px rgba(79,138,255,0.3), inset 0 1px 0 rgba(255,255,255,0.1)",
-                  transition: "all 0.3s ease",
+                  boxShadow: "0 2px 16px rgba(255,191,0,0.25)",
+                  transition: "all 0.2s ease",
                   letterSpacing: "-0.01em",
                 }}>
-                  <Plus size={16} strokeWidth={2.5} /> {t('dash.startBuilding')}
+                  <Plus size={14} strokeWidth={2.5} /> {t('dash.startBuilding')}
                 </Link>
-                {role === "FREE" && (
-                  <Link href="/dashboard/billing" className="dash-upgrade-btn" style={{
-                    display: "flex", alignItems: "center", gap: 8,
-                    padding: "11px 22px", borderRadius: 12,
-                    background: "rgba(245,158,11,0.04)",
-                    border: "1px solid rgba(245,158,11,0.12)",
-                    color: "#F59E0B", fontSize: 14, fontWeight: 600,
-                    textDecoration: "none",
-                    transition: "all 0.3s ease",
-                  }}>
-                    <Crown size={15} /> {t('dash.upgradePlan')}
-                  </Link>
-                )}
               </motion.div>
             </div>
 
-            {/* ── Bottom fade line ── */}
+            {/* Bottom line */}
             <div style={{
               position: "absolute", bottom: 0, left: 0, right: 0, height: 1,
-              background: "linear-gradient(90deg, transparent, rgba(79,138,255,0.1), rgba(139,92,246,0.08), transparent)",
+              background: "linear-gradient(90deg, transparent, rgba(255,191,0,0.08), transparent)",
               pointerEvents: "none",
             }} />
           </motion.div>
