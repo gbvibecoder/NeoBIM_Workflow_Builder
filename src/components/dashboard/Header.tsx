@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { Search, Command, LogOut, Gift, Copy, Check, ChevronDown, Globe, Settings } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
@@ -20,16 +21,32 @@ export function Header({ title, subtitle }: HeaderProps) {
   const { data: session } = useSession();
   const avatarSrc = useAvatar(session?.user?.image);
   const [profileOpen, setProfileOpen] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const [dropdownPos, setDropdownPos] = useState({ top: 0, right: 0 });
 
   // Referral state
   const [referralCode, setReferralCode] = useState<string | null>(null);
   const [referralCopied, setReferralCopied] = useState(false);
 
+  // Position dropdown below trigger button
+  const updatePosition = useCallback(() => {
+    if (triggerRef.current) {
+      const rect = triggerRef.current.getBoundingClientRect();
+      setDropdownPos({
+        top: rect.bottom + 8,
+        right: window.innerWidth - rect.right,
+      });
+    }
+  }, []);
+
   // Close dropdown on click outside
   useEffect(() => {
     const handler = (e: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+      if (
+        dropdownRef.current && !dropdownRef.current.contains(e.target as Node) &&
+        triggerRef.current && !triggerRef.current.contains(e.target as Node)
+      ) {
         setProfileOpen(false);
       }
     };
@@ -178,9 +195,10 @@ export function Header({ title, subtitle }: HeaderProps) {
         </button>
 
         {/* ── Profile dropdown ─────────────────────────────────── */}
-        <div ref={dropdownRef} style={{ position: "relative" }}>
+        <div style={{ position: "relative" }}>
           <button
-            onClick={() => setProfileOpen(!profileOpen)}
+            ref={triggerRef}
+            onClick={() => { updatePosition(); setProfileOpen(!profileOpen); }}
             className="flex items-center gap-2 transition-all"
             style={{
               padding: "5px 10px 5px 5px",
@@ -231,17 +249,20 @@ export function Header({ title, subtitle }: HeaderProps) {
             }} />
           </button>
 
-          {/* Dropdown menu */}
-          {profileOpen && (
+          {/* Dropdown menu — rendered via portal to escape overflow:hidden */}
+          {profileOpen && createPortal(
             <div
+              ref={dropdownRef}
               style={{
-                position: "absolute", top: "calc(100% + 8px)", right: 0,
+                position: "fixed",
+                top: dropdownPos.top,
+                right: dropdownPos.right,
                 width: 260, borderRadius: 14,
                 background: "rgba(14,16,24,0.98)",
                 backdropFilter: "blur(24px)",
                 border: "1px solid rgba(255,255,255,0.08)",
                 boxShadow: "0 16px 48px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.03)",
-                zIndex: 100, overflow: "hidden",
+                zIndex: 9999, overflow: "hidden",
               }}
             >
               {/* User info */}
@@ -346,7 +367,8 @@ export function Header({ title, subtitle }: HeaderProps) {
                   Sign out
                 </button>
               </div>
-            </div>
+            </div>,
+            document.body
           )}
         </div>
       </div>
