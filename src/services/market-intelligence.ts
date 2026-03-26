@@ -102,6 +102,37 @@ const STATIC_FALLBACKS = {
   },
 };
 
+// ─── Redis Cache ────────────────────────────────────────────────────────────
+
+async function getCachedResult(cacheKey: string): Promise<MarketIntelligenceResult | null> {
+  try {
+    if (!process.env.UPSTASH_REDIS_REST_URL || !process.env.UPSTASH_REDIS_REST_TOKEN) return null;
+    const { Redis } = await import("@upstash/redis");
+    const redis = new Redis({
+      url: process.env.UPSTASH_REDIS_REST_URL,
+      token: process.env.UPSTASH_REDIS_REST_TOKEN,
+    });
+    const cached = await redis.get<MarketIntelligenceResult>(cacheKey);
+    return cached ?? null;
+  } catch {
+    return null;
+  }
+}
+
+async function setCachedResult(cacheKey: string, data: MarketIntelligenceResult): Promise<void> {
+  try {
+    if (!process.env.UPSTASH_REDIS_REST_URL || !process.env.UPSTASH_REDIS_REST_TOKEN) return;
+    const { Redis } = await import("@upstash/redis");
+    const redis = new Redis({
+      url: process.env.UPSTASH_REDIS_REST_URL,
+      token: process.env.UPSTASH_REDIS_REST_TOKEN,
+    });
+    await redis.set(cacheKey, data, { ex: 82800 }); // 23 hours TTL
+  } catch {
+    // Non-fatal — caching is best-effort
+  }
+}
+
 // ─── Agent Implementation ───────────────────────────────────────────────────
 
 export async function fetchMarketPrices(
@@ -113,10 +144,26 @@ export async function fetchMarketPrices(
   const now = new Date();
   const monthYear = now.toLocaleString("en-IN", { month: "long", year: "numeric" });
   const yearStr = String(now.getFullYear());
+  const dateStr = now.toISOString().split("T")[0];
 
-  // ── Diagnostic logging (visible in Vercel function logs) ──
-  console.log(`[TR-015] Starting market intelligence for: ${city}, ${state} (${buildingType})`);
-  console.log(`[TR-015] API key present: ${!!apiKey}, length: ${apiKey.length}, starts with sk-ant-api: ${apiKey.startsWith("sk-ant-api")}`);
+  // ── Diagnostic logging ──
+  console.log(`[TR-015] Starting for: ${city}, ${state} (${buildingType})`);
+
+  // ── Cache check ──
+  const norm = (s: string) => s.toLowerCase().trim().replace(/\s+/g, "_");
+  const cacheKey = `market_intel:v2:${norm(city)}:${norm(state)}:${dateStr}`;
+  const cached = await getCachedResult(cacheKey);
+  if (cached && cached.city?.toLowerCase() === city.toLowerCase() && cached.state?.toLowerCase() === state.toLowerCase()) {
+    console.log(`[TR-015] Cache HIT for ${city}, ${state} — returning cached prices (${cached.agent_status})`);
+    cached.agent_notes = [...(cached.agent_notes || []), `Served from cache (originally fetched ${cached.fetched_at?.split("T")[0] ?? "today"})`];
+    return cached;
+  }
+  if (cached) {
+    console.warn(`[TR-015] Cache key matched but city/state mismatch — ignoring cache`);
+  }
+
+  console.log(`[TR-015] Cache MISS — will fetch live prices`);
+  console.log(`[TR-015] API key: present=${!!apiKey}, valid=${apiKey.startsWith("sk-ant-api")}`);
 
   // Default result with static fallbacks
   const result: MarketIntelligenceResult = {
@@ -337,6 +384,14 @@ Return ONLY JSON, no explanation:
   }
 
   result.duration_ms = Date.now() - startTime;
+
+  // ── Cache write (only if we got live data) ──
+  if (result.agent_status !== "fallback") {
+    setCachedResult(cacheKey, result).catch(() => {});
+    console.log(`[TR-015] Cached result for ${city}, ${state} (key: ${cacheKey})`);
+  }
+
+  console.log(`[TR-015] Completed in ${result.duration_ms}ms — status: ${result.agent_status}, fallbacks: ${result.fallbacks_used}`);
   return result;
 }
 
