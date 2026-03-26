@@ -2125,22 +2125,23 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
       });
       const quantityWarnings = checkQuantitySanity(sanitizedElements, gfaForProvisional, floorCountForProv);
 
-      // ── Market Intelligence: fetch live prices if available ──
-      let marketData: Awaited<ReturnType<typeof import("@/services/market-intelligence").fetchMarketPrices>> | null = null;
-      let marketAdjustments: Awaited<ReturnType<typeof import("@/services/market-intelligence").computeMarketAdjustments>> | null = null;
-      if (isIndianProject && locationData?.city && process.env.ANTHROPIC_API_KEY) {
+      // ── Market Intelligence: read from upstream TR-015 node (NOT fetched here) ──
+      // TR-015 runs as a separate pipeline node to avoid Vercel timeout.
+      // If TR-015 output is connected, use its prices. Otherwise skip (use static rates).
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let marketData: any = null;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let marketAdjustments: any = null;
+      const upstreamMarket = inputData?._marketData as Record<string, unknown> | undefined;
+      if (upstreamMarket && upstreamMarket.steel_per_tonne) {
+        marketData = upstreamMarket;
         try {
-          const { fetchMarketPrices, computeMarketAdjustments } = await import("@/services/market-intelligence");
-          marketData = await fetchMarketPrices(
-            locationData.city,
-            locationData.state || "",
-            projectTypeInfo.type
-          );
+          const { computeMarketAdjustments } = await import("@/services/market-intelligence");
           marketAdjustments = computeMarketAdjustments(marketData);
-          console.log(`[TR-008] Market Intelligence: ${marketData.agent_status} — steel adj: ${marketAdjustments.steelAdjustment}x, cement adj: ${marketAdjustments.cementAdjustment}x`);
-        } catch (miErr) {
-          console.error("[TR-008] Market Intelligence failed (non-fatal):", miErr);
-        }
+          console.log(`[TR-008] Using upstream market data: ${marketData.agent_status} — steel adj: ${marketAdjustments.steelAdjustment}x`);
+        } catch { /* non-fatal */ }
+      } else if (isIndianProject) {
+        console.log("[TR-008] No upstream market data from TR-015 — using static CPWD rates. Add Market Intelligence node (TR-015) to pipeline for live prices.");
       }
 
       // Rebuild rows grouped by storey (if storey data available)
