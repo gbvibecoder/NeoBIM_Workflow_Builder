@@ -1666,6 +1666,45 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
         parseSummary += ` | MEP IFC merged (pipe/duct/fixture data)`;
       }
 
+      // ── Apply QS corrections from learning database ──
+      // If 3+ QS professionals have corrected this element type in this region,
+      // apply the average correction ratio to improve accuracy over time.
+      try {
+        const correctionNotes: string[] = [];
+        for (const elem of elements) {
+          if (!elem.description || !elem.quantity) continue;
+          const ifcType = "Ifc" + elem.description.replace(/\s*[—\-].*/g, "").replace(/\s*\(.*\)/g, "").trim();
+          // Internal API call (same server, no network hop)
+          const { prisma } = await import("@/lib/db");
+          const corrections = await prisma.quantityCorrection.findMany({
+            where: { elementType: ifcType },
+            select: { correctionRatio: true },
+            orderBy: { createdAt: "desc" },
+            take: 20,
+          });
+          if (corrections.length >= 3) {
+            const ratios = corrections.map((c: { correctionRatio: number }) => c.correctionRatio).sort((a: number, b: number) => a - b);
+            const trimmed = ratios.slice(1, -1); // drop min and max
+            if (trimmed.length > 0) {
+              const avgRatio = trimmed.reduce((a: number, b: number) => a + b, 0) / trimmed.length;
+              if (Math.abs(avgRatio - 1.0) > 0.05) { // Only apply if >5% difference
+                const oldQty = elem.quantity;
+                elem.quantity = Math.round(elem.quantity * avgRatio * 100) / 100;
+                if (elem.grossArea) elem.grossArea = Math.round(elem.grossArea * avgRatio * 100) / 100;
+                correctionNotes.push(`${elem.description}: adjusted ${avgRatio > 1 ? "+" : ""}${Math.round((avgRatio - 1) * 100)}% (${corrections.length} QS corrections, was ${oldQty.toFixed(1)})`);
+              }
+            }
+          }
+        }
+        if (correctionNotes.length > 0) {
+          parseSummary += ` | QS corrections applied: ${correctionNotes.length} adjustments`;
+          console.log(`[TR-007] Applied ${correctionNotes.length} QS corrections:`, correctionNotes);
+        }
+      } catch (corrErr) {
+        // Non-fatal — corrections are best-effort
+        console.warn("[TR-007] QS correction lookup failed (non-fatal):", corrErr instanceof Error ? corrErr.message : corrErr);
+      }
+
       artifact = {
         id: generateId(),
         executionId: executionId ?? "local",
