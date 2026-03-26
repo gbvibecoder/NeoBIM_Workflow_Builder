@@ -1383,7 +1383,7 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
 
           // Use same aggregation logic as inline parsing (below)
           const typeAggregates = new Map<string, {
-            count: number; grossArea: number; netArea: number; openingArea: number; volume: number;
+            count: number; grossArea: number; netArea: number; openingArea: number; volume: number; length: number;
             divisionName: string; storey: string; elementType: string;
             materialLayers?: Array<{name: string; thickness: number}>;
             coveringType?: string;
@@ -1392,13 +1392,12 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
           for (const division of parseResult.divisions) {
             for (const category of division.categories) {
               for (const element of category.elements) {
-                // IfcCovering: use PredefinedType in key to distinguish flooring/ceiling/cladding
                 const coveringType = element.type === "IfcCovering" && (element as unknown as Record<string, unknown>).properties
                   ? String(((element as unknown as Record<string, unknown>).properties as Record<string, unknown>)?.PredefinedType ?? "")
                   : "";
                 const key = `${element.type}${coveringType ? ":" + coveringType : ""}|${normalizeStorey(element.storey)}`;
                 const existing = typeAggregates.get(key) || {
-                  count: 0, grossArea: 0, netArea: 0, openingArea: 0, volume: 0,
+                  count: 0, grossArea: 0, netArea: 0, openingArea: 0, volume: 0, length: 0,
                   divisionName: division.name, storey: normalizeStorey(element.storey), elementType: element.type,
                   coveringType,
                 };
@@ -1407,6 +1406,10 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
                 existing.netArea += element.quantities.area?.net ?? 0;
                 existing.openingArea += element.quantities.openingArea ?? 0;
                 existing.volume += element.quantities.volume?.base ?? 0;
+                existing.length += (element.quantities as Record<string, unknown>).length as number ?? 0;
+                if (element.type === "IfcRailing" && !((element.quantities as Record<string, unknown>).length) && existing.length === 0) {
+                  existing.length += ((element.quantities as Record<string, unknown>).height as number) ?? 3.0;
+                }
                 if (!existing.materialLayers && element.materialLayers && element.materialLayers.length > 1) {
                   existing.materialLayers = element.materialLayers;
                 }
@@ -1415,15 +1418,27 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
             }
           }
 
+          const LINEAR_TYPES_P = new Set(["IfcRailing", "IfcMember"]);
+
           for (const [, agg] of typeAggregates) {
             let description = agg.elementType.replace("Ifc", "");
-            // Add covering subtype for display
             if (agg.coveringType) {
               const ctLabel: Record<string, string> = { FLOORING: "Flooring", CEILING: "Ceiling", CLADDING: "Cladding", ROOFING: "Roof Covering" };
               description = ctLabel[agg.coveringType] ?? `Covering (${agg.coveringType})`;
             }
-            const primaryQty = agg.grossArea > 0 ? agg.grossArea : agg.volume > 0 ? agg.volume : agg.count;
-            const unit = agg.grossArea > 0 ? "m²" : agg.volume > 0 ? "m³" : "EA";
+            let primaryQty: number;
+            let unit: string;
+            if (LINEAR_TYPES_P.has(agg.elementType) && agg.length > 0.5) {
+              primaryQty = agg.length; unit = "Rmt";
+            } else if (LINEAR_TYPES_P.has(agg.elementType) && agg.count > 0) {
+              primaryQty = agg.count * (agg.elementType === "IfcRailing" ? 3.0 : 4.0); unit = "Rmt";
+            } else if (agg.grossArea > 0) {
+              primaryQty = agg.grossArea; unit = "m²";
+            } else if (agg.volume > 0) {
+              primaryQty = agg.volume; unit = "m³";
+            } else {
+              primaryQty = agg.count; unit = "EA";
+            }
             rows.push([agg.divisionName, description, agg.grossArea.toFixed(2), agg.openingArea.toFixed(2), agg.netArea.toFixed(2), agg.volume.toFixed(2), primaryQty.toFixed(2), unit]);
             elements.push({
               description, category: agg.divisionName, quantity: primaryQty, unit,
@@ -1465,7 +1480,7 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
 
           // Aggregate elements by type + storey for per-floor BOQ breakdown
           const typeAggregates = new Map<string, {
-            count: number; grossArea: number; netArea: number; openingArea: number; volume: number;
+            count: number; grossArea: number; netArea: number; openingArea: number; volume: number; length: number;
             divisionName: string; storey: string; elementType: string;
             materialLayers?: Array<{name: string; thickness: number}>;
             coveringType?: string;
@@ -1479,7 +1494,7 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
                   : "";
                 const key = `${element.type}${coveringType ? ":" + coveringType : ""}|${normalizeStorey(element.storey)}`;
                 const existing = typeAggregates.get(key) || {
-                  count: 0, grossArea: 0, netArea: 0, openingArea: 0, volume: 0,
+                  count: 0, grossArea: 0, netArea: 0, openingArea: 0, volume: 0, length: 0,
                   divisionName: division.name, storey: normalizeStorey(element.storey), elementType: element.type,
                   coveringType,
                 };
@@ -1488,6 +1503,11 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
                 existing.netArea += element.quantities.area?.net ?? 0;
                 existing.openingArea += element.quantities.openingArea ?? 0;
                 existing.volume += element.quantities.volume?.base ?? 0;
+                existing.length += element.quantities.length ?? 0;
+                // Railing fallback: if no length, estimate from height (vertical railing) or 3m default
+                if (element.type === "IfcRailing" && !(element.quantities.length) && existing.length === 0) {
+                  existing.length += element.quantities.height ?? 3.0; // 3m per railing segment default
+                }
                 if (!existing.materialLayers && element.materialLayers && element.materialLayers.length > 1) {
                   existing.materialLayers = element.materialLayers;
                 }
@@ -1496,14 +1516,35 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
             }
           }
 
+          // Linear element types: use length (Rmt) as primary quantity
+          const LINEAR_TYPES = new Set(["IfcRailing", "IfcMember"]);
+
           for (const [, agg] of typeAggregates) {
             let description = agg.elementType.replace("Ifc", "");
             if (agg.coveringType) {
               const ctLabel: Record<string, string> = { FLOORING: "Flooring", CEILING: "Ceiling", CLADDING: "Cladding", ROOFING: "Roof Covering" };
               description = ctLabel[agg.coveringType] ?? `Covering (${agg.coveringType})`;
             }
-            const primaryQty = agg.grossArea > 0 ? agg.grossArea : agg.volume > 0 ? agg.volume : agg.count;
-            const unit = agg.grossArea > 0 ? "m²" : agg.volume > 0 ? "m³" : "EA";
+            // Railings and members: use length as primary quantity in Rmt
+            let primaryQty: number;
+            let unit: string;
+            if (LINEAR_TYPES.has(agg.elementType) && agg.length > 0.5) {
+              primaryQty = agg.length;
+              unit = "Rmt";
+            } else if (LINEAR_TYPES.has(agg.elementType) && agg.count > 0) {
+              // No usable length — estimate: 3m per railing, 4m per member
+              primaryQty = agg.count * (agg.elementType === "IfcRailing" ? 3.0 : 4.0);
+              unit = "Rmt";
+            } else if (agg.grossArea > 0) {
+              primaryQty = agg.grossArea;
+              unit = "m²";
+            } else if (agg.volume > 0) {
+              primaryQty = agg.volume;
+              unit = "m³";
+            } else {
+              primaryQty = agg.count;
+              unit = "EA";
+            }
 
             rows.push([
               agg.divisionName, description,
@@ -2270,6 +2311,7 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
             grandTotal: costSummary.totalCost,
             disclaimer: COST_DISCLAIMERS.full,
           },
+          _gfa: gfaForProvisional,
           _benchmark: benchmarkResult,
           ...(marketData && { _marketIntelligence: {
             status: marketData.agent_status,
@@ -2608,16 +2650,24 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
         ["Seasonal Adjustment:", "", String(pricingInfo?.seasonalNotes ?? "Standard"), ""],
         ["Confidence Level:", "", String(pricingInfo?.confidence ?? "MEDIUM"), ""],
         [""],
-        // ── Labor rates ──
-        ["LABOR RATES (daily)", "", "₹/day", ""],
-        ["Mason (skilled):", "", 800, ""],
-        ["Helper (unskilled):", "", 450, ""],
-        ["Carpenter:", "", 900, ""],
-        ["Steel Fixer:", "", 750, ""],
-        ["Painter:", "", 650, ""],
-        ["Electrician:", "", 1000, ""],
-        ["Plumber:", "", 850, ""],
       );
+
+      // ── Labor rates (location-aware) ──
+      {
+        const ct = String(pricingInfo?.cityTier ?? "tier-2").toLowerCase();
+        const laborMult = ct === "metro" ? 1.35 : ct === "tier-1" ? 1.15 : ct === "tier-2" ? 1.00 : (ct === "tier-3" || ct === "town") ? 0.85 : 0.70;
+        const tier = ct === "metro" ? "Metro" : ct === "tier-1" ? "Tier-1" : ct === "tier-2" ? "Tier-2" : (ct === "tier-3" || ct === "town") ? "Tier-3" : "Rural";
+        cpRows.push(
+          ["LABOR RATES (daily)", "", "₹/day", `${tier} city (${laborMult}x)`],
+          ["Mason (skilled):", "", Math.round(800 * laborMult), `₹800 base × ${laborMult}`],
+          ["Helper (unskilled):", "", Math.round(450 * laborMult), `₹450 base × ${laborMult}`],
+          ["Carpenter:", "", Math.round(900 * laborMult), `₹900 base × ${laborMult}`],
+          ["Steel Fixer:", "", Math.round(750 * laborMult), `₹750 base × ${laborMult}`],
+          ["Painter:", "", Math.round(650 * laborMult), `₹650 base × ${laborMult}`],
+          ["Electrician:", "", Math.round(1000 * laborMult), `₹1,000 base × ${laborMult}`],
+          ["Plumber:", "", Math.round(850 * laborMult), `₹850 base × ${laborMult}`],
+        );
+      }
 
       // Find actual row indices for cement and steel "Selected" rows (dynamic due to market intel/benchmark sections)
       const cpSheet = XLSX.utils.aoa_to_sheet(cpRows);
@@ -2694,16 +2744,24 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
         const hasIS1200 = boqLines.some(l => l.is1200Code);
 
         // GST rates by subcategory
+        // All BOQ line items are WORKS CONTRACTS (supply + apply) → 18% GST
+        // Exception: raw material procurement (cement bags as goods → 28%, sand/aggregate → 5%)
+        // In a BOQ, concrete/plaster/tile work is a works contract, not goods sale
         const getGSTRate = (desc: string, division: string): number => {
           const d = (desc + " " + division).toLowerCase();
+          // Works contracts (supply + labour + apply) — 18% GST
+          if (d.includes("concrete") || d.includes("rcc") || d.includes("pcc")) return 0.18;
           if (d.includes("steel") || d.includes("rebar") || d.includes("metal")) return 0.18;
-          if (d.includes("cement") || d.includes("concrete") || d.includes("rcc") || d.includes("pcc")) return 0.28;
-          if (d.includes("brick") || d.includes("block") || d.includes("sand") || d.includes("aggregate") || d.includes("masonry")) return 0.05;
-          if (d.includes("tile") || d.includes("flooring") || d.includes("marble")) return 0.18;
-          if (d.includes("paint") || d.includes("plaster")) return 0.18;
+          if (d.includes("plaster") || d.includes("paint")) return 0.18;
+          if (d.includes("tile") || d.includes("flooring") || d.includes("marble") || d.includes("granite")) return 0.18;
           if (d.includes("door") || d.includes("window") || d.includes("curtain") || d.includes("aluminium")) return 0.18;
-          if (d.includes("formwork")) return 0.18;
-          return 0.18; // default
+          if (d.includes("formwork") || d.includes("centering")) return 0.18;
+          if (d.includes("waterproof")) return 0.18;
+          // Raw materials as goods (used in Rate Card, not in BOQ line items)
+          if (d.includes("brick") || d.includes("block") || d.includes("sand") || d.includes("aggregate") || d.includes("masonry")) return 0.12;
+          // Labour-only contracts (pure labour supply)
+          if (d.includes("labour") || d.includes("labor")) return 0.18;
+          return 0.18; // default for works contracts
         };
 
         const boqHeaders = hasIS1200
@@ -2793,7 +2851,8 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
         // ═════════════════════════════════════════════════════════════════════
         // SHEET 4: COST SUMMARY
         // ═════════════════════════════════════════════════════════════════════
-        const gfa = Number(inputData?._gfa ?? 0) || (hardTotal > 0 ? hardTotal / 35000 : 100); // estimate if missing
+        // GFA from TR-008 (sum of slab areas) — never use hardcoded ₹35,000 fallback
+        const gfa = Number(inputData?._gfa ?? 0) || 100; // 100m² absolute minimum fallback
         const costPerSqm = hardTotal > 0 ? Math.round(hardTotal / gfa) : 0;
         const costPerSqmInclGST = grandTotalInclGST > 0 ? Math.round(grandTotalInclGST / gfa) : 0;
         const contingencyAmt = Math.round(hardTotal * 0.10);
@@ -2834,7 +2893,12 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
           ["COST PER m² GFA", "", `${currencySymbol}${costPerSqm.toLocaleString()}`, "excl GST"],
           ["COST PER m² (incl GST)", "", `${currencySymbol}${costPerSqmInclGST.toLocaleString()}`, "incl GST"],
           [""],
-          isINR ? ["BENCHMARK", "", "₹35,000 - ₹70,000 /m²", "Typical range for commercial in India"] : [""],
+          isINR && upstreamBenchmark ? [
+            "BENCHMARK",
+            "",
+            `₹${Number(upstreamBenchmark.rangeLow ?? 35000).toLocaleString()} - ₹${Number(upstreamBenchmark.rangeHigh ?? 70000).toLocaleString()} /m²`,
+            `${projectType} in ${String(pricingInfo?.cityTier ?? "India")} — ${String(upstreamBenchmark.status ?? "within range")}`,
+          ] : isINR ? ["BENCHMARK", "", `₹35,000 - ₹70,000 /m²`, "Default range (no city-specific data)"] : [""],
           [""],
           ["DISCLAIMER"],
           [COST_DISCLAIMERS.full],
@@ -2910,7 +2974,7 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
         isINR ? ["Rate Basis:", `${pricingInfo?.statePWD ?? "CPWD"} SOR + IS 1200`] : ["Rate Basis:", "RSMeans 2024/25 + CSI MasterFormat"],
         [""],
         ["Total Cost:", `${currencySymbol}${Math.round(boqData?.grandTotal ?? 0).toLocaleString()} ${currencyCode}`],
-        ["Cost/m² GFA:", `${currencySymbol}${Math.round(hardTotal / Math.max(1, Number(inputData?._gfa ?? hardTotal / 35000))).toLocaleString()}`],
+        ["Cost/m² GFA:", `${currencySymbol}${Math.round(hardTotal / Math.max(1, Number(inputData?._gfa ?? 100))).toLocaleString()}`],
         [""],
         [""],
         ["This estimate is for preliminary budgeting only."],
