@@ -5,7 +5,7 @@ import { safeErrorMessage } from "@/lib/safe-error";
 import { uploadIFCToR2 } from "@/lib/r2";
 import { formatErrorResponse, UserErrors } from "@/lib/user-errors";
 
-export const maxDuration = 60; // Vercel: allow 60s for WASM parsing
+export const maxDuration = 180; // Vercel: allow 180s for WASM parsing of large IFC files
 
 export async function POST(req: NextRequest) {
   const session = await auth();

@@ -198,41 +198,144 @@ async function executeNode(
         ...nodeConfig,
       };
 
-      // ── Safety net: Large IFC files must be uploaded to R2 first ──
-      // If fileData is > 2MB base64, it will exceed Vercel's 4.5MB body limit.
-      // Upload to R2 via /api/parse-ifc and replace inline data with URL + parsed result.
-      const fileData = inputData.fileData as string | undefined;
-      const fileName = inputData.fileName as string | undefined;
-      const isLargeIFC = fileData && typeof fileData === "string" && fileData.length > 2 * 1024 * 1024
-        && fileName?.toLowerCase().endsWith(".ifc");
+      // ══════════════════════════════════════════════════════════════════════
+      // TR-007 SPECIAL HANDLING: Large IFC files CANNOT go through execute-node
+      // because Vercel's 4.5MB body limit will reject the ~28MB base64 payload.
+      //
+      // Solution: Handle TR-007 entirely client-side for large IFC files:
+      //   1. Upload to /api/parse-ifc (FormData, no body limit)
+      //   2. Get parsed result back
+      //   3. Construct the TR-007 artifact directly (skip execute-node)
+      //   4. Send the lightweight artifact to downstream nodes
+      // ══════════════════════════════════════════════════════════════════════
+      if (catalogueId === "TR-007") {
+        const fileData = inputData.fileData as string | undefined;
+        const fileName = (inputData.fileName ?? inputData.inputValue ?? "model.ifc") as string;
+        const hasLargeFile = fileData && typeof fileData === "string" && fileData.length > 1_500_000; // >1.5MB base64 ≈ >1MB binary
+        const hasPreparsed = inputData.ifcParsed && typeof inputData.ifcParsed === "object";
 
-      if (isLargeIFC && !inputData.ifcParsed && !inputData.ifcUrl) {
-        console.log(`[exec] Large IFC detected (${(fileData.length / 1024 / 1024).toFixed(1)}MB base64) — uploading to R2 first`);
-        try {
-          // Convert base64 back to File for FormData upload
-          const binaryStr = atob(fileData);
-          const bytes = new Uint8Array(binaryStr.length);
-          for (let i = 0; i < binaryStr.length; i++) bytes[i] = binaryStr.charCodeAt(i);
-          const blob = new Blob([bytes], { type: "application/octet-stream" });
-          const file = new File([blob], fileName || "model.ifc");
+        if (hasLargeFile || hasPreparsed) {
+          console.log(`[TR-007] ${hasPreparsed ? "Using pre-parsed IFC data" : `Large IFC file (${(fileData!.length / 1024 / 1024).toFixed(1)}MB base64) — parsing via /api/parse-ifc`}`);
 
-          const formData = new FormData();
-          formData.append("file", file);
+          let parseResult: Record<string, unknown> | null = hasPreparsed ? inputData.ifcParsed as Record<string, unknown> : null;
 
-          const uploadRes = await fetch("/api/parse-ifc", { method: "POST", body: formData });
-          if (uploadRes.ok) {
-            const uploadData = await uploadRes.json();
-            // Replace large base64 with R2 URL + pre-parsed result
-            inputData.ifcUrl = uploadData.meta?.ifcUrl ?? null;
-            inputData.ifcParsed = uploadData.result ?? null;
-            delete inputData.fileData; // Remove the 28MB blob
-            console.log(`[exec] IFC uploaded to R2, ${uploadData.result?.summary?.totalElements ?? 0} elements parsed`);
-          } else {
-            console.error("[exec] R2 upload failed:", uploadRes.status);
+          // If no pre-parsed data, upload and parse now via FormData
+          if (!parseResult && fileData) {
+            try {
+              const binaryStr = atob(fileData);
+              const bytes = new Uint8Array(binaryStr.length);
+              for (let i = 0; i < binaryStr.length; i++) bytes[i] = binaryStr.charCodeAt(i);
+              const blob = new Blob([bytes], { type: "application/octet-stream" });
+              const ifcFile = new File([blob], fileName.endsWith(".ifc") ? fileName : `${fileName}.ifc`);
+
+              const formData = new FormData();
+              formData.append("file", ifcFile);
+
+              console.log(`[TR-007] Uploading ${(bytes.length / 1024 / 1024).toFixed(1)}MB to /api/parse-ifc...`);
+              const uploadRes = await fetch("/api/parse-ifc", {
+                method: "POST",
+                body: formData,
+                signal: AbortSignal.timeout(180_000), // 3 min timeout for large files
+              });
+
+              if (!uploadRes.ok) {
+                const errBody = await uploadRes.json().catch(() => ({ error: { message: `Server returned ${uploadRes.status}` } }));
+                throw new Error(errBody.error?.message || `Upload failed with status ${uploadRes.status}`);
+              }
+
+              const uploadData = await uploadRes.json();
+              parseResult = uploadData.result ?? null;
+              console.log(`[TR-007] Parse complete: ${(parseResult as Record<string, unknown>)?.summary ? JSON.stringify((parseResult as Record<string, unknown>).summary).slice(0, 200) : "no summary"}`);
+            } catch (uploadErr) {
+              clearTimeout(timeoutId);
+              const msg = uploadErr instanceof Error ? uploadErr.message : "IFC upload/parse failed";
+              console.error("[TR-007] Client-side IFC processing failed:", msg);
+              throw new Error(`IFC file processing failed: ${msg}. The file may be too large or corrupted. Try a smaller IFC file (<50MB).`);
+            }
           }
-        } catch (uploadErr) {
-          console.error("[exec] Failed to upload IFC to R2:", uploadErr);
+
+          if (!parseResult) {
+            clearTimeout(timeoutId);
+            throw new Error("No IFC data available. Please re-upload the IFC file.");
+          }
+
+          // Construct TR-007 artifact directly — skip execute-node entirely
+          clearTimeout(timeoutId);
+
+          const divisions = (parseResult as Record<string, unknown>).divisions as Array<Record<string, unknown>> ?? [];
+          const summary = (parseResult as Record<string, unknown>).summary as Record<string, unknown> ?? {};
+          const meta = (parseResult as Record<string, unknown>).meta as Record<string, unknown> ?? {};
+
+          const rows: string[][] = [];
+          const elements: Array<Record<string, unknown>> = [];
+
+          for (const division of divisions) {
+            const categories = (division.categories ?? []) as Array<Record<string, unknown>>;
+            for (const category of categories) {
+              const elems = (category.elements ?? []) as Array<Record<string, unknown>>;
+              for (const element of elems) {
+                const type = (element.type as string) ?? "Unknown";
+                const quantities = (element.quantities ?? {}) as Record<string, unknown>;
+                const area = quantities.area as Record<string, unknown> | undefined;
+                const volume = quantities.volume as Record<string, unknown> | undefined;
+                const grossArea = Number(area?.gross ?? 0);
+                const netArea = Number(area?.net ?? 0);
+                const openingArea = Number(quantities.openingArea ?? 0);
+                const vol = Number(volume?.base ?? 0);
+                const count = Number(quantities.count ?? 1);
+                const storey = (element.storey as string) ?? "Unassigned";
+
+                const description = type.replace("Ifc", "");
+                const primaryQty = grossArea > 0 ? grossArea : vol > 0 ? vol : count;
+                const unit = grossArea > 0 ? "m²" : vol > 0 ? "m³" : "EA";
+
+                rows.push([
+                  (division.name as string) ?? "", description,
+                  grossArea.toFixed(2), openingArea.toFixed(2),
+                  netArea.toFixed(2), vol.toFixed(2),
+                  primaryQty.toFixed(2), unit,
+                ]);
+
+                elements.push({
+                  description, category: (division.name as string) ?? "",
+                  quantity: primaryQty, unit,
+                  grossArea: grossArea || undefined, netArea: netArea || undefined,
+                  openingArea: openingArea || undefined, totalVolume: vol || undefined,
+                  storey, elementCount: count,
+                  materialLayers: element.materialLayers,
+                });
+              }
+            }
+          }
+
+          const parseSummary = `Parsed ${summary.processedElements ?? "?"} of ${summary.totalElements ?? "?"} elements from ${summary.buildingStoreys ?? "?"} storeys (${meta.ifcSchema ?? "IFC"})`;
+
+          return {
+            id: `art_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
+            executionId,
+            tileInstanceId: node.id,
+            type: "table" as const,
+            data: {
+              label: "Extracted Quantities (IFC)",
+              headers: ["Category", "Element", "Gross Area (m²)", "Opening Area (m²)", "Net Area (m²)", "Volume (m³)", "Qty", "Unit"],
+              rows,
+              _elements: elements,
+              content: parseSummary,
+            },
+            metadata: { model: "ifc-parser-v2-client", real: true },
+            createdAt: new Date(),
+          };
         }
+      }
+      // ══════════════════════════════════════════════════════════════════════
+      // END TR-007 special handling — all other nodes use normal execute-node
+      // ══════════════════════════════════════════════════════════════════════
+
+      // For non-IFC nodes or small IFC files: strip large fileData to prevent body limit issues
+      if (inputData.fileData && typeof inputData.fileData === "string" && (inputData.fileData as string).length > 3_000_000) {
+        // If we got here with a large file, something is wrong — remove it to prevent 413
+        console.warn("[exec] Stripping large fileData to prevent Vercel 413 error");
+        delete inputData.fileData;
       }
 
       res = await fetch("/api/execute-node", {
