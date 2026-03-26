@@ -122,9 +122,12 @@ export async function fetchMarketPrices(
   const startTime = Date.now();
 
   // Support both API keys (sk-ant-api03-...) and OAuth tokens (sk-ant-oat01-...)
+  // When using OAuth: must set apiKey to null explicitly, otherwise the constructor
+  // reads ANTHROPIC_API_KEY env var (same OAuth token) and sends it as X-Api-Key
+  // header — which the API rejects as an invalid API key (400).
   const isOAuth = apiKey.startsWith("sk-ant-oat");
   const client = isOAuth
-    ? new Anthropic({ authToken: apiKey })
+    ? new Anthropic({ authToken: apiKey, apiKey: null as unknown as string })
     : new Anthropic({ apiKey });
 
   const jsonSchema = `{
