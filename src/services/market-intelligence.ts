@@ -164,101 +164,75 @@ export async function fetchMarketPrices(
   const startTime = Date.now();
   const client = new Anthropic({ apiKey });
 
-  // ── The comprehensive prompt — covers ALL pricing for ANY city, ANY year ──
-  const userPrompt = `You are a construction cost research agent for India. Find current, real prices for ${city}, ${state}.
-Date: ${monthYear}. Building type: ${buildingType}.
+  // ── Lean prompt: 5 core items only (steel, cement, sand, mason, benchmark) ──
+  // Other labor rates derived from mason: helper=0.55×, carpenter=1.10×, etc.
+  // Keeps the Claude call fast (under 45s) to avoid Vercel timeout.
+  const userPrompt = `Find current construction prices for ${city}, ${state}, India. Date: ${monthYear}.
 
-SEARCH STRATEGY — use this cascade:
-1. Search for ${city} specifically first
-2. If not found, search for ${state} state-level rates
-3. If not found, search for national average
-Always note which level you found the data at.
+Search for these 5 items (try ${city} first, then ${state}, then national):
+1. TMT steel Fe500 price per tonne in ${state}
+2. Cement price per 50kg bag in ${city} (UltraTech/Ambuja/ACC)
+3. M-sand or construction sand per cft in ${city}/${state}
+4. Mason (skilled) daily wage in ${city} or ${state}
+5. Construction cost per sqft for ${buildingType} in ${city} ${yearStr}
 
-FIND ALL OF THESE:
-
-MATERIALS:
-1. TMT steel Fe500 price per tonne in ${state} (search: "steel TMT price ${state} ${monthYear}")
-2. Cement price per 50kg bag in ${city} — try UltraTech/Ambuja/ACC (search: "cement price ${city} today")
-3. Construction sand (M-sand or river sand) per cubic feet in ${city}/${state}
-
-LABOR RATES (daily wages):
-4. Mason (skilled) daily wage in ${city} (search: "mason wages ${city} ${yearStr}" or "${state} construction labor rate")
-5. Helper/unskilled labor daily wage in ${state}
-6. Carpenter daily wage in ${city}/${state}
-7. Steel fixer daily wage in ${state}
-8. Electrician daily wage in ${city}/${state}
-9. Plumber daily wage in ${city}/${state}
-
-BENCHMARKS:
-10. Construction cost per m² for ${buildingType} in ${city} ${yearStr} (search: "construction cost per sqft ${buildingType} ${city} ${yearStr}")
-11. Current CPWD construction cost index or ${state} PWD SOR year
-
-For labor, check: ${state} minimum wages notification ${yearStr}, labour.gov.in, or job portal listings.
-
-RULES:
-- Return REAL numbers you found. Do NOT guess or make up values.
-- Include the source name/URL for every price.
-- If you cannot find a specific item, set confidence to "LOW" and note the fallback level.
-- All prices in INR.
-
-Return ONLY this JSON (no markdown, no explanation):
-{
-  "steel_per_tonne": { "value": <number>, "source": "<source>", "date": "<date>", "confidence": "HIGH|MEDIUM|LOW" },
-  "cement_per_bag": { "value": <number>, "brand": "<brand>", "source": "<source>", "date": "<date>", "confidence": "HIGH|MEDIUM|LOW" },
-  "sand_per_cft": { "value": <number>, "type": "M-sand|River sand", "source": "<source>", "date": "<date>", "confidence": "HIGH|MEDIUM|LOW" },
-  "labor": {
-    "mason": { "value": <number>, "source": "<source>", "date": "<date>", "confidence": "HIGH|MEDIUM|LOW" },
-    "helper": { "value": <number>, "source": "<source>", "date": "<date>", "confidence": "HIGH|MEDIUM|LOW" },
-    "carpenter": { "value": <number>, "source": "<source>", "date": "<date>", "confidence": "HIGH|MEDIUM|LOW" },
-    "steelFixer": { "value": <number>, "source": "<source>", "date": "<date>", "confidence": "HIGH|MEDIUM|LOW" },
-    "electrician": { "value": <number>, "source": "<source>", "date": "<date>", "confidence": "HIGH|MEDIUM|LOW" },
-    "plumber": { "value": <number>, "source": "<source>", "date": "<date>", "confidence": "HIGH|MEDIUM|LOW" }
-  },
-  "benchmark_per_sqft": { "value": <number>, "range_low": <number>, "range_high": <number>, "source": "<source>", "building_type": "${buildingType}" },
-  "cpwd_index": { "factor": <number>, "source": "<source>", "year": ${yearStr} },
-  "sources": ["<url1>", "<url2>", ...]
-}`;
+Return ONLY JSON, no explanation:
+{"steel_per_tonne":{"value":0,"source":"","date":"","confidence":"LOW"},"cement_per_bag":{"value":0,"brand":"","source":"","date":"","confidence":"LOW"},"sand_per_cft":{"value":0,"type":"M-sand","source":"","date":"","confidence":"LOW"},"mason":{"value":0,"source":"","date":"","confidence":"LOW"},"benchmark":{"value":0,"range_low":0,"range_high":0,"source":""},"sources":[]}`;
 
   let jsonText = "";
   let usedWebSearch = false;
 
-  // ── Attempt 1: Claude with web_search (live prices — best accuracy) ──
+  // 45-second hard timeout to stay within Vercel limits
+  const TIMEOUT_MS = 45_000;
+
+  // ── Attempt 1: Claude with web_search (live prices) ──
   try {
+    console.log("[TR-015] Starting web search call...");
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
     const response = await client.messages.create({
       model: "claude-sonnet-4-6",
-      max_tokens: 4096,
-      tools: [{ type: "web_search_20260209", name: "web_search", max_uses: 15 }],
+      max_tokens: 1024,
+      tools: [{ type: "web_search_20260209", name: "web_search", max_uses: 5 }],
       messages: [{ role: "user", content: userPrompt }],
-    });
+    }, { signal: controller.signal });
+    clearTimeout(timer);
     for (const block of response.content) {
       if (block.type === "text") jsonText += block.text;
     }
     usedWebSearch = true;
-    result.search_count = 11;
-    console.log("[Market Intelligence] Web search succeeded");
+    result.search_count = 5;
+    console.log(`[TR-015] Web search done in ${Date.now() - startTime}ms`);
   } catch (wsErr) {
     const wsMsg = wsErr instanceof Error ? wsErr.message : String(wsErr);
-    console.warn("[Market Intelligence] Web search unavailable:", wsMsg);
-    result.agent_notes.push("Web search not available — using AI knowledge base.");
+    const isTimeout = wsMsg.includes("abort") || wsMsg.includes("timeout");
+    console.warn(`[TR-015] Web search ${isTimeout ? "timed out" : "failed"}: ${wsMsg}`);
+    result.agent_notes.push(isTimeout
+      ? "Web search timed out (>45s) — using AI knowledge base."
+      : "Web search not available — using AI knowledge base.");
   }
 
-  // ── Attempt 2: Plain Claude (training data — decent for recent years) ──
+  // ── Attempt 2: Plain Claude, fast model (training data) ──
   if (!jsonText) {
     try {
+      console.log("[TR-015] Falling back to plain Claude (no web search)...");
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 30_000);
       const response = await client.messages.create({
-        model: "claude-sonnet-4-6",
-        max_tokens: 4096,
+        model: "claude-haiku-4-5-20251001",
+        max_tokens: 1024,
         messages: [{ role: "user", content: userPrompt }],
-      });
+      }, { signal: controller.signal });
+      clearTimeout(timer);
       for (const block of response.content) {
         if (block.type === "text") jsonText += block.text;
       }
       result.search_count = 0;
-      console.log("[Market Intelligence] Plain Claude fallback succeeded");
+      console.log(`[TR-015] Plain Claude done in ${Date.now() - startTime}ms`);
     } catch (plainErr) {
       const plainMsg = plainErr instanceof Error ? plainErr.message : String(plainErr);
       result.agent_notes.push(`Claude API error: ${plainMsg}`);
-      console.error("[Market Intelligence] Both attempts failed:", plainMsg);
+      console.error("[TR-015] Both attempts failed:", plainMsg);
     }
   }
 
@@ -302,30 +276,31 @@ Return ONLY this JSON (no markdown, no explanation):
           };
         }
 
-        // Labor rates
-        const laborKeys = ["mason", "helper", "carpenter", "steelFixer", "electrician", "plumber"] as const;
-        if (p.labor && typeof p.labor === "object") {
-          for (const key of laborKeys) {
-            const lr = p.labor[key];
-            if (lr?.value > 0) {
-              result.labor[key] = {
-                value: lr.value, unit: "₹/day",
-                source: lr.source || src,
-                date: lr.date || monthYear,
-                confidence: lr.confidence || conf,
-                fallbackLevel: usedWebSearch ? "city" : "state",
-              };
-            }
-          }
+        // Mason rate — derive all other labor from this
+        const mason = p.mason ?? p.labor?.mason;
+        if (mason?.value > 0) {
+          const masonVal = mason.value;
+          const mSrc = mason.source || src;
+          const mDate = mason.date || monthYear;
+          const mConf = mason.confidence || conf;
+          const fb = usedWebSearch ? "city" as const : "state" as const;
+          result.labor.mason = { value: masonVal, unit: "₹/day", source: mSrc, date: mDate, confidence: mConf, fallbackLevel: fb };
+          // Derive other rates from mason with industry ratios
+          result.labor.helper = { value: Math.round(masonVal * 0.55), unit: "₹/day", source: `Derived from mason (×0.55) — ${mSrc}`, date: mDate, confidence: mConf, fallbackLevel: fb };
+          result.labor.carpenter = { value: Math.round(masonVal * 1.10), unit: "₹/day", source: `Derived from mason (×1.10) — ${mSrc}`, date: mDate, confidence: mConf, fallbackLevel: fb };
+          result.labor.steelFixer = { value: Math.round(masonVal * 0.95), unit: "₹/day", source: `Derived from mason (×0.95) — ${mSrc}`, date: mDate, confidence: mConf, fallbackLevel: fb };
+          result.labor.electrician = { value: Math.round(masonVal * 1.25), unit: "₹/day", source: `Derived from mason (×1.25) — ${mSrc}`, date: mDate, confidence: mConf, fallbackLevel: fb };
+          result.labor.plumber = { value: Math.round(masonVal * 1.05), unit: "₹/day", source: `Derived from mason (×1.05) — ${mSrc}`, date: mDate, confidence: mConf, fallbackLevel: fb };
         }
 
-        // Benchmarks
-        if (p.benchmark_per_sqft?.value > 0) {
+        // Benchmark — handle both flat and nested format
+        const bench = p.benchmark ?? p.benchmark_per_sqft;
+        if (bench?.value > 0) {
           result.benchmark_per_sqft = {
-            value: p.benchmark_per_sqft.value,
-            range_low: p.benchmark_per_sqft.range_low || p.benchmark_per_sqft.value * 0.75,
-            range_high: p.benchmark_per_sqft.range_high || p.benchmark_per_sqft.value * 1.25,
-            source: p.benchmark_per_sqft.source || src,
+            value: bench.value,
+            range_low: bench.range_low || bench.value * 0.75,
+            range_high: bench.range_high || bench.value * 1.25,
+            source: bench.source || src,
             building_type: buildingType,
           };
         }
@@ -340,16 +315,15 @@ Return ONLY this JSON (no markdown, no explanation):
           result.sources_summary = p.sources.filter((s: unknown) => typeof s === "string");
         }
 
-        // Status
+        // Status — count how many items have live data
         const matPrices = [result.steel_per_tonne, result.cement_per_bag, result.sand_per_cft];
-        const laborPrices = Object.values(result.labor);
-        const allPrices = [...matPrices, ...laborPrices];
-        const liveCount = allPrices.filter(p2 => p2.confidence !== "LOW").length;
-        result.fallbacks_used = allPrices.length - liveCount;
+        const corePrices = [...matPrices, result.labor.mason];
+        const liveCount = corePrices.filter(p2 => p2.confidence !== "LOW").length;
+        result.fallbacks_used = 9 - (liveCount + (liveCount >= 1 ? 5 : 0)); // mason derives 5 others
 
-        if (liveCount >= 7) {
+        if (liveCount >= 3) {
           result.agent_status = "success";
-        } else if (liveCount >= 3) {
+        } else if (liveCount >= 1) {
           result.agent_status = "partial";
           if (!usedWebSearch) result.agent_notes.push("Prices from AI training data — verify against current market.");
         }
