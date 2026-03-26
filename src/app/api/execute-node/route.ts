@@ -1388,6 +1388,7 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
             divisionName: string; storey: string; elementType: string;
             materialLayers?: Array<{name: string; thickness: number}>;
             coveringType?: string;
+            concreteGrade?: string;
           }>();
 
           for (const division of parseResult.divisions) {
@@ -1397,10 +1398,14 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
                   ? String(((element as unknown as Record<string, unknown>).properties as Record<string, unknown>)?.PredefinedType ?? "")
                   : "";
                 const key = `${element.type}${coveringType ? ":" + coveringType : ""}|${normalizeStorey(element.storey)}`;
+                const concreteGrade = (element as unknown as Record<string, unknown>).properties
+                  ? String(((element as unknown as Record<string, unknown>).properties as Record<string, unknown>)?.concreteGrade ?? "")
+                  : "";
                 const existing = typeAggregates.get(key) || {
                   count: 0, grossArea: 0, netArea: 0, openingArea: 0, volume: 0, length: 0,
                   divisionName: division.name, storey: normalizeStorey(element.storey), elementType: element.type,
                   coveringType,
+                  concreteGrade: concreteGrade || undefined,
                 };
                 existing.count += element.quantities.count ?? 1;
                 existing.grossArea += element.quantities.area?.gross ?? 0;
@@ -1408,6 +1413,7 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
                 existing.openingArea += element.quantities.openingArea ?? 0;
                 existing.volume += element.quantities.volume?.base ?? 0;
                 existing.length += (element.quantities as Record<string, unknown>).length as number ?? 0;
+                if (!existing.concreteGrade && concreteGrade) existing.concreteGrade = concreteGrade;
                 if (element.type === "IfcRailing" && !((element.quantities as Record<string, unknown>).length) && existing.length === 0) {
                   existing.length += ((element.quantities as Record<string, unknown>).height as number) ?? 3.0;
                 }
@@ -1447,6 +1453,7 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
               openingArea: agg.openingArea || undefined, totalVolume: agg.volume || undefined,
               storey: agg.storey, elementCount: agg.count, materialLayers: agg.materialLayers,
               ...(agg.coveringType ? { coveringType: agg.coveringType } : {}),
+              ...(agg.concreteGrade ? { concreteGrade: agg.concreteGrade } : {}),
             });
           }
 
@@ -1485,6 +1492,7 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
             divisionName: string; storey: string; elementType: string;
             materialLayers?: Array<{name: string; thickness: number}>;
             coveringType?: string;
+            concreteGrade?: string;
           }>();
 
           for (const division of parseResult.divisions) {
@@ -1493,11 +1501,15 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
                 const coveringType = element.type === "IfcCovering" && (element as unknown as Record<string, unknown>).properties
                   ? String(((element as unknown as Record<string, unknown>).properties as Record<string, unknown>)?.PredefinedType ?? "")
                   : "";
+                const concreteGradeInline = (element as unknown as Record<string, unknown>).properties
+                  ? String(((element as unknown as Record<string, unknown>).properties as Record<string, unknown>)?.concreteGrade ?? "")
+                  : "";
                 const key = `${element.type}${coveringType ? ":" + coveringType : ""}|${normalizeStorey(element.storey)}`;
                 const existing = typeAggregates.get(key) || {
                   count: 0, grossArea: 0, netArea: 0, openingArea: 0, volume: 0, length: 0,
                   divisionName: division.name, storey: normalizeStorey(element.storey), elementType: element.type,
                   coveringType,
+                  concreteGrade: concreteGradeInline || undefined,
                 };
                 existing.count += element.quantities.count ?? 1;
                 existing.grossArea += element.quantities.area?.gross ?? 0;
@@ -1505,6 +1517,7 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
                 existing.openingArea += element.quantities.openingArea ?? 0;
                 existing.volume += element.quantities.volume?.base ?? 0;
                 existing.length += element.quantities.length ?? 0;
+                if (!existing.concreteGrade && concreteGradeInline) existing.concreteGrade = concreteGradeInline;
                 // Railing fallback: if no length, estimate from height (vertical railing) or 3m default
                 if (element.type === "IfcRailing" && !(element.quantities.length) && existing.length === 0) {
                   existing.length += element.quantities.height ?? 3.0; // 3m per railing segment default
@@ -1567,6 +1580,7 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
               elementCount: agg.count,
               materialLayers: agg.materialLayers,
               ...(agg.coveringType ? { coveringType: agg.coveringType } : {}),
+              ...(agg.concreteGrade ? { concreteGrade: agg.concreteGrade } : {}),
             });
           }
 
@@ -1811,12 +1825,19 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
                 else categoryFactor = ip.overall;
               }
 
+              // Apply concrete grade multiplier if available (M30 costs more than M25)
+              let gradeMult = 1.0;
+              if (rate.subcategory === "Concrete" && is1200Module) {
+                const elemGrade = typeof elem === "object" ? ((elem as Record<string, unknown>).concreteGrade as string) : undefined;
+                gradeMult = is1200Module.getConcreteGradeMultiplier(elemGrade);
+              }
+
               // Apply category factor to material rate, labor factor to labour rate
               const laborFactor = ip?.labor ?? categoryFactor;
-              const adjRate = Math.round(rate.rate * categoryFactor * 100) / 100;
-              const matCost = Math.round(adjQty * rate.material * categoryFactor * 100) / 100;
-              const labCost = Math.round(adjQty * rate.labour * laborFactor * 100) / 100;
-              const eqpCost = Math.round(adjQty * (rate.rate - rate.material - rate.labour) * categoryFactor * 100) / 100;
+              const adjRate = Math.round(rate.rate * categoryFactor * gradeMult * 100) / 100;
+              const matCost = Math.round(adjQty * rate.material * categoryFactor * gradeMult * 100) / 100;
+              const labCost = Math.round(adjQty * rate.labour * laborFactor * gradeMult * 100) / 100;
+              const eqpCost = Math.round(adjQty * (rate.rate - rate.material - rate.labour) * categoryFactor * gradeMult * 100) / 100;
               const lineTot = Math.round(adjQty * adjRate * 100) / 100;
 
               hardCostSubtotal += lineTot;
