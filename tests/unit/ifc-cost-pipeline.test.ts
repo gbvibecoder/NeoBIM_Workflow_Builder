@@ -181,7 +181,8 @@ describe("IS 1200 Indian Standards", () => {
   it("all rates have positive values", () => {
     for (const rate of IS1200_RATES) {
       expect(rate.rate, `${rate.is1200Code} rate should be positive`).toBeGreaterThan(0);
-      expect(rate.material, `${rate.is1200Code} material should be positive`).toBeGreaterThan(0);
+      // Earthwork/excavation rates can have material=0 (pure labour)
+      expect(rate.material, `${rate.is1200Code} material should be non-negative`).toBeGreaterThanOrEqual(0);
       expect(rate.labour, `${rate.is1200Code} labour should be positive`).toBeGreaterThanOrEqual(0);
       // material + labour should not exceed total rate
       expect(rate.material + rate.labour, `${rate.is1200Code} M+L should not exceed rate`)
@@ -209,7 +210,7 @@ describe("IS 1200 Indian Standards", () => {
   it("Indian derived rates have correct structure", () => {
     expect(INDIAN_DERIVED_RATES.formwork.slab.rate).toBeGreaterThan(0);
     expect(INDIAN_DERIVED_RATES.rebar.slab.kgPerM3).toBeGreaterThan(0);
-    expect(INDIAN_DERIVED_RATES.rebar.slab.rate).toBe(72); // CPWD TMT rate
+    expect(INDIAN_DERIVED_RATES.rebar.slab.rate).toBe(88); // TMT Fe500 rate (calibrated from real BOQ 2025)
   });
 
   it("calculates correct Indian wall cost for known area", () => {

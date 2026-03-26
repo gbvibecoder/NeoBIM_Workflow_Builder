@@ -3,8 +3,9 @@
  *
  * Codes and rates based on:
  * - IS 1200 (Parts 1-24) code structure
- * - CPWD Delhi Schedule of Rates (DSR) 2023-24
- * - CPWD Analysis of Rates for Delhi 2023-24
+ * - CPWD Delhi Schedule of Rates (DSR) 2023-24 (base)
+ * - Calibrated against real BOQ data: CPDCL-Sify DG Works Hyderabad 2025,
+ *   Siemens Energy Pune Interior Nov 2025, 1BHK Structural BOQ 2024
  *
  * Rates are in INR (Indian Rupees), applicable as national average.
  * City/state factors from regional-factors.ts are applied on top.
@@ -98,6 +99,10 @@ export const IS1200_MAPPINGS: IS1200Mapping[] = [
     is1200Part: "Part 2",
     is1200PartName: "Concrete Work",
     defaultRateCodes: ["IS1200-P2-PCC-FOOTING", "IS1200-P2-RCC-FOOTING"],
+    materialOverrides: {
+      pile: ["IS1200-P1-PILE-450"],
+      piling: ["IS1200-P1-PILE-450"],
+    },
   },
   {
     ifcType: "IfcDoor",
@@ -280,22 +285,93 @@ export const IS1200_RATES: IS1200Rate[] = [
     subcategory: "Masonry",
   },
 
+  // ── Part 1: Earthwork & Piling ─────────────────────────────────────────
+  // Source: CPDCL-Sify DG Works BOQ, Hyderabad 2025
+  {
+    is1200Part: "Part 1", is1200Code: "IS1200-P1-EXCAVATION-SHALLOW",
+    description: "Excavation in ordinary soil (0-1.5m depth)",
+    unit: "m³", rate: 650, material: 0, labour: 650,
+    subcategory: "Earthwork",
+    notes: "CPDCL-Sify Hyderabad 2025: ₹650/cum. Manual/machine combined.",
+  },
+  {
+    is1200Part: "Part 1", is1200Code: "IS1200-P1-EXCAVATION-DEEP",
+    description: "Excavation in ordinary soil (1.5-3.0m depth)",
+    unit: "m³", rate: 1200, material: 0, labour: 1200,
+    subcategory: "Earthwork",
+    notes: "Deep excavation with shoring. CPDCL reference ₹6,500/cum is hard rock; ₹1,200 for ordinary soil.",
+  },
+  {
+    is1200Part: "Part 1", is1200Code: "IS1200-P1-PILE-450",
+    description: "Bored cast-in-situ RCC pile 450mm dia (incl. concrete & cage)",
+    unit: "Rmt", rate: 2750, material: 1850, labour: 900,
+    subcategory: "Piling",
+    notes: "CPDCL-Sify Hyderabad 2025: ₹2,750/rmt. M25 concrete, Fe500 cage.",
+  },
+  {
+    is1200Part: "Part 1", is1200Code: "IS1200-P1-PILE-600",
+    description: "Bored cast-in-situ RCC pile 600mm dia (incl. concrete & cage)",
+    unit: "Rmt", rate: 4200, material: 2800, labour: 1400,
+    subcategory: "Piling",
+    notes: "Scaled from 450mm pile proportional to cross-section area.",
+  },
+  {
+    is1200Part: "Part 1", is1200Code: "IS1200-P1-PILE-EXTRA-DEPTH",
+    description: "Extra for piling beyond 12m depth",
+    unit: "Rmt", rate: 2950, material: 1900, labour: 1050,
+    subcategory: "Piling",
+    notes: "CPDCL-Sify Hyderabad 2025: ₹2,950/rmt extra depth premium.",
+  },
+  {
+    is1200Part: "Part 1", is1200Code: "IS1200-P1-PILE-LOAD-TEST",
+    description: "Initial pile load test (maintained load, 450mm dia)",
+    unit: "EA", rate: 395000, material: 250000, labour: 145000,
+    subcategory: "Piling",
+    notes: "CPDCL-Sify Hyderabad 2025: ₹3,95,000/nos. Incl. reaction piles.",
+  },
+  {
+    is1200Part: "Part 1", is1200Code: "IS1200-P1-PILE-INTEGRITY",
+    description: "Pile integrity test (PIT/cross-hole sonic logging)",
+    unit: "EA", rate: 7500, material: 3000, labour: 4500,
+    subcategory: "Piling",
+    notes: "Non-destructive test per pile. Industry standard rate 2025.",
+  },
+
+  // ── Part 3 (continued): Block Work for Interior Fitout ────────────────
+  // Source: Siemens Energy Pune Interior BOQ Nov 2025, market verification
+  {
+    is1200Part: "Part 3", is1200Code: "IS1200-P3-BLOCK-100",
+    description: "Concrete block masonry 100mm thick in CM 1:6 (partition wall)",
+    unit: "m²", rate: 620, material: 420, labour: 200,
+    subcategory: "Masonry",
+    notes: "400×200×100mm solid concrete blocks. Interior partition. Pune market 2025.",
+  },
+
+  // ── Part 8 (continued): Plaster 15mm for interior fitout ──────────────
+  {
+    is1200Part: "Part 8", is1200Code: "IS1200-P8-PLASTER-15",
+    description: "Cement plaster 15mm thick in CM 1:4 (internal walls, commercial grade)",
+    unit: "m²", rate: 245, material: 155, labour: 90,
+    subcategory: "Finishes",
+    notes: "15mm single coat, smooth finish. Siemens Pune fitout reference. Intermediate between 12mm and 20mm.",
+  },
+
   // ── Part 6: Reinforcement Steel ────────────────────────────────────────
   {
     is1200Part: "Part 6", is1200Code: "IS1200-P6-REBAR-500",
     description: "TMT reinforcement bars Fe 500 (cutting, bending, placing, tying)",
-    unit: "kg", rate: 72, material: 58, labour: 14,
+    unit: "kg", rate: 88, material: 68, labour: 20,
     subcategory: "Steel",
-    notes: "Incl. binding wire @ 8kg/MT. CPWD DSR 2023-24.",
+    notes: "Incl. binding wire @ 8kg/MT. Calibrated: CPDCL-Sify Hyderabad 2025 Fe550 ₹138/kg → Fe500 ≈ ₹88/kg all-in.",
   },
 
   // ── Part 7: Structural Steel ───────────────────────────────────────────
   {
     is1200Part: "Part 7", is1200Code: "IS1200-P7-STRUCT-STEEL",
     description: "Structural steel work in built-up sections (fabrication + erection)",
-    unit: "kg", rate: 120, material: 85, labour: 35,
+    unit: "kg", rate: 140, material: 100, labour: 40,
     subcategory: "Steel",
-    notes: "Incl. cutting, welding, bolting, one coat primer, erection",
+    notes: "Incl. cutting, welding, bolting, one coat primer, erection. Calibrated: 2025 market ₹135-145/kg.",
   },
 
   // ── Part 8: Plastering ─────────────────────────────────────────────────
@@ -476,12 +552,13 @@ export const INDIAN_DERIVED_RATES = {
   },
   rebar: {
     // Typical reinforcement kg/m³ of concrete (IS 456 guidance)
-    slab:   { kgPerM3: 90,  rate: 72, notes: "Avg 80-120 kg/m³ for slabs" },
-    beam:   { kgPerM3: 160, rate: 72, notes: "Avg 120-200 kg/m³ for beams" },
-    column: { kgPerM3: 200, rate: 72, notes: "Avg 150-250 kg/m³ for columns" },
-    wall:   { kgPerM3: 50,  rate: 72, notes: "Avg 30-70 kg/m³ for RCC walls" },
-    footing:{ kgPerM3: 80,  rate: 72, notes: "Avg 60-100 kg/m³ for footings" },
-    stair:  { kgPerM3: 130, rate: 72, notes: "Avg 100-150 kg/m³ for stairs" },
+    // Calibrated: 1BHK structural BOQ → 1.8 MT / 101 sqm = 17.8 kg/sqm, avg 96 kg/m³
+    slab:   { kgPerM3: 80,  rate: 88, notes: "Avg 70-100 kg/m³ for slabs. Calibrated from 1BHK BOQ 2024." },
+    beam:   { kgPerM3: 140, rate: 88, notes: "Avg 120-180 kg/m³ for beams. Calibrated from 1BHK BOQ 2024." },
+    column: { kgPerM3: 180, rate: 88, notes: "Avg 150-220 kg/m³ for columns. Calibrated from 1BHK BOQ 2024." },
+    wall:   { kgPerM3: 45,  rate: 88, notes: "Avg 30-60 kg/m³ for RCC walls" },
+    footing:{ kgPerM3: 70,  rate: 88, notes: "Avg 50-90 kg/m³ for footings" },
+    stair:  { kgPerM3: 120, rate: 88, notes: "Avg 100-140 kg/m³ for stairs" },
   },
 };
 
