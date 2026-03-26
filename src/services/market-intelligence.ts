@@ -88,7 +88,7 @@ export async function fetchMarketPrices(
   state: string,
   buildingType: string,
 ): Promise<MarketIntelligenceResult> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const apiKey = process.env.ANTHROPIC_API_KEY || "";
   const now = new Date();
   const monthYear = now.toLocaleString("en-IN", { month: "long", year: "numeric" });
   const yearStr = String(now.getFullYear());
@@ -122,7 +122,11 @@ export async function fetchMarketPrices(
   const startTime = Date.now();
 
   try {
-    const client = new Anthropic({ apiKey });
+    // Support both API keys (sk-ant-api03-...) and OAuth tokens (sk-ant-oat01-...)
+    const isOAuth = apiKey.startsWith("sk-ant-oat");
+    const client = isOAuth
+      ? new Anthropic({ authToken: apiKey })
+      : new Anthropic({ apiKey });
 
     const systemPrompt = `You are a construction market price research agent for India. Your job is to find current, accurate construction material prices.
 
