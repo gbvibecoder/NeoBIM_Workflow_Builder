@@ -121,49 +121,43 @@ export async function fetchMarketPrices(
 
   const startTime = Date.now();
 
-  try {
-    // Support both API keys (sk-ant-api03-...) and OAuth tokens (sk-ant-oat01-...)
-    const isOAuth = apiKey.startsWith("sk-ant-oat");
-    const client = isOAuth
-      ? new Anthropic({ authToken: apiKey })
-      : new Anthropic({ apiKey });
+  // Support both API keys (sk-ant-api03-...) and OAuth tokens (sk-ant-oat01-...)
+  const isOAuth = apiKey.startsWith("sk-ant-oat");
+  const client = isOAuth
+    ? new Anthropic({ authToken: apiKey })
+    : new Anthropic({ apiKey });
 
-    const systemPrompt = `You are a construction market price research agent for India. Your job is to find current, accurate construction material prices.
-
-IMPORTANT RULES:
-1. Search for REAL prices with sources. Do NOT make up numbers.
-2. If you cannot find a specific city price, try state level, then national.
-3. Always include the source URL or name.
-4. Prices must be in INR (Indian Rupees).
-5. Return ONLY valid JSON — no markdown, no explanation before or after.
-
-Return this exact JSON structure:
-{
-  "steel_per_tonne": { "value": <number>, "source": "<source name or URL>", "date": "<when this price is from>", "confidence": "HIGH|MEDIUM|LOW" },
-  "cement_per_bag": { "value": <number>, "brand": "<brand name>", "source": "<source>", "date": "<date>", "confidence": "HIGH|MEDIUM|LOW" },
+  const jsonSchema = `{
+  "steel_per_tonne": { "value": <number>, "source": "<source>", "date": "<date>", "confidence": "HIGH|MEDIUM|LOW" },
+  "cement_per_bag": { "value": <number>, "brand": "<brand>", "source": "<source>", "date": "<date>", "confidence": "HIGH|MEDIUM|LOW" },
   "sand_per_cft": { "value": <number>, "type": "M-sand|River sand|Crushed", "source": "<source>", "date": "<date>", "confidence": "HIGH|MEDIUM|LOW" },
   "benchmark_per_sqft": { "value": <number>, "range_low": <number>, "range_high": <number>, "source": "<source>", "building_type": "${buildingType}" },
   "cpwd_index": { "factor": <number>, "source": "<source>", "year": ${yearStr} },
-  "sources": ["<url1>", "<url2>", ...]
+  "sources": ["<source1>", "<source2>"]
 }`;
 
-    const userPrompt = `Find current construction material prices for ${city}, ${state}, India.
-Date: ${monthYear}
-Building type: ${buildingType}
+  const userPrompt = `Provide current construction material prices for ${city}, ${state}, India.
+Date: ${monthYear}. Building type: ${buildingType}.
 
-Search for:
-1. TMT steel Fe500 price per tonne in ${state} (${monthYear})
-2. UltraTech or Ambuja cement price per 50kg bag in ${city} (current)
+I need:
+1. TMT steel Fe500 price per tonne in ${state}
+2. UltraTech or Ambuja cement price per 50kg bag in ${city}
 3. M-sand or construction sand price per cft in ${city}/${state}
-4. Construction cost per sqft for ${buildingType} in ${city} (${yearStr})
-5. CPWD construction cost index for ${yearStr}
+4. Construction cost per sqft benchmark for ${buildingType} in ${city} (${yearStr})
+5. CPWD construction cost index factor for ${yearStr}
 
-For each, find the most recent price with a verifiable source.`;
+Return ONLY valid JSON matching this structure (no markdown, no explanation):
+${jsonSchema}`;
 
+  // Strategy: try web_search first, fall back to plain Claude if web_search isn't available
+  let jsonText = "";
+  let usedWebSearch = false;
+
+  // ── Attempt 1: Claude with web_search tool (live prices) ──
+  try {
     const response = await client.messages.create({
-      model: "claude-opus-4-6",
+      model: "claude-sonnet-4-6",
       max_tokens: 2048,
-      system: systemPrompt,
       tools: [
         {
           type: "web_search_20260209",
@@ -174,74 +168,96 @@ For each, find the most recent price with a verifiable source.`;
       messages: [{ role: "user", content: userPrompt }],
     });
 
-    // Extract the text response (the agent may have used web_search internally)
-    let jsonText = "";
     for (const block of response.content) {
-      if (block.type === "text") {
-        jsonText += block.text;
-      }
+      if (block.type === "text") jsonText += block.text;
     }
+    usedWebSearch = true;
+    result.search_count = 7;
+    console.log("[Market Intelligence] Web search succeeded");
+  } catch (wsErr) {
+    const wsMsg = wsErr instanceof Error ? wsErr.message : String(wsErr);
+    console.warn("[Market Intelligence] Web search unavailable, falling back to training data:", wsMsg);
+    result.agent_notes.push("Web search not available on this API plan — using AI knowledge base instead.");
+  }
 
-    // Parse the JSON from the response
-    // The response may contain markdown code fences
+  // ── Attempt 2: Plain Claude without tools (training data estimates) ──
+  if (!jsonText) {
+    try {
+      const response = await client.messages.create({
+        model: "claude-sonnet-4-6",
+        max_tokens: 2048,
+        messages: [{ role: "user", content: userPrompt }],
+      });
+
+      for (const block of response.content) {
+        if (block.type === "text") jsonText += block.text;
+      }
+      result.search_count = 0;
+      console.log("[Market Intelligence] Plain Claude fallback succeeded");
+    } catch (plainErr) {
+      const plainMsg = plainErr instanceof Error ? plainErr.message : String(plainErr);
+      result.agent_notes.push(`Claude API error: ${plainMsg}`);
+      console.error("[Market Intelligence] Plain Claude also failed:", plainMsg);
+    }
+  }
+
+  // ── Parse the JSON response ──
+  if (jsonText) {
     const jsonMatch = jsonText.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
       try {
         const parsed = JSON.parse(jsonMatch[0]);
+        const sourceLabel = usedWebSearch ? "Web search" : "AI estimate (training data)";
+        const defaultConf = usedWebSearch ? "HIGH" : "MEDIUM";
 
-        // Steel
         if (parsed.steel_per_tonne?.value > 0) {
           result.steel_per_tonne = {
             value: parsed.steel_per_tonne.value,
             unit: "₹/tonne",
-            source: parsed.steel_per_tonne.source || "Web search",
+            source: parsed.steel_per_tonne.source || sourceLabel,
             sourceUrl: parsed.steel_per_tonne.source_url,
             date: parsed.steel_per_tonne.date || monthYear,
-            confidence: parsed.steel_per_tonne.confidence || "MEDIUM",
-            fallbackLevel: "city",
+            confidence: parsed.steel_per_tonne.confidence || defaultConf,
+            fallbackLevel: usedWebSearch ? "city" : "national",
           };
         }
 
-        // Cement
         if (parsed.cement_per_bag?.value > 0) {
           result.cement_per_bag = {
             value: parsed.cement_per_bag.value,
             unit: "₹/bag (50kg)",
-            source: parsed.cement_per_bag.source || "Web search",
+            source: parsed.cement_per_bag.source || sourceLabel,
             sourceUrl: parsed.cement_per_bag.source_url,
             date: parsed.cement_per_bag.date || monthYear,
-            confidence: parsed.cement_per_bag.confidence || "MEDIUM",
+            confidence: parsed.cement_per_bag.confidence || defaultConf,
             brand: parsed.cement_per_bag.brand || "UltraTech/Ambuja",
-            fallbackLevel: "city",
+            fallbackLevel: usedWebSearch ? "city" : "national",
           };
         }
 
-        // Sand
         if (parsed.sand_per_cft?.value > 0) {
           result.sand_per_cft = {
             value: parsed.sand_per_cft.value,
             unit: "₹/cft",
-            source: parsed.sand_per_cft.source || "Web search",
+            source: parsed.sand_per_cft.source || sourceLabel,
             sourceUrl: parsed.sand_per_cft.source_url,
             date: parsed.sand_per_cft.date || monthYear,
-            confidence: parsed.sand_per_cft.confidence || "MEDIUM",
+            confidence: parsed.sand_per_cft.confidence || defaultConf,
             type: parsed.sand_per_cft.type || "M-sand",
-            fallbackLevel: "city",
+            fallbackLevel: usedWebSearch ? "city" : "national",
           };
         }
 
-        // Benchmark
         if (parsed.benchmark_per_sqft?.value > 0) {
           result.benchmark_per_sqft = {
             value: parsed.benchmark_per_sqft.value,
             range_low: parsed.benchmark_per_sqft.range_low || parsed.benchmark_per_sqft.value * 0.75,
             range_high: parsed.benchmark_per_sqft.range_high || parsed.benchmark_per_sqft.value * 1.25,
-            source: parsed.benchmark_per_sqft.source || "Web search",
+            source: parsed.benchmark_per_sqft.source || sourceLabel,
             building_type: buildingType,
           };
         }
 
-        // CPWD Index
         if (parsed.cpwd_index?.factor > 0) {
           result.cpwd_index = {
             factor: parsed.cpwd_index.factor,
@@ -250,40 +266,29 @@ For each, find the most recent price with a verifiable source.`;
           };
         }
 
-        // Sources
         if (Array.isArray(parsed.sources)) {
           result.sources_summary = parsed.sources.filter((s: unknown) => typeof s === "string");
         }
 
-        // Determine overall status and count fallbacks
+        // Determine status
         const hasSteel = result.steel_per_tonne.confidence !== "LOW";
         const hasCement = result.cement_per_bag.confidence !== "LOW";
         const hasSand = result.sand_per_cft.confidence !== "LOW";
         result.fallbacks_used = [hasSteel, hasCement, hasSand].filter(x => !x).length;
-        result.search_count = 7; // We asked for 7 searches
 
         if (hasSteel && hasCement && hasSand) {
-          result.agent_status = "success";
+          result.agent_status = usedWebSearch ? "success" : "partial";
+          if (!usedWebSearch) result.agent_notes.push("Prices from AI training data — verify against current market before use.");
         } else if (hasSteel || hasCement || hasSand) {
           result.agent_status = "partial";
-          result.agent_notes.push("Some prices fetched from live sources, others using static fallback.");
         }
 
       } catch (parseErr) {
-        result.agent_notes.push(`Failed to parse agent response: ${String(parseErr)}`);
+        result.agent_notes.push(`Failed to parse AI response: ${String(parseErr)}`);
       }
     } else {
-      result.agent_notes.push("Agent response did not contain valid JSON — using static fallbacks.");
+      result.agent_notes.push("AI response did not contain valid JSON.");
     }
-
-  } catch (err) {
-    // Anthropic SDK APIError has: .status, .message (pre-formatted), .error (raw JSON body)
-    const msg = err instanceof Error ? err.message : String(err);
-    result.agent_notes.push(`Market intelligence agent error: ${msg}`);
-    console.error("[Market Intelligence] Agent error:", msg);
-    // Log full error body for debugging
-    try { console.error("[Market Intelligence] Error body:", JSON.stringify((err as { error?: unknown }).error ?? err)); } catch { /* skip */ }
-    // Graceful degradation — result already has static fallbacks
   }
 
   result.duration_ms = Date.now() - startTime;
