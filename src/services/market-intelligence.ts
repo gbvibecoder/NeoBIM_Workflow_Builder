@@ -119,16 +119,18 @@ export async function fetchMarketPrices(
     return result;
   }
 
-  const startTime = Date.now();
+  // OAuth tokens (sk-ant-oat...) are NOT supported by the Anthropic Messages API.
+  // Only API keys (sk-ant-api03-...) work.
+  if (!apiKey.startsWith("sk-ant-api")) {
+    result.agent_notes.push(
+      "ANTHROPIC_API_KEY must be an API key (starts with sk-ant-api03-), not an OAuth token. " +
+      "Get one from console.anthropic.com/settings/keys — using static fallback rates."
+    );
+    return result;
+  }
 
-  // Support both API keys (sk-ant-api03-...) and OAuth tokens (sk-ant-oat01-...)
-  // When using OAuth: must set apiKey to null explicitly, otherwise the constructor
-  // reads ANTHROPIC_API_KEY env var (same OAuth token) and sends it as X-Api-Key
-  // header — which the API rejects as an invalid API key (400).
-  const isOAuth = apiKey.startsWith("sk-ant-oat");
-  const client = isOAuth
-    ? new Anthropic({ authToken: apiKey, apiKey: null as unknown as string })
-    : new Anthropic({ apiKey });
+  const startTime = Date.now();
+  const client = new Anthropic({ apiKey });
 
   const jsonSchema = `{
   "steel_per_tonne": { "value": <number>, "source": "<source>", "date": "<date>", "confidence": "HIGH|MEDIUM|LOW" },
