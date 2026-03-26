@@ -1472,6 +1472,13 @@ const en = {
   'landing.demoVideo3Node1': 'Building Data',
   'landing.demoVideo3Node2': '3D Engine',
   'landing.demoVideo3Node3': 'Model Viewer',
+  'landing.demoVideo4Title': 'Image → Renovation Video',
+  'landing.demoVideo4Subtitle': 'AI-powered before & after visualization',
+  'landing.demoVideo4Category': 'Renovation',
+  'landing.demoVideo4Spec': '3 Nodes · AI Video · ~45s',
+  'landing.demoVideo4Node1': 'Image Upload',
+  'landing.demoVideo4Node2': 'AI Renovator',
+  'landing.demoVideo4Node3': 'Video Generator',
 
   // ===== BOQ PANEL =====
   'landing.boqDesc1': 'Concrete Slab 4"',
@@ -3952,6 +3959,13 @@ const de: Record<keyof typeof en, string | string[]> = {
   'landing.demoVideo3Node1': 'Gebäudedaten',
   'landing.demoVideo3Node2': '3D-Engine',
   'landing.demoVideo3Node3': 'Modell-Betrachter',
+  'landing.demoVideo4Title': 'Bild → Renovierungsvideo',
+  'landing.demoVideo4Subtitle': 'KI-gestützte Vorher-Nachher-Visualisierung',
+  'landing.demoVideo4Category': 'Renovierung',
+  'landing.demoVideo4Spec': '3 Knoten · KI-Video · ~45s',
+  'landing.demoVideo4Node1': 'Bild-Upload',
+  'landing.demoVideo4Node2': 'KI-Renovierer',
+  'landing.demoVideo4Node3': 'Video-Generator',
 
   // ===== BOQ-PANEL =====
   'landing.boqDesc1': 'Betonplatte 4"',

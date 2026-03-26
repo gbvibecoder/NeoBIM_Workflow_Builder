@@ -49,9 +49,10 @@ const stagger = { visible: { transition: { staggerChildren: 0.12 } } };
 // ─── Demo videos (same as landing page) ──────────────────────────────────────
 const R2 = "https://pub-27d9a7371b6d47ff94fee1a3228f1720.r2.dev/workflow-demos";
 const DEMO_VIDEOS = [
+  { id: "dv-4", url: `/videos/img-to-renovation.mp4`, previewStart: 0, color: "#F59E0B", rgb: "245,158,11" },
+  { id: "dv-3", url: `${R2}/3d-model-preview.mp4`, previewStart: 0, color: "#10B981", rgb: "16,185,129" },
   { id: "dv-1", url: `${R2}/text-to-concept-building.mp4`, previewStart: 105, color: "#4F8AFF", rgb: "79,138,255" },
   { id: "dv-2", url: `${R2}/floor-plan-demo.mp4`, previewStart: 0, color: "#8B5CF6", rgb: "139,92,246" },
-  { id: "dv-3", url: `${R2}/3d-model-preview.mp4`, previewStart: 0, color: "#10B981", rgb: "16,185,129" },
 ];
 
 // ─── Plan limits ─────────────────────────────────────────────────────────────
@@ -198,13 +199,15 @@ export default function DashboardPage() {
     "dv-1": "wf-03", // Text to Concept Building + IFC
     "dv-2": "wf-05", // Floor Plan to 3D
     "dv-3": "wf-04", // Parameters to 3D Building + IFC
+    "dv-4": "wf-03", // Image to Renovation Video
   };
 
   // Video card titles/subtitles/nodes from i18n
   const videoCards = [
-    { ...DEMO_VIDEOS[0], titleKey: "landing.demoVideo1Title" as TranslationKey, subKey: "landing.demoVideo1Subtitle" as TranslationKey, nodes: ["landing.demoVideo1Node1" as TranslationKey, "landing.demoVideo1Node2" as TranslationKey, "landing.demoVideo1Node3" as TranslationKey], duration: "1:32" },
-    { ...DEMO_VIDEOS[1], titleKey: "landing.demoVideo2Title" as TranslationKey, subKey: "landing.demoVideo2Subtitle" as TranslationKey, nodes: ["landing.demoVideo2Node1" as TranslationKey, "landing.demoVideo2Node2" as TranslationKey, "landing.demoVideo2Node3" as TranslationKey], duration: "2:45" },
-    { ...DEMO_VIDEOS[2], titleKey: "landing.demoVideo3Title" as TranslationKey, subKey: "landing.demoVideo3Subtitle" as TranslationKey, nodes: ["landing.demoVideo3Node1" as TranslationKey, "landing.demoVideo3Node2" as TranslationKey, "landing.demoVideo3Node3" as TranslationKey], duration: "1:45" },
+    { ...DEMO_VIDEOS[0], titleKey: "landing.demoVideo4Title" as TranslationKey, subKey: "landing.demoVideo4Subtitle" as TranslationKey, nodes: ["landing.demoVideo4Node1" as TranslationKey, "landing.demoVideo4Node2" as TranslationKey, "landing.demoVideo4Node3" as TranslationKey], duration: "0:45" },
+    { ...DEMO_VIDEOS[1], titleKey: "landing.demoVideo3Title" as TranslationKey, subKey: "landing.demoVideo3Subtitle" as TranslationKey, nodes: ["landing.demoVideo3Node1" as TranslationKey, "landing.demoVideo3Node2" as TranslationKey, "landing.demoVideo3Node3" as TranslationKey], duration: "1:45" },
+    { ...DEMO_VIDEOS[2], titleKey: "landing.demoVideo1Title" as TranslationKey, subKey: "landing.demoVideo1Subtitle" as TranslationKey, nodes: ["landing.demoVideo1Node1" as TranslationKey, "landing.demoVideo1Node2" as TranslationKey, "landing.demoVideo1Node3" as TranslationKey], duration: "1:32" },
+    { ...DEMO_VIDEOS[3], titleKey: "landing.demoVideo2Title" as TranslationKey, subKey: "landing.demoVideo2Subtitle" as TranslationKey, nodes: ["landing.demoVideo2Node1" as TranslationKey, "landing.demoVideo2Node2" as TranslationKey, "landing.demoVideo2Node3" as TranslationKey], duration: "2:45" },
   ];
 
   return (
@@ -462,7 +465,7 @@ export default function DashboardPage() {
             </motion.div>
 
             {/* Video cards grid */}
-            <div ref={videoSectionRef} className="grid gap-5 dashboard-video-grid" style={{ gridTemplateColumns: "repeat(3, 1fr)" }}>
+            <div ref={videoSectionRef} className="grid gap-5 dashboard-video-grid" style={{ gridTemplateColumns: "repeat(2, 1fr)" }}>
               {videoCards.map((vc, i) => (
                 <motion.div
                   key={vc.id}
