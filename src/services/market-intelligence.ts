@@ -211,62 +211,54 @@ export async function fetchMarketPrices(
   const startTime = Date.now();
   const client = new Anthropic({ apiKey });
 
-  // ── Lean prompt: 5 core items only (steel, cement, sand, mason, benchmark) ──
-  // Other labor rates derived from mason: helper=0.55×, carpenter=1.10×, etc.
-  // Keeps the Claude call fast (under 45s) to avoid Vercel timeout.
-  const userPrompt = `Find current construction prices for ${city}, ${state}, India. Date: ${monthYear}.
+  // ── Prompt: ask Claude for city-specific construction cost knowledge ──
+  // Primary: plain Claude (fast, 3-8s, works on any plan)
+  // Claude knows Indian city-level price differences from training data
+  const userPrompt = `You are an Indian construction cost expert. Provide current approximate market rates for ${city}, ${state}, India as of ${monthYear}.
 
-Search for these 5 items (try ${city} first, then ${state}, then national):
-1. TMT steel Fe500 price per tonne in ${state}
-2. Cement price per 50kg bag in ${city} (UltraTech/Ambuja/ACC)
+Give city-specific estimates (${city} rates, NOT national averages):
+1. TMT Steel Fe500 price per tonne in ${state}
+2. Cement price per 50kg bag in ${city} (UltraTech or Ambuja)
 3. M-sand or construction sand per cft in ${city}/${state}
-4. Mason (skilled) daily wage in ${city} or ${state}
-5. Construction cost per sqft for ${buildingType} in ${city} ${yearStr}
+4. Mason (skilled) daily wage in ${city}
+5. Typical ${buildingType} construction cost per sqft in ${city} (${yearStr})
 
-Return ONLY JSON, no explanation:
-{"steel_per_tonne":{"value":0,"source":"","date":"","confidence":"LOW"},"cement_per_bag":{"value":0,"brand":"","source":"","date":"","confidence":"LOW"},"sand_per_cft":{"value":0,"type":"M-sand","source":"","date":"","confidence":"LOW"},"mason":{"value":0,"source":"","date":"","confidence":"LOW"},"benchmark":{"value":0,"range_low":0,"range_high":0,"source":""},"sources":[]}`;
+Consider: ${state} is ${state === "Kerala" ? "known for highest labor costs in India" : state === "Bihar" ? "known for lowest labor costs in India" : state === "Maharashtra" ? "a high-cost state with strong labor unions" : state === "Gujarat" ? "moderate costs with good material availability" : "an Indian state"}.
+
+Return ONLY this JSON, no explanation:
+{"steel_per_tonne":{"value":0,"source":"","date":"${monthYear}","confidence":"MEDIUM"},"cement_per_bag":{"value":0,"brand":"","source":"","date":"${monthYear}","confidence":"MEDIUM"},"sand_per_cft":{"value":0,"type":"M-sand","source":"","date":"${monthYear}","confidence":"MEDIUM"},"mason":{"value":0,"source":"","date":"${monthYear}","confidence":"MEDIUM"},"benchmark":{"value":0,"range_low":0,"range_high":0,"source":""},"sources":[]}`;
 
   let jsonText = "";
   let usedWebSearch = false;
 
-  // 45-second hard timeout to stay within Vercel limits
-  const TIMEOUT_MS = 45_000;
-
-  // ── Attempt 1: Claude with web_search (live prices) ──
+  // ── Primary: Plain Claude Haiku (fast, 3-8s, any API plan) ──
   try {
-    console.log("[TR-015] Starting web search call...");
+    console.log("[TR-015] Calling Claude Haiku for price estimates...");
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+    const timer = setTimeout(() => controller.abort(), 20_000);
     const response = await client.messages.create({
-      model: "claude-sonnet-4-6",
+      model: "claude-haiku-4-5-20251001",
       max_tokens: 1024,
-      tools: [{ type: "web_search_20260209", name: "web_search", max_uses: 5 }],
       messages: [{ role: "user", content: userPrompt }],
     }, { signal: controller.signal });
     clearTimeout(timer);
     for (const block of response.content) {
       if (block.type === "text") jsonText += block.text;
     }
-    usedWebSearch = true;
     result.search_count = 5;
-    console.log(`[TR-015] Web search done in ${Date.now() - startTime}ms`);
-  } catch (wsErr) {
-    const wsMsg = wsErr instanceof Error ? wsErr.message : String(wsErr);
-    const isTimeout = wsMsg.includes("abort") || wsMsg.includes("timeout");
-    console.warn(`[TR-015] Web search ${isTimeout ? "timed out" : "failed"}: ${wsMsg}`);
-    result.agent_notes.push(isTimeout
-      ? "Web search timed out (>45s) — using AI knowledge base."
-      : "Web search not available — using AI knowledge base.");
-  }
+    result.agent_notes.push("Prices from Claude AI knowledge — verify with local suppliers before use.");
+    console.log(`[TR-015] Claude Haiku responded in ${Date.now() - startTime}ms`);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error("[TR-015] Claude Haiku failed:", msg);
 
-  // ── Attempt 2: Plain Claude, fast model (training data) ──
-  if (!jsonText) {
+    // ── Fallback: try Sonnet if Haiku unavailable ──
     try {
-      console.log("[TR-015] Falling back to plain Claude (no web search)...");
+      console.log("[TR-015] Trying Sonnet fallback...");
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), 30_000);
       const response = await client.messages.create({
-        model: "claude-haiku-4-5-20251001",
+        model: "claude-sonnet-4-6",
         max_tokens: 1024,
         messages: [{ role: "user", content: userPrompt }],
       }, { signal: controller.signal });
@@ -274,12 +266,13 @@ Return ONLY JSON, no explanation:
       for (const block of response.content) {
         if (block.type === "text") jsonText += block.text;
       }
-      result.search_count = 0;
-      console.log(`[TR-015] Plain Claude done in ${Date.now() - startTime}ms`);
-    } catch (plainErr) {
-      const plainMsg = plainErr instanceof Error ? plainErr.message : String(plainErr);
-      result.agent_notes.push(`Claude API error: ${plainMsg}`);
-      console.error("[TR-015] Both attempts failed:", plainMsg);
+      result.search_count = 5;
+      result.agent_notes.push("Prices from Claude AI knowledge — verify with local suppliers before use.");
+      console.log(`[TR-015] Sonnet responded in ${Date.now() - startTime}ms`);
+    } catch (fallbackErr) {
+      const fbMsg = fallbackErr instanceof Error ? fallbackErr.message : String(fallbackErr);
+      result.agent_notes.push(`Claude API error: ${fbMsg}`);
+      console.error("[TR-015] All attempts failed:", fbMsg);
     }
   }
 
@@ -289,7 +282,7 @@ Return ONLY JSON, no explanation:
     if (jsonMatch) {
       try {
         const p = JSON.parse(jsonMatch[0]);
-        const src = usedWebSearch ? "Web search" : "AI estimate";
+        const src = usedWebSearch ? "Web search" : `Claude AI estimate (${monthYear})`;
         const conf = usedWebSearch ? "HIGH" : "MEDIUM";
 
         // Materials
@@ -299,7 +292,7 @@ Return ONLY JSON, no explanation:
             source: p.steel_per_tonne.source || src,
             date: p.steel_per_tonne.date || monthYear,
             confidence: p.steel_per_tonne.confidence || conf,
-            fallbackLevel: usedWebSearch ? "city" : "national",
+            fallbackLevel: usedWebSearch ? "city" : "state",
           };
         }
         if (p.cement_per_bag?.value > 0) {
@@ -309,7 +302,7 @@ Return ONLY JSON, no explanation:
             date: p.cement_per_bag.date || monthYear,
             confidence: p.cement_per_bag.confidence || conf,
             brand: p.cement_per_bag.brand || "UltraTech/Ambuja",
-            fallbackLevel: usedWebSearch ? "city" : "national",
+            fallbackLevel: usedWebSearch ? "city" : "state",
           };
         }
         if (p.sand_per_cft?.value > 0) {
@@ -319,7 +312,7 @@ Return ONLY JSON, no explanation:
             date: p.sand_per_cft.date || monthYear,
             confidence: p.sand_per_cft.confidence || conf,
             type: p.sand_per_cft.type || "M-sand",
-            fallbackLevel: usedWebSearch ? "city" : "national",
+            fallbackLevel: usedWebSearch ? "city" : "state",
           };
         }
 
