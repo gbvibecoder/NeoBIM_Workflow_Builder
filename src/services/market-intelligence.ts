@@ -70,6 +70,10 @@ export interface MarketIntelligenceResult {
   mep_percentage: number;           // MEP as % of hard cost (wellness=35%, office=25%)
   benchmark_label: string;          // Human-readable: "wellness in Tier-2 Durg, March 2026"
 
+  // Dynamic state factor (replaces hardcoded STATE_PWD_FACTORS table)
+  state_pwd_factor: number;           // 0.80-1.40, relative to CPWD national average
+  absolute_minimum_cost: number;      // Absolute minimum ₹/m² to build anything in this state
+
   // Metadata
   sources_summary: string[];
   fetched_at: string;
@@ -194,6 +198,8 @@ export async function fetchMarketPrices(
     minimum_cost_per_m2: 22000,
     typical_range_min: 25000,
     typical_range_max: 55000,
+    state_pwd_factor: 1.0,
+    absolute_minimum_cost: 18000,
     building_type_factor: 1.0,
     mep_percentage: 25,
     benchmark_label: `${buildingType} in ${city}, ${state} (static fallback)`,
@@ -242,9 +248,11 @@ Give CITY-SPECIFIC estimates for ${city} (NOT national averages):
 6. Minimum possible cost per m² for ${buildingType} in ${city} (below this is impossible) — in ₹/m²
 7. What premium multiplier does ${buildingType} have vs generic commercial? (e.g. wellness=1.35x, hospital=1.6x)
 8. What % of total hard cost is MEP for ${buildingType}? (e.g. wellness=35%, office=25%)
+9. ${state} PWD Schedule of Rates factor relative to CPWD national average (0.80-1.40). Consider local labor, materials, transport.
+10. Absolute minimum cost per m² to build ANY structure in ${state} (just materials + basic labor, no finishes) — in ₹/m²
 
 Return ONLY this JSON:
-{"steel_per_tonne":{"value":0,"source":"","date":"${monthYear}","confidence":"MEDIUM"},"cement_per_bag":{"value":0,"brand":"","source":"","date":"${monthYear}","confidence":"MEDIUM"},"sand_per_cft":{"value":0,"type":"M-sand","source":"","date":"${monthYear}","confidence":"MEDIUM"},"mason":{"value":0,"source":"","date":"${monthYear}","confidence":"MEDIUM"},"benchmark":{"value":0,"range_low":0,"range_high":0,"source":""},"minimum_cost_per_m2":0,"building_type_factor":1.0,"mep_percentage":25,"sources":[]}`;
+{"steel_per_tonne":{"value":0,"source":"","date":"${monthYear}","confidence":"MEDIUM"},"cement_per_bag":{"value":0,"brand":"","source":"","date":"${monthYear}","confidence":"MEDIUM"},"sand_per_cft":{"value":0,"type":"M-sand","source":"","date":"${monthYear}","confidence":"MEDIUM"},"mason":{"value":0,"source":"","date":"${monthYear}","confidence":"MEDIUM"},"benchmark":{"value":0,"range_low":0,"range_high":0,"source":""},"minimum_cost_per_m2":0,"building_type_factor":1.0,"mep_percentage":25,"state_pwd_factor":1.0,"absolute_minimum_cost":18000,"sources":[]}`;
 
   let jsonText = "";
   let usedWebSearch = false;
@@ -402,6 +410,17 @@ Return ONLY this JSON:
           result.mep_percentage = p.mep_percentage;
         }
         result.benchmark_label = `${buildingType} in ${city}, ${state} (${monthYear} — AI estimate)`;
+
+        // State PWD factor from Claude (replaces hardcoded table)
+        if (p.state_pwd_factor > 0 && p.state_pwd_factor >= 0.5 && p.state_pwd_factor <= 2.0) {
+          result.state_pwd_factor = p.state_pwd_factor;
+        }
+        // Absolute minimum cost
+        if (p.absolute_minimum_cost > 0) {
+          let absMin = p.absolute_minimum_cost;
+          if (absMin < 10000) absMin = Math.round(absMin * 10.764); // sqft→m² conversion
+          result.absolute_minimum_cost = absMin;
+        }
 
         // Status — count how many items have live data
         const matPrices = [result.steel_per_tonne, result.cement_per_bag, result.sand_per_cft];

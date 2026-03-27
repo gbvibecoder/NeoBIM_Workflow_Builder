@@ -1858,7 +1858,25 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
           locationData?.city || "",
           currentMonth
         );
-        console.log(`[TR-008] Indian project: ${locationData?.city || "?"}, ${locationData?.state || "?"} | State PWD: ${indianPricing.stateFactor?.state ?? "N/A"} | Overall: ${indianPricing.overall.toFixed(3)}x | Season: ${indianPricing.seasonal.notes} | Confidence: ${indianPricing.confidence}`);
+        console.log(`[TR-008] Indian pricing (static table): Overall: ${indianPricing.overall.toFixed(3)}x | State: ${indianPricing.stateFactor?.state ?? "N/A"} | City tier: ${indianPricing.cityTier}`);
+
+        // Override with dynamic state factor from market intelligence (Claude AI) when available
+        // This makes the system accurate in 2026, 2030, 2038+ without code changes
+        const dynamicPWD = (inputData?._marketData as Record<string, unknown>)?.state_pwd_factor as number | undefined;
+        if (typeof dynamicPWD === "number" && dynamicPWD >= 0.5 && dynamicPWD <= 2.0) {
+          const staticOverall = indianPricing.overall;
+          // Replace the overall factor with Claude's dynamic value × city tier
+          const cityMult = indianPricing.cityTier === "metro" ? 1.10 : indianPricing.cityTier === "tier-2" ? 0.98 : indianPricing.cityTier === "tier-3" ? 0.92 : 1.0;
+          indianPricing.overall = Math.round(dynamicPWD * cityMult * 1000) / 1000;
+          indianPricing.concrete = Math.round(dynamicPWD * cityMult * 1000) / 1000;
+          indianPricing.steel = Math.round(dynamicPWD * cityMult * 1000) / 1000;
+          indianPricing.masonry = Math.round(dynamicPWD * cityMult * 1000) / 1000;
+          indianPricing.finishing = Math.round(dynamicPWD * cityMult * 1000) / 1000;
+          indianPricing.labor = Math.round(dynamicPWD * cityMult * 1000) / 1000;
+          console.log(`[TR-008] Dynamic PWD override: Claude=${dynamicPWD} × cityTier=${cityMult} = ${indianPricing.overall} (was static ${staticOverall})`);
+        } else {
+          console.log(`[TR-008] Using static PWD table (no dynamic factor from Claude)`);
+        }
       }
 
       // Expand elements with material layers into separate line items per layer
