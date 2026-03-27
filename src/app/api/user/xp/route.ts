@@ -14,8 +14,8 @@ export async function POST(req: NextRequest) {
 
     const userId = session.user.id;
 
-    // Rate limit XP awards: 30 per minute per user
-    const rl = await checkEndpointRateLimit(userId, "user-xp", 30, "1 m");
+    // Rate limit XP awards: 10 per minute per user (reduced to lower DB pressure)
+    const rl = await checkEndpointRateLimit(userId, "user-xp", 10, "1 m");
     if (!rl.success) {
       return NextResponse.json(formatErrorResponse({ title: "Too many requests", message: "Please slow down.", code: "RATE_001" }), { status: 429 });
     }

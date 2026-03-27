@@ -2390,9 +2390,10 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
         // Prefer dynamic minimum from market intelligence (city-specific, year-specific)
         let dynamicMin = Number(marketData?.minimum_cost_per_m2 ?? 0);
         // Sanity: if Claude returned per-sqft instead of per-m², convert (1 m² ≈ 10.76 sqft)
-        if (dynamicMin > 0 && dynamicMin < 5000) dynamicMin = Math.round(dynamicMin * 10.76);
+        if (dynamicMin > 0 && dynamicMin < 10000) dynamicMin = Math.round(dynamicMin * 10.764);
         const staticMin = STATIC_FLOORS[btKey] ?? STATIC_FLOORS.commercial;
-        const minFloor = dynamicMin > 5000 ? dynamicMin : staticMin;
+        // Always use the HIGHER of dynamic and static — static is physical floor, dynamic is AI suggestion
+        const minFloor = Math.max(dynamicMin, staticMin);
         console.log(`[TR-008] Cost floor: dynamic_raw=${marketData?.minimum_cost_per_m2}, dynamic_adj=${dynamicMin}, static=${staticMin}, using=${minFloor}`);
         // Diagnostic: dump all marketData keys that contain 'min' or 'bench' or 'range'
         if (marketData) {

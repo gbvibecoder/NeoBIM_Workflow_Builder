@@ -188,14 +188,17 @@ export function calculateIndianPricingAdjustment(
   let cityTierFactor = 1.0;
   let cityTier = "town";
 
+  // City tier adjustments are SMALL — state PWD factor already captures most regional variation.
+  // These only adjust within-state: metro premium vs rural discount.
+  // Combined floor: no state × tier should produce factor below 0.75.
   if (metros.some(m => cityLower.includes(m) || cityLower === "new delhi" || cityLower === "ncr" || cityLower === "noida" || cityLower === "gurgaon" || cityLower === "gurugram")) {
-    cityTierFactor = 1.15;
+    cityTierFactor = 1.10;
     cityTier = "metro";
   } else if (tier2.some(t => cityLower.includes(t))) {
-    cityTierFactor = 0.95;
+    cityTierFactor = 0.98;
     cityTier = "tier-2";
   } else if (city) {
-    cityTierFactor = 0.80;
+    cityTierFactor = 0.92;
     cityTier = "tier-3";
   } else {
     cityTierFactor = 1.0;

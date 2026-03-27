@@ -230,13 +230,16 @@ export async function fetchMarketPrices(
   // Claude knows Indian city-level price differences from training data
   const userPrompt = `You are an Indian construction cost expert. Provide current market rates for ${city}, ${state}, India as of ${monthYear}. Building type: ${buildingType}.
 
+IMPORTANT: Return ALL construction costs in INR per SQUARE METRE (m²), NOT per square foot.
+Example: commercial in Delhi = ₹45,000-80,000 per m² (not ₹4,000-7,500 per sqft).
+
 Give CITY-SPECIFIC estimates for ${city} (NOT national averages):
 1. TMT Steel Fe500 price per tonne in ${state}
 2. Cement price per 50kg bag in ${city} (UltraTech or Ambuja)
 3. M-sand or construction sand per cft in ${city}/${state}
 4. Mason (skilled) daily wage in ${city}
-5. Typical ${buildingType} construction cost per m² in ${city} (${yearStr}) — give range
-6. Minimum possible cost per m² for ${buildingType} in ${city} (below this is impossible)
+5. Typical ${buildingType} construction cost per m² in ${city} (${yearStr}) — give range in ₹/m²
+6. Minimum possible cost per m² for ${buildingType} in ${city} (below this is impossible) — in ₹/m²
 7. What premium multiplier does ${buildingType} have vs generic commercial? (e.g. wellness=1.35x, hospital=1.6x)
 8. What % of total hard cost is MEP for ${buildingType}? (e.g. wellness=35%, office=25%)
 
@@ -349,14 +352,22 @@ Return ONLY this JSON:
         }
 
         // Benchmark — handle both flat and nested format
+        // Auto-convert sqft→m² if values are suspiciously low (Indian sqft rates are typically ₹1,500-8,000)
         const bench = p.benchmark ?? p.benchmark_per_sqft;
         if (bench?.value > 0) {
+          let bVal = bench.value;
+          let bLow = bench.range_low || bVal * 0.75;
+          let bHigh = bench.range_high || bVal * 1.25;
+          // If range_low < 10,000 → likely sqft values, convert to m²
+          if (bLow > 0 && bLow < 10000) {
+            console.log(`[TR-015] Converting benchmark from sqft to m²: ₹${bLow}-${bHigh}/sqft → ₹${Math.round(bLow * 10.764)}-${Math.round(bHigh * 10.764)}/m²`);
+            bVal = Math.round(bVal * 10.764);
+            bLow = Math.round(bLow * 10.764);
+            bHigh = Math.round(bHigh * 10.764);
+          }
           result.benchmark_per_sqft = {
-            value: bench.value,
-            range_low: bench.range_low || bench.value * 0.75,
-            range_high: bench.range_high || bench.value * 1.25,
-            source: bench.source || src,
-            building_type: buildingType,
+            value: bVal, range_low: bLow, range_high: bHigh,
+            source: bench.source || src, building_type: buildingType,
           };
         }
         if (p.cpwd_index?.factor > 0) {
@@ -372,7 +383,13 @@ Return ONLY this JSON:
 
         // Dynamic benchmarks from Claude (city + building type specific)
         if (p.minimum_cost_per_m2 > 0) {
-          result.minimum_cost_per_m2 = p.minimum_cost_per_m2;
+          let minVal = p.minimum_cost_per_m2;
+          // If < 10,000 → likely sqft, convert to m²
+          if (minVal < 10000) {
+            console.log(`[TR-015] Converting minimum_cost from sqft to m²: ₹${minVal}/sqft → ₹${Math.round(minVal * 10.764)}/m²`);
+            minVal = Math.round(minVal * 10.764);
+          }
+          result.minimum_cost_per_m2 = minVal;
         }
         if (bench?.range_low > 0) {
           result.typical_range_min = bench.range_low;
