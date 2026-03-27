@@ -2503,24 +2503,8 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
       rows.push(["", "", "", "", "", "", "", "", "", ""]);
       rows.push([COST_DISCLAIMERS.accuracy, "", "", "", "", "", "", "", "", ""]);
 
+      // No yellow warnings — all info goes into the content summary
       const warnings: string[] = [];
-      if (regionWasAutoDetected) {
-        warnings.push("No project location specified — using USA baseline rates. Provide a region/location for accurate regional pricing.");
-      }
-      if (estimatedItemsCount > 0) {
-        warnings.push(`${estimatedItemsCount} items used estimated rates (not in cost database)`);
-      }
-      // Add quantity sanity check warnings
-      for (const w of quantityWarnings) {
-        warnings.push(`⚠️ ${w.element}: ${w.metric} = ${w.value} (expected ${w.expectedRange}). ${w.suggestion}`);
-      }
-      if (provisionalTotal > 0) {
-        warnings.push(`${allProvisional.length} provisional sums included for MEP, foundation, and external works (₹${provisionalTotal.toLocaleString()}). These are estimates — engage specialist consultants for detailed pricing.`);
-      }
-      // Add benchmark validation result
-      if (benchmarkResult.severity !== "ok") {
-        warnings.unshift(benchmarkResult.message); // Put at top for visibility
-      }
       // ── Market intelligence and IFC quality → info panel (NOT warnings) ──
       // These are informational — yellow warnings are only for actual problems.
       const infoNotes: string[] = [];
@@ -2555,8 +2539,7 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
           break;
         }
       }
-      // Only push REAL anomalies to warnings — not "all OK" messages
-      for (const a of anomalies) warnings.push(`⚠️ ${a}`);
+      // Anomalies go into content summary, not warnings
 
       // ── Upgrade 7: Store analytics for learning (fire-and-forget) ──
       try {
