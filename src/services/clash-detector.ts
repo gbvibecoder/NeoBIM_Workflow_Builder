@@ -94,14 +94,15 @@ export interface ElementBBox {
   name: string;
   storey: string;
   aabb: AABB;
+  sourceModel: string;
 }
 
 export type ClashSeverity = "hard" | "soft" | "clearance";
 
 export interface ClashResult {
   id: string;
-  elementA: { expressID: number; type: string; name: string; storey: string };
-  elementB: { expressID: number; type: string; name: string; storey: string };
+  elementA: { expressID: number; type: string; name: string; storey: string; sourceModel: string };
+  elementB: { expressID: number; type: string; name: string; storey: string; sourceModel: string };
   severity: ClashSeverity;
   overlapVolume: number;
   overlapCenter: [number, number, number];
@@ -117,15 +118,18 @@ export interface ClashDetectionResult {
     hardClashes: number;
     softClashes: number;
     clearanceClashes: number;
+    modelCount: number;
+    crossModelClashes: number;
   };
   clashes: ClashResult[];
 }
 
 export interface ClashDetectionOptions {
-  tolerance?: number;     // Minimum overlap in meters on each axis (default 0.025 = 25mm)
-  maxClashes?: number;    // Cap on reported clashes (default 5000)
-  cellSize?: number;      // Spatial grid cell size in meters (default 2.0)
-  timeoutMs?: number;     // Processing timeout in ms (default 120000)
+  tolerance?: number;       // Minimum overlap in meters on each axis (default 0.025 = 25mm)
+  maxClashes?: number;      // Cap on reported clashes (default 5000)
+  cellSize?: number;        // Spatial grid cell size in meters (default 2.0)
+  timeoutMs?: number;       // Processing timeout in ms (default 120000)
+  crossModelOnly?: boolean; // Only report clashes between different source models (default false)
 }
 
 // ─── AABB Utility Functions ─────────────────────────────────────────
@@ -188,6 +192,15 @@ export function shouldFilter(a: ElementBBox, b: ElementBBox): boolean {
   const typeA = a.typeID;
   const typeB = b.typeID;
 
+  // Cross-model pairs: only skip virtual elements (IfcOpeningElement, IfcSpace)
+  // All other cross-model intersections are real coordination issues
+  if (a.sourceModel !== b.sourceModel) {
+    if (typeA === IFCOPENINGELEMENT || typeB === IFCOPENINGELEMENT) return true;
+    if (typeA === IFCSPACE || typeB === IFCSPACE) return true;
+    return false;
+  }
+
+  // Same-model pairs: apply aggressive structural connection filters
   // Helper: check if pair contains specific types (order-independent)
   const pairHas = (t1: number | number[], t2: number | number[]): boolean => {
     const set1 = Array.isArray(t1) ? t1 : [t1];
@@ -296,6 +309,7 @@ export function detectClashes(
     maxClashes = 5000,
     cellSize = 2.0,
     timeoutMs = 120_000,
+    crossModelOnly = false,
   } = options;
 
   const grid = buildSpatialGrid(elements, cellSize);
@@ -321,6 +335,9 @@ export function detectClashes(
         const a = elements[idxA];
         const b = elements[idxB];
 
+        // Skip same-model pairs when crossModelOnly is enabled
+        if (crossModelOnly && a.sourceModel === b.sourceModel) continue;
+
         if (shouldFilter(a, b)) continue;
 
         const overlap = aabbOverlap(a.aabb, b.aabb, tolerance);
@@ -330,8 +347,8 @@ export function detectClashes(
 
         clashes.push({
           id: `clash-${clashes.length + 1}`,
-          elementA: { expressID: a.expressID, type: a.type, name: a.name, storey: a.storey },
-          elementB: { expressID: b.expressID, type: b.type, name: b.name, storey: b.storey },
+          elementA: { expressID: a.expressID, type: a.type, name: a.name, storey: a.storey, sourceModel: a.sourceModel },
+          elementB: { expressID: b.expressID, type: b.type, name: b.name, storey: b.storey, sourceModel: b.sourceModel },
           severity,
           overlapVolume: Math.round(overlap.volume * 1_000_000) / 1_000_000, // 6 decimal places
           overlapCenter: overlap.center.map(v => Math.round(v * 1000) / 1000) as [number, number, number],
@@ -362,7 +379,7 @@ function transformPoint(
   ];
 }
 
-export async function computeElementAABBs(buffer: Uint8Array): Promise<ElementBBox[]> {
+export async function computeElementAABBs(buffer: Uint8Array, modelLabel: string = "Primary"): Promise<ElementBBox[]> {
   const ifcAPI = new IfcAPI();
   const path = await import("path");
   const wasmDir = path.resolve(process.cwd(), "node_modules", "web-ifc") + "/";
@@ -512,6 +529,7 @@ export async function computeElementAABBs(buffer: Uint8Array): Promise<ElementBB
         name: nameMap.get(expressID) || `#${expressID}`,
         storey: elementStoreyLookup.get(expressID) || "Unassigned",
         aabb,
+        sourceModel: modelLabel,
       });
     }
 
@@ -549,6 +567,48 @@ export async function detectClashesFromBuffer(
       hardClashes,
       softClashes,
       clearanceClashes,
+      modelCount: 1,
+      crossModelClashes: 0,
+    },
+    clashes,
+  };
+}
+
+// ─── Multi-Model Entry Point ────────────────────────────────────────
+
+export async function detectClashesFromMultipleBuffers(
+  models: Array<{ buffer: Uint8Array; discipline: string; fileName: string }>,
+  options: ClashDetectionOptions = {}
+): Promise<ClashDetectionResult> {
+  const startTime = Date.now();
+
+  // Extract AABBs from each model, tagging with discipline
+  const allElements: ElementBBox[] = [];
+  for (const model of models) {
+    const elements = await computeElementAABBs(model.buffer, model.discipline);
+    allElements.push(...elements);
+  }
+
+  // Run clash detection on merged element set
+  const clashes = detectClashes(allElements, options);
+
+  // Compute statistics
+  const hardClashes = clashes.filter(c => c.severity === "hard").length;
+  const softClashes = clashes.filter(c => c.severity === "soft").length;
+  const clearanceClashes = clashes.filter(c => c.severity === "clearance").length;
+  const crossModelClashes = clashes.filter(c => c.elementA.sourceModel !== c.elementB.sourceModel).length;
+
+  return {
+    meta: {
+      totalElements: allElements.length,
+      elementsWithGeometry: allElements.length,
+      processingTimeMs: Date.now() - startTime,
+      clashesFound: clashes.length,
+      hardClashes,
+      softClashes,
+      clearanceClashes,
+      modelCount: models.length,
+      crossModelClashes,
     },
     clashes,
   };

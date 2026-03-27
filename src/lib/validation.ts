@@ -340,8 +340,9 @@ export function validateTR016Input(inputData: unknown): ValidationResult {
   const hasIfcUrl = !!input.ifcUrl;
   const hasIfcData = !!input.ifcData;
   const hasIfcParsedWithUrl = !!input.ifcParsed && !!((input.ifcParsed as Record<string, unknown>)?.ifcUrl);
+  const hasIfcModels = Array.isArray(input.ifcModels) && (input.ifcModels as unknown[]).length > 0;
 
-  if (!hasFileData && !hasIfcUrl && !hasIfcData && !hasIfcParsedWithUrl) {
+  if (!hasFileData && !hasIfcUrl && !hasIfcData && !hasIfcParsedWithUrl && !hasIfcModels) {
     return {
       valid: false,
       error: "Clash detection requires raw IFC geometry (not pre-parsed quantities)",

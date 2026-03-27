@@ -6,7 +6,7 @@ import { useWorkflowStore } from "@/stores/workflow-store";
 import { useExecutionStore } from "@/stores/execution-store";
 import { useUIStore } from "@/stores/ui-store";
 import { executeNode as mockExecuteNode } from "@/services/mock-executor";
-import { inputFileStore, inputMultiFileStore } from "@/components/canvas/nodes/InputNode";
+import { inputFileStore, inputMultiFileStore, supplementaryIFCStore } from "@/components/canvas/nodes/InputNode";
 import { generateId } from "@/lib/utils";
 import { awardXP } from "@/lib/award-xp";
 import { trackWorkflowExecuted, trackNodeUsed, trackRegenerationUsed } from "@/lib/track";
@@ -446,58 +446,100 @@ async function executeNode(
       // IN-004 strips raw file data (too large for JSON) and only passes
       // ifcParsed (text-parsed quantities). TR-016 needs the binary buffer
       // for mesh streaming. Solution: find the raw File in inputFileStore,
-      // upload to R2 via /api/parse-ifc, and pass the ifcUrl to the server.
+      // upload to R2 via /api/upload-ifc, and pass the ifcUrl to the server.
+      // Also checks supplementaryIFCStore for multi-model federation.
       // ══════════════════════════════════════════════════════════════════════
-      if (catalogueId === "TR-016" && !inputData.fileData && !inputData.ifcUrl && !inputData.ifcData) {
+      if (catalogueId === "TR-016" && !inputData.fileData && !inputData.ifcUrl && !inputData.ifcData && !inputData.ifcModels) {
         console.log("[TR-016] No raw IFC data in inputData — looking for File in inputFileStore");
 
-        // Find the upstream input node's File object
-        let ifcFile: File | null = null;
-        let ifcFileName = (inputData.fileName as string) ?? "model.ifc";
+        // Helper: upload a single IFC file to R2 and return URL
+        const uploadToR2 = async (file: File): Promise<string> => {
+          const fd = new FormData();
+          fd.append("file", file);
+          const res = await fetch("/api/upload-ifc", {
+            method: "POST",
+            body: fd,
+            signal: AbortSignal.timeout(120_000),
+          });
+          if (!res.ok) {
+            const errBody = await res.json().catch(() => ({ error: { message: `Server returned ${res.status}` } }));
+            throw new Error(errBody.error?.message || `Upload failed with status ${res.status}`);
+          }
+          const data = await res.json();
+          if (!data.ifcUrl) throw new Error("R2 upload did not return ifcUrl");
+          return data.ifcUrl as string;
+        };
 
-        // Check all entries in inputFileStore for an IFC file
+        // Find the primary IFC file and its source node
+        let primaryFile: File | null = null;
+        let primaryFileName = (inputData.fileName as string) ?? "model.ifc";
+        let sourceNodeId = "";
+
         for (const [storeNodeId, fileObj] of inputFileStore.entries()) {
           if (fileObj.name.toLowerCase().endsWith(".ifc")) {
-            ifcFile = fileObj;
-            ifcFileName = fileObj.name;
-            console.log(`[TR-016] Found IFC file "${fileObj.name}" (${(fileObj.size / 1024 / 1024).toFixed(1)}MB) from node ${storeNodeId}`);
+            primaryFile = fileObj;
+            primaryFileName = fileObj.name;
+            sourceNodeId = storeNodeId;
+            console.log(`[TR-016] Found primary IFC "${fileObj.name}" (${(fileObj.size / 1024 / 1024).toFixed(1)}MB) from node ${storeNodeId}`);
             break;
           }
         }
 
-        if (ifcFile) {
+        if (!primaryFile) {
+          throw new Error("No IFC file found. Please connect an IFC Upload (IN-004) node and upload a .ifc file.");
+        }
+
+        // Check for supplementary IFC files (structural, MEP)
+        const structEntry = supplementaryIFCStore.get(`${sourceNodeId}:structural`);
+        const mepEntry = supplementaryIFCStore.get(`${sourceNodeId}:mep`);
+        const hasSupplementary = !!structEntry || !!mepEntry;
+
+        if (hasSupplementary) {
+          // Multi-model federation: upload all files to R2 and build ifcModels array
+          console.log(`[TR-016] Multi-model federation: primary + ${structEntry ? "structural" : ""}${structEntry && mepEntry ? " + " : ""}${mepEntry ? "MEP" : ""}`);
           try {
-            const formData = new FormData();
-            formData.append("file", ifcFile);
+            const uploadPromises: Array<Promise<{ ifcUrl: string; discipline: string; fileName: string }>> = [];
 
-            console.log(`[TR-016] Uploading ${(ifcFile.size / 1024 / 1024).toFixed(1)}MB to /api/parse-ifc for R2 storage...`);
-            const uploadRes = await fetch("/api/parse-ifc", {
-              method: "POST",
-              body: formData,
-              signal: AbortSignal.timeout(180_000),
-            });
+            // Primary (Architecture)
+            uploadPromises.push(
+              uploadToR2(primaryFile).then(url => ({ ifcUrl: url, discipline: "Architecture", fileName: primaryFileName }))
+            );
 
-            if (!uploadRes.ok) {
-              const errBody = await uploadRes.json().catch(() => ({ error: { message: `Server returned ${uploadRes.status}` } }));
-              throw new Error(errBody.error?.message || `Upload failed with status ${uploadRes.status}`);
+            // Structural
+            if (structEntry) {
+              uploadPromises.push(
+                uploadToR2(structEntry.file).then(url => ({ ifcUrl: url, discipline: "Structural", fileName: structEntry.file.name }))
+              );
             }
 
-            const uploadData = await uploadRes.json();
-            const r2Url = uploadData.meta?.ifcUrl ?? uploadData.ifcUrl;
-            if (r2Url) {
-              inputData.ifcUrl = r2Url;
-              inputData.fileName = ifcFileName;
-              console.log(`[TR-016] IFC uploaded to R2: ${(r2Url as string).slice(0, 80)}...`);
-            } else {
-              throw new Error("R2 upload did not return ifcUrl — R2 storage may be unavailable");
+            // MEP
+            if (mepEntry) {
+              uploadPromises.push(
+                uploadToR2(mepEntry.file).then(url => ({ ifcUrl: url, discipline: "MEP", fileName: mepEntry.file.name }))
+              );
             }
+
+            const ifcModels = await Promise.all(uploadPromises);
+            inputData.ifcModels = ifcModels;
+            inputData.fileName = primaryFileName;
+            console.log(`[TR-016] ${ifcModels.length} models uploaded to R2 for cross-model clash detection`);
+          } catch (uploadErr) {
+            const msg = uploadErr instanceof Error ? uploadErr.message : "Multi-model upload failed";
+            console.error("[TR-016] Multi-model upload failed:", msg);
+            throw new Error(`Failed to upload IFC files for clash detection. ${msg}`);
+          }
+        } else {
+          // Single-model: upload primary file only
+          try {
+            const r2Url = await uploadToR2(primaryFile);
+            inputData.ifcUrl = r2Url;
+            inputData.fileName = primaryFileName;
+            console.log(`[TR-016] Single model uploaded to R2: ${r2Url.slice(0, 80)}...`);
           } catch (uploadErr) {
             const msg = uploadErr instanceof Error ? uploadErr.message : "IFC upload failed";
             console.error("[TR-016] Failed to upload IFC to R2:", msg);
             throw new Error(`Clash detection requires the raw IFC file to be uploaded. ${msg}`);
           }
-        } else {
-          throw new Error("No IFC file found. Please connect an IFC Upload (IN-004) node and upload a .ifc file.");
         }
       }
       // ══════════════════════════════════════════════════════════════════════

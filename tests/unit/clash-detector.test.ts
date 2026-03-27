@@ -20,6 +20,7 @@ function makeElement(
     type: "Pipe/Duct",
     name: "Test Element",
     storey: "Level 1",
+    sourceModel: "Primary",
     ...overrides,
   };
 }
