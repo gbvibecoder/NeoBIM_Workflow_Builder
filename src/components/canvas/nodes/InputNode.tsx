@@ -384,7 +384,7 @@ export function ParameterInput({ nodeId, data }: { nodeId: string; data: Workflo
 // ─── Supplementary IFC Upload (Build 5: Multi-IFC) ──────────────────────────
 
 // Store for supplementary IFC files (structural, MEP) — keyed by nodeId:type
-const supplementaryIFCStore = new Map<string, { file: File; parsed?: unknown }>();
+export const supplementaryIFCStore = new Map<string, { file: File; parsed?: unknown }>();
 
 function SupplementaryIFCUpload({ nodeId }: { nodeId: string }) {
   const updateNode = useWorkflowStore(s => s.updateNode);
@@ -431,33 +431,33 @@ function SupplementaryIFCUpload({ nodeId }: { nodeId: string }) {
         onChange={e => { if (e.target.files?.[0]) handleSupplementary(e.target.files[0], "mep"); }} />
 
       <button onClick={() => setExpanded((v: boolean) => !v)} style={{
-        width: "100%", padding: "4px 6px", fontSize: 9, color: "#55556A",
-        background: "none", border: "1px dashed rgba(255,255,255,0.06)", borderRadius: 4,
-        cursor: "pointer", textAlign: "left",
+        width: "100%", padding: "6px 8px", fontSize: 11, color: "#A0A0B8",
+        background: "none", border: "1px dashed rgba(255,255,255,0.15)", borderRadius: 4,
+        cursor: "pointer", textAlign: "left", fontWeight: 500,
       }}>
         {expanded ? "▾" : "▸"} Additional IFC files (optional)
       </button>
 
       {expanded && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 3, marginTop: 3 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: 4 }}>
           <button onClick={() => structRef.current?.click()} style={{
-            padding: "3px 6px", fontSize: 9, borderRadius: 3,
-            border: `1px solid ${structural ? "rgba(16,185,129,0.3)" : "rgba(255,255,255,0.06)"}`,
-            background: structural ? "rgba(16,185,129,0.06)" : "rgba(0,0,0,0.2)",
-            color: structural ? "#10B981" : "#55556A", cursor: "pointer", textAlign: "left",
+            padding: "5px 8px", fontSize: 11, borderRadius: 4,
+            border: `1px solid ${structural ? "rgba(16,185,129,0.4)" : "rgba(255,255,255,0.15)"}`,
+            background: structural ? "rgba(16,185,129,0.08)" : "rgba(0,0,0,0.25)",
+            color: structural ? "#34D399" : "#A0A0B8", cursor: "pointer", textAlign: "left", fontWeight: 500,
           }}>
             {structural ? `Structural: ${structural}` : "+ Add Structural IFC"}
           </button>
           <button onClick={() => mepRef.current?.click()} style={{
-            padding: "3px 6px", fontSize: 9, borderRadius: 3,
-            border: `1px solid ${mep ? "rgba(16,185,129,0.3)" : "rgba(255,255,255,0.06)"}`,
-            background: mep ? "rgba(16,185,129,0.06)" : "rgba(0,0,0,0.2)",
-            color: mep ? "#10B981" : "#55556A", cursor: "pointer", textAlign: "left",
+            padding: "5px 8px", fontSize: 11, borderRadius: 4,
+            border: `1px solid ${mep ? "rgba(16,185,129,0.4)" : "rgba(255,255,255,0.15)"}`,
+            background: mep ? "rgba(16,185,129,0.08)" : "rgba(0,0,0,0.25)",
+            color: mep ? "#34D399" : "#A0A0B8", cursor: "pointer", textAlign: "left", fontWeight: 500,
           }}>
             {mep ? `MEP: ${mep}` : "+ Add MEP/Services IFC"}
           </button>
           {(structural || mep) && (
-            <div style={{ fontSize: 8, color: "#00F5FF", opacity: 0.6, textAlign: "center" }}>
+            <div style={{ fontSize: 10, color: "#00F5FF", opacity: 0.8, textAlign: "center", fontWeight: 500 }}>
               Arch ✅ {structural ? "Struct ✅" : "Struct ➕"} {mep ? "MEP ✅" : "MEP ➕"}
             </div>
           )}

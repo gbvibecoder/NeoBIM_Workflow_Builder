@@ -955,8 +955,8 @@ export const PREBUILT_WORKFLOWS: WorkflowTemplate[] = [
     id: "wf-12",
     name: "IFC Upload → Clash Detection",
     description:
-      "Upload an IFC model → detect spatial clashes between building elements using AABB collision analysis. Identifies hard clashes (MEP vs structural), soft clashes, and clearance violations — generates a detailed clash report with element IDs, storeys, and overlap volumes.",
-    tags: ["ifc", "bim", "clash", "detection", "coordination", "quality", "mep", "structural"],
+      "Upload an IFC model → detect spatial clashes between building elements using AABB collision analysis. Supports multi-model federation: expand 'Additional IFC files' to add Structural and MEP models for cross-discipline clash detection. Identifies hard clashes (MEP vs structural), soft clashes, and clearance violations.",
+    tags: ["ifc", "bim", "clash", "detection", "coordination", "quality", "mep", "structural", "federation", "multi-model"],
     category: "BIM Analysis",
     complexity: "simple",
     estimatedRunTime: "~30 seconds",
