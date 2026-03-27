@@ -268,8 +268,13 @@ Return ONLY this JSON:
         cement_per_bag: { type: "object" as const, properties: { value: { type: "number" as const }, brand: { type: "string" as const }, source: { type: "string" as const }, date: { type: "string" as const }, confidence: { type: "string" as const } }, required: ["value"] },
         sand_per_cft: { type: "object" as const, properties: { value: { type: "number" as const }, type: { type: "string" as const }, source: { type: "string" as const }, date: { type: "string" as const }, confidence: { type: "string" as const } }, required: ["value"] },
         mason: { type: "object" as const, properties: { value: { type: "number" as const }, source: { type: "string" as const }, date: { type: "string" as const }, confidence: { type: "string" as const } }, required: ["value"] },
-        benchmark: { type: "object" as const, properties: { value: { type: "number" as const }, range_low: { type: "number" as const }, range_high: { type: "number" as const }, source: { type: "string" as const } }, required: ["value", "range_low", "range_high"] },
-        minimum_cost_per_m2: { type: "number" as const },
+        benchmark: { type: "object" as const, properties: {
+          value: { type: "number" as const, description: "Typical construction cost in INR per SQUARE METRE (m²). NOT per sqft. If you know sqft, multiply by 10.764." },
+          range_low: { type: "number" as const, description: "Minimum typical cost in INR per SQUARE METRE (m²). Example: commercial in tier-3 = 18000-25000. NOT sqft values like 1800-2500." },
+          range_high: { type: "number" as const, description: "Maximum typical cost in INR per SQUARE METRE (m²). Example: commercial in metro = 45000-90000." },
+          source: { type: "string" as const },
+        }, required: ["value", "range_low", "range_high"] },
+        minimum_cost_per_m2: { type: "number" as const, description: "Absolute minimum cost in INR per SQUARE METRE (m²) to build this building type in this city. Must be > 10000 for any Indian city." },
         building_type_factor: { type: "number" as const },
         mep_percentage: { type: "number" as const },
         state_pwd_factor: { type: "number" as const },
@@ -405,15 +410,16 @@ Return ONLY this JSON:
         }
 
         // Benchmark — handle both flat and nested format
-        // Auto-convert sqft→m² if values are suspiciously low (Indian sqft rates are typically ₹1,500-8,000)
+        // Auto-convert sqft→m² if values are suspiciously low
         const bench = p.benchmark ?? p.benchmark_per_sqft;
-        if (bench?.value > 0) {
-          let bVal = bench.value;
+        console.log(`[TR-015] Raw benchmark from Claude: ${JSON.stringify(bench)}`);
+        if (bench?.value > 0 || bench?.range_low > 0) {
+          let bVal = bench.value || bench.range_low || 0;
           let bLow = bench.range_low || bVal * 0.75;
           let bHigh = bench.range_high || bVal * 1.25;
-          // If range_low < 10,000 → likely sqft values, convert to m²
+          // If range_low < 10,000 → sqft values, convert to m² (1 m² = 10.764 sqft)
           if (bLow > 0 && bLow < 10000) {
-            console.log(`[TR-015] Converting benchmark from sqft to m²: ₹${bLow}-${bHigh}/sqft → ₹${Math.round(bLow * 10.764)}-${Math.round(bHigh * 10.764)}/m²`);
+            console.log(`[TR-015] Converting benchmark sqft→m²: ₹${bLow}-${bHigh}/sqft → ₹${Math.round(bLow * 10.764)}-${Math.round(bHigh * 10.764)}/m²`);
             bVal = Math.round(bVal * 10.764);
             bLow = Math.round(bLow * 10.764);
             bHigh = Math.round(bHigh * 10.764);
@@ -422,6 +428,8 @@ Return ONLY this JSON:
             value: bVal, range_low: bLow, range_high: bHigh,
             source: bench.source || src, building_type: buildingType,
           };
+          result.typical_range_min = bLow;
+          result.typical_range_max = bHigh;
         }
         if (p.cpwd_index?.factor > 0) {
           result.cpwd_index = {
