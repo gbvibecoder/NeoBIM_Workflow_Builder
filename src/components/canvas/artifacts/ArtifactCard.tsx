@@ -2,9 +2,10 @@
 
 import React, { useEffect, useState, useMemo, useCallback } from "react";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
-import { Download, ChevronDown, X, FileText, Image as ImageIcon, Database, BarChart2, Table2, File, LayoutGrid, Box, RefreshCw, Loader2, Video } from "lucide-react";
+import { Download, ChevronDown, X, FileText, Image as ImageIcon, Database, BarChart2, Table2, File, LayoutGrid, Box, RefreshCw, Loader2, Video, ArrowRight } from "lucide-react";
 import DOMPurify from "dompurify";
 import dynamic from "next/dynamic";
+import Link from "next/link";
 import { formatBytes } from "@/lib/utils";
 import { useLocale } from "@/hooks/useLocale";
 import type { TranslationKey } from "@/lib/i18n";
@@ -300,6 +301,65 @@ function ArtifactCardInner({ artifact, nodeLabel, nodeCategory, onDismiss, onReg
           </motion.div>
         )}
       </AnimatePresence>
+
+        {/* BOQ Visualizer CTA — shown for table artifacts that contain BOQ data */}
+        {!collapsed && artifact.type === "table" && (() => {
+          const d = artifact.data as Record<string, unknown> | undefined;
+          const hasBOQ = d && (d._boqData || d._totalCost);
+          if (!hasBOQ) return null;
+          const totalCost = d._totalCost as number | undefined;
+          const gfa = d._gfa as number | undefined;
+          const region = (d._region as string) || "";
+          const costLabel = totalCost && totalCost >= 10000000 ? `₹${(totalCost / 10000000).toFixed(1)} Cr` : totalCost ? `₹${(totalCost / 100000).toFixed(1)} L` : "";
+          const subtitle = [costLabel, gfa ? `${gfa.toLocaleString("en-IN")}m²` : "", region].filter(Boolean).join(" · ");
+          const execId = artifact.executionId || "demo";
+          return (
+            <Link href={`/dashboard/results/${execId}/boq`}>
+              <div
+                style={{
+                  margin: "8px 14px 10px",
+                  padding: "12px 16px",
+                  borderRadius: 10,
+                  background: "linear-gradient(135deg, rgba(0,245,255,0.08), rgba(0,245,255,0.03))",
+                  border: "1px solid rgba(0,245,255,0.2)",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  transition: "all 0.2s ease",
+                  boxShadow: "0 0 16px rgba(0,245,255,0.06)",
+                }}
+                onMouseEnter={e => {
+                  e.currentTarget.style.borderColor = "rgba(0,245,255,0.4)";
+                  e.currentTarget.style.boxShadow = "0 0 24px rgba(0,245,255,0.15)";
+                  e.currentTarget.style.background = "linear-gradient(135deg, rgba(0,245,255,0.12), rgba(0,245,255,0.05))";
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.borderColor = "rgba(0,245,255,0.2)";
+                  e.currentTarget.style.boxShadow = "0 0 16px rgba(0,245,255,0.06)";
+                  e.currentTarget.style.background = "linear-gradient(135deg, rgba(0,245,255,0.08), rgba(0,245,255,0.03))";
+                }}
+              >
+                <div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: "#00F5FF", display: "flex", alignItems: "center", gap: 6 }}>
+                    Open BOQ Visualizer
+                    <ArrowRight size={13} />
+                  </div>
+                  {subtitle && (
+                    <div style={{ fontSize: 10, color: "#9898B0", marginTop: 2 }}>{subtitle}</div>
+                  )}
+                </div>
+                <div style={{
+                  width: 32, height: 32, borderRadius: 8,
+                  background: "rgba(0,245,255,0.1)",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                }}>
+                  <BarChart2 size={16} color="#00F5FF" />
+                </div>
+              </div>
+            </Link>
+          );
+        })()}
 
         {/* Type-specific disclaimer */}
         {!collapsed && (artifact.type === "table" || artifact.type === "kpi") && !!artifact.metadata?.real && (
