@@ -118,6 +118,11 @@ async function executeNode(
     const ifcParsed = nodeData.ifcParsed as Record<string, unknown> | undefined;
     if (catalogueId === "IN-004" && ifcParsed) {
       console.log("[IN-004] Using pre-parsed IFC data (client-side parsed)");
+      // Include supplementary IFC data if uploaded (structural, MEP)
+      const structuralIFCParsed = nodeData.structuralIFCParsed as Record<string, unknown> | undefined;
+      const mepIFCParsed = nodeData.mepIFCParsed as Record<string, unknown> | undefined;
+      if (structuralIFCParsed) console.log("[IN-004] Structural IFC data included");
+      if (mepIFCParsed) console.log("[IN-004] MEP IFC data included");
       return {
         id: generateId(),
         executionId,
@@ -129,6 +134,8 @@ async function executeNode(
           label: "IFC Model (parsed)",
           fileName: nodeData.fileName as string ?? inputValue ?? "model.ifc",
           ifcParsed, // Pre-parsed result — TR-007 uses this directly
+          ...(structuralIFCParsed ? { structuralIFCParsed } : {}),
+          ...(mepIFCParsed ? { mepIFCParsed } : {}),
           // Do NOT include fileData — it would be 28MB and break Vercel
         },
         metadata: { source: "user-input", parser: "ifc-text-parser" },
@@ -173,6 +180,8 @@ async function executeNode(
             label: "IFC Model (parsed)",
             fileName: fileObj.name,
             ifcParsed: result,
+            ...(nodeData.structuralIFCParsed ? { structuralIFCParsed: nodeData.structuralIFCParsed } : {}),
+            ...(nodeData.mepIFCParsed ? { mepIFCParsed: nodeData.mepIFCParsed } : {}),
           },
           metadata: { source: "user-input", parser: "ifc-text-parser" },
           createdAt: new Date(),
