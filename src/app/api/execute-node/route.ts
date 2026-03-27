@@ -2351,7 +2351,12 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
           // FIX 6: round rate to whole ₹, then multiply — displayed math checks out
           adjRate = Math.round(adjRate);
           const total = Math.round(adjQty * adjRate * 100) / 100;
-          const breakdown = { material: 0.45, labor: 0.50, equipment: 0.05 };
+          // Steel items: 85% material, 10% labor, 5% equipment (rebar is mostly material cost)
+          // Non-steel: 45% material, 50% labor, 5% equipment
+          const isRebarOrSteel = is1200Key === "rebar" || is1200Key === "structural-steel";
+          const breakdown = isRebarOrSteel
+            ? { material: 0.85, labor: 0.10, equipment: 0.05 }
+            : { material: 0.45, labor: 0.50, equipment: 0.05 };
           const matC = Math.round(total * breakdown.material * 100) / 100;
           const labC = Math.round(total * breakdown.labor * 100) / 100;
           const eqpC = Math.round((total - matC - labC) * 100) / 100; // remainder — guarantees sum = total
@@ -3491,28 +3496,33 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
               : "MED 60%";
 
             // Derive short division name for the Division column
-            const divShort = l.division.includes("Concrete") || l.division.includes("Part 2") ? "Structural"
-              : l.division.includes("Masonry") || l.division.includes("Part 3") ? "Masonry"
-              : l.division.includes("Steel") || l.division.includes("Part 6") || l.division.includes("Part 7") ? "Steel"
-              : l.division.includes("Plaster") || l.division.includes("Part 8") || l.division.includes("Paint") || l.division.includes("Part 10") || l.division.includes("Flooring") || l.division.includes("Part 13") ? "Finishes"
-              : l.division.includes("MEP") || l.division.includes("Part 14") || l.division.includes("Part 15") || l.division.includes("Part 16") || l.division.includes("Part 17") ? "MEP"
-              : l.division.includes("SUBSTRUCTURE") || l.division.includes("Part 1") ? "Foundation"
-              : l.division.includes("EXTERNAL") ? "External"
-              : l.division.includes("Formwork") || l.division.includes("Part 5") ? "Formwork"
-              : l.division.includes("Reinforcement") ? "Rebar"
-              : l.division.split("—")[0]?.trim().slice(0, 15) || "General";
+            const divStr = String(l.division || "General");
+            const divShort = divStr.includes("Concrete") || divStr.includes("Part 2") ? "Structural"
+              : divStr.includes("Masonry") || divStr.includes("Part 3") ? "Masonry"
+              : divStr.includes("Steel") || divStr.includes("Part 6") || divStr.includes("Part 7") ? "Steel"
+              : divStr.includes("Plaster") || divStr.includes("Part 8") || divStr.includes("Paint") || divStr.includes("Part 10") || divStr.includes("Flooring") || divStr.includes("Part 13") ? "Finishes"
+              : divStr.includes("MEP") || divStr.includes("Part 14") || divStr.includes("Part 15") || divStr.includes("Part 16") || divStr.includes("Part 17") ? "MEP"
+              : divStr.includes("SUBSTRUCTURE") || divStr.includes("Part 1") ? "Foundation"
+              : divStr.includes("EXTERNAL") ? "External"
+              : divStr.includes("Formwork") || divStr.includes("Part 5") ? "Formwork"
+              : divStr.includes("Reinforcement") ? "Rebar"
+              : divStr.includes("PROVISIONAL") ? "Provisional"
+              : divStr.split("—")[0]?.trim().slice(0, 15) || "General";
+
+            // Sanitize NaN — Excel shows "NaN" for undefined/NaN numbers
+            const safeNum = (v: number) => (Number.isFinite(v) ? v : 0);
 
             const row: (string | number)[] = hasIS1200
               ? [l.is1200Code ?? "", divShort, `${l.description}${countLabel}`, l.unit,
-                 l.quantity, wasteStr, adjQty,
-                 l.materialRate, l.laborRate, l.equipmentRate, l.unitRate,
-                 l.materialCost, l.laborCost, l.equipmentCost, subtotal,
-                 `${(gstRate * 100).toFixed(0)}%`, gstAmt, totalInclGST, dataSource, confidence]
+                 safeNum(l.quantity), wasteStr, safeNum(adjQty),
+                 safeNum(l.materialRate), safeNum(l.laborRate), safeNum(l.equipmentRate), safeNum(l.unitRate),
+                 safeNum(l.materialCost), safeNum(l.laborCost), safeNum(l.equipmentCost), safeNum(subtotal),
+                 `${(gstRate * 100).toFixed(0)}%`, safeNum(gstAmt), safeNum(totalInclGST), dataSource, confidence]
               : ["", `${l.description}${countLabel}`, l.unit,
-                 l.quantity, wasteStr, adjQty,
-                 l.materialRate, l.laborRate, l.equipmentRate, l.unitRate,
-                 l.materialCost, l.laborCost, l.equipmentCost, subtotal,
-                 `${(gstRate * 100).toFixed(0)}%`, gstAmt, totalInclGST, dataSource, confidence];
+                 safeNum(l.quantity), wasteStr, safeNum(adjQty),
+                 safeNum(l.materialRate), safeNum(l.laborRate), safeNum(l.equipmentRate), safeNum(l.unitRate),
+                 safeNum(l.materialCost), safeNum(l.laborCost), safeNum(l.equipmentCost), safeNum(subtotal),
+                 `${(gstRate * 100).toFixed(0)}%`, safeNum(gstAmt), safeNum(totalInclGST), dataSource, confidence];
 
             boqTableRows.push(row);
             divMat += l.materialCost; divLab += l.laborCost; divEqp += l.equipmentCost;
