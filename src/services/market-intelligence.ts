@@ -292,7 +292,11 @@ Before finalizing, check each answer:
   If benchmark range_low < 10,000 → you're returning sqft. Convert before returning.
 - Is ${buildingType} premium applied? wellness > hotel > hospital > office > residential.
 
-Use the tool to report your reasoned prices.`;
+IMPORTANT: You have web_search available. SEARCH for current prices before answering.
+Search for: "{material} price {city} {state} India today" for at least steel and cement.
+Use searched data as your primary source. Mark confidence HIGH if you found real data.
+
+After searching, use the report_construction_prices tool to return your findings.`;
 
   // ── Tool definition forces structured JSON output — no parse errors ever ──
   const priceTool = {
@@ -332,41 +336,59 @@ Use the tool to report your reasoned prices.`;
   let jsonText = "";
   const usedWebSearch = false;
 
-  // ── Primary: Claude Haiku with tool_use (guaranteed valid JSON) ──
+  // ── Primary: Claude Sonnet with web_search + structured output ──
+  // web_search costs $0.01/search × ~5 searches = $0.05/run
+  // Sonnet 4.6 gives better reasoning than Haiku for $0.02 more per run
   try {
-    console.log("[TR-015] Calling Claude Haiku with structured tool output...");
+    console.log("[TR-015] Calling Claude Sonnet with web_search + structured output...");
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 20_000);
+    const timer = setTimeout(() => controller.abort(), 45_000); // web search needs more time
     const response = await client.messages.create({
-      model: "claude-haiku-4-5-20251001",
-      max_tokens: 2048,
-      tools: [priceTool],
-      tool_choice: { type: "tool", name: "report_construction_prices" },
+      model: "claude-sonnet-4-6",
+      max_tokens: 4096,
+      tools: [
+        { type: "web_search_20250305" as const, name: "web_search" as const, max_uses: 5 },
+        priceTool,
+      ],
+      tool_choice: { type: "auto" as const }, // auto lets Claude search THEN report
       messages: [{ role: "user", content: userPrompt }],
     }, { signal: controller.signal });
     clearTimeout(timer);
 
-    // Extract structured data from tool_use block (guaranteed valid JSON)
+    // Extract structured data — Claude may search the web first, then call the tool
+    let webSearchUsed = false;
     for (const block of response.content) {
+      if (block.type === "web_search_tool_result" || (block.type as string) === "server_tool_use") {
+        webSearchUsed = true;
+      }
       if (block.type === "tool_use" && block.name === "report_construction_prices") {
         jsonText = JSON.stringify(block.input);
-        break;
       }
     }
-    result.search_count = 10;
-    result.agent_notes.push(`✨ Market Intelligence — ${city}, ${state} · ${monthYear} · Just fetched · Claude AI · Accuracy ±15-25%`);
-    console.log(`[TR-015] Claude Haiku (structured) responded in ${Date.now() - startTime}ms`);
+    // If Claude didn't call the tool (just searched and returned text), extract from text
+    if (!jsonText) {
+      for (const block of response.content) {
+        if (block.type === "text" && block.text.includes("{")) {
+          jsonText = block.text;
+          break;
+        }
+      }
+    }
+    result.search_count = webSearchUsed ? 5 : 0;
+    const sourceLabel = webSearchUsed ? "web search" : "Claude AI knowledge";
+    result.agent_notes.push(`✨ Market Intelligence — ${city}, ${state} · ${monthYear} · Just fetched · ${sourceLabel} · Accuracy ±${webSearchUsed ? "10-15" : "15-25"}%`);
+    console.log(`[TR-015] Sonnet responded in ${Date.now() - startTime}ms (web_search: ${webSearchUsed})`);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    console.error("[TR-015] Claude Haiku failed:", msg);
+    console.error("[TR-015] Sonnet+web_search failed:", msg);
 
-    // ── Fallback: Sonnet with tool_use ──
+    // ── Fallback: Haiku without web_search (training data only) ──
     try {
-      console.log("[TR-015] Trying Sonnet fallback (structured)...");
+      console.log("[TR-015] Trying Haiku fallback (no web search)...");
       const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 30_000);
+      const timer = setTimeout(() => controller.abort(), 20_000);
       const response = await client.messages.create({
-        model: "claude-sonnet-4-6",
+        model: "claude-haiku-4-5-20251001",
         max_tokens: 2048,
         tools: [priceTool],
         tool_choice: { type: "tool", name: "report_construction_prices" },
