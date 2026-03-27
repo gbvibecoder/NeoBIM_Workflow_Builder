@@ -709,7 +709,7 @@ export const PREBUILT_WORKFLOWS: WorkflowTemplate[] = [
         {
           id: "n5",
           type: "workflowNode",
-          position: { x: X1, y: Y + 220 },
+          position: { x: X1, y: Y + 480 },
           data: {
             catalogueId: "IN-006",
             label: "Location Input",
@@ -723,7 +723,7 @@ export const PREBUILT_WORKFLOWS: WorkflowTemplate[] = [
         {
           id: "n6",
           type: "workflowNode",
-          position: { x: X2, y: Y + 220 },
+          position: { x: X2, y: Y + 480 },
           data: {
             catalogueId: "TR-015",
             label: "Market Intelligence",
@@ -751,7 +751,7 @@ export const PREBUILT_WORKFLOWS: WorkflowTemplate[] = [
         {
           id: "n3",
           type: "workflowNode",
-          position: { x: X3, y: Y + 110 },
+          position: { x: X3, y: Y + 240 },
           data: {
             catalogueId: "TR-008",
             label: "BOQ / Cost Mapper",
@@ -765,7 +765,7 @@ export const PREBUILT_WORKFLOWS: WorkflowTemplate[] = [
         {
           id: "n4",
           type: "workflowNode",
-          position: { x: X4, y: Y + 110 },
+          position: { x: X4, y: Y + 240 },
           data: {
             catalogueId: "EX-002",
             label: "BOQ / Spreadsheet Exporter",
