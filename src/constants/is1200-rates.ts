@@ -248,9 +248,14 @@ export const IS1200_MAPPINGS: IS1200Mapping[] = [
   },
   {
     ifcType: "IfcFlowTerminal",
-    is1200Part: "Part 17",
-    is1200PartName: "HVAC",
-    defaultRateCodes: ["IS1200-P17-DIFFUSER"],
+    is1200Part: "Part 14",
+    is1200PartName: "Plumbing Fixtures",
+    defaultRateCodes: ["IS1200-P14-FIXTURE"],
+    materialOverrides: {
+      diffuser: ["IS1200-P17-DIFFUSER"],
+      grille: ["IS1200-P17-DIFFUSER"],
+      terminal: ["IS1200-P17-DIFFUSER"],
+    },
   },
   {
     ifcType: "IfcFlowTreatmentDevice",
@@ -658,6 +663,13 @@ export const IS1200_RATES: IS1200Rate[] = [
     description: "PVC pipe 110mm (soil/drainage) with fittings, S&F",
     unit: "Rmt", rate: 480, material: 340, labour: 140,
     subcategory: "Plumbing",
+  },
+  {
+    is1200Part: "Part 14", is1200Code: "IS1200-P14-FIXTURE",
+    description: "Sanitary fixture (average — WC/basin/tap) supply and fix",
+    unit: "EA", rate: 12000, material: 9000, labour: 3000,
+    subcategory: "Plumbing",
+    notes: "Average rate for commercial-grade sanitary fixtures. Static fallback — market rate preferred.",
   },
   {
     is1200Part: "Part 14", is1200Code: "IS1200-P14-COPPER-PIPE",
