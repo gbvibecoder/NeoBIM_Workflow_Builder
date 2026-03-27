@@ -296,6 +296,21 @@ export const NODE_CATALOGUE: NodeCatalogueItem[] = [
     executionTime: "< 30s",
   },
 
+  {
+    id: "TR-016",
+    name: "Clash Detector",
+    description: "Detects spatial overlaps between building elements (pipes through beams, ducts through columns) using bounding-box collision analysis — generates a clash report with severity classification",
+    category: "transform",
+    icon: "AlertTriangle",
+    inputs: [
+      { id: "ifc-in", label: "IFC Model", type: "ifc" },
+    ],
+    outputs: [{ id: "clashes-out", label: "Clash Report", type: "json" }],
+    apiEngine: "web-ifc (WASM)",
+    tags: ["clash", "detection", "collision", "coordination", "bim", "ifc", "quality", "mep", "structural"],
+    executionTime: "< 60s",
+  },
+
   // ── Control Flow / Branching ──
   {
     id: "TR-013",
@@ -640,7 +655,7 @@ export const CATEGORY_CONFIG = {
 } as const;
 
 /** Nodes that use real API calls (not mock/sample data) */
-export const LIVE_NODES = new Set(['TR-003', 'TR-007', 'TR-008', 'TR-015', 'GN-001', 'GN-003', 'GN-007', 'GN-008', 'GN-009', 'GN-010', 'EX-001', 'EX-002']);
+export const LIVE_NODES = new Set(['TR-003', 'TR-007', 'TR-008', 'TR-015', 'TR-016', 'GN-001', 'GN-003', 'GN-007', 'GN-008', 'GN-009', 'GN-010', 'EX-001', 'EX-002']);
 
 // Mark isLive on catalogue items at module init
 for (const node of NODE_CATALOGUE) {

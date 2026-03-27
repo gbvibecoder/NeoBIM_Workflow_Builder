@@ -321,6 +321,38 @@ export function validateGN008Input(inputData: unknown): ValidationResult {
 }
 
 /**
+ * TR-016: Clash Detector
+ * Requires raw IFC buffer (fileData, ifcUrl, or ifcData with buffer)
+ */
+export function validateTR016Input(inputData: unknown): ValidationResult {
+  if (!inputData) {
+    return {
+      valid: false,
+      error: "No IFC data provided for clash detection",
+      userError: UserErrors.NO_GEOMETRY_FOR_CLASHES,
+    };
+  }
+
+  const input = inputData as Record<string, unknown>;
+
+  // Need at least one source of raw IFC data
+  const hasFileData = !!input.fileData;
+  const hasIfcUrl = !!input.ifcUrl;
+  const hasIfcData = !!input.ifcData;
+  const hasIfcParsedWithUrl = !!input.ifcParsed && !!((input.ifcParsed as Record<string, unknown>)?.ifcUrl);
+
+  if (!hasFileData && !hasIfcUrl && !hasIfcData && !hasIfcParsedWithUrl) {
+    return {
+      valid: false,
+      error: "Clash detection requires raw IFC geometry (not pre-parsed quantities)",
+      userError: UserErrors.NO_GEOMETRY_FOR_CLASHES,
+    };
+  }
+
+  return { valid: true };
+}
+
+/**
  * Validate input based on node catalogue ID
  */
 export function validateNodeInput(
@@ -350,6 +382,8 @@ export function validateNodeInput(
       return validateGN007Input(inputData);
     case "GN-008":
       return validateGN008Input(inputData);
+    case "TR-016":
+      return validateTR016Input(inputData);
     default:
       return { valid: true }; // Unknown nodes pass (might be new)
   }

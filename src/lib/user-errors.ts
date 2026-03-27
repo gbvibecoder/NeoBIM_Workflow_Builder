@@ -167,6 +167,18 @@ export const UserErrors = {
     code: "NODE_003",
   },
 
+  CLASH_DETECTION_FAILED: {
+    title: "Clash detection failed",
+    message: "Unable to analyze the IFC model for clashes. The file may be corrupted or contain no geometry.",
+    code: "NODE_004",
+  },
+
+  NO_GEOMETRY_FOR_CLASHES: {
+    title: "No geometry available",
+    message: "Clash detection requires the raw IFC file (not pre-parsed data). Please connect an IFC Upload node directly.",
+    code: "NODE_005",
+  },
+
   // Workflow limits
   WORKFLOW_LIMIT_REACHED: (limit: number): UserError => ({
     title: "Workflow limit reached",

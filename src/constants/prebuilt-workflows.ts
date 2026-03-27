@@ -951,6 +951,57 @@ export const PREBUILT_WORKFLOWS: WorkflowTemplate[] = [
       ],
     },
   },
+  {
+    id: "wf-12",
+    name: "IFC Upload → Clash Detection",
+    description:
+      "Upload an IFC model → detect spatial clashes between building elements using AABB collision analysis. Identifies hard clashes (MEP vs structural), soft clashes, and clearance violations — generates a detailed clash report with element IDs, storeys, and overlap volumes.",
+    tags: ["ifc", "bim", "clash", "detection", "coordination", "quality", "mep", "structural"],
+    category: "BIM Analysis",
+    complexity: "simple",
+    estimatedRunTime: "~30 seconds",
+    requiredInputs: ["IFC model file (.ifc)"],
+    expectedOutputs: [
+      "Clash detection report with severity classification",
+      "Table of clashing element pairs with storeys and overlap volumes",
+    ],
+    thumbnail: "https://picsum.photos/seed/wf20/600/400",
+    tileGraph: {
+      nodes: [
+        {
+          id: "n1",
+          type: "workflowNode",
+          position: { x: X1, y: Y },
+          data: {
+            catalogueId: "IN-004",
+            label: "IFC Upload",
+            category: "input",
+            status: "idle",
+            inputs: [],
+            outputs: [{ id: "ifc-out", label: "IFC Model", type: "ifc" }],
+            icon: "Box",
+          },
+        },
+        {
+          id: "n2",
+          type: "workflowNode",
+          position: { x: X2, y: Y },
+          data: {
+            catalogueId: "TR-016",
+            label: "Clash Detector",
+            category: "transform",
+            status: "idle",
+            inputs: [{ id: "ifc-in", label: "IFC Model", type: "ifc" }],
+            outputs: [{ id: "clashes-out", label: "Clash Report", type: "json" }],
+            icon: "AlertTriangle",
+          },
+        },
+      ],
+      edges: [
+        { id: "e1-2", source: "n1", sourceHandle: "ifc-out", target: "n2", targetHandle: "ifc-in", type: "animatedEdge" },
+      ],
+    },
+  },
 ];
 
 export const PREBUILT_WORKFLOWS_MAP = new Map(

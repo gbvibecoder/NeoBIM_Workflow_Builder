@@ -91,7 +91,7 @@ function extractBuildingTypeFromText(text: string): string | null {
 }
 
 // Node IDs that have real implementations
-const REAL_NODE_IDS = new Set(["TR-001", "TR-003", "TR-004", "TR-005", "TR-012", "GN-001", "GN-003", "GN-004", "GN-007", "GN-008", "GN-009", "GN-010", "GN-011", "TR-007", "TR-008", "TR-015", "EX-001", "EX-002", "EX-003"]);
+const REAL_NODE_IDS = new Set(["TR-001", "TR-003", "TR-004", "TR-005", "TR-012", "GN-001", "GN-003", "GN-004", "GN-007", "GN-008", "GN-009", "GN-010", "GN-011", "TR-007", "TR-008", "TR-015", "TR-016", "EX-001", "EX-002", "EX-003"]);
 
 // Nodes that require OpenAI API calls
 const OPENAI_NODES = new Set(["TR-003", "TR-004", "TR-005", "TR-012", "GN-003", "GN-004", "GN-008"]);
@@ -2838,6 +2838,127 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
         },
         createdAt: new Date(),
       };
+
+    } else if (catalogueId === "TR-016") {
+      // ── Clash Detector — AABB-based spatial overlap analysis ──
+      // Requires raw IFC geometry (not pre-parsed quantities).
+      // Supports 3 input modes: fileData (base64), ifcUrl (R2), ifcData (buffer array).
+      console.log(`[TR-016] inputData keys: ${Object.keys(inputData ?? {}).join(", ")}`);
+
+      let ifcBuffer: Uint8Array | null = null;
+
+      // Mode 1: inline base64 (small files from IN-004 pass-through)
+      if (inputData?.fileData && typeof inputData.fileData === "string") {
+        try {
+          const binaryStr = atob(inputData.fileData as string);
+          const bytes = new Uint8Array(binaryStr.length);
+          for (let i = 0; i < binaryStr.length; i++) {
+            bytes[i] = binaryStr.charCodeAt(i);
+          }
+          ifcBuffer = bytes;
+          console.log(`[TR-016] Decoded base64 fileData → ${bytes.length} bytes`);
+        } catch (e) {
+          console.error("[TR-016] Failed to decode base64 fileData:", e);
+        }
+      }
+
+      // Mode 2: ifcUrl — fetch from R2
+      if (!ifcBuffer && inputData?.ifcUrl && typeof inputData.ifcUrl === "string") {
+        console.log(`[TR-016] Fetching IFC from R2 URL: ${(inputData.ifcUrl as string).slice(0, 80)}...`);
+        try {
+          const resp = await fetch(inputData.ifcUrl as string);
+          if (!resp.ok) throw new Error(`R2 fetch failed: ${resp.status}`);
+          const arrayBuf = await resp.arrayBuffer();
+          ifcBuffer = new Uint8Array(arrayBuf);
+          console.log(`[TR-016] Fetched ${arrayBuf.byteLength} bytes from R2`);
+        } catch (fetchErr) {
+          console.error("[TR-016] Failed to fetch IFC from R2:", fetchErr);
+        }
+      }
+
+      // Mode 3: ifcData with buffer array (from upstream node)
+      if (!ifcBuffer && inputData?.ifcData && typeof inputData.ifcData === "object") {
+        const ifcDataObj = inputData.ifcData as Record<string, unknown>;
+        if (ifcDataObj.buffer) {
+          ifcBuffer = new Uint8Array(ifcDataObj.buffer as ArrayLike<number>);
+          console.log(`[TR-016] Using ifcData buffer → ${ifcBuffer.length} bytes`);
+        }
+      }
+
+      // Mode 4: ifcParsed may have an ifcUrl we can fetch
+      if (!ifcBuffer && inputData?.ifcParsed && typeof inputData.ifcParsed === "object") {
+        const parsed = inputData.ifcParsed as Record<string, unknown>;
+        if (parsed.ifcUrl && typeof parsed.ifcUrl === "string") {
+          try {
+            const resp = await fetch(parsed.ifcUrl as string);
+            if (!resp.ok) throw new Error(`R2 fetch failed: ${resp.status}`);
+            const arrayBuf = await resp.arrayBuffer();
+            ifcBuffer = new Uint8Array(arrayBuf);
+            console.log(`[TR-016] Fetched ${arrayBuf.byteLength} bytes from ifcParsed.ifcUrl`);
+          } catch (fetchErr) {
+            console.error("[TR-016] Failed to fetch IFC from ifcParsed.ifcUrl:", fetchErr);
+          }
+        }
+      }
+
+      if (!ifcBuffer) {
+        throw new APIError(UserErrors.NO_GEOMETRY_FOR_CLASHES, 400);
+      }
+
+      try {
+        const { detectClashesFromBuffer } = await import("@/services/clash-detector");
+        const result = await detectClashesFromBuffer(ifcBuffer, {
+          tolerance: 0.025,
+          maxClashes: 5000,
+        });
+
+        const { meta, clashes } = result;
+
+        // Build table rows for artifact
+        const tableRows = clashes.map((c, i) => [
+          String(i + 1),
+          c.severity.toUpperCase(),
+          `${c.elementA.type} "${c.elementA.name}"`,
+          `#${c.elementA.expressID}`,
+          `${c.elementB.type} "${c.elementB.name}"`,
+          `#${c.elementB.expressID}`,
+          c.elementA.storey || c.elementB.storey || "—",
+          c.overlapVolume.toFixed(4),
+        ]);
+
+        const summaryParts = [];
+        if (meta.hardClashes > 0) summaryParts.push(`${meta.hardClashes} hard`);
+        if (meta.softClashes > 0) summaryParts.push(`${meta.softClashes} soft`);
+        if (meta.clearanceClashes > 0) summaryParts.push(`${meta.clearanceClashes} clearance`);
+        const summaryStr = summaryParts.length > 0
+          ? `Found ${meta.clashesFound} clashes (${summaryParts.join(", ")}) across ${meta.totalElements} elements in ${(meta.processingTimeMs / 1000).toFixed(1)}s`
+          : `No clashes detected among ${meta.totalElements} elements (processed in ${(meta.processingTimeMs / 1000).toFixed(1)}s)`;
+
+        artifact = {
+          id: generateId(),
+          executionId: executionId ?? "local",
+          tileInstanceId,
+          type: "table",
+          data: {
+            label: "Clash Detection Report",
+            headers: ["#", "Severity", "Element A", "ID A", "Element B", "ID B", "Storey", "Overlap (m³)"],
+            rows: tableRows,
+            content: summaryStr,
+            _clashes: clashes,
+            _meta: meta,
+          },
+          metadata: {
+            real: true,
+            processingTimeMs: meta.processingTimeMs,
+            totalElements: meta.totalElements,
+            clashesFound: meta.clashesFound,
+          },
+          createdAt: new Date(),
+        };
+      } catch (clashErr) {
+        console.error("[TR-016] Clash detection error:", clashErr);
+        throw new APIError(UserErrors.CLASH_DETECTION_FAILED, 500);
+      }
 
     } else if (catalogueId === "EX-002") {
       // BOQ Excel Export — Interactive 6-sheet XLSX workbook

@@ -107,12 +107,22 @@ Requires `.env.local` (not committed). See `.env.example` for a template. Key va
 - Framework: Vitest with `@testing-library/react`
 - Setup file: `tests/setup.ts` (mocks all env vars before tests)
 - Test dirs: `tests/unit/`, `tests/integration/`, `tests/mocks/`
-- Test environment: `node` (configured in `vitest.config.ts`)
+- Test environment: `happy-dom` (configured in `vitest.config.ts`)
 - Coverage thresholds: 70% (lines, functions, branches, statements)
+
+## Infrastructure
+
+**Cloudflare R2 (next.config.ts rewrites):** 3D models and textures are proxied through `/r2-models/` and `/r2-textures/` routes to avoid CORS. Presigned URL uploads go through `/r2-upload/`. Falls back to `R2_PUBLIC_URL` env var or a public CDN default.
+
+**Sentry:** Only active when `NEXT_PUBLIC_SENTRY_DSN` is set — config wrapping is conditional to avoid runtime crashes without it.
+
+**Image optimization:** AVIF/WebP prioritized, 1-year cache TTL. External sources whitelisted: Unsplash, Google, Azure Blob, Picsum.
+
+**Bundle optimization:** `next.config.ts` explicitly optimizes imports for `lucide-react`, Radix UI components, and `framer-motion` to reduce bundle size.
 
 ## Security
 
-- CSP headers configured in `next.config.ts`
+- CSP headers configured in `next.config.ts` — `unsafe-eval` is intentional for Three.js shader compilation in blob iframes
 - Input sanitization with DOMPurify
 - Password hashing: bcryptjs (12 rounds)
 - Server action body limit: 2MB

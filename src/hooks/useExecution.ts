@@ -15,7 +15,7 @@ import type { WorkflowNode } from "@/types/nodes";
 import type { LogEntry } from "@/components/canvas/ExecutionLog";
 
 // All node IDs that have real API implementations on the server
-const REAL_NODE_IDS = new Set(["TR-001", "TR-003", "TR-004", "TR-005", "TR-012", "TR-015", "GN-001", "GN-003", "GN-004", "GN-009", "GN-010", "GN-011", "TR-007", "TR-008", "EX-001", "EX-002", "EX-003"]);
+const REAL_NODE_IDS = new Set(["TR-001", "TR-003", "TR-004", "TR-005", "TR-012", "TR-015", "TR-016", "GN-001", "GN-003", "GN-004", "GN-009", "GN-010", "GN-011", "TR-007", "TR-008", "EX-001", "EX-002", "EX-003"]);
 
 // Live nodes — ALWAYS use real API execution regardless of NEXT_PUBLIC_ENABLE_MOCK_EXECUTION.
 // These are production-ready and should never fall through to mock when authenticated.
@@ -29,6 +29,7 @@ const LIVE_NODE_IDS = new Set([
   "GN-003",  // Concept Render Generator (DALL-E 3)
   "GN-009",  // Video Walkthrough Generator (Kling 2.1 via fal.ai)
   "GN-010",  // Hi-Fi 3D Reconstructor (Meshy v4)
+  "TR-016",  // Clash Detector (web-ifc AABB analysis, no API key)
   "EX-001",  // IFC Exporter (pure computation, no API key)
   "EX-002",  // BOQ Spreadsheet Exporter (xlsx, no API key)
 ]);
@@ -236,7 +237,7 @@ async function executeNode(
     if (nd.viewType != null) nodeConfig.viewType = nd.viewType;
 
     // Long-running nodes (3D generation, video, IFC parsing) need extended timeout
-    const LONG_RUNNING_NODES = new Set(["GN-001", "GN-009", "GN-010", "TR-007"]);
+    const LONG_RUNNING_NODES = new Set(["GN-001", "GN-009", "GN-010", "TR-007", "TR-016"]);
     const timeoutMs = LONG_RUNNING_NODES.has(catalogueId) ? 300_000 : 120_000; // 5min vs 2min
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
@@ -438,6 +439,69 @@ async function executeNode(
       }
       // ══════════════════════════════════════════════════════════════════════
       // END TR-007 special handling — all other nodes use normal execute-node
+      // ══════════════════════════════════════════════════════════════════════
+
+      // ══════════════════════════════════════════════════════════════════════
+      // TR-016 SPECIAL HANDLING: Clash Detector needs raw IFC geometry
+      // IN-004 strips raw file data (too large for JSON) and only passes
+      // ifcParsed (text-parsed quantities). TR-016 needs the binary buffer
+      // for mesh streaming. Solution: find the raw File in inputFileStore,
+      // upload to R2 via /api/parse-ifc, and pass the ifcUrl to the server.
+      // ══════════════════════════════════════════════════════════════════════
+      if (catalogueId === "TR-016" && !inputData.fileData && !inputData.ifcUrl && !inputData.ifcData) {
+        console.log("[TR-016] No raw IFC data in inputData — looking for File in inputFileStore");
+
+        // Find the upstream input node's File object
+        let ifcFile: File | null = null;
+        let ifcFileName = (inputData.fileName as string) ?? "model.ifc";
+
+        // Check all entries in inputFileStore for an IFC file
+        for (const [storeNodeId, fileObj] of inputFileStore.entries()) {
+          if (fileObj.name.toLowerCase().endsWith(".ifc")) {
+            ifcFile = fileObj;
+            ifcFileName = fileObj.name;
+            console.log(`[TR-016] Found IFC file "${fileObj.name}" (${(fileObj.size / 1024 / 1024).toFixed(1)}MB) from node ${storeNodeId}`);
+            break;
+          }
+        }
+
+        if (ifcFile) {
+          try {
+            const formData = new FormData();
+            formData.append("file", ifcFile);
+
+            console.log(`[TR-016] Uploading ${(ifcFile.size / 1024 / 1024).toFixed(1)}MB to /api/parse-ifc for R2 storage...`);
+            const uploadRes = await fetch("/api/parse-ifc", {
+              method: "POST",
+              body: formData,
+              signal: AbortSignal.timeout(180_000),
+            });
+
+            if (!uploadRes.ok) {
+              const errBody = await uploadRes.json().catch(() => ({ error: { message: `Server returned ${uploadRes.status}` } }));
+              throw new Error(errBody.error?.message || `Upload failed with status ${uploadRes.status}`);
+            }
+
+            const uploadData = await uploadRes.json();
+            const r2Url = uploadData.meta?.ifcUrl ?? uploadData.ifcUrl;
+            if (r2Url) {
+              inputData.ifcUrl = r2Url;
+              inputData.fileName = ifcFileName;
+              console.log(`[TR-016] IFC uploaded to R2: ${(r2Url as string).slice(0, 80)}...`);
+            } else {
+              throw new Error("R2 upload did not return ifcUrl — R2 storage may be unavailable");
+            }
+          } catch (uploadErr) {
+            const msg = uploadErr instanceof Error ? uploadErr.message : "IFC upload failed";
+            console.error("[TR-016] Failed to upload IFC to R2:", msg);
+            throw new Error(`Clash detection requires the raw IFC file to be uploaded. ${msg}`);
+          }
+        } else {
+          throw new Error("No IFC file found. Please connect an IFC Upload (IN-004) node and upload a .ifc file.");
+        }
+      }
+      // ══════════════════════════════════════════════════════════════════════
+      // END TR-016 special handling
       // ══════════════════════════════════════════════════════════════════════
 
       // For non-IFC nodes with large images: upload to temp-image first, pass URL instead
