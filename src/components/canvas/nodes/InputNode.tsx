@@ -427,75 +427,155 @@ function SupplementaryIFCUpload({ nodeId }: { nodeId: string }) {
   const totalAccuracy = baseAccuracy + structBonus + mepBonus;
   const barColor = totalAccuracy >= 85 ? "#10B981" : totalAccuracy >= 75 ? "#FFBF00" : "#00F5FF";
 
+  const onDrop = useCallback((e: React.DragEvent, type: "structural" | "mep") => {
+    e.preventDefault(); e.stopPropagation();
+    const f = e.dataTransfer.files?.[0];
+    if (f) handleSupplementary(f, type);
+  }, [handleSupplementary]);
+
+  const onDragOver = useCallback((e: React.DragEvent) => { e.preventDefault(); e.stopPropagation(); }, []);
+
   return (
     <div className="nodrag nowheel nopan" onMouseDown={stopAll} onClick={stopAll} onKeyDown={stopAll}
-      style={{ marginTop: 6 }}>
+      style={{ marginTop: 8 }}>
       <input ref={structRef} type="file" accept=".ifc" style={{ display: "none" }}
         onChange={e => { if (e.target.files?.[0]) handleSupplementary(e.target.files[0], "structural"); }} />
       <input ref={mepRef} type="file" accept=".ifc" style={{ display: "none" }}
         onChange={e => { if (e.target.files?.[0]) handleSupplementary(e.target.files[0], "mep"); }} />
 
-      {/* Accuracy Meter */}
-      <div style={{ padding: "6px 8px", background: "rgba(0,0,0,0.3)", borderRadius: 6, border: "1px solid rgba(255,255,255,0.06)" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
-          <span style={{ fontSize: 9, color: "#8888A0", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>Estimate Accuracy</span>
-          <span style={{ fontSize: 13, fontWeight: 700, color: barColor }}>{totalAccuracy}%</span>
-        </div>
-        <div style={{ height: 4, background: "rgba(255,255,255,0.06)", borderRadius: 2, overflow: "hidden" }}>
-          <div style={{ height: "100%", width: `${totalAccuracy}%`, background: barColor, borderRadius: 2, transition: "width 0.5s ease, background 0.5s ease" }} />
-        </div>
+      {/* ── Accuracy Meter ── */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 4 }}>
+        <span style={{ fontSize: 9, color: "#8888A0", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em" }}>Estimate Accuracy</span>
+        <span style={{ fontSize: 14, fontWeight: 800, color: barColor, fontFamily: "monospace" }}>~{totalAccuracy}%</span>
+      </div>
+      <div style={{ height: 4, background: "rgba(255,255,255,0.06)", borderRadius: 2, overflow: "hidden", marginBottom: 10 }}>
+        <div style={{ height: "100%", width: `${totalAccuracy}%`, background: `linear-gradient(90deg, ${barColor}, ${barColor}dd)`, borderRadius: 2, transition: "width 0.6s ease, background 0.6s ease" }} />
+      </div>
 
-        {/* File Slots */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 3, marginTop: 6 }}>
-          {/* Architectural — always filled */}
-          <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "3px 0" }}>
-            <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#10B981", flexShrink: 0 }} />
-            <span style={{ fontSize: 9, color: "#10B981", flex: 1, fontWeight: 500 }}>Architectural IFC</span>
-            <span style={{ fontSize: 8, color: "#555570", fontWeight: 600 }}>BASE</span>
-          </div>
+      {/* ── Boost Accuracy Header ── */}
+      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
+        <span style={{ fontSize: 8, color: "#555570", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", whiteSpace: "nowrap" }}>Boost Accuracy</span>
+        <div style={{ flex: 1, height: 1, background: "rgba(255,255,255,0.06)" }} />
+      </div>
 
-          {/* Structural */}
-          <button onClick={() => !structural && structRef.current?.click()} style={{
-            display: "flex", alignItems: "center", gap: 6, padding: "3px 0",
-            background: "none", border: "none", cursor: structural ? "default" : "pointer", width: "100%", textAlign: "left",
+      {/* ── Structural IFC Drop Zone ── */}
+      <div
+        onClick={() => !structural && structRef.current?.click()}
+        onDrop={e => onDrop(e, "structural")}
+        onDragOver={onDragOver}
+        style={{
+          padding: "8px 10px", marginBottom: 6, borderRadius: 6, cursor: structural ? "default" : "pointer",
+          border: structural ? "1px solid rgba(16,185,129,0.3)" : "1.5px dashed rgba(255,255,255,0.12)",
+          background: structural ? "rgba(16,185,129,0.05)" : "rgba(0,0,0,0.15)",
+          transition: "all 0.2s",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
+          <div style={{
+            width: 28, height: 28, borderRadius: 5, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+            background: structural ? "rgba(16,185,129,0.12)" : "rgba(255,255,255,0.04)",
           }}>
-            <div style={{ width: 6, height: 6, borderRadius: "50%", background: structural ? "#10B981" : "rgba(255,255,255,0.15)", flexShrink: 0 }} />
-            <span style={{ fontSize: 9, color: structural ? "#10B981" : "#8888A0", flex: 1, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-              {structural ? `Structural: ${structural}` : "Add Structural IFC"}
-            </span>
-            <span style={{
-              fontSize: 8, fontWeight: 700, padding: "1px 5px", borderRadius: 3,
-              background: structural ? "rgba(16,185,129,0.15)" : "rgba(0,245,255,0.1)",
-              color: structural ? "#10B981" : "#00F5FF",
-            }}>
-              {structural ? "✓ +12%" : "+12%"}
-            </span>
-          </button>
-
-          {/* MEP */}
-          <button onClick={() => !mep && mepRef.current?.click()} style={{
-            display: "flex", alignItems: "center", gap: 6, padding: "3px 0",
-            background: "none", border: "none", cursor: mep ? "default" : "pointer", width: "100%", textAlign: "left",
-          }}>
-            <div style={{ width: 6, height: 6, borderRadius: "50%", background: mep ? "#10B981" : "rgba(255,255,255,0.15)", flexShrink: 0 }} />
-            <span style={{ fontSize: 9, color: mep ? "#10B981" : "#8888A0", flex: 1, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-              {mep ? `MEP: ${mep}` : "Add MEP/Services IFC"}
-            </span>
-            <span style={{
-              fontSize: 8, fontWeight: 700, padding: "1px 5px", borderRadius: 3,
-              background: mep ? "rgba(16,185,129,0.15)" : "rgba(0,245,255,0.1)",
-              color: mep ? "#10B981" : "#00F5FF",
-            }}>
-              {mep ? "✓ +10%" : "+10%"}
-            </span>
-          </button>
-
-          {/* QS Corrections note */}
-          <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "3px 0" }}>
-            <div style={{ width: 6, height: 6, borderRadius: "50%", background: "rgba(255,191,0,0.4)", flexShrink: 0 }} />
-            <span style={{ fontSize: 9, color: "#8888A0", flex: 1, fontWeight: 500 }}>QS corrections</span>
-            <span style={{ fontSize: 8, fontWeight: 600, color: "#FFBF00", opacity: 0.6 }}>+5% over time</span>
+            <span style={{ fontSize: 13, opacity: structural ? 1 : 0.4 }}>{structural ? "✓" : "⊞"}</span>
           </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+              <span style={{ fontSize: 10, fontWeight: 700, color: structural ? "#34D399" : "#C0C0D0" }}>
+                {structural ? structural : "Structural IFC"}
+              </span>
+              {!structural && <span style={{ fontSize: 8, color: "#555570" }}>optional</span>}
+            </div>
+            <div style={{ fontSize: 8, color: "#555570", marginTop: 1 }}>
+              {structural ? "Foundation, rebar, columns, beams" : "Foundations, rebar, columns, beams"}
+            </div>
+            {!structural && (
+              <div style={{ fontSize: 8, color: "#555570", marginTop: 2, display: "flex", alignItems: "center", gap: 3 }}>
+                <span style={{ fontSize: 9 }}>↑</span> Click or drag to upload
+              </div>
+            )}
+          </div>
+          <span style={{
+            fontSize: 9, fontWeight: 700, padding: "2px 6px", borderRadius: 4, flexShrink: 0, marginTop: 2,
+            background: structural ? "rgba(16,185,129,0.15)" : "rgba(0,245,255,0.08)",
+            color: structural ? "#10B981" : "#00F5FF",
+          }}>
+            {structural ? "✓ +12%" : "+12%"}
+          </span>
+        </div>
+      </div>
+
+      {/* ── MEP IFC Drop Zone ── */}
+      <div
+        onClick={() => !mep && mepRef.current?.click()}
+        onDrop={e => onDrop(e, "mep")}
+        onDragOver={onDragOver}
+        style={{
+          padding: "8px 10px", marginBottom: 6, borderRadius: 6, cursor: mep ? "default" : "pointer",
+          border: mep ? "1px solid rgba(16,185,129,0.3)" : "1.5px dashed rgba(255,255,255,0.12)",
+          background: mep ? "rgba(16,185,129,0.05)" : "rgba(0,0,0,0.15)",
+          transition: "all 0.2s",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
+          <div style={{
+            width: 28, height: 28, borderRadius: 5, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+            background: mep ? "rgba(16,185,129,0.12)" : "rgba(255,255,255,0.04)",
+          }}>
+            <span style={{ fontSize: 13, opacity: mep ? 1 : 0.4 }}>{mep ? "✓" : "⚙"}</span>
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+              <span style={{ fontSize: 10, fontWeight: 700, color: mep ? "#34D399" : "#C0C0D0" }}>
+                {mep ? mep : "MEP IFC"}
+              </span>
+              {!mep && <span style={{ fontSize: 8, color: "#555570" }}>optional</span>}
+            </div>
+            <div style={{ fontSize: 8, color: "#555570", marginTop: 1 }}>
+              {mep ? "Plumbing, electrical, HVAC, fire" : "Plumbing, electrical, HVAC, fire"}
+            </div>
+            {!mep && (
+              <div style={{ fontSize: 8, color: "#555570", marginTop: 2, display: "flex", alignItems: "center", gap: 3 }}>
+                <span style={{ fontSize: 9 }}>↑</span> Click or drag to upload
+              </div>
+            )}
+          </div>
+          <span style={{
+            fontSize: 9, fontWeight: 700, padding: "2px 6px", borderRadius: 4, flexShrink: 0, marginTop: 2,
+            background: mep ? "rgba(16,185,129,0.15)" : "rgba(0,245,255,0.08)",
+            color: mep ? "#10B981" : "#00F5FF",
+          }}>
+            {mep ? "✓ +10%" : "+10%"}
+          </span>
+        </div>
+      </div>
+
+      {/* ── QS Corrections (informational only) ── */}
+      <div style={{
+        padding: "8px 10px", borderRadius: 6,
+        border: "1px solid rgba(255,191,0,0.15)",
+        background: "rgba(255,191,0,0.03)",
+      }}>
+        <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
+          <div style={{
+            width: 28, height: 28, borderRadius: 5, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+            background: "rgba(255,191,0,0.08)",
+          }}>
+            <span style={{ fontSize: 12, opacity: 0.7 }}>✎</span>
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+              <span style={{ fontSize: 10, fontWeight: 700, color: "#FFBF00" }}>QS corrections</span>
+              <span style={{ fontSize: 8, color: "#8888A0" }}>builds over time</span>
+            </div>
+            <div style={{ fontSize: 8, color: "#555570", marginTop: 1 }}>
+              Edit rates in BOQ results to train the system
+            </div>
+          </div>
+          <span style={{
+            fontSize: 8, fontWeight: 700, padding: "2px 6px", borderRadius: 4, flexShrink: 0, marginTop: 2,
+            background: "rgba(255,191,0,0.1)", color: "#FFBF00",
+          }}>
+            +5% over time
+          </span>
         </div>
       </div>
     </div>
