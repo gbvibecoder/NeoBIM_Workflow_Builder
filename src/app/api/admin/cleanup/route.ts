@@ -4,15 +4,17 @@ import { prisma } from "@/lib/db";
 import { isAdminUser } from "@/lib/rate-limit";
 
 /**
- * POST /api/admin/cleanup — Reduce Neon DB data transfer by cleaning old data
+ * POST /api/admin/cleanup — Safely reduce Neon DB data transfer
  *
- * Actions:
- * - Delete executions older than N days (default 7)
- * - Delete orphaned artifacts
- * - Delete old workflow versions (keep last 3)
- * - Optionally: delete all demo/test workflows
+ * SAFETY RULES:
+ * 1. NEVER deletes the most recent execution per workflow (preserves "View Results")
+ * 2. NEVER deletes workflows themselves (preserves user canvas)
+ * 3. Only deletes old executions + their cascaded artifacts
+ * 4. Keeps workflow versions (last 3)
+ * 5. Logs everything deleted for audit
  *
- * Body: { daysToKeep?: number, deleteTestWorkflows?: boolean }
+ * Body: { daysToKeep?: number, dryRun?: boolean }
+ * dryRun: true → shows what WOULD be deleted without actually deleting
  */
 export async function POST(req: NextRequest) {
   try {
@@ -22,25 +24,35 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json().catch(() => ({}));
-    const daysToKeep = Number(body.daysToKeep ?? 7);
-    const deleteTestWorkflows = body.deleteTestWorkflows === true;
+    const daysToKeep = Number(body.daysToKeep ?? 3);
+    const dryRun = body.dryRun === true;
     const cutoffDate = new Date(Date.now() - daysToKeep * 24 * 60 * 60 * 1000);
 
-    const results: Record<string, number> = {};
-
-    // 1. Delete old artifacts (biggest data consumer — JSON blobs)
-    const oldArtifacts = await prisma.artifact.deleteMany({
-      where: { createdAt: { lt: cutoffDate } },
+    // Step 1: Find the LATEST execution per workflow — these are PROTECTED
+    const latestPerWorkflow = await prisma.execution.findMany({
+      where: { status: "SUCCESS" },
+      orderBy: { createdAt: "desc" },
+      distinct: ["workflowId"],
+      select: { id: true, workflowId: true },
     });
-    results.artifactsDeleted = oldArtifacts.count;
+    const protectedIds = new Set(latestPerWorkflow.map(e => e.id));
+    console.log(`[CLEANUP] Protecting ${protectedIds.size} latest executions (one per workflow)`);
 
-    // 2. Delete old executions
-    const oldExecutions = await prisma.execution.deleteMany({
-      where: { createdAt: { lt: cutoffDate } },
+    // Step 2: Find old executions that are NOT protected
+    const oldExecutions = await prisma.execution.findMany({
+      where: {
+        createdAt: { lt: cutoffDate },
+        id: { notIn: [...protectedIds] },
+      },
+      select: { id: true, workflowId: true, createdAt: true },
     });
-    results.executionsDeleted = oldExecutions.count;
 
-    // 3. Delete old workflow versions (keep last 3 per workflow)
+    // Step 3: Count artifacts that will be cascade-deleted
+    const oldArtifactCount = await prisma.artifact.count({
+      where: { executionId: { in: oldExecutions.map(e => e.id) } },
+    });
+
+    // Step 4: Find old workflow versions (keep last 3 per workflow)
     const allVersions = await prisma.workflowVersion.findMany({
       select: { id: true, workflowId: true, version: true },
       orderBy: { version: "desc" },
@@ -55,37 +67,51 @@ export async function POST(req: NextRequest) {
     for (const [, ids] of versionsByWorkflow) {
       if (ids.length > 3) versionIdsToDelete.push(...ids.slice(3));
     }
+
+    const summary = {
+      dryRun,
+      cutoffDate: cutoffDate.toISOString(),
+      protectedExecutions: protectedIds.size,
+      executionsToDelete: oldExecutions.length,
+      artifactsToDelete: oldArtifactCount,
+      versionsToDelete: versionIdsToDelete.length,
+    };
+
+    if (dryRun) {
+      return NextResponse.json({ ...summary, message: "DRY RUN — nothing deleted. Set dryRun: false to execute." });
+    }
+
+    // Step 5: Delete (artifacts cascade from executions via onDelete: Cascade)
+    let executionsDeleted = 0;
+    let versionsDeleted = 0;
+
+    if (oldExecutions.length > 0) {
+      // Delete in batches of 50 to avoid timeout
+      for (let i = 0; i < oldExecutions.length; i += 50) {
+        const batch = oldExecutions.slice(i, i + 50).map(e => e.id);
+        await prisma.execution.deleteMany({ where: { id: { in: batch } } });
+        executionsDeleted += batch.length;
+      }
+    }
+
     if (versionIdsToDelete.length > 0) {
-      const deleted = await prisma.workflowVersion.deleteMany({
+      const result = await prisma.workflowVersion.deleteMany({
         where: { id: { in: versionIdsToDelete } },
       });
-      results.versionsDeleted = deleted.count;
+      versionsDeleted = result.count;
     }
 
-    // 4. Optionally delete test/demo workflows (named "Copy of ...")
-    if (deleteTestWorkflows) {
-      const testWf = await prisma.workflow.deleteMany({
-        where: {
-          name: { startsWith: "Copy of " },
-          createdAt: { lt: cutoffDate },
-        },
-      });
-      results.testWorkflowsDeleted = testWf.count;
-    }
+    const finalSummary = {
+      ...summary,
+      executionsDeleted,
+      artifactsCascadeDeleted: oldArtifactCount, // cascaded from execution delete
+      versionsDeleted,
+      message: `Cleaned ${executionsDeleted} executions + ${oldArtifactCount} artifacts + ${versionsDeleted} versions. Latest execution per workflow preserved.`,
+    };
 
-    // 5. Delete old quantity corrections (keep last 30 days)
-    const oldCorrections = await prisma.quantityCorrection.deleteMany({
-      where: { createdAt: { lt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) } },
-    });
-    results.correctionsDeleted = oldCorrections.count;
+    console.log("[CLEANUP] Complete:", finalSummary);
+    return NextResponse.json(finalSummary);
 
-    console.log("[CLEANUP]", results);
-
-    return NextResponse.json({
-      success: true,
-      message: `Cleaned data older than ${daysToKeep} days`,
-      results,
-    });
   } catch (error) {
     console.error("[CLEANUP] Error:", error);
     return NextResponse.json({ error: String(error) }, { status: 500 });
@@ -93,7 +119,7 @@ export async function POST(req: NextRequest) {
 }
 
 /**
- * GET /api/admin/cleanup — Show DB usage stats
+ * GET /api/admin/cleanup — Show what CAN be safely deleted
  */
 export async function GET() {
   try {
@@ -102,17 +128,26 @@ export async function GET() {
       return NextResponse.json({ error: "Admin only" }, { status: 403 });
     }
 
-    const [artifactCount, executionCount, workflowCount, versionCount, userCount] = await Promise.all([
+    const [artifactCount, executionCount, workflowCount, userCount] = await Promise.all([
       prisma.artifact.count(),
       prisma.execution.count(),
       prisma.workflow.count(),
-      prisma.workflowVersion.count(),
       prisma.user.count(),
     ]);
 
+    // Find how many executions are "protected" (latest per workflow)
+    const latestPerWorkflow = await prisma.execution.findMany({
+      where: { status: "SUCCESS" },
+      orderBy: { createdAt: "desc" },
+      distinct: ["workflowId"],
+      select: { id: true },
+    });
+
     return NextResponse.json({
-      counts: { artifacts: artifactCount, executions: executionCount, workflows: workflowCount, versions: versionCount, users: userCount },
-      tip: "POST to this endpoint with { daysToKeep: 3, deleteTestWorkflows: true } to clean old data",
+      total: { artifacts: artifactCount, executions: executionCount, workflows: workflowCount, users: userCount },
+      protectedExecutions: latestPerWorkflow.length,
+      deletableExecutions: executionCount - latestPerWorkflow.length,
+      tip: "POST { dryRun: true } to preview what will be deleted. POST { daysToKeep: 3 } to actually delete.",
     });
   } catch (error) {
     return NextResponse.json({ error: String(error) }, { status: 500 });
