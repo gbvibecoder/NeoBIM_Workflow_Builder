@@ -302,15 +302,22 @@ function ArtifactCardInner({ artifact, nodeLabel, nodeCategory, onDismiss, onReg
         )}
       </AnimatePresence>
 
-        {/* BOQ Visualizer CTA — shown for table artifacts that contain BOQ data */}
+        {/* BOQ Visualizer CTA — shown for table artifacts from BOQ / Cost Mapper (TR-008) */}
         {!collapsed && artifact.type === "table" && (() => {
           const d = artifact.data as Record<string, unknown> | undefined;
-          const hasBOQ = d && (d._boqData || d._totalCost);
-          if (!hasBOQ) return null;
-          const totalCost = d._totalCost as number | undefined;
-          const gfa = d._gfa as number | undefined;
-          const region = (d._region as string) || "";
-          const costLabel = totalCost && totalCost >= 10000000 ? `₹${(totalCost / 10000000).toFixed(1)} Cr` : totalCost ? `₹${(totalCost / 100000).toFixed(1)} L` : "";
+          // Broad detection: match _boqData, _totalCost, label containing "bill of quantities",
+          // or node label containing "BOQ" or "Cost Mapper"
+          const hasBOQKeys = d && (d._boqData || d._totalCost);
+          const labelStr = typeof d?.label === "string" ? d.label.toLowerCase() : "";
+          const hasLabelMatch = labelStr.includes("bill of quantities") || labelStr.includes("boq");
+          const nodeLabelLower = (nodeLabel ?? "").toLowerCase();
+          const hasNodeMatch = nodeLabelLower.includes("boq") || nodeLabelLower.includes("cost mapper");
+          if (!hasBOQKeys && !hasLabelMatch && !hasNodeMatch) return null;
+          const totalCost = (d?._totalCost as number | undefined) ?? 0;
+          const gfa = d?._gfa as number | undefined;
+          const region = (d?._region as string) || "";
+          const sym = (d?._currencySymbol as string) || "₹";
+          const costLabel = totalCost >= 10000000 ? `${sym}${(totalCost / 10000000).toFixed(1)} Cr` : totalCost >= 100000 ? `${sym}${(totalCost / 100000).toFixed(1)} L` : totalCost > 0 ? `${sym}${totalCost.toLocaleString("en-IN")}` : "";
           const subtitle = [costLabel, gfa ? `${gfa.toLocaleString("en-IN")}m²` : "", region].filter(Boolean).join(" · ");
           const execId = artifact.executionId || "demo";
           return (

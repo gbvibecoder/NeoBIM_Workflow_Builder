@@ -24,7 +24,9 @@ import {
   ExternalLink,
   BarChart3,
   File,
+  Sparkles,
 } from "lucide-react";
+import Link from "next/link";
 import { useLocale } from "@/hooks/useLocale";
 import { COLORS } from "../constants";
 import { HeroSection } from "../sections/HeroSection";
@@ -195,6 +197,9 @@ export function OverviewTab({
 
       {/* ═══ COMPACT EXECUTION BANNER ═══ */}
       <CompactBanner data={data} />
+
+      {/* ═══ BOQ VISUALIZER CTA ═══ */}
+      {data.boqSummary && <BOQVisualizerCTA boq={data.boqSummary} />}
 
       {/* ═══ TECH STACK — compact inline chips ═══ */}
       <TechChips data={data} />
@@ -1589,6 +1594,94 @@ function InsightStripSection({ insights }: { insights: InsightMetric[] }) {
           </motion.div>
         );
       })}
+    </motion.div>
+  );
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// ── BOQ VISUALIZER CTA ──────────────────────────────────────────────────────
+// ═════════════════════════════════════════════════════════════════════════════
+
+function BOQVisualizerCTA({ boq }: { boq: NonNullable<ShowcaseData["boqSummary"]> }) {
+  const costLabel = boq.totalCost >= 10000000
+    ? `${boq.currencySymbol}${(boq.totalCost / 10000000).toFixed(1)} Cr`
+    : boq.totalCost >= 100000
+    ? `${boq.currencySymbol}${(boq.totalCost / 100000).toFixed(1)} L`
+    : boq.totalCost > 0
+    ? `${boq.currencySymbol}${boq.totalCost.toLocaleString("en-IN")}`
+    : "";
+  const subtitle = [costLabel, boq.gfa ? `${boq.gfa.toLocaleString("en-IN")}m²` : "", boq.region].filter(Boolean).join(" · ");
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.35, duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+    >
+      <Link href={`/dashboard/results/${boq.executionId}/boq`} style={{ textDecoration: "none" }}>
+        <div
+          style={{
+            padding: "14px 20px",
+            borderRadius: 12,
+            background: "linear-gradient(135deg, rgba(0,245,255,0.10), rgba(0,245,255,0.04))",
+            border: "1px solid rgba(0,245,255,0.25)",
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            transition: "all 0.25s ease",
+            boxShadow: "0 0 20px rgba(0,245,255,0.08)",
+          }}
+          onMouseEnter={e => {
+            e.currentTarget.style.borderColor = "rgba(0,245,255,0.5)";
+            e.currentTarget.style.boxShadow = "0 0 32px rgba(0,245,255,0.18), 0 4px 20px rgba(0,245,255,0.1)";
+            e.currentTarget.style.background = "linear-gradient(135deg, rgba(0,245,255,0.14), rgba(0,245,255,0.06))";
+          }}
+          onMouseLeave={e => {
+            e.currentTarget.style.borderColor = "rgba(0,245,255,0.25)";
+            e.currentTarget.style.boxShadow = "0 0 20px rgba(0,245,255,0.08)";
+            e.currentTarget.style.background = "linear-gradient(135deg, rgba(0,245,255,0.10), rgba(0,245,255,0.04))";
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <div style={{
+              width: 36, height: 36, borderRadius: 10,
+              background: "rgba(0,245,255,0.12)",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              flexShrink: 0,
+            }}>
+              <Sparkles size={18} color="#00F5FF" />
+            </div>
+            <div>
+              <div style={{
+                fontSize: 13, fontWeight: 700, color: "#00F5FF",
+                display: "flex", alignItems: "center", gap: 6,
+                letterSpacing: "0.01em",
+              }}>
+                Open BOQ Visualizer
+                <ArrowRight size={14} style={{ opacity: 0.8 }} />
+              </div>
+              {subtitle && (
+                <div style={{ fontSize: 11, color: COLORS.TEXT_SECONDARY, marginTop: 2 }}>
+                  {subtitle}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div style={{
+            fontSize: 9, fontWeight: 600,
+            padding: "3px 8px", borderRadius: 6,
+            background: "rgba(0,245,255,0.1)",
+            color: "#00F5FF",
+            letterSpacing: "0.05em",
+            textTransform: "uppercase" as const,
+            flexShrink: 0,
+          }}>
+            INTERACTIVE
+          </div>
+        </div>
+      </Link>
     </motion.div>
   );
 }

@@ -148,6 +148,15 @@ export interface ShowcaseData {
   pipelineSteps: PipelineStep[];
   costBreakdown: CostItem[] | null;
   complianceItems: ComplianceItem[] | null;
+
+  // BOQ Visualizer data (present when TR-008 ran)
+  boqSummary: {
+    totalCost: number;
+    gfa: number;
+    region: string;
+    executionId: string;
+    currencySymbol: string;
+  } | null;
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -261,6 +270,30 @@ export function useShowcaseData(): ShowcaseData {
         isQuantityTable,
       };
     });
+
+    // ── BOQ Summary (detect TR-008 output) ──
+    let boqSummary: ShowcaseData["boqSummary"] = null;
+    for (const a of artifacts.values()) {
+      if (a.type !== "table") continue;
+      const d = asRecord(a.data);
+      // Check for _boqData (TR-008 specific) or _totalCost + table label containing "bill of quantities"
+      const hasBOQData = !!d._boqData || !!d._totalCost;
+      const labelMatch = typeof d.label === "string" && d.label.toLowerCase().includes("bill of quantities");
+      // Also check if the artifact came from a node whose catalogue ID is TR-008
+      const nodeForArtifact = nodes.find(n => n.id === a.tileInstanceId);
+      const isTR008 = nodeForArtifact?.data?.catalogueId === "TR-008";
+      if (hasBOQData || labelMatch || isTR008) {
+        const execId = currentExecution?.id ?? "demo";
+        boqSummary = {
+          totalCost: (d._totalCost as number) ?? 0,
+          gfa: (d._gfa as number) ?? 0,
+          region: (d._region as string) ?? "",
+          executionId: execId,
+          currencySymbol: (d._currencySymbol as string) ?? "₹",
+        };
+        break;
+      }
+    }
 
     // ── SVG ──
     const svgArtifact = findByType(artifacts, "svg");
@@ -445,6 +478,7 @@ export function useShowcaseData(): ShowcaseData {
       pipelineSteps,
       costBreakdown,
       complianceItems,
+      boqSummary,
     };
   }, [artifacts, nodes, currentWorkflow, currentExecution]);
 }
