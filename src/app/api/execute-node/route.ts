@@ -1883,6 +1883,10 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
         }
       }
 
+      // ── DIAGNOSTIC: Track which path each element takes ──
+      let pathIS1200 = 0, pathUSD = 0, pathFallback = 0;
+      let costIS1200 = 0, costUSD = 0, costFallback = 0;
+
       // Process each element (may include expanded material layers)
       for (const elem of expandedElements) {
         const description = typeof elem === "string" ? elem : elem.description ?? elem[0];
@@ -1964,6 +1968,7 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
               const lineTot = Math.round(adjQty * adjRate * 100) / 100;
 
               hardCostSubtotal += lineTot;
+              costIS1200 += lineTot;
               totalMaterial += matCost;
               totalLabor += labCost;
               totalEquipment += Math.max(0, eqpCost);
@@ -1998,6 +2003,7 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
                 is1200Code: rate.is1200Code,
               });
             }
+            pathIS1200++;
             continue; // Skip the USD rate path for this element
           }
           // If no IS 1200 rate found, fall through to USD path below
@@ -2085,6 +2091,7 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
             elementCount: elemCount || undefined,
             is1200Code: isIndianProject ? "IS1200-CSI-MAPPED" : undefined,
           });
+          pathUSD++; costUSD += lineTot;
         } else {
           // Fallback for unknown items — estimate with default waste
           estimatedItemsCount++;
@@ -2131,8 +2138,12 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
             totalCost: Math.round(lineTotal * 100) / 100,
             is1200Code: isIndianProject ? "IS1200-EST" : undefined,
           });
+          pathFallback++; costFallback += Math.round(lineTotal * 100) / 100;
         }
       }
+
+      // ── DIAGNOSTIC: Path breakdown ──
+      console.log(`[TR-008] PATH BREAKDOWN: IS1200=${pathIS1200} items (₹${costIS1200.toLocaleString()}), USD=${pathUSD} items (₹${costUSD.toLocaleString()}), Fallback=${pathFallback} items (₹${costFallback.toLocaleString()})`);
 
       // ── Derived quantities: Formwork, Rebar, Finishing ──
       // For Indian projects, use CPWD rates directly with IS 1200 codes.
@@ -2383,6 +2394,11 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
         const staticMin = STATIC_FLOORS[btKey] ?? STATIC_FLOORS.commercial;
         const minFloor = dynamicMin > 5000 ? dynamicMin : staticMin;
         console.log(`[TR-008] Cost floor: dynamic_raw=${marketData?.minimum_cost_per_m2}, dynamic_adj=${dynamicMin}, static=${staticMin}, using=${minFloor}`);
+        // Diagnostic: dump all marketData keys that contain 'min' or 'bench' or 'range'
+        if (marketData) {
+          const mKeys = Object.keys(marketData).filter((k: string) => /min|bench|range|floor|typical/i.test(k));
+          console.log(`[TR-008] MarketData benchmark fields: ${mKeys.map((k: string) => `${k}=${JSON.stringify(marketData[k])}`).join(", ")}`);
+        }
         const currentCostPerM2 = hardCostSubtotal / gfaForProvisional;
         if (currentCostPerM2 < minFloor) {
           const scaleFactor = minFloor / currentCostPerM2;
