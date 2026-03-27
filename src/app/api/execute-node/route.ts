@@ -1806,7 +1806,7 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
         if (locationData.escalation != null) escalationRate = Number(locationData.escalation) / 100;
         if (locationData.contingency != null) contingencyPct = Number(locationData.contingency) / 100;
         if (locationData.months != null) escalationMonths = Number(locationData.months);
-        console.log(`[TR-008] Location: ${locationLabel}, factor=${loc.combinedFactor.toFixed(3)}, currency=${currencyCode}, escalation=${(escalationRate*100).toFixed(1)}%/yr, contingency=${(contingencyPct*100).toFixed(0)}%, months=${escalationMonths}`);
+        console.log(`[TR-008] Location: ${locationLabel}, combinedFactor=${loc.combinedFactor.toFixed(3)} (country=${loc.countryFactor} × tier=${loc.cityTierFactor}), currency=${currencyCode}. NOTE: combinedFactor only used for USD-path items, NOT IS1200 rates.`);
       } else {
         // Fall back to text-based region detection
         const regionInput = inputData?.region ?? inputData?.location ?? "USA (baseline)";
@@ -2088,7 +2088,8 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
         } else {
           // Fallback for unknown items — estimate with default waste
           estimatedItemsCount++;
-          const fallbackRate = 100 * locationFactor * exchangeRate;
+          // For Indian projects: use ₹5,000/unit as reasonable fallback (not USD×0.266 which gives nonsense)
+          const fallbackRate = isIndianProject ? 5000 : 100 * locationFactor * exchangeRate;
           const defaultWaste = 0.10;
           const adjQty = quantity * (1 + defaultWaste);
           const lineTotal = adjQty * fallbackRate;
@@ -2376,10 +2377,12 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
         };
         const btKey = projectTypeInfo.type.toLowerCase();
         // Prefer dynamic minimum from market intelligence (city-specific, year-specific)
-        const dynamicMin = marketData?.minimum_cost_per_m2 ?? 0;
+        let dynamicMin = Number(marketData?.minimum_cost_per_m2 ?? 0);
+        // Sanity: if Claude returned per-sqft instead of per-m², convert (1 m² ≈ 10.76 sqft)
+        if (dynamicMin > 0 && dynamicMin < 5000) dynamicMin = Math.round(dynamicMin * 10.76);
         const staticMin = STATIC_FLOORS[btKey] ?? STATIC_FLOORS.commercial;
-        const minFloor = dynamicMin > 0 ? dynamicMin : staticMin;
-        console.log(`[TR-008] Cost floor: dynamic=${dynamicMin}, static=${staticMin}, using=${minFloor}`);
+        const minFloor = dynamicMin > 5000 ? dynamicMin : staticMin;
+        console.log(`[TR-008] Cost floor: dynamic_raw=${marketData?.minimum_cost_per_m2}, dynamic_adj=${dynamicMin}, static=${staticMin}, using=${minFloor}`);
         const currentCostPerM2 = hardCostSubtotal / gfaForProvisional;
         if (currentCostPerM2 < minFloor) {
           const scaleFactor = minFloor / currentCostPerM2;
