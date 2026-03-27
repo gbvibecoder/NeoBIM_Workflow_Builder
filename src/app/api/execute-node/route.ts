@@ -2635,7 +2635,8 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
       rows.push(["", "", "", "", "", "", "", "", "", ""]);
       rows.push(["TOTAL PROJECT COST", "", "", "", "", "", "", "", "", `${cs}${costSummary.totalCost.toFixed(2)}`]);
       rows.push(["", "", "", "", "", "", "", "", "", ""]);
-      rows.push([`Estimate accuracy: ${aaceInfo.accuracy} (AACE ${aaceInfo.class}). Not suitable for contract pricing.`, "", "", "", "", "", "", "", "", ""]);
+      // AACE class determined later — use generic text here (detailed AACE in output metadata)
+      rows.push(["Estimate accuracy: preliminary. Not suitable for contract pricing.", "", "", "", "", "", "", "", "", ""]);
 
       // No yellow warnings — all info goes into the content summary
       const warnings: string[] = [];
