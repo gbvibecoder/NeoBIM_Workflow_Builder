@@ -2258,10 +2258,16 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
 
           // For Indian projects, use CPWD rate × state PWD category factor
           let adjRate: number;
-          if (isIndianProject && is1200Key === "rebar" && is1200Module) {
-            const rebarRate = is1200Module.getIS1200Rate("IS1200-P6-REBAR-500");
-            const steelFactor = ip?.steel ?? ip?.overall ?? 1.0;
-            adjRate = rebarRate ? Math.round(rebarRate.rate * steelFactor * 100) / 100 : Math.round(rateUSD * locationFactor * exchangeRate * 100) / 100;
+          if (isIndianProject && is1200Key === "rebar") {
+            // Fix 1: Use market TMT price from TR-015, not static table
+            const marketTMTPerKg = Number(marketData?.steel_per_tonne?.value ?? 0) / 1000; // ₹/tonne → ₹/kg
+            const staticRebarRate = is1200Module?.getIS1200Rate("IS1200-P6-REBAR-500");
+            // Market TMT includes material only — add ₹14-20/kg for cutting/bending/placing labor
+            const REBAR_LABOR_PER_KG = 18; // engineering constant: cutting, bending, placing, tying
+            const rebarAllIn = marketTMTPerKg > 0
+              ? Math.round((marketTMTPerKg + REBAR_LABOR_PER_KG) * 100) / 100
+              : (staticRebarRate?.rate ?? 88); // static fallback only if no market data
+            adjRate = Math.round(rebarAllIn * 100) / 100;
           } else if (isIndianProject && is1200Key.startsWith("formwork") && is1200Module) {
             const fwRates: Record<string, number> = { "formwork-wall": 400, "formwork-slab": 380, "formwork-column": 480, "formwork-beam": 420 };
             const concFactor = ip?.concrete ?? ip?.overall ?? 1.0;
