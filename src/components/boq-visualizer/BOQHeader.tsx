@@ -2,6 +2,7 @@
 
 import { ArrowLeft, Download, Share2, Building2, MapPin, Calendar } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import type { BOQData } from "./types";
 
 interface BOQHeaderProps {
@@ -13,7 +14,9 @@ export function BOQHeader({ data, onExportExcel }: BOQHeaderProps) {
   const router = useRouter();
 
   const copyLink = () => {
-    navigator.clipboard.writeText(window.location.href);
+    navigator.clipboard.writeText(window.location.href).then(() => {
+      toast.success("Link copied!", { description: "Share this BOQ with your team or client." });
+    });
   };
 
   const confidenceColor =

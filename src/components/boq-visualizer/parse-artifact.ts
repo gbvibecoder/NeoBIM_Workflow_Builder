@@ -23,6 +23,88 @@ function inferConfidence(source: string, division: string, description: string):
   return 65;
 }
 
+// ─── Extract IFC quality from all available sources ─────────────────────────
+// TR-008 stores quality as metadata.warnings string OR via upstream _ifcContext
+function extractIfcQuality(data: any): BOQData["ifcQuality"] | undefined {
+  // Direct quality objects (various naming conventions)
+  const ifcQ = data._ifcQuality || data._ifcAssessment;
+  if (ifcQ && (ifcQ.score || ifcQ.qualityScore)) {
+    return {
+      score: ifcQ.score || ifcQ.qualityScore || 0,
+      confidence: ifcQ.confidence || ifcQ.overallConfidence || 0,
+      elementCoverage: ifcQ.elementCoverage || ifcQ.coverage || 0,
+      missingFiles: ifcQ.missingFiles || ifcQ.missing || [],
+      anomalies: ifcQ.anomalies || [],
+    };
+  }
+
+  // Extract from _ifcContext (TR-007 passes this downstream)
+  const ifcCtx = data._ifcContext;
+  if (ifcCtx) {
+    // _ifcContext has: totalFloors, totalGFA, dominantStructure, etc.
+    // We can infer quality from geometry completeness
+    const geometryPct = ifcCtx.geometryCompleteness ?? ifcCtx.geometryPct ?? 0;
+    const overallQuality = ifcCtx.overallQuality;
+    if (geometryPct > 0 || overallQuality) {
+      const score = geometryPct || (
+        overallQuality === "EXCELLENT" ? 92 :
+        overallQuality === "GOOD" ? 78 :
+        overallQuality === "FAIR" ? 55 : 30
+      );
+      return {
+        score,
+        confidence: Math.min(95, score + (ifcCtx.hasStructuralFoundation ? 8 : 0) + (ifcCtx.hasMEPData ? 10 : 0)),
+        elementCoverage: geometryPct || score,
+        missingFiles: ifcCtx.missingFiles || [],
+        anomalies: ifcCtx.anomalies || [],
+      };
+    }
+  }
+
+  // Parse from metadata warnings string (TR-008 embeds IFC quality here)
+  // Format: "📋 IFC Quality: GOOD (78% confidence) | 125/150 elements with geometry | ..."
+  const metadata = data._metadata || data.metadata;
+  const warnings = metadata?.warnings;
+  if (typeof warnings === "string" && warnings.includes("IFC Quality")) {
+    const qualityMatch = warnings.match(/IFC Quality:\s*(\w+)\s*\((\d+)%\s*confidence\)/);
+    const elemMatch = warnings.match(/(\d+)\/(\d+)\s*elements/);
+    if (qualityMatch) {
+      const label = qualityMatch[1]; // EXCELLENT, GOOD, FAIR, POOR
+      const confPct = parseInt(qualityMatch[2], 10);
+      const score = label === "EXCELLENT" ? 92 : label === "GOOD" ? 78 : label === "FAIR" ? 55 : 30;
+      const coverage = elemMatch ? Math.round((parseInt(elemMatch[1]) / parseInt(elemMatch[2])) * 100) : score;
+      return {
+        score,
+        confidence: confPct,
+        elementCoverage: coverage,
+        missingFiles: [],
+        anomalies: [],
+      };
+    }
+  }
+
+  // Infer from _boqData line items — if most lines have IFC geometry source
+  const boqLines = (data._boqData?.lines || []) as any[];
+  if (boqLines.length > 5) {
+    const withGeometry = boqLines.filter((l: any) => {
+      const d = (l.description || "").toLowerCase();
+      return d.includes("rcc") || d.includes("concrete") || d.includes("slab") || d.includes("wall") || d.includes("steel") || d.includes("brick");
+    }).length;
+    const pct = Math.round((withGeometry / boqLines.length) * 100);
+    if (pct > 20) {
+      return {
+        score: Math.min(95, pct + 15), // Boost since these are IFC-sourced
+        confidence: Math.min(90, pct + 10),
+        elementCoverage: pct,
+        missingFiles: data._hasMEPData === false ? ["MEP Services Model"] : [],
+        anomalies: [],
+      };
+    }
+  }
+
+  return undefined;
+}
+
 export function parseArtifactToBOQ(artifactData: any): BOQData | null {
   if (!artifactData) return null;
 
@@ -84,11 +166,14 @@ export function parseArtifactToBOQ(artifactData: any): BOQData | null {
     masonConfidence: market.labor?.mason?.confidence || "MEDIUM",
   } : undefined;
 
-  // Benchmark
+  // Benchmark — read from TR-008 _benchmark (includes dynamic market overrides)
   const bench = data._benchmark || {};
+  // Also check for rangeLow/rangeHigh which are market-overridden values
+  const benchmarkLow = bench.rangeLow || bench.benchmarkLow || 0;
+  const benchmarkHigh = bench.rangeHigh || bench.benchmarkHigh || 0;
 
-  // IFC Quality
-  const ifcQ = data._ifcQuality || data._ifcAssessment;
+  // IFC Quality — robust extraction from multiple sources
+  const ifcQuality = extractIfcQuality(data);
 
   // MEP Breakdown — derive from provisional lines if not provided
   const mepLines = linesWithSensitivity.filter(l =>
@@ -103,6 +188,24 @@ export function parseArtifactToBOQ(artifactData: any): BOQData | null {
   const locationMatch = label.match(/\(([^)]+)\)/);
   const projectTypeMatch = label.match(/—\s*(\w[\w\s]*)\s*\(/);
 
+  // ── Cost Totals ───────────────────────────────────────────────────────────
+  // TR-008 sets:
+  //   _totalCost = hardCosts + softCosts (the FULL project cost)
+  //   _hardCosts = hardCostWithEscalation (material + labor + equipment + escalation)
+  //   _softCosts = professional fees, contingency, PM, etc.
+  // Line items sum to hard cost subtotal (before escalation & soft costs)
+  const lineTotal = linesWithSensitivity.reduce((s, l) => s + l.totalCost, 0);
+  const hardCosts = data._hardCosts || boqData.grandTotal || lineTotal;
+  const softCosts = data._softCosts || 0;
+  const escalation = data._escalation || boqData.escalation || 0;
+  // Total project cost is ALWAYS hard + soft (not just line total)
+  const totalProjectCost = data._totalCost || (hardCosts + softCosts);
+
+  // Confidence level — derive from IFC quality if available
+  const confLevel: "LOW" | "MEDIUM" | "HIGH" = data._confidenceLevel ||
+    (ifcQuality && ifcQuality.score >= 80 ? "HIGH" :
+     ifcQuality && ifcQuality.score >= 55 ? "MEDIUM" : "LOW");
+
   return {
     projectName: data._projectName || projectTypeMatch?.[1]?.trim() || data._projectType || "Construction Project",
     location: data._region || locationMatch?.[1] || "India",
@@ -114,40 +217,32 @@ export function parseArtifactToBOQ(artifactData: any): BOQData | null {
 
     lines: linesWithSensitivity,
 
-    totalCost: data._totalCost || boqData.grandTotal || linesWithSensitivity.reduce((s, l) => s + l.totalCost, 0),
-    hardCosts: data._hardCosts || boqData.subtotalMaterial + boqData.subtotalLabor + boqData.subtotalEquipment || 0,
-    softCosts: data._softCosts || 0,
-    escalation: data._escalation || boqData.escalation || 0,
+    totalCost: totalProjectCost,
+    hardCosts,
+    softCosts,
+    escalation,
     subtotalMaterial: boqData.subtotalMaterial || linesWithSensitivity.reduce((s, l) => s + l.materialCost, 0),
     subtotalLabor: boqData.subtotalLabor || linesWithSensitivity.reduce((s, l) => s + l.laborCost, 0),
     subtotalEquipment: boqData.subtotalEquipment || linesWithSensitivity.reduce((s, l) => s + l.equipmentCost, 0),
-    grandTotal: boqData.grandTotal || data._totalCost || 0,
+    grandTotal: totalProjectCost,
 
     benchmark: {
-      costPerM2: bench.costPerM2 || 0,
-      benchmarkLow: bench.benchmarkLow || 0,
-      benchmarkHigh: bench.benchmarkHigh || 0,
+      costPerM2: bench.costPerM2 || (data._gfa > 0 ? totalProjectCost / data._gfa : 0),
+      benchmarkLow,
+      benchmarkHigh,
       status: bench.status || "within",
       severity: bench.severity || "ok",
-      message: bench.message || "",
-      buildingType: bench.buildingType || "Commercial",
+      message: bench.message || bench.benchmarkLabel || "",
+      buildingType: bench.buildingType || data._projectType || "Commercial",
       cityTier: bench.cityTier || "Metro",
     },
 
     market: marketParsed,
-
-    ifcQuality: ifcQ ? {
-      score: ifcQ.score || ifcQ.qualityScore || 0,
-      confidence: ifcQ.confidence || ifcQ.overallConfidence || 0,
-      elementCoverage: ifcQ.elementCoverage || ifcQ.coverage || 0,
-      missingFiles: ifcQ.missingFiles || ifcQ.missing || [],
-      anomalies: ifcQ.anomalies || [],
-    } : undefined,
-
+    ifcQuality,
     mepBreakdown,
 
     aaceClass: data._aaceClass || "Class 3",
-    confidenceLevel: data._confidenceLevel || "MEDIUM",
+    confidenceLevel: confLevel,
 
     summary: data.content || data._summary || "",
     disclaimer: data._disclaimer || boqData.disclaimer || "This is an AI-generated estimate for preliminary budgeting purposes only. Verify all quantities with detailed measurement before procurement.",
@@ -205,7 +300,12 @@ function parseFromTableRows(data: any): BOQData | null {
     });
 
   const linesWithSensitivity = computeSensitivities(parsedLines, DEFAULT_PRICES);
-  const totalCost = linesWithSensitivity.reduce((s, l) => s + l.totalCost, 0);
+  const lineTotal = linesWithSensitivity.reduce((s, l) => s + l.totalCost, 0);
+  const hardCosts = data._hardCosts || lineTotal;
+  const softCosts = data._softCosts || 0;
+  const totalCost = data._totalCost || (hardCosts + softCosts);
+  const ifcQuality = extractIfcQuality(data);
+  const bench = data._benchmark || {};
 
   return {
     projectName: data._projectType || "Construction Project",
@@ -217,25 +317,26 @@ function parseFromTableRows(data: any): BOQData | null {
     projectType: data._projectType || "Commercial",
     lines: linesWithSensitivity,
     totalCost,
-    hardCosts: data._hardCosts || totalCost * 0.77,
-    softCosts: data._softCosts || totalCost * 0.23,
+    hardCosts,
+    softCosts,
     escalation: data._escalation || 0,
     subtotalMaterial: linesWithSensitivity.reduce((s, l) => s + l.materialCost, 0),
     subtotalLabor: linesWithSensitivity.reduce((s, l) => s + l.laborCost, 0),
     subtotalEquipment: linesWithSensitivity.reduce((s, l) => s + l.equipmentCost, 0),
-    grandTotal: data._totalCost || totalCost,
+    grandTotal: totalCost,
     benchmark: {
-      costPerM2: data._benchmark?.costPerM2 || (data._gfa ? totalCost / data._gfa : 0),
-      benchmarkLow: data._benchmark?.benchmarkLow || 0,
-      benchmarkHigh: data._benchmark?.benchmarkHigh || 0,
-      status: data._benchmark?.status || "within",
-      severity: data._benchmark?.severity || "ok",
-      message: data._benchmark?.message || "",
-      buildingType: data._benchmark?.buildingType || "Commercial",
-      cityTier: data._benchmark?.cityTier || "Metro",
+      costPerM2: bench.costPerM2 || (data._gfa ? totalCost / data._gfa : 0),
+      benchmarkLow: bench.rangeLow || bench.benchmarkLow || 0,
+      benchmarkHigh: bench.rangeHigh || bench.benchmarkHigh || 0,
+      status: bench.status || "within",
+      severity: bench.severity || "ok",
+      message: bench.message || bench.benchmarkLabel || "",
+      buildingType: bench.buildingType || data._projectType || "Commercial",
+      cityTier: bench.cityTier || "Metro",
     },
+    ifcQuality,
     aaceClass: "Class 3",
-    confidenceLevel: "MEDIUM",
+    confidenceLevel: ifcQuality && ifcQuality.score >= 80 ? "HIGH" : ifcQuality && ifcQuality.score >= 55 ? "MEDIUM" : "LOW",
     summary: data.content || "",
     disclaimer: data._disclaimer || "AI-generated estimate for preliminary budgeting. Verify all quantities before procurement.",
   };

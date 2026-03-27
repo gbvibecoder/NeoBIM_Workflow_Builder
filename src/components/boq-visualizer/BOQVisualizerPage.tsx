@@ -47,7 +47,11 @@ export function BOQVisualizerPage({ data, executionId }: BOQVisualizerPageProps)
 
   const totals = useMemo(() => computeTotals(recalcLines), [recalcLines]);
 
-  const costPerM2 = data.gfa > 0 ? totals.totalCost / data.gfa : data.benchmark.costPerM2;
+  // Total project cost = recalculated hard costs + original soft costs
+  // Hard costs change with price sliders; soft costs stay fixed (% of original)
+  const softCostRatio = data.totalCost > 0 ? data.softCosts / data.totalCost : 0;
+  const recalcTotalProject = totals.totalCost + totals.totalCost * softCostRatio;
+  const costPerM2 = data.gfa > 0 ? recalcTotalProject / data.gfa : data.benchmark.costPerM2;
 
   // Price change handler with flash animation
   const handlePriceChange = useCallback((newPrices: PriceOverrides) => {
@@ -108,9 +112,9 @@ export function BOQVisualizerPage({ data, executionId }: BOQVisualizerPageProps)
       <div className="flex flex-col gap-6 py-6">
         {/* Hero Stats */}
         <HeroStats
-          totalCost={totals.totalCost}
+          totalCost={recalcTotalProject}
           costPerM2={costPerM2}
-          hardCosts={totals.subtotalMaterial + totals.subtotalLabor + totals.subtotalEquipment}
+          hardCosts={totals.totalCost}
           ifcQualityScore={data.ifcQuality?.score ?? 0}
           benchmarkLow={data.benchmark.benchmarkLow}
           benchmarkHigh={data.benchmark.benchmarkHigh}
@@ -120,7 +124,9 @@ export function BOQVisualizerPage({ data, executionId }: BOQVisualizerPageProps)
         {/* Price Controls */}
         <PriceControls
           prices={prices}
+          basePrices={basePrices.current}
           onChange={handlePriceChange}
+          totalSavings={data.totalCost - recalcTotalProject}
           market={data.market ? {
             steelSource: data.market.steelSource,
             steelConfidence: data.market.steelConfidence,

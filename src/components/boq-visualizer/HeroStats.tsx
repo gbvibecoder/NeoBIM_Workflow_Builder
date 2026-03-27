@@ -1,6 +1,6 @@
 "use client";
 
-import { IndianRupee, Ruler, Hammer, ShieldCheck } from "lucide-react";
+import { IndianRupee, Ruler, Hammer, ShieldCheck, Check, AlertTriangle } from "lucide-react";
 import { AnimatedNumber } from "./AnimatedNumber";
 import { formatCrores } from "./recalc-engine";
 
@@ -16,9 +16,75 @@ interface HeroStatsProps {
 
 function getCostPerM2Color(value: number, low: number, high: number): string {
   if (low === 0 && high === 0) return "#F0F0F5";
-  if (value <= high && value >= low) return "#22C55E";
+  if (value >= low && value <= high) return "#22C55E";
   if (value > high * 1.1 || value < low * 0.9) return "#EF4444";
   return "#F59E0B";
+}
+
+function BenchmarkBar({ value, low, high }: { value: number; low: number; high: number }) {
+  if (low === 0 && high === 0) return null;
+
+  const color = getCostPerM2Color(value, low, high);
+  const isBelow = value < low;
+  const isAbove = value > high;
+  const isWithin = !isBelow && !isAbove;
+
+  // Position on a scale from 0.5*low to 1.3*high
+  const scaleMin = low * 0.5;
+  const scaleMax = high * 1.3;
+  const pos = Math.min(100, Math.max(0, ((value - scaleMin) / (scaleMax - scaleMin)) * 100));
+  const lowPos = ((low - scaleMin) / (scaleMax - scaleMin)) * 100;
+  const highPos = ((high - scaleMin) / (scaleMax - scaleMin)) * 100;
+
+  const pctDiff = isBelow
+    ? Math.round(((low - value) / low) * 100)
+    : isAbove
+    ? Math.round(((value - high) / high) * 100)
+    : 0;
+
+  return (
+    <div className="mt-2">
+      {/* Bar */}
+      <div className="relative h-[6px] rounded-full" style={{ background: "rgba(255,255,255,0.04)" }}>
+        {/* Benchmark range (green zone) */}
+        <div
+          className="absolute h-full rounded-full"
+          style={{
+            left: `${lowPos}%`,
+            width: `${highPos - lowPos}%`,
+            background: "rgba(34, 197, 94, 0.15)",
+          }}
+        />
+        {/* Current value marker */}
+        <div
+          className="absolute top-1/2 -translate-y-1/2 w-2.5 h-2.5 rounded-full border-2"
+          style={{
+            left: `${pos}%`,
+            transform: `translateX(-50%) translateY(-50%)`,
+            background: color,
+            borderColor: `${color}80`,
+            boxShadow: `0 0 8px ${color}40`,
+            transition: "left 0.3s ease",
+          }}
+        />
+      </div>
+      {/* Status text */}
+      <div className="flex items-center gap-1 mt-1.5">
+        {isWithin ? (
+          <Check size={9} color="#22C55E" />
+        ) : (
+          <AlertTriangle size={9} color={color} />
+        )}
+        <span className="text-[10px]" style={{ color }}>
+          {isWithin
+            ? "Within metro benchmark"
+            : isBelow
+            ? `${pctDiff}% below benchmark — add structural/MEP IFC for accuracy`
+            : `${pctDiff}% above benchmark — review for optimization`}
+        </span>
+      </div>
+    </div>
+  );
 }
 
 export function HeroStats({
@@ -36,6 +102,7 @@ export function HeroStats({
 
   const cards = [
     {
+      key: "total",
       label: "Total Project Cost",
       icon: IndianRupee,
       color: "#00F5FF",
@@ -44,14 +111,16 @@ export function HeroStats({
       large: true,
     },
     {
+      key: "costm2",
       label: "Cost per m²",
       icon: Ruler,
       color: costColor,
       value: costPerM2,
       formatter: (n: number) => `₹${n.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`,
-      subtitle: benchmarkLow > 0 ? `Benchmark: ₹${benchmarkLow.toLocaleString("en-IN")}–₹${benchmarkHigh.toLocaleString("en-IN")}` : undefined,
+      hasBenchmarkBar: true,
     },
     {
+      key: "hard",
       label: "Hard Cost Subtotal",
       icon: Hammer,
       color: "#B87333",
@@ -59,6 +128,7 @@ export function HeroStats({
       formatter: (n: number) => `₹${formatCrores(n)} Cr`,
     },
     {
+      key: "quality",
       label: "IFC Quality Score",
       icon: ShieldCheck,
       color: qualityColor,
@@ -72,7 +142,7 @@ export function HeroStats({
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 px-6">
       {cards.map((card, i) => (
         <div
-          key={card.label}
+          key={card.key}
           className="relative overflow-hidden rounded-xl p-4 transition-all duration-300"
           style={{
             background: "rgba(255, 255, 255, 0.03)",
@@ -119,10 +189,9 @@ export function HeroStats({
             )}
           </div>
 
-          {card.subtitle && (
-            <div className="text-[10px] mt-1.5" style={{ color: "#5C5C78" }}>
-              {card.subtitle}
-            </div>
+          {/* Benchmark bar for cost/m² card */}
+          {card.hasBenchmarkBar && (
+            <BenchmarkBar value={costPerM2} low={benchmarkLow} high={benchmarkHigh} />
           )}
         </div>
       ))}
