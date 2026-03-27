@@ -334,76 +334,65 @@ After searching, use the report_construction_prices tool to return your findings
   };
 
   let jsonText = "";
-  const usedWebSearch = false;
+  let usedWebSearch = false;
 
   // ── Primary: Claude Sonnet with web_search + structured output ──
-  // web_search costs $0.01/search × ~5 searches = $0.05/run
-  // Sonnet 4.6 gives better reasoning than Haiku for $0.02 more per run
   try {
-    console.log("[TR-015] Calling Claude Sonnet with web_search + structured output...");
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 45_000); // web search needs more time
-    const response = await client.messages.create({
+    console.log("[TR-015] Calling Sonnet with web_search...");
+    const ctrl1 = new AbortController();
+    const t1 = setTimeout(() => ctrl1.abort(), 45_000);
+    const resp = await client.messages.create({
       model: "claude-sonnet-4-6",
       max_tokens: 4096,
       tools: [
-        { type: "web_search_20250305" as const, name: "web_search" as const, max_uses: 5 },
+        { type: "web_search_20250305", name: "web_search", max_uses: 5 },
         priceTool,
       ],
-      tool_choice: { type: "auto" as const }, // auto lets Claude search THEN report
+      tool_choice: { type: "auto" },
       messages: [{ role: "user", content: userPrompt }],
-    }, { signal: controller.signal });
-    clearTimeout(timer);
+    }, { signal: ctrl1.signal });
+    clearTimeout(t1);
 
-    // Extract structured data — Claude may search the web first, then call the tool
-    let webSearchUsed = false;
-    for (const block of response.content) {
-      if (block.type === "web_search_tool_result" || (block.type as string) === "server_tool_use") {
-        webSearchUsed = true;
-      }
+    for (const block of resp.content) {
+      const bt = block.type as string;
+      if (bt === "web_search_tool_result" || bt === "server_tool_use") usedWebSearch = true;
       if (block.type === "tool_use" && block.name === "report_construction_prices") {
         jsonText = JSON.stringify(block.input);
       }
     }
-    // If Claude didn't call the tool (just searched and returned text), extract from text
     if (!jsonText) {
-      for (const block of response.content) {
-        if (block.type === "text" && block.text.includes("{")) {
-          jsonText = block.text;
-          break;
-        }
+      for (const block of resp.content) {
+        if (block.type === "text" && block.text.includes("{")) { jsonText = block.text; break; }
       }
     }
-    result.search_count = webSearchUsed ? 5 : 0;
-    const sourceLabel = webSearchUsed ? "web search" : "Claude AI knowledge";
-    result.agent_notes.push(`✨ Market Intelligence — ${city}, ${state} · ${monthYear} · Just fetched · ${sourceLabel} · Accuracy ±${webSearchUsed ? "10-15" : "15-25"}%`);
-    console.log(`[TR-015] Sonnet responded in ${Date.now() - startTime}ms (web_search: ${webSearchUsed})`);
+    result.search_count = usedWebSearch ? 5 : 0;
+    result.agent_notes.push(`✨ Market Intelligence — ${city}, ${state} · ${monthYear} · ${usedWebSearch ? "web search" : "Claude AI"} · ±${usedWebSearch ? "10-15" : "15-25"}%`);
+    console.log(`[TR-015] Sonnet done in ${Date.now() - startTime}ms (web: ${usedWebSearch})`);
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    console.error("[TR-015] Sonnet+web_search failed:", msg);
+    console.error("[TR-015] Sonnet failed:", err instanceof Error ? err.message : err);
 
-    // ── Fallback: Haiku without web_search (training data only) ──
+    // ── Fallback: Haiku without web_search ──
     try {
-      console.log("[TR-015] Trying Haiku fallback (no web search)...");
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 20_000);
-      const response = await client.messages.create({
+      console.log("[TR-015] Haiku fallback...");
+      const ctrl2 = new AbortController();
+      const t2 = setTimeout(() => ctrl2.abort(), 20_000);
+      const resp2 = await client.messages.create({
         model: "claude-haiku-4-5-20251001",
         max_tokens: 2048,
         tools: [priceTool],
         tool_choice: { type: "tool", name: "report_construction_prices" },
         messages: [{ role: "user", content: userPrompt }],
-      }, { signal: controller.signal });
-      clearTimeout(timer);
-      for (const block of response.content) {
+      }, { signal: ctrl2.signal });
+      clearTimeout(t2);
+      for (const block of resp2.content) {
         if (block.type === "tool_use" && block.name === "report_construction_prices") {
           jsonText = JSON.stringify(block.input);
           break;
         }
       }
-      result.search_count = 10;
-      result.agent_notes.push(`✨ Market Intelligence — ${city}, ${state} · ${monthYear} · Just fetched · Claude AI · Accuracy ±15-25%`);
-      console.log(`[TR-015] Sonnet (structured) responded in ${Date.now() - startTime}ms`);
+      result.search_count = 0;
+      result.agent_notes.push(`✨ Market Intelligence — ${city}, ${state} · ${monthYear} · Claude AI · ±15-25%`);
+      console.log(`[TR-015] Haiku done in ${Date.now() - startTime}ms`);
     } catch (fallbackErr) {
       const fbMsg = fallbackErr instanceof Error ? fallbackErr.message : String(fallbackErr);
       result.agent_notes.push(`Claude API error: ${fbMsg}`);
