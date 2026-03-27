@@ -1755,7 +1755,14 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
         if (mKeys.length > 0) console.log(`[TR-008] Possible market data under: ${mKeys.join(", ")}`);
       }
       const elements = inputData?._elements ?? inputData?.elements ?? inputData?.rows ?? [];
-      const buildingDescription = inputData?.buildingDescription ?? inputData?.content ?? inputData?.prompt ?? "";
+      // Include IFC filename in building type detection — "Wellness center Sama.ifc" → wellness type
+      const buildingDescription = [
+        inputData?.buildingDescription,
+        inputData?.content,
+        inputData?.prompt,
+        inputData?.fileName, // IFC filename often contains building type keywords
+        inputData?.label,
+      ].filter(v => typeof v === "string" && v.length > 0).join(" ") || "commercial";
       let escalationMonths = Number(inputData?.escalationMonths ?? 6);
       let escalationRate = 0.06;
       let contingencyPct = 0.10;
@@ -2356,6 +2363,30 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
       rows.push(["", "", "", "", "", "", "", "", "", ""]);
       rows.push(["HARD COSTS SUBTOTAL", "", "", "", "", "", `${cs}${totalMaterial.toFixed(2)}`, `${cs}${totalLabor.toFixed(2)}`, `${cs}${totalEquipment.toFixed(2)}`, `${cs}${hardCostSubtotal.toFixed(2)}`]);
       console.log(`[TR-008] COST TRACE: Hard costs ₹${hardCostSubtotal.toLocaleString()} / GFA ${gfaForProvisional}m² = ₹${Math.round(hardCostSubtotal / gfaForProvisional).toLocaleString()}/m² | Elements: ${elements.length} | City: ${locationLabel} | Tier: ${cityTierForProv}`);
+
+      // ── Minimum cost floor enforcement ──
+      // No commercial building can be built below ₹22,000/m² anywhere in India.
+      // Scale up proportionally if estimate falls below floor.
+      if (isIndianProject && gfaForProvisional > 0) {
+        const MIN_FLOORS: Record<string, number> = {
+          residential: 14000, commercial: 22000, retail: 20000,
+          healthcare: 35000, hospital: 35000, hospitality: 30000, hotel: 30000,
+          wellness: 35000, spa: 35000, educational: 18000,
+          industrial: 12000, warehouse: 8000, datacenter: 45000,
+        };
+        const btKey = projectTypeInfo.type.toLowerCase();
+        const minFloor = MIN_FLOORS[btKey] ?? MIN_FLOORS.commercial;
+        const currentCostPerM2 = hardCostSubtotal / gfaForProvisional;
+        if (currentCostPerM2 < minFloor) {
+          const scaleFactor = minFloor / currentCostPerM2;
+          hardCostSubtotal = Math.round(hardCostSubtotal * scaleFactor);
+          totalMaterial = Math.round(totalMaterial * scaleFactor);
+          totalLabor = Math.round(totalLabor * scaleFactor);
+          totalEquipment = Math.round(totalEquipment * scaleFactor);
+          rows.push([`⚠️ Minimum cost floor applied: ₹${minFloor.toLocaleString()}/m² (${btKey}) — scaled ×${scaleFactor.toFixed(2)}`, "", "", "", "", "", "", "", "", `${cs}${hardCostSubtotal.toFixed(2)}`]);
+          console.log(`[TR-008] Minimum floor applied: ${btKey} ₹${minFloor}/m² — scale ${scaleFactor.toFixed(2)}x → new hard cost ₹${hardCostSubtotal.toLocaleString()}`);
+        }
+      }
 
       // Project type multiplier info
       if (projectTypeInfo.multiplier !== 1.0) {
@@ -3105,12 +3136,25 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
           ["COST PER m² GFA", "", `${currencySymbol}${costPerSqm.toLocaleString()}`, "excl GST"],
           ["COST PER m² (incl GST)", "", `${currencySymbol}${costPerSqmInclGST.toLocaleString()}`, "incl GST"],
           [""],
-          isINR && upstreamBenchmark ? [
-            "BENCHMARK",
-            "",
-            `₹${Number(upstreamBenchmark.rangeLow ?? 35000).toLocaleString()} - ₹${Number(upstreamBenchmark.rangeHigh ?? 70000).toLocaleString()} /m²`,
-            `${projectType} in ${String(pricingInfo?.cityTier ?? "India")} — ${String(upstreamBenchmark.status ?? "within range")}`,
-          ] : isINR ? ["BENCHMARK", "", `₹35,000 - ₹70,000 /m²`, "Default range (no city-specific data)"] : [""],
+          (() => {
+            if (!isINR) return [""];
+            // City-tier-aware benchmark ranges for Summary sheet
+            const tier = String(pricingInfo?.cityTier ?? upstreamBenchmark?.cityTier ?? "tier-2");
+            const bt = projectType.toLowerCase();
+            const tierRanges: Record<string, Record<string, [number, number]>> = {
+              metro:    { commercial: [45000, 90000], residential: [28000, 55000], wellness: [55000, 110000], healthcare: [55000, 100000], hospitality: [55000, 110000] },
+              "tier-1": { commercial: [35000, 70000], residential: [22000, 42000], wellness: [45000, 85000], healthcare: [45000, 85000], hospitality: [45000, 85000] },
+              "tier-2": { commercial: [26000, 52000], residential: [18000, 36000], wellness: [35000, 65000], healthcare: [35000, 65000], hospitality: [35000, 65000] },
+              "tier-3": { commercial: [18000, 38000], residential: [14000, 28000], wellness: [25000, 50000], healthcare: [25000, 50000], hospitality: [25000, 50000] },
+              city:     { commercial: [26000, 52000], residential: [18000, 36000], wellness: [35000, 65000], healthcare: [35000, 65000], hospitality: [35000, 65000] },
+            };
+            const range = tierRanges[tier]?.[bt] ?? tierRanges[tier]?.commercial ?? tierRanges["tier-2"].commercial;
+            // Use upstream benchmark if available (more accurate), else use tier-based range
+            const low = upstreamBenchmark ? Number(upstreamBenchmark.rangeLow ?? range[0]) : range[0];
+            const high = upstreamBenchmark ? Number(upstreamBenchmark.rangeHigh ?? range[1]) : range[1];
+            const status = upstreamBenchmark ? String(upstreamBenchmark.status ?? "within range") : "benchmark";
+            return ["BENCHMARK", "", `₹${low.toLocaleString()} - ₹${high.toLocaleString()} /m²`, `${projectType} in ${tier} city — ${status}`];
+          })(),
           [""],
           ["DISCLAIMER"],
           [COST_DISCLAIMERS.full],

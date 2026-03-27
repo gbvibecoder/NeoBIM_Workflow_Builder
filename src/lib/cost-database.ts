@@ -675,11 +675,14 @@ export function detectProjectType(description: string): { type: string; multipli
       return { type, multiplier: data.multiplier };
     }
   }
-  // Additional keyword matching
-  if (lower.includes("office") || lower.includes("retail")) return { type: "commercial", multiplier: 1.00 };
-  if (lower.includes("hotel") || lower.includes("resort")) return { type: "hospitality", multiplier: 1.20 };
-  if (lower.includes("school") || lower.includes("university")) return { type: "educational", multiplier: 1.10 };
-  if (lower.includes("clinic") || lower.includes("medical")) return { type: "healthcare", multiplier: 1.45 };
+  // Additional keyword matching — order matters (specific before generic)
+  if (lower.includes("wellness") || lower.includes("spa") || lower.includes("club house") || lower.includes("clubhouse")) return { type: "wellness", multiplier: 1.35 };
+  if (lower.includes("hotel") || lower.includes("resort") || lower.includes("hospitality")) return { type: "hospitality", multiplier: 1.20 };
+  if (lower.includes("hospital") || lower.includes("clinic") || lower.includes("medical")) return { type: "healthcare", multiplier: 1.45 };
+  if (lower.includes("school") || lower.includes("university") || lower.includes("college")) return { type: "educational", multiplier: 1.10 };
+  if (lower.includes("warehouse") || lower.includes("storage") || lower.includes("godown")) return { type: "warehouse", multiplier: 0.70 };
+  if (lower.includes("factory") || lower.includes("plant") || lower.includes("manufacturing")) return { type: "industrial", multiplier: 0.90 };
+  if (lower.includes("office") || lower.includes("retail") || lower.includes("it park")) return { type: "commercial", multiplier: 1.00 };
   if (lower.includes("apartment") || lower.includes("condo") || lower.includes("housing")) return { type: "residential", multiplier: 0.85 };
   if (lower.includes("church") || lower.includes("mosque") || lower.includes("temple")) return { type: "religious", multiplier: 1.10 };
   if (lower.includes("factory") || lower.includes("plant") || lower.includes("manufacturing")) return { type: "industrial", multiplier: 0.90 };
