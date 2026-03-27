@@ -336,16 +336,27 @@ After searching, use the report_construction_prices tool to return your findings
   let jsonText = "";
   let usedWebSearch = false;
 
+  // ── Shorter prompt for Haiku (no web_search instructions, no self-critique) ──
+  const haikuPrompt = `You are a senior Quantity Surveyor. Return current construction prices for ${city}, ${state}, India (${monthYear}). Building type: ${buildingType}.
+
+Consider: Is ${city} metro/tier-2/tier-3? Is ${state} near steel/cement plants? Labor surplus or scarce?
+
+Rules:
+- ALL benchmark values in INR per SQUARE METRE (m²), NOT sqft. m² values > 15,000.
+- Steel: ₹52,000-78,000/tonne. Cement: ₹340-560/bag. Mason: ₹500-1200/day.
+
+Use the report_construction_prices tool to return your findings.`;
+
   // ── Primary: Claude Sonnet with web_search + structured output ──
   try {
-    console.log("[TR-015] Calling Sonnet with web_search...");
+    console.log("[TR-015] Calling Sonnet with web_search (40s timeout)...");
     const ctrl1 = new AbortController();
-    const t1 = setTimeout(() => ctrl1.abort(), 45_000);
+    const t1 = setTimeout(() => ctrl1.abort(), 40_000);
     const resp = await client.messages.create({
       model: "claude-sonnet-4-6",
       max_tokens: 4096,
       tools: [
-        { type: "web_search_20250305", name: "web_search", max_uses: 5 },
+        { type: "web_search_20250305", name: "web_search", max_uses: 3 },
         priceTool,
       ],
       tool_choice: { type: "auto" },
@@ -365,23 +376,25 @@ After searching, use the report_construction_prices tool to return your findings
         if (block.type === "text" && block.text.includes("{")) { jsonText = block.text; break; }
       }
     }
-    result.search_count = usedWebSearch ? 5 : 0;
+    result.search_count = usedWebSearch ? 3 : 0;
     result.agent_notes.push(`✨ Market Intelligence — ${city}, ${state} · ${monthYear} · ${usedWebSearch ? "web search" : "Claude AI"} · ±${usedWebSearch ? "10-15" : "15-25"}%`);
     console.log(`[TR-015] Sonnet done in ${Date.now() - startTime}ms (web: ${usedWebSearch})`);
   } catch (err) {
-    console.error("[TR-015] Sonnet failed:", err instanceof Error ? err.message : err);
+    const sonnetMs = Date.now() - startTime;
+    console.error(`[TR-015] Sonnet failed after ${sonnetMs}ms:`, err instanceof Error ? err.message : err);
 
-    // ── Fallback: Haiku without web_search ──
+    // ── Fallback: Haiku with SHORT prompt, forced tool_use, 12s timeout ──
     try {
-      console.log("[TR-015] Haiku fallback...");
+      console.log("[TR-015] Haiku fallback (12s timeout, short prompt)...");
+      const haikuStart = Date.now();
       const ctrl2 = new AbortController();
-      const t2 = setTimeout(() => ctrl2.abort(), 20_000);
+      const t2 = setTimeout(() => ctrl2.abort(), 12_000);
       const resp2 = await client.messages.create({
         model: "claude-haiku-4-5-20251001",
-        max_tokens: 2048,
+        max_tokens: 1024,
         tools: [priceTool],
         tool_choice: { type: "tool", name: "report_construction_prices" },
-        messages: [{ role: "user", content: userPrompt }],
+        messages: [{ role: "user", content: haikuPrompt }],
       }, { signal: ctrl2.signal });
       clearTimeout(t2);
       for (const block of resp2.content) {
@@ -392,11 +405,12 @@ After searching, use the report_construction_prices tool to return your findings
       }
       result.search_count = 0;
       result.agent_notes.push(`✨ Market Intelligence — ${city}, ${state} · ${monthYear} · Claude AI · ±15-25%`);
-      console.log(`[TR-015] Haiku done in ${Date.now() - startTime}ms`);
+      console.log(`[TR-015] Haiku done in ${Date.now() - haikuStart}ms (total: ${Date.now() - startTime}ms)`);
     } catch (fallbackErr) {
       const fbMsg = fallbackErr instanceof Error ? fallbackErr.message : String(fallbackErr);
-      result.agent_notes.push(`Claude API error: ${fbMsg}`);
-      console.error("[TR-015] All attempts failed:", fbMsg);
+      const totalMs = Date.now() - startTime;
+      result.agent_notes.push(`Using CPWD 2024 static rates (AI unavailable — ${fbMsg})`);
+      console.error(`[TR-015] Both attempts failed after ${totalMs}ms: ${fbMsg}`);
     }
   }
 

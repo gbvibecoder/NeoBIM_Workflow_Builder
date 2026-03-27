@@ -15,6 +15,7 @@ import {
   calculateEscalation,
   detectProjectType,
   COST_DISCLAIMERS,
+  buildDynamicDisclaimer,
   getWasteFactor,
   getCostBreakdown,
 } from "@/lib/cost-database";
@@ -1747,6 +1748,13 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
     } else if (catalogueId === "TR-008") {
       // BOQ Cost Mapper — Professional QS-grade with waste, M/L/E breakdown, escalation, project type
 
+      // FIX 11: Indian number formatting (Cr/L) for QS summary
+      const formatINR = (value: number): string => {
+        if (Math.abs(value) >= 10000000) return `₹${(value / 10000000).toFixed(2)} Cr`;
+        if (Math.abs(value) >= 100000) return `₹${(value / 100000).toFixed(2)} L`;
+        return `₹${Math.round(value).toLocaleString("en-IN")}`;
+      };
+
       // Normalize storey names in ALL element descriptions received from upstream
       // Belt-and-suspenders: catches "Grond" even if TR-007 path missed it
       const fixStoreyInDesc = (s: string): string => s.replace(/\bGrond\b/gi, "Ground").replace(/\bGroung\b/gi, "Ground");
@@ -1769,6 +1777,30 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
         const mKeys = inputKeys.filter(k => k.toLowerCase().includes("market") || k.toLowerCase().includes("price") || k.toLowerCase().includes("steel"));
         if (mKeys.length > 0) console.log(`[TR-008] Possible market data under: ${mKeys.join(", ")}`);
       }
+      // ── Steel market rate — derived from TR-015 market data (safe scoping: all let at top) ──
+      let marketTMTPerKg: number | null = null;       // TMT Fe500 rebar rate ₹/kg from market
+      let marketStructSteelPerKg: number | null = null; // Structural steel ₹/kg (TMT × 1.55 section premium)
+      let steelFromMarket = false;
+      try {
+        const earlyMarket = inputData?._marketData as Record<string, unknown> | undefined;
+        const steelVal = earlyMarket?.steel_per_tonne as { value?: number } | number | undefined;
+        let steelPerTonne = 0;
+        if (typeof steelVal === "number") {
+          steelPerTonne = steelVal;
+        } else if (typeof steelVal === "object" && steelVal !== null && typeof steelVal.value === "number") {
+          steelPerTonne = steelVal.value;
+        }
+        if (steelPerTonne > 10000) { // sanity: must be > ₹10,000/tonne
+          marketTMTPerKg = Math.round(steelPerTonne / 1000 * 100) / 100; // ₹/tonne → ₹/kg
+          marketStructSteelPerKg = Math.round(marketTMTPerKg * 1.55 * 100) / 100; // structural section premium
+          steelFromMarket = true;
+          console.log(`[TR-008] Steel from market: TMT ₹${marketTMTPerKg}/kg, Structural ₹${marketStructSteelPerKg}/kg (from ₹${steelPerTonne}/tonne)`);
+        }
+      } catch (steelErr) {
+        console.warn("[TR-008] Could not extract steel rate from market data:", steelErr);
+        // steelFromMarket stays false — will use static IS 1200 rates
+      }
+
       const elements = inputData?._elements ?? inputData?.elements ?? inputData?.rows ?? [];
       // Include IFC filename in building type detection — "Wellness center Sama.ifc" → wellness type
       const buildingDescription = [
@@ -1994,11 +2026,35 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
 
               // Apply category factor to material rate, labor factor to labour rate
               const laborFactor = ip?.labor ?? categoryFactor;
-              const adjRate = Math.round(rate.rate * categoryFactor * gradeMult * 100) / 100;
-              const matCost = Math.round(adjQty * rate.material * categoryFactor * gradeMult * 100) / 100;
-              const labCost = Math.round(adjQty * rate.labour * laborFactor * gradeMult * 100) / 100;
-              const eqpCost = Math.round(adjQty * (rate.rate - rate.material - rate.labour) * categoryFactor * gradeMult * 100) / 100;
-              const lineTot = Math.round(adjQty * adjRate * 100) / 100;
+              let adjRate = Math.round(rate.rate * categoryFactor * gradeMult * 100) / 100;
+
+              // FIX 1: Override steel rates with market TMT price when available
+              if (steelFromMarket && rate.subcategory === "Steel") {
+                const isStructSteel2 = !rate.is1200Code.includes("REBAR");
+                const mktRate = isStructSteel2 ? marketStructSteelPerKg : marketTMTPerKg;
+                if (mktRate !== null) {
+                  adjRate = Math.round(mktRate * 100) / 100;
+                  console.log(`[TR-008] Steel rate override: ${rate.is1200Code} → ₹${adjRate}/kg (market)`);
+                }
+              }
+              // FIX 6: Round Qty and Rate first, then multiply — so displayed math checks out
+              const roundedAdjQty = Math.round(adjQty * 100) / 100;
+              const roundedAdjRate = Math.round(adjRate);
+              const lineTot = Math.round(roundedAdjQty * roundedAdjRate * 100) / 100;
+
+              // M/L/E breakdown: use market split for market-overridden steel, else IS 1200 split
+              let matCost: number;
+              let labCost: number;
+              let eqpCost: number;
+              if (steelFromMarket && rate.subcategory === "Steel" && marketTMTPerKg !== null) {
+                matCost = Math.round(lineTot * 0.85 * 100) / 100;
+                labCost = Math.round(lineTot * 0.10 * 100) / 100;
+                eqpCost = Math.round((lineTot - matCost - labCost) * 100) / 100; // remainder — guarantees sum = lineTot
+              } else {
+                matCost = Math.round(adjQty * rate.material * categoryFactor * gradeMult * 100) / 100;
+                labCost = Math.round(adjQty * rate.labour * laborFactor * gradeMult * 100) / 100;
+                eqpCost = Math.round((lineTot - matCost - labCost) * 100) / 100; // remainder — guarantees sum = lineTot
+              }
 
               hardCostSubtotal += lineTot;
               costIS1200 += lineTot;
@@ -2015,17 +2071,28 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
                 `₹${Math.max(0, eqpCost).toFixed(2)}`, `₹${lineTot.toFixed(2)}`,
               ]);
 
+              // FIX 10: Include storey name in description for clarity
+              const lineDesc = elemStorey && !rate.description.includes(elemStorey)
+                ? `${rate.description} — ${elemStorey}`
+                : rate.description;
+
               boqLines.push({
                 division: is1200Label,
                 csiCode: rate.is1200Code,
-                description: rate.description,
+                description: lineDesc,
                 unit: rate.unit,
                 quantity: qty,
                 wasteFactor,
                 adjustedQty: adjQty,
-                materialRate: Math.round(rate.material * categoryFactor * 100) / 100,
-                laborRate: Math.round(rate.labour * laborFactor * 100) / 100,
-                equipmentRate: Math.round((rate.rate - rate.material - rate.labour) * categoryFactor * 100) / 100,
+                materialRate: (steelFromMarket && rate.subcategory === "Steel" && marketTMTPerKg !== null)
+                  ? Math.round(adjRate * 0.85 * 100) / 100
+                  : Math.round(rate.material * categoryFactor * 100) / 100,
+                laborRate: (steelFromMarket && rate.subcategory === "Steel" && marketTMTPerKg !== null)
+                  ? Math.round(adjRate * 0.10 * 100) / 100
+                  : Math.round(rate.labour * laborFactor * 100) / 100,
+                equipmentRate: (steelFromMarket && rate.subcategory === "Steel" && marketTMTPerKg !== null)
+                  ? Math.round(adjRate * 0.05 * 100) / 100
+                  : Math.round((rate.rate - rate.material - rate.labour) * categoryFactor * 100) / 100,
                 unitRate: adjRate,
                 materialCost: matCost,
                 laborCost: labCost,
@@ -2259,9 +2326,14 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
           // For Indian projects, use CPWD rate × state PWD category factor
           let adjRate: number;
           if (isIndianProject && is1200Key === "rebar" && is1200Module) {
-            const rebarRate = is1200Module.getIS1200Rate("IS1200-P6-REBAR-500");
-            const steelFactor = ip?.steel ?? ip?.overall ?? 1.0;
-            adjRate = rebarRate ? Math.round(rebarRate.rate * steelFactor * 100) / 100 : Math.round(rateUSD * locationFactor * exchangeRate * 100) / 100;
+            // FIX 1: Use market TMT rate when available, else fall back to IS 1200 static
+            if (steelFromMarket && marketTMTPerKg !== null) {
+              adjRate = marketTMTPerKg;
+            } else {
+              const rebarRate = is1200Module.getIS1200Rate("IS1200-P6-REBAR-500");
+              const steelFactor = ip?.steel ?? ip?.overall ?? 1.0;
+              adjRate = rebarRate ? Math.round(rebarRate.rate * steelFactor * 100) / 100 : Math.round(rateUSD * locationFactor * exchangeRate * 100) / 100;
+            }
           } else if (isIndianProject && is1200Key.startsWith("formwork") && is1200Module) {
             const fwRates: Record<string, number> = { "formwork-wall": 400, "formwork-slab": 380, "formwork-column": 480, "formwork-beam": 420 };
             const concFactor = ip?.concrete ?? ip?.overall ?? 1.0;
@@ -2276,11 +2348,13 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
 
           const waste = 0.05;
           const adjQty = Math.round(baseQty * (1 + waste) * 100) / 100;
+          // FIX 6: round rate to whole ₹, then multiply — displayed math checks out
+          adjRate = Math.round(adjRate);
           const total = Math.round(adjQty * adjRate * 100) / 100;
           const breakdown = { material: 0.45, labor: 0.50, equipment: 0.05 };
           const matC = Math.round(total * breakdown.material * 100) / 100;
           const labC = Math.round(total * breakdown.labor * 100) / 100;
-          const eqpC = Math.round(total * breakdown.equipment * 100) / 100;
+          const eqpC = Math.round((total - matC - labC) * 100) / 100; // remainder — guarantees sum = total
           hardCostSubtotal += total;
           totalMaterial += matC; totalLabor += labC; totalEquipment += eqpC;
 
@@ -2532,11 +2606,18 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
       }
       // ── Rate Benchmark Validator (uses total project cost including soft costs) ──
       const { validateBenchmark } = await import("@/services/boq-intelligence");
+      // FIX 7: Pass dynamic benchmark from market agent when available
+      const dynamicBench = marketData ? {
+        rangeLow: Number(marketData.typical_range_min) || undefined,
+        rangeHigh: Number(marketData.typical_range_max) || undefined,
+        minFloor: Number(marketData.absolute_minimum_cost) || undefined,
+      } : undefined;
       const benchmarkResult = validateBenchmark(
         costSummary.totalCost,
         gfaForProvisional,
         projectTypeInfo.type,
-        indianPricing?.cityTier ?? cityTierForProv
+        indianPricing?.cityTier ?? cityTierForProv,
+        dynamicBench
       );
 
       rows.push(["", "", "", "", "", "", "", "", "", ""]);
@@ -2554,7 +2635,7 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
       rows.push(["", "", "", "", "", "", "", "", "", ""]);
       rows.push(["TOTAL PROJECT COST", "", "", "", "", "", "", "", "", `${cs}${costSummary.totalCost.toFixed(2)}`]);
       rows.push(["", "", "", "", "", "", "", "", "", ""]);
-      rows.push([COST_DISCLAIMERS.accuracy, "", "", "", "", "", "", "", "", ""]);
+      rows.push([`Estimate accuracy: ${aaceInfo.accuracy} (AACE ${aaceInfo.class}). Not suitable for contract pricing.`, "", "", "", "", "", "", "", "", ""]);
 
       // No yellow warnings — all info goes into the content summary
       const warnings: string[] = [];
@@ -2576,6 +2657,23 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
       const geometryPct = totalElems > 0 ? Math.round((withGeometry / totalElems) * 100) : 0;
       const hasStructIFC = !!(inputData?._hasStructuralFoundation);
       const hasMEPIFC = !!(inputData?._hasMEPData);
+
+      // FIX 10: Dynamic AACE class based on uploaded IFC files
+      const aaceInfo = (() => {
+        if (hasStructIFC && hasMEPIFC) return { class: "Class 3", accuracy: "±15-20%", confidence: "HIGH" };
+        if (hasStructIFC || hasMEPIFC) return { class: "Class 3-4", accuracy: "±20-25%", confidence: "MEDIUM-HIGH" };
+        return { class: "Class 4", accuracy: "±25-30%", confidence: "MEDIUM" };
+      })();
+
+      // FIX 8: Dynamic disclaimer with city, state, AACE class, fetch date
+      const dynamicDisclaimer = buildDynamicDisclaimer({
+        aaceClass: aaceInfo.class,
+        accuracy: aaceInfo.accuracy,
+        city: locationData?.city,
+        state: locationData?.state,
+        marketFetchDate: marketData?.fetched_at,
+      });
+
       const ifcQuality = geometryPct > 85 ? "EXCELLENT" : geometryPct > 65 ? "GOOD" : geometryPct > 40 ? "FAIR" : "POOR";
       const confidencePct = Math.min(95, geometryPct + (hasStructIFC ? 8 : 0) + (hasMEPIFC ? 10 : 0));
 
@@ -2615,7 +2713,7 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
       const costPerM2 = gfaForProvisional > 0 ? Math.round(costSummary.totalCost / gfaForProvisional) : 0;
       const provPct = hardCostSubtotal > 0 ? Math.round((provisionalTotal / hardCostSubtotal) * 100) : 0;
       const nlSummary = [
-        `This ${Math.round(gfaForProvisional)}m² ${projectTypeInfo.type} in ${locationLabel || "India"} is estimated at ₹${costSummary.totalCost.toLocaleString()} (₹${costPerM2.toLocaleString()}/m²).`,
+        `This ${Math.round(gfaForProvisional)}m² ${projectTypeInfo.type} in ${locationLabel || "India"} is estimated at ${formatINR(costSummary.totalCost)} (₹${costPerM2.toLocaleString("en-IN")}/m²).`,
         `IFC Quality: ${ifcQuality} (${confidencePct}% confidence) · ${withGeometry}/${totalElems} elements`,
         ...infoNotes,
         anomalies.length === 0 ? `Quality Check: all ratios within expected ranges` : `Quality Check: ${anomalies.length} anomal${anomalies.length === 1 ? "y" : "ies"} — review recommended`,
@@ -2640,8 +2738,9 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
           _locationFactor: locationFactor,
           _projectType: projectTypeInfo.type,
           _projectMultiplier: projectTypeInfo.multiplier,
-          _disclaimer: COST_DISCLAIMERS.full,
-          _aaceClass: (hasStructuralFoundation && hasMEPData) ? "Class 3" : "Class 4",
+          _disclaimer: dynamicDisclaimer,
+          _aaceClass: aaceInfo.class,
+          _aaceAccuracy: aaceInfo.accuracy,
           content: nlSummary,
           _boqData: {
             lines: boqLines,
@@ -2652,7 +2751,7 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
             projectType: projectTypeInfo.type,
             projectMultiplier: projectTypeInfo.multiplier,
             grandTotal: costSummary.totalCost,
-            disclaimer: COST_DISCLAIMERS.full,
+            disclaimer: dynamicDisclaimer,
           },
           _gfa: gfaForProvisional,
           _benchmark: {
@@ -3461,6 +3560,11 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
         const estimatedGST = Math.round(hardTotal * 0.55 * 0.18); // 18% GST on ~55% material component
         const hardTotalInclGST = hardTotal + (totalGST > 0 ? totalGST : estimatedGST);
         const costPerSqmInclGST = hardTotalInclGST > 0 ? Math.round(hardTotalInclGST / gfa) : 0;
+        // FIX 4: Use TR-008's computed soft costs when available, not hardcoded 44%
+        const tr008TotalCost = Number(inputData?._totalCost ?? 0);
+        const tr008SoftCosts = Number(inputData?._softCosts ?? 0);
+        const softCostTotal = tr008SoftCosts > 0 ? tr008SoftCosts : Math.round(hardTotal * 0.44);
+        const totalExclGST = tr008TotalCost > 0 ? tr008TotalCost : Math.round(hardTotal + softCostTotal);
         const contingencyAmt = Math.round(hardTotal * 0.10);
         const overheadAmt = Math.round(hardTotal * 0.15);
         // Sanity: incl GST must ALWAYS be > excl GST
@@ -3495,10 +3599,10 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
           ["Insurance & Bonding (2.5%)", "", Math.round(hardTotal * 0.025), ""],
           ["Labour Cess (1%)", "", Math.round(hardTotal * 0.01), ""],
           [""],
-          ["TOTAL SOFT COSTS", "", Math.round(hardTotal * 0.44), ""],
+          ["TOTAL SOFT COSTS", "", Math.round(softCostTotal), ""],
           [""],
-          ["TOTAL PROJECT COST (excl GST)", "", Math.round(hardTotal + hardTotal * 0.44), ""],
-          ["TOTAL PROJECT COST (incl GST)", "", Math.round(hardTotalInclGST + hardTotal * 0.44), ""],
+          ["TOTAL PROJECT COST (excl GST)", "", Math.round(totalExclGST), ""],
+          ["TOTAL PROJECT COST (incl GST)", "", Math.round(totalExclGST + (totalGST > 0 ? totalGST : estimatedGST)), ""],
           [""],
           ["COST PER m² GFA", "", `${currencySymbol}${costPerSqm.toLocaleString()}`, "excl GST"],
           ["COST PER m² (incl GST)", "", `${currencySymbol}${costPerSqmInclGST.toLocaleString()}`, "incl GST"],
@@ -3524,7 +3628,7 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
           })(),
           [""],
           ["DISCLAIMER"],
-          [COST_DISCLAIMERS.full],
+          [boqData?.disclaimer ?? String(inputData?._disclaimer ?? COST_DISCLAIMERS.full)],
         ];
         const summarySheet = XLSX.utils.aoa_to_sheet(summaryRows);
         summarySheet["!cols"] = [{ wch: 34 }, { wch: 5 }, { wch: 22 }, { wch: 28 }];
@@ -3569,9 +3673,11 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
         ["", "Off-site infrastructure, hazardous material abatement", "", ""],
         [""],
         ["ACCURACY"],
-        ["", !!(inputData?._hasStructuralFoundation) && !!(inputData?._hasMEPData)
-          ? "AACE Class 3 estimate: ±15-20% accuracy (structural + MEP IFC provided)"
-          : "AACE Class 4 estimate: ±25-30% accuracy (architectural IFC only)", "", ""],
+        ["", `AACE ${String(inputData?._aaceClass ?? "Class 4")} estimate: ${String(inputData?._aaceAccuracy ?? "±25-30%")} accuracy`
+          + (!!(inputData?._hasStructuralFoundation) && !!(inputData?._hasMEPData) ? " (structural + MEP IFC provided)"
+            : !!(inputData?._hasStructuralFoundation) ? " (structural IFC provided)"
+            : !!(inputData?._hasMEPData) ? " (MEP IFC provided)"
+            : " (architectural IFC only)"), "", ""],
         ["", "Valid for 90 days from date of preparation", "", ""],
         ["", "Engage a RICS/AACE certified QS for contract-grade pricing", "", ""],
       ];
@@ -3594,7 +3700,7 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
         ["Date:", dateStr],
         ["Prepared By:", "BuildFlow — trybuildflow.in"],
         [""],
-        ["Estimate Class:", !!(inputData?._hasStructuralFoundation) && !!(inputData?._hasMEPData) ? "AACE Class 3 (±15-20%)" : "AACE Class 4 (±25-30%)"],
+        ["Estimate Class:", `AACE ${String(inputData?._aaceClass ?? "Class 4")} (${String(inputData?._aaceAccuracy ?? "±25-30%")})`],
         ["Confidence:", String(pricingInfo?.confidence ?? "MEDIUM")],
         isINR ? ["Rate Basis:", `IS 1200 / CPWD DSR 2023-24 + ${pricingInfo?.statePWD ?? "State"} PWD SOR + AI market intelligence`] : ["Rate Basis:", "CSI MasterFormat + regional factors"],
         [""],
@@ -3633,7 +3739,7 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
           size: xlsxBuffer.length,
           downloadUrl,
           label: "BOQ Export (Professional Excel)",
-          content: `BOQ Export: ${boqLines.length} line items across 4 sheets. Grand Total: ${currencySymbol}${(boqData?.grandTotal ?? 0).toLocaleString()} ${currencyCode}. ${COST_DISCLAIMERS.accuracy}`,
+          content: `BOQ Export: ${boqLines.length} line items across 4 sheets. Grand Total: ${currencySymbol}${(boqData?.grandTotal ?? 0).toLocaleString()} ${currencyCode}. AACE ${String(inputData?._aaceClass ?? "Class 4")} (${String(inputData?._aaceAccuracy ?? "±25-30%")}).`,
         },
         metadata: { real: true },
         createdAt: new Date(),

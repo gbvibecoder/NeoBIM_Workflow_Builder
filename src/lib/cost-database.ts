@@ -840,6 +840,21 @@ export const COST_DISCLAIMERS = {
   full: "DISCLAIMER: Preliminary estimate only (AACE Class 4, ±25-30%). Rates based on IS 1200 method of measurement, CPWD DSR 2023-24, and state PWD Schedule of Rates with AI market intelligence. Valid for 90 days. Excludes land, financing, FF&E, and specialty systems. Engage a certified QS for contract-grade pricing.",
 };
 
+/** Generate dynamic disclaimer with city, state, AACE class, and fetch date */
+export function buildDynamicDisclaimer(opts: {
+  aaceClass?: string; accuracy?: string;
+  city?: string; state?: string;
+  marketFetchDate?: string;
+}): string {
+  const cls = opts.aaceClass ?? "Class 4";
+  const acc = opts.accuracy ?? "±25-30%";
+  const loc = opts.city && opts.state ? `${opts.city}, ${opts.state}` : (opts.state ?? "India");
+  const fetchDate = opts.marketFetchDate
+    ? new Date(opts.marketFetchDate).toLocaleDateString("en-IN")
+    : new Date().toLocaleDateString("en-IN");
+  return `DISCLAIMER: Preliminary estimate only (AACE ${cls}, ${acc} accuracy). Rates based on IS 1200 method of measurement and ${opts.state ?? "CPWD"} Schedule of Rates, adjusted by AI market intelligence for ${loc}. Market prices fetched ${fetchDate}. Valid for 90 days. Excludes land, financing, FF&E, and specialty systems. Engage a certified QS for contract-grade pricing.`;
+}
+
 // =============================================================================
 // HELPER FUNCTIONS
 // =============================================================================

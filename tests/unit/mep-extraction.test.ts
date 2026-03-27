@@ -12,7 +12,12 @@ const MEP_TYPES = [
   "IfcFlowStorageDevice", "IfcFlowTreatmentDevice",
 ];
 
-const HVAC_TYPES = ["IfcDuctSegment", "IfcDuctFitting", "IfcFlowController", "IfcFlowMovingDevice", "IfcFlowTerminal", "IfcFlowTreatmentDevice"];
+// CSI mapping groups (IfcFlowTerminal → Division 23 HVAC in CSI)
+const CSI_HVAC_TYPES = ["IfcDuctSegment", "IfcDuctFitting", "IfcFlowController", "IfcFlowMovingDevice", "IfcFlowTerminal", "IfcFlowTreatmentDevice"];
+const CSI_PLUMBING_TYPES = ["IfcPipeSegment", "IfcPipeFitting", "IfcFlowStorageDevice"];
+
+// IS1200 mapping groups (IfcFlowTerminal → Part 14 Plumbing by default, HVAC via materialOverride)
+const HVAC_TYPES = ["IfcDuctSegment", "IfcDuctFitting", "IfcFlowController", "IfcFlowMovingDevice", "IfcFlowTreatmentDevice"];
 const PLUMBING_TYPES = ["IfcPipeSegment", "IfcPipeFitting", "IfcFlowStorageDevice"];
 const ELECTRICAL_TYPES = ["IfcCableSegment", "IfcCableCarrierSegment", "IfcCableFitting", "IfcCableCarrierFitting"];
 
@@ -27,14 +32,14 @@ describe("IFC_TO_CSI_MAP (MEP types)", () => {
   });
 
   it("maps HVAC types to Division 23 rates", () => {
-    for (const type of HVAC_TYPES) {
+    for (const type of CSI_HVAC_TYPES) {
       const codes = IFC_TO_CSI_MAP[type];
       expect(codes.every(c => c.startsWith("23-")), `${type} should map to Division 23`).toBe(true);
     }
   });
 
   it("maps Plumbing types to Division 22 rates", () => {
-    for (const type of PLUMBING_TYPES) {
+    for (const type of CSI_PLUMBING_TYPES) {
       const codes = IFC_TO_CSI_MAP[type];
       expect(codes.every(c => c.startsWith("22-")), `${type} should map to Division 22`).toBe(true);
     }
@@ -113,6 +118,13 @@ describe("IS1200_MAPPINGS (MEP types)", () => {
       const mapping = IS1200_MAPPINGS.find(m => m.ifcType === type);
       expect(mapping?.is1200Part).toBe("Part 16");
     }
+  });
+
+  it("IfcFlowTerminal defaults to Part 14 (plumbing) with HVAC materialOverrides", () => {
+    const mapping = IS1200_MAPPINGS.find(m => m.ifcType === "IfcFlowTerminal");
+    expect(mapping?.is1200Part).toBe("Part 14");
+    expect(mapping?.materialOverrides).toBeDefined();
+    expect(mapping?.materialOverrides?.diffuser).toBeDefined();
   });
 
   it("IfcPipeSegment has material overrides for copper and GI", () => {

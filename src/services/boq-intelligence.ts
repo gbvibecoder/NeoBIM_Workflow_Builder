@@ -418,6 +418,8 @@ export function validateBenchmark(
   totalGFA: number,
   buildingType: string,
   cityTier: string,
+  /** Dynamic benchmark from market agent — overrides static ranges when present */
+  dynamicBenchmark?: { rangeLow?: number; rangeHigh?: number; minFloor?: number },
 ): BenchmarkResult {
   const costPerM2 = totalGFA > 0 ? totalProjectCost / totalGFA : 0;
   const btLower = buildingType.toLowerCase();
@@ -436,9 +438,16 @@ export function validateBenchmark(
 
   const cityFactor = BENCHMARK_CITY_FACTORS[cityTier] ?? 1.0;
   // Apply city factor but enforce minimum floor — no building type can go below its floor
-  const minFloor = MINIMUM_COST_FLOORS[btLower] ?? MINIMUM_COST_FLOORS["commercial"] ?? 22000;
-  const adjLow = Math.max(Math.round(range.low * cityFactor), minFloor);
-  const adjHigh = Math.round(range.high * cityFactor);
+  const staticMinFloor = MINIMUM_COST_FLOORS[btLower] ?? MINIMUM_COST_FLOORS["commercial"] ?? 22000;
+  const minFloor = (dynamicBenchmark?.minFloor && dynamicBenchmark.minFloor > 10000) ? dynamicBenchmark.minFloor : staticMinFloor;
+
+  // FIX 7: Use dynamic benchmark from market agent when available, else static ranges
+  const adjLow = (dynamicBenchmark?.rangeLow && dynamicBenchmark.rangeLow > 10000)
+    ? Math.max(dynamicBenchmark.rangeLow, minFloor)
+    : Math.max(Math.round(range.low * cityFactor), minFloor);
+  const adjHigh = (dynamicBenchmark?.rangeHigh && dynamicBenchmark.rangeHigh > adjLow)
+    ? dynamicBenchmark.rangeHigh
+    : Math.round(range.high * cityFactor);
 
   let status: BenchmarkResult["status"] = "within";
   let severity: BenchmarkResult["severity"] = "ok";
