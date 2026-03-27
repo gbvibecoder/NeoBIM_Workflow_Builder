@@ -43,11 +43,30 @@ export const UNIT_RATES: UnitRate[] = [
   { csi: "09-91-13.10", division: "09", description: "Interior Paint 2 Coats", unit: "SF", material: 0.45, labor: 1.20, equipment: 0.05, total: 1.70 },
   { csi: "09-65-13.10", division: "09", description: "Resilient Flooring", unit: "SF", material: 3.80, labor: 2.40, equipment: 0.10, total: 6.30 },
 
-  // DIVISION 22 - PLUMBING (simplified)
-  { csi: "22-11-13.10", division: "22", description: "Plumbing Rough-In per Fixture", unit: "EA", material: 850.00, labor: 1200.00, equipment: 50.00, total: 2100.00 },
+  // DIVISION 22 - PLUMBING
+  { csi: "22-11-13.10", division: "22", description: "PVC Pipe 2\" Supply", unit: "LF", material: 4.50, labor: 8.00, equipment: 0.50, total: 13.00 },
+  { csi: "22-11-13.20", division: "22", description: "PVC Pipe 4\" Drainage", unit: "LF", material: 7.00, labor: 10.00, equipment: 1.00, total: 18.00 },
+  { csi: "22-11-13.30", division: "22", description: "Copper Pipe 3/4\" Supply", unit: "LF", material: 12.00, labor: 15.00, equipment: 1.00, total: 28.00 },
+  { csi: "22-11-13.40", division: "22", description: "Pipe Fitting (Elbow/Tee)", unit: "EA", material: 8.00, labor: 12.00, equipment: 0.50, total: 20.50 },
+  { csi: "22-41-13.10", division: "22", description: "Water Closet Fixture", unit: "EA", material: 350.00, labor: 250.00, equipment: 25.00, total: 625.00 },
+  { csi: "22-41-13.20", division: "22", description: "Lavatory/Wash Basin", unit: "EA", material: 280.00, labor: 180.00, equipment: 20.00, total: 480.00 },
+  { csi: "22-11-13.50", division: "22", description: "Water Storage Tank", unit: "EA", material: 1200.00, labor: 600.00, equipment: 100.00, total: 1900.00 },
 
-  // DIVISION 26 - ELECTRICAL (simplified)
-  { csi: "26-05-13.10", division: "26", description: "Electrical Rough-In per 1000SF", unit: "MSF", material: 3500.00, labor: 4800.00, equipment: 200.00, total: 8500.00 },
+  // DIVISION 23 - HVAC
+  { csi: "23-31-13.10", division: "23", description: "Galvanized Ductwork", unit: "LB", material: 3.50, labor: 2.80, equipment: 0.50, total: 6.80 },
+  { csi: "23-31-13.20", division: "23", description: "Flexible Ductwork 6\"", unit: "LF", material: 5.00, labor: 4.00, equipment: 0.30, total: 9.30 },
+  { csi: "23-31-13.30", division: "23", description: "Duct Fitting (Elbow/Transition)", unit: "EA", material: 25.00, labor: 18.00, equipment: 2.00, total: 45.00 },
+  { csi: "23-37-13.10", division: "23", description: "Air Diffuser/Grille", unit: "EA", material: 45.00, labor: 30.00, equipment: 3.00, total: 78.00 },
+  { csi: "23-09-13.10", division: "23", description: "Damper/Valve", unit: "EA", material: 120.00, labor: 60.00, equipment: 10.00, total: 190.00 },
+  { csi: "23-34-13.10", division: "23", description: "Fan/Pump Unit", unit: "EA", material: 2500.00, labor: 800.00, equipment: 200.00, total: 3500.00 },
+  { csi: "23-41-13.10", division: "23", description: "Air Filter Unit", unit: "EA", material: 85.00, labor: 35.00, equipment: 5.00, total: 125.00 },
+
+  // DIVISION 26 - ELECTRICAL
+  { csi: "26-05-29.10", division: "26", description: "Cable Tray 12\" Wide", unit: "LF", material: 15.00, labor: 12.00, equipment: 1.50, total: 28.50 },
+  { csi: "26-05-19.10", division: "26", description: "Conduit and Wiring #12 AWG", unit: "LF", material: 6.00, labor: 10.00, equipment: 0.50, total: 16.50 },
+  { csi: "26-05-19.20", division: "26", description: "Cable Fitting/Connector", unit: "EA", material: 5.00, labor: 8.00, equipment: 0.50, total: 13.50 },
+  { csi: "26-51-13.10", division: "26", description: "LED Lighting Fixture", unit: "EA", material: 85.00, labor: 45.00, equipment: 5.00, total: 135.00 },
+  { csi: "26-24-16.10", division: "26", description: "Panel/Switchboard 200A", unit: "EA", material: 2000.00, labor: 800.00, equipment: 150.00, total: 2950.00 },
 ];
 
 // Default IFC-to-CSI mapping (used when no material info available)
@@ -68,6 +87,22 @@ export const IFC_TO_CSI_MAP: Record<string, string[]> = {
   IfcBuildingElementProxy: ["03-30-53.40"],
   IfcMember: ["05-12-23.10"],
   IfcPlate: ["05-31-13.25"],
+  // MEP — Plumbing (Division 22)
+  IfcPipeSegment: ["22-11-13.10"],
+  IfcPipeFitting: ["22-11-13.40"],
+  IfcFlowStorageDevice: ["22-11-13.50"],
+  // MEP — HVAC (Division 23)
+  IfcDuctSegment: ["23-31-13.10"],
+  IfcDuctFitting: ["23-31-13.30"],
+  IfcFlowController: ["23-09-13.10"],
+  IfcFlowMovingDevice: ["23-34-13.10"],
+  IfcFlowTerminal: ["23-37-13.10"],
+  IfcFlowTreatmentDevice: ["23-41-13.10"],
+  // MEP — Electrical (Division 26)
+  IfcCableSegment: ["26-05-19.10"],
+  IfcCableCarrierSegment: ["26-05-29.10"],
+  IfcCableFitting: ["26-05-19.20"],
+  IfcCableCarrierFitting: ["26-05-29.10"],
 };
 
 // Material-aware CSI overrides: when IFC material name contains these keywords,

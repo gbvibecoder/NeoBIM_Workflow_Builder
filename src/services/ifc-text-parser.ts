@@ -89,6 +89,11 @@ const ELEMENT_TYPES = [
   "IFCDOOR", "IFCWINDOW", "IFCSTAIR", "IFCRAILING", "IFCCOVERING",
   "IFCROOF", "IFCFOOTING", "IFCBUILDINGELEMENTPROXY", "IFCMEMBER",
   "IFCPLATE", "IFCCURTAINWALL",
+  // MEP
+  "IFCDUCTSEGMENT", "IFCDUCTFITTING", "IFCPIPESEGMENT", "IFCPIPEFITTING",
+  "IFCCABLESEGMENT", "IFCCABLECARRIERSEGMENT", "IFCCABLEFITTING", "IFCCABLECARRIERFITTING",
+  "IFCFLOWCONTROLLER", "IFCFLOWMOVINGDEVICE", "IFCFLOWTERMINAL",
+  "IFCFLOWSTORAGEDEVICE", "IFCFLOWTREATMENTDEVICE",
 ];
 
 // CSI division mapping
@@ -109,6 +114,22 @@ const TYPE_TO_DIVISION: Record<string, { code: string; name: string; waste: numb
   IFCMEMBER: { code: "05", name: "Metals", waste: 0.03 },
   IFCPLATE: { code: "05", name: "Metals", waste: 0.03 },
   IFCCURTAINWALL: { code: "08", name: "Openings", waste: 0.02 },
+  // MEP — HVAC
+  IFCDUCTSEGMENT: { code: "23", name: "HVAC", waste: 0.08 },
+  IFCDUCTFITTING: { code: "23", name: "HVAC", waste: 0.08 },
+  IFCFLOWCONTROLLER: { code: "23", name: "HVAC", waste: 0.02 },
+  IFCFLOWMOVINGDEVICE: { code: "23", name: "HVAC", waste: 0.02 },
+  IFCFLOWTERMINAL: { code: "23", name: "HVAC", waste: 0.03 },
+  IFCFLOWTREATMENTDEVICE: { code: "23", name: "HVAC", waste: 0.03 },
+  // MEP — Plumbing
+  IFCPIPESEGMENT: { code: "22", name: "Plumbing", waste: 0.05 },
+  IFCPIPEFITTING: { code: "22", name: "Plumbing", waste: 0.05 },
+  IFCFLOWSTORAGEDEVICE: { code: "22", name: "Plumbing", waste: 0.02 },
+  // MEP — Electrical
+  IFCCABLESEGMENT: { code: "26", name: "Electrical", waste: 0.03 },
+  IFCCABLECARRIERSEGMENT: { code: "26", name: "Electrical", waste: 0.03 },
+  IFCCABLEFITTING: { code: "26", name: "Electrical", waste: 0.03 },
+  IFCCABLECARRIERFITTING: { code: "26", name: "Electrical", waste: 0.03 },
 };
 
 /**

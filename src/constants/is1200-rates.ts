@@ -186,6 +186,101 @@ export const IS1200_MAPPINGS: IS1200Mapping[] = [
     is1200PartName: "Structural Steel",
     defaultRateCodes: ["IS1200-P7-STRUCT-STEEL"],
   },
+  // ── MEP — Plumbing (Part 14) ──
+  {
+    ifcType: "IfcPipeSegment",
+    is1200Part: "Part 14",
+    is1200PartName: "Plumbing",
+    defaultRateCodes: ["IS1200-P14-PVC-PIPE"],
+    materialOverrides: {
+      copper: ["IS1200-P14-COPPER-PIPE"],
+      galvanized: ["IS1200-P14-GI-PIPE"],
+      gi: ["IS1200-P14-GI-PIPE"],
+      cast: ["IS1200-P14-CI-PIPE"],
+    },
+  },
+  {
+    ifcType: "IfcPipeFitting",
+    is1200Part: "Part 14",
+    is1200PartName: "Plumbing",
+    defaultRateCodes: ["IS1200-P14-PIPE-FITTING"],
+  },
+  {
+    ifcType: "IfcFlowStorageDevice",
+    is1200Part: "Part 14",
+    is1200PartName: "Plumbing",
+    defaultRateCodes: ["IS1200-P14-TANK"],
+  },
+  // ── MEP — HVAC (Part 17) ──
+  {
+    ifcType: "IfcDuctSegment",
+    is1200Part: "Part 17",
+    is1200PartName: "HVAC",
+    defaultRateCodes: ["IS1200-P17-GI-DUCT"],
+    materialOverrides: {
+      flexible: ["IS1200-P17-FLEX-DUCT"],
+      flex: ["IS1200-P17-FLEX-DUCT"],
+    },
+  },
+  {
+    ifcType: "IfcDuctFitting",
+    is1200Part: "Part 17",
+    is1200PartName: "HVAC",
+    defaultRateCodes: ["IS1200-P17-DUCT-FITTING"],
+  },
+  {
+    ifcType: "IfcFlowController",
+    is1200Part: "Part 17",
+    is1200PartName: "HVAC",
+    defaultRateCodes: ["IS1200-P17-DAMPER-VALVE"],
+  },
+  {
+    ifcType: "IfcFlowMovingDevice",
+    is1200Part: "Part 17",
+    is1200PartName: "HVAC",
+    defaultRateCodes: ["IS1200-P17-FAN-PUMP"],
+  },
+  {
+    ifcType: "IfcFlowTerminal",
+    is1200Part: "Part 17",
+    is1200PartName: "HVAC",
+    defaultRateCodes: ["IS1200-P17-DIFFUSER"],
+  },
+  {
+    ifcType: "IfcFlowTreatmentDevice",
+    is1200Part: "Part 17",
+    is1200PartName: "HVAC",
+    defaultRateCodes: ["IS1200-P17-FILTER"],
+  },
+  // ── MEP — Electrical (Part 16) ──
+  {
+    ifcType: "IfcCableSegment",
+    is1200Part: "Part 16",
+    is1200PartName: "Electrical",
+    defaultRateCodes: ["IS1200-P16-CABLE"],
+    materialOverrides: {
+      armoured: ["IS1200-P16-ARMOURED-CABLE"],
+      armored: ["IS1200-P16-ARMOURED-CABLE"],
+    },
+  },
+  {
+    ifcType: "IfcCableCarrierSegment",
+    is1200Part: "Part 16",
+    is1200PartName: "Electrical",
+    defaultRateCodes: ["IS1200-P16-CABLE-TRAY"],
+  },
+  {
+    ifcType: "IfcCableFitting",
+    is1200Part: "Part 16",
+    is1200PartName: "Electrical",
+    defaultRateCodes: ["IS1200-P16-CABLE-FITTING"],
+  },
+  {
+    ifcType: "IfcCableCarrierFitting",
+    is1200Part: "Part 16",
+    is1200PartName: "Electrical",
+    defaultRateCodes: ["IS1200-P16-CABLE-TRAY"],
+  },
 ];
 
 // ─── CPWD DSR 2023-24 Rate Database (INR) ───────────────────────────────────
@@ -537,6 +632,183 @@ export const IS1200_RATES: IS1200Rate[] = [
     unit: "m²", rate: 8500, material: 7200, labour: 1300,
     subcategory: "Doors & Windows",
     notes: "Structural silicone glazing, double glazed unit",
+  },
+
+  // ── Part 14: Plumbing (IS 1200 Part 14 — Water Supply & Sanitary) ─────────
+  {
+    is1200Part: "Part 14", is1200Code: "IS1200-P14-PVC-PIPE",
+    description: "PVC pipe 20-25mm (cold water supply) with fittings, S&F",
+    unit: "Rmt", rate: 220, material: 150, labour: 70,
+    subcategory: "Plumbing",
+  },
+  {
+    is1200Part: "Part 14", is1200Code: "IS1200-P14-PVC-PIPE-50",
+    description: "PVC pipe 50mm (waste) with fittings, S&F",
+    unit: "Rmt", rate: 320, material: 220, labour: 100,
+    subcategory: "Plumbing",
+  },
+  {
+    is1200Part: "Part 14", is1200Code: "IS1200-P14-PVC-PIPE-110",
+    description: "PVC pipe 110mm (soil/drainage) with fittings, S&F",
+    unit: "Rmt", rate: 480, material: 340, labour: 140,
+    subcategory: "Plumbing",
+  },
+  {
+    is1200Part: "Part 14", is1200Code: "IS1200-P14-COPPER-PIPE",
+    description: "Copper pipe 15mm (hot water supply) with fittings",
+    unit: "Rmt", rate: 850, material: 680, labour: 170,
+    subcategory: "Plumbing",
+  },
+  {
+    is1200Part: "Part 14", is1200Code: "IS1200-P14-GI-PIPE",
+    description: "GI pipe 25mm (water supply) threaded with fittings",
+    unit: "Rmt", rate: 420, material: 300, labour: 120,
+    subcategory: "Plumbing",
+  },
+  {
+    is1200Part: "Part 14", is1200Code: "IS1200-P14-CI-PIPE",
+    description: "Cast iron pipe 100mm (soil stack) with caulked joints",
+    unit: "Rmt", rate: 1200, material: 950, labour: 250,
+    subcategory: "Plumbing",
+  },
+  {
+    is1200Part: "Part 14", is1200Code: "IS1200-P14-PIPE-FITTING",
+    description: "Pipe fitting (elbow/tee/reducer) — average all sizes",
+    unit: "EA", rate: 180, material: 120, labour: 60,
+    subcategory: "Plumbing",
+  },
+  {
+    is1200Part: "Part 14", is1200Code: "IS1200-P14-WC",
+    description: "EWC (European water closet) with flush valve & CI trap",
+    unit: "EA", rate: 6500, material: 5000, labour: 1500,
+    subcategory: "Plumbing",
+  },
+  {
+    is1200Part: "Part 14", is1200Code: "IS1200-P14-WASH-BASIN",
+    description: "Wash basin with pillar cock & waste coupling",
+    unit: "EA", rate: 4200, material: 3200, labour: 1000,
+    subcategory: "Plumbing",
+  },
+  {
+    is1200Part: "Part 14", is1200Code: "IS1200-P14-FLOOR-TRAP",
+    description: "Floor trap (Jali) CI/PVC 100mm",
+    unit: "EA", rate: 350, material: 220, labour: 130,
+    subcategory: "Plumbing",
+  },
+  {
+    is1200Part: "Part 14", is1200Code: "IS1200-P14-TANK",
+    description: "Overhead water tank (FRP/PVC) 1000 litre with stand",
+    unit: "EA", rate: 12000, material: 9500, labour: 2500,
+    subcategory: "Plumbing",
+  },
+
+  // ── Part 15: Fire Protection ───────────────────────────────────────────────
+  {
+    is1200Part: "Part 15", is1200Code: "IS1200-P15-SPRINKLER-PIPE",
+    description: "Sprinkler piping (MS/GI 25mm) with supports",
+    unit: "Rmt", rate: 650, material: 480, labour: 170,
+    subcategory: "Fire Protection",
+  },
+  {
+    is1200Part: "Part 15", is1200Code: "IS1200-P15-SPRINKLER-HEAD",
+    description: "Sprinkler head (pendent/upright) 68°C glass bulb",
+    unit: "EA", rate: 450, material: 320, labour: 130,
+    subcategory: "Fire Protection",
+  },
+
+  // ── Part 16: Electrical ────────────────────────────────────────────────────
+  {
+    is1200Part: "Part 16", is1200Code: "IS1200-P16-CABLE",
+    description: "PVC conduit 20mm with copper wiring 2.5 sq.mm (1C+1E)",
+    unit: "Rmt", rate: 95, material: 65, labour: 30,
+    subcategory: "Electrical",
+  },
+  {
+    is1200Part: "Part 16", is1200Code: "IS1200-P16-ARMOURED-CABLE",
+    description: "Armoured cable 4C × 6 sq.mm with glands & termination",
+    unit: "Rmt", rate: 380, material: 290, labour: 90,
+    subcategory: "Electrical",
+  },
+  {
+    is1200Part: "Part 16", is1200Code: "IS1200-P16-CABLE-TRAY",
+    description: "Perforated cable tray (GI 300mm wide) with supports",
+    unit: "Rmt", rate: 650, material: 480, labour: 170,
+    subcategory: "Electrical",
+  },
+  {
+    is1200Part: "Part 16", is1200Code: "IS1200-P16-CABLE-FITTING",
+    description: "Cable gland/connector/junction box",
+    unit: "EA", rate: 120, material: 80, labour: 40,
+    subcategory: "Electrical",
+  },
+  {
+    is1200Part: "Part 16", is1200Code: "IS1200-P16-MCB-PANEL",
+    description: "MCB distribution board (8-way) with MCBs",
+    unit: "EA", rate: 4500, material: 3500, labour: 1000,
+    subcategory: "Electrical",
+  },
+  {
+    is1200Part: "Part 16", is1200Code: "IS1200-P16-LED-LIGHT",
+    description: "LED panel light 40W (2×2 ft) with driver",
+    unit: "EA", rate: 1800, material: 1400, labour: 400,
+    subcategory: "Electrical",
+  },
+  {
+    is1200Part: "Part 16", is1200Code: "IS1200-P16-DB-BOX",
+    description: "DB box (TPN 63A) with MCCB & bus bar",
+    unit: "EA", rate: 8500, material: 7000, labour: 1500,
+    subcategory: "Electrical",
+  },
+
+  // ── Part 17: HVAC ─────────────────────────────────────────────────────────
+  {
+    is1200Part: "Part 17", is1200Code: "IS1200-P17-GI-DUCT",
+    description: "GI sheet ductwork (24 gauge) with insulation & supports",
+    unit: "m²", rate: 750, material: 520, labour: 230,
+    subcategory: "HVAC",
+    notes: "Rate per m² of duct surface area",
+  },
+  {
+    is1200Part: "Part 17", is1200Code: "IS1200-P17-FLEX-DUCT",
+    description: "Flexible duct 150mm (insulated) with connectors",
+    unit: "Rmt", rate: 450, material: 320, labour: 130,
+    subcategory: "HVAC",
+  },
+  {
+    is1200Part: "Part 17", is1200Code: "IS1200-P17-DUCT-FITTING",
+    description: "Duct fitting (elbow/tee/transition) GI sheet",
+    unit: "EA", rate: 850, material: 600, labour: 250,
+    subcategory: "HVAC",
+  },
+  {
+    is1200Part: "Part 17", is1200Code: "IS1200-P17-DIFFUSER",
+    description: "Supply air diffuser (4-way 600×600mm) with damper",
+    unit: "EA", rate: 2200, material: 1700, labour: 500,
+    subcategory: "HVAC",
+  },
+  {
+    is1200Part: "Part 17", is1200Code: "IS1200-P17-DAMPER-VALVE",
+    description: "Volume control damper / fire damper (300×300mm)",
+    unit: "EA", rate: 3500, material: 2800, labour: 700,
+    subcategory: "HVAC",
+  },
+  {
+    is1200Part: "Part 17", is1200Code: "IS1200-P17-FAN-PUMP",
+    description: "Inline duct fan / centrifugal pump (1-2 HP)",
+    unit: "EA", rate: 18000, material: 15000, labour: 3000,
+    subcategory: "HVAC",
+  },
+  {
+    is1200Part: "Part 17", is1200Code: "IS1200-P17-AC-OUTDOOR",
+    description: "Split AC outdoor unit (2-ton inverter) with piping",
+    unit: "EA", rate: 42000, material: 35000, labour: 7000,
+    subcategory: "HVAC",
+  },
+  {
+    is1200Part: "Part 17", is1200Code: "IS1200-P17-FILTER",
+    description: "Air filter unit (pre-filter + fine filter) 600×600mm",
+    unit: "EA", rate: 3200, material: 2500, labour: 700,
+    subcategory: "HVAC",
   },
 ];
 

@@ -36,6 +36,21 @@ import {
   IFCRELVOIDSELEMENT,
 } from "web-ifc";
 
+// ─── MEP IFC type constants (not exported by web-ifc) ───────────────────────
+const IFCDUCTSEGMENT = 3518393246;
+const IFCPIPESEGMENT = 3612865200;
+const IFCCABLESEGMENT = 4217484030;
+const IFCCABLECARRIERSEGMENT = 3758799889;
+const IFCDUCTFITTING = 342316401;
+const IFCPIPEFITTING = 310824031;
+const IFCCABLEFITTING = 1051757585;
+const IFCCABLECARRIERFITTING = 635142910;
+const IFCFLOWCONTROLLER = 2058353004;
+const IFCFLOWMOVINGDEVICE = 3132237377;
+const IFCFLOWTERMINAL_TYPE = 2223149337;
+const IFCFLOWSTORAGEDEVICE = 707683696;
+const IFCFLOWTREATMENTDEVICE = 3508470533;
+
 // ============================================================================
 // TYPES
 // ============================================================================
@@ -154,6 +169,9 @@ const DEFAULT_WASTE_FACTORS: Record<string, number> = {
   "07": 10.0, // Thermal/Moisture
   "08": 2.0,  // Openings
   "09": 15.0, // Finishes
+  "22": 5.0,  // Plumbing
+  "23": 8.0,  // HVAC
+  "26": 3.0,  // Electrical
   default: 5.0,
 };
 
@@ -309,6 +327,61 @@ function getCSIMapping(
       codeName: "Curtain Wall and Glazed Assemblies",
       wasteFactor: DEFAULT_WASTE_FACTORS["08"],
     },
+    // ── MEP — HVAC (Division 23) ──
+    IfcDuctSegment: {
+      division: "23", divisionName: "HVAC", code: "23 31 00",
+      codeName: "HVAC Ducts and Casings", wasteFactor: DEFAULT_WASTE_FACTORS["23"],
+    },
+    IfcDuctFitting: {
+      division: "23", divisionName: "HVAC", code: "23 31 00",
+      codeName: "Duct Fittings", wasteFactor: DEFAULT_WASTE_FACTORS["23"],
+    },
+    IfcFlowController: {
+      division: "23", divisionName: "HVAC", code: "23 09 00",
+      codeName: "Instrumentation and Control for HVAC", wasteFactor: 2.0,
+    },
+    IfcFlowMovingDevice: {
+      division: "23", divisionName: "HVAC", code: "23 34 00",
+      codeName: "HVAC Fans", wasteFactor: 2.0,
+    },
+    IfcFlowTerminal: {
+      division: "23", divisionName: "HVAC", code: "23 37 00",
+      codeName: "Air Outlets and Inlets", wasteFactor: 3.0,
+    },
+    IfcFlowTreatmentDevice: {
+      division: "23", divisionName: "HVAC", code: "23 41 00",
+      codeName: "Particulate Air Filtration", wasteFactor: 3.0,
+    },
+    // ── MEP — Plumbing (Division 22) ──
+    IfcPipeSegment: {
+      division: "22", divisionName: "Plumbing", code: "22 11 00",
+      codeName: "Facility Water Distribution Piping", wasteFactor: DEFAULT_WASTE_FACTORS["22"],
+    },
+    IfcPipeFitting: {
+      division: "22", divisionName: "Plumbing", code: "22 11 00",
+      codeName: "Pipe Fittings", wasteFactor: DEFAULT_WASTE_FACTORS["22"],
+    },
+    IfcFlowStorageDevice: {
+      division: "22", divisionName: "Plumbing", code: "22 11 00",
+      codeName: "Water Storage", wasteFactor: 2.0,
+    },
+    // ── MEP — Electrical (Division 26) ──
+    IfcCableSegment: {
+      division: "26", divisionName: "Electrical", code: "26 05 19",
+      codeName: "Low-Voltage Electrical Power Conductors and Cables", wasteFactor: DEFAULT_WASTE_FACTORS["26"],
+    },
+    IfcCableCarrierSegment: {
+      division: "26", divisionName: "Electrical", code: "26 05 29",
+      codeName: "Hangers and Supports for Electrical Systems", wasteFactor: DEFAULT_WASTE_FACTORS["26"],
+    },
+    IfcCableFitting: {
+      division: "26", divisionName: "Electrical", code: "26 05 19",
+      codeName: "Cable Fittings", wasteFactor: DEFAULT_WASTE_FACTORS["26"],
+    },
+    IfcCableCarrierFitting: {
+      division: "26", divisionName: "Electrical", code: "26 05 29",
+      codeName: "Cable Tray Fittings", wasteFactor: DEFAULT_WASTE_FACTORS["26"],
+    },
   };
 
   return (
@@ -347,6 +420,22 @@ const IFC_TYPES = [
   { typeId: IFCPLATE, label: "IfcPlate" },
   // Curtain walls (glass facades)
   { typeId: IFCCURTAINWALL, label: "IfcCurtainWall" },
+  // ── MEP — HVAC (Division 23) ──
+  { typeId: IFCDUCTSEGMENT, label: "IfcDuctSegment" },
+  { typeId: IFCDUCTFITTING, label: "IfcDuctFitting" },
+  { typeId: IFCFLOWCONTROLLER, label: "IfcFlowController" },
+  { typeId: IFCFLOWMOVINGDEVICE, label: "IfcFlowMovingDevice" },
+  { typeId: IFCFLOWTERMINAL_TYPE, label: "IfcFlowTerminal" },
+  { typeId: IFCFLOWTREATMENTDEVICE, label: "IfcFlowTreatmentDevice" },
+  // ── MEP — Plumbing (Division 22) ──
+  { typeId: IFCPIPESEGMENT, label: "IfcPipeSegment" },
+  { typeId: IFCPIPEFITTING, label: "IfcPipeFitting" },
+  { typeId: IFCFLOWSTORAGEDEVICE, label: "IfcFlowStorageDevice" },
+  // ── MEP — Electrical (Division 26) ──
+  { typeId: IFCCABLESEGMENT, label: "IfcCableSegment" },
+  { typeId: IFCCABLECARRIERSEGMENT, label: "IfcCableCarrierSegment" },
+  { typeId: IFCCABLEFITTING, label: "IfcCableFitting" },
+  { typeId: IFCCABLECARRIERFITTING, label: "IfcCableCarrierFitting" },
 ];
 
 // ============================================================================
