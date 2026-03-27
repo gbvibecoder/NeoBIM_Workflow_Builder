@@ -342,6 +342,21 @@ function TableView({ table, index }: { table: TableDataItem; index: number }) {
                             const val = parseFloat(e.target.value);
                             if (!isNaN(val) && val > 0 && table.tileInstanceId) {
                               setQuantityOverride(table.tileInstanceId, ri, val);
+                              // Persist correction to DB for learning loop
+                              const originalVal = parseFloat(String(cell));
+                              const rowData = table.rows[ri];
+                              if (!isNaN(originalVal) && originalVal > 0 && rowData) {
+                                fetch("/api/quantity-corrections", {
+                                  method: "POST",
+                                  headers: { "Content-Type": "application/json" },
+                                  body: JSON.stringify({
+                                    elementType: `Ifc${String(rowData[1] ?? "").replace(/\s*[—\-].*/g, "").trim()}`,
+                                    extractedQty: originalVal,
+                                    correctedQty: val,
+                                    unit: String(rowData[7] ?? rowData[table.headers.length - 1] ?? "EA"),
+                                  }),
+                                }).catch(() => {}); // fire-and-forget
+                              }
                             }
                             setEditingCell(null);
                           }}

@@ -21,6 +21,7 @@ const en = {
   'nav.userFallback': 'User',
   'nav.searchPlaceholder': 'Search workflows, templates...',
   'nav.feedback': 'Feedback',
+  'nav.ifcViewer': 'IFC Viewer',
 
   // ===== AUTH =====
   'auth.welcomeBack': 'Welcome back',
@@ -2507,6 +2508,7 @@ const de: Record<keyof typeof en, string | string[]> = {
   'nav.userFallback': 'Benutzer',
   'nav.searchPlaceholder': 'Workflows, Vorlagen suchen...',
   'nav.feedback': 'Feedback',
+  'nav.ifcViewer': 'IFC-Viewer',
 
   // ===== AUTH =====
   'auth.welcomeBack': 'Willkommen zurück',

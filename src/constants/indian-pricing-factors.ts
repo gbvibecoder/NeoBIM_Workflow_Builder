@@ -188,10 +188,10 @@ export function calculateIndianPricingAdjustment(
   let cityTierFactor = 1.0;
   let cityTier = "town";
 
-  if (metros.includes(cityLower)) {
+  if (metros.some(m => cityLower.includes(m) || cityLower === "new delhi" || cityLower === "ncr" || cityLower === "noida" || cityLower === "gurgaon" || cityLower === "gurugram")) {
     cityTierFactor = 1.15;
     cityTier = "metro";
-  } else if (tier2.includes(cityLower)) {
+  } else if (tier2.some(t => cityLower.includes(t))) {
     cityTierFactor = 0.95;
     cityTier = "tier-2";
   } else if (city) {

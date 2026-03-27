@@ -458,6 +458,33 @@ function extractQuantities(
         const propDef = ifcAPI.GetLine(modelID, propDefId, false);
         if (!propDef) continue;
 
+        // ── Read IfcPropertySet (Pset) properties ──
+        // Extracts ConcreteGrade, IsExternal, LoadBearing, FireRating, etc.
+        const hasProperties = propDef.HasProperties;
+        if (hasProperties && !propDef.Quantities) {
+          const propRefs = Array.isArray(hasProperties) ? hasProperties : [hasProperties];
+          for (const propRef of propRefs) {
+            try {
+              const propId = propRef?.value;
+              if (typeof propId !== "number") continue;
+              const propLine = ifcAPI.GetLine(modelID, propId, false);
+              if (!propLine?.Name?.value) continue;
+              const propName = String(propLine.Name.value);
+              // Extract concrete grade from various property names
+              if (propName === "ConcreteGrade" || propName === "Grade" || propName === "ConcreteMix" || propName === "StrengthClass") {
+                const val = propLine.NominalValue?.value;
+                if (val != null) quantities.concreteGrade = String(val);
+              }
+              // Extract IsExternal for wall cost differentiation
+              if (propName === "IsExternal") {
+                const val = propLine.NominalValue?.value;
+                if (val != null) quantities.isExternal = String(val) === ".T." || val === true;
+              }
+            } catch { /* skip individual property */ }
+          }
+          continue; // This propDef was a PropertySet, not ElementQuantity
+        }
+
         // Get the Quantities array from the IfcElementQuantity
         const quantitiesRef = propDef.Quantities;
         if (!quantitiesRef) continue;
@@ -1269,10 +1296,13 @@ export async function parseIFCBuffer(
         const layers = elementMaterialLayersLookup.get(expressID);
 
         // Read PredefinedType for IfcCovering to distinguish FLOORING/CEILING/CLADDING/ROOFING
-        let coveringProperties: Record<string, unknown> | undefined;
+        const elementProperties: Record<string, unknown> = {};
         if (label === "IfcCovering" && element?.PredefinedType?.value) {
-          const pType = String(element.PredefinedType.value).toUpperCase();
-          coveringProperties = { PredefinedType: pType };
+          elementProperties.PredefinedType = String(element.PredefinedType.value).toUpperCase();
+        }
+        // Concrete grade from Pset (extracted in extractQuantities)
+        if (quantities.concreteGrade) {
+          elementProperties.concreteGrade = quantities.concreteGrade;
         }
 
         const elementData: IFCElementData = {
@@ -1283,7 +1313,7 @@ export async function parseIFCBuffer(
           material: materialName,
           materialLayers: layers && layers.length > 1 ? layers : undefined,
           quantities,
-          ...(coveringProperties ? { properties: coveringProperties } : {}),
+          ...(Object.keys(elementProperties).length > 0 ? { properties: elementProperties } : {}),
         };
 
         // Organize by division and category

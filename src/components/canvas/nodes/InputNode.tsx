@@ -6,7 +6,7 @@
  * so React Flow doesn't interfere with typing/clicking.
  */
 
-import React, { useRef, useCallback, useMemo } from "react";
+import React, { useRef, useCallback, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { useWorkflowStore } from "@/stores/workflow-store";
 import { useLocale } from "@/hooks/useLocale";
@@ -377,6 +377,92 @@ export function ParameterInput({ nodeId, data }: { nodeId: string; data: Workflo
           )}
         </div>
       ))}
+    </div>
+  );
+}
+
+// ─── Supplementary IFC Upload (Build 5: Multi-IFC) ──────────────────────────
+
+// Store for supplementary IFC files (structural, MEP) — keyed by nodeId:type
+const supplementaryIFCStore = new Map<string, { file: File; parsed?: unknown }>();
+
+function SupplementaryIFCUpload({ nodeId }: { nodeId: string }) {
+  const updateNode = useWorkflowStore(s => s.updateNode);
+  const [structural, setStructural] = useState<string | null>(null);
+  const [mep, setMep] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState(false);
+  const structRef = useRef<HTMLInputElement>(null);
+  const mepRef = useRef<HTMLInputElement>(null);
+
+  const handleSupplementary = useCallback(async (file: File, type: "structural" | "mep") => {
+    if (file.size > 50 * 1024 * 1024) { toast.error("File too large (max 50MB)"); return; }
+    if (!file.name.toLowerCase().endsWith(".ifc")) { toast.error("Only .ifc files accepted"); return; }
+
+    supplementaryIFCStore.set(`${nodeId}:${type}`, { file });
+    if (type === "structural") setStructural(file.name);
+    else setMep(file.name);
+
+    toast.loading(`Parsing ${type} IFC...`, { id: `ifc-${type}-${nodeId}` });
+    try {
+      const text = await file.text();
+      const { parseIFCText } = await import("@/services/ifc-text-parser");
+      const result = parseIFCText(text);
+      supplementaryIFCStore.set(`${nodeId}:${type}`, { file, parsed: result });
+
+      // Store parsed result on the node data so it flows downstream
+      const node = useWorkflowStore.getState().nodes.find(n => n.id === nodeId);
+      if (node) {
+        const key = type === "structural" ? "structuralIFCParsed" : "mepIFCParsed";
+        updateNode(nodeId, { data: { ...node.data, [key]: result } });
+      }
+
+      toast.success(`${type} IFC: ${result.summary.totalElements} elements`, { id: `ifc-${type}-${nodeId}`, duration: 4000 });
+    } catch (err) {
+      toast.error(`${type} IFC parse failed`, { id: `ifc-${type}-${nodeId}` });
+    }
+  }, [nodeId, updateNode]);
+
+  return (
+    <div className="nodrag nowheel nopan" onMouseDown={stopAll} onClick={stopAll} onKeyDown={stopAll}
+      style={{ marginTop: 4 }}>
+      <input ref={structRef} type="file" accept=".ifc" style={{ display: "none" }}
+        onChange={e => { if (e.target.files?.[0]) handleSupplementary(e.target.files[0], "structural"); }} />
+      <input ref={mepRef} type="file" accept=".ifc" style={{ display: "none" }}
+        onChange={e => { if (e.target.files?.[0]) handleSupplementary(e.target.files[0], "mep"); }} />
+
+      <button onClick={() => setExpanded((v: boolean) => !v)} style={{
+        width: "100%", padding: "4px 6px", fontSize: 9, color: "#55556A",
+        background: "none", border: "1px dashed rgba(255,255,255,0.06)", borderRadius: 4,
+        cursor: "pointer", textAlign: "left",
+      }}>
+        {expanded ? "▾" : "▸"} Additional IFC files (optional)
+      </button>
+
+      {expanded && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 3, marginTop: 3 }}>
+          <button onClick={() => structRef.current?.click()} style={{
+            padding: "3px 6px", fontSize: 9, borderRadius: 3,
+            border: `1px solid ${structural ? "rgba(16,185,129,0.3)" : "rgba(255,255,255,0.06)"}`,
+            background: structural ? "rgba(16,185,129,0.06)" : "rgba(0,0,0,0.2)",
+            color: structural ? "#10B981" : "#55556A", cursor: "pointer", textAlign: "left",
+          }}>
+            {structural ? `Structural: ${structural}` : "+ Add Structural IFC"}
+          </button>
+          <button onClick={() => mepRef.current?.click()} style={{
+            padding: "3px 6px", fontSize: 9, borderRadius: 3,
+            border: `1px solid ${mep ? "rgba(16,185,129,0.3)" : "rgba(255,255,255,0.06)"}`,
+            background: mep ? "rgba(16,185,129,0.06)" : "rgba(0,0,0,0.2)",
+            color: mep ? "#10B981" : "#55556A", cursor: "pointer", textAlign: "left",
+          }}>
+            {mep ? `MEP: ${mep}` : "+ Add MEP/Services IFC"}
+          </button>
+          {(structural || mep) && (
+            <div style={{ fontSize: 8, color: "#00F5FF", opacity: 0.6, textAlign: "center" }}>
+              Arch ✅ {structural ? "Struct ✅" : "Struct ➕"} {mep ? "MEP ✅" : "MEP ➕"}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -841,7 +927,12 @@ export function InputNodeContent({ nodeId, data }: { nodeId: string; data: Workf
     case "IN-003":
       return <FileUploadInput nodeId={nodeId} data={data} accept=".png,.jpg,.jpeg,.webp" label="an image" maxMB={10} showPreview />;
     case "IN-004":
-      return <FileUploadInput nodeId={nodeId} data={data} accept=".ifc" label="an IFC file" maxMB={50} />;
+      return (
+        <>
+          <FileUploadInput nodeId={nodeId} data={data} accept=".ifc" label="an IFC file" maxMB={50} />
+          <SupplementaryIFCUpload nodeId={nodeId} />
+        </>
+      );
     case "IN-005":
       return <ParameterInput nodeId={nodeId} data={data} />;
     case "IN-006":

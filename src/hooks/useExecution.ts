@@ -344,6 +344,13 @@ async function executeNode(
           const summary = (parseResult as Record<string, unknown>).summary as Record<string, unknown> ?? {};
           const meta = (parseResult as Record<string, unknown>).meta as Record<string, unknown> ?? {};
 
+          // Normalize storey names from IFC (fixes "Grond floor" → "Ground Floor" etc.)
+          const normStorey = (s: string): string => {
+            if (!s) return s;
+            return s.replace(/\bGrond\b/gi, "Ground").replace(/\bGroung\b/gi, "Ground")
+              .replace(/\b(\w)/g, (_, c: string) => c.toUpperCase());
+          };
+
           // ── Aggregate elements by type + storey (QS-standard grouping) ──
           // A QS wants "Walls — Ground Floor: 245 m²", not 69 individual wall rows
           const typeAggregates = new Map<string, {
@@ -361,7 +368,7 @@ async function executeNode(
                 const quantities = (element.quantities ?? {}) as Record<string, unknown>;
                 const area = quantities.area as Record<string, unknown> | undefined;
                 const volume = quantities.volume as Record<string, unknown> | undefined;
-                const storey = (element.storey as string) ?? "Unassigned";
+                const storey = normStorey((element.storey as string) ?? "Unassigned");
 
                 const key = `${type}|${storey}`;
                 const existing = typeAggregates.get(key) || {

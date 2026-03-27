@@ -273,11 +273,12 @@ const WorkflowCanvas = dynamic(
 export default function CanvasPage() {
   const searchParams = useSearchParams();
   const workflowId = searchParams.get("id") ?? undefined;
+  const templateId = searchParams.get("template") ?? undefined;
 
   return (
     <ErrorBoundary showHomeButton showSupportButton>
       <Suspense fallback={<CanvasSkeletonLoader />}>
-        <WorkflowCanvas workflowId={workflowId} />
+        <WorkflowCanvas workflowId={workflowId} templateId={templateId} />
       </Suspense>
     </ErrorBoundary>
   );

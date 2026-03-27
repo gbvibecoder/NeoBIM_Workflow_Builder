@@ -562,6 +562,30 @@ export const INDIAN_DERIVED_RATES = {
   },
 };
 
+// ─── Concrete Grade Multipliers ──────────────────────────────────────────────
+// Applied on top of CPWD base rate (M25 = 1.00 baseline)
+// Source: CPWD Analysis of Rates, mix design cost differential
+export const CONCRETE_GRADE_MULTIPLIERS: Record<string, number> = {
+  "M10": 0.72, "M15": 0.85, "M20": 0.92, "M25": 1.00,
+  "M30": 1.12, "M35": 1.20, "M40": 1.28, "M45": 1.35, "M50": 1.42,
+  "C20/25": 0.92, "C25/30": 1.00, "C30/37": 1.12, "C35/45": 1.20, "C40/50": 1.28, // Eurocode notation
+};
+
+/** Get concrete grade multiplier. Returns 1.0 for unknown grades. */
+export function getConcreteGradeMultiplier(grade?: string): number {
+  if (!grade) return 1.0;
+  const normalized = grade.toUpperCase().replace(/\s+/g, "");
+  // Try direct match
+  if (CONCRETE_GRADE_MULTIPLIERS[normalized]) return CONCRETE_GRADE_MULTIPLIERS[normalized];
+  // Try extracting number: "M 25" → "M25", "Grade M30" → "M30"
+  const match = normalized.match(/M(\d+)/);
+  if (match) return CONCRETE_GRADE_MULTIPLIERS[`M${match[1]}`] ?? 1.0;
+  // Try Eurocode: "C30/37"
+  const ecMatch = normalized.match(/C(\d+)\/(\d+)/);
+  if (ecMatch) return CONCRETE_GRADE_MULTIPLIERS[`C${ecMatch[1]}/${ecMatch[2]}`] ?? 1.0;
+  return 1.0;
+}
+
 // ─── Lookup Functions ────────────────────────────────────────────────────────
 
 const rateIndex = new Map<string, IS1200Rate>();

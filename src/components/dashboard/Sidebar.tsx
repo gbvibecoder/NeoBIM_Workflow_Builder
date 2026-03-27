@@ -22,6 +22,7 @@ import {
   Crown,
   FlaskConical,
   MessageSquareHeart,
+  FileBox,
 } from "lucide-react";
 import { PREBUILT_WORKFLOWS } from "@/constants/prebuilt-workflows";
 import { useLocale } from "@/hooks/useLocale";
@@ -39,6 +40,7 @@ export function Sidebar() {
     { href: "/dashboard/workflows", label: t("nav.myWorkflows"), icon: Workflow },
     { href: "/dashboard/history",   label: t("nav.history"),     icon: History },
     { href: "/dashboard/analytics", label: t("nav.analytics"),   icon: BarChart3 },
+    { href: "/dashboard/ifc-viewer", label: t("nav.ifcViewer"),   icon: FileBox, badge: "New" },
   ];
 
   const SECONDARY_NAV = [

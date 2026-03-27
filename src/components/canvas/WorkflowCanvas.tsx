@@ -55,6 +55,8 @@ const ArchitecturalViewer = dynamic(
 import { FullscreenVideoPlayer } from "./artifacts/FullscreenVideoPlayer";
 
 import { useWorkflowStore, isUntitledWorkflow } from "@/stores/workflow-store";
+import { PREBUILT_WORKFLOWS } from "@/constants/prebuilt-workflows";
+import type { WorkflowTemplate } from "@/types/workflow";
 import { SaveWorkflowModal } from "./modals/SaveWorkflowModal";
 import { ExecutionBlockModal } from "./modals/ExecutionBlockModal";
 import { useExecutionStore } from "@/stores/execution-store";
@@ -344,9 +346,10 @@ function FullscreenArtifactViewer() {
 
 interface WorkflowCanvasInnerProps {
   workflowId?: string;
+  templateId?: string;
 }
 
-function WorkflowCanvasInner({ workflowId: urlWorkflowId }: WorkflowCanvasInnerProps) {
+function WorkflowCanvasInner({ workflowId: urlWorkflowId, templateId }: WorkflowCanvasInnerProps) {
   const { fitView, screenToFlowPosition, zoomIn, zoomOut } = useReactFlow();
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
 
@@ -373,6 +376,7 @@ function WorkflowCanvasInner({ workflowId: urlWorkflowId }: WorkflowCanvasInnerP
     isSaveModalOpen,
     openSaveModal,
     closeSaveModal,
+    loadFromTemplate,
   } = useWorkflowStore();
 
   const { artifacts, executionProgress, clearArtifacts, clearCurrentExecution, restoreArtifactsFromDB } = useExecutionStore();
@@ -490,6 +494,18 @@ function WorkflowCanvasInner({ workflowId: urlWorkflowId }: WorkflowCanvasInnerP
   React.useEffect(() => {
     return () => { restoreAbortRef.current?.abort(); };
   }, []);
+
+  // ─── Load from template query param (?template=wf-09) ──────────
+  const templateLoadedRef = useRef(false);
+  React.useEffect(() => {
+    if (!templateId || urlWorkflowId || templateLoadedRef.current) return;
+    const template = PREBUILT_WORKFLOWS.find(w => w.id === templateId);
+    if (!template) return;
+    templateLoadedRef.current = true;
+    loadFromTemplate(template as WorkflowTemplate);
+    toast.success(`"${template.name}" loaded`, { description: "Template ready — customize and run" });
+    setTimeout(() => fitView({ padding: 0.3, duration: 600 }), 300);
+  }, [templateId, urlWorkflowId, loadFromTemplate, fitView]);
 
   const isNodeLibraryOpen = useUIStore(s => s.isNodeLibraryOpen);
   const setPromptModeActive = useUIStore(s => s.setPromptModeActive);
@@ -1189,12 +1205,13 @@ function WorkflowCanvasInner({ workflowId: urlWorkflowId }: WorkflowCanvasInnerP
 
 interface WorkflowCanvasProps {
   workflowId?: string;
+  templateId?: string;
 }
 
-export function WorkflowCanvas({ workflowId }: WorkflowCanvasProps) {
+export function WorkflowCanvas({ workflowId, templateId }: WorkflowCanvasProps) {
   return (
     <ReactFlowProvider>
-      <WorkflowCanvasInner workflowId={workflowId} />
+      <WorkflowCanvasInner workflowId={workflowId} templateId={templateId} />
     </ReactFlowProvider>
   );
 }

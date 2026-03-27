@@ -39,6 +39,7 @@ model User {
   sessions        Session[]
   clones          WorkflowClone[]
   feedbacks       Feedback[]
+  quantityCorrections QuantityCorrection[]
   workflows       Workflow[]
   referralsSent     Referral[]  @relation("ReferralsSent")
   referralsReceived Referral[]  @relation("ReferralReceived")
@@ -454,4 +455,29 @@ model AiRoadmapTask {
   @@index([roadmapId])
   @@index([status])
   @@map("ai_roadmap_tasks")
+}
+
+// QS Feedback Loop — stores quantity corrections from professional QS users
+// Used to calibrate the IFC parser over time. Each correction improves future estimates.
+model QuantityCorrection {
+  id              String   @id @default(cuid())
+  userId          String
+  workflowId      String?
+  elementType     String   // "IfcWall", "IfcSlab", "IfcColumn", etc.
+  buildingType    String   // "commercial", "residential", "wellness", etc.
+  city            String
+  state           String
+  extractedQty    Float    // What the parser extracted
+  correctedQty    Float    // What the QS corrected to
+  correctionRatio Float    // corrected / extracted
+  unit            String   // "m²", "m³", "Rmt", "EA"
+  notes           String?
+  createdAt       DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([elementType, buildingType, state])
+  @@index([userId])
+  @@index([createdAt])
+  @@map("quantity_corrections")
 }
