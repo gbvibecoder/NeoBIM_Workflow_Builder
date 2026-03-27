@@ -62,6 +62,14 @@ export interface MarketIntelligenceResult {
     year: number;
   };
 
+  // Dynamic benchmarks (from Claude AI — city + building type specific)
+  minimum_cost_per_m2: number;      // Floor: cannot build for less in this city
+  typical_range_min: number;        // Low end of typical cost range
+  typical_range_max: number;        // High end of typical cost range
+  building_type_factor: number;     // Multiplier vs generic commercial (wellness=1.35, etc.)
+  mep_percentage: number;           // MEP as % of hard cost (wellness=35%, office=25%)
+  benchmark_label: string;          // Human-readable: "wellness in Tier-2 Durg, March 2026"
+
   // Metadata
   sources_summary: string[];
   fetched_at: string;
@@ -183,6 +191,12 @@ export async function fetchMarketPrices(
       source: "Estimated (no live data)", building_type: buildingType,
     },
     cpwd_index: { factor: 1.0, source: "Baseline (no live data)", year: now.getFullYear() },
+    minimum_cost_per_m2: 22000,
+    typical_range_min: 25000,
+    typical_range_max: 55000,
+    building_type_factor: 1.0,
+    mep_percentage: 25,
+    benchmark_label: `${buildingType} in ${city}, ${state} (static fallback)`,
     sources_summary: [],
     fetched_at: now.toISOString(),
     city, state,
@@ -214,19 +228,20 @@ export async function fetchMarketPrices(
   // ── Prompt: ask Claude for city-specific construction cost knowledge ──
   // Primary: plain Claude (fast, 3-8s, works on any plan)
   // Claude knows Indian city-level price differences from training data
-  const userPrompt = `You are an Indian construction cost expert. Provide current approximate market rates for ${city}, ${state}, India as of ${monthYear}.
+  const userPrompt = `You are an Indian construction cost expert. Provide current market rates for ${city}, ${state}, India as of ${monthYear}. Building type: ${buildingType}.
 
-Give city-specific estimates (${city} rates, NOT national averages):
+Give CITY-SPECIFIC estimates for ${city} (NOT national averages):
 1. TMT Steel Fe500 price per tonne in ${state}
 2. Cement price per 50kg bag in ${city} (UltraTech or Ambuja)
 3. M-sand or construction sand per cft in ${city}/${state}
 4. Mason (skilled) daily wage in ${city}
-5. Typical ${buildingType} construction cost per sqft in ${city} (${yearStr})
+5. Typical ${buildingType} construction cost per m² in ${city} (${yearStr}) — give range
+6. Minimum possible cost per m² for ${buildingType} in ${city} (below this is impossible)
+7. What premium multiplier does ${buildingType} have vs generic commercial? (e.g. wellness=1.35x, hospital=1.6x)
+8. What % of total hard cost is MEP for ${buildingType}? (e.g. wellness=35%, office=25%)
 
-Consider: ${state} is ${state === "Kerala" ? "known for highest labor costs in India" : state === "Bihar" ? "known for lowest labor costs in India" : state === "Maharashtra" ? "a high-cost state with strong labor unions" : state === "Gujarat" ? "moderate costs with good material availability" : "an Indian state"}.
-
-Return ONLY this JSON, no explanation:
-{"steel_per_tonne":{"value":0,"source":"","date":"${monthYear}","confidence":"MEDIUM"},"cement_per_bag":{"value":0,"brand":"","source":"","date":"${monthYear}","confidence":"MEDIUM"},"sand_per_cft":{"value":0,"type":"M-sand","source":"","date":"${monthYear}","confidence":"MEDIUM"},"mason":{"value":0,"source":"","date":"${monthYear}","confidence":"MEDIUM"},"benchmark":{"value":0,"range_low":0,"range_high":0,"source":""},"sources":[]}`;
+Return ONLY this JSON:
+{"steel_per_tonne":{"value":0,"source":"","date":"${monthYear}","confidence":"MEDIUM"},"cement_per_bag":{"value":0,"brand":"","source":"","date":"${monthYear}","confidence":"MEDIUM"},"sand_per_cft":{"value":0,"type":"M-sand","source":"","date":"${monthYear}","confidence":"MEDIUM"},"mason":{"value":0,"source":"","date":"${monthYear}","confidence":"MEDIUM"},"benchmark":{"value":0,"range_low":0,"range_high":0,"source":""},"minimum_cost_per_m2":0,"building_type_factor":1.0,"mep_percentage":25,"sources":[]}`;
 
   let jsonText = "";
   let usedWebSearch = false;
@@ -354,6 +369,22 @@ Return ONLY this JSON, no explanation:
         if (Array.isArray(p.sources)) {
           result.sources_summary = p.sources.filter((s: unknown) => typeof s === "string");
         }
+
+        // Dynamic benchmarks from Claude (city + building type specific)
+        if (p.minimum_cost_per_m2 > 0) {
+          result.minimum_cost_per_m2 = p.minimum_cost_per_m2;
+        }
+        if (bench?.range_low > 0) {
+          result.typical_range_min = bench.range_low;
+          result.typical_range_max = bench.range_high || bench.range_low * 1.5;
+        }
+        if (p.building_type_factor > 0) {
+          result.building_type_factor = p.building_type_factor;
+        }
+        if (p.mep_percentage > 0) {
+          result.mep_percentage = p.mep_percentage;
+        }
+        result.benchmark_label = `${buildingType} in ${city}, ${state} (${monthYear} — AI estimate)`;
 
         // Status — count how many items have live data
         const matPrices = [result.steel_per_tonne, result.cement_per_bag, result.sand_per_cft];

@@ -2365,17 +2365,21 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
       console.log(`[TR-008] COST TRACE: Hard costs ₹${hardCostSubtotal.toLocaleString()} / GFA ${gfaForProvisional}m² = ₹${Math.round(hardCostSubtotal / gfaForProvisional).toLocaleString()}/m² | Elements: ${elements.length} | City: ${locationLabel} | Tier: ${cityTierForProv}`);
 
       // ── Minimum cost floor enforcement ──
-      // No commercial building can be built below ₹22,000/m² anywhere in India.
-      // Scale up proportionally if estimate falls below floor.
+      // Uses dynamic minimum from market intelligence (Claude AI) when available,
+      // falls back to static floors as emergency parachute.
       if (isIndianProject && gfaForProvisional > 0) {
-        const MIN_FLOORS: Record<string, number> = {
+        const STATIC_FLOORS: Record<string, number> = {
           residential: 14000, commercial: 22000, retail: 20000,
           healthcare: 35000, hospital: 35000, hospitality: 30000, hotel: 30000,
           wellness: 35000, spa: 35000, educational: 18000,
           industrial: 12000, warehouse: 8000, datacenter: 45000,
         };
         const btKey = projectTypeInfo.type.toLowerCase();
-        const minFloor = MIN_FLOORS[btKey] ?? MIN_FLOORS.commercial;
+        // Prefer dynamic minimum from market intelligence (city-specific, year-specific)
+        const dynamicMin = marketData?.minimum_cost_per_m2 ?? 0;
+        const staticMin = STATIC_FLOORS[btKey] ?? STATIC_FLOORS.commercial;
+        const minFloor = dynamicMin > 0 ? dynamicMin : staticMin;
+        console.log(`[TR-008] Cost floor: dynamic=${dynamicMin}, static=${staticMin}, using=${minFloor}`);
         const currentCostPerM2 = hardCostSubtotal / gfaForProvisional;
         if (currentCostPerM2 < minFloor) {
           const scaleFactor = minFloor / currentCostPerM2;
@@ -2508,7 +2512,12 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
             disclaimer: COST_DISCLAIMERS.full,
           },
           _gfa: gfaForProvisional,
-          _benchmark: benchmarkResult,
+          _benchmark: {
+            ...benchmarkResult,
+            // Override with dynamic market data when available (from Claude AI)
+            ...(marketData?.typical_range_min > 0 ? { rangeLow: marketData.typical_range_min, rangeHigh: marketData.typical_range_max } : {}),
+            ...(marketData?.benchmark_label ? { benchmarkLabel: marketData.benchmark_label } : {}),
+          },
           ...(marketData && { _marketIntelligence: {
             status: marketData.agent_status,
             steel: `₹${marketData.steel_per_tonne.value.toLocaleString()}/tonne (${marketData.steel_per_tonne.confidence})`,
