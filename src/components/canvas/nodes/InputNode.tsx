@@ -390,12 +390,11 @@ function SupplementaryIFCUpload({ nodeId }: { nodeId: string }) {
   const updateNode = useWorkflowStore(s => s.updateNode);
   const [structural, setStructural] = useState<string | null>(null);
   const [mep, setMep] = useState<string | null>(null);
-  const [expanded, setExpanded] = useState(false);
   const structRef = useRef<HTMLInputElement>(null);
   const mepRef = useRef<HTMLInputElement>(null);
 
   const handleSupplementary = useCallback(async (file: File, type: "structural" | "mep") => {
-    if (file.size > 50 * 1024 * 1024) { toast.error("File too large (max 50MB)"); return; }
+    if (file.size > 100 * 1024 * 1024) { toast.error("File too large (max 100MB)"); return; }
     if (!file.name.toLowerCase().endsWith(".ifc")) { toast.error("Only .ifc files accepted"); return; }
 
     supplementaryIFCStore.set(`${nodeId}:${type}`, { file });
@@ -409,7 +408,6 @@ function SupplementaryIFCUpload({ nodeId }: { nodeId: string }) {
       const result = parseIFCText(text);
       supplementaryIFCStore.set(`${nodeId}:${type}`, { file, parsed: result });
 
-      // Store parsed result on the node data so it flows downstream
       const node = useWorkflowStore.getState().nodes.find(n => n.id === nodeId);
       if (node) {
         const key = type === "structural" ? "structuralIFCParsed" : "mepIFCParsed";
@@ -417,54 +415,92 @@ function SupplementaryIFCUpload({ nodeId }: { nodeId: string }) {
       }
 
       toast.success(`${type} IFC: ${result.summary.totalElements} elements`, { id: `ifc-${type}-${nodeId}`, duration: 4000 });
-    } catch (err) {
+    } catch {
       toast.error(`${type} IFC parse failed`, { id: `ifc-${type}-${nodeId}` });
     }
   }, [nodeId, updateNode]);
 
+  // Accuracy meter calculation
+  const baseAccuracy = 68;
+  const structBonus = structural ? 12 : 0;
+  const mepBonus = mep ? 10 : 0;
+  const totalAccuracy = baseAccuracy + structBonus + mepBonus;
+  const barColor = totalAccuracy >= 85 ? "#10B981" : totalAccuracy >= 75 ? "#FFBF00" : "#00F5FF";
+
   return (
     <div className="nodrag nowheel nopan" onMouseDown={stopAll} onClick={stopAll} onKeyDown={stopAll}
-      style={{ marginTop: 4 }}>
+      style={{ marginTop: 6 }}>
       <input ref={structRef} type="file" accept=".ifc" style={{ display: "none" }}
         onChange={e => { if (e.target.files?.[0]) handleSupplementary(e.target.files[0], "structural"); }} />
       <input ref={mepRef} type="file" accept=".ifc" style={{ display: "none" }}
         onChange={e => { if (e.target.files?.[0]) handleSupplementary(e.target.files[0], "mep"); }} />
 
-      <button onClick={() => setExpanded((v: boolean) => !v)} style={{
-        width: "100%", padding: "6px 8px", fontSize: 11, color: "#A0A0B8",
-        background: "none", border: "1px dashed rgba(255,255,255,0.15)", borderRadius: 4,
-        cursor: "pointer", textAlign: "left", fontWeight: 500,
-      }}>
-        {expanded ? "▾" : "▸"} Additional IFC files (optional)
-      </button>
-
-      {expanded && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: 4 }}>
-          <button onClick={() => structRef.current?.click()} style={{
-            padding: "5px 8px", fontSize: 11, borderRadius: 4,
-            border: `1px solid ${structural ? "rgba(16,185,129,0.4)" : "rgba(255,255,255,0.15)"}`,
-            background: structural ? "rgba(16,185,129,0.08)" : "rgba(0,0,0,0.25)",
-            color: structural ? "#34D399" : "#A0A0B8", cursor: "pointer", textAlign: "left", fontWeight: 500,
-          }}>
-            {structural ? `Structural: ${structural}` : "+ Add Structural IFC"}
-          </button>
-          <button onClick={() => mepRef.current?.click()} style={{
-            padding: "5px 8px", fontSize: 11, borderRadius: 4,
-            border: `1px solid ${mep ? "rgba(16,185,129,0.4)" : "rgba(255,255,255,0.15)"}`,
-            background: mep ? "rgba(16,185,129,0.08)" : "rgba(0,0,0,0.25)",
-            color: mep ? "#34D399" : "#A0A0B8", cursor: "pointer", textAlign: "left", fontWeight: 500,
-          }}>
-            {mep ? `MEP: ${mep}` : "+ Add MEP/Services IFC"}
-          </button>
-          {(structural || mep) && (
-            <div style={{ fontSize: 10, color: "#00F5FF", opacity: 0.8, textAlign: "center", fontWeight: 500 }}>
-              Arch ✅ {structural ? "Struct ✅" : "Struct ➕"} {mep ? "MEP ✅" : "MEP ➕"}
-            </div>
-          )}
+      {/* Accuracy Meter */}
+      <div style={{ padding: "6px 8px", background: "rgba(0,0,0,0.3)", borderRadius: 6, border: "1px solid rgba(255,255,255,0.06)" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+          <span style={{ fontSize: 9, color: "#8888A0", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>Estimate Accuracy</span>
+          <span style={{ fontSize: 13, fontWeight: 700, color: barColor }}>{totalAccuracy}%</span>
         </div>
-      )}
+        <div style={{ height: 4, background: "rgba(255,255,255,0.06)", borderRadius: 2, overflow: "hidden" }}>
+          <div style={{ height: "100%", width: `${totalAccuracy}%`, background: barColor, borderRadius: 2, transition: "width 0.5s ease, background 0.5s ease" }} />
+        </div>
+
+        {/* File Slots */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 3, marginTop: 6 }}>
+          {/* Architectural — always filled */}
+          <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "3px 0" }}>
+            <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#10B981", flexShrink: 0 }} />
+            <span style={{ fontSize: 9, color: "#10B981", flex: 1, fontWeight: 500 }}>Architectural IFC</span>
+            <span style={{ fontSize: 8, color: "#555570", fontWeight: 600 }}>BASE</span>
+          </div>
+
+          {/* Structural */}
+          <button onClick={() => !structural && structRef.current?.click()} style={{
+            display: "flex", alignItems: "center", gap: 6, padding: "3px 0",
+            background: "none", border: "none", cursor: structural ? "default" : "pointer", width: "100%", textAlign: "left",
+          }}>
+            <div style={{ width: 6, height: 6, borderRadius: "50%", background: structural ? "#10B981" : "rgba(255,255,255,0.15)", flexShrink: 0 }} />
+            <span style={{ fontSize: 9, color: structural ? "#10B981" : "#8888A0", flex: 1, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              {structural ? `Structural: ${structural}` : "Add Structural IFC"}
+            </span>
+            <span style={{
+              fontSize: 8, fontWeight: 700, padding: "1px 5px", borderRadius: 3,
+              background: structural ? "rgba(16,185,129,0.15)" : "rgba(0,245,255,0.1)",
+              color: structural ? "#10B981" : "#00F5FF",
+            }}>
+              {structural ? "✓ +12%" : "+12%"}
+            </span>
+          </button>
+
+          {/* MEP */}
+          <button onClick={() => !mep && mepRef.current?.click()} style={{
+            display: "flex", alignItems: "center", gap: 6, padding: "3px 0",
+            background: "none", border: "none", cursor: mep ? "default" : "pointer", width: "100%", textAlign: "left",
+          }}>
+            <div style={{ width: 6, height: 6, borderRadius: "50%", background: mep ? "#10B981" : "rgba(255,255,255,0.15)", flexShrink: 0 }} />
+            <span style={{ fontSize: 9, color: mep ? "#10B981" : "#8888A0", flex: 1, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              {mep ? `MEP: ${mep}` : "Add MEP/Services IFC"}
+            </span>
+            <span style={{
+              fontSize: 8, fontWeight: 700, padding: "1px 5px", borderRadius: 3,
+              background: mep ? "rgba(16,185,129,0.15)" : "rgba(0,245,255,0.1)",
+              color: mep ? "#10B981" : "#00F5FF",
+            }}>
+              {mep ? "✓ +10%" : "+10%"}
+            </span>
+          </button>
+
+          {/* QS Corrections note */}
+          <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "3px 0" }}>
+            <div style={{ width: 6, height: 6, borderRadius: "50%", background: "rgba(255,191,0,0.4)", flexShrink: 0 }} />
+            <span style={{ fontSize: 9, color: "#8888A0", flex: 1, fontWeight: 500 }}>QS corrections</span>
+            <span style={{ fontSize: 8, fontWeight: 600, color: "#FFBF00", opacity: 0.6 }}>+5% over time</span>
+          </div>
+        </div>
+      </div>
     </div>
   );
+
 }
 
 // ─── Location Input (IN-006) ─────────────────────────────────────────────────
