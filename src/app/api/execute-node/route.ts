@@ -2513,6 +2513,48 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
         }
       }
 
+      // ── Upgrade 3: IFC Quality Assessment ──
+      const totalElems = elements.length;
+      const withGeometry = elements.filter((e: unknown) => {
+        const el = e as Record<string, unknown>;
+        return (Number(el.grossArea ?? 0) > 0 || Number(el.totalVolume ?? 0) > 0);
+      }).length;
+      const geometryPct = totalElems > 0 ? Math.round((withGeometry / totalElems) * 100) : 0;
+      const hasStructIFC = !!(inputData?._hasStructuralFoundation);
+      const hasMEPIFC = !!(inputData?._hasMEPData);
+      const ifcQuality = geometryPct > 85 ? "EXCELLENT" : geometryPct > 65 ? "GOOD" : geometryPct > 40 ? "FAIR" : "POOR";
+      const confidencePct = Math.min(95, geometryPct + (hasStructIFC ? 8 : 0) + (hasMEPIFC ? 10 : 0));
+      const missingIFC: string[] = [];
+      if (!hasStructIFC) missingIFC.push("Structural IFC (foundation ±30%)");
+      if (!hasMEPIFC) missingIFC.push("MEP IFC (services ±25%)");
+      warnings.push(`📋 IFC Quality: ${ifcQuality} (${confidencePct}% confidence) | ${withGeometry}/${totalElems} elements with geometry${missingIFC.length > 0 ? ` | Missing: ${missingIFC.join(", ")}` : ""}`);
+
+      // ── Upgrade 4: Anomaly Detection ──
+      const anomalies: string[] = [];
+      const matRatio = hardCostSubtotal > 0 ? totalMaterial / hardCostSubtotal : 0;
+      const labRatio = hardCostSubtotal > 0 ? totalLabor / hardCostSubtotal : 0;
+      if (matRatio < 0.45) anomalies.push(`Material ratio ${(matRatio * 100).toFixed(0)}% — unusually low (expected 50-65%)`);
+      if (labRatio > 0.50) anomalies.push(`Labor ratio ${(labRatio * 100).toFixed(0)}% — unusually high (expected 30-42%)`);
+      if (provisionalTotal > hardCostSubtotal * 0.50) anomalies.push(`Provisional sums are ${Math.round((provisionalTotal / hardCostSubtotal) * 100)}% of hard cost — add structural/MEP IFC to reduce`);
+      // Check for dominant cost items
+      for (const line of boqLines) {
+        if (line.totalCost > hardCostSubtotal * 0.25) {
+          anomalies.push(`"${line.description}" is ${Math.round((line.totalCost / hardCostSubtotal) * 100)}% of budget — verify quantities`);
+          break; // Only flag the biggest one
+        }
+      }
+      if (anomalies.length > 0) {
+        warnings.push(`🔍 Quality Check: ${anomalies.length} anomal${anomalies.length === 1 ? "y" : "ies"} found`);
+        for (const a of anomalies) warnings.push(`   · ${a}`);
+      } else {
+        warnings.push(`✅ Quality Check: all ratios within expected ranges`);
+      }
+
+      // ── Upgrade 8: Natural Language Summary ──
+      const costPerM2 = gfaForProvisional > 0 ? Math.round(costSummary.totalCost / gfaForProvisional) : 0;
+      const provPct = hardCostSubtotal > 0 ? Math.round((provisionalTotal / hardCostSubtotal) * 100) : 0;
+      const nlSummary = `This ${Math.round(gfaForProvisional)}m² ${projectTypeInfo.type} in ${locationLabel || "India"} is estimated at ₹${costSummary.totalCost.toLocaleString()} (₹${costPerM2.toLocaleString()}/m²). Material costs are ${(matRatio * 100).toFixed(0)}% of budget. ${provPct > 30 ? `${provPct}% of costs are provisional estimates — provide structural/MEP IFC to improve accuracy.` : `${provPct}% provisional estimates — good IFC coverage.`}`;
+
       artifact = {
         id: generateId(),
         executionId: executionId ?? "local",
@@ -2533,7 +2575,7 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
           _projectType: projectTypeInfo.type,
           _projectMultiplier: projectTypeInfo.multiplier,
           _disclaimer: COST_DISCLAIMERS.full,
-          content: `Total: ${cs}${costSummary.totalCost.toFixed(2)} ${currencyCode} (Hard: ${cs}${costSummary.hardCosts.toFixed(2)}, Soft: ${cs}${costSummary.softCosts.toFixed(2)}) | Region: ${activeRegion} | Type: ${projectTypeInfo.type}`,
+          content: nlSummary,
           _boqData: {
             lines: boqLines,
             subtotalMaterial: Math.round(totalMaterial * 100) / 100,

@@ -275,12 +275,16 @@ STEP 2 — Market factors for ${state}:
 
 STEP 3 — Derive prices with brief reasoning in the "source" field. Example: "Near Bhilai Steel Plant, cheapest steel belt in India" or "Kerala imports cement, ~15% above national average".
 
-STEP 4 — Cross-validate before returning:
-- Steel: national range ₹55,000-75,000/tonne (lower near plants, higher in NE/islands)
-- Cement: national range ₹360-540/bag (lower in producing states, higher in Kerala/NE)
-- Mason: national range ₹400-1,400/day (lowest Bihar/UP, highest Kerala/Goa/Mumbai)
-- ALL benchmark and cost values MUST be in INR per SQUARE METRE (m²). NOT sqft.
-  If you think in sqft, multiply by 10.764. Commercial m² costs are always > 15,000.
+STEP 4 — SELF-CRITIQUE (act as your own reviewer):
+Before finalizing, check each answer:
+- Is steel in ₹52,000-78,000/tonne range? If not, reconsider.
+- Is cement in ₹340-560/bag range? If cement-producing state shows >₹450, that's wrong.
+- Is mason wage consistent? Labor-surplus states must be <₹700, scarce states >₹900.
+- If mason is high (Kerala) but cement is low (national avg) → inconsistent. High-labor markets usually have higher material costs too.
+- ALL benchmark values MUST be in INR per SQUARE METRE (m²). NOT sqft.
+  If you think in sqft, multiply by 10.764. m² values are ALWAYS > 15,000.
+  If benchmark range_low < 10,000 → you're returning sqft. Convert before returning.
+- Is ${buildingType} premium applied? wellness > hotel > hospital > office > residential.
 
 Use the tool to report your reasoned prices.`;
 
