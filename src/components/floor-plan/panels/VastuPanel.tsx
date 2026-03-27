@@ -1,0 +1,214 @@
+"use client";
+
+import React, { useMemo } from "react";
+import { useFloorPlanStore } from "@/stores/floor-plan-store";
+import { analyzeVastuCompliance, type VastuReport, type VastuReportItem } from "@/lib/floor-plan/vastu-analyzer";
+import { DIRECTION_LABELS } from "@/lib/floor-plan/vastu-rules";
+
+export function VastuPanel() {
+  const floor = useFloorPlanStore((s) => s.getActiveFloor());
+  const setSelectedIds = useFloorPlanStore((s) => s.setSelectedIds);
+  const vastuOverlayVisible = useFloorPlanStore((s) => s.vastuOverlayVisible);
+  const toggleVastuOverlay = useFloorPlanStore((s) => s.toggleVastuOverlay);
+  const northAngle = useFloorPlanStore((s) => s.project?.settings.north_angle_deg ?? 0);
+
+  const report = useMemo<VastuReport | null>(() => {
+    if (!floor) return null;
+    return analyzeVastuCompliance(floor, northAngle);
+  }, [floor, northAngle]);
+
+  if (!report) {
+    return (
+      <div className="p-4 text-sm text-gray-400">
+        No floor plan loaded.
+      </div>
+    );
+  }
+
+  const handleClickRoom = (roomId: string | null) => {
+    if (roomId) setSelectedIds([roomId]);
+  };
+
+  return (
+    <div className="flex flex-col text-xs">
+      {/* Score Header */}
+      <div className="p-4 border-b border-gray-200">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-sm font-semibold text-gray-800">Vastu Compliance</h3>
+          <button
+            onClick={toggleVastuOverlay}
+            className={`px-2 py-0.5 rounded text-[10px] font-medium ${
+              vastuOverlayVisible
+                ? "bg-orange-100 text-orange-700"
+                : "bg-gray-100 text-gray-500"
+            }`}
+          >
+            {vastuOverlayVisible ? "Hide Overlay" : "Show Overlay"}
+          </button>
+        </div>
+
+        {/* Score ring */}
+        <div className="flex items-center gap-4">
+          <ScoreRing score={report.score} grade={report.grade} />
+          <div className="flex-1">
+            <div className="flex items-center gap-1.5 mb-1">
+              <StatusDot color="#22c55e" />
+              <span className="text-gray-600">Pass: {report.passes}</span>
+            </div>
+            <div className="flex items-center gap-1.5 mb-1">
+              <StatusDot color="#eab308" />
+              <span className="text-gray-600">Acceptable: {report.acceptable}</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <StatusDot color="#ef4444" />
+              <span className="text-gray-600">Violations: {report.violations}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Items list */}
+      <div className="flex-1 overflow-y-auto max-h-[calc(100vh-400px)]">
+        {/* Violations first */}
+        {report.items.filter((i) => i.status === "violation").length > 0 && (
+          <Section title="Violations" count={report.violations} color="#ef4444">
+            {report.items
+              .filter((i) => i.status === "violation")
+              .map((item) => (
+                <VastuItem
+                  key={item.rule_id + item.room_id}
+                  item={item}
+                  onClick={() => handleClickRoom(item.room_id)}
+                />
+              ))}
+          </Section>
+        )}
+
+        {/* Acceptable */}
+        {report.items.filter((i) => i.status === "acceptable").length > 0 && (
+          <Section title="Acceptable" count={report.acceptable} color="#eab308">
+            {report.items
+              .filter((i) => i.status === "acceptable")
+              .map((item) => (
+                <VastuItem
+                  key={item.rule_id + item.room_id}
+                  item={item}
+                  onClick={() => handleClickRoom(item.room_id)}
+                />
+              ))}
+          </Section>
+        )}
+
+        {/* Passes */}
+        {report.passes > 0 && (
+          <Section title="Passing" count={report.passes} color="#22c55e">
+            {report.items
+              .filter((i) => i.status === "pass")
+              .map((item) => (
+                <VastuItem
+                  key={item.rule_id + item.room_id}
+                  item={item}
+                  onClick={() => handleClickRoom(item.room_id)}
+                />
+              ))}
+          </Section>
+        )}
+      </div>
+
+      {/* Suggestions */}
+      {report.suggestions.length > 0 && (
+        <div className="border-t border-gray-200 p-3">
+          <h4 className="text-[10px] font-semibold text-gray-500 uppercase mb-2">Suggestions</h4>
+          {report.suggestions.map((s, i) => (
+            <p key={i} className="text-gray-600 mb-1 leading-relaxed">{s}</p>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ============================================================
+// SUB-COMPONENTS
+// ============================================================
+
+function ScoreRing({ score, grade }: { score: number; grade: string }) {
+  const circumference = 2 * Math.PI * 28;
+  const offset = circumference - (score / 100) * circumference;
+  const color = score >= 75 ? "#22c55e" : score >= 50 ? "#eab308" : "#ef4444";
+
+  return (
+    <div className="relative w-16 h-16">
+      <svg viewBox="0 0 64 64" className="w-full h-full -rotate-90">
+        <circle cx="32" cy="32" r="28" fill="none" stroke="#f1f5f9" strokeWidth="4" />
+        <circle
+          cx="32" cy="32" r="28"
+          fill="none"
+          stroke={color}
+          strokeWidth="4"
+          strokeDasharray={circumference}
+          strokeDashoffset={offset}
+          strokeLinecap="round"
+        />
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center">
+        <span className="text-lg font-bold" style={{ color }}>{score}</span>
+        <span className="text-[9px] font-semibold text-gray-400">{grade}</span>
+      </div>
+    </div>
+  );
+}
+
+function StatusDot({ color }: { color: string }) {
+  return <div className="w-2 h-2 rounded-full" style={{ backgroundColor: color }} />;
+}
+
+function Section({
+  title,
+  count,
+  color,
+  children,
+}: {
+  title: string;
+  count: number;
+  color: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="border-b border-gray-100">
+      <div className="flex items-center gap-2 px-3 py-2 bg-gray-50">
+        <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: color }} />
+        <span className="text-[10px] font-semibold text-gray-500 uppercase">{title}</span>
+        <span className="text-[10px] text-gray-400">({count})</span>
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function VastuItem({ item, onClick }: { item: VastuReportItem; onClick: () => void }) {
+  const statusColor =
+    item.status === "violation" ? "#ef4444" : item.status === "acceptable" ? "#eab308" : "#22c55e";
+
+  return (
+    <button
+      onClick={onClick}
+      className="w-full text-left px-3 py-2 hover:bg-gray-50 transition-colors border-b border-gray-50"
+    >
+      <div className="flex items-start gap-2">
+        <div className="w-1.5 h-1.5 rounded-full mt-1 shrink-0" style={{ backgroundColor: statusColor }} />
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-1">
+            <span className="font-medium text-gray-700 truncate">{item.room_name ?? "General"}</span>
+            <span className="text-gray-300">—</span>
+            <span className="text-gray-400">{DIRECTION_LABELS[item.actual_direction]}</span>
+          </div>
+          <p className="text-gray-500 mt-0.5 leading-relaxed">{item.message}</p>
+          {item.remedy && item.status !== "pass" && (
+            <p className="text-gray-400 mt-0.5 italic">{item.remedy}</p>
+          )}
+        </div>
+      </div>
+    </button>
+  );
+}

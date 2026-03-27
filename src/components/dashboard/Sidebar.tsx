@@ -23,6 +23,7 @@ import {
   FlaskConical,
   MessageSquareHeart,
   FileBox,
+  PenTool,
 } from "lucide-react";
 import { PREBUILT_WORKFLOWS } from "@/constants/prebuilt-workflows";
 import { useLocale } from "@/hooks/useLocale";
@@ -41,6 +42,7 @@ export function Sidebar() {
     { href: "/dashboard/history",   label: t("nav.history"),     icon: History },
     { href: "/dashboard/analytics", label: t("nav.analytics"),   icon: BarChart3 },
     { href: "/dashboard/ifc-viewer", label: t("nav.ifcViewer"),   icon: FileBox, badge: "New" },
+    { href: "/dashboard/floor-plan", label: "Floor Plan",         icon: PenTool, badge: "New" },
   ];
 
   const SECONDARY_NAV = [

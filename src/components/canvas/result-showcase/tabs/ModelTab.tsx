@@ -109,6 +109,7 @@ export function ModelTab({ data }: ModelTabProps) {
         roomCount={roomCount} wallCount={wallCount}
         iframeRef={iframeRef}
         aiRenderUrl={aiRenderUrl}
+        geometry={geometry}
         extra={[{ label: "Mode", value: viewMode === "editor" ? "2D Editor" : "Interactive 3D" }]}
       >
         {viewMode === "editor" ? (
@@ -156,6 +157,7 @@ export function ModelTab({ data }: ModelTabProps) {
         roomCount={roomCount} wallCount={wallCount}
         iframeRef={iframeRef}
         aiRenderUrl={aiRenderUrl}
+        geometry={geometry}
       >
         <HtmlIframeViewer model={model} iframeRef={iframeRef} />
       </FloorPlanLayout>
@@ -238,11 +240,12 @@ interface FloorPlanLayoutProps {
   iframeRef: React.RefObject<HTMLIFrameElement | null>;
   extra?: Array<{ label: string; value: string }>;
   aiRenderUrl?: string;
+  geometry?: FloorPlanGeometry;
 }
 
 function FloorPlanLayout({
   children, rooms, bw, bd, totalArea, roomCount, wallCount,
-  iframeRef, extra, aiRenderUrl,
+  iframeRef, extra, aiRenderUrl, geometry,
 }: FloorPlanLayoutProps) {
   const { t } = useLocale();
   const [activeView, setActiveView] = useState("top");
@@ -706,6 +709,68 @@ function FloorPlanLayout({
             ))}
           </div>
         </div>
+
+        {/* Open in Floor Plan Editor CTA */}
+        {geometry && (
+          <div style={{
+            padding: "12px 18px",
+            borderTop: "1px solid rgba(255,255,255,0.04)",
+            flexShrink: 0,
+          }}>
+            <button
+              onClick={() => {
+                // Store geometry in sessionStorage for the floor plan page to pick up
+                try {
+                  sessionStorage.setItem("fp-editor-geometry", JSON.stringify(geometry));
+                  sessionStorage.setItem("fp-editor-prompt", "");
+                } catch { /* ignore quota errors */ }
+                window.open("/dashboard/floor-plan?source=pipeline", "_blank");
+              }}
+              style={{
+                width: "100%",
+                background: "linear-gradient(135deg, rgba(79,138,255,0.15), rgba(139,92,246,0.15))",
+                border: "1px solid rgba(79,138,255,0.3)",
+                borderRadius: 10, padding: "10px 16px",
+                cursor: "pointer",
+                display: "flex", alignItems: "center", gap: 10,
+                transition: "all 0.15s ease",
+              }}
+              onMouseEnter={e => {
+                e.currentTarget.style.background = "linear-gradient(135deg, rgba(79,138,255,0.25), rgba(139,92,246,0.25))";
+                e.currentTarget.style.borderColor = "rgba(79,138,255,0.5)";
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.background = "linear-gradient(135deg, rgba(79,138,255,0.15), rgba(139,92,246,0.15))";
+                e.currentTarget.style.borderColor = "rgba(79,138,255,0.3)";
+              }}
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#4F8AFF" strokeWidth="1.5">
+                <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              <div style={{ flex: 1, textAlign: "left" }}>
+                <div style={{
+                  fontSize: 12, fontWeight: 600, color: "#C0D4FF",
+                  fontFamily: "Inter, system-ui, sans-serif",
+                }}>
+                  Open in Floor Plan Editor
+                </div>
+                <div style={{
+                  fontSize: 10, color: "#4A4A60",
+                  fontFamily: "Inter, system-ui, sans-serif",
+                  marginTop: 2,
+                }}>
+                  CAD editor with Vastu &amp; BOQ analysis
+                </div>
+              </div>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#4A4A60" strokeWidth="1.5">
+                <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" strokeLinecap="round" strokeLinejoin="round"/>
+                <polyline points="15 3 21 3 21 9" stroke="#4A4A60" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                <line x1="10" y1="14" x2="21" y2="3" stroke="#4A4A60" strokeWidth="1.5" strokeLinecap="round"/>
+              </svg>
+            </button>
+          </div>
+        )}
 
         {/* Footer */}
         <div style={{
