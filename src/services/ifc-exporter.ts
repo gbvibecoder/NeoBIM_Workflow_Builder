@@ -22,15 +22,25 @@ interface IFCExportOptions {
 // IFC GlobalId: exactly 22 characters from the IFC base-64 alphabet.
 const IFC_BASE64 = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_$";
 
-/** Deterministic 22-char IFC GlobalId from a seed. */
+/**
+ * Deterministic 22-char IFC GlobalId from a seed — must be unique per seed.
+ * Uses a seeded PRNG (xorshift32) where each seed produces a distinct sequence.
+ */
 function ifcGuid(seed: number): string {
-  // Use a simple hash to generate unique 22-char strings
-  let h = seed * 2654435761 + Date.now();
+  // xorshift32 state — must be non-zero
+  let state = ((seed + 1) * 2654435761) >>> 0;
+  if (state === 0) state = 1;
+
+  const xorshift = (): number => {
+    state ^= state << 13;
+    state ^= state >>> 17;
+    state ^= state << 5;
+    return state >>> 0;
+  };
+
   let result = "";
   for (let i = 0; i < 22; i++) {
-    h = ((h >>> 0) * 31 + i * 17 + seed) >>> 0;
-    result += IFC_BASE64[h % 64];
-    h = (h >>> 6) ^ (h * 65599);
+    result += IFC_BASE64[xorshift() % 64];
   }
   return result;
 }
@@ -46,6 +56,18 @@ class IdCounter {
 // ─── Helpers ────────────────────────────────────────────────────────────────
 function f(n: number, decimals = 4): string {
   return n.toFixed(decimals);
+}
+
+/** Calculate polygon area using the shoelace formula */
+function polygonAreaCalc(points: FootprintPoint[]): number {
+  let area = 0;
+  const n = points.length;
+  for (let i = 0; i < n; i++) {
+    const j = (i + 1) % n;
+    area += points[i].x * points[j].y;
+    area -= points[j].x * points[i].y;
+  }
+  return Math.abs(area) / 2;
 }
 
 /**
@@ -221,6 +243,38 @@ export function generateIFCFile(
         );
         storeyElementIds.push(colId);
 
+      } else if (element.type === "window") {
+        const winId = writeWindowEntity(
+          element, storeyPlacementId,
+          bodyContextId, zDirId, ownerHistId,
+          id, lines
+        );
+        storeyElementIds.push(winId);
+
+      } else if (element.type === "door") {
+        const doorId = writeDoorEntity(
+          element, storeyPlacementId,
+          bodyContextId, zDirId, ownerHistId,
+          id, lines
+        );
+        storeyElementIds.push(doorId);
+
+      } else if (element.type === "beam") {
+        const beamId = writeBeamEntity(
+          element, storeyPlacementId,
+          bodyContextId, zDirId, ownerHistId,
+          id, lines
+        );
+        storeyElementIds.push(beamId);
+
+      } else if (element.type === "stair") {
+        const stairId = writeStairEntity(
+          element, storeyPlacementId,
+          bodyContextId, zDirId, ownerHistId,
+          id, lines
+        );
+        storeyElementIds.push(stairId);
+
       } else if (element.type === "space") {
         const spaceId = writeSpaceEntity(
           element, storeyPlacementId,
@@ -279,6 +333,89 @@ export function generateIFCFile(
 
   const relPsetId = id.next();
   lines.push(`#${relPsetId}=IFCRELDEFINESBYPROPERTIES('${ifcGuid(relPsetId)}',#${ownerHistId},$,$,(#${buildingId}),#${psetId});`);
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // MATERIALS (shared material definitions)
+  // ═══════════════════════════════════════════════════════════════════════════
+  const matConcreteId = id.next();
+  lines.push(`#${matConcreteId}=IFCMATERIAL('Reinforced Concrete C30/37',$,$);`);
+
+  const matSteelId = id.next();
+  lines.push(`#${matSteelId}=IFCMATERIAL('Structural Steel S355',$,$);`);
+
+  const matGlassId = id.next();
+  lines.push(`#${matGlassId}=IFCMATERIAL('Tempered Glass 6mm',$,$);`);
+
+  const matTimberDoorId = id.next();
+  lines.push(`#${matTimberDoorId}=IFCMATERIAL('Hardwood Timber',$,$);`);
+
+  // ── Wall material layer set (concrete + insulation + plaster) ──
+  const matInsulationId = id.next();
+  lines.push(`#${matInsulationId}=IFCMATERIAL('Mineral Wool Insulation',$,$);`);
+
+  const matPlasterId = id.next();
+  lines.push(`#${matPlasterId}=IFCMATERIAL('Gypsum Plaster',$,$);`);
+
+  const wallLayer1Id = id.next();
+  lines.push(`#${wallLayer1Id}=IFCMATERIALLAYER(#${matPlasterId},0.015,.U.,$,$,$,$);`);
+
+  const wallLayer2Id = id.next();
+  lines.push(`#${wallLayer2Id}=IFCMATERIALLAYER(#${matConcreteId},0.15,.U.,$,$,$,$);`);
+
+  const wallLayer3Id = id.next();
+  lines.push(`#${wallLayer3Id}=IFCMATERIALLAYER(#${matInsulationId},0.07,.U.,$,$,$,$);`);
+
+  const wallLayer4Id = id.next();
+  lines.push(`#${wallLayer4Id}=IFCMATERIALLAYER(#${matPlasterId},0.015,.U.,$,$,$,$);`);
+
+  const wallLayerSetId = id.next();
+  lines.push(`#${wallLayerSetId}=IFCMATERIALLAYERSET((#${wallLayer1Id},#${wallLayer2Id},#${wallLayer3Id},#${wallLayer4Id}),'Wall Layer Set',$);`);
+
+  const wallLayerSetUsageId = id.next();
+  lines.push(`#${wallLayerSetUsageId}=IFCMATERIALLAYERSETUSAGE(#${wallLayerSetId},.AXIS2.,.POSITIVE.,0.);`);
+
+  // ── Slab material layer set ──
+  const slabLayer1Id = id.next();
+  lines.push(`#${slabLayer1Id}=IFCMATERIALLAYER(#${matConcreteId},0.25,.U.,$,$,$,$);`);
+
+  const slabLayer2Id = id.next();
+  lines.push(`#${slabLayer2Id}=IFCMATERIALLAYER(#${matInsulationId},0.05,.U.,$,$,$,$);`);
+
+  const slabLayerSetId = id.next();
+  lines.push(`#${slabLayerSetId}=IFCMATERIALLAYERSET((#${slabLayer1Id},#${slabLayer2Id}),'Slab Layer Set',$);`);
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // STOREY-LEVEL PROPERTY SETS
+  // ═══════════════════════════════════════════════════════════════════════════
+  for (let si = 0; si < geometry.storeys.length; si++) {
+    const st = geometry.storeys[si];
+    const stId = storeyIds[si];
+
+    const propElevation = id.next();
+    lines.push(`#${propElevation}=IFCPROPERTYSINGLEVALUE('Elevation',$,IFCLENGTHMEASURE(${f(st.elevation)}),$);`);
+
+    const propStoreyHeight = id.next();
+    lines.push(`#${propStoreyHeight}=IFCPROPERTYSINGLEVALUE('Height',$,IFCLENGTHMEASURE(${f(st.height)}),$);`);
+
+    const wallCount = st.elements.filter(e => e.type === "wall").length;
+    const windowCount = st.elements.filter(e => e.type === "window").length;
+    const doorCount = st.elements.filter(e => e.type === "door").length;
+
+    const propWallCount = id.next();
+    lines.push(`#${propWallCount}=IFCPROPERTYSINGLEVALUE('WallCount',$,IFCINTEGER(${wallCount}),$);`);
+
+    const propWindowCount = id.next();
+    lines.push(`#${propWindowCount}=IFCPROPERTYSINGLEVALUE('WindowCount',$,IFCINTEGER(${windowCount}),$);`);
+
+    const propDoorCount = id.next();
+    lines.push(`#${propDoorCount}=IFCPROPERTYSINGLEVALUE('DoorCount',$,IFCINTEGER(${doorCount}),$);`);
+
+    const storeyPsetId = id.next();
+    lines.push(`#${storeyPsetId}=IFCPROPERTYSET('${ifcGuid(storeyPsetId)}',#${ownerHistId},'BuildFlow_StoreyInfo',$,(#${propElevation},#${propStoreyHeight},#${propWallCount},#${propWindowCount},#${propDoorCount}));`);
+
+    const relStoreyPsetId = id.next();
+    lines.push(`#${relStoreyPsetId}=IFCRELDEFINESBYPROPERTIES('${ifcGuid(relStoreyPsetId)}',#${ownerHistId},$,$,(#${stId}),#${storeyPsetId});`);
+  }
 
   // ═══════════════════════════════════════════════════════════════════════════
   // ASSEMBLE FILE
@@ -353,6 +490,34 @@ function writeWallEntity(
   const wallId = id.next();
   lines.push(`#${wallId}=IFCWALL('${ifcGuid(wallId)}',#${ownerHistId},'${element.properties.name}',$,$,#${wallPlacementId},#${prodShapeId},$,${wallPredefinedType});`);
 
+  // ── Wall base quantities (Qto_WallBaseQuantities) ──
+  const wallArea = wallLength * wallHeight;
+  const wallVolume = wallArea * wallThickness;
+
+  const qLength = id.next();
+  lines.push(`#${qLength}=IFCQUANTITYLENGTH('Length',$,$,${f(wallLength)},$);`);
+
+  const qHeight = id.next();
+  lines.push(`#${qHeight}=IFCQUANTITYLENGTH('Height',$,$,${f(wallHeight)},$);`);
+
+  const qWidth = id.next();
+  lines.push(`#${qWidth}=IFCQUANTITYLENGTH('Width',$,$,${f(wallThickness)},$);`);
+
+  const qGrossArea = id.next();
+  lines.push(`#${qGrossArea}=IFCQUANTITYAREA('GrossSideArea',$,$,${f(wallArea, 2)},$);`);
+
+  const qNetArea = id.next();
+  lines.push(`#${qNetArea}=IFCQUANTITYAREA('NetSideArea',$,$,${f(wallArea * 0.85, 2)},$);`);
+
+  const qVolume = id.next();
+  lines.push(`#${qVolume}=IFCQUANTITYVOLUME('GrossVolume',$,$,${f(wallVolume, 4)},$);`);
+
+  const wallQtoId = id.next();
+  lines.push(`#${wallQtoId}=IFCELEMENTQUANTITY('${ifcGuid(wallQtoId)}',#${ownerHistId},'Qto_WallBaseQuantities_BF',$,$,(#${qLength},#${qHeight},#${qWidth},#${qGrossArea},#${qNetArea},#${qVolume}));`);
+
+  const relWallQtoId = id.next();
+  lines.push(`#${relWallQtoId}=IFCRELDEFINESBYPROPERTIES('${ifcGuid(relWallQtoId)}',#${ownerHistId},$,$,(#${wallId}),#${wallQtoId});`);
+
   return wallId;
 }
 
@@ -416,6 +581,35 @@ function writeSlabEntity(
   const predefinedType = isRoof ? ".ROOF." : ".FLOOR.";
   const slabId = id.next();
   lines.push(`#${slabId}=IFCSLAB('${ifcGuid(slabId)}',#${ownerHistId},'${element.properties.name}',$,$,#${slabPlacementId},#${prodShapeId},$,${predefinedType});`);
+
+  // ── Slab base quantities (Qto_SlabBaseQuantities) ──
+  const slabArea = element.properties.area ?? polygonAreaCalc(footprint);
+  const slabVolume = slabArea * thickness;
+
+  const sqDepth = id.next();
+  lines.push(`#${sqDepth}=IFCQUANTITYLENGTH('Depth',$,$,${f(thickness)},$);`);
+
+  const sqGrossArea = id.next();
+  lines.push(`#${sqGrossArea}=IFCQUANTITYAREA('GrossArea',$,$,${f(slabArea, 2)},$);`);
+
+  const sqNetArea = id.next();
+  lines.push(`#${sqNetArea}=IFCQUANTITYAREA('NetArea',$,$,${f(slabArea * 0.95, 2)},$);`);
+
+  const sqVolume = id.next();
+  lines.push(`#${sqVolume}=IFCQUANTITYVOLUME('GrossVolume',$,$,${f(slabVolume, 4)},$);`);
+
+  const sqPerimeter = id.next();
+  const perimeterLen = footprint.reduce((sum, p, i) => {
+    const np = footprint[(i + 1) % footprint.length];
+    return sum + Math.sqrt((np.x - p.x) ** 2 + (np.y - p.y) ** 2);
+  }, 0);
+  lines.push(`#${sqPerimeter}=IFCQUANTITYLENGTH('Perimeter',$,$,${f(perimeterLen)},$);`);
+
+  const slabQtoId = id.next();
+  lines.push(`#${slabQtoId}=IFCELEMENTQUANTITY('${ifcGuid(slabQtoId)}',#${ownerHistId},'Qto_SlabBaseQuantities_BF',$,$,(#${sqDepth},#${sqGrossArea},#${sqNetArea},#${sqVolume},#${sqPerimeter}));`);
+
+  const relSlabQtoId = id.next();
+  lines.push(`#${relSlabQtoId}=IFCRELDEFINESBYPROPERTIES('${ifcGuid(relSlabQtoId)}',#${ownerHistId},$,$,(#${slabId}),#${slabQtoId});`);
 
   return slabId;
 }
@@ -550,4 +744,339 @@ function writeSpaceEntity(
   lines.push(`#${spaceId}=IFCSPACE('${ifcGuid(spaceId)}',#${ownerHistId},'${element.properties.spaceName ?? element.properties.name}',$,$,#${spacePlacementId},#${prodShapeId},$,.ELEMENT.,${spaceType},$);`);
 
   return spaceId;
+}
+
+
+// ─── Window Entity Writer ────────────────────────────────────────────────────
+
+function writeWindowEntity(
+  element: GeometryElement,
+  storeyPlacementId: number,
+  bodyContextId: number,
+  zDirId: number,
+  ownerHistId: number,
+  id: IdCounter,
+  lines: string[]
+): number {
+  const winWidth = element.properties.width ?? 1.2;
+  const winHeight = element.properties.height ?? 1.5;
+  const winThickness = element.properties.thickness ?? 0.1;
+  const sillHeight = element.properties.sillHeight ?? 0.9;
+  const wallOffset = element.properties.wallOffset ?? 0;
+
+  // ── Profile: IfcRectangleProfileDef ──
+  const profCenterId = id.next();
+  lines.push(`#${profCenterId}=IFCCARTESIANPOINT((${f(winWidth / 2)},${f(winThickness / 2)}));`);
+
+  const profPlacementId = id.next();
+  lines.push(`#${profPlacementId}=IFCAXIS2PLACEMENT2D(#${profCenterId},$);`);
+
+  const profileId = id.next();
+  lines.push(`#${profileId}=IFCRECTANGLEPROFILEDEF(.AREA.,'Window Profile',#${profPlacementId},${f(winWidth)},${f(winThickness)});`);
+
+  // ── Extrusion: Z-up by window height ──
+  const extDirId = id.next();
+  lines.push(`#${extDirId}=IFCDIRECTION((0.,0.,1.));`);
+
+  const solidId = id.next();
+  lines.push(`#${solidId}=IFCEXTRUDEDAREASOLID(#${profileId},$,#${extDirId},${f(winHeight)});`);
+
+  // ── Shape representation ──
+  const shapeRepId = id.next();
+  lines.push(`#${shapeRepId}=IFCSHAPEREPRESENTATION(#${bodyContextId},'Body','SweptSolid',(#${solidId}));`);
+
+  const prodShapeId = id.next();
+  lines.push(`#${prodShapeId}=IFCPRODUCTDEFINITIONSHAPE($,$,(#${shapeRepId}));`);
+
+  // ── Local placement: position window along wall direction ──
+  const dirX = element.properties.wallDirectionX ?? 1;
+  const dirY = element.properties.wallDirectionY ?? 0;
+  const origX = element.properties.wallOriginX ?? 0;
+  const origY = element.properties.wallOriginY ?? 0;
+
+  const winX = origX + dirX * wallOffset - dirX * winWidth / 2;
+  const winY = origY + dirY * wallOffset - dirY * winWidth / 2;
+
+  const winOriginId = id.next();
+  lines.push(`#${winOriginId}=IFCCARTESIANPOINT((${f(winX)},${f(winY)},${f(sillHeight)}));`);
+
+  const winXDirId = id.next();
+  lines.push(`#${winXDirId}=IFCDIRECTION((${f(dirX, 6)},${f(dirY, 6)},0.));`);
+
+  const winAxisId = id.next();
+  lines.push(`#${winAxisId}=IFCAXIS2PLACEMENT3D(#${winOriginId},#${zDirId},#${winXDirId});`);
+
+  const winPlacementId = id.next();
+  lines.push(`#${winPlacementId}=IFCLOCALPLACEMENT(#${storeyPlacementId},#${winAxisId});`);
+
+  // ── Window entity ──
+  const winId = id.next();
+  lines.push(`#${winId}=IFCWINDOW('${ifcGuid(winId)}',#${ownerHistId},'${element.properties.name}',$,$,#${winPlacementId},#${prodShapeId},$,${f(winHeight)},${f(winWidth)},.WINDOW.,.SINGLE_PANEL.,$);`);
+
+  // ── Window property set (Pset_WindowCommon) ──
+  const propGlazingType = id.next();
+  lines.push(`#${propGlazingType}=IFCPROPERTYSINGLEVALUE('GlazingAreaFraction',$,IFCPOSITIVERATIOMEASURE(0.85),$);`);
+
+  const propThermal = id.next();
+  lines.push(`#${propThermal}=IFCPROPERTYSINGLEVALUE('ThermalTransmittance',$,IFCTHERMALTRANSMITTANCEMEASURE(1.4),$);`);
+
+  const propIsExternal = id.next();
+  lines.push(`#${propIsExternal}=IFCPROPERTYSINGLEVALUE('IsExternal',$,IFCBOOLEAN(.T.),$);`);
+
+  const winPsetId = id.next();
+  lines.push(`#${winPsetId}=IFCPROPERTYSET('${ifcGuid(winPsetId)}',#${ownerHistId},'Pset_WindowCommon',$,(#${propGlazingType},#${propThermal},#${propIsExternal}));`);
+
+  const relWinPsetId = id.next();
+  lines.push(`#${relWinPsetId}=IFCRELDEFINESBYPROPERTIES('${ifcGuid(relWinPsetId)}',#${ownerHistId},$,$,(#${winId}),#${winPsetId});`);
+
+  return winId;
+}
+
+
+// ─── Door Entity Writer ──────────────────────────────────────────────────────
+
+function writeDoorEntity(
+  element: GeometryElement,
+  storeyPlacementId: number,
+  bodyContextId: number,
+  zDirId: number,
+  ownerHistId: number,
+  id: IdCounter,
+  lines: string[]
+): number {
+  const doorWidth = element.properties.width ?? 1.0;
+  const doorHeight = element.properties.height ?? 2.1;
+  const doorThickness = element.properties.thickness ?? 0.2;
+  const wallOffset = element.properties.wallOffset ?? 0;
+
+  // ── Profile ──
+  const profCenterId = id.next();
+  lines.push(`#${profCenterId}=IFCCARTESIANPOINT((${f(doorWidth / 2)},${f(doorThickness / 2)}));`);
+
+  const profPlacementId = id.next();
+  lines.push(`#${profPlacementId}=IFCAXIS2PLACEMENT2D(#${profCenterId},$);`);
+
+  const profileId = id.next();
+  lines.push(`#${profileId}=IFCRECTANGLEPROFILEDEF(.AREA.,'Door Profile',#${profPlacementId},${f(doorWidth)},${f(doorThickness)});`);
+
+  // ── Extrusion ──
+  const extDirId = id.next();
+  lines.push(`#${extDirId}=IFCDIRECTION((0.,0.,1.));`);
+
+  const solidId = id.next();
+  lines.push(`#${solidId}=IFCEXTRUDEDAREASOLID(#${profileId},$,#${extDirId},${f(doorHeight)});`);
+
+  // ── Shape representation ──
+  const shapeRepId = id.next();
+  lines.push(`#${shapeRepId}=IFCSHAPEREPRESENTATION(#${bodyContextId},'Body','SweptSolid',(#${solidId}));`);
+
+  const prodShapeId = id.next();
+  lines.push(`#${prodShapeId}=IFCPRODUCTDEFINITIONSHAPE($,$,(#${shapeRepId}));`);
+
+  // ── Local placement ──
+  const dirX = element.properties.wallDirectionX ?? 1;
+  const dirY = element.properties.wallDirectionY ?? 0;
+  const origX = element.properties.wallOriginX ?? 0;
+  const origY = element.properties.wallOriginY ?? 0;
+
+  const doorX = origX + dirX * wallOffset - dirX * doorWidth / 2;
+  const doorY = origY + dirY * wallOffset - dirY * doorWidth / 2;
+
+  const doorOriginId = id.next();
+  lines.push(`#${doorOriginId}=IFCCARTESIANPOINT((${f(doorX)},${f(doorY)},0.));`);
+
+  const doorXDirId = id.next();
+  lines.push(`#${doorXDirId}=IFCDIRECTION((${f(dirX, 6)},${f(dirY, 6)},0.));`);
+
+  const doorAxisId = id.next();
+  lines.push(`#${doorAxisId}=IFCAXIS2PLACEMENT3D(#${doorOriginId},#${zDirId},#${doorXDirId});`);
+
+  const doorPlacementId = id.next();
+  lines.push(`#${doorPlacementId}=IFCLOCALPLACEMENT(#${storeyPlacementId},#${doorAxisId});`);
+
+  // ── Door entity ──
+  const isDoubleDoor = doorWidth >= 1.8;
+  const operationType = isDoubleDoor ? ".DOUBLE_DOOR_SINGLE_SWING." : ".SINGLE_SWING_LEFT.";
+  const doorId = id.next();
+  lines.push(`#${doorId}=IFCDOOR('${ifcGuid(doorId)}',#${ownerHistId},'${element.properties.name}',$,$,#${doorPlacementId},#${prodShapeId},$,${f(doorHeight)},${f(doorWidth)},.DOOR.,${operationType},$);`);
+
+  // ── Door property set (Pset_DoorCommon) ──
+  const propFireRating = id.next();
+  lines.push(`#${propFireRating}=IFCPROPERTYSINGLEVALUE('FireRating',$,IFCLABEL('FD30'),$);`);
+
+  const propIsExternal = id.next();
+  lines.push(`#${propIsExternal}=IFCPROPERTYSINGLEVALUE('IsExternal',$,IFCBOOLEAN(.T.),$);`);
+
+  const propHandicap = id.next();
+  lines.push(`#${propHandicap}=IFCPROPERTYSINGLEVALUE('HandicapAccessible',$,IFCBOOLEAN(${doorWidth >= 0.9 ? ".T." : ".F."}),$);`);
+
+  const doorPsetId = id.next();
+  lines.push(`#${doorPsetId}=IFCPROPERTYSET('${ifcGuid(doorPsetId)}',#${ownerHistId},'Pset_DoorCommon',$,(#${propFireRating},#${propIsExternal},#${propHandicap}));`);
+
+  const relDoorPsetId = id.next();
+  lines.push(`#${relDoorPsetId}=IFCRELDEFINESBYPROPERTIES('${ifcGuid(relDoorPsetId)}',#${ownerHistId},$,$,(#${doorId}),#${doorPsetId});`);
+
+  return doorId;
+}
+
+
+// ─── Beam Entity Writer ──────────────────────────────────────────────────────
+
+function writeBeamEntity(
+  element: GeometryElement,
+  storeyPlacementId: number,
+  bodyContextId: number,
+  zDirId: number,
+  ownerHistId: number,
+  id: IdCounter,
+  lines: string[]
+): number {
+  const beamWidth = element.properties.width ?? 0.3;
+  const beamDepth = element.properties.height ?? 0.5;
+  const beamLength = element.properties.length ?? 6;
+
+  // ── Profile: IfcRectangleProfileDef ──
+  const profCenterId = id.next();
+  lines.push(`#${profCenterId}=IFCCARTESIANPOINT((${f(beamWidth / 2)},${f(beamDepth / 2)}));`);
+
+  const profPlacementId = id.next();
+  lines.push(`#${profPlacementId}=IFCAXIS2PLACEMENT2D(#${profCenterId},$);`);
+
+  const profileId = id.next();
+  lines.push(`#${profileId}=IFCRECTANGLEPROFILEDEF(.AREA.,'Beam Profile',#${profPlacementId},${f(beamWidth)},${f(beamDepth)});`);
+
+  // ── Determine beam direction from vertices ──
+  const v0 = element.vertices[0];
+  const v4 = element.vertices[4]; // corresponding top vertex
+  // Beam runs along longest axis
+  const v1 = element.vertices[1];
+  const lenX = Math.abs(v1.x - v0.x);
+  const lenY = Math.abs(v1.y - v0.y);
+
+  let beamDirX: number, beamDirY: number, beamStartX: number, beamStartY: number, beamZ: number;
+
+  if (lenX > lenY) {
+    // Beam runs along X
+    beamDirX = v1.x > v0.x ? 1 : -1;
+    beamDirY = 0;
+    beamStartX = Math.min(v0.x, v1.x);
+    beamStartY = v0.y;
+  } else {
+    // Beam runs along Y
+    beamDirX = 0;
+    beamDirY = 1;
+    beamStartX = v0.x;
+    beamStartY = Math.min(v0.y, v1.y);
+  }
+  beamZ = v0.z; // bottom of beam
+
+  // ── Extrusion along beam length ──
+  const extDirId = id.next();
+  lines.push(`#${extDirId}=IFCDIRECTION((${f(beamDirX, 6)},${f(beamDirY, 6)},0.));`);
+
+  const solidId = id.next();
+  lines.push(`#${solidId}=IFCEXTRUDEDAREASOLID(#${profileId},$,#${extDirId},${f(beamLength)});`);
+
+  // ── Shape representation ──
+  const shapeRepId = id.next();
+  lines.push(`#${shapeRepId}=IFCSHAPEREPRESENTATION(#${bodyContextId},'Body','SweptSolid',(#${solidId}));`);
+
+  const prodShapeId = id.next();
+  lines.push(`#${prodShapeId}=IFCPRODUCTDEFINITIONSHAPE($,$,(#${shapeRepId}));`);
+
+  // ── Local placement ──
+  const beamOriginId = id.next();
+  lines.push(`#${beamOriginId}=IFCCARTESIANPOINT((${f(beamStartX)},${f(beamStartY)},${f(beamZ)}));`);
+
+  const beamAxisId = id.next();
+  lines.push(`#${beamAxisId}=IFCAXIS2PLACEMENT3D(#${beamOriginId},#${zDirId},$);`);
+
+  const beamPlacementId = id.next();
+  lines.push(`#${beamPlacementId}=IFCLOCALPLACEMENT(#${storeyPlacementId},#${beamAxisId});`);
+
+  // ── Beam entity ──
+  const beamId = id.next();
+  lines.push(`#${beamId}=IFCBEAM('${ifcGuid(beamId)}',#${ownerHistId},'${element.properties.name}',$,$,#${beamPlacementId},#${prodShapeId},$,.BEAM.);`);
+
+  return beamId;
+}
+
+
+// ─── Stair Entity Writer ─────────────────────────────────────────────────────
+
+function writeStairEntity(
+  element: GeometryElement,
+  storeyPlacementId: number,
+  bodyContextId: number,
+  zDirId: number,
+  ownerHistId: number,
+  id: IdCounter,
+  lines: string[]
+): number {
+  const stairWidth = element.properties.width ?? 1.2;
+  const stairLength = element.properties.length ?? 3.0;
+  const stairHeight = element.properties.height ?? 3.6;
+  const riserCount = element.properties.riserCount ?? 20;
+  const riserHeight = element.properties.riserHeight ?? 0.17;
+  const treadDepth = element.properties.treadDepth ?? 0.28;
+
+  // ── Profile: IfcRectangleProfileDef (simplified as a solid block) ──
+  const profCenterId = id.next();
+  lines.push(`#${profCenterId}=IFCCARTESIANPOINT((${f(stairWidth / 2)},${f(stairLength / 2)}));`);
+
+  const profPlacementId = id.next();
+  lines.push(`#${profPlacementId}=IFCAXIS2PLACEMENT2D(#${profCenterId},$);`);
+
+  const profileId = id.next();
+  lines.push(`#${profileId}=IFCRECTANGLEPROFILEDEF(.AREA.,'Stair Profile',#${profPlacementId},${f(stairWidth)},${f(stairLength)});`);
+
+  // ── Extrusion ──
+  const extDirId = id.next();
+  lines.push(`#${extDirId}=IFCDIRECTION((0.,0.,1.));`);
+
+  const solidId = id.next();
+  lines.push(`#${solidId}=IFCEXTRUDEDAREASOLID(#${profileId},$,#${extDirId},${f(stairHeight)});`);
+
+  // ── Shape representation ──
+  const shapeRepId = id.next();
+  lines.push(`#${shapeRepId}=IFCSHAPEREPRESENTATION(#${bodyContextId},'Body','SweptSolid',(#${solidId}));`);
+
+  const prodShapeId = id.next();
+  lines.push(`#${prodShapeId}=IFCPRODUCTDEFINITIONSHAPE($,$,(#${shapeRepId}));`);
+
+  // ── Local placement ──
+  const v0 = element.vertices[0];
+  const stairOriginId = id.next();
+  lines.push(`#${stairOriginId}=IFCCARTESIANPOINT((${f(v0.x)},${f(v0.y)},0.));`);
+
+  const stairAxisId = id.next();
+  lines.push(`#${stairAxisId}=IFCAXIS2PLACEMENT3D(#${stairOriginId},#${zDirId},$);`);
+
+  const stairPlacementId = id.next();
+  lines.push(`#${stairPlacementId}=IFCLOCALPLACEMENT(#${storeyPlacementId},#${stairAxisId});`);
+
+  // ── StairFlight entity ──
+  const stairId = id.next();
+  lines.push(`#${stairId}=IFCSTAIRFLIGHT('${ifcGuid(stairId)}',#${ownerHistId},'${element.properties.name}',$,$,#${stairPlacementId},#${prodShapeId},$,${riserCount},${riserCount - 1},${f(riserHeight)},${f(treadDepth)},.STRAIGHT.);`);
+
+  // ── Stair property set ──
+  const propRiserCount = id.next();
+  lines.push(`#${propRiserCount}=IFCPROPERTYSINGLEVALUE('NumberOfRiser',$,IFCINTEGER(${riserCount}),$);`);
+
+  const propTreadCount = id.next();
+  lines.push(`#${propTreadCount}=IFCPROPERTYSINGLEVALUE('NumberOfTreads',$,IFCINTEGER(${riserCount - 1}),$);`);
+
+  const propRiserH = id.next();
+  lines.push(`#${propRiserH}=IFCPROPERTYSINGLEVALUE('RiserHeight',$,IFCLENGTHMEASURE(${f(riserHeight)}),$);`);
+
+  const propTreadD = id.next();
+  lines.push(`#${propTreadD}=IFCPROPERTYSINGLEVALUE('TreadLength',$,IFCLENGTHMEASURE(${f(treadDepth)}),$);`);
+
+  const stairPsetId = id.next();
+  lines.push(`#${stairPsetId}=IFCPROPERTYSET('${ifcGuid(stairPsetId)}',#${ownerHistId},'Pset_StairFlightCommon_BF',$,(#${propRiserCount},#${propTreadCount},#${propRiserH},#${propTreadD}));`);
+
+  const relStairPsetId = id.next();
+  lines.push(`#${relStairPsetId}=IFCRELDEFINESBYPROPERTIES('${ifcGuid(relStairPsetId)}',#${ownerHistId},$,$,(#${stairId}),#${stairPsetId});`);
+
+  return stairId;
 }

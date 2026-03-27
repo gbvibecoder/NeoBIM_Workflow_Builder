@@ -92,70 +92,74 @@ const MAX_RETRIES = 3;
 const NEGATIVE_PROMPT =
   "low quality, blurry, distorted, noise, artifacts, unrealistic proportions, " +
   "toy-like, cartoon, non-architectural, furniture, people, vehicles, trees, " +
-  "interior details, text, watermark, signature";
+  "interior details, text, watermark, signature, simplified, abstract, blocky, " +
+  "flat shading, untextured, plastic, miniature, dollhouse, game asset, low-poly, " +
+  "smooth featureless walls, missing windows, blank facade, no detail";
 
 const VIEW_SUFFIX =
-  "isometric view, white background, professional architectural visualization, " +
-  "high detail architectural massing model, clean geometry, sharp edges, " +
-  "accurate proportions, photorealistic rendering";
+  "isometric view, white background, ultra-realistic architectural visualization, " +
+  "detailed facade with windows and facade panels, real-world building proportions, " +
+  "high-resolution PBR materials and textures, sharp edges, " +
+  "accurate scale, photorealistic octane render quality, " +
+  "architectural photography lighting, 8K detail";
 
 /** Maps massing type keywords to architectural form descriptions */
 const MASSING_VOCAB: Record<string, string> = {
-  extruded: "simple extruded rectangular massing volume",
-  stepped: "stepped massing with setbacks at upper floors",
-  tapered: "tapered form narrowing toward the top",
-  twisted: "twisted tower with rotated floor plates",
-  podium_tower: "podium-tower typology with a wide base and slender tower rising above",
-  stacked: "stacked volumes with offset floor plates",
-  cantilever: "cantilevered upper floors extending beyond the base",
-  terraced: "terraced form with cascading setbacks creating outdoor terraces",
-  sculpted: "sculpturally carved massing with organic curves",
-  split: "split massing with two connected volumes",
-  courtyard: "courtyard typology with central open space",
-  atrium: "atrium building with a tall interior void",
-  bar: "elongated bar building with linear form",
-  slab: "slab typology with wide flat proportions",
-  point_tower: "slender point tower with compact floor plate",
+  extruded: "clean extruded rectangular building with detailed window grid facade and entrance canopy",
+  stepped: "stepped building with setbacks at upper floors, each level with distinct facade treatment and glazing",
+  tapered: "elegantly tapered tower narrowing toward the top with continuous curtain wall glazing",
+  twisted: "twisted tower with rotated floor plates and seamless glass curtain wall wrapping the form",
+  podium_tower: "podium-tower typology with a wide retail base featuring storefront glazing and a slender glass tower rising above",
+  stacked: "stacked volumes with offset floor plates, each volume clad in contrasting materials",
+  cantilever: "dramatically cantilevered upper floors with exposed structural steel and floor-to-ceiling glazing",
+  terraced: "terraced building with cascading setbacks creating planted outdoor terraces with glass balustrades",
+  sculpted: "sculpturally carved building with organic flowing facade and parametric panel cladding",
+  split: "split building with two connected volumes joined by a glazed skybridge",
+  courtyard: "courtyard building with central landscaped open space and inward-facing glazed corridors",
+  atrium: "atrium building with a soaring multi-storey glazed interior void visible from exterior",
+  bar: "elongated bar building with rhythmic window bays and articulated facade panels",
+  slab: "slab building with wide proportions featuring a detailed grid of windows and sunshading louvers",
+  point_tower: "slender point tower with compact floor plate and full-height glazed curtain wall",
 };
 
-/** Maps material keywords to descriptive phrases */
+/** Maps material keywords to descriptive phrases — each must contain the raw keyword */
 const MATERIAL_DESCRIPTORS: Record<string, string> = {
-  glass: "glass curtain wall facade",
-  aluminum: "aluminum panel cladding",
-  concrete: "exposed concrete finish",
-  steel: "steel frame structure",
-  timber: "mass timber construction",
-  brick: "brick masonry facade",
-  terracotta: "terracotta rain-screen panels",
-  zinc: "zinc standing-seam cladding",
-  stone: "natural stone cladding",
-  copper: "copper panel facade with patina",
-  ceramic: "ceramic tile facade",
-  metal: "metal panel cladding",
-  wood: "wood-clad exterior",
-  composite: "composite panel system",
+  glass: "glass curtain wall facade with high-performance double-glazing, visible mullions and transoms",
+  aluminum: "aluminum composite panel cladding with precision-fabricated shadow gap joints",
+  concrete: "exposed concrete finish with board-formed texture, visible formwork tie-hole pattern",
+  steel: "structural steel frame with expressed bolted connections and cross-bracing",
+  timber: "timber construction using cross-laminated CLT with warm natural wood grain finish",
+  brick: "brick masonry facade in running bond with soldier course lintels and recessed mortar joints",
+  terracotta: "terracotta rain-screen panels with deep reveals and warm earth-tone glazing",
+  zinc: "zinc standing-seam cladding with pre-patinated finish and crisp folded edges",
+  stone: "stone cladding in honed natural limestone with ashlar coursing and rusticated base",
+  copper: "copper panel facade with weathered green patina and standing seam joints",
+  ceramic: "ceramic tile facade in a glazed bespoke pattern with visible grout lines",
+  metal: "metal panel cladding with perforated patterns creating depth and shadow play",
+  wood: "wood-clad exterior in charred timber (Shou Sugi Ban) with rich black texture",
+  composite: "composite panel system in fiber-reinforced polymer with seamless joints",
 };
 
 /** Maps style keywords to architectural style descriptions */
 const STYLE_DESCRIPTORS: Record<string, string> = {
-  parametric: "parametric architecture with computational design patterns",
-  brutalist: "brutalist architecture with exposed concrete and bold geometric forms",
-  minimalist: "minimalist architecture with clean lines and restrained palette",
-  hightech: "high-tech architecture with exposed structural elements",
-  "high-tech": "high-tech architecture with exposed structural elements",
-  deconstructivist: "deconstructivist architecture with fragmented angular forms",
-  artdeco: "art deco architecture with decorative geometric ornamentation",
-  "art deco": "art deco architecture with decorative geometric ornamentation",
-  organic: "organic architecture with flowing biomorphic curves",
-  sustainable: "sustainable green architecture with living walls and solar features",
-  modern: "modern contemporary architecture with clean geometric forms",
-  contemporary: "contemporary architecture with innovative material expression",
-  classical: "neoclassical architecture with columns and symmetrical composition",
-  tropical: "tropical modernist architecture with deep overhangs and natural ventilation",
-  industrial: "industrial architecture with raw materials and open structural systems",
-  nordic: "nordic minimalist architecture with warm wood and clean white surfaces",
-  japanese: "japanese-inspired architecture with timber screens and zen proportions",
-  futuristic: "futuristic architecture with sleek aerodynamic curves",
+  parametric: "parametric architecture with algorithmically generated facade panels, complex double-curved surfaces, and Voronoi-patterned cladding",
+  brutalist: "brutalist architecture with raw board-formed concrete, deeply recessed windows, massive cantilevers, and bold monolithic geometric forms",
+  minimalist: "minimalist architecture with razor-thin edges, floor-to-ceiling frameless glazing, white render walls, and restrained material palette",
+  hightech: "high-tech architecture with exposed steel trusses, external service risers, tension cables, and color-coded mechanical systems",
+  "high-tech": "high-tech architecture with exposed steel trusses, external service risers, tension cables, and color-coded mechanical systems",
+  deconstructivist: "deconstructivist architecture with fragmented angular forms, colliding planes, tilted walls, and sharp metallic cladding",
+  artdeco: "art deco architecture with stepped crown, decorative geometric bas-relief ornamentation, bronze metalwork, and symmetrical setbacks",
+  "art deco": "art deco architecture with stepped crown, decorative geometric bas-relief ornamentation, bronze metalwork, and symmetrical setbacks",
+  organic: "organic architecture with flowing biomorphic curves, living green walls, and seamless white shell structure",
+  sustainable: "sustainable green architecture with rooftop photovoltaic arrays, living green walls, operable louvers, and rainwater collection systems",
+  modern: "modern contemporary architecture with precise geometric forms, large glass panels, thin steel columns, and flat roof with clean parapets",
+  contemporary: "contemporary architecture with innovative mixed-material facade, dramatic lighting reveals, and bold entrance statement",
+  classical: "neoclassical architecture with fluted Corinthian columns, stone entablature, pediment, rusticated base, and symmetrical window composition",
+  tropical: "tropical modernist architecture with deep cantilevered overhangs, perforated screen walls, open breezeways, and lush planted terraces",
+  industrial: "industrial architecture with exposed steel portal frames, corrugated metal cladding, clerestory windows, and raw concrete floors",
+  nordic: "Scandinavian architecture with pale timber cladding, large picture windows framing views, pitched roof, and warm interior glow",
+  japanese: "Japanese-inspired architecture with timber post-and-beam structure, sliding shoji screens, engawa veranda, and zen garden courtyard",
+  futuristic: "futuristic architecture with sleek aerodynamic flowing curves, holographic glass panels, LED-embedded facade, and floating canopy",
 };
 
 /** Maps building type to proportional descriptions */
@@ -203,6 +207,20 @@ const FEATURE_DESCRIPTIONS: Record<string, string> = {
 
 // ─── Prompt Builder ─────────────────────────────────────────────────────────────
 
+/** Maps building type to realistic facade window descriptions */
+const FACADE_DETAIL_BY_TYPE: Record<string, string> = {
+  residential: "with regular rows of recessed windows with visible frames, Juliet balconies, and a grand entrance lobby at ground level",
+  office: "with a rhythmic grid of floor-to-ceiling curtain wall glazing, expressed floor slabs, spandrel panels between floors, and a double-height glazed lobby entrance",
+  "mixed-use": "with retail storefront glazing at ground level, office curtain wall on middle floors, and residential windows with balconies on upper floors",
+  hotel: "with uniform hotel room windows in a precise grid, a porte-cochere entrance canopy, and a glazed rooftop bar level",
+  hospital: "with ribbon windows on clinical floors, a clearly marked emergency entrance with canopy, and mechanical plant rooms screened behind louvered panels on the roof",
+  school: "with large classroom windows for natural light, covered walkways between wings, and a visible gymnasium volume",
+  museum: "with dramatic windowless gallery walls contrasted by fully glazed atrium and entrance hall",
+  library: "with tall reading-room windows, a colonnade entrance, and visible bookstack levels through clerestory glazing",
+  retail: "with full-height storefront display windows, illuminated signage band, and a covered arcade at street level",
+  warehouse: "with high-level clerestory strip windows, large loading dock roller doors, and standing-seam metal roof",
+};
+
 function buildMasterPrompt(req: BuildingRequirements): string {
   const parts: string[] = [];
 
@@ -211,7 +229,7 @@ function buildMasterPrompt(req: BuildingRequirements): string {
   const height = req.height ?? floors * (req.floorToFloorHeight ?? 3.5);
   const buildingType = req.buildingType ?? "mixed-use building";
   parts.push(
-    `A ${floors}-storey ${buildingType}, approximately ${Math.round(height)} meters tall`
+    `A highly detailed, ultra-realistic ${floors}-storey ${buildingType}, approximately ${Math.round(height)} meters tall`
   );
 
   // 2. Proportions
@@ -252,9 +270,20 @@ function buildMasterPrompt(req: BuildingRequirements): string {
       .map(m => MATERIAL_DESCRIPTORS[m.toLowerCase()] ?? `${m} facade`)
       .slice(0, 3);
     parts.push(`featuring ${matDescs.join(" and ")}`);
+  } else {
+    // Default: add realistic material description if none specified
+    parts.push("with realistic facade materials showing texture and depth");
   }
 
-  // 7. Features
+  // 7. Facade detail — add window/entrance descriptions based on building type
+  const facadeDetail = FACADE_DETAIL_BY_TYPE[typeKey];
+  if (facadeDetail) {
+    parts.push(facadeDetail);
+  } else {
+    parts.push("with visible windows on every floor, a defined entrance at ground level, and articulated facade panels with depth and shadow");
+  }
+
+  // 8. Features
   if (req.features && req.features.length > 0) {
     const featDescs = req.features
       .map(f => FEATURE_DESCRIPTIONS[f.toLowerCase().replace(/[-\s]+/g, "_")] ?? "")
@@ -263,7 +292,7 @@ function buildMasterPrompt(req: BuildingRequirements): string {
     if (featDescs.length) parts.push(featDescs.join(", "));
   }
 
-  // 8. Context
+  // 9. Context
   if (req.context) {
     const ctxParts: string[] = [];
     if (req.context.site) ctxParts.push(`situated on a ${req.context.site}`);
@@ -272,7 +301,7 @@ function buildMasterPrompt(req: BuildingRequirements): string {
     if (ctxParts.length) parts.push(ctxParts.join(", "));
   }
 
-  // 9. View and quality suffix
+  // 10. View and quality suffix
   parts.push(VIEW_SUFFIX);
 
   return parts.join(", ");
@@ -285,8 +314,9 @@ function buildMinimalPrompt(req: BuildingRequirements): string {
   const materials = req.materials?.length ? `, ${req.materials.join(" and ")} facade` : "";
 
   return (
-    `A ${floors}-storey ${buildingType}${style}${materials}, ` +
-    `architectural massing model, ${VIEW_SUFFIX}`
+    `A highly detailed ultra-realistic ${floors}-storey ${buildingType}${style}${materials}, ` +
+    `with visible windows on every floor, entrance at ground level, realistic facade materials with depth and texture, ` +
+    `detailed exterior architectural model, ${VIEW_SUFFIX}`
   );
 }
 
@@ -328,9 +358,9 @@ export function buildPrompt(req: BuildingRequirements): { prompt: string; negati
   const isRichDescription = userText.length > 100;
 
   if (isRichDescription) {
-    // Use the user's text directly with only view/quality suffixes.
-    // Truncate user text if needed — 3D AI Studio caps prompts at 1024 chars.
-    const suffix = `, ${VIEW_SUFFIX}`;
+    // Use the user's text directly with realism boosters and quality suffixes.
+    const realismBooster = ", ultra-realistic detailed exterior with visible windows doors and facade materials, real-world building not a toy or massing model";
+    const suffix = `${realismBooster}, ${VIEW_SUFFIX}`;
     const maxUserLen = 1024 - suffix.length;
     const trimmedText = userText.length > maxUserLen
       ? userText.slice(0, maxUserLen - 3) + "..."
@@ -354,7 +384,7 @@ export function buildPrompt(req: BuildingRequirements): { prompt: string; negati
     template = "master";
   } else if (userText) {
     // PRIORITY 4: Short text with no structured data
-    prompt = `${userText}, architectural massing model, exterior building view, ${VIEW_SUFFIX}`;
+    prompt = `${userText}, ultra-realistic detailed architectural building with windows and facade materials, exterior view, ${VIEW_SUFFIX}`;
     template = "minimal";
   } else {
     prompt = buildMinimalPrompt(req);

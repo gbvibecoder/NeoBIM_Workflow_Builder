@@ -17,11 +17,12 @@ export interface Face {
 /** A single geometry element (wall, slab, space, etc.) */
 export interface GeometryElement {
   id: string;
-  type: "wall" | "slab" | "column" | "roof" | "space";
+  type: "wall" | "slab" | "column" | "roof" | "space" | "window" | "door" | "beam" | "stair";
   vertices: Vertex[];
   faces: Face[];
   /** IFC element class this maps to */
-  ifcType: "IfcWall" | "IfcSlab" | "IfcColumn" | "IfcBuildingElementProxy" | "IfcSpace";
+  ifcType: "IfcWall" | "IfcSlab" | "IfcColumn" | "IfcBuildingElementProxy" | "IfcSpace"
+    | "IfcWindow" | "IfcDoor" | "IfcBeam" | "IfcStairFlight";
   /** Metadata */
   properties: {
     name: string;
@@ -42,6 +43,26 @@ export interface GeometryElement {
     spaceUsage?: string;
     /** For IfcSpace: footprint polygon */
     spaceFootprint?: FootprintPoint[];
+    /** For windows/doors: sill height above floor */
+    sillHeight?: number;
+    /** For windows/doors: position along parent wall (distance from wall start) */
+    wallOffset?: number;
+    /** For windows/doors: reference to parent wall element ID */
+    parentWallId?: string;
+    /** For windows/doors: wall direction unit vector */
+    wallDirectionX?: number;
+    wallDirectionY?: number;
+    /** For windows/doors: wall origin point */
+    wallOriginX?: number;
+    wallOriginY?: number;
+    /** For beams: material type */
+    material?: string;
+    /** For stairs: number of risers */
+    riserCount?: number;
+    /** For stairs: riser height */
+    riserHeight?: number;
+    /** For stairs: tread depth */
+    treadDepth?: number;
   };
 }
 

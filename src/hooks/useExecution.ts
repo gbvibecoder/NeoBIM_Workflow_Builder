@@ -440,11 +440,62 @@ async function executeNode(
       // END TR-007 special handling — all other nodes use normal execute-node
       // ══════════════════════════════════════════════════════════════════════
 
-      // For non-IFC nodes or small IFC files: strip large fileData to prevent body limit issues
+      // For non-IFC nodes with large images: upload to temp-image first, pass URL instead
+      // This prevents Vercel's 4.5MB body limit from rejecting the request.
+      const IMAGE_ANALYSIS_NODES = new Set(["TR-004", "TR-005", "GN-003", "GN-007", "GN-008", "GN-009"]);
       if (inputData.fileData && typeof inputData.fileData === "string" && (inputData.fileData as string).length > 3_000_000) {
-        // If we got here with a large file, something is wrong — remove it to prevent 413
-        console.warn("[exec] Stripping large fileData to prevent Vercel 413 error");
-        delete inputData.fileData;
+        if (IMAGE_ANALYSIS_NODES.has(catalogueId)) {
+          // Upload large image to temp storage, replace fileData with URL
+          try {
+            console.log(`[exec] Large image (${((inputData.fileData as string).length / 1024 / 1024).toFixed(1)}MB base64) for ${catalogueId} — uploading to temp storage`);
+            const mimeType = (inputData.mimeType as string) ?? "image/jpeg";
+            const uploadRes = await fetch("/api/temp-image", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ base64: inputData.fileData, contentType: mimeType }),
+            });
+            if (uploadRes.ok) {
+              const { url } = await uploadRes.json();
+              console.log(`[exec] Image uploaded to temp storage: ${url}`);
+              // Replace inline base64 with URL reference — TR-004 accepts both
+              inputData.url = url;
+              inputData.imageUrl = url;
+              delete inputData.fileData;
+              // Also upload additional images if present (multi-image IN-008 flow)
+              if (inputData.fileDataArray && Array.isArray(inputData.fileDataArray)) {
+                const arr = inputData.fileDataArray as string[];
+                const mimeTypes = (inputData.mimeTypes as string[]) ?? [];
+                const uploadedUrls: string[] = [url]; // first image already uploaded
+                for (let fi = 1; fi < arr.length; fi++) {
+                  if (arr[fi] && arr[fi].length > 0) {
+                    try {
+                      const fiRes = await fetch("/api/temp-image", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ base64: arr[fi], contentType: mimeTypes[fi] ?? "image/jpeg" }),
+                      });
+                      if (fiRes.ok) {
+                        const { url: fiUrl } = await fiRes.json();
+                        uploadedUrls.push(fiUrl);
+                      }
+                    } catch { /* continue with remaining images */ }
+                  }
+                }
+                inputData.imageUrls = uploadedUrls;
+                delete inputData.fileDataArray;
+              }
+            } else {
+              console.warn("[exec] Temp image upload failed, stripping fileData");
+              delete inputData.fileData;
+            }
+          } catch (err) {
+            console.warn("[exec] Temp image upload error:", err);
+            delete inputData.fileData;
+          }
+        } else {
+          console.warn("[exec] Stripping large fileData to prevent Vercel 413 error");
+          delete inputData.fileData;
+        }
       }
 
       res = await fetch("/api/execute-node", {

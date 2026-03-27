@@ -858,6 +858,387 @@ function generateInteriorElements(
   return generateRectangularInterior(footprint, elevation, floorHeight, storeyIndex, programme, floorLabel);
 }
 
+// ─── Window Element Generation ────────────────────────────────────────────
+
+/**
+ * Generate window elements along an exterior wall.
+ * Places windows at regular intervals with realistic sizing based on building type.
+ */
+function generateWindowsForWall(
+  p1: FootprintPoint,
+  p2: FootprintPoint,
+  elevation: number,
+  floorHeight: number,
+  storeyIndex: number,
+  wallIndex: number,
+  buildingType: string,
+): GeometryElement[] {
+  const windows: GeometryElement[] = [];
+  const dx = p2.x - p1.x;
+  const dy = p2.y - p1.y;
+  const wallLength = Math.sqrt(dx * dx + dy * dy);
+
+  if (wallLength < 2.0) return windows; // too short for windows
+
+  // Window dimensions based on building type
+  const type = buildingType.toLowerCase();
+  let winWidth = 1.2;
+  let winHeight = 1.5;
+  let sillHeight = 0.9;
+  let spacing = 3.0; // center-to-center
+
+  if (/office/i.test(type)) {
+    winWidth = 1.8; winHeight = 2.2; sillHeight = 0.8; spacing = 2.7;
+  } else if (/residential|apartment/i.test(type)) {
+    winWidth = 1.2; winHeight = 1.5; sillHeight = 0.9; spacing = 3.0;
+  } else if (/hotel/i.test(type)) {
+    winWidth = 1.4; winHeight = 1.8; sillHeight = 0.8; spacing = 3.2;
+  } else if (/warehouse|industrial/i.test(type)) {
+    winWidth = 2.0; winHeight = 1.0; sillHeight = 2.5; spacing = 5.0;
+  } else if (/museum|gallery/i.test(type)) {
+    winWidth = 2.5; winHeight = 3.0; sillHeight = 0.6; spacing = 4.0;
+  } else if (/school/i.test(type)) {
+    winWidth = 1.8; winHeight = 1.8; sillHeight = 0.9; spacing = 2.4;
+  }
+
+  // Ensure windows fit within floor height
+  if (sillHeight + winHeight > floorHeight - 0.3) {
+    winHeight = floorHeight - sillHeight - 0.3;
+  }
+  if (winHeight < 0.5) return windows;
+
+  // Calculate number of windows that fit
+  const edgeMargin = 0.8; // margin from wall corners
+  const usableLength = wallLength - 2 * edgeMargin;
+  if (usableLength < winWidth) return windows;
+
+  const numWindows = Math.max(1, Math.floor(usableLength / spacing));
+  const actualSpacing = usableLength / numWindows;
+
+  const dirX = dx / wallLength;
+  const dirY = dy / wallLength;
+
+  for (let i = 0; i < numWindows; i++) {
+    const offset = edgeMargin + (i + 0.5) * actualSpacing;
+    const cx = p1.x + dirX * offset;
+    const cy = p1.y + dirY * offset;
+    const baseZ = elevation + sillHeight;
+
+    // Window vertices (simplified box for geometry)
+    const hw = winWidth / 2;
+    const nx = -dirY * 0.05; // 50mm depth (normal to wall)
+    const ny = dirX * 0.05;
+
+    const vertices: Vertex[] = [
+      { x: cx - dirX * hw + nx, y: cy - dirY * hw + ny, z: baseZ },
+      { x: cx + dirX * hw + nx, y: cy + dirY * hw + ny, z: baseZ },
+      { x: cx + dirX * hw + nx, y: cy + dirY * hw + ny, z: baseZ + winHeight },
+      { x: cx - dirX * hw + nx, y: cy - dirY * hw + ny, z: baseZ + winHeight },
+      { x: cx - dirX * hw - nx, y: cy - dirY * hw - ny, z: baseZ },
+      { x: cx + dirX * hw - nx, y: cy + dirY * hw - ny, z: baseZ },
+      { x: cx + dirX * hw - nx, y: cy + dirY * hw - ny, z: baseZ + winHeight },
+      { x: cx - dirX * hw - nx, y: cy - dirY * hw - ny, z: baseZ + winHeight },
+    ];
+
+    const faces: Face[] = [
+      { vertices: [0, 1, 2, 3] },
+      { vertices: [5, 4, 7, 6] },
+      { vertices: [0, 3, 7, 4] },
+      { vertices: [1, 5, 6, 2] },
+      { vertices: [3, 2, 6, 7] },
+      { vertices: [0, 4, 5, 1] },
+    ];
+
+    windows.push({
+      id: `window-s${storeyIndex}-w${wallIndex}-${i}`,
+      type: "window",
+      vertices,
+      faces,
+      ifcType: "IfcWindow",
+      properties: {
+        name: `Window S${storeyIndex + 1}-W${wallIndex + 1}-${i + 1}`,
+        storeyIndex,
+        width: winWidth,
+        height: winHeight,
+        thickness: 0.1,
+        sillHeight,
+        wallOffset: offset,
+        parentWallId: `wall-s${storeyIndex}-w${wallIndex}`,
+        wallDirectionX: dirX,
+        wallDirectionY: dirY,
+        wallOriginX: p1.x,
+        wallOriginY: p1.y,
+        area: winWidth * winHeight,
+      },
+    });
+  }
+
+  return windows;
+}
+
+// ─── Door Element Generation ──────────────────────────────────────────────
+
+/**
+ * Generate entrance doors on ground floor exterior walls.
+ * Places a main entrance door on the longest wall, and secondary doors on other long walls.
+ */
+function generateDoorsForWall(
+  p1: FootprintPoint,
+  p2: FootprintPoint,
+  elevation: number,
+  floorHeight: number,
+  storeyIndex: number,
+  wallIndex: number,
+  isMainEntrance: boolean,
+): GeometryElement[] {
+  if (storeyIndex !== 0) return []; // doors only on ground floor
+
+  const dx = p2.x - p1.x;
+  const dy = p2.y - p1.y;
+  const wallLength = Math.sqrt(dx * dx + dy * dy);
+
+  if (wallLength < 3.0) return []; // too short for a door
+
+  const doorWidth = isMainEntrance ? 2.4 : 1.0; // double door for main entrance
+  const doorHeight = isMainEntrance ? 2.8 : 2.1;
+
+  const dirX = dx / wallLength;
+  const dirY = dy / wallLength;
+  const offset = wallLength / 2; // center of wall
+
+  const cx = p1.x + dirX * offset;
+  const cy = p1.y + dirY * offset;
+  const hw = doorWidth / 2;
+  const nx = -dirY * 0.1;
+  const ny = dirX * 0.1;
+
+  const vertices: Vertex[] = [
+    { x: cx - dirX * hw + nx, y: cy - dirY * hw + ny, z: elevation },
+    { x: cx + dirX * hw + nx, y: cy + dirY * hw + ny, z: elevation },
+    { x: cx + dirX * hw + nx, y: cy + dirY * hw + ny, z: elevation + doorHeight },
+    { x: cx - dirX * hw + nx, y: cy - dirY * hw + ny, z: elevation + doorHeight },
+    { x: cx - dirX * hw - nx, y: cy - dirY * hw - ny, z: elevation },
+    { x: cx + dirX * hw - nx, y: cy + dirY * hw - ny, z: elevation },
+    { x: cx + dirX * hw - nx, y: cy + dirY * hw - ny, z: elevation + doorHeight },
+    { x: cx - dirX * hw - nx, y: cy - dirY * hw - ny, z: elevation + doorHeight },
+  ];
+
+  const faces: Face[] = [
+    { vertices: [0, 1, 2, 3] },
+    { vertices: [5, 4, 7, 6] },
+    { vertices: [0, 3, 7, 4] },
+    { vertices: [1, 5, 6, 2] },
+    { vertices: [3, 2, 6, 7] },
+    { vertices: [0, 4, 5, 1] },
+  ];
+
+  return [{
+    id: `door-s${storeyIndex}-w${wallIndex}`,
+    type: "door",
+    vertices,
+    faces,
+    ifcType: "IfcDoor",
+    properties: {
+      name: isMainEntrance ? "Main Entrance Door" : `Door S1-W${wallIndex + 1}`,
+      storeyIndex,
+      width: doorWidth,
+      height: doorHeight,
+      thickness: 0.2,
+      sillHeight: 0,
+      wallOffset: offset,
+      parentWallId: `wall-s${storeyIndex}-w${wallIndex}`,
+      wallDirectionX: dirX,
+      wallDirectionY: dirY,
+      wallOriginX: p1.x,
+      wallOriginY: p1.y,
+      area: doorWidth * doorHeight,
+    },
+  }];
+}
+
+// ─── Beam Element Generation ──────────────────────────────────────────────
+
+/**
+ * Generate structural beams along the column grid lines for each storey.
+ */
+function generateBeamsForStorey(
+  footprint: FootprintPoint[],
+  elevation: number,
+  floorHeight: number,
+  storeyIndex: number,
+): GeometryElement[] {
+  const beams: GeometryElement[] = [];
+  const bounds = polygonBounds(footprint);
+  const bW = bounds.maxX - bounds.minX;
+  const bD = bounds.maxY - bounds.minY;
+
+  const beamWidth = 0.3;
+  const beamDepth = 0.5; // beam hangs below slab
+  const beamTopZ = elevation + floorHeight; // flush with top of storey (bottom of slab above)
+
+  // Beams along X-direction (spanning depth)
+  const colSpacingX = Math.max(6, Math.min(bW / 3, 8));
+  const numBeamsX = Math.max(2, Math.floor(bW / colSpacingX) + 1);
+  const stepX = bW / (numBeamsX - 1);
+
+  for (let i = 0; i < numBeamsX; i++) {
+    const x = bounds.minX + i * stepX;
+    const y1 = bounds.minY;
+    const y2 = bounds.maxY;
+    const length = y2 - y1;
+
+    beams.push({
+      id: `beam-x-s${storeyIndex}-${i}`,
+      type: "beam",
+      vertices: [
+        { x: x - beamWidth / 2, y: y1, z: beamTopZ - beamDepth },
+        { x: x + beamWidth / 2, y: y1, z: beamTopZ - beamDepth },
+        { x: x + beamWidth / 2, y: y2, z: beamTopZ - beamDepth },
+        { x: x - beamWidth / 2, y: y2, z: beamTopZ - beamDepth },
+        { x: x - beamWidth / 2, y: y1, z: beamTopZ },
+        { x: x + beamWidth / 2, y: y1, z: beamTopZ },
+        { x: x + beamWidth / 2, y: y2, z: beamTopZ },
+        { x: x - beamWidth / 2, y: y2, z: beamTopZ },
+      ],
+      faces: [
+        { vertices: [0, 1, 2, 3] },
+        { vertices: [4, 7, 6, 5] },
+        { vertices: [0, 4, 5, 1] },
+        { vertices: [2, 6, 7, 3] },
+        { vertices: [0, 3, 7, 4] },
+        { vertices: [1, 5, 6, 2] },
+      ],
+      ifcType: "IfcBeam",
+      properties: {
+        name: `Beam X-${i + 1} S${storeyIndex + 1}`,
+        storeyIndex,
+        width: beamWidth,
+        height: beamDepth,
+        length,
+        area: beamWidth * length,
+        volume: beamWidth * beamDepth * length,
+        material: "reinforced_concrete",
+      },
+    });
+  }
+
+  // Beams along Y-direction (spanning width)
+  const colSpacingY = Math.max(6, Math.min(bD / 3, 8));
+  const numBeamsY = Math.max(2, Math.floor(bD / colSpacingY) + 1);
+  const stepY = bD / (numBeamsY - 1);
+
+  for (let j = 0; j < numBeamsY; j++) {
+    const y = bounds.minY + j * stepY;
+    const x1 = bounds.minX;
+    const x2 = bounds.maxX;
+    const length = x2 - x1;
+
+    beams.push({
+      id: `beam-y-s${storeyIndex}-${j}`,
+      type: "beam",
+      vertices: [
+        { x: x1, y: y - beamWidth / 2, z: beamTopZ - beamDepth },
+        { x: x2, y: y - beamWidth / 2, z: beamTopZ - beamDepth },
+        { x: x2, y: y + beamWidth / 2, z: beamTopZ - beamDepth },
+        { x: x1, y: y + beamWidth / 2, z: beamTopZ - beamDepth },
+        { x: x1, y: y - beamWidth / 2, z: beamTopZ },
+        { x: x2, y: y - beamWidth / 2, z: beamTopZ },
+        { x: x2, y: y + beamWidth / 2, z: beamTopZ },
+        { x: x1, y: y + beamWidth / 2, z: beamTopZ },
+      ],
+      faces: [
+        { vertices: [0, 1, 2, 3] },
+        { vertices: [4, 7, 6, 5] },
+        { vertices: [0, 4, 5, 1] },
+        { vertices: [2, 6, 7, 3] },
+        { vertices: [0, 3, 7, 4] },
+        { vertices: [1, 5, 6, 2] },
+      ],
+      ifcType: "IfcBeam",
+      properties: {
+        name: `Beam Y-${j + 1} S${storeyIndex + 1}`,
+        storeyIndex,
+        width: beamWidth,
+        height: beamDepth,
+        length,
+        area: beamWidth * length,
+        volume: beamWidth * beamDepth * length,
+        material: "reinforced_concrete",
+      },
+    });
+  }
+
+  return beams;
+}
+
+// ─── Stair Element Generation ─────────────────────────────────────────────
+
+/**
+ * Generate a staircase element in the core area of the building.
+ */
+function generateStairElement(
+  footprint: FootprintPoint[],
+  elevation: number,
+  floorHeight: number,
+  storeyIndex: number,
+): GeometryElement | null {
+  if (floorHeight <= 0) return null; // roof level has no stairs
+
+  const bounds = polygonBounds(footprint);
+  const bW = bounds.maxX - bounds.minX;
+  const bD = bounds.maxY - bounds.minY;
+
+  // Place stair near center-left of building (in core area)
+  const stairWidth = 1.2;
+  const stairLength = 3.0;
+  const riserHeight = 0.17;
+  const treadDepth = 0.28;
+  const riserCount = Math.round(floorHeight / riserHeight);
+
+  const sx = bounds.minX + bW * 0.15; // 15% from left edge
+  const sy = bounds.minY + bD * 0.5 - stairLength / 2;
+
+  const vertices: Vertex[] = [
+    { x: sx, y: sy, z: elevation },
+    { x: sx + stairWidth, y: sy, z: elevation },
+    { x: sx + stairWidth, y: sy + stairLength, z: elevation },
+    { x: sx, y: sy + stairLength, z: elevation },
+    { x: sx, y: sy, z: elevation + floorHeight },
+    { x: sx + stairWidth, y: sy, z: elevation + floorHeight },
+    { x: sx + stairWidth, y: sy + stairLength, z: elevation + floorHeight },
+    { x: sx, y: sy + stairLength, z: elevation + floorHeight },
+  ];
+
+  const faces: Face[] = [
+    { vertices: [0, 1, 2, 3] },
+    { vertices: [4, 7, 6, 5] },
+    { vertices: [0, 4, 5, 1] },
+    { vertices: [2, 6, 7, 3] },
+    { vertices: [0, 3, 7, 4] },
+    { vertices: [1, 5, 6, 2] },
+  ];
+
+  return {
+    id: `stair-s${storeyIndex}`,
+    type: "stair",
+    vertices,
+    faces,
+    ifcType: "IfcStairFlight",
+    properties: {
+      name: `Stair Flight S${storeyIndex + 1}`,
+      storeyIndex,
+      width: stairWidth,
+      length: stairLength,
+      height: floorHeight,
+      riserCount,
+      riserHeight,
+      treadDepth,
+      area: stairWidth * stairLength,
+      volume: stairWidth * stairLength * floorHeight * 0.5, // approximate
+    },
+  };
+}
+
 /**
  * Generate complete massing geometry from a building description.
  */
@@ -916,6 +1297,17 @@ export function generateMassingGeometry(input: BuildingDescriptionInput): Massin
   // Generate storeys with walls, slabs, and interior elements
   const storeys: MassingStorey[] = [];
 
+  // Find the longest wall index (for main entrance door placement)
+  let longestWallIdx = 0;
+  let longestWallLen = 0;
+  for (let w = 0; w < footprint.length; w++) {
+    const nextW = (w + 1) % footprint.length;
+    const dx = footprint[nextW].x - footprint[w].x;
+    const dy = footprint[nextW].y - footprint[w].y;
+    const len = Math.sqrt(dx * dx + dy * dy);
+    if (len > longestWallLen) { longestWallLen = len; longestWallIdx = w; }
+  }
+
   for (let i = 0; i < floors; i++) {
     const elevation = i * floorHeight;
     const floorLabel = i === 0 ? "Ground" : `Level ${i + 1}`;
@@ -935,12 +1327,39 @@ export function generateMassingGeometry(input: BuildingDescriptionInput): Massin
           w
         )
       );
+
+      // Generate windows on exterior walls
+      const windowElements = generateWindowsForWall(
+        footprint[w], footprint[nextW],
+        elevation, floorHeight, i, w, buildingType
+      );
+      elements.push(...windowElements);
+
+      // Generate doors on ground floor
+      if (i === 0) {
+        const isMainEntrance = w === longestWallIdx;
+        const doorElements = generateDoorsForWall(
+          footprint[w], footprint[nextW],
+          elevation, floorHeight, i, w, isMainEntrance
+        );
+        elements.push(...doorElements);
+      }
     }
 
     // Create floor slab
     elements.push(
       createSlabElement(footprint, elevation, slabThickness, i, false)
     );
+
+    // Create structural beams at each floor level (skip circular buildings for simplicity)
+    if (!isCircularFootprint(footprint)) {
+      const beamElements = generateBeamsForStorey(footprint, elevation, floorHeight, i);
+      elements.push(...beamElements);
+    }
+
+    // Create staircase in core area
+    const stair = generateStairElement(footprint, elevation, floorHeight, i);
+    if (stair) elements.push(stair);
 
     // Create interior elements (partition walls, spaces, columns)
     const interiorElements = generateInteriorElements(

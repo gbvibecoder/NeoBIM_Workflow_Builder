@@ -12,7 +12,7 @@
 import crypto from "crypto";
 import { Redis } from "@upstash/redis";
 
-const TTL_SECONDS = 600; // 10 minutes
+const TTL_SECONDS = 1800; // 30 minutes
 
 let redis: Redis | null = null;
 
