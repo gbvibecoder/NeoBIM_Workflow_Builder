@@ -5099,13 +5099,18 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
         logger.debug("[GN-001] requirements:", JSON.stringify(requirements, null, 2));
 
         let result;
+        let apiSucceeded = true;
         try {
           result = await generate3DModel(requirements);
         } catch (genErr) {
           const genMsg = genErr instanceof Error ? genErr.message : String(genErr);
-          console.error("[GN-001] generate3DModel FAILED:", genMsg, genErr);
-          throw new Error(`3D model generation failed: ${genMsg}`);
+          console.warn("[GN-001] 3D AI Studio API failed, falling back to procedural generator:", genMsg);
+          apiSucceeded = false;
         }
+
+        if (!apiSucceeded || !result) {
+          // Fall through to procedural massing generator below
+        } else {
 
         logger.debug("[GN-001] 3D AI Studio result:", {
           taskId: result.taskId,
@@ -5161,9 +5166,13 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
           },
           createdAt: new Date(),
         };
-      } else {
+        } // end API success block
+      }
+
+      if (!artifact) {
         // ── FALLBACK: Procedural massing generator ──
-        logger.debug("[GN-001] THREEDAI_API_KEY not set, falling back to procedural massing generator");
+        // Triggered when: (1) THREEDAI_API_KEY not set, or (2) API call failed
+        logger.debug("[GN-001] Using procedural massing generator (fallback)");
 
         const massingInput = {
           floors,
@@ -5225,20 +5234,16 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
       // Path C: Basic numeric fields (floors, footprint, buildingType) from any upstream node
       const upstreamGeometry = inputData?._geometry as Record<string, unknown> | undefined;
 
-      let ifcContent: string;
       let resolvedBuildingType = "Mixed-Use Building";
       let resolvedProjectName = "BuildFlow Export";
+      let resolvedGeometry: import("@/types/geometry").MassingGeometry;
 
       if (upstreamGeometry?.storeys && upstreamGeometry?.footprint) {
         // ── Path A: Real geometry from GN-001 ──
-        const { generateIFCFile: genIFC } = await import("@/services/ifc-exporter");
         const upstreamRaw = (inputData?._raw ?? {}) as Record<string, unknown>;
         resolvedProjectName = String(upstreamRaw?.projectName ?? inputData?.buildingType ?? inputData?.content ?? "BuildFlow Export");
         resolvedBuildingType = String(upstreamRaw?.projectName ?? inputData?.buildingType ?? "Generated Building");
-        ifcContent = genIFC(
-          upstreamGeometry as unknown as import("@/types/geometry").MassingGeometry,
-          { projectName: resolvedProjectName, buildingName: resolvedBuildingType }
-        );
+        resolvedGeometry = upstreamGeometry as unknown as import("@/types/geometry").MassingGeometry;
       } else {
         // ── Path B/C: Extract building parameters from upstream data ──
         // This handles TR-001 (ParsedBrief), TR-003 (BuildingDescription),
@@ -5324,7 +5329,7 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
 
         logger.debug("[EX-001] Extracted params:", { floors, footprint: computedFootprint, buildingType: resolvedBuildingType, gfa, height, projectName: resolvedProjectName, programmeTotal });
 
-        const fallbackGeometry = generateMassingGeometry({
+        resolvedGeometry = generateMassingGeometry({
           floors,
           footprint_m2: computedFootprint,
           building_type: resolvedBuildingType,
@@ -5333,33 +5338,47 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
           content: textContent,
           programme: programme as import("@/types/geometry").ProgrammeEntry[] | undefined,
         });
-        ifcContent = generateIFCFile(fallbackGeometry, {
-          projectName: resolvedProjectName,
-          buildingName: resolvedBuildingType,
-        });
       }
 
       const bldgNameSlug = String(resolvedBuildingType ?? "building").replace(/\s+/g, "_").toLowerCase();
-      const fileName = `${bldgNameSlug}_${new Date().toISOString().split("T")[0]}.ifc`;
-      const ifcBase64 = Buffer.from(ifcContent).toString("base64");
+      const dateStr = new Date().toISOString().split("T")[0];
 
-      // Try to upload to R2 for persistent storage
-      let downloadUrl: string | null = null;
-      try {
-        const r2Url = await uploadBase64ToR2(ifcBase64, fileName, "application/x-step");
-        // uploadBase64ToR2 returns the input unchanged if R2 is not configured
-        if (r2Url && r2Url !== ifcBase64 && r2Url.startsWith("http")) {
-          downloadUrl = r2Url;
-        }
-      } catch {
-        // R2 not available — fall through to inline approach
-      }
+      // Generate 4 discipline-specific IFC files
+      const { generateMultipleIFCFiles: genMulti } = await import("@/services/ifc-exporter");
+      const ifcFiles = genMulti(resolvedGeometry, {
+        projectName: resolvedProjectName, buildingName: resolvedBuildingType,
+      });
 
-      // Fallback: store content inline as _ifcContent so the client can create a blob URL
-      // data: URIs fail for large files in most browsers
-      if (!downloadUrl) {
-        downloadUrl = `data:application/x-step;base64,${ifcBase64}`;
-      }
+      const disciplines = [
+        { key: "architectural" as const, label: "Architectural", suffix: "architectural" },
+        { key: "structural" as const, label: "Structural", suffix: "structural" },
+        { key: "mep" as const, label: "MEP", suffix: "mep" },
+        { key: "combined" as const, label: "Combined", suffix: "combined" },
+      ];
+
+      // Upload all 4 files to R2 in parallel
+      const files = await Promise.all(disciplines.map(async (d) => {
+        const content = ifcFiles[d.key];
+        const fileName = `${bldgNameSlug}_${d.suffix}_${dateStr}.ifc`;
+        const b64 = Buffer.from(content).toString("base64");
+        let downloadUrl: string | null = null;
+        try {
+          const r2Url = await uploadBase64ToR2(b64, fileName, "application/x-step");
+          if (r2Url && r2Url !== b64 && r2Url.startsWith("http")) downloadUrl = r2Url;
+        } catch { /* R2 not available */ }
+        if (!downloadUrl) downloadUrl = `data:application/x-step;base64,${b64}`;
+        return {
+          name: fileName,
+          type: "IFC 4",
+          size: content.length,
+          downloadUrl,
+          label: `${d.label} IFC`,
+          discipline: d.key,
+          _ifcContent: content,
+        };
+      }));
+
+      const combinedFile = files.find(f => f.discipline === "combined")!;
 
       artifact = {
         id: generateId(),
@@ -5367,14 +5386,18 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
         tileInstanceId,
         type: "file",
         data: {
-          name: fileName,
+          // Multi-file array
+          files,
+          label: "IFC Export (4 Discipline Files)",
+          totalSize: files.reduce((s, f) => s + f.size, 0),
+          // Backward compatible: top-level fields from combined file
+          name: combinedFile.name,
           type: "IFC 4",
-          size: ifcContent.length,
-          downloadUrl,
-          label: "IFC Export",
-          _ifcContent: ifcContent,
+          size: combinedFile.size,
+          downloadUrl: combinedFile.downloadUrl,
+          _ifcContent: combinedFile._ifcContent,
         },
-        metadata: { engine: "ifc-exporter", real: true, schema: "IFC4" },
+        metadata: { engine: "ifc-exporter", real: true, schema: "IFC4", multiFile: true },
         createdAt: new Date(),
       };
 

@@ -16,7 +16,13 @@ interface IFCExportOptions {
   siteName?: string;
   buildingName?: string;
   author?: string;
+  filter?: "architectural" | "structural" | "mep" | "all";
 }
+
+// ─── Discipline Filter Sets ──────────────────────────────────────────────
+const ARCHITECTURAL_TYPES = new Set(["wall", "window", "door", "space", "balcony", "canopy", "parapet"]);
+const STRUCTURAL_TYPES = new Set(["column", "beam", "slab", "stair", "roof"]);
+const MEP_TYPE_SET = new Set(["duct", "pipe", "cable-tray", "equipment"]);
 
 // ─── IFC Base-64 GUID Generator ─────────────────────────────────────────────
 // IFC GlobalId: exactly 22 characters from the IFC base-64 alphabet.
@@ -218,7 +224,16 @@ export function generateIFCFile(
     const storeySpaceIds: number[] = [];
 
     for (const element of storey.elements) {
-      if (element.type === "wall") {
+      // ── Discipline filtering ──
+      const filter = options.filter ?? "all";
+      if (filter !== "all") {
+        const filterSet = filter === "architectural" ? ARCHITECTURAL_TYPES
+          : filter === "structural" ? STRUCTURAL_TYPES
+          : MEP_TYPE_SET;
+        if (!filterSet.has(element.type)) continue;
+      }
+
+      if (element.type === "wall" || element.type === "parapet") {
         const wallId = writeWallEntity(
           element, storey, storeyPlacementId,
           bodyContextId, zDirId, ownerHistId,
@@ -282,6 +297,52 @@ export function generateIFCFile(
           id, lines
         );
         storeySpaceIds.push(spaceId);
+
+      } else if (element.type === "duct") {
+        const ductId = writeMEPSegmentEntity(
+          element, "IFCDUCTSEGMENT", storeyPlacementId,
+          bodyContextId, zDirId, ownerHistId, id, lines
+        );
+        storeyElementIds.push(ductId);
+
+      } else if (element.type === "pipe") {
+        const pipeId = writeMEPPipeEntity(
+          element, storeyPlacementId,
+          bodyContextId, zDirId, ownerHistId, id, lines
+        );
+        storeyElementIds.push(pipeId);
+
+      } else if (element.type === "cable-tray") {
+        const ctId = writeMEPSegmentEntity(
+          element, "IFCCABLECARRIERSEGMENT", storeyPlacementId,
+          bodyContextId, zDirId, ownerHistId, id, lines
+        );
+        storeyElementIds.push(ctId);
+
+      } else if (element.type === "equipment") {
+        const eqId = writeMEPEquipmentEntity(
+          element, storeyPlacementId,
+          bodyContextId, zDirId, ownerHistId, id, lines
+        );
+        storeyElementIds.push(eqId);
+
+      } else if (element.type === "balcony") {
+        // Balcony slabs use slab writer, railings use beam writer
+        if (element.ifcType === "IfcRailing") {
+          const rId = writeBeamEntity(element, storeyPlacementId, bodyContextId, zDirId, ownerHistId, id, lines);
+          storeyElementIds.push(rId);
+        } else {
+          const bId = writeSlabEntity(element, element.vertices.length >= 4
+            ? element.vertices.map(v => ({ x: v.x, y: v.y }))
+            : geometry.footprint, storeyPlacementId, bodyContextId, ownerHistId, false, id, lines);
+          storeyElementIds.push(bId);
+        }
+
+      } else if (element.type === "canopy") {
+        const cId = writeSlabEntity(element, element.vertices.length >= 4
+          ? element.vertices.map(v => ({ x: v.x, y: v.y }))
+          : geometry.footprint, storeyPlacementId, bodyContextId, ownerHistId, true, id, lines);
+        storeyElementIds.push(cId);
       }
     }
 
@@ -1079,4 +1140,172 @@ function writeStairEntity(
   lines.push(`#${relStairPsetId}=IFCRELDEFINESBYPROPERTIES('${ifcGuid(relStairPsetId)}',#${ownerHistId},$,$,(#${stairId}),#${stairPsetId});`);
 
   return stairId;
+}
+
+// ─── MEP Entity Writers ──────────────────────────────────────────────────
+
+/** Write IfcDuctSegment or IfcCableCarrierSegment — rectangular profile extrusion */
+function writeMEPSegmentEntity(
+  element: GeometryElement,
+  ifcEntityName: string,
+  storeyPlacementId: number,
+  bodyContextId: number,
+  zDirId: number,
+  ownerHistId: number,
+  id: IdCounter,
+  lines: string[]
+): number {
+  const segW = element.properties.width ?? 0.6;
+  const segH = element.properties.height ?? 0.4;
+  const segLen = element.properties.length ?? 5;
+  const name = element.properties.name ?? "MEP Segment";
+
+  // Rectangle profile
+  const profCenterId = id.next();
+  lines.push(`#${profCenterId}=IFCCARTESIANPOINT((${f(segW / 2)},${f(segH / 2)}));`);
+  const profPlacementId = id.next();
+  lines.push(`#${profPlacementId}=IFCAXIS2PLACEMENT2D(#${profCenterId},$);`);
+  const profileId = id.next();
+  lines.push(`#${profileId}=IFCRECTANGLEPROFILEDEF(.AREA.,'${ifcEntityName} Profile',#${profPlacementId},${f(segW)},${f(segH)});`);
+
+  // Extrusion along X axis (horizontal)
+  const extDirId = id.next();
+  lines.push(`#${extDirId}=IFCDIRECTION((1.,0.,0.));`);
+  const solidId = id.next();
+  lines.push(`#${solidId}=IFCEXTRUDEDAREASOLID(#${profileId},$,#${extDirId},${f(segLen)});`);
+
+  // Shape
+  const shapeRepId = id.next();
+  lines.push(`#${shapeRepId}=IFCSHAPEREPRESENTATION(#${bodyContextId},'Body','SweptSolid',(#${solidId}));`);
+  const prodShapeId = id.next();
+  lines.push(`#${prodShapeId}=IFCPRODUCTDEFINITIONSHAPE($,$,(#${shapeRepId}));`);
+
+  // Placement
+  const v = element.vertices[0] ?? { x: 0, y: 0, z: 0 };
+  const originId = id.next();
+  lines.push(`#${originId}=IFCCARTESIANPOINT((${f(v.x)},${f(v.y)},${f(v.z)}));`);
+  const axisId = id.next();
+  lines.push(`#${axisId}=IFCAXIS2PLACEMENT3D(#${originId},#${zDirId},$);`);
+  const placementId = id.next();
+  lines.push(`#${placementId}=IFCLOCALPLACEMENT(#${storeyPlacementId},#${axisId});`);
+
+  // Entity
+  const entityId = id.next();
+  lines.push(`#${entityId}=${ifcEntityName}('${ifcGuid(entityId)}',#${ownerHistId},'${name}',$,$,#${placementId},#${prodShapeId},$,.NOTDEFINED.);`);
+
+  return entityId;
+}
+
+/** Write IfcPipeSegment — circular profile extrusion (vertical) */
+function writeMEPPipeEntity(
+  element: GeometryElement,
+  storeyPlacementId: number,
+  bodyContextId: number,
+  zDirId: number,
+  ownerHistId: number,
+  id: IdCounter,
+  lines: string[]
+): number {
+  const diameter = element.properties.diameter ?? 0.05;
+  const pipeHeight = element.properties.height ?? element.properties.length ?? 3.6;
+  const name = element.properties.name ?? "Pipe";
+
+  // Circle profile
+  const profCenterId = id.next();
+  lines.push(`#${profCenterId}=IFCCARTESIANPOINT((0.,0.));`);
+  const profPlacementId = id.next();
+  lines.push(`#${profPlacementId}=IFCAXIS2PLACEMENT2D(#${profCenterId},$);`);
+  const profileId = id.next();
+  lines.push(`#${profileId}=IFCCIRCLEPROFILEDEF(.AREA.,'Pipe Profile',#${profPlacementId},${f(diameter / 2)});`);
+
+  // Extrusion upward
+  const solidId = id.next();
+  lines.push(`#${solidId}=IFCEXTRUDEDAREASOLID(#${profileId},$,#${zDirId},${f(pipeHeight)});`);
+
+  // Shape
+  const shapeRepId = id.next();
+  lines.push(`#${shapeRepId}=IFCSHAPEREPRESENTATION(#${bodyContextId},'Body','SweptSolid',(#${solidId}));`);
+  const prodShapeId = id.next();
+  lines.push(`#${prodShapeId}=IFCPRODUCTDEFINITIONSHAPE($,$,(#${shapeRepId}));`);
+
+  // Placement
+  const v = element.vertices[0] ?? { x: 0, y: 0, z: 0 };
+  const originId = id.next();
+  lines.push(`#${originId}=IFCCARTESIANPOINT((${f(v.x)},${f(v.y)},${f(v.z)}));`);
+  const axisId = id.next();
+  lines.push(`#${axisId}=IFCAXIS2PLACEMENT3D(#${originId},#${zDirId},$);`);
+  const placementId = id.next();
+  lines.push(`#${placementId}=IFCLOCALPLACEMENT(#${storeyPlacementId},#${axisId});`);
+
+  // Entity
+  const entityId = id.next();
+  lines.push(`#${entityId}=IFCPIPESEGMENT('${ifcGuid(entityId)}',#${ownerHistId},'${name}',$,$,#${placementId},#${prodShapeId},$,.NOTDEFINED.);`);
+
+  return entityId;
+}
+
+/** Write IfcFlowTerminal — rectangular box for equipment */
+function writeMEPEquipmentEntity(
+  element: GeometryElement,
+  storeyPlacementId: number,
+  bodyContextId: number,
+  zDirId: number,
+  ownerHistId: number,
+  id: IdCounter,
+  lines: string[]
+): number {
+  const eqW = element.properties.width ?? 2.0;
+  const eqH = element.properties.height ?? 1.8;
+  const eqL = element.properties.length ?? 1.5;
+  const name = element.properties.name ?? "Equipment";
+
+  // Rectangle profile
+  const profCenterId = id.next();
+  lines.push(`#${profCenterId}=IFCCARTESIANPOINT((${f(eqW / 2)},${f(eqL / 2)}));`);
+  const profPlacementId = id.next();
+  lines.push(`#${profPlacementId}=IFCAXIS2PLACEMENT2D(#${profCenterId},$);`);
+  const profileId = id.next();
+  lines.push(`#${profileId}=IFCRECTANGLEPROFILEDEF(.AREA.,'Equipment Profile',#${profPlacementId},${f(eqW)},${f(eqL)});`);
+
+  // Extrusion upward
+  const solidId = id.next();
+  lines.push(`#${solidId}=IFCEXTRUDEDAREASOLID(#${profileId},$,#${zDirId},${f(eqH)});`);
+
+  // Shape
+  const shapeRepId = id.next();
+  lines.push(`#${shapeRepId}=IFCSHAPEREPRESENTATION(#${bodyContextId},'Body','SweptSolid',(#${solidId}));`);
+  const prodShapeId = id.next();
+  lines.push(`#${prodShapeId}=IFCPRODUCTDEFINITIONSHAPE($,$,(#${shapeRepId}));`);
+
+  // Placement
+  const v = element.vertices[0] ?? { x: 0, y: 0, z: 0 };
+  const originId = id.next();
+  lines.push(`#${originId}=IFCCARTESIANPOINT((${f(v.x)},${f(v.y)},${f(v.z)}));`);
+  const axisId = id.next();
+  lines.push(`#${axisId}=IFCAXIS2PLACEMENT3D(#${originId},#${zDirId},$);`);
+  const placementId = id.next();
+  lines.push(`#${placementId}=IFCLOCALPLACEMENT(#${storeyPlacementId},#${axisId});`);
+
+  // Entity
+  const entityId = id.next();
+  lines.push(`#${entityId}=IFCFLOWTERMINAL('${ifcGuid(entityId)}',#${ownerHistId},'${name}',$,$,#${placementId},#${prodShapeId},$,.NOTDEFINED.);`);
+
+  return entityId;
+}
+
+// ─── Multi-File Export ──────────────────────────────────────────────────
+
+/**
+ * Generate 4 separate IFC files: Architectural, Structural, MEP, and Combined.
+ */
+export function generateMultipleIFCFiles(
+  geometry: MassingGeometry,
+  options: IFCExportOptions = {}
+): { architectural: string; structural: string; mep: string; combined: string } {
+  return {
+    architectural: generateIFCFile(geometry, { ...options, filter: "architectural" }),
+    structural: generateIFCFile(geometry, { ...options, filter: "structural" }),
+    mep: generateIFCFile(geometry, { ...options, filter: "mep" }),
+    combined: generateIFCFile(geometry, { ...options, filter: "all" }),
+  };
 }

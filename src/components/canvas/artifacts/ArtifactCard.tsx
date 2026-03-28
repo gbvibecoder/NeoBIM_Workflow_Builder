@@ -962,49 +962,118 @@ function triggerBlobDownload(blob: Blob, filename: string) {
   }, 0);
 }
 
+/** Download helper for IFC content (blob or URL) */
+function downloadIFCFile(fileData: { name?: string; type?: string; downloadUrl?: string; _ifcContent?: string }) {
+  const filename = ensureFileExtension(fileData?.name ?? "export", fileData?.type);
+
+  if (fileData._ifcContent) {
+    const blob = new Blob([fileData._ifcContent], { type: "application/x-step" });
+    triggerBlobDownload(blob, filename);
+    return;
+  }
+
+  const downloadUrl = fileData?.downloadUrl ?? "";
+  if (downloadUrl.startsWith("data:")) {
+    try {
+      const [header, b64] = downloadUrl.split(",");
+      const mime = header.split(":")[1]?.split(";")[0] ?? "application/octet-stream";
+      const binary = atob(b64);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+      triggerBlobDownload(new Blob([bytes], { type: mime }), filename);
+      return;
+    } catch { /* fall through */ }
+  }
+
+  const a = document.createElement("a");
+  a.href = downloadUrl;
+  a.download = filename;
+  a.style.display = "none";
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => document.body.removeChild(a), 100);
+}
+
+const DISCIPLINE_COLORS: Record<string, string> = {
+  architectural: "#60A5FA",  // blue
+  structural: "#F97316",     // orange
+  mep: "#10B981",            // green
+  combined: "#A78BFA",       // purple
+};
+
 function FileBody({ data }: { data: FileArtifactData }) {
   const { t } = useLocale();
+  const extData = data as FileArtifactData & { files?: Array<{ name: string; downloadUrl: string; label: string; size: number; type: string; discipline: string; _ifcContent?: string }>; _ifcContent?: string };
 
-  const handleDownload = useCallback(() => {
-    const extData = data as FileArtifactData & { _ifcContent?: string };
-    // Ensure filename always has proper extension
-    const filename = ensureFileExtension(data?.name ?? "export", data?.type);
+  // ── Multi-file mode (4 discipline IFC files) ──
+  if (extData.files && extData.files.length > 1) {
+    const handleDownloadAll = () => { for (const f of extData.files!) downloadIFCFile(f); };
 
-    // If we have raw IFC content, create a blob download
-    if (extData._ifcContent) {
-      const blob = new Blob([extData._ifcContent], { type: "application/x-step" });
-      triggerBlobDownload(blob, filename);
-      return;
-    }
+    return (
+      <div style={{ padding: "0 12px 10px 14px" }}>
+        <div style={{ fontSize: 11, fontWeight: 600, color: "#F0F0F5", marginBottom: 8 }}>
+          {extData.files.length} IFC Discipline Files
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          {extData.files.map((file, i) => {
+            const color = DISCIPLINE_COLORS[file.discipline] ?? "#00F5FF";
+            return (
+              <div key={i} style={{
+                display: "flex", alignItems: "center", justifyContent: "space-between",
+                padding: "6px 8px", borderRadius: 6,
+                background: "rgba(255,255,255,0.03)",
+                border: `1px solid ${color}22`,
+              }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+                  <div style={{
+                    width: 8, height: 8, borderRadius: "50%",
+                    background: color, flexShrink: 0,
+                  }} />
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: 11, fontWeight: 500, color: "#F0F0F5", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {file.label}
+                    </div>
+                    <div style={{ fontSize: 9, color: "#5C5C78" }}>
+                      {formatBytes(file.size)}
+                    </div>
+                  </div>
+                </div>
+                <button
+                  onClick={() => downloadIFCFile(file)}
+                  style={{
+                    display: "flex", alignItems: "center", gap: 4,
+                    padding: "3px 8px", borderRadius: 4,
+                    background: `${color}15`, border: `1px solid ${color}33`,
+                    fontSize: 9, fontWeight: 500, color,
+                    cursor: "pointer", flexShrink: 0,
+                  }}
+                >
+                  <Download size={9} />
+                  Download
+                </button>
+              </div>
+            );
+          })}
+        </div>
+        <button
+          onClick={handleDownloadAll}
+          style={{
+            width: "100%", marginTop: 8, padding: "6px 0",
+            borderRadius: 6, background: "rgba(0,245,255,0.08)",
+            border: "1px solid rgba(0,245,255,0.2)",
+            fontSize: 10, fontWeight: 500, color: "#00F5FF",
+            cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
+          }}
+        >
+          <Download size={10} />
+          Download All ({extData.files.length} files)
+        </button>
+      </div>
+    );
+  }
 
-    // If downloadUrl is a data: URI, convert to blob for reliable download
-    const downloadUrl = data?.downloadUrl ?? "";
-    if (downloadUrl.startsWith("data:")) {
-      try {
-        const [header, b64] = downloadUrl.split(",");
-        const mime = header.split(":")[1]?.split(";")[0] ?? "application/octet-stream";
-        const binary = atob(b64);
-        const bytes = new Uint8Array(binary.length);
-        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-        const blob = new Blob([bytes], { type: mime });
-        triggerBlobDownload(blob, filename);
-        return;
-      } catch {
-        // Fall through to normal link
-      }
-    }
-
-    // Normal HTTP URL — use standard link behavior
-    const a = document.createElement("a");
-    a.href = downloadUrl;
-    a.download = filename;
-    a.style.display = "none";
-    document.body.appendChild(a);
-    a.click();
-    setTimeout(() => document.body.removeChild(a), 100);
-  }, [data]);
-
-  // Display a clean filename with proper extension
+  // ── Single-file mode (backward compatible) ──
+  const handleDownload = useCallback(() => downloadIFCFile(extData), [extData]);
   const displayName = ensureFileExtension(data?.name ?? "export", data?.type);
 
   return (

@@ -77,8 +77,8 @@ export default function Building3DViewer({
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
     controls.dampingFactor = 0.08;
-    controls.autoRotate = true;
-    controls.autoRotateSpeed = 1.5;
+    controls.autoRotate = false;
+    controls.autoRotateSpeed = 0;
     controls.minDistance = 0.5;
     controls.maxDistance = 50;
     controlsRef.current = controls;

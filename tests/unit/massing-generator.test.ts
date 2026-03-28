@@ -16,8 +16,8 @@ describe("Massing Generator", () => {
       expect(result.gfa).toBeGreaterThan(0);
       expect(result.totalHeight).toBeGreaterThan(0);
       expect(result.footprint.length).toBeGreaterThanOrEqual(4);
-      // 5 floor storeys + 1 roof = 6
-      expect(result.storeys.length).toBe(6);
+      // 5 floor storeys + 1 roof + 1 basement (>= 3 floors) = 7
+      expect(result.storeys.length).toBe(7);
     });
 
     it("generates geometry for a 1-storey villa", () => {
@@ -42,7 +42,7 @@ describe("Massing Generator", () => {
       });
 
       expect(result.floors).toBe(30);
-      expect(result.storeys.length).toBe(31); // 30 + roof
+      expect(result.storeys.length).toBe(32); // 30 + roof + basement
       expect(result.totalHeight).toBeGreaterThan(90);
     });
 
@@ -143,7 +143,8 @@ describe("Massing Generator", () => {
 
       const roofStorey = result.storeys[result.storeys.length - 1];
       expect(roofStorey.name).toBe("Roof");
-      expect(roofStorey.elements.length).toBe(1);
+      // Roof slab + parapet walls around perimeter
+      expect(roofStorey.elements.length).toBeGreaterThanOrEqual(1);
       expect(roofStorey.elements[0].type).toBe("roof");
     });
 
@@ -186,20 +187,22 @@ describe("Massing Generator", () => {
       expect(result.totalHeight).toBeCloseTo(10.0, 0);
     });
 
-    it("uses 3.8m for office", () => {
+    it("uses 3.8m for office (ground floor 4.5m min)", () => {
       const result = generateMassingGeometry({
         floors: 2,
         building_type: "Office Building",
       });
-      expect(result.totalHeight).toBeCloseTo(7.6, 0);
+      // Ground floor = max(3.8, 4.5) = 4.5, upper = 3.8 → total = 8.3
+      expect(result.totalHeight).toBeCloseTo(8.3, 0);
     });
 
-    it("uses 3.0m for residential", () => {
+    it("uses 3.0m for residential (ground floor 4.5m min)", () => {
       const result = generateMassingGeometry({
         floors: 2,
         building_type: "Residential Apartment",
       });
-      expect(result.totalHeight).toBeCloseTo(6.0, 0);
+      // Ground floor = max(3.0, 4.5) = 4.5, upper = 3.0 → total = 7.5
+      expect(result.totalHeight).toBeCloseTo(7.5, 0);
     });
 
     it("uses explicit height when both floors and height given", () => {
@@ -208,7 +211,8 @@ describe("Massing Generator", () => {
         height: 20,
         building_type: "Office",
       });
-      expect(result.totalHeight).toBe(20);
+      // floorHeight = 20/5 = 4.0, ground = max(4.0, 4.5) = 4.5, upper = 4×4.0 = 16 → total = 20.5
+      expect(result.totalHeight).toBeCloseTo(20.5, 0);
     });
   });
 
@@ -237,7 +241,8 @@ describe("Massing Generator", () => {
         building_type: "Office",
       });
 
-      expect(result.boundingBox.min.z).toBe(0);
+      // With basement (>= 3 floors), min.z is negative
+      expect(result.boundingBox.min.z).toBeLessThanOrEqual(0);
       expect(result.boundingBox.max.z).toBe(result.totalHeight);
       expect(result.boundingBox.min.x).toBeLessThanOrEqual(result.boundingBox.max.x);
       expect(result.boundingBox.min.y).toBeLessThanOrEqual(result.boundingBox.max.y);

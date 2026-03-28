@@ -17,12 +17,14 @@ export interface Face {
 /** A single geometry element (wall, slab, space, etc.) */
 export interface GeometryElement {
   id: string;
-  type: "wall" | "slab" | "column" | "roof" | "space" | "window" | "door" | "beam" | "stair";
+  type: "wall" | "slab" | "column" | "roof" | "space" | "window" | "door" | "beam" | "stair"
+    | "balcony" | "canopy" | "parapet" | "duct" | "pipe" | "cable-tray" | "equipment";
   vertices: Vertex[];
   faces: Face[];
   /** IFC element class this maps to */
   ifcType: "IfcWall" | "IfcSlab" | "IfcColumn" | "IfcBuildingElementProxy" | "IfcSpace"
-    | "IfcWindow" | "IfcDoor" | "IfcBeam" | "IfcStairFlight";
+    | "IfcWindow" | "IfcDoor" | "IfcBeam" | "IfcStairFlight" | "IfcRailing" | "IfcCovering"
+    | "IfcFooting" | "IfcDuctSegment" | "IfcPipeSegment" | "IfcCableCarrierSegment" | "IfcFlowTerminal";
   /** Metadata */
   properties: {
     name: string;
@@ -57,6 +59,12 @@ export interface GeometryElement {
     wallOriginY?: number;
     /** For beams: material type */
     material?: string;
+    /** BIM discipline for IFC split export */
+    discipline?: "architectural" | "structural" | "mep";
+    /** For pipes: diameter in meters */
+    diameter?: number;
+    /** Whether element is exterior-facing */
+    isExterior?: boolean;
     /** For stairs: number of risers */
     riserCount?: number;
     /** For stairs: riser height */
@@ -73,6 +81,7 @@ export interface MassingStorey {
   elevation: number;
   height: number;
   elements: GeometryElement[];
+  isBasement?: boolean;
 }
 
 /** A 2D footprint point */

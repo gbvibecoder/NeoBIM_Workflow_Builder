@@ -1308,82 +1308,187 @@ export function generateMassingGeometry(input: BuildingDescriptionInput): Massin
     if (len > longestWallLen) { longestWallLen = len; longestWallIdx = w; }
   }
 
+  // ── Enhanced realism: per-storey height calculation ──
+  const groundFloorHeight = Math.max(floorHeight, 4.5); // lobby/retail always >= 4.5m
+  const getStoreyHeight = (idx: number): number => idx === 0 ? groundFloorHeight : floorHeight;
+
+  // ── Setback footprint for upper floors (rectangular buildings >= 6 floors) ──
+  const setbackFloor = floors >= 6 ? Math.floor(floors * 0.7) : floors + 1;
+  const isRectangular = footprint.length === 4;
+  const setbackFootprint = isRectangular && floors >= 6
+    ? computeSetbackFootprint(footprint, 2.0)
+    : footprint;
+
+  // ── Basement level (for buildings >= 3 floors) ──
+  const hasBasement = floors >= 3;
+  const basementHeight = 3.6;
+  if (hasBasement) {
+    const basementElements: GeometryElement[] = [];
+
+    // Retaining walls (thicker)
+    for (let w = 0; w < footprint.length; w++) {
+      const nextW = (w + 1) % footprint.length;
+      const bWall = createWallElement(footprint[w], footprint[nextW], -basementHeight, basementHeight, 0.30, -1, w);
+      bWall.properties.discipline = "structural";
+      basementElements.push(bWall);
+    }
+
+    // Basement slab
+    const bSlab = createSlabElement(footprint, -basementHeight, slabThickness, -1, false);
+    bSlab.properties.discipline = "structural";
+    basementElements.push(bSlab);
+
+    // Parking columns (6m grid)
+    const bxMin = Math.min(...footprint.map(p => p.x));
+    const byMin = Math.min(...footprint.map(p => p.y));
+    const bxMax = Math.max(...footprint.map(p => p.x));
+    const byMax = Math.max(...footprint.map(p => p.y));
+    let bColIdx = 0;
+    for (let cx = bxMin + 3; cx < bxMax - 1; cx += 6) {
+      for (let cy = byMin + 3; cy < byMax - 1; cy += 6) {
+        basementElements.push({
+          id: `col-b-${bColIdx}`,
+          type: "column",
+          vertices: [{ x: cx, y: cy, z: -basementHeight }],
+          faces: [],
+          ifcType: "IfcColumn",
+          properties: { name: `Basement Column B-C${bColIdx + 1}`, storeyIndex: -1, height: basementHeight, radius: 0.35, discipline: "structural" },
+        });
+        bColIdx++;
+      }
+    }
+
+    storeys.push({
+      index: -1,
+      name: "Basement",
+      elevation: -basementHeight,
+      height: basementHeight,
+      elements: basementElements,
+      isBasement: true,
+    });
+  }
+
+  // ── Main storey loop with enhanced realism ──
+  let cumulativeElevation = 0;
   for (let i = 0; i < floors; i++) {
-    const elevation = i * floorHeight;
+    const storeyH = getStoreyHeight(i);
+    const elevation = cumulativeElevation;
     const floorLabel = i === 0 ? "Ground" : `Level ${i + 1}`;
     const elements: GeometryElement[] = [];
 
-    // Create exterior walls for this storey
-    for (let w = 0; w < footprint.length; w++) {
-      const nextW = (w + 1) % footprint.length;
-      elements.push(
-        createWallElement(
-          footprint[w],
-          footprint[nextW],
-          elevation,
-          floorHeight,
-          wallThickness,
-          i,
-          w
-        )
-      );
+    // Use setback footprint for upper floors
+    const activeFootprint = i >= setbackFloor ? setbackFootprint : footprint;
 
-      // Generate windows on exterior walls
+    // Create exterior walls for this storey
+    for (let w = 0; w < activeFootprint.length; w++) {
+      const nextW = (w + 1) % activeFootprint.length;
+      const wall = createWallElement(activeFootprint[w], activeFootprint[nextW], elevation, storeyH, wallThickness, i, w);
+      wall.properties.discipline = "architectural";
+      wall.properties.isExterior = true;
+      elements.push(wall);
+
+      // Generate windows on exterior walls (ground floor gets retail glazing for commercial)
       const windowElements = generateWindowsForWall(
-        footprint[w], footprint[nextW],
-        elevation, floorHeight, i, w, buildingType
+        activeFootprint[w], activeFootprint[nextW],
+        elevation, storeyH, i, w, buildingType
       );
+      for (const win of windowElements) { win.properties.discipline = "architectural"; }
       elements.push(...windowElements);
 
       // Generate doors on ground floor
       if (i === 0) {
         const isMainEntrance = w === longestWallIdx;
         const doorElements = generateDoorsForWall(
-          footprint[w], footprint[nextW],
-          elevation, floorHeight, i, w, isMainEntrance
+          activeFootprint[w], activeFootprint[nextW],
+          elevation, storeyH, i, w, isMainEntrance
         );
+        for (const door of doorElements) { door.properties.discipline = "architectural"; }
         elements.push(...doorElements);
+      }
+
+      // Generate balconies (residential/hotel, floor 1+, every other wall+floor)
+      const typeLC = buildingType.toLowerCase();
+      if (i > 0 && (i % 2 === 1 || w % 2 === 0) &&
+          (/residential|apartment|hotel|housing/i.test(typeLC))) {
+        const balconyEls = generateBalconyElements(activeFootprint[w], activeFootprint[nextW], elevation, i, w);
+        elements.push(...balconyEls);
       }
     }
 
     // Create floor slab
-    elements.push(
-      createSlabElement(footprint, elevation, slabThickness, i, false)
-    );
+    const slab = createSlabElement(activeFootprint, elevation, slabThickness, i, false);
+    slab.properties.discipline = "structural";
+    elements.push(slab);
 
-    // Create structural beams at each floor level (skip circular buildings for simplicity)
-    if (!isCircularFootprint(footprint)) {
-      const beamElements = generateBeamsForStorey(footprint, elevation, floorHeight, i);
+    // Create structural beams at each floor level
+    if (!isCircularFootprint(activeFootprint)) {
+      const beamElements = generateBeamsForStorey(activeFootprint, elevation, storeyH, i);
+      for (const beam of beamElements) { beam.properties.discipline = "structural"; }
       elements.push(...beamElements);
     }
 
     // Create staircase in core area
-    const stair = generateStairElement(footprint, elevation, floorHeight, i);
-    if (stair) elements.push(stair);
+    const stair = generateStairElement(activeFootprint, elevation, storeyH, i);
+    if (stair) { stair.properties.discipline = "structural"; elements.push(stair); }
 
     // Create interior elements (partition walls, spaces, columns)
     const interiorElements = generateInteriorElements(
-      footprint, elevation, floorHeight, i, programme, floorLabel
+      activeFootprint, elevation, storeyH, i, programme, floorLabel
     );
+    for (const el of interiorElements) {
+      if (!el.properties.discipline) {
+        el.properties.discipline = el.type === "column" ? "structural" : "architectural";
+      }
+    }
     elements.push(...interiorElements);
+
+    // Elevator shaft walls
+    const shaftElements = generateElevatorShaft(activeFootprint, elevation, storeyH, i);
+    elements.push(...shaftElements);
+
+    // MEP elements (ducts, pipes, cable trays, equipment)
+    const mepElements = generateMEPElementsForStorey(activeFootprint, elevation, storeyH, i, buildingType, programme);
+    elements.push(...mepElements);
 
     storeys.push({
       index: i,
       name: i === 0 ? "Ground Floor" : `Level ${i + 1}`,
       elevation,
-      height: floorHeight,
+      height: storeyH,
       elements,
     });
+
+    cumulativeElevation += storeyH;
   }
 
-  // Add roof slab
-  const roofElements: GeometryElement[] = [
-    createSlabElement(footprint, floors * floorHeight, slabThickness, floors, true),
-  ];
+  // Entrance canopy on ground floor
+  const canopyElements = generateEntranceCanopy(footprint, longestWallIdx, groundFloorHeight);
+  if (canopyElements.length > 0 && storeys.length > 0) {
+    const groundIdx = storeys.findIndex(s => s.index === 0);
+    if (groundIdx >= 0) storeys[groundIdx].elements.push(...canopyElements);
+  }
+
+  // Add roof slab + parapet walls
+  const roofElevation = cumulativeElevation;
+  const roofElements: GeometryElement[] = [];
+  const roofSlab = createSlabElement(footprint, roofElevation, slabThickness, floors, true);
+  roofSlab.properties.discipline = "structural";
+  roofElements.push(roofSlab);
+
+  // Parapet walls around roof perimeter
+  for (let w = 0; w < footprint.length; w++) {
+    const nextW = (w + 1) % footprint.length;
+    const parapetWall = createWallElement(footprint[w], footprint[nextW], roofElevation, 1.0, 0.2, floors, w);
+    parapetWall.type = "parapet";
+    parapetWall.properties.name = `Parapet Wall R-W${w + 1}`;
+    parapetWall.properties.discipline = "architectural";
+    roofElements.push(parapetWall);
+  }
+
   storeys.push({
     index: floors,
     name: "Roof",
-    elevation: floors * floorHeight,
+    elevation: roofElevation,
     height: 0,
     elements: roofElements,
   });
@@ -1400,22 +1505,338 @@ export function generateMassingGeometry(input: BuildingDescriptionInput): Massin
   return {
     buildingType,
     floors,
-    totalHeight,
+    totalHeight: roofElevation,
     footprintArea: Math.round(actualFootprintArea),
     gfa,
     footprint,
     storeys,
     boundingBox: {
-      min: { x: minX, y: minY, z: 0 },
-      max: { x: maxX, y: maxY, z: totalHeight },
+      min: { x: minX, y: minY, z: hasBasement ? -basementHeight : 0 },
+      max: { x: maxX, y: maxY, z: roofElevation },
     },
     metrics: [
       { label: "GFA", value: gfa.toLocaleString(), unit: "m²" },
-      { label: "Height", value: totalHeight.toFixed(1), unit: "m" },
-      { label: "Floors", value: floors },
+      { label: "Height", value: roofElevation.toFixed(1), unit: "m" },
+      { label: "Floors", value: floors + (hasBasement ? 1 : 0) },
       { label: "Footprint", value: Math.round(actualFootprintArea).toLocaleString(), unit: "m²" },
       { label: "Floor Height", value: floorHeight.toFixed(1), unit: "m" },
       { label: "Plot Ratio", value: (gfa / actualFootprintArea).toFixed(2), unit: "FAR" },
     ],
   };
+}
+
+// ─── Enhanced Realism Generators ───────────────────────────────────────────
+
+/** Inset a rectangular footprint by setbackDepth on all sides */
+function computeSetbackFootprint(footprint: FootprintPoint[], depth: number): FootprintPoint[] {
+  if (footprint.length !== 4) return footprint;
+  const xs = footprint.map(p => p.x);
+  const ys = footprint.map(p => p.y);
+  const minX = Math.min(...xs) + depth;
+  const maxX = Math.max(...xs) - depth;
+  const minY = Math.min(...ys) + depth;
+  const maxY = Math.max(...ys) - depth;
+  if (maxX <= minX || maxY <= minY) return footprint;
+  return [{ x: minX, y: minY }, { x: maxX, y: minY }, { x: maxX, y: maxY }, { x: minX, y: maxY }];
+}
+
+/** Generate entrance canopy — thin slab + two columns projecting outward */
+function generateEntranceCanopy(footprint: FootprintPoint[], longestWallIdx: number, groundHeight: number): GeometryElement[] {
+  const elements: GeometryElement[] = [];
+  const w = longestWallIdx;
+  const nextW = (w + 1) % footprint.length;
+  const p1 = footprint[w], p2 = footprint[nextW];
+
+  const dx = p2.x - p1.x, dy = p2.y - p1.y;
+  const len = Math.sqrt(dx * dx + dy * dy);
+  if (len < 4) return elements;
+
+  const ux = dx / len, uy = dy / len; // along wall
+  const nx = -uy, ny = ux; // outward normal
+
+  const canopyDepth = 3.0, canopyWidth = Math.min(5.0, len * 0.4);
+  const midX = (p1.x + p2.x) / 2, midY = (p1.y + p2.y) / 2;
+  const canopyHeight = Math.min(groundHeight * 0.75, 3.5);
+
+  // Canopy slab footprint
+  const c1 = { x: midX - ux * canopyWidth / 2, y: midY - uy * canopyWidth / 2 };
+  const c2 = { x: midX + ux * canopyWidth / 2, y: midY + uy * canopyWidth / 2 };
+  const c3 = { x: c2.x + nx * canopyDepth, y: c2.y + ny * canopyDepth };
+  const c4 = { x: c1.x + nx * canopyDepth, y: c1.y + ny * canopyDepth };
+
+  elements.push({
+    id: "canopy-slab",
+    type: "canopy",
+    vertices: [
+      { x: c1.x, y: c1.y, z: canopyHeight },
+      { x: c2.x, y: c2.y, z: canopyHeight },
+      { x: c3.x, y: c3.y, z: canopyHeight },
+      { x: c4.x, y: c4.y, z: canopyHeight },
+    ],
+    faces: [{ vertices: [0, 1, 2, 3] }],
+    ifcType: "IfcSlab",
+    properties: { name: "Entrance Canopy", storeyIndex: 0, thickness: 0.15, discipline: "architectural" },
+  });
+
+  // Support columns at outer edge
+  for (let ci = 0; ci < 2; ci++) {
+    const cp = ci === 0 ? c4 : c3;
+    elements.push({
+      id: `canopy-col-${ci}`,
+      type: "column",
+      vertices: [{ x: cp.x, y: cp.y, z: 0 }],
+      faces: [],
+      ifcType: "IfcColumn",
+      properties: { name: `Canopy Column ${ci + 1}`, storeyIndex: 0, height: canopyHeight, radius: 0.15, discipline: "structural" },
+    });
+  }
+
+  return elements;
+}
+
+/** Generate elevator shaft walls for one storey */
+function generateElevatorShaft(footprint: FootprintPoint[], elevation: number, floorHeight: number, storeyIndex: number): GeometryElement[] {
+  const xs = footprint.map(p => p.x), ys = footprint.map(p => p.y);
+  const bW = Math.max(...xs) - Math.min(...xs), bD = Math.max(...ys) - Math.min(...ys);
+  if (bW < 6 || bD < 6) return [];
+
+  const shaftW = 2.5, shaftD = 2.5;
+  const sx = Math.min(...xs) + bW * 0.15 + 3.5; // next to stairs
+  const sy = Math.min(...ys) + bD / 2 - shaftD / 2;
+  const elements: GeometryElement[] = [];
+
+  const shaftCorners: [FootprintPoint, FootprintPoint][] = [
+    [{ x: sx, y: sy }, { x: sx + shaftW, y: sy }],
+    [{ x: sx + shaftW, y: sy }, { x: sx + shaftW, y: sy + shaftD }],
+    [{ x: sx + shaftW, y: sy + shaftD }, { x: sx, y: sy + shaftD }],
+    [{ x: sx, y: sy + shaftD }, { x: sx, y: sy }],
+  ];
+
+  for (let sw = 0; sw < 4; sw++) {
+    const wall = createWallElement(shaftCorners[sw][0], shaftCorners[sw][1], elevation, floorHeight, 0.2, storeyIndex, 100 + sw);
+    wall.properties.isPartition = true;
+    wall.properties.name = `Elevator Shaft S${storeyIndex + 1}-SW${sw + 1}`;
+    wall.properties.discipline = "architectural";
+    elements.push(wall);
+  }
+
+  elements.push({
+    id: `lift-space-s${storeyIndex}`,
+    type: "space",
+    vertices: [],
+    faces: [],
+    ifcType: "IfcSpace",
+    properties: {
+      name: `Elevator Shaft S${storeyIndex + 1}`,
+      storeyIndex,
+      spaceName: "Elevator Shaft",
+      spaceUsage: "circulation",
+      spaceFootprint: [{ x: sx, y: sy }, { x: sx + shaftW, y: sy }, { x: sx + shaftW, y: sy + shaftD }, { x: sx, y: sy + shaftD }],
+      height: floorHeight,
+      discipline: "architectural",
+    },
+  });
+
+  return elements;
+}
+
+/** Generate balcony slab + railing for a wall segment */
+function generateBalconyElements(p1: FootprintPoint, p2: FootprintPoint, elevation: number, storeyIndex: number, wallIndex: number): GeometryElement[] {
+  const dx = p2.x - p1.x, dy = p2.y - p1.y;
+  const wallLen = Math.sqrt(dx * dx + dy * dy);
+  if (wallLen < 5) return [];
+
+  const ux = dx / wallLen, uy = dy / wallLen;
+  const nx = -uy, ny = ux; // outward normal
+  const balconyW = 3.0, balconyD = 1.5;
+  const midX = (p1.x + p2.x) / 2, midY = (p1.y + p2.y) / 2;
+
+  const b1 = { x: midX - ux * balconyW / 2, y: midY - uy * balconyW / 2 };
+  const b2 = { x: midX + ux * balconyW / 2, y: midY + uy * balconyW / 2 };
+  const b3 = { x: b2.x + nx * balconyD, y: b2.y + ny * balconyD };
+  const b4 = { x: b1.x + nx * balconyD, y: b1.y + ny * balconyD };
+
+  return [
+    {
+      id: `balcony-s${storeyIndex}-w${wallIndex}`,
+      type: "balcony",
+      vertices: [{ x: b1.x, y: b1.y, z: elevation }, { x: b2.x, y: b2.y, z: elevation }, { x: b3.x, y: b3.y, z: elevation }, { x: b4.x, y: b4.y, z: elevation }],
+      faces: [{ vertices: [0, 1, 2, 3] }],
+      ifcType: "IfcSlab",
+      properties: { name: `Balcony S${storeyIndex + 1}-W${wallIndex + 1}`, storeyIndex, thickness: 0.15, discipline: "architectural" },
+    },
+    {
+      id: `railing-s${storeyIndex}-w${wallIndex}`,
+      type: "balcony",
+      vertices: [{ x: b4.x, y: b4.y, z: elevation }, { x: b3.x, y: b3.y, z: elevation }],
+      faces: [],
+      ifcType: "IfcRailing",
+      properties: { name: `Railing S${storeyIndex + 1}-W${wallIndex + 1}`, storeyIndex, height: 1.1, length: balconyW, thickness: 0.05, discipline: "architectural" },
+    },
+  ];
+}
+
+// ─── MEP Element Generation ───────────────────────────────────────────────
+
+/** Generate MEP elements for one storey (ducts, pipes, cable trays, equipment) */
+function generateMEPElementsForStorey(
+  footprint: FootprintPoint[],
+  elevation: number,
+  floorHeight: number,
+  storeyIndex: number,
+  buildingType: string,
+  programme: ProgrammeEntry[]
+): GeometryElement[] {
+  const elements: GeometryElement[] = [];
+  const xs = footprint.map(p => p.x), ys = footprint.map(p => p.y);
+  const bMinX = Math.min(...xs), bMaxX = Math.max(...xs);
+  const bMinY = Math.min(...ys), bMaxY = Math.max(...ys);
+  const bW = bMaxX - bMinX, bD = bMaxY - bMinY;
+  if (bW < 4 || bD < 4) return elements;
+
+  const ceilZ = elevation + floorHeight - 0.4; // just below ceiling
+  const corridorY = bMinY + bD / 2; // corridor centerline
+  let mepIdx = 0;
+
+  // ── Main supply duct (along longest axis at ceiling) ──
+  elements.push({
+    id: `duct-supply-s${storeyIndex}`,
+    type: "duct",
+    vertices: [{ x: bMinX + 1, y: corridorY - 0.3, z: ceilZ }, { x: bMaxX - 1, y: corridorY + 0.3, z: ceilZ + 0.4 }],
+    faces: [],
+    ifcType: "IfcDuctSegment",
+    properties: {
+      name: `Supply Duct S${storeyIndex + 1}`,
+      storeyIndex,
+      width: 0.6, height: 0.4, length: bW - 2,
+      discipline: "mep",
+    },
+  });
+
+  // ── Return duct (parallel, offset 1m) ──
+  elements.push({
+    id: `duct-return-s${storeyIndex}`,
+    type: "duct",
+    vertices: [{ x: bMinX + 1, y: corridorY + 1.0, z: ceilZ }, { x: bMaxX - 1, y: corridorY + 1.6, z: ceilZ + 0.4 }],
+    faces: [],
+    ifcType: "IfcDuctSegment",
+    properties: {
+      name: `Return Duct S${storeyIndex + 1}`,
+      storeyIndex,
+      width: 0.6, height: 0.4, length: bW - 2,
+      discipline: "mep",
+    },
+  });
+
+  // ── Branch ducts to rooms (perpendicular from main duct) ──
+  const branchSpacing = Math.max(3.0, bW / 6);
+  for (let bx = bMinX + branchSpacing; bx < bMaxX - 1; bx += branchSpacing) {
+    // Branch to north side
+    elements.push({
+      id: `duct-branch-n-s${storeyIndex}-${mepIdx}`,
+      type: "duct",
+      vertices: [{ x: bx - 0.15, y: corridorY - 0.3, z: ceilZ }, { x: bx + 0.15, y: bMinY + 1, z: ceilZ + 0.2 }],
+      faces: [],
+      ifcType: "IfcDuctSegment",
+      properties: { name: `Branch Duct N-${mepIdx + 1}`, storeyIndex, width: 0.3, height: 0.2, length: corridorY - bMinY - 1, discipline: "mep" },
+    });
+    // Branch to south side
+    elements.push({
+      id: `duct-branch-s-s${storeyIndex}-${mepIdx}`,
+      type: "duct",
+      vertices: [{ x: bx - 0.15, y: corridorY + 0.3, z: ceilZ }, { x: bx + 0.15, y: bMaxY - 1, z: ceilZ + 0.2 }],
+      faces: [],
+      ifcType: "IfcDuctSegment",
+      properties: { name: `Branch Duct S-${mepIdx + 1}`, storeyIndex, width: 0.3, height: 0.2, length: bMaxY - corridorY - 1, discipline: "mep" },
+    });
+    mepIdx++;
+  }
+
+  // ── Pipe risers in core area (hot + cold water) ──
+  const coreX = bMinX + bW * 0.15;
+  const coreY = corridorY;
+  elements.push({
+    id: `pipe-hw-s${storeyIndex}`,
+    type: "pipe",
+    vertices: [{ x: coreX, y: coreY - 0.5, z: elevation }],
+    faces: [],
+    ifcType: "IfcPipeSegment",
+    properties: { name: `Hot Water Riser S${storeyIndex + 1}`, storeyIndex, height: floorHeight, diameter: 0.05, discipline: "mep" },
+  });
+  elements.push({
+    id: `pipe-cw-s${storeyIndex}`,
+    type: "pipe",
+    vertices: [{ x: coreX + 0.3, y: coreY - 0.5, z: elevation }],
+    faces: [],
+    ifcType: "IfcPipeSegment",
+    properties: { name: `Cold Water Riser S${storeyIndex + 1}`, storeyIndex, height: floorHeight, diameter: 0.05, discipline: "mep" },
+  });
+  elements.push({
+    id: `pipe-drain-s${storeyIndex}`,
+    type: "pipe",
+    vertices: [{ x: coreX + 0.6, y: coreY - 0.5, z: elevation }],
+    faces: [],
+    ifcType: "IfcPipeSegment",
+    properties: { name: `Drainage Stack S${storeyIndex + 1}`, storeyIndex, height: floorHeight, diameter: 0.11, discipline: "mep" },
+  });
+
+  // ── Horizontal branch pipes to wet rooms ──
+  let pipeIdx = 0;
+  for (const room of programme) {
+    const roomName = (room.space ?? "").toLowerCase();
+    if (/bathroom|toilet|kitchen|wash|wc|restroom/i.test(roomName)) {
+      // Place pipe from riser toward the room (simplified: horizontal run along Y)
+      const pipeY = bMinY + 2 + pipeIdx * 2.5;
+      if (pipeY < bMaxY - 1) {
+        elements.push({
+          id: `pipe-branch-s${storeyIndex}-${pipeIdx}`,
+          type: "pipe",
+          vertices: [{ x: coreX, y: coreY, z: ceilZ + 0.1 }, { x: coreX, y: pipeY, z: ceilZ + 0.1 }],
+          faces: [],
+          ifcType: "IfcPipeSegment",
+          properties: { name: `Branch Pipe to ${room.space} S${storeyIndex + 1}`, storeyIndex, diameter: 0.025, length: Math.abs(pipeY - coreY), discipline: "mep" },
+        });
+        pipeIdx++;
+      }
+    }
+  }
+
+  // ── Main cable tray (parallel to ducts, above them) ──
+  elements.push({
+    id: `ctray-main-s${storeyIndex}`,
+    type: "cable-tray",
+    vertices: [{ x: bMinX + 1, y: corridorY - 0.8, z: ceilZ + 0.5 }, { x: bMaxX - 1, y: corridorY - 0.5, z: ceilZ + 0.6 }],
+    faces: [],
+    ifcType: "IfcCableCarrierSegment",
+    properties: { name: `Cable Tray S${storeyIndex + 1}`, storeyIndex, width: 0.3, height: 0.1, length: bW - 2, discipline: "mep" },
+  });
+
+  // ── AHU equipment (one per floor) ──
+  elements.push({
+    id: `ahu-s${storeyIndex}`,
+    type: "equipment",
+    vertices: [{ x: bMaxX - 3.0, y: bMaxY - 2.5, z: elevation }],
+    faces: [],
+    ifcType: "IfcFlowTerminal",
+    properties: { name: `AHU S${storeyIndex + 1}`, storeyIndex, width: 2.0, height: 1.8, length: 1.5, discipline: "mep" },
+  });
+
+  // ── Diffusers (one per room, at ceiling) ──
+  let diffIdx = 0;
+  const diffSpacing = Math.max(4.0, bW / 5);
+  for (let dx = bMinX + diffSpacing / 2; dx < bMaxX; dx += diffSpacing) {
+    for (let dy = bMinY + diffSpacing / 2; dy < bMaxY; dy += diffSpacing) {
+      elements.push({
+        id: `diffuser-s${storeyIndex}-${diffIdx}`,
+        type: "equipment",
+        vertices: [{ x: dx, y: dy, z: ceilZ - 0.02 }],
+        faces: [],
+        ifcType: "IfcFlowTerminal",
+        properties: { name: `Diffuser S${storeyIndex + 1}-D${diffIdx + 1}`, storeyIndex, width: 0.6, height: 0.05, length: 0.6, discipline: "mep" },
+      });
+      diffIdx++;
+    }
+  }
+
+  return elements;
 }
