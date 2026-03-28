@@ -357,6 +357,7 @@ Building type: ${buildingType}. All benchmark values in INR per SQUARE METRE (m�
 Steel range: ₹52,000-78,000/tonne. Cement: ₹340-560/bag. Mason: ₹500-1200/day.`;
 
   try {
+    console.log(`[TR-015] Prompt: ${webSearchPrompt.length} chars | "${webSearchPrompt.slice(0, 80)}..."`);
     console.log("[TR-015] Calling Sonnet with web_search (25s timeout, short prompt)...");
     const ctrl1 = new AbortController();
     const t1 = setTimeout(() => ctrl1.abort(), 25_000);
