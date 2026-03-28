@@ -17,6 +17,7 @@ import {
 } from "@/lib/floor-plan/geometry";
 import { formatDimension } from "@/lib/floor-plan/unit-conversion";
 import type { DisplayUnit } from "@/lib/floor-plan/unit-conversion";
+import { lw } from "@/lib/floor-plan/line-weights";
 
 interface DimensionRendererProps {
   rooms: Room[];
@@ -265,7 +266,9 @@ export function DimensionRenderer({
         const color = dim.isOverall ? overallColor
           : dim.isOpening ? openingColor
           : dimColor;
-        const weight = dim.isOverall ? 0.7 : 0.4;
+        const weight = dim.isOverall ? lw("dim-overall", zoom) : lw("dim-line", zoom);
+        const extWeight = lw("dim-ext", zoom);
+        const tickWeight = lw("dim-tick", zoom);
         const textSize = dim.isOverall ? fontSize + 1 : fontSize;
 
         return (
@@ -274,14 +277,14 @@ export function DimensionRenderer({
             <KLine
               points={[dim.extStart1.x, dim.extStart1.y, dim.extEnd1.x, dim.extEnd1.y]}
               stroke={color}
-              strokeWidth={0.3}
+              strokeWidth={extWeight}
               listening={false}
             />
             {/* Extension line 2 */}
             <KLine
               points={[dim.extStart2.x, dim.extStart2.y, dim.extEnd2.x, dim.extEnd2.y]}
               stroke={color}
-              strokeWidth={0.3}
+              strokeWidth={extWeight}
               listening={false}
             />
             {/* Dimension line */}
@@ -298,7 +301,7 @@ export function DimensionRenderer({
                 dim.dimStart.x + TICK_PX, dim.dimStart.y - TICK_PX,
               ]}
               stroke={color}
-              strokeWidth={0.8}
+              strokeWidth={tickWeight}
               listening={false}
             />
             {/* Tick at end */}
@@ -308,7 +311,7 @@ export function DimensionRenderer({
                 dim.dimEnd.x + TICK_PX, dim.dimEnd.y - TICK_PX,
               ]}
               stroke={color}
-              strokeWidth={0.8}
+              strokeWidth={tickWeight}
               listening={false}
             />
             {/* Text */}

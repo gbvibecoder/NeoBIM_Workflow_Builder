@@ -5,6 +5,7 @@ import { Line, Text } from "react-konva";
 import type { Viewport } from "@/lib/floor-plan/geometry";
 import { worldToScreen, worldToScreenDistance } from "@/lib/floor-plan/geometry";
 import type { ViewMode } from "@/types/floor-plan-cad";
+import { lw } from "@/lib/floor-plan/line-weights";
 
 interface GridRendererProps {
   viewport: Viewport;
@@ -108,7 +109,7 @@ export function GridRenderer({ viewport, gridSize_mm, viewMode }: GridRendererPr
           key={`grid-${i}`}
           points={line.points}
           stroke={line.major ? majorColor : minorColor}
-          strokeWidth={line.major ? 0.5 : 0.25}
+          strokeWidth={line.major ? lw("grid-major", viewport.zoom) : lw("grid-minor", viewport.zoom)}
           listening={false}
         />
       ))}

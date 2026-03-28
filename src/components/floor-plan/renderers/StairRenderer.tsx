@@ -5,6 +5,7 @@ import { Group, Line, Rect, Text, Arrow } from "react-konva";
 import type { Stair, Point } from "@/types/floor-plan-cad";
 import type { Viewport } from "@/lib/floor-plan/geometry";
 import { worldToScreen } from "@/lib/floor-plan/geometry";
+import { lw } from "@/lib/floor-plan/line-weights";
 
 interface StairRendererProps {
   stairs: Stair[];
@@ -69,7 +70,7 @@ function StairItem({
         points={boundaryFlat}
         closed
         stroke={strokeColor}
-        strokeWidth={isSelected ? 2 : 1.5}
+        strokeWidth={isSelected ? 2 : lw("stair", zoom)}
         fill="rgba(200, 200, 210, 0.1)"
       />
 
@@ -79,7 +80,7 @@ function StairItem({
           key={i}
           points={[t.x1, t.y1, t.x2, t.y2]}
           stroke={strokeColor}
-          strokeWidth={0.8}
+          strokeWidth={lw("stair-tread", zoom)}
           opacity={0.5}
         />
       ))}
@@ -92,7 +93,7 @@ function StairItem({
           <Line
             points={[t.x1, t.y1, t.x2, t.y2]}
             stroke={strokeColor}
-            strokeWidth={1.5}
+            strokeWidth={lw("stair", zoom)}
             dash={[6, 4]}
           />
         );
@@ -103,7 +104,7 @@ function StairItem({
         points={[arrowStart.x, arrowStart.y, arrowEnd.x, arrowEnd.y]}
         stroke={strokeColor}
         fill={strokeColor}
-        strokeWidth={1.5}
+        strokeWidth={lw("stair", zoom)}
         pointerLength={8}
         pointerWidth={6}
       />
@@ -123,7 +124,7 @@ function StairItem({
         <Line
           points={boundaryFlat.slice(0, 4)} // First two points = left side
           stroke="#888"
-          strokeWidth={2.5}
+          strokeWidth={lw("stair", zoom) * 1.5}
           lineCap="round"
         />
       )}
