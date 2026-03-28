@@ -23,6 +23,7 @@ import type {
   Point,
   RoomType,
 } from "@/types/floor-plan-cad";
+import { smartPlaceDoors, smartPlaceWindows } from "./smart-placement";
 
 let _idCounter = 0;
 function genId(prefix: string): string {
@@ -91,6 +92,110 @@ interface RoomRect {
 }
 
 // ============================================================
+// ROOM SNAPPING — close gaps between rooms
+// ============================================================
+
+/**
+ * Snap room edges that are within tolerance to close AI-generated gaps.
+ * GPT-4o often leaves 0.1m–0.5m gaps between rooms for visual spacing;
+ * this pass closes them so shared wall detection works correctly.
+ * Operates on RoomRect[] (mm, Y-up coordinates).
+ */
+function snapRoomRects(rects: RoomRect[], tol: number = 400): void {
+  // Run 2 passes to propagate snapping (A snaps to B, then C snaps to new A)
+  for (let pass = 0; pass < 2; pass++) {
+    for (let i = 0; i < rects.length; i++) {
+      for (let j = i + 1; j < rects.length; j++) {
+        const a = rects[i];
+        const b = rects[j];
+
+        // Require vertical overlap for horizontal snapping and vice versa
+        const vOverlap = Math.min(a.y1, b.y1) - Math.max(a.y0, b.y0);
+        const hOverlap = Math.min(a.x1, b.x1) - Math.max(a.x0, b.x0);
+
+        // Horizontal: A-right → B-left
+        if (vOverlap > 100) {
+          const gapR = b.x0 - a.x1;
+          if (gapR > 1 && gapR < tol) {
+            const mid = (a.x1 + b.x0) / 2;
+            a.x1 = mid;
+            b.x0 = mid;
+          }
+          const gapL = a.x0 - b.x1;
+          if (gapL > 1 && gapL < tol) {
+            const mid = (b.x1 + a.x0) / 2;
+            b.x1 = mid;
+            a.x0 = mid;
+          }
+        }
+
+        // Vertical: A-top → B-bottom
+        if (hOverlap > 100) {
+          const gapT = b.y0 - a.y1;
+          if (gapT > 1 && gapT < tol) {
+            const mid = (a.y1 + b.y0) / 2;
+            a.y1 = mid;
+            b.y0 = mid;
+          }
+          const gapB = a.y0 - b.y1;
+          if (gapB > 1 && gapB < tol) {
+            const mid = (b.y1 + a.y0) / 2;
+            b.y1 = mid;
+            a.y0 = mid;
+          }
+        }
+
+        // Also snap nearly-aligned edges (e.g., two rooms whose tops are 50mm apart)
+        if (hOverlap > 100) {
+          if (Math.abs(a.y1 - b.y1) > 0 && Math.abs(a.y1 - b.y1) < tol / 2) {
+            const avg = (a.y1 + b.y1) / 2;
+            a.y1 = avg;
+            b.y1 = avg;
+          }
+          if (Math.abs(a.y0 - b.y0) > 0 && Math.abs(a.y0 - b.y0) < tol / 2) {
+            const avg = (a.y0 + b.y0) / 2;
+            a.y0 = avg;
+            b.y0 = avg;
+          }
+        }
+        if (vOverlap > 100) {
+          if (Math.abs(a.x1 - b.x1) > 0 && Math.abs(a.x1 - b.x1) < tol / 2) {
+            const avg = (a.x1 + b.x1) / 2;
+            a.x1 = avg;
+            b.x1 = avg;
+          }
+          if (Math.abs(a.x0 - b.x0) > 0 && Math.abs(a.x0 - b.x0) < tol / 2) {
+            const avg = (a.x0 + b.x0) / 2;
+            a.x0 = avg;
+            b.x0 = avg;
+          }
+        }
+      }
+    }
+  }
+}
+
+/**
+ * After snapping rects, update room boundary points + area to match.
+ */
+function syncRoomsToRects(rooms: Room[], rects: RoomRect[]): void {
+  for (let i = 0; i < rooms.length && i < rects.length; i++) {
+    const r = rects[i];
+    const wMm = r.x1 - r.x0;
+    const dMm = r.y1 - r.y0;
+    rooms[i].boundary.points = [
+      { x: r.x0, y: r.y0 },
+      { x: r.x1, y: r.y0 },
+      { x: r.x1, y: r.y1 },
+      { x: r.x0, y: r.y1 },
+    ];
+    rooms[i].area_sqm = (wMm * dMm) / 1_000_000;
+    rooms[i].perimeter_mm = (wMm + dMm) * 2;
+    rooms[i].label_position = { x: r.x0 + wMm / 2, y: r.y0 + dMm / 2 };
+  }
+}
+
+// ============================================================
 // MAIN ADAPTER
 // ============================================================
 
@@ -153,6 +258,12 @@ export function convertGeometryToProject(
     };
   });
 
+  // ---- 1b. SNAP PASS — close AI-generated gaps between rooms ----
+  // GPT-4o often leaves 0.1–0.5m gaps; this snaps adjacent edges together
+  // so shared wall detection in step 2 works correctly.
+  snapRoomRects(roomRects, 400); // 400mm tolerance
+  syncRoomsToRects(rooms, roomRects);
+
   // ---- 2. Generate / convert walls (Bug 1: deduplication + room adjacency) ----
   const walls =
     geometry.walls.length > 0
@@ -161,11 +272,15 @@ export function convertGeometryToProject(
 
   assignRoomIds(walls, rooms, roomRects);
 
-  // ---- 3. Convert doors (Bug 2: smart swing, Bug 4: hinge point) ----
-  const doors = convertDoors(geometry, M, buildingD, walls, rooms, roomIdMap);
+  // ---- 3. Doors — use smart placement when geometry has none ----
+  const doors: Door[] = geometry.doors.length > 0
+    ? convertDoors(geometry, M, buildingD, walls, rooms, roomIdMap)
+    : [];
 
-  // ---- 4. Convert windows (Bug 3: centered + room-type sizing) ----
-  const windows = convertWindows(geometry, M, buildingD, walls, rooms);
+  // ---- 4. Windows — use smart placement when geometry has none ----
+  const windows: CadWindow[] = geometry.windows.length > 0
+    ? convertWindows(geometry, M, buildingD, walls, rooms)
+    : [];
 
   // ---- 5. Assemble project ----
   const floor: Floor = {
@@ -194,6 +309,16 @@ export function convertGeometryToProject(
     dimensions: [],
     zones: [],
   };
+
+  // ---- 5b. Auto-place doors and windows when AI provided none ----
+  if (doors.length === 0) {
+    const doorResult = smartPlaceDoors(floor);
+    floor.doors = doorResult.doors;
+  }
+  if (windows.length === 0) {
+    const windowResult = smartPlaceWindows(floor);
+    floor.windows = windowResult.windows;
+  }
 
   return {
     id: genId("proj"),
@@ -268,8 +393,8 @@ function generateWallsFromRooms(
   buildingD: number,
 ): Wall[] {
   const walls: Wall[] = [];
-  const TOL = 100;
-  const BTOL = 200; // building-boundary tolerance
+  const TOL = 250; // tolerance for shared edge detection (increased from 100 — rooms snapped but may have residual offset)
+  const BTOL = 300; // building-boundary tolerance
   const shared = new Set<string>();
 
   // 1. Shared edges between room pairs → single interior wall
