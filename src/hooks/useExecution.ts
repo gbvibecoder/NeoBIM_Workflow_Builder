@@ -15,7 +15,7 @@ import type { WorkflowNode } from "@/types/nodes";
 import type { LogEntry } from "@/components/canvas/ExecutionLog";
 
 // All node IDs that have real API implementations on the server
-const REAL_NODE_IDS = new Set(["TR-001", "TR-003", "TR-004", "TR-005", "TR-012", "TR-015", "TR-016", "GN-001", "GN-003", "GN-004", "GN-009", "GN-010", "GN-011", "TR-007", "TR-008", "EX-001", "EX-002", "EX-003"]);
+const REAL_NODE_IDS = new Set(["TR-001", "TR-003", "TR-004", "TR-005", "TR-012", "TR-015", "TR-016", "GN-001", "GN-003", "GN-004", "GN-009", "GN-010", "GN-011", "GN-012", "TR-007", "TR-008", "EX-001", "EX-002", "EX-003"]);
 
 // Live nodes — ALWAYS use real API execution regardless of NEXT_PUBLIC_ENABLE_MOCK_EXECUTION.
 // These are production-ready and should never fall through to mock when authenticated.
@@ -30,6 +30,7 @@ const LIVE_NODE_IDS = new Set([
   "GN-009",  // Video Walkthrough Generator (Kling 2.1 via fal.ai)
   "GN-010",  // Hi-Fi 3D Reconstructor (Meshy v4)
   "TR-016",  // Clash Detector (web-ifc AABB analysis, no API key)
+  "GN-012",  // Floor Plan Editor (pure computation — adapts upstream geometry, no API key)
   "EX-001",  // IFC Exporter (pure computation, no API key)
   "EX-002",  // BOQ Spreadsheet Exporter (xlsx, no API key)
 ]);

@@ -40,11 +40,12 @@ interface DimLine {
   textRotation: number;
   label: string;
   isOverall?: boolean;
+  isOpening?: boolean;
 }
 
 const EXT_GAP = 50;      // mm - gap between measured point and extension line
 const EXT_OVERSHOOT = 100; // mm - extension line past dimension line
-const TICK_PX = 4;        // px - tick mark half-size
+const TICK_PX = 3;        // px - tick mark half-size (reduced from 4)
 
 export function DimensionRenderer({
   rooms,
@@ -56,8 +57,15 @@ export function DimensionRenderer({
   showChainDimensions = true,
   showOpeningDimensions = true,
 }: DimensionRendererProps) {
+  // Zoom-based LOD for dimensions
+  const zoom = viewport.zoom;
+  const showRoomDims = zoom > 0.04;      // hide room dims when very zoomed out
+  const showOpenings = zoom > 0.08;       // opening dims need more zoom
+  const showChain = zoom > 0.03;          // chain dims visible earlier
+
   // ======== ROOM INTERNAL DIMENSIONS ========
   const roomDims = useMemo(() => {
+    if (!showRoomDims) return [];
     const dims: DimLine[] = [];
     const OFFSET = 800; // mm from room boundary
 
@@ -66,7 +74,8 @@ export function DimensionRenderer({
       const roomW = bounds.width;
       const roomH = bounds.height;
 
-      if (worldToScreenDistance(roomW, viewport.zoom) < 50) continue;
+      // Skip if too small on screen to show dimensions
+      if (worldToScreenDistance(roomW, zoom) < 55) continue;
 
       // Horizontal dimension (below room)
       dims.push(createLinearDim(
@@ -75,8 +84,8 @@ export function DimensionRenderer({
         -OFFSET, "horizontal", roomW, viewport, displayUnit
       ));
 
-      // Vertical dimension (left of room)
-      if (worldToScreenDistance(roomH, viewport.zoom) >= 50) {
+      // Vertical dimension (left of room) — only if tall enough
+      if (worldToScreenDistance(roomH, zoom) >= 55) {
         dims.push(createLinearDim(
           { x: bounds.min.x, y: bounds.min.y },
           { x: bounds.min.x, y: bounds.max.y },
@@ -85,17 +94,17 @@ export function DimensionRenderer({
       }
     }
     return dims;
-  }, [rooms, viewport, displayUnit]);
+  }, [rooms, viewport, displayUnit, zoom, showRoomDims]);
 
   // ======== CHAIN DIMENSIONS (along exterior boundary) ========
   const chainDims = useMemo(() => {
-    if (!showChainDimensions) return [];
+    if (!showChainDimensions || !showChain) return [];
     const dims: DimLine[] = [];
     const bounds = floorBounds(walls, rooms);
     if (bounds.width === 0) return dims;
 
-    const CHAIN_OFFSET = 1400; // mm from outer boundary
-    const OVERALL_OFFSET = 2200;
+    const CHAIN_OFFSET = 1600; // mm from outer boundary (increased from 1400)
+    const OVERALL_OFFSET = 2600; // increased from 2200 for more clearance
 
     // Collect all unique X positions of vertical wall faces
     const xPositions = new Set<number>();
@@ -106,31 +115,29 @@ export function DimensionRenderer({
       const s = wall.centerline.start;
       const e = wall.centerline.end;
 
-      // Vertical walls → track X positions of faces
       if (Math.abs(s.x - e.x) < 10) {
         xPositions.add(Math.round(s.x - halfT));
         xPositions.add(Math.round(s.x + halfT));
       }
-      // Horizontal walls → track Y positions of faces
       if (Math.abs(s.y - e.y) < 10) {
         yPositions.add(Math.round(s.y - halfT));
         yPositions.add(Math.round(s.y + halfT));
       }
     }
 
-    // Sort positions
     const sortedX = [...xPositions].sort((a, b) => a - b);
     const sortedY = [...yPositions].sort((a, b) => a - b);
 
-    // Filter to only significant positions (skip positions < 200mm apart)
-    const filteredX = filterClosePositions(sortedX, 200);
-    const filteredY = filterClosePositions(sortedY, 200);
+    // Filter positions that are too close (< 300mm apart — skip tiny wall face offsets)
+    const filteredX = filterClosePositions(sortedX, 300);
+    const filteredY = filterClosePositions(sortedY, 300);
 
-    // Bottom chain dimensions (horizontal segments)
+    // Bottom chain dimensions
     const chainY = bounds.min.y - CHAIN_OFFSET;
     for (let i = 0; i < filteredX.length - 1; i++) {
       const segWidth = filteredX[i + 1] - filteredX[i];
-      if (segWidth < 300) continue; // skip tiny segments
+      if (segWidth < 400) continue; // skip segments too small to label
+      if (worldToScreenDistance(segWidth, zoom) < 35) continue; // skip if screen-space too small
       dims.push(createLinearDim(
         { x: filteredX[i], y: chainY + EXT_GAP },
         { x: filteredX[i + 1], y: chainY + EXT_GAP },
@@ -138,7 +145,7 @@ export function DimensionRenderer({
       ));
     }
 
-    // Bottom overall dimension
+    // Bottom overall
     if (filteredX.length >= 2) {
       const totalW = filteredX[filteredX.length - 1] - filteredX[0];
       const overall = createLinearDim(
@@ -150,11 +157,12 @@ export function DimensionRenderer({
       dims.push(overall);
     }
 
-    // Left chain dimensions (vertical segments)
+    // Left chain dimensions
     const chainX = bounds.min.x - CHAIN_OFFSET;
     for (let i = 0; i < filteredY.length - 1; i++) {
       const segHeight = filteredY[i + 1] - filteredY[i];
-      if (segHeight < 300) continue;
+      if (segHeight < 400) continue;
+      if (worldToScreenDistance(segHeight, zoom) < 35) continue;
       dims.push(createLinearDim(
         { x: chainX + EXT_GAP, y: filteredY[i] },
         { x: chainX + EXT_GAP, y: filteredY[i + 1] },
@@ -162,7 +170,7 @@ export function DimensionRenderer({
       ));
     }
 
-    // Left overall dimension
+    // Left overall
     if (filteredY.length >= 2) {
       const totalH = filteredY[filteredY.length - 1] - filteredY[0];
       const overall = createLinearDim(
@@ -175,26 +183,24 @@ export function DimensionRenderer({
     }
 
     return dims;
-  }, [showChainDimensions, walls, rooms, viewport, displayUnit]);
+  }, [showChainDimensions, showChain, walls, rooms, viewport, displayUnit, zoom]);
 
   // ======== OPENING DIMENSIONS ========
   const openingDims = useMemo(() => {
-    if (!showOpeningDimensions) return [];
+    if (!showOpeningDimensions || !showOpenings) return [];
     const dims: DimLine[] = [];
-    const minScreenPx = 30;
+    const minScreenPx = 35; // increased threshold
 
-    // Door widths
     for (const door of doors) {
       const wall = walls.find((w) => w.id === door.wall_id);
       if (!wall) continue;
-      if (worldToScreenDistance(door.width_mm, viewport.zoom) < minScreenPx) continue;
+      if (worldToScreenDistance(door.width_mm, zoom) < minScreenPx) continue;
 
       const dir = lineDirection(wall.centerline);
       const doorStart = addPoints(wall.centerline.start, scalePoint(dir, door.position_along_wall_mm));
       const doorEnd = addPoints(doorStart, scalePoint(dir, door.width_mm));
       const norm = perpendicularLeft(dir);
 
-      // Place dimension inside the opening, offset along normal
       const offset = wall.thickness_mm * 0.8;
       const p1 = addPoints(doorStart, scalePoint(norm, offset));
       const p2 = addPoints(doorEnd, scalePoint(norm, offset));
@@ -202,21 +208,22 @@ export function DimensionRenderer({
       const p2s = worldToScreen(p2, viewport);
       const isHoriz = Math.abs(p1s.y - p2s.y) < Math.abs(p1s.x - p2s.x);
 
-      dims.push({
+      const dim: DimLine = {
         extStart1: p1s, extEnd1: p1s,
         extStart2: p2s, extEnd2: p2s,
         dimStart: p1s, dimEnd: p2s,
-        textPos: { x: (p1s.x + p2s.x) / 2, y: (p1s.y + p2s.y) / 2 - 10 },
+        textPos: { x: (p1s.x + p2s.x) / 2, y: (p1s.y + p2s.y) / 2 - 8 },
         textRotation: isHoriz ? 0 : -90,
         label: formatDimension(door.width_mm, displayUnit),
-      });
+        isOpening: true,
+      };
+      dims.push(dim);
     }
 
-    // Window widths
     for (const win of windows) {
       const wall = walls.find((w) => w.id === win.wall_id);
       if (!wall) continue;
-      if (worldToScreenDistance(win.width_mm, viewport.zoom) < minScreenPx) continue;
+      if (worldToScreenDistance(win.width_mm, zoom) < minScreenPx) continue;
 
       const dir = lineDirection(wall.centerline);
       const winStart = addPoints(wall.centerline.start, scalePoint(dir, win.position_along_wall_mm));
@@ -230,32 +237,35 @@ export function DimensionRenderer({
       const p2s = worldToScreen(p2, viewport);
       const isHoriz = Math.abs(p1s.y - p2s.y) < Math.abs(p1s.x - p2s.x);
 
-      dims.push({
+      const dim: DimLine = {
         extStart1: p1s, extEnd1: p1s,
         extStart2: p2s, extEnd2: p2s,
         dimStart: p1s, dimEnd: p2s,
-        textPos: { x: (p1s.x + p2s.x) / 2, y: (p1s.y + p2s.y) / 2 - 10 },
+        textPos: { x: (p1s.x + p2s.x) / 2, y: (p1s.y + p2s.y) / 2 - 8 },
         textRotation: isHoriz ? 0 : -90,
         label: formatDimension(win.width_mm, displayUnit),
-      });
+        isOpening: true,
+      };
+      dims.push(dim);
     }
 
     return dims;
-  }, [showOpeningDimensions, doors, windows, walls, viewport, displayUnit]);
+  }, [showOpeningDimensions, showOpenings, doors, windows, walls, viewport, displayUnit, zoom]);
 
   const allDims = [...roomDims, ...chainDims, ...openingDims];
-  const dimColor = "#555555";
-  const overallColor = "#333333";
-  const openingColor = "#0066CC";
-  const fontSize = Math.max(8, Math.min(11, viewport.zoom * 110));
+  const dimColor = "#777777";       // lighter than room labels
+  const overallColor = "#444444";
+  const openingColor = "#3388CC";
+  // Dimension font is deliberately smaller than room name font (hierarchy)
+  const fontSize = Math.max(7, Math.min(9.5, zoom * 95));
 
   return (
     <>
       {allDims.map((dim, i) => {
         const color = dim.isOverall ? overallColor
-          : (i >= roomDims.length + chainDims.length) ? openingColor
+          : dim.isOpening ? openingColor
           : dimColor;
-        const weight = dim.isOverall ? 0.8 : 0.5;
+        const weight = dim.isOverall ? 0.7 : 0.4;
         const textSize = dim.isOverall ? fontSize + 1 : fontSize;
 
         return (
@@ -264,14 +274,14 @@ export function DimensionRenderer({
             <KLine
               points={[dim.extStart1.x, dim.extStart1.y, dim.extEnd1.x, dim.extEnd1.y]}
               stroke={color}
-              strokeWidth={0.4}
+              strokeWidth={0.3}
               listening={false}
             />
             {/* Extension line 2 */}
             <KLine
               points={[dim.extStart2.x, dim.extStart2.y, dim.extEnd2.x, dim.extEnd2.y]}
               stroke={color}
-              strokeWidth={0.4}
+              strokeWidth={0.3}
               listening={false}
             />
             {/* Dimension line */}
@@ -281,14 +291,14 @@ export function DimensionRenderer({
               strokeWidth={weight}
               listening={false}
             />
-            {/* Tick at start (45° diagonal) */}
+            {/* Tick at start */}
             <KLine
               points={[
                 dim.dimStart.x - TICK_PX, dim.dimStart.y + TICK_PX,
                 dim.dimStart.x + TICK_PX, dim.dimStart.y - TICK_PX,
               ]}
               stroke={color}
-              strokeWidth={1}
+              strokeWidth={0.8}
               listening={false}
             />
             {/* Tick at end */}
@@ -298,7 +308,7 @@ export function DimensionRenderer({
                 dim.dimEnd.x + TICK_PX, dim.dimEnd.y - TICK_PX,
               ]}
               stroke={color}
-              strokeWidth={1}
+              strokeWidth={0.8}
               listening={false}
             />
             {/* Text */}
@@ -312,9 +322,9 @@ export function DimensionRenderer({
               fill={color}
               align="center"
               rotation={dim.textRotation}
-              offsetX={dim.textRotation === 0 ? 30 : 0}
-              offsetY={dim.textRotation !== 0 ? 30 : 0}
-              width={60}
+              offsetX={dim.textRotation === 0 ? 28 : 0}
+              offsetY={dim.textRotation !== 0 ? 28 : 0}
+              width={56}
               listening={false}
             />
           </Group>
@@ -351,7 +361,7 @@ function createLinearDim(
       extStart1: es1, extEnd1: ee1,
       extStart2: es2, extEnd2: ee2,
       dimStart: s, dimEnd: e,
-      textPos: { x: (s.x + e.x) / 2, y: s.y - 13 },
+      textPos: { x: (s.x + e.x) / 2, y: s.y - 11 },
       textRotation: 0,
       label: formatDimension(value_mm, displayUnit),
     };
@@ -368,7 +378,7 @@ function createLinearDim(
       extStart1: es1, extEnd1: ee1,
       extStart2: es2, extEnd2: ee2,
       dimStart: s, dimEnd: e,
-      textPos: { x: s.x - 13, y: (s.y + e.y) / 2 },
+      textPos: { x: s.x - 11, y: (s.y + e.y) / 2 },
       textRotation: -90,
       label: formatDimension(value_mm, displayUnit),
     };
