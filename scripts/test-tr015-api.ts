@@ -72,9 +72,9 @@ async function testSonnetWithWebSearch() {
     if (err instanceof Error) {
       console.error(`   Error name: ${err.name}`);
       console.error(`   Error message: ${err.message}`);
-      console.error(`   Error cause: ${JSON.stringify((err as Record<string, unknown>).cause)}`);
-      console.error(`   Status: ${(err as Record<string, unknown>).status}`);
-      console.error(`   Headers: ${JSON.stringify((err as Record<string, unknown>).headers)}`);
+      console.error(`   Error cause: ${JSON.stringify((err as unknown as Record<string, unknown>).cause)}`);
+      console.error(`   Status: ${(err as unknown as Record<string, unknown>).status}`);
+      console.error(`   Headers: ${JSON.stringify((err as unknown as Record<string, unknown>).headers)}`);
     } else {
       console.error(`   Raw error:`, err);
     }
