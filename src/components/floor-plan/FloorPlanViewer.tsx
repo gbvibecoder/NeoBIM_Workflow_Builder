@@ -15,6 +15,7 @@ import { VastuPanel } from "./panels/VastuPanel";
 import { CodeCompliancePanel } from "./panels/CodeCompliancePanel";
 import { AnalyticsPanel } from "./panels/AnalyticsPanel";
 import { BOQPanel } from "./panels/BOQPanel";
+import { ProgramPanel } from "./panels/ProgramPanel";
 import { WelcomeScreen } from "./WelcomeScreen";
 import { GenerationLoader } from "./GenerationLoader";
 import { getProjectIndex, importProjectFile } from "@/lib/floor-plan/project-persistence";
@@ -160,13 +161,23 @@ export function FloorPlanViewer({ initialGeometry, initialPrompt, initialProject
         }
         break;
       case "v":
-        store.setActiveTool("select");
+        if (e.ctrlKey || e.metaKey) {
+          e.preventDefault();
+          store.pasteAtCursor();
+        } else {
+          store.setActiveTool("select");
+        }
         break;
       case "l":
         store.setActiveTool("wall");
         break;
       case "d":
-        if (!e.ctrlKey && !e.metaKey) store.setActiveTool("door");
+        if (e.ctrlKey || e.metaKey) {
+          e.preventDefault();
+          store.duplicateSelected();
+        } else {
+          store.setActiveTool("door");
+        }
         break;
       case "w":
         store.setActiveTool("window");
@@ -238,6 +249,20 @@ export function FloorPlanViewer({ initialGeometry, initialPrompt, initialProject
               store.rotateFurniture(furnId, 90);
             }
           }
+        }
+        break;
+      case "c":
+        if (e.ctrlKey || e.metaKey) {
+          e.preventDefault();
+          store.copySelected();
+        } else {
+          store.setActiveTool("column");
+        }
+        break;
+      case "x":
+        if (e.ctrlKey || e.metaKey) {
+          e.preventDefault();
+          store.cutSelected();
         }
         break;
       case "z":
@@ -350,6 +375,7 @@ export function FloorPlanViewer({ initialGeometry, initialPrompt, initialProject
                 { id: "code", label: "Code" },
                 { id: "analytics", label: "Stats" },
                 { id: "boq", label: "BOQ" },
+                { id: "program", label: "Program" },
               ] as const).map((tab) => (
                 <button
                   key={tab.id}
@@ -372,6 +398,7 @@ export function FloorPlanViewer({ initialGeometry, initialPrompt, initialProject
                 {rightPanelTab === "code" && <CodeCompliancePanel />}
                 {rightPanelTab === "analytics" && <AnalyticsPanel />}
                 {rightPanelTab === "boq" && <BOQPanel />}
+                {rightPanelTab === "program" && <ProgramPanel />}
               </FloorPlanErrorBoundary>
             </div>
           </div>

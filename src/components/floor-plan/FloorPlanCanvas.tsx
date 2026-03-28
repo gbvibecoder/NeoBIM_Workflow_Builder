@@ -23,6 +23,9 @@ import { FurnitureRenderer } from "./renderers/FurnitureRenderer";
 import { StairRenderer } from "./renderers/StairRenderer";
 import { ColumnRenderer } from "./renderers/ColumnRenderer";
 import { VastuOverlayRenderer } from "./renderers/VastuOverlayRenderer";
+import { AnnotationRenderer } from "./renderers/AnnotationRenderer";
+import { LightOverlayRenderer } from "./renderers/LightOverlayRenderer";
+import { CodeOverlayRenderer } from "./renderers/CodeOverlayRenderer";
 import { exportStageToPng } from "@/lib/floor-plan/export-png";
 import type { PngExportOptions } from "@/lib/floor-plan/export-png";
 
@@ -309,6 +312,15 @@ export function FloorPlanCanvas() {
         }
         break;
       }
+
+      case "annotate": {
+        const text = window.prompt("Enter annotation text:");
+        if (text && text.trim()) {
+          store.addAnnotation(text.trim(), { ...worldPos });
+          store.setActiveTool("select");
+        }
+        break;
+      }
     }
   }, [activeTool]);
 
@@ -531,6 +543,9 @@ export function FloorPlanCanvas() {
         activeTool === "pan" ? "grab" :
         activeTool === "wall" ? "crosshair" :
         activeTool === "door" || activeTool === "window" ? "crosshair" :
+        activeTool === "measure" ? "crosshair" :
+        activeTool === "annotate" ? "text" :
+        activeTool === "column" || activeTool === "stair" ? "crosshair" :
         "default";
     }
 
@@ -582,12 +597,15 @@ export function FloorPlanCanvas() {
   const showDimensions = isLayerVisible("A-DIM") && (viewMode === "construction" || viewMode === "cad");
   const showGrid = isLayerVisible("A-GRID") || useFloorPlanStore.getState().gridVisible;
 
-  // Cursor style
+  // Cursor style per tool
   const cursorStyle =
     activeTool === "pan" ? "grab" :
     activeTool === "wall" ? "crosshair" :
     activeTool === "door" || activeTool === "window" ? "crosshair" :
     activeTool === "measure" ? "crosshair" :
+    activeTool === "annotate" ? "text" :
+    activeTool === "column" || activeTool === "stair" ? "crosshair" :
+    activeTool === "furniture" ? "copy" :
     "default";
 
   return (
@@ -698,6 +716,27 @@ export function FloorPlanCanvas() {
         {isLayerVisible("A-VASTU") && (
           <Layer listening={false}>
             <VastuOverlayRenderer viewport={viewport} />
+          </Layer>
+        )}
+
+        {/* Layer 4d-2: Light Analysis Overlay */}
+        <Layer listening={false}>
+          <LightOverlayRenderer viewport={viewport} />
+        </Layer>
+
+        {/* Layer 4d-3: Code Violation Overlay */}
+        <Layer listening={false}>
+          <CodeOverlayRenderer viewport={viewport} />
+        </Layer>
+
+        {/* Layer 4e: Annotations */}
+        {floor.annotations.length > 0 && (
+          <Layer listening={false}>
+            <AnnotationRenderer
+              annotations={floor.annotations}
+              viewport={viewport}
+              selectedIds={selectedIds}
+            />
           </Layer>
         )}
 

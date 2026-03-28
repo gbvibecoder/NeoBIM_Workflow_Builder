@@ -7,7 +7,7 @@
  */
 
 import type { Floor, Room, Door, CadWindow, Stair, Wall } from "@/types/floor-plan-cad";
-import { polygonBounds, wallLength } from "@/lib/floor-plan/geometry";
+import { polygonBounds, wallLength, lineDirection, addPoints, scalePoint } from "@/lib/floor-plan/geometry";
 import {
   ALL_BUILDING_CODE_RULES,
   CODE_CATEGORY_LABELS,
@@ -61,6 +61,14 @@ export function validateBuildingCode(
 
   // ---- Ceiling Height Checks ----
   totalChecks += checkCeilingHeight(floor, violations);
+
+  // ---- Enhanced Checks (Sprint 4) ----
+  totalChecks += checkKitchenVentilation(floor, violations);
+  totalChecks += checkBathroomWaterproofing(floor, violations);
+  totalChecks += checkBalconyRailing(floor, violations);
+  totalChecks += checkAccessibleEntrance(floor, violations);
+  totalChecks += checkNaturalLightRatio(floor, violations);
+  totalChecks += checkFireEgressDistance(floor, violations);
 
   // Group by category
   const byCategory: Record<CodeCategory, CodeViolation[]> = {
@@ -474,5 +482,223 @@ function checkCeilingHeight(floor: Floor, violations: CodeViolation[]): number {
     });
   }
 
+  return checks;
+}
+
+// ============================================================
+// KITCHEN VENTILATION (NBC-WV-005)
+// ============================================================
+
+function checkKitchenVentilation(floor: Floor, violations: CodeViolation[]): number {
+  let checks = 0;
+  const rule = ALL_BUILDING_CODE_RULES.find((r) => r.id === "NBC-WV-005");
+  if (!rule) return 0;
+
+  const kitchens = floor.rooms.filter((r) => r.type === "kitchen");
+  for (const kitchen of kitchens) {
+    checks++;
+    const hasExterior = floor.walls.some(
+      (w) => w.type === "exterior" && (w.left_room_id === kitchen.id || w.right_room_id === kitchen.id)
+    );
+    const hasWindow = floor.windows.some((win) => {
+      const wall = floor.walls.find((w) => w.id === win.wall_id);
+      return wall && (wall.left_room_id === kitchen.id || wall.right_room_id === kitchen.id);
+    });
+
+    if (!hasExterior || !hasWindow) {
+      violations.push({
+        rule_id: rule.id,
+        rule,
+        entity_type: "room",
+        entity_id: kitchen.id,
+        entity_name: kitchen.name,
+        severity: rule.severity,
+        message: `${kitchen.name} lacks natural ventilation — no window on exterior wall.`,
+        actual_value: hasExterior ? "Exterior wall exists, no window" : "No exterior wall",
+        required_value: "Window or exhaust on exterior wall",
+        suggestion: hasExterior ? "Add a window on the exterior wall" : "Kitchen requires an exterior wall for ventilation or a mechanical exhaust system.",
+      });
+    }
+  }
+  return checks;
+}
+
+// ============================================================
+// BATHROOM WATERPROOFING (NBC-WV-006)
+// ============================================================
+
+function checkBathroomWaterproofing(floor: Floor, violations: CodeViolation[]): number {
+  let checks = 0;
+  const rule = ALL_BUILDING_CODE_RULES.find((r) => r.id === "NBC-WV-006");
+  if (!rule) return 0;
+
+  const bathrooms = floor.rooms.filter((r) => ["bathroom", "toilet", "wc"].includes(r.type));
+  for (const bath of bathrooms) {
+    checks++;
+    // Always flag as info — this is a specification reminder, not a geometry check
+    violations.push({
+      rule_id: rule.id,
+      rule,
+      entity_type: "room",
+      entity_id: bath.id,
+      entity_name: bath.name,
+      severity: "info",
+      message: `${bath.name} requires waterproofing treatment per NBC specification.`,
+      actual_value: "Not verified in plan",
+      required_value: "Waterproofing up to 150mm above FFL",
+      suggestion: "Specify waterproofing in construction notes for all bathroom floors and walls up to 150mm.",
+    });
+  }
+  return checks;
+}
+
+// ============================================================
+// BALCONY RAILING (NBC-FS-003)
+// ============================================================
+
+function checkBalconyRailing(floor: Floor, violations: CodeViolation[]): number {
+  let checks = 0;
+  const rule = ALL_BUILDING_CODE_RULES.find((r) => r.id === "NBC-FS-003");
+  if (!rule) return 0;
+
+  const balconies = floor.rooms.filter((r) => ["balcony", "terrace"].includes(r.type));
+  for (const balcony of balconies) {
+    checks++;
+    violations.push({
+      rule_id: rule.id,
+      rule,
+      entity_type: "room",
+      entity_id: balcony.id,
+      entity_name: balcony.name,
+      severity: "info",
+      message: `${balcony.name} requires railing of minimum 1.05 m height.`,
+      actual_value: "Not specified in plan",
+      required_value: "≥ 1050 mm railing height",
+      suggestion: "Add railing specification to balcony/terrace detail drawing.",
+    });
+  }
+  return checks;
+}
+
+// ============================================================
+// ACCESSIBLE ENTRANCE (NBC-AC-003)
+// ============================================================
+
+function checkAccessibleEntrance(floor: Floor, violations: CodeViolation[]): number {
+  let checks = 0;
+  const rule = ALL_BUILDING_CODE_RULES.find((r) => r.id === "NBC-AC-003");
+  if (!rule) return 0;
+
+  checks++;
+  const minW = rule.parameters.min_width_mm as number;
+  const mainEntrance = floor.doors.find((d) => d.type === "main_entrance");
+  const hasWideEntrance = mainEntrance ? mainEntrance.width_mm >= minW : false;
+
+  if (!hasWideEntrance) {
+    violations.push({
+      rule_id: rule.id,
+      rule,
+      entity_type: "door",
+      entity_id: mainEntrance?.id ?? null,
+      entity_name: "Main Entrance",
+      severity: "info",
+      message: `Main entrance width (${mainEntrance?.width_mm ?? 0} mm) may not meet accessibility standard (${minW} mm).`,
+      actual_value: `${mainEntrance?.width_mm ?? "N/A"} mm`,
+      required_value: `≥ ${minW} mm`,
+      suggestion: "Consider widening the main entrance to 900 mm for wheelchair accessibility.",
+    });
+  }
+  return checks;
+}
+
+// ============================================================
+// NATURAL LIGHT 1/6 RATIO (NBC-WV-004)
+// ============================================================
+
+function checkNaturalLightRatio(floor: Floor, violations: CodeViolation[]): number {
+  let checks = 0;
+  const rule = ALL_BUILDING_CODE_RULES.find((r) => r.id === "NBC-WV-004");
+  if (!rule) return 0;
+
+  const applicableRooms = floor.rooms.filter(
+    (r) => rule.room_types.length === 0 || rule.room_types.includes(r.type)
+  );
+
+  for (const room of applicableRooms) {
+    checks++;
+    const roomWallIds = new Set(room.wall_ids);
+    const roomWindows = floor.windows.filter((w) => roomWallIds.has(w.wall_id));
+    const totalWindowArea = roomWindows.reduce(
+      (sum, w) => sum + (w.width_mm * w.height_mm) / 1_000_000, 0
+    );
+    const floorArea = room.area_sqm;
+    const ratio = floorArea > 0 ? totalWindowArea / floorArea : 0;
+    const minRatio = rule.parameters.min_ratio as number;
+
+    if (ratio < minRatio) {
+      violations.push({
+        rule_id: rule.id,
+        rule,
+        entity_type: "room",
+        entity_id: room.id,
+        entity_name: room.name,
+        severity: rule.severity,
+        message: `${room.name} natural light ratio (${(ratio * 100).toFixed(1)}%) is below recommended 1/6th (16.7%).`,
+        actual_value: `${(ratio * 100).toFixed(1)}%`,
+        required_value: `≥ ${(minRatio * 100).toFixed(1)}%`,
+        suggestion: `Add approximately ${((minRatio * floorArea - totalWindowArea)).toFixed(2)} sq.m more window area.`,
+      });
+    }
+  }
+  return checks;
+}
+
+// ============================================================
+// FIRE EGRESS DISTANCE (NBC-FS-002)
+// ============================================================
+
+function checkFireEgressDistance(floor: Floor, violations: CodeViolation[]): number {
+  let checks = 0;
+  const rule = ALL_BUILDING_CODE_RULES.find((r) => r.id === "NBC-FS-002");
+  if (!rule) return 0;
+
+  const maxDist = rule.parameters.max_travel_distance_mm as number;
+
+  // Simplified: check if the farthest room centroid from any exit door exceeds threshold
+  const exitDoors = floor.doors.filter((d) => d.type === "main_entrance" || d.type === "fire_rated");
+  if (exitDoors.length === 0) return 0;
+
+  // Get exit positions
+  const exitPositions: { x: number; y: number }[] = [];
+  for (const door of exitDoors) {
+    const wall = floor.walls.find((w) => w.id === door.wall_id);
+    if (!wall) continue;
+    const dir = lineDirection(wall.centerline);
+    const pos = addPoints(wall.centerline.start, scalePoint(dir, door.position_along_wall_mm + door.width_mm / 2));
+    exitPositions.push(pos);
+  }
+
+  for (const room of floor.rooms) {
+    checks++;
+    const centroid = room.label_position;
+    const minDist = Math.min(
+      ...exitPositions.map((ep) => Math.sqrt((centroid.x - ep.x) ** 2 + (centroid.y - ep.y) ** 2))
+    );
+
+    if (minDist > maxDist) {
+      violations.push({
+        rule_id: rule.id,
+        rule,
+        entity_type: "room",
+        entity_id: room.id,
+        entity_name: room.name,
+        severity: rule.severity,
+        message: `${room.name} is ${(minDist / 1000).toFixed(1)} m from nearest exit (max ${(maxDist / 1000).toFixed(1)} m).`,
+        actual_value: `${(minDist / 1000).toFixed(1)} m`,
+        required_value: `≤ ${(maxDist / 1000).toFixed(1)} m`,
+        suggestion: "Consider adding a secondary exit or fire escape route closer to this room.",
+      });
+    }
+  }
   return checks;
 }

@@ -238,6 +238,11 @@ function RoomMenu({ roomId, onClose }: { roomId: string; onClose: () => void }) 
     "dining_room", "study", "corridor", "balcony",
   ];
 
+  const handleAutoFurnish = () => {
+    useFloorPlanStore.getState().autoFurnishRoom(roomId);
+    onClose();
+  };
+
   return (
     <>
       <MenuItem label={`Room — ${room?.name ?? "unknown"}`} disabled />
@@ -250,6 +255,8 @@ function RoomMenu({ roomId, onClose }: { roomId: string; onClose: () => void }) 
           active={room?.type === t}
         />
       ))}
+      <MenuSep />
+      <MenuItem label="Smart Furnish" onClick={handleAutoFurnish} shortcut="AI" />
     </>
   );
 }

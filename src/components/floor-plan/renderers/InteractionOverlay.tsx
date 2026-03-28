@@ -145,6 +145,8 @@ function WallPreview({
   viewport: Viewport;
   displayUnit: string;
 }) {
+  const wallThickness = useFloorPlanStore.getState().project?.settings.wall_thickness_mm || 150;
+
   // Apply ortho constraint
   let endWorld = cursor;
   if (ortho) {
@@ -159,13 +161,37 @@ function WallPreview({
   const midX = (startScreen.x + endScreen.x) / 2;
   const midY = (startScreen.y + endScreen.y) / 2;
 
+  // Wall thickness preview — compute quad corners
+  const halfT = wallThickness / 2;
+  const dir = len > 1 ? lineDirection({ start, end: endWorld }) : { x: 1, y: 0 };
+  const norm = perpendicularLeft(dir);
+
+  const c1 = worldToScreen(addPoints(start, scalePoint(norm, halfT)), viewport);
+  const c2 = worldToScreen(addPoints(endWorld, scalePoint(norm, halfT)), viewport);
+  const c3 = worldToScreen(addPoints(endWorld, scalePoint(norm, -halfT)), viewport);
+  const c4 = worldToScreen(addPoints(start, scalePoint(norm, -halfT)), viewport);
+
+  // Angle indicator
+  const angleDeg = len > 50 ? Math.round(Math.atan2(-(endWorld.y - start.y), endWorld.x - start.x) * 180 / Math.PI) : 0;
+  const normalizedAngle = ((angleDeg % 360) + 360) % 360;
+
   return (
     <Group listening={false}>
-      {/* Preview line */}
+      {/* Wall thickness rectangle */}
+      <KLine
+        points={[c1.x, c1.y, c2.x, c2.y, c3.x, c3.y, c4.x, c4.y]}
+        closed
+        fill="rgba(239, 68, 68, 0.08)"
+        stroke="#EF4444"
+        strokeWidth={1}
+        dash={[6, 3]}
+      />
+
+      {/* Centerline */}
       <KLine
         points={[startScreen.x, startScreen.y, endScreen.x, endScreen.y]}
         stroke="#EF4444"
-        strokeWidth={2}
+        strokeWidth={1.5}
         dash={[8, 4]}
       />
 
@@ -194,6 +220,30 @@ function WallPreview({
             fontSize={11}
             fontFamily="Inter, system-ui, sans-serif"
             fontStyle="bold"
+            fill="#FFFFFF"
+            align="center"
+          />
+        </>
+      )}
+
+      {/* Angle indicator near start point */}
+      {len > 200 && (
+        <>
+          <Rect
+            x={startScreen.x + 12}
+            y={startScreen.y - 20}
+            width={36}
+            height={16}
+            fill="rgba(0,0,0,0.65)"
+            cornerRadius={2}
+          />
+          <Text
+            x={startScreen.x + 12}
+            y={startScreen.y - 18}
+            width={36}
+            text={`${normalizedAngle}°`}
+            fontSize={10}
+            fontFamily="Inter, system-ui, sans-serif"
             fill="#FFFFFF"
             align="center"
           />

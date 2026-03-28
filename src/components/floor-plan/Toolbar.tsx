@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { useFloorPlanStore } from "@/stores/floor-plan-store";
 import type { ViewMode } from "@/types/floor-plan-cad";
 import { ExportMenu } from "./ExportMenu";
@@ -256,6 +256,12 @@ export function Toolbar() {
       {/* Separator */}
       <div className="h-5 w-px bg-gray-200" />
 
+      {/* AI Actions dropdown */}
+      <AIDropdown />
+
+      {/* Separator */}
+      <div className="h-5 w-px bg-gray-200" />
+
       {/* Analysis buttons */}
       <button
         onClick={() => setRightPanelTab("vastu")}
@@ -346,6 +352,92 @@ export function Toolbar() {
           <line x1="11" y1="2" x2="11" y2="14" stroke="currentColor" strokeWidth="1.2"/>
         </svg>
       </button>
+    </div>
+  );
+}
+
+// ============================================================
+// AI ACTIONS DROPDOWN
+// ============================================================
+
+function AIDropdown() {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  const autoPlaceDoors = useFloorPlanStore((s) => s.autoPlaceDoors);
+  const autoPlaceWindows = useFloorPlanStore((s) => s.autoPlaceWindows);
+  const autoFurnishAll = useFloorPlanStore((s) => s.autoFurnishAll);
+  const lightOverlayVisible = useFloorPlanStore((s) => s.lightOverlayVisible);
+  const toggleLightOverlay = useFloorPlanStore((s) => s.toggleLightOverlay);
+
+  // Close on outside click
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        onClick={() => setOpen(!open)}
+        className={`flex items-center gap-1.5 rounded px-2.5 py-1 text-xs font-medium transition-colors ${
+          open
+            ? "bg-violet-600 text-white"
+            : "bg-violet-50 text-violet-700 hover:bg-violet-100"
+        }`}
+        title="AI-powered auto-placement and analysis"
+      >
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="inline-block">
+          <path d="M7 1L8.5 5H12.5L9.5 7.5L10.5 11.5L7 9L3.5 11.5L4.5 7.5L1.5 5H5.5L7 1Z" stroke="currentColor" strokeWidth="1.1" strokeLinejoin="round"/>
+        </svg>
+        AI
+        <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+          <path d="M3 4L5 6L7 4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+      </button>
+
+      {open && (
+        <div className="absolute top-full left-0 mt-1 w-56 rounded-md border border-gray-200 bg-white py-1 shadow-lg z-50">
+          <div className="px-3 py-1.5 text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Auto-Placement</div>
+          <button
+            onClick={() => { autoPlaceDoors(); setOpen(false); }}
+            className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-50"
+          >
+            <span className="w-4 text-center text-violet-500">D</span>
+            Auto-place Doors
+          </button>
+          <button
+            onClick={() => { autoPlaceWindows(); setOpen(false); }}
+            className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-50"
+          >
+            <span className="w-4 text-center text-violet-500">W</span>
+            Auto-place Windows
+          </button>
+          <button
+            onClick={() => { autoFurnishAll(); setOpen(false); }}
+            className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-50"
+          >
+            <span className="w-4 text-center text-violet-500">F</span>
+            Smart Furnish All Rooms
+          </button>
+          <div className="my-1 h-px bg-gray-100" />
+          <div className="px-3 py-1.5 text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Analysis Overlays</div>
+          <button
+            onClick={() => { toggleLightOverlay(); setOpen(false); }}
+            className="flex w-full items-center justify-between px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-50"
+          >
+            <span className="flex items-center gap-2">
+              <span className="w-4 text-center text-amber-500">L</span>
+              Natural Light Heatmap
+            </span>
+            {lightOverlayVisible && <span className="text-[10px] text-green-600 font-medium">ON</span>}
+          </button>
+        </div>
+      )}
     </div>
   );
 }

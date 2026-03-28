@@ -3,6 +3,7 @@
 import React, { useMemo } from "react";
 import { useFloorPlanStore } from "@/stores/floor-plan-store";
 import { analyzeVastuCompliance, type VastuReport, type VastuReportItem } from "@/lib/floor-plan/vastu-analyzer";
+import { suggestRoomSwaps, type SwapSuggestion } from "@/lib/floor-plan/room-optimizer";
 import { DIRECTION_LABELS } from "@/lib/floor-plan/vastu-rules";
 
 export function VastuPanel() {
@@ -12,9 +13,16 @@ export function VastuPanel() {
   const toggleVastuOverlay = useFloorPlanStore((s) => s.toggleVastuOverlay);
   const northAngle = useFloorPlanStore((s) => s.project?.settings.north_angle_deg ?? 0);
 
+  const applySwapSuggestion = useFloorPlanStore((s) => s.applySwapSuggestion);
+
   const report = useMemo<VastuReport | null>(() => {
     if (!floor) return null;
     return analyzeVastuCompliance(floor, northAngle);
+  }, [floor, northAngle]);
+
+  const swapSuggestions = useMemo<SwapSuggestion[]>(() => {
+    if (!floor) return [];
+    return suggestRoomSwaps(floor, northAngle, 3);
   }, [floor, northAngle]);
 
   if (!report) {
@@ -115,10 +123,57 @@ export function VastuPanel() {
         )}
       </div>
 
-      {/* Suggestions */}
+      {/* Swap Suggestions with Apply buttons */}
+      {swapSuggestions.length > 0 && (
+        <div className="border-t border-gray-200 p-3">
+          <h4 className="text-[10px] font-semibold text-violet-500 uppercase mb-2">AI Swap Suggestions</h4>
+          {swapSuggestions.map((suggestion) => (
+            <div key={suggestion.id} className="mb-2 rounded border border-gray-100 p-2 bg-white">
+              <div className="flex items-center justify-between mb-1">
+                <span className={`text-[10px] font-semibold ${
+                  suggestion.priority === "high" ? "text-green-600" :
+                  suggestion.priority === "medium" ? "text-amber-600" : "text-gray-500"
+                }`}>
+                  +{suggestion.improvement} pts
+                </span>
+                <span className={`text-[9px] px-1.5 py-0.5 rounded ${
+                  suggestion.priority === "high" ? "bg-green-50 text-green-700" :
+                  suggestion.priority === "medium" ? "bg-amber-50 text-amber-700" : "bg-gray-50 text-gray-500"
+                }`}>
+                  {suggestion.priority}
+                </span>
+              </div>
+              <p className="text-gray-600 text-[11px] mb-1.5">
+                Swap <strong>{suggestion.room_a_name}</strong> with <strong>{suggestion.room_b_name}</strong>
+              </p>
+              <p className="text-gray-400 text-[10px] mb-2">{suggestion.reason}</p>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    setSelectedIds([suggestion.room_a_id, suggestion.room_b_id]);
+                  }}
+                  className="flex-1 rounded border border-gray-200 px-2 py-1 text-[10px] font-medium text-gray-600 hover:bg-gray-50 transition-colors"
+                >
+                  Preview
+                </button>
+                <button
+                  onClick={() => {
+                    applySwapSuggestion(suggestion.room_a_id, suggestion.room_b_id);
+                  }}
+                  className="flex-1 rounded bg-violet-600 px-2 py-1 text-[10px] font-medium text-white hover:bg-violet-700 transition-colors"
+                >
+                  Apply Swap
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* General Suggestions */}
       {report.suggestions.length > 0 && (
         <div className="border-t border-gray-200 p-3">
-          <h4 className="text-[10px] font-semibold text-gray-500 uppercase mb-2">Suggestions</h4>
+          <h4 className="text-[10px] font-semibold text-gray-500 uppercase mb-2">Remedies</h4>
           {report.suggestions.map((s, i) => (
             <p key={i} className="text-gray-600 mb-1 leading-relaxed">{s}</p>
           ))}
