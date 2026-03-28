@@ -356,23 +356,15 @@ Then use the report_construction_prices tool with your findings.
 Building type: ${buildingType}. All benchmark values in INR per SQUARE METRE (m²), not sqft.
 Steel range: ₹52,000-78,000/tonne. Cement: ₹340-560/bag. Mason: ₹500-1200/day.`;
 
+  // ── Primary: Haiku + web_search (Sonnet times out on Vercel cold starts) ──
   try {
-    // ── DIAGNOSTIC: full visibility into the Sonnet+web_search call ──
-    console.log(`[TR-015] DIAG: Vercel maxDuration=${process.env.VERCEL_FUNCTION_MAX_DURATION ?? "not set"}, region=${process.env.VERCEL_REGION ?? "unknown"}`);
-    const payloadSize = JSON.stringify({ model: "claude-sonnet-4-6", max_tokens: 2048, tools: 2, prompt: webSearchPrompt }).length;
-    console.log(`[TR-015] DIAG: prompt=${webSearchPrompt.length}chars, payload~${payloadSize}bytes, model=sonnet-4-6, web_max_uses=3`);
-
     const callStart = Date.now();
-    console.log(`[TR-015] Calling Sonnet with web_search (25s timeout)...`);
+    console.log(`[TR-015] Haiku + web_search (20s timeout, ${webSearchPrompt.length} char prompt)...`);
 
     const ctrl1 = new AbortController();
-    const t1 = setTimeout(() => {
-      console.log(`[TR-015] DIAG: OUR 25s timeout fired at ${Date.now() - callStart}ms — aborting`);
-      ctrl1.abort();
-    }, 25_000);
-
+    const t1 = setTimeout(() => ctrl1.abort(), 20_000);
     const resp = await client.messages.create({
-      model: "claude-sonnet-4-6",
+      model: "claude-haiku-4-5-20251001",
       max_tokens: 2048,
       tools: [
         { type: "web_search_20250305", name: "web_search", max_uses: 3 },
@@ -383,10 +375,7 @@ Steel range: ₹52,000-78,000/tonne. Cement: ₹340-560/bag. Mason: ₹500-1200/
     }, { signal: ctrl1.signal });
     clearTimeout(t1);
 
-    const callDuration = Date.now() - callStart;
-    console.log(`[TR-015] DIAG: Sonnet responded in ${callDuration}ms, stop_reason=${resp.stop_reason}, blocks=${resp.content.length}`);
-    console.log(`[TR-015] DIAG: usage: input=${resp.usage.input_tokens} output=${resp.usage.output_tokens}`);
-
+    const callMs = Date.now() - callStart;
     for (const block of resp.content) {
       const bt = block.type as string;
       if (bt === "web_search_tool_result" || bt === "server_tool_use") usedWebSearch = true;
@@ -401,58 +390,15 @@ Steel range: ₹52,000-78,000/tonne. Cement: ₹340-560/bag. Mason: ₹500-1200/
     }
     result.search_count = usedWebSearch ? 3 : 0;
     result.agent_notes.push(`✨ Market Intelligence — ${city}, ${state} · ${monthYear} · ${usedWebSearch ? "web search" : "Claude AI"} · ±${usedWebSearch ? "10-15" : "15-25"}%`);
-    console.log(`[TR-015] Sonnet done in ${Date.now() - startTime}ms (web: ${usedWebSearch})`);
+    console.log(`[TR-015] Haiku + web_search done in ${callMs}ms (web: ${usedWebSearch}, tokens: ${resp.usage.input_tokens}+${resp.usage.output_tokens})`);
   } catch (err) {
-    const sonnetMs = Date.now() - startTime;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const errAny = err as any;
-    console.error(`[TR-015] DIAG: Sonnet+web FAILED after ${sonnetMs}ms`);
-    console.error(`[TR-015] DIAG: err.name=${errAny?.name}, err.message=${errAny?.message}`);
-    console.error(`[TR-015] DIAG: err.status=${errAny?.status}, err.type=${errAny?.type}`);
-    console.error(`[TR-015] DIAG: abort was our timeout (25s exceeded)`);
-    if (errAny?.error) console.error(`[TR-015] DIAG: API error body:`, JSON.stringify(errAny.error));
-    if (errAny?.headers) {
-      const h = errAny.headers;
-      console.error(`[TR-015] DIAG: x-request-id=${h?.["x-request-id"] ?? h?.get?.("x-request-id") ?? "N/A"}`);
-      console.error(`[TR-015] DIAG: retry-after=${h?.["retry-after"] ?? h?.get?.("retry-after") ?? "N/A"}`);
-    }
+    const errMsg = err instanceof Error ? err.message : String(err);
+    console.error(`[TR-015] Haiku + web_search failed after ${Date.now() - startTime}ms: ${errMsg}`);
 
-    // ── Fallback 1: Sonnet WITHOUT web_search — uses reasoning prompt, forced tool ──
-    // Tested at 1.4s locally. Has better price reasoning than Haiku.
+    // ── Fallback: Haiku WITHOUT web_search ──
     try {
-      const sonnetFbStart = Date.now();
-      console.log(`[TR-015] Sonnet fallback (no web, 15s timeout). Prompt: ${userPrompt.length} chars`);
-      const ctrl1b = new AbortController();
-      const t1b = setTimeout(() => {
-        console.log(`[TR-015] DIAG: Sonnet-no-web 15s timeout fired at ${Date.now() - sonnetFbStart}ms`);
-        ctrl1b.abort();
-      }, 15_000);
-      const resp1b = await client.messages.create({
-        model: "claude-sonnet-4-6",
-        max_tokens: 2048,
-        tools: [priceTool],
-        tool_choice: { type: "tool", name: "report_construction_prices" },
-        messages: [{ role: "user", content: userPrompt }],
-      }, { signal: ctrl1b.signal });
-      clearTimeout(t1b);
-      console.log(`[TR-015] DIAG: Sonnet-no-web responded in ${Date.now() - sonnetFbStart}ms`);
-      for (const block of resp1b.content) {
-        if (block.type === "tool_use" && block.name === "report_construction_prices") {
-          jsonText = JSON.stringify(block.input);
-          break;
-        }
-      }
-      result.search_count = 0;
-      result.agent_notes.push(`✨ Market Intelligence — ${city}, ${state} · ${monthYear} · Claude AI (Sonnet reasoning) · ±15-25%`);
-      console.log(`[TR-015] Sonnet (no web) done in ${Date.now() - sonnetFbStart}ms (total: ${Date.now() - startTime}ms)`);
-    } catch (fallback1Err) {
-      const fb1Msg = fallback1Err instanceof Error ? fallback1Err.message : String(fallback1Err);
-      console.error(`[TR-015] Sonnet fallback also failed: ${fb1Msg}`);
-
-    // ── Fallback 2: Haiku with SHORT prompt, forced tool_use, 12s timeout ──
-    try {
-      console.log("[TR-015] Haiku fallback (12s timeout, short prompt)...");
       const haikuStart = Date.now();
+      console.log("[TR-015] Haiku fallback (no web, 12s timeout)...");
       const ctrl2 = new AbortController();
       const t2 = setTimeout(() => ctrl2.abort(), 12_000);
       const resp2 = await client.messages.create({
@@ -471,15 +417,13 @@ Steel range: ₹52,000-78,000/tonne. Cement: ₹340-560/bag. Mason: ₹500-1200/
       }
       result.search_count = 0;
       result.agent_notes.push(`✨ Market Intelligence — ${city}, ${state} · ${monthYear} · Claude AI · ±15-25%`);
-      console.log(`[TR-015] Haiku done in ${Date.now() - haikuStart}ms (total: ${Date.now() - startTime}ms)`);
+      console.log(`[TR-015] Haiku (no web) done in ${Date.now() - haikuStart}ms (total: ${Date.now() - startTime}ms)`);
     } catch (fallbackErr) {
       const fbMsg = fallbackErr instanceof Error ? fallbackErr.message : String(fallbackErr);
-      const totalMs = Date.now() - startTime;
       result.agent_notes.push(`Using CPWD 2024 static rates (AI unavailable — ${fbMsg})`);
-      console.error(`[TR-015] All 3 attempts failed after ${totalMs}ms: ${fbMsg}`);
+      console.error(`[TR-015] All attempts failed after ${Date.now() - startTime}ms: ${fbMsg}`);
     }
-    } // close fallback1Err catch
-  } // close Sonnet+web_search catch
+  }
 
   // ── Parse response (tool_use gives guaranteed valid JSON) ──
   if (jsonText) {
