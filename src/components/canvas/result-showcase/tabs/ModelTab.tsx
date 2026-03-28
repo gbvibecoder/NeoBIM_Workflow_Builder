@@ -6,7 +6,7 @@ import { motion } from "framer-motion";
 import dynamic from "next/dynamic";
 import { useLocale } from "@/hooks/useLocale";
 import { COLORS } from "../constants";
-import type { ShowcaseData, ProceduralModelData, GlbModelData, HtmlIframeModelData } from "../useShowcaseData";
+import type { ShowcaseData, ProceduralModelData, GlbModelData, HtmlIframeModelData, FloorPlanInteractiveData } from "../useShowcaseData";
 import type { FloorPlanGeometry, FloorPlanRoom } from "@/types/floor-plan";
 
 const ArchitecturalViewer = dynamic(
@@ -22,6 +22,11 @@ const Building3DViewer = dynamic(
 const FloorPlanEditor = dynamic(
   () => import("../../artifacts/FloorPlanEditor").then(m => ({ default: m.FloorPlanEditor })),
   { ssr: false }
+);
+
+const FloorPlanViewer = dynamic(
+  () => import("../../../floor-plan/FloorPlanViewer").then(m => ({ default: m.FloorPlanViewer })),
+  { ssr: false, loading: () => <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", color: "#888", fontSize: 13 }}>Loading Floor Plan Editor...</div> }
 );
 
 interface ModelTabProps {
@@ -101,7 +106,57 @@ export function ModelTab({ data }: ModelTabProps) {
     );
   }
 
-  // Floor Plan Editor mode
+  // GN-012 Floor Plan Interactive Editor mode (full CAD editor)
+  if (model?.kind === "floor-plan-interactive") {
+    const fpProject = model.floorPlanProject;
+    const s = model.summary;
+    return (
+      <div style={{
+        height: "100%", minHeight: 600,
+        display: "flex", flexDirection: "column",
+        background: "#fff", borderRadius: 16,
+        overflow: "hidden", border: "1px solid rgba(0,0,0,0.06)",
+        boxShadow: "0 4px 20px rgba(0,0,0,0.08)",
+      }}>
+        {/* Stats bar */}
+        <div style={{
+          display: "flex", alignItems: "center", gap: 16,
+          padding: "8px 16px",
+          borderBottom: "1px solid #e5e7eb",
+          background: "#f9fafb",
+          fontSize: 11, color: "#6b7280", flexShrink: 0,
+        }}>
+          <span style={{ fontWeight: 600, color: "#111827" }}>{model.label}</span>
+          <span>{s.totalRooms} rooms</span>
+          <span>{s.totalArea_sqm} m²</span>
+          <span>{s.totalWalls} walls</span>
+          <span>{s.totalDoors} doors</span>
+          <span>{s.totalWindows} windows</span>
+          <span style={{ marginLeft: "auto", color: "#3b82f6", fontWeight: 500 }}>
+            {s.buildingType} · {s.floorCount} floor{s.floorCount > 1 ? "s" : ""}
+          </span>
+        </div>
+        {/* Full interactive editor */}
+        <div style={{ flex: 1, overflow: "hidden" }}>
+          {fpProject ? (
+            <FloorPlanViewer
+              initialProject={fpProject}
+            />
+          ) : (
+            <div style={{
+              display: "flex", alignItems: "center", justifyContent: "center",
+              height: "100%", color: "#9ca3af", fontSize: 13,
+            }}>
+              Floor plan project data not available in mock mode.
+              <br />Run with a real upstream node to see the interactive editor.
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // Floor Plan Editor mode (GN-011 with geometry + source image)
   if (model?.kind === "floor-plan-editor") {
     return (
       <FloorPlanLayout

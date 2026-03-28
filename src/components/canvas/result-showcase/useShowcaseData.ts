@@ -92,7 +92,25 @@ export interface FloorPlanEditorData {
   aiRenderUrl?: string;
 }
 
-export type Model3DData = ProceduralModelData | GlbModelData | HtmlIframeModelData | FloorPlanEditorData;
+export interface FloorPlanInteractiveData {
+  kind: "floor-plan-interactive";
+  floorPlanProject: import("@/types/floor-plan-cad").FloorPlanProject;
+  boqQuantities: Record<string, unknown>;
+  roomSchedule: Array<Record<string, unknown>>;
+  svgContent: string;
+  label: string;
+  summary: {
+    totalRooms: number;
+    totalArea_sqm: number;
+    totalWalls: number;
+    totalDoors: number;
+    totalWindows: number;
+    floorCount: number;
+    buildingType: string;
+  };
+}
+
+export type Model3DData = ProceduralModelData | GlbModelData | HtmlIframeModelData | FloorPlanEditorData | FloorPlanInteractiveData;
 
 export interface PipelineStep {
   nodeId: string;
@@ -324,6 +342,35 @@ export function useShowcaseData(): ShowcaseData {
           buildingType: (d.buildingType as string) ?? "Mixed-Use",
           style: d.style as Record<string, unknown> | undefined,
         };
+      }
+    }
+
+    // ── GN-012 Floor Plan Interactive Editor (type:"json" with floorPlanProject) ──
+    if (!model3dData) {
+      for (const a of artifacts.values()) {
+        if (a.type !== "json") continue;
+        const d = asRecord(a.data);
+        if (d.interactive === true && d.floorPlanProject) {
+          const summary = asRecord(d.summary ?? {});
+          model3dData = {
+            kind: "floor-plan-interactive",
+            floorPlanProject: d.floorPlanProject as import("@/types/floor-plan-cad").FloorPlanProject,
+            boqQuantities: asRecord(d.boqQuantities ?? {}),
+            roomSchedule: (d.roomSchedule as Array<Record<string, unknown>>) ?? [],
+            svgContent: (d.svgContent as string) ?? "",
+            label: (d.label as string) ?? "Floor Plan Editor",
+            summary: {
+              totalRooms: (summary.totalRooms as number) ?? 0,
+              totalArea_sqm: (summary.totalArea_sqm as number) ?? 0,
+              totalWalls: (summary.totalWalls as number) ?? 0,
+              totalDoors: (summary.totalDoors as number) ?? 0,
+              totalWindows: (summary.totalWindows as number) ?? 0,
+              floorCount: (summary.floorCount as number) ?? 1,
+              buildingType: (summary.buildingType as string) ?? "residential",
+            },
+          };
+          break;
+        }
       }
     }
 

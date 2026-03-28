@@ -561,6 +561,14 @@ export const useFloorPlanStore = create<FloorPlanState>()((set, get) => ({
                 windows: f.windows.filter((w) => !allRemoveIds.has(w.id)),
                 furniture: f.furniture.filter((fi) => !ids.has(fi.id)),
                 columns: f.columns.filter((c) => !ids.has(c.id)),
+                // Clean orphaned wall references from rooms
+                rooms: wallIdsToRemove.length > 0
+                  ? f.rooms.map((r) =>
+                      r.wall_ids.some((wid) => allRemoveIds.has(wid))
+                        ? { ...r, wall_ids: r.wall_ids.filter((wid) => !allRemoveIds.has(wid)) }
+                        : r
+                    )
+                  : f.rooms,
               }
             : f
         ),
@@ -981,11 +989,15 @@ export const useFloorPlanStore = create<FloorPlanState>()((set, get) => ({
       const nid = genId("r"); idMap.set(r.id, nid); r.id = nid;
       r.wall_ids = r.wall_ids.map((wid) => idMap.get(wid) ?? wid);
     });
-    copy.doors.forEach((d) => { d.id = genId("d"); d.wall_id = idMap.get(d.wall_id) ?? d.wall_id; });
+    copy.doors.forEach((d) => {
+      d.id = genId("d");
+      d.wall_id = idMap.get(d.wall_id) ?? d.wall_id;
+      d.connects_rooms = d.connects_rooms.map((rid) => idMap.get(rid) ?? rid) as [string, string];
+    });
     copy.windows.forEach((w) => { w.id = genId("win"); w.wall_id = idMap.get(w.wall_id) ?? w.wall_id; });
     copy.stairs.forEach((st) => { st.id = genId("stair"); });
     copy.columns.forEach((c) => { c.id = genId("col"); });
-    copy.furniture.forEach((fi) => { fi.id = genId("furn"); });
+    copy.furniture.forEach((fi) => { fi.id = genId("furn"); fi.room_id = idMap.get(fi.room_id) ?? fi.room_id; });
     set({
       project: { ...s.project, floors: [...s.project.floors, copy] },
       activeFloorId: copy.id,
@@ -1020,6 +1032,7 @@ export const useFloorPlanStore = create<FloorPlanState>()((set, get) => ({
     const s = get();
     if (s._historyIndex <= 0 || !s.project || !s.activeFloorId) return;
     const prev = s._history[s._historyIndex - 1];
+    if (!prev) return; // Bounds safety
     set({
       _historyIndex: s._historyIndex - 1,
       project: {
@@ -1035,6 +1048,7 @@ export const useFloorPlanStore = create<FloorPlanState>()((set, get) => ({
     const s = get();
     if (s._historyIndex >= s._history.length - 1 || !s.project || !s.activeFloorId) return;
     const next = s._history[s._historyIndex + 1];
+    if (!next) return; // Bounds safety
     set({
       _historyIndex: s._historyIndex + 1,
       project: {

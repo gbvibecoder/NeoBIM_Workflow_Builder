@@ -792,6 +792,78 @@ export async function executeNode(
       });
     }
 
+    case "GN-012": { // Floor Plan Editor — mock
+      const mockRooms012 = [
+        { name: "Living Room", type: "living", area_sqm: 25.5, width_m: 5.1, length_m: 5.0 },
+        { name: "Kitchen", type: "kitchen", area_sqm: 12.0, width_m: 4.0, length_m: 3.0 },
+        { name: "Bedroom 1", type: "bedroom", area_sqm: 16.0, width_m: 4.0, length_m: 4.0 },
+        { name: "Bedroom 2", type: "bedroom", area_sqm: 12.0, width_m: 4.0, length_m: 3.0 },
+        { name: "Bathroom 1", type: "bathroom", area_sqm: 4.5, width_m: 2.5, length_m: 1.8 },
+        { name: "Bathroom 2", type: "bathroom", area_sqm: 3.5, width_m: 2.0, length_m: 1.75 },
+        { name: "Hallway", type: "hallway", area_sqm: 6.0, width_m: 6.0, length_m: 1.0 },
+        { name: "Balcony", type: "balcony", area_sqm: 5.0, width_m: 5.0, length_m: 1.0 },
+      ];
+      const totalArea012 = mockRooms012.reduce((s, r) => s + r.area_sqm, 0);
+
+      return mockArtifact(executionId, tileInstanceId, "json", {
+        label: "Floor Plan Editor — 2BHK Apartment (Mock)",
+        interactive: true,
+        sourceType: "fallback",
+        warnings: ["Mock mode — using sample floor plan data"],
+        floorPlanProject: null, // Full project not available in mock
+        boqQuantities: {
+          walls: {
+            exterior: { length_m: 38.2, area_sqm: 114.6, volume_cum: 26.36, material: "brick_230mm" },
+            interior: { length_m: 22.5, area_sqm: 67.5, volume_cum: 10.13, material: "brick_150mm" },
+            partition: { length_m: 5.0, area_sqm: 15.0, volume_cum: 1.5, material: "drywall_100mm" },
+          },
+          doors: [
+            { type: "single swing", width_mm: 1050, height_mm: 2100, count: 1, description: "Main / Entrance" },
+            { type: "single swing", width_mm: 900, height_mm: 2100, count: 4, description: "Room" },
+            { type: "single swing", width_mm: 750, height_mm: 2100, count: 2, description: "Bathroom" },
+          ],
+          windows: [
+            { type: "sliding", width_mm: 1500, height_mm: 1200, count: 4, area_sqm: 7.2 },
+            { type: "sliding", width_mm: 900, height_mm: 600, count: 2, area_sqm: 1.08 },
+          ],
+          flooring: { total_area_sqm: totalArea012, by_room_type: { living: 25.5, kitchen: 12.0, bedroom: 28.0, bathroom: 8.0, hallway: 6.0, balcony: 5.0 } },
+          plastering: { interior_wall_area_sqm: 135.0, ceiling_area_sqm: totalArea012, exterior_wall_area_sqm: 114.6 },
+          skirting: { total_length_m: 65.0 },
+          painting: { wall_area_sqm: 230.0, ceiling_area_sqm: totalArea012 },
+          structural: { columns_count: 4, columns_volume_cum: 1.08, slab_area_sqm: totalArea012, slab_volume_cum: totalArea012 * 0.15, stairs_count: 0 },
+        },
+        roomSchedule: mockRooms012.map((r, i) => ({
+          room_number: i + 1,
+          name: r.name,
+          type: r.type,
+          area_sqm: r.area_sqm,
+          width_m: r.width_m,
+          length_m: r.length_m,
+          floor: "Ground Floor",
+        })),
+        massingGeometry: null,
+        svgContent: "",
+        summary: {
+          totalRooms: mockRooms012.length,
+          totalArea_sqm: Math.round(totalArea012 * 100) / 100,
+          totalWalls: 18,
+          totalDoors: 7,
+          totalWindows: 6,
+          totalColumns: 4,
+          totalStairs: 0,
+          floorCount: 1,
+          buildingType: "residential",
+        },
+        _outputs: {
+          "project-out": null,
+          "geo-out": null,
+          "schedule-out": mockRooms012.map((r, i) => ({ room_number: i + 1, ...r, floor: "Ground Floor" })),
+          "boq-out": { walls: { exterior: { length_m: 38.2 }, interior: { length_m: 22.5 }, partition: { length_m: 5.0 } } },
+          "svg-out": "",
+        },
+      });
+    }
+
     case "GN-008": { // Text to 3D Generator — mock
       const t2dPrompt = String(inputData?.content ?? inputData?.prompt ?? "modern building");
       const t2dSeed = t2dPrompt.slice(0, 15).replace(/\s+/g, "-").toLowerCase() || "building";

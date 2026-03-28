@@ -25,9 +25,11 @@ interface FloorPlanViewerProps {
   initialGeometry?: import("@/types/floor-plan").FloorPlanGeometry;
   initialPrompt?: string;
   initialProjectId?: string;
+  /** Pre-loaded FloorPlanProject from workflow node (GN-012) */
+  initialProject?: import("@/types/floor-plan-cad").FloorPlanProject;
 }
 
-export function FloorPlanViewer({ initialGeometry, initialPrompt, initialProjectId }: FloorPlanViewerProps) {
+export function FloorPlanViewer({ initialGeometry, initialPrompt, initialProjectId, initialProject }: FloorPlanViewerProps) {
   const project = useFloorPlanStore((s) => s.project);
   const leftPanelOpen = useFloorPlanStore((s) => s.leftPanelOpen);
   const rightPanelOpen = useFloorPlanStore((s) => s.rightPanelOpen);
@@ -47,7 +49,16 @@ export function FloorPlanViewer({ initialGeometry, initialPrompt, initialProject
 
   // Load from props on mount (e.g. navigated from result showcase or URL params)
   useEffect(() => {
-    if (initialGeometry) {
+    if (initialProject) {
+      // Direct FloorPlanProject from workflow node (GN-012)
+      const store = useFloorPlanStore.getState();
+      store.setProject(initialProject);
+      useFloorPlanStore.setState({
+        dataSource: "pipeline",
+        originalPrompt: null,
+        projectModified: false,
+      });
+    } else if (initialGeometry) {
       loadFromGeometry(initialGeometry, undefined, initialPrompt);
     } else if (initialProjectId) {
       loadFromSaved(initialProjectId);

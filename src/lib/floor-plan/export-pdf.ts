@@ -49,7 +49,7 @@ export async function exportFloorToPdf(
 ): Promise<void> {
   const { default: jsPDF } = await import("jspdf");
 
-  const paper = PAPER_SIZES[options.paperSize];
+  const paper = PAPER_SIZES[options.paperSize] ?? PAPER_SIZES.A4;
   const pdf = new jsPDF({
     orientation: "landscape",
     unit: "mm",

@@ -92,7 +92,7 @@ function extractBuildingTypeFromText(text: string): string | null {
 }
 
 // Node IDs that have real implementations
-const REAL_NODE_IDS = new Set(["TR-001", "TR-003", "TR-004", "TR-005", "TR-012", "GN-001", "GN-003", "GN-004", "GN-007", "GN-008", "GN-009", "GN-010", "GN-011", "TR-007", "TR-008", "TR-015", "TR-016", "EX-001", "EX-002", "EX-003"]);
+const REAL_NODE_IDS = new Set(["TR-001", "TR-003", "TR-004", "TR-005", "TR-012", "GN-001", "GN-003", "GN-004", "GN-007", "GN-008", "GN-009", "GN-010", "GN-011", "GN-012", "TR-007", "TR-008", "TR-015", "TR-016", "EX-001", "EX-002", "EX-003"]);
 
 // Nodes that require OpenAI API calls
 const OPENAI_NODES = new Set(["TR-003", "TR-004", "TR-005", "TR-012", "GN-003", "GN-004", "GN-008"]);
@@ -4996,6 +4996,92 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
           aiRenderUrl: aiRenderUrl || undefined,
         },
         metadata: { engine: "threejs-r128", real: true },
+        createdAt: new Date(),
+      };
+
+    } else if (catalogueId === "GN-012") {
+      // ── Floor Plan Editor (Interactive CAD) ──────────────────────────
+      // Converts upstream geometry into a FloorPlanProject and produces
+      // structured outputs for downstream nodes (BOQ, IFC, reports).
+      // The actual interactive editing happens client-side in the result showcase.
+      const { adaptNodeInput } = await import("@/lib/floor-plan/node-input-adapter");
+      const { buildNodeOutputs, computeBOQQuantities, extractRoomSchedule } = await import("@/lib/floor-plan/node-output-adapter");
+      const { convertFloorPlanToMassing } = await import("@/lib/floor-plan/floorplan-to-massing");
+      const { exportFloorToSvg } = await import("@/lib/floor-plan/export-svg");
+
+      const designBrief = typeof inputData?.brief === "string" ? inputData.brief
+        : typeof inputData?.content === "string" ? inputData.content
+        : typeof inputData?.prompt === "string" ? inputData.prompt
+        : undefined;
+
+      const adapted = adaptNodeInput(
+        (inputData?._raw ?? inputData ?? {}) as Record<string, unknown>,
+        designBrief,
+      );
+      const project = adapted.project;
+      const floor = project.floors[0];
+      if (!floor) throw new Error("FloorPlanProject has no floors");
+
+      // Compute all outputs
+      const boqQuantities = computeBOQQuantities(project);
+      const roomSchedule = extractRoomSchedule(project);
+      const massingGeometry = convertFloorPlanToMassing(project);
+
+      let svgContent = "";
+      try {
+        svgContent = exportFloorToSvg(floor, project.name, {
+          includeRoomFills: true,
+          includeDimensions: true,
+          includeGrid: false,
+          displayUnit: (project.settings.display_unit as "mm" | "cm" | "m") ?? "mm",
+        });
+      } catch { /* SVG export is non-critical */ }
+
+      const totalArea = floor.rooms.reduce((s, r) => s + r.area_sqm, 0);
+
+      artifact = {
+        id: `art_${generateId()}`,
+        executionId,
+        tileInstanceId,
+        type: "json",
+        data: {
+          label: `Floor Plan Editor — ${project.name}`,
+          interactive: true,
+          sourceType: adapted.sourceType,
+          warnings: adapted.warnings,
+
+          // Full project for the interactive editor
+          floorPlanProject: project,
+
+          // Structured outputs for downstream nodes
+          boqQuantities,
+          roomSchedule,
+          massingGeometry,
+          svgContent,
+
+          // Summary metrics
+          summary: {
+            totalRooms: floor.rooms.length,
+            totalArea_sqm: Math.round(totalArea * 100) / 100,
+            totalWalls: floor.walls.length,
+            totalDoors: floor.doors.length,
+            totalWindows: floor.windows.length,
+            totalColumns: floor.columns.length,
+            totalStairs: floor.stairs.length,
+            floorCount: project.floors.length,
+            buildingType: project.metadata.project_type ?? "residential",
+          },
+
+          // Port outputs (keyed by output port ID for downstream consumption)
+          _outputs: {
+            "project-out": project,
+            "geo-out": massingGeometry,
+            "schedule-out": roomSchedule,
+            "boq-out": boqQuantities,
+            "svg-out": svgContent,
+          },
+        },
+        metadata: { engine: "floor-plan-cad", real: true, interactive: true },
         createdAt: new Date(),
       };
 
