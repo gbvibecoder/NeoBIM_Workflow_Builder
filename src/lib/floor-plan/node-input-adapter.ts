@@ -32,7 +32,15 @@ export function adaptNodeInput(
 ): AdaptedInput {
   const warnings: string[] = [];
   const raw = inputData._raw as Record<string, unknown> | undefined;
-  const effective = raw ?? inputData;
+
+  // When GN-012 receives merged data from multiple upstream nodes (GN-004 + TR-003),
+  // _raw comes from TR-003 (design brief) while geometry/roomList sit at top level
+  // from GN-004. Don't let _raw shadow the actual room data.
+  const hasDirectRoomData = !!inputData.geometry
+    || Array.isArray(inputData.roomList)
+    || Array.isArray(inputData.rooms)
+    || Array.isArray(inputData.richRooms);
+  const effective = (raw && !hasDirectRoomData) ? raw : inputData;
 
   // Strategy 1: Already a FloorPlanProject (re-edit or direct pass-through)
   if (isFloorPlanProject(effective)) {
@@ -42,9 +50,17 @@ export function adaptNodeInput(
       warnings,
     };
   }
+  // Also check _raw for FloorPlanProject (in case it's nested)
+  if (raw && raw !== effective && isFloorPlanProject(raw)) {
+    return {
+      project: raw as unknown as FloorPlanProject,
+      sourceType: "project",
+      warnings,
+    };
+  }
 
-  // Strategy 2: TR-004 output — has geometry.rooms + geometry.walls
-  const geometry = extractGeometry(effective);
+  // Strategy 2: TR-004 / GN-004 output — has geometry.rooms
+  const geometry = extractGeometry(effective) ?? (raw && raw !== effective ? extractGeometry(raw) : null);
   if (geometry) {
     const name = designBrief
       ? designBrief.slice(0, 60).trim()
@@ -53,8 +69,8 @@ export function adaptNodeInput(
     return { project, sourceType: "tr004", warnings };
   }
 
-  // Strategy 3: Raw rooms array (from simplified AI output)
-  const rooms = extractRooms(effective);
+  // Strategy 3: Raw rooms array (from simplified AI output or GN-004 roomList)
+  const rooms = extractRooms(effective) ?? (raw && raw !== effective ? extractRooms(raw) : null);
   if (rooms && rooms.length > 0) {
     const footprint = estimateFootprint(rooms);
     const syntheticGeometry: FloorPlanGeometry = {
@@ -65,36 +81,65 @@ export function adaptNodeInput(
       windows: [],
       rooms,
     };
+    const name = designBrief
+      ? designBrief.slice(0, 60).trim()
+      : "AI-Generated Floor Plan";
     const project = convertGeometryToProject(
       syntheticGeometry,
-      "AI-Generated Floor Plan",
+      name,
       designBrief
     );
     warnings.push("Walls auto-generated from room boundaries (no wall data in input)");
     return { project, sourceType: "raw-rooms", warnings };
   }
 
-  // Strategy 4: Fallback — create a blank project
-  warnings.push("No recognizable floor plan data in input. Created blank project.");
-  const blankGeometry: FloorPlanGeometry = {
-    footprint: { width: 12, depth: 10 },
+  // Strategy 4: Fallback — use realistic sample 2BHK so the editor is never blank
+  warnings.push("No recognizable floor plan data in input. Using sample floor plan.");
+  const fallbackGeometry: FloorPlanGeometry = {
+    footprint: { width: 11.6, depth: 9.0 },
     wallHeight: 3.0,
-    walls: [],
-    doors: [],
-    windows: [],
+    walls: [
+      { start: [0, 0], end: [11.6, 0], thickness: 0.23, type: "exterior" as const },
+      { start: [11.6, 0], end: [11.6, 9.0], thickness: 0.23, type: "exterior" as const },
+      { start: [11.6, 9.0], end: [0, 9.0], thickness: 0.23, type: "exterior" as const },
+      { start: [0, 9.0], end: [0, 0], thickness: 0.23, type: "exterior" as const },
+      { start: [5.1, 0], end: [5.1, 7.0], thickness: 0.15, type: "interior" as const },
+      { start: [9.1, 0], end: [9.1, 3.55], thickness: 0.15, type: "interior" as const },
+      { start: [0, 5.0], end: [10.0, 5.0], thickness: 0.15, type: "interior" as const },
+      { start: [4.0, 5.0], end: [4.0, 6.0], thickness: 0.15, type: "interior" as const },
+    ],
+    doors: [
+      { position: [2.5, 5.0], width: 0.9, wallId: 6, type: "single" as const },
+      { position: [5.1, 2.0], width: 0.9, wallId: 4, type: "single" as const },
+      { position: [5.1, 5.5], width: 0.9, wallId: 4, type: "single" as const },
+      { position: [9.1, 0.9], width: 0.75, wallId: 5, type: "single" as const },
+      { position: [9.1, 2.7], width: 0.75, wallId: 5, type: "single" as const },
+      { position: [2.0, 5.0], width: 0.9, wallId: 6, type: "single" as const },
+      { position: [5.5, 0], width: 1.05, wallId: 0, type: "single" as const },
+    ],
+    windows: [
+      { position: [2.5, 0], width: 1.5, height: 1.2, sillHeight: 0.9 },
+      { position: [7.1, 0], width: 1.5, height: 1.2, sillHeight: 0.9 },
+      { position: [0, 2.5], width: 1.5, height: 1.2, sillHeight: 0.9 },
+      { position: [0, 6.5], width: 1.2, height: 1.2, sillHeight: 0.9 },
+      { position: [11.6, 5.0], width: 1.2, height: 1.0, sillHeight: 1.0 },
+      { position: [2.5, 9.0], width: 1.5, height: 1.2, sillHeight: 0.9 },
+    ],
     rooms: [
-      {
-        name: "Room 1",
-        center: [6, 5],
-        width: 12,
-        depth: 10,
-        type: "living",
-        x: 0,
-        y: 0,
-      },
+      { name: "Living Room",  type: "living",   x: 0,   y: 0,   width: 5.1, depth: 5.0, center: [2.55, 2.5]  },
+      { name: "Bedroom 1",    type: "bedroom",  x: 5.1, y: 0,   width: 4.0, depth: 4.0, center: [7.1, 2.0]   },
+      { name: "Bathroom 1",   type: "bathroom", x: 9.1, y: 0,   width: 2.5, depth: 1.8, center: [10.35, 0.9] },
+      { name: "Bathroom 2",   type: "bathroom", x: 9.1, y: 1.8, width: 2.0, depth: 1.75, center: [10.1, 2.675] },
+      { name: "Bedroom 2",    type: "bedroom",  x: 5.1, y: 4.0, width: 4.0, depth: 3.0, center: [7.1, 5.5]   },
+      { name: "Kitchen",      type: "kitchen",  x: 0,   y: 5.0, width: 4.0, depth: 3.0, center: [2.0, 6.5]   },
+      { name: "Hallway",      type: "hallway",  x: 4.0, y: 5.0, width: 6.0, depth: 1.0, center: [7.0, 5.5]   },
+      { name: "Balcony",      type: "balcony",  x: 0,   y: 8.0, width: 5.0, depth: 1.0, center: [2.5, 8.5]   },
     ],
   };
-  const project = convertGeometryToProject(blankGeometry, "Untitled Floor Plan", designBrief);
+  const fallbackName = designBrief
+    ? designBrief.slice(0, 60).trim()
+    : "Sample Floor Plan";
+  const project = convertGeometryToProject(fallbackGeometry, fallbackName, designBrief);
   return { project, sourceType: "fallback", warnings };
 }
 
