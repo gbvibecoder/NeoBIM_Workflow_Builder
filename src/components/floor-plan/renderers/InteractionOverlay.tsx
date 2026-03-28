@@ -13,6 +13,7 @@ import {
   scalePoint,
 } from "@/lib/floor-plan/geometry";
 import { formatDimension } from "@/lib/floor-plan/unit-conversion";
+import type { DisplayUnit } from "@/lib/floor-plan/unit-conversion";
 import type { Point } from "@/types/floor-plan-cad";
 
 interface InteractionOverlayProps {
@@ -143,7 +144,7 @@ function WallPreview({
   cursor: Point;
   ortho: boolean;
   viewport: Viewport;
-  displayUnit: string;
+  displayUnit: DisplayUnit;
 }) {
   const wallThickness = useFloorPlanStore.getState().project?.settings.wall_thickness_mm || 150;
 
@@ -216,7 +217,7 @@ function WallPreview({
             x={midX - 35}
             y={midY - 19}
             width={70}
-            text={formatDimension(len, displayUnit as "m")}
+            text={formatDimension(len, displayUnit)}
             fontSize={11}
             fontFamily="Inter, system-ui, sans-serif"
             fontStyle="bold"
@@ -272,7 +273,14 @@ function GhostDoor({
   const dir = lineDirection(wall.centerline);
   const norm = perpendicularLeft(dir);
   const halfT = wall.thickness_mm / 2;
-  const doorWidth = 900;
+  // Use context-aware width: bathroom=750, lobby/foyer=1050, default=900
+  const adjRoomTypes: string[] = [wall.left_room_id, wall.right_room_id]
+    .filter(Boolean)
+    .map((rid) => floor.rooms.find((r: any) => r.id === rid)?.type ?? "")
+    .filter(Boolean);
+  const hasBathroom = adjRoomTypes.some((t: string) => ["bathroom", "toilet", "wc", "utility"].includes(t));
+  const hasLobby = adjRoomTypes.some((t: string) => ["lobby", "foyer"].includes(t));
+  const doorWidth = hasLobby ? 1050 : hasBathroom ? 750 : 900;
 
   const doorStart = addPoints(wall.centerline.start, scalePoint(dir, ghostDoor.position_mm));
   const doorEnd = addPoints(doorStart, scalePoint(dir, doorWidth));
@@ -317,7 +325,14 @@ function GhostWindow({
   const dir = lineDirection(wall.centerline);
   const norm = perpendicularLeft(dir);
   const halfT = wall.thickness_mm / 2;
-  const winWidth = 1200;
+  // Use context-aware width: bathroom=600, kitchen=900, default=1200
+  const adjRoomTypes: string[] = [wall.left_room_id, wall.right_room_id]
+    .filter(Boolean)
+    .map((rid) => floor.rooms.find((r: any) => r.id === rid)?.type ?? "")
+    .filter(Boolean);
+  const hasBathroom = adjRoomTypes.some((t: string) => ["bathroom", "toilet", "wc"].includes(t));
+  const hasKitchen = adjRoomTypes.some((t: string) => ["kitchen"].includes(t));
+  const winWidth = hasBathroom ? 600 : hasKitchen ? 900 : 1200;
 
   const winStart = addPoints(wall.centerline.start, scalePoint(dir, ghostWindow.position_mm));
   const winEnd = addPoints(winStart, scalePoint(dir, winWidth));

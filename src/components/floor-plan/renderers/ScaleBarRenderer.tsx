@@ -21,7 +21,8 @@ export function ScaleBarRenderer({ viewport, displayUnit }: ScaleBarRendererProp
     // Determine a "nice" scale bar length in world units (mm)
     // Target: scale bar should be ~200px on screen
     const targetScreenWidth = 180;
-    const worldWidth = targetScreenWidth / viewport.zoom; // mm
+    const zoom = viewport.zoom || 1;
+    const worldWidth = targetScreenWidth / zoom; // mm
 
     // Pick the nearest "nice" interval in mm
     const niceIntervals = [100, 200, 500, 1000, 2000, 5000, 10000, 20000, 50000];

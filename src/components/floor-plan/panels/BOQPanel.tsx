@@ -31,9 +31,9 @@ export function BOQPanel() {
             <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
         </div>
-        <p className="text-xs font-medium text-gray-500">No quantities to estimate</p>
+        <p className="text-xs font-medium text-gray-500">No quantities to extract</p>
         <p className="mt-1 text-[10px] text-gray-400">
-          Add walls, doors, and rooms to generate a Bill of Quantities
+          Add walls, doors, and rooms to generate a material takeoff
         </p>
       </div>
     );
@@ -46,21 +46,19 @@ export function BOQPanel() {
     categories.get(item.category)!.push(item);
   }
 
-  // Category totals for chart
-  const categoryTotals = Array.from(categories.entries()).map(([cat, items]) => ({
+  // Category quantities for chart (use total quantity as metric)
+  const categoryData = Array.from(categories.entries()).map(([cat, items]) => ({
     name: cat,
-    total: items.reduce((s, i) => s + (i.amount_inr ?? 0), 0),
+    count: items.length,
     color: CATEGORY_COLORS[cat] ?? "#6B7280",
-  })).sort((a, b) => b.total - a.total);
-
-  const maxCatTotal = Math.max(...categoryTotals.map((c) => c.total), 1);
+  }));
 
   return (
     <div className="text-xs">
       {/* Header */}
       <div className="p-3 border-b border-gray-200">
         <div className="flex items-center justify-between mb-2">
-          <h3 className="text-sm font-bold text-gray-800">Bill of Quantities</h3>
+          <h3 className="text-sm font-bold text-gray-800">Material Takeoff</h3>
           <button
             onClick={() => exportBOQAsCSV(report)}
             className="rounded-md bg-green-50 px-2.5 py-1 text-[10px] font-semibold text-green-700 hover:bg-green-100 transition-colors"
@@ -68,39 +66,29 @@ export function BOQPanel() {
             Export CSV
           </button>
         </div>
-        <div className="flex items-baseline gap-1">
-          <span className="text-lg font-bold text-gray-900">
-            {formatINR(report.total_estimated_cost)}
-          </span>
-          <span className="text-[10px] text-gray-400 font-medium">estimated total</span>
-        </div>
-        <p className="text-[10px] text-gray-400 mt-1">
+        <p className="text-[10px] text-gray-400">
           {report.items.length} line items &middot; {report.floor_name}
+        </p>
+        <p className="text-[9px] text-gray-400 mt-0.5">
+          Quantities only — costing via TR-008 pipeline
         </p>
       </div>
 
-      {/* Cost breakdown chart */}
+      {/* Category summary */}
       <div className="p-3 border-b border-gray-200">
         <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-400 mb-2">
-          Cost Breakdown
+          Categories
         </p>
-        <div className="space-y-1.5">
-          {categoryTotals.map((cat) => (
-            <div key={cat.name}>
-              <div className="flex items-center justify-between mb-0.5">
-                <span className="text-[10px] font-medium text-gray-600">{cat.name}</span>
-                <span className="text-[10px] font-mono text-gray-500">{formatINR(cat.total)}</span>
-              </div>
-              <div className="h-1.5 rounded-full bg-gray-100 overflow-hidden">
-                <div
-                  className="h-full rounded-full transition-all"
-                  style={{
-                    width: `${(cat.total / maxCatTotal) * 100}%`,
-                    backgroundColor: cat.color,
-                  }}
-                />
-              </div>
-            </div>
+        <div className="flex flex-wrap gap-1.5">
+          {categoryData.map((cat) => (
+            <span
+              key={cat.name}
+              className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium"
+              style={{ backgroundColor: cat.color + "15", color: cat.color }}
+            >
+              <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: cat.color }} />
+              {cat.name} ({cat.count})
+            </span>
           ))}
         </div>
       </div>
@@ -108,7 +96,7 @@ export function BOQPanel() {
       {/* Detailed items */}
       <div className="p-3">
         <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-400 mb-2">
-          Detailed Items
+          Detailed Quantities
         </p>
         {Array.from(categories.entries()).map(([category, items]) => (
           <div key={category} className="mb-3">
@@ -121,7 +109,7 @@ export function BOQPanel() {
                 {category}
               </span>
               <span className="text-[10px] text-gray-400">
-                ({formatINR(items.reduce((s, i) => s + (i.amount_inr ?? 0), 0))})
+                ({items.length} {items.length === 1 ? "item" : "items"})
               </span>
             </div>
             <div className="space-y-1 ml-3.5">
@@ -136,16 +124,8 @@ export function BOQPanel() {
                     </span>
                   </div>
                   <div className="flex items-center gap-3 mt-1">
-                    <span className="text-[10px] text-gray-500">
+                    <span className="text-[11px] font-semibold text-gray-800">
                       {item.quantity} {item.unit}
-                    </span>
-                    {item.rate_inr && (
-                      <span className="text-[10px] text-gray-400">
-                        @ {formatINR(item.rate_inr)}/{item.unit}
-                      </span>
-                    )}
-                    <span className="ml-auto text-[10px] font-semibold text-gray-700">
-                      {item.amount_inr ? formatINR(item.amount_inr) : "—"}
                     </span>
                   </div>
                   {item.remarks && (
@@ -160,25 +140,10 @@ export function BOQPanel() {
 
       {/* Footer */}
       <div className="p-3 border-t border-gray-200 bg-gray-50">
-        <div className="flex items-center justify-between">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500">
-            Grand Total
-          </span>
-          <span className="text-sm font-bold text-gray-900">
-            {formatINR(report.total_estimated_cost)}
-          </span>
-        </div>
-        <p className="text-[9px] text-gray-400 mt-1">
-          Rates: 2024 Pune metro approximates. Actual costs may vary.
+        <p className="text-[9px] text-gray-400">
+          Geometry-derived quantities. Cost estimation handled by the BOQ/Cost Mapper (TR-008) using live market rates.
         </p>
       </div>
     </div>
   );
-}
-
-function formatINR(amount: number): string {
-  if (amount >= 10_000_000) return `\u20B9${(amount / 10_000_000).toFixed(2)} Cr`;
-  if (amount >= 100_000) return `\u20B9${(amount / 100_000).toFixed(2)} L`;
-  if (amount >= 1_000) return `\u20B9${(amount / 1_000).toFixed(1)}K`;
-  return `\u20B9${amount.toFixed(0)}`;
 }

@@ -415,6 +415,43 @@ function tryMerge(a: Wall, b: Wall, tol: number): Wall | null {
     const x = (ax + bx) / 2;
     return mergedWall(a, b, { x, y: Math.min(aMin, bMin) }, { x, y: Math.max(aMax, bMax) });
   }
+
+  // Diagonal walls: merge if collinear (same direction vector) and overlapping
+  if (!aH && !aV && !bH && !bV) {
+    const adx = a.centerline.end.x - a.centerline.start.x;
+    const ady = a.centerline.end.y - a.centerline.start.y;
+    const bdx = b.centerline.end.x - b.centerline.start.x;
+    const bdy = b.centerline.end.y - b.centerline.start.y;
+    const aLen = Math.sqrt(adx * adx + ady * ady);
+    const bLen = Math.sqrt(bdx * bdx + bdy * bdy);
+    if (aLen < 1 || bLen < 1) return null;
+    // Normalize direction vectors
+    const anx = adx / aLen, any_ = ady / aLen;
+    const bnx = bdx / bLen, bny = bdy / bLen;
+    // Check if parallel (cross product ≈ 0)
+    const cross = anx * bny - any_ * bnx;
+    if (Math.abs(cross) > 0.05) return null; // >~3° difference — not collinear
+    // Check if on the same line (perpendicular distance between lines < tol)
+    const dx = b.centerline.start.x - a.centerline.start.x;
+    const dy = b.centerline.start.y - a.centerline.start.y;
+    const perpDist = Math.abs(dx * (-any_) + dy * anx);
+    if (perpDist > tol) return null;
+    // Project all 4 endpoints onto the shared direction axis
+    const projA0 = a.centerline.start.x * anx + a.centerline.start.y * any_;
+    const projA1 = a.centerline.end.x * anx + a.centerline.end.y * any_;
+    const projB0 = b.centerline.start.x * anx + b.centerline.start.y * any_;
+    const projB1 = b.centerline.end.x * anx + b.centerline.end.y * any_;
+    const aMinP = Math.min(projA0, projA1), aMaxP = Math.max(projA0, projA1);
+    const bMinP = Math.min(projB0, projB1), bMaxP = Math.max(projB0, projB1);
+    if (aMaxP + tol < bMinP || bMaxP + tol < aMinP) return null; // No overlap
+    // Merged extent
+    const minP = Math.min(aMinP, bMinP);
+    const maxP = Math.max(aMaxP, bMaxP);
+    const start: Point = { x: a.centerline.start.x + anx * (minP - projA0), y: a.centerline.start.y + any_ * (minP - projA0) };
+    const end: Point = { x: a.centerline.start.x + anx * (maxP - projA0), y: a.centerline.start.y + any_ * (maxP - projA0) };
+    return mergedWall(a, b, start, end);
+  }
+
   return null;
 }
 

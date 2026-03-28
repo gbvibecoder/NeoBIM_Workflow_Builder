@@ -14,7 +14,7 @@ import {
   addPoints,
   scalePoint,
   wallLength,
-  lineIntersection,
+  segmentIntersection,
 } from "./geometry";
 
 // ============================================================
@@ -83,7 +83,7 @@ export function findSnap(
   // 2. Intersection snaps (where wall centerlines cross)
   for (let i = 0; i < walls.length; i++) {
     for (let j = i + 1; j < walls.length; j++) {
-      const ix = lineIntersection(
+      const ix = segmentIntersection(
         walls[i].centerline.start,
         walls[i].centerline.end,
         walls[j].centerline.start,
@@ -204,26 +204,35 @@ export function snapPointToGrid(point: Point, gridSize: number): Point {
 // ============================================================
 
 /**
- * Nearest point on a wall's face edges (the outer lines of the rectangle).
+ * Nearest point on a wall's face edges (all 4 sides of the rectangle).
  */
 function nearestPointOnWallFace(point: Point, wall: Wall): Point | null {
   const dir = lineDirection(wall.centerline);
   const norm = perpendicularLeft(dir);
   const halfT = wall.thickness_mm / 2;
 
-  // Two face lines (parallel to centerline)
-  const face1Start = addPoints(wall.centerline.start, scalePoint(norm, halfT));
-  const face1End = addPoints(wall.centerline.end, scalePoint(norm, halfT));
-  const face2Start = addPoints(wall.centerline.start, scalePoint(norm, -halfT));
-  const face2End = addPoints(wall.centerline.end, scalePoint(norm, -halfT));
+  // 4 corners of wall rectangle
+  const sL = addPoints(wall.centerline.start, scalePoint(norm, halfT));
+  const sR = addPoints(wall.centerline.start, scalePoint(norm, -halfT));
+  const eL = addPoints(wall.centerline.end, scalePoint(norm, halfT));
+  const eR = addPoints(wall.centerline.end, scalePoint(norm, -halfT));
 
-  const p1 = nearestPointOnSegment(point, face1Start, face1End);
-  const p2 = nearestPointOnSegment(point, face2Start, face2End);
+  // All 4 edges: 2 parallel faces + 2 perpendicular end faces
+  const segments: [Point, Point][] = [
+    [sL, eL],  // left face (parallel)
+    [sR, eR],  // right face (parallel)
+    [sL, sR],  // start end face (perpendicular)
+    [eL, eR],  // end face (perpendicular)
+  ];
 
-  const d1 = distance(point, p1);
-  const d2 = distance(point, p2);
-
-  return d1 < d2 ? p1 : p2;
+  let best: Point | null = null;
+  let bestDist = Infinity;
+  for (const [a, b] of segments) {
+    const p = nearestPointOnSegment(point, a, b);
+    const d = distance(point, p);
+    if (d < bestDist) { bestDist = d; best = p; }
+  }
+  return best;
 }
 
 function nearestPointOnSegment(point: Point, a: Point, b: Point): Point {

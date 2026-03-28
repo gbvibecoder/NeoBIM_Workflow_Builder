@@ -1,8 +1,12 @@
 /**
- * BOQ Generator — Bill of Quantities from FloorPlanProject
+ * Material Takeoff — Quantity Extraction from FloorPlanProject
  *
- * Computes accurate material quantities directly from floor plan geometry:
+ * Extracts accurate material QUANTITIES from floor plan geometry:
  * walls, doors, windows, flooring, painting, structural elements.
+ *
+ * NOTE: This module outputs QUANTITIES ONLY — no costs or rates.
+ * Cost estimation is handled by the TR-008 (BOQ/Cost Mapper) node
+ * which uses live market rates, IS 1200 codes, and regional factors.
  */
 
 import type { Floor, Wall, Door, CadWindow, Room, Column, Stair } from "@/types/floor-plan-cad";
@@ -18,43 +22,14 @@ export interface BOQItem {
   description: string;
   quantity: number;
   unit: string;
-  rate_inr?: number;
-  amount_inr?: number;
   remarks?: string;
 }
 
 export interface BOQReport {
   items: BOQItem[];
-  total_estimated_cost: number;
   generated_at: string;
   floor_name: string;
 }
-
-// ============================================================
-// APPROXIMATE RATES (INR, 2024 Pune metro)
-// ============================================================
-
-const RATES: Record<string, number> = {
-  "brick_masonry_cum": 6500,
-  "concrete_masonry_cum": 8500,
-  "plastering_sqm": 350,
-  "painting_sqm": 180,
-  "flooring_tile_sqm": 1200,
-  "flooring_marble_sqm": 2800,
-  "flooring_wood_sqm": 3500,
-  "skirting_rm": 250,
-  "door_wooden_nos": 12000,
-  "door_main_nos": 25000,
-  "door_bath_nos": 8000,
-  "window_casement_nos": 8000,
-  "window_sliding_nos": 6500,
-  "window_awning_nos": 4500,
-  "column_concrete_cum": 9500,
-  "slab_concrete_cum": 8000,
-  "stair_concrete_cum": 9000,
-  "waterproofing_sqm": 600,
-  "ceiling_sqm": 450,
-};
 
 // ============================================================
 // GENERATOR
@@ -85,7 +60,6 @@ export function generateBOQ(floor: Floor): BOQReport {
   for (const [key, data] of Object.entries(wallGroups)) {
     const [type, material] = key.split("_");
     const thickLabel = type === "exterior" ? "230mm" : "150mm";
-    const rate = material === "concrete" ? RATES.concrete_masonry_cum : RATES.brick_masonry_cum;
 
     items.push({
       sno: ++sno,
@@ -93,8 +67,6 @@ export function generateBOQ(floor: Floor): BOQReport {
       description: `${capitalize(material)} masonry — ${thickLabel} ${type} walls`,
       quantity: round(data.volume, 2),
       unit: "cum",
-      rate_inr: rate,
-      amount_inr: round(data.volume * rate, 0),
       remarks: `${round(data.length, 1)} m total length`,
     });
   }
@@ -113,8 +85,6 @@ export function generateBOQ(floor: Floor): BOQReport {
       description: "Internal/external wall plastering (12mm cement mortar)",
       quantity: round(plasterArea, 1),
       unit: "sqm",
-      rate_inr: RATES.plastering_sqm,
-      amount_inr: round(plasterArea * RATES.plastering_sqm, 0),
     });
   }
 
@@ -128,9 +98,6 @@ export function generateBOQ(floor: Floor): BOQReport {
 
   for (const [type, doors] of Object.entries(doorGroups)) {
     if (doors.length === 0) continue;
-    const rate = type === "main_entrance" ? RATES.door_main_nos
-      : type.includes("bath") ? RATES.door_bath_nos
-      : RATES.door_wooden_nos;
     const avgW = doors.reduce((s, d) => s + d.width_mm, 0) / doors.length;
     const avgH = doors.reduce((s, d) => s + d.height_mm, 0) / doors.length;
 
@@ -140,8 +107,6 @@ export function generateBOQ(floor: Floor): BOQReport {
       description: `${capitalize(type.replace(/_/g, " "))} door (${Math.round(avgW)}x${Math.round(avgH)}mm)`,
       quantity: doors.length,
       unit: "nos",
-      rate_inr: rate,
-      amount_inr: round(doors.length * rate, 0),
     });
   }
 
@@ -157,8 +122,6 @@ export function generateBOQ(floor: Floor): BOQReport {
       description: "Door frame (teak/sal wood, 100x75mm section)",
       quantity: round(totalDoorFrame, 1),
       unit: "rm",
-      rate_inr: 850,
-      amount_inr: round(totalDoorFrame * 850, 0),
     });
   }
 
@@ -171,18 +134,13 @@ export function generateBOQ(floor: Floor): BOQReport {
   }
 
   for (const [type, wins] of Object.entries(windowGroups)) {
-    const rate = type === "sliding" ? RATES.window_sliding_nos
-      : type === "awning" ? RATES.window_awning_nos
-      : RATES.window_casement_nos;
-
+    if (wins.length === 0) continue;
     items.push({
       sno: ++sno,
       category: "Windows",
       description: `${capitalize(type)} window (avg ${Math.round(wins[0].width_mm)}x${Math.round(wins[0].height_mm)}mm)`,
       quantity: wins.length,
       unit: "nos",
-      rate_inr: rate,
-      amount_inr: round(wins.length * rate, 0),
     });
   }
 
@@ -198,8 +156,6 @@ export function generateBOQ(floor: Floor): BOQReport {
       description: "Glass glazing (double-pane, 6mm+6mm)",
       quantity: round(totalGlassArea, 2),
       unit: "sqm",
-      rate_inr: 2500,
-      amount_inr: round(totalGlassArea * 2500, 0),
     });
   }
 
@@ -218,8 +174,6 @@ export function generateBOQ(floor: Floor): BOQReport {
 
   for (const [type, data] of Object.entries(flooringGroups)) {
     if (data.area <= 0) continue;
-    const rateKey = `flooring_${type}_sqm` as keyof typeof RATES;
-    const rate = RATES[rateKey] ?? 1200;
 
     items.push({
       sno: ++sno,
@@ -227,19 +181,18 @@ export function generateBOQ(floor: Floor): BOQReport {
       description: `${capitalize(type)} flooring`,
       quantity: round(data.area, 1),
       unit: "sqm",
-      rate_inr: rate,
-      amount_inr: round(data.area * rate, 0),
       remarks: data.rooms.join(", "),
     });
   }
 
-  // Skirting
+  // Skirting — deduct each door opening once per room side it faces
   const totalSkirting = floor.rooms.reduce((s, r) => {
-    // Perimeter minus door widths on walls
+    const roomWallIds = new Set(r.wall_ids ?? []);
     const doorWidths = floor.doors
-      .filter((d) => r.wall_ids.includes(d.wall_id))
+      .filter((d) => roomWallIds.has(d.wall_id))
       .reduce((ds, d) => ds + d.width_mm / 1000, 0);
-    return s + r.perimeter_mm / 1000 - doorWidths;
+    const perimeter = (r.perimeter_mm ?? 0) / 1000;
+    return s + Math.max(0, perimeter - doorWidths);
   }, 0);
 
   if (totalSkirting > 0) {
@@ -249,8 +202,6 @@ export function generateBOQ(floor: Floor): BOQReport {
       description: "Skirting (100mm height, matching floor tile)",
       quantity: round(totalSkirting, 1),
       unit: "rm",
-      rate_inr: RATES.skirting_rm,
-      amount_inr: round(totalSkirting * RATES.skirting_rm, 0),
     });
   }
 
@@ -265,8 +216,6 @@ export function generateBOQ(floor: Floor): BOQReport {
       description: "Wall painting (2 coats emulsion over primer)",
       quantity: round(paintWallArea, 1),
       unit: "sqm",
-      rate_inr: RATES.painting_sqm,
-      amount_inr: round(paintWallArea * RATES.painting_sqm, 0),
     });
   }
 
@@ -277,8 +226,6 @@ export function generateBOQ(floor: Floor): BOQReport {
       description: "Ceiling painting (2 coats emulsion)",
       quantity: round(paintCeilingArea, 1),
       unit: "sqm",
-      rate_inr: RATES.ceiling_sqm,
-      amount_inr: round(paintCeilingArea * RATES.ceiling_sqm, 0),
     });
   }
 
@@ -294,8 +241,6 @@ export function generateBOQ(floor: Floor): BOQReport {
       description: "Bathroom waterproofing (APP membrane + tile bed)",
       quantity: round(wpArea, 1),
       unit: "sqm",
-      rate_inr: RATES.waterproofing_sqm,
-      amount_inr: round(wpArea * RATES.waterproofing_sqm, 0),
     });
   }
 
@@ -318,8 +263,6 @@ export function generateBOQ(floor: Floor): BOQReport {
       description: `RCC Column ${col.grid_ref ? `(${col.grid_ref})` : ""} — ${col.type}`,
       quantity: round(vol, 3),
       unit: "cum",
-      rate_inr: RATES.column_concrete_cum,
-      amount_inr: round(vol * RATES.column_concrete_cum, 0),
     });
   }
 
@@ -333,8 +276,6 @@ export function generateBOQ(floor: Floor): BOQReport {
       description: `RCC Slab (${floor.slab_thickness_mm}mm thick)`,
       quantity: round(slabVol, 2),
       unit: "cum",
-      rate_inr: RATES.slab_concrete_cum,
-      amount_inr: round(slabVol * RATES.slab_concrete_cum, 0),
     });
   }
 
@@ -344,7 +285,9 @@ export function generateBOQ(floor: Floor): BOQReport {
     const treadM = stair.tread_depth_mm / 1000;
     const riserM = stair.riser_height_mm / 1000;
     const waistThick = 0.15; // 150mm waist slab
-    const vol = stair.num_risers * treadM * widthM * (riserM / 2 + waistThick);
+    // Step triangle + inclined waist slab (corrected from horizontal projection)
+    const inclineLen = Math.sqrt(treadM * treadM + riserM * riserM);
+    const vol = stair.num_risers * widthM * (treadM * riserM / 2 + inclineLen * waistThick);
 
     items.push({
       sno: ++sno,
@@ -352,17 +295,11 @@ export function generateBOQ(floor: Floor): BOQReport {
       description: `RCC Staircase (${stair.type}, ${stair.num_risers} risers)`,
       quantity: round(vol, 3),
       unit: "cum",
-      rate_inr: RATES.stair_concrete_cum,
-      amount_inr: round(vol * RATES.stair_concrete_cum, 0),
     });
   }
 
-  // Total
-  const total = items.reduce((s, i) => s + (i.amount_inr ?? 0), 0);
-
   return {
     items,
-    total_estimated_cost: total,
     generated_at: new Date().toISOString(),
     floor_name: floor.name,
   };
@@ -373,18 +310,18 @@ export function generateBOQ(floor: Floor): BOQReport {
 // ============================================================
 
 export function exportBOQAsCSV(report: BOQReport): void {
-  const header = "S.No,Category,Description,Quantity,Unit,Rate (INR),Amount (INR),Remarks\n";
+  const header = "S.No,Category,Description,Quantity,Unit,Remarks\n";
+  const esc = (s: string) => s.replace(/"/g, '""');
   const rows = report.items.map((i) =>
-    `${i.sno},"${i.category}","${i.description}",${i.quantity},"${i.unit}",${i.rate_inr ?? ""},${i.amount_inr ?? ""},"${i.remarks ?? ""}"`
+    `${i.sno},"${esc(i.category)}","${esc(i.description)}",${i.quantity},"${esc(i.unit)}","${esc(i.remarks ?? "")}"`
   ).join("\n");
-  const footer = `\n,,TOTAL,,,,${report.total_estimated_cost},`;
 
-  const csv = header + rows + footer;
+  const csv = header + rows;
   const blob = new Blob([csv], { type: "text/csv" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `BOQ_${report.floor_name.replace(/\s/g, "_")}.csv`;
+  a.download = `MaterialTakeoff_${report.floor_name.replace(/\s/g, "_")}.csv`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);

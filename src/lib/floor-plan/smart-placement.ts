@@ -95,6 +95,7 @@ export function findUnreachableRooms(floor: Floor): string[] {
 
   // BFS from first room
   const visited = new Set<string>();
+  if (floor.rooms.length === 0) return [];
   const queue = [floor.rooms[0].id];
   visited.add(floor.rooms[0].id);
 
@@ -293,7 +294,8 @@ export function smartPlaceDoors(floor: Floor): DoorPlacementResult {
   // 1. Find main entrance — exterior wall of lobby/foyer/living, or largest public room
   const entranceRoom = floor.rooms.find((r) => r.type === "foyer" || r.type === "lobby")
     ?? floor.rooms.find((r) => r.type === "living_room")
-    ?? floor.rooms.filter((r) => isType(r.type, PUBLIC)).sort((a, b) => b.area_sqm - a.area_sqm)[0];
+    ?? floor.rooms.filter((r) => isType(r.type, PUBLIC)).sort((a, b) => b.area_sqm - a.area_sqm)[0]
+    ?? undefined;
 
   if (entranceRoom) {
     const entranceWall = findExteriorWallForRoom(entranceRoom, floor);
@@ -374,7 +376,7 @@ function findExteriorWallForRoom(room: Room, floor: Floor): Wall | null {
   );
   if (exteriorWalls.length === 0) return null;
   // Prefer longest exterior wall
-  return exteriorWalls.sort((a, b) => wallLength(b) - wallLength(a))[0];
+  return exteriorWalls.sort((a, b) => wallLength(b) - wallLength(a))[0] ?? null;
 }
 
 function findDoorPosition(
@@ -541,8 +543,9 @@ export function smartPlaceWindows(floor: Floor): WindowPlacementResult {
       continue;
     }
 
-    // Calculate required window area (NBC: 1/6 of floor area for light)
-    const requiredWindowArea = room.area_sqm * 1_000_000 / 6; // mm²
+    // Target window area: IS:1038 recommends 1/6 of floor area for adequate daylighting.
+    // NBC 2016 minimum is 1/10 for ventilation (checked separately below).
+    const requiredWindowArea = room.area_sqm * 1_000_000 / 6; // mm² (IS:1038 target)
     let placedWindowArea = 0;
 
     // Place windows on exterior walls, preferring longest walls first
@@ -606,7 +609,8 @@ export function smartPlaceWindows(floor: Floor): WindowPlacementResult {
       }
     }
 
-    // Check ventilation compliance
+    // Check ventilation compliance — NBC 2016 minimum: 1/10 of floor area
+    // (distinct from IS:1038 daylighting target of 1/6 used above for placement)
     const roomFloorArea_sqm = room.area_sqm;
     const roomWindowArea_sqm = placedWindowArea / 1_000_000;
     const ratio = roomFloorArea_sqm > 0 ? roomWindowArea_sqm / roomFloorArea_sqm : 0;
@@ -615,7 +619,7 @@ export function smartPlaceWindows(floor: Floor): WindowPlacementResult {
       const needed = (roomFloorArea_sqm / 10 - roomWindowArea_sqm).toFixed(2);
       issues.push({
         severity: "warning",
-        message: `${room.name}: window area (${roomWindowArea_sqm.toFixed(2)} sqm) is ${(ratio * 100).toFixed(1)}% of floor area — need ${needed} sqm more for NBC compliance (10%)`,
+        message: `${room.name}: window area (${roomWindowArea_sqm.toFixed(2)} sqm) is ${(ratio * 100).toFixed(1)}% of floor area — need ${needed} sqm more for NBC 2016 ventilation minimum (10%)`,
         roomId: room.id,
       });
     }

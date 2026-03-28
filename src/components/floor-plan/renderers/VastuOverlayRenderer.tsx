@@ -47,8 +47,8 @@ export function VastuOverlayRenderer({ viewport }: Props) {
   const toScreen = (wx: number, wy: number) => worldToScreen({ x: wx, y: wy }, viewport);
   const grid = analysis.zone_grid;
   const zoom = viewport.zoom;
-  const fontSize = Math.max(10, Math.min(16, 800 * zoom));
-  const smallFont = Math.max(8, Math.min(12, 600 * zoom));
+  const fontSize = Math.max(10, Math.min(18, 800 * zoom));
+  const smallFont = Math.max(8, Math.min(14, 600 * zoom));
 
   // Build a map: direction -> worst status
   const dirStatus = new Map<VastuDirection, "pass" | "acceptable" | "violation">();

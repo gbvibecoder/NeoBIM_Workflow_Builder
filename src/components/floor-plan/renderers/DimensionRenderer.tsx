@@ -104,8 +104,10 @@ export function DimensionRenderer({
     const bounds = floorBounds(walls, rooms);
     if (bounds.width === 0) return dims;
 
-    const CHAIN_OFFSET = 1600; // mm from outer boundary (increased from 1400)
-    const OVERALL_OFFSET = 2600; // increased from 2200 for more clearance
+    const REF_ZOOM = 0.15;
+    const zoomFactor = Math.max(0.5, Math.min(2, REF_ZOOM / Math.max(viewport.zoom, 0.005)));
+    const CHAIN_OFFSET = 1600 * zoomFactor; // mm from outer boundary, zoom-adaptive
+    const OVERALL_OFFSET = 2600 * zoomFactor;
 
     // Collect all unique X positions of vertical wall faces
     const xPositions = new Set<number>();
@@ -115,14 +117,21 @@ export function DimensionRenderer({
       const halfT = wall.thickness_mm / 2;
       const s = wall.centerline.start;
       const e = wall.centerline.end;
+      const isVertical = Math.abs(s.x - e.x) < 10;
+      const isHorizontal = Math.abs(s.y - e.y) < 10;
 
-      if (Math.abs(s.x - e.x) < 10) {
+      if (isVertical) {
         xPositions.add(Math.round(s.x - halfT));
         xPositions.add(Math.round(s.x + halfT));
-      }
-      if (Math.abs(s.y - e.y) < 10) {
+      } else if (isHorizontal) {
         yPositions.add(Math.round(s.y - halfT));
         yPositions.add(Math.round(s.y + halfT));
+      } else {
+        // Diagonal wall — project both endpoints onto X and Y axes
+        xPositions.add(Math.round(Math.min(s.x, e.x)));
+        xPositions.add(Math.round(Math.max(s.x, e.x)));
+        yPositions.add(Math.round(Math.min(s.y, e.y)));
+        yPositions.add(Math.round(Math.max(s.y, e.y)));
       }
     }
 
@@ -325,9 +334,9 @@ export function DimensionRenderer({
               fill={color}
               align="center"
               rotation={dim.textRotation}
-              offsetX={dim.textRotation === 0 ? 28 : 0}
-              offsetY={dim.textRotation !== 0 ? 28 : 0}
-              width={56}
+              offsetX={dim.textRotation === 0 ? textSize * 3 : 0}
+              offsetY={dim.textRotation !== 0 ? textSize * 3 : 0}
+              width={textSize * 6}
               listening={false}
             />
           </Group>

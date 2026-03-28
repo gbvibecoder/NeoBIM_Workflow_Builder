@@ -7,7 +7,7 @@
  */
 
 import type { Floor, Room, Door, CadWindow, Stair, Wall } from "@/types/floor-plan-cad";
-import { polygonBounds, wallLength, lineDirection, addPoints, scalePoint } from "@/lib/floor-plan/geometry";
+import { polygonBounds, polygonCentroid, wallLength, lineDirection, addPoints, scalePoint } from "@/lib/floor-plan/geometry";
 import {
   ALL_BUILDING_CODE_RULES,
   CODE_CATEGORY_LABELS,
@@ -318,8 +318,9 @@ function checkWindows(floor: Floor, violations: CodeViolation[]): number {
       // Find windows on walls bounding this room
       const roomWallIds = new Set(room.wall_ids);
       const roomWindows = floor.windows.filter((w) => roomWallIds.has(w.wall_id));
+      const FRAME_FACTOR = 0.8; // ~20% frame deduction for glazed area
       const totalWindowArea = roomWindows.reduce(
-        (sum, w) => sum + (w.width_mm * w.height_mm) / 1_000_000,
+        (sum, w) => sum + (w.width_mm * w.height_mm * FRAME_FACTOR) / 1_000_000,
         0
       );
       const floorArea = room.area_sqm;
@@ -680,7 +681,7 @@ function checkFireEgressDistance(floor: Floor, violations: CodeViolation[]): num
 
   for (const room of floor.rooms) {
     checks++;
-    const centroid = room.label_position;
+    const centroid = polygonCentroid(room.boundary.points);
     const minDist = Math.min(
       ...exitPositions.map((ep) => Math.sqrt((centroid.x - ep.x) ** 2 + (centroid.y - ep.y) ** 2))
     );

@@ -184,7 +184,7 @@ function findAnchorWall(walls: WallInfo[]): WallInfo | null {
     // Fallback: longest wall overall
     return walls.sort((a, b) => b.length - a.length)[0] ?? null;
   }
-  return candidates.sort((a, b) => b.length - a.length)[0];
+  return candidates.sort((a, b) => b.length - a.length)[0] ?? null;
 }
 
 function findOppositeWall(anchor: WallInfo, walls: WallInfo[]): WallInfo | null {

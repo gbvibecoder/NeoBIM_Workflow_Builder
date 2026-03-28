@@ -235,8 +235,9 @@ export function computeBOQQuantities(project: FloorPlanProject): BOQQuantities {
 // ────────────────────────────────────────────────────────────────────────────
 
 /**
- * Converts raw BOQQuantities into the `_boqData` format that EX-002 expects.
- * Includes CSI division codes, Indian market rates, and cost calculations.
+ * Converts raw BOQQuantities into a structured format for downstream nodes.
+ * Outputs QUANTITIES + CSI division codes ONLY — no rates or costs.
+ * Cost estimation is handled by TR-008 (BOQ/Cost Mapper) using live market rates.
  */
 export interface BOQExporterLine {
   division: string;
@@ -246,25 +247,12 @@ export interface BOQExporterLine {
   quantity: number;
   wasteFactor: number;
   adjustedQty: number;
-  materialRate: number;
-  laborRate: number;
-  equipmentRate: number;
-  unitRate: number;
-  materialCost: number;
-  laborCost: number;
-  equipmentCost: number;
-  totalCost: number;
 }
 
 export interface BOQExporterData {
   lines: BOQExporterLine[];
-  subtotalMaterial: number;
-  subtotalLabor: number;
-  subtotalEquipment: number;
-  grandTotal: number;
   projectType: string;
-  projectMultiplier: number;
-  disclaimer: string;
+  note: string;
 }
 
 export function formatBOQForExporter(
@@ -276,128 +264,105 @@ export function formatBOQForExporter(
   const addLine = (
     division: string, csiCode: string, description: string,
     unit: string, quantity: number, wasteFactor: number,
-    materialRate: number, laborRate: number, equipmentRate: number,
   ) => {
     if (quantity <= 0) return;
     const adjustedQty = Math.round(quantity * (1 + wasteFactor) * 100) / 100;
-    const unitRate = materialRate + laborRate + equipmentRate;
     lines.push({
       division, csiCode, description, unit,
       quantity: Math.round(quantity * 100) / 100,
       wasteFactor, adjustedQty,
-      materialRate, laborRate, equipmentRate, unitRate,
-      materialCost: Math.round(adjustedQty * materialRate * 100) / 100,
-      laborCost: Math.round(adjustedQty * laborRate * 100) / 100,
-      equipmentCost: Math.round(adjustedQty * equipmentRate * 100) / 100,
-      totalCost: Math.round(adjustedQty * unitRate * 100) / 100,
     });
   };
 
   // ── Division 04: Masonry ──
   if (boq.walls.exterior.volume_cum > 0) {
     addLine("04 — Masonry", "04 21 13", "Exterior brick masonry (230mm)", "cum",
-      boq.walls.exterior.volume_cum, 0.05, 5500, 2500, 500);
+      boq.walls.exterior.volume_cum, 0.05);
   }
   if (boq.walls.interior.volume_cum > 0) {
     addLine("04 — Masonry", "04 21 13", "Interior brick masonry (150mm)", "cum",
-      boq.walls.interior.volume_cum, 0.05, 5200, 2400, 400);
+      boq.walls.interior.volume_cum, 0.05);
   }
   if (boq.walls.partition.volume_cum > 0) {
     addLine("04 — Masonry", "04 22 00", "Partition drywall (100mm)", "cum",
-      boq.walls.partition.volume_cum, 0.03, 3800, 1800, 300);
+      boq.walls.partition.volume_cum, 0.03);
   }
 
   // ── Division 03: Concrete (Structural) ──
   if (boq.structural.slab_volume_cum > 0) {
     addLine("03 — Concrete", "03 30 00", "RCC slab (M25 grade)", "cum",
-      boq.structural.slab_volume_cum, 0.03, 4800, 1800, 600);
+      boq.structural.slab_volume_cum, 0.03);
   }
   if (boq.structural.columns_volume_cum > 0) {
     addLine("03 — Concrete", "03 30 00", "RCC columns (M25 grade)", "cum",
-      boq.structural.columns_volume_cum, 0.02, 5200, 2200, 800);
+      boq.structural.columns_volume_cum, 0.02);
   }
 
   // ── Division 09: Finishes — Plastering ──
   if (boq.plastering.interior_wall_area_sqm > 0) {
     addLine("09 — Finishes", "09 24 00", "Interior wall plaster (12mm cement)", "sqm",
-      boq.plastering.interior_wall_area_sqm, 0.05, 280, 150, 20);
+      boq.plastering.interior_wall_area_sqm, 0.05);
   }
   if (boq.plastering.exterior_wall_area_sqm > 0) {
     addLine("09 — Finishes", "09 24 00", "Exterior wall plaster (20mm cement)", "sqm",
-      boq.plastering.exterior_wall_area_sqm, 0.05, 350, 180, 20);
+      boq.plastering.exterior_wall_area_sqm, 0.05);
   }
   if (boq.plastering.ceiling_area_sqm > 0) {
     addLine("09 — Finishes", "09 24 00", "Ceiling plaster (10mm POP)", "sqm",
-      boq.plastering.ceiling_area_sqm, 0.03, 320, 160, 20);
+      boq.plastering.ceiling_area_sqm, 0.03);
   }
 
   // ── Division 09: Finishes — Flooring ──
   if (boq.flooring.total_area_sqm > 0) {
-    addLine("09 — Finishes", "09 30 00", "Vitrified tile flooring (600×600)", "sqm",
-      boq.flooring.total_area_sqm, 0.08, 850, 280, 70);
+    addLine("09 — Finishes", "09 30 00", "Vitrified tile flooring (600x600)", "sqm",
+      boq.flooring.total_area_sqm, 0.08);
   }
 
   // ── Division 09: Finishes — Skirting ──
   if (boq.skirting.total_length_m > 0) {
     addLine("09 — Finishes", "09 65 00", "Ceramic tile skirting (100mm)", "rmt",
-      boq.skirting.total_length_m, 0.05, 120, 80, 10);
+      boq.skirting.total_length_m, 0.05);
   }
 
   // ── Division 09: Finishes — Painting ──
   if (boq.painting.wall_area_sqm > 0) {
     addLine("09 — Finishes", "09 91 00", "Interior wall painting (2 coats emulsion)", "sqm",
-      boq.painting.wall_area_sqm, 0.05, 110, 80, 10);
+      boq.painting.wall_area_sqm, 0.05);
   }
   if (boq.painting.ceiling_area_sqm > 0) {
     addLine("09 — Finishes", "09 91 00", "Ceiling painting (2 coats emulsion)", "sqm",
-      boq.painting.ceiling_area_sqm, 0.05, 100, 80, 10);
+      boq.painting.ceiling_area_sqm, 0.05);
   }
 
   // ── Division 08: Openings — Doors ──
   for (const door of boq.doors) {
-    const isMain = door.width_mm >= 1050;
-    const isBath = door.width_mm <= 750;
-    const matRate = isMain ? 16000 : isBath ? 6000 : 9000;
-    const labRate = isMain ? 4500 : isBath ? 2500 : 3200;
-    addLine("08 — Openings", "08 11 13", `${door.description} door (${door.type}, ${door.width_mm}×${door.height_mm}mm)`, "nos",
-      door.count, 0, matRate, labRate, 500);
+    addLine("08 — Openings", "08 11 13", `${door.description} door (${door.type}, ${door.width_mm}x${door.height_mm}mm)`, "nos",
+      door.count, 0);
   }
 
   // ── Division 08: Openings — Windows ──
   for (const win of boq.windows) {
-    const areaSqft = win.area_sqm * 10.764;
-    const perUnitRate = Math.round(areaSqft * 650);
-    addLine("08 — Openings", "08 51 13", `${win.type} window (${win.width_mm}×${win.height_mm}mm)`, "nos",
-      win.count, 0, Math.round(perUnitRate * 0.6), Math.round(perUnitRate * 0.3), Math.round(perUnitRate * 0.1));
+    addLine("08 — Openings", "08 51 13", `${win.type} window (${win.width_mm}x${win.height_mm}mm)`, "nos",
+      win.count, 0);
   }
 
   // ── Division 05: Metals — Staircase ──
   if (boq.structural.stairs_count > 0) {
-    addLine("05 — Metals", "05 51 00", "MS staircase railing + treads", "nos",
-      boq.structural.stairs_count, 0, 35000, 12000, 3000);
+    addLine("05 — Metals", "05 51 00", "Staircase railing + treads", "nos",
+      boq.structural.stairs_count, 0);
   }
-
-  // Totals
-  const subtotalMaterial = lines.reduce((s, l) => s + l.materialCost, 0);
-  const subtotalLabor = lines.reduce((s, l) => s + l.laborCost, 0);
-  const subtotalEquipment = lines.reduce((s, l) => s + l.equipmentCost, 0);
-  const grandTotal = subtotalMaterial + subtotalLabor + subtotalEquipment;
 
   return {
     lines,
-    subtotalMaterial: Math.round(subtotalMaterial * 100) / 100,
-    subtotalLabor: Math.round(subtotalLabor * 100) / 100,
-    subtotalEquipment: Math.round(subtotalEquipment * 100) / 100,
-    grandTotal: Math.round(grandTotal * 100) / 100,
     projectType,
-    projectMultiplier: 1.0,
-    disclaimer: "Rates are indicative Indian market rates (2024–25). Actual rates may vary by region, supplier, and market conditions.",
+    note: "Quantities from geometry. Rates and costs to be applied by TR-008 (BOQ/Cost Mapper) using live market rates.",
   };
 }
 
 /**
  * Generates a table-format (rows + headers) from BOQExporterData
  * for EX-002 validation compatibility (expects top-level rows/headers).
+ * Outputs quantities only — TR-008 adds rates and costs downstream.
  */
 export function formatBOQAsTable(boqData: BOQExporterData): {
   headers: string[];
@@ -405,13 +370,11 @@ export function formatBOQAsTable(boqData: BOQExporterData): {
 } {
   const headers = [
     "Division", "CSI Code", "Description", "Unit", "Qty",
-    "Material Rate", "Labor Rate", "Equip Rate", "Unit Rate",
-    "Material Cost", "Labor Cost", "Equip Cost", "Total Cost",
+    "Waste Factor", "Adjusted Qty",
   ];
   const rows = boqData.lines.map(l => [
     l.division, l.csiCode, l.description, l.unit, l.quantity,
-    l.materialRate, l.laborRate, l.equipmentRate, l.unitRate,
-    l.materialCost, l.laborCost, l.equipmentCost, l.totalCost,
+    l.wasteFactor, l.adjustedQty,
   ]);
   return { headers, rows };
 }
@@ -438,7 +401,6 @@ export interface NodeOutputs {
     vastuGrade: string;
     codeErrors: number;
     codeWarnings: number;
-    estimatedCost_inr: number;
   };
 }
 
@@ -484,7 +446,6 @@ export function buildNodeOutputs(project: FloorPlanProject): NodeOutputs {
       vastuGrade: vastuReport.grade,
       codeErrors: codeReport.errors,
       codeWarnings: codeReport.warnings,
-      estimatedCost_inr: boqReport.total_estimated_cost,
     },
   };
 }

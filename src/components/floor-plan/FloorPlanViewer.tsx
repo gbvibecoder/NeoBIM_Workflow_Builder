@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useCallback, useMemo } from "react";
+import React, { useEffect, useCallback, useMemo, useRef } from "react";
 import { useFloorPlanStore } from "@/stores/floor-plan-store";
 import { FloorPlanCanvas } from "./FloorPlanCanvas";
 import { Toolbar } from "./Toolbar";
@@ -87,8 +87,25 @@ export function FloorPlanViewer({ initialGeometry, initialPrompt, initialProject
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [!project]); // Re-check when project presence changes
 
-  // Handle AI generation (simulated — real implementation calls API)
+  // TODO: Replace with real AI generation API call (POST /api/generate-floor-plan)
+  // Currently loads sample data with simulated progress steps.
+  // Real implementation should: 1) POST prompt to API, 2) poll for progress,
+  // 3) load returned Floor data. See pipeline-adapter.ts for data format.
+  const generationTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
+
+  // Clean up generation timers on unmount
+  useEffect(() => {
+    return () => {
+      for (const t of generationTimers.current) clearTimeout(t);
+      generationTimers.current = [];
+    };
+  }, []);
+
   const handleGenerateFromPrompt = useCallback((prompt: string) => {
+    // Clear any pending timers from previous generation
+    for (const t of generationTimers.current) clearTimeout(t);
+    generationTimers.current = [];
+
     const store = useFloorPlanStore.getState();
     store.startGeneration(prompt);
 
@@ -106,22 +123,28 @@ export function FloorPlanViewer({ initialGeometry, initialPrompt, initialProject
     let cumDelay = 0;
     for (const s of steps) {
       cumDelay += s.delay;
-      setTimeout(() => store.updateGenerationStep(s.step, s.progress), cumDelay);
+      generationTimers.current.push(
+        setTimeout(() => store.updateGenerationStep(s.step, s.progress), cumDelay)
+      );
     }
 
     // Show "complete" step briefly, then load the floor plan and dismiss loader
     cumDelay += 300;
-    setTimeout(() => {
-      store.updateGenerationStep("complete", 100);
-    }, cumDelay);
+    generationTimers.current.push(
+      setTimeout(() => {
+        store.updateGenerationStep("complete", 100);
+      }, cumDelay)
+    );
 
     // After showing "Floor plan ready!" for 800ms, load data and transition to editor
     cumDelay += 800;
-    setTimeout(() => {
-      store.loadSample();
-      // loadSample sets project but doesn't clear isGenerating — clear it now
-      useFloorPlanStore.setState({ isGenerating: false });
-    }, cumDelay);
+    generationTimers.current.push(
+      setTimeout(() => {
+        store.loadSample();
+        // loadSample sets project but doesn't clear isGenerating — clear it now
+        useFloorPlanStore.setState({ isGenerating: false });
+      }, cumDelay)
+    );
   }, []);
 
   const handleImportFile = useCallback(async () => {

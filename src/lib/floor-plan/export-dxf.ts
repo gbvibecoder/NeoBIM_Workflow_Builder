@@ -8,6 +8,7 @@
 import type { Floor, Wall, Door, CadWindow, Room, FurnitureInstance } from "@/types/floor-plan-cad";
 import {
   wallToRectangle,
+  floorBounds,
   lineDirection,
   perpendicularLeft,
   addPoints,
@@ -225,15 +226,25 @@ export function exportFloorToDxf(
     if (!catalog) continue;
     const w_mm = catalog.width_mm * furn.scale;
     const d_mm = catalog.depth_mm * furn.scale;
-    const cx = furn.position.x;
-    const cy = furn.position.y;
-    // Simple rectangle outline for each furniture item
-    const corners = [
-      [cx, cy], [cx + w_mm, cy], [cx + w_mm, cy + d_mm], [cx, cy + d_mm],
+    const ox = furn.position.x;
+    const oy = furn.position.y;
+    // Local corners before rotation
+    const local: [number, number][] = [
+      [0, 0], [w_mm, 0], [w_mm, d_mm], [0, d_mm],
     ];
+    // Rotate around origin (position) then translate
+    const rad = (furn.rotation_deg * Math.PI) / 180;
+    const cos = Math.cos(rad);
+    const sin = Math.sin(rad);
+    const corners = local.map(([lx, ly]) => [
+      ox + lx * cos - ly * sin,
+      oy + lx * sin + ly * cos,
+    ]);
     writeLwPolyline(w, corners, "A-FURN", true);
-    // Label
-    writeMtext(w, cx + w_mm / 2, cy + d_mm / 2, catalog.name, 120, "A-FURN");
+    // Label at rotated center
+    const centerLocal: [number, number] = [w_mm / 2, d_mm / 2];
+    writeMtext(w, ox + centerLocal[0] * cos - centerLocal[1] * sin,
+      oy + centerLocal[0] * sin + centerLocal[1] * cos, catalog.name, 120, "A-FURN");
   }
 
   // --- COLUMNS ---
@@ -253,6 +264,46 @@ export function exportFloorToDxf(
       // X pattern
       writeLine(w, col.center.x - hw, col.center.y - hd, col.center.x + hw, col.center.y + hd, "A-GRID");
       writeLine(w, col.center.x + hw, col.center.y - hd, col.center.x - hw, col.center.y + hd, "A-GRID");
+    }
+  }
+
+  // --- STAIRS ---
+  for (const stair of floor.stairs) {
+    // Boundary
+    writeLwPolyline(w, stair.boundary.points.map((p) => [p.x, p.y]), "A-WALL-INTR", true);
+    // Treads
+    for (const tread of stair.treads) {
+      writeLine(w, tread.start.x, tread.start.y, tread.end.x, tread.end.y, "A-WALL-INTR");
+    }
+    // Up direction arrow
+    writeLine(w, stair.up_direction.start.x, stair.up_direction.start.y,
+      stair.up_direction.end.x, stair.up_direction.end.y, "A-NOTE");
+  }
+
+  // --- ANNOTATIONS ---
+  for (const ann of floor.annotations) {
+    writeMtext(w, ann.position.x, ann.position.y, ann.text, ann.font_size_mm || 200, "A-NOTE");
+    if (ann.leader_line && ann.leader_line.length >= 2) {
+      for (let i = 0; i < ann.leader_line.length - 1; i++) {
+        writeLine(w, ann.leader_line[i].x, ann.leader_line[i].y,
+          ann.leader_line[i + 1].x, ann.leader_line[i + 1].y, "A-NOTE");
+      }
+    }
+  }
+
+  // --- GRID ---
+  if (options.includeGrid) {
+    const bounds = floorBounds(floor.walls, floor.rooms);
+    const gridSize = 1000; // 1m grid
+    const startX = Math.floor(bounds.min.x / gridSize) * gridSize;
+    const endX = Math.ceil(bounds.max.x / gridSize) * gridSize;
+    const startY = Math.floor(bounds.min.y / gridSize) * gridSize;
+    const endY = Math.ceil(bounds.max.y / gridSize) * gridSize;
+    for (let gx = startX; gx <= endX; gx += gridSize) {
+      writeLine(w, gx, startY, gx, endY, "A-GRID");
+    }
+    for (let gy = startY; gy <= endY; gy += gridSize) {
+      writeLine(w, startX, gy, endX, gy, "A-GRID");
     }
   }
 

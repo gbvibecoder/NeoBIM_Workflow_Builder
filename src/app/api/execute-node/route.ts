@@ -5076,7 +5076,7 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
           // EX-002 compatible: rows + headers for validation
           rows: boqTable.rows,
           headers: boqTable.headers,
-          _totalCost: boqExporterData.grandTotal,
+          _totalCost: null, // Costing handled by TR-008 downstream
 
           // Summary metrics
           summary: {

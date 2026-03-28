@@ -178,17 +178,28 @@ export async function exportFloorToPdf(
     if (!catalog) continue;
     const fw = catalog.width_mm * furn.scale;
     const fd = catalog.depth_mm * furn.scale;
-    const fx = toX(furn.position.x);
-    const fy = toY(furn.position.y + fd); // flip Y
     const pw = fw * scaleNum / 1000;
     const ph = fd * scaleNum / 1000;
+    // Compute rotated corners in world space, then transform to paper
+    const ox = furn.position.x;
+    const oy = furn.position.y;
+    const rad = (furn.rotation_deg * Math.PI) / 180;
+    const cos = Math.cos(rad);
+    const sin = Math.sin(rad);
+    const localCorners: [number, number][] = [[0, 0], [fw, 0], [fw, fd], [0, fd]];
+    const paperCorners = localCorners.map(([lx, ly]) => [
+      toX(ox + lx * cos - ly * sin),
+      toY(oy + lx * sin + ly * cos),
+    ] as [number, number]);
     pdf.setFillColor(240, 240, 240);
-    pdf.rect(fx, fy, pw, ph, "FD");
-    // Label
+    drawPolygon(pdf, paperCorners, "FD");
+    // Label at rotated center
+    const cx = toX(ox + (fw / 2) * cos - (fd / 2) * sin);
+    const cy = toY(oy + (fw / 2) * sin + (fd / 2) * cos);
     pdf.setFontSize(4);
     pdf.setFont("helvetica", "normal");
     pdf.setTextColor(120, 120, 120);
-    pdf.text(catalog.name, fx + pw / 2, fy + ph / 2 + 0.5, { align: "center" });
+    pdf.text(catalog.name, cx, cy + 0.5, { align: "center" });
   }
 
   // ======== COLUMNS ========
@@ -206,6 +217,40 @@ export async function exportFloorToPdf(
       const hd = ((col.depth_mm ?? 300) / 2) * scaleNum / 1000;
       pdf.setFillColor(180, 180, 180);
       pdf.rect(sx - hw, sy - hd, hw * 2, hd * 2, "FD");
+    }
+  }
+
+  // ======== STAIRS ========
+  for (const stair of floor.stairs) {
+    pdf.setDrawColor(80, 80, 80);
+    pdf.setFillColor(220, 220, 220);
+    pdf.setLineWidth(0.2);
+    const stairPts = stair.boundary.points.map((p) => [toX(p.x), toY(p.y)] as [number, number]);
+    drawPolygon(pdf, stairPts, "FD");
+    // Draw treads
+    pdf.setLineWidth(0.1);
+    for (const tread of stair.treads) {
+      pdf.line(toX(tread.start.x), toY(tread.start.y), toX(tread.end.x), toY(tread.end.y));
+    }
+  }
+
+  // ======== ANNOTATIONS ========
+  pdf.setTextColor(50, 50, 50);
+  for (const ann of floor.annotations) {
+    const ax = toX(ann.position.x);
+    const ay = toY(ann.position.y);
+    pdf.setFontSize(Math.max(5, Math.min(10, (ann.font_size_mm || 200) * scaleNum / 1000)));
+    pdf.text(ann.text, ax, ay);
+    // Leader line
+    if (ann.leader_line && ann.leader_line.length >= 2) {
+      pdf.setDrawColor(100, 100, 100);
+      pdf.setLineWidth(0.1);
+      for (let i = 0; i < ann.leader_line.length - 1; i++) {
+        pdf.line(
+          toX(ann.leader_line[i].x), toY(ann.leader_line[i].y),
+          toX(ann.leader_line[i + 1].x), toY(ann.leader_line[i + 1].y)
+        );
+      }
     }
   }
 
@@ -337,21 +382,13 @@ export async function exportFloorToPdf(
 
 function drawPolygon(pdf: any, points: [number, number][], style: string) {
   if (points.length < 3) return;
-  pdf.triangle(
-    points[0][0], points[0][1],
-    points[1][0], points[1][1],
-    points[2][0], points[2][1],
-    style
-  );
-  // For 4+ point polygons, split into triangles
-  for (let i = 2; i < points.length - 1; i++) {
-    pdf.triangle(
-      points[0][0], points[0][1],
-      points[i][0], points[i][1],
-      points[i + 1][0], points[i + 1][1],
-      style
-    );
+  // Build line deltas from first point — jsPDF lines() handles concave polygons correctly
+  const deltas: [number, number][] = [];
+  for (let i = 1; i < points.length; i++) {
+    deltas.push([points[i][0] - points[i - 1][0], points[i][1] - points[i - 1][1]]);
   }
+  // closed=true auto-closes back to start
+  pdf.lines(deltas, points[0][0], points[0][1], [1, 1], style, true);
 }
 
 function hexToRgb(hex: string): { r: number; g: number; b: number } | null {

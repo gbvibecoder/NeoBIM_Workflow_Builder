@@ -27,6 +27,8 @@ export function Toolbar() {
   const rightPanelOpen = useFloorPlanStore((s) => s.rightPanelOpen);
   const undo = useFloorPlanStore((s) => s.undo);
   const redo = useFloorPlanStore((s) => s.redo);
+  const canUndo = useFloorPlanStore((s) => s.canUndo());
+  const canRedo = useFloorPlanStore((s) => s.canRedo());
   const exportMenuOpen = useFloorPlanStore((s) => s.exportMenuOpen);
   const setExportMenuOpen = useFloorPlanStore((s) => s.setExportMenuOpen);
   const furniturePanelOpen = useFloorPlanStore((s) => s.furniturePanelOpen);
@@ -87,6 +89,7 @@ export function Toolbar() {
           onClick={() => addFloor(`Floor ${floors.length + 1}`)}
           className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
           title="Add Floor"
+          aria-label="Add Floor"
         >
           <svg width="14" height="14" viewBox="0 0 14 14"><path d="M7 3V11M3 7H11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
         </button>
@@ -95,6 +98,7 @@ export function Toolbar() {
             onClick={() => copyFloor(activeFloorId, `${activeFloor?.name ?? "Floor"} (Copy)`)}
             className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
             title="Duplicate Floor"
+            aria-label="Duplicate Floor"
           >
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
               <rect x="4" y="4" width="8" height="8" rx="1" stroke="currentColor" strokeWidth="1.2"/>
@@ -153,8 +157,10 @@ export function Toolbar() {
       <div className="flex items-center gap-1">
         <button
           onClick={undo}
-          className="rounded p-1 text-gray-500 hover:bg-gray-100 hover:text-gray-700 disabled:opacity-30"
+          disabled={!canUndo}
+          className="rounded p-1 text-gray-500 hover:bg-gray-100 hover:text-gray-700 disabled:opacity-30 disabled:pointer-events-none"
           title="Undo (Ctrl+Z)"
+          aria-label="Undo"
         >
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
             <path d="M3 8H10C11.6569 8 13 9.34315 13 11V11C13 12.6569 11.6569 14 10 14H8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
@@ -163,8 +169,10 @@ export function Toolbar() {
         </button>
         <button
           onClick={redo}
-          className="rounded p-1 text-gray-500 hover:bg-gray-100 hover:text-gray-700 disabled:opacity-30"
+          disabled={!canRedo}
+          className="rounded p-1 text-gray-500 hover:bg-gray-100 hover:text-gray-700 disabled:opacity-30 disabled:pointer-events-none"
           title="Redo (Ctrl+Shift+Z)"
+          aria-label="Redo"
         >
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
             <path d="M13 8H6C4.34315 8 3 9.34315 3 11V11C3 12.6569 4.34315 14 6 14H8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
@@ -178,11 +186,11 @@ export function Toolbar() {
 
       {/* Zoom controls */}
       <div className="flex items-center gap-1">
-        <button onClick={zoomOut} className="rounded p-1 text-gray-500 hover:bg-gray-100" title="Zoom Out">
+        <button onClick={zoomOut} className="rounded p-1 text-gray-500 hover:bg-gray-100" title="Zoom Out" aria-label="Zoom Out">
           <svg width="14" height="14" viewBox="0 0 14 14"><path d="M3 7H11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
         </button>
         <span className="w-10 text-center text-xs font-mono text-gray-600">{zoomPercent}%</span>
-        <button onClick={zoomIn} className="rounded p-1 text-gray-500 hover:bg-gray-100" title="Zoom In">
+        <button onClick={zoomIn} className="rounded p-1 text-gray-500 hover:bg-gray-100" title="Zoom In" aria-label="Zoom In">
           <svg width="14" height="14" viewBox="0 0 14 14"><path d="M7 3V11M3 7H11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
         </button>
         <button onClick={fitToView} className="rounded px-2 py-1 text-xs text-gray-500 hover:bg-gray-100" title="Fit to View (F)">
@@ -336,6 +344,7 @@ export function Toolbar() {
         onClick={toggleLeftPanel}
         className={`rounded p-1 ${leftPanelOpen ? "bg-gray-100 text-gray-700" : "text-gray-400 hover:bg-gray-50"}`}
         title="Toggle Tools Panel"
+        aria-label="Toggle Tools Panel"
       >
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
           <rect x="1" y="2" width="14" height="12" rx="1" stroke="currentColor" strokeWidth="1.2"/>
@@ -346,6 +355,7 @@ export function Toolbar() {
         onClick={toggleRightPanel}
         className={`rounded p-1 ${rightPanelOpen ? "bg-gray-100 text-gray-700" : "text-gray-400 hover:bg-gray-50"}`}
         title="Toggle Properties Panel"
+        aria-label="Toggle Properties Panel"
       >
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
           <rect x="1" y="2" width="14" height="12" rx="1" stroke="currentColor" strokeWidth="1.2"/>

@@ -73,6 +73,31 @@ const TOOLS: ToolDef[] = [
     ),
   },
   {
+    id: "column",
+    label: "Place Column",
+    shortcut: "C",
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+        <rect x="5" y="3" width="8" height="12" rx="0.5" stroke="currentColor" strokeWidth="1.5"/>
+        <line x1="5" y1="3" x2="13" y2="15" stroke="currentColor" strokeWidth="0.8" opacity="0.5"/>
+        <line x1="13" y1="3" x2="5" y2="15" stroke="currentColor" strokeWidth="0.8" opacity="0.5"/>
+      </svg>
+    ),
+  },
+  {
+    id: "stair",
+    label: "Place Stair",
+    shortcut: "",
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+        <path d="M3 15H7V11H11V7H15V3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+        <line x1="7" y1="15" x2="7" y2="11" stroke="currentColor" strokeWidth="1.5"/>
+        <line x1="11" y1="11" x2="11" y2="7" stroke="currentColor" strokeWidth="1.5"/>
+        <line x1="15" y1="7" x2="15" y2="3" stroke="currentColor" strokeWidth="1.5"/>
+      </svg>
+    ),
+  },
+  {
     id: "measure",
     label: "Measure",
     shortcut: "M",

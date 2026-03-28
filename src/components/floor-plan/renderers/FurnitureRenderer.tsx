@@ -130,7 +130,7 @@ function FurnitureItem({
           x={0}
           y={-sd - 8}
           text={catalog.name}
-          fontSize={Math.max(8, Math.min(11, 10 * viewport.zoom * 12))}
+          fontSize={Math.max(8, Math.min(14, 120 * viewport.zoom))}
           fill={isSelected ? "#3B82F6" : "#888888"}
           align="left"
           opacity={0.7}

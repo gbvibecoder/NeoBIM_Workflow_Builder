@@ -33,7 +33,29 @@ export function exportStageToPng(
   if (!options.transparentBackground) {
     // Create a canvas to composite white bg + stage content
     const img = new Image();
+    const timeout = setTimeout(() => {
+      console.warn("PNG export timed out — downloading raw data URL as fallback");
+      const link = document.createElement("a");
+      link.href = dataUrl;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }, 10000);
+
+    img.onerror = () => {
+      clearTimeout(timeout);
+      console.warn("PNG export image decode failed — downloading raw data URL");
+      const link = document.createElement("a");
+      link.href = dataUrl;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    };
+
     img.onload = () => {
+      clearTimeout(timeout);
       const canvas = document.createElement("canvas");
       canvas.width = img.width;
       canvas.height = img.height;

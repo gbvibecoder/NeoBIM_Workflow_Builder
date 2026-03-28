@@ -64,13 +64,30 @@ export function exportFloorToSvg(
   w(`    .room-area { font-size: 180px; font-weight: bold; text-anchor: middle; fill: #444444; }`);
   w(`  </style>`);
 
+  // ======== GRID ========
+  if (options.includeGrid) {
+    const gridSize = 1000; // 1m grid in mm
+    w(`  <g id="A-GRID" opacity="0.3">`);
+    const gridStartX = Math.floor(bounds.min.x / gridSize) * gridSize;
+    const gridEndX = Math.ceil(bounds.max.x / gridSize) * gridSize;
+    const gridStartY = Math.floor(bounds.min.y / gridSize) * gridSize;
+    const gridEndY = Math.ceil(bounds.max.y / gridSize) * gridSize;
+    for (let gx = gridStartX; gx <= gridEndX; gx += gridSize) {
+      w(`    <line x1="${gx}" y1="${y(gridStartY)}" x2="${gx}" y2="${y(gridEndY)}" stroke="#CCCCCC" stroke-width="1"/>`);
+    }
+    for (let gy = gridStartY; gy <= gridEndY; gy += gridSize) {
+      w(`    <line x1="${gridStartX}" y1="${y(gy)}" x2="${gridEndX}" y2="${y(gy)}" stroke="#CCCCCC" stroke-width="1"/>`);
+    }
+    w(`  </g>`);
+  }
+
   // ======== ROOM FILLS ========
   if (options.includeRoomFills) {
-    w(`  <g id="A-ROOM-FILL" opacity="0.4">`);
+    w(`  <g id="A-ROOM-FILL">`);
     for (const room of floor.rooms) {
       const colors = ROOM_COLORS[room.type] ?? ROOM_COLORS.custom;
       const pts = room.boundary.points.map((p) => `${p.x},${y(p.y)}`).join(" ");
-      w(`    <polygon points="${pts}" fill="${colors.fill}" stroke="${colors.stroke}" stroke-width="3"/>`);
+      w(`    <polygon points="${pts}" fill="${colors.fill}" fill-opacity="0.4" stroke="${colors.stroke}" stroke-width="3"/>`);
     }
     w(`  </g>`);
   }
@@ -103,6 +120,13 @@ export function exportFloorToSvg(
 
     // Leaf line
     w(`    <line x1="${hinge.x}" y1="${y(hinge.y)}" x2="${leafEnd.x}" y2="${y(leafEnd.y)}" class="door-leaf"/>`);
+
+    // Swing arc (quarter-circle from closed to open position)
+    const arcRadius = door.width_mm;
+    // Arc sweeps from wall face direction to perpendicular (open) position
+    const closedEnd = addPoints(hinge, scalePoint(dir, door.swing_direction === "left" ? arcRadius : -arcRadius));
+    const sweepFlag = door.swing_direction === "left" ? 1 : 0;
+    w(`    <path d="M ${leafEnd.x},${y(leafEnd.y)} A ${arcRadius},${arcRadius} 0 0 ${sweepFlag} ${closedEnd.x},${y(closedEnd.y)}" class="door-arc"/>`);
 
     // Hinge dot
     w(`    <circle cx="${hinge.x}" cy="${y(hinge.y)}" r="40" fill="#1A1A1A"/>`);
@@ -157,7 +181,7 @@ export function exportFloorToSvg(
       const fd = catalog.depth_mm * furn.scale;
       const fx = furn.position.x;
       const fy = y(furn.position.y);
-      w(`    <g transform="translate(${fx},${fy}) rotate(${-furn.rotation_deg})">`);
+      w(`    <g transform="translate(${fx},${fy}) rotate(${-furn.rotation_deg} ${fw / 2} ${-fd / 2})">`);
       w(`      <rect x="0" y="${-fd}" width="${fw}" height="${fd}" stroke="#666" stroke-width="2" fill="#f5f5f5" fill-opacity="0.3"/>`);
       w(`      <text x="${fw / 2}" y="${-fd / 2}" font-size="120" text-anchor="middle" dominant-baseline="central" fill="#888">${escapeXml(catalog.name)}</text>`);
       w(`    </g>`);
@@ -176,6 +200,42 @@ export function exportFloorToSvg(
         const hw = (col.width_mm ?? 300) / 2;
         const hd = (col.depth_mm ?? 300) / 2;
         w(`    <rect x="${col.center.x - hw}" y="${y(col.center.y) - hd}" width="${hw * 2}" height="${hd * 2}" stroke="#333" stroke-width="3" fill="rgba(100,100,100,0.2)"/>`);
+      }
+    }
+    w(`  </g>`);
+  }
+
+  // ======== STAIRS ========
+  if (floor.stairs.length > 0) {
+    w(`  <g id="A-STAIR">`);
+    for (const stair of floor.stairs) {
+      const pts = stair.boundary.points.map((p) => `${p.x},${y(p.y)}`).join(" ");
+      w(`    <polygon points="${pts}" stroke="#333" stroke-width="3" fill="rgba(200,200,200,0.3)"/>`);
+      // Draw treads
+      for (const tread of stair.treads) {
+        w(`    <line x1="${tread.start.x}" y1="${y(tread.start.y)}" x2="${tread.end.x}" y2="${y(tread.end.y)}" stroke="#666" stroke-width="1.5"/>`);
+      }
+      // Up arrow
+      const uStart = stair.up_direction.start;
+      const uEnd = stair.up_direction.end;
+      w(`    <line x1="${uStart.x}" y1="${y(uStart.y)}" x2="${uEnd.x}" y2="${y(uEnd.y)}" stroke="#333" stroke-width="2" marker-end="url(#arrow)"/>`);
+    }
+    w(`  </g>`);
+  }
+
+  // ======== ANNOTATIONS ========
+  if (floor.annotations.length > 0) {
+    w(`  <g id="A-NOTE">`);
+    for (const ann of floor.annotations) {
+      const ax = ann.position.x;
+      const ay = y(ann.position.y);
+      const fs = ann.font_size_mm || 200;
+      const rot = ann.rotation_deg ? ` transform="rotate(${-ann.rotation_deg} ${ax} ${ay})"` : "";
+      w(`    <text x="${ax}" y="${ay}" font-size="${fs}" fill="#333"${rot}>${escapeXml(ann.text)}</text>`);
+      // Leader line
+      if (ann.leader_line && ann.leader_line.length >= 2) {
+        const lpts = ann.leader_line.map((p) => `${p.x},${y(p.y)}`).join(" ");
+        w(`    <polyline points="${lpts}" stroke="#666" stroke-width="1.5" fill="none"/>`);
       }
     }
     w(`  </g>`);

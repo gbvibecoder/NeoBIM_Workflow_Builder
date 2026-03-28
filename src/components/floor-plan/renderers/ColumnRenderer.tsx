@@ -61,7 +61,7 @@ function ColumnItem({
             x={-r - 10}
             y={-r - 14}
             text={column.grid_ref}
-            fontSize={Math.max(7, 9 * zoom * 10)}
+            fontSize={Math.max(7, Math.min(14, 90 * zoom))}
             fill="#666"
             fontStyle="bold"
           />
@@ -95,7 +95,7 @@ function ColumnItem({
           x={-w / 2 - 10}
           y={-d / 2 - 14}
           text={column.grid_ref}
-          fontSize={Math.max(7, 9 * zoom * 10)}
+          fontSize={Math.max(7, Math.min(14, 90 * zoom))}
           fill="#666"
           fontStyle="bold"
         />

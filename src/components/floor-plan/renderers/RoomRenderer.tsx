@@ -5,7 +5,7 @@ import { Line as KLine, Text, Group, Circle, Rect } from "react-konva";
 import type { Room, ViewMode } from "@/types/floor-plan-cad";
 import { ROOM_COLORS } from "@/types/floor-plan-cad";
 import type { Viewport } from "@/lib/floor-plan/geometry";
-import { worldToScreen, worldToScreenDistance } from "@/lib/floor-plan/geometry";
+import { worldToScreen, worldToScreenDistance, polygonBounds } from "@/lib/floor-plan/geometry";
 import { formatArea, formatDimension } from "@/lib/floor-plan/unit-conversion";
 import type { DisplayUnit } from "@/lib/floor-plan/unit-conversion";
 
@@ -71,10 +71,9 @@ export function RoomRenderer({
         const colors = ROOM_COLORS[room.type] ?? ROOM_COLORS.custom;
         const labelScreen = worldToScreen(room.label_position, viewport);
 
-        const xs = room.boundary.points.map((p) => p.x);
-        const ys = room.boundary.points.map((p) => p.y);
-        const roomW_mm = Math.max(...xs) - Math.min(...xs);
-        const roomH_mm = Math.max(...ys) - Math.min(...ys);
+        const rb = polygonBounds(room.boundary.points);
+        const roomW_mm = rb.width;
+        const roomH_mm = rb.height;
 
         const screenW = worldToScreenDistance(roomW_mm, viewport.zoom);
         const screenH = worldToScreenDistance(roomH_mm, viewport.zoom);

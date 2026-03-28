@@ -28,6 +28,15 @@ import { saveProject, loadProject } from "@/lib/floor-plan/project-persistence";
 import { createSample2BHK } from "@/lib/floor-plan/sample-data";
 
 // ============================================================
+// SAFE DEEP CLONE (structuredClone with JSON fallback)
+// ============================================================
+
+function deepClone<T>(obj: T): T {
+  if (typeof structuredClone === "function") return deepClone(obj);
+  return JSON.parse(JSON.stringify(obj));
+}
+
+// ============================================================
 // HISTORY (Undo/Redo)
 // ============================================================
 
@@ -269,10 +278,10 @@ interface FloorPlanState {
   toggleCodeOverlay: () => void;
 
   // AI actions (Sprint 4)
-  autoPlaceDoors: () => void;
-  autoPlaceWindows: () => void;
-  autoFurnishRoom: (roomId: string) => void;
-  autoFurnishAll: () => void;
+  autoPlaceDoors: () => Promise<void> | void;
+  autoPlaceWindows: () => Promise<void> | void;
+  autoFurnishRoom: (roomId: string) => Promise<void> | void;
+  autoFurnishAll: () => Promise<void> | void;
   applySwapSuggestion: (roomAId: string, roomBId: string) => void;
 
   // Data source & generation
@@ -622,7 +631,6 @@ export const useFloorPlanStore = create<FloorPlanState>()((set, get) => ({
     if (!door) return;
 
     s.pushHistory();
-    s.updateWall; // ensure we use the store pattern
     set((state) => {
       if (!state.project || !state.activeFloorId) return state;
       return {
@@ -689,14 +697,15 @@ export const useFloorPlanStore = create<FloorPlanState>()((set, get) => ({
     if (maxPos < minPos) return; // Wall too short
     const clampedPos = Math.max(minPos, Math.min(position_mm - doorWidth / 2, maxPos));
 
-    // Check overlap with existing doors/windows on this wall
+    // Check overlap with existing doors/windows on this wall (min 50mm gap required)
+    const MIN_GAP = 50;
     for (const d of floor.doors) {
       if (d.wall_id !== wallId) continue;
-      if (clampedPos < d.position_along_wall_mm + d.width_mm && clampedPos + doorWidth > d.position_along_wall_mm) return;
+      if (clampedPos < d.position_along_wall_mm + d.width_mm + MIN_GAP && clampedPos + doorWidth + MIN_GAP > d.position_along_wall_mm) return;
     }
     for (const w of floor.windows) {
       if (w.wall_id !== wallId) continue;
-      if (clampedPos < w.position_along_wall_mm + w.width_mm && clampedPos + doorWidth > w.position_along_wall_mm) return;
+      if (clampedPos < w.position_along_wall_mm + w.width_mm + MIN_GAP && clampedPos + doorWidth + MIN_GAP > w.position_along_wall_mm) return;
     }
 
     s.pushHistory();
@@ -955,7 +964,7 @@ export const useFloorPlanStore = create<FloorPlanState>()((set, get) => ({
     const furniture = floor.furniture.filter((f) => ids.has(f.id));
     const annotations = floor.annotations.filter((a) => ids.has(a.id));
 
-    set({ _clipboard: JSON.parse(JSON.stringify({ walls, doors, windows, furniture, annotations })) });
+    set({ _clipboard: deepClone({ walls, doors, windows, furniture, annotations }) });
   },
 
   pasteAtCursor: () => {
@@ -1222,7 +1231,7 @@ export const useFloorPlanStore = create<FloorPlanState>()((set, get) => ({
     const srcFloor = s.project.floors.find((f) => f.id === floorId);
     if (!srcFloor) return;
     const maxLevel = Math.max(0, ...s.project.floors.map((f) => f.level));
-    const copy: Floor = JSON.parse(JSON.stringify(srcFloor));
+    const copy: Floor = deepClone(srcFloor);
     copy.id = genId("floor");
     copy.name = newName;
     copy.level = maxLevel + 1;
@@ -1266,7 +1275,7 @@ export const useFloorPlanStore = create<FloorPlanState>()((set, get) => ({
     if (!floor) return;
     set((s) => {
       const newHistory = s._history.slice(0, s._historyIndex + 1);
-      newHistory.push({ floor: JSON.parse(JSON.stringify(floor)), timestamp: Date.now() });
+      newHistory.push({ floor: deepClone(floor), timestamp: Date.now() });
       if (newHistory.length > MAX_HISTORY) newHistory.shift();
       return { _history: newHistory, _historyIndex: newHistory.length - 1 };
     });
@@ -1321,95 +1330,111 @@ export const useFloorPlanStore = create<FloorPlanState>()((set, get) => ({
   toggleCodeOverlay: () => set((s) => ({ codeOverlayVisible: !s.codeOverlayVisible })),
 
   // ---- AI Actions (Sprint 4) ----
-  autoPlaceDoors: () => {
+  autoPlaceDoors: async () => {
     const s = get();
     const floor = s.getActiveFloor();
     if (!floor || !s.project || !s.activeFloorId) return;
 
     s.pushHistory();
 
-    const { smartPlaceDoors } = require("@/lib/floor-plan/smart-placement");
-    const result = smartPlaceDoors(floor);
+    try {
+      const { smartPlaceDoors } = await import("@/lib/floor-plan/smart-placement");
+      const result = smartPlaceDoors(floor);
 
-    set({
-      project: {
-        ...s.project,
-        floors: s.project.floors.map((f) =>
-          f.id === s.activeFloorId ? { ...f, doors: result.doors } : f
-        ),
-      },
-      projectModified: true,
-    });
+      set({
+        project: {
+          ...s.project,
+          floors: s.project.floors.map((f) =>
+            f.id === s.activeFloorId ? { ...f, doors: result.doors } : f
+          ),
+        },
+        projectModified: true,
+      });
+    } catch (e) {
+      console.error("Failed to load smart-placement module:", e);
+    }
   },
 
-  autoPlaceWindows: () => {
+  autoPlaceWindows: async () => {
     const s = get();
     const floor = s.getActiveFloor();
     if (!floor || !s.project || !s.activeFloorId) return;
 
     s.pushHistory();
 
-    const { smartPlaceWindows } = require("@/lib/floor-plan/smart-placement");
-    const result = smartPlaceWindows(floor);
+    try {
+      const { smartPlaceWindows } = await import("@/lib/floor-plan/smart-placement");
+      const result = smartPlaceWindows(floor);
 
-    set({
-      project: {
-        ...s.project,
-        floors: s.project.floors.map((f) =>
-          f.id === s.activeFloorId ? { ...f, windows: result.windows } : f
-        ),
-      },
-      projectModified: true,
-    });
+      set({
+        project: {
+          ...s.project,
+          floors: s.project.floors.map((f) =>
+            f.id === s.activeFloorId ? { ...f, windows: result.windows } : f
+          ),
+        },
+        projectModified: true,
+      });
+    } catch (e) {
+      console.error("Failed to load smart-placement module:", e);
+    }
   },
 
-  autoFurnishRoom: (roomId) => {
+  autoFurnishRoom: async (roomId) => {
     const s = get();
     const floor = s.getActiveFloor();
     if (!floor || !s.project || !s.activeFloorId) return;
 
     s.pushHistory();
 
-    const { layoutRoomFurniture } = require("@/lib/floor-plan/furniture-layout");
-    const room = floor.rooms.find((r) => r.id === roomId);
-    if (!room) return;
+    try {
+      const { layoutRoomFurniture } = await import("@/lib/floor-plan/furniture-layout");
+      const room = floor.rooms.find((r) => r.id === roomId);
+      if (!room) return;
 
-    const result = layoutRoomFurniture(room, floor);
-    // Remove existing furniture in this room, add new
-    const otherFurniture = floor.furniture.filter((f) => f.room_id !== roomId);
+      const result = layoutRoomFurniture(room, floor);
+      // Remove existing furniture in this room, add new
+      const otherFurniture = floor.furniture.filter((f) => f.room_id !== roomId);
 
-    set({
-      project: {
-        ...s.project,
-        floors: s.project.floors.map((f) =>
-          f.id === s.activeFloorId
-            ? { ...f, furniture: [...otherFurniture, ...result.furniture] }
-            : f
-        ),
-      },
-      projectModified: true,
-    });
+      set({
+        project: {
+          ...s.project,
+          floors: s.project.floors.map((f) =>
+            f.id === s.activeFloorId
+              ? { ...f, furniture: [...otherFurniture, ...result.furniture] }
+              : f
+          ),
+        },
+        projectModified: true,
+      });
+    } catch (e) {
+      console.error("Failed to load furniture-layout module:", e);
+    }
   },
 
-  autoFurnishAll: () => {
+  autoFurnishAll: async () => {
     const s = get();
     const floor = s.getActiveFloor();
     if (!floor || !s.project || !s.activeFloorId) return;
 
     s.pushHistory();
 
-    const { layoutAllFurniture } = require("@/lib/floor-plan/furniture-layout");
-    const result = layoutAllFurniture(floor);
+    try {
+      const { layoutAllFurniture } = await import("@/lib/floor-plan/furniture-layout");
+      const result = layoutAllFurniture(floor);
 
-    set({
-      project: {
-        ...s.project,
-        floors: s.project.floors.map((f) =>
-          f.id === s.activeFloorId ? { ...f, furniture: result.furniture } : f
-        ),
-      },
-      projectModified: true,
-    });
+      set({
+        project: {
+          ...s.project,
+          floors: s.project.floors.map((f) =>
+            f.id === s.activeFloorId ? { ...f, furniture: result.furniture } : f
+          ),
+        },
+        projectModified: true,
+      });
+    } catch (e) {
+      console.error("Failed to load furniture-layout module:", e);
+    }
   },
 
   applySwapSuggestion: (roomAId, roomBId) => {

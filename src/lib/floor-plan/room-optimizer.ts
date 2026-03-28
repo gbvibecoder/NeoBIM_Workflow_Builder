@@ -148,7 +148,20 @@ function simulateSwapScore(
     return r;
   });
 
-  const virtualFloor: Floor = { ...floor, rooms: swappedRooms };
+  // Also swap wall room references so downstream analysis is consistent
+  const swappedWalls = floor.walls.map((w) => {
+    let left = w.left_room_id;
+    let right = w.right_room_id;
+    if (left === roomA.id) left = roomB.id;
+    else if (left === roomB.id) left = roomA.id;
+    if (right === roomA.id) right = roomB.id;
+    else if (right === roomB.id) right = roomA.id;
+    return (left !== w.left_room_id || right !== w.right_room_id)
+      ? { ...w, left_room_id: left, right_room_id: right }
+      : w;
+  });
+
+  const virtualFloor: Floor = { ...floor, rooms: swappedRooms, walls: swappedWalls };
   const report = analyzeVastuCompliance(virtualFloor, northAngleDeg);
   return report.score;
 }
@@ -159,6 +172,7 @@ function getRoomDir(room: Room, floor: Floor): VastuDirection {
   const bounds = floorBounds(floor.walls, floor.rooms);
   const cellW = bounds.width / 3;
   const cellH = bounds.height / 3;
+  if (cellW < 1 || cellH < 1) return "CENTER";
   const centroid = polygonCentroid(room.boundary.points);
 
   const relX = centroid.x - bounds.min.x;

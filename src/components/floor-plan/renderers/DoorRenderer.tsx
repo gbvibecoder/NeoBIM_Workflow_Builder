@@ -161,15 +161,19 @@ export function DoorRenderer({ doors, walls, viewport, viewMode }: DoorRendererP
       {doorShapes.map((g) => {
         // ── Sliding / Pocket / Barn ──
         if (g.type === "sliding" || g.type === "pocket" || g.type === "barn") {
+          const bMinX = Math.min(g.breakStart.x, g.breakEnd.x);
+          const bMinY = Math.min(g.breakStart.y, g.breakEnd.y);
+          const bMaxX = Math.max(g.breakStart.x, g.breakEnd.x);
+          const bMaxY = Math.max(g.breakStart.y, g.breakEnd.y);
           return (
             <Group key={g.id}>
               {/* Wall break */}
               <KLine
                 points={[
-                  g.breakStart.x, g.breakStart.y,
-                  g.breakEnd.x, g.breakStart.y,
-                  g.breakEnd.x, g.breakEnd.y,
-                  g.breakStart.x, g.breakEnd.y,
+                  bMinX, bMinY,
+                  bMaxX, bMinY,
+                  bMaxX, bMaxY,
+                  bMinX, bMaxY,
                 ]}
                 closed fill="#FFFFFF" stroke="transparent" listening={false}
               />
@@ -216,15 +220,19 @@ export function DoorRenderer({ doors, walls, viewport, viewMode }: DoorRendererP
         // ── Double Swing / French ──
         if ((g.type === "double_swing" || g.type === "french") && g.hinge2Screen) {
           const halfRadius = g.arcRadius;
+          const dMinX = Math.min(g.breakStart.x, g.breakEnd.x);
+          const dMinY = Math.min(g.breakStart.y, g.breakEnd.y);
+          const dMaxX = Math.max(g.breakStart.x, g.breakEnd.x);
+          const dMaxY = Math.max(g.breakStart.y, g.breakEnd.y);
           return (
             <Group key={g.id}>
               {/* Wall break */}
               <KLine
                 points={[
-                  g.breakStart.x, g.breakStart.y,
-                  g.breakEnd.x, g.breakStart.y,
-                  g.breakEnd.x, g.breakEnd.y,
-                  g.breakStart.x, g.breakEnd.y,
+                  dMinX, dMinY,
+                  dMaxX, dMinY,
+                  dMaxX, dMaxY,
+                  dMinX, dMaxY,
                 ]}
                 closed fill="#FFFFFF" stroke="transparent" listening={false}
               />
@@ -286,16 +294,20 @@ export function DoorRenderer({ doors, walls, viewport, viewMode }: DoorRendererP
         const isEntrance = g.type === "main_entrance";
         const lfW = isEntrance ? leafWeight * 1.4 : leafWeight;
         const hR = isEntrance ? hingeRadius * 1.3 : hingeRadius;
+        const sMinX = Math.min(g.breakStart.x, g.breakEnd.x);
+        const sMinY = Math.min(g.breakStart.y, g.breakEnd.y);
+        const sMaxX = Math.max(g.breakStart.x, g.breakEnd.x);
+        const sMaxY = Math.max(g.breakStart.y, g.breakEnd.y);
 
         return (
           <Group key={g.id}>
             {/* Wall break */}
             <KLine
               points={[
-                g.breakStart.x, g.breakStart.y,
-                g.breakEnd.x, g.breakStart.y,
-                g.breakEnd.x, g.breakEnd.y,
-                g.breakStart.x, g.breakEnd.y,
+                sMinX, sMinY,
+                sMaxX, sMinY,
+                sMaxX, sMaxY,
+                sMinX, sMaxY,
               ]}
               closed fill="#FFFFFF" stroke="transparent" listening={false}
             />

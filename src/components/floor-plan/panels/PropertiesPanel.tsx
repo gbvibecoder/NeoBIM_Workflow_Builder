@@ -63,6 +63,9 @@ export function PropertiesPanel() {
                   isSelected ? "bg-blue-50 ring-1 ring-blue-200" : "hover:bg-gray-100"
                 }`}
                 onClick={() => useFloorPlanStore.getState().setSelectedIds([room.id])}
+                onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); useFloorPlanStore.getState().setSelectedIds([room.id]); } }}
+                role="button"
+                tabIndex={0}
               >
                 <div
                   className="h-3 w-3 rounded-sm border"
@@ -490,10 +493,14 @@ function RoomProperties({ room, displayUnit }: { room: Room; displayUnit: Displa
   }, [room.id, room.name]);
 
   const handleNameSave = useCallback(() => {
-    if (nameValue.trim() && nameValue !== room.name) {
+    const trimmed = nameValue.trim();
+    if (!trimmed) {
+      // Revert to previous name if empty
+      setNameValue(room.name);
+    } else if (trimmed !== room.name) {
       const s = useFloorPlanStore.getState();
       s.pushHistory();
-      s.updateRoom(room.id, { name: nameValue.trim() });
+      s.updateRoom(room.id, { name: trimmed });
     }
     setEditingName(false);
   }, [room.id, room.name, nameValue]);
