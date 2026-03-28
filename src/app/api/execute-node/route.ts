@@ -5005,7 +5005,7 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
       // structured outputs for downstream nodes (BOQ, IFC, reports).
       // The actual interactive editing happens client-side in the result showcase.
       const { adaptNodeInput } = await import("@/lib/floor-plan/node-input-adapter");
-      const { buildNodeOutputs, computeBOQQuantities, extractRoomSchedule } = await import("@/lib/floor-plan/node-output-adapter");
+      const { computeBOQQuantities, extractRoomSchedule, formatBOQForExporter } = await import("@/lib/floor-plan/node-output-adapter");
       const { convertFloorPlanToMassing } = await import("@/lib/floor-plan/floorplan-to-massing");
       const { exportFloorToSvg } = await import("@/lib/floor-plan/export-svg");
 
@@ -5026,6 +5026,7 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
       const boqQuantities = computeBOQQuantities(project);
       const roomSchedule = extractRoomSchedule(project);
       const massingGeometry = convertFloorPlanToMassing(project);
+      const boqExporterData = formatBOQForExporter(boqQuantities, project.metadata.project_type ?? "residential");
 
       let svgContent = "";
       try {
@@ -5038,6 +5039,8 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
       } catch { /* SVG export is non-critical */ }
 
       const totalArea = floor.rooms.reduce((s, r) => s + r.area_sqm, 0);
+
+      const totalGfa = floor.rooms.reduce((s, r) => s + r.area_sqm, 0);
 
       artifact = {
         id: `art_${generateId()}`,
@@ -5059,6 +5062,13 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
           massingGeometry,
           svgContent,
 
+          // EX-002 compatible BOQ data (top-level for downstream consumption)
+          _boqData: boqExporterData,
+          _currency: "INR",
+          _currencySymbol: "₹",
+          _region: "India",
+          _gfa: Math.round(totalGfa * 100) / 100,
+
           // Summary metrics
           summary: {
             totalRooms: floor.rooms.length,
@@ -5077,7 +5087,14 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
             "project-out": project,
             "geo-out": massingGeometry,
             "schedule-out": roomSchedule,
-            "boq-out": boqQuantities,
+            "boq-out": {
+              ...boqQuantities,
+              _boqData: boqExporterData,
+              _currency: "INR",
+              _currencySymbol: "₹",
+              _region: "India",
+              _gfa: Math.round(totalGfa * 100) / 100,
+            },
             "svg-out": svgContent,
           },
         },
