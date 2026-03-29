@@ -108,7 +108,8 @@ function extractIfcQuality(data: any): BOQData["ifcQuality"] | undefined {
 export function parseArtifactToBOQ(artifactData: any): BOQData | null {
   if (!artifactData) return null;
 
-  let data: Record<string, unknown>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let data: Record<string, any>;
   if (typeof artifactData === "string") {
     try { data = JSON.parse(artifactData); }
     catch { return null; }

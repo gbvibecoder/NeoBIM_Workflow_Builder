@@ -247,8 +247,8 @@ function PdfSettings({
   onBack,
   onClose,
 }: {
-  project: FloorPlanProject;
-  floor: Floor;
+  project: FloorPlanProject | null;
+  floor: Floor | null;
   displayUnit: DisplayUnit;
   exporting: boolean;
   setExporting: (v: boolean) => void;
@@ -322,9 +322,9 @@ function DxfSettings({
   onBack,
   onClose,
 }: {
-  floor: Floor;
+  floor: Floor | null;
   displayUnit: DisplayUnit;
-  project: FloorPlanProject;
+  project: FloorPlanProject | null;
   exporting: boolean;
   setExporting: (v: boolean) => void;
   onExportError?: (msg: string) => void;
@@ -383,9 +383,9 @@ function SvgSettings({
   onBack,
   onClose,
 }: {
-  floor: Floor;
+  floor: Floor | null;
   displayUnit: DisplayUnit;
-  project: FloorPlanProject;
+  project: FloorPlanProject | null;
   exporting: boolean;
   setExporting: (v: boolean) => void;
   onExportError?: (msg: string) => void;
@@ -447,7 +447,7 @@ function PngSettings({
   onExportError?: (msg: string) => void;
   onBack: () => void;
   onClose: () => void;
-  project: FloorPlanProject;
+  project: FloorPlanProject | null;
 }) {
   const [dpi, setDpi] = useState<PngDpi>(150);
   const [transparent, setTransparent] = useState(false);
