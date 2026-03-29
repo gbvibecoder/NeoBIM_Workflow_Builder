@@ -36,7 +36,7 @@ function FurnitureRendererBase({
   );
 }
 
-function FurnitureItem({
+const FurnitureItem = React.memo(function FurnitureItem({
   instance,
   viewport,
   isSelected,
@@ -138,7 +138,7 @@ function FurnitureItem({
       )}
     </Group>
   );
-}
+});
 
 /**
  * Parse simple SVG path with M, L, Z commands into flat Konva points.

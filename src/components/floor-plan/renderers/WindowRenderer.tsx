@@ -104,7 +104,7 @@ function WindowRendererBase({ windows, walls, viewport, viewMode }: WindowRender
 
       return shape;
     }).filter(Boolean) as WinShape[];
-  }, [windows, walls, viewport]);
+  }, [windows, walls, viewport.x, viewport.y, viewport.zoom, viewport.canvasWidth, viewport.canvasHeight]);
 
   const lineColor = viewMode === "cad" ? "#1A1A1A" : "#444444";
   const glassColor = viewMode === "cad" ? "#3B82F6" : "#60A5FA";

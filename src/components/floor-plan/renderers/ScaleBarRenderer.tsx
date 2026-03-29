@@ -67,7 +67,7 @@ function ScaleBarRendererBase({ viewport, displayUnit }: ScaleBarRendererProps) 
     }
 
     return { segments, x0, y0, barHeight, totalScreen, totalWorld };
-  }, [viewport, displayUnit]);
+  }, [viewport.zoom, viewport.canvasWidth, viewport.canvasHeight, displayUnit]);
 
   return (
     <Group listening={false}>

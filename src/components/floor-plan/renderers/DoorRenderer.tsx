@@ -148,7 +148,7 @@ function DoorRendererBase({ doors, walls, viewport, viewMode }: DoorRendererProp
 
       return geom;
     }).filter(Boolean) as DoorGeom[];
-  }, [doors, walls, viewport]);
+  }, [doors, walls, viewport.x, viewport.y, viewport.zoom, viewport.canvasWidth, viewport.canvasHeight]);
 
   const strokeColor = viewMode === "cad" ? "#1A1A1A" : "#555555";
   const arcColor = viewMode === "cad" ? "#444444" : "#888888";
