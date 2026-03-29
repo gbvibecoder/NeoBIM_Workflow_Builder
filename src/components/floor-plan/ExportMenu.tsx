@@ -10,6 +10,7 @@ import type { PdfExportOptions, PaperSize, PdfScale } from "@/lib/floor-plan/exp
 import type { SvgExportOptions } from "@/lib/floor-plan/export-svg";
 import type { PngDpi, PngExportOptions } from "@/lib/floor-plan/export-png";
 import type { DisplayUnit } from "@/lib/floor-plan/unit-conversion";
+import type { FloorPlanProject, Floor } from "@/types/floor-plan-cad";
 
 type ExportFormat = "dxf" | "pdf" | "svg" | "png";
 
@@ -246,8 +247,8 @@ function PdfSettings({
   onBack,
   onClose,
 }: {
-  project: any;
-  floor: any;
+  project: FloorPlanProject;
+  floor: Floor;
   displayUnit: DisplayUnit;
   exporting: boolean;
   setExporting: (v: boolean) => void;
@@ -321,9 +322,9 @@ function DxfSettings({
   onBack,
   onClose,
 }: {
-  floor: any;
+  floor: Floor;
   displayUnit: DisplayUnit;
-  project: any;
+  project: FloorPlanProject;
   exporting: boolean;
   setExporting: (v: boolean) => void;
   onExportError?: (msg: string) => void;
@@ -382,9 +383,9 @@ function SvgSettings({
   onBack,
   onClose,
 }: {
-  floor: any;
+  floor: Floor;
   displayUnit: DisplayUnit;
-  project: any;
+  project: FloorPlanProject;
   exporting: boolean;
   setExporting: (v: boolean) => void;
   onExportError?: (msg: string) => void;
@@ -446,7 +447,7 @@ function PngSettings({
   onExportError?: (msg: string) => void;
   onBack: () => void;
   onClose: () => void;
-  project: any;
+  project: FloorPlanProject;
 }) {
   const [dpi, setDpi] = useState<PngDpi>(150);
   const [transparent, setTransparent] = useState(false);

@@ -32,7 +32,7 @@ import { createSample2BHK } from "@/lib/floor-plan/sample-data";
 // ============================================================
 
 function deepClone<T>(obj: T): T {
-  if (typeof structuredClone === "function") return deepClone(obj);
+  if (typeof structuredClone === "function") return structuredClone(obj);
   return JSON.parse(JSON.stringify(obj));
 }
 
@@ -315,7 +315,7 @@ function genId(prefix: string): string {
 // STORE IMPLEMENTATION
 // ============================================================
 
-const MAX_HISTORY = 100;
+const MAX_HISTORY = 50;
 
 export const useFloorPlanStore = create<FloorPlanState>()((set, get) => ({
   project: null,
