@@ -32,7 +32,7 @@ import { useLocale } from "@/hooks/useLocale";
 import { COLORS } from "../constants";
 
 const FloorPlanViewer = dynamic(
-  () => import("../../../floor-plan/FloorPlanViewer").then(m => ({ default: m.FloorPlanViewer })),
+  () => import("@/components/floor-plan/FloorPlanViewer").then(m => ({ default: m.FloorPlanViewer })),
   { ssr: false, loading: () => <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", color: "#888", fontSize: 13 }}>Loading Floor Plan Editor...</div> }
 );
 import { HeroSection } from "../sections/HeroSection";

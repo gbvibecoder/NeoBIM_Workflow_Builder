@@ -3,7 +3,9 @@
 import React from "react";
 import { Line as KLine, Rect, Circle, Group, Text } from "react-konva";
 import { useFloorPlanStore } from "@/stores/floor-plan-store";
-import type { Viewport, } from "@/lib/floor-plan/geometry";
+import type { Viewport } from "@/lib/floor-plan/geometry";
+import type { SnapResult } from "@/lib/floor-plan/snap-engine";
+import type { Floor } from "@/types/floor-plan-cad";
 import {
   worldToScreen,
   distance,
@@ -78,7 +80,7 @@ export function InteractionOverlay({ viewport }: InteractionOverlayProps) {
 // SNAP INDICATOR
 // ============================================================
 
-function SnapIndicator({ snap, viewport }: { snap: any; viewport: Viewport }) {
+function SnapIndicator({ snap, viewport }: { snap: SnapResult; viewport: Viewport }) {
   const screen = worldToScreen(snap.point, viewport);
   const size = 5;
   const color = "#FF00FF"; // Magenta — visible in all modes
@@ -264,10 +266,10 @@ function GhostDoor({
   viewport,
 }: {
   ghostDoor: { wallId: string; position_mm: number };
-  floor: any;
+  floor: Floor;
   viewport: Viewport;
 }) {
-  const wall = floor.walls.find((w: any) => w.id === ghostDoor.wallId);
+  const wall = floor.walls.find((w) => w.id === ghostDoor.wallId);
   if (!wall) return null;
 
   const dir = lineDirection(wall.centerline);
@@ -276,7 +278,7 @@ function GhostDoor({
   // Use context-aware width: bathroom=750, lobby/foyer=1050, default=900
   const adjRoomTypes: string[] = [wall.left_room_id, wall.right_room_id]
     .filter(Boolean)
-    .map((rid) => floor.rooms.find((r: any) => r.id === rid)?.type ?? "")
+    .map((rid) => floor.rooms.find((r) => r.id === rid)?.type ?? "")
     .filter(Boolean);
   const hasBathroom = adjRoomTypes.some((t: string) => ["bathroom", "toilet", "wc", "utility"].includes(t));
   const hasLobby = adjRoomTypes.some((t: string) => ["lobby", "foyer"].includes(t));
@@ -316,10 +318,10 @@ function GhostWindow({
   viewport,
 }: {
   ghostWindow: { wallId: string; position_mm: number };
-  floor: any;
+  floor: Floor;
   viewport: Viewport;
 }) {
-  const wall = floor.walls.find((w: any) => w.id === ghostWindow.wallId);
+  const wall = floor.walls.find((w) => w.id === ghostWindow.wallId);
   if (!wall) return null;
 
   const dir = lineDirection(wall.centerline);
@@ -328,7 +330,7 @@ function GhostWindow({
   // Use context-aware width: bathroom=600, kitchen=900, default=1200
   const adjRoomTypes: string[] = [wall.left_room_id, wall.right_room_id]
     .filter(Boolean)
-    .map((rid) => floor.rooms.find((r: any) => r.id === rid)?.type ?? "")
+    .map((rid) => floor.rooms.find((r) => r.id === rid)?.type ?? "")
     .filter(Boolean);
   const hasBathroom = adjRoomTypes.some((t: string) => ["bathroom", "toilet", "wc"].includes(t));
   const hasKitchen = adjRoomTypes.some((t: string) => ["kitchen"].includes(t));

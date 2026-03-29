@@ -2,7 +2,7 @@
 
 import React, { useMemo } from "react";
 import { Line as KLine, Rect, Circle, Group, Text } from "react-konva";
-import type { Floor, Point } from "@/types/floor-plan-cad";
+import type { Floor, Point, Wall, Door, CadWindow, Room } from "@/types/floor-plan-cad";
 import type { Viewport } from "@/lib/floor-plan/geometry";
 import {
   worldToScreen,
@@ -69,7 +69,7 @@ function SelectionRendererBase({ selectedIds, floor, viewport }: SelectionRender
 // WALL SELECTION
 // ============================================================
 
-function WallSelection({ wall, viewport }: { wall: any; viewport: Viewport }) {
+function WallSelection({ wall, viewport }: { wall: Wall; viewport: Viewport }) {
   const corners = wallToRectangle(wall);
   const screenPts = corners.map((p: Point) => worldToScreen(p, viewport));
   const points = screenPts.flatMap((p: Point) => [p.x, p.y]);
@@ -136,7 +136,7 @@ function WallSelection({ wall, viewport }: { wall: any; viewport: Viewport }) {
 // DOOR SELECTION
 // ============================================================
 
-function DoorSelection({ door, floor, viewport }: { door: any; floor: Floor; viewport: Viewport }) {
+function DoorSelection({ door, floor, viewport }: { door: Door; floor: Floor; viewport: Viewport }) {
   const wall = floor.walls.find((w) => w.id === door.wall_id);
   if (!wall) return null;
 
@@ -185,7 +185,7 @@ function DoorSelection({ door, floor, viewport }: { door: any; floor: Floor; vie
 // WINDOW SELECTION
 // ============================================================
 
-function WindowSelection({ window: win, floor, viewport }: { window: any; floor: Floor; viewport: Viewport }) {
+function WindowSelection({ window: win, floor, viewport }: { window: CadWindow; floor: Floor; viewport: Viewport }) {
   const wall = floor.walls.find((w) => w.id === win.wall_id);
   if (!wall) return null;
 
@@ -232,7 +232,7 @@ function WindowSelection({ window: win, floor, viewport }: { window: any; floor:
 // ROOM SELECTION
 // ============================================================
 
-function RoomSelection({ room, viewport }: { room: any; viewport: Viewport }) {
+function RoomSelection({ room, viewport }: { room: Room; viewport: Viewport }) {
   const screenPts = room.boundary.points.map((p: Point) => worldToScreen(p, viewport));
   const points = screenPts.flatMap((p: Point) => [p.x, p.y]);
 
