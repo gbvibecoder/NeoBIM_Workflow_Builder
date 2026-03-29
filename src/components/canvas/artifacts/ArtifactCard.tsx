@@ -39,6 +39,15 @@ const VideoBody = dynamic(() => import("./VideoBody").then(m => ({ default: m.Vi
   ssr: false,
   loading: () => <VideoBodyLoader />,
 });
+
+function IFCBIMViewerLoader() {
+  return <div style={{ height: 400, background: "#0A0A12", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center" }}><span style={{ fontSize: 11, color: "#3A3A50" }}>Loading BIM Viewer…</span></div>;
+}
+
+const IFCBIMViewer = dynamic(() => import("./IFCBIMViewer"), {
+  ssr: false,
+  loading: () => <IFCBIMViewerLoader />,
+});
 import type {
   ExecutionArtifact,
   ArtifactType,
@@ -1008,9 +1017,20 @@ function FileBody({ data }: { data: FileArtifactData }) {
   // ── Multi-file mode (4 discipline IFC files) ──
   if (extData.files && extData.files.length > 1) {
     const handleDownloadAll = () => { for (const f of extData.files!) downloadIFCFile(f); };
+    const combinedFile = extData.files.find(f => f.discipline === "combined") ?? extData.files[0];
+    const hasIFC = extData.files.some(f => f.name?.endsWith(".ifc"));
 
     return (
-      <div style={{ padding: "0 12px 10px 14px" }}>
+      <div>
+        {/* Embedded BIM Viewer for IFC files */}
+        {hasIFC && combinedFile?.downloadUrl && (
+          <IFCBIMViewer
+            downloadUrl={combinedFile.downloadUrl}
+            ifcContent={combinedFile._ifcContent}
+            height={380}
+          />
+        )}
+        <div style={{ padding: "0 12px 10px 14px" }}>
         <div style={{ fontSize: 11, fontWeight: 600, color: "#F0F0F5", marginBottom: 8 }}>
           {extData.files.length} IFC Discipline Files
         </div>
@@ -1068,6 +1088,7 @@ function FileBody({ data }: { data: FileArtifactData }) {
           <Download size={10} />
           Download All ({extData.files.length} files)
         </button>
+      </div>
       </div>
     );
   }
