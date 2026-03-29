@@ -5342,43 +5342,81 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
 
       const bldgNameSlug = String(resolvedBuildingType ?? "building").replace(/\s+/g, "_").toLowerCase();
       const dateStr = new Date().toISOString().split("T")[0];
+      const filePrefix = `${bldgNameSlug}_${dateStr}`;
 
-      // Generate 4 discipline-specific IFC files
-      const { generateMultipleIFCFiles: genMulti } = await import("@/services/ifc-exporter");
-      const ifcFiles = genMulti(resolvedGeometry, {
-        projectName: resolvedProjectName, buildingName: resolvedBuildingType,
-      });
+      // ── Try Python IfcOpenShell service first (production-quality IFC) ──
+      let ifcServiceUsed = false;
+      let files: Array<{
+        name: string; type: string; size: number; downloadUrl: string;
+        label: string; discipline: string; _ifcContent?: string;
+      }> = [];
 
-      const disciplines = [
-        { key: "architectural" as const, label: "Architectural", suffix: "architectural" },
-        { key: "structural" as const, label: "Structural", suffix: "structural" },
-        { key: "mep" as const, label: "MEP", suffix: "mep" },
-        { key: "combined" as const, label: "Combined", suffix: "combined" },
-      ];
+      try {
+        const { generateIFCViaService } = await import("@/services/ifc-service-client");
+        const serviceResult = await generateIFCViaService(
+          resolvedGeometry,
+          { projectName: resolvedProjectName, buildingName: resolvedBuildingType },
+          filePrefix,
+        );
 
-      // Upload all 4 files to R2 in parallel
-      const files = await Promise.all(disciplines.map(async (d) => {
-        const content = ifcFiles[d.key];
-        const fileName = `${bldgNameSlug}_${d.suffix}_${dateStr}.ifc`;
-        const b64 = Buffer.from(content).toString("base64");
-        let downloadUrl: string | null = null;
-        try {
-          const r2Url = await uploadBase64ToR2(b64, fileName, "application/x-step");
-          if (r2Url && r2Url !== b64 && r2Url.startsWith("http")) downloadUrl = r2Url;
-        } catch { /* R2 not available */ }
-        if (!downloadUrl) downloadUrl = `data:application/x-step;base64,${b64}`;
-        return {
-          name: fileName,
-          type: "IFC 4",
-          size: content.length,
-          downloadUrl,
-          label: `${d.label} IFC`,
-          discipline: d.key,
-          _ifcContent: content,
-        };
-      }));
+        if (serviceResult) {
+          ifcServiceUsed = true;
+          files = serviceResult.files.map(f => ({
+            name: f.file_name,
+            type: "IFC 4",
+            size: f.size,
+            downloadUrl: f.download_url,
+            label: `${f.discipline.charAt(0).toUpperCase() + f.discipline.slice(1)} IFC`,
+            discipline: f.discipline,
+            _ifcContent: undefined as unknown as string,
+          }));
+          logger.debug("[EX-001] IFC generated via IfcOpenShell service", {
+            files: files.length,
+            engine: serviceResult.metadata.engine,
+            timeMs: serviceResult.metadata.generation_time_ms,
+          });
+        }
+      } catch (err) {
+        logger.debug("[EX-001] IfcOpenShell service unavailable, using TS fallback", { error: String(err) });
+      }
 
-      const combinedFile = files.find(f => f.discipline === "combined")!;
+      // ── Fallback: TypeScript IFC exporter ──
+      if (!ifcServiceUsed) {
+        const { generateMultipleIFCFiles: genMulti } = await import("@/services/ifc-exporter");
+        const ifcFiles = genMulti(resolvedGeometry, {
+          projectName: resolvedProjectName, buildingName: resolvedBuildingType,
+        });
+
+        const disciplines = [
+          { key: "architectural" as const, label: "Architectural", suffix: "architectural" },
+          { key: "structural" as const, label: "Structural", suffix: "structural" },
+          { key: "mep" as const, label: "MEP", suffix: "mep" },
+          { key: "combined" as const, label: "Combined", suffix: "combined" },
+        ];
+
+        files = await Promise.all(disciplines.map(async (d) => {
+          const content = ifcFiles[d.key];
+          const fileName = `${bldgNameSlug}_${d.suffix}_${dateStr}.ifc`;
+          const b64 = Buffer.from(content).toString("base64");
+          let downloadUrl: string | null = null;
+          try {
+            const r2Url = await uploadBase64ToR2(b64, fileName, "application/x-step");
+            if (r2Url && r2Url !== b64 && r2Url.startsWith("http")) downloadUrl = r2Url;
+          } catch { /* R2 not available */ }
+          if (!downloadUrl) downloadUrl = `data:application/x-step;base64,${b64}`;
+          return {
+            name: fileName,
+            type: "IFC 4",
+            size: content.length,
+            downloadUrl,
+            label: `${d.label} IFC`,
+            discipline: d.key,
+            _ifcContent: content,
+          };
+        }));
+      }
+
+      const combinedFile = files.find(f => f.discipline === "combined") ?? files[0];
 
       artifact = {
         id: generateId(),
@@ -5397,7 +5435,13 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
           downloadUrl: combinedFile.downloadUrl,
           _ifcContent: combinedFile._ifcContent,
         },
-        metadata: { engine: "ifc-exporter", real: true, schema: "IFC4", multiFile: true },
+        metadata: {
+          engine: ifcServiceUsed ? "ifcopenshell" : "ifc-exporter",
+          real: true,
+          schema: "IFC4",
+          multiFile: true,
+          ifcServiceUsed,
+        },
         createdAt: new Date(),
       };
 

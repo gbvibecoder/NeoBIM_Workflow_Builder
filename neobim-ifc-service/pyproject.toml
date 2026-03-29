@@ -1,0 +1,25 @@
+[project]
+name = "neobim-ifc-service"
+version = "1.0.0"
+description = "IfcOpenShell-based IFC generation microservice for NeoBIM Workflow Builder"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi[standard]>=0.115.0",
+    "uvicorn[standard]>=0.30.0",
+    "pydantic>=2.0",
+    "pydantic-settings>=2.0",
+    "ifcopenshell>=0.8.0",
+    "boto3>=1.35.0",
+    "structlog>=24.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.24",
+    "httpx>=0.27",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"

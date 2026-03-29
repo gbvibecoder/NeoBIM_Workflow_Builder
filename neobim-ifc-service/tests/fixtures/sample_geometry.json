@@ -1,0 +1,260 @@
+{
+  "geometry": {
+    "buildingType": "Office Building",
+    "floors": 3,
+    "totalHeight": 10.8,
+    "footprintArea": 400.0,
+    "gfa": 1200.0,
+    "footprint": [
+      {"x": 0, "y": 0},
+      {"x": 20, "y": 0},
+      {"x": 20, "y": 20},
+      {"x": 0, "y": 20}
+    ],
+    "storeys": [
+      {
+        "index": 0,
+        "name": "Ground Floor",
+        "elevation": 0.0,
+        "height": 3.6,
+        "elements": [
+          {
+            "id": "wall-gf-n",
+            "type": "wall",
+            "ifcType": "IfcWall",
+            "vertices": [{"x": 0, "y": 0, "z": 0}, {"x": 20, "y": 0, "z": 0}],
+            "faces": [],
+            "properties": {
+              "name": "Wall North GF",
+              "storeyIndex": 0,
+              "length": 20.0,
+              "thickness": 0.25,
+              "height": 3.6,
+              "isPartition": false
+            }
+          },
+          {
+            "id": "wall-gf-e",
+            "type": "wall",
+            "ifcType": "IfcWall",
+            "vertices": [{"x": 20, "y": 0, "z": 0}, {"x": 20, "y": 20, "z": 0}],
+            "faces": [],
+            "properties": {
+              "name": "Wall East GF",
+              "storeyIndex": 0,
+              "length": 20.0,
+              "thickness": 0.25,
+              "height": 3.6,
+              "isPartition": false
+            }
+          },
+          {
+            "id": "wall-gf-s",
+            "type": "wall",
+            "ifcType": "IfcWall",
+            "vertices": [{"x": 20, "y": 20, "z": 0}, {"x": 0, "y": 20, "z": 0}],
+            "faces": [],
+            "properties": {
+              "name": "Wall South GF",
+              "storeyIndex": 0,
+              "length": 20.0,
+              "thickness": 0.25,
+              "height": 3.6,
+              "isPartition": false
+            }
+          },
+          {
+            "id": "wall-gf-w",
+            "type": "wall",
+            "ifcType": "IfcWall",
+            "vertices": [{"x": 0, "y": 20, "z": 0}, {"x": 0, "y": 0, "z": 0}],
+            "faces": [],
+            "properties": {
+              "name": "Wall West GF",
+              "storeyIndex": 0,
+              "length": 20.0,
+              "thickness": 0.25,
+              "height": 3.6,
+              "isPartition": false
+            }
+          },
+          {
+            "id": "win-gf-n-1",
+            "type": "window",
+            "ifcType": "IfcWindow",
+            "vertices": [{"x": 3, "y": 0, "z": 0.9}],
+            "faces": [],
+            "properties": {
+              "name": "Window N1",
+              "storeyIndex": 0,
+              "width": 1.5,
+              "height": 1.5,
+              "sillHeight": 0.9,
+              "wallOffset": 3.0,
+              "parentWallId": "wall-gf-n"
+            }
+          },
+          {
+            "id": "win-gf-n-2",
+            "type": "window",
+            "ifcType": "IfcWindow",
+            "vertices": [{"x": 8, "y": 0, "z": 0.9}],
+            "faces": [],
+            "properties": {
+              "name": "Window N2",
+              "storeyIndex": 0,
+              "width": 1.5,
+              "height": 1.5,
+              "sillHeight": 0.9,
+              "wallOffset": 8.0,
+              "parentWallId": "wall-gf-n"
+            }
+          },
+          {
+            "id": "door-gf-s",
+            "type": "door",
+            "ifcType": "IfcDoor",
+            "vertices": [{"x": 9, "y": 20, "z": 0}],
+            "faces": [],
+            "properties": {
+              "name": "Main Entrance",
+              "storeyIndex": 0,
+              "width": 2.0,
+              "height": 2.4,
+              "wallOffset": 9.0,
+              "parentWallId": "wall-gf-s",
+              "isExterior": true
+            }
+          },
+          {
+            "id": "slab-gf",
+            "type": "slab",
+            "ifcType": "IfcSlab",
+            "vertices": [],
+            "faces": [],
+            "properties": {
+              "name": "Ground Floor Slab",
+              "storeyIndex": 0,
+              "thickness": 0.3,
+              "area": 400.0
+            }
+          },
+          {
+            "id": "col-gf-1",
+            "type": "column",
+            "ifcType": "IfcColumn",
+            "vertices": [{"x": 5, "y": 5, "z": 0}],
+            "faces": [],
+            "properties": {
+              "name": "Column C1",
+              "storeyIndex": 0,
+              "height": 3.6,
+              "radius": 0.25
+            }
+          },
+          {
+            "id": "col-gf-2",
+            "type": "column",
+            "ifcType": "IfcColumn",
+            "vertices": [{"x": 15, "y": 5, "z": 0}],
+            "faces": [],
+            "properties": {
+              "name": "Column C2",
+              "storeyIndex": 0,
+              "height": 3.6,
+              "radius": 0.25
+            }
+          },
+          {
+            "id": "space-gf-lobby",
+            "type": "space",
+            "ifcType": "IfcSpace",
+            "vertices": [
+              {"x": 0, "y": 0, "z": 0},
+              {"x": 10, "y": 0, "z": 0},
+              {"x": 10, "y": 10, "z": 0},
+              {"x": 0, "y": 10, "z": 0}
+            ],
+            "faces": [],
+            "properties": {
+              "name": "Lobby",
+              "storeyIndex": 0,
+              "spaceName": "Main Lobby",
+              "spaceUsage": "CIRCULATION",
+              "area": 100.0,
+              "height": 3.6
+            }
+          }
+        ]
+      },
+      {
+        "index": 1,
+        "name": "Level 1",
+        "elevation": 3.6,
+        "height": 3.6,
+        "elements": [
+          {
+            "id": "wall-l1-n",
+            "type": "wall",
+            "ifcType": "IfcWall",
+            "vertices": [{"x": 0, "y": 0, "z": 3.6}, {"x": 20, "y": 0, "z": 3.6}],
+            "faces": [],
+            "properties": {
+              "name": "Wall North L1",
+              "storeyIndex": 1,
+              "length": 20.0,
+              "thickness": 0.25,
+              "height": 3.6,
+              "isPartition": false
+            }
+          },
+          {
+            "id": "slab-l1",
+            "type": "slab",
+            "ifcType": "IfcSlab",
+            "vertices": [],
+            "faces": [],
+            "properties": {
+              "name": "Level 1 Slab",
+              "storeyIndex": 1,
+              "thickness": 0.3,
+              "area": 400.0
+            }
+          }
+        ]
+      },
+      {
+        "index": 2,
+        "name": "Level 2",
+        "elevation": 7.2,
+        "height": 3.6,
+        "elements": [
+          {
+            "id": "roof-slab",
+            "type": "roof",
+            "ifcType": "IfcSlab",
+            "vertices": [],
+            "faces": [],
+            "properties": {
+              "name": "Roof Slab",
+              "storeyIndex": 2,
+              "thickness": 0.35,
+              "area": 400.0
+            }
+          }
+        ]
+      }
+    ],
+    "boundingBox": {
+      "min": {"x": 0, "y": 0, "z": 0},
+      "max": {"x": 20, "y": 20, "z": 10.8}
+    },
+    "metrics": []
+  },
+  "options": {
+    "projectName": "Test Office Building",
+    "buildingName": "Office Tower A",
+    "disciplines": ["architectural", "structural", "mep", "combined"]
+  },
+  "filePrefix": "test_office_2026-03-29"
+}
