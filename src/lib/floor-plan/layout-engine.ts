@@ -71,9 +71,21 @@ export function layoutFloorPlan(program: EnhancedRoomProgram): PlacedRoom[] {
   const cls = classifyRooms(rooms);
   const roomAreaTotal = rooms.reduce((s, r) => s + r.areaSqm, 0);
 
-  // When zones are used, corridor eats into footprint — compensate
+  // Determine if zone-based layout is appropriate
   const needsCorridor = cls.hasPrivate && cls.hasPublic && rooms.length > 3;
-  const corridorEstimate = needsCorridor
+
+  // Skip zoning if zones are extremely imbalanced (one zone <25% of other's area)
+  // — avoids forcing a tiny zone to MIN_HABITABLE which wastes space and creates bad ARs
+  let useZones = needsCorridor;
+  if (useZones) {
+    const privateArea = cls.privateZone.reduce((s, r) => s + r.areaSqm, 0);
+    const publicArea = cls.publicZone.reduce((s, r) => s + r.areaSqm, 0);
+    const zoneRatio = Math.min(privateArea, publicArea) / Math.max(privateArea, publicArea, 1);
+    if (zoneRatio < 0.25) useZones = false;
+  }
+
+  // When zones are used, corridor eats into footprint — compensate
+  const corridorEstimate = useZones
     ? CORRIDOR_DEPTH * Math.sqrt(Math.max(program.totalAreaSqm, roomAreaTotal) * DEFAULT_ASPECT)
     : 0;
 
@@ -81,8 +93,9 @@ export function layoutFloorPlan(program: EnhancedRoomProgram): PlacedRoom[] {
   const fpW = grid(Math.sqrt(totalArea * DEFAULT_ASPECT));
   const fpH = grid(totalArea / fpW);
 
-  // Small apartment (≤3 rooms or no clear zones) → simple BSP
-  if (!needsCorridor) {
+  // Skip zoning if footprint too shallow for corridor + two minimum-height zones
+  const minZoneHeight = MIN_HABITABLE * 2 + CORRIDOR_DEPTH;
+  if (!useZones || fpH < minZoneHeight) {
     return bspSubdivide(rooms, { x: 0, y: 0, w: fpW, h: fpH }, program.adjacency);
   }
 
@@ -318,7 +331,8 @@ function layoutBedroomBathPair(rooms: RoomSpec[], rect: Rect): PlacedRoom[] {
   const vBedAR = ar(vBedW, rect.h);
   const vBathAR = ar(vBathW, rect.h);
   const vAreaOff = bedroom.areaSqm > 0 ? Math.abs(vBedW * rect.h - bedroom.areaSqm) / bedroom.areaSqm : 0;
-  const vScore = Math.max(vBedAR, vBathAR) + vAreaOff * 0.5;
+  const vBedArDev = Math.max(0, vBedAR - 1.8);   // penalty for elongated bedrooms (target AR 1.0-1.8)
+  const vScore = Math.max(vBedAR, vBathAR) + vAreaOff * 0.5 + vBedArDev * 0.15 + 0.05; // +0.05: prefer H-split (bathroom at corridor side)
   const vValid = vBedW >= MIN_HABITABLE && vBathW >= MIN_BATHROOM_DIM;
 
   // Horizontal split: bedroom top (exterior wall), bathroom bottom (near corridor)
@@ -331,7 +345,8 @@ function layoutBedroomBathPair(rooms: RoomSpec[], rect: Rect): PlacedRoom[] {
   const hBedAR = ar(rect.w, hBedH);
   const hBathAR = ar(rect.w, hBathH);
   const hAreaOff = bedroom.areaSqm > 0 ? Math.abs(rect.w * hBedH - bedroom.areaSqm) / bedroom.areaSqm : 0;
-  const hScore = Math.max(hBedAR, hBathAR) + hAreaOff * 0.5;
+  const hBedArDev = Math.max(0, hBedAR - 1.8);   // penalty for elongated bedrooms
+  const hScore = Math.max(hBedAR, hBathAR) + hAreaOff * 0.5 + hBedArDev * 0.15;
   const hValid = hBedH >= MIN_HABITABLE && hBathH >= MIN_BATHROOM_DIM;
 
   if (vValid && (!hValid || vScore <= hScore)) {
@@ -439,15 +454,26 @@ function bspSubdivide(
 
 function splitTwo(a: RoomSpec, b: RoomSpec, rect: Rect): PlacedRoom[] {
   const ratio = a.areaSqm / (a.areaSqm + b.areaSqm);
+  const minFloor = MIN_BATHROOM_DIM; // 1.2m hard floor for any room dimension
 
-  // Try horizontal split
-  const hAh = grid(rect.h * ratio);
-  const hBh = grid(rect.h - hAh);
+  // Horizontal split (with dimension clamping to prevent sub-minimum rooms)
+  let hAh = grid(rect.h * ratio);
+  let hBh = grid(rect.h - hAh);
+  if (hBh < minFloor && rect.h >= minFloor * 2) {
+    hBh = grid(minFloor); hAh = grid(rect.h - hBh);
+  } else if (hAh < minFloor && rect.h >= minFloor * 2) {
+    hAh = grid(minFloor); hBh = grid(rect.h - hAh);
+  }
   const hScore = Math.max(ar(rect.w, hAh), ar(rect.w, hBh));
 
-  // Try vertical split
-  const vAw = grid(rect.w * ratio);
-  const vBw = grid(rect.w - vAw);
+  // Vertical split (with dimension clamping)
+  let vAw = grid(rect.w * ratio);
+  let vBw = grid(rect.w - vAw);
+  if (vBw < minFloor && rect.w >= minFloor * 2) {
+    vBw = grid(minFloor); vAw = grid(rect.w - vBw);
+  } else if (vAw < minFloor && rect.w >= minFloor * 2) {
+    vAw = grid(minFloor); vBw = grid(rect.w - vAw);
+  }
   const vScore = Math.max(ar(vAw, rect.h), ar(vBw, rect.h));
 
   if (hScore <= vScore) {
@@ -493,7 +519,7 @@ function findBestSplit(
     // Horizontal split
     const hLH = grid(rect.h * ratio);
     const hRH = grid(rect.h - hLH);
-    if (hLH >= 1.0 && hRH >= 1.0) {
+    if (hLH >= MIN_BATHROOM_DIM && hRH >= MIN_BATHROOM_DIM) {
       const score = Math.max(ar(rect.w, hLH), ar(rect.w, hRH)) + adjPenalty;
       if (score < bestScore) {
         bestScore = score;
@@ -508,7 +534,7 @@ function findBestSplit(
     // Vertical split
     const vLW = grid(rect.w * ratio);
     const vRW = grid(rect.w - vLW);
-    if (vLW >= 1.0 && vRW >= 1.0) {
+    if (vLW >= MIN_BATHROOM_DIM && vRW >= MIN_BATHROOM_DIM) {
       const score = Math.max(ar(vLW, rect.h), ar(vRW, rect.h)) + adjPenalty;
       if (score < bestScore) {
         bestScore = score;

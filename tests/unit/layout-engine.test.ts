@@ -92,8 +92,10 @@ function checkAspectRatios(rooms: PlacedRoom[], maxRatio = 3.0): string[] {
   const errors: string[] = [];
   for (const r of rooms) {
     if (r.type === "hallway" || r.name.toLowerCase().includes("corridor")) continue;
+    const isBath = r.type === "bathroom" || r.name.toLowerCase().includes("bath") || r.name.toLowerCase().includes("toilet");
+    const limit = isBath ? 3.5 : maxRatio; // bathrooms can be narrow (common in Indian apartments)
     const ratio = Math.max(r.width, r.depth) / Math.min(r.width, r.depth);
-    if (ratio > maxRatio) {
+    if (ratio > limit) {
       errors.push(`"${r.name}" aspect ratio ${ratio.toFixed(1)}:1 (${r.width.toFixed(1)}×${r.depth.toFixed(1)})`);
     }
   }
@@ -103,11 +105,13 @@ function checkAspectRatios(rooms: PlacedRoom[], maxRatio = 3.0): string[] {
 function checkMinDimensions(rooms: PlacedRoom[]): string[] {
   const errors: string[] = [];
   for (const r of rooms) {
-    const min = (r.type === "bathroom" || r.name.toLowerCase().includes("bath") || r.name.toLowerCase().includes("toilet"))
-      ? 1.2
-      : r.type === "hallway" || r.name.toLowerCase().includes("corridor")
-        ? 1.0
-        : 2.0; // relaxed from 2.4 to account for grid snapping
+    const isBath = r.type === "bathroom" || r.name.toLowerCase().includes("bath") || r.name.toLowerCase().includes("toilet");
+    const isService = r.type === "kitchen" || r.type === "utility" || r.type === "storage";
+    const isCorridor = r.type === "hallway" || r.name.toLowerCase().includes("corridor");
+    const min = isBath ? 1.2
+      : isCorridor ? 1.0
+      : isService ? 1.2  // kitchens/utility can be narrow in small apartments
+      : 2.0;             // habitable rooms: relaxed from 2.4 for grid snapping
     if (r.width < min - 0.1 || r.depth < min - 0.1) {
       errors.push(`"${r.name}" dimension too small: ${r.width.toFixed(1)}×${r.depth.toFixed(1)} (min ${min}m)`);
     }
@@ -133,12 +137,8 @@ function checkCorridorWidth(rooms: PlacedRoom[]): string[] {
   const errors: string[] = [];
   const corridor = rooms.find(r => r.type === "hallway" || r.name.toLowerCase().includes("corridor"));
   if (corridor) {
-    const corridorArea = corridor.width * corridor.depth;
-    // Corridor should be thin (1.2m wide, full building width)
-    // Area should be reasonable: building_width × 1.2m ≈ 10-15m²
-    if (corridorArea > 20) {
-      errors.push(`Corridor is ${corridorArea.toFixed(1)}m² — too large (should be ~${(corridor.width * 1.2).toFixed(0)}m²)`);
-    }
+    // Corridor should be thin — minimum dimension ≤ 2.0m (nominal 1.2m)
+    // Area scales with building width so we only check the narrow dimension
     const minDim = Math.min(corridor.width, corridor.depth);
     if (minDim > 2.0) {
       errors.push(`Corridor minimum dimension is ${minDim.toFixed(1)}m — should be ~1.2m`);
@@ -423,6 +423,390 @@ describe("Layout Engine", () => {
       const result = layoutFloorPlan(program);
       expect(result.length).toBe(3);
       expect(checkZeroOverlaps(result)).toEqual([]);
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Part 1: Edge Case Hardening — 10 scenarios from stress testing spec
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  describe("Part 1: Edge Case Hardening", () => {
+
+    it("1. Studio apartment — 3 rooms, no corridor needed", () => {
+      const program = makeProgram([
+        { name: "Studio Room", type: "living", areaSqm: 20, zone: "public" },
+        { name: "Kitchenette", type: "kitchen", areaSqm: 5, zone: "service" },
+        { name: "Bathroom", type: "bathroom", areaSqm: 3, zone: "service" },
+      ]);
+      const result = layoutFloorPlan(program);
+      expect(result.length).toBe(3); // no corridor for ≤3 rooms
+      expect(checkZeroOverlaps(result)).toEqual([]);
+      expect(checkWithinFootprint(result)).toEqual([]);
+      expect(checkMinDimensions(result)).toEqual([]);
+      expect(checkAspectRatios(result)).toEqual([]);
+      // Studio room should be the largest
+      const studio = result.find(r => r.name === "Studio Room")!;
+      expect(studio.width * studio.depth).toBeGreaterThan(15);
+    });
+
+    it("2. 10BHK mansion — 25+ rooms", () => {
+      const rooms: Array<{ name: string; type: string; areaSqm: number; zone: "public" | "private" | "service" | "circulation"; adjacentTo?: string[] }> = [];
+      for (let i = 1; i <= 10; i++) {
+        rooms.push({
+          name: i === 1 ? "Master Bedroom" : `Bedroom ${i}`,
+          type: "bedroom", areaSqm: i === 1 ? 20 : 15,
+          zone: "private", adjacentTo: [`Bathroom ${i}`],
+        });
+      }
+      for (let i = 1; i <= 10; i++) {
+        rooms.push({ name: `Bathroom ${i}`, type: "bathroom", areaSqm: 4, zone: "service" });
+      }
+      rooms.push(
+        { name: "Living Room", type: "living", areaSqm: 40, zone: "public" },
+        { name: "Dining Room", type: "dining", areaSqm: 20, zone: "public" },
+        { name: "Kitchen", type: "kitchen", areaSqm: 15, zone: "service" },
+        { name: "Foyer", type: "entrance", areaSqm: 10, zone: "public" },
+        { name: "Utility", type: "utility", areaSqm: 6, zone: "service" },
+      );
+      const program = makeProgram(rooms, [], { totalAreaSqm: 500 });
+      const result = layoutFloorPlan(program);
+      // 25 input rooms + 1 corridor = 26
+      expect(result.length).toBe(26);
+      expect(checkZeroOverlaps(result)).toEqual([]);
+      expect(checkWithinFootprint(result)).toEqual([]);
+      expect(checkMinDimensions(result)).toEqual([]);
+      expect(checkCorridorWidth(result)).toEqual([]);
+      // Every input room should appear in output
+      for (const r of rooms) {
+        expect(result.find(p => p.name === r.name)).toBeDefined();
+      }
+    });
+
+    it("3. Very small 1BHK — ~28 sqm (300 sqft)", () => {
+      const program = makeProgram([
+        { name: "Living Room", type: "living", areaSqm: 12, zone: "public" },
+        { name: "Kitchen", type: "kitchen", areaSqm: 4, zone: "service" },
+        { name: "Bedroom", type: "bedroom", areaSqm: 9, zone: "private", adjacentTo: ["Bathroom"] },
+        { name: "Bathroom", type: "bathroom", areaSqm: 3, zone: "service" },
+      ], [
+        { roomA: "Bedroom", roomB: "Bathroom", reason: "attached bath" },
+      ], { totalAreaSqm: 28 });
+      const result = layoutFloorPlan(program);
+      // Footprint too small for zoning → BSP fallback, no corridor
+      expect(result.length).toBe(4);
+      expect(checkZeroOverlaps(result)).toEqual([]);
+      expect(checkWithinFootprint(result)).toEqual([]);
+      expect(checkMinDimensions(result)).toEqual([]);
+      expect(checkAspectRatios(result)).toEqual([]);
+      // Total placed area should be reasonable
+      const total = result.reduce((s, r) => s + r.width * r.depth, 0);
+      expect(total).toBeGreaterThan(25);
+      expect(total).toBeLessThan(50);
+    });
+
+    it("4. Very large farmhouse — ~465 sqm (5000 sqft)", () => {
+      const program = makeProgram([
+        { name: "Living Room", type: "living", areaSqm: 50, zone: "public" },
+        { name: "Dining Room", type: "dining", areaSqm: 25, zone: "public" },
+        { name: "Kitchen", type: "kitchen", areaSqm: 20, zone: "service" },
+        { name: "Foyer", type: "entrance", areaSqm: 12, zone: "public" },
+        { name: "Study", type: "living", areaSqm: 15, zone: "public" },
+        { name: "Master Bedroom", type: "bedroom", areaSqm: 25, zone: "private", adjacentTo: ["Bathroom 1"] },
+        { name: "Bedroom 2", type: "bedroom", areaSqm: 20, zone: "private", adjacentTo: ["Bathroom 2"] },
+        { name: "Bedroom 3", type: "bedroom", areaSqm: 18, zone: "private", adjacentTo: ["Bathroom 3"] },
+        { name: "Guest Bedroom", type: "bedroom", areaSqm: 15, zone: "private", adjacentTo: ["Guest Bath"] },
+        { name: "Bathroom 1", type: "bathroom", areaSqm: 6, zone: "service" },
+        { name: "Bathroom 2", type: "bathroom", areaSqm: 5, zone: "service" },
+        { name: "Bathroom 3", type: "bathroom", areaSqm: 5, zone: "service" },
+        { name: "Guest Bath", type: "bathroom", areaSqm: 4, zone: "service" },
+        { name: "Utility", type: "utility", areaSqm: 8, zone: "service" },
+        { name: "Patio", type: "balcony", areaSqm: 30, zone: "public" },
+      ], [
+        { roomA: "Master Bedroom", roomB: "Bathroom 1", reason: "attached bath" },
+        { roomA: "Bedroom 2", roomB: "Bathroom 2", reason: "attached bath" },
+        { roomA: "Bedroom 3", roomB: "Bathroom 3", reason: "attached bath" },
+        { roomA: "Guest Bedroom", roomB: "Guest Bath", reason: "attached bath" },
+        { roomA: "Kitchen", roomB: "Dining Room", reason: "serving" },
+      ], { totalAreaSqm: 465 });
+      const result = layoutFloorPlan(program);
+      // 15 rooms + 1 corridor = 16
+      expect(result.length).toBe(16);
+      expect(checkZeroOverlaps(result)).toEqual([]);
+      expect(checkWithinFootprint(result)).toEqual([]);
+      expect(checkMinDimensions(result)).toEqual([]);
+      expect(checkCorridorWidth(result)).toEqual([]);
+      // Each bedroom should be adjacent to its bathroom
+      for (const [bedName, bathName] of [
+        ["Master Bedroom", "Bathroom 1"],
+        ["Bedroom 2", "Bathroom 2"],
+        ["Bedroom 3", "Bathroom 3"],
+        ["Guest Bedroom", "Guest Bath"],
+      ]) {
+        const bed = result.find(r => r.name === bedName);
+        const bath = result.find(r => r.name === bathName);
+        if (bed && bath) expect(areAdjacent(bed, bath)).toBe(true);
+      }
+    });
+
+    it("5. All same size — 5 rooms × 15 sqm each", () => {
+      const program = makeProgram([
+        { name: "Room A", type: "living", areaSqm: 15, zone: "public" },
+        { name: "Room B", type: "bedroom", areaSqm: 15, zone: "private" },
+        { name: "Room C", type: "bedroom", areaSqm: 15, zone: "private" },
+        { name: "Room D", type: "kitchen", areaSqm: 15, zone: "service" },
+        { name: "Room E", type: "dining", areaSqm: 15, zone: "public" },
+      ]);
+      const result = layoutFloorPlan(program);
+      // Zone layout: 5 rooms + 1 corridor = 6
+      expect(result.length).toBe(6);
+      expect(checkZeroOverlaps(result)).toEqual([]);
+      expect(checkWithinFootprint(result)).toEqual([]);
+      expect(checkAspectRatios(result)).toEqual([]);
+      // Equal-size rooms should get similar areas (within 3× ratio)
+      const nonCorridor = result.filter(r => r.type !== "hallway");
+      const areas = nonCorridor.map(r => r.width * r.depth);
+      expect(Math.max(...areas) / Math.min(...areas)).toBeLessThan(3.0);
+    });
+
+    it("6. One huge room + many tiny — Living 50sqm + 4 bathrooms 3sqm", () => {
+      const program = makeProgram([
+        { name: "Great Hall", type: "living", areaSqm: 50, zone: "public" },
+        { name: "Bathroom 1", type: "bathroom", areaSqm: 3, zone: "service" },
+        { name: "Bathroom 2", type: "bathroom", areaSqm: 3, zone: "service" },
+        { name: "Bathroom 3", type: "bathroom", areaSqm: 3, zone: "service" },
+        { name: "Bathroom 4", type: "bathroom", areaSqm: 3, zone: "service" },
+      ]);
+      const result = layoutFloorPlan(program);
+      // Zone imbalance (12/50 = 0.24 < 0.25) → BSP, no corridor
+      expect(result.length).toBe(5);
+      expect(checkZeroOverlaps(result)).toEqual([]);
+      expect(checkWithinFootprint(result)).toEqual([]);
+      expect(checkMinDimensions(result)).toEqual([]);
+      // Hall should be the largest room
+      const hall = result.find(r => r.name === "Great Hall")!;
+      const bathAreas = result.filter(r => r.name !== "Great Hall").map(r => r.width * r.depth);
+      expect(hall.width * hall.depth).toBeGreaterThan(Math.max(...bathAreas));
+    });
+
+    it("7. No bedrooms — open plan office", () => {
+      const program = makeProgram([
+        { name: "Open Floor", type: "living", areaSqm: 60, zone: "public" },
+        { name: "Reception", type: "entrance", areaSqm: 15, zone: "public" },
+        { name: "Meeting Room", type: "living", areaSqm: 20, zone: "public" },
+        { name: "Pantry", type: "kitchen", areaSqm: 8, zone: "service" },
+        { name: "Restroom", type: "bathroom", areaSqm: 5, zone: "service" },
+      ], [], { buildingType: "Commercial Office" });
+      const result = layoutFloorPlan(program);
+      // Zone imbalance (5/103 = 0.049 < 0.25) → BSP, no corridor
+      expect(result.length).toBe(5);
+      expect(checkZeroOverlaps(result)).toEqual([]);
+      expect(checkWithinFootprint(result)).toEqual([]);
+      expect(checkMinDimensions(result)).toEqual([]);
+      expect(checkAspectRatios(result)).toEqual([]);
+      // Open floor should be the largest room
+      const openFloor = result.find(r => r.name === "Open Floor")!;
+      expect(openFloor.width * openFloor.depth).toBeGreaterThan(40);
+    });
+
+    it("8. No public rooms — dormitory (all bedrooms)", () => {
+      const program = makeProgram([
+        { name: "Dorm 1", type: "bedroom", areaSqm: 12, zone: "private" },
+        { name: "Dorm 2", type: "bedroom", areaSqm: 12, zone: "private" },
+        { name: "Dorm 3", type: "bedroom", areaSqm: 12, zone: "private" },
+        { name: "Dorm 4", type: "bedroom", areaSqm: 12, zone: "private" },
+        { name: "Dorm 5", type: "bedroom", areaSqm: 12, zone: "private" },
+        { name: "Dorm 6", type: "bedroom", areaSqm: 12, zone: "private" },
+      ], [], { buildingType: "Dormitory" });
+      const result = layoutFloorPlan(program);
+      // No public zone → no corridor, just BSP
+      expect(result.length).toBe(6);
+      expect(checkZeroOverlaps(result)).toEqual([]);
+      expect(checkWithinFootprint(result)).toEqual([]);
+      expect(checkMinDimensions(result)).toEqual([]);
+      expect(checkAspectRatios(result)).toEqual([]);
+      // Equal rooms should get similar areas (within 2× ratio)
+      const areas = result.map(r => r.width * r.depth);
+      expect(Math.max(...areas) / Math.min(...areas)).toBeLessThan(2.0);
+    });
+
+    it("9. Custom rooms — pool, theater, gym", () => {
+      const program = makeProgram([
+        { name: "Swimming Pool", type: "other", areaSqm: 40, zone: "public" },
+        { name: "Home Theater", type: "other", areaSqm: 25, zone: "public" },
+        { name: "Gym", type: "other", areaSqm: 20, zone: "public" },
+        { name: "Kitchen", type: "kitchen", areaSqm: 12, zone: "service" },
+        { name: "Master Bedroom", type: "bedroom", areaSqm: 18, zone: "private", adjacentTo: ["Bathroom"] },
+        { name: "Bathroom", type: "bathroom", areaSqm: 5, zone: "service" },
+      ], [
+        { roomA: "Master Bedroom", roomB: "Bathroom", reason: "attached bath" },
+      ]);
+      const result = layoutFloorPlan(program);
+      // Zone imbalance (23/97 = 0.24 < 0.25) → BSP, no corridor
+      expect(result.length).toBe(6);
+      expect(checkZeroOverlaps(result)).toEqual([]);
+      expect(checkWithinFootprint(result)).toEqual([]);
+      expect(checkMinDimensions(result)).toEqual([]);
+      // Custom room types should not crash — all present in output
+      expect(result.find(r => r.name === "Swimming Pool")).toBeDefined();
+      expect(result.find(r => r.name === "Home Theater")).toBeDefined();
+      expect(result.find(r => r.name === "Gym")).toBeDefined();
+    });
+
+    it("10. Near-square footprint — 100 sqm, 4 uniform rooms", () => {
+      const program = makeProgram([
+        { name: "Room 1", type: "living", areaSqm: 25, zone: "public" },
+        { name: "Room 2", type: "living", areaSqm: 25, zone: "public" },
+        { name: "Room 3", type: "living", areaSqm: 25, zone: "public" },
+        { name: "Room 4", type: "living", areaSqm: 25, zone: "public" },
+      ], [], { totalAreaSqm: 100 });
+      const result = layoutFloorPlan(program);
+      // No private zone → no corridor, just BSP
+      expect(result.length).toBe(4);
+      expect(checkZeroOverlaps(result)).toEqual([]);
+      expect(checkWithinFootprint(result)).toEqual([]);
+      expect(checkAspectRatios(result)).toEqual([]);
+      // Footprint aspect ratio should be moderate (DEFAULT_ASPECT = 1.33)
+      const fpW = Math.max(...result.map(r => r.x + r.width));
+      const fpH = Math.max(...result.map(r => r.y + r.depth));
+      const fpAR = Math.max(fpW, fpH) / Math.min(fpW, fpH);
+      expect(fpAR).toBeLessThan(1.8);
+      // Each room should be ~25 sqm (within ±30%)
+      for (const r of result) {
+        const area = r.width * r.depth;
+        expect(area).toBeGreaterThan(17.5); // 25 × 0.7
+        expect(area).toBeLessThan(32.5);    // 25 × 1.3
+      }
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Part 2: Layout Quality Verification
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  describe("Part 2: Layout Quality", () => {
+
+    // Standard 2BHK for quality checks
+    const q2BHK = makeProgram([
+      { name: "Living Room", type: "living", areaSqm: 18, zone: "public", adjacentTo: ["Dining Room"] },
+      { name: "Kitchen", type: "kitchen", areaSqm: 8, zone: "service", adjacentTo: ["Dining Room"] },
+      { name: "Dining Room", type: "dining", areaSqm: 8, zone: "public", adjacentTo: ["Living Room", "Kitchen"] },
+      { name: "Master Bedroom", type: "bedroom", areaSqm: 14, zone: "private", adjacentTo: ["Bathroom 1"] },
+      { name: "Bedroom 2", type: "bedroom", areaSqm: 12, zone: "private", adjacentTo: ["Bathroom 2"] },
+      { name: "Bathroom 1", type: "bathroom", areaSqm: 4, zone: "service" },
+      { name: "Bathroom 2", type: "bathroom", areaSqm: 3, zone: "service" },
+    ], [
+      { roomA: "Kitchen", roomB: "Dining Room", reason: "serving" },
+      { roomA: "Living Room", roomB: "Dining Room", reason: "flow" },
+      { roomA: "Master Bedroom", roomB: "Bathroom 1", reason: "attached bath" },
+      { roomA: "Bedroom 2", roomB: "Bathroom 2", reason: "attached bath" },
+    ]);
+
+    // 3BHK with equal bedrooms for equality check
+    const q3BHK = makeProgram([
+      { name: "Living Room", type: "living", areaSqm: 25, zone: "public", adjacentTo: ["Dining Room"] },
+      { name: "Dining Room", type: "dining", areaSqm: 12, zone: "public", adjacentTo: ["Living Room", "Kitchen"] },
+      { name: "Kitchen", type: "kitchen", areaSqm: 10, zone: "service", adjacentTo: ["Dining Room"] },
+      { name: "Master Bedroom", type: "bedroom", areaSqm: 16, zone: "private", adjacentTo: ["Bathroom 1"] },
+      { name: "Bedroom 2", type: "bedroom", areaSqm: 12, zone: "private", adjacentTo: ["Bathroom 2"] },
+      { name: "Bedroom 3", type: "bedroom", areaSqm: 12, zone: "private", adjacentTo: ["Bathroom 3"] },
+      { name: "Bathroom 1", type: "bathroom", areaSqm: 4, zone: "service" },
+      { name: "Bathroom 2", type: "bathroom", areaSqm: 4, zone: "service" },
+      { name: "Bathroom 3", type: "bathroom", areaSqm: 4, zone: "service" },
+    ], [
+      { roomA: "Living Room", roomB: "Dining Room", reason: "flow" },
+      { roomA: "Kitchen", roomB: "Dining Room", reason: "serving" },
+      { roomA: "Master Bedroom", roomB: "Bathroom 1", reason: "attached bath" },
+      { roomA: "Bedroom 2", roomB: "Bathroom 2", reason: "attached bath" },
+      { roomA: "Bedroom 3", roomB: "Bathroom 3", reason: "attached bath" },
+    ], { totalAreaSqm: 130 });
+
+    // 4BHK with foyer for entrance placement check
+    const q4BHK = makeProgram([
+      { name: "Living Room", type: "living", areaSqm: 30, zone: "public", adjacentTo: ["Dining Room", "Foyer"] },
+      { name: "Dining Room", type: "dining", areaSqm: 15, zone: "public", adjacentTo: ["Living Room", "Kitchen"] },
+      { name: "Kitchen", type: "kitchen", areaSqm: 12, zone: "service", adjacentTo: ["Dining Room"] },
+      { name: "Foyer", type: "entrance", areaSqm: 6, zone: "public" },
+      { name: "Master Bedroom", type: "bedroom", areaSqm: 20, zone: "private", adjacentTo: ["Bathroom 1"] },
+      { name: "Bedroom 2", type: "bedroom", areaSqm: 14, zone: "private", adjacentTo: ["Bathroom 2"] },
+      { name: "Bedroom 3", type: "bedroom", areaSqm: 14, zone: "private", adjacentTo: ["Bathroom 3"] },
+      { name: "Bathroom 1", type: "bathroom", areaSqm: 4, zone: "service" },
+      { name: "Bathroom 2", type: "bathroom", areaSqm: 4, zone: "service" },
+      { name: "Bathroom 3", type: "bathroom", areaSqm: 4, zone: "service" },
+    ], [
+      { roomA: "Living Room", roomB: "Dining Room", reason: "flow" },
+      { roomA: "Kitchen", roomB: "Dining Room", reason: "serving" },
+      { roomA: "Master Bedroom", roomB: "Bathroom 1", reason: "attached bath" },
+      { roomA: "Bedroom 2", roomB: "Bathroom 2", reason: "attached bath" },
+      { roomA: "Bedroom 3", roomB: "Bathroom 3", reason: "attached bath" },
+    ], { totalAreaSqm: 160 });
+
+    it("bedrooms have proportions between 1.0 and 2.2", () => {
+      for (const program of [q2BHK, q3BHK, q4BHK]) {
+        const result = layoutFloorPlan(program);
+        const bedrooms = result.filter(r =>
+          r.type === "bedroom" || r.name.toLowerCase().includes("bed") || r.name.toLowerCase().includes("master")
+        );
+        for (const bed of bedrooms) {
+          const bedAR = Math.max(bed.width, bed.depth) / Math.min(bed.width, bed.depth);
+          expect(bedAR).toBeLessThan(2.2);
+        }
+      }
+    });
+
+    it("corridor takes ≤ 20% of total floor area", () => {
+      for (const program of [q2BHK, q3BHK, q4BHK]) {
+        const result = layoutFloorPlan(program);
+        const corridor = result.find(r => r.type === "hallway");
+        if (!corridor) continue;
+        const totalArea = result.reduce((s, r) => s + r.width * r.depth, 0);
+        const corridorPct = (corridor.width * corridor.depth) / totalArea * 100;
+        expect(corridorPct).toBeLessThan(20);
+      }
+    });
+
+    it("equal-target bedrooms get similar actual areas (within 25%)", () => {
+      const result = layoutFloorPlan(q3BHK);
+      const bed2 = result.find(r => r.name === "Bedroom 2")!;
+      const bed3 = result.find(r => r.name === "Bedroom 3")!;
+      expect(bed2).toBeDefined();
+      expect(bed3).toBeDefined();
+      const area2 = bed2.width * bed2.depth;
+      const area3 = bed3.width * bed3.depth;
+      const diff = Math.abs(area2 - area3) / Math.max(area2, area3);
+      expect(diff).toBeLessThan(0.25);
+    });
+
+    it("bathrooms are interior (≤ 2 exterior-facing sides)", () => {
+      for (const program of [q2BHK, q3BHK, q4BHK]) {
+        const result = layoutFloorPlan(program);
+        const fpW = Math.max(...result.map(r => r.x + r.width));
+        const fpH = Math.max(...result.map(r => r.y + r.depth));
+        const baths = result.filter(r => r.type === "bathroom");
+        for (const bath of baths) {
+          const exteriorSides = [
+            bath.x < 0.15,                             // left wall
+            bath.y < 0.15,                             // top wall
+            Math.abs(bath.x + bath.width - fpW) < 0.15, // right wall
+            Math.abs(bath.y + bath.depth - fpH) < 0.15, // bottom wall
+          ].filter(Boolean).length;
+          expect(exteriorSides).toBeLessThanOrEqual(2);
+        }
+      }
+    });
+
+    it("foyer/entrance is at building perimeter", () => {
+      const result = layoutFloorPlan(q4BHK);
+      const foyer = result.find(r => r.name === "Foyer");
+      expect(foyer).toBeDefined();
+      const fpW = Math.max(...result.map(r => r.x + r.width));
+      const fpH = Math.max(...result.map(r => r.y + r.depth));
+      // Foyer should touch at least one building edge
+      const touchesEdge =
+        foyer!.x < 0.15 ||
+        foyer!.y < 0.15 ||
+        Math.abs(foyer!.x + foyer!.width - fpW) < 0.15 ||
+        Math.abs(foyer!.y + foyer!.depth - fpH) < 0.15;
+      expect(touchesEdge).toBe(true);
     });
   });
 });
