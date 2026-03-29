@@ -108,7 +108,6 @@ async function generateModel(
   };
   const taskId = createData.task_id;
 
-  console.log(`[3DAI] Task created: ${taskId} (${edition}, pbr=${enablePbr})`);
 
   // Step 2: Poll status until FINISHED
   for (let i = 0; i < MAX_POLL_ATTEMPTS; i++) {
@@ -126,7 +125,6 @@ async function generateModel(
 
     if (data.status === "FINISHED" && data.results?.length) {
       const glbUrl = data.results[0].asset_url;
-      console.log(`[3DAI] Task ${taskId} FINISHED → ${glbUrl.substring(0, 60)}...`);
       return { glbUrl, taskId };
     }
 
@@ -135,7 +133,6 @@ async function generateModel(
     }
 
     if (i % 6 === 0) {
-      console.log(`[3DAI] Task ${taskId}: ${data.status} (${data.progress ?? "?"}%)`);
     }
 
     await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
@@ -154,7 +151,6 @@ async function uploadModelToR2(glbUrl: string, filename: string): Promise<string
   if (!modelRes.ok) throw new Error(`Failed to download model: ${modelRes.status}`);
   const modelBuffer = Buffer.from(await modelRes.arrayBuffer());
 
-  console.log(`[3DAI] Downloaded ${filename}: ${(modelBuffer.length / 1024).toFixed(0)}KB`);
 
   // Upload to R2 with stable key for CDN access
   const { S3Client, PutObjectCommand } = await import("@aws-sdk/client-s3");
@@ -254,7 +250,6 @@ export async function generateAllFurniture(
   const pendingJobs = jobs.filter((j) => j.status === "pending");
   const creditsEach = creditsPerModel(edition, enablePbr);
 
-  console.log(`[3DAI] Batch: ${allPrompts.length} total, ${existing.size} cached, ${pendingJobs.length} to generate (${edition}+${enablePbr ? "pbr" : "nopbr"} = ${creditsEach} credits each)`);
 
   // Process in batches
   for (let i = 0; i < pendingJobs.length; i += concurrency) {
@@ -267,7 +262,6 @@ export async function generateAllFurniture(
           job.status = "generating";
           onProgress?.(job, jobs.indexOf(job), jobs.length);
 
-          console.log(`[3DAI] Generating: ${job.file} — "${job.prompt.substring(0, 60)}..."`);
           const { glbUrl, taskId } = await generateModel(job.prompt, edition, enablePbr);
           job.taskId = taskId;
           job.glbUrl = glbUrl;
@@ -281,7 +275,6 @@ export async function generateAllFurniture(
           job.status = "done";
           job.durationMs = Date.now() - jobStart;
 
-          console.log(`[3DAI] Done: ${job.file} (${(job.durationMs / 1000).toFixed(1)}s, ${creditsEach} credits) → ${job.r2Url}`);
         } catch (err) {
           job.status = "failed";
           job.error = err instanceof Error ? err.message : String(err);
@@ -305,7 +298,6 @@ export async function generateAllFurniture(
     totalDurationMs: Date.now() - startTime,
   };
 
-  console.log(`[3DAI] Batch complete: ${result.succeeded}/${result.total} ok, ${result.failed} failed, ${result.skipped} cached. Credits: ${result.totalCreditsUsed}, Time: ${(result.totalDurationMs / 1000).toFixed(0)}s`);
 
   return result;
 }
@@ -320,14 +312,12 @@ export async function generateSingleFurniture(
 ): Promise<{ r2Url: string; durationMs: number; creditsUsed: number }> {
   const start = Date.now();
 
-  console.log(`[3DAI] Single: ${file} — "${prompt}"`);
   const { glbUrl } = await generateModel(prompt, edition, true);
   const r2Url = await uploadModelToR2(glbUrl, file);
 
   const durationMs = Date.now() - start;
   const creditsUsed = creditsPerModel(edition, true);
 
-  console.log(`[3DAI] Single done: ${file} (${(durationMs / 1000).toFixed(1)}s, ${creditsUsed} credits) → ${r2Url}`);
 
   return { r2Url, durationMs, creditsUsed };
 }

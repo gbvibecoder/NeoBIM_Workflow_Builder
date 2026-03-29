@@ -532,7 +532,6 @@ async function fetchWithRetry(
         lastStatus = res.status;
         lastError = new Error(`HTTP ${res.status} from ${new URL(url).pathname}`);
         const delay = Math.min(1000 * Math.pow(2, attempt), 10000);
-        console.log(`[3DAI] Retry ${attempt + 1}/${retries} after ${delay}ms (status ${res.status})`);
         await new Promise(r => setTimeout(r, delay));
         continue;
       }
@@ -540,7 +539,6 @@ async function fetchWithRetry(
     } catch (err) {
       lastError = err instanceof Error ? err : new Error(String(err));
       const delay = Math.min(1000 * Math.pow(2, attempt), 10000);
-      console.log(`[3DAI] Retry ${attempt + 1}/${retries} after ${delay}ms (${lastError.message})`);
       await new Promise(r => setTimeout(r, delay));
     }
   }
@@ -582,8 +580,6 @@ export async function generate3DModel(
   const { prompt, negativePrompt, template } = buildPrompt(requirements);
   const startTime = Date.now();
 
-  console.log(`[3DAI] Generating 3D model (template: ${template})`);
-  console.log(`[3DAI] Prompt: ${prompt.slice(0, 200)}...`);
 
   // Step 1: Create generation task
   const createRes = await fetchWithRetry(`${API_BASE}${GENERATE_ENDPOINT}`, {
@@ -611,13 +607,11 @@ export async function generate3DModel(
   const createData: TaskCreateResponse = await createRes.json();
   const taskId = createData.task_id ?? createData.id;
 
-  console.log("[3DAI] Create response:", JSON.stringify(createData));
 
   if (!taskId) {
     throw new Error(`3D AI Studio did not return a task_id. Response: ${JSON.stringify(createData)}`);
   }
 
-  console.log(`[3DAI] Task created: ${taskId}`);
 
   // Step 2: Poll for completion using the documented endpoint
   let pollAttempts = 0;
@@ -636,14 +630,12 @@ export async function generate3DModel(
     });
 
     if (!pollRes.ok) {
-      console.log(`[3DAI] Poll ${pollAttempts} failed: ${pollRes.status}`);
       await new Promise(r => setTimeout(r, POLL_INTERVAL_MS));
       continue;
     }
 
     const pollData: TaskStatusResponse = await pollRes.json();
     const status = pollData.status?.toUpperCase() ?? "UNKNOWN";
-    console.log(`[3DAI] Poll ${pollAttempts}: status=${status}`);
 
     if (status === "FINISHED" || status === "COMPLETED" || status === "SUCCEEDED") {
       let assetUrl = extractAssetUrl(pollData);
@@ -651,7 +643,6 @@ export async function generate3DModel(
       // The API sometimes returns FINISHED with asset=null on the first poll.
       // Re-poll a few times to wait for the asset URL to populate.
       if (!assetUrl) {
-        console.log("[3DAI] FINISHED but asset is null — re-polling for URL...");
         for (let retry = 0; retry < 5; retry++) {
           await new Promise(r => setTimeout(r, 2000));
           const retryRes = await fetchWithRetry(pollUrl, {
@@ -667,7 +658,6 @@ export async function generate3DModel(
       }
 
       if (!assetUrl) {
-        console.log("[3DAI] Finished response:", JSON.stringify(pollData));
         throw new Error("Task finished but no asset URL found after multiple polls");
       }
 
@@ -677,7 +667,6 @@ export async function generate3DModel(
 
       const kpis = calculateKPIs(requirements);
       const elapsed = Date.now() - startTime;
-      console.log(`[3DAI] Done in ${(elapsed / 1000).toFixed(1)}s (${pollAttempts} polls)`);
 
       return {
         glbUrl,
@@ -745,7 +734,6 @@ function extractAssetUrl(data: TaskStatusResponse): string | null {
  * don't have CORS headers — so browsers can't fetch them directly.
  */
 async function convertToGlb(archiveUrl: string, apiKey: string): Promise<string> {
-  console.log("[3DAI] Converting OBJ → GLB via API...");
 
   const convertRes = await fetchWithRetry(`${API_BASE}${CONVERT_ENDPOINT}`, {
     method: "POST",
@@ -771,7 +759,6 @@ async function convertToGlb(archiveUrl: string, apiKey: string): Promise<string>
     throw new Error("Convert endpoint did not return a task_id");
   }
 
-  console.log(`[3DAI] Conversion task: ${convertTaskId}`);
 
   // Poll conversion — typically completes in 10-15s
   const convDeadline = Date.now() + 2 * 60 * 1000; // 2 min max for conversion
@@ -787,14 +774,12 @@ async function convertToGlb(archiveUrl: string, apiKey: string): Promise<string>
     });
 
     if (!pollRes.ok) {
-      console.log(`[3DAI] Convert poll ${convPolls} failed: ${pollRes.status}`);
       await new Promise(r => setTimeout(r, 2000));
       continue;
     }
 
     const pollData: TaskStatusResponse = await pollRes.json();
     const status = pollData.status?.toUpperCase() ?? "UNKNOWN";
-    console.log(`[3DAI] Convert poll ${convPolls}: status=${status}`);
 
     if (status === "FINISHED" || status === "COMPLETED") {
       let sourceGlbUrl = extractAssetUrl(pollData);
@@ -834,7 +819,6 @@ async function convertToGlb(archiveUrl: string, apiKey: string): Promise<string>
  * Falls back to a proxy API route if R2 is not configured.
  */
 async function reuploadToR2(sourceUrl: string): Promise<string> {
-  console.log("[3DAI] Downloading GLB for R2 re-upload...");
 
   const dlRes = await fetch(sourceUrl);
   if (!dlRes.ok) {
@@ -844,7 +828,6 @@ async function reuploadToR2(sourceUrl: string): Promise<string> {
   }
 
   const glbBuffer = Buffer.from(await dlRes.arrayBuffer());
-  console.log(`[3DAI] GLB downloaded: ${(glbBuffer.length / 1024).toFixed(0)} KB`);
 
   try {
     const { uploadIFCToR2, isR2Configured } = await import("@/lib/r2");
@@ -857,7 +840,6 @@ async function reuploadToR2(sourceUrl: string): Promise<string> {
     const filename = `gn001-${Date.now()}.glb`;
     const result = await uploadIFCToR2(glbBuffer, filename);
     if (result?.url) {
-      console.log(`[3DAI] GLB uploaded to R2: ${result.url}`);
       return result.url;
     }
 

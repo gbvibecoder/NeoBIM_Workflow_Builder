@@ -57,21 +57,17 @@ export async function POST(req: NextRequest) {
     let parserUsed = "web-ifc";
 
     try {
-      console.log(`[parse-ifc] Parsing ${file.name} (${(file.size / 1024 / 1024).toFixed(1)}MB) with web-ifc WASM...`);
       const { parseIFCBuffer } = await import("@/services/ifc-parser");
       result = await parseIFCBuffer(buffer, file.name);
-      console.log(`[parse-ifc] web-ifc success: ${result.summary.processedElements} elements in ${result.meta.processingTimeMs}ms`);
     } catch (wasmErr) {
       // web-ifc failed (memory, timeout, unsupported geometry) — use text parser
       console.warn(`[parse-ifc] web-ifc WASM failed: ${wasmErr instanceof Error ? wasmErr.message : wasmErr}`);
-      console.log("[parse-ifc] Falling back to lightweight text parser...");
       parserUsed = "text-regex";
 
       try {
         const { parseIFCText } = await import("@/services/ifc-text-parser");
         const textContent = new TextDecoder().decode(buffer);
         result = parseIFCText(textContent);
-        console.log(`[parse-ifc] Text parser success: ${result.summary.processedElements} elements in ${result.meta.processingTimeMs}ms`);
       } catch (textErr) {
         console.error("[parse-ifc] Both parsers failed:", textErr);
         return NextResponse.json(

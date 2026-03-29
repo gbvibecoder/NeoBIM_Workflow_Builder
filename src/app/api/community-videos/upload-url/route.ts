@@ -13,7 +13,6 @@ async function ensureCorsOnce() {
     const result = await ensureBucketCors();
     if (result.success) {
       corsEnsured = true;
-      console.log("[upload-url] CORS auto-configured on first request");
     } else {
       console.warn("[upload-url] CORS auto-config failed:", result.error);
     }

@@ -186,17 +186,9 @@ export async function reconstructHiFi3D(
   input: MeshyTaskInput
 ): Promise<HiFi3DResult> {
   const startTime = Date.now();
-
-  console.log("[Meshy] Starting Hi-Fi 3D reconstruction", {
-    imageUrl: input.imageUrl.slice(0, 80),
-    topology: input.topology ?? "quad",
-    targetPolycount: input.targetPolycount ?? 30000,
-  });
-
   // Step 1: Create task
   const taskId = await createTask(input);
 
-  console.log("[Meshy] Task created", { taskId });
 
   // Step 2: Poll until complete
   const task = await pollTask(taskId);
@@ -210,13 +202,6 @@ export async function reconstructHiFi3D(
   }
 
   const durationMs = Date.now() - startTime;
-
-  console.log("[Meshy] Reconstruction completed", {
-    taskId,
-    durationMs,
-    costUsd: COST_PER_GENERATION,
-  });
-
   return {
     taskId: task.id,
     glbUrl: task.modelUrl,

@@ -98,7 +98,6 @@ export async function POST(req: NextRequest) {
     let roomProgram: EnhancedRoomProgram;
     try {
       roomProgram = await programRooms(prompt, apiKey);
-      console.log(`[generate-floor-plan] Stage 1: ${roomProgram.rooms.length} rooms, ${roomProgram.totalAreaSqm}sqm, type=${roomProgram.buildingType}, adjacencies=${roomProgram.adjacency.length}`);
     } catch (parseErr) {
       console.warn("[generate-floor-plan] Stage 1 AI failed, using regex fallback:", parseErr);
       roomProgram = programRoomsFallback(prompt);
@@ -146,7 +145,6 @@ export async function POST(req: NextRequest) {
           break; // Score ground floor only
         }
       }
-      console.log(`[generate-floor-plan] Multi-floor: ${multiFloor.floors.length} floors, ${project.metadata.carpet_area_sqm?.toFixed(0)}sqm total`);
       return NextResponse.json({ project, geometry, svg: null, feedback });
     }
 

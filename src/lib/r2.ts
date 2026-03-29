@@ -377,7 +377,6 @@ export async function cleanupOldFiles(): Promise<CleanupResult> {
   ifcDeleted = ifcResult.deleted;
   errors += ifcResult.errors;
 
-  console.log(`[R2 Cleanup] files: ${filesDeleted} deleted (>${CLEANUP_DAYS_FILES}d), ifc: ${ifcDeleted} deleted (>${CLEANUP_DAYS_IFC}d), errors: ${errors}`);
   return { filesDeleted, ifcDeleted, errors };
 }
 
@@ -420,7 +419,6 @@ export async function ensureBucketCors(
       }),
     );
 
-    console.log("[R2] CORS configured for origins:", origins);
     return { success: true };
   } catch (err) {
     console.error("[R2] Failed to set CORS:", err);

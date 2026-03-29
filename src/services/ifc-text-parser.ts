@@ -421,7 +421,6 @@ export function parseIFCText(text: string): TextParseResult {
       elementProperties.set(elemId, existing);
     }
   }
-  console.log(`[IFC-Text] Extracted ${allPropertyValues.size} property values, ${propertySets.size} Psets, linked to ${elementProperties.size} elements`);
 
   // ── Extract building elements ──
   const elements: TextParseElement[] = [];

@@ -151,7 +151,6 @@ async function klingFetch(
     const url = `${KLING_BASE_URL}${path}`;
 
     if (attempt === 0) {
-      console.log(`[Video] ${options.method} ${path}`, options.body ? JSON.stringify(options.body).slice(0, 300) : "");
     }
 
     const res = await fetch(url, {
@@ -229,7 +228,6 @@ async function pollTask(taskId: string): Promise<KlingTaskResponse> {
     );
 
     const status = result.data.task_status;
-    console.log(`[Video] Poll #${attempt}: status="${status}" taskId=${taskId}`);
 
     if (status === "succeed") {
       return result;
@@ -270,7 +268,6 @@ async function createTask(
 ): Promise<KlingTaskResponse> {
   const errors: string[] = [];
 
-  console.log("[KLING] createTask: duration=%s mode=%s models=%s", duration, mode, MODELS.join(","));
 
   for (const modelName of MODELS) {
     try {
@@ -296,7 +293,6 @@ async function createTask(
       });
 
       console.error("[KLING-MODEL] SUCCESS:", modelName, "duration:", duration, "mode:", mode);
-      console.log("[KLING] Task created: model=%s taskId=%s", modelName, result.data.task_id);
       return result;
     } catch (err) {
       const msg = (err as Error).message;
@@ -331,14 +327,6 @@ export async function generateWalkthroughVideo(
   const startTime = Date.now();
   const requestId = generateId();
 
-  console.log("[Video] Starting walkthrough generation", {
-    requestId,
-    imageUrl: imageUrl.slice(0, 80),
-    duration: `${duration}s`,
-    mode,
-    promptLength: prompt.length,
-  });
-
   try {
     // Step 1: Create the task (tries models in priority order)
     const createResult = await createTask(
@@ -369,16 +357,6 @@ export async function generateWalkthroughVideo(
     const durationSeconds = parseInt(duration, 10);
     const costUsd = parseFloat((durationSeconds * COST_PER_SECOND).toFixed(3));
     const generationTimeMs = Date.now() - startTime;
-
-    console.log("[Video] Walkthrough complete!", {
-      requestId,
-      taskId,
-      videoUrl: videoUrl.slice(0, 80),
-      durationSeconds,
-      costUsd,
-      generationTimeMs,
-    });
-
     return {
       id: taskId,
       videoUrl,
@@ -432,7 +410,6 @@ export async function generateDualWalkthrough(
   const exteriorPrompt = buildExteriorPrompt(buildingDescription);
   const interiorPrompt = buildInteriorPrompt(buildingDescription);
 
-  console.log("[Video] Starting DUAL walkthrough (5s exterior + 10s interior)");
 
   // Generate both in parallel for speed
   const [exterior, interior] = await Promise.all([
@@ -451,14 +428,6 @@ export async function generateDualWalkthrough(
       negativePrompt,
     }),
   ]);
-
-  console.log("[Video] DUAL walkthrough complete!", {
-    exteriorId: exterior.id,
-    interiorId: interior.id,
-    totalCost: (exterior.costUsd + interior.costUsd).toFixed(2),
-    totalTime: exterior.generationTimeMs + interior.generationTimeMs,
-  });
-
   return {
     exteriorVideo: exterior,
     interiorVideo: interior,
@@ -724,7 +693,6 @@ async function createTextToVideoTask(
 
   for (const modelName of MODELS) {
     try {
-      console.log(`[Video] Text2Video trying model: ${modelName}, mode: ${mode}, duration: ${duration}s`);
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const body: Record<string, any> = {
@@ -745,7 +713,6 @@ async function createTextToVideoTask(
         body,
       });
 
-      console.log(`[Video] Text2Video task created with ${modelName}! taskId=${result.data.task_id}`);
       return result;
     } catch (err) {
       const msg = (err as Error).message;
@@ -782,11 +749,6 @@ export async function submitDualTextToVideo(
   const exteriorPrompt = buildExteriorTextPrompt(buildingDescription);
   const interiorPrompt = buildInteriorTextPrompt(buildingDescription);
 
-  console.log("[Video] Submitting DUAL text2video tasks (non-blocking)");
-  console.log("[Video] Input description length:", buildingDescription.length, "chars");
-  console.log("[Video] Exterior prompt length:", exteriorPrompt.length, "chars");
-  console.log("[Video] Exterior prompt (first 500):", exteriorPrompt.slice(0, 500));
-  console.log("[Video] Interior prompt length:", interiorPrompt.length, "chars");
 
   const [exteriorResult, interiorResult] = await Promise.all([
     createTextToVideoTask(exteriorPrompt, negativePrompt, "5", "16:9", mode),
@@ -800,12 +762,6 @@ export async function submitDualTextToVideo(
     submittedAt: Date.now(),
     pipeline: "text2video" as const,
   };
-
-  console.log("[Video] Text2Video tasks submitted!", {
-    exteriorTaskId: result.exteriorTaskId,
-    interiorTaskId: result.interiorTaskId,
-  });
-
   return result;
 }
 
@@ -843,14 +799,6 @@ export async function checkDualTextVideoStatus(
   } else if (intStatus === "failed") {
     failureMessage = `Interior video failed: ${intResult.data.task_status_msg ?? "Unknown error"}`;
   }
-
-  console.log("[Video] Text2Video status check:", {
-    exterior: extStatus,
-    interior: intStatus,
-    progress,
-    isComplete,
-  });
-
   return {
     exteriorStatus: extStatus,
     interiorStatus: intStatus,
@@ -933,7 +881,6 @@ export async function submitDualWalkthrough(
   mode: "std" | "pro" = "pro",
   options?: { isFloorPlan?: boolean; roomInfo?: string; isRenovation?: boolean },
 ): Promise<SubmittedVideoTasks> {
-  console.log("[DUAL] submitDualWalkthrough: mode=%s isFloorPlan=%s isRenovation=%s", mode, options?.isFloorPlan, options?.isRenovation);
 
   const negativePrompt = "zoom in, close-up, tight shot, cropped building, partial view, dolly forward, approach, moving closer, blur, distortion, low quality, warped geometry, melting walls, deformed architecture, shaky camera, noise, artifacts, morphing surfaces, bent lines, wobbly structure, jittery motion, flickering textures, plastic appearance, fisheye distortion, floating objects, wireframe, cartoon, sketch, low polygon, unrealistic proportions, text overlay, watermark, oversaturated colors, CGI look, video game graphics, toy model, miniature, tilt-shift, abstract, surreal, people walking, cars moving, birds flying, lens flare";
 
@@ -959,7 +906,6 @@ export async function submitDualWalkthrough(
     createTask(imageUrl, interiorPrompt, negativePrompt, "10", "16:9", mode),
   ]);
 
-  console.log("[DUAL] Tasks submitted: exterior=%s interior=%s", exteriorResult.data.task_id, interiorResult.data.task_id);
 
   const result = {
     exteriorTaskId: exteriorResult.data.task_id,
@@ -990,13 +936,9 @@ export async function submitSingleWalkthrough(
 ): Promise<SubmittedSingleVideoTask> {
   const negativePrompt = "blur, distortion, low quality, noise, artifacts, cartoon, sketch, watermark";
 
-  console.log("[GN-009] submitSingleWalkthrough: Submitting SINGLE 10s walkthrough");
-  console.log("[GN-009] Image type:", imageUrl?.startsWith("http") ? "URL" : "base64", "length:", imageUrl?.length);
-  console.log("[GN-009] Prompt:", prompt);
 
   const result = await createTask(imageUrl, prompt, negativePrompt, "10", "16:9", mode);
 
-  console.log("[GN-009] Single task submitted! taskId:", result.data.task_id);
   return { taskId: result.data.task_id, submittedAt: Date.now() };
 }
 
@@ -1020,7 +962,6 @@ async function uploadToImgbb(base64Image: string): Promise<string> {
   const data = await res.json();
   if (!data.success) throw new Error(`imgbb upload failed: ${data.error?.message || "unknown"}`);
 
-  console.log("[OMNI] imgbb upload success:", data.data.url);
   return data.data.url;
 }
 
@@ -1037,7 +978,6 @@ async function createOmniTask(
   aspectRatio: string,
   mode: string,
 ): Promise<KlingTaskResponse> {
-  console.log("[OMNI] createOmniTask: duration=%s mode=%s", duration, mode);
 
   // Kling Omni needs a public URL — upload base64 to imgbb
   let finalImageUrl = imageUrl;
@@ -1059,7 +999,6 @@ async function createOmniTask(
 
   const result = await klingFetch(KLING_OMNI_PATH, { method: "POST", body });
 
-  console.log("[OMNI] Task created: taskId=%s", result.data.task_id);
   return result;
 }
 
@@ -1079,7 +1018,6 @@ export async function submitFloorPlanWalkthrough(
   const isLocalhost = authUrl.includes("localhost") || authUrl.includes("127.0.0.1");
 
   if (isLocalhost) {
-    console.log("[OMNI] Localhost — using v2.6 (Kling requires public URL for Omni)");
     const result = await createTask(imageUrl, prompt, negativePrompt, "10", "16:9", mode);
     return { taskId: result.data.task_id, submittedAt: Date.now(), usedOmni: true, durationSeconds: 10 };
   }
@@ -1120,7 +1058,6 @@ export async function checkSingleVideoStatus(taskId: string): Promise<{
     ? (result.data.task_status_msg ?? "Unknown error")
     : null;
 
-  console.log("[Video] Single task status:", { taskId, taskStatus, progress, videoUrl: videoUrl?.slice(0, 80) });
 
   return { status: taskStatus, videoUrl, progress, isComplete, hasFailed, failureMessage };
 }
@@ -1173,14 +1110,6 @@ export async function checkDualVideoStatus(
   } else if (intStatus === "failed") {
     failureMessage = `Interior video failed: ${intResult.data.task_status_msg ?? "Unknown error"}`;
   }
-
-  console.log("[Video] Status check:", {
-    exterior: extStatus,
-    interior: intStatus,
-    progress,
-    isComplete,
-  });
-
   return {
     exteriorStatus: extStatus,
     interiorStatus: intStatus,

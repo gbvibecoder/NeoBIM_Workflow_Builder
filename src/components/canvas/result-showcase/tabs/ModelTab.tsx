@@ -90,7 +90,6 @@ export function ModelTab({ data }: ModelTabProps) {
   const aiRenderUrl = (model && "aiRenderUrl" in model ? model.aiRenderUrl : undefined) as string | undefined;
   // Debug: log AI render URL status
   if (model) {
-    console.log("[ModelTab] model.kind:", model.kind, "| aiRenderUrl:", aiRenderUrl ? `YES (${aiRenderUrl.length} chars)` : "NONE");
   }
 
   if (!model && !data.svgContent) {
@@ -655,7 +654,6 @@ function FloorPlanLayout({
               <div
                 key={i}
                 onClick={() => {
-                  console.log('[PARENT] Room clicked:', room.name);
                   setSelectedRoom(room.name);
                   const rx = (room.x ?? 0) + (room.width ?? 0) / 2;
                   const rz = (room.y ?? 0) + (room.depth ?? 0) / 2;
@@ -904,9 +902,7 @@ function GlbViewer({ model }: { model: GlbModelData }) {
 // PostMessage handler + buildflowControls global — injected into old HTML that lacks it
 const PM_HANDLER = `<script>
 if(!window.__bfMsg){window.__bfMsg=1;
-console.log("[IFRAME-INJECT] Injecting message handler + buildflowControls");
 window.addEventListener("message",function(ev){
-console.log("[IFRAME-INJECT] Message received:",ev.data);
 if(!ev.data||!ev.data.type)return;
 var t=ev.data.type;
 if(t==="setTopView"&&typeof setMode==="function")setMode("top");
@@ -947,7 +943,6 @@ if(typeof renderer!=="undefined"){renderer.render(scene,camera);
 var a2=document.createElement("a");a2.download="buildflow-3d.png";
 a2.href=renderer.domElement.toDataURL("image/png");a2.click();}}
 };
-console.log("[IFRAME-INJECT] buildflowControls registered");
 }
 <\/script>`;
 
