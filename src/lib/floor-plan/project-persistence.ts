@@ -50,11 +50,18 @@ export function saveProject(project: FloorPlanProject): void {
   try {
     localStorage.setItem(key, data);
   } catch (e) {
-    // localStorage might be full — try to evict oldest project
+    // localStorage might be full — try to evict oldest project with user consent
     const index = getProjectIndex();
     if (index.length > 5) {
       const oldest = index.sort((a, b) => a.updatedAt.localeCompare(b.updatedAt))[0];
       if (oldest) {
+        const confirmed = typeof window !== "undefined"
+          ? window.confirm(`Storage is full. Delete oldest project "${oldest.name}" to make room?`)
+          : false;
+        if (!confirmed) {
+          console.warn("User declined — project not saved (storage full)");
+          return;
+        }
         localStorage.removeItem(STORAGE_PREFIX + oldest.id);
         index.splice(index.indexOf(oldest), 1);
         setProjectIndex(index);
@@ -63,7 +70,7 @@ export function saveProject(project: FloorPlanProject): void {
       try {
         localStorage.setItem(key, data);
       } catch {
-        console.warn("Failed to save project — localStorage full");
+        console.warn("Failed to save project — localStorage still full after eviction");
         return;
       }
     }

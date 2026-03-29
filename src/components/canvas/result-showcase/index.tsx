@@ -29,9 +29,12 @@ export function ResultShowcase({ onClose }: ResultShowcaseProps) {
   const setVideoPlayerNodeId = useUIStore(s => s.setVideoPlayerNodeId);
 
   // Auto-switch to "model" tab when 3D model becomes available
+  // (but NOT for floor-plan-interactive — that renders directly in the Overview tab)
   useEffect(() => {
     if (!hasAutoSwitched.current && data.model3dData && data.availableTabs.includes("model")) {
-      setActiveTab("model");
+      if (data.model3dData.kind !== "floor-plan-interactive") {
+        setActiveTab("model");
+      }
       hasAutoSwitched.current = true;
     }
   }, [data.model3dData, data.availableTabs]);

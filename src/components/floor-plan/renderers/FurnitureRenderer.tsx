@@ -6,6 +6,7 @@ import type { FurnitureInstance, Floor, Point } from "@/types/floor-plan-cad";
 import type { Viewport } from "@/lib/floor-plan/geometry";
 import { worldToScreen } from "@/lib/floor-plan/geometry";
 import { getCatalogItem } from "@/lib/floor-plan/furniture-catalog";
+import { lw } from "@/lib/floor-plan/line-weights";
 
 interface FurnitureRendererProps {
   floor: Floor;
@@ -73,7 +74,7 @@ function FurnitureItem({
   }
 
   const strokeColor = isSelected ? "#3B82F6" : "#555555";
-  const strokeW = isSelected ? 2 : 1;
+  const strokeW = isSelected ? 2 : lw("furn", viewport.zoom);
 
   return (
     <Group
@@ -114,7 +115,7 @@ function FurnitureItem({
               key={i}
               points={linePoints}
               stroke={strokeColor}
-              strokeWidth={pathDef.stroke_width * viewport.zoom * 0.5}
+              strokeWidth={lw("furn-detail", viewport.zoom)}
               opacity={0.6}
               dash={pathDef.dash ? pathDef.dash.map((v) => v * viewport.zoom * 0.05) : undefined}
             />
@@ -129,7 +130,7 @@ function FurnitureItem({
           x={0}
           y={-sd - 8}
           text={catalog.name}
-          fontSize={Math.max(8, Math.min(11, 10 * viewport.zoom * 12))}
+          fontSize={Math.max(8, Math.min(14, 120 * viewport.zoom))}
           fill={isSelected ? "#3B82F6" : "#888888"}
           align="left"
           opacity={0.7}

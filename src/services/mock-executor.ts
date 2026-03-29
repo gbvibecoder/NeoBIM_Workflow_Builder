@@ -4,8 +4,10 @@
  */
 
 import type { ExecutionArtifact, ArtifactType } from "@/types/execution";
+import type { FloorPlanGeometry, FloorPlanRoom } from "@/types/floor-plan";
 import { generateId } from "@/lib/utils";
 import { calculateBOQ } from "@/constants/unit-rates";
+import { convertGeometryToProject } from "@/lib/floor-plan/pipeline-adapter";
 
 const ARCHITECTURAL_IMAGES = [
   "https://picsum.photos/seed/arch1/600/400",
@@ -789,6 +791,162 @@ export async function executeNode(
         roomCount: mockRoomCount,
         hasGeometry: !!geoData,
         footprint: fp011 ? `${fp011.width ?? 12}m x ${fp011.depth ?? 8}m` : "12m x 8m",
+      });
+    }
+
+    case "GN-012": { // Floor Plan Editor — mock
+      const mockRooms012 = [
+        { name: "Living Room", type: "living", area_sqm: 25.5, width_m: 5.1, length_m: 5.0 },
+        { name: "Kitchen", type: "kitchen", area_sqm: 12.0, width_m: 4.0, length_m: 3.0 },
+        { name: "Bedroom 1", type: "bedroom", area_sqm: 16.0, width_m: 4.0, length_m: 4.0 },
+        { name: "Bedroom 2", type: "bedroom", area_sqm: 12.0, width_m: 4.0, length_m: 3.0 },
+        { name: "Bathroom 1", type: "bathroom", area_sqm: 4.5, width_m: 2.5, length_m: 1.8 },
+        { name: "Bathroom 2", type: "bathroom", area_sqm: 3.5, width_m: 2.0, length_m: 1.75 },
+        { name: "Hallway", type: "hallway", area_sqm: 6.0, width_m: 6.0, length_m: 1.0 },
+        { name: "Balcony", type: "balcony", area_sqm: 5.0, width_m: 5.0, length_m: 1.0 },
+      ];
+      const totalArea012 = mockRooms012.reduce((s, r) => s + r.area_sqm, 0);
+
+      // Build valid FloorPlanProject from mock rooms
+      const geoRooms012: FloorPlanRoom[] = [
+        { name: "Living Room",  type: "living",   x: 0,   y: 0,   width: 5.1, depth: 5.0, center: [2.55, 2.5]  },
+        { name: "Bedroom 1",    type: "bedroom",  x: 5.1, y: 0,   width: 4.0, depth: 4.0, center: [7.1, 2.0]   },
+        { name: "Bathroom 1",   type: "bathroom", x: 9.1, y: 0,   width: 2.5, depth: 1.8, center: [10.35, 0.9] },
+        { name: "Bathroom 2",   type: "bathroom", x: 9.1, y: 1.8, width: 2.0, depth: 1.75, center: [10.1, 2.675] },
+        { name: "Bedroom 2",    type: "bedroom",  x: 5.1, y: 4.0, width: 4.0, depth: 3.0, center: [7.1, 5.5]   },
+        { name: "Kitchen",      type: "kitchen",  x: 0,   y: 5.0, width: 4.0, depth: 3.0, center: [2.0, 6.5]   },
+        { name: "Hallway",      type: "hallway",  x: 4.0, y: 5.0, width: 6.0, depth: 1.0, center: [7.0, 5.5]   },
+        { name: "Balcony",      type: "balcony",  x: 0,   y: 8.0, width: 5.0, depth: 1.0, center: [2.5, 8.5]   },
+      ];
+      const mockGeometry012: FloorPlanGeometry = {
+        footprint: { width: 11.6, depth: 9.0 },
+        wallHeight: 3.0,
+        walls: [
+          { start: [0, 0], end: [11.6, 0], thickness: 0.23, type: "exterior" },
+          { start: [11.6, 0], end: [11.6, 9.0], thickness: 0.23, type: "exterior" },
+          { start: [11.6, 9.0], end: [0, 9.0], thickness: 0.23, type: "exterior" },
+          { start: [0, 9.0], end: [0, 0], thickness: 0.23, type: "exterior" },
+          { start: [5.1, 0], end: [5.1, 7.0], thickness: 0.15, type: "interior" },
+          { start: [9.1, 0], end: [9.1, 3.55], thickness: 0.15, type: "interior" },
+          { start: [0, 5.0], end: [10.0, 5.0], thickness: 0.15, type: "interior" },
+          { start: [4.0, 5.0], end: [4.0, 6.0], thickness: 0.15, type: "interior" },
+        ],
+        doors: [
+          { position: [2.5, 5.0], width: 0.9, wallId: 6, type: "single" },
+          { position: [5.1, 2.0], width: 0.9, wallId: 4, type: "single" },
+          { position: [5.1, 5.5], width: 0.9, wallId: 4, type: "single" },
+          { position: [9.1, 0.9], width: 0.75, wallId: 5, type: "single" },
+          { position: [9.1, 2.7], width: 0.75, wallId: 5, type: "single" },
+          { position: [2.0, 5.0], width: 0.9, wallId: 6, type: "single" },
+          { position: [5.5, 0], width: 1.05, wallId: 0, type: "single" },
+        ],
+        windows: [
+          { position: [2.5, 0], width: 1.5, height: 1.2, sillHeight: 0.9 },
+          { position: [7.1, 0], width: 1.5, height: 1.2, sillHeight: 0.9 },
+          { position: [0, 2.5], width: 1.5, height: 1.2, sillHeight: 0.9 },
+          { position: [0, 6.5], width: 1.2, height: 1.2, sillHeight: 0.9 },
+          { position: [11.6, 5.0], width: 1.2, height: 1.0, sillHeight: 1.0 },
+          { position: [2.5, 9.0], width: 1.5, height: 1.2, sillHeight: 0.9 },
+        ],
+        rooms: geoRooms012,
+      };
+      const mockProject012 = convertGeometryToProject(mockGeometry012, "2BHK Apartment — Mock");
+
+      return mockArtifact(executionId, tileInstanceId, "json", {
+        label: "Floor Plan Editor — 2BHK Apartment (Mock)",
+        interactive: true,
+        sourceType: "tr004",
+        warnings: ["Mock mode — using sample floor plan data"],
+        floorPlanProject: mockProject012,
+        boqQuantities: {
+          walls: {
+            exterior: { length_m: 38.2, area_sqm: 114.6, volume_cum: 26.36, material: "brick_230mm" },
+            interior: { length_m: 22.5, area_sqm: 67.5, volume_cum: 10.13, material: "brick_150mm" },
+            partition: { length_m: 5.0, area_sqm: 15.0, volume_cum: 1.5, material: "drywall_100mm" },
+          },
+          doors: [
+            { type: "single swing", width_mm: 1050, height_mm: 2100, count: 1, description: "Main / Entrance" },
+            { type: "single swing", width_mm: 900, height_mm: 2100, count: 4, description: "Room" },
+            { type: "single swing", width_mm: 750, height_mm: 2100, count: 2, description: "Bathroom" },
+          ],
+          windows: [
+            { type: "sliding", width_mm: 1500, height_mm: 1200, count: 4, area_sqm: 7.2 },
+            { type: "sliding", width_mm: 900, height_mm: 600, count: 2, area_sqm: 1.08 },
+          ],
+          flooring: { total_area_sqm: totalArea012, by_room_type: { living: 25.5, kitchen: 12.0, bedroom: 28.0, bathroom: 8.0, hallway: 6.0, balcony: 5.0 } },
+          plastering: { interior_wall_area_sqm: 135.0, ceiling_area_sqm: totalArea012, exterior_wall_area_sqm: 114.6 },
+          skirting: { total_length_m: 65.0 },
+          painting: { wall_area_sqm: 230.0, ceiling_area_sqm: totalArea012 },
+          structural: { columns_count: 4, columns_volume_cum: 1.08, slab_area_sqm: totalArea012, slab_volume_cum: totalArea012 * 0.15, stairs_count: 0 },
+        },
+        roomSchedule: mockRooms012.map((r, i) => ({
+          room_number: i + 1,
+          name: r.name,
+          type: r.type,
+          area_sqm: r.area_sqm,
+          width_m: r.width_m,
+          length_m: r.length_m,
+          floor: "Ground Floor",
+        })),
+        massingGeometry: null,
+        svgContent: "",
+        // EX-002 compatible BOQ data
+        _boqData: {
+          lines: [
+            { division: "04 — Masonry", csiCode: "04 21 13", description: "Exterior brick masonry (230mm)", unit: "cum", quantity: 26.36, wasteFactor: 0.05, adjustedQty: 27.68, materialRate: 5500, laborRate: 2500, equipmentRate: 500, unitRate: 8500, materialCost: 152240, laborCost: 69200, equipmentCost: 13840, totalCost: 235280 },
+            { division: "04 — Masonry", csiCode: "04 21 13", description: "Interior brick masonry (150mm)", unit: "cum", quantity: 10.13, wasteFactor: 0.05, adjustedQty: 10.64, materialRate: 5200, laborRate: 2400, equipmentRate: 400, unitRate: 8000, materialCost: 55328, laborCost: 25536, equipmentCost: 4256, totalCost: 85120 },
+            { division: "03 — Concrete", csiCode: "03 30 00", description: "RCC slab (M25 grade)", unit: "cum", quantity: 12.68, wasteFactor: 0.03, adjustedQty: 13.06, materialRate: 4800, laborRate: 1800, equipmentRate: 600, unitRate: 7200, materialCost: 62688, laborCost: 23508, equipmentCost: 7836, totalCost: 94032 },
+            { division: "09 — Finishes", csiCode: "09 24 00", description: "Interior wall plaster (12mm cement)", unit: "sqm", quantity: 135.0, wasteFactor: 0.05, adjustedQty: 141.75, materialRate: 280, laborRate: 150, equipmentRate: 20, unitRate: 450, materialCost: 39690, laborCost: 21263, equipmentCost: 2835, totalCost: 63788 },
+            { division: "09 — Finishes", csiCode: "09 30 00", description: "Vitrified tile flooring (600×600)", unit: "sqm", quantity: 84.5, wasteFactor: 0.08, adjustedQty: 91.26, materialRate: 850, laborRate: 280, equipmentRate: 70, unitRate: 1200, materialCost: 77571, laborCost: 25553, equipmentCost: 6388, totalCost: 109512 },
+            { division: "09 — Finishes", csiCode: "09 91 00", description: "Interior wall painting (2 coats emulsion)", unit: "sqm", quantity: 230.0, wasteFactor: 0.05, adjustedQty: 241.5, materialRate: 110, laborRate: 80, equipmentRate: 10, unitRate: 200, materialCost: 26565, laborCost: 19320, equipmentCost: 2415, totalCost: 48300 },
+            { division: "08 — Openings", csiCode: "08 11 13", description: "Main / Entrance door (single swing, 1050×2100mm)", unit: "nos", quantity: 1, wasteFactor: 0, adjustedQty: 1, materialRate: 16000, laborRate: 4500, equipmentRate: 500, unitRate: 21000, materialCost: 16000, laborCost: 4500, equipmentCost: 500, totalCost: 21000 },
+            { division: "08 — Openings", csiCode: "08 11 13", description: "Room door (single swing, 900×2100mm)", unit: "nos", quantity: 4, wasteFactor: 0, adjustedQty: 4, materialRate: 9000, laborRate: 3200, equipmentRate: 500, unitRate: 12700, materialCost: 36000, laborCost: 12800, equipmentCost: 2000, totalCost: 50800 },
+            { division: "08 — Openings", csiCode: "08 51 13", description: "Sliding window (1500×1200mm)", unit: "nos", quantity: 4, wasteFactor: 0, adjustedQty: 4, materialRate: 7500, laborRate: 3750, equipmentRate: 1250, unitRate: 12500, materialCost: 30000, laborCost: 15000, equipmentCost: 5000, totalCost: 50000 },
+          ],
+          subtotalMaterial: 496082,
+          subtotalLabor: 216680,
+          subtotalEquipment: 45070,
+          grandTotal: 757832,
+          projectType: "residential",
+          projectMultiplier: 1.0,
+          disclaimer: "Mock data — indicative Indian market rates (2024–25).",
+        },
+        _currency: "INR",
+        _currencySymbol: "₹",
+        _region: "India",
+        _gfa: Math.round(totalArea012 * 100) / 100,
+        _totalCost: 757832,
+        // EX-002 validation: rows + headers table format
+        headers: ["Division", "CSI Code", "Description", "Unit", "Qty", "Material Rate", "Labor Rate", "Equip Rate", "Unit Rate", "Material Cost", "Labor Cost", "Equip Cost", "Total Cost"],
+        rows: [
+          ["04 — Masonry", "04 21 13", "Exterior brick masonry (230mm)", "cum", 26.36, 5500, 2500, 500, 8500, 152240, 69200, 13840, 235280],
+          ["04 — Masonry", "04 21 13", "Interior brick masonry (150mm)", "cum", 10.13, 5200, 2400, 400, 8000, 55328, 25536, 4256, 85120],
+          ["03 — Concrete", "03 30 00", "RCC slab (M25 grade)", "cum", 12.68, 4800, 1800, 600, 7200, 62688, 23508, 7836, 94032],
+          ["09 — Finishes", "09 24 00", "Interior wall plaster (12mm cement)", "sqm", 135.0, 280, 150, 20, 450, 39690, 21263, 2835, 63788],
+          ["09 — Finishes", "09 30 00", "Vitrified tile flooring (600×600)", "sqm", 84.5, 850, 280, 70, 1200, 77571, 25553, 6388, 109512],
+          ["09 — Finishes", "09 91 00", "Interior wall painting (2 coats emulsion)", "sqm", 230.0, 110, 80, 10, 200, 26565, 19320, 2415, 48300],
+          ["08 — Openings", "08 11 13", "Main / Entrance door (single swing, 1050×2100mm)", "nos", 1, 16000, 4500, 500, 21000, 16000, 4500, 500, 21000],
+          ["08 — Openings", "08 11 13", "Room door (single swing, 900×2100mm)", "nos", 4, 9000, 3200, 500, 12700, 36000, 12800, 2000, 50800],
+          ["08 — Openings", "08 51 13", "Sliding window (1500×1200mm)", "nos", 4, 7500, 3750, 1250, 12500, 30000, 15000, 5000, 50000],
+        ],
+        summary: {
+          totalRooms: mockRooms012.length,
+          totalArea_sqm: Math.round(totalArea012 * 100) / 100,
+          totalWalls: 18,
+          totalDoors: 7,
+          totalWindows: 6,
+          totalColumns: 4,
+          totalStairs: 0,
+          floorCount: 1,
+          buildingType: "residential",
+        },
+        _outputs: {
+          "project-out": null,
+          "geo-out": null,
+          "schedule-out": mockRooms012.map((r, i) => ({ room_number: i + 1, ...r, floor: "Ground Floor" })),
+          "boq-out": { walls: { exterior: { length_m: 38.2 }, interior: { length_m: 22.5 }, partition: { length_m: 5.0 } } },
+          "svg-out": "",
+        },
       });
     }
 

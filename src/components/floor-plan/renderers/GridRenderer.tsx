@@ -5,6 +5,7 @@ import { Line, Text } from "react-konva";
 import type { Viewport } from "@/lib/floor-plan/geometry";
 import { worldToScreen, worldToScreenDistance } from "@/lib/floor-plan/geometry";
 import type { ViewMode } from "@/types/floor-plan-cad";
+import { lw } from "@/lib/floor-plan/line-weights";
 
 interface GridRendererProps {
   viewport: Viewport;
@@ -18,13 +19,14 @@ export function GridRenderer({ viewport, gridSize_mm, viewMode }: GridRendererPr
     const labels: Array<{ x: number; y: number; text: string }> = [];
 
     // Determine visible world extent
+    const zoom = viewport.zoom || 1;
     const topLeft = {
-      x: viewport.x - viewport.canvasWidth / 2 / viewport.zoom,
-      y: viewport.y + viewport.canvasHeight / 2 / viewport.zoom,
+      x: viewport.x - viewport.canvasWidth / 2 / zoom,
+      y: viewport.y + viewport.canvasHeight / 2 / zoom,
     };
     const bottomRight = {
-      x: viewport.x + viewport.canvasWidth / 2 / viewport.zoom,
-      y: viewport.y - viewport.canvasHeight / 2 / viewport.zoom,
+      x: viewport.x + viewport.canvasWidth / 2 / zoom,
+      y: viewport.y - viewport.canvasHeight / 2 / zoom,
     };
 
     // Grid spacing: minor = gridSize_mm, major = gridSize_mm * 10
@@ -78,7 +80,7 @@ export function GridRenderer({ viewport, gridSize_mm, viewMode }: GridRendererPr
       const minorEndY = Math.ceil(topLeft.y / minor) * minor;
 
       for (let x = minorStartX; x <= minorEndX; x += minor) {
-        if (x % major === 0) continue;
+        if (major > 0 && Math.abs(x % major) < 1) continue;
         const screenX = worldToScreen({ x, y: 0 }, viewport).x;
         lines.push({
           points: [screenX, 0, screenX, viewport.canvasHeight],
@@ -86,7 +88,7 @@ export function GridRenderer({ viewport, gridSize_mm, viewMode }: GridRendererPr
         });
       }
       for (let y = minorStartY; y <= minorEndY; y += minor) {
-        if (y % major === 0) continue;
+        if (major > 0 && Math.abs(y % major) < 1) continue;
         const screenY = worldToScreen({ x: 0, y }, viewport).y;
         lines.push({
           points: [0, screenY, viewport.canvasWidth, screenY],
@@ -108,7 +110,7 @@ export function GridRenderer({ viewport, gridSize_mm, viewMode }: GridRendererPr
           key={`grid-${i}`}
           points={line.points}
           stroke={line.major ? majorColor : minorColor}
-          strokeWidth={line.major ? 0.5 : 0.25}
+          strokeWidth={line.major ? lw("grid-major", viewport.zoom) : lw("grid-minor", viewport.zoom)}
           listening={false}
         />
       ))}

@@ -347,23 +347,35 @@ Rules:
 
 Use the report_construction_prices tool to return your findings.`;
 
-  // ── Primary: Claude Sonnet with web_search + structured output ──
+  // ── Primary: Claude Sonnet with web_search — SHORT prompt for speed ──
+  // The long reasoning prompt was causing 40s+ timeouts on Vercel.
+  // Web search results provide the context — no need for reasoning steps in prompt.
+  const webSearchPrompt = `Search for current construction material prices in ${city}, ${state}, India (${monthYear}).
+Search: "TMT steel price ${city} ${state} today" and "cement price ${city} today".
+Then use the report_construction_prices tool with your findings.
+Building type: ${buildingType}. All benchmark values in INR per SQUARE METRE (m²), not sqft.
+Steel range: ₹52,000-78,000/tonne. Cement: ₹340-560/bag. Mason: ₹500-1200/day.`;
+
+  // ── Primary: Haiku + web_search (Sonnet times out on Vercel cold starts) ──
   try {
-    console.log("[TR-015] Calling Sonnet with web_search (40s timeout)...");
+    const callStart = Date.now();
+    console.log(`[TR-015] Haiku + web_search (20s timeout, ${webSearchPrompt.length} char prompt)...`);
+
     const ctrl1 = new AbortController();
-    const t1 = setTimeout(() => ctrl1.abort(), 40_000);
+    const t1 = setTimeout(() => ctrl1.abort(), 20_000);
     const resp = await client.messages.create({
-      model: "claude-sonnet-4-6",
-      max_tokens: 4096,
+      model: "claude-haiku-4-5-20251001",
+      max_tokens: 2048,
       tools: [
         { type: "web_search_20250305", name: "web_search", max_uses: 3 },
         priceTool,
       ],
       tool_choice: { type: "auto" },
-      messages: [{ role: "user", content: userPrompt }],
+      messages: [{ role: "user", content: webSearchPrompt }],
     }, { signal: ctrl1.signal });
     clearTimeout(t1);
 
+    const callMs = Date.now() - callStart;
     for (const block of resp.content) {
       const bt = block.type as string;
       if (bt === "web_search_tool_result" || bt === "server_tool_use") usedWebSearch = true;
@@ -378,15 +390,15 @@ Use the report_construction_prices tool to return your findings.`;
     }
     result.search_count = usedWebSearch ? 3 : 0;
     result.agent_notes.push(`✨ Market Intelligence — ${city}, ${state} · ${monthYear} · ${usedWebSearch ? "web search" : "Claude AI"} · ±${usedWebSearch ? "10-15" : "15-25"}%`);
-    console.log(`[TR-015] Sonnet done in ${Date.now() - startTime}ms (web: ${usedWebSearch})`);
+    console.log(`[TR-015] Haiku + web_search done in ${callMs}ms (web: ${usedWebSearch}, tokens: ${resp.usage.input_tokens}+${resp.usage.output_tokens})`);
   } catch (err) {
-    const sonnetMs = Date.now() - startTime;
-    console.error(`[TR-015] Sonnet failed after ${sonnetMs}ms:`, err instanceof Error ? err.message : err);
+    const errMsg = err instanceof Error ? err.message : String(err);
+    console.error(`[TR-015] Haiku + web_search failed after ${Date.now() - startTime}ms: ${errMsg}`);
 
-    // ── Fallback: Haiku with SHORT prompt, forced tool_use, 12s timeout ──
+    // ── Fallback: Haiku WITHOUT web_search ──
     try {
-      console.log("[TR-015] Haiku fallback (12s timeout, short prompt)...");
       const haikuStart = Date.now();
+      console.log("[TR-015] Haiku fallback (no web, 12s timeout)...");
       const ctrl2 = new AbortController();
       const t2 = setTimeout(() => ctrl2.abort(), 12_000);
       const resp2 = await client.messages.create({
@@ -405,12 +417,11 @@ Use the report_construction_prices tool to return your findings.`;
       }
       result.search_count = 0;
       result.agent_notes.push(`✨ Market Intelligence — ${city}, ${state} · ${monthYear} · Claude AI · ±15-25%`);
-      console.log(`[TR-015] Haiku done in ${Date.now() - haikuStart}ms (total: ${Date.now() - startTime}ms)`);
+      console.log(`[TR-015] Haiku (no web) done in ${Date.now() - haikuStart}ms (total: ${Date.now() - startTime}ms)`);
     } catch (fallbackErr) {
       const fbMsg = fallbackErr instanceof Error ? fallbackErr.message : String(fallbackErr);
-      const totalMs = Date.now() - startTime;
       result.agent_notes.push(`Using CPWD 2024 static rates (AI unavailable — ${fbMsg})`);
-      console.error(`[TR-015] Both attempts failed after ${totalMs}ms: ${fbMsg}`);
+      console.error(`[TR-015] All attempts failed after ${Date.now() - startTime}ms: ${fbMsg}`);
     }
   }
 

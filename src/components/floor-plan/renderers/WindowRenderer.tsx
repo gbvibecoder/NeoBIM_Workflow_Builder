@@ -11,7 +11,9 @@ import {
   perpendicularLeft,
   addPoints,
   scalePoint,
+  midpoint,
 } from "@/lib/floor-plan/geometry";
+import { lw } from "@/lib/floor-plan/line-weights";
 
 interface WindowRendererProps {
   windows: CadWindow[];
@@ -20,9 +22,25 @@ interface WindowRendererProps {
   viewMode: ViewMode;
 }
 
+interface WinShape {
+  id: string;
+  type: CadWindow["type"];
+  outer: [{ x: number; y: number }, { x: number; y: number }];
+  inner: [{ x: number; y: number }, { x: number; y: number }];
+  glass: [{ x: number; y: number }, { x: number; y: number }];
+  breakTopLeft: { x: number; y: number };
+  breakBottomRight: { x: number; y: number };
+  // Casement swing indicator
+  swingTri?: number[];
+  // Sliding overlap indicator
+  glass2?: [{ x: number; y: number }, { x: number; y: number }];
+}
+
 export function WindowRenderer({ windows, walls, viewport, viewMode }: WindowRendererProps) {
+  const zoom = viewport.zoom;
+
   const windowShapes = useMemo(() => {
-    return windows.map((win) => {
+    return windows.map((win): WinShape | null => {
       const wall = walls.find((w) => w.id === win.wall_id);
       if (!wall) return null;
 
@@ -30,94 +48,120 @@ export function WindowRenderer({ windows, walls, viewport, viewMode }: WindowRen
       const wallNorm = perpendicularLeft(wallDir);
       const halfThick = wall.thickness_mm / 2;
 
-      // Window position along wall
       const winStart = addPoints(
         wall.centerline.start,
-        scalePoint(wallDir, win.position_along_wall_mm)
+        scalePoint(wallDir, win.position_along_wall_mm),
       );
       const winEnd = addPoints(winStart, scalePoint(wallDir, win.width_mm));
-      const winMid = addPoints(winStart, scalePoint(wallDir, win.width_mm / 2));
 
-      // Three parallel lines (outer face, glass, inner face)
+      // Three parallel lines
       const outerStart = addPoints(winStart, scalePoint(wallNorm, halfThick));
       const outerEnd = addPoints(winEnd, scalePoint(wallNorm, halfThick));
       const innerStart = addPoints(winStart, scalePoint(wallNorm, -halfThick));
       const innerEnd = addPoints(winEnd, scalePoint(wallNorm, -halfThick));
-      const glassStart = winStart; // centerline
-      const glassEnd = winEnd;
 
-      return {
+      const shape: WinShape = {
         id: win.id,
+        type: win.type,
         outer: [worldToScreen(outerStart, viewport), worldToScreen(outerEnd, viewport)],
         inner: [worldToScreen(innerStart, viewport), worldToScreen(innerEnd, viewport)],
-        glass: [worldToScreen(glassStart, viewport), worldToScreen(glassEnd, viewport)],
-        // Wall break rectangle (to clear wall fill)
-        breakTopLeft: worldToScreen(addPoints(winStart, scalePoint(wallNorm, halfThick + 2)), viewport),
-        breakBottomRight: worldToScreen(addPoints(winEnd, scalePoint(wallNorm, -halfThick - 2)), viewport),
-        type: win.type,
+        glass: [worldToScreen(winStart, viewport), worldToScreen(winEnd, viewport)],
+        breakTopLeft: worldToScreen(
+          addPoints(winStart, scalePoint(wallNorm, halfThick + 2)),
+          viewport,
+        ),
+        breakBottomRight: worldToScreen(
+          addPoints(winEnd, scalePoint(wallNorm, -halfThick - 2)),
+          viewport,
+        ),
       };
-    }).filter(Boolean);
+
+      // ── Casement: small triangle showing swing direction ──
+      if (win.type === "casement" || win.type === "awning") {
+        const midPt = midpoint(winStart, winEnd);
+        const triTip = addPoints(midPt, scalePoint(wallNorm, halfThick * 1.8));
+        const triBase1 = addPoints(
+          midPt,
+          addPoints(scalePoint(wallDir, win.width_mm * 0.15), scalePoint(wallNorm, halfThick * 0.4)),
+        );
+        const triBase2 = addPoints(
+          midPt,
+          addPoints(scalePoint(wallDir, -win.width_mm * 0.15), scalePoint(wallNorm, halfThick * 0.4)),
+        );
+        const t = worldToScreen(triTip, viewport);
+        const b1 = worldToScreen(triBase1, viewport);
+        const b2 = worldToScreen(triBase2, viewport);
+        shape.swingTri = [t.x, t.y, b1.x, b1.y, b2.x, b2.y];
+      }
+
+      // ── Sliding: two overlapping glass panes ──
+      if (win.type === "sliding" || win.type === "double_hung") {
+        const offset = scalePoint(wallDir, win.width_mm * 0.08);
+        const g2Start = addPoints(winStart, addPoints(offset, scalePoint(wallNorm, halfThick * 0.25)));
+        const g2End = addPoints(winEnd, addPoints(offset, scalePoint(wallNorm, halfThick * 0.25)));
+        shape.glass2 = [worldToScreen(g2Start, viewport), worldToScreen(g2End, viewport)];
+      }
+
+      return shape;
+    }).filter(Boolean) as WinShape[];
   }, [windows, walls, viewport]);
 
   const lineColor = viewMode === "cad" ? "#1A1A1A" : "#444444";
   const glassColor = viewMode === "cad" ? "#3B82F6" : "#60A5FA";
+  const frameWeight = lw("win-frame", zoom);
+  const glassWeight = lw("win-glass", zoom);
 
   return (
     <>
-      {windowShapes.map((shape) => {
-        if (!shape) return null;
-
-        return (
-          <Group key={shape.id}>
-            {/* Wall break (clear the wall fill) */}
+      {windowShapes.map((s) => (
+        <Group key={s.id}>
+          {/* Wall break */}
+          <KLine
+            points={[
+              s.breakTopLeft.x, s.breakTopLeft.y,
+              s.breakBottomRight.x, s.breakTopLeft.y,
+              s.breakBottomRight.x, s.breakBottomRight.y,
+              s.breakTopLeft.x, s.breakBottomRight.y,
+            ]}
+            closed fill="#FFFFFF" stroke="transparent" listening={false}
+          />
+          {/* Outer wall face */}
+          <KLine
+            points={[s.outer[0].x, s.outer[0].y, s.outer[1].x, s.outer[1].y]}
+            stroke={lineColor} strokeWidth={frameWeight} listening={false}
+          />
+          {/* Inner wall face */}
+          <KLine
+            points={[s.inner[0].x, s.inner[0].y, s.inner[1].x, s.inner[1].y]}
+            stroke={lineColor} strokeWidth={frameWeight} listening={false}
+          />
+          {/* Glass pane */}
+          <KLine
+            points={[s.glass[0].x, s.glass[0].y, s.glass[1].x, s.glass[1].y]}
+            stroke={glassColor} strokeWidth={glassWeight} listening={false}
+          />
+          {/* Casement swing triangle */}
+          {s.swingTri && (
             <KLine
-              points={[
-                shape.breakTopLeft.x, shape.breakTopLeft.y,
-                shape.breakBottomRight.x, shape.breakTopLeft.y,
-                shape.breakBottomRight.x, shape.breakBottomRight.y,
-                shape.breakTopLeft.x, shape.breakBottomRight.y,
-              ]}
+              points={s.swingTri}
               closed
-              fill="#FFFFFF"
-              stroke="transparent"
-              listening={false}
-            />
-
-            {/* Outer wall face line */}
-            <KLine
-              points={[
-                shape.outer[0].x, shape.outer[0].y,
-                shape.outer[1].x, shape.outer[1].y,
-              ]}
               stroke={lineColor}
-              strokeWidth={1.2}
+              strokeWidth={lw("dim-line", zoom)}
+              fill="rgba(59,130,246,0.06)"
               listening={false}
             />
-
-            {/* Inner wall face line */}
+          )}
+          {/* Sliding: second glass pane (offset) */}
+          {s.glass2 && (
             <KLine
-              points={[
-                shape.inner[0].x, shape.inner[0].y,
-                shape.inner[1].x, shape.inner[1].y,
-              ]}
-              stroke={lineColor}
-              strokeWidth={1.2}
+              points={[s.glass2[0].x, s.glass2[0].y, s.glass2[1].x, s.glass2[1].y]}
+              stroke={glassColor} strokeWidth={glassWeight * 0.7}
+              dash={[6, 3]}
               listening={false}
             />
-
-            {/* Glass pane (center line, colored) */}
-            <KLine
-              points={[
-                shape.glass[0].x, shape.glass[0].y,
-                shape.glass[1].x, shape.glass[1].y,
-              ]}
-              stroke={glassColor}
-              strokeWidth={1.5}
-              listening={false}
-            />
-          </Group>
-        );
-      })}
+          )}
+        </Group>
+      ))}
     </>
   );
 }

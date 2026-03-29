@@ -8,6 +8,7 @@ import type { ShowcaseData } from "./useShowcaseData";
 
 export type HeroType =
   | "floor-plan"
+  | "floor-plan-interactive"
   | "video"
   | "3d-model"
   | "image"
@@ -49,6 +50,7 @@ export function useHeroDetection(data: ShowcaseData): HeroData {
     let type: HeroType = "generic";
 
     if (data.videoData) type = "video";
+    else if (data.model3dData?.kind === "floor-plan-interactive") type = "floor-plan-interactive";
     else if (data.model3dData) type = "3d-model";
     else if (data.svgContent) type = "floor-plan";
     else if (data.allImageUrls.length > 0) type = "image";
@@ -120,6 +122,17 @@ export function useHeroDetection(data: ShowcaseData): HeroData {
           if (unitNames.size > 1) {
             insights.push({ label: "Units", value: unitNames.size });
           }
+        }
+        break;
+      }
+
+      case "floor-plan-interactive": {
+        if (data.model3dData?.kind === "floor-plan-interactive") {
+          const s = data.model3dData.summary;
+          if (s.totalArea_sqm > 0) insights.push({ label: "Total Area", value: Math.round(s.totalArea_sqm), unit: "m²" });
+          if (s.totalRooms > 0) insights.push({ label: "Rooms", value: s.totalRooms });
+          if (s.totalWalls > 0) insights.push({ label: "Walls", value: s.totalWalls });
+          if (s.floorCount > 1) insights.push({ label: "Floors", value: s.floorCount });
         }
         break;
       }

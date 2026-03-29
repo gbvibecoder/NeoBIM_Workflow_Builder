@@ -27,8 +27,14 @@ import {
   Sparkles,
 } from "lucide-react";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { useLocale } from "@/hooks/useLocale";
 import { COLORS } from "../constants";
+
+const FloorPlanViewer = dynamic(
+  () => import("../../../floor-plan/FloorPlanViewer").then(m => ({ default: m.FloorPlanViewer })),
+  { ssr: false, loading: () => <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", color: "#888", fontSize: 13 }}>Loading Floor Plan Editor...</div> }
+);
 import { HeroSection } from "../sections/HeroSection";
 import { KpiStrip } from "../sections/KpiStrip";
 import { PipelineViz } from "../sections/PipelineViz";
@@ -154,6 +160,53 @@ export function OverviewTab({
       `}</style>
 
       {/* ═══ HERO: Primary Result ═══ */}
+      {hero.type === "floor-plan-interactive" && data.model3dData?.kind === "floor-plan-interactive" && (
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+          style={{ borderRadius: 16, overflow: "hidden", border: "1px solid rgba(255,255,255,0.06)", boxShadow: "0 4px 24px rgba(0,0,0,0.25)" }}
+        >
+          {/* Header bar with stats + Open Full Editor button */}
+          <div style={{
+            display: "flex", alignItems: "center", gap: 16,
+            padding: "10px 16px",
+            background: "rgba(15,15,20,0.95)",
+            borderBottom: "1px solid rgba(255,255,255,0.08)",
+            fontSize: 11, color: "#9ca3af", flexShrink: 0,
+          }}>
+            <span style={{ fontWeight: 600, color: "#e5e7eb", fontSize: 13 }}>{data.model3dData.label}</span>
+            <span>{data.model3dData.summary.totalRooms} rooms</span>
+            <span>{data.model3dData.summary.totalArea_sqm} m²</span>
+            <span>{data.model3dData.summary.totalWalls} walls</span>
+            <span style={{ marginLeft: "auto", display: "flex", gap: 8, alignItems: "center" }}>
+              <span style={{ color: COLORS.CYAN, fontWeight: 500 }}>
+                {data.model3dData.summary.buildingType} · {data.model3dData.summary.floorCount} floor{data.model3dData.summary.floorCount > 1 ? "s" : ""}
+              </span>
+              <button
+                onClick={() => {
+                  try {
+                    sessionStorage.setItem("floorPlanProject", JSON.stringify(data.model3dData?.kind === "floor-plan-interactive" ? data.model3dData.floorPlanProject : null));
+                    window.open("/dashboard/floor-plan?source=pipeline", "_blank");
+                  } catch { /* sessionStorage may fail */ }
+                }}
+                style={{
+                  background: COLORS.CYAN, color: "#000", border: "none",
+                  padding: "5px 14px", borderRadius: 6, fontSize: 11, fontWeight: 600,
+                  cursor: "pointer", display: "flex", alignItems: "center", gap: 4,
+                }}
+              >
+                Open Full Editor <ExternalLink size={11} />
+              </button>
+            </span>
+          </div>
+          {/* Interactive CAD editor */}
+          <div style={{ height: "calc(100vh - 280px)", minHeight: 550, background: "#0a0a0f" }}>
+            <FloorPlanViewer initialProject={data.model3dData.floorPlanProject} />
+          </div>
+        </motion.div>
+      )}
+
       {hero.type === "floor-plan" && data.svgContent && (
         <FloorPlanHero
           svgContent={data.svgContent}
@@ -1883,6 +1936,7 @@ const TAB_FOR_TYPE: Record<string, TabId> = {
 // Map hero type to its artifact type so we can skip it in supporting cards
 const HERO_ARTIFACT_TYPES: Record<HeroType, string[]> = {
   "floor-plan": ["svg"],
+  "floor-plan-interactive": ["json", "svg"],
   video: ["video"],
   "3d-model": ["3d", "html"],
   image: ["image"],

@@ -1,6 +1,7 @@
 "use client";
 
-import React from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { useFloorPlanStore } from "@/stores/floor-plan-store";
 import type { ViewMode } from "@/types/floor-plan-cad";
 import { ExportMenu } from "./ExportMenu";
@@ -27,6 +28,8 @@ export function Toolbar() {
   const rightPanelOpen = useFloorPlanStore((s) => s.rightPanelOpen);
   const undo = useFloorPlanStore((s) => s.undo);
   const redo = useFloorPlanStore((s) => s.redo);
+  const canUndo = useFloorPlanStore((s) => s.canUndo());
+  const canRedo = useFloorPlanStore((s) => s.canRedo());
   const exportMenuOpen = useFloorPlanStore((s) => s.exportMenuOpen);
   const setExportMenuOpen = useFloorPlanStore((s) => s.setExportMenuOpen);
   const furniturePanelOpen = useFloorPlanStore((s) => s.furniturePanelOpen);
@@ -39,6 +42,14 @@ export function Toolbar() {
   const toggleVastuOverlay = useFloorPlanStore((s) => s.toggleVastuOverlay);
   const projectModified = useFloorPlanStore((s) => s.projectModified);
   const saveToStorage = useFloorPlanStore((s) => s.saveToStorage);
+  const resetToWelcome = useFloorPlanStore((s) => s.resetToWelcome);
+  const router = useRouter();
+
+  const handleBack = useCallback(() => {
+    // Reset store state so the welcome screen shows when user returns
+    resetToWelcome();
+    router.push("/dashboard");
+  }, [resetToWelcome, router]);
 
   if (!project) return null;
 
@@ -50,7 +61,7 @@ export function Toolbar() {
     <div className="flex h-11 items-center border-b border-gray-200 bg-white px-3 gap-2 text-sm print:hidden">
       {/* Back button */}
       <button
-        onClick={() => window.history.back()}
+        onClick={handleBack}
         className="flex items-center gap-1 rounded px-2 py-1 text-gray-500 hover:bg-gray-100 hover:text-gray-700"
       >
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
@@ -87,6 +98,7 @@ export function Toolbar() {
           onClick={() => addFloor(`Floor ${floors.length + 1}`)}
           className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
           title="Add Floor"
+          aria-label="Add Floor"
         >
           <svg width="14" height="14" viewBox="0 0 14 14"><path d="M7 3V11M3 7H11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
         </button>
@@ -95,6 +107,7 @@ export function Toolbar() {
             onClick={() => copyFloor(activeFloorId, `${activeFloor?.name ?? "Floor"} (Copy)`)}
             className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
             title="Duplicate Floor"
+            aria-label="Duplicate Floor"
           >
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
               <rect x="4" y="4" width="8" height="8" rx="1" stroke="currentColor" strokeWidth="1.2"/>
@@ -153,8 +166,10 @@ export function Toolbar() {
       <div className="flex items-center gap-1">
         <button
           onClick={undo}
-          className="rounded p-1 text-gray-500 hover:bg-gray-100 hover:text-gray-700 disabled:opacity-30"
+          disabled={!canUndo}
+          className="rounded p-1 text-gray-500 hover:bg-gray-100 hover:text-gray-700 disabled:opacity-30 disabled:pointer-events-none"
           title="Undo (Ctrl+Z)"
+          aria-label="Undo"
         >
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
             <path d="M3 8H10C11.6569 8 13 9.34315 13 11V11C13 12.6569 11.6569 14 10 14H8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
@@ -163,8 +178,10 @@ export function Toolbar() {
         </button>
         <button
           onClick={redo}
-          className="rounded p-1 text-gray-500 hover:bg-gray-100 hover:text-gray-700 disabled:opacity-30"
+          disabled={!canRedo}
+          className="rounded p-1 text-gray-500 hover:bg-gray-100 hover:text-gray-700 disabled:opacity-30 disabled:pointer-events-none"
           title="Redo (Ctrl+Shift+Z)"
+          aria-label="Redo"
         >
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
             <path d="M13 8H6C4.34315 8 3 9.34315 3 11V11C3 12.6569 4.34315 14 6 14H8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
@@ -178,11 +195,11 @@ export function Toolbar() {
 
       {/* Zoom controls */}
       <div className="flex items-center gap-1">
-        <button onClick={zoomOut} className="rounded p-1 text-gray-500 hover:bg-gray-100" title="Zoom Out">
+        <button onClick={zoomOut} className="rounded p-1 text-gray-500 hover:bg-gray-100" title="Zoom Out" aria-label="Zoom Out">
           <svg width="14" height="14" viewBox="0 0 14 14"><path d="M3 7H11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
         </button>
         <span className="w-10 text-center text-xs font-mono text-gray-600">{zoomPercent}%</span>
-        <button onClick={zoomIn} className="rounded p-1 text-gray-500 hover:bg-gray-100" title="Zoom In">
+        <button onClick={zoomIn} className="rounded p-1 text-gray-500 hover:bg-gray-100" title="Zoom In" aria-label="Zoom In">
           <svg width="14" height="14" viewBox="0 0 14 14"><path d="M7 3V11M3 7H11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
         </button>
         <button onClick={fitToView} className="rounded px-2 py-1 text-xs text-gray-500 hover:bg-gray-100" title="Fit to View (F)">
@@ -252,6 +269,12 @@ export function Toolbar() {
         </svg>
         Furniture
       </button>
+
+      {/* Separator */}
+      <div className="h-5 w-px bg-gray-200" />
+
+      {/* AI Actions dropdown */}
+      <AIDropdown />
 
       {/* Separator */}
       <div className="h-5 w-px bg-gray-200" />
@@ -330,6 +353,7 @@ export function Toolbar() {
         onClick={toggleLeftPanel}
         className={`rounded p-1 ${leftPanelOpen ? "bg-gray-100 text-gray-700" : "text-gray-400 hover:bg-gray-50"}`}
         title="Toggle Tools Panel"
+        aria-label="Toggle Tools Panel"
       >
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
           <rect x="1" y="2" width="14" height="12" rx="1" stroke="currentColor" strokeWidth="1.2"/>
@@ -340,12 +364,99 @@ export function Toolbar() {
         onClick={toggleRightPanel}
         className={`rounded p-1 ${rightPanelOpen ? "bg-gray-100 text-gray-700" : "text-gray-400 hover:bg-gray-50"}`}
         title="Toggle Properties Panel"
+        aria-label="Toggle Properties Panel"
       >
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
           <rect x="1" y="2" width="14" height="12" rx="1" stroke="currentColor" strokeWidth="1.2"/>
           <line x1="11" y1="2" x2="11" y2="14" stroke="currentColor" strokeWidth="1.2"/>
         </svg>
       </button>
+    </div>
+  );
+}
+
+// ============================================================
+// AI ACTIONS DROPDOWN
+// ============================================================
+
+function AIDropdown() {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  const autoPlaceDoors = useFloorPlanStore((s) => s.autoPlaceDoors);
+  const autoPlaceWindows = useFloorPlanStore((s) => s.autoPlaceWindows);
+  const autoFurnishAll = useFloorPlanStore((s) => s.autoFurnishAll);
+  const lightOverlayVisible = useFloorPlanStore((s) => s.lightOverlayVisible);
+  const toggleLightOverlay = useFloorPlanStore((s) => s.toggleLightOverlay);
+
+  // Close on outside click
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        onClick={() => setOpen(!open)}
+        className={`flex items-center gap-1.5 rounded px-2.5 py-1 text-xs font-medium transition-colors ${
+          open
+            ? "bg-violet-600 text-white"
+            : "bg-violet-50 text-violet-700 hover:bg-violet-100"
+        }`}
+        title="AI-powered auto-placement and analysis"
+      >
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="inline-block">
+          <path d="M7 1L8.5 5H12.5L9.5 7.5L10.5 11.5L7 9L3.5 11.5L4.5 7.5L1.5 5H5.5L7 1Z" stroke="currentColor" strokeWidth="1.1" strokeLinejoin="round"/>
+        </svg>
+        AI
+        <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+          <path d="M3 4L5 6L7 4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+      </button>
+
+      {open && (
+        <div className="absolute top-full left-0 mt-1 w-56 rounded-md border border-gray-200 bg-white py-1 shadow-lg z-50">
+          <div className="px-3 py-1.5 text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Auto-Placement</div>
+          <button
+            onClick={() => { autoPlaceDoors(); setOpen(false); }}
+            className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-50"
+          >
+            <span className="w-4 text-center text-violet-500">D</span>
+            Auto-place Doors
+          </button>
+          <button
+            onClick={() => { autoPlaceWindows(); setOpen(false); }}
+            className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-50"
+          >
+            <span className="w-4 text-center text-violet-500">W</span>
+            Auto-place Windows
+          </button>
+          <button
+            onClick={() => { autoFurnishAll(); setOpen(false); }}
+            className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-50"
+          >
+            <span className="w-4 text-center text-violet-500">F</span>
+            Smart Furnish All Rooms
+          </button>
+          <div className="my-1 h-px bg-gray-100" />
+          <div className="px-3 py-1.5 text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Analysis Overlays</div>
+          <button
+            onClick={() => { toggleLightOverlay(); setOpen(false); }}
+            className="flex w-full items-center justify-between px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-50"
+          >
+            <span className="flex items-center gap-2">
+              <span className="w-4 text-center text-amber-500">L</span>
+              Natural Light Heatmap
+            </span>
+            {lightOverlayVisible && <span className="text-[10px] text-green-600 font-medium">ON</span>}
+          </button>
+        </div>
+      )}
     </div>
   );
 }

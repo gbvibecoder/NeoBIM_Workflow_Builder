@@ -9,6 +9,7 @@ import type {
   Door,
   CadWindow,
   FurnitureInstance,
+  Annotation,
   Column,
   Stair,
   EditorTool,
@@ -25,6 +26,15 @@ import type { FloorPlanGeometry } from "@/types/floor-plan";
 import { convertGeometryToProject } from "@/lib/floor-plan/pipeline-adapter";
 import { saveProject, loadProject } from "@/lib/floor-plan/project-persistence";
 import { createSample2BHK } from "@/lib/floor-plan/sample-data";
+
+// ============================================================
+// SAFE DEEP CLONE (structuredClone with JSON fallback)
+// ============================================================
+
+function deepClone<T>(obj: T): T {
+  if (typeof structuredClone === "function") return deepClone(obj);
+  return JSON.parse(JSON.stringify(obj));
+}
 
 // ============================================================
 // HISTORY (Undo/Redo)
@@ -123,7 +133,7 @@ interface FloorPlanState {
   showAdjacentFloor: boolean;
 
   // Right panel tab system
-  rightPanelTab: "properties" | "vastu" | "code" | "analytics" | "boq";
+  rightPanelTab: "properties" | "vastu" | "code" | "analytics" | "boq" | "program";
 
   // Vastu overlay
   vastuOverlayVisible: boolean;
@@ -140,6 +150,7 @@ interface FloorPlanState {
 
   // Project
   setProject: (project: FloorPlanProject) => void;
+  resetToWelcome: () => void;
   setActiveFloor: (floorId: string) => void;
   getActiveFloor: () => Floor | null;
 
@@ -204,6 +215,23 @@ interface FloorPlanState {
   addWindow: (window: CadWindow) => void;
   removeWindow: (windowId: string) => void;
 
+  // Generic entity updates (for properties panel two-way binding)
+  updateDoor: (doorId: string, updates: Partial<Door>) => void;
+  updateWindowEntity: (windowId: string, updates: Partial<CadWindow>) => void;
+  updateFurnitureProps: (id: string, updates: Partial<FurnitureInstance>) => void;
+
+  // Clipboard
+  _clipboard: { walls: Wall[]; doors: Door[]; windows: CadWindow[]; furniture: FurnitureInstance[]; annotations: Annotation[] } | null;
+  copySelected: () => void;
+  pasteAtCursor: () => void;
+  duplicateSelected: () => void;
+  cutSelected: () => void;
+
+  // Annotations
+  addAnnotation: (text: string, position: Point, leaderTarget?: Point) => void;
+  removeAnnotation: (id: string) => void;
+  updateAnnotation: (id: string, updates: Partial<Annotation>) => void;
+
   // Editing actions
   deleteSelectedEntities: () => void;
   flipSelectedDoor: () => void;
@@ -241,10 +269,21 @@ interface FloorPlanState {
   toggleFurniturePanel: () => void;
 
   // Right panel tabs
-  setRightPanelTab: (tab: "properties" | "vastu" | "code" | "analytics" | "boq") => void;
+  setRightPanelTab: (tab: "properties" | "vastu" | "code" | "analytics" | "boq" | "program") => void;
 
   // Vastu overlay
   toggleVastuOverlay: () => void;
+  lightOverlayVisible: boolean;
+  toggleLightOverlay: () => void;
+  codeOverlayVisible: boolean;
+  toggleCodeOverlay: () => void;
+
+  // AI actions (Sprint 4)
+  autoPlaceDoors: () => Promise<void> | void;
+  autoPlaceWindows: () => Promise<void> | void;
+  autoFurnishRoom: (roomId: string) => Promise<void> | void;
+  autoFurnishAll: () => Promise<void> | void;
+  applySwapSuggestion: (roomAId: string, roomBId: string) => void;
 
   // Data source & generation
   loadFromGeometry: (geometry: FloorPlanGeometry, name?: string, prompt?: string) => void;
@@ -307,12 +346,15 @@ export const useFloorPlanStore = create<FloorPlanState>()((set, get) => ({
   showAdjacentFloor: false,
   rightPanelTab: "properties",
   vastuOverlayVisible: false,
+  lightOverlayVisible: false,
+  codeOverlayVisible: false,
   dataSource: null,
   isGenerating: false,
   generationStep: "",
   generationProgress: 0,
   originalPrompt: null,
   projectModified: false,
+  _clipboard: null,
 
   // ---- Project ----
   setProject: (project) => set({
@@ -320,6 +362,22 @@ export const useFloorPlanStore = create<FloorPlanState>()((set, get) => ({
     activeFloorId: project.floors[0]?.id ?? null,
     layers: [...DEFAULT_LAYERS],
     projectModified: true,
+  }),
+
+  resetToWelcome: () => set({
+    project: null,
+    activeFloorId: null,
+    dataSource: null,
+    originalPrompt: null,
+    isGenerating: false,
+    generationStep: "",
+    generationProgress: 0,
+    projectModified: false,
+    selectedIds: [],
+    hoveredId: null,
+    _history: [],
+    _historyIndex: -1,
+    activeTool: "select",
   }),
 
   setActiveFloor: (floorId) => set({ activeFloorId: floorId }),
@@ -561,6 +619,15 @@ export const useFloorPlanStore = create<FloorPlanState>()((set, get) => ({
                 windows: f.windows.filter((w) => !allRemoveIds.has(w.id)),
                 furniture: f.furniture.filter((fi) => !ids.has(fi.id)),
                 columns: f.columns.filter((c) => !ids.has(c.id)),
+                annotations: f.annotations.filter((a) => !ids.has(a.id)),
+                // Clean orphaned wall references from rooms
+                rooms: wallIdsToRemove.length > 0
+                  ? f.rooms.map((r) =>
+                      r.wall_ids.some((wid) => allRemoveIds.has(wid))
+                        ? { ...r, wall_ids: r.wall_ids.filter((wid) => !allRemoveIds.has(wid)) }
+                        : r
+                    )
+                  : f.rooms,
               }
             : f
         ),
@@ -581,7 +648,6 @@ export const useFloorPlanStore = create<FloorPlanState>()((set, get) => ({
     if (!door) return;
 
     s.pushHistory();
-    s.updateWall; // ensure we use the store pattern
     set((state) => {
       if (!state.project || !state.activeFloorId) return state;
       return {
@@ -627,7 +693,8 @@ export const useFloorPlanStore = create<FloorPlanState>()((set, get) => ({
     };
 
     s.addWall(wall);
-    set({ selectedIds: [wall.id], wallDrawStart: null });
+    // Continuous wall drawing: start next wall from this wall's end point
+    set({ selectedIds: [wall.id], wallDrawStart: { ...end } });
   },
 
   addNewDoor: (wallId, position_mm) => {
@@ -647,14 +714,15 @@ export const useFloorPlanStore = create<FloorPlanState>()((set, get) => ({
     if (maxPos < minPos) return; // Wall too short
     const clampedPos = Math.max(minPos, Math.min(position_mm - doorWidth / 2, maxPos));
 
-    // Check overlap with existing doors/windows on this wall
+    // Check overlap with existing doors/windows on this wall (min 50mm gap required)
+    const MIN_GAP = 50;
     for (const d of floor.doors) {
       if (d.wall_id !== wallId) continue;
-      if (clampedPos < d.position_along_wall_mm + d.width_mm && clampedPos + doorWidth > d.position_along_wall_mm) return;
+      if (clampedPos < d.position_along_wall_mm + d.width_mm + MIN_GAP && clampedPos + doorWidth + MIN_GAP > d.position_along_wall_mm) return;
     }
     for (const w of floor.windows) {
       if (w.wall_id !== wallId) continue;
-      if (clampedPos < w.position_along_wall_mm + w.width_mm && clampedPos + doorWidth > w.position_along_wall_mm) return;
+      if (clampedPos < w.position_along_wall_mm + w.width_mm + MIN_GAP && clampedPos + doorWidth + MIN_GAP > w.position_along_wall_mm) return;
     }
 
     s.pushHistory();
@@ -855,6 +923,216 @@ export const useFloorPlanStore = create<FloorPlanState>()((set, get) => ({
     });
   },
 
+  // ---- Generic entity updates ----
+  updateDoor: (doorId, updates) => set((s) => {
+    if (!s.project || !s.activeFloorId) return s;
+    return {
+      project: {
+        ...s.project,
+        floors: s.project.floors.map((f) =>
+          f.id === s.activeFloorId
+            ? { ...f, doors: f.doors.map((d) => d.id === doorId ? { ...d, ...updates } : d) }
+            : f
+        ),
+      },
+    };
+  }),
+
+  updateWindowEntity: (windowId, updates) => set((s) => {
+    if (!s.project || !s.activeFloorId) return s;
+    return {
+      project: {
+        ...s.project,
+        floors: s.project.floors.map((f) =>
+          f.id === s.activeFloorId
+            ? { ...f, windows: f.windows.map((w) => w.id === windowId ? { ...w, ...updates } : w) }
+            : f
+        ),
+      },
+    };
+  }),
+
+  updateFurnitureProps: (id, updates) => set((s) => {
+    if (!s.project || !s.activeFloorId) return s;
+    return {
+      project: {
+        ...s.project,
+        floors: s.project.floors.map((f) =>
+          f.id === s.activeFloorId
+            ? { ...f, furniture: f.furniture.map((fi) => fi.id === id ? { ...fi, ...updates } : fi) }
+            : f
+        ),
+      },
+    };
+  }),
+
+  // ---- Clipboard ----
+  copySelected: () => {
+    const s = get();
+    const floor = s.getActiveFloor();
+    if (!floor || s.selectedIds.length === 0) return;
+    const ids = new Set(s.selectedIds);
+
+    const walls = floor.walls.filter((w) => ids.has(w.id));
+    const wallIdSet = new Set(walls.map((w) => w.id));
+    // Also grab doors/windows on copied walls
+    const doors = floor.doors.filter((d) => ids.has(d.id) || wallIdSet.has(d.wall_id));
+    const windows = floor.windows.filter((w) => ids.has(w.id) || wallIdSet.has(w.wall_id));
+    const furniture = floor.furniture.filter((f) => ids.has(f.id));
+    const annotations = floor.annotations.filter((a) => ids.has(a.id));
+
+    set({ _clipboard: deepClone({ walls, doors, windows, furniture, annotations }) });
+  },
+
+  pasteAtCursor: () => {
+    const s = get();
+    if (!s._clipboard || !s.project || !s.activeFloorId) return;
+    const floor = s.getActiveFloor();
+    if (!floor) return;
+
+    s.pushHistory();
+
+    const clip = s._clipboard;
+    const OFFSET = 200; // mm offset from original
+    const wallIdMap = new Map<string, string>();
+    const newIds: string[] = [];
+
+    // Paste walls with offset
+    const newWalls: Wall[] = [];
+    for (const w of clip.walls) {
+      const newId = genId("w");
+      wallIdMap.set(w.id, newId);
+      newWalls.push({
+        ...w,
+        id: newId,
+        centerline: {
+          start: { x: w.centerline.start.x + OFFSET, y: w.centerline.start.y + OFFSET },
+          end: { x: w.centerline.end.x + OFFSET, y: w.centerline.end.y + OFFSET },
+        },
+      });
+      newIds.push(newId);
+    }
+
+    // Paste doors with remapped wall_id
+    const newDoors: Door[] = [];
+    for (const d of clip.doors) {
+      const newId = genId("d");
+      newDoors.push({ ...d, id: newId, wall_id: wallIdMap.get(d.wall_id) ?? d.wall_id });
+      newIds.push(newId);
+    }
+
+    // Paste windows with remapped wall_id
+    const newWindows: CadWindow[] = [];
+    for (const w of clip.windows) {
+      const newId = genId("win");
+      newWindows.push({ ...w, id: newId, wall_id: wallIdMap.get(w.wall_id) ?? w.wall_id });
+      newIds.push(newId);
+    }
+
+    // Paste furniture with offset
+    const newFurniture: FurnitureInstance[] = [];
+    for (const f of clip.furniture) {
+      const newId = genId("furn");
+      newFurniture.push({
+        ...f,
+        id: newId,
+        position: { x: f.position.x + OFFSET, y: f.position.y + OFFSET },
+      });
+      newIds.push(newId);
+    }
+
+    // Paste annotations with offset
+    const newAnnotations: Annotation[] = [];
+    for (const a of clip.annotations) {
+      const newId = genId("ann");
+      newAnnotations.push({
+        ...a,
+        id: newId,
+        position: { x: a.position.x + OFFSET, y: a.position.y + OFFSET },
+      });
+    }
+
+    set({
+      project: {
+        ...s.project,
+        floors: s.project.floors.map((f) =>
+          f.id === s.activeFloorId
+            ? {
+                ...f,
+                walls: [...f.walls, ...newWalls],
+                doors: [...f.doors, ...newDoors],
+                windows: [...f.windows, ...newWindows],
+                furniture: [...f.furniture, ...newFurniture],
+                annotations: [...f.annotations, ...newAnnotations],
+              }
+            : f
+        ),
+      },
+      selectedIds: newIds,
+    });
+  },
+
+  duplicateSelected: () => {
+    get().copySelected();
+    get().pasteAtCursor();
+  },
+
+  cutSelected: () => {
+    get().copySelected();
+    get().deleteSelectedEntities();
+  },
+
+  // ---- Annotations ----
+  addAnnotation: (text, position, leaderTarget) => {
+    const s = get();
+    if (!s.project || !s.activeFloorId) return;
+    s.pushHistory();
+    const ann: Annotation = {
+      id: genId("ann"),
+      type: leaderTarget ? "leader" : "text",
+      position: { ...position },
+      text,
+      font_size_mm: 150,
+      rotation_deg: 0,
+      leader_line: leaderTarget ? [{ ...leaderTarget }, { ...position }] : undefined,
+    };
+    set({
+      project: {
+        ...s.project,
+        floors: s.project.floors.map((f) =>
+          f.id === s.activeFloorId ? { ...f, annotations: [...f.annotations, ann] } : f
+        ),
+      },
+      selectedIds: [ann.id],
+    });
+  },
+
+  removeAnnotation: (id) => set((s) => {
+    if (!s.project || !s.activeFloorId) return s;
+    return {
+      project: {
+        ...s.project,
+        floors: s.project.floors.map((f) =>
+          f.id === s.activeFloorId ? { ...f, annotations: f.annotations.filter((a) => a.id !== id) } : f
+        ),
+      },
+    };
+  }),
+
+  updateAnnotation: (id, updates) => set((s) => {
+    if (!s.project || !s.activeFloorId) return s;
+    return {
+      project: {
+        ...s.project,
+        floors: s.project.floors.map((f) =>
+          f.id === s.activeFloorId
+            ? { ...f, annotations: f.annotations.map((a) => a.id === id ? { ...a, ...updates } : a) }
+            : f
+        ),
+      },
+    };
+  }),
+
   // ---- Furniture ----
   addFurniture: (data) => {
     const s = get();
@@ -970,7 +1248,7 @@ export const useFloorPlanStore = create<FloorPlanState>()((set, get) => ({
     const srcFloor = s.project.floors.find((f) => f.id === floorId);
     if (!srcFloor) return;
     const maxLevel = Math.max(0, ...s.project.floors.map((f) => f.level));
-    const copy: Floor = JSON.parse(JSON.stringify(srcFloor));
+    const copy: Floor = deepClone(srcFloor);
     copy.id = genId("floor");
     copy.name = newName;
     copy.level = maxLevel + 1;
@@ -981,11 +1259,15 @@ export const useFloorPlanStore = create<FloorPlanState>()((set, get) => ({
       const nid = genId("r"); idMap.set(r.id, nid); r.id = nid;
       r.wall_ids = r.wall_ids.map((wid) => idMap.get(wid) ?? wid);
     });
-    copy.doors.forEach((d) => { d.id = genId("d"); d.wall_id = idMap.get(d.wall_id) ?? d.wall_id; });
+    copy.doors.forEach((d) => {
+      d.id = genId("d");
+      d.wall_id = idMap.get(d.wall_id) ?? d.wall_id;
+      d.connects_rooms = d.connects_rooms.map((rid) => idMap.get(rid) ?? rid) as [string, string];
+    });
     copy.windows.forEach((w) => { w.id = genId("win"); w.wall_id = idMap.get(w.wall_id) ?? w.wall_id; });
     copy.stairs.forEach((st) => { st.id = genId("stair"); });
     copy.columns.forEach((c) => { c.id = genId("col"); });
-    copy.furniture.forEach((fi) => { fi.id = genId("furn"); });
+    copy.furniture.forEach((fi) => { fi.id = genId("furn"); fi.room_id = idMap.get(fi.room_id) ?? fi.room_id; });
     set({
       project: { ...s.project, floors: [...s.project.floors, copy] },
       activeFloorId: copy.id,
@@ -1010,7 +1292,7 @@ export const useFloorPlanStore = create<FloorPlanState>()((set, get) => ({
     if (!floor) return;
     set((s) => {
       const newHistory = s._history.slice(0, s._historyIndex + 1);
-      newHistory.push({ floor: JSON.parse(JSON.stringify(floor)), timestamp: Date.now() });
+      newHistory.push({ floor: deepClone(floor), timestamp: Date.now() });
       if (newHistory.length > MAX_HISTORY) newHistory.shift();
       return { _history: newHistory, _historyIndex: newHistory.length - 1 };
     });
@@ -1020,6 +1302,7 @@ export const useFloorPlanStore = create<FloorPlanState>()((set, get) => ({
     const s = get();
     if (s._historyIndex <= 0 || !s.project || !s.activeFloorId) return;
     const prev = s._history[s._historyIndex - 1];
+    if (!prev) return; // Bounds safety
     set({
       _historyIndex: s._historyIndex - 1,
       project: {
@@ -1035,6 +1318,7 @@ export const useFloorPlanStore = create<FloorPlanState>()((set, get) => ({
     const s = get();
     if (s._historyIndex >= s._history.length - 1 || !s.project || !s.activeFloorId) return;
     const next = s._history[s._historyIndex + 1];
+    if (!next) return; // Bounds safety
     set({
       _historyIndex: s._historyIndex + 1,
       project: {
@@ -1059,6 +1343,167 @@ export const useFloorPlanStore = create<FloorPlanState>()((set, get) => ({
 
   // ---- Vastu overlay ----
   toggleVastuOverlay: () => set((s) => ({ vastuOverlayVisible: !s.vastuOverlayVisible })),
+  toggleLightOverlay: () => set((s) => ({ lightOverlayVisible: !s.lightOverlayVisible })),
+  toggleCodeOverlay: () => set((s) => ({ codeOverlayVisible: !s.codeOverlayVisible })),
+
+  // ---- AI Actions (Sprint 4) ----
+  autoPlaceDoors: async () => {
+    const s = get();
+    const floor = s.getActiveFloor();
+    if (!floor || !s.project || !s.activeFloorId) return;
+
+    s.pushHistory();
+
+    try {
+      const { smartPlaceDoors } = await import("@/lib/floor-plan/smart-placement");
+      const result = smartPlaceDoors(floor);
+
+      set({
+        project: {
+          ...s.project,
+          floors: s.project.floors.map((f) =>
+            f.id === s.activeFloorId ? { ...f, doors: result.doors } : f
+          ),
+        },
+        projectModified: true,
+      });
+    } catch (e) {
+      console.error("Failed to load smart-placement module:", e);
+    }
+  },
+
+  autoPlaceWindows: async () => {
+    const s = get();
+    const floor = s.getActiveFloor();
+    if (!floor || !s.project || !s.activeFloorId) return;
+
+    s.pushHistory();
+
+    try {
+      const { smartPlaceWindows } = await import("@/lib/floor-plan/smart-placement");
+      const result = smartPlaceWindows(floor);
+
+      set({
+        project: {
+          ...s.project,
+          floors: s.project.floors.map((f) =>
+            f.id === s.activeFloorId ? { ...f, windows: result.windows } : f
+          ),
+        },
+        projectModified: true,
+      });
+    } catch (e) {
+      console.error("Failed to load smart-placement module:", e);
+    }
+  },
+
+  autoFurnishRoom: async (roomId) => {
+    const s = get();
+    const floor = s.getActiveFloor();
+    if (!floor || !s.project || !s.activeFloorId) return;
+
+    s.pushHistory();
+
+    try {
+      const { layoutRoomFurniture } = await import("@/lib/floor-plan/furniture-layout");
+      const room = floor.rooms.find((r) => r.id === roomId);
+      if (!room) return;
+
+      const result = layoutRoomFurniture(room, floor);
+      // Remove existing furniture in this room, add new
+      const otherFurniture = floor.furniture.filter((f) => f.room_id !== roomId);
+
+      set({
+        project: {
+          ...s.project,
+          floors: s.project.floors.map((f) =>
+            f.id === s.activeFloorId
+              ? { ...f, furniture: [...otherFurniture, ...result.furniture] }
+              : f
+          ),
+        },
+        projectModified: true,
+      });
+    } catch (e) {
+      console.error("Failed to load furniture-layout module:", e);
+    }
+  },
+
+  autoFurnishAll: async () => {
+    const s = get();
+    const floor = s.getActiveFloor();
+    if (!floor || !s.project || !s.activeFloorId) return;
+
+    s.pushHistory();
+
+    try {
+      const { layoutAllFurniture } = await import("@/lib/floor-plan/furniture-layout");
+      const result = layoutAllFurniture(floor);
+
+      set({
+        project: {
+          ...s.project,
+          floors: s.project.floors.map((f) =>
+            f.id === s.activeFloorId ? { ...f, furniture: result.furniture } : f
+          ),
+        },
+        projectModified: true,
+      });
+    } catch (e) {
+      console.error("Failed to load furniture-layout module:", e);
+    }
+  },
+
+  applySwapSuggestion: (roomAId, roomBId) => {
+    const s = get();
+    const floor = s.getActiveFloor();
+    if (!floor || !s.project || !s.activeFloorId) return;
+
+    s.pushHistory();
+
+    const roomA = floor.rooms.find((r) => r.id === roomAId);
+    const roomB = floor.rooms.find((r) => r.id === roomBId);
+    if (!roomA || !roomB) return;
+
+    // Swap room names, types, and vastu metadata — keep boundaries/positions
+    const updatedRooms = floor.rooms.map((r) => {
+      if (r.id === roomAId) {
+        return {
+          ...r,
+          name: roomB.name,
+          type: roomB.type,
+          vastu_direction: roomB.vastu_direction,
+          vastu_compliant: roomB.vastu_compliant,
+          vastu_notes: roomB.vastu_notes,
+          natural_light_required: roomB.natural_light_required,
+          ventilation_required: roomB.ventilation_required,
+        };
+      }
+      if (r.id === roomBId) {
+        return {
+          ...r,
+          name: roomA.name,
+          type: roomA.type,
+          vastu_direction: roomA.vastu_direction,
+          vastu_compliant: roomA.vastu_compliant,
+          vastu_notes: roomA.vastu_notes,
+          natural_light_required: roomA.natural_light_required,
+          ventilation_required: roomA.ventilation_required,
+        };
+      }
+      return r;
+    });
+
+    set({
+      project: {
+        ...s.project,
+        floors: s.project.floors.map((f) =>
+          f.id === s.activeFloorId ? { ...f, rooms: updatedRooms } : f
+        ),
+      },
+      projectModified: true,
+    });
+  },
 
   // ---- Data source & generation ----
   loadFromGeometry: (geometry, name, prompt) => {

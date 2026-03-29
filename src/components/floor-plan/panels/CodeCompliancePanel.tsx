@@ -9,6 +9,8 @@ export function CodeCompliancePanel() {
   const floor = useFloorPlanStore((s) => s.getActiveFloor());
   const projectType = useFloorPlanStore((s) => s.project?.metadata.project_type ?? "residential");
   const setSelectedIds = useFloorPlanStore((s) => s.setSelectedIds);
+  const codeOverlayVisible = useFloorPlanStore((s) => s.codeOverlayVisible);
+  const toggleCodeOverlay = useFloorPlanStore((s) => s.toggleCodeOverlay);
 
   const report = useMemo<CodeReport | null>(() => {
     if (!floor) return null;
@@ -23,6 +25,10 @@ export function CodeCompliancePanel() {
     );
   }
 
+  const compliancePercent = report.total_checks > 0
+    ? Math.round((report.passes / report.total_checks) * 100)
+    : 100;
+
   const handleClick = (v: CodeViolation) => {
     if (v.entity_id) setSelectedIds([v.entity_id]);
   };
@@ -32,20 +38,37 @@ export function CodeCompliancePanel() {
 
   return (
     <div className="flex flex-col text-xs">
-      {/* Summary Header */}
+      {/* Summary Header with Compliance Ring */}
       <div className="p-4 border-b border-gray-200">
-        <h3 className="text-sm font-semibold text-gray-800 mb-3">NBC 2016 Compliance</h3>
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-sm font-semibold text-gray-800">NBC 2016 Compliance</h3>
+          <button
+            onClick={toggleCodeOverlay}
+            className={`px-2 py-0.5 rounded text-[10px] font-medium ${
+              codeOverlayVisible
+                ? "bg-red-100 text-red-700"
+                : "bg-gray-100 text-gray-500"
+            }`}
+          >
+            {codeOverlayVisible ? "Hide Violations" : "Show Violations"}
+          </button>
+        </div>
 
-        {/* Stats bar */}
-        <div className="flex items-center gap-3 mb-3">
-          <Stat label="Checks" value={report.total_checks} color="#64748b" />
-          <Stat label="Pass" value={report.passes} color="#22c55e" />
-          <Stat label="Errors" value={report.errors} color="#ef4444" />
-          <Stat label="Warnings" value={report.warnings} color="#eab308" />
+        {/* Score ring + stats */}
+        <div className="flex items-center gap-4">
+          <ComplianceRing percent={compliancePercent} />
+          <div className="flex-1">
+            <div className="flex items-center gap-3 flex-wrap">
+              <Stat label="Checks" value={report.total_checks} color="#64748b" />
+              <Stat label="Pass" value={report.passes} color="#22c55e" />
+              <Stat label="Errors" value={report.errors} color="#ef4444" />
+              <Stat label="Warnings" value={report.warnings} color="#eab308" />
+            </div>
+          </div>
         </div>
 
         {/* Progress bar */}
-        <div className="h-2 rounded-full bg-gray-100 overflow-hidden flex">
+        <div className="h-2 rounded-full bg-gray-100 overflow-hidden flex mt-3">
           {report.total_checks > 0 && (
             <>
               <div
@@ -92,6 +115,33 @@ export function CodeCompliancePanel() {
 // ============================================================
 // SUB-COMPONENTS
 // ============================================================
+
+function ComplianceRing({ percent }: { percent: number }) {
+  const circumference = 2 * Math.PI * 28;
+  const offset = circumference - (percent / 100) * circumference;
+  const color = percent >= 90 ? "#22c55e" : percent >= 70 ? "#eab308" : "#ef4444";
+
+  return (
+    <div className="relative w-16 h-16 shrink-0">
+      <svg viewBox="0 0 64 64" className="w-full h-full -rotate-90">
+        <circle cx="32" cy="32" r="28" fill="none" stroke="#f1f5f9" strokeWidth="4" />
+        <circle
+          cx="32" cy="32" r="28"
+          fill="none"
+          stroke={color}
+          strokeWidth="4"
+          strokeDasharray={circumference}
+          strokeDashoffset={offset}
+          strokeLinecap="round"
+        />
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center">
+        <span className="text-lg font-bold" style={{ color }}>{percent}%</span>
+        <span className="text-[8px] font-semibold text-gray-400 uppercase">Compliant</span>
+      </div>
+    </div>
+  );
+}
 
 function Stat({ label, value, color }: { label: string; value: number; color: string }) {
   return (

@@ -1002,6 +1002,121 @@ export const PREBUILT_WORKFLOWS: WorkflowTemplate[] = [
       ],
     },
   },
+  {
+    id: "wf-13",
+    name: "Text → Floor Plan Editor → BOQ",
+    description:
+      "Full design-to-cost pipeline: enter a text prompt → generate a design brief → create floor plan geometry → edit interactively in the 2D CAD editor → compute BOQ quantities and cost estimates. The editor node pauses for your edits before calculating final quantities.",
+    tags: ["floor-plan", "cad", "editor", "boq", "cost", "interactive", "ai", "end-to-end"],
+    category: "Concept Design",
+    complexity: "intermediate",
+    estimatedRunTime: "~45s + interactive editing",
+    requiredInputs: ["Text description of building program"],
+    expectedOutputs: [
+      "Interactive 2D floor plan (editable)",
+      "Room schedule with areas and Vastu compliance",
+      "BOQ quantities (walls, doors, windows, flooring, plastering)",
+      "SVG drawing export",
+      "IFC-ready geometry",
+    ],
+    thumbnail: "https://picsum.photos/seed/wf13/600/400",
+    tileGraph: {
+      nodes: [
+        {
+          id: "n1",
+          type: "workflowNode",
+          position: { x: X1, y: Y },
+          data: {
+            catalogueId: "IN-001",
+            label: "Text Prompt",
+            category: "input",
+            status: "idle",
+            inputs: [],
+            outputs: [{ id: "text-out", label: "Text", type: "text" }],
+            icon: "Type",
+          },
+        },
+        {
+          id: "n2",
+          type: "workflowNode",
+          position: { x: X2, y: Y },
+          data: {
+            catalogueId: "TR-003",
+            label: "Design Brief Analyzer",
+            category: "transform",
+            status: "idle",
+            inputs: [{ id: "json-in", label: "Requirements", type: "json" }],
+            outputs: [
+              { id: "text-out", label: "Description", type: "text" },
+              { id: "prog-out", label: "Program Blocks", type: "json" },
+            ],
+            icon: "Building2",
+          },
+        },
+        {
+          id: "n3",
+          type: "workflowNode",
+          position: { x: X3, y: Y },
+          data: {
+            catalogueId: "GN-004",
+            label: "Floor Plan Generator",
+            category: "generate",
+            status: "idle",
+            inputs: [{ id: "prog-in", label: "Room Program", type: "json" }],
+            outputs: [
+              { id: "plan-out", label: "Floor Plan", type: "geometry" },
+              { id: "img-out", label: "Plan Image", type: "image" },
+            ],
+            icon: "LayoutGrid",
+          },
+        },
+        {
+          id: "n4",
+          type: "workflowNode",
+          position: { x: X4, y: Y },
+          data: {
+            catalogueId: "GN-012",
+            label: "Floor Plan Editor",
+            category: "generate",
+            status: "idle",
+            inputs: [
+              { id: "json-in", label: "Floor Plan Geometry", type: "json" },
+              { id: "brief-in", label: "Design Brief", type: "text" },
+            ],
+            outputs: [
+              { id: "project-out", label: "Floor Plan Project", type: "json" },
+              { id: "geo-out", label: "IFC Geometry", type: "geometry" },
+              { id: "schedule-out", label: "Room Schedule", type: "json" },
+              { id: "boq-out", label: "BOQ Quantities", type: "json" },
+              { id: "svg-out", label: "SVG Drawing", type: "image" },
+            ],
+            icon: "PenTool",
+          },
+        },
+        {
+          id: "n5",
+          type: "workflowNode",
+          position: { x: X5, y: Y },
+          data: {
+            catalogueId: "EX-002",
+            label: "BOQ Exporter",
+            category: "export",
+            status: "idle",
+            inputs: [{ id: "boq-in", label: "BOQ Data", type: "json" }],
+            outputs: [{ id: "xlsx-out", label: "XLSX + CSV", type: "csv" }],
+            icon: "Table",
+          },
+        },
+      ],
+      edges: [
+        { id: "e1-2", source: "n1", sourceHandle: "text-out", target: "n2", targetHandle: "json-in", type: "animatedEdge" },
+        { id: "e2-3", source: "n2", sourceHandle: "prog-out", target: "n3", targetHandle: "prog-in", type: "animatedEdge" },
+        { id: "e3-4", source: "n3", sourceHandle: "plan-out", target: "n4", targetHandle: "json-in", type: "animatedEdge" },
+        { id: "e2-4b", source: "n2", sourceHandle: "text-out", target: "n4", targetHandle: "brief-in", type: "animatedEdge" },
+        { id: "e4-5", source: "n4", sourceHandle: "boq-out", target: "n5", targetHandle: "boq-in", type: "animatedEdge" },
+      ],
+    },
+  },
 ];
 
 export const PREBUILT_WORKFLOWS_MAP = new Map(

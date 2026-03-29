@@ -419,14 +419,23 @@ export function furnitureBBox(instance: FurnitureInstance): { min: Point; max: P
   if (!catalog) return null;
   const w = catalog.width_mm * instance.scale;
   const d = catalog.depth_mm * instance.scale;
-  // For simplicity, use axis-aligned bounding box around position
-  const halfDiag = Math.sqrt(w * w + d * d) / 2;
-  const cx = instance.position.x + w / 2;
-  const cy = instance.position.y + d / 2;
-  return {
-    min: { x: cx - halfDiag, y: cy - halfDiag },
-    max: { x: cx + halfDiag, y: cy + halfDiag },
-  };
+  const ox = instance.position.x;
+  const oy = instance.position.y;
+  const rad = (instance.rotation_deg * Math.PI) / 180;
+  const cos = Math.cos(rad);
+  const sin = Math.sin(rad);
+  // Compute all 4 rotated corners and find AABB
+  const localCorners: [number, number][] = [[0, 0], [w, 0], [w, d], [0, d]];
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const [lx, ly] of localCorners) {
+    const rx = ox + lx * cos - ly * sin;
+    const ry = oy + lx * sin + ly * cos;
+    if (rx < minX) minX = rx;
+    if (ry < minY) minY = ry;
+    if (rx > maxX) maxX = rx;
+    if (ry > maxY) maxY = ry;
+  }
+  return { min: { x: minX, y: minY }, max: { x: maxX, y: maxY } };
 }
 
 // ============================================================

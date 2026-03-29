@@ -529,6 +529,29 @@ export const NODE_CATALOGUE: NodeCatalogueItem[] = [
     executionTime: "< 5s",
   },
 
+  {
+    id: "GN-012",
+    name: "Floor Plan Editor",
+    description:
+      "Interactive 2D CAD editor for floor plans — edit walls, doors, windows, rooms, furniture, dimensions, and annotations. Connects upstream geometry (from TR-004 or GN-004) to downstream BOQ, IFC, and report nodes. Supports Vastu analysis, building code compliance, and real-time cost estimation.",
+    category: "generate",
+    icon: "PenTool",
+    inputs: [
+      { id: "json-in", label: "Floor Plan Geometry", type: "json" },
+      { id: "brief-in", label: "Design Brief", type: "text" },
+    ],
+    outputs: [
+      { id: "project-out", label: "Floor Plan Project", type: "json" },
+      { id: "geo-out", label: "IFC Geometry", type: "geometry" },
+      { id: "schedule-out", label: "Room Schedule", type: "json" },
+      { id: "boq-out", label: "BOQ Quantities", type: "json" },
+      { id: "svg-out", label: "SVG Drawing", type: "image" },
+    ],
+    apiEngine: "Built-in CAD (client-side, no AI)",
+    tags: ["floor-plan", "cad", "editor", "2d", "interactive", "boq", "vastu", "ifc", "walls", "rooms"],
+    executionTime: "Interactive",
+  },
+
   // ============================================================
   // EXPORT / OUTPUT NODES (Amber)
   // ============================================================

@@ -150,8 +150,9 @@ export function getRoomDirection(
   if (room.vastu_direction) return room.vastu_direction;
 
   const bounds = floorBounds(floor.walls, floor.rooms);
-  const cellW = bounds.width / 3;
-  const cellH = bounds.height / 3;
+  const cellW = bounds.width > 0 ? bounds.width / 3 : 1000;
+  const cellH = bounds.height > 0 ? bounds.height / 3 : 1000;
+  if (cellW < 1 || cellH < 1) return "CENTER";
   const centroid = polygonCentroid(room.boundary.points);
 
   return getDirectionForPoint(centroid, bounds, cellW, cellH);

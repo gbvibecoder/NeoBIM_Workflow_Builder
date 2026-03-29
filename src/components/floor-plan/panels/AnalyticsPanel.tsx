@@ -4,6 +4,7 @@ import React, { useMemo } from "react";
 import { useFloorPlanStore } from "@/stores/floor-plan-store";
 import { polygonBounds, wallLength, polygonArea } from "@/lib/floor-plan/geometry";
 import type { Floor, Room, Wall } from "@/types/floor-plan-cad";
+import { analyzeNaturalLight, type LightAnalysisResult, type LightGrade } from "@/lib/floor-plan/light-analysis";
 
 // ============================================================
 // TYPES
@@ -75,6 +76,9 @@ interface WallMetrics {
 
 export function AnalyticsPanel() {
   const floor = useFloorPlanStore((s) => s.getActiveFloor());
+  const northAngle = useFloorPlanStore((s) => s.project?.settings.north_angle_deg ?? 0);
+  const lightOverlayVisible = useFloorPlanStore((s) => s.lightOverlayVisible);
+  const toggleLightOverlay = useFloorPlanStore((s) => s.toggleLightOverlay);
 
   const metrics = useMemo(() => {
     if (!floor) return null;
@@ -84,8 +88,9 @@ export function AnalyticsPanel() {
       circulation: computeCirculationMetrics(floor),
       openings: computeOpeningMetrics(floor),
       walls: computeWallMetrics(floor),
+      light: analyzeNaturalLight(floor, northAngle),
     };
-  }, [floor]);
+  }, [floor, northAngle]);
 
   if (!metrics) {
     return <div className="p-4 text-sm text-gray-400">No floor plan loaded.</div>;
@@ -94,6 +99,7 @@ export function AnalyticsPanel() {
   return (
     <div className="flex flex-col text-xs overflow-y-auto max-h-[calc(100vh-200px)]">
       <AreaSection data={metrics.area} />
+      <LightSection data={metrics.light} overlayVisible={lightOverlayVisible} onToggle={toggleLightOverlay} />
       <ProportionsSection data={metrics.proportions} />
       <CirculationSection data={metrics.circulation} />
       <OpeningsSection data={metrics.openings} />
@@ -232,6 +238,93 @@ function OpeningsSection({ data }: { data: OpeningMetrics }) {
           </div>
         </div>
       ))}
+    </div>
+  );
+}
+
+function LightSection({
+  data,
+  overlayVisible,
+  onToggle,
+}: {
+  data: LightAnalysisResult;
+  overlayVisible: boolean;
+  onToggle: () => void;
+}) {
+  const GRADE_COLORS: Record<string, string> = {
+    excellent: "#ca8a04",
+    good: "#65a30d",
+    fair: "#3b82f6",
+    poor: "#64748b",
+  };
+
+  const GRADE_ICONS: Record<string, string> = {
+    excellent: "\u2600",
+    good: "\u2600",
+    fair: "\u26C5",
+    poor: "\u2601",
+  };
+
+  return (
+    <div className="border-b border-gray-200 p-4">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-sm font-semibold text-gray-800">Natural Light</h3>
+        <button
+          onClick={onToggle}
+          className={`px-2 py-0.5 rounded text-[10px] font-medium ${
+            overlayVisible
+              ? "bg-yellow-100 text-yellow-700"
+              : "bg-gray-100 text-gray-500"
+          }`}
+        >
+          {overlayVisible ? "Hide Heatmap" : "Show Heatmap"}
+        </button>
+      </div>
+
+      {/* Average score */}
+      <div className="flex items-center gap-3 mb-3">
+        <div className="text-2xl font-bold" style={{ color: GRADE_COLORS[data.averageGrade] }}>
+          {data.averageScore}
+        </div>
+        <div>
+          <div className="font-medium text-gray-600 capitalize">{data.averageGrade} Average</div>
+          <div className="text-gray-400">{data.rooms.length} rooms analyzed</div>
+        </div>
+      </div>
+
+      {/* Per-room scores */}
+      {data.rooms
+        .sort((a, b) => a.score - b.score)
+        .map((room) => (
+          <div key={room.roomId} className="flex items-center gap-2 mb-1.5">
+            <span className="text-[11px]">{GRADE_ICONS[room.grade]}</span>
+            <span className="w-24 truncate text-gray-600">{room.roomName}</span>
+            <div className="flex-1 h-2.5 bg-gray-100 rounded-full overflow-hidden">
+              <div
+                className="h-full rounded-full transition-all"
+                style={{
+                  width: `${room.score}%`,
+                  backgroundColor: GRADE_COLORS[room.grade],
+                }}
+              />
+            </div>
+            <span className="w-8 text-right font-medium" style={{ color: GRADE_COLORS[room.grade] }}>
+              {room.score}
+            </span>
+          </div>
+        ))}
+
+      {/* Recommendations */}
+      {data.recommendations.length > 0 && (
+        <div className="mt-3 pt-2 border-t border-gray-100">
+          <span className="text-[10px] font-semibold text-gray-500 uppercase">Recommendations</span>
+          {data.recommendations.map((rec, i) => (
+            <p key={i} className={`mt-1 leading-relaxed ${rec.severity === "warning" ? "text-amber-600" : "text-gray-500"}`}>
+              {rec.message}
+            </p>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

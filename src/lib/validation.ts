@@ -169,38 +169,40 @@ export function validateTR008Input(inputData: unknown): ValidationResult {
 
 /**
  * EX-002: BOQ Spreadsheet Exporter
+ * Accepts EITHER:
+ *   - rows + headers (from TR-008 table output)
+ *   - _boqData.lines (from GN-012 floor plan editor output)
  */
 export function validateEX002Input(inputData: unknown): ValidationResult {
-  // EX-002 requires rows and headers from TR-008
   const input = inputData as Record<string, unknown> | null | undefined;
   const rows = input?.rows;
   const headers = input?.headers;
 
-  if (!rows || !Array.isArray(rows)) {
-    return {
-      valid: false,
-      error: "No rows to export (expected output from TR-008)",
-      userError: UserErrors.MISSING_REQUIRED_FIELD("rows"),
-    };
+  // Path A: Traditional rows + headers (from TR-008)
+  if (rows && Array.isArray(rows) && headers && Array.isArray(headers)) {
+    if (rows.length === 0) {
+      return {
+        valid: false,
+        error: "Empty rows array",
+        userError: UserErrors.INVALID_BOQ_DATA,
+      };
+    }
+    return { valid: true };
   }
 
-  if (!headers || !Array.isArray(headers)) {
-    return {
-      valid: false,
-      error: "No headers provided",
-      userError: UserErrors.MISSING_REQUIRED_FIELD("headers"),
-    };
+  // Path B: _boqData.lines (from GN-012 floor plan editor)
+  const boqData = input?._boqData as Record<string, unknown> | undefined;
+  const boqLines = boqData?.lines;
+  if (boqLines && Array.isArray(boqLines) && boqLines.length > 0) {
+    return { valid: true };
   }
 
-  if (rows.length === 0) {
-    return {
-      valid: false,
-      error: "Empty rows array",
-      userError: UserErrors.INVALID_BOQ_DATA,
-    };
-  }
-
-  return { valid: true };
+  // Neither path matched
+  return {
+    valid: false,
+    error: "No BOQ data to export (expected rows/headers from TR-008 or _boqData from GN-012)",
+    userError: UserErrors.MISSING_REQUIRED_FIELD("rows"),
+  };
 }
 
 /**

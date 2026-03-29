@@ -5,6 +5,7 @@ import { Group, Rect, Circle, Line, Text } from "react-konva";
 import type { Column } from "@/types/floor-plan-cad";
 import type { Viewport } from "@/lib/floor-plan/geometry";
 import { worldToScreen } from "@/lib/floor-plan/geometry";
+import { lw } from "@/lib/floor-plan/line-weights";
 
 interface ColumnRendererProps {
   columns: Column[];
@@ -48,19 +49,19 @@ function ColumnItem({
         <Circle
           radius={r}
           stroke={strokeColor}
-          strokeWidth={isSelected ? 2 : 1.5}
+          strokeWidth={isSelected ? 2 : lw("col", zoom)}
           fill={fillColor}
         />
         {/* Cross pattern */}
-        <Line points={[-r * 0.7, -r * 0.7, r * 0.7, r * 0.7]} stroke={strokeColor} strokeWidth={0.8} opacity={0.4} />
-        <Line points={[r * 0.7, -r * 0.7, -r * 0.7, r * 0.7]} stroke={strokeColor} strokeWidth={0.8} opacity={0.4} />
+        <Line points={[-r * 0.7, -r * 0.7, r * 0.7, r * 0.7]} stroke={strokeColor} strokeWidth={lw("furn-detail", zoom)} opacity={0.4} />
+        <Line points={[r * 0.7, -r * 0.7, -r * 0.7, r * 0.7]} stroke={strokeColor} strokeWidth={lw("furn-detail", zoom)} opacity={0.4} />
         {/* Grid ref label */}
         {column.grid_ref && zoom > 0.03 && (
           <Text
             x={-r - 10}
             y={-r - 14}
             text={column.grid_ref}
-            fontSize={Math.max(7, 9 * zoom * 10)}
+            fontSize={Math.max(7, Math.min(14, 90 * zoom))}
             fill="#666"
             fontStyle="bold"
           />
@@ -82,19 +83,19 @@ function ColumnItem({
         width={w}
         height={d}
         stroke={strokeColor}
-        strokeWidth={isSelected ? 2 : 1.5}
+        strokeWidth={isSelected ? 2 : lw("col", zoom)}
         fill={fillColor}
       />
       {/* X pattern */}
-      <Line points={[-w / 2, -d / 2, w / 2, d / 2]} stroke={strokeColor} strokeWidth={0.8} opacity={0.4} />
-      <Line points={[w / 2, -d / 2, -w / 2, d / 2]} stroke={strokeColor} strokeWidth={0.8} opacity={0.4} />
+      <Line points={[-w / 2, -d / 2, w / 2, d / 2]} stroke={strokeColor} strokeWidth={lw("furn-detail", zoom)} opacity={0.4} />
+      <Line points={[w / 2, -d / 2, -w / 2, d / 2]} stroke={strokeColor} strokeWidth={lw("furn-detail", zoom)} opacity={0.4} />
       {/* Grid ref label */}
       {column.grid_ref && zoom > 0.03 && (
         <Text
           x={-w / 2 - 10}
           y={-d / 2 - 14}
           text={column.grid_ref}
-          fontSize={Math.max(7, 9 * zoom * 10)}
+          fontSize={Math.max(7, Math.min(14, 90 * zoom))}
           fill="#666"
           fontStyle="bold"
         />

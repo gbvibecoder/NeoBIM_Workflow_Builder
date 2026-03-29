@@ -98,6 +98,22 @@ export function lineIntersection(
   return { x: a1.x + d1.x * t, y: a1.y + d1.y * t };
 }
 
+/** Find intersection of two finite line segments. Returns null if no intersection within both segments. */
+export function segmentIntersection(
+  a1: Point, a2: Point,
+  b1: Point, b2: Point
+): Point | null {
+  const d1 = subtractPoints(a2, a1);
+  const d2 = subtractPoints(b2, b1);
+  const cross = crossProduct(d1, d2);
+  if (Math.abs(cross) < 1e-6) return null;
+  const d = subtractPoints(b1, a1);
+  const t = crossProduct(d, d2) / cross;
+  const u = crossProduct(d, d1) / cross;
+  if (t < 0 || t > 1 || u < 0 || u > 1) return null;
+  return { x: a1.x + d1.x * t, y: a1.y + d1.y * t };
+}
+
 // ============================================================
 // WALL GEOMETRY
 // ============================================================
@@ -250,15 +266,26 @@ export function polygonArea(points: Point[]): number {
   return Math.abs(area) / 2;
 }
 
-/** Compute centroid of a polygon */
+/** Compute area-weighted centroid of a polygon (shoelace formula) */
 export function polygonCentroid(points: Point[]): Point {
-  let cx = 0, cy = 0;
   const n = points.length;
-  for (const p of points) {
-    cx += p.x;
-    cy += p.y;
+  if (n === 0) return { x: 0, y: 0 };
+  let cx = 0, cy = 0, signedArea = 0;
+  for (let i = 0; i < n; i++) {
+    const j = (i + 1) % n;
+    const cross = points[i].x * points[j].y - points[j].x * points[i].y;
+    signedArea += cross;
+    cx += (points[i].x + points[j].x) * cross;
+    cy += (points[i].y + points[j].y) * cross;
   }
-  return { x: cx / n, y: cy / n };
+  if (Math.abs(signedArea) < 1e-10) {
+    // Degenerate polygon — fall back to simple average
+    let sx = 0, sy = 0;
+    for (const p of points) { sx += p.x; sy += p.y; }
+    return { x: sx / n, y: sy / n };
+  }
+  const a6 = signedArea * 3; // 6A / 2 = 3 * signedArea
+  return { x: cx / a6, y: cy / a6 };
 }
 
 /** Compute bounding box of a polygon */

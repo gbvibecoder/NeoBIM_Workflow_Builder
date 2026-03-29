@@ -321,6 +321,93 @@ const FIRE_SAFETY_RULES: BuildingCodeRule[] = [
     room_types: ["fire_escape", "corridor", "staircase"],
     parameters: { min_width_mm: 1000 },
   },
+  {
+    id: "NBC-FS-002",
+    code_ref: "NBC 2016, Part 4, Clause 4.4.1",
+    category: "fire_safety",
+    title: "Maximum Travel Distance to Exit",
+    description: "Maximum travel distance from any point to the nearest exit shall not exceed 22.5 m for residential buildings.",
+    severity: "warning",
+    room_types: [],
+    parameters: { max_travel_distance_mm: 22500 },
+  },
+  {
+    id: "NBC-FS-003",
+    code_ref: "NBC 2016, Part 4, Clause 4.2",
+    category: "fire_safety",
+    title: "Balcony Railing Height",
+    description: "Balcony railings shall be at least 1.05 m (1050 mm) high.",
+    severity: "error",
+    room_types: ["balcony", "terrace"],
+    parameters: { min_railing_height_mm: 1050 },
+  },
+];
+
+// ============================================================
+// ENHANCED RULES (Sprint 4)
+// ============================================================
+
+const ENHANCED_RULES: BuildingCodeRule[] = [
+  {
+    id: "NBC-WV-004",
+    code_ref: "NBC 2016, Clause 8.4.6",
+    category: "window_ventilation",
+    title: "Natural Light Ratio (1/6th rule)",
+    description: "Habitable rooms shall have window openings of at least 1/6th of floor area for adequate natural light.",
+    severity: "warning",
+    room_types: ["living_room", "bedroom", "master_bedroom", "guest_bedroom", "dining_room", "study", "home_office"],
+    parameters: { min_ratio: 0.167 },
+  },
+  {
+    id: "NBC-WV-005",
+    code_ref: "NBC 2016, Clause 8.4.9",
+    category: "window_ventilation",
+    title: "Kitchen Exterior Ventilation",
+    description: "Kitchen shall have at least one opening on an exterior wall for natural ventilation or exhaust.",
+    severity: "warning",
+    room_types: ["kitchen"],
+    parameters: { requires_exterior_wall: true },
+  },
+  {
+    id: "NBC-RS-008",
+    code_ref: "NBC 2016, Clause 8.4.1",
+    category: "room_size",
+    title: "Floor-to-Ceiling Height (Residential)",
+    description: "Minimum clear floor-to-ceiling height for habitable rooms is 2.75 m.",
+    severity: "error",
+    room_types: [],
+    parameters: { min_clear_height_mm: 2750 },
+  },
+  {
+    id: "NBC-ST-005",
+    code_ref: "NBC 2016, Clause 8.6.1",
+    category: "stair",
+    title: "Residential Stair Width",
+    description: "Stairs in residential buildings of more than one dwelling unit shall have a minimum width of 1.0 m.",
+    severity: "warning",
+    room_types: [],
+    parameters: { min_width_mm: 1000 },
+  },
+  {
+    id: "NBC-AC-003",
+    code_ref: "NBC 2016, Clause 11.2",
+    category: "accessibility",
+    title: "Door Clear Width for Accessibility",
+    description: "At least one entrance door shall have a minimum clear width of 0.9 m for wheelchair access.",
+    severity: "info",
+    room_types: [],
+    parameters: { min_width_mm: 900 },
+  },
+  {
+    id: "NBC-WV-006",
+    code_ref: "NBC 2016, Clause 8.4.10",
+    category: "window_ventilation",
+    title: "Bathroom Waterproofing Zone",
+    description: "Bathroom floors require waterproofing treatment up to 150mm above finished floor level.",
+    severity: "info",
+    room_types: ["bathroom", "toilet", "wc"],
+    parameters: { waterproofing_required: true },
+  },
 ];
 
 // ============================================================
@@ -335,6 +422,7 @@ export const ALL_BUILDING_CODE_RULES: BuildingCodeRule[] = [
   ...STAIR_RULES,
   ...ACCESSIBILITY_RULES,
   ...FIRE_SAFETY_RULES,
+  ...ENHANCED_RULES,
 ];
 
 /** Get rules by category */
