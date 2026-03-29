@@ -70,8 +70,34 @@ export function StatusBar() {
       {/* Separator */}
       <div className="h-3 w-px bg-gray-300" />
 
-      {/* Grid size */}
-      <span>Grid: {gridSize_mm}mm</span>
+      {/* Unit toggle */}
+      <select
+        value={displayUnit}
+        onChange={(e) => useFloorPlanStore.getState().setDisplayUnit(e.target.value as any)}
+        className="rounded border border-gray-200 bg-white px-1 py-0 text-[10px] font-bold text-gray-600 cursor-pointer outline-none"
+        title="Display unit"
+      >
+        <option value="mm">MM</option>
+        <option value="cm">CM</option>
+        <option value="m">M</option>
+        <option value="ft">FT</option>
+        <option value="in">IN</option>
+      </select>
+
+      {/* Grid size selector */}
+      <select
+        value={gridSize_mm}
+        onChange={(e) => useFloorPlanStore.getState().setGridSize(Number(e.target.value))}
+        className="rounded border border-gray-200 bg-white px-1 py-0 text-[10px] text-gray-600 cursor-pointer outline-none"
+        title="Grid size"
+      >
+        <option value="50">Grid 50mm</option>
+        <option value="100">Grid 100mm</option>
+        <option value="200">Grid 200mm</option>
+        <option value="250">Grid 250mm</option>
+        <option value="500">Grid 500mm</option>
+        <option value="1000">Grid 1m</option>
+      </select>
 
       {/* Toggle buttons */}
       <button

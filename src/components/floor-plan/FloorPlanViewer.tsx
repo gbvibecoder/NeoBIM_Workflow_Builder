@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useCallback, useMemo, useRef } from "react";
+import React, { useEffect, useCallback, useMemo, useRef, useState } from "react";
 import { useFloorPlanStore } from "@/stores/floor-plan-store";
 import { FloorPlanCanvas } from "./FloorPlanCanvas";
 import { Toolbar } from "./Toolbar";
@@ -21,6 +21,8 @@ import { GenerationLoader } from "./GenerationLoader";
 import { getProjectIndex, importProjectFile } from "@/lib/floor-plan/project-persistence";
 import { getSampleProjectForPrompt } from "@/lib/floor-plan/sample-layouts";
 import { FloorPlanErrorBoundary } from "./ErrorBoundary";
+import { displayToMm, formatDimension, type DisplayUnit } from "@/lib/floor-plan/unit-conversion";
+import { worldToScreen, screenToWorld } from "@/lib/floor-plan/geometry";
 
 interface FloorPlanViewerProps {
   /** Pre-loaded geometry from pipeline (e.g. navigated from result showcase) */
@@ -90,6 +92,9 @@ export function FloorPlanViewer({ initialGeometry, initialPrompt, initialProject
 
   const [fallbackBanner, setFallbackBanner] = React.useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const [undoToast, setUndoToast] = useState<string | null>(null);
+  const undoToastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [editingRoomId, setEditingRoomId] = useState<string | null>(null);
 
   // Clean up on unmount
   useEffect(() => {
@@ -196,6 +201,42 @@ export function FloorPlanViewer({ initialGeometry, initialPrompt, initialProject
         projectModified: false,
       });
     }
+  }, []);
+
+  // Undo toast helper
+  const showUndoToast = useCallback((label: string) => {
+    if (undoToastTimer.current) clearTimeout(undoToastTimer.current);
+    setUndoToast(label);
+    undoToastTimer.current = setTimeout(() => setUndoToast(null), 1500);
+  }, []);
+
+  // Double-click room label → inline edit
+  const handleCanvasDblClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    try {
+      const store = useFloorPlanStore.getState();
+      if (store.activeTool !== "select") return;
+      const floor = store.getActiveFloor();
+      if (!floor) return;
+
+      // Get canvas container and compute click position relative to it
+      const container = (e.currentTarget as HTMLElement);
+      const rect = container.getBoundingClientRect();
+      const screenPt = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+      const worldPt = screenToWorld(screenPt, store.viewport);
+
+      // Hit-test rooms by checking if click is inside room label area
+      for (const room of floor.rooms) {
+        const lp = room.label_position;
+        if (!lp) continue;
+        // ~500mm radius around label center
+        const dx = worldPt.x - lp.x;
+        const dy = worldPt.y - lp.y;
+        if (dx * dx + dy * dy < 500 * 500) {
+          setEditingRoomId(room.id);
+          return;
+        }
+      }
+    } catch { /* non-critical */ }
   }, []);
 
   // Keyboard shortcuts
@@ -329,8 +370,17 @@ export function FloorPlanViewer({ initialGeometry, initialPrompt, initialProject
       case "z":
         if (e.ctrlKey || e.metaKey) {
           e.preventDefault();
-          if (e.shiftKey) store.redo();
-          else store.undo();
+          if (e.shiftKey) {
+            if (store.canRedo()) {
+              store.redo();
+              showUndoToast("Redo");
+            }
+          } else {
+            if (store.canUndo()) {
+              store.undo();
+              showUndoToast("Undo");
+            }
+          }
         }
         break;
       case "delete":
@@ -435,10 +485,33 @@ export function FloorPlanViewer({ initialGeometry, initialPrompt, initialProject
         )}
 
         {/* Canvas */}
-        <div className="relative flex-1 overflow-hidden">
+        <div className="relative flex-1 overflow-hidden" onDoubleClick={handleCanvasDblClick}>
           <FloorPlanErrorBoundary fallbackLabel="Canvas">
             <FloorPlanCanvas />
           </FloorPlanErrorBoundary>
+
+          {/* Ruler overlay (top + left) */}
+          <RulerOverlay />
+
+          {/* Wall length input (appears when wall first point is placed) */}
+          <WallLengthInput />
+
+          {/* Room name inline edit overlay */}
+          {editingRoomId && (
+            <RoomNameEditOverlay
+              roomId={editingRoomId}
+              onClose={() => setEditingRoomId(null)}
+            />
+          )}
+
+          {/* Undo/Redo toast */}
+          {undoToast && (
+            <div className="pointer-events-none absolute top-4 left-1/2 -translate-x-1/2 z-50 animate-pulse">
+              <div className="rounded-lg bg-gray-900/80 px-4 py-1.5 text-xs font-medium text-white shadow-lg">
+                {undoToast}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Right Panel: Tabbed */}
@@ -501,5 +574,232 @@ export function FloorPlanViewer({ initialGeometry, initialPrompt, initialProject
         }
       `}</style>
     </div>
+  );
+}
+
+// ============================================================
+// WALL LENGTH INPUT (Feature 2)
+// ============================================================
+
+function WallLengthInput() {
+  const wallDrawStart = useFloorPlanStore((s) => s.wallDrawStart);
+  const activeTool = useFloorPlanStore((s) => s.activeTool);
+  const displayUnit = useFloorPlanStore((s) => (s.project?.settings.display_unit ?? "m") as DisplayUnit);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [value, setValue] = useState("");
+
+  useEffect(() => {
+    if (wallDrawStart && activeTool === "wall") {
+      setValue("");
+      setTimeout(() => inputRef.current?.focus(), 100);
+    }
+  }, [wallDrawStart, activeTool]);
+
+  if (!wallDrawStart || activeTool !== "wall") return null;
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" && value.trim()) {
+      e.preventDefault();
+      e.stopPropagation();
+      try {
+        const store = useFloorPlanStore.getState();
+        const start = store.wallDrawStart;
+        if (!start) return;
+
+        const parsed = parseFloat(value);
+        if (isNaN(parsed) || parsed <= 0) return;
+        const length_mm = displayToMm(parsed, displayUnit);
+
+        // Direction from start to cursor (with ortho constraint)
+        let target = store.cursorWorldPos;
+        if (store.orthoEnabled) {
+          const dx = Math.abs(target.x - start.x);
+          const dy = Math.abs(target.y - start.y);
+          target = dx >= dy ? { x: target.x, y: start.y } : { x: start.x, y: target.y };
+        }
+
+        const dx = target.x - start.x;
+        const dy = target.y - start.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+
+        if (dist < 1) {
+          store.addNewWall(start, { x: start.x + length_mm, y: start.y });
+        } else {
+          const scale = length_mm / dist;
+          store.addNewWall(start, { x: start.x + dx * scale, y: start.y + dy * scale });
+        }
+        setValue("");
+      } catch { /* non-critical */ }
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      e.stopPropagation();
+      useFloorPlanStore.getState().setWallDrawStart(null);
+      setValue("");
+    }
+  };
+
+  const unitLabel = displayUnit === "m" ? "m" : displayUnit === "ft" ? "ft" : displayUnit === "cm" ? "cm" : displayUnit === "in" ? "in" : "mm";
+
+  return (
+    <div className="absolute bottom-12 left-1/2 -translate-x-1/2 z-50 flex items-center gap-1.5 rounded-lg bg-gray-900/90 px-3 py-1.5 shadow-lg print:hidden">
+      <span className="text-[11px] text-gray-400">Length:</span>
+      <input
+        ref={inputRef}
+        type="text"
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        onKeyDown={handleKeyDown}
+        className="w-20 bg-transparent text-white text-sm font-mono outline-none border-b border-gray-600 focus:border-blue-400 px-1"
+        placeholder="0"
+        autoComplete="off"
+      />
+      <span className="text-[11px] text-gray-400">{unitLabel}</span>
+      <span className="text-[10px] text-gray-500 ml-1">↵ apply</span>
+    </div>
+  );
+}
+
+// ============================================================
+// ROOM NAME EDIT OVERLAY (Feature 5)
+// ============================================================
+
+function RoomNameEditOverlay({ roomId, onClose }: { roomId: string; onClose: () => void }) {
+  const floor = useFloorPlanStore((s) => s.getActiveFloor());
+  const viewport = useFloorPlanStore((s) => s.viewport);
+  const room = floor?.rooms.find((r) => r.id === roomId);
+  const [name, setName] = useState(room?.name ?? "");
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    setTimeout(() => inputRef.current?.select(), 50);
+  }, []);
+
+  if (!room || !room.label_position) { onClose(); return null; }
+
+  const screenPos = worldToScreen(room.label_position, viewport);
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      if (name.trim()) {
+        const store = useFloorPlanStore.getState();
+        store.pushHistory();
+        store.updateRoom(roomId, { name: name.trim() });
+      }
+      onClose();
+    } else if (e.key === "Escape") {
+      onClose();
+    }
+  };
+
+  return (
+    <div
+      className="absolute z-50 print:hidden"
+      style={{ left: screenPos.x - 60, top: screenPos.y - 12 }}
+    >
+      <input
+        ref={inputRef}
+        type="text"
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        onKeyDown={handleKeyDown}
+        onBlur={onClose}
+        className="w-[120px] rounded border border-blue-400 bg-white px-2 py-0.5 text-xs font-medium text-gray-800 shadow-lg outline-none ring-2 ring-blue-200"
+        autoComplete="off"
+      />
+    </div>
+  );
+}
+
+// ============================================================
+// RULER OVERLAY (Feature 4)
+// ============================================================
+
+const RULER_SIZE = 22; // px
+
+function RulerOverlay() {
+  const viewport = useFloorPlanStore((s) => s.viewport);
+  const displayUnit = useFloorPlanStore((s) => (s.project?.settings.display_unit ?? "m") as DisplayUnit);
+
+  if (!viewport.canvasWidth || !viewport.canvasHeight) return null;
+
+  // Choose tick spacing so ticks are 60-200px apart on screen
+  const niceIntervals = [50, 100, 200, 250, 500, 1000, 2000, 5000, 10000, 20000, 50000];
+  const interval = niceIntervals.find((i) => i * viewport.zoom >= 50) ?? 50000;
+
+  // Visible world range — using screenToWorld for edges
+  const topLeft = screenToWorld({ x: 0, y: 0 }, viewport);
+  const bottomRight = screenToWorld({ x: viewport.canvasWidth, y: viewport.canvasHeight }, viewport);
+
+  const minX = Math.min(topLeft.x, bottomRight.x);
+  const maxX = Math.max(topLeft.x, bottomRight.x);
+  const minY = Math.min(topLeft.y, bottomRight.y);
+  const maxY = Math.max(topLeft.y, bottomRight.y);
+
+  // X ticks (horizontal ruler at top)
+  const xTicks: number[] = [];
+  const firstX = Math.floor(minX / interval) * interval;
+  for (let x = firstX; x <= maxX; x += interval) xTicks.push(x);
+
+  // Y ticks (vertical ruler at left)
+  const yTicks: number[] = [];
+  const firstY = Math.floor(minY / interval) * interval;
+  for (let y = firstY; y <= maxY; y += interval) yTicks.push(y);
+
+  return (
+    <>
+      {/* Top ruler */}
+      <div
+        className="absolute top-0 left-0 overflow-hidden bg-gray-50/90 border-b border-gray-200 pointer-events-none print:hidden"
+        style={{ height: RULER_SIZE, width: viewport.canvasWidth, paddingLeft: RULER_SIZE }}
+      >
+        {xTicks.map((wx) => {
+          const sx = worldToScreen({ x: wx, y: 0 }, viewport).x;
+          if (sx < RULER_SIZE || sx > viewport.canvasWidth) return null;
+          return (
+            <div key={wx} className="absolute" style={{ left: sx }}>
+              <div className="w-px h-2 bg-gray-400" style={{ marginTop: RULER_SIZE - 8 }} />
+              <div className="text-[8px] text-gray-500 font-mono -translate-x-1/2 whitespace-nowrap" style={{ marginTop: -RULER_SIZE + 2 }}>
+                {formatDimension(wx, displayUnit, 0)}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Left ruler */}
+      <div
+        className="absolute top-0 left-0 overflow-hidden bg-gray-50/90 border-r border-gray-200 pointer-events-none print:hidden"
+        style={{ width: RULER_SIZE, height: viewport.canvasHeight, paddingTop: RULER_SIZE }}
+      >
+        {yTicks.map((wy) => {
+          const sy = worldToScreen({ x: 0, y: wy }, viewport).y;
+          if (sy < RULER_SIZE || sy > viewport.canvasHeight) return null;
+          return (
+            <div key={wy} className="absolute" style={{ top: sy, left: 0 }}>
+              <div className="h-px w-2 bg-gray-400" style={{ marginLeft: RULER_SIZE - 8 }} />
+              <div
+                className="text-[8px] text-gray-500 font-mono whitespace-nowrap"
+                style={{
+                  position: "absolute",
+                  left: 2,
+                  top: -4,
+                  transformOrigin: "left center",
+                  transform: "rotate(-90deg) translateX(-100%)",
+                }}
+              >
+                {formatDimension(wy, displayUnit, 0)}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Corner square */}
+      <div
+        className="absolute top-0 left-0 bg-gray-100/90 border-b border-r border-gray-200 pointer-events-none print:hidden"
+        style={{ width: RULER_SIZE, height: RULER_SIZE }}
+      />
+    </>
   );
 }

@@ -278,6 +278,11 @@ interface FloorPlanState {
   codeOverlayVisible: boolean;
   toggleCodeOverlay: () => void;
 
+  // Project settings
+  setDisplayUnit: (unit: "mm" | "cm" | "m" | "ft" | "in") => void;
+  setNorthAngle: (deg: number) => void;
+  mirrorFloor: (axis: "horizontal" | "vertical") => void;
+
   // AI actions (Sprint 4)
   autoPlaceDoors: () => Promise<void> | void;
   autoPlaceWindows: () => Promise<void> | void;
@@ -1345,6 +1350,92 @@ export const useFloorPlanStore = create<FloorPlanState>()((set, get) => ({
   toggleVastuOverlay: () => set((s) => ({ vastuOverlayVisible: !s.vastuOverlayVisible })),
   toggleLightOverlay: () => set((s) => ({ lightOverlayVisible: !s.lightOverlayVisible })),
   toggleCodeOverlay: () => set((s) => ({ codeOverlayVisible: !s.codeOverlayVisible })),
+
+  // ---- Project Settings ----
+  setDisplayUnit: (unit) => {
+    const s = get();
+    if (!s.project) return;
+    set({
+      project: { ...s.project, settings: { ...s.project.settings, display_unit: unit } },
+      projectModified: true,
+    });
+  },
+
+  setNorthAngle: (deg) => {
+    const s = get();
+    if (!s.project) return;
+    set({
+      project: { ...s.project, settings: { ...s.project.settings, north_angle_deg: deg } },
+      projectModified: true,
+    });
+  },
+
+  mirrorFloor: (axis) => {
+    try {
+      const s = get();
+      const floor = s.getActiveFloor();
+      if (!floor || !s.project || !s.activeFloorId) return;
+
+      s.pushHistory();
+
+      // Compute bounding box center
+      const allX: number[] = [];
+      const allY: number[] = [];
+      for (const w of floor.walls) {
+        allX.push(w.centerline.start.x, w.centerline.end.x);
+        allY.push(w.centerline.start.y, w.centerline.end.y);
+      }
+      if (allX.length === 0) return;
+      const cx = (Math.min(...allX) + Math.max(...allX)) / 2;
+      const cy = (Math.min(...allY) + Math.max(...allY)) / 2;
+
+      const flipPt = (p: Point): Point => {
+        if (axis === "horizontal") return { x: 2 * cx - p.x, y: p.y };
+        return { x: p.x, y: 2 * cy - p.y };
+      };
+
+      const newWalls = floor.walls.map((w) => ({
+        ...w,
+        centerline: { start: flipPt(w.centerline.start), end: flipPt(w.centerline.end) },
+      }));
+
+      const newRooms = floor.rooms.map((r) => ({
+        ...r,
+        boundary: { ...r.boundary, points: r.boundary.points.map(flipPt) },
+        label_position: flipPt(r.label_position),
+      }));
+
+      const newFurniture = floor.furniture.map((f) => ({
+        ...f,
+        position: flipPt(f.position),
+        rotation_deg: axis === "horizontal" ? 360 - f.rotation_deg : f.rotation_deg + 180,
+      }));
+
+      const newAnnotations = floor.annotations.map((a) => ({
+        ...a,
+        position: flipPt(a.position),
+        leader_line: a.leader_line ? a.leader_line.map(flipPt) : undefined,
+      }));
+
+      const updatedFloor: Floor = {
+        ...floor,
+        walls: newWalls,
+        rooms: newRooms,
+        furniture: newFurniture,
+        annotations: newAnnotations,
+      };
+
+      set({
+        project: {
+          ...s.project,
+          floors: s.project.floors.map((f) => (f.id === s.activeFloorId ? updatedFloor : f)),
+        },
+        projectModified: true,
+      });
+    } catch {
+      // Non-critical: mirror failed, no-op
+    }
+  },
 
   // ---- AI Actions (Sprint 4) ----
   autoPlaceDoors: async () => {

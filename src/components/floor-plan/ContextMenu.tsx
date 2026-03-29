@@ -159,7 +159,7 @@ function WallMenu({ wallId, onClose }: { wallId: string; onClose: () => void }) 
       <MenuItem label="Add Door on This Wall" onClick={handleAddDoor} />
       <MenuItem label="Add Window on This Wall" onClick={handleAddWindow} />
       <MenuSep />
-      <MenuItem label="Delete Wall" onClick={handleDelete} danger />
+      <MenuItem label="Delete Wall" shortcut="Del" onClick={handleDelete} danger />
     </>
   );
 }
@@ -192,7 +192,7 @@ function DoorMenu({ doorId, onClose }: { doorId: string; onClose: () => void }) 
       <MenuSep />
       <MenuItem label="Flip Swing Direction" shortcut="F" onClick={handleFlip} />
       <MenuSep />
-      <MenuItem label="Delete Door" onClick={handleDelete} danger />
+      <MenuItem label="Delete Door" shortcut="Del" onClick={handleDelete} danger />
     </>
   );
 }
@@ -213,7 +213,7 @@ function WindowMenu({ windowId, onClose }: { windowId: string; onClose: () => vo
     <>
       <MenuItem label="Window" disabled />
       <MenuSep />
-      <MenuItem label="Delete Window" onClick={handleDelete} danger />
+      <MenuItem label="Delete Window" shortcut="Del" onClick={handleDelete} danger />
     </>
   );
 }
@@ -300,6 +300,8 @@ function FurnitureMenu({ furnitureId, onClose }: { furnitureId: string; onClose:
 // ============================================================
 
 function EmptyMenu({ onClose }: { onClose: () => void }) {
+  const selectedIds = useFloorPlanStore((s) => s.selectedIds);
+
   const handleAddWall = () => {
     useFloorPlanStore.getState().setActiveTool("wall");
     onClose();
@@ -315,8 +317,25 @@ function EmptyMenu({ onClose }: { onClose: () => void }) {
     onClose();
   };
 
+  const handleDeleteSelected = () => {
+    useFloorPlanStore.getState().deleteSelectedEntities();
+    onClose();
+  };
+
+  const handlePaste = () => {
+    useFloorPlanStore.getState().pasteAtCursor();
+    onClose();
+  };
+
   return (
     <>
+      {selectedIds.length > 0 && (
+        <>
+          <MenuItem label={`Delete Selected (${selectedIds.length})`} shortcut="Del" onClick={handleDeleteSelected} danger />
+          <MenuSep />
+        </>
+      )}
+      <MenuItem label="Paste" shortcut="⌘V" onClick={handlePaste} />
       <MenuItem label="Add Wall Here" shortcut="L" onClick={handleAddWall} />
       <MenuSep />
       <MenuItem label="Zoom Extents" shortcut="F" onClick={handleZoomExtents} />

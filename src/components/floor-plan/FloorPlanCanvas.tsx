@@ -48,6 +48,8 @@ export function FloorPlanCanvas() {
   const isPanning = useRef(false);
   const lastPointer = useRef<{ x: number; y: number } | null>(null);
   const dragInfo = useRef<DragInfo | null>(null);
+  const spaceHeld = useRef(false);
+  const [isSpaceDown, setIsSpaceDown] = useState(false);
 
   const viewport = useFloorPlanStore((s) => s.viewport);
   const setViewport = useFloorPlanStore((s) => s.setViewport);
@@ -104,7 +106,53 @@ export function FloorPlanCanvas() {
   }, []);
 
   // ============================================================
-  // MOUSE WHEEL ZOOM
+  // SPACE KEY — Grab-to-pan modifier
+  // ============================================================
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.code === "Space" && !e.repeat) {
+        // Don't hijack Space when typing in inputs or using annotate tool
+        const tag = (e.target as HTMLElement)?.tagName;
+        if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+        if (activeTool === "annotate") return;
+        e.preventDefault();
+        spaceHeld.current = true;
+        setIsSpaceDown(true);
+      }
+    };
+    const onKeyUp = (e: KeyboardEvent) => {
+      if (e.code === "Space") {
+        spaceHeld.current = false;
+        setIsSpaceDown(false);
+        // End any active space-panning
+        if (isPanning.current) {
+          isPanning.current = false;
+          lastPointer.current = null;
+          const stage = stageRef.current;
+          if (stage) {
+            stage.container().style.cursor =
+              activeTool === "pan" ? "grab" :
+              activeTool === "wall" ? "crosshair" :
+              activeTool === "door" || activeTool === "window" ? "crosshair" :
+              activeTool === "measure" ? "crosshair" :
+              activeTool === "annotate" ? "text" :
+              activeTool === "column" || activeTool === "stair" ? "crosshair" :
+              "default";
+          }
+        }
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("keyup", onKeyUp);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("keyup", onKeyUp);
+    };
+  }, [activeTool]);
+
+  // ============================================================
+  // MOUSE WHEEL — Zoom (Ctrl/pinch) + Pan (plain scroll/trackpad)
   // ============================================================
 
   const handleWheel = useCallback((e: Konva.KonvaEventObject<WheelEvent>) => {
@@ -112,23 +160,38 @@ export function FloorPlanCanvas() {
     const stage = stageRef.current;
     if (!stage) return;
 
-    const pointer = stage.getPointerPosition();
-    if (!pointer) return;
-
     const vp = useFloorPlanStore.getState().viewport;
-    const worldBefore = screenToWorld(pointer, vp);
 
-    const direction = e.evt.deltaY > 0 ? -1 : 1;
-    const factor = direction > 0 ? 1.12 : 1 / 1.12;
-    const newZoom = Math.max(0.005, Math.min(vp.zoom * factor, 10));
+    // ── Ctrl+scroll / pinch-to-zoom → zoom ──────────────────────
+    if (e.evt.ctrlKey || e.evt.metaKey) {
+      const pointer = stage.getPointerPosition();
+      if (!pointer) return;
 
-    const newVp = { ...vp, zoom: newZoom };
-    const worldAfter = screenToWorld(pointer, newVp);
+      const worldBefore = screenToWorld(pointer, vp);
+
+      const direction = e.evt.deltaY > 0 ? -1 : 1;
+      const factor = direction > 0 ? 1.12 : 1 / 1.12;
+      const newZoom = Math.max(0.005, Math.min(vp.zoom * factor, 10));
+
+      const newVp = { ...vp, zoom: newZoom };
+      const worldAfter = screenToWorld(pointer, newVp);
+
+      setViewport({
+        zoom: newZoom,
+        x: vp.x + (worldBefore.x - worldAfter.x),
+        y: vp.y + (worldBefore.y - worldAfter.y),
+      });
+      return;
+    }
+
+    // ── Plain scroll / two-finger trackpad → pan ────────────────
+    // Shift+scroll → pan horizontally (some browsers send deltaY with shiftKey)
+    const dx = e.evt.shiftKey ? (e.evt.deltaX || e.evt.deltaY) : e.evt.deltaX;
+    const dy = e.evt.shiftKey ? 0 : e.evt.deltaY;
 
     setViewport({
-      zoom: newZoom,
-      x: vp.x + (worldBefore.x - worldAfter.x),
-      y: vp.y + (worldBefore.y - worldAfter.y),
+      x: vp.x + dx / vp.zoom,
+      y: vp.y - dy / vp.zoom,
     });
   }, [setViewport]);
 
@@ -183,8 +246,8 @@ export function FloorPlanCanvas() {
       return;
     }
 
-    // Middle mouse → pan
-    if (e.evt.button === 1 || activeTool === "pan") {
+    // Middle mouse, Pan tool, or Space+left click → pan
+    if (e.evt.button === 1 || activeTool === "pan" || (spaceHeld.current && e.evt.button === 0)) {
       isPanning.current = true;
       lastPointer.current = { x: e.evt.clientX, y: e.evt.clientY };
       if (stage) stage.container().style.cursor = "grabbing";
@@ -540,6 +603,7 @@ export function FloorPlanCanvas() {
     const stage = stageRef.current;
     if (stage) {
       stage.container().style.cursor =
+        spaceHeld.current ? "grab" :
         activeTool === "pan" ? "grab" :
         activeTool === "wall" ? "crosshair" :
         activeTool === "door" || activeTool === "window" ? "crosshair" :
@@ -597,8 +661,9 @@ export function FloorPlanCanvas() {
   const showDimensions = isLayerVisible("A-DIM") && (viewMode === "construction" || viewMode === "cad");
   const showGrid = isLayerVisible("A-GRID") || useFloorPlanStore.getState().gridVisible;
 
-  // Cursor style per tool
+  // Cursor style per tool (Space key overrides to grab hand)
   const cursorStyle =
+    isSpaceDown ? "grab" :
     activeTool === "pan" ? "grab" :
     activeTool === "wall" ? "crosshair" :
     activeTool === "door" || activeTool === "window" ? "crosshair" :
@@ -774,8 +839,8 @@ export function FloorPlanCanvas() {
           <MeasurementOverlay viewport={viewport} />
         </Layer>
 
-        {/* Layer 8: Screen-fixed overlay (scale bar, north arrow) */}
-        <Layer listening={false}>
+        {/* Layer 8: Screen-fixed overlay (scale bar, north arrow — north arrow is clickable) */}
+        <Layer>
           {isLayerVisible("A-SCALE") && (
             <ScaleBarRenderer
               viewport={viewport}

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef, useEffect, useCallback } from "react";
+import React, { useState, useRef, useEffect, useCallback, type KeyboardEvent as ReactKE } from "react";
 import { useRouter } from "next/navigation";
 import { useFloorPlanStore } from "@/stores/floor-plan-store";
 import type { ViewMode } from "@/types/floor-plan-cad";
@@ -56,6 +56,31 @@ export function Toolbar() {
   const floors = project.floors;
   const activeFloor = floors.find((f) => f.id === activeFloorId);
   const zoomPercent = Math.round(viewport.zoom * 1250);
+  const mirrorFloor = useFloorPlanStore((s) => s.mirrorFloor);
+
+  // Zoom percentage input
+  const [zoomEditing, setZoomEditing] = useState(false);
+  const [zoomInput, setZoomInput] = useState("");
+  const zoomInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (zoomEditing) {
+      setZoomInput(String(zoomPercent));
+      setTimeout(() => zoomInputRef.current?.select(), 0);
+    }
+  }, [zoomEditing]);  // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleZoomInputKey = (e: ReactKE<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      const v = parseInt(zoomInput, 10);
+      if (v > 0 && v <= 10000) {
+        useFloorPlanStore.getState().setViewport({ zoom: v / 1250 });
+      }
+      setZoomEditing(false);
+    } else if (e.key === "Escape") {
+      setZoomEditing(false);
+    }
+  };
 
   return (
     <div className="flex h-11 items-center border-b border-gray-200 bg-white px-3 gap-2 text-sm print:hidden">
@@ -198,12 +223,59 @@ export function Toolbar() {
         <button onClick={zoomOut} className="rounded p-1 text-gray-500 hover:bg-gray-100" title="Zoom Out" aria-label="Zoom Out">
           <svg width="14" height="14" viewBox="0 0 14 14"><path d="M3 7H11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
         </button>
-        <span className="w-10 text-center text-xs font-mono text-gray-600">{zoomPercent}%</span>
+        {zoomEditing ? (
+          <input
+            ref={zoomInputRef}
+            type="text"
+            value={zoomInput}
+            onChange={(e) => setZoomInput(e.target.value)}
+            onKeyDown={handleZoomInputKey}
+            onBlur={() => setZoomEditing(false)}
+            className="w-12 rounded border border-blue-300 bg-white px-1 py-0.5 text-center text-xs font-mono text-gray-800 outline-none"
+          />
+        ) : (
+          <button
+            onClick={() => setZoomEditing(true)}
+            className="w-12 rounded py-0.5 text-center text-xs font-mono text-gray-600 hover:bg-gray-100"
+            title="Click to type exact zoom %"
+          >
+            {zoomPercent}%
+          </button>
+        )}
         <button onClick={zoomIn} className="rounded p-1 text-gray-500 hover:bg-gray-100" title="Zoom In" aria-label="Zoom In">
           <svg width="14" height="14" viewBox="0 0 14 14"><path d="M7 3V11M3 7H11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
         </button>
         <button onClick={fitToView} className="rounded px-2 py-1 text-xs text-gray-500 hover:bg-gray-100" title="Fit to View (F)">
           Fit
+        </button>
+      </div>
+
+      {/* Mirror / Flip */}
+      <div className="h-5 w-px bg-gray-200" />
+      <div className="flex items-center gap-0.5">
+        <button
+          onClick={() => mirrorFloor("horizontal")}
+          className="rounded p-1 text-gray-500 hover:bg-gray-100"
+          title="Mirror Horizontal"
+          aria-label="Mirror Horizontal"
+        >
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+            <line x1="7" y1="1" x2="7" y2="13" stroke="currentColor" strokeWidth="1" strokeDasharray="2 1"/>
+            <path d="M5 4H2L2 10H5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+            <path d="M9 4H12V10H9" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        </button>
+        <button
+          onClick={() => mirrorFloor("vertical")}
+          className="rounded p-1 text-gray-500 hover:bg-gray-100"
+          title="Mirror Vertical"
+          aria-label="Mirror Vertical"
+        >
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+            <line x1="1" y1="7" x2="13" y2="7" stroke="currentColor" strokeWidth="1" strokeDasharray="2 1"/>
+            <path d="M4 5V2H10V5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+            <path d="M4 9V12H10V9" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
         </button>
       </div>
 

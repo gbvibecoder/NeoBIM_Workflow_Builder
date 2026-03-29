@@ -14,6 +14,7 @@ interface WelcomeScreenProps {
 const TEMPLATES = [
   { label: "2BHK Apartment", prompt: "2BHK apartment, 900 sqft, living room, kitchen, 2 bedrooms, 2 bathrooms, balcony", icon: "M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-4 0h4" },
   { label: "3BHK Villa", prompt: "3BHK villa, 1500 sqft, living room, dining room, kitchen, 3 bedrooms, 3 bathrooms, study, balcony, utility room", icon: "M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" },
+  { label: "Duplex 4BHK", prompt: "duplex 4BHK, 2200 sqft, ground floor: living, dining, kitchen, guest bedroom, powder room, staircase; first floor: master suite, 2 bedrooms, family lounge, 2 bathrooms, terrace", icon: "M3 21h18M3 10h18M3 7l9-4 9 4M4 10h16v11H4V10z" },
   { label: "Studio Flat", prompt: "studio apartment, 400 sqft, open plan living and kitchen, bedroom area, bathroom, small balcony", icon: "M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6z" },
   { label: "Office Layout", prompt: "small office, 1200 sqft, reception, 3 cabins, conference room, pantry, 2 restrooms, storage", icon: "M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" },
 ];
@@ -82,7 +83,7 @@ export function WelcomeScreen({
           <p className="mb-2.5 text-center text-[10px] font-semibold uppercase tracking-widest text-gray-400">
             Quick Templates
           </p>
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
             {TEMPLATES.map((tpl) => (
               <button
                 key={tpl.label}

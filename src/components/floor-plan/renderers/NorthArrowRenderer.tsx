@@ -2,6 +2,7 @@
 
 import React from "react";
 import { Group, Line as KLine, Text, Circle } from "react-konva";
+import { useFloorPlanStore } from "@/stores/floor-plan-store";
 import type { Viewport } from "@/lib/floor-plan/geometry";
 
 interface NorthArrowRendererProps {
@@ -11,8 +12,7 @@ interface NorthArrowRendererProps {
 
 /**
  * Screen-fixed north arrow — top-right of canvas.
- * Simple black arrow with "N" label.
- * Rotatable based on project north angle.
+ * Click to rotate in 45° increments.
  */
 export function NorthArrowRenderer({ viewport, northAngleDeg }: NorthArrowRendererProps) {
   // Position: top-right, offset from edge
@@ -20,14 +20,23 @@ export function NorthArrowRenderer({ viewport, northAngleDeg }: NorthArrowRender
   const cy = 52;
   const size = 18; // arrow half-height
 
+  const handleClick = () => {
+    try {
+      const next = (northAngleDeg + 45) % 360;
+      useFloorPlanStore.getState().setNorthAngle(next);
+    } catch { /* non-critical */ }
+  };
+
   return (
     <Group
       x={cx}
       y={cy}
       rotation={northAngleDeg}
-      listening={false}
+      listening={true}
+      onClick={handleClick}
+      onTap={handleClick}
     >
-      {/* Background circle */}
+      {/* Background circle — clickable hit area */}
       <Circle
         x={0}
         y={0}
@@ -78,6 +87,22 @@ export function NorthArrowRenderer({ viewport, northAngleDeg }: NorthArrowRender
         width={20}
         offsetX={10}
       />
+
+      {/* Angle badge */}
+      {northAngleDeg !== 0 && (
+        <Text
+          x={0}
+          y={size + 12}
+          text={`${northAngleDeg}°`}
+          fontSize={9}
+          fontFamily="Inter, system-ui, sans-serif"
+          fill="#666666"
+          align="center"
+          width={30}
+          offsetX={15}
+          rotation={-northAngleDeg}
+        />
+      )}
     </Group>
   );
 }
