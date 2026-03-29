@@ -24,6 +24,7 @@ import type {
   RoomType,
 } from "@/types/floor-plan-cad";
 import { smartPlaceDoors, smartPlaceWindows } from "./smart-placement";
+import { layoutAllFurniture } from "./furniture-layout";
 
 let _idCounter = 0;
 function genId(prefix: string): string {
@@ -318,6 +319,32 @@ export function convertGeometryToProject(
   if (windows.length === 0) {
     const windowResult = smartPlaceWindows(floor);
     floor.windows = windowResult.windows;
+  }
+
+  // ---- 5c. Auto-furnish rooms (safe — skips rooms on failure) ----
+  try {
+    const furnResult = layoutAllFurniture(floor);
+    if (furnResult.furniture.length > 0) {
+      floor.furniture = furnResult.furniture;
+    }
+  } catch {
+    // Non-critical: floor plan works without furniture
+  }
+
+  // ---- 5d. Generate staircase geometry for staircase rooms ----
+  try {
+    generateStaircaseGeometry(floor);
+  } catch {
+    // Non-critical: floor plan works without stair treads
+  }
+
+  // ---- 5e. Smart annotations from original prompt ----
+  if (originalPrompt) {
+    try {
+      generateSmartAnnotations(floor, originalPrompt);
+    } catch {
+      // Non-critical: floor plan works without annotations
+    }
   }
 
   return {
@@ -940,4 +967,299 @@ function computeVastuDirection(cx: number, cy: number, bw: number, bh: number): 
     ["NW", "N", "NE"],
   ];
   return GRID[row][col];
+}
+
+// ============================================================
+// SMART ANNOTATIONS FROM PROMPT
+// ============================================================
+
+/** Keyword → annotation text mapping for room-specific features */
+const ANNOTATION_KEYWORDS: Array<{
+  pattern: RegExp;
+  roomTypes: string[];
+  text: string;
+}> = [
+  { pattern: /double\s*height/i, roomTypes: ["living_room", "foyer"], text: "Double Height Ceiling" },
+  { pattern: /(?:kitchen\s+)?island/i, roomTypes: ["kitchen"], text: "Kitchen Island" },
+  { pattern: /western\s*(?:style\s*)?(?:toilet|wc|commode)/i, roomTypes: ["bathroom", "wc", "toilet"], text: "Western Style WC" },
+  { pattern: /indian\s*(?:style\s*)?(?:toilet|wc)/i, roomTypes: ["bathroom", "wc", "toilet"], text: "Indian Style WC" },
+  { pattern: /walk[\s-]*in\s*(?:closet|wardrobe)/i, roomTypes: ["bedroom", "master_bedroom", "walk_in_closet", "dressing_room"], text: "Walk-in Closet" },
+  { pattern: /french\s*(?:window|door)/i, roomTypes: ["living_room", "bedroom", "master_bedroom", "balcony"], text: "French Window" },
+  { pattern: /modular\s*kitchen/i, roomTypes: ["kitchen"], text: "Modular Kitchen" },
+  { pattern: /(?:open|combined)\s*(?:plan|layout|kitchen)/i, roomTypes: ["living_room", "dining_room", "kitchen"], text: "Open Plan" },
+  { pattern: /(?:dry|wet)\s*kitchen/i, roomTypes: ["kitchen"], text: "Dry + Wet Kitchen" },
+  { pattern: /(?:servant|maid|staff)\s*(?:quarter|room)/i, roomTypes: ["servant_quarter", "bedroom"], text: "Servant Quarter" },
+  { pattern: /(?:home\s*)?theater|(?:home\s*)?cinema/i, roomTypes: ["custom"], text: "Home Theater" },
+  { pattern: /gym|workout/i, roomTypes: ["custom"], text: "Home Gym" },
+  { pattern: /pooja|puja|prayer|mandir/i, roomTypes: ["puja_room", "custom"], text: "Pooja Room" },
+  { pattern: /jacuzzi|hot\s*tub/i, roomTypes: ["bathroom", "master_bedroom"], text: "Jacuzzi" },
+  { pattern: /(?:rain\s*)?shower/i, roomTypes: ["bathroom"], text: "Rain Shower" },
+  { pattern: /terrace\s*garden/i, roomTypes: ["terrace", "balcony"], text: "Terrace Garden" },
+  { pattern: /sit[\s-]*out|(?:covered\s*)?verandah/i, roomTypes: ["verandah", "balcony"], text: "Sit-out / Verandah" },
+];
+
+/**
+ * Scan the original prompt for room-specific features and add leader-line annotations.
+ * Appears as text labels with leader lines on the floor plan — professional practice.
+ */
+function generateSmartAnnotations(floor: Floor, prompt: string): void {
+  const p = prompt.toLowerCase();
+
+  for (const kw of ANNOTATION_KEYWORDS) {
+    if (!kw.pattern.test(p)) continue;
+
+    // Find the first matching room
+    const room = floor.rooms.find(r => kw.roomTypes.includes(r.type));
+    if (!room) continue;
+
+    // Avoid duplicate annotations
+    if (floor.annotations.some(a => a.text === kw.text)) continue;
+
+    // Place annotation near room center with a leader line from the corner
+    const labelPos = {
+      x: room.label_position.x + 200,
+      y: room.label_position.y + 400,
+    };
+    const leaderStart = room.label_position;
+    const leaderEnd = labelPos;
+
+    floor.annotations.push({
+      id: genId("ann"),
+      type: "leader",
+      position: labelPos,
+      text: kw.text,
+      font_size_mm: 100,
+      rotation_deg: 0,
+      leader_line: [leaderStart, leaderEnd],
+    });
+  }
+}
+
+// ============================================================
+// STAIRCASE GEOMETRY GENERATION
+// ============================================================
+
+/**
+ * Generate proper Stair objects for staircase rooms.
+ * Indian residential standards:
+ *   - Floor height: 3000mm
+ *   - Riser: 175mm → ~17 risers per flight
+ *   - Tread: 250mm
+ *   - Width: 1200mm (min residential)
+ *   - Half-landing for U-turn
+ */
+function generateStaircaseGeometry(floor: Floor): void {
+  const FLOOR_HEIGHT_MM = floor.floor_to_floor_height_mm || 3000;
+  const RISER_HEIGHT = 175;
+  const TREAD_DEPTH = 250;
+  const STAIR_WIDTH = 1200;
+  const numRisers = Math.round(FLOOR_HEIGHT_MM / RISER_HEIGHT);
+  const halfRisers = Math.ceil(numRisers / 2);
+
+  const staircaseRooms = floor.rooms.filter(
+    r => r.type === "staircase" || r.name.toLowerCase().includes("staircase"),
+  );
+
+  for (const room of staircaseRooms) {
+    const bounds = room.boundary.points;
+    if (bounds.length < 4) continue;
+
+    // Room bounding box
+    const xs = bounds.map(p => p.x);
+    const ys = bounds.map(p => p.y);
+    const minX = Math.min(...xs);
+    const minY = Math.min(...ys);
+    const maxX = Math.max(...xs);
+    const maxY = Math.max(...ys);
+    const roomW = maxX - minX;
+    const roomD = maxY - minY;
+
+    // Determine stair orientation (treads along longer dimension)
+    const isVertical = roomD > roomW;
+
+    // Generate tread lines
+    const treads: Array<{ start: Point; end: Point }> = [];
+    const flightLength = halfRisers * TREAD_DEPTH;
+
+    if (isVertical) {
+      // Treads are horizontal lines, flight goes up Y
+      const x0 = minX + (roomW - STAIR_WIDTH) / 2;
+      const x1 = x0 + STAIR_WIDTH;
+      const startY = minY + 100; // small margin
+
+      for (let i = 0; i < halfRisers && startY + i * TREAD_DEPTH < maxY - 200; i++) {
+        const y = startY + i * TREAD_DEPTH;
+        treads.push({ start: { x: x0, y }, end: { x: x1, y } });
+      }
+    } else {
+      // Treads are vertical lines, flight goes along X
+      const y0 = minY + (roomD - STAIR_WIDTH) / 2;
+      const y1 = y0 + STAIR_WIDTH;
+      const startX = minX + 100;
+
+      for (let i = 0; i < halfRisers && startX + i * TREAD_DEPTH < maxX - 200; i++) {
+        const x = startX + i * TREAD_DEPTH;
+        treads.push({ start: { x, y: y0 }, end: { x, y: y1 } });
+      }
+    }
+
+    // Direction arrow (start → end of flight)
+    const upStart = treads.length > 0 ? treads[0].start : { x: minX, y: minY };
+    const upEnd = treads.length > 0 ? treads[treads.length - 1].start : { x: maxX, y: maxY };
+
+    // Landing at mid-point
+    const landingDepth = STAIR_WIDTH;
+
+    const stair = {
+      id: genId("stair"),
+      type: "dog_leg" as const,
+      boundary: room.boundary,
+      num_risers: numRisers,
+      riser_height_mm: RISER_HEIGHT,
+      tread_depth_mm: TREAD_DEPTH,
+      width_mm: STAIR_WIDTH,
+      landing_depth_mm: landingDepth,
+      up_direction: { start: upStart, end: upEnd },
+      treads,
+      has_railing: true,
+      railing_side: "both" as const,
+      connects_floors: [floor.level, floor.level + 1] as [number, number],
+    };
+
+    floor.stairs.push(stair);
+
+    // Add UP/DN annotation
+    const labelPos = {
+      x: (minX + maxX) / 2,
+      y: (minY + maxY) / 2,
+    };
+    const label = floor.level === 0 ? "UP" : "DN / UP";
+
+    floor.annotations.push({
+      id: genId("ann"),
+      type: "text",
+      position: labelPos,
+      text: label,
+      font_size_mm: 120,
+      rotation_deg: isVertical ? 0 : 90,
+    });
+  }
+}
+
+// ============================================================
+// MULTI-FLOOR CONVERSION
+// ============================================================
+
+/** Input shape from layout engine — avoids circular import */
+interface PlacedRoomInput {
+  name: string;
+  type: string;
+  x: number;
+  y: number;
+  width: number;
+  depth: number;
+  area: number;
+}
+
+/**
+ * Convert a multi-floor layout to a FloorPlanProject with multiple Floor objects.
+ * Each floor is converted independently using convertGeometryToProject,
+ * then merged into a single project.
+ *
+ * ADDITIVE: uses existing convertGeometryToProject per floor.
+ */
+export function convertMultiFloorToProject(
+  floorLayouts: Array<{
+    level: number;
+    rooms: PlacedRoomInput[];
+    footprintWidth: number;
+    footprintDepth: number;
+  }>,
+  projectName: string = "AI-Generated Floor Plan",
+  originalPrompt?: string,
+): FloorPlanProject {
+  if (floorLayouts.length === 0) {
+    return convertGeometryToProject(
+      { footprint: { width: 10, depth: 10 }, wallHeight: 3, walls: [], doors: [], windows: [], rooms: [] },
+      projectName,
+      originalPrompt,
+    );
+  }
+
+  const FLOOR_NAMES: Record<number, string> = {
+    0: "Ground Floor",
+    1: "First Floor",
+    2: "Second Floor",
+    3: "Third Floor",
+  };
+
+  const floors: Floor[] = [];
+
+  for (const fl of floorLayouts) {
+    const geometry: FloorPlanGeometry = {
+      footprint: { width: fl.footprintWidth, depth: fl.footprintDepth },
+      wallHeight: 3.0,
+      walls: [],
+      doors: [],
+      windows: [],
+      rooms: fl.rooms.map(r => ({
+        name: r.name,
+        type: r.type as FloorPlanGeometry["rooms"][number]["type"],
+        x: r.x,
+        y: r.y,
+        width: r.width,
+        depth: r.depth,
+        center: [r.x + r.width / 2, r.y + r.depth / 2] as [number, number],
+        area: r.area,
+      })),
+    };
+
+    const singleProject = convertGeometryToProject(geometry, projectName, originalPrompt);
+    const floor = singleProject.floors[0];
+
+    floor.name = FLOOR_NAMES[fl.level] ?? `Floor ${fl.level}`;
+    floor.level = fl.level;
+
+    floors.push(floor);
+  }
+
+  // Build unified project with all floors
+  const firstGeom = floorLayouts[0];
+  const totalCarpet = floorLayouts.reduce(
+    (s, fl) => s + fl.rooms.reduce((rs, r) => rs + r.area, 0),
+    0,
+  );
+
+  return {
+    id: genId("proj"),
+    name: projectName,
+    version: "1.0",
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+    metadata: {
+      project_type: "residential",
+      building_type: `${floorLayouts.length}-floor layout`,
+      num_floors: floorLayouts.length,
+      plot_area_sqm: firstGeom.footprintWidth * firstGeom.footprintDepth,
+      carpet_area_sqm: totalCarpet,
+      original_prompt: originalPrompt,
+      generation_model: "AI Pipeline",
+      generation_timestamp: new Date().toISOString(),
+    },
+    settings: {
+      units: "metric",
+      display_unit: "m",
+      scale: "1:100",
+      grid_size_mm: 100,
+      wall_thickness_mm: INTERIOR_WALL_MM,
+      paper_size: "A3",
+      orientation: "landscape",
+      north_angle_deg: 0,
+      vastu_compliance: true,
+      feng_shui_compliance: false,
+      ada_compliance: false,
+      nbc_compliance: true,
+    },
+    floors,
+  };
 }

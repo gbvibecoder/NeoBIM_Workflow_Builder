@@ -22,6 +22,7 @@ export interface RoomSpec {
   mustHaveExteriorWall: boolean;
   adjacentTo: string[]; // names of rooms that MUST share a wall with this room
   preferNear: string[]; // names of rooms that SHOULD be nearby (soft constraint)
+  floor?: number;       // 0=ground, 1=first, 2=second (multi-floor buildings)
 }
 
 export interface AdjacencyRequirement {
@@ -104,6 +105,22 @@ SIZE GUIDELINES (sqm, Indian standards):
 - Balcony/Verandah: 5-12, Home Theater: 15-25, Gym: 10-20, Study/Office: 8-12
 - Reception (commercial): 12-25, Waiting Area: 10-20, Meeting Room: 12-20
 
+MULTI-FLOOR BUILDINGS:
+For duplex, multi-story, or 2+ floor buildings, assign each room a "floor" field:
+- floor: 0 = ground floor
+- floor: 1 = first floor
+- floor: 2 = second floor
+
+A "Staircase" room (type: "staircase", ~12 sqm) must appear on EVERY floor it connects.
+Set numFloors to the total number of floors.
+
+Standard Indian duplex pattern:
+Ground floor (floor: 0): living, dining, kitchen, guest bedroom, servant quarter, powder room, staircase
+First floor (floor: 1): master suite, other bedrooms, family lounge, terrace, staircase
+
+If the user says "duplex", "2-story", "two floors", "ground floor + first floor", set numFloors: 2 and assign floor numbers.
+If single floor (default), omit the "floor" field or set floor: 0 for all rooms.
+
 OUTPUT THIS EXACT JSON STRUCTURE:
 {
   "buildingType": "Residential Villa",
@@ -117,7 +134,8 @@ OUTPUT THIS EXACT JSON STRUCTURE:
       "zone": "public",
       "mustHaveExteriorWall": true,
       "adjacentTo": ["Dining Room", "Foyer"],
-      "preferNear": ["Kitchen"]
+      "preferNear": ["Kitchen"],
+      "floor": 0
     }
   ],
   "adjacency": [
@@ -176,6 +194,9 @@ export async function programRooms(
     }
     if (!Array.isArray(room.adjacentTo)) room.adjacentTo = [];
     if (!Array.isArray(room.preferNear)) room.preferNear = [];
+    if (room.floor !== undefined && room.floor !== null) {
+      room.floor = Math.max(0, Math.floor(Number(room.floor) || 0));
+    }
   }
 
   // Ensure adjacency is valid
@@ -281,14 +302,29 @@ export function programRoomsFallback(prompt: string): EnhancedRoomProgram {
   if (!bhk) bhk = 2;
   bhk = Math.max(1, Math.min(bhk, 9));
 
+  // Detect multi-floor
+  let numFloors = 1;
+  if (
+    p.includes("duplex") || p.includes("2-story") || p.includes("2 story") ||
+    p.includes("two story") || p.includes("two-story") || p.includes("two floor") ||
+    p.includes("2 floor") || (p.includes("ground floor") && p.includes("first floor"))
+  ) {
+    numFloors = 2;
+  } else if (
+    p.includes("triplex") || p.includes("3-story") || p.includes("3 story") ||
+    p.includes("three story") || p.includes("three floor") || p.includes("3 floor")
+  ) {
+    numFloors = 3;
+  }
+
   let buildingType = "Residential Apartment";
-  if (p.includes("villa")) buildingType = "Residential Villa";
+  if (p.includes("duplex")) buildingType = "Duplex";
+  else if (p.includes("villa")) buildingType = "Residential Villa";
   else if (p.includes("bungalow")) buildingType = "Residential Bungalow";
   else if (p.includes("house")) buildingType = "Residential House";
   else if (p.includes("office")) buildingType = "Commercial Office";
   else if (p.includes("studio")) buildingType = "Studio Apartment";
   else if (p.includes("penthouse")) buildingType = "Penthouse";
-  else if (p.includes("duplex")) buildingType = "Duplex";
 
   const areaPerBhk: Record<number, number> = { 1: 55, 2: 90, 3: 140, 4: 200, 5: 280 };
   const totalArea = areaPerBhk[bhk] ?? bhk * 45 + 20;
@@ -340,6 +376,35 @@ export function programRoomsFallback(prompt: string): EnhancedRoomProgram {
     rooms.push({ name: "Verandah", type: "balcony", areaSqm: Math.round(totalArea * 0.06), zone: "public", mustHaveExteriorWall: true, adjacentTo: [], preferNear: ["Living Room", "Living + Dining Room"] });
   }
 
+  // Multi-floor: assign floor numbers and add staircases
+  if (numFloors >= 2) {
+    let bathIdx = 0;
+    for (const room of rooms) {
+      if (room.zone === "public" || room.type === "kitchen") {
+        room.floor = 0;
+      } else if (room.type === "bedroom") {
+        room.floor = 1;
+      } else if (room.type === "bathroom") {
+        // First bathroom on ground floor (powder room), rest follow bedrooms
+        room.floor = bathIdx === 0 ? 0 : 1;
+        bathIdx++;
+      } else if (room.zone === "circulation") {
+        room.floor = 0;
+      } else {
+        room.floor = 0;
+      }
+    }
+
+    // Add staircase on each floor
+    for (let f = 0; f < numFloors; f++) {
+      rooms.push({
+        name: "Staircase", type: "staircase", areaSqm: 12,
+        zone: "circulation", mustHaveExteriorWall: false,
+        adjacentTo: [], preferNear: [], floor: f,
+      });
+    }
+  }
+
   const zones = {
     public: rooms.filter(r => r.zone === "public").map(r => r.name),
     private: rooms.filter(r => r.zone === "private").map(r => r.name),
@@ -352,7 +417,7 @@ export function programRoomsFallback(prompt: string): EnhancedRoomProgram {
   return {
     buildingType,
     totalAreaSqm: totalArea,
-    numFloors: 1,
+    numFloors,
     rooms,
     adjacency,
     zones,

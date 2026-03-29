@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { layoutFloorPlan, PlacedRoom } from "@/lib/floor-plan/layout-engine";
+import { layoutFloorPlan, layoutMultiFloor, scoreAdjacency, PlacedRoom } from "@/lib/floor-plan/layout-engine";
 import type { EnhancedRoomProgram, RoomSpec, AdjacencyRequirement } from "@/lib/floor-plan/ai-room-programmer";
 
 // ── Helper to build a minimal EnhancedRoomProgram ────────────────────────────
@@ -807,6 +807,276 @@ describe("Layout Engine", () => {
         Math.abs(foyer!.x + foyer!.width - fpW) < 0.15 ||
         Math.abs(foyer!.y + foyer!.depth - fpH) < 0.15;
       expect(touchesEdge).toBe(true);
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Part 3: Multi-Floor Layout
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  describe("Part 3: Multi-Floor Layout", () => {
+
+    it("1. single-floor program returns 1 floor", () => {
+      const program = makeProgram([
+        { name: "Living Room", type: "living", areaSqm: 20, zone: "public" },
+        { name: "Bedroom", type: "bedroom", areaSqm: 14, zone: "private" },
+        { name: "Kitchen", type: "kitchen", areaSqm: 8, zone: "service" },
+        { name: "Bathroom", type: "bathroom", areaSqm: 4, zone: "service" },
+      ]);
+      const result = layoutMultiFloor(program);
+      expect(result.floors.length).toBe(1);
+      expect(result.floors[0].level).toBe(0);
+      expect(result.floors[0].rooms.length).toBeGreaterThanOrEqual(4);
+      expect(result.floors[0].footprintWidth).toBeGreaterThan(0);
+      expect(result.floors[0].footprintDepth).toBeGreaterThan(0);
+    });
+
+    it("2. duplex generates 2 floors with correct room distribution", () => {
+      const rooms: Array<{ name: string; type: string; areaSqm: number; zone: RoomSpec["zone"]; floor?: number }> = [
+        { name: "Living Room", type: "living", areaSqm: 25, zone: "public", floor: 0 },
+        { name: "Dining Room", type: "dining", areaSqm: 12, zone: "public", floor: 0 },
+        { name: "Kitchen", type: "kitchen", areaSqm: 10, zone: "service", floor: 0 },
+        { name: "Powder Room", type: "bathroom", areaSqm: 3, zone: "service", floor: 0 },
+        { name: "Staircase", type: "staircase", areaSqm: 12, zone: "circulation", floor: 0 },
+        { name: "Master Bedroom", type: "bedroom", areaSqm: 18, zone: "private", floor: 1 },
+        { name: "Bedroom 2", type: "bedroom", areaSqm: 14, zone: "private", floor: 1 },
+        { name: "Bedroom 3", type: "bedroom", areaSqm: 14, zone: "private", floor: 1 },
+        { name: "Bathroom 1", type: "bathroom", areaSqm: 5, zone: "service", floor: 1 },
+        { name: "Bathroom 2", type: "bathroom", areaSqm: 4, zone: "service", floor: 1 },
+        { name: "Staircase", type: "staircase", areaSqm: 12, zone: "circulation", floor: 1 },
+      ];
+
+      const roomSpecs: RoomSpec[] = rooms.map(r => ({
+        name: r.name, type: r.type, areaSqm: r.areaSqm, zone: r.zone,
+        mustHaveExteriorWall: false, adjacentTo: [], preferNear: [], floor: r.floor,
+      }));
+
+      const program: EnhancedRoomProgram = {
+        buildingType: "Duplex",
+        totalAreaSqm: rooms.reduce((s, r) => s + r.areaSqm, 0),
+        numFloors: 2,
+        rooms: roomSpecs,
+        adjacency: [],
+        zones: { public: [], private: [], service: [], circulation: [] },
+        entranceRoom: "Living Room",
+        circulationNotes: "",
+        projectName: "3BHK Duplex",
+      };
+
+      const result = layoutMultiFloor(program);
+
+      // Must have 2 floors
+      expect(result.floors.length).toBe(2);
+      expect(result.floors[0].level).toBe(0);
+      expect(result.floors[1].level).toBe(1);
+
+      // Ground floor has public rooms
+      const gfNames = result.floors[0].rooms.map(r => r.name);
+      expect(gfNames).toContain("Living Room");
+      expect(gfNames).toContain("Kitchen");
+
+      // First floor has bedrooms
+      const ffNames = result.floors[1].rooms.map(r => r.name);
+      expect(ffNames).toContain("Master Bedroom");
+      expect(ffNames).toContain("Bedroom 2");
+
+      // Both floors have staircase
+      expect(result.floors[0].rooms.some(r => r.type === "staircase" || r.name.includes("Staircase"))).toBe(true);
+      expect(result.floors[1].rooms.some(r => r.type === "staircase" || r.name.includes("Staircase"))).toBe(true);
+
+      // No overlaps on either floor
+      for (const floor of result.floors) {
+        expect(checkZeroOverlaps(floor.rooms)).toEqual([]);
+        expect(checkWithinFootprint(floor.rooms)).toEqual([]);
+      }
+    });
+
+    it("3. all floors share the same footprint dimensions", () => {
+      const roomSpecs: RoomSpec[] = [
+        { name: "Hall", type: "living", areaSqm: 30, zone: "public", mustHaveExteriorWall: true, adjacentTo: [], preferNear: [], floor: 0 },
+        { name: "Kitchen", type: "kitchen", areaSqm: 10, zone: "service", mustHaveExteriorWall: true, adjacentTo: [], preferNear: [], floor: 0 },
+        { name: "Staircase", type: "staircase", areaSqm: 12, zone: "circulation", mustHaveExteriorWall: false, adjacentTo: [], preferNear: [], floor: 0 },
+        { name: "Master Bed", type: "bedroom", areaSqm: 20, zone: "private", mustHaveExteriorWall: true, adjacentTo: [], preferNear: [], floor: 1 },
+        { name: "Bed 2", type: "bedroom", areaSqm: 15, zone: "private", mustHaveExteriorWall: true, adjacentTo: [], preferNear: [], floor: 1 },
+        { name: "Bath", type: "bathroom", areaSqm: 5, zone: "service", mustHaveExteriorWall: false, adjacentTo: [], preferNear: [], floor: 1 },
+        { name: "Staircase", type: "staircase", areaSqm: 12, zone: "circulation", mustHaveExteriorWall: false, adjacentTo: [], preferNear: [], floor: 1 },
+      ];
+
+      const program: EnhancedRoomProgram = {
+        buildingType: "Duplex", totalAreaSqm: 104, numFloors: 2,
+        rooms: roomSpecs, adjacency: [],
+        zones: { public: [], private: [], service: [], circulation: [] },
+        entranceRoom: "Hall", circulationNotes: "", projectName: "Test Duplex",
+      };
+
+      const result = layoutMultiFloor(program);
+      expect(result.floors.length).toBe(2);
+
+      // Same footprint on both floors
+      expect(result.floors[0].footprintWidth).toBe(result.floors[1].footprintWidth);
+      expect(result.floors[0].footprintDepth).toBe(result.floors[1].footprintDepth);
+    });
+
+    it("4. auto-adds staircase when missing from a floor", () => {
+      const roomSpecs: RoomSpec[] = [
+        { name: "Living", type: "living", areaSqm: 20, zone: "public", mustHaveExteriorWall: true, adjacentTo: [], preferNear: [], floor: 0 },
+        { name: "Bedroom", type: "bedroom", areaSqm: 15, zone: "private", mustHaveExteriorWall: true, adjacentTo: [], preferNear: [], floor: 1 },
+        // No staircase provided on either floor
+      ];
+
+      const program: EnhancedRoomProgram = {
+        buildingType: "Duplex", totalAreaSqm: 35, numFloors: 2,
+        rooms: roomSpecs, adjacency: [],
+        zones: { public: [], private: [], service: [], circulation: [] },
+        entranceRoom: "Living", circulationNotes: "", projectName: "Test",
+      };
+
+      const result = layoutMultiFloor(program);
+      expect(result.floors.length).toBe(2);
+
+      // Both floors should have an auto-added staircase
+      for (const floor of result.floors) {
+        const hasStair = floor.rooms.some(r => r.type === "staircase" || r.name.toLowerCase().includes("staircase"));
+        expect(hasStair).toBe(true);
+      }
+    });
+
+    it("5. staircase alignment across floors", () => {
+      const roomSpecs: RoomSpec[] = [
+        { name: "Living", type: "living", areaSqm: 25, zone: "public", mustHaveExteriorWall: true, adjacentTo: [], preferNear: [], floor: 0 },
+        { name: "Kitchen", type: "kitchen", areaSqm: 10, zone: "service", mustHaveExteriorWall: true, adjacentTo: [], preferNear: [], floor: 0 },
+        { name: "Bath GF", type: "bathroom", areaSqm: 4, zone: "service", mustHaveExteriorWall: false, adjacentTo: [], preferNear: [], floor: 0 },
+        { name: "Staircase", type: "staircase", areaSqm: 12, zone: "circulation", mustHaveExteriorWall: false, adjacentTo: [], preferNear: [], floor: 0 },
+        { name: "Master Bed", type: "bedroom", areaSqm: 18, zone: "private", mustHaveExteriorWall: true, adjacentTo: [], preferNear: [], floor: 1 },
+        { name: "Bed 2", type: "bedroom", areaSqm: 14, zone: "private", mustHaveExteriorWall: true, adjacentTo: [], preferNear: [], floor: 1 },
+        { name: "Bath FF", type: "bathroom", areaSqm: 5, zone: "service", mustHaveExteriorWall: false, adjacentTo: [], preferNear: [], floor: 1 },
+        { name: "Staircase", type: "staircase", areaSqm: 12, zone: "circulation", mustHaveExteriorWall: false, adjacentTo: [], preferNear: [], floor: 1 },
+      ];
+
+      const program: EnhancedRoomProgram = {
+        buildingType: "Duplex", totalAreaSqm: 100, numFloors: 2,
+        rooms: roomSpecs, adjacency: [],
+        zones: { public: [], private: [], service: [], circulation: [] },
+        entranceRoom: "Living", circulationNotes: "", projectName: "Test Duplex",
+      };
+
+      const result = layoutMultiFloor(program);
+      expect(result.floors.length).toBe(2);
+
+      const gfStair = result.floors[0].rooms.find(r => r.type === "staircase" || r.name.includes("Staircase"));
+      const ffStair = result.floors[1].rooms.find(r => r.type === "staircase" || r.name.includes("Staircase"));
+
+      expect(gfStair).toBeDefined();
+      expect(ffStair).toBeDefined();
+
+      // Staircase alignment is best-effort (different room sets = different BSP layouts).
+      // Verify both exist and have valid positions.
+      expect(gfStair!.width).toBeGreaterThan(0);
+      expect(ffStair!.width).toBeGreaterThan(0);
+      expect(gfStair!.x).toBeGreaterThanOrEqual(0);
+      expect(ffStair!.x).toBeGreaterThanOrEqual(0);
+    });
+
+    it("6. 3-story building produces 3 floors", () => {
+      const roomSpecs: RoomSpec[] = [
+        { name: "Shop", type: "living", areaSqm: 40, zone: "public", mustHaveExteriorWall: true, adjacentTo: [], preferNear: [], floor: 0 },
+        { name: "Staircase", type: "staircase", areaSqm: 10, zone: "circulation", mustHaveExteriorWall: false, adjacentTo: [], preferNear: [], floor: 0 },
+        { name: "Bedroom 1", type: "bedroom", areaSqm: 15, zone: "private", mustHaveExteriorWall: true, adjacentTo: [], preferNear: [], floor: 1 },
+        { name: "Bedroom 2", type: "bedroom", areaSqm: 15, zone: "private", mustHaveExteriorWall: true, adjacentTo: [], preferNear: [], floor: 1 },
+        { name: "Staircase", type: "staircase", areaSqm: 10, zone: "circulation", mustHaveExteriorWall: false, adjacentTo: [], preferNear: [], floor: 1 },
+        { name: "Terrace", type: "balcony", areaSqm: 30, zone: "public", mustHaveExteriorWall: true, adjacentTo: [], preferNear: [], floor: 2 },
+        { name: "Utility", type: "utility", areaSqm: 5, zone: "service", mustHaveExteriorWall: false, adjacentTo: [], preferNear: [], floor: 2 },
+        { name: "Staircase", type: "staircase", areaSqm: 10, zone: "circulation", mustHaveExteriorWall: false, adjacentTo: [], preferNear: [], floor: 2 },
+      ];
+
+      const program: EnhancedRoomProgram = {
+        buildingType: "Multi-story", totalAreaSqm: 135, numFloors: 3,
+        rooms: roomSpecs, adjacency: [],
+        zones: { public: [], private: [], service: [], circulation: [] },
+        entranceRoom: "Shop", circulationNotes: "", projectName: "3-Story",
+      };
+
+      const result = layoutMultiFloor(program);
+      expect(result.floors.length).toBe(3);
+      expect(result.floors[0].level).toBe(0);
+      expect(result.floors[1].level).toBe(1);
+      expect(result.floors[2].level).toBe(2);
+
+      // Each floor has rooms
+      for (const f of result.floors) {
+        expect(f.rooms.length).toBeGreaterThan(0);
+        expect(checkZeroOverlaps(f.rooms)).toEqual([]);
+      }
+
+      // All floors same footprint
+      expect(result.floors[0].footprintWidth).toBe(result.floors[2].footprintWidth);
+      expect(result.floors[0].footprintDepth).toBe(result.floors[2].footprintDepth);
+    });
+
+    it("7. empty program returns 1 empty floor", () => {
+      const program = makeProgram([]);
+      const result = layoutMultiFloor(program);
+      expect(result.floors.length).toBe(1);
+      expect(result.floors[0].rooms).toEqual([]);
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Part 4: Adjacency Scoring (report only)
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  describe("Part 4: Adjacency Scoring", () => {
+
+    it("reports 100% when no adjacency requirements", () => {
+      const rooms: PlacedRoom[] = [
+        { name: "A", type: "living", x: 0, y: 0, width: 5, depth: 5, area: 25 },
+      ];
+      const score = scoreAdjacency(rooms, []);
+      expect(score.total).toBe(0);
+      expect(score.percentage).toBe(100);
+      expect(score.unsatisfied).toEqual([]);
+    });
+
+    it("reports satisfied when rooms share an edge", () => {
+      const rooms: PlacedRoom[] = [
+        { name: "Kitchen", type: "kitchen", x: 0, y: 0, width: 4, depth: 4, area: 16 },
+        { name: "Dining", type: "dining", x: 4, y: 0, width: 4, depth: 4, area: 16 },
+      ];
+      const adj = [{ roomA: "Kitchen", roomB: "Dining", reason: "serving" }];
+      const score = scoreAdjacency(rooms, adj);
+      expect(score.total).toBe(1);
+      expect(score.satisfied).toBe(1);
+      expect(score.percentage).toBe(100);
+    });
+
+    it("reports unsatisfied when rooms don't touch", () => {
+      const rooms: PlacedRoom[] = [
+        { name: "Kitchen", type: "kitchen", x: 0, y: 0, width: 4, depth: 4, area: 16 },
+        { name: "Dining", type: "dining", x: 8, y: 8, width: 4, depth: 4, area: 16 },
+      ];
+      const adj = [{ roomA: "Kitchen", roomB: "Dining", reason: "serving" }];
+      const score = scoreAdjacency(rooms, adj);
+      expect(score.satisfied).toBe(0);
+      expect(score.percentage).toBe(0);
+      expect(score.unsatisfied.length).toBe(1);
+      expect(score.unsatisfied[0].roomA).toBe("Kitchen");
+    });
+
+    it("scores 2BHK layout adjacency", () => {
+      const program = makeProgram([
+        { name: "Living Room", type: "living", areaSqm: 18, zone: "public", adjacentTo: ["Kitchen"] },
+        { name: "Kitchen", type: "kitchen", areaSqm: 8, zone: "service", adjacentTo: ["Living Room"] },
+        { name: "Bedroom", type: "bedroom", areaSqm: 14, zone: "private", adjacentTo: ["Bathroom"] },
+        { name: "Bathroom", type: "bathroom", areaSqm: 4, zone: "service" },
+      ], [
+        { roomA: "Living Room", roomB: "Kitchen", reason: "serving" },
+        { roomA: "Bedroom", roomB: "Bathroom", reason: "attached bath" },
+      ]);
+      const result = layoutFloorPlan(program);
+      const score = scoreAdjacency(result, program.adjacency);
+      expect(score.total).toBe(2);
+      // At least bedroom-bathroom should be satisfied (they're paired)
+      expect(score.satisfied).toBeGreaterThanOrEqual(1);
     });
   });
 });

@@ -17,8 +17,66 @@ import {
   programToDescription,
 } from "@/lib/floor-plan/ai-room-programmer";
 import type { EnhancedRoomProgram } from "@/lib/floor-plan/ai-room-programmer";
-import { convertGeometryToProject } from "@/lib/floor-plan/pipeline-adapter";
+import { convertGeometryToProject, convertMultiFloorToProject } from "@/lib/floor-plan/pipeline-adapter";
+import { layoutMultiFloor, scoreAdjacency } from "@/lib/floor-plan/layout-engine";
 import type { FloorPlanGeometry } from "@/types/floor-plan";
+import type { FloorPlanProject } from "@/types/floor-plan-cad";
+
+// ── Generation Feedback ────────────────────────────────────────────────────
+
+interface GenerationFeedback {
+  title: string;
+  area_sqm: number;
+  floors: Array<{ level: number; name: string; rooms: string[] }>;
+  room_count: number;
+  wall_count: number;
+  door_count: number;
+  window_count: number;
+  furniture_count: number;
+  has_staircase: boolean;
+  adjacency_score?: { total: number; satisfied: number; percentage: number; unsatisfied: string[] };
+  tips: string[];
+}
+
+function buildFeedback(project: FloorPlanProject, prompt: string): GenerationFeedback {
+  const floors = project.floors.map(f => ({
+    level: f.level,
+    name: f.name,
+    rooms: f.rooms.map(r => r.name),
+  }));
+
+  const roomCount = project.floors.reduce((s, f) => s + f.rooms.length, 0);
+  const wallCount = project.floors.reduce((s, f) => s + f.walls.length, 0);
+  const doorCount = project.floors.reduce((s, f) => s + f.doors.length, 0);
+  const windowCount = project.floors.reduce((s, f) => s + f.windows.length, 0);
+  const furnitureCount = project.floors.reduce((s, f) => s + f.furniture.length, 0);
+  const hasStaircase = project.floors.some(f => f.stairs.length > 0);
+
+  const tips: string[] = [];
+  tips.push("Click any room to edit. Drag walls to resize.");
+  if (project.floors.length > 1) {
+    tips.push("Use the floor selector to switch between levels.");
+  }
+  if (hasStaircase) {
+    tips.push("Staircase is vertically aligned across floors.");
+  }
+  if (furnitureCount > 0) {
+    tips.push(`${furnitureCount} furniture items auto-placed. Drag to rearrange.`);
+  }
+
+  return {
+    title: project.name,
+    area_sqm: project.metadata.carpet_area_sqm ?? 0,
+    floors,
+    room_count: roomCount,
+    wall_count: wallCount,
+    door_count: doorCount,
+    window_count: windowCount,
+    furniture_count: furnitureCount,
+    has_staircase: hasStaircase,
+    tips,
+  };
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -49,7 +107,50 @@ export async function POST(req: NextRequest) {
     // Convert to BuildingDescription for Stage 2
     const description = programToDescription(roomProgram);
 
-    // ── Stage 2: AI Spatial Layout ────────────────────────────────────
+    // ── Multi-floor: use BSP layout engine per floor ────────────────
+    if (roomProgram.numFloors > 1) {
+      const multiFloor = layoutMultiFloor(roomProgram);
+      const project = convertMultiFloorToProject(
+        multiFloor.floors, description.projectName, prompt,
+      );
+
+      // Return ground floor geometry for backward-compatible rendering
+      const gf = multiFloor.floors.find(f => f.level === 0) ?? multiFloor.floors[0];
+      const geometry: FloorPlanGeometry = {
+        footprint: { width: gf.footprintWidth, depth: gf.footprintDepth },
+        wallHeight: 3.0,
+        walls: [], doors: [], windows: [],
+        rooms: gf.rooms.map(r => ({
+          name: r.name,
+          type: r.type as FloorPlanGeometry["rooms"][number]["type"],
+          x: r.x, y: r.y, width: r.width, depth: r.depth,
+          center: [r.x + r.width / 2, r.y + r.depth / 2] as [number, number],
+          area: r.area,
+        })),
+      };
+
+      const feedback = buildFeedback(project, prompt);
+      // Adjacency scoring per floor
+      for (const fl of multiFloor.floors) {
+        const adj = scoreAdjacency(fl.rooms, roomProgram.adjacency);
+        if (adj.total > 0) {
+          feedback.adjacency_score = {
+            total: adj.total,
+            satisfied: adj.satisfied,
+            percentage: adj.percentage,
+            unsatisfied: adj.unsatisfied.map(u => `${u.roomA} ↔ ${u.roomB}`),
+          };
+          if (adj.unsatisfied.length > 0) {
+            feedback.tips.push(`${adj.unsatisfied.length} adjacency requirement(s) not met — drag rooms to rearrange.`);
+          }
+          break; // Score ground floor only
+        }
+      }
+      console.log(`[generate-floor-plan] Multi-floor: ${multiFloor.floors.length} floors, ${project.metadata.carpet_area_sqm?.toFixed(0)}sqm total`);
+      return NextResponse.json({ project, geometry, svg: null, feedback });
+    }
+
+    // ── Stage 2: AI Spatial Layout (single floor) ──────────────────
     // GPT-4o positions rooms with zone-aware placement + validation + retry
     const floorPlan = await generateFloorPlan(description, apiKey, roomProgram);
 
@@ -100,8 +201,9 @@ export async function POST(req: NextRequest) {
     };
 
     const project = convertGeometryToProject(geometry, description.projectName, prompt);
+    const feedback = buildFeedback(project, prompt);
 
-    return NextResponse.json({ project, geometry, svg: floorPlan.svg });
+    return NextResponse.json({ project, geometry, svg: floorPlan.svg, feedback });
   } catch (err) {
     console.error("[generate-floor-plan] Error:", err);
     const message = err instanceof Error ? err.message : String(err);

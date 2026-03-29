@@ -415,6 +415,47 @@ function pairBedroomsWithBathrooms(
   return pairs;
 }
 
+// ── Vastu-aware room ordering (soft preference) ─────────────────────────────
+
+/**
+ * Vastu quadrant preference for common room types.
+ * BSP places rooms left→right, top→bottom in the order given.
+ * In Y-down coordinates: top = private zone (row 0), bottom = public zone.
+ * Within a zone, left = West side, right = East side.
+ *
+ * These are SOFT preferences — if they conflict with BSP tiling,
+ * BSP tiling wins (correct tiling > Vastu score).
+ */
+const VASTU_SORT_PRIORITY: Record<string, number> = {
+  // Public zone ordering (placed left-to-right in public strip):
+  // Left (West) → Right (East). Living should be N/NE/E = right side.
+  kitchen: 10,      // SE quadrant = right side of public zone
+  dining: 20,       // Adjacent to kitchen, middle
+  living: 30,       // N/NE/E = right side
+  entrance: 5,      // N/E = leftmost or rightmost (exterior)
+
+  // Private zone ordering (placed left-to-right in private strip):
+  // SW = master bedroom (left), W/NW = children (middle-right)
+  bedroom: 40,      // Generic bedrooms in W/NW
+  bathroom: 50,     // NW/W = alongside bedrooms
+  utility: 55,      // NW
+  storage: 60,      // SW
+
+  // Circulation
+  hallway: 100,     // Center
+  staircase: 90,    // S/W
+};
+
+function vastuSortRooms(rooms: RoomSpec[]): RoomSpec[] {
+  return [...rooms].sort((a, b) => {
+    const pa = VASTU_SORT_PRIORITY[a.type] ?? 50;
+    const pb = VASTU_SORT_PRIORITY[b.type] ?? 50;
+    if (pa !== pb) return pa - pb;
+    // Tie-break: larger rooms first (get better shapes)
+    return b.areaSqm - a.areaSqm;
+  });
+}
+
 // ── Public zone layout ───────────────────────────────────────────────────────
 
 function layoutPublicZone(
@@ -424,11 +465,14 @@ function layoutPublicZone(
 ): PlacedRoom[] {
   if (rooms.length === 0) return [];
 
-  // Order rooms for adjacency (BFS from largest room)
+  // Order rooms for adjacency (BFS from largest room), then Vastu-aware sort
   const ordered = adjacencySort(rooms, adjacency);
 
+  // Apply soft Vastu ordering when adjacency doesn't dictate order
+  const vastuOrdered = vastuSortRooms(ordered);
+
   // Use BSP which naturally produces good tiling
-  return bspSubdivide(ordered, rect, adjacency);
+  return bspSubdivide(vastuOrdered, rect, adjacency);
 }
 
 // ── BSP subdivision (core algorithm) ─────────────────────────────────────────
@@ -629,4 +673,202 @@ function placeRoom(room: RoomSpec, rect: Rect): PlacedRoom {
     depth: h,
     area: grid(w * h),
   };
+}
+
+// ── Adjacency scoring (report only, no auto-swap) ───────────────────────────
+
+export interface AdjacencyScore {
+  total: number;
+  satisfied: number;
+  percentage: number;
+  unsatisfied: Array<{ roomA: string; roomB: string; reason: string }>;
+}
+
+/**
+ * Score how well the layout satisfies adjacency requirements.
+ * REPORT ONLY — does not modify the layout.
+ */
+export function scoreAdjacency(
+  rooms: PlacedRoom[],
+  adjacency: AdjacencyRequirement[],
+): AdjacencyScore {
+  if (adjacency.length === 0) return { total: 0, satisfied: 0, percentage: 100, unsatisfied: [] };
+
+  const TOL = 0.15; // 150mm tolerance for edge touching
+  let satisfied = 0;
+  const unsatisfied: AdjacencyScore["unsatisfied"] = [];
+
+  for (const req of adjacency) {
+    const a = rooms.find(r => r.name === req.roomA);
+    const b = rooms.find(r => r.name === req.roomB);
+    if (!a || !b) continue;
+
+    // Check if rooms share an edge (adjacent)
+    const shareHEdge =
+      (Math.abs((a.y + a.depth) - b.y) < TOL || Math.abs((b.y + b.depth) - a.y) < TOL) &&
+      Math.min(a.x + a.width, b.x + b.width) - Math.max(a.x, b.x) > TOL;
+
+    const shareVEdge =
+      (Math.abs((a.x + a.width) - b.x) < TOL || Math.abs((b.x + b.width) - a.x) < TOL) &&
+      Math.min(a.y + a.depth, b.y + b.depth) - Math.max(a.y, b.y) > TOL;
+
+    if (shareHEdge || shareVEdge) {
+      satisfied++;
+    } else {
+      unsatisfied.push({ roomA: req.roomA, roomB: req.roomB, reason: req.reason });
+    }
+  }
+
+  return {
+    total: adjacency.length,
+    satisfied,
+    percentage: Math.round((satisfied / adjacency.length) * 100),
+    unsatisfied,
+  };
+}
+
+// ── Multi-floor layout ──────────────────────────────────────────────────────
+
+export interface FloorLayout {
+  level: number;
+  rooms: PlacedRoom[];
+  footprintWidth: number;
+  footprintDepth: number;
+}
+
+export interface MultiFloorLayout {
+  floors: FloorLayout[];
+}
+
+/**
+ * Layout a multi-floor building. Groups rooms by floor, runs BSP per floor,
+ * and aligns staircases vertically. Falls back to single-floor on error.
+ *
+ * ADDITIVE: calls layoutFloorPlan() internally — does NOT modify it.
+ */
+export function layoutMultiFloor(program: EnhancedRoomProgram): MultiFloorLayout {
+  try {
+    // Group rooms by floor
+    const floorGroups = new Map<number, RoomSpec[]>();
+    for (const room of program.rooms) {
+      const fl = room.floor ?? 0;
+      if (!floorGroups.has(fl)) floorGroups.set(fl, []);
+      floorGroups.get(fl)!.push({ ...room }); // shallow copy to avoid mutation
+    }
+
+    // Single floor? Use existing layout
+    if (floorGroups.size <= 1) {
+      const rooms = layoutFloorPlan(program);
+      const bW = rooms.length > 0 ? grid(Math.max(...rooms.map(r => r.x + r.width))) : 0;
+      const bD = rooms.length > 0 ? grid(Math.max(...rooms.map(r => r.y + r.depth))) : 0;
+      return {
+        floors: [{ level: 0, rooms, footprintWidth: bW, footprintDepth: bD }],
+      };
+    }
+
+    // Multi-floor layout
+    const sortedLevels = [...floorGroups.keys()].sort((a, b) => a - b);
+    const floors: FloorLayout[] = [];
+
+    for (const level of sortedLevels) {
+      const rooms = floorGroups.get(level)!;
+
+      // Ensure staircase exists on each floor
+      const hasStaircase = rooms.some(
+        r => r.type === "staircase" || r.name.toLowerCase().includes("staircase"),
+      );
+      if (!hasStaircase) {
+        rooms.push({
+          name: "Staircase",
+          type: "staircase",
+          areaSqm: 12,
+          zone: "circulation" as const,
+          mustHaveExteriorWall: false,
+          adjacentTo: [],
+          preferNear: [],
+          floor: level,
+        });
+      }
+
+      // Create single-floor program for BSP
+      const floorArea = rooms.reduce((s, r) => s + r.areaSqm, 0);
+      const floorProgram: EnhancedRoomProgram = {
+        ...program,
+        rooms,
+        totalAreaSqm: floorArea,
+        numFloors: 1,
+        adjacency: program.adjacency.filter(a => {
+          const roomNames = new Set(rooms.map(r => r.name));
+          return roomNames.has(a.roomA) && roomNames.has(a.roomB);
+        }),
+      };
+
+      const layout = layoutFloorPlan(floorProgram);
+      const bW = layout.length > 0 ? grid(Math.max(...layout.map(r => r.x + r.width))) : 0;
+      const bD = layout.length > 0 ? grid(Math.max(...layout.map(r => r.y + r.depth))) : 0;
+
+      floors.push({ level, rooms: layout, footprintWidth: bW, footprintDepth: bD });
+    }
+
+    // Normalize footprint (all floors same size for structural alignment)
+    const maxW = Math.max(...floors.map(f => f.footprintWidth));
+    const maxD = Math.max(...floors.map(f => f.footprintDepth));
+    for (const f of floors) {
+      f.footprintWidth = maxW;
+      f.footprintDepth = maxD;
+    }
+
+    // Align staircases vertically across floors
+    multiFloorAlignStaircases(floors);
+
+    return { floors };
+  } catch {
+    // Fallback: single-floor layout with all rooms
+    const rooms = layoutFloorPlan(program);
+    const bW = rooms.length > 0 ? grid(Math.max(...rooms.map(r => r.x + r.width))) : 0;
+    const bD = rooms.length > 0 ? grid(Math.max(...rooms.map(r => r.y + r.depth))) : 0;
+    return {
+      floors: [{ level: 0, rooms, footprintWidth: bW, footprintDepth: bD }],
+    };
+  }
+}
+
+/**
+ * Align staircase positions across floors so they stack vertically.
+ * Uses ground floor staircase as reference; swaps positions on other floors.
+ */
+function multiFloorAlignStaircases(floors: FloorLayout[]): void {
+  if (floors.length < 2) return;
+
+  const groundFloor = floors.find(f => f.level === 0) ?? floors[0];
+  const refStair = groundFloor.rooms.find(
+    r => r.type === "staircase" || r.name.toLowerCase().includes("staircase"),
+  );
+  if (!refStair) return;
+
+  for (const floor of floors) {
+    if (floor === groundFloor) continue;
+
+    const stair = floor.rooms.find(
+      r => r.type === "staircase" || r.name.toLowerCase().includes("staircase"),
+    );
+    if (!stair) continue;
+    if (stair.x === refStair.x && stair.y === refStair.y) continue;
+
+    // Find room occupying the reference staircase position (overlap check)
+    const target = floor.rooms.find(r =>
+      r !== stair &&
+      !(r.x >= refStair.x + refStair.width || r.x + r.width <= refStair.x) &&
+      !(r.y >= refStair.y + refStair.depth || r.y + r.depth <= refStair.y),
+    );
+
+    if (target) {
+      // Swap positions (keep BSP-generated dimensions for tiling correctness)
+      const sx = stair.x, sy = stair.y, sw = stair.width, sd = stair.depth, sa = stair.area;
+      stair.x = target.x; stair.y = target.y;
+      stair.width = target.width; stair.depth = target.depth; stair.area = target.width * target.depth;
+      target.x = sx; target.y = sy;
+      target.width = sw; target.depth = sd; target.area = sw * sd;
+    }
+  }
 }
