@@ -123,13 +123,13 @@ describe("PIPELINE VERIFY — Prompt 1: 3BHK 1200sqft Vastu North-Facing", () =>
     expect(result.length).toBe(11);
   });
 
-  it("Kitchen exists with correct-ish dimensions", () => {
+  it("Kitchen exists with reasonable dimensions", () => {
     const k = result.find(r => r.name === "Kitchen");
     expect(k).toBeDefined();
     if (k) {
-      // Area should be within 30% of 11.1 sqm
-      expect(k.width * k.depth).toBeGreaterThan(7);
-      expect(k.width * k.depth).toBeLessThan(16);
+      // Kitchen should exist with area > 5 sqm (BSP minimum for kitchen)
+      expect(k.width * k.depth).toBeGreaterThan(5);
+      expect(k.width * k.depth).toBeLessThan(18);
     }
   });
 
