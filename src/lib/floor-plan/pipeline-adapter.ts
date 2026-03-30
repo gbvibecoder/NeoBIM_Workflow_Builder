@@ -1002,7 +1002,64 @@ const ANNOTATION_KEYWORDS: Array<{
   { pattern: /(?:rain\s*)?shower/i, roomTypes: ["bathroom"], text: "Rain Shower" },
   { pattern: /terrace\s*garden/i, roomTypes: ["terrace", "balcony"], text: "Terrace Garden" },
   { pattern: /sit[\s-]*out|(?:covered\s*)?verandah/i, roomTypes: ["verandah", "balcony"], text: "Verandah" },
+
+  // ── Cultural / Architectural ──
+  { pattern: /tulsi|tulasi/i, roomTypes: ["courtyard", "custom", "balcony"], text: "Tulsi Platform" },
+  { pattern: /swing\s*seat/i, roomTypes: ["verandah", "balcony", "living_room"], text: "Swing Seating" },
+  { pattern: /pillar/i, roomTypes: ["verandah", "foyer", "living_room"], text: "Pillared" },
+  { pattern: /courtyard/i, roomTypes: ["courtyard", "custom"], text: "Open Courtyard" },
+  { pattern: /thinnai/i, roomTypes: ["verandah", "custom"], text: "Thinnai" },
+
+  // ── Furniture / Fixtures ──
+  { pattern: /grab\s*(?:bar|rail)/i, roomTypes: ["bathroom", "wc", "toilet"], text: "Grab Rails" },
+  { pattern: /anti[\s-]*skid/i, roomTypes: ["bathroom", "wc", "toilet"], text: "Anti-Skid Floor" },
+  { pattern: /display\s*showcase/i, roomTypes: ["living_room", "dining_room", "custom"], text: "Display Showcase" },
+  { pattern: /(?:projector|projection)/i, roomTypes: ["custom", "living_room", "bedroom"], text: "Projector Setup" },
+  { pattern: /recliner/i, roomTypes: ["custom", "living_room", "bedroom"], text: "Recliners" },
+  { pattern: /dual\s*(?:vanity|basin)/i, roomTypes: ["bathroom", "master_bedroom"], text: "Dual Vanity" },
+  { pattern: /breakfast\s*(?:bar|counter|nook)/i, roomTypes: ["kitchen", "dining_room"], text: "Breakfast Bar" },
+  { pattern: /exhaust|chimney/i, roomTypes: ["kitchen"], text: "Exhaust/Chimney" },
+  { pattern: /cloth\s*dry|drying\s*(?:line|area)/i, roomTypes: ["utility", "balcony", "custom"], text: "Drying Area" },
+  { pattern: /study\s*corner|competitive\s*exam/i, roomTypes: ["bedroom", "custom"], text: "Study Corner" },
+  { pattern: /gaming\s*setup/i, roomTypes: ["bedroom", "custom"], text: "Gaming Setup" },
+  { pattern: /vanity\s*table/i, roomTypes: ["bedroom", "custom"], text: "Vanity Table" },
+  { pattern: /tv\s*wall/i, roomTypes: ["living_room", "bedroom", "custom"], text: "TV Wall" },
+  { pattern: /photo\s*gallery/i, roomTypes: ["hallway", "custom"], text: "Photo Gallery" },
+  { pattern: /toy\s*storage/i, roomTypes: ["bedroom", "custom"], text: "Toy Storage" },
+  { pattern: /bathtub|bath\s*tub/i, roomTypes: ["bathroom"], text: "Bathtub" },
+  { pattern: /two[\s-]*wheeler/i, roomTypes: ["custom", "parking"], text: "Two-Wheeler" },
 ];
+
+/**
+ * Find a room by looking at prompt context around a keyword match.
+ * If a keyword like "grab rails" appears near "parents bedroom", return that room.
+ */
+function findRoomByPromptContext(
+  rooms: Floor["rooms"],
+  pattern: RegExp,
+  prompt: string,
+): Floor["rooms"][number] | null {
+  try {
+    pattern.lastIndex = 0;
+    const match = pattern.exec(prompt);
+    if (!match) return null;
+
+    // Extract ~80 chars before the keyword to find the room name
+    const contextStart = Math.max(0, match.index - 80);
+    const context = prompt.substring(contextStart, match.index + match[0].length + 30);
+
+    // Check which room name appears in this context
+    for (const room of rooms) {
+      const roomWords = room.name.toLowerCase().split(/\s+/).filter(w => w.length > 3);
+      if (roomWords.some(w => context.includes(w)) && room.area_sqm >= 3) {
+        return room;
+      }
+    }
+  } catch {
+    // Non-critical
+  }
+  return null;
+}
 
 /**
  * Scan the original prompt for room-specific features and add leader-line annotations.
@@ -1014,8 +1071,13 @@ function generateSmartAnnotations(floor: Floor, prompt: string): void {
   for (const kw of ANNOTATION_KEYWORDS) {
     if (!kw.pattern.test(p)) continue;
 
-    // Find the first matching room (skip small rooms to avoid label overlap)
-    const room = floor.rooms.find(r => kw.roomTypes.includes(r.type) && r.area_sqm >= 6);
+    // Find the best matching room: prefer type match, fall back to name match
+    // Skip small rooms (< 4 sqm) to avoid label overlap
+    let room = floor.rooms.find(r => kw.roomTypes.includes(r.type) && r.area_sqm >= 4);
+    if (!room) {
+      // Try matching by room name context — find the room mentioned near this keyword
+      room = findRoomByPromptContext(floor.rooms, kw.pattern, p) ?? undefined;
+    }
     if (!room) continue;
 
     // Avoid duplicate annotations
