@@ -5005,59 +5005,73 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
               roomProgram = programRoomsFallback(promptForAI);
             }
 
+            console.log(`[GN-012][STAGE-1] Rooms from AI: ${roomProgram.rooms.length}`, roomProgram.rooms.map(r => `${r.name} (floor:${r.floor ?? 0})`));
+
             const description = programToDescription(roomProgram);
 
-            // Stage 2: AI Spatial Layout (GPT-4o with validation + retry)
-            const floorPlan = await generateFloorPlan(description, floorPlanApiKey, roomProgram);
-
-            // Stage 3: Build geometry → FloorPlanProject
-            const positionedRooms = floorPlan.positionedRooms;
-            const roomList = floorPlan.roomList;
-
-            const rooms = positionedRooms
-              ? positionedRooms.map((r: Record<string, unknown>) => ({
-                  name: r.name as string,
-                  type: (r.type as string ?? "other") as "living" | "bedroom" | "kitchen" | "dining" | "bathroom" | "hallway" | "entrance" | "utility" | "balcony" | "other",
-                  x: r.x as number, y: r.y as number,
-                  width: r.width as number, depth: r.depth as number,
-                  center: [(r.x as number) + (r.width as number) / 2, (r.y as number) + (r.depth as number) / 2] as [number, number],
-                  area: r.area as number,
-                }))
-              : roomList.map((r: Record<string, unknown>) => {
-                  const area = (r.area as number) ?? 16;
-                  const w = Math.round(Math.sqrt(area * 1.2) * 10) / 10;
-                  const d = Math.round((area / w) * 10) / 10;
-                  return {
-                    name: r.name as string,
-                    type: ((r.type as string) ?? "other") as "living" | "bedroom" | "kitchen" | "dining" | "bathroom" | "other",
-                    x: 0, y: 0, width: w, depth: d,
-                    center: [w / 2, d / 2] as [number, number],
-                    area,
-                  };
-                });
-
-            // Compute footprint from actual room bounding box (layout engine may
-            // expand footprint beyond totalArea to fit corridor/zones)
-            let bW: number, bD: number;
-            if (positionedRooms && positionedRooms.length > 0) {
-              bW = Math.round(Math.max(...positionedRooms.map((r: Record<string, unknown>) => (r.x as number) + (r.width as number))) * 10) / 10;
-              bD = Math.round(Math.max(...positionedRooms.map((r: Record<string, unknown>) => (r.y as number) + (r.depth as number))) * 10) / 10;
+            // Multi-floor: use BSP layout engine per floor (same as standalone API)
+            if (roomProgram.numFloors > 1) {
+              const { layoutMultiFloor } = await import("@/lib/floor-plan/layout-engine");
+              const { convertMultiFloorToProject } = await import("@/lib/floor-plan/pipeline-adapter");
+              const multiFloor = layoutMultiFloor(roomProgram);
+              console.log(`[GN-012][STAGE-2] Multi-floor: ${multiFloor.floors.reduce((s, f) => s + f.rooms.length, 0)} rooms placed`);
+              project = convertMultiFloorToProject(multiFloor.floors, description.projectName, designBrief);
+              sourceType = "ai-generated";
             } else {
-              const fpArea = floorPlan.totalArea / Math.max(floorPlan.floors, 1);
-              const aspect = 1.33;
-              bW = Math.round(Math.sqrt(fpArea * aspect) * 10) / 10;
-              bD = Math.round((fpArea / bW) * 10) / 10;
+              // Stage 2: AI Spatial Layout (GPT-4o with validation + retry)
+              const floorPlan = await generateFloorPlan(description, floorPlanApiKey, roomProgram);
+
+              // Stage 3: Build geometry → FloorPlanProject
+              const positionedRooms = floorPlan.positionedRooms;
+              const roomList = floorPlan.roomList;
+
+              const rooms = positionedRooms
+                ? positionedRooms.map((r: Record<string, unknown>) => ({
+                    name: r.name as string,
+                    type: (r.type as string ?? "other") as "living" | "bedroom" | "kitchen" | "dining" | "bathroom" | "hallway" | "entrance" | "utility" | "balcony" | "other",
+                    x: r.x as number, y: r.y as number,
+                    width: r.width as number, depth: r.depth as number,
+                    center: [(r.x as number) + (r.width as number) / 2, (r.y as number) + (r.depth as number) / 2] as [number, number],
+                    area: r.area as number,
+                  }))
+                : roomList.map((r: Record<string, unknown>) => {
+                    const area = (r.area as number) ?? 16;
+                    const w = Math.round(Math.sqrt(area * 1.2) * 10) / 10;
+                    const d = Math.round((area / w) * 10) / 10;
+                    return {
+                      name: r.name as string,
+                      type: ((r.type as string) ?? "other") as "living" | "bedroom" | "kitchen" | "dining" | "bathroom" | "other",
+                      x: 0, y: 0, width: w, depth: d,
+                      center: [w / 2, d / 2] as [number, number],
+                      area,
+                    };
+                  });
+
+              console.log(`[GN-012][STAGE-2] Single-floor: ${rooms.length} rooms placed`);
+
+              // Compute footprint from actual room bounding box (layout engine may
+              // expand footprint beyond totalArea to fit corridor/zones)
+              let bW: number, bD: number;
+              if (positionedRooms && positionedRooms.length > 0) {
+                bW = Math.round(Math.max(...positionedRooms.map((r: Record<string, unknown>) => (r.x as number) + (r.width as number))) * 10) / 10;
+                bD = Math.round(Math.max(...positionedRooms.map((r: Record<string, unknown>) => (r.y as number) + (r.depth as number))) * 10) / 10;
+              } else {
+                const fpArea = floorPlan.totalArea / Math.max(floorPlan.floors, 1);
+                const aspect = 1.33;
+                bW = Math.round(Math.sqrt(fpArea * aspect) * 10) / 10;
+                bD = Math.round((fpArea / bW) * 10) / 10;
+              }
+
+              const geometry: import("@/types/floor-plan").FloorPlanGeometry = {
+                footprint: { width: bW, depth: bD },
+                wallHeight: 3.0,
+                walls: [], doors: [], windows: [],
+                rooms,
+              };
+
+              project = convertGeometryToProject(geometry, description.projectName, designBrief);
+              sourceType = "ai-generated";
             }
-
-            const geometry: import("@/types/floor-plan").FloorPlanGeometry = {
-              footprint: { width: bW, depth: bD },
-              wallHeight: 3.0,
-              walls: [], doors: [], windows: [],
-              rooms,
-            };
-
-            project = convertGeometryToProject(geometry, description.projectName, designBrief);
-            sourceType = "ai-generated";
           } catch (aiErr) {
             console.warn("[GN-012] AI generation failed:", aiErr);
             warnings.push(`AI generation failed (${aiErr instanceof Error ? aiErr.message : String(aiErr)}), using fallback.`);
