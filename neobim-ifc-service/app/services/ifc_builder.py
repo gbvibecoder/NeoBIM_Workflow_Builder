@@ -175,11 +175,14 @@ def build_ifc(
         for elem in storey_data.elements:
             if elem.type != "wall" or not _element_in_discipline(elem, discipline):
                 continue
-            ifc_wall = create_wall(model, elem, ifc_storey, body_context)
-            wall_lookup[elem.id] = ifc_wall
-            assign_material_to_element(model, ifc_wall, _get_wall_mat(elem.properties.is_partition or False))
-            add_wall_psets(model, ifc_wall, elem, building_type)
-            counts.IfcWall += 1
+            try:
+                ifc_wall = create_wall(model, elem, ifc_storey, body_context)
+                wall_lookup[elem.id] = ifc_wall
+                assign_material_to_element(model, ifc_wall, _get_wall_mat(elem.properties.is_partition or False))
+                add_wall_psets(model, ifc_wall, elem, building_type)
+                counts.IfcWall += 1
+            except Exception as e:
+                log.warning("wall_creation_failed", elem_id=elem.id, error=str(e))
 
         # Second pass: all other elements
         for elem in storey_data.elements:
@@ -188,78 +191,82 @@ def build_ifc(
             if not _element_in_discipline(elem, discipline):
                 continue
 
-            if elem.type in ("slab", "roof"):
-                ifc_slab = create_slab(
-                    model, elem, ifc_storey, body_context,
-                    footprint=geometry.footprint,
-                    elevation=storey_data.elevation if elem.type == "slab" else storey_data.elevation + storey_data.height,
-                )
-                is_roof = elem.type == "roof"
-                assign_material_to_element(model, ifc_slab, roof_mat if is_roof else slab_mat)
-                add_slab_psets(model, ifc_slab, elem, is_roof=is_roof)
-                counts.IfcSlab += 1
+            try:
+                if elem.type in ("slab", "roof"):
+                    ifc_slab = create_slab(
+                        model, elem, ifc_storey, body_context,
+                        footprint=geometry.footprint,
+                        elevation=storey_data.elevation if elem.type == "slab" else storey_data.elevation + storey_data.height,
+                    )
+                    is_roof = elem.type == "roof"
+                    assign_material_to_element(model, ifc_slab, roof_mat if is_roof else slab_mat)
+                    add_slab_psets(model, ifc_slab, elem, is_roof=is_roof)
+                    counts.IfcSlab += 1
 
-            elif elem.type == "column":
-                ifc_col = create_column(model, elem, ifc_storey, body_context)
-                add_column_psets(model, ifc_col, elem)
-                counts.IfcColumn += 1
+                elif elem.type == "column":
+                    ifc_col = create_column(model, elem, ifc_storey, body_context)
+                    add_column_psets(model, ifc_col, elem)
+                    counts.IfcColumn += 1
 
-            elif elem.type == "window":
-                parent_wall = wall_lookup.get(elem.properties.parent_wall_id or "")
-                ifc_win = create_window(model, elem, ifc_storey, body_context, parent_wall)
-                add_window_psets(model, ifc_win, elem)
-                counts.IfcWindow += 1
-                if parent_wall:
-                    counts.IfcOpeningElement += 1
+                elif elem.type == "window":
+                    parent_wall = wall_lookup.get(elem.properties.parent_wall_id or "")
+                    ifc_win = create_window(model, elem, ifc_storey, body_context, parent_wall)
+                    add_window_psets(model, ifc_win, elem)
+                    counts.IfcWindow += 1
+                    if parent_wall:
+                        counts.IfcOpeningElement += 1
 
-            elif elem.type == "door":
-                parent_wall = wall_lookup.get(elem.properties.parent_wall_id or "")
-                ifc_door = create_door(model, elem, ifc_storey, body_context, parent_wall)
-                add_door_psets(model, ifc_door, elem)
-                counts.IfcDoor += 1
-                if parent_wall:
-                    counts.IfcOpeningElement += 1
+                elif elem.type == "door":
+                    parent_wall = wall_lookup.get(elem.properties.parent_wall_id or "")
+                    ifc_door = create_door(model, elem, ifc_storey, body_context, parent_wall)
+                    add_door_psets(model, ifc_door, elem)
+                    counts.IfcDoor += 1
+                    if parent_wall:
+                        counts.IfcOpeningElement += 1
 
-            elif elem.type == "space":
-                ifc_space = create_space(model, elem, ifc_storey, body_context)
-                add_space_psets(model, ifc_space, elem)
-                counts.IfcSpace += 1
+                elif elem.type == "space":
+                    ifc_space = create_space(model, elem, ifc_storey, body_context)
+                    add_space_psets(model, ifc_space, elem)
+                    counts.IfcSpace += 1
 
-            elif elem.type == "beam":
-                ifc_beam = create_beam(model, elem, ifc_storey, body_context)
-                add_beam_psets(model, ifc_beam, elem)
-                counts.IfcBeam += 1
+                elif elem.type == "beam":
+                    ifc_beam = create_beam(model, elem, ifc_storey, body_context)
+                    add_beam_psets(model, ifc_beam, elem)
+                    counts.IfcBeam += 1
 
-            elif elem.type == "stair":
-                create_stair(model, elem, ifc_storey, body_context)
-                counts.IfcStairFlight += 1
+                elif elem.type == "stair":
+                    create_stair(model, elem, ifc_storey, body_context)
+                    counts.IfcStairFlight += 1
 
-            elif elem.type == "duct":
-                ifc_duct = create_duct(model, elem, ifc_storey, body_context)
-                mep_elements["HVAC"].append(ifc_duct)
-                counts.IfcDuctSegment += 1
+                elif elem.type == "duct":
+                    ifc_duct = create_duct(model, elem, ifc_storey, body_context)
+                    mep_elements["HVAC"].append(ifc_duct)
+                    counts.IfcDuctSegment += 1
 
-            elif elem.type == "pipe":
-                ifc_pipe = create_pipe(model, elem, ifc_storey, body_context)
-                mep_elements["Plumbing"].append(ifc_pipe)
-                counts.IfcPipeSegment += 1
+                elif elem.type == "pipe":
+                    ifc_pipe = create_pipe(model, elem, ifc_storey, body_context)
+                    mep_elements["Plumbing"].append(ifc_pipe)
+                    counts.IfcPipeSegment += 1
 
-            elif elem.type == "cable-tray":
-                ifc_tray = create_cable_tray(model, elem, ifc_storey, body_context)
-                mep_elements["Electrical"].append(ifc_tray)
+                elif elem.type == "cable-tray":
+                    ifc_tray = create_cable_tray(model, elem, ifc_storey, body_context)
+                    mep_elements["Electrical"].append(ifc_tray)
 
-            elif elem.type == "equipment":
-                ifc_equip = create_equipment(model, elem, ifc_storey, body_context)
-                mep_elements["HVAC"].append(ifc_equip)
+                elif elem.type == "equipment":
+                    ifc_equip = create_equipment(model, elem, ifc_storey, body_context)
+                    mep_elements["HVAC"].append(ifc_equip)
 
-            elif elem.type in ("balcony", "canopy", "parapet"):
-                # Create as IfcBuildingElementProxy
-                proxy = api.run(
-                    "root.create_entity", model, ifc_class="IfcBuildingElementProxy"
-                )
-                proxy.GlobalId = new_guid()
-                proxy.Name = elem.properties.name
-                api.run("spatial.assign_container", model, relating_structure=ifc_storey, products=[proxy])
+                elif elem.type in ("balcony", "canopy", "parapet"):
+                    proxy = api.run(
+                        "root.create_entity", model, ifc_class="IfcBuildingElementProxy"
+                    )
+                    proxy.GlobalId = new_guid()
+                    proxy.Name = elem.properties.name
+                    from app.utils.ifc_helpers import assign_to_storey
+                    assign_to_storey(model, ifc_storey, proxy)
+
+            except Exception as e:
+                log.warning("element_creation_failed", elem_id=elem.id, elem_type=elem.type, error=str(e))
 
     # ── MEP systems ──────────────────────────────────────────────
     if discipline in ("mep", "combined"):

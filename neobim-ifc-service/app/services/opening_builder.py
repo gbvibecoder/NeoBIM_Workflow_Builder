@@ -30,7 +30,8 @@ def create_window(
     window.OverallHeight = height
     window.OverallWidth = width
 
-    api.run("spatial.assign_container", model, relating_structure=storey, products=[window])
+    from app.utils.ifc_helpers import assign_to_storey
+    assign_to_storey(model, storey, window)
 
     # If parent wall exists, create proper opening + fill relationship
     if parent_wall is not None:
@@ -123,7 +124,8 @@ def create_door(
     door.OverallWidth = width
     door.OperationType = "DOUBLE_DOOR_SINGLE_SWING" if width >= 1.8 else "SINGLE_SWING_LEFT"
 
-    api.run("spatial.assign_container", model, relating_structure=storey, products=[door])
+    from app.utils.ifc_helpers import assign_to_storey
+    assign_to_storey(model, storey, door)
 
     if parent_wall is not None:
         opening = create_opening_in_wall(

@@ -26,7 +26,8 @@ def create_column(
     column.GlobalId = new_guid()
     column.Name = props.name
 
-    api.run("spatial.assign_container", model, relating_structure=storey, products=[column])
+    from app.utils.ifc_helpers import assign_to_storey
+    assign_to_storey(model, storey, column)
 
     # Position at first vertex
     cx, cy = 0.0, 0.0
