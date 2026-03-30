@@ -678,10 +678,11 @@ function enforceCorridorCap(rooms: PlacedRoom[], totalFloorArea: number): Placed
     if (area <= maxArea * 1.2) continue; // within 20% tolerance
 
     // Shrink the shorter dimension (usually depth for corridors)
+    // NEVER let corridor go below 1.0m (NBC 2016 minimum for residential)
     if (room.width > room.depth) {
-      room.depth = grid(Math.max(0.9, maxArea / room.width));
+      room.depth = grid(Math.max(1.0, maxArea / room.width));
     } else {
-      room.width = grid(Math.max(0.9, maxArea / room.depth));
+      room.width = grid(Math.max(1.0, maxArea / room.depth));
     }
     room.area = grid(room.width * room.depth);
   }
@@ -699,21 +700,34 @@ function enforceCorridorCap(rooms: PlacedRoom[], totalFloorArea: number): Placed
  *   2. GENERAL CLAMP for all rooms — shrink if >2x target, expand if <0.5x target
  */
 function validateRoomSizes(rooms: PlacedRoom[], specs?: RoomSpec[]): PlacedRoom[] {
-  // Pass 1: Hard caps for utility rooms (max area by name pattern)
+  // Pass 1: Hard caps for rooms (max area by name/type pattern)
   const MAX_SIZES: Array<{ pattern: RegExp; max: number }> = [
+    // Very small utility rooms
     { pattern: /shoe\s*(?:rack|cabinet|closet|storage)/i, max: 4 },
-    { pattern: /powder\s*room/i, max: 4 },
-    { pattern: /linen\s*(?:storage|closet|cupboard)/i, max: 4 },
+    { pattern: /powder\s*room/i, max: 5 },
+    { pattern: /linen\s*(?:storage|closet|cupboard)/i, max: 5 },
     { pattern: /coat\s*closet/i, max: 4 },
-    { pattern: /servant\s*toilet|maid.*toilet/i, max: 4 },
     { pattern: /umbrella/i, max: 3 },
-    { pattern: /pooja|puja|prayer|mandir/i, max: 8 },
-    { pattern: /store\s*room|storage\s*room/i, max: 8 },
-    { pattern: /pantry/i, max: 8 },
-    { pattern: /utility\s*room/i, max: 8 },
+    { pattern: /dog\s*(?:room|kennel)|kennel/i, max: 5 },
+    { pattern: /wine\s*(?:room|cellar)|cellar/i, max: 8 },
+    // Service rooms
+    { pattern: /servant\s*toilet|maid.*toilet/i, max: 5 },
+    { pattern: /servant\s*(?:quarter|room)|maid.*room|driver.*room/i, max: 12 },
+    { pattern: /pooja|puja|prayer|mandir/i, max: 10 },
+    { pattern: /store\s*room|storage\s*room/i, max: 10 },
+    { pattern: /pantry/i, max: 10 },
+    { pattern: /utility/i, max: 10 },
     { pattern: /washing\s*area/i, max: 6 },
     { pattern: /laundry/i, max: 8 },
     { pattern: /kitchenette/i, max: 8 },
+    // Circulation
+    { pattern: /foyer|entrance/i, max: 12 },
+    { pattern: /corridor|passage/i, max: 15 },
+    // Medium rooms
+    { pattern: /balcony|sit.?out/i, max: 12 },
+    { pattern: /walk.?in\s*(?:wardrobe|closet)/i, max: 8 },
+    { pattern: /bathroom/i, max: 12 },
+    { pattern: /toilet|\bwc\b/i, max: 5 },
   ];
 
   for (const room of rooms) {
@@ -925,8 +939,9 @@ function layoutWithZones(
   const corridorAreaCheck = corridorDepth * fpW;
   if (corridorAreaCheck > cappedArea * 1.2) {
     const targetDepth = grid(cappedArea / fpW);
-    // Allow corridor as narrow as 0.9m to respect the area cap
-    corridorDepth = Math.max(grid(0.9), targetDepth);
+    // Never let corridor go below 1.0m (NBC 2016 residential minimum)
+    // If this makes area exceed cap, accept it — code compliance > area cap
+    corridorDepth = Math.max(grid(1.0), targetDepth);
   }
 
   const corridorArea = corridorDepth * fpW;

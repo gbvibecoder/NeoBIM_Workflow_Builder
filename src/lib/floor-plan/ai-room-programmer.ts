@@ -222,7 +222,22 @@ export async function programRooms(
 ): Promise<EnhancedRoomProgram> {
   // Estimate complexity — complex prompts need explicit room-count instruction
   const mentionedRooms = extractMentionedRooms(prompt);
-  const isComplex = mentionedRooms.length >= 10;
+  const isComplex = mentionedRooms.length >= 15;
+  const isMultiFloor = /duplex|first\s*floor|second\s*floor|upper\s*(?:floor|level|storey)|ground\s*floor.*first\s*floor|two.?stor/i.test(prompt);
+
+  // ── MULTI-CALL STRATEGY for complex multi-floor prompts ──
+  // GPT-4o-mini truncates/merges rooms when asked for 30+.
+  // Split into per-floor calls for much higher faithfulness.
+  if (isComplex && isMultiFloor) {
+    try {
+      const result = await programRoomsMultiCall(prompt, mentionedRooms, userApiKey);
+      console.log(`[STAGE-1-MULTI] Total rooms: ${result.rooms.length}`);
+      return result;
+    } catch (err) {
+      console.warn("[STAGE-1-MULTI] Multi-call failed, falling back to single call:", err);
+      // Fall through to single-call path
+    }
+  }
 
   // Complex prompts need longer timeout — GPT-4o-mini generating 25+ room JSON
   // can take 30-60s. Default 30s timeout causes fallback to regex.
@@ -386,6 +401,271 @@ export async function programRooms(
   raw.originalPrompt = prompt;
 
   console.log(`[STAGE-1] Rooms from AI: ${raw.rooms.length}`, raw.rooms.map(r => `${r.name} (floor:${r.floor ?? 0})`));
+
+  return raw;
+}
+
+// ── Multi-call strategy for complex multi-floor prompts ─────────────────────
+
+/**
+ * Split a complex multi-floor prompt into separate per-floor API calls.
+ * Merges results into a single EnhancedRoomProgram with correct floor assignments.
+ */
+async function programRoomsMultiCall(
+  prompt: string,
+  allMentionedRooms: string[],
+  userApiKey?: string,
+): Promise<EnhancedRoomProgram> {
+  const client = getClient(userApiKey, 90_000);
+
+  // Step 1: Split the prompt at floor boundaries
+  const { ground, first, general } = splitPromptByFloor(prompt);
+  const generalContext = general || extractGeneralContext(prompt);
+
+  // Step 2: Call GPT-4o-mini separately for each floor
+  const groundPrompt = `${generalContext}\n\nGenerate rooms ONLY for the GROUND FLOOR.\nGround floor description: ${ground || prompt}`;
+  const firstPrompt = first
+    ? `${generalContext}\n\nGenerate rooms ONLY for the FIRST FLOOR (floor: 1).\nFirst floor description: ${first}`
+    : null;
+
+  const groundMentioned = ground ? extractMentionedRooms(ground) : allMentionedRooms;
+  const firstMentioned = first ? extractMentionedRooms(first) : [];
+
+  console.log(`[STAGE-1-MULTI] Splitting: ground=${groundMentioned.length} rooms, first=${firstMentioned.length} rooms`);
+
+  const groundProgram = await programSingleFloor(client, groundPrompt, 0, groundMentioned);
+
+  let firstProgram: EnhancedRoomProgram | null = null;
+  if (firstPrompt && firstMentioned.length > 0) {
+    firstProgram = await programSingleFloor(client, firstPrompt, 1, firstMentioned);
+  }
+
+  // Step 3: Merge results
+  const allRooms = [
+    ...groundProgram.rooms.map(r => ({ ...r, floor: 0 as number | undefined })),
+    ...(firstProgram?.rooms ?? []).map(r => ({ ...r, floor: 1 as number | undefined })),
+  ];
+
+  // Step 4: Add staircase to each floor if missing
+  if (firstProgram && !allRooms.some(r => r.floor === 0 && r.type === "staircase")) {
+    allRooms.push({
+      name: "Staircase", type: "staircase", areaSqm: 12, floor: 0,
+      zone: "circulation" as const, mustHaveExteriorWall: false, adjacentTo: [], preferNear: [],
+    });
+  }
+  if (firstProgram && !allRooms.some(r => r.floor === 1 && r.type === "staircase")) {
+    allRooms.push({
+      name: "Staircase", type: "staircase", areaSqm: 12, floor: 1,
+      zone: "circulation" as const, mustHaveExteriorWall: false, adjacentTo: [], preferNear: [],
+    });
+  }
+
+  // Step 5: Per-floor faithfulness check — inject missing rooms
+  const groundRooms = allRooms.filter(r => r.floor === 0);
+  const firstRooms = allRooms.filter(r => r.floor === 1);
+  const missingGround = findMissingRooms(groundMentioned, groundRooms, ground || prompt);
+  const missingFirst = first ? findMissingRooms(firstMentioned, firstRooms, first) : [];
+  for (const r of missingGround) { r.floor = 0; }
+  for (const r of missingFirst) { r.floor = 1; }
+  allRooms.push(
+    ...missingGround.map(r => ({ ...r, floor: r.floor as number | undefined })),
+    ...missingFirst.map(r => ({ ...r, floor: r.floor as number | undefined })),
+  );
+
+  if (missingGround.length + missingFirst.length > 0) {
+    console.warn(`[STAGE-1-MULTI] Injected ${missingGround.length} ground + ${missingFirst.length} first floor missing rooms`);
+  }
+
+  // Step 6: Build merged program
+  const merged = sanitizeProgram({
+    buildingType: groundProgram.buildingType || "Residential Villa",
+    totalAreaSqm: allRooms.reduce((s, r) => s + r.areaSqm, 0),
+    numFloors: firstProgram ? 2 : 1,
+    rooms: allRooms,
+    adjacency: [...(groundProgram.adjacency || []), ...(firstProgram?.adjacency || [])],
+    zones: { public: [], private: [], service: [], circulation: [] },
+    entranceRoom: groundProgram.entranceRoom || allRooms[0]?.name || "Entrance",
+    circulationNotes: groundProgram.circulationNotes || "",
+    projectName: groundProgram.projectName || "",
+    isVastuRequested: /vastu|vaastu/i.test(prompt),
+    originalPrompt: prompt,
+  });
+
+  console.log(`[STAGE-1-MULTI] Ground: ${groundRooms.length + missingGround.length}, First: ${firstRooms.length + missingFirst.length}, Total: ${merged.rooms.length}`);
+
+  return merged;
+}
+
+/**
+ * Call GPT-4o-mini for a single floor's rooms.
+ */
+async function programSingleFloor(
+  client: ReturnType<typeof getClient>,
+  floorPrompt: string,
+  floorNum: number,
+  mentionedRooms: string[],
+): Promise<EnhancedRoomProgram> {
+  const userMessage = mentionedRooms.length > 5
+    ? `${floorPrompt}\n\nIMPORTANT: This floor mentions at least ${mentionedRooms.length} rooms: ${mentionedRooms.join(", ")}. Include ALL of them.`
+    : floorPrompt;
+
+  const completion = await client.chat.completions.create({
+    model: "gpt-4o-mini",
+    temperature: 0.2,
+    max_tokens: 8192,
+    response_format: { type: "json_object" },
+    messages: [
+      { role: "system", content: SYSTEM_PROMPT },
+      { role: "user", content: userMessage },
+    ],
+  });
+
+  const content = completion.choices[0]?.message?.content;
+  if (!content) throw new Error(`AI returned empty response for floor ${floorNum}`);
+
+  const raw = JSON.parse(content) as EnhancedRoomProgram;
+  if (!raw.rooms || !Array.isArray(raw.rooms)) raw.rooms = [];
+
+  // Force correct floor assignment
+  for (const room of raw.rooms) {
+    room.floor = floorNum;
+  }
+
+  return raw;
+}
+
+/**
+ * Split prompt text at floor boundary markers.
+ */
+function splitPromptByFloor(prompt: string): { ground: string; first: string; general: string } {
+  const lower = prompt.toLowerCase();
+
+  // Find "first floor" / "upper floor" marker
+  const firstFloorPatterns = [
+    /first\s*floor\s*[:\.\-–—]/i,
+    /upper\s*(?:floor|level|storey)\s*[:\.\-–—]/i,
+    /1st\s*floor\s*[:\.\-–—]/i,
+  ];
+
+  let splitIndex = -1;
+  let matchLen = 0;
+  for (const pattern of firstFloorPatterns) {
+    const match = pattern.exec(prompt);
+    if (match) {
+      splitIndex = match.index;
+      matchLen = match[0].length;
+      break;
+    }
+  }
+
+  // If we can't find a clear first floor marker, try splitting at "Ground floor: ..." then next floor
+  if (splitIndex === -1) {
+    const groundMatch = /ground\s*floor\s*[:\.\-–—]/i.exec(prompt);
+    if (groundMatch) {
+      const afterGround = prompt.substring(groundMatch.index + groundMatch[0].length);
+      for (const pattern of firstFloorPatterns) {
+        const match = pattern.exec(afterGround);
+        if (match) {
+          splitIndex = groundMatch.index + groundMatch[0].length + match.index;
+          matchLen = match[0].length;
+          break;
+        }
+      }
+    }
+  }
+
+  if (splitIndex === -1) {
+    // No clear split — return everything as ground
+    return { ground: prompt, first: "", general: "" };
+  }
+
+  // Extract general context = text before "Ground floor:" or first room mention
+  let general = "";
+  const groundFloorStart = /ground\s*floor\s*[:\.\-–—]/i.exec(prompt);
+  if (groundFloorStart && groundFloorStart.index > 10) {
+    general = prompt.substring(0, groundFloorStart.index).trim();
+  }
+
+  const ground = prompt.substring(general.length, splitIndex).trim();
+  const first = prompt.substring(splitIndex).trim();
+
+  return { ground, first, general };
+}
+
+/**
+ * Extract the general context from a prompt (building type, plot size, etc.).
+ */
+function extractGeneralContext(prompt: string): string {
+  // Extract text before first floor-specific content
+  const firstRoomMention = /ground\s*floor|first\s+room|entrance|foyer|living\s+room/i.exec(prompt);
+  if (firstRoomMention && firstRoomMention.index > 20) {
+    return prompt.substring(0, firstRoomMention.index).trim();
+  }
+  // Fallback: first 300 chars
+  return prompt.substring(0, Math.min(300, prompt.length)).trim();
+}
+
+/**
+ * Apply standard sanitization to a merged program (zones, totals, name, etc.).
+ */
+function sanitizeProgram(raw: EnhancedRoomProgram): EnhancedRoomProgram {
+  // Ensure every room has required fields
+  const validZones = new Set(["public", "private", "service", "circulation"]);
+  for (const room of raw.rooms) {
+    if (!room.name) room.name = "Room";
+    if (!room.type) room.type = "other";
+    if (!room.areaSqm || room.areaSqm <= 0) room.areaSqm = 10;
+    if (!validZones.has(room.zone)) room.zone = "other" as RoomSpec["zone"];
+    if (typeof room.mustHaveExteriorWall !== "boolean") {
+      room.mustHaveExteriorWall = !["bathroom", "utility", "storage", "hallway", "staircase"].includes(room.type);
+    }
+    if (!Array.isArray(room.adjacentTo)) room.adjacentTo = [];
+    if (!Array.isArray(room.preferNear)) room.preferNear = [];
+    if (room.preferredWidth && room.preferredWidth > 0) room.preferredWidth = Number(room.preferredWidth);
+    if (room.preferredDepth && room.preferredDepth > 0) room.preferredDepth = Number(room.preferredDepth);
+
+    // Clamp utility room areas
+    if (!room.preferredWidth && !room.preferredDepth) {
+      const maxArea = getMaxAreaForRoomType(room.name, room.type);
+      if (maxArea !== null && room.areaSqm > maxArea) {
+        room.areaSqm = maxArea;
+      }
+    }
+  }
+
+  // Build zones
+  raw.zones = { public: [], private: [], service: [], circulation: [] };
+  for (const room of raw.rooms) {
+    if (validZones.has(room.zone)) {
+      raw.zones[room.zone as keyof typeof raw.zones]?.push(room.name);
+    }
+  }
+
+  // Ensure totals
+  raw.totalAreaSqm = Math.max(
+    raw.totalAreaSqm || 0,
+    raw.rooms.reduce((s, r) => s + r.areaSqm, 0)
+  );
+
+  if (!raw.numFloors || raw.numFloors <= 0) raw.numFloors = 1;
+  if (!raw.buildingType) raw.buildingType = "Residential Apartment";
+  if (!raw.entranceRoom) raw.entranceRoom = raw.rooms[0]?.name ?? "Entrance";
+
+  // Generate project name
+  if (!raw.projectName) {
+    const bedroomCount = raw.rooms.filter(
+      r => r.type === "bedroom" || r.name.toLowerCase().includes("bedroom")
+    ).length;
+    raw.projectName = bedroomCount > 0
+      ? `${bedroomCount}BHK ${raw.buildingType.split(" ").pop()}`
+      : raw.buildingType;
+  }
+
+  raw.isVastuRequested = raw.isVastuRequested || false;
+
+  // Filter adjacency to valid rooms
+  const roomNames = new Set(raw.rooms.map(r => r.name));
+  raw.adjacency = (raw.adjacency || []).filter(a => roomNames.has(a.roomA) && roomNames.has(a.roomB));
 
   return raw;
 }

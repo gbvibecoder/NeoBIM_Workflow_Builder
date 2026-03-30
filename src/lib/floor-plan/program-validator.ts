@@ -73,7 +73,7 @@ export function parsePromptRequirements(prompt: string): ParsedRequirements {
   };
 
   // Parse BHK pattern: "3bhk", "3 bhk", "3-bhk"
-  const bhkMatch = lower.match(/(\d)\s*[-]?\s*bhk/);
+  const bhkMatch = lower.match(/(\d+)\s*[-]?\s*bhk/);
   if (bhkMatch) {
     result.rawBHK = parseInt(bhkMatch[1]);
     result.bedrooms = result.rawBHK;
@@ -121,7 +121,7 @@ export function parsePromptRequirements(prompt: string): ParsedRequirements {
 }
 
 // ============================================================
-// ROOM COUNTING
+// ROOM COUNTING — fuzzy matching by type AND name
 // ============================================================
 
 const BEDROOM_TYPES: RoomType[] = ["bedroom", "master_bedroom", "guest_bedroom"];
@@ -129,8 +129,93 @@ const BATHROOM_TYPES: RoomType[] = ["bathroom", "toilet", "wc"];
 const BALCONY_TYPES: RoomType[] = ["balcony", "terrace", "verandah"];
 const PARKING_TYPES: RoomType[] = ["parking", "garage"];
 
+/**
+ * Count bedrooms using BOTH type and name matching.
+ * Catches: "Son Bedroom", "Daughter Bedroom", "Parents Suite", etc.
+ */
+function countBedrooms(rooms: Room[]): number {
+  return rooms.filter(r => {
+    const name = r.name.toLowerCase();
+    const type = (r.type || "").toLowerCase();
+    return type.includes("bedroom") || type === "master_bedroom" || type === "guest_bedroom" ||
+           name.includes("bedroom") || name.includes("suite") ||
+           name.includes("master bed") || name.includes("guest bed") ||
+           name.includes("kids bed") || name.includes("son") || name.includes("daughter") ||
+           name.includes("parents") || name.includes("elder") || name.includes("younger");
+  }).length;
+}
+
+/**
+ * Count bathrooms using BOTH type and name matching.
+ */
+function countBathrooms(rooms: Room[]): number {
+  return rooms.filter(r => {
+    const name = r.name.toLowerCase();
+    const type = (r.type || "").toLowerCase();
+    return type.includes("bathroom") || type.includes("toilet") || type === "wc" ||
+           type === "powder_room" || name.includes("bathroom") || name.includes("toilet") ||
+           name.includes("wc") || name.includes("powder room") || name.includes("washroom");
+  }).length;
+}
+
 function countRoomsByType(rooms: Room[], types: RoomType[]): number {
   return rooms.filter((r) => types.includes(r.type)).length;
+}
+
+// ============================================================
+// FUZZY ROOM EXISTENCE CHECK
+// ============================================================
+
+/** Synonym groups for fuzzy matching */
+const ROOM_SYNONYMS: Record<string, string[]> = {
+  kitchen: ["kitchen", "chef kitchen", "modern kitchen", "modular kitchen", "wet kitchen", "kitchenette"],
+  puja: ["puja", "pooja", "prayer", "mandir", "temple", "puja room", "pooja room"],
+  parking: ["parking", "car parking", "garage", "carport", "covered parking"],
+  living: ["living", "drawing", "sitting", "lounge", "hall", "family room", "living room"],
+  dining: ["dining", "dining room", "dining area", "breakfast"],
+  bedroom: ["bedroom", "bed room", "suite", "master bed", "retreat"],
+  bathroom: ["bathroom", "toilet", "washroom", "wc", "restroom", "lavatory", "bath"],
+  study: ["study", "office", "library", "reading room", "home office"],
+  balcony: ["balcony", "terrace", "sit-out", "sitout", "verandah", "porch", "deck"],
+  servant: ["servant", "maid", "helper", "domestic", "staff", "driver"],
+  store: ["store", "storage", "storeroom", "godown"],
+  utility: ["utility", "laundry", "washing", "utility room"],
+};
+
+/**
+ * Check if a required feature/room exists in the plan using fuzzy matching.
+ */
+function roomExistsInPlan(requiredLabel: string, rooms: Room[]): boolean {
+  const required = requiredLabel.toLowerCase().trim();
+
+  for (const room of rooms) {
+    const name = room.name.toLowerCase().trim();
+    const type = (room.type || "").toLowerCase().trim();
+
+    // Exact match
+    if (name === required || type === required) return true;
+
+    // Contains match (either direction)
+    if (name.includes(required) || required.includes(name)) return true;
+    if (type.includes(required) || required.includes(type)) return true;
+
+    // Word overlap — if 50%+ of required words match room name words
+    const requiredWords = required.split(/[\s_-]+/).filter(w => w.length > 2);
+    const nameWords = name.split(/[\s_-]+/).filter(w => w.length > 2);
+    if (requiredWords.length > 0) {
+      const overlap = requiredWords.filter(w => nameWords.some(nw => nw.includes(w) || w.includes(nw)));
+      if (overlap.length >= Math.ceil(requiredWords.length * 0.5)) return true;
+    }
+
+    // Synonym matching
+    for (const synonyms of Object.values(ROOM_SYNONYMS)) {
+      const requiredMatchesGroup = synonyms.some(s => required.includes(s));
+      const roomMatchesGroup = synonyms.some(s => name.includes(s) || type.includes(s));
+      if (requiredMatchesGroup && roomMatchesGroup) return true;
+    }
+  }
+
+  return false;
 }
 
 // ============================================================
@@ -147,16 +232,16 @@ export function validateProgram(
   const reqs = prompt ? parsePromptRequirements(prompt) : null;
   const rooms = floor.rooms;
 
-  // ---- Room count checks ----
-  const actualBedrooms = countRoomsByType(rooms, BEDROOM_TYPES);
-  const actualBathrooms = countRoomsByType(rooms, BATHROOM_TYPES);
+  // ---- Room count checks (fuzzy by name + type) ----
+  const actualBedrooms = countBedrooms(rooms);
+  const actualBathrooms = countBathrooms(rooms);
   const actualBalconies = countRoomsByType(rooms, BALCONY_TYPES);
   const actualParking = countRoomsByType(rooms, PARKING_TYPES);
-  const hasLiving = rooms.some((r) => r.type === "living_room");
-  const hasKitchen = rooms.some((r) => r.type === "kitchen");
-  const hasDining = rooms.some((r) => r.type === "dining_room");
-  const hasStudy = rooms.some((r) => r.type === "study" || r.type === "home_office");
-  const hasPuja = rooms.some((r) => r.type === "puja_room");
+  const hasLiving = roomExistsInPlan("living", rooms);
+  const hasKitchen = roomExistsInPlan("kitchen", rooms);
+  const hasDining = roomExistsInPlan("dining", rooms);
+  const hasStudy = roomExistsInPlan("study", rooms);
+  const hasPuja = roomExistsInPlan("puja", rooms);
 
   if (reqs) {
     if (reqs.bedrooms !== null) {
@@ -238,26 +323,41 @@ export function validateProgram(
       }
     }
 
-    // Feature checks
-    if (reqs.hasKitchen && !hasKitchen) {
-      requirements.push({ type: "feature", label: "Kitchen", expected: "Yes", actual: "No", met: false });
-      issues.push({ severity: "error", message: "Plan is missing a kitchen" });
+    // Feature checks — use fuzzy matching to find rooms by name OR type
+    if (reqs.hasKitchen) {
+      const met = hasKitchen;
+      requirements.push({ type: "feature", label: "Kitchen", expected: "Yes", actual: met ? "Yes" : "No", met });
+      if (!met) issues.push({ severity: "error", message: "Plan is missing a kitchen" });
     }
-    if (reqs.hasLiving && !hasLiving) {
-      requirements.push({ type: "feature", label: "Living Room", expected: "Yes", actual: "No", met: false });
-      issues.push({ severity: "error", message: "Plan is missing a living room" });
+    if (reqs.hasLiving) {
+      const met = hasLiving;
+      requirements.push({ type: "feature", label: "Living Room", expected: "Yes", actual: met ? "Yes" : "No", met });
+      if (!met) issues.push({ severity: "error", message: "Plan is missing a living room" });
     }
-    if (reqs.hasDining && !hasDining) {
-      requirements.push({ type: "feature", label: "Dining", expected: "Yes", actual: "No", met: false });
-      issues.push({ severity: "warning", message: "Plan is missing a dining room" });
+    if (reqs.hasDining) {
+      const met = hasDining;
+      requirements.push({ type: "feature", label: "Dining", expected: "Yes", actual: met ? "Yes" : "No", met });
+      if (!met) issues.push({ severity: "warning", message: "Plan is missing a dining room" });
     }
-    if (reqs.hasStudy && !hasStudy) {
-      requirements.push({ type: "feature", label: "Study", expected: "Yes", actual: "No", met: false });
-      issues.push({ severity: "suggestion", message: "Plan is missing a study/office — consider converting a room" });
+    if (reqs.hasStudy) {
+      const met = hasStudy;
+      requirements.push({ type: "feature", label: "Study", expected: "Yes", actual: met ? "Yes" : "No", met });
+      if (!met) issues.push({ severity: "suggestion", message: "Plan is missing a study/office — consider converting a room" });
     }
-    if (reqs.hasPuja && !hasPuja) {
-      requirements.push({ type: "feature", label: "Puja Room", expected: "Yes", actual: "No", met: false });
-      issues.push({ severity: "suggestion", message: "Plan is missing a puja room" });
+    if (reqs.hasPuja) {
+      const met = hasPuja;
+      requirements.push({ type: "feature", label: "Puja Room", expected: "Yes", actual: met ? "Yes" : "No", met });
+      if (!met) issues.push({ severity: "suggestion", message: "Plan is missing a puja room" });
+    }
+    if (reqs.hasUtility) {
+      const met = roomExistsInPlan("utility", rooms);
+      requirements.push({ type: "feature", label: "Utility", expected: "Yes", actual: met ? "Yes" : "No", met });
+      if (!met) issues.push({ severity: "suggestion", message: "Plan is missing a utility room" });
+    }
+    if (reqs.hasServantQuarter) {
+      const met = roomExistsInPlan("servant", rooms);
+      requirements.push({ type: "feature", label: "Servant Quarter", expected: "Yes", actual: met ? "Yes" : "No", met });
+      if (!met) issues.push({ severity: "warning", message: "Plan is missing servant quarter" });
     }
   }
 
