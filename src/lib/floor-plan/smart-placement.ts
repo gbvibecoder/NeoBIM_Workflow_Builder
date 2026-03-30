@@ -346,8 +346,8 @@ export function smartPlaceDoors(floor: Floor): DoorPlacementResult {
   }
 
   // 3. Check connectivity — ensure all rooms are reachable, auto-fix with fallback doors
-  let tempFloor = { ...floor, doors };
-  let unreachable = findUnreachableRooms(tempFloor);
+  const tempFloor = { ...floor, doors };
+  const unreachable = findUnreachableRooms(tempFloor);
   for (const roomId of unreachable) {
     const room = floor.rooms.find((r) => r.id === roomId);
     if (!room) continue;
@@ -487,7 +487,7 @@ function checkSwingConflicts(doors: Door[], floor: Floor, issues: PlacementIssue
     byWall.get(d.wall_id)!.push(d);
   }
 
-  for (const [wallId, wallDoors] of byWall) {
+  for (const [, wallDoors] of byWall) {
     if (wallDoors.length < 2) continue;
     // Check if any two doors' positions overlap with swing clearance
     for (let i = 0; i < wallDoors.length; i++) {
