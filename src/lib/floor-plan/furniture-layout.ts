@@ -96,6 +96,59 @@ const ROOM_FURNITURE: Partial<Record<RoomType, FurnitureSpec[]>> = {
   utility: [
     { catalogId: "washing-machine", priority: 10, wallPlacement: "anchor" },
   ],
+  // ── NEW ROOM TYPES — Indian homes ──
+  puja_room: [
+    { catalogId: "puja-mandir", priority: 10, wallPlacement: "anchor" },
+    { catalogId: "diya-stand", priority: 5,  wallPlacement: "adjacent" },
+  ],
+  servant_quarter: [
+    { catalogId: "bed-single",    priority: 10, wallPlacement: "anchor" },
+    { catalogId: "small-cupboard", priority: 7,  wallPlacement: "opposite" },
+  ],
+  balcony: [
+    { catalogId: "outdoor-chair", priority: 10, wallPlacement: "near-window" },
+    { catalogId: "planter",       priority: 5,  wallPlacement: "adjacent" },
+  ],
+  terrace: [
+    { catalogId: "outdoor-chair", priority: 10, wallPlacement: "anchor" },
+    { catalogId: "planter",       priority: 5,  wallPlacement: "adjacent" },
+  ],
+  verandah: [
+    { catalogId: "outdoor-chair", priority: 10, wallPlacement: "anchor" },
+    { catalogId: "planter",       priority: 5,  wallPlacement: "adjacent" },
+  ],
+  foyer: [
+    { catalogId: "shoe-cabinet",  priority: 10, wallPlacement: "anchor" },
+    { catalogId: "console-table", priority: 5,  wallPlacement: "opposite" },
+  ],
+  lobby: [
+    { catalogId: "console-table", priority: 10, wallPlacement: "anchor" },
+  ],
+  store_room: [
+    { catalogId: "storage-shelf", priority: 10, wallPlacement: "anchor" },
+  ],
+  pantry: [
+    { catalogId: "kitchen-counter", priority: 10, wallPlacement: "anchor" },
+    { catalogId: "refrigerator",    priority: 7,  wallPlacement: "adjacent" },
+  ],
+  laundry: [
+    { catalogId: "washing-machine", priority: 10, wallPlacement: "anchor" },
+    { catalogId: "clothes-rack",    priority: 5,  wallPlacement: "opposite" },
+  ],
+  walk_in_closet: [
+    { catalogId: "wardrobe",    priority: 10, wallPlacement: "anchor" },
+    { catalogId: "dresser",     priority: 5,  wallPlacement: "opposite" },
+  ],
+  dressing_room: [
+    { catalogId: "dresser",     priority: 10, wallPlacement: "anchor" },
+    { catalogId: "wardrobe",    priority: 7,  wallPlacement: "opposite" },
+  ],
+  parking: [
+    { catalogId: "car-outline", priority: 10, wallPlacement: "center", minRoomArea: 12 },
+  ],
+  garage: [
+    { catalogId: "car-outline", priority: 10, wallPlacement: "center", minRoomArea: 12 },
+  ],
 };
 
 // ============================================================

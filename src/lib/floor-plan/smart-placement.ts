@@ -437,7 +437,7 @@ function findEntranceWall(
 
     scoredWalls.sort((a, b) => b.score - a.score);
     return scoredWalls[0]?.wall ?? null;
-  } catch {
+  } catch (e) { console.warn("[PLACEMENT]", (e as Error)?.message ?? e);
     return findExteriorWallForRoom(room, floor);
   }
 }
@@ -728,7 +728,7 @@ export function smartPlaceWindows(floor: Floor): WindowPlacementResult {
           }
         }
       }
-    } catch { /* cross-vent is best-effort */ }
+    } catch (e) { console.warn("[CROSS-VENT]", (e as Error)?.message ?? e); }
 
     // Check ventilation compliance — NBC 2016 minimum: 1/10 of floor area
     // (distinct from IS:1038 daylighting target of 1/6 used above for placement)

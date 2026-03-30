@@ -331,7 +331,7 @@ export function convertGeometryToProject(
   // ---- 5b2. Enforce window ratios — add windows to rooms below NBC 10% minimum ----
   try {
     ensureWindowRatios(floor);
-  } catch {
+  } catch (e) { console.warn("[PIPELINE]", (e as Error)?.message ?? e);
     // Non-critical: plan works without extra windows
   }
 
@@ -341,14 +341,14 @@ export function convertGeometryToProject(
     if (furnResult.furniture.length > 0) {
       floor.furniture = furnResult.furniture;
     }
-  } catch {
+  } catch (e) { console.warn("[PIPELINE]", (e as Error)?.message ?? e);
     // Non-critical: floor plan works without furniture
   }
 
   // ---- 5d. Generate staircase geometry for staircase rooms ----
   try {
     generateStaircaseGeometry(floor);
-  } catch {
+  } catch (e) { console.warn("[PIPELINE]", (e as Error)?.message ?? e);
     // Non-critical: floor plan works without stair treads
   }
 
@@ -356,7 +356,7 @@ export function convertGeometryToProject(
   if (originalPrompt) {
     try {
       generateSmartAnnotations(floor, originalPrompt);
-    } catch {
+    } catch (e) { console.warn("[PIPELINE]", (e as Error)?.message ?? e);
       // Non-critical: floor plan works without annotations
     }
   }
@@ -1200,7 +1200,7 @@ function findRoomByPromptContext(
         return room;
       }
     }
-  } catch {
+  } catch (e) { console.warn("[PIPELINE]", (e as Error)?.message ?? e);
     // Non-critical
   }
   return null;

@@ -767,7 +767,7 @@ function mergeOpenPlanRooms(rooms: RoomSpec[], prompt: string): RoomSpec[] {
         }
       }
     }
-  } catch {
+  } catch (e) { console.warn("[AI-PROG]", (e as Error)?.message ?? e);
     // Non-critical — rooms work separately too
   }
   return rooms;

@@ -159,7 +159,7 @@ export async function exportFloorToPdf(
                    cx + r * Math.cos(a2), cy - r * Math.sin(a2));
         }
       }
-    } catch { /* arc drawing is best-effort */ }
+    } catch (e) { console.warn("[PDF-ARC]", (e as Error)?.message ?? e); }
 
     // Hinge dot
     pdf.setFillColor(180, 0, 0);

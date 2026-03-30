@@ -391,7 +391,7 @@ function evaluateRoomRule(
       severity: "info",
       message: `${room.name} is in ${dirLabel} — acceptable but not ideal. Preferred: ${rule.preferred_directions.map((d) => DIRECTION_LABELS[d]).join(", ")}.`,
       remedy: rule.remedy,
-      penalty_applied: Math.round(rule.penalty_points * 0.3),
+      penalty_applied: Math.round(rule.penalty_points * 0.15),
     };
   }
 
@@ -421,7 +421,7 @@ function evaluateRoomRule(
     severity: "info",
     message: `${room.name} is in ${dirLabel} — neutral placement.`,
     remedy: rule.remedy,
-    penalty_applied: Math.round(rule.penalty_points * 0.2),
+    penalty_applied: 0, // Neutral placement: no penalty (room is not in avoid zone)
   };
 }
 

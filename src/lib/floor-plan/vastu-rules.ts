@@ -163,7 +163,7 @@ const ROOM_PLACEMENT_RULES: VastuRule[] = [
     preferred_directions: ["W", "E"],
     acceptable_directions: ["N", "NW"],
     avoid_directions: ["S", "SE", "SW"],
-    penalty_points: 4,
+    penalty_points: 0,
     remedy: "Face East while eating. Place the dining table in the center of the dining area.",
   },
   {
@@ -222,7 +222,7 @@ const ADDITIONAL_PLACEMENT_RULES: VastuRule[] = [
     preferred_directions: ["NW", "W"],
     acceptable_directions: ["N", "NE"],
     avoid_directions: ["SW", "SE"],
-    penalty_points: 3,
+    penalty_points: 0,
     remedy: "Guest rooms in NW ensure visitors don't overstay — Vayu energy promotes movement.",
   },
   {
@@ -235,7 +235,7 @@ const ADDITIONAL_PLACEMENT_RULES: VastuRule[] = [
     preferred_directions: ["N", "NE"],
     acceptable_directions: ["E", "NW"],
     avoid_directions: ["SW", "SE"],
-    penalty_points: 3,
+    penalty_points: 0,
     remedy: "Ensure the host seat faces North or East for positive energy during conversations.",
   },
   {
@@ -313,7 +313,7 @@ const ADDITIONAL_PLACEMENT_RULES: VastuRule[] = [
     preferred_directions: ["NE"],
     acceptable_directions: ["N", "E"],
     avoid_directions: ["S", "SW", "W"],
-    penalty_points: 4,
+    penalty_points: 0,
     remedy: "Face East or North during meditation for maximum benefit.",
   },
   {
