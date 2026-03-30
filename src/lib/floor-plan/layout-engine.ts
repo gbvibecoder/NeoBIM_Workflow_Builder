@@ -384,9 +384,38 @@ function layoutWithFixedRooms(
       });
       occupied.push({ x: bestPos.x, y: bestPos.y, w: bestPos.w, h: bestPos.d });
     } else {
-      // Can't fit with exact dimensions — demote to flex
-      flex.push(room);
-      console.warn(`[FIXED-PLACE] ${room.name}: can't fit ${rw}x${rd}m, demoting to flex`);
+      // Can't fit with exact dimensions — try progressively smaller sizes
+      // before demoting to flex (which loses dimensions entirely).
+      let placed85 = false;
+      for (const shrink of [0.85, 0.75]) {
+        const sw = grid(rw * shrink);
+        const sd = grid(rd * shrink);
+        for (let y = 0; y <= fpH - sd + 0.01; y += 0.5) {
+          for (let x = 0; x <= fpW - sw + 0.01; x += 0.5) {
+            const gx = grid(x), gy = grid(y);
+            const overlaps = occupied.some(r =>
+              gx < r.x + r.w - 0.05 && gx + sw > r.x + 0.05 &&
+              gy < r.y + r.h - 0.05 && gy + sd > r.y + 0.05
+            );
+            if (!overlaps) {
+              placed.push({
+                name: room.name, type: room.type,
+                x: gx, y: gy, width: sw, depth: sd,
+                area: grid(sw * sd),
+              });
+              occupied.push({ x: gx, y: gy, w: sw, h: sd });
+              placed85 = true;
+              break;
+            }
+          }
+          if (placed85) break;
+        }
+        if (placed85) break;
+      }
+      if (!placed85) {
+        flex.push(room);
+        console.warn(`[FIXED-PLACE] ${room.name}: can't fit ${rw}x${rd}m even at 75%, demoting to flex`);
+      }
     }
   }
 
@@ -1192,16 +1221,33 @@ function enforceNBCMinimumDimensions(rooms: PlacedRoom[]): PlacedRoom[] {
       const shorter = Math.min(room.width, room.depth);
       if (shorter >= minDim) continue;
 
-      // Save snapshot to revert if expansion creates overlaps
       const saved = { ...room };
-      if (room.width < room.depth) {
-        room.width = grid(Math.max(room.width, minDim));
-      } else {
-        room.depth = grid(Math.max(room.depth, minDim));
-      }
-      room.area = grid(room.width * room.depth);
+      const area = room.width * room.depth;
 
-      // Check if expansion created overlaps — revert if so
+      // Strategy 1: Reshape — keep area constant, swap dimensions toward squarer
+      // E.g. a 1.0m × 5.0m kitchen → 2.24m × 2.24m (same area, wider)
+      const newShort = grid(Math.max(minDim, Math.sqrt(area)));
+      const newLong = grid(area / newShort);
+      if (newShort >= minDim && newLong >= minDim) {
+        if (room.width < room.depth) {
+          room.width = newShort;
+          room.depth = newLong;
+        } else {
+          room.width = newLong;
+          room.depth = newShort;
+        }
+        room.area = grid(room.width * room.depth);
+      } else {
+        // Strategy 2: Simply expand the short side
+        if (room.width < room.depth) {
+          room.width = grid(Math.max(room.width, minDim));
+        } else {
+          room.depth = grid(Math.max(room.depth, minDim));
+        }
+        room.area = grid(room.width * room.depth);
+      }
+
+      // Check if reshape/expansion created overlaps — revert if so
       let overlaps = false;
       for (let j = 0; j < rooms.length; j++) {
         if (j === i) continue;
