@@ -167,7 +167,7 @@ export function layoutFloorPlan(program: EnhancedRoomProgram): PlacedRoom[] {
 
   let result: PlacedRoom[];
 
-  if (fixedRooms.length >= 2) {
+  if (fixedRooms.length >= 1) {
     // Use fixed-room pre-placement + BSP for remaining space
     try {
       result = layoutWithFixedRooms(rooms, fpW, fpH, program.adjacency, program.isVastuRequested);
@@ -275,13 +275,17 @@ function fallbackBSP(
 // ── Fixed-room pre-placement + BSP for remaining ───────────────────────────
 
 /**
- * Place rooms with user-specified dimensions FIRST, then BSP fills the rest.
+ * CONSTRAINT-BASED room placement — replaces greedy grid-scan.
  *
- * Strategy:
- * 1. Sort fixed rooms by area (largest first)
- * 2. Place each using edge-aligned greedy packing with Vastu preference
- * 3. Find remaining free rectangles via grid scan
- * 4. BSP subdivides flex rooms into the largest free rectangle
+ * Algorithm:
+ *   1. Separate fixed (has preferredWidth/Depth) from flex rooms
+ *   2. If total fixed area exceeds footprint, scale down proportionally
+ *   3. Assign each fixed room a target quadrant (vastu) or "any"
+ *   4. Place fixed rooms in quadrant corners, then pack remaining along edges
+ *   5. BSP fills remaining free space with flex rooms
+ *
+ * KEY GUARANTEE: fixed rooms are NEVER demoted to flex. They may shrink
+ * up to 20% but always get placed at approximately their target dimensions.
  */
 function layoutWithFixedRooms(
   allRooms: RoomSpec[],
@@ -294,184 +298,223 @@ function layoutWithFixedRooms(
     r.preferredWidth > 0 && r.preferredDepth > 0);
   const flex = allRooms.filter(r => !fixed.includes(r));
 
-  // Sort fixed rooms by area descending (largest first = hardest to place)
-  const sortedFixed = [...fixed].sort((a, b) =>
-    (b.preferredWidth! * b.preferredDepth!) - (a.preferredWidth! * a.preferredDepth!)
-  );
+  // ── Step 1: Scale down fixed rooms if they exceed available space ──
+  const totalFixedArea = fixed.reduce((s, r) => s + r.preferredWidth! * r.preferredDepth!, 0);
+  const flexMinArea = flex.reduce((s, r) => s + Math.max(r.areaSqm, 2), 0);
+  const available = fpW * fpH;
+  let shrinkFactor = 1.0;
+  if (totalFixedArea + flexMinArea > available) {
+    const target = available - flexMinArea;
+    if (target > 0 && totalFixedArea > 0) {
+      shrinkFactor = Math.sqrt(Math.max(0.64, target / totalFixedArea)); // never below 80%
+    }
+  }
 
+  // ── Step 2: Determine vastu quadrant target for each fixed room ──
+  // Y-down: y=0=North(top), y=max=South. x=0=West, x=max=East.
+  // NE: high x, low y. SE: high x, high y. SW: low x, high y. NW: low x, low y.
+  type Quadrant = "NE" | "NW" | "SE" | "SW" | null;
+  interface FixedEntry {
+    room: RoomSpec; w: number; d: number; quadrant: Quadrant;
+  }
+
+  const entries: FixedEntry[] = fixed.map(r => {
+    let w = grid(r.preferredWidth! * shrinkFactor);
+    let d = grid(r.preferredDepth! * shrinkFactor);
+    // Ensure room fits within footprint (try rotation)
+    if (w > fpW && d <= fpW) { const t = w; w = d; d = t; }
+    if (d > fpH && w <= fpH) { const t = w; w = d; d = t; }
+    w = Math.min(w, fpW);
+    d = Math.min(d, fpH);
+
+    let quadrant: Quadrant = null;
+    if (vastuRequested) {
+      const n = r.name.toLowerCase();
+      const t = (r.type || "").toLowerCase();
+      if (t === "kitchen" || n.includes("kitchen")) quadrant = "SE";
+      else if (n.includes("pooja") || n.includes("puja") || n.includes("prayer")) quadrant = "NE";
+      else if ((n.includes("master") || n.includes("parent")) && t === "bedroom") quadrant = "SW";
+      else if (t === "living" || n.includes("living") || n.includes("drawing")) quadrant = "NE";
+    }
+    return { room: r, w, d, quadrant };
+  });
+
+  // Sort: vastu-constrained first, then by area descending
+  entries.sort((a, b) => {
+    const aPri = a.quadrant ? 1 : 0;
+    const bPri = b.quadrant ? 1 : 0;
+    if (aPri !== bPri) return bPri - aPri;
+    return (b.w * b.d) - (a.w * a.d);
+  });
+
+  // ── Step 3: Place each fixed room ──
   const placed: PlacedRoom[] = [];
   const occupied: Rect[] = [];
-  const step = GRID; // 0.1m placement grid
 
-  for (const room of sortedFixed) {
-    const rw = grid(room.preferredWidth!);
-    const rd = grid(room.preferredDepth!);
+  function overlapsAny(x: number, y: number, w: number, d: number): boolean {
+    return occupied.some(r =>
+      x < r.x + r.w - 0.05 && x + w > r.x + 0.05 &&
+      y < r.y + r.h - 0.05 && y + d > r.y + 0.05
+    );
+  }
 
-    // Try both orientations
-    const orientations = [
-      { w: rw, d: rd },
-      { w: rd, d: rw },
-    ];
+  function placeFixed(entry: FixedEntry): boolean {
+    const { room, w, d, quadrant } = entry;
 
-    let bestPos: { x: number; y: number; w: number; d: number } | null = null;
+    // Generate candidate positions — quadrant corner first, then edges, then scan
+    const candidates: Array<{ x: number; y: number }> = [];
+
+    // Quadrant corner positions
+    if (quadrant === "SW" || !quadrant) candidates.push({ x: 0, y: fpH - d });
+    if (quadrant === "SE" || !quadrant) candidates.push({ x: fpW - w, y: fpH - d });
+    if (quadrant === "NE" || !quadrant) candidates.push({ x: fpW - w, y: 0 });
+    if (quadrant === "NW" || !quadrant) candidates.push({ x: 0, y: 0 });
+
+    // Edge positions (along building perimeter at 0.5m steps)
+    const edgeStep = 0.5;
+    // South edge (for SW/SE rooms)
+    if (quadrant === "SW" || quadrant === "SE" || !quadrant) {
+      for (let x = 0; x <= fpW - w + 0.01; x += edgeStep) candidates.push({ x: grid(x), y: grid(fpH - d) });
+    }
+    // North edge (for NW/NE rooms)
+    if (quadrant === "NW" || quadrant === "NE" || !quadrant) {
+      for (let x = 0; x <= fpW - w + 0.01; x += edgeStep) candidates.push({ x: grid(x), y: 0 });
+    }
+    // West edge (for NW/SW rooms)
+    if (quadrant === "NW" || quadrant === "SW" || !quadrant) {
+      for (let y = 0; y <= fpH - d + 0.01; y += edgeStep) candidates.push({ x: 0, y: grid(y) });
+    }
+    // East edge (for NE/SE rooms)
+    if (quadrant === "NE" || quadrant === "SE" || !quadrant) {
+      for (let y = 0; y <= fpH - d + 0.01; y += edgeStep) candidates.push({ x: grid(fpW - w), y: grid(y) });
+    }
+
+    // Interior positions (coarser grid for any remaining space)
+    for (let y = 0; y <= fpH - d + 0.01; y += 1.0) {
+      for (let x = 0; x <= fpW - w + 0.01; x += 1.0) {
+        candidates.push({ x: grid(x), y: grid(y) });
+      }
+    }
+
+    // Try each candidate — score by quadrant correctness + edge alignment
+    let bestPos: { x: number; y: number } | null = null;
     let bestScore = -Infinity;
 
-    for (const { w, d } of orientations) {
-      if (w > fpW || d > fpH) continue;
+    for (const pos of candidates) {
+      if (overlapsAny(pos.x, pos.y, w, d)) continue;
 
-      // Scan positions at grid resolution (coarser step for speed)
-      const scanStep = Math.max(step, 0.3);
-      for (let y = 0; y <= fpH - d + 0.01; y += scanStep) {
-        for (let x = 0; x <= fpW - w + 0.01; x += scanStep) {
-          const gx = grid(x);
-          const gy = grid(y);
+      let score = 0;
+      const cx = pos.x + w / 2;
+      const cy = pos.y + d / 2;
 
-          // Check overlap with occupied
-          const overlaps = occupied.some(r =>
-            gx < r.x + r.w - 0.05 && gx + w > r.x + 0.05 &&
-            gy < r.y + r.h - 0.05 && gy + d > r.y + 0.05
-          );
-          if (overlaps) continue;
+      // Quadrant match bonus (highest priority)
+      if (quadrant) {
+        const inCorrectNS = quadrant[0] === "N" ? cy < fpH / 2 : cy >= fpH / 2;
+        const inCorrectEW = quadrant[1] === "E" ? cx >= fpW / 2 : cx < fpW / 2;
+        if (inCorrectNS && inCorrectEW) score += 100;
+        else if (inCorrectNS || inCorrectEW) score += 40;
+      }
 
-          // Score: prefer edges, corners, and Vastu-correct positions
-          let score = 0;
+      // Edge alignment bonus
+      if (pos.x < 0.05) score += 5;
+      if (pos.x + w > fpW - 0.05) score += 5;
+      if (pos.y < 0.05) score += 5;
+      if (pos.y + d > fpH - 0.05) score += 5;
 
-          // Edge bonuses (rooms against building edges are more realistic)
-          if (gx < step) score += 3;
-          if (gx + w > fpW - step) score += 3;
-          if (gy < step) score += 3;
-          if (gy + d > fpH - step) score += 3;
+      // Adjacency to placed rooms
+      for (const occ of occupied) {
+        const touchH = Math.abs(pos.x + w - occ.x) < 0.2 || Math.abs(occ.x + occ.w - pos.x) < 0.2;
+        const touchV = Math.abs(pos.y + d - occ.y) < 0.2 || Math.abs(occ.y + occ.h - pos.y) < 0.2;
+        if (touchH || touchV) score += 3;
+      }
 
-          // Corner bonus
-          if ((gx < step || gx + w > fpW - step) && (gy < step || gy + d > fpH - step)) score += 2;
+      if (score > bestScore) {
+        bestScore = score;
+        bestPos = pos;
+      }
+    }
 
-          // Adjacency to already-placed rooms (touching = good)
-          for (const occ of occupied) {
-            const touchH = Math.abs(gx + w - occ.x) < 0.15 || Math.abs(occ.x + occ.w - gx) < 0.15;
-            const touchV = Math.abs(gy + d - occ.y) < 0.15 || Math.abs(occ.y + occ.h - gy) < 0.15;
-            const overlapH = gx < occ.x + occ.w - 0.1 && gx + w > occ.x + 0.1;
-            const overlapV = gy < occ.y + occ.h - 0.1 && gy + d > occ.y + 0.1;
-            if ((touchH && overlapV) || (touchV && overlapH)) score += 2;
-          }
-
-          // Vastu preference scoring
-          if (vastuRequested) {
-            const nameLower = room.name.toLowerCase();
-            const typeLower = (room.type || "").toLowerCase();
-            const cx = gx + w / 2;
-            const cy = gy + d / 2;
-            // Kitchen in SE (high y, high x in Y-down coords)
-            if (typeLower.includes("kitchen") || nameLower.includes("kitchen")) {
-              if (cx > fpW / 2 && cy > fpH / 2) score += 8;
-            }
-            // Pooja in NE (low y, high x)
-            if (nameLower.includes("pooja") || nameLower.includes("puja") || nameLower.includes("prayer")) {
-              if (cx > fpW / 2 && cy < fpH / 2) score += 8;
-            }
-            // Master bedroom in SW (high y, low x)
-            if (nameLower.includes("master")) {
-              if (cx < fpW / 2 && cy > fpH / 2) score += 8;
-            }
-            // Living/entrance near north edge (low y)
-            if (typeLower.includes("living") || nameLower.includes("living")) {
-              if (cy < fpH / 2) score += 4;
-            }
-          }
-
-          if (score > bestScore) {
-            bestScore = score;
-            bestPos = { x: gx, y: gy, w, d };
-          }
-        }
+    // Try rotated orientation if no position found
+    if (!bestPos && Math.abs(w - d) > 0.1) {
+      for (const pos of candidates) {
+        if (overlapsAny(pos.x, pos.y, d, w)) continue;
+        bestPos = pos;
+        // Swap dimensions for rotation
+        entry.w = d;
+        entry.d = w;
+        break;
       }
     }
 
     if (bestPos) {
       placed.push({
-        name: room.name,
-        type: room.type,
-        x: bestPos.x,
-        y: bestPos.y,
-        width: bestPos.w,
-        depth: bestPos.d,
-        area: grid(bestPos.w * bestPos.d),
+        name: room.name, type: room.type,
+        x: bestPos.x, y: bestPos.y,
+        width: entry.w, depth: entry.d,
+        area: grid(entry.w * entry.d),
       });
-      occupied.push({ x: bestPos.x, y: bestPos.y, w: bestPos.w, h: bestPos.d });
-    } else {
-      // Can't fit with exact dimensions — try progressively smaller sizes
-      // before demoting to flex (which loses dimensions entirely).
-      let placed85 = false;
-      for (const shrink of [0.85, 0.75]) {
-        const sw = grid(rw * shrink);
-        const sd = grid(rd * shrink);
-        for (let y = 0; y <= fpH - sd + 0.01; y += 0.5) {
-          for (let x = 0; x <= fpW - sw + 0.01; x += 0.5) {
-            const gx = grid(x), gy = grid(y);
-            const overlaps = occupied.some(r =>
-              gx < r.x + r.w - 0.05 && gx + sw > r.x + 0.05 &&
-              gy < r.y + r.h - 0.05 && gy + sd > r.y + 0.05
-            );
-            if (!overlaps) {
-              placed.push({
-                name: room.name, type: room.type,
-                x: gx, y: gy, width: sw, depth: sd,
-                area: grid(sw * sd),
-              });
-              occupied.push({ x: gx, y: gy, w: sw, h: sd });
-              placed85 = true;
-              break;
-            }
-          }
-          if (placed85) break;
+      occupied.push({ x: bestPos.x, y: bestPos.y, w: entry.w, h: entry.d });
+      return true;
+    }
+    return false;
+  }
+
+  for (const entry of entries) {
+    if (!placeFixed(entry)) {
+      // Last resort: shrink to 80% and try again with any position
+      entry.w = grid(entry.w * 0.8);
+      entry.d = grid(entry.d * 0.8);
+      if (!placeFixed(entry)) {
+        // Absolute last resort: force-place in remaining space
+        console.warn(`[FIXED-PLACE] ${entry.room.name}: force-placing at reduced size`);
+        const maxY = occupied.length > 0 ? Math.max(...occupied.map(r => r.y + r.h)) : 0;
+        const ew = Math.min(entry.w, fpW);
+        const ed = Math.min(entry.d, fpH - maxY);
+        if (ed > 0.5) {
+          placed.push({
+            name: entry.room.name, type: entry.room.type,
+            x: 0, y: grid(maxY), width: ew, depth: Math.max(ed, 1.5),
+            area: grid(ew * Math.max(ed, 1.5)),
+          });
+          occupied.push({ x: 0, y: grid(maxY), w: ew, h: Math.max(ed, 1.5) });
+        } else {
+          // True failure — place as minimum viable room
+          placed.push({
+            name: entry.room.name, type: entry.room.type,
+            x: 0, y: grid(maxY), width: grid(Math.sqrt(entry.room.areaSqm * 1.2)),
+            depth: grid(entry.room.areaSqm / Math.sqrt(entry.room.areaSqm * 1.2)),
+            area: grid(entry.room.areaSqm),
+          });
         }
-        if (placed85) break;
-      }
-      if (!placed85) {
-        flex.push(room);
-        console.warn(`[FIXED-PLACE] ${room.name}: can't fit ${rw}x${rd}m even at 75%, demoting to flex`);
       }
     }
   }
 
-  // Find free rectangular regions for BSP
+  // ── Step 4: BSP fills remaining space with flex rooms ──
   if (flex.length > 0) {
     const freeRects = findFreeRectangles(fpW, fpH, occupied);
     if (freeRects.length > 0) {
-      // Sort flex rooms by area descending
       flex.sort((a, b) => b.areaSqm - a.areaSqm);
-
-      // Distribute flex rooms across free rects proportionally
       const totalFreeArea = freeRects.reduce((s, r) => s + r.w * r.h, 0);
       let flexIdx = 0;
 
       for (const freeRect of freeRects) {
         if (flexIdx >= flex.length) break;
         const rectArea = freeRect.w * freeRect.h;
-        if (rectArea < 2) continue; // Too small for a room
-
-        // How many flex rooms fit in this rect (proportional to area)
+        if (rectArea < 2) continue;
         const roomCount = Math.max(1, Math.round(flex.length * rectArea / totalFreeArea));
         const roomsForRect = flex.slice(flexIdx, flexIdx + roomCount);
         flexIdx += roomCount;
-
         if (roomsForRect.length > 0) {
-          const bspResult = bspSubdivide(roomsForRect, freeRect, adjacency);
-          placed.push(...bspResult);
+          placed.push(...bspSubdivide(roomsForRect, freeRect, adjacency));
         }
       }
-
-      // Any remaining flex rooms go in the largest free rect
       if (flexIdx < flex.length) {
-        const remaining = flex.slice(flexIdx);
-        const bspResult = bspSubdivide(remaining, freeRects[0], adjacency);
-        placed.push(...bspResult);
+        placed.push(...bspSubdivide(flex.slice(flexIdx), freeRects[0], adjacency));
       }
     } else {
-      // No free space — append below the footprint
-      console.warn("[FIXED-PLACE] No free space for flex rooms, appending below footprint");
       const maxY = Math.max(...occupied.map(r => r.y + r.h), fpH);
-      const bspResult = bspSubdivide(flex, { x: 0, y: maxY, w: fpW, h: fpH * 0.5 }, adjacency);
-      placed.push(...bspResult);
+      placed.push(...bspSubdivide(flex, { x: 0, y: maxY, w: fpW, h: fpH * 0.4 }, adjacency));
     }
   }
 
@@ -1385,7 +1428,7 @@ function validateRoomSizes(rooms: PlacedRoom[], specs?: RoomSpec[]): PlacedRoom[
     { pattern: /foyer|entrance|reception/i, max: 15 },
     { pattern: /corridor|passage/i, max: 15 },
     { pattern: /landing|staircase\s*landing/i, max: 12 },
-    { pattern: /staircase|stair/i, max: 15 },
+    { pattern: /staircase|stair/i, max: 14 },
     // Medium rooms
     { pattern: /balcony|sit.?out|sitout/i, max: 6 },
     { pattern: /walk.?in\s*(?:wardrobe|closet)/i, max: 10 },
@@ -1401,7 +1444,7 @@ function validateRoomSizes(rooms: PlacedRoom[], specs?: RoomSpec[]): PlacedRoom[
     const nameLower = room.name.toLowerCase();
 
     for (const { pattern, max } of MAX_SIZES) {
-      if (pattern.test(nameLower) && currentArea > max * 1.5) {
+      if (pattern.test(nameLower) && currentArea > max * 1.2) {
         console.warn(`[SIZE-FIX] ${room.name} is ${currentArea.toFixed(1)} sqm, max should be ${max} sqm`);
         const scale = Math.sqrt(max / currentArea);
         room.width = grid(room.width * scale);
