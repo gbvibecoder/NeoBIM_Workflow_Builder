@@ -87,10 +87,10 @@ export function layoutFloorPlan(program: EnhancedRoomProgram): PlacedRoom[] {
   }
 
   // When zones are used, corridor eats into footprint — compensate
-  // Cap corridor to 8% of total area (matches layoutWithZones logic)
+  // Cap corridor to 6% of total area or 12 sqm (matches layoutWithZones logic)
   const rawCorridorEstimate = CORRIDOR_DEPTH * Math.sqrt(Math.max(program.totalAreaSqm, roomAreaTotal) * DEFAULT_ASPECT);
   const corridorEstimate = useZones
-    ? Math.min(rawCorridorEstimate, Math.max(program.totalAreaSqm, roomAreaTotal) * 0.08)
+    ? Math.min(rawCorridorEstimate, Math.max(program.totalAreaSqm, roomAreaTotal) * 0.06, 12.0)
     : 0;
 
   let totalArea = Math.max(program.totalAreaSqm, roomAreaTotal + corridorEstimate);
@@ -551,16 +551,16 @@ function layoutWithZones(
   const floorArea = fpW * fpH;
 
   // ── Corridor depth calculation with cap ──
-  // Cap corridor area to 8% of floor area (prevents oversized corridors)
-  // Use user-specified corridor area if available, else default to CORRIDOR_DEPTH
-  const MAX_CORRIDOR_RATIO = 0.08;
-  const maxCorridorArea = floorArea * MAX_CORRIDOR_RATIO;
-  const maxCorridorDepth = maxCorridorArea / fpW;
+  // Cap corridor area to 6% of floor area AND 12 sqm hard max
+  const MAX_CORRIDOR_RATIO = 0.06;
+  const MAX_CORRIDOR_AREA = 12.0; // sqm hard cap for large floors
+  const cappedArea = Math.min(floorArea * MAX_CORRIDOR_RATIO, MAX_CORRIDOR_AREA);
+  const maxCorridorDepth = cappedArea / fpW;
 
-  // If user specified a corridor room with area, respect it
+  // If user specified a corridor room with area, respect it (up to cap)
   const userCorridorArea = corridor?.areaSqm ?? 0;
   let corridorDepth: number;
-  if (userCorridorArea > 0 && userCorridorArea < maxCorridorArea) {
+  if (userCorridorArea > 0 && userCorridorArea < cappedArea) {
     corridorDepth = grid(Math.max(1.0, userCorridorArea / fpW));
   } else {
     corridorDepth = grid(Math.min(CORRIDOR_DEPTH, Math.max(1.0, maxCorridorDepth)));
