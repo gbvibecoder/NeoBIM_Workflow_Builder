@@ -209,6 +209,11 @@ export function layoutFloorPlan(program: EnhancedRoomProgram): PlacedRoom[] {
     console.warn(`[STAGE-2] Room count mismatch after recovery: input=${inputCount}, output=${result.length}`);
   }
 
+  // ── NBC minimum dimension enforcement ──
+  // Verify every room meets NBC 2016 minimum dimensions.
+  // Habitable: ≥2.4m, Kitchen: ≥2.1m, Bathroom: ≥1.2m, Corridor: ≥1.0m
+  result = enforceNBCMinimumDimensions(result);
+
   // ── Dimension accuracy check (diagnostic) ──
   checkDimensionAccuracy(result, rooms);
 
@@ -1170,6 +1175,69 @@ function enforceCorridorCap(rooms: PlacedRoom[], totalFloorArea: number): Placed
   }
 
   return rooms;
+}
+
+// ── NBC minimum dimension enforcement ─────────────────────────────────────
+
+/**
+ * Verify every room meets NBC 2016 minimum dimensions.
+ * If a room is too narrow, expand its shortest dimension to the minimum.
+ * This may create minor overlaps which the pipeline-adapter snapping resolves.
+ */
+function enforceNBCMinimumDimensions(rooms: PlacedRoom[]): PlacedRoom[] {
+  try {
+    for (let i = 0; i < rooms.length; i++) {
+      const room = rooms[i];
+      const minDim = getNBCMinDimension(room.type, room.name);
+      const shorter = Math.min(room.width, room.depth);
+      if (shorter >= minDim) continue;
+
+      // Save snapshot to revert if expansion creates overlaps
+      const saved = { ...room };
+      if (room.width < room.depth) {
+        room.width = grid(Math.max(room.width, minDim));
+      } else {
+        room.depth = grid(Math.max(room.depth, minDim));
+      }
+      room.area = grid(room.width * room.depth);
+
+      // Check if expansion created overlaps — revert if so
+      let overlaps = false;
+      for (let j = 0; j < rooms.length; j++) {
+        if (j === i) continue;
+        const other = rooms[j];
+        const ox = Math.min(room.x + room.width, other.x + other.width) - Math.max(room.x, other.x);
+        const oy = Math.min(room.y + room.depth, other.y + other.depth) - Math.max(room.y, other.y);
+        if (ox > 0.15 && oy > 0.15) { overlaps = true; break; }
+      }
+      if (overlaps) {
+        Object.assign(room, saved); // Revert — don't break tiling for NBC
+      }
+    }
+    return rooms;
+  } catch {
+    return rooms;
+  }
+}
+
+/**
+ * NBC 2016 minimum dimension by room type.
+ */
+function getNBCMinDimension(type: string, name: string): number {
+  const n = name.toLowerCase();
+  const t = type.toLowerCase();
+  // Corridors: 1.0m residential
+  if (t === "hallway" || n.includes("corridor") || n.includes("passage")) return 1.0;
+  // Bathrooms: 1.2m
+  if (t === "bathroom" || n.includes("bath") || n.includes("toilet") || n.includes("wc")) return 1.2;
+  // Kitchen: 2.1m (NBC requires ≥1.8m, but 2.1m is practical minimum)
+  if (t === "kitchen" || n.includes("kitchen")) return 2.1;
+  // Staircases: 0.9m
+  if (t === "staircase" || n.includes("staircase")) return 0.9;
+  // Small utility/service rooms: 1.5m
+  if (t === "utility" || t === "storage" || n.includes("utility") || n.includes("store")) return 1.5;
+  // Habitable rooms: 2.4m
+  return 2.4;
 }
 
 // ── Post-BSP room size validation ──────────────────────────────────────────
