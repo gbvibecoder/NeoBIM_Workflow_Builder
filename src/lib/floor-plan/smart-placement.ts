@@ -589,29 +589,27 @@ export function smartPlaceWindows(floor: Floor): WindowPlacementResult {
       const wLen = wallLength(wall);
       const MIN_FROM_CORNER = 600;
       const MIN_FROM_DOOR = 500;
-
-      // Find available position centered on wall
-      const used = usedSegments.get(wall.id) ?? [];
       const winWidth = spec.width;
-      const idealPos = (wLen - winWidth) / 2;
       const minPos = MIN_FROM_CORNER;
       const maxPos = wLen - winWidth - MIN_FROM_CORNER;
 
       if (maxPos < minPos) continue; // Wall too short
 
-      // Try centered first, then offset positions
+      // Allow MULTIPLE windows per wall for large rooms that need more light.
+      // Try up to 3 window positions: center, left offset, right offset.
+      const idealPos = (wLen - winWidth) / 2;
       const candidates = [
         Math.max(minPos, Math.min(idealPos, maxPos)),
         minPos,
         maxPos,
       ];
 
-      let placed = false;
       for (const candidate of candidates) {
-        if (placed) break;
+        if (placedWindowArea >= requiredWindowArea) break;
         const wStart = candidate;
         const wEnd = candidate + winWidth;
 
+        const used = usedSegments.get(wall.id) ?? [];
         const fits = used.every(
           (seg) => wEnd + MIN_FROM_DOOR <= seg.start || wStart >= seg.end + MIN_FROM_DOOR
         );
@@ -636,7 +634,6 @@ export function smartPlaceWindows(floor: Floor): WindowPlacementResult {
           windows.push(win);
           markUsed(wall.id, candidate, winWidth, usedSegments);
           placedWindowArea += winWidth * spec.height;
-          placed = true;
         }
       }
     }

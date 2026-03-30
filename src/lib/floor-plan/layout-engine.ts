@@ -571,6 +571,7 @@ function optimizeVastu(rooms: PlacedRoom[], fpW: number, fpH: number): PlacedRoo
   try {
     const layout = rooms.map(r => ({ ...r }));
 
+    // Pass 1: Standard pairwise swaps with 3x size tolerance
     for (let iteration = 0; iteration < 50; iteration++) {
       let improved = false;
 
@@ -579,7 +580,7 @@ function optimizeVastu(rooms: PlacedRoom[], fpW: number, fpH: number): PlacedRoo
           const roomA = layout[i];
           const roomB = layout[j];
 
-          // Only swap rooms of similar size (within 3x for vastu — relaxed from 2x)
+          // Only swap rooms of similar size (within 3x for vastu)
           const areaA = roomA.width * roomA.depth;
           const areaB = roomB.width * roomB.depth;
           if (Math.min(areaA, areaB) / Math.max(areaA, areaB) < 0.33) continue;
@@ -588,10 +589,8 @@ function optimizeVastu(rooms: PlacedRoom[], fpW: number, fpH: number): PlacedRoo
           if (roomA.type === "hallway" || roomB.type === "hallway") continue;
           if (roomA.type === "staircase" || roomB.type === "staircase") continue;
 
-          // Calculate vastu score before swap
           const beforeScore = vastuRoomScore(roomA, fpW, fpH) + vastuRoomScore(roomB, fpW, fpH);
 
-          // Swap room identities (keep BSP-assigned positions)
           const tmpName = roomA.name, tmpType = roomA.type;
           layout[i] = { ...roomA, name: roomB.name, type: roomB.type };
           layout[j] = { ...roomB, name: tmpName, type: tmpType };
@@ -599,9 +598,8 @@ function optimizeVastu(rooms: PlacedRoom[], fpW: number, fpH: number): PlacedRoo
           const afterScore = vastuRoomScore(layout[i], fpW, fpH) + vastuRoomScore(layout[j], fpW, fpH);
 
           if (afterScore > beforeScore) {
-            improved = true; // Keep the swap
+            improved = true;
           } else {
-            // Revert swap
             layout[i] = roomA;
             layout[j] = roomB;
           }
@@ -609,6 +607,43 @@ function optimizeVastu(rooms: PlacedRoom[], fpW: number, fpH: number): PlacedRoo
       }
 
       if (!improved) break;
+    }
+
+    // Pass 2: Force-swap critical vastu rooms that are still misplaced
+    // For kitchen/pooja/master, ignore size ratio — correctness > tiling aesthetics
+    const CRITICAL_VASTU: Array<{ keyword: string; quadrant: string }> = [
+      { keyword: "kitchen", quadrant: "SE" },
+      { keyword: "pooja", quadrant: "NE" },
+      { keyword: "puja", quadrant: "NE" },
+      { keyword: "prayer", quadrant: "NE" },
+      { keyword: "master", quadrant: "SW" },
+    ];
+
+    for (const rule of CRITICAL_VASTU) {
+      const roomIdx = layout.findIndex(r => {
+        const n = r.name.toLowerCase();
+        const t = r.type.toLowerCase();
+        return n.includes(rule.keyword) || t.includes(rule.keyword);
+      });
+      if (roomIdx === -1) continue;
+
+      const room = layout[roomIdx];
+      const currentQuadrant = getQuadrant(room, fpW, fpH);
+      if (currentQuadrant === rule.quadrant) continue; // Already correct
+
+      // Find ANY non-corridor/staircase room currently in the target quadrant
+      const targetIdx = layout.findIndex((r, i) =>
+        i !== roomIdx &&
+        r.type !== "hallway" && r.type !== "staircase" &&
+        getQuadrant(r, fpW, fpH) === rule.quadrant
+      );
+
+      if (targetIdx !== -1) {
+        const target = layout[targetIdx];
+        const tmpName = room.name, tmpType = room.type;
+        layout[roomIdx] = { ...room, name: target.name, type: target.type };
+        layout[targetIdx] = { ...target, name: tmpName, type: tmpType };
+      }
     }
 
     return layout;
@@ -703,13 +738,15 @@ function validateRoomSizes(rooms: PlacedRoom[], specs?: RoomSpec[]): PlacedRoom[
   // Pass 1: Hard caps for rooms (max area by name/type pattern)
   const MAX_SIZES: Array<{ pattern: RegExp; max: number }> = [
     // Very small utility rooms
-    { pattern: /shoe\s*(?:rack|cabinet|closet|storage)/i, max: 4 },
+    { pattern: /shoe\s*(?:rack|cabinet|closet|storage)|shoe$/i, max: 5 },
     { pattern: /powder\s*room/i, max: 5 },
     { pattern: /linen\s*(?:storage|closet|cupboard)/i, max: 5 },
     { pattern: /coat\s*closet/i, max: 4 },
     { pattern: /umbrella/i, max: 3 },
     { pattern: /dog\s*(?:room|kennel)|kennel/i, max: 5 },
     { pattern: /wine\s*(?:room|cellar)|cellar/i, max: 8 },
+    { pattern: /mini\s*bar|\bbar\b/i, max: 10 },
+    { pattern: /nook|reading\s*nook|breakfast\s*nook/i, max: 8 },
     // Service rooms
     { pattern: /servant\s*toilet|maid.*toilet/i, max: 5 },
     { pattern: /servant\s*(?:quarter|room)|maid.*room|driver.*room/i, max: 12 },
@@ -720,12 +757,16 @@ function validateRoomSizes(rooms: PlacedRoom[], specs?: RoomSpec[]): PlacedRoom[
     { pattern: /washing\s*area/i, max: 6 },
     { pattern: /laundry/i, max: 8 },
     { pattern: /kitchenette/i, max: 8 },
+    { pattern: /craft|hobby|sewing/i, max: 12 },
     // Circulation
-    { pattern: /foyer|entrance/i, max: 12 },
+    { pattern: /foyer|entrance|reception/i, max: 15 },
     { pattern: /corridor|passage/i, max: 15 },
+    { pattern: /landing|staircase\s*landing/i, max: 12 },
     // Medium rooms
-    { pattern: /balcony|sit.?out/i, max: 12 },
-    { pattern: /walk.?in\s*(?:wardrobe|closet)/i, max: 8 },
+    { pattern: /balcony|sit.?out|sitout/i, max: 15 },
+    { pattern: /walk.?in\s*(?:wardrobe|closet)/i, max: 10 },
+    { pattern: /dressing/i, max: 12 },
+    { pattern: /wardrobe/i, max: 10 },
     { pattern: /bathroom/i, max: 12 },
     { pattern: /toilet|\bwc\b/i, max: 5 },
   ];
@@ -770,6 +811,21 @@ function validateRoomSizes(rooms: PlacedRoom[], specs?: RoomSpec[]): PlacedRoom[
       // NOTE: rooms that are too SMALL are handled by the dimension corrector
       // which moves shared boundaries (tile-safe). We do NOT expand rooms here
       // because expanding in place would overlap with neighbors.
+    }
+  }
+
+  // Pass 3: Minimum size enforcement — no habitable room smaller than 3 sqm
+  for (const room of rooms) {
+    const isCirculation = ["hallway", "staircase"].includes(room.type) ||
+      room.name.toLowerCase().includes("corridor") || room.name.toLowerCase().includes("passage");
+    if (isCirculation) continue;
+
+    const area = room.width * room.depth;
+    if (area < 3.0) {
+      const scale = Math.sqrt(3.0 / Math.max(area, 0.1));
+      room.width = grid(room.width * scale);
+      room.depth = grid(room.depth * scale);
+      room.area = grid(room.width * room.depth);
     }
   }
 
