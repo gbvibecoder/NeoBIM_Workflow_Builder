@@ -579,10 +579,10 @@ function optimizeVastu(rooms: PlacedRoom[], fpW: number, fpH: number): PlacedRoo
           const roomA = layout[i];
           const roomB = layout[j];
 
-          // Only swap rooms of similar size (within 50%)
+          // Only swap rooms of similar size (within 3x for vastu — relaxed from 2x)
           const areaA = roomA.width * roomA.depth;
           const areaB = roomB.width * roomB.depth;
-          if (Math.min(areaA, areaB) / Math.max(areaA, areaB) < 0.5) continue;
+          if (Math.min(areaA, areaB) / Math.max(areaA, areaB) < 0.33) continue;
 
           // Don't swap corridors or staircases
           if (roomA.type === "hallway" || roomB.type === "hallway") continue;

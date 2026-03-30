@@ -1052,7 +1052,8 @@ function findRoomByPromptContext(
 
     // Check which room name appears in this context
     for (const room of rooms) {
-      const roomWords = room.name.toLowerCase().split(/\s+/).filter(w => w.length > 3);
+      const KEEP_SHORT = new Set(["wc", "ac", "tv", "hob"]);
+      const roomWords = room.name.toLowerCase().split(/\s+/).filter(w => w.length > 3 || KEEP_SHORT.has(w));
       if (roomWords.some(w => context.includes(w)) && room.area_sqm >= 3) {
         return room;
       }

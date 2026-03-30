@@ -276,7 +276,7 @@ export async function programRooms(
       }
     }
 
-    if (!raw) throw firstErr as Error;
+    if (!raw) throw firstErr instanceof Error ? firstErr : new Error(String(firstErr));
   }
 
   // ── Validate & sanitize ──
@@ -607,7 +607,7 @@ function inferDefaultArea(name: string): number {
     { pattern: /terrace/, area: 15 },
     { pattern: /study/, area: 11 },
     { pattern: /family\s+lounge|tv\s+lounge|lounge/, area: 15 },
-    { pattern: /home\s+theat/, area: 20 },
+    { pattern: /home\s+theat(?:er|re)\b/, area: 20 },
     { pattern: /pool/, area: 30 },
     { pattern: /gym/, area: 15 },
     { pattern: /store/, area: 4 },
@@ -643,7 +643,7 @@ function inferRoomTypeAndZone(name: string): { type: string; zone: RoomSpec["zon
     { pattern: /pool/, type: "other", zone: "public", exterior: true },
     { pattern: /gym|fitness/, type: "other", zone: "private", exterior: true },
     { pattern: /store|storage/, type: "storage", zone: "service", exterior: false },
-    { pattern: /home\s+theat/, type: "other", zone: "private", exterior: false },
+    { pattern: /home\s+theat(?:er|re)\b/, type: "other", zone: "private", exterior: false },
     { pattern: /reception|waiting/, type: "other", zone: "public", exterior: false },
     { pattern: /meeting|conference/, type: "office", zone: "public", exterior: true },
   ];
@@ -651,7 +651,7 @@ function inferRoomTypeAndZone(name: string): { type: string; zone: RoomSpec["zon
   for (const { pattern, type, zone, exterior } of MAPPING) {
     if (pattern.test(name)) return { type, zone, exterior };
   }
-  return { type: "other", zone: "service", exterior: false };
+  return { type: "other", zone: "public", exterior: false };
 }
 
 function inferFloor(name: string, prompt: string, isMultiFloor: boolean): number | undefined {

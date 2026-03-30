@@ -97,23 +97,24 @@ export function correctDimensions(
         const errorA = (areaA - roomA.targetArea) / roomA.targetArea; // positive = too big
         const errorB = (areaB - roomB.targetArea) / roomB.targetArea;
 
-        // Only adjust if one room is too big AND its neighbor is too small
-        if (errorA > 0.15 && errorB < -0.10) {
+        // Adjust if one room is too big AND its neighbor is too small,
+        // OR if one room is severely oversized (>25% over target) regardless
+        const shouldAdjustAB = (errorA > 0.15 && errorB < -0.10) || (errorA > 0.25 && errorB < 0);
+        const shouldAdjustBA = (errorB > 0.15 && errorA < -0.10) || (errorB > 0.25 && errorA < 0);
+
+        if (shouldAdjustAB) {
           const shift = calculateShift(roomA, roomB, boundary, errorA, errorB);
           if (Math.abs(shift) > 0.05) {
-            // Snapshot state before shift in case we need to revert
             const snapshot = result.map(r => ({ ...r }));
             applyShift(result, boundary, shift, fpW, fpH);
-            // Verify no overlaps were introduced
             if (hasOverlaps(result)) {
-              // Revert — this boundary adjustment broke tiling
               for (let k = 0; k < result.length; k++) Object.assign(result[k], snapshot[k]);
             } else {
               totalAdjustment += Math.abs(shift);
               movedBoundaries.add(bKey);
             }
           }
-        } else if (errorB > 0.15 && errorA < -0.10) {
+        } else if (shouldAdjustBA) {
           const shift = calculateShift(roomB, roomA, boundary, errorB, errorA);
           if (Math.abs(shift) > 0.05) {
             const snapshot = result.map(r => ({ ...r }));
