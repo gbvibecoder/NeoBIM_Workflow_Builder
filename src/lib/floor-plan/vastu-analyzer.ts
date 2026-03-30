@@ -158,6 +158,42 @@ export function getRoomDirection(
   return getDirectionForPoint(centroid, bounds, cellW, cellH);
 }
 
+/**
+ * Get room direction with rotation applied for non-zero north angle.
+ * Rotates the room centroid by -angleRad around (midX, midY) before zone lookup.
+ */
+function getRoomDirectionWithRotation(
+  room: Room,
+  floor: Floor,
+  angleRad: number,
+  midX: number,
+  midY: number,
+): VastuDirection {
+  if (room.vastu_direction) return room.vastu_direction;
+
+  const bounds = floorBounds(floor.walls, floor.rooms);
+  const cellW = bounds.width > 0 ? bounds.width / 3 : 1000;
+  const cellH = bounds.height > 0 ? bounds.height / 3 : 1000;
+  if (cellW < 1 || cellH < 1) return "CENTER";
+
+  const centroid = polygonCentroid(room.boundary.points);
+
+  // Apply rotation when building is not aligned to cardinal directions
+  if (Math.abs(angleRad) > 0.001) {
+    const cosA = Math.cos(-angleRad);
+    const sinA = Math.sin(-angleRad);
+    const dx = centroid.x - midX;
+    const dy = centroid.y - midY;
+    const rotatedPoint: Point = {
+      x: cosA * dx - sinA * dy + midX,
+      y: sinA * dx + cosA * dy + midY,
+    };
+    return getDirectionForPoint(rotatedPoint, bounds, cellW, cellH);
+  }
+
+  return getDirectionForPoint(centroid, bounds, cellW, cellH);
+}
+
 function directionToGridIndex(dir: VastuDirection): { row: number; col: number } {
   for (let r = 0; r < 3; r++) {
     for (let c = 0; c < 3; c++) {
@@ -180,6 +216,14 @@ export function analyzeVastuCompliance(
   let totalPenalty = 0;
   let maxPossiblePenalty = 0;
 
+  // Pre-compute rotation parameters for non-zero north angle.
+  // When the building is rotated, we rotate room centroids by -northAngleDeg
+  // around the building center before determining their Vastu zone.
+  const angleRad = (northAngleDeg * Math.PI) / 180;
+  const bounds = floorBounds(floor.walls, floor.rooms);
+  const midX = (bounds.min.x + bounds.max.x) / 2;
+  const midY = (bounds.min.y + bounds.max.y) / 2;
+
   // ---- Room placement rules ----
   for (const rule of ALL_VASTU_RULES) {
     if (rule.category === "room_placement") {
@@ -190,7 +234,7 @@ export function analyzeVastuCompliance(
       if (matchingRooms.length === 0) continue; // Rule doesn't apply
 
       for (const room of matchingRooms) {
-        const dir = getRoomDirection(room, floor);
+        const dir = getRoomDirectionWithRotation(room, floor, angleRad, midX, midY);
         const item = evaluateRoomRule(rule, room, dir);
         items.push(item);
         totalPenalty += item.penalty_applied;
@@ -220,11 +264,11 @@ export function analyzeVastuCompliance(
   const brahmasthanRule = ALL_VASTU_RULES.find((r) => r.id === "V-EL-003");
   if (brahmasthanRule) {
     const centerRooms = floor.rooms.filter((r) => {
-      const dir = getRoomDirection(r, floor);
+      const dir = getRoomDirectionWithRotation(r, floor, angleRad, midX, midY);
       return dir === "CENTER";
     });
     const heavyInCenter = centerRooms.some((r) =>
-      ["bathroom", "toilet", "wc", "staircase", "store_room", "kitchen"].includes(r.type)
+      ["bathroom", "toilet", "wc", "staircase", "store_room", "kitchen", "utility", "laundry", "servant_quarter"].includes(r.type)
     );
     maxPossiblePenalty += brahmasthanRule.penalty_points;
     if (heavyInCenter) {
@@ -425,15 +469,29 @@ function getEntranceDirection(wall: Wall, floor: Floor): VastuDirection {
   // Determine which exterior wall the entrance is on
   const mx = (wall.centerline.start.x + wall.centerline.end.x) / 2;
   const my = (wall.centerline.start.y + wall.centerline.end.y) / 2;
+
+  // Use threshold of 25% from edge to detect corner (intercardinal) directions
+  const xThreshold = bounds.width * 0.25;
+  const yThreshold = bounds.height * 0.25;
+  const isNorth = my > bounds.max.y - yThreshold;
+  const isSouth = my < bounds.min.y + yThreshold;
+  const isEast = mx > bounds.max.x - xThreshold;
+  const isWest = mx < bounds.min.x + xThreshold;
+
+  // Intercardinal directions for corner entrances
+  if (isNorth && isEast) return "NE";
+  if (isNorth && isWest) return "NW";
+  if (isSouth && isEast) return "SE";
+  if (isSouth && isWest) return "SW";
+
+  // Cardinal directions
   const isHorizontal = Math.abs(wall.centerline.start.y - wall.centerline.end.y) <
     Math.abs(wall.centerline.start.x - wall.centerline.end.x);
 
   if (isHorizontal) {
-    // South wall (y ≈ min) or North wall (y ≈ max)
     if (my < bounds.center.y) return "S";
     return "N";
   } else {
-    // West wall (x ≈ min) or East wall (x ≈ max)
     if (mx < bounds.center.x) return "W";
     return "E";
   }

@@ -465,8 +465,8 @@ export function extractMentionedRooms(prompt: string): string[] {
     if (!seen.has(name)) { seen.add(name); found.push(name); }
   }
 
-  // Detect BHK patterns: "4bhk" implies N bedrooms
-  const bhkMatch = p.match(/(\d)\s*[-]?\s*bhk/);
+  // Detect BHK patterns: "4bhk", "10bhk" etc. implies N bedrooms
+  const bhkMatch = p.match(/(\d+)\s*[-]?\s*bhk/);
   if (bhkMatch) {
     const count = parseInt(bhkMatch[1], 10);
     // Only add generic bedrooms if specific ones weren't found
@@ -720,19 +720,23 @@ export function programRoomsFallback(prompt: string): EnhancedRoomProgram {
   const p = prompt.toLowerCase().trim();
 
   let bhk = 0;
-  const bhkMatch = p.match(/(\d)\s*[-]?\s*bhk/);
+  const bhkMatch = p.match(/(\d+)\s*[-]?\s*bhk/);
   if (bhkMatch) bhk = parseInt(bhkMatch[1], 10);
   if (!bhk) {
     const bedroomMatch = p.match(/(\d+)\s*[-]?\s*bed(?:room)?s?\b/);
     if (bedroomMatch) bhk = parseInt(bedroomMatch[1], 10);
   }
   if (!bhk) {
-    const wordNums: Record<string, number> = { one: 1, two: 2, three: 3, four: 4, five: 5 };
-    const wordMatch = p.match(/(one|two|three|four|five)\s*[-]?\s*bed(?:room)?s?\b/);
+    const wordNums: Record<string, number> = {
+      one: 1, two: 2, three: 3, four: 4, five: 5,
+      six: 6, seven: 7, eight: 8, nine: 9, ten: 10,
+      eleven: 11, twelve: 12,
+    };
+    const wordMatch = p.match(/(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\s*[-]?\s*bed(?:room)?s?\b/);
     if (wordMatch) bhk = wordNums[wordMatch[1]] ?? 0;
   }
   if (!bhk) bhk = 2;
-  bhk = Math.max(1, Math.min(bhk, 9));
+  bhk = Math.max(1, Math.min(bhk, 20));
 
   // Detect multi-floor
   let numFloors = 1;

@@ -141,10 +141,10 @@ const CORRIDOR_RULES: BuildingCodeRule[] = [
     code_ref: "NBC 2016, Clause 8.5.2",
     category: "corridor",
     title: "Corridor Minimum Width (Commercial)",
-    description: "Corridors in commercial/public buildings shall have a minimum width of 1.5 m.",
+    description: "Corridors in commercial/public buildings shall have a minimum width of 2.0 m.",
     severity: "error",
     room_types: ["corridor", "lobby"],
-    parameters: { min_width_mm: 1500, project_types: "commercial,institutional" },
+    parameters: { min_width_mm: 2000, project_types: "commercial,institutional" },
   },
 ];
 

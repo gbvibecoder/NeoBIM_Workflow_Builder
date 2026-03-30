@@ -345,15 +345,47 @@ export function smartPlaceDoors(floor: Floor): DoorPlacementResult {
     connectedPairs.add(pairKey);
   }
 
-  // 3. Check connectivity — ensure all rooms are reachable
-  const tempFloor = { ...floor, doors };
-  const unreachable = findUnreachableRooms(tempFloor);
+  // 3. Check connectivity — ensure all rooms are reachable, auto-fix with fallback doors
+  let tempFloor = { ...floor, doors };
+  let unreachable = findUnreachableRooms(tempFloor);
   for (const roomId of unreachable) {
     const room = floor.rooms.find((r) => r.id === roomId);
-    if (room) {
+    if (!room) continue;
+
+    // Try to find a shared wall with any reachable room and place a fallback door
+    let fixed = false;
+    for (const edge of graph.edges) {
+      const isEdgeForRoom = edge.roomAId === roomId || edge.roomBId === roomId;
+      if (!isEdgeForRoom) continue;
+      const otherRoomId = edge.roomAId === roomId ? edge.roomBId : edge.roomAId;
+      // Check if the other room is reachable (not in unreachable list)
+      if (unreachable.includes(otherRoomId)) continue;
+
+      const wall = floor.walls.find((w) => w.id === edge.wallId);
+      if (!wall) continue;
+      const doorWidth = 800; // Standard fallback width
+      const pos = findDoorPosition(wall, doorWidth, usedWallSegments, floor);
+      if (pos === null) continue;
+
+      const otherRoom = floor.rooms.find((r) => r.id === otherRoomId);
+      const door = createDoor(wall, pos, doorWidth, "single_swing",
+        [roomId, otherRoomId],
+        { swing: "left", opensTo: "inside" });
+      doors.push(door);
+      markUsed(wall.id, pos, doorWidth, usedWallSegments);
+      issues.push({
+        severity: "info",
+        message: `Auto-placed fallback door for ${room.name} → ${otherRoom?.name ?? "adjacent room"}`,
+        roomId,
+      });
+      fixed = true;
+      break;
+    }
+
+    if (!fixed) {
       issues.push({
         severity: "error",
-        message: `${room.name} is not reachable — no door connects it to the rest of the plan`,
+        message: `${room.name} is not reachable — no shared wall found for fallback door`,
         roomId,
       });
     }

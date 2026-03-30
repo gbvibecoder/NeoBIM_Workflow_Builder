@@ -201,20 +201,28 @@ function classifyForStrips(
     }
   }
 
-  // Handle empty strips by redistributing from the largest
+  // Handle empty strips by redistributing from the largest.
+  // Loop until no empty strip can be filled (handles multiple empty strips).
   const strips = [south, north, east, west];
-  for (let i = 0; i < strips.length; i++) {
-    if (strips[i].length === 0) {
-      // Find largest strip and move one room from it
-      const largest = strips.reduce((a, b) => a.length > b.length ? a : b);
-      if (largest.length > 1) {
-        // Move the smallest room from the largest strip
-        const sorted = [...largest].sort((a, b) => a.areaSqm - b.areaSqm);
-        const moved = sorted[0];
-        largest.splice(largest.indexOf(moved), 1);
-        strips[i].push(moved);
-      }
+  let redistributed = true;
+  while (redistributed) {
+    redistributed = false;
+    const emptyIdx = strips.findIndex(s => s.length === 0);
+    if (emptyIdx === -1) break;
+
+    // Find largest strip that can donate a room
+    let largestIdx = 0;
+    for (let i = 1; i < strips.length; i++) {
+      if (strips[i].length > strips[largestIdx].length) largestIdx = i;
     }
+    if (strips[largestIdx].length <= 1) break; // Can't redistribute further
+
+    // Move the smallest room from the largest strip
+    const sorted = [...strips[largestIdx]].sort((a, b) => a.areaSqm - b.areaSqm);
+    const moved = sorted[0];
+    strips[largestIdx].splice(strips[largestIdx].indexOf(moved), 1);
+    strips[emptyIdx].push(moved);
+    redistributed = true;
   }
 
   return { south, north, east, west };
