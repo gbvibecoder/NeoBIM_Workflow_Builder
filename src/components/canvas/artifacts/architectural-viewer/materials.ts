@@ -236,7 +236,7 @@ export function createBrickTexture(): THREE.CanvasTexture {
     ctx.fillRect(0, 0, w, h);
 
     const brickW = 64, brickH = 32, mortar = 3;
-    const brickColors = ["#A0543C", "#964830", "#B86048", "#8C4028", "#C07050"];
+    const brickColors = ["#C47860", "#B86B55", "#D08870", "#CC7E68", "#D89880"];
 
     for (let row = 0; row < h / brickH + 1; row++) {
       const offset = row % 2 === 0 ? 0 : brickW / 2;
@@ -425,7 +425,7 @@ export function createMaterials(): MaterialLibrary {
   const brickTex = createBrickTexture();
   brickTex.repeat.set(4, 4);
 
-  const wallConcreteTex = createConcreteTexture("#D8D4CC");
+  const wallConcreteTex = createConcreteTexture("#E8E4DC");
   wallConcreteTex.repeat.set(1, 1);
 
   const fabricTex = createFabricTexture("#6B7B8D");

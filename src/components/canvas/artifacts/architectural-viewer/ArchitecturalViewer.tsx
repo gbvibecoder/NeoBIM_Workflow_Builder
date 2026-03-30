@@ -157,7 +157,7 @@ export default function ArchitecturalViewer({ floors, height, footprint, buildin
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.1;
+    renderer.toneMappingExposure = 1.6;
     renderer.localClippingEnabled = true;
     container.appendChild(renderer.domElement);
     rendererRef.current = renderer;
@@ -214,10 +214,10 @@ export default function ArchitecturalViewer({ floors, height, footprint, buildin
     });
 
     // ─── Lighting ──────────────────────────────────────────────
-    const ambientLight = new THREE.AmbientLight(0x8899AA, effectiveFloors > 10 ? 0.6 : 0.5);
+    const ambientLight = new THREE.AmbientLight(0xCCCCDD, effectiveFloors > 10 ? 1.0 : 0.9);
     scene.add(ambientLight);
 
-    const hemiLight = new THREE.HemisphereLight(0x87CEEB, 0x556633, 0.4);
+    const hemiLight = new THREE.HemisphereLight(0x87CEEB, 0x556633, 0.7);
     scene.add(hemiLight);
 
     const sunLight = new THREE.DirectionalLight(0xFFEECC, 2.0);
@@ -241,7 +241,7 @@ export default function ArchitecturalViewer({ floors, height, footprint, buildin
     sunLight.shadow.normalBias = 0.02;
     scene.add(sunLight);
 
-    const fillLight = new THREE.DirectionalLight(0xAABBDD, 0.4);
+    const fillLight = new THREE.DirectionalLight(0xBBCCEE, 0.8);
     fillLight.position.set(-20, Math.max(25, bldgHeight * 0.7), -10);
     scene.add(fillLight);
 
