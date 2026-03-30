@@ -318,7 +318,7 @@ function checkWindows(floor: Floor, violations: CodeViolation[]): number {
       // Find windows on walls bounding this room
       const roomWallIds = new Set(room.wall_ids);
       const roomWindows = floor.windows.filter((w) => roomWallIds.has(w.wall_id));
-      const FRAME_FACTOR = 0.8; // ~20% frame deduction for glazed area
+      const FRAME_FACTOR = 0.7; // ~30% frame deduction for glazed area (double-hung standard)
       const totalWindowArea = roomWindows.reduce(
         (sum, w) => sum + (w.width_mm * w.height_mm * FRAME_FACTOR) / 1_000_000,
         0
@@ -533,21 +533,22 @@ function checkBathroomWaterproofing(floor: Floor, violations: CodeViolation[]): 
   const rule = ALL_BUILDING_CODE_RULES.find((r) => r.id === "NBC-WV-006");
   if (!rule) return 0;
 
+  // Waterproofing is a construction detail, not a plan-level geometry check.
+  // Only flag once as a general note if bathrooms exist, not per-bathroom.
   const bathrooms = floor.rooms.filter((r) => ["bathroom", "toilet", "wc"].includes(r.type));
-  for (const bath of bathrooms) {
+  if (bathrooms.length > 0) {
     checks++;
-    // Always flag as info — this is a specification reminder, not a geometry check
     violations.push({
       rule_id: rule.id,
       rule,
       entity_type: "room",
-      entity_id: bath.id,
-      entity_name: bath.name,
+      entity_id: bathrooms[0].id,
+      entity_name: `${bathrooms.length} bathroom(s)`,
       severity: "info",
-      message: `${bath.name} requires waterproofing treatment per NBC specification.`,
-      actual_value: "Not verified in plan",
+      message: `${bathrooms.length} bathroom(s) require waterproofing treatment per NBC specification — include in construction notes.`,
+      actual_value: "Construction specification",
       required_value: "Waterproofing up to 150mm above FFL",
-      suggestion: "Specify waterproofing in construction notes for all bathroom floors and walls up to 150mm.",
+      suggestion: "Add waterproofing note to construction drawing for all wet areas.",
     });
   }
   return checks;
@@ -562,18 +563,19 @@ function checkBalconyRailing(floor: Floor, violations: CodeViolation[]): number 
   const rule = ALL_BUILDING_CODE_RULES.find((r) => r.id === "NBC-FS-003");
   if (!rule) return 0;
 
+  // Railing is a construction detail — flag once as a general note if balconies exist.
   const balconies = floor.rooms.filter((r) => ["balcony", "terrace"].includes(r.type));
-  for (const balcony of balconies) {
+  if (balconies.length > 0) {
     checks++;
     violations.push({
       rule_id: rule.id,
       rule,
       entity_type: "room",
-      entity_id: balcony.id,
-      entity_name: balcony.name,
+      entity_id: balconies[0].id,
+      entity_name: `${balconies.length} balcony/terrace(s)`,
       severity: "info",
-      message: `${balcony.name} requires railing of minimum 1.05 m height.`,
-      actual_value: "Not specified in plan",
+      message: `${balconies.length} balcony/terrace(s) require railing of minimum 1.05 m height — include in detail drawing.`,
+      actual_value: "Construction specification",
       required_value: "≥ 1050 mm railing height",
       suggestion: "Add railing specification to balcony/terrace detail drawing.",
     });

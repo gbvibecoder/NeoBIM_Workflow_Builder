@@ -285,9 +285,12 @@ export function generateBOQ(floor: Floor): BOQReport {
     const treadM = stair.tread_depth_mm / 1000;
     const riserM = stair.riser_height_mm / 1000;
     const waistThick = 0.15; // 150mm waist slab
-    // Step triangle + inclined waist slab (corrected from horizontal projection)
-    const inclineLen = Math.sqrt(treadM * treadM + riserM * riserM);
-    const vol = stair.num_risers * widthM * (treadM * riserM / 2 + inclineLen * waistThick);
+    // Step triangles: each step is half a rectangle (tread × riser)
+    const stepVol = stair.num_risers * widthM * (treadM * riserM / 2);
+    // Waist slab: runs along the total horizontal projection
+    const totalRun = stair.num_risers * treadM;
+    const waistVol = totalRun * waistThick * widthM;
+    const vol = stepVol + waistVol;
 
     items.push({
       sno: ++sno,

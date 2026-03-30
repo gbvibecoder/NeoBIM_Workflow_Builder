@@ -783,7 +783,9 @@ function convertDoors(
         hinge_point: hinge,
         arc_radius_mm: widthMm,
         arc_start_angle_deg: swingDir === "left" ? wAngle - 180 : wAngle,
-        arc_end_angle_deg: 90,
+        arc_end_angle_deg: swingDir === "left"
+          ? wAngle - 180 + (opensTo === "inside" ? 90 : -90)
+          : wAngle + (opensTo === "inside" ? 90 : -90),
         leaf_end_point: leafEnd,
       },
       connects_rooms: (gd.connectsRooms?.map((rn) => roomIdMap.get(rn) ?? "") ?? [

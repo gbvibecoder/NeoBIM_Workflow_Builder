@@ -819,10 +819,11 @@ export function programRoomsFallback(prompt: string): EnhancedRoomProgram {
       if (room.zone === "public" || room.type === "kitchen") {
         room.floor = 0;
       } else if (room.type === "bedroom") {
-        room.floor = 1;
+        // Distribute bedrooms across upper floors
+        room.floor = Math.min(1, numFloors - 1);
       } else if (room.type === "bathroom") {
-        // First bathroom on ground floor (powder room), rest follow bedrooms
-        room.floor = bathIdx === 0 ? 0 : 1;
+        // First bathroom on ground floor (powder room), rest on same floor as paired bedroom
+        room.floor = bathIdx === 0 ? 0 : Math.min(1, numFloors - 1);
         bathIdx++;
       } else if (room.zone === "circulation") {
         room.floor = 0;

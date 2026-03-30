@@ -7,6 +7,7 @@
 
 import type { Floor, Room, Wall, Door, FurnitureInstance, Point, RoomType } from "@/types/floor-plan-cad";
 import { wallLength, lineDirection, addPoints, scalePoint } from "./geometry";
+import { getCatalogItem } from "./furniture-catalog";
 
 function genId(prefix: string): string {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
@@ -88,46 +89,15 @@ const ROOM_FURNITURE: Partial<Record<RoomType, FurnitureSpec[]>> = {
 };
 
 // ============================================================
-// CATALOG DIMENSIONS (simplified — matches furniture-catalog.ts)
+// CATALOG DIMENSIONS — sourced from furniture-catalog.ts (single source of truth)
 // ============================================================
 
-const CATALOG_DIMS: Record<string, { width: number; depth: number }> = {
-  "bed-king":        { width: 1950, depth: 2050 },
-  "bed-queen":       { width: 1650, depth: 2050 },
-  "bed-single":      { width: 1000, depth: 2000 },
-  "nightstand":      { width: 500,  depth: 450 },
-  "wardrobe":        { width: 1800, depth: 600 },
-  "dresser":         { width: 1200, depth: 500 },
-  "desk-study":      { width: 1200, depth: 600 },
-  "armchair":        { width: 850,  depth: 850 },
-  "sofa-3seat":      { width: 2200, depth: 900 },
-  "sofa-2seat":      { width: 1600, depth: 900 },
-  "coffee-table":    { width: 1200, depth: 600 },
-  "tv-unit":         { width: 1800, depth: 450 },
-  "side-table":      { width: 500,  depth: 500 },
-  "bookshelf":       { width: 1200, depth: 350 },
-  "dining-table-6":  { width: 1800, depth: 900 },
-  "dining-table-4":  { width: 1200, depth: 800 },
-  "dining-table-round": { width: 1100, depth: 1100 },
-  "dining-chair":    { width: 450,  depth: 450 },
-  "kitchen-counter": { width: 2400, depth: 600 },
-  "sink-kitchen":    { width: 800,  depth: 600 },
-  "stove-4burner":   { width: 600,  depth: 600 },
-  "refrigerator":    { width: 700,  depth: 700 },
-  "kitchen-island":  { width: 1500, depth: 800 },
-  "toilet":          { width: 400,  depth: 700 },
-  "washbasin":       { width: 600,  depth: 450 },
-  "bathtub":         { width: 750,  depth: 1700 },
-  "shower-enclosure": { width: 900, depth: 900 },
-  "vanity-unit":     { width: 900,  depth: 500 },
-  "washing-machine": { width: 600,  depth: 600 },
-  "office-desk":     { width: 1500, depth: 750 },
-  "office-chair":    { width: 550,  depth: 550 },
-  "filing-cabinet":  { width: 450,  depth: 600 },
-  "conference-table": { width: 2400, depth: 1200 },
-  "credenza":        { width: 1500, depth: 450 },
-  "microwave-stand": { width: 600,  depth: 450 },
-};
+function getCatalogDims(catalogId: string): { width: number; depth: number } {
+  const item = getCatalogItem(catalogId);
+  if (item) return { width: item.width_mm, depth: item.depth_mm };
+  // Fallback for unknown items
+  return { width: 600, depth: 600 };
+}
 
 // ============================================================
 // WALL CLASSIFICATION FOR PLACEMENT
@@ -434,7 +404,7 @@ export function layoutRoomFurniture(room: Room, floor: Floor): FurnitureLayoutRe
   const placedRects: Array<{ x: number; y: number; w: number; d: number }> = [];
 
   for (const spec of adjustedSpecs) {
-    const dims = CATALOG_DIMS[spec.catalogId];
+    const dims = getCatalogDims(spec.catalogId);
     if (!dims) continue;
 
     // Skip if furniture larger than room interior
@@ -546,7 +516,7 @@ export function layoutRoomFurniture(room: Room, floor: Floor): FurnitureLayoutRe
   // Remove any furniture that ended up in a door swing zone or outside room
   const validated: FurnitureInstance[] = [];
   for (const fi of furniture) {
-    const dims = CATALOG_DIMS[fi.catalog_id];
+    const dims = getCatalogDims(fi.catalog_id);
     if (!dims) { validated.push(fi); continue; }
 
     // Final room boundary check
