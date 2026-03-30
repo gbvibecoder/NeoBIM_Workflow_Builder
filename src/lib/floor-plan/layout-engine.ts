@@ -171,6 +171,30 @@ export function layoutFloorPlan(program: EnhancedRoomProgram): PlacedRoom[] {
     // Use fixed-room pre-placement + BSP for remaining space
     try {
       result = layoutWithFixedRooms(rooms, fpW, fpH, program.adjacency, program.isVastuRequested);
+
+      // ── Check if any fixed room got squeezed below 70% of target ──
+      // If so, expand footprint and re-run once.
+      const undersized = result.filter(r => {
+        const spec = fixedRooms.find(s => s.name === r.name);
+        if (!spec?.preferredWidth || !spec?.preferredDepth) return false;
+        const target = spec.preferredWidth * spec.preferredDepth;
+        return r.width * r.depth < target * 0.70;
+      });
+
+      if (undersized.length > 0 && !program.plotWidthM) {
+        // Only expand auto-calculated footprints (not user-specified plots)
+        const totalFixed = fixedRooms.reduce((s, r) => s + (r.preferredWidth! * r.preferredDepth!), 0);
+        const totalFlex = rooms.filter(r => !fixedRooms.includes(r)).reduce((s, r) => s + r.areaSqm, 0);
+        const needed = (totalFixed + totalFlex) * 1.15;
+        if (needed > fpW * fpH) {
+          const scale = Math.sqrt(needed / (fpW * fpH));
+          fpW = grid(fpW * scale);
+          fpH = grid(fpH * scale);
+          console.log(`[LAYOUT] Expanding footprint to ${fpW}x${fpH}m for ${undersized.length} undersized fixed rooms`);
+          result = layoutWithFixedRooms(rooms, fpW, fpH, program.adjacency, program.isVastuRequested);
+        }
+      }
+
       console.log(`[LAYOUT] Fixed-room placement: ${fixedRooms.length} fixed + ${rooms.length - fixedRooms.length} flex`);
     } catch (err) {
       console.warn("[LAYOUT] Fixed-room placement failed, falling back to BSP:", err);
@@ -389,9 +413,29 @@ function layoutWithFixedRooms(
       for (let y = 0; y <= fpH - d + 0.01; y += edgeStep) candidates.push({ x: grid(fpW - w), y: grid(y) });
     }
 
-    // Interior positions (coarser grid for any remaining space)
-    for (let y = 0; y <= fpH - d + 0.01; y += 1.0) {
-      for (let x = 0; x <= fpW - w + 0.01; x += 1.0) {
+    // Positions snapped to edges of already-placed rooms (best gaps)
+    for (const occ of occupied) {
+      // Right of placed room
+      candidates.push({ x: grid(occ.x + occ.w), y: grid(occ.y) });
+      candidates.push({ x: grid(occ.x + occ.w), y: grid(occ.y + occ.h - d) });
+      // Below placed room
+      candidates.push({ x: grid(occ.x), y: grid(occ.y + occ.h) });
+      candidates.push({ x: grid(occ.x + occ.w - w), y: grid(occ.y + occ.h) });
+      // Left of placed room
+      if (occ.x >= w) {
+        candidates.push({ x: grid(occ.x - w), y: grid(occ.y) });
+        candidates.push({ x: grid(occ.x - w), y: grid(occ.y + occ.h - d) });
+      }
+      // Above placed room
+      if (occ.y >= d) {
+        candidates.push({ x: grid(occ.x), y: grid(occ.y - d) });
+        candidates.push({ x: grid(occ.x + occ.w - w), y: grid(occ.y - d) });
+      }
+    }
+
+    // Interior positions (finer grid)
+    for (let y = 0; y <= fpH - d + 0.01; y += 0.5) {
+      for (let x = 0; x <= fpW - w + 0.01; x += 0.5) {
         candidates.push({ x: grid(x), y: grid(y) });
       }
     }
