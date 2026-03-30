@@ -31,7 +31,8 @@ def create_stair(
     stair.RiserHeight = riser_height
     stair.TreadLength = tread_depth
 
-    api.run("spatial.assign_container", model, relating_structure=storey, products=[stair])
+    from app.utils.ifc_helpers import assign_to_storey
+    assign_to_storey(model, storey, stair)
 
     # Position
     cx, cy = 0.0, 0.0

@@ -25,7 +25,8 @@ def create_space(
     space.LongName = props.space_usage or ""
     space.CompositionType = "ELEMENT"
 
-    api.run("spatial.assign_container", model, relating_structure=storey, products=[space])
+    from app.utils.ifc_helpers import assign_to_storey
+    assign_to_storey(model, storey, space)
 
     # Position from vertices
     cx, cy = 0.0, 0.0

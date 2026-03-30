@@ -31,7 +31,8 @@ def create_slab(
     slab.Name = props.name
     slab.PredefinedType = "ROOF" if is_roof else "FLOOR"
 
-    api.run("spatial.assign_container", model, relating_structure=storey, products=[slab])
+    from app.utils.ifc_helpers import assign_to_storey
+    assign_to_storey(model, storey, slab)
 
     # Placement at slab elevation
     slab.ObjectPlacement = model.create_entity(

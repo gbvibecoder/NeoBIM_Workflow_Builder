@@ -27,7 +27,8 @@ def create_beam(
     beam.GlobalId = new_guid()
     beam.Name = props.name
 
-    api.run("spatial.assign_container", model, relating_structure=storey, products=[beam])
+    from app.utils.ifc_helpers import assign_to_storey
+    assign_to_storey(model, storey, beam)
 
     # Position from vertices
     if len(elem.vertices) >= 2:

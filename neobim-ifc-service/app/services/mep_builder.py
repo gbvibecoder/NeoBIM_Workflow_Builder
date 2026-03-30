@@ -27,7 +27,8 @@ def create_duct(
     duct.GlobalId = new_guid()
     duct.Name = props.name
 
-    api.run("spatial.assign_container", model, relating_structure=storey, products=[duct])
+    from app.utils.ifc_helpers import assign_to_storey
+    assign_to_storey(model, storey, duct)
 
     cx, cy, cz = 0.0, 0.0, 0.0
     if elem.vertices:
@@ -88,7 +89,8 @@ def create_pipe(
     pipe.GlobalId = new_guid()
     pipe.Name = props.name
 
-    api.run("spatial.assign_container", model, relating_structure=storey, products=[pipe])
+    from app.utils.ifc_helpers import assign_to_storey
+    assign_to_storey(model, storey, pipe)
 
     cx, cy, cz = 0.0, 0.0, 0.0
     if elem.vertices:
@@ -148,7 +150,8 @@ def create_cable_tray(
     tray.GlobalId = new_guid()
     tray.Name = props.name
 
-    api.run("spatial.assign_container", model, relating_structure=storey, products=[tray])
+    from app.utils.ifc_helpers import assign_to_storey
+    assign_to_storey(model, storey, tray)
 
     cx, cy, cz = 0.0, 0.0, 0.0
     if elem.vertices:
@@ -209,7 +212,8 @@ def create_equipment(
     equip.GlobalId = new_guid()
     equip.Name = props.name
 
-    api.run("spatial.assign_container", model, relating_structure=storey, products=[equip])
+    from app.utils.ifc_helpers import assign_to_storey
+    assign_to_storey(model, storey, equip)
 
     cx, cy, cz = 0.0, 0.0, 0.0
     if elem.vertices:

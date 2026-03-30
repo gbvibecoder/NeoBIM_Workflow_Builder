@@ -46,7 +46,8 @@ def create_wall(
     wall.PredefinedType = "PARTITIONING" if props.is_partition else "STANDARD"
 
     # Assign to storey
-    api.run("spatial.assign_container", model, relating_structure=storey, products=[wall])
+    from app.utils.ifc_helpers import assign_to_storey
+    assign_to_storey(model, storey, wall)
 
     # Build placement at wall origin
     origin = model.create_entity("IfcCartesianPoint", Coordinates=(v0.x if v0 else 0.0, v0.y if v0 else 0.0, 0.0))
