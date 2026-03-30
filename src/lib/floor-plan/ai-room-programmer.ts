@@ -465,9 +465,12 @@ async function programRoomsMultiCall(
   const firstRooms = allRooms.filter(r => r.floor === 1);
   const missingGround = findMissingRooms(groundMentioned, groundRooms, ground || prompt);
   const missingFirst = first ? findMissingRooms(firstMentioned, firstRooms, first) : [];
-  for (const r of missingGround) r.floor = 0;
-  for (const r of missingFirst) r.floor = 1;
-  allRooms.push(...missingGround, ...missingFirst);
+  for (const r of missingGround) { r.floor = 0; }
+  for (const r of missingFirst) { r.floor = 1; }
+  allRooms.push(
+    ...missingGround.map(r => ({ ...r, floor: r.floor as number | undefined })),
+    ...missingFirst.map(r => ({ ...r, floor: r.floor as number | undefined })),
+  );
 
   if (missingGround.length + missingFirst.length > 0) {
     console.warn(`[STAGE-1-MULTI] Injected ${missingGround.length} ground + ${missingFirst.length} first floor missing rooms`);
