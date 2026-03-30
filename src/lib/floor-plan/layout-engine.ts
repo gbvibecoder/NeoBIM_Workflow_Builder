@@ -746,10 +746,15 @@ function refineRoomProportions(rooms: PlacedRoom[]): PlacedRoom[] {
     if (room.type === "hallway" || room.type === "staircase") continue;
 
     const roomAr = ar(room.width, room.depth);
-    if (roomAr <= 2.5) continue;
 
-    // Target AR based on room type
-    const maxAr = room.type === "bathroom" ? 2.0 : room.type === "bedroom" ? 1.8 : 2.2;
+    // Type-specific max aspect ratios (architectural best practice)
+    const MAX_AR: Record<string, number> = {
+      bedroom: 1.6, bathroom: 2.0, kitchen: 1.8,
+      living: 2.0, dining: 1.8, entrance: 2.0,
+      utility: 2.2, storage: 2.5, balcony: 3.0,
+      other: 2.2,
+    };
+    const maxAr = MAX_AR[room.type] ?? 2.2;
     if (roomAr <= maxAr) continue;
 
     // Try to make more square: shrink the longer dimension, extend the shorter
@@ -1052,11 +1057,16 @@ function applyDimensionCorrection(
   try {
     const withTargets: RoomWithTarget[] = placed.map(r => {
       const spec = specs.find(s => s.name === r.name);
+      // Mark rooms with user-specified exact dimensions as fixed —
+      // dimension corrector will not move their boundaries.
+      const hasExactDims = spec?.preferredWidth && spec?.preferredDepth &&
+        spec.preferredWidth > 0 && spec.preferredDepth > 0;
       return {
         ...r,
         targetWidth: spec?.preferredWidth,
         targetDepth: spec?.preferredDepth,
         targetArea: spec?.areaSqm ?? r.width * r.depth,
+        isFixed: !!hasExactDims,
       };
     });
 

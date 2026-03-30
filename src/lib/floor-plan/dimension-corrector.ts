@@ -19,6 +19,7 @@ export interface RoomWithTarget extends PlacedRoom {
   targetWidth?: number;  // from user spec or AI
   targetDepth?: number;
   targetArea: number;    // always available
+  isFixed?: boolean;     // true = user-specified exact dims, don't move boundaries
 }
 
 interface SharedBoundary {
@@ -65,8 +66,8 @@ export function correctDimensions(
   fpH: number,
   maxIterations?: number,
 ): RoomWithTarget[] {
-  // Use more iterations for complex layouts to reach convergence
-  const iters = maxIterations ?? (rooms.length > 15 ? 25 : 15);
+  // Scale iterations by room count for better convergence on complex layouts
+  const iters = maxIterations ?? Math.min(50, Math.max(15, rooms.length * 3));
   try {
     const result = rooms.map(r => ({ ...r }));
 
@@ -93,6 +94,10 @@ export function correctDimensions(
         const roomA = result[boundary.idxA];
         const roomB = result[boundary.idxB];
 
+        // PROTECT FIXED ROOMS: never move a boundary that would change
+        // a user-specified exact dimension (isFixed flag set by layoutWithFixedRooms)
+        if (roomA.isFixed || roomB.isFixed) continue;
+
         // Calculate how much each room deviates from its target
         const areaA = roomA.width * roomA.depth;
         const areaB = roomB.width * roomB.depth;
@@ -101,7 +106,6 @@ export function correctDimensions(
 
         // Adjust if one room is too big AND its neighbor is too small,
         // OR if one room is significantly oversized (>15% over target) regardless.
-        // Thresholds lowered from 10%/8% to 7%/5% for tighter dimension control.
         const shouldAdjustAB = (errorA > 0.07 && errorB < -0.05) || (errorA > 0.15 && errorB < 0);
         const shouldAdjustBA = (errorB > 0.07 && errorA < -0.05) || (errorB > 0.15 && errorA < 0);
 
