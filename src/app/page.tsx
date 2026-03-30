@@ -1099,8 +1099,6 @@ export default function LandingPage() {
             {/* Blueprint architectural grid */}
             <div className="blueprint-grid" />
 
-            {/* Scanning laser beam */}
-            <div className="scan-beam" />
 
             {/* Central radial glow — stronger */}
             <div style={{
