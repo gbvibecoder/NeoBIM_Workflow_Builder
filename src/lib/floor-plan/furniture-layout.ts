@@ -6,7 +6,7 @@
  */
 
 import type { Floor, Room, Wall, Door, FurnitureInstance, Point, RoomType } from "@/types/floor-plan-cad";
-import { polygonBounds, wallLength, lineDirection, addPoints, scalePoint, distance } from "./geometry";
+import { wallLength, lineDirection, addPoints, scalePoint } from "./geometry";
 
 function genId(prefix: string): string {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
@@ -148,9 +148,9 @@ function classifyRoomWalls(room: Room, floor: Floor): WallInfo[] {
     (w) => roomWallIds.has(w.id) || w.left_room_id === room.id || w.right_room_id === room.id
   );
 
-  const bounds = polygonBounds(room.boundary.points);
-  const cx = bounds.center.x;
-  const cy = bounds.center.y;
+  const pts = room.boundary.points;
+  const cx = pts.reduce((s, p) => s + p.x, 0) / pts.length;
+  const cy = pts.reduce((s, p) => s + p.y, 0) / pts.length;
 
   return roomWalls.map((wall) => {
     const len = wallLength(wall);
@@ -221,6 +221,180 @@ interface PlacementIssue {
 }
 
 /**
+ * Compute room interior bounds (inset from boundary to avoid wall overlap).
+ * Returns minX, maxX, minY, maxY in mm.
+ */
+function getRoomInterior(room: Room, wallInset: number = 100): {
+  minX: number; maxX: number; minY: number; maxY: number;
+  cx: number; cy: number; w: number; h: number;
+} {
+  const pts = room.boundary.points;
+  const xs = pts.map(p => p.x);
+  const ys = pts.map(p => p.y);
+  const minX = Math.min(...xs) + wallInset;
+  const maxX = Math.max(...xs) - wallInset;
+  const minY = Math.min(...ys) + wallInset;
+  const maxY = Math.max(...ys) - wallInset;
+  return {
+    minX, maxX, minY, maxY,
+    cx: (minX + maxX) / 2, cy: (minY + maxY) / 2,
+    w: maxX - minX, h: maxY - minY,
+  };
+}
+
+/**
+ * Build door swing zones — quarter-circle arcs that must stay clear.
+ * Returns array of {x, y, radius} circles to keep free.
+ */
+function getDoorSwingZones(room: Room, floor: Floor): Array<{ x: number; y: number; radius: number }> {
+  const zones: Array<{ x: number; y: number; radius: number }> = [];
+  for (const door of floor.doors) {
+    const wall = floor.walls.find(w => w.id === door.wall_id);
+    if (!wall) continue;
+    // Only care about doors touching this room
+    if (wall.left_room_id !== room.id && wall.right_room_id !== room.id) continue;
+
+    const dir = lineDirection(wall.centerline);
+    const doorCenter = addPoints(
+      wall.centerline.start,
+      scalePoint(dir, door.position_along_wall_mm + door.width_mm / 2),
+    );
+    zones.push({ x: doorCenter.x, y: doorCenter.y, radius: door.width_mm + 200 });
+  }
+  return zones;
+}
+
+/**
+ * Check if a furniture bounding box is fully inside the room interior.
+ */
+function isInsideRoom(
+  pos: Point, w: number, d: number, rotation: number,
+  interior: { minX: number; maxX: number; minY: number; maxY: number },
+): boolean {
+  // Swap w/d for 90° or 270° rotation
+  const isRotated = rotation === 90 || rotation === 270;
+  const hw = (isRotated ? d : w) / 2;
+  const hd = (isRotated ? w : d) / 2;
+
+  return (
+    pos.x - hw >= interior.minX &&
+    pos.x + hw <= interior.maxX &&
+    pos.y - hd >= interior.minY &&
+    pos.y + hd <= interior.maxY
+  );
+}
+
+/**
+ * Clamp a furniture position to stay inside the room interior.
+ */
+function clampToRoom(
+  pos: Point, w: number, d: number, rotation: number,
+  interior: { minX: number; maxX: number; minY: number; maxY: number },
+): Point {
+  const isRotated = rotation === 90 || rotation === 270;
+  const hw = (isRotated ? d : w) / 2;
+  const hd = (isRotated ? w : d) / 2;
+
+  return {
+    x: Math.max(interior.minX + hw, Math.min(interior.maxX - hw, pos.x)),
+    y: Math.max(interior.minY + hd, Math.min(interior.maxY - hd, pos.y)),
+  };
+}
+
+/**
+ * Check if a position conflicts with any door swing zone.
+ */
+function inDoorSwingZone(
+  pos: Point, w: number, d: number, rotation: number,
+  swingZones: Array<{ x: number; y: number; radius: number }>,
+): boolean {
+  const isRotated = rotation === 90 || rotation === 270;
+  const hw = (isRotated ? d : w) / 2;
+  const hd = (isRotated ? w : d) / 2;
+
+  for (const zone of swingZones) {
+    // Closest point on furniture rect to the swing center
+    const closestX = Math.max(pos.x - hw, Math.min(pos.x + hw, zone.x));
+    const closestY = Math.max(pos.y - hd, Math.min(pos.y + hd, zone.y));
+    const dx = closestX - zone.x;
+    const dy = closestY - zone.y;
+    if (dx * dx + dy * dy < zone.radius * zone.radius) return true;
+  }
+  return false;
+}
+
+/**
+ * Try placing furniture along a wall with slide attempts.
+ * Returns position + rotation, or null if can't fit.
+ */
+function tryPlaceOnWall(
+  wallInfo: WallInfo,
+  dims: { width: number; depth: number },
+  offset: number,
+  interior: { minX: number; maxX: number; minY: number; maxY: number; cx: number; cy: number },
+  placedRects: Array<{ x: number; y: number; w: number; d: number }>,
+  swingZones: Array<{ x: number; y: number; radius: number }>,
+): { position: Point; rotation: number } | null {
+  const rotation = getRotationForWall(wallInfo);
+  const isRotated = rotation === 90 || rotation === 270;
+  const fw = isRotated ? dims.depth : dims.width;
+  const fd = isRotated ? dims.width : dims.depth;
+
+  // Wall-side determines placement axis
+  const wallSide = wallInfo.side;
+  let fixedAxis: "x" | "y";
+  let fixedValue: number;
+  let slideMin: number;
+  let slideMax: number;
+
+  if (wallSide === "bottom") {
+    fixedAxis = "y"; fixedValue = interior.minY + fd / 2 + offset;
+    slideMin = interior.minX + fw / 2; slideMax = interior.maxX - fw / 2;
+  } else if (wallSide === "top") {
+    fixedAxis = "y"; fixedValue = interior.maxY - fd / 2 - offset;
+    slideMin = interior.minX + fw / 2; slideMax = interior.maxX - fw / 2;
+  } else if (wallSide === "left") {
+    fixedAxis = "x"; fixedValue = interior.minX + fd / 2 + offset;
+    slideMin = interior.minY + fw / 2; slideMax = interior.maxY - fw / 2;
+  } else {
+    fixedAxis = "x"; fixedValue = interior.maxX - fd / 2 - offset;
+    slideMin = interior.minY + fw / 2; slideMax = interior.maxY - fw / 2;
+  }
+
+  if (slideMin > slideMax) return null; // Room too small for this item
+
+  // Try 5 positions along wall: center, then offset left/right
+  const center = (slideMin + slideMax) / 2;
+  const step = (slideMax - slideMin) / 4;
+  const candidates = [center, center - step, center + step, slideMin + fw / 2, slideMax - fw / 2];
+
+  for (const slidePos of candidates) {
+    if (slidePos < slideMin || slidePos > slideMax) continue;
+
+    const pos: Point = fixedAxis === "y"
+      ? { x: slidePos, y: fixedValue }
+      : { x: fixedValue, y: slidePos };
+
+    // Check room boundary
+    if (!isInsideRoom(pos, dims.width, dims.depth, rotation, interior)) continue;
+
+    // Check door swing zones
+    if (inDoorSwingZone(pos, dims.width, dims.depth, rotation, swingZones)) continue;
+
+    // Check overlap with placed furniture (200mm clearance)
+    const overlaps = placedRects.some(pr =>
+      Math.abs(pos.x - pr.x) < (fw + pr.w) / 2 + 200 &&
+      Math.abs(pos.y - pr.y) < (fd + pr.d) / 2 + 200
+    );
+    if (overlaps) continue;
+
+    return { position: pos, rotation };
+  }
+
+  return null; // Can't fit on this wall
+}
+
+/**
  * Auto-furnish a single room.
  */
 export function layoutRoomFurniture(room: Room, floor: Floor): FurnitureLayoutResult {
@@ -230,11 +404,11 @@ export function layoutRoomFurniture(room: Room, floor: Floor): FurnitureLayoutRe
   const furniture: FurnitureInstance[] = [];
   const issues: PlacementIssue[] = [];
   const walls = classifyRoomWalls(room, floor);
-  const bounds = polygonBounds(room.boundary.points);
+  const interior = getRoomInterior(room, 100);
+  const swingZones = getDoorSwingZones(room, floor);
   const usedSides = new Set<string>();
 
-  if (walls.length === 0) {
-    issues.push({ severity: "warning", message: `No walls found for ${room.name}`, roomId: room.id });
+  if (walls.length === 0 || interior.w < 600 || interior.h < 600) {
     return { furniture, issues };
   }
 
@@ -263,104 +437,133 @@ export function layoutRoomFurniture(room: Room, floor: Floor): FurnitureLayoutRe
     const dims = CATALOG_DIMS[spec.catalogId];
     if (!dims) continue;
 
+    // Skip if furniture larger than room interior
+    if (dims.width > interior.w + 100 && dims.depth > interior.h + 100) continue;
+    if (dims.depth > interior.w + 100 && dims.width > interior.h + 100) continue;
+
     const offset = spec.offsetFromWall ?? 50;
-    let position: Point | null = null;
-    let rotation = 0;
+    let placed = false;
 
-    // Determine target wall based on placement strategy
-    let targetWall: WallInfo | null = null;
-    switch (spec.wallPlacement) {
-      case "anchor":
-        targetWall = anchor;
-        break;
-      case "opposite":
-        targetWall = findOppositeWall(anchor, walls);
-        break;
-      case "adjacent":
-        targetWall = findAdjacentWall(anchor, walls, usedSides);
-        break;
-      case "near-window":
-        targetWall = findWallWithWindow(walls) ?? findAdjacentWall(anchor, walls, usedSides);
-        break;
-      case "near-door":
-        targetWall = findDoorWall(walls) ?? anchor;
-        break;
-      case "far-from-door": {
-        const doorWall = findDoorWall(walls);
-        if (doorWall) {
-          targetWall = findOppositeWall(doorWall, walls) ?? findAdjacentWall(doorWall, walls, usedSides);
+    if (spec.wallPlacement === "center") {
+      // Center placement — try room center, avoiding door swings
+      const pos: Point = { x: interior.cx, y: interior.cy };
+      const clamped = clampToRoom(pos, dims.width, dims.depth, 0, interior);
+      if (!inDoorSwingZone(clamped, dims.width, dims.depth, 0, swingZones)) {
+        const overlaps = placedRects.some(pr =>
+          Math.abs(clamped.x - pr.x) < (dims.width + pr.w) / 2 + 200 &&
+          Math.abs(clamped.y - pr.y) < (dims.depth + pr.d) / 2 + 200
+        );
+        if (!overlaps) {
+          placedRects.push({ x: clamped.x, y: clamped.y, w: dims.width, d: dims.depth });
+          furniture.push({
+            id: genId("furn"), catalog_id: spec.catalogId,
+            position: clamped, rotation_deg: 0, scale: 1, room_id: room.id, locked: false,
+          });
+          placed = true;
         }
-        if (!targetWall) targetWall = anchor;
-        break;
       }
-      case "center":
-        // Place in room center
-        position = { x: bounds.center.x, y: bounds.center.y };
-        break;
+    } else {
+      // Wall-based placement — determine target wall(s), try each
+      const targetWalls: WallInfo[] = [];
+      switch (spec.wallPlacement) {
+        case "anchor":
+          if (anchor) targetWalls.push(anchor);
+          break;
+        case "opposite":
+          { const opp = findOppositeWall(anchor, walls); if (opp) targetWalls.push(opp); }
+          break;
+        case "adjacent":
+          { const adj = findAdjacentWall(anchor, walls, usedSides); if (adj) targetWalls.push(adj); }
+          // Fallback to other adjacent
+          { const adj2 = findAdjacentWall(anchor, walls, new Set()); if (adj2 && !targetWalls.includes(adj2)) targetWalls.push(adj2); }
+          break;
+        case "near-window":
+          { const ww = findWallWithWindow(walls); if (ww) targetWalls.push(ww); }
+          { const adj = findAdjacentWall(anchor, walls, usedSides); if (adj && !targetWalls.includes(adj)) targetWalls.push(adj); }
+          break;
+        case "near-door":
+          { const dw = findDoorWall(walls); if (dw) targetWalls.push(dw); }
+          if (anchor && !targetWalls.includes(anchor)) targetWalls.push(anchor);
+          break;
+        case "far-from-door": {
+          const doorWall = findDoorWall(walls);
+          if (doorWall) {
+            const opp = findOppositeWall(doorWall, walls);
+            if (opp) targetWalls.push(opp);
+            const adj = findAdjacentWall(doorWall, walls, usedSides);
+            if (adj && !targetWalls.includes(adj)) targetWalls.push(adj);
+          }
+          if (anchor && !targetWalls.includes(anchor)) targetWalls.push(anchor);
+          break;
+        }
+      }
+
+      // Try each target wall in order
+      for (const tw of targetWalls) {
+        const result = tryPlaceOnWall(tw, dims, offset, interior, placedRects, swingZones);
+        if (result) {
+          placedRects.push({
+            x: result.position.x, y: result.position.y,
+            w: (result.rotation === 90 || result.rotation === 270) ? dims.depth : dims.width,
+            d: (result.rotation === 90 || result.rotation === 270) ? dims.width : dims.depth,
+          });
+          furniture.push({
+            id: genId("furn"), catalog_id: spec.catalogId,
+            position: result.position, rotation_deg: result.rotation,
+            scale: 1, room_id: room.id, locked: false,
+          });
+          if (tw.side) usedSides.add(tw.side);
+          placed = true;
+          break;
+        }
+      }
     }
 
-    if (!position && targetWall) {
-      position = computeWallPosition(targetWall, dims, offset, bounds, placedRects);
-      rotation = getRotationForWall(targetWall);
-      if (targetWall.side) usedSides.add(targetWall.side);
+    // If wall placement failed, try all walls as last resort
+    if (!placed && spec.wallPlacement !== "center") {
+      for (const w of walls) {
+        if (placedRects.length > 0 && w === anchor) continue; // already tried
+        const result = tryPlaceOnWall(w, dims, offset, interior, placedRects, swingZones);
+        if (result) {
+          placedRects.push({
+            x: result.position.x, y: result.position.y,
+            w: (result.rotation === 90 || result.rotation === 270) ? dims.depth : dims.width,
+            d: (result.rotation === 90 || result.rotation === 270) ? dims.width : dims.depth,
+          });
+          furniture.push({
+            id: genId("furn"), catalog_id: spec.catalogId,
+            position: result.position, rotation_deg: result.rotation,
+            scale: 1, room_id: room.id, locked: false,
+          });
+          break;
+        }
+      }
     }
-
-    if (!position) {
-      // Fallback: place in room center area
-      position = {
-        x: bounds.center.x + (Math.random() - 0.5) * bounds.width * 0.3,
-        y: bounds.center.y + (Math.random() - 0.5) * bounds.height * 0.3,
-      };
-    }
-
-    // Check overlap with already-placed furniture
-    const rect = { x: position.x, y: position.y, w: dims.width, d: dims.depth };
-    const overlaps = placedRects.some(
-      (pr) =>
-        Math.abs(rect.x - pr.x) < (rect.w + pr.w) / 2 + 100 &&
-        Math.abs(rect.y - pr.y) < (rect.d + pr.d) / 2 + 100
-    );
-
-    if (overlaps) continue; // Skip this piece — no room
-
-    placedRects.push(rect);
-
-    furniture.push({
-      id: genId("furn"),
-      catalog_id: spec.catalogId,
-      position,
-      rotation_deg: rotation,
-      scale: 1,
-      room_id: room.id,
-      locked: false,
-    });
+    // If still can't place: skip silently (better no furniture than clipped furniture)
   }
 
-  // Verify clearance to doors (minimum 600mm passage)
+  // ── Post-placement validation ──
+  // Remove any furniture that ended up in a door swing zone or outside room
+  const validated: FurnitureInstance[] = [];
   for (const fi of furniture) {
     const dims = CATALOG_DIMS[fi.catalog_id];
-    if (!dims) continue;
+    if (!dims) { validated.push(fi); continue; }
 
-    for (const door of floor.doors) {
-      const wall = floor.walls.find((w) => w.id === door.wall_id);
-      if (!wall) continue;
-
-      const dir = lineDirection(wall.centerline);
-      const doorCenter = addPoints(wall.centerline.start, scalePoint(dir, door.position_along_wall_mm + door.width_mm / 2));
-      const dist = distance(fi.position, doorCenter);
-
-      if (dist < 600 + Math.max(dims.width, dims.depth) / 2) {
-        issues.push({
-          severity: "warning",
-          message: `Furniture near door in ${room.name} — may block passage`,
-          roomId: room.id,
-        });
-        break;
-      }
+    // Final room boundary check
+    if (!isInsideRoom(fi.position, dims.width, dims.depth, fi.rotation_deg, interior)) {
+      fi.position = clampToRoom(fi.position, dims.width, dims.depth, fi.rotation_deg, interior);
     }
+
+    // Final door swing check — remove if blocking
+    if (inDoorSwingZone(fi.position, dims.width, dims.depth, fi.rotation_deg, swingZones)) {
+      issues.push({ severity: "info", message: `Removed ${fi.catalog_id} in ${room.name} — blocks door swing`, roomId: room.id });
+      continue; // Remove this item
+    }
+
+    validated.push(fi);
   }
 
-  return { furniture, issues };
+  return { furniture: validated, issues };
 }
 
 /**
@@ -380,34 +583,8 @@ export function layoutAllFurniture(floor: Floor): FurnitureLayoutResult {
 }
 
 // ============================================================
-// POSITION HELPERS
+// ROTATION HELPER
 // ============================================================
-
-function computeWallPosition(
-  wallInfo: WallInfo,
-  dims: { width: number; depth: number },
-  offset: number,
-  roomBounds: ReturnType<typeof polygonBounds>,
-  placed: Array<{ x: number; y: number; w: number; d: number }>,
-): Point | null {
-  const wall = wallInfo.wall;
-  const dir = lineDirection(wall.centerline);
-  const mid = wallInfo.midpoint;
-
-  // Place centered along wall, offset perpendicular toward room center
-  const toCenter = {
-    x: roomBounds.center.x - mid.x,
-    y: roomBounds.center.y - mid.y,
-  };
-  const dist = Math.sqrt(toCenter.x * toCenter.x + toCenter.y * toCenter.y);
-  const normToCenter = dist > 0 ? { x: toCenter.x / dist, y: toCenter.y / dist } : { x: 0, y: 1 };
-
-  const perpOffset = offset + dims.depth / 2;
-  return {
-    x: mid.x + normToCenter.x * perpOffset,
-    y: mid.y + normToCenter.y * perpOffset,
-  };
-}
 
 function getRotationForWall(wallInfo: WallInfo): number {
   switch (wallInfo.side) {
