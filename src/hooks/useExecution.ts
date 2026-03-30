@@ -118,12 +118,9 @@ async function executeNode(
     // ── IFC files with pre-parsed data: pass parsed result, NOT raw file ──
     const ifcParsed = nodeData.ifcParsed as Record<string, unknown> | undefined;
     if (catalogueId === "IN-004" && ifcParsed) {
-      console.log("[IN-004] Using pre-parsed IFC data (client-side parsed)");
       // Include supplementary IFC data if uploaded (structural, MEP)
       const structuralIFCParsed = nodeData.structuralIFCParsed as Record<string, unknown> | undefined;
       const mepIFCParsed = nodeData.mepIFCParsed as Record<string, unknown> | undefined;
-      if (structuralIFCParsed) console.log("[IN-004] Structural IFC data included");
-      if (mepIFCParsed) console.log("[IN-004] MEP IFC data included");
       return {
         id: generateId(),
         executionId,
@@ -165,7 +162,6 @@ async function executeNode(
       mimeType = fileObj.type || "application/pdf";
     } else if (fileObj && catalogueId === "IN-004") {
       // IFC file in inputFileStore but no ifcParsed — parse now
-      console.log("[IN-004] IFC file in store but not pre-parsed — parsing now");
       try {
         const text = await fileObj.text();
         const { parseIFCText } = await import("@/services/ifc-text-parser");
@@ -282,7 +278,6 @@ async function executeNode(
               }
             }
             inputData._elements = elements;
-            console.log(`[TR-008] Applied ${overrides.size} user quantity override(s) from TR-007`);
           }
         }
       }
@@ -304,7 +299,6 @@ async function executeNode(
         const hasPreparsed = inputData.ifcParsed && typeof inputData.ifcParsed === "object";
 
         if (hasLargeFile || hasPreparsed) {
-          console.log(`[TR-007] ${hasPreparsed ? "Using pre-parsed IFC data" : `Large IFC file (${(fileData!.length / 1024 / 1024).toFixed(1)}MB base64) — parsing via /api/parse-ifc`}`);
 
           let parseResult: Record<string, unknown> | null = hasPreparsed ? inputData.ifcParsed as Record<string, unknown> : null;
 
@@ -320,7 +314,6 @@ async function executeNode(
               const formData = new FormData();
               formData.append("file", ifcFile);
 
-              console.log(`[TR-007] Uploading ${(bytes.length / 1024 / 1024).toFixed(1)}MB to /api/parse-ifc...`);
               const uploadRes = await fetch("/api/parse-ifc", {
                 method: "POST",
                 body: formData,
@@ -334,7 +327,6 @@ async function executeNode(
 
               const uploadData = await uploadRes.json();
               parseResult = uploadData.result ?? null;
-              console.log(`[TR-007] Parse complete: ${(parseResult as Record<string, unknown>)?.summary ? JSON.stringify((parseResult as Record<string, unknown>).summary).slice(0, 200) : "no summary"}`);
             } catch (uploadErr) {
               clearTimeout(timeoutId);
               const msg = uploadErr instanceof Error ? uploadErr.message : "IFC upload/parse failed";
@@ -460,7 +452,6 @@ async function executeNode(
       // Also checks supplementaryIFCStore for multi-model federation.
       // ══════════════════════════════════════════════════════════════════════
       if (catalogueId === "TR-016" && !inputData.fileData && !inputData.ifcUrl && !inputData.ifcData && !inputData.ifcModels) {
-        console.log("[TR-016] No raw IFC data in inputData — looking for File in inputFileStore");
 
         // Helper: upload a single IFC file to R2 and return URL
         const uploadToR2 = async (file: File): Promise<string> => {
@@ -490,7 +481,6 @@ async function executeNode(
             primaryFile = fileObj;
             primaryFileName = fileObj.name;
             sourceNodeId = storeNodeId;
-            console.log(`[TR-016] Found primary IFC "${fileObj.name}" (${(fileObj.size / 1024 / 1024).toFixed(1)}MB) from node ${storeNodeId}`);
             break;
           }
         }
@@ -506,7 +496,6 @@ async function executeNode(
 
         if (hasSupplementary) {
           // Multi-model federation: upload all files to R2 and build ifcModels array
-          console.log(`[TR-016] Multi-model federation: primary + ${structEntry ? "structural" : ""}${structEntry && mepEntry ? " + " : ""}${mepEntry ? "MEP" : ""}`);
           try {
             const uploadPromises: Array<Promise<{ ifcUrl: string; discipline: string; fileName: string }>> = [];
 
@@ -532,7 +521,6 @@ async function executeNode(
             const ifcModels = await Promise.all(uploadPromises);
             inputData.ifcModels = ifcModels;
             inputData.fileName = primaryFileName;
-            console.log(`[TR-016] ${ifcModels.length} models uploaded to R2 for cross-model clash detection`);
           } catch (uploadErr) {
             const msg = uploadErr instanceof Error ? uploadErr.message : "Multi-model upload failed";
             console.error("[TR-016] Multi-model upload failed:", msg);
@@ -544,7 +532,6 @@ async function executeNode(
             const r2Url = await uploadToR2(primaryFile);
             inputData.ifcUrl = r2Url;
             inputData.fileName = primaryFileName;
-            console.log(`[TR-016] Single model uploaded to R2: ${r2Url.slice(0, 80)}...`);
           } catch (uploadErr) {
             const msg = uploadErr instanceof Error ? uploadErr.message : "IFC upload failed";
             console.error("[TR-016] Failed to upload IFC to R2:", msg);
@@ -563,7 +550,6 @@ async function executeNode(
         if (IMAGE_ANALYSIS_NODES.has(catalogueId)) {
           // Upload large image to temp storage, replace fileData with URL
           try {
-            console.log(`[exec] Large image (${((inputData.fileData as string).length / 1024 / 1024).toFixed(1)}MB base64) for ${catalogueId} — uploading to temp storage`);
             const mimeType = (inputData.mimeType as string) ?? "image/jpeg";
             const uploadRes = await fetch("/api/temp-image", {
               method: "POST",
@@ -572,7 +558,6 @@ async function executeNode(
             });
             if (uploadRes.ok) {
               const { url } = await uploadRes.json();
-              console.log(`[exec] Image uploaded to temp storage: ${url}`);
               // Replace inline base64 with URL reference — TR-004 accepts both
               inputData.url = url;
               inputData.imageUrl = url;
@@ -1136,7 +1121,6 @@ function getUpstreamArtifact(
       if (!firstArtifact) firstArtifact = artifact;
       if (artifact.data && typeof artifact.data === "object") {
         const dataKeys = Object.keys(artifact.data as Record<string, unknown>).filter(k => k.startsWith("_"));
-        console.log(`[merge] Node ${nodeId} ← source ${edge.source}: _keys=[${dataKeys.join(",")}] type=${artifact.type}`);
         Object.assign(mergedData, artifact.data);
       }
     } else {
@@ -1145,7 +1129,6 @@ function getUpstreamArtifact(
   }
 
   const mergedUnderscoreKeys = Object.keys(mergedData).filter(k => k.startsWith("_"));
-  console.log(`[merge] Final merged for ${nodeId}: _keys=[${mergedUnderscoreKeys.join(",")}]`);
 
   if (!firstArtifact) return null;
 

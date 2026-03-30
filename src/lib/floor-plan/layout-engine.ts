@@ -67,6 +67,8 @@ export function layoutFloorPlan(program: EnhancedRoomProgram): PlacedRoom[] {
   const rooms = program.rooms;
   if (rooms.length === 0) return [];
 
+  const inputCount = rooms.length;
+
   // Classify rooms
   const cls = classifyRooms(rooms);
   const roomAreaTotal = rooms.reduce((s, r) => s + r.areaSqm, 0);
@@ -89,18 +91,127 @@ export function layoutFloorPlan(program: EnhancedRoomProgram): PlacedRoom[] {
     ? CORRIDOR_DEPTH * Math.sqrt(Math.max(program.totalAreaSqm, roomAreaTotal) * DEFAULT_ASPECT)
     : 0;
 
-  const totalArea = Math.max(program.totalAreaSqm, roomAreaTotal + corridorEstimate);
-  const fpW = grid(Math.sqrt(totalArea * DEFAULT_ASPECT));
-  const fpH = grid(totalArea / fpW);
+  let totalArea = Math.max(program.totalAreaSqm, roomAreaTotal + corridorEstimate);
+
+  // ── Footprint auto-expansion (only for high room counts) ──
+  // For complex layouts (10+ rooms), ensure footprint has enough room.
+  // Conservative: only expand when room area clearly exceeds footprint.
+  if (rooms.length >= 10) {
+    const requiredArea = roomAreaTotal + corridorEstimate;
+    if (totalArea < requiredArea) {
+      totalArea = requiredArea * 1.05; // 5% margin for wall thickness
+    }
+  }
+
+  let fpW = grid(Math.sqrt(totalArea * DEFAULT_ASPECT));
+  let fpH = grid(totalArea / fpW);
+
+  // For very high room counts (15+), ensure footprint is generous enough
+  // that BSP doesn't create unusably small rooms
+  if (rooms.length >= 15) {
+    const minFootprint = rooms.length * 4; // at least 4 sqm per room on average
+    if (fpW * fpH < minFootprint) {
+      const scale = Math.sqrt(minFootprint / (fpW * fpH));
+      fpW = grid(fpW * scale);
+      fpH = grid(fpH * scale);
+    }
+  }
 
   // Skip zoning if footprint too shallow for corridor + two minimum-height zones
   const minZoneHeight = MIN_HABITABLE * 2 + CORRIDOR_DEPTH;
+  let result: PlacedRoom[];
   if (!useZones || fpH < minZoneHeight) {
-    return bspSubdivide(rooms, { x: 0, y: 0, w: fpW, h: fpH }, program.adjacency);
+    result = bspSubdivide(rooms, { x: 0, y: 0, w: fpW, h: fpH }, program.adjacency);
+  } else {
+    // Zone-based layout with corridor
+    result = layoutWithZones(cls, fpW, fpH, program.adjacency);
   }
 
-  // Zone-based layout with corridor
-  return layoutWithZones(cls, fpW, fpH, program.adjacency);
+  // ── Room count validation ──
+  // RULE: rooms_in == rooms_out. If BSP lost any rooms, force-place them.
+  result = validateAndRecoverRooms(rooms, result, fpW, fpH);
+
+  if (result.length !== inputCount) {
+    console.warn(`[STAGE-2] Room count mismatch after recovery: input=${inputCount}, output=${result.length}`);
+  }
+
+  return result;
+}
+
+/**
+ * Validate that all input rooms appear in the output. If any are missing,
+ * force-place them by appending to the footprint edge.
+ */
+function validateAndRecoverRooms(
+  inputRooms: RoomSpec[],
+  outputRooms: PlacedRoom[],
+  fpW: number,
+  fpH: number,
+): PlacedRoom[] {
+  const outputNames = new Set(outputRooms.map(r => r.name));
+  const missing = inputRooms.filter(r => !outputNames.has(r.name));
+
+  if (missing.length === 0) return outputRooms;
+
+  console.warn(
+    `[STAGE-2] ROOM LOSS DETECTED: ${inputRooms.length} input → ${outputRooms.length} output. ` +
+    `Missing: ${missing.map(r => r.name).join(", ")}. Force-placing.`
+  );
+
+  const result = [...outputRooms];
+  for (const room of missing) {
+    result.push(forcePlaceRoom(room, fpW, fpH, result));
+  }
+  return result;
+}
+
+/**
+ * Force-place a room that BSP failed to include.
+ * Strategy: append below or to the right of existing rooms.
+ */
+function forcePlaceRoom(
+  room: RoomSpec,
+  fpW: number,
+  fpH: number,
+  existing: PlacedRoom[],
+): PlacedRoom {
+  const area = Math.max(room.areaSqm, 1.5);
+  // Compute dimensions maintaining reasonable aspect ratio
+  const w = grid(Math.sqrt(area * 1.2));
+  const d = grid(area / w);
+
+  // Find the bottom-most y extent of existing rooms
+  const maxY = existing.length > 0
+    ? Math.max(...existing.map(r => r.y + r.depth))
+    : 0;
+  // Find rightmost x extent at the bottom row
+  const bottomRooms = existing.filter(r => Math.abs(r.y + r.depth - maxY) < 0.2);
+  const maxX = bottomRooms.length > 0
+    ? Math.max(...bottomRooms.map(r => r.x + r.width))
+    : 0;
+
+  let x: number, y: number;
+
+  if (maxX + w <= fpW + 0.5) {
+    // Fits to the right of existing bottom rooms
+    x = grid(maxX);
+    y = grid(maxY - d);
+    if (y < 0) { y = grid(maxY); }
+  } else {
+    // Start a new row below
+    x = 0;
+    y = grid(maxY);
+  }
+
+  return {
+    name: room.name,
+    type: room.type,
+    x,
+    y,
+    width: w,
+    depth: d,
+    area: grid(w * d),
+  };
 }
 
 // ── Room classification ──────────────────────────────────────────────────────
@@ -747,6 +858,8 @@ export interface MultiFloorLayout {
  * ADDITIVE: calls layoutFloorPlan() internally — does NOT modify it.
  */
 export function layoutMultiFloor(program: EnhancedRoomProgram): MultiFloorLayout {
+  const totalInputRooms = program.rooms.length;
+
   try {
     // Group rooms by floor
     const floorGroups = new Map<number, RoomSpec[]>();
@@ -754,6 +867,12 @@ export function layoutMultiFloor(program: EnhancedRoomProgram): MultiFloorLayout
       const fl = room.floor ?? 0;
       if (!floorGroups.has(fl)) floorGroups.set(fl, []);
       floorGroups.get(fl)!.push({ ...room }); // shallow copy to avoid mutation
+    }
+
+    // Validate: no rooms lost during grouping
+    const groupedTotal = [...floorGroups.values()].reduce((s, g) => s + g.length, 0);
+    if (groupedTotal < totalInputRooms) {
+      console.warn(`[layoutMultiFloor] Room loss during grouping: ${totalInputRooms} → ${groupedTotal}`);
     }
 
     // Single floor? Use existing layout
@@ -772,6 +891,7 @@ export function layoutMultiFloor(program: EnhancedRoomProgram): MultiFloorLayout
 
     for (const level of sortedLevels) {
       const rooms = floorGroups.get(level)!;
+      const inputCountForFloor = rooms.length;
 
       // Ensure staircase exists on each floor
       const hasStaircase = rooms.some(
@@ -804,6 +924,17 @@ export function layoutMultiFloor(program: EnhancedRoomProgram): MultiFloorLayout
       };
 
       const layout = layoutFloorPlan(floorProgram);
+
+      // Validate: floor room count
+      if (layout.length < inputCountForFloor) {
+        console.warn(
+          `[layoutMultiFloor] Floor ${level}: ${inputCountForFloor} input → ${layout.length} output. ` +
+          `Missing rooms handled by layoutFloorPlan recovery.`
+        );
+      }
+
+      console.log(`[STAGE-2] Floor ${level}: ${layout.length} rooms placed:`, layout.map(r => `${r.name} ${r.width.toFixed(1)}x${r.depth.toFixed(1)}`));
+
       const bW = layout.length > 0 ? grid(Math.max(...layout.map(r => r.x + r.width))) : 0;
       const bD = layout.length > 0 ? grid(Math.max(...layout.map(r => r.y + r.depth))) : 0;
 
@@ -821,8 +952,13 @@ export function layoutMultiFloor(program: EnhancedRoomProgram): MultiFloorLayout
     // Align staircases vertically across floors
     multiFloorAlignStaircases(floors);
 
+    // Final validation: total rooms across all floors
+    const totalOutput = floors.reduce((s, f) => s + f.rooms.length, 0);
+    console.log(`[STAGE-2] Total rooms placed: ${totalOutput} (input: ${totalInputRooms})`);
+
     return { floors };
-  } catch {
+  } catch (err) {
+    console.error("[layoutMultiFloor] Error, falling back to single-floor:", err);
     // Fallback: single-floor layout with all rooms
     const rooms = layoutFloorPlan(program);
     const bW = rooms.length > 0 ? grid(Math.max(...rooms.map(r => r.x + r.width))) : 0;

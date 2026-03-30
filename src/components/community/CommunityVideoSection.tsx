@@ -189,9 +189,11 @@ function CommunityVideoCard({
           if (isUnlike) { setLiked(true); setLikeCount(c => c + 1); }
           else {
             setLiked(false); setLikeCount(c => c - 1);
-            localStorage.setItem("cv-likes", JSON.stringify(
-              JSON.parse(localStorage.getItem("cv-likes") || "[]").filter((id: string) => id !== video.id)
-            ));
+            try {
+              localStorage.setItem("cv-likes", JSON.stringify(
+                JSON.parse(localStorage.getItem("cv-likes") || "[]").filter((id: string) => id !== video.id)
+              ));
+            } catch { /* ignore corrupted localStorage */ }
           }
           toast("Sign in to like videos", { duration: 3000 });
         }

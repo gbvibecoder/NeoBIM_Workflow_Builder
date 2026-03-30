@@ -14,7 +14,7 @@ interface WallRendererProps {
   selectedIds: string[];
 }
 
-export function WallRenderer({ walls, viewport, viewMode, selectedIds }: WallRendererProps) {
+function WallRendererBase({ walls, viewport, viewMode, selectedIds }: WallRendererProps) {
   const zoom = viewport.zoom;
 
   // Compute wall polygons
@@ -135,7 +135,7 @@ export function WallRenderer({ walls, viewport, viewMode, selectedIds }: WallRen
       }
     }
     return fills;
-  }, [walls, viewport]);
+  }, [walls, viewport.x, viewport.y, viewport.zoom, viewport.canvasWidth, viewport.canvasHeight]);
 
   const juncStroke = viewMode === "cad" ? "#1A1A1A" : "#404040";
   const juncFill = viewMode === "cad" ? "#FFFFFF" : "#F0F0F0";
@@ -189,3 +189,5 @@ export function WallRenderer({ walls, viewport, viewMode, selectedIds }: WallRen
     </>
   );
 }
+
+export const WallRenderer = React.memo(WallRendererBase);

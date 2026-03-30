@@ -39,7 +39,6 @@ export async function storeImage(base64: string, contentType: string): Promise<s
   const r = getRedis();
 
   const payload = JSON.stringify({ base64, contentType });
-  console.log(`[temp-image] Storing image ${id} in Redis (${(payload.length / 1024).toFixed(0)}KB, TTL=${TTL_SECONDS}s)`);
 
   await r.set(`temp-img:${id}`, payload, { ex: TTL_SECONDS });
 

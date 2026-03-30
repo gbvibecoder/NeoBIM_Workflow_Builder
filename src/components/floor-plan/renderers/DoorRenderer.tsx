@@ -46,7 +46,7 @@ interface DoorGeom {
   travelEnd?: { x: number; y: number };
 }
 
-export function DoorRenderer({ doors, walls, viewport, viewMode }: DoorRendererProps) {
+function DoorRendererBase({ doors, walls, viewport, viewMode }: DoorRendererProps) {
   const zoom = viewport.zoom;
 
   const doorShapes = useMemo(() => {
@@ -148,7 +148,7 @@ export function DoorRenderer({ doors, walls, viewport, viewMode }: DoorRendererP
 
       return geom;
     }).filter(Boolean) as DoorGeom[];
-  }, [doors, walls, viewport]);
+  }, [doors, walls, viewport.x, viewport.y, viewport.zoom, viewport.canvasWidth, viewport.canvasHeight]);
 
   const strokeColor = viewMode === "cad" ? "#1A1A1A" : "#555555";
   const arcColor = viewMode === "cad" ? "#444444" : "#888888";
@@ -345,3 +345,5 @@ export function DoorRenderer({ doors, walls, viewport, viewMode }: DoorRendererP
     </>
   );
 }
+
+export const DoorRenderer = React.memo(DoorRendererBase);

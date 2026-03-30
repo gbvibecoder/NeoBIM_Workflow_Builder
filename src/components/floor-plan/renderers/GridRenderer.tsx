@@ -13,7 +13,7 @@ interface GridRendererProps {
   viewMode: ViewMode;
 }
 
-export function GridRenderer({ viewport, gridSize_mm, viewMode }: GridRendererProps) {
+function GridRendererBase({ viewport, gridSize_mm, viewMode }: GridRendererProps) {
   const gridLines = useMemo(() => {
     const lines: Array<{ points: number[]; major: boolean }> = [];
     const labels: Array<{ x: number; y: number; text: string }> = [];
@@ -98,7 +98,7 @@ export function GridRenderer({ viewport, gridSize_mm, viewMode }: GridRendererPr
     }
 
     return { lines, labels };
-  }, [viewport, gridSize_mm]);
+  }, [viewport.x, viewport.y, viewport.zoom, viewport.canvasWidth, viewport.canvasHeight, gridSize_mm]);
 
   const majorColor = viewMode === "cad" ? "#E0E0E0" : "#ECECEC";
   const minorColor = viewMode === "cad" ? "#F0F0F0" : "#F5F5F5";
@@ -129,3 +129,5 @@ export function GridRenderer({ viewport, gridSize_mm, viewMode }: GridRendererPr
     </>
   );
 }
+
+export const GridRenderer = React.memo(GridRendererBase);

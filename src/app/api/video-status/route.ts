@@ -41,9 +41,7 @@ export async function GET(req: NextRequest) {
   try {
     // ── Single video mode (floor plans) ──
     if (singleTaskId) {
-      console.log("[POLL] /api/video-status (single) taskId:", singleTaskId);
       const status = await checkSingleVideoStatus(singleTaskId);
-      console.log("[POLL] checkSingleVideoStatus result:", JSON.stringify(status));
 
       return NextResponse.json({
         ...status,
@@ -67,11 +65,9 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    console.log("[POLL] /api/video-status (dual) exteriorTaskId:", exteriorTaskId, "interiorTaskId:", interiorTaskId, "pipeline:", pipeline);
     const status = pipeline === "text2video"
       ? await checkDualTextVideoStatus(exteriorTaskId, interiorTaskId)
       : await checkDualVideoStatus(exteriorTaskId, interiorTaskId);
-    console.log("[POLL] checkDualVideoStatus result:", JSON.stringify(status));
 
     return NextResponse.json({
       ...status,

@@ -36,8 +36,6 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  console.log("[RENDER] /api/concat-videos called");
-  console.log("[RENDER] R2 configured:", isR2Configured());
 
   if (!isR2Configured()) {
     console.error("[RENDER] ❌ R2 NOT configured — concat-videos cannot work without R2 storage!");
@@ -76,7 +74,6 @@ export async function POST(req: NextRequest) {
     const listPath = join(tempDir, "filelist.txt");
     filesToClean.push(extPath, intPath, outPath, listPath);
 
-    console.log("[concat-videos] Downloading videos...");
 
     // Download both videos in parallel
     const [extRes, intRes] = await Promise.all([
@@ -97,7 +94,6 @@ export async function POST(req: NextRequest) {
       writeFile(intPath, Buffer.from(intBuf)),
     ]);
 
-    console.log("[concat-videos] Videos downloaded. Concatenating with ffmpeg...");
 
     // Create ffmpeg concat file list
     await writeFile(listPath, `file '${extPath}'\nfile '${intPath}'\n`);
@@ -114,7 +110,6 @@ export async function POST(req: NextRequest) {
       outPath,
     ], { timeout: 120_000 });
 
-    console.log("[concat-videos] ffmpeg concat complete. Uploading to R2...");
 
     // Read the concatenated file
     const { readFile } = await import("fs/promises");
@@ -131,7 +126,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    console.log("[concat-videos] Done!", { url: result.url, size: result.size });
 
     return NextResponse.json({
       videoUrl: result.url,

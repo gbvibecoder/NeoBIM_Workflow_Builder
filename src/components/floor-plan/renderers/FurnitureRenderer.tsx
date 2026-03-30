@@ -15,7 +15,7 @@ interface FurnitureRendererProps {
   showClearances?: boolean;
 }
 
-export function FurnitureRenderer({
+function FurnitureRendererBase({
   floor,
   viewport,
   selectedIds,
@@ -36,7 +36,7 @@ export function FurnitureRenderer({
   );
 }
 
-function FurnitureItem({
+const FurnitureItem = React.memo(function FurnitureItem({
   instance,
   viewport,
   isSelected,
@@ -138,7 +138,7 @@ function FurnitureItem({
       )}
     </Group>
   );
-}
+});
 
 /**
  * Parse simple SVG path with M, L, Z commands into flat Konva points.
@@ -162,3 +162,5 @@ function parseSimplePath(d: string, scale: number, zoom: number): number[] {
 
   return points;
 }
+
+export const FurnitureRenderer = React.memo(FurnitureRendererBase);

@@ -657,7 +657,6 @@ async function generateElevationSketch(
   ${heightAnnotation}
 </svg>`;
 
-  console.log(`[ElevationSketch] Generated SVG: ${floors} floors, ${buildingWidth.toFixed(1)}m × ${buildingHeight.toFixed(1)}m`);
   return svg;
 }
 
@@ -683,7 +682,6 @@ async function sketchToRender(
     .png()
     .toBuffer();
 
-  console.log(`[SketchToRender] SVG → PNG: ${pngBuffer.length} bytes`);
 
   // Create File object for gpt-image-1 (convert Buffer → Uint8Array for type safety)
   const imageFile = new File([new Uint8Array(pngBuffer)], "elevation-sketch.png", { type: "image/png" });
@@ -728,7 +726,6 @@ async function sketchToRender(
     `QUALITY REFERENCE: This should be indistinguishable from a real photograph in a Dezeen/ArchDaily article. ` +
     `Think Foster + Partners project photography by Nigel Young, or Heatherwick Studio shoots by Hufton+Crow. No text, watermarks, or labels.`;
 
-  console.log(`[SketchToRender] Prompt (first 300): ${fullPrompt.slice(0, 300)}`);
 
   // Use gpt-image-1 images.edit — it SEES the sketch and renders it photorealistically
   // input_fidelity: "low" — use sketch as loose reference for massing/floor count,
@@ -756,7 +753,6 @@ async function sketchToRender(
         const uploadResult = await uploadToR2(resultBuffer, `concept-render-${Date.now()}.png`, "image/png");
         if (uploadResult.success) {
           resultUrl = uploadResult.url;
-          console.log("[SketchToRender] Uploaded to R2:", resultUrl.slice(0, 80));
         }
       }
     } catch (r2Err) {
@@ -767,7 +763,6 @@ async function sketchToRender(
     }
   }
 
-  console.log("[SketchToRender] gpt-image-1 render complete!");
   return {
     url: resultUrl,
     revisedPrompt: fullPrompt,
@@ -796,7 +791,6 @@ export async function generateConceptImage(
     // ── Path 1: BuildingDescription → Sketch → gpt-image-1 Render (highest accuracy) ──
     if (typeof descriptionOrPrompt !== "string" && viewType === "exterior") {
       try {
-        console.log("[generateConceptImage] Using Sketch → gpt-image-1 pipeline for maximum accuracy");
 
         // Generate the architectural elevation sketch
         const sketchSvg = await generateElevationSketch(descriptionOrPrompt);
@@ -841,7 +835,6 @@ export async function generateConceptImage(
 
     // Use gpt-image-1 for generation (much better instruction following than DALL-E 3)
     try {
-      console.log("[generateConceptImage] Using gpt-image-1 generate");
       const size = (viewType === "exterior" || viewType === "interior") ? "1536x1024" : "1024x1024";
       const response = await client.images.generate({
         model: "gpt-image-1",
@@ -992,7 +985,6 @@ Respond with JSON only:
     };
 
     const passed = qa.floorCountCorrect && qa.locationContextCorrect && qa.buildingTypeMatch;
-    console.log(`[RenderQA] ${passed ? "PASSED" : "FAILED"}: floors=${qa.detectedFloors}/${description.floors}, location=${qa.locationContextCorrect}, type=${qa.buildingTypeMatch}`);
 
     return {
       passed,
@@ -1045,9 +1037,6 @@ export async function generateRenovationRender(
       `The building must look like it was just built yesterday — but keep the same architecture and style. ` +
       `Ultra-realistic photograph, not a render.`;
 
-    console.log("[RenovationRender] Using gpt-image-1 images.edit with actual building photo");
-    console.log("[RenovationRender] Image size:", imageBuffer.length, "bytes, type:", mimeType);
-    console.log("[RenovationRender] Prompt (first 200):", renovationPrompt.slice(0, 200));
 
     // Use gpt-image-1 images.edit — this model SEES the input image and edits it
     // input_fidelity: "high" ensures the output closely matches the input structure
@@ -1089,7 +1078,6 @@ export async function generateRenovationRender(
           const uploadResult = await uploadToR2(resultBuffer, `renovation-render-${Date.now()}.png`, "image/png");
           if (uploadResult.success) {
             resultUrl = uploadResult.url;
-            console.log("[RenovationRender] Uploaded to R2:", resultUrl.slice(0, 80));
           }
         }
       } catch (r2Err) {
@@ -1099,11 +1087,9 @@ export async function generateRenovationRender(
       // Fallback: pass as data URI (Kling accepts base64)
       if (!resultUrl) {
         resultUrl = image.b64_json; // raw base64 — Kling can handle this
-        console.log("[RenovationRender] Using raw base64 (length:", image.b64_json.length, ")");
       }
     }
 
-    console.log("[RenovationRender] gpt-image-1 edit complete! URL type:", resultUrl.startsWith("http") ? "URL" : "base64");
 
     return {
       url: resultUrl,
@@ -2189,7 +2175,6 @@ export async function generateFloorPlan(
             const svg = renderArchitecturalSvg(posRooms, sharedWalls, title, pxPerMeter, fpWidthM, fpHeightM, ox, oy);
             const roomList = posRooms.map(r => ({ name: r.name, area: snap(r.width * r.depth), unit: "m²" }));
 
-            console.log(`[generateFloorPlan] Layout engine: ${placed.length} rooms, score=${validation.score}/100`);
 
             return {
               svg, roomList, totalArea, floors,
@@ -2435,7 +2420,6 @@ CRITICAL CONSTRAINTS:
         }
 
         if (validation.score < 100) {
-          console.log(`[generateFloorPlan] Final layout validation score: ${validation.score}/100 (${validation.errors.length} issues)`);
         }
 
         // Apply geometric fixes (snap, clamp, overlap resolution)
@@ -2942,7 +2926,6 @@ export async function analyzeImage(
 
     const checkContent = quickCheck.choices[0]?.message?.content;
     const isFloorPlan = checkContent ? (JSON.parse(checkContent) as { isFloorPlan?: boolean }).isFloorPlan === true : false;
-    console.log(`[analyzeImage] Phase 1 done — isFloorPlan: ${isFloorPlan}, using model: ${isFloorPlan ? "gpt-4o" : "gpt-4o-mini"}`);
 
     // ── Phase 2: Deep analysis ──
     // Floor plans get GPT-4o for rich room-by-room extraction + render prompts.
@@ -3098,7 +3081,6 @@ Be specific about dimensions, proportions, materials, and spatial relationships.
 
     const result = JSON.parse(content) as ImageAnalysis;
 
-    console.log(`[analyzeImage] Model: ${model}, isFloorPlan: ${isFloorPlan}, rooms: ${result.rooms?.length ?? 0}, richRooms: ${result.richRooms?.length ?? 0}`);
 
     return {
       buildingType: result.buildingType || "Unknown",
@@ -3233,7 +3215,6 @@ export async function analyzeFloorPlanSVG(
 ) {
   const client = getClient(userApiKey);
 
-  console.log("[GPT-4o SVG] Generating SVG floor plan...");
 
   const response = await client.chat.completions.create({
     model: "gpt-4o",
@@ -3312,17 +3293,13 @@ OUTPUT ONLY THE SVG. Start with <svg, end with </svg>. No explanation. No markdo
     throw new Error("GPT-4o did not return valid SVG");
   }
 
-  console.log(`[GPT-4o SVG] SVG size: ${svgContent.length} chars`);
-  console.log("[GPT-4o SVG] First 300 chars:", svgContent.substring(0, 300));
 
   // Save SVG for debugging
   try {
     const fs = await import("fs");
     const path = await import("path");
     fs.writeFileSync(path.join(process.cwd(), "public", "debug-floor-plan.svg"), svgContent);
-    console.log("[GPT-4o SVG] Saved to public/debug-floor-plan.svg");
   } catch {
-    console.log("[GPT-4o SVG] Could not save debug file");
   }
 
   // Parse SVG using existing parser
@@ -3330,9 +3307,7 @@ OUTPUT ONLY THE SVG. Start with <svg, end with </svg>. No explanation. No markdo
   const result = parseSVGtoFloorPlan(svgContent);
   result.svgContent = svgContent;
 
-  console.log(`[GPT-4o SVG] Parsed: ${result.rooms.length} rooms, ${result.walls?.length ?? 0} walls`);
   for (const r of result.rooms) {
-    console.log(`  ${r.name} (${r.type}): ${r.width}x${r.depth}m polygon:${r.polygon?.length ?? 0}pts area=${r.area}m²`);
   }
 
   return result;
@@ -3467,7 +3442,6 @@ export async function generateFloorPlanRender(
 
   const prompt = `Architectural dollhouse cutaway from above at a 45-degree angle, looking into a ${buildingDimensions.width.toFixed(0)}m x ${buildingDimensions.depth.toFixed(0)}m residential floor plan with the ceiling/roof completely removed, open top view like a miniature model home. Rooms: ${roomList}. Interior is fully furnished and decorated in ${styleDescriptions[style]}. Real wood plank floors in living spaces, clean white walls with subtle shadows between rooms. Each room has appropriate furniture arranged naturally. Warm golden-hour sunlight streaming through windows casting soft long shadows across the interior. Photorealistic, architectural visualization quality, tilt-shift depth of field, 8K detail. No text, no labels, no annotations, no people.`;
 
-  console.log(`[DALL-E 3] Generating floor plan render (${style})...`);
 
   return handleOpenAICall(async () => {
     const response = await client.images.generate({
@@ -3484,7 +3458,6 @@ export async function generateFloorPlanRender(
 
     if (!imageUrl) throw new Error("DALL-E 3 returned no image");
 
-    console.log(`[DALL-E 3] Render generated successfully`);
 
     // Fetch the image and convert to base64 data URL for persistence
     const imgResponse = await fetch(imageUrl);
@@ -3492,7 +3465,6 @@ export async function generateFloorPlanRender(
     const base64 = imgBuffer.toString("base64");
     const dataUrl = `data:image/png;base64,${base64}`;
 
-    console.log(`[DALL-E 3] Image fetched: ${(imgBuffer.length / 1024).toFixed(0)}KB`);
 
     return { imageUrl: dataUrl, revisedPrompt };
   });

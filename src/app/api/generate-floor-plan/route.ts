@@ -15,6 +15,7 @@ import {
   programRooms,
   programRoomsFallback,
   programToDescription,
+  extractMentionedRooms,
 } from "@/lib/floor-plan/ai-room-programmer";
 import type { EnhancedRoomProgram } from "@/lib/floor-plan/ai-room-programmer";
 import { convertGeometryToProject, convertMultiFloorToProject } from "@/lib/floor-plan/pipeline-adapter";
@@ -98,10 +99,26 @@ export async function POST(req: NextRequest) {
     let roomProgram: EnhancedRoomProgram;
     try {
       roomProgram = await programRooms(prompt, apiKey);
-      console.log(`[generate-floor-plan] Stage 1: ${roomProgram.rooms.length} rooms, ${roomProgram.totalAreaSqm}sqm, type=${roomProgram.buildingType}, adjacencies=${roomProgram.adjacency.length}`);
     } catch (parseErr) {
       console.warn("[generate-floor-plan] Stage 1 AI failed, using regex fallback:", parseErr);
       roomProgram = programRoomsFallback(prompt);
+    }
+
+    // ── Stage 1 Diagnostic ──
+    console.log(`[STAGE-1] Rooms from AI: ${roomProgram.rooms.length}`, roomProgram.rooms.map(r => `${r.name} (floor:${r.floor ?? 0})`));
+
+    // ── Prompt faithfulness check ──
+    const mentionedRooms = extractMentionedRooms(prompt);
+    const roomNamesLower = roomProgram.rooms.map(r => r.name.toLowerCase());
+    const missingFromPrompt = mentionedRooms.filter(mentioned => {
+      const ml = mentioned.toLowerCase();
+      return !roomNamesLower.some(rn => rn.includes(ml) || ml.includes(rn) ||
+        ml.split(/\s+/).some(w => w.length > 3 && rn.includes(w)));
+    });
+    if (missingFromPrompt.length > 0) {
+      console.warn(`[FAITHFULNESS] ${missingFromPrompt.length} rooms from prompt not in output: ${missingFromPrompt.join(", ")}`);
+    } else if (mentionedRooms.length > 0) {
+      console.log(`[FAITHFULNESS] All ${mentionedRooms.length} mentioned rooms present in output`);
     }
 
     // Convert to BuildingDescription for Stage 2
@@ -110,9 +127,18 @@ export async function POST(req: NextRequest) {
     // ── Multi-floor: use BSP layout engine per floor ────────────────
     if (roomProgram.numFloors > 1) {
       const multiFloor = layoutMultiFloor(roomProgram);
+
+      // ── Stage 2 Diagnostic ──
+      const totalPlaced = multiFloor.floors.reduce((s, f) => s + f.rooms.length, 0);
+      console.log(`[STAGE-2] Rooms after layout: ${totalPlaced}`, multiFloor.floors.map(f => `Floor ${f.level}: ${f.rooms.map(r => `${r.name} ${r.width.toFixed(1)}x${r.depth.toFixed(1)}`).join(", ")}`));
+
       const project = convertMultiFloorToProject(
         multiFloor.floors, description.projectName, prompt,
       );
+
+      // ── Stage 3 Diagnostic ──
+      const projectRoomCount = project.floors.reduce((s, f) => s + f.rooms.length, 0);
+      console.log(`[STAGE-3] Rooms in project: ${projectRoomCount}`, project.floors.map(f => `Floor ${f.level}: ${f.rooms.map(r => r.name).join(", ")}`));
 
       // Return ground floor geometry for backward-compatible rendering
       const gf = multiFloor.floors.find(f => f.level === 0) ?? multiFloor.floors[0];
@@ -146,12 +172,12 @@ export async function POST(req: NextRequest) {
           break; // Score ground floor only
         }
       }
-      console.log(`[generate-floor-plan] Multi-floor: ${multiFloor.floors.length} floors, ${project.metadata.carpet_area_sqm?.toFixed(0)}sqm total`);
       return NextResponse.json({ project, geometry, svg: null, feedback });
     }
 
     // ── Stage 2: AI Spatial Layout (single floor) ──────────────────
     // GPT-4o positions rooms with zone-aware placement + validation + retry
+    console.log(`[STAGE-2] Starting single-floor layout for ${roomProgram.rooms.length} rooms`);
     const floorPlan = await generateFloorPlan(description, apiKey, roomProgram);
 
     // ── Stage 3: Architectural Detailing ──────────────────────────────

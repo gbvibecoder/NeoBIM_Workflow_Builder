@@ -77,8 +77,6 @@ if(!__parentOrigin||__parentOrigin==='null'){__parentOrigin="${modelBase ?? ''}"
 var MODEL_CDN=__parentOrigin?__parentOrigin+'/r2-models':'https://pub-27d9a7371b6d47ff94fee1a3228f1720.r2.dev/models';
 var TEXTURE_CDN=__parentOrigin?__parentOrigin+'/r2-textures':'https://pub-27d9a7371b6d47ff94fee1a3228f1720.r2.dev/textures';
 var HAS_MODELS=MODEL_CDN.length>10;
-console.log('[GLTF] Model CDN: '+MODEL_CDN);
-console.log('[TEX] Texture CDN: '+TEXTURE_CDN);
 var CX=BW/2,CZ=BD/2,MXD=Math.max(BW,BD);
 
 // ─── Inline OrbitControls ─────────────────────────────────────────────────────
@@ -174,7 +172,6 @@ controls.target.set(CX,0,CZ);
   var envMap=pmremGen.fromScene(envScene,0).texture;
   scene.environment=envMap;
   pmremGen.dispose();
-  console.log('[BUILDER] Procedural HDR environment map applied');
 })();
 
 // ─── Lights (warm golden-hour key + warm fill + sky hemisphere) ──────────────
@@ -192,7 +189,6 @@ scene.add(new THREE.HemisphereLight(0xFFF5E8,0xA89070,.9));
 
 // ─── Anisotropic Filtering ───────────────────────────────────────────────────
 var maxAniso=renderer.capabilities.getMaxAnisotropy();
-console.log('[BUILDER] Max anisotropy:',maxAniso);
 
 // ─── Real PBR Texture Loader (R2 CDN with solid-color fallback) ──────────────
 var texLoader=new THREE.TextureLoader();
@@ -209,7 +205,6 @@ function loadPBRTex(mat,name,rx,ry,normalStr){
     mat.map=tex;
     mat.color.set(0xFFFFFF); // Reset to white so texture shows true colors (no tinting)
     mat.needsUpdate=true;
-    console.log('[TEX] Loaded '+name+'-color.jpg');
   },null,function(){console.warn('[TEX] Failed: '+name+'-color.jpg — using solid color fallback')});
   texLoader.load(TEXTURE_CDN+'/'+name+'-normal.jpg',function(tex){
     tex.wrapS=tex.wrapT=THREE.RepeatWrapping;
@@ -219,7 +214,6 @@ function loadPBRTex(mat,name,rx,ry,normalStr){
     tex.magFilter=THREE.LinearFilter;
     mat.normalMap=tex;mat.normalScale=new THREE.Vector2(normalStr,normalStr);
     mat.needsUpdate=true;
-    console.log('[TEX] Loaded '+name+'-normal.jpg');
   },null,function(){});
 }
 
@@ -427,7 +421,6 @@ function queueLoadGLTF(filename,targetX,targetZ,targetW,targetD,rotY,roomName){
 function flushQueue(){
   // Sort: lower priority number = loads first
   loadQueue.sort(function(a,b){return a.priority-b.priority});
-  console.log('[GLTF] Queue: '+loadQueue.length+' models (max '+MAX_CONCURRENT+' concurrent)');
   processQueue();
 }
 
@@ -496,7 +489,7 @@ function startLoad(job){
       resolve();
       processQueue();
     },function(p){
-      if(p.total>0){var pct=Math.round(p.loaded/p.total*100);if(pct%25===0)console.log('[GLTF] '+id+' '+pct+'%')}
+      if(p.total>0){Math.round(p.loaded/p.total*100)}
     },function(err){
       console.warn('[GLTF] FAIL '+filename+': '+(err&&err.message||err));
       gltfFailed++;
@@ -583,7 +576,6 @@ function removeProcItem(roomName,fname){
   var toRemove=[];
   pg.children.forEach(function(ch){if(ch.userData&&ch.userData.gltfId===gid)toRemove.push(ch)});
   toRemove.forEach(function(obj){pg.remove(obj)});
-  if(toRemove.length>0)console.log('[GLTF] Swapped '+toRemove.length+' procedural '+gid+' -> GLTF in '+roomName);
 }
 
 // Legacy wrapper — now queues instead of firing immediately
@@ -1621,7 +1613,6 @@ D.rooms.forEach(function(r){
   var cx=rx+w/2,cz=ry+d/2;
   var area=r.area||(w*d);
   var floorHex=FC[r.type]||0xB89B6A;
-  console.log("[IFRAME] Floor:",r.name,"type:",r.type,"color:#"+floorHex.toString(16));
 
   // Room floor: polygon (SVG) → THREE.Shape, image → invisible target, else → textured rect
   var fl;
@@ -1706,7 +1697,6 @@ D.rooms.forEach(function(r){
   // Try GLTF models for this room type (loads async from R2 CDN)
   var rModels=ROOM_MODELS[r.type];
   var roomKey=r.name||('room'+i);
-  console.log('[FURNITURE] Room "'+roomKey+'" type='+r.type+' models='+(rModels?rModels.length:0)+' gltfLoader='+(!!gltfLoader));
   if(rModels&&gltfLoader){
     rModels.forEach(function(md){
       loadGLTF(md.file,rx+w*md.rx,ry+d*md.rz,w*md.wF,d*md.dF,md.rot,roomKey);
@@ -2540,7 +2530,7 @@ var isWalking=false;
 var fpCamera=camera.clone();
 fpCamera.position.set(CX,1.6,CZ);
 var fpControls=null;
-try{fpControls=new THREE.PointerLockControls(fpCamera,renderer.domElement)}catch(e){console.log('[WALK] PointerLockControls not available')}
+try{fpControls=new THREE.PointerLockControls(fpCamera,renderer.domElement)}catch(e){/* PointerLockControls not available */}
 var moveF=false,moveB=false,moveL=false,moveR=false;
 var walkVel=new THREE.Vector3();
 var walkDir=new THREE.Vector3();
@@ -2636,12 +2626,10 @@ function enterWalkMode(){
         setTimeout(function(){walkOvl.style.display='none'},2000);
         fpControls.lock();
         crosshair.style.display='block';
-        console.log('[WALK] Cinematic entry complete — user has control');
         try{parent.postMessage({type:'walkModeChanged',walking:true},'*')}catch(e2){}
       }
     }
 
-    console.log('[WALK] Starting cinematic entrance from ('+startPos.x.toFixed(1)+','+startPos.z.toFixed(1)+') to ('+endPos.x.toFixed(1)+','+endPos.z.toFixed(1)+')');
     animateEntry();
   });
   document.body.appendChild(clickOverlay);
@@ -2654,7 +2642,6 @@ function exitWalkMode(){
   controls.enabled=true;
   crosshair.style.display='none';
   walkOvl.style.display='none';
-  console.log('[WALK] Exited first-person mode');
   try{parent.postMessage({type:'walkModeChanged',walking:false},'*')}catch(e){}
 }
 if(fpControls){
@@ -2762,7 +2749,6 @@ window.buildflowControls={
     animTo(new THREE.Vector3(x+fd*.6,fd*.8,z+fd*.6),new THREE.Vector3(x,.5,z),800);
   }
 };
-console.log("[IFRAME] buildflowControls registered on window");
 
 // ─── Raycaster / Interaction ─────────────────────────────────────────────────
 var rc=new THREE.Raycaster(),mv=new THREE.Vector2();
@@ -2819,8 +2805,7 @@ try{
   ssaoPass.maxDistance=0.12;
   ssaoPass.output=THREE.SSAOPass.OUTPUT.Default;
   composer.addPass(ssaoPass);
-  console.log('[POST] SSAO enabled — ambient occlusion active');
-}catch(e){console.log('[POST] SSAO not available:',e.message)}
+}catch(e){/* SSAO not available */}
 
 // Bloom (very subtle — preserves texture detail)
 var bloomPass=new THREE.UnrealBloomPass(
@@ -2875,7 +2860,7 @@ try{
   fxaaPass=new THREE.ShaderPass(THREE.FXAAShader);
   fxaaPass.uniforms['resolution'].value.set(1/innerWidth,1/innerHeight);
   composer.addPass(fxaaPass);
-}catch(e){console.log('[POST] FXAA not available:',e.message)}
+}catch(e){/* FXAA not available */}
 
 // ─── Animate ─────────────────────────────────────────────────────────────────
 function animate(){
@@ -2898,7 +2883,6 @@ function animate(){
     composer.render();
   }
 }
-console.log("[IFRAME] Three.js scene initialized. Rooms:",D.rooms.length,"Labels:",labels.length);
 animate();
 addEventListener("resize",function(){
   var w2=innerWidth,h2=innerHeight;

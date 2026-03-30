@@ -213,6 +213,7 @@ export function convertGeometryToProject(
   const roomRects: RoomRect[] = [];
 
   // ---- 1. Convert rooms (walls depend on room positions) ----
+  const inputRoomCount = geometry.rooms.length;
   const rooms: Room[] = geometry.rooms.map((gr) => {
     const id = genId("r");
     roomIdMap.set(gr.name, id);
@@ -258,6 +259,11 @@ export function convertGeometryToProject(
       vastu_direction: computeVastuDirection(cx, cy, buildingW, buildingD),
     };
   });
+
+  // Validate: room count preserved through conversion
+  if (rooms.length !== inputRoomCount) {
+    console.error(`[STAGE-3] Room loss during conversion: ${inputRoomCount} → ${rooms.length}`);
+  }
 
   // ---- 1b. SNAP PASS — close AI-generated gaps between rooms ----
   // GPT-4o often leaves 0.1–0.5m gaps; this snaps adjacent edges together
@@ -1193,6 +1199,7 @@ export function convertMultiFloorToProject(
     3: "Third Floor",
   };
 
+  const totalInputRooms = floorLayouts.reduce((s, fl) => s + fl.rooms.length, 0);
   const floors: Floor[] = [];
 
   for (const fl of floorLayouts) {
@@ -1222,6 +1229,13 @@ export function convertMultiFloorToProject(
 
     floors.push(floor);
   }
+
+  // Validate: room count preserved through multi-floor conversion
+  const totalOutputRooms = floors.reduce((s, f) => s + f.rooms.length, 0);
+  if (totalOutputRooms !== totalInputRooms) {
+    console.error(`[STAGE-3] Multi-floor room loss: ${totalInputRooms} → ${totalOutputRooms}`);
+  }
+  console.log(`[STAGE-3] Rooms in project: ${totalOutputRooms}`, floors.map(f => `Floor ${f.level}: ${f.rooms.map(r => r.name).join(", ")}`));
 
   // Build unified project with all floors
   const firstGeom = floorLayouts[0];

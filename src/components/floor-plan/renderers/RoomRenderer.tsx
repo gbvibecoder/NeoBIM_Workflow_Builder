@@ -36,7 +36,7 @@ function abbreviate(name: string): string {
   return name.length > 5 ? name.slice(0, 4) : name;
 }
 
-export function RoomRenderer({
+function RoomRendererBase({
   rooms, viewport, viewMode, renderMode, displayUnit = "m",
 }: RoomRendererProps) {
   if (renderMode === "fill") {
@@ -217,3 +217,5 @@ export function RoomRenderer({
     </>
   );
 }
+
+export const RoomRenderer = React.memo(RoomRendererBase);

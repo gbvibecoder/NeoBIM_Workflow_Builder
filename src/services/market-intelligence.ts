@@ -159,7 +159,6 @@ async function setCachedResult(cacheKey: string, data: MarketIntelligenceResult)
 function ensurePerM2(value: number, field: string): number {
   if (value > 0 && value < 10000) {
     const converted = Math.round(value * 10.764);
-    console.log(`[TR-015] Auto-converting ${field}: ₹${value}/sqft → ₹${converted}/m²`);
     return converted;
   }
   return value;
@@ -167,8 +166,8 @@ function ensurePerM2(value: number, field: string): number {
 
 /** Clamp state PWD factor to realistic range. No Indian state is <0.80x or >1.50x CPWD. */
 function clampPWDFactor(factor: number): number {
-  if (factor < 0.80) { console.log(`[TR-015] PWD factor ${factor} clamped to 0.80`); return 0.80; }
-  if (factor > 1.50) { console.log(`[TR-015] PWD factor ${factor} clamped to 1.50`); return 1.50; }
+  if (factor < 0.80) { return 0.80; }
+  if (factor > 1.50) { return 1.50; }
   return factor;
 }
 
@@ -186,7 +185,6 @@ export async function fetchMarketPrices(
   const dateStr = now.toISOString().split("T")[0];
 
   // ── Diagnostic logging ──
-  console.log(`[TR-015] Starting for: ${city}, ${state} (${buildingType})`);
 
   // ── Cache check ──
   const norm = (s: string) => s.toLowerCase().trim().replace(/\s+/g, "_");
@@ -194,7 +192,6 @@ export async function fetchMarketPrices(
   const cached = await getCachedResult(cacheKey);
   if (cached && cached.city?.toLowerCase() === city.toLowerCase() && cached.state?.toLowerCase() === state.toLowerCase()) {
     const fetchTime = cached.fetched_at ? new Date(cached.fetched_at).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }) : "earlier";
-    console.log(`[TR-015] Cache HIT for ${city}, ${state} — returning cached prices (${cached.agent_status})`);
     cached.agent_notes = [
       `💾 Market Intelligence — ${city}, ${state} (cached, fetched today at ${fetchTime})`,
       `Steel ₹${cached.steel_per_tonne?.value?.toLocaleString() ?? "?"}/t · Cement ₹${cached.cement_per_bag?.value ?? "?"}/bag · Mason ₹${cached.labor?.mason?.value ?? "?"}/day · Sand ₹${cached.sand_per_cft?.value ?? "?"}/cft`,
@@ -207,8 +204,6 @@ export async function fetchMarketPrices(
     console.warn(`[TR-015] Cache key matched but city/state mismatch — ignoring cache`);
   }
 
-  console.log(`[TR-015] Cache MISS — will fetch live prices`);
-  console.log(`[TR-015] API key: present=${!!apiKey}, valid=${apiKey.startsWith("sk-ant-api")}`);
 
   // Default result with static fallbacks
   const result: MarketIntelligenceResult = {
@@ -359,7 +354,6 @@ Steel range: ₹52,000-78,000/tonne. Cement: ₹340-560/bag. Mason: ₹500-1200/
   // ── Primary: Haiku + web_search (Sonnet times out on Vercel cold starts) ──
   try {
     const callStart = Date.now();
-    console.log(`[TR-015] Haiku + web_search (20s timeout, ${webSearchPrompt.length} char prompt)...`);
 
     const ctrl1 = new AbortController();
     const t1 = setTimeout(() => ctrl1.abort(), 20_000);
@@ -390,7 +384,6 @@ Steel range: ₹52,000-78,000/tonne. Cement: ₹340-560/bag. Mason: ₹500-1200/
     }
     result.search_count = usedWebSearch ? 3 : 0;
     result.agent_notes.push(`✨ Market Intelligence — ${city}, ${state} · ${monthYear} · ${usedWebSearch ? "web search" : "Claude AI"} · ±${usedWebSearch ? "10-15" : "15-25"}%`);
-    console.log(`[TR-015] Haiku + web_search done in ${callMs}ms (web: ${usedWebSearch}, tokens: ${resp.usage.input_tokens}+${resp.usage.output_tokens})`);
   } catch (err) {
     const errMsg = err instanceof Error ? err.message : String(err);
     console.error(`[TR-015] Haiku + web_search failed after ${Date.now() - startTime}ms: ${errMsg}`);
@@ -398,7 +391,6 @@ Steel range: ₹52,000-78,000/tonne. Cement: ₹340-560/bag. Mason: ₹500-1200/
     // ── Fallback: Haiku WITHOUT web_search ──
     try {
       const haikuStart = Date.now();
-      console.log("[TR-015] Haiku fallback (no web, 12s timeout)...");
       const ctrl2 = new AbortController();
       const t2 = setTimeout(() => ctrl2.abort(), 12_000);
       const resp2 = await client.messages.create({
@@ -417,7 +409,6 @@ Steel range: ₹52,000-78,000/tonne. Cement: ₹340-560/bag. Mason: ₹500-1200/
       }
       result.search_count = 0;
       result.agent_notes.push(`✨ Market Intelligence — ${city}, ${state} · ${monthYear} · Claude AI · ±15-25%`);
-      console.log(`[TR-015] Haiku (no web) done in ${Date.now() - haikuStart}ms (total: ${Date.now() - startTime}ms)`);
     } catch (fallbackErr) {
       const fbMsg = fallbackErr instanceof Error ? fallbackErr.message : String(fallbackErr);
       result.agent_notes.push(`Using CPWD 2024 static rates (AI unavailable — ${fbMsg})`);
@@ -493,7 +484,6 @@ Steel range: ₹52,000-78,000/tonne. Cement: ₹340-560/bag. Mason: ₹500-1200/
         // Benchmark — handle both flat and nested format
         // Auto-convert sqft→m² if values are suspiciously low
         const bench = p.benchmark ?? p.benchmark_per_sqft;
-        console.log(`[TR-015] Raw benchmark from Claude: ${JSON.stringify(bench)}`);
         if (bench?.value > 0 || bench?.range_low > 0) {
           const bVal = ensurePerM2(bench.value || bench.range_low || 0, "benchmark_value");
           const bLow = ensurePerM2(bench.range_low || bVal * 0.75, "benchmark_low");
@@ -568,10 +558,8 @@ Steel range: ₹52,000-78,000/tonne. Cement: ₹340-560/bag. Mason: ₹500-1200/
   // ── Cache write (only if we got live data) ──
   if (result.agent_status !== "fallback") {
     setCachedResult(cacheKey, result).catch(() => {});
-    console.log(`[TR-015] Cached result for ${city}, ${state} (key: ${cacheKey})`);
   }
 
-  console.log(`[TR-015] Completed in ${result.duration_ms}ms — status: ${result.agent_status}, fallbacks: ${result.fallbacks_used}`);
   return result;
 }
 

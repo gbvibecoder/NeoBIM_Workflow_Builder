@@ -1190,7 +1190,6 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
 
           // If QA fails on floor count, attempt one regeneration with explicit correction
           if (!qaResult.passed && !qaResult.floorCountCorrect && qaResult.detectedFloors !== descForQA.floors) {
-            console.log(`[GN-003] QA FAILED: detected ${qaResult.detectedFloors} floors, expected ${descForQA.floors}. Regenerating...`);
             const correctionPrompt = `CRITICAL CORRECTION: The building MUST have EXACTLY ${descForQA.floors} floors. ` +
               `The previous render incorrectly showed ${qaResult.detectedFloors} floors. ` +
               `Count carefully: ${descForQA.floors} distinct floor levels from ground to roof. ` +
@@ -1207,7 +1206,6 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
             );
             url = retryResult.url;
             revisedPrompt = retryResult.revisedPrompt;
-            console.log("[GN-003] Regenerated render after QA correction");
           }
         } catch (qaErr) {
           console.warn("[GN-003] QA validation error (non-blocking):", qaErr);
@@ -1315,11 +1313,9 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
       //   1. ifcParsed — pre-parsed result from /api/parse-ifc (large files uploaded to R2)
       //   2. ifcUrl — R2 URL to fetch and parse server-side
       //   3. fileData — inline base64 (small files only, <4MB)
-      console.log(`[TR-007] inputData keys: ${Object.keys(inputData ?? {}).join(", ")}`);
       const hasPreParsed = !!inputData?.ifcParsed;
       const hasIfcUrl = !!inputData?.ifcUrl;
       const hasFileData = !!inputData?.fileData;
-      console.log(`[TR-007] ifcParsed: ${hasPreParsed}, ifcUrl: ${hasIfcUrl}, fileData: ${hasFileData}`);
 
       let ifcData: Record<string, unknown> | null = (inputData?.ifcData as Record<string, unknown>) ?? null;
 
@@ -1332,7 +1328,6 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
             bytes[i] = binaryStr.charCodeAt(i);
           }
           ifcData = { buffer: Array.from(bytes) };
-          console.log(`[TR-007] Decoded base64 fileData → ${bytes.length} bytes`);
         } catch (e) {
           console.error("[TR-007] Failed to decode base64 fileData:", e);
         }
@@ -1361,7 +1356,6 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
       // We skip re-parsing and use the result directly.
       const preParsed = inputData?.ifcParsed as Record<string, unknown> | undefined;
       if (preParsed && typeof preParsed === "object" && (preParsed as Record<string, unknown>).divisions) {
-        console.log("[TR-007] Using pre-parsed IFC result from /api/parse-ifc");
         try {
           const parseResult = preParsed as {
             divisions: Array<{
@@ -1467,13 +1461,11 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
 
       // ── Mode 2: Fetch from R2 URL and parse server-side ──
       if (rows.length === 0 && inputData?.ifcUrl && typeof inputData.ifcUrl === "string") {
-        console.log(`[TR-007] Fetching IFC from R2 URL: ${(inputData.ifcUrl as string).slice(0, 80)}...`);
         try {
           const resp = await fetch(inputData.ifcUrl as string);
           if (!resp.ok) throw new Error(`R2 fetch failed: ${resp.status}`);
           const arrayBuf = await resp.arrayBuffer();
           ifcData = { buffer: Array.from(new Uint8Array(arrayBuf)) };
-          console.log(`[TR-007] Fetched ${arrayBuf.byteLength} bytes from R2`);
         } catch (fetchErr) {
           console.error("[TR-007] Failed to fetch IFC from R2:", fetchErr);
         }
@@ -1614,7 +1606,6 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
 
       const structParsed = inputData?.structuralIFCParsed as { divisions?: Array<{ categories: Array<{ elements: Array<{ type: string; name: string; storey: string; quantities: Record<string, unknown> }> }> }> } | undefined;
       if (structParsed?.divisions) {
-        console.log("[TR-007] Structural IFC data found — merging foundation/beam quantities");
         for (const div of structParsed.divisions) {
           for (const cat of div.categories) {
             for (const elem of cat.elements) {
@@ -1639,7 +1630,6 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
 
       const mepParsed = inputData?.mepIFCParsed as typeof structParsed | undefined;
       if (mepParsed?.divisions) {
-        console.log("[TR-007] MEP IFC data found — merging pipe/duct/fixture quantities");
         hasMEPData = true;
         for (const div of mepParsed.divisions) {
           for (const cat of div.categories) {
@@ -1699,7 +1689,6 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
         }
         if (correctionNotes.length > 0) {
           parseSummary += ` | QS corrections applied: ${correctionNotes.length} adjustments`;
-          console.log(`[TR-007] Applied ${correctionNotes.length} QS corrections:`, correctionNotes);
         }
       } catch (corrErr) {
         // Non-fatal — corrections are best-effort
@@ -1770,12 +1759,9 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
 
       // Diagnostic: what keys does TR-008 actually receive from upstream merge?
       const inputKeys = Object.keys(inputData ?? {});
-      console.log(`[TR-008] Input keys (${inputKeys.length}): ${inputKeys.filter(k => k.startsWith("_")).join(", ")}`);
-      console.log(`[TR-008] _marketData: ${typeof inputData?._marketData} (${!!inputData?._marketData}), _elements: ${typeof inputData?._elements} (${!!inputData?._elements})`);
       // If _marketData is missing, check if market data is nested under a different key
       if (!inputData?._marketData) {
         const mKeys = inputKeys.filter(k => k.toLowerCase().includes("market") || k.toLowerCase().includes("price") || k.toLowerCase().includes("steel"));
-        if (mKeys.length > 0) console.log(`[TR-008] Possible market data under: ${mKeys.join(", ")}`);
       }
       // ── Steel market rate — derived from TR-015 market data (safe scoping: all let at top) ──
       // Market TMT price is MATERIAL ONLY. Labor for cutting/bending/placing is added on top.
@@ -1800,7 +1786,6 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
           marketTMTPerKg = Math.round((marketSteelMaterialPerKg + marketSteelLabourPerKg) * 100) / 100; // total: mat + lab
           marketStructSteelPerKg = Math.round(marketSteelMaterialPerKg * 1.55 + 40) / 1; // structural: higher mat + fab labour ₹40
           steelFromMarket = true;
-          console.log(`[TR-008] Steel from market: Mat ₹${marketSteelMaterialPerKg}/kg + Lab ₹${marketSteelLabourPerKg}/kg = TMT ₹${marketTMTPerKg}/kg | Structural ₹${marketStructSteelPerKg}/kg (from ₹${steelPerTonne}/tonne)`);
         }
       } catch (steelErr) {
         console.warn("[TR-008] Could not extract steel rate from market data:", steelErr);
@@ -1859,7 +1844,6 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
         if (locationData.escalation != null) escalationRate = Number(locationData.escalation) / 100;
         if (locationData.contingency != null) contingencyPct = Number(locationData.contingency) / 100;
         if (locationData.months != null) escalationMonths = Number(locationData.months);
-        console.log(`[TR-008] Location: ${locationLabel}, combinedFactor=${loc.combinedFactor.toFixed(3)} (country=${loc.countryFactor} × tier=${loc.cityTierFactor}), currency=${currencyCode}. NOTE: combinedFactor only used for USD-path items, NOT IS1200 rates.`);
       } else {
         // Fall back to text-based region detection
         const regionInput = inputData?.region ?? inputData?.location ?? "USA (baseline)";
@@ -1911,7 +1895,6 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
           locationData?.city || "",
           currentMonth
         );
-        console.log(`[TR-008] Indian pricing (static table): Overall: ${indianPricing.overall.toFixed(3)}x | State: ${indianPricing.stateFactor?.state ?? "N/A"} | City tier: ${indianPricing.cityTier}`);
 
         // Override with dynamic state factor from market intelligence (Claude AI) when available
         // This makes the system accurate in 2026, 2030, 2038+ without code changes
@@ -1926,9 +1909,7 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
           indianPricing.masonry = Math.round(dynamicPWD * cityMult * 1000) / 1000;
           indianPricing.finishing = Math.round(dynamicPWD * cityMult * 1000) / 1000;
           indianPricing.labor = Math.round(dynamicPWD * cityMult * 1000) / 1000;
-          console.log(`[TR-008] Dynamic PWD override: Claude=${dynamicPWD} × cityTier=${cityMult} = ${indianPricing.overall} (was static ${staticOverall})`);
         } else {
-          console.log(`[TR-008] Using static PWD table (no dynamic factor from Claude)`);
         }
       }
 
@@ -2052,7 +2033,6 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
                   isMarketRate = true;
                 }
                 if (isMarketRate) {
-                  console.log(`[TR-008] Steel MARKET rate: ${rate.is1200Code} → ₹${adjRate}/kg (no PWD/regional adjustment)`);
                 }
               }
 
@@ -2295,7 +2275,6 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
       }
 
       // ── DIAGNOSTIC: Path breakdown ──
-      console.log(`[TR-008] PATH BREAKDOWN: IS1200=${pathIS1200} items (₹${costIS1200.toLocaleString()}), USD=${pathUSD} items (₹${costUSD.toLocaleString()}), Fallback=${pathFallback} items (₹${costFallback.toLocaleString()})`);
 
       // ── Derived quantities: Formwork, Rebar, Finishing ──
       // For Indian projects, use CPWD rates directly with IS 1200 codes.
@@ -2445,7 +2424,6 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
       const cityTierForProv = indianPricing?.cityTier ?? "city";
 
       // Diagnostic: cost per m² tracing
-      console.log(`[TR-008] GFA from slabs: ${gfaForProvisional}m² | Floors: ${floorCountForProv} | City tier: ${cityTierForProv} | Indian pricing overall: ${indianPricing?.overall?.toFixed(3)} | Location: ${locationLabel}`);
 
       // Check flags from TR-007 multi-IFC merge
       const hasStructuralFoundation = !!(inputData?._hasStructuralFoundation);
@@ -2453,13 +2431,11 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
 
       // MEP: skip provisional if real MEP IFC data exists
       const mepSums = hasMEPData ? [] : estimateMEPCosts(gfaForProvisional, projectTypeInfo.type, floorCountForProv, cityTierForProv, isIndianProject);
-      if (hasMEPData) console.log("[TR-008] MEP IFC data found — skipping provisional MEP sums");
 
       // Foundation: skip provisional if real structural IFC data exists
       const soilType = locationData?.soilType as string | undefined;
       const plotArea = locationData?.plotArea ? Number(locationData.plotArea) : undefined;
       const foundSums = hasStructuralFoundation ? [] : estimateFoundationCosts(gfaForProvisional, floorCountForProv, projectTypeInfo.type, cityTierForProv, isIndianProject, soilType || undefined);
-      if (hasStructuralFoundation) console.log("[TR-008] Structural IFC data found — skipping provisional foundation sums");
 
       // External works always provisional (rarely in IFC)
       const extSums = estimateExternalWorksCosts(gfaForProvisional, floorCountForProv, cityTierForProv, isIndianProject, (plotArea && plotArea > 0) ? plotArea : undefined);
@@ -2493,7 +2469,6 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
           is1200Code: prov.is1200Code,
         });
       }
-      console.log(`[TR-008] Added ${allProvisional.length} provisional sums: ₹${provisionalTotal.toLocaleString()}`);
 
       // ── Quantity Sanity Checker ──
       const sanitizedElements = elements.map((e: unknown) => {
@@ -2515,10 +2490,8 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
         try {
           const { computeMarketAdjustments } = await import("@/services/market-intelligence");
           marketAdjustments = computeMarketAdjustments(marketData);
-          console.log(`[TR-008] Using upstream market data: ${marketData.agent_status} — steel adj: ${marketAdjustments.steelAdjustment}x`);
         } catch { /* non-fatal */ }
       } else if (isIndianProject) {
-        console.log("[TR-008] No upstream market data from TR-015 — using static CPWD rates. Add Market Intelligence node (TR-015) to pipeline for live prices.");
       }
 
       // Rebuild rows grouped by storey (if storey data available)
@@ -2569,7 +2542,6 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
       const cs = currencySymbol;
       rows.push(["", "", "", "", "", "", "", "", "", ""]);
       rows.push(["HARD COSTS SUBTOTAL", "", "", "", "", "", `${cs}${totalMaterial.toFixed(2)}`, `${cs}${totalLabor.toFixed(2)}`, `${cs}${totalEquipment.toFixed(2)}`, `${cs}${hardCostSubtotal.toFixed(2)}`]);
-      console.log(`[TR-008] COST TRACE: Hard costs ₹${hardCostSubtotal.toLocaleString()} / GFA ${gfaForProvisional}m² = ₹${Math.round(hardCostSubtotal / gfaForProvisional).toLocaleString()}/m² | Elements: ${elements.length} | City: ${locationLabel} | Tier: ${cityTierForProv}`);
 
       // ── Minimum cost floor enforcement ──
       // Uses dynamic minimum from market intelligence (Claude AI) when available,
@@ -2582,7 +2554,6 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
           industrial: 12000, warehouse: 8000, datacenter: 45000,
         };
         const btKey = projectTypeInfo.type.toLowerCase();
-        console.log(`[TR-008] Building type detected: "${btKey}" (multiplier ${projectTypeInfo.multiplier}) — floor: ${STATIC_FLOORS[btKey] ?? STATIC_FLOORS.commercial}`);
         // Prefer dynamic minimum from market intelligence (city-specific, year-specific)
         let dynamicMin = Number(marketData?.minimum_cost_per_m2 ?? 0);
         // Sanity: if Claude returned per-sqft instead of per-m², convert (1 m² ≈ 10.76 sqft)
@@ -2590,11 +2561,9 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
         const staticMin = STATIC_FLOORS[btKey] ?? STATIC_FLOORS.commercial;
         // Always use the HIGHER of dynamic and static — static is physical floor, dynamic is AI suggestion
         const minFloor = Math.max(dynamicMin, staticMin);
-        console.log(`[TR-008] Cost floor: dynamic_raw=${marketData?.minimum_cost_per_m2}, dynamic_adj=${dynamicMin}, static=${staticMin}, using=${minFloor}`);
         // Diagnostic: dump all marketData keys that contain 'min' or 'bench' or 'range'
         if (marketData) {
           const mKeys = Object.keys(marketData).filter((k: string) => /min|bench|range|floor|typical/i.test(k));
-          console.log(`[TR-008] MarketData benchmark fields: ${mKeys.map((k: string) => `${k}=${JSON.stringify(marketData[k])}`).join(", ")}`);
         }
         const currentCostPerM2 = hardCostSubtotal / gfaForProvisional;
         if (currentCostPerM2 < minFloor) {
@@ -2604,7 +2573,6 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
           totalLabor = Math.round(totalLabor * scaleFactor);
           totalEquipment = Math.round(totalEquipment * scaleFactor);
           rows.push([`⚠️ Minimum cost floor applied: ₹${minFloor.toLocaleString()}/m² (${btKey}) — scaled ×${scaleFactor.toFixed(2)}`, "", "", "", "", "", "", "", "", `${cs}${hardCostSubtotal.toFixed(2)}`]);
-          console.log(`[TR-008] Minimum floor applied: ${btKey} ₹${minFloor}/m² — scale ${scaleFactor.toFixed(2)}x → new hard cost ₹${hardCostSubtotal.toLocaleString()}`);
         }
       }
 
@@ -2877,7 +2845,6 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
       let miBuildingType = "commercial";
 
       // Log raw input for debugging
-      console.log(`[TR-015] Raw inputData keys: ${Object.keys(inputData ?? {}).join(", ")}`);
 
       // Path 1: Direct fields (from IN-006 JSON parse)
       if (inputData?.city) miCity = String(inputData.city);
@@ -2917,7 +2884,6 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
       if (ifcCtx) {
         buildingDesc = `${miBuildingType} (${ifcCtx.totalFloors ?? "?"} floors, ${ifcCtx.totalGFA ?? "?"}m² GFA, ${ifcCtx.dominantStructure ?? "RCC"}, ~${ifcCtx.estimatedHeight ?? "?"}m height)`;
       }
-      console.log(`[TR-015] Resolved location: ${miCity}, ${miState} — ${buildingDesc}`);
 
       const marketData = await fetchMarketPrices(miCity, miState, buildingDesc);
       const adjustments = computeMarketAdjustments(marketData);
@@ -3012,22 +2978,18 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
     } else if (catalogueId === "TR-016") {
       // ── Clash Detector — AABB-based spatial overlap analysis ──
       // Supports single-model (ifcUrl/fileData) and multi-model (ifcModels array) modes.
-      console.log(`[TR-016] inputData keys: ${Object.keys(inputData ?? {}).join(", ")}`);
 
       // ── Multi-model mode: ifcModels array from federated upload ──
       const ifcModels = inputData?.ifcModels as Array<{ ifcUrl: string; discipline: string; fileName: string }> | undefined;
 
       if (Array.isArray(ifcModels) && ifcModels.length > 0) {
-        console.log(`[TR-016] Multi-model federation: ${ifcModels.length} models`);
         try {
           // Fetch all model buffers in parallel
           const modelBuffers = await Promise.all(
             ifcModels.map(async (model) => {
-              console.log(`[TR-016] Fetching ${model.discipline}: ${model.ifcUrl.slice(0, 80)}...`);
               const resp = await fetch(model.ifcUrl);
               if (!resp.ok) throw new Error(`Failed to fetch ${model.discipline} model: ${resp.status}`);
               const arrayBuf = await resp.arrayBuffer();
-              console.log(`[TR-016] ${model.discipline}: ${arrayBuf.byteLength} bytes`);
               return { buffer: new Uint8Array(arrayBuf), discipline: model.discipline, fileName: model.fileName };
             })
           );
@@ -5038,65 +5000,78 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
             let roomProgram: import("@/lib/floor-plan/ai-room-programmer").EnhancedRoomProgram;
             try {
               roomProgram = await programRooms(promptForAI, floorPlanApiKey);
-              console.log(`[GN-012] Stage 1: ${roomProgram.rooms.length} rooms, ${roomProgram.totalAreaSqm}sqm, ${roomProgram.adjacency.length} adjacencies`);
             } catch (parseErr) {
               console.warn("[GN-012] Stage 1 AI failed, using regex fallback:", parseErr);
               roomProgram = programRoomsFallback(promptForAI);
             }
 
+            console.log(`[GN-012][STAGE-1] Rooms from AI: ${roomProgram.rooms.length}`, roomProgram.rooms.map(r => `${r.name} (floor:${r.floor ?? 0})`));
+
             const description = programToDescription(roomProgram);
 
-            // Stage 2: AI Spatial Layout (GPT-4o with validation + retry)
-            const floorPlan = await generateFloorPlan(description, floorPlanApiKey, roomProgram);
-
-            // Stage 3: Build geometry → FloorPlanProject
-            const positionedRooms = floorPlan.positionedRooms;
-            const roomList = floorPlan.roomList;
-
-            const rooms = positionedRooms
-              ? positionedRooms.map((r: Record<string, unknown>) => ({
-                  name: r.name as string,
-                  type: (r.type as string ?? "other") as "living" | "bedroom" | "kitchen" | "dining" | "bathroom" | "hallway" | "entrance" | "utility" | "balcony" | "other",
-                  x: r.x as number, y: r.y as number,
-                  width: r.width as number, depth: r.depth as number,
-                  center: [(r.x as number) + (r.width as number) / 2, (r.y as number) + (r.depth as number) / 2] as [number, number],
-                  area: r.area as number,
-                }))
-              : roomList.map((r: Record<string, unknown>) => {
-                  const area = (r.area as number) ?? 16;
-                  const w = Math.round(Math.sqrt(area * 1.2) * 10) / 10;
-                  const d = Math.round((area / w) * 10) / 10;
-                  return {
-                    name: r.name as string,
-                    type: ((r.type as string) ?? "other") as "living" | "bedroom" | "kitchen" | "dining" | "bathroom" | "other",
-                    x: 0, y: 0, width: w, depth: d,
-                    center: [w / 2, d / 2] as [number, number],
-                    area,
-                  };
-                });
-
-            // Compute footprint from actual room bounding box (layout engine may
-            // expand footprint beyond totalArea to fit corridor/zones)
-            let bW: number, bD: number;
-            if (positionedRooms && positionedRooms.length > 0) {
-              bW = Math.round(Math.max(...positionedRooms.map((r: Record<string, unknown>) => (r.x as number) + (r.width as number))) * 10) / 10;
-              bD = Math.round(Math.max(...positionedRooms.map((r: Record<string, unknown>) => (r.y as number) + (r.depth as number))) * 10) / 10;
+            // Multi-floor: use BSP layout engine per floor (same as standalone API)
+            if (roomProgram.numFloors > 1) {
+              const { layoutMultiFloor } = await import("@/lib/floor-plan/layout-engine");
+              const { convertMultiFloorToProject } = await import("@/lib/floor-plan/pipeline-adapter");
+              const multiFloor = layoutMultiFloor(roomProgram);
+              console.log(`[GN-012][STAGE-2] Multi-floor: ${multiFloor.floors.reduce((s, f) => s + f.rooms.length, 0)} rooms placed`);
+              project = convertMultiFloorToProject(multiFloor.floors, description.projectName, designBrief);
+              sourceType = "ai-generated";
             } else {
-              const fpArea = floorPlan.totalArea / Math.max(floorPlan.floors, 1);
-              const aspect = 1.33;
-              bW = Math.round(Math.sqrt(fpArea * aspect) * 10) / 10;
-              bD = Math.round((fpArea / bW) * 10) / 10;
+              // Stage 2: AI Spatial Layout (GPT-4o with validation + retry)
+              const floorPlan = await generateFloorPlan(description, floorPlanApiKey, roomProgram);
+
+              // Stage 3: Build geometry → FloorPlanProject
+              const positionedRooms = floorPlan.positionedRooms;
+              const roomList = floorPlan.roomList;
+
+              const rooms = positionedRooms
+                ? positionedRooms.map((r: Record<string, unknown>) => ({
+                    name: r.name as string,
+                    type: (r.type as string ?? "other") as "living" | "bedroom" | "kitchen" | "dining" | "bathroom" | "hallway" | "entrance" | "utility" | "balcony" | "other",
+                    x: r.x as number, y: r.y as number,
+                    width: r.width as number, depth: r.depth as number,
+                    center: [(r.x as number) + (r.width as number) / 2, (r.y as number) + (r.depth as number) / 2] as [number, number],
+                    area: r.area as number,
+                  }))
+                : roomList.map((r: Record<string, unknown>) => {
+                    const area = (r.area as number) ?? 16;
+                    const w = Math.round(Math.sqrt(area * 1.2) * 10) / 10;
+                    const d = Math.round((area / w) * 10) / 10;
+                    return {
+                      name: r.name as string,
+                      type: ((r.type as string) ?? "other") as "living" | "bedroom" | "kitchen" | "dining" | "bathroom" | "other",
+                      x: 0, y: 0, width: w, depth: d,
+                      center: [w / 2, d / 2] as [number, number],
+                      area,
+                    };
+                  });
+
+              console.log(`[GN-012][STAGE-2] Single-floor: ${rooms.length} rooms placed`);
+
+              // Compute footprint from actual room bounding box (layout engine may
+              // expand footprint beyond totalArea to fit corridor/zones)
+              let bW: number, bD: number;
+              if (positionedRooms && positionedRooms.length > 0) {
+                bW = Math.round(Math.max(...positionedRooms.map((r: Record<string, unknown>) => (r.x as number) + (r.width as number))) * 10) / 10;
+                bD = Math.round(Math.max(...positionedRooms.map((r: Record<string, unknown>) => (r.y as number) + (r.depth as number))) * 10) / 10;
+              } else {
+                const fpArea = floorPlan.totalArea / Math.max(floorPlan.floors, 1);
+                const aspect = 1.33;
+                bW = Math.round(Math.sqrt(fpArea * aspect) * 10) / 10;
+                bD = Math.round((fpArea / bW) * 10) / 10;
+              }
+
+              const geometry: import("@/types/floor-plan").FloorPlanGeometry = {
+                footprint: { width: bW, depth: bD },
+                wallHeight: 3.0,
+                walls: [], doors: [], windows: [],
+                rooms,
+              };
+
+              project = convertGeometryToProject(geometry, description.projectName, designBrief);
+              sourceType = "ai-generated";
             }
-
-            const geometry: import("@/types/floor-plan").FloorPlanGeometry = {
-              footprint: { width: bW, depth: bD },
-              wallHeight: 3.0,
-              walls: [], doors: [], windows: [],
-              rooms,
-            };
-
-            project = convertGeometryToProject(geometry, description.projectName, designBrief);
-            sourceType = "ai-generated";
           } catch (aiErr) {
             console.warn("[GN-012] AI generation failed:", aiErr);
             warnings.push(`AI generation failed (${aiErr instanceof Error ? aiErr.message : String(aiErr)}), using fallback.`);

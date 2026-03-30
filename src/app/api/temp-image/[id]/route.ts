@@ -35,7 +35,6 @@ export async function GET(
   }
 
   const { id } = await params;
-  console.log("[temp-image] GET:", id);
 
   const image = await getImage(id);
 
@@ -47,7 +46,6 @@ export async function GET(
     );
   }
 
-  console.log("[temp-image] GET: serving image", id, `(${image.buffer.length} bytes, ${image.contentType})`);
 
   return new NextResponse(new Uint8Array(image.buffer), {
     status: 200,

@@ -42,7 +42,6 @@ export async function POST(req: NextRequest) {
     const id = await storeImage(base64, mime);
     const url = getTempImageUrl(id);
 
-    console.log("[temp-image] POST: stored image", id, "→", url);
     return NextResponse.json({ url, id }, { headers: CORS_HEADERS });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);

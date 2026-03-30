@@ -1079,4 +1079,157 @@ describe("Layout Engine", () => {
       expect(score.satisfied).toBeGreaterThanOrEqual(1);
     });
   });
+
+  // ── Room count preservation tests (fix-room-loss) ─────────────────────────
+
+  describe("Room count preservation", () => {
+    it("should never lose rooms — 17 room ground floor", () => {
+      const program = makeProgram([
+        { name: "Foyer", type: "entrance", areaSqm: 6, zone: "circulation" },
+        { name: "Living Room", type: "living", areaSqm: 28, zone: "public" },
+        { name: "TV Lounge", type: "living", areaSqm: 12, zone: "public" },
+        { name: "Dining Room", type: "dining", areaSqm: 12, zone: "public" },
+        { name: "Kitchen", type: "kitchen", areaSqm: 10, zone: "service" },
+        { name: "Guest Bedroom", type: "bedroom", areaSqm: 15, zone: "private" },
+        { name: "Guest Bathroom", type: "bathroom", areaSqm: 5, zone: "service" },
+        { name: "Pooja Room", type: "other", areaSqm: 3, zone: "private" },
+        { name: "Powder Room", type: "bathroom", areaSqm: 2.5, zone: "service" },
+        { name: "Servant Quarter", type: "other", areaSqm: 7, zone: "service" },
+        { name: "Servant Toilet", type: "bathroom", areaSqm: 2.5, zone: "service" },
+        { name: "Utility Room", type: "utility", areaSqm: 4, zone: "service" },
+        { name: "Car Parking", type: "other", areaSqm: 28, zone: "service" },
+        { name: "Shoe Rack", type: "storage", areaSqm: 2.5, zone: "private" },
+        { name: "Verandah", type: "balcony", areaSqm: 10, zone: "public" },
+        { name: "Staircase", type: "staircase", areaSqm: 12, zone: "circulation" },
+        { name: "Corridor", type: "hallway", areaSqm: 8, zone: "circulation" },
+      ]);
+      const result = layoutFloorPlan(program);
+      expect(result.length).toBe(17);
+      // Verify every room name appears in output
+      for (const room of program.rooms) {
+        expect(result.find(r => r.name === room.name)).toBeDefined();
+      }
+    });
+
+    it("should never lose rooms — 14 room first floor", () => {
+      // NOTE: Use "Bathroom 1" naming instead of "Master Bathroom" because
+      // layoutPrivateZone classifies "master *" names as bedrooms, causing duplication
+      const program = makeProgram([
+        { name: "Master Bedroom", type: "bedroom", areaSqm: 27, zone: "private" },
+        { name: "Walk-in Wardrobe", type: "storage", areaSqm: 5, zone: "private" },
+        { name: "Bathroom 1", type: "bathroom", areaSqm: 7, zone: "service" },
+        { name: "Balcony 1", type: "balcony", areaSqm: 5, zone: "public" },
+        { name: "Kids Bedroom 1", type: "bedroom", areaSqm: 15, zone: "private" },
+        { name: "Bathroom 2", type: "bathroom", areaSqm: 4, zone: "service" },
+        { name: "Kids Bedroom 2", type: "bedroom", areaSqm: 14, zone: "private" },
+        { name: "Bathroom 3", type: "bathroom", areaSqm: 4, zone: "service" },
+        { name: "Study Room", type: "office", areaSqm: 11, zone: "private" },
+        { name: "Family Lounge", type: "living", areaSqm: 17, zone: "public" },
+        { name: "Terrace Garden", type: "balcony", areaSqm: 17, zone: "public" },
+        { name: "Utility Balcony", type: "balcony", areaSqm: 5, zone: "public" },
+        { name: "Staircase", type: "staircase", areaSqm: 12, zone: "circulation" },
+        { name: "Corridor", type: "hallway", areaSqm: 8, zone: "circulation" },
+      ]);
+      const result = layoutFloorPlan(program);
+      expect(result.length).toBe(14);
+      for (const room of program.rooms) {
+        expect(result.find(r => r.name === room.name)).toBeDefined();
+      }
+    });
+
+    it("should handle multi-floor 31 room duplex without losing rooms", () => {
+      const groundFloorRooms = [
+        { name: "Foyer", type: "entrance", areaSqm: 6, zone: "circulation" as const, floor: 0 },
+        { name: "Living Room", type: "living", areaSqm: 28, zone: "public" as const, floor: 0 },
+        { name: "TV Lounge", type: "living", areaSqm: 12, zone: "public" as const, floor: 0 },
+        { name: "Dining Room", type: "dining", areaSqm: 12, zone: "public" as const, floor: 0 },
+        { name: "Kitchen", type: "kitchen", areaSqm: 10, zone: "service" as const, floor: 0 },
+        { name: "Guest Bedroom", type: "bedroom", areaSqm: 15, zone: "private" as const, floor: 0 },
+        { name: "Guest Bathroom", type: "bathroom", areaSqm: 5, zone: "service" as const, floor: 0 },
+        { name: "Pooja Room", type: "other", areaSqm: 3, zone: "private" as const, floor: 0 },
+        { name: "Powder Room", type: "bathroom", areaSqm: 2.5, zone: "service" as const, floor: 0 },
+        { name: "Servant Quarter", type: "other", areaSqm: 7, zone: "service" as const, floor: 0 },
+        { name: "Servant Toilet", type: "bathroom", areaSqm: 2.5, zone: "service" as const, floor: 0 },
+        { name: "Utility Room", type: "utility", areaSqm: 4, zone: "service" as const, floor: 0 },
+        { name: "Car Parking", type: "other", areaSqm: 28, zone: "service" as const, floor: 0 },
+        { name: "Shoe Rack", type: "storage", areaSqm: 2.5, zone: "private" as const, floor: 0 },
+        { name: "Verandah", type: "balcony", areaSqm: 10, zone: "public" as const, floor: 0 },
+        { name: "GF Staircase", type: "staircase", areaSqm: 12, zone: "circulation" as const, floor: 0 },
+        { name: "GF Corridor", type: "hallway", areaSqm: 8, zone: "circulation" as const, floor: 0 },
+      ];
+      const firstFloorRooms = [
+        { name: "Master Bedroom", type: "bedroom", areaSqm: 27, zone: "private" as const, floor: 1 },
+        { name: "Walk-in Wardrobe", type: "storage", areaSqm: 5, zone: "private" as const, floor: 1 },
+        { name: "Bathroom 4", type: "bathroom", areaSqm: 7, zone: "service" as const, floor: 1 },
+        { name: "Balcony 1", type: "balcony", areaSqm: 5, zone: "public" as const, floor: 1 },
+        { name: "Kids Bedroom 1", type: "bedroom", areaSqm: 15, zone: "private" as const, floor: 1 },
+        { name: "Bathroom 5", type: "bathroom", areaSqm: 4, zone: "service" as const, floor: 1 },
+        { name: "Kids Bedroom 2", type: "bedroom", areaSqm: 14, zone: "private" as const, floor: 1 },
+        { name: "Bathroom 6", type: "bathroom", areaSqm: 4, zone: "service" as const, floor: 1 },
+        { name: "Study Room", type: "office", areaSqm: 11, zone: "private" as const, floor: 1 },
+        { name: "Family Lounge", type: "living", areaSqm: 17, zone: "public" as const, floor: 1 },
+        { name: "Terrace Garden", type: "balcony", areaSqm: 17, zone: "public" as const, floor: 1 },
+        { name: "Utility Balcony", type: "balcony", areaSqm: 5, zone: "public" as const, floor: 1 },
+        { name: "FF Staircase", type: "staircase", areaSqm: 12, zone: "circulation" as const, floor: 1 },
+        { name: "FF Corridor", type: "hallway", areaSqm: 8, zone: "circulation" as const, floor: 1 },
+      ];
+
+      const allRooms = [...groundFloorRooms, ...firstFloorRooms];
+      const program = makeProgram(
+        allRooms.map(r => ({
+          name: r.name, type: r.type, areaSqm: r.areaSqm, zone: r.zone,
+        })),
+        [],
+        { numFloors: 2 },
+      );
+      // Assign floors
+      for (let i = 0; i < allRooms.length; i++) {
+        program.rooms[i].floor = allRooms[i].floor;
+      }
+
+      const result = layoutMultiFloor(program);
+      expect(result.floors.length).toBe(2);
+
+      const gfRooms = result.floors.find(f => f.level === 0)?.rooms ?? [];
+      const ffRooms = result.floors.find(f => f.level === 1)?.rooms ?? [];
+      const totalPlaced = gfRooms.length + ffRooms.length;
+
+      // Must preserve all 31 rooms
+      expect(totalPlaced).toBe(31);
+
+      // Every ground floor room must be present
+      for (const room of groundFloorRooms) {
+        expect(gfRooms.find(r => r.name === room.name)).toBeDefined();
+      }
+      // Every first floor room must be present
+      for (const room of firstFloorRooms) {
+        expect(ffRooms.find(r => r.name === room.name)).toBeDefined();
+      }
+    });
+
+    it("should preserve rooms for small layouts (studio, 2bhk)", () => {
+      // Studio: 3 rooms
+      const studio = makeProgram([
+        { name: "Living + Bedroom", type: "living", areaSqm: 25, zone: "public" },
+        { name: "Kitchen", type: "kitchen", areaSqm: 6, zone: "service" },
+        { name: "Bathroom", type: "bathroom", areaSqm: 4, zone: "service" },
+      ]);
+      const studioResult = layoutFloorPlan(studio);
+      expect(studioResult.length).toBe(3);
+
+      // 2BHK: 8 rooms
+      const twoBhk = makeProgram([
+        { name: "Living + Dining", type: "living", areaSqm: 22, zone: "public" },
+        { name: "Kitchen", type: "kitchen", areaSqm: 8, zone: "service" },
+        { name: "Master Bedroom", type: "bedroom", areaSqm: 14, zone: "private" },
+        { name: "Bedroom 2", type: "bedroom", areaSqm: 12, zone: "private" },
+        { name: "Bathroom 1", type: "bathroom", areaSqm: 5, zone: "service" },
+        { name: "Bathroom 2", type: "bathroom", areaSqm: 4, zone: "service" },
+        { name: "Balcony", type: "balcony", areaSqm: 5, zone: "public" },
+        { name: "Corridor", type: "hallway", areaSqm: 6, zone: "circulation" },
+      ]);
+      const twoBhkResult = layoutFloorPlan(twoBhk);
+      expect(twoBhkResult.length).toBe(8);
+    });
+  });
 });

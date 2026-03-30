@@ -13,7 +13,7 @@ interface AnnotationRendererProps {
   selectedIds: string[];
 }
 
-export function AnnotationRenderer({ annotations, viewport, selectedIds }: AnnotationRendererProps) {
+function AnnotationRendererBase({ annotations, viewport, selectedIds }: AnnotationRendererProps) {
   return (
     <>
       {annotations.map((ann) => (
@@ -98,3 +98,5 @@ function AnnotationItem({
     </Group>
   );
 }
+
+export const AnnotationRenderer = React.memo(AnnotationRendererBase);

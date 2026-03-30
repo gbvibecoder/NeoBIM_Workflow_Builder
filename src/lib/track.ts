@@ -57,14 +57,6 @@ export function trackNodeUsed(catalogueId: string, nodeLabel: string) {
   track("node_used", { catalogueId, nodeLabel });
 }
 
-export function trackFeatureUsed(feature: string, detail?: string) {
-  track("feature_used", { feature, detail });
-}
-
-export function trackTemplateLoaded(templateId: string, templateName: string) {
-  track("template_loaded", { templateId, templateName });
-}
-
 export function trackRegenerationUsed(nodeId: string, catalogueId: string) {
   track("regeneration_used", { nodeId, catalogueId });
 }

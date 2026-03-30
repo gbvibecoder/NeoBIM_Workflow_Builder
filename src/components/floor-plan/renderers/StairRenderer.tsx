@@ -13,7 +13,7 @@ interface StairRendererProps {
   selectedIds: string[];
 }
 
-export function StairRenderer({ stairs, viewport, selectedIds }: StairRendererProps) {
+function StairRendererBase({ stairs, viewport, selectedIds }: StairRendererProps) {
   return (
     <>
       {stairs.map((stair) => (
@@ -131,3 +131,5 @@ function StairItem({
     </Group>
   );
 }
+
+export const StairRenderer = React.memo(StairRendererBase);

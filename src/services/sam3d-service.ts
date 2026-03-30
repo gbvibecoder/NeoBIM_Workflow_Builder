@@ -159,16 +159,6 @@ export async function convertImageTo3D(
 
     job.status = "completed";
     job.completedAt = now.toISOString();
-
-    // Log cost for monitoring
-    console.log("[SAM 3D] Generation completed", {
-      jobId: job.id,
-      costUsd: COST_PER_GENERATION,
-      seed: result.seed,
-      glbSize: result.mesh?.file_size,
-      timings: result.timings,
-    });
-
     // Cache the result
     jobCache.set(cacheKey, job);
 

@@ -36,7 +36,7 @@ interface WinShape {
   glass2?: [{ x: number; y: number }, { x: number; y: number }];
 }
 
-export function WindowRenderer({ windows, walls, viewport, viewMode }: WindowRendererProps) {
+function WindowRendererBase({ windows, walls, viewport, viewMode }: WindowRendererProps) {
   const zoom = viewport.zoom;
 
   const windowShapes = useMemo(() => {
@@ -104,7 +104,7 @@ export function WindowRenderer({ windows, walls, viewport, viewMode }: WindowRen
 
       return shape;
     }).filter(Boolean) as WinShape[];
-  }, [windows, walls, viewport]);
+  }, [windows, walls, viewport.x, viewport.y, viewport.zoom, viewport.canvasWidth, viewport.canvasHeight]);
 
   const lineColor = viewMode === "cad" ? "#1A1A1A" : "#444444";
   const glassColor = viewMode === "cad" ? "#3B82F6" : "#60A5FA";
@@ -165,3 +165,5 @@ export function WindowRenderer({ windows, walls, viewport, viewMode }: WindowRen
     </>
   );
 }
+
+export const WindowRenderer = React.memo(WindowRendererBase);

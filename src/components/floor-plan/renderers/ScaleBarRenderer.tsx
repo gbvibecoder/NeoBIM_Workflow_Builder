@@ -16,7 +16,7 @@ interface ScaleBarRendererProps {
  * Adapts segment count and labels to current zoom level.
  * Standard bar-and-gap architectural style.
  */
-export function ScaleBarRenderer({ viewport, displayUnit }: ScaleBarRendererProps) {
+function ScaleBarRendererBase({ viewport, displayUnit }: ScaleBarRendererProps) {
   const bar = useMemo(() => {
     // Determine a "nice" scale bar length in world units (mm)
     // Target: scale bar should be ~200px on screen
@@ -67,7 +67,7 @@ export function ScaleBarRenderer({ viewport, displayUnit }: ScaleBarRendererProp
     }
 
     return { segments, x0, y0, barHeight, totalScreen, totalWorld };
-  }, [viewport, displayUnit]);
+  }, [viewport.zoom, viewport.canvasWidth, viewport.canvasHeight, displayUnit]);
 
   return (
     <Group listening={false}>
@@ -131,3 +131,5 @@ export function ScaleBarRenderer({ viewport, displayUnit }: ScaleBarRendererProp
     </Group>
   );
 }
+
+export const ScaleBarRenderer = React.memo(ScaleBarRendererBase);

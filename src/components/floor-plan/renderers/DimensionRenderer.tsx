@@ -48,7 +48,7 @@ const EXT_GAP = 50;      // mm - gap between measured point and extension line
 const EXT_OVERSHOOT = 100; // mm - extension line past dimension line
 const TICK_PX = 3;        // px - tick mark half-size (reduced from 4)
 
-export function DimensionRenderer({
+function DimensionRendererBase({
   rooms,
   walls,
   doors = [],
@@ -407,3 +407,5 @@ function filterClosePositions(sorted: number[], minGap: number): number[] {
   }
   return result;
 }
+
+export const DimensionRenderer = React.memo(DimensionRendererBase);

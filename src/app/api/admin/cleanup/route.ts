@@ -36,7 +36,6 @@ export async function POST(req: NextRequest) {
       select: { id: true, workflowId: true },
     });
     const protectedIds = new Set(latestPerWorkflow.map(e => e.id));
-    console.log(`[CLEANUP] Protecting ${protectedIds.size} latest executions (one per workflow)`);
 
     // Step 2: Find old executions that are NOT protected
     const oldExecutions = await prisma.execution.findMany({
@@ -109,7 +108,6 @@ export async function POST(req: NextRequest) {
       message: `Cleaned ${executionsDeleted} executions + ${oldArtifactCount} artifacts + ${versionsDeleted} versions. Latest execution per workflow preserved.`,
     };
 
-    console.log("[CLEANUP] Complete:", finalSummary);
     return NextResponse.json(finalSummary);
 
   } catch (error) {

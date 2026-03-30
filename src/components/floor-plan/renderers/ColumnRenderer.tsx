@@ -13,7 +13,7 @@ interface ColumnRendererProps {
   selectedIds: string[];
 }
 
-export function ColumnRenderer({ columns, viewport, selectedIds }: ColumnRendererProps) {
+function ColumnRendererBase({ columns, viewport, selectedIds }: ColumnRendererProps) {
   return (
     <>
       {columns.map((col) => (
@@ -103,3 +103,5 @@ function ColumnItem({
     </Group>
   );
 }
+
+export const ColumnRenderer = React.memo(ColumnRendererBase);

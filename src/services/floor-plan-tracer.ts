@@ -125,7 +125,6 @@ export async function traceFloorPlanToSVG(
     }
   }
 
-  console.log(`[Tracer] Dilated wall map with radius ${dilateRadius}px`);
 
   const visited: boolean[][] = [];
   for (let y = 0; y < processHeight; y++) {
@@ -147,11 +146,9 @@ export async function traceFloorPlanToSVG(
   }
 
   // Log all regions before filtering
-  console.log(`[Tracer] Total regions found: ${allRegions.length}`);
   for (const r of allRegions) {
     const pct = ((r.area / imageArea) * 100).toFixed(1);
     const included = r.area > imageArea * 0.02 && r.area < imageArea * 0.6;
-    console.log(`  Region: ${r.area}px² (${pct}% of image) ${r.bounds.width}x${r.bounds.height}px ${included ? "✓ ROOM" : "✗ skip"}`);
   }
 
   // Filter: rooms must be 3-60% of image area (skip furniture, door arcs, background)

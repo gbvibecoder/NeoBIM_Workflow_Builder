@@ -379,8 +379,6 @@ export function useShowcaseData(): ShowcaseData {
     if (!model3dData && htmlArtifact) {
       const d = asRecord(htmlArtifact.data);
       // Debug: log all keys present in the html artifact data
-      console.log("[useShowcaseData] HTML artifact data keys:", Object.keys(d));
-      console.log("[useShowcaseData] aiRenderUrl present:", typeof d.aiRenderUrl, d.aiRenderUrl ? `(${String(d.aiRenderUrl).length} chars)` : "NONE");
       const hasEditorData = d.floorPlanGeometry && d.sourceImageUrl;
 
       if (hasEditorData) {
