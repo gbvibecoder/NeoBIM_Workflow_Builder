@@ -986,33 +986,38 @@ function optimizeVastu(rooms: PlacedRoom[], fpW: number, fpH: number): PlacedRoo
       if (!improved) break;
     }
 
-    // Pass 2: Force-swap critical vastu rooms that are still misplaced
-    // For kitchen/pooja/master, ignore size ratio — correctness > tiling aesthetics
-    const CRITICAL_VASTU: Array<{ keyword: string; quadrant: string }> = [
-      { keyword: "kitchen", quadrant: "SE" },
-      { keyword: "pooja", quadrant: "NE" },
-      { keyword: "puja", quadrant: "NE" },
-      { keyword: "prayer", quadrant: "NE" },
-      { keyword: "master", quadrant: "SW" },
-    ];
+    // Pass 2: Dynamic force-swap — read from VASTU_QUADRANTS mapping.
+    // For any room with a known Vastu preference that is still misplaced,
+    // force-swap it with whatever room is in the preferred quadrant.
+    // Process highest-penalty rules first (critical > major > minor).
+    const swappedIndices = new Set<number>();
+    const sortedEntries = Object.entries(VASTU_QUADRANTS)
+      .sort((a, b) => {
+        // Prioritize: kitchen, pooja, master first (most architecturally important)
+        const priority: Record<string, number> = {
+          kitchen: 10, pooja: 9, puja: 9, prayer: 9, master_bedroom: 8,
+          parents: 8, living: 6, staircase: 3,
+        };
+        return (priority[b[0]] ?? 1) - (priority[a[0]] ?? 1);
+      });
 
-    for (const rule of CRITICAL_VASTU) {
-      const roomIdx = layout.findIndex(r => {
+    for (const [keyword, targetQuadrant] of sortedEntries) {
+      const roomIdx = layout.findIndex((r, i) => {
+        if (swappedIndices.has(i)) return false;
         const n = r.name.toLowerCase();
         const t = r.type.toLowerCase();
-        return n.includes(rule.keyword) || t.includes(rule.keyword);
+        return n.includes(keyword) || t.includes(keyword);
       });
       if (roomIdx === -1) continue;
 
       const room = layout[roomIdx];
       const currentQuadrant = getQuadrant(room, fpW, fpH);
-      if (currentQuadrant === rule.quadrant) continue; // Already correct
+      if (currentQuadrant === targetQuadrant) continue;
 
-      // Find ANY non-corridor/staircase room currently in the target quadrant
       const targetIdx = layout.findIndex((r, i) =>
-        i !== roomIdx &&
+        i !== roomIdx && !swappedIndices.has(i) &&
         r.type !== "hallway" && r.type !== "staircase" &&
-        getQuadrant(r, fpW, fpH) === rule.quadrant
+        getQuadrant(r, fpW, fpH) === targetQuadrant
       );
 
       if (targetIdx !== -1) {
@@ -1020,6 +1025,8 @@ function optimizeVastu(rooms: PlacedRoom[], fpW: number, fpH: number): PlacedRoo
         const tmpName = room.name, tmpType = room.type;
         layout[roomIdx] = { ...room, name: target.name, type: target.type };
         layout[targetIdx] = { ...target, name: tmpName, type: tmpType };
+        swappedIndices.add(roomIdx);
+        swappedIndices.add(targetIdx);
       }
     }
 
@@ -1139,6 +1146,7 @@ function validateRoomSizes(rooms: PlacedRoom[], specs?: RoomSpec[]): PlacedRoom[
     { pattern: /foyer|entrance|reception/i, max: 15 },
     { pattern: /corridor|passage/i, max: 15 },
     { pattern: /landing|staircase\s*landing/i, max: 12 },
+    { pattern: /staircase|stair/i, max: 15 },
     // Medium rooms
     { pattern: /balcony|sit.?out|sitout/i, max: 15 },
     { pattern: /walk.?in\s*(?:wardrobe|closet)/i, max: 10 },
@@ -1149,7 +1157,7 @@ function validateRoomSizes(rooms: PlacedRoom[], specs?: RoomSpec[]): PlacedRoom[
   ];
 
   for (const room of rooms) {
-    if (room.type === "hallway" || room.type === "staircase") continue;
+    if (room.type === "hallway") continue; // Corridors handled by enforceCorridorCap
     const currentArea = room.width * room.depth;
     const nameLower = room.name.toLowerCase();
 
@@ -1168,7 +1176,7 @@ function validateRoomSizes(rooms: PlacedRoom[], specs?: RoomSpec[]): PlacedRoom[
   // Pass 2: General clamp — catch rooms at >2x or <0.5x their target
   if (specs && specs.length > 0) {
     for (const room of rooms) {
-      if (room.type === "hallway" || room.type === "staircase") continue;
+      if (room.type === "hallway") continue; // Corridors handled separately
 
       const spec = specs.find(s => s.name === room.name);
       if (!spec) continue;

@@ -300,6 +300,9 @@ export async function programRooms(
     throw new Error("AI returned no rooms in room program");
   }
 
+  // Merge "open-plan" / "combined" rooms the AI incorrectly split
+  raw.rooms = mergeOpenPlanRooms(raw.rooms, prompt);
+
   // Ensure every room has required fields
   const validZones = new Set(["public", "private", "service", "circulation"]);
   for (const room of raw.rooms) {
@@ -440,11 +443,24 @@ async function programRoomsMultiCall(
     firstProgram = await programSingleFloor(client, firstPrompt, 1, firstMentioned);
   }
 
-  // Step 3: Merge results
+  // Step 3: Merge results and recover user-specified dimensions from original prompt
   const allRooms = [
     ...groundProgram.rooms.map(r => ({ ...r, floor: 0 as number | undefined })),
     ...(firstProgram?.rooms ?? []).map(r => ({ ...r, floor: 1 as number | undefined })),
   ];
+
+  // Recover preferredWidth/preferredDepth that per-floor GPT calls may have dropped
+  const promptLower = prompt.toLowerCase();
+  for (const room of allRooms) {
+    if (!room.preferredWidth || !room.preferredDepth) {
+      const dims = extractDimensionsForRoom(room.name.toLowerCase(), promptLower);
+      if (dims) {
+        room.preferredWidth = dims.width;
+        room.preferredDepth = dims.depth;
+        room.areaSqm = dims.area;
+      }
+    }
+  }
 
   // Step 4: Add staircase to each floor if missing
   if (firstProgram && !allRooms.some(r => r.floor === 0 && r.type === "staircase")) {
@@ -668,6 +684,61 @@ function sanitizeProgram(raw: EnhancedRoomProgram): EnhancedRoomProgram {
   raw.adjacency = (raw.adjacency || []).filter(a => roomNames.has(a.roomA) && roomNames.has(a.roomB));
 
   return raw;
+}
+
+// ── Merge open-plan / combined rooms ────────────────────────────────────────
+
+/**
+ * When user says "open-plan living and dining area", GPT may create separate
+ * Living Room + Dining Room. This merges them into one combined room.
+ * Works for any "open-plan X and Y" or "combined X and Y" pattern.
+ */
+function mergeOpenPlanRooms(rooms: RoomSpec[], prompt: string): RoomSpec[] {
+  try {
+    const lower = prompt.toLowerCase();
+    // Match "open-plan X and Y" or "combined X and Y" or "open plan X + Y"
+    const patterns = [
+      /open[- ]?plan\s+([\w\s]+?)\s+(?:and|&|\+)\s+([\w\s]+?)(?:\s+area|\s+space|\s+room|\s+exactly|\s+\d|,|\.|$)/gi,
+      /combined\s+([\w\s]+?)\s+(?:and|&|\+)\s+([\w\s]+?)(?:\s+area|\s+space|\s+room|\s+exactly|\s+\d|,|\.|$)/gi,
+    ];
+
+    for (const pattern of patterns) {
+      let match: RegExpExecArray | null;
+      pattern.lastIndex = 0;
+      while ((match = pattern.exec(lower)) !== null) {
+        const partA = match[1].trim();
+        const partB = match[2].trim();
+        if (!partA || !partB) continue;
+
+        // Find rooms matching each part
+        const idxA = rooms.findIndex(r => r.name.toLowerCase().includes(partA));
+        const idxB = rooms.findIndex(r => r !== rooms[idxA] && r.name.toLowerCase().includes(partB));
+
+        if (idxA !== -1 && idxB !== -1 && idxA !== idxB) {
+          const primary = rooms[idxA];
+          const secondary = rooms[idxB];
+          // Merge: combine areas, keep dimensions of the larger room
+          primary.name = `${primary.name} + ${secondary.name}`;
+          if (primary.preferredWidth && primary.preferredDepth) {
+            // Keep user-specified dimensions (they apply to the combined space)
+          } else if (secondary.preferredWidth && secondary.preferredDepth) {
+            primary.preferredWidth = secondary.preferredWidth;
+            primary.preferredDepth = secondary.preferredDepth;
+            primary.areaSqm = secondary.areaSqm;
+          } else {
+            primary.areaSqm += secondary.areaSqm;
+          }
+          // Remove secondary
+          const removeIdx = rooms.indexOf(secondary);
+          if (removeIdx !== -1) rooms.splice(removeIdx, 1);
+          console.log(`[MERGE] Open-plan merge: "${primary.name}" (${primary.areaSqm.toFixed(1)} sqm)`);
+        }
+      }
+    }
+  } catch {
+    // Non-critical — rooms work separately too
+  }
+  return rooms;
 }
 
 // ── Extract room names mentioned in the user prompt ─────────────────────────

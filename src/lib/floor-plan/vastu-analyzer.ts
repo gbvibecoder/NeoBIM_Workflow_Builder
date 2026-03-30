@@ -225,22 +225,32 @@ export function analyzeVastuCompliance(
   const midY = (bounds.min.y + bounds.max.y) / 2;
 
   // ---- Room placement rules ----
-  for (const rule of ALL_VASTU_RULES) {
-    if (rule.category === "room_placement") {
-      const matchingRooms = floor.rooms.filter(
-        (r) => rule.room_types.includes(r.type)
-      );
+  // For each room, find the MOST SPECIFIC matching rule to avoid conflicting evaluations.
+  // E.g., "master_bedroom" should use V-RP-001 (preferred: SW), not V-RP-007 (bedroom, preferred: W/NW).
+  const roomPlacementRules = ALL_VASTU_RULES.filter(r => r.category === "room_placement");
+  const evaluatedRoomIds = new Set<string>();
 
-      if (matchingRooms.length === 0) continue; // Rule doesn't apply
+  for (const room of floor.rooms) {
+    // Find all rules that match this room's type
+    const matchingRules = roomPlacementRules.filter(rule =>
+      rule.room_types.includes(room.type)
+    );
+    if (matchingRules.length === 0) continue;
 
-      for (const room of matchingRooms) {
-        const dir = getRoomDirectionWithRotation(room, floor, angleRad, midX, midY);
-        const item = evaluateRoomRule(rule, room, dir);
-        items.push(item);
-        totalPenalty += item.penalty_applied;
-        maxPossiblePenalty += rule.penalty_points;
-      }
-    }
+    // Pick the most specific rule — longest matching room_type string wins
+    // "master_bedroom" (14 chars) > "bedroom" (7 chars)
+    const bestRule = matchingRules.sort((a, b) => {
+      const aSpec = Math.max(...a.room_types.filter(t => t === room.type).map(t => t.length), 0);
+      const bSpec = Math.max(...b.room_types.filter(t => t === room.type).map(t => t.length), 0);
+      return bSpec - aSpec;
+    })[0];
+
+    const dir = getRoomDirectionWithRotation(room, floor, angleRad, midX, midY);
+    const item = evaluateRoomRule(bestRule, room, dir);
+    items.push(item);
+    totalPenalty += item.penalty_applied;
+    maxPossiblePenalty += bestRule.penalty_points;
+    evaluatedRoomIds.add(room.id);
   }
 
   // ---- Entrance rules ----
