@@ -15,6 +15,7 @@
 import type { EnhancedRoomProgram, RoomSpec, AdjacencyRequirement } from "./ai-room-programmer";
 import { correctDimensions } from "./dimension-corrector";
 import type { RoomWithTarget } from "./dimension-corrector";
+import { layoutCourtyardPlan, hasCourtyardRoom } from "./courtyard-layout";
 
 // ── Output type ──────────────────────────────────────────────────────────────
 
@@ -118,6 +119,27 @@ export function layoutFloorPlan(program: EnhancedRoomProgram): PlacedRoom[] {
       const scale = Math.sqrt(minFootprint / (fpW * fpH));
       fpW = grid(fpW * scale);
       fpH = grid(fpH * scale);
+    }
+  }
+
+  // ── Courtyard layout (if courtyard room present) ──
+  if (hasCourtyardRoom(program)) {
+    try {
+      const courtyardResult = layoutCourtyardPlan(program, fpW, fpH);
+      if (courtyardResult && courtyardResult.length > 0) {
+        // Run dimension correction on courtyard layout too
+        let result = courtyardResult;
+        result = validateRoomSizes(result, rooms);
+        if (rooms.length >= 10) {
+          result = applyDimensionCorrection(result, rooms, fpW, fpH);
+        }
+        result = enforceCorridorCap(result, fpW * fpH);
+        result = validateAndRecoverRooms(rooms, result, fpW, fpH);
+        checkDimensionAccuracy(result, rooms);
+        return result;
+      }
+    } catch (err) {
+      console.warn("[LAYOUT] Courtyard layout failed, falling back to BSP:", err);
     }
   }
 
