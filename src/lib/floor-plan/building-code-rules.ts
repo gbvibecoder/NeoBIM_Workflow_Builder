@@ -389,6 +389,16 @@ const ENHANCED_RULES: BuildingCodeRule[] = [
     parameters: { min_width_mm: 1000 },
   },
   {
+    id: "NBC-ST-006",
+    code_ref: "NBC 2016, Clause 8.6.2",
+    category: "stair",
+    title: "Stair Comfort Formula (2R+T)",
+    description: "The sum of twice the riser height plus tread depth should be between 550-650mm for comfortable use.",
+    severity: "warning",
+    room_types: [],
+    parameters: { min_formula: 550, max_formula: 650 },
+  },
+  {
     id: "NBC-AC-003",
     code_ref: "NBC 2016, Clause 11.2",
     category: "accessibility",

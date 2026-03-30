@@ -25,22 +25,32 @@ interface FurnitureSpec {
   offsetFromWall?: number; // mm from wall face (default: 50)
 }
 
+/** Select bed size based on room area */
+function selectBedCatalogId(roomType: RoomType, areaSqm: number): string {
+  if (roomType === "master_bedroom") {
+    return areaSqm >= 14 ? "bed-king" : "bed-queen";
+  }
+  if (areaSqm < 10) return "bed-single";
+  if (areaSqm < 14) return "bed-queen";
+  return "bed-queen";
+}
+
 const ROOM_FURNITURE: Partial<Record<RoomType, FurnitureSpec[]>> = {
   master_bedroom: [
-    { catalogId: "bed-king",    priority: 10, wallPlacement: "anchor" },
+    { catalogId: "bed-king",    priority: 10, wallPlacement: "anchor" }, // swapped adaptively below
     { catalogId: "nightstand",  priority: 8,  wallPlacement: "anchor", offsetFromWall: 0 },
     { catalogId: "wardrobe",    priority: 9,  wallPlacement: "opposite" },
     { catalogId: "dresser",     priority: 5,  wallPlacement: "adjacent", minRoomArea: 14 },
     { catalogId: "armchair",    priority: 3,  wallPlacement: "adjacent", minRoomArea: 16 },
   ],
   bedroom: [
-    { catalogId: "bed-queen",   priority: 10, wallPlacement: "anchor" },
+    { catalogId: "bed-queen",   priority: 10, wallPlacement: "anchor" }, // swapped adaptively below
     { catalogId: "nightstand",  priority: 7,  wallPlacement: "anchor", offsetFromWall: 0 },
     { catalogId: "wardrobe",    priority: 9,  wallPlacement: "opposite" },
     { catalogId: "desk-study",  priority: 5,  wallPlacement: "adjacent", minRoomArea: 11 },
   ],
   guest_bedroom: [
-    { catalogId: "bed-queen",   priority: 10, wallPlacement: "anchor" },
+    { catalogId: "bed-queen",   priority: 10, wallPlacement: "anchor" }, // swapped adaptively below
     { catalogId: "nightstand",  priority: 7,  wallPlacement: "anchor", offsetFromWall: 0 },
     { catalogId: "wardrobe",    priority: 8,  wallPlacement: "opposite" },
   ],
@@ -390,15 +400,28 @@ export function layoutRoomFurniture(room: Room, floor: Floor): FurnitureLayoutRe
     .filter((s) => !s.minRoomArea || room.area_sqm >= s.minRoomArea)
     .sort((a, b) => b.priority - a.priority);
 
-  // For dining room: choose table size based on area
-  const adjustedSpecs = applicableSpecs.filter((s) => {
-    if (room.type === "dining_room") {
-      if (s.catalogId === "dining-table-6" && room.area_sqm >= 10) return true;
-      if (s.catalogId === "dining-table-4" && room.area_sqm < 10) return true;
-      if (s.catalogId === "dining-table-6" && room.area_sqm < 10) return false;
-    }
-    return true;
-  });
+  // Adaptive furniture selection based on room area
+  const adjustedSpecs = applicableSpecs
+    .map((s) => {
+      // Adapt bed size to room area
+      if (s.catalogId.startsWith("bed-")) {
+        return { ...s, catalogId: selectBedCatalogId(room.type, room.area_sqm) };
+      }
+      return s;
+    })
+    .filter((s) => {
+      // For dining room: choose table size based on area
+      if (room.type === "dining_room") {
+        if (s.catalogId === "dining-table-6" && room.area_sqm >= 10) return true;
+        if (s.catalogId === "dining-table-4" && room.area_sqm < 10) return true;
+        if (s.catalogId === "dining-table-6" && room.area_sqm < 10) return false;
+      }
+      // For living room: use 2-seat sofa in small rooms
+      if (room.type === "living_room" && s.catalogId === "sofa-3seat" && room.area_sqm < 15) {
+        s = { ...s, catalogId: "sofa-2seat" };
+      }
+      return true;
+    });
 
   // Track placed rectangles for overlap checking
   const placedRects: Array<{ x: number; y: number; w: number; d: number }> = [];

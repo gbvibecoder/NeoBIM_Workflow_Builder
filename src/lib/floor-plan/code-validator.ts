@@ -55,9 +55,11 @@ export function validateBuildingCode(
 
   // ---- Window / Ventilation Checks ----
   totalChecks += checkWindows(floor, violations);
+  totalChecks += checkVentilationRatio(floor, violations);
 
   // ---- Stair Checks ----
   totalChecks += checkStairs(floor, violations);
+  totalChecks += checkStairFormula(floor, violations);
 
   // ---- Ceiling Height Checks ----
   totalChecks += checkCeilingHeight(floor, violations);
@@ -762,6 +764,93 @@ function checkFireEgressDistance(floor: Floor, violations: CodeViolation[]): num
         actual_value: `${(minPathDist / 1000).toFixed(1)} m`,
         required_value: `≤ ${(maxDist / 1000).toFixed(1)} m`,
         suggestion: "Consider adding a secondary exit or fire escape route closer to this room.",
+      });
+    }
+  }
+  return checks;
+}
+
+// ============================================================
+// STAIR COMFORT FORMULA (NBC-ST-006)
+// ============================================================
+
+function checkStairFormula(floor: Floor, violations: CodeViolation[]): number {
+  let checks = 0;
+  const rule = ALL_BUILDING_CODE_RULES.find((r) => r.id === "NBC-ST-006");
+  if (!rule) return 0;
+
+  const minFormula = rule.parameters.min_formula as number;
+  const maxFormula = rule.parameters.max_formula as number;
+
+  for (const stair of floor.stairs) {
+    checks++;
+    const formulaValue = 2 * stair.riser_height_mm + stair.tread_depth_mm;
+
+    if (formulaValue < minFormula || formulaValue > maxFormula) {
+      const isBelow = formulaValue < minFormula;
+      violations.push({
+        rule_id: rule.id,
+        rule,
+        entity_type: "stair",
+        entity_id: stair.id,
+        entity_name: `Staircase (${stair.type})`,
+        severity: rule.severity,
+        message: `Stair comfort formula 2R+T = ${formulaValue} mm is ${isBelow ? "below" : "above"} the acceptable range (${minFormula}–${maxFormula} mm).`,
+        actual_value: `2×${stair.riser_height_mm} + ${stair.tread_depth_mm} = ${formulaValue} mm`,
+        required_value: `${minFormula}–${maxFormula} mm (ideal 600 mm)`,
+        suggestion: isBelow
+          ? `Increase tread depth or riser height to bring 2R+T above ${minFormula} mm.`
+          : `Decrease riser height or increase tread depth to bring 2R+T below ${maxFormula} mm.`,
+      });
+    }
+  }
+  return checks;
+}
+
+// ============================================================
+// VENTILATION RATIO (NBC-WV-002)
+// ============================================================
+
+function checkVentilationRatio(floor: Floor, violations: CodeViolation[]): number {
+  let checks = 0;
+  const rule = ALL_BUILDING_CODE_RULES.find((r) => r.id === "NBC-WV-002");
+  if (!rule) return 0;
+
+  const minRatio = rule.parameters.min_ratio as number;
+  const OPERABLE_FACTOR = 0.5; // 50% of window area counts as effective ventilation opening
+
+  const applicableRooms = floor.rooms.filter(
+    (r) => rule.room_types.length === 0 || rule.room_types.includes(r.type)
+  );
+
+  for (const room of applicableRooms) {
+    checks++;
+    const roomWallIds = new Set(room.wall_ids);
+    const roomWindows = floor.windows.filter((w) => roomWallIds.has(w.wall_id));
+
+    // Only operable windows contribute to ventilation; use 50% of their area
+    const totalVentArea = roomWindows
+      .filter((w) => w.operable)
+      .reduce(
+        (sum, w) => sum + (w.width_mm * w.height_mm * OPERABLE_FACTOR) / 1_000_000,
+        0
+      );
+
+    const floorArea = room.area_sqm;
+    const ratio = floorArea > 0 ? totalVentArea / floorArea : 0;
+
+    if (ratio < minRatio) {
+      violations.push({
+        rule_id: rule.id,
+        rule,
+        entity_type: "room",
+        entity_id: room.id,
+        entity_name: room.name,
+        severity: rule.severity,
+        message: `${room.name} ventilation opening ratio (${(ratio * 100).toFixed(1)}%) is below required ${(minRatio * 100).toFixed(0)}% of floor area.`,
+        actual_value: `${(ratio * 100).toFixed(1)}% (${totalVentArea.toFixed(2)} sq.m operable / ${floorArea.toFixed(1)} sq.m floor)`,
+        required_value: `≥ ${(minRatio * 100).toFixed(0)}% (1/20th of floor area)`,
+        suggestion: `Add ${((minRatio * floorArea - totalVentArea)).toFixed(2)} sq.m more operable window area to ${room.name}, or provide mechanical ventilation.`,
       });
     }
   }
