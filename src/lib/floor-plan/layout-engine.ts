@@ -177,9 +177,11 @@ function checkDimensionAccuracy(placed: PlacedRoom[], specs: RoomSpec[]): void {
 // ── Post-BSP swap optimization ──────────────────────────────────────────────
 
 /**
- * Improve adjacency satisfaction by swapping positions of similarly-sized rooms.
- * Runs up to 50 iterations, swapping pairs that improve the overall score.
- * Does NOT modify room dimensions — only swaps (x, y) positions.
+ * Improve adjacency satisfaction by swapping room identities.
+ *
+ * Two phases:
+ *   1. Priority swaps — force Kitchen↔Dining, Living↔Foyer adjacency
+ *   2. General optimization — iterative pairwise swaps scored by layout quality
  */
 function optimizeLayoutSwaps(
   rooms: PlacedRoom[],
@@ -188,9 +190,15 @@ function optimizeLayoutSwaps(
   if (rooms.length < 4 || adjacency.length === 0) return rooms;
 
   let layout = rooms.map(r => ({ ...r }));
+
+  // ── Phase 1: Priority swaps for critical adjacencies ──
+  layout = prioritySwaps(layout);
+
+  // ── Phase 2: General optimization (more iterations for complex layouts) ──
+  const maxIter = layout.length >= 15 ? 100 : 50;
   let bestScore = scoreLayout(layout, adjacency);
 
-  for (let iteration = 0; iteration < 50; iteration++) {
+  for (let iteration = 0; iteration < maxIter; iteration++) {
     let improved = false;
 
     for (let i = 0; i < layout.length; i++) {
@@ -204,7 +212,6 @@ function optimizeLayoutSwaps(
         if (a.type === "staircase" || b.type === "staircase") continue;
 
         // Swap room identity (name/type) while keeping BSP-assigned positions/dimensions
-        // This preserves perfect tiling while improving logical adjacency
         const swapped = layout.map(r => ({ ...r }));
         swapped[i] = { ...a, name: b.name, type: b.type };
         swapped[j] = { ...b, name: a.name, type: a.type };
@@ -225,10 +232,63 @@ function optimizeLayoutSwaps(
 }
 
 /**
+ * Force critical room adjacencies by targeted swaps.
+ * Runs before general optimization to establish the flow backbone.
+ */
+function prioritySwaps(layout: PlacedRoom[]): PlacedRoom[] {
+  const TOL = 0.15;
+  const result = layout.map(r => ({ ...r }));
+
+  // Priority 1: Kitchen adjacent to Dining
+  forceAdjacency(result, "kitchen", "dining", TOL);
+  // Priority 2: Dining/Living adjacent to Foyer/Entrance
+  forceAdjacency(result, "living", "entrance", TOL);
+  // Priority 3: Living adjacent to Dining
+  forceAdjacency(result, "living", "dining", TOL);
+
+  return result;
+}
+
+/**
+ * Try to force two room types to be adjacent by swapping one of them
+ * with a room currently adjacent to the other.
+ */
+function forceAdjacency(
+  rooms: PlacedRoom[], typeA: string, typeB: string, tol: number,
+): void {
+  const roomA = rooms.find(r => r.type === typeA);
+  const roomB = rooms.find(r => r.type === typeB);
+  if (!roomA || !roomB) return;
+  if (roomsShareEdge(roomA, roomB, tol)) return; // Already adjacent
+
+  const idxA = rooms.indexOf(roomA);
+  const idxB = rooms.indexOf(roomB);
+
+  // Find rooms currently adjacent to roomA
+  for (let k = 0; k < rooms.length; k++) {
+    if (k === idxA || k === idxB) continue;
+    const candidate = rooms[k];
+    if (candidate.type === "hallway" || candidate.type === "staircase") continue;
+
+    if (roomsShareEdge(roomA, candidate, tol)) {
+      // Check if swapping candidate↔roomB would be size-compatible
+      const ratio = Math.min(candidate.area, roomB.area) / Math.max(candidate.area, roomB.area);
+      if (ratio < 0.35) continue; // Too different in size
+
+      // Swap identities
+      const tmpName = candidate.name, tmpType = candidate.type;
+      rooms[k] = { ...candidate, name: roomB.name, type: roomB.type };
+      rooms[idxB] = { ...roomB, name: tmpName, type: tmpType };
+      return; // Done
+    }
+  }
+}
+
+/**
  * Score a layout for quality. Higher = better.
  */
 function scoreLayout(rooms: PlacedRoom[], adjacency: AdjacencyRequirement[]): number {
-  const TOL = 0.15; // 150mm tolerance for edge touching
+  const TOL = 0.15;
   let score = 0;
 
   // 1. ADJACENCY SATISFACTION (weight: 10 per satisfied)
@@ -236,33 +296,53 @@ function scoreLayout(rooms: PlacedRoom[], adjacency: AdjacencyRequirement[]): nu
     const a = rooms.find(r => r.name === req.roomA);
     const b = rooms.find(r => r.name === req.roomB);
     if (!a || !b) continue;
-
-    if (roomsShareEdge(a, b, TOL)) {
-      score += 10;
-    }
+    if (roomsShareEdge(a, b, TOL)) score += 10;
   }
 
-  // 2. FLOW SEQUENCE: foyer→living→dining→kitchen (weight: 8 per link)
+  // 2. FLOW SEQUENCE: foyer→living→dining→kitchen (weight: 20 per link)
   const FLOW_TYPES = ["entrance", "living", "dining", "kitchen"];
   for (let i = 0; i < FLOW_TYPES.length - 1; i++) {
     const ra = rooms.find(r => r.type === FLOW_TYPES[i]);
     const rb = rooms.find(r => r.type === FLOW_TYPES[i + 1]);
-    if (ra && rb && roomsShareEdge(ra, rb, TOL)) score += 8;
+    if (ra && rb && roomsShareEdge(ra, rb, TOL)) {
+      score += 20;
+    }
   }
 
-  // 3. ASPECT RATIO PENALTY (weight: -3 per room with AR > 2.5)
+  // 3. HARD PENALTIES for broken critical adjacencies
+  const kitchen = rooms.find(r => r.type === "kitchen");
+  const dining = rooms.find(r => r.type === "dining");
+  const living = rooms.find(r => r.type === "living");
+  const foyer = rooms.find(r => r.type === "entrance");
+
+  if (kitchen && dining && !roomsShareEdge(kitchen, dining, TOL)) score -= 15;
+  if (dining && living && !roomsShareEdge(dining, living, TOL)) score -= 15;
+  if (foyer && living && !roomsShareEdge(foyer, living, TOL)) score -= 10;
+
+  // 4. ASPECT RATIO PENALTY (weight: -3 per room with AR > 2.5)
   for (const room of rooms) {
     if (room.type === "hallway") continue;
     const roomAr = ar(room.width, room.depth);
     if (roomAr > 2.5) score -= 3;
   }
 
-  // 4. WET WALL CLUSTERING: bathrooms near each other (weight: 5)
+  // 5. WET WALL CLUSTERING: bathrooms near each other (weight: 5)
   const baths = rooms.filter(r => r.type === "bathroom");
   for (let i = 0; i < baths.length; i++) {
     for (let j = i + 1; j < baths.length; j++) {
       if (roomsShareEdge(baths[i], baths[j], TOL)) score += 5;
     }
+  }
+
+  // 6. BEDROOM-BATHROOM DETACHMENT penalty (-30 per detached pair)
+  for (const req of adjacency) {
+    const a = rooms.find(r => r.name === req.roomA);
+    const b = rooms.find(r => r.name === req.roomB);
+    if (!a || !b) continue;
+    const isBedBath =
+      (a.type === "bedroom" && b.type === "bathroom") ||
+      (a.type === "bathroom" && b.type === "bedroom");
+    if (isBedBath && !roomsShareEdge(a, b, TOL)) score -= 30;
   }
 
   return score;
