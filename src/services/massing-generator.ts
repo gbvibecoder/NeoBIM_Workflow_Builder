@@ -426,6 +426,41 @@ function isCircularFootprint(footprint: FootprintPoint[]): boolean {
 }
 
 /**
+ * For circular footprints, compute the center and radius.
+ */
+function getCircularFootprintParams(footprint: FootprintPoint[]): { cx: number; cy: number; radius: number } {
+  const c = centroid(footprint);
+  const radius = Math.sqrt(
+    Math.pow(footprint[0].x - c.x, 2) + Math.pow(footprint[0].y - c.y, 2)
+  );
+  return { cx: c.x, cy: c.y, radius };
+}
+
+/**
+ * Check if a point (px, py) is inside the footprint polygon.
+ * Uses ray-casting algorithm for general polygons,
+ * fast circle-distance check for circular footprints.
+ */
+function isPointInsideFootprint(footprint: FootprintPoint[], px: number, py: number, margin: number = 0): boolean {
+  if (isCircularFootprint(footprint)) {
+    const { cx, cy, radius } = getCircularFootprintParams(footprint);
+    const dist = Math.sqrt((px - cx) ** 2 + (py - cy) ** 2);
+    return dist <= radius - margin;
+  }
+  // Ray-casting for general polygons
+  let inside = false;
+  const n = footprint.length;
+  for (let i = 0, j = n - 1; i < n; j = i++) {
+    const xi = footprint[i].x, yi = footprint[i].y;
+    const xj = footprint[j].x, yj = footprint[j].y;
+    if ((yi > py) !== (yj > py) && px < ((xj - xi) * (py - yi)) / (yj - yi) + xi) {
+      inside = !inside;
+    }
+  }
+  return inside;
+}
+
+/**
  * Generate interior elements for a circular building storey.
  * Creates: central core walls, radial partition walls, wedge-shaped spaces, ring of columns.
  */
@@ -1195,8 +1230,16 @@ function generateStairElement(
   const treadDepth = 0.28;
   const riserCount = Math.round(floorHeight / riserHeight);
 
-  const sx = bounds.minX + bW * 0.15; // 15% from left edge
-  const sy = bounds.minY + bD * 0.5 - stairLength / 2;
+  let sx: number, sy: number;
+  if (isCircularFootprint(footprint)) {
+    // For circular buildings, place stair inside the core (near center)
+    const { cx, cy } = getCircularFootprintParams(footprint);
+    sx = cx - stairWidth / 2 - 1.5; // offset slightly from center
+    sy = cy - stairLength / 2;
+  } else {
+    sx = bounds.minX + bW * 0.15; // 15% from left edge
+    sy = bounds.minY + bD * 0.5 - stairLength / 2;
+  }
 
   const vertices: Vertex[] = [
     { x: sx, y: sy, z: elevation },
@@ -1338,7 +1381,7 @@ export function generateMassingGeometry(input: BuildingDescriptionInput): Massin
     bSlab.properties.discipline = "structural";
     basementElements.push(bSlab);
 
-    // Parking columns (6m grid)
+    // Parking columns (6m grid) — only place inside the footprint
     const bxMin = Math.min(...footprint.map(p => p.x));
     const byMin = Math.min(...footprint.map(p => p.y));
     const bxMax = Math.max(...footprint.map(p => p.x));
@@ -1346,6 +1389,7 @@ export function generateMassingGeometry(input: BuildingDescriptionInput): Massin
     let bColIdx = 0;
     for (let cx = bxMin + 3; cx < bxMax - 1; cx += 6) {
       for (let cy = byMin + 3; cy < byMax - 1; cy += 6) {
+        if (!isPointInsideFootprint(footprint, cx, cy, 1.0)) continue;
         basementElements.push({
           id: `col-b-${bColIdx}`,
           type: "column",
@@ -1543,6 +1587,8 @@ function computeSetbackFootprint(footprint: FootprintPoint[], depth: number): Fo
 /** Generate entrance canopy — thin slab + two columns projecting outward */
 function generateEntranceCanopy(footprint: FootprintPoint[], longestWallIdx: number, groundHeight: number): GeometryElement[] {
   const elements: GeometryElement[] = [];
+  // Skip canopy for circular buildings — no clear entrance wall
+  if (isCircularFootprint(footprint)) return elements;
   const w = longestWallIdx;
   const nextW = (w + 1) % footprint.length;
   const p1 = footprint[w], p2 = footprint[nextW];
@@ -1601,8 +1647,16 @@ function generateElevatorShaft(footprint: FootprintPoint[], elevation: number, f
   if (bW < 6 || bD < 6) return [];
 
   const shaftW = 2.5, shaftD = 2.5;
-  const sx = Math.min(...xs) + bW * 0.15 + 3.5; // next to stairs
-  const sy = Math.min(...ys) + bD / 2 - shaftD / 2;
+  let sx: number, sy: number;
+  if (isCircularFootprint(footprint)) {
+    // For circular buildings, place elevator shaft near center (next to stair)
+    const { cx, cy } = getCircularFootprintParams(footprint);
+    sx = cx - shaftW / 2 + 1.5; // offset slightly from center, opposite side of stair
+    sy = cy - shaftD / 2;
+  } else {
+    sx = Math.min(...xs) + bW * 0.15 + 3.5; // next to stairs
+    sy = Math.min(...ys) + bD / 2 - shaftD / 2;
+  }
   const elements: GeometryElement[] = [];
 
   const shaftCorners: [FootprintPoint, FootprintPoint][] = [
@@ -1695,20 +1749,50 @@ function generateMEPElementsForStorey(
   if (bW < 4 || bD < 4) return elements;
 
   const ceilZ = elevation + floorHeight - 0.4; // just below ceiling
-  const corridorY = bMinY + bD / 2; // corridor centerline
+  const isCircular = isCircularFootprint(footprint);
   let mepIdx = 0;
+
+  // For circular buildings, compute center/radius and use inset boundaries
+  let ductStartX: number, ductEndX: number, corridorY: number;
+  let coreX: number, coreY: number;
+  let ahuX: number, ahuY: number;
+
+  if (isCircular) {
+    const { cx, cy, radius } = getCircularFootprintParams(footprint);
+    corridorY = cy; // corridor through center
+    // Ducts run through the center, inset by 30% of radius from each side
+    const ductInset = radius * 0.3;
+    ductStartX = cx - radius + ductInset;
+    ductEndX = cx + radius - ductInset;
+    // Core area near center
+    coreX = cx - 1.5;
+    coreY = cy;
+    // AHU near core
+    ahuX = cx + 2.0;
+    ahuY = cy - 2.0;
+  } else {
+    corridorY = bMinY + bD / 2;
+    ductStartX = bMinX + 1;
+    ductEndX = bMaxX - 1;
+    coreX = bMinX + bW * 0.15;
+    coreY = corridorY;
+    ahuX = bMaxX - 3.0;
+    ahuY = bMaxY - 2.5;
+  }
+
+  const ductLength = ductEndX - ductStartX;
 
   // ── Main supply duct (along longest axis at ceiling) ──
   elements.push({
     id: `duct-supply-s${storeyIndex}`,
     type: "duct",
-    vertices: [{ x: bMinX + 1, y: corridorY - 0.3, z: ceilZ }, { x: bMaxX - 1, y: corridorY + 0.3, z: ceilZ + 0.4 }],
+    vertices: [{ x: ductStartX, y: corridorY - 0.3, z: ceilZ }, { x: ductEndX, y: corridorY + 0.3, z: ceilZ + 0.4 }],
     faces: [],
     ifcType: "IfcDuctSegment",
     properties: {
       name: `Supply Duct S${storeyIndex + 1}`,
       storeyIndex,
-      width: 0.6, height: 0.4, length: bW - 2,
+      width: 0.6, height: 0.4, length: ductLength,
       discipline: "mep",
     },
   });
@@ -1717,44 +1801,60 @@ function generateMEPElementsForStorey(
   elements.push({
     id: `duct-return-s${storeyIndex}`,
     type: "duct",
-    vertices: [{ x: bMinX + 1, y: corridorY + 1.0, z: ceilZ }, { x: bMaxX - 1, y: corridorY + 1.6, z: ceilZ + 0.4 }],
+    vertices: [{ x: ductStartX, y: corridorY + 1.0, z: ceilZ }, { x: ductEndX, y: corridorY + 1.6, z: ceilZ + 0.4 }],
     faces: [],
     ifcType: "IfcDuctSegment",
     properties: {
       name: `Return Duct S${storeyIndex + 1}`,
       storeyIndex,
-      width: 0.6, height: 0.4, length: bW - 2,
+      width: 0.6, height: 0.4, length: ductLength,
       discipline: "mep",
     },
   });
 
   // ── Branch ducts to rooms (perpendicular from main duct) ──
-  const branchSpacing = Math.max(3.0, bW / 6);
-  for (let bx = bMinX + branchSpacing; bx < bMaxX - 1; bx += branchSpacing) {
+  const branchSpacing = Math.max(3.0, (ductEndX - ductStartX) / 6);
+  for (let bx = ductStartX + branchSpacing; bx < ductEndX - 1; bx += branchSpacing) {
+    // For circular buildings, compute how far north/south the branch can extend
+    let branchNorthY: number, branchSouthY: number;
+    if (isCircular) {
+      const { cx, cy, radius } = getCircularFootprintParams(footprint);
+      // How far from center-Y can we go at this X position?
+      const dxFromCenter = bx - cx;
+      const maxDy = Math.sqrt(Math.max(0, (radius - 1) ** 2 - dxFromCenter ** 2));
+      branchNorthY = cy - maxDy + 1;
+      branchSouthY = cy + maxDy - 1;
+    } else {
+      branchNorthY = bMinY + 1;
+      branchSouthY = bMaxY - 1;
+    }
+
     // Branch to north side
-    elements.push({
-      id: `duct-branch-n-s${storeyIndex}-${mepIdx}`,
-      type: "duct",
-      vertices: [{ x: bx - 0.15, y: corridorY - 0.3, z: ceilZ }, { x: bx + 0.15, y: bMinY + 1, z: ceilZ + 0.2 }],
-      faces: [],
-      ifcType: "IfcDuctSegment",
-      properties: { name: `Branch Duct N-${mepIdx + 1}`, storeyIndex, width: 0.3, height: 0.2, length: corridorY - bMinY - 1, discipline: "mep" },
-    });
+    if (corridorY - branchNorthY > 1) {
+      elements.push({
+        id: `duct-branch-n-s${storeyIndex}-${mepIdx}`,
+        type: "duct",
+        vertices: [{ x: bx - 0.15, y: corridorY - 0.3, z: ceilZ }, { x: bx + 0.15, y: branchNorthY, z: ceilZ + 0.2 }],
+        faces: [],
+        ifcType: "IfcDuctSegment",
+        properties: { name: `Branch Duct N-${mepIdx + 1}`, storeyIndex, width: 0.3, height: 0.2, length: corridorY - branchNorthY, discipline: "mep" },
+      });
+    }
     // Branch to south side
-    elements.push({
-      id: `duct-branch-s-s${storeyIndex}-${mepIdx}`,
-      type: "duct",
-      vertices: [{ x: bx - 0.15, y: corridorY + 0.3, z: ceilZ }, { x: bx + 0.15, y: bMaxY - 1, z: ceilZ + 0.2 }],
-      faces: [],
-      ifcType: "IfcDuctSegment",
-      properties: { name: `Branch Duct S-${mepIdx + 1}`, storeyIndex, width: 0.3, height: 0.2, length: bMaxY - corridorY - 1, discipline: "mep" },
-    });
+    if (branchSouthY - corridorY > 1) {
+      elements.push({
+        id: `duct-branch-s-s${storeyIndex}-${mepIdx}`,
+        type: "duct",
+        vertices: [{ x: bx - 0.15, y: corridorY + 0.3, z: ceilZ }, { x: bx + 0.15, y: branchSouthY, z: ceilZ + 0.2 }],
+        faces: [],
+        ifcType: "IfcDuctSegment",
+        properties: { name: `Branch Duct S-${mepIdx + 1}`, storeyIndex, width: 0.3, height: 0.2, length: branchSouthY - corridorY, discipline: "mep" },
+      });
+    }
     mepIdx++;
   }
 
   // ── Pipe risers in core area (hot + cold water) ──
-  const coreX = bMinX + bW * 0.15;
-  const coreY = corridorY;
   elements.push({
     id: `pipe-hw-s${storeyIndex}`,
     type: "pipe",
@@ -1785,19 +1885,25 @@ function generateMEPElementsForStorey(
   for (const room of programme) {
     const roomName = (room.space ?? "").toLowerCase();
     if (/bathroom|toilet|kitchen|wash|wc|restroom/i.test(roomName)) {
-      // Place pipe from riser toward the room (simplified: horizontal run along Y)
-      const pipeY = bMinY + 2 + pipeIdx * 2.5;
-      if (pipeY < bMaxY - 1) {
-        elements.push({
-          id: `pipe-branch-s${storeyIndex}-${pipeIdx}`,
-          type: "pipe",
-          vertices: [{ x: coreX, y: coreY, z: ceilZ + 0.1 }, { x: coreX, y: pipeY, z: ceilZ + 0.1 }],
-          faces: [],
-          ifcType: "IfcPipeSegment",
-          properties: { name: `Branch Pipe to ${room.space} S${storeyIndex + 1}`, storeyIndex, diameter: 0.025, length: Math.abs(pipeY - coreY), discipline: "mep" },
-        });
-        pipeIdx++;
+      let pipeY: number;
+      if (isCircular) {
+        // Radial branch from core toward room area (stay well inside the circle)
+        const { cy, radius } = getCircularFootprintParams(footprint);
+        pipeY = cy - radius * 0.4 + pipeIdx * 2.5;
+        if (pipeY > cy + radius * 0.4) continue; // skip if outside safe zone
+      } else {
+        pipeY = bMinY + 2 + pipeIdx * 2.5;
+        if (pipeY >= bMaxY - 1) continue;
       }
+      elements.push({
+        id: `pipe-branch-s${storeyIndex}-${pipeIdx}`,
+        type: "pipe",
+        vertices: [{ x: coreX, y: coreY, z: ceilZ + 0.1 }, { x: coreX, y: pipeY, z: ceilZ + 0.1 }],
+        faces: [],
+        ifcType: "IfcPipeSegment",
+        properties: { name: `Branch Pipe to ${room.space} S${storeyIndex + 1}`, storeyIndex, diameter: 0.025, length: Math.abs(pipeY - coreY), discipline: "mep" },
+      });
+      pipeIdx++;
     }
   }
 
@@ -1805,27 +1911,29 @@ function generateMEPElementsForStorey(
   elements.push({
     id: `ctray-main-s${storeyIndex}`,
     type: "cable-tray",
-    vertices: [{ x: bMinX + 1, y: corridorY - 0.8, z: ceilZ + 0.5 }, { x: bMaxX - 1, y: corridorY - 0.5, z: ceilZ + 0.6 }],
+    vertices: [{ x: ductStartX, y: corridorY - 0.8, z: ceilZ + 0.5 }, { x: ductEndX, y: corridorY - 0.5, z: ceilZ + 0.6 }],
     faces: [],
     ifcType: "IfcCableCarrierSegment",
-    properties: { name: `Cable Tray S${storeyIndex + 1}`, storeyIndex, width: 0.3, height: 0.1, length: bW - 2, discipline: "mep" },
+    properties: { name: `Cable Tray S${storeyIndex + 1}`, storeyIndex, width: 0.3, height: 0.1, length: ductLength, discipline: "mep" },
   });
 
   // ── AHU equipment (one per floor) ──
   elements.push({
     id: `ahu-s${storeyIndex}`,
     type: "equipment",
-    vertices: [{ x: bMaxX - 3.0, y: bMaxY - 2.5, z: elevation }],
+    vertices: [{ x: ahuX, y: ahuY, z: elevation }],
     faces: [],
     ifcType: "IfcFlowTerminal",
     properties: { name: `AHU S${storeyIndex + 1}`, storeyIndex, width: 2.0, height: 1.8, length: 1.5, discipline: "mep" },
   });
 
-  // ── Diffusers (one per room, at ceiling) ──
+  // ── Diffusers (one per room, at ceiling) — only place inside the footprint ──
   let diffIdx = 0;
   const diffSpacing = Math.max(4.0, bW / 5);
   for (let dx = bMinX + diffSpacing / 2; dx < bMaxX; dx += diffSpacing) {
     for (let dy = bMinY + diffSpacing / 2; dy < bMaxY; dy += diffSpacing) {
+      // Skip diffusers outside the footprint (important for circular buildings)
+      if (!isPointInsideFootprint(footprint, dx, dy, 1.0)) continue;
       elements.push({
         id: `diffuser-s${storeyIndex}-${diffIdx}`,
         type: "equipment",
