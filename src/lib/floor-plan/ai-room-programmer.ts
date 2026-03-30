@@ -62,40 +62,52 @@ YOU HANDLE ALL BUILDING TYPES:
 - Mixed-use: ground floor commercial + upper residential
 - Custom: any combination the user describes
 
-CRITICAL RULES:
-1. Include ALL rooms the user mentions explicitly — do NOT skip any
-2. Add essential rooms the user didn't mention:
-   - Residential: kitchen (if missing), at least 1 bathroom, living area, corridor (if 3+ rooms)
-   - Commercial: reception, restrooms, server/utility room
-   - Medical: waiting area, reception, restroom
-   - Any building: at least one entrance/foyer area
-3. "BHK" = bedrooms + hall + kitchen. "3BHK" = 3 bedrooms + living/hall + kitchen
-4. Each bedroom gets an attached bathroom (unless user says otherwise)
-5. For 3+ bedrooms: add utility room
-6. For villa/bungalow/house: add verandah/porch
-7. If user mentions special rooms (home theater, gym, pool, servant quarter), include them
+CRITICAL RULES — ROOM COMPLETENESS (MOST IMPORTANT):
+1. You MUST include EVERY room the user mentions explicitly — do NOT skip, merge, or consolidate ANY room
+2. If the user says "pooja room", include a "Pooja Room". If they say "powder room", include a "Powder Room"
+3. If the user says "servant quarter with attached toilet", include BOTH "Servant Quarter" AND "Servant Toilet" as separate rooms
+4. If the user says "walk-in wardrobe", include it as a separate room, NOT merged into the bedroom
+5. Count your rooms before outputting. If the user mentions 25 rooms, you must output at least 25 rooms
+6. Small rooms are VALID: shoe rack (2 sqm), powder room (2 sqm), pooja room (3 sqm) — include them
+7. Each attached bathroom is a SEPARATE room from its bedroom
+8. "BHK" = bedrooms + hall + kitchen. "3BHK" = 3 bedrooms + living/hall + kitchen
+
+USER-SPECIFIED DIMENSIONS:
+- If the user specifies exact dimensions like "20x15 feet" or "6x5 feet", CONVERT to meters (1 foot = 0.3048m) and use those EXACT dimensions for areaSqm
+- Example: "20x15 feet" = 6.1 x 4.6m = 28 sqm. Use areaSqm: 28
+- Do NOT override user-specified sizes with your own estimates
+
+ESSENTIAL ROOMS TO ADD (if user didn't mention them):
+- Residential: kitchen (if missing), at least 1 bathroom, living area, corridor (if 5+ rooms per floor)
+- Commercial: reception, restrooms, server/utility room
+- Medical: waiting area, reception, restroom
+- Any building: at least one entrance/foyer area
+- For villa/bungalow/house: add verandah/porch
+- For 3+ bedrooms: add utility room
 
 ROOM TYPES (use ONLY these): living, dining, kitchen, bedroom, bathroom, hallway, entrance, utility, balcony, office, storage, staircase, other
 
 ZONE ASSIGNMENT:
-- public: living room, dining room, entrance, foyer, reception, waiting area, retail
-- private: bedrooms, study, home office, home theater, gym, prayer room
-- service: kitchen, bathrooms, utility, laundry, storage, server room, pantry
+- public: living room, dining room, entrance, foyer, reception, waiting area, verandah, TV lounge, family room
+- private: bedrooms, study, home office, home theater, gym, prayer room, pooja room, walk-in closet/wardrobe
+- service: kitchen, bathrooms, utility, laundry, storage, server room, pantry, servant quarter, car parking
 - circulation: corridor, hallway, foyer, passage, staircase, lobby
 
 ADJACENCY RULES (generate these pairs):
 - Kitchen ↔ Dining (serving access)
 - Master Bedroom ↔ Master Bathroom (attached bath)
-- Each Bedroom ↔ nearest Bathroom (within 1 room distance)
+- Master Bedroom ↔ Walk-in Wardrobe (direct access)
+- Each Bedroom ↔ its attached Bathroom
 - Living Room ↔ Dining Room (open plan flow)
 - Entrance/Foyer ↔ Living Room (arrival sequence)
 - Kitchen ↔ Utility (service connection)
+- Servant Quarter ↔ Servant Toilet (attached)
 - Wet rooms (bathrooms, kitchen, utility) should cluster for shared plumbing
 - Corridor must touch both public and private zones
 
 EXTERIOR WALL RULES:
-- MUST have exterior wall: all bedrooms, living room, dining room, kitchen, office
-- CAN be interior: bathroom, WC, corridor, utility, storage, staircase, closet
+- MUST have exterior wall: all bedrooms, living room, dining room, kitchen, office, balcony, verandah, terrace, car parking
+- CAN be interior: bathroom, WC, corridor, utility, storage, staircase, closet, pooja room, powder room
 
 SIZE GUIDELINES (sqm, Indian standards):
 - Master Bedroom: 14-20, Other Bedrooms: 10-15
@@ -103,6 +115,9 @@ SIZE GUIDELINES (sqm, Indian standards):
 - Kitchen: 8-12, Bathroom: 4-6, WC/Toilet: 2.5-4
 - Corridor/Hallway: 5-12, Utility: 3-5, Foyer/Entrance: 4-8
 - Balcony/Verandah: 5-12, Home Theater: 15-25, Gym: 10-20, Study/Office: 8-12
+- Pooja Room: 2.5-4, Powder Room: 2-3, Shoe Rack: 2-3, Walk-in Wardrobe: 4-6
+- Servant Quarter: 7-10, Car Parking: 25-35, Terrace Garden: 10-20
+- Family Lounge: 12-18, TV Lounge: 10-15
 - Reception (commercial): 12-25, Waiting Area: 10-20, Meeting Room: 12-20
 
 MULTI-FLOOR BUILDINGS:
@@ -111,12 +126,16 @@ For duplex, multi-story, or 2+ floor buildings, assign each room a "floor" field
 - floor: 1 = first floor
 - floor: 2 = second floor
 
-A "Staircase" room (type: "staircase", ~12 sqm) must appear on EVERY floor it connects.
-Set numFloors to the total number of floors.
-
-Standard Indian duplex pattern:
-Ground floor (floor: 0): living, dining, kitchen, guest bedroom, servant quarter, powder room, staircase
-First floor (floor: 1): master suite, other bedrooms, family lounge, terrace, staircase
+CRITICAL FLOOR ASSIGNMENT:
+- When the user says "Ground floor: X, Y, Z" and "First floor: A, B, C":
+  Rooms X, Y, Z MUST have floor: 0
+  Rooms A, B, C MUST have floor: 1
+- Do NOT put first floor rooms on the ground floor or vice versa
+- If a room's floor isn't clear from context, use these defaults:
+  Living, dining, kitchen, guest rooms, foyer, car parking → floor: 0
+  Master bedroom, kids bedrooms, study, family lounge → floor: 1
+- A "Staircase" room (type: "staircase", ~12 sqm) MUST appear on EVERY floor it connects
+- Set numFloors to the total number of floors
 
 If the user says "duplex", "2-story", "two floors", "ground floor + first floor", set numFloors: 2 and assign floor numbers.
 If single floor (default), omit the "floor" field or set floor: 0 for all rooms.
@@ -161,20 +180,60 @@ export async function programRooms(
 ): Promise<EnhancedRoomProgram> {
   const client = getClient(userApiKey);
 
-  const completion = await client.chat.completions.create({
-    model: "gpt-4o-mini",
-    temperature: 0.2,
-    response_format: { type: "json_object" },
-    messages: [
-      { role: "system", content: SYSTEM_PROMPT },
-      { role: "user", content: prompt },
-    ],
-  });
+  // Estimate complexity — complex prompts need explicit room-count instruction
+  const mentionedRooms = extractMentionedRooms(prompt);
+  const isComplex = mentionedRooms.length >= 10;
 
-  const content = completion.choices[0]?.message?.content;
-  if (!content) throw new Error("AI returned empty response for room program");
+  const userMessage = isComplex
+    ? `${prompt}\n\nIMPORTANT: This prompt mentions at least ${mentionedRooms.length} distinct rooms/spaces: ${mentionedRooms.join(", ")}. You MUST include ALL of them as separate rooms in your output. Do NOT merge or skip any.`
+    : prompt;
 
-  const raw = JSON.parse(content) as EnhancedRoomProgram;
+  let raw: EnhancedRoomProgram | null = null;
+
+  // Attempt 1: primary AI call with sufficient token budget
+  try {
+    const completion = await client.chat.completions.create({
+      model: "gpt-4o-mini",
+      temperature: 0.2,
+      max_tokens: isComplex ? 8192 : 4096,
+      response_format: { type: "json_object" },
+      messages: [
+        { role: "system", content: SYSTEM_PROMPT },
+        { role: "user", content: userMessage },
+      ],
+    });
+
+    const content = completion.choices[0]?.message?.content;
+    if (!content) throw new Error("AI returned empty response for room program");
+
+    raw = JSON.parse(content) as EnhancedRoomProgram;
+  } catch (firstErr) {
+    // Attempt 2: retry with explicit room list in a simpler prompt format
+    if (isComplex) {
+      console.warn("[programRooms] First attempt failed for complex prompt, retrying with room list:", firstErr);
+      try {
+        const retryMessage = `Generate a room program for this building. Here are ALL the rooms that MUST be included:\n\n${mentionedRooms.map((r, i) => `${i + 1}. ${r}`).join("\n")}\n\nOriginal description: ${prompt}\n\nInclude EVERY room listed above. Do NOT skip any.`;
+        const completion2 = await client.chat.completions.create({
+          model: "gpt-4o-mini",
+          temperature: 0.2,
+          max_tokens: 8192,
+          response_format: { type: "json_object" },
+          messages: [
+            { role: "system", content: SYSTEM_PROMPT },
+            { role: "user", content: retryMessage },
+          ],
+        });
+        const content2 = completion2.choices[0]?.message?.content;
+        if (content2) {
+          raw = JSON.parse(content2) as EnhancedRoomProgram;
+        }
+      } catch (retryErr) {
+        console.warn("[programRooms] Retry also failed:", retryErr);
+      }
+    }
+
+    if (!raw) throw firstErr as Error;
+  }
 
   // ── Validate & sanitize ──
 
@@ -197,6 +256,14 @@ export async function programRooms(
     if (room.floor !== undefined && room.floor !== null) {
       room.floor = Math.max(0, Math.floor(Number(room.floor) || 0));
     }
+  }
+
+  // ── Post-AI room faithfulness check ──
+  // Compare AI output against rooms extracted from the prompt, inject missing ones
+  const missingRooms = findMissingRooms(mentionedRooms, raw.rooms, prompt);
+  if (missingRooms.length > 0) {
+    console.warn(`[programRooms] AI missed ${missingRooms.length} rooms from prompt: ${missingRooms.map(r => r.name).join(", ")}`);
+    raw.rooms.push(...missingRooms);
   }
 
   // Ensure adjacency is valid
@@ -232,6 +299,12 @@ export async function programRooms(
   if (!raw.totalAreaSqm || raw.totalAreaSqm <= 0) {
     raw.totalAreaSqm = raw.rooms.reduce((s, r) => s + r.areaSqm, 0);
   }
+  // Fix: totalAreaSqm must be at least the sum of room areas
+  const actualTotal = raw.rooms.reduce((s, r) => s + r.areaSqm, 0);
+  if (raw.totalAreaSqm < actualTotal) {
+    raw.totalAreaSqm = actualTotal;
+  }
+
   if (!raw.numFloors || raw.numFloors <= 0) raw.numFloors = 1;
   if (!raw.buildingType) raw.buildingType = "Residential Apartment";
   if (!raw.entranceRoom) raw.entranceRoom = raw.rooms[0]?.name ?? "Entrance";
@@ -247,7 +320,296 @@ export async function programRooms(
       : raw.buildingType;
   }
 
+  console.log(`[STAGE-1] Rooms from AI: ${raw.rooms.length}`, raw.rooms.map(r => `${r.name} (floor:${r.floor ?? 0})`));
+
   return raw;
+}
+
+// ── Extract room names mentioned in the user prompt ─────────────────────────
+
+/**
+ * Regex-based extraction of room/space names from a natural language prompt.
+ * Returns a list of canonical room names the user explicitly mentioned.
+ * This is used to validate AI output and inject missing rooms.
+ */
+export function extractMentionedRooms(prompt: string): string[] {
+  const p = prompt.toLowerCase();
+  const found: string[] = [];
+
+  // Known room patterns — order matters (longer patterns first to avoid partial matches)
+  const ROOM_PATTERNS: Array<{ pattern: RegExp; name: string }> = [
+    // Specific rooms (longer names first)
+    { pattern: /walk[- ]?in\s+wardrobe|walk[- ]?in\s+closet/g, name: "Walk-in Wardrobe" },
+    { pattern: /master\s+bath(?:room)?/g, name: "Master Bathroom" },
+    { pattern: /master\s+bed(?:room)?(?:\s+suite)?/g, name: "Master Bedroom" },
+    { pattern: /kids?\s+bed(?:room)?\s*1|(?:first|1st)\s+kids?\s+bed(?:room)?/g, name: "Kids Bedroom 1" },
+    { pattern: /kids?\s+bed(?:room)?\s*2|(?:second|2nd)\s+kids?\s+bed(?:room)?/g, name: "Kids Bedroom 2" },
+    { pattern: /kids?\s+bed(?:room)?\s*3/g, name: "Kids Bedroom 3" },
+    { pattern: /kids?\s+bath(?:room)?\s*1/g, name: "Kids Bathroom 1" },
+    { pattern: /kids?\s+bath(?:room)?\s*2/g, name: "Kids Bathroom 2" },
+    { pattern: /guest\s+bed(?:room)?/g, name: "Guest Bedroom" },
+    { pattern: /guest\s+bath(?:room)?/g, name: "Guest Bathroom" },
+    { pattern: /servant\s+quarter|servants?\s+room|maid'?s?\s+room/g, name: "Servant Quarter" },
+    { pattern: /servant\s+toilet|maid'?s?\s+(?:bath|toilet)/g, name: "Servant Toilet" },
+    { pattern: /powder\s+room/g, name: "Powder Room" },
+    { pattern: /pooja\s+room|puja\s+room|prayer\s+room|mandir/g, name: "Pooja Room" },
+    { pattern: /shoe\s+(?:rack|cabinet|closet|storage)/g, name: "Shoe Rack" },
+    { pattern: /coat\s+closet/g, name: "Coat Closet" },
+    { pattern: /utility\s+room|laundry\s+room/g, name: "Utility Room" },
+    { pattern: /utility\s+balcony|drying\s+(?:balcony|area)/g, name: "Utility Balcony" },
+    { pattern: /terrace\s+garden/g, name: "Terrace Garden" },
+    { pattern: /car\s+parking|garage|covered\s+parking/g, name: "Car Parking" },
+    { pattern: /family\s+(?:lounge|room)|tv\s+lounge|family\s+tv/g, name: "Family Lounge" },
+    { pattern: /home\s+theater|home\s+theatre/g, name: "Home Theater" },
+    { pattern: /mini\s+bar/g, name: "Mini Bar" },
+    { pattern: /study\s+room|shared\s+study/g, name: "Study Room" },
+    { pattern: /sit[- ]?out|verandah|veranda|porch/g, name: "Verandah" },
+    { pattern: /living\s+room|formal\s+living/g, name: "Living Room" },
+    { pattern: /dining\s+(?:room|area)/g, name: "Dining Room" },
+    { pattern: /(?:open\s+)?kitchen|wet\s+kitchen|dry\s+kitchen|modular\s+kitchen/g, name: "Kitchen" },
+    { pattern: /foyer|entrance\s+(?:hall|area)/g, name: "Foyer" },
+    { pattern: /(?:master\s+)?balcony|private\s+balcony/g, name: "Balcony" },
+    { pattern: /(?:internal\s+)?staircase/g, name: "Staircase" },
+    { pattern: /linen\s+(?:storage|closet|cupboard)/g, name: "Linen Storage" },
+    { pattern: /breakfast\s+(?:bar|nook|area)/g, name: "Breakfast Bar" },
+    { pattern: /swimming\s+pool|pool/g, name: "Swimming Pool" },
+    { pattern: /gym|fitness|workout/g, name: "Gym" },
+    { pattern: /store\s*room|storage\s*room/g, name: "Store Room" },
+    { pattern: /reception/g, name: "Reception" },
+    { pattern: /waiting\s+area/g, name: "Waiting Area" },
+    { pattern: /conference\s+room|meeting\s+room/g, name: "Meeting Room" },
+    { pattern: /server\s+room/g, name: "Server Room" },
+    { pattern: /pantry/g, name: "Pantry" },
+  ];
+
+  const seen = new Set<string>();
+  for (const { pattern, name } of ROOM_PATTERNS) {
+    // Reset lastIndex for global regex
+    pattern.lastIndex = 0;
+    if (pattern.test(p) && !seen.has(name)) {
+      seen.add(name);
+      found.push(name);
+    }
+  }
+
+  // Detect numbered bedrooms: "bedroom 1", "bedroom 2", etc.
+  let numberedBedMatch: RegExpExecArray | null;
+  const numberedBedRe = /(?:bed(?:room)?)\s*(\d)/g;
+  while ((numberedBedMatch = numberedBedRe.exec(p)) !== null) {
+    const name = `Bedroom ${numberedBedMatch[1]}`;
+    if (!seen.has(name)) { seen.add(name); found.push(name); }
+  }
+
+  // Detect BHK patterns: "4bhk" implies N bedrooms
+  const bhkMatch = p.match(/(\d)\s*[-]?\s*bhk/);
+  if (bhkMatch) {
+    const count = parseInt(bhkMatch[1], 10);
+    // Only add generic bedrooms if specific ones weren't found
+    const specificBedrooms = found.filter(n =>
+      n.toLowerCase().includes("bedroom") || n.toLowerCase().includes("master")
+    ).length;
+    if (specificBedrooms < count) {
+      for (let i = specificBedrooms + 1; i <= count; i++) {
+        const name = `Bedroom ${i}`;
+        if (!seen.has(name)) { seen.add(name); found.push(name); }
+      }
+    }
+  }
+
+  return found;
+}
+
+// ── Find rooms mentioned in prompt but missing from AI output ───────────────
+
+function findMissingRooms(
+  mentionedRooms: string[],
+  aiRooms: RoomSpec[],
+  prompt: string,
+): RoomSpec[] {
+  const missing: RoomSpec[] = [];
+  const aiNames = aiRooms.map(r => r.name.toLowerCase());
+
+  // Detect floor context from prompt
+  const p = prompt.toLowerCase();
+  const isMultiFloor = p.includes("duplex") || p.includes("2-story") || p.includes("two floor") ||
+    p.includes("2 floor") || (p.includes("ground floor") && p.includes("first floor"));
+
+  for (const mentioned of mentionedRooms) {
+    const mentionedLower = mentioned.toLowerCase();
+
+    // Check if AI already has this room (fuzzy match)
+    const found = aiNames.some(aiName => {
+      // Exact match
+      if (aiName === mentionedLower) return true;
+      // One contains the other
+      if (aiName.includes(mentionedLower) || mentionedLower.includes(aiName)) return true;
+      // Key word match (e.g., "pooja" in "pooja room")
+      const mentionedWords = mentionedLower.split(/\s+/);
+      const aiWords = aiName.split(/\s+/);
+      const keyMatch = mentionedWords.some(w => w.length > 3 && aiWords.some(aw => aw.includes(w) || w.includes(aw)));
+      return keyMatch;
+    });
+
+    if (!found) {
+      const spec = inferRoomSpec(mentioned, prompt, isMultiFloor);
+      missing.push(spec);
+    }
+  }
+
+  return missing;
+}
+
+// ── Infer room spec for a missing room ──────────────────────────────────────
+
+function inferRoomSpec(roomName: string, prompt: string, isMultiFloor: boolean): RoomSpec {
+  const name = roomName.toLowerCase();
+  const p = prompt.toLowerCase();
+
+  // Try to extract user-specified dimensions from prompt
+  const areaSqm = extractDimensionsForRoom(name, p) ?? inferDefaultArea(name);
+  const { type, zone, exterior } = inferRoomTypeAndZone(name);
+  const floor = inferFloor(name, p, isMultiFloor);
+
+  return {
+    name: roomName,
+    type,
+    areaSqm,
+    zone,
+    mustHaveExteriorWall: exterior,
+    adjacentTo: [],
+    preferNear: [],
+    floor,
+  };
+}
+
+function extractDimensionsForRoom(roomName: string, prompt: string): number | null {
+  // Look for patterns like "pooja room 6x5 feet" or "living room 20x15 feet"
+  const keywords = roomName.split(/\s+/).filter(w => w.length > 2);
+  for (const keyword of keywords) {
+    const pattern = new RegExp(
+      `${keyword}[^.]*?(\\d+(?:\\.\\d+)?)\\s*[x×]\\s*(\\d+(?:\\.\\d+)?)\\s*(?:feet|ft|foot)`,
+      "i"
+    );
+    const match = prompt.match(pattern);
+    if (match) {
+      const w = parseFloat(match[1]) * 0.3048; // feet to meters
+      const d = parseFloat(match[2]) * 0.3048;
+      return Math.round(w * d * 10) / 10;
+    }
+
+    // Also check for "Xm x Ym" or "X x Y meters"
+    const mPattern = new RegExp(
+      `${keyword}[^.]*?(\\d+(?:\\.\\d+)?)\\s*[x×]\\s*(\\d+(?:\\.\\d+)?)\\s*(?:m(?:eters?)?|sqm?)`,
+      "i"
+    );
+    const mMatch = prompt.match(mPattern);
+    if (mMatch) {
+      return Math.round(parseFloat(mMatch[1]) * parseFloat(mMatch[2]) * 10) / 10;
+    }
+  }
+  return null;
+}
+
+function inferDefaultArea(name: string): number {
+  const DEFAULTS: Array<{ pattern: RegExp; area: number }> = [
+    { pattern: /master\s+bed/, area: 18 },
+    { pattern: /kids?\s+bed|bed(?:room)?/, area: 14 },
+    { pattern: /guest\s+bed/, area: 15 },
+    { pattern: /master\s+bath/, area: 7 },
+    { pattern: /bath(?:room)?|toilet/, area: 4 },
+    { pattern: /powder/, area: 2.5 },
+    { pattern: /living/, area: 25 },
+    { pattern: /dining/, area: 12 },
+    { pattern: /kitchen/, area: 10 },
+    { pattern: /foyer|entrance/, area: 6 },
+    { pattern: /corridor|hallway/, area: 8 },
+    { pattern: /staircase/, area: 12 },
+    { pattern: /pooja|prayer|puja|mandir/, area: 3 },
+    { pattern: /utility(?:\s+room)?$/, area: 4 },
+    { pattern: /utility\s+balcony/, area: 5 },
+    { pattern: /servant\s+quarter/, area: 8 },
+    { pattern: /servant\s+toilet/, area: 2.5 },
+    { pattern: /car\s+parking|garage/, area: 28 },
+    { pattern: /walk[- ]?in\s+wardrobe|walk[- ]?in\s+closet/, area: 5 },
+    { pattern: /shoe\s+rack|coat\s+closet/, area: 2.5 },
+    { pattern: /verandah|veranda|porch|sit[- ]?out/, area: 10 },
+    { pattern: /balcony/, area: 5 },
+    { pattern: /terrace/, area: 15 },
+    { pattern: /study/, area: 11 },
+    { pattern: /family\s+lounge|tv\s+lounge|lounge/, area: 15 },
+    { pattern: /home\s+theat/, area: 20 },
+    { pattern: /pool/, area: 30 },
+    { pattern: /gym/, area: 15 },
+    { pattern: /store/, area: 4 },
+    { pattern: /linen/, area: 2 },
+    { pattern: /reception/, area: 15 },
+    { pattern: /waiting/, area: 12 },
+    { pattern: /meeting|conference/, area: 15 },
+  ];
+
+  for (const { pattern, area } of DEFAULTS) {
+    if (pattern.test(name)) return area;
+  }
+  return 8; // safe default
+}
+
+function inferRoomTypeAndZone(name: string): { type: string; zone: RoomSpec["zone"]; exterior: boolean } {
+  const MAPPING: Array<{ pattern: RegExp; type: string; zone: RoomSpec["zone"]; exterior: boolean }> = [
+    { pattern: /bed(?:room)?|master\s+bed|kids?\s+bed|guest\s+bed/, type: "bedroom", zone: "private", exterior: true },
+    { pattern: /bath(?:room)?|toilet|powder|wc/, type: "bathroom", zone: "service", exterior: false },
+    { pattern: /living|lounge|family\s+room|tv\s+lounge/, type: "living", zone: "public", exterior: true },
+    { pattern: /dining/, type: "dining", zone: "public", exterior: true },
+    { pattern: /kitchen/, type: "kitchen", zone: "service", exterior: true },
+    { pattern: /corridor|hallway|passage/, type: "hallway", zone: "circulation", exterior: false },
+    { pattern: /staircase/, type: "staircase", zone: "circulation", exterior: false },
+    { pattern: /foyer|entrance/, type: "entrance", zone: "circulation", exterior: true },
+    { pattern: /utility/, type: "utility", zone: "service", exterior: false },
+    { pattern: /balcony|verandah|veranda|porch|terrace|sit[- ]?out/, type: "balcony", zone: "public", exterior: true },
+    { pattern: /car\s+parking|garage/, type: "other", zone: "service", exterior: true },
+    { pattern: /servant/, type: "other", zone: "service", exterior: false },
+    { pattern: /pooja|prayer|puja|mandir/, type: "other", zone: "private", exterior: false },
+    { pattern: /wardrobe|closet|shoe|coat|linen/, type: "storage", zone: "private", exterior: false },
+    { pattern: /study|office/, type: "office", zone: "private", exterior: true },
+    { pattern: /pool/, type: "other", zone: "public", exterior: true },
+    { pattern: /gym|fitness/, type: "other", zone: "private", exterior: true },
+    { pattern: /store|storage/, type: "storage", zone: "service", exterior: false },
+    { pattern: /home\s+theat/, type: "other", zone: "private", exterior: false },
+    { pattern: /reception|waiting/, type: "other", zone: "public", exterior: false },
+    { pattern: /meeting|conference/, type: "office", zone: "public", exterior: true },
+  ];
+
+  for (const { pattern, type, zone, exterior } of MAPPING) {
+    if (pattern.test(name)) return { type, zone, exterior };
+  }
+  return { type: "other", zone: "service", exterior: false };
+}
+
+function inferFloor(name: string, prompt: string, isMultiFloor: boolean): number | undefined {
+  if (!isMultiFloor) return 0;
+
+  // Check if the room name appears after "first floor" or "upper floor" context
+  const groundFloorSection = prompt.match(/ground\s+floor[:\s]+([\s\S]*?)(?=first\s+floor|upper\s+floor|$)/i);
+  const firstFloorSection = prompt.match(/first\s+floor[:\s]+([\s\S]*?)(?=second\s+floor|$)/i);
+
+  const keywords = name.split(/\s+/).filter(w => w.length > 3);
+
+  if (groundFloorSection) {
+    const gfText = groundFloorSection[1].toLowerCase();
+    if (keywords.some(kw => gfText.includes(kw.toLowerCase()))) return 0;
+  }
+  if (firstFloorSection) {
+    const ffText = firstFloorSection[1].toLowerCase();
+    if (keywords.some(kw => ffText.includes(kw.toLowerCase()))) return 1;
+  }
+
+  // Defaults based on room type
+  const GROUND_FLOOR = /living|dining|kitchen|guest|servant|car\s+park|garage|foyer|entrance|powder|pooja|prayer|shoe|coat|verandah/;
+  const FIRST_FLOOR = /master|kids|study|family\s+lounge|terrace|walk[- ]?in|home\s+theat|utility\s+balcony/;
+
+  if (GROUND_FLOOR.test(name)) return 0;
+  if (FIRST_FLOOR.test(name)) return 1;
+
+  return 0; // default to ground
 }
 
 // ── Convert EnhancedRoomProgram → BuildingDescription (for generateFloorPlan) ──
