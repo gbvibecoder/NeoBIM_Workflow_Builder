@@ -48,6 +48,8 @@ export interface EnhancedRoomProgram {
   entranceRoom: string;    // which room is nearest to the main entrance
   circulationNotes: string; // AI's note on how zones connect
   projectName: string;
+  isVastuRequested?: boolean; // true when user asked for vastu/vaastu compliance
+  originalPrompt?: string;   // original user prompt (for downstream stages)
 }
 
 // ── System prompt ────────────────────────────────────────────────────────────
@@ -179,6 +181,39 @@ OUTPUT THIS EXACT JSON STRUCTURE:
   "projectName": "2BHK Villa"
 }`;
 
+// ── Room size limits (post-AI clamp) ────────────────────────────────────────
+
+/**
+ * Maximum area for utility/service rooms. Returns null if no limit applies.
+ * Prevents AI from assigning absurdly large areas to small rooms like shoe racks.
+ */
+function getMaxAreaForRoomType(name: string, type: string): number | null {
+  const n = name.toLowerCase();
+  const MAX_SIZES: Array<{ pattern: RegExp; max: number }> = [
+    { pattern: /shoe\s*(?:rack|cabinet|closet|storage)/, max: 4 },
+    { pattern: /powder\s*room/, max: 4 },
+    { pattern: /linen\s*(?:storage|closet|cupboard)/, max: 4 },
+    { pattern: /coat\s*closet/, max: 4 },
+    { pattern: /servant\s*toilet|maid.*toilet/, max: 4 },
+    { pattern: /pooja|puja|prayer|mandir/, max: 8 },
+    { pattern: /store\s*room|storage\s*room/, max: 8 },
+    { pattern: /pantry/, max: 8 },
+    { pattern: /utility\s*room/, max: 8 },
+    { pattern: /washing\s*area/, max: 6 },
+    { pattern: /laundry/, max: 8 },
+    { pattern: /balcony/, max: 10 },
+    { pattern: /umbrella/, max: 3 },
+    { pattern: /kitchenette/, max: 8 },
+  ];
+
+  for (const { pattern, max } of MAX_SIZES) {
+    if (pattern.test(n)) return max;
+  }
+  // Generic type-based limits for small rooms
+  if (type === "storage") return 10;
+  return null;
+}
+
 // ── Main function ────────────────────────────────────────────────────────────
 
 export async function programRooms(
@@ -272,6 +307,16 @@ export async function programRooms(
     if (room.preferredDepth && room.preferredDepth > 0) {
       room.preferredDepth = Number(room.preferredDepth);
     }
+
+    // ── Clamp utility/service room areas to realistic maximums ──
+    // AI sometimes assigns wildly large areas to small utility rooms
+    if (!room.preferredWidth && !room.preferredDepth) {
+      const maxArea = getMaxAreaForRoomType(room.name, room.type);
+      if (maxArea !== null && room.areaSqm > maxArea) {
+        console.warn(`[SIZE-CLAMP] ${room.name}: AI assigned ${room.areaSqm.toFixed(1)} sqm, clamped to ${maxArea} sqm`);
+        room.areaSqm = maxArea;
+      }
+    }
   }
 
   // ── Post-AI room faithfulness check ──
@@ -335,6 +380,10 @@ export async function programRooms(
       ? `${bedroomCount}BHK ${raw.buildingType.split(" ").pop()}`
       : raw.buildingType;
   }
+
+  // ── Vastu flag ──
+  raw.isVastuRequested = /vastu|vaastu|vastu.?compliant/i.test(prompt);
+  raw.originalPrompt = prompt;
 
   console.log(`[STAGE-1] Rooms from AI: ${raw.rooms.length}`, raw.rooms.map(r => `${r.name} (floor:${r.floor ?? 0})`));
 

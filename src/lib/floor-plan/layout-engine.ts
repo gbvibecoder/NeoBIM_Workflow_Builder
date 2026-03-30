@@ -129,6 +129,10 @@ export function layoutFloorPlan(program: EnhancedRoomProgram): PlacedRoom[] {
     result = layoutWithZones(cls, fpW, fpH, program.adjacency);
   }
 
+  // ── Post-BSP room size validation ──
+  // Shrink utility rooms that BSP over-allocated
+  result = validateRoomSizes(result);
+
   // ── Post-BSP swap optimization ──
   // Try swapping similarly-sized rooms to improve adjacency satisfaction
   if (program.adjacency.length > 0 && result.length >= 4) {
@@ -411,6 +415,50 @@ function refineRoomProportions(rooms: PlacedRoom[]): PlacedRoom[] {
   return result;
 }
 
+// ── Post-BSP room size validation ──────────────────────────────────────────
+
+/**
+ * Shrink utility/service rooms that BSP allocated too much space.
+ * BSP splits by area ratio, so a tiny room grouped with large rooms
+ * can end up with vastly more space than it needs.
+ */
+function validateRoomSizes(rooms: PlacedRoom[]): PlacedRoom[] {
+  const MAX_SIZES: Array<{ pattern: RegExp; max: number }> = [
+    { pattern: /shoe\s*(?:rack|cabinet|closet|storage)/i, max: 4 },
+    { pattern: /powder\s*room/i, max: 4 },
+    { pattern: /linen\s*(?:storage|closet|cupboard)/i, max: 4 },
+    { pattern: /coat\s*closet/i, max: 4 },
+    { pattern: /servant\s*toilet|maid.*toilet/i, max: 4 },
+    { pattern: /umbrella/i, max: 3 },
+    { pattern: /pooja|puja|prayer|mandir/i, max: 8 },
+    { pattern: /store\s*room|storage\s*room/i, max: 8 },
+    { pattern: /pantry/i, max: 8 },
+    { pattern: /utility\s*room/i, max: 8 },
+    { pattern: /washing\s*area/i, max: 6 },
+    { pattern: /laundry/i, max: 8 },
+    { pattern: /kitchenette/i, max: 8 },
+  ];
+
+  for (const room of rooms) {
+    if (room.type === "hallway" || room.type === "staircase") continue;
+    const currentArea = room.width * room.depth;
+    const nameLower = room.name.toLowerCase();
+
+    for (const { pattern, max } of MAX_SIZES) {
+      if (pattern.test(nameLower) && currentArea > max * 1.5) {
+        // Room is WAY too big for its type — shrink maintaining aspect ratio
+        console.warn(`[SIZE-FIX] ${room.name} is ${currentArea.toFixed(1)} sqm, max should be ${max} sqm`);
+        const scale = Math.sqrt(max / currentArea);
+        room.width = grid(room.width * scale);
+        room.depth = grid(room.depth * scale);
+        room.area = grid(room.width * room.depth);
+        break;
+      }
+    }
+  }
+  return rooms;
+}
+
 /**
  * Validate that all input rooms appear in the output. If any are missing,
  * force-place them by appending to the footprint edge.
@@ -564,6 +612,14 @@ function layoutWithZones(
     corridorDepth = grid(Math.max(1.0, userCorridorArea / fpW));
   } else {
     corridorDepth = grid(Math.min(CORRIDOR_DEPTH, Math.max(1.0, maxCorridorDepth)));
+  }
+
+  // ── Enforce corridor area cap (min-depth floor can cause area to exceed cap on wide footprints) ──
+  const corridorAreaCheck = corridorDepth * fpW;
+  if (corridorAreaCheck > cappedArea * 1.2) {
+    const targetDepth = grid(cappedArea / fpW);
+    // Allow corridor as narrow as 0.9m to respect the area cap
+    corridorDepth = Math.max(grid(0.9), targetDepth);
   }
 
   const corridorArea = corridorDepth * fpW;
