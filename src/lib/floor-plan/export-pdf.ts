@@ -134,6 +134,33 @@ export async function exportFloorToPdf(
     pdf.setLineWidth(0.25);
     pdf.line(toX(hinge.x), toY(hinge.y), toX(leafEnd.x), toY(leafEnd.y));
 
+    // Swing arc (quarter-circle from open to closed position)
+    try {
+      const arcR = door.width_mm;
+      const closedEnd = addPoints(hinge, scalePoint(dir, door.swing_direction === "left" ? arcR : -arcR));
+      // Draw dashed arc by approximating with line segments
+      pdf.setDrawColor(180, 0, 0);
+      pdf.setLineWidth(0.15);
+      const cx = toX(hinge.x);
+      const cy = toY(hinge.y);
+      const r = arcR * scaleNum / 1000;
+      // Compute start/end angles from leafEnd and closedEnd
+      const angOpen = Math.atan2(-(toY(leafEnd.y) - cy), toX(leafEnd.x) - cx);
+      const angClosed = Math.atan2(-(toY(closedEnd.y) - cy), toX(closedEnd.x) - cx);
+      const SEGMENTS = 12;
+      const sweep = angClosed - angOpen;
+      const step = sweep / SEGMENTS;
+      for (let i = 0; i < SEGMENTS; i++) {
+        // Dashed: draw every other segment
+        if (i % 2 === 0) {
+          const a1 = angOpen + step * i;
+          const a2 = angOpen + step * (i + 1);
+          pdf.line(cx + r * Math.cos(a1), cy - r * Math.sin(a1),
+                   cx + r * Math.cos(a2), cy - r * Math.sin(a2));
+        }
+      }
+    } catch { /* arc drawing is best-effort */ }
+
     // Hinge dot
     pdf.setFillColor(180, 0, 0);
     pdf.circle(toX(hinge.x), toY(hinge.y), 0.4, "F");

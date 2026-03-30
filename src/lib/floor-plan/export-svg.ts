@@ -63,6 +63,11 @@ export function exportFloorToSvg(
   w(`    .room-dim { font-size: 180px; text-anchor: middle; fill: #666666; }`);
   w(`    .room-area { font-size: 180px; font-weight: bold; text-anchor: middle; fill: #444444; }`);
   w(`  </style>`);
+  w(`  <defs>`);
+  w(`    <marker id="arrow" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">`);
+  w(`      <path d="M 0 0 L 10 5 L 0 10 z" fill="#333"/>`);
+  w(`    </marker>`);
+  w(`  </defs>`);
 
   // ======== GRID ========
   if (options.includeGrid) {
