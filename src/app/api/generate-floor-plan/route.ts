@@ -161,20 +161,24 @@ export async function POST(req: NextRequest) {
       };
 
       const feedback = buildFeedback(project, prompt);
-      // Adjacency scoring per floor
+      // Adjacency scoring across ALL floors (not just ground)
+      let totalAdj = 0, satisfiedAdj = 0;
+      const allUnsatisfied: string[] = [];
       for (const fl of multiFloor.floors) {
         const adj = scoreAdjacency(fl.rooms, roomProgram.adjacency);
-        if (adj.total > 0) {
-          feedback.adjacency_score = {
-            total: adj.total,
-            satisfied: adj.satisfied,
-            percentage: adj.percentage,
-            unsatisfied: adj.unsatisfied.map(u => `${u.roomA} ↔ ${u.roomB}`),
-          };
-          if (adj.unsatisfied.length > 0) {
-            feedback.tips.push(`${adj.unsatisfied.length} adjacency requirement(s) not met — drag rooms to rearrange.`);
-          }
-          break; // Score ground floor only
+        totalAdj += adj.total;
+        satisfiedAdj += adj.satisfied;
+        allUnsatisfied.push(...adj.unsatisfied.map(u => `${u.roomA} ↔ ${u.roomB}`));
+      }
+      if (totalAdj > 0) {
+        feedback.adjacency_score = {
+          total: totalAdj,
+          satisfied: satisfiedAdj,
+          percentage: Math.round((satisfiedAdj / totalAdj) * 100),
+          unsatisfied: allUnsatisfied,
+        };
+        if (allUnsatisfied.length > 0) {
+          feedback.tips.push(`${allUnsatisfied.length} adjacency requirement(s) not met — drag rooms to rearrange.`);
         }
       }
       // DIAGNOSTIC — trace room counts at final output

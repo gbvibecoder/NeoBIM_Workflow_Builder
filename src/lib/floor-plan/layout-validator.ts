@@ -74,11 +74,11 @@ export function validateRoomLayout(
     }
   }
 
-  // 2. Boundary check
+  // 2. Boundary check (symmetric 0.2m tolerance on all sides)
   for (const r of rooms) {
     const issues: string[] = [];
-    if (r.x < -0.1) issues.push(`x=${r.x.toFixed(1)} < 0`);
-    if (r.y < -0.1) issues.push(`y=${r.y.toFixed(1)} < 0`);
+    if (r.x < -0.2) issues.push(`x=${r.x.toFixed(1)} < 0`);
+    if (r.y < -0.2) issues.push(`y=${r.y.toFixed(1)} < 0`);
     if (r.x + r.width > fpW + 0.2) issues.push(`right edge ${(r.x + r.width).toFixed(1)} > footprint width ${fpW}`);
     if (r.y + r.depth > fpH + 0.2) issues.push(`bottom edge ${(r.y + r.depth).toFixed(1)} > footprint depth ${fpH}`);
     if (issues.length > 0) {
@@ -95,7 +95,8 @@ export function validateRoomLayout(
   // 3. Aspect ratio check (no room thinner than 1:3)
   for (const r of rooms) {
     const ratio = Math.max(r.width, r.depth) / Math.min(r.width, r.depth);
-    if (ratio > 3.0 && r.type !== "hallway" && r.type !== "corridor" && r.type !== "balcony") {
+    const arExemptTypes = ["hallway", "corridor", "balcony", "staircase", "passage", "verandah", "entrance"];
+    if (ratio > 3.0 && !arExemptTypes.includes(r.type)) {
       errors.push({
         type: "bad_aspect_ratio",
         severity: "warning",
