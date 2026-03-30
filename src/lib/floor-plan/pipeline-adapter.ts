@@ -327,6 +327,13 @@ export function convertGeometryToProject(
     floor.windows = windowResult.windows;
   }
 
+  // ---- 5b2. Enforce window ratios — add windows to rooms below NBC 10% minimum ----
+  try {
+    ensureWindowRatios(floor);
+  } catch {
+    // Non-critical: plan works without extra windows
+  }
+
   // ---- 5c. Auto-furnish rooms (safe — skips rooms on failure) ----
   try {
     const furnResult = layoutAllFurniture(floor);
@@ -975,6 +982,116 @@ function computeVastuDirection(cx: number, cy: number, bw: number, bh: number): 
     ["NW", "N", "NE"],
   ];
   return GRID[row][col];
+}
+
+// ============================================================
+// WINDOW RATIO ENFORCEMENT — ensure every habitable room has windows
+// ============================================================
+
+function pipelineWallLength(wall: Wall): number {
+  const dx = wall.centerline.end.x - wall.centerline.start.x;
+  const dy = wall.centerline.end.y - wall.centerline.start.y;
+  return Math.sqrt(dx * dx + dy * dy);
+}
+
+/**
+ * Post-placement pass: for any habitable room with < 10% window-to-floor ratio,
+ * add windows on the longest available wall (exterior preferred, interior as fallback).
+ */
+function ensureWindowRatios(floor: Floor): void {
+  const SKIP_TYPES = new Set([
+    "corridor", "lobby", "foyer", "staircase", "elevator", "shaft",
+    "store_room", "walk_in_closet", "dressing_room", "pantry",
+  ]);
+  const SKIP_NAMES = /corridor|passage|stair|closet|storage|store|pantry/i;
+
+  for (const room of floor.rooms) {
+    if (SKIP_TYPES.has(room.type) || SKIP_NAMES.test(room.name)) continue;
+
+    // Calculate current window area for this room
+    const roomWallIds = new Set(room.wall_ids);
+    const roomWindows = floor.windows.filter(w => roomWallIds.has(w.wall_id));
+    const windowArea = roomWindows.reduce((s, w) => s + w.width_mm * w.height_mm * 0.7, 0);
+    const floorArea = room.area_sqm * 1_000_000; // mm²
+    if (floorArea <= 0) continue;
+    const ratio = windowArea / floorArea;
+
+    if (ratio >= 0.10) continue; // Already meets NBC 10% minimum
+
+    // Find walls of this room sorted by length (longest first)
+    const roomWalls = floor.walls.filter(w =>
+      w.left_room_id === room.id || w.right_room_id === room.id
+    );
+    if (roomWalls.length === 0) continue;
+
+    // Prefer exterior walls, then any wall
+    const sortedWalls = [...roomWalls].sort((a, b) => {
+      const aExt = a.type === "exterior" ? 0 : 1;
+      const bExt = b.type === "exterior" ? 0 : 1;
+      if (aExt !== bExt) return aExt - bExt;
+      return pipelineWallLength(b) - pipelineWallLength(a);
+    });
+
+    let currentWindowArea = windowArea;
+    const targetWindowArea = floorArea * 0.10;
+
+    for (const wall of sortedWalls) {
+      if (currentWindowArea >= targetWindowArea) break;
+
+      const wLen = pipelineWallLength(wall);
+      if (wLen < 800) continue; // Wall too short for a window
+
+      // Check what's already on this wall
+      const existingOnWall = [
+        ...floor.doors.filter(d => d.wall_id === wall.id),
+        ...floor.windows.filter(w => w.wall_id === wall.id),
+      ];
+      const usedLength = existingOnWall.reduce((s, item) => {
+        const w = "width_mm" in item ? item.width_mm : 900;
+        return s + w;
+      }, 0);
+      const available = wLen - usedLength - 600; // 300mm margin each side
+      if (available < 600) continue;
+
+      const winWidth = Math.min(1500, Math.max(600, available * 0.7));
+      const winHeight = 1200;
+
+      // Find a position that doesn't overlap existing openings
+      const minPos = 300;
+      const maxPos = wLen - winWidth - 300;
+      if (maxPos < minPos) continue;
+
+      // Try center position
+      const pos = Math.max(minPos, Math.min((wLen - winWidth) / 2, maxPos));
+
+      // Verify no overlap with existing
+      const overlaps = existingOnWall.some(item => {
+        const itemPos = "position_along_wall_mm" in item ? item.position_along_wall_mm : 0;
+        const itemWidth = "width_mm" in item ? item.width_mm : 900;
+        return pos + winWidth + 100 > itemPos && pos < itemPos + itemWidth + 100;
+      });
+      if (overlaps) continue;
+
+      floor.windows.push({
+        id: genId("win"),
+        wall_id: wall.id,
+        type: "casement",
+        width_mm: winWidth,
+        height_mm: winHeight,
+        sill_height_mm: 900,
+        position_along_wall_mm: pos,
+        symbol: {
+          start_point: { x: 0, y: 0 },
+          end_point: { x: winWidth, y: 0 },
+          glass_lines: [],
+        },
+        glazing: "double",
+        operable: true,
+      });
+
+      currentWindowArea += winWidth * winHeight * 0.7;
+    }
+  }
 }
 
 // ============================================================

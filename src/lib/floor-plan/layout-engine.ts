@@ -130,9 +130,10 @@ export function layoutFloorPlan(program: EnhancedRoomProgram): PlacedRoom[] {
         // Run dimension correction on courtyard layout too
         let result = courtyardResult;
         result = validateRoomSizes(result, rooms);
-        if (rooms.length >= 10) {
+        if (rooms.length >= 6) {
           result = applyDimensionCorrection(result, rooms, fpW, fpH);
         }
+        result = validateRoomSizes(result, rooms); // Second pass after correction
         result = enforceCorridorCap(result, fpW * fpH);
         result = validateAndRecoverRooms(rooms, result, fpW, fpH);
         checkDimensionAccuracy(result, rooms);
@@ -174,11 +175,14 @@ export function layoutFloorPlan(program: EnhancedRoomProgram): PlacedRoom[] {
   }
 
   // ── Post-BSP dimension correction ──
-  // Adjust shared boundaries to make room sizes closer to targets
-  // Only run for layouts with many rooms where size deviation matters
-  if (rooms.length >= 10) {
+  // Adjust shared boundaries to make room sizes closer to targets.
+  // Run for layouts with 6+ rooms (lowered from 10 to cover per-floor duplex layouts).
+  if (rooms.length >= 6) {
     result = applyDimensionCorrection(result, rooms, fpW, fpH);
   }
+
+  // ── SECOND size validation — catch rooms inflated by dimension correction ──
+  result = validateRoomSizes(result, rooms);
 
   // ── Corridor hard cap enforcement ──
   // Cap corridor area regardless of source (AI-specified or BSP-created)
