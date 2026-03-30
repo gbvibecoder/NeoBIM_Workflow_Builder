@@ -536,8 +536,11 @@ export function layoutRoomFurniture(room: Room, floor: Floor): FurnitureLayoutRe
   }
 
   // ── Post-placement validation ──
-  // Remove any furniture that ended up in a door swing zone or outside room
+  // Remove any furniture that ended up in a door swing zone, outside room,
+  // or overlapping another placed item.
   const validated: FurnitureInstance[] = [];
+  const validatedRects: Array<{ x: number; y: number; w: number; d: number }> = [];
+
   for (const fi of furniture) {
     const dims = getCatalogDims(fi.catalog_id);
     if (!dims) { validated.push(fi); continue; }
@@ -550,9 +553,22 @@ export function layoutRoomFurniture(room: Room, floor: Floor): FurnitureLayoutRe
     // Final door swing check — remove if blocking
     if (inDoorSwingZone(fi.position, dims.width, dims.depth, fi.rotation_deg, swingZones)) {
       issues.push({ severity: "info", message: `Removed ${fi.catalog_id} in ${room.name} — blocks door swing`, roomId: room.id });
-      continue; // Remove this item
+      continue;
     }
 
+    // Final furniture-to-furniture overlap check (50mm tolerance)
+    const fw = fi.rotation_deg === 90 || fi.rotation_deg === 270 ? dims.depth : dims.width;
+    const fd = fi.rotation_deg === 90 || fi.rotation_deg === 270 ? dims.width : dims.depth;
+    const overlapsExisting = validatedRects.some(pr =>
+      Math.abs(fi.position.x - pr.x) < (fw + pr.w) / 2 + 50 &&
+      Math.abs(fi.position.y - pr.y) < (fd + pr.d) / 2 + 50
+    );
+    if (overlapsExisting) {
+      issues.push({ severity: "info", message: `Removed ${fi.catalog_id} in ${room.name} — overlaps another item`, roomId: room.id });
+      continue;
+    }
+
+    validatedRects.push({ x: fi.position.x, y: fi.position.y, w: fw, d: fd });
     validated.push(fi);
   }
 

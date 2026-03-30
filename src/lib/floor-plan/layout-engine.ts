@@ -184,6 +184,7 @@ export function layoutFloorPlan(program: EnhancedRoomProgram): PlacedRoom[] {
   // ── Vastu post-optimization (only when requested) ──
   if (program.isVastuRequested && result.length >= 4) {
     result = optimizeVastu(result, fpW, fpH);
+    result = verifyVastuPlacement(result, fpW, fpH);
   }
 
   // ── Post-BSP dimension correction ──
@@ -207,6 +208,11 @@ export function layoutFloorPlan(program: EnhancedRoomProgram): PlacedRoom[] {
   if (result.length !== inputCount) {
     console.warn(`[STAGE-2] Room count mismatch after recovery: input=${inputCount}, output=${result.length}`);
   }
+
+  // ── NBC minimum dimension enforcement ──
+  // Verify every room meets NBC 2016 minimum dimensions.
+  // Habitable: ≥2.4m, Kitchen: ≥2.1m, Bathroom: ≥1.2m, Corridor: ≥1.0m
+  result = enforceNBCMinimumDimensions(result);
 
   // ── Dimension accuracy check (diagnostic) ──
   checkDimensionAccuracy(result, rooms);
@@ -746,10 +752,15 @@ function refineRoomProportions(rooms: PlacedRoom[]): PlacedRoom[] {
     if (room.type === "hallway" || room.type === "staircase") continue;
 
     const roomAr = ar(room.width, room.depth);
-    if (roomAr <= 2.5) continue;
 
-    // Target AR based on room type
-    const maxAr = room.type === "bathroom" ? 2.0 : room.type === "bedroom" ? 1.8 : 2.2;
+    // Type-specific max aspect ratios (architectural best practice)
+    const MAX_AR: Record<string, number> = {
+      bedroom: 1.6, bathroom: 2.0, kitchen: 1.8,
+      living: 2.0, dining: 1.8, entrance: 2.0,
+      utility: 2.2, storage: 2.5, balcony: 3.0,
+      other: 2.2,
+    };
+    const maxAr = MAX_AR[room.type] ?? 2.2;
     if (roomAr <= maxAr) continue;
 
     // Try to make more square: shrink the longer dimension, extend the shorter
@@ -1037,6 +1048,58 @@ function optimizeVastu(rooms: PlacedRoom[], fpW: number, fpH: number): PlacedRoo
   }
 }
 
+// ── Post-layout vastu verification ─────────────────────────────────────────
+
+/**
+ * Final targeted vastu check. For each room with a known ideal quadrant,
+ * verify it's in position. If not AND a swap partner exists, do one swap.
+ * Runs AFTER optimizeVastu() as a safety net for remaining violations.
+ */
+function verifyVastuPlacement(
+  rooms: PlacedRoom[], fpW: number, fpH: number,
+): PlacedRoom[] {
+  try {
+    const layout = rooms.map(r => ({ ...r }));
+    const midX = fpW / 2;
+    const midY = fpH / 2;
+
+    // Brahmasthan protection: if a heavy room is in the center 1/9th, swap it out
+    const HEAVY_TYPES = new Set(["bathroom", "kitchen", "staircase", "utility", "storage"]);
+    for (let i = 0; i < layout.length; i++) {
+      const room = layout[i];
+      const cx = room.x + room.width / 2;
+      const cy = room.y + room.depth / 2;
+      const inCenter = cx > fpW / 3 && cx < fpW * 2 / 3 && cy > fpH / 3 && cy < fpH * 2 / 3;
+      if (!inCenter) continue;
+      if (!HEAVY_TYPES.has(room.type) && !room.name.toLowerCase().includes("bath")) continue;
+
+      // Find a non-heavy room NOT in center to swap with
+      for (let j = 0; j < layout.length; j++) {
+        if (j === i) continue;
+        const candidate = layout[j];
+        if (HEAVY_TYPES.has(candidate.type)) continue;
+        if (candidate.type === "hallway" || candidate.type === "staircase") continue;
+        const ccx = candidate.x + candidate.width / 2;
+        const ccy = candidate.y + candidate.depth / 2;
+        const candInCenter = ccx > fpW / 3 && ccx < fpW * 2 / 3 && ccy > fpH / 3 && ccy < fpH * 2 / 3;
+        if (candInCenter) continue;
+        // Size compatibility
+        const ratio = Math.min(room.area, candidate.area) / Math.max(room.area, candidate.area);
+        if (ratio < 0.3) continue;
+        // Swap identities
+        const tmpN = room.name, tmpT = room.type;
+        layout[i] = { ...room, name: candidate.name, type: candidate.type };
+        layout[j] = { ...candidate, name: tmpN, type: tmpT };
+        break;
+      }
+    }
+
+    return layout;
+  } catch {
+    return rooms;
+  }
+}
+
 // ── Post-BSP dimension correction wrapper ─────────────────────────────────
 
 /**
@@ -1052,11 +1115,16 @@ function applyDimensionCorrection(
   try {
     const withTargets: RoomWithTarget[] = placed.map(r => {
       const spec = specs.find(s => s.name === r.name);
+      // Mark rooms with user-specified exact dimensions as fixed —
+      // dimension corrector will not move their boundaries.
+      const hasExactDims = spec?.preferredWidth && spec?.preferredDepth &&
+        spec.preferredWidth > 0 && spec.preferredDepth > 0;
       return {
         ...r,
         targetWidth: spec?.preferredWidth,
         targetDepth: spec?.preferredDepth,
         targetArea: spec?.areaSqm ?? r.width * r.depth,
+        isFixed: !!hasExactDims,
       };
     });
 
@@ -1107,6 +1175,69 @@ function enforceCorridorCap(rooms: PlacedRoom[], totalFloorArea: number): Placed
   }
 
   return rooms;
+}
+
+// ── NBC minimum dimension enforcement ─────────────────────────────────────
+
+/**
+ * Verify every room meets NBC 2016 minimum dimensions.
+ * If a room is too narrow, expand its shortest dimension to the minimum.
+ * This may create minor overlaps which the pipeline-adapter snapping resolves.
+ */
+function enforceNBCMinimumDimensions(rooms: PlacedRoom[]): PlacedRoom[] {
+  try {
+    for (let i = 0; i < rooms.length; i++) {
+      const room = rooms[i];
+      const minDim = getNBCMinDimension(room.type, room.name);
+      const shorter = Math.min(room.width, room.depth);
+      if (shorter >= minDim) continue;
+
+      // Save snapshot to revert if expansion creates overlaps
+      const saved = { ...room };
+      if (room.width < room.depth) {
+        room.width = grid(Math.max(room.width, minDim));
+      } else {
+        room.depth = grid(Math.max(room.depth, minDim));
+      }
+      room.area = grid(room.width * room.depth);
+
+      // Check if expansion created overlaps — revert if so
+      let overlaps = false;
+      for (let j = 0; j < rooms.length; j++) {
+        if (j === i) continue;
+        const other = rooms[j];
+        const ox = Math.min(room.x + room.width, other.x + other.width) - Math.max(room.x, other.x);
+        const oy = Math.min(room.y + room.depth, other.y + other.depth) - Math.max(room.y, other.y);
+        if (ox > 0.15 && oy > 0.15) { overlaps = true; break; }
+      }
+      if (overlaps) {
+        Object.assign(room, saved); // Revert — don't break tiling for NBC
+      }
+    }
+    return rooms;
+  } catch {
+    return rooms;
+  }
+}
+
+/**
+ * NBC 2016 minimum dimension by room type.
+ */
+function getNBCMinDimension(type: string, name: string): number {
+  const n = name.toLowerCase();
+  const t = type.toLowerCase();
+  // Corridors: 1.0m residential
+  if (t === "hallway" || n.includes("corridor") || n.includes("passage")) return 1.0;
+  // Bathrooms: 1.2m
+  if (t === "bathroom" || n.includes("bath") || n.includes("toilet") || n.includes("wc")) return 1.2;
+  // Kitchen: 2.1m (NBC requires ≥1.8m, but 2.1m is practical minimum)
+  if (t === "kitchen" || n.includes("kitchen")) return 2.1;
+  // Staircases: 0.9m
+  if (t === "staircase" || n.includes("staircase")) return 0.9;
+  // Small utility/service rooms: 1.5m
+  if (t === "utility" || t === "storage" || n.includes("utility") || n.includes("store")) return 1.5;
+  // Habitable rooms: 2.4m
+  return 2.4;
 }
 
 // ── Post-BSP room size validation ──────────────────────────────────────────

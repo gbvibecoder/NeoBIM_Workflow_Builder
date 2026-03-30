@@ -638,6 +638,57 @@ export function smartPlaceWindows(floor: Floor): WindowPlacementResult {
       }
     }
 
+    // ── Cross-ventilation pass: large rooms (>15 sqm) need windows on 2+ walls ──
+    // Count how many walls have windows placed
+    try {
+      const wallsWithWindows = new Set(
+        windows.filter(w => {
+          const rWallIds = new Set(room.wall_ids);
+          return rWallIds.has(w.wall_id);
+        }).map(w => w.wall_id)
+      );
+      const needsCrossVent = room.area_sqm > 15 && wallsWithWindows.size < 2;
+      if (needsCrossVent) {
+        // Try to add a window on a second exterior wall
+        for (const wall of sortedWalls) {
+          if (wallsWithWindows.has(wall.id)) continue; // Already has window
+          const wLen = wallLength(wall);
+          const winWidth = spec.width;
+          const minPos = 600;
+          const maxPos = wLen - winWidth - 600;
+          if (maxPos < minPos) continue;
+          const idealPos = (wLen - winWidth) / 2;
+          const candidate = Math.max(minPos, Math.min(idealPos, maxPos));
+          const used = usedSegments.get(wall.id) ?? [];
+          const fits = used.every(
+            (seg) => candidate + winWidth + 500 <= seg.start || candidate >= seg.end + 500
+          );
+          if (fits) {
+            const win: CadWindow = {
+              id: genId("win"),
+              wall_id: wall.id,
+              type: spec.type,
+              width_mm: winWidth,
+              height_mm: spec.height,
+              sill_height_mm: spec.sill,
+              position_along_wall_mm: candidate,
+              symbol: {
+                start_point: { x: 0, y: 0 },
+                end_point: { x: winWidth, y: 0 },
+                glass_lines: [],
+              },
+              glazing: "double",
+              operable: spec.type !== "fixed",
+            };
+            windows.push(win);
+            markUsed(wall.id, candidate, winWidth, usedSegments);
+            placedWindowArea += winWidth * spec.height;
+            break; // One additional wall is enough
+          }
+        }
+      }
+    } catch { /* cross-vent is best-effort */ }
+
     // Check ventilation compliance — NBC 2016 minimum: 1/10 of floor area
     // (distinct from IS:1038 daylighting target of 1/6 used above for placement)
     const roomFloorArea_sqm = room.area_sqm;
