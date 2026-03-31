@@ -2131,28 +2131,65 @@ export async function generateFloorPlan(
     const typology = d.buildingType ?? "Residential";
     const floorPlate = Math.round(totalArea / floors);
 
-    // ── PRIMARY PATH: Deterministic layout engine ─────────────────────
-    // If we have a structured room program from Stage 1, use the BSP engine.
-    // This produces architecturally correct layouts without any AI calls.
-    // Falls through to GPT-4o if the engine fails or isn't available.
+    // ── PRIMARY PATH: AI Spatial Layout (GPT-4o) ──────────────────────
+    // GPT-4o solves ALL constraints simultaneously — room coordinates,
+    // adjacency, NBC compliance, proportions — in a single pass.
+    // Falls back to algorithmic layout if AI fails or is unavailable.
     if (roomProgram) {
+      // Compute footprint for AI
+      const roomAreaSum = roomProgram.rooms.reduce((s, r) => s + r.areaSqm, 0);
+      const fpArea = Math.max(roomProgram.totalAreaSqm, roomAreaSum * 1.08);
+      const defaultAspect = 1.33;
+      const aiFpW = Math.round(Math.sqrt(fpArea * defaultAspect) * 10) / 10;
+      const aiFpH = Math.round((fpArea / aiFpW) * 10) / 10;
+
+      try {
+        const { generateAISpatialLayout } = await import("@/lib/floor-plan/ai-spatial-layout");
+        const aiPlaced = await generateAISpatialLayout(roomProgram, aiFpW, aiFpH, userApiKey);
+
+        if (aiPlaced && aiPlaced.length > 0) {
+          console.log(`[generateFloorPlan] AI spatial layout accepted: ${aiPlaced.length} rooms`);
+
+          const fpWidthM = Math.max(...aiPlaced.map(r => r.x + r.width));
+          const fpHeightM = Math.max(...aiPlaced.map(r => r.y + r.depth));
+          const title = `${typology} — Floor Plan`;
+
+          const posRooms: PositionedRoom[] = aiPlaced.map(r => ({
+            name: r.name, type: r.type, area: r.area,
+            x: r.x, y: r.y, width: r.width, depth: r.depth,
+          }));
+
+          const sharedWalls = findSharedWalls(posRooms);
+          const margin = 50;
+          const drawW = 700;
+          const drawH = 490;
+          const pxPerMeter = Math.min(drawW / fpWidthM, drawH / fpHeightM);
+          const planW = fpWidthM * pxPerMeter;
+          const planH = fpHeightM * pxPerMeter;
+          const ox = margin + (drawW - planW) / 2;
+          const oy = margin + (drawH - planH) / 2;
+
+          const svg = renderArchitecturalSvg(posRooms, sharedWalls, title, pxPerMeter, fpWidthM, fpHeightM, ox, oy);
+          const roomList = posRooms.map(r => ({ name: r.name, area: snap(r.width * r.depth), unit: "m²" }));
+
+          return {
+            svg, roomList, totalArea, floors,
+            positionedRooms: posRooms.map(r => ({
+              name: r.name, type: r.type, x: r.x, y: r.y,
+              width: r.width, depth: r.depth, area: snap(r.width * r.depth),
+            })),
+          };
+        }
+      } catch (aiErr) {
+        console.warn("[generateFloorPlan] AI spatial layout failed:", aiErr instanceof Error ? aiErr.message : aiErr);
+      }
+
+      // ── FALLBACK: Algorithmic layout (BSP/spine) ──────────────────────
+      console.log("[generateFloorPlan] Falling back to algorithmic layout");
       const { layoutFloorPlan } = await import("@/lib/floor-plan/layout-engine");
       const placed = layoutFloorPlan(roomProgram);
 
       if (placed.length > 0) {
-        // Validate (diagnostic only — BSP always produces tiled layouts)
-        const { validateRoomLayout } = await import("@/lib/floor-plan/layout-validator");
-        const validation = validateRoomLayout(
-          placed, placed.reduce((maxX, r) => Math.max(maxX, r.x + r.width), 0),
-          placed.reduce((maxY, r) => Math.max(maxY, r.y + r.depth), 0),
-          roomProgram.adjacency, roomProgram.entranceRoom,
-        );
-        if (validation.score < 80) {
-          console.warn(`[generateFloorPlan] BSP layout validation ${validation.score}/100 — using BSP output (no GPT-4o fallback)`);
-        }
-
-        // Always use BSP — it guarantees zero gaps, zero overlaps, 100% tiling.
-        // GPT-4o fallback was producing floating rooms with 50-60% efficiency.
         const fpWidthM = placed.reduce((mx, r) => Math.max(mx, r.x + r.width), 0);
         const fpHeightM = placed.reduce((mx, r) => Math.max(mx, r.y + r.depth), 0);
         const title = `${typology} — Floor Plan`;
@@ -2163,7 +2200,6 @@ export async function generateFloorPlan(
         }));
 
         const sharedWalls = findSharedWalls(posRooms);
-
         const margin = 50;
         const drawW = 700;
         const drawH = 490;
