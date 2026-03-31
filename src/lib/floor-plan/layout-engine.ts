@@ -160,10 +160,10 @@ export function layoutFloorPlan(program: EnhancedRoomProgram): PlacedRoom[] {
     } catch (err) {
       console.warn("[LAYOUT] Fixed-room placement failed, falling back to BSP:", err);
       // Fall through to normal BSP
-      result = fallbackBSP(rooms, useZones, cls, fpW, fpH, program.adjacency, program.entranceRoom);
+      result = fallbackBSP(rooms, useZones, cls, fpW, fpH, program.adjacency, program.entranceRoom, program);
     }
   } else {
-    result = fallbackBSP(rooms, useZones, cls, fpW, fpH, program.adjacency, program.entranceRoom);
+    result = fallbackBSP(rooms, useZones, cls, fpW, fpH, program.adjacency, program.entranceRoom, program);
   }
 
   // ── Post-BSP room size validation ──
@@ -264,7 +264,17 @@ function fallbackBSP(
   rooms: RoomSpec[], useZones: boolean, cls: ReturnType<typeof classifyRooms>,
   fpW: number, fpH: number, adjacency: AdjacencyRequirement[],
   entranceRoom?: string,
+  program?: EnhancedRoomProgram,
 ): PlacedRoom[] {
+  // ── PRIMARY: Spine-first layout (architecturally-informed placement) ──
+  // Requires both public and private zones, enough rooms, and adequate footprint.
+  const minZoneH = MIN_HABITABLE * 2 + CORRIDOR_DEPTH;
+  if (useZones && program && program.rooms.length >= 8 && fpH >= minZoneH) {
+    const spineResult = layoutWithSpine(program, cls, fpW, fpH);
+    if (spineResult) return spineResult;
+  }
+
+  // ── FALLBACK: BSP zone-based layout ──
   const minZoneHeight = MIN_HABITABLE * 2 + CORRIDOR_DEPTH;
   if (!useZones || fpH < minZoneHeight) {
     return bspSubdivide(rooms, { x: 0, y: 0, w: fpW, h: fpH }, adjacency);
@@ -1648,6 +1658,709 @@ function classifyRooms(rooms: RoomSpec[]): ClassifiedRooms {
     hasPublic: publicZone.length > 0,
     hasPrivate: privateZone.length > 0,
   };
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// SPINE-FIRST LAYOUT ENGINE
+//
+// Replaces BSP's zone-based layout with an architecturally-informed placement
+// strategy. Rooms are area-budgeted first, then placed around a circulation
+// spine (I-shape or L-shape corridor) with bedroom-bathroom pairs as units.
+//
+// Returns PlacedRoom[] identical to BSP output — post-processing unchanged.
+// Falls back to BSP if spine score < 0.50.
+// ══════════════════════════════════════════════════════════════════════════════
+
+// ── Room area standards (NBC 2016 + IS codes + industry practice) ──────────
+
+interface AreaStandard {
+  min: number;
+  ideal: number;
+  max: number;
+  minDim: number;
+  idealAR: number; // ideal width:depth ratio (width / depth)
+}
+
+const AREA_STANDARDS: Record<string, AreaStandard> = {
+  living:    { min: 12.0, ideal: 18.0, max: 25.0, minDim: 3.0, idealAR: 1.3 },
+  dining:    { min:  9.5, ideal: 12.0, max: 18.0, minDim: 3.0, idealAR: 1.3 },
+  kitchen:   { min:  5.5, ideal: 10.0, max: 15.0, minDim: 2.4, idealAR: 1.5 },
+  bedroom:   { min:  9.5, ideal: 13.0, max: 18.0, minDim: 2.7, idealAR: 1.3 },
+  bathroom:  { min:  2.8, ideal:  4.0, max:  6.0, minDim: 1.5, idealAR: 1.5 },
+  office:    { min:  6.0, ideal:  9.0, max: 14.0, minDim: 2.4, idealAR: 1.3 },
+  balcony:   { min:  3.0, ideal:  5.0, max: 10.0, minDim: 1.2, idealAR: 3.0 },
+  utility:   { min:  3.0, ideal:  4.5, max:  8.0, minDim: 1.5, idealAR: 1.5 },
+  staircase: { min:  6.0, ideal:  8.0, max: 12.0, minDim: 2.5, idealAR: 2.0 },
+  entrance:  { min:  3.0, ideal:  5.0, max:  8.0, minDim: 1.5, idealAR: 1.5 },
+  hallway:   { min:  3.0, ideal:  5.0, max: 12.0, minDim: 1.05,idealAR: 5.0 },
+  storage:   { min:  2.0, ideal:  3.5, max:  8.0, minDim: 1.2, idealAR: 1.5 },
+  other:     { min:  2.5, ideal:  5.0, max: 12.0, minDim: 1.5, idealAR: 1.3 },
+};
+
+function getAreaStandard(type: string, name: string): AreaStandard {
+  const n = name.toLowerCase();
+  // Master bedroom gets higher ideal
+  if ((type === "bedroom" || n.includes("master")) && n.includes("master")) {
+    return { min: 12.0, ideal: 16.0, max: 22.0, minDim: 3.0, idealAR: 1.3 };
+  }
+  // Pooja/prayer rooms
+  if (n.includes("pooja") || n.includes("puja") || n.includes("prayer")) {
+    return { min: 2.5, ideal: 3.5, max: 6.0, minDim: 1.5, idealAR: 1.2 };
+  }
+  return AREA_STANDARDS[type] ?? AREA_STANDARDS["other"];
+}
+
+// ── Step 1: Budget room areas ──────────────────────────────────────────────
+
+function budgetRoomAreas(rooms: RoomSpec[], totalAreaSqm: number): RoomSpec[] {
+  const budgeted = rooms.map(r => ({ ...r }));
+  const usableArea = totalAreaSqm * 0.92; // 8% for walls + circulation overhead
+
+  // Assign ideal areas based on room type
+  for (const room of budgeted) {
+    const std = getAreaStandard(room.type, room.name);
+    // If user specified dimensions, respect those
+    if (room.preferredWidth && room.preferredDepth) continue;
+    // Use AI-specified area as hint but clamp to standards
+    room.areaSqm = Math.max(std.min, Math.min(room.areaSqm, std.max));
+  }
+
+  // Scale to fit available area
+  const currentTotal = budgeted.reduce((s, r) => s + r.areaSqm, 0);
+  if (currentTotal > usableArea) {
+    // Scale down proportionally, respecting minimums
+    const scale = usableArea / currentTotal;
+    for (const room of budgeted) {
+      if (room.preferredWidth && room.preferredDepth) continue;
+      const std = getAreaStandard(room.type, room.name);
+      room.areaSqm = Math.max(std.min, grid(room.areaSqm * scale));
+    }
+  } else if (currentTotal < usableArea * 0.8) {
+    // Surplus: distribute to living and bedrooms
+    const surplus = usableArea * 0.9 - currentTotal;
+    const expandable = budgeted.filter(r =>
+      (r.type === "living" || r.type === "bedroom" || r.type === "dining") &&
+      !(r.preferredWidth && r.preferredDepth)
+    );
+    if (expandable.length > 0) {
+      const perRoom = surplus / expandable.length;
+      for (const room of expandable) {
+        const std = getAreaStandard(room.type, room.name);
+        room.areaSqm = Math.min(std.max, grid(room.areaSqm + perRoom));
+      }
+    }
+  }
+
+  // Sanity checks: bathroom < bedroom, kitchen reasonable
+  const smallestBedroom = Math.min(
+    ...budgeted.filter(r => r.type === "bedroom").map(r => r.areaSqm),
+    999
+  );
+  for (const room of budgeted) {
+    if (room.type === "bathroom" && room.areaSqm > smallestBedroom * 0.5) {
+      room.areaSqm = grid(Math.max(3.5, smallestBedroom * 0.35));
+    }
+    if (room.type === "utility" && room.areaSqm > smallestBedroom) {
+      room.areaSqm = grid(Math.min(room.areaSqm, 5.0));
+    }
+  }
+
+  // Cap living room to 20% of total
+  const living = budgeted.find(r => r.type === "living");
+  if (living && living.areaSqm > totalAreaSqm * 0.20) {
+    living.areaSqm = grid(totalAreaSqm * 0.20);
+  }
+
+  return budgeted;
+}
+
+// ── Spine geometry types ───────────────────────────────────────────────────
+
+type SpineShape = "I" | "L";
+
+interface SpineGeometry {
+  shape: SpineShape;
+  corridorRects: Rect[];       // corridor segment rectangles
+  publicWing: Rect;            // region for public rooms
+  privateWing: Rect;           // region for private rooms
+  serviceWing: Rect | null;    // region for service rooms (L-shape only)
+  corridorName: string;
+}
+
+// ── Step 2-3: Generate I-shape spine ───────────────────────────────────────
+
+function generateISpine(
+  fpW: number, fpH: number,
+  publicArea: number, privateArea: number,
+): SpineGeometry {
+  const cw = CORRIDOR_DEPTH; // 1.2m corridor width
+
+  // Public wing on left (~proportional to area), private on right
+  const totalWingArea = publicArea + privateArea;
+  const publicRatio = Math.max(0.35, Math.min(0.65, publicArea / totalWingArea));
+  // Ensure each wing is at least 3.0m wide (enough for a room + corridor)
+  const minWingW = 3.0;
+  const publicW = grid(Math.max(minWingW, (fpW - cw) * publicRatio));
+  const privateW = grid(Math.max(minWingW, fpW - publicW - cw));
+
+  return {
+    shape: "I",
+    corridorRects: [{ x: publicW, y: 0, w: cw, h: fpH }],
+    publicWing: { x: 0, y: 0, w: publicW, h: fpH },
+    privateWing: { x: grid(publicW + cw), y: 0, w: privateW, h: fpH },
+    serviceWing: null,
+    corridorName: "Corridor",
+  };
+}
+
+// ── Step 2-3: Generate L-shape spine ───────────────────────────────────────
+
+function generateLSpine(
+  fpW: number, fpH: number,
+  _publicArea: number, _privateArea: number, _serviceArea: number,
+): SpineGeometry {
+  const cw = CORRIDOR_DEPTH; // 1.2m
+
+  // Horizontal corridor at ~55% height, vertical corridor at ~45% width
+  const hCorrY = grid(fpH * 0.55);
+  const vCorrX = grid(fpW * 0.45);
+
+  // Private wing: full width, above horizontal corridor
+  const privateH = grid(hCorrY);
+  // Public wing: left of vertical corridor, below horizontal corridor
+  const publicH = grid(fpH - hCorrY - cw);
+  const publicW = grid(vCorrX);
+  // Service wing: right of vertical corridor, below horizontal corridor
+  const serviceW = grid(fpW - vCorrX - cw);
+
+  return {
+    shape: "L",
+    corridorRects: [
+      { x: 0, y: hCorrY, w: fpW, h: cw },           // horizontal
+      { x: vCorrX, y: grid(hCorrY + cw), w: cw, h: publicH }, // vertical
+    ],
+    publicWing: { x: 0, y: grid(hCorrY + cw), w: publicW, h: publicH },
+    privateWing: { x: 0, y: 0, w: fpW, h: privateH },
+    serviceWing: { x: grid(vCorrX + cw), y: grid(hCorrY + cw), w: serviceW, h: publicH },
+    corridorName: "Corridor",
+  };
+}
+
+// ── Step 5: Place public rooms in wing (strip placement) ──────────────────
+
+function placePublicRooms(
+  rooms: RoomSpec[], wing: Rect,
+): PlacedRoom[] {
+  if (rooms.length === 0) return [];
+
+  // Order: living → dining → kitchen → entrance → others
+  // This ensures living-dining-kitchen adjacency chain
+  const ORDER: Record<string, number> = {
+    entrance: 0, living: 1, dining: 2, kitchen: 3, balcony: 5,
+  };
+  const sorted = [...rooms].sort((a, b) => {
+    const oa = ORDER[a.type] ?? 4;
+    const ob = ORDER[b.type] ?? 4;
+    if (oa !== ob) return oa - ob;
+    return b.areaSqm - a.areaSqm;
+  });
+
+  const totalArea = sorted.reduce((s, r) => s + r.areaSqm, 0);
+
+  // Try horizontal strips (stack top-to-bottom) AND vertical strips (left-to-right)
+  // Pick whichever gives better aspect ratios
+  const hResult = placeStrips(sorted, wing, totalArea, "horizontal");
+  const vResult = placeStrips(sorted, wing, totalArea, "vertical");
+
+  const hMaxAR = Math.max(...hResult.map(r => ar(r.width, r.depth)));
+  const vMaxAR = Math.max(...vResult.map(r => ar(r.width, r.depth)));
+
+  return (hMaxAR <= vMaxAR) ? hResult : vResult;
+}
+
+/**
+ * Place rooms as strips in a wing region.
+ * "horizontal" = strips stacked vertically (each strip is full-width, variable height)
+ * "vertical" = strips side by side (each strip is full-height, variable width)
+ */
+function placeStrips(
+  rooms: RoomSpec[], wing: Rect, totalArea: number,
+  direction: "horizontal" | "vertical",
+): PlacedRoom[] {
+  const placed: PlacedRoom[] = [];
+  let cursor = 0;
+
+  // Minimum strip size: habitable rooms need ≥2.0m, bathrooms/utility ≥1.2m
+  function minStripSize(type: string): number {
+    if (type === "bathroom" || type === "utility" || type === "storage") return MIN_BATHROOM_DIM;
+    return 2.0;
+  }
+
+  for (let i = 0; i < rooms.length; i++) {
+    const room = rooms[i];
+    const isLast = i === rooms.length - 1;
+    const ratio = room.areaSqm / Math.max(totalArea, 1);
+    const minSize = minStripSize(room.type);
+
+    if (direction === "horizontal") {
+      const stripH = isLast
+        ? grid(wing.h - cursor)
+        : grid(Math.max(minSize, wing.h * ratio));
+      if (stripH <= 0) continue;
+      placed.push({
+        name: room.name, type: room.type,
+        x: grid(wing.x), y: grid(wing.y + cursor),
+        width: grid(wing.w), depth: stripH,
+        area: grid(wing.w * stripH),
+      });
+      cursor += stripH;
+    } else {
+      const stripW = isLast
+        ? grid(wing.w - cursor)
+        : grid(Math.max(minSize, wing.w * ratio));
+      if (stripW <= 0) continue;
+      placed.push({
+        name: room.name, type: room.type,
+        x: grid(wing.x + cursor), y: grid(wing.y),
+        width: stripW, depth: grid(wing.h),
+        area: grid(stripW * wing.h),
+      });
+      cursor += stripW;
+    }
+  }
+
+  return placed;
+}
+
+// ── Step 6: Place private pairs (bedroom + bathroom as units) ──────────────
+
+function placePrivatePairs(
+  rooms: RoomSpec[],
+  wing: Rect,
+  adjacency: AdjacencyRequirement[],
+): PlacedRoom[] {
+  if (rooms.length === 0) return [];
+
+  // Separate bedrooms, bathrooms, and others
+  const bedrooms = rooms.filter(r =>
+    r.type === "bedroom" || r.name.toLowerCase().includes("bedroom") ||
+    r.name.toLowerCase().includes("master")
+  );
+  const bathrooms = rooms.filter(r =>
+    r.type === "bathroom" || r.name.toLowerCase().includes("bath") ||
+    r.name.toLowerCase().includes("toilet")
+  );
+  const others = rooms.filter(r => !bedrooms.includes(r) && !bathrooms.includes(r));
+
+  // Pair bedrooms with bathrooms using adjacency hints
+  const pairs: Array<{ bed: RoomSpec; bath: RoomSpec | null }> = [];
+  const usedBaths = new Set<RoomSpec>();
+
+  // Sort bedrooms: master first
+  const sortedBeds = [...bedrooms].sort((a, b) => {
+    const am = a.name.toLowerCase().includes("master") ? 1 : 0;
+    const bm = b.name.toLowerCase().includes("master") ? 1 : 0;
+    if (am !== bm) return bm - am;
+    return b.areaSqm - a.areaSqm;
+  });
+
+  for (const bed of sortedBeds) {
+    // Try adjacency-specified match first
+    let match: RoomSpec | null = null;
+    for (const adj of adjacency) {
+      const bathName = adj.roomA === bed.name ? adj.roomB :
+                       adj.roomB === bed.name ? adj.roomA : null;
+      if (bathName) {
+        match = bathrooms.find(b => b.name === bathName && !usedBaths.has(b)) ?? null;
+        if (match) break;
+      }
+    }
+    if (!match) match = bathrooms.find(b => !usedBaths.has(b)) ?? null;
+    if (match) usedBaths.add(match);
+    pairs.push({ bed, bath: match });
+  }
+
+  // Unpaired bathrooms and others go into a remainder list
+  const remainder = [
+    ...bathrooms.filter(b => !usedBaths.has(b)),
+    ...others,
+  ];
+
+  // Calculate total area for strip sizing
+  const totalPairArea = pairs.reduce((s, p) =>
+    s + p.bed.areaSqm + (p.bath?.areaSqm ?? 0), 0);
+  const remainderArea = remainder.reduce((s, r) => s + r.areaSqm, 0);
+  const totalArea = totalPairArea + remainderArea;
+
+  const placed: PlacedRoom[] = [];
+
+  // Decide strip direction: vertical strips if wing is wide, horizontal if tall
+  const useVerticalStrips = wing.w >= wing.h * 1.2;
+
+  let cursor = 0;
+
+  for (let i = 0; i < pairs.length; i++) {
+    const { bed, bath } = pairs[i];
+    const unitArea = bed.areaSqm + (bath?.areaSqm ?? 0);
+    const ratio = unitArea / Math.max(totalArea, 1);
+    const isLast = i === pairs.length - 1 && remainder.length === 0;
+
+    if (useVerticalStrips) {
+      // Vertical strip: bedroom on top (exterior), bathroom bottom (corridor side)
+      const stripW = isLast
+        ? grid(wing.w - cursor)
+        : grid(Math.max(MIN_STRIP_WIDTH, wing.w * ratio));
+      if (stripW <= 0) continue;
+
+      if (bath) {
+        // Bathroom depth: proportional to area but capped for reasonable AR
+        const bathRatio = bath.areaSqm / (bed.areaSqm + bath.areaSqm);
+        // Ensure bathroom is at least 1.5m deep AND width:depth ≤ 3.0
+        const minBathDepth = Math.max(MIN_BATHROOM_DIM, stripW / 3.0, 1.5);
+        const bathDepth = grid(Math.max(minBathDepth, wing.h * bathRatio));
+        const bedDepth = grid(wing.h - bathDepth);
+
+        // Bedroom: full strip width, upper portion (exterior wall at top)
+        placed.push({
+          name: bed.name, type: bed.type,
+          x: grid(wing.x + cursor), y: grid(wing.y),
+          width: stripW, depth: bedDepth,
+          area: grid(stripW * bedDepth),
+        });
+        // Bathroom: full strip width, lower portion (near corridor)
+        placed.push({
+          name: bath.name, type: bath.type,
+          x: grid(wing.x + cursor), y: grid(wing.y + bedDepth),
+          width: stripW, depth: bathDepth,
+          area: grid(stripW * bathDepth),
+        });
+      } else {
+        // No bathroom — bedroom fills entire strip
+        placed.push({
+          name: bed.name, type: bed.type,
+          x: grid(wing.x + cursor), y: grid(wing.y),
+          width: stripW, depth: grid(wing.h),
+          area: grid(stripW * wing.h),
+        });
+      }
+      cursor += stripW;
+    } else {
+      // Horizontal strip: bedroom left (exterior), bathroom right (corridor side)
+      const stripH = isLast
+        ? grid(wing.h - cursor)
+        : grid(Math.max(MIN_STRIP_WIDTH, wing.h * ratio));
+      if (stripH <= 0) continue;
+
+      if (bath) {
+        const bathRatio = bath.areaSqm / (bed.areaSqm + bath.areaSqm);
+        const bathWidth = grid(Math.max(MIN_BATHROOM_DIM, wing.w * bathRatio));
+        const bedWidth = grid(wing.w - bathWidth);
+
+        placed.push({
+          name: bed.name, type: bed.type,
+          x: grid(wing.x), y: grid(wing.y + cursor),
+          width: bedWidth, depth: stripH,
+          area: grid(bedWidth * stripH),
+        });
+        placed.push({
+          name: bath.name, type: bath.type,
+          x: grid(wing.x + bedWidth), y: grid(wing.y + cursor),
+          width: bathWidth, depth: stripH,
+          area: grid(bathWidth * stripH),
+        });
+      } else {
+        placed.push({
+          name: bed.name, type: bed.type,
+          x: grid(wing.x), y: grid(wing.y + cursor),
+          width: grid(wing.w), depth: stripH,
+          area: grid(wing.w * stripH),
+        });
+      }
+      cursor += stripH;
+    }
+  }
+
+  // Place remainder rooms in leftover space
+  if (remainder.length > 0) {
+    const remainderTotal = remainder.reduce((s, r) => s + r.areaSqm, 0);
+    if (useVerticalStrips) {
+      const remW = grid(wing.w - cursor);
+      if (remW >= MIN_BATHROOM_DIM) {
+        const remRect: Rect = { x: grid(wing.x + cursor), y: wing.y, w: remW, h: wing.h };
+        placed.push(...placeStrips(remainder, remRect, remainderTotal, "horizontal"));
+      }
+    } else {
+      const remH = grid(wing.h - cursor);
+      if (remH >= MIN_BATHROOM_DIM) {
+        const remRect: Rect = { x: wing.x, y: grid(wing.y + cursor), w: wing.w, h: remH };
+        placed.push(...placeStrips(remainder, remRect, remainderTotal, "vertical"));
+      }
+    }
+  }
+
+  return placed;
+}
+
+// ── Step 7: Place service rooms ────────────────────────────────────────────
+
+function placeServiceRooms(
+  rooms: RoomSpec[], wing: Rect,
+): PlacedRoom[] {
+  if (rooms.length === 0 || wing.w < MIN_BATHROOM_DIM || wing.h < MIN_BATHROOM_DIM) return [];
+  const totalArea = rooms.reduce((s, r) => s + r.areaSqm, 0);
+  // Use strip placement in whichever direction gives better AR
+  const hResult = placeStrips(rooms, wing, totalArea, "horizontal");
+  const vResult = placeStrips(rooms, wing, totalArea, "vertical");
+  const hMaxAR = Math.max(...hResult.map(r => ar(r.width, r.depth)), 0);
+  const vMaxAR = Math.max(...vResult.map(r => ar(r.width, r.depth)), 0);
+  return (hMaxAR <= vMaxAR) ? hResult : vResult;
+}
+
+// ── Step 8: Validate and score ─────────────────────────────────────────────
+
+interface SpineScore {
+  score: number;
+  issues: string[];
+}
+
+function validateSpine(
+  placed: PlacedRoom[], specs: RoomSpec[], fpW: number, fpH: number,
+  adjacency: AdjacencyRequirement[],
+): SpineScore {
+  let score = 1.0;
+  const issues: string[] = [];
+  const TOL = 0.15;
+
+  // Check rooms within footprint
+  for (const r of placed) {
+    if (r.x < -TOL || r.y < -TOL || r.x + r.width > fpW + TOL || r.y + r.depth > fpH + TOL) {
+      score -= 0.15;
+      issues.push(`${r.name} outside footprint`);
+    }
+  }
+
+  // Check overlaps
+  for (let i = 0; i < placed.length; i++) {
+    for (let j = i + 1; j < placed.length; j++) {
+      const a = placed[i], b = placed[j];
+      const ox = Math.min(a.x + a.width, b.x + b.width) - Math.max(a.x, b.x);
+      const oy = Math.min(a.y + a.depth, b.y + b.depth) - Math.max(a.y, b.y);
+      if (ox > TOL && oy > TOL) {
+        score -= 0.10;
+        issues.push(`Overlap: ${a.name} ∩ ${b.name}`);
+      }
+    }
+  }
+
+  // Check adjacency satisfaction
+  for (const req of adjacency) {
+    const a = placed.find(r => r.name === req.roomA);
+    const b = placed.find(r => r.name === req.roomB);
+    if (!a || !b) continue;
+    if (!roomsShareEdge(a, b, 0.3)) {
+      score -= 0.08;
+      issues.push(`Adjacency miss: ${req.roomA} ↔ ${req.roomB}`);
+    }
+  }
+
+  // Check exterior wall constraint
+  for (const spec of specs) {
+    if (!spec.mustHaveExteriorWall) continue;
+    const room = placed.find(r => r.name === spec.name);
+    if (!room) continue;
+    const onPerimeter = room.x < TOL || room.y < TOL ||
+      Math.abs(room.x + room.width - fpW) < TOL ||
+      Math.abs(room.y + room.depth - fpH) < TOL;
+    if (!onPerimeter) {
+      score -= 0.12;
+      issues.push(`${room.name} needs exterior wall`);
+    }
+  }
+
+  // Check room area accuracy (within ±30% of budget)
+  for (const spec of specs) {
+    const room = placed.find(r => r.name === spec.name);
+    if (!room) continue;
+    const actualArea = room.width * room.depth;
+    const diff = Math.abs(actualArea - spec.areaSqm) / Math.max(spec.areaSqm, 1);
+    if (diff > 0.30) {
+      score -= 0.05;
+      issues.push(`${room.name} area ${actualArea.toFixed(1)}m² vs target ${spec.areaSqm.toFixed(1)}m²`);
+    }
+  }
+
+  // Check aspect ratios
+  for (const room of placed) {
+    if (room.type === "hallway" || room.type === "balcony") continue;
+    const roomAR = ar(room.width, room.depth);
+    const isBath = room.type === "bathroom";
+    const maxAR = isBath ? 3.5 : 3.0;
+    if (roomAR > maxAR) {
+      score -= 0.08;
+      issues.push(`${room.name} AR ${roomAR.toFixed(1)}`);
+    }
+  }
+
+  // Check minimum dimensions (hard fail for habitable rooms)
+  for (const room of placed) {
+    if (room.type === "hallway") continue;
+    const isBath = room.type === "bathroom";
+    const minDim = isBath ? 1.2 : room.type === "kitchen" || room.type === "utility" ? 1.2 : 2.0;
+    const shorter = Math.min(room.width, room.depth);
+    if (shorter < minDim - 0.1) {
+      // Hard penalty for habitable rooms below minimum — forces BSP fallback
+      const penalty = isBath ? 0.08 : 0.20;
+      score -= penalty;
+      issues.push(`${room.name} min dim ${shorter.toFixed(1)}m < ${minDim}m`);
+    }
+  }
+
+  // Check coverage
+  const roomAreaSum = placed.reduce((s, r) => s + r.width * r.depth, 0);
+  const coverage = roomAreaSum / (fpW * fpH);
+  if (coverage < 0.85) {
+    score -= 0.10;
+    issues.push(`Coverage ${(coverage * 100).toFixed(0)}% < 85%`);
+  }
+
+  return { score: Math.max(0, score), issues };
+}
+
+
+// ── Main spine layout function ─────────────────────────────────────────────
+
+function layoutWithSpine(
+  program: EnhancedRoomProgram,
+  cls: ClassifiedRooms,
+  fpW: number,
+  fpH: number,
+): PlacedRoom[] | null {
+  try {
+    const rooms = program.rooms;
+
+    // Step 1: Budget room areas
+    const budgeted = budgetRoomAreas(rooms, program.totalAreaSqm);
+
+    // Re-classify with budgeted areas
+    const publicRooms: RoomSpec[] = [];
+    const privateRooms: RoomSpec[] = [];
+    const serviceRooms: RoomSpec[] = [];
+    let corridorSpec: RoomSpec | null = null;
+
+    for (const r of budgeted) {
+      const name = r.name.toLowerCase();
+      const isCorridor = r.type === "hallway" || name.includes("corridor") || name.includes("passage");
+      const isEntrance = r.type === "entrance" || name.includes("foyer") || name.includes("entrance");
+
+      if (isCorridor) {
+        corridorSpec = r;
+      } else if (isEntrance) {
+        publicRooms.push(r); // entrance goes in public wing
+      } else if (r.type === "living" || r.type === "dining" || r.type === "kitchen") {
+        publicRooms.push(r);
+      } else if (name.includes("dining") || name.includes("drawing")) {
+        publicRooms.push(r);
+      } else if (r.type === "bedroom" || r.type === "bathroom") {
+        privateRooms.push(r);
+      } else if (r.zone === "private") {
+        privateRooms.push(r);
+      } else if (r.type === "utility" || r.type === "storage" || r.zone === "service") {
+        serviceRooms.push(r);
+      } else if (r.type === "balcony") {
+        publicRooms.push(r);
+      } else if (r.type === "staircase") {
+        serviceRooms.push(r);
+      } else {
+        // Default: small rooms → service, larger → public
+        if (r.areaSqm < 6) serviceRooms.push(r);
+        else publicRooms.push(r);
+      }
+    }
+
+    const publicArea = publicRooms.reduce((s, r) => s + r.areaSqm, 0);
+    const privateArea = privateRooms.reduce((s, r) => s + r.areaSqm, 0);
+    const serviceArea = serviceRooms.reduce((s, r) => s + r.areaSqm, 0);
+
+    // Need both public and private rooms for spine layout
+    if (publicRooms.length === 0 || privateRooms.length === 0) return null;
+
+    // Step 2-3: Try spine shapes
+    const shapes: SpineShape[] = rooms.length <= 6 ? ["I", "L"] : ["L", "I"];
+    let bestResult: PlacedRoom[] | null = null;
+    let bestScore = -1;
+
+    for (const shape of shapes) {
+      const spine = shape === "I"
+        ? generateISpine(fpW, fpH, publicArea, privateArea)
+        : generateLSpine(fpW, fpH, publicArea, privateArea, serviceArea);
+
+      const allPlaced: PlacedRoom[] = [];
+
+      // Place corridor — always add one (BSP layoutWithZones does the same)
+      const cr = spine.corridorRects[0];
+      if (cr) {
+        allPlaced.push({
+          name: corridorSpec?.name ?? "Corridor",
+          type: "hallway",
+          x: cr.x, y: cr.y, width: cr.w, depth: cr.h,
+          area: grid(cr.w * cr.h),
+        });
+      }
+
+      // For I-shape: merge service rooms into private wing (no separate service wing)
+      const effectivePrivate = shape === "I"
+        ? [...privateRooms, ...serviceRooms]
+        : privateRooms;
+
+      // Step 5: Place public rooms
+      allPlaced.push(...placePublicRooms(publicRooms, spine.publicWing));
+
+      // Step 6: Place private pairs (+ service rooms in I-shape)
+      allPlaced.push(...placePrivatePairs(effectivePrivate, spine.privateWing, program.adjacency));
+
+      // Step 7: Place service rooms (L-shape only — I-shape merged above)
+      if (shape === "L" && serviceRooms.length > 0 && spine.serviceWing &&
+          spine.serviceWing.w >= MIN_BATHROOM_DIM && spine.serviceWing.h >= MIN_BATHROOM_DIM) {
+        allPlaced.push(...placeServiceRooms(serviceRooms, spine.serviceWing));
+      }
+
+      // Step 8: Validate
+      const { score, issues } = validateSpine(allPlaced, budgeted, fpW, fpH, program.adjacency);
+      console.log(`[SPINE-${shape}] Score: ${score.toFixed(2)}, Issues: ${issues.length > 0 ? issues.join("; ") : "none"}`);
+
+      if (score > bestScore) {
+        bestScore = score;
+        bestResult = [...allPlaced];
+      }
+
+      // Accept immediately if good enough
+      if (score >= 0.75) break;
+    }
+
+    if (bestResult && bestScore >= 0.50) {
+      console.log(`[SPINE] Accepted with score ${bestScore.toFixed(2)} (${bestResult.length} rooms)`);
+
+      // Ensure all input rooms are present in output
+      const outputNames = new Set(bestResult.map(r => r.name));
+      const missing = budgeted.filter(r => !outputNames.has(r.name) &&
+        r.type !== "hallway" && !r.name.toLowerCase().includes("corridor"));
+      if (missing.length > 0) {
+        console.warn(`[SPINE] Missing ${missing.length} rooms: ${missing.map(r => r.name).join(", ")}`);
+        // Force-place missing rooms
+        for (const room of missing) {
+          bestResult.push(forcePlaceRoom(room, fpW, fpH, bestResult));
+        }
+      }
+
+      return bestResult;
+    }
+
+    console.log(`[SPINE] Best score ${bestScore.toFixed(2)} < 0.50, falling back to BSP`);
+    return null;
+  } catch (err) {
+    console.warn("[SPINE] Error, falling back to BSP:", err);
+    return null;
+  }
 }
 
 // ── Zone-based layout ────────────────────────────────────────────────────────
