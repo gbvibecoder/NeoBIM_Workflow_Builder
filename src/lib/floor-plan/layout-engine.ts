@@ -269,7 +269,7 @@ function fallbackBSP(
   // ── PRIMARY: Spine-first layout (architecturally-informed placement) ──
   // Requires both public and private zones, enough rooms, and adequate footprint.
   const minZoneH = MIN_HABITABLE * 2 + CORRIDOR_DEPTH;
-  if (useZones && program && program.rooms.length >= 8 && fpH >= minZoneH) {
+  if (useZones && program && program.rooms.length >= 10 && fpH >= minZoneH) {
     const spineResult = layoutWithSpine(program, cls, fpW, fpH);
     if (spineResult) return spineResult;
   }
@@ -1771,6 +1771,19 @@ function budgetRoomAreas(rooms: RoomSpec[], totalAreaSqm: number): RoomSpec[] {
     living.areaSqm = grid(totalAreaSqm * 0.20);
   }
 
+  // Equalize non-master bedrooms: all should have the SAME budget
+  // This prevents post-processing drift from creating >25% differences
+  const nonMasterBeds = budgeted.filter(r =>
+    r.type === "bedroom" && !r.name.toLowerCase().includes("master") &&
+    !(r.preferredWidth && r.preferredDepth)
+  );
+  if (nonMasterBeds.length >= 2) {
+    const avgArea = grid(nonMasterBeds.reduce((s, r) => s + r.areaSqm, 0) / nonMasterBeds.length);
+    for (const bed of nonMasterBeds) {
+      bed.areaSqm = avgArea;
+    }
+  }
+
   return budgeted;
 }
 
@@ -1847,35 +1860,135 @@ function generateLSpine(
 }
 
 // ── Step 5: Place public rooms in wing (strip placement) ──────────────────
+//
+// FIX 2: Kitchen+Dining treated as a single paired unit and placed together,
+// then split internally. This GUARANTEES they share a wall ≥1.2m.
 
 function placePublicRooms(
   rooms: RoomSpec[], wing: Rect,
 ): PlacedRoom[] {
   if (rooms.length === 0) return [];
 
-  // Order: living → dining → kitchen → entrance → others
-  // This ensures living-dining-kitchen adjacency chain
-  const ORDER: Record<string, number> = {
-    entrance: 0, living: 1, dining: 2, kitchen: 3, balcony: 5,
-  };
-  const sorted = [...rooms].sort((a, b) => {
-    const oa = ORDER[a.type] ?? 4;
-    const ob = ORDER[b.type] ?? 4;
-    if (oa !== ob) return oa - ob;
-    return b.areaSqm - a.areaSqm;
-  });
+  // Identify kitchen, dining, living, and others
+  const kitchen = rooms.find(r => r.type === "kitchen");
+  const dining = rooms.find(r => r.type === "dining" || r.name.toLowerCase().includes("dining"));
+  const living = rooms.find(r => r.type === "living");
+  const others = rooms.filter(r => r !== kitchen && r !== dining && r !== living);
 
-  const totalArea = sorted.reduce((s, r) => s + r.areaSqm, 0);
+  // Build placement units: Kitchen+Dining is ONE unit
+  interface PlacementUnit { rooms: RoomSpec[]; paired: boolean; totalArea: number }
+  const units: PlacementUnit[] = [];
 
-  // Try horizontal strips (stack top-to-bottom) AND vertical strips (left-to-right)
-  // Pick whichever gives better aspect ratios
-  const hResult = placeStrips(sorted, wing, totalArea, "horizontal");
-  const vResult = placeStrips(sorted, wing, totalArea, "vertical");
+  if (living) units.push({ rooms: [living], paired: false, totalArea: living.areaSqm });
+  if (kitchen && dining) {
+    units.push({ rooms: [dining, kitchen], paired: true, totalArea: dining.areaSqm + kitchen.areaSqm });
+  } else {
+    if (dining) units.push({ rooms: [dining], paired: false, totalArea: dining.areaSqm });
+    if (kitchen) units.push({ rooms: [kitchen], paired: false, totalArea: kitchen.areaSqm });
+  }
+  for (const r of others) units.push({ rooms: [r], paired: false, totalArea: r.areaSqm });
 
-  const hMaxAR = Math.max(...hResult.map(r => ar(r.width, r.depth)));
-  const vMaxAR = Math.max(...vResult.map(r => ar(r.width, r.depth)));
+  if (units.length === 0) return [];
 
+  // Divide wing into strips for each unit (try H and V, pick best)
+  const bestResult = placePublicUnits(units, wing);
+  return bestResult;
+}
+
+/**
+ * Place public room units as strips, handling paired kitchen+dining as a single strip
+ * that is split internally.
+ */
+function placePublicUnits(
+  units: Array<{ rooms: RoomSpec[]; paired: boolean; totalArea: number }>,
+  wing: Rect,
+): PlacedRoom[] {
+  // Try both directions
+  const hResult = placePublicUnitsDir(units, wing, "horizontal");
+  const vResult = placePublicUnitsDir(units, wing, "vertical");
+  const hMaxAR = Math.max(...hResult.map(r => ar(r.width, r.depth)), 99);
+  const vMaxAR = Math.max(...vResult.map(r => ar(r.width, r.depth)), 99);
   return (hMaxAR <= vMaxAR) ? hResult : vResult;
+}
+
+function placePublicUnitsDir(
+  units: Array<{ rooms: RoomSpec[]; paired: boolean; totalArea: number }>,
+  wing: Rect,
+  direction: "horizontal" | "vertical",
+): PlacedRoom[] {
+  const placed: PlacedRoom[] = [];
+  const totalArea = units.reduce((s, u) => s + u.totalArea, 0);
+  let cursor = 0;
+
+  for (let i = 0; i < units.length; i++) {
+    const unit = units[i];
+    const isLast = i === units.length - 1;
+    const ratio = unit.totalArea / Math.max(totalArea, 1);
+    const minSize = 2.0;
+
+    if (direction === "horizontal") {
+      const stripH = isLast
+        ? grid(wing.h - cursor)
+        : grid(Math.max(minSize, wing.h * ratio));
+      if (stripH <= 0) continue;
+      const stripRect: Rect = { x: wing.x, y: grid(wing.y + cursor), w: wing.w, h: stripH };
+
+      if (unit.paired && unit.rooms.length === 2) {
+        // Split strip between dining (55%) and kitchen (45%)
+        const splitRatio = unit.rooms[0].areaSqm / (unit.rooms[0].areaSqm + unit.rooms[1].areaSqm);
+        const aW = grid(Math.max(MIN_HABITABLE, wing.w * splitRatio));
+        const bW = grid(wing.w - aW);
+        placed.push({
+          name: unit.rooms[0].name, type: unit.rooms[0].type,
+          x: grid(stripRect.x), y: grid(stripRect.y), width: aW, depth: stripH,
+          area: grid(aW * stripH),
+        });
+        placed.push({
+          name: unit.rooms[1].name, type: unit.rooms[1].type,
+          x: grid(stripRect.x + aW), y: grid(stripRect.y), width: bW, depth: stripH,
+          area: grid(bW * stripH),
+        });
+      } else {
+        placed.push({
+          name: unit.rooms[0].name, type: unit.rooms[0].type,
+          x: grid(stripRect.x), y: grid(stripRect.y), width: grid(wing.w), depth: stripH,
+          area: grid(wing.w * stripH),
+        });
+      }
+      cursor += stripH;
+    } else {
+      const stripW = isLast
+        ? grid(wing.w - cursor)
+        : grid(Math.max(minSize, wing.w * ratio));
+      if (stripW <= 0) continue;
+      const stripRect: Rect = { x: grid(wing.x + cursor), y: wing.y, w: stripW, h: wing.h };
+
+      if (unit.paired && unit.rooms.length === 2) {
+        const splitRatio = unit.rooms[0].areaSqm / (unit.rooms[0].areaSqm + unit.rooms[1].areaSqm);
+        const aH = grid(Math.max(MIN_HABITABLE, wing.h * splitRatio));
+        const bH = grid(wing.h - aH);
+        placed.push({
+          name: unit.rooms[0].name, type: unit.rooms[0].type,
+          x: grid(stripRect.x), y: grid(stripRect.y), width: stripW, depth: aH,
+          area: grid(stripW * aH),
+        });
+        placed.push({
+          name: unit.rooms[1].name, type: unit.rooms[1].type,
+          x: grid(stripRect.x), y: grid(stripRect.y + aH), width: stripW, depth: bH,
+          area: grid(stripW * bH),
+        });
+      } else {
+        placed.push({
+          name: unit.rooms[0].name, type: unit.rooms[0].type,
+          x: grid(stripRect.x), y: grid(wing.y), width: stripW, depth: grid(wing.h),
+          area: grid(stripW * wing.h),
+        });
+      }
+      cursor += stripW;
+    }
+  }
+
+  return placed;
 }
 
 /**
@@ -1933,6 +2046,13 @@ function placeStrips(
 }
 
 // ── Step 6: Place private pairs (bedroom + bathroom as units) ──────────────
+//
+// FIX 1: EQUAL bedroom strip sizes. All non-master bedrooms get the same strip
+// width. Master gets at most 1.25× the normal share. No bedroom should end up
+// at 30m² while another is at 6m².
+//
+// FIX 3: Bathroom sizes CLAMPED to 2.8-5.0m² regardless of strip dimensions.
+// Excess space from bathroom clamping goes back to the paired bedroom.
 
 function placePrivatePairs(
   rooms: RoomSpec[],
@@ -1956,7 +2076,6 @@ function placePrivatePairs(
   const pairs: Array<{ bed: RoomSpec; bath: RoomSpec | null }> = [];
   const usedBaths = new Set<RoomSpec>();
 
-  // Sort bedrooms: master first
   const sortedBeds = [...bedrooms].sort((a, b) => {
     const am = a.name.toLowerCase().includes("master") ? 1 : 0;
     const bm = b.name.toLowerCase().includes("master") ? 1 : 0;
@@ -1965,7 +2084,6 @@ function placePrivatePairs(
   });
 
   for (const bed of sortedBeds) {
-    // Try adjacency-specified match first
     let match: RoomSpec | null = null;
     for (const adj of adjacency) {
       const bathName = adj.roomA === bed.name ? adj.roomB :
@@ -1980,54 +2098,68 @@ function placePrivatePairs(
     pairs.push({ bed, bath: match });
   }
 
-  // Unpaired bathrooms and others go into a remainder list
   const remainder = [
     ...bathrooms.filter(b => !usedBaths.has(b)),
     ...others,
   ];
 
-  // Calculate total area for strip sizing
-  const totalPairArea = pairs.reduce((s, p) =>
-    s + p.bed.areaSqm + (p.bath?.areaSqm ?? 0), 0);
-  const remainderArea = remainder.reduce((s, r) => s + r.areaSqm, 0);
-  const totalArea = totalPairArea + remainderArea;
-
   const placed: PlacedRoom[] = [];
-
-  // Decide strip direction: vertical strips if wing is wide, horizontal if tall
   const useVerticalStrips = wing.w >= wing.h * 1.2;
+
+  // ── FIX 1: EQUAL strip allocation ──
+  // Total units = pairs + (1 for remainder if non-empty)
+  const totalUnits = pairs.length + (remainder.length > 0 ? 1 : 0);
+  if (totalUnits === 0) return [];
+
+  // Find master pair index
+  const masterIdx = pairs.findIndex(p =>
+    p.bed.name.toLowerCase().includes("master") ||
+    (pairs.length > 0 && p.bed.areaSqm === Math.max(...pairs.map(p2 => p2.bed.areaSqm)))
+  );
+
+  // Master gets 1.25× share, all others EQUAL
+  const masterMult = 1.25;
+  const totalDim = useVerticalStrips ? wing.w : wing.h;
+  const hasRemainder = remainder.length > 0;
+  // Remainder strip gets 0.6× share (utility/staircase rooms are smaller)
+  const remainderMult = 0.6;
+  const denominator = (totalUnits - 1) + (masterIdx >= 0 ? masterMult : 1) +
+                      (hasRemainder ? remainderMult - 1 : 0);
+  const normalShare = grid(totalDim / denominator);
+  const masterShare = grid(normalShare * masterMult);
+  const remainderShare = hasRemainder ? grid(normalShare * remainderMult) : 0;
 
   let cursor = 0;
 
   for (let i = 0; i < pairs.length; i++) {
     const { bed, bath } = pairs[i];
-    const unitArea = bed.areaSqm + (bath?.areaSqm ?? 0);
-    const ratio = unitArea / Math.max(totalArea, 1);
-    const isLast = i === pairs.length - 1 && remainder.length === 0;
+    const isLast = i === pairs.length - 1 && !hasRemainder;
+
+    // FIX 1: Equal strips — master gets masterShare, ALL others get normalShare
+    // Never use "remainder" for a bedroom strip — that causes unequal sizing
+    const stripDim = (i === masterIdx) ? masterShare : normalShare;
+
+    if (stripDim <= 0) continue;
 
     if (useVerticalStrips) {
-      // Vertical strip: bedroom on top (exterior), bathroom bottom (corridor side)
-      const stripW = isLast
-        ? grid(wing.w - cursor)
-        : grid(Math.max(MIN_STRIP_WIDTH, wing.w * ratio));
-      if (stripW <= 0) continue;
+      const stripW = grid(Math.max(MIN_STRIP_WIDTH, stripDim));
 
       if (bath) {
-        // Bathroom depth: proportional to area but capped for reasonable AR
-        const bathRatio = bath.areaSqm / (bed.areaSqm + bath.areaSqm);
-        // Ensure bathroom is at least 1.5m deep AND width:depth ≤ 3.0
-        const minBathDepth = Math.max(MIN_BATHROOM_DIM, stripW / 3.0, 1.5);
-        const bathDepth = grid(Math.max(minBathDepth, wing.h * bathRatio));
+        // FIX 3: Calculate bathroom depth from TARGET AREA, not strip proportion
+        // Target: bath.areaSqm, clamped to 2.8-5.0m²
+        const targetBathArea = Math.max(2.8, Math.min(5.0, bath.areaSqm));
+        // bathDepth = targetArea / stripWidth, clamped to minimums
+        let bathDepth = grid(Math.max(1.5, targetBathArea / stripW));
+        // Don't let bathroom take more than 40% of wing height
+        bathDepth = grid(Math.min(bathDepth, wing.h * 0.40));
         const bedDepth = grid(wing.h - bathDepth);
 
-        // Bedroom: full strip width, upper portion (exterior wall at top)
         placed.push({
           name: bed.name, type: bed.type,
           x: grid(wing.x + cursor), y: grid(wing.y),
           width: stripW, depth: bedDepth,
           area: grid(stripW * bedDepth),
         });
-        // Bathroom: full strip width, lower portion (near corridor)
         placed.push({
           name: bath.name, type: bath.type,
           x: grid(wing.x + cursor), y: grid(wing.y + bedDepth),
@@ -2035,7 +2167,6 @@ function placePrivatePairs(
           area: grid(stripW * bathDepth),
         });
       } else {
-        // No bathroom — bedroom fills entire strip
         placed.push({
           name: bed.name, type: bed.type,
           x: grid(wing.x + cursor), y: grid(wing.y),
@@ -2045,15 +2176,12 @@ function placePrivatePairs(
       }
       cursor += stripW;
     } else {
-      // Horizontal strip: bedroom left (exterior), bathroom right (corridor side)
-      const stripH = isLast
-        ? grid(wing.h - cursor)
-        : grid(Math.max(MIN_STRIP_WIDTH, wing.h * ratio));
-      if (stripH <= 0) continue;
+      const stripH = grid(Math.max(MIN_STRIP_WIDTH, stripDim));
 
       if (bath) {
-        const bathRatio = bath.areaSqm / (bed.areaSqm + bath.areaSqm);
-        const bathWidth = grid(Math.max(MIN_BATHROOM_DIM, wing.w * bathRatio));
+        const targetBathArea = Math.max(2.8, Math.min(5.0, bath.areaSqm));
+        let bathWidth = grid(Math.max(1.5, targetBathArea / stripH));
+        bathWidth = grid(Math.min(bathWidth, wing.w * 0.40));
         const bedWidth = grid(wing.w - bathWidth);
 
         placed.push({
@@ -2084,13 +2212,13 @@ function placePrivatePairs(
   if (remainder.length > 0) {
     const remainderTotal = remainder.reduce((s, r) => s + r.areaSqm, 0);
     if (useVerticalStrips) {
-      const remW = grid(wing.w - cursor);
+      const remW = grid(totalDim - cursor);
       if (remW >= MIN_BATHROOM_DIM) {
         const remRect: Rect = { x: grid(wing.x + cursor), y: wing.y, w: remW, h: wing.h };
         placed.push(...placeStrips(remainder, remRect, remainderTotal, "horizontal"));
       }
     } else {
-      const remH = grid(wing.h - cursor);
+      const remH = grid(totalDim - cursor);
       if (remH >= MIN_BATHROOM_DIM) {
         const remRect: Rect = { x: wing.x, y: grid(wing.y + cursor), w: wing.w, h: remH };
         placed.push(...placeStrips(remainder, remRect, remainderTotal, "vertical"));
@@ -2227,6 +2355,52 @@ function validateSpine(
 }
 
 
+// ── Post-spine NBC enforcement ──────────────────────────────────────────────
+//
+// Clamps room dimensions to meet NBC 2016 minimums BEFORE the general pipeline
+// post-processing runs. This catches issues the spine strip placement creates.
+
+function enforceSpineNBC(rooms: PlacedRoom[]): void {
+  for (const room of rooms) {
+    const minDim = Math.min(room.width, room.depth);
+
+    if (room.type === "bedroom") {
+      // NBC: bedrooms ≥ 9.5m², min dimension ≥ 2.4m
+      if (minDim < 2.4) {
+        if (room.width < room.depth) room.width = grid(2.4);
+        else room.depth = grid(2.4);
+        room.area = grid(room.width * room.depth);
+      }
+    }
+
+    if (room.type === "bathroom") {
+      // Clamp bathroom area to max 5.0m²
+      const currentArea = room.width * room.depth;
+      if (currentArea > 5.5) {
+        const scale = Math.sqrt(5.0 / currentArea);
+        room.width = grid(Math.max(1.5, room.width * scale));
+        room.depth = grid(Math.max(1.5, room.depth * scale));
+        room.area = grid(room.width * room.depth);
+      }
+      // Minimum dimension 1.5m
+      if (Math.min(room.width, room.depth) < 1.5) {
+        if (room.width < room.depth) room.width = grid(1.5);
+        else room.depth = grid(1.5);
+        room.area = grid(room.width * room.depth);
+      }
+    }
+
+    if (room.type === "kitchen") {
+      // NBC: kitchen min dimension ≥ 2.1m (practical: 2.4m)
+      if (minDim < 2.1) {
+        if (room.width < room.depth) room.width = grid(2.1);
+        else room.depth = grid(2.1);
+        room.area = grid(room.width * room.depth);
+      }
+    }
+  }
+}
+
 // ── Main spine layout function ─────────────────────────────────────────────
 
 function layoutWithSpine(
@@ -2340,13 +2514,15 @@ function layoutWithSpine(
     if (bestResult && bestScore >= 0.50) {
       console.log(`[SPINE] Accepted with score ${bestScore.toFixed(2)} (${bestResult.length} rooms)`);
 
+      // ── Post-spine NBC enforcement (within spine, before pipeline post-processing) ──
+      enforceSpineNBC(bestResult);
+
       // Ensure all input rooms are present in output
       const outputNames = new Set(bestResult.map(r => r.name));
       const missing = budgeted.filter(r => !outputNames.has(r.name) &&
         r.type !== "hallway" && !r.name.toLowerCase().includes("corridor"));
       if (missing.length > 0) {
         console.warn(`[SPINE] Missing ${missing.length} rooms: ${missing.map(r => r.name).join(", ")}`);
-        // Force-place missing rooms
         for (const room of missing) {
           bestResult.push(forcePlaceRoom(room, fpW, fpH, bestResult));
         }
