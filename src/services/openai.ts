@@ -2131,28 +2131,24 @@ export async function generateFloorPlan(
     const typology = d.buildingType ?? "Residential";
     const floorPlate = Math.round(totalArea / floors);
 
-    // ── PRIMARY PATH: AI Spatial Layout (GPT-4o) ──────────────────────
-    // GPT-4o solves ALL constraints simultaneously — room coordinates,
-    // adjacency, NBC compliance, proportions — in a single pass.
-    // Falls back to algorithmic layout if AI fails or is unavailable.
+    // ── PRIMARY PATH: Grid Topology Layout ─────────────────────────────
+    // GPT-4o places rooms on a grid (row/col) — no coordinate math.
+    // Algorithm converts grid to exact coordinates — no gaps, no overlaps.
     if (roomProgram) {
-      // Compute footprint for AI
       const roomAreaSum = roomProgram.rooms.reduce((s, r) => s + r.areaSqm, 0);
       const fpArea = Math.max(roomProgram.totalAreaSqm, roomAreaSum * 1.08);
       const defaultAspect = 1.33;
-      const aiFpW = Math.round(Math.sqrt(fpArea * defaultAspect) * 10) / 10;
-      const aiFpH = Math.round((fpArea / aiFpW) * 10) / 10;
+      const gridFpW = Math.round(Math.sqrt(fpArea * defaultAspect) * 10) / 10;
+      const gridFpH = Math.round((fpArea / gridFpW) * 10) / 10;
 
       try {
-        const { generateAISpatialLayout } = await import("@/lib/floor-plan/ai-spatial-layout");
-        const aiPlaced = await generateAISpatialLayout(roomProgram, aiFpW, aiFpH, userApiKey);
+        const { generateGridLayout } = await import("@/lib/floor-plan/grid-layout");
+        const gridPlaced = await generateGridLayout(roomProgram, gridFpW, gridFpH, userApiKey);
 
-        if (aiPlaced && aiPlaced.length > 0) {
-          // Run hard constraint safety net on AI output too
+        if (gridPlaced && gridPlaced.length > 0) {
           const { enforceHardAreaConstraints } = await import("@/lib/floor-plan/layout-engine");
-          const safePlaced = enforceHardAreaConstraints(aiPlaced);
-          console.log(`[generateFloorPlan] ★★★ USING AI SPATIAL LAYOUT ★★★ ${safePlaced.length} rooms`);
-          console.log(`[generateFloorPlan] Room sizes:`, safePlaced.map(r => `${r.name}: ${r.width.toFixed(1)}×${r.depth.toFixed(1)}=${(r.width*r.depth).toFixed(1)}m²`).join(", "));
+          const safePlaced = enforceHardAreaConstraints(gridPlaced);
+          console.log(`[generateFloorPlan] ★★★ USING GRID TOPOLOGY LAYOUT ★★★ ${safePlaced.length} rooms`);
 
           const fpWidthM = Math.max(...safePlaced.map(r => r.x + r.width));
           const fpHeightM = Math.max(...safePlaced.map(r => r.y + r.depth));
@@ -2184,12 +2180,12 @@ export async function generateFloorPlan(
             })),
           };
         }
-      } catch (aiErr) {
-        console.warn("[generateFloorPlan] AI spatial layout failed:", aiErr instanceof Error ? aiErr.message : aiErr);
+      } catch (gridErr) {
+        console.warn("[generateFloorPlan] Grid layout failed:", gridErr instanceof Error ? gridErr.message : gridErr);
       }
 
       // ── FALLBACK: Algorithmic layout (BSP/spine) ──────────────────────
-      console.log("[generateFloorPlan] ⚠️ FALLING BACK TO BSP/SPINE (AI spatial failed or unavailable)");
+      console.log("[generateFloorPlan] ⚠️ FALLING BACK TO BSP/SPINE");
       const { layoutFloorPlan } = await import("@/lib/floor-plan/layout-engine");
       const placed = layoutFloorPlan(roomProgram);
 
