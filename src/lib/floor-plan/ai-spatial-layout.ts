@@ -1,186 +1,148 @@
 /**
  * AI Spatial Layout — GPT-4o-powered room coordinate generation
  *
- * Replaces algorithmic layout (BSP/spine) with AI spatial reasoning.
  * GPT-4o sees ALL rooms + constraints simultaneously and outputs
  * exact (x, y, width, depth) coordinates for every room.
  *
- * Includes validation + retry with error feedback (max 2 retries).
- * Falls back to algorithmic layout if AI fails or is unavailable.
- *
- * Integration: Called from layoutFloorPlan() as primary path.
- * Returns PlacedRoom[] identical to BSP output format.
+ * Validation + retry with SPECIFIC error feedback (max 2 retries).
+ * Gap-closing pass after acceptance to fix GPT-4o coordinate drift.
+ * Falls back to algorithmic layout if AI fails.
  */
 
 import { getClient } from "@/services/openai";
-import type { EnhancedRoomProgram, RoomSpec, AdjacencyRequirement } from "./ai-room-programmer";
+import type { EnhancedRoomProgram, RoomSpec } from "./ai-room-programmer";
 import type { PlacedRoom } from "./layout-engine";
 
-// ── Grid snap (match layout-engine) ────────────────────────────────────────
+// ── Grid snap ──────────────────────────────────────────────────────────────
 
 const GRID = 0.1;
-
 function grid(v: number): number {
   return Math.round(v / GRID) * GRID;
 }
 
 // ── System prompt ──────────────────────────────────────────────────────────
 
-const SPATIAL_SYSTEM_PROMPT = `You are an expert Indian residential architect with 25 years of experience designing floor plans that comply with NBC 2016 and IS codes. You specialize in space-efficient layouts for Indian homes.
-
-Your task: Given a building footprint and room program, output the EXACT coordinates (x, y, width, depth) for every room so that the plan is architecturally sound and NBC compliant.
+const SPATIAL_SYSTEM_PROMPT = `You are an expert Indian residential architect. Given a building footprint and room program, output EXACT coordinates for every room.
 
 COORDINATE SYSTEM:
-- Origin (0,0) is the TOP-LEFT corner of the footprint (Y increases downward)
-- X increases rightward (East)
-- Y increases downward (South)
-- All dimensions in METERS, rounded to nearest 0.10m
-- Entry facade is at y=footprintDepth (bottom edge) unless specified otherwise
+- Origin (0,0) = TOP-LEFT of footprint. X → right. Y → down. All in METERS, rounded to 0.10m.
 
-MANDATORY NBC 2016 RULES (you MUST satisfy ALL of these):
-- Living Room: min area 9.5 sq.m, min dimension 2.4m, ideal 12-20 sq.m
-- Dining Room: min area 9.5 sq.m, min dimension 2.4m, ideal 10-14 sq.m
-- Kitchen: min area 5.5 sq.m, min dimension 2.1m, ideal 8-12 sq.m
-- Bedroom: min area 9.5 sq.m, min dimension 2.7m, ideal 10-16 sq.m
-- Master Bedroom: min area 12.0 sq.m, min dimension 3.0m, ideal 14-18 sq.m
-- Bathroom: min area 2.8 sq.m, min dimension 1.5m, MAX 5.0 sq.m
-- Study/Office: min area 6.0 sq.m, min dimension 2.4m
-- Corridor: min width 1.2m
-- Balcony: min depth 1.2m
-- Staircase: min 2.5m x 3.0m
+ABSOLUTE NBC 2016 RULES — EVERY room MUST meet these or the plan is REJECTED:
+- Living Room: area >= 9.5 sq.m, min(width,depth) >= 2.4m
+- Dining Room: area >= 9.5 sq.m, min(width,depth) >= 2.4m
+- Kitchen: area >= 5.5 sq.m, min(width,depth) >= 2.1m
+- ANY Bedroom: area >= 9.5 sq.m, min(width,depth) >= 2.7m
+- Master Bedroom: area >= 12.0 sq.m, min(width,depth) >= 3.0m
+- Bathroom: area >= 2.8 AND <= 5.0 sq.m, min(width,depth) >= 1.5m
+- Study/Office: area >= 6.0 sq.m, min(width,depth) >= 2.4m
+- Corridor: width >= 1.2m
 
-ARCHITECTURAL RULES (you MUST follow ALL of these):
-1. ADJACENCY: Kitchen MUST share a wall (touching rectangles) with Dining Room. Dining MUST touch Living Room. Each Bedroom MUST touch its paired Bathroom.
-2. EXTERIOR WALLS: Living Room, ALL Bedrooms, Kitchen, and Dining MUST touch at least one footprint edge (x=0, x=fpW, y=0, or y=fpH).
-3. CIRCULATION: Include a corridor connecting entry to all zones. No room accessible only through another private room.
-4. ENTRY SEQUENCE: Foyer/entrance near entry edge. Living Room near entry. Bedrooms away from entry (privacy gradient).
-5. PROPORTIONS: No habitable room aspect ratio > 2.0 (except corridor and balcony).
-6. NO OVERLAPS: Rooms may touch (share a wall) but must NOT overlap. Two rooms overlap if their rectangles intersect with area > 0.
-7. COMPLETE TILING: Rooms should fill >=85% of footprint. Minimize gaps.
-8. BATHROOM SIZE: Every bathroom MUST be 2.8-5.0 sq.m. No bathroom may be larger than any bedroom.
+SIZE PRIORITY (if space is tight, reduce in this order):
+1. NEVER reduce Bedrooms below 9.5 sq.m — this is the #1 rule
+2. Reduce Study/Utility FIRST (study needs only 6-8 sq.m, utility 3-5 sq.m)
+3. Reduce Balcony to minimum 3 sq.m
+4. Reduce Kitchen toward 7 sq.m (never below 5.5)
+5. Reduce Dining toward 9.5 sq.m (never below 9.5)
+6. NEVER let any Bathroom exceed 5.0 sq.m
 
-DESIGN PRINCIPLES:
-- Public zone (living, dining, kitchen) near entry, grouped together
-- Private zone (bedrooms, bathrooms) away from entry, grouped together
-- Service rooms (utility, storage) can be interior
-- Kitchen and bathrooms share plumbing walls where possible
-- Living room gets maximum facade exposure for light and ventilation
+WALL SHARING — THIS IS CRITICAL:
+- Adjacent rooms MUST share an edge. If Room A ends at x=4.70, Room B MUST start at x=4.70 (not 5.20).
+- NO GAPS between rooms. Every room edge must either touch another room or the footprint boundary.
+- Rooms should tile together like puzzle pieces filling the entire footprint.
+- The sum of all room areas must be >= 85% of footprint area.
 
-OUTPUT FORMAT — Respond with ONLY a JSON object, no markdown, no explanation:
-{
-  "rooms": [
-    {"name": "Living Room", "type": "living", "x": 0.0, "y": 0.0, "width": 4.50, "depth": 3.80},
-    {"name": "Kitchen", "type": "kitchen", "x": 4.50, "y": 0.0, "width": 3.00, "depth": 3.00}
-  ]
+ARCHITECTURAL RULES:
+1. Kitchen MUST share a wall with Dining Room
+2. Dining MUST share a wall with Living Room
+3. Each Bedroom MUST share a wall with its paired Bathroom
+4. Living Room, ALL Bedrooms, Kitchen, Dining MUST touch at least one footprint edge
+5. Include a corridor connecting public and private zones
+6. No habitable room aspect ratio > 2.0 (except corridor/balcony)
+
+OUTPUT FORMAT — ONLY JSON, no markdown, no explanation:
+{"rooms": [{"name": "Room Name", "type": "room_type", "x": 0.0, "y": 0.0, "width": 4.0, "depth": 3.5}]}
+
+SELF-CHECK before responding — verify EACH room:
+1. width * depth >= NBC minimum area for that room type?
+2. min(width, depth) >= NBC minimum dimension?
+3. Bathrooms area <= 5.0 sq.m?
+4. No bedroom < 9.5 sq.m?
+5. Kitchen touching Dining? Each Bedroom touching its Bathroom?
+6. No overlaps? No gaps between adjacent rooms?
+7. All rooms fit within [0, fpW] x [0, fpH]?
+
+If ANY check fails, FIX your coordinates before responding.`;
+
+// ── NBC lookup (uses BOTH type and name for reliability) ───────────────────
+
+function getNBCMin(type: string, name: string): { minArea: number; minDim: number; maxArea?: number } {
+  const n = name.toLowerCase();
+  // Name-based detection first (more reliable than GPT-returned type)
+  if (n.includes("master") && (n.includes("bed") || type === "bedroom"))
+    return { minArea: 12.0, minDim: 3.0 };
+  if (n.includes("bed") || type === "bedroom")
+    return { minArea: 9.5, minDim: 2.7 };
+  if (n.includes("bath") || n.includes("toilet") || n.includes("wc") || type === "bathroom")
+    return { minArea: 2.8, minDim: 1.5, maxArea: 5.0 };
+  if (n.includes("living") || type === "living")
+    return { minArea: 9.5, minDim: 2.4 };
+  if (n.includes("dining") || type === "dining")
+    return { minArea: 9.5, minDim: 2.4 };
+  if (n.includes("kitchen") || type === "kitchen")
+    return { minArea: 5.5, minDim: 2.1 };
+  if (n.includes("study") || n.includes("office") || type === "office")
+    return { minArea: 6.0, minDim: 2.4 };
+  if (n.includes("corridor") || n.includes("hallway") || type === "hallway")
+    return { minArea: 2.0, minDim: 1.05 };
+  if (n.includes("staircase") || type === "staircase")
+    return { minArea: 6.0, minDim: 2.5 };
+  if (n.includes("balcony") || type === "balcony")
+    return { minArea: 2.0, minDim: 1.2 };
+  if (n.includes("foyer") || n.includes("entrance") || type === "entrance")
+    return { minArea: 2.5, minDim: 1.5 };
+  return { minArea: 2.5, minDim: 1.2 };
 }
-
-BEFORE outputting, mentally verify ALL of these (fix any that fail):
-1. Every room area (width x depth) >= NBC minimum for its type?
-2. Every room min(width, depth) >= NBC minimum dimension for its type?
-3. Kitchen and Dining rectangles touch (share an edge)?
-4. Every Bedroom rectangle touches its paired Bathroom rectangle?
-5. Living, Bedrooms, Kitchen, Dining all touch a footprint edge?
-6. No two room rectangles overlap (intersect with positive area)?
-7. Every room fits within footprint boundary [0, fpW] x [0, fpH]?
-8. Every bathroom area <= 5.0 sq.m?
-9. Sum of all room areas >= 85% of footprint area?
-10. No habitable room has aspect ratio > 2.0?`;
-
-// ── Few-shot example ───────────────────────────────────────────────────────
-
-const FEW_SHOT_EXAMPLE = `
-EXAMPLE — "3BHK apartment, 1200 sqft" (footprint 13.6m x 8.2m):
-
-{
-  "rooms": [
-    {"name": "Foyer", "type": "entrance", "x": 5.0, "y": 6.7, "width": 1.8, "depth": 1.5},
-    {"name": "Living Room", "type": "living", "x": 0.0, "y": 4.5, "width": 5.0, "depth": 3.7},
-    {"name": "Dining Room", "type": "dining", "x": 0.0, "y": 1.5, "width": 3.8, "depth": 3.0},
-    {"name": "Kitchen", "type": "kitchen", "x": 3.8, "y": 1.5, "width": 3.0, "depth": 3.0},
-    {"name": "Corridor", "type": "hallway", "x": 5.0, "y": 1.5, "width": 1.2, "depth": 5.2},
-    {"name": "Master Bedroom", "type": "bedroom", "x": 6.8, "y": 4.2, "width": 4.0, "depth": 4.0},
-    {"name": "Bathroom 1", "type": "bathroom", "x": 6.8, "y": 2.7, "width": 2.0, "depth": 1.5},
-    {"name": "Bedroom 2", "type": "bedroom", "x": 8.8, "y": 0.0, "width": 4.8, "depth": 3.5},
-    {"name": "Bathroom 2", "type": "bathroom", "x": 6.8, "y": 0.0, "width": 2.0, "depth": 1.5},
-    {"name": "Bedroom 3", "type": "bedroom", "x": 0.0, "y": 0.0, "width": 3.8, "depth": 1.5},
-    {"name": "Bathroom 3", "type": "bathroom", "x": 10.8, "y": 4.2, "width": 1.5, "depth": 2.0},
-    {"name": "Balcony", "type": "balcony", "x": 0.0, "y": 6.7, "width": 3.0, "depth": 1.5}
-  ]
-}
-
-Note: Kitchen touches Dining (shared wall at x=3.8). Each bedroom touches its bathroom. Living room at entry edge. All habitable rooms touch footprint edges.`;
 
 // ── Build user message ─────────────────────────────────────────────────────
 
 function buildUserMessage(
   program: EnhancedRoomProgram,
-  fpW: number,
-  fpH: number,
+  fpW: number, fpH: number,
 ): string {
   const roomTable = program.rooms.map(r => {
     const std = getNBCMin(r.type, r.name);
-    return `- ${r.name} (${r.type}): target ${r.areaSqm.toFixed(1)} sq.m, NBC min ${std.minArea} sq.m / ${std.minDim}m${r.mustHaveExteriorWall ? " [MUST touch exterior]" : ""}`;
+    const maxNote = std.maxArea ? `, MAX ${std.maxArea} sq.m` : "";
+    return `- ${r.name} (${r.type}): target ${r.areaSqm.toFixed(1)} sq.m, NBC min ${std.minArea} sq.m / ${std.minDim}m${maxNote}${r.mustHaveExteriorWall ? " [EXTERIOR WALL REQUIRED]" : ""}`;
   }).join("\n");
 
   const adjList = program.adjacency.map(a =>
-    `- ${a.roomA} ↔ ${a.roomB} (${a.reason}) — MUST share a wall`
+    `- ${a.roomA} ↔ ${a.roomB} (${a.reason}) — rooms MUST share a wall (touching edges)`
   ).join("\n");
 
   const vastuLine = program.isVastuRequested
-    ? "VASTU REQUESTED: Kitchen in SE, Master Bedroom in SW, Pooja in NE, Living in N/E, Entrance from N or E preferred."
+    ? "\nVASTU: Kitchen in SE, Master Bedroom in SW, Pooja in NE, Living in N/E."
     : "";
 
-  const facingLine = program.facingDirection
-    ? `PLOT FACING: ${program.facingDirection} (entry from ${program.facingDirection})`
-    : "Entry: from bottom edge (y = footprintDepth)";
+  return `Design a floor plan for: ${program.originalPrompt ?? program.projectName}
 
-  return `Design a floor plan for:
-${program.originalPrompt ?? program.projectName}
-
-FOOTPRINT: ${fpW.toFixed(1)}m wide (X) x ${fpH.toFixed(1)}m deep (Y)
+FOOTPRINT: ${fpW.toFixed(1)}m wide x ${fpH.toFixed(1)}m deep (origin top-left, Y-down)
 TOTAL AREA: ${program.totalAreaSqm.toFixed(1)} sq.m
-${facingLine}
 ${vastuLine}
 
-ROOM PROGRAM (${program.rooms.length} rooms):
+ROOMS (${program.rooms.length} rooms — include ALL of them):
 ${roomTable}
 
-ADJACENCY REQUIREMENTS:
-${adjList || "- None specified (use architectural best practices)"}
+ADJACENCY (rooms MUST share a wall — no gaps between them):
+${adjList || "- Use architectural best practices"}
 
-CONSTRAINTS:
-- Footprint boundary: x in [0, ${fpW.toFixed(1)}], y in [0, ${fpH.toFixed(1)}]
-- Every dimension rounded to 0.10m
-- Kitchen MUST touch Dining Room (shared wall)
-- Each Bedroom MUST touch its paired Bathroom (shared wall)
-- Living Room, ALL Bedrooms, Kitchen, Dining MUST touch a footprint edge
-- ALL bathrooms: area between 2.8 and 5.0 sq.m
-- Corridor width >= 1.2m
-- No room overlap allowed
-- Total room area >= ${(fpW * fpH * 0.85).toFixed(1)} sq.m (85% of footprint)
+CRITICAL REMINDERS:
+- Every Bedroom MUST be >= 9.5 sq.m. If space is tight, shrink Study/Utility first.
+- Every Bathroom MUST be <= 5.0 sq.m (typically 2.0m x 2.0m = 4.0 sq.m).
+- Adjacent rooms share edges exactly: if Room A ends at x=4.0, Room B starts at x=4.0.
+- ALL room areas must sum to >= ${(fpW * fpH * 0.85).toFixed(1)} sq.m (85% of footprint).
+- Footprint boundary: x in [0, ${fpW.toFixed(1)}], y in [0, ${fpH.toFixed(1)}].
 
-Output the JSON coordinates for ALL ${program.rooms.length} rooms.${program.rooms.length > 8 ? "\n\n" + FEW_SHOT_EXAMPLE : ""}`;
-}
-
-// ── NBC minimums lookup ────────────────────────────────────────────────────
-
-function getNBCMin(type: string, name: string): { minArea: number; minDim: number } {
-  const n = name.toLowerCase();
-  if (n.includes("master") && (type === "bedroom" || n.includes("bed")))
-    return { minArea: 12.0, minDim: 3.0 };
-  switch (type) {
-    case "living": return { minArea: 9.5, minDim: 2.4 };
-    case "dining": return { minArea: 9.5, minDim: 2.4 };
-    case "kitchen": return { minArea: 5.5, minDim: 2.1 };
-    case "bedroom": return { minArea: 9.5, minDim: 2.7 };
-    case "bathroom": return { minArea: 2.8, minDim: 1.5 };
-    case "office": return { minArea: 6.0, minDim: 2.4 };
-    case "hallway": return { minArea: 2.0, minDim: 1.05 };
-    case "staircase": return { minArea: 6.0, minDim: 2.5 };
-    case "balcony": return { minArea: 2.0, minDim: 1.2 };
-    case "entrance": return { minArea: 2.5, minDim: 1.5 };
-    default: return { minArea: 2.5, minDim: 1.2 };
-  }
+Output JSON with coordinates for all ${program.rooms.length} rooms.`;
 }
 
 // ── Validation ─────────────────────────────────────────────────────────────
@@ -194,18 +156,17 @@ interface ValidationResult {
 
 function validateAILayout(
   rooms: PlacedRoom[],
-  fpW: number,
-  fpH: number,
+  fpW: number, fpH: number,
   program: EnhancedRoomProgram,
 ): ValidationResult {
   const errors: string[] = [];
   const warnings: string[] = [];
-  const TOL = 0.15;
+  const TOL = 0.20; // 200mm tolerance for wall thickness
 
   // 1. All rooms within footprint
   for (const r of rooms) {
     if (r.x < -TOL || r.y < -TOL || r.x + r.width > fpW + TOL || r.y + r.depth > fpH + TOL) {
-      errors.push(`${r.name} outside footprint: (${r.x},${r.y}) ${r.width}x${r.depth}`);
+      errors.push(`${r.name} outside footprint`);
     }
   }
 
@@ -216,61 +177,76 @@ function validateAILayout(
       const ox = Math.min(a.x + a.width, b.x + b.width) - Math.max(a.x, b.x);
       const oy = Math.min(a.y + a.depth, b.y + b.depth) - Math.max(a.y, b.y);
       if (ox > TOL && oy > TOL) {
-        errors.push(`${a.name} overlaps ${b.name} by ${(ox * oy).toFixed(2)}m²`);
+        errors.push(`${a.name} overlaps ${b.name}`);
       }
     }
   }
 
-  // 3. NBC minimum areas and dimensions
+  // 3. NBC minimum areas and dimensions — uses NAME-BASED detection
   for (const r of rooms) {
-    const spec = program.rooms.find(s => s.name === r.name);
     const nbc = getNBCMin(r.type, r.name);
     const area = r.width * r.depth;
     const minDim = Math.min(r.width, r.depth);
 
     if (area < nbc.minArea * 0.95) {
-      errors.push(`${r.name} area ${area.toFixed(1)}m² < NBC min ${nbc.minArea}m²`);
+      // Find the biggest non-bedroom room to suggest stealing from
+      const biggest = rooms
+        .filter(rm => rm.type !== "bedroom" && !rm.name.toLowerCase().includes("bed") &&
+                      rm.type !== "living" && rm.type !== "hallway")
+        .sort((a, b) => (b.width * b.depth) - (a.width * a.depth))[0];
+      const suggestion = biggest
+        ? ` Reduce ${biggest.name} (${(biggest.width * biggest.depth).toFixed(1)}m²) to give space to ${r.name}.`
+        : "";
+      errors.push(`${r.name} area ${area.toFixed(1)}m² < NBC min ${nbc.minArea}m² (needs ${r.name} to be at least ${Math.ceil(nbc.minArea * 10) / 10}m²).${suggestion}`);
     }
     if (minDim < nbc.minDim - 0.05) {
-      errors.push(`${r.name} dim ${minDim.toFixed(2)}m < NBC min ${nbc.minDim}m`);
+      errors.push(`${r.name} min dimension ${minDim.toFixed(2)}m < ${nbc.minDim}m. Make ${r.name} at least ${nbc.minDim}m in both width and depth.`);
+    }
+
+    // Bathroom max area
+    if (nbc.maxArea && area > nbc.maxArea + 0.3) {
+      errors.push(`${r.name} area ${area.toFixed(1)}m² exceeds ${nbc.maxArea}m² max. Shrink ${r.name} to ~${nbc.maxArea.toFixed(1)}m² (e.g., ${Math.sqrt(nbc.maxArea).toFixed(1)}m x ${Math.sqrt(nbc.maxArea).toFixed(1)}m).`);
     }
   }
 
-  // 4. Bathroom max 5.0m² and smaller than every bedroom
-  const bedAreas = rooms.filter(r => r.type === "bedroom").map(r => r.width * r.depth);
+  // 4. No bathroom larger than smallest bedroom
+  const bedAreas = rooms
+    .filter(r => r.type === "bedroom" || r.name.toLowerCase().includes("bed"))
+    .map(r => r.width * r.depth);
   const minBedArea = bedAreas.length > 0 ? Math.min(...bedAreas) : 999;
   for (const r of rooms) {
-    if (r.type === "bathroom") {
+    if (r.type === "bathroom" || r.name.toLowerCase().includes("bath") || r.name.toLowerCase().includes("toilet")) {
       const area = r.width * r.depth;
-      if (area > 5.5) {
-        errors.push(`${r.name} area ${area.toFixed(1)}m² > 5.5m² max`);
-      }
       if (area > minBedArea && bedAreas.length > 0) {
         errors.push(`${r.name} (${area.toFixed(1)}m²) larger than smallest bedroom (${minBedArea.toFixed(1)}m²)`);
       }
     }
   }
 
-  // 5. Kitchen-Dining adjacency (HARD)
-  const kitchen = rooms.find(r => r.type === "kitchen");
+  // 5. Kitchen-Dining adjacency
+  const kitchen = rooms.find(r => r.type === "kitchen" || r.name.toLowerCase().includes("kitchen"));
   const dining = rooms.find(r => r.type === "dining" || r.name.toLowerCase().includes("dining"));
   if (kitchen && dining && !roomsTouch(kitchen, dining, TOL)) {
-    errors.push("Kitchen and Dining Room do not share a wall");
+    errors.push("Kitchen and Dining Room do not share a wall. Move them so their rectangles touch.");
   }
 
-  // 6. Bedroom-Bathroom adjacency (HARD)
+  // 6. Bedroom-Bathroom adjacency
   for (const adj of program.adjacency) {
     const a = rooms.find(r => r.name === adj.roomA);
     const b = rooms.find(r => r.name === adj.roomB);
     if (!a || !b) continue;
-    const isBedBath = (a.type === "bedroom" && b.type === "bathroom") ||
-                      (a.type === "bathroom" && b.type === "bedroom");
-    if (isBedBath && !roomsTouch(a, b, TOL)) {
-      errors.push(`${adj.roomA} and ${adj.roomB} do not share a wall (${adj.reason})`);
+    const nameA = adj.roomA.toLowerCase();
+    const nameB = adj.roomB.toLowerCase();
+    const isBedBath = (nameA.includes("bed") || nameA.includes("master")) &&
+                      (nameB.includes("bath") || nameB.includes("toilet"));
+    const isBathBed = (nameB.includes("bed") || nameB.includes("master")) &&
+                      (nameA.includes("bath") || nameA.includes("toilet"));
+    if ((isBedBath || isBathBed) && !roomsTouch(a, b, TOL)) {
+      errors.push(`${adj.roomA} and ${adj.roomB} must share a wall but don't touch.`);
     }
   }
 
-  // 7. Exterior wall check
+  // 7. Exterior wall check (warning, not hard error)
   for (const spec of program.rooms) {
     if (!spec.mustHaveExteriorWall) continue;
     const r = rooms.find(rm => rm.name === spec.name);
@@ -279,68 +255,145 @@ function validateAILayout(
       Math.abs(r.x + r.width - fpW) < TOL ||
       Math.abs(r.y + r.depth - fpH) < TOL;
     if (!onEdge) {
-      warnings.push(`${r.name} needs exterior wall but is interior`);
+      warnings.push(`${r.name} should touch a footprint edge for windows`);
     }
   }
 
   // 8. Coverage
   const totalRoomArea = rooms.reduce((s, r) => s + r.width * r.depth, 0);
   const coverage = totalRoomArea / (fpW * fpH);
-  if (coverage < 0.80) {
-    warnings.push(`Coverage ${(coverage * 100).toFixed(0)}% below 85% target`);
+  if (coverage < 0.75) {
+    warnings.push(`Coverage ${(coverage * 100).toFixed(0)}% — rooms have large gaps`);
   }
 
-  // 9. Aspect ratios
-  for (const r of rooms) {
-    if (r.type === "hallway" || r.type === "balcony") continue;
-    const ratio = Math.max(r.width, r.depth) / Math.min(r.width, r.depth);
-    if (ratio > 2.5) {
-      warnings.push(`${r.name} AR ${ratio.toFixed(1)} > 2.0`);
-    }
-  }
-
-  const score = Math.max(0, 1.0 - errors.length * 0.12 - warnings.length * 0.03);
+  const score = Math.max(0, 1.0 - errors.length * 0.15 - warnings.length * 0.03);
   return { valid: errors.length === 0, score, errors, warnings };
 }
 
 function roomsTouch(a: PlacedRoom, b: PlacedRoom, tol: number): boolean {
-  // Horizontal edge touch
   const hTouch =
     (Math.abs((a.y + a.depth) - b.y) < tol || Math.abs((b.y + b.depth) - a.y) < tol) &&
     Math.min(a.x + a.width, b.x + b.width) - Math.max(a.x, b.x) > tol;
-  // Vertical edge touch
   const vTouch =
     (Math.abs((a.x + a.width) - b.x) < tol || Math.abs((b.x + b.width) - a.x) < tol) &&
     Math.min(a.y + a.depth, b.y + b.depth) - Math.max(a.y, b.y) > tol;
   return hTouch || vTouch;
 }
 
+// ── Gap-closing pass ───────────────────────────────────────────────────────
+
+/**
+ * Close gaps between rooms that should be adjacent.
+ * GPT-4o often leaves 0.1-0.5m gaps between rooms. This pass finds
+ * nearby edges and snaps them together, then expands rooms to touch
+ * footprint boundaries.
+ */
+function closeGaps(rooms: PlacedRoom[], fpW: number, fpH: number): PlacedRoom[] {
+  const result = rooms.map(r => ({ ...r }));
+  const GAP_TOL = 0.6; // close gaps up to 600mm
+
+  // Pass 1: Snap nearby edges between room pairs
+  for (let pass = 0; pass < 2; pass++) {
+    for (let i = 0; i < result.length; i++) {
+      for (let j = i + 1; j < result.length; j++) {
+        const a = result[i], b = result[j];
+
+        // Check vertical overlap (for horizontal edge snapping)
+        const vOverlap = Math.min(a.y + a.depth, b.y + b.depth) - Math.max(a.y, b.y);
+        if (vOverlap > 0.3) {
+          // A right edge → B left edge
+          const gapR = b.x - (a.x + a.width);
+          if (gapR > 0.01 && gapR < GAP_TOL) {
+            const mid = grid((a.x + a.width + b.x) / 2);
+            a.width = grid(mid - a.x);
+            b.width = grid(b.x + b.width - mid);
+            b.x = mid;
+          }
+          // B right edge → A left edge
+          const gapL = a.x - (b.x + b.width);
+          if (gapL > 0.01 && gapL < GAP_TOL) {
+            const mid = grid((b.x + b.width + a.x) / 2);
+            b.width = grid(mid - b.x);
+            a.width = grid(a.x + a.width - mid);
+            a.x = mid;
+          }
+        }
+
+        // Check horizontal overlap (for vertical edge snapping)
+        const hOverlap = Math.min(a.x + a.width, b.x + b.width) - Math.max(a.x, b.x);
+        if (hOverlap > 0.3) {
+          // A bottom edge → B top edge
+          const gapB = b.y - (a.y + a.depth);
+          if (gapB > 0.01 && gapB < GAP_TOL) {
+            const mid = grid((a.y + a.depth + b.y) / 2);
+            a.depth = grid(mid - a.y);
+            b.depth = grid(b.y + b.depth - mid);
+            b.y = mid;
+          }
+          // B bottom edge → A top edge
+          const gapT = a.y - (b.y + b.depth);
+          if (gapT > 0.01 && gapT < GAP_TOL) {
+            const mid = grid((b.y + b.depth + a.y) / 2);
+            b.depth = grid(mid - b.y);
+            a.depth = grid(a.y + a.depth - mid);
+            a.y = mid;
+          }
+        }
+      }
+    }
+  }
+
+  // Pass 2: Expand rooms to touch footprint edges if close
+  for (const r of result) {
+    if (r.x > 0 && r.x < GAP_TOL) {
+      r.width = grid(r.width + r.x);
+      r.x = 0;
+    }
+    if (r.y > 0 && r.y < GAP_TOL) {
+      r.depth = grid(r.depth + r.y);
+      r.y = 0;
+    }
+    const rightGap = fpW - (r.x + r.width);
+    if (rightGap > 0 && rightGap < GAP_TOL) {
+      r.width = grid(fpW - r.x);
+    }
+    const bottomGap = fpH - (r.y + r.depth);
+    if (bottomGap > 0 && bottomGap < GAP_TOL) {
+      r.depth = grid(fpH - r.y);
+    }
+  }
+
+  // Recompute areas
+  for (const r of result) {
+    r.area = grid(r.width * r.depth);
+  }
+
+  return result;
+}
+
 // ── Parse GPT-4o response ──────────────────────────────────────────────────
 
-function parseAIResponse(content: string, program: EnhancedRoomProgram): PlacedRoom[] | null {
+function parseAIResponse(content: string): PlacedRoom[] | null {
   try {
     const parsed = JSON.parse(content);
     const rawRooms = parsed.rooms;
     if (!Array.isArray(rawRooms) || rawRooms.length === 0) return null;
 
-    const placed: PlacedRoom[] = rawRooms.map((r: Record<string, unknown>) => ({
-      name: String(r.name ?? "Room"),
-      type: String(r.type ?? "other"),
-      x: grid(Number(r.x ?? 0)),
-      y: grid(Number(r.y ?? 0)),
-      width: grid(Number(r.width ?? r.w ?? 3)),
-      depth: grid(Number(r.depth ?? r.h ?? 3)),
-      area: 0,
-    }));
-
-    // Compute areas
-    for (const r of placed) {
-      r.area = grid(r.width * r.depth);
-    }
-
-    return placed;
+    return rawRooms.map((r: Record<string, unknown>) => {
+      const w = grid(Number(r.width ?? r.w ?? 3));
+      const d = grid(Number(r.depth ?? r.h ?? r.d ?? 3));
+      return {
+        name: String(r.name ?? "Room"),
+        type: String(r.type ?? "other"),
+        x: grid(Number(r.x ?? 0)),
+        y: grid(Number(r.y ?? 0)),
+        width: w,
+        depth: d,
+        area: grid(w * d),
+      };
+    });
   } catch (err) {
-    console.error("[AI-SPATIAL] Failed to parse response:", err);
+    console.error("[AI-SPATIAL] Parse error:", err);
     return null;
   }
 }
@@ -349,8 +402,7 @@ function parseAIResponse(content: string, program: EnhancedRoomProgram): PlacedR
 
 export async function generateAISpatialLayout(
   program: EnhancedRoomProgram,
-  fpW: number,
-  fpH: number,
+  fpW: number, fpH: number,
   userApiKey?: string,
 ): Promise<PlacedRoom[] | null> {
   const MAX_RETRIES = 2;
@@ -362,14 +414,14 @@ export async function generateAISpatialLayout(
     for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
       const userMessage = buildUserMessage(program, fpW, fpH);
 
-      // On retry, append errors for GPT-4o to fix
+      // On retry, append SPECIFIC errors with fix suggestions
       const retryFeedback = attempt > 0
-        ? `\n\nYour PREVIOUS layout had these ERRORS — you MUST fix ALL of them:\n${lastErrors.map(e => `- ${e}`).join("\n")}\n\nAdjust coordinates to fix every error. Do NOT repeat the same mistakes.`
+        ? `\n\n--- ERRORS IN YOUR PREVIOUS ATTEMPT (you MUST fix ALL) ---\n${lastErrors.map((e, i) => `${i + 1}. ${e}`).join("\n")}\n\nFix every error above. Remember: bedrooms >= 9.5 sq.m, bathrooms <= 5.0 sq.m, adjacent rooms share edges exactly.`
         : "";
 
       const completion = await client.chat.completions.create({
         model: "gpt-4o",
-        temperature: 0.3,
+        temperature: attempt === 0 ? 0.3 : 0.2, // lower temp on retry
         max_tokens: 4096,
         response_format: { type: "json_object" },
         messages: [
@@ -384,47 +436,34 @@ export async function generateAISpatialLayout(
         continue;
       }
 
-      const rooms = parseAIResponse(content, program);
+      const rooms = parseAIResponse(content);
       if (!rooms || rooms.length === 0) {
-        console.warn(`[AI-SPATIAL] Attempt ${attempt + 1}: failed to parse rooms`);
+        console.warn(`[AI-SPATIAL] Attempt ${attempt + 1}: parse failed`);
         continue;
       }
 
-      const validation = validateAILayout(rooms, fpW, fpH, program);
+      // Close gaps before validation (GPT-4o coordinate drift)
+      const gapClosed = closeGaps(rooms, fpW, fpH);
+
+      const validation = validateAILayout(gapClosed, fpW, fpH, program);
       console.log(
-        `[AI-SPATIAL] Attempt ${attempt + 1}: ${rooms.length} rooms, ` +
+        `[AI-SPATIAL] Attempt ${attempt + 1}: ${gapClosed.length} rooms, ` +
         `score=${validation.score.toFixed(2)}, errors=${validation.errors.length}, ` +
         `warnings=${validation.warnings.length}`
       );
-
       if (validation.errors.length > 0) {
         console.log(`[AI-SPATIAL] Errors: ${validation.errors.join("; ")}`);
       }
 
       if (validation.valid) {
         console.log(`[AI-SPATIAL] ACCEPTED on attempt ${attempt + 1}`);
-
-        // Ensure all program rooms are present
-        const outputNames = new Set(rooms.map(r => r.name));
-        for (const spec of program.rooms) {
-          if (!outputNames.has(spec.name)) {
-            // Check fuzzy match
-            const fuzzy = rooms.find(r =>
-              r.name.toLowerCase().includes(spec.name.toLowerCase().split(" ")[0])
-            );
-            if (!fuzzy) {
-              console.warn(`[AI-SPATIAL] Missing room: ${spec.name}`);
-            }
-          }
-        }
-
-        return rooms;
+        return gapClosed;
       }
 
       lastErrors = validation.errors;
     }
 
-    console.warn(`[AI-SPATIAL] Failed after ${MAX_RETRIES + 1} attempts, falling back`);
+    console.warn(`[AI-SPATIAL] Failed after ${MAX_RETRIES + 1} attempts`);
     return null;
   } catch (err) {
     console.error("[AI-SPATIAL] Error:", err instanceof Error ? err.message : err);
