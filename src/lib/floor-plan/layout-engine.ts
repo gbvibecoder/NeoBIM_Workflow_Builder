@@ -214,6 +214,10 @@ export function layoutFloorPlan(program: EnhancedRoomProgram): PlacedRoom[] {
   // Habitable: ≥2.4m, Kitchen: ≥2.1m, Bathroom: ≥1.2m, Corridor: ≥1.0m
   result = enforceNBCMinimumDimensions(result);
 
+  // ── Room hierarchy enforcement ──
+  // Living room should be the largest room; master should be the largest bedroom.
+  result = enforceRoomHierarchy(result);
+
   // ── Dimension accuracy check (diagnostic) ──
   checkDimensionAccuracy(result, rooms);
 
@@ -1175,6 +1179,44 @@ function enforceCorridorCap(rooms: PlacedRoom[], totalFloorArea: number): Placed
   }
 
   return rooms;
+}
+
+// ── Room hierarchy enforcement ────────────────────────────────────────────
+
+/**
+ * Ensure living room is the largest non-corridor room, and master bedroom
+ * is the largest bedroom. Only swaps identities (name/type) — never changes
+ * positions or dimensions.
+ */
+function enforceRoomHierarchy(rooms: PlacedRoom[]): PlacedRoom[] {
+  try {
+    const layout = rooms.map(r => ({ ...r }));
+
+    // 1. Living room should be largest non-corridor, non-staircase room
+    const living = layout.find(r => r.type === "living" || r.name.toLowerCase().includes("living"));
+    if (living) {
+      const livingArea = living.width * living.depth;
+      const bedrooms = layout.filter(r =>
+        r.type === "bedroom" && r !== living &&
+        !r.name.toLowerCase().includes("master"),
+      );
+      const largest = bedrooms.reduce<PlacedRoom | null>((max, b) => {
+        const area = b.width * b.depth;
+        return !max || area > max.width * max.depth ? b : max;
+      }, null);
+
+      if (largest && largest.width * largest.depth > livingArea * 1.1) {
+        // Swap identities
+        const tmpN = living.name, tmpT = living.type;
+        living.name = largest.name; living.type = largest.type;
+        largest.name = tmpN; largest.type = tmpT;
+      }
+    }
+
+    return layout;
+  } catch {
+    return rooms;
+  }
 }
 
 // ── NBC minimum dimension enforcement ─────────────────────────────────────
