@@ -31,11 +31,17 @@ ABSOLUTE NBC 2016 RULES — EVERY room MUST meet these or the plan is REJECTED:
 - Living Room: area >= 9.5 sq.m, min(width,depth) >= 2.4m
 - Dining Room: area >= 9.5 sq.m, min(width,depth) >= 2.4m
 - Kitchen: area >= 5.5 sq.m, min(width,depth) >= 2.1m
-- ANY Bedroom: area >= 9.5 sq.m, min(width,depth) >= 2.7m
-- Master Bedroom: area >= 12.0 sq.m, min(width,depth) >= 3.0m
-- Bathroom: area >= 2.8 AND <= 5.0 sq.m, min(width,depth) >= 1.5m
+- ANY Bedroom: area >= 9.5 sq.m, min(width,depth) >= 2.7m, aspect ratio <= 2.0 (e.g. 4.0x3.5 OK, 6.6x2.8 TOO ELONGATED)
+- Master Bedroom: area >= 12.0 sq.m, min(width,depth) >= 3.0m, aspect ratio <= 2.0
+- Bathroom: area >= 2.8 AND <= 4.5 sq.m (typical: 2.0m x 2.0m = 4.0 sq.m), min(width,depth) >= 1.5m
 - Study/Office: area >= 6.0 sq.m, min(width,depth) >= 2.4m
-- Corridor: width >= 1.2m
+- Corridor: min(width,depth) MUST be >= 1.2m (NOT 0.6m, NOT 1.0m — at least 1.2m)
+- Balcony: min depth 1.2m
+
+ROOM PROPORTION RULES:
+- Bedrooms MUST have aspect ratio <= 2.0 (width/depth or depth/width). A 4.0m x 3.5m bedroom is good. A 6.6m x 2.8m bedroom is REJECTED (ratio 2.36).
+- Make bedrooms more square: ideal ratio between 1.0 and 1.5.
+- Corridor is the ONLY room allowed to be long and narrow.
 
 SIZE PRIORITY (if space is tight, reduce in this order):
 1. NEVER reduce Bedrooms below 9.5 sq.m — this is the #1 rule
@@ -43,7 +49,7 @@ SIZE PRIORITY (if space is tight, reduce in this order):
 3. Reduce Balcony to minimum 3 sq.m
 4. Reduce Kitchen toward 7 sq.m (never below 5.5)
 5. Reduce Dining toward 9.5 sq.m (never below 9.5)
-6. NEVER let any Bathroom exceed 5.0 sq.m
+6. NEVER let any Bathroom exceed 4.5 sq.m (typical bathroom is 2.0m x 2.0m)
 
 WALL SHARING — THIS IS CRITICAL:
 - Adjacent rooms MUST share an edge. If Room A ends at x=4.70, Room B MUST start at x=4.70 (not 5.20).
@@ -65,11 +71,12 @@ OUTPUT FORMAT — ONLY JSON, no markdown, no explanation:
 SELF-CHECK before responding — verify EACH room:
 1. width * depth >= NBC minimum area for that room type?
 2. min(width, depth) >= NBC minimum dimension?
-3. Bathrooms area <= 5.0 sq.m?
-4. No bedroom < 9.5 sq.m?
-5. Kitchen touching Dining? Each Bedroom touching its Bathroom?
-6. No overlaps? No gaps between adjacent rooms?
-7. All rooms fit within [0, fpW] x [0, fpH]?
+3. Every bathroom area <= 4.5 sq.m? (NOT 5, NOT 6 — max 4.5)
+4. Every bedroom >= 9.5 sq.m AND aspect ratio <= 2.0?
+5. Corridor min(width,depth) >= 1.2m? (NOT 0.6, NOT 1.0)
+6. Kitchen touching Dining? Each Bedroom touching its Bathroom?
+7. No overlaps? No gaps between adjacent rooms?
+8. All rooms fit within [0, fpW] x [0, fpH]?
 
 If ANY check fails, FIX your coordinates before responding.`;
 
@@ -83,7 +90,7 @@ function getNBCMin(type: string, name: string): { minArea: number; minDim: numbe
   if (n.includes("bed") || type === "bedroom")
     return { minArea: 9.5, minDim: 2.7 };
   if (n.includes("bath") || n.includes("toilet") || n.includes("wc") || type === "bathroom")
-    return { minArea: 2.8, minDim: 1.5, maxArea: 5.0 };
+    return { minArea: 2.8, minDim: 1.5, maxArea: 4.5 };
   if (n.includes("living") || type === "living")
     return { minArea: 9.5, minDim: 2.4 };
   if (n.includes("dining") || type === "dining")
@@ -136,11 +143,12 @@ ADJACENCY (rooms MUST share a wall — no gaps between them):
 ${adjList || "- Use architectural best practices"}
 
 CRITICAL REMINDERS:
-- Every Bedroom MUST be >= 9.5 sq.m. If space is tight, shrink Study/Utility first.
-- Every Bathroom MUST be <= 5.0 sq.m (typically 2.0m x 2.0m = 4.0 sq.m).
-- Adjacent rooms share edges exactly: if Room A ends at x=4.0, Room B starts at x=4.0.
-- ALL room areas must sum to >= ${(fpW * fpH * 0.85).toFixed(1)} sq.m (85% of footprint).
-- Footprint boundary: x in [0, ${fpW.toFixed(1)}], y in [0, ${fpH.toFixed(1)}].
+- Every Bedroom >= 9.5 sq.m AND aspect ratio <= 2.0 (e.g. 4.0x3.5m, NOT 6.6x2.8m).
+- Every Bathroom MUST be between 2.8 and 4.5 sq.m (typical: 2.0m x 2.0m = 4.0 sq.m). NOT 5, NOT 6.
+- Corridor min(width,depth) MUST be >= 1.2m. NOT 0.6m. NOT 1.0m. At LEAST 1.2m.
+- Adjacent rooms share edges exactly: Room A ends at x=4.0, Room B starts at x=4.0.
+- ALL room areas sum to >= ${(fpW * fpH * 0.85).toFixed(1)} sq.m.
+- Footprint: x in [0, ${fpW.toFixed(1)}], y in [0, ${fpH.toFixed(1)}].
 
 Output JSON with coordinates for all ${program.rooms.length} rooms.`;
 }
@@ -259,7 +267,34 @@ function validateAILayout(
     }
   }
 
-  // 8. Coverage
+  // 8. Corridor minimum width (HARD — 1.2m minimum)
+  for (const r of rooms) {
+    const isCorridor = r.type === "hallway" || r.name.toLowerCase().includes("corr") ||
+                       r.name.toLowerCase().includes("passage") || r.name.toLowerCase().includes("hallway");
+    if (isCorridor) {
+      const minDim = Math.min(r.width, r.depth);
+      if (minDim < 1.15) { // 1.2m with 0.05m tolerance
+        errors.push(`Corridor "${r.name}" width ${minDim.toFixed(2)}m is below 1.2m minimum. Corridor min(width,depth) MUST be >= 1.2m.`);
+      }
+    }
+  }
+
+  // 9. Bedroom aspect ratio (HARD — max 2.0)
+  for (const r of rooms) {
+    const isBedroom = r.type === "bedroom" || r.name.toLowerCase().includes("bed") ||
+                      r.name.toLowerCase().includes("master");
+    if (isBedroom) {
+      const ratio = Math.max(r.width, r.depth) / Math.min(r.width, r.depth);
+      if (ratio > 2.05) { // 2.0 with small tolerance
+        const shorter = Math.min(r.width, r.depth);
+        const longer = Math.max(r.width, r.depth);
+        const idealShorter = Math.sqrt(r.width * r.depth / 1.4); // target AR ~1.4
+        errors.push(`${r.name} aspect ratio ${ratio.toFixed(1)} exceeds 2.0 max (${r.width.toFixed(1)}m x ${r.depth.toFixed(1)}m). Make it more square, e.g., ${idealShorter.toFixed(1)}m x ${(r.width * r.depth / idealShorter).toFixed(1)}m.`);
+      }
+    }
+  }
+
+  // 10. Coverage
   const totalRoomArea = rooms.reduce((s, r) => s + r.width * r.depth, 0);
   const coverage = totalRoomArea / (fpW * fpH);
   if (coverage < 0.75) {
