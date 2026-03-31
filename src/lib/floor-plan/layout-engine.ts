@@ -1486,55 +1486,58 @@ function layoutWithZones(
 ): PlacedRoom[] {
   const { publicZone, privateZone, corridor } = cls;
 
-  // Compute zone areas
-  const publicArea = publicZone.reduce((s, r) => s + r.areaSqm, 0);
+  // ── Corridor: fixed 1.2m depth (NBC 2016 residential minimum) ──
+  let corridorDepth = grid(CORRIDOR_DEPTH); // 1.2m
+
+  // ── Private zone depth: based on room content, not proportional area ──
+  // Calculate the minimum depth needed for bedroom-bathroom pairs.
+  // In the private zone, bedrooms and bathrooms are laid out as vertical strips
+  // where each strip stacks a bedroom above its bathroom (or side-by-side).
+  // The zone depth must accommodate the tallest such pair.
+  const privateBedrooms = privateZone.filter(r =>
+    r.type === "bedroom" || r.name.toLowerCase().includes("bedroom") || r.name.toLowerCase().includes("master")
+  );
+  const privateBathrooms = privateZone.filter(r =>
+    r.type === "bathroom" || r.name.toLowerCase().includes("bath") || r.name.toLowerCase().includes("toilet")
+  );
+
+  // Estimate depth needed for bedroom-bath pairs:
+  // bedroom needs sqrt(area / target_ar) depth, bathroom needs MIN_BATHROOM_DIM
+  // Use target AR ~1.5 for bedrooms (slightly rectangular, conservative)
+  const BEDROOM_TARGET_AR = 1.5;
+  let geometricDepth = 5.0; // absolute minimum for any private zone with bedrooms
+  if (privateBedrooms.length > 0) {
+    const bedDepths = privateBedrooms.map(b => Math.sqrt(b.areaSqm / BEDROOM_TARGET_AR));
+    const avgBedDepth = bedDepths.reduce((s, d) => s + d, 0) / bedDepths.length;
+    const bathDepth = Math.max(MIN_BATHROOM_DIM, 1.5);
+    geometricDepth = Math.max(avgBedDepth + bathDepth, 5.0);
+  }
+
+  // Also consider area demand: private zone must hold all private rooms
   const privateArea = privateZone.reduce((s, r) => s + r.areaSqm, 0);
-  const floorArea = fpW * fpH;
+  const publicArea = publicZone.reduce((s, r) => s + r.areaSqm, 0);
+  const areaBasedDepth = privateArea / fpW;
 
-  // ── Corridor depth calculation with cap ──
-  // Cap corridor area to 6% of floor area AND 12 sqm hard max
-  const MAX_CORRIDOR_RATIO = 0.06;
-  const MAX_CORRIDOR_AREA = 12.0; // sqm hard cap for large floors
-  const cappedArea = Math.min(floorArea * MAX_CORRIDOR_RATIO, MAX_CORRIDOR_AREA);
-  const maxCorridorDepth = cappedArea / fpW;
+  // Take the larger of geometric and area-based depths
+  let privateDepth = grid(Math.max(geometricDepth, areaBasedDepth));
 
-  // If user specified a corridor room with area, respect it (up to cap)
-  const userCorridorArea = corridor?.areaSqm ?? 0;
-  let corridorDepth: number;
-  if (userCorridorArea > 0 && userCorridorArea < cappedArea) {
-    corridorDepth = grid(Math.max(1.0, userCorridorArea / fpW));
-  } else {
-    corridorDepth = grid(Math.min(CORRIDOR_DEPTH, Math.max(1.0, maxCorridorDepth)));
+  // ── Public zone: gets the remainder ──
+  const MIN_PUBLIC_DEPTH = 3.0;
+  let publicDepth = grid(fpH - privateDepth - corridorDepth);
+
+  // If public zone is too shallow, take from private zone
+  if (publicDepth < MIN_PUBLIC_DEPTH) {
+    publicDepth = grid(MIN_PUBLIC_DEPTH);
+    privateDepth = grid(fpH - publicDepth - corridorDepth);
   }
 
-  // ── Enforce corridor area cap (min-depth floor can cause area to exceed cap on wide footprints) ──
-  const corridorAreaCheck = corridorDepth * fpW;
-  if (corridorAreaCheck > cappedArea * 1.2) {
-    const targetDepth = grid(cappedArea / fpW);
-    // Never let corridor go below 1.0m (NBC 2016 residential minimum)
-    // If this makes area exceed cap, accept it — code compliance > area cap
-    corridorDepth = Math.max(grid(1.0), targetDepth);
-  }
-
-  const corridorArea = corridorDepth * fpW;
-  const usableArea = fpW * fpH - corridorArea;
-
-  // Zone depths proportional to area
-  const publicRatio = publicArea / Math.max(publicArea + privateArea, 1);
-  let privateDepth = grid(usableArea * (1 - publicRatio) / fpW);
-  let publicDepth = grid(usableArea * publicRatio / fpW);
-
-  // Enforce minimums
+  // Safety: ensure private zone doesn't go below habitable minimum
   if (privateDepth < MIN_HABITABLE) {
     privateDepth = MIN_HABITABLE;
     publicDepth = grid(fpH - privateDepth - corridorDepth);
   }
-  if (publicDepth < MIN_HABITABLE) {
-    publicDepth = MIN_HABITABLE;
-    privateDepth = grid(fpH - publicDepth - corridorDepth);
-  }
 
-  // Absorb rounding error into larger zone
+  // Absorb rounding error into the larger zone
   const rem = fpH - privateDepth - corridorDepth - publicDepth;
   if (Math.abs(rem) > 0.01) {
     if (privateDepth >= publicDepth) privateDepth = grid(privateDepth + rem);
