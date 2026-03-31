@@ -396,7 +396,7 @@ describe("Part 6: Full Pipeline Stress Tests", () => {
       const sumArea = floor.rooms.reduce((s, r) => s + r.area_sqm, 0);
       expect(sumArea).toBeGreaterThan(80);
       // Carpet area in metadata should be close to room sum
-      const carpetArea = result.project.metadata.carpet_area_sqm;
+      const carpetArea = result.project.metadata.carpet_area_sqm ?? 0;
       expect(Math.abs(carpetArea - sumArea) / sumArea).toBeLessThan(0.30);
     });
 

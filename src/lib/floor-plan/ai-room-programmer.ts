@@ -50,6 +50,9 @@ export interface EnhancedRoomProgram {
   projectName: string;
   isVastuRequested?: boolean; // true when user asked for vastu/vaastu compliance
   originalPrompt?: string;   // original user prompt (for downstream stages)
+  facingDirection?: "north" | "south" | "east" | "west"; // plot facing direction for entrance placement
+  plotWidthM?: number;  // plot width in meters (for constrained layouts)
+  plotDepthM?: number;  // plot depth in meters (for constrained layouts)
 }
 
 // ── System prompt ────────────────────────────────────────────────────────────

@@ -2,6 +2,8 @@
 
 import React, { useMemo } from "react";
 import { Line as KLine, Shape } from "react-konva";
+import type { Context } from "konva/lib/Context";
+import type { Shape as KonvaShape } from "konva/lib/Shape";
 import type { Wall, ViewMode } from "@/types/floor-plan-cad";
 import type { Viewport } from "@/lib/floor-plan/geometry";
 import { wallToRectangle, worldToScreen } from "@/lib/floor-plan/geometry";
@@ -175,7 +177,7 @@ function WallRendererBase({ walls, viewport, viewMode, selectedIds }: WallRender
           stroke={hatchColor}
           strokeWidth={lw("wall-hatch", zoom)}
           opacity={0.3}
-          sceneFunc={(context, shape) => {
+          sceneFunc={(context: Context, shape: KonvaShape) => {
             context.beginPath();
             for (const seg of hatchSegments) {
               context.moveTo(seg[0], seg[1]);
