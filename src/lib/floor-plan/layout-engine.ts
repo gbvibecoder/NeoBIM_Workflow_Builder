@@ -160,10 +160,10 @@ export function layoutFloorPlan(program: EnhancedRoomProgram): PlacedRoom[] {
     } catch (err) {
       console.warn("[LAYOUT] Fixed-room placement failed, falling back to BSP:", err);
       // Fall through to normal BSP
-      result = fallbackBSP(rooms, useZones, cls, fpW, fpH, program.adjacency);
+      result = fallbackBSP(rooms, useZones, cls, fpW, fpH, program.adjacency, program.entranceRoom);
     }
   } else {
-    result = fallbackBSP(rooms, useZones, cls, fpW, fpH, program.adjacency);
+    result = fallbackBSP(rooms, useZones, cls, fpW, fpH, program.adjacency, program.entranceRoom);
   }
 
   // ── Post-BSP room size validation ──
@@ -181,10 +181,18 @@ export function layoutFloorPlan(program: EnhancedRoomProgram): PlacedRoom[] {
   // If not, swap the drifted bathroom with a room adjacent to the bedroom.
   result = repairBedroomBathroomAdjacency(result, program.adjacency);
 
+  // ── Exterior wall constraint enforcement ──
+  // Rooms flagged mustHaveExteriorWall (living, bedrooms, kitchen) must touch
+  // the building perimeter. Swap landlocked rooms with interior-ok rooms on the edge.
+  result = enforceExteriorWallConstraint(result, rooms, fpW, fpH);
+
   // ── Vastu post-optimization (only when requested) ──
+  // Bed-bath pair locking prevents Vastu swaps from breaking adjacency.
   if (program.isVastuRequested && result.length >= 4) {
-    result = optimizeVastu(result, fpW, fpH);
+    result = optimizeVastu(result, fpW, fpH, program.adjacency);
     result = verifyVastuPlacement(result, fpW, fpH);
+    // Safety net: repair any bed-bath adjacency that slipped through locking
+    result = repairBedroomBathroomAdjacency(result, program.adjacency);
   }
 
   // ── Post-BSP dimension correction ──
@@ -193,6 +201,11 @@ export function layoutFloorPlan(program: EnhancedRoomProgram): PlacedRoom[] {
   if (rooms.length >= 6) {
     result = applyDimensionCorrection(result, rooms, fpW, fpH);
   }
+
+  // ── Room proportion refinement ──
+  // Fix extreme aspect ratios (e.g., 7×2m bedrooms → 5×3m).
+  // Runs after dimension correction so it refines the corrected sizes.
+  result = refineRoomProportions(result);
 
   // ── SECOND size validation — catch rooms inflated by dimension correction ──
   result = validateRoomSizes(result, rooms);
@@ -250,12 +263,13 @@ function checkDimensionAccuracy(placed: PlacedRoom[], specs: RoomSpec[]): void {
 function fallbackBSP(
   rooms: RoomSpec[], useZones: boolean, cls: ReturnType<typeof classifyRooms>,
   fpW: number, fpH: number, adjacency: AdjacencyRequirement[],
+  entranceRoom?: string,
 ): PlacedRoom[] {
   const minZoneHeight = MIN_HABITABLE * 2 + CORRIDOR_DEPTH;
   if (!useZones || fpH < minZoneHeight) {
     return bspSubdivide(rooms, { x: 0, y: 0, w: fpW, h: fpH }, adjacency);
   }
-  return layoutWithZones(cls, fpW, fpH, adjacency);
+  return layoutWithZones(cls, fpW, fpH, adjacency, entranceRoom);
 }
 
 // ── Fixed-room pre-placement + BSP for remaining ───────────────────────────
@@ -738,6 +752,82 @@ function roomsShareEdge(a: PlacedRoom, b: PlacedRoom, tol: number): boolean {
   return shareH || shareV;
 }
 
+// ── Exterior wall constraint enforcement ──────────────────────────────────
+
+/**
+ * Ensure rooms that need exterior walls (living, bedrooms, kitchen) actually
+ * touch the building perimeter. Swaps landlocked rooms with perimeter rooms
+ * that don't need exterior access (bathrooms, storage, utility, corridors).
+ *
+ * Uses identity swaps only — no position changes, preserves BSP tiling.
+ */
+function enforceExteriorWallConstraint(
+  placed: PlacedRoom[],
+  specs: RoomSpec[],
+  fpW: number,
+  fpH: number,
+): PlacedRoom[] {
+  try {
+    const TOL = 0.15;
+    const layout = placed.map(r => ({ ...r }));
+
+    // Build a map from room name to its mustHaveExteriorWall flag
+    const extRequired = new Map<string, boolean>();
+    for (const spec of specs) {
+      extRequired.set(spec.name, spec.mustHaveExteriorWall);
+    }
+
+    // Check if a room touches the building perimeter
+    function touchesPerimeter(r: PlacedRoom): boolean {
+      return r.x < TOL || r.y < TOL ||
+        Math.abs(r.x + r.width - fpW) < TOL ||
+        Math.abs(r.y + r.depth - fpH) < TOL;
+    }
+
+    // Find rooms that need exterior walls but are landlocked
+    for (let i = 0; i < layout.length; i++) {
+      const room = layout[i];
+      if (!extRequired.get(room.name)) continue; // doesn't need exterior wall
+      if (touchesPerimeter(room)) continue; // already on perimeter
+
+      // Find a perimeter room that does NOT need an exterior wall
+      // Prefer rooms of similar size for minimal disruption
+      let bestSwapIdx = -1;
+      let bestSizeDiff = Infinity;
+
+      for (let j = 0; j < layout.length; j++) {
+        if (j === i) continue;
+        const candidate = layout[j];
+        if (candidate.type === "hallway" || candidate.type === "staircase") continue;
+        if (!touchesPerimeter(candidate)) continue; // must be on perimeter
+        if (extRequired.get(candidate.name)) continue; // also needs exterior — can't swap
+
+        const sizeDiff = Math.abs(room.area - candidate.area);
+        const sizeRatio = Math.min(room.area, candidate.area) / Math.max(room.area, candidate.area);
+        if (sizeRatio < 0.3) continue; // too different in size
+
+        if (sizeDiff < bestSizeDiff) {
+          bestSizeDiff = sizeDiff;
+          bestSwapIdx = j;
+        }
+      }
+
+      if (bestSwapIdx !== -1) {
+        // Swap identities
+        const target = layout[bestSwapIdx];
+        const tmpName = room.name, tmpType = room.type;
+        layout[i] = { ...room, name: target.name, type: target.type };
+        layout[bestSwapIdx] = { ...target, name: tmpName, type: tmpType };
+        console.log(`[EXT-WALL] Swapped landlocked ${tmpName} ↔ ${target.name} for perimeter access`);
+      }
+    }
+
+    return layout;
+  } catch {
+    return placed;
+  }
+}
+
 // ── Room proportion refinement ─────────────────────────────────────────────
 
 /**
@@ -748,7 +838,8 @@ function roomsShareEdge(a: PlacedRoom, b: PlacedRoom, tol: number): boolean {
 function refineRoomProportions(rooms: PlacedRoom[]): PlacedRoom[] {
   const result = rooms.map(r => ({ ...r }));
 
-  for (const room of result) {
+  for (let idx = 0; idx < result.length; idx++) {
+    const room = result[idx];
     if (room.type === "hallway" || room.type === "staircase") continue;
 
     const roomAr = ar(room.width, room.depth);
@@ -762,6 +853,9 @@ function refineRoomProportions(rooms: PlacedRoom[]): PlacedRoom[] {
     };
     const maxAr = MAX_AR[room.type] ?? 2.2;
     if (roomAr <= maxAr) continue;
+
+    // Save snapshot to revert if the adjustment creates overlaps
+    const saved = { width: room.width, depth: room.depth, area: room.area };
 
     // Try to make more square: shrink the longer dimension, extend the shorter
     // while keeping area approximately the same
@@ -787,6 +881,21 @@ function refineRoomProportions(rooms: PlacedRoom[]): PlacedRoom[] {
         room.depth = newDepth;
         room.area = grid(newWidth * newDepth);
       }
+    }
+
+    // Overlap safety: revert if adjusted room overlaps any neighbor
+    let overlaps = false;
+    for (let j = 0; j < result.length; j++) {
+      if (j === idx) continue;
+      const other = result[j];
+      const ox = Math.min(room.x + room.width, other.x + other.width) - Math.max(room.x, other.x);
+      const oy = Math.min(room.y + room.depth, other.y + other.depth) - Math.max(room.y, other.y);
+      if (ox > 0.15 && oy > 0.15) { overlaps = true; break; }
+    }
+    if (overlaps) {
+      room.width = saved.width;
+      room.depth = saved.depth;
+      room.area = saved.area;
     }
   }
 
@@ -954,10 +1063,69 @@ function areRoomsAdjacent(a: PlacedRoom, b: PlacedRoom, tolerance: number): bool
  * Runs AFTER the adjacency swap optimizer. Uses iterative pairwise swaps
  * to improve the vastu score without breaking tiling (only swaps identity,
  * not position).
+ *
+ * BED-BATH PAIR LOCKING: When adjacency requirements include bedroom↔bathroom
+ * pairs that are currently adjacent, those room names are "locked" — any swap
+ * that would move a locked room away from its partner is skipped. This prevents
+ * Vastu optimization from breaking bedroom-bathroom adjacency.
  */
-function optimizeVastu(rooms: PlacedRoom[], fpW: number, fpH: number): PlacedRoom[] {
+function optimizeVastu(
+  rooms: PlacedRoom[], fpW: number, fpH: number,
+  adjacency?: AdjacencyRequirement[],
+): PlacedRoom[] {
   try {
     const layout = rooms.map(r => ({ ...r }));
+
+    // ── Build bed-bath locked pairs ──
+    // A "locked pair" = bedroom + bathroom that are currently adjacent.
+    // We store the room NAMES that must not be swapped apart.
+    const lockedPairs: Array<{ bedName: string; bathName: string }> = [];
+    if (adjacency) {
+      for (const req of adjacency) {
+        const aLower = req.roomA.toLowerCase();
+        const bLower = req.roomB.toLowerCase();
+        const aIsBed = aLower.includes("bedroom") || aLower.includes("master");
+        const bIsBath = bLower.includes("bath") || bLower.includes("toilet");
+        const aIsBath = aLower.includes("bath") || aLower.includes("toilet");
+        const bIsBed = bLower.includes("bedroom") || bLower.includes("master");
+
+        if ((aIsBed && bIsBath) || (aIsBath && bIsBed)) {
+          const bedName = aIsBed ? req.roomA : req.roomB;
+          const bathName = bedName === req.roomA ? req.roomB : req.roomA;
+          // Check if they are currently adjacent in the layout
+          const bed = layout.find(r => r.name === bedName);
+          const bath = layout.find(r => r.name === bathName);
+          if (bed && bath && areRoomsAdjacent(bed, bath, 0.3)) {
+            lockedPairs.push({ bedName, bathName });
+          }
+        }
+      }
+    }
+
+    /** Check if swapping indices i↔j would break any locked bed-bath pair. */
+    function wouldBreakLockedPair(i: number, j: number): boolean {
+      for (const { bedName, bathName } of lockedPairs) {
+        const nameI = layout[i].name;
+        const nameJ = layout[j].name;
+        // If one of the swapped rooms is part of a locked pair, check if
+        // its partner is still adjacent after the swap.
+        if (nameI === bedName || nameI === bathName || nameJ === bedName || nameJ === bathName) {
+          // After swap: layout[i] gets name of j, layout[j] gets name of i.
+          // Check: would the bed and bath still be adjacent?
+          const newNameI = nameJ;
+          const newNameJ = nameI;
+          const bedIdx = newNameI === bedName ? i : newNameJ === bedName ? j :
+            layout.findIndex(r => r.name === bedName);
+          const bathIdx = newNameI === bathName ? i : newNameJ === bathName ? j :
+            layout.findIndex(r => r.name === bathName);
+          if (bedIdx === -1 || bathIdx === -1) continue;
+          if (!areRoomsAdjacent(layout[bedIdx], layout[bathIdx], 0.3)) {
+            return true; // swap would break adjacency
+          }
+        }
+      }
+      return false;
+    }
 
     // Pass 1: Standard pairwise swaps with 3x size tolerance
     for (let iteration = 0; iteration < 50; iteration++) {
@@ -976,6 +1144,9 @@ function optimizeVastu(rooms: PlacedRoom[], fpW: number, fpH: number): PlacedRoo
           // Don't swap corridors or staircases
           if (roomA.type === "hallway" || roomB.type === "hallway") continue;
           if (roomA.type === "staircase" || roomB.type === "staircase") continue;
+
+          // Don't break locked bed-bath pairs
+          if (wouldBreakLockedPair(i, j)) continue;
 
           const beforeScore = vastuRoomScore(roomA, fpW, fpH) + vastuRoomScore(roomB, fpW, fpH);
 
@@ -1032,12 +1203,15 @@ function optimizeVastu(rooms: PlacedRoom[], fpW: number, fpH: number): PlacedRoo
       );
 
       if (targetIdx !== -1) {
-        const target = layout[targetIdx];
-        const tmpName = room.name, tmpType = room.type;
-        layout[roomIdx] = { ...room, name: target.name, type: target.type };
-        layout[targetIdx] = { ...target, name: tmpName, type: tmpType };
-        swappedIndices.add(roomIdx);
-        swappedIndices.add(targetIdx);
+        // Check if this force-swap would break a locked pair
+        if (!wouldBreakLockedPair(roomIdx, targetIdx)) {
+          const target = layout[targetIdx];
+          const tmpName = room.name, tmpType = room.type;
+          layout[roomIdx] = { ...room, name: target.name, type: target.type };
+          layout[targetIdx] = { ...target, name: tmpName, type: tmpType };
+          swappedIndices.add(roomIdx);
+          swappedIndices.add(targetIdx);
+        }
       }
     }
 
@@ -1483,6 +1657,7 @@ function layoutWithZones(
   fpW: number,
   fpH: number,
   adjacency: AdjacencyRequirement[],
+  entranceRoom?: string,
 ): PlacedRoom[] {
   const { publicZone, privateZone, corridor } = cls;
 
@@ -1560,8 +1735,8 @@ function layoutWithZones(
     area: grid(corridorRect.w * corridorRect.h),
   });
 
-  // Public zone: adjacency-ordered BSP
-  result.push(...layoutPublicZone(publicZone, publicRect, adjacency));
+  // Public zone: adjacency-ordered BSP (entrance room placed first → gets entry edge)
+  result.push(...layoutPublicZone(publicZone, publicRect, adjacency, entranceRoom));
 
   return result;
 }
@@ -1856,6 +2031,7 @@ function layoutPublicZone(
   rooms: RoomSpec[],
   rect: Rect,
   adjacency: AdjacencyRequirement[],
+  entranceRoom?: string,
 ): PlacedRoom[] {
   if (rooms.length === 0) return [];
 
@@ -1867,6 +2043,22 @@ function layoutPublicZone(
 
   // ── Group critical pairs so BSP places them adjacent ──
   groupCriticalPairs(vastuOrdered);
+
+  // ── Entrance room priority: place entrance/foyer FIRST in BSP order ──
+  // BSP processes rooms left-to-right, so the first room gets the leftmost
+  // (building entry edge) position. This ensures the foyer is at the entry facade.
+  if (entranceRoom) {
+    const entrIdx = vastuOrdered.findIndex(r =>
+      r.name === entranceRoom ||
+      r.name.toLowerCase().includes("foyer") ||
+      r.name.toLowerCase().includes("entrance") ||
+      r.type === "entrance"
+    );
+    if (entrIdx > 0) {
+      const [entrRoom] = vastuOrdered.splice(entrIdx, 1);
+      vastuOrdered.unshift(entrRoom);
+    }
+  }
 
   // Use BSP which naturally produces good tiling
   return bspSubdivide(vastuOrdered, rect, adjacency);
