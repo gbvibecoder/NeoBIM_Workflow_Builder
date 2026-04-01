@@ -16,6 +16,7 @@ import type { EnhancedRoomProgram, RoomSpec, AdjacencyRequirement } from "./ai-r
 import { correctDimensions } from "./dimension-corrector";
 import type { RoomWithTarget } from "./dimension-corrector";
 import { layoutCourtyardPlan, hasCourtyardRoom } from "./courtyard-layout";
+import { solveLayout } from "./constraint-solver";
 
 // ── Output type ──────────────────────────────────────────────────────────────
 
@@ -182,43 +183,68 @@ export function layoutFloorPlan(program: EnhancedRoomProgram): PlacedRoom[] {
     }
   }
 
-  // ── Fixed-room pre-placement ──
-  // Rooms with user-specified "exactly" dimensions are placed FIRST.
-  // BSP only fills the remaining space with flex rooms.
-  //
-  // IMPORTANT: Only use greedy packing when the USER actually specified room
-  // dimensions in the prompt (e.g., "bedroom 20x15 feet"). GPT-4o-mini often
-  // fills in preferredWidth/preferredDepth as its own estimates even when the
-  // user didn't ask — those should NOT bypass the zone-based layout.
-  const userSpecifiedDims = hasUserSpecifiedDimensions(program.originalPrompt);
-  const fixedRooms = userSpecifiedDims
-    ? rooms.filter(r => r.preferredWidth && r.preferredDepth &&
-        r.preferredWidth > 0 && r.preferredDepth > 0)
-    : [];
+  // ── Constraint Solver (primary path) ──
+  // Try the holistic constraint solver first. It generates hundreds of
+  // candidate layouts and picks the one that satisfies ALL constraints
+  // simultaneously. Falls back to BSP if the solver's score is too low.
+  let result: PlacedRoom[] = [];
+  let usedSolver = false;
 
-  // If the user didn't specify dimensions, strip AI-estimated preferred dims
-  // so the zone-based layout uses areaSqm (from the AI) as the sizing input
-  if (!userSpecifiedDims) {
-    for (const r of rooms) {
-      delete r.preferredWidth;
-      delete r.preferredDepth;
+  // Use solver for standard residential plans with 7+ rooms, private+public zones.
+  // Conservative: only use for plans large enough to benefit from zone-row strategy.
+  // Small plans, courtyard houses, and edge cases go through BSP.
+  const solverEligible = inputCount >= 10 && cls.hasPrivate && cls.hasPublic && !hasCourtyardRoom(program) && useZones;
+
+  if (solverEligible) try {
+    const solverResult = solveLayout(program, { maxCandidates: 300, timeoutMs: 1500 });
+    if (solverResult.score.total >= 50 && solverResult.score.hardViolations === 0 && solverResult.layout.length >= inputCount) {
+      result = solverResult.layout;
+      usedSolver = true;
+      console.log(`[SOLVER] Accepted layout: score=${solverResult.score.total}, candidates=${solverResult.candidatesEvaluated}, strategy=${solverResult.strategy}`);
+    } else {
+      console.log(`[SOLVER] Score ${solverResult.score.total} (hard=${solverResult.score.hardViolations}, rooms=${solverResult.layout.length}/${inputCount}) — falling back to BSP`);
     }
+  } catch (err) {
+    console.warn("[SOLVER] Constraint solver failed, falling back to BSP:", err);
   }
 
-  let result: PlacedRoom[];
+  if (!usedSolver) {
+    // ── Fixed-room pre-placement ──
+    // Rooms with user-specified "exactly" dimensions are placed FIRST.
+    // BSP only fills the remaining space with flex rooms.
+    //
+    // IMPORTANT: Only use greedy packing when the USER actually specified room
+    // dimensions in the prompt (e.g., "bedroom 20x15 feet"). GPT-4o-mini often
+    // fills in preferredWidth/preferredDepth as its own estimates even when the
+    // user didn't ask — those should NOT bypass the zone-based layout.
+    const userSpecifiedDims = hasUserSpecifiedDimensions(program.originalPrompt);
+    const fixedRooms = userSpecifiedDims
+      ? rooms.filter(r => r.preferredWidth && r.preferredDepth &&
+          r.preferredWidth > 0 && r.preferredDepth > 0)
+      : [];
 
-  if (fixedRooms.length >= 2) {
-    // Use fixed-room pre-placement + BSP for remaining space
-    try {
-      result = layoutWithFixedRooms(rooms, fpW, fpH, program.adjacency, program.isVastuRequested);
-      console.log(`[LAYOUT] Fixed-room placement: ${fixedRooms.length} fixed + ${rooms.length - fixedRooms.length} flex`);
-    } catch (err) {
-      console.warn("[LAYOUT] Fixed-room placement failed, falling back to BSP:", err);
-      // Fall through to normal BSP
+    // If the user didn't specify dimensions, strip AI-estimated preferred dims
+    // so the zone-based layout uses areaSqm (from the AI) as the sizing input
+    if (!userSpecifiedDims) {
+      for (const r of rooms) {
+        delete r.preferredWidth;
+        delete r.preferredDepth;
+      }
+    }
+
+    if (fixedRooms.length >= 2) {
+      // Use fixed-room pre-placement + BSP for remaining space
+      try {
+        result = layoutWithFixedRooms(rooms, fpW, fpH, program.adjacency, program.isVastuRequested);
+        console.log(`[LAYOUT] Fixed-room placement: ${fixedRooms.length} fixed + ${rooms.length - fixedRooms.length} flex`);
+      } catch (err) {
+        console.warn("[LAYOUT] Fixed-room placement failed, falling back to BSP:", err);
+        // Fall through to normal BSP
+        result = fallbackBSP(rooms, useZones, cls, fpW, fpH, program.adjacency);
+      }
+    } else {
       result = fallbackBSP(rooms, useZones, cls, fpW, fpH, program.adjacency);
     }
-  } else {
-    result = fallbackBSP(rooms, useZones, cls, fpW, fpH, program.adjacency);
   }
 
   // ── Post-BSP room size validation ──
@@ -273,8 +299,14 @@ export function layoutFloorPlan(program: EnhancedRoomProgram): PlacedRoom[] {
 
   // ── NBC minimum dimension enforcement ──
   // Verify every room meets NBC 2016 minimum dimensions.
-  // Habitable: ≥2.4m, Kitchen: ≥2.1m, Bathroom: ≥1.2m, Corridor: ≥1.0m
+  // Bedrooms: ≥3.0m, Habitable: ≥2.4m, Kitchen: ≥2.1m, Bathroom: ≥1.2m, Corridor: ≥1.0m
   result = enforceNBCMinimumDimensions(result);
+
+  // ── Gap closure ──
+  // Post-processing steps (validateRoomSizes, enforceCorridorCap, dimension correction)
+  // shrink rooms in-place, creating gaps. This pass expands rooms into adjacent
+  // empty space to restore tiling and recover efficiency.
+  result = closeLayoutGaps(result, fpW, fpH);
 
   // ── Dimension accuracy check (diagnostic) ──
   checkDimensionAccuracy(result, rooms);
@@ -1299,26 +1331,73 @@ function enforceNBCMinimumDimensions(rooms: PlacedRoom[]): PlacedRoom[] {
       const shorter = Math.min(room.width, room.depth);
       if (shorter >= minDim) continue;
 
-      // Save snapshot to revert if expansion creates overlaps
-      const saved = { ...room };
-      if (room.width < room.depth) {
+      // Snapshot ALL rooms so we can revert the entire operation
+      const snapshot = rooms.map(r => ({ ...r }));
+      const expandWidth = room.width <= room.depth;
+
+      if (expandWidth) {
         room.width = grid(Math.max(room.width, minDim));
       } else {
         room.depth = grid(Math.max(room.depth, minDim));
       }
       room.area = grid(room.width * room.depth);
 
-      // Check if expansion created overlaps — revert if so
-      let overlaps = false;
+      // Check for overlaps — try to resolve by shrinking the overlapping neighbor
+      let resolved = true;
       for (let j = 0; j < rooms.length; j++) {
         if (j === i) continue;
         const other = rooms[j];
         const ox = Math.min(room.x + room.width, other.x + other.width) - Math.max(room.x, other.x);
         const oy = Math.min(room.y + room.depth, other.y + other.depth) - Math.max(room.y, other.y);
-        if (ox > 0.15 && oy > 0.15) { overlaps = true; break; }
+        if (ox <= 0.15 || oy <= 0.15) continue;
+
+        // Overlap detected — try to push the neighbor back
+        const otherMin = getNBCMinDimension(other.type, other.name);
+
+        if (expandWidth) {
+          if (other.x >= room.x) {
+            const push = grid(room.x + room.width - other.x);
+            if (push > 0 && other.width - push >= otherMin) {
+              other.x = grid(other.x + push);
+              other.width = grid(other.width - push);
+              other.area = grid(other.width * other.depth);
+            } else {
+              resolved = false; break;
+            }
+          } else {
+            resolved = false; break;
+          }
+        } else {
+          if (other.y >= room.y) {
+            const push = grid(room.y + room.depth - other.y);
+            if (push > 0 && other.depth - push >= otherMin) {
+              other.y = grid(other.y + push);
+              other.depth = grid(other.depth - push);
+              other.area = grid(other.width * other.depth);
+            } else {
+              resolved = false; break;
+            }
+          } else {
+            resolved = false; break;
+          }
+        }
       }
-      if (overlaps) {
-        Object.assign(room, saved); // Revert — don't break tiling for NBC
+
+      // After resolving direct overlaps, verify NO cascading overlaps were created
+      if (resolved) {
+        for (let p = 0; p < rooms.length && resolved; p++) {
+          for (let q = p + 1; q < rooms.length && resolved; q++) {
+            const rp = rooms[p], rq = rooms[q];
+            const ox = Math.min(rp.x + rp.width, rq.x + rq.width) - Math.max(rp.x, rq.x);
+            const oy = Math.min(rp.y + rp.depth, rq.y + rq.depth) - Math.max(rp.y, rq.y);
+            if (ox > 0.15 && oy > 0.15) resolved = false;
+          }
+        }
+      }
+
+      if (!resolved) {
+        // Revert ALL rooms to pre-expansion state
+        for (let k = 0; k < rooms.length; k++) Object.assign(rooms[k], snapshot[k]);
       }
     }
     return rooms;
@@ -1333,6 +1412,183 @@ function enforceNBCMinimumDimensions(rooms: PlacedRoom[]): PlacedRoom[] {
  */
 function getNBCMinDimension(type: string, name: string): number {
   return getMinDimForType(type, name);
+}
+
+// ── Gap closure — restore tiling broken by post-processing ──────────────
+
+/** Max area a room is allowed to grow to during gap closure (by room type). */
+function getMaxAreaForGapClosure(room: PlacedRoom): number {
+  const n = room.name.toLowerCase();
+  const t = (room.type || "").toLowerCase();
+  // Very small rooms — hard cap
+  if (/shoe|linen|coat|umbrella/.test(n)) return 5;
+  if (/pooja|puja|prayer|mandir/.test(n)) return 8;
+  if (/powder\s*room/.test(n)) return 5;
+  // Service rooms
+  if (/servant\s*toilet|maid.*toilet/.test(n)) return 5;
+  if (/utility|pantry|washing|laundry/.test(n) || t === "utility" || t === "storage") return 10;
+  if (/store\s*room|storage/.test(n)) return 10;
+  // Wet rooms — cap at current area + 20% (don't let gap closure significantly inflate bathrooms)
+  if (t === "bathroom" || /bathroom|toilet|\bwc\b/.test(n)) {
+    const currentArea = room.width * room.depth;
+    return Math.min(currentArea * 1.2, 5.5);
+  }
+  // Circulation
+  if (t === "hallway" || /corridor|passage|foyer/.test(n)) return 15;
+  // Balconies
+  if (/balcony|sit.?out|sitout/.test(n)) return 12;
+  // Large rooms (bedrooms, living, dining, kitchen) — generous cap
+  return Infinity;
+}
+
+/**
+ * Close gaps between rooms created by post-processing shrinkage.
+ *
+ * Multiple pipeline steps (validateRoomSizes, enforceCorridorCap, dimension
+ * correction) shrink rooms in-place without redistributing freed space. This
+ * creates rectangular gaps that waste floor area and drop efficiency.
+ *
+ * This pass expands each room into adjacent empty space on all four sides.
+ * It is overlap-safe: expansion stops at the nearest neighbor edge or footprint
+ * boundary. Multiple passes propagate gap closure through the layout.
+ */
+function closeLayoutGaps(rooms: PlacedRoom[], fpW: number, fpH: number): PlacedRoom[] {
+  const TOL = 0.05; // 50mm — below this is floating-point noise
+  const OVERLAP_TOL = 0.15; // match overlap tolerance used elsewhere
+
+  // Helper: check if `room` overlaps with any other room in the list
+  function wouldOverlap(room: PlacedRoom): boolean {
+    for (const other of rooms) {
+      if (other === room) continue;
+      const ox = Math.min(room.x + room.width, other.x + other.width) - Math.max(room.x, other.x);
+      const oy = Math.min(room.y + room.depth, other.y + other.depth) - Math.max(room.y, other.y);
+      if (ox > OVERLAP_TOL && oy > OVERLAP_TOL) return true;
+    }
+    return false;
+  }
+
+  for (let pass = 0; pass < 3; pass++) {
+    let changed = false;
+
+    for (const room of rooms) {
+      // Type-based area cap — prevent small rooms from absorbing huge gaps
+      const maxArea = getMaxAreaForGapClosure(room);
+      if (room.width * room.depth >= maxArea) continue;
+
+      // ── Expand DOWN ──
+      if (room.width * room.depth < maxArea) {
+        let maxDown = grid(fpH) - (room.y + room.depth);
+        for (const other of rooms) {
+          if (other === room) continue;
+          if (room.x + room.width <= other.x + TOL || other.x + other.width <= room.x + TOL) continue;
+          if (other.y >= room.y + room.depth - TOL) {
+            maxDown = Math.min(maxDown, Math.max(0, other.y - (room.y + room.depth)));
+          }
+        }
+        // Clamp expansion to stay within area cap
+        if (maxDown > TOL && room.width > TOL) {
+          const areaRoom = maxArea - room.width * room.depth;
+          maxDown = Math.min(maxDown, Math.max(0, areaRoom / room.width));
+        }
+        if (maxDown > TOL) {
+          const saved = { depth: room.depth, area: room.area };
+          room.depth = grid(room.depth + maxDown);
+          room.area = grid(room.width * room.depth);
+          if (wouldOverlap(room)) {
+            room.depth = saved.depth; room.area = saved.area;
+          } else {
+            changed = true;
+          }
+        }
+      }
+
+      // ── Expand RIGHT ──
+      if (room.width * room.depth < maxArea) {
+        let maxRight = grid(fpW) - (room.x + room.width);
+        for (const other of rooms) {
+          if (other === room) continue;
+          if (room.y + room.depth <= other.y + TOL || other.y + other.depth <= room.y + TOL) continue;
+          if (other.x >= room.x + room.width - TOL) {
+            maxRight = Math.min(maxRight, Math.max(0, other.x - (room.x + room.width)));
+          }
+        }
+        if (maxRight > TOL && room.depth > TOL) {
+          const areaRoom = maxArea - room.width * room.depth;
+          maxRight = Math.min(maxRight, Math.max(0, areaRoom / room.depth));
+        }
+        if (maxRight > TOL) {
+          const saved = { width: room.width, area: room.area };
+          room.width = grid(room.width + maxRight);
+          room.area = grid(room.width * room.depth);
+          if (wouldOverlap(room)) {
+            room.width = saved.width; room.area = saved.area;
+          } else {
+            changed = true;
+          }
+        }
+      }
+
+      // ── Expand UP ──
+      if (room.width * room.depth < maxArea) {
+        let maxUp = room.y;
+        for (const other of rooms) {
+          if (other === room) continue;
+          if (room.x + room.width <= other.x + TOL || other.x + other.width <= room.x + TOL) continue;
+          const otherBottom = other.y + other.depth;
+          if (otherBottom <= room.y + TOL) {
+            maxUp = Math.min(maxUp, Math.max(0, room.y - otherBottom));
+          }
+        }
+        if (maxUp > TOL && room.width > TOL) {
+          const areaRoom = maxArea - room.width * room.depth;
+          maxUp = Math.min(maxUp, Math.max(0, areaRoom / room.width));
+        }
+        if (maxUp > TOL) {
+          const saved = { y: room.y, depth: room.depth, area: room.area };
+          room.y = grid(room.y - maxUp);
+          room.depth = grid(room.depth + maxUp);
+          room.area = grid(room.width * room.depth);
+          if (wouldOverlap(room)) {
+            room.y = saved.y; room.depth = saved.depth; room.area = saved.area;
+          } else {
+            changed = true;
+          }
+        }
+      }
+
+      // ── Expand LEFT ──
+      if (room.width * room.depth < maxArea) {
+        let maxLeft = room.x;
+        for (const other of rooms) {
+          if (other === room) continue;
+          if (room.y + room.depth <= other.y + TOL || other.y + other.depth <= room.y + TOL) continue;
+          const otherRight = other.x + other.width;
+          if (otherRight <= room.x + TOL) {
+            maxLeft = Math.min(maxLeft, Math.max(0, room.x - otherRight));
+          }
+        }
+        if (maxLeft > TOL && room.depth > TOL) {
+          const areaRoom = maxArea - room.width * room.depth;
+          maxLeft = Math.min(maxLeft, Math.max(0, areaRoom / room.depth));
+        }
+        if (maxLeft > TOL) {
+          const saved = { x: room.x, width: room.width, area: room.area };
+          room.x = grid(room.x - maxLeft);
+          room.width = grid(room.width + maxLeft);
+          room.area = grid(room.width * room.depth);
+          if (wouldOverlap(room)) {
+            room.x = saved.x; room.width = saved.width; room.area = saved.area;
+          } else {
+            changed = true;
+          }
+        }
+      }
+    }
+
+    if (!changed) break;
+  }
+
+  return rooms;
 }
 
 // ── Post-BSP room size validation ──────────────────────────────────────────
@@ -2003,6 +2259,10 @@ function splitTwo(a: RoomSpec, b: RoomSpec, rect: Rect): PlacedRoom[] {
   const depthA = getMinDepthForType(a.type, a.name);
   const depthB = getMinDepthForType(b.type, b.name);
 
+  // Room-type-aware minimum dimensions (bedrooms need ≥3.0m)
+  const aMinDim = getMinDimForSplit(a);
+  const bMinDim = getMinDimForSplit(b);
+
   // Horizontal split (with dimension clamping to prevent sub-minimum rooms)
   let hAh = grid(rect.h * ratio);
   let hBh = grid(rect.h - hAh);
@@ -2015,12 +2275,17 @@ function splitTwo(a: RoomSpec, b: RoomSpec, rect: Rect): PlacedRoom[] {
   } else if (hAh < minFloor && rect.h >= minFloor * 2) {
     hAh = grid(minFloor); hBh = grid(rect.h - hAh);
   }
+  // Enforce bedroom minimums on horizontal split (depth axis)
+  if (hAh < aMinDim && rect.h >= aMinDim + minFloor) {
+    hAh = grid(aMinDim); hBh = grid(rect.h - hAh);
+  }
+  if (hBh < bMinDim && rect.h >= bMinDim + minFloor) {
+    hBh = grid(bMinDim); hAh = grid(rect.h - hBh);
+  }
   let hScore = Math.max(ar(rect.w, hAh), ar(rect.w, hBh));
   // Cross-axis penalty: both rooms inherit rect.w — penalize if it violates depth minimum
-  // In H-split, room gets (w=rect.w, h=hXh). The "shorter side" is min(rect.w, hXh).
-  // The "longer side" is max(rect.w, hXh). Check both against minWidth and minDepth.
-  if (rect.w < minA && hAh >= depthA) hScore += 2; // width too small for A
-  if (rect.w < minB && hBh >= depthB) hScore += 2; // width too small for B
+  if (rect.w < minA && hAh >= depthA) hScore += 2;
+  if (rect.w < minB && hBh >= depthB) hScore += 2;
 
   // Vertical split (with dimension clamping)
   let vAw = grid(rect.w * ratio);
@@ -2034,12 +2299,36 @@ function splitTwo(a: RoomSpec, b: RoomSpec, rect: Rect): PlacedRoom[] {
   } else if (vAw < minFloor && rect.w >= minFloor * 2) {
     vAw = grid(minFloor); vBw = grid(rect.w - vAw);
   }
+  // Enforce bedroom minimums on vertical split (width axis)
+  if (vAw < aMinDim && rect.w >= aMinDim + minFloor) {
+    vAw = grid(aMinDim); vBw = grid(rect.w - vAw);
+  }
+  if (vBw < bMinDim && rect.w >= bMinDim + minFloor) {
+    vBw = grid(bMinDim); vAw = grid(rect.w - vBw);
+  }
   let vScore = Math.max(ar(vAw, rect.h), ar(vBw, rect.h));
   // Cross-axis penalty: both rooms inherit rect.h — penalize if it violates depth minimum
-  if (rect.h < minA && vAw >= depthA) vScore += 2; // height too small for A
-  if (rect.h < minB && vBw >= depthB) vScore += 2; // height too small for B
+  if (rect.h < minA && vAw >= depthA) vScore += 2;
+  if (rect.h < minB && vBw >= depthB) vScore += 2;
 
-  if (hScore <= vScore) {
+  // Protect non-bedroom rooms from getting excessively large in any dimension
+  // If enforcing bedroom minimum made the non-bedroom side much larger, prefer the other split
+  const hValid = hAh >= minFloor && hBh >= minFloor;
+  const vValid = vAw >= minFloor && vBw >= minFloor;
+
+  if (hValid && vValid) {
+    if (hScore <= vScore) {
+      return [
+        placeRoom(a, { x: rect.x, y: rect.y, w: rect.w, h: hAh }),
+        placeRoom(b, { x: rect.x, y: grid(rect.y + hAh), w: rect.w, h: hBh }),
+      ];
+    } else {
+      return [
+        placeRoom(a, { x: rect.x, y: rect.y, w: vAw, h: rect.h }),
+        placeRoom(b, { x: grid(rect.x + vAw), y: rect.y, w: vBw, h: rect.h }),
+      ];
+    }
+  } else if (hValid) {
     return [
       placeRoom(a, { x: rect.x, y: rect.y, w: rect.w, h: hAh }),
       placeRoom(b, { x: rect.x, y: grid(rect.y + hAh), w: rect.w, h: hBh }),
@@ -2050,6 +2339,14 @@ function splitTwo(a: RoomSpec, b: RoomSpec, rect: Rect): PlacedRoom[] {
       placeRoom(b, { x: grid(rect.x + vAw), y: rect.y, w: vBw, h: rect.h }),
     ];
   }
+}
+
+/** Minimum dimension for BSP split — bedrooms get 3.0m, others get 1.2m floor. */
+function getMinDimForSplit(room: RoomSpec): number {
+  const n = room.name.toLowerCase();
+  const t = (room.type || "").toLowerCase();
+  if (t === "bedroom" || n.includes("bedroom") || n.includes("master")) return 3.0;
+  return MIN_BATHROOM_DIM;
 }
 
 // ── Find best split for 3+ rooms ─────────────────────────────────────────────
