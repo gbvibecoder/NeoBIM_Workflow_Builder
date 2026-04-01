@@ -833,6 +833,37 @@ export function CanvasToolbar({
             {isSaving ? t('canvas.saving') : savedFlash ? t('canvas.saved') : t('canvas.save')}
           </button>
 
+          <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+            <button
+              onClick={onUndo}
+              aria-label={t('canvas.undo')}
+              style={{
+                width: 36, height: 36, borderRadius: 8,
+                display: "flex", alignItems: "center", justifyContent: "center",
+                background: "transparent",
+                border: "1px solid rgba(255,255,255,0.08)",
+                color: "rgba(255,255,255,0.55)",
+                cursor: "pointer",
+              }}
+            >
+              <Undo2 size={14} />
+            </button>
+            <button
+              onClick={onRedo}
+              aria-label={t('canvas.redo')}
+              style={{
+                width: 36, height: 36, borderRadius: 8,
+                display: "flex", alignItems: "center", justifyContent: "center",
+                background: "transparent",
+                border: "1px solid rgba(255,255,255,0.08)",
+                color: "rgba(255,255,255,0.55)",
+                cursor: "pointer",
+              }}
+            >
+              <Redo2 size={14} />
+            </button>
+          </div>
+
           <button
             onClick={onPromptMode}
             style={{

@@ -1090,6 +1090,8 @@ const en = {
   'contextMenu.deleteNode': 'Delete Node',
   'contextMenu.fitToView': 'Fit to View',
   'contextMenu.clearCanvas': 'Clear Canvas',
+  'contextMenu.confirmClear': 'Yes, clear all',
+  'toast.workflowLoadFailed': 'Failed to load workflow — please try again',
 
   // ===== ONBOARDING EXTRA =====
   'onboarding.step': 'STEP',
@@ -3577,6 +3579,8 @@ const de: Record<keyof typeof en, string | string[]> = {
   'contextMenu.deleteNode': 'Node löschen',
   'contextMenu.fitToView': 'An Ansicht anpassen',
   'contextMenu.clearCanvas': 'Arbeitsfläche leeren',
+  'contextMenu.confirmClear': 'Ja, alles löschen',
+  'toast.workflowLoadFailed': 'Workflow konnte nicht geladen werden — bitte erneut versuchen',
 
   // ===== ONBOARDING EXTRA =====
   'onboarding.step': 'SCHRITT',

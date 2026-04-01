@@ -90,6 +90,7 @@ export function ContextMenu({
 }: ContextMenuProps) {
   const { t } = useLocale();
   const ref = useRef<HTMLDivElement>(null);
+  const [confirmClear, setConfirmClear] = React.useState(false);
 
   // Close on click outside
   useEffect(() => {
@@ -177,12 +178,21 @@ export function ContextMenu({
             onClick={() => { onFitView(); onClose(); }}
           />
           <Separator />
-          <MenuItem
-            label={t('contextMenu.clearCanvas')}
-            icon={<Eraser size={13} />}
-            onClick={() => { onClearCanvas(); onClose(); }}
-            danger
-          />
+          {confirmClear ? (
+            <MenuItem
+              label={t('contextMenu.confirmClear')}
+              icon={<Trash2 size={13} />}
+              onClick={() => { onClearCanvas(); onClose(); }}
+              danger
+            />
+          ) : (
+            <MenuItem
+              label={t('contextMenu.clearCanvas')}
+              icon={<Eraser size={13} />}
+              onClick={() => setConfirmClear(true)}
+              danger
+            />
+          )}
         </>
       )}
     </motion.div>
