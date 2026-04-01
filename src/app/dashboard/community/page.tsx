@@ -3,7 +3,6 @@
 import React, { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Search, TrendingUp, Star, GitFork, Clock, MessageSquarePlus, X, ChevronDown } from "lucide-react";
-import { Header } from "@/components/dashboard/Header";
 import { WorkflowCard } from "@/components/community/WorkflowCard";
 import { PREBUILT_WORKFLOWS } from "@/constants/prebuilt-workflows";
 import { toast } from "sonner";
@@ -390,11 +389,6 @@ export default function CommunityPage() {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
-      <Header
-        title={t('community.title')}
-        subtitle={t('community.subtitle')}
-      />
-
       <main style={{ flex: 1, overflowY: "auto" }}>
 
         {/* ── Disclaimer banner ──────────────────────────────────────────── */}

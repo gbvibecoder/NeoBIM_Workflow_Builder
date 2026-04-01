@@ -91,15 +91,15 @@ export function Header({ title, subtitle }: HeaderProps) {
       className="flex items-center justify-between px-5 dashboard-header"
       style={{
         minHeight: 52,
-        marginTop: 4,
+        flexShrink: 0,
         background: "rgba(10,12,20,0.8)",
         backdropFilter: "blur(20px)",
         WebkitBackdropFilter: "blur(20px)",
         borderBottom: "1px solid rgba(255,255,255,0.06)",
       }}
     >
-      {/* Left — Title */}
-      <div style={{ minWidth: 0 }}>
+      {/* Left — Title (optional) */}
+      <div style={{ minWidth: 0, flex: 1 }}>
         {title && (
           <div className="flex items-center gap-2.5">
             <h1 style={{ fontSize: 18, fontWeight: 700, color: "#F0F0F5", letterSpacing: "-0.02em" }}>{title}</h1>
@@ -173,7 +173,7 @@ export function Header({ title, subtitle }: HeaderProps) {
           </div>
         </button>
 
-        {/* Language toggle — directly on navbar */}
+        {/* Language toggle */}
         <button
           className="header-lang-btn"
           onClick={() => setLocale(locale === "en" ? "de" : "en")}
@@ -205,7 +205,7 @@ export function Header({ title, subtitle }: HeaderProps) {
           {locale === "en" ? "EN" : "DE"}
         </button>
 
-        {/* Thin separator */}
+        {/* Separator */}
         <div style={{ width: 1, height: 20, background: "rgba(255,255,255,0.06)" }} />
 
         {/* Profile dropdown */}

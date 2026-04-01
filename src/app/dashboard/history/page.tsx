@@ -10,7 +10,6 @@ import {
   ArrowRight, Activity, Share2,
 } from "lucide-react";
 import { shareHistoryToTwitter } from "@/lib/share";
-import { Header } from "@/components/dashboard/Header";
 import { PageBackground } from "@/components/dashboard/PageBackground";
 import { toast } from "sonner";
 import { useLocale } from "@/hooks/useLocale";
@@ -587,8 +586,6 @@ export default function HistoryPage() {
   return (
     <div className="dp-page-bg" style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
       <PageBackground />
-      <Header title={t('history.title')} subtitle={t('history.subtitle')} />
-
       <main className="history-page" style={{ flex: 1, overflowY: "auto", padding: "28px 36px", position: "relative", zIndex: 1 }}>
         {/* Stat cards */}
         <div className="history-stats-bar" style={{ display: "flex", gap: 14, marginBottom: 28 }}>

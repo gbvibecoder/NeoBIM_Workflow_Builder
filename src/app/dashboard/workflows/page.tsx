@@ -5,7 +5,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { Plus, Workflow, ArrowRight, Trash2, ExternalLink, Clock, Sparkles, Box, Image as ImageIcon, Search, FileText, Layers, Zap, FolderOpen, ChevronRight } from "lucide-react";
-import { Header } from "@/components/dashboard/Header";
 import { api, type WorkflowSummary } from "@/lib/api";
 import { formatRelativeTime } from "@/lib/utils";
 import { toast } from "sonner";
@@ -236,11 +235,6 @@ export default function WorkflowsPage() {
         position: "absolute", inset: 0, pointerEvents: "none", zIndex: 0,
         background: "radial-gradient(ellipse 60% 40% at 15% 5%, rgba(0,245,255,0.03) 0%, transparent 70%)",
       }} />
-
-      <Header
-        title={t('workflows.title')}
-        subtitle={t('workflows.subtitle')}
-      />
 
       <main className="flex-1 overflow-y-auto p-6" style={{ position: "relative", zIndex: 1 }}>
         {loading ? (

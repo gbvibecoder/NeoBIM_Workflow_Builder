@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { BarChart3, TrendingUp, CheckCircle2, XCircle, Clock, Workflow, ArrowRight, Activity } from "lucide-react";
 import { PageBackground } from "@/components/dashboard/PageBackground";
-import { Header } from "@/components/dashboard/Header";
 import { useLocale } from "@/hooks/useLocale";
 import dynamic from "next/dynamic";
 
@@ -305,7 +304,6 @@ export default function AnalyticsPage() {
     return (
       <div className="dp-page-bg" style={{ display: "flex", flexDirection: "column", height: "100%" }}>
         <PageBackground />
-        <Header title={t('analytics.title')} subtitle={t('analytics.subtitle')} />
         <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", position: "relative", zIndex: 1 }}>
           <Activity size={28} style={{ color: "#4F8AFF", animation: "dp-pulse 1.5s ease-in-out infinite" }} />
         </div>
@@ -317,7 +315,6 @@ export default function AnalyticsPage() {
     return (
       <div className="dp-page-bg" style={{ display: "flex", flexDirection: "column", height: "100%" }}>
         <PageBackground />
-        <Header title={t('analytics.title')} subtitle={t('analytics.subtitle')} />
         <div style={{ padding: 32, position: "relative", zIndex: 1 }}>
           <SectionCard delay={0}>
             <div style={{ textAlign: "center", padding: "40px 0" }}>
@@ -338,8 +335,6 @@ export default function AnalyticsPage() {
   return (
     <div className="dp-page-bg" style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
       <PageBackground />
-      <Header title={t('analytics.title')} subtitle={t('analytics.subtitle')} />
-
       <main className="analytics-page" style={{ flex: 1, overflowY: "auto", padding: "28px 36px", position: "relative", zIndex: 1, maxWidth: 1100, margin: "0 auto", width: "100%" }}>
         {/* Live telemetry indicator */}
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.05 }}
