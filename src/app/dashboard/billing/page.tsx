@@ -3,7 +3,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { Header } from "@/components/dashboard/Header";
 import { useSession } from "next-auth/react";
 import Script from "next/script";
 import {
@@ -451,11 +450,6 @@ export default function BillingPage() {
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      <Header
-        title={t('billing.title')}
-        subtitle={t('billing.subtitle')}
-      />
-
       <main className="flex-1 overflow-y-auto p-6 space-y-8">
 
         {/* ── Launch Offer Banner — FREE users only ── */}

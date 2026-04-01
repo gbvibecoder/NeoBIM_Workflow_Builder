@@ -3,7 +3,6 @@
 import { useEffect, useState, useCallback, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { ArrowLeft, ArrowUp, ArrowDown, Minus, CheckCircle2, XCircle, Clock, FileText, Table2, Image as ImageIcon } from "lucide-react";
-import { Header } from "@/components/dashboard/Header";
 import { useLocale } from "@/hooks/useLocale";
 import type { TranslationKey } from "@/lib/i18n";
 
@@ -348,11 +347,6 @@ export default function ComparePage() {
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      <Header
-        title={t('compare.title')}
-        subtitle={t('compare.subtitle')}
-      />
-
       <div style={{ padding: "12px 24px 0" }}>
         <button
           onClick={() => router.push("/dashboard/history")}

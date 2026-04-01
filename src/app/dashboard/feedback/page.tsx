@@ -3,7 +3,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence, useMotionValue, useTransform, useSpring } from "framer-motion";
 import { toast } from "sonner";
-import { Header } from "@/components/dashboard/Header";
 import { useLocale } from "@/hooks/useLocale";
 import {
   Bug,
@@ -646,11 +645,6 @@ export default function FeedbackPage() {
         {/* Scan beam */}
         <div className="scan-beam" style={{ position: "absolute", top: "30%", left: 0, right: 0 }} />
       </div>
-
-      <Header
-        title={isDE ? "Beta-Feedback" : "Beta Feedback"}
-        subtitle={isDE ? "Gestalten Sie die Zukunft der AEC-Automatisierung" : "Shape the future of AEC automation"}
-      />
 
       <main className="flex-1 overflow-y-auto relative z-1">
         <div className="fb-container">

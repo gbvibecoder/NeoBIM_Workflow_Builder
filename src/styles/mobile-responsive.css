@@ -362,13 +362,12 @@
 /* ─── DASHBOARD HEADER ──────────────────────────────────────────── */
 @media (max-width: 768px) {
   .dashboard-header {
-    padding-left: 60px !important;
+    padding-left: 12px !important;
     padding-right: 12px !important;
     min-height: 48px !important;
     gap: 8px !important;
   }
 
-  /* Hide search bar keyboard shortcut hints */
   .dashboard-header kbd {
     display: none !important;
   }
