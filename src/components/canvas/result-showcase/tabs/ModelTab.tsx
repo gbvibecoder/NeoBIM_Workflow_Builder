@@ -890,31 +890,16 @@ function ProceduralViewer({ model }: { model: ProceduralModelData }) {
 function GlbViewer({ model }: { model: GlbModelData }) {
   const viewerHeight = typeof window !== "undefined" ? window.innerHeight - 180 : 600;
 
-  // Use BIMViewer when metadata is available (from unified pipeline)
-  if (model.metadataUrl) {
-    return (
-      <div style={{ width: "100%", height: "100%", position: "relative" }}>
-        <BIMViewer
-          glbUrl={model.glbUrl}
-          metadataUrl={model.metadataUrl}
-          ifcUrl={model.ifcUrl}
-          height={viewerHeight}
-        />
-      </div>
-    );
-  }
-
-  // Fallback to basic GLB viewer (for external models without metadata)
+  // Always use BIMViewer for ALL GLB models — it provides ultra-realistic rendering
+  // (SSAO, bloom, HDRI sky, 6-light setup, PBR materials) regardless of whether
+  // BIM metadata is available. When metadataUrl is absent, BIM-specific features
+  // (discipline coloring, element selection) are simply hidden.
   return (
     <div style={{ width: "100%", height: "100%", position: "relative" }}>
-      {model.thumbnailUrl && (
-        <div style={{ position: "absolute", inset: 0, zIndex: 1, pointerEvents: "none", opacity: 0 }}>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={model.thumbnailUrl} alt="3D preview" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-        </div>
-      )}
-      <Building3DViewer
+      <BIMViewer
         glbUrl={model.glbUrl}
+        metadataUrl={model.metadataUrl}
+        ifcUrl={model.ifcUrl}
         height={viewerHeight}
       />
     </div>

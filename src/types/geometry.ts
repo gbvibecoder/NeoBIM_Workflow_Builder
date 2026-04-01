@@ -18,7 +18,8 @@ export interface Face {
 export interface GeometryElement {
   id: string;
   type: "wall" | "slab" | "column" | "roof" | "space" | "window" | "door" | "beam" | "stair"
-    | "balcony" | "canopy" | "parapet" | "duct" | "pipe" | "cable-tray" | "equipment";
+    | "balcony" | "canopy" | "parapet" | "duct" | "pipe" | "cable-tray" | "equipment"
+    | "mullion" | "spandrel";
   vertices: Vertex[];
   faces: Face[];
   /** IFC element class this maps to */

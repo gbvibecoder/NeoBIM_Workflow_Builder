@@ -922,7 +922,19 @@ function generateWindowsForWall(
   let sillHeight = 0.9;
   let spacing = 3.0; // center-to-center
 
-  if (/office/i.test(type)) {
+  // ── Curtain wall mode for modern glazed facades ──
+  // These building types get floor-to-ceiling glass panels (curtain wall)
+  const isCurtainWall = /civic|commercial|tower|corporate|tech|futur|modern|mixed[\s-]?use|retail|convention|arena|stadium|terminal|airport/i.test(type);
+
+  if (isCurtainWall) {
+    // Curtain wall: each wall segment becomes mostly glass
+    // One large panel per wall segment, leaving thin mullion strips at edges
+    const mullionWidth = 0.08; // 80mm mullion frame at edges
+    winWidth = Math.max(wallLength - 2 * mullionWidth, wallLength * 0.92);
+    winHeight = floorHeight - 0.35; // floor-to-ceiling minus spandrel
+    sillHeight = 0.15; // minimal sill
+    spacing = wallLength; // one panel per wall segment
+  } else if (/office/i.test(type)) {
     winWidth = 1.8; winHeight = 2.2; sillHeight = 0.8; spacing = 2.7;
   } else if (/residential|apartment/i.test(type)) {
     winWidth = 1.2; winHeight = 1.5; sillHeight = 0.9; spacing = 3.0;
@@ -943,11 +955,11 @@ function generateWindowsForWall(
   if (winHeight < 0.5) return windows;
 
   // Calculate number of windows that fit
-  const edgeMargin = 0.8; // margin from wall corners
+  const edgeMargin = isCurtainWall ? 0.04 : 0.8; // curtain wall: minimal mullion margin
   const usableLength = wallLength - 2 * edgeMargin;
   if (usableLength < winWidth) return windows;
 
-  const numWindows = Math.max(1, Math.floor(usableLength / spacing));
+  const numWindows = isCurtainWall ? 1 : Math.max(1, Math.floor(usableLength / spacing));
   const actualSpacing = usableLength / numWindows;
 
   const dirX = dx / wallLength;
@@ -1009,6 +1021,194 @@ function generateWindowsForWall(
   }
 
   return windows;
+}
+
+// ─── Mullion Frame Generation ─────────────────────────────────────────────
+
+/**
+ * Generate aluminum mullion frames around window elements.
+ * Creates vertical and horizontal frame strips that give curtain walls
+ * their characteristic grid appearance when viewed up close.
+ */
+function generateMullionFrames(
+  windowElements: GeometryElement[],
+  storeyIndex: number,
+  wallIndex: number,
+  floorHeight: number,
+  elevation: number,
+): GeometryElement[] {
+  const mullions: GeometryElement[] = [];
+  const mullionDepth = 0.06; // 60mm frame depth
+  const mullionWidth = 0.05; // 50mm frame width
+
+  for (let wi = 0; wi < windowElements.length; wi++) {
+    const win = windowElements[wi];
+    const ww = win.properties.width ?? 1.2;
+    const wh = win.properties.height ?? 1.5;
+    const sill = win.properties.sillHeight ?? 0.9;
+    const dirX = win.properties.wallDirectionX ?? 1;
+    const dirY = win.properties.wallDirectionY ?? 0;
+    const ox = win.properties.wallOriginX ?? 0;
+    const oy = win.properties.wallOriginY ?? 0;
+    const offset = win.properties.wallOffset ?? 0;
+
+    // Normal to wall (outward)
+    const nx = -dirY * mullionDepth;
+    const ny = dirX * mullionDepth;
+
+    // Center of window on wall
+    const cx = ox + dirX * offset;
+    const cy = oy + dirY * offset;
+    const baseZ = elevation + sill;
+
+    // Helper: create a thin frame bar as a box
+    const createBar = (
+      id: string,
+      x1: number, y1: number, z1: number,
+      x2: number, y2: number, z2: number,
+      halfW: number,
+    ): GeometryElement => {
+      // Bar runs from (x1,y1,z1) to (x2,y2,z2) with halfW cross-section
+      const vertices: Vertex[] = [
+        { x: x1 + nx - dirX * halfW, y: y1 + ny - dirY * halfW, z: z1 },
+        { x: x1 + nx + dirX * halfW, y: y1 + ny + dirY * halfW, z: z1 },
+        { x: x1 - nx + dirX * halfW, y: y1 - ny + dirY * halfW, z: z1 },
+        { x: x1 - nx - dirX * halfW, y: y1 - ny - dirY * halfW, z: z1 },
+        { x: x2 + nx - dirX * halfW, y: y2 + ny - dirY * halfW, z: z2 },
+        { x: x2 + nx + dirX * halfW, y: y2 + ny + dirY * halfW, z: z2 },
+        { x: x2 - nx + dirX * halfW, y: y2 - ny + dirY * halfW, z: z2 },
+        { x: x2 - nx - dirX * halfW, y: y2 - ny - dirY * halfW, z: z2 },
+      ];
+      const faces: Face[] = [
+        { vertices: [0, 1, 5, 4] }, { vertices: [2, 3, 7, 6] },
+        { vertices: [0, 3, 7, 4] }, { vertices: [1, 2, 6, 5] },
+        { vertices: [0, 1, 2, 3] }, { vertices: [4, 5, 6, 7] },
+      ];
+      return {
+        id, type: "mullion", vertices, faces,
+        ifcType: "IfcBuildingElementProxy",
+        properties: {
+          name: id, storeyIndex,
+          width: mullionWidth, height: wh, thickness: mullionDepth,
+          material: "aluminum", discipline: "architectural",
+        },
+      };
+    };
+
+    const hw = ww / 2;
+    const hmw = mullionWidth / 2;
+
+    // Left vertical mullion
+    mullions.push(createBar(
+      `mullion-v-s${storeyIndex}-w${wallIndex}-${wi}-L`,
+      cx - dirX * hw, cy - dirY * hw, baseZ,
+      cx - dirX * hw, cy - dirY * hw, baseZ + wh,
+      hmw,
+    ));
+
+    // Right vertical mullion
+    mullions.push(createBar(
+      `mullion-v-s${storeyIndex}-w${wallIndex}-${wi}-R`,
+      cx + dirX * hw, cy + dirY * hw, baseZ,
+      cx + dirX * hw, cy + dirY * hw, baseZ + wh,
+      hmw,
+    ));
+
+    // Bottom horizontal (sill bar)
+    mullions.push(createBar(
+      `mullion-h-s${storeyIndex}-w${wallIndex}-${wi}-B`,
+      cx - dirX * hw, cy - dirY * hw, baseZ,
+      cx + dirX * hw, cy + dirY * hw, baseZ,
+      hmw,
+    ));
+
+    // Top horizontal (head bar)
+    mullions.push(createBar(
+      `mullion-h-s${storeyIndex}-w${wallIndex}-${wi}-T`,
+      cx - dirX * hw, cy - dirY * hw, baseZ + wh,
+      cx + dirX * hw, cy + dirY * hw, baseZ + wh,
+      hmw,
+    ));
+
+    // Mid horizontal transom (for tall windows > 1.5m)
+    if (wh > 1.5) {
+      const midZ = baseZ + wh / 2;
+      mullions.push(createBar(
+        `mullion-h-s${storeyIndex}-w${wallIndex}-${wi}-M`,
+        cx - dirX * hw, cy - dirY * hw, midZ,
+        cx + dirX * hw, cy + dirY * hw, midZ,
+        hmw,
+      ));
+    }
+
+    // Vertical mid-mullion (for wide windows > 2m)
+    if (ww > 2.0) {
+      mullions.push(createBar(
+        `mullion-v-s${storeyIndex}-w${wallIndex}-${wi}-M`,
+        cx, cy, baseZ,
+        cx, cy, baseZ + wh,
+        hmw,
+      ));
+    }
+  }
+
+  return mullions;
+}
+
+/**
+ * Generate spandrel panels between floors.
+ * These are the opaque horizontal bands between window rows on each floor,
+ * creating the characteristic banded facade of modern commercial buildings.
+ */
+function generateSpandrelPanel(
+  p1: FootprintPoint,
+  p2: FootprintPoint,
+  elevation: number,
+  panelHeight: number,
+  storeyIndex: number,
+  wallIndex: number,
+): GeometryElement {
+  const dx = p2.x - p1.x;
+  const dy = p2.y - p1.y;
+  const length = Math.sqrt(dx * dx + dy * dy);
+  const thickness = 0.04; // 40mm thin panel
+  const nx = -dy / length * thickness / 2;
+  const ny = dx / length * thickness / 2;
+
+  const vertices: Vertex[] = [
+    { x: p1.x + nx, y: p1.y + ny, z: elevation },
+    { x: p2.x + nx, y: p2.y + ny, z: elevation },
+    { x: p2.x + nx, y: p2.y + ny, z: elevation + panelHeight },
+    { x: p1.x + nx, y: p1.y + ny, z: elevation + panelHeight },
+    { x: p1.x - nx, y: p1.y - ny, z: elevation },
+    { x: p2.x - nx, y: p2.y - ny, z: elevation },
+    { x: p2.x - nx, y: p2.y - ny, z: elevation + panelHeight },
+    { x: p1.x - nx, y: p1.y - ny, z: elevation + panelHeight },
+  ];
+
+  const faces: Face[] = [
+    { vertices: [0, 1, 2, 3] }, { vertices: [5, 4, 7, 6] },
+    { vertices: [0, 3, 7, 4] }, { vertices: [1, 5, 6, 2] },
+    { vertices: [3, 2, 6, 7] }, { vertices: [0, 4, 5, 1] },
+  ];
+
+  return {
+    id: `spandrel-s${storeyIndex}-w${wallIndex}`,
+    type: "spandrel",
+    vertices, faces,
+    ifcType: "IfcCovering",
+    properties: {
+      name: `Spandrel S${storeyIndex + 1}-W${wallIndex + 1}`,
+      storeyIndex,
+      height: panelHeight,
+      length,
+      thickness,
+      area: length * panelHeight,
+      material: "aluminum_composite",
+      discipline: "architectural",
+      isExterior: true,
+    },
+  };
 }
 
 // ─── Door Element Generation ──────────────────────────────────────────────
@@ -1438,6 +1638,38 @@ export function generateMassingGeometry(input: BuildingDescriptionInput): Massin
       );
       for (const win of windowElements) { win.properties.discipline = "architectural"; }
       elements.push(...windowElements);
+
+      // Generate mullion frames around windows (aluminum frame strips)
+      if (windowElements.length > 0) {
+        const mullionElements = generateMullionFrames(windowElements, i, w, storeyH, elevation);
+        for (const m of mullionElements) { m.properties.discipline = "architectural"; }
+        elements.push(...mullionElements);
+      }
+
+      // Generate spandrel panels between floors (for curtain wall buildings)
+      const hasCurtainWall = /civic|commercial|tower|corporate|tech|futur|modern|mixed[\s-]?use|retail|office/i.test(buildingType);
+      if (hasCurtainWall && windowElements.length > 0) {
+        // Spandrel below sill (between floor slab and window bottom)
+        const sillH = windowElements[0]?.properties.sillHeight ?? 0.15;
+        if (sillH > 0.1) {
+          elements.push(generateSpandrelPanel(
+            activeFootprint[w], activeFootprint[nextW],
+            elevation, sillH, i, w,
+          ));
+        }
+        // Spandrel above window head (between window top and next floor slab)
+        const winTop = sillH + (windowElements[0]?.properties.height ?? storeyH - 0.35);
+        const topGap = storeyH - winTop;
+        if (topGap > 0.05) {
+          const topSpandrel = generateSpandrelPanel(
+            activeFootprint[w], activeFootprint[nextW],
+            elevation + winTop, topGap, i, w,
+          );
+          topSpandrel.id = `spandrel-top-s${i}-w${w}`;
+          topSpandrel.properties.name = `Spandrel Top S${i + 1}-W${w + 1}`;
+          elements.push(topSpandrel);
+        }
+      }
 
       // Generate doors on ground floor
       if (i === 0) {

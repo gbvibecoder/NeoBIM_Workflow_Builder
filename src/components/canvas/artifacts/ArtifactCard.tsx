@@ -48,6 +48,11 @@ const IFCBIMViewer = dynamic(() => import("./IFCBIMViewer"), {
   ssr: false,
   loading: () => <IFCBIMViewerLoader />,
 });
+
+const BIMViewer = dynamic(() => import("./BIMViewer"), {
+  ssr: false,
+  loading: () => <Building3DViewerLoader />,
+});
 import type {
   ExecutionArtifact,
   ArtifactType,
@@ -732,7 +737,7 @@ function Massing3dBody({ data }: { data: Massing3dData }) {
         <div style={{ fontSize: 10, color: "#6A6A80", marginBottom: 4, fontWeight: 500 }}>
           {isTextTo3D ? t('artifact.model3dSam') : t('artifact.model3d')}
         </div>
-        <Building3DViewer glbUrl={glbData.glbUrl as string} height={320} />
+        <BIMViewer glbUrl={glbData.glbUrl as string} height={320} />
         <div style={{ marginTop: 6, display: "flex", gap: 6 }}>
           <a
             href={glbData.glbUrl as string}

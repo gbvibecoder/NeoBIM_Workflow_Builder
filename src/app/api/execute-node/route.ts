@@ -26,6 +26,7 @@ import { uploadBase64ToR2 } from "@/lib/r2";
 import { reconstructHiFi3D, isMeshyConfigured } from "@/services/meshy-service";
 import { generateMassingGeometry } from "@/services/massing-generator";
 import { generate3DModel, is3DAIConfigured, calculateKPIs, type BuildingRequirements } from "@/services/threedai-studio";
+import { generateWithMeshy, isMeshyTextTo3DConfigured } from "@/services/meshy-ai";
 import { generateIFCFile } from "@/services/ifc-exporter";
 import { parsePromptToStyle } from "@/services/prompt-style-parser";
 // glb-generator imported dynamically inside GN-001 to avoid DOM polyfill at module load
@@ -5356,10 +5357,153 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
         } // end API success block
       }
 
+      // ── FALLBACK 1: Meshy.ai Text-to-3D ──
+      // Try Meshy if 3D AI Studio didn't produce an artifact
+      if (!artifact && isMeshyTextTo3DConfigured()) {
+        logger.debug("[GN-001] Trying Meshy.ai Text-to-3D as fallback");
+
+        const meshyRequirements: BuildingRequirements = {
+          buildingType,
+          floors,
+          floorToFloorHeight: Number(rawData?.floorToFloorHeight ?? rawData?.floor_height ?? 3.5),
+          height,
+          style: (typeof (rawData?.style ?? rawData?.architecturalStyle) === "string") ? String(rawData?.style ?? rawData?.architecturalStyle) : "",
+          massing: (typeof (rawData?.massing ?? rawData?.massingType) === "string") ? String(rawData?.massing ?? rawData?.massingType) : "",
+          materials: Array.isArray(rawData?.materials) ? rawData.materials as string[] : undefined,
+          footprint_m2: computedFootprint,
+          features: Array.isArray(rawData?.features) ? rawData.features as string[] : undefined,
+          siteArea: Number(rawData?.siteArea ?? rawData?.site_area ?? 0) || undefined,
+          total_gfa_m2: gfa,
+          content: textContent,
+          prompt: String(inputData?.prompt ?? textContent),
+        };
+
+        try {
+          const meshyResult = await generateWithMeshy(meshyRequirements);
+          logger.debug("[GN-001] Meshy result:", {
+            taskId: meshyResult.taskId,
+            glbUrl: meshyResult.glbUrl?.slice(0, 80),
+            generationTimeMs: meshyResult.metadata.generationTimeMs,
+          });
+
+          const kpis = meshyResult.kpis;
+          const metrics = [
+            { label: "Gross Floor Area", value: kpis.grossFloorArea.toLocaleString(), unit: "m²" },
+            { label: "Net Floor Area", value: kpis.netFloorArea.toLocaleString(), unit: "m²" },
+            { label: "Efficiency", value: String(kpis.efficiency), unit: "%" },
+            { label: "Building Height", value: String(kpis.totalHeight), unit: "m" },
+            { label: "Floors", value: String(kpis.floors), unit: "" },
+            { label: "Footprint Area", value: kpis.footprintArea.toLocaleString(), unit: "m²" },
+            { label: "Estimated Volume", value: kpis.estimatedVolume.toLocaleString(), unit: "m³" },
+            { label: "Facade Area", value: kpis.facadeArea.toLocaleString(), unit: "m²" },
+            { label: "S/V Ratio", value: String(kpis.surfaceToVolumeRatio), unit: "" },
+            { label: "Structural Grid", value: kpis.structuralGrid, unit: "" },
+            { label: "Est. EUI", value: String(kpis.sustainability.estimatedEUI), unit: kpis.sustainability.euiUnit },
+            { label: "Daylight Potential", value: kpis.sustainability.daylightPotential, unit: "" },
+            ...(kpis.floorAreaRatio !== null ? [{ label: "Floor Area Ratio", value: String(kpis.floorAreaRatio), unit: "" }] : []),
+            ...(kpis.siteCoverage !== null ? [{ label: "Site Coverage", value: String(kpis.siteCoverage), unit: "%" }] : []),
+          ];
+
+          artifact = {
+            id: generateId(),
+            executionId: executionId ?? "local",
+            tileInstanceId,
+            type: "3d",
+            data: {
+              glbUrl: meshyResult.glbUrl,
+              thumbnailUrl: meshyResult.thumbnailUrl,
+              floors: kpis.floors,
+              height: kpis.totalHeight,
+              footprint: kpis.footprintArea,
+              gfa: kpis.grossFloorArea,
+              buildingType: kpis.buildingType,
+              metrics,
+              content: textContent || `${kpis.floors}-storey ${kpis.buildingType}, ${kpis.grossFloorArea.toLocaleString()} m² GFA`,
+              prompt: meshyResult.prompt,
+              kpis,
+              _raw: rawData,
+            },
+            metadata: {
+              engine: "meshy",
+              model: meshyResult.metadata.model,
+              real: true,
+              taskId: meshyResult.taskId,
+              generationTimeMs: meshyResult.metadata.generationTimeMs,
+            },
+            createdAt: new Date(),
+          };
+        } catch (meshyErr) {
+          const meshyMsg = meshyErr instanceof Error ? meshyErr.message : String(meshyErr);
+          console.warn("[GN-001] Meshy.ai API failed, falling back to procedural generator:", meshyMsg);
+        }
+      }
+
+      // ── FALLBACK 2: Image-to-3D pipeline (DALL-E → SAM 3D) ──
+      // Generates a photorealistic image first, then converts to 3D.
+      // Often produces better architectural results than direct text-to-3D.
+      if (!artifact && process.env.ENABLE_IMAGE_TO_3D_PIPELINE === "true" && process.env.OPENAI_API_KEY) {
+        logger.debug("[GN-001] Trying Image-to-3D pipeline (DALL-E → SAM 3D) as fallback");
+        try {
+          const { textTo3D } = await import("@/services/text-to-3d-service");
+          const img3dResult = await textTo3D({
+            prompt: textContent || `${buildingType}, ${floors} floors`,
+            buildingDescription: rawData as unknown as import("@/services/openai").BuildingDescription | undefined,
+            viewType: "exterior",
+          });
+
+          const sam3dGlbUrl = img3dResult.job.glbModel?.downloadUrl;
+          if (sam3dGlbUrl) {
+            // Re-upload to R2 for CORS
+            let finalGlbUrl = sam3dGlbUrl;
+            try {
+              const { uploadIFCToR2, isR2Configured: checkR2 } = await import("@/lib/r2");
+              if (checkR2()) {
+                const glbRes = await fetch(sam3dGlbUrl);
+                if (glbRes.ok) {
+                  const glbBuf = Buffer.from(await glbRes.arrayBuffer());
+                  const r2Result = await uploadIFCToR2(glbBuf, `img2_3d-${Date.now()}.glb`);
+                  if (r2Result?.url) finalGlbUrl = r2Result.url;
+                }
+              }
+            } catch { /* keep direct URL */ }
+
+            artifact = {
+              id: generateId(),
+              executionId: executionId ?? "local",
+              tileInstanceId,
+              type: "3d",
+              data: {
+                glbUrl: finalGlbUrl,
+                thumbnailUrl: img3dResult.imageUrl,
+                floors,
+                height: height ?? floors * 3.5,
+                footprint: computedFootprint,
+                gfa,
+                buildingType,
+                content: textContent || `${floors}-storey ${buildingType}`,
+                prompt: img3dResult.revisedPrompt,
+                _raw: rawData,
+              },
+              metadata: {
+                engine: "dalle-sam3d",
+                model: "gpt-image-1+sam3d",
+                real: true,
+              },
+              createdAt: new Date(),
+            };
+            logger.debug("[GN-001] Image-to-3D pipeline succeeded:", { glbUrl: finalGlbUrl.slice(0, 60) });
+          }
+        } catch (img3dErr) {
+          const msg = img3dErr instanceof Error ? img3dErr.message : String(img3dErr);
+          console.warn("[GN-001] Image-to-3D pipeline failed:", msg);
+        }
+      }
+
       if (!artifact) {
-        // ── FALLBACK: Procedural massing generator ──
-        // Triggered when: (1) THREEDAI_API_KEY not set, or (2) API call failed
-        logger.debug("[GN-001] Using procedural massing generator (fallback)");
+        // ── UNIFIED BIM+AI Pipeline ──
+        // Generates procedural BIM geometry with AI-derived material palette.
+        // Result: ONE model with real BIM elements that LOOKS photorealistic.
+        logger.debug("[GN-001] Using unified BIM+AI pipeline");
 
         const massingInput = {
           floors,
@@ -5377,6 +5521,22 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
 
         logger.debug("[GN-001] geometry result:", { floors: geometry.floors, height: geometry.totalHeight, footprint: geometry.footprintArea, gfa: geometry.gfa, buildingType: geometry.buildingType });
 
+        // ── AI Material Palette: Generate concept render + extract color palette ──
+        let aiThumbnailUrl: string | null = null;
+        let aiPalette: Record<string, Partial<import("@/services/material-mapping").PBRMaterialDef>> | null = null;
+        try {
+          const { generateAIMaterialPalette, paletteToMaterialOverrides } = await import("@/services/ai-material-palette");
+          const { palette, imageUrl } = await generateAIMaterialPalette(
+            textContent || `${buildingType}, ${floors} floors`,
+            buildingType,
+          );
+          aiPalette = paletteToMaterialOverrides(palette);
+          aiThumbnailUrl = imageUrl;
+          logger.debug("[GN-001] AI palette extracted:", { style: palette.style, facade: palette.facadeMaterial, glassTint: palette.glassTint });
+        } catch (paletteErr) {
+          console.warn("[GN-001] AI palette generation failed (non-fatal):", paletteErr instanceof Error ? paletteErr.message : paletteErr);
+        }
+
         // ── Unified BIM Pipeline: Generate GLB + IFC + Metadata from same geometry ──
         let assetUrls: { glbUrl: string; ifcUrl: string; metadataUrl: string } | null = null;
         try {
@@ -5387,9 +5547,9 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
           const metadata = extractMetadata(geometry);
           const metadataJson = JSON.stringify(metadata);
 
-          // Generate GLB and IFC in parallel
+          // Generate GLB (with AI palette if available) and IFC in parallel
           const [glbBuffer, ifcContent] = await Promise.all([
-            generateGLB(geometry),
+            generateGLB(geometry, aiPalette ?? undefined),
             Promise.resolve(generateIFCFile(geometry, {
               buildingName: geometry.buildingType,
               projectName: massingInput.content?.slice(0, 80) || geometry.buildingType,
@@ -5437,8 +5597,10 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
             glbUrl: assetUrls?.glbUrl ?? null,
             ifcUrl: assetUrls?.ifcUrl ?? null,
             metadataUrl: assetUrls?.metadataUrl ?? null,
+            // ── AI concept render thumbnail ──
+            thumbnailUrl: aiThumbnailUrl ?? null,
           },
-          metadata: { engine: "massing-generator", real: true },
+          metadata: { engine: aiPalette ? "bim-ai-hybrid" : "massing-generator", real: true },
           createdAt: new Date(),
         };
       }

@@ -1,9 +1,9 @@
 "use client";
 
 /**
- * BIMViewer — Production-quality BIM 3D viewer with element selection,
- * properties panel, post-processing (SSAO, bloom, FXAA), and BIM features
- * (section planes, discipline coloring, storey isolation).
+ * BIMViewer — Ultra-realistic BIM 3D viewer with PBR materials, SSAO,
+ * bloom, environment mapping, element selection, properties panel,
+ * section planes, discipline coloring, and storey isolation.
  */
 
 import { useEffect, useRef, useCallback, useState } from "react";
@@ -16,12 +16,18 @@ import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPa
 import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";
 import { ShaderPass } from "three/examples/jsm/postprocessing/ShaderPass.js";
 import { FXAAShader } from "three/examples/jsm/shaders/FXAAShader.js";
+import { SSAOPass } from "three/examples/jsm/postprocessing/SSAOPass.js";
 import {
   Loader2, AlertCircle, RotateCcw, Maximize2, Minimize2,
   MousePointerClick, X, Download, Layers, Scissors, Eye,
 } from "lucide-react";
 import type { BIMMetadata, BIMElementMeta } from "@/services/metadata-extractor";
 import { getDisciplineColor, getStoreyColor } from "@/services/material-mapping";
+import {
+  createBIMMaterials, getMaterialKey, disposeBIMMaterials,
+  createSkyTexture,
+  type BIMMaterialLib,
+} from "./bim-materials";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -62,6 +68,7 @@ export default function BIMViewer({ glbUrl, metadataUrl, ifcUrl, height = 500 }:
   const originalMatsRef = useRef<Map<string, THREE.Material | THREE.Material[]>>(new Map());
   const raycasterRef = useRef(new THREE.Raycaster());
   const mouseRef = useRef(new THREE.Vector2());
+  const materialsRef = useRef<BIMMaterialLib | null>(null);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -101,6 +108,10 @@ export default function BIMViewer({ glbUrl, metadataUrl, ifcUrl, height = 500 }:
     cameraRef.current = null;
     modelRef.current = null;
     originalMatsRef.current.clear();
+    if (materialsRef.current) {
+      disposeBIMMaterials(materialsRef.current);
+      materialsRef.current = null;
+    }
   }, []);
 
   // ─── Deselect ──────────────────────────────────────────────────────────────
@@ -124,7 +135,6 @@ export default function BIMViewer({ glbUrl, metadataUrl, ifcUrl, height = 500 }:
       if (!(obj instanceof THREE.Mesh) || obj.name === "ground-plane") return;
 
       if (mode === "default") {
-        // Restore original materials
         const orig = originalMatsRef.current.get(obj.name);
         if (orig) obj.material = orig;
       } else if (mode === "discipline") {
@@ -158,7 +168,11 @@ export default function BIMViewer({ glbUrl, metadataUrl, ifcUrl, height = 500 }:
     const w = container.clientWidth || 800;
     const h = expanded ? Math.min(window.innerHeight * 0.85, 800) : height;
 
-    // ── Renderer ──
+    // ═══ Create ultra-realistic PBR materials ═══
+    const mats = createBIMMaterials();
+    materialsRef.current = mats;
+
+    // ═══ Renderer (high quality) ═══
     const renderer = new THREE.WebGLRenderer({
       antialias: true,
       alpha: false,
@@ -169,102 +183,156 @@ export default function BIMViewer({ glbUrl, metadataUrl, ifcUrl, height = 500 }:
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.5;
+    renderer.toneMappingExposure = 1.4;
     renderer.localClippingEnabled = true;
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
     container.appendChild(renderer.domElement);
     rendererRef.current = renderer;
 
-    // ── Scene ──
+    // ═══ Scene ═══
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0xE8EDF2);
-    scene.fog = new THREE.Fog(0xE8EDF2, 80, 250);
+    scene.fog = new THREE.FogExp2(0xD4E4F0, 0.004);
     sceneRef.current = scene;
 
-    // ── Procedural environment for reflections ──
+    // ═══ Procedural HDRI Sky Environment ═══
     const pmremGenerator = new THREE.PMREMGenerator(renderer);
+    pmremGenerator.compileEquirectangularShader();
+
+    // Rich sky dome for environment reflections
     const envScene = new THREE.Scene();
-    // Sky gradient
-    const skyGeo = new THREE.SphereGeometry(50, 32, 16);
+
+    // Sky sphere with gradient + sun
+    const skyGeo = new THREE.SphereGeometry(100, 64, 32);
+    const skyTex = createSkyTexture();
+    skyTex.mapping = THREE.EquirectangularReflectionMapping;
     const skyMat = new THREE.MeshBasicMaterial({
-      color: 0x88AACC,
+      map: skyTex,
       side: THREE.BackSide,
     });
     envScene.add(new THREE.Mesh(skyGeo, skyMat));
-    // Ground color for reflection bounce
-    const groundReflGeo = new THREE.PlaneGeometry(100, 100);
-    const groundReflMat = new THREE.MeshBasicMaterial({ color: 0x556644 });
-    const groundRefl = new THREE.Mesh(groundReflGeo, groundReflMat);
-    groundRefl.rotation.x = -Math.PI / 2;
-    groundRefl.position.y = -5;
-    envScene.add(groundRefl);
-    const envMap = pmremGenerator.fromScene(envScene, 0.04).texture;
+
+    // Ground plane in env for bounce light
+    const envGround = new THREE.Mesh(
+      new THREE.PlaneGeometry(200, 200),
+      new THREE.MeshBasicMaterial({ color: 0x4A6B3A })
+    );
+    envGround.rotation.x = -Math.PI / 2;
+    envGround.position.y = -10;
+    envScene.add(envGround);
+
+    const envMap = pmremGenerator.fromScene(envScene, 0.02).texture;
     scene.environment = envMap;
+    // Don't use envMap as background — add a visible sky dome instead
     pmremGenerator.dispose();
 
-    // ── Camera ──
-    const camera = new THREE.PerspectiveCamera(45, w / h, 0.1, 500);
-    camera.position.set(30, 20, 30);
+    // ═══ Visible Sky Dome (in main scene) ═══
+    const mainSkyGeo = new THREE.SphereGeometry(400, 64, 32);
+    const mainSkyTex = createSkyTexture();
+    const mainSkyMat = new THREE.MeshBasicMaterial({
+      map: mainSkyTex,
+      side: THREE.BackSide,
+      fog: false,
+      depthWrite: false,
+    });
+    const mainSkyMesh = new THREE.Mesh(mainSkyGeo, mainSkyMat);
+    mainSkyMesh.name = "sky-dome";
+    mainSkyMesh.renderOrder = -1;
+    scene.add(mainSkyMesh);
+
+    // ═══ Camera ═══
+    const camera = new THREE.PerspectiveCamera(40, w / h, 0.1, 1000);
+    camera.position.set(40, 25, 40);
     cameraRef.current = camera;
 
-    // ── Controls ──
+    // ═══ Controls ═══
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
-    controls.dampingFactor = 0.08;
+    controls.dampingFactor = 0.06;
     controls.autoRotate = true;
-    controls.autoRotateSpeed = 0.3;
-    controls.minDistance = 3;
-    controls.maxDistance = 200;
+    controls.autoRotateSpeed = 0.25;
+    controls.minDistance = 0.5; // Allow very close zoom for detailed inspection
+    controls.maxDistance = 300;
     controls.maxPolarAngle = Math.PI / 2.05;
     controlsRef.current = controls;
 
-    // ── Lighting ──
-    const ambientLight = new THREE.AmbientLight(0xCCCCDD, 0.9);
+    // ═══ Lighting (cinematic multi-light setup) ═══
+
+    // Ambient — soft fill from all directions
+    const ambientLight = new THREE.AmbientLight(0xCCCCDD, 0.5);
     scene.add(ambientLight);
 
-    const hemiLight = new THREE.HemisphereLight(0x87CEEB, 0x556633, 0.7);
+    // Hemisphere — sky/ground color bleed
+    const hemiLight = new THREE.HemisphereLight(0x87CEEB, 0x556633, 0.8);
     scene.add(hemiLight);
 
-    const sunLight = new THREE.DirectionalLight(0xFFEECC, 2.0);
-    sunLight.position.set(40, 60, 30);
+    // Sun — primary directional with high-quality shadows
+    const sunLight = new THREE.DirectionalLight(0xFFEECC, 2.5);
+    sunLight.position.set(50, 80, 40);
     sunLight.castShadow = true;
-    sunLight.shadow.mapSize.width = 2048;
-    sunLight.shadow.mapSize.height = 2048;
-    sunLight.shadow.camera.left = -60;
-    sunLight.shadow.camera.right = 60;
-    sunLight.shadow.camera.top = 60;
-    sunLight.shadow.camera.bottom = -60;
+    sunLight.shadow.mapSize.width = 4096;
+    sunLight.shadow.mapSize.height = 4096;
+    sunLight.shadow.camera.left = -80;
+    sunLight.shadow.camera.right = 80;
+    sunLight.shadow.camera.top = 80;
+    sunLight.shadow.camera.bottom = -80;
     sunLight.shadow.camera.near = 0.5;
-    sunLight.shadow.camera.far = 200;
-    sunLight.shadow.bias = -0.0005;
-    sunLight.shadow.normalBias = 0.02;
+    sunLight.shadow.camera.far = 300;
+    sunLight.shadow.bias = -0.0003;
+    sunLight.shadow.normalBias = 0.015;
+    sunLight.shadow.radius = 2;
     scene.add(sunLight);
 
-    const fillLight = new THREE.DirectionalLight(0xBBCCEE, 0.6);
-    fillLight.position.set(-25, 30, -15);
+    // Fill light — softer, from opposite side to reduce harsh shadows
+    const fillLight = new THREE.DirectionalLight(0xBBCCEE, 0.7);
+    fillLight.position.set(-30, 40, -20);
     scene.add(fillLight);
+
+    // Rim light — subtle back-lighting for edge definition
+    const rimLight = new THREE.DirectionalLight(0xF0E8D0, 0.3);
+    rimLight.position.set(-20, 15, -40);
+    scene.add(rimLight);
+
+    // Warm ground bounce light
+    const bounceLight = new THREE.DirectionalLight(0xEEDDCC, 0.2);
+    bounceLight.position.set(0, -10, 0);
+    scene.add(bounceLight);
 
     // Section plane (Y-axis cut)
     const sectionPlane = new THREE.Plane(new THREE.Vector3(0, -1, 0), 100);
 
-    // ── Post-processing ──
+    // ═══ Post-processing Pipeline ═══
     const composer = new EffectComposer(renderer);
+
+    // 1. Base render
     composer.addPass(new RenderPass(scene, camera));
 
-    // Bloom (subtle glow on glass/emissives)
+    // 2. SSAO — Screen Space Ambient Occlusion for contact shadows and depth
+    const ssaoPass = new SSAOPass(scene, camera, w, h);
+    ssaoPass.kernelRadius = 0.8;
+    ssaoPass.minDistance = 0.001;
+    ssaoPass.maxDistance = 0.15;
+    ssaoPass.output = SSAOPass.OUTPUT.Default;
+    composer.addPass(ssaoPass);
+
+    // 3. Bloom — subtle glow on glass/emissive/bright areas
     const bloomPass = new UnrealBloomPass(
-      new THREE.Vector2(w, h), 0.08, 0.4, 0.9
+      new THREE.Vector2(w, h), 0.12, 0.5, 0.85
     );
     composer.addPass(bloomPass);
 
-    // FXAA anti-aliasing
+    // 4. FXAA — edge anti-aliasing
     const fxaaPass = new ShaderPass(FXAAShader);
-    fxaaPass.uniforms["resolution"].value.set(1 / (w * renderer.getPixelRatio()), 1 / (h * renderer.getPixelRatio()));
+    fxaaPass.uniforms["resolution"].value.set(
+      1 / (w * renderer.getPixelRatio()),
+      1 / (h * renderer.getPixelRatio())
+    );
     composer.addPass(fxaaPass);
 
+    // 5. Output (tone mapping)
     composer.addPass(new OutputPass());
     composerRef.current = composer;
 
-    // ── Load GLB ──
+    // ═══ Load GLB ═══
     const loader = new GLTFLoader();
     loader.load(
       glbUrl,
@@ -278,47 +346,129 @@ export default function BIMViewer({ glbUrl, metadataUrl, ifcUrl, height = 500 }:
         const size = box.getSize(new THREE.Vector3());
         const maxDim = Math.max(size.x, size.y, size.z);
 
-        // Enable shadows and store original materials
+        // ═══ MATERIAL REPLACEMENT — upgrade flat GLB materials to ultra-realistic PBR ═══
         model.traverse((child) => {
-          if (child instanceof THREE.Mesh) {
-            child.castShadow = true;
+          if (!(child instanceof THREE.Mesh)) return;
+
+          child.castShadow = true;
+          child.receiveShadow = true;
+
+          const elemType = child.userData.elementType as string;
+          const isExterior = child.userData.discipline === "architectural" &&
+            (child.name.includes("exterior") || child.userData.isExterior);
+
+          if (child.name === "ground-plane") {
+            // Replace ground with rich grass material
+            child.material = mats.ground;
+            child.castShadow = false;
             child.receiveShadow = true;
-            if (child.name === "ground-plane") {
-              child.castShadow = false;
+          } else if (child.name.startsWith("tree-trunk") || child.name.startsWith("tree-far-trunk")) {
+            child.material = mats.treeTrunk;
+          } else if (child.name.startsWith("tree-crown") || child.name.startsWith("tree-far-crown")) {
+            child.material = mats.treeCrown;
+          } else if (elemType) {
+            // Replace with ultra-realistic PBR material
+            const matKey = getMaterialKey(elemType, isExterior);
+            child.material = mats[matKey];
+          } else {
+            // ═══ External model (AI-generated) — enhance existing materials ═══
+            // These models already have textures from 3D AI Studio/Meshy but lack
+            // environment reflections. Apply envMap and tune PBR properties.
+            const mat = child.material;
+            if (mat && "isMeshStandardMaterial" in mat && (mat as THREE.MeshStandardMaterial).isMeshStandardMaterial) {
+              const stdMat = mat as THREE.MeshStandardMaterial;
+              stdMat.envMap = envMap;
+              stdMat.envMapIntensity = 1.3;
+              // Slightly enhance roughness/metalness for more realistic look
+              if (stdMat.roughness > 0.9) stdMat.roughness = 0.85;
+              if (stdMat.transparent && stdMat.opacity < 0.5) {
+                // Looks like glass — boost reflections
+                stdMat.envMapIntensity = 2.0;
+                stdMat.metalness = Math.max(stdMat.metalness, 0.05);
+              }
+              stdMat.needsUpdate = true;
             }
-            // Store original material for color mode reset
-            originalMatsRef.current.set(child.name, child.material);
+            if (mat && "isMeshPhysicalMaterial" in mat && (mat as THREE.MeshPhysicalMaterial).isMeshPhysicalMaterial) {
+              const physMat = mat as THREE.MeshPhysicalMaterial;
+              physMat.envMap = envMap;
+              physMat.envMapIntensity = 1.5;
+              physMat.needsUpdate = true;
+            }
           }
+
+          // Store the upgraded material as "original" for color mode reset
+          originalMatsRef.current.set(child.name, child.material);
         });
 
         scene.add(model);
 
-        // Fit camera to model
-        const dist = Math.max(maxDim * 1.8, 20);
+        // ═══ Enhanced Ground Plane ═══
+        // If the model has a ground-plane, scale it up; otherwise add one
+        let hasGround = false;
+        model.traverse((obj) => {
+          if (obj instanceof THREE.Mesh && obj.name === "ground-plane") {
+            hasGround = true;
+          }
+        });
+        if (!hasGround) {
+          const groundSize = Math.max(maxDim * 4, 100);
+          const groundMesh = new THREE.Mesh(
+            new THREE.PlaneGeometry(groundSize, groundSize),
+            mats.ground
+          );
+          groundMesh.rotation.x = -Math.PI / 2;
+          groundMesh.position.y = box.min.y - 0.02;
+          groundMesh.receiveShadow = true;
+          groundMesh.name = "ground-plane";
+          scene.add(groundMesh);
+        }
+
+        // ═══ Fit camera to model ═══
+        // For small AI-generated models, get closer; for large BIM models, keep some distance
+        const dist = Math.max(maxDim * 1.4, maxDim + 2);
         camera.position.set(
-          center.x + dist * 0.7,
-          center.y + dist * 0.5,
-          center.z + dist * 0.7
+          center.x + dist * 0.65,
+          center.y + dist * 0.4,
+          center.z + dist * 0.65
         );
+        camera.near = 0.01; // Allow very close zoom for inspection
+        camera.updateProjectionMatrix();
         controls.target.copy(center);
+        controls.minDistance = Math.max(maxDim * 0.1, 0.5); // Allow zooming very close
         controls.update();
 
-        // Update shadow camera to fit building
-        const shadowExtent = maxDim * 1.2;
+        // ═══ Update shadow camera to fit building precisely ═══
+        const shadowExtent = maxDim * 1.5;
         sunLight.shadow.camera.left = -shadowExtent;
         sunLight.shadow.camera.right = shadowExtent;
         sunLight.shadow.camera.top = shadowExtent;
         sunLight.shadow.camera.bottom = -shadowExtent;
+        sunLight.shadow.camera.far = shadowExtent * 4;
         sunLight.shadow.camera.updateProjectionMatrix();
         sunLight.position.set(
-          center.x + shadowExtent,
-          center.y + shadowExtent * 1.5,
-          center.z + shadowExtent * 0.7
+          center.x + shadowExtent * 0.8,
+          center.y + shadowExtent * 1.8,
+          center.z + shadowExtent * 0.5
         );
         sunLight.target.position.copy(center);
         scene.add(sunLight.target);
 
-        // Set section plane default to mid-height
+        // Position fill/rim relative to building
+        fillLight.position.set(
+          center.x - shadowExtent * 0.6,
+          center.y + shadowExtent * 0.8,
+          center.z - shadowExtent * 0.4
+        );
+        rimLight.position.set(
+          center.x - shadowExtent * 0.3,
+          center.y + shadowExtent * 0.3,
+          center.z - shadowExtent * 0.8
+        );
+
+        // Update fog distance based on building size
+        (scene.fog as THREE.FogExp2).density = 0.5 / Math.max(maxDim, 30);
+
+        // Section plane default to mid-height
         setSectionY(center.y + size.y * 0.5);
 
         setLoading(false);
@@ -334,7 +484,7 @@ export default function BIMViewer({ glbUrl, metadataUrl, ifcUrl, height = 500 }:
       }
     );
 
-    // ── Click handler (element selection) ──
+    // ═══ Click handler (element selection) ═══
     const onClick = (event: MouseEvent) => {
       const rect = renderer.domElement.getBoundingClientRect();
       mouseRef.current.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
@@ -346,31 +496,27 @@ export default function BIMViewer({ glbUrl, metadataUrl, ifcUrl, height = 500 }:
 
       const meshes: THREE.Mesh[] = [];
       model.traverse((obj) => {
-        if (obj instanceof THREE.Mesh && obj.name && obj.name !== "ground-plane") {
+        if (obj instanceof THREE.Mesh && obj.name && obj.name !== "ground-plane"
+            && !obj.name.startsWith("tree-") && obj.name !== "sky-dome") {
           meshes.push(obj);
         }
       });
 
       const intersects = raycasterRef.current.intersectObjects(meshes, false);
-
-      // Deselect previous
       deselectElement();
 
       if (intersects.length > 0) {
         const hit = intersects[0].object as THREE.Mesh;
         const elementId = hit.name;
 
-        // Highlight
         originalMatsRef.current.set(hit.name, hit.material);
         hit.material = HIGHLIGHT_MAT;
         selectedMeshRef.current = hit;
 
-        // Look up metadata
         const meta = metadataRef.current?.elements[elementId];
         if (meta) {
           setSelectedElement(meta);
         } else {
-          // Basic info from userData
           setSelectedElement({
             id: elementId,
             ifcType: hit.userData.ifcType ?? "Unknown",
@@ -381,19 +527,17 @@ export default function BIMViewer({ glbUrl, metadataUrl, ifcUrl, height = 500 }:
           });
         }
 
-        // Stop auto-rotate on selection
         controls.autoRotate = false;
       }
     };
 
     renderer.domElement.addEventListener("click", onClick);
 
-    // ── Animate ──
+    // ═══ Animate ═══
     function animate() {
       animFrameRef.current = requestAnimationFrame(animate);
       controls.update();
 
-      // Apply section plane
       if (sectionPlane) {
         renderer.clippingPlanes = sectionEnabled
           ? [new THREE.Plane(new THREE.Vector3(0, -1, 0), sectionY)]
@@ -404,7 +548,7 @@ export default function BIMViewer({ glbUrl, metadataUrl, ifcUrl, height = 500 }:
     }
     animate();
 
-    // ── Resize ──
+    // ═══ Resize ═══
     const onResize = () => {
       const newW = container.clientWidth;
       const newH = expanded ? Math.min(window.innerHeight * 0.85, 800) : height;
@@ -453,9 +597,8 @@ export default function BIMViewer({ glbUrl, metadataUrl, ifcUrl, height = 500 }:
 
   return (
     <div className="relative w-full" style={{ minHeight: expanded ? 800 : height }}>
-      {/* ── Toolbar ── */}
-      <div className="absolute top-2 left-2 z-10 flex gap-1">
-        {/* Color mode buttons */}
+      {/* ── Toolbar (BIM controls only when metadata available) ── */}
+      {metadataUrl && <div className="absolute top-2 left-2 z-10 flex gap-1">
         <button
           onClick={() => setColorMode(colorMode === "discipline" ? "default" : "discipline")}
           className="rounded px-2 py-1 text-[10px] font-medium transition-colors"
@@ -495,10 +638,10 @@ export default function BIMViewer({ glbUrl, metadataUrl, ifcUrl, height = 500 }:
           <Scissors size={12} className="inline mr-1" />
           Section
         </button>
-      </div>
+      </div>}
 
       {/* Section height slider */}
-      {sectionEnabled && (
+      {sectionEnabled && metadataUrl && (
         <div className="absolute top-10 left-2 z-10 flex items-center gap-2 rounded px-2 py-1"
           style={{ background: "rgba(13, 13, 26, 0.8)" }}>
           <span style={{ color: "#888", fontSize: 10 }}>Cut Height</span>
@@ -627,9 +770,9 @@ export default function BIMViewer({ glbUrl, metadataUrl, ifcUrl, height = 500 }:
       {/* ── Loading overlay ── */}
       {loading && (
         <div className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-2"
-          style={{ background: "#E8EDF2", borderRadius: 8 }}>
+          style={{ background: "linear-gradient(135deg, #0D0D1A 0%, #1A1A2E 100%)", borderRadius: 8 }}>
           <Loader2 size={24} className="animate-spin" style={{ color: "#4FC3F7" }} />
-          <span style={{ fontSize: 11, color: "#666" }}>
+          <span style={{ fontSize: 11, color: "#888" }}>
             Loading BIM Model{progress > 0 ? ` (${progress}%)` : "..."}
           </span>
         </div>
@@ -638,7 +781,7 @@ export default function BIMViewer({ glbUrl, metadataUrl, ifcUrl, height = 500 }:
       {/* ── Error overlay ── */}
       {error && (
         <div className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-3"
-          style={{ background: "#E8EDF2", borderRadius: 8 }}>
+          style={{ background: "#0D0D1A", borderRadius: 8 }}>
           <AlertCircle size={24} style={{ color: "#ef4444" }} />
           <span style={{ fontSize: 11, color: "#ef4444" }}>{error}</span>
           <button onClick={buildScene} className="rounded px-3 py-1 text-xs"
@@ -660,12 +803,12 @@ export default function BIMViewer({ glbUrl, metadataUrl, ifcUrl, height = 500 }:
 
       {/* ── Attribution + info ── */}
       <div className="absolute bottom-2 left-2 z-10 flex items-center gap-2">
-        <span style={{ fontSize: 9, color: "#999" }}>
+        <span style={{ fontSize: 9, color: "rgba(255,255,255,0.5)" }}>
           <Eye size={9} className="inline mr-0.5" />
-          BIM Viewer • Click elements to inspect
+          {metadataUrl ? "BIM Viewer • Click elements to inspect" : "3D Model Viewer"}
         </span>
         {metadataRef.current && (
-          <span style={{ fontSize: 9, color: "#666" }}>
+          <span style={{ fontSize: 9, color: "rgba(255,255,255,0.3)" }}>
             • {metadataRef.current.summary.totalElements} elements
           </span>
         )}

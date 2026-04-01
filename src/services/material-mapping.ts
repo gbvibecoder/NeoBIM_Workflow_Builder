@@ -42,6 +42,10 @@ const ELEMENT_MATERIALS: Record<string, PBRMaterialDef> = {
   pipe:         { color: 0x3A8A5A, roughness: 0.3, metalness: 0.65 },
   "cable-tray": { color: 0xCCA020, roughness: 0.35, metalness: 0.55 },
   equipment:    { color: 0x5080B0, roughness: 0.3, metalness: 0.6 },
+
+  // Facade detail
+  mullion:      { color: 0xC0C0C8, roughness: 0.25, metalness: 0.9 },
+  spandrel:     { color: 0x1A1A22, roughness: 0.3, metalness: 0.8 },
 };
 
 /**

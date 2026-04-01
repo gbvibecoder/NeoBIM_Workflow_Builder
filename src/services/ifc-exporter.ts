@@ -343,6 +343,10 @@ export function generateIFCFile(
           ? element.vertices.map(v => ({ x: v.x, y: v.y }))
           : geometry.footprint, storeyPlacementId, bodyContextId, ownerHistId, true, id, lines);
         storeyElementIds.push(cId);
+      // mullion and spandrel are visual facade detail — exported as beam entities
+      } else if (element.type === "mullion" || element.type === "spandrel") {
+        const mId = writeBeamEntity(element, storeyPlacementId, bodyContextId, zDirId, ownerHistId, id, lines);
+        storeyElementIds.push(mId);
       }
     }
 

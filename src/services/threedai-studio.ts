@@ -94,14 +94,19 @@ const NEGATIVE_PROMPT =
   "toy-like, cartoon, non-architectural, furniture, people, vehicles, trees, " +
   "interior details, text, watermark, signature, simplified, abstract, blocky, " +
   "flat shading, untextured, plastic, miniature, dollhouse, game asset, low-poly, " +
-  "smooth featureless walls, missing windows, blank facade, no detail";
+  "smooth featureless walls, missing windows, blank facade, no detail, " +
+  "spaceship, spacecraft, UFO, flying saucer, rocket, vehicle, airplane, robot, " +
+  "sci-fi ship, starship, space station, action figure, figurine, diorama, model kit";
 
 const VIEW_SUFFIX =
   "isometric view, white background, ultra-realistic architectural visualization, " +
   "detailed facade with windows and facade panels, real-world building proportions, " +
   "high-resolution PBR materials and textures, sharp edges, " +
   "accurate scale, photorealistic octane render quality, " +
-  "architectural photography lighting, 8K detail";
+  "architectural photography lighting, 8K detail, " +
+  "large-scale detailed building model with visible structural columns, floor slabs, " +
+  "glass curtain wall mullions, entrance canopy, roof parapet, " +
+  "real architectural building at full scale not a miniature or toy";
 
 /** Maps massing type keywords to architectural form descriptions */
 const MASSING_VOCAB: Record<string, string> = {
@@ -359,13 +364,16 @@ export function buildPrompt(req: BuildingRequirements): { prompt: string; negati
 
   if (isRichDescription) {
     // Use the user's text directly with realism boosters and quality suffixes.
+    // Prefix with architectural anchoring to prevent misinterpretation
+    // (e.g., "space-inspired" → spaceship, "organic" → blob).
+    const anchor = "Architectural building exterior (NOT a vehicle or spacecraft): ";
     const realismBooster = ", ultra-realistic detailed exterior with visible windows doors and facade materials, real-world building not a toy or massing model";
     const suffix = `${realismBooster}, ${VIEW_SUFFIX}`;
-    const maxUserLen = 1024 - suffix.length;
+    const maxUserLen = 1024 - anchor.length - suffix.length;
     const trimmedText = userText.length > maxUserLen
       ? userText.slice(0, maxUserLen - 3) + "..."
       : userText;
-    prompt = trimmedText + suffix;
+    prompt = anchor + trimmedText + suffix;
     template = "passthrough";
     return { prompt, negativePrompt: NEGATIVE_PROMPT, template };
   }
