@@ -8,7 +8,7 @@ import {
   Box, Play, Image as ImageIcon, FileCode,
   MousePointerClick, Workflow, Layers, Settings, Target, Calendar,
   ChevronUp, ChevronDown, ClipboardList, Send, Copy, Building2, Star,
-  Film, Eye, Heart, Upload,
+  Film, Eye, Heart, Upload, Menu, X,
 } from "lucide-react";
 import { MiniWorkflowDiagram } from "@/components/shared/MiniWorkflowDiagram";
 import { PREBUILT_WORKFLOWS } from "@/constants/prebuilt-workflows";
@@ -866,6 +866,7 @@ export default function LandingPage() {
 
 
   const newsItems = [t('landing.news1'), t('landing.news2'), t('landing.news3'), t('landing.news5')];
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // ─── Roadmap vote state (localStorage-persisted) ────────────────────────────
   const defaultVotes = Object.fromEntries(ROADMAP_ITEMS.map(i => [i.id, i.defaultVotes]));
@@ -1078,8 +1079,108 @@ export default function LandingPage() {
               {t('landing.signUpFree')}
             </Link>
           </div>
+
+          {/* Mobile hamburger button — visible only on small screens */}
+          <button
+            className="landing-mobile-menu-btn"
+            onClick={() => setMobileMenuOpen(v => !v)}
+            aria-label="Toggle menu"
+            aria-expanded={mobileMenuOpen}
+            style={{
+              display: "none", alignItems: "center", justifyContent: "center",
+              width: 40, height: 40, borderRadius: 10,
+              background: "rgba(255,255,255,0.06)",
+              border: "1px solid rgba(255,255,255,0.08)",
+              color: "#F0F0F5", cursor: "pointer", flexShrink: 0,
+              marginLeft: 8,
+            }}
+          >
+            {mobileMenuOpen ? <X size={18} /> : <Menu size={18} />}
+          </button>
         </nav>
       </header>
+
+      {/* Mobile navigation drawer */}
+      <AnimatePresence>
+        {mobileMenuOpen && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              onClick={() => setMobileMenuOpen(false)}
+              style={{
+                position: "fixed", inset: 0, zIndex: 998,
+                background: "rgba(0,0,0,0.6)",
+                backdropFilter: "blur(4px)",
+              }}
+            />
+            <motion.div
+              initial={{ x: "100%" }}
+              animate={{ x: 0 }}
+              exit={{ x: "100%" }}
+              transition={{ type: "spring", stiffness: 400, damping: 35 }}
+              style={{
+                position: "fixed", top: 0, right: 0, bottom: 0,
+                width: 280, zIndex: 999,
+                background: "rgba(10,10,18,0.98)",
+                borderLeft: "1px solid rgba(255,255,255,0.06)",
+                backdropFilter: "blur(24px)",
+                padding: "80px 24px 32px",
+                display: "flex", flexDirection: "column", gap: 4,
+              }}
+            >
+              {[
+                { label: t('landing.features'), href: '#how-it-works' },
+                { label: t('landing.community'), href: '#community' },
+                { label: t('landing.pricing'), href: '#pricing' },
+                { label: t('landing.blog'), href: '/blog' },
+              ].map(l => (
+                <a
+                  key={l.href}
+                  href={l.href}
+                  onClick={() => setMobileMenuOpen(false)}
+                  style={{
+                    display: "block", padding: "14px 16px", borderRadius: 10,
+                    fontSize: 15, fontWeight: 600, color: "#C0C0D0",
+                    textDecoration: "none",
+                    transition: "background 0.15s",
+                  }}
+                >
+                  {l.label}
+                </a>
+              ))}
+              <div style={{ height: 1, background: "rgba(255,255,255,0.06)", margin: "12px 0" }} />
+              <Link
+                href="/login"
+                onClick={() => setMobileMenuOpen(false)}
+                style={{
+                  display: "block", padding: "12px 16px", borderRadius: 10,
+                  fontSize: 14, fontWeight: 600, color: "#9898B0",
+                  textDecoration: "none", textAlign: "center",
+                  border: "1px solid rgba(255,255,255,0.08)",
+                }}
+              >
+                {t('landing.login')}
+              </Link>
+              <Link
+                href="/register"
+                onClick={() => { setMobileMenuOpen(false); trackLead({ content_name: "mobile_menu_sign_up" }); }}
+                style={{
+                  display: "block", padding: "12px 16px", borderRadius: 10,
+                  fontSize: 14, fontWeight: 700, color: "white", textAlign: "center",
+                  textDecoration: "none",
+                  background: "linear-gradient(135deg, #4F8AFF 0%, #6366F1 100%)",
+                  boxShadow: "0 2px 12px rgba(79,138,255,0.3)",
+                }}
+              >
+                {t('landing.signUpFree')}
+              </Link>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
 
       <main>
         {/* ── HERO ─────────────────────────────────────────────────── */}

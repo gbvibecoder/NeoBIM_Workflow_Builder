@@ -630,6 +630,45 @@ function WorkflowCanvasInner({ workflowId: urlWorkflowId, templateId }: Workflow
     setContextMenu({ x: evt.clientX, y: evt.clientY, type: "canvas" });
   }, []);
 
+  // Long-press touch handler for mobile context menu (500ms hold)
+  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const longPressFiredRef = useRef(false);
+
+  const onTouchStartCapture = useCallback((e: React.TouchEvent) => {
+    longPressFiredRef.current = false;
+    const touch = e.touches[0];
+    const x = touch.clientX;
+    const y = touch.clientY;
+    longPressTimerRef.current = setTimeout(() => {
+      longPressFiredRef.current = true;
+      // Find if touch landed on a node element
+      const el = document.elementFromPoint(x, y)?.closest('.react-flow__node');
+      if (el) {
+        const nodeId = el.getAttribute('data-id');
+        if (nodeId) {
+          setContextMenu({ x, y, type: "node", nodeId });
+        }
+      } else {
+        setContextMenu({ x, y, type: "canvas" });
+      }
+    }, 500);
+  }, []);
+
+  const onTouchEndCapture = useCallback(() => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  }, []);
+
+  const onTouchMoveCapture = useCallback(() => {
+    // Cancel long press if finger moves (user is panning/scrolling)
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  }, []);
+
   const handleDuplicateNode = useCallback((nodeId: string) => {
     const node = storeNodes.find(n => n.id === nodeId);
     if (!node) return;
@@ -890,6 +929,9 @@ function WorkflowCanvasInner({ workflowId: urlWorkflowId, templateId }: Workflow
         className="flex-1 relative"
         onDrop={onDrop}
         onDragOver={onDragOver}
+        onTouchStartCapture={onTouchStartCapture}
+        onTouchEndCapture={onTouchEndCapture}
+        onTouchMoveCapture={onTouchMoveCapture}
       >
         {/* Hide toolbar when showcase overlay is active to avoid z-index clash */}
         {!(showShowcase && !isExecuting && artifacts.size > 0) && (

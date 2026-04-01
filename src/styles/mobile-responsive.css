@@ -59,6 +59,15 @@
     display: none !important;
   }
 
+  .landing-nav-cta .landing-signup-link {
+    display: none !important;
+  }
+
+  /* Show hamburger button on mobile */
+  .landing-mobile-menu-btn {
+    display: flex !important;
+  }
+
   /* Logo — compact on mobile */
   .landing-logo-link {
     gap: 6px !important;
@@ -225,7 +234,8 @@
   }
 
   /* 3-column grids become single column */
-  .landing-grid-3 {
+  .landing-grid-3,
+  .testimonial-grid {
     grid-template-columns: 1fr !important;
     gap: 16px !important;
   }
@@ -544,7 +554,8 @@
     padding-right: 32px !important;
   }
 
-  .grid.grid-cols-3 {
+  .grid.grid-cols-3,
+  .testimonial-grid {
     grid-template-columns: repeat(2, 1fr) !important;
   }
 
