@@ -194,6 +194,7 @@ export function layoutFloorPlan(program: EnhancedRoomProgram): PlacedRoom[] {
   // Use solver for standard residential plans with 7+ rooms, private+public zones.
   // Conservative: only use for plans large enough to benefit from zone-row strategy.
   // Small plans, courtyard houses, and edge cases go through BSP.
+  // Solver handles 10+ room plans with zone structure. Multi-row layout handles 15+ rooms.
   const solverEligible = inputCount >= 10 && cls.hasPrivate && cls.hasPublic && !hasCourtyardRoom(program) && useZones;
 
   if (solverEligible) try {
@@ -1506,11 +1507,17 @@ function enforceHardCapsOnLayout(rooms: PlacedRoom[], specs?: RoomSpec[]): Place
     const area = room.width * room.depth;
 
     if (area > caps.max * 1.05) {
-      // Check if the AI specifically asked for this size
+      // Only skip capping if ALL of these are true:
+      // 1. AI spec exists for this room
+      // 2. AI spec itself is larger than the cap (AI deliberately oversized)
+      // 3. BSP area is close to AI spec (not a BSP blowup)
+      // 4. The cap type allows oversizing (living_room, open_workspace — NOT bathroom/utility)
+      const NEVER_SKIP = new Set(["bathroom", "master_bathroom", "toilet", "powder_room",
+        "servant_toilet", "pooja_room", "utility", "store_room", "shoe_rack",
+        "staircase", "servant_quarter", "walk_in_closet", "laundry"]);
       const spec = specs?.find(s => s.name === room.name);
-      if (spec && spec.areaSqm > caps.max && area <= spec.areaSqm * 1.3) {
-        // AI intentionally sized this room larger than the type cap — respect it
-        continue;
+      if (spec && !NEVER_SKIP.has(classified) && spec.areaSqm > caps.max && area <= spec.areaSqm * 1.3) {
+        continue; // AI intentionally sized this large room — respect it
       }
 
       // Shrink the longer dimension, but ensure result stays ≥ 2.0m in both dims

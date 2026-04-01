@@ -487,25 +487,21 @@ function generateCandidate(
 
   const result: PlacedRoom[] = [];
 
-  // ── PRIVATE ZONE: vertical strips for bed-bath pairs ──
+  // ── PRIVATE ZONE: multi-row layout for bed-bath pairs ──
   // Reorder pairs
   const orderedPairs = config.pairOrder
     .filter(i => i < pairs.length)
     .map(i => pairs[i]);
-  // Add any pairs not in order
   for (let i = 0; i < pairs.length; i++) {
     if (!config.pairOrder.includes(i)) orderedPairs.push(pairs[i]);
   }
 
-  // Calculate strip widths
+  // Build groups: bed-bath pairs + other private rooms
   const allPrivateGroups: { rooms: RoomSpec[]; totalArea: number }[] = [];
   for (const p of orderedPairs) {
     const rooms = p.bathroom ? [p.bedroom, p.bathroom] : [p.bedroom];
     allPrivateGroups.push({ rooms, totalArea: rooms.reduce((s, r) => s + r.areaSqm, 0) });
   }
-  // Other private rooms: group small ones together, give large ones own strips.
-  // Merging into bed-bath pairs creates 3+ room groups that stack poorly.
-  // Instead, cluster small rooms (< 6 sqm) together, larger rooms get own strip.
   const smallOther: RoomSpec[] = [];
   for (const r of otherPrivate) {
     if (r.areaSqm < 6 && smallOther.reduce((s, x) => s + x.areaSqm, 0) + r.areaSqm < 12) {
@@ -520,32 +516,58 @@ function generateCandidate(
 
   if (allPrivateGroups.length === 0 && publicRooms.length === 0) return null;
 
-  const privateTotalArea = allPrivateGroups.reduce((s, g) => s + g.totalArea, 0);
-  let px = 0;
+  // ── Split into multiple rows if one row can't fit all groups ──
+  // Each bed-bath pair needs ~3.5m width. If total needed > fpW, use 2+ rows.
+  // Allow tighter packing: 2.5m min strip width handles bed-bath vertical splits
+  const MIN_STRIP_W = 2.5;
+  const maxGroupsPerRow = Math.max(3, Math.floor(fpW / MIN_STRIP_W));
+  const privateRows: typeof allPrivateGroups[] = [];
 
-  // Merge small groups so no strip ends up too narrow
-  // A group's strip width ≈ fpW × (groupArea / totalArea). If that < 1.5m, merge it.
-  while (allPrivateGroups.length > 1) {
-    const totalA = allPrivateGroups.reduce((s, g) => s + g.totalArea, 0);
-    const smallestGroup = allPrivateGroups.reduce((a, b) => a.totalArea < b.totalArea ? a : b);
-    const smallestStripW = fpW * (smallestGroup.totalArea / totalA);
-    if (smallestStripW >= 1.5) break;
-    // Merge the smallest group into the next-smallest non-bed-bath group
-    allPrivateGroups.sort((a, b) => a.totalArea - b.totalArea);
-    const merged = allPrivateGroups.shift()!;
-    // Merge into another small group, preferring non-pair groups
-    const target = allPrivateGroups.find(g => g.rooms.length !== 2 || !isBedroom(g.rooms[0])) ?? allPrivateGroups[0];
-    target.rooms.push(...merged.rooms);
-    target.totalArea += merged.totalArea;
+  // Distribute groups across rows
+  let remaining = [...allPrivateGroups];
+  while (remaining.length > 0) {
+    const rowSize = Math.min(remaining.length, maxGroupsPerRow);
+    privateRows.push(remaining.slice(0, rowSize));
+    remaining = remaining.slice(rowSize);
   }
 
-  const privateTotalAreaFinal = allPrivateGroups.reduce((s, g) => s + g.totalArea, 0);
+  // Each row gets a proportional share of the private zone depth
+  const privateTotalArea = allPrivateGroups.reduce((s, g) => s + g.totalArea, 0);
+  const rowAreas = privateRows.map(row => row.reduce((s, g) => s + g.totalArea, 0));
+  const totalRowArea = rowAreas.reduce((s, a) => s + a, 0);
 
-  for (let gi = 0; gi < allPrivateGroups.length; gi++) {
-    const group = allPrivateGroups[gi];
-    const isLast = gi === allPrivateGroups.length - 1;
-    const ratio = privateTotalAreaFinal > 0 ? group.totalArea / privateTotalAreaFinal : 1 / allPrivateGroups.length;
-    const stripW = isLast ? grid(fpW - px) : grid(Math.max(fpW * ratio, 1.5));
+  let currentY = privateY;
+  for (let rowIdx = 0; rowIdx < privateRows.length; rowIdx++) {
+    const row = privateRows[rowIdx];
+    const isLastRow = rowIdx === privateRows.length - 1;
+    const rowDepth = isLastRow
+      ? grid(privateY + privateDepth - currentY)
+      : grid(Math.max(privateDepth * (rowAreas[rowIdx] / totalRowArea), 2.4));
+
+    if (rowDepth < 1.2) continue; // absolute minimum
+
+    // Place groups in this row as horizontal strips
+    // Pre-allocate widths: each group gets minimum + proportional extra (same as public zone)
+    const rowTotalArea = row.reduce((s, g) => s + g.totalArea, 0);
+    const stripMinW = 1.5; // absolute minimum per strip
+    const totalMinW = row.length * stripMinW;
+    const extraW = Math.max(0, fpW - totalMinW);
+    const rowWidths: number[] = [];
+    for (let gi = 0; gi < row.length; gi++) {
+      const ratio = rowTotalArea > 0 ? row[gi].totalArea / rowTotalArea : 1 / row.length;
+      rowWidths.push(grid(stripMinW + extraW * ratio));
+    }
+    // Adjust last to absorb rounding
+    if (rowWidths.length > 0) {
+      const used = rowWidths.reduce((s, w) => s + w, 0);
+      rowWidths[rowWidths.length - 1] = grid(rowWidths[rowWidths.length - 1] + (fpW - used));
+    }
+
+    let px = 0;
+
+    for (let gi = 0; gi < row.length; gi++) {
+      const group = row[gi];
+      const stripW = rowWidths[gi];
 
     if (stripW < 1.0) return null;
 
@@ -554,9 +576,9 @@ function generateCandidate(
       result.push({
         name: group.rooms[0].name,
         type: group.rooms[0].type,
-        x: grid(px), y: grid(privateY),
-        width: grid(stripW), depth: grid(privateDepth),
-        area: grid(stripW * privateDepth),
+        x: grid(px), y: grid(currentY),
+        width: grid(stripW), depth: grid(rowDepth),
+        area: grid(stripW * rowDepth),
       });
     } else if (group.rooms.length === 2 && isBedroom(group.rooms[0]) && isBathroom(group.rooms[1])) {
       // Bedroom-bathroom pair — try vertical split (side-by-side) first,
@@ -587,17 +609,17 @@ function generateCandidate(
         const bedW = grid(stripW - bathW);
 
         let bathDepth = grid(Math.max(bathMins.minDepth,
-          Math.min(bathTargetArea / bathW, bathW * bathMaxAR, privateDepth)));
+          Math.min(bathTargetArea / bathW, bathW * bathMaxAR, rowDepth)));
 
         const bathY = config.bathBelow
-          ? grid(privateY + privateDepth - bathDepth)
-          : grid(privateY);
+          ? grid(currentY + rowDepth - bathDepth)
+          : grid(currentY);
 
         result.push({
           name: bed.name, type: bed.type,
-          x: grid(px), y: grid(privateY),
-          width: grid(bedW), depth: grid(privateDepth),
-          area: grid(bedW * privateDepth),
+          x: grid(px), y: grid(currentY),
+          width: grid(bedW), depth: grid(rowDepth),
+          area: grid(bedW * rowDepth),
         });
         result.push({
           name: bath.name, type: bath.type,
@@ -608,42 +630,42 @@ function generateCandidate(
       } else {
         // ── Horizontal split (stacked) with area-capped bathroom ──
         let bathDepth = grid(Math.max(bathMins.minDepth,
-          Math.min(bathTargetArea / stripW, stripW * bathMaxAR, privateDepth * 0.4)));
-        let bedDepth = grid(privateDepth - bathDepth);
+          Math.min(bathTargetArea / stripW, stripW * bathMaxAR, rowDepth * 0.4)));
+        let bedDepth = grid(rowDepth - bathDepth);
 
         if (bedDepth < bedMins.minDepth) {
           bedDepth = grid(bedMins.minDepth);
-          bathDepth = grid(privateDepth - bedDepth);
+          bathDepth = grid(rowDepth - bedDepth);
         }
         if (bathDepth < bathMins.minDepth) {
           bathDepth = grid(bathMins.minDepth);
-          bedDepth = grid(privateDepth - bathDepth);
+          bedDepth = grid(rowDepth - bathDepth);
         }
         if (bedDepth < 1.0 || bathDepth < 0.8) return null;
 
         if (config.bathBelow) {
           result.push({
             name: bed.name, type: bed.type,
-            x: grid(px), y: grid(privateY),
+            x: grid(px), y: grid(currentY),
             width: grid(stripW), depth: grid(bedDepth),
             area: grid(stripW * bedDepth),
           });
           result.push({
             name: bath.name, type: bath.type,
-            x: grid(px), y: grid(privateY + bedDepth),
+            x: grid(px), y: grid(currentY + bedDepth),
             width: grid(stripW), depth: grid(bathDepth),
             area: grid(stripW * bathDepth),
           });
         } else {
           result.push({
             name: bath.name, type: bath.type,
-            x: grid(px), y: grid(privateY),
+            x: grid(px), y: grid(currentY),
             width: grid(stripW), depth: grid(bathDepth),
             area: grid(stripW * bathDepth),
           });
           result.push({
             name: bed.name, type: bed.type,
-            x: grid(px), y: grid(privateY + bathDepth),
+            x: grid(px), y: grid(currentY + bathDepth),
             width: grid(stripW), depth: grid(bedDepth),
             area: grid(stripW * bedDepth),
           });
@@ -652,13 +674,13 @@ function generateCandidate(
     } else {
       // Multiple rooms: stack vertically within strip
       const totalArea = group.rooms.reduce((s, r) => s + r.areaSqm, 0);
-      let ry = privateY;
+      let ry = currentY;
       for (let ri = 0; ri < group.rooms.length; ri++) {
         const room = group.rooms[ri];
         const isLastRoom = ri === group.rooms.length - 1;
         const roomDepth = isLastRoom
-          ? grid(privateY + privateDepth - ry)
-          : grid(Math.max(privateDepth * (room.areaSqm / totalArea), 1.2));
+          ? grid(currentY + rowDepth - ry)
+          : grid(Math.max(rowDepth * (room.areaSqm / totalArea), 1.2));
 
         result.push({
           name: room.name, type: room.type,
@@ -670,8 +692,11 @@ function generateCandidate(
       }
     }
 
-    px = grid(px + stripW);
-  }
+      px = grid(px + stripW);
+    } // end strip loop
+
+    currentY = grid(currentY + rowDepth);
+  } // end row loop
 
   // ── CORRIDOR (only when both zones exist) ──
   const hasPrivateContent = allPrivateGroups.length > 0 && allPrivateGroups.some(g => g.rooms.length > 0);
