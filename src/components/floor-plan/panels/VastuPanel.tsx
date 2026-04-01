@@ -67,6 +67,12 @@ export function VastuPanel() {
               <StatusDot color="#eab308" />
               <span className="text-gray-600">Acceptable: {report.acceptable}</span>
             </div>
+            {report.advisories > 0 && (
+              <div className="flex items-center gap-1.5 mb-1">
+                <StatusDot color="#8b5cf6" />
+                <span className="text-gray-600">Advisory: {report.advisories}</span>
+              </div>
+            )}
             <div className="flex items-center gap-1.5">
               <StatusDot color="#ef4444" />
               <span className="text-gray-600">Violations: {report.violations}</span>
@@ -93,10 +99,25 @@ export function VastuPanel() {
         )}
 
         {/* Acceptable */}
-        {report.items.filter((i) => i.status === "acceptable").length > 0 && (
+        {report.acceptable > 0 && (
           <Section title="Acceptable" count={report.acceptable} color="#eab308">
             {report.items
               .filter((i) => i.status === "acceptable")
+              .map((item) => (
+                <VastuItem
+                  key={item.rule_id + item.room_id}
+                  item={item}
+                  onClick={() => handleClickRoom(item.room_id)}
+                />
+              ))}
+          </Section>
+        )}
+
+        {/* Advisory */}
+        {report.advisories > 0 && (
+          <Section title="Advisory" count={report.advisories} color="#8b5cf6">
+            {report.items
+              .filter((i) => i.status === "advisory")
               .map((item) => (
                 <VastuItem
                   key={item.rule_id + item.room_id}
@@ -243,7 +264,7 @@ function Section({
 
 function VastuItem({ item, onClick }: { item: VastuReportItem; onClick: () => void }) {
   const statusColor =
-    item.status === "violation" ? "#ef4444" : item.status === "acceptable" ? "#eab308" : "#22c55e";
+    item.status === "violation" ? "#ef4444" : item.status === "acceptable" ? "#eab308" : item.status === "advisory" ? "#8b5cf6" : "#22c55e";
 
   return (
     <button

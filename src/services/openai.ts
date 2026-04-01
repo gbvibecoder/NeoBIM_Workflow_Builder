@@ -2131,75 +2131,303 @@ export async function generateFloorPlan(
     const typology = d.buildingType ?? "Residential";
     const floorPlate = Math.round(totalArea / floors);
 
-    // ── PRIMARY PATH: AI Spatial Layout (GPT-4o) ──────────────────────
-    // GPT-4o solves ALL constraints simultaneously — room coordinates,
-    // adjacency, NBC compliance, proportions — in a single pass.
-    // Falls back to algorithmic layout if AI fails or is unavailable.
+    // ── PRIMARY PATH: Deterministic layout engine ─────────────────────
+    // If we have a structured room program from Stage 1, use the BSP engine.
+    // This produces architecturally correct layouts without any AI calls.
+    // Falls through to GPT-4o if the engine fails or isn't available.
     if (roomProgram) {
-      // Compute footprint for AI
-      const roomAreaSum = roomProgram.rooms.reduce((s, r) => s + r.areaSqm, 0);
-      const fpArea = Math.max(roomProgram.totalAreaSqm, roomAreaSum * 1.08);
-      const defaultAspect = 1.33;
-      const aiFpW = Math.round(Math.sqrt(fpArea * defaultAspect) * 10) / 10;
-      const aiFpH = Math.round((fpArea / aiFpW) * 10) / 10;
-
       try {
-        const { generateAISpatialLayout } = await import("@/lib/floor-plan/ai-spatial-layout");
-        const aiPlaced = await generateAISpatialLayout(roomProgram, aiFpW, aiFpH, userApiKey);
+        const { layoutFloorPlan } = await import("@/lib/floor-plan/layout-engine");
+        const placed = layoutFloorPlan(roomProgram);
 
-        if (aiPlaced && aiPlaced.length > 0) {
-          console.log(`[generateFloorPlan] AI spatial layout accepted: ${aiPlaced.length} rooms`);
+        if (placed.length > 0) {
+          // Validate the deterministic layout
+          const { validateRoomLayout } = await import("@/lib/floor-plan/layout-validator");
+          const validation = validateRoomLayout(
+            placed, placed.reduce((maxX, r) => Math.max(maxX, r.x + r.width), 0),
+            placed.reduce((maxY, r) => Math.max(maxY, r.y + r.depth), 0),
+            roomProgram.adjacency, roomProgram.entranceRoom,
+          );
 
-          const fpWidthM = Math.max(...aiPlaced.map(r => r.x + r.width));
-          const fpHeightM = Math.max(...aiPlaced.map(r => r.y + r.depth));
-          const title = `${typology} — Floor Plan`;
+          if (validation.score >= 50) {
+            // Layout engine succeeded — build result
+            const fpWidthM = placed.reduce((mx, r) => Math.max(mx, r.x + r.width), 0);
+            const fpHeightM = placed.reduce((mx, r) => Math.max(mx, r.y + r.depth), 0);
+            const title = `${typology} — Floor Plan`;
 
-          const posRooms: PositionedRoom[] = aiPlaced.map(r => ({
-            name: r.name, type: r.type, area: r.area,
-            x: r.x, y: r.y, width: r.width, depth: r.depth,
-          }));
+            // Convert to PositionedRoom format
+            const posRooms: PositionedRoom[] = placed.map(r => ({
+              name: r.name, type: r.type, area: r.area,
+              x: r.x, y: r.y, width: r.width, depth: r.depth,
+            }));
 
-          const sharedWalls = findSharedWalls(posRooms);
-          const margin = 50;
-          const drawW = 700;
-          const drawH = 490;
-          const pxPerMeter = Math.min(drawW / fpWidthM, drawH / fpHeightM);
-          const planW = fpWidthM * pxPerMeter;
-          const planH = fpHeightM * pxPerMeter;
-          const ox = margin + (drawW - planW) / 2;
-          const oy = margin + (drawH - planH) / 2;
+            const sharedWalls = findSharedWalls(posRooms);
 
-          const svg = renderArchitecturalSvg(posRooms, sharedWalls, title, pxPerMeter, fpWidthM, fpHeightM, ox, oy);
-          const roomList = posRooms.map(r => ({ name: r.name, area: snap(r.width * r.depth), unit: "m²" }));
+            const margin = 50;
+            const drawW = 700;
+            const drawH = 490;
+            const pxPerMeter = Math.min(drawW / fpWidthM, drawH / fpHeightM);
+            const planW = fpWidthM * pxPerMeter;
+            const planH = fpHeightM * pxPerMeter;
+            const ox = margin + (drawW - planW) / 2;
+            const oy = margin + (drawH - planH) / 2;
 
-          return {
-            svg, roomList, totalArea, floors,
-            positionedRooms: posRooms.map(r => ({
-              name: r.name, type: r.type, x: r.x, y: r.y,
-              width: r.width, depth: r.depth, area: snap(r.width * r.depth),
-            })),
-          };
+            const svg = renderArchitecturalSvg(posRooms, sharedWalls, title, pxPerMeter, fpWidthM, fpHeightM, ox, oy);
+            const roomList = posRooms.map(r => ({ name: r.name, area: snap(r.width * r.depth), unit: "m²" }));
+
+
+            return {
+              svg, roomList, totalArea, floors,
+              positionedRooms: posRooms.map(r => ({
+                name: r.name, type: r.type, x: r.x, y: r.y,
+                width: r.width, depth: r.depth, area: snap(r.width * r.depth),
+              })),
+            };
+          } else {
+            console.warn(`[generateFloorPlan] Layout engine score too low (${validation.score}/100), falling back to GPT-4o`);
+          }
         }
-      } catch (aiErr) {
-        console.warn("[generateFloorPlan] AI spatial layout failed:", aiErr instanceof Error ? aiErr.message : aiErr);
+      } catch (engineErr) {
+        console.warn("[generateFloorPlan] Layout engine failed, falling back to GPT-4o:", engineErr);
+      }
+    }
+
+    // Build detailed program from structured data if available
+    let programDetail: string;
+    if (d.program && Array.isArray(d.program) && d.program.length > 0) {
+      programDetail = d.program
+        .map((p) => `${p.space}${p.area_m2 ? ` (${p.area_m2} m²)` : ""}${p.floor ? ` [${p.floor}]` : ""}`)
+        .join(", ");
+    } else {
+      programDetail = d.programSummary ?? "residential rooms";
+    }
+
+    // Also capture the original user prompt/narrative for better context
+    const narrativeContext = d.narrative ?? "";
+    const programSummaryContext = d.programSummary ?? "";
+
+    // ── Detect multi-floor building with distinct per-floor layouts ──
+    const isMultiFloor = floors >= 2 && hasPerFloorRequirements(d);
+
+    if (isMultiFloor) {
+      return generateMultiFloorPlan(client, d, floors, totalArea, typology, programDetail, narrativeContext, programSummaryContext);
+    }
+
+    // ── Single floor plan generation ────────────────────────────────
+
+    // ── Calculate footprint dimensions ──────────────────────────────
+    const aspect = 1.33;
+    const fpWidthM = snap(Math.sqrt(floorPlate * aspect));
+    const fpHeightM = snap(floorPlate / fpWidthM);
+
+    // ── Build zone-aware layout instructions ─────────────────────────
+    let zoneInstructions = "";
+    let adjacencyInstructions = "";
+    if (roomProgram) {
+      // Zone placement rules
+      const zoneLines: string[] = [];
+      if (roomProgram.zones.public.length > 0) {
+        zoneLines.push(`PUBLIC ZONE (bottom/south of plan, higher y): ${roomProgram.zones.public.join(", ")}`);
+      }
+      if (roomProgram.zones.private.length > 0) {
+        zoneLines.push(`PRIVATE ZONE (top/north of plan, lower y): ${roomProgram.zones.private.join(", ")}`);
+      }
+      if (roomProgram.zones.service.length > 0) {
+        zoneLines.push(`SERVICE ZONE (interior or grouped together): ${roomProgram.zones.service.join(", ")}`);
+      }
+      if (roomProgram.zones.circulation.length > 0) {
+        zoneLines.push(`CIRCULATION (connects public ↔ private): ${roomProgram.zones.circulation.join(", ")}`);
+      }
+      zoneInstructions = `\n\nZONE PLACEMENT (follow these strictly):\n${zoneLines.join("\n")}`;
+
+      // Adjacency constraints
+      if (roomProgram.adjacency.length > 0) {
+        const adjLines = roomProgram.adjacency.map(a =>
+          `- "${a.roomA}" MUST share a wall with "${a.roomB}" (${a.reason})`
+        );
+        adjacencyInstructions = `\n\nREQUIRED ADJACENCIES (rooms must share a wall):\n${adjLines.join("\n")}`;
       }
 
-      // ── FALLBACK: Algorithmic layout (BSP/spine) ──────────────────────
-      console.log("[generateFloorPlan] Falling back to algorithmic layout");
-      const { layoutFloorPlan } = await import("@/lib/floor-plan/layout-engine");
-      const placed = layoutFloorPlan(roomProgram);
+      // Exterior wall requirements
+      const extWallRooms = roomProgram.rooms
+        .filter(r => r.mustHaveExteriorWall)
+        .map(r => r.name);
+      if (extWallRooms.length > 0) {
+        zoneInstructions += `\n\nMUST HAVE EXTERIOR WALL (at least one edge on footprint boundary):\n${extWallRooms.join(", ")}`;
+      }
 
-      if (placed.length > 0) {
-        const fpWidthM = placed.reduce((mx, r) => Math.max(mx, r.x + r.width), 0);
-        const fpHeightM = placed.reduce((mx, r) => Math.max(mx, r.y + r.depth), 0);
-        const title = `${typology} — Floor Plan`;
+      if (roomProgram.circulationNotes) {
+        zoneInstructions += `\n\nCIRCULATION STRATEGY: ${roomProgram.circulationNotes}`;
+      }
+    }
 
-        const posRooms: PositionedRoom[] = placed.map(r => ({
-          name: r.name, type: r.type, area: r.area,
-          x: r.x, y: r.y, width: r.width, depth: r.depth,
+    // ── Step 1: Ask AI for positioned room layout (with retry) ──────
+    const MAX_ATTEMPTS = 2;
+    let lastAttemptRooms: PositionedRoom[] | null = null;
+    let lastValidationFeedback = "";
+
+    for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+      const messages: Array<{ role: "system" | "user" | "assistant"; content: string }> = [
+        {
+          role: "system",
+          content: `You are an expert architect creating a precise, dimensioned floor plan layout.
+Given a building brief, generate rooms with EXACT positions and dimensions in meters.
+
+COORDINATE SYSTEM:
+- Origin (0,0) is the top-left corner of the building
+- x increases to the right, y increases downward
+- Each room: x (left edge), y (top edge), width (x-axis), depth (y-axis)
+
+CRITICAL TILING RULES:
+1. ALL rooms MUST tile PERFECTLY within the footprint rectangle — NO gaps, NO overlaps
+2. Room edges MUST align exactly. If two rooms share a wall, their coordinates must match to 0.1m precision
+3. Every point inside the footprint must belong to exactly one room. Partition the rectangle into smaller rectangles.
+4. Room width:depth ratio must be between 0.5 and 3.0 (corridors may be up to 1:4)
+5. Sum of all room areas must equal footprint width × depth (within 2%)
+6. After placing rooms, verify: for each room, x + width ≤ footprint width AND y + depth ≤ footprint depth
+
+LAYOUT STRATEGY (think step by step):
+1. Divide the footprint into 2-3 horizontal bands (rows). Each row spans the full width.
+2. Subdivide each row into rooms. Room widths in a row must sum to exactly the footprint width.
+3. Row depths must sum to exactly the footprint depth.
+4. Place public/entrance rooms in the bottom row (highest y). Place private rooms in the top row (lowest y). Service rooms go in the middle.
+${zoneInstructions}
+${adjacencyInstructions}
+
+ARCHITECTURAL RULES:
+- Kitchen adjacent to dining. Master bedroom adjacent to master bath
+- Wet rooms (bath, kitchen, utility) should cluster for shared plumbing
+- Bedrooms, living room, and kitchen MUST have at least one exterior wall
+- Bathrooms, storage, utility CAN be interior rooms
+- Entrance should be at the bottom of the plan (high y)
+
+ROOM TYPES: living, dining, kitchen, bedroom, bathroom, hallway, corridor, entrance, utility, balcony, office, storage, staircase, other
+
+MINIMUM AREAS: bedroom ≥ 10m², living ≥ 15m², kitchen ≥ 7m², bathroom ≥ 3.5m², corridor ≥ 4m²
+
+RESPOND WITH JSON:
+{
+  "rooms": [
+    { "name": "Living Room", "type": "living", "x": 0, "y": 0, "width": 5.0, "depth": 4.2, "area": 21.0 },
+    { "name": "Kitchen", "type": "kitchen", "x": 5.0, "y": 0, "width": 3.5, "depth": 2.8, "area": 9.8 }
+  ],
+  "title": "Residential Floor Plan"
+}`,
+        },
+        {
+          role: "user",
+          content: `Design a floor plan for: ${typology}
+Building footprint: ${fpWidthM}m × ${fpHeightM}m = ${floorPlate} m²
+
+REQUIRED ROOMS (generate ALL of these, EXACTLY as listed):
+${d.program && Array.isArray(d.program) && d.program.length > 0
+  ? d.program.map((p, i) => `  ${i + 1}. "${p.space}" — ${p.area_m2 ? `${p.area_m2} m²` : "auto-size"}`).join("\n")
+  : `Program: ${programDetail}`}
+${narrativeContext ? `\nDescription: ${narrativeContext.substring(0, 500)}` : ""}
+${programSummaryContext ? `\nSummary: ${programSummaryContext}` : ""}
+
+CRITICAL CONSTRAINTS:
+- Output EXACTLY ${d.program?.length ?? "the listed"} rooms — no more, no less
+- Use the EXACT room names listed above
+- Rooms MUST perfectly tile the ${fpWidthM}m × ${fpHeightM}m rectangle with NO gaps and NO overlaps
+- x + width ≤ ${fpWidthM} and y + depth ≤ ${fpHeightM} for ALL rooms
+- Room areas MUST sum to approximately ${floorPlate} m²
+- Think in horizontal rows: divide depth into rows, then subdivide each row by width`,
+        },
+      ];
+
+      // If this is a retry, add validation feedback
+      if (attempt > 0 && lastValidationFeedback) {
+        messages.push({
+          role: "assistant",
+          content: JSON.stringify({ rooms: lastAttemptRooms, title: `${typology} — Floor Plan` }),
+        });
+        messages.push({
+          role: "user",
+          content: `Your previous layout has issues. Fix ALL of these problems:\n\n${lastValidationFeedback}\n\nGenerate a corrected layout. Same rooms, same footprint (${fpWidthM}m × ${fpHeightM}m), but fix the tiling issues.`,
+        });
+      }
+
+      const completion = await client.chat.completions.create({
+        model: "gpt-4o",
+        response_format: { type: "json_object" },
+        messages,
+      });
+
+      const content = completion.choices[0]?.message?.content;
+      if (!content) throw new Error("OpenAI returned empty response for floor plan");
+
+      const aiResult = JSON.parse(content) as {
+        rooms: Array<{ name: string; area: number; type?: string; x?: number; y?: number; width?: number; depth?: number }>;
+        title?: string;
+      };
+
+      if (!aiResult.rooms || aiResult.rooms.length === 0) {
+        throw new Error("AI returned no rooms for floor plan");
+      }
+
+      // ── Post-generation: inject missing required rooms ──────────────
+      if (d.program && Array.isArray(d.program) && d.program.length > 0) {
+        const aiRoomNames = new Set(aiResult.rooms.map(r => r.name.toLowerCase().trim()));
+        const missing: Array<{ space: string; area_m2?: number }> = [];
+        for (const req of d.program) {
+          const reqName = req.space.toLowerCase().trim();
+          const found = aiRoomNames.has(reqName) ||
+            [...aiRoomNames].some(n => n.includes(reqName) || reqName.includes(n));
+          if (!found) missing.push(req);
+        }
+        if (missing.length > 0) {
+          console.warn(`[generateFloorPlan] AI missed ${missing.length} rooms: ${missing.map(m => m.space).join(", ")}. Injecting.`);
+          for (const m of missing) {
+            const area = m.area_m2 ?? 12;
+            const w = snap(Math.sqrt(area * 1.3));
+            const h = snap(area / w);
+            aiResult.rooms.push({
+              name: m.space, area, type: detectRoomType(m.space),
+              x: 0, y: 0, width: w, depth: h,
+            });
+          }
+        }
+      }
+
+      // ── Check if AI returned positioned rooms ──────────────────────
+      const hasPositions = aiResult.rooms.every(r =>
+        typeof r.x === "number" && typeof r.y === "number" &&
+        typeof r.width === "number" && typeof r.depth === "number"
+      );
+
+      if (hasPositions) {
+        let posRooms: PositionedRoom[] = aiResult.rooms.map(r => ({
+          name: r.name,
+          area: r.area ?? snap(r.width! * r.depth!),
+          type: r.type ?? detectRoomType(r.name),
+          x: r.x!, y: r.y!, width: r.width!, depth: r.depth!,
         }));
 
+        // Stage 2b: Validate the layout
+        const { validateRoomLayout, formatValidationErrors } = await import("@/lib/floor-plan/layout-validator");
+        const validation = validateRoomLayout(
+          posRooms, fpWidthM, fpHeightM,
+          roomProgram?.adjacency, roomProgram?.entranceRoom,
+        );
+
+        if (!validation.valid && attempt < MAX_ATTEMPTS - 1) {
+          // Retry: feed errors back to GPT-4o
+          console.warn(`[generateFloorPlan] Attempt ${attempt + 1} validation score ${validation.score}/100, retrying...`);
+          lastAttemptRooms = posRooms;
+          lastValidationFeedback = formatValidationErrors(validation);
+          continue; // retry loop
+        }
+
+        if (validation.score < 100) {
+        }
+
+        // Apply geometric fixes (snap, clamp, overlap resolution)
+        posRooms = validateLayout(posRooms, fpWidthM, fpHeightM);
+
+        const title = aiResult.title ?? `${typology} — Floor Plan`;
         const sharedWalls = findSharedWalls(posRooms);
+
         const margin = 50;
         const drawW = 700;
         const drawH = 490;
@@ -2220,19 +2448,41 @@ export async function generateFloorPlan(
           })),
         };
       }
+
+      // ── Fallback: treemap layout (AI didn't return positions) ──────
+      const title = aiResult.title ?? `${typology} — Floor Plan`;
+      const rooms: RoomDef[] = aiResult.rooms.map(r => ({
+        name: r.name,
+        area: r.area,
+        type: r.type ?? detectRoomType(r.name),
+      }));
+
+      const roomAreaSum = rooms.reduce((s, r) => s + r.area, 0);
+      if (roomAreaSum > 0 && Math.abs(roomAreaSum - floorPlate) > floorPlate * 0.05) {
+        const scale = floorPlate / roomAreaSum;
+        for (const room of rooms) {
+          room.area = Math.round(room.area * scale * 10) / 10;
+        }
+      }
+
+      const margin = 50;
+      const drawW = 700;
+      const drawH = 490;
+      const pxPerMeter = Math.min(drawW / fpWidthM, drawH / fpHeightM);
+      const planW = fpWidthM * pxPerMeter;
+      const planH = fpHeightM * pxPerMeter;
+      const ox = margin + (drawW - planW) / 2;
+      const oy = margin + (drawH - planH) / 2;
+
+      const rects = layoutTreemap(rooms, ox, oy, planW, planH);
+      const svg = renderFloorPlanSvg(rects, title, pxPerMeter, planW, planH, ox, oy);
+      const roomList = rooms.map(r => ({ name: r.name, area: r.area, unit: "m²" }));
+
+      return { svg, roomList, totalArea, floors };
     }
 
-    // ── GPT-4o LAYOUT FALLBACK — PERMANENTLY REMOVED ─────────────────
-    // ~290 lines of GPT-4o room positioning code were here. They produced
-    // floating rooms with 50-60% efficiency. BSP is now the only path.
-    // See git history for the removed code.
-    console.error("[generateFloorPlan] BSP path did not return. roomProgram:", !!roomProgram);
-    return {
-      svg: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600"><text x="400" y="300" text-anchor="middle" font-size="18" fill="#666">Layout error</text></svg>',
-      roomList: [] as Array<{ name: string; area: number; unit: string }>,
-      totalArea,
-      floors,
-    };
+    // Should not reach here, but just in case all attempts exhausted without return
+    throw new Error("Floor plan generation failed after all attempts");
   });
 }
 

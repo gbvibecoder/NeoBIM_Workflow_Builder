@@ -12,7 +12,7 @@ import type {
 } from "@/types/floor-plan-cad";
 import {
   wallLength, lineDirection, perpendicularLeft, addPoints, scalePoint,
-  polygonBounds, polygonCentroid, wallAngle, floorBounds,
+  polygonBounds, polygonCentroid, wallAngle,
 } from "./geometry";
 
 // ============================================================
@@ -282,7 +282,7 @@ export interface DoorPlacementResult {
   issues: PlacementIssue[];
 }
 
-export function smartPlaceDoors(floor: Floor, facingDirection?: "north" | "south" | "east" | "west"): DoorPlacementResult {
+export function smartPlaceDoors(floor: Floor): DoorPlacementResult {
   const graph = buildAdjacencyGraph(floor);
   const doors: Door[] = [];
   const issues: PlacementIssue[] = [];
@@ -298,7 +298,7 @@ export function smartPlaceDoors(floor: Floor, facingDirection?: "north" | "south
     ?? undefined;
 
   if (entranceRoom) {
-    const entranceWall = findEntranceWall(entranceRoom, floor, facingDirection);
+    const entranceWall = findExteriorWallForRoom(entranceRoom, floor);
     if (entranceWall) {
       const doorWidth = 1050;
       const pos = findDoorPosition(entranceWall, doorWidth, usedWallSegments, floor);
@@ -401,47 +401,6 @@ export function smartPlaceDoors(floor: Floor, facingDirection?: "north" | "south
 // DOOR PLACEMENT HELPERS
 // ============================================================
 
-/**
- * Find the best exterior wall for the main entrance, considering facing direction.
- * If facingDirection is specified, prefer walls on that edge of the building.
- */
-function findEntranceWall(
-  room: Room, floor: Floor,
-  facingDirection?: "north" | "south" | "east" | "west",
-): Wall | null {
-  try {
-    const roomWallIds = new Set(room.wall_ids);
-    const exteriorWalls = floor.walls.filter(
-      (w) => w.type === "exterior" && (roomWallIds.has(w.id) || w.left_room_id === room.id || w.right_room_id === room.id)
-    );
-    if (exteriorWalls.length === 0) return null;
-    if (!facingDirection || exteriorWalls.length === 1) {
-      return exteriorWalls.sort((a, b) => wallLength(b) - wallLength(a))[0] ?? null;
-    }
-
-    // Compute building bounds to identify which edge each wall is on
-    const bounds = floorBounds(floor.walls, floor.rooms);
-    const TOL = bounds.width * 0.15; // 15% tolerance for edge detection
-
-    const scoredWalls = exteriorWalls.map(w => {
-      const mx = (w.centerline.start.x + w.centerline.end.x) / 2;
-      const my = (w.centerline.start.y + w.centerline.end.y) / 2;
-      let dirScore = 0;
-      // Y-up coords in pipeline-adapter: y=0=bottom(south), y=max=top(north)
-      if (facingDirection === "north" && my > bounds.max.y - TOL) dirScore = 10;
-      if (facingDirection === "south" && my < bounds.min.y + TOL) dirScore = 10;
-      if (facingDirection === "east" && mx > bounds.max.x - TOL) dirScore = 10;
-      if (facingDirection === "west" && mx < bounds.min.x + TOL) dirScore = 10;
-      return { wall: w, score: dirScore + wallLength(w) / 10000 };
-    });
-
-    scoredWalls.sort((a, b) => b.score - a.score);
-    return scoredWalls[0]?.wall ?? null;
-  } catch (e) { console.warn("[PLACEMENT]", (e as Error)?.message ?? e);
-    return findExteriorWallForRoom(room, floor);
-  }
-}
-
 function findExteriorWallForRoom(room: Room, floor: Floor): Wall | null {
   const roomWallIds = new Set(room.wall_ids);
   const exteriorWalls = floor.walls.filter(
@@ -460,34 +419,85 @@ function findDoorPosition(
 ): number | null {
   const wLen = wallLength(wall);
   const MIN_FROM_CORNER = 200;
+  const MIN_GAP = 100;           // minimum gap between door edge and any element
+  const SWEEP_STEP = 50;         // 50mm sweep resolution
+  const IDEAL_CORNER_DIST = 300; // preferred distance from corners
+  const WINDOW_CLEARANCE = 400;  // preferred clearance from windows
+
   const minPos = MIN_FROM_CORNER;
   const maxPos = wLen - doorWidth - MIN_FROM_CORNER;
   if (maxPos < minPos) return null;
 
-  // Check against existing used segments on this wall
+  // Collect all existing obstacles on this wall
   const used = usedSegments.get(wall.id) ?? [];
-
-  // Also check existing doors/windows on this wall
-  const existingOnWall: Array<{ start: number; end: number }> = [
-    ...floor.doors.filter((d) => d.wall_id === wall.id).map((d) => ({ start: d.position_along_wall_mm, end: d.position_along_wall_mm + d.width_mm })),
-    ...floor.windows.filter((w) => w.wall_id === wall.id).map((w) => ({ start: w.position_along_wall_mm, end: w.position_along_wall_mm + w.width_mm })),
-    ...used,
+  const existingOnWall: Array<{ start: number; end: number; isWindow?: boolean }> = [
+    ...floor.doors.filter((d) => d.wall_id === wall.id).map((d) => ({
+      start: d.position_along_wall_mm, end: d.position_along_wall_mm + d.width_mm,
+    })),
+    ...floor.windows.filter((w) => w.wall_id === wall.id).map((w) => ({
+      start: w.position_along_wall_mm, end: w.position_along_wall_mm + w.width_mm, isWindow: true,
+    })),
+    ...used.map((s) => ({ ...s })),
   ];
 
-  // Try preferred position: 200mm from start
-  const candidates = [minPos, maxPos, (minPos + maxPos) / 2];
-  for (const candidate of candidates) {
-    const doorStart = candidate;
-    const doorEnd = candidate + doorWidth;
+  // Full wall sweep: evaluate every valid position and pick the best-scoring one
+  let bestPos: number | null = null;
+  let bestScore = -Infinity;
+
+  for (let pos = minPos; pos <= maxPos; pos += SWEEP_STEP) {
+    const doorStart = pos;
+    const doorEnd = pos + doorWidth;
+
+    // Hard constraint: must not overlap any existing element (with MIN_GAP clearance)
     const fits = existingOnWall.every(
-      (seg) => doorEnd + 100 <= seg.start || doorStart >= seg.end + 100
+      (seg) => doorEnd + MIN_GAP <= seg.start || doorStart >= seg.end + MIN_GAP
     );
-    if (fits && doorStart >= minPos && doorEnd <= wLen - MIN_FROM_CORNER) {
-      return candidate;
+    if (!fits) continue;
+
+    // Scoring: higher is better
+    let score = 0;
+
+    // 1. Corner distance: prefer 300mm+, penalize <200mm (already excluded), reward center-ish
+    const distFromStart = doorStart;
+    const distFromEnd = wLen - doorEnd;
+    const minCornerDist = Math.min(distFromStart, distFromEnd);
+    if (minCornerDist >= IDEAL_CORNER_DIST) score += 10;
+    else score += (minCornerDist / IDEAL_CORNER_DIST) * 10;
+
+    // 2. Window clearance: prefer distance from windows
+    for (const seg of existingOnWall) {
+      if (!seg.isWindow) continue;
+      const gapToWindow = Math.min(
+        Math.abs(doorStart - seg.end),
+        Math.abs(doorEnd - seg.start)
+      );
+      if (gapToWindow >= WINDOW_CLEARANCE) score += 5;
+      else score += (gapToWindow / WINDOW_CLEARANCE) * 5;
+    }
+
+    // 3. Door-to-door spacing: maximize distance from other doors
+    for (const seg of existingOnWall) {
+      if (seg.isWindow) continue;
+      const gapToDoor = Math.min(
+        Math.abs(doorStart - seg.end),
+        Math.abs(doorEnd - seg.start)
+      );
+      score += Math.min(gapToDoor / 1000, 3); // up to 3 points for 1m+ spacing
+    }
+
+    // 4. Centering preference: slight bias toward wall center (natural circulation flow)
+    const wallCenter = wLen / 2;
+    const doorCenter = doorStart + doorWidth / 2;
+    const centerDeviation = Math.abs(doorCenter - wallCenter) / (wLen / 2);
+    score += (1 - centerDeviation) * 4; // up to 4 points for perfect centering
+
+    if (score > bestScore) {
+      bestScore = score;
+      bestPos = pos;
     }
   }
 
-  return null;
+  return bestPos;
 }
 
 function markUsed(wallId: string, pos: number, width: number, map: Map<string, Array<{ start: number; end: number }>>) {
@@ -621,8 +631,29 @@ export function smartPlaceWindows(floor: Floor): WindowPlacementResult {
     const requiredWindowArea = room.area_sqm * 1_000_000 / 6; // mm² (IS:1038 target)
     let placedWindowArea = 0;
 
-    // Place windows on exterior walls, preferring longest walls first
-    const sortedWalls = [...exteriorWalls].sort((a, b) => wallLength(b) - wallLength(a));
+    // Score and sort exterior walls by architectural suitability for this room type.
+    // Not just longest-first — consider room function and wall orientation.
+    const sortedWalls = [...exteriorWalls].sort((a, b) => {
+      let scoreA = wallLength(a) / 1000; // base: longer walls score higher (in meters)
+      let scoreB = wallLength(b) / 1000;
+
+      // Bedrooms: prefer wall OPPOSITE the door (door wall is typically the shortest/internal side)
+      // This maximizes light on the occupied area and avoids window behind bed headboard.
+      if (room.type === "bedroom" || room.type === "master_bedroom" || room.type === "guest_bedroom") {
+        const doorOnA = floor.doors.some((d) => d.wall_id === a.id);
+        const doorOnB = floor.doors.some((d) => d.wall_id === b.id);
+        if (!doorOnA) scoreA += 3; // prefer walls WITHOUT doors
+        if (!doorOnB) scoreB += 3;
+      }
+
+      // Living/dining: prefer the widest wall for maximum daylight
+      if (room.type === "living_room" || room.type === "dining_room") {
+        scoreA += wallLength(a) / 2000; // extra weight on length
+        scoreB += wallLength(b) / 2000;
+      }
+
+      return scoreB - scoreA; // descending by score
+    });
 
     for (const wall of sortedWalls) {
       if (placedWindowArea >= requiredWindowArea) break;
@@ -680,7 +711,7 @@ export function smartPlaceWindows(floor: Floor): WindowPlacementResult {
     }
 
     // ── Cross-ventilation pass: large rooms (>15 sqm) need windows on 2+ walls ──
-    // Count how many walls have windows placed
+    // Prefer OPPOSITE walls for effective cross-ventilation (not adjacent walls).
     try {
       const wallsWithWindows = new Set(
         windows.filter(w => {
@@ -690,9 +721,26 @@ export function smartPlaceWindows(floor: Floor): WindowPlacementResult {
       );
       const needsCrossVent = room.area_sqm > 15 && wallsWithWindows.size < 2;
       if (needsCrossVent) {
-        // Try to add a window on a second exterior wall
-        for (const wall of sortedWalls) {
-          if (wallsWithWindows.has(wall.id)) continue; // Already has window
+        // Find the wall with the first window to determine its orientation
+        const firstWindowWall = floor.walls.find((w) => wallsWithWindows.has(w.id));
+        // Sort candidate walls: prefer opposite orientation (perpendicular/opposite) over adjacent
+        const crossVentCandidates = sortedWalls.filter((w) => !wallsWithWindows.has(w.id));
+        if (firstWindowWall) {
+          const isFirstHorizontal = Math.abs(firstWindowWall.centerline.start.y - firstWindowWall.centerline.end.y) <
+            Math.abs(firstWindowWall.centerline.start.x - firstWindowWall.centerline.end.x);
+          crossVentCandidates.sort((a, b) => {
+            const isAHoriz = Math.abs(a.centerline.start.y - a.centerline.end.y) <
+              Math.abs(a.centerline.start.x - a.centerline.end.x);
+            const isBHoriz = Math.abs(b.centerline.start.y - b.centerline.end.y) <
+              Math.abs(b.centerline.start.x - b.centerline.end.x);
+            // Prefer walls with SAME orientation (parallel = opposite wall) for cross-ventilation
+            const aOpposite = isAHoriz === isFirstHorizontal ? 1 : 0;
+            const bOpposite = isBHoriz === isFirstHorizontal ? 1 : 0;
+            if (aOpposite !== bOpposite) return bOpposite - aOpposite;
+            return wallLength(b) - wallLength(a);
+          });
+        }
+        for (const wall of crossVentCandidates) {
           const wLen = wallLength(wall);
           const winWidth = spec.width;
           const minPos = 600;
@@ -728,7 +776,7 @@ export function smartPlaceWindows(floor: Floor): WindowPlacementResult {
           }
         }
       }
-    } catch (e) { console.warn("[CROSS-VENT]", (e as Error)?.message ?? e); }
+    } catch { /* cross-vent is best-effort */ }
 
     // Check ventilation compliance — NBC 2016 minimum: 1/10 of floor area
     // (distinct from IS:1038 daylighting target of 1/6 used above for placement)

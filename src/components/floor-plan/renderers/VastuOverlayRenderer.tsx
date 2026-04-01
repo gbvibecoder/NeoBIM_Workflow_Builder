@@ -51,11 +51,12 @@ export function VastuOverlayRenderer({ viewport }: Props) {
   const smallFont = Math.max(8, Math.min(14, 600 * zoom));
 
   // Build a map: direction -> worst status
-  const dirStatus = new Map<VastuDirection, "pass" | "acceptable" | "violation">();
+  const dirStatus = new Map<VastuDirection, "pass" | "acceptable" | "violation" | "advisory">();
   for (const item of analysis.items) {
     const dir = item.actual_direction;
     const current = dirStatus.get(dir);
-    if (!current || statusPriority(item.status) > statusPriority(current)) {
+    const s = item.status;
+    if (!current || statusPriority(s === "advisory" ? "acceptable" : s) > statusPriority(current === "advisory" ? "acceptable" : current)) {
       dirStatus.set(dir, item.status);
     }
   }

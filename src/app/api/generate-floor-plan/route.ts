@@ -129,13 +129,14 @@ export async function POST(req: NextRequest) {
     // Convert to BuildingDescription for Stage 2
     const description = programToDescription(roomProgram);
 
-    // ── Multi-floor: use BSP layout engine per floor ────────────────
+    // ── Multi-floor: BSP layout engine per floor (single path, no fallbacks) ──
     if (roomProgram.numFloors > 1) {
+      console.log(`[MULTI-FLOOR] ★ BSP ONLY ★ ${roomProgram.numFloors} floors`);
       const multiFloor = layoutMultiFloor(roomProgram);
 
       // ── Stage 2 Diagnostic ──
       const totalPlaced = multiFloor.floors.reduce((s, f) => s + f.rooms.length, 0);
-      console.log(`[STAGE-2] Rooms after layout: ${totalPlaced}`, multiFloor.floors.map(f => `Floor ${f.level}: ${f.rooms.map(r => `${r.name} ${r.width.toFixed(1)}x${r.depth.toFixed(1)}`).join(", ")}`));
+      console.log(`[STAGE-2] BSP multi-floor: ${totalPlaced} rooms`, multiFloor.floors.map(f => `Floor ${f.level}: ${f.rooms.length} rooms`));
 
       const project = convertMultiFloorToProject(
         multiFloor.floors, description.projectName, prompt,
@@ -249,11 +250,15 @@ export async function POST(req: NextRequest) {
     const project = convertGeometryToProject(geometry, description.projectName, prompt);
     const feedback = buildFeedback(project, prompt);
 
-    // DIAGNOSTIC — trace room counts at final output
-    const allRoomNames = project.floors.flatMap(f => f.rooms.map(r => r.name));
-    console.log('=== FINAL OUTPUT (single-floor) ===');
-    console.log('Total rooms:', allRoomNames.length);
-    console.log('Room names:', JSON.stringify(allRoomNames));
+    // DIAGNOSTIC — Stage 3 output
+    const f0 = project.floors[0];
+    console.log('=== STAGE 3 OUTPUT (single-floor) ===');
+    console.log(`[STAGE-3] rooms: ${f0?.rooms.length}, walls: ${f0?.walls.length}, doors: ${f0?.doors.length}, windows: ${f0?.windows.length}`);
+    console.log(`[STAGE-3] room areas: ${f0?.rooms.map(r => `${r.name}: ${r.area_sqm.toFixed(1)}m²`).join(', ')}`);
+    if (f0 && f0.doors.length < 6) {
+      console.warn(`[STAGE-3] ⚠️ Only ${f0.doors.length} doors for ${f0.rooms.length} rooms — may indicate gaps between rooms`);
+    }
+    console.log('=== FLOOR PLAN GENERATION COMPLETE ===');
 
     return NextResponse.json({ project, geometry, svg: floorPlan.svg, feedback });
   } catch (err) {

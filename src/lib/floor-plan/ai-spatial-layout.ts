@@ -353,55 +353,150 @@ function roomsTouch(a: PlacedRoom, b: PlacedRoom, tol: number): boolean {
 
 // ── Gap-closing pass ───────────────────────────────────────────────────────
 
+/**
+ * Aggressive gap-closing pass for GPT-4o output.
+ *
+ * GPT-4o leaves gaps of 0.1m to 2.0m+ between rooms. This pass:
+ * 1. Snaps nearby edges between all room pairs (up to 2.0m gap)
+ * 2. Expands rooms to touch footprint edges (up to 2.0m)
+ * 3. Runs 4 passes for chain propagation
+ * 4. Expands rooms toward nearest neighbor to fill remaining gaps
+ */
 function closeGaps(rooms: PlacedRoom[], fpW: number, fpH: number): PlacedRoom[] {
   const result = rooms.map(r => ({ ...r }));
-  const GAP_TOL = 0.6;
+  const GAP_TOL = 2.0; // GPT-4o can leave gaps up to 2m
 
-  for (let pass = 0; pass < 2; pass++) {
+  // Pass 1-3: Snap nearby edges between room pairs
+  for (let pass = 0; pass < 4; pass++) {
     for (let i = 0; i < result.length; i++) {
       for (let j = i + 1; j < result.length; j++) {
         const a = result[i], b = result[j];
+
         const vOverlap = Math.min(a.y + a.depth, b.y + b.depth) - Math.max(a.y, b.y);
-        if (vOverlap > 0.3) {
+        if (vOverlap > 0.2) {
+          // A right → B left
           const gapR = b.x - (a.x + a.width);
           if (gapR > 0.01 && gapR < GAP_TOL) {
             const mid = grid((a.x + a.width + b.x) / 2);
-            a.width = grid(mid - a.x); b.width = grid(b.x + b.width - mid); b.x = mid;
+            a.width = grid(mid - a.x);
+            b.width = grid(b.x + b.width - mid);
+            b.x = mid;
           }
+          // B right → A left
           const gapL = a.x - (b.x + b.width);
           if (gapL > 0.01 && gapL < GAP_TOL) {
             const mid = grid((b.x + b.width + a.x) / 2);
-            b.width = grid(mid - b.x); a.width = grid(a.x + a.width - mid); a.x = mid;
+            b.width = grid(mid - b.x);
+            a.width = grid(a.x + a.width - mid);
+            a.x = mid;
           }
         }
+
         const hOverlap = Math.min(a.x + a.width, b.x + b.width) - Math.max(a.x, b.x);
-        if (hOverlap > 0.3) {
+        if (hOverlap > 0.2) {
+          // A bottom → B top
           const gapB = b.y - (a.y + a.depth);
           if (gapB > 0.01 && gapB < GAP_TOL) {
             const mid = grid((a.y + a.depth + b.y) / 2);
-            a.depth = grid(mid - a.y); b.depth = grid(b.y + b.depth - mid); b.y = mid;
+            a.depth = grid(mid - a.y);
+            b.depth = grid(b.y + b.depth - mid);
+            b.y = mid;
           }
+          // B bottom → A top
           const gapT = a.y - (b.y + b.depth);
           if (gapT > 0.01 && gapT < GAP_TOL) {
             const mid = grid((b.y + b.depth + a.y) / 2);
-            b.depth = grid(mid - b.y); a.depth = grid(a.y + a.depth - mid); a.y = mid;
+            b.depth = grid(mid - b.y);
+            a.depth = grid(a.y + a.depth - mid);
+            a.y = mid;
+          }
+        }
+
+        // Also snap aligned edges (e.g., two rooms whose tops differ by <0.5m)
+        if (hOverlap > 0.5) {
+          if (Math.abs(a.y - b.y) > 0 && Math.abs(a.y - b.y) < 0.5) {
+            const avg = grid(Math.min(a.y, b.y));
+            const diff = Math.max(a.y, b.y) - avg;
+            if (a.y > b.y) { a.depth = grid(a.depth + diff); a.y = avg; }
+            else { b.depth = grid(b.depth + diff); b.y = avg; }
+          }
+          if (Math.abs((a.y + a.depth) - (b.y + b.depth)) > 0 && Math.abs((a.y + a.depth) - (b.y + b.depth)) < 0.5) {
+            const maxBottom = grid(Math.max(a.y + a.depth, b.y + b.depth));
+            if (a.y + a.depth < maxBottom) a.depth = grid(maxBottom - a.y);
+            else b.depth = grid(maxBottom - b.y);
+          }
+        }
+        if (vOverlap > 0.5) {
+          if (Math.abs(a.x - b.x) > 0 && Math.abs(a.x - b.x) < 0.5) {
+            const avg = grid(Math.min(a.x, b.x));
+            const diff = Math.max(a.x, b.x) - avg;
+            if (a.x > b.x) { a.width = grid(a.width + diff); a.x = avg; }
+            else { b.width = grid(b.width + diff); b.x = avg; }
+          }
+          if (Math.abs((a.x + a.width) - (b.x + b.width)) > 0 && Math.abs((a.x + a.width) - (b.x + b.width)) < 0.5) {
+            const maxRight = grid(Math.max(a.x + a.width, b.x + b.width));
+            if (a.x + a.width < maxRight) a.width = grid(maxRight - a.x);
+            else b.width = grid(maxRight - b.x);
           }
         }
       }
     }
   }
 
-  // Expand to footprint edges
+  // Pass 4: Expand rooms to footprint edges
   for (const r of result) {
     if (r.x > 0 && r.x < GAP_TOL) { r.width = grid(r.width + r.x); r.x = 0; }
     if (r.y > 0 && r.y < GAP_TOL) { r.depth = grid(r.depth + r.y); r.y = 0; }
     const rGap = fpW - (r.x + r.width);
-    if (rGap > 0 && rGap < GAP_TOL) r.width = grid(fpW - r.x);
+    if (rGap > 0.01 && rGap < GAP_TOL) r.width = grid(fpW - r.x);
     const bGap = fpH - (r.y + r.depth);
-    if (bGap > 0 && bGap < GAP_TOL) r.depth = grid(fpH - r.y);
+    if (bGap > 0.01 && bGap < GAP_TOL) r.depth = grid(fpH - r.y);
   }
 
+  // Pass 5: Expand each room toward its nearest neighbor to fill remaining gaps
+  // Only expand in directions where there's empty space (no other room)
+  for (const r of result) {
+    // Try expanding right
+    const rightEdge = r.x + r.width;
+    if (rightEdge < fpW - 0.1) {
+      // Find nearest room to the right that overlaps vertically
+      let nearestRight = fpW;
+      for (const other of result) {
+        if (other === r) continue;
+        const vOvl = Math.min(r.y + r.depth, other.y + other.depth) - Math.max(r.y, other.y);
+        if (vOvl > 0.2 && other.x > rightEdge - 0.1 && other.x < nearestRight) {
+          nearestRight = other.x;
+        }
+      }
+      if (nearestRight > rightEdge + 0.05 && nearestRight - rightEdge < 1.5) {
+        r.width = grid(nearestRight - r.x);
+      }
+    }
+    // Try expanding down
+    const bottomEdge = r.y + r.depth;
+    if (bottomEdge < fpH - 0.1) {
+      let nearestDown = fpH;
+      for (const other of result) {
+        if (other === r) continue;
+        const hOvl = Math.min(r.x + r.width, other.x + other.width) - Math.max(r.x, other.x);
+        if (hOvl > 0.2 && other.y > bottomEdge - 0.1 && other.y < nearestDown) {
+          nearestDown = other.y;
+        }
+      }
+      if (nearestDown > bottomEdge + 0.05 && nearestDown - bottomEdge < 1.5) {
+        r.depth = grid(nearestDown - r.y);
+      }
+    }
+  }
+
+  // Recompute areas
   for (const r of result) r.area = grid(r.width * r.depth);
+
+  // Log coverage
+  const totalArea = result.reduce((s, r) => s + r.width * r.depth, 0);
+  const coverage = totalArea / (fpW * fpH) * 100;
+  console.log(`[GAP-CLOSE] Coverage: ${coverage.toFixed(0)}% (${totalArea.toFixed(1)}/${(fpW * fpH).toFixed(1)} m²)`);
+
   return result;
 }
 

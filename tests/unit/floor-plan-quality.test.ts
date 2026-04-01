@@ -191,15 +191,19 @@ describe("Vastu Analyzer Rule Specificity", () => {
 // ============================================================
 
 describe("Code Validator Frame Factor Consistency", () => {
-  it("should use same frame factor in natural light and window checks", async () => {
+  it("should use gross opening area (no frame factor) per NBC 2016 Cl. 8.4.6", async () => {
     const fs = await import("fs");
     const path = await import("path");
     const filePath = path.resolve("src/lib/floor-plan/code-validator.ts");
     const content = fs.readFileSync(filePath, "utf-8");
-    // Both checkWindows and checkNaturalLightRatio should use FRAME_FACTOR
-    const matches = content.match(/FRAME_FACTOR\s*=\s*0\.7/g);
-    expect(matches).not.toBeNull();
-    expect(matches!.length).toBeGreaterThanOrEqual(2);
+    // NBC 2016 Cl. 8.4.6 specifies "opening area" (gross window opening), not glazed area.
+    // FRAME_FACTOR should NOT be applied to window-to-floor ratio checks.
+    const frameFactor = content.match(/FRAME_FACTOR\s*=\s*0\.7/g);
+    expect(frameFactor).toBeNull();
+    // Verify both checks use gross area (w.width_mm * w.height_mm) without frame factor
+    const grossAreaCalcs = content.match(/w\.width_mm \* w\.height_mm\) \/ 1_000_000/g);
+    expect(grossAreaCalcs).not.toBeNull();
+    expect(grossAreaCalcs!.length).toBeGreaterThanOrEqual(2);
   });
 });
 

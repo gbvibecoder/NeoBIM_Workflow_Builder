@@ -72,6 +72,14 @@ export function validateBuildingCode(
   totalChecks += checkNaturalLightRatio(floor, violations);
   totalChecks += checkFireEgressDistance(floor, violations);
 
+  // ---- Previously missing checks (Phase 1 accuracy fix) ----
+  totalChecks += checkBathroomDoorWidth(floor, violations);
+  totalChecks += checkStairHeadroom(floor, violations);
+  totalChecks += checkMultiUnitStairWidth(floor, projectType, violations);
+  totalChecks += checkWheelchairCorridor(floor, violations);
+  totalChecks += checkAccessibleBathroom(floor, violations);
+  totalChecks += checkFireEscapeRouteWidth(floor, violations);
+
   // Group by category
   const byCategory: Record<CodeCategory, CodeViolation[]> = {
     room_size: [],
@@ -320,9 +328,10 @@ function checkWindows(floor: Floor, violations: CodeViolation[]): number {
       // Find windows on walls bounding this room
       const roomWallIds = new Set(room.wall_ids);
       const roomWindows = floor.windows.filter((w) => roomWallIds.has(w.wall_id));
-      const FRAME_FACTOR = 0.7; // ~30% frame deduction for glazed area (double-hung standard)
+      // NBC 2016 Cl. 8.4.6 specifies "opening area" (gross window opening), not glazed area.
+      // No frame factor applied — the full window width × height counts as the opening.
       const totalWindowArea = roomWindows.reduce(
-        (sum, w) => sum + (w.width_mm * w.height_mm * FRAME_FACTOR) / 1_000_000,
+        (sum, w) => sum + (w.width_mm * w.height_mm) / 1_000_000,
         0
       );
       const floorArea = room.area_sqm;
@@ -635,10 +644,9 @@ function checkNaturalLightRatio(floor: Floor, violations: CodeViolation[]): numb
     checks++;
     const roomWallIds = new Set(room.wall_ids);
     const roomWindows = floor.windows.filter((w) => roomWallIds.has(w.wall_id));
-    // Apply same frame factor as checkWindows for consistency
-    const FRAME_FACTOR = 0.7;
+    // NBC 2016 Cl. 8.4.6 — uses gross opening area (no frame factor)
     const totalWindowArea = roomWindows.reduce(
-      (sum, w) => sum + (w.width_mm * w.height_mm * FRAME_FACTOR) / 1_000_000, 0
+      (sum, w) => sum + (w.width_mm * w.height_mm) / 1_000_000, 0
     );
     const floorArea = room.area_sqm;
     const ratio = floorArea > 0 ? totalWindowArea / floorArea : 0;
@@ -904,6 +912,244 @@ function checkVentilationRatio(floor: Floor, violations: CodeViolation[]): numbe
         actual_value: `${(ratio * 100).toFixed(1)}% (${totalVentArea.toFixed(2)} sq.m operable / ${floorArea.toFixed(1)} sq.m floor)`,
         required_value: `≥ ${(minRatio * 100).toFixed(0)}% (1/20th of floor area)`,
         suggestion: `Add ${((minRatio * floorArea - totalVentArea)).toFixed(2)} sq.m more operable window area to ${room.name}, or provide mechanical ventilation.`,
+      });
+    }
+  }
+  return checks;
+}
+
+// ============================================================
+// BATHROOM DOOR WIDTH (NBC-DR-004)
+// ============================================================
+
+function checkBathroomDoorWidth(floor: Floor, violations: CodeViolation[]): number {
+  let checks = 0;
+  const rule = ALL_BUILDING_CODE_RULES.find((r) => r.id === "NBC-DR-004");
+  if (!rule) return 0;
+
+  const minW = rule.parameters.min_width_mm as number;
+  const wetRoomTypes = (rule.parameters.connects_to as string)?.split(",") ?? ["bathroom", "toilet", "wc"];
+
+  for (const door of floor.doors) {
+    // Check if this door connects to a bathroom/toilet/wc
+    const connectsToWet = door.connects_rooms.some((roomId) => {
+      const room = floor.rooms.find((r) => r.id === roomId);
+      return room && wetRoomTypes.includes(room.type);
+    });
+    if (!connectsToWet) continue;
+
+    checks++;
+    if (door.width_mm < minW) {
+      violations.push({
+        rule_id: rule.id,
+        rule,
+        entity_type: "door",
+        entity_id: door.id,
+        entity_name: `Bathroom Door (${door.type.replace(/_/g, " ")})`,
+        severity: rule.severity,
+        message: `Bathroom door width (${door.width_mm} mm) is below minimum ${minW} mm.`,
+        actual_value: `${door.width_mm} mm`,
+        required_value: `≥ ${minW} mm`,
+        suggestion: `Widen bathroom door to at least ${minW} mm.`,
+      });
+    }
+  }
+  return checks;
+}
+
+// ============================================================
+// STAIR HEADROOM (NBC-ST-004)
+// ============================================================
+
+function checkStairHeadroom(floor: Floor, violations: CodeViolation[]): number {
+  let checks = 0;
+  const rule = ALL_BUILDING_CODE_RULES.find((r) => r.id === "NBC-ST-004");
+  if (!rule) return 0;
+
+  const minHeadroom = rule.parameters.min_headroom_mm as number;
+
+  for (const stair of floor.stairs) {
+    checks++;
+    // Headroom estimated from floor geometry. Under-stair clearance at midpoint:
+    const clearHeight = floor.floor_to_floor_height_mm - floor.slab_thickness_mm;
+    const midpointHeight = clearHeight - (Math.floor(stair.num_risers / 2) * stair.riser_height_mm);
+
+    if (midpointHeight < minHeadroom) {
+      violations.push({
+        rule_id: rule.id,
+        rule,
+        entity_type: "stair",
+        entity_id: stair.id,
+        entity_name: `Staircase (${stair.type})`,
+        severity: rule.severity,
+        message: `Estimated stair headroom (${midpointHeight} mm) may be below minimum ${minHeadroom} mm — verify on site.`,
+        actual_value: `~${midpointHeight} mm (estimated)`,
+        required_value: `≥ ${minHeadroom} mm`,
+        suggestion: `Increase floor-to-floor height or adjust stair geometry to ensure ${minHeadroom} mm headroom.`,
+      });
+    }
+  }
+  return checks;
+}
+
+// ============================================================
+// MULTI-UNIT STAIR WIDTH (NBC-ST-005)
+// ============================================================
+
+function checkMultiUnitStairWidth(
+  floor: Floor,
+  projectType: string,
+  violations: CodeViolation[]
+): number {
+  let checks = 0;
+  const rule = ALL_BUILDING_CODE_RULES.find((r) => r.id === "NBC-ST-005");
+  if (!rule) return 0;
+
+  // Only applies to multi-unit residential (apartments) or commercial/institutional
+  const isMultiUnit = ["commercial", "institutional", "mixed_use"].includes(projectType) ||
+    projectType.includes("apartment");
+  if (!isMultiUnit) return 0;
+
+  const minW = rule.parameters.min_width_mm as number;
+
+  for (const stair of floor.stairs) {
+    checks++;
+    if (stair.width_mm < minW) {
+      violations.push({
+        rule_id: rule.id,
+        rule,
+        entity_type: "stair",
+        entity_id: stair.id,
+        entity_name: `Staircase (${stair.type})`,
+        severity: rule.severity,
+        message: `Stair width (${stair.width_mm} mm) is below ${minW} mm required for multi-unit buildings.`,
+        actual_value: `${stair.width_mm} mm`,
+        required_value: `≥ ${minW} mm`,
+        suggestion: `Widen staircase to at least ${minW} mm for multi-unit compliance.`,
+      });
+    }
+  }
+  return checks;
+}
+
+// ============================================================
+// WHEELCHAIR ACCESSIBLE CORRIDOR (NBC-AC-001)
+// ============================================================
+
+function checkWheelchairCorridor(floor: Floor, violations: CodeViolation[]): number {
+  let checks = 0;
+  const rule = ALL_BUILDING_CODE_RULES.find((r) => r.id === "NBC-AC-001");
+  if (!rule) return 0;
+
+  const minW = rule.parameters.min_width_mm as number;
+  const corridors = floor.rooms.filter((r) =>
+    ["corridor", "lobby"].includes(r.type)
+  );
+
+  if (corridors.length === 0) return 0;
+
+  checks++;
+  // Check if at least one corridor path meets wheelchair width
+  const hasAccessiblePath = corridors.some((c) => {
+    const bounds = polygonBounds(c.boundary.points);
+    return Math.min(bounds.width, bounds.height) >= minW;
+  });
+
+  if (!hasAccessiblePath) {
+    const narrowest = corridors.reduce((min, c) => {
+      const bounds = polygonBounds(c.boundary.points);
+      const w = Math.min(bounds.width, bounds.height);
+      return w < min.width ? { room: c, width: w } : min;
+    }, { room: corridors[0], width: Infinity });
+
+    violations.push({
+      rule_id: rule.id,
+      rule,
+      entity_type: "corridor",
+      entity_id: narrowest.room.id,
+      entity_name: "Corridors",
+      severity: rule.severity,
+      message: `No corridor meets wheelchair accessible width of ${(minW / 1000).toFixed(1)} m. Narrowest is ${(narrowest.width / 1000).toFixed(2)} m.`,
+      actual_value: `${(narrowest.width / 1000).toFixed(2)} m (narrowest)`,
+      required_value: `≥ ${(minW / 1000).toFixed(1)} m (at least one path)`,
+      suggestion: `Widen at least one corridor to ${(minW / 1000).toFixed(1)} m for wheelchair access.`,
+    });
+  }
+  return checks;
+}
+
+// ============================================================
+// ACCESSIBLE BATHROOM (NBC-AC-002)
+// ============================================================
+
+function checkAccessibleBathroom(floor: Floor, violations: CodeViolation[]): number {
+  let checks = 0;
+  const rule = ALL_BUILDING_CODE_RULES.find((r) => r.id === "NBC-AC-002");
+  if (!rule) return 0;
+
+  const minTurning = rule.parameters.min_turning_circle_mm as number;
+  const bathrooms = floor.rooms.filter((r) =>
+    ["bathroom", "toilet", "wc"].includes(r.type)
+  );
+
+  if (bathrooms.length === 0) return 0;
+
+  checks++;
+  const hasAccessible = bathrooms.some((b) => {
+    const bounds = polygonBounds(b.boundary.points);
+    return Math.min(bounds.width, bounds.height) >= minTurning;
+  });
+
+  if (!hasAccessible) {
+    violations.push({
+      rule_id: rule.id,
+      rule,
+      entity_type: "room",
+      entity_id: bathrooms[0].id,
+      entity_name: "Bathrooms",
+      severity: "info",
+      message: `No bathroom provides ${(minTurning / 1000).toFixed(1)} m turning circle for wheelchair access.`,
+      actual_value: "All bathrooms below turning circle requirement",
+      required_value: `≥ ${(minTurning / 1000).toFixed(1)} m × ${(minTurning / 1000).toFixed(1)} m (at least one)`,
+      suggestion: `Consider enlarging at least one bathroom to accommodate a ${(minTurning / 1000).toFixed(1)} m turning circle.`,
+    });
+  }
+  return checks;
+}
+
+// ============================================================
+// FIRE ESCAPE ROUTE WIDTH (NBC-FS-001)
+// ============================================================
+
+function checkFireEscapeRouteWidth(floor: Floor, violations: CodeViolation[]): number {
+  let checks = 0;
+  const rule = ALL_BUILDING_CODE_RULES.find((r) => r.id === "NBC-FS-001");
+  if (!rule) return 0;
+
+  const minW = rule.parameters.min_width_mm as number;
+
+  // Check fire escape rooms, corridors used as escape routes, and staircases
+  const escapeRoutes = floor.rooms.filter((r) =>
+    ["fire_escape", "corridor", "staircase"].includes(r.type)
+  );
+
+  for (const route of escapeRoutes) {
+    checks++;
+    const bounds = polygonBounds(route.boundary.points);
+    const routeWidth = Math.min(bounds.width, bounds.height);
+
+    if (routeWidth < minW) {
+      violations.push({
+        rule_id: rule.id,
+        rule,
+        entity_type: route.type === "corridor" ? "corridor" : "room",
+        entity_id: route.id,
+        entity_name: route.name,
+        severity: rule.severity,
+        message: `${route.name} width (${(routeWidth / 1000).toFixed(2)} m) is below fire escape minimum ${(minW / 1000).toFixed(1)} m.`,
+        actual_value: `${(routeWidth / 1000).toFixed(2)} m`,
+        required_value: `≥ ${(minW / 1000).toFixed(1)} m`,
+        suggestion: `Widen ${route.name} to at least ${(minW / 1000).toFixed(1)} m for fire safety compliance.`,
       });
     }
   }
