@@ -210,7 +210,8 @@ function FormField({
         fontSize: 11, fontWeight: 600, color: COLORS.textTertiary,
         marginBottom: 6, letterSpacing: "0.04em", textTransform: "uppercase",
       }}>
-        <Icon size={11} />
+        {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+        {React.createElement(Icon as any, { size: 11 })}
         {label}
         {required && <span style={{ color: COLORS.cyan }}>*</span>}
       </label>
