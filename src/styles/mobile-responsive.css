@@ -124,12 +124,54 @@
 }
 
 /* ─── LANDING PAGE — HERO SECTION ───────────────────────────────── */
+
+/* Tablet */
+@media (max-width: 1024px) {
+  .landing-hero-content {
+    padding: 0 32px !important;
+    margin-top: 24px !important;
+  }
+
+  .landing-hero-heading {
+    font-size: clamp(2rem, 4vw, 3.2rem) !important;
+  }
+
+  .landing-hero-subtitle {
+    font-size: 16px !important;
+    max-width: 440px !important;
+  }
+
+  .landing-partners {
+    gap: 32px !important;
+  }
+}
+
+/* Mobile */
 @media (max-width: 768px) {
   /* Hide floating decorative elements on mobile */
   .landing-floating-card,
   .landing-side-toolbar,
   .landing-prompt-card {
     display: none !important;
+  }
+
+  /* Hero content — proper mobile spacing */
+  .landing-hero-content {
+    padding: 0 20px !important;
+    margin-top: 16px !important;
+  }
+
+  .landing-hero-heading {
+    font-size: clamp(1.75rem, 7vw, 2.5rem) !important;
+    line-height: 1 !important;
+    letter-spacing: -0.03em !important;
+  }
+
+  .landing-hero-subtitle {
+    font-size: 15px !important;
+    max-width: 340px !important;
+    margin-top: 20px !important;
+    line-height: 1.6 !important;
   }
 
   /* Partner logos bar at bottom of hero */
@@ -152,6 +194,24 @@
     border-radius: 14px !important;
     width: 100% !important;
     justify-content: center !important;
+  }
+}
+
+/* Small mobile (≤ 480px) */
+@media (max-width: 480px) {
+  .landing-hero-content {
+    padding: 0 16px !important;
+    margin-top: 8px !important;
+  }
+
+  .landing-hero-heading {
+    font-size: clamp(1.5rem, 8vw, 2.2rem) !important;
+  }
+
+  .landing-hero-subtitle {
+    font-size: 14px !important;
+    max-width: 300px !important;
+    margin-top: 16px !important;
   }
 }
 
