@@ -54,7 +54,7 @@ const DEFAULT_ASPECT = 1.33;    // footprint width:depth ratio
 const MAX_ROOM_AR = 2.8;        // max aspect ratio for non-corridor rooms
 
 // ── Room standards (centralized architectural minimums) ──────────────────────
-import { getMinDimMeters, getMinDepthMeters } from "./room-standards";
+import { getMinDimMeters, getMinDepthMeters, getRoomStandardByName } from "./room-standards";
 
 /** Get the furniture-aware minimum dimension (shorter side) for a room. */
 function getMinDimForType(type: string, name: string): number {
@@ -265,6 +265,11 @@ export function layoutFloorPlan(program: EnhancedRoomProgram): PlacedRoom[] {
   if (result.length !== inputCount) {
     console.warn(`[STAGE-2] Room count mismatch after recovery: input=${inputCount}, output=${result.length}`);
   }
+
+  // ── Fix elongated rooms (bowling alleys) ──
+  // BSP zone layout can produce bathrooms that inherit the full zone depth (e.g., 1.5m × 3.8m).
+  // Cap their aspect ratio per room-standards and redistribute freed space to neighbors.
+  result = fixElongatedRooms(result);
 
   // ── NBC minimum dimension enforcement ──
   // Verify every room meets NBC 2016 minimum dimensions.
@@ -1235,6 +1240,51 @@ function enforceCorridorCap(rooms: PlacedRoom[], totalFloorArea: number): Placed
 }
 
 // ── NBC minimum dimension enforcement ─────────────────────────────────────
+
+// ── Fix elongated rooms ──────────────────────────────────────────────────────
+
+/**
+ * Fix rooms with aspect ratios exceeding their type-specific maxAspectRatio.
+ *
+ * Common case: BSP zone layout produces bathrooms that inherit the full zone
+ * depth (e.g., 1.5m × 3.8m, AR 2.53). This function caps the longer dimension.
+ * The freed space creates a small gap which pipeline-adapter's snapRoomRects()
+ * resolves during wall generation.
+ *
+ * Strategy: shrink the elongated room and expand ONLY the adjacent room that
+ * shares the SAME edge orientation (the paired bedroom in a bed-bath strip).
+ * This avoids creating overlaps with rooms in other zones.
+ */
+function fixElongatedRooms(rooms: PlacedRoom[]): PlacedRoom[] {
+  const TOL = 0.15;
+
+  for (const room of rooms) {
+    const std = getRoomStandardByName(room.type, room.name);
+    const shorter = Math.min(room.width, room.depth);
+    const longer = Math.max(room.width, room.depth);
+    const currentAR = shorter > 0 ? longer / shorter : 1;
+
+    if (currentAR <= std.maxAspectRatio) continue;
+
+    // Cap the longer dimension
+    const idealLonger = grid(shorter * std.maxAspectRatio);
+    const minDepthM = std.minDepth / 1000;
+    const newLonger = Math.max(idealLonger, minDepthM);
+    if (newLonger >= longer) continue;
+
+    if (room.depth > room.width) {
+      // Bowling alley case: depth too large. Shrink depth, keep anchored at top.
+      room.depth = grid(newLonger);
+      room.area = room.width * room.depth;
+    } else {
+      // Width too large. Shrink width, keep anchored at left.
+      room.width = grid(newLonger);
+      room.area = room.width * room.depth;
+    }
+  }
+
+  return rooms;
+}
 
 /**
  * Verify every room meets NBC 2016 minimum dimensions.
