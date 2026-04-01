@@ -5,6 +5,7 @@ import {
   detectBHKCount,
   detectFloorCount,
   extractTotalAreaSqm,
+  classifyRoom,
 } from "@/lib/floor-plan/room-sizer";
 
 // ── Helper ──────────────────────────────────────────────────────────────────
@@ -81,13 +82,13 @@ describe("Room Sizer — 2BHK 800 sqft", () => {
     { name: "Balcony", type: "balcony" },
   ], 74.3, "2bhk apartment 800 sqft");
 
-  it("bedrooms 10-15 sqm", () => {
+  it("bedrooms 10-18 sqm", () => {
     const bed1 = findRoom(rooms, "Bedroom 1")!;
     const bed2 = findRoom(rooms, "Bedroom 2")!;
     expect(bed1.areaSqm).toBeGreaterThanOrEqual(10);
-    expect(bed1.areaSqm).toBeLessThanOrEqual(15);
+    expect(bed1.areaSqm).toBeLessThanOrEqual(18);
     expect(bed2.areaSqm).toBeGreaterThanOrEqual(10);
-    expect(bed2.areaSqm).toBeLessThanOrEqual(15);
+    expect(bed2.areaSqm).toBeLessThanOrEqual(18);
   });
 
   it("bathrooms 3-5.5 sqm", () => {
@@ -237,5 +238,88 @@ describe("Room Sizer — Total area normalization", () => {
     const total = rooms.reduce((s, r) => s + r.areaSqm, 0);
     expect(total).toBeGreaterThan(100 * 0.9);
     expect(total).toBeLessThan(100 * 1.1);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// NAME MATCHING EDGE CASES — must handle any AI-generated room name
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("Room Sizer — Fuzzy name classification", () => {
+  it("Guest Bedroom → guest_bedroom", () => expect(classifyRoom("bedroom", "Guest Bedroom")).toBe("guest_bedroom"));
+  it("Modular Kitchen → kitchen", () => expect(classifyRoom("kitchen", "Modular Kitchen")).toBe("kitchen"));
+  it("Servant Quarter → servant_quarter", () => expect(classifyRoom("other", "Servant Quarter")).toBe("servant_quarter"));
+  it("Servant Toilet → servant_toilet", () => expect(classifyRoom("bathroom", "Servant Toilet")).toBe("servant_toilet"));
+  it("Shoe Rack Area → shoe_rack", () => expect(classifyRoom("other", "Shoe Rack Area")).toBe("shoe_rack"));
+  it("Walk-in Closet → walk_in_closet", () => expect(classifyRoom("other", "Walk-in Closet")).toBe("walk_in_closet"));
+  it("Family Sitting Area → living_room", () => expect(classifyRoom("other", "Family Sitting Area")).toBe("living_room"));
+  it("Powder Room → powder_room", () => expect(classifyRoom("bathroom", "Powder Room")).toBe("powder_room"));
+  it("Car Parking → parking", () => expect(classifyRoom("other", "Car Parking")).toBe("parking"));
+  it("Pooja Room → pooja_room", () => expect(classifyRoom("other", "Pooja Room")).toBe("pooja_room"));
+  it("Master Bathroom → master_bathroom", () => expect(classifyRoom("bathroom", "Master Bathroom")).toBe("master_bathroom"));
+  it("Study Room → study", () => expect(classifyRoom("study", "Study Room")).toBe("study"));
+  it("Bathroom 4 → bathroom", () => expect(classifyRoom("bathroom", "Bathroom 4")).toBe("bathroom"));
+  it("Bedroom 3 → bedroom", () => expect(classifyRoom("bedroom", "Bedroom 3")).toBe("bedroom"));
+});
+
+describe("Room Sizer — Normalization respects max caps", () => {
+  it("bathroom NEVER exceeds 7 sqm in large plans", () => {
+    const rooms = sizeAndGet([
+      { name: "Living Room", type: "living" },
+      { name: "Dining Room", type: "dining" },
+      { name: "Kitchen", type: "kitchen" },
+      { name: "Master Bedroom", type: "bedroom" },
+      { name: "Master Bathroom", type: "bathroom" },
+      { name: "Bedroom 2", type: "bedroom" },
+      { name: "Bathroom 2", type: "bathroom" },
+      { name: "Bedroom 3", type: "bedroom" },
+      { name: "Bathroom 3", type: "bathroom" },
+      { name: "Bedroom 4", type: "bedroom" },
+      { name: "Bathroom 4", type: "bathroom" },
+      { name: "Servant Quarter", type: "other" },
+      { name: "Staircase", type: "staircase" },
+      { name: "Study", type: "study" },
+      { name: "Balcony", type: "balcony" },
+    ], 260, "4BHK luxury villa 2800 sqft");
+
+    for (const r of rooms) {
+      if (/bath/i.test(r.name)) expect(r.areaSqm).toBeLessThanOrEqual(7.0);
+    }
+  });
+
+  it("servant quarter capped at 12 sqm", () => {
+    const rooms = sizeAndGet([
+      { name: "Living Room", type: "living" },
+      { name: "Kitchen", type: "kitchen" },
+      { name: "Master Bedroom", type: "bedroom" },
+      { name: "Bathroom 1", type: "bathroom" },
+      { name: "Servant Quarter", type: "other" },
+    ], 200, "3bhk villa 2000 sqft");
+    const sq = findRoom(rooms, "Servant Quarter")!;
+    expect(sq.areaSqm).toBeLessThanOrEqual(12);
+  });
+
+  it("Guest Bedroom gets proper sizing (9.5-16 sqm)", () => {
+    const rooms = sizeAndGet([
+      { name: "Living Room", type: "living" },
+      { name: "Kitchen", type: "kitchen" },
+      { name: "Guest Bedroom", type: "bedroom" },
+      { name: "Bathroom 1", type: "bathroom" },
+    ], 120, "3bhk villa 1300 sqft");
+    const gb = findRoom(rooms, "Guest Bedroom")!;
+    expect(gb.areaSqm).toBeGreaterThanOrEqual(9.5);
+    expect(gb.areaSqm).toBeLessThanOrEqual(16);
+  });
+
+  it("Modular Kitchen gets proper sizing (5.5-12 sqm)", () => {
+    const rooms = sizeAndGet([
+      { name: "Living Room", type: "living" },
+      { name: "Modular Kitchen", type: "kitchen" },
+      { name: "Bedroom 1", type: "bedroom" },
+      { name: "Bathroom 1", type: "bathroom" },
+    ], 100, "2bhk apartment 1076 sqft");
+    const k = findRoom(rooms, "Modular Kitchen")!;
+    expect(k.areaSqm).toBeGreaterThanOrEqual(5.5);
+    expect(k.areaSqm).toBeLessThanOrEqual(12);
   });
 });

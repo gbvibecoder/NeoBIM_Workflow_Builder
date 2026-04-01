@@ -327,6 +327,13 @@ export function convertGeometryToProject(
     floor.windows = windowResult.windows;
   }
 
+  // ---- 5b1. DOOR GUARANTEE: every enclosed room must have at least 1 door ----
+  try {
+    ensureEveryRoomHasDoor(floor);
+  } catch {
+    // Non-critical: plan still works, just some rooms might lack doors
+  }
+
   // ---- 5b2. Enforce window ratios — add windows to rooms below NBC 10% minimum ----
   try {
     ensureWindowRatios(floor);
@@ -991,6 +998,93 @@ function computeVastuDirection(cx: number, cy: number, bw: number, bh: number): 
 function pipelineWallLength(wall: Wall): number {
   const dx = wall.centerline.end.x - wall.centerline.start.x;
   const dy = wall.centerline.end.y - wall.centerline.start.y;
+  return Math.sqrt(dx * dx + dy * dy);
+}
+
+/**
+/**
+ * Door guarantee: every enclosed room gets at least 1 door.
+ * Finds rooms with no door and adds one on their longest shared interior wall.
+ */
+function ensureEveryRoomHasDoor(floor: Floor): void {
+  const SKIP = /parking|terrace|garden|lawn|car\s*park/i;
+
+  // Find which rooms already have doors
+  const roomsWithDoors = new Set<string>();
+  for (const door of floor.doors) {
+    if (door.connects_rooms) {
+      for (const rid of door.connects_rooms) {
+        if (rid) roomsWithDoors.add(rid);
+      }
+    }
+  }
+
+  for (const room of floor.rooms) {
+    if (SKIP.test(room.name)) continue;
+    if (roomsWithDoors.has(room.id)) continue;
+
+    // Find walls that belong to this room
+    const roomWalls = floor.walls.filter(w =>
+      w.left_room_id === room.id || w.right_room_id === room.id
+    );
+    if (roomWalls.length === 0) continue;
+
+    // Prefer interior walls shared with another room
+    const interiorWalls = roomWalls.filter(w => w.type === "interior");
+    const candidates = interiorWalls.length > 0 ? interiorWalls : roomWalls;
+
+    const targetWall = candidates.reduce((a, b) => wallCenterLen(a) > wallCenterLen(b) ? a : b);
+    const wLen = wallCenterLen(targetWall);
+    if (wLen < 600) continue;
+
+    const rn = room.name.toLowerCase();
+    let doorW = 900;
+    if (/bath|toilet|wc|powder|servant.*toilet/i.test(rn)) doorW = 750;
+    if (/entrance|main|front/i.test(rn)) doorW = 1050;
+    if (/balcony/i.test(rn)) doorW = 1200;
+    if (/store|utility/i.test(rn)) doorW = 750;
+
+    const pos = Math.max(150, Math.round((wLen - doorW) / 2));
+    const otherRoomId = targetWall.left_room_id === room.id
+      ? (targetWall.right_room_id ?? "")
+      : (targetWall.left_room_id ?? "");
+
+    // Compute hinge point and leaf end from wall geometry
+    const cs = targetWall.centerline.start;
+    const ce = targetWall.centerline.end;
+    const hingePoint = { x: cs.x + (ce.x - cs.x) * (pos / wLen), y: cs.y + (ce.y - cs.y) * (pos / wLen) };
+    const leafEnd = { x: cs.x + (ce.x - cs.x) * ((pos + doorW) / wLen), y: cs.y + (ce.y - cs.y) * ((pos + doorW) / wLen) };
+
+    const newDoor: Door = {
+      id: genId("door"),
+      type: "single_swing",
+      wall_id: targetWall.id,
+      width_mm: doorW,
+      height_mm: 2100,
+      thickness_mm: 35,
+      position_along_wall_mm: pos,
+      swing_direction: "left",
+      swing_angle_deg: 90,
+      opens_to: /bath|toilet|wc|powder/i.test(rn) ? "outside" : "inside",
+      symbol: {
+        hinge_point: hingePoint,
+        arc_radius_mm: doorW,
+        arc_start_angle_deg: 0,
+        arc_end_angle_deg: 90,
+        leaf_end_point: leafEnd,
+      },
+      connects_rooms: [room.id, otherRoomId],
+    };
+
+    floor.doors.push(newDoor);
+    roomsWithDoors.add(room.id);
+    if (otherRoomId) roomsWithDoors.add(otherRoomId);
+  }
+}
+
+function wallCenterLen(w: Wall): number {
+  const dx = w.centerline.end.x - w.centerline.start.x;
+  const dy = w.centerline.end.y - w.centerline.start.y;
   return Math.sqrt(dx * dx + dy * dy);
 }
 
