@@ -13,6 +13,7 @@ import { PageBackground } from "@/components/dashboard/PageBackground";
 import { PREBUILT_WORKFLOWS } from "@/constants/prebuilt-workflows";
 import { useWorkflowStore } from "@/stores/workflow-store";
 import { useLocale } from "@/hooks/useLocale";
+import { toast } from "sonner";
 import type { TranslationKey } from "@/lib/i18n";
 import type { WorkflowTemplate } from "@/types/workflow";
 
@@ -160,7 +161,11 @@ export default function DashboardPage() {
     fetch("/api/user/dashboard-stats", { signal: controller.signal })
       .then(r => { if (!r.ok) throw new Error("API error"); return r.json(); })
       .then((d: DashboardData) => { if (d && typeof d.workflowCount === "number") setData(d); })
-      .catch(() => {});
+      .catch((err: Error) => {
+        if (err.name !== "AbortError") {
+          toast.error("Could not load dashboard data", { duration: 4000 });
+        }
+      });
     const timeout = setTimeout(() => controller.abort(), 5000);
     return () => { clearTimeout(timeout); controller.abort(); };
   }, []);

@@ -149,6 +149,10 @@ export async function POST(req: NextRequest) {
     userRole === "PLATFORM_ADMIN" ||
     userRole === "TEAM_ADMIN";
 
+  // Track remaining executions for success response headers
+  let rateLimitRemaining: number | null = null;
+  let rateLimitTotal: number | null = null;
+
   if (!isAdmin) {
     // Apply rate limiting — count once per workflow execution, not per node.
     // The first node in a workflow run consumes the rate limit slot.
@@ -207,6 +211,8 @@ export async function POST(req: NextRequest) {
           remaining: rateLimitResult.remaining, limit: rateLimitResult.limit,
           reset: rateLimitResult.reset, userRole,
         });
+        rateLimitRemaining = rateLimitResult.remaining;
+        rateLimitTotal = rateLimitResult.limit;
 
         // Mark this execution as rate-limited so subsequent nodes skip the check
         if (executionId) {
@@ -5902,7 +5908,10 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
     await logNodeSuccess(executionId, catalogueId, tileInstanceId, Date.now() - nodeStartTime, {
       type: artifact.type, dataKeys: Object.keys(artifact.data ?? {}),
     });
-    return NextResponse.json({ artifact });
+    const successHeaders: Record<string, string> = {};
+    if (rateLimitRemaining !== null) successHeaders["X-RateLimit-Remaining"] = String(rateLimitRemaining);
+    if (rateLimitTotal !== null) successHeaders["X-RateLimit-Limit"] = String(rateLimitTotal);
+    return NextResponse.json({ artifact }, { headers: successHeaders });
   } catch (err) {
     // Handle APIError (user-friendly errors)
     if (err instanceof APIError) {

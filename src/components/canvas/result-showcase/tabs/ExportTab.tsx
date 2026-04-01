@@ -10,6 +10,7 @@ import { useExecutionStore } from "@/stores/execution-store";
 import { useWorkflowStore } from "@/stores/workflow-store";
 import { useLocale } from "@/hooks/useLocale";
 import { formatBytes } from "@/lib/utils";
+import { toast } from "sonner";
 import { COLORS } from "../constants";
 import type { ShowcaseData } from "../useShowcaseData";
 
@@ -27,6 +28,7 @@ export function ExportTab({ data }: ExportTabProps) {
   // ─── PDF Generation ─────────────────────────────────────────────────
   const handleGeneratePDF = useCallback(async () => {
     setGenerating("pdf");
+    toast.loading("Generating PDF report...", { id: "pdf-gen" });
     try {
       const { generatePDFReport } = await import("@/services/pdf-report");
       const labels = new Map<string, string>();
@@ -36,6 +38,9 @@ export function ExportTab({ data }: ExportTabProps) {
         artifacts,
         nodeLabels: labels,
       });
+      toast.success("PDF report downloaded", { id: "pdf-gen", duration: 3000 });
+    } catch {
+      toast.error("PDF generation failed", { id: "pdf-gen", duration: 5000 });
     } finally {
       setGenerating(null);
     }

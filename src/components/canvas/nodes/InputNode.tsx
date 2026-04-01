@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { useWorkflowStore } from "@/stores/workflow-store";
 import { useLocale } from "@/hooks/useLocale";
 import type { WorkflowNodeData } from "@/types/nodes";
+import { formatBytes } from "@/lib/utils";
 
 // ─── File store (module-level, not in Zustand — files can't serialize) ───────
 export const inputFileStore = new Map<string, File>();
@@ -119,12 +120,14 @@ export function FileUploadInput({ nodeId, data, accept, label, maxMB = 20, showP
 
     if (isIFCFile) {
       updateNode(nodeId, { data: { ...currentNode.data, inputValue: file.name, fileSize: file.size, fileName: file.name, mimeType: file.type } });
-      toast.loading("Parsing IFC file...", { id: `ifc-parse-${nodeId}` });
+      const sizeLabel = formatBytes(file.size, 1);
+      toast.loading(`Reading IFC file (${sizeLabel})...`, { id: `ifc-parse-${nodeId}` });
 
       // Read file as text and parse in the browser — zero server calls
       const reader = new FileReader();
       reader.onload = async () => {
         try {
+          toast.loading(`Parsing building elements...`, { id: `ifc-parse-${nodeId}` });
           const text = reader.result as string;
           // Dynamic import to keep bundle size small
           const { parseIFCText } = await import("@/services/ifc-text-parser");
@@ -152,7 +155,12 @@ export function FileUploadInput({ nodeId, data, accept, label, maxMB = 20, showP
           );
         } catch (err) {
           const msg = err instanceof Error ? err.message : "Parse failed";
-          toast.error(`IFC parse failed: ${msg}`, { id: `ifc-parse-${nodeId}`, duration: 8000 });
+          toast.error("Could not parse this IFC file", {
+            id: `ifc-parse-${nodeId}`,
+            description: "The file may be corrupted or in an unsupported format. Try re-exporting from your BIM software.",
+            duration: 8000,
+          });
+          console.warn("[IFC Parse] Technical error:", msg);
         }
       };
       reader.onerror = () => {
