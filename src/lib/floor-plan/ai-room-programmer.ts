@@ -11,7 +11,7 @@
  */
 
 import { getClient } from "@/services/openai";
-import { applyDeterministicSizing, extractTotalAreaSqm } from "./room-sizer";
+import { enforceHardCaps, classifyRoom } from "./room-sizer";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -117,16 +117,70 @@ EXTERIOR WALL RULES:
 - MUST have exterior wall: all bedrooms, living room, dining room, kitchen, office, balcony, verandah, terrace, car parking
 - CAN be interior: bathroom, WC, corridor, utility, storage, staircase, closet, pooja room, powder room
 
-SIZE GUIDELINES (sqm, Indian standards):
-- Master Bedroom: 14-20, Other Bedrooms: 10-15
-- Living Room: 18-30 (larger for 3+ BHK), Dining Room: 10-15, Living+Dining: 22-35
-- Kitchen: 8-12, Bathroom: 4-6, WC/Toilet: 2.5-4
-- Corridor/Hallway: 5-12, Utility: 3-5, Foyer/Entrance: 4-8
-- Balcony/Verandah: 5-12, Home Theater: 15-25, Gym: 10-20, Study/Office: 8-12
-- Pooja Room: 2.5-4, Powder Room: 2-3, Shoe Rack: 2-3, Walk-in Wardrobe: 4-6
-- Servant Quarter: 7-10, Car Parking: 25-35, Terrace Garden: 10-20
-- Family Lounge: 12-18, TV Lounge: 10-15
-- Reception (commercial): 12-25, Waiting Area: 10-20, Meeting Room: 12-20
+SIZE GUIDELINES (sqm, Indian standards — follow these STRICTLY):
+
+BATHROOMS (STRICT CAPS — NEVER exceed these):
+- Standard bathroom: 3.5-5.0 sqm (NEVER more than 5.5)
+- Master bathroom: 4.5-6.0 sqm (NEVER more than 7.0)
+- Powder room/guest toilet: 1.5-2.5 sqm
+- Servant toilet: 1.8-3.0 sqm
+
+BEDROOMS:
+- Master Bedroom: 14-20 sqm
+- Other Bedrooms: 10-16 sqm
+- Guest Bedroom: 10-14 sqm
+
+LIVING AREAS:
+- Living Room: 16-28 sqm (scales with total area)
+- Dining Room: 10-16 sqm
+- Drawing Room: 14-22 sqm
+- Living+Dining combined: 22-35 sqm
+- Family Sitting/Lounge: 12-18 sqm
+
+KITCHEN:
+- Standard: 7-10 sqm
+- Large/modular: 10-14 sqm (NEVER more than 16)
+
+SERVICE ROOMS (STRICT CAPS):
+- Pooja/Puja room: 3-5 sqm (NEVER more than 6)
+- Utility/washing: 3-5 sqm (NEVER more than 6)
+- Store room: 3-5 sqm (NEVER more than 6)
+- Servant quarter: 7-10 sqm (NEVER more than 12)
+- Shoe rack area: 1-2 sqm (NEVER more than 3)
+- Walk-in closet/wardrobe: 4-6 sqm (NEVER more than 7)
+- Laundry: 3-5 sqm
+
+CIRCULATION:
+- Corridor: 8-12% of total area
+- Foyer/Entrance: 3-6 sqm
+- Staircase: 8-12 sqm (NEVER more than 14)
+
+OUTDOOR:
+- Balcony: 4-8 sqm
+- Verandah: 6-12 sqm
+- Car parking: 13-18 sqm per car (not counted in built-up)
+
+STUDY/OFFICE: 8-12 sqm
+Home Theater: 15-25 sqm, Gym: 10-20 sqm
+Reception (commercial): 12-25 sqm, Waiting Area: 10-20 sqm, Meeting Room: 12-20 sqm
+
+SIZING EXAMPLE — 3BHK 1200 sqft (111 sqm):
+Living Room: 20, Dining: 11, Kitchen: 8.5, Master Bed: 15, Bed 2: 12, Bed 3: 11,
+Bath 1: 4.5, Bath 2: 3.8, Bath 3: 3.5, Balcony: 5, Utility: 3.5, Corridor: 10
+
+SIZING EXAMPLE — 4BHK duplex 2800 sqft (260 sqm, 130/floor):
+Ground: Living 28, Dining 14, Kitchen 12, Guest Bed 12, Bath 4, Pooja 4, Utility 4,
+Servant Quarter 9, Servant Toilet 2.5, Shoe Rack 2, Staircase 10, Corridor 9
+First: Master Bed 20, Master Bath 5.5, Walk-in 5, Bed2 15, Bath2 4, Bed3 14, Bath3 4,
+Bed4 13, Bath4 3.8, Study 10, Family Sitting 16, Balcony 6, Staircase 10, Corridor 10
+
+SIZING EXAMPLE — 5BHK duplex 3500 sqft (325 sqm):
+Ground: Drawing 22, Living 25, Dining 16, Kitchen 14, Guest Bed 13, Guest Bath 4,
+Pooja 4.5, Utility 4, Store 4, Servant Quarter 10, Servant Toilet 2.5, Verandah 10,
+Staircase 10, Corridor 10
+First: Master Bed 22, Master Bath 6, Walk-in 5.5, Bed2 16, Bath2 4.5, Bed3 15, Bath3 4,
+Bed4 14, Bath4 4, Bed5 13, Bath5 3.5, Study 10, Family Room 18, Balcony1 6, Balcony2 5,
+Staircase 10, Corridor 10
 
 MULTI-FLOOR BUILDINGS:
 For duplex, multi-story, or 2+ floor buildings, assign each room a "floor" field:
@@ -346,20 +400,10 @@ export async function programRooms(
     raw.rooms.push(...missingRooms);
   }
 
-  // ── Deterministic room sizing ──
-  // Override AI-estimated areas with formula-based sizing.
-  // AI decides WHAT rooms, formulas decide HOW BIG.
-  {
-    const promptArea = extractTotalAreaSqm(prompt);
-    const aiTotal = raw.totalAreaSqm && raw.totalAreaSqm > 0
-      ? raw.totalAreaSqm
-      : raw.rooms.reduce((s, r) => s + r.areaSqm, 0);
-    const targetArea = promptArea ?? aiTotal;
-    if (targetArea > 0) {
-      applyDeterministicSizing(raw.rooms, targetArea, prompt);
-      console.log(`[ROOM-SIZER] Applied deterministic sizing: ${raw.rooms.length} rooms, target=${targetArea.toFixed(0)} sqm`);
-    }
-  }
+  // ── Hard caps: enforce absolute min/max per room type ──
+  // AI handles sizing via few-shot examples. Caps catch the 10% outliers.
+  enforceHardCaps(raw.rooms);
+  console.log(`[HARD-CAPS] Enforced caps on ${raw.rooms.length} rooms`);
 
   // Ensure adjacency is valid
   if (!Array.isArray(raw.adjacency)) raw.adjacency = [];
@@ -1211,8 +1255,8 @@ export function programRoomsFallback(prompt: string): EnhancedRoomProgram {
     }
   }
 
-  // ── Deterministic sizing (same formulas as AI path) ──
-  applyDeterministicSizing(rooms, totalArea, prompt);
+  // ── Hard caps (same as AI path) ──
+  enforceHardCaps(rooms);
 
   const zones = {
     public: rooms.filter(r => r.zone === "public").map(r => r.name),

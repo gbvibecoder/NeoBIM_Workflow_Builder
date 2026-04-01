@@ -17,6 +17,7 @@ import { correctDimensions } from "./dimension-corrector";
 import type { RoomWithTarget } from "./dimension-corrector";
 import { layoutCourtyardPlan, hasCourtyardRoom } from "./courtyard-layout";
 import { solveLayout } from "./constraint-solver";
+import { classifyRoom } from "./room-sizer";
 
 // ── Output type ──────────────────────────────────────────────────────────────
 
@@ -310,6 +311,14 @@ export function layoutFloorPlan(program: EnhancedRoomProgram): PlacedRoom[] {
 
   // ── Dimension accuracy check (diagnostic) ──
   checkDimensionAccuracy(result, rooms);
+
+  // ── ABSOLUTE FINAL: Enforce hard area caps on placed rooms ──
+  // This MUST be the very last step. BSP and closeLayoutGaps can create
+  // rooms with areas outside their architectural range. These caps are
+  // non-negotiable — a bathroom is NEVER 25 sqm, a pooja room is NEVER 8 sqm.
+  // Running this after closeLayoutGaps prevents gap closure from re-inflating
+  // rooms that were just capped.
+  result = enforceHardCapsOnLayout(result, rooms);
 
   return result;
 }
@@ -1447,6 +1456,85 @@ function getMaxAreaForGapClosure(room: PlacedRoom): number {
  * Multiple pipeline steps (validateRoomSizes, enforceCorridorCap, dimension
  * correction) shrink rooms in-place without redistributing freed space. This
  * creates rectangular gaps that waste floor area and drop efficiency.
+ *
+// ── Hard caps on PLACED rooms (output) ──────────────────────────────────────
+
+/**
+ * Enforce absolute min/max area caps on placed rooms.
+ * BSP creates room dimensions from zone geometry, which may produce rooms
+ * with areas outside their architectural range (e.g., kitchen 2.8 m² or
+ * guest bedroom 21.7 m²). This shrinks oversized and expands undersized rooms.
+ */
+const LAYOUT_CAPS: Record<string, { min: number; max: number }> = {
+  bathroom: { min: 2.5, max: 5.5 }, master_bathroom: { min: 3.5, max: 7.0 },
+  toilet: { min: 1.5, max: 3.5 }, powder_room: { min: 1.5, max: 3.0 },
+  servant_toilet: { min: 1.5, max: 3.0 },
+  master_bedroom: { min: 12.0, max: 25.0 }, bedroom: { min: 9.5, max: 20.0 },
+  guest_bedroom: { min: 9.5, max: 16.0 },
+  living_room: { min: 12.0, max: 35.0 }, dining_room: { min: 8.0, max: 18.0 },
+  drawing_room: { min: 12.0, max: 25.0 }, family_room: { min: 10.0, max: 22.0 },
+  kitchen: { min: 5.0, max: 16.0 },
+  pooja_room: { min: 2.5, max: 6.0 }, utility: { min: 2.5, max: 6.0 },
+  store_room: { min: 2.5, max: 6.0 }, servant_quarter: { min: 7.0, max: 12.0 },
+  laundry: { min: 2.5, max: 5.0 }, shoe_rack: { min: 1.0, max: 3.0 },
+  walk_in_closet: { min: 3.0, max: 7.0 },
+  foyer: { min: 3.0, max: 10.0 }, staircase: { min: 6.0, max: 14.0 },
+  balcony: { min: 3.0, max: 12.0 }, verandah: { min: 4.0, max: 15.0 },
+  study: { min: 6.0, max: 14.0 }, home_office: { min: 7.0, max: 16.0 },
+  // Commercial (generous caps — offices need large open areas)
+  reception: { min: 8.0, max: 25.0 }, cabin: { min: 8.0, max: 16.0 },
+  conference_room: { min: 12.0, max: 30.0 }, open_workspace: { min: 15.0, max: 100.0 },
+  server_room: { min: 4.0, max: 10.0 }, pantry: { min: 4.0, max: 12.0 },
+  // Hostel
+  hostel_room: { min: 9.0, max: 14.0 }, common_room: { min: 12.0, max: 30.0 },
+  // Specialty
+  gym: { min: 8.0, max: 25.0 }, home_theater: { min: 12.0, max: 30.0 },
+  library: { min: 6.0, max: 16.0 }, terrace: { min: 6.0, max: 50.0 },
+};
+
+function enforceHardCapsOnLayout(rooms: PlacedRoom[], specs?: RoomSpec[]): PlacedRoom[] {
+  // Only enforce MAX caps (shrink oversized rooms).
+  // This is the ABSOLUTE LAST step — nothing runs after this.
+  // Skip capping if the room's area is close to its AI-specified target
+  // (the AI deliberately sized it larger, e.g., open-plan office at 60 sqm).
+  let capped = 0;
+  for (const room of rooms) {
+    const classified = classifyRoom(room.type, room.name);
+    const caps = LAYOUT_CAPS[classified];
+    if (!caps) continue;
+
+    const area = room.width * room.depth;
+
+    if (area > caps.max * 1.05) {
+      // Check if the AI specifically asked for this size
+      const spec = specs?.find(s => s.name === room.name);
+      if (spec && spec.areaSqm > caps.max && area <= spec.areaSqm * 1.3) {
+        // AI intentionally sized this room larger than the type cap — respect it
+        continue;
+      }
+
+      // Shrink the longer dimension, but ensure result stays ≥ 2.0m in both dims
+      const shorter = Math.min(room.width, room.depth);
+      const newLonger = caps.max / shorter;
+      if (newLonger >= 2.0 && shorter >= 1.0) {
+        console.log(`[LAYOUT-CAP] ${room.name}: ${area.toFixed(1)} sqm → capped to ${caps.max} sqm (${classified})`);
+        if (room.depth >= room.width) {
+          room.depth = grid(newLonger);
+        } else {
+          room.width = grid(newLonger);
+        }
+        room.area = grid(room.width * room.depth);
+        capped++;
+      }
+    }
+  }
+  if (capped > 0) console.log(`[LAYOUT-CAP] Capped ${capped} rooms`);
+
+  return rooms;
+}
+
+/**
+ * Close gaps between rooms created by post-processing shrinkage.
  *
  * This pass expands each room into adjacent empty space on all four sides.
  * It is overlap-safe: expansion stops at the nearest neighbor edge or footprint

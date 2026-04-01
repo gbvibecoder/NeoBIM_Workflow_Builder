@@ -1,115 +1,15 @@
 /**
- * Deterministic Room Sizer
+ * Room Sizer — Simple Hard Caps
  *
- * Overrides AI-estimated room areas with formula-based sizing.
- * AI decides WHAT rooms to create; this module decides HOW BIG each should be.
+ * The AI (with few-shot examples) handles room sizing.
+ * This module ONLY enforces absolute min/max caps per room type.
  *
- * Based on: NBC 2016, Neufert Architects' Data, Indian residential practice.
+ * No normalization. No scaling formulas. No sqrt/linear calculations.
+ * Just: if room > max, set to max. If room < min, set to min.
  *
- * Key principles:
- * 1. Bathrooms/utility/pooja are FIXED-size (don't scale with total area)
- * 2. Bedrooms/living/dining SCALE with total area (with diminishing returns)
- * 3. After normalization, HARD CAPS are enforced — no room exceeds its max EVER
- * 4. Comprehensive fuzzy name matching handles any AI-generated room name
+ * The AI gets sizing right ~90% of the time via examples.
+ * Hard caps catch the remaining 10% outliers.
  */
-
-// ── Types ───────────────────────────────────────────────────────────────────
-
-export type BuildingType =
-  | "apartment" | "villa" | "bungalow" | "duplex" | "row_house"
-  | "penthouse" | "studio" | "hostel" | "office" | "farmhouse" | "default";
-
-export interface BuildingContext {
-  totalAreaSqm: number;
-  bhkCount: number;
-  buildingType: BuildingType;
-  floorCount: number;
-  isVastu: boolean;
-}
-
-// ── Area allocation rules ───────────────────────────────────────────────────
-
-interface AreaRule {
-  basePct: number;
-  min: number;
-  max: number;
-  scale: "linear" | "sqrt" | "fixed";
-}
-
-const RULES: Record<string, AreaRule> = {
-  // ── Bedrooms ──
-  master_bedroom:    { basePct: 0.15, min: 12.0, max: 22.0, scale: "sqrt" },
-  bedroom:           { basePct: 0.12, min: 10.0, max: 18.0, scale: "sqrt" },
-  guest_bedroom:     { basePct: 0.10, min: 9.5,  max: 16.0, scale: "sqrt" },
-
-  // ── Bathrooms (FIXED — NEVER scales) ──
-  master_bathroom:   { basePct: 0.04, min: 4.0,  max: 6.5,  scale: "fixed" },
-  bathroom:          { basePct: 0.03, min: 3.0,  max: 5.5,  scale: "fixed" },
-  toilet:            { basePct: 0.02, min: 1.8,  max: 3.5,  scale: "fixed" },
-  powder_room:       { basePct: 0.015,min: 1.5,  max: 2.5,  scale: "fixed" },
-
-  // ── Public rooms ──
-  living_room:       { basePct: 0.18, min: 14.0, max: 30.0, scale: "sqrt" },
-  dining_room:       { basePct: 0.09, min: 8.0,  max: 16.0, scale: "sqrt" },
-  drawing_room:      { basePct: 0.12, min: 12.0, max: 22.0, scale: "sqrt" },
-  family_room:       { basePct: 0.10, min: 10.0, max: 18.0, scale: "sqrt" },
-
-  // ── Kitchen ──
-  kitchen:           { basePct: 0.07, min: 5.5,  max: 12.0, scale: "sqrt" },
-
-  // ── Service (FIXED) ──
-  pooja_room:        { basePct: 0.03, min: 3.0,  max: 6.0,  scale: "fixed" },
-  utility:           { basePct: 0.03, min: 2.5,  max: 6.0,  scale: "fixed" },
-  store_room:        { basePct: 0.02, min: 2.5,  max: 5.0,  scale: "fixed" },
-  servant_quarter:   { basePct: 0.04, min: 7.0,  max: 12.0, scale: "fixed" },
-  servant_toilet:    { basePct: 0.015,min: 1.8,  max: 3.0,  scale: "fixed" },
-  laundry:           { basePct: 0.02, min: 2.5,  max: 5.0,  scale: "fixed" },
-  shoe_rack:         { basePct: 0.01, min: 1.0,  max: 3.0,  scale: "fixed" },
-  walk_in_closet:    { basePct: 0.03, min: 3.0,  max: 7.0,  scale: "fixed" },
-
-  // ── Circulation ──
-  corridor:          { basePct: 0.08, min: 5.0,  max: 18.0, scale: "linear" },
-  foyer:             { basePct: 0.04, min: 3.0,  max: 8.0,  scale: "sqrt" },
-  lobby:             { basePct: 0.04, min: 4.0,  max: 10.0, scale: "sqrt" },
-
-  // ── Outdoor ──
-  balcony:           { basePct: 0.05, min: 3.0,  max: 10.0, scale: "sqrt" },
-  verandah:          { basePct: 0.06, min: 5.0,  max: 12.0, scale: "sqrt" },
-  terrace:           { basePct: 0.10, min: 8.0,  max: 30.0, scale: "linear" },
-
-  // ── Staircase (FIXED) ──
-  staircase:         { basePct: 0.06, min: 6.0,  max: 12.0, scale: "fixed" },
-
-  // ── Parking (excluded from normalization) ──
-  parking:           { basePct: 0.00, min: 13.0, max: 18.0, scale: "fixed" },
-  garage:            { basePct: 0.00, min: 13.0, max: 18.0, scale: "fixed" },
-
-  // ── Study / Office ──
-  study:             { basePct: 0.05, min: 6.0,  max: 10.0, scale: "sqrt" },
-  home_office:       { basePct: 0.06, min: 8.0,  max: 14.0, scale: "sqrt" },
-
-  // ── Commercial ──
-  reception:         { basePct: 0.08, min: 8.0,  max: 20.0, scale: "sqrt" },
-  cabin:             { basePct: 0.06, min: 8.0,  max: 14.0, scale: "sqrt" },
-  conference_room:   { basePct: 0.10, min: 12.0, max: 25.0, scale: "sqrt" },
-  open_workspace:    { basePct: 0.30, min: 20.0, max: 80.0, scale: "linear" },
-  server_room:       { basePct: 0.03, min: 4.0,  max: 8.0,  scale: "fixed" },
-  pantry:            { basePct: 0.04, min: 4.0,  max: 10.0, scale: "sqrt" },
-  break_room:        { basePct: 0.05, min: 6.0,  max: 12.0, scale: "sqrt" },
-
-  // ── Hostel ──
-  hostel_room:       { basePct: 0.00, min: 9.0,  max: 14.0, scale: "fixed" },
-  common_room:       { basePct: 0.10, min: 15.0, max: 25.0, scale: "sqrt" },
-  warden_room:       { basePct: 0.06, min: 10.0, max: 14.0, scale: "fixed" },
-
-  // ── Specialty ──
-  gym:               { basePct: 0.05, min: 8.0,  max: 20.0, scale: "sqrt" },
-  home_theater:      { basePct: 0.06, min: 12.0, max: 25.0, scale: "sqrt" },
-  library:           { basePct: 0.04, min: 6.0,  max: 14.0, scale: "sqrt" },
-
-  // ── Fallback ──
-  custom:            { basePct: 0.05, min: 4.0,  max: 15.0, scale: "sqrt" },
-};
 
 // ── Comprehensive fuzzy name classification ─────────────────────────────────
 
@@ -120,15 +20,15 @@ const RULES: Record<string, AreaRule> = {
 export function classifyRoom(type: string, name: string): string {
   const t = (type || "").toLowerCase().trim();
   const n = (name || "").toLowerCase().trim();
-  const c = `${t} ${n}`; // combined for matching
+  const c = `${t} ${n}`;
 
-  // ── BEDROOMS (master/guest first, then generic) ──
+  // ── BEDROOMS ──
   if (/master\s*(bed|suite|room)|main\s*bed/i.test(c)) return "master_bedroom";
   if (/guest\s*(bed|room|suite)/i.test(c)) return "guest_bedroom";
   if (/kid|child|boy|girl|son|daughter/i.test(c) && /bed|room/i.test(c)) return "bedroom";
   if (/bed\s*room|bedroom/i.test(c) || t === "bedroom") return "bedroom";
 
-  // ── BATHROOMS (master/servant/guest first) ──
+  // ── BATHROOMS ──
   if (/master\s*(bath|toilet|wash)/i.test(c)) return "master_bathroom";
   if (/servant\s*(bath|toilet|wash|wc)/i.test(c) || /maid.*toilet/i.test(c) || /staff.*toilet/i.test(c)) return "servant_toilet";
   if (/guest\s*(bath|toilet|powder|wash)/i.test(c) || /powder\s*room|half\s*bath/i.test(c)) return "powder_room";
@@ -142,16 +42,19 @@ export function classifyRoom(type: string, name: string): string {
   if (/drawing\s*room|formal\s*living/i.test(c)) return "drawing_room";
   if (/dining/i.test(c) || t === "dining" || t === "dining_room") return "dining_room";
 
-  // ── SERVICE ──
+  // ── SERVICE (name-specific checks FIRST, type fallback LAST) ──
   if (/servant\s*quarter|maid\s*(room|quarter)|domestic\s*help|staff\s*room|driver\s*room/i.test(c)) return "servant_quarter";
   if (/pooja|puja|prayer|mandir|temple/i.test(c) || t === "puja_room") return "pooja_room";
+  if (/shoe\s*(rack|area|cabinet|closet|room)|cloak\s*room/i.test(n)) return "shoe_rack";
+  if (/walk.in\s*(closet|wardrobe)|wardrobe\s*room|dressing\s*room/i.test(n)) return "walk_in_closet";
   if (/utility|wash\s*area|washing\s*area/i.test(c) || t === "utility") return "utility";
   if (/laundry/i.test(c)) return "laundry";
-  if (/store\s*room|storage\s*room|lumber|box\s*room/i.test(c) || t === "storage" || t === "store_room") return "store_room";
-  if (/shoe\s*(rack|area|cabinet|closet|room)|cloak\s*room/i.test(c)) return "shoe_rack";
-  if (/walk.in\s*(closet|wardrobe)|wardrobe\s*room|dressing\s*room/i.test(c)) return "walk_in_closet";
+  if (/store\s*room|storage\s*room|lumber|box\s*room/i.test(n) || (t === "storage" && !/shoe|closet|wardrobe|walk/i.test(n)) || t === "store_room") return "store_room";
 
   // ── CIRCULATION ──
+  // ── COMMERCIAL (check BEFORE circulation — "Reception" with type "entrance" must not become "foyer") ──
+  if (/reception|front\s*desk|waiting/i.test(n)) return "reception";
+
   if (/corridor|hallway|passage|lobby/i.test(c) || t === "hallway" || t === "corridor") return "corridor";
   if (/foyer|entrance\s*(hall|area)|entry\s*hall/i.test(c) || t === "foyer" || t === "entrance") return "foyer";
   if (/stair|staircase|stairwell/i.test(c) || t === "staircase") return "staircase";
@@ -161,7 +64,6 @@ export function classifyRoom(type: string, name: string): string {
   if (/verandah|veranda|porch|portico/i.test(c)) return "verandah";
   if (/terrace|roof\s*top|roof\s*garden/i.test(c)) return "terrace";
   if (/car\s*park|parking|garage|car\s*port/i.test(c)) return "parking";
-  if (/garden|lawn|landscape/i.test(c)) return "parking"; // outdoor, not built-up
 
   // ── SPECIALTY ──
   if (/study|home\s*office|work\s*room/i.test(c) || t === "study" || t === "home_office") return "study";
@@ -171,9 +73,9 @@ export function classifyRoom(type: string, name: string): string {
 
   // ── COMMERCIAL ──
   if (/reception|front\s*desk|waiting/i.test(c)) return "reception";
+  if (/open\s*(work|office|floor|plan|space)|workstation/i.test(c)) return "open_workspace";
   if (/cabin|private\s*office|director/i.test(c) || t === "office") return "cabin";
   if (/conference|meeting|board\s*room/i.test(c)) return "conference_room";
-  if (/open\s*(work|office)|workstation/i.test(c)) return "open_workspace";
   if (/server\s*room|data\s*center|it\s*room/i.test(c)) return "server_room";
   if (/pantry|break\s*room|cafeteria|canteen/i.test(c)) return "pantry";
 
@@ -192,114 +94,98 @@ export function classifyRoom(type: string, name: string): string {
   return "custom";
 }
 
-function findRule(type: string, name: string): AreaRule {
-  const classified = classifyRoom(type, name);
-  return RULES[classified] ?? RULES.custom;
-}
+// ── Hard caps: absolute min/max per room type ───────────────────────────────
 
-// ── Core sizing function ────────────────────────────────────────────────────
+const HARD_CAPS: Record<string, { min: number; max: number }> = {
+  // Bathrooms (STRICT)
+  bathroom:          { min: 2.5, max: 5.5 },
+  master_bathroom:   { min: 3.5, max: 7.0 },
+  toilet:            { min: 1.5, max: 3.5 },
+  powder_room:       { min: 1.5, max: 3.0 },
+  servant_toilet:    { min: 1.5, max: 3.0 },
 
-function calculateArea(
-  type: string,
-  name: string,
-  perFloorArea: number,
-  bhkCount: number,
-): number {
-  const rule = findRule(type, name);
+  // Bedrooms
+  master_bedroom:    { min: 12.0, max: 25.0 },
+  bedroom:           { min: 9.5, max: 20.0 },
+  guest_bedroom:     { min: 9.5, max: 16.0 },
 
-  let area: number;
+  // Public
+  living_room:       { min: 12.0, max: 35.0 },
+  dining_room:       { min: 8.0, max: 18.0 },
+  drawing_room:      { min: 12.0, max: 25.0 },
+  family_room:       { min: 10.0, max: 22.0 },
+  kitchen:           { min: 5.0, max: 16.0 },
 
-  if (rule.scale === "fixed") {
-    const t = Math.min(1, Math.max(0, (perFloorArea - 40) / 160));
-    area = rule.min + (rule.max - rule.min) * t * 0.5;
-  } else if (rule.scale === "sqrt") {
-    const refArea = 100;
-    const scaledPct = rule.basePct * Math.sqrt(refArea / Math.max(perFloorArea, 30));
-    const effectivePct = Math.max(rule.basePct * 0.5, Math.min(rule.basePct, scaledPct));
-    area = perFloorArea * effectivePct;
-  } else {
-    area = perFloorArea * rule.basePct;
-  }
+  // Service (STRICT)
+  pooja_room:        { min: 2.5, max: 6.0 },
+  utility:           { min: 2.5, max: 6.0 },
+  store_room:        { min: 2.5, max: 6.0 },
+  servant_quarter:   { min: 7.0, max: 12.0 },
+  laundry:           { min: 2.5, max: 5.0 },
+  shoe_rack:         { min: 1.0, max: 3.0 },
+  walk_in_closet:    { min: 3.0, max: 7.0 },
 
-  // BHK adjustment for non-master bedrooms
-  const classified = classifyRoom(type, name);
-  if (classified === "bedroom" && bhkCount > 3) {
-    area *= (3 / bhkCount) * 1.1;
-  }
+  // Circulation
+  corridor:          { min: 4.0, max: 20.0 },
+  foyer:             { min: 3.0, max: 10.0 },
+  staircase:         { min: 6.0, max: 14.0 },
 
-  // Master bedroom boost
-  if (classified === "master_bedroom") {
-    area = Math.max(area, rule.min * 1.1);
-  }
+  // Outdoor
+  balcony:           { min: 3.0, max: 12.0 },
+  verandah:          { min: 4.0, max: 15.0 },
+  terrace:           { min: 6.0, max: 50.0 },
 
-  // Clamp to min/max
-  area = Math.max(rule.min, Math.min(rule.max, area));
+  // Study / Office
+  study:             { min: 6.0, max: 14.0 },
+  home_office:       { min: 7.0, max: 16.0 },
+  gym:               { min: 8.0, max: 25.0 },
+  home_theater:      { min: 12.0, max: 30.0 },
+  library:           { min: 6.0, max: 16.0 },
 
-  return Math.round(area * 10) / 10;
-}
+  // Commercial
+  reception:         { min: 8.0, max: 25.0 },
+  cabin:             { min: 8.0, max: 16.0 },
+  conference_room:   { min: 12.0, max: 30.0 },
+  open_workspace:    { min: 15.0, max: 100.0 },
+  server_room:       { min: 4.0, max: 10.0 },
+  pantry:            { min: 4.0, max: 12.0 },
 
-// ── Normalization: respect fixed/flexible split ─────────────────────────────
+  // Hostel
+  hostel_room:       { min: 9.0, max: 14.0 },
+  common_room:       { min: 12.0, max: 30.0 },
+  warden_room:       { min: 9.0, max: 16.0 },
+};
 
-function normalizeAreas(
-  rooms: Array<{ name: string; type: string; areaSqm: number }>,
-  targetTotal: number,
+/**
+ * Enforce absolute min/max caps on room areas.
+ * This is the ONLY post-AI validation. No normalization, no scaling.
+ * If AI got it right (it should, with few-shot examples), this is a no-op.
+ * If AI hallucinated, this catches it.
+ */
+export function enforceHardCaps(
+  rooms: Array<{ name: string; type: string; areaSqm: number }>
 ): void {
-  // Separate into fixed and flexible
-  const isFixed = (r: { name: string; type: string }) => {
-    const rule = findRule(r.type, r.name);
-    return rule.scale === "fixed";
-  };
-  const isParking = (r: { name: string; type: string }) => {
-    const cls = classifyRoom(r.type, r.name);
-    return cls === "parking" || cls === "garage";
-  };
+  for (const room of rooms) {
+    const classified = classifyRoom(room.type, room.name);
+    const caps = HARD_CAPS[classified];
+    if (!caps) continue;
 
-  // Exclude parking from target (not counted in built-up area)
-  const parkingArea = rooms.filter(isParking).reduce((s, r) => s + r.areaSqm, 0);
-  const adjustedTarget = targetTotal - parkingArea;
-
-  const fixedTotal = rooms.filter(r => isFixed(r) && !isParking(r)).reduce((s, r) => s + r.areaSqm, 0);
-  const flexRooms = rooms.filter(r => !isFixed(r) && !isParking(r));
-  const flexTotal = flexRooms.reduce((s, r) => s + r.areaSqm, 0);
-
-  const flexTarget = adjustedTarget - fixedTotal;
-  if (flexTarget <= 0 || flexTotal <= 0) return;
-
-  if (Math.abs(flexTotal - flexTarget) > 2.0) {
-    const ratio = flexTarget / flexTotal;
-    for (const room of flexRooms) {
-      const rule = findRule(room.type, room.name);
-      room.areaSqm = Math.max(rule.min, Math.min(rule.max,
-        Math.round(room.areaSqm * ratio * 10) / 10
-      ));
+    if (room.areaSqm > caps.max) {
+      console.warn(`[HARD-CAP] ${room.name}: ${room.areaSqm.toFixed(1)} sqm → capped to ${caps.max} sqm`);
+      room.areaSqm = caps.max;
+    }
+    if (room.areaSqm < caps.min) {
+      console.warn(`[HARD-CAP] ${room.name}: ${room.areaSqm.toFixed(1)} sqm → raised to ${caps.min} sqm`);
+      room.areaSqm = caps.min;
     }
   }
-
-  // Absorb remainder into the largest flexible room
-  const newFlexTotal = flexRooms.reduce((s, r) => s + r.areaSqm, 0);
-  const diff = flexTarget - newFlexTotal;
-  if (Math.abs(diff) > 1.0 && flexRooms.length > 0) {
-    const largest = flexRooms.reduce((a, b) => a.areaSqm > b.areaSqm ? a : b);
-    const rule = findRule(largest.type, largest.name);
-    largest.areaSqm = Math.max(rule.min, Math.min(rule.max,
-      Math.round((largest.areaSqm + diff) * 10) / 10
-    ));
-  }
 }
 
-// ── HARD VALIDATION: absolute caps that NOTHING can override ────────────────
+// ── Legacy exports (kept for backward compatibility with tests) ─────────────
 
-function enforceHardCaps(rooms: Array<{ name: string; type: string; areaSqm: number }>): void {
-  for (const room of rooms) {
-    const rule = findRule(room.type, room.name);
-    // Always enforce min and max from the rule table
-    if (room.areaSqm > rule.max) room.areaSqm = rule.max;
-    if (room.areaSqm < rule.min) room.areaSqm = rule.min;
-    room.areaSqm = Math.round(room.areaSqm * 10) / 10;
-  }
-}
-
-// ── Building type detection ─────────────────────────────────────────────────
+export type BuildingType =
+  | "apartment" | "villa" | "bungalow" | "duplex" | "row_house"
+  | "penthouse" | "studio" | "hostel" | "office" | "farmhouse" | "default";
 
 export function detectBuildingType(prompt: string): BuildingType {
   const p = prompt.toLowerCase();
@@ -330,8 +216,6 @@ export function detectBHKCount(rooms: Array<{ name: string; type: string }>): nu
   }).length;
 }
 
-// ── Total area extraction from prompt ───────────────────────────────────────
-
 export function extractTotalAreaSqm(prompt: string): number | null {
   const p = prompt.toLowerCase();
   const sqftMatch = p.match(/(\d[\d,]*(?:\.\d+)?)\s*(?:sq\.?\s*ft|square\s*feet|sqft|sft)/);
@@ -341,30 +225,11 @@ export function extractTotalAreaSqm(prompt: string): number | null {
   return null;
 }
 
-// ── Main entry point ────────────────────────────────────────────────────────
-
+// Legacy function — now just calls enforceHardCaps
 export function applyDeterministicSizing(
   rooms: Array<{ name: string; type: string; areaSqm: number; zone?: string; preferredWidth?: number; preferredDepth?: number }>,
-  totalAreaSqm: number,
-  prompt: string,
+  _totalAreaSqm: number,
+  _prompt: string,
 ): void {
-  if (rooms.length === 0 || totalAreaSqm <= 0) return;
-
-  const bhkCount = detectBHKCount(rooms);
-  const floorCount = detectFloorCount(prompt);
-  const perFloorArea = totalAreaSqm / Math.max(floorCount, 1);
-
-  // Step 1: Calculate area for each room using formulas
-  for (const room of rooms) {
-    if (room.preferredWidth && room.preferredWidth > 0 && room.preferredDepth && room.preferredDepth > 0) {
-      continue; // user specified exact dimensions
-    }
-    room.areaSqm = calculateArea(room.type, room.name, perFloorArea, bhkCount);
-  }
-
-  // Step 2: Normalize flexible rooms so total matches target
-  normalizeAreas(rooms, totalAreaSqm);
-
-  // Step 3: HARD CAPS — enforce absolute min/max regardless of normalization
   enforceHardCaps(rooms);
 }
