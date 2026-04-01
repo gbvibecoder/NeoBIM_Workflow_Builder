@@ -631,8 +631,29 @@ export function smartPlaceWindows(floor: Floor): WindowPlacementResult {
     const requiredWindowArea = room.area_sqm * 1_000_000 / 6; // mm² (IS:1038 target)
     let placedWindowArea = 0;
 
-    // Place windows on exterior walls, preferring longest walls first
-    const sortedWalls = [...exteriorWalls].sort((a, b) => wallLength(b) - wallLength(a));
+    // Score and sort exterior walls by architectural suitability for this room type.
+    // Not just longest-first — consider room function and wall orientation.
+    const sortedWalls = [...exteriorWalls].sort((a, b) => {
+      let scoreA = wallLength(a) / 1000; // base: longer walls score higher (in meters)
+      let scoreB = wallLength(b) / 1000;
+
+      // Bedrooms: prefer wall OPPOSITE the door (door wall is typically the shortest/internal side)
+      // This maximizes light on the occupied area and avoids window behind bed headboard.
+      if (room.type === "bedroom" || room.type === "master_bedroom" || room.type === "guest_bedroom") {
+        const doorOnA = floor.doors.some((d) => d.wall_id === a.id);
+        const doorOnB = floor.doors.some((d) => d.wall_id === b.id);
+        if (!doorOnA) scoreA += 3; // prefer walls WITHOUT doors
+        if (!doorOnB) scoreB += 3;
+      }
+
+      // Living/dining: prefer the widest wall for maximum daylight
+      if (room.type === "living_room" || room.type === "dining_room") {
+        scoreA += wallLength(a) / 2000; // extra weight on length
+        scoreB += wallLength(b) / 2000;
+      }
+
+      return scoreB - scoreA; // descending by score
+    });
 
     for (const wall of sortedWalls) {
       if (placedWindowArea >= requiredWindowArea) break;
@@ -690,7 +711,7 @@ export function smartPlaceWindows(floor: Floor): WindowPlacementResult {
     }
 
     // ── Cross-ventilation pass: large rooms (>15 sqm) need windows on 2+ walls ──
-    // Count how many walls have windows placed
+    // Prefer OPPOSITE walls for effective cross-ventilation (not adjacent walls).
     try {
       const wallsWithWindows = new Set(
         windows.filter(w => {
@@ -700,9 +721,26 @@ export function smartPlaceWindows(floor: Floor): WindowPlacementResult {
       );
       const needsCrossVent = room.area_sqm > 15 && wallsWithWindows.size < 2;
       if (needsCrossVent) {
-        // Try to add a window on a second exterior wall
-        for (const wall of sortedWalls) {
-          if (wallsWithWindows.has(wall.id)) continue; // Already has window
+        // Find the wall with the first window to determine its orientation
+        const firstWindowWall = floor.walls.find((w) => wallsWithWindows.has(w.id));
+        // Sort candidate walls: prefer opposite orientation (perpendicular/opposite) over adjacent
+        const crossVentCandidates = sortedWalls.filter((w) => !wallsWithWindows.has(w.id));
+        if (firstWindowWall) {
+          const isFirstHorizontal = Math.abs(firstWindowWall.centerline.start.y - firstWindowWall.centerline.end.y) <
+            Math.abs(firstWindowWall.centerline.start.x - firstWindowWall.centerline.end.x);
+          crossVentCandidates.sort((a, b) => {
+            const isAHoriz = Math.abs(a.centerline.start.y - a.centerline.end.y) <
+              Math.abs(a.centerline.start.x - a.centerline.end.x);
+            const isBHoriz = Math.abs(b.centerline.start.y - b.centerline.end.y) <
+              Math.abs(b.centerline.start.x - b.centerline.end.x);
+            // Prefer walls with SAME orientation (parallel = opposite wall) for cross-ventilation
+            const aOpposite = isAHoriz === isFirstHorizontal ? 1 : 0;
+            const bOpposite = isBHoriz === isFirstHorizontal ? 1 : 0;
+            if (aOpposite !== bOpposite) return bOpposite - aOpposite;
+            return wallLength(b) - wallLength(a);
+          });
+        }
+        for (const wall of crossVentCandidates) {
           const wLen = wallLength(wall);
           const winWidth = spec.width;
           const minPos = 600;

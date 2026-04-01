@@ -53,59 +53,17 @@ const MIN_STRIP_WIDTH = 2.8;    // minimum strip width for bedroom-bath pairs
 const DEFAULT_ASPECT = 1.33;    // footprint width:depth ratio
 const MAX_ROOM_AR = 2.8;        // max aspect ratio for non-corridor rooms
 
-/**
- * Furniture-aware minimum dimension per room type (meters).
- * Derived from furniture catalog dimensions + clearances + 600mm circulation.
- * These ensure every room can physically fit its essential furniture.
- */
-const MIN_DIM_BY_TYPE: Record<string, number> = {
-  master_bedroom: 3.6,   // king bed(2050) + wardrobe(600) + clearance(800)
-  bedroom: 3.0,          // queen bed(2050) + wardrobe(600) + clearance(350)
-  guest_bedroom: 2.8,    // single bed(1900) + wardrobe(600) + clearance(300)
-  living_room: 3.2,      // sofa(900) + coffee table + circulation
-  dining_room: 2.8,      // table(900) + chair circulation(800) each side
-  kitchen: 2.2,          // counter(600) + working aisle(1000) + gap(600)
-  bathroom: 1.5,         // toilet(700) + front clearance(600) + wall(200)
-  toilet: 1.2,           // toilet + basin side-by-side
-  wc: 1.2,
-  study: 2.4,            // desk(750) + chair rollback(900) + gap
-  home_office: 2.4,
-  office: 2.4,
-  utility: 1.5,
-  laundry: 1.5,
-  store_room: 1.2,
-  pantry: 1.2,
-  puja_room: 1.8,        // mandir(600) + sitting(1200)
-  balcony: 1.2,
-  verandah: 1.5,
-  hallway: 1.0,          // residential corridor
-  staircase: 0.9,
-  entrance: 2.0,
-  foyer: 2.0,
-};
+// ── Room standards (centralized architectural minimums) ──────────────────────
+import { getMinDimMeters, getMinDepthMeters } from "./room-standards";
 
-/** Get the furniture-aware minimum dimension for a room type/name. */
+/** Get the furniture-aware minimum dimension (shorter side) for a room. */
 function getMinDimForType(type: string, name: string): number {
-  const t = type.toLowerCase();
-  const n = name.toLowerCase();
-  // Direct type match
-  if (MIN_DIM_BY_TYPE[t] !== undefined) return MIN_DIM_BY_TYPE[t];
-  // Name-based fallback for common patterns
-  if (n.includes("master") && n.includes("bed")) return MIN_DIM_BY_TYPE.master_bedroom;
-  if (n.includes("bedroom") || n.includes("bed room")) return MIN_DIM_BY_TYPE.bedroom;
-  if (n.includes("living")) return MIN_DIM_BY_TYPE.living_room;
-  if (n.includes("kitchen")) return MIN_DIM_BY_TYPE.kitchen;
-  if (n.includes("dining")) return MIN_DIM_BY_TYPE.dining_room;
-  if (n.includes("bath")) return MIN_DIM_BY_TYPE.bathroom;
-  if (n.includes("toilet") || n.includes("wc")) return MIN_DIM_BY_TYPE.toilet;
-  if (n.includes("corridor") || n.includes("passage")) return MIN_DIM_BY_TYPE.hallway;
-  if (n.includes("puja") || n.includes("pooja") || n.includes("prayer")) return MIN_DIM_BY_TYPE.puja_room;
-  if (n.includes("study") || n.includes("office")) return MIN_DIM_BY_TYPE.study;
-  if (n.includes("utility") || n.includes("store")) return MIN_DIM_BY_TYPE.utility;
-  if (n.includes("balcony")) return MIN_DIM_BY_TYPE.balcony;
-  if (n.includes("stair")) return MIN_DIM_BY_TYPE.staircase;
-  // Fallback to general habitable minimum
-  return MIN_HABITABLE;
+  return getMinDimMeters(type, name);
+}
+
+/** Get the furniture-aware minimum depth (longer side) for a room. */
+function getMinDepthForType(type: string, name: string): number {
+  return getMinDepthMeters(type, name);
 }
 
 // ── Grid snap ────────────────────────────────────────────────────────────────
@@ -1991,6 +1949,10 @@ function splitTwo(a: RoomSpec, b: RoomSpec, rect: Rect): PlacedRoom[] {
   const minB = getMinDimForType(b.type, b.name);
   const minFloor = Math.min(minA, minB); // hard floor for BSP feasibility
 
+  // Cross-axis depth minimums (the dimension NOT being split)
+  const depthA = getMinDepthForType(a.type, a.name);
+  const depthB = getMinDepthForType(b.type, b.name);
+
   // Horizontal split (with dimension clamping to prevent sub-minimum rooms)
   let hAh = grid(rect.h * ratio);
   let hBh = grid(rect.h - hAh);
@@ -2003,7 +1965,12 @@ function splitTwo(a: RoomSpec, b: RoomSpec, rect: Rect): PlacedRoom[] {
   } else if (hAh < minFloor && rect.h >= minFloor * 2) {
     hAh = grid(minFloor); hBh = grid(rect.h - hAh);
   }
-  const hScore = Math.max(ar(rect.w, hAh), ar(rect.w, hBh));
+  let hScore = Math.max(ar(rect.w, hAh), ar(rect.w, hBh));
+  // Cross-axis penalty: both rooms inherit rect.w — penalize if it violates depth minimum
+  // In H-split, room gets (w=rect.w, h=hXh). The "shorter side" is min(rect.w, hXh).
+  // The "longer side" is max(rect.w, hXh). Check both against minWidth and minDepth.
+  if (rect.w < minA && hAh >= depthA) hScore += 2; // width too small for A
+  if (rect.w < minB && hBh >= depthB) hScore += 2; // width too small for B
 
   // Vertical split (with dimension clamping)
   let vAw = grid(rect.w * ratio);
@@ -2017,7 +1984,10 @@ function splitTwo(a: RoomSpec, b: RoomSpec, rect: Rect): PlacedRoom[] {
   } else if (vAw < minFloor && rect.w >= minFloor * 2) {
     vAw = grid(minFloor); vBw = grid(rect.w - vAw);
   }
-  const vScore = Math.max(ar(vAw, rect.h), ar(vBw, rect.h));
+  let vScore = Math.max(ar(vAw, rect.h), ar(vBw, rect.h));
+  // Cross-axis penalty: both rooms inherit rect.h — penalize if it violates depth minimum
+  if (rect.h < minA && vAw >= depthA) vScore += 2; // height too small for A
+  if (rect.h < minB && vBw >= depthB) vScore += 2; // height too small for B
 
   if (hScore <= vScore) {
     return [
