@@ -6,7 +6,7 @@
  * so React Flow doesn't interfere with typing/clicking.
  */
 
-import React, { useRef, useCallback, useMemo, useState } from "react";
+import React, { useRef, useCallback, useMemo, useState, useEffect } from "react";
 import { toast } from "sonner";
 import { useWorkflowStore } from "@/stores/workflow-store";
 import { useLocale } from "@/hooks/useLocale";
@@ -302,6 +302,46 @@ export function FileUploadInput({ nodeId, data, accept, label, maxMB = 20, showP
 
 interface Params { floors: number; gfa: number; height: number; style: string }
 
+function NumericParamInput({
+  value,
+  onChange,
+  style,
+}: {
+  value: number;
+  onChange: (v: number) => void;
+  style: React.CSSProperties;
+}) {
+  const [localValue, setLocalValue] = useState<string>(String(value));
+
+  useEffect(() => {
+    setLocalValue(String(value));
+  }, [value]);
+
+  return (
+    <input
+      type="number"
+      value={localValue}
+      onChange={e => {
+        setLocalValue(e.target.value);
+        const parsed = parseFloat(e.target.value);
+        if (!isNaN(parsed)) {
+          onChange(parsed);
+        }
+      }}
+      onBlur={() => {
+        const parsed = parseFloat(localValue);
+        if (isNaN(parsed) || localValue.trim() === "") {
+          setLocalValue(String(value));
+        } else {
+          setLocalValue(String(parsed));
+          onChange(parsed);
+        }
+      }}
+      style={style}
+    />
+  );
+}
+
 export function ParameterInput({ nodeId, data }: { nodeId: string; data: WorkflowNodeData }) {
   const updateNode = useWorkflowStore(s => s.updateNode);
   const t = useLocale(s => s.t);
@@ -368,10 +408,9 @@ export function ParameterInput({ nodeId, data }: { nodeId: string; data: Workflo
             {row.label}
           </label>
           {row.type === "number" ? (
-            <input
-              type="number"
+            <NumericParamInput
               value={params[row.key] as number}
-              onChange={e => update(row.key, parseFloat(e.target.value) || 0)}
+              onChange={v => update(row.key, v)}
               style={inputStyle}
             />
           ) : (
