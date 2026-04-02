@@ -52,13 +52,13 @@ const SORT_OPTION_KEYS: Record<string, string> = {
 const COMPLEXITY_ORDER: Record<string, number> = { simple: 0, intermediate: 1, advanced: 2 };
 
 // Templates that use expensive API nodes (render, video, 3D model) — locked for FREE users
-const LOCKED_IDS = new Set(["wf-02", "wf-05", "wf-06", "wf-07", "wf-08", "wf-11"]);
+const LOCKED_IDS = new Set(["wf-05", "wf-06", "wf-08", "wf-11"]);
 
 // Quick start templates (simple, fast output — displayed in order)
 const QUICK_START_IDS = ["wf-01", "wf-03", "wf-04"];
 
 // Core pipelines (the main value props — 3D, IFC, BOQ, visualization)
-const CORE_IDS = ["wf-05", "wf-06", "wf-08", "wf-09"];
+const CORE_IDS = ["wf-06", "wf-08", "wf-09"];
 
 const CATEGORY_LABEL_KEYS: Record<string, TranslationKey> = {
   "Concept Design": 'templates.categoryConceptDesign',
@@ -78,12 +78,9 @@ function hexToRgb(hex: string): string {
 // ─── Video/image preview mapping for template cards ─────────────────────────
 const R2 = "https://pub-27d9a7371b6d47ff94fee1a3228f1720.r2.dev/workflow-demos";
 const TEMPLATE_PREVIEWS: Record<string, { type: "video"; url: string; start: number } | { type: "svg"; output: string } | { type: "image"; url: string }> = {
-  "wf-07": { type: "svg", output: "render" },
   "wf-04": { type: "video", url: `${R2}/ifc-exporter.mp4`, start: 120 },
-  "wf-09": { type: "video", url: `${R2}/boq-result.mp4`, start: 45 },
-  "wf-01": { type: "video", url: `${R2}/text-prompt-to-floor-plan.mp4`, start: 28 },
-  "wf-02": { type: "video", url: `${R2}/text-to-concept-building.mp4`, start: 132 },
-  "wf-10": { type: "image", url: `${R2}/site-analysis-preview.jpg` },
+  "wf-09": { type: "image", url: `/boq-cost-estimate-preview.png` },
+  "wf-01": { type: "image", url: `/floor-plan-editor-preview.png` },
   "wf-08": { type: "video", url: `${R2}/pdf-to-3d-model.mp4`, start: 2 },
   "wf-06": { type: "video", url: `${R2}/floor-plan-to-video-render.mp4`, start: 2 },
   "wf-05": { type: "video", url: `${R2}/interactive-3d-model.mp4`, start: 8 },
