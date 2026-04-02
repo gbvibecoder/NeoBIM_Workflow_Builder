@@ -52,7 +52,7 @@ const R2 = "https://pub-27d9a7371b6d47ff94fee1a3228f1720.r2.dev/workflow-demos";
 const DEMO_VIDEOS = [
   { id: "dv-4", url: `/videos/img-to-renovation.mp4`, previewStart: 0, color: "#F59E0B", rgb: "245,158,11" },
   { id: "dv-3", url: `${R2}/3d-model-preview.mp4`, previewStart: 0, color: "#10B981", rgb: "16,185,129" },
-  { id: "dv-1", url: `${R2}/text-to-concept-building.mp4`, previewStart: 105, color: "#4F8AFF", rgb: "79,138,255" },
+  { id: "dv-1", url: `${R2}/text-to-concept-building.mp4`, previewStart: 2, color: "#4F8AFF", rgb: "79,138,255" },
   { id: "dv-2", url: `${R2}/floor-plan-demo.mp4`, previewStart: 0, color: "#8B5CF6", rgb: "139,92,246" },
 ];
 
@@ -391,65 +391,98 @@ export default function DashboardPage() {
                     direction: isReversed ? "rtl" : "ltr",
                     gap: 0,
                     borderRadius: 24, overflow: "hidden",
-                    background: "rgba(10,12,22,0.7)",
-                    border: `1px solid rgba(${vc.rgb}, 0.1)`,
+                    background: "linear-gradient(135deg, rgba(14,16,28,0.95), rgba(10,12,20,0.98))",
+                    border: `1px solid rgba(${vc.rgb}, 0.15)`,
                     cursor: "pointer",
                     transition: "all 400ms cubic-bezier(0.22, 1, 0.36, 1)",
+                    boxShadow: `0 8px 40px rgba(0,0,0,0.35), 0 0 80px rgba(${vc.rgb}, 0.03)`,
+                    position: "relative",
                   }}
                 >
+                  {/* Top accent line */}
+                  <div style={{ position: "absolute", top: 0, left: "10%", right: "10%", height: 1, background: `linear-gradient(90deg, transparent, rgba(${vc.rgb}, 0.3), transparent)`, zIndex: 2, pointerEvents: "none" }} />
+
                   {/* Video side */}
-                  <div style={{ direction: "ltr", position: "relative", minHeight: 280, overflow: "hidden" }}>
+                  <div style={{
+                    direction: "ltr", position: "relative", minHeight: 320, overflow: "hidden",
+                    background: `radial-gradient(ellipse at center, rgba(${vc.rgb}, 0.08) 0%, transparent 70%)`,
+                  }}>
                     <video
                       ref={(el) => { videoRefs.current[vc.id] = el; }}
                       src={vc.url}
                       muted
                       playsInline
+                      preload="auto"
                       onLoadedMetadata={(e) => { e.currentTarget.currentTime = vc.previewStart; }}
                       onEnded={(e) => { const v = e.currentTarget; v.currentTime = vc.previewStart; v.play().catch(() => {}); }}
-                      style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", position: "absolute", inset: 0 }}
+                      className="db-feature-video"
+                      style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", position: "absolute", inset: 0, transition: "transform 0.6s cubic-bezier(0.22,1,0.36,1)" }}
                     />
-                    <div style={{ position: "absolute", top: 12, right: 12, padding: "4px 10px", borderRadius: 8, background: "rgba(0,0,0,0.7)", backdropFilter: "blur(8px)", fontSize: 11, color: "#8898AA", fontFamily: "var(--font-jetbrains), monospace", zIndex: 1 }}>
+                    {/* Duration badge */}
+                    <div style={{
+                      position: "absolute", top: 14, right: 14, padding: "5px 12px", borderRadius: 10, zIndex: 2,
+                      background: "rgba(0,0,0,0.6)", backdropFilter: "blur(12px)",
+                      border: `1px solid rgba(${vc.rgb}, 0.2)`,
+                      fontSize: 11, color: vc.color, fontFamily: "var(--font-jetbrains), monospace",
+                    }}>
                       {vc.duration}
                     </div>
                     {/* Gradient edge toward content */}
-                    <div style={{ position: "absolute", top: 0, [isReversed ? "left" : "right"]: 0, bottom: 0, width: "30%", background: `linear-gradient(${isReversed ? "90deg" : "270deg"}, transparent, rgba(10,12,22,0.7))`, pointerEvents: "none" }} />
+                    <div style={{ position: "absolute", top: 0, [isReversed ? "left" : "right"]: 0, bottom: 0, width: "35%", background: `linear-gradient(${isReversed ? "90deg" : "270deg"}, transparent, rgba(10,12,20,0.98))`, pointerEvents: "none" }} />
+                    {/* Bottom gradient for polish */}
+                    <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: "25%", background: "linear-gradient(transparent, rgba(10,12,20,0.5))", pointerEvents: "none" }} />
                   </div>
 
                   {/* Content side */}
-                  <div style={{ direction: "ltr", padding: "40px 36px", display: "flex", flexDirection: "column", justifyContent: "center" }}>
-                    <h3 style={{ fontSize: "clamp(20px, 2.5vw, 28px)", fontWeight: 800, color: "#F0F0F5", letterSpacing: "-0.03em", lineHeight: 1.2, marginBottom: 8 }}>
+                  <div style={{ direction: "ltr", padding: "40px 40px", display: "flex", flexDirection: "column", justifyContent: "center", position: "relative" }}>
+                    {/* Category badge */}
+                    <div style={{
+                      display: "inline-flex", alignItems: "center", gap: 5, alignSelf: "flex-start",
+                      padding: "4px 12px", borderRadius: 8, marginBottom: 16,
+                      background: `rgba(${vc.rgb}, 0.1)`, border: `1px solid rgba(${vc.rgb}, 0.25)`,
+                      boxShadow: `0 0 12px rgba(${vc.rgb}, 0.08)`,
+                    }}>
+                      <Play size={9} style={{ color: vc.color }} />
+                      <span style={{ fontSize: 9, fontWeight: 700, color: vc.color, letterSpacing: "0.1em", textTransform: "uppercase" }}>
+                        {i === 0 ? "VISUALIZATION" : "CONCEPT DESIGN"}
+                      </span>
+                    </div>
+
+                    <h3 style={{ fontSize: "clamp(22px, 2.5vw, 30px)", fontWeight: 800, color: "#F0F2F8", letterSpacing: "-0.03em", lineHeight: 1.2, marginBottom: 10 }}>
                       {t(vc.titleKey)}
                     </h3>
-                    <p style={{ fontSize: 14, color: vc.color, fontWeight: 600, marginBottom: 20 }}>
+                    <p style={{ fontSize: 14, color: vc.color, fontWeight: 600, marginBottom: 22 }}>
                       {t(vc.subKey)}
                     </p>
 
                     {/* Pipeline tags */}
-                    <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", marginBottom: 28 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 28 }}>
                       {vc.nodes.map((nk, ni) => (
                         <React.Fragment key={nk}>
                           <span style={{
-                            fontSize: 9, fontWeight: 600, color: "#9898B0",
-                            padding: "3px 10px", borderRadius: 6,
-                            background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)",
+                            fontSize: 10, fontWeight: 600, color: "#A0A8C0",
+                            padding: "5px 14px", borderRadius: 8,
+                            background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)",
                             fontFamily: "var(--font-jetbrains), monospace", textTransform: "uppercase", letterSpacing: "0.04em",
                           }}>
                             {t(nk)}
                           </span>
-                          {ni < vc.nodes.length - 1 && <span style={{ fontSize: 10, color: "#3A3A50" }}>→</span>}
+                          {ni < vc.nodes.length - 1 && <span style={{ fontSize: 11, color: `rgba(${vc.rgb}, 0.5)` }}>→</span>}
                         </React.Fragment>
                       ))}
                     </div>
 
-                    <div style={{
-                      display: "inline-flex", alignItems: "center", gap: 8, alignSelf: "flex-start",
-                      padding: "10px 22px", borderRadius: 12,
-                      background: `rgba(${vc.rgb}, 0.1)`, border: `1px solid rgba(${vc.rgb}, 0.2)`,
-                      color: vc.color, fontSize: 12, fontWeight: 700,
-                      fontFamily: "var(--font-jetbrains), monospace", letterSpacing: "0.03em",
-                      transition: "all 0.25s",
+                    <div className="db-feature-cta" style={{
+                      display: "inline-flex", alignItems: "center", gap: 10, alignSelf: "flex-start",
+                      padding: "12px 26px", borderRadius: 14,
+                      background: `linear-gradient(135deg, rgba(${vc.rgb}, 0.15), rgba(${vc.rgb}, 0.06))`,
+                      border: `1px solid rgba(${vc.rgb}, 0.3)`,
+                      color: "#fff", fontSize: 13, fontWeight: 700,
+                      fontFamily: "var(--font-jetbrains), monospace", letterSpacing: "0.02em",
+                      transition: "all 0.3s ease",
+                      boxShadow: `0 0 20px rgba(${vc.rgb}, 0.06)`,
                     }}>
-                      {t("dash.tryThisWorkflow")} <ArrowRight size={14} />
+                      {t("dash.tryThisWorkflow")} <ArrowRight size={15} style={{ color: vc.color }} />
                     </div>
                   </div>
                 </motion.div>
@@ -847,9 +880,16 @@ export default function DashboardPage() {
 
         /* ── Feature cards ── */
         .db-feature-card:hover {
-          transform: translateY(-4px) !important;
-          box-shadow: 0 24px 64px rgba(0,0,0,0.4), 0 0 40px rgba(79,138,255,0.06) !important;
-          border-color: rgba(79,138,255,0.2) !important;
+          transform: translateY(-6px) !important;
+          box-shadow: 0 24px 80px rgba(0,0,0,0.45), 0 0 60px rgba(79,138,255,0.06) !important;
+          border-color: rgba(79,138,255,0.22) !important;
+        }
+        .db-feature-card:hover .db-feature-video {
+          transform: scale(1.04);
+        }
+        .db-feature-card:hover .db-feature-cta {
+          box-shadow: 0 0 32px rgba(79,138,255,0.15) !important;
+          transform: translateY(-1px);
         }
 
         /* ── Glass card hover ── */
