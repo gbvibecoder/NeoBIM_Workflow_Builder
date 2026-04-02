@@ -279,6 +279,7 @@ const COMPLEXITY_ORDER: Record<string, number> = { simple: 0, intermediate: 1, a
 const LOCKED_IDS = new Set(["wf-05", "wf-06", "wf-08", "wf-11"]);
 const QUICK_START_IDS = ["wf-01", "wf-03", "wf-04"];
 const CORE_IDS = ["wf-06", "wf-08", "wf-09"];
+const HIDDEN_IDS = new Set(["wf-12"]);
 
 const CATEGORY_LABEL_KEYS: Record<string, TranslationKey> = {
   "Concept Design": "templates.categoryConceptDesign", "Visualization": "templates.categoryVisualization",
@@ -911,7 +912,7 @@ export default function TemplatesPage() {
   const router = useRouter();
 
   const filtered = useMemo(() => {
-    let list = [...PREBUILT_WORKFLOWS];
+    let list = PREBUILT_WORKFLOWS.filter(w => !HIDDEN_IDS.has(w.id));
     if (activeCategory !== "All") list = list.filter(w => w.category === activeCategory);
     if (sortBy === "simple") list.sort((a, b) => COMPLEXITY_ORDER[a.complexity] - COMPLEXITY_ORDER[b.complexity]);
     if (sortBy === "advanced") list.sort((a, b) => COMPLEXITY_ORDER[b.complexity] - COMPLEXITY_ORDER[a.complexity]);
