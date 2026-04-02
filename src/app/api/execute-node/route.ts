@@ -113,8 +113,8 @@ function cleanupRateLimitCache() {
   }
 }
 
-// Allow up to 180s for heavy GPT-4o vision + 3D AI Studio generation + conversion chains
-export const maxDuration = 180;
+// Allow up to 600s for heavy AI generation chains (DALL-E + Claude QA + retries, 3D, video)
+export const maxDuration = 600;
 
 
 export async function POST(req: NextRequest) {

@@ -266,9 +266,8 @@ async function executeNode(
     const nd = node.data as Record<string, unknown>;
     if (nd.viewType != null) nodeConfig.viewType = nd.viewType;
 
-    // Long-running nodes (3D generation, video, IFC parsing) need extended timeout
-    const LONG_RUNNING_NODES = new Set(["GN-001", "GN-009", "GN-010", "TR-007", "TR-016"]);
-    const timeoutMs = LONG_RUNNING_NODES.has(catalogueId) ? 300_000 : 120_000; // 5min vs 2min
+    // Generous timeout for all nodes — AI generation (DALL-E, Claude QA, Kling, Meshy) can take minutes
+    const timeoutMs = 600_000; // 10 min
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 

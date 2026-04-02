@@ -915,10 +915,7 @@ export async function validateRenderWithClaude(
       return { passed: true, floorCountCorrect: true, detectedFloors: description.floors, locationContextCorrect: true, feedback: "QA skipped (no API key)" };
     }
 
-    const isOAuth = apiKey.startsWith("sk-ant-oat01-");
-    const client = isOAuth
-      ? new Anthropic({ authToken: apiKey, apiKey: null })
-      : new Anthropic({ apiKey });
+    const client = new Anthropic({ apiKey });
 
     // Fetch image and convert to base64 for Claude
     let imageContent: { type: "image"; source: { type: "base64"; media_type: "image/png"; data: string } } | { type: "image"; source: { type: "url"; url: string } };
