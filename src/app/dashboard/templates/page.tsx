@@ -1,8 +1,10 @@
 "use client";
 
-import React, { useState, useMemo, useEffect, useRef } from "react";
+import React, { useState, useMemo, useEffect, useRef, lazy, Suspense, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronDown, Building2, Ruler, Compass, HardHat, Layers, PenTool, Triangle, Lock, Crown, Lightbulb, ArrowRight, MessageSquare } from "lucide-react";
+import { Canvas, useFrame } from "@react-three/fiber";
+import * as THREE from "three";
+import { ChevronDown, Building2, Ruler, Compass, HardHat, Layers, PenTool, Triangle, Lock, ArrowRight, MessageSquare, Sparkles, Zap } from "lucide-react";
 import { PREBUILT_WORKFLOWS } from "@/constants/prebuilt-workflows";
 import { toast } from "sonner";
 import { useWorkflowStore } from "@/stores/workflow-store";
@@ -12,61 +14,276 @@ import { useLocale } from "@/hooks/useLocale";
 import type { TranslationKey } from "@/lib/i18n";
 import { awardXP } from "@/lib/award-xp";
 
-// ─── Constants ───────────────────────────────────────────────────────────────
+/* ── Lazy-loaded hero scene ── */
+const TemplatesHeroScene = lazy(() => import("@/components/dashboard/TemplatesHeroScene").then(m => ({ default: m.TemplatesHeroScene })));
 
-const CATEGORIES = [
-  "All",
-  "Concept Design",
-  "Visualization",
-  "BIM Export",
-  "Cost Estimation",
-  "Full Pipeline",
-  "Site Analysis",
-];
+/* ═══════════════════════════════════════════════════════════════════
+   INLINE 3D SCENES — rendered behind text on each template card
+   Each scene auto-rotates and represents the workflow's output.
+   ═══════════════════════════════════════════════════════════════════ */
+
+function EBox({ args, color, edgeColor, pos, op = 0.25, eo = 0.5 }: {
+  args: [number, number, number]; color: string; edgeColor: string;
+  pos: [number, number, number]; op?: number; eo?: number;
+}) {
+  const geo = useMemo(() => new THREE.BoxGeometry(...args), [args]);
+  const edges = useMemo(() => new THREE.EdgesGeometry(geo), [geo]);
+  return (
+    <group position={pos}>
+      <mesh geometry={geo}><meshStandardMaterial color={color} transparent opacity={op} roughness={0.8} /></mesh>
+      <lineSegments geometry={edges}><lineBasicMaterial color={edgeColor} transparent opacity={eo} /></lineSegments>
+    </group>
+  );
+}
+
+// wf-01: Floor plan lines
+function Scene01() {
+  const ref = useRef<THREE.Group>(null);
+  const dotRef = useRef<THREE.Mesh>(null);
+  const path = useMemo(() => {
+    const pts = [[0,0],[5,0],[5,4],[0,4],[0,0]].map(([x,z]) => new THREE.Vector3(x-2.5, 0.05, z-2));
+    return new THREE.CatmullRomCurve3(pts, true);
+  }, []);
+  const lines = useMemo(() => {
+    const segs: [number,number,number,number][] = [[0,0,5,0],[5,0,5,4],[5,4,0,4],[0,4,0,0],[0,2.2,3,2.2],[3.3,2.2,5,2.2],[3,0,3,2],[3,2.4,3,4]];
+    return segs.map(([x1,z1,x2,z2]) => new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(x1-2.5,0,z1-2), new THREE.Vector3(x2-2.5,0,z2-2)]));
+  }, []);
+  useFrame(({ clock }) => {
+    if (ref.current) ref.current.rotation.y = clock.getElapsedTime() * 0.08;
+    if (dotRef.current) { const p = path.getPoint((clock.getElapsedTime()*0.1)%1); dotRef.current.position.copy(p); }
+  });
+  return (
+    <group ref={ref} position={[0,-0.5,0]}>
+      {lines.map((g,i) => <lineSegments key={i} geometry={g}><lineBasicMaterial color="#06b6d4" transparent opacity={0.5} /></lineSegments>)}
+      <mesh ref={dotRef}><sphereGeometry args={[0.08,8,8]} /><meshBasicMaterial color="#06b6d4" /></mesh>
+      <mesh rotation={[-Math.PI/2,0,0]} position={[0,-0.02,0]}><planeGeometry args={[6,5,12,10]} /><meshBasicMaterial color="#06b6d4" wireframe transparent opacity={0.05} /></mesh>
+    </group>
+  );
+}
+
+// wf-03: Wireframe building
+function Scene03() {
+  const ref = useRef<THREE.Group>(null);
+  useFrame(({ clock }) => { if (ref.current) ref.current.rotation.y = clock.getElapsedTime()*0.1; });
+  return (
+    <group ref={ref}>
+      <EBox args={[2,3,1.5]} color="#1e1e3a" edgeColor="#a855f7" pos={[0,1.5,0]} op={0.15} eo={0.55} />
+      <EBox args={[2.1,0.06,1.6]} color="#a855f7" edgeColor="#a855f7" pos={[0,1,0]} op={0.08} eo={0.3} />
+      <EBox args={[2.1,0.06,1.6]} color="#a855f7" edgeColor="#a855f7" pos={[0,2,0]} op={0.08} eo={0.3} />
+      {[[-0.8,-0.6],[0.8,-0.6],[-0.8,0.6],[0.8,0.6]].map(([x,z],i) => <EBox key={i} args={[0.12,3,0.12]} color="#475569" edgeColor="#94a3b8" pos={[x,1.5,z]} op={0.25} eo={0.4} />)}
+      <EBox args={[2.3,0.08,1.8]} color="#1e293b" edgeColor="#a855f7" pos={[0,3.04,0]} op={0.2} eo={0.45} />
+    </group>
+  );
+}
+
+// wf-04: Breathing massing volumes
+function Scene04() {
+  const ref = useRef<THREE.Group>(null);
+  const v0 = useRef<THREE.Group>(null);
+  const v1 = useRef<THREE.Group>(null);
+  const v2 = useRef<THREE.Group>(null);
+  useFrame(({ clock }) => {
+    const t = clock.getElapsedTime();
+    if (ref.current) ref.current.rotation.y = t*0.07;
+    if (v0.current) { v0.current.scale.y = 1+Math.sin(t*0.8)*0.1; }
+    if (v1.current) { v1.current.scale.y = 1+Math.sin(t*0.6+2)*0.12; }
+    if (v2.current) { v2.current.scale.y = 1+Math.sin(t*0.9+1)*0.08; }
+  });
+  return (
+    <group ref={ref}>
+      <group ref={v0} position={[-1,1.25,-0.3]}><EBox args={[1.3,2.5,1.3]} color="#0e1e30" edgeColor="#06b6d4" pos={[0,0,0]} op={0.15} eo={0.5} /></group>
+      <group ref={v1} position={[0.8,0.5,0.5]}><EBox args={[2,1,1.5]} color="#1a0e30" edgeColor="#a855f7" pos={[0,0,0]} op={0.12} eo={0.45} /></group>
+      <group ref={v2} position={[0.2,1.5,-0.8]}><EBox args={[1,3,1]} color="#0e2a20" edgeColor="#10b981" pos={[0,0,0]} op={0.12} eo={0.5} /></group>
+    </group>
+  );
+}
+
+// wf-06: Orbiting camera around render screen
+function Scene06() {
+  const ref = useRef<THREE.Group>(null);
+  const camRef = useRef<THREE.Mesh>(null);
+  useFrame(({ clock }) => {
+    const t = clock.getElapsedTime();
+    if (ref.current) ref.current.rotation.y = t*0.05;
+    if (camRef.current) { camRef.current.position.set(Math.cos(t*0.4)*2.2, 0.5+Math.sin(t*0.2)*0.3, Math.sin(t*0.4)*2.2); }
+  });
+  const screenEdges = useMemo(() => new THREE.EdgesGeometry(new THREE.BoxGeometry(2.5,1.5,0.05)), []);
+  return (
+    <group ref={ref}>
+      <mesh position={[0,0.5,0]}><boxGeometry args={[2.5,1.5,0.05]} /><meshStandardMaterial color="#10b981" transparent opacity={0.08} emissive="#10b981" emissiveIntensity={0.3} /></mesh>
+      <lineSegments geometry={screenEdges} position={[0,0.5,0]}><lineBasicMaterial color="#10b981" transparent opacity={0.45} /></lineSegments>
+      <mesh ref={camRef}><octahedronGeometry args={[0.12,0]} /><meshBasicMaterial color="#8b5cf6" transparent opacity={0.8} /></mesh>
+      <mesh rotation={[-Math.PI/2,0,0]} position={[0,0.5,0]}><ringGeometry args={[2.1,2.2,48]} /><meshBasicMaterial color="#8b5cf6" transparent opacity={0.1} side={THREE.DoubleSide} /></mesh>
+    </group>
+  );
+}
+
+// wf-08: PDF → Building flow with particles
+function Scene08() {
+  const ref = useRef<THREE.Group>(null);
+  const particles = useRef<THREE.InstancedMesh>(null);
+  const dummy = useMemo(() => new THREE.Object3D(), []);
+  useFrame(({ clock }) => {
+    const t = clock.getElapsedTime();
+    if (ref.current) ref.current.rotation.y = t*0.04;
+    if (particles.current) {
+      for (let i = 0; i < 8; i++) {
+        const p = ((t*0.3+i/8)%1);
+        dummy.position.set(-1.5+p*3, 0.8+Math.sin(p*Math.PI)*0.3, 0);
+        dummy.scale.setScalar(0.04+Math.sin(p*Math.PI)*0.02);
+        dummy.updateMatrix();
+        particles.current.setMatrixAt(i, dummy.matrix);
+      }
+      particles.current.instanceMatrix.needsUpdate = true;
+    }
+  });
+  return (
+    <group ref={ref}>
+      <EBox args={[1,1.4,0.05]} color="#1e293b" edgeColor="#3b82f6" pos={[-1.5,0.8,0]} op={0.15} eo={0.45} />
+      <instancedMesh ref={particles} args={[undefined,undefined,8]}><sphereGeometry args={[1,6,6]} /><meshBasicMaterial color="#06b6d4" transparent opacity={0.7} /></instancedMesh>
+      <EBox args={[1.2,1.8,0.8]} color="#0e1e30" edgeColor="#06b6d4" pos={[1.5,0.9,0]} op={0.12} eo={0.45} />
+      <EBox args={[1.3,0.05,0.9]} color="#06b6d4" edgeColor="#06b6d4" pos={[1.5,1.8,0]} op={0.1} eo={0.3} />
+    </group>
+  );
+}
+
+// wf-09: Animated bar chart
+function Scene09() {
+  const ref = useRef<THREE.Group>(null);
+  const bars = useRef<THREE.Mesh[]>([]);
+  const heights = [1.5,2.4,1.0,2.8,1.8];
+  const colors = ["#06b6d4","#a855f7","#10b981","#f59e0b","#3b82f6"];
+  useFrame(({ clock }) => {
+    const t = clock.getElapsedTime();
+    if (ref.current) ref.current.rotation.y = t*0.06;
+    bars.current.forEach((bar,i) => { if (bar) { const h = heights[i]*(1+Math.sin(t*0.7+i*1.2)*0.12); bar.scale.y = h/heights[i]; bar.position.y = h/2; } });
+  });
+  return (
+    <group ref={ref}>
+      {heights.map((h,i) => {
+        const geo = new THREE.BoxGeometry(0.35,h,0.35);
+        const edgeGeo = new THREE.EdgesGeometry(geo);
+        return (
+          <group key={i}>
+            <mesh ref={el => { if (el) bars.current[i]=el; }} position={[-1.2+i*0.6,h/2,0]}><boxGeometry args={[0.35,h,0.35]} /><meshStandardMaterial color={colors[i]} transparent opacity={0.2} /></mesh>
+            <lineSegments geometry={edgeGeo} position={[-1.2+i*0.6,h/2,0]}><lineBasicMaterial color={colors[i]} transparent opacity={0.5} /></lineSegments>
+          </group>
+        );
+      })}
+    </group>
+  );
+}
+
+// wf-05: Mini extruded floor plan
+function Scene05() {
+  const ref = useRef<THREE.Group>(null);
+  useFrame(({ clock }) => { if (ref.current) ref.current.rotation.y = clock.getElapsedTime()*0.12; });
+  return (
+    <group ref={ref} position={[0,-0.3,0]}>
+      <EBox args={[2,0.5,1.5]} color="#0e1e30" edgeColor="#3b82f6" pos={[-0.5,0.25,-0.5]} op={0.1} eo={0.4} />
+      <EBox args={[1.2,0.5,1.5]} color="#1a0e30" edgeColor="#a78bfa" pos={[1.1,0.25,-0.5]} op={0.1} eo={0.4} />
+      <EBox args={[3.2,0.5,1.2]} color="#0e2a20" edgeColor="#06b6d4" pos={[0.1,0.25,0.85]} op={0.1} eo={0.4} />
+    </group>
+  );
+}
+
+// wf-11: Before/after split
+function Scene11() {
+  const ref = useRef<THREE.Group>(null);
+  const divRef = useRef<THREE.Mesh>(null);
+  useFrame(({ clock }) => {
+    const t = clock.getElapsedTime();
+    if (ref.current) ref.current.rotation.y = t*0.04;
+    if (divRef.current) divRef.current.position.x = Math.sin(t*0.5)*0.3;
+  });
+  const eL = useMemo(() => new THREE.EdgesGeometry(new THREE.PlaneGeometry(1.4,1.8)), []);
+  const eR = useMemo(() => new THREE.EdgesGeometry(new THREE.PlaneGeometry(1.4,1.8)), []);
+  return (
+    <group ref={ref}>
+      <mesh position={[-0.8,0.8,0]}><planeGeometry args={[1.4,1.8]} /><meshStandardMaterial color="#7f1d1d" transparent opacity={0.12} /></mesh>
+      <lineSegments geometry={eL} position={[-0.8,0.8,0.01]}><lineBasicMaterial color="#ef4444" transparent opacity={0.3} /></lineSegments>
+      <mesh position={[0.8,0.8,0]}><planeGeometry args={[1.4,1.8]} /><meshStandardMaterial color="#0e2a20" transparent opacity={0.12} /></mesh>
+      <lineSegments geometry={eR} position={[0.8,0.8,0.01]}><lineBasicMaterial color="#10b981" transparent opacity={0.35} /></lineSegments>
+      <mesh ref={divRef} position={[0,0.8,0.02]}><planeGeometry args={[0.03,1.9]} /><meshBasicMaterial color="#ffffff" transparent opacity={0.5} /></mesh>
+    </group>
+  );
+}
+
+// wf-12: Clash detection — intersecting beams + pulse
+function Scene12() {
+  const ref = useRef<THREE.Group>(null);
+  const pulseRef = useRef<THREE.Mesh>(null);
+  useFrame(({ clock }) => {
+    const t = clock.getElapsedTime();
+    if (ref.current) ref.current.rotation.y = t*0.06;
+    if (pulseRef.current) { const s = 0.9+Math.sin(t*2)*0.3; pulseRef.current.scale.setScalar(s); }
+  });
+  return (
+    <group ref={ref}>
+      <EBox args={[3.5,0.25,0.25]} color="#475569" edgeColor="#94a3b8" pos={[0,0.8,0]} op={0.2} eo={0.4} />
+      <EBox args={[0.25,0.25,3]} color="#475569" edgeColor="#f59e0b" pos={[0,0.8,0]} op={0.2} eo={0.4} />
+      <group position={[0,0.8,0]} rotation={[0,0,Math.PI/6]}>
+        <EBox args={[3,0.15,0.15]} color="#2d1b69" edgeColor="#a855f7" pos={[0,0,0]} op={0.15} eo={0.35} />
+      </group>
+      <mesh ref={pulseRef} position={[0,0.8,0]}><sphereGeometry args={[0.25,16,16]} /><meshBasicMaterial color="#ef4444" transparent opacity={0.4} /></mesh>
+      <mesh position={[0.6,0.8,0.6]}><sphereGeometry args={[0.15,12,12]} /><meshBasicMaterial color="#f59e0b" transparent opacity={0.3} /></mesh>
+    </group>
+  );
+}
+
+// Scene registry
+const CARD_SCENES: Record<string, React.FC> = {
+  "wf-01": Scene01, "wf-03": Scene03, "wf-04": Scene04,
+  "wf-06": Scene06, "wf-08": Scene08, "wf-09": Scene09,
+  "wf-05": Scene05, "wf-11": Scene11, "wf-12": Scene12,
+};
+
+function CardScene3D({ wfId }: { wfId: string }) {
+  const SceneComp = CARD_SCENES[wfId];
+  if (!SceneComp) return null;
+  return (
+    <Canvas
+      camera={{ position: [3, 2.5, 3], fov: 42, near: 0.1, far: 30 }}
+      gl={{ antialias: true, alpha: true, powerPreference: "high-performance" }}
+      dpr={[1, 2]}
+      style={{ width: "100%", height: "100%", background: "transparent" }}
+    >
+      <ambientLight color="#b0c0d0" intensity={0.3} />
+      <directionalLight color="#e0e8ff" intensity={0.7} position={[2, 3, 2]} />
+      <SceneComp />
+    </Canvas>
+  );
+}
+
+/* ── Constants ── */
+
+const CATEGORIES = ["All", "Concept Design", "Visualization", "BIM Export", "Cost Estimation", "Full Pipeline", "Site Analysis"];
 
 const CATEGORY_COLORS: Record<string, string> = {
-  "Concept Design":  "#3B82F6",
-  "Visualization":   "#10B981",
-  "BIM Export":      "#F59E0B",
-  "Cost Estimation": "#8B5CF6",
-  "Full Pipeline":   "#06B6D4",
-  "Site Analysis":   "#10B981",
+  "Concept Design": "#3B82F6", "Visualization": "#10B981", "BIM Export": "#F59E0B",
+  "Cost Estimation": "#8B5CF6", "Full Pipeline": "#06B6D4", "Site Analysis": "#10B981",
 };
 
 const CATEGORY_ICONS: Record<string, React.ReactNode> = {
-  "Concept Design":  <PenTool size={11} />,
-  "Visualization":   <Compass size={11} />,
-  "BIM Export":      <Layers size={11} />,
-  "Cost Estimation": <Ruler size={11} />,
-  "Full Pipeline":   <Building2 size={11} />,
-  "Site Analysis":   <Triangle size={11} />,
+  "Concept Design": <PenTool size={11} />, "Visualization": <Compass size={11} />,
+  "BIM Export": <Layers size={11} />, "Cost Estimation": <Ruler size={11} />,
+  "Full Pipeline": <Building2 size={11} />, "Site Analysis": <Triangle size={11} />,
 };
 
 const SORT_OPTION_KEYS: Record<string, string> = {
-  default: "templates.popular",
-  simple: "templates.simpleFirst",
-  advanced: "templates.advancedFirst",
-  nodes: "templates.fewestNodes",
+  default: "templates.popular", simple: "templates.simpleFirst",
+  advanced: "templates.advancedFirst", nodes: "templates.fewestNodes",
 };
 
 const COMPLEXITY_ORDER: Record<string, number> = { simple: 0, intermediate: 1, advanced: 2 };
-
-// Templates that use expensive API nodes (render, video, 3D model) — locked for FREE users
 const LOCKED_IDS = new Set(["wf-05", "wf-06", "wf-08", "wf-11"]);
-
-// Quick start templates (simple, fast output — displayed in order)
 const QUICK_START_IDS = ["wf-01", "wf-03", "wf-04"];
-
-// Core pipelines (the main value props — 3D, IFC, BOQ, visualization)
 const CORE_IDS = ["wf-06", "wf-08", "wf-09"];
 
 const CATEGORY_LABEL_KEYS: Record<string, TranslationKey> = {
-  "Concept Design": 'templates.categoryConceptDesign',
-  "Visualization": 'templates.categoryVisualization',
-  "BIM Export": 'templates.categoryBimExport',
-  "Cost Estimation": 'templates.categoryCostEstimation',
-  "Full Pipeline": 'templates.categoryFullPipeline',
-  "Site Analysis": 'templates.categorySiteAnalysis',
+  "Concept Design": "templates.categoryConceptDesign", "Visualization": "templates.categoryVisualization",
+  "BIM Export": "templates.categoryBimExport", "Cost Estimation": "templates.categoryCostEstimation",
+  "Full Pipeline": "templates.categoryFullPipeline", "Site Analysis": "templates.categorySiteAnalysis",
 };
 
 function hexToRgb(hex: string): string {
@@ -75,7 +292,7 @@ function hexToRgb(hex: string): string {
   return `${parseInt(r[1], 16)}, ${parseInt(r[2], 16)}, ${parseInt(r[3], 16)}`;
 }
 
-// ─── Video/image preview mapping for template cards ─────────────────────────
+/* ── Preview mapping ── */
 const R2 = "https://pub-27d9a7371b6d47ff94fee1a3228f1720.r2.dev/workflow-demos";
 const TEMPLATE_PREVIEWS: Record<string, { type: "video"; url: string; start: number } | { type: "svg"; output: string } | { type: "image"; url: string }> = {
   "wf-04": { type: "video", url: `${R2}/ifc-exporter.mp4`, start: 120 },
@@ -89,322 +306,27 @@ const TEMPLATE_PREVIEWS: Record<string, { type: "video"; url: string; start: num
   "wf-11": { type: "video", url: `/videos/img-to-renovation.mp4`, start: 0 },
 };
 
-// SVG output type illustrations
+
+/* ── SVG output illustration ── */
 function OutputPreviewSVG({ output, color }: { output: string; color: string }) {
   const rgb = hexToRgb(color);
-  switch (output) {
-    case "3d":
-      return (
-        <svg viewBox="0 0 200 120" fill="none" style={{ width: "100%", height: "100%" }}>
-          <rect x="50" y="30" width="40" height="70" rx="2" fill={`rgba(${rgb},0.08)`} stroke={`rgba(${rgb},0.2)`} strokeWidth="0.8" />
-          <rect x="95" y="15" width="35" height="85" rx="2" fill={`rgba(${rgb},0.06)`} stroke={`rgba(${rgb},0.15)`} strokeWidth="0.8" />
-          <rect x="135" y="40" width="30" height="60" rx="2" fill={`rgba(${rgb},0.04)`} stroke={`rgba(${rgb},0.12)`} strokeWidth="0.8" />
-          <path d="M50 30 L70 15 L110 15 L90 30 Z" fill={`rgba(${rgb},0.1)`} stroke={`rgba(${rgb},0.2)`} strokeWidth="0.5" />
-          <text x="100" y="112" textAnchor="middle" fill={`rgba(${rgb},0.3)`} fontSize="8" fontFamily="monospace">3D MODEL</text>
-        </svg>
-      );
-    case "floorplan":
-      return (
-        <svg viewBox="0 0 200 120" fill="none" style={{ width: "100%", height: "100%" }}>
-          <rect x="30" y="15" width="140" height="90" rx="2" fill="none" stroke={`rgba(${rgb},0.15)`} strokeWidth="1" />
-          <line x1="30" y1="55" x2="100" y2="55" stroke={`rgba(${rgb},0.12)`} strokeWidth="0.8" />
-          <line x1="100" y1="15" x2="100" y2="105" stroke={`rgba(${rgb},0.12)`} strokeWidth="0.8" />
-          <line x1="100" y1="75" x2="170" y2="75" stroke={`rgba(${rgb},0.1)`} strokeWidth="0.8" />
-          <rect x="45" y="25" width="15" height="12" rx="1" fill={`rgba(${rgb},0.06)`} stroke={`rgba(${rgb},0.1)`} strokeWidth="0.5" />
-          <rect x="75" y="62" width="12" height="10" rx="1" fill={`rgba(${rgb},0.06)`} stroke={`rgba(${rgb},0.1)`} strokeWidth="0.5" />
-          <rect x="120" y="82" width="20" height="14" rx="1" fill={`rgba(${rgb},0.08)`} stroke={`rgba(${rgb},0.12)`} strokeWidth="0.5" />
-          <text x="100" y="112" textAnchor="middle" fill={`rgba(${rgb},0.3)`} fontSize="8" fontFamily="monospace">FLOOR PLAN</text>
-        </svg>
-      );
-    case "boq":
-      return (
-        <svg viewBox="0 0 200 120" fill="none" style={{ width: "100%", height: "100%" }}>
-          {[0,1,2,3,4].map(r => (
-            <g key={r}>
-              <rect x="35" y={18 + r * 18} width="130" height="14" rx="2" fill={r === 0 ? `rgba(${rgb},0.08)` : "rgba(255,255,255,0.02)"} stroke={`rgba(${rgb},${r === 0 ? 0.15 : 0.06})`} strokeWidth="0.5" />
-              <line x1="85" y1={18 + r * 18} x2="85" y2={32 + r * 18} stroke={`rgba(${rgb},0.06)`} strokeWidth="0.5" />
-              <line x1="130" y1={18 + r * 18} x2="130" y2={32 + r * 18} stroke={`rgba(${rgb},0.06)`} strokeWidth="0.5" />
-            </g>
-          ))}
-          <text x="100" y="112" textAnchor="middle" fill={`rgba(${rgb},0.3)`} fontSize="8" fontFamily="monospace">BOQ EXPORT</text>
-        </svg>
-      );
-    case "ifc":
-      return (
-        <svg viewBox="0 0 200 120" fill="none" style={{ width: "100%", height: "100%" }}>
-          <path d="M60 90 L60 30 L100 15 L140 30 L140 90" fill="none" stroke={`rgba(${rgb},0.15)`} strokeWidth="1" strokeDasharray="3 3" />
-          <path d="M60 30 L100 45 L140 30" fill="none" stroke={`rgba(${rgb},0.1)`} strokeWidth="0.8" />
-          <path d="M100 45 L100 105" fill="none" stroke={`rgba(${rgb},0.08)`} strokeWidth="0.8" strokeDasharray="2 2" />
-          <path d="M60 60 L100 75 L140 60" fill="none" stroke={`rgba(${rgb},0.08)`} strokeWidth="0.5" />
-          <circle cx="100" cy="15" r="3" fill={`rgba(${rgb},0.2)`} />
-          <text x="100" y="112" textAnchor="middle" fill={`rgba(${rgb},0.3)`} fontSize="8" fontFamily="monospace">IFC MODEL</text>
-        </svg>
-      );
-    case "render":
-      return (
-        <svg viewBox="0 0 200 120" fill="none" style={{ width: "100%", height: "100%" }}>
-          <defs>
-            <linearGradient id="render-grad" x1="0" y1="0" x2="200" y2="120" gradientUnits="userSpaceOnUse">
-              <stop offset="0%" stopColor={`rgba(${rgb},0.1)`} />
-              <stop offset="100%" stopColor="rgba(139,92,246,0.05)" />
-            </linearGradient>
-          </defs>
-          <rect x="30" y="15" width="140" height="85" rx="4" fill="url(#render-grad)" stroke={`rgba(${rgb},0.12)`} strokeWidth="0.8" />
-          <rect x="50" y="35" width="35" height="50" rx="2" fill={`rgba(${rgb},0.06)`} />
-          <rect x="90" y="25" width="25" height="60" rx="2" fill={`rgba(${rgb},0.08)`} />
-          <rect x="120" y="40" width="30" height="45" rx="2" fill={`rgba(${rgb},0.05)`} />
-          <circle cx="155" cy="25" r="8" fill={`rgba(245,158,11,0.08)`} stroke="rgba(245,158,11,0.15)" strokeWidth="0.5" />
-          <text x="100" y="112" textAnchor="middle" fill={`rgba(${rgb},0.3)`} fontSize="8" fontFamily="monospace">RENDER</text>
-        </svg>
-      );
-    case "map":
-      return (
-        <svg viewBox="0 0 200 120" fill="none" style={{ width: "100%", height: "100%" }}>
-          <rect x="30" y="15" width="140" height="85" rx="4" fill="rgba(16,185,129,0.03)" stroke="rgba(16,185,129,0.1)" strokeWidth="0.8" />
-          <path d="M50 40 L80 30 L120 50 L150 35 L150 85 L120 100 L80 80 L50 90 Z" fill="rgba(16,185,129,0.04)" stroke="rgba(16,185,129,0.08)" strokeWidth="0.5" />
-          <circle cx="95" cy="55" r="5" fill="rgba(239,68,68,0.15)" stroke="rgba(239,68,68,0.3)" strokeWidth="0.8" />
-          <line x1="95" y1="50" x2="95" y2="42" stroke="rgba(239,68,68,0.3)" strokeWidth="0.8" />
-          <text x="100" y="112" textAnchor="middle" fill="rgba(16,185,129,0.3)" fontSize="8" fontFamily="monospace">SITE ANALYSIS</text>
-        </svg>
-      );
-    case "clash":
-      return (
-        <svg viewBox="0 0 200 120" fill="none" style={{ width: "100%", height: "100%" }}>
-          {/* Structural beam (horizontal) */}
-          <rect x="25" y="42" width="150" height="12" rx="1.5" fill={`rgba(${rgb},0.08)`} stroke={`rgba(${rgb},0.2)`} strokeWidth="0.8" />
-          <line x1="25" y1="48" x2="175" y2="48" stroke={`rgba(${rgb},0.1)`} strokeWidth="0.3" strokeDasharray="4 2" />
-          {/* MEP duct (vertical, crossing beam) */}
-          <rect x="88" y="15" width="14" height="85" rx="1.5" fill="rgba(245,158,11,0.08)" stroke="rgba(245,158,11,0.2)" strokeWidth="0.8" />
-          <line x1="95" y1="15" x2="95" y2="100" stroke="rgba(245,158,11,0.1)" strokeWidth="0.3" strokeDasharray="4 2" />
-          {/* Pipe (diagonal, crossing both) */}
-          <line x1="40" y1="85" x2="160" y2="25" stroke="rgba(139,92,246,0.2)" strokeWidth="6" strokeLinecap="round" />
-          <line x1="40" y1="85" x2="160" y2="25" stroke="rgba(139,92,246,0.08)" strokeWidth="4" strokeLinecap="round" />
-          {/* Clash point 1 — beam × duct intersection */}
-          <circle cx="95" cy="48" r="10" fill="rgba(239,68,68,0.12)" stroke="rgba(239,68,68,0.5)" strokeWidth="1" />
-          <circle cx="95" cy="48" r="10" fill="none" stroke="rgba(239,68,68,0.25)" strokeWidth="3">
-            <animate attributeName="r" values="10;14;10" dur="2s" repeatCount="indefinite" />
-            <animate attributeName="opacity" values="1;0.3;1" dur="2s" repeatCount="indefinite" />
-          </circle>
-          <line x1="91" y1="44" x2="99" y2="52" stroke="rgba(239,68,68,0.7)" strokeWidth="1.2" strokeLinecap="round" />
-          <line x1="99" y1="44" x2="91" y2="52" stroke="rgba(239,68,68,0.7)" strokeWidth="1.2" strokeLinecap="round" />
-          {/* Clash point 2 — pipe × beam */}
-          <circle cx="128" cy="40" r="7" fill="rgba(245,158,11,0.1)" stroke="rgba(245,158,11,0.45)" strokeWidth="0.8" />
-          <circle cx="128" cy="40" r="7" fill="none" stroke="rgba(245,158,11,0.2)" strokeWidth="2.5">
-            <animate attributeName="r" values="7;10;7" dur="2.5s" repeatCount="indefinite" />
-            <animate attributeName="opacity" values="1;0.3;1" dur="2.5s" repeatCount="indefinite" />
-          </circle>
-          <text x="128" y="43" textAnchor="middle" fill="rgba(245,158,11,0.7)" fontSize="8" fontWeight="bold">!</text>
-          {/* Clash point 3 — pipe × duct */}
-          <circle cx="75" cy="62" r="6" fill="rgba(139,92,246,0.1)" stroke="rgba(139,92,246,0.4)" strokeWidth="0.8" />
-          <text x="75" y="65" textAnchor="middle" fill="rgba(139,92,246,0.6)" fontSize="7" fontWeight="bold">!</text>
-          {/* Labels */}
-          <text x="30" y="38" fill={`rgba(${rgb},0.35)`} fontSize="5.5" fontFamily="monospace">STRUCTURAL</text>
-          <text x="105" y="22" fill="rgba(245,158,11,0.35)" fontSize="5.5" fontFamily="monospace">MEP</text>
-          <text x="145" y="20" fill="rgba(139,92,246,0.35)" fontSize="5.5" fontFamily="monospace">PIPE</text>
-          <text x="100" y="114" textAnchor="middle" fill={`rgba(${rgb},0.3)`} fontSize="8" fontFamily="monospace">CLASH DETECTION</text>
-        </svg>
-      );
-    default:
-      return (
-        <svg viewBox="0 0 200 120" fill="none" style={{ width: "100%", height: "100%" }}>
-          <rect x="60" y="30" width="80" height="60" rx="4" fill={`rgba(${rgb},0.05)`} stroke={`rgba(${rgb},0.1)`} strokeWidth="0.8" />
-          <text x="100" y="112" textAnchor="middle" fill={`rgba(${rgb},0.3)`} fontSize="8" fontFamily="monospace">OUTPUT</text>
-        </svg>
-      );
-  }
+  const cases: Record<string, React.ReactNode> = {
+    clash: (
+      <svg viewBox="0 0 200 120" fill="none" style={{ width: "100%", height: "100%" }}>
+        <rect x="25" y="42" width="150" height="12" rx="1.5" fill={`rgba(${rgb},0.08)`} stroke={`rgba(${rgb},0.2)`} strokeWidth="0.8" />
+        <rect x="88" y="15" width="14" height="85" rx="1.5" fill="rgba(245,158,11,0.08)" stroke="rgba(245,158,11,0.2)" strokeWidth="0.8" />
+        <line x1="40" y1="85" x2="160" y2="25" stroke="rgba(139,92,246,0.2)" strokeWidth="6" strokeLinecap="round" />
+        <circle cx="95" cy="48" r="10" fill="rgba(239,68,68,0.12)" stroke="rgba(239,68,68,0.5)" strokeWidth="1">
+          <animate attributeName="r" values="10;14;10" dur="2s" repeatCount="indefinite" />
+        </circle>
+        <text x="100" y="114" textAnchor="middle" fill={`rgba(${rgb},0.3)`} fontSize="8" fontFamily="monospace">CLASH DETECTION</text>
+      </svg>
+    ),
+  };
+  return <>{cases[output] ?? <svg viewBox="0 0 200 120" fill="none" style={{ width: "100%", height: "100%" }}><rect x="60" y="30" width="80" height="60" rx="4" fill={`rgba(${rgb},0.05)`} stroke={`rgba(${rgb},0.1)`} strokeWidth="0.8" /></svg>}</>;
 }
 
-// ─── Isometric Building Illustration (SVG) ──────────────────────────────────
-
-function IsometricBuilding() {
-  return (
-    <motion.svg
-      width="280"
-      height="220"
-      viewBox="0 0 280 220"
-      fill="none"
-      initial={{ opacity: 0, x: 20 }}
-      animate={{ opacity: 1, x: 0 }}
-      transition={{ duration: 0.8, ease: "easeOut" }}
-      style={{ overflow: "visible" }}
-    >
-      {/* Grid floor */}
-      {[0, 1, 2, 3, 4, 5].map(i => (
-        <motion.line
-          key={`gx-${i}`}
-          x1={60 + i * 30} y1={180} x2={90 + i * 30} y2={200}
-          stroke="rgba(79,138,255,0.08)" strokeWidth="0.5"
-          initial={{ pathLength: 0 }} animate={{ pathLength: 1 }}
-          transition={{ duration: 0.6, delay: 0.1 + i * 0.05 }}
-        />
-      ))}
-      {[0, 1, 2, 3, 4, 5].map(i => (
-        <motion.line
-          key={`gy-${i}`}
-          x1={60 + i * 30} y1={180} x2={30 + i * 30} y2={200}
-          stroke="rgba(79,138,255,0.08)" strokeWidth="0.5"
-          initial={{ pathLength: 0 }} animate={{ pathLength: 1 }}
-          transition={{ duration: 0.6, delay: 0.1 + i * 0.05 }}
-        />
-      ))}
-
-      {/* Building 1 — Main tower */}
-      <motion.g
-        initial={{ opacity: 0, y: 30 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.7, delay: 0.3, ease: "easeOut" }}
-      >
-        {/* Left face */}
-        <path d="M80 180 L80 60 L140 30 L140 150 Z" fill="rgba(59,130,246,0.06)" stroke="rgba(59,130,246,0.25)" strokeWidth="0.8" />
-        {/* Right face */}
-        <path d="M140 30 L200 60 L200 180 L140 150 Z" fill="rgba(59,130,246,0.03)" stroke="rgba(59,130,246,0.2)" strokeWidth="0.8" />
-        {/* Top face */}
-        <path d="M80 60 L140 30 L200 60 L140 90 Z" fill="rgba(59,130,246,0.1)" stroke="rgba(59,130,246,0.3)" strokeWidth="0.8" />
-
-        {/* Floor lines — left face */}
-        {[0, 1, 2, 3, 4].map(i => (
-          <motion.line
-            key={`fl-${i}`}
-            x1={80} y1={80 + i * 24} x2={140} y2={50 + i * 24}
-            stroke="rgba(59,130,246,0.12)" strokeWidth="0.5"
-            initial={{ pathLength: 0 }} animate={{ pathLength: 1 }}
-            transition={{ duration: 0.4, delay: 0.5 + i * 0.08 }}
-          />
-        ))}
-        {/* Floor lines — right face */}
-        {[0, 1, 2, 3, 4].map(i => (
-          <motion.line
-            key={`fr-${i}`}
-            x1={140} y1={50 + i * 24} x2={200} y2={80 + i * 24}
-            stroke="rgba(59,130,246,0.1)" strokeWidth="0.5"
-            initial={{ pathLength: 0 }} animate={{ pathLength: 1 }}
-            transition={{ duration: 0.4, delay: 0.5 + i * 0.08 }}
-          />
-        ))}
-
-        {/* Windows — left face */}
-        {[0, 1, 2, 3].map(row => (
-          [0, 1].map(col => (
-            <motion.rect
-              key={`wl-${row}-${col}`}
-              x={88 + col * 22} y={68 + row * 24}
-              width={10} height={8}
-              fill="rgba(79,138,255,0.12)"
-              rx={1}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: [0.1, 0.25, 0.1] }}
-              transition={{ duration: 3, repeat: Infinity, delay: row * 0.3 + col * 0.15 }}
-              style={{ transform: `skewY(-26.5deg)`, transformOrigin: `${88 + col * 22}px ${68 + row * 24}px` }}
-            />
-          ))
-        ))}
-      </motion.g>
-
-      {/* Building 2 — Low-rise */}
-      <motion.g
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.7, delay: 0.5, ease: "easeOut" }}
-      >
-        <path d="M185 180 L185 130 L220 115 L220 165 Z" fill="rgba(16,185,129,0.05)" stroke="rgba(16,185,129,0.2)" strokeWidth="0.8" />
-        <path d="M220 115 L255 130 L255 180 L220 165 Z" fill="rgba(16,185,129,0.03)" stroke="rgba(16,185,129,0.15)" strokeWidth="0.8" />
-        <path d="M185 130 L220 115 L255 130 L220 145 Z" fill="rgba(16,185,129,0.08)" stroke="rgba(16,185,129,0.25)" strokeWidth="0.8" />
-      </motion.g>
-
-      {/* Dimension lines */}
-      <motion.g
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 0.5, delay: 0.9 }}
-      >
-        {/* Vertical dimension */}
-        <line x1="68" y1="60" x2="68" y2="180" stroke="rgba(245,158,11,0.2)" strokeWidth="0.5" strokeDasharray="2 2" />
-        <line x1="64" y1="60" x2="72" y2="60" stroke="rgba(245,158,11,0.25)" strokeWidth="0.5" />
-        <line x1="64" y1="180" x2="72" y2="180" stroke="rgba(245,158,11,0.25)" strokeWidth="0.5" />
-        <text x="55" y="124" fill="rgba(245,158,11,0.3)" fontSize="7" fontFamily="monospace" textAnchor="middle" transform="rotate(-90, 55, 124)">24m</text>
-
-        {/* Horizontal dimension */}
-        <line x1="80" y1="190" x2="200" y2="190" stroke="rgba(245,158,11,0.15)" strokeWidth="0.5" strokeDasharray="2 2" />
-        <text x="140" y="198" fill="rgba(245,158,11,0.25)" fontSize="7" fontFamily="monospace" textAnchor="middle">18m</text>
-      </motion.g>
-
-      {/* Compass rose */}
-      <motion.g
-        initial={{ opacity: 0, rotate: -90 }}
-        animate={{ opacity: 1, rotate: 0 }}
-        transition={{ duration: 0.8, delay: 1.1 }}
-        style={{ transformOrigin: "245px 40px" }}
-      >
-        <circle cx="245" cy="40" r="14" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="0.5" />
-        <line x1="245" y1="28" x2="245" y2="52" stroke="rgba(255,255,255,0.1)" strokeWidth="0.5" />
-        <line x1="233" y1="40" x2="257" y2="40" stroke="rgba(255,255,255,0.1)" strokeWidth="0.5" />
-        <text x="245" y="25" fill="rgba(255,255,255,0.2)" fontSize="7" fontFamily="monospace" textAnchor="middle">N</text>
-      </motion.g>
-
-      {/* Crane silhouette (subtle) */}
-      <motion.g
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 1, delay: 0.7 }}
-      >
-        <line x1="30" y1="180" x2="30" y2="20" stroke="rgba(255,255,255,0.04)" strokeWidth="1.5" />
-        <line x1="30" y1="20" x2="75" y2="20" stroke="rgba(255,255,255,0.04)" strokeWidth="1" />
-        <line x1="75" y1="20" x2="65" y2="30" stroke="rgba(255,255,255,0.03)" strokeWidth="0.5" />
-        <line x1="30" y1="20" x2="20" y2="30" stroke="rgba(255,255,255,0.04)" strokeWidth="0.5" />
-        {/* Cable */}
-        <motion.line
-          x1="60" y1="20" x2="60" y2="50"
-          stroke="rgba(255,255,255,0.03)" strokeWidth="0.5"
-          animate={{ y2: [50, 55, 50] }}
-          transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
-        />
-      </motion.g>
-    </motion.svg>
-  );
-}
-
-// ─── Blueprint Grid Background ──────────────────────────────────────────────
-
-function BlueprintGrid() {
-  return (
-    <div style={{ position: "absolute", inset: 0, pointerEvents: "none", overflow: "hidden" }}>
-      {/* Primary grid */}
-      <div style={{
-        position: "absolute", inset: 0,
-        backgroundImage: `
-          linear-gradient(rgba(59,130,246,0.03) 1px, transparent 1px),
-          linear-gradient(90deg, rgba(59,130,246,0.03) 1px, transparent 1px)
-        `,
-        backgroundSize: "60px 60px",
-      }} />
-      {/* Secondary grid */}
-      <div style={{
-        position: "absolute", inset: 0,
-        backgroundImage: `
-          linear-gradient(rgba(59,130,246,0.015) 1px, transparent 1px),
-          linear-gradient(90deg, rgba(59,130,246,0.015) 1px, transparent 1px)
-        `,
-        backgroundSize: "12px 12px",
-      }} />
-      {/* Corner markers (architectural section marks) */}
-      <svg style={{ position: "absolute", top: 16, left: 24, opacity: 0.15 }} width="24" height="24" viewBox="0 0 24 24" fill="none">
-        <path d="M0 8 L0 0 L8 0" stroke="#3B82F6" strokeWidth="1" />
-      </svg>
-      <svg style={{ position: "absolute", top: 16, right: 24, opacity: 0.15 }} width="24" height="24" viewBox="0 0 24 24" fill="none">
-        <path d="M16 0 L24 0 L24 8" stroke="#3B82F6" strokeWidth="1" />
-      </svg>
-      <svg style={{ position: "absolute", bottom: 16, left: 24, opacity: 0.15 }} width="24" height="24" viewBox="0 0 24 24" fill="none">
-        <path d="M0 16 L0 24 L8 24" stroke="#3B82F6" strokeWidth="1" />
-      </svg>
-      <svg style={{ position: "absolute", bottom: 16, right: 24, opacity: 0.15 }} width="24" height="24" viewBox="0 0 24 24" fill="none">
-        <path d="M16 24 L24 24 L24 16" stroke="#3B82F6" strokeWidth="1" />
-      </svg>
-    </div>
-  );
-}
-
-// ─── AEC Stats Bar ──────────────────────────────────────────────────────────
-
+/* ── Stats bar data ── */
 const AEC_STATS = [
   { value: PREBUILT_WORKFLOWS.length.toString(), labelKey: "templates.statWorkflows" as const, icon: <Layers size={13} /> },
   { value: "5", labelKey: "templates.statDisciplines" as const, icon: <HardHat size={13} /> },
@@ -412,870 +334,1028 @@ const AEC_STATS = [
   { value: "IFC", labelKey: "templates.statNativeExport" as const, icon: <Compass size={13} /> },
 ];
 
-// ─── Page ─────────────────────────────────────────────────────────────────────
+const fadeInUp = { hidden: { opacity: 0, y: 30, filter: "blur(6px)" }, visible: { opacity: 1, y: 0, filter: "blur(0px)" } };
+const stagger = { visible: { transition: { staggerChildren: 0.1 } } };
+
+/* ═══════════════════════════════════════════════════════════════════
+   FEATURED TEMPLATE — Full-width immersive card with animations
+   ═══════════════════════════════════════════════════════════════════ */
+
+// Per-workflow decorative overlay — subtle animated SVG elements hinting at the output type
+function WorkflowOverlay({ wfId, color, rgb }: { wfId: string; color: string; rgb: string }) {
+  const overlays: Record<string, React.ReactNode> = {
+    // Floor plan → blueprint grid lines
+    "wf-01": (
+      <svg viewBox="0 0 120 120" fill="none" style={{ width: 120, height: 120, opacity: 0.15 }}>
+        <rect x="10" y="10" width="100" height="100" stroke={color} strokeWidth="0.5" strokeDasharray="4 4"><animate attributeName="stroke-dashoffset" from="0" to="8" dur="3s" repeatCount="indefinite" /></rect>
+        <line x1="10" y1="50" x2="70" y2="50" stroke={color} strokeWidth="0.5" />
+        <line x1="60" y1="10" x2="60" y2="110" stroke={color} strokeWidth="0.5" />
+      </svg>
+    ),
+    // 3D building → wireframe cube
+    "wf-03": (
+      <svg viewBox="0 0 100 100" fill="none" style={{ width: 100, height: 100, opacity: 0.12 }}>
+        <path d="M20 70 L20 30 L50 15 L80 30 L80 70 L50 85 Z" stroke={color} strokeWidth="0.6"><animate attributeName="stroke-dasharray" values="0 200;200 0" dur="4s" repeatCount="indefinite" /></path>
+        <line x1="50" y1="15" x2="50" y2="55" stroke={color} strokeWidth="0.4" opacity="0.5" />
+        <line x1="20" y1="30" x2="50" y2="45" stroke={color} strokeWidth="0.4" opacity="0.5" />
+      </svg>
+    ),
+    // Massing → parametric boxes
+    "wf-04": (
+      <svg viewBox="0 0 100 100" fill="none" style={{ width: 100, height: 100, opacity: 0.12 }}>
+        <rect x="15" y="30" width="25" height="55" stroke={color} strokeWidth="0.5"><animate attributeName="height" values="55;50;55" dur="3s" repeatCount="indefinite" /></rect>
+        <rect x="45" y="50" width="35" height="35" stroke={color} strokeWidth="0.5"><animate attributeName="height" values="35;40;35" dur="3.5s" repeatCount="indefinite" /></rect>
+        <rect x="60" y="20" width="20" height="65" stroke={color} strokeWidth="0.5"><animate attributeName="height" values="65;60;65" dur="2.8s" repeatCount="indefinite" /></rect>
+      </svg>
+    ),
+    // Render + Video → camera frame
+    "wf-06": (
+      <svg viewBox="0 0 100 80" fill="none" style={{ width: 100, height: 80, opacity: 0.12 }}>
+        <rect x="5" y="5" width="90" height="60" rx="3" stroke={color} strokeWidth="0.6" />
+        <circle cx="50" cy="35" r="15" stroke={color} strokeWidth="0.5" opacity="0.4"><animate attributeName="r" values="15;17;15" dur="3s" repeatCount="indefinite" /></circle>
+        <circle cx="50" cy="35" r="4" fill={`rgba(${rgb},0.2)`} />
+        <rect x="5" y="68" width="90" height="6" rx="2" fill={`rgba(${rgb},0.06)`} />
+        <rect x="5" y="68" width="30" height="6" rx="2" fill={`rgba(${rgb},0.12)`}><animate attributeName="width" values="0;90;0" dur="5s" repeatCount="indefinite" /></rect>
+      </svg>
+    ),
+    // IFC + video → document flow
+    "wf-08": (
+      <svg viewBox="0 0 100 80" fill="none" style={{ width: 100, height: 80, opacity: 0.12 }}>
+        <rect x="5" y="10" width="30" height="40" rx="2" stroke={color} strokeWidth="0.5" />
+        <line x1="10" y1="20" x2="30" y2="20" stroke={color} strokeWidth="0.3" />
+        <line x1="10" y1="26" x2="28" y2="26" stroke={color} strokeWidth="0.3" />
+        <line x1="10" y1="32" x2="25" y2="32" stroke={color} strokeWidth="0.3" />
+        <line x1="40" y1="30" x2="55" y2="30" stroke={color} strokeWidth="0.5" strokeDasharray="2 2"><animate attributeName="stroke-dashoffset" from="0" to="4" dur="1s" repeatCount="indefinite" /></line>
+        <polygon points="53,26 60,30 53,34" fill={`rgba(${rgb},0.3)`} />
+        <rect x="65" y="10" width="30" height="40" rx="2" stroke={color} strokeWidth="0.5" />
+        <rect x="70" y="15" width="20" height="15" rx="1" fill={`rgba(${rgb},0.06)`} />
+      </svg>
+    ),
+    // BOQ cost → data chart
+    "wf-09": (
+      <svg viewBox="0 0 100 80" fill="none" style={{ width: 100, height: 80, opacity: 0.12 }}>
+        {[0,1,2,3,4].map(i => (
+          <rect key={i} x={10 + i * 18} y={60 - [30,45,25,50,35][i]} width="12" height={[30,45,25,50,35][i]} rx="1" fill={`rgba(${rgb},0.08)`} stroke={color} strokeWidth="0.4">
+            <animate attributeName="height" values={`${[30,45,25,50,35][i]};${[35,40,30,45,40][i]};${[30,45,25,50,35][i]}`} dur={`${2.5 + i * 0.3}s`} repeatCount="indefinite" />
+            <animate attributeName="y" values={`${60 - [30,45,25,50,35][i]};${60 - [35,40,30,45,40][i]};${60 - [30,45,25,50,35][i]}`} dur={`${2.5 + i * 0.3}s`} repeatCount="indefinite" />
+          </rect>
+        ))}
+        <line x1="5" y1="62" x2="95" y2="62" stroke={color} strokeWidth="0.3" />
+      </svg>
+    ),
+    // Interactive 3D → rotating cube indicator
+    "wf-05": (
+      <svg viewBox="0 0 80 80" fill="none" style={{ width: 80, height: 80, opacity: 0.12 }}>
+        <g><animateTransform attributeName="transform" type="rotate" from="0 40 40" to="360 40 40" dur="20s" repeatCount="indefinite" />
+          <circle cx="40" cy="40" r="30" stroke={color} strokeWidth="0.5" strokeDasharray="4 3" />
+          <circle cx="40" cy="40" r="20" stroke={color} strokeWidth="0.4" strokeDasharray="3 4" />
+          <circle cx="40" cy="40" r="5" fill={`rgba(${rgb},0.15)`} />
+        </g>
+      </svg>
+    ),
+    // Renovation → before/after split
+    "wf-11": (
+      <svg viewBox="0 0 100 60" fill="none" style={{ width: 100, height: 60, opacity: 0.12 }}>
+        <rect x="5" y="5" width="42" height="50" rx="2" stroke={color} strokeWidth="0.5" opacity="0.4" />
+        <text x="26" y="33" textAnchor="middle" fill={color} fontSize="6" opacity="0.5">OLD</text>
+        <rect x="53" y="5" width="42" height="50" rx="2" stroke={color} strokeWidth="0.5" />
+        <text x="74" y="33" textAnchor="middle" fill={color} fontSize="6" opacity="0.8">NEW</text>
+        <line x1="50" y1="5" x2="50" y2="55" stroke={color} strokeWidth="0.6"><animate attributeName="x1" values="50;52;50" dur="2s" repeatCount="indefinite" /><animate attributeName="x2" values="50;52;50" dur="2s" repeatCount="indefinite" /></line>
+      </svg>
+    ),
+    // Clash detection → intersection warning
+    "wf-12": (
+      <svg viewBox="0 0 80 80" fill="none" style={{ width: 80, height: 80, opacity: 0.15 }}>
+        <line x1="10" y1="40" x2="70" y2="40" stroke={color} strokeWidth="2" opacity="0.4" />
+        <line x1="40" y1="10" x2="40" y2="70" stroke="#F59E0B" strokeWidth="2" opacity="0.4" />
+        <circle cx="40" cy="40" r="8" stroke="#EF4444" strokeWidth="1" fill="rgba(239,68,68,0.1)">
+          <animate attributeName="r" values="8;12;8" dur="2s" repeatCount="indefinite" />
+          <animate attributeName="opacity" values="1;0.4;1" dur="2s" repeatCount="indefinite" />
+        </circle>
+      </svg>
+    ),
+  };
+  return <>{overlays[wfId] ?? null}</>;
+}
+
+function FeaturedTemplate({ wf, index, isMobile, onUse, t }: {
+  wf: WorkflowTemplate; index: number; isMobile: boolean;
+  onUse: (wf: WorkflowTemplate) => void; t: (key: TranslationKey) => string;
+}) {
+  const catColor = CATEGORY_COLORS[wf.category] ?? "#06B6D4";
+  const catRgb = hexToRgb(catColor);
+  const reversed = index % 2 === 1;
+  const pipelineSteps = wf.name.split("→").map(s => s.trim());
+  const cardRef = useRef<HTMLDivElement>(null);
+
+  const outputBadges: Array<{ label: string; icon: string; color: string }> = [];
+  const eo = (wf.expectedOutputs ?? []).join(" ").toLowerCase();
+  if (eo.includes("floor plan") || eo.includes("svg")) outputBadges.push({ label: "Floor Plan", icon: "📐", color: "#14B8A6" });
+  if (eo.includes("3d") || eo.includes("massing") || eo.includes("interactive")) outputBadges.push({ label: "3D Model", icon: "🧊", color: "#FFBF00" });
+  if (eo.includes("render") || eo.includes("image") || eo.includes("concept")) outputBadges.push({ label: "Render", icon: "🖼", color: "#10B981" });
+  if (eo.includes("video") || eo.includes("walkthrough") || eo.includes("cinematic")) outputBadges.push({ label: "Video", icon: "🎬", color: "#8B5CF6" });
+  if (eo.includes("ifc") || eo.includes("bim")) outputBadges.push({ label: "IFC", icon: "📦", color: "#3B82F6" });
+  if (eo.includes("boq") || eo.includes("xlsx") || eo.includes("spreadsheet") || eo.includes("quantities")) outputBadges.push({ label: "BOQ", icon: "💰", color: "#F59E0B" });
+
+  // Hover tilt effect
+  const handleMouseMove = useCallback((e: React.MouseEvent) => {
+    const el = cardRef.current;
+    if (!el || isMobile) return;
+    const rect = el.getBoundingClientRect();
+    const x = (e.clientX - rect.left) / rect.width - 0.5;
+    const y = (e.clientY - rect.top) / rect.height - 0.5;
+    el.style.transform = `perspective(1200px) rotateY(${x * 3}deg) rotateX(${-y * 2}deg) translateY(-6px)`;
+  }, [isMobile]);
+
+  const handleMouseLeave = useCallback(() => {
+    const el = cardRef.current;
+    if (!el) return;
+    el.style.transform = "perspective(1200px) rotateY(0deg) rotateX(0deg) translateY(0px)";
+  }, []);
+
+  // Stagger variants for inner content
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: { staggerChildren: 0.08, delayChildren: 0.2 },
+    },
+  };
+  const itemVariants = {
+    hidden: { opacity: 0, y: 16 },
+    visible: { opacity: 1, y: 0, transition: { duration: 0.5, ease: [0.22, 1, 0.36, 1] as const } },
+  };
+  const previewVariants = {
+    hidden: { opacity: 0, x: reversed ? 40 : -40, scale: 0.96 },
+    visible: { opacity: 1, x: 0, scale: 1, transition: { duration: 0.8, ease: [0.22, 1, 0.36, 1] as const } },
+  };
+
+  return (
+    <motion.div
+      ref={cardRef}
+      initial="hidden"
+      whileInView="visible"
+      viewport={{ once: true, margin: "-80px" }}
+      className="tpl-featured"
+      onClick={() => onUse(wf)}
+      onMouseMove={handleMouseMove}
+      onMouseLeave={handleMouseLeave}
+      style={{
+        cursor: "pointer",
+        display: "flex",
+        flexDirection: isMobile ? "column" : reversed ? "row-reverse" : "row",
+        marginBottom: 48,
+        borderRadius: 24,
+        overflow: "hidden",
+        background: "linear-gradient(135deg, rgba(14,16,28,0.95) 0%, rgba(10,12,20,0.98) 100%)",
+        border: `1px solid rgba(${catRgb}, 0.12)`,
+        boxShadow: `0 8px 40px rgba(0,0,0,0.35), 0 0 80px rgba(${catRgb}, 0.03)`,
+        transition: "border-color 0.4s, box-shadow 0.4s, transform 0.35s cubic-bezier(0.22,1,0.36,1)",
+        position: "relative",
+        transformStyle: "preserve-3d",
+        willChange: "transform",
+      }}
+    >
+      {/* Top shimmer line */}
+      <div className="tpl-featured-shimmer" style={{ position: "absolute", top: 0, left: 0, right: 0, height: 1, zIndex: 3, overflow: "hidden" }}>
+        <div style={{ width: "100%", height: "100%", background: `linear-gradient(90deg, transparent, ${catColor}50, transparent)` }} />
+      </div>
+
+      {/* ── Preview Side — slides in from direction ── */}
+      <motion.div
+        variants={previewVariants}
+        className="tpl-featured-scene"
+        style={{
+          width: isMobile ? "100%" : "45%",
+          height: isMobile ? 220 : 340,
+          position: "relative",
+          flexShrink: 0,
+          overflow: "hidden",
+        }}
+      >
+        {/* Category-colored glow behind image */}
+        <div style={{
+          position: "absolute", inset: 0, zIndex: 0,
+          background: `radial-gradient(ellipse at ${reversed ? "30%" : "70%"} 50%, rgba(${catRgb}, 0.12) 0%, transparent 60%)`,
+          pointerEvents: "none",
+        }} />
+
+        {/* Preview image/video */}
+        {(() => {
+          const preview = TEMPLATE_PREVIEWS[wf.id];
+          if (preview?.type === "image") return (
+            /* eslint-disable-next-line @next/next/no-img-element */
+            <img src={preview.url} alt={wf.name} loading="lazy" className="tpl-featured-media" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", position: "relative", zIndex: 1, transition: "transform 0.7s cubic-bezier(0.22,1,0.36,1)" }} />
+          );
+          if (preview?.type === "video") return (
+            <video
+              src={preview.url} muted playsInline
+              onLoadedMetadata={e => { e.currentTarget.currentTime = preview.start; }}
+              onMouseEnter={e => { e.currentTarget.play().catch(() => {}); }}
+              onMouseLeave={e => { e.currentTarget.pause(); e.currentTarget.currentTime = preview.start; }}
+              className="tpl-featured-media"
+              style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", position: "relative", zIndex: 1, transition: "transform 0.7s cubic-bezier(0.22,1,0.36,1)" }}
+            />
+          );
+          return <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}><Building2 size={48} style={{ color: `rgba(${catRgb}, 0.15)` }} /></div>;
+        })()}
+
+        {/* Workflow-specific animated overlay */}
+        <div style={{ position: "absolute", bottom: 16, [reversed ? "left" : "right"]: 16, zIndex: 2, pointerEvents: "none" }}>
+          <WorkflowOverlay wfId={wf.id} color={catColor} rgb={catRgb} />
+        </div>
+
+        {/* Fade edge toward content side */}
+        {!isMobile && (
+          <div style={{
+            position: "absolute", top: 0, bottom: 0, zIndex: 2,
+            [reversed ? "left" : "right"]: 0, width: 100,
+            background: reversed
+              ? "linear-gradient(90deg, rgba(10,12,20,0.98), transparent)"
+              : "linear-gradient(270deg, rgba(10,12,20,0.98), transparent)",
+            pointerEvents: "none",
+          }} />
+        )}
+        {isMobile && (
+          <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: 60, background: "linear-gradient(transparent, rgba(10,12,20,1))", pointerEvents: "none", zIndex: 2 }} />
+        )}
+      </motion.div>
+
+      {/* ── Content Side — elements stagger in ── */}
+      <motion.div
+        variants={containerVariants}
+        style={{
+          flex: 1, padding: isMobile ? "20px 24px 28px" : "32px 44px",
+          display: "flex", flexDirection: "column", justifyContent: "center",
+          position: "relative", zIndex: 1,
+          height: isMobile ? "auto" : 340,
+          overflow: "hidden",
+        }}
+      >
+        {/* 3D Background Scene — visible behind text */}
+        {!isMobile && (
+          <div style={{
+            position: "absolute", inset: 0, zIndex: 0, pointerEvents: "none",
+            opacity: 0.45,
+          }}>
+            <CardScene3D wfId={wf.id} />
+          </div>
+        )}
+
+        {/* Text content — above 3D background */}
+        <div style={{ position: "relative", zIndex: 2 }}>
+
+        {/* Category + complexity */}
+        <motion.div variants={itemVariants} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
+          <div className="tpl-featured-badge" style={{
+            display: "inline-flex", alignItems: "center", gap: 5,
+            padding: "4px 12px", borderRadius: 8,
+            background: `rgba(${catRgb}, 0.12)`,
+            border: `1px solid rgba(${catRgb}, 0.3)`,
+            boxShadow: `0 0 16px rgba(${catRgb}, 0.08)`,
+          }}>
+            {CATEGORY_ICONS[wf.category] && <span style={{ color: catColor, display: "flex" }}>{CATEGORY_ICONS[wf.category]}</span>}
+            <span style={{ fontSize: 10, fontWeight: 700, color: catColor, letterSpacing: "0.08em", textTransform: "uppercase" }}>{wf.category}</span>
+          </div>
+          <span style={{ fontSize: 11, color: "rgba(160,175,200,0.4)" }}>·</span>
+          <span style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11, color: "rgba(160,175,200,0.5)" }}>
+            <span style={{ width: 6, height: 6, borderRadius: "50%", background: wf.complexity === "simple" ? "#10B981" : "#F59E0B", boxShadow: wf.complexity === "simple" ? "0 0 8px rgba(16,185,129,0.5)" : "0 0 8px rgba(245,158,11,0.5)" }} />
+            {wf.complexity === "simple" ? t("dash.simpleLabel") : t("dash.advancedLabel")}
+          </span>
+          <span style={{ fontSize: 11, color: "rgba(160,175,200,0.4)" }}>·</span>
+          <span style={{ fontSize: 11, color: "rgba(160,175,200,0.4)", fontFamily: "var(--font-jetbrains), monospace" }}>{wf.tileGraph.nodes.length} {t("dash.nodes")} · {wf.estimatedRunTime}</span>
+        </motion.div>
+
+        {/* Title */}
+        <motion.h3 variants={itemVariants} style={{ fontSize: 24, fontWeight: 700, color: "#F0F2F8", marginBottom: 12, letterSpacing: "-0.025em", lineHeight: 1.25 }}>
+          {wf.name}
+        </motion.h3>
+
+        {/* Description */}
+        <motion.p variants={itemVariants} style={{ fontSize: 13.5, color: "rgba(160,175,200,0.6)", lineHeight: 1.6, marginBottom: 16, maxWidth: 480, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const, overflow: "hidden" }}>
+          {wf.description}
+        </motion.p>
+
+        {/* Output badges — stagger in */}
+        <motion.div variants={itemVariants} style={{ display: "flex", gap: 7, flexWrap: "wrap", marginBottom: 20 }}>
+          {outputBadges.map((b, bi) => (
+            <motion.span
+              key={b.label}
+              initial={{ opacity: 0, scale: 0.8 }}
+              whileInView={{ opacity: 1, scale: 1 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.4, delay: 0.4 + bi * 0.06, ease: [0.22, 1, 0.36, 1] }}
+              className="tpl-output-badge"
+              style={{
+                fontSize: 11, fontWeight: 600, color: b.color,
+                padding: "5px 14px", borderRadius: 8,
+                background: `rgba(${hexToRgb(b.color)}, 0.08)`,
+                border: `1px solid rgba(${hexToRgb(b.color)}, 0.2)`,
+                display: "flex", alignItems: "center", gap: 5,
+                transition: "box-shadow 0.3s ease",
+              }}
+            >
+              <span style={{ fontSize: 13 }}>{b.icon}</span>
+              {b.label}
+            </motion.span>
+          ))}
+        </motion.div>
+
+        {/* CTA button */}
+        <motion.div variants={itemVariants}>
+          <button
+            className="tpl-featured-cta"
+            style={{
+              display: "inline-flex", alignItems: "center", gap: 10,
+              padding: "12px 28px", borderRadius: 14, cursor: "pointer",
+              background: `linear-gradient(135deg, rgba(${catRgb}, 0.15), rgba(${catRgb}, 0.06))`,
+              border: `1px solid rgba(${catRgb}, 0.3)`,
+              color: "#fff", fontSize: 14, fontWeight: 700,
+              transition: "all 0.3s ease",
+              boxShadow: `0 0 24px rgba(${catRgb}, 0.08)`,
+              position: "relative", overflow: "hidden",
+            }}
+          >
+            <span style={{ position: "relative", zIndex: 1 }}>Use This Template</span>
+            <ArrowRight size={16} className="tpl-cta-arrow" style={{ color: catColor, position: "relative", zIndex: 1, transition: "transform 0.3s ease" }} />
+          </button>
+        </motion.div>
+
+        </div>{/* end text content wrapper */}
+      </motion.div>
+    </motion.div>
+  );
+}
+
+/* eslint-disable @typescript-eslint/no-unused-vars -- CatalogCard kept for filtered views if needed later */
+function CatalogCard({ wf, i, onCardClick, t, userRole }: {
+  wf: WorkflowTemplate; i: number;
+  onCardClick: (wf: WorkflowTemplate) => void;
+  t: (key: TranslationKey) => string;
+  userRole: string;
+}) {
+  const catColor = CATEGORY_COLORS[wf.category] ?? "#06B6D4";
+  const catRgb = hexToRgb(catColor);
+  const preview = TEMPLATE_PREVIEWS[wf.id];
+  const nodeCount = wf.tileGraph.nodes.length;
+  const isLocked = LOCKED_IDS.has(wf.id) && userRole === "FREE";
+  const pipelineSteps = wf.name.split("→").map(s => s.trim());
+
+  const outputBadges: Array<{ label: string; icon: string; color: string }> = [];
+  const eo = (wf.expectedOutputs ?? []).join(" ").toLowerCase();
+  if (eo.includes("floor plan") || eo.includes("svg")) outputBadges.push({ label: "Floor Plan", icon: "📐", color: "#14B8A6" });
+  if (eo.includes("3d") || eo.includes("massing") || eo.includes("interactive")) outputBadges.push({ label: "3D Model", icon: "🧊", color: "#FFBF00" });
+  if (eo.includes("render") || eo.includes("image") || eo.includes("concept")) outputBadges.push({ label: "Render", icon: "🖼", color: "#10B981" });
+  if (eo.includes("video") || eo.includes("walkthrough") || eo.includes("cinematic")) outputBadges.push({ label: "Video", icon: "🎬", color: "#8B5CF6" });
+  if (eo.includes("ifc") || eo.includes("bim")) outputBadges.push({ label: "IFC", icon: "📦", color: "#3B82F6" });
+  if (eo.includes("boq") || eo.includes("xlsx") || eo.includes("spreadsheet") || eo.includes("quantities")) outputBadges.push({ label: "BOQ", icon: "💰", color: "#F59E0B" });
+
+  return (
+    <motion.div
+      className="tpl-catalog-card"
+      initial={{ opacity: 0, y: 40, scale: 0.95 }}
+      whileInView={{ opacity: 1, y: 0, scale: 1 }}
+      viewport={{ once: true, margin: "-80px" }}
+      transition={{ duration: 0.6, delay: i * 0.1, ease: [0.22, 1, 0.36, 1] }}
+      onClick={() => onCardClick(wf)}
+      style={{
+        cursor: "pointer", position: "relative",
+        borderRadius: 20, overflow: "hidden",
+        background: "linear-gradient(170deg, rgba(16,18,30,1) 0%, rgba(10,12,20,1) 100%)",
+        border: `1px solid rgba(${catRgb}, 0.1)`,
+        boxShadow: "0 4px 20px rgba(0,0,0,0.3)",
+        transition: "transform 0.5s cubic-bezier(0.22,1,0.36,1), border-color 0.3s, box-shadow 0.4s",
+      }}
+    >
+      {/* ── Thumbnail ── */}
+      <div className="tpl-catalog-thumb" style={{ position: "relative", height: 220, overflow: "hidden" }}>
+        {preview?.type === "video" ? (
+          <video
+            src={preview.url} muted playsInline
+            onLoadedMetadata={e => { e.currentTarget.currentTime = preview.start; }}
+            onMouseEnter={e => { e.currentTarget.play().catch(() => {}); }}
+            onMouseLeave={e => { e.currentTarget.pause(); e.currentTarget.currentTime = preview.start; }}
+            className="tpl-catalog-media"
+            style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", transition: "transform 0.6s cubic-bezier(0.22,1,0.36,1)" }}
+          />
+        ) : preview?.type === "image" ? (
+          /* eslint-disable-next-line @next/next/no-img-element */
+          <img src={preview.url} alt={wf.name} loading="lazy" className="tpl-catalog-media" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", transition: "transform 0.6s cubic-bezier(0.22,1,0.36,1)" }} />
+        ) : preview?.type === "svg" ? (
+          <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
+            <OutputPreviewSVG output={preview.output} color={catColor} />
+          </div>
+        ) : (
+          <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <Building2 size={36} style={{ color: `rgba(${catRgb}, 0.15)` }} />
+          </div>
+        )}
+
+        {/* Bottom gradient ONLY — keeps thumbnail visible */}
+        <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: "40%", background: "linear-gradient(transparent, rgba(10,12,20,1))", pointerEvents: "none" }} />
+
+        {/* Category badge */}
+        <div style={{
+          position: "absolute", top: 12, left: 12, zIndex: 2,
+          display: "inline-flex", alignItems: "center", gap: 5,
+          padding: "4px 11px", borderRadius: 8,
+          background: `rgba(${catRgb}, 0.15)`, backdropFilter: "blur(16px)",
+          border: `1px solid rgba(${catRgb}, 0.35)`,
+          boxShadow: `0 0 12px rgba(${catRgb}, 0.12)`,
+        }}>
+          {CATEGORY_ICONS[wf.category] && <span style={{ color: catColor, display: "flex" }}>{CATEGORY_ICONS[wf.category]}</span>}
+          <span style={{ fontSize: 9, fontWeight: 800, color: catColor, letterSpacing: "0.1em", textTransform: "uppercase" }}>{wf.category}</span>
+        </div>
+
+        {/* Small "Use Template" button fades in at bottom on hover */}
+        <div className="tpl-catalog-use-btn" style={{
+          position: "absolute", bottom: 12, right: 12, zIndex: 3,
+          display: "flex", alignItems: "center", gap: 6,
+          padding: "7px 16px", borderRadius: 10,
+          background: `rgba(${catRgb}, 0.2)`, backdropFilter: "blur(16px)",
+          border: `1px solid rgba(${catRgb}, 0.4)`,
+          opacity: 0, transition: "opacity 0.3s ease, transform 0.3s ease",
+          transform: "translateY(6px)",
+        }}>
+          <span style={{ fontSize: 11, fontWeight: 700, color: "#fff" }}>Use Template</span>
+          <ArrowRight size={12} style={{ color: catColor }} />
+        </div>
+      </div>
+
+      {/* ── Separator ── */}
+      <div style={{ height: 1, background: `linear-gradient(90deg, transparent, rgba(${catRgb}, 0.12), transparent)` }} />
+
+      {/* ── Content ── */}
+      <div style={{ padding: "16px 20px 20px" }}>
+        <div style={{ fontSize: 16, fontWeight: 700, color: "#F0F2F8", marginBottom: 8, letterSpacing: "-0.015em", lineHeight: 1.3 }}>
+          {wf.name}
+        </div>
+
+        {/* Pipeline flow */}
+        {pipelineSteps.length >= 2 && (
+          <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 10, flexWrap: "wrap" }}>
+            {pipelineSteps.map((step, si) => (
+              <span key={si} style={{ display: "flex", alignItems: "center", gap: 7 }}>
+                {si > 0 && <span style={{ color: catColor, fontSize: 12, opacity: 0.6 }}>→</span>}
+                <span style={{ fontSize: 11, fontWeight: 600, color: si === pipelineSteps.length - 1 ? catColor : "rgba(160,175,200,0.65)" }}>{step}</span>
+              </span>
+            ))}
+          </div>
+        )}
+
+        <div style={{ fontSize: 12.5, color: "rgba(160,175,200,0.5)", lineHeight: 1.6, marginBottom: 14, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const, overflow: "hidden" }}>
+          {wf.description}
+        </div>
+
+        {/* Separator */}
+        <div style={{ height: 1, background: "rgba(255,255,255,0.04)", marginBottom: 14 }} />
+
+        {/* Footer */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 11, color: "rgba(160,175,200,0.45)", fontFamily: "var(--font-jetbrains), monospace" }}>
+            <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
+              <span style={{ width: 6, height: 6, borderRadius: "50%", background: wf.complexity === "simple" ? "#10B981" : "#F59E0B", boxShadow: wf.complexity === "simple" ? "0 0 8px rgba(16,185,129,0.5)" : "0 0 8px rgba(245,158,11,0.5)" }} />
+              <span style={{ color: wf.complexity === "simple" ? "rgba(16,185,129,0.7)" : "rgba(245,158,11,0.7)" }}>{wf.complexity === "simple" ? t("dash.simpleLabel") : t("dash.advancedLabel")}</span>
+            </span>
+            <span style={{ color: "rgba(255,255,255,0.06)" }}>|</span>
+            <span>{nodeCount} {t("dash.nodes")}</span>
+            <span style={{ color: "rgba(255,255,255,0.06)" }}>|</span>
+            <span>{wf.estimatedRunTime}</span>
+          </div>
+          <div className="tpl-catalog-arrow" style={{
+            width: 28, height: 28, borderRadius: 8,
+            background: `rgba(${catRgb}, 0.06)`, border: `1px solid rgba(${catRgb}, 0.1)`,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            transition: "all 0.3s ease",
+          }}>
+            <ArrowRight size={13} style={{ color: `rgba(${catRgb}, 0.4)`, transition: "all 0.3s ease" }} />
+          </div>
+        </div>
+      </div>
+
+      {/* PRO badge — small corner badge, NO blur, thumbnail stays fully visible */}
+      {isLocked && (
+        <>
+          {/* Small PRO badge in top-right of thumbnail */}
+          <div style={{
+            position: "absolute", top: 12, right: 12, zIndex: 11,
+            display: "flex", alignItems: "center", gap: 5,
+            padding: "4px 10px", borderRadius: 8,
+            background: "rgba(245,158,11,0.15)", backdropFilter: "blur(12px)",
+            border: "1px solid rgba(245,158,11,0.35)",
+            boxShadow: "0 0 12px rgba(245,158,11,0.1)",
+          }}>
+            <Lock size={10} style={{ color: "#F59E0B" }} />
+            <span style={{ fontSize: 9, fontWeight: 800, color: "#F59E0B", letterSpacing: "0.08em", fontFamily: "var(--font-jetbrains), monospace" }}>PRO</span>
+          </div>
+          {/* Subtle "Upgrade to unlock" text in footer area */}
+          <div style={{
+            position: "absolute", bottom: 0, left: 0, right: 0, zIndex: 11,
+            padding: "6px 0", textAlign: "center",
+            background: "linear-gradient(transparent, rgba(245,158,11,0.04))",
+            borderTop: "1px solid rgba(245,158,11,0.08)",
+            borderRadius: "0 0 20px 20px",
+          }}>
+            <span style={{ fontSize: 10, color: "rgba(245,158,11,0.6)", fontFamily: "var(--font-jetbrains), monospace" }}>{t("dash.clickToUpgrade")}</span>
+          </div>
+        </>
+      )}
+    </motion.div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   MAIN PAGE
+   ═══════════════════════════════════════════════════════════════════ */
 
 export default function TemplatesPage() {
   const { t } = useLocale();
   const [activeCategory, setActiveCategory] = useState("All");
-  const [sortBy, setSortBy]       = useState("default");
-  const [showSort, setShowSort]   = useState(false);
-  const [userRole, setUserRole]   = useState("FREE");
+  const [sortBy, setSortBy] = useState("default");
+  const [showSort, setShowSort] = useState(false);
+  const [userRole, setUserRole] = useState("FREE");
+  const [isSticky, setIsSticky] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
   const sortRef = useRef<HTMLDivElement>(null);
+  const mainRef = useRef<HTMLElement>(null);
+  const heroRef = useRef<HTMLDivElement>(null);
 
-  // Fetch user role
+  useEffect(() => { setIsMobile(window.innerWidth < 768); }, []);
+
   useEffect(() => {
-    fetch("/api/user/dashboard-stats")
-      .then(r => r.ok ? r.json() : null)
-      .then(d => { if (d?.userRole) setUserRole(d.userRole); })
-      .catch(() => {});
+    fetch("/api/user/dashboard-stats").then(r => r.ok ? r.json() : null).then(d => { if (d?.userRole) setUserRole(d.userRole); }).catch(() => {});
   }, []);
 
   useEffect(() => {
     if (!showSort) return;
-    const handleClickOutside = (e: MouseEvent) => {
-      if (sortRef.current && !sortRef.current.contains(e.target as Node)) {
-        setShowSort(false);
+    const h = (e: MouseEvent) => { if (sortRef.current && !sortRef.current.contains(e.target as Node)) setShowSort(false); };
+    document.addEventListener("mousedown", h);
+    return () => document.removeEventListener("mousedown", h);
+  }, [showSort]);
+
+  useEffect(() => {
+    const el = mainRef.current;
+    if (!el) return;
+    const onScroll = () => {
+      if (heroRef.current) {
+        const heroBottom = heroRef.current.getBoundingClientRect().bottom;
+        const mainTop = el.getBoundingClientRect().top;
+        setIsSticky(heroBottom <= mainTop + 1);
       }
     };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [showSort]);
+    el.addEventListener("scroll", onScroll, { passive: true });
+    return () => el.removeEventListener("scroll", onScroll);
+  }, []);
 
   const { loadFromTemplate } = useWorkflowStore();
   const router = useRouter();
 
   const filtered = useMemo(() => {
     let list = [...PREBUILT_WORKFLOWS];
-    if (activeCategory !== "All") {
-      list = list.filter(w => w.category === activeCategory);
-    }
-    if (sortBy === "simple")   list.sort((a, b) => COMPLEXITY_ORDER[a.complexity] - COMPLEXITY_ORDER[b.complexity]);
+    if (activeCategory !== "All") list = list.filter(w => w.category === activeCategory);
+    if (sortBy === "simple") list.sort((a, b) => COMPLEXITY_ORDER[a.complexity] - COMPLEXITY_ORDER[b.complexity]);
     if (sortBy === "advanced") list.sort((a, b) => COMPLEXITY_ORDER[b.complexity] - COMPLEXITY_ORDER[a.complexity]);
-    if (sortBy === "nodes")    list.sort((a, b) => a.tileGraph.nodes.length - b.tileGraph.nodes.length);
+    if (sortBy === "nodes") list.sort((a, b) => a.tileGraph.nodes.length - b.tileGraph.nodes.length);
     return list;
   }, [activeCategory, sortBy]);
 
-  const handleUse = (id: string) => {
-    const template = PREBUILT_WORKFLOWS.find(w => w.id === id);
+  const handleUse = (wf: WorkflowTemplate) => {
+    if (LOCKED_IDS.has(wf.id) && userRole === "FREE") {
+      toast.error(t("dash.upgradeToast"), {
+        description: t("dash.upgradeToastDesc"),
+        action: { label: t("dash.upgradePlan"), onClick: () => router.push("/dashboard/billing") },
+      });
+      return;
+    }
+    const template = PREBUILT_WORKFLOWS.find(w => w.id === wf.id);
     if (!template) return;
     loadFromTemplate(template as WorkflowTemplate);
-    toast.success(`"${template.name}" ${t('toast.cloned')}`, { description: t('toast.openingCanvas') });
+    toast.success(`"${template.name}" ${t("toast.cloned")}`, { description: t("toast.openingCanvas") });
     awardXP("template-cloned");
     router.push("/dashboard/canvas");
   };
 
   const SORT_OPTIONS = Object.entries(SORT_OPTION_KEYS).map(([value, key]) => ({ value, label: t(key as TranslationKey) }));
-  const currentSort = SORT_OPTIONS.find(o => o.value === sortBy)?.label ?? t('templates.popular');
+  const currentSort = SORT_OPTIONS.find(o => o.value === sortBy)?.label ?? t("templates.popular");
+
+  // Split templates
+  const quickStart = filtered.filter(w => QUICK_START_IDS.includes(w.id));
+  const core = filtered.filter(w => CORE_IDS.includes(w.id) && !QUICK_START_IDS.includes(w.id));
+  const rest = filtered.filter(w => !QUICK_START_IDS.includes(w.id) && !CORE_IDS.includes(w.id));
+  const isFiltered = activeCategory !== "All";
+
+  function SectionHeader({ title, subtitle, icon, color, rgb, count }: { title: string; subtitle: string; icon: React.ReactNode; color: string; rgb: string; count: number }) {
+    return (
+      <div style={{ marginBottom: 40, position: "relative" }}>
+        {/* Ambient glow behind section */}
+        <div style={{
+          position: "absolute", top: -40, left: "50%", transform: "translateX(-50%)",
+          width: 500, height: 200, borderRadius: "50%",
+          background: `radial-gradient(ellipse, rgba(${rgb}, 0.035) 0%, transparent 70%)`,
+          pointerEvents: "none",
+        }} />
+
+        {/* Gradient line — draws itself */}
+        <motion.div
+          initial={{ scaleX: 0, opacity: 0 }}
+          whileInView={{ scaleX: 1, opacity: 1 }}
+          viewport={{ once: true, margin: "-50px" }}
+          transition={{ duration: 1, ease: [0.22, 1, 0.36, 1] }}
+          style={{ height: 1, maxWidth: 280, margin: "0 auto 32px", background: `linear-gradient(90deg, transparent, rgba(${rgb}, 0.5), rgba(139,92,246,0.2), transparent)`, transformOrigin: "center" }}
+        />
+
+        {/* Header row */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: "-50px" }}
+          transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+          style={{ display: "flex", alignItems: "center", gap: 16, position: "relative", zIndex: 1 }}
+        >
+          {/* Icon with pulse ring */}
+          <div className="tpl-section-icon" style={{
+            width: 48, height: 48, borderRadius: 16, position: "relative",
+            background: `linear-gradient(135deg, rgba(${rgb}, 0.18), rgba(${rgb}, 0.05))`,
+            border: `1px solid rgba(${rgb}, 0.3)`,
+            display: "flex", alignItems: "center", justifyContent: "center", color,
+            boxShadow: `0 0 28px rgba(${rgb}, 0.15), inset 0 1px 0 rgba(255,255,255,0.06)`,
+          }}>
+            {icon}
+            {/* Pulse ring */}
+            <div style={{
+              position: "absolute", inset: -4, borderRadius: 20,
+              border: `1px solid rgba(${rgb}, 0.15)`,
+              animation: "tpl-pulse 3s ease-in-out infinite",
+              pointerEvents: "none",
+            }} />
+          </div>
+
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 20, fontWeight: 700, color: "#F0F2F8", letterSpacing: "-0.025em" }}>{title}</div>
+            <div style={{ fontSize: 13, color: "rgba(160,175,200,0.45)", marginTop: 4 }}>{subtitle}</div>
+          </div>
+
+          {/* Count badge */}
+          <motion.div
+            initial={{ scale: 0 }}
+            whileInView={{ scale: 1 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.5, delay: 0.3, type: "spring", stiffness: 200 }}
+            style={{
+              width: 38, height: 38, borderRadius: 12,
+              background: `rgba(${rgb}, 0.1)`, border: `1px solid rgba(${rgb}, 0.22)`,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              fontSize: 14, fontWeight: 700, color, boxShadow: `0 0 16px rgba(${rgb}, 0.08)`,
+            }}
+          >{count}</motion.div>
+        </motion.div>
+      </div>
+    );
+  }
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
-      <main style={{ flex: 1, overflowY: "auto" }}>
+      <main ref={mainRef} style={{ flex: 1, overflowY: "auto" }}>
 
-        {/* ── Hero Section — Blueprint Style ──────────────────────────── */}
-        <div
-          className="templates-hero"
-          style={{
-            position: "relative", overflow: "hidden",
-            minHeight: 240, display: "flex", alignItems: "center",
-            padding: "0 40px",
-            background: `
-              radial-gradient(ellipse at 20% 50%, rgba(59,130,246,0.08) 0%, transparent 50%),
-              radial-gradient(ellipse at 80% 30%, rgba(16,185,129,0.05) 0%, transparent 40%),
-              radial-gradient(ellipse at 60% 80%, rgba(139,92,246,0.04) 0%, transparent 40%),
-              linear-gradient(180deg, #060610 0%, #07070D 100%)
-            `,
-            borderBottom: "1px solid rgba(59,130,246,0.08)",
-          }}
-        >
-          <BlueprintGrid />
+        {/* ════════════════════════════ HERO ════════════════════════════ */}
+        <div ref={heroRef} className="tpl-hero" style={{
+          position: "relative", overflow: "hidden", minHeight: 420,
+          display: "flex", alignItems: "center", padding: "60px 48px 40px",
+          background: "radial-gradient(ellipse at 30% 40%, rgba(6,182,212,0.1) 0%, transparent 60%), radial-gradient(ellipse at 70% 20%, rgba(139,92,246,0.08) 0%, transparent 50%), linear-gradient(180deg, #060610 0%, #07070D 100%)",
+        }}>
+          <Suspense fallback={<div style={{ position: "absolute", inset: 0, background: "#07070D" }} />}>
+            <TemplatesHeroScene />
+          </Suspense>
+          <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: 120, background: "linear-gradient(transparent, #07070D)", zIndex: 1, pointerEvents: "none" }} />
 
-          {/* Left content */}
-          <div className="templates-hero-content" style={{ flex: 1, minWidth: 0, zIndex: 1 }}>
-            {/* Section marker */}
-            <motion.div
-              initial={{ opacity: 0, x: -10 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.5 }}
-              style={{
-                display: "inline-flex", alignItems: "center", gap: 8,
-                marginBottom: 16,
-              }}
-            >
-              <div style={{
-                width: 20, height: 20, borderRadius: "50%",
-                border: "1.5px solid rgba(59,130,246,0.4)",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                fontSize: 8, fontWeight: 800, color: "#3B82F6",
-                fontFamily: "monospace",
-              }}>
-                A
-              </div>
-              <div style={{
-                height: 1, width: 32,
-                background: "linear-gradient(90deg, rgba(59,130,246,0.4), rgba(59,130,246,0))",
-              }} />
-              <span style={{
-                fontSize: 10, fontWeight: 700, color: "rgba(59,130,246,0.6)",
-                textTransform: "uppercase", letterSpacing: "2px",
-                fontFamily: "monospace",
-              }}>
-                {t('templates.startWithProven')}
-              </span>
+          <motion.div initial="hidden" animate="visible" variants={stagger} style={{ position: "relative", zIndex: 2, maxWidth: 640 }}>
+            <motion.div variants={fadeInUp} transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }} style={{ display: "inline-flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
+              <div style={{ width: 36, height: 2, background: "linear-gradient(90deg, #06B6D4, rgba(139,92,246,0.6))", borderRadius: 1 }} />
+              <span style={{ fontSize: 11, fontWeight: 700, color: "rgba(6,182,212,0.8)", textTransform: "uppercase", letterSpacing: "3px", fontFamily: "var(--font-jetbrains), monospace" }}>{t("templates.startWithProven")}</span>
             </motion.div>
-
-            <motion.h2
-              className="templates-hero-title"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.1 }}
-              style={{
-                fontSize: 30, fontWeight: 800, color: "#F0F0F5",
-                lineHeight: 1.15, marginBottom: 10, letterSpacing: "-0.03em",
-              }}
-            >
-              {t('templates.fromBrief')}
-            </motion.h2>
-
-            <motion.p
-              className="templates-hero-subtitle"
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.2 }}
-              style={{
-                fontSize: 14, color: "#6B6B85", lineHeight: 1.7, maxWidth: 460,
-                marginBottom: 24,
-              }}
-            >
-              {t('templates.fromBriefDesc')}
-            </motion.p>
-
-            {/* AEC Stats Bar */}
-            <motion.div
-              className="templates-stats-bar"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.35 }}
-              style={{
-                display: "flex", gap: 2,
-              }}
-            >
+            <motion.h1 className="tpl-hero-title" variants={fadeInUp} transition={{ duration: 0.7, delay: 0.1 }} style={{ fontSize: 42, fontWeight: 800, color: "#F0F0F5", lineHeight: 1.1, marginBottom: 16, letterSpacing: "-0.035em", textShadow: "0 0 60px rgba(6,182,212,0.15)" }}>{t("templates.fromBrief")}</motion.h1>
+            <motion.p className="tpl-hero-subtitle" variants={fadeInUp} transition={{ duration: 0.7, delay: 0.2 }} style={{ fontSize: 15, color: "rgba(160,170,200,0.7)", lineHeight: 1.7, maxWidth: 480, marginBottom: 32 }}>{t("templates.fromBriefDesc")}</motion.p>
+            <motion.div className="tpl-stats-bar" variants={fadeInUp} transition={{ duration: 0.7, delay: 0.35 }} style={{ display: "inline-flex", background: "rgba(10,12,20,0.5)", backdropFilter: "blur(16px)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 14, overflow: "hidden" }}>
               {AEC_STATS.map((stat, i) => (
-                <div
-                  key={stat.labelKey}
-                  style={{
-                    display: "flex", alignItems: "center", gap: 8,
-                    padding: "8px 16px",
-                    background: i === 0
-                      ? "rgba(59,130,246,0.06)"
-                      : "rgba(255,255,255,0.02)",
-                    borderRadius: i === 0 ? "8px 0 0 8px" : i === AEC_STATS.length - 1 ? "0 8px 8px 0" : 0,
-                    border: "1px solid rgba(255,255,255,0.04)",
-                    borderRight: i < AEC_STATS.length - 1 ? "none" : undefined,
-                  }}
-                >
-                  <span style={{ color: "rgba(59,130,246,0.4)" }}>{stat.icon}</span>
-                  <div>
-                    <span style={{
-                      fontSize: 14, fontWeight: 700, color: "#E0E0F0",
-                      fontFamily: "monospace",
-                    }}>
-                      {stat.value}
-                    </span>
-                    <span style={{
-                      fontSize: 10, color: "#4A4A60", marginLeft: 5,
-                      textTransform: "uppercase", letterSpacing: "0.5px",
-                    }}>
-                      {t(stat.labelKey)}
-                    </span>
-                  </div>
+                <div key={stat.labelKey} style={{ display: "flex", alignItems: "center", gap: 8, padding: "12px 20px", borderRight: i < AEC_STATS.length - 1 ? "1px solid rgba(255,255,255,0.04)" : "none" }}>
+                  <span style={{ color: "rgba(6,182,212,0.5)", display: "flex" }}>{stat.icon}</span>
+                  <span style={{ fontSize: 15, fontWeight: 700, color: "#E0E0F0", fontFamily: "var(--font-jetbrains), monospace" }}>{stat.value}</span>
+                  <span style={{ fontSize: 10, color: "rgba(160,170,200,0.4)", textTransform: "uppercase", letterSpacing: "0.5px" }}>{t(stat.labelKey)}</span>
                 </div>
               ))}
             </motion.div>
-          </div>
+          </motion.div>
+        </div>
 
-          {/* Right: Isometric Building */}
-          <div className="templates-hero-deco" style={{ flexShrink: 0, zIndex: 1 }}>
-            <IsometricBuilding />
+        {/* ════════════════════════════ FILTER BAR ════════════════════════════ */}
+        <div className="tpl-filter-bar" style={{
+          position: "sticky", top: 0, zIndex: 20, padding: "14px 32px",
+          display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap",
+          background: isSticky ? "rgba(7,7,13,0.92)" : "rgba(7,7,13,0.5)",
+          backdropFilter: isSticky ? "blur(24px)" : "blur(10px)",
+          borderBottom: isSticky ? "1px solid rgba(6,182,212,0.06)" : "1px solid transparent",
+          boxShadow: isSticky ? "0 8px 32px rgba(0,0,0,0.3)" : "none",
+          transition: "all 0.35s ease",
+        }}>
+          {CATEGORIES.map(cat => {
+            const isActive = cat === activeCategory;
+            const cc = CATEGORY_COLORS[cat]; const rgb = cc ? hexToRgb(cc) : "6, 182, 212";
+            return (
+              <button key={cat} onClick={() => setActiveCategory(cat)} className="tpl-filter-chip" style={{
+                padding: "8px 18px", borderRadius: 12, cursor: "pointer", fontSize: 11.5, fontWeight: 600,
+                display: "flex", alignItems: "center", gap: 6,
+                background: isActive ? `rgba(${rgb}, 0.15)` : "rgba(255,255,255,0.03)",
+                border: isActive ? `1px solid rgba(${rgb}, 0.4)` : "1px solid rgba(255,255,255,0.06)",
+                color: isActive ? (cc ?? "#06B6D4") : "#6B6B85",
+                boxShadow: isActive ? `0 0 20px rgba(${rgb}, 0.1)` : "none",
+                transition: "all 0.25s ease",
+              }}
+                onMouseEnter={e => { if (!isActive) { const el = e.currentTarget as HTMLElement; el.style.borderColor = "rgba(255,255,255,0.15)"; el.style.background = "rgba(255,255,255,0.06)"; el.style.color = "#C0C0D8"; } }}
+                onMouseLeave={e => { if (!isActive) { const el = e.currentTarget as HTMLElement; el.style.borderColor = "rgba(255,255,255,0.06)"; el.style.background = "rgba(255,255,255,0.03)"; el.style.color = "#6B6B85"; } }}
+              >
+                {CATEGORY_ICONS[cat] && <span style={{ opacity: isActive ? 1 : 0.5, display: "flex" }}>{CATEGORY_ICONS[cat]}</span>}
+                {cat === "All" ? t("templates.allWorkflows") : (CATEGORY_LABEL_KEYS[cat] ? t(CATEGORY_LABEL_KEYS[cat]) : cat)}
+              </button>
+            );
+          })}
+          <div style={{ flex: 1 }} />
+          <div ref={sortRef} style={{ position: "relative" }}>
+            <button onClick={() => setShowSort(v => !v)} style={{
+              display: "flex", alignItems: "center", gap: 7, padding: "8px 18px", borderRadius: 12, cursor: "pointer",
+              fontSize: 11.5, fontWeight: 500, color: "#8888A0", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", transition: "all 0.2s ease",
+            }}
+              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = "rgba(255,255,255,0.15)"; (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.06)"; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = "rgba(255,255,255,0.06)"; (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.03)"; }}
+            >
+              <span style={{ color: "#3A3A50" }}>{t("templates.sort")}</span>
+              <span style={{ color: "#B0B0C8" }}>{currentSort}</span>
+              <ChevronDown size={11} style={{ color: "#55556A", transition: "transform 0.2s", transform: showSort ? "rotate(180deg)" : "rotate(0)" }} />
+            </button>
+            <AnimatePresence>
+              {showSort && (
+                <motion.div initial={{ opacity: 0, y: -8, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -6, scale: 0.97 }} transition={{ duration: 0.15 }} style={{
+                  position: "absolute", top: "calc(100% + 8px)", right: 0, width: 185, zIndex: 50,
+                  background: "rgba(12,14,22,0.97)", backdropFilter: "blur(24px)", borderRadius: 14, border: "1px solid rgba(255,255,255,0.08)",
+                  boxShadow: "0 20px 60px rgba(0,0,0,0.6)", overflow: "hidden", padding: "4px 0",
+                }}>
+                  {SORT_OPTIONS.map(opt => (
+                    <button key={opt.value} onClick={() => { setSortBy(opt.value); setShowSort(false); }} style={{
+                      display: "block", width: "100%", textAlign: "left", padding: "10px 18px", fontSize: 12.5,
+                      color: opt.value === sortBy ? "#06B6D4" : "#B0B0C8",
+                      background: opt.value === sortBy ? "rgba(6,182,212,0.1)" : "transparent",
+                      border: "none", cursor: "pointer", transition: "background 0.15s",
+                    }}
+                      onMouseEnter={e => { if (opt.value !== sortBy) (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.04)"; }}
+                      onMouseLeave={e => { if (opt.value !== sortBy) (e.currentTarget as HTMLElement).style.background = "transparent"; }}
+                    >{opt.label}</button>
+                  ))}
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
         </div>
 
-        <div className="templates-content" style={{ padding: "24px 28px 40px" }}>
+        {/* ════════════════════════════ CONTENT ════════════════════════════ */}
+        <div className="tpl-content" style={{ padding: "36px 32px 56px", position: "relative" }}>
 
-          {/* ── Filter bar ──────────────────────────────────────────────── */}
+          {/* Background grid — fades down */}
           <div style={{
-            display: "flex", alignItems: "center", gap: 6,
-            flexWrap: "wrap", marginBottom: 24,
-          }}>
-            {/* Category chips with AEC icons */}
-            {CATEGORIES.map(cat => {
-              const isActive = cat === activeCategory;
-              const catColor = CATEGORY_COLORS[cat];
-              const rgb = catColor ? hexToRgb(catColor) : "79, 138, 255";
-              const icon = CATEGORY_ICONS[cat];
+            position: "absolute", top: 0, left: 0, right: 0, height: 800,
+            backgroundImage: "linear-gradient(rgba(6,182,212,0.015) 1px, transparent 1px), linear-gradient(90deg, rgba(6,182,212,0.015) 1px, transparent 1px)",
+            backgroundSize: "60px 60px", pointerEvents: "none", zIndex: 0,
+            maskImage: "linear-gradient(to bottom, rgba(0,0,0,0.3) 0%, rgba(0,0,0,0.05) 50%, transparent 100%)",
+            WebkitMaskImage: "linear-gradient(to bottom, rgba(0,0,0,0.3) 0%, rgba(0,0,0,0.05) 50%, transparent 100%)",
+          }} />
 
-              return (
-                <button
-                  key={cat}
-                  onClick={() => setActiveCategory(cat)}
-                  style={{
-                    padding: "6px 14px", borderRadius: 8, cursor: "pointer",
-                    fontSize: 11, fontWeight: 600,
-                    display: "flex", alignItems: "center", gap: 5,
-                    background: isActive
-                      ? (catColor ? `rgba(${rgb}, 0.12)` : "rgba(79,138,255,0.12)")
-                      : "rgba(255,255,255,0.02)",
-                    border: isActive
-                      ? `1px solid rgba(${rgb}, 0.3)`
-                      : "1px solid rgba(255,255,255,0.05)",
-                    color: isActive
-                      ? (catColor ?? "#4F8AFF")
-                      : "#6B6B85",
-                    transition: "all 0.15s ease",
-                  }}
-                  onMouseEnter={e => {
-                    if (!isActive) {
-                      (e.currentTarget as HTMLElement).style.borderColor = "rgba(255,255,255,0.1)";
-                      (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.04)";
-                      (e.currentTarget as HTMLElement).style.color = "#B0B0C8";
-                    }
-                  }}
-                  onMouseLeave={e => {
-                    if (!isActive) {
-                      (e.currentTarget as HTMLElement).style.borderColor = "rgba(255,255,255,0.05)";
-                      (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.02)";
-                      (e.currentTarget as HTMLElement).style.color = "#6B6B85";
-                    }
-                  }}
-                >
-                  {icon && <span style={{ opacity: isActive ? 1 : 0.5, display: "flex" }}>{icon}</span>}
-                  {cat === "All" ? t('templates.allWorkflows') : (CATEGORY_LABEL_KEYS[cat] ? t(CATEGORY_LABEL_KEYS[cat]) : cat)}
-                </button>
-              );
-            })}
-
-            {/* Spacer */}
-            <div style={{ flex: 1 }} />
-
-            {/* Sort dropdown */}
-            <div ref={sortRef} style={{ position: "relative" }}>
-              <button
-                onClick={() => setShowSort(v => !v)}
-                style={{
-                  display: "flex", alignItems: "center", gap: 6,
-                  padding: "6px 14px", borderRadius: 8, cursor: "pointer",
-                  fontSize: 11, fontWeight: 500, color: "#8888A0",
-                  background: "rgba(255,255,255,0.02)",
-                  border: "1px solid rgba(255,255,255,0.05)",
-                  transition: "all 0.15s ease",
-                }}
-                onMouseEnter={e => {
-                  (e.currentTarget as HTMLElement).style.borderColor = "rgba(255,255,255,0.1)";
-                  (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.04)";
-                }}
-                onMouseLeave={e => {
-                  (e.currentTarget as HTMLElement).style.borderColor = "rgba(255,255,255,0.05)";
-                  (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.02)";
-                }}
-              >
-                <span style={{ color: "#3A3A50" }}>{t('templates.sort')}</span>
-                <span style={{ color: "#B0B0C8" }}>{currentSort}</span>
-                <ChevronDown size={11} style={{ color: "#55556A" }} />
-              </button>
-
-              <AnimatePresence>
-                {showSort && (
-                  <motion.div
-                    initial={{ opacity: 0, y: -6, scale: 0.96 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, y: -4, scale: 0.97 }}
-                    transition={{ duration: 0.12 }}
-                    style={{
-                      position: "absolute", top: "calc(100% + 6px)", right: 0,
-                      width: 170, zIndex: 50,
-                      background: "linear-gradient(145deg, rgba(14,14,22,0.98), rgba(10,10,18,0.99))",
-                      borderRadius: 10,
-                      border: "1px solid rgba(255,255,255,0.06)",
-                      boxShadow: "0 12px 32px rgba(0,0,0,0.5)",
-                      overflow: "hidden", padding: "4px 0",
-                      backdropFilter: "blur(20px)",
-                    }}
-                  >
-                    {SORT_OPTIONS.map(opt => (
-                      <button
-                        key={opt.value}
-                        onClick={() => { setSortBy(opt.value); setShowSort(false); }}
-                        style={{
-                          display: "block", width: "100%", textAlign: "left",
-                          padding: "8px 14px", fontSize: 12,
-                          color: opt.value === sortBy ? "#4F8AFF" : "#B0B0C8",
-                          background: opt.value === sortBy ? "rgba(79,138,255,0.08)" : "transparent",
-                          border: "none", cursor: "pointer",
-                          transition: "background 0.1s",
-                        }}
-                        onMouseEnter={e => {
-                          if (opt.value !== sortBy) (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.04)";
-                        }}
-                        onMouseLeave={e => {
-                          if (opt.value !== sortBy) (e.currentTarget as HTMLElement).style.background = "transparent";
-                        }}
-                      >
-                        {opt.label}
-                      </button>
-                    ))}
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
+          {/* Floating ambient particles — visible */}
+          <div className="tpl-particles" style={{ position: "absolute", inset: 0, pointerEvents: "none", overflow: "hidden", zIndex: 0 }}>
+            {Array.from({ length: 40 }).map((_, i) => (
+              <div key={i} style={{
+                position: "absolute",
+                width: 3 + (i % 3) * 1.5,
+                height: 3 + (i % 3) * 1.5,
+                borderRadius: "50%",
+                background: i % 4 === 0 ? "rgba(6,182,212,0.5)" : i % 4 === 1 ? "rgba(139,92,246,0.45)" : i % 4 === 2 ? "rgba(79,138,255,0.4)" : "rgba(16,185,129,0.4)",
+                left: `${(i * 2.6 + 1) % 97}%`,
+                top: `${(i * 5.3 + 2) % 96}%`,
+                animation: `tpl-float-${i % 3} ${10 + (i % 5) * 3}s ease-in-out infinite`,
+                animationDelay: `${i * 0.5}s`,
+              }} />
+            ))}
           </div>
 
-          {/* ── Results count with architectural section marker ─────── */}
-          <div style={{
-            display: "flex", alignItems: "center", gap: 10,
-            marginBottom: 20,
-          }}>
-            <div style={{
-              width: 4, height: 4, borderRadius: "50%",
-              background: "rgba(59,130,246,0.3)",
-            }} />
-            <span style={{ fontSize: 11, color: "#3A3A50", fontFamily: "monospace" }}>
-              {filtered.length} {filtered.length !== 1 ? t('templates.templates') : t('templates.template')}
-              {activeCategory !== "All" && ` ${t('templates.inCategory')} ${CATEGORY_LABEL_KEYS[activeCategory] ? t(CATEGORY_LABEL_KEYS[activeCategory]) : activeCategory}`}
+          {/* Results count */}
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.5, delay: 0.1 }} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 32, position: "relative", zIndex: 1 }}>
+            <div style={{ width: 5, height: 5, borderRadius: "50%", background: "#06B6D4", boxShadow: "0 0 8px rgba(6,182,212,0.5)" }} />
+            <span style={{ fontSize: 12, color: "rgba(160,175,200,0.35)", fontFamily: "var(--font-jetbrains), monospace" }}>
+              {filtered.length} {filtered.length !== 1 ? t("templates.templates") : t("templates.template")}
+              {activeCategory !== "All" && ` ${t("templates.inCategory")} ${CATEGORY_LABEL_KEYS[activeCategory] ? t(CATEGORY_LABEL_KEYS[activeCategory]) : activeCategory}`}
             </span>
-            <div style={{
-              flex: 1, height: 1,
-              background: "linear-gradient(90deg, rgba(59,130,246,0.08), transparent)",
-            }} />
-          </div>
+            <div style={{ flex: 1, height: 1, background: "linear-gradient(90deg, rgba(6,182,212,0.1), transparent 50%)" }} />
+          </motion.div>
 
-          {/* ── Grid — Organized by sections ─────────────────────────── */}
           <AnimatePresence mode="wait">
             {filtered.length === 0 ? (
-              <motion.div
-                key="empty"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                style={{ padding: "80px 0", textAlign: "center" }}
-              >
-                <div style={{
-                  width: 48, height: 48, borderRadius: 12,
-                  background: "rgba(59,130,246,0.06)", border: "1px solid rgba(59,130,246,0.1)",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  margin: "0 auto 16px",
-                }}>
-                  <Building2 size={20} style={{ color: "rgba(59,130,246,0.3)" }} />
+              <motion.div key="empty" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={{ padding: "100px 0", textAlign: "center", position: "relative", zIndex: 1 }}>
+                <div style={{ width: 56, height: 56, borderRadius: 16, background: "rgba(6,182,212,0.06)", border: "1px solid rgba(6,182,212,0.15)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
+                  <Building2 size={22} style={{ color: "rgba(6,182,212,0.4)" }} />
                 </div>
-                <p style={{ fontSize: 14, color: "#3A3A50", marginBottom: 12 }}>{t('templates.noTemplates')}</p>
-                <button
-                  onClick={() => setActiveCategory("All")}
-                  style={{
-                    fontSize: 12, color: "#4F8AFF", background: "rgba(79,138,255,0.08)",
-                    border: "1px solid rgba(79,138,255,0.15)",
-                    padding: "6px 16px", borderRadius: 6, cursor: "pointer",
-                  }}
-                >
-                  {t('templates.viewAll')}
-                </button>
+                <p style={{ fontSize: 14, color: "rgba(160,175,200,0.5)", marginBottom: 14 }}>{t("templates.noTemplates")}</p>
+                <button onClick={() => setActiveCategory("All")} style={{ fontSize: 12, color: "#06B6D4", background: "rgba(6,182,212,0.08)", border: "1px solid rgba(6,182,212,0.2)", padding: "8px 20px", borderRadius: 10, cursor: "pointer" }}>{t("templates.viewAll")}</button>
               </motion.div>
-            ) : (() => {
-              // Split filtered into sections
-              const quickStart = filtered.filter(w => QUICK_START_IDS.includes(w.id));
-              const core = filtered.filter(w => CORE_IDS.includes(w.id) && !QUICK_START_IDS.includes(w.id));
-              const rest = filtered.filter(w => !QUICK_START_IDS.includes(w.id) && !CORE_IDS.includes(w.id));
-              const isFiltered = activeCategory !== "All";
+            ) : (
+              <motion.div key={activeCategory} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }} transition={{ duration: 0.3 }} style={{ position: "relative", zIndex: 1 }}>
 
-              const handleCardClick = (wf: WorkflowTemplate) => {
-                if (LOCKED_IDS.has(wf.id) && userRole === "FREE") {
-                  toast.error(t('dash.upgradeToast'), {
-                    description: t('dash.upgradeToastDesc'),
-                    action: { label: t('dash.upgradePlan'), onClick: () => router.push("/dashboard/billing") },
-                  });
-                  return;
-                }
-                handleUse(wf.id);
-              };
-
-              const renderSection = (
-                title: string,
-                subtitle: string,
-                icon: React.ReactNode,
-                color: string,
-                rgb: string,
-                workflows: WorkflowTemplate[],
-                baseIndex: number,
-              ) => {
-                if (workflows.length === 0) return null;
-                return (
-                  <div style={{ marginBottom: 48, scrollMarginTop: 80 }}>
-                    {/* Wavy SVG section divider */}
-                    <svg viewBox="0 0 1200 40" preserveAspectRatio="none" style={{ width: "100%", height: 32, display: "block", marginBottom: 20, opacity: 0.5 }}>
-                      <defs>
-                        <linearGradient id={`wave-grad-${rgb.replace(/,/g,"")}`} x1="0%" y1="0%" x2="100%" y2="0%">
-                          <stop offset="0%" stopColor={color} stopOpacity="0" />
-                          <stop offset="30%" stopColor={color} stopOpacity="0.3" />
-                          <stop offset="70%" stopColor={color} stopOpacity="0.3" />
-                          <stop offset="100%" stopColor={color} stopOpacity="0" />
-                        </linearGradient>
-                      </defs>
-                      <path d="M0,28 C200,10 400,35 600,20 C800,5 1000,30 1200,18" stroke={`url(#wave-grad-${rgb.replace(/,/g,"")})`} strokeWidth="1.5" fill="none">
-                        <animate attributeName="d" dur="6s" repeatCount="indefinite" values="M0,28 C200,10 400,35 600,20 C800,5 1000,30 1200,18;M0,18 C200,32 400,12 600,28 C800,15 1000,35 1200,22;M0,28 C200,10 400,35 600,20 C800,5 1000,30 1200,18" />
-                      </path>
-                      <path d="M0,22 C200,35 400,15 600,28 C800,12 1000,32 1200,20" stroke={`url(#wave-grad-${rgb.replace(/,/g,"")})`} strokeWidth="0.8" fill="none" opacity="0.4">
-                        <animate attributeName="d" dur="8s" repeatCount="indefinite" values="M0,22 C200,35 400,15 600,28 C800,12 1000,32 1200,20;M0,30 C200,15 400,32 600,18 C800,30 1000,12 1200,25;M0,22 C200,35 400,15 600,28 C800,12 1000,32 1200,20" />
-                      </path>
-                    </svg>
-
-                    {/* Section header */}
-                    <motion.div
-                      initial={{ opacity: 0, y: 12 }}
-                      whileInView={{ opacity: 1, y: 0 }}
-                      viewport={{ once: true, margin: "-40px" }}
-                      transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-                      style={{
-                        display: "flex", alignItems: "center", gap: 14,
-                        marginBottom: 24,
-                      }}
-                    >
-                      <div style={{
-                        width: 40, height: 40, borderRadius: 12,
-                        background: `linear-gradient(135deg, rgba(${rgb}, 0.12), rgba(${rgb}, 0.04))`,
-                        border: `1px solid rgba(${rgb}, 0.2)`,
-                        display: "flex", alignItems: "center", justifyContent: "center",
-                        color,
-                        boxShadow: `0 0 20px rgba(${rgb}, 0.08)`,
-                      }}>
-                        {icon}
-                      </div>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: 16, fontWeight: 700, color: "#F1F5F9", letterSpacing: "-0.02em" }}>
-                          {title}
-                        </div>
-                        <div style={{ fontSize: 12, color: "#6B7A8D", marginTop: 2 }}>
-                          {subtitle}
-                        </div>
-                      </div>
-                      {/* Workflow count pill */}
-                      <div style={{
-                        padding: "4px 12px", borderRadius: 20,
-                        background: `rgba(${rgb}, 0.06)`, border: `1px solid rgba(${rgb}, 0.12)`,
-                        fontSize: 11, fontWeight: 600, color, fontVariantNumeric: "tabular-nums",
-                      }}>
-                        {workflows.length}
-                      </div>
-                    </motion.div>
-
-                    {/* Cards grid */}
-                    <div className="templates-grid" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 24 }}>
-                      {workflows.map((wf, i) => {
-                        const isLocked = LOCKED_IDS.has(wf.id) && userRole === "FREE";
-                        const catColor = CATEGORY_COLORS[wf.category] ?? "#4F8AFF";
-                        const catRgb = hexToRgb(catColor);
-                        const preview = TEMPLATE_PREVIEWS[wf.id];
-                        const nodeCount = wf.tileGraph.nodes.length;
-
-                        // Output type badges from expectedOutputs
-                        const outputBadges: Array<{ label: string; icon: string; color: string }> = [];
-                        const eo = (wf.expectedOutputs ?? []).join(" ").toLowerCase();
-                        if (eo.includes("floor plan") || eo.includes("svg")) outputBadges.push({ label: "Floor Plan", icon: "📐", color: "#14B8A6" });
-                        if (eo.includes("3d") || eo.includes("massing") || eo.includes("interactive")) outputBadges.push({ label: "3D Model", icon: "🧊", color: "#FFBF00" });
-                        if (eo.includes("render") || eo.includes("image") || eo.includes("concept")) outputBadges.push({ label: "Render", icon: "🖼", color: "#10B981" });
-                        if (eo.includes("video") || eo.includes("walkthrough") || eo.includes("cinematic")) outputBadges.push({ label: "Video", icon: "🎬", color: "#8B5CF6" });
-                        if (eo.includes("ifc") || eo.includes("bim")) outputBadges.push({ label: "IFC", icon: "📦", color: "#3B82F6" });
-                        if (eo.includes("boq") || eo.includes("xlsx") || eo.includes("spreadsheet") || eo.includes("quantities")) outputBadges.push({ label: "BOQ", icon: "💰", color: "#F59E0B" });
-
-                        // Pipeline flow: split name by →
-                        const pipelineSteps = wf.name.split("→").map(s => s.trim());
-
-                        return (
-                          <motion.div
-                            key={wf.id}
-                            className="template-card"
-                            initial={{ opacity: 0, y: 24 }}
-                            whileInView={{ opacity: 1, y: 0 }}
-                            viewport={{ once: true, margin: "-60px" }}
-                            transition={{ duration: 0.4, delay: i * 0.08, ease: [0.22, 1, 0.36, 1] }}
-                            whileHover={{ y: -8, transition: { duration: 0.3, ease: [0.22, 1, 0.36, 1] } }}
-                            onClick={() => handleCardClick(wf)}
-                            style={{
-                              cursor: "pointer", position: "relative",
-                              borderRadius: 18, overflow: "hidden",
-                              background: `linear-gradient(170deg, rgba(20,21,35,1) 0%, rgba(14,15,26,1) 100%)`,
-                              border: `1px solid rgba(${catRgb}, 0.1)`,
-                              boxShadow: `0 4px 20px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.03)`,
-                              transition: "border-color 0.3s, box-shadow 0.3s",
-                            }}
-                            onMouseEnter={e => {
-                              (e.currentTarget as HTMLElement).style.borderColor = `rgba(${catRgb},0.4)`;
-                              (e.currentTarget as HTMLElement).style.boxShadow = `0 20px 60px rgba(0,0,0,0.5), 0 0 40px rgba(${catRgb},0.1), inset 0 1px 0 rgba(255,255,255,0.05)`;
-                            }}
-                            onMouseLeave={e => {
-                              (e.currentTarget as HTMLElement).style.borderColor = `rgba(${catRgb},0.1)`;
-                              (e.currentTarget as HTMLElement).style.boxShadow = `0 4px 20px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.03)`;
-                            }}
-                          >
-                            {/* ── Shine sweep overlay (CSS animated) ── */}
-                            <div className="card-shine" style={{ position: "absolute", inset: 0, zIndex: 5, pointerEvents: "none" }} />
-
-                            {/* ── Preview area ── */}
-                            <div className="template-card-preview" style={{
-                              position: "relative", height: 240, overflow: "hidden",
-                              background: `linear-gradient(180deg, rgba(${catRgb}, 0.05) 0%, rgba(${catRgb}, 0.01) 100%)`,
-                            }}>
-                              {/* Accent top border with glow */}
-                              <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, background: `linear-gradient(90deg, transparent 5%, ${catColor} 50%, transparent 95%)`, zIndex: 3, opacity: 0.7 }} />
-
-                              {preview?.type === "video" ? (
-                                <video
-                                  src={preview.url} muted playsInline
-                                  onLoadedMetadata={e => { e.currentTarget.currentTime = preview.start; }}
-                                  onMouseEnter={e => { e.currentTarget.play().catch(() => {}); }}
-                                  onMouseLeave={e => { e.currentTarget.pause(); e.currentTarget.currentTime = preview.start; }}
-                                  className="template-card-video"
-                                  style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", transition: "transform 0.5s cubic-bezier(0.22,1,0.36,1)" }}
-                                />
-                              ) : preview?.type === "image" ? (
-                                /* eslint-disable-next-line @next/next/no-img-element */
-                                <img
-                                  src={preview.url} alt={wf.name} loading="lazy"
-                                  className="template-card-img"
-                                  style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", transition: "transform 0.5s cubic-bezier(0.22,1,0.36,1)" }}
-                                />
-                              ) : preview?.type === "svg" ? (
-                                <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
-                                  <OutputPreviewSVG output={preview.output} color={catColor} />
-                                </div>
-                              ) : (
-                                <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                                  <Building2 size={36} style={{ color: `rgba(${catRgb}, 0.2)` }} />
-                                </div>
-                              )}
-
-                              {/* Bottom gradient — subtle */}
-                              <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: "40%", background: "linear-gradient(transparent, rgba(14,15,26,0.95))", pointerEvents: "none" }} />
-
-                              {/* Category badge — top left */}
-                              <div style={{
-                                position: "absolute", top: 10, left: 10, zIndex: 4,
-                                display: "inline-flex", alignItems: "center", gap: 5,
-                                padding: "4px 10px", borderRadius: 8,
-                                background: "rgba(0,0,0,0.6)", backdropFilter: "blur(12px)",
-                                border: `1px solid rgba(${catRgb}, 0.3)`,
-                              }}>
-                                {CATEGORY_ICONS[wf.category] && <span style={{ color: catColor, display: "flex" }}>{CATEGORY_ICONS[wf.category]}</span>}
-                                <span style={{ fontSize: 9, fontWeight: 700, color: catColor, letterSpacing: "0.06em", textTransform: "uppercase" }}>
-                                  {wf.category}
-                                </span>
-                              </div>
-
-                              {/* "You get" output badges — bottom */}
-                              {outputBadges.length > 0 && (
-                                <div style={{
-                                  position: "absolute", bottom: 10, left: 12, right: 12, zIndex: 4,
-                                  display: "flex", gap: 5, flexWrap: "wrap",
-                                }}>
-                                  {outputBadges.slice(0, 4).map(b => (
-                                    <span key={b.label} style={{
-                                      fontSize: 9, fontWeight: 700, color: b.color,
-                                      padding: "3px 8px", borderRadius: 6,
-                                      background: `rgba(0,0,0,0.55)`, backdropFilter: "blur(8px)",
-                                      border: `1px solid ${b.color}35`,
-                                      letterSpacing: "0.03em",
-                                      display: "flex", alignItems: "center", gap: 3,
-                                    }}>
-                                      <span style={{ fontSize: 10 }}>{b.icon}</span>
-                                      {b.label}
-                                    </span>
-                                  ))}
-                                </div>
-                              )}
-
-                              {/* Hover CTA overlay — slides up */}
-                              <div className="card-cta-overlay" style={{
-                                position: "absolute", inset: 0, zIndex: 6,
-                                background: `linear-gradient(180deg, rgba(${catRgb},0.05) 0%, rgba(${catRgb},0.15) 100%)`,
-                                display: "flex", alignItems: "center", justifyContent: "center",
-                                opacity: 0, transition: "opacity 0.3s ease",
-                                pointerEvents: "none",
-                              }}>
-                                <div style={{
-                                  display: "flex", alignItems: "center", gap: 8,
-                                  padding: "10px 24px", borderRadius: 12,
-                                  background: `rgba(${catRgb}, 0.15)`, backdropFilter: "blur(16px)",
-                                  border: `1px solid rgba(${catRgb}, 0.4)`,
-                                  boxShadow: `0 8px 32px rgba(${catRgb}, 0.2)`,
-                                }}>
-                                  <span style={{ fontSize: 13, fontWeight: 700, color: "#fff" }}>
-                                    Use Template
-                                  </span>
-                                  <ArrowRight size={14} style={{ color: catColor }} />
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* ── Content ── */}
-                            <div style={{ padding: "16px 18px 18px" }}>
-                              {/* Title */}
-                              <div style={{ fontSize: 15, fontWeight: 700, color: "#F1F5F9", marginBottom: 8, letterSpacing: "-0.01em", lineHeight: 1.35 }}>
-                                {wf.name}
-                              </div>
-
-                              {/* Pipeline mini-flow */}
-                              {pipelineSteps.length >= 2 && (
-                                <div className="card-pipeline-flow" style={{
-                                  display: "flex", alignItems: "center", gap: 6,
-                                  marginBottom: 10, padding: "6px 10px",
-                                  borderRadius: 8, background: "rgba(255,255,255,0.02)",
-                                  border: "1px solid rgba(255,255,255,0.04)",
-                                  overflow: "hidden",
-                                }}>
-                                  {pipelineSteps.map((step, si) => (
-                                    <span key={si} style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                                      {si > 0 && (
-                                        <span style={{ color: catColor, fontSize: 10, opacity: 0.6 }}>→</span>
-                                      )}
-                                      <span style={{
-                                        fontSize: 10, fontWeight: 600,
-                                        color: si === pipelineSteps.length - 1 ? catColor : "#8B9DB5",
-                                        whiteSpace: "nowrap",
-                                      }}>
-                                        {step}
-                                      </span>
-                                    </span>
-                                  ))}
-                                </div>
-                              )}
-
-                              {/* Description */}
-                              <div style={{ fontSize: 12, color: "#8B9DB5", lineHeight: 1.6, marginBottom: 14, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const, overflow: "hidden" }}>
-                                {wf.description}
-                              </div>
-
-                              {/* Meta row */}
-                              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                                <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 11, color: "#7B8FA3", fontFamily: "var(--font-jetbrains), monospace" }}>
-                                  <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                                    <span style={{ width: 6, height: 6, borderRadius: "50%", background: wf.complexity === "simple" ? "#10B981" : "#F59E0B", boxShadow: wf.complexity === "simple" ? "0 0 8px #10B98150" : "0 0 8px #F59E0B50" }} />
-                                    {wf.complexity === "simple" ? t('dash.simpleLabel') : t('dash.advancedLabel')}
-                                  </span>
-                                  <span style={{ color: "#3D4A5C" }}>·</span>
-                                  <span>{nodeCount} {t('dash.nodes')}</span>
-                                  <span style={{ color: "#3D4A5C" }}>·</span>
-                                  <span>{wf.estimatedRunTime}</span>
-                                </div>
-                                {/* Subtle arrow on right */}
-                                <ArrowRight size={14} className="card-arrow" style={{ color: `rgba(${catRgb}, 0.3)`, transition: "color 0.3s, transform 0.3s" }} />
-                              </div>
-                            </div>
-
-                            {/* Lock overlay */}
-                            {isLocked && (
-                              <div style={{
-                                position: "absolute", inset: 0, zIndex: 10, borderRadius: 18,
-                                background: "rgba(8,10,18,0.4)", backdropFilter: "blur(2px)",
-                                display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8,
-                              }}>
-                                <div style={{
-                                  display: "flex", alignItems: "center", gap: 6,
-                                  padding: "8px 20px", borderRadius: 12,
-                                  background: "rgba(245,158,11,0.12)", border: "1px solid rgba(245,158,11,0.25)",
-                                  backdropFilter: "blur(8px)",
-                                }}>
-                                  <Lock size={13} style={{ color: "#F59E0B" }} />
-                                  <span style={{ fontSize: 11, fontWeight: 700, color: "#F59E0B", fontFamily: "var(--font-jetbrains), monospace" }}>PRO</span>
-                                </div>
-                                <span style={{ fontSize: 10, color: "#8898A8" }}>{t('dash.clickToUpgrade')}</span>
-                              </div>
-                            )}
-                          </motion.div>
-                        );
-                      })}
-                    </div>
-
-                    {/* Card interaction styles + smooth scroll + mobile */}
-                    <style>{`
-                      /* Smooth scroll */
-                      html { scroll-behavior: smooth; }
-
-                      /* Preview zoom on hover */
-                      .template-card:hover .template-card-video,
-                      .template-card:hover .template-card-img {
-                        transform: scale(1.08);
-                      }
-                      /* Show CTA overlay on hover */
-                      .template-card:hover .card-cta-overlay {
-                        opacity: 1 !important;
-                      }
-                      /* Animate arrow on hover */
-                      .template-card:hover .card-arrow {
-                        color: rgba(255,255,255,0.6) !important;
-                        transform: translateX(3px);
-                      }
-                      /* Shine sweep effect */
-                      .card-shine::before {
-                        content: '';
-                        position: absolute;
-                        top: 0;
-                        left: -120%;
-                        width: 60%;
-                        height: 100%;
-                        background: linear-gradient(
-                          105deg,
-                          transparent 40%,
-                          rgba(255,255,255,0.03) 45%,
-                          rgba(255,255,255,0.05) 50%,
-                          rgba(255,255,255,0.03) 55%,
-                          transparent 60%
-                        );
-                        transition: left 0.6s cubic-bezier(0.22,1,0.36,1);
-                        pointer-events: none;
-                      }
-                      .template-card:hover .card-shine::before {
-                        left: 120%;
-                      }
-
-                      /* ── Mobile responsive ── */
-                      @media (max-width: 768px) {
-                        .template-card-preview {
-                          height: 180px !important;
-                        }
-                        .template-card .card-cta-overlay {
-                          display: none !important;
-                        }
-                        .card-pipeline-flow {
-                          overflow-x: auto !important;
-                          -webkit-overflow-scrolling: touch !important;
-                        }
-                      }
-                      @media (max-width: 480px) {
-                        .template-card-preview {
-                          height: 160px !important;
-                        }
-                      }
-                      @media (min-width: 769px) and (max-width: 1024px) {
-                        .template-card-preview {
-                          height: 200px !important;
-                        }
-                      }
-                    `}</style>
+                {isFiltered ? (
+                  /* ── Filtered: full-width immersive layout ── */
+                  <div style={{ marginBottom: 64 }}>
+                    <SectionHeader
+                      title={CATEGORY_LABEL_KEYS[activeCategory] ? t(CATEGORY_LABEL_KEYS[activeCategory]) : activeCategory}
+                      subtitle={`${filtered.length} templates`}
+                      icon={CATEGORY_ICONS[activeCategory] || <Building2 size={18} />}
+                      color={CATEGORY_COLORS[activeCategory] || "#06B6D4"}
+                      rgb={hexToRgb(CATEGORY_COLORS[activeCategory] || "#06B6D4")}
+                      count={filtered.length}
+                    />
+                    {filtered.map((wf, i) => (
+                      <FeaturedTemplate key={wf.id} wf={wf} index={i} isMobile={isMobile} onUse={handleUse} t={t} />
+                    ))}
                   </div>
-                );
-              };
+                ) : (
+                  <>
+                    {/* ═══════ FEATURED — Full-width immersive ═══════ */}
+                    {quickStart.length > 0 && (
+                      <div style={{ marginBottom: 72 }}>
+                        <SectionHeader
+                          title={t("dash.quickStartSection")} subtitle={t("dash.quickStartDesc")}
+                          icon={<Zap size={18} />} color="#10B981" rgb="16,185,129" count={quickStart.length}
+                        />
+                        {quickStart.map((wf, i) => (
+                          <FeaturedTemplate key={wf.id} wf={wf} index={i} isMobile={isMobile} onUse={handleUse} t={t} />
+                        ))}
+                      </div>
+                    )}
 
-              return (
-                <motion.div
-                  key={activeCategory}
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  transition={{ duration: 0.15 }}
-                >
-                  {isFiltered ? (
-                    /* When filtered by category, show flat grid with preview cards */
-                    (() => {
-                      // Reuse the same renderSection but as flat
-                      return renderSection(
-                        CATEGORY_LABEL_KEYS[activeCategory] ? t(CATEGORY_LABEL_KEYS[activeCategory]) : activeCategory,
-                        `${filtered.length} templates`,
-                        CATEGORY_ICONS[activeCategory] || <Building2 size={18} />,
-                        CATEGORY_COLORS[activeCategory] || "#4F8AFF",
-                        hexToRgb(CATEGORY_COLORS[activeCategory] || "#4F8AFF"),
-                        filtered, 0,
-                      );
-                    })()
-                  ) : (
-                    /* When showing all, organize into 3 sections */
-                    <>
-                      {renderSection(
-                        t('dash.quickStartSection'),
-                        t('dash.quickStartDesc'),
-                        <Lightbulb size={18} />,
-                        "#10B981", "16,185,129",
-                        quickStart, 0,
-                      )}
-                      {renderSection(
-                        t('dash.corePipelines'),
-                        t('dash.corePipelinesDesc'),
-                        <Building2 size={18} />,
-                        "#4F8AFF", "79,138,255",
-                        core, quickStart.length,
-                      )}
-                      {renderSection(
-                        t('dash.exploreMore'),
-                        t('dash.exploreMoreDesc'),
-                        <Compass size={18} />,
-                        "#8B5CF6", "139,92,246",
-                        rest, quickStart.length + core.length,
-                      )}
-                    </>
-                  )}
-                </motion.div>
-              );
-            })()}
+                    {/* ═══════ CORE PIPELINES — Full-width immersive ═══════ */}
+                    {core.length > 0 && (
+                      <div style={{ marginBottom: 72 }}>
+                        <SectionHeader
+                          title={t("dash.corePipelines")} subtitle={t("dash.corePipelinesDesc")}
+                          icon={<Building2 size={18} />} color="#4F8AFF" rgb="79,138,255" count={core.length}
+                        />
+                        {core.map((wf, i) => (
+                          <FeaturedTemplate key={wf.id} wf={wf} index={quickStart.length + i} isMobile={isMobile} onUse={handleUse} t={t} />
+                        ))}
+                      </div>
+                    )}
+
+                    {/* ═══════ EXPLORE MORE — Full-width immersive ═══════ */}
+                    {rest.length > 0 && (
+                      <div style={{ marginBottom: 72 }}>
+                        <SectionHeader
+                          title={t("dash.exploreMore")} subtitle={t("dash.exploreMoreDesc")}
+                          icon={<Sparkles size={18} />} color="#8B5CF6" rgb="139,92,246" count={rest.length}
+                        />
+                        {rest.map((wf, i) => (
+                          <FeaturedTemplate key={wf.id} wf={wf} index={quickStart.length + core.length + i} isMobile={isMobile} onUse={handleUse} t={t} />
+                        ))}
+                      </div>
+                    )}
+                  </>
+                )}
+              </motion.div>
+            )}
           </AnimatePresence>
 
-          {/* ── Footer — Suggest a Workflow ───────────────────────────── */}
+          {/* ════════════════════════════ FEEDBACK ════════════════════════════ */}
           <motion.div
-            className="templates-suggest-footer"
-            initial={{ opacity: 0, y: 16 }}
+            initial={{ opacity: 0, y: 30 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
-            transition={{ duration: 0.5, ease: "easeOut" }}
+            transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
             style={{
-              marginTop: 40, padding: "32px 28px",
-              borderRadius: 18,
-              background: "linear-gradient(135deg, rgba(79,138,255,0.04), rgba(139,92,246,0.03))",
-              border: "1px solid rgba(79,138,255,0.08)",
-              display: "flex", alignItems: "center", gap: 20,
-              position: "relative", overflow: "hidden",
+              marginTop: 40, padding: "40px 36px", borderRadius: 24, position: "relative", overflow: "hidden", zIndex: 1,
+              background: "linear-gradient(135deg, rgba(14,18,30,0.9), rgba(10,12,20,0.95))",
+              border: "1px solid rgba(6,182,212,0.1)",
+              display: "flex", alignItems: "center", gap: 28,
+              boxShadow: "0 12px 48px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.04)",
             }}
           >
-            {/* Blueprint grid bg */}
+            <div style={{ position: "absolute", top: 0, left: "15%", right: "15%", height: 1, background: "linear-gradient(90deg, transparent, rgba(6,182,212,0.2), rgba(139,92,246,0.15), transparent)", pointerEvents: "none" }} />
             <div style={{
-              position: "absolute", inset: 0, pointerEvents: "none",
-              backgroundImage: "linear-gradient(rgba(79,138,255,0.02) 1px, transparent 1px), linear-gradient(90deg, rgba(79,138,255,0.02) 1px, transparent 1px)",
-              backgroundSize: "28px 28px",
-              maskImage: "linear-gradient(90deg, transparent 0%, rgba(0,0,0,0.3) 100%)",
-              WebkitMaskImage: "linear-gradient(90deg, transparent 0%, rgba(0,0,0,0.3) 100%)",
-            }} />
-
-            <div style={{
-              width: 46, height: 46, borderRadius: 12, flexShrink: 0,
-              background: "rgba(79,138,255,0.08)", border: "1px solid rgba(79,138,255,0.12)",
+              width: 56, height: 56, borderRadius: 18, flexShrink: 0,
+              background: "linear-gradient(135deg, rgba(6,182,212,0.12), rgba(139,92,246,0.08))",
+              border: "1px solid rgba(6,182,212,0.2)",
               display: "flex", alignItems: "center", justifyContent: "center",
-              position: "relative", zIndex: 1,
+              boxShadow: "0 0 24px rgba(6,182,212,0.08)",
             }}>
-              <MessageSquare size={20} style={{ color: "#4F8AFF" }} />
+              <MessageSquare size={22} style={{ color: "#06B6D4" }} />
             </div>
-
-            <div style={{ flex: 1, position: "relative", zIndex: 1 }}>
-              <div style={{ fontSize: 15, fontWeight: 700, color: "#E2E8F0", marginBottom: 3, letterSpacing: "-0.02em" }}>
-                {t('dash.suggestTitle')}
-              </div>
-              <div style={{ fontSize: 12, color: "#6B7A8D", lineHeight: 1.6 }}>
-                {t('dash.suggestDesc')}
-              </div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 17, fontWeight: 700, color: "#F0F2F8", marginBottom: 6, letterSpacing: "-0.02em" }}>{t("dash.suggestTitle")}</div>
+              <div style={{ fontSize: 13, color: "rgba(160,175,200,0.5)", lineHeight: 1.65 }}>{t("dash.suggestDesc")}</div>
             </div>
-
-            <a
-              href="#request-workflow"
-              onClick={e => { e.preventDefault(); router.push("/dashboard/feedback"); }}
-              style={{
-                display: "flex", alignItems: "center", gap: 6,
-                padding: "10px 22px", borderRadius: 10, flexShrink: 0,
-                background: "rgba(79,138,255,0.08)", border: "1px solid rgba(79,138,255,0.15)",
-                color: "#4F8AFF", fontSize: 12, fontWeight: 700,
-                textDecoration: "none",
-                fontFamily: "var(--font-jetbrains), monospace",
-                transition: "all 0.2s",
-                position: "relative", zIndex: 1,
-                cursor: "pointer",
-              }}
-            >
-              {t('dash.suggestBtn')} <ArrowRight size={13} />
+            <a href="#" onClick={e => { e.preventDefault(); router.push("/dashboard/feedback"); }} className="tpl-suggest-btn" style={{
+              display: "flex", alignItems: "center", gap: 8, padding: "12px 28px", borderRadius: 14, flexShrink: 0,
+              background: "linear-gradient(135deg, rgba(6,182,212,0.1), rgba(139,92,246,0.06))",
+              border: "1px solid rgba(6,182,212,0.25)", color: "#06B6D4", fontSize: 13, fontWeight: 700,
+              textDecoration: "none", fontFamily: "var(--font-jetbrains), monospace",
+              transition: "all 0.3s ease", cursor: "pointer", boxShadow: "0 0 24px rgba(6,182,212,0.06)",
+            }}>
+              {t("dash.suggestBtn")} <ArrowRight size={14} />
             </a>
           </motion.div>
         </div>
       </main>
+
+      {/* ════════════════════════════ STYLES ════════════════════════════ */}
+      <style>{`
+        /* ── Floating particles ── */
+        @keyframes tpl-float-0 {
+          0% { transform: translate(0, 0); opacity: 0.2; }
+          50% { transform: translate(20px, -60px); opacity: 0.5; }
+          100% { transform: translate(-10px, -120px); opacity: 0.1; }
+        }
+        @keyframes tpl-float-1 {
+          0% { transform: translate(0, 0); opacity: 0.15; }
+          50% { transform: translate(-30px, -40px); opacity: 0.4; }
+          100% { transform: translate(15px, -100px); opacity: 0.1; }
+        }
+        @keyframes tpl-float-2 {
+          0% { transform: translate(0, 0); opacity: 0.25; }
+          50% { transform: translate(15px, -50px); opacity: 0.45; }
+          100% { transform: translate(-20px, -90px); opacity: 0.05; }
+        }
+
+        /* ── Section icon pulse ring ── */
+        @keyframes tpl-pulse {
+          0%, 100% { transform: scale(1); opacity: 0.3; }
+          50% { transform: scale(1.15); opacity: 0; }
+        }
+
+        /* ── Featured card hover ── */
+        .tpl-featured:hover {
+          border-color: rgba(6,182,212,0.22) !important;
+          box-shadow: 0 20px 80px rgba(0,0,0,0.45), 0 0 100px rgba(6,182,212,0.05) !important;
+        }
+        .tpl-featured:hover .tpl-featured-media {
+          transform: scale(1.05);
+        }
+        .tpl-featured:hover .tpl-featured-shimmer > div {
+          animation: tpl-shimmer-sweep 1.5s ease forwards;
+        }
+        @keyframes tpl-shimmer-sweep {
+          0% { opacity: 0.3; }
+          50% { opacity: 0.8; }
+          100% { opacity: 0.3; }
+        }
+
+        /* ── CTA button hover ── */
+        .tpl-featured-cta:hover {
+          box-shadow: 0 0 36px rgba(6,182,212,0.2), 0 0 72px rgba(6,182,212,0.06) !important;
+          transform: translateY(-2px) !important;
+          border-color: rgba(6,182,212,0.5) !important;
+        }
+        .tpl-featured-cta:hover .tpl-cta-arrow {
+          transform: translateX(4px) !important;
+        }
+
+        /* ── Output badge hover ── */
+        .tpl-output-badge:hover {
+          box-shadow: 0 0 16px currentColor;
+          transform: translateY(-1px);
+        }
+
+        /* ── Suggest button hover ── */
+        .tpl-suggest-btn:hover {
+          background: linear-gradient(135deg, rgba(6,182,212,0.18), rgba(139,92,246,0.1)) !important;
+          border-color: rgba(6,182,212,0.4) !important;
+          box-shadow: 0 0 40px rgba(6,182,212,0.12) !important;
+          transform: translateY(-2px);
+        }
+
+        /* ── Mobile ── */
+        @media (max-width: 768px) {
+          .tpl-hero { min-height: 300px !important; padding: 40px 20px 28px !important; }
+          .tpl-hero-title { font-size: 28px !important; }
+          .tpl-hero-subtitle { font-size: 13px !important; }
+          .tpl-stats-bar { flex-wrap: wrap !important; }
+          .tpl-stats-bar > div { padding: 8px 14px !important; }
+          .tpl-filter-bar { overflow-x: auto !important; flex-wrap: nowrap !important; gap: 5px !important; padding: 10px 16px !important; }
+          .tpl-filter-chip { white-space: nowrap !important; flex-shrink: 0 !important; }
+          .tpl-content { padding: 20px 16px 36px !important; }
+          .tpl-featured { border-radius: 18px !important; }
+          .tpl-featured-scene { min-height: 200px !important; }
+          .tpl-particles { display: none !important; }
+        }
+        @media (min-width: 769px) and (max-width: 1024px) {
+          .tpl-hero-title { font-size: 34px !important; }
+        }
+        @media (max-width: 480px) {
+          .tpl-hero { min-height: 260px !important; padding: 28px 16px 20px !important; }
+          .tpl-hero-title { font-size: 24px !important; }
+        }
+      `}</style>
     </div>
   );
 }
