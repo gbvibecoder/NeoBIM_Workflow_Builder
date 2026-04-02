@@ -549,7 +549,8 @@ function StatCard({ icon: Icon, value, suffix, prefix, label, color, delay }: {
         display: "flex", alignItems: "center", justifyContent: "center",
         margin: "0 auto 16px",
       }}>
-        <Icon size={20} style={{ color }} />
+        {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+        {React.createElement(Icon as any, { size: 20, style: { color } })}
       </div>
       <div style={{
         fontSize: 36, fontWeight: 800, letterSpacing: "-1.5px",

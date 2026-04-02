@@ -2150,6 +2150,12 @@
   border: none;
 }
 
+/* ─── Hero Heading Glow ────────────────────────────────────────────── */
+.landing-hero-glow {
+  position: relative;
+  filter: drop-shadow(0 0 40px rgba(59, 130, 246, 0.35)) drop-shadow(0 0 80px rgba(139, 92, 246, 0.2));
+}
+
 /* ═══════════════════════════════════════════════════════════════════
    MOBILE RESPONSIVE STYLES (imported at top of file — see line 1)
    ═══════════════════════════════════════════════════════════════════ */

@@ -645,6 +645,21 @@ async function executeNode(
       throw err;
     }
 
+    // Check rate limit remaining — warn user when running low
+    const rlRemaining = res.headers.get("X-RateLimit-Remaining");
+    const rlLimit = res.headers.get("X-RateLimit-Limit");
+    if (rlRemaining !== null && rlLimit !== null) {
+      const rem = parseInt(rlRemaining, 10);
+      const lim = parseInt(rlLimit, 10);
+      if (!isNaN(rem) && !isNaN(lim) && rem <= 2 && rem > 0) {
+        toast.warning(`${rem} execution${rem === 1 ? "" : "s"} remaining this month (${lim} total)`, {
+          description: "Upgrade your plan for more executions",
+          action: { label: "Upgrade", onClick: () => { window.location.href = "/dashboard/billing"; } },
+          duration: 8000,
+        });
+      }
+    }
+
     const { artifact } = await res.json() as { artifact: ExecutionArtifact };
     return { ...artifact, createdAt: new Date() };
   }
@@ -732,9 +747,16 @@ async function pollSingleVideoGeneration(
   const deadline = Date.now() + VIDEO_POLL_TIMEOUT_MS;
 
   setVideoProgressFn(nodeId, { progress: 5, status: "processing", taskId });
+  let warnedTimeout = false;
 
   while (Date.now() < deadline) {
     await abortableSleep(VIDEO_POLL_INTERVAL_MS, signal);
+
+    // Warn user when 2 minutes remain
+    if (!warnedTimeout && deadline - Date.now() < 120_000) {
+      warnedTimeout = true;
+      toast.warning("Video generation is taking longer than expected — 2 minutes remaining", { duration: 10000 });
+    }
 
     try {
       const res = await fetch(`/api/video-status?taskId=${encodeURIComponent(taskId)}`, { signal });
@@ -830,9 +852,16 @@ async function pollVideoGeneration(
     exteriorTaskId,
     interiorTaskId,
   });
+  let warnedTimeout = false;
 
   while (Date.now() < deadline) {
     await abortableSleep(VIDEO_POLL_INTERVAL_MS, signal);
+
+    // Warn user when 2 minutes remain
+    if (!warnedTimeout && deadline - Date.now() < 120_000) {
+      warnedTimeout = true;
+      toast.warning("Video generation is taking longer than expected — 2 minutes remaining", { duration: 10000 });
+    }
 
     try {
       const res = await fetch(

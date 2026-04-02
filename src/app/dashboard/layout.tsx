@@ -1,5 +1,6 @@
 import React from "react";
 import { Sidebar } from "@/components/dashboard/Sidebar";
+import { Header } from "@/components/dashboard/Header";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { CommandPaletteLoader } from "@/components/ui/CommandPaletteLoader";
 import { OnboardingModal } from "@/components/dashboard/OnboardingModal";
@@ -15,6 +16,7 @@ export default function DashboardLayout({
       <Sidebar />
       <ErrorBoundary>
         <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
+          <Header />
           {children}
         </div>
       </ErrorBoundary>

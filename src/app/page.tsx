@@ -8,7 +8,7 @@ import {
   Box, Play, Image as ImageIcon, FileCode,
   MousePointerClick, Workflow, Layers, Settings, Target, Calendar,
   ChevronUp, ChevronDown, ClipboardList, Send, Copy, Building2, Star,
-  Film, Eye, Heart, Upload,
+  Film, Eye, Heart, Upload, Menu, X,
 } from "lucide-react";
 import { MiniWorkflowDiagram } from "@/components/shared/MiniWorkflowDiagram";
 import { PREBUILT_WORKFLOWS } from "@/constants/prebuilt-workflows";
@@ -23,7 +23,7 @@ import { FAQSection } from '@/components/landing/FAQSection';
 import { HowItWorksSection } from '@/components/landing/HowItWorksSection';
 import { PricingSection } from '@/components/landing/PricingSection';
 import { LandingFooter } from '@/components/landing/LandingFooter';
-import { ExitIntentModal } from '@/components/marketing/ExitIntentModal';
+// import { ExitIntentModal } from '@/components/marketing/ExitIntentModal';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -211,7 +211,7 @@ const SHOWCASE = [
 
 // ─── Logo Marquee ────────────────────────────────────────────────────────────
 
-const PARTNER_LOGO_KEYS = ['landing.builtForAecBadge', 'landing.complementBadge', 'landing.noCadBadge', 'landing.schematicBadge'] as const;
+const PARTNER_LOGO_KEYS = ['landing.builtForAecBadge', 'landing.noCadBadge', 'landing.schematicBadge'] as const;
 
 // ─── Community Social Proof Data ────────────────────────────────────────────
 
@@ -865,7 +865,8 @@ export default function LandingPage() {
   const heroScale = useTransform(scrollYProgress, [0, 0.5], [1, 0.95]);
 
 
-  const newsItems = [t('landing.news1'), t('landing.news2'), t('landing.news3'), t('landing.news4'), t('landing.news5')];
+  const newsItems = [t('landing.news1'), t('landing.news2'), t('landing.news3'), t('landing.news5')];
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // ─── Roadmap vote state (localStorage-persisted) ────────────────────────────
   const defaultVotes = Object.fromEntries(ROADMAP_ITEMS.map(i => [i.id, i.defaultVotes]));
@@ -1078,8 +1079,108 @@ export default function LandingPage() {
               {t('landing.signUpFree')}
             </Link>
           </div>
+
+          {/* Mobile hamburger button — visible only on small screens */}
+          <button
+            className="landing-mobile-menu-btn"
+            onClick={() => setMobileMenuOpen(v => !v)}
+            aria-label="Toggle menu"
+            aria-expanded={mobileMenuOpen}
+            style={{
+              display: "none", alignItems: "center", justifyContent: "center",
+              width: 40, height: 40, borderRadius: 10,
+              background: "rgba(255,255,255,0.06)",
+              border: "1px solid rgba(255,255,255,0.08)",
+              color: "#F0F0F5", cursor: "pointer", flexShrink: 0,
+              marginLeft: 8,
+            }}
+          >
+            {mobileMenuOpen ? <X size={18} /> : <Menu size={18} />}
+          </button>
         </nav>
       </header>
+
+      {/* Mobile navigation drawer */}
+      <AnimatePresence>
+        {mobileMenuOpen && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              onClick={() => setMobileMenuOpen(false)}
+              style={{
+                position: "fixed", inset: 0, zIndex: 998,
+                background: "rgba(0,0,0,0.6)",
+                backdropFilter: "blur(4px)",
+              }}
+            />
+            <motion.div
+              initial={{ x: "100%" }}
+              animate={{ x: 0 }}
+              exit={{ x: "100%" }}
+              transition={{ type: "spring", stiffness: 400, damping: 35 }}
+              style={{
+                position: "fixed", top: 0, right: 0, bottom: 0,
+                width: 280, zIndex: 999,
+                background: "rgba(10,10,18,0.98)",
+                borderLeft: "1px solid rgba(255,255,255,0.06)",
+                backdropFilter: "blur(24px)",
+                padding: "80px 24px 32px",
+                display: "flex", flexDirection: "column", gap: 4,
+              }}
+            >
+              {[
+                { label: t('landing.features'), href: '#how-it-works' },
+                { label: t('landing.community'), href: '#community' },
+                { label: t('landing.pricing'), href: '#pricing' },
+                { label: t('landing.blog'), href: '/blog' },
+              ].map(l => (
+                <a
+                  key={l.href}
+                  href={l.href}
+                  onClick={() => setMobileMenuOpen(false)}
+                  style={{
+                    display: "block", padding: "14px 16px", borderRadius: 10,
+                    fontSize: 15, fontWeight: 600, color: "#C0C0D0",
+                    textDecoration: "none",
+                    transition: "background 0.15s",
+                  }}
+                >
+                  {l.label}
+                </a>
+              ))}
+              <div style={{ height: 1, background: "rgba(255,255,255,0.06)", margin: "12px 0" }} />
+              <Link
+                href="/login"
+                onClick={() => setMobileMenuOpen(false)}
+                style={{
+                  display: "block", padding: "12px 16px", borderRadius: 10,
+                  fontSize: 14, fontWeight: 600, color: "#9898B0",
+                  textDecoration: "none", textAlign: "center",
+                  border: "1px solid rgba(255,255,255,0.08)",
+                }}
+              >
+                {t('landing.login')}
+              </Link>
+              <Link
+                href="/register"
+                onClick={() => { setMobileMenuOpen(false); trackLead({ content_name: "mobile_menu_sign_up" }); }}
+                style={{
+                  display: "block", padding: "12px 16px", borderRadius: 10,
+                  fontSize: 14, fontWeight: 700, color: "white", textAlign: "center",
+                  textDecoration: "none",
+                  background: "linear-gradient(135deg, #4F8AFF 0%, #6366F1 100%)",
+                  boxShadow: "0 2px 12px rgba(79,138,255,0.3)",
+                }}
+              >
+                {t('landing.signUpFree')}
+              </Link>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
 
       <main>
         {/* ── HERO ─────────────────────────────────────────────────── */}
@@ -1367,25 +1468,25 @@ export default function LandingPage() {
           </motion.div>
 
           {/* Main hero content */}
-          <div style={{ position: "relative", zIndex: 30, textAlign: "center", maxWidth: 1000, padding: "0 48px" }}>
+          <div className="landing-hero-content" style={{ position: "relative", zIndex: 30, textAlign: "center", maxWidth: 1000, padding: "0 48px", marginTop: 40 }}>
             <motion.div
               initial={{ opacity: 0, y: 40 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.8, ease: smoothEase }}
             >
-              <h1 style={{
-                fontSize: "clamp(2.5rem, 5.5vw, 5rem)",
-                fontWeight: 900, lineHeight: 0.95,
-                letterSpacing: "-0.04em",
+              <h1 className="landing-hero-heading" style={{
+                fontSize: "clamp(2.2rem, 4.5vw, 4rem)",
+                fontWeight: 900, lineHeight: 1,
+                letterSpacing: "-0.03em",
                 marginBottom: 0,
                 textTransform: "uppercase",
               }}>
                 <span style={{ color: "#F0F0F5", display: "block" }}>
                   {t('landing.heroLine1')}
                 </span>
-                <span style={{
+                <span className="landing-hero-glow" style={{
                   display: "block",
-                  background: "linear-gradient(135deg, #7C6FF7 0%, #A78BFA 40%, #C084FC 100%)",
+                  background: "linear-gradient(90deg, #06B6D4 0%, #3B82F6 50%, #8B5CF6 100%)",
                   WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text",
                 }}>
                   {t('landing.heroLine2')}
@@ -1397,12 +1498,13 @@ export default function LandingPage() {
             </motion.div>
 
             <motion.p
+              className="landing-hero-subtitle"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.3, duration: 0.6, ease: smoothEase }}
               style={{
-                fontSize: 18, color: "#9898B0", lineHeight: 1.7,
-                maxWidth: 600, margin: "32px auto 0", letterSpacing: "-0.005em",
+                fontSize: 17, color: "#A0A0B8", lineHeight: 1.7,
+                maxWidth: 480, margin: "28px auto 0", letterSpacing: "0.01em",
               }}
             >
               {t('landing.heroSubtitle')}
@@ -3095,7 +3197,7 @@ export default function LandingPage() {
       <NewsTicker items={newsItems} whatsNewLabel={t('landing.whatsNew')} />
 
       {/* Exit Intent Email Capture */}
-      <ExitIntentModal />
+      {/* ExitIntentModal removed — users can access demos from the demos page */}
 
       {/* Mobile Responsive Styles */}
       <style jsx global>{`

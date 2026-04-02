@@ -3,7 +3,6 @@
 import React, { useState, useMemo, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronDown, Building2, Ruler, Compass, HardHat, Layers, PenTool, Triangle, Lock, Crown, Lightbulb, ArrowRight, MessageSquare } from "lucide-react";
-import { Header } from "@/components/dashboard/Header";
 import { PREBUILT_WORKFLOWS } from "@/constants/prebuilt-workflows";
 import { toast } from "sonner";
 import { useWorkflowStore } from "@/stores/workflow-store";
@@ -435,11 +434,6 @@ export default function TemplatesPage() {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
-      <Header
-        title={t('templates.title')}
-        subtitle={t('templates.subtitle')}
-      />
-
       <main style={{ flex: 1, overflowY: "auto" }}>
 
         {/* ── Hero Section — Blueprint Style ──────────────────────────── */}

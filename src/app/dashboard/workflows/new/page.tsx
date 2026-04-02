@@ -5,7 +5,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { MousePointer2, Sparkles, GitMerge, ArrowRight, ArrowLeft } from "lucide-react";
-import { Header } from "@/components/dashboard/Header";
 import { useWorkflowStore } from "@/stores/workflow-store";
 import type { CreationMode } from "@/types/workflow";
 import { generateId } from "@/lib/utils";
@@ -90,8 +89,6 @@ export default function NewWorkflowPage() {
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      <Header title={t('newWorkflow.title')} subtitle={t('newWorkflow.subtitle')} />
-
       <main className="flex-1 overflow-y-auto p-8">
         <div className="max-w-3xl mx-auto">
           {/* Back button */}

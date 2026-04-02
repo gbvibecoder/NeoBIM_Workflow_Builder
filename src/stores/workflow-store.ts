@@ -8,6 +8,7 @@ import { generateId } from "@/lib/utils";
 import { api, ApiError } from "@/lib/api";
 import { awardXP } from "@/lib/award-xp";
 import { toast } from "sonner";
+import { useUIStore } from "@/stores/ui-store";
 
 /** Returns true if the workflow name is empty, whitespace, or the default "Untitled Workflow" */
 export function isUntitledWorkflow(name: string | null | undefined): boolean {
@@ -119,15 +120,29 @@ export const useWorkflowStore = create<WorkflowState>()(
     },
 
     undo: () => {
-      const { _history, _historyIndex } = get();
+      const { nodes, edges, _history, _historyIndex } = get();
       if (_historyIndex <= 0) return;
-      const prev = _history[_historyIndex - 1];
-      set({
-        nodes: prev.nodes,
-        edges: prev.edges,
-        _historyIndex: _historyIndex - 1,
-        isDirty: true,
-      });
+      // If at the tip (last entry), snapshot current live state so redo can restore it
+      if (_historyIndex === _history.length - 1) {
+        const snapshot: HistoryEntry = { nodes: structuredClone(nodes), edges: structuredClone(edges) };
+        const updated = [..._history, snapshot];
+        const prev = _history[_historyIndex - 1];
+        set({
+          nodes: prev.nodes,
+          edges: prev.edges,
+          _history: updated,
+          _historyIndex: _historyIndex - 1,
+          isDirty: true,
+        });
+      } else {
+        const prev = _history[_historyIndex - 1];
+        set({
+          nodes: prev.nodes,
+          edges: prev.edges,
+          _historyIndex: _historyIndex - 1,
+          isDirty: true,
+        });
+      }
     },
 
     redo: () => {
@@ -385,13 +400,16 @@ export const useWorkflowStore = create<WorkflowState>()(
       await api.workflows.delete(id);
     },
 
-    resetCanvas: () =>
+    resetCanvas: () => {
       set({
         nodes: [],
         edges: [],
         isDirty: false,
         currentWorkflow: null,
-      }),
+      });
+      // Clear stale selection IDs from UI store
+      useUIStore.getState().setSelectedNodeIds([]);
+    },
   }))
 );
 
