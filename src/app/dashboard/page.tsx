@@ -427,8 +427,6 @@ export default function DashboardPage() {
                     }}>
                       {vc.duration}
                     </div>
-                    {/* Gradient edge toward content */}
-                    <div style={{ position: "absolute", top: 0, [isReversed ? "left" : "right"]: 0, bottom: 0, width: "35%", background: `linear-gradient(${isReversed ? "90deg" : "270deg"}, transparent, rgba(10,12,20,0.98))`, pointerEvents: "none" }} />
                   </div>
 
                   {/* Content side */}
