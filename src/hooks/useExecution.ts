@@ -190,6 +190,30 @@ async function executeNode(
       }
     }
 
+    // ── IN-005 (Parameter Input): parse JSON params and spread as top-level fields
+    // so downstream nodes (GN-001) can access floors, gfa, height, style directly
+    if (catalogueId === "IN-005" && inputValue) {
+      try {
+        const params = JSON.parse(inputValue) as Record<string, unknown>;
+        return {
+          id: generateId(),
+          executionId,
+          tileInstanceId: node.id,
+          type: "text",
+          data: {
+            content: inputValue,
+            prompt: inputValue,
+            label: "User Input",
+            ...params, // floors, gfa, height, style etc. as top-level properties
+          },
+          metadata: { source: "user-input" },
+          createdAt: new Date(),
+        };
+      } catch {
+        // Not valid JSON — fall through to default handling
+      }
+    }
+
     return {
       id: generateId(),
       executionId,

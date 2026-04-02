@@ -100,13 +100,8 @@ const NEGATIVE_PROMPT =
 
 const VIEW_SUFFIX =
   "isometric view, white background, ultra-realistic architectural visualization, " +
-  "detailed facade with windows and facade panels, real-world building proportions, " +
-  "high-resolution PBR materials and textures, sharp edges, " +
-  "accurate scale, photorealistic octane render quality, " +
-  "architectural photography lighting, 8K detail, " +
-  "large-scale detailed building model with visible structural columns, floor slabs, " +
-  "glass curtain wall mullions, entrance canopy, roof parapet, " +
-  "real architectural building at full scale not a miniature or toy";
+  "photorealistic PBR materials, sharp edges, accurate real-world scale, " +
+  "8K detail, architectural photography lighting, full-scale building not a miniature or toy";
 
 /** Maps massing type keywords to architectural form descriptions */
 const MASSING_VOCAB: Record<string, string> = {
@@ -229,18 +224,22 @@ const FACADE_DETAIL_BY_TYPE: Record<string, string> = {
 function buildMasterPrompt(req: BuildingRequirements): string {
   const parts: string[] = [];
 
-  // 1. Building type and scale
+  // 1. Building type and scale — strongly emphasize floor count
   const floors = req.floors ?? 5;
   const height = req.height ?? floors * (req.floorToFloorHeight ?? 3.5);
-  const buildingType = req.buildingType ?? "mixed-use building";
+  const rawType = req.buildingType ?? "mixed-use building";
+  // Ensure "building" is in the name for prompt clarity
+  const buildingType = /building|tower|complex/i.test(rawType) ? rawType : `${rawType} building`;
   parts.push(
-    `A highly detailed, ultra-realistic ${floors}-storey ${buildingType}, approximately ${Math.round(height)} meters tall`
+    `A highly detailed, ultra-realistic ${buildingType} with EXACTLY ${floors} floors (${floors} visible storey levels), ${Math.round(height)} meters tall, each floor clearly visible with ${floors} rows of windows`
   );
 
-  // 2. Proportions
+  // 2. Proportions — try exact key first, then strip common suffixes like "building", "tower"
   const typeKey = buildingType.toLowerCase().replace(/\s+/g, "-");
-  if (PROPORTION_BY_TYPE[typeKey]) {
-    parts.push(PROPORTION_BY_TYPE[typeKey]);
+  const typeKeyShort = typeKey.replace(/-(building|tower|complex|center|centre|block|structure)$/i, "");
+  const proportions = PROPORTION_BY_TYPE[typeKey] ?? PROPORTION_BY_TYPE[typeKeyShort];
+  if (proportions) {
+    parts.push(proportions);
   }
 
   // 3. Footprint description
@@ -281,7 +280,7 @@ function buildMasterPrompt(req: BuildingRequirements): string {
   }
 
   // 7. Facade detail — add window/entrance descriptions based on building type
-  const facadeDetail = FACADE_DETAIL_BY_TYPE[typeKey];
+  const facadeDetail = FACADE_DETAIL_BY_TYPE[typeKey] ?? FACADE_DETAIL_BY_TYPE[typeKeyShort];
   if (facadeDetail) {
     parts.push(facadeDetail);
   } else {
@@ -314,14 +313,15 @@ function buildMasterPrompt(req: BuildingRequirements): string {
 
 function buildMinimalPrompt(req: BuildingRequirements): string {
   const floors = req.floors ?? 5;
+  const height = req.height ?? floors * (req.floorToFloorHeight ?? 3.5);
   const buildingType = req.buildingType ?? "building";
   const style = req.style ? `, ${req.style} style` : "";
   const materials = req.materials?.length ? `, ${req.materials.join(" and ")} facade` : "";
 
   return (
-    `A highly detailed ultra-realistic ${floors}-storey ${buildingType}${style}${materials}, ` +
-    `with visible windows on every floor, entrance at ground level, realistic facade materials with depth and texture, ` +
-    `detailed exterior architectural model, ${VIEW_SUFFIX}`
+    `A highly detailed ultra-realistic ${buildingType} with EXACTLY ${floors} floors (${floors} visible storey levels)${style}${materials}, ` +
+    `${Math.round(height)} meters tall, with ${floors} rows of windows visible on facade, entrance at ground level, ` +
+    `realistic facade materials with depth and texture, detailed exterior architectural model, ${VIEW_SUFFIX}`
   );
 }
 
@@ -455,7 +455,9 @@ export function calculateKPIs(req: BuildingRequirements): BuildingKPIs {
   const floorToFloor = Math.max(req.floorToFloorHeight ?? 3.5, 2);
   const totalHeight = Math.max(req.height ?? floors * floorToFloor, floorToFloor);
   const buildingType = (req.buildingType ?? "mixed-use").toLowerCase();
-  const typeKey = buildingType.replace(/\s+/g, "-");
+  const rawTypeKey = buildingType.replace(/\s+/g, "-");
+  // Strip common suffixes so "mixed-use-building" matches "mixed-use" in lookup tables
+  const typeKey = rawTypeKey.replace(/-(building|tower|complex|center|centre|block|structure)$/i, "");
 
   // Footprint — guaranteed > 0
   let footprintArea: number;
@@ -588,8 +590,10 @@ export async function generate3DModel(
   const { prompt, negativePrompt, template } = buildPrompt(requirements);
   const startTime = Date.now();
 
+  console.log(`[3DAI] Prompt template: ${template}`);
+  console.log(`[3DAI] Prompt (${prompt.length} chars): ${prompt}`);
 
-  // Step 1: Create generation task
+  // Step 1: Create generation task (use Hunyuan 3D 3.5 for best quality + direct GLB)
   const createRes = await fetchWithRetry(`${API_BASE}${GENERATE_ENDPOINT}`, {
     method: "POST",
     headers: {
@@ -600,6 +604,7 @@ export async function generate3DModel(
       prompt,
       negative_prompt: negativePrompt,
       enable_pbr: true,
+      model: "3.5", // Hunyuan 3D 3.5 — better quality, direct GLB output
     }),
   });
 
@@ -613,8 +618,8 @@ export async function generate3DModel(
   }
 
   const createData: TaskCreateResponse = await createRes.json();
+  console.log("[3DAI] Create task response:", JSON.stringify(createData, null, 2));
   const taskId = createData.task_id ?? createData.id;
-
 
   if (!taskId) {
     throw new Error(`3D AI Studio did not return a task_id. Response: ${JSON.stringify(createData)}`);
@@ -644,34 +649,53 @@ export async function generate3DModel(
 
     const pollData: TaskStatusResponse = await pollRes.json();
     const status = pollData.status?.toUpperCase() ?? "UNKNOWN";
+    console.log(`[3DAI] Poll #${pollAttempts}: status=${status}`);
 
     if (status === "FINISHED" || status === "COMPLETED" || status === "SUCCEEDED") {
+      console.log("[3DAI] Task finished. Full response:", JSON.stringify(pollData, null, 2));
       let assetUrl = extractAssetUrl(pollData);
 
       // The API sometimes returns FINISHED with asset=null on the first poll.
       // Re-poll a few times to wait for the asset URL to populate.
       if (!assetUrl) {
-        for (let retry = 0; retry < 5; retry++) {
-          await new Promise(r => setTimeout(r, 2000));
+        console.warn("[3DAI] No asset URL on first finished poll, retrying...");
+        for (let retry = 0; retry < 8; retry++) {
+          await new Promise(r => setTimeout(r, 3000));
           const retryRes = await fetchWithRetry(pollUrl, {
             method: "GET",
             headers: { Authorization: `Bearer ${apiKey}` },
           });
           if (retryRes.ok) {
             const retryData: TaskStatusResponse = await retryRes.json();
+            console.log(`[3DAI] Retry ${retry + 1} response:`, JSON.stringify(retryData, null, 2));
             assetUrl = extractAssetUrl(retryData);
-            if (assetUrl) break;
+            if (assetUrl) {
+              console.log("[3DAI] Asset URL found on retry:", assetUrl);
+              break;
+            }
           }
         }
       }
 
       if (!assetUrl) {
-        throw new Error("Task finished but no asset URL found after multiple polls");
+        console.error("[3DAI] Task finished but no asset URL found. Last response:", JSON.stringify(pollData, null, 2));
+        throw new Error("Task finished but no asset URL found after multiple polls. Response: " + JSON.stringify(pollData));
       }
 
-      // The API returns a .zip archive with OBJ+textures.
-      // Convert to GLB using the API's convert endpoint for direct GLB URL.
-      const glbUrl = await convertToGlb(assetUrl, apiKey);
+      console.log("[3DAI] Asset URL found:", assetUrl);
+
+      // Hunyuan 3D 3.5 returns GLB directly; older versions return ZIP (OBJ+textures).
+      // If the asset is already GLB, skip conversion and re-upload directly.
+      let glbUrl: string;
+      const assetLower = assetUrl.toLowerCase();
+      if (assetLower.endsWith(".glb") || assetLower.includes(".glb?") || assetLower.includes("format=glb")) {
+        console.log("[3DAI] Asset is already GLB, skipping conversion");
+        glbUrl = await reuploadToR2(assetUrl);
+      } else {
+        // Legacy: ZIP/OBJ archive — convert to GLB using the API's convert endpoint
+        console.log("[3DAI] Asset is archive, converting to GLB...");
+        glbUrl = await convertToGlb(assetUrl, apiKey);
+      }
 
       const kpis = calculateKPIs(requirements);
       const elapsed = Date.now() - startTime;
@@ -708,30 +732,66 @@ export async function generate3DModel(
 
 /**
  * Extract the asset download URL from the status response.
- * The API returns results as: [{ asset: "https://...", asset_type: "ARCHIVE" }]
+ * Handles multiple API response formats including nested structures.
  */
 function extractAssetUrl(data: TaskStatusResponse): string | null {
+  // Helper: check if a value looks like a URL
+  const isUrl = (v: unknown): v is string => typeof v === "string" && (v.startsWith("http") || v.startsWith("/"));
+
+  // 1. Check results array (primary format)
   if (Array.isArray(data.results) && data.results.length > 0) {
     for (const result of data.results) {
-      if (typeof result === "string" && result.startsWith("http")) return result;
+      if (isUrl(result)) return result;
       if (typeof result === "object" && result !== null) {
-        // Primary format: { asset: "url", asset_type: "ARCHIVE" }
-        if (typeof result.asset === "string" && result.asset.startsWith("http")) {
-          return result.asset;
+        // Primary format: { asset: "url" } or { asset_url: "url" } (v3.5)
+        for (const key of ["asset_url", "asset", "url", "download_url", "model_url", "glb", "glb_url", "output", "file_url", "model", "mesh_url", "obj_url"]) {
+          if (isUrl(result[key])) return result[key];
         }
-        // Fallback keys
-        for (const key of ["url", "download_url", "model_url", "glb", "output"]) {
-          if (typeof result[key] === "string" && result[key].startsWith("http")) return result[key];
+        // Check nested objects (some APIs nest: { output: { model: "url" } })
+        for (const val of Object.values(result)) {
+          if (isUrl(val)) return val;
+          if (typeof val === "object" && val !== null && !Array.isArray(val)) {
+            for (const innerVal of Object.values(val as Record<string, unknown>)) {
+              if (isUrl(innerVal)) return innerVal as string;
+            }
+          }
         }
       }
     }
   }
-  // Top-level fallbacks
-  for (const key of ["asset", "result", "output", "model_url", "download_url", "url"]) {
+
+  // 2. Check top-level keys
+  for (const key of ["asset_url", "asset", "result", "output", "model_url", "download_url", "url", "file_url", "model", "mesh_url", "glb_url"]) {
     const val = data[key];
-    if (typeof val === "string" && val.startsWith("http")) return val;
+    if (isUrl(val)) return val;
+    // If the value is an object, check its children
+    if (typeof val === "object" && val !== null && !Array.isArray(val)) {
+      for (const innerVal of Object.values(val as Record<string, unknown>)) {
+        if (isUrl(innerVal)) return innerVal as string;
+      }
+    }
   }
-  return null;
+
+  // 3. Deep search: scan all string values in the response for URLs
+  const findUrlDeep = (obj: unknown, depth = 0): string | null => {
+    if (depth > 4) return null;
+    if (isUrl(obj)) return obj;
+    if (Array.isArray(obj)) {
+      for (const item of obj) {
+        const found = findUrlDeep(item, depth + 1);
+        if (found) return found;
+      }
+    }
+    if (typeof obj === "object" && obj !== null) {
+      for (const val of Object.values(obj)) {
+        const found = findUrlDeep(val, depth + 1);
+        if (found) return found;
+      }
+    }
+    return null;
+  };
+
+  return findUrlDeep(data);
 }
 
 /**

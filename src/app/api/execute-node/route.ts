@@ -5254,18 +5254,36 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
 
       // Extract height, style, materials, features from raw data
       const rawHeight = Number(rawData?.height ?? 0);
-      const height = rawHeight > 0 ? rawHeight : undefined;
+      const floorToFloorH = Number(rawData?.floorToFloorHeight ?? rawData?.floor_height ?? 3.5);
+      // Sanity check: if height/floors < 2.5m per floor, the height is unrealistic —
+      // recalculate from floors × floor-to-floor height instead.
+      const heightPerFloor = (rawHeight > 0 && floors > 0) ? rawHeight / floors : 999;
+      const height = (rawHeight > 0 && heightPerFloor >= 2.5) ? rawHeight : (floors > 0 ? Math.round(floors * floorToFloorH) : undefined);
 
       logger.debug("[GN-001] rawData keys:", Object.keys(rawData ?? {}));
+
+      // Always prefer 3D AI Studio for best visual quality.
+      // All explicit parameters (floors, height, footprint, style, materials) are
+      // captured and included in the prompt so the AI model matches the input.
+      const hasExplicitParams = rawFloors > 0;
+      if (hasExplicitParams) {
+        logger.debug("[GN-001] Explicit parametric input detected (floors=" + floors + ", height=" + height + ") — will pass all params to 3D AI Studio for accurate generation");
+      }
 
       if (is3DAIConfigured()) {
         // ── PRIMARY PATH: 3D AI Studio Text-to-3D ──
         logger.debug("[GN-001] Using 3D AI Studio Text-to-3D API");
 
+        // When content is raw JSON from IN-005 (e.g. '{"floors":12,"gfa":6000}'),
+        // clear it so buildMasterPrompt generates a proper natural language prompt
+        // from the structured parameters instead.
+        const isJsonContent = textContent.startsWith("{") || textContent.startsWith("[");
+        const cleanContent = isJsonContent ? "" : textContent;
+
         const requirements: BuildingRequirements = {
           buildingType,
           floors,
-          floorToFloorHeight: Number(rawData?.floorToFloorHeight ?? rawData?.floor_height ?? 3.5),
+          floorToFloorHeight: floorToFloorH,
           height,
           style: (typeof (rawData?.style ?? rawData?.architecturalStyle) === "string") ? String(rawData?.style ?? rawData?.architecturalStyle) : "",
           massing: (typeof (rawData?.massing ?? rawData?.massingType) === "string") ? String(rawData?.massing ?? rawData?.massingType) : "",
@@ -5275,8 +5293,8 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
           context: (rawData?.context ?? undefined) as BuildingRequirements["context"],
           siteArea: Number(rawData?.siteArea ?? rawData?.site_area ?? 0) || undefined,
           total_gfa_m2: gfa,
-          content: textContent,
-          prompt: String(inputData?.prompt ?? textContent),
+          content: cleanContent,
+          prompt: cleanContent,
         };
 
         // If footprint is an object (from structured input)
@@ -5364,7 +5382,7 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
       }
 
       // ── FALLBACK 1: Meshy.ai Text-to-3D ──
-      // Try Meshy if 3D AI Studio didn't produce an artifact
+      // Try Meshy if 3D AI Studio didn't produce an artifact (skip for parametric input)
       if (!artifact && isMeshyTextTo3DConfigured()) {
         logger.debug("[GN-001] Trying Meshy.ai Text-to-3D as fallback");
 
@@ -5447,6 +5465,7 @@ ${siteData.designImplications.map(d => `• ${d}`).join("\n")}`;
       // ── FALLBACK 2: Image-to-3D pipeline (DALL-E → SAM 3D) ──
       // Generates a photorealistic image first, then converts to 3D.
       // Often produces better architectural results than direct text-to-3D.
+      // Skip for parametric input — procedural generator is more precise.
       if (!artifact && process.env.ENABLE_IMAGE_TO_3D_PIPELINE === "true" && process.env.OPENAI_API_KEY) {
         logger.debug("[GN-001] Trying Image-to-3D pipeline (DALL-E → SAM 3D) as fallback");
         try {

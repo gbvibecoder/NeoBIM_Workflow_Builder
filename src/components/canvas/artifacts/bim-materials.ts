@@ -15,8 +15,8 @@ import * as THREE from "three";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const TEX_SIZE = 1024;       // Up from 512 — sharper close-up detail
-const BUMP_SIZE = 512;       // Normal/roughness maps (lighter)
+const TEX_SIZE = 512;        // Balanced quality/performance (was 1024)
+const BUMP_SIZE = 256;       // Normal/roughness maps (was 512)
 const DS = THREE.DoubleSide;
 
 // ─── Noise Utilities ──────────────────────────────────────────────────────────
@@ -330,55 +330,88 @@ function roofTex(repeat?: [number, number]): THREE.CanvasTexture {
 
 export function createSkyTexture(): THREE.CanvasTexture {
   return tex(2048, 1024, (ctx, w, h) => {
-    // Sky gradient — warm horizon, blue zenith
+    // Golden-hour sky gradient — rich warm tones
     const grad = ctx.createLinearGradient(0, 0, 0, h);
-    grad.addColorStop(0, "#2A5BB5");     // Zenith — deep blue
-    grad.addColorStop(0.2, "#5A8DC6");
-    grad.addColorStop(0.4, "#8AB8D8");
-    grad.addColorStop(0.6, "#B8D4E8");
-    grad.addColorStop(0.72, "#D4E4F0");
-    grad.addColorStop(0.82, "#F0E8D8");  // Warm horizon glow
-    grad.addColorStop(0.9, "#E8D8C0");
-    grad.addColorStop(1.0, "#8A9A6A");   // Ground
+    grad.addColorStop(0, "#1A3A8A");     // Zenith — deep blue
+    grad.addColorStop(0.15, "#3868B8");
+    grad.addColorStop(0.3, "#6A98CC");
+    grad.addColorStop(0.45, "#A0C0D8");
+    grad.addColorStop(0.55, "#C8D8E0");
+    grad.addColorStop(0.65, "#E8D8C0");  // Warm transition
+    grad.addColorStop(0.73, "#F5C880");  // Golden band
+    grad.addColorStop(0.80, "#F0A850");  // Deep golden horizon
+    grad.addColorStop(0.87, "#E08840");  // Orange horizon glow
+    grad.addColorStop(0.93, "#C07040");  // Warm earth
+    grad.addColorStop(1.0, "#5A6A3A");   // Ground
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, w, h);
 
-    // Sun disc with multi-layer glow
-    const sunX = w * 0.72, sunY = h * 0.36;
-    // Wide atmospheric glow
-    const atmo = ctx.createRadialGradient(sunX, sunY, 0, sunX, sunY, 200);
-    atmo.addColorStop(0, "rgba(255, 250, 230, 0.4)");
-    atmo.addColorStop(0.4, "rgba(255, 240, 200, 0.12)");
-    atmo.addColorStop(1, "rgba(255, 230, 180, 0)");
+    // Sun disc — lower position, larger, warmer for golden hour
+    const sunX = w * 0.68, sunY = h * 0.52; // Lower sun = golden hour
+    // Ultra-wide atmospheric scatter
+    const scatter = ctx.createRadialGradient(sunX, sunY, 0, sunX, sunY, 350);
+    scatter.addColorStop(0, "rgba(255, 220, 140, 0.3)");
+    scatter.addColorStop(0.3, "rgba(255, 200, 120, 0.12)");
+    scatter.addColorStop(0.6, "rgba(255, 180, 100, 0.04)");
+    scatter.addColorStop(1, "rgba(255, 160, 80, 0)");
+    ctx.fillStyle = scatter;
+    ctx.fillRect(sunX - 350, sunY - 350, 700, 700);
+    // Wide warm glow
+    const atmo = ctx.createRadialGradient(sunX, sunY, 0, sunX, sunY, 160);
+    atmo.addColorStop(0, "rgba(255, 240, 200, 0.7)");
+    atmo.addColorStop(0.25, "rgba(255, 220, 160, 0.3)");
+    atmo.addColorStop(0.6, "rgba(255, 200, 130, 0.08)");
+    atmo.addColorStop(1, "rgba(255, 180, 100, 0)");
     ctx.fillStyle = atmo;
-    ctx.fillRect(sunX - 200, sunY - 200, 400, 400);
-    // Tight glow
-    const glow = ctx.createRadialGradient(sunX, sunY, 0, sunX, sunY, 60);
-    glow.addColorStop(0, "rgba(255, 252, 240, 0.8)");
-    glow.addColorStop(0.3, "rgba(255, 245, 220, 0.35)");
-    glow.addColorStop(1, "rgba(255, 240, 200, 0)");
+    ctx.fillRect(sunX - 160, sunY - 160, 320, 320);
+    // Tight bright glow
+    const glow = ctx.createRadialGradient(sunX, sunY, 0, sunX, sunY, 50);
+    glow.addColorStop(0, "rgba(255, 255, 240, 0.95)");
+    glow.addColorStop(0.3, "rgba(255, 248, 220, 0.5)");
+    glow.addColorStop(0.7, "rgba(255, 235, 190, 0.15)");
+    glow.addColorStop(1, "rgba(255, 220, 160, 0)");
     ctx.fillStyle = glow;
-    ctx.fillRect(sunX - 60, sunY - 60, 120, 120);
-    // Core
-    const core = ctx.createRadialGradient(sunX, sunY, 0, sunX, sunY, 15);
-    core.addColorStop(0, "rgba(255, 255, 250, 0.98)");
-    core.addColorStop(1, "rgba(255, 250, 230, 0)");
+    ctx.fillRect(sunX - 50, sunY - 50, 100, 100);
+    // Core — intense white-gold
+    const core = ctx.createRadialGradient(sunX, sunY, 0, sunX, sunY, 18);
+    core.addColorStop(0, "rgba(255, 255, 250, 1.0)");
+    core.addColorStop(0.5, "rgba(255, 250, 230, 0.7)");
+    core.addColorStop(1, "rgba(255, 245, 210, 0)");
     ctx.fillStyle = core;
     ctx.fillRect(sunX - 20, sunY - 20, 40, 40);
 
-    // Clouds — more volumetric, layered
-    for (let i = 0; i < 15; i++) {
+    // Horizontal glow band across horizon (atmospheric scattering)
+    const horizonBand = ctx.createLinearGradient(0, h * 0.7, 0, h * 0.88);
+    horizonBand.addColorStop(0, "rgba(255, 200, 120, 0)");
+    horizonBand.addColorStop(0.3, "rgba(255, 190, 100, 0.08)");
+    horizonBand.addColorStop(0.5, "rgba(255, 180, 90, 0.12)");
+    horizonBand.addColorStop(0.7, "rgba(255, 170, 80, 0.06)");
+    horizonBand.addColorStop(1, "rgba(255, 160, 70, 0)");
+    ctx.fillStyle = horizonBand;
+    ctx.fillRect(0, h * 0.7, w, h * 0.18);
+
+    // Volumetric clouds — golden-lit, more dramatic
+    for (let i = 0; i < 20; i++) {
       const cx = Math.random() * w;
-      const cy = h * 0.1 + Math.random() * h * 0.4;
-      const cw = 80 + Math.random() * 200;
-      const ch = 10 + Math.random() * 30;
+      const cy = h * 0.08 + Math.random() * h * 0.45;
+      const cw = 100 + Math.random() * 280;
+      const ch = 12 + Math.random() * 35;
+      // Distance from sun affects cloud color (lit vs shadow side)
+      const distFromSun = Math.sqrt((cx - sunX) ** 2 + (cy - sunY) ** 2) / w;
+      const isLit = distFromSun < 0.3;
       // Multiple overlapping ellipses for volume
-      for (let j = 0; j < 3; j++) {
-        const ox = (Math.random() - 0.5) * cw * 0.4;
-        const oy = (Math.random() - 0.5) * ch * 0.5;
-        ctx.fillStyle = `rgba(255, 255, 255, ${0.02 + Math.random() * 0.06})`;
+      for (let j = 0; j < 4; j++) {
+        const ox = (Math.random() - 0.5) * cw * 0.5;
+        const oy = (Math.random() - 0.5) * ch * 0.6;
+        const alpha = isLit
+          ? 0.04 + Math.random() * 0.1   // Brighter near sun
+          : 0.02 + Math.random() * 0.05;
+        const r = isLit ? 255 : 240;
+        const g = isLit ? 240 + Math.random() * 15 : 240;
+        const b = isLit ? 200 + Math.random() * 30 : 245;
+        ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${alpha})`;
         ctx.beginPath();
-        ctx.ellipse(cx + ox, cy + oy, cw * (0.6 + Math.random() * 0.4), ch * (0.5 + Math.random() * 0.5), 0, 0, Math.PI * 2);
+        ctx.ellipse(cx + ox, cy + oy, cw * (0.5 + Math.random() * 0.5), ch * (0.4 + Math.random() * 0.6), 0, 0, Math.PI * 2);
         ctx.fill();
       }
     }
@@ -386,7 +419,7 @@ export function createSkyTexture(): THREE.CanvasTexture {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// Material Library v2 — PBR with Normal Maps + Roughness Maps + AO
+// Material Library v3 — Real PBR Textures from /public/textures/ + Fallback
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export interface BIMMaterialLib {
@@ -415,184 +448,216 @@ export interface BIMMaterialLib {
   treeTrunk: THREE.Material;
 }
 
+// ─── Real Texture Loader Helper ─────────────────────────────────────────────
+
+const textureLoader = new THREE.TextureLoader();
+
+function loadPBR(
+  folder: string,
+  repeat: [number, number] = [2, 2],
+  opts?: { hasAO?: boolean; hasMetalness?: boolean },
+): {
+  map: THREE.Texture;
+  normalMap: THREE.Texture;
+  roughnessMap: THREE.Texture;
+  aoMap?: THREE.Texture;
+  metalnessMap?: THREE.Texture;
+} {
+  const base = `/textures/${folder}`;
+
+  function load(file: string): THREE.Texture {
+    const t = textureLoader.load(`${base}/${file}`);
+    t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    t.repeat.set(repeat[0], repeat[1]);
+    t.anisotropy = 4;
+    t.colorSpace = file === "albedo.jpg" ? THREE.SRGBColorSpace : THREE.LinearSRGBColorSpace;
+    return t;
+  }
+
+  const result: ReturnType<typeof loadPBR> = {
+    map: load("albedo.jpg"),
+    normalMap: load("normal.jpg"),
+    roughnessMap: load("roughness.jpg"),
+  };
+  if (opts?.hasAO) result.aoMap = load("ao.jpg");
+  if (opts?.hasMetalness) result.metalnessMap = load("metalness.jpg");
+  return result;
+}
+
 export function createBIMMaterials(): BIMMaterialLib {
-  // ── Generate height canvases for normal map conversion ──
-  const concreteHeight = noiseHeightCanvas(BUMP_SIZE, 0.03, 42, 5);
-  const plasterHeight = noiseHeightCanvas(BUMP_SIZE, 0.05, 17, 5);
-  const brickHeight = noiseHeightCanvas(BUMP_SIZE, 0.04, 14, 5);
-  const woodHeight = noiseHeightCanvas(BUMP_SIZE, 0.06, 31, 4);
-  const metalHeight = noiseHeightCanvas(BUMP_SIZE, 0.1, 44, 3);
-  const grassHeight = noiseHeightCanvas(BUMP_SIZE, 0.05, 22, 5);
-  const roofHeight = noiseHeightCanvas(BUMP_SIZE, 0.025, 71, 4);
+  // ── Load real PBR textures from /public/textures/ ──
+  const plasterPBR = loadPBR("plaster", [2, 2]);
+  const brickPBR = loadPBR("brick", [3, 3], { hasAO: true });
+  const concretePBR = loadPBR("concrete", [2, 2]);
+  const woodPBR = loadPBR("wood", [1, 2]);
+  const metalPBR = loadPBR("metal-aluminum", [3, 3], { hasMetalness: true });
+  const grassPBR = loadPBR("grass", [25, 25], { hasAO: true });
+  const roofPBR = loadPBR("roof-membrane", [2, 2]);
+  const stonePBR = loadPBR("stone", [2, 2], { hasAO: true });
+  const pavementPBR = loadPBR("pavement", [4, 4], { hasAO: true });
 
-  // ── Convert to normal maps (Sobel filter) ──
-  const concreteNormal = heightToNormalMap(concreteHeight, 2.5, [2, 2]);
-  const plasterNormal = heightToNormalMap(plasterHeight, 1.8, [2, 2]);
-  const brickNormal = heightToNormalMap(brickHeight, 3.0, [3, 3]);
-  const woodNormal = heightToNormalMap(woodHeight, 1.5, [1, 2]);
-  const metalNormal = heightToNormalMap(metalHeight, 0.8, [3, 3]);
-  const grassNormal = heightToNormalMap(grassHeight, 1.2, [25, 25]);
-  const roofNormal = heightToNormalMap(roofHeight, 1.5, [2, 2]);
-
-  // ── Roughness maps (varying shininess across surface) ──
-  const concreteRoughness = noiseRoughnessMap(0.82, 0.12, 0.03, 55, [2, 2]);
+  // Procedural fallbacks for materials without real textures
+  const metalNormal = heightToNormalMap(noiseHeightCanvas(BUMP_SIZE, 0.1, 44, 3), 0.8, [3, 3]);
   const metalRoughness = noiseRoughnessMap(0.3, 0.15, 0.08, 66, [3, 3]);
-  const grassRoughness = noiseRoughnessMap(0.9, 0.08, 0.04, 33, [25, 25]);
-
-  // ── Albedo textures (1024px) ──
-  const wallPlaster = plasterTex("#E8E0D4", [2, 2]);
-  const wallBrick = brickTex([3, 3]);
-  const concSlab = concreteTex("#D0CCC4", [2, 2]);
-  const roofMap = roofTex([2, 2]);
-  const doorWood = woodTex("#6B4E10", [1, 2]);
-  const metalBrushed = brushedMetalTex([3, 3]);
-  const grassMap = grassTex([25, 25]);
 
   return {
-    // ── Walls — plaster with Sobel normal map ──
+    // ── Walls — real plaster PBR ──
     wall: new THREE.MeshStandardMaterial({
-      map: wallPlaster, side: DS, roughness: 0.85, metalness: 0.0,
-      normalMap: plasterNormal, normalScale: new THREE.Vector2(1.0, 1.0),
+      ...plasterPBR, side: DS, roughness: 0.78, metalness: 0.0,
+      normalScale: new THREE.Vector2(1.2, 1.2),
+      envMapIntensity: 0.5,
     }),
     wallInterior: new THREE.MeshStandardMaterial({
-      color: 0xF5F0EB, side: DS, roughness: 0.92, metalness: 0.0,
-      normalMap: heightToNormalMap(noiseHeightCanvas(256, 0.08, 90, 3), 0.5),
-      normalScale: new THREE.Vector2(0.3, 0.3),
+      ...plasterPBR, side: DS, roughness: 0.88, metalness: 0.0,
+      normalScale: new THREE.Vector2(0.5, 0.5),
+      envMapIntensity: 0.3,
     }),
     wallExterior: new THREE.MeshStandardMaterial({
-      map: wallBrick, side: DS, roughness: 0.85, metalness: 0.0,
-      normalMap: brickNormal, normalScale: new THREE.Vector2(1.5, 1.5),
+      ...brickPBR, side: DS, roughness: 0.82, metalness: 0.0,
+      normalScale: new THREE.Vector2(1.8, 1.8),
+      envMapIntensity: 0.4,
     }),
 
-    // ── Slabs / Floors — polished concrete ──
+    // ── Slabs / Floors — real concrete PBR ──
     slab: new THREE.MeshStandardMaterial({
-      map: concSlab, side: DS, roughness: 0.72, metalness: 0.02,
-      normalMap: concreteNormal, normalScale: new THREE.Vector2(1.2, 1.2),
-      roughnessMap: concreteRoughness,
+      ...concretePBR, side: DS, roughness: 0.68, metalness: 0.03,
+      normalScale: new THREE.Vector2(1.4, 1.4),
+      envMapIntensity: 0.5,
     }),
 
-    // ── Roof — dark membrane ──
+    // ── Roof — real roof membrane PBR ──
     roof: new THREE.MeshStandardMaterial({
-      map: roofMap, side: DS, roughness: 0.7, metalness: 0.12,
-      normalMap: roofNormal, normalScale: new THREE.Vector2(1.0, 1.0),
-    }),
-
-    // ── Glass — physically-based transmission (polished, high specular) ──
-    window: new THREE.MeshPhysicalMaterial({
-      color: 0x88CCEE,
-      transparent: true,
-      opacity: 0.15,
-      side: DS,
-      roughness: 0.01,     // Ultra-smooth — polished glass
-      metalness: 0.02,
-      transmission: 0.92,   // Higher transmission
-      reflectivity: 0.98,   // Near-perfect reflection
-      ior: 1.52,
-      thickness: 0.6,
-      envMapIntensity: 2.0,  // Strong environment reflections
-      clearcoat: 1.0,        // Full clearcoat for extra shine
-      clearcoatRoughness: 0.02,
-      specularIntensity: 1.0,
-      specularColor: new THREE.Color(0xffffff),
-    }),
-
-    // ── Door — polished wood ──
-    door: new THREE.MeshStandardMaterial({
-      map: doorWood, side: DS, roughness: 0.45, metalness: 0.0,
-      normalMap: woodNormal, normalScale: new THREE.Vector2(0.8, 0.8),
+      ...roofPBR, side: DS, roughness: 0.6, metalness: 0.15,
+      normalScale: new THREE.Vector2(1.2, 1.2),
       envMapIntensity: 0.6,
     }),
 
-    // ── Column — polished concrete ──
+    // ── Glass — dark reflective curtain-wall glass ──
+    window: new THREE.MeshPhysicalMaterial({
+      color: 0x3A6888,
+      transparent: true,
+      opacity: 0.65,
+      side: DS,
+      roughness: 0.03,
+      metalness: 0.15,
+      transmission: 0.25,
+      reflectivity: 0.98,
+      ior: 1.52,
+      thickness: 0.8,
+      envMapIntensity: 3.5,
+      clearcoat: 1.0,
+      clearcoatRoughness: 0.01,
+      specularIntensity: 1.2,
+      specularColor: new THREE.Color(0xFFEEDD),
+      emissive: 0x102030,
+      emissiveIntensity: 0.08,
+    }),
+
+    // ── Door — real wood PBR ──
+    door: new THREE.MeshStandardMaterial({
+      ...woodPBR, side: DS, roughness: 0.45, metalness: 0.0,
+      normalScale: new THREE.Vector2(1.0, 1.0),
+      envMapIntensity: 0.6,
+    }),
+
+    // ── Column — real concrete PBR (polished) ──
     column: new THREE.MeshStandardMaterial({
-      map: concreteTex("#C4C4C4", [1, 2]), side: DS, roughness: 0.5, metalness: 0.15,
-      normalMap: heightToNormalMap(noiseHeightCanvas(BUMP_SIZE, 0.04, 66, 5), 2.0, [1, 2]),
+      ...concretePBR, side: DS, roughness: 0.5, metalness: 0.15,
       normalScale: new THREE.Vector2(1.0, 1.0),
       envMapIntensity: 0.8,
     }),
 
-    // ── Beam — brushed steel ──
+    // ── Beam — real brushed aluminum PBR ──
     beam: new THREE.MeshStandardMaterial({
-      map: metalBrushed, side: DS, roughness: 0.35, metalness: 0.88,
-      normalMap: metalNormal, normalScale: new THREE.Vector2(0.5, 0.5),
-      roughnessMap: metalRoughness,
+      ...metalPBR, side: DS, roughness: 0.35, metalness: 0.88,
+      normalScale: new THREE.Vector2(0.5, 0.5),
       envMapIntensity: 1.3,
     }),
 
-    // ── Stair — polished concrete ──
+    // ── Stair — real stone PBR ──
     stair: new THREE.MeshStandardMaterial({
-      map: concreteTex("#D4D0C8", [2, 1]), side: DS, roughness: 0.6, metalness: 0.02,
-      normalMap: heightToNormalMap(noiseHeightCanvas(BUMP_SIZE, 0.035, 50, 5), 1.8, [2, 1]),
-      normalScale: new THREE.Vector2(0.8, 0.8),
+      ...stonePBR, side: DS, roughness: 0.55, metalness: 0.02,
+      normalScale: new THREE.Vector2(1.0, 1.0),
+      envMapIntensity: 0.5,
     }),
 
-    // ── Space (transparent volume) ──
+    // ── Space (interior volume) ──
     space: new THREE.MeshStandardMaterial({
       color: 0xF0EDE8, side: DS, roughness: 0.95, metalness: 0.0,
-      transparent: true, opacity: 0.03, depthWrite: false,
+      transparent: true, opacity: 0.15, depthWrite: false,
     }),
 
-    // ── Parapet — clean concrete cap ──
+    // ── Parapet — real stone PBR ──
     parapet: new THREE.MeshStandardMaterial({
-      map: concreteTex("#C8C0B4", [2, 1]), side: DS, roughness: 0.7, metalness: 0.02,
-      normalMap: concreteNormal, normalScale: new THREE.Vector2(0.8, 0.8),
+      ...stonePBR, side: DS, roughness: 0.65, metalness: 0.02,
+      normalScale: new THREE.Vector2(0.8, 0.8),
+      envMapIntensity: 0.5,
     }),
-    // ── Canopy — smooth concrete/metal ──
+    // ── Canopy — real concrete ──
     canopy: new THREE.MeshStandardMaterial({
-      color: 0xB8B0A4, side: DS, roughness: 0.5, metalness: 0.2,
+      ...concretePBR, side: DS, roughness: 0.5, metalness: 0.2,
       envMapIntensity: 0.8,
     }),
-    // ── Balcony — polished concrete with glass railing feel ──
+    // ── Balcony — real concrete with glass railing feel ──
     balcony: new THREE.MeshStandardMaterial({
-      color: 0xC0C0C0, side: DS, roughness: 0.55, metalness: 0.2,
+      ...concretePBR, side: DS, roughness: 0.55, metalness: 0.15,
       envMapIntensity: 0.7,
     }),
 
-    // ── MEP — shiny galvanized duct ──
+    // ── MEP — real aluminum metal ──
     duct: new THREE.MeshStandardMaterial({
-      map: metalBrushed, side: DS, roughness: 0.2, metalness: 0.88,
-      normalMap: metalNormal, normalScale: new THREE.Vector2(0.3, 0.3),
-      roughnessMap: metalRoughness,
+      ...metalPBR, side: DS, roughness: 0.2, metalness: 0.88,
+      normalScale: new THREE.Vector2(0.3, 0.3),
       envMapIntensity: 1.5,
     }),
     pipe: new THREE.MeshStandardMaterial({
       color: 0x3A8A5A, side: DS, roughness: 0.25, metalness: 0.75,
+      normalMap: metalNormal, normalScale: new THREE.Vector2(0.3, 0.3),
+      roughnessMap: metalRoughness,
       envMapIntensity: 1.3,
     }),
     cableTray: new THREE.MeshStandardMaterial({
       color: 0xCCA020, side: DS, roughness: 0.3, metalness: 0.65,
+      normalMap: metalNormal, normalScale: new THREE.Vector2(0.2, 0.2),
     }),
     equipment: new THREE.MeshStandardMaterial({
       color: 0x5080B0, side: DS, roughness: 0.3, metalness: 0.65,
       envMapIntensity: 1.0,
     }),
 
-    // ── Ground — rich grass with normal map ──
+    // ── Ground — real grass PBR with AO ──
     ground: new THREE.MeshStandardMaterial({
-      map: grassMap, side: DS, roughness: 0.88, metalness: 0.0,
-      normalMap: grassNormal, normalScale: new THREE.Vector2(0.6, 0.6),
-      roughnessMap: grassRoughness,
+      ...grassPBR, side: DS, roughness: 0.85, metalness: 0.0,
+      normalScale: new THREE.Vector2(0.8, 0.8),
+      envMapIntensity: 0.3,
     }),
 
     // ── Facade detail — polished aluminum mullion ──
     mullion: new THREE.MeshStandardMaterial({
-      color: 0xC8C8D0, side: DS, roughness: 0.18, metalness: 0.92,
-      envMapIntensity: 1.8,
-      normalMap: heightToNormalMap(noiseHeightCanvas(128, 0.15, 99, 2), 0.3),
+      ...metalPBR, side: DS, roughness: 0.12, metalness: 0.95,
+      envMapIntensity: 2.5,
+      emissive: 0xFFDDCC,
+      emissiveIntensity: 0.06,
       normalScale: new THREE.Vector2(0.2, 0.2),
     }),
-    // ── Dark spandrel panel — semi-glossy ──
+    // ── Dark spandrel panel ──
     spandrel: new THREE.MeshStandardMaterial({
-      color: 0x1A1A24, side: DS, roughness: 0.25, metalness: 0.82,
-      envMapIntensity: 1.2,
+      color: 0x181820, side: DS, roughness: 0.18, metalness: 0.88,
+      envMapIntensity: 1.8,
+      emissive: 0x101018,
+      emissiveIntensity: 0.04,
     }),
 
     // ── Landscaping ──
     treeCrown: new THREE.MeshStandardMaterial({
-      color: 0x2D6B1E, side: DS, roughness: 0.85, metalness: 0.0,
+      color: 0x2D6B1E, side: DS, roughness: 0.82, metalness: 0.0,
+      emissive: 0x1A3A0A,
+      emissiveIntensity: 0.05,
+      envMapIntensity: 0.4,
     }),
     treeTrunk: new THREE.MeshStandardMaterial({
-      color: 0x5C3A1E, side: DS, roughness: 0.8, metalness: 0.0,
+      ...woodPBR, side: DS, roughness: 0.75, metalness: 0.0,
+      envMapIntensity: 0.3,
     }),
   };
 }
@@ -636,8 +701,7 @@ export function disposeBIMMaterials(lib: BIMMaterialLib) {
       if (m.normalMap) m.normalMap.dispose();
       if (m.roughnessMap) m.roughnessMap.dispose();
       if (m.aoMap) m.aoMap.dispose();
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      if ((m as any).bumpMap) (m as any).bumpMap.dispose();
+      if (m.metalnessMap) m.metalnessMap.dispose();
       mat.dispose();
     }
   }

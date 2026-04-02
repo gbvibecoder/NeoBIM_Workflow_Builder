@@ -10,6 +10,7 @@ import { useEffect, useRef, useCallback, useState } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
+import { RGBELoader } from "three/examples/jsm/loaders/RGBELoader.js";
 import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer.js";
 import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
@@ -183,7 +184,7 @@ export default function BIMViewer({ glbUrl, metadataUrl, ifcUrl, height = 500 }:
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.1; // Cooler, more cinematic (was 1.4)
+    renderer.toneMappingExposure = 1.35; // Warm golden-hour exposure
     renderer.localClippingEnabled = true;
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     container.appendChild(renderer.domElement);
@@ -191,41 +192,17 @@ export default function BIMViewer({ glbUrl, metadataUrl, ifcUrl, height = 500 }:
 
     // ═══ Scene ═══
     const scene = new THREE.Scene();
-    scene.fog = new THREE.FogExp2(0xD4E4F0, 0.004);
+    scene.fog = new THREE.FogExp2(0xE8DDD0, 0.003); // Warm atmospheric haze
     sceneRef.current = scene;
 
-    // ═══ Procedural HDRI Sky Environment ═══
+    // ═══ Real HDRI Environment (with procedural fallback) ═══
     const pmremGenerator = new THREE.PMREMGenerator(renderer);
     pmremGenerator.compileEquirectangularShader();
 
-    // Rich sky dome for environment reflections
-    const envScene = new THREE.Scene();
+    // Try loading real HDRI first, fall back to procedural
+    let envMap: THREE.Texture | null = null;
 
-    // Sky sphere with gradient + sun
-    const skyGeo = new THREE.SphereGeometry(100, 64, 32);
-    const skyTex = createSkyTexture();
-    skyTex.mapping = THREE.EquirectangularReflectionMapping;
-    const skyMat = new THREE.MeshBasicMaterial({
-      map: skyTex,
-      side: THREE.BackSide,
-    });
-    envScene.add(new THREE.Mesh(skyGeo, skyMat));
-
-    // Ground plane in env for bounce light
-    const envGround = new THREE.Mesh(
-      new THREE.PlaneGeometry(200, 200),
-      new THREE.MeshBasicMaterial({ color: 0x4A6B3A })
-    );
-    envGround.rotation.x = -Math.PI / 2;
-    envGround.position.y = -10;
-    envScene.add(envGround);
-
-    const envMap = pmremGenerator.fromScene(envScene, 0.02).texture;
-    scene.environment = envMap;
-    // Don't use envMap as background — add a visible sky dome instead
-    pmremGenerator.dispose();
-
-    // ═══ Visible Sky Dome (in main scene) ═══
+    // Procedural sky dome (always added as visible background)
     const mainSkyGeo = new THREE.SphereGeometry(400, 64, 32);
     const mainSkyTex = createSkyTexture();
     const mainSkyMat = new THREE.MeshBasicMaterial({
@@ -239,9 +216,48 @@ export default function BIMViewer({ glbUrl, metadataUrl, ifcUrl, height = 500 }:
     mainSkyMesh.renderOrder = -1;
     scene.add(mainSkyMesh);
 
+    // Load real HDRI for ultra-realistic reflections
+    const rgbeLoader = new RGBELoader();
+    rgbeLoader.load(
+      "/textures/hdri/industrial_sunset_2k.hdr",
+      (hdrTexture) => {
+        hdrTexture.mapping = THREE.EquirectangularReflectionMapping;
+        const hdrEnvMap = pmremGenerator.fromEquirectangular(hdrTexture).texture;
+        scene.environment = hdrEnvMap;
+        // Also use HDRI as visible background for ultra-realistic sky
+        scene.background = hdrEnvMap;
+        // Remove procedural sky dome when HDRI loads
+        scene.remove(mainSkyMesh);
+        mainSkyMat.dispose();
+        mainSkyGeo.dispose();
+        hdrTexture.dispose();
+        pmremGenerator.dispose();
+      },
+      undefined,
+      () => {
+        // HDRI load failed — fall back to procedural environment
+        console.warn("[BIMViewer] HDRI load failed, using procedural sky environment");
+        const envScene = new THREE.Scene();
+        const skyGeo = new THREE.SphereGeometry(100, 64, 32);
+        const skyTex = createSkyTexture();
+        skyTex.mapping = THREE.EquirectangularReflectionMapping;
+        envScene.add(new THREE.Mesh(skyGeo, new THREE.MeshBasicMaterial({ map: skyTex, side: THREE.BackSide })));
+        const envGround = new THREE.Mesh(
+          new THREE.PlaneGeometry(200, 200),
+          new THREE.MeshBasicMaterial({ color: 0x6B7A4A })
+        );
+        envGround.rotation.x = -Math.PI / 2;
+        envGround.position.y = -10;
+        envScene.add(envGround);
+        envMap = pmremGenerator.fromScene(envScene, 0.02).texture;
+        scene.environment = envMap;
+        pmremGenerator.dispose();
+      }
+    );
+
     // ═══ Camera ═══
-    const camera = new THREE.PerspectiveCamera(40, w / h, 0.1, 1000);
-    camera.position.set(40, 25, 40);
+    const camera = new THREE.PerspectiveCamera(35, w / h, 0.1, 1000); // Tighter FOV for architectural drama
+    camera.position.set(40, 20, 45); // Lower eye level for more imposing view
     cameraRef.current = camera;
 
     // ═══ Controls ═══
@@ -255,45 +271,45 @@ export default function BIMViewer({ glbUrl, metadataUrl, ifcUrl, height = 500 }:
     controls.maxPolarAngle = Math.PI / 2.05;
     controlsRef.current = controls;
 
-    // ═══ Lighting (cinematic multi-light setup) ═══
+    // ═══ Lighting (cinematic golden-hour setup) ═══
 
-    // Ambient — soft fill from all directions
-    const ambientLight = new THREE.AmbientLight(0xCCCCDD, 0.5);
+    // Ambient — warm soft fill
+    const ambientLight = new THREE.AmbientLight(0xE8D8C8, 0.4);
     scene.add(ambientLight);
 
-    // Hemisphere — sky/ground color bleed
-    const hemiLight = new THREE.HemisphereLight(0x87CEEB, 0x556633, 0.8);
+    // Hemisphere — warm sky / cool ground for contrast
+    const hemiLight = new THREE.HemisphereLight(0xFFE8C0, 0x3A5533, 0.9);
     scene.add(hemiLight);
 
-    // Sun — primary directional with high-quality shadows
-    const sunLight = new THREE.DirectionalLight(0xFFEECC, 2.5);
-    sunLight.position.set(50, 80, 40);
+    // Sun — low-angle golden hour with dramatic shadows
+    const sunLight = new THREE.DirectionalLight(0xFFD4A0, 3.2);
+    sunLight.position.set(60, 35, 50); // Lower angle = longer, more dramatic shadows
     sunLight.castShadow = true;
-    sunLight.shadow.mapSize.width = 8192;
-    sunLight.shadow.mapSize.height = 8192;
+    sunLight.shadow.mapSize.width = 4096;
+    sunLight.shadow.mapSize.height = 4096;
     sunLight.shadow.camera.left = -80;
     sunLight.shadow.camera.right = 80;
     sunLight.shadow.camera.top = 80;
     sunLight.shadow.camera.bottom = -80;
     sunLight.shadow.camera.near = 0.5;
     sunLight.shadow.camera.far = 300;
-    sunLight.shadow.bias = -0.0001;      // Tighter for 8K shadow map
-    sunLight.shadow.normalBias = 0.02;
-    sunLight.shadow.radius = 2;
+    sunLight.shadow.bias = -0.0002;
+    sunLight.shadow.normalBias = 0.03;
+    sunLight.shadow.radius = 3; // Softer shadow edges
     scene.add(sunLight);
 
-    // Fill light — softer, from opposite side to reduce harsh shadows
-    const fillLight = new THREE.DirectionalLight(0xBBCCEE, 0.7);
+    // Fill light — cool blue from opposite side for cinematic warm/cool contrast
+    const fillLight = new THREE.DirectionalLight(0x8AACDD, 0.6);
     fillLight.position.set(-30, 40, -20);
     scene.add(fillLight);
 
-    // Rim light — subtle back-lighting for edge definition
-    const rimLight = new THREE.DirectionalLight(0xF0E8D0, 0.3);
+    // Rim light — warm back-lighting for edge glow
+    const rimLight = new THREE.DirectionalLight(0xFFD090, 0.5);
     rimLight.position.set(-20, 15, -40);
     scene.add(rimLight);
 
-    // Warm ground bounce light
-    const bounceLight = new THREE.DirectionalLight(0xEEDDCC, 0.2);
+    // Warm ground bounce light — stronger for ambient warmth
+    const bounceLight = new THREE.DirectionalLight(0xFFDDBB, 0.35);
     bounceLight.position.set(0, -10, 0);
     scene.add(bounceLight);
 
@@ -306,17 +322,17 @@ export default function BIMViewer({ glbUrl, metadataUrl, ifcUrl, height = 500 }:
     // 1. Base render
     composer.addPass(new RenderPass(scene, camera));
 
-    // 2. SSAO — Screen Space Ambient Occlusion for contact shadows and depth
+    // 2. SSAO — Screen Space Ambient Occlusion for deep contact shadows
     const ssaoPass = new SSAOPass(scene, camera, w, h);
-    ssaoPass.kernelRadius = 1.6;      // Wider catch for corners (was 0.8)
-    ssaoPass.minDistance = 0.0005;     // Finer detail (was 0.001)
-    ssaoPass.maxDistance = 0.3;        // Deeper shadow reach (was 0.15)
+    ssaoPass.kernelRadius = 1.4;      // Wider radius for deeper AO
+    ssaoPass.minDistance = 0.0005;     // Finer detail
+    ssaoPass.maxDistance = 0.12;       // Tight reach for crisp contact shadows
     ssaoPass.output = SSAOPass.OUTPUT.Default;
     composer.addPass(ssaoPass);
 
-    // 3. Bloom — subtle glow on glass/emissive/bright areas
+    // 3. Bloom — golden glow on glass edges, sun-lit surfaces
     const bloomPass = new UnrealBloomPass(
-      new THREE.Vector2(w, h), 0.12, 0.5, 0.85
+      new THREE.Vector2(w, h), 0.08, 0.6, 0.9 // Lower threshold = more glow on bright areas
     );
     composer.addPass(bloomPass);
 
@@ -372,26 +388,25 @@ export default function BIMViewer({ glbUrl, metadataUrl, ifcUrl, height = 500 }:
             child.material = mats[matKey];
           } else {
             // ═══ External model (AI-generated) — enhance existing materials ═══
-            // These models already have textures from 3D AI Studio/Meshy but lack
-            // environment reflections. Apply envMap and tune PBR properties.
+            // These models already have textures from 3D AI Studio/Meshy.
+            // scene.environment provides reflections automatically to all PBR materials.
+            // Tune envMapIntensity and PBR properties for richer look.
             const mat = child.material;
             if (mat && "isMeshStandardMaterial" in mat && (mat as THREE.MeshStandardMaterial).isMeshStandardMaterial) {
               const stdMat = mat as THREE.MeshStandardMaterial;
-              stdMat.envMap = envMap;
-              stdMat.envMapIntensity = 1.3;
-              // Slightly enhance roughness/metalness for more realistic look
-              if (stdMat.roughness > 0.9) stdMat.roughness = 0.85;
+              stdMat.envMapIntensity = 1.5;
+              // Enhance roughness for more realistic look
+              if (stdMat.roughness > 0.9) stdMat.roughness = 0.82;
               if (stdMat.transparent && stdMat.opacity < 0.5) {
                 // Looks like glass — boost reflections
-                stdMat.envMapIntensity = 2.0;
-                stdMat.metalness = Math.max(stdMat.metalness, 0.05);
+                stdMat.envMapIntensity = 2.5;
+                stdMat.metalness = Math.max(stdMat.metalness, 0.08);
               }
               stdMat.needsUpdate = true;
             }
             if (mat && "isMeshPhysicalMaterial" in mat && (mat as THREE.MeshPhysicalMaterial).isMeshPhysicalMaterial) {
               const physMat = mat as THREE.MeshPhysicalMaterial;
-              physMat.envMap = envMap;
-              physMat.envMapIntensity = 1.5;
+              physMat.envMapIntensity = 2.0;
               physMat.needsUpdate = true;
             }
           }
@@ -435,12 +450,12 @@ export default function BIMViewer({ glbUrl, metadataUrl, ifcUrl, height = 500 }:
         scene.add(shadowPlane);
 
         // ═══ Fit camera to model ═══
-        // For small AI-generated models, get closer; for large BIM models, keep some distance
-        const dist = Math.max(maxDim * 1.4, maxDim + 2);
+        // Lower eye-level angle for imposing architectural perspective
+        const dist = Math.max(maxDim * 1.5, maxDim + 3);
         camera.position.set(
-          center.x + dist * 0.65,
-          center.y + dist * 0.4,
-          center.z + dist * 0.65
+          center.x + dist * 0.7,
+          center.y + dist * 0.28, // Lower eye level — more dramatic
+          center.z + dist * 0.7
         );
         camera.near = 0.01; // Allow very close zoom for inspection
         camera.updateProjectionMatrix();
@@ -456,10 +471,11 @@ export default function BIMViewer({ glbUrl, metadataUrl, ifcUrl, height = 500 }:
         sunLight.shadow.camera.bottom = -shadowExtent;
         sunLight.shadow.camera.far = shadowExtent * 4;
         sunLight.shadow.camera.updateProjectionMatrix();
+        // Golden-hour sun: lower Y = longer dramatic shadows across the facade
         sunLight.position.set(
-          center.x + shadowExtent * 0.8,
-          center.y + shadowExtent * 1.8,
-          center.z + shadowExtent * 0.5
+          center.x + shadowExtent * 1.0,
+          center.y + shadowExtent * 0.7,
+          center.z + shadowExtent * 0.6
         );
         sunLight.target.position.copy(center);
         scene.add(sunLight.target);
@@ -476,8 +492,8 @@ export default function BIMViewer({ glbUrl, metadataUrl, ifcUrl, height = 500 }:
           center.z - shadowExtent * 0.8
         );
 
-        // Update fog distance based on building size
-        (scene.fog as THREE.FogExp2).density = 0.5 / Math.max(maxDim, 30);
+        // Warm atmospheric haze scales with building size
+        (scene.fog as THREE.FogExp2).density = 0.4 / Math.max(maxDim, 30);
 
         // Section plane default to mid-height
         setSectionY(center.y + size.y * 0.5);

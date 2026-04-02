@@ -25,9 +25,9 @@ const ELEMENT_MATERIALS: Record<string, PBRMaterialDef> = {
   wall:         { color: 0xE8E0D4, roughness: 0.82, metalness: 0.0 },
   slab:         { color: 0xD0CCC4, roughness: 0.75, metalness: 0.0 },
   roof:         { color: 0x505050, roughness: 0.65, metalness: 0.15 },
-  window:       { color: 0x88CCEE, roughness: 0.05, metalness: 0.05, opacity: 0.25, transparent: true, transmission: 0.85, ior: 1.52, reflectivity: 0.9 },
+  window:       { color: 0x3A6888, roughness: 0.03, metalness: 0.15, opacity: 0.65, transparent: true, transmission: 0.25, ior: 1.52, reflectivity: 0.98, emissive: 0x102030, emissiveIntensity: 0.08 },
   door:         { color: 0x8B7340, roughness: 0.55, metalness: 0.0 },
-  space:        { color: 0xF0EDE8, roughness: 0.95, metalness: 0.0, opacity: 0.05, transparent: true },
+  space:        { color: 0xF0EDE8, roughness: 0.95, metalness: 0.0, opacity: 0.15, transparent: true },
   parapet:      { color: 0xC8C0B4, roughness: 0.8, metalness: 0.0 },
   canopy:       { color: 0xB8B0A4, roughness: 0.6, metalness: 0.1 },
   balcony:      { color: 0xC0C0C0, roughness: 0.7, metalness: 0.1 },
@@ -44,8 +44,8 @@ const ELEMENT_MATERIALS: Record<string, PBRMaterialDef> = {
   equipment:    { color: 0x5080B0, roughness: 0.3, metalness: 0.6 },
 
   // Facade detail
-  mullion:      { color: 0xC0C0C8, roughness: 0.25, metalness: 0.9 },
-  spandrel:     { color: 0x1A1A22, roughness: 0.3, metalness: 0.8 },
+  mullion:      { color: 0xD0D0D8, roughness: 0.12, metalness: 0.95, emissive: 0xFFDDCC, emissiveIntensity: 0.06 },
+  spandrel:     { color: 0x181820, roughness: 0.18, metalness: 0.88, emissive: 0x101018, emissiveIntensity: 0.04 },
 };
 
 /**
