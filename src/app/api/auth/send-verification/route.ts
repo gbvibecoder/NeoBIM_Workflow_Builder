@@ -34,14 +34,17 @@ export async function POST(req: Request) {
     const token = crypto.randomBytes(32).toString("hex");
     const expires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
 
+    // Normalize email to lowercase to match verify-email route lookup
+    const normalizedEmail = user.email!.trim().toLowerCase();
+
     // Delete existing verification tokens for this email
     await prisma.verificationToken.deleteMany({
-      where: { identifier: `verify:${user.email}` },
+      where: { identifier: `verify:${normalizedEmail}` },
     });
 
     await prisma.verificationToken.create({
       data: {
-        identifier: `verify:${user.email}`,
+        identifier: `verify:${normalizedEmail}`,
         token,
         expires,
       },
@@ -50,7 +53,7 @@ export async function POST(req: Request) {
     const baseUrl = process.env.NEXTAUTH_URL
       || (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : null)
       || "https://trybuildflow.in";
-    const verifyUrl = `${baseUrl}/verify-email?token=${token}&email=${encodeURIComponent(user.email)}`;
+    const verifyUrl = `${baseUrl}/verify-email?token=${token}&email=${encodeURIComponent(normalizedEmail)}`;
 
     console.info("[send-verification] Sending to:", user.email, "url:", verifyUrl);
     await sendVerificationEmail(user.email, user.name, verifyUrl);

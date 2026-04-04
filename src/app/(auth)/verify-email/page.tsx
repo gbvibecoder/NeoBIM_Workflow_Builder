@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, useRef, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useSession } from "next-auth/react";
@@ -19,6 +19,7 @@ function VerifyEmailContent() {
 
   const [status, setStatus] = useState<"loading" | "success" | "error">("loading");
   const [errorMsg, setErrorMsg] = useState("");
+  const didVerify = useRef(false);
 
   useEffect(() => {
     if (!token || !email) {
@@ -27,7 +28,9 @@ function VerifyEmailContent() {
       return;
     }
 
-    let cancelled = false;
+    // Prevent re-running after session refresh changes updateSession identity
+    if (didVerify.current) return;
+    didVerify.current = true;
 
     fetch("/api/auth/verify-email", {
       method: "POST",
@@ -35,7 +38,6 @@ function VerifyEmailContent() {
       body: JSON.stringify({ token, email }),
     })
       .then(async (res) => {
-        if (cancelled) return;
         const data = await res.json();
         if (res.ok) {
           setStatus("success");
@@ -47,13 +49,11 @@ function VerifyEmailContent() {
         }
       })
       .catch(() => {
-        if (cancelled) return;
         setStatus("error");
         setErrorMsg(t('auth.networkError'));
       });
-
-    return () => { cancelled = true; };
-  }, [token, email, t, updateSession]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token, email]);
 
   if (status === "loading") {
     return (
@@ -119,17 +119,30 @@ function VerifyEmailContent() {
       <h1 style={{ fontSize: 22, fontWeight: 700, color: "#F0F0F5", marginBottom: 10 }}>
         {t('auth.verificationFailed')}
       </h1>
-      <p style={{ fontSize: 14, color: "#7C7C96", lineHeight: 1.6, marginBottom: 24 }}>
+      <p style={{ fontSize: 14, color: "#7C7C96", lineHeight: 1.6, marginBottom: 8 }}>
         {errorMsg}
       </p>
-      <Link href="/dashboard" style={{
-        display: "inline-flex", alignItems: "center", gap: 6,
-        padding: "10px 20px", borderRadius: 10,
-        border: "1px solid rgba(79,138,255,0.2)", background: "rgba(79,138,255,0.06)",
-        color: "#4F8AFF", fontSize: 13, fontWeight: 600, textDecoration: "none",
-      }}>
-        {t('auth.goToDashboard')}
-      </Link>
+      <p style={{ fontSize: 12, color: "#55556A", lineHeight: 1.5, marginBottom: 24 }}>
+        If you resent the email, make sure to click the link in the <strong style={{ color: "#9898B0" }}>newest</strong> email. Older links are automatically invalidated.
+      </p>
+      <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap" }}>
+        <Link href="/dashboard/settings" style={{
+          display: "inline-flex", alignItems: "center", gap: 6,
+          padding: "10px 20px", borderRadius: 10,
+          background: "linear-gradient(135deg, #4F8AFF 0%, #6366F1 100%)",
+          color: "#fff", fontSize: 13, fontWeight: 600, textDecoration: "none",
+        }}>
+          Resend from Settings
+        </Link>
+        <Link href="/dashboard" style={{
+          display: "inline-flex", alignItems: "center", gap: 6,
+          padding: "10px 20px", borderRadius: 10,
+          border: "1px solid rgba(79,138,255,0.2)", background: "rgba(79,138,255,0.06)",
+          color: "#4F8AFF", fontSize: 13, fontWeight: 600, textDecoration: "none",
+        }}>
+          {t('auth.goToDashboard')}
+        </Link>
+      </div>
     </motion.div>
   );
 }
