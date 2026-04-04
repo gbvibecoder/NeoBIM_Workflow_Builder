@@ -439,12 +439,14 @@ function WorkflowOverlay({ wfId, color, rgb }: { wfId: string; color: string; rg
   return <>{overlays[wfId] ?? null}</>;
 }
 
-function FeaturedTemplate({ wf, index, isMobile, onUse, t }: {
+function FeaturedTemplate({ wf, index, isMobile, onUse, t, userRole }: {
   wf: WorkflowTemplate; index: number; isMobile: boolean;
   onUse: (wf: WorkflowTemplate) => void; t: (key: TranslationKey) => string;
+  userRole: string;
 }) {
   const catColor = CATEGORY_COLORS[wf.category] ?? "#06B6D4";
   const catRgb = hexToRgb(catColor);
+  const isLocked = LOCKED_IDS.has(wf.id) && userRole === "FREE";
   const reversed = index % 2 === 1;
   const pipelineSteps = wf.name.split("→").map(s => s.trim());
   const cardRef = useRef<HTMLDivElement>(null);
@@ -669,16 +671,26 @@ function FeaturedTemplate({ wf, index, isMobile, onUse, t }: {
             style={{
               display: "inline-flex", alignItems: "center", gap: 10,
               padding: "12px 28px", borderRadius: 14, cursor: "pointer",
-              background: `linear-gradient(135deg, rgba(${catRgb}, 0.15), rgba(${catRgb}, 0.06))`,
-              border: `1px solid rgba(${catRgb}, 0.3)`,
+              background: isLocked
+                ? "linear-gradient(135deg, rgba(245,158,11,0.15), rgba(245,158,11,0.06))"
+                : `linear-gradient(135deg, rgba(${catRgb}, 0.15), rgba(${catRgb}, 0.06))`,
+              border: isLocked
+                ? "1px solid rgba(245,158,11,0.35)"
+                : `1px solid rgba(${catRgb}, 0.3)`,
               color: "#fff", fontSize: 14, fontWeight: 700,
               transition: "all 0.3s ease",
-              boxShadow: `0 0 24px rgba(${catRgb}, 0.08)`,
+              boxShadow: isLocked
+                ? "0 0 24px rgba(245,158,11,0.1)"
+                : `0 0 24px rgba(${catRgb}, 0.08)`,
               position: "relative", overflow: "hidden",
             }}
           >
-            <span style={{ position: "relative", zIndex: 1 }}>Use This Template</span>
-            <ArrowRight size={16} className="tpl-cta-arrow" style={{ color: catColor, position: "relative", zIndex: 1, transition: "transform 0.3s ease" }} />
+            {isLocked && <Lock size={14} style={{ color: "#F59E0B", position: "relative", zIndex: 1 }} />}
+            <span style={{ position: "relative", zIndex: 1 }}>{isLocked ? "Unlock Template" : "Use This Template"}</span>
+            {isLocked
+              ? <Sparkles size={14} style={{ color: "#F59E0B", position: "relative", zIndex: 1 }} />
+              : <ArrowRight size={16} className="tpl-cta-arrow" style={{ color: catColor, position: "relative", zIndex: 1, transition: "transform 0.3s ease" }} />
+            }
           </button>
         </motion.div>
 
@@ -773,13 +785,17 @@ function CatalogCard({ wf, i, onCardClick, t, userRole }: {
           position: "absolute", bottom: 12, right: 12, zIndex: 3,
           display: "flex", alignItems: "center", gap: 6,
           padding: "7px 16px", borderRadius: 10,
-          background: `rgba(${catRgb}, 0.2)`, backdropFilter: "blur(16px)",
-          border: `1px solid rgba(${catRgb}, 0.4)`,
+          background: isLocked ? "rgba(245,158,11,0.2)" : `rgba(${catRgb}, 0.2)`, backdropFilter: "blur(16px)",
+          border: isLocked ? "1px solid rgba(245,158,11,0.4)" : `1px solid rgba(${catRgb}, 0.4)`,
           opacity: 0, transition: "opacity 0.3s ease, transform 0.3s ease",
           transform: "translateY(6px)",
         }}>
-          <span style={{ fontSize: 11, fontWeight: 700, color: "#fff" }}>Use Template</span>
-          <ArrowRight size={12} style={{ color: catColor }} />
+          {isLocked && <Lock size={10} style={{ color: "#F59E0B" }} />}
+          <span style={{ fontSize: 11, fontWeight: 700, color: "#fff" }}>{isLocked ? "Unlock" : "Use Template"}</span>
+          {isLocked
+            ? <Sparkles size={11} style={{ color: "#F59E0B" }} />
+            : <ArrowRight size={12} style={{ color: catColor }} />
+          }
         </div>
       </div>
 
@@ -875,6 +891,7 @@ export default function TemplatesPage() {
   const [sortBy, setSortBy] = useState("default");
   const [showSort, setShowSort] = useState(false);
   const [userRole, setUserRole] = useState("FREE");
+  const [upgradeModal, setUpgradeModal] = useState<{ wf: WorkflowTemplate } | null>(null);
   const [isSticky, setIsSticky] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const sortRef = useRef<HTMLDivElement>(null);
@@ -922,10 +939,7 @@ export default function TemplatesPage() {
 
   const handleUse = (wf: WorkflowTemplate) => {
     if (LOCKED_IDS.has(wf.id) && userRole === "FREE") {
-      toast.error(t("dash.upgradeToast"), {
-        description: t("dash.upgradeToastDesc"),
-        action: { label: t("dash.upgradePlan"), onClick: () => router.push("/dashboard/billing") },
-      });
+      setUpgradeModal({ wf });
       return;
     }
     const template = PREBUILT_WORKFLOWS.find(w => w.id === wf.id);
@@ -1179,7 +1193,7 @@ export default function TemplatesPage() {
                       count={filtered.length}
                     />
                     {filtered.map((wf, i) => (
-                      <FeaturedTemplate key={wf.id} wf={wf} index={i} isMobile={isMobile} onUse={handleUse} t={t} />
+                      <FeaturedTemplate key={wf.id} wf={wf} index={i} isMobile={isMobile} onUse={handleUse} t={t} userRole={userRole} />
                     ))}
                   </div>
                 ) : (
@@ -1192,7 +1206,7 @@ export default function TemplatesPage() {
                           icon={<Zap size={18} />} color="#10B981" rgb="16,185,129" count={quickStart.length}
                         />
                         {quickStart.map((wf, i) => (
-                          <FeaturedTemplate key={wf.id} wf={wf} index={i} isMobile={isMobile} onUse={handleUse} t={t} />
+                          <FeaturedTemplate key={wf.id} wf={wf} index={i} isMobile={isMobile} onUse={handleUse} t={t} userRole={userRole} />
                         ))}
                       </div>
                     )}
@@ -1205,7 +1219,7 @@ export default function TemplatesPage() {
                           icon={<Building2 size={18} />} color="#4F8AFF" rgb="79,138,255" count={core.length}
                         />
                         {core.map((wf, i) => (
-                          <FeaturedTemplate key={wf.id} wf={wf} index={quickStart.length + i} isMobile={isMobile} onUse={handleUse} t={t} />
+                          <FeaturedTemplate key={wf.id} wf={wf} index={quickStart.length + i} isMobile={isMobile} onUse={handleUse} t={t} userRole={userRole} />
                         ))}
                       </div>
                     )}
@@ -1218,7 +1232,7 @@ export default function TemplatesPage() {
                           icon={<Sparkles size={18} />} color="#8B5CF6" rgb="139,92,246" count={rest.length}
                         />
                         {rest.map((wf, i) => (
-                          <FeaturedTemplate key={wf.id} wf={wf} index={quickStart.length + core.length + i} isMobile={isMobile} onUse={handleUse} t={t} />
+                          <FeaturedTemplate key={wf.id} wf={wf} index={quickStart.length + core.length + i} isMobile={isMobile} onUse={handleUse} t={t} userRole={userRole} />
                         ))}
                       </div>
                     )}
@@ -1356,7 +1370,162 @@ export default function TemplatesPage() {
           .tpl-hero { min-height: 260px !important; padding: 28px 16px 20px !important; }
           .tpl-hero-title { font-size: 24px !important; }
         }
+
+
+        /* ── Upgrade modal animations ── */
+        @keyframes upgrade-float {
+          0%, 100% { transform: translateY(0); }
+          50% { transform: translateY(-8px); }
+        }
+        @keyframes upgrade-shake {
+          0%, 100% { transform: rotate(0deg); }
+          25% { transform: rotate(-3deg); }
+          75% { transform: rotate(3deg); }
+        }
+        @keyframes upgrade-sparkle {
+          0%, 100% { opacity: 0.4; transform: scale(0.8); }
+          50% { opacity: 1; transform: scale(1.2); }
+        }
       `}</style>
+
+      {/* ════════════════════════════ CREATIVE UPGRADE MODAL ════════════════════════════ */}
+      <AnimatePresence>
+        {upgradeModal && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setUpgradeModal(null)}
+              style={{
+                position: "fixed", inset: 0,
+                background: "rgba(0,0,0,0.7)",
+                backdropFilter: "blur(8px)",
+                zIndex: 9990,
+              }}
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+              style={{
+                position: "fixed", inset: 0, zIndex: 9991,
+                display: "flex", alignItems: "center", justifyContent: "center",
+                pointerEvents: "none", padding: 16,
+              }}
+            >
+              <div style={{
+                width: "100%", maxWidth: 460, borderRadius: 24, overflow: "hidden",
+                background: "linear-gradient(180deg, #111125 0%, #0A0A18 100%)",
+                border: "1px solid rgba(245,158,11,0.15)",
+                boxShadow: "0 32px 100px rgba(0,0,0,0.7), 0 0 60px rgba(245,158,11,0.05)",
+                pointerEvents: "auto",
+              }}>
+                {/* Top gradient bar */}
+                <div style={{ height: 3, background: "linear-gradient(90deg, #F59E0B, #EF4444, #8B5CF6, #F59E0B)" }} />
+
+                {/* Illustration area */}
+                <div style={{
+                  padding: "36px 32px 20px", textAlign: "center",
+                  background: "radial-gradient(ellipse at 50% 80%, rgba(245,158,11,0.06) 0%, transparent 70%)",
+                }}>
+                  {/* Fun animated character */}
+                  <div style={{ fontSize: 64, lineHeight: 1, marginBottom: 8, animation: "upgrade-float 3s ease-in-out infinite" }}>
+                    🦊
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "center", gap: 6, marginBottom: 20 }}>
+                    {["✨", "⭐", "💎", "⭐", "✨"].map((s, i) => (
+                      <span key={i} style={{
+                        fontSize: 14, opacity: 0.6,
+                        animation: `upgrade-sparkle 2s ease-in-out infinite`,
+                        animationDelay: `${i * 0.3}s`,
+                      }}>{s}</span>
+                    ))}
+                  </div>
+
+                  {/* Sarcastic headline */}
+                  <h2 style={{
+                    fontSize: 22, fontWeight: 800, color: "#F0F2F8",
+                    letterSpacing: "-0.03em", margin: "0 0 8px",
+                    lineHeight: 1.3,
+                  }}>
+                    Whoa, easy there! 🔥
+                  </h2>
+                  <p style={{
+                    fontSize: 14, color: "#9898B0", lineHeight: 1.6, margin: "0 0 4px",
+                  }}>
+                    <strong style={{ color: "#F59E0B" }}>&ldquo;{upgradeModal.wf.name}&rdquo;</strong> is a
+                    premium workflow — the kind that makes clients go{" "}
+                    <em style={{ color: "#10B981" }}>&ldquo;wait, you built that?!&rdquo;</em>
+                  </p>
+                </div>
+
+                {/* What you'll unlock */}
+                <div style={{ padding: "0 32px 24px" }}>
+                  <div style={{
+                    background: "rgba(245,158,11,0.04)",
+                    border: "1px solid rgba(245,158,11,0.1)",
+                    borderRadius: 16, padding: "16px 20px",
+                    marginBottom: 20,
+                  }}>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: "#F59E0B", textTransform: "uppercase", letterSpacing: "1.5px", marginBottom: 12 }}>
+                      What you&apos;re missing out on
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                      {[
+                        { icon: "🎬", text: "AI video walkthroughs" },
+                        { icon: "🧊", text: "Interactive 3D models" },
+                        { icon: "🎨", text: "Photorealistic concept renders" },
+                        { icon: "⚡", text: "Up to 100 workflow runs/month" },
+                      ].map((item, i) => (
+                        <div key={i} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                          <span style={{ fontSize: 16 }}>{item.icon}</span>
+                          <span style={{ fontSize: 13, color: "#C0C0D8" }}>{item.text}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* CTA buttons */}
+                  <button
+                    onClick={() => { setUpgradeModal(null); router.push("/dashboard/billing"); }}
+                    style={{
+                      width: "100%", padding: "14px 24px", borderRadius: 14,
+                      background: "linear-gradient(135deg, #F59E0B 0%, #EF4444 100%)",
+                      color: "#fff", fontSize: 15, fontWeight: 800, border: "none",
+                      cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
+                      boxShadow: "0 8px 32px rgba(245,158,11,0.25)",
+                      transition: "all 0.2s ease",
+                      letterSpacing: "-0.01em",
+                    }}
+                    onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.boxShadow = "0 12px 40px rgba(245,158,11,0.35)"; }}
+                    onMouseLeave={e => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = "0 8px 32px rgba(245,158,11,0.25)"; }}
+                  >
+                    <Zap size={18} />
+                    Upgrade & Unlock This Workflow
+                    <ArrowRight size={16} />
+                  </button>
+
+                  <button
+                    onClick={() => setUpgradeModal(null)}
+                    style={{
+                      width: "100%", marginTop: 10, padding: "10px", borderRadius: 12,
+                      background: "transparent", border: "none",
+                      color: "#55556A", fontSize: 12, cursor: "pointer",
+                      transition: "color 0.15s",
+                    }}
+                    onMouseEnter={e => { e.currentTarget.style.color = "#9898B0"; }}
+                    onMouseLeave={e => { e.currentTarget.style.color = "#55556A"; }}
+                  >
+                    Nah, I&apos;ll stick with free for now 🐢
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
