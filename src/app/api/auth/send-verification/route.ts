@@ -4,18 +4,22 @@ import { prisma } from "@/lib/db";
 import { auth } from "@/lib/auth";
 import { checkEndpointRateLimit } from "@/lib/rate-limit";
 import { sendVerificationEmail } from "@/services/email";
+import { formatErrorResponse, UserErrors } from "@/lib/user-errors";
 
 export async function POST(req: Request) {
   try {
     const session = await auth();
     if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json(formatErrorResponse(UserErrors.UNAUTHORIZED), { status: 401 });
     }
 
     const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
     const rl = await checkEndpointRateLimit(ip, "send-verification", 10, "15 m");
     if (!rl.success) {
-      return NextResponse.json({ error: "Too many requests. Please wait a few minutes before trying again." }, { status: 429 });
+      return NextResponse.json(
+        formatErrorResponse({ title: "Too many requests", message: "Please wait a few minutes before trying again.", code: "RATE_001" }),
+        { status: 429 },
+      );
     }
 
     const user = await prisma.user.findUnique({
@@ -24,11 +28,22 @@ export async function POST(req: Request) {
     });
 
     if (!user) {
-      return NextResponse.json({ error: "User not found." }, { status: 404 });
+      return NextResponse.json(
+        formatErrorResponse({ title: "User not found", message: "Your account could not be found.", code: "AUTH_001" }),
+        { status: 404 },
+      );
     }
 
     if (user.emailVerified) {
       return NextResponse.json({ error: "Email already verified." }, { status: 400 });
+    }
+
+    // Block verification for placeholder phone-registration emails
+    if (user.email?.endsWith("@phone.buildflow.app")) {
+      return NextResponse.json(
+        formatErrorResponse({ title: "No email set", message: "Please add a real email address in your profile settings first.", code: "VAL_001" }),
+        { status: 400 },
+      );
     }
 
     const token = crypto.randomBytes(32).toString("hex");
@@ -61,6 +76,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("[send-verification] Error:", error);
-    return NextResponse.json({ error: "Something went wrong." }, { status: 500 });
+    return NextResponse.json(formatErrorResponse(UserErrors.INTERNAL_ERROR), { status: 500 });
   }
 }

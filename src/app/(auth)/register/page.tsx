@@ -8,19 +8,14 @@ import { Mail, Lock, User, Chrome, Loader2, Eye, EyeOff, Gift } from "lucide-rea
 import { motion } from "framer-motion";
 import { useLocale } from "@/hooks/useLocale";
 import { LanguageSwitcher } from "@/components/ui/LanguageSwitcher";
-import { trackCompleteRegistration, trackLead, trackRegisterPageView } from "@/lib/meta-pixel";
-import type { TranslationKey } from "@/lib/i18n";
-const EMAIL_REGEX = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*\.[a-zA-Z]{2,}$/;
+import { trackCompleteRegistration, trackRegisterPageView } from "@/lib/meta-pixel";
+import { validateEmail, validatePhone, normalizePhone } from "@/lib/form-validation";
+
 const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/;
 
-function validateRegisterForm(name: string, email: string, password: string, t: (key: TranslationKey) => string): string | null {
-  if (!name.trim()) return t('auth.nameRequired');
-  if (!email.trim()) return t('auth.emailRequired');
-  if (!EMAIL_REGEX.test(email.trim().toLowerCase())) return t('auth.invalidEmail');
-  if (!password) return t('auth.passwordRequired');
-  if (password.length < 8) return t('auth.passwordMinLength');
-  if (!PASSWORD_REGEX.test(password)) return t('auth.passwordComplexity');
-  return null;
+/** Returns "email" if input contains @, otherwise "phone" */
+function detectIdentifierType(value: string): "email" | "phone" {
+  return value.includes("@") ? "email" : "phone";
 }
 
 function extractErrorMessage(err: unknown, fallback: string): string {
@@ -53,10 +48,12 @@ function RegisterForm() {
   const referralCode = searchParams.get("ref") || "";
   const { t } = useLocale();
   const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
+  const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
 
@@ -65,12 +62,32 @@ function RegisterForm() {
     trackRegisterPageView();
   }, []);
 
+  function validateForm(): string | null {
+    if (!name.trim()) return t('auth.nameRequired');
+    if (!identifier.trim()) return "Email or phone number is required";
+
+    const type = detectIdentifierType(identifier);
+    if (type === "email") {
+      const v = validateEmail(identifier);
+      if (!v.isValid) return v.error || "Invalid email";
+    } else {
+      const v = validatePhone(identifier);
+      if (!v.isValid) return v.error || "Invalid phone number";
+    }
+
+    if (!password) return t('auth.passwordRequired');
+    if (password.length < 8) return t('auth.passwordMinLength');
+    if (!PASSWORD_REGEX.test(password)) return t('auth.passwordComplexity');
+    if (!confirmPassword) return "Please confirm your password";
+    if (password !== confirmPassword) return "Passwords don't match";
+    return null;
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
 
-    // Client-side validation before round-trip
-    const validationError = validateRegisterForm(name, email, password, t);
+    const validationError = validateForm();
     if (validationError) {
       setError(validationError);
       return;
@@ -79,10 +96,31 @@ function RegisterForm() {
     setLoading(true);
 
     try {
+      const type = detectIdentifierType(identifier);
+      const isEmail = type === "email";
+
+      // Build the request body
+      // If email: send email field. If phone: send a placeholder email + phoneNumber.
+      // The backend requires email, so for phone-only registration we need to handle this.
+      // For now, email is always required by the backend, so if the user enters a phone,
+      // we'll send the phone as phoneNumber and require them to also have an email.
+      // Actually — let's detect and send properly:
+      const body: Record<string, string> = { name, password };
+      if (isEmail) {
+        body.email = identifier.trim().toLowerCase();
+      } else {
+        // Phone-only registration: generate a placeholder email from the phone number
+        // This keeps backward compatibility with the email-required User model
+        const normalized = normalizePhone(identifier) ?? identifier;
+        body.email = `${normalized.replace("+", "")}@phone.buildflow.app`;
+        body.phoneNumber = normalized;
+      }
+      if (referralCode) body.referralCode = referralCode;
+
       const res = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, email, password, ...(referralCode && { referralCode }) }),
+        body: JSON.stringify(body),
       });
 
       const data = await res.json();
@@ -93,17 +131,25 @@ function RegisterForm() {
       }
 
       trackCompleteRegistration({
-        content_name: "email_signup",
-        user_email: email.trim().toLowerCase(),
+        content_name: isEmail ? "email_signup" : "phone_signup",
+        ...(isEmail && { user_email: identifier.trim().toLowerCase() }),
         user_name: name.trim()
       });
 
-      // Auto-login and redirect to dashboard
-      await signIn("credentials", {
-        email: email.trim().toLowerCase(),
-        password,
-        callbackUrl: "/dashboard",
-      });
+      // Auto-login: for email use email creds, for phone use phone creds
+      if (isEmail) {
+        await signIn("credentials", {
+          email: identifier.trim().toLowerCase(),
+          password,
+          callbackUrl: "/dashboard",
+        });
+      } else {
+        await signIn("credentials", {
+          phone: normalizePhone(identifier) ?? identifier,
+          password,
+          callbackUrl: "/dashboard",
+        });
+      }
     } catch (err) {
       setError(extractErrorMessage(err, t('auth.somethingWentWrong')));
     } finally {
@@ -115,7 +161,6 @@ function RegisterForm() {
     setGoogleLoading(true);
     setError("");
     try {
-      // Persist referral code so it survives the OAuth redirect
       if (referralCode) {
         localStorage.setItem("pending_referral_code", referralCode);
       }
@@ -133,6 +178,15 @@ function RegisterForm() {
     background: "#08080f", color: "#F0F0F5",
     fontSize: 14, outline: "none", boxSizing: "border-box" as const,
     transition: "border-color 0.2s, box-shadow 0.2s",
+  };
+
+  const focusHandler = (e: React.FocusEvent<HTMLInputElement>) => {
+    e.currentTarget.style.borderColor = "rgba(79,138,255,0.4)";
+    e.currentTarget.style.boxShadow = "0 0 0 3px rgba(79,138,255,0.08)";
+  };
+  const blurHandler = (e: React.FocusEvent<HTMLInputElement>) => {
+    e.currentTarget.style.borderColor = "rgba(255,255,255,0.06)";
+    e.currentTarget.style.boxShadow = "none";
   };
 
   return (
@@ -187,7 +241,7 @@ function RegisterForm() {
         </p>
       </div>
 
-      {/* Google OAuth — completely separate from the credentials form */}
+      {/* Google OAuth */}
       <motion.button
         type="button"
         whileHover={{ scale: 1.008 }}
@@ -229,6 +283,7 @@ function RegisterForm() {
       </div>
 
       <form onSubmit={handleSubmit}>
+        {/* Name */}
         <motion.div
           initial={{ opacity: 0, x: -8 }}
           animate={{ opacity: 1, x: 0 }}
@@ -246,18 +301,13 @@ function RegisterForm() {
               onChange={e => setName(e.target.value)}
               placeholder="Jane Smith"
               style={inputStyle}
-              onFocus={e => {
-                e.currentTarget.style.borderColor = "rgba(79,138,255,0.4)";
-                e.currentTarget.style.boxShadow = "0 0 0 3px rgba(79,138,255,0.08)";
-              }}
-              onBlur={e => {
-                e.currentTarget.style.borderColor = "rgba(255,255,255,0.06)";
-                e.currentTarget.style.boxShadow = "none";
-              }}
+              onFocus={focusHandler}
+              onBlur={blurHandler}
             />
           </div>
         </motion.div>
 
+        {/* Email or Phone — single field */}
         <motion.div
           initial={{ opacity: 0, x: -8 }}
           animate={{ opacity: 1, x: 0 }}
@@ -265,34 +315,30 @@ function RegisterForm() {
           style={{ marginBottom: 14 }}
         >
           <label style={{ display: "block", fontSize: 12.5, fontWeight: 500, color: "#7C7C96", marginBottom: 6, letterSpacing: "-0.005em" }}>
-            {t('auth.email')}
+            Email or Phone Number
           </label>
           <div style={{ position: "relative" }}>
             <Mail size={13} style={{ position: "absolute", left: 13, top: "50%", transform: "translateY(-50%)", color: "#3A3A50" }} />
             <input
-              type="email"
-              value={email}
-              onChange={e => setEmail(e.target.value)}
+              type="text"
+              value={identifier}
+              onChange={e => { setIdentifier(e.target.value); setError(""); }}
               required
-              placeholder="you@example.com"
+              placeholder="you@email.com or +91 phone number"
+              autoComplete="username"
               style={inputStyle}
-              onFocus={e => {
-                e.currentTarget.style.borderColor = "rgba(79,138,255,0.4)";
-                e.currentTarget.style.boxShadow = "0 0 0 3px rgba(79,138,255,0.08)";
-              }}
-              onBlur={e => {
-                e.currentTarget.style.borderColor = "rgba(255,255,255,0.06)";
-                e.currentTarget.style.boxShadow = "none";
-              }}
+              onFocus={focusHandler}
+              onBlur={blurHandler}
             />
           </div>
         </motion.div>
 
+        {/* Password */}
         <motion.div
           initial={{ opacity: 0, x: -8 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ delay: 0.2, ease: [0.22, 1, 0.36, 1] }}
-          style={{ marginBottom: 22 }}
+          style={{ marginBottom: 14 }}
         >
           <label style={{ display: "block", fontSize: 12.5, fontWeight: 500, color: "#7C7C96", marginBottom: 6, letterSpacing: "-0.005em" }}>
             {t('auth.password')}
@@ -302,19 +348,14 @@ function RegisterForm() {
             <input
               type={showPassword ? "text" : "password"}
               value={password}
-              onChange={e => setPassword(e.target.value)}
+              onChange={e => { setPassword(e.target.value); setError(""); }}
               required
               minLength={8}
               placeholder={t('auth.minChars')}
+              autoComplete="new-password"
               style={{ ...inputStyle, paddingRight: 40 }}
-              onFocus={e => {
-                e.currentTarget.style.borderColor = "rgba(79,138,255,0.4)";
-                e.currentTarget.style.boxShadow = "0 0 0 3px rgba(79,138,255,0.08)";
-              }}
-              onBlur={e => {
-                e.currentTarget.style.borderColor = "rgba(255,255,255,0.06)";
-                e.currentTarget.style.boxShadow = "none";
-              }}
+              onFocus={focusHandler}
+              onBlur={blurHandler}
             />
             <button
               type="button"
@@ -334,9 +375,65 @@ function RegisterForm() {
               {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
             </button>
           </div>
-              <p style={{ fontSize: 11, color: "#5C5C78", marginTop: 4, lineHeight: 1.4 }}>
-                {t('auth.passwordRequirements')}
-              </p>
+          <p style={{ fontSize: 11, color: "#5C5C78", marginTop: 4, lineHeight: 1.4 }}>
+            {t('auth.passwordRequirements')}
+          </p>
+        </motion.div>
+
+        {/* Confirm Password */}
+        <motion.div
+          initial={{ opacity: 0, x: -8 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: 0.25, ease: [0.22, 1, 0.36, 1] }}
+          style={{ marginBottom: 22 }}
+        >
+          <label style={{ display: "block", fontSize: 12.5, fontWeight: 500, color: "#7C7C96", marginBottom: 6, letterSpacing: "-0.005em" }}>
+            Confirm Password
+          </label>
+          <div style={{ position: "relative" }}>
+            <Lock size={13} style={{ position: "absolute", left: 13, top: "50%", transform: "translateY(-50%)", color: "#3A3A50" }} />
+            <input
+              type={showConfirm ? "text" : "password"}
+              value={confirmPassword}
+              onChange={e => { setConfirmPassword(e.target.value); setError(""); }}
+              required
+              minLength={8}
+              placeholder="Re-enter password"
+              autoComplete="new-password"
+              style={{ ...inputStyle, paddingRight: 40 }}
+              onFocus={focusHandler}
+              onBlur={blurHandler}
+            />
+            <button
+              type="button"
+              tabIndex={0}
+              aria-label={showConfirm ? t('auth.hidePassword') : t('auth.showPassword')}
+              onClick={() => setShowConfirm(v => !v)}
+              style={{
+                position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)",
+                background: "none", border: "none", padding: 4,
+                cursor: "pointer", color: "#3A3A50",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                opacity: 0.7, transition: "opacity 0.15s ease",
+              }}
+              onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.opacity = "1"; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.opacity = "0.7"; }}
+            >
+              {showConfirm ? <EyeOff size={15} /> : <Eye size={15} />}
+            </button>
+          </div>
+          {confirmPassword && password !== confirmPassword && (
+            <motion.div
+              initial={{ opacity: 0, y: -4 }}
+              animate={{ opacity: 1, y: 0 }}
+              style={{
+                marginTop: 6, fontSize: 11.5, color: "#EF4444",
+                display: "flex", alignItems: "center", gap: 4,
+              }}
+            >
+              <span>Passwords don&apos;t match</span>
+            </motion.div>
+          )}
         </motion.div>
 
         {error && (

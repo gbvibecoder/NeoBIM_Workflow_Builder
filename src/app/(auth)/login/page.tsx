@@ -6,10 +6,15 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Mail, Lock, Chrome, Loader2, AlertCircle, Eye, EyeOff } from "lucide-react";
 import { motion } from "framer-motion";
-import { validateEmail } from "@/lib/form-validation";
+import { validateEmail, validatePhone, normalizePhone } from "@/lib/form-validation";
 import { useLocale } from "@/hooks/useLocale";
 import { LanguageSwitcher } from "@/components/ui/LanguageSwitcher";
 import { trackLead } from "@/lib/meta-pixel";
+
+/** Returns "email" if input contains @, otherwise "phone" */
+function detectIdentifierType(value: string): "email" | "phone" {
+  return value.includes("@") ? "email" : "phone";
+}
 
 function LoginForm() {
   const router = useRouter();
@@ -32,43 +37,65 @@ function LoginForm() {
       ? authErrorMessages[authErrorParam] ?? authErrorMessages.Default
       : "";
 
-  const [email, setEmail] = useState("");
+  const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
-  const [emailError, setEmailError] = useState("");
+  const [identifierError, setIdentifierError] = useState("");
   const [error, setError] = useState(initialError);
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [touched, setTouched] = useState({ email: false, password: false });
+  const [touched, setTouched] = useState({ identifier: false, password: false });
 
-  function handleEmailChange(value: string) {
-    setEmail(value);
+  function handleIdentifierChange(value: string) {
+    setIdentifier(value);
     setError("");
-
-    if (touched.email) {
-      const validation = validateEmail(value);
-      setEmailError(validation.isValid ? "" : validation.error || "");
+    if (touched.identifier && value.trim()) {
+      const type = detectIdentifierType(value);
+      if (type === "email") {
+        const v = validateEmail(value);
+        setIdentifierError(v.isValid ? "" : v.error || "");
+      } else {
+        const v = validatePhone(value);
+        setIdentifierError(v.isValid ? "" : v.error || "");
+      }
+    } else if (touched.identifier && !value.trim()) {
+      setIdentifierError("Email or phone number is required");
     }
   }
 
-  function handleEmailBlur() {
-    setTouched(prev => ({ ...prev, email: true }));
-    const validation = validateEmail(email);
-    setEmailError(validation.isValid ? "" : validation.error || "");
-  }
-
-  function handlePasswordBlur() {
-    setTouched(prev => ({ ...prev, password: true }));
+  function handleIdentifierBlur() {
+    setTouched(prev => ({ ...prev, identifier: true }));
+    if (!identifier.trim()) {
+      setIdentifierError("Email or phone number is required");
+      return;
+    }
+    const type = detectIdentifierType(identifier);
+    if (type === "email") {
+      const v = validateEmail(identifier);
+      setIdentifierError(v.isValid ? "" : v.error || "");
+    } else {
+      const v = validatePhone(identifier);
+      setIdentifierError(v.isValid ? "" : v.error || "");
+    }
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
 
-    const emailValidation = validateEmail(email);
-    if (!emailValidation.isValid) {
-      setEmailError(emailValidation.error || "Invalid email");
+    if (!identifier.trim()) {
+      setIdentifierError("Email or phone number is required");
       return;
+    }
+
+    const type = detectIdentifierType(identifier);
+
+    if (type === "email") {
+      const v = validateEmail(identifier);
+      if (!v.isValid) { setIdentifierError(v.error || "Invalid email"); return; }
+    } else {
+      const v = validatePhone(identifier);
+      if (!v.isValid) { setIdentifierError(v.error || "Invalid phone number"); return; }
     }
 
     if (!password || password.length === 0) {
@@ -79,16 +106,16 @@ function LoginForm() {
     setLoading(true);
 
     try {
-      const res = await signIn("credentials", {
-        email,
-        password,
-        redirect: false,
-      });
+      const credentials = type === "email"
+        ? { email: identifier.trim().toLowerCase(), password, redirect: false as const }
+        : { phone: normalizePhone(identifier) ?? identifier, password, redirect: false as const };
+
+      const res = await signIn("credentials", credentials);
 
       if (res?.error) {
-        setError(t('auth.invalidCredentials'));
+        setError("Invalid email/phone or password. Please try again.");
       } else {
-        trackLead({ content_name: "email_login" });
+        trackLead({ content_name: type === "email" ? "email_login" : "phone_login" });
         router.push(callbackUrl);
         router.refresh();
       }
@@ -148,7 +175,7 @@ function LoginForm() {
         </p>
       </div>
 
-      {/* Google OAuth — completely separate from the credentials form */}
+      {/* Google OAuth */}
       <motion.button
         type="button"
         whileHover={{ scale: 1.008 }}
@@ -190,7 +217,7 @@ function LoginForm() {
       </div>
 
       <form onSubmit={handleSubmit}>
-        {/* Email field */}
+        {/* Email or Phone — single field */}
         <motion.div
           initial={{ opacity: 0, x: -8 }}
           animate={{ opacity: 1, x: 0 }}
@@ -198,49 +225,46 @@ function LoginForm() {
           style={{ marginBottom: 14 }}
         >
           <label style={{ display: "block", fontSize: 12.5, fontWeight: 500, color: "#7C7C96", marginBottom: 6, letterSpacing: "-0.005em" }}>
-            {t('auth.email')}
+            Email or Phone Number
           </label>
           <div style={{ position: "relative" }}>
             <Mail size={13} style={{ position: "absolute", left: 13, top: "50%", transform: "translateY(-50%)", color: "#3A3A50" }} />
             <input
-              type="email"
-              value={email}
-              onChange={e => handleEmailChange(e.target.value)}
-              onBlur={handleEmailBlur}
+              type="text"
+              value={identifier}
+              onChange={e => handleIdentifierChange(e.target.value)}
+              onBlur={handleIdentifierBlur}
               onFocus={e => {
-                if (!emailError) e.currentTarget.style.borderColor = "rgba(79,138,255,0.4)";
+                if (!identifierError) e.currentTarget.style.borderColor = "rgba(79,138,255,0.4)";
                 e.currentTarget.style.boxShadow = "0 0 0 3px rgba(79,138,255,0.08)";
               }}
               required
-              placeholder="you@example.com"
-              aria-invalid={!!emailError}
-              aria-describedby={emailError ? "email-error" : undefined}
+              placeholder="you@email.com or +91 phone number"
+              autoComplete="username"
+              aria-invalid={!!identifierError}
+              aria-describedby={identifierError ? "identifier-error" : undefined}
               style={{
                 width: "100%", padding: "10px 14px 10px 36px", height: 44,
                 borderRadius: 10,
-                border: `1px solid ${emailError ? "rgba(239,68,68,0.5)" : "rgba(255,255,255,0.06)"}`,
+                border: `1px solid ${identifierError ? "rgba(239,68,68,0.5)" : "rgba(255,255,255,0.06)"}`,
                 background: "#08080f", color: "#F0F0F5",
                 fontSize: 14, outline: "none", boxSizing: "border-box",
                 transition: "border-color 0.2s, box-shadow 0.2s",
               }}
             />
           </div>
-          {emailError && (
+          {identifierError && (
             <motion.div
               initial={{ opacity: 0, y: -4 }}
               animate={{ opacity: 1, y: 0 }}
-              id="email-error"
+              id="identifier-error"
               style={{
-                marginTop: 6,
-                fontSize: 11.5,
-                color: "#EF4444",
-                display: "flex",
-                alignItems: "center",
-                gap: 4,
+                marginTop: 6, fontSize: 11.5, color: "#EF4444",
+                display: "flex", alignItems: "center", gap: 4,
               }}
             >
               <AlertCircle size={11} />
-              {emailError}
+              {identifierError}
             </motion.div>
           )}
         </motion.div>
@@ -261,13 +285,13 @@ function LoginForm() {
               type={showPassword ? "text" : "password"}
               value={password}
               onChange={e => { setPassword(e.target.value); setError(""); }}
-              onBlur={handlePasswordBlur}
               onFocus={e => {
                 e.currentTarget.style.borderColor = "rgba(79,138,255,0.4)";
                 e.currentTarget.style.boxShadow = "0 0 0 3px rgba(79,138,255,0.08)";
               }}
               required
               placeholder="••••••••"
+              autoComplete="current-password"
               style={{
                 width: "100%", padding: "10px 40px 10px 36px", height: 44,
                 borderRadius: 10, border: "1px solid rgba(255,255,255,0.06)",
@@ -324,16 +348,16 @@ function LoginForm() {
           whileHover={{ scale: 1.008 }}
           whileTap={{ scale: 0.995 }}
           type="submit"
-          disabled={loading || googleLoading || !!emailError}
+          disabled={loading || googleLoading || !!identifierError}
           style={{
             width: "100%", padding: "11px", height: 44, borderRadius: 10, border: "none",
-            background: (loading || googleLoading || emailError)
+            background: (loading || googleLoading || identifierError)
               ? "rgba(79,138,255,0.3)"
               : "linear-gradient(135deg, #4F8AFF 0%, #6366F1 100%)",
             color: "#fff", fontSize: 13.5, fontWeight: 600,
-            cursor: (loading || googleLoading || emailError) ? "not-allowed" : "pointer",
-            opacity: (loading || googleLoading || emailError) ? 0.5 : 1,
-            boxShadow: (loading || googleLoading || emailError)
+            cursor: (loading || googleLoading || identifierError) ? "not-allowed" : "pointer",
+            opacity: (loading || googleLoading || identifierError) ? 0.5 : 1,
+            boxShadow: (loading || googleLoading || identifierError)
               ? "none"
               : "0 1px 3px rgba(79,138,255,0.3), 0 4px 12px rgba(79,138,255,0.15), inset 0 1px 0 rgba(255,255,255,0.1)",
             display: "flex", alignItems: "center", justifyContent: "center", gap: 8,

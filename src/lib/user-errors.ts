@@ -315,6 +315,12 @@ export const FormErrors = {
     message: "Please enter a valid URL (e.g., https://example.com).",
     code: "FORM_005",
   },
+
+  INVALID_PHONE: {
+    title: "Invalid phone number",
+    message: "Please enter a valid phone number with country code (e.g., +919876543210).",
+    code: "FORM_006",
+  },
 } as const;
 
 // ─── Auth Errors ──────────────────────────────────────────────────────────────
@@ -352,6 +358,20 @@ export const AuthErrors = {
     title: "Permission denied",
     message: "You don't have permission to access this resource.",
     code: "AUTH_006",
+  },
+
+  PHONE_ALREADY_EXISTS: {
+    title: "Phone number already registered",
+    message: "An account with this phone number already exists. Try signing in instead.",
+    action: "Sign In",
+    actionUrl: "/login",
+    code: "AUTH_007",
+  },
+
+  LOGIN_FAILED_PHONE: {
+    title: "Login failed",
+    message: "Invalid phone number or password. Please try again.",
+    code: "AUTH_008",
   },
 } as const;
 

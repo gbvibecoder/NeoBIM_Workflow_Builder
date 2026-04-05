@@ -25,6 +25,10 @@ export const authConfig = {
         (session.user as { role?: string }).role = token.role as string;
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (session.user as any).emailVerified = !!token.emailVerified;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (session.user as any).phoneNumber = (token.phoneNumber as string) ?? null;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (session.user as any).phoneVerified = !!token.phoneVerified;
       }
       return session;
     },
@@ -37,6 +41,8 @@ export const authConfig = {
         token.picture = user.image;
         token.role = (user as { role?: string }).role;
         token.emailVerified = !!(user as { emailVerified?: Date | null }).emailVerified;
+        token.phoneNumber = (user as { phoneNumber?: string | null }).phoneNumber ?? null;
+        token.phoneVerified = !!(user as { phoneVerified?: Date | null }).phoneVerified;
       }
       return token;
     },

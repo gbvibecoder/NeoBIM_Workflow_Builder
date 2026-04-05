@@ -10,11 +10,12 @@ import {
   User, Key, Shield, Save, Loader2, AlertCircle,
   CheckCircle2, Info, Crown, Star, Lock, Unlock,
   Fingerprint, ScanLine, Cpu, Activity, Camera, Trash2, Pencil,
-  Gift, Users, Zap, Copy, Check,
+  Gift, Users, Zap, Copy, Check, Phone, Smartphone, Mail,
 } from "lucide-react";
 import { PageBackground } from "@/components/dashboard/PageBackground";
 import { useLocale } from "@/hooks/useLocale";
 import { useAvatar } from "@/hooks/useAvatar";
+import { normalizePhone } from "@/lib/form-validation";
 
 type SettingsTab = "profile" | "api-keys" | "plan" | "security";
 
@@ -154,27 +155,171 @@ function SaveStatus({ status }: { status: "idle" | "saving" | "saved" }) {
 }
 
 // ---- Email Verification Status inside Profile ----
-function EmailVerificationStatus({ emailVerified, onVerified }: { emailVerified: boolean; onVerified: () => void }) {
+function EmailVerificationStatus({
+  email,
+  emailVerified,
+  onEmailAdded,
+  onVerified,
+}: {
+  email: string | null;
+  emailVerified: boolean;
+  onEmailAdded: (newEmail: string) => void;
+  onVerified: () => void;
+}) {
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
   const [error, setError] = useState("");
+  const [isAdding, setIsAdding] = useState(false);
+  const [editValue, setEditValue] = useState("");
+  const [saving, setSaving] = useState(false);
 
-  if (emailVerified) {
+  const hasRealEmail = !!email;
+
+  // Email verified — green checkmark
+  if (hasRealEmail && emailVerified) {
     return (
       <div style={{
-        display: "flex", alignItems: "center", gap: 8,
+        display: "flex", alignItems: "center", justifyContent: "space-between",
         padding: "10px 16px", borderRadius: 10,
         background: "rgba(16,185,129,0.05)",
         border: "1px solid rgba(16,185,129,0.12)",
       }}>
-        <CheckCircle2 size={14} style={{ color: "#10B981", flexShrink: 0 }} />
-        <span style={{ fontSize: 12, fontWeight: 600, color: "#10B981", fontFamily: "var(--font-jetbrains), monospace" }}>
-          EMAIL VERIFIED
-        </span>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <CheckCircle2 size={14} style={{ color: "#10B981", flexShrink: 0 }} />
+          <span style={{ fontSize: 12, fontWeight: 600, color: "#10B981", fontFamily: "var(--font-jetbrains), monospace" }}>
+            EMAIL VERIFIED
+          </span>
+          <span style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", fontFamily: "var(--font-jetbrains), monospace" }}>
+            {email}
+          </span>
+        </div>
       </div>
     );
   }
 
+  // Save a new email address
+  async function handleSaveEmail() {
+    setError("");
+    const trimmed = editValue.trim().toLowerCase();
+    if (!trimmed) { setError("Email is required"); return; }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(trimmed)) { setError("Please enter a valid email address"); return; }
+
+    setSaving(true);
+    try {
+      const res = await fetch("/api/user/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: trimmed }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data?.error?.message || "Failed to update email.");
+      }
+      onEmailAdded(trimmed);
+      setIsAdding(false);
+      setEditValue("");
+      setSent(true); // Verification email auto-sent by backend
+      toast.success("Email saved! Check your inbox — a wild verification email appears.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to save email.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  // No email set — show "Add Email" prompt
+  if (!hasRealEmail) {
+    return (
+      <div style={{
+        padding: "12px 16px", borderRadius: 10,
+        background: "rgba(79,138,255,0.05)",
+        border: "1px solid rgba(79,138,255,0.12)",
+      }}>
+        {isAdding ? (
+          <div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+              <Mail size={14} style={{ color: "#4F8AFF", flexShrink: 0 }} />
+              <span style={{ fontSize: 12, fontWeight: 600, color: "#4F8AFF", fontFamily: "var(--font-jetbrains), monospace" }}>
+                ADD EMAIL ADDRESS
+              </span>
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <input
+                type="email"
+                value={editValue}
+                onChange={e => { setEditValue(e.target.value); setError(""); }}
+                placeholder="your-real-email@not-fake.com"
+                autoFocus
+                onKeyDown={e => { if (e.key === "Enter") handleSaveEmail(); if (e.key === "Escape") { setIsAdding(false); setEditValue(""); setError(""); } }}
+                style={{
+                  flex: 1, padding: "8px 12px", borderRadius: 8,
+                  border: "1px solid rgba(255,255,255,0.08)",
+                  background: "#08080f", color: "#F0F0F5",
+                  fontSize: 13, outline: "none",
+                }}
+              />
+              <button
+                onClick={handleSaveEmail}
+                disabled={saving}
+                style={{
+                  padding: "6px 14px", borderRadius: 6,
+                  background: "rgba(79,138,255,0.15)",
+                  border: "1px solid rgba(79,138,255,0.25)",
+                  color: "#4F8AFF", fontSize: 11, fontWeight: 600,
+                  cursor: saving ? "wait" : "pointer",
+                  fontFamily: "var(--font-jetbrains), monospace",
+                }}
+              >
+                {saving ? "SHIPPING..." : "LOCK IT IN"}
+              </button>
+              <button
+                onClick={() => { setIsAdding(false); setEditValue(""); setError(""); }}
+                style={{
+                  padding: "6px 10px", borderRadius: 6,
+                  background: "rgba(255,255,255,0.04)",
+                  border: "1px solid rgba(255,255,255,0.08)",
+                  color: "#5C5C78", fontSize: 11, fontWeight: 600, cursor: "pointer",
+                  fontFamily: "var(--font-jetbrains), monospace",
+                }}
+              >
+                CANCEL
+              </button>
+            </div>
+            {error && <div style={{ fontSize: 11, color: "#EF4444", marginTop: 6 }}>{error}</div>}
+          </div>
+        ) : (
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <Mail size={14} style={{ color: "#4F8AFF", flexShrink: 0 }} />
+              <span style={{ fontSize: 12, fontWeight: 600, color: "#4F8AFF", fontFamily: "var(--font-jetbrains), monospace" }}>
+                NO EMAIL ADDRESS
+              </span>
+            </div>
+            <button
+              onClick={() => setIsAdding(true)}
+              style={{
+                background: "rgba(79,138,255,0.08)",
+                border: "1px solid rgba(79,138,255,0.15)",
+                borderRadius: 6, padding: "4px 12px",
+                fontSize: 11, fontWeight: 600, color: "#4F8AFF",
+                cursor: "pointer",
+                fontFamily: "var(--font-jetbrains), monospace",
+              }}
+            >
+              HOOK ME UP
+            </button>
+          </div>
+        )}
+        <div style={{ fontSize: 11, color: "#7C7C96", marginTop: 6, lineHeight: 1.5 }}>
+          No email? Bold move. Add one so we can send you important stuff (and maybe a meme or two).
+        </div>
+      </div>
+    );
+  }
+
+  // Has real email but NOT verified
   return (
     <div style={{
       padding: "12px 16px", borderRadius: 10,
@@ -186,6 +331,9 @@ function EmailVerificationStatus({ emailVerified, onVerified }: { emailVerified:
           <AlertCircle size={14} style={{ color: "#F59E0B", flexShrink: 0 }} />
           <span style={{ fontSize: 12, fontWeight: 600, color: "#F59E0B", fontFamily: "var(--font-jetbrains), monospace" }}>
             EMAIL NOT VERIFIED
+          </span>
+          <span style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", fontFamily: "var(--font-jetbrains), monospace" }}>
+            {email}
           </span>
         </div>
         {sent ? (
@@ -232,7 +380,387 @@ function EmailVerificationStatus({ emailVerified, onVerified }: { emailVerified:
         <div style={{ fontSize: 11, color: "#EF4444", marginTop: 6 }}>{error}</div>
       )}
       <div style={{ fontSize: 11, color: "#7C7C96", marginTop: 6, lineHeight: 1.5 }}>
-        Verify your email to unlock workflow execution and full platform access.
+        We sent you a verification email. Check your inbox (or spam, we won&apos;t judge).
+      </div>
+    </div>
+  );
+}
+
+// ---- Phone Verification Status ----
+function PhoneVerificationStatus({
+  phoneNumber,
+  phoneVerified,
+  onPhoneChange,
+  onVerified,
+}: {
+  phoneNumber: string | null;
+  phoneVerified: boolean;
+  onPhoneChange: (phone: string | null) => void;
+  onVerified: () => void;
+}) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [editValue, setEditValue] = useState(phoneNumber ?? "");
+  const [saving, setSaving] = useState(false);
+  const [verifying, setVerifying] = useState(false);
+  const [verified, setVerified] = useState(false);
+  const [error, setError] = useState("");
+
+  // Sync editValue when phoneNumber changes externally
+  useEffect(() => { setEditValue(phoneNumber ?? ""); }, [phoneNumber]);
+
+  async function handleSavePhone() {
+    setError("");
+    const trimmed = editValue.trim();
+
+    // Allow clearing
+    if (!trimmed) {
+      setSaving(true);
+      try {
+        const res = await fetch("/api/user/profile", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ phoneNumber: null }),
+        });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data?.error?.message || "Failed to update.");
+        }
+        onPhoneChange(null);
+        setVerified(false);
+        setIsEditing(false);
+        toast.success("Phone number removed. Gone. Poof. Like it never existed.");
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to save.");
+      } finally {
+        setSaving(false);
+      }
+      return;
+    }
+
+    // Validate
+    const normalized = normalizePhone(trimmed);
+    if (!normalized) {
+      setError("Enter a valid phone number (e.g., +919876543210)");
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const res = await fetch("/api/user/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phoneNumber: trimmed }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data?.error?.message || "Failed to update.");
+      }
+      onPhoneChange(normalized);
+      setVerified(false); // Reset local verified state for new number
+      setIsEditing(false);
+      toast.success("New phone, new you. Don't forget to verify it!");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to save.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleVerify() {
+    setVerifying(true);
+    setError("");
+    try {
+      // 2-second simulated delay for UX
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      const res = await fetch("/api/user/verify-phone", { method: "POST" });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data?.error?.message || "Verification failed.");
+      }
+      setVerified(true);
+      onVerified();
+      toast.success("Phone verified! You're officially not a robot. Probably.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Verification failed.");
+    } finally {
+      setVerifying(false);
+    }
+  }
+
+  // No phone number set — show add button
+  if (!phoneNumber) {
+    return (
+      <div style={{
+        padding: "12px 16px", borderRadius: 10,
+        background: "rgba(100,116,139,0.05)",
+        border: "1px solid rgba(100,116,139,0.12)",
+      }}>
+        {isEditing ? (
+          <div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+              <Smartphone size={14} style={{ color: "#94A3B8", flexShrink: 0 }} />
+              <span style={{ fontSize: 12, fontWeight: 600, color: "#94A3B8", fontFamily: "var(--font-jetbrains), monospace" }}>
+                ADD PHONE NUMBER
+              </span>
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <input
+                type="tel"
+                value={editValue}
+                onChange={e => { setEditValue(e.target.value); setError(""); }}
+                placeholder="+91 your digits here"
+                autoFocus
+                onKeyDown={e => { if (e.key === "Enter") handleSavePhone(); if (e.key === "Escape") { setIsEditing(false); setEditValue(""); setError(""); } }}
+                style={{
+                  flex: 1, padding: "8px 12px", borderRadius: 8,
+                  border: "1px solid rgba(255,255,255,0.08)",
+                  background: "#08080f", color: "#F0F0F5",
+                  fontSize: 13, outline: "none",
+                }}
+              />
+              <button
+                onClick={handleSavePhone}
+                disabled={saving}
+                style={{
+                  padding: "6px 14px", borderRadius: 6,
+                  background: "rgba(79,138,255,0.15)",
+                  border: "1px solid rgba(79,138,255,0.25)",
+                  color: "#4F8AFF", fontSize: 11, fontWeight: 600,
+                  cursor: saving ? "wait" : "pointer",
+                  fontFamily: "var(--font-jetbrains), monospace",
+                }}
+              >
+                {saving ? "SAVING..." : "SAVE"}
+              </button>
+              <button
+                onClick={() => { setIsEditing(false); setEditValue(""); setError(""); }}
+                style={{
+                  padding: "6px 10px", borderRadius: 6,
+                  background: "rgba(255,255,255,0.04)",
+                  border: "1px solid rgba(255,255,255,0.08)",
+                  color: "#5C5C78", fontSize: 11, fontWeight: 600, cursor: "pointer",
+                  fontFamily: "var(--font-jetbrains), monospace",
+                }}
+              >
+                CANCEL
+              </button>
+            </div>
+            {error && <div style={{ fontSize: 11, color: "#EF4444", marginTop: 6 }}>{error}</div>}
+          </div>
+        ) : (
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <Smartphone size={14} style={{ color: "#94A3B8", flexShrink: 0 }} />
+              <span style={{ fontSize: 12, fontWeight: 600, color: "#94A3B8", fontFamily: "var(--font-jetbrains), monospace" }}>
+                NO PHONE NUMBER
+              </span>
+            </div>
+            <button
+              onClick={() => setIsEditing(true)}
+              style={{
+                background: "rgba(79,138,255,0.08)",
+                border: "1px solid rgba(79,138,255,0.15)",
+                borderRadius: 6, padding: "4px 12px",
+                fontSize: 11, fontWeight: 600, color: "#4F8AFF",
+                cursor: "pointer",
+                fontFamily: "var(--font-jetbrains), monospace",
+              }}
+            >
+              RING ME UP
+            </button>
+          </div>
+        )}
+        <div style={{ fontSize: 11, color: "#7C7C96", marginTop: 6, lineHeight: 1.5 }}>
+          No phone number? Are you a ghost? Add one for phone login and so we know you&apos;re real.
+        </div>
+      </div>
+    );
+  }
+
+  // Phone verified
+  if (phoneVerified || verified) {
+    return (
+      <div style={{
+        padding: "12px 16px", borderRadius: 10,
+        background: "rgba(16,185,129,0.05)",
+        border: "1px solid rgba(16,185,129,0.12)",
+      }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <CheckCircle2 size={14} style={{ color: "#10B981", flexShrink: 0 }} />
+            <span style={{ fontSize: 12, fontWeight: 600, color: "#10B981", fontFamily: "var(--font-jetbrains), monospace" }}>
+              PHONE VERIFIED
+            </span>
+            <span style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", fontFamily: "var(--font-jetbrains), monospace" }}>
+              {phoneNumber}
+            </span>
+          </div>
+          <button
+            onClick={() => setIsEditing(true)}
+            style={{
+              background: "rgba(255,255,255,0.04)",
+              border: "1px solid rgba(255,255,255,0.08)",
+              borderRadius: 6, padding: "4px 10px",
+              fontSize: 10, fontWeight: 600, color: "#5C5C78",
+              cursor: "pointer",
+              fontFamily: "var(--font-jetbrains), monospace",
+            }}
+          >
+            CHANGE
+          </button>
+        </div>
+        {isEditing && (
+          <div style={{ marginTop: 10 }}>
+            <div style={{ display: "flex", gap: 8 }}>
+              <input
+                type="tel"
+                value={editValue}
+                onChange={e => { setEditValue(e.target.value); setError(""); }}
+                placeholder="+91 your digits here"
+                autoFocus
+                onKeyDown={e => { if (e.key === "Enter") handleSavePhone(); if (e.key === "Escape") { setIsEditing(false); setEditValue(phoneNumber ?? ""); setError(""); } }}
+                style={{
+                  flex: 1, padding: "8px 12px", borderRadius: 8,
+                  border: "1px solid rgba(255,255,255,0.08)",
+                  background: "#08080f", color: "#F0F0F5",
+                  fontSize: 13, outline: "none",
+                }}
+              />
+              <button
+                onClick={handleSavePhone}
+                disabled={saving}
+                style={{
+                  padding: "6px 14px", borderRadius: 6,
+                  background: "rgba(79,138,255,0.15)",
+                  border: "1px solid rgba(79,138,255,0.25)",
+                  color: "#4F8AFF", fontSize: 11, fontWeight: 600,
+                  cursor: saving ? "wait" : "pointer",
+                  fontFamily: "var(--font-jetbrains), monospace",
+                }}
+              >
+                {saving ? "SAVING..." : "SAVE"}
+              </button>
+              <button
+                onClick={() => { setIsEditing(false); setEditValue(phoneNumber ?? ""); setError(""); }}
+                style={{
+                  padding: "6px 10px", borderRadius: 6,
+                  background: "rgba(255,255,255,0.04)",
+                  border: "1px solid rgba(255,255,255,0.08)",
+                  color: "#5C5C78", fontSize: 11, fontWeight: 600, cursor: "pointer",
+                  fontFamily: "var(--font-jetbrains), monospace",
+                }}
+              >
+                CANCEL
+              </button>
+            </div>
+            {error && <div style={{ fontSize: 11, color: "#EF4444", marginTop: 6 }}>{error}</div>}
+            <div style={{ fontSize: 10, color: "#F59E0B", marginTop: 4 }}>
+              New number, who dis? You&apos;ll need to re-verify after changing.
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // Phone set but NOT verified
+  return (
+    <div style={{
+      padding: "12px 16px", borderRadius: 10,
+      background: "rgba(245,158,11,0.05)",
+      border: "1px solid rgba(245,158,11,0.12)",
+    }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, flexWrap: "wrap" as const }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <AlertCircle size={14} style={{ color: "#F59E0B", flexShrink: 0 }} />
+          <span style={{ fontSize: 12, fontWeight: 600, color: "#F59E0B", fontFamily: "var(--font-jetbrains), monospace" }}>
+            PHONE NOT VERIFIED
+          </span>
+          <span style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", fontFamily: "var(--font-jetbrains), monospace" }}>
+            {phoneNumber}
+          </span>
+        </div>
+        <div style={{ display: "flex", gap: 6 }}>
+          <button
+            onClick={handleVerify}
+            disabled={verifying}
+            style={{
+              background: "rgba(245,158,11,0.1)",
+              border: "1px solid rgba(245,158,11,0.2)",
+              borderRadius: 6, padding: "4px 12px",
+              fontSize: 11, fontWeight: 600, color: "#F59E0B",
+              cursor: verifying ? "wait" : "pointer",
+              opacity: verifying ? 0.6 : 1,
+              fontFamily: "var(--font-jetbrains), monospace",
+            }}
+          >
+            {verifying ? "PROVING YOU EXIST..." : "VERIFY NOW"}
+          </button>
+          <button
+            onClick={() => setIsEditing(true)}
+            style={{
+              background: "rgba(255,255,255,0.04)",
+              border: "1px solid rgba(255,255,255,0.08)",
+              borderRadius: 6, padding: "4px 10px",
+              fontSize: 10, fontWeight: 600, color: "#5C5C78",
+              cursor: "pointer",
+              fontFamily: "var(--font-jetbrains), monospace",
+            }}
+          >
+            CHANGE
+          </button>
+        </div>
+      </div>
+      {isEditing && (
+        <div style={{ marginTop: 10 }}>
+          <div style={{ display: "flex", gap: 8 }}>
+            <input
+              type="tel"
+              value={editValue}
+              onChange={e => { setEditValue(e.target.value); setError(""); }}
+              placeholder="+919876543210"
+              autoFocus
+              onKeyDown={e => { if (e.key === "Enter") handleSavePhone(); if (e.key === "Escape") { setIsEditing(false); setEditValue(phoneNumber ?? ""); setError(""); } }}
+              style={{
+                flex: 1, padding: "8px 12px", borderRadius: 8,
+                border: "1px solid rgba(255,255,255,0.08)",
+                background: "#08080f", color: "#F0F0F5",
+                fontSize: 13, outline: "none",
+              }}
+            />
+            <button
+              onClick={handleSavePhone}
+              disabled={saving}
+              style={{
+                padding: "6px 14px", borderRadius: 6,
+                background: "rgba(79,138,255,0.15)",
+                border: "1px solid rgba(79,138,255,0.25)",
+                color: "#4F8AFF", fontSize: 11, fontWeight: 600,
+                cursor: saving ? "wait" : "pointer",
+                fontFamily: "var(--font-jetbrains), monospace",
+              }}
+            >
+              {saving ? "SAVING..." : "SAVE"}
+            </button>
+            <button
+              onClick={() => { setIsEditing(false); setEditValue(phoneNumber ?? ""); setError(""); }}
+              style={{
+                padding: "6px 10px", borderRadius: 6,
+                background: "rgba(255,255,255,0.04)",
+                border: "1px solid rgba(255,255,255,0.08)",
+                color: "#5C5C78", fontSize: 11, fontWeight: 600, cursor: "pointer",
+                fontFamily: "var(--font-jetbrains), monospace",
+              }}
+            >
+              CANCEL
+            </button>
+          </div>
+          {error && <div style={{ fontSize: 11, color: "#EF4444", marginTop: 6 }}>{error}</div>}
+        </div>
+      )}
+      {!isEditing && error && <div style={{ fontSize: 11, color: "#EF4444", marginTop: 6 }}>{error}</div>}
+      <div style={{ fontSize: 11, color: "#7C7C96", marginTop: 6, lineHeight: 1.5 }}>
+        Your phone is feeling unverified and insecure. Hit that verify button, be a hero.
       </div>
     </div>
   );
@@ -257,8 +785,8 @@ function ProfileSection({
   const [isEditingName, setIsEditingName] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [profileData, setProfileData] = useState<{
-    emailVerified: boolean; createdAt: string | null; role: string;
-  }>({ emailVerified: false, createdAt: null, role: "FREE" });
+    email: string | null; emailVerified: boolean; phoneNumber: string | null; phoneVerified: boolean; createdAt: string | null; role: string;
+  }>({ email: null, emailVerified: false, phoneNumber: null, phoneVerified: false, createdAt: null, role: "FREE" });
 
   // Fetch profile data (emailVerified, createdAt, role)
   useEffect(() => {
@@ -266,7 +794,14 @@ function ProfileSection({
       .then(res => res.json())
       .then(data => {
         if (data.emailVerified !== undefined) {
-          setProfileData({ emailVerified: data.emailVerified, createdAt: data.createdAt, role: data.role });
+          setProfileData({
+            email: data.email ?? null,
+            emailVerified: data.emailVerified,
+            phoneNumber: data.phoneNumber ?? null,
+            phoneVerified: !!data.phoneVerified,
+            createdAt: data.createdAt,
+            role: data.role,
+          });
         }
       })
       .catch(() => {});
@@ -534,7 +1069,7 @@ function ProfileSection({
               fontFamily: "var(--font-jetbrains), monospace",
               overflowWrap: "break-word", wordBreak: "break-all",
             }}>
-              {user?.email ?? "\u2014"}
+              {profileData.email ?? profileData.phoneNumber ?? (user?.email?.endsWith("@phone.buildflow.app") ? null : user?.email) ?? "\u2014"}
             </div>
 
             {/* Action buttons row */}
@@ -650,9 +1185,32 @@ function ProfileSection({
 
       {/* Email Verification Status */}
       <EmailVerificationStatus
+        email={profileData.email}
         emailVerified={profileData.emailVerified}
+        onEmailAdded={(newEmail) => {
+          setProfileData(prev => ({ ...prev, email: newEmail, emailVerified: false }));
+          onSessionUpdate();
+        }}
         onVerified={() => {
           setProfileData(prev => ({ ...prev, emailVerified: true }));
+          onSessionUpdate();
+        }}
+      />
+
+      {/* Phone Verification Status */}
+      <PhoneVerificationStatus
+        phoneNumber={profileData.phoneNumber}
+        phoneVerified={profileData.phoneVerified}
+        onPhoneChange={(phone) => {
+          setProfileData(prev => ({
+            ...prev,
+            phoneNumber: phone,
+            phoneVerified: false,
+          }));
+          onSessionUpdate();
+        }}
+        onVerified={() => {
+          setProfileData(prev => ({ ...prev, phoneVerified: true }));
           onSessionUpdate();
         }}
       />
@@ -680,10 +1238,11 @@ function ProfileSection({
         </div>
         <div style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: 14 }}>
           {[
-            { label: "Email", value: user?.email ?? "—" },
+            { label: "Email", value: profileData.email ?? "Not set" },
+            { label: "Phone", value: profileData.phoneNumber ?? "Not set" },
             { label: "Plan", value: profileData.role === "FREE" ? "Free" : profileData.role === "MINI" ? "Mini" : profileData.role === "STARTER" ? "Starter" : profileData.role === "PRO" ? "Pro" : profileData.role === "TEAM_ADMIN" ? "Team" : profileData.role === "PLATFORM_ADMIN" ? "Admin" : profileData.role },
             { label: "Member since", value: profileData.createdAt ? new Date(profileData.createdAt).toLocaleDateString("en-US", { month: "long", year: "numeric" }) : "—" },
-            { label: "Auth method", value: user?.image?.startsWith("https://lh3.googleusercontent.com") ? "Google OAuth" : "Email & Password" },
+            { label: "Auth method", value: user?.image?.startsWith("https://lh3.googleusercontent.com") ? "Google OAuth" : profileData.phoneNumber && profileData.email ? "Email / Phone & Password" : profileData.phoneNumber ? "Phone & Password" : "Email & Password" },
           ].map((item) => (
             <div key={item.label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <span style={{

@@ -12,6 +12,7 @@ import {
   AuthErrors,
   UserErrors
 } from "@/lib/user-errors";
+import { normalizePhone } from "@/lib/form-validation";
 
 export async function POST(req: NextRequest) {
   try {
@@ -25,7 +26,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { name, email, password, source, referralCode } = await req.json();
+    const { name, email, password, source, referralCode, phoneNumber: rawPhone } = await req.json();
 
     // Validate required fields
     if (!email || !email.trim()) {
@@ -52,6 +53,27 @@ export async function POST(req: NextRequest) {
         formatErrorResponse(FormErrors.INVALID_EMAIL),
         { status: 400 }
       );
+    }
+
+    // Validate and normalize phone number if provided
+    let normalizedPhone: string | null = null;
+    if (rawPhone && typeof rawPhone === "string" && rawPhone.trim()) {
+      normalizedPhone = normalizePhone(rawPhone);
+      if (!normalizedPhone) {
+        return NextResponse.json(
+          formatErrorResponse(FormErrors.INVALID_PHONE),
+          { status: 400 }
+        );
+      }
+
+      // Check if phone already exists
+      const existingPhone = await prisma.user.findUnique({ where: { phoneNumber: normalizedPhone } });
+      if (existingPhone) {
+        return NextResponse.json(
+          formatErrorResponse(AuthErrors.PHONE_ALREADY_EXISTS),
+          { status: 409 }
+        );
+      }
     }
 
     // Validate password length
@@ -91,7 +113,12 @@ export async function POST(req: NextRequest) {
     const hashedPassword = await bcrypt.hash(password, 12);
 
     const user = await prisma.user.create({
-      data: { name, email: normalizedEmail, password: hashedPassword },
+      data: {
+        name,
+        email: normalizedEmail,
+        password: hashedPassword,
+        ...(normalizedPhone && { phoneNumber: normalizedPhone }),
+      },
       select: { id: true, email: true, name: true },
     });
 
@@ -106,7 +133,10 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Send verification email (fire-and-forget)
+    // Send verification email (fire-and-forget) — skip for phone-only registrations
+    if (normalizedEmail.endsWith("@phone.buildflow.app")) {
+      return NextResponse.json({ user }, { status: 201 });
+    }
     const verifyToken = crypto.randomBytes(32).toString("hex");
     const verifyExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
     prisma.verificationToken.create({
@@ -126,15 +156,42 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ user }, { status: 201 });
   } catch (error) {
     console.error("[auth/register] Error:", error);
-    
-    // Handle database errors
+
+    // Handle database unique constraint errors
     if ((error as { code?: string }).code === "P2002") {
+      const target = (error as { meta?: { target?: string[] } }).meta?.target;
+      if (target?.includes("phoneNumber")) {
+        return NextResponse.json(
+          formatErrorResponse(AuthErrors.PHONE_ALREADY_EXISTS),
+          { status: 409 }
+        );
+      }
       return NextResponse.json(
         formatErrorResponse(AuthErrors.EMAIL_ALREADY_EXISTS),
         { status: 409 }
       );
     }
-    
+
+    // Handle Neon WebSocket / transient connection errors
+    const isConnectionError = (
+      (error as { type?: string })?.type === "error" || // ErrorEvent from Neon WS
+      (error as { code?: string })?.code === "ECONNRESET" ||
+      (error as { code?: string })?.code === "ECONNREFUSED" ||
+      (error as { message?: string })?.message?.includes("fetch failed")
+    );
+    if (isConnectionError) {
+      console.warn("[auth/register] Database connection error — transient, user should retry");
+      return NextResponse.json(
+        formatErrorResponse({
+          title: "Connection hiccup",
+          message: "Our database took a coffee break. Please try again in a moment.",
+          action: "Try Again",
+          code: "NET_001",
+        }),
+        { status: 503 }
+      );
+    }
+
     // Generic error
     return NextResponse.json(
       formatErrorResponse(UserErrors.INTERNAL_ERROR),

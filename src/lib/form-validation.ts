@@ -25,6 +25,48 @@ export function validateEmail(email: string): ValidationResult {
 }
 
 /**
+ * Normalize a phone number: strip spaces, dashes, parens; keep leading +.
+ * Auto-detects 10-digit Indian mobile numbers (starting with 6-9) and adds +91.
+ * Returns null if the input cannot be a valid phone number.
+ */
+export function normalizePhone(raw: string): string | null {
+  if (!raw) return null;
+  // Strip everything except digits and leading +
+  const stripped = raw.replace(/[\s\-().]/g, "");
+  // Must start with optional + followed by digits only
+  if (!/^\+?\d+$/.test(stripped)) return null;
+  // Extract digits (without leading +)
+  const digits = stripped.replace(/^\+/, "");
+  // ITU-T E.164: 7–15 digits
+  if (digits.length < 7 || digits.length > 15) return null;
+
+  // Auto-detect 10-digit Indian mobile numbers (start with 6, 7, 8, or 9)
+  // Without this, "9876543210" would become "+9876543210" which is invalid
+  if (!stripped.startsWith("+") && digits.length === 10 && /^[6-9]/.test(digits)) {
+    return `+91${digits}`;
+  }
+
+  // Always store with + prefix for consistency
+  return stripped.startsWith("+") ? stripped : `+${stripped}`;
+}
+
+/**
+ * Validate phone number in real-time
+ */
+export function validatePhone(phone: string): ValidationResult {
+  if (!phone || phone.trim().length === 0) {
+    return { isValid: false, error: "Phone number is required" };
+  }
+
+  const normalized = normalizePhone(phone);
+  if (!normalized) {
+    return { isValid: false, error: "Enter a valid phone number (e.g., +919876543210)" };
+  }
+
+  return { isValid: true };
+}
+
+/**
  * Validate password strength in real-time
  */
 export function validatePassword(password: string): ValidationResult {

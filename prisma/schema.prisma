@@ -12,6 +12,8 @@ model User {
   name          String?
   image         String?
   emailVerified DateTime?
+  phoneNumber   String?                @unique
+  phoneVerified DateTime?
   password      String?
   role          UserRole               @default(FREE)
   bio           String?

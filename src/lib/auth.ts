@@ -6,6 +6,7 @@ import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/db";
 import { authConfig } from "@/lib/auth.config";
 import { trackLogin } from "@/lib/analytics";
+import { normalizePhone } from "@/lib/form-validation";
 
 // Throttle DB role lookups: refresh at most once per 60 seconds per user.
 // This avoids a DB query on every single authenticated request while still
@@ -30,6 +31,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         token.role = (user as { role?: string }).role;
         // Google OAuth users have emailVerified set by the adapter automatically
         token.emailVerified = !!(user as { emailVerified?: Date | null }).emailVerified;
+        token.phoneNumber = (user as { phoneNumber?: string | null }).phoneNumber ?? null;
+        token.phoneVerified = !!(user as { phoneVerified?: Date | null }).phoneVerified;
       }
       // Refresh role from DB so subscription changes are reflected without sign-out.
       // Throttled to once per 60s to avoid excessive DB queries. Explicit session
@@ -44,12 +47,15 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             const dbUser = await prisma.user.findUnique({
               where: { id: token.sub },
               select: trigger === "update"
-                ? { role: true, name: true, image: true, emailVerified: true }
-                : { role: true, emailVerified: true },
+                ? { role: true, name: true, image: true, email: true, emailVerified: true, phoneNumber: true, phoneVerified: true }
+                : { role: true, email: true, emailVerified: true, phoneNumber: true, phoneVerified: true },
             });
             if (dbUser) {
               token.role = dbUser.role;
+              token.email = (dbUser as { email?: string }).email;
               token.emailVerified = !!dbUser.emailVerified;
+              token.phoneNumber = (dbUser as { phoneNumber?: string | null }).phoneNumber ?? null;
+              token.phoneVerified = !!(dbUser as { phoneVerified?: Date | null }).phoneVerified;
               if (trigger === "update") {
                 token.name = (dbUser as { name?: string | null }).name;
                 const img = (dbUser as { image?: string | null }).image;
@@ -85,20 +91,44 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       name: "credentials",
       credentials: {
         email: { label: "Email", type: "email" },
+        phone: { label: "Phone", type: "tel" },
         password: { label: "Password", type: "password" },
       },
       async authorize(credentials) {
-        if (!credentials?.email || !credentials?.password) return null;
+        if (!credentials?.password) return null;
 
-        const normalizedEmail = (credentials.email as string).trim().toLowerCase();
+        const email = credentials.email as string | undefined;
+        const phone = credentials.phone as string | undefined;
 
-        const user = await prisma.user.findUnique({
-          where: { email: normalizedEmail },
-        });
+        // Must provide either email or phone
+        if (!email && !phone) return null;
 
-        if (!user || !user.password) {
-          console.warn("[auth] Failed login attempt for:", normalizedEmail);
-          return null;
+        let user;
+
+        if (phone) {
+          // Phone + password login
+          const normalizedPhone = normalizePhone(phone);
+          if (!normalizedPhone) {
+            console.warn("[auth] Invalid phone format:", phone);
+            return null;
+          }
+          user = await prisma.user.findUnique({
+            where: { phoneNumber: normalizedPhone },
+          });
+          if (!user || !user.password) {
+            console.warn("[auth] Failed phone login for:", normalizedPhone);
+            return null;
+          }
+        } else {
+          // Email + password login (existing flow)
+          const normalizedEmail = (email as string).trim().toLowerCase();
+          user = await prisma.user.findUnique({
+            where: { email: normalizedEmail },
+          });
+          if (!user || !user.password) {
+            console.warn("[auth] Failed login attempt for:", normalizedEmail);
+            return null;
+          }
         }
 
         const passwordsMatch = await bcrypt.compare(
@@ -107,7 +137,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         );
 
         if (!passwordsMatch) {
-          console.warn("[auth] Invalid password for:", normalizedEmail);
+          console.warn("[auth] Invalid password for:", user.email ?? user.phoneNumber);
           return null;
         }
 
@@ -118,6 +148,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           image: user.image,
           role: user.role,
           emailVerified: user.emailVerified,
+          phoneNumber: user.phoneNumber,
+          phoneVerified: user.phoneVerified,
         };
       },
     }),
