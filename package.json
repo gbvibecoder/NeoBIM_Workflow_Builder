@@ -21,6 +21,7 @@
     "@aws-sdk/client-s3": "^3.1009.0",
     "@aws-sdk/s3-request-presigner": "^3.1009.0",
     "@fal-ai/client": "^1.9.4",
+    "@google/genai": "^1.48.0",
     "@gsap/react": "^2.1.2",
     "@neondatabase/serverless": "^1.0.2",
     "@prisma/adapter-neon": "^7.5.0",
