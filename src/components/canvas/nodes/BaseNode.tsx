@@ -764,14 +764,6 @@ export const BaseNode = memo(function BaseNode({ id, data, selected }: BaseNodeP
           pointerEvents: "none", zIndex: 0,
         }} />
 
-        {/* ── Scanning line (Atelier) ── */}
-        <div style={{
-          position: "absolute", left: 0, width: "100%", height: "1.5px",
-          background: `linear-gradient(90deg, transparent, rgba(${rgb}, 0.4), transparent)`,
-          animation: status === "running" ? "atelier-scan 1s linear infinite" : "atelier-scan 4s linear infinite",
-          opacity: 0.45, pointerEvents: "none", zIndex: 3,
-        }} />
-
         {/* ── Glow behind node (Atelier) ── */}
         <div style={{
           position: "absolute", inset: "-30px",
