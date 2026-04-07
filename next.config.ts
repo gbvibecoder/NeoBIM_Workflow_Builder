@@ -6,6 +6,24 @@ const R2_ACCOUNT_ID = process.env.R2_ACCOUNT_ID || "";
 const R2_BUCKET = process.env.R2_BUCKET_NAME || process.env.R2_BUCKET || "buildflow-files";
 
 const nextConfig: NextConfig = {
+  // ── External native-binary packages ──────────────────────────────────────
+  // ffmpeg-static ships a platform-specific binary alongside its index.js and
+  // resolves the path with `path.join(__dirname, 'ffmpeg')`. When Next.js /
+  // Turbopack BUNDLES this package into the route chunk, `__dirname` gets
+  // baked at build time to a virtual filesystem path like `/ROOT/node_modules/
+  // ffmpeg-static/` (Turbopack's workspace root prefix), which doesn't exist
+  // at runtime — `child_process.spawn` then fails with "spawn /ROOT/node_modules
+  // /ffmpeg-static/ffmpeg ENOENT".
+  //
+  // Marking ffmpeg-static as a serverExternalPackage tells Next.js to NOT
+  // bundle it: at runtime the route does a real `require('ffmpeg-static')`
+  // from disk, `__dirname` resolves to the actual `node_modules/ffmpeg-static/`
+  // directory, and the binary is found alongside it. This is the canonical
+  // Next.js fix for native-binary packages.
+  //
+  // Affects /api/concat-videos AND /api/cinematic-status (both use ffmpeg).
+  serverExternalPackages: ["ffmpeg-static"],
+
   // ⚡ PERFORMANCE: Image optimization
   images: {
     remotePatterns: [
