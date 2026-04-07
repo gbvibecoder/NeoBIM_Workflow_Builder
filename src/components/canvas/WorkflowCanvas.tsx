@@ -625,9 +625,9 @@ function WorkflowCanvasInner({ workflowId: urlWorkflowId, templateId }: Workflow
   }, []);
 
   const onPaneContextMenu = useCallback((e: React.MouseEvent | MouseEvent) => {
+    // Suppress the canvas-level popup (Fit to View / Clear Canvas).
+    // Only node-level context menus remain.
     e.preventDefault();
-    const evt = e as React.MouseEvent;
-    setContextMenu({ x: evt.clientX, y: evt.clientY, type: "canvas" });
   }, []);
 
   // Long-press touch handler for mobile context menu (500ms hold)
@@ -648,8 +648,6 @@ function WorkflowCanvasInner({ workflowId: urlWorkflowId, templateId }: Workflow
         if (nodeId) {
           setContextMenu({ x, y, type: "node", nodeId });
         }
-      } else {
-        setContextMenu({ x, y, type: "canvas" });
       }
     }, 500);
   }, []);
