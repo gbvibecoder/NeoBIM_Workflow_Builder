@@ -23,12 +23,36 @@ Keep it SHORT — under 800 words. Focus on room names, furniture, and materials
 // ─── Render prompts ─────────────────────────────────────────────────────────
 // Full-layout views use images.edit with high fidelity (model SEES the floor plan).
 // Room-specific views generate zoomed-in interior renders of individual rooms.
+//
+// The "FILL CANVAS" instruction is critical for slider alignment: when the
+// route picks a non-square output size to match the floor plan ratio
+// (1536×1024 landscape or 1024×1536 portrait), we need GPT-Image-1 to fill
+// the entire frame edge-to-edge so the rendered building lines up with the
+// 2D floor plan in the BEFORE/AFTER comparison.
 const RENDER_PROMPTS: Record<string, string> = {
   topDown:
-    "Transform this 2D floor plan into a photorealistic 3D top-down view from directly above with roof removed. LAYOUT_DESC. CRITICAL: This must be the original floor plan brought to life in 3D — SAME room positions, SAME proportions, SAME wall positions, SAME adjacencies. Realistic furniture, flooring textures, proper shadows. Professional interior design rendering.",
+    "Transform this 2D floor plan into a photorealistic 3D top-down view from directly above with roof removed. LAYOUT_DESC. CRITICAL: This must be the original floor plan brought to life in 3D — SAME room positions, SAME proportions, SAME wall positions, SAME adjacencies. The 3D render MUST FILL THE ENTIRE IMAGE CANVAS edge-to-edge — no empty borders, no whitespace, no margins, no centered framing. The complete floor plan should occupy the FULL frame at the same proportions as the source image. Realistic furniture, flooring textures, proper shadows. Professional interior design rendering.",
   birdsEye:
-    "Transform this 2D floor plan into a photorealistic 3D isometric bird's-eye cutaway view at exactly 45 degrees with the roof removed, showing ALL rooms simultaneously. LAYOUT_DESC. CRITICAL: Preserve the EXACT room arrangement, sizes, proportions, and wall positions from the floor plan — do NOT move, resize, add, or remove any room. Realistic furniture as described, warm oak flooring in living areas, tile in bathrooms/kitchen, warm natural lighting. Include room name labels. Ultra-detailed architectural rendering.",
+    "Transform this 2D floor plan into a photorealistic 3D isometric bird's-eye cutaway view at exactly 45 degrees with the roof removed, showing ALL rooms simultaneously. LAYOUT_DESC. CRITICAL: Preserve the EXACT room arrangement, sizes, proportions, and wall positions from the floor plan — do NOT move, resize, add, or remove any room. The 3D render MUST FILL THE ENTIRE IMAGE CANVAS edge-to-edge — no empty borders, no whitespace, no margins. Realistic furniture as described, warm oak flooring in living areas, tile in bathrooms/kitchen, warm natural lighting. Include room name labels. Ultra-detailed architectural rendering.",
 };
+
+// ─── Output size selection ──────────────────────────────────────────────────
+// GPT-Image-1 only supports 3 output sizes for images.edit:
+//   1024×1024 (square), 1536×1024 (landscape 3:2), 1024×1536 (portrait 2:3).
+// We pick the closest match to the floor plan's aspect ratio so the rendered
+// building visually aligns with the original 2D plan in the comparison slider.
+type RenderSize = "1024x1024" | "1536x1024" | "1024x1536";
+
+function pickRenderSize(width: number, height: number): RenderSize {
+  if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
+    return "1024x1024";
+  }
+  const ratio = width / height;
+  // > 1.2 → clearly landscape, < 0.8 → clearly portrait, otherwise square
+  if (ratio > 1.2) return "1536x1024";
+  if (ratio < 0.8) return "1024x1536";
+  return "1024x1024";
+}
 
 // Room-specific interior render prompt — ROOM_NAME and LAYOUT_DESC get replaced
 const ROOM_INTERIOR_PROMPT =
@@ -97,6 +121,14 @@ export async function POST(req: NextRequest) {
     const imageFile = formData.get("image") as File | null;
     const angle = (formData.get("angle") as string) || "birdsEye";
     const cachedDescription = (formData.get("cachedDescription") as string) || null;
+
+    // Optional original-image dimensions sent by the client (read from
+    // <img>.naturalWidth/Height on upload). Used to pick a non-square output
+    // size so the slider BEFORE/AFTER align. Falls back to square if absent.
+    const rawOriginalWidth = formData.get("originalWidth");
+    const rawOriginalHeight = formData.get("originalHeight");
+    const originalWidth = rawOriginalWidth ? parseInt(String(rawOriginalWidth), 10) : 0;
+    const originalHeight = rawOriginalHeight ? parseInt(String(rawOriginalHeight), 10) : 0;
 
     if (!imageFile) {
       return NextResponse.json(
@@ -190,17 +222,23 @@ export async function POST(req: NextRequest) {
       const renderTemplate = RENDER_PROMPTS[layoutAngle || "topDown"] || RENDER_PROMPTS.topDown;
       const renderPrompt = renderTemplate.replace("LAYOUT_DESC", roomDescription.substring(0, 2000));
 
+      // Pick the closest GPT-Image-1 size for the original floor plan ratio
+      // so the rendered building visually aligns with the BEFORE in the
+      // comparison slider. Square / landscape / portrait → matching output.
+      const layoutSize = pickRenderSize(originalWidth, originalHeight);
+
       render = await withRetry(async () => {
         try {
           return await client.images.edit({
             model: "gpt-image-1",
             image: editImageFile,
             prompt: renderPrompt,
-            size: "auto" as "1024x1024",
+            size: layoutSize,
             quality: "high",
             input_fidelity: "high",
           });
         } catch {
+          // Fallback to square if the model rejects the non-square request
           return await client.images.edit({
             model: "gpt-image-1",
             image: editImageFile,
@@ -229,12 +267,22 @@ export async function POST(req: NextRequest) {
         ? generatedImage
         : `data:image/png;base64,${generatedImage}`;
 
+    // Report the rendered size so the client can use it for slider alignment
+    // (room interiors are always square; full-layout follows the picker).
+    const renderedSize: RenderSize = isRoomInterior
+      ? "1024x1024"
+      : pickRenderSize(originalWidth, originalHeight);
+    const [renderedWidth, renderedHeight] = renderedSize.split("x").map((n) => parseInt(n, 10));
+
     return NextResponse.json({
       success: true,
       image: resultDataUrl,
       angle,
       description: roomDescription.substring(0, 500),
       fullDescription: roomDescription, // Frontend caches this to avoid redundant GPT-4o calls
+      renderedSize,
+      renderedWidth,
+      renderedHeight,
     });
   } catch (error: unknown) {
     console.error("[generate-3d-render] Full error:", JSON.stringify(error, Object.getOwnPropertyNames(error instanceof Error ? error : {}), 2));

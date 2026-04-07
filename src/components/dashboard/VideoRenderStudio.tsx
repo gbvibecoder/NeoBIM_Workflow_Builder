@@ -298,14 +298,33 @@ function ComparisonSlider({
   // True natural aspect ratio of the BEFORE image — NO CLAMPING.
   // Updated by the <img> onLoad handler below. Any shape (triangle,
   // L-shape, U-shape, panorama, tall portrait) sizes the container to its
-  // own ratio. Combined with object-contain on both BEFORE and AFTER images
-  // and a maxHeight cap, the entire image is ALWAYS visible — never cropped.
+  // own ratio.
   const [imageAspect, setImageAspect] = useState<number>(4 / 3);
+  // Natural aspect ratio of the AFTER (3D render) image. Used to decide
+  // whether the AFTER image should `object-cover` (filling the container,
+  // matching BEFORE size) or fall back to `object-contain` (letterboxed)
+  // when the ratio mismatch is too large to crop safely.
+  const [afterAspect, setAfterAspect] = useState<number | null>(null);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- reset on src clear
     if (!beforeSrc) setImageAspect(4 / 3);
   }, [beforeSrc]);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- reset on src clear
+    if (!afterSrc) setAfterAspect(null);
+  }, [afterSrc]);
+
+  // Decide AFTER image fit. If the rendered output ratio is within ±20% of
+  // the floor plan ratio, use `cover` so the AFTER fills the container at
+  // the same scale as BEFORE (cropping a thin band of empty render edge).
+  // Beyond 20%, fall back to `contain` so we don't crop the actual building.
+  const afterFit: "cover" | "contain" = (() => {
+    if (!afterAspect || imageAspect <= 0) return "contain";
+    const diff = Math.abs(afterAspect - imageAspect) / imageAspect;
+    return diff < 0.2 ? "cover" : "contain";
+  })();
 
   const handleMove = useCallback((clientX: number) => {
     if (!containerRef.current) return;
@@ -421,12 +440,31 @@ function ComparisonSlider({
         {/* AFTER */}
         <div className="absolute inset-0" style={{ background: "#f8f8f8", clipPath: `inset(0 0 0 ${sliderPos}%)` }}>
           {afterSrc ? (
-            // object-contain (not cover) so a square 1024×1024 GPT-Image-1
-            // render is never cropped — letterboxes against the same #f8f8f8
-            // background as the BEFORE side. The clipPath above only reveals
-            // the right side of this layer; it does not crop the image itself.
+            // Dynamic object-fit (set via inline style so we can switch it
+            // without Tailwind class generation issues):
+            //   • cover  → ratio mismatch <20%, fills container like BEFORE
+            //              (slider alignment looks correct, may crop a tiny
+            //              edge band of empty render area)
+            //   • contain → ratio mismatch >20%, letterboxed so building is
+            //              never cropped (used when the mapping to GPT-Image-1's
+            //              discrete sizes can't get close enough to the floor
+            //              plan ratio)
+            // The onLoad reads the ACTUAL dimensions of the rendered image
+            // so the decision uses ground truth, not API response trust.
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={afterSrc} alt="3D Render" className="w-full h-full object-contain" draggable={false} />
+            <img
+              src={afterSrc}
+              alt="3D Render"
+              className="w-full h-full"
+              style={{ objectFit: afterFit }}
+              draggable={false}
+              onLoad={(e) => {
+                const img = e.currentTarget;
+                if (img.naturalWidth > 0 && img.naturalHeight > 0) {
+                  setAfterAspect(img.naturalWidth / img.naturalHeight);
+                }
+              }}
+            />
           ) : (
             <div className="w-full h-full flex items-center justify-center" style={{
               background: "linear-gradient(145deg, #EEF2FF 0%, #E0E7FF 35%, #C7D2FE 65%, #A5B4FC 100%)",
@@ -1159,6 +1197,10 @@ export default function VideoRenderStudio() {
   const [step, setStep] = useState<WizardStep>("upload");
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  // Natural pixel dimensions of the uploaded floor plan, read from the
+  // <img> onLoad. Sent to /api/generate-3d-render so it can pick a non-square
+  // GPT-Image-1 output size that matches the floor plan ratio.
+  const [uploadedDims, setUploadedDims] = useState<{ width: number; height: number } | null>(null);
   const [renderProgress, setRenderProgress] = useState(0);
   const [renders, setRenders] = useState<RenderResult[]>([]);
   const [selectedRender, setSelectedRender] = useState("r1");
@@ -1177,9 +1219,22 @@ export default function VideoRenderStudio() {
   const localBlobUrlRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (!uploadedFile) { setPreviewUrl(null); return; }
+    if (!uploadedFile) {
+      setPreviewUrl(null);
+      setUploadedDims(null);
+      return;
+    }
     const url = URL.createObjectURL(uploadedFile);
     setPreviewUrl(url);
+    // Read the floor plan's natural dimensions so we can send them to the
+    // render API and pick a matching GPT-Image-1 output size.
+    const probe = new Image();
+    probe.onload = () => {
+      if (probe.naturalWidth > 0 && probe.naturalHeight > 0) {
+        setUploadedDims({ width: probe.naturalWidth, height: probe.naturalHeight });
+      }
+    };
+    probe.src = url;
     return () => URL.revokeObjectURL(url);
   }, [uploadedFile]);
 
@@ -1305,6 +1360,12 @@ export default function VideoRenderStudio() {
       formData.append("image", uploadedFile);
       formData.append("angle", view.apiAngle);
       if (cachedDesc) formData.append("cachedDescription", cachedDesc);
+      // Send original dimensions so the API can pick a matching output size
+      // (1024×1024, 1536×1024, or 1024×1536). Critical for slider alignment.
+      if (uploadedDims) {
+        formData.append("originalWidth", String(uploadedDims.width));
+        formData.append("originalHeight", String(uploadedDims.height));
+      }
 
       const res = await fetch("/api/generate-3d-render", {
         method: "POST",
@@ -1352,7 +1413,7 @@ export default function VideoRenderStudio() {
       // Going BACK to upload on error — base state, no history push
       setStep("upload");
     }
-  }, [uploadedFile, goToStep]);
+  }, [uploadedFile, uploadedDims, goToStep]);
 
   // ─── REAL VIDEO GENERATION PIPELINE ───────────────────────────────────────
   // Calls /api/generate-video-walkthrough → polls /api/video-status →
@@ -1773,6 +1834,7 @@ export default function VideoRenderStudio() {
     setStep("upload");
     setUploadedFile(null);
     setPreviewUrl(null);
+    setUploadedDims(null);
     setRenderProgress(0);
     setRenders([]);
     setSelectedRender("r1");
