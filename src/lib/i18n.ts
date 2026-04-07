@@ -22,6 +22,7 @@ const en = {
   'nav.searchPlaceholder': 'Search workflows, templates...',
   'nav.feedback': 'Feedback',
   'nav.ifcViewer': 'IFC Viewer',
+  'nav.3dRender': '3D Video Render',
 
   // ===== AUTH =====
   'auth.welcomeBack': 'Welcome back',
@@ -2627,6 +2628,7 @@ const de: Record<keyof typeof en, string | string[]> = {
   'nav.searchPlaceholder': 'Workflows, Vorlagen suchen...',
   'nav.feedback': 'Feedback',
   'nav.ifcViewer': 'IFC-Viewer',
+  'nav.3dRender': '3D Video Render',
 
   // ===== AUTH =====
   'auth.welcomeBack': 'Willkommen zurück',

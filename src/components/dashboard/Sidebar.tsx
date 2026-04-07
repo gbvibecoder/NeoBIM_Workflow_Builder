@@ -24,6 +24,7 @@ import {
   MessageSquareHeart,
   FileBox,
   PenTool,
+  Video,
 } from "lucide-react";
 import { PREBUILT_WORKFLOWS } from "@/constants/prebuilt-workflows";
 import { useLocale } from "@/hooks/useLocale";
@@ -43,6 +44,7 @@ export function Sidebar() {
     { href: "/dashboard/analytics", label: t("nav.analytics"),   icon: BarChart3 },
     { href: "/dashboard/ifc-viewer", label: t("nav.ifcViewer"),   icon: FileBox, badge: "New" },
     { href: "/dashboard/floor-plan", label: "Floor Plan",         icon: PenTool, badge: "New" },
+    { href: "/dashboard/3d-render",  label: t("nav.3dRender"),    icon: Video,   badge: "New" },
   ];
 
   const SECONDARY_NAV = [

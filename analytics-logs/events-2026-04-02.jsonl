@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 {"id":"4707d0fe-97c8-4f11-b0c8-f2cba519d65b","timestamp":"2026-04-02T01:55:52.672Z","userId":"cmmdh1l94000004l8v14nq5gu","eventName":"user_login"}
 {"id":"73bf565d-9bcb-4982-8b85-5def199bbe24","timestamp":"2026-04-02T01:56:17.953Z","userId":"cmmdh1l94000004l8v14nq5gu","eventName":"workflow_created","properties":{"workflowId":"cmngtpu5r0000otvbl7xbbzwk"}}
 {"id":"756b7265-9498-4feb-a0dd-56ddabeb8c4a","timestamp":"2026-04-02T01:56:25.632Z","userId":"cmmdh1l94000004l8v14nq5gu","eventName":"execution_started","properties":{"executionId":"cmngtq04p0002otvbsgga4gfp"}}
@@ -100,3 +101,26 @@
 {"id":"20c1323f-a46d-4b2f-969b-52e1d0613a85","timestamp":"2026-04-02T07:39:56.235Z","userId":"cmmdh1l94000004l8v14nq5gu","eventName":"workflow_executed","properties":{"nodeCount":5,"catalogueIds":["IN-003","TR-004","GN-003","GN-003","GN-009"]}}
 {"id":"df987ce4-2593-42bf-b192-154fd2a22e67","timestamp":"2026-04-02T09:43:35.935Z","userId":"cmmdh1l94000004l8v14nq5gu","eventName":"user_login"}
 {"id":"c8775cab-8298-4173-b20b-d66ad033561c","timestamp":"2026-04-02T10:16:28.090Z","userId":"cmmdh1l94000004l8v14nq5gu","eventName":"user_login"}
+=======
+{"id":"6dd12e07-b4c3-428a-a444-48db58a1ff50","timestamp":"2026-04-02T04:12:45.602Z","userId":"cmmdh1l94000004l8v14nq5gu","eventName":"user_login"}
+{"id":"f4b6adba-c9ee-4651-9fbe-c76a37f8ac66","timestamp":"2026-04-02T04:13:43.762Z","userId":"cmmdh1l94000004l8v14nq5gu","eventName":"workflow_created","properties":{"workflowId":"cmngymkm40000kwsuzlocj2n7"}}
+{"id":"19834c75-a5aa-4189-a430-bab96b6107c0","timestamp":"2026-04-02T04:13:51.340Z","userId":"cmmdh1l94000004l8v14nq5gu","eventName":"execution_started","properties":{"executionId":"cmngymqp20002kwsu45wrwfnu"}}
+{"id":"3954e599-7d24-46ac-a336-6bcb3fb180c4","timestamp":"2026-04-02T04:13:53.476Z","userId":"cmmdh1l94000004l8v14nq5gu","eventName":"node_used","properties":{"catalogueId":"IN-001","nodeLabel":"Text Prompt"}}
+{"id":"2dc4e2f1-b919-44d1-bfd7-bab754fe3c29","timestamp":"2026-04-02T04:14:12.607Z","userId":"cmmdh1l94000004l8v14nq5gu","eventName":"node_used","properties":{"catalogueId":"TR-003","nodeLabel":"Design Brief Analyzer"}}
+{"id":"76e409d2-b713-43b5-9a07-95d63776c464","timestamp":"2026-04-02T04:14:36.201Z","userId":"cmmdh1l94000004l8v14nq5gu","eventName":"workflow_executed","properties":{"nodeCount":3,"catalogueIds":["IN-001","TR-003","GN-012"]}}
+{"id":"a414a4b2-4fb2-415a-b9c9-927ff2e08ffc","timestamp":"2026-04-02T04:14:36.201Z","userId":"cmmdh1l94000004l8v14nq5gu","eventName":"node_used","properties":{"catalogueId":"GN-012","nodeLabel":"Floor Plan Editor"}}
+{"id":"3f5e3ca3-9d55-42cf-af99-9a2bdf83a527","timestamp":"2026-04-02T04:31:38.725Z","userId":"cmmdh1l94000004l8v14nq5gu","eventName":"workflow_created","properties":{"workflowId":"cmngz9jwk0006kwsuf4h9ro9t"}}
+{"id":"0e033498-e2ca-4576-9b75-1e7c8450bf39","timestamp":"2026-04-02T04:31:50.749Z","userId":"cmmdh1l94000004l8v14nq5gu","eventName":"execution_started","properties":{"executionId":"cmngz9vew0008kwsuov1tchwf"}}
+{"id":"54be8895-c052-4d79-8984-187ebcfe0aab","timestamp":"2026-04-02T04:31:52.939Z","userId":"cmmdh1l94000004l8v14nq5gu","eventName":"node_used","properties":{"catalogueId":"IN-004","nodeLabel":"IFC Upload"}}
+{"id":"59ff4b02-84fd-4892-90f1-adf86d58295f","timestamp":"2026-04-02T04:31:52.939Z","userId":"cmmdh1l94000004l8v14nq5gu","eventName":"node_used","properties":{"catalogueId":"TR-007","nodeLabel":"Quantity Extractor"}}
+{"id":"3a367c35-eba5-47a5-a55c-6362855ecf0c","timestamp":"2026-04-02T04:31:52.939Z","userId":"cmmdh1l94000004l8v14nq5gu","eventName":"node_used","properties":{"catalogueId":"IN-006","nodeLabel":"Location Input"}}
+{"id":"e862da4a-fe91-428a-af18-1a338ba034fe","timestamp":"2026-04-02T04:32:11.844Z","userId":"cmmdh1l94000004l8v14nq5gu","eventName":"node_used","properties":{"catalogueId":"TR-015","nodeLabel":"Market Intelligence"}}
+{"id":"6cae63ab-981e-4585-8985-9755f70f592f","timestamp":"2026-04-02T04:32:11.844Z","userId":"cmmdh1l94000004l8v14nq5gu","eventName":"node_used","properties":{"catalogueId":"EX-002","nodeLabel":"BOQ / Spreadsheet Exporter"}}
+{"id":"80e2916a-afab-462d-b862-45011a9195ff","timestamp":"2026-04-02T04:32:11.844Z","userId":"cmmdh1l94000004l8v14nq5gu","eventName":"node_used","properties":{"catalogueId":"TR-008","nodeLabel":"BOQ / Cost Mapper"}}
+{"id":"e6d220fe-5a97-42af-b24c-31aebc8815d1","timestamp":"2026-04-02T04:32:11.844Z","userId":"cmmdh1l94000004l8v14nq5gu","eventName":"workflow_executed","properties":{"nodeCount":6,"catalogueIds":["IN-004","IN-006","TR-007","TR-015","TR-008","EX-002"]}}
+{"id":"593e3e17-cbb8-4bce-9d7b-13ae84fd859d","timestamp":"2026-04-02T04:47:07.239Z","userId":"cmmdh1l94000004l8v14nq5gu","eventName":"workflow_created","properties":{"workflowId":"cmngztgo5000dkwsu2cpkggk3"}}
+{"id":"66efad9a-c389-414d-a64e-32eae0c3eaef","timestamp":"2026-04-02T04:47:23.750Z","userId":"cmmdh1l94000004l8v14nq5gu","eventName":"execution_started","properties":{"executionId":"cmngztvgj000fkwsu6t5x83wr"}}
+{"id":"e0cba287-a769-4952-a265-0c584d4f7936","timestamp":"2026-04-02T04:47:26.008Z","userId":"cmmdh1l94000004l8v14nq5gu","eventName":"node_used","properties":{"catalogueId":"IN-004","nodeLabel":"IFC Upload"}}
+{"id":"f6842996-0a63-4295-850a-39aa72807106","timestamp":"2026-04-02T04:47:26.008Z","userId":"cmmdh1l94000004l8v14nq5gu","eventName":"workflow_executed","properties":{"nodeCount":2,"catalogueIds":["IN-004","TR-016"]}}
+{"id":"29ba2883-2f19-4252-acf8-56aab94c3f92","timestamp":"2026-04-02T09:24:53.150Z","userId":"cmmdh1l94000004l8v14nq5gu","eventName":"user_login"}
+>>>>>>> upstream/main

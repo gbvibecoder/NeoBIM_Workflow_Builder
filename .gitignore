@@ -24,6 +24,9 @@ prisma/dev.db-journal
 *.pem
 *.pid
 
+# Client project files (confidential, not for git)
+2025 Anbau EG/
+
 # Vercel
 .vercel
 

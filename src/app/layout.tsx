@@ -269,7 +269,9 @@ export default function RootLayout({
           Skip to main content
         </a>
         <SessionProvider>
-          <MobileGate><div id="main-content">{children}</div></MobileGate>
+          <div id="main-content">
+            <MobileGate>{children}</MobileGate>
+          </div>
         </SessionProvider>
         <Toaster
           position="bottom-right"

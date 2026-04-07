@@ -11,9 +11,12 @@ export function MobileGate({ children }: { children: React.ReactNode }) {
   const { t } = useLocale();
   const pathname = usePathname();
   const [isSmall, setIsSmall] = useState(false);
-  const [dismissed, setDismissed] = useState(
-    () => typeof window !== "undefined" && sessionStorage.getItem(DISMISSED_KEY) === "1"
-  );
+  const [dismissed, setDismissed] = useState(false);
+
+  // Read sessionStorage after mount to avoid hydration mismatch
+  useEffect(() => {
+    if (sessionStorage.getItem(DISMISSED_KEY) === "1") setDismissed(true);
+  }, []);
 
   useEffect(() => {
     const check = () => setIsSmall(window.innerWidth < 1024);
