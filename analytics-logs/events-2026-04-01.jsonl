@@ -21,3 +21,7 @@
 {"id":"efc0cf52-68db-4a33-9fd1-445c034937e6","timestamp":"2026-04-01T11:12:58.704Z","userId":"cmmav32p2000004jmbi8nukwf","eventName":"user_login"}
 {"id":"1742be79-f608-4df9-a4fe-52713fa540d5","timestamp":"2026-04-01T11:20:16.442Z","userId":"cmmav32p2000004jmbi8nukwf","eventName":"user_login"}
 {"id":"3eac57aa-0e5b-42ed-92a0-f602a72694b3","timestamp":"2026-04-01T11:45:37.312Z","userId":"cmmav32p2000004jmbi8nukwf","eventName":"user_login"}
+{"id":"cec276cc-2db9-4d2e-b3ca-7b7699298034","timestamp":"2026-04-01T16:31:25.600Z","userId":"cmmav32p2000004jmbi8nukwf","eventName":"user_login"}
+{"id":"189376a4-199b-4544-a9c8-647c50715755","timestamp":"2026-04-01T16:43:08.821Z","userId":"cmmav32p2000004jmbi8nukwf","eventName":"workflow_created","properties":{"workflowId":"cmng9yhld0000nzl8cuy151h7"}}
+{"id":"0fd0b114-6b2e-432f-b35a-0c9d2d81f99a","timestamp":"2026-04-01T16:43:12.734Z","userId":"cmmav32p2000004jmbi8nukwf","eventName":"execution_started","properties":{"executionId":"cmng9ykoq0002nzl8qv2w337p"}}
+{"id":"bd8cac12-51ef-4880-8568-2b57f8ee7499","timestamp":"2026-04-01T16:43:14.764Z","userId":"cmmav32p2000004jmbi8nukwf","eventName":"node_used","properties":{"catalogueId":"IN-001","nodeLabel":"Text Prompt"}}

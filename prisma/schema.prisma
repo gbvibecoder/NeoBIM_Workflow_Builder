@@ -12,6 +12,9 @@ model User {
   name          String?
   image         String?
   emailVerified DateTime?
+  // Phone login (production-aligned): phoneNumber is unique because it doubles
+  // as a login identifier alongside email. phoneVerified is a timestamp marking
+  // when the number was confirmed (null = unverified).
   phoneNumber   String?                @unique
   phoneVerified DateTime?
   password      String?
@@ -46,6 +49,7 @@ model User {
   referralsSent     Referral[]  @relation("ReferralsSent")
   referralsReceived Referral[]  @relation("ReferralReceived")
   supportConversations SupportConversation[]
+  videoShareLinks   VideoShareLink[]
 
   @@map("users")
 }
@@ -603,4 +607,24 @@ model SupportQuickReply {
 
   @@index([category])
   @@map("support_quick_replies")
+}
+
+// ─── Video Share Links ──────────────────────────────────────────────────────
+// Public, slug-addressed share links for generated walkthrough videos.
+// Created via POST /api/share/video and consumed by app/share/[slug]/page.tsx.
+// View count is incremented (best-effort) on each public page load.
+model VideoShareLink {
+  id          String    @id @default(cuid())
+  slug        String    @unique
+  videoUrl    String
+  title       String?
+  expiresAt   DateTime?
+  viewCount   Int       @default(0)
+  createdById String
+  createdBy   User      @relation(fields: [createdById], references: [id], onDelete: Cascade)
+  createdAt   DateTime  @default(now())
+
+  @@index([createdById])
+  @@index([createdAt])
+  @@map("video_share_links")
 }

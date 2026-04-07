@@ -49,6 +49,16 @@ window.addEventListener("message",function(ev){
   if(!__sceneReady){__cmdQueue.push(ev.data);return;}
 });
 <\/script>
+<!--
+  THREE.JS VERSION PIN — DO NOT BUMP NAIVELY.
+  This iframe uses the legacy r128 global-script ('examples/js/...') API.
+  Three.js r129 (May 2021) DEPRECATED examples/js and migrated to ES modules
+  under examples/jsm/, requiring \`<script type="module">\` + an import map.
+  Bumping the version below to anything > 0.128 will 404 every postprocessing
+  / loader / controls script in this file. The package.json npm \`three\` is
+  pinned at 0.183.x for the React Three Fiber world; the iframe lives on r128
+  on its own. Bumping requires a full rewrite to the ESM examples/jsm path.
+-->
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js" onerror="document.title='CDN_FAIL';console.error('[IFRAME] Three.js CDN failed to load')"><\/script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/EffectComposer.js"><\/script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/RenderPass.js"><\/script>

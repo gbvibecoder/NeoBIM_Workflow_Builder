@@ -1773,6 +1773,21 @@ const en = {
   'toast.renderingWalkthrough': 'Rendering walkthrough...',
   'toast.threejsRendering': 'Three.js rendering in your browser',
   'toast.videoRetryFailed': 'Video retry failed',
+  'toast.videoCreateStarting': 'Submitting to AI walkthrough generator…',
+  'toast.videoCreateFailed': 'Could not start video generation',
+  'toast.videoCreateNoModel': 'Generate a 3D model first',
+  'toast.shareLinkCopied': 'Share link copied to clipboard',
+  'toast.shareLinkFailed': 'Could not create share link',
+
+  // ===== CREATE VIDEO CTA =====
+  'showcase.createVideoWalkthrough': 'Create 3D Video Walkthrough',
+  'showcase.createVideoWalkthroughDesc': 'Generate a cinematic 1080p flythrough of your 3D model — exterior orbit + interior tour, powered by AI',
+  'showcase.createVideoSubmitting': 'Submitting to AI…',
+  'showcase.createVideoArrow': '→',
+  'showcase.downloadMP4': 'Download MP4',
+  'showcase.previewFullScreen': 'Preview Full Screen',
+  'showcase.shareLink': 'Share Link',
+  'showcase.resultTabsLabel': 'Workflow result tabs',
 
   // ===== AUTH PAGES (additional) =====
   'auth.authenticate': 'AUTHENTICATE',
@@ -4380,6 +4395,21 @@ const de: Record<keyof typeof en, string | string[]> = {
   'toast.renderingWalkthrough': 'Rundgang wird gerendert...',
   'toast.threejsRendering': 'Three.js-Rendering in Ihrem Browser',
   'toast.videoRetryFailed': 'Video-Wiederholung fehlgeschlagen',
+  'toast.videoCreateStarting': 'Wird an KI-Rundgang-Generator übermittelt…',
+  'toast.videoCreateFailed': 'Videogenerierung konnte nicht gestartet werden',
+  'toast.videoCreateNoModel': 'Erstellen Sie zuerst ein 3D-Modell',
+  'toast.shareLinkCopied': 'Freigabelink in Zwischenablage kopiert',
+  'toast.shareLinkFailed': 'Freigabelink konnte nicht erstellt werden',
+
+  // ===== CREATE VIDEO CTA =====
+  'showcase.createVideoWalkthrough': '3D-Video-Rundgang erstellen',
+  'showcase.createVideoWalkthroughDesc': 'Generieren Sie einen filmischen 1080p-Flug durch Ihr 3D-Modell — Außenorbit + Innenrundgang, KI-gesteuert',
+  'showcase.createVideoSubmitting': 'Wird an KI übermittelt…',
+  'showcase.createVideoArrow': '→',
+  'showcase.downloadMP4': 'MP4 herunterladen',
+  'showcase.previewFullScreen': 'Vollbildvorschau',
+  'showcase.shareLink': 'Freigabelink',
+  'showcase.resultTabsLabel': 'Workflow-Ergebnis-Reiter',
 
   // ===== AUTH PAGES (additional) =====
   'auth.authenticate': 'AUTHENTIFIZIEREN',

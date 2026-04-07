@@ -66,6 +66,7 @@
     "web-ifc": "^0.0.76",
     "ws": "^8.19.0",
     "xlsx": "^0.18.5",
+    "zod": "^4.3.6",
     "zustand": "^5.0.12"
   },
   "devDependencies": {

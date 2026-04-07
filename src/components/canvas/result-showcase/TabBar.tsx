@@ -37,7 +37,7 @@ export function TabBar({ availableTabs, activeTab, onTabChange }: TabBarProps) {
   return (
     <div
       role="tablist"
-      aria-label={t('showcase.tabOverview')}
+      aria-label={t('showcase.resultTabsLabel')}
       style={{
         display: "flex",
         alignItems: "center",
