@@ -723,7 +723,7 @@ export const BaseNode = memo(function BaseNode({ id, data, selected }: BaseNodeP
         style={{
           ["--cat-color" as string]: color,
           ["--cat-rgb" as string]: rgb,
-          width: isInput ? 320 : 260,
+          width: isInput ? 320 : 200,
           background: "rgba(10, 12, 14, 0.75)",
           border: `1.5px solid ${outerBorderColor}`,
           borderRadius: 4,
@@ -886,7 +886,7 @@ export const BaseNode = memo(function BaseNode({ id, data, selected }: BaseNodeP
         )}
 
         {/* ── Content ── */}
-        <div style={{ padding: "16px 18px 14px 18px", position: "relative", zIndex: 1 }}>
+        <div style={{ padding: isInput ? "16px 18px 14px 18px" : "10px 12px 9px 14px", position: "relative", zIndex: 1 }}>
 
           {/* Row 1: Icon + name + status + INPUT badge */}
           <div style={{ display: "flex", alignItems: "flex-start", gap: 10, marginBottom: 2 }}>
@@ -1040,7 +1040,7 @@ export const BaseNode = memo(function BaseNode({ id, data, selected }: BaseNodeP
           {data.catalogueId === "GN-003" && <ViewTypeSelect nodeId={id} data={data} />}
 
           {/* Row 3: Category decoration + time estimate pill */}
-          <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 10 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: isInput ? 10 : 6 }}>
             {/* Category-specific mini visualization */}
             {category === "input" && <DraftingCompass color={color} />}
             {category === "transform" && <TrussFrame color={color} isRunning={status === "running"} />}
