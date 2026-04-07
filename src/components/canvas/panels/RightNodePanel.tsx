@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { ChevronLeft, ChevronRight, Layers3 } from "lucide-react";
 import { NodeLibrarySidebar } from "./NodeLibrarySidebar";
 import { useLocale } from "@/hooks/useLocale";
+import { useUIStore } from "@/stores/ui-store";
 
 /**
  * Right-side collapsible panel that houses the Node Library on the canvas page.
@@ -12,7 +13,8 @@ import { useLocale } from "@/hooks/useLocale";
  */
 export function RightNodePanel() {
   const { t } = useLocale();
-  const [isOpen, setIsOpen] = useState(false);
+  const isOpen = useUIStore((s) => s.isNodeLibraryOpen);
+  const toggleNodeLibrary = useUIStore((s) => s.toggleNodeLibrary);
   const [isHovered, setIsHovered] = useState(false);
 
   const tabActive = isOpen || isHovered;
@@ -35,7 +37,7 @@ export function RightNodePanel() {
     >
       {/* Toggle tab — always visible on the left edge of the panel */}
       <button
-        onClick={() => setIsOpen((o) => !o)}
+        onClick={toggleNodeLibrary}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
         title={isOpen ? t('canvas.collapseNodeLibrary') : t('canvas.expandNodeLibrary')}
