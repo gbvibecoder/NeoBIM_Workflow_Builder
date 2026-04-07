@@ -11,6 +11,7 @@ import React, {
 import { Canvas, useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { motion, AnimatePresence } from "framer-motion";
+import { toast } from "sonner";
 import Link from "next/link";
 import {
   Upload,
@@ -24,13 +25,13 @@ import {
   Eye,
   Layers,
   Camera,
-  Play,
   Check,
   MoveHorizontal,
   PenTool,
   Share2,
   Film,
   Maximize2,
+  AlertTriangle,
 } from "lucide-react";
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -95,6 +96,20 @@ const RENDER_VIEWS: Omit<RenderResult, "url">[] = [
   { id: "r2", label: "Kitchen", angle: "Interior View", apiAngle: "roomInterior:Kitchen" },
   { id: "r3", label: "Bedroom", angle: "Interior View", apiAngle: "roomInterior:Bedroom" },
   { id: "r4", label: "Full Layout", angle: "Top Down", apiAngle: "topDown" },
+];
+
+// Witty status messages cycled during real video generation. Same tone as
+// COPY.processing.stages so the video step feels consistent with rendering.
+const VIDEO_STATUS_MESSAGES = [
+  "Submitting your masterpiece to the AI render farm...",
+  "Teaching pixels how to pretend they're walls...",
+  "Convincing the AI that 3D is just 2D with confidence...",
+  "Generating exterior cinematic sweep...",
+  "Adding that natural lighting your actual apartment doesn't have...",
+  "Filming the interior walkthrough — slowly, dramatically...",
+  "Arranging furniture with better taste than IKEA...",
+  "Almost there — stitching scenes together...",
+  "Polishing the final cut. Try not to blink.",
 ];
 
 // Model options kept for future use but not rendered in current UI
@@ -280,14 +295,16 @@ function ComparisonSlider({
   const containerRef = useRef<HTMLDivElement>(null);
   const [sliderPos, setSliderPos] = useState(50);
   const [isDragging, setIsDragging] = useState(false);
-  const [imgRatio, setImgRatio] = useState("4/3");
+  // True natural aspect ratio of the BEFORE image — NO CLAMPING.
+  // Updated by the <img> onLoad handler below. Any shape (triangle,
+  // L-shape, U-shape, panorama, tall portrait) sizes the container to its
+  // own ratio. Combined with object-contain on both BEFORE and AFTER images
+  // and a maxHeight cap, the entire image is ALWAYS visible — never cropped.
+  const [imageAspect, setImageAspect] = useState<number>(4 / 3);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- reset ratio when source clears
-    if (!beforeSrc) { setImgRatio("4/3"); return; }
-    const img = new Image();
-    img.onload = () => setImgRatio(`${img.naturalWidth}/${img.naturalHeight}`);
-    img.src = beforeSrc;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- reset on src clear
+    if (!beforeSrc) setImageAspect(4 / 3);
   }, [beforeSrc]);
 
   const handleMove = useCallback((clientX: number) => {
@@ -344,8 +361,16 @@ function ComparisonSlider({
         ref={containerRef}
         className="relative w-full overflow-hidden rounded-2xl select-none"
         style={{
-          aspectRatio: imgRatio,
-          maxHeight: "65vh",
+          // Container ratio = the BEFORE image's TRUE natural aspect ratio.
+          // No clamping. With object-contain on the inner images and the
+          // maxHeight cap below, the full image is always shown — letterboxed
+          // against #f8f8f8 in the unused dimension. This works for ANY
+          // shape: square, wide panorama, tall portrait, triangle, L, U, etc.
+          aspectRatio: imageAspect,
+          maxHeight: "min(70vh, 600px)",
+          minHeight: "240px",
+          width: "100%",
+          background: "#f8f8f8",
           cursor: isDragging ? "grabbing" : "ew-resize",
           boxShadow: "0 20px 60px rgba(99,102,241,0.15), 0 4px 20px rgba(0,0,0,0.08)",
         }}
@@ -363,10 +388,26 @@ function ComparisonSlider({
         aria-valuenow={Math.round(sliderPos)}
       >
         {/* BEFORE */}
-        <div className="absolute inset-0 bg-white">
+        <div className="absolute inset-0" style={{ background: "#f8f8f8" }}>
           {beforeSrc ? (
+            // The onLoad handler reads the image's TRUE natural aspect ratio
+            // and sets the container ratio so the entire shape is shown,
+            // regardless of how unusual the floor plan is. object-contain
+            // guarantees no cropping in the (rare) case where maxHeight forces
+            // the container into a slightly different ratio than the image.
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={beforeSrc} alt="2D Floor Plan" className="w-full h-full object-contain bg-white" draggable={false} />
+            <img
+              src={beforeSrc}
+              alt="2D Floor Plan"
+              className="w-full h-full object-contain"
+              draggable={false}
+              onLoad={(e) => {
+                const img = e.currentTarget;
+                if (img.naturalWidth > 0 && img.naturalHeight > 0) {
+                  setImageAspect(img.naturalWidth / img.naturalHeight);
+                }
+              }}
+            />
           ) : (
             <div className="w-full h-full flex items-center justify-center bg-gray-50">
               <div className="text-center text-gray-300">
@@ -378,10 +419,14 @@ function ComparisonSlider({
         </div>
 
         {/* AFTER */}
-        <div className="absolute inset-0" style={{ clipPath: `inset(0 0 0 ${sliderPos}%)` }}>
+        <div className="absolute inset-0" style={{ background: "#f8f8f8", clipPath: `inset(0 0 0 ${sliderPos}%)` }}>
           {afterSrc ? (
+            // object-contain (not cover) so a square 1024×1024 GPT-Image-1
+            // render is never cropped — letterboxes against the same #f8f8f8
+            // background as the BEFORE side. The clipPath above only reveals
+            // the right side of this layer; it does not crop the image itself.
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={afterSrc} alt="3D Render" className="w-full h-full object-cover" draggable={false} />
+            <img src={afterSrc} alt="3D Render" className="w-full h-full object-contain" draggable={false} />
           ) : (
             <div className="w-full h-full flex items-center justify-center" style={{
               background: "linear-gradient(145deg, #EEF2FF 0%, #E0E7FF 35%, #C7D2FE 65%, #A5B4FC 100%)",
@@ -824,12 +869,38 @@ function RenderGallery({
 function VideoSection({
   videoProgress,
   videoReady,
+  videoUrl,
+  videoStatusText,
+  videoError,
+  videoElapsed,
+  isSharing,
   onGenerate,
+  onDownload,
+  onPreview,
+  onShare,
+  onRetry,
+  onDownload4K,
+  videoRef,
 }: {
   videoProgress: number;
   videoReady: boolean;
+  videoUrl: string | null;
+  videoStatusText: string;
+  videoError: string | null;
+  videoElapsed: number;
+  isSharing: boolean;
   onGenerate: () => void;
+  onDownload: () => void;
+  onPreview: () => void;
+  onShare: () => void;
+  onRetry: () => void;
+  onDownload4K: () => void;
+  videoRef: React.RefObject<HTMLVideoElement | null>;
 }) {
+  const elapsedMins = Math.floor(videoElapsed / 60);
+  const elapsedSecs = videoElapsed % 60;
+  const elapsedLabel = `${elapsedMins}:${elapsedSecs.toString().padStart(2, "0")}`;
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 24 }}
@@ -853,36 +924,63 @@ function VideoSection({
           boxShadow: "0 20px 60px rgba(0,0,0,0.2)",
         }}
       >
-        {videoReady ? (
-          <div className="absolute inset-0 flex items-center justify-center">
-            <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: "spring", bounce: 0.4 }} className="text-center">
-              <motion.div
-                className="w-16 h-16 rounded-full bg-white/10 backdrop-blur-xl flex items-center justify-center mx-auto mb-3 border border-white/20 cursor-pointer"
-                whileHover={{ scale: 1.1, boxShadow: "0 0 30px rgba(99,102,241,0.3)" }}
-                whileTap={{ scale: 0.95 }}
-                animate={{ boxShadow: ["0 0 0px rgba(99,102,241,0)", "0 0 20px rgba(99,102,241,0.3)", "0 0 0px rgba(99,102,241,0)"] }}
-                transition={{ duration: 2, repeat: Infinity }}
-              >
-                <Play size={28} className="text-white ml-1" />
-              </motion.div>
-              <p className="text-xs text-gray-400 font-medium italic">{COPY.video.done}</p>
-            </motion.div>
+        {videoError ? (
+          // ─── ERROR STATE ───
+          <div className="absolute inset-0 flex items-center justify-center px-6">
+            <div className="text-center max-w-sm">
+              <div className="w-12 h-12 rounded-full bg-red-500/15 border border-red-500/30 flex items-center justify-center mx-auto mb-3">
+                <AlertTriangle size={20} className="text-red-400" />
+              </div>
+              <p className="text-sm font-semibold text-red-200 mb-1">Video generation failed</p>
+              <p className="text-[11px] text-red-300/70 italic break-words">{videoError}</p>
+            </div>
           </div>
+        ) : videoReady && videoUrl ? (
+          // ─── REAL VIDEO PLAYER ───
+          <video
+            ref={videoRef}
+            src={videoUrl}
+            controls
+            autoPlay
+            muted
+            playsInline
+            crossOrigin="anonymous"
+            className="absolute inset-0 w-full h-full"
+            style={{ objectFit: "cover", background: "#000" }}
+          />
         ) : videoProgress > 0 ? (
+          // ─── PROGRESS STATE ───
           <div className="absolute inset-0 flex flex-col items-center justify-center">
             <div className="w-3/5 max-w-sm">
               <div className="flex items-center justify-between text-[11px] text-gray-500 mb-2 font-medium">
                 <span>Rendering walkthrough</span>
-                <span>{Math.round(videoProgress)}%</span>
+                <span style={{ fontFamily: "var(--font-jetbrains, monospace)" }}>{elapsedLabel} · {Math.round(videoProgress)}%</span>
               </div>
               <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
-                <motion.div className="h-full rounded-full" style={{ background: "linear-gradient(90deg, #6366F1, #F59E0B)" }}
-                  initial={{ width: "0%" }} animate={{ width: `${videoProgress}%` }} transition={{ duration: 0.4 }} />
+                <motion.div
+                  className="h-full rounded-full"
+                  style={{ background: "linear-gradient(90deg, #6366F1, #F59E0B)" }}
+                  initial={{ width: "0%" }}
+                  animate={{ width: `${videoProgress}%` }}
+                  transition={{ duration: 0.6, ease: "easeOut" }}
+                />
               </div>
-              <p className="text-[11px] text-gray-600 mt-2.5 text-center italic">{COPY.video.generating}</p>
+              <AnimatePresence mode="wait">
+                <motion.p
+                  key={videoStatusText}
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -6 }}
+                  transition={{ duration: 0.35 }}
+                  className="text-[11px] text-gray-400 mt-2.5 text-center italic"
+                >
+                  {videoStatusText || COPY.video.generating}
+                </motion.p>
+              </AnimatePresence>
             </div>
           </div>
         ) : (
+          // ─── EMPTY STATE ───
           <div className="absolute inset-0 flex items-center justify-center">
             <div className="text-center">
               <Video size={36} className="text-gray-700 mx-auto mb-2" />
@@ -894,31 +992,67 @@ function VideoSection({
 
       {/* Action buttons */}
       <div className="flex items-center justify-center gap-3 mt-5 flex-wrap">
-        {!videoReady && videoProgress === 0 && (
-          <motion.button whileHover={{ scale: 1.03, y: -2 }} whileTap={{ scale: 0.97 }} onClick={onGenerate}
+        {!videoReady && videoProgress === 0 && !videoError && (
+          <motion.button
+            whileHover={{ scale: 1.03, y: -2 }}
+            whileTap={{ scale: 0.97 }}
+            onClick={onGenerate}
             className="px-7 py-3 rounded-xl text-white font-bold text-sm flex items-center gap-2.5 relative overflow-hidden"
-            style={{ background: "linear-gradient(135deg, #6366F1, #4F46E5)", boxShadow: "0 6px 24px rgba(99,102,241,0.35)" }}>
+            style={{ background: "linear-gradient(135deg, #6366F1, #4F46E5)", boxShadow: "0 6px 24px rgba(99,102,241,0.35)" }}
+          >
             <Sparkles size={15} />
             Generate 3D Video Walkthrough
           </motion.button>
         )}
-        {videoReady && (
+        {videoError && (
+          <motion.button
+            whileHover={{ scale: 1.03, y: -2 }}
+            whileTap={{ scale: 0.97 }}
+            onClick={onRetry}
+            className="px-7 py-3 rounded-xl text-white font-bold text-sm flex items-center gap-2.5"
+            style={{ background: "linear-gradient(135deg, #6366F1, #4F46E5)", boxShadow: "0 6px 24px rgba(99,102,241,0.35)" }}
+          >
+            <RotateCcw size={15} />
+            Try Again
+          </motion.button>
+        )}
+        {videoReady && videoUrl && (
           <>
-            <motion.button whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
-              className="px-5 py-2.5 rounded-xl bg-emerald-500 text-white font-bold text-sm flex items-center gap-2 shadow-lg shadow-emerald-200">
+            {/* IMPORTANT: <button> not <a>. Cross-origin <a download> would
+                navigate the page (blanking it) instead of downloading. The
+                onDownload handler does fetch+blob to force a real save. */}
+            <motion.button
+              whileHover={{ scale: 1.03 }}
+              whileTap={{ scale: 0.97 }}
+              onClick={onDownload}
+              className="px-5 py-2.5 rounded-xl bg-emerald-500 text-white font-bold text-sm flex items-center gap-2 shadow-lg shadow-emerald-200"
+            >
               <Download size={15} /> Download MP4
             </motion.button>
-            <motion.button whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
-              className="px-5 py-2.5 rounded-xl bg-white text-gray-700 font-bold text-sm flex items-center gap-2 border border-gray-200 shadow-sm">
+            <motion.button
+              whileHover={{ scale: 1.03 }}
+              whileTap={{ scale: 0.97 }}
+              onClick={onPreview}
+              className="px-5 py-2.5 rounded-xl bg-white text-gray-700 font-bold text-sm flex items-center gap-2 border border-gray-200 shadow-sm"
+            >
               <Eye size={15} /> Preview Full Screen
             </motion.button>
-            <motion.button whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
-              className="px-5 py-2.5 rounded-xl bg-white text-gray-700 font-bold text-sm flex items-center gap-2 border border-gray-200 shadow-sm">
-              <Share2 size={15} /> Share Link
+            <motion.button
+              whileHover={{ scale: 1.03 }}
+              whileTap={{ scale: 0.97 }}
+              onClick={onShare}
+              disabled={isSharing}
+              className="px-5 py-2.5 rounded-xl bg-white text-gray-700 font-bold text-sm flex items-center gap-2 border border-gray-200 shadow-sm disabled:opacity-60"
+            >
+              <Share2 size={15} /> {isSharing ? "Copying..." : "Share Link"}
             </motion.button>
-            <motion.button whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
+            <motion.button
+              whileHover={{ scale: 1.03 }}
+              whileTap={{ scale: 0.97 }}
+              onClick={onDownload4K}
               className="px-5 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 border shadow-sm"
-              style={{ background: "linear-gradient(135deg, #FEF3C7, #FDE68A)", borderColor: "#F59E0B", color: "#92400E" }}>
+              style={{ background: "linear-gradient(135deg, #FEF3C7, #FDE68A)", borderColor: "#F59E0B", color: "#92400E" }}
+            >
               <Download size={15} /> Download 4K
               <span className="text-[9px] px-1.5 py-0.5 rounded-md font-bold bg-amber-600 text-white">PRO</span>
             </motion.button>
@@ -926,7 +1060,7 @@ function VideoSection({
         )}
       </div>
 
-      {videoReady && (
+      {videoReady && videoUrl && (
         <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5 }}
           className="text-xs text-gray-400 text-center mt-6 italic">
           &quot;Don&apos;t pretend you won&apos;t screenshot this.&quot;
@@ -1030,6 +1164,17 @@ export default function VideoRenderStudio() {
   const [selectedRender, setSelectedRender] = useState("r1");
   const [videoProgress, setVideoProgress] = useState(0);
   const [videoReady, setVideoReady] = useState(false);
+  // ── Video state (real pipeline) ──
+  const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [videoStatusText, setVideoStatusText] = useState<string>("");
+  const [videoError, setVideoError] = useState<string | null>(null);
+  const [videoElapsed, setVideoElapsed] = useState(0);
+  const [isSharingVideo, setIsSharingVideo] = useState(false);
+  const [fullDescription, setFullDescription] = useState<string>("");
+  const videoElementRef = useRef<HTMLVideoElement | null>(null);
+  const videoAbortRef = useRef<AbortController | null>(null);
+  const videoTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const localBlobUrlRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!uploadedFile) { setPreviewUrl(null); return; }
@@ -1038,8 +1183,105 @@ export default function VideoRenderStudio() {
     return () => URL.revokeObjectURL(url);
   }, [uploadedFile]);
 
+  // Elapsed-time ticker — runs while a video is being generated.
+  useEffect(() => {
+    const isGenerating = videoProgress > 0 && !videoReady && !videoError;
+    if (!isGenerating) {
+      if (videoTimerRef.current) {
+        clearInterval(videoTimerRef.current);
+        videoTimerRef.current = null;
+      }
+      return;
+    }
+    videoTimerRef.current = setInterval(() => {
+      setVideoElapsed((p) => p + 1);
+    }, 1000);
+    return () => {
+      if (videoTimerRef.current) {
+        clearInterval(videoTimerRef.current);
+        videoTimerRef.current = null;
+      }
+    };
+  }, [videoProgress, videoReady, videoError]);
+
+  // Revoke any local blob URL on unmount (Three.js fallback path).
+  useEffect(() => {
+    return () => {
+      if (localBlobUrlRef.current) {
+        URL.revokeObjectURL(localBlobUrlRef.current);
+        localBlobUrlRef.current = null;
+      }
+      if (videoAbortRef.current) videoAbortRef.current.abort();
+    };
+  }, []);
+
   const [renderError, setRenderError] = useState<string | null>(null);
   const handleFileSelect = useCallback((file: File) => setUploadedFile(file), []);
+
+  // ─── Wizard ↔ Browser History API Integration ─────────────────────────────
+  // Without this, the browser back button collapses straight back to the
+  // previous page (or earlier wizard runs) because each wizard "step" is
+  // pure React state with no URL representation.
+  //
+  // Strategy:
+  //   • goToStep() pushes a hashed URL like "#gallery" / "#video" so each
+  //     stable step gets its own history entry. We DO NOT push for "upload"
+  //     (it's the base state) or "processing" (it's transient).
+  //   • A popstate listener watches for browser back/forward and syncs the
+  //     React `step` state to the URL hash, aborting in-flight video
+  //     generation when the user navigates away from the video step.
+  //   • Refs are used inside the listener so we always read the latest
+  //     `step`/`renders` values without re-registering the listener.
+  const stepRef = useRef(step);
+  const rendersRef = useRef(renders);
+  useEffect(() => { stepRef.current = step; }, [step]);
+  useEffect(() => { rendersRef.current = renders; }, [renders]);
+
+  const goToStep = useCallback((next: WizardStep) => {
+    setStep(next);
+    if (typeof window === "undefined") return;
+    // Only push history for stable, user-meaningful destinations. "upload"
+    // is the base state, "processing" is transient — skipping both keeps
+    // the back stack matching what the user actually navigated.
+    if (next === "gallery" || next === "video") {
+      try {
+        window.history.pushState({ step: next }, "", `#${next}`);
+      } catch {
+        /* SecurityError on file:// — ignore */
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const handlePopState = (e: PopStateEvent) => {
+      let next: WizardStep = (e.state?.step as WizardStep) ?? "upload";
+
+      // Defensive: bounce to upload if we'd land in a step that needs data
+      // we no longer have (e.g. user pressed Reset, then back). The renders
+      // array is the gating data for both gallery and video.
+      if ((next === "gallery" || next === "video") && rendersRef.current.length === 0) {
+        next = "upload";
+      }
+
+      // Aborting in-flight video generation when leaving the video step.
+      // The fetch in startVideoGeneration / pollKlingTasks listens to this
+      // signal and bails out cleanly.
+      if (stepRef.current === "video" && next !== "video" && videoAbortRef.current) {
+        videoAbortRef.current.abort();
+        videoAbortRef.current = null;
+      }
+
+      // Use raw setStep here, NOT goToStep — popstate is the browser
+      // moving through existing entries; we must not push another entry
+      // or we'd lock the user inside the wizard forever.
+      setStep(next);
+    };
+
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
 
   const startRendering = useCallback(async () => {
     if (!uploadedFile) return;
@@ -1088,6 +1330,9 @@ export default function VideoRenderStudio() {
     try {
       const fullLayoutIdx = RENDER_VIEWS.findIndex((v) => v.id === "r4");
       const desc = await callRender(RENDER_VIEWS[fullLayoutIdx], fullLayoutIdx);
+      // Save the GPT-4o floor-plan analysis so the video step can prime Kling
+      // with rich room/material context without re-calling /api/generate-3d-render.
+      setFullDescription(desc ?? "");
 
       const roomViews = RENDER_VIEWS.map((v, i) => ({ view: v, idx: i })).filter(
         (_, i) => i !== fullLayoutIdx
@@ -1100,30 +1345,431 @@ export default function VideoRenderStudio() {
 
       setRenders(results);
       setSelectedRender("r4");
-      setStep("gallery");
+      goToStep("gallery");
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Render generation failed";
       setRenderError(msg);
+      // Going BACK to upload on error — base state, no history push
       setStep("upload");
     }
-  }, [uploadedFile]);
+  }, [uploadedFile, goToStep]);
 
-  const startVideoGeneration = useCallback(() => {
+  // ─── REAL VIDEO GENERATION PIPELINE ───────────────────────────────────────
+  // Calls /api/generate-video-walkthrough → polls /api/video-status →
+  // concats via /api/concat-videos → final R2 URL.
+  // Falls back to client-side Three.js renderer (walkthrough-renderer.ts)
+  // when the server returns status: "client-rendering" (no Kling keys
+  // configured or Kling failed gracefully).
+  const startVideoGeneration = useCallback(async () => {
+    // Reset state for a fresh run
+    if (videoAbortRef.current) videoAbortRef.current.abort();
+    if (localBlobUrlRef.current) {
+      URL.revokeObjectURL(localBlobUrlRef.current);
+      localBlobUrlRef.current = null;
+    }
+    setVideoUrl(null);
+    setVideoReady(false);
+    setVideoError(null);
+    setVideoElapsed(0);
     setVideoProgress(0.1);
-    let p = 0;
-    const iv = setInterval(() => {
-      p += Math.random() * 5 + 1;
-      if (p >= 100) {
-        clearInterval(iv);
-        setVideoProgress(100);
-        setTimeout(() => setVideoReady(true), 500);
-      } else {
-        setVideoProgress(p);
+    setVideoStatusText(VIDEO_STATUS_MESSAGES[0]);
+
+    const abort = new AbortController();
+    videoAbortRef.current = abort;
+
+    // Pick the best source image: Full Layout render is ideal because it's
+    // a top-down photorealistic 3D view of the entire floor plan. Fall back
+    // to whichever render is available, then to the original upload.
+    const fullLayout = renders.find((r) => r.id === "r4");
+    const firstWithUrl = renders.find((r) => !!r.url);
+    const sourceImageRaw = fullLayout?.url ?? firstWithUrl?.url ?? previewUrl ?? null;
+
+    if (!sourceImageRaw) {
+      setVideoError("No source image available. Please re-render the floor plan first.");
+      setVideoProgress(0);
+      return;
+    }
+
+    // Build rooms list from render labels (exclude "Full Layout")
+    const rooms = renders
+      .filter((r) => r.id !== "r4" && !!r.url)
+      .map((r) => r.label);
+
+    try {
+      // ── Step 1: Submit to backend ──
+      const res = await fetch("/api/generate-video-walkthrough", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sourceImage: sourceImageRaw,
+          description: fullDescription,
+          rooms,
+          buildingType: rooms.length > 0 ? "modern apartment" : "modern building",
+        }),
+        signal: abort.signal,
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        const msg = data?.error?.message ?? data?.error ?? `HTTP ${res.status}`;
+        throw new Error(typeof msg === "string" ? msg : "Video request failed");
       }
-    }, 600);
+
+      // ── Step 2a: Three.js client-side fallback ──
+      if (data.status === "client-rendering") {
+        await renderClientFallback(data.buildingConfig, abort);
+        return;
+      }
+
+      // ── Step 2b: Kling dual-task polling ──
+      if (data.status === "processing" && data.exteriorTaskId && data.interiorTaskId) {
+        await pollKlingTasks(data.exteriorTaskId, data.interiorTaskId, abort);
+        return;
+      }
+
+      throw new Error("Unexpected response from video service");
+    } catch (err) {
+      if (abort.signal.aborted) return; // user cancelled — silent
+      const msg = err instanceof Error ? err.message : "Video generation failed";
+      console.error("[VideoRenderStudio] startVideoGeneration error:", msg);
+      setVideoError(msg);
+      setVideoProgress(0);
+      setVideoStatusText("");
+    } finally {
+      if (videoAbortRef.current === abort) videoAbortRef.current = null;
+    }
+  }, [renders, previewUrl, fullDescription]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Three.js fallback: render the walkthrough fully client-side ──
+  const renderClientFallback = useCallback(
+    async (
+      buildingConfig: { floors?: number; floorHeight?: number; footprint?: number; buildingType?: string } | null,
+      abort: AbortController,
+    ) => {
+      setVideoStatusText("Rendering locally with Three.js (no Kling keys configured)...");
+      setVideoProgress(5);
+
+      try {
+        const { renderWalkthrough } = await import("@/services/walkthrough-renderer");
+        const result = await renderWalkthrough({
+          floors: buildingConfig?.floors ?? 2,
+          floorHeight: buildingConfig?.floorHeight ?? 3.0,
+          footprint: buildingConfig?.footprint ?? 200,
+          buildingType: buildingConfig?.buildingType ?? "modern apartment",
+          onProgress: (percent, phase) => {
+            if (abort.signal.aborted) return;
+            setVideoProgress(Math.max(5, Math.min(99, percent)));
+            setVideoStatusText(`${phase} (${percent}%)`);
+          },
+        });
+
+        if (abort.signal.aborted) {
+          URL.revokeObjectURL(result.blobUrl);
+          return;
+        }
+
+        // Track the blob URL so we can revoke it on reset/unmount
+        localBlobUrlRef.current = result.blobUrl;
+        setVideoUrl(result.blobUrl);
+        setVideoProgress(100);
+        setVideoStatusText("Your video is ready!");
+        setVideoReady(true);
+      } catch (err) {
+        if (abort.signal.aborted) return;
+        const msg = err instanceof Error ? err.message : "Three.js rendering failed";
+        throw new Error(msg);
+      }
+    },
+    [],
+  );
+
+  // ── Poll Kling dual tasks → concat → done ──
+  const pollKlingTasks = useCallback(
+    async (
+      exteriorTaskId: string,
+      interiorTaskId: string,
+      abort: AbortController,
+    ) => {
+      const POLL_INTERVAL_MS = 6000;
+      const TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes
+      const startedAt = Date.now();
+      let messageIdx = 1; // we already showed message[0] in the parent
+
+      const setRotatingStatus = () => {
+        setVideoStatusText(VIDEO_STATUS_MESSAGES[messageIdx % VIDEO_STATUS_MESSAGES.length]);
+        messageIdx++;
+      };
+
+      while (!abort.signal.aborted) {
+        if (Date.now() - startedAt > TIMEOUT_MS) {
+          throw new Error("Video generation timed out after 10 minutes. Please try again.");
+        }
+
+        await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
+        if (abort.signal.aborted) return;
+
+        let statusJson: {
+          exteriorStatus?: string;
+          interiorStatus?: string;
+          exteriorVideoUrl?: string | null;
+          interiorVideoUrl?: string | null;
+          progress?: number;
+          isComplete?: boolean;
+          hasFailed?: boolean;
+          failureMessage?: string | null;
+        };
+        try {
+          const params = new URLSearchParams({
+            exteriorTaskId,
+            interiorTaskId,
+            pipeline: "image2video",
+          });
+          const sres = await fetch(`/api/video-status?${params}`, { signal: abort.signal });
+          if (!sres.ok) {
+            // Transient — keep polling, don't break the loop
+            console.warn("[VideoRenderStudio] poll non-200:", sres.status);
+            continue;
+          }
+          statusJson = await sres.json();
+        } catch (pollErr) {
+          if (abort.signal.aborted) return;
+          console.warn("[VideoRenderStudio] poll error (transient):", pollErr);
+          continue;
+        }
+
+        if (statusJson.hasFailed) {
+          throw new Error(statusJson.failureMessage ?? "Kling video generation failed");
+        }
+
+        // Animate progress bar smoothly toward server-reported value, capped at 80
+        // until we hit the concat/persist phases (so the bar still has room to grow).
+        const serverProgress = typeof statusJson.progress === "number" ? statusJson.progress : 0;
+        const cappedProgress = Math.max(10, Math.min(80, serverProgress));
+        setVideoProgress(cappedProgress);
+
+        // Rotate the status messages every poll
+        setRotatingStatus();
+
+        if (
+          statusJson.isComplete &&
+          statusJson.exteriorVideoUrl &&
+          statusJson.interiorVideoUrl
+        ) {
+          // ── Step 3: Concat the two segments via ffmpeg ──
+          setVideoProgress(85);
+          setVideoStatusText("Stitching scenes together...");
+
+          let finalUrl: string | null = null;
+          try {
+            const cres = await fetch("/api/concat-videos", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                exteriorUrl: statusJson.exteriorVideoUrl,
+                interiorUrl: statusJson.interiorVideoUrl,
+              }),
+              signal: abort.signal,
+            });
+            const cdata = await cres.json();
+            if (cres.ok && cdata.videoUrl) {
+              finalUrl = cdata.videoUrl as string;
+            } else if (cres.status === 503) {
+              // R2 not configured in this environment — gracefully use the
+              // longer of the two Kling URLs (interior is 10s vs exterior 5s).
+              console.warn("[VideoRenderStudio] R2 not configured, using interior segment directly");
+              finalUrl = statusJson.interiorVideoUrl;
+            } else {
+              const cmsg = cdata?.error?.message ?? cdata?.error ?? "Concat failed";
+              throw new Error(typeof cmsg === "string" ? cmsg : "Concat failed");
+            }
+          } catch (concatErr) {
+            if (abort.signal.aborted) return;
+            // Final fallback: use the interior segment alone so the user still
+            // gets a video. This is the longer (10s) of the two.
+            console.warn("[VideoRenderStudio] concat failed, falling back to interior:", concatErr);
+            finalUrl = statusJson.interiorVideoUrl;
+          }
+
+          if (!finalUrl) {
+            throw new Error("Both concat and fallback failed — no video URL available");
+          }
+
+          setVideoProgress(100);
+          setVideoStatusText("Your video is ready!");
+          setVideoUrl(finalUrl);
+          setVideoReady(true);
+          return;
+        }
+      }
+    },
+    [],
+  );
+
+  // ── Action handlers (download / preview / share / 4K) ──
+  // Real download — fetch the bytes and trigger a same-origin blob download.
+  // We do NOT use a plain `<a href download>` because:
+  //   1. R2 URLs are cross-origin → the browser silently strips the download
+  //      attribute and treats the click as a navigation, blanking the page.
+  //   2. blob: URLs from the Three.js fallback work with `download` but they
+  //      should be saved as .webm not .mp4.
+  // The fetch+blob approach handles both consistently.
+  const handleDownloadVideo = useCallback(async () => {
+    if (!videoUrl) return;
+
+    const isBlobUrl = videoUrl.startsWith("blob:");
+    const filename = isBlobUrl
+      ? "buildflow-walkthrough.webm"
+      : "buildflow-walkthrough.mp4";
+
+    // Local blob — already same-origin, the download attribute always works.
+    if (isBlobUrl) {
+      const a = document.createElement("a");
+      a.href = videoUrl;
+      a.download = filename;
+      a.style.display = "none";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      toast.success("Downloading your walkthrough...");
+      return;
+    }
+
+    // Remote URL — fetch as blob so the browser saves it instead of navigating.
+    toast.info("Preparing download...");
+    try {
+      const res = await fetch(videoUrl, { mode: "cors" });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const blob = await res.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = blobUrl;
+      a.download = filename;
+      a.style.display = "none";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      // Revoke after the click has registered (200ms is plenty).
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+      toast.success("Downloaded!");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Download failed";
+      console.error("[Download MP4] Error:", msg);
+      // Last-resort fallback: open the URL in a new tab so the user can
+      // right-click → Save As. Better than a silent failure.
+      toast.error("Couldn't download — opening in a new tab", { description: msg });
+      window.open(videoUrl, "_blank", "noopener,noreferrer");
+    }
+  }, [videoUrl]);
+
+  const handlePreviewFullscreen = useCallback(() => {
+    const el = videoElementRef.current;
+    if (!el) return;
+    // Some browsers (Safari iOS) only expose webkitEnterFullscreen
+    const anyEl = el as HTMLVideoElement & {
+      webkitEnterFullscreen?: () => void;
+      webkitRequestFullscreen?: () => Promise<void>;
+    };
+    try {
+      if (typeof el.requestFullscreen === "function") {
+        void el.requestFullscreen();
+      } else if (typeof anyEl.webkitRequestFullscreen === "function") {
+        void anyEl.webkitRequestFullscreen();
+      } else if (typeof anyEl.webkitEnterFullscreen === "function") {
+        anyEl.webkitEnterFullscreen();
+      } else {
+        toast.info("Fullscreen isn't supported in this browser.");
+      }
+    } catch (err) {
+      console.warn("[VideoRenderStudio] fullscreen failed:", err);
+      toast.error("Couldn't enter fullscreen.");
+    }
   }, []);
 
+  const handleShareVideo = useCallback(async () => {
+    if (!videoUrl || isSharingVideo) return;
+    // Local blob URLs (Three.js fallback) can't be shared publicly.
+    if (videoUrl.startsWith("blob:")) {
+      toast.error("Local previews can't be shared. Generate a Kling video to share publicly.");
+      return;
+    }
+    setIsSharingVideo(true);
+    try {
+      const res = await fetch("/api/share/video", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          videoUrl,
+          title: "3D Walkthrough",
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        const msg = data?.error?.message ?? data?.error ?? `HTTP ${res.status}`;
+        throw new Error(typeof msg === "string" ? msg : "Share failed");
+      }
+      const shareUrl: string = data.shareUrl;
+      try {
+        await navigator.clipboard.writeText(shareUrl);
+      } catch {
+        // Fallback for browsers that block the clipboard API
+        const ta = document.createElement("textarea");
+        ta.value = shareUrl;
+        ta.style.position = "fixed";
+        ta.style.opacity = "0";
+        document.body.appendChild(ta);
+        ta.select();
+        try {
+          document.execCommand("copy");
+        } catch {
+          /* noop */
+        }
+        document.body.removeChild(ta);
+      }
+      toast.success("Share link copied!", { description: shareUrl, duration: 6000 });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Unknown error";
+      toast.error("Couldn't create share link", { description: msg });
+    } finally {
+      setIsSharingVideo(false);
+    }
+  }, [videoUrl, isSharingVideo]);
+
+  const handleDownload4K = useCallback(() => {
+    toast.info("4K renders coming soon", {
+      description: "Pro plan unlocks 4K. The current 1080p MP4 is already downloaded.",
+      duration: 5000,
+    });
+  }, []);
+
+  const handleRetryVideo = useCallback(() => {
+    setVideoError(null);
+    void startVideoGeneration();
+  }, [startVideoGeneration]);
+
   const handleReset = useCallback(() => {
+    if (videoAbortRef.current) {
+      videoAbortRef.current.abort();
+      videoAbortRef.current = null;
+    }
+    if (videoTimerRef.current) {
+      clearInterval(videoTimerRef.current);
+      videoTimerRef.current = null;
+    }
+    if (localBlobUrlRef.current) {
+      URL.revokeObjectURL(localBlobUrlRef.current);
+      localBlobUrlRef.current = null;
+    }
+    // Replace the current history entry so the URL no longer points at a
+    // wizard step the user has explicitly reset away from. We can't erase
+    // earlier back-stack entries (browsers don't allow it), but the popstate
+    // handler's defensive bounce-to-upload will catch any stale ones.
+    if (typeof window !== "undefined") {
+      try {
+        window.history.replaceState({ step: "upload" }, "", window.location.pathname);
+      } catch {
+        /* ignore */
+      }
+    }
     setStep("upload");
     setUploadedFile(null);
     setPreviewUrl(null);
@@ -1132,6 +1778,11 @@ export default function VideoRenderStudio() {
     setSelectedRender("r1");
     setVideoProgress(0);
     setVideoReady(false);
+    setVideoUrl(null);
+    setVideoStatusText("");
+    setVideoError(null);
+    setVideoElapsed(0);
+    setFullDescription("");
   }, []);
 
   return (
@@ -1274,7 +1925,7 @@ export default function VideoRenderStudio() {
               <RenderGallery renders={renders} selectedId={selectedRender} onSelect={setSelectedRender} />
               <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="flex justify-center mt-8">
                 <motion.button whileHover={{ scale: 1.04, y: -2 }} whileTap={{ scale: 0.96 }}
-                  onClick={() => setStep("video")}
+                  onClick={() => goToStep("video")}
                   className="px-7 py-3 rounded-xl text-white font-bold text-sm flex items-center gap-2.5"
                   style={{ background: "linear-gradient(135deg, #6366F1, #7C3AED)", boxShadow: "0 6px 24px rgba(99,102,241,0.3)" }}>
                   <Video size={15} /> Create 3D Video Walkthrough <ArrowRight size={15} />
@@ -1286,7 +1937,22 @@ export default function VideoRenderStudio() {
           {step === "video" && (
             <motion.div key="video" initial={{ opacity: 0, x: 40 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -40 }}>
               <ComparisonSlider beforeSrc={previewUrl} afterSrc={renders.find(r => r.id === selectedRender)?.url ?? null} />
-              <VideoSection videoProgress={videoProgress} videoReady={videoReady} onGenerate={startVideoGeneration} />
+              <VideoSection
+                videoProgress={videoProgress}
+                videoReady={videoReady}
+                videoUrl={videoUrl}
+                videoStatusText={videoStatusText}
+                videoError={videoError}
+                videoElapsed={videoElapsed}
+                isSharing={isSharingVideo}
+                videoRef={videoElementRef}
+                onGenerate={startVideoGeneration}
+                onDownload={handleDownloadVideo}
+                onPreview={handlePreviewFullscreen}
+                onShare={handleShareVideo}
+                onRetry={handleRetryVideo}
+                onDownload4K={handleDownload4K}
+              />
             </motion.div>
           )}
         </AnimatePresence>

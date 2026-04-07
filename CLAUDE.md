@@ -14,8 +14,15 @@ npm run test:ui          # Vitest UI dashboard
 npm run test:coverage    # Tests with coverage (70% threshold enforced)
 npx vitest run path/to/file.test.ts  # Run a single test file
 npx prisma generate      # Regenerate Prisma client (run after pulling changes)
-npx prisma db push       # Push schema changes to DB
+npx prisma migrate dev --name <change-name>   # Create + apply a new migration locally
+npx prisma migrate deploy                     # Apply pending migrations in CI / production
 ```
+
+> **Schema changes use `prisma migrate`, NEVER `prisma db push`.** A previous
+> `db push` accidentally dropped two drift columns from `users` (4 + 1 records
+> lost). The project is now baselined under `prisma/migrations/0_baseline`;
+> all schema changes must go through `migrate dev` so every change ends up as a
+> reviewable, reversible SQL file.
 
 ## Architecture Overview
 
@@ -24,6 +31,24 @@ npx prisma db push       # Push schema changes to DB
 **What it does:** A visual workflow builder for BIM (Building Information Modeling). Users drag-and-drop nodes onto a canvas to build pipelines that parse IFC files, run AI analysis, generate reports, and export results.
 
 ### Key Architectural Patterns
+
+**Env validation:**
+- `src/lib/env.ts` — Zod-validated env schema with REQUIRED / RECOMMENDED / OPTIONAL tiers
+- `instrumentation.ts` — Calls `validateEnv()` on Node.js boot via Next.js instrumentation hook
+- Required vars throw at startup; recommended vars warn loudly via `console.warn`
+- Tests don't trigger validation (it runs only in instrumentation, not at module import)
+
+**Node handler decomposition:**
+- `src/app/api/execute-node/route.ts` — Thin dispatcher (~280 lines): auth, rate limit, validation, then dispatch to a handler
+- `src/app/api/execute-node/handlers/` — One file per `catalogueId` (TR-001, GN-009, etc.), 23 handlers total
+- `handlers/types.ts` — `NodeHandler` type and `NodeHandlerContext` interface
+- `handlers/index.ts` — Registry mapping `catalogueId` → handler function
+- `handlers/deps.ts` — Aggregated re-exports of dependencies handlers need
+- `handlers/shared.ts` — Helper functions used by multiple handlers
+- Adding a new node: create `handlers/<id>.ts`, register it in `handlers/index.ts`, add to `REAL_NODE_IDS` in `route.ts`
+
+**Showcase Error Boundaries:**
+- `src/components/canvas/result-showcase/index.tsx` wraps each tab (`OverviewTab`, `MediaTab`, `DataTab`, `ModelTab`, `ExportTab`) in the shared `ErrorBoundary` from `src/components/ErrorBoundary.tsx`. A crash in one tab does not tear down the showcase or block users from switching to a working tab.
 
 **Auth (split config pattern):**
 - `src/lib/auth.config.ts` — Lightweight, edge-safe config used by middleware

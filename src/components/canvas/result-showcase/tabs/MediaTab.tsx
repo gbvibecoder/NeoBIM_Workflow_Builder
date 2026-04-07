@@ -1,9 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import DOMPurify from "dompurify";
 import { motion, AnimatePresence } from "framer-motion";
-import { Maximize2, X, Download, ExternalLink, Loader2, ArrowLeft } from "lucide-react";
+import { Maximize2, X, Download, ExternalLink, Loader2, ArrowLeft, Video, Sparkles, Share2 } from "lucide-react";
+import { toast } from "sonner";
 import { useLocale } from "@/hooks/useLocale";
 import { useExecutionStore } from "@/stores/execution-store";
 import { COLORS } from "../constants";
@@ -12,9 +13,11 @@ import type { ShowcaseData } from "../useShowcaseData";
 interface MediaTabProps {
   data: ShowcaseData;
   onExpandVideo: () => void;
+  onCreateVideo?: () => void;
+  isCreatingVideo?: boolean;
 }
 
-export function MediaTab({ data, onExpandVideo }: MediaTabProps) {
+export function MediaTab({ data, onExpandVideo, onCreateVideo, isCreatingVideo = false }: MediaTabProps) {
   const { t } = useLocale();
 
   const RENDER_PHASES = useMemo(() => [
@@ -47,8 +50,76 @@ export function MediaTab({ data, onExpandVideo }: MediaTabProps) {
 
   const isVideoGenerating = videoGenProgress && (videoGenProgress.status === "rendering" || videoGenProgress.status === "processing" || videoGenProgress.status === "submitting");
 
+  // Show "Create 3D Video Walkthrough" CTA when:
+  //  - A 3D model has been generated (GN-011 result available)
+  //  - No video exists yet AND nothing is in progress
+  //  - The parent passed an onCreateVideo handler
+  const canShowCreateCTA = !!onCreateVideo && !!data.model3dData && !data.videoData && !isVideoGenerating;
+
+  // ─── Share Link state + handler ──────────────────────────────────────────
+  const [isCreatingShare, setIsCreatingShare] = useState(false);
+  const handleShareLink = useCallback(async () => {
+    if (isCreatingShare) return;
+    const videoUrl = data.videoData?.downloadUrl ?? data.videoData?.videoUrl;
+    if (!videoUrl) {
+      toast.error(t('toast.shareLinkFailed'), { description: t('video.noVideoAvailable') });
+      return;
+    }
+    setIsCreatingShare(true);
+    try {
+      const res = await fetch("/api/share/video", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          videoUrl,
+          title: data.projectTitle,
+        }),
+      });
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => ({}));
+        const msg = errBody?.error?.message ?? errBody?.message ?? `HTTP ${res.status}`;
+        throw new Error(msg);
+      }
+      const { shareUrl } = await res.json() as { shareUrl: string };
+      // Best-effort clipboard copy — falls back to a select-all approach if denied.
+      try {
+        await navigator.clipboard.writeText(shareUrl);
+      } catch {
+        const ta = document.createElement("textarea");
+        ta.value = shareUrl;
+        ta.style.position = "fixed";
+        ta.style.opacity = "0";
+        document.body.appendChild(ta);
+        ta.select();
+        try { document.execCommand("copy"); } catch { /* noop */ }
+        document.body.removeChild(ta);
+      }
+      toast.success(t('toast.shareLinkCopied'), {
+        description: shareUrl,
+        duration: 6000,
+      });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Unknown error";
+      console.error("[Share Link] Error:", msg);
+      toast.error(t('toast.shareLinkFailed'), { description: msg, duration: 6000 });
+    } finally {
+      setIsCreatingShare(false);
+    }
+  }, [isCreatingShare, data.videoData, data.projectTitle, t]);
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 28, maxWidth: "100%" }}>
+      {/* Create Video Walkthrough CTA — appears when a 3D model exists but no video yet */}
+      {canShowCreateCTA && (
+        <CreateVideoCTA
+          onClick={onCreateVideo!}
+          isSubmitting={isCreatingVideo}
+          ctaLabel={t('showcase.createVideoWalkthrough')}
+          ctaDesc={t('showcase.createVideoWalkthroughDesc')}
+          submittingLabel={t('showcase.createVideoSubmitting')}
+        />
+      )}
+
       {/* Video Generation Progress */}
       {isVideoGenerating && !data.videoData?.videoUrl && (
         <section>
@@ -211,6 +282,18 @@ export function MediaTab({ data, onExpandVideo }: MediaTabProps) {
               </div>
             ))}
           </div>
+
+          {/* ─── Export action row: Download MP4 (primary) · Preview Full Screen · Share Link ─── */}
+          <VideoExportButtons
+            downloadUrl={data.videoData.downloadUrl ?? data.videoData.videoUrl}
+            videoName={data.videoData.name}
+            onPreview={onExpandVideo}
+            onShare={handleShareLink}
+            isSharing={isCreatingShare}
+            downloadLabel={t('showcase.downloadMP4')}
+            previewLabel={t('showcase.previewFullScreen')}
+            shareLabel={t('showcase.shareLink')}
+          />
         </section>
       )}
 
@@ -562,5 +645,325 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
     }}>
       {children}
     </div>
+  );
+}
+
+// ─── Video Export Buttons ───────────────────────────────────────────────────
+// Three-button action row that appears below the video player + metadata strip
+// once a walkthrough has been generated. Primary action is the green/amber
+// gradient "Download MP4"; secondary actions are outlined "Preview Full Screen"
+// and "Share Link". The Share Link button calls /api/share/video and copies
+// the returned slug URL to the clipboard.
+function VideoExportButtons({
+  downloadUrl,
+  videoName,
+  onPreview,
+  onShare,
+  isSharing,
+  downloadLabel,
+  previewLabel,
+  shareLabel,
+}: {
+  downloadUrl: string;
+  videoName: string;
+  onPreview: () => void;
+  onShare: () => void;
+  isSharing: boolean;
+  downloadLabel: string;
+  previewLabel: string;
+  shareLabel: string;
+}) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.05, duration: 0.3 }}
+      style={{
+        display: "flex",
+        gap: 10,
+        marginTop: 12,
+        flexWrap: "wrap",
+      }}
+    >
+      {/* Primary: Download MP4 — green/amber gradient */}
+      <a
+        href={downloadUrl}
+        download={videoName || "walkthrough.mp4"}
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          gap: 8,
+          padding: "12px 22px",
+          borderRadius: 10,
+          background: "linear-gradient(135deg, #10B981 0%, #F59E0B 100%)",
+          color: "#0A0A0F",
+          fontSize: 13,
+          fontWeight: 700,
+          textDecoration: "none",
+          letterSpacing: "0.01em",
+          boxShadow: "0 6px 24px rgba(16,185,129,0.32), 0 0 0 1px rgba(16,185,129,0.4)",
+          transition: "transform 0.15s ease, box-shadow 0.15s ease",
+          cursor: "pointer",
+        }}
+        onMouseEnter={e => {
+          e.currentTarget.style.transform = "translateY(-1px)";
+          e.currentTarget.style.boxShadow = "0 10px 32px rgba(16,185,129,0.42), 0 0 0 1px rgba(16,185,129,0.55)";
+        }}
+        onMouseLeave={e => {
+          e.currentTarget.style.transform = "translateY(0)";
+          e.currentTarget.style.boxShadow = "0 6px 24px rgba(16,185,129,0.32), 0 0 0 1px rgba(16,185,129,0.4)";
+        }}
+      >
+        <Download size={15} strokeWidth={2.4} />
+        {downloadLabel}
+      </a>
+
+      {/* Secondary: Preview Full Screen */}
+      <button
+        type="button"
+        onClick={onPreview}
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          gap: 8,
+          padding: "12px 20px",
+          borderRadius: 10,
+          background: "rgba(255,255,255,0.04)",
+          border: "1px solid rgba(255,255,255,0.14)",
+          color: COLORS.TEXT_PRIMARY,
+          fontSize: 13,
+          fontWeight: 600,
+          cursor: "pointer",
+          transition: "all 0.15s ease",
+        }}
+        onMouseEnter={e => {
+          e.currentTarget.style.background = "rgba(255,255,255,0.08)";
+          e.currentTarget.style.borderColor = "rgba(255,255,255,0.25)";
+        }}
+        onMouseLeave={e => {
+          e.currentTarget.style.background = "rgba(255,255,255,0.04)";
+          e.currentTarget.style.borderColor = "rgba(255,255,255,0.14)";
+        }}
+      >
+        <Maximize2 size={14} strokeWidth={2.2} />
+        {previewLabel}
+      </button>
+
+      {/* Secondary: Share Link */}
+      <button
+        type="button"
+        onClick={onShare}
+        disabled={isSharing}
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          gap: 8,
+          padding: "12px 20px",
+          borderRadius: 10,
+          background: "rgba(139,92,246,0.08)",
+          border: "1px solid rgba(139,92,246,0.3)",
+          color: "#C4B5FD",
+          fontSize: 13,
+          fontWeight: 600,
+          cursor: isSharing ? "wait" : "pointer",
+          opacity: isSharing ? 0.7 : 1,
+          transition: "all 0.15s ease",
+        }}
+        onMouseEnter={e => {
+          if (isSharing) return;
+          e.currentTarget.style.background = "rgba(139,92,246,0.16)";
+          e.currentTarget.style.borderColor = "rgba(139,92,246,0.5)";
+        }}
+        onMouseLeave={e => {
+          if (isSharing) return;
+          e.currentTarget.style.background = "rgba(139,92,246,0.08)";
+          e.currentTarget.style.borderColor = "rgba(139,92,246,0.3)";
+        }}
+      >
+        {isSharing ? (
+          <Loader2 size={14} style={{ animation: "spin 1s linear infinite" }} />
+        ) : (
+          <Share2 size={14} strokeWidth={2.2} />
+        )}
+        {shareLabel}
+      </button>
+
+      {/* Spin animation for the Share button loader */}
+      <style>{`
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+      `}</style>
+    </motion.div>
+  );
+}
+
+// ─── Create 3D Video Walkthrough CTA ────────────────────────────────────────
+// Purple gradient hero card with hover lift + sparkle/video icon. Appears in
+// the Media tab when a 3D model exists but no walkthrough has been generated.
+function CreateVideoCTA({
+  onClick,
+  isSubmitting,
+  ctaLabel,
+  ctaDesc,
+  submittingLabel,
+}: {
+  onClick: () => void;
+  isSubmitting: boolean;
+  ctaLabel: string;
+  ctaDesc: string;
+  submittingLabel: string;
+}) {
+  return (
+    <motion.section
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+      aria-label={ctaLabel}
+    >
+      <motion.button
+        type="button"
+        onClick={onClick}
+        disabled={isSubmitting}
+        whileHover={isSubmitting ? undefined : { y: -2, scale: 1.005 }}
+        whileTap={isSubmitting ? undefined : { scale: 0.995 }}
+        transition={{ type: "spring", stiffness: 400, damping: 28 }}
+        style={{
+          width: "100%",
+          display: "flex",
+          alignItems: "center",
+          gap: 22,
+          padding: "26px 28px",
+          borderRadius: 16,
+          background: "linear-gradient(135deg, rgba(139,92,246,0.18) 0%, rgba(99,102,241,0.14) 50%, rgba(168,85,247,0.16) 100%)",
+          border: "1px solid rgba(168,85,247,0.35)",
+          boxShadow: "0 10px 50px rgba(139,92,246,0.18), inset 0 1px 0 rgba(255,255,255,0.06)",
+          cursor: isSubmitting ? "wait" : "pointer",
+          textAlign: "left",
+          color: COLORS.TEXT_PRIMARY,
+          opacity: isSubmitting ? 0.85 : 1,
+          transition: "box-shadow 0.25s ease, border-color 0.25s ease",
+        }}
+        onMouseEnter={e => {
+          if (isSubmitting) return;
+          e.currentTarget.style.borderColor = "rgba(168,85,247,0.55)";
+          e.currentTarget.style.boxShadow = "0 14px 60px rgba(139,92,246,0.32), inset 0 1px 0 rgba(255,255,255,0.08)";
+        }}
+        onMouseLeave={e => {
+          if (isSubmitting) return;
+          e.currentTarget.style.borderColor = "rgba(168,85,247,0.35)";
+          e.currentTarget.style.boxShadow = "0 10px 50px rgba(139,92,246,0.18), inset 0 1px 0 rgba(255,255,255,0.06)";
+        }}
+      >
+        {/* Icon badge */}
+        <div style={{
+          width: 60,
+          height: 60,
+          borderRadius: 16,
+          background: "linear-gradient(135deg, #8B5CF6 0%, #6366F1 50%, #A855F7 100%)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          flexShrink: 0,
+          boxShadow: "0 6px 20px rgba(139,92,246,0.45), inset 0 1px 0 rgba(255,255,255,0.25)",
+          position: "relative",
+        }}>
+          {isSubmitting ? (
+            <motion.div
+              animate={{ rotate: 360 }}
+              transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
+            >
+              <Loader2 size={26} color="#fff" strokeWidth={2.2} />
+            </motion.div>
+          ) : (
+            <>
+              <Video size={26} color="#fff" strokeWidth={2.2} />
+              <motion.div
+                animate={{ scale: [1, 1.18, 1], opacity: [0.55, 1, 0.55] }}
+                transition={{ repeat: Infinity, duration: 2.2, ease: "easeInOut" }}
+                style={{
+                  position: "absolute",
+                  top: -4,
+                  right: -4,
+                  width: 18,
+                  height: 18,
+                  borderRadius: 6,
+                  background: "rgba(255,255,255,0.16)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  border: "1px solid rgba(255,255,255,0.35)",
+                }}
+              >
+                <Sparkles size={10} color="#fff" />
+              </motion.div>
+            </>
+          )}
+        </div>
+
+        {/* Text + arrow */}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            fontSize: 17,
+            fontWeight: 700,
+            color: COLORS.TEXT_PRIMARY,
+            letterSpacing: "-0.01em",
+            marginBottom: 4,
+          }}>
+            {isSubmitting ? submittingLabel : ctaLabel}
+            {!isSubmitting && (
+              <motion.span
+                aria-hidden="true"
+                animate={{ x: [0, 4, 0] }}
+                transition={{ repeat: Infinity, duration: 1.6, ease: "easeInOut" }}
+                style={{ color: "#C4B5FD", fontSize: 18, fontWeight: 700 }}
+              >
+                →
+              </motion.span>
+            )}
+          </div>
+          <div style={{
+            fontSize: 12,
+            color: "rgba(220,215,240,0.75)",
+            lineHeight: 1.55,
+            maxWidth: 540,
+          }}>
+            {ctaDesc}
+          </div>
+        </div>
+
+        {/* Status badge */}
+        <div style={{
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "flex-end",
+          gap: 4,
+          flexShrink: 0,
+        }}>
+          <span style={{
+            fontSize: 9,
+            fontWeight: 700,
+            letterSpacing: "0.08em",
+            padding: "4px 10px",
+            borderRadius: 6,
+            background: "rgba(168,85,247,0.18)",
+            border: "1px solid rgba(168,85,247,0.35)",
+            color: "#DDD6FE",
+            textTransform: "uppercase",
+          }}>
+            HD · 1080p
+          </span>
+          <span style={{
+            fontSize: 9,
+            fontWeight: 600,
+            color: "rgba(196,181,253,0.7)",
+            letterSpacing: "0.04em",
+          }}>
+            Kling 3.0 · ~3-8 min
+          </span>
+        </div>
+      </motion.button>
+    </motion.section>
   );
 }
