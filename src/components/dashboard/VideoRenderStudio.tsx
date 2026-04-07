@@ -1478,7 +1478,14 @@ export default function VideoRenderStudio() {
 
       // ── Step 2a: Three.js client-side fallback ──
       if (data.status === "client-rendering") {
-        await renderClientFallback(data.buildingConfig, abort);
+        // Pass the reason so renderClientFallback can show the right
+        // status text (e.g. "no keys" vs "Kling failed: <error>").
+        await renderClientFallback(
+          data.buildingConfig,
+          typeof data.reason === "string" ? data.reason : undefined,
+          typeof data.klingError === "string" ? data.klingError : undefined,
+          abort,
+        );
         return;
       }
 
@@ -1502,12 +1509,36 @@ export default function VideoRenderStudio() {
   }, [renders, previewUrl, fullDescription]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Three.js fallback: render the walkthrough fully client-side ──
+  // Receives `reason` and `klingError` from the server response so we can
+  // tell the user WHY we're falling back instead of always claiming "no
+  // Kling keys configured" (which is wrong when Kling actually failed).
   const renderClientFallback = useCallback(
     async (
       buildingConfig: { floors?: number; floorHeight?: number; footprint?: number; buildingType?: string } | null,
+      reason: string | undefined,
+      klingError: string | undefined,
       abort: AbortController,
     ) => {
-      setVideoStatusText("Rendering locally with Three.js (no Kling keys configured)...");
+      // Differentiate the three cases:
+      //   1. kling-failed → real Kling outage → loud toast with error details
+      //   2. kling-not-configured → env vars missing → quiet status update
+      //   3. anything else → generic fallback message
+      if (reason === "kling-failed" && klingError) {
+        const truncated =
+          klingError.length > 80 ? klingError.slice(0, 77) + "..." : klingError;
+        setVideoStatusText(`Kling AI unavailable, rendering locally... (${truncated})`);
+        // Surface the real Kling error in a toast so the dev/admin can see
+        // exactly what went wrong (expired account, network, bad signature,
+        // image format, etc.). 8s duration so it doesn't disappear too fast.
+        toast.error("Kling AI unavailable", {
+          description: klingError,
+          duration: 8000,
+        });
+      } else if (reason === "kling-not-configured") {
+        setVideoStatusText("Rendering locally (Kling API not configured)");
+      } else {
+        setVideoStatusText("Rendering locally with Three.js...");
+      }
       setVideoProgress(5);
 
       try {
