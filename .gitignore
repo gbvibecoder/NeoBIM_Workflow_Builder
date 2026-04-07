@@ -57,6 +57,7 @@ blob-report/
 # Logs
 *.log
 logs/
+analytics-logs/
 
 # Generated files (AI tools, reports, scripts)
 *.sh
