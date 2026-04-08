@@ -24,7 +24,7 @@ export async function POST(req: NextRequest, { params }: Params) {
 
     // Verify ownership
     const execution = await prisma.execution.findFirst({
-      where: { id: executionId, userId: session.user.id },
+      where: { id: executionId, userId: session.user.id, workflow: { deletedAt: null } },
     });
     if (!execution) {
       return NextResponse.json(formatErrorResponse({ title: "Not found", message: "Execution not found.", code: "NODE_001" }), { status: 404 });

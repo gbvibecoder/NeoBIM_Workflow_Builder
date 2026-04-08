@@ -23,7 +23,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
     const { id } = await params;
 
     const execution = await prisma.execution.findFirst({
-      where: { id, userId: session.user.id },
+      where: { id, userId: session.user.id, workflow: { deletedAt: null } },
       include: {
         workflow: { select: { id: true, name: true } },
       },
@@ -74,7 +74,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
 
     // Verify ownership before updating
     const existing = await prisma.execution.findFirst({
-      where: { id, userId: session.user.id },
+      where: { id, userId: session.user.id, workflow: { deletedAt: null } },
     });
     if (!existing) {
       return NextResponse.json(formatErrorResponse({ title: "Execution not found", message: "The requested execution could not be found.", code: "NODE_001" }), { status: 404 });

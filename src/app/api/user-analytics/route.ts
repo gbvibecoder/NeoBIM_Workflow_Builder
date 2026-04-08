@@ -29,11 +29,15 @@ export async function GET() {
       recentExecutions,
       workflows,
     ] = await Promise.all([
-      prisma.execution.count({ where: { userId } }),
-      prisma.execution.count({ where: { userId, status: "SUCCESS" } }),
-      prisma.execution.count({ where: { userId, status: "FAILED" } }),
+      prisma.execution.count({ where: { userId, workflow: { deletedAt: null } } }),
+      prisma.execution.count({ where: { userId, status: "SUCCESS", workflow: { deletedAt: null } } }),
+      prisma.execution.count({ where: { userId, status: "FAILED", workflow: { deletedAt: null } } }),
       prisma.execution.findMany({
-        where: { userId, startedAt: { gte: sevenDaysAgo } },
+        where: {
+          userId,
+          startedAt: { gte: sevenDaysAgo },
+          workflow: { deletedAt: null },
+        },
         select: {
           id: true,
           status: true,
@@ -46,7 +50,7 @@ export async function GET() {
         take: 100,
       }),
       prisma.workflow.findMany({
-        where: { ownerId: userId },
+        where: { ownerId: userId, deletedAt: null },
         select: { id: true, name: true, _count: { select: { executions: true } } },
         orderBy: { updatedAt: "desc" },
         take: 10,

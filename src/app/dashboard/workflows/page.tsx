@@ -787,7 +787,7 @@ export default function WorkflowsPage() {
                     fontSize: 13, color: "#9898B0", lineHeight: 1.6, margin: 0,
                     maxWidth: 360, marginLeft: "auto", marginRight: "auto",
                   }}>
-                    This will permanently remove the selected workflows along with all their executions, artifacts, generated files, and uploaded media. <strong style={{ color: "#FCA5A5" }}>This action cannot be undone.</strong>
+                    The selected workflows will be removed from your account and their generated files will be wiped from cloud storage. <strong style={{ color: "#FCA5A5" }}>This action cannot be undone.</strong>
                   </p>
                 </div>
 
@@ -801,10 +801,9 @@ export default function WorkflowsPage() {
                     }}
                   >
                     <div style={{ display: "flex", flexDirection: "column", gap: 6, fontSize: 12, color: "#C0C0D8" }}>
-                      <div>• Workflow definitions and version history</div>
-                      <div>• All execution runs and their outputs</div>
-                      <div>• Generated artifacts and uploaded files</div>
-                      <div>• Community publications and reviews</div>
+                      <div>• Removed from your workflow list</div>
+                      <div>• Generated files and uploaded media wiped from cloud storage</div>
+                      <div>• Cannot be reopened or recovered by you</div>
                     </div>
                   </div>
 
