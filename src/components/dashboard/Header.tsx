@@ -49,8 +49,10 @@ export function Header({ title, subtitle }: HeaderProps) {
         setProfileOpen(false);
       }
     };
-    if (profileOpen) document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
+    // Capture phase — ReactFlow on the canvas page stops propagation on
+    // mousedown, so a bubble-phase listener wouldn't fire for canvas clicks.
+    if (profileOpen) document.addEventListener("mousedown", handler, true);
+    return () => document.removeEventListener("mousedown", handler, true);
   }, [profileOpen]);
 
   // Fetch referral code when dropdown opens
@@ -96,6 +98,11 @@ export function Header({ title, subtitle }: HeaderProps) {
         backdropFilter: "blur(20px)",
         WebkitBackdropFilter: "blur(20px)",
         borderBottom: "1px solid rgba(255,255,255,0.06)",
+        // Establish a stacking context above the canvas/ReactFlow area so the
+        // canvas-toolbar dropdowns (Manual mode, Share, Run options) — which
+        // are now portaled into this header — render above the canvas pane.
+        position: "relative",
+        zIndex: 40,
       }}
     >
       {/* Left — Title (optional) */}
