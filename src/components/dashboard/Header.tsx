@@ -131,7 +131,7 @@ export function Header({ title, subtitle }: HeaderProps) {
           </div>
         )}
         {subtitle && (
-          <p className="font-mono-data" style={{ fontSize: 11, color: "#5C5C78", marginTop: 1, letterSpacing: "0.02em" }}>{subtitle}</p>
+          <p className="font-mono-data" style={{ fontSize: 11, color: "#9090A8", marginTop: 1, letterSpacing: "0.02em" }}>{subtitle}</p>
         )}
       </div>
 
@@ -157,7 +157,7 @@ export function Header({ title, subtitle }: HeaderProps) {
             borderRadius: 10,
             border: "1px solid rgba(255,255,255,0.07)",
             background: "rgba(255,255,255,0.03)",
-            color: "#6B7A8D",
+            color: "#B8C0CC",
           }}
           onClick={() => {
             document.dispatchEvent(new KeyboardEvent("keydown", { key: "k", metaKey: true, bubbles: true }));
@@ -261,7 +261,7 @@ export function Header({ title, subtitle }: HeaderProps) {
               {userName.split(" ")[0]}
             </span>
             <ChevronDown size={11} style={{
-              color: "#5C5C78",
+              color: "#9090A8",
               transition: "transform 0.2s",
               transform: profileOpen ? "rotate(180deg)" : "rotate(0deg)",
             }} />
@@ -307,7 +307,7 @@ export function Header({ title, subtitle }: HeaderProps) {
                   <div style={{ fontSize: 12, fontWeight: 600, color: "#E2E8F0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                     {userName}
                   </div>
-                  <div style={{ fontSize: 9, color: "#5C5C78", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontFamily: "var(--font-jetbrains), monospace" }}>
+                  <div style={{ fontSize: 9, color: "#9090A8", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontFamily: "var(--font-jetbrains), monospace" }}>
                     {userEmail}
                   </div>
                 </div>
@@ -350,7 +350,7 @@ export function Header({ title, subtitle }: HeaderProps) {
                   <span style={{ flex: 1, textAlign: "left" }}>
                     {referralCopied ? "Link Copied!" : "Refer & Earn"}
                   </span>
-                  {!referralCopied && <Copy size={10} style={{ color: "#5C5C78" }} />}
+                  {!referralCopied && <Copy size={10} style={{ color: "#9090A8" }} />}
                 </button>
               </div>
 

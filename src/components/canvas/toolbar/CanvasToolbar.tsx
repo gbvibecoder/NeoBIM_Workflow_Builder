@@ -75,7 +75,7 @@ function TBBtn({ onClick, icon, title, disabled }: TBBtnProps) {
         width: 44, height: 44, borderRadius: 8,
         display: "flex", alignItems: "center", justifyContent: "center",
         background: "transparent", border: "none",
-        color: "rgba(255,255,255,0.55)", cursor: disabled ? "not-allowed" : "pointer",
+        color: "rgba(255,255,255,0.85)", cursor: disabled ? "not-allowed" : "pointer",
         opacity: disabled ? 0.35 : 1,
         transition: "all 150ms ease",
       }}
@@ -87,7 +87,7 @@ function TBBtn({ onClick, icon, title, disabled }: TBBtnProps) {
       }}
       onMouseLeave={e => {
         e.currentTarget.style.background = "transparent";
-        e.currentTarget.style.color = "rgba(255,255,255,0.55)";
+        e.currentTarget.style.color = "rgba(255,255,255,0.85)";
       }}
       onFocus={e => {
         if (!disabled) {
@@ -97,7 +97,7 @@ function TBBtn({ onClick, icon, title, disabled }: TBBtnProps) {
       }}
       onBlur={e => {
         e.currentTarget.style.background = "transparent";
-        e.currentTarget.style.color = "rgba(255,255,255,0.55)";
+        e.currentTarget.style.color = "rgba(255,255,255,0.85)";
       }}
     >
       {icon}
@@ -253,7 +253,7 @@ export function CanvasToolbar({
               display: "flex", alignItems: "center", justifyContent: "center",
               background: isNodeLibraryOpen ? "rgba(0,245,255,0.10)" : "transparent",
               border: isNodeLibraryOpen ? "1px solid rgba(0,245,255,0.25)" : "1px solid transparent",
-              color: isNodeLibraryOpen ? "#00F5FF" : "rgba(255,255,255,0.55)",
+              color: isNodeLibraryOpen ? "#00F5FF" : "rgba(255,255,255,0.85)",
               cursor: "pointer", transition: "all 0.15s ease",
             }}
             onMouseEnter={e => {
@@ -265,7 +265,7 @@ export function CanvasToolbar({
             onMouseLeave={e => {
               if (!isNodeLibraryOpen) {
                 e.currentTarget.style.background = "transparent";
-                e.currentTarget.style.color = "rgba(255,255,255,0.55)";
+                e.currentTarget.style.color = "rgba(255,255,255,0.85)";
               }
             }}
           >
@@ -861,7 +861,7 @@ export function CanvasToolbar({
                 display: "flex", alignItems: "center", justifyContent: "center",
                 background: "transparent",
                 border: "1px solid rgba(255,255,255,0.08)",
-                color: "rgba(255,255,255,0.55)",
+                color: "rgba(255,255,255,0.85)",
                 cursor: "pointer",
               }}
             >
@@ -875,7 +875,7 @@ export function CanvasToolbar({
                 display: "flex", alignItems: "center", justifyContent: "center",
                 background: "transparent",
                 border: "1px solid rgba(255,255,255,0.08)",
-                color: "rgba(255,255,255,0.55)",
+                color: "rgba(255,255,255,0.85)",
                 cursor: "pointer",
               }}
             >

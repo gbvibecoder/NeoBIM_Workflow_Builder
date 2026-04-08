@@ -7,12 +7,12 @@ export const COLORS = {
   EMERALD: "#10B981",
   VIOLET: "#8B5CF6",
   RED: "#EF4444",
-  TEXT_PRIMARY: "#F0F0F5",
-  TEXT_SECONDARY: "#8888A0",
-  TEXT_MUTED: "#5C5C78",
+  TEXT_PRIMARY: "#F5F5FA",
+  TEXT_SECONDARY: "#B8B8C8",
+  TEXT_MUTED: "#9090A8",
   BG_BASE: "#070809",
-  GLASS_BG: "rgba(255,255,255,0.03)",
-  GLASS_BORDER: "rgba(255,255,255,0.06)",
+  GLASS_BG: "rgba(255,255,255,0.04)",
+  GLASS_BORDER: "rgba(255,255,255,0.10)",
 } as const;
 
 // ─── Tab Definitions ────────────────────────────────────────────────────────
