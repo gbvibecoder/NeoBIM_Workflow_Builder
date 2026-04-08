@@ -602,12 +602,24 @@ export function extractR2KeyFromUrl(url: string | null | undefined): string | nu
   // Ignore data URIs
   if (url.startsWith("data:")) return null;
   try {
-    // Relative path style: /r2-models/foo/bar.glb or /r2-files/...
+    // Relative path style from next.config.ts rewrites:
+    //   /r2-models/foo.glb   → models/foo.glb
+    //   /r2-textures/foo.jpg → textures/foo.jpg
+    // (rewrite source/destination is in next.config.ts)
+    if (url.startsWith("/r2-models/")) {
+      const tail = url.slice("/r2-models/".length).split("?")[0];
+      return tail ? `models/${tail}` : null;
+    }
+    if (url.startsWith("/r2-textures/")) {
+      const tail = url.slice("/r2-textures/".length).split("?")[0];
+      return tail ? `textures/${tail}` : null;
+    }
     if (url.startsWith("/r2-")) {
-      const idx = url.indexOf("/", 1);
-      if (idx === -1) return null;
-      const key = url.slice(idx + 1).split("?")[0];
-      return key || null;
+      // Generic fallback for any future /r2-<prefix>/ rewrite — strip the
+      // leading /r2- and treat the next segment as the prefix.
+      const m = /^\/r2-([^/]+)\/(.+)$/.exec(url.split("?")[0]);
+      if (m) return `${m[1]}/${m[2]}`;
+      return null;
     }
     const parsed = new URL(url);
     // Custom public URL

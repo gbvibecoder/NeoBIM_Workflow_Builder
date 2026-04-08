@@ -803,7 +803,7 @@ export default function WorkflowsPage() {
                     <div style={{ display: "flex", flexDirection: "column", gap: 6, fontSize: 12, color: "#C0C0D8" }}>
                       <div>• Workflow definitions and version history</div>
                       <div>• All execution runs and their outputs</div>
-                      <div>• Generated artifacts in cloud storage (R2)</div>
+                      <div>• Generated artifacts and uploaded files</div>
                       <div>• Community publications and reviews</div>
                     </div>
                   </div>
