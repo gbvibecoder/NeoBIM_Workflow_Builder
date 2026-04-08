@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion, useInView, useScroll, useTransform } from "framer-motion";
 import {
-  ArrowRight, Crown, Play, Plus, Zap, ChevronDown,
+  ArrowRight, Play, Plus, Zap, ChevronDown,
   Type, FileText, Image as ImageIcon, Box, Sliders, MapPin,
   Sparkles, Palette, Building2, FileSpreadsheet, X, ChevronRight,
 } from "lucide-react";
@@ -20,6 +20,8 @@ import type { WorkflowTemplate } from "@/types/workflow";
 const WorldCanvas = lazy(() => import("@/components/dashboard/WorldCanvas").then((m) => ({ default: m.WorldCanvas })));
 const FloorPlanScene = lazy(() => import("@/components/dashboard/FloorPlanScene").then((m) => ({ default: m.FloorPlanScene })));
 const IFCViewerScene = lazy(() => import("@/components/dashboard/IFCViewerScene").then((m) => ({ default: m.IFCViewerScene })));
+const VideoRenderScene = lazy(() => import("@/components/dashboard/VideoRenderScene").then((m) => ({ default: m.VideoRenderScene })));
+const HeroBuildingShowcase = lazy(() => import("@/components/dashboard/HeroBuildingShowcase").then((m) => ({ default: m.HeroBuildingShowcase })));
 import { scrollState } from "@/components/dashboard/WorldCanvas";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -103,11 +105,22 @@ export default function DashboardPage() {
   const videoSectionRef = useRef<HTMLDivElement>(null);
   const videoInView = useInView(videoSectionRef, { once: false, margin: "-10%" });
 
-  // Floor plan + IFC scene scroll progress — track within the main scroll container
+  // Floor plan + IFC + Video Render scene scroll progress — track within the main scroll container
   const floorPlanRef = useRef<HTMLDivElement>(null);
   const ifcRef = useRef<HTMLDivElement>(null);
+  const videoRenderRef = useRef<HTMLDivElement>(null);
   const [fpVal, setFpVal] = useState(0);
   const [ifcVal, setIfcVal] = useState(0);
+  const [vrVal, setVrVal] = useState(0);
+
+  // ── Mobile layout detection (matches HeroBuildingShowcase's < 820px breakpoint) ──
+  const [isMobileLayout, setIsMobileLayout] = useState(false);
+  useEffect(() => {
+    const check = () => setIsMobileLayout(window.innerWidth < 820);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
 
   // Manual scroll tracking since useScroll needs the custom container
   useEffect(() => {
@@ -125,6 +138,7 @@ export default function DashboardPage() {
       };
       setFpVal(rect(floorPlanRef.current));
       setIfcVal(rect(ifcRef.current));
+      setVrVal(rect(videoRenderRef.current));
     };
     el.addEventListener("scroll", update, { passive: true });
     update(); // initial
@@ -206,138 +220,254 @@ export default function DashboardPage() {
       <main ref={mainRef} className="db-scroll" style={{ position: "relative", zIndex: 1, height: "100%", overflowY: "auto", overflowX: "hidden" }}>
 
         {/* ═══════════════════════════════════════════════════════════════
-            HERO — Full viewport, transparent overlay on 3D
+            HERO — "The BIM Holotable" · dedicated 3D scene + asymmetric UI
             ═══════════════════════════════════════════════════════════════ */}
         <motion.section
           ref={heroRef}
           style={{ position: "relative", height: "100%", overflow: "hidden", opacity: heroOpacity, scale: heroScale }}
         >
-
-          {/* Depth separation — dark vignette behind text */}
-          <div style={{ position: "absolute", inset: 0, background: "radial-gradient(ellipse 55% 45% at 50% 48%, rgba(7,7,13,0.55) 0%, transparent 75%)", pointerEvents: "none", zIndex: 1 }} />
-
-          {/* ── Content block — absolute centered ── */}
+          {/* Opaque backdrop — clean dark void behind the building.
+              Subtle warm radial at building location to ground the scene
+              and a faint cyan accent on the left to support the text. */}
           <div style={{
-            position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)",
-            zIndex: 2, textAlign: "center", maxWidth: 720, width: "90%",
-            padding: "48px 40px", borderRadius: 24,
-            background: "rgba(10,12,20,0.15)",
-            backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)",
-            border: "1px solid rgba(255,255,255,0.04)",
-          }}>
-            {/* Decorative line */}
-            <motion.div
-              initial={{ opacity: 0, scaleX: 0 }}
-              animate={{ opacity: 1, scaleX: 1 }}
-              transition={{ duration: 0.6, ease }}
-              style={{ width: 50, height: 1, background: "linear-gradient(90deg, transparent, #06b6d4, transparent)", margin: "0 auto 24px", transformOrigin: "center" }}
-            />
+            position: "absolute", inset: 0, zIndex: 0,
+            background: `
+              radial-gradient(ellipse 60% 55% at 68% 52%, rgba(255,184,108,0.08) 0%, transparent 60%),
+              radial-gradient(ellipse 55% 50% at 22% 45%, rgba(125,249,255,0.04) 0%, transparent 55%),
+              radial-gradient(ellipse 100% 80% at 50% 50%, #0a0d16 0%, #05070e 55%, #02030a 100%)
+            `,
+          }} />
 
-            {/* WELCOME BACK */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2, duration: 0.7, ease }}
-            >
-              <span style={{
-                fontSize: 11, fontWeight: 400, letterSpacing: "0.3em", textTransform: "uppercase",
-                color: "rgba(255,255,255,0.45)",
-                fontFamily: "var(--font-jetbrains), monospace",
-              }}>
-                {data.userName ? t("dash.welcomeBack") : ""}
-              </span>
-            </motion.div>
-
-            {/* NAME — the hero moment */}
-            <motion.div
-              initial={{ opacity: 0, y: 20, scale: 0.95 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              transition={{ delay: 0.4, duration: 0.8, ease }}
-            >
-              <h1 style={{
-                fontSize: "clamp(38px, 7vw, 72px)", fontWeight: 900,
-                letterSpacing: "-0.04em", lineHeight: 1.05,
-                marginTop: 8, marginBottom: 16,
-                background: "linear-gradient(135deg, #06b6d4 0%, #818cf8 45%, #a855f7 100%)",
-                WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text",
-                textShadow: "none",
-                filter: "drop-shadow(0 0 40px rgba(6,182,212,0.2)) drop-shadow(0 0 80px rgba(168,85,247,0.1))",
-              }}>
-                {data.userName || t("dash.welcomeNew")}
-              </h1>
-            </motion.div>
-
-            {/* Subtitle */}
-            <motion.p
-              initial={{ opacity: 0, y: 16 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.6, duration: 0.6, ease }}
-              style={{ fontSize: 16, color: "rgba(255,255,255,0.5)", lineHeight: 1.7, marginBottom: 36, letterSpacing: "0.01em" }}
-            >
-              {t("dash.letsCreate")}
-            </motion.p>
-
-            {/* Actions */}
-            <motion.div
-              initial={{ opacity: 0, y: 14 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.8, duration: 0.6, ease }}
-              style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 16, flexWrap: "wrap" }}
-            >
-              {/* Plan badge — cyan themed */}
-              <div style={{
-                display: "inline-flex", alignItems: "center", gap: 8,
-                padding: "7px 7px 7px 14px", borderRadius: 24,
-                background: "rgba(6,182,212,0.06)",
-                border: "1px solid rgba(6,182,212,0.2)",
-                backdropFilter: "blur(8px)",
-              }}>
-                <span style={{
-                  display: "inline-flex", alignItems: "center", gap: 4,
-                  fontSize: 10, fontWeight: 700, letterSpacing: "0.1em",
-                  color: "#06b6d4",
-                  fontFamily: "var(--font-jetbrains), monospace",
-                }}>
-                  {role === "FREE" ? <Zap size={10} /> : <Crown size={10} />}
-                  {role}
-                </span>
-                <div style={{ width: 1, height: 14, background: "rgba(255,255,255,0.08)" }} />
-                <span style={{ fontSize: 11, color: "rgba(255,255,255,0.35)", fontFamily: "var(--font-jetbrains), monospace", paddingRight: 4 }}>
-                  {used}/{effectiveLimit}
-                </span>
-              </div>
-
-              {/* CTA — gradient border, dark fill */}
-              <Link
-                href="/dashboard/workflows/new"
-                className="db-hero-cta"
-                style={{
-                  display: "inline-flex", alignItems: "center", gap: 8,
-                  padding: "12px 28px", borderRadius: 14,
-                  background: "rgba(6,182,212,0.08)",
-                  border: "1px solid rgba(6,182,212,0.3)",
-                  color: "#e2e8f0", fontSize: 14, fontWeight: 700,
-                  textDecoration: "none", letterSpacing: "0.01em",
-                  transition: "all 0.35s cubic-bezier(0.22, 1, 0.36, 1)",
-                }}
-              >
-                <Plus size={15} strokeWidth={2.5} /> {t("dash.startBuilding")}
-              </Link>
-            </motion.div>
+          {/* Dedicated hero 3D scene — eats its own dog food: real BuildFlow BIM model */}
+          <div style={{ position: "absolute", inset: 0, zIndex: 1, pointerEvents: "auto" }}>
+            <Suspense fallback={<div style={{ width: "100%", height: "100%", background: "#03050c" }} />}>
+              <HeroBuildingShowcase />
+            </Suspense>
           </div>
 
-          {/* ── Scroll indicator — absolute bottom ── */}
+          {/* Bottom fade — connects to next section. NOTE: top is intentionally
+              clean so the building's sky and the HUD have unobstructed reading. */}
+          <div style={{
+            position: "absolute", inset: 0, zIndex: 2, pointerEvents: "none",
+            background: "linear-gradient(180deg, transparent 0%, transparent 72%, rgba(3,4,10,0.95) 100%)",
+          }} />
+          {/* Left protected zone — strong dark mask covers ONLY the left half so
+              the text overlay always reads regardless of where the building's
+              shadows fall, while leaving the right (building + HUD) untouched.
+              On mobile there's no 3D scene to fade into, so this mask is skipped. */}
+          {!isMobileLayout && (
+            <div style={{
+              position: "absolute", inset: 0, zIndex: 2, pointerEvents: "none",
+              background: "linear-gradient(90deg, rgba(3,4,10,0.92) 0%, rgba(3,4,10,0.78) 22%, rgba(3,4,10,0.42) 38%, transparent 50%)",
+            }} />
+          )}
+
+          {/* ─── Apple/Linear-style overlay — left side only ─── */}
+          <div style={{
+            position: "absolute", inset: 0, zIndex: 3,
+            display: "flex",
+            alignItems: isMobileLayout ? "flex-start" : "center",
+            padding: isMobileLayout ? "78px 22px 80px 22px" : "0 clamp(32px, 6vw, 110px)",
+            pointerEvents: "none",
+            overflowY: isMobileLayout ? "auto" : "visible",
+          }}>
+            {/* ── LEFT: identity + CTA — full width on mobile, hard-capped on desktop ── */}
+            <div style={{
+              pointerEvents: "auto",
+              width: isMobileLayout ? "100%" : "min(560px, 46%)",
+            }}>
+              {/* Eyebrow — transformation story */}
+              <motion.div
+                initial={{ opacity: 0, x: -16 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.15, duration: 0.7, ease }}
+                style={{ display: "inline-flex", alignItems: "center", gap: 10, marginBottom: 24,
+                  padding: "6px 12px 6px 10px", borderRadius: 999,
+                  background: "rgba(125,249,255,0.04)",
+                  border: "1px solid rgba(125,249,255,0.12)",
+                  backdropFilter: "blur(8px)",
+                  whiteSpace: "nowrap",
+                  maxWidth: "100%",
+                }}
+              >
+                <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#06b6d4", boxShadow: "0 0 12px #06b6d4", flexShrink: 0 }} />
+                <span style={{
+                  fontSize: isMobileLayout ? 9 : 10,
+                  fontWeight: 600, letterSpacing: "0.22em", textTransform: "uppercase",
+                  color: "rgba(125,249,255,0.85)", fontFamily: "var(--font-jetbrains), monospace",
+                  whiteSpace: "nowrap",
+                }}>
+                  PROMPT → BIM MODEL · LIVE
+                </span>
+              </motion.div>
+
+              {/* Welcome line */}
+              <motion.div
+                initial={{ opacity: 0, y: 18 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.28, duration: 0.7, ease }}
+              >
+                <span style={{
+                  display: "block",
+                  fontSize: 13, fontWeight: 400, letterSpacing: "0.18em", textTransform: "uppercase",
+                  color: "rgba(255,255,255,0.42)",
+                  fontFamily: "var(--font-jetbrains), monospace",
+                  marginBottom: 10,
+                }}>
+                  {data.userName ? t("dash.welcomeBack") : ""}
+                </span>
+              </motion.div>
+
+              {/* Display name — AEC-tech restraint (Inter SemiBold feel) */}
+              <motion.h1
+                initial={{ opacity: 0, y: 18 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.36, duration: 0.8, ease }}
+                style={{
+                  fontSize: isMobileLayout
+                    ? "clamp(34px, 9vw, 52px)"
+                    : "clamp(40px, 4.6vw, 68px)",
+                  fontWeight: 600,
+                  letterSpacing: "-0.035em",
+                  lineHeight: 1.02,
+                  margin: "0 0 16px",
+                  color: "#f5f7fb",
+                }}
+              >
+                {data.userName || t("dash.welcomeNew")}
+              </motion.h1>
+
+              {/* Subtitle — single line, restrained, factual */}
+              <motion.p
+                initial={{ opacity: 0, y: 14 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.5, duration: 0.6, ease }}
+                style={{
+                  fontSize: isMobileLayout ? 14 : 16,
+                  color: "rgba(203,213,225,0.62)",
+                  lineHeight: 1.55,
+                  margin: isMobileLayout ? "0 0 26px" : "0 0 36px",
+                  maxWidth: 480,
+                  fontWeight: 400,
+                  letterSpacing: "-0.003em",
+                }}
+              >
+                The visual workflow studio for BIM. Compose pipelines that turn prompts, images, and IFC files into real building models.
+              </motion.p>
+
+              {/* Actions row */}
+              <motion.div
+                initial={{ opacity: 0, y: 14 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.7, duration: 0.6, ease }}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: isMobileLayout ? 10 : 14,
+                  flexWrap: "wrap",
+                }}
+              >
+                {/* Primary CTA */}
+                <Link
+                  href="/dashboard/workflows/new"
+                  className="db-hero-cta"
+                  style={{
+                    display: "inline-flex", alignItems: "center", gap: 10,
+                    padding: isMobileLayout ? "13px 22px" : "16px 32px",
+                    borderRadius: 14,
+                    background: "linear-gradient(135deg, #06b6d4 0%, #6366f1 50%, #a855f7 100%)",
+                    color: "#ffffff",
+                    fontSize: isMobileLayout ? 13 : 14,
+                    fontWeight: 700,
+                    textDecoration: "none", letterSpacing: "0.02em",
+                    whiteSpace: "nowrap",
+                    boxShadow: "0 12px 40px rgba(6,182,212,0.28), 0 4px 18px rgba(168,85,247,0.18), inset 0 1px 0 rgba(255,255,255,0.18)",
+                    border: "1px solid rgba(255,255,255,0.12)",
+                    transition: "all 0.35s cubic-bezier(0.22, 1, 0.36, 1)",
+                  }}
+                >
+                  <Plus size={16} strokeWidth={2.6} /> {t("dash.startBuilding")}
+                  <ArrowRight size={15} strokeWidth={2.4} style={{ marginLeft: 2 }} />
+                </Link>
+
+                {/* Secondary — templates */}
+                <Link
+                  href="/dashboard/templates"
+                  style={{
+                    display: "inline-flex", alignItems: "center", gap: 10,
+                    padding: isMobileLayout ? "12px 18px" : "15px 26px",
+                    borderRadius: 14,
+                    background: "rgba(255,255,255,0.03)",
+                    border: "1px solid rgba(255,255,255,0.10)",
+                    color: "rgba(226,232,240,0.85)",
+                    fontSize: isMobileLayout ? 12 : 13,
+                    fontWeight: 600,
+                    textDecoration: "none", letterSpacing: "0.01em",
+                    whiteSpace: "nowrap",
+                    backdropFilter: "blur(10px)",
+                    transition: "all 0.3s cubic-bezier(0.22, 1, 0.36, 1)",
+                  }}
+                >
+                  <Sparkles size={14} /> Browse Templates
+                </Link>
+
+              </motion.div>
+
+              {/* ── Inline metric strip — flex row on desktop, 2x2 grid on mobile ── */}
+              <motion.div
+                initial={{ opacity: 0, y: 14 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.85, duration: 0.6, ease }}
+                style={{
+                  marginTop: isMobileLayout ? 28 : 38,
+                  display: isMobileLayout ? "grid" : "flex",
+                  ...(isMobileLayout
+                    ? { gridTemplateColumns: "repeat(2, 1fr)", rowGap: 18, columnGap: 14 }
+                    : { alignItems: "center", gap: 28, flexWrap: "wrap" }),
+                  paddingTop: 22,
+                  borderTop: "1px solid rgba(255,255,255,0.06)",
+                }}
+              >
+                {[
+                  { label: "PLAN",       value: role,                  color: role === "FREE" ? "#7dd3fc" : "#a78bfa" },
+                  { label: "WORKFLOWS",  value: data.workflowCount,    color: "#4F8AFF" },
+                  { label: "EXECUTIONS", value: `${used}/${effectiveLimit}`, color: "#8B5CF6" },
+                  { label: "LEVEL",      value: data.level,            color: "#10B981" },
+                ].map((m) => (
+                  <div key={m.label} style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                    <span style={{
+                      fontSize: 9, letterSpacing: "0.18em",
+                      color: "rgba(255,255,255,0.4)",
+                      fontFamily: "var(--font-jetbrains), monospace",
+                    }}>
+                      {m.label}
+                    </span>
+                    <span style={{
+                      fontSize: 17, fontWeight: 700, color: "#F0F2F8",
+                      fontFamily: "var(--font-jetbrains), monospace",
+                      letterSpacing: "-0.01em",
+                      textShadow: `0 0 16px ${m.color}40`,
+                    }}>
+                      {m.value}
+                    </span>
+                  </div>
+                ))}
+              </motion.div>
+            </div>
+          </div>
+
+          {/* ── Scroll indicator ── */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 1.2, duration: 0.6 }}
-            style={{ position: "absolute", bottom: 32, left: "50%", transform: "translateX(-50%)", zIndex: 2, display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}
+            style={{ position: "absolute", bottom: 28, left: "50%", transform: "translateX(-50%)", zIndex: 4, display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}
           >
-            <span style={{ fontSize: 9, color: "rgba(255,255,255,0.25)", letterSpacing: "0.2em", textTransform: "uppercase", fontFamily: "var(--font-jetbrains), monospace" }}>
+            <span style={{ fontSize: 9, color: "rgba(255,255,255,0.35)", letterSpacing: "0.22em", textTransform: "uppercase", fontFamily: "var(--font-jetbrains), monospace" }}>
               {t("dash.scrollExplore")}
             </span>
             <motion.div animate={{ y: [0, 6, 0] }} transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}>
-              <ChevronDown size={14} style={{ color: "rgba(255,255,255,0.2)" }} />
+              <ChevronDown size={14} style={{ color: "rgba(125,249,255,0.5)" }} />
             </motion.div>
           </motion.div>
         </motion.section>
@@ -668,6 +798,84 @@ export default function DashboardPage() {
               </Link>
             </motion.div>
           </motion.div>
+        </section>
+
+        {/* ═══════════════════════════════════════════════════════════════
+            FLAGSHIP: 3D VIDEO RENDER
+            ═══════════════════════════════════════════════════════════════ */}
+        <section
+          ref={videoRenderRef}
+          style={{
+            position: "relative", minHeight: "80vh",
+            display: "grid", gridTemplateColumns: "45% 55%",
+            alignItems: "center",
+            background: "linear-gradient(180deg, rgba(7,7,13,0.8) 0%, rgba(7,7,13,0.5) 50%, rgba(7,7,13,0.8) 100%)",
+            overflow: "hidden",
+          }}
+          className="db-showcase-section"
+        >
+          {/* Text content — LEFT */}
+          <motion.div
+            initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-100px" }}
+            variants={stagger}
+            style={{ padding: "60px 48px 60px 64px" }}
+          >
+            <motion.div variants={fadeIn} transition={{ duration: 0.6, ease }}>
+              <span style={{
+                display: "inline-flex", alignItems: "center", gap: 6,
+                padding: "5px 14px", borderRadius: 20, marginBottom: 20,
+                background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.22)",
+                fontSize: 9, fontWeight: 700, color: "#f59e0b", letterSpacing: "0.15em",
+                fontFamily: "var(--font-jetbrains), monospace",
+              }}>
+                {t("dash.flagshipFeature")}
+              </span>
+            </motion.div>
+
+            <motion.h2 variants={fadeIn} transition={{ duration: 0.6, delay: 0.1, ease }} style={{ fontSize: "clamp(28px, 4vw, 44px)", fontWeight: 900, color: "#F0F0F5", letterSpacing: "-0.04em", lineHeight: 1.1, marginBottom: 14 }}>
+              {t("dash.vrTitle")}
+            </motion.h2>
+
+            <motion.p variants={fadeIn} transition={{ duration: 0.6, delay: 0.2, ease }} style={{ fontSize: 16, color: "rgba(255,255,255,0.5)", lineHeight: 1.7, marginBottom: 32, maxWidth: 380 }}>
+              {t("dash.vrSubtitle")}
+            </motion.p>
+
+            <motion.div variants={fadeIn} transition={{ duration: 0.5, delay: 0.3, ease }} style={{ display: "flex", flexDirection: "column", gap: 14, marginBottom: 36 }}>
+              {(["dash.vrBullet1", "dash.vrBullet2", "dash.vrBullet3", "dash.vrBullet4"] as const).map((key, i) => (
+                <div key={i} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#f59e0b", boxShadow: "0 0 10px rgba(245,158,11,0.55)", flexShrink: 0 }} />
+                  <span style={{ fontSize: 14, color: "rgba(255,255,255,0.6)" }}>{t(key)}</span>
+                </div>
+              ))}
+            </motion.div>
+
+            <motion.div variants={fadeIn} transition={{ duration: 0.5, delay: 0.4, ease }}>
+              <Link
+                href="/dashboard/3d-render"
+                className="db-hero-cta"
+                style={{
+                  display: "inline-flex", alignItems: "center", gap: 8,
+                  padding: "12px 26px", borderRadius: 14,
+                  background: "rgba(245,158,11,0.08)",
+                  border: "1px solid rgba(245,158,11,0.28)",
+                  color: "#e2e8f0", fontSize: 13, fontWeight: 700,
+                  textDecoration: "none",
+                  transition: "all 0.35s cubic-bezier(0.22, 1, 0.36, 1)",
+                }}
+              >
+                {t("dash.vrCta")} <ArrowRight size={14} />
+              </Link>
+            </motion.div>
+          </motion.div>
+
+          {/* 3D Scene — RIGHT */}
+          <div style={{ height: "100%", minHeight: 500, position: "relative" }}>
+            <Suspense fallback={<div style={{ width: "100%", height: "100%", background: "#07070D" }} />}>
+              <VideoRenderScene progress={vrVal} />
+            </Suspense>
+            {/* Fade left edge into background */}
+            <div style={{ position: "absolute", top: 0, left: 0, bottom: 0, width: "15%", background: "linear-gradient(90deg, rgba(7,7,13,0.8), transparent)", pointerEvents: "none" }} />
+          </div>
         </section>
 
         {/* ═══════════════════════════════════════════════════════════════
