@@ -254,13 +254,13 @@ export function UploadZone({ onFileSelected, onError, loading, loadProgress, loa
           margin: 0,
           marginBottom: 8,
           color: INK,
-          fontSize: 28,
+          fontSize: 30,
           fontWeight: 700,
           letterSpacing: "-0.02em",
           textAlign: "center",
         }}
       >
-        Bring your building model to life
+        Upload an IFC file
       </h1>
       <p
         style={{
@@ -270,11 +270,11 @@ export function UploadZone({ onFileSelected, onError, loading, loadProgress, loa
           color: INK_SOFT,
           fontSize: 15,
           textAlign: "center",
-          maxWidth: 520,
+          maxWidth: 460,
           lineHeight: 1.55,
         }}
       >
-        Drop an IFC file to explore geometry, properties, and spatial structure in a high-fidelity 3D viewer.
+        Open your BIM model in a fast, browser-based 3D viewer.
       </p>
 
       {/* Upload card */}
