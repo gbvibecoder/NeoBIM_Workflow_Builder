@@ -49,8 +49,10 @@ export function Header({ title, subtitle }: HeaderProps) {
         setProfileOpen(false);
       }
     };
-    if (profileOpen) document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
+    // Capture phase — ReactFlow on the canvas page stops propagation on
+    // mousedown, so a bubble-phase listener wouldn't fire for canvas clicks.
+    if (profileOpen) document.addEventListener("mousedown", handler, true);
+    return () => document.removeEventListener("mousedown", handler, true);
   }, [profileOpen]);
 
   // Fetch referral code when dropdown opens
@@ -96,10 +98,16 @@ export function Header({ title, subtitle }: HeaderProps) {
         backdropFilter: "blur(20px)",
         WebkitBackdropFilter: "blur(20px)",
         borderBottom: "1px solid rgba(255,255,255,0.06)",
+        // Establish a stacking context above the canvas/ReactFlow area so the
+        // canvas-toolbar dropdowns (Manual mode, Share, Run options) — which
+        // are now portaled into this header — render above the canvas pane.
+        position: "relative",
+        zIndex: 40,
       }}
     >
-      {/* Left — Title (optional) */}
-      <div style={{ minWidth: 0, flex: 1 }}>
+      {/* Left — Title (optional). Collapses when empty so the center toolbar
+          slot can occupy the full available width. */}
+      <div style={{ minWidth: 0, flex: title || subtitle ? 1 : "0 0 auto" }}>
         {title && (
           <div className="flex items-center gap-2.5">
             <h1 style={{ fontSize: 18, fontWeight: 700, color: "#F0F0F5", letterSpacing: "-0.02em" }}>{title}</h1>
@@ -127,11 +135,14 @@ export function Header({ title, subtitle }: HeaderProps) {
         )}
       </div>
 
-      {/* Center — Canvas toolbar slot (portal target, only filled on /dashboard/canvas) */}
+      {/* Center — Canvas toolbar slot (portal target, only filled on /dashboard/canvas).
+          flex:1 so portaled content (ShowcaseHeader) can stretch and align its
+          children left/right via space-between. The canvas toolbar pill inside
+          stays centered via justify-center. */}
       <div
         id="canvas-toolbar-slot"
         className="hidden md:flex items-center justify-center"
-        style={{ flex: "0 1 auto", minWidth: 0, marginRight: 12 }}
+        style={{ flex: 1, minWidth: 0, marginRight: 12 }}
       />
 
       {/* Right — Actions */}

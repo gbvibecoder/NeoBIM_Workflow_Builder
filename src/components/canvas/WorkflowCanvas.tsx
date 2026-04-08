@@ -1168,43 +1168,60 @@ function WorkflowCanvasInner({ workflowId: urlWorkflowId, templateId }: Workflow
             )}
           </AnimatePresence>
 
-          {/* "View Results" floating button — visible when showcase is closed but artifacts exist */}
+          {/* "View Results" floating CTA — clean, professional, true-centered */}
           <AnimatePresence>
             {!showShowcase && !isExecuting && artifacts.size > 0 && (
               <motion.button
                 className="view-results-fab"
                 key="view-results-fab"
-                initial={{ opacity: 0, y: 20, scale: 0.9 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: 10, scale: 0.9 }}
-                transition={{ duration: 0.25, ease: "easeOut" }}
                 onClick={() => setShowShowcase(true)}
+                initial={{ opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 8 }}
+                transition={{ duration: 0.22, ease: [0.4, 0, 0.2, 1] }}
+                whileHover={{ y: -2 }}
+                whileTap={{ scale: 0.98 }}
+                aria-label={tLocale('showcase.viewResults') ?? "View Results"}
                 style={{
+                  // True-centered over the visible canvas. Compensate for the
+                  // right node-library width: 300px when open, 44px tab when
+                  // collapsed. Half of that width is added as a left offset.
                   position: "absolute",
-                  bottom: 20,
-                  left: "50%",
+                  bottom: 28,
+                  left: `calc(50% - ${(isNodeLibraryOpen ? 300 : 44) / 2}px)`,
                   transform: "translateX(-50%)",
                   zIndex: 12,
-                  display: "flex",
+                  display: "inline-flex",
                   alignItems: "center",
-                  gap: 8,
-                  padding: "10px 20px",
+                  gap: 10,
+                  height: 48,
+                  padding: "0 32px",
                   borderRadius: 12,
-                  background: "linear-gradient(135deg, rgba(0,245,255,0.12), rgba(184,115,51,0.08))",
-                  border: "1px solid rgba(0,245,255,0.25)",
-                  backdropFilter: "blur(12px)",
-                  WebkitBackdropFilter: "blur(12px)",
-                  color: "#00F5FF",
-                  fontSize: 12,
-                  fontWeight: 600,
+                  background:
+                    "linear-gradient(180deg, #22F5FF 0%, #00D4E8 50%, #00A8C2 100%)",
+                  border: "1px solid rgba(120, 250, 255, 0.7)",
+                  color: "#001016",
+                  fontSize: 14,
+                  fontWeight: 700,
+                  letterSpacing: "0.01em",
+                  fontFamily: "var(--font-inter), -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
                   cursor: "pointer",
-                  boxShadow: "0 4px 24px rgba(0,0,0,0.4), 0 0 20px rgba(0,245,255,0.08)",
+                  boxShadow:
+                    "0 1px 0 rgba(255,255,255,0.45) inset, 0 -1px 0 rgba(0,0,0,0.2) inset, 0 10px 28px rgba(0,0,0,0.55), 0 0 0 1px rgba(0,245,255,0.35), 0 0 36px rgba(0,245,255,0.35)",
+                  transition: "box-shadow 200ms ease, filter 200ms ease",
                 }}
-                whileHover={{ scale: 1.03, boxShadow: "0 4px 30px rgba(0,0,0,0.5), 0 0 30px rgba(0,245,255,0.15)" }}
-                whileTap={{ scale: 0.97 }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.filter = "brightness(1.08)";
+                  e.currentTarget.style.boxShadow =
+                    "0 1px 0 rgba(255,255,255,0.55) inset, 0 -1px 0 rgba(0,0,0,0.2) inset, 0 14px 36px rgba(0,0,0,0.6), 0 0 0 1px rgba(0,245,255,0.6), 0 0 56px rgba(0,245,255,0.55)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.filter = "brightness(1)";
+                  e.currentTarget.style.boxShadow =
+                    "0 1px 0 rgba(255,255,255,0.45) inset, 0 -1px 0 rgba(0,0,0,0.2) inset, 0 10px 28px rgba(0,0,0,0.55), 0 0 0 1px rgba(0,245,255,0.35), 0 0 36px rgba(0,245,255,0.35)";
+                }}
               >
-                <Sparkles size={14} />
-                {tLocale('showcase.viewResults') ?? "View Results"}
+                <span>{tLocale('showcase.viewResults') ?? "View Results"}</span>
               </motion.button>
             )}
           </AnimatePresence>

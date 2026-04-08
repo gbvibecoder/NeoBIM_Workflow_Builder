@@ -187,8 +187,10 @@ export function CanvasToolbar({
       if (runMenuRef.current && !runMenuRef.current.contains(e.target as Node)) setShowRunMenu(false);
       if (shareMenuRef.current && !shareMenuRef.current.contains(e.target as Node)) setShowShareMenu(false);
     };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
+    // Use capture phase — ReactFlow's pane stops propagation on mousedown,
+    // so a bubble-phase document listener would never fire for canvas clicks.
+    document.addEventListener("mousedown", handler, true);
+    return () => document.removeEventListener("mousedown", handler, true);
   }, []);
 
   const commitName = useCallback(() => {
