@@ -1000,7 +1000,7 @@ function WorkflowCanvasInner({ workflowId: urlWorkflowId, templateId }: Workflow
           <div
             style={{
               position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 0,
-              background: 'radial-gradient(ellipse 80% 60% at 50% 40%, #1a1d24 0%, #121418 35%, #0a0c10 75%, #07080b 100%)',
+              background: 'radial-gradient(ellipse 85% 65% at 50% 42%, #14161c 0%, #0d0e13 38%, #090a0f 78%, #06070a 100%)',
             }}
           />
           {/* Crisp dot grid — n8n-style, evenly spaced and clearly visible */}
