@@ -151,23 +151,23 @@ export function HeroBuildingShowcase() {
 
     switch (timeOfDay) {
       case "day":
-        sun.color.set(0xfff0d4); sun.intensity = 3.2;
+        sun.color.set(0xfff0d4); sun.intensity = 1.7;
         sun.position.set(60, 80, 50);
-        amb.color.set(0xe8d8c8); amb.intensity = 0.45;
-        hemi.color.set(0xa8c5ff); hemi.groundColor.set(0x556633); hemi.intensity = 0.9;
-        fill.color.set(0x8aacdd); fill.intensity = 0.6;
-        rim.color.set(0xffd090); rim.intensity = 0.5;
-        renderer.toneMappingExposure = 1.1;
+        amb.color.set(0xe8d8c8); amb.intensity = 0.32;
+        hemi.color.set(0xa8c5ff); hemi.groundColor.set(0x556633); hemi.intensity = 0.55;
+        fill.color.set(0x8aacdd); fill.intensity = 0.38;
+        rim.color.set(0xffd090); rim.intensity = 0.32;
+        renderer.toneMappingExposure = 0.82;
         scene.fog = new THREE.Fog(0xb6d4ff, 80, 280);
         break;
       case "dusk":
-        sun.color.set(0xffd4a0); sun.intensity = 3.0;
+        sun.color.set(0xffd4a0); sun.intensity = 1.6;
         sun.position.set(60, 35, 50);
-        amb.color.set(0xe8d8c8); amb.intensity = 0.45;
-        hemi.color.set(0xffe8c0); hemi.groundColor.set(0x3a5533); hemi.intensity = 0.9;
-        fill.color.set(0x8aacdd); fill.intensity = 0.55;
-        rim.color.set(0xffd090); rim.intensity = 0.55;
-        renderer.toneMappingExposure = 1.25;
+        amb.color.set(0xe8d8c8); amb.intensity = 0.32;
+        hemi.color.set(0xffe8c0); hemi.groundColor.set(0x3a5533); hemi.intensity = 0.55;
+        fill.color.set(0x8aacdd); fill.intensity = 0.35;
+        rim.color.set(0xffd090); rim.intensity = 0.35;
+        renderer.toneMappingExposure = 0.88;
         scene.fog = new THREE.Fog(0xff9966, 80, 260);
         break;
       case "night":
@@ -231,7 +231,7 @@ export function HeroBuildingShowcase() {
       renderer.shadowMap.enabled = true;
       renderer.shadowMap.type = THREE.PCFSoftShadowMap;
       renderer.toneMapping = THREE.ACESFilmicToneMapping;
-      renderer.toneMappingExposure = 1.25;
+      renderer.toneMappingExposure = 0.85;
       renderer.localClippingEnabled = true;
       renderer.outputColorSpace = THREE.SRGBColorSpace;
       container.appendChild(renderer.domElement);
@@ -273,16 +273,16 @@ export function HeroBuildingShowcase() {
         }
       );
 
-      // ═══ Cinematic 5-light rig (golden hour) ═══
-      const ambient = new THREE.AmbientLight(0xe8d8c8, 0.45);
+      // ═══ Cinematic 5-light rig (toned down — matte reads, no glare) ═══
+      const ambient = new THREE.AmbientLight(0xe8d8c8, 0.32);
       scene.add(ambient);
       ambientRef.current = ambient;
 
-      const hemi = new THREE.HemisphereLight(0xffe8c0, 0x3a5533, 0.9);
+      const hemi = new THREE.HemisphereLight(0xffe8c0, 0x3a5533, 0.55);
       scene.add(hemi);
       hemiRef.current = hemi;
 
-      const sun = new THREE.DirectionalLight(0xffd4a0, 3.0);
+      const sun = new THREE.DirectionalLight(0xffd4a0, 1.6);
       sun.position.set(60, 35, 50);
       sun.castShadow = true;
       sun.shadow.mapSize.width = 4096;
@@ -299,12 +299,12 @@ export function HeroBuildingShowcase() {
       scene.add(sun);
       sunLightRef.current = sun;
 
-      const fill = new THREE.DirectionalLight(0x8aacdd, 0.55);
+      const fill = new THREE.DirectionalLight(0x8aacdd, 0.35);
       fill.position.set(-30, 40, -20);
       scene.add(fill);
       fillRef.current = fill;
 
-      const rim = new THREE.DirectionalLight(0xffd090, 0.55);
+      const rim = new THREE.DirectionalLight(0xffd090, 0.35);
       rim.position.set(-20, 15, -40);
       scene.add(rim);
       rimRef.current = rim;
@@ -339,6 +339,40 @@ export function HeroBuildingShowcase() {
               obj.geometry?.dispose();
             }
           });
+        }
+      });
+
+      // ═══ Matte pass — kill the high-gloss "showroom" sheen ═══
+      // The building's stock materials are too reflective for the dashboard
+      // hero. Walk the group once and tone down envMap reflections + bump
+      // roughness so glass/metal read as architectural, not chrome.
+      buildResult.buildingGroup.traverse((obj) => {
+        if (!(obj instanceof THREE.Mesh)) return;
+        const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+        for (const m of mats) {
+          if (!m) continue;
+          const std = m as THREE.MeshStandardMaterial;
+          if (typeof std.envMapIntensity === "number") {
+            std.envMapIntensity = Math.min(std.envMapIntensity, 0.18);
+          }
+          if (typeof std.roughness === "number") {
+            std.roughness = Math.min(1, std.roughness + 0.35);
+          }
+          if (typeof std.metalness === "number") {
+            std.metalness = Math.max(0, std.metalness * 0.5);
+          }
+          // MeshPhysicalMaterial extras
+          const phys = m as THREE.MeshPhysicalMaterial;
+          if (typeof phys.clearcoat === "number") {
+            phys.clearcoat = Math.min(phys.clearcoat, 0.1);
+          }
+          if (typeof phys.clearcoatRoughness === "number") {
+            phys.clearcoatRoughness = Math.max(phys.clearcoatRoughness, 0.6);
+          }
+          if (typeof phys.reflectivity === "number") {
+            phys.reflectivity = Math.min(phys.reflectivity, 0.25);
+          }
+          m.needsUpdate = true;
         }
       });
 
@@ -682,7 +716,8 @@ export function HeroBuildingShowcase() {
 
   return (
     <div style={{ position: "absolute", inset: 0, overflow: "hidden" }}>
-      {/* Three.js mount point */}
+      {/* Three.js mount point — shifted right on desktop so the centered
+          building doesn't overlap the left-side hero text overlay. */}
       <div
         ref={containerRef}
         style={{
@@ -691,6 +726,8 @@ export function HeroBuildingShowcase() {
           width: "100%",
           height: "100%",
           cursor: viewMode === "orbit" ? "grab" : "crosshair",
+          transform: "translateX(clamp(60px, 9vw, 160px))",
+          willChange: "transform",
         }}
       />
 
