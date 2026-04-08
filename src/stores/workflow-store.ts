@@ -84,7 +84,12 @@ interface WorkflowState {
   setSaving: (isSaving: boolean) => void;
 
   // Async DB persistence
-  saveWorkflow: (name?: string) => Promise<string | null>; // returns workflow id
+  // saveWorkflow returns the workflow id on success, or null on failure.
+  // When `name` is omitted, it's an automatic save (Run-button auto-save,
+  // dirty-debounce, etc.) and the backend is allowed to auto-suffix " (N)"
+  // to keep names unique. When `name` is provided, the user explicitly
+  // named the workflow and a duplicate is rejected (toast prompts retry).
+  saveWorkflow: (name?: string) => Promise<string | null>;
   loadWorkflow: (id: string) => Promise<void>;
   deleteWorkflow: (id: string) => Promise<void>;
 
@@ -177,7 +182,9 @@ export const useWorkflowStore = create<WorkflowState>()(
       const newWorkflow: Workflow = {
         id: generateId(),
         ownerId: "",
-        name: `Copy of ${template.name}`,
+        // Use the clean template name; the backend will auto-suffix " (N)" on
+        // first save if the user already has a workflow with the same name.
+        name: template.name,
         description: template.description,
         tags: [...template.tags],
         tileGraph: {
@@ -308,6 +315,11 @@ export const useWorkflowStore = create<WorkflowState>()(
       const { isSaving, nodes, edges, currentWorkflow } = get();
       if (isSaving) return null;
       set({ isSaving: true });
+
+      // userExplicit = the caller passed a name (e.g. user typed it in the
+      // Save modal). When true, the backend rejects duplicate names with 409
+      // instead of auto-suffixing.
+      const userExplicit = typeof name === "string" && name.trim().length > 0;
       try {
         // Use snapshot from single get() call above to avoid mutation between reads
         const tileGraph = { nodes, edges };
@@ -315,21 +327,16 @@ export const useWorkflowStore = create<WorkflowState>()(
 
         if (isPersistedId(workflowId)) {
           // Has a real DB id (Prisma cuid) — update existing workflow
-          await api.workflows.update(workflowId!, {
+          const { workflow } = await api.workflows.update(workflowId!, {
             name: name ?? currentWorkflow!.name,
             tileGraph,
           });
-          // Update name in store if changed
-          if (name && name !== currentWorkflow!.name) {
-            set((s) => ({
-              isDirty: false,
-              currentWorkflow: s.currentWorkflow
-                ? { ...s.currentWorkflow, name }
-                : null,
-            }));
-          } else {
-            set({ isDirty: false });
-          }
+          set((s) => ({
+            isDirty: false,
+            currentWorkflow: s.currentWorkflow
+              ? { ...s.currentWorkflow, name: workflow.name }
+              : null,
+          }));
           return workflowId!;
         } else {
           // No persisted ID — create new workflow in DB
@@ -338,11 +345,13 @@ export const useWorkflowStore = create<WorkflowState>()(
             description: currentWorkflow?.description ?? undefined,
             tags: currentWorkflow?.tags ?? [],
             tileGraph,
+            // Auto-suffix only when the user did NOT type a name explicitly.
+            autoSuffix: !userExplicit,
           });
           set((s) => ({
             isDirty: false,
             currentWorkflow: s.currentWorkflow
-              ? { ...s.currentWorkflow, id: workflow.id, name: name ?? s.currentWorkflow.name }
+              ? { ...s.currentWorkflow, id: workflow.id, name: workflow.name }
               : null,
           }));
           // Award XP for first workflow created (fire-and-forget)
@@ -351,7 +360,7 @@ export const useWorkflowStore = create<WorkflowState>()(
         }
       } catch (err) {
         console.error("Save failed:", err);
-        // Detect workflow limit error (403) and show upgrade prompt
+        // Workflow limit reached
         if (err instanceof ApiError && err.status === 403) {
           toast("🐙 You've hit your workflow limit!", {
             description: "Upgrade your plan for unlimited workflows and more power.",
@@ -360,6 +369,13 @@ export const useWorkflowStore = create<WorkflowState>()(
               onClick: () => { window.location.href = "/dashboard/billing"; },
             },
             duration: 6000,
+          });
+        }
+        // Duplicate name (user explicitly typed an existing name)
+        else if (err instanceof ApiError && err.status === 409) {
+          toast.error("Name already in use", {
+            description: `A workflow named "${name}" already exists. Please choose a different name.`,
+            duration: 5000,
           });
         }
         return null;

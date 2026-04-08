@@ -56,6 +56,28 @@ export async function PUT(req: NextRequest, { params }: Params) {
       return NextResponse.json(formatErrorResponse({ title: "Not found", message: "Workflow not found.", code: "NODE_001" }), { status: 404 });
     }
 
+    // Reject rename to a name already used by another of this user's workflows
+    if (typeof name === "string" && name.trim() && name.trim() !== existing.name) {
+      const clash = await prisma.workflow.findFirst({
+        where: {
+          ownerId: session.user.id,
+          name: name.trim(),
+          NOT: { id },
+        },
+        select: { id: true },
+      });
+      if (clash) {
+        return NextResponse.json(
+          formatErrorResponse({
+            title: "Name already in use",
+            message: `A workflow named "${name.trim()}" already exists. Please choose a different name.`,
+            code: "VAL_002",
+          }),
+          { status: 409 }
+        );
+      }
+    }
+
     // Save current state as a version snapshot before overwriting
     if (tileGraph !== undefined) {
       try {

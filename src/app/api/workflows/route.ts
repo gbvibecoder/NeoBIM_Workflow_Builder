@@ -97,7 +97,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { name, description, tags, tileGraph } = body;
+    const { name, description, tags, tileGraph, autoSuffix } = body;
 
     // Validate workflow name
     if (name && typeof name !== "string") {
@@ -107,10 +107,48 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // ── Unique-name handling ──
+    // If autoSuffix is true (template clones, auto-saves on Run, etc.) we
+    // append " (N)" to the requested name until it's unique for this user.
+    // If autoSuffix is false (user explicitly typed a name) and the name
+    // already exists, we return 409 so the UI can prompt for a different one.
+    const requestedName = (typeof name === "string" && name.trim()) ? name.trim() : "Untitled Workflow";
+
+    let finalName = requestedName;
+    const existingSame = await prisma.workflow.findFirst({
+      where: { ownerId: session.user.id, name: requestedName },
+      select: { id: true },
+    });
+
+    if (existingSame) {
+      if (autoSuffix === false) {
+        return NextResponse.json(
+          formatErrorResponse({
+            title: "Name already in use",
+            message: `A workflow named "${requestedName}" already exists. Please choose a different name.`,
+            code: "VAL_002",
+          }),
+          { status: 409 }
+        );
+      }
+      // Find the next free " (N)" suffix
+      const siblings = await prisma.workflow.findMany({
+        where: {
+          ownerId: session.user.id,
+          name: { startsWith: requestedName },
+        },
+        select: { name: true },
+      });
+      const taken = new Set(siblings.map((w) => w.name));
+      let n = 1;
+      while (taken.has(`${requestedName} (${n})`)) n++;
+      finalName = `${requestedName} (${n})`;
+    }
+
     const workflow = await prisma.workflow.create({
       data: {
         ownerId: session.user.id,
-        name: name ?? "Untitled Workflow",
+        name: finalName,
         description,
         tags: tags ?? [],
         tileGraph: tileGraph ?? { nodes: [], edges: [] },
