@@ -996,26 +996,34 @@ function WorkflowCanvasInner({ workflowId: urlWorkflowId, templateId }: Workflow
         <div
           className="absolute inset-0"
         >
-          {/* Architectural grid — major lines every 100px, minor every 20px */}
+          {/* Premium base gradient — subtle radial lift from pure black */}
           <div
             style={{
               position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 0,
-              backgroundImage: `
-                linear-gradient(rgba(184,115,51,0.10) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(184,115,51,0.10) 1px, transparent 1px),
-                linear-gradient(rgba(184,115,51,0.05) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(184,115,51,0.05) 1px, transparent 1px)
-              `,
-              backgroundSize: '100px 100px, 100px 100px, 20px 20px, 20px 20px',
+              background: 'radial-gradient(ellipse 85% 65% at 50% 42%, #14161c 0%, #0d0e13 38%, #090a0f 78%, #06070a 100%)',
             }}
           />
-          {/* Copper dot grid */}
+          {/* Crisp dot grid — n8n-style, evenly spaced and clearly visible */}
           <div
             className="absolute inset-0 pointer-events-none"
             style={{
-              zIndex: 0, opacity: 0.22,
-              backgroundImage: 'radial-gradient(circle, #B87333 0.7px, transparent 0.7px)',
-              backgroundSize: '60px 60px',
+              zIndex: 0,
+              backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.18) 1.2px, transparent 1.2px)',
+              backgroundSize: '22px 22px',
+              maskImage: 'radial-gradient(ellipse 90% 80% at 50% 50%, #000 50%, transparent 100%)',
+              WebkitMaskImage: 'radial-gradient(ellipse 90% 80% at 50% 50%, #000 50%, transparent 100%)',
+            }}
+          />
+          {/* Faint architectural major lines for depth */}
+          <div
+            className="absolute inset-0 pointer-events-none"
+            style={{
+              zIndex: 0,
+              backgroundImage: `
+                linear-gradient(rgba(184,115,51,0.04) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(184,115,51,0.04) 1px, transparent 1px)
+              `,
+              backgroundSize: '220px 220px',
             }}
           />
           {/* Warm atmospheric glow */}
@@ -1076,7 +1084,7 @@ function WorkflowCanvasInner({ workflowId: urlWorkflowId, templateId }: Workflow
               opacity: 0.4,
             }}
             style={{
-              background: '#070809',
+              background: 'transparent',
             }}
           >
 
