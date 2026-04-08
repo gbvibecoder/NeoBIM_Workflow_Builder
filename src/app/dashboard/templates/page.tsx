@@ -277,8 +277,8 @@ const SORT_OPTION_KEYS: Record<string, string> = {
 
 const COMPLEXITY_ORDER: Record<string, number> = { simple: 0, intermediate: 1, advanced: 2 };
 const LOCKED_IDS = new Set(["wf-05", "wf-06", "wf-08", "wf-11"]);
-const QUICK_START_IDS = ["wf-01", "wf-03", "wf-04"];
-const CORE_IDS = ["wf-06", "wf-08", "wf-09"];
+const QUICK_START_IDS = ["wf-08", "wf-01", "wf-06"];
+const CORE_IDS = ["wf-09", "wf-11", "wf-03"];
 const HIDDEN_IDS = new Set(["wf-12"]);
 
 const CATEGORY_LABEL_KEYS: Record<string, TranslationKey> = {
