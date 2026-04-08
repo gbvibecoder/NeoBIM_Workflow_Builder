@@ -403,6 +403,7 @@ export function HeroBuildingShowcase() {
       orbit.autoRotate = true;
       orbit.autoRotateSpeed = 0.28;
       orbit.enablePan = false;
+      orbit.enableZoom = false; // let wheel/touchpad scroll the page instead of zooming
       orbitRef.current = orbit;
 
       const fp = new PointerLockControls(camera, renderer.domElement);
