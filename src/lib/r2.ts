@@ -590,6 +590,77 @@ async function cleanupTempChunks(
   );
 }
 
+// ─── Targeted Deletion ────────────────────────────────────────────────────
+
+/**
+ * Best-effort: parse a public R2 URL (custom domain, r2.dev URL, or our
+ * /r2-models//r2-textures/ Next.js rewrites) and return the underlying
+ * object key. Returns null if the URL doesn't look like an R2 object we own.
+ */
+export function extractR2KeyFromUrl(url: string | null | undefined): string | null {
+  if (!url || typeof url !== "string") return null;
+  // Ignore data URIs
+  if (url.startsWith("data:")) return null;
+  try {
+    // Relative path style: /r2-models/foo/bar.glb or /r2-files/...
+    if (url.startsWith("/r2-")) {
+      const idx = url.indexOf("/", 1);
+      if (idx === -1) return null;
+      const key = url.slice(idx + 1).split("?")[0];
+      return key || null;
+    }
+    const parsed = new URL(url);
+    // Custom public URL
+    if (PUBLIC_URL && url.startsWith(PUBLIC_URL)) {
+      return parsed.pathname.replace(/^\/+/, "") || null;
+    }
+    // r2.dev URLs: https://<bucket>.<accountid>.r2.dev/<key>
+    if (parsed.hostname.endsWith(".r2.dev") || parsed.hostname.endsWith(".r2.cloudflarestorage.com")) {
+      // path-style: /<bucket>/<key>
+      const path = parsed.pathname.replace(/^\/+/, "");
+      if (path.startsWith(`${BUCKET_NAME}/`)) return path.slice(BUCKET_NAME.length + 1) || null;
+      return path || null;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Delete a single object from R2 by key. Best-effort: returns true on
+ * success, false on failure. Never throws — callers should not gate critical
+ * paths on this.
+ */
+export async function deleteFromR2(key: string): Promise<boolean> {
+  const client = getClient();
+  if (!client || !key) return false;
+  try {
+    await client.send(new DeleteObjectCommand({ Bucket: BUCKET_NAME, Key: key }));
+    return true;
+  } catch (err) {
+    console.warn("[r2/deleteFromR2] failed for key", key, err);
+    return false;
+  }
+}
+
+/**
+ * Delete many R2 objects by key in parallel. Returns counts.
+ * Failures are swallowed per-key — never throws.
+ */
+export async function deleteManyFromR2(keys: string[]): Promise<{ deleted: number; failed: number }> {
+  const unique = Array.from(new Set(keys.filter(Boolean)));
+  if (unique.length === 0) return { deleted: 0, failed: 0 };
+  const results = await Promise.allSettled(unique.map((k) => deleteFromR2(k)));
+  let deleted = 0;
+  let failed = 0;
+  for (const r of results) {
+    if (r.status === "fulfilled" && r.value) deleted++;
+    else failed++;
+  }
+  return { deleted, failed };
+}
+
 // ─── Storage Info ──────────────────────────────────────────────────────────
 
 interface StorageInfo {
