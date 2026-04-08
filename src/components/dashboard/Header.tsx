@@ -105,8 +105,9 @@ export function Header({ title, subtitle }: HeaderProps) {
         zIndex: 40,
       }}
     >
-      {/* Left — Title (optional) */}
-      <div style={{ minWidth: 0, flex: 1 }}>
+      {/* Left — Title (optional). Collapses when empty so the center toolbar
+          slot can occupy the full available width. */}
+      <div style={{ minWidth: 0, flex: title || subtitle ? 1 : "0 0 auto" }}>
         {title && (
           <div className="flex items-center gap-2.5">
             <h1 style={{ fontSize: 18, fontWeight: 700, color: "#F0F0F5", letterSpacing: "-0.02em" }}>{title}</h1>
@@ -134,11 +135,14 @@ export function Header({ title, subtitle }: HeaderProps) {
         )}
       </div>
 
-      {/* Center — Canvas toolbar slot (portal target, only filled on /dashboard/canvas) */}
+      {/* Center — Canvas toolbar slot (portal target, only filled on /dashboard/canvas).
+          flex:1 so portaled content (ShowcaseHeader) can stretch and align its
+          children left/right via space-between. The canvas toolbar pill inside
+          stays centered via justify-center. */}
       <div
         id="canvas-toolbar-slot"
         className="hidden md:flex items-center justify-center"
-        style={{ flex: "0 1 auto", minWidth: 0, marginRight: 12 }}
+        style={{ flex: 1, minWidth: 0, marginRight: 12 }}
       />
 
       {/* Right — Actions */}

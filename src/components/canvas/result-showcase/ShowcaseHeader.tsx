@@ -1,7 +1,9 @@
 "use client";
 
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { motion } from "framer-motion";
-import { CheckCircle2, Zap, ArrowLeft } from "lucide-react";
+import { CheckCircle2, ArrowLeft } from "lucide-react";
 import { useLocale } from "@/hooks/useLocale";
 import { COLORS } from "./constants";
 
@@ -21,7 +23,20 @@ export function ShowcaseHeader({
   onClose,
 }: ShowcaseHeaderProps) {
   const { t } = useLocale();
-  return (
+
+  // Portal target — when on the canvas page in the dashboard layout, the
+  // showcase header content renders inside the empty top dashboard header
+  // instead of taking its own row.
+  const [headerSlot, setHeaderSlot] = useState<HTMLElement | null>(null);
+  useEffect(() => {
+    const find = () => setHeaderSlot(document.getElementById("canvas-toolbar-slot"));
+    find();
+    const t = setTimeout(find, 0);
+    return () => clearTimeout(t);
+  }, []);
+  const inHeader = !!headerSlot;
+
+  const content = (
     <motion.div
       className="showcase-header"
       initial={{ opacity: 0, y: -10 }}
@@ -30,16 +45,17 @@ export function ShowcaseHeader({
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
-        padding: "10px clamp(12px, 3vw, 20px)",
-        borderBottom: `1px solid ${COLORS.GLASS_BORDER}`,
-        background: "rgba(10,12,16,0.92)",
-        backdropFilter: "blur(24px)",
-        WebkitBackdropFilter: "blur(24px)",
-        position: "sticky",
-        top: 0,
-        zIndex: 10,
+        padding: inHeader ? 0 : "10px clamp(12px, 3vw, 20px)",
+        borderBottom: inHeader ? "none" : `1px solid ${COLORS.GLASS_BORDER}`,
+        background: inHeader ? "transparent" : "rgba(10,12,16,0.92)",
+        backdropFilter: inHeader ? "none" : "blur(24px)",
+        WebkitBackdropFilter: inHeader ? "none" : "blur(24px)",
+        position: inHeader ? "relative" : "sticky",
+        top: inHeader ? undefined : 0,
+        zIndex: inHeader ? undefined : 10,
         flexShrink: 0,
         gap: 16,
+        width: inHeader ? "100%" : undefined,
       }}
     >
       {/* Left: back + title */}
@@ -114,21 +130,13 @@ export function ShowcaseHeader({
         </div>
       </div>
 
-      {/* Right: stats */}
-      <div style={{ display: "flex", alignItems: "center", gap: 16, flexShrink: 0 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
-          <Zap size={11} style={{ color: COLORS.AMBER }} />
-          <span style={{ fontSize: 11, color: COLORS.TEXT_MUTED }}>
-            {totalArtifacts} {t('showcase.artifacts')}
-          </span>
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
-          <CheckCircle2 size={11} style={{ color: COLORS.EMERALD }} />
-          <span style={{ fontSize: 11, color: COLORS.TEXT_MUTED }}>
-            {successNodes}/{totalNodes} {t('showcase.nodes')}
-          </span>
-        </div>
-      </div>
+      {/*
+        Right-side stats (artifacts count + N/N nodes) intentionally removed
+        from the dashboard header — they're already surfaced inside the
+        showcase body (Execution Complete row + per-section stat cards).
+      */}
     </motion.div>
   );
+
+  return inHeader && headerSlot ? createPortal(content, headerSlot) : content;
 }

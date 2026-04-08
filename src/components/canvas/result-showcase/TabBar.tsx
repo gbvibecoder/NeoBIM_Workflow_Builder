@@ -47,7 +47,9 @@ export function TabBar({ availableTabs, activeTab, onTabChange }: TabBarProps) {
         background: "rgba(7,8,9,0.8)",
         backdropFilter: "blur(12px)",
         position: "sticky",
-        top: 52, // below header
+        // ShowcaseHeader is now portaled into the dashboard header, so the
+        // tab bar sits at the top of the showcase scroll container.
+        top: 0,
         zIndex: 9,
         flexShrink: 0,
         overflowX: "auto",
