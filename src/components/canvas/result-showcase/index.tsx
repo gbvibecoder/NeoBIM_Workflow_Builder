@@ -460,6 +460,10 @@ export function ResultShowcase({ onClose }: ResultShowcaseProps) {
         availableTabs={data.availableTabs}
         activeTab={resolvedTab}
         onTabChange={setActiveTab}
+        modelTabIs2DFloorPlan={
+          data.model3dData?.kind === "floor-plan-interactive" ||
+          data.model3dData?.kind === "floor-plan-editor"
+        }
       />
 
       {/* Tab Content */}

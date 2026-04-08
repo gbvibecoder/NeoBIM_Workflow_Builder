@@ -2,7 +2,7 @@
 
 import { motion } from "framer-motion";
 import {
-  LayoutDashboard, Film, BarChart3, Box, Download,
+  LayoutDashboard, Film, BarChart3, Box, Download, LayoutGrid,
 } from "lucide-react";
 import { useLocale } from "@/hooks/useLocale";
 import { COLORS, TAB_DEFS, type TabId } from "./constants";
@@ -28,9 +28,14 @@ interface TabBarProps {
   availableTabs: TabId[];
   activeTab: TabId;
   onTabChange: (tab: TabId) => void;
+  /**
+   * When set, the "model" tab is relabeled (and re-iconed) — used when the
+   * underlying artifact is a 2D floor plan rather than a true 3D model.
+   */
+  modelTabIs2DFloorPlan?: boolean;
 }
 
-export function TabBar({ availableTabs, activeTab, onTabChange }: TabBarProps) {
+export function TabBar({ availableTabs, activeTab, onTabChange, modelTabIs2DFloorPlan }: TabBarProps) {
   const { t } = useLocale();
   const visibleTabs = TAB_DEFS.filter(td => availableTabs.includes(td.id));
 
@@ -86,8 +91,8 @@ export function TabBar({ availableTabs, activeTab, onTabChange }: TabBarProps) {
               if (!isActive) e.currentTarget.style.color = COLORS.TEXT_MUTED;
             }}
           >
-            {ICONS[tab.id]}
-            {t(TAB_LABEL_KEYS[tab.id])}
+            {tab.id === "model" && modelTabIs2DFloorPlan ? <LayoutGrid size={14} /> : ICONS[tab.id]}
+            {tab.id === "model" && modelTabIs2DFloorPlan ? "2D Floor Plan" : t(TAB_LABEL_KEYS[tab.id])}
             {isActive && (
               <motion.div
                 layoutId="tab-indicator"
