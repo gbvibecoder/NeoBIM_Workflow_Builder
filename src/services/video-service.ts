@@ -27,8 +27,13 @@ const REQUEST_TIMEOUT_MS = 600_000; // 10 minutes
 const POLL_INTERVAL_MS = 8_000;     // 8 seconds between status checks
 const JWT_EXPIRY_SECONDS = 1800;
 
-// Model names for /v1/videos/image2video — v2.x only (v3 uses the Omni endpoint)
-const MODELS = ["kling-v2-6"] as const;
+// Model names for /v1/videos/image2video — v2.x only (v3 uses the Omni endpoint).
+// Order matters: createTask tries each model in sequence and uses the first
+// one that succeeds. The "master" variant is the highest-quality tier inside
+// the v2.1 release line; we try it FIRST for the best output, with v2-6
+// as a graceful fallback if the user's Kling account doesn't have master
+// tier access (returns "model not available" → loop continues).
+const MODELS = ["kling-v2-1-master", "kling-v2-6"] as const;
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 

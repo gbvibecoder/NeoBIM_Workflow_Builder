@@ -40,6 +40,9 @@ import {
 
 type WizardStep = "upload" | "processing" | "gallery" | "video";
 
+/** Which video pipeline the user is running. */
+type VideoMode = "quick" | "cinematic";
+
 interface RenderResult {
   id: string;
   label: string;
@@ -47,6 +50,55 @@ interface RenderResult {
   apiAngle: string;
   url: string | null;
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// CINEMATIC PIPELINE TYPES (mirror /api/cinematic-status response)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+type CinematicStageStatus =
+  | "pending"
+  | "preparing"
+  | "submitted"
+  | "processing"
+  | "complete"
+  | "failed";
+
+interface CinematicStageView {
+  name: string;
+  status: CinematicStageStatus;
+  videoUrl?: string;
+  imageUrl?: string;
+  error?: string;
+  durationSeconds?: number;
+}
+
+interface CinematicStatusResponse {
+  pipelineId: string;
+  pipelineStatus: "processing" | "complete" | "partial" | "failed";
+  progress: number;
+  currentStage: "overview" | "transition" | "lifestyle" | "stitch" | "complete";
+  statusMessage: string;
+  stages: {
+    overview: CinematicStageView;
+    transition: CinematicStageView;
+    lifestyle: CinematicStageView;
+    stitch: CinematicStageView;
+  };
+  finalVideoUrl?: string;
+  durationSeconds?: number;
+  pipeline: "cinematic-multi-stage";
+}
+
+/** Witty per-stage copy for the cinematic indicator. */
+const CINEMATIC_STAGE_LABELS: Record<
+  "overview" | "transition" | "lifestyle" | "stitch",
+  { label: string; subtitle: string }
+> = {
+  overview: { label: "Overview", subtitle: "Aerial orbit" },
+  transition: { label: "Transition", subtitle: "Descent" },
+  lifestyle: { label: "Lifestyle", subtitle: "Family scene" },
+  stitch: { label: "Final Cut", subtitle: "Crossfade & color" },
+};
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // COPY — Sarcastic microcopy bank
@@ -298,14 +350,33 @@ function ComparisonSlider({
   // True natural aspect ratio of the BEFORE image — NO CLAMPING.
   // Updated by the <img> onLoad handler below. Any shape (triangle,
   // L-shape, U-shape, panorama, tall portrait) sizes the container to its
-  // own ratio. Combined with object-contain on both BEFORE and AFTER images
-  // and a maxHeight cap, the entire image is ALWAYS visible — never cropped.
+  // own ratio.
   const [imageAspect, setImageAspect] = useState<number>(4 / 3);
+  // Natural aspect ratio of the AFTER (3D render) image. Used to decide
+  // whether the AFTER image should `object-cover` (filling the container,
+  // matching BEFORE size) or fall back to `object-contain` (letterboxed)
+  // when the ratio mismatch is too large to crop safely.
+  const [afterAspect, setAfterAspect] = useState<number | null>(null);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- reset on src clear
     if (!beforeSrc) setImageAspect(4 / 3);
   }, [beforeSrc]);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- reset on src clear
+    if (!afterSrc) setAfterAspect(null);
+  }, [afterSrc]);
+
+  // Decide AFTER image fit. If the rendered output ratio is within ±20% of
+  // the floor plan ratio, use `cover` so the AFTER fills the container at
+  // the same scale as BEFORE (cropping a thin band of empty render edge).
+  // Beyond 20%, fall back to `contain` so we don't crop the actual building.
+  const afterFit: "cover" | "contain" = (() => {
+    if (!afterAspect || imageAspect <= 0) return "contain";
+    const diff = Math.abs(afterAspect - imageAspect) / imageAspect;
+    return diff < 0.2 ? "cover" : "contain";
+  })();
 
   const handleMove = useCallback((clientX: number) => {
     if (!containerRef.current) return;
@@ -421,12 +492,31 @@ function ComparisonSlider({
         {/* AFTER */}
         <div className="absolute inset-0" style={{ background: "#f8f8f8", clipPath: `inset(0 0 0 ${sliderPos}%)` }}>
           {afterSrc ? (
-            // object-contain (not cover) so a square 1024×1024 GPT-Image-1
-            // render is never cropped — letterboxes against the same #f8f8f8
-            // background as the BEFORE side. The clipPath above only reveals
-            // the right side of this layer; it does not crop the image itself.
+            // Dynamic object-fit (set via inline style so we can switch it
+            // without Tailwind class generation issues):
+            //   • cover  → ratio mismatch <20%, fills container like BEFORE
+            //              (slider alignment looks correct, may crop a tiny
+            //              edge band of empty render area)
+            //   • contain → ratio mismatch >20%, letterboxed so building is
+            //              never cropped (used when the mapping to GPT-Image-1's
+            //              discrete sizes can't get close enough to the floor
+            //              plan ratio)
+            // The onLoad reads the ACTUAL dimensions of the rendered image
+            // so the decision uses ground truth, not API response trust.
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={afterSrc} alt="3D Render" className="w-full h-full object-contain" draggable={false} />
+            <img
+              src={afterSrc}
+              alt="3D Render"
+              className="w-full h-full"
+              style={{ objectFit: afterFit }}
+              draggable={false}
+              onLoad={(e) => {
+                const img = e.currentTarget;
+                if (img.naturalWidth > 0 && img.naturalHeight > 0) {
+                  setAfterAspect(img.naturalWidth / img.naturalHeight);
+                }
+              }}
+            />
           ) : (
             <div className="w-full h-full flex items-center justify-center" style={{
               background: "linear-gradient(145deg, #EEF2FF 0%, #E0E7FF 35%, #C7D2FE 65%, #A5B4FC 100%)",
@@ -863,10 +953,231 @@ function RenderGallery({
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// CINEMATIC STAGE INDICATOR
+// ═══════════════════════════════════════════════════════════════════════════════
+//
+// Renders the 4-stage progress strip for the cinematic pipeline:
+//
+//   [✓ Overview] → [● Transition] → [○ Lifestyle] → [○ Final Cut]
+//
+// Each stage box has:
+//   • A status icon (check ✓ for complete, spinner ● for in-progress, ○ for
+//     pending, ⚠ for failed)
+//   • The stage label + subtitle
+//   • A mini auto-playing muted preview of the segment once it's available
+//     (this is the magic that makes "progress feels real" — users see actual
+//     footage land while the next stages are still cooking)
+//
+// The component is passive — all state comes from the cinematicStatus prop.
+
+function CinematicStagePreview({
+  stage,
+  isActive,
+  isPast,
+}: {
+  stage: CinematicStageView;
+  isActive: boolean;
+  isPast: boolean;
+}) {
+  const meta = CINEMATIC_STAGE_LABELS[stage.name as keyof typeof CINEMATIC_STAGE_LABELS];
+  const failed = stage.status === "failed";
+  const complete = stage.status === "complete";
+  const inProgress =
+    stage.status === "preparing" ||
+    stage.status === "submitted" ||
+    stage.status === "processing";
+
+  let icon: React.ReactNode;
+  let iconBg: string;
+  if (failed) {
+    icon = <AlertTriangle size={11} className="text-white" strokeWidth={3} />;
+    iconBg = "#EF4444";
+  } else if (complete) {
+    icon = <Check size={11} className="text-white" strokeWidth={3} />;
+    iconBg = "#10B981";
+  } else if (inProgress) {
+    icon = (
+      <motion.div
+        animate={{ rotate: 360 }}
+        transition={{ duration: 1.4, repeat: Infinity, ease: "linear" }}
+        className="w-2.5 h-2.5 rounded-full border-2 border-white border-t-transparent"
+      />
+    );
+    iconBg = "linear-gradient(135deg, #6366F1, #4F46E5)";
+  } else {
+    icon = (
+      <span className="text-[9px] font-bold text-gray-400 font-mono">○</span>
+    );
+    iconBg = "#E5E7EB";
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      className={`relative rounded-xl border-2 transition-all overflow-hidden ${
+        isActive
+          ? "border-indigo-400 shadow-md shadow-indigo-100"
+          : isPast || complete
+            ? "border-emerald-200"
+            : failed
+              ? "border-red-200"
+              : "border-gray-200"
+      }`}
+      style={{
+        background: complete
+          ? "rgba(16, 185, 129, 0.04)"
+          : failed
+            ? "rgba(239, 68, 68, 0.04)"
+            : isActive
+              ? "rgba(99, 102, 241, 0.05)"
+              : "rgba(255,255,255,0.85)",
+      }}
+    >
+      {/* Mini preview thumbnail (muted, autoplaying loop) */}
+      <div
+        className="aspect-video w-full overflow-hidden"
+        style={{ background: "#0c0a1a" }}
+      >
+        {stage.videoUrl ? (
+          <video
+            src={stage.videoUrl}
+            autoPlay
+            loop
+            muted
+            playsInline
+            className="w-full h-full object-cover"
+            style={{ background: "#000" }}
+          />
+        ) : stage.imageUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={stage.imageUrl}
+            alt={`${meta?.label ?? "Stage"} preview`}
+            className="w-full h-full object-cover"
+            draggable={false}
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center">
+            {inProgress ? (
+              <motion.div
+                animate={{ opacity: [0.3, 0.7, 0.3] }}
+                transition={{ duration: 1.6, repeat: Infinity }}
+                className="text-[9px] font-mono text-indigo-300"
+              >
+                rendering...
+              </motion.div>
+            ) : failed ? (
+              <span className="text-[9px] font-mono text-red-300">failed</span>
+            ) : (
+              <span className="text-[9px] font-mono text-gray-500">queued</span>
+            )}
+          </div>
+        )}
+      </div>
+
+      <div className="px-2.5 py-1.5 flex items-center gap-1.5 bg-white/90 backdrop-blur-sm border-t border-gray-100">
+        <div
+          className="flex items-center justify-center rounded-full shrink-0"
+          style={{ width: 18, height: 18, background: iconBg }}
+        >
+          {icon}
+        </div>
+        <div className="min-w-0 flex-1">
+          <p
+            className={`text-[10px] font-bold truncate ${
+              isActive ? "text-indigo-700" : complete ? "text-emerald-700" : failed ? "text-red-700" : "text-gray-700"
+            }`}
+          >
+            {meta?.label ?? stage.name}
+          </p>
+          <p className="text-[9px] text-gray-400 truncate">
+            {failed ? (stage.error ?? "Failed") : meta?.subtitle ?? ""}
+            {stage.durationSeconds && complete ? ` · ${stage.durationSeconds}s` : ""}
+          </p>
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
+function CinematicStageIndicator({
+  status,
+  elapsed,
+}: {
+  status: CinematicStatusResponse;
+  elapsed: number;
+}) {
+  const stageOrder = ["overview", "transition", "lifestyle", "stitch"] as const;
+  const currentIdx = stageOrder.indexOf(
+    status.currentStage === "complete"
+      ? "stitch"
+      : (status.currentStage as (typeof stageOrder)[number]),
+  );
+
+  const elapsedMins = Math.floor(elapsed / 60);
+  const elapsedSecs = elapsed % 60;
+  const elapsedLabel = `${elapsedMins}:${elapsedSecs.toString().padStart(2, "0")}`;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="rounded-2xl border border-indigo-100 bg-white/80 backdrop-blur-sm p-4 mb-4"
+      style={{ boxShadow: "0 4px 24px rgba(99,102,241,0.08)" }}
+    >
+      {/* Header — current stage message + elapsed time */}
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2 min-w-0">
+          <Film size={14} className="text-indigo-500 shrink-0" />
+          <p className="text-xs font-bold text-gray-700 truncate">
+            {status.statusMessage}
+          </p>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <span
+            className="text-[10px] font-mono font-bold text-indigo-600"
+            style={{ fontFamily: "var(--font-jetbrains, monospace)" }}
+          >
+            {elapsedLabel} · {Math.round(status.progress)}%
+          </span>
+        </div>
+      </div>
+
+      {/* Top-level progress bar */}
+      <div className="h-1 rounded-full bg-indigo-50 overflow-hidden mb-4">
+        <motion.div
+          className="h-full"
+          style={{
+            background: "linear-gradient(90deg, #6366F1, #F59E0B, #10B981)",
+          }}
+          initial={{ width: "0%" }}
+          animate={{ width: `${Math.max(2, status.progress)}%` }}
+          transition={{ duration: 0.6, ease: "easeOut" }}
+        />
+      </div>
+
+      {/* 4 stage tiles in a row */}
+      <div className="grid grid-cols-4 gap-2">
+        {stageOrder.map((stageName, idx) => (
+          <CinematicStagePreview
+            key={stageName}
+            stage={status.stages[stageName]}
+            isActive={idx === currentIdx}
+            isPast={idx < currentIdx}
+          />
+        ))}
+      </div>
+    </motion.div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // VIDEO SECTION
 // ═══════════════════════════════════════════════════════════════════════════════
 
 function VideoSection({
+  mode,
   videoProgress,
   videoReady,
   videoUrl,
@@ -874,7 +1185,10 @@ function VideoSection({
   videoError,
   videoElapsed,
   isSharing,
+  cinematicStatus,
+  cinematicElapsed,
   onGenerate,
+  onGenerateCinematic,
   onDownload,
   onPreview,
   onShare,
@@ -882,6 +1196,7 @@ function VideoSection({
   onDownload4K,
   videoRef,
 }: {
+  mode: VideoMode | null;
   videoProgress: number;
   videoReady: boolean;
   videoUrl: string | null;
@@ -889,7 +1204,10 @@ function VideoSection({
   videoError: string | null;
   videoElapsed: number;
   isSharing: boolean;
+  cinematicStatus: CinematicStatusResponse | null;
+  cinematicElapsed: number;
   onGenerate: () => void;
+  onGenerateCinematic: () => void;
   onDownload: () => void;
   onPreview: () => void;
   onShare: () => void;
@@ -900,6 +1218,14 @@ function VideoSection({
   const elapsedMins = Math.floor(videoElapsed / 60);
   const elapsedSecs = videoElapsed % 60;
   const elapsedLabel = `${elapsedMins}:${elapsedSecs.toString().padStart(2, "0")}`;
+
+  // Show the cinematic stage indicator while a cinematic pipeline is in
+  // flight OR has completed (it remains visible after completion as a
+  // visual record of the 4 stages, with their mini-previews still playing).
+  const showCinematicIndicator =
+    mode === "cinematic" && cinematicStatus !== null;
+  const cinematicPartial =
+    cinematicStatus?.pipelineStatus === "partial";
 
   return (
     <motion.div
@@ -915,6 +1241,27 @@ function VideoSection({
         </div>
         <p className="text-sm text-gray-500 mt-1.5 max-w-md mx-auto italic">{COPY.video.subtitle}</p>
       </div>
+
+      {showCinematicIndicator && cinematicStatus && (
+        <CinematicStageIndicator
+          status={cinematicStatus}
+          elapsed={cinematicElapsed}
+        />
+      )}
+
+      {cinematicPartial && (
+        <motion.div
+          initial={{ opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-3 px-4 py-2.5 rounded-xl border border-amber-200 bg-amber-50 text-[11px] text-amber-800 flex items-start gap-2"
+        >
+          <AlertTriangle size={13} className="text-amber-600 shrink-0 mt-[2px]" />
+          <span>
+            We delivered a partial cinematic walkthrough — some stages couldn&apos;t be
+            completed but the rest are stitched into your final video below.
+          </span>
+        </motion.div>
+      )}
 
       <div
         className="relative rounded-2xl overflow-hidden border border-gray-800/20"
@@ -993,16 +1340,50 @@ function VideoSection({
       {/* Action buttons */}
       <div className="flex items-center justify-center gap-3 mt-5 flex-wrap">
         {!videoReady && videoProgress === 0 && !videoError && (
-          <motion.button
-            whileHover={{ scale: 1.03, y: -2 }}
-            whileTap={{ scale: 0.97 }}
-            onClick={onGenerate}
-            className="px-7 py-3 rounded-xl text-white font-bold text-sm flex items-center gap-2.5 relative overflow-hidden"
-            style={{ background: "linear-gradient(135deg, #6366F1, #4F46E5)", boxShadow: "0 6px 24px rgba(99,102,241,0.35)" }}
-          >
-            <Sparkles size={15} />
-            Generate 3D Video Walkthrough
-          </motion.button>
+          <>
+            {/* QUICK PATH — 15s dual-segment Kling walkthrough (existing flow). */}
+            <motion.button
+              whileHover={{ scale: 1.03, y: -2 }}
+              whileTap={{ scale: 0.97 }}
+              onClick={onGenerate}
+              className="px-6 py-3 rounded-xl text-white font-bold text-sm flex items-center gap-2.5 relative overflow-hidden"
+              style={{ background: "linear-gradient(135deg, #6366F1, #4F46E5)", boxShadow: "0 6px 24px rgba(99,102,241,0.35)" }}
+            >
+              <Sparkles size={15} />
+              Generate 3D Video Walkthrough
+              <span className="text-[9px] px-1.5 py-0.5 rounded-md font-bold bg-white/20">
+                ~15s · 5 min
+              </span>
+            </motion.button>
+
+            {/* PREMIUM PATH — multi-stage cinematic pipeline with eye-level
+                lifestyle scene + xfade stitching. ~10 min wall time, ~$2.50/run. */}
+            <motion.button
+              whileHover={{ scale: 1.03, y: -2 }}
+              whileTap={{ scale: 0.97 }}
+              onClick={onGenerateCinematic}
+              className="px-6 py-3 rounded-xl text-white font-bold text-sm flex items-center gap-2.5 relative overflow-hidden"
+              style={{
+                background:
+                  "linear-gradient(135deg, #F59E0B 0%, #EA580C 50%, #B45309 100%)",
+                boxShadow: "0 6px 28px rgba(245,158,11,0.45)",
+              }}
+            >
+              <span
+                className="absolute inset-0 pointer-events-none"
+                style={{
+                  background:
+                    "linear-gradient(90deg, transparent, rgba(255,255,255,0.18), transparent)",
+                  animation: "cta-shimmer 2.5s ease-in-out infinite",
+                }}
+              />
+              <Film size={15} className="relative z-[1]" />
+              <span className="relative z-[1]">Create Cinematic Walkthrough</span>
+              <span className="relative z-[1] text-[9px] px-1.5 py-0.5 rounded-md font-bold bg-white/25">
+                ~24s · 4 stages
+              </span>
+            </motion.button>
+          </>
         )}
         {videoError && (
           <motion.button
@@ -1159,6 +1540,10 @@ export default function VideoRenderStudio() {
   const [step, setStep] = useState<WizardStep>("upload");
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  // Natural pixel dimensions of the uploaded floor plan, read from the
+  // <img> onLoad. Sent to /api/generate-3d-render so it can pick a non-square
+  // GPT-Image-1 output size that matches the floor plan ratio.
+  const [uploadedDims, setUploadedDims] = useState<{ width: number; height: number } | null>(null);
   const [renderProgress, setRenderProgress] = useState(0);
   const [renders, setRenders] = useState<RenderResult[]>([]);
   const [selectedRender, setSelectedRender] = useState("r1");
@@ -1176,10 +1561,34 @@ export default function VideoRenderStudio() {
   const videoTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const localBlobUrlRef = useRef<string | null>(null);
 
+  // ── Cinematic pipeline state ──
+  // Tracks an in-flight or completed multi-stage cinematic walkthrough.
+  // Lives alongside (not inside) the quick-path state so the two flows don't
+  // step on each other. The active flow is decided by `videoMode`.
+  const [videoMode, setVideoMode] = useState<VideoMode | null>(null);
+  const [cinematicStatus, setCinematicStatus] =
+    useState<CinematicStatusResponse | null>(null);
+  const [cinematicElapsed, setCinematicElapsed] = useState(0);
+  const cinematicTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const cinematicPollAbortRef = useRef<AbortController | null>(null);
+
   useEffect(() => {
-    if (!uploadedFile) { setPreviewUrl(null); return; }
+    if (!uploadedFile) {
+      setPreviewUrl(null);
+      setUploadedDims(null);
+      return;
+    }
     const url = URL.createObjectURL(uploadedFile);
     setPreviewUrl(url);
+    // Read the floor plan's natural dimensions so we can send them to the
+    // render API and pick a matching GPT-Image-1 output size.
+    const probe = new Image();
+    probe.onload = () => {
+      if (probe.naturalWidth > 0 && probe.naturalHeight > 0) {
+        setUploadedDims({ width: probe.naturalWidth, height: probe.naturalHeight });
+      }
+    };
+    probe.src = url;
     return () => URL.revokeObjectURL(url);
   }, [uploadedFile]);
 
@@ -1212,8 +1621,33 @@ export default function VideoRenderStudio() {
         localBlobUrlRef.current = null;
       }
       if (videoAbortRef.current) videoAbortRef.current.abort();
+      if (cinematicPollAbortRef.current) cinematicPollAbortRef.current.abort();
     };
   }, []);
+
+  // ── Cinematic elapsed-time ticker — runs while a cinematic pipeline is in flight. ──
+  useEffect(() => {
+    const isCinematicGenerating =
+      videoMode === "cinematic" &&
+      cinematicStatus !== null &&
+      cinematicStatus.pipelineStatus === "processing";
+    if (!isCinematicGenerating) {
+      if (cinematicTimerRef.current) {
+        clearInterval(cinematicTimerRef.current);
+        cinematicTimerRef.current = null;
+      }
+      return;
+    }
+    cinematicTimerRef.current = setInterval(() => {
+      setCinematicElapsed((p) => p + 1);
+    }, 1000);
+    return () => {
+      if (cinematicTimerRef.current) {
+        clearInterval(cinematicTimerRef.current);
+        cinematicTimerRef.current = null;
+      }
+    };
+  }, [videoMode, cinematicStatus]);
 
   const [renderError, setRenderError] = useState<string | null>(null);
   const handleFileSelect = useCallback((file: File) => setUploadedFile(file), []);
@@ -1305,6 +1739,12 @@ export default function VideoRenderStudio() {
       formData.append("image", uploadedFile);
       formData.append("angle", view.apiAngle);
       if (cachedDesc) formData.append("cachedDescription", cachedDesc);
+      // Send original dimensions so the API can pick a matching output size
+      // (1024×1024, 1536×1024, or 1024×1536). Critical for slider alignment.
+      if (uploadedDims) {
+        formData.append("originalWidth", String(uploadedDims.width));
+        formData.append("originalHeight", String(uploadedDims.height));
+      }
 
       const res = await fetch("/api/generate-3d-render", {
         method: "POST",
@@ -1352,7 +1792,7 @@ export default function VideoRenderStudio() {
       // Going BACK to upload on error — base state, no history push
       setStep("upload");
     }
-  }, [uploadedFile, goToStep]);
+  }, [uploadedFile, uploadedDims, goToStep]);
 
   // ─── REAL VIDEO GENERATION PIPELINE ───────────────────────────────────────
   // Calls /api/generate-video-walkthrough → polls /api/video-status →
@@ -1417,7 +1857,14 @@ export default function VideoRenderStudio() {
 
       // ── Step 2a: Three.js client-side fallback ──
       if (data.status === "client-rendering") {
-        await renderClientFallback(data.buildingConfig, abort);
+        // Pass the reason so renderClientFallback can show the right
+        // status text (e.g. "no keys" vs "Kling failed: <error>").
+        await renderClientFallback(
+          data.buildingConfig,
+          typeof data.reason === "string" ? data.reason : undefined,
+          typeof data.klingError === "string" ? data.klingError : undefined,
+          abort,
+        );
         return;
       }
 
@@ -1441,12 +1888,36 @@ export default function VideoRenderStudio() {
   }, [renders, previewUrl, fullDescription]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Three.js fallback: render the walkthrough fully client-side ──
+  // Receives `reason` and `klingError` from the server response so we can
+  // tell the user WHY we're falling back instead of always claiming "no
+  // Kling keys configured" (which is wrong when Kling actually failed).
   const renderClientFallback = useCallback(
     async (
       buildingConfig: { floors?: number; floorHeight?: number; footprint?: number; buildingType?: string } | null,
+      reason: string | undefined,
+      klingError: string | undefined,
       abort: AbortController,
     ) => {
-      setVideoStatusText("Rendering locally with Three.js (no Kling keys configured)...");
+      // Differentiate the three cases:
+      //   1. kling-failed → real Kling outage → loud toast with error details
+      //   2. kling-not-configured → env vars missing → quiet status update
+      //   3. anything else → generic fallback message
+      if (reason === "kling-failed" && klingError) {
+        const truncated =
+          klingError.length > 80 ? klingError.slice(0, 77) + "..." : klingError;
+        setVideoStatusText(`Kling AI unavailable, rendering locally... (${truncated})`);
+        // Surface the real Kling error in a toast so the dev/admin can see
+        // exactly what went wrong (expired account, network, bad signature,
+        // image format, etc.). 8s duration so it doesn't disappear too fast.
+        toast.error("Kling AI unavailable", {
+          description: klingError,
+          duration: 8000,
+        });
+      } else if (reason === "kling-not-configured") {
+        setVideoStatusText("Rendering locally (Kling API not configured)");
+      } else {
+        setVideoStatusText("Rendering locally with Three.js...");
+      }
       setVideoProgress(5);
 
       try {
@@ -1605,6 +2076,278 @@ export default function VideoRenderStudio() {
     [],
   );
 
+  // ─── CINEMATIC PIPELINE — multi-stage walkthrough ────────────────────────
+  // Calls /api/generate-cinematic-walkthrough → polls /api/cinematic-status
+  // until the pipeline reaches "complete" or "failed". On completion the
+  // final stitched MP4 URL is set on `videoUrl` so the existing player +
+  // download / share / fullscreen actions all work unchanged.
+  const startCinematicGeneration = useCallback(async () => {
+    // Reset state for a fresh cinematic run
+    if (videoAbortRef.current) videoAbortRef.current.abort();
+    if (cinematicPollAbortRef.current) cinematicPollAbortRef.current.abort();
+    if (localBlobUrlRef.current) {
+      URL.revokeObjectURL(localBlobUrlRef.current);
+      localBlobUrlRef.current = null;
+    }
+    setVideoUrl(null);
+    setVideoReady(false);
+    setVideoError(null);
+    setVideoElapsed(0);
+    setVideoProgress(0);
+    setVideoStatusText("");
+    setVideoMode("cinematic");
+    setCinematicStatus(null);
+    setCinematicElapsed(0);
+
+    // Pick the photorealistic Full Layout (r4) as the source image — it's
+    // the only render that's a true top-down view of the entire floor plan,
+    // which is what the OVERVIEW stage's prompt expects.
+    const fullLayout = renders.find((r) => r.id === "r4");
+    const sourceImage = fullLayout?.url ?? null;
+    if (!sourceImage) {
+      toast.error("Cinematic walkthrough needs the Full Layout render", {
+        description: "Please render the floor plan first, then try again.",
+      });
+      setVideoMode(null);
+      return;
+    }
+    // We need the ORIGINAL uploaded File so we can read it as a data URL
+    // (see the floorPlanDataUrl block below). The previewUrl state variable
+    // is a `blob:` URL that only exists in this browser tab — the server
+    // can't fetch it, so we must encode the bytes inline.
+    if (!uploadedFile) {
+      toast.error("Original floor plan missing", {
+        description: "Re-upload your floor plan before generating a cinematic walkthrough.",
+      });
+      setVideoMode(null);
+      return;
+    }
+
+    // ── Encode the uploaded floor plan as a data URL ──
+    // The /api/generate-cinematic-walkthrough endpoint needs the floor plan
+    // bytes server-side (it feeds them to GPT-Image-1's images.edit). We
+    // can't send `previewUrl` here because that's a `blob:http://...` URL
+    // produced by URL.createObjectURL — those URLs only exist in the
+    // browser tab that created them, so the server can't fetch them.
+    // Reading the actual File via FileReader.readAsDataURL gives us a
+    // self-contained `data:image/...;base64,...` string the server can
+    // decode directly.
+    let floorPlanDataUrl: string;
+    try {
+      floorPlanDataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = () =>
+          reject(reader.error ?? new Error("FileReader failed"));
+        reader.readAsDataURL(uploadedFile);
+      });
+    } catch (readErr) {
+      const msg = readErr instanceof Error ? readErr.message : String(readErr);
+      toast.error("Could not read floor plan file", { description: msg });
+      setVideoMode(null);
+      return;
+    }
+
+    // Build the rooms list from render labels (exclude the Full Layout tile).
+    const rooms = renders
+      .filter((r) => r.id !== "r4" && !!r.url)
+      .map((r) => r.label);
+
+    // The primary room (the one we descend into) defaults to "Living Room"
+    // if it's in the renders, otherwise the first available room.
+    const primaryRoom =
+      rooms.find((r) => r.toLowerCase().includes("living")) ??
+      rooms[0] ??
+      "Living Room";
+
+    const submitAbort = new AbortController();
+    cinematicPollAbortRef.current = submitAbort;
+
+    let pipelineId: string;
+    try {
+      toast.info("Producing cinematic walkthrough", {
+        description: "Generating the eye-level lifestyle render...",
+        duration: 4000,
+      });
+      const res = await fetch("/api/generate-cinematic-walkthrough", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sourceImage,
+          // floor plan as a data URL — see floorPlanDataUrl block above for
+          // why we can't send `previewUrl` (it's a blob: URL the server
+          // can't fetch).
+          floorPlanImage: floorPlanDataUrl,
+          description: fullDescription,
+          rooms,
+          buildingType: "modern apartment",
+          primaryRoom,
+        }),
+        signal: submitAbort.signal,
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        const msg =
+          data?.error?.message ?? data?.error ?? `HTTP ${res.status}`;
+        const msgStr = typeof msg === "string" ? msg : "Cinematic submit failed";
+        // Tag the error so the catch handler can show a friendlier toast
+        // for rate-limit responses (vs. mistaking them for real failures).
+        const tagged = res.status === 429 ? `RATE_LIMIT::${msgStr}` : msgStr;
+        throw new Error(tagged);
+      }
+      pipelineId = data.pipelineId as string;
+      // Initial state — we already have the stages map back from the orchestrator.
+      // We synthesize a minimal CinematicStatusResponse so the UI can render
+      // the indicator immediately, before the first poll round-trip.
+      setCinematicStatus({
+        pipelineId,
+        pipelineStatus: "processing",
+        progress: 5,
+        currentStage: "overview",
+        statusMessage: "Creating cinematic overview of your floor plan...",
+        stages: {
+          overview: {
+            name: "overview",
+            status: data.stages?.overview?.status ?? "submitted",
+            durationSeconds: 10,
+          },
+          transition: {
+            name: "transition",
+            status: data.stages?.transition?.status ?? "pending",
+            durationSeconds: 5,
+          },
+          lifestyle: {
+            name: "lifestyle",
+            status: data.stages?.lifestyle?.status ?? "submitted",
+            imageUrl: data.stages?.lifestyle?.sourceImageUrl,
+            durationSeconds: 10,
+          },
+          stitch: {
+            name: "stitch",
+            status: data.stages?.stitch?.status ?? "pending",
+          },
+        },
+        pipeline: "cinematic-multi-stage",
+      });
+    } catch (err) {
+      if (submitAbort.signal.aborted) return;
+      const rawMsg = err instanceof Error ? err.message : "Cinematic submit failed";
+      // Detect rate-limit responses (tagged in the throw above) so the
+      // user gets a friendlier message and a clear next step instead of a
+      // scary "video generation failed" panel.
+      const isRateLimit = rawMsg.startsWith("RATE_LIMIT::");
+      const msg = isRateLimit ? rawMsg.slice("RATE_LIMIT::".length) : rawMsg;
+      console.error("[VideoRenderStudio] cinematic submit error:", msg);
+      if (isRateLimit) {
+        toast.warning("Cinematic walkthrough limit reached", {
+          description:
+            "Try the standard 3D Video Walkthrough — same source image, no extra wait.",
+          duration: 8000,
+        });
+      } else {
+        toast.error("Cinematic walkthrough failed", { description: msg });
+      }
+      setVideoError(msg);
+      setVideoMode(null);
+      return;
+    }
+
+    // ── Poll cinematic status until complete or failed ──
+    const POLL_INTERVAL_MS = 5000;
+    const TIMEOUT_MS = 20 * 60 * 1000; // 20 minutes max
+    const startedAt = Date.now();
+
+    while (!submitAbort.signal.aborted) {
+      if (Date.now() - startedAt > TIMEOUT_MS) {
+        toast.error("Cinematic walkthrough timed out", {
+          description: "Generation took longer than 20 minutes. Please try again.",
+        });
+        setVideoError("Cinematic generation timed out after 20 minutes");
+        return;
+      }
+
+      await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
+      if (submitAbort.signal.aborted) return;
+
+      let statusJson: CinematicStatusResponse;
+      try {
+        const sres = await fetch(
+          `/api/cinematic-status?pipelineId=${encodeURIComponent(pipelineId)}`,
+          { signal: submitAbort.signal },
+        );
+        if (!sres.ok) {
+          if (sres.status === 404) {
+            // Pipeline expired or never existed
+            const data = await sres.json().catch(() => ({}));
+            const msg =
+              data?.error?.message ?? "Cinematic pipeline not found (it may have expired)";
+            setVideoError(msg);
+            return;
+          }
+          // Transient — keep polling
+          console.warn("[VideoRenderStudio] cinematic poll non-200:", sres.status);
+          continue;
+        }
+        statusJson = (await sres.json()) as CinematicStatusResponse;
+      } catch (pollErr) {
+        if (submitAbort.signal.aborted) return;
+        console.warn("[VideoRenderStudio] cinematic poll error (transient):", pollErr);
+        continue;
+      }
+
+      setCinematicStatus(statusJson);
+
+      if (
+        statusJson.pipelineStatus === "complete" &&
+        statusJson.finalVideoUrl
+      ) {
+        setVideoUrl(statusJson.finalVideoUrl);
+        setVideoReady(true);
+        setVideoProgress(100);
+        setVideoStatusText("Your cinematic walkthrough is ready!");
+        toast.success("Cinematic walkthrough ready!", {
+          description: "Try not to watch it 47 times.",
+        });
+        return;
+      }
+
+      if (statusJson.pipelineStatus === "failed") {
+        const errors: string[] = [];
+        if (statusJson.stages.overview.error)
+          errors.push(`Overview: ${statusJson.stages.overview.error}`);
+        if (statusJson.stages.lifestyle.error)
+          errors.push(`Lifestyle: ${statusJson.stages.lifestyle.error}`);
+        if (statusJson.stages.stitch.error)
+          errors.push(`Stitch: ${statusJson.stages.stitch.error}`);
+        const errMsg =
+          errors.length > 0
+            ? errors.join(" · ")
+            : "Cinematic generation failed";
+        setVideoError(errMsg);
+        toast.error("Cinematic walkthrough failed", { description: errMsg });
+        return;
+      }
+
+      // partial → keep going if stitch isn't done yet; otherwise show what we have.
+      if (
+        statusJson.pipelineStatus === "partial" &&
+        statusJson.finalVideoUrl
+      ) {
+        setVideoUrl(statusJson.finalVideoUrl);
+        setVideoReady(true);
+        setVideoProgress(100);
+        setVideoStatusText(
+          "Partial walkthrough delivered — some stages couldn't be completed.",
+        );
+        toast.warning("Partial cinematic walkthrough", {
+          description: "Some stages failed but we delivered what we have.",
+          duration: 6000,
+        });
+        return;
+      }
+    }
+  }, [renders, uploadedFile, fullDescription]);
+
   // ── Action handlers (download / preview / share / 4K) ──
   // Real download — fetch the bytes and trigger a same-origin blob download.
   // We do NOT use a plain `<a href download>` because:
@@ -1743,8 +2486,15 @@ export default function VideoRenderStudio() {
 
   const handleRetryVideo = useCallback(() => {
     setVideoError(null);
-    void startVideoGeneration();
-  }, [startVideoGeneration]);
+    // Retry the same mode the user was on. If they were running cinematic
+    // and it failed, hitting "Try Again" should restart the cinematic
+    // pipeline, not silently switch them to the quick path.
+    if (videoMode === "cinematic") {
+      void startCinematicGeneration();
+    } else {
+      void startVideoGeneration();
+    }
+  }, [videoMode, startCinematicGeneration, startVideoGeneration]);
 
   const handleReset = useCallback(() => {
     if (videoAbortRef.current) {
@@ -1754,6 +2504,14 @@ export default function VideoRenderStudio() {
     if (videoTimerRef.current) {
       clearInterval(videoTimerRef.current);
       videoTimerRef.current = null;
+    }
+    if (cinematicPollAbortRef.current) {
+      cinematicPollAbortRef.current.abort();
+      cinematicPollAbortRef.current = null;
+    }
+    if (cinematicTimerRef.current) {
+      clearInterval(cinematicTimerRef.current);
+      cinematicTimerRef.current = null;
     }
     if (localBlobUrlRef.current) {
       URL.revokeObjectURL(localBlobUrlRef.current);
@@ -1773,6 +2531,7 @@ export default function VideoRenderStudio() {
     setStep("upload");
     setUploadedFile(null);
     setPreviewUrl(null);
+    setUploadedDims(null);
     setRenderProgress(0);
     setRenders([]);
     setSelectedRender("r1");
@@ -1783,6 +2542,10 @@ export default function VideoRenderStudio() {
     setVideoError(null);
     setVideoElapsed(0);
     setFullDescription("");
+    // Cinematic-specific resets
+    setVideoMode(null);
+    setCinematicStatus(null);
+    setCinematicElapsed(0);
   }, []);
 
   return (
@@ -1938,6 +2701,7 @@ export default function VideoRenderStudio() {
             <motion.div key="video" initial={{ opacity: 0, x: 40 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -40 }}>
               <ComparisonSlider beforeSrc={previewUrl} afterSrc={renders.find(r => r.id === selectedRender)?.url ?? null} />
               <VideoSection
+                mode={videoMode}
                 videoProgress={videoProgress}
                 videoReady={videoReady}
                 videoUrl={videoUrl}
@@ -1945,8 +2709,14 @@ export default function VideoRenderStudio() {
                 videoError={videoError}
                 videoElapsed={videoElapsed}
                 isSharing={isSharingVideo}
+                cinematicStatus={cinematicStatus}
+                cinematicElapsed={cinematicElapsed}
                 videoRef={videoElementRef}
-                onGenerate={startVideoGeneration}
+                onGenerate={() => {
+                  setVideoMode("quick");
+                  void startVideoGeneration();
+                }}
+                onGenerateCinematic={startCinematicGeneration}
                 onDownload={handleDownloadVideo}
                 onPreview={handlePreviewFullscreen}
                 onShare={handleShareVideo}

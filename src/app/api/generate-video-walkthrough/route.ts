@@ -134,6 +134,17 @@ export async function POST(req: NextRequest) {
 
   const hasKlingKeys = !!(process.env.KLING_ACCESS_KEY && process.env.KLING_SECRET_KEY);
 
+  // Diagnostic log so devs can see at a glance whether the env vars are
+  // visible to the running Node process. Common gotcha: editing .env.local
+  // without restarting `npm run dev` → keys present in file, missing in
+  // process.env. This log eliminates that ambiguity.
+  console.log(
+    "[video-walkthrough] Kling keys present:",
+    hasKlingKeys,
+    "user:",
+    session.user.id,
+  );
+
   // ── No Kling keys → Three.js client-side fallback ──
   if (!hasKlingKeys) {
     return NextResponse.json({
@@ -141,6 +152,8 @@ export async function POST(req: NextRequest) {
       pipeline: "threejs-client",
       buildingConfig: fallbackBuildingConfig(buildingType, rooms.length),
       reason: "kling-not-configured",
+      warning:
+        "Kling AI keys are not visible to the server. Add KLING_ACCESS_KEY and KLING_SECRET_KEY to .env.local and restart the dev server. Showing local Three.js render.",
     });
   }
 
@@ -157,7 +170,14 @@ export async function POST(req: NextRequest) {
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Unknown error";
-    console.error("[generate-video-walkthrough] Kling submit failed:", msg);
+
+    // Log the FULL error object (not just .message) so devs can see the
+    // request_id, status code, and any nested API error fields. Then log
+    // the stack separately so it doesn't get truncated by JSON serialization.
+    console.error("[generate-video-walkthrough] Kling submit failed:", err);
+    if (err instanceof Error && err.stack) {
+      console.error("[generate-video-walkthrough] Stack trace:\n" + err.stack);
+    }
 
     // Billing / quota errors → clear actionable error so user can top up.
     const lower = msg.toLowerCase();
@@ -174,12 +194,15 @@ export async function POST(req: NextRequest) {
     }
 
     // Other errors → graceful degrade to Three.js so the user gets *something*.
+    // Include both `klingError` (raw, for the toast) and `warning` (formatted,
+    // for a banner) so the client can surface the real reason.
     return NextResponse.json({
       status: "client-rendering",
       pipeline: "threejs-client",
       buildingConfig: fallbackBuildingConfig(buildingType, rooms.length),
       reason: "kling-failed",
       klingError: msg.slice(0, 300),
+      warning: `Kling AI is currently unavailable. Showing local Three.js render. (${msg.slice(0, 150)})`,
     });
   }
 }
