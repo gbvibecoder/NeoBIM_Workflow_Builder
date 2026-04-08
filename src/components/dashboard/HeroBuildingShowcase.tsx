@@ -496,10 +496,17 @@ export function HeroBuildingShowcase() {
       composer.addPass(new OutputPass());
       composerRef.current = composer;
 
-      // ═══ Resize — observe the CONTAINER, not the window.
-      // Sidebar toggles change the parent's width without firing window.resize.
-      // ResizeObserver fires for any container size change (sidebar, window,
-      // fullscreen, devtools, anything) so the canvas always tracks its host. ═══
+      // ═══ Resize — synchronous, flicker-free.
+      // PROBLEM (old approach): the 30ms setTimeout debounce meant the
+      // canvas was the wrong size for ~30ms during sidebar collapse → a
+      // visible black gap on the right edge.
+      //
+      // FIX: ResizeObserver fires *before paint*. If we run applyResize
+      // synchronously inside the callback, the renderer/composer resize
+      // and one frame is rendered in the SAME tick as the layout change,
+      // so the user never sees a stale canvas. A 300ms sidebar animation
+      // is ~18 frames — reallocating the framebuffer that many times is
+      // perfectly fine on modern GPUs. ═══
       const applyResize = () => {
         if (!container) return;
         const nw = container.clientWidth;
@@ -514,15 +521,14 @@ export function HeroBuildingShowcase() {
           1 / (nw * renderer.getPixelRatio()),
           1 / (nh * renderer.getPixelRatio())
         );
-        // Force one immediate render so the canvas doesn't show a stale frame
-        // during the sidebar animation.
+        // Render synchronously so the new framebuffer is painted this tick.
         composer.render();
       };
       resizeObserver = new ResizeObserver(() => {
-        // Light debounce so we don't reallocate the framebuffer on every
-        // intermediate animation frame, but still feels instant.
-        if (resizeTimer) clearTimeout(resizeTimer);
-        resizeTimer = setTimeout(applyResize, 30);
+        // SYNCHRONOUS: ResizeObserver runs after layout but before paint, so
+        // resizing the renderer here means the new framebuffer is committed
+        // in the SAME frame as the layout change — no stale-canvas flash.
+        applyResize();
       });
       resizeObserver.observe(container);
 
