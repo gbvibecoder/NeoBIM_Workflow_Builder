@@ -29,8 +29,9 @@ function ss(x: number, lo: number, hi: number) {
 
 const AMBER = "#f59e0b";
 const AMBER_BRIGHT = "#fbbf24";
-const STEEL = "#475569";
-const STEEL_LIGHT = "#94a3b8";
+const STEEL = "#7c8ea8";
+const STEEL_LIGHT = "#cbd5e1";
+const GLASS_BLUE = "#5a7fa8";
 
 /* ─── Subject building ──────────────────────────────────────────────
    A small 3-floor glass mass — the thing being "rendered".
@@ -51,11 +52,13 @@ function SubjectBuilding({ progress }: { progress: number }) {
       <mesh position={[0, TOWER_H / 2, 0]} scale={[1, vis, 1]}>
         <boxGeometry args={[TOWER_W, TOWER_H, TOWER_D]} />
         <meshStandardMaterial
-          color="#1e293b"
-          metalness={0.9}
-          roughness={0.12}
+          color={GLASS_BLUE}
+          emissive={GLASS_BLUE}
+          emissiveIntensity={0.18}
+          metalness={0.85}
+          roughness={0.18}
           transparent
-          opacity={vis * 0.55}
+          opacity={vis * 0.82}
         />
       </mesh>
 
@@ -93,7 +96,7 @@ function SubjectBuilding({ progress }: { progress: number }) {
       {/* Wireframe outline — gives the BIM/CAD hint */}
       <lineSegments position={[0, TOWER_H / 2, 0]}>
         <edgesGeometry args={[new THREE.BoxGeometry(TOWER_W + 0.05, TOWER_H, TOWER_D + 0.05)]} />
-        <lineBasicMaterial color={AMBER} transparent opacity={vis * 0.32} />
+        <lineBasicMaterial color={AMBER_BRIGHT} transparent opacity={vis * 0.7} />
       </lineSegments>
     </group>
   );
@@ -340,8 +343,8 @@ function Scene({ progress }: { progress: number }) {
   return (
     <>
       <color attach="background" args={["#07070D"]} />
-      <ambientLight color="#b0c0d0" intensity={0.18} />
-      <directionalLight color="#ffe8c0" intensity={1.2} position={[8, 12, 6]} castShadow />
+      <ambientLight color="#b0c0d0" intensity={0.45} />
+      <directionalLight color="#ffe8c0" intensity={1.6} position={[8, 12, 6]} castShadow />
       <pointLight color={AMBER} intensity={3.2} distance={18} position={[6, 5, 6]} />
       <pointLight color="#06b6d4" intensity={1.1} distance={20} position={[-7, 4, -5]} />
       <fog attach="fog" args={["#07070D", 22, 50]} />
