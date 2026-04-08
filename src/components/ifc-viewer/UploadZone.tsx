@@ -117,66 +117,94 @@ export function UploadZone({ onFileSelected, onError, loading, loadProgress, loa
     [onFileSelected, onError]
   );
 
+  /* ── Elegant white theme tokens (empty + loading state only) ── */
+  const INK = "#0B1220";
+  const INK_SOFT = "#475569";
+  const INK_MUTED = "#94A3B8";
+  const BRAND = "#2563EB";
+  const BRAND_SOFT = "#EFF4FF";
+  const HAIRLINE = "#E5E9F2";
+  const SURFACE = "#FFFFFF";
+  /* Subtle architectural backdrop: soft white with faint grid + radial wash */
+  const BACKDROP: React.CSSProperties = {
+    position: "absolute",
+    inset: 0,
+    background:
+      "radial-gradient(1200px 600px at 50% -10%, #EEF3FF 0%, rgba(238,243,255,0) 60%)," +
+      "radial-gradient(900px 500px at 90% 110%, #F5F7FB 0%, rgba(245,247,251,0) 60%)," +
+      "linear-gradient(180deg, #FFFFFF 0%, #FAFBFD 100%)",
+    zIndex: 10,
+  };
+  const GRID_OVERLAY: React.CSSProperties = {
+    position: "absolute",
+    inset: 0,
+    backgroundImage:
+      "linear-gradient(rgba(15,23,42,0.04) 1px, transparent 1px)," +
+      "linear-gradient(90deg, rgba(15,23,42,0.04) 1px, transparent 1px)",
+    backgroundSize: "32px 32px",
+    maskImage: "radial-gradient(ellipse at center, #000 40%, transparent 80%)",
+    WebkitMaskImage: "radial-gradient(ellipse at center, #000 40%, transparent 80%)",
+    pointerEvents: "none",
+  };
+
   if (loading) {
     return (
       <div
         style={{
-          position: "absolute",
-          inset: 0,
+          ...BACKDROP,
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
           justifyContent: "center",
-          background: UI.bg.canvas,
-          zIndex: 10,
         }}
       >
-        <div style={{ width: 320, textAlign: "center" }}>
-          {/* Animated cube */}
+        <div style={GRID_OVERLAY} />
+        <div style={{ width: 340, textAlign: "center", position: "relative" }}>
           <div
             style={{
-              width: 64,
-              height: 64,
+              width: 72,
+              height: 72,
               margin: "0 auto 24px",
-              border: `2px solid ${UI.accent.cyan}`,
-              borderRadius: 12,
+              borderRadius: 18,
+              background: SURFACE,
+              border: `1px solid ${HAIRLINE}`,
+              boxShadow: "0 10px 30px rgba(15,23,42,0.06)",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              animation: "spin 2s linear infinite",
+              animation: "spin 2.4s linear infinite",
             }}
           >
-            <FileBox size={28} color={UI.accent.cyan} />
+            <FileBox size={30} color={BRAND} />
           </div>
-
-          <p style={{ color: UI.text.primary, fontSize: 16, fontWeight: 500, marginBottom: 8 }}>
+          <p style={{ color: INK, fontSize: 16, fontWeight: 600, marginBottom: 6, letterSpacing: "-0.01em" }}>
             Loading IFC Model
           </p>
-          <p style={{ color: UI.text.secondary, fontSize: 13, marginBottom: 20 }}>{loadMessage}</p>
-
-          {/* Progress bar */}
+          <p style={{ color: INK_SOFT, fontSize: 13, marginBottom: 20 }}>{loadMessage}</p>
           <div
             style={{
               width: "100%",
-              height: 4,
-              borderRadius: 2,
-              background: "rgba(255,255,255,0.06)",
+              height: 6,
+              borderRadius: 999,
+              background: "#EEF1F7",
               overflow: "hidden",
+              border: `1px solid ${HAIRLINE}`,
             }}
           >
             <div
               style={{
                 height: "100%",
                 width: `${Math.max(loadProgress, 2)}%`,
-                background: `linear-gradient(90deg, ${UI.accent.cyan}, ${UI.accent.blue})`,
-                borderRadius: 2,
+                background: `linear-gradient(90deg, #60A5FA, ${BRAND})`,
+                borderRadius: 999,
                 transition: "width 0.3s ease",
               }}
             />
           </div>
-          <p style={{ color: UI.text.tertiary, fontSize: 12, marginTop: 8 }}>{Math.round(loadProgress)}%</p>
+          <p style={{ color: INK_MUTED, fontSize: 12, marginTop: 10, fontVariantNumeric: "tabular-nums" }}>
+            {Math.round(loadProgress)}%
+          </p>
         </div>
-
         <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
       </div>
     );
@@ -188,53 +216,107 @@ export function UploadZone({ onFileSelected, onError, loading, loadProgress, loa
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       style={{
-        position: "absolute",
-        inset: 0,
+        ...BACKDROP,
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
         justifyContent: "center",
-        background: UI.bg.canvas,
-        zIndex: 10,
-        cursor: "pointer",
+        padding: "40px 24px",
       }}
-      onClick={handleBrowse}
     >
+      <div style={GRID_OVERLAY} />
       <input ref={inputRef} type="file" accept=".ifc" style={{ display: "none" }} onChange={handleInputChange} />
 
+      {/* Eyebrow */}
       <div
         style={{
-          width: "min(90%, 480px)",
-          padding: 40,
-          borderRadius: UI.radius.xl,
-          border: `2px dashed ${dragOver ? UI.accent.cyan : "rgba(255,255,255,0.12)"}`,
-          background: dragOver ? "rgba(0,245,255,0.03)" : "rgba(255,255,255,0.02)",
-          textAlign: "center",
-          transition: UI.transition,
+          position: "relative",
+          display: "inline-flex",
+          alignItems: "center",
+          gap: 8,
+          padding: "6px 12px",
+          borderRadius: 999,
+          background: SURFACE,
+          border: `1px solid ${HAIRLINE}`,
+          boxShadow: "0 1px 2px rgba(15,23,42,0.04)",
+          marginBottom: 18,
         }}
       >
-        {/* Icon */}
+        <span style={{ width: 6, height: 6, borderRadius: 999, background: BRAND }} />
+        <span style={{ fontSize: 12, fontWeight: 600, color: INK_SOFT, letterSpacing: "0.04em", textTransform: "uppercase" }}>
+          IFC Viewer
+        </span>
+      </div>
+
+      <h1
+        style={{
+          position: "relative",
+          margin: 0,
+          marginBottom: 8,
+          color: INK,
+          fontSize: 28,
+          fontWeight: 700,
+          letterSpacing: "-0.02em",
+          textAlign: "center",
+        }}
+      >
+        Bring your building model to life
+      </h1>
+      <p
+        style={{
+          position: "relative",
+          margin: 0,
+          marginBottom: 28,
+          color: INK_SOFT,
+          fontSize: 15,
+          textAlign: "center",
+          maxWidth: 520,
+          lineHeight: 1.55,
+        }}
+      >
+        Drop an IFC file to explore geometry, properties, and spatial structure in a high-fidelity 3D viewer.
+      </p>
+
+      {/* Upload card */}
+      <div
+        onClick={handleBrowse}
+        style={{
+          position: "relative",
+          width: "min(92%, 560px)",
+          padding: 36,
+          borderRadius: 20,
+          border: `1.5px dashed ${dragOver ? BRAND : "#CBD5E1"}`,
+          background: dragOver ? BRAND_SOFT : SURFACE,
+          textAlign: "center",
+          transition: "all 0.2s ease",
+          cursor: "pointer",
+          boxShadow: dragOver
+            ? "0 20px 50px rgba(37,99,235,0.12)"
+            : "0 12px 40px rgba(15,23,42,0.06), 0 1px 2px rgba(15,23,42,0.04)",
+        }}
+      >
         <div
           style={{
-            width: 80,
-            height: 80,
+            width: 76,
+            height: 76,
             borderRadius: 20,
-            background: "rgba(79,138,255,0.06)",
-            border: `1px solid rgba(79,138,255,0.12)`,
+            background: `linear-gradient(180deg, ${BRAND_SOFT}, #FFFFFF)`,
+            border: `1px solid ${HAIRLINE}`,
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            margin: "0 auto 24px",
-            animation: "float 3s ease-in-out infinite",
+            margin: "0 auto 22px",
+            boxShadow: "inset 0 -2px 6px rgba(37,99,235,0.06), 0 6px 16px rgba(37,99,235,0.10)",
+            animation: "float 3.2s ease-in-out infinite",
           }}
         >
-          <Upload size={32} color={UI.accent.blue} style={{ opacity: 0.8 }} />
+          <Upload size={30} color={BRAND} />
         </div>
 
-        <p style={{ color: UI.text.primary, fontSize: 18, fontWeight: 600, marginBottom: 8 }}>
-          Drag & drop your IFC file here
+        <p style={{ color: INK, fontSize: 18, fontWeight: 600, marginBottom: 6, letterSpacing: "-0.01em" }}>
+          Drag &amp; drop your IFC file here
         </p>
-        <p style={{ color: UI.text.secondary, fontSize: 14, marginBottom: 20 }}>or click to browse</p>
+        <p style={{ color: INK_SOFT, fontSize: 14, marginBottom: 22 }}>or click to browse from your computer</p>
 
         <button
           onClick={(e) => {
@@ -242,35 +324,38 @@ export function UploadZone({ onFileSelected, onError, loading, loadProgress, loa
             handleBrowse();
           }}
           style={{
-            padding: "10px 28px",
-            borderRadius: UI.radius.md,
-            border: `1px solid ${UI.accent.blue}`,
-            background: "rgba(79,138,255,0.1)",
-            color: UI.accent.blue,
+            padding: "11px 26px",
+            borderRadius: 10,
+            border: "1px solid transparent",
+            background: BRAND,
+            color: "#FFFFFF",
             fontSize: 14,
-            fontWeight: 500,
+            fontWeight: 600,
             cursor: "pointer",
-            transition: UI.transition,
+            transition: "all 0.18s ease",
+            boxShadow: "0 8px 20px rgba(37,99,235,0.25), inset 0 1px 0 rgba(255,255,255,0.25)",
           }}
           onMouseEnter={(e) => {
-            e.currentTarget.style.background = "rgba(79,138,255,0.2)";
+            e.currentTarget.style.background = "#1D4ED8";
+            e.currentTarget.style.transform = "translateY(-1px)";
           }}
           onMouseLeave={(e) => {
-            e.currentTarget.style.background = "rgba(79,138,255,0.1)";
+            e.currentTarget.style.background = BRAND;
+            e.currentTarget.style.transform = "translateY(0)";
           }}
         >
           Browse Files
         </button>
 
-        <p style={{ color: UI.text.tertiary, fontSize: 12, marginTop: 16 }}>
-          Supports .ifc files up to 500 MB · IFC2x3 & IFC4
+        <p style={{ color: INK_MUTED, fontSize: 12, marginTop: 18 }}>
+          Supports <strong style={{ color: INK_SOFT, fontWeight: 600 }}>.ifc</strong> files up to 500 MB · IFC2x3 &amp; IFC4
         </p>
       </div>
 
       {/* Sample models */}
-      <div style={{ marginTop: 32, textAlign: "center" }}>
-        <p style={{ color: UI.text.tertiary, fontSize: 13, marginBottom: 12 }}>
-          🚀 Try with a sample model:
+      <div style={{ position: "relative", marginTop: 32, textAlign: "center" }}>
+        <p style={{ color: INK_SOFT, fontSize: 12, marginBottom: 12, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase" }}>
+          Or try a sample model
         </p>
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "center" }}>
           {SAMPLE_MODELS.map((sample) => {
@@ -285,43 +370,47 @@ export function UploadZone({ onFileSelected, onError, loading, loadProgress, loa
                 }}
                 disabled={isFetching}
                 style={{
-                  display: "flex",
+                  display: "inline-flex",
                   alignItems: "center",
                   gap: 8,
-                  padding: "8px 16px",
-                  borderRadius: UI.radius.sm,
-                  border: `1px solid ${UI.border.subtle}`,
-                  background: "rgba(255,255,255,0.02)",
-                  color: UI.text.secondary,
+                  padding: "9px 16px",
+                  borderRadius: 10,
+                  border: `1px solid ${HAIRLINE}`,
+                  background: SURFACE,
+                  color: INK_SOFT,
                   fontSize: 13,
+                  fontWeight: 500,
                   cursor: isFetching ? "wait" : "pointer",
-                  transition: "all 0.2s ease",
-                  opacity: isFetching ? 0.5 : 1,
+                  transition: "all 0.18s ease",
+                  opacity: isFetching ? 0.6 : 1,
+                  boxShadow: "0 1px 2px rgba(15,23,42,0.04)",
                 }}
                 onMouseEnter={(e) => {
                   if (!isFetching) {
-                    e.currentTarget.style.borderColor = "rgba(79,138,255,0.3)";
-                    e.currentTarget.style.color = UI.text.primary;
+                    e.currentTarget.style.borderColor = "#BFD2FF";
+                    e.currentTarget.style.color = INK;
+                    e.currentTarget.style.background = BRAND_SOFT;
                     e.currentTarget.style.transform = "translateY(-1px)";
-                    e.currentTarget.style.boxShadow = "0 4px 12px rgba(0,0,0,0.2)";
+                    e.currentTarget.style.boxShadow = "0 8px 18px rgba(37,99,235,0.10)";
                   }
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.borderColor = UI.border.subtle;
-                  e.currentTarget.style.color = UI.text.secondary;
+                  e.currentTarget.style.borderColor = HAIRLINE;
+                  e.currentTarget.style.color = INK_SOFT;
+                  e.currentTarget.style.background = SURFACE;
                   e.currentTarget.style.transform = "translateY(0)";
-                  e.currentTarget.style.boxShadow = "none";
+                  e.currentTarget.style.boxShadow = "0 1px 2px rgba(15,23,42,0.04)";
                 }}
               >
-                <Icon size={14} />
-                <span>{isFetching ? (fetchProgress > 0 ? `${fetchProgress}%` : "Loading...") : sample.label}</span>
+                <Icon size={14} color={BRAND} />
+                <span>{isFetching ? (fetchProgress > 0 ? `${fetchProgress}%` : "Loading…") : sample.label}</span>
               </button>
             );
           })}
         </div>
       </div>
 
-      <style>{`@keyframes float { 0%, 100% { transform: translateY(0px); } 50% { transform: translateY(-8px); } }`}</style>
+      <style>{`@keyframes float { 0%, 100% { transform: translateY(0px); } 50% { transform: translateY(-6px); } }`}</style>
     </div>
   );
 }

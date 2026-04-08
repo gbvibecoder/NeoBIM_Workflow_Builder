@@ -38,5 +38,17 @@ const VideoRenderStudio = dynamic(
 );
 
 export default function Page() {
-  return <VideoRenderStudio />;
+  return (
+    <div
+      style={{
+        height: "100%",
+        borderRadius: 8,
+        overflow: "hidden",
+        border: "1px solid rgba(255,255,255,0.06)",
+        boxShadow: "0 10px 40px rgba(0,0,0,0.35)",
+      }}
+    >
+      <VideoRenderStudio />
+    </div>
+  );
 }
