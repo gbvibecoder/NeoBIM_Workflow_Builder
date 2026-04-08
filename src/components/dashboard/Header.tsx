@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { Search, Command, LogOut, Gift, Copy, Check, ChevronDown, Settings } from "lucide-react";
+import { Search, LogOut, Gift, Copy, Check, ChevronDown, Settings } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
 import { useLocale } from "@/hooks/useLocale";
@@ -127,19 +127,26 @@ export function Header({ title, subtitle }: HeaderProps) {
         )}
       </div>
 
+      {/* Center — Canvas toolbar slot (portal target, only filled on /dashboard/canvas) */}
+      <div
+        id="canvas-toolbar-slot"
+        className="hidden md:flex items-center justify-center"
+        style={{ flex: "0 1 auto", minWidth: 0, marginRight: 12 }}
+      />
+
       {/* Right — Actions */}
       <div className="flex items-center gap-2.5">
-        {/* Search */}
+        {/* Search — icon-only trigger for ⌘K command palette */}
         <button
-          className="h-[36px] flex items-center gap-2 px-3 text-xs transition-all"
+          className="flex items-center justify-center transition-all"
           aria-label={t('nav.searchPlaceholder')}
+          title={`${t('nav.searchPlaceholder')} (⌘K)`}
           style={{
+            width: 36, height: 36,
             borderRadius: 10,
             border: "1px solid rgba(255,255,255,0.07)",
             background: "rgba(255,255,255,0.03)",
             color: "#6B7A8D",
-            fontFamily: "var(--font-jetbrains), monospace",
-            fontSize: 11,
           }}
           onClick={() => {
             document.dispatchEvent(new KeyboardEvent("keydown", { key: "k", metaKey: true, bubbles: true }));
@@ -147,30 +154,15 @@ export function Header({ title, subtitle }: HeaderProps) {
           onMouseEnter={e => {
             e.currentTarget.style.borderColor = "rgba(255,191,0,0.25)";
             e.currentTarget.style.background = "rgba(255,255,255,0.05)";
+            e.currentTarget.style.color = "#F0F0F5";
           }}
           onMouseLeave={e => {
             e.currentTarget.style.borderColor = "rgba(255,255,255,0.07)";
             e.currentTarget.style.background = "rgba(255,255,255,0.03)";
+            e.currentTarget.style.color = "#6B7A8D";
           }}
         >
-          <Search size={12} />
-          <span className="search-text">{t('nav.searchPlaceholder')}</span>
-          <div className="flex items-center gap-0.5 ml-1.5">
-            <kbd className="rounded" style={{
-              background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.07)",
-              padding: "1px 4px", fontSize: 8, color: "#4A5568",
-              minWidth: 16, height: 16, display: "flex", alignItems: "center", justifyContent: "center",
-            }}>
-              <Command size={7} />
-            </kbd>
-            <kbd className="rounded" style={{
-              background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.07)",
-              padding: "1px 4px", fontSize: 8, color: "#4A5568",
-              minWidth: 16, height: 16, display: "flex", alignItems: "center", justifyContent: "center",
-            }}>
-              K
-            </kbd>
-          </div>
+          <Search size={14} />
         </button>
 
         {/* Language toggle */}

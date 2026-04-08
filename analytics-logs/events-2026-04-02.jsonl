@@ -1,3 +1,107 @@
+<<<<<<< HEAD
+{"id":"4707d0fe-97c8-4f11-b0c8-f2cba519d65b","timestamp":"2026-04-02T01:55:52.672Z","userId":"cmmdh1l94000004l8v14nq5gu","eventName":"user_login"}
+{"id":"73bf565d-9bcb-4982-8b85-5def199bbe24","timestamp":"2026-04-02T01:56:17.953Z","userId":"cmmdh1l94000004l8v14nq5gu","eventName":"workflow_created","properties":{"workflowId":"cmngtpu5r0000otvbl7xbbzwk"}}
+{"id":"756b7265-9498-4feb-a0dd-56ddabeb8c4a","timestamp":"2026-04-02T01:56:25.632Z","userId":"cmmdh1l94000004l8v14nq5gu","eventName":"execution_started","properties":{"executionId":"cmngtq04p0002otvbsgga4gfp"}}
+{"id":"6fc8db9c-b10d-42f8-b1bb-1ecf3eacf222","timestamp":"2026-04-02T01:56:28.275Z","userId":"cmmdh1l94000004l8v14nq5gu","eventName":"node_used","properties":{"catalogueId":"IN-001","nodeLabel":"Text Prompt"}}
+{"id":"74c6f05e-559b-4c83-8883-961faa306f21","timestamp":"2026-04-02T01:56:48.529Z","userId":"cmmdh1l94000004l8v14nq5gu","eventName":"node_used","properties":{"catalogueId":"TR-003","nodeLabel":"Design Brief Analyzer"}}
+{"id":"b3575cd3-ee46-412b-ba15-b27a5fd2d963","timestamp":"2026-04-02T01:58:20.833Z","userId":"cmmdh1l94000004l8v14nq5gu","eventName":"node_used","properties":{"catalogueId":"GN-001","nodeLabel":"Massing Generator"}}
+{"id":"4105a687-d460-4231-9222-90f31b849c3d","timestamp":"2026-04-02T01:58:23.263Z","userId":"cmmdh1l94000004l8v14nq5gu","eventName":"node_used","properties":{"catalogueId":"EX-001","nodeLabel":"IFC Exporter"}}
+{"id":"4e4677a2-74e5-4aaf-b743-4bfb447b46eb","timestamp":"2026-04-02T01:58:23.263Z","userId":"cmmdh1l94000004l8v14nq5gu","eventName":"workflow_executed","properties":{"nodeCount":4,"catalogueIds":["IN-001","TR-003","GN-001","EX-001"]}}
+{"id":"b0f95a37-437e-4a50-8e2d-99d624edb666","timestamp":"2026-04-02T02:02:05.308Z","userId":"cmmav32p2000004jmbi8nukwf","eventName":"user_login"}
+{"id":"27257959-efe9-4c42-b8d4-3ca646647912","timestamp":"2026-04-02T02:36:09.090Z","userId":"cmmav32p2000004jmbi8nukwf","eventName":"workflow_created","properties":{"workflowId":"cmngv53cu0000sevbxzjtn913"}}
+{"id":"d5f2e6f8-3682-4e43-a889-2be56125baee","timestamp":"2026-04-02T02:36:14.024Z","userId":"cmmav32p2000004jmbi8nukwf","eventName":"execution_started","properties":{"executionId":"cmngv578i0002sevbmhnr4mqz"}}
+{"id":"214b7cec-7210-4cc3-8a18-b124d6de10d5","timestamp":"2026-04-02T02:36:16.192Z","userId":"cmmav32p2000004jmbi8nukwf","eventName":"node_used","properties":{"catalogueId":"IN-001","nodeLabel":"Text Prompt"}}
+{"id":"e00d4a84-9a25-4027-a36e-542f571e3af7","timestamp":"2026-04-02T02:36:31.024Z","userId":"cmmav32p2000004jmbi8nukwf","eventName":"node_used","properties":{"catalogueId":"TR-003","nodeLabel":"Design Brief Analyzer"}}
+{"id":"2cb1746d-375c-48f3-a4f7-110f70bcb442","timestamp":"2026-04-02T02:38:07.810Z","userId":"cmmav32p2000004jmbi8nukwf","eventName":"node_used","properties":{"catalogueId":"GN-001","nodeLabel":"Massing Generator"}}
+{"id":"cf4c4932-6233-4f6d-8ade-0995135bd988","timestamp":"2026-04-02T02:38:09.348Z","userId":"cmmav32p2000004jmbi8nukwf","eventName":"node_used","properties":{"catalogueId":"EX-001","nodeLabel":"IFC Exporter"}}
+{"id":"85d03928-2fe7-4f40-8575-3a330f309f90","timestamp":"2026-04-02T02:38:09.348Z","userId":"cmmav32p2000004jmbi8nukwf","eventName":"workflow_executed","properties":{"nodeCount":4,"catalogueIds":["IN-001","TR-003","GN-001","EX-001"]}}
+{"id":"e822df39-176c-4752-81b5-aac6beb5b774","timestamp":"2026-04-02T02:43:29.643Z","userId":"cmmav32p2000004jmbi8nukwf","eventName":"user_login"}
+{"id":"9500120c-d031-49d3-9332-08f8159eb8d1","timestamp":"2026-04-02T02:47:20.353Z","userId":"cmmav32p2000004jmbi8nukwf","eventName":"user_login"}
+{"id":"ad7ff90b-4bb2-427d-85b2-d8ab576e8363","timestamp":"2026-04-02T02:48:01.073Z","userId":"cmmav32p2000004jmbi8nukwf","eventName":"workflow_created","properties":{"workflowId":"cmngvkcpz00010vvba03to31a"}}
+{"id":"433f3784-380a-4e56-9806-1a903d1902ee","timestamp":"2026-04-02T02:48:05.135Z","userId":"cmmav32p2000004jmbi8nukwf","eventName":"execution_started","properties":{"executionId":"cmngvkg0100030vvb7ddjf5e4"}}
+{"id":"2b1183b6-eb49-4f88-a70e-f45f9cda9ec5","timestamp":"2026-04-02T02:48:07.187Z","userId":"cmmav32p2000004jmbi8nukwf","eventName":"node_used","properties":{"catalogueId":"IN-001","nodeLabel":"Text Prompt"}}
+{"id":"662cd630-943f-46cb-ab67-b97ab444de06","timestamp":"2026-04-02T02:48:23.113Z","userId":"cmmav32p2000004jmbi8nukwf","eventName":"node_used","properties":{"catalogueId":"TR-003","nodeLabel":"Design Brief Analyzer"}}
+{"id":"2324c523-c0ff-490f-9a9d-a10175b6c2f6","timestamp":"2026-04-02T02:49:52.819Z","userId":"cmmav32p2000004jmbi8nukwf","eventName":"node_used","properties":{"catalogueId":"GN-001","nodeLabel":"Massing Generator"}}
+{"id":"5a0cad34-97fd-4b2b-b12a-e6f9c0501963","timestamp":"2026-04-02T02:49:54.030Z","userId":"cmmav32p2000004jmbi8nukwf","eventName":"node_used","properties":{"catalogueId":"EX-001","nodeLabel":"IFC Exporter"}}
+{"id":"6e50f959-d381-46be-82b6-f26fef264c61","timestamp":"2026-04-02T02:49:54.030Z","userId":"cmmav32p2000004jmbi8nukwf","eventName":"workflow_executed","properties":{"nodeCount":4,"catalogueIds":["IN-001","TR-003","GN-001","EX-001"]}}
+{"id":"508ec244-a5e8-43d2-a27f-2cb64ef7e54b","timestamp":"2026-04-02T03:12:16.386Z","userId":"cmmdh1l94000004l8v14nq5gu","eventName":"workflow_created","properties":{"workflowId":"cmngwfjhw00007lvbdciojwxc"}}
+{"id":"8d3712aa-ee33-4924-a9e9-a5793afe79de","timestamp":"2026-04-02T03:12:22.022Z","userId":"cmmdh1l94000004l8v14nq5gu","eventName":"execution_started","properties":{"executionId":"cmngwfnxa00027lvbw72twzk4"}}
+{"id":"86518b6e-ff36-4e7c-8cd7-03e6119f9205","timestamp":"2026-04-02T03:12:24.168Z","userId":"cmmdh1l94000004l8v14nq5gu","eventName":"node_used","properties":{"catalogueId":"IN-005","nodeLabel":"Parameter Input"}}
+{"id":"dbd0e4a3-2a58-4072-b72e-f953560970aa","timestamp":"2026-04-02T03:15:01.455Z","userId":"cmmdh1l94000004l8v14nq5gu","eventName":"node_used","properties":{"catalogueId":"GN-001","nodeLabel":"Massing Generator"}}
+{"id":"29879183-3461-44b9-99f3-7f36e548a817","timestamp":"2026-04-02T03:15:03.457Z","userId":"cmmdh1l94000004l8v14nq5gu","eventName":"workflow_executed","properties":{"nodeCount":3,"catalogueIds":["IN-005","GN-001","EX-001"]}}
+{"id":"19fac4a2-1598-4b4a-b335-57fe55afd8d8","timestamp":"2026-04-02T03:15:03.457Z","userId":"cmmdh1l94000004l8v14nq5gu","eventName":"node_used","properties":{"catalogueId":"EX-001","nodeLabel":"IFC Exporter"}}
+{"id":"9112fe2d-9d72-47ab-8223-92e7625ba9d8","timestamp":"2026-04-02T03:49:53.739Z","userId":"cmmdh1l94000004l8v14nq5gu","eventName":"user_login"}
+{"id":"76731e47-b7ab-4081-b381-b55dfbb74afb","timestamp":"2026-04-02T03:51:13.665Z","userId":"cmmdh1l94000004l8v14nq5gu","eventName":"workflow_created","properties":{"workflowId":"cmngxtn610001hnvb0wqj6472"}}
+{"id":"eb6381f0-ee61-41f5-b23e-4e7bc19595dc","timestamp":"2026-04-02T03:51:18.284Z","userId":"cmmdh1l94000004l8v14nq5gu","eventName":"execution_started","properties":{"executionId":"cmngxtqmo0003hnvb0mcoenur"}}
+{"id":"2fbcdbe1-e013-4e96-8bc4-0d683a2e6da9","timestamp":"2026-04-02T03:51:20.582Z","userId":"cmmdh1l94000004l8v14nq5gu","eventName":"node_used","properties":{"catalogueId":"IN-005","nodeLabel":"Parameter Input"}}
+{"id":"7ba12761-da9d-4691-85ae-716be5b58305","timestamp":"2026-04-02T03:52:47.385Z","userId":"cmmdh1l94000004l8v14nq5gu","eventName":"node_used","properties":{"catalogueId":"GN-001","nodeLabel":"Massing Generator"}}
+{"id":"f8a3396b-4fb5-4e16-96d7-671e4cc7bf4d","timestamp":"2026-04-02T03:52:48.847Z","userId":"cmmdh1l94000004l8v14nq5gu","eventName":"node_used","properties":{"catalogueId":"EX-001","nodeLabel":"IFC Exporter"}}
+{"id":"ca82dd6d-57aa-43f7-9d2e-faa09298f336","timestamp":"2026-04-02T03:52:48.847Z","userId":"cmmdh1l94000004l8v14nq5gu","eventName":"workflow_executed","properties":{"nodeCount":3,"catalogueIds":["IN-005","GN-001","EX-001"]}}
+{"id":"bef78436-6de7-4ab0-ab27-41aff6ecee11","timestamp":"2026-04-02T04:00:59.996Z","userId":"cmmav32p2000004jmbi8nukwf","eventName":"user_login"}
+{"id":"7cc2e476-07c9-479f-862b-6175f3cc4f1a","timestamp":"2026-04-02T04:01:23.471Z","userId":"cmmav32p2000004jmbi8nukwf","eventName":"workflow_created","properties":{"workflowId":"cmngy6ph70001zjvb49wuokp6"}}
+{"id":"89c8cbfb-9c8e-44b6-af43-05cd15277659","timestamp":"2026-04-02T04:01:27.914Z","userId":"cmmav32p2000004jmbi8nukwf","eventName":"execution_started","properties":{"executionId":"cmngy6t4e0003zjvbmf9auib5"}}
+{"id":"1ecb2ec4-3bc8-4bae-8140-912d52949836","timestamp":"2026-04-02T04:01:30.087Z","userId":"cmmav32p2000004jmbi8nukwf","eventName":"node_used","properties":{"catalogueId":"IN-005","nodeLabel":"Parameter Input"}}
+{"id":"33607c19-70c6-47a9-b497-a2737ef2f294","timestamp":"2026-04-02T04:02:32.665Z","userId":"cmmav32p2000004jmbi8nukwf","eventName":"node_used","properties":{"catalogueId":"GN-001","nodeLabel":"Massing Generator"}}
+{"id":"469dcb06-6c00-474a-9ad1-f6f56eb1c595","timestamp":"2026-04-02T04:02:33.760Z","userId":"cmmav32p2000004jmbi8nukwf","eventName":"workflow_executed","properties":{"nodeCount":3,"catalogueIds":["IN-005","GN-001","EX-001"]}}
+{"id":"b91b6c70-9c30-4862-8a16-bc4e30affa4d","timestamp":"2026-04-02T04:02:33.760Z","userId":"cmmav32p2000004jmbi8nukwf","eventName":"node_used","properties":{"catalogueId":"EX-001","nodeLabel":"IFC Exporter"}}
+{"id":"5a95d195-580b-4d05-a048-0e750200636d","timestamp":"2026-04-02T04:19:17.139Z","userId":"cmmav32p2000004jmbi8nukwf","eventName":"execution_started","properties":{"executionId":"cmngytq390003sdvb21g691jp"}}
+{"id":"9af7e7c4-8d1a-44b2-ac07-a6878de96b85","timestamp":"2026-04-02T04:19:19.523Z","userId":"cmmav32p2000004jmbi8nukwf","eventName":"node_used","properties":{"catalogueId":"IN-005","nodeLabel":"Parameter Input"}}
+{"id":"43dc5594-d6be-4c54-a794-11f95d7e2a6c","timestamp":"2026-04-02T04:20:25.743Z","userId":"cmmav32p2000004jmbi8nukwf","eventName":"node_used","properties":{"catalogueId":"GN-001","nodeLabel":"Massing Generator"}}
+{"id":"860e4068-f03e-4581-970a-8976aa6fd0cd","timestamp":"2026-04-02T04:20:26.674Z","userId":"cmmav32p2000004jmbi8nukwf","eventName":"workflow_executed","properties":{"nodeCount":3,"catalogueIds":["IN-005","GN-001","EX-001"]}}
+{"id":"c240bb63-d2de-4f6e-9af2-da0d296e3426","timestamp":"2026-04-02T04:20:26.674Z","userId":"cmmav32p2000004jmbi8nukwf","eventName":"node_used","properties":{"catalogueId":"EX-001","nodeLabel":"IFC Exporter"}}
+{"id":"a70110da-cfe3-4b5c-a0df-6eea705d4958","timestamp":"2026-04-02T04:44:58.908Z","userId":"cmmav32p2000004jmbi8nukwf","eventName":"execution_started","properties":{"executionId":"cmngzqrtz0004p3vb0tttq3ak"}}
+{"id":"b7c7cb62-f85d-40bc-b305-cad0baa8fa99","timestamp":"2026-04-02T04:45:01.083Z","userId":"cmmav32p2000004jmbi8nukwf","eventName":"node_used","properties":{"catalogueId":"IN-005","nodeLabel":"Parameter Input"}}
+{"id":"91696219-578c-4f16-a624-2ea3679ca94b","timestamp":"2026-04-02T04:46:05.455Z","userId":"cmmav32p2000004jmbi8nukwf","eventName":"node_used","properties":{"catalogueId":"GN-001","nodeLabel":"Massing Generator"}}
+{"id":"f53bb290-751e-4388-8cfb-2ed5c8838dec","timestamp":"2026-04-02T04:46:07.904Z","userId":"cmmav32p2000004jmbi8nukwf","eventName":"workflow_executed","properties":{"nodeCount":3,"catalogueIds":["IN-005","GN-001","EX-001"]}}
+{"id":"7762ef65-35c7-4a8d-a996-b3e2f1dbbfce","timestamp":"2026-04-02T04:46:07.904Z","userId":"cmmav32p2000004jmbi8nukwf","eventName":"node_used","properties":{"catalogueId":"EX-001","nodeLabel":"IFC Exporter"}}
+{"id":"3b042c61-0037-4665-aa74-4fc0524b210f","timestamp":"2026-04-02T05:10:16.186Z","userId":"cmmav32p2000004jmbi8nukwf","eventName":"user_login"}
+{"id":"2078e9e4-4a8c-4ee3-9075-5d81b661abd2","timestamp":"2026-04-02T05:10:37.006Z","userId":"cmmav32p2000004jmbi8nukwf","eventName":"workflow_created","properties":{"workflowId":"cmnh0nqkd0000j3vbyhx2mxry"}}
+{"id":"0ae3bd20-1e74-4e04-9971-edb81ebc68e8","timestamp":"2026-04-02T05:10:42.143Z","userId":"cmmav32p2000004jmbi8nukwf","eventName":"execution_started","properties":{"executionId":"cmnh0nufr0002j3vbo1d6wh3l"}}
+{"id":"edea7343-fe23-4e4b-92ca-59a2b8241372","timestamp":"2026-04-02T05:10:44.744Z","userId":"cmmav32p2000004jmbi8nukwf","eventName":"node_used","properties":{"catalogueId":"IN-005","nodeLabel":"Parameter Input"}}
+{"id":"4147362f-1d24-48ff-bd1f-fee778195773","timestamp":"2026-04-02T05:12:59.827Z","userId":"cmmav32p2000004jmbi8nukwf","eventName":"node_used","properties":{"catalogueId":"GN-001","nodeLabel":"Massing Generator"}}
+{"id":"04d82e62-b2df-4579-8232-63cf152a12f3","timestamp":"2026-04-02T05:13:01.272Z","userId":"cmmav32p2000004jmbi8nukwf","eventName":"workflow_executed","properties":{"nodeCount":3,"catalogueIds":["IN-005","GN-001","EX-001"]}}
+{"id":"a3bdd5eb-2be9-42e9-87d4-d053d5d473e6","timestamp":"2026-04-02T05:13:01.272Z","userId":"cmmav32p2000004jmbi8nukwf","eventName":"node_used","properties":{"catalogueId":"EX-001","nodeLabel":"IFC Exporter"}}
+{"id":"56e83f11-0fe8-48ec-8951-b5af7ae35f48","timestamp":"2026-04-02T05:33:36.800Z","userId":"cmmav32p2000004jmbi8nukwf","eventName":"user_login"}
+{"id":"85cf40a1-186e-4432-877e-f1d2429609ec","timestamp":"2026-04-02T05:34:21.208Z","userId":"cmmav32p2000004jmbi8nukwf","eventName":"workflow_created","properties":{"workflowId":"cmnh1i9dg000048vbvobh29hm"}}
+{"id":"1b168c25-b480-4ac9-8e42-c2ffb3cd6078","timestamp":"2026-04-02T05:34:26.324Z","userId":"cmmav32p2000004jmbi8nukwf","eventName":"execution_started","properties":{"executionId":"cmnh1idcw000248vbwjx0fiaf"}}
+{"id":"67e80f53-0a83-40d2-a29f-4642413c6aff","timestamp":"2026-04-02T05:34:28.527Z","userId":"cmmav32p2000004jmbi8nukwf","eventName":"node_used","properties":{"catalogueId":"IN-005","nodeLabel":"Parameter Input"}}
+{"id":"1b247f6e-a489-4473-8223-93049a950127","timestamp":"2026-04-02T05:36:16.192Z","userId":"cmmav32p2000004jmbi8nukwf","eventName":"node_used","properties":{"catalogueId":"GN-001","nodeLabel":"Massing Generator"}}
+{"id":"a2c64b1b-85df-43ad-855a-d4f00f399822","timestamp":"2026-04-02T05:36:17.944Z","userId":"cmmav32p2000004jmbi8nukwf","eventName":"workflow_executed","properties":{"nodeCount":3,"catalogueIds":["IN-005","GN-001","EX-001"]}}
+{"id":"44f610a6-649a-4d49-8442-244be65053ac","timestamp":"2026-04-02T05:36:17.944Z","userId":"cmmav32p2000004jmbi8nukwf","eventName":"node_used","properties":{"catalogueId":"EX-001","nodeLabel":"IFC Exporter"}}
+{"id":"cfeb2ea3-1a33-46a6-bc56-ecaeec6b20b8","timestamp":"2026-04-02T05:59:40.049Z","userId":"cmmav32p2000004jmbi8nukwf","eventName":"user_login"}
+{"id":"8e061ad6-9479-4300-93da-2b5e7a90b69f","timestamp":"2026-04-02T06:00:15.341Z","userId":"cmmav32p2000004jmbi8nukwf","eventName":"workflow_created","properties":{"workflowId":"cmnh2fkgq00015wvb6kcry0os"}}
+{"id":"ed3163e9-dd2c-48b6-bfbf-38424919133c","timestamp":"2026-04-02T06:00:20.358Z","userId":"cmmav32p2000004jmbi8nukwf","eventName":"execution_started","properties":{"executionId":"cmnh2fodt00035wvbmu9r2351"}}
+{"id":"1b279141-84fe-44c5-80fa-3fae07a44059","timestamp":"2026-04-02T06:00:22.502Z","userId":"cmmav32p2000004jmbi8nukwf","eventName":"node_used","properties":{"catalogueId":"IN-005","nodeLabel":"Parameter Input"}}
+{"id":"90a4ab42-eebe-4391-9be4-cd2ecb012603","timestamp":"2026-04-02T06:02:00.744Z","userId":"cmmav32p2000004jmbi8nukwf","eventName":"node_used","properties":{"catalogueId":"GN-001","nodeLabel":"Massing Generator"}}
+{"id":"c8a0fe2e-3654-4781-9a65-64ebfc84a459","timestamp":"2026-04-02T06:02:03.625Z","userId":"cmmav32p2000004jmbi8nukwf","eventName":"workflow_executed","properties":{"nodeCount":3,"catalogueIds":["IN-005","GN-001","EX-001"]}}
+{"id":"8bb4370a-1b85-4e06-8dd0-78a71ba16590","timestamp":"2026-04-02T06:02:03.625Z","userId":"cmmav32p2000004jmbi8nukwf","eventName":"node_used","properties":{"catalogueId":"EX-001","nodeLabel":"IFC Exporter"}}
+{"id":"8d257281-acbf-44fb-8a59-81888df227d6","timestamp":"2026-04-02T07:22:02.338Z","userId":"cmmav32p2000004jmbi8nukwf","eventName":"user_login"}
+{"id":"dd374200-d580-43ff-98a0-b357b2b8782b","timestamp":"2026-04-02T07:22:33.537Z","userId":"cmmav32p2000004jmbi8nukwf","eventName":"workflow_created","properties":{"workflowId":"cmnh5dcu700065wvba6ic0wbh"}}
+{"id":"a2232e5f-0bba-4bcf-8f5a-77bcba1e7624","timestamp":"2026-04-02T07:22:44.396Z","userId":"cmmav32p2000004jmbi8nukwf","eventName":"execution_started","properties":{"executionId":"cmnh5dnbw00085wvb6eln3ptd"}}
+{"id":"04032b83-55d0-4b5c-8b51-2a1eceed7550","timestamp":"2026-04-02T07:22:46.400Z","userId":"cmmav32p2000004jmbi8nukwf","eventName":"node_used","properties":{"catalogueId":"IN-003","nodeLabel":"Image Upload"}}
+{"id":"a482646b-e456-40af-b2d6-8602e1badb12","timestamp":"2026-04-02T07:23:13.093Z","userId":"cmmav32p2000004jmbi8nukwf","eventName":"node_used","properties":{"catalogueId":"TR-004","nodeLabel":"Floor Plan Analyzer (GPT-4o)"}}
+{"id":"b4c08774-5b35-4b8b-881b-fe745902fa8d","timestamp":"2026-04-02T07:23:59.539Z","userId":"cmmav32p2000004jmbi8nukwf","eventName":"workflow_executed","properties":{"nodeCount":3,"catalogueIds":["IN-003","TR-004","GN-011"]}}
+{"id":"b55c3427-db36-42aa-b6f6-9025a94af49b","timestamp":"2026-04-02T07:23:59.539Z","userId":"cmmav32p2000004jmbi8nukwf","eventName":"node_used","properties":{"catalogueId":"GN-011","nodeLabel":"Interactive 3D Viewer"}}
+{"id":"d3b55b2e-d1b1-45ec-b77b-e33912f8e81b","timestamp":"2026-04-02T07:24:30.589Z","userId":"cmmav32p2000004jmbi8nukwf","eventName":"workflow_created","properties":{"workflowId":"cmnh5fvdt000c5wvbt4kiko9x"}}
+{"id":"d9a4fbe6-8d63-43a4-94f3-61e3aa52d430","timestamp":"2026-04-02T07:24:41.228Z","userId":"cmmav32p2000004jmbi8nukwf","eventName":"execution_started","properties":{"executionId":"cmnh5g5ek000e5wvbrzkbe8wy"}}
+{"id":"41a128f4-44a3-4d93-961f-9e6e7f082096","timestamp":"2026-04-02T07:24:43.309Z","userId":"cmmav32p2000004jmbi8nukwf","eventName":"node_used","properties":{"catalogueId":"IN-003","nodeLabel":"Image Upload"}}
+{"id":"65e7944f-994b-4666-a7f6-9dc57dee5ce6","timestamp":"2026-04-02T07:25:02.398Z","userId":"cmmav32p2000004jmbi8nukwf","eventName":"node_used","properties":{"catalogueId":"TR-004","nodeLabel":"Floor Plan Analyzer (GPT-4o)"}}
+{"id":"6a55fc73-f1e3-45b7-8676-e40a470683d9","timestamp":"2026-04-02T07:26:19.849Z","userId":"cmmav32p2000004jmbi8nukwf","eventName":"node_used","properties":{"catalogueId":"GN-003","nodeLabel":"Exterior Render (DALL-E 3)"}}
+{"id":"6ead0e69-9d17-4dd7-84ad-706664405e99","timestamp":"2026-04-02T07:27:25.199Z","userId":"cmmav32p2000004jmbi8nukwf","eventName":"node_used","properties":{"catalogueId":"GN-003","nodeLabel":"Interior Render (DALL-E 3)"}}
+{"id":"1bf0cb84-bf49-4833-8e9e-a0509a0da990","timestamp":"2026-04-02T07:27:28.308Z","userId":"cmmav32p2000004jmbi8nukwf","eventName":"workflow_executed","properties":{"nodeCount":5,"catalogueIds":["IN-003","TR-004","GN-003","GN-003","GN-009"]}}
+{"id":"cc3c4e6a-22da-42a7-82b4-44b9796f3b4a","timestamp":"2026-04-02T07:27:28.308Z","userId":"cmmav32p2000004jmbi8nukwf","eventName":"node_used","properties":{"catalogueId":"GN-009","nodeLabel":"Video Walkthrough (Kling 3.0)"}}
+{"id":"b9b2e36e-c8b0-48e6-9613-7bde84f931f8","timestamp":"2026-04-02T07:36:45.790Z","userId":"cmmdh1l94000004l8v14nq5gu","eventName":"user_login"}
+{"id":"354134d5-ceea-4b4f-95ae-0ac0653ac08a","timestamp":"2026-04-02T07:37:10.288Z","userId":"cmmdh1l94000004l8v14nq5gu","eventName":"workflow_created","properties":{"workflowId":"cmnh5w5bp000j5wvbkkq0qa1z"}}
+{"id":"92ba8ba6-90fc-4169-b52d-eb47f41c3c23","timestamp":"2026-04-02T07:37:22.269Z","userId":"cmmdh1l94000004l8v14nq5gu","eventName":"execution_started","properties":{"executionId":"cmnh5wgkh000l5wvbp8n3rqhp"}}
+{"id":"b7d80cbd-064b-4b79-a828-03afb24b6976","timestamp":"2026-04-02T07:37:24.315Z","userId":"cmmdh1l94000004l8v14nq5gu","eventName":"node_used","properties":{"catalogueId":"IN-003","nodeLabel":"Image Upload"}}
+{"id":"51a5a4b6-84aa-4ec2-8e03-ba8ce961d2ff","timestamp":"2026-04-02T07:37:45.916Z","userId":"cmmdh1l94000004l8v14nq5gu","eventName":"node_used","properties":{"catalogueId":"TR-004","nodeLabel":"Floor Plan Analyzer (GPT-4o)"}}
+{"id":"8be50352-dd07-40b4-8ed2-581cddd96566","timestamp":"2026-04-02T07:38:49.277Z","userId":"cmmdh1l94000004l8v14nq5gu","eventName":"node_used","properties":{"catalogueId":"GN-003","nodeLabel":"Exterior Render (DALL-E 3)"}}
+{"id":"cf0560b8-6ad4-49d5-aaac-985bdc1bf7f5","timestamp":"2026-04-02T07:39:54.141Z","userId":"cmmdh1l94000004l8v14nq5gu","eventName":"node_used","properties":{"catalogueId":"GN-003","nodeLabel":"Interior Render (DALL-E 3)"}}
+{"id":"f75e61ab-980f-4a77-91bd-1109b069ccd7","timestamp":"2026-04-02T07:39:56.235Z","userId":"cmmdh1l94000004l8v14nq5gu","eventName":"node_used","properties":{"catalogueId":"GN-009","nodeLabel":"Video Walkthrough (Kling 3.0)"}}
+{"id":"20c1323f-a46d-4b2f-969b-52e1d0613a85","timestamp":"2026-04-02T07:39:56.235Z","userId":"cmmdh1l94000004l8v14nq5gu","eventName":"workflow_executed","properties":{"nodeCount":5,"catalogueIds":["IN-003","TR-004","GN-003","GN-003","GN-009"]}}
+{"id":"df987ce4-2593-42bf-b192-154fd2a22e67","timestamp":"2026-04-02T09:43:35.935Z","userId":"cmmdh1l94000004l8v14nq5gu","eventName":"user_login"}
+{"id":"c8775cab-8298-4173-b20b-d66ad033561c","timestamp":"2026-04-02T10:16:28.090Z","userId":"cmmdh1l94000004l8v14nq5gu","eventName":"user_login"}
+=======
 {"id":"6dd12e07-b4c3-428a-a444-48db58a1ff50","timestamp":"2026-04-02T04:12:45.602Z","userId":"cmmdh1l94000004l8v14nq5gu","eventName":"user_login"}
 {"id":"f4b6adba-c9ee-4651-9fbe-c76a37f8ac66","timestamp":"2026-04-02T04:13:43.762Z","userId":"cmmdh1l94000004l8v14nq5gu","eventName":"workflow_created","properties":{"workflowId":"cmngymkm40000kwsuzlocj2n7"}}
 {"id":"19834c75-a5aa-4189-a430-bab96b6107c0","timestamp":"2026-04-02T04:13:51.340Z","userId":"cmmdh1l94000004l8v14nq5gu","eventName":"execution_started","properties":{"executionId":"cmngymqp20002kwsu45wrwfnu"}}
@@ -19,3 +123,4 @@
 {"id":"e0cba287-a769-4952-a265-0c584d4f7936","timestamp":"2026-04-02T04:47:26.008Z","userId":"cmmdh1l94000004l8v14nq5gu","eventName":"node_used","properties":{"catalogueId":"IN-004","nodeLabel":"IFC Upload"}}
 {"id":"f6842996-0a63-4295-850a-39aa72807106","timestamp":"2026-04-02T04:47:26.008Z","userId":"cmmdh1l94000004l8v14nq5gu","eventName":"workflow_executed","properties":{"nodeCount":2,"catalogueIds":["IN-004","TR-016"]}}
 {"id":"29ba2883-2f19-4252-acf8-56aab94c3f92","timestamp":"2026-04-02T09:24:53.150Z","userId":"cmmdh1l94000004l8v14nq5gu","eventName":"user_login"}
+>>>>>>> upstream/main

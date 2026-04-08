@@ -697,12 +697,12 @@ export const BaseNode = memo(function BaseNode({ id, data, selected }: BaseNodeP
   const accentOpacity = selected ? 0.7 : isHovered ? 0.45 : 0.2;
 
   const outerBorderColor =
-    status === "error"   ? "rgba(248,113,113,0.5)" :
-    status === "success" ? "rgba(52,211,153,0.5)" :
-    status === "running" ? `rgba(${rgb}, 0.7)` :
-    selected ? `rgba(${rgb}, 0.45)` :
-    isHovered ? `rgba(${rgb}, 0.3)` :
-    `rgba(${rgb}, 0.12)`;
+    status === "error"   ? "rgba(248,113,113,0.85)" :
+    status === "success" ? "rgba(52,211,153,0.85)" :
+    status === "running" ? `rgba(${rgb}, 0.95)` :
+    selected ? `rgba(${rgb}, 0.9)` :
+    isHovered ? `rgba(${rgb}, 0.75)` :
+    `rgba(${rgb}, 0.55)`;
 
   const stateGlow =
     status === "success" ? `0 0 30px rgba(52, 211, 153, 0.35)` :
@@ -723,14 +723,14 @@ export const BaseNode = memo(function BaseNode({ id, data, selected }: BaseNodeP
         style={{
           ["--cat-color" as string]: color,
           ["--cat-rgb" as string]: rgb,
-          width: isInput ? 320 : 260,
+          width: isInput ? 320 : 200,
           background: "rgba(10, 12, 14, 0.75)",
-          border: `1px solid ${outerBorderColor}`,
+          border: `1.5px solid ${outerBorderColor}`,
           borderRadius: 4,
           boxShadow: [
             isHovered
-              ? `0 16px 48px rgba(0,0,0,0.65), 0 0 40px rgba(${rgb}, 0.1)`
-              : `0 4px 24px rgba(0,0,0,0.5)`,
+              ? `0 16px 48px rgba(0,0,0,0.65), 0 0 40px rgba(${rgb}, 0.18), 0 0 0 1px rgba(${rgb}, 0.35)`
+              : `0 4px 24px rgba(0,0,0,0.5), 0 0 0 1px rgba(${rgb}, 0.2)`,
             stateGlow,
           ].filter(Boolean).join(", "),
           backdropFilter: "blur(12px) saturate(1.1)",
@@ -762,14 +762,6 @@ export const BaseNode = memo(function BaseNode({ id, data, selected }: BaseNodeP
           borderRadius: "4px 4px 0 0",
           background: `linear-gradient(180deg, rgba(${rgb}, 0.05) 0%, transparent 100%)`,
           pointerEvents: "none", zIndex: 0,
-        }} />
-
-        {/* ── Scanning line (Atelier) ── */}
-        <div style={{
-          position: "absolute", left: 0, width: "100%", height: "1.5px",
-          background: `linear-gradient(90deg, transparent, rgba(${rgb}, 0.4), transparent)`,
-          animation: status === "running" ? "atelier-scan 1s linear infinite" : "atelier-scan 4s linear infinite",
-          opacity: 0.45, pointerEvents: "none", zIndex: 3,
         }} />
 
         {/* ── Glow behind node (Atelier) ── */}
@@ -894,7 +886,7 @@ export const BaseNode = memo(function BaseNode({ id, data, selected }: BaseNodeP
         )}
 
         {/* ── Content ── */}
-        <div style={{ padding: "16px 18px 14px 18px", position: "relative", zIndex: 1 }}>
+        <div style={{ padding: isInput ? "16px 18px 14px 18px" : "10px 12px 9px 14px", position: "relative", zIndex: 1 }}>
 
           {/* Row 1: Icon + name + status + INPUT badge */}
           <div style={{ display: "flex", alignItems: "flex-start", gap: 10, marginBottom: 2 }}>
@@ -1048,7 +1040,7 @@ export const BaseNode = memo(function BaseNode({ id, data, selected }: BaseNodeP
           {data.catalogueId === "GN-003" && <ViewTypeSelect nodeId={id} data={data} />}
 
           {/* Row 3: Category decoration + time estimate pill */}
-          <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 10 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: isInput ? 10 : 6 }}>
             {/* Category-specific mini visualization */}
             {category === "input" && <DraftingCompass color={color} />}
             {category === "transform" && <TrussFrame color={color} isRunning={status === "running"} />}

@@ -66,8 +66,8 @@ interface UIState {
 }
 
 export const useUIStore = create<UIState>()((set) => ({
-  activePanel: "nodeLibrary",
-  isNodeLibraryOpen: true,
+  activePanel: "none",
+  isNodeLibraryOpen: false,
   isExecutionPanelOpen: false,
   isMetaPanelOpen: false,
 
