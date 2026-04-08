@@ -237,7 +237,7 @@ const Viewport = forwardRef<ViewportHandle, ViewportProps>(function Viewport(
     /* Blueprint grid background — matches landing page .blueprint-grid
        Rendered in a SEPARATE scene with toneMapped:false to bypass ACES tonemapping.
        Uses gl_FragCoord for pixel-perfect grid lines (square cells). */
-    scene.background = null;
+    scene.background = new THREE.Color(0xf6f7f9);
     sceneRef.current = scene;
 
     const bgGradScene = new THREE.Scene();
@@ -247,16 +247,13 @@ const Viewport = forwardRef<ViewportHandle, ViewportProps>(function Viewport(
       fragmentShader: `
         varying vec2 vUv;
         void main() {
-          /* Base gradient: #07070D with subtle warm horizon */
+          /* White base with very subtle vertical shading */
           float vy = vUv.y;
-          vec3 top    = vec3(0.027, 0.027, 0.051);
-          vec3 mid    = vec3(0.043, 0.047, 0.075);
-          vec3 bottom = vec3(0.020, 0.020, 0.039);
-          vec3 bg = vy > 0.5
-            ? mix(mid, top, (vy - 0.5) * 2.0)
-            : mix(bottom, mid, vy * 2.0);
+          vec3 top    = vec3(0.965, 0.969, 0.976);
+          vec3 bottom = vec3(0.992, 0.992, 0.996);
+          vec3 bg = mix(bottom, top, vy);
 
-          /* Blueprint grid (pixel coords → square cells) */
+          /* Architectural grid (pixel coords → square cells) */
           vec2 px = gl_FragCoord.xy;
 
           /* Major grid: 120px spacing */
@@ -273,16 +270,16 @@ const Viewport = forwardRef<ViewportHandle, ViewportProps>(function Viewport(
             1.0 - smoothstep(0.0, 1.0, dMin.y)
           );
 
-          /* Grid color: #4F8AFF (matching UI accent blue) */
-          vec3 gridBlue = vec3(0.31, 0.541, 1.0);
+          /* Grid line color: cool gray */
+          vec3 gridGray = vec3(0.55, 0.60, 0.66);
 
           vec3 color = bg;
-          color += gridBlue * minor * 0.035;
-          color += gridBlue * major * 0.09;
+          color = mix(color, gridGray, minor * 0.18);
+          color = mix(color, gridGray, major * 0.32);
 
-          /* Radial vignette: grid fades at edges (matching landing page mask) */
+          /* Soft radial vignette so edges fade gently */
           vec2 center = vUv - vec2(0.5, 0.45);
-          float vig = 1.0 - smoothstep(0.1, 0.7, length(center * vec2(1.25, 1.43)));
+          float vig = 1.0 - smoothstep(0.15, 0.85, length(center * vec2(1.25, 1.43)));
           color = mix(bg, color, vig);
 
           gl_FragColor = vec4(color, 1.0);
@@ -388,10 +385,73 @@ const Viewport = forwardRef<ViewportHandle, ViewportProps>(function Viewport(
     groundRef.current = ground;
 
     /* ── Subtle professional grid ── */
-    const grid = new THREE.GridHelper(SCENE.gridSize, SCENE.gridDivisions, 0x1e1e3a, 0x151530);
-    (grid.material as THREE.Material).opacity = 0.12;
-    (grid.material as THREE.Material).transparent = true;
-    (grid.material as THREE.Material).depthWrite = false;
+    /* Architectural infinite grid (shader-based) — minor + major lines,
+       fades with distance, world-space so it pans with the building. */
+    const gridGeo = new THREE.PlaneGeometry(4000, 4000);
+    const gridMat = new THREE.ShaderMaterial({
+      side: THREE.DoubleSide,
+      transparent: true,
+      depthWrite: false,
+      uniforms: {
+        uMinor: { value: 1.0 },          // minor cell size in world units
+        uMajor: { value: 10.0 },         // major cell every N minors
+        uMinorColor: { value: new THREE.Color(0xc4cad3) },
+        uMajorColor: { value: new THREE.Color(0x8a93a0) },
+        uBgColor:    { value: new THREE.Color(0xf6f7f9) },
+        uFadeStart:  { value: 60.0 },
+        uFadeEnd:    { value: 320.0 },
+      },
+      vertexShader: `
+        varying vec3 vWorld;
+        void main() {
+          vec4 wp = modelMatrix * vec4(position, 1.0);
+          vWorld = wp.xyz;
+          gl_Position = projectionMatrix * viewMatrix * wp;
+        }
+      `,
+      fragmentShader: `
+        varying vec3 vWorld;
+        uniform float uMinor;
+        uniform float uMajor;
+        uniform vec3  uMinorColor;
+        uniform vec3  uMajorColor;
+        uniform vec3  uBgColor;
+        uniform float uFadeStart;
+        uniform float uFadeEnd;
+
+        float gridLine(vec2 p, float scale) {
+          vec2 coord = p / scale;
+          vec2 deriv = fwidth(coord);
+          vec2 grid  = abs(fract(coord - 0.5) - 0.5) / deriv;
+          float line = min(grid.x, grid.y);
+          return 1.0 - min(line, 1.0);
+        }
+
+        void main() {
+          vec2 p = vWorld.xz;
+
+          float minor = gridLine(p, uMinor);
+          float major = gridLine(p, uMinor * uMajor);
+
+          /* Distance fade from camera xz */
+          float dist = length(p - cameraPosition.xz);
+          float fade = 1.0 - smoothstep(uFadeStart, uFadeEnd, dist);
+
+          vec3 color = uBgColor;
+          color = mix(color, uMinorColor, minor * 0.55 * fade);
+          color = mix(color, uMajorColor, major * 0.85 * fade);
+
+          float alpha = max(minor * 0.55, major * 0.9) * fade;
+          if (alpha < 0.001) discard;
+          gl_FragColor = vec4(color, alpha);
+        }
+      `,
+      extensions: { derivatives: true } as never,
+    });
+    const grid = new THREE.Mesh(gridGeo, gridMat) as unknown as THREE.GridHelper;
+    (grid as unknown as THREE.Mesh).rotation.x = -Math.PI / 2;
+    (grid as unknown as THREE.Mesh).position.y = -0.005;
+    (grid as unknown as THREE.Mesh).renderOrder = -1;
     scene.add(grid);
     gridRef.current = grid;
 
@@ -422,7 +482,6 @@ const Viewport = forwardRef<ViewportHandle, ViewportProps>(function Viewport(
 
       controls.update();
       renderer.clear();
-      renderer.render(bgGradScene, bgGradCamera);
       renderer.render(scene, camera);
 
       /* Sync view cube orientation */
