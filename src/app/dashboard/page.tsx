@@ -373,21 +373,21 @@ export default function DashboardPage() {
                   className="db-hero-cta"
                   style={{
                     display: "inline-flex", alignItems: "center", gap: 10,
-                    padding: isMobileLayout ? "13px 22px" : "16px 32px",
-                    borderRadius: 14,
-                    background: "linear-gradient(135deg, #06b6d4 0%, #6366f1 50%, #a855f7 100%)",
-                    color: "#ffffff",
+                    padding: isMobileLayout ? "13px 22px" : "15px 30px",
+                    borderRadius: 999,
+                    background: "#F5F7FA",
+                    color: "#0A0A0F",
                     fontSize: isMobileLayout ? 13 : 14,
-                    fontWeight: 700,
-                    textDecoration: "none", letterSpacing: "0.02em",
+                    fontWeight: 600,
+                    textDecoration: "none", letterSpacing: "-0.01em",
                     whiteSpace: "nowrap",
-                    boxShadow: "0 12px 40px rgba(6,182,212,0.28), 0 4px 18px rgba(168,85,247,0.18), inset 0 1px 0 rgba(255,255,255,0.18)",
-                    border: "1px solid rgba(255,255,255,0.12)",
-                    transition: "all 0.35s cubic-bezier(0.22, 1, 0.36, 1)",
+                    boxShadow: "0 1px 0 rgba(255,255,255,0.6) inset, 0 18px 40px -12px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,255,255,0.08)",
+                    border: "none",
+                    transition: "transform 0.35s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.35s cubic-bezier(0.22, 1, 0.36, 1)",
                   }}
                 >
-                  <Plus size={16} strokeWidth={2.6} /> {t("dash.startBuilding")}
-                  <ArrowRight size={15} strokeWidth={2.4} style={{ marginLeft: 2 }} />
+                  {t("dash.startBuilding")}
+                  <ArrowRight size={15} strokeWidth={2.4} />
                 </Link>
 
                 {/* Secondary — templates */}
