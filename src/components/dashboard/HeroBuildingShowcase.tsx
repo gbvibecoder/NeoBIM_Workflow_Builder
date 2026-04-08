@@ -403,6 +403,7 @@ export function HeroBuildingShowcase() {
       orbit.autoRotate = true;
       orbit.autoRotateSpeed = 0.28;
       orbit.enablePan = false;
+      orbit.enableZoom = false; // let wheel/touchpad scroll the page instead of zooming
       orbitRef.current = orbit;
 
       const fp = new PointerLockControls(camera, renderer.domElement);
@@ -568,14 +569,48 @@ export function HeroBuildingShowcase() {
           ? [sectionPlaneRef.current]
           : [];
 
-        // X-ray toggle (only on change)
+        // X-ray toggle (only on change) — translucent ghost, not wireframe
         if (xrayRef.current !== lastXrayState.current) {
           lastXrayState.current = xrayRef.current;
+          const on = xrayRef.current;
           buildingGroup?.traverse((child) => {
-            if (child instanceof THREE.Mesh && child.material) {
-              const mat = child.material as THREE.Material & { wireframe?: boolean };
-              if ("wireframe" in mat) mat.wireframe = xrayRef.current;
-            }
+            if (!(child instanceof THREE.Mesh) || !child.material) return;
+            const mats = Array.isArray(child.material) ? child.material : [child.material];
+            mats.forEach((m) => {
+              const mat = m as THREE.Material & {
+                transparent?: boolean; opacity?: number; depthWrite?: boolean;
+                emissive?: THREE.Color; emissiveIntensity?: number;
+              };
+              const ud = (mat.userData ||= {});
+              if (on) {
+                if (!ud.__xraySaved) {
+                  ud.__xraySaved = {
+                    transparent: mat.transparent,
+                    opacity: mat.opacity,
+                    depthWrite: mat.depthWrite,
+                    emissive: mat.emissive ? mat.emissive.clone() : null,
+                    emissiveIntensity: mat.emissiveIntensity,
+                  };
+                }
+                mat.transparent = true;
+                mat.opacity = 0.18;
+                mat.depthWrite = false;
+                if (mat.emissive) {
+                  mat.emissive.setRGB(0.05, 0.5, 0.65);
+                  mat.emissiveIntensity = 0.45;
+                }
+                mat.needsUpdate = true;
+              } else if (ud.__xraySaved) {
+                const s = ud.__xraySaved;
+                mat.transparent = s.transparent;
+                mat.opacity = s.opacity;
+                mat.depthWrite = s.depthWrite;
+                if (mat.emissive && s.emissive) mat.emissive.copy(s.emissive);
+                if (typeof s.emissiveIntensity === "number") mat.emissiveIntensity = s.emissiveIntensity;
+                delete ud.__xraySaved;
+                mat.needsUpdate = true;
+              }
+            });
           });
         }
 

@@ -117,7 +117,7 @@ export function BOQVisualizerPage({ data, executionId }: BOQVisualizerPageProps)
 
   return (
     <div
-      className="flex-1 overflow-y-auto"
+      className="h-full overflow-y-auto"
       style={{ background: "#070809" }}
     >
       {/* Header */}

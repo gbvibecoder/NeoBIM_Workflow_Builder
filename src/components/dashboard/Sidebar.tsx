@@ -20,7 +20,6 @@ import {
   Menu,
   X,
   Crown,
-  FlaskConical,
   MessageSquareHeart,
   FileBox,
   PenTool,
@@ -52,9 +51,6 @@ export function Sidebar() {
     { href: "/dashboard/feedback",  label: t("nav.feedback"),  icon: MessageSquareHeart, badge: "New" },
     { href: "/dashboard/billing",   label: t("nav.billing"),   icon: CreditCard },
     { href: "/dashboard/settings",  label: t("nav.settings"),  icon: Settings },
-    ...(process.env.NODE_ENV === "development"
-      ? [{ href: "/dashboard/test-results", label: "Test Suite", icon: FlaskConical }]
-      : []),
   ];
 
   const [collapsed, setCollapsed] = useState(true);
