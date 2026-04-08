@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Play, Square, Save, Undo2, Redo2, ZoomIn, ZoomOut, Maximize2,
@@ -205,14 +206,25 @@ export function CanvasToolbar({
   const canSave = isDirty || isUntitled;
   const saveDisabled = (!canSave && !savedFlash) || isSaving;
 
-  return (
-    <>
-      {/* Desktop toolbar - floating pill at top */}
+  // Portal target — when present (canvas page in dashboard layout), the desktop
+  // toolbar renders inside the dashboard Header instead of floating over the canvas.
+  const [headerSlot, setHeaderSlot] = useState<HTMLElement | null>(null);
+  useEffect(() => {
+    const find = () => setHeaderSlot(document.getElementById("canvas-toolbar-slot"));
+    find();
+    // Slot belongs to a sibling component; re-check on next tick in case it mounts later.
+    const t = setTimeout(find, 0);
+    return () => clearTimeout(t);
+  }, []);
+  const inHeader = !!headerSlot;
+
+  const desktopBar = (
       <div
         className="hidden md:flex"
         style={{
-          position: "absolute", top: 12, left: "50%", transform: "translateX(-50%)",
-          zIndex: 1000,
+          ...(inHeader
+            ? { position: "relative" as const }
+            : { position: "absolute" as const, top: 12, left: "50%", transform: "translateX(-50%)", zIndex: 1000 }),
           height: 44,
           alignItems: "center",
           padding: "0 6px",
@@ -702,6 +714,11 @@ export function CanvasToolbar({
           )}
         </div>
       </div>
+  );
+
+  return (
+    <>
+      {inHeader && headerSlot ? createPortal(desktopBar, headerSlot) : desktopBar}
 
       {/* Mobile sticky bottom bar */}
       <motion.div
