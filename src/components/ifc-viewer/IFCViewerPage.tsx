@@ -254,6 +254,10 @@ export default function IFCViewerPage() {
         height: "100%",
         background: UI.bg.base,
         position: "relative",
+        borderRadius: 8,
+        overflow: "hidden",
+        border: "1px solid rgba(255,255,255,0.06)",
+        boxShadow: "0 10px 40px rgba(0,0,0,0.35)",
       }}
     >
       <input
@@ -264,19 +268,21 @@ export default function IFCViewerPage() {
         onChange={handleFileInput}
       />
 
-      {/* Toolbar */}
-      <Toolbar
-        viewportRef={viewportRef}
-        modelInfo={modelInfo}
-        onOpenFile={handleOpenFile}
-        onUnload={handleUnload}
-        bottomPanelOpen={bottomPanelOpen}
-        onToggleBottomPanel={() => setBottomPanelOpen((p) => !p)}
-        showShortcuts={showShortcuts}
-        onToggleShortcuts={() => setShowShortcuts((p) => !p)}
-        measureUnit={measureUnit}
-        onToggleUnit={handleToggleUnit}
-      />
+      {/* Toolbar — only show once a model is loaded; the empty state has its own Browse Files CTA */}
+      {hasModel && (
+        <Toolbar
+          viewportRef={viewportRef}
+          modelInfo={modelInfo}
+          onOpenFile={handleOpenFile}
+          onUnload={handleUnload}
+          bottomPanelOpen={bottomPanelOpen}
+          onToggleBottomPanel={() => setBottomPanelOpen((p) => !p)}
+          showShortcuts={showShortcuts}
+          onToggleShortcuts={() => setShowShortcuts((p) => !p)}
+          measureUnit={measureUnit}
+          onToggleUnit={handleToggleUnit}
+        />
+      )}
 
       {/* Integration banner — full-width bar between toolbar and viewport */}
       {hasModel && <IntegrationBanner visible={hasModel} />}

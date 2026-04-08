@@ -82,12 +82,22 @@ function FloorPlanPageInner() {
   }, [searchParams]);
 
   return (
-    <FloorPlanViewer
-      initialProject={initialProject}
-      initialGeometry={initialGeometry}
-      initialPrompt={initialPrompt}
-      initialProjectId={initialProjectId}
-    />
+    <div
+      style={{
+        height: "100%",
+        borderRadius: 8,
+        overflow: "hidden",
+        border: "1px solid rgba(255,255,255,0.06)",
+        boxShadow: "0 10px 40px rgba(0,0,0,0.35)",
+      }}
+    >
+      <FloorPlanViewer
+        initialProject={initialProject}
+        initialGeometry={initialGeometry}
+        initialPrompt={initialPrompt}
+        initialProjectId={initialProjectId}
+      />
+    </div>
   );
 }
 
