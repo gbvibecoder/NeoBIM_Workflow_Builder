@@ -11,9 +11,9 @@ import type { HandleType } from "@/features/floor-plan/lib/hit-detection";
 import { GridRenderer } from "@/components/floor-plan/renderers/GridRenderer";
 import { WallRenderer } from "@/components/floor-plan/renderers/WallRenderer";
 import { RoomRenderer } from "@/components/floor-plan/renderers/RoomRenderer";
-import { DoorRenderer } from "@/components/floor-plan/renderers/DoorRenderer";
+import { DoorRenderer } from "@/features/floor-plan/components/renderers/DoorRenderer";
 import { WindowRenderer } from "@/components/floor-plan/renderers/WindowRenderer";
-import { DimensionRenderer } from "@/components/floor-plan/renderers/DimensionRenderer";
+import { DimensionRenderer } from "@/features/floor-plan/components/renderers/DimensionRenderer";
 import { MeasurementOverlay } from "@/components/floor-plan/renderers/MeasurementOverlay";
 import { ScaleBarRenderer } from "@/components/floor-plan/renderers/ScaleBarRenderer";
 import { NorthArrowRenderer } from "@/components/floor-plan/renderers/NorthArrowRenderer";
@@ -21,11 +21,11 @@ import { SelectionRenderer } from "@/components/floor-plan/renderers/SelectionRe
 import { InteractionOverlay } from "@/components/floor-plan/renderers/InteractionOverlay";
 import { FurnitureRenderer } from "@/components/floor-plan/renderers/FurnitureRenderer";
 import { StairRenderer } from "@/components/floor-plan/renderers/StairRenderer";
-import { ColumnRenderer } from "@/components/floor-plan/renderers/ColumnRenderer";
+import { ColumnRenderer } from "@/features/floor-plan/components/renderers/ColumnRenderer";
 import { VastuOverlayRenderer } from "@/components/floor-plan/renderers/VastuOverlayRenderer";
-import { AnnotationRenderer } from "@/components/floor-plan/renderers/AnnotationRenderer";
+import { AnnotationRenderer } from "@/features/floor-plan/components/renderers/AnnotationRenderer";
 import { LightOverlayRenderer } from "@/components/floor-plan/renderers/LightOverlayRenderer";
-import { CodeOverlayRenderer } from "@/components/floor-plan/renderers/CodeOverlayRenderer";
+import { CodeOverlayRenderer } from "@/features/floor-plan/components/renderers/CodeOverlayRenderer";
 import { exportStageToPng } from "@/features/floor-plan/lib/export-png";
 import type { PngExportOptions } from "@/features/floor-plan/lib/export-png";
 
