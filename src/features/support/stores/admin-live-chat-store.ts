@@ -10,6 +10,19 @@ import type {
   PusherStatusEvent,
 } from "@/features/support/types/live-chat";
 
+// Polling fallback for the admin inbox — same WhatsApp-style safety net as
+// the user side. Guarantees the admin sees new conversations + new messages
+// within ~5s even if Pusher is unavailable.
+const ADMIN_POLL_INTERVAL_MS = 5000;
+let _adminPollTimerId: ReturnType<typeof setInterval> | null = null;
+
+function _stopAdminPollTimer() {
+  if (_adminPollTimerId) {
+    clearInterval(_adminPollTimerId);
+    _adminPollTimerId = null;
+  }
+}
+
 interface AdminLiveChatState {
   conversations: AdminLiveChatConversation[];
   selectedConversationId: string | null;
@@ -24,6 +37,9 @@ interface AdminLiveChatState {
   selectConversation: (id: string) => Promise<void>;
   sendReply: (conversationId: string, content: string) => Promise<void>;
   closeConversation: (id: string) => Promise<void>;
+  refreshSelectedMessages: () => Promise<void>;
+  startPolling: () => void;
+  stopPolling: () => void;
 
   _receiveNewMessage: (data: PusherNewMessageEvent) => void;
   _receiveReply: (data: PusherReplyEvent) => void;
@@ -196,6 +212,57 @@ export const useAdminLiveChatStore = create<AdminLiveChatState>()((set, get) => 
     } catch (e) {
       console.error("[admin-live-chat] closeConversation failed:", e);
     }
+  },
+
+  // ── Safety-net polling ────────────────────────────────────────────────
+  refreshSelectedMessages: async () => {
+    const { selectedConversationId } = get();
+    if (!selectedConversationId) return;
+    try {
+      const res = await fetch(
+        `/api/live-chat/conversations/${selectedConversationId}/messages`,
+      );
+      if (!res.ok) return;
+      const data = await res.json();
+      const incoming: LiveChatMessage[] = data.messages || [];
+      set((s) => {
+        const existing = s.messages[selectedConversationId] || [];
+        const tempMessages = existing.filter((m) => m.id.startsWith("temp-"));
+        const byId = new Map<string, LiveChatMessage>();
+        for (const m of incoming) byId.set(m.id, m);
+        for (const m of tempMessages) byId.set(m.id, m);
+        const sameLength = byId.size === existing.length;
+        const sameIds = sameLength && existing.every((m) => byId.has(m.id));
+        if (sameIds) return s;
+        const merged = [...byId.values()].sort(
+          (a, b) =>
+            new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+        );
+        return {
+          messages: { ...s.messages, [selectedConversationId]: merged },
+        };
+      });
+    } catch (e) {
+      console.warn("[admin-live-chat] refreshSelectedMessages failed:", e);
+    }
+  },
+
+  startPolling: () => {
+    _stopAdminPollTimer();
+    _adminPollTimerId = setInterval(() => {
+      const state = get();
+      if (state.isSending) return;
+      // Always refresh the conversation list (cheap, captures new convs)
+      state.fetchConversations();
+      // Also refresh the selected thread's messages
+      if (state.selectedConversationId) {
+        state.refreshSelectedMessages();
+      }
+    }, ADMIN_POLL_INTERVAL_MS);
+  },
+
+  stopPolling: () => {
+    _stopAdminPollTimer();
   },
 
   _receiveNewMessage: (data) => {

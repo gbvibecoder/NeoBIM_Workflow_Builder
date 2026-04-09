@@ -100,6 +100,9 @@ export default function LiveChatView() {
   const setInputDraft = useLiveChatStore((s) => s.setInputDraft);
   const openLiveChat = useLiveChatStore((s) => s.openLiveChat);
   const sendMessage = useLiveChatStore((s) => s.sendMessage);
+  const startPolling = useLiveChatStore((s) => s.startPolling);
+  const stopPolling = useLiveChatStore((s) => s.stopPolling);
+  const refreshMessages = useLiveChatStore((s) => s.refreshMessages);
   const pageContext = useSupportStore((s) => s.pageContext);
 
   // Open on mount. Pusher subscription is mounted globally in
@@ -107,6 +110,25 @@ export default function LiveChatView() {
   useEffect(() => {
     if (!isActive) openLiveChat();
   }, [isActive, openLiveChat]);
+
+  // Polling fallback — guarantees messages always arrive within ~4s even if
+  // Pusher is misconfigured, blocked, or the WebSocket dropped silently.
+  // Plus immediate refetch when the tab becomes visible or window regains
+  // focus (browsers throttle background tabs and pause WebSockets).
+  useEffect(() => {
+    startPolling();
+    const onVisible = () => {
+      if (document.visibilityState === "visible") refreshMessages();
+    };
+    const onFocus = () => refreshMessages();
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", onFocus);
+    return () => {
+      stopPolling();
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", onFocus);
+    };
+  }, [startPolling, stopPolling, refreshMessages]);
 
   // Auto-scroll
   const bottomRef = useRef<HTMLDivElement>(null);

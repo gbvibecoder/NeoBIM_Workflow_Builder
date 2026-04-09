@@ -7,6 +7,24 @@ import type {
   PusherReplyEvent,
 } from "@/features/support/types/live-chat";
 
+// ─── Polling fallback (the WhatsApp safety net) ─────────────────────────────
+// Pusher delivers events in <1s when it works. But it can silently fail for
+// many reasons in production: missing env vars, ad-blockers killing the WS,
+// browser tab throttling, corporate firewalls blocking WebSockets, Pusher
+// subscription rejects, etc. To guarantee that messages always arrive within
+// a few seconds — like WhatsApp / Instagram / Telegram — we run a 4s polling
+// fallback while the user is on the live-chat view. The fetch is a cheap
+// no-op when Pusher is healthy (no new ids → merge produces zero new state).
+const POLL_INTERVAL_MS = 4000;
+let _pollTimerId: ReturnType<typeof setInterval> | null = null;
+
+function _stopPollTimer() {
+  if (_pollTimerId) {
+    clearInterval(_pollTimerId);
+    _pollTimerId = null;
+  }
+}
+
 interface LiveChatState {
   isActive: boolean;
   conversationId: string | null;
@@ -24,6 +42,11 @@ interface LiveChatState {
   closeLiveChat: () => void;
   setInputDraft: (v: string) => void;
   sendMessage: (content: string, pageContext: string) => Promise<void>;
+
+  // safety-net polling
+  refreshMessages: () => Promise<void>;
+  startPolling: () => void;
+  stopPolling: () => void;
 
   // pusher handlers (private)
   _receiveAdminReply: (data: PusherReplyEvent) => void;
@@ -81,12 +104,69 @@ export const useLiveChatStore = create<LiveChatState>()((set, get) => ({
   },
 
   closeLiveChat: () => {
+    _stopPollTimer();
     set({
       isActive: false,
       adminTyping: false,
       inputDraft: "",
       error: null,
     });
+  },
+
+  // ── Safety-net polling: refresh + interval control ───────────────────────
+  refreshMessages: async () => {
+    const { conversationId } = get();
+    if (!conversationId) return;
+    try {
+      const res = await fetch(`/api/live-chat/conversations/${conversationId}/messages`);
+      if (!res.ok) return;
+      const data = await res.json();
+      const incoming: LiveChatMessage[] = data.messages || [];
+      const incomingStatus: LiveChatStatus | undefined = data.status;
+      set((s) => {
+        // Preserve any optimistic temp messages that haven't been replaced yet.
+        const tempMessages = s.messages.filter((m) => m.id.startsWith("temp-"));
+        // Server messages + any in-flight temps (they'll get replaced by the
+        // next poll cycle once the server has assigned them real ids).
+        const mergedById = new Map<string, LiveChatMessage>();
+        for (const m of incoming) mergedById.set(m.id, m);
+        for (const m of tempMessages) mergedById.set(m.id, m);
+        // Quick equality check — same length AND every id matches → no diff.
+        const sameLength = mergedById.size === s.messages.length;
+        const sameIds =
+          sameLength && s.messages.every((m) => mergedById.has(m.id));
+        const statusChanged =
+          incomingStatus && incomingStatus !== s.conversationStatus;
+        if (sameIds && !statusChanged) return s;
+        const merged = [...mergedById.values()].sort(
+          (a, b) =>
+            new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+        );
+        const next: Partial<LiveChatState> = { messages: merged };
+        if (statusChanged) next.conversationStatus = incomingStatus;
+        return next;
+      });
+    } catch (e) {
+      // Polling failures are silent — Pusher may still deliver, and the next
+      // tick will retry. Don't surface errors for background fetches.
+      console.warn("[live-chat] refreshMessages failed:", e);
+    }
+  },
+
+  startPolling: () => {
+    _stopPollTimer();
+    _pollTimerId = setInterval(() => {
+      const state = get();
+      if (!state.isActive || !state.conversationId) return;
+      // Skip polling while a send is in flight to avoid clobbering the
+      // optimistic message replacement.
+      if (state.isSending) return;
+      state.refreshMessages();
+    }, POLL_INTERVAL_MS);
+  },
+
+  stopPolling: () => {
+    _stopPollTimer();
   },
 
   setInputDraft: (v) => set({ inputDraft: v }),
