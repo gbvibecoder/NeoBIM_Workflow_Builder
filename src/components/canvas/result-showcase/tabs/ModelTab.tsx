@@ -10,7 +10,7 @@ import type { ShowcaseData, ProceduralModelData, GlbModelData, HtmlIframeModelDa
 import type { FloorPlanGeometry, FloorPlanRoom } from "@/features/floor-plan/types/floor-plan";
 
 const ArchitecturalViewer = dynamic(
-  () => import("@/components/canvas/artifacts/architectural-viewer/ArchitecturalViewer"),
+  () => import("@/features/canvas/components/artifacts/architectural-viewer/ArchitecturalViewer"),
   { ssr: false }
 );
 

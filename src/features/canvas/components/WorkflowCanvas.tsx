@@ -26,7 +26,7 @@ import {
 
 import dynamic from "next/dynamic";
 import { BaseNode } from "@/components/canvas/nodes/BaseNode";
-import { AnimatedEdge } from "@/components/canvas/edges/AnimatedEdge";
+import { AnimatedEdge } from "@/features/canvas/components/edges/AnimatedEdge";
 import { RightNodePanel } from "@/components/canvas/panels/RightNodePanel";
 import { CanvasToolbar } from "@/components/canvas/toolbar/CanvasToolbar";
 
@@ -47,7 +47,7 @@ const ContextMenu = dynamic(
 
 // Architectural 3D walkthrough viewer — client-only
 const ArchitecturalViewer = dynamic(
-  () => import("@/components/canvas/artifacts/architectural-viewer/ArchitecturalViewer"),
+  () => import("@/features/canvas/components/artifacts/architectural-viewer/ArchitecturalViewer"),
   { ssr: false }
 );
 
@@ -57,8 +57,8 @@ import { FullscreenVideoPlayer } from "@/features/canvas/components/artifacts/Fu
 import { useWorkflowStore, isUntitledWorkflow } from "@/stores/workflow-store";
 import { PREBUILT_WORKFLOWS } from "@/constants/prebuilt-workflows";
 import type { WorkflowTemplate } from "@/types/workflow";
-import { SaveWorkflowModal } from "@/components/canvas/modals/SaveWorkflowModal";
-import { ExecutionBlockModal } from "@/components/canvas/modals/ExecutionBlockModal";
+import { SaveWorkflowModal } from "@/features/canvas/components/modals/SaveWorkflowModal";
+import { ExecutionBlockModal } from "@/features/canvas/components/modals/ExecutionBlockModal";
 import { useExecutionStore } from "@/stores/execution-store";
 import { useUIStore } from "@/stores/ui-store";
 import { NODE_CATALOGUE_MAP, CATEGORY_CONFIG } from "@/constants/node-catalogue";
