@@ -4,7 +4,7 @@ import { useRef, useEffect, useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowDown } from "lucide-react";
 import type { SupportMessage } from "@/types/support";
-import { MessageBubble } from "@/components/support/MessageBubble";
+import { MessageBubble } from "@/features/support/components/MessageBubble";
 import { TypingIndicator } from "@/components/support/TypingIndicator";
 
 interface MessageThreadProps {

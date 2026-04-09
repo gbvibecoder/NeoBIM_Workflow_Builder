@@ -5,11 +5,11 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useSupportStore } from "@/stores/support-store";
 import { ChatHeader } from "@/features/support/components/ChatHeader";
 import ConversationListView from "@/features/support/components/ConversationListView";
-import { MessageThread } from "@/components/support/MessageThread";
+import { MessageThread } from "@/features/support/components/MessageThread";
 import { ChatInput } from "@/features/support/components/ChatInput";
-import { SuggestedReplies } from "@/components/support/SuggestedReplies";
-import EscalationBanner from "@/components/support/EscalationBanner";
-import SatisfactionRating from "@/components/support/SatisfactionRating";
+import { SuggestedReplies } from "@/features/support/components/SuggestedReplies";
+import EscalationBanner from "@/features/support/components/EscalationBanner";
+import SatisfactionRating from "@/features/support/components/SatisfactionRating";
 import WelcomeScreen from "@/components/support/WelcomeScreen";
 import type { SupportMessage } from "@/types/support";
 
