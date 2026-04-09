@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useRef, useMemo } from "react";
 import { useLocale } from "@/hooks/useLocale";
-import type { FloorPlanGeometry, FloorPlanRoom, FloorPlanRoomType } from "@/types/floor-plan";
+import type { FloorPlanGeometry, FloorPlanRoom, FloorPlanRoomType } from "@/features/floor-plan/types/floor-plan";
 
 // ─── Constants ─────────────────────────────────────────────────────────────
 

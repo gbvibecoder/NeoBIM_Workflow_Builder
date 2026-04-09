@@ -21,7 +21,7 @@ import {
 import type { EnhancedRoomProgram } from "@/features/floor-plan/lib/ai-room-programmer";
 import { convertGeometryToProject, convertMultiFloorToProject } from "@/features/floor-plan/lib/pipeline-adapter";
 import { layoutMultiFloor, scoreAdjacency } from "@/features/floor-plan/lib/layout-engine";
-import type { FloorPlanGeometry } from "@/types/floor-plan";
+import type { FloorPlanGeometry } from "@/features/floor-plan/types/floor-plan";
 import type { FloorPlanProject } from "@/types/floor-plan-cad";
 
 // ── Generation Feedback ────────────────────────────────────────────────────

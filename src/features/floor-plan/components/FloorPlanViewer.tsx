@@ -26,7 +26,7 @@ import { worldToScreen, screenToWorld } from "@/features/floor-plan/lib/geometry
 
 interface FloorPlanViewerProps {
   /** Pre-loaded geometry from pipeline (e.g. navigated from result showcase) */
-  initialGeometry?: import("@/types/floor-plan").FloorPlanGeometry;
+  initialGeometry?: import("@/features/floor-plan/types/floor-plan").FloorPlanGeometry;
   initialPrompt?: string;
   initialProjectId?: string;
   /** Pre-loaded FloorPlanProject from workflow node (GN-012) */

@@ -78,13 +78,13 @@ export interface HtmlIframeModelData {
   label: string;
   roomCount?: number;
   wallCount?: number;
-  geometry?: import("@/types/floor-plan").FloorPlanGeometry;
+  geometry?: import("@/features/floor-plan/types/floor-plan").FloorPlanGeometry;
   aiRenderUrl?: string;
 }
 
 export interface FloorPlanEditorData {
   kind: "floor-plan-editor";
-  geometry: import("@/types/floor-plan").FloorPlanGeometry;
+  geometry: import("@/features/floor-plan/types/floor-plan").FloorPlanGeometry;
   sourceImageUrl: string;
   url: string;
   content: string;
@@ -389,7 +389,7 @@ export function useShowcaseData(): ShowcaseData {
         // Floor Plan Editor mode — geometry + source image available
         model3dData = {
           kind: "floor-plan-editor",
-          geometry: d.floorPlanGeometry as import("@/types/floor-plan").FloorPlanGeometry,
+          geometry: d.floorPlanGeometry as import("@/features/floor-plan/types/floor-plan").FloorPlanGeometry,
           sourceImageUrl: d.sourceImageUrl as string,
           url: (d.downloadUrl as string) ?? "",
           content: (d.html as string) ?? "",
@@ -406,7 +406,7 @@ export function useShowcaseData(): ShowcaseData {
           label: (d.label as string) ?? "Interactive 3D Viewer",
           roomCount: d.roomCount as number | undefined,
           wallCount: d.wallCount as number | undefined,
-          geometry: d.floorPlanGeometry as import("@/types/floor-plan").FloorPlanGeometry | undefined,
+          geometry: d.floorPlanGeometry as import("@/features/floor-plan/types/floor-plan").FloorPlanGeometry | undefined,
           aiRenderUrl: (typeof d.aiRenderUrl === "string" && d.aiRenderUrl.length > 10) ? d.aiRenderUrl : undefined,
         };
       }

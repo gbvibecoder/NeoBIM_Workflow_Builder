@@ -4,7 +4,7 @@
  */
 
 import type { ExecutionArtifact, ArtifactType } from "@/types/execution";
-import type { FloorPlanGeometry, FloorPlanRoom } from "@/types/floor-plan";
+import type { FloorPlanGeometry, FloorPlanRoom } from "@/features/floor-plan/types/floor-plan";
 import { generateId } from "@/lib/utils";
 import { calculateBOQ } from "@/constants/unit-rates";
 import { convertGeometryToProject } from "@/features/floor-plan/lib/pipeline-adapter";

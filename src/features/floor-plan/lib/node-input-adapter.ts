@@ -8,7 +8,7 @@
  *   - Raw FloorPlanGeometry JSON (from any geometry-producing node)
  */
 
-import type { FloorPlanGeometry, FloorPlanRoom } from "@/types/floor-plan";
+import type { FloorPlanGeometry, FloorPlanRoom } from "@/features/floor-plan/types/floor-plan";
 import type { FloorPlanProject, Floor } from "@/types/floor-plan-cad";
 import { convertGeometryToProject } from "@/features/floor-plan/lib/pipeline-adapter";
 

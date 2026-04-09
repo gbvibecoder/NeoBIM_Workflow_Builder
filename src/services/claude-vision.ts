@@ -9,7 +9,7 @@
  */
 
 import Anthropic from "@anthropic-ai/sdk";
-import type { FloorPlanRoomType } from "@/types/floor-plan";
+import type { FloorPlanRoomType } from "@/features/floor-plan/types/floor-plan";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 

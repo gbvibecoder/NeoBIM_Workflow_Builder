@@ -7,7 +7,7 @@ import dynamic from "next/dynamic";
 import { useLocale } from "@/hooks/useLocale";
 import { COLORS } from "../constants";
 import type { ShowcaseData, ProceduralModelData, GlbModelData, HtmlIframeModelData, FloorPlanInteractiveData } from "../useShowcaseData";
-import type { FloorPlanGeometry, FloorPlanRoom } from "@/types/floor-plan";
+import type { FloorPlanGeometry, FloorPlanRoom } from "@/features/floor-plan/types/floor-plan";
 
 const ArchitecturalViewer = dynamic(
   () => import("../../artifacts/architectural-viewer/ArchitecturalViewer"),

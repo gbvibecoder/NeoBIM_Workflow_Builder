@@ -1,6 +1,6 @@
 import OpenAI from "openai";
 import { detectOpenAIError, APIError } from "@/lib/user-errors";
-import type { FloorPlanRoomType } from "@/types/floor-plan";
+import type { FloorPlanRoomType } from "@/features/floor-plan/types/floor-plan";
 
 export function getClient(userApiKey?: string, timeout?: number): OpenAI {
   const key = userApiKey || process.env.OPENAI_API_KEY;

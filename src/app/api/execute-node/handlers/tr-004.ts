@@ -293,7 +293,7 @@ export const handleTR004: NodeHandler = async (ctx) => {
             return {
               ...room,
               name: label?.name ?? room.name,
-              type: (label?.type ?? room.type) as import("@/types/floor-plan").FloorPlanRoomType,
+              type: (label?.type ?? room.type) as import("@/features/floor-plan/types/floor-plan").FloorPlanRoomType,
               width: label?.refinedWidth ?? room.width,
               depth: label?.refinedDepth ?? room.depth,
             };

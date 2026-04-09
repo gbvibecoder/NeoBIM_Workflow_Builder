@@ -12,7 +12,7 @@
  *  Bug 4 — Correct hinge point calculation from wall geometry
  */
 
-import type { FloorPlanGeometry } from "@/types/floor-plan";
+import type { FloorPlanGeometry } from "@/features/floor-plan/types/floor-plan";
 import { logger } from "@/lib/logger";
 import type {
   FloorPlanProject,

@@ -288,7 +288,7 @@ export const handleGN011: NodeHandler = async (ctx) => {
     center: [rm.x + rm.width / 2, rm.y + rm.depth / 2] as [number, number],
     width: rm.width,
     depth: rm.depth,
-    type: rm.type as import("@/types/floor-plan").FloorPlanRoomType,
+    type: rm.type as import("@/features/floor-plan/types/floor-plan").FloorPlanRoomType,
     x: rm.x,
     y: rm.y,
     adjacentRooms: rm.adjacentRooms,
@@ -312,7 +312,7 @@ export const handleGN011: NodeHandler = async (ctx) => {
   const buildingShape = rawGeometry?.buildingShape as string | undefined;
   const buildingOutline = rawGeometry?.buildingOutline as [number, number][] | undefined;
 
-  const fpGeometry: import("@/types/floor-plan").FloorPlanGeometry = {
+  const fpGeometry: import("@/features/floor-plan/types/floor-plan").FloorPlanGeometry = {
     footprint: { width: finalW, depth: finalD },
     wallHeight: 2.8,
     walls: fpWalls,

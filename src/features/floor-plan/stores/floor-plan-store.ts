@@ -22,7 +22,7 @@ import { floorBounds, zoomToFit, distance, wallLength, type Viewport } from "@/f
 import type { SnapResult } from "@/features/floor-plan/lib/snap-engine";
 import type { HandleType } from "@/features/floor-plan/lib/hit-detection";
 import { findConnectedWalls } from "@/features/floor-plan/lib/hit-detection";
-import type { FloorPlanGeometry } from "@/types/floor-plan";
+import type { FloorPlanGeometry } from "@/features/floor-plan/types/floor-plan";
 import { convertGeometryToProject } from "@/features/floor-plan/lib/pipeline-adapter";
 import { saveProject, loadProject } from "@/features/floor-plan/lib/project-persistence";
 import { createSample2BHK } from "@/features/floor-plan/lib/sample-data";

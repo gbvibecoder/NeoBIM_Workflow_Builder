@@ -5,7 +5,7 @@
  * Rooms tile perfectly within the footprint (zero gaps, zero overlaps).
  */
 
-import type { FloorPlanGeometry } from "@/types/floor-plan";
+import type { FloorPlanGeometry } from "@/features/floor-plan/types/floor-plan";
 import { convertGeometryToProject } from "@/features/floor-plan/lib/pipeline-adapter";
 import type { FloorPlanProject } from "@/types/floor-plan-cad";
 

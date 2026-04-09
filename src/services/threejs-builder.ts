@@ -13,7 +13,7 @@
  * post-processing (bloom, color grading, FXAA, vignette).
  */
 
-import type { FloorPlanGeometry } from "@/types/floor-plan";
+import type { FloorPlanGeometry } from "@/features/floor-plan/types/floor-plan";
 
 export function buildFloorPlan3D(data: FloorPlanGeometry, sourceImage?: string, modelBase?: string): string {
   const jsonData = JSON.stringify(data);

@@ -82,7 +82,7 @@ export function ResultShowcase({ onClose }: ResultShowcaseProps) {
     // Build inputData from current execution artifacts.
     // Priority for source image: aiRenderUrl (DALL-E render) > heroImageUrl > sourceImageUrl.
     let imageUrl: string | null = null;
-    let geometry: import("@/types/floor-plan").FloorPlanGeometry | null = null;
+    let geometry: import("@/features/floor-plan/types/floor-plan").FloorPlanGeometry | null = null;
     let isFloorPlanModel = false;
 
     if (data.model3dData.kind === "floor-plan-editor") {

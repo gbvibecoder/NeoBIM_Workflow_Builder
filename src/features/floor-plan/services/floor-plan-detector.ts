@@ -14,7 +14,7 @@ import type {
   FloorPlanDoor,
   FloorPlanRoom,
   FloorPlanRoomType,
-} from "@/types/floor-plan";
+} from "@/features/floor-plan/types/floor-plan";
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 

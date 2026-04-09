@@ -108,7 +108,7 @@ export const handleGN012: NodeHandler = async (ctx) => {
             bD = Math.round((fpArea / bW) * 10) / 10;
           }
 
-          const geometry: import("@/types/floor-plan").FloorPlanGeometry = {
+          const geometry: import("@/features/floor-plan/types/floor-plan").FloorPlanGeometry = {
             footprint: { width: bW, depth: bD },
             wallHeight: 3.0,
             walls: [], doors: [], windows: [],
