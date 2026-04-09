@@ -3,7 +3,7 @@
 import React, { useState, useMemo } from "react";
 import { Package, ChevronRight, Search, X, GripVertical } from "lucide-react";
 import * as LucideIcons from "lucide-react";
-import { NODE_CATALOGUE, CATEGORY_CONFIG, LIVE_NODES } from "@/constants/node-catalogue";
+import { NODE_CATALOGUE, CATEGORY_CONFIG, LIVE_NODES } from "@/features/workflows/constants/node-catalogue";
 import type { NodeCatalogueItem, NodeCategory } from "@/types/nodes";
 import { useUIStore } from "@/stores/ui-store";
 import { useLocale } from "@/hooks/useLocale";

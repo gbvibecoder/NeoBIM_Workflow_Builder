@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import { useExecutionStore } from "@/features/execution/stores/execution-store";
-import { useWorkflowStore } from "@/stores/workflow-store";
+import { useWorkflowStore } from "@/features/workflows/stores/workflow-store";
 import type { ExecutionArtifact } from "@/types/execution";
 import type { TabId } from "@/features/execution/components/result-showcase/constants";
 

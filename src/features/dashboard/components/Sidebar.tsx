@@ -23,7 +23,7 @@ import {
   PenTool,
   Video,
 } from "lucide-react";
-import { PREBUILT_WORKFLOWS } from "@/constants/prebuilt-workflows";
+import { PREBUILT_WORKFLOWS } from "@/features/workflows/constants/prebuilt-workflows";
 import { useLocale } from "@/hooks/useLocale";
 
 // ─── Sidebar ─────────────────────────────────────────────────────────────────

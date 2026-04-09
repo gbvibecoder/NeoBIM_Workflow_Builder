@@ -10,8 +10,8 @@ import {
   Sparkles, Palette, Building2, FileSpreadsheet, X, ChevronRight,
   Layers, Trophy, Crown,
 } from "lucide-react";
-import { PREBUILT_WORKFLOWS } from "@/constants/prebuilt-workflows";
-import { useWorkflowStore } from "@/stores/workflow-store";
+import { PREBUILT_WORKFLOWS } from "@/features/workflows/constants/prebuilt-workflows";
+import { useWorkflowStore } from "@/features/workflows/stores/workflow-store";
 import { useLocale } from "@/hooks/useLocale";
 import { toast } from "sonner";
 import type { TranslationKey } from "@/lib/i18n";

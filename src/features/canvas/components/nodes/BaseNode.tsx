@@ -16,7 +16,7 @@ import type { ExecutionArtifact } from "@/types/execution";
 const INPUT_NODE_IDS = new Set(["IN-001","IN-002","IN-003","IN-004","IN-005","IN-006","IN-007","IN-008"]);
 
 import { CATEGORY_COLORS, hexToRgb } from "@/lib/ui-constants";
-import { LIVE_NODES } from "@/constants/node-catalogue";
+import { LIVE_NODES } from "@/features/workflows/constants/node-catalogue";
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 

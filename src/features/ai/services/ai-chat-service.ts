@@ -4,7 +4,7 @@
  * which returns natural language + structured JSON actions.
  */
 
-import { NODE_CATALOGUE } from "@/constants/node-catalogue";
+import { NODE_CATALOGUE } from "@/features/workflows/constants/node-catalogue";
 import type { NodeCatalogueItem } from "@/types/nodes";
 
 // ─── Types ───────────────────────────────────────────────────────────────────

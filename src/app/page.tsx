@@ -10,8 +10,8 @@ import {
   ChevronUp, ChevronDown, ClipboardList, Send, Copy, Building2, Star,
   Film, Eye, Heart, Upload, Menu, X,
 } from "lucide-react";
-import { MiniWorkflowDiagram } from "@/components/shared/MiniWorkflowDiagram";
-import { PREBUILT_WORKFLOWS } from "@/constants/prebuilt-workflows";
+import { MiniWorkflowDiagram } from "@/features/workflows/components/MiniWorkflowDiagram";
+import { PREBUILT_WORKFLOWS } from "@/features/workflows/constants/prebuilt-workflows";
 import { useLocale } from '@/hooks/useLocale';
 import type { TranslationKey } from '@/lib/i18n';
 import { trackLead, trackViewContent } from '@/lib/meta-pixel';

@@ -8,7 +8,7 @@
 
 import React, { useRef, useCallback, useMemo, useState, useEffect, memo } from "react";
 import { toast } from "sonner";
-import { useWorkflowStore } from "@/stores/workflow-store";
+import { useWorkflowStore } from "@/features/workflows/stores/workflow-store";
 import { useLocale } from "@/hooks/useLocale";
 import type { WorkflowNodeData } from "@/types/nodes";
 import { formatBytes } from "@/lib/utils";

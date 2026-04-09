@@ -4,9 +4,9 @@ import React, { useState, useMemo, useEffect, useRef, lazy, Suspense, useCallbac
 import { motion, AnimatePresence } from "framer-motion";
 import dynamic from "next/dynamic";
 import { ChevronDown, Building2, Ruler, Compass, HardHat, Layers, PenTool, Triangle, Lock, ArrowRight, MessageSquare, Sparkles, Zap } from "lucide-react";
-import { PREBUILT_WORKFLOWS } from "@/constants/prebuilt-workflows";
+import { PREBUILT_WORKFLOWS } from "@/features/workflows/constants/prebuilt-workflows";
 import { toast } from "sonner";
-import { useWorkflowStore } from "@/stores/workflow-store";
+import { useWorkflowStore } from "@/features/workflows/stores/workflow-store";
 import { useRouter } from "next/navigation";
 import type { WorkflowTemplate } from "@/types/workflow";
 import { useLocale } from "@/hooks/useLocale";

@@ -1,5 +1,5 @@
 import { MetadataRoute } from 'next';
-import { PREBUILT_WORKFLOWS } from '@/constants/prebuilt-workflows';
+import { PREBUILT_WORKFLOWS } from '@/features/workflows/constants/prebuilt-workflows';
 
 const siteUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://trybuildflow.in';
 

@@ -3,9 +3,9 @@
 import React, { useState, useRef, useCallback } from "react";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { Sparkles, X, Loader2 } from "lucide-react";
-import { useWorkflowStore } from "@/stores/workflow-store";
+import { useWorkflowStore } from "@/features/workflows/stores/workflow-store";
 import { useUIStore } from "@/stores/ui-store";
-import { PREBUILT_WORKFLOWS } from "@/constants/prebuilt-workflows";
+import { PREBUILT_WORKFLOWS } from "@/features/workflows/constants/prebuilt-workflows";
 import { generateId } from "@/lib/utils";
 import { toast } from "sonner";
 import type { WorkflowTemplate } from "@/types/workflow";

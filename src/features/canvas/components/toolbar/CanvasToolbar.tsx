@@ -9,7 +9,7 @@ import {
   Loader2, CheckCircle2, Pencil,
 } from "lucide-react";
 import type { CreationMode } from "@/types/workflow";
-import { useWorkflowStore, isUntitledWorkflow } from "@/stores/workflow-store";
+import { useWorkflowStore, isUntitledWorkflow } from "@/features/workflows/stores/workflow-store";
 import { useLocale } from "@/hooks/useLocale";
 import {
   shareWorkflowToTwitter,

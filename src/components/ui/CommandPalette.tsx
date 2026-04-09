@@ -9,9 +9,9 @@ import {
 } from "lucide-react";
 import type { ComponentType } from "react";
 import * as LucideIcons from "lucide-react";
-import { NODE_CATALOGUE } from "@/constants/node-catalogue";
-import { PREBUILT_WORKFLOWS } from "@/constants/prebuilt-workflows";
-import { useWorkflowStore } from "@/stores/workflow-store";
+import { NODE_CATALOGUE } from "@/features/workflows/constants/node-catalogue";
+import { PREBUILT_WORKFLOWS } from "@/features/workflows/constants/prebuilt-workflows";
+import { useWorkflowStore } from "@/features/workflows/stores/workflow-store";
 import { useExecution } from "@/features/execution/hooks/useExecution";
 import { useLocale } from "@/hooks/useLocale";
 

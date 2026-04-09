@@ -1,7 +1,7 @@
 "use client";
 
 import { create } from "zustand";
-import { useWorkflowStore } from "@/stores/workflow-store";
+import { useWorkflowStore } from "@/features/workflows/stores/workflow-store";
 import { MAX_REGENERATIONS } from "@/constants/limits";
 import type {
   Execution,

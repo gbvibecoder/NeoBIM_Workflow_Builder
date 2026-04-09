@@ -54,14 +54,14 @@ const ArchitecturalViewer = dynamic(
 // Fullscreen video player — direct import to avoid dynamic() hook instability with React 19
 import { FullscreenVideoPlayer } from "@/features/canvas/components/artifacts/FullscreenVideoPlayer";
 
-import { useWorkflowStore, isUntitledWorkflow } from "@/stores/workflow-store";
-import { PREBUILT_WORKFLOWS } from "@/constants/prebuilt-workflows";
+import { useWorkflowStore, isUntitledWorkflow } from "@/features/workflows/stores/workflow-store";
+import { PREBUILT_WORKFLOWS } from "@/features/workflows/constants/prebuilt-workflows";
 import type { WorkflowTemplate } from "@/types/workflow";
 import { SaveWorkflowModal } from "@/features/canvas/components/modals/SaveWorkflowModal";
 import { ExecutionBlockModal } from "@/features/canvas/components/modals/ExecutionBlockModal";
 import { useExecutionStore } from "@/features/execution/stores/execution-store";
 import { useUIStore } from "@/stores/ui-store";
-import { NODE_CATALOGUE_MAP, CATEGORY_CONFIG } from "@/constants/node-catalogue";
+import { NODE_CATALOGUE_MAP, CATEGORY_CONFIG } from "@/features/workflows/constants/node-catalogue";
 import type { WorkflowNodeData, NodeCategory } from "@/types/nodes";
 import type { WorkflowNode, WorkflowEdge } from "@/types/nodes";
 import { generateId } from "@/lib/utils";

@@ -3,8 +3,8 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Sparkles, Send, X, MessageSquare, Trash2, Zap } from "lucide-react";
-import { useWorkflowStore } from "@/stores/workflow-store";
-import { NODE_CATALOGUE_MAP } from "@/constants/node-catalogue";
+import { useWorkflowStore } from "@/features/workflows/stores/workflow-store";
+import { NODE_CATALOGUE_MAP } from "@/features/workflows/constants/node-catalogue";
 import type { WorkflowNodeData, NodeCategory } from "@/types/nodes";
 import type { WorkflowNode } from "@/types/nodes";
 import { generateId } from "@/lib/utils";

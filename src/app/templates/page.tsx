@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { PREBUILT_WORKFLOWS } from "@/constants/prebuilt-workflows";
+import { PREBUILT_WORKFLOWS } from "@/features/workflows/constants/prebuilt-workflows";
 
 function slugify(name: string): string {
   return name

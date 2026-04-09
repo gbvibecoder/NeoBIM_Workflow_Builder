@@ -7,7 +7,7 @@ import {
   FileText, Table2, Code2, Layers, CheckCircle, Loader2, ArrowLeft, X,
 } from "lucide-react";
 import { useExecutionStore } from "@/features/execution/stores/execution-store";
-import { useWorkflowStore } from "@/stores/workflow-store";
+import { useWorkflowStore } from "@/features/workflows/stores/workflow-store";
 import { useLocale } from "@/hooks/useLocale";
 import { formatBytes } from "@/lib/utils";
 import { toast } from "sonner";

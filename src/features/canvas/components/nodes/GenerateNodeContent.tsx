@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useCallback, useMemo, memo } from "react";
-import { useWorkflowStore } from "@/stores/workflow-store";
+import { useWorkflowStore } from "@/features/workflows/stores/workflow-store";
 import { useLocale } from "@/hooks/useLocale";
 import type { WorkflowNodeData } from "@/types/nodes";
 
