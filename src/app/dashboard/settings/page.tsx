@@ -1,20 +1,20 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import {
-  User, Key, Shield, Save, Loader2, AlertCircle,
+  User, Key, Shield, Loader2, AlertCircle,
   CheckCircle2, Info, Crown, Star, Lock, Unlock,
   Fingerprint, ScanLine, Cpu, Activity, Camera, Trash2, Pencil,
   Gift, Users, Zap, Copy, Check, Phone, Smartphone, Mail,
 } from "lucide-react";
 import { PageBackground } from "@/components/dashboard/PageBackground";
 import { useLocale } from "@/hooks/useLocale";
-import { useAvatar } from "@/hooks/useAvatar";
+import { useAvatar, primeAvatarCache } from "@/hooks/useAvatar";
 import { normalizePhone } from "@/lib/form-validation";
 
 type SettingsTab = "profile" | "api-keys" | "plan" | "security";
@@ -768,12 +768,10 @@ function PhoneVerificationStatus({
 
 // ---- Profile Section — Identity Card (Editable) ----
 function ProfileSection({
-  user, initials, saveStatus, onSaveStatusChange, onSessionUpdate,
+  user, initials, onSessionUpdate,
 }: {
   user: { name?: string | null; email?: string | null; image?: string | null } | undefined;
   initials: string;
-  saveStatus: "idle" | "saving" | "saved";
-  onSaveStatusChange: (s: "idle" | "saving" | "saved") => void;
   onSessionUpdate: () => Promise<unknown>;
 }) {
   const { t } = useLocale();
@@ -783,7 +781,6 @@ function ProfileSection({
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [isHoveringAvatar, setIsHoveringAvatar] = useState(false);
   const [isEditingName, setIsEditingName] = useState(false);
-  const [isProcessing, setIsProcessing] = useState(false);
   const [profileData, setProfileData] = useState<{
     email: string | null; emailVerified: boolean; phoneNumber: string | null; phoneVerified: boolean; createdAt: string | null; role: string;
   }>({ email: null, emailVerified: false, phoneNumber: null, phoneVerified: false, createdAt: null, role: "FREE" });
@@ -819,9 +816,6 @@ function ProfileSection({
   const displayImage = previewImage ?? loadedImage;
   const hasImageToRemove = !!(previewImage || loadedImage);
 
-  const nameChanged = editName.trim() !== (user?.name ?? "");
-  const hasChanges = nameChanged || previewImage !== null;
-
   function processImage(file: File) {
     if (file.size > 5 * 1024 * 1024) {
       toast.error(t('settings.imageTooLarge'));
@@ -833,7 +827,6 @@ function ProfileSection({
     }
     // Increment generation counter — only the latest selection wins
     const generation = ++processingRef.current;
-    setIsProcessing(true);
     const reader = new FileReader();
     reader.onload = (e) => {
       if (processingRef.current !== generation) return; // stale
@@ -849,19 +842,20 @@ function ProfileSection({
         canvas.height = TARGET;
         const ctx = canvas.getContext("2d")!;
         ctx.drawImage(img, sx, sy, size, size, 0, 0, TARGET, TARGET);
-        setPreviewImage(canvas.toDataURL("image/jpeg", 0.8));
-        setIsProcessing(false);
+        const dataUrl = canvas.toDataURL("image/jpeg", 0.8);
+        setPreviewImage(dataUrl);
+        // Auto-save the new avatar to the backend in the background. No
+        // status indicator, no Save button — the upload is the save.
+        autoSaveAvatar(dataUrl);
       };
       img.onerror = () => {
         if (processingRef.current !== generation) return;
-        setIsProcessing(false);
         toast.error(t('settings.invalidImageType'));
       };
       img.src = e.target?.result as string;
     };
     reader.onerror = () => {
       if (processingRef.current !== generation) return;
-      setIsProcessing(false);
       toast.error(t('settings.profileSaveFailed'));
     };
     reader.readAsDataURL(file);
@@ -875,40 +869,22 @@ function ProfileSection({
   }
 
   async function handleRemoveAvatar() {
-    onSaveStatusChange("saving");
-    try {
-      const res = await fetch("/api/user/profile", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ image: null }),
-      });
-      if (!res.ok) {
-        let msg = t('settings.profileSaveFailed');
-        try { const d = await res.json(); msg = d?.error?.message ?? msg; } catch { /* non-JSON response */ }
-        throw new Error(msg);
-      }
+    const ok = await silentPatch({ image: null });
+    if (ok) {
+      primeAvatarCache(null);
       setPreviewImage(null);
-      await onSessionUpdate();
-      onSaveStatusChange("saved");
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event("avatar:updated"));
+      }
       toast.success(t('settings.profileSaved'));
-      setTimeout(() => onSaveStatusChange("idle"), 2000);
-    } catch (err) {
-      onSaveStatusChange("idle");
-      toast.error(err instanceof Error ? err.message : t('settings.profileSaveFailed'));
     }
   }
 
-  async function handleSave() {
-    onSaveStatusChange("saving");
+  // Silent background patcher — used by avatar auto-save and name auto-save.
+  // Intentionally does NOT touch saveStatus, so the "Encrypting..." indicator
+  // never appears for these auto-saves.
+  async function silentPatch(payload: { name?: string; image?: string | null }) {
     try {
-      const payload: { name?: string; image?: string | null } = {};
-      if (nameChanged) payload.name = editName.trim();
-      if (previewImage) payload.image = previewImage;
-      if (Object.keys(payload).length === 0) {
-        onSaveStatusChange("idle");
-        return;
-      }
-
       const res = await fetch("/api/user/profile", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -916,20 +892,45 @@ function ProfileSection({
       });
       if (!res.ok) {
         let msg = t('settings.profileSaveFailed');
-        try { const d = await res.json(); msg = d?.error?.message ?? msg; } catch { /* non-JSON response */ }
+        try { const d = await res.json(); msg = d?.error?.message ?? msg; } catch { /* non-JSON */ }
         throw new Error(msg);
       }
-
-      setPreviewImage(null);
-      setIsEditingName(false);
       await onSessionUpdate();
-      onSaveStatusChange("saved");
-      toast.success(t('settings.profileSaved'));
-      setTimeout(() => onSaveStatusChange("idle"), 2000);
+      return true;
     } catch (err) {
-      onSaveStatusChange("idle");
       toast.error(err instanceof Error ? err.message : t('settings.profileSaveFailed'));
+      return false;
     }
+  }
+
+  async function autoSaveAvatar(dataUrl: string) {
+    const ok = await silentPatch({ image: dataUrl });
+    if (ok) {
+      // Prime the cross-component avatar cache so the header (and any
+      // remount of this section) renders the new photo synchronously
+      // — no flash to initials, no extra fetch round-trip.
+      primeAvatarCache(dataUrl);
+      // Intentionally keep previewImage set — `displayImage` falls back to it
+      // until the session refetch / useAvatar refresh resolves.
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event("avatar:updated"));
+      }
+      toast.success(t('settings.profileSaved'));
+    } else {
+      setPreviewImage(null);
+    }
+  }
+
+  async function autoSaveName() {
+    const trimmed = editName.trim();
+    setIsEditingName(false);
+    // Nothing to save if unchanged or empty
+    if (!trimmed || trimmed === (user?.name ?? "")) {
+      setEditName(user?.name ?? "");
+      return;
+    }
+    const ok = await silentPatch({ name: trimmed });
+    if (ok) toast.success(t('settings.profileSaved'));
   }
 
   return (
@@ -1013,14 +1014,18 @@ function ProfileSection({
               ) : (
                 initials
               )}
-              {/* Hover overlay */}
-              <div style={{
+              {/* Hover overlay — only shown on real hover-capable devices.
+                  On touch devices iOS keeps `mouseenter` sticky after a tap,
+                  which would otherwise leave this dark mask covering the
+                  freshly-uploaded photo. */}
+              <div className="settings-avatar-hover" style={{
                 position: "absolute", inset: 0,
                 background: "rgba(0,0,0,0.5)",
                 display: "flex", alignItems: "center", justifyContent: "center",
                 opacity: isHoveringAvatar ? 1 : 0,
                 transition: "opacity 0.2s",
                 borderRadius: "50%",
+                pointerEvents: "none",
               }}>
                 <Camera size={20} style={{ color: "#fff" }} />
               </div>
@@ -1036,7 +1041,11 @@ function ProfileSection({
                   type="text"
                   value={editName}
                   onChange={(e) => setEditName(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === "Escape") { setIsEditingName(false); setEditName(user?.name ?? ""); } }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Escape") { setIsEditingName(false); setEditName(user?.name ?? ""); }
+                    if (e.key === "Enter")  { (e.target as HTMLInputElement).blur(); }
+                  }}
+                  onBlur={() => { autoSaveName(); }}
                   maxLength={100}
                   autoFocus
                   style={{
@@ -1122,12 +1131,13 @@ function ProfileSection({
         </div>
 
         {/* Card footer — session info + save */}
-        <div style={{
-          padding: "10px 24px",
+        <div className="settings-identity-footer" style={{
+          padding: "12px 20px",
           borderTop: "1px solid rgba(255,255,255,0.04)",
           display: "flex", alignItems: "center", justifyContent: "space-between",
+          gap: 12, flexWrap: "wrap",
         }}>
-          <div style={{ display: "flex", gap: 24 }}>
+          <div className="settings-identity-meta" style={{ display: "flex", gap: 20, flexWrap: "wrap" }}>
             {[
               { label: t('settings.session'), value: t('settings.encrypted') },
               { label: t('settings.protocol'), value: "OAuth 2.0" },
@@ -1152,34 +1162,6 @@ function ProfileSection({
             ))}
           </div>
 
-          {/* Save button */}
-          {hasChanges && (
-            <motion.button
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              onClick={handleSave}
-              disabled={saveStatus === "saving" || isProcessing}
-              style={{
-                display: "inline-flex", alignItems: "center", gap: 6,
-                padding: "6px 16px", borderRadius: 8,
-                background: "linear-gradient(135deg, #1B4FFF, #4F8AFF)",
-                border: "1px solid rgba(79,138,255,0.3)",
-                color: "#fff", fontSize: 11, fontWeight: 700,
-                cursor: (saveStatus === "saving" || isProcessing) ? "wait" : "pointer",
-                fontFamily: "var(--font-jetbrains), monospace",
-                letterSpacing: "0.05em",
-                opacity: (saveStatus === "saving" || isProcessing) ? 0.7 : 1,
-                transition: "opacity 0.2s",
-              }}
-            >
-              {saveStatus === "saving" ? (
-                <Loader2 size={12} style={{ animation: "spin 1s linear infinite" }} />
-              ) : (
-                <Save size={12} />
-              )}
-              {t('settings.saveProfile')}
-            </motion.button>
-          )}
         </div>
       </div>
 
@@ -1493,36 +1475,73 @@ function ApiKeysSection({ saveStatus, onSaveStatusChange }: {
   const [loadingKeys, setLoadingKeys] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000);
+  // Tracks the latest in-flight load. Older calls (e.g. from a strict-mode
+  // double-mount, an unmount, or a manual retry) become "stale" and any
+  // results / errors they produce are dropped on the floor.
+  const loadIdRef = useRef(0);
 
-    fetch("/api/user/api-keys", { signal: controller.signal })
-      .then(r => {
-        clearTimeout(timeoutId);
+  const loadKeys = useCallback(async () => {
+    const myId = ++loadIdRef.current;
+    setLoadingKeys(true);
+    setLoadError(null);
+
+    const isStale = () => loadIdRef.current !== myId;
+
+    // Two attempts: the first request often hits a cold Neon/serverless start
+    // on mobile and can take 10–20s. Only surface an error if both fail.
+    const attemptFetch = async (timeoutMs: number) => {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+      try {
+        const r = await fetch("/api/user/api-keys", {
+          signal: controller.signal,
+          cache: "no-store",
+        });
         if (!r.ok) throw new Error(`API returned ${r.status}`);
-        return r.json();
-      })
-      .then(({ apiKeys }) => {
-        if (apiKeys?.openai) setOpenAiKey(apiKeys.openai);
-        if (apiKeys?.stability) setStabilityKey(apiKeys.stability);
-        setLoadError(null);
-      })
-      .catch((err) => {
-        const errorMsg = err instanceof Error && err.name === 'AbortError'
-          ? t('toast.requestTimeout')
-          : t('toast.loadKeysFailed');
-        setLoadError(errorMsg);
-        toast.error(errorMsg);
-      })
-      .finally(() => setLoadingKeys(false));
-
-    return () => {
-      clearTimeout(timeoutId);
-      controller.abort();
+        return (await r.json()) as { apiKeys?: { openai?: string; stability?: string } };
+      } finally {
+        clearTimeout(timeoutId);
+      }
     };
+
+    try {
+      let data;
+      try {
+        data = await attemptFetch(25000);
+      } catch (firstErr) {
+        if (isStale()) return;
+        // If the server actively rejected us (auth, validation), retrying
+        // won't help — surface immediately.
+        const isHttpError =
+          firstErr instanceof Error && firstErr.message.startsWith("API returned ");
+        if (isHttpError) throw firstErr;
+        // Silent retry once before showing the user any error
+        data = await attemptFetch(25000);
+      }
+      if (isStale()) return;
+      if (data.apiKeys?.openai) setOpenAiKey(data.apiKeys.openai);
+      if (data.apiKeys?.stability) setStabilityKey(data.apiKeys.stability);
+      setLoadError(null);
+    } catch (err) {
+      if (isStale()) return;
+      const isTimeout = err instanceof Error && err.name === "AbortError";
+      setLoadError(isTimeout ? t("toast.requestTimeout") : t("toast.loadKeysFailed"));
+      // No toast — the inline panel already explains the failure.
+    } finally {
+      if (!isStale()) setLoadingKeys(false);
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    loadKeys();
+    return () => {
+      // Invalidate any in-flight load so its result/error never lands on a
+      // remounted component (fixes the false "Request timed out" flash that
+      // appeared within 1s of opening the tab in strict mode / on remount).
+      loadIdRef.current++;
+    };
+  }, [loadKeys]);
 
   async function handleSaveKeys() {
     if (!openAiKey.trim() && !stabilityKey.trim()) {
@@ -1536,7 +1555,7 @@ function ApiKeysSection({ saveStatus, onSaveStatusChange }: {
       if (stabilityKey.trim()) apiKeys.stability = stabilityKey.trim();
 
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000);
+      const timeoutId = setTimeout(() => controller.abort(), 25000);
 
       const res = await fetch("/api/user/api-keys", {
         method: "PATCH",
@@ -1645,7 +1664,7 @@ function ApiKeysSection({ saveStatus, onSaveStatusChange }: {
                 {t('settings.loadError')}
               </p>
               <button
-                onClick={() => window.location.reload()}
+                onClick={() => loadKeys()}
                 style={{
                   fontSize: 11, color: "#4F8AFF", background: "none",
                   border: "none", cursor: "pointer", padding: 0,
@@ -2236,9 +2255,6 @@ export default function SettingsPage() {
             {t('settings.subtitle')}
           </p>
         </div>
-        <AnimatePresence>
-          <SaveStatus status={saveStatus} />
-        </AnimatePresence>
       </header>
 
       <main className="settings-main-padding" style={{ flex: 1, overflowY: "auto", padding: "28px 32px", position: "relative", zIndex: 1 }}>
@@ -2259,7 +2275,7 @@ export default function SettingsPage() {
               }}
             >
               {/* Panel label */}
-              <div style={{
+              <div className="settings-sidebar-label" style={{
                 padding: "8px 14px 12px",
                 borderBottom: "1px solid rgba(255,255,255,0.04)",
                 marginBottom: 4,
@@ -2273,30 +2289,33 @@ export default function SettingsPage() {
                 </span>
               </div>
 
-              {tabs.map((tab, i) => (
-                <motion.button
-                  key={tab.key}
-                  className="dp-settings-tab"
-                  data-active={activeTab === tab.key ? "true" : "false"}
-                  onClick={() => setActiveTab(tab.key)}
-                  initial={{ opacity: 0, x: -10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: i * 0.1 }}
-                  style={{ flexDirection: "column", alignItems: "flex-start", gap: 2, padding: "12px 14px" }}
-                >
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, width: "100%" }}>
-                    {tab.icon}
-                    <span>{tab.label}</span>
-                  </div>
-                  <span style={{
-                    fontSize: 9, color: "rgba(255,255,255,0.15)",
-                    fontFamily: "var(--font-jetbrains), monospace",
-                    paddingLeft: 24,
-                  }}>
-                    {tab.desc}
-                  </span>
-                </motion.button>
-              ))}
+              <div className="settings-sidebar-tabs" style={{ display: "contents" }}>
+                {tabs.map((tab, i) => (
+                  <motion.button
+                    key={tab.key}
+                    className="dp-settings-tab settings-tab-btn"
+                    data-active={activeTab === tab.key ? "true" : "false"}
+                    data-tab={tab.key}
+                    onClick={() => setActiveTab(tab.key)}
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: i * 0.1 }}
+                    style={{ flexDirection: "column", alignItems: "flex-start", gap: 2, padding: "12px 14px" }}
+                  >
+                    <div className="settings-tab-row" style={{ display: "flex", alignItems: "center", gap: 8, width: "100%" }}>
+                      {tab.icon}
+                      <span className="settings-tab-label">{tab.label}</span>
+                    </div>
+                    <span className="settings-tab-desc" style={{
+                      fontSize: 9, color: "rgba(255,255,255,0.15)",
+                      fontFamily: "var(--font-jetbrains), monospace",
+                      paddingLeft: 24,
+                    }}>
+                      {tab.desc}
+                    </span>
+                  </motion.button>
+                ))}
+              </div>
             </motion.div>
 
             {/* Content Panel */}
@@ -2304,7 +2323,7 @@ export default function SettingsPage() {
               <AnimatePresence mode="wait">
                 {activeTab === "profile" && (
                   <motion.div key="profile" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} transition={{ duration: 0.3 }}>
-                    <ProfileSection user={user} initials={initials} saveStatus={saveStatus} onSaveStatusChange={setSaveStatus} onSessionUpdate={updateSession} />
+                    <ProfileSection user={user} initials={initials} onSessionUpdate={updateSession} />
                     <ReferralDetailsSection />
                   </motion.div>
                 )}

@@ -1542,6 +1542,347 @@
   filter: drop-shadow(0 0 4px rgba(79,138,255,0.4));
 }
 
+/* ── Settings — Mobile responsive polish ──────────────────────── */
+@media (max-width: 768px) {
+  /* Main content padding — tighten breathing room on small screens */
+  .settings-main-padding {
+    padding: 14px 12px 96px !important;
+  }
+
+  /* Header — keep title row tight, allow status to wrap below */
+  .dashboard-header {
+    padding-left: 16px !important;
+    padding-right: 16px !important;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding-top: 10px;
+    padding-bottom: 10px;
+  }
+
+  /* Stack sidebar above content */
+  .settings-layout {
+    flex-direction: column !important;
+    gap: 14px !important;
+  }
+
+  /* Sidebar becomes a 2x2 tab pad — fits Profile / API Keys / Plan & Usage / Security
+     comfortably at any phone width without truncating "Security". */
+  .settings-sidebar {
+    width: 100% !important;
+    position: static !important;
+    padding: 10px !important;
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 8px !important;
+    overflow: visible !important;
+  }
+
+  /* Hide the "CONTROL PANEL" header label on mobile — it's pure decoration
+     and was being mistaken for a tab. */
+  .settings-sidebar-label {
+    display: none !important;
+  }
+
+  .settings-sidebar .settings-tab-btn,
+  .settings-sidebar .dp-settings-tab {
+    --tab-accent: 79, 138, 255;
+    position: relative;
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    text-align: left !important;
+    padding: 12px 12px !important;
+    gap: 10px !important;
+    border-radius: 14px !important;
+    min-height: 64px;
+    width: 100% !important;
+    background:
+      linear-gradient(135deg, rgba(255,255,255,0.025), rgba(255,255,255,0.005)) !important;
+    border: 1px solid rgba(255,255,255,0.07) !important;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.03);
+    overflow: hidden;
+    transition: transform 200ms ease, border-color 200ms ease, background 200ms ease, box-shadow 200ms ease;
+  }
+  .settings-sidebar .settings-tab-btn[data-tab="profile"]   { --tab-accent: 79, 138, 255; }
+  .settings-sidebar .settings-tab-btn[data-tab="api-keys"]  { --tab-accent: 167, 139, 250; }
+  .settings-sidebar .settings-tab-btn[data-tab="plan"]      { --tab-accent: 245, 158, 11; }
+  .settings-sidebar .settings-tab-btn[data-tab="security"]  { --tab-accent: 16, 185, 129; }
+
+  .settings-sidebar .settings-tab-btn::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: radial-gradient(120% 120% at 0% 0%, rgba(var(--tab-accent), 0.10), transparent 55%);
+    opacity: 0;
+    transition: opacity 220ms ease;
+    pointer-events: none;
+  }
+  .settings-sidebar .settings-tab-btn[data-active="true"]::before {
+    opacity: 1;
+  }
+  .settings-sidebar .settings-tab-btn[data-active="true"] {
+    background:
+      linear-gradient(135deg, rgba(var(--tab-accent), 0.14), rgba(var(--tab-accent), 0.04)) !important;
+    border-color: rgba(var(--tab-accent), 0.45) !important;
+    box-shadow:
+      0 10px 28px -14px rgba(var(--tab-accent), 0.55),
+      inset 0 1px 0 rgba(255,255,255,0.06);
+  }
+  .settings-sidebar .settings-tab-btn:active {
+    transform: scale(0.98);
+  }
+
+  .settings-sidebar .settings-tab-row {
+    flex-direction: row !important;
+    gap: 0 !important;
+    justify-content: flex-start !important;
+    align-items: center !important;
+    width: auto !important;
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+  /* Icon — colored chip on the left */
+  .settings-sidebar .settings-tab-row > svg {
+    flex-shrink: 0;
+    box-sizing: border-box;
+    width: 32px !important;
+    height: 32px !important;
+    padding: 7px;
+    border-radius: 9px;
+    background: rgba(var(--tab-accent), 0.10) !important;
+    border: 1px solid rgba(var(--tab-accent), 0.22);
+    color: rgb(var(--tab-accent)) !important;
+    margin-right: 10px;
+    transition: background 200ms ease, border-color 200ms ease, transform 220ms ease;
+  }
+  .settings-sidebar .settings-tab-btn[data-active="true"] .settings-tab-row > svg {
+    background: rgba(var(--tab-accent), 0.18) !important;
+    border-color: rgba(var(--tab-accent), 0.45);
+    transform: scale(1.04);
+    filter: drop-shadow(0 0 8px rgba(var(--tab-accent), 0.45));
+  }
+
+  /* Wrap label + descriptor in a vertical text column to the right of the icon */
+  .settings-sidebar .settings-tab-label {
+    display: block;
+    font-size: 12.5px !important;
+    font-weight: 600 !important;
+    line-height: 1.2;
+    color: rgba(255,255,255,0.92) !important;
+    letter-spacing: -0.01em;
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+    word-break: keep-all;
+  }
+  .settings-sidebar .settings-tab-btn[data-active="true"] .settings-tab-label {
+    color: #ffffff !important;
+  }
+  /* Hide the small descriptor on mobile — it ate horizontal space and was
+     forcing the real label ("Plan & Usage", "Security") to truncate. The
+     primary label is what the user actually needs to read. */
+  .settings-sidebar .settings-tab-desc {
+    display: none !important;
+  }
+
+  /* Identity card — stack avatar above name + actions */
+  .settings-identity-layout {
+    flex-direction: column !important;
+    align-items: center !important;
+    text-align: center !important;
+    gap: 16px !important;
+    padding: 24px 18px !important;
+  }
+  .settings-identity-layout > div:last-child {
+    width: 100%;
+    text-align: center;
+  }
+  .settings-identity-layout > div:last-child > div:first-child {
+    justify-content: center;
+  }
+  .settings-identity-layout > div:last-child > div:nth-child(3) {
+    justify-content: center;
+  }
+
+  /* Footer row — stack meta above a full-width Save button */
+  .settings-identity-footer {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    padding: 14px 18px 16px !important;
+    gap: 12px !important;
+  }
+  .settings-identity-meta {
+    justify-content: center !important;
+    gap: 14px !important;
+    row-gap: 6px !important;
+  }
+  .settings-identity-footer button {
+    width: 100% !important;
+    justify-content: center !important;
+    padding: 12px 16px !important;
+    font-size: 12px !important;
+    border-radius: 10px !important;
+  }
+
+  /* ─────────────────────────────────────────────────────────────
+     Premium polish — elevation, gradients, typography rhythm
+     ───────────────────────────────────────────────────────────── */
+
+  /* Glass cards — layered shadow + soft inner highlight + tint */
+  .settings-main-padding .dp-glass-card {
+    border-radius: 18px !important;
+    background:
+      linear-gradient(180deg, rgba(255,255,255,0.025), rgba(255,255,255,0.005) 40%, rgba(0,0,0,0.10)) !important;
+    border: 1px solid rgba(255,255,255,0.07) !important;
+    box-shadow:
+      0 1px 0 rgba(255,255,255,0.04) inset,
+      0 24px 60px -28px rgba(0,0,0,0.65),
+      0 8px 24px -12px rgba(0,0,0,0.5) !important;
+    backdrop-filter: blur(14px) saturate(140%);
+    -webkit-backdrop-filter: blur(14px) saturate(140%);
+  }
+
+  /* Top accent shine on each card */
+  .settings-main-padding .dp-glass-card {
+    position: relative;
+  }
+  .settings-main-padding .dp-glass-card::before {
+    content: "";
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 1px;
+    background: linear-gradient(90deg,
+      transparent 0%,
+      rgba(255,255,255,0.18) 30%,
+      rgba(255,255,255,0.18) 70%,
+      transparent 100%);
+    border-radius: 18px 18px 0 0;
+    pointer-events: none;
+  }
+
+  /* Spacing rhythm between cards in the content panel */
+  .settings-main-padding .dp-glass-card + .dp-glass-card,
+  .settings-main-padding [data-framer] + [data-framer] {
+    margin-top: 4px;
+  }
+
+  /* Settings page title — refined gradient text */
+  .settings-main-padding {
+    /* paint a soft radial top-of-page glow for depth */
+    background:
+      radial-gradient(120% 60% at 50% -10%, rgba(27,79,255,0.10), transparent 70%),
+      radial-gradient(80% 50% at 100% 0%, rgba(139,92,246,0.06), transparent 70%);
+  }
+  .dashboard-header h1 {
+    background: linear-gradient(180deg, #FFFFFF 0%, #B8C2D9 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    font-size: 24px !important;
+    letter-spacing: -0.025em !important;
+  }
+
+  /* Identity card avatar — multi-layer ring + soft halo */
+  .settings-identity-layout > div:first-child > div:last-child {
+    box-shadow:
+      0 0 0 1px rgba(255,255,255,0.08),
+      0 0 0 6px rgba(27,79,255,0.06),
+      0 0 0 7px rgba(27,79,255,0.12),
+      0 18px 40px -12px rgba(27,79,255,0.45) !important;
+  }
+
+  /* Card header strip — refined accent bar with gradient */
+  .settings-main-padding .dp-glass-card > div:first-of-type {
+    position: relative;
+  }
+
+  /* Save button — premium gradient + inset highlight + glow */
+  .settings-identity-footer button {
+    background:
+      linear-gradient(180deg, rgba(255,255,255,0.10), rgba(255,255,255,0) 40%),
+      linear-gradient(135deg, #1B4FFF 0%, #5B7CFF 50%, #8B5CF6 100%) !important;
+    border: 1px solid rgba(155,180,255,0.4) !important;
+    box-shadow:
+      0 1px 0 rgba(255,255,255,0.20) inset,
+      0 0 0 1px rgba(27,79,255,0.30),
+      0 12px 32px -10px rgba(27,79,255,0.55),
+      0 0 28px -6px rgba(139,92,246,0.35) !important;
+    letter-spacing: 0.04em !important;
+    text-transform: uppercase;
+    font-weight: 700 !important;
+  }
+  .settings-identity-footer button:active {
+    transform: scale(0.985);
+  }
+
+  /* Section spacing inside the sidebar pad */
+  .settings-sidebar {
+    background:
+      linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0)) !important;
+  }
+
+  /* Save status pill in header */
+  .dashboard-header > div:last-child {
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: rgba(16,185,129,0.06);
+    border: 1px solid rgba(16,185,129,0.16);
+  }
+
+  /* Subtle scroll feel: hide scrollbar, smooth scrolling */
+  .settings-main-padding {
+    scroll-behavior: smooth;
+  }
+  .settings-main-padding::-webkit-scrollbar {
+    width: 0;
+    display: none;
+  }
+
+  /* Inputs across the settings page get a more refined look on mobile */
+  .settings-main-padding .dp-settings-input {
+    border-radius: 12px !important;
+    padding: 14px 16px !important;
+    font-size: 13px !important;
+    background:
+      linear-gradient(180deg, rgba(0,0,0,0.25), rgba(0,0,0,0.10)) !important;
+    border: 1px solid rgba(255,255,255,0.08) !important;
+    box-shadow:
+      0 1px 0 rgba(255,255,255,0.03) inset,
+      0 4px 12px -6px rgba(0,0,0,0.4);
+  }
+  .settings-main-padding .dp-settings-input:focus {
+    border-color: rgba(139,92,246,0.45) !important;
+    box-shadow:
+      0 0 0 3px rgba(139,92,246,0.12),
+      0 1px 0 rgba(255,255,255,0.05) inset !important;
+  }
+}
+
+/* On any touch / hover-incapable device, the camera-icon hover overlay
+   must never appear — iOS keeps `mouseenter` sticky after a tap, which
+   would otherwise mask the freshly-uploaded avatar photo on mobile. */
+@media (hover: none) {
+  .settings-avatar-hover {
+    opacity: 0 !important;
+  }
+}
+
+/* On the very tightest phones, drop to a single column rather than squashing labels */
+@media (max-width: 340px) {
+  .settings-sidebar {
+    grid-template-columns: 1fr !important;
+  }
+  .settings-sidebar .settings-tab-btn,
+  .settings-sidebar .dp-settings-tab {
+    min-height: 60px;
+    flex-direction: row !important;
+  }
+  .settings-sidebar .settings-tab-row {
+    flex-direction: row !important;
+  }
+}
+
 /* ── Settings input ────────────────────────────────────────────── */
 .dp-settings-input {
   width: 100%;

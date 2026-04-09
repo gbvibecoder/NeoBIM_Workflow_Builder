@@ -55,10 +55,15 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json(formatErrorResponse(UserErrors.UNAUTHORIZED), { status: 401 });
     }
 
-    const rateLimit = await checkEndpointRateLimit(session.user.id, "user-profile", 10, "1 m");
+    // 30 PATCHes / minute. The settings page makes one request per field
+    // (name, email, phone, avatar upload, avatar remove), and a user can
+    // realistically tweak several of these in quick succession; the previous
+    // 10/min limit was too tight and produced 429s on a single Save Profile
+    // click after the user had already been editing other fields.
+    const rateLimit = await checkEndpointRateLimit(session.user.id, "user-profile", 30, "1 m");
     if (!rateLimit.success) {
       return NextResponse.json(
-        formatErrorResponse({ title: "Too many requests", message: "Too many profile updates. Please wait a moment.", code: "RATE_001" }),
+        formatErrorResponse({ title: "Too many requests", message: "Too many profile updates in a short window. Please wait about a minute and try again.", code: "RATE_001" }),
         { status: 429 },
       );
     }
