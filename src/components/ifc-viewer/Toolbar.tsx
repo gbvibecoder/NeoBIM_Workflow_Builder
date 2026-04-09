@@ -7,7 +7,7 @@ import {
   RotateCcw, ChevronDown, Download, Keyboard,
   Layers, Scan, PanelBottomOpen, X, Waypoints,
 } from "lucide-react";
-import { UI, SHORTCUTS } from "./constants";
+import { UI, SHORTCUTS } from "@/components/ifc-viewer/constants";
 import type {
   ViewModeType,
   ColorByType,

@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import { ChevronDown, ChevronRight, Copy, Check } from "lucide-react";
-import { UI } from "./constants";
+import { UI } from "@/components/ifc-viewer/constants";
 import type { IFCElementData } from "@/types/ifc-viewer";
 
 interface PropertiesPanelProps {

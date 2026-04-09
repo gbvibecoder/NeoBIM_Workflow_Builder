@@ -4,7 +4,7 @@ import React, { useState, useCallback, useMemo } from "react";
 import {
   ChevronRight, ChevronDown, Building2, Layers, Box, Search,
 } from "lucide-react";
-import { UI } from "./constants";
+import { UI } from "@/components/ifc-viewer/constants";
 import type { SpatialNode, ViewportHandle } from "@/types/ifc-viewer";
 
 interface ModelTreeProps {

@@ -9,7 +9,7 @@ import React, {
 } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
-import { SCENE, CATEGORY_COLORS, STOREY_COLORS } from "./constants";
+import { SCENE, CATEGORY_COLORS, STOREY_COLORS } from "@/components/ifc-viewer/constants";
 import type {
   ViewportHandle,
   ViewModeType,

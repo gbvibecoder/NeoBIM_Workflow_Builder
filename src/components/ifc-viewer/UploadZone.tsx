@@ -2,7 +2,7 @@
 
 import React, { useCallback, useRef, useState } from "react";
 import { Upload, FileBox, Building2, Warehouse, Wrench, Building } from "lucide-react";
-import { UI } from "./constants";
+import { UI } from "@/components/ifc-viewer/constants";
 
 interface UploadZoneProps {
   onFileSelected: (file: File) => void;

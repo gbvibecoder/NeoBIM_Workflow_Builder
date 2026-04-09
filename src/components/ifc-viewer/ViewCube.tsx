@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useRef, useEffect } from "react";
-import { UI } from "./constants";
+import { UI } from "@/components/ifc-viewer/constants";
 import type { PresetView, ViewportHandle } from "@/types/ifc-viewer";
 
 interface ViewCubeProps {
