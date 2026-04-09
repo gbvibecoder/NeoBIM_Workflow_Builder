@@ -3,8 +3,8 @@
 import { motion } from "framer-motion";
 import { CheckCircle2, XCircle, AlertTriangle } from "lucide-react";
 import { useLocale } from "@/hooks/useLocale";
-import { COLORS } from "../constants";
-import type { ComplianceItem } from "../useShowcaseData";
+import { COLORS } from "@/components/canvas/result-showcase/constants";
+import type { ComplianceItem } from "@/components/canvas/result-showcase/useShowcaseData";
 
 interface ComplianceBadgesProps {
   items: ComplianceItem[];

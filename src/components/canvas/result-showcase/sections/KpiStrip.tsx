@@ -2,9 +2,9 @@
 
 import { motion } from "framer-motion";
 import { TrendingUp, TrendingDown, Minus } from "lucide-react";
-import { COLORS } from "../constants";
-import { AnimatedNumber } from "./AnimatedNumber";
-import type { KpiMetric } from "../useShowcaseData";
+import { COLORS } from "@/components/canvas/result-showcase/constants";
+import { AnimatedNumber } from "@/components/canvas/result-showcase/sections/AnimatedNumber";
+import type { KpiMetric } from "@/components/canvas/result-showcase/useShowcaseData";
 
 interface KpiStripProps {
   metrics: KpiMetric[];

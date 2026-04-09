@@ -29,20 +29,20 @@ import {
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { useLocale } from "@/hooks/useLocale";
-import { COLORS } from "../constants";
+import { COLORS } from "@/components/canvas/result-showcase/constants";
 
 const FloorPlanViewer = dynamic(
   () => import("@/features/floor-plan/components/FloorPlanViewer").then(m => ({ default: m.FloorPlanViewer })),
   { ssr: false, loading: () => <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", color: "#888", fontSize: 13 }}>Loading Floor Plan Editor...</div> }
 );
-import { HeroSection } from "../sections/HeroSection";
-import { KpiStrip } from "../sections/KpiStrip";
-import { PipelineViz } from "../sections/PipelineViz";
-import { AnimatedNumber } from "../sections/AnimatedNumber";
-import { useHeroDetection } from "../useHeroDetection";
-import type { ShowcaseData } from "../useShowcaseData";
-import type { TabId } from "../constants";
-import type { HeroType, InsightMetric, FloorPlanMeta, RoomInfo } from "../useHeroDetection";
+import { HeroSection } from "@/components/canvas/result-showcase/sections/HeroSection";
+import { KpiStrip } from "@/components/canvas/result-showcase/sections/KpiStrip";
+import { PipelineViz } from "@/components/canvas/result-showcase/sections/PipelineViz";
+import { AnimatedNumber } from "@/components/canvas/result-showcase/sections/AnimatedNumber";
+import { useHeroDetection } from "@/components/canvas/result-showcase/useHeroDetection";
+import type { ShowcaseData } from "@/components/canvas/result-showcase/useShowcaseData";
+import type { TabId } from "@/components/canvas/result-showcase/constants";
+import type { HeroType, InsightMetric, FloorPlanMeta, RoomInfo } from "@/components/canvas/result-showcase/useHeroDetection";
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 

@@ -11,8 +11,8 @@ import { useWorkflowStore } from "@/stores/workflow-store";
 import { useLocale } from "@/hooks/useLocale";
 import { formatBytes } from "@/lib/utils";
 import { toast } from "sonner";
-import { COLORS } from "../constants";
-import type { ShowcaseData } from "../useShowcaseData";
+import { COLORS } from "@/components/canvas/result-showcase/constants";
+import type { ShowcaseData } from "@/components/canvas/result-showcase/useShowcaseData";
 
 interface ExportTabProps {
   data: ShowcaseData;

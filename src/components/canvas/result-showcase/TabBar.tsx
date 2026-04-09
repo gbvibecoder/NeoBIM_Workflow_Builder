@@ -5,7 +5,7 @@ import {
   LayoutDashboard, Film, BarChart3, Box, Download, LayoutGrid,
 } from "lucide-react";
 import { useLocale } from "@/hooks/useLocale";
-import { COLORS, TAB_DEFS, type TabId } from "./constants";
+import { COLORS, TAB_DEFS, type TabId } from "@/components/canvas/result-showcase/constants";
 import type { TranslationKey } from "@/lib/i18n";
 
 const TAB_LABEL_KEYS: Record<TabId, TranslationKey> = {

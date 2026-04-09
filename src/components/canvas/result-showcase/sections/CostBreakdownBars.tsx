@@ -2,8 +2,8 @@
 
 import { motion } from "framer-motion";
 import { useLocale } from "@/hooks/useLocale";
-import { COLORS } from "../constants";
-import type { CostItem } from "../useShowcaseData";
+import { COLORS } from "@/components/canvas/result-showcase/constants";
+import type { CostItem } from "@/components/canvas/result-showcase/useShowcaseData";
 
 interface CostBreakdownBarsProps {
   items: CostItem[];

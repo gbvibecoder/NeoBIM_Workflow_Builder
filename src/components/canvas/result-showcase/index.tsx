@@ -10,16 +10,16 @@ import { generateId } from "@/lib/utils";
 import { logger } from "@/lib/logger";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import type { ExecutionArtifact } from "@/types/execution";
-import { useShowcaseData } from "./useShowcaseData";
-import { ShowcaseHeader } from "./ShowcaseHeader";
-import { TabBar } from "./TabBar";
-import { COLORS, type TabId } from "./constants";
+import { useShowcaseData } from "@/components/canvas/result-showcase/useShowcaseData";
+import { ShowcaseHeader } from "@/components/canvas/result-showcase/ShowcaseHeader";
+import { TabBar } from "@/components/canvas/result-showcase/TabBar";
+import { COLORS, type TabId } from "@/components/canvas/result-showcase/constants";
 
-import { OverviewTab } from "./tabs/OverviewTab";
-import { MediaTab } from "./tabs/MediaTab";
-import { DataTab } from "./tabs/DataTab";
-import { ModelTab } from "./tabs/ModelTab";
-import { ExportTab } from "./tabs/ExportTab";
+import { OverviewTab } from "@/components/canvas/result-showcase/tabs/OverviewTab";
+import { MediaTab } from "@/components/canvas/result-showcase/tabs/MediaTab";
+import { DataTab } from "@/components/canvas/result-showcase/tabs/DataTab";
+import { ModelTab } from "@/components/canvas/result-showcase/tabs/ModelTab";
+import { ExportTab } from "@/components/canvas/result-showcase/tabs/ExportTab";
 
 interface ResultShowcaseProps {
   onClose: () => void;
