@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect, useCallback, type KeyboardEvent as ReactKE } from "react";
 import { useRouter } from "next/navigation";
-import { useFloorPlanStore } from "@/stores/floor-plan-store";
+import { useFloorPlanStore } from "@/features/floor-plan/stores/floor-plan-store";
 import type { ViewMode } from "@/types/floor-plan-cad";
 import { ExportMenu } from "@/features/floor-plan/components/ExportMenu";
 

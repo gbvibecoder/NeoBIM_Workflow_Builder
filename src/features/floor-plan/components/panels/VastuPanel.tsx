@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useMemo } from "react";
-import { useFloorPlanStore } from "@/stores/floor-plan-store";
+import { useFloorPlanStore } from "@/features/floor-plan/stores/floor-plan-store";
 import { analyzeVastuCompliance, type VastuReport, type VastuReportItem } from "@/features/floor-plan/lib/vastu-analyzer";
 import { suggestRoomSwaps, type SwapSuggestion } from "@/features/floor-plan/lib/room-optimizer";
 import { DIRECTION_LABELS } from "@/features/floor-plan/lib/vastu-rules";

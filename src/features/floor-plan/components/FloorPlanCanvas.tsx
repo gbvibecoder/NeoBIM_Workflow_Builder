@@ -3,7 +3,7 @@
 import React, { useRef, useCallback, useEffect, useState } from "react";
 import { Stage, Layer } from "react-konva";
 import type Konva from "konva";
-import { useFloorPlanStore } from "@/stores/floor-plan-store";
+import { useFloorPlanStore } from "@/features/floor-plan/stores/floor-plan-store";
 import { screenToWorld, worldToScreen, distance } from "@/features/floor-plan/lib/geometry";
 import { hitTest, hitTestHandles, findNearestWall, rubberBandSelect } from "@/features/floor-plan/lib/hit-detection";
 import { findSnap, applyOrthoConstraint } from "@/features/floor-plan/lib/snap-engine";

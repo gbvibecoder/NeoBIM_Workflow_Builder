@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { useFloorPlanStore } from "@/stores/floor-plan-store";
+import { useFloorPlanStore } from "@/features/floor-plan/stores/floor-plan-store";
 import { formatDimension } from "@/features/floor-plan/lib/unit-conversion";
 
 export function StatusBar() {

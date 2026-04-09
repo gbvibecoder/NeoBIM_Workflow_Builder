@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect, useCallback } from "react";
-import { useFloorPlanStore } from "@/stores/floor-plan-store";
+import { useFloorPlanStore } from "@/features/floor-plan/stores/floor-plan-store";
 import { exportFloorToDxf, downloadDxf } from "@/features/floor-plan/lib/export-dxf";
 import { exportFloorToPdf } from "@/features/floor-plan/lib/export-pdf";
 import { exportFloorToSvg, downloadSvg } from "@/features/floor-plan/lib/export-svg";

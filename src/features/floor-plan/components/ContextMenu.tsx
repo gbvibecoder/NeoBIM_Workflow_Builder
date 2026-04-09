@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useRef } from "react";
-import { useFloorPlanStore, type ContextMenuState } from "@/stores/floor-plan-store";
+import { useFloorPlanStore, type ContextMenuState } from "@/features/floor-plan/stores/floor-plan-store";
 
 export function ContextMenu() {
   const contextMenu = useFloorPlanStore((s) => s.contextMenu);

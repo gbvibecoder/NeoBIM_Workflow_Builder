@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useCallback, useMemo, useRef, useState } from "react";
-import { useFloorPlanStore } from "@/stores/floor-plan-store";
+import { useFloorPlanStore } from "@/features/floor-plan/stores/floor-plan-store";
 import { FloorPlanCanvas } from "@/features/floor-plan/components/FloorPlanCanvas";
 import { Toolbar } from "@/features/floor-plan/components/Toolbar";
 import { StatusBar } from "@/features/floor-plan/components/StatusBar";

@@ -2,7 +2,7 @@
 
 import React, { useMemo } from "react";
 import { Group, Rect, Text, Line, Circle } from "react-konva";
-import { useFloorPlanStore } from "@/stores/floor-plan-store";
+import { useFloorPlanStore } from "@/features/floor-plan/stores/floor-plan-store";
 import { analyzeVastuCompliance } from "@/features/floor-plan/lib/vastu-analyzer";
 import { DIRECTION_LABELS, type VastuDirection } from "@/features/floor-plan/lib/vastu-rules";
 import { worldToScreen, worldToScreenDistance } from "@/features/floor-plan/lib/geometry";

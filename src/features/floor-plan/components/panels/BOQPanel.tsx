@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useMemo } from "react";
-import { useFloorPlanStore } from "@/stores/floor-plan-store";
+import { useFloorPlanStore } from "@/features/floor-plan/stores/floor-plan-store";
 import { generateBOQ, exportBOQAsCSV, type BOQReport } from "@/features/floor-plan/lib/boq-generator";
 
 const CATEGORY_COLORS: Record<string, string> = {

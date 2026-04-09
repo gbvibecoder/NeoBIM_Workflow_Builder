@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { useFloorPlanStore } from "@/stores/floor-plan-store";
+import { useFloorPlanStore } from "@/features/floor-plan/stores/floor-plan-store";
 
 export function LayerPanel() {
   const layers = useFloorPlanStore((s) => s.layers);

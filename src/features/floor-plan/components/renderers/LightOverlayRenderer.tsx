@@ -2,7 +2,7 @@
 
 import React, { useMemo } from "react";
 import { Rect, Text, Group } from "react-konva";
-import { useFloorPlanStore } from "@/stores/floor-plan-store";
+import { useFloorPlanStore } from "@/features/floor-plan/stores/floor-plan-store";
 import type { Viewport } from "@/features/floor-plan/lib/geometry";
 import { worldToScreen, polygonBounds } from "@/features/floor-plan/lib/geometry";
 import { analyzeNaturalLight, type RoomLightScore } from "@/features/floor-plan/lib/light-analysis";
