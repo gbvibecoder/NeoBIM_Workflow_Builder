@@ -2,13 +2,13 @@
 
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { useFloorPlanStore } from "@/stores/floor-plan-store";
-import { exportFloorToDxf, downloadDxf } from "@/lib/floor-plan/export-dxf";
-import { exportFloorToPdf } from "@/lib/floor-plan/export-pdf";
+import { exportFloorToDxf, downloadDxf } from "@/features/floor-plan/lib/export-dxf";
+import { exportFloorToPdf } from "@/features/floor-plan/lib/export-pdf";
 import { exportFloorToSvg, downloadSvg } from "@/lib/floor-plan/export-svg";
-import type { DxfExportOptions } from "@/lib/floor-plan/export-dxf";
-import type { PdfExportOptions, PaperSize, PdfScale } from "@/lib/floor-plan/export-pdf";
+import type { DxfExportOptions } from "@/features/floor-plan/lib/export-dxf";
+import type { PdfExportOptions, PaperSize, PdfScale } from "@/features/floor-plan/lib/export-pdf";
 import type { SvgExportOptions } from "@/lib/floor-plan/export-svg";
-import type { PngDpi, PngExportOptions } from "@/lib/floor-plan/export-png";
+import type { PngDpi, PngExportOptions } from "@/features/floor-plan/lib/export-png";
 import type { DisplayUnit } from "@/lib/floor-plan/unit-conversion";
 import type { FloorPlanProject, Floor } from "@/types/floor-plan-cad";
 

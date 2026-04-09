@@ -26,8 +26,8 @@ import { VastuOverlayRenderer } from "./renderers/VastuOverlayRenderer";
 import { AnnotationRenderer } from "./renderers/AnnotationRenderer";
 import { LightOverlayRenderer } from "./renderers/LightOverlayRenderer";
 import { CodeOverlayRenderer } from "./renderers/CodeOverlayRenderer";
-import { exportStageToPng } from "@/lib/floor-plan/export-png";
-import type { PngExportOptions } from "@/lib/floor-plan/export-png";
+import { exportStageToPng } from "@/features/floor-plan/lib/export-png";
+import type { PngExportOptions } from "@/features/floor-plan/lib/export-png";
 
 // ============================================================
 // DRAG STATE (transient, kept in refs)

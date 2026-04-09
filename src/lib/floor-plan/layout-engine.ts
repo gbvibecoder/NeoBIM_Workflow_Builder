@@ -14,9 +14,9 @@
 
 import type { EnhancedRoomProgram, RoomSpec, AdjacencyRequirement } from "@/features/floor-plan/lib/ai-room-programmer";
 import { logger } from "@/lib/logger";
-import { correctDimensions } from "@/lib/floor-plan/dimension-corrector";
-import type { RoomWithTarget } from "@/lib/floor-plan/dimension-corrector";
-import { layoutCourtyardPlan, hasCourtyardRoom } from "@/lib/floor-plan/courtyard-layout";
+import { correctDimensions } from "@/features/floor-plan/lib/dimension-corrector";
+import type { RoomWithTarget } from "@/features/floor-plan/lib/dimension-corrector";
+import { layoutCourtyardPlan, hasCourtyardRoom } from "@/features/floor-plan/lib/courtyard-layout";
 import { solveLayout } from "@/features/floor-plan/lib/constraint-solver";
 import { classifyRoom } from "@/lib/floor-plan/room-sizer";
 
