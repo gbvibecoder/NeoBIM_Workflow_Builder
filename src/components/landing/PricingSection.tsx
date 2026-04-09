@@ -4,7 +4,7 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import { useLocale } from "@/hooks/useLocale";
 import { trackViewContent } from "@/lib/meta-pixel";
-import { fadeUp, smoothEase } from "./landing-helpers";
+import { fadeUp, smoothEase } from "@/components/landing/landing-helpers";
 
 export function PricingSection() {
   const { t, tArray } = useLocale();
