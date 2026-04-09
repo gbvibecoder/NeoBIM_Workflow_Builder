@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import type { AiRoadmapTask } from "@prisma/client";
 import { getAdminSession, unauthorizedResponse, logAudit } from "@/lib/admin-server";
-import { generateWeeklyRoadmap } from "@/services/roadmap-agent";
+import { generateWeeklyRoadmap } from "@/features/ai/services/roadmap-agent";
 
 // GET — List roadmaps (newest first)
 export async function GET(req: Request) {

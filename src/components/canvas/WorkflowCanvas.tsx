@@ -37,7 +37,7 @@ import { AIChatPanel } from "./panels/AIChatPanel";
 import type { ChatMessage } from "./panels/AIChatPanel";
 import type { LogEntry } from "./ExecutionLog";
 import type { ContextMenuState } from "./ContextMenu";
-import { PromptInput } from "@/components/ai/PromptInput";
+import { PromptInput } from "@/features/ai/components/PromptInput";
 
 // ContextMenu is right-click only — load lazily
 const ContextMenu = dynamic(

@@ -9,8 +9,8 @@ import type { WorkflowNodeData, NodeCategory } from "@/types/nodes";
 import type { WorkflowNode } from "@/types/nodes";
 import { generateId } from "@/lib/utils";
 import { toast } from "sonner";
-import { processWorkflowChat } from "@/services/ai-chat-service";
-import type { ChatAction } from "@/services/ai-chat-service";
+import { processWorkflowChat } from "@/features/ai/services/ai-chat-service";
+import type { ChatAction } from "@/features/ai/services/ai-chat-service";
 import { useLocale } from "@/hooks/useLocale";
 import type { TranslationKey } from "@/lib/i18n";
 

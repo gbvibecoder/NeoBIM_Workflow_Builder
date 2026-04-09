@@ -362,7 +362,7 @@ export const handleGN011: NodeHandler = async (ctx) => {
   const renderApiKey = apiKey || process.env.OPENAI_API_KEY || undefined;
   let aiRenderUrl = "";
   try {
-    const { generateFloorPlanRender } = await import("@/services/openai");
+    const { generateFloorPlanRender } = await import("@/features/ai/services/openai");
     const renderRooms = fpRooms.map((r: { name: string; type: string; width: number; depth: number }) => ({
       name: r.name, type: r.type, width: r.width, depth: r.depth,
     }));

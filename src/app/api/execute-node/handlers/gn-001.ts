@@ -307,7 +307,7 @@ export const handleGN001: NodeHandler = async (ctx) => {
       const { textTo3D } = await import("@/features/3d-render/services/text-to-3d-service");
       const img3dResult = await textTo3D({
         prompt: textContent || `${buildingType}, ${floors} floors`,
-        buildingDescription: rawData as unknown as import("@/services/openai").BuildingDescription | undefined,
+        buildingDescription: rawData as unknown as import("@/features/ai/services/openai").BuildingDescription | undefined,
         viewType: "exterior",
       });
 

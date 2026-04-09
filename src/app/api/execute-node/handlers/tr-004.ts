@@ -119,7 +119,7 @@ export const handleTR004: NodeHandler = async (ctx) => {
   if (!analysis.isFloorPlan && multiImages.length > 1) {
     try {
       logger.debug(`[TR-004] Multi-image: enhancing analysis with ${multiImages.length} photos`);
-      const { getClient } = await import("@/services/openai");
+      const { getClient } = await import("@/features/ai/services/openai");
       const multiClient = getClient(apiKey);
 
       // Build content blocks with ALL images
@@ -180,7 +180,7 @@ export const handleTR004: NodeHandler = async (ctx) => {
 
       if (trace.enclosedRegions.length >= 1) {
         // GPT-4o labels the rooms Potrace found
-        const { labelFloorPlanRooms } = await import("@/services/openai");
+        const { labelFloorPlanRooms } = await import("@/features/ai/services/openai");
         const labels = await labelFloorPlanRooms(
           base64Data as string,
           typeof mimeType === "string" ? mimeType : "image/jpeg",
@@ -277,7 +277,7 @@ export const handleTR004: NodeHandler = async (ctx) => {
           && sharpResult.geometry.rooms.length >= 2;
 
         if (useSharp) {
-          const { labelDetectedRooms } = await import("@/services/openai");
+          const { labelDetectedRooms } = await import("@/features/ai/services/openai");
           const labels = await labelDetectedRooms({
             roomCenters: sharpResult.geometry.rooms.map(r => ({
               center: r.center,

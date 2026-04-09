@@ -10,7 +10,7 @@
  * Output feeds directly into Stage 2 (AI Spatial Layout in generateFloorPlan).
  */
 
-import { getClient } from "@/services/openai";
+import { getClient } from "@/features/ai/services/openai";
 import { enforceHardCaps, classifyRoom } from "@/features/floor-plan/lib/room-sizer";
 import { logger } from "@/lib/logger";
 

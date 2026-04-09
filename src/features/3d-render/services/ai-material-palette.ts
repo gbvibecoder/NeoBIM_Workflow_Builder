@@ -65,7 +65,7 @@ export async function generateAIMaterialPalette(
   // Step 1: Generate concept render via DALL-E
   let imageUrl: string | null = null;
   try {
-    const { generateConceptImage } = await import("@/services/openai");
+    const { generateConceptImage } = await import("@/features/ai/services/openai");
     const prompt = `Professional architectural exterior rendering of: ${description.slice(0, 300)}.
 Show the building in warm golden hour lighting, 3/4 view angle.
 Photorealistic materials — visible glass reflections, concrete texture, metal finishes.

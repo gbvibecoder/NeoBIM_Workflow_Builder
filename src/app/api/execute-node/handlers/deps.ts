@@ -55,8 +55,8 @@ export {
   analyzeImage,
   enhanceArchitecturalPrompt,
   validateRenderWithClaude,
-} from "@/services/openai";
-export type { BuildingDescription, RenderQAResult } from "@/services/openai";
+} from "@/features/ai/services/openai";
+export type { BuildingDescription, RenderQAResult } from "@/features/ai/services/openai";
 export { analyzeSite } from "@/services/site-analysis";
 export { generatePDFBase64 } from "@/services/pdf-report-server";
 export { reconstructHiFi3D, isMeshyConfigured } from "@/features/3d-render/services/meshy-service";

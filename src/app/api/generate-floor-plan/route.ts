@@ -10,7 +10,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { generateFloorPlan } from "@/services/openai";
+import { generateFloorPlan } from "@/features/ai/services/openai";
 import { logger } from "@/lib/logger";
 import {
   programRooms,
