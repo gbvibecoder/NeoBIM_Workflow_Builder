@@ -11,6 +11,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { generateFloorPlan } from "@/services/openai";
+import { logger } from "@/lib/logger";
 import {
   programRooms,
   programRoomsFallback,
@@ -110,7 +111,7 @@ export async function POST(req: NextRequest) {
     }
 
     // ── Stage 1 Diagnostic ──
-    console.log(`[STAGE-1] Source: ${stage1Source}, Rooms: ${roomProgram.rooms.length}`, roomProgram.rooms.map(r => `${r.name} (floor:${r.floor ?? 0})`));
+    logger.debug(`[STAGE-1] Source: ${stage1Source}, Rooms: ${roomProgram.rooms.length}`, roomProgram.rooms.map(r => `${r.name} (floor:${r.floor ?? 0})`));
 
     // ── Prompt faithfulness check ──
     const mentionedRooms = extractMentionedRooms(prompt);
@@ -123,7 +124,7 @@ export async function POST(req: NextRequest) {
     if (missingFromPrompt.length > 0) {
       console.warn(`[FAITHFULNESS] ${missingFromPrompt.length} rooms from prompt not in output: ${missingFromPrompt.join(", ")}`);
     } else if (mentionedRooms.length > 0) {
-      console.log(`[FAITHFULNESS] All ${mentionedRooms.length} mentioned rooms present in output`);
+      logger.debug(`[FAITHFULNESS] All ${mentionedRooms.length} mentioned rooms present in output`);
     }
 
     // Convert to BuildingDescription for Stage 2
@@ -131,12 +132,12 @@ export async function POST(req: NextRequest) {
 
     // ── Multi-floor: BSP layout engine per floor (single path, no fallbacks) ──
     if (roomProgram.numFloors > 1) {
-      console.log(`[MULTI-FLOOR] ★ BSP ONLY ★ ${roomProgram.numFloors} floors`);
+      logger.debug(`[MULTI-FLOOR] ★ BSP ONLY ★ ${roomProgram.numFloors} floors`);
       const multiFloor = layoutMultiFloor(roomProgram);
 
       // ── Stage 2 Diagnostic ──
       const totalPlaced = multiFloor.floors.reduce((s, f) => s + f.rooms.length, 0);
-      console.log(`[STAGE-2] BSP multi-floor: ${totalPlaced} rooms`, multiFloor.floors.map(f => `Floor ${f.level}: ${f.rooms.length} rooms`));
+      logger.debug(`[STAGE-2] BSP multi-floor: ${totalPlaced} rooms`, multiFloor.floors.map(f => `Floor ${f.level}: ${f.rooms.length} rooms`));
 
       const project = convertMultiFloorToProject(
         multiFloor.floors, description.projectName, prompt,
@@ -144,7 +145,7 @@ export async function POST(req: NextRequest) {
 
       // ── Stage 3 Diagnostic ──
       const projectRoomCount = project.floors.reduce((s, f) => s + f.rooms.length, 0);
-      console.log(`[STAGE-3] Rooms in project: ${projectRoomCount}`, project.floors.map(f => `Floor ${f.level}: ${f.rooms.map(r => r.name).join(", ")}`));
+      logger.debug(`[STAGE-3] Rooms in project: ${projectRoomCount}`, project.floors.map(f => `Floor ${f.level}: ${f.rooms.map(r => r.name).join(", ")}`));
 
       // Return ground floor geometry for backward-compatible rendering
       const gf = multiFloor.floors.find(f => f.level === 0) ?? multiFloor.floors[0];
@@ -184,10 +185,10 @@ export async function POST(req: NextRequest) {
       }
       // DIAGNOSTIC — trace room counts at final output
       const allRoomNames = project.floors.flatMap(f => f.rooms.map(r => r.name));
-      console.log('=== FINAL OUTPUT (multi-floor) ===');
-      console.log('Total rooms:', allRoomNames.length);
-      console.log('Room names:', JSON.stringify(allRoomNames));
-      console.log('Floors:', JSON.stringify(project.floors.map(f => ({
+      logger.debug('=== FINAL OUTPUT (multi-floor) ===');
+      logger.debug('Total rooms:', allRoomNames.length);
+      logger.debug('Room names:', JSON.stringify(allRoomNames));
+      logger.debug('Floors:', JSON.stringify(project.floors.map(f => ({
         level: f.level,
         rooms: f.rooms.length,
         names: f.rooms.map(r => r.name)
@@ -198,7 +199,7 @@ export async function POST(req: NextRequest) {
 
     // ── Stage 2: AI Spatial Layout (single floor) ──────────────────
     // GPT-4o positions rooms with zone-aware placement + validation + retry
-    console.log(`[STAGE-2] Starting single-floor layout for ${roomProgram.rooms.length} rooms`);
+    logger.debug(`[STAGE-2] Starting single-floor layout for ${roomProgram.rooms.length} rooms`);
     const floorPlan = await generateFloorPlan(description, apiKey, roomProgram);
 
     // ── Stage 3: Architectural Detailing ──────────────────────────────
@@ -252,13 +253,13 @@ export async function POST(req: NextRequest) {
 
     // DIAGNOSTIC — Stage 3 output
     const f0 = project.floors[0];
-    console.log('=== STAGE 3 OUTPUT (single-floor) ===');
-    console.log(`[STAGE-3] rooms: ${f0?.rooms.length}, walls: ${f0?.walls.length}, doors: ${f0?.doors.length}, windows: ${f0?.windows.length}`);
-    console.log(`[STAGE-3] room areas: ${f0?.rooms.map(r => `${r.name}: ${r.area_sqm.toFixed(1)}m²`).join(', ')}`);
+    logger.debug('=== STAGE 3 OUTPUT (single-floor) ===');
+    logger.debug(`[STAGE-3] rooms: ${f0?.rooms.length}, walls: ${f0?.walls.length}, doors: ${f0?.doors.length}, windows: ${f0?.windows.length}`);
+    logger.debug(`[STAGE-3] room areas: ${f0?.rooms.map(r => `${r.name}: ${r.area_sqm.toFixed(1)}m²`).join(', ')}`);
     if (f0 && f0.doors.length < 6) {
       console.warn(`[STAGE-3] ⚠️ Only ${f0.doors.length} doors for ${f0.rooms.length} rooms — may indicate gaps between rooms`);
     }
-    console.log('=== FLOOR PLAN GENERATION COMPLETE ===');
+    logger.debug('=== FLOOR PLAN GENERATION COMPLETE ===');
 
     return NextResponse.json({ project, geometry, svg: floorPlan.svg, feedback });
   } catch (err) {
