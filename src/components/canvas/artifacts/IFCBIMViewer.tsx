@@ -8,7 +8,7 @@
  */
 
 import React, { useRef, useState, useCallback, useEffect } from "react";
-import { Viewport } from "@/components/ifc-viewer/Viewport";
+import { Viewport } from "@/features/ifc/components/Viewport";
 import type {
   ViewportHandle,
   IFCElementData,

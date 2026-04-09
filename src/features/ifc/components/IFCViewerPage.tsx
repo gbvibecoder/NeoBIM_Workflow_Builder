@@ -1,15 +1,15 @@
 "use client";
 
 import React, { useState, useRef, useCallback, useEffect } from "react";
-import { Viewport } from "@/components/ifc-viewer/Viewport";
-import { UploadZone } from "@/components/ifc-viewer/UploadZone";
-import { Toolbar } from "@/components/ifc-viewer/Toolbar";
+import { Viewport } from "@/features/ifc/components/Viewport";
+import { UploadZone } from "@/features/ifc/components/UploadZone";
+import { Toolbar } from "@/features/ifc/components/Toolbar";
 import { ModelTree } from "@/features/ifc/components/ModelTree";
 import { PropertiesPanel } from "@/features/ifc/components/PropertiesPanel";
 import { IntegrationBanner } from "@/features/ifc/components/IntegrationBanner";
 import { ContextMenu, type ContextMenuData } from "@/features/ifc/components/ContextMenu";
-import { ViewCube } from "@/components/ifc-viewer/ViewCube";
-import { UI, SHORTCUTS } from "@/components/ifc-viewer/constants";
+import { ViewCube } from "@/features/ifc/components/ViewCube";
+import { UI, SHORTCUTS } from "@/features/ifc/components/constants";
 import type {
   ViewportHandle,
   IFCElementData,

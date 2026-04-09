@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { Sparkles, X, FileSpreadsheet, Video, DollarSign } from "lucide-react";
-import { UI } from "@/components/ifc-viewer/constants";
+import { UI } from "@/features/ifc/components/constants";
 
 const DISMISSED_KEY = "buildflow-ifc-viewer-banner-dismissed";
 

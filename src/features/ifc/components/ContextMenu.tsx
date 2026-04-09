@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef } from "react";
 import { EyeOff, Scan, RotateCcw, Maximize, MousePointerClick } from "lucide-react";
-import { UI } from "@/components/ifc-viewer/constants";
+import { UI } from "@/features/ifc/components/constants";
 
 export interface ContextMenuData {
   x: number;
