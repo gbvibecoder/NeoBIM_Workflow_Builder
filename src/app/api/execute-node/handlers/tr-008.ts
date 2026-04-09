@@ -112,7 +112,7 @@ export const handleTR008: NodeHandler = async (ctx) => {
   }
 
   // Import regional factors
-  const { resolveProjectLocation } = await import("@/constants/regional-factors");
+  const { resolveProjectLocation } = await import("@/features/boq/constants/regional-factors");
 
   let activeRegion = "USA (baseline)";
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -184,10 +184,10 @@ export const handleTR008: NodeHandler = async (ctx) => {
     || currencyCode === "INR"
     || locationLabel.toLowerCase().includes("india");
   let is1200Module: typeof import("@/features/boq/constants/is1200-rates") | null = null;
-  let indianPricing: Awaited<ReturnType<typeof import("@/constants/indian-pricing-factors").calculateIndianPricingAdjustment>> | null = null;
+  let indianPricing: Awaited<ReturnType<typeof import("@/features/boq/constants/indian-pricing-factors").calculateIndianPricingAdjustment>> | null = null;
   if (isIndianProject) {
     is1200Module = await import("@/features/boq/constants/is1200-rates");
-    const { calculateIndianPricingAdjustment } = await import("@/constants/indian-pricing-factors");
+    const { calculateIndianPricingAdjustment } = await import("@/features/boq/constants/indian-pricing-factors");
     const currentMonth = new Date().getMonth() + 1;
     indianPricing = calculateIndianPricingAdjustment(
       locationData?.state || "",
@@ -581,7 +581,7 @@ export const handleTR008: NodeHandler = async (ctx) => {
   // ── Derived quantities: Formwork, Rebar, Finishing ──
   // For Indian projects, use CPWD rates directly with IS 1200 codes.
   // For non-Indian, use DERIVED_RATES from regional-factors.ts.
-  const { DERIVED_RATES } = await import("@/constants/regional-factors");
+  const { DERIVED_RATES } = await import("@/features/boq/constants/regional-factors");
 
   // Fix 4: Plaster dedup — find storeys that already have plaster from IFC Geometry extraction
   // (IfcCovering CEILING/FLOORING or explicit plaster elements). Skip derived plaster for those.

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { UNIT_RATES, IFC_TO_CSI_MAP } from "@/constants/unit-rates";
+import { UNIT_RATES, IFC_TO_CSI_MAP } from "@/features/boq/constants/unit-rates";
 import { IS1200_MAPPINGS, IS1200_RATES } from "@/features/boq/constants/is1200-rates";
 
 // ─── MEP IFC types that should be supported ────────────────────────

@@ -700,7 +700,7 @@ export const LocationInput = memo(function LocationInput({ nodeId, data }: { nod
   const locationData = useMemo(() => {
     try {
       // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const mod = require("@/constants/regional-factors");
+      const mod = require("@/features/boq/constants/regional-factors");
       return {
         states: (mod.STATES_BY_COUNTRY ?? {}) as Record<string, string[]>,
         citiesByState: (mod.CITIES_BY_STATE ?? {}) as Record<string, Record<string, string[]>>,

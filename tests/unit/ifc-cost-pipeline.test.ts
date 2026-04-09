@@ -8,7 +8,7 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { calculateBOQ, getRatesForElement, getUnitRate } from "@/constants/unit-rates";
+import { calculateBOQ, getRatesForElement, getUnitRate } from "@/features/boq/constants/unit-rates";
 import {
   getIS1200RatesForElement,
   getIS1200Rate,
