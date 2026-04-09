@@ -68,7 +68,7 @@ export {
 } from "@/services/threedai-studio";
 export type { BuildingRequirements } from "@/services/threedai-studio";
 export { generateWithMeshy, isMeshyTextTo3DConfigured } from "@/services/meshy-ai";
-export { generateIFCFile } from "@/services/ifc-exporter";
+export { generateIFCFile } from "@/features/ifc/services/ifc-exporter";
 export { parsePromptToStyle } from "@/services/prompt-style-parser";
 export { extractMetadata } from "@/services/metadata-extractor";
 export {

@@ -164,7 +164,7 @@ async function executeNode(
       // IFC file in inputFileStore but no ifcParsed — parse now
       try {
         const text = await fileObj.text();
-        const { parseIFCText } = await import("@/services/ifc-text-parser");
+        const { parseIFCText } = await import("@/features/ifc/services/ifc-text-parser");
         const result = parseIFCText(text);
         return {
           id: generateId(),

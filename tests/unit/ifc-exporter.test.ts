@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { generateIFCFile } from "@/services/ifc-exporter";
+import { generateIFCFile } from "@/features/ifc/services/ifc-exporter";
 import { generateMassingGeometry } from "@/services/massing-generator";
 import type { MassingGeometry } from "@/types/geometry";
 

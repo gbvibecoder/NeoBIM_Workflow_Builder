@@ -178,7 +178,7 @@ export const handleTR007: NodeHandler = async (ctx) => {
   if (rows.length === 0 && ifcData && typeof ifcData === "object" && ifcData.buffer) {
     // Real IFC file — parse it
     try {
-      const { parseIFCBuffer } = await import("@/services/ifc-parser");
+      const { parseIFCBuffer } = await import("@/features/ifc/services/ifc-parser");
       const buffer = new Uint8Array(ifcData.buffer as ArrayLike<number>);
       const parseResult = await parseIFCBuffer(buffer, inputData?.fileName as string ?? "uploaded.ifc");
 

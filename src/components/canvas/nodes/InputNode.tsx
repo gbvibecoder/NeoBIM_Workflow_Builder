@@ -130,7 +130,7 @@ export const FileUploadInput = memo(function FileUploadInput({ nodeId, data, acc
           toast.loading(`Parsing building elements...`, { id: `ifc-parse-${nodeId}` });
           const text = reader.result as string;
           // Dynamic import to keep bundle size small
-          const { parseIFCText } = await import("@/services/ifc-text-parser");
+          const { parseIFCText } = await import("@/features/ifc/services/ifc-text-parser");
           const result = parseIFCText(text);
 
           const node = useWorkflowStore.getState().nodes.find(n => n.id === nodeId);
@@ -451,7 +451,7 @@ function SupplementaryIFCUpload({ nodeId }: { nodeId: string }) {
     toast.loading(`Parsing ${type} IFC...`, { id: `ifc-${type}-${nodeId}` });
     try {
       const text = await file.text();
-      const { parseIFCText } = await import("@/services/ifc-text-parser");
+      const { parseIFCText } = await import("@/features/ifc/services/ifc-text-parser");
       const result = parseIFCText(text);
       supplementaryIFCStore.set(`${nodeId}:${type}`, { file, parsed: result });
 

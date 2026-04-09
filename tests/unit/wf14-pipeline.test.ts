@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { generateMassingGeometry } from "@/services/massing-generator";
-import { generateIFCFile } from "@/services/ifc-exporter";
+import { generateIFCFile } from "@/features/ifc/services/ifc-exporter";
 import { PREBUILT_WORKFLOWS } from "@/constants/prebuilt-workflows";
 
 /**
