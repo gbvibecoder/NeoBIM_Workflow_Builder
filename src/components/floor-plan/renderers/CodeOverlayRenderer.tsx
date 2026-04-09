@@ -5,7 +5,7 @@ import { Rect, Group } from "react-konva";
 import { useFloorPlanStore } from "@/stores/floor-plan-store";
 import type { Viewport } from "@/lib/floor-plan/geometry";
 import { worldToScreen, polygonBounds } from "@/lib/floor-plan/geometry";
-import { validateBuildingCode } from "@/lib/floor-plan/code-validator";
+import { validateBuildingCode } from "@/features/floor-plan/lib/code-validator";
 
 interface CodeOverlayRendererProps {
   viewport: Viewport;

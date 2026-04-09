@@ -12,12 +12,12 @@
  * Pure synchronous function — no AI calls, runs in < 10ms.
  */
 
-import type { EnhancedRoomProgram, RoomSpec, AdjacencyRequirement } from "@/lib/floor-plan/ai-room-programmer";
+import type { EnhancedRoomProgram, RoomSpec, AdjacencyRequirement } from "@/features/floor-plan/lib/ai-room-programmer";
 import { logger } from "@/lib/logger";
 import { correctDimensions } from "@/lib/floor-plan/dimension-corrector";
 import type { RoomWithTarget } from "@/lib/floor-plan/dimension-corrector";
 import { layoutCourtyardPlan, hasCourtyardRoom } from "@/lib/floor-plan/courtyard-layout";
-import { solveLayout } from "@/lib/floor-plan/constraint-solver";
+import { solveLayout } from "@/features/floor-plan/lib/constraint-solver";
 import { classifyRoom } from "@/lib/floor-plan/room-sizer";
 
 // ── Output type ──────────────────────────────────────────────────────────────

@@ -2,8 +2,8 @@
 
 import React, { useMemo } from "react";
 import { useFloorPlanStore } from "@/stores/floor-plan-store";
-import { validateBuildingCode, type CodeReport } from "@/lib/floor-plan/code-validator";
-import { CODE_CATEGORY_LABELS, type CodeCategory, type CodeViolation } from "@/lib/floor-plan/building-code-rules";
+import { validateBuildingCode, type CodeReport } from "@/features/floor-plan/lib/code-validator";
+import { CODE_CATEGORY_LABELS, type CodeCategory, type CodeViolation } from "@/features/floor-plan/lib/building-code-rules";
 
 export function CodeCompliancePanel() {
   const floor = useFloorPlanStore((s) => s.getActiveFloor());

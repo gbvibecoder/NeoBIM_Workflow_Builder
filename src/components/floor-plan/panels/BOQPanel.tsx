@@ -2,7 +2,7 @@
 
 import React, { useMemo } from "react";
 import { useFloorPlanStore } from "@/stores/floor-plan-store";
-import { generateBOQ, exportBOQAsCSV, type BOQReport } from "@/lib/floor-plan/boq-generator";
+import { generateBOQ, exportBOQAsCSV, type BOQReport } from "@/features/floor-plan/lib/boq-generator";
 
 const CATEGORY_COLORS: Record<string, string> = {
   Masonry: "#8B5CF6",

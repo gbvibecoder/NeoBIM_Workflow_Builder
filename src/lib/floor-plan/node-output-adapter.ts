@@ -4,9 +4,9 @@
  */
 
 import type { FloorPlanProject, Floor, Wall, Room, Door, CadWindow } from "@/types/floor-plan-cad";
-import { generateBOQ, type BOQReport } from "@/lib/floor-plan/boq-generator";
+import { generateBOQ, type BOQReport } from "@/features/floor-plan/lib/boq-generator";
 import { analyzeVastuCompliance, type VastuReport } from "@/lib/floor-plan/vastu-analyzer";
-import { validateBuildingCode, type CodeReport } from "@/lib/floor-plan/code-validator";
+import { validateBuildingCode, type CodeReport } from "@/features/floor-plan/lib/code-validator";
 import { exportFloorToSvg } from "@/lib/floor-plan/export-svg";
 import { wallLength, polygonBounds } from "@/lib/floor-plan/geometry";
 

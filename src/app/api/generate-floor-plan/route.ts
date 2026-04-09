@@ -17,8 +17,8 @@ import {
   programRoomsFallback,
   programToDescription,
   extractMentionedRooms,
-} from "@/lib/floor-plan/ai-room-programmer";
-import type { EnhancedRoomProgram } from "@/lib/floor-plan/ai-room-programmer";
+} from "@/features/floor-plan/lib/ai-room-programmer";
+import type { EnhancedRoomProgram } from "@/features/floor-plan/lib/ai-room-programmer";
 import { convertGeometryToProject, convertMultiFloorToProject } from "@/lib/floor-plan/pipeline-adapter";
 import { layoutMultiFloor, scoreAdjacency } from "@/lib/floor-plan/layout-engine";
 import type { FloorPlanGeometry } from "@/types/floor-plan";

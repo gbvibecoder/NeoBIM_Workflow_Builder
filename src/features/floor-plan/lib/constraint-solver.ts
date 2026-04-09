@@ -27,7 +27,7 @@ import type {
   EnhancedRoomProgram,
   RoomSpec,
   AdjacencyRequirement,
-} from "@/lib/floor-plan/ai-room-programmer";
+} from "@/features/floor-plan/lib/ai-room-programmer";
 import type { PlacedRoom } from "@/lib/floor-plan/layout-engine";
 
 // ── Grid snap (match layout-engine.ts) ──────────────────────────────────────

@@ -42,8 +42,8 @@ export const handleGN012: NodeHandler = async (ctx) => {
         const promptForAI = originalPrompt || designBrief || "";
 
         // Stage 1: AI Room Programming (adjacency + zones)
-        const { programRooms, programRoomsFallback, programToDescription } = await import("@/lib/floor-plan/ai-room-programmer");
-        let roomProgram: import("@/lib/floor-plan/ai-room-programmer").EnhancedRoomProgram;
+        const { programRooms, programRoomsFallback, programToDescription } = await import("@/features/floor-plan/lib/ai-room-programmer");
+        let roomProgram: import("@/features/floor-plan/lib/ai-room-programmer").EnhancedRoomProgram;
         try {
           roomProgram = await programRooms(promptForAI, floorPlanApiKey);
         } catch (parseErr) {

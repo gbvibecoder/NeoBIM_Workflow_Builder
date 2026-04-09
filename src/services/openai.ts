@@ -2112,7 +2112,7 @@ OUTPUT ONLY THIS JSON:
 
 // ─── Main generateFloorPlan function ────────────────────────────────────────
 
-import type { EnhancedRoomProgram } from "@/lib/floor-plan/ai-room-programmer";
+import type { EnhancedRoomProgram } from "@/features/floor-plan/lib/ai-room-programmer";
 
 export async function generateFloorPlan(
   description: BuildingDescription | Record<string, unknown>,
