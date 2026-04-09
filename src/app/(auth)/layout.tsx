@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useEffect } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { Zap, Users, Workflow, TrendingUp, Box, Play, FileCode, Sparkles } from "lucide-react";
@@ -17,6 +17,52 @@ function hexToRgb(hex: string): string {
 
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   const { t } = useLocale();
+
+  // In-app webviews (Instagram, Meta/Facebook) do NOT shrink the visual
+  // viewport when the on-screen keyboard opens. That means:
+  //   1. window.innerHeight stays at full screen height.
+  //   2. The browser's own "scroll focused input into view" thinks the
+  //      whole screen is visible and leaves the input behind the keyboard.
+  //   3. scrollIntoView({ block: "center" }) centers it mid-screen — still
+  //      behind the keyboard.
+  // Workaround: manually scroll the document so the focused input sits at
+  // ~15% from the top of the screen — well above any realistic keyboard
+  // (keyboards occupy 40–55% of the screen) and below the webview's top
+  // chrome. Retry a few times because the webview fires its own scroll
+  // after focus and we need to run last.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (window.innerWidth > 768) return;
+
+    const scrollFocusedToSafeArea = () => {
+      const el = document.activeElement as HTMLElement | null;
+      if (!el) return;
+      const tag = el.tagName;
+      if (tag !== "INPUT" && tag !== "TEXTAREA") return;
+      const rect = el.getBoundingClientRect();
+      // Target: 15% of the screen from the top, but at least 96px down so
+      // we don't hide the input behind the webview's own top bar.
+      const targetTop = Math.max(96, window.innerHeight * 0.15);
+      const delta = rect.top - targetTop;
+      if (Math.abs(delta) < 4) return;
+      window.scrollBy({ top: delta, behavior: "smooth" });
+    };
+
+    const onFocusIn = (e: FocusEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (!t) return;
+      if (t.tagName !== "INPUT" && t.tagName !== "TEXTAREA") return;
+      // Multiple retries: the keyboard animation + the webview's own
+      // auto-scroll can take up to ~700ms to settle, and we want to be
+      // the LAST adjustment so the input ends up where we put it.
+      setTimeout(scrollFocusedToSafeArea, 150);
+      setTimeout(scrollFocusedToSafeArea, 400);
+      setTimeout(scrollFocusedToSafeArea, 750);
+    };
+
+    document.addEventListener("focusin", onFocusIn);
+    return () => document.removeEventListener("focusin", onFocusIn);
+  }, []);
 
   const stats = useMemo(() => [
     { icon: <Zap size={16} />, value: "31", label: t('auth.aecNodeTypes'), color: "#4F8AFF", type: "INPUT" },
