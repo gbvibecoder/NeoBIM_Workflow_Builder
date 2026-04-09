@@ -1921,7 +1921,7 @@ export default function VideoRenderStudio() {
       setVideoProgress(5);
 
       try {
-        const { renderWalkthrough } = await import("@/services/walkthrough-renderer");
+        const { renderWalkthrough } = await import("@/features/3d-render/services/walkthrough-renderer");
         const result = await renderWalkthrough({
           floors: buildingConfig?.floors ?? 2,
           floorHeight: buildingConfig?.floorHeight ?? 3.0,

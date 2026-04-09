@@ -65,8 +65,8 @@ export {
   generate3DModel,
   is3DAIConfigured,
   calculateKPIs,
-} from "@/services/threedai-studio";
-export type { BuildingRequirements } from "@/services/threedai-studio";
+} from "@/features/3d-render/services/threedai-studio";
+export type { BuildingRequirements } from "@/features/3d-render/services/threedai-studio";
 export { generateWithMeshy, isMeshyTextTo3DConfigured } from "@/features/3d-render/services/meshy-ai";
 export { generateIFCFile } from "@/features/ifc/services/ifc-exporter";
 export { parsePromptToStyle } from "@/services/prompt-style-parser";

@@ -304,7 +304,7 @@ export const handleGN001: NodeHandler = async (ctx) => {
   if (!artifact && process.env.ENABLE_IMAGE_TO_3D_PIPELINE === "true" && process.env.OPENAI_API_KEY) {
     logger.debug("[GN-001] Trying Image-to-3D pipeline (DALL-E → SAM 3D) as fallback");
     try {
-      const { textTo3D } = await import("@/services/text-to-3d-service");
+      const { textTo3D } = await import("@/features/3d-render/services/text-to-3d-service");
       const img3dResult = await textTo3D({
         prompt: textContent || `${buildingType}, ${floors} floors`,
         buildingDescription: rawData as unknown as import("@/services/openai").BuildingDescription | undefined,

@@ -1008,7 +1008,7 @@ async function renderClientWalkthrough(
 
   try {
     // Dynamic import for code splitting
-    const { renderWalkthrough } = await import("@/services/walkthrough-renderer");
+    const { renderWalkthrough } = await import("@/features/3d-render/services/walkthrough-renderer");
 
     const buildingConfig = artifactData._buildingConfig as {
       floors?: number;

@@ -73,7 +73,7 @@ export function ModelTab({ data }: ModelTabProps) {
   , [data.svgContent]);
 
   const handleGenerate3D = useCallback(async (geometry: FloorPlanGeometry) => {
-    const { buildFloorPlan3D } = await import("@/services/threejs-builder");
+    const { buildFloorPlan3D } = await import("@/features/3d-render/services/threejs-builder");
     const modelBase = typeof window !== "undefined" ? window.location.origin : "";
     setGeneratedHtml(buildFloorPlan3D(geometry, undefined, modelBase));
     setViewMode("3d");

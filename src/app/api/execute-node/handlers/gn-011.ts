@@ -323,7 +323,7 @@ export const handleGN011: NodeHandler = async (ctx) => {
     ...(buildingOutline && { buildingOutline }),
   };
 
-  const { buildFloorPlan3D } = await import("@/services/threejs-builder");
+  const { buildFloorPlan3D } = await import("@/features/3d-render/services/threejs-builder");
 
   // Fetch source image for image-as-floor approach
   let sourceImageDataUrl = "";

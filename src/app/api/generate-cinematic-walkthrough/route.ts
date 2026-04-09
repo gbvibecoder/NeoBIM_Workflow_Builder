@@ -13,7 +13,7 @@ import {
   savePipelineState,
   STAGE_DURATIONS,
   type CinematicPipelineState,
-} from "@/services/cinematic-pipeline";
+} from "@/features/3d-render/services/cinematic-pipeline";
 
 /**
  * POST /api/generate-cinematic-walkthrough
