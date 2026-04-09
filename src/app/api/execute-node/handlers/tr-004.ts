@@ -164,7 +164,7 @@ export const handleTR004: NodeHandler = async (ctx) => {
     let traceSucceeded = false;
     try {
       logger.debug("[TR-004] Starting Potrace + GPT-4o hybrid analysis...");
-      const { traceFloorPlanToSVG } = await import("@/services/floor-plan-tracer");
+      const { traceFloorPlanToSVG } = await import("@/features/floor-plan/services/floor-plan-tracer");
       const imageBuffer = Buffer.from(base64Data as string, "base64");
       const trace = await traceFloorPlanToSVG(imageBuffer);
 
@@ -258,7 +258,7 @@ export const handleTR004: NodeHandler = async (ctx) => {
     // ── FALLBACK: Sharp pixel detection + GPT-4o labeling ──
     if (!traceSucceeded) {
       try {
-        const { detectFloorPlanGeometry } = await import("@/services/floor-plan-detector");
+        const { detectFloorPlanGeometry } = await import("@/features/floor-plan/services/floor-plan-detector");
         const sharpResult = await detectFloorPlanGeometry(
           base64Data as string,
           typeof mimeType === "string" ? mimeType : "image/jpeg",

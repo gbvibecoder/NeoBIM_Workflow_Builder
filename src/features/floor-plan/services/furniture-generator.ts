@@ -18,7 +18,7 @@
  *   - Pro + PBR: 80 credits → ~40 models/month
  */
 
-import { getAllAIPrompts } from "./furniture-catalog";
+import { getAllAIPrompts } from "@/features/floor-plan/services/furniture-catalog";
 
 // ─── 3D AI Studio Configuration ─────────────────────────────────────────────
 
