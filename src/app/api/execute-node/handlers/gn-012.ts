@@ -1,5 +1,6 @@
 import { generateId, generateFloorPlan } from "./deps";
 import type { NodeHandler } from "./types";
+import { logger } from "@/lib/logger";
 
 /**
  * GN-012 — Floor Plan Editor (Interactive CAD) — 3-Stage AI Pipeline
@@ -50,7 +51,7 @@ export const handleGN012: NodeHandler = async (ctx) => {
           roomProgram = programRoomsFallback(promptForAI);
         }
 
-        console.log(`[GN-012][STAGE-1] Rooms from AI: ${roomProgram.rooms.length}`, roomProgram.rooms.map(r => `${r.name} (floor:${r.floor ?? 0})`));
+        logger.debug(`[GN-012][STAGE-1] Rooms from AI: ${roomProgram.rooms.length}`, roomProgram.rooms.map(r => `${r.name} (floor:${r.floor ?? 0})`));
 
         const description = programToDescription(roomProgram);
 
@@ -59,7 +60,7 @@ export const handleGN012: NodeHandler = async (ctx) => {
           const { layoutMultiFloor } = await import("@/lib/floor-plan/layout-engine");
           const { convertMultiFloorToProject } = await import("@/lib/floor-plan/pipeline-adapter");
           const multiFloor = layoutMultiFloor(roomProgram);
-          console.log(`[GN-012][STAGE-2] Multi-floor: ${multiFloor.floors.reduce((s, f) => s + f.rooms.length, 0)} rooms placed`);
+          logger.debug(`[GN-012][STAGE-2] Multi-floor: ${multiFloor.floors.reduce((s, f) => s + f.rooms.length, 0)} rooms placed`);
           project = convertMultiFloorToProject(multiFloor.floors, description.projectName, designBrief);
           sourceType = "ai-generated";
         } else {
@@ -92,7 +93,7 @@ export const handleGN012: NodeHandler = async (ctx) => {
                 };
               });
 
-          console.log(`[GN-012][STAGE-2] Single-floor: ${rooms.length} rooms placed`);
+          logger.debug(`[GN-012][STAGE-2] Single-floor: ${rooms.length} rooms placed`);
 
           // Compute footprint from actual room bounding box (layout engine may
           // expand footprint beyond totalArea to fit corridor/zones)

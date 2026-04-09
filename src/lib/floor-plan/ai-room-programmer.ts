@@ -12,6 +12,7 @@
 
 import { getClient } from "@/services/openai";
 import { enforceHardCaps, classifyRoom } from "./room-sizer";
+import { logger } from "@/lib/logger";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -286,7 +287,7 @@ export async function programRooms(
   if (isComplex && isMultiFloor) {
     try {
       const result = await programRoomsMultiCall(prompt, mentionedRooms, userApiKey);
-      console.log(`[STAGE-1-MULTI] Total rooms: ${result.rooms.length}`);
+      logger.debug(`[STAGE-1-MULTI] Total rooms: ${result.rooms.length}`);
       return result;
     } catch (err) {
       console.warn("[STAGE-1-MULTI] Multi-call failed, falling back to single call:", err);
@@ -403,7 +404,7 @@ export async function programRooms(
   // ── Hard caps: enforce absolute min/max per room type ──
   // AI handles sizing via few-shot examples. Caps catch the 10% outliers.
   enforceHardCaps(raw.rooms);
-  console.log(`[HARD-CAPS] Enforced caps on ${raw.rooms.length} rooms`);
+  logger.debug(`[HARD-CAPS] Enforced caps on ${raw.rooms.length} rooms`);
 
   // Ensure adjacency is valid
   if (!Array.isArray(raw.adjacency)) raw.adjacency = [];
@@ -463,7 +464,7 @@ export async function programRooms(
   raw.isVastuRequested = /vastu|vaastu|vastu.?compliant/i.test(prompt);
   raw.originalPrompt = prompt;
 
-  console.log(`[STAGE-1] Rooms from AI: ${raw.rooms.length}`, raw.rooms.map(r => `${r.name} (floor:${r.floor ?? 0})`));
+  logger.debug(`[STAGE-1] Rooms from AI: ${raw.rooms.length}`, raw.rooms.map(r => `${r.name} (floor:${r.floor ?? 0})`));
 
   return raw;
 }
@@ -494,7 +495,7 @@ async function programRoomsMultiCall(
   const groundMentioned = ground ? extractMentionedRooms(ground) : allMentionedRooms;
   const firstMentioned = first ? extractMentionedRooms(first) : [];
 
-  console.log(`[STAGE-1-MULTI] Splitting: ground=${groundMentioned.length} rooms, first=${firstMentioned.length} rooms`);
+  logger.debug(`[STAGE-1-MULTI] Splitting: ground=${groundMentioned.length} rooms, first=${firstMentioned.length} rooms`);
 
   const groundProgram = await programSingleFloor(client, groundPrompt, 0, groundMentioned);
 
@@ -567,7 +568,7 @@ async function programRoomsMultiCall(
     originalPrompt: prompt,
   });
 
-  console.log(`[STAGE-1-MULTI] Ground: ${groundRooms.length + missingGround.length}, First: ${firstRooms.length + missingFirst.length}, Total: ${merged.rooms.length}`);
+  logger.debug(`[STAGE-1-MULTI] Ground: ${groundRooms.length + missingGround.length}, First: ${firstRooms.length + missingFirst.length}, Total: ${merged.rooms.length}`);
 
   return merged;
 }
@@ -791,7 +792,7 @@ function mergeOpenPlanRooms(rooms: RoomSpec[], prompt: string): RoomSpec[] {
           // Remove secondary
           const removeIdx = rooms.indexOf(secondary);
           if (removeIdx !== -1) rooms.splice(removeIdx, 1);
-          console.log(`[MERGE] Open-plan merge: "${primary.name}" (${primary.areaSqm.toFixed(1)} sqm)`);
+          logger.debug(`[MERGE] Open-plan merge: "${primary.name}" (${primary.areaSqm.toFixed(1)} sqm)`);
         }
       }
     }

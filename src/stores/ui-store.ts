@@ -29,10 +29,6 @@ interface UIState {
   // Demo mode
   isDemoMode: boolean;
 
-  // Execution complete modal
-  showExecutionCompleteModal: boolean;
-  setShowExecutionCompleteModal: (show: boolean) => void;
-
   // Pending node add — sidebar click-to-add, consumed by WorkflowCanvas
   pendingNodeAdd: string | null;
   requestAddNode: (catalogueId: string) => void;
@@ -82,9 +78,6 @@ export const useUIStore = create<UIState>()((set) => ({
   isGeneratingWorkflow: false,
 
   isDemoMode: false,
-
-  showExecutionCompleteModal: false,
-  setShowExecutionCompleteModal: (show) => set({ showExecutionCompleteModal: show }),
 
   pendingNodeAdd: null,
   requestAddNode: (catalogueId) => set({ pendingNodeAdd: catalogueId }),

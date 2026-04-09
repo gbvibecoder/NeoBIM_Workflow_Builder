@@ -515,7 +515,6 @@ function WorkflowCanvasInner({ workflowId: urlWorkflowId, templateId }: Workflow
   const isPromptModeActive = useUIStore(s => s.isPromptModeActive);
   const toggleNodeLibrary = useUIStore(s => s.toggleNodeLibrary);
   const isDemoMode = useUIStore(s => s.isDemoMode);
-  const setShowExecutionCompleteModal = useUIStore(s => s.setShowExecutionCompleteModal);
   const pendingNodeAdd = useUIStore(s => s.pendingNodeAdd);
   const clearPendingNodeAdd = useUIStore(s => s.clearPendingNodeAdd);
 

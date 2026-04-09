@@ -17,17 +17,8 @@ const REAL_NODE_IDS = new Set(["TR-001", "TR-003", "TR-004", "TR-005", "TR-012",
 // Nodes that require OpenAI API calls
 const OPENAI_NODES = new Set(["TR-003", "TR-004", "TR-005", "TR-012", "GN-003", "GN-004", "GN-008"]);
 
-// In-memory set of executionIds that have already been rate-limited this run.
-// This ensures we count rate limit once per workflow execution, not once per node.
-// Entries auto-expire after 10 minutes to prevent memory leaks.
-const rateLimitedExecutions = new Map<string, number>();
-
-function cleanupRateLimitCache() {
-  const tenMinutesAgo = Date.now() - 10 * 60 * 1000;
-  for (const [key, ts] of rateLimitedExecutions) {
-    if (ts < tenMinutesAgo) rateLimitedExecutions.delete(key);
-  }
-}
+// Per-workflow rate-limit dedup is handled by isExecutionAlreadyCounted() in
+// src/lib/rate-limit.ts (Redis-backed, 30-day TTL). No in-memory cache needed.
 
 // Allow up to 600s for heavy AI generation chains (DALL-E + Claude QA + retries, 3D, video)
 export const maxDuration = 600;
@@ -78,9 +69,6 @@ export async function POST(req: NextRequest) {
         : false;
 
       if (!alreadyCounted) {
-        // Cleanup stale entries periodically
-        if (rateLimitedExecutions.size > 500) cleanupRateLimitCache();
-
         const rateLimitResult = await checkRateLimit(userId, userRole, userEmail);
 
         if (!rateLimitResult.success) {
@@ -127,11 +115,6 @@ export async function POST(req: NextRequest) {
         });
         rateLimitRemaining = rateLimitResult.remaining;
         rateLimitTotal = rateLimitResult.limit;
-
-        // Mark this execution as rate-limited so subsequent nodes skip the check
-        if (executionId) {
-          rateLimitedExecutions.set(`${userId}:${executionId}`, Date.now());
-        }
       }
 
     } catch (error) {

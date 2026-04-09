@@ -13,6 +13,7 @@
  */
 
 import type { EnhancedRoomProgram, RoomSpec, AdjacencyRequirement } from "./ai-room-programmer";
+import { logger } from "@/lib/logger";
 import { correctDimensions } from "./dimension-corrector";
 import type { RoomWithTarget } from "./dimension-corrector";
 import { layoutCourtyardPlan, hasCourtyardRoom } from "./courtyard-layout";
@@ -208,9 +209,9 @@ export function layoutFloorPlan(program: EnhancedRoomProgram): PlacedRoom[] {
     if (solverResult.score.total >= 50 && solverResult.score.hardViolations === 0 && solverResult.layout.length >= inputCount) {
       result = solverResult.layout;
       usedSolver = true;
-      console.log(`[SOLVER] Accepted layout: score=${solverResult.score.total}, candidates=${solverResult.candidatesEvaluated}, strategy=${solverResult.strategy}`);
+      logger.debug(`[SOLVER] Accepted layout: score=${solverResult.score.total}, candidates=${solverResult.candidatesEvaluated}, strategy=${solverResult.strategy}`);
     } else {
-      console.log(`[SOLVER] Score ${solverResult.score.total} (hard=${solverResult.score.hardViolations}, rooms=${solverResult.layout.length}/${inputCount}) — falling back to BSP`);
+      logger.debug(`[SOLVER] Score ${solverResult.score.total} (hard=${solverResult.score.hardViolations}, rooms=${solverResult.layout.length}/${inputCount}) — falling back to BSP`);
     }
   } catch (err) {
     console.warn("[SOLVER] Constraint solver failed, falling back to BSP:", err);
@@ -244,7 +245,7 @@ export function layoutFloorPlan(program: EnhancedRoomProgram): PlacedRoom[] {
       // Use fixed-room pre-placement + BSP for remaining space
       try {
         result = layoutWithFixedRooms(rooms, fpW, fpH, program.adjacency, program.isVastuRequested);
-        console.log(`[LAYOUT] Fixed-room placement: ${fixedRooms.length} fixed + ${rooms.length - fixedRooms.length} flex`);
+        logger.debug(`[LAYOUT] Fixed-room placement: ${fixedRooms.length} fixed + ${rooms.length - fixedRooms.length} flex`);
       } catch (err) {
         console.warn("[LAYOUT] Fixed-room placement failed, falling back to BSP:", err);
         // Fall through to normal BSP
@@ -1530,7 +1531,7 @@ function enforceHardCapsOnLayout(rooms: PlacedRoom[], specs?: RoomSpec[]): Place
       const shorter = Math.min(room.width, room.depth);
       const newLonger = caps.max / shorter;
       if (newLonger >= 2.0 && shorter >= 1.0) {
-        console.log(`[LAYOUT-CAP] ${room.name}: ${area.toFixed(1)} sqm → capped to ${caps.max} sqm (${classified})`);
+        logger.debug(`[LAYOUT-CAP] ${room.name}: ${area.toFixed(1)} sqm → capped to ${caps.max} sqm (${classified})`);
         if (room.depth >= room.width) {
           room.depth = grid(newLonger);
         } else {
@@ -1541,7 +1542,7 @@ function enforceHardCapsOnLayout(rooms: PlacedRoom[], specs?: RoomSpec[]): Place
       }
     }
   }
-  if (capped > 0) console.log(`[LAYOUT-CAP] Capped ${capped} rooms`);
+  if (capped > 0) logger.debug(`[LAYOUT-CAP] Capped ${capped} rooms`);
 
   return rooms;
 }
@@ -2739,7 +2740,7 @@ export function layoutMultiFloor(program: EnhancedRoomProgram): MultiFloorLayout
         );
       }
 
-      console.log(`[STAGE-2] Floor ${level}: ${layout.length} rooms placed:`, layout.map(r => `${r.name} ${r.width.toFixed(1)}x${r.depth.toFixed(1)}`));
+      logger.debug(`[STAGE-2] Floor ${level}: ${layout.length} rooms placed:`, layout.map(r => `${r.name} ${r.width.toFixed(1)}x${r.depth.toFixed(1)}`));
 
       const bW = layout.length > 0 ? grid(Math.max(...layout.map(r => r.x + r.width))) : 0;
       const bD = layout.length > 0 ? grid(Math.max(...layout.map(r => r.y + r.depth))) : 0;
@@ -2760,7 +2761,7 @@ export function layoutMultiFloor(program: EnhancedRoomProgram): MultiFloorLayout
 
     // Final validation: total rooms across all floors
     const totalOutput = floors.reduce((s, f) => s + f.rooms.length, 0);
-    console.log(`[STAGE-2] Total rooms placed: ${totalOutput} (input: ${totalInputRooms})`);
+    logger.debug(`[STAGE-2] Total rooms placed: ${totalOutput} (input: ${totalInputRooms})`);
 
     return { floors };
   } catch (err) {

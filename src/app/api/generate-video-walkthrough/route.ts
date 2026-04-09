@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { checkEndpointRateLimit } from "@/lib/rate-limit";
 import { formatErrorResponse } from "@/lib/user-errors";
 import { submitDualWalkthrough } from "@/services/video-service";
+import { logger } from "@/lib/logger";
 
 /**
  * POST /api/generate-video-walkthrough
@@ -138,7 +139,7 @@ export async function POST(req: NextRequest) {
   // visible to the running Node process. Common gotcha: editing .env.local
   // without restarting `npm run dev` → keys present in file, missing in
   // process.env. This log eliminates that ambiguity.
-  console.log(
+  logger.debug(
     "[video-walkthrough] Kling keys present:",
     hasKlingKeys,
     "user:",
