@@ -5,9 +5,9 @@ import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { PointerLockControls } from "three/examples/jsm/controls/PointerLockControls.js";
 import type { ArchitecturalViewerProps, DoorMesh, RoomDef, BuildingStyle } from "@/types/architectural-viewer";
-import { createMaterials, disposeMaterials } from "@/lib/3d-generation/materials";
-import { buildBuilding, getDefaultConfig, generateRoomsForBuilding } from "@/lib/3d-generation/building";
-import { addFurniture } from "@/lib/3d-generation/furniture";
+import { createMaterials, disposeMaterials } from "@/features/3d-render/lib/materials";
+import { buildBuilding, getDefaultConfig, generateRoomsForBuilding } from "@/features/3d-render/lib/building";
+import { addFurniture } from "@/features/3d-render/lib/furniture";
 
 // ─── Control Mode ─────────────────────────────────────────────────────────────
 

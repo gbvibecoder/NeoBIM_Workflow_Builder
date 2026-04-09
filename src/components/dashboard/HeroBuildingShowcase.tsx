@@ -44,13 +44,13 @@ import {
   ScanLine,
   MousePointerClick,
 } from "lucide-react";
-import { createMaterials, disposeMaterials } from "@/lib/3d-generation/materials";
+import { createMaterials, disposeMaterials } from "@/features/3d-render/lib/materials";
 import {
   buildBuilding,
   getDefaultConfig,
   generateRoomsForBuilding,
-} from "@/lib/3d-generation/building";
-import { addFurniture } from "@/lib/3d-generation/furniture";
+} from "@/features/3d-render/lib/building";
+import { addFurniture } from "@/features/3d-render/lib/furniture";
 import type {
   BuildingStyle,
   DoorMesh,

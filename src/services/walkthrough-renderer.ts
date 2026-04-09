@@ -29,9 +29,9 @@ import {
   buildBuilding,
   generateRoomsForBuilding,
   getDefaultConfig,
-} from "@/lib/3d-generation/building";
-import { createMaterials, disposeMaterials } from "@/lib/3d-generation/materials";
-import { addFurniture } from "@/lib/3d-generation/furniture";
+} from "@/features/3d-render/lib/building";
+import { createMaterials, disposeMaterials } from "@/features/3d-render/lib/materials";
+import { addFurniture } from "@/features/3d-render/lib/furniture";
 import type { BuildingStyle } from "@/types/architectural-viewer";
 
 // ─── Public Types ────────────────────────────────────────────────────────────
