@@ -4,11 +4,11 @@
  */
 
 import type { FloorPlanProject, Floor, Wall, Room, Door, CadWindow } from "@/types/floor-plan-cad";
-import { generateBOQ, type BOQReport } from "./boq-generator";
-import { analyzeVastuCompliance, type VastuReport } from "./vastu-analyzer";
-import { validateBuildingCode, type CodeReport } from "./code-validator";
-import { exportFloorToSvg } from "./export-svg";
-import { wallLength, polygonBounds } from "./geometry";
+import { generateBOQ, type BOQReport } from "@/lib/floor-plan/boq-generator";
+import { analyzeVastuCompliance, type VastuReport } from "@/lib/floor-plan/vastu-analyzer";
+import { validateBuildingCode, type CodeReport } from "@/lib/floor-plan/code-validator";
+import { exportFloorToSvg } from "@/lib/floor-plan/export-svg";
+import { wallLength, polygonBounds } from "@/lib/floor-plan/geometry";
 
 // ────────────────────────────────────────────────────────────────────────────
 // Room Schedule

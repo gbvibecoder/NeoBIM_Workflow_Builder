@@ -8,7 +8,7 @@
  */
 
 import type { Floor, Room, Wall, CadWindow, Point } from "@/types/floor-plan-cad";
-import { wallLength, wallAngle, polygonBounds } from "./geometry";
+import { wallLength, wallAngle, polygonBounds } from "@/lib/floor-plan/geometry";
 
 // ============================================================
 // TYPES

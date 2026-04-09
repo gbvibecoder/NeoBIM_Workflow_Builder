@@ -12,13 +12,13 @@
  * Pure synchronous function — no AI calls, runs in < 10ms.
  */
 
-import type { EnhancedRoomProgram, RoomSpec, AdjacencyRequirement } from "./ai-room-programmer";
+import type { EnhancedRoomProgram, RoomSpec, AdjacencyRequirement } from "@/lib/floor-plan/ai-room-programmer";
 import { logger } from "@/lib/logger";
-import { correctDimensions } from "./dimension-corrector";
-import type { RoomWithTarget } from "./dimension-corrector";
-import { layoutCourtyardPlan, hasCourtyardRoom } from "./courtyard-layout";
-import { solveLayout } from "./constraint-solver";
-import { classifyRoom } from "./room-sizer";
+import { correctDimensions } from "@/lib/floor-plan/dimension-corrector";
+import type { RoomWithTarget } from "@/lib/floor-plan/dimension-corrector";
+import { layoutCourtyardPlan, hasCourtyardRoom } from "@/lib/floor-plan/courtyard-layout";
+import { solveLayout } from "@/lib/floor-plan/constraint-solver";
+import { classifyRoom } from "@/lib/floor-plan/room-sizer";
 
 // ── Output type ──────────────────────────────────────────────────────────────
 
@@ -57,7 +57,7 @@ const DEFAULT_ASPECT = 1.33;    // footprint width:depth ratio
 const MAX_ROOM_AR = 2.8;        // max aspect ratio for non-corridor rooms
 
 // ── Room standards (centralized architectural minimums) ──────────────────────
-import { getMinDimMeters, getMinDepthMeters, getRoomStandardByName } from "./room-standards";
+import { getMinDimMeters, getMinDepthMeters, getRoomStandardByName } from "@/lib/floor-plan/room-standards";
 
 /** Get the furniture-aware minimum dimension (shorter side) for a room. */
 function getMinDimForType(type: string, name: string): number {

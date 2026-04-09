@@ -15,7 +15,7 @@ import {
   type CodeCategory,
   type CodeSeverity,
   type CodeViolation,
-} from "./building-code-rules";
+} from "@/lib/floor-plan/building-code-rules";
 
 // ============================================================
 // TYPES

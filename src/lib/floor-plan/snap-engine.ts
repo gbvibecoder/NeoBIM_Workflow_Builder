@@ -15,7 +15,7 @@ import {
   scalePoint,
   wallLength,
   segmentIntersection,
-} from "./geometry";
+} from "@/lib/floor-plan/geometry";
 
 // ============================================================
 // TYPES

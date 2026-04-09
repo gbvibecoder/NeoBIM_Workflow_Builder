@@ -6,8 +6,8 @@
  */
 
 import type { Floor, Room, Wall, Door, FurnitureInstance, Point, RoomType } from "@/types/floor-plan-cad";
-import { wallLength, lineDirection, addPoints, scalePoint } from "./geometry";
-import { getCatalogItem } from "./furniture-catalog";
+import { wallLength, lineDirection, addPoints, scalePoint } from "@/lib/floor-plan/geometry";
+import { getCatalogItem } from "@/lib/floor-plan/furniture-catalog";
 
 function genId(prefix: string): string {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;

@@ -24,8 +24,8 @@ import type {
   Point,
   RoomType,
 } from "@/types/floor-plan-cad";
-import { smartPlaceDoors, smartPlaceWindows } from "./smart-placement";
-import { layoutAllFurniture } from "./furniture-layout";
+import { smartPlaceDoors, smartPlaceWindows } from "@/lib/floor-plan/smart-placement";
+import { layoutAllFurniture } from "@/lib/floor-plan/furniture-layout";
 
 let _idCounter = 0;
 function genId(prefix: string): string {

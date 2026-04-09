@@ -7,12 +7,12 @@
 
 import type { Floor, Room } from "@/types/floor-plan-cad";
 import { polygonCentroid, polygonBounds, floorBounds } from "@/lib/floor-plan/geometry";
-import { analyzeVastuCompliance } from "./vastu-analyzer";
+import { analyzeVastuCompliance } from "@/lib/floor-plan/vastu-analyzer";
 import {
   ALL_VASTU_RULES,
   DIRECTION_LABELS,
   type VastuDirection,
-} from "./vastu-rules";
+} from "@/lib/floor-plan/vastu-rules";
 
 // ============================================================
 // TYPES

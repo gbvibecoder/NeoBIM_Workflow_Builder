@@ -14,7 +14,7 @@
  * 6. Adjacency satisfaction (required adjacencies from Stage 1)
  */
 
-import type { AdjacencyRequirement } from "./ai-room-programmer";
+import type { AdjacencyRequirement } from "@/lib/floor-plan/ai-room-programmer";
 
 export interface PositionedRoomForValidation {
   name: string;

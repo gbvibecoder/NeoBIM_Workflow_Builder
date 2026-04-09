@@ -10,7 +10,7 @@
 
 import type { FloorPlanGeometry, FloorPlanRoom } from "@/types/floor-plan";
 import type { FloorPlanProject, Floor } from "@/types/floor-plan-cad";
-import { convertGeometryToProject } from "./pipeline-adapter";
+import { convertGeometryToProject } from "@/lib/floor-plan/pipeline-adapter";
 
 // ────────────────────────────────────────────────────────────────────────────
 // Public API

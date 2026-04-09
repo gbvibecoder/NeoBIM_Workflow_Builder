@@ -11,7 +11,7 @@
  */
 
 import { getClient } from "@/services/openai";
-import { enforceHardCaps, classifyRoom } from "./room-sizer";
+import { enforceHardCaps, classifyRoom } from "@/lib/floor-plan/room-sizer";
 import { logger } from "@/lib/logger";
 
 // ── Types ────────────────────────────────────────────────────────────────────

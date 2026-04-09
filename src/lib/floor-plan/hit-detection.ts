@@ -15,8 +15,8 @@ import {
   distance,
   midpoint,
   wallLength,
-} from "./geometry";
-import { getCatalogItem } from "./furniture-catalog";
+} from "@/lib/floor-plan/geometry";
+import { getCatalogItem } from "@/lib/floor-plan/furniture-catalog";
 
 // ============================================================
 // PUBLIC TYPES

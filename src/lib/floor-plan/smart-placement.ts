@@ -13,7 +13,7 @@ import type {
 import {
   wallLength, lineDirection, perpendicularLeft, addPoints, scalePoint,
   polygonBounds, polygonCentroid, wallAngle,
-} from "./geometry";
+} from "@/lib/floor-plan/geometry";
 
 // ============================================================
 // ID GENERATOR
