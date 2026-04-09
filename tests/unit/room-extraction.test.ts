@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { extractMentionedRooms } from "@/lib/floor-plan/ai-room-programmer";
+import { extractMentionedRooms } from "@/features/floor-plan/lib/ai-room-programmer";
 
 describe("extractMentionedRooms", () => {
   it("should extract rooms from a simple prompt", () => {

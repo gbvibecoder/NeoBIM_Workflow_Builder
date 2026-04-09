@@ -9,9 +9,9 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { layoutFloorPlan, layoutMultiFloor } from "@/lib/floor-plan/layout-engine";
-import { layoutCourtyardPlan } from "@/lib/floor-plan/courtyard-layout";
-import type { EnhancedRoomProgram, RoomSpec, AdjacencyRequirement } from "@/lib/floor-plan/ai-room-programmer";
+import { layoutFloorPlan, layoutMultiFloor } from "@/features/floor-plan/lib/layout-engine";
+import { layoutCourtyardPlan } from "@/features/floor-plan/lib/courtyard-layout";
+import type { EnhancedRoomProgram, RoomSpec, AdjacencyRequirement } from "@/features/floor-plan/lib/ai-room-programmer";
 
 function makeProgram(
   rooms: Array<Partial<RoomSpec> & { name: string; type: string; areaSqm: number }>,

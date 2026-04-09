@@ -12,8 +12,8 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { correctDimensions, type RoomWithTarget } from "@/lib/floor-plan/dimension-corrector";
-import { parsePromptRequirements } from "@/lib/floor-plan/program-validator";
+import { correctDimensions, type RoomWithTarget } from "@/features/floor-plan/lib/dimension-corrector";
+import { parsePromptRequirements } from "@/features/floor-plan/lib/program-validator";
 
 // ============================================================
 // DIMENSION CORRECTOR — tighter thresholds
@@ -146,7 +146,7 @@ describe("SVG Export — Arrow Marker", () => {
   it("should include arrow marker definition in source", async () => {
     const fs = await import("fs");
     const path = await import("path");
-    const filePath = path.resolve("src/lib/floor-plan/export-svg.ts");
+    const filePath = path.resolve("src/features/floor-plan/lib/export-svg.ts");
     const content = fs.readFileSync(filePath, "utf-8");
     expect(content).toContain('<marker id="arrow"');
     expect(content).toContain('orient="auto-start-reverse"');
@@ -162,7 +162,7 @@ describe("Smart Placement Door Heights", () => {
     // Verify the constant in the source code
     const fs = await import("fs");
     const path = await import("path");
-    const filePath = path.resolve("src/lib/floor-plan/smart-placement.ts");
+    const filePath = path.resolve("src/features/floor-plan/lib/smart-placement.ts");
     const content = fs.readFileSync(filePath, "utf-8");
     // Main entrance should be 2200mm, not 2100mm
     expect(content).toContain('type === "main_entrance" ? 2200 : 2100');
@@ -177,7 +177,7 @@ describe("Vastu Analyzer Rule Specificity", () => {
   it("should use penalty_points for rule priority, not string length", async () => {
     const fs = await import("fs");
     const path = await import("path");
-    const filePath = path.resolve("src/lib/floor-plan/vastu-analyzer.ts");
+    const filePath = path.resolve("src/features/floor-plan/lib/vastu-analyzer.ts");
     const content = fs.readFileSync(filePath, "utf-8");
     // Should NOT use string length for specificity
     expect(content).not.toContain("map(t => t.length)");
@@ -194,7 +194,7 @@ describe("Code Validator Frame Factor Consistency", () => {
   it("should use gross opening area (no frame factor) per NBC 2016 Cl. 8.4.6", async () => {
     const fs = await import("fs");
     const path = await import("path");
-    const filePath = path.resolve("src/lib/floor-plan/code-validator.ts");
+    const filePath = path.resolve("src/features/floor-plan/lib/code-validator.ts");
     const content = fs.readFileSync(filePath, "utf-8");
     // NBC 2016 Cl. 8.4.6 specifies "opening area" (gross window opening), not glazed area.
     // FRAME_FACTOR should NOT be applied to window-to-floor ratio checks.
@@ -215,7 +215,7 @@ describe("Furniture Layout Sofa Fix", () => {
   it("should not have sofa mutation inside .filter() callback", async () => {
     const fs = await import("fs");
     const path = await import("path");
-    const filePath = path.resolve("src/lib/floor-plan/furniture-layout.ts");
+    const filePath = path.resolve("src/features/floor-plan/lib/furniture-layout.ts");
     const content = fs.readFileSync(filePath, "utf-8");
     // The sofa-2seat adaptation should be in .map(), not .filter()
     // .filter() should not contain catalogId mutation

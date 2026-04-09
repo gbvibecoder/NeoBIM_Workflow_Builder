@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { solveLayout, type SolverResult } from "@/lib/floor-plan/constraint-solver";
-import type { EnhancedRoomProgram, RoomSpec, AdjacencyRequirement } from "@/lib/floor-plan/ai-room-programmer";
-import type { PlacedRoom } from "@/lib/floor-plan/layout-engine";
+import { solveLayout, type SolverResult } from "@/features/floor-plan/lib/constraint-solver";
+import type { EnhancedRoomProgram, RoomSpec, AdjacencyRequirement } from "@/features/floor-plan/lib/ai-room-programmer";
+import type { PlacedRoom } from "@/features/floor-plan/lib/layout-engine";
 
 // ── Helper: build a minimal EnhancedRoomProgram ─────────────────────────────
 

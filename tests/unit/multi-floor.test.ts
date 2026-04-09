@@ -8,10 +8,10 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { programRoomsFallback } from "@/lib/floor-plan/ai-room-programmer";
-import { layoutMultiFloor } from "@/lib/floor-plan/layout-engine";
-import { convertMultiFloorToProject, convertGeometryToProject } from "@/lib/floor-plan/pipeline-adapter";
-import type { FloorPlanGeometry } from "@/types/floor-plan";
+import { programRoomsFallback } from "@/features/floor-plan/lib/ai-room-programmer";
+import { layoutMultiFloor } from "@/features/floor-plan/lib/layout-engine";
+import { convertMultiFloorToProject, convertGeometryToProject } from "@/features/floor-plan/lib/pipeline-adapter";
+import type { FloorPlanGeometry } from "@/features/floor-plan/types/floor-plan";
 
 describe("Multi-Floor Generation", () => {
 
