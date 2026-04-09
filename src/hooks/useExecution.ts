@@ -12,7 +12,7 @@ import { awardXP } from "@/lib/award-xp";
 import { trackWorkflowExecuted, trackNodeUsed, trackRegenerationUsed } from "@/lib/track";
 import type { Execution, ExecutionArtifact } from "@/types/execution";
 import type { WorkflowNode } from "@/types/nodes";
-import type { LogEntry } from "@/components/canvas/ExecutionLog";
+import type { LogEntry } from "@/features/canvas/components/ExecutionLog";
 
 // All node IDs that have real API implementations on the server
 const REAL_NODE_IDS = new Set(["TR-001", "TR-003", "TR-004", "TR-005", "TR-012", "TR-015", "TR-016", "GN-001", "GN-003", "GN-004", "GN-009", "GN-010", "GN-011", "GN-012", "TR-007", "TR-008", "EX-001", "EX-002", "EX-003"]);

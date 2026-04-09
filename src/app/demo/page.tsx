@@ -4,7 +4,7 @@ import React, { useEffect, useRef } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowRight, Play } from "lucide-react";
-import { WorkflowCanvas } from "@/components/canvas/WorkflowCanvas";
+import { WorkflowCanvas } from "@/features/canvas/components/WorkflowCanvas";
 import { useWorkflowStore } from "@/stores/workflow-store";
 import { useUIStore } from "@/stores/ui-store";
 import { useExecutionStore } from "@/stores/execution-store";

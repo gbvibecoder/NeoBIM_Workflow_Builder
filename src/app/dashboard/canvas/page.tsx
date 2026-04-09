@@ -263,7 +263,7 @@ function CanvasSkeletonLoader() {
 // ─── Lazy Load Heavy Canvas Component ─────────────────────────────
 // @xyflow/react is 260KB - only load when user navigates to canvas
 const WorkflowCanvas = dynamic(
-  () => import("@/components/canvas/WorkflowCanvas").then((m) => ({ default: m.WorkflowCanvas })),
+  () => import("@/features/canvas/components/WorkflowCanvas").then((m) => ({ default: m.WorkflowCanvas })),
   {
     ssr: false,
     loading: () => <CanvasSkeletonLoader />,

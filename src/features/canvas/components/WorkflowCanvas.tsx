@@ -30,24 +30,24 @@ import { AnimatedEdge } from "@/components/canvas/edges/AnimatedEdge";
 import { RightNodePanel } from "@/components/canvas/panels/RightNodePanel";
 import { CanvasToolbar } from "@/components/canvas/toolbar/CanvasToolbar";
 
-import { ExecutionLog } from "@/components/canvas/ExecutionLog";
-import { ResultShowcase } from "@/components/canvas/ResultShowcase";
-import { OnboardingTour } from "@/components/canvas/OnboardingTour";
+import { ExecutionLog } from "@/features/canvas/components/ExecutionLog";
+import { ResultShowcase } from "@/features/canvas/components/ResultShowcase";
+import { OnboardingTour } from "@/features/canvas/components/OnboardingTour";
 import { AIChatPanel } from "@/components/canvas/panels/AIChatPanel";
 import type { ChatMessage } from "@/components/canvas/panels/AIChatPanel";
-import type { LogEntry } from "@/components/canvas/ExecutionLog";
-import type { ContextMenuState } from "@/components/canvas/ContextMenu";
+import type { LogEntry } from "@/features/canvas/components/ExecutionLog";
+import type { ContextMenuState } from "@/features/canvas/components/ContextMenu";
 import { PromptInput } from "@/features/ai/components/PromptInput";
 
 // ContextMenu is right-click only — load lazily
 const ContextMenu = dynamic(
-  () => import("./ContextMenu").then((m) => m.ContextMenu),
+  () => import("@/features/canvas/components/ContextMenu").then((m) => m.ContextMenu),
   { ssr: false }
 );
 
 // Architectural 3D walkthrough viewer — client-only
 const ArchitecturalViewer = dynamic(
-  () => import("./artifacts/architectural-viewer/ArchitecturalViewer"),
+  () => import("@/components/canvas/artifacts/architectural-viewer/ArchitecturalViewer"),
   { ssr: false }
 );
 
