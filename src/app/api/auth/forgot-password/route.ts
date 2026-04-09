@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import crypto from "crypto";
 import { prisma } from "@/lib/db";
 import { checkEndpointRateLimit } from "@/lib/rate-limit";
-import { sendPasswordResetEmail } from "@/services/email";
+import { sendPasswordResetEmail } from "@/shared/services/email";
 
 export async function POST(req: Request) {
   try {

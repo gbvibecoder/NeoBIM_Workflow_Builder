@@ -6,7 +6,7 @@ import {
   detectBHKCount,
   detectFloorCount,
   extractTotalAreaSqm,
-} from "@/lib/floor-plan/room-sizer";
+} from "@/features/floor-plan/lib/room-sizer";
 
 // ── Helper ──────────────────────────────────────────────────────────────────
 

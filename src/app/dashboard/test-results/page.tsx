@@ -18,7 +18,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
-import { Header } from "@/components/dashboard/Header";
+import { Header } from "@/features/dashboard/components/Header";
 import type {
   TestSummaryReport,
   NodeTestResult,

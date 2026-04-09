@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { checkEndpointRateLimit, getClientIp } from "@/lib/rate-limit";
-import { sendInboundLeadNotification } from "@/services/email";
+import { sendInboundLeadNotification } from "@/shared/services/email";
 
 const EMAIL_REGEX = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*\.[a-zA-Z]{2,}$/;
 

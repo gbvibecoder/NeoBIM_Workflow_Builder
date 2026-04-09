@@ -8,7 +8,7 @@ import type { NodeHandler } from "./types";
 export const handleTR015: NodeHandler = async (ctx) => {
   const { inputData, tileInstanceId, executionId } = ctx;
   // Market Intelligence Agent — live construction material prices via web search
-  const { fetchMarketPrices, computeMarketAdjustments } = await import("@/services/market-intelligence");
+  const { fetchMarketPrices, computeMarketAdjustments } = await import("@/features/boq/services/market-intelligence");
 
   // Extract location from all possible input paths
   let miCity = "";

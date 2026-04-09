@@ -10,20 +10,20 @@ import {
   Sparkles, Palette, Building2, FileSpreadsheet, X, ChevronRight,
   Layers, Trophy, Crown,
 } from "lucide-react";
-import { PREBUILT_WORKFLOWS } from "@/constants/prebuilt-workflows";
-import { useWorkflowStore } from "@/stores/workflow-store";
+import { PREBUILT_WORKFLOWS } from "@/features/workflows/constants/prebuilt-workflows";
+import { useWorkflowStore } from "@/features/workflows/stores/workflow-store";
 import { useLocale } from "@/hooks/useLocale";
 import { toast } from "sonner";
 import type { TranslationKey } from "@/lib/i18n";
 import type { WorkflowTemplate } from "@/types/workflow";
 
 // Lazy-load 3D scenes
-const WorldCanvas = lazy(() => import("@/components/dashboard/WorldCanvas").then((m) => ({ default: m.WorldCanvas })));
-const FloorPlanScene = lazy(() => import("@/components/dashboard/FloorPlanScene").then((m) => ({ default: m.FloorPlanScene })));
-const IFCViewerScene = lazy(() => import("@/components/dashboard/IFCViewerScene").then((m) => ({ default: m.IFCViewerScene })));
-const VideoRenderScene = lazy(() => import("@/components/dashboard/VideoRenderScene").then((m) => ({ default: m.VideoRenderScene })));
-const HeroBuildingShowcase = lazy(() => import("@/components/dashboard/HeroBuildingShowcase").then((m) => ({ default: m.HeroBuildingShowcase })));
-import { scrollState } from "@/components/dashboard/WorldCanvas";
+const WorldCanvas = lazy(() => import("@/features/dashboard/components/WorldCanvas").then((m) => ({ default: m.WorldCanvas })));
+const FloorPlanScene = lazy(() => import("@/features/dashboard/components/FloorPlanScene").then((m) => ({ default: m.FloorPlanScene })));
+const IFCViewerScene = lazy(() => import("@/features/dashboard/components/IFCViewerScene").then((m) => ({ default: m.IFCViewerScene })));
+const VideoRenderScene = lazy(() => import("@/features/dashboard/components/VideoRenderScene").then((m) => ({ default: m.VideoRenderScene })));
+const HeroBuildingShowcase = lazy(() => import("@/features/dashboard/components/HeroBuildingShowcase").then((m) => ({ default: m.HeroBuildingShowcase })));
+import { scrollState } from "@/features/dashboard/components/WorldCanvas";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 interface DashboardData {

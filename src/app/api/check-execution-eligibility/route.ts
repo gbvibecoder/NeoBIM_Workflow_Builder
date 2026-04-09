@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { isAdminUser, redis, redisConfigured } from "@/lib/rate-limit";
-import { VIDEO_NODES, MODEL_3D_NODES, RENDER_NODES, STRIPE_PLANS, getNodeTypeLimits } from "@/lib/stripe";
+import { VIDEO_NODES, MODEL_3D_NODES, RENDER_NODES, STRIPE_PLANS, getNodeTypeLimits } from "@/features/billing/lib/stripe";
 
 interface ExecutionBlock {
   type: "email_verification" | "plan_limit" | "node_limit";

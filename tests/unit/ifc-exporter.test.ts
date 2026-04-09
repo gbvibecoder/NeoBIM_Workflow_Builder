@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { generateIFCFile } from "@/services/ifc-exporter";
-import { generateMassingGeometry } from "@/services/massing-generator";
+import { generateIFCFile } from "@/features/ifc/services/ifc-exporter";
+import { generateMassingGeometry } from "@/features/3d-render/services/massing-generator";
 import type { MassingGeometry } from "@/types/geometry";
 
 function createTestGeometry(overrides?: Partial<Parameters<typeof generateMassingGeometry>[0]>): MassingGeometry {

@@ -7,7 +7,7 @@ import {
   detectClashes,
   type AABB,
   type ElementBBox,
-} from "@/services/clash-detector";
+} from "@/features/3d-render/services/clash-detector";
 
 // ─── Helper to create ElementBBox ──────────────────────────────────
 

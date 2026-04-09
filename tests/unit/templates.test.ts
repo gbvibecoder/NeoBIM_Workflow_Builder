@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { PREBUILT_WORKFLOWS } from "@/constants/prebuilt-workflows";
-import { NODE_CATALOGUE } from "@/constants/node-catalogue";
+import { PREBUILT_WORKFLOWS } from "@/features/workflows/constants/prebuilt-workflows";
+import { NODE_CATALOGUE } from "@/features/workflows/constants/node-catalogue";
 
 const VALID_NODE_IDS = new Set(NODE_CATALOGUE.map((n) => n.id));
 

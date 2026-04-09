@@ -3,7 +3,7 @@ import crypto from "crypto";
 import { prisma } from "@/lib/db";
 import { auth } from "@/lib/auth";
 import { checkEndpointRateLimit } from "@/lib/rate-limit";
-import { sendVerificationEmail } from "@/services/email";
+import { sendVerificationEmail } from "@/shared/services/email";
 import { formatErrorResponse, UserErrors } from "@/lib/user-errors";
 
 export async function POST(req: Request) {

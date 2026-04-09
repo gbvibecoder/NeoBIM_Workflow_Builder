@@ -10,11 +10,11 @@
  * Uses mocked API calls — no real Claude/Anthropic calls needed.
  */
 import { describe, it, expect, vi, beforeAll } from "vitest";
-import { calculateIndianPricingAdjustment } from "@/constants/indian-pricing-factors";
-import { getIS1200RatesForElement, getConcreteGradeMultiplier } from "@/constants/is1200-rates";
-import { resolveProjectLocation } from "@/constants/regional-factors";
-import { validateBenchmark, estimateMEPCosts, estimateFoundationCosts } from "@/services/boq-intelligence";
-import { detectProjectType } from "@/lib/cost-database";
+import { calculateIndianPricingAdjustment } from "@/features/boq/constants/indian-pricing-factors";
+import { getIS1200RatesForElement, getConcreteGradeMultiplier } from "@/features/boq/constants/is1200-rates";
+import { resolveProjectLocation } from "@/features/boq/constants/regional-factors";
+import { validateBenchmark, estimateMEPCosts, estimateFoundationCosts } from "@/features/boq/services/boq-intelligence";
+import { detectProjectType } from "@/features/boq/lib/cost-database";
 
 // ── Test Cities (diverse tiers + regions) ──
 const TEST_CITIES = [
@@ -187,13 +187,13 @@ describe(`BOQ Pipeline Smoke Test — ${picked.city}, ${picked.state}`, () => {
 
   it("ensurePerM2 converts sqft values correctly", async () => {
     // Import the module to verify it loads without errors
-    const mod = await import("@/services/market-intelligence");
+    const mod = await import("@/features/boq/services/market-intelligence");
     expect(mod.fetchMarketPrices).toBeDefined();
     expect(mod.computeMarketAdjustments).toBeDefined();
   });
 
   it("LiveRateResolver imports without error", async () => {
-    const mod = await import("@/services/live-rate-resolver");
+    const mod = await import("@/features/boq/services/live-rate-resolver");
     expect(mod.resolveRate).toBeDefined();
     expect(mod.resolveRatesBatch).toBeDefined();
     expect(mod.validateAgainstBenchmark).toBeDefined();

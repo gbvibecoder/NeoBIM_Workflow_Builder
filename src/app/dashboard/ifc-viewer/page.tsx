@@ -4,7 +4,7 @@ import dynamic from "next/dynamic";
 
 /* Dynamic import with SSR disabled — web-ifc uses WASM which can't run server-side */
 const IFCViewerPage = dynamic(
-  () => import("@/components/ifc-viewer/IFCViewerPage"),
+  () => import("@/features/ifc/components/IFCViewerPage"),
   {
     ssr: false,
     loading: () => (

@@ -10,18 +10,18 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { generateFloorPlan } from "@/services/openai";
+import { generateFloorPlan } from "@/features/ai/services/openai";
 import { logger } from "@/lib/logger";
 import {
   programRooms,
   programRoomsFallback,
   programToDescription,
   extractMentionedRooms,
-} from "@/lib/floor-plan/ai-room-programmer";
-import type { EnhancedRoomProgram } from "@/lib/floor-plan/ai-room-programmer";
-import { convertGeometryToProject, convertMultiFloorToProject } from "@/lib/floor-plan/pipeline-adapter";
-import { layoutMultiFloor, scoreAdjacency } from "@/lib/floor-plan/layout-engine";
-import type { FloorPlanGeometry } from "@/types/floor-plan";
+} from "@/features/floor-plan/lib/ai-room-programmer";
+import type { EnhancedRoomProgram } from "@/features/floor-plan/lib/ai-room-programmer";
+import { convertGeometryToProject, convertMultiFloorToProject } from "@/features/floor-plan/lib/pipeline-adapter";
+import { layoutMultiFloor, scoreAdjacency } from "@/features/floor-plan/lib/layout-engine";
+import type { FloorPlanGeometry } from "@/features/floor-plan/types/floor-plan";
 import type { FloorPlanProject } from "@/types/floor-plan-cad";
 
 // ── Generation Feedback ────────────────────────────────────────────────────

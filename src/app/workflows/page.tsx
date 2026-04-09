@@ -7,7 +7,7 @@ import {
   Play, Pause, X, Volume2, VolumeX, Maximize,
   ArrowRight, ChevronDown, Clock,
 } from "lucide-react";
-import CommunityVideoSection from "@/components/community/CommunityVideoSection";
+import CommunityVideoSection from "@/features/community/components/CommunityVideoSection";
 
 // ─── Design Tokens ───────────────────────────────────────────────────────────
 

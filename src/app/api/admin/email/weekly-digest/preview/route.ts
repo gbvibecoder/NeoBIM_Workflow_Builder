@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminSession, unauthorizedResponse } from "@/lib/admin-server";
 import { prisma } from "@/lib/db";
-import { renderWeeklyDigestEmail } from "@/services/email-weekly-digest";
+import { renderWeeklyDigestEmail } from "@/shared/services/email-weekly-digest";
 
 export async function GET(req: NextRequest) {
   const session = await getAdminSession();

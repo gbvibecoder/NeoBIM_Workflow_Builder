@@ -57,7 +57,7 @@ export async function POST(req: NextRequest) {
     let parserUsed = "web-ifc";
 
     try {
-      const { parseIFCBuffer } = await import("@/services/ifc-parser");
+      const { parseIFCBuffer } = await import("@/features/ifc/services/ifc-parser");
       result = await parseIFCBuffer(buffer, file.name);
     } catch (wasmErr) {
       // web-ifc failed (memory, timeout, unsupported geometry) — use text parser
@@ -65,7 +65,7 @@ export async function POST(req: NextRequest) {
       parserUsed = "text-regex";
 
       try {
-        const { parseIFCText } = await import("@/services/ifc-text-parser");
+        const { parseIFCText } = await import("@/features/ifc/services/ifc-text-parser");
         const textContent = new TextDecoder().decode(buffer);
         result = parseIFCText(textContent);
       } catch (textErr) {

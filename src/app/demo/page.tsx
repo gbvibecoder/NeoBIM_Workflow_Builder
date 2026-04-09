@@ -4,11 +4,11 @@ import React, { useEffect, useRef } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowRight, Play } from "lucide-react";
-import { WorkflowCanvas } from "@/components/canvas/WorkflowCanvas";
-import { useWorkflowStore } from "@/stores/workflow-store";
-import { useUIStore } from "@/stores/ui-store";
-import { useExecutionStore } from "@/stores/execution-store";
-import { PREBUILT_WORKFLOWS_MAP } from "@/constants/prebuilt-workflows";
+import { WorkflowCanvas } from "@/features/canvas/components/WorkflowCanvas";
+import { useWorkflowStore } from "@/features/workflows/stores/workflow-store";
+import { useUIStore } from "@/shared/stores/ui-store";
+import { useExecutionStore } from "@/features/execution/stores/execution-store";
+import { PREBUILT_WORKFLOWS_MAP } from "@/features/workflows/constants/prebuilt-workflows";
 import { useLocale } from "@/hooks/useLocale";
 
 const DEMO_PROMPT =

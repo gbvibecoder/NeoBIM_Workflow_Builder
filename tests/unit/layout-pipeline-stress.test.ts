@@ -11,10 +11,10 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { layoutFloorPlan, PlacedRoom } from "@/lib/floor-plan/layout-engine";
-import { convertGeometryToProject } from "@/lib/floor-plan/pipeline-adapter";
-import type { EnhancedRoomProgram, RoomSpec, AdjacencyRequirement } from "@/lib/floor-plan/ai-room-programmer";
-import type { FloorPlanGeometry } from "@/types/floor-plan";
+import { layoutFloorPlan, PlacedRoom } from "@/features/floor-plan/lib/layout-engine";
+import { convertGeometryToProject } from "@/features/floor-plan/lib/pipeline-adapter";
+import type { EnhancedRoomProgram, RoomSpec, AdjacencyRequirement } from "@/features/floor-plan/lib/ai-room-programmer";
+import type { FloorPlanGeometry } from "@/features/floor-plan/types/floor-plan";
 import type { FloorPlanProject } from "@/types/floor-plan-cad";
 
 // ── Helper to build EnhancedRoomProgram ──────────────────────────────────────

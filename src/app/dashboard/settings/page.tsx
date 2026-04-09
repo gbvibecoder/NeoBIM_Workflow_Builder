@@ -12,7 +12,7 @@ import {
   Fingerprint, ScanLine, Cpu, Activity, Camera, Trash2, Pencil,
   Gift, Users, Zap, Copy, Check, Phone, Smartphone, Mail,
 } from "lucide-react";
-import { PageBackground } from "@/components/dashboard/PageBackground";
+import { PageBackground } from "@/features/dashboard/components/PageBackground";
 import { useLocale } from "@/hooks/useLocale";
 import { useAvatar, primeAvatarCache } from "@/hooks/useAvatar";
 import { normalizePhone } from "@/lib/form-validation";

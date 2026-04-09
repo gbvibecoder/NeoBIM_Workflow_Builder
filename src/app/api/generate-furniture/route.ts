@@ -20,8 +20,8 @@ import {
   generateAllFurniture,
   generateSingleFurniture,
   isFurnitureGenerationAvailable,
-} from "@/services/furniture-generator";
-import { getAllAIPrompts } from "@/services/furniture-catalog";
+} from "@/features/floor-plan/services/furniture-generator";
+import { getAllAIPrompts } from "@/features/floor-plan/services/furniture-catalog";
 
 export async function POST(request: Request) {
   // Auth: require PLATFORM_ADMIN

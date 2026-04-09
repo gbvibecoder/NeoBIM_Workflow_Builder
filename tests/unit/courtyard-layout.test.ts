@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { layoutCourtyardPlan, hasCourtyardRoom } from "@/lib/floor-plan/courtyard-layout";
-import type { EnhancedRoomProgram, RoomSpec } from "@/lib/floor-plan/ai-room-programmer";
+import { layoutCourtyardPlan, hasCourtyardRoom } from "@/features/floor-plan/lib/courtyard-layout";
+import type { EnhancedRoomProgram, RoomSpec } from "@/features/floor-plan/lib/ai-room-programmer";
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 

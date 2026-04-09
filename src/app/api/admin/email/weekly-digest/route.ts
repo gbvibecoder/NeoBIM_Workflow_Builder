@@ -3,8 +3,8 @@ import { readFile } from "fs/promises";
 import { join } from "path";
 import { getAdminSession, unauthorizedResponse } from "@/lib/admin-server";
 import { prisma } from "@/lib/db";
-import { sendWeeklyDigest } from "@/services/email-weekly-digest";
-import type { WeeklyDigestData } from "@/services/email-weekly-digest";
+import { sendWeeklyDigest } from "@/shared/services/email-weekly-digest";
+import type { WeeklyDigestData } from "@/shared/services/email-weekly-digest";
 
 interface RequestBody {
   featuredWorkflowId: string;

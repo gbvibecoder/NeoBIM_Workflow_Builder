@@ -20,7 +20,7 @@ export const handleGN008: NodeHandler = async (ctx) => {
     );
   }
 
-  const { textTo3D } = await import("@/services/text-to-3d-service");
+  const { textTo3D } = await import("@/features/3d-render/services/text-to-3d-service");
 
   const prompt = String(inputData?.prompt ?? inputData?.content ?? "");
   const description = inputData?._raw as BuildingDescription | undefined;

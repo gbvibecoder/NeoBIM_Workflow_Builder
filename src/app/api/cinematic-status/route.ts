@@ -19,7 +19,7 @@ import {
   stitchCinematicSegments,
   submitCinematicSegment,
   type CinematicPipelineState,
-} from "@/services/cinematic-pipeline";
+} from "@/features/3d-render/services/cinematic-pipeline";
 
 /**
  * GET /api/cinematic-status?pipelineId=XXX

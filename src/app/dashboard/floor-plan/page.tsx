@@ -3,10 +3,10 @@
 import dynamic from "next/dynamic";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo } from "react";
-import { useFloorPlanStore } from "@/stores/floor-plan-store";
+import { useFloorPlanStore } from "@/features/floor-plan/stores/floor-plan-store";
 
 const FloorPlanViewer = dynamic(
-  () => import("@/components/floor-plan/FloorPlanViewer").then((m) => m.FloorPlanViewer),
+  () => import("@/features/floor-plan/components/FloorPlanViewer").then((m) => m.FloorPlanViewer),
   { ssr: false, loading: () => (
     <div className="flex h-screen items-center justify-center bg-white">
       <div className="text-center">

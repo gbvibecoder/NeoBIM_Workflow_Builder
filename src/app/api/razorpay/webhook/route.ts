@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { razorpay, verifyWebhookSignature, getRoleByRazorpayPlanId } from '@/lib/razorpay';
+import { razorpay, verifyWebhookSignature, getRoleByRazorpayPlanId } from '@/features/billing/lib/razorpay';
 import { prisma } from '@/lib/db';
 import { formatErrorResponse } from '@/lib/user-errors';
 import {
   sendWelcomeEmail,
   sendPaymentFailedEmail,
   sendSubscriptionCanceledEmail,
-} from '@/services/email';
+} from '@/shared/services/email';
 import { checkWebhookIdempotency } from '@/lib/webhook-idempotency';
 
 export async function POST(req: NextRequest) {

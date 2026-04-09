@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { generateBuildingDescription, generateConceptImage } from "@/services/openai";
+import { generateBuildingDescription, generateConceptImage } from "@/features/ai/services/openai";
 import { generateId } from "@/lib/utils";
 import type { ExecutionArtifact } from "@/types/execution";
 

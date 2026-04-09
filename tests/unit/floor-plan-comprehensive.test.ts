@@ -10,9 +10,9 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { layoutFloorPlan, layoutMultiFloor } from "@/lib/floor-plan/layout-engine";
-import { correctDimensions, type RoomWithTarget } from "@/lib/floor-plan/dimension-corrector";
-import type { EnhancedRoomProgram, RoomSpec, AdjacencyRequirement } from "@/lib/floor-plan/ai-room-programmer";
+import { layoutFloorPlan, layoutMultiFloor } from "@/features/floor-plan/lib/layout-engine";
+import { correctDimensions, type RoomWithTarget } from "@/features/floor-plan/lib/dimension-corrector";
+import type { EnhancedRoomProgram, RoomSpec, AdjacencyRequirement } from "@/features/floor-plan/lib/ai-room-programmer";
 
 // ── Helper ──────────────────────────────────────────────────────────────────
 
@@ -270,7 +270,7 @@ describe("Export Module Validation", () => {
   it("DXF export has correct layer names", async () => {
     const fs = await import("fs");
     const path = await import("path");
-    const content = fs.readFileSync(path.resolve("src/lib/floor-plan/export-dxf.ts"), "utf-8");
+    const content = fs.readFileSync(path.resolve("src/features/floor-plan/lib/export-dxf.ts"), "utf-8");
     // Verify AIA-standard layer naming
     expect(content).toContain("A-WALL-EXTR");
     expect(content).toContain("A-WALL-INTR");
@@ -286,7 +286,7 @@ describe("Export Module Validation", () => {
   it("SVG export has valid structure", async () => {
     const fs = await import("fs");
     const path = await import("path");
-    const content = fs.readFileSync(path.resolve("src/lib/floor-plan/export-svg.ts"), "utf-8");
+    const content = fs.readFileSync(path.resolve("src/features/floor-plan/lib/export-svg.ts"), "utf-8");
     // Must have SVG declaration, style block, defs, and proper closing
     expect(content).toContain('<?xml version="1.0"');
     expect(content).toContain("<style>");
@@ -298,7 +298,7 @@ describe("Export Module Validation", () => {
   it("PDF export has title block and scale bar", async () => {
     const fs = await import("fs");
     const path = await import("path");
-    const content = fs.readFileSync(path.resolve("src/lib/floor-plan/export-pdf.ts"), "utf-8");
+    const content = fs.readFileSync(path.resolve("src/features/floor-plan/lib/export-pdf.ts"), "utf-8");
     expect(content).toContain("TITLE BLOCK");
     expect(content).toContain("SCALE BAR");
     // Verify door swing arc rendering exists

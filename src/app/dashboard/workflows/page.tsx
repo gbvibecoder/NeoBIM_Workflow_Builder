@@ -9,7 +9,7 @@ import { api, type WorkflowSummary } from "@/lib/api";
 import { formatRelativeTime } from "@/lib/utils";
 import { toast } from "sonner";
 import { useSession } from "next-auth/react";
-import { STRIPE_PLANS } from "@/lib/stripe";
+import { STRIPE_PLANS } from "@/features/billing/lib/stripe";
 import { useLocale } from "@/hooks/useLocale";
 
 // ─── Workflow type detection ─────────────────────────────────────────────────

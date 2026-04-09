@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
-import { razorpay, resolveRazorpayPlanId } from '@/lib/razorpay';
+import { razorpay, resolveRazorpayPlanId } from '@/features/billing/lib/razorpay';
 import { prisma } from '@/lib/db';
 import { checkEndpointRateLimit } from '@/lib/rate-limit';
 import { formatErrorResponse, UserErrors } from '@/lib/user-errors';

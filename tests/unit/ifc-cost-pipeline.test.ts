@@ -8,7 +8,7 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { calculateBOQ, getRatesForElement, getUnitRate } from "@/constants/unit-rates";
+import { calculateBOQ, getRatesForElement, getUnitRate } from "@/features/boq/constants/unit-rates";
 import {
   getIS1200RatesForElement,
   getIS1200Rate,
@@ -16,7 +16,7 @@ import {
   IS1200_RATES,
   IS1200_MAPPINGS,
   INDIAN_DERIVED_RATES,
-} from "@/constants/is1200-rates";
+} from "@/features/boq/constants/is1200-rates";
 
 // ─── Unit Rate Database Tests ─────────────────────────────────────────────
 

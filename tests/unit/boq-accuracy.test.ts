@@ -13,10 +13,10 @@
 import { describe, it, expect } from "vitest";
 
 // ── Import functions under test ──
-import { calculateIndianPricingAdjustment, getStatePWDFactor } from "@/constants/indian-pricing-factors";
-import { detectCityTier, resolveProjectLocation } from "@/constants/regional-factors";
-import { validateBenchmark, estimateMEPCosts } from "@/services/boq-intelligence";
-import { IS1200_RATES, getConcreteGradeMultiplier } from "@/constants/is1200-rates";
+import { calculateIndianPricingAdjustment, getStatePWDFactor } from "@/features/boq/constants/indian-pricing-factors";
+import { detectCityTier, resolveProjectLocation } from "@/features/boq/constants/regional-factors";
+import { validateBenchmark, estimateMEPCosts } from "@/features/boq/services/boq-intelligence";
+import { IS1200_RATES, getConcreteGradeMultiplier } from "@/features/boq/constants/is1200-rates";
 
 // ============================================================================
 // TEST GROUP 1: City Tier Detection

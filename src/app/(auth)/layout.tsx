@@ -4,7 +4,7 @@ import { useMemo, useEffect } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { Zap, Users, Workflow, TrendingUp, Box, Play, FileCode, Sparkles } from "lucide-react";
-import { PREBUILT_WORKFLOWS } from "@/constants/prebuilt-workflows";
+import { PREBUILT_WORKFLOWS } from "@/features/workflows/constants/prebuilt-workflows";
 import { useLocale } from "@/hooks/useLocale";
 
 const smoothEase: [number, number, number, number] = [0.22, 1, 0.36, 1];

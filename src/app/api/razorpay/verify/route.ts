@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
-import { razorpay, verifyPaymentSignature, getRoleByRazorpayPlanId } from '@/lib/razorpay';
+import { razorpay, verifyPaymentSignature, getRoleByRazorpayPlanId } from '@/features/billing/lib/razorpay';
 import { prisma } from '@/lib/db';
 import { checkEndpointRateLimit } from '@/lib/rate-limit';
 import { formatErrorResponse, UserErrors } from '@/lib/user-errors';
-import { sendWelcomeEmail } from '@/services/email';
+import { sendWelcomeEmail } from '@/shared/services/email';
 
 /**
  * POST — Verify Razorpay payment after checkout widget success.

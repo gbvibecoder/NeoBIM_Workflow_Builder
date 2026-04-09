@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { PREBUILT_WORKFLOWS } from "@/constants/prebuilt-workflows";
+import { PREBUILT_WORKFLOWS } from "@/features/workflows/constants/prebuilt-workflows";
 
 const siteUrl = process.env.NEXT_PUBLIC_APP_URL || "https://trybuildflow.in";
 

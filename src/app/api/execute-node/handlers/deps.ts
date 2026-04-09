@@ -42,8 +42,8 @@ export {
   buildDynamicDisclaimer,
   getWasteFactor,
   getCostBreakdown,
-} from "@/lib/cost-database";
-export { VIDEO_NODES, MODEL_3D_NODES, RENDER_NODES, getNodeTypeLimits } from "@/lib/stripe";
+} from "@/features/boq/lib/cost-database";
+export { VIDEO_NODES, MODEL_3D_NODES, RENDER_NODES, getNodeTypeLimits } from "@/features/billing/lib/stripe";
 
 // Services
 export {
@@ -55,29 +55,29 @@ export {
   analyzeImage,
   enhanceArchitecturalPrompt,
   validateRenderWithClaude,
-} from "@/services/openai";
-export type { BuildingDescription, RenderQAResult } from "@/services/openai";
-export { analyzeSite } from "@/services/site-analysis";
+} from "@/features/ai/services/openai";
+export type { BuildingDescription, RenderQAResult } from "@/features/ai/services/openai";
+export { analyzeSite } from "@/features/ai/services/site-analysis";
 export { generatePDFBase64 } from "@/services/pdf-report-server";
-export { reconstructHiFi3D, isMeshyConfigured } from "@/services/meshy-service";
-export { generateMassingGeometry } from "@/services/massing-generator";
+export { reconstructHiFi3D, isMeshyConfigured } from "@/features/3d-render/services/meshy-service";
+export { generateMassingGeometry } from "@/features/3d-render/services/massing-generator";
 export {
   generate3DModel,
   is3DAIConfigured,
   calculateKPIs,
-} from "@/services/threedai-studio";
-export type { BuildingRequirements } from "@/services/threedai-studio";
-export { generateWithMeshy, isMeshyTextTo3DConfigured } from "@/services/meshy-ai";
-export { generateIFCFile } from "@/services/ifc-exporter";
-export { parsePromptToStyle } from "@/services/prompt-style-parser";
-export { extractMetadata } from "@/services/metadata-extractor";
+} from "@/features/3d-render/services/threedai-studio";
+export type { BuildingRequirements } from "@/features/3d-render/services/threedai-studio";
+export { generateWithMeshy, isMeshyTextTo3DConfigured } from "@/features/3d-render/services/meshy-ai";
+export { generateIFCFile } from "@/features/ifc/services/ifc-exporter";
+export { parsePromptToStyle } from "@/features/3d-render/services/prompt-style-parser";
+export { extractMetadata } from "@/features/ai/services/metadata-extractor";
 export {
   submitDualWalkthrough,
   submitDualTextToVideo,
   submitSingleWalkthrough,
   submitFloorPlanWalkthrough,
   buildFloorPlanCombinedPrompt,
-} from "@/services/video-service";
+} from "@/features/3d-render/services/video-service";
 
 // Types
 export type { ExecutionArtifact } from "@/types/execution";
