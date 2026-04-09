@@ -2,7 +2,7 @@
 
 import { motion } from "framer-motion";
 import { useLocale } from "@/hooks/useLocale";
-import { fadeUp, smoothEase } from "@/components/landing/landing-helpers";
+import { fadeUp, smoothEase } from "@/features/landing/lib/landing-helpers";
 
 export function TestimonialsSection() {
   const { t } = useLocale();

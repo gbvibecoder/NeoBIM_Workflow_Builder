@@ -4,7 +4,7 @@ import React from "react";
 import { motion } from "framer-motion";
 import { LayoutGrid, Zap, Play } from "lucide-react";
 import { useLocale } from "@/hooks/useLocale";
-import { hexToRgb, fadeUp, stagger, smoothEase } from "@/components/landing/landing-helpers";
+import { hexToRgb, fadeUp, stagger, smoothEase } from "@/features/landing/lib/landing-helpers";
 
 export function HowItWorksSection() {
   const { t } = useLocale();

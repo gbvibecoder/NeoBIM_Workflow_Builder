@@ -18,10 +18,10 @@ import { trackLead, trackViewContent } from '@/lib/meta-pixel';
 import { LanguageSwitcher } from '@/components/ui/LanguageSwitcher';
 import { PipelineSection } from '@/features/landing/components/PipelineSection';
 import { NewsletterSignup } from '@/features/landing/components/NewsletterSignup';
-import { TestimonialsSection } from '@/components/landing/TestimonialsSection';
+import { TestimonialsSection } from '@/features/landing/components/TestimonialsSection';
 import { FAQSection } from '@/features/landing/components/FAQSection';
 import { HowItWorksSection } from '@/features/landing/components/HowItWorksSection';
-import { PricingSection } from '@/components/landing/PricingSection';
+import { PricingSection } from '@/features/landing/components/PricingSection';
 import { LandingFooter } from '@/features/landing/components/LandingFooter';
 // import { ExitIntentModal } from '@/components/marketing/ExitIntentModal';
 
