@@ -1,9 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { formatINR } from "@/components/boq-visualizer/recalc-engine";
-import { getDivisionCategory } from "@/components/boq-visualizer/recalc-engine";
-import type { BOQLineItem } from "@/components/boq-visualizer/types";
+import { formatINR } from "@/features/boq/components/recalc-engine";
+import { getDivisionCategory } from "@/features/boq/components/recalc-engine";
+import type { BOQLineItem } from "@/features/boq/components/types";
 
 interface DivisionBarChartProps {
   lines: BOQLineItem[];

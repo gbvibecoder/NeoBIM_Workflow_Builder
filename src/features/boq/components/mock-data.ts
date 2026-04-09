@@ -1,8 +1,8 @@
 // ─── Mock BOQ Data for Development ──────────────────────────────────────────
 // Used when no executionId artifact is available (demo / dev mode)
 
-import type { BOQData } from "@/components/boq-visualizer/types";
-import { computeSensitivities, DEFAULT_PRICES } from "@/components/boq-visualizer/recalc-engine";
+import type { BOQData } from "@/features/boq/components/types";
+import { computeSensitivities, DEFAULT_PRICES } from "@/features/boq/components/recalc-engine";
 
 const RAW_LINES = [
   { division: "Part 2", isCode: "IS1200-P2-RCC-FDN", description: "RCC Foundation (M25)", unit: "m³", quantity: 180, wasteFactor: 0.08, materialRate: 9800, laborRate: 4200, equipmentRate: 1200, confidence: 92, source: "ifc-geometry" as const },

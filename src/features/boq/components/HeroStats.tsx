@@ -2,7 +2,7 @@
 
 import { IndianRupee, Ruler, Hammer, ShieldCheck, Check, AlertTriangle } from "lucide-react";
 import { AnimatedNumber } from "@/features/boq/components/AnimatedNumber";
-import { formatCrores } from "@/components/boq-visualizer/recalc-engine";
+import { formatCrores } from "@/features/boq/components/recalc-engine";
 
 interface HeroStatsProps {
   totalCost: number;

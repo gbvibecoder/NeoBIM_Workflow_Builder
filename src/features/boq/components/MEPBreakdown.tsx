@@ -1,8 +1,8 @@
 "use client";
 
 import { Wind, Zap, Droplets, Flame, ArrowUpDown } from "lucide-react";
-import { formatINR } from "@/components/boq-visualizer/recalc-engine";
-import type { BOQData } from "@/components/boq-visualizer/types";
+import { formatINR } from "@/features/boq/components/recalc-engine";
+import type { BOQData } from "@/features/boq/components/types";
 
 interface MEPBreakdownProps {
   mep: NonNullable<BOQData["mepBreakdown"]>;

@@ -1,7 +1,7 @@
 // ─── BOQ Recalculation Engine ───────────────────────────────────────────────
 // Pre-calculates sensitivity coefficients so price slider changes are instant.
 
-import type { BOQLineItem, PriceOverrides, RateOverride } from "@/components/boq-visualizer/types";
+import type { BOQLineItem, PriceOverrides, RateOverride } from "@/features/boq/components/types";
 
 // Default base prices (used to compute deltas)
 export const DEFAULT_PRICES: PriceOverrides = {

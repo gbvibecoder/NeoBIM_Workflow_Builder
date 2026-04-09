@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { formatINR } from "@/components/boq-visualizer/recalc-engine";
+import { formatINR } from "@/features/boq/components/recalc-engine";
 
 interface CostDonutChartProps {
   material: number;

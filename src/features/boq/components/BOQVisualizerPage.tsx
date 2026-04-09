@@ -4,16 +4,16 @@ import { useState, useCallback, useMemo, useRef } from "react";
 import { toast } from "sonner";
 import { BOQHeader } from "@/features/boq/components/BOQHeader";
 import { HeroStats } from "@/features/boq/components/HeroStats";
-import { PriceControls } from "@/components/boq-visualizer/PriceControls";
+import { PriceControls } from "@/features/boq/components/PriceControls";
 import { CostDonutChart } from "@/features/boq/components/CostDonutChart";
 import { DivisionBarChart } from "@/features/boq/components/DivisionBarChart";
 import { MEPBreakdown } from "@/features/boq/components/MEPBreakdown";
 import { IFCQualityCard } from "@/features/boq/components/IFCQualityCard";
 import { BOQTable } from "@/features/boq/components/BOQTable";
-import { NLSummary } from "@/components/boq-visualizer/NLSummary";
+import { NLSummary } from "@/features/boq/components/NLSummary";
 import { BOQFooter } from "@/features/boq/components/BOQFooter";
-import type { BOQData, PriceOverrides, RateOverride } from "@/components/boq-visualizer/types";
-import { DEFAULT_PRICES, recalculateLines, computeTotals } from "@/components/boq-visualizer/recalc-engine";
+import type { BOQData, PriceOverrides, RateOverride } from "@/features/boq/components/types";
+import { DEFAULT_PRICES, recalculateLines, computeTotals } from "@/features/boq/components/recalc-engine";
 
 interface BOQVisualizerPageProps {
   data: BOQData;

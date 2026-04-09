@@ -2,8 +2,8 @@
 
 import { useState, useMemo, useCallback, useEffect } from "react";
 import { ChevronDown, ChevronUp, Pencil, Check, X, ChevronLeft, ChevronRight } from "lucide-react";
-import type { BOQLineItem, BOQFilterTab, BOQSortKey, BOQSortDir, SourceType, RateOverride } from "@/components/boq-visualizer/types";
-import { formatINRFull, getDivisionCategory } from "@/components/boq-visualizer/recalc-engine";
+import type { BOQLineItem, BOQFilterTab, BOQSortKey, BOQSortDir, SourceType, RateOverride } from "@/features/boq/components/types";
+import { formatINRFull, getDivisionCategory } from "@/features/boq/components/recalc-engine";
 
 interface BOQTableProps {
   lines: BOQLineItem[];
