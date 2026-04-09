@@ -2,21 +2,19 @@
 
 import { create } from "zustand";
 import { useWorkflowStore } from "@/stores/workflow-store";
+import { MAX_REGENERATIONS } from "@/constants/limits";
 import type {
   Execution,
   ExecutionArtifact,
+  ExecutionMetadata,
   ExecutionStatus,
   TileExecutionResult,
+  VideoGenerationState,
 } from "@/types/execution";
 
-export interface VideoGenerationState {
-  progress: number; // 0-100
-  status: "submitting" | "processing" | "rendering" | "complete" | "failed";
-  phase?: string; // Current rendering phase label (e.g., "Exterior Pull-in")
-  exteriorTaskId?: string;
-  interiorTaskId?: string;
-  failureMessage?: string;
-}
+// Re-export so existing importers (e.g. useExecution.ts) keep working without
+// touching their import lines. The canonical definition lives in types/execution.
+export type { VideoGenerationState };
 
 interface ExecutionState {
   // Current execution
@@ -56,11 +54,29 @@ interface ExecutionState {
   // Video generation progress
   setVideoGenProgress: (nodeId: string, state: VideoGenerationState) => void;
   clearVideoGenProgress: (nodeId: string) => void;
+  /** Replace the in-memory videoGenProgress Map with the contents of an
+   *  ExecutionMetadata.videoGenProgress record loaded from the server.
+   *  Called once on canvas mount alongside hydrateQuantityOverrides so the
+   *  user can see in-flight render progress (or final failure messages)
+   *  after a page reload. Pure local-state update — does NOT trigger a
+   *  persist round-trip. */
+  hydrateVideoGenProgress: (progress: Record<string, VideoGenerationState>) => void;
 
-  // Regeneration
+  // Regeneration. The Zustand Map is a UX hint only — server-side enforcement
+  // lives in /api/execute-node. Both sides use MAX_REGENERATIONS from
+  // @/constants/limits as the single source of truth.
   incrementRegenCount: (tileInstanceId: string) => boolean; // returns false if at max
   getRegenRemaining: (tileInstanceId: string) => number;
   setRegeneratingNode: (nodeId: string | null) => void;
+  /** Roll back a local optimistic increment when the server rejects the
+   *  regen request (e.g., 429 REGEN_001 or any network failure during the
+   *  round-trip). Floors at 0 — never goes negative. */
+  decrementRegenCount: (tileInstanceId: string) => void;
+  /** Replace the in-memory regenerationCounts Map with the contents of an
+   *  ExecutionMetadata.regenerationCounts record loaded from the server.
+   *  Called once on canvas mount alongside the other hydrate actions so
+   *  the regen "X left" UI is correct after page reload. */
+  hydrateRegenerationCounts: (counts: Record<string, number>) => void;
 
   // History
   addToHistory: (execution: Execution) => void;
@@ -72,11 +88,19 @@ interface ExecutionState {
   clearArtifacts: () => void;
 
   // Quantity overrides: tileInstanceId → Map<rowIndex, overrideValue>
-  // Allows users to correct TR-007 quantities before passing to TR-008
+  // Allows users to correct TR-007 quantities before passing to TR-008.
+  // Persisted to Execution.metadata.quantityOverrides via debounced PATCH
+  // (see schedulePersist below) so edits survive page reloads.
   quantityOverrides: Map<string, Map<number, number>>;
   setQuantityOverride: (tileInstanceId: string, rowIndex: number, value: number) => void;
   clearQuantityOverrides: (tileInstanceId: string) => void;
   getQuantityOverrides: (tileInstanceId: string) => Map<number, number>;
+  /** Replace the in-memory quantityOverrides Map with the contents of an
+   *  ExecutionMetadata.quantityOverrides object loaded from the server.
+   *  Called once on result-showcase mount after the execution metadata
+   *  is fetched. Pure local-state update — does NOT trigger a persist
+   *  (would create a no-op round-trip back to the server). */
+  hydrateQuantityOverrides: (overrides: Record<string, Record<string, number>>) => void;
 
   // Restore artifacts from DB (after loading a workflow)
   restoreArtifactsFromDB: (dbArtifacts: Array<{
@@ -95,7 +119,79 @@ interface ExecutionState {
   }) => void;
 }
 
-const MAX_REGENERATIONS = 3;
+// ─── Execution metadata persistence (debounced, field-aware PATCH) ──────────
+// Both user BOQ quantity edits (quantityOverrides) and live video render
+// progress (videoGenProgress) are pushed to Execution.metadata via
+// PATCH /api/executions/[id]/metadata, debounced 500ms so rapid bursts
+// batch into a single network round-trip.
+//
+// Field-aware: each setter passes the field name to schedulePersist(field).
+// At flush time we send ONLY the fields that had pending changes — this
+// avoids the multi-tab footgun where, e.g., a videoGenProgress poll cycle
+// in tab A would otherwise send an empty quantityOverrides snapshot and
+// wipe BOQ edits saved on tab B. The server's PATCH endpoint top-level
+// merges JSON fields, so partial bodies are correct.
+//
+// Best-effort: failures are swallowed because the in-memory state is the
+// source of truth during the editing session. The next change retries
+// with a fresh snapshot.
+
+const PERSIST_DEBOUNCE_MS = 500;
+let pendingPersistTimer: ReturnType<typeof setTimeout> | null = null;
+const pendingFields = new Set<keyof ExecutionMetadata>();
+
+function schedulePersist(field: keyof ExecutionMetadata) {
+  if (typeof window === "undefined") return; // SSR safety
+  pendingFields.add(field);
+  if (pendingPersistTimer) clearTimeout(pendingPersistTimer);
+  pendingPersistTimer = setTimeout(() => {
+    pendingPersistTimer = null;
+    void flushPersist();
+  }, PERSIST_DEBOUNCE_MS);
+}
+
+async function flushPersist() {
+  // Snapshot + clear the pending set so any updates after this flush starts
+  // get scheduled into the next debounce cycle.
+  const fieldsToFlush = new Set(pendingFields);
+  pendingFields.clear();
+  if (fieldsToFlush.size === 0) return;
+
+  const state = useExecutionStore.getState();
+  const executionId = state.currentExecution?.id;
+  if (!executionId) return; // No execution loaded → nothing to persist against
+
+  // Build the PATCH body with only the fields that had pending changes.
+  const body: Partial<ExecutionMetadata> = {};
+
+  if (fieldsToFlush.has("quantityOverrides")) {
+    const serialized: Record<string, Record<string, number>> = {};
+    for (const [tileId, rowMap] of state.quantityOverrides) {
+      const inner: Record<string, number> = {};
+      for (const [row, val] of rowMap) inner[String(row)] = val;
+      serialized[tileId] = inner;
+    }
+    body.quantityOverrides = serialized;
+  }
+
+  if (fieldsToFlush.has("videoGenProgress")) {
+    const serialized: Record<string, VideoGenerationState> = {};
+    for (const [nodeId, vgState] of state.videoGenProgress) {
+      serialized[nodeId] = vgState;
+    }
+    body.videoGenProgress = serialized;
+  }
+
+  try {
+    await fetch(`/api/executions/${executionId}/metadata`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+  } catch {
+    // Best-effort: in-memory state is still correct, next change retries
+  }
+}
 
 export const useExecutionStore = create<ExecutionState>()((set, get) => ({
   currentExecution: null,
@@ -175,19 +271,36 @@ export const useExecutionStore = create<ExecutionState>()((set, get) => ({
 
   setProgress: (progress) => set({ executionProgress: progress }),
 
-  setVideoGenProgress: (nodeId, state) =>
+  setVideoGenProgress: (nodeId, state) => {
     set((s) => {
       const newMap = new Map(s.videoGenProgress);
       newMap.set(nodeId, state);
       return { videoGenProgress: newMap };
-    }),
+    });
+    schedulePersist("videoGenProgress");
+  },
 
-  clearVideoGenProgress: (nodeId) =>
+  clearVideoGenProgress: (nodeId) => {
     set((s) => {
       const newMap = new Map(s.videoGenProgress);
       newMap.delete(nodeId);
       return { videoGenProgress: newMap };
-    }),
+    });
+    schedulePersist("videoGenProgress");
+  },
+
+  hydrateVideoGenProgress: (progress) => {
+    // Convert the JSON record back to Map<string, VideoGenerationState>.
+    // Defensive: skip entries with non-finite progress or unknown status.
+    const newMap = new Map<string, VideoGenerationState>();
+    for (const [nodeId, vgState] of Object.entries(progress)) {
+      if (!vgState || typeof vgState !== "object") continue;
+      if (typeof vgState.progress !== "number" || !Number.isFinite(vgState.progress)) continue;
+      if (typeof vgState.status !== "string") continue;
+      newMap.set(nodeId, vgState);
+    }
+    set({ videoGenProgress: newMap });
+  },
 
   addToHistory: (execution) =>
     set((state) => ({
@@ -212,6 +325,26 @@ export const useExecutionStore = create<ExecutionState>()((set, get) => ({
 
   setRegeneratingNode: (nodeId) => set({ regeneratingNodeId: nodeId }),
 
+  decrementRegenCount: (tileInstanceId) => {
+    const current = get().regenerationCounts.get(tileInstanceId) ?? 0;
+    if (current <= 0) return; // Floor at 0 — nothing to roll back
+    const newCounts = new Map(get().regenerationCounts);
+    newCounts.set(tileInstanceId, current - 1);
+    set({ regenerationCounts: newCounts });
+  },
+
+  hydrateRegenerationCounts: (counts) => {
+    // Convert the JSON record back to Map<string, number>. Defensive: skip
+    // entries with non-finite or non-integer values.
+    const newMap = new Map<string, number>();
+    for (const [tileId, val] of Object.entries(counts)) {
+      if (typeof val === "number" && Number.isInteger(val) && val >= 0) {
+        newMap.set(tileId, val);
+      }
+    }
+    set({ regenerationCounts: newMap });
+  },
+
   getArtifactForTile: (tileInstanceId) => {
     return get().artifacts.get(tileInstanceId);
   },
@@ -225,24 +358,46 @@ export const useExecutionStore = create<ExecutionState>()((set, get) => ({
 
   clearArtifacts: () => set({ artifacts: new Map() }),
 
-  setQuantityOverride: (tileInstanceId, rowIndex, value) =>
+  setQuantityOverride: (tileInstanceId, rowIndex, value) => {
     set((state) => {
       const newOverrides = new Map(state.quantityOverrides);
       const tileOverrides = new Map(newOverrides.get(tileInstanceId) ?? new Map());
       tileOverrides.set(rowIndex, value);
       newOverrides.set(tileInstanceId, tileOverrides);
       return { quantityOverrides: newOverrides };
-    }),
+    });
+    schedulePersist("quantityOverrides");
+  },
 
-  clearQuantityOverrides: (tileInstanceId) =>
+  clearQuantityOverrides: (tileInstanceId) => {
     set((state) => {
       const newOverrides = new Map(state.quantityOverrides);
       newOverrides.delete(tileInstanceId);
       return { quantityOverrides: newOverrides };
-    }),
+    });
+    schedulePersist("quantityOverrides");
+  },
 
   getQuantityOverrides: (tileInstanceId) => {
     return get().quantityOverrides.get(tileInstanceId) ?? new Map();
+  },
+
+  hydrateQuantityOverrides: (overrides) => {
+    // Convert the serialized JSON form back to Map<string, Map<number, number>>.
+    // Defensive: skip non-numeric row keys and non-finite values.
+    const newOverrides = new Map<string, Map<number, number>>();
+    for (const [tileId, rowRecord] of Object.entries(overrides)) {
+      if (!rowRecord || typeof rowRecord !== "object") continue;
+      const inner = new Map<number, number>();
+      for (const [rowKey, val] of Object.entries(rowRecord)) {
+        const rowIdx = Number(rowKey);
+        if (Number.isInteger(rowIdx) && typeof val === "number" && Number.isFinite(val)) {
+          inner.set(rowIdx, val);
+        }
+      }
+      if (inner.size > 0) newOverrides.set(tileId, inner);
+    }
+    set({ quantityOverrides: newOverrides });
   },
 
   restoreArtifactsFromDB: (dbArtifacts, executionMeta) => {

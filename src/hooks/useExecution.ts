@@ -649,10 +649,13 @@ async function executeNode(
       // Extract user-friendly error info
       const error = errorData.error;
 
-      // Special handling for 429 Rate Limit errors
+      // Special handling for 429 Rate Limit errors. The code field is also
+      // attached so callers can distinguish specific 429 reasons (RATE_001
+      // monthly limit vs REGEN_001 regen cap reached vs node-type limits).
       if (res.status === 429) {
         const rateLimitError = new Error(error.message);
         (rateLimitError as unknown as Record<string, unknown>).status = 429;
+        (rateLimitError as unknown as Record<string, unknown>).code = error.code;
         (rateLimitError as unknown as Record<string, unknown>).title = error.title;
         (rateLimitError as unknown as Record<string, unknown>).action = error.action;
         (rateLimitError as unknown as Record<string, unknown>).actionUrl = error.actionUrl;
@@ -1203,6 +1206,7 @@ export function useExecution({ onLog }: UseExecutionOptions = {}) {
     isRateLimited,
     setRateLimited,
     incrementRegenCount,
+    decrementRegenCount,
     getRegenRemaining,
     setRegeneratingNode,
     regeneratingNodeId,
@@ -1866,12 +1870,29 @@ export function useExecution({ onLog }: UseExecutionOptions = {}) {
       toast.success(`${node.data.label} regenerated`, { duration: 2000 });
     } catch (error) {
       const errMsg = error instanceof Error ? error.message : "Regeneration failed";
-      updateNodeStatus(nodeId, "error");
-      toast.error(`Regeneration failed: ${errMsg}`);
+      const errAny = error as Record<string, unknown> | null;
+      const errStatus = typeof errAny?.status === "number" ? errAny.status : null;
+      const errCode = typeof errAny?.code === "string" ? errAny.code : null;
+
+      // Server-side regen cap reached (Phase 2 Task 4). The server returned
+      // 429 / REGEN_001 BEFORE running the handler, so the optimistic local
+      // increment must be rolled back to keep the "X regens left" UI in sync
+      // with the server state. Status restores to "success" — for a regen
+      // to even be attempted, the node had to have a prior successful run.
+      if (errStatus === 429 && errCode === "REGEN_001") {
+        decrementRegenCount(nodeId);
+        updateNodeStatus(nodeId, "success");
+        toast.error("Maximum regeneration attempts reached", {
+          description: "You can regenerate each node up to 3 times per execution. Run the workflow again to start over.",
+        });
+      } else {
+        updateNodeStatus(nodeId, "error");
+        toast.error(`Regeneration failed: ${errMsg}`);
+      }
     } finally {
       setRegeneratingNode(null);
     }
-  }, [nodes, isExecuting, regeneratingNodeId, workflowEdges, isDemoMode, getRegenRemaining, incrementRegenCount, setRegeneratingNode, updateNodeStatus, addArtifact, artifacts]);
+  }, [nodes, isExecuting, regeneratingNodeId, workflowEdges, isDemoMode, getRegenRemaining, incrementRegenCount, decrementRegenCount, setRegeneratingNode, updateNodeStatus, addArtifact, artifacts]);
 
   const resetExecution = useCallback(() => {
     nodes.forEach((node) => updateNodeStatus(node.id, "idle"));

@@ -23,6 +23,47 @@ export interface TileExecutionResult {
   errorMessage?: string;
 }
 
+/** Per-node video generation progress (used by GN-009 walkthrough renders
+ *  and the result-showcase "Create Video" CTA path). Mirrors the live
+ *  in-memory state in useExecutionStore.videoGenProgress, and is persisted
+ *  to Execution.metadata so long renders can be observed after page reload. */
+export interface VideoGenerationState {
+  progress: number; // 0-100
+  status: "submitting" | "processing" | "rendering" | "complete" | "failed";
+  phase?: string; // Current rendering phase label (e.g., "Exterior Pull-in")
+  exteriorTaskId?: string;
+  interiorTaskId?: string;
+  failureMessage?: string;
+}
+
+/** Per-execution UI/state metadata persisted in Execution.metadata JSONB.
+ *  Each field is optional so older executions without metadata stay valid. */
+export interface ExecutionMetadata {
+  /** Per-tile, per-row quantity overrides set by the user via the BOQ data
+   *  table. Outer key is tileInstanceId, inner key is the row index as a
+   *  string (JSON keys can't be numbers). Mirrors the shape of
+   *  useExecutionStore.quantityOverrides serialized for JSON. Used to
+   *  rehydrate the in-memory Map on result-showcase mount so edits survive
+   *  page reloads. Persisted via PATCH /api/executions/[id]/metadata. */
+  quantityOverrides?: Record<string, Record<string, number>>;
+  /** Per-node video generation progress, keyed by nodeId. Mirrors the live
+   *  useExecutionStore.videoGenProgress Map serialized as a plain record.
+   *  Persisted by the same debounced PATCH path so long video renders are
+   *  observable after page reload (and, if final, the failure message
+   *  remains visible). */
+  videoGenProgress?: Record<string, VideoGenerationState>;
+  /** Per-node regeneration counter, keyed by tileInstanceId. Value is the
+   *  number of regenerations executed for this node within THIS execution
+   *  (not including the first run). Server-side enforced in
+   *  /api/execute-node — increments before dispatching the handler, returns
+   *  429 with REGEN_001 if it would exceed MAX_REGENERATIONS.
+   *
+   *  IMPORTANT: This field is server-managed only. Clients must NOT write
+   *  to it via the metadata PATCH endpoint — that would defeat enforcement.
+   *  The PATCH endpoint validator explicitly rejects this field in the body. */
+  regenerationCounts?: Record<string, number>;
+}
+
 export interface Execution {
   id: string;
   workflowId: string;
@@ -32,6 +73,7 @@ export interface Execution {
   completedAt?: Date;
   tileResults: TileExecutionResult[];
   errorMessage?: string;
+  metadata?: ExecutionMetadata;
   createdAt: Date;
 }
 

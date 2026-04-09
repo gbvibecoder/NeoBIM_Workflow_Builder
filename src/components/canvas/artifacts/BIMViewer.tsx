@@ -28,7 +28,7 @@ import {
   createBIMMaterials, getMaterialKey, disposeBIMMaterials,
   createSkyTexture,
   type BIMMaterialLib,
-} from "./bim-materials";
+} from "@/lib/3d-generation/bim-materials";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 

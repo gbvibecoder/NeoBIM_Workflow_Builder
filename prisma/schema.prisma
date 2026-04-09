@@ -50,6 +50,7 @@ model User {
   referralsReceived Referral[]  @relation("ReferralReceived")
   supportConversations SupportConversation[]
   videoShareLinks   VideoShareLink[]
+  videoLikes        CommunityVideoLike[]
 
   @@map("users")
 }
@@ -169,6 +170,11 @@ model Execution {
   completedAt  DateTime?
   tileResults  Json            @default("[]")
   errorMessage String?
+  // Per-execution UI/state metadata (e.g. quantityOverrides for Task 2,
+  // videoGenProgress for Task 3). Nullable JSON column written via
+  // PATCH /api/executions/[id]/metadata. Stays null for executions
+  // created before this column existed.
+  metadata     Json?
   createdAt    DateTime        @default(now())
   artifacts    Artifact[]
   user         User            @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -321,10 +327,30 @@ model CommunityVideo {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
   author       User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  likedBy      CommunityVideoLike[]
 
   @@index([authorId])
   @@index([createdAt])
   @@map("community_videos")
+}
+
+// Per-user like tracking for community videos. Joins users to videos they've
+// liked so the like API can be idempotent and the GET /community-videos
+// endpoint can return `isLikedByMe` per video. The `likes Int` counter on
+// CommunityVideo above is kept as a denormalized display value, maintained
+// transactionally alongside this table.
+model CommunityVideoLike {
+  id        String         @id @default(cuid())
+  userId    String
+  videoId   String
+  createdAt DateTime       @default(now())
+  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  video     CommunityVideo @relation(fields: [videoId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, videoId])
+  @@index([videoId])
+  @@index([userId])
+  @@map("community_video_likes")
 }
 
 // ─── Gamification ──────────────────────────────────────────────────

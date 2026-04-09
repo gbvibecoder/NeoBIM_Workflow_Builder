@@ -1,6 +1,6 @@
 import * as THREE from "three";
-import type { RoomDef } from "./types";
-import type { MaterialLibrary } from "./materials";
+import type { RoomDef } from "@/types/architectural-viewer";
+import type { MaterialLibrary } from "@/lib/3d-generation/materials";
 
 // ─── Furniture Placement ──────────────────────────────────────────────────────
 
