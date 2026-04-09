@@ -8,7 +8,7 @@ import { useExecutionStore } from "@/features/execution/stores/execution-store";
 import { useLocale } from "@/hooks/useLocale";
 import { generateId } from "@/lib/utils";
 import { logger } from "@/lib/logger";
-import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { ErrorBoundary } from "@/shared/components/ErrorBoundary";
 import type { ExecutionArtifact } from "@/types/execution";
 import { useShowcaseData } from "@/features/execution/components/result-showcase/useShowcaseData";
 import { ShowcaseHeader } from "@/features/execution/components/result-showcase/ShowcaseHeader";

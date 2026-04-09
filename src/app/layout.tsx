@@ -4,11 +4,11 @@ import { DM_Sans, JetBrains_Mono, Syne, Space_Grotesk } from "next/font/google";
 import { Toaster } from "sonner";
 import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/next";
-import { MobileGate } from "@/components/MobileGate";
+import { MobileGate } from "@/shared/components/MobileGate";
 import { SessionProvider } from "@/shared/components/providers/SessionProvider";
-import { TrackingScripts } from "@/components/TrackingScripts";
-import { CookieConsent } from "@/components/CookieConsent";
-import { UTMCapture } from "@/components/UTMCapture";
+import { TrackingScripts } from "@/shared/components/TrackingScripts";
+import { CookieConsent } from "@/shared/components/CookieConsent";
+import { UTMCapture } from "@/shared/components/UTMCapture";
 import "./globals.css";
 import "@/lib/env-check";
 

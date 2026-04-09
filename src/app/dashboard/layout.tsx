@@ -1,7 +1,7 @@
 import React from "react";
 import { Sidebar } from "@/features/dashboard/components/Sidebar";
 import { Header } from "@/features/dashboard/components/Header";
-import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { ErrorBoundary } from "@/shared/components/ErrorBoundary";
 import { CommandPaletteLoader } from "@/shared/components/ui/CommandPaletteLoader";
 import { OnboardingModal } from "@/features/onboarding/components/OnboardingModal";
 import { PendingReferralClaimer } from "@/features/referral/components/PendingReferralClaimer";
