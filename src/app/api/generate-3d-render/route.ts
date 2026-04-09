@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { checkEndpointRateLimit } from "@/lib/rate-limit";
 import { formatErrorResponse, UserErrors } from "@/lib/user-errors";
 import OpenAI from "openai";
+import { logger } from "@/lib/logger";
 
 // ─── Floor Plan → 3D Photorealistic Render ──────────────────────────────────
 // Pipeline: GPT-Image-1 images.edit — the model SEES the floor plan image
@@ -79,7 +80,7 @@ async function withRetry<T>(fn: () => Promise<T>, retries = 1, delayMs = 8000): 
     if (isBilling) throw err;
 
     if (retries > 0 && (msg.includes("429") || msg.includes("rate") || msg.includes("Rate"))) {
-      console.log(`[generate-3d-render] Rate limited, retrying in ${delayMs}ms...`);
+      logger.debug(`[generate-3d-render] Rate limited, retrying in ${delayMs}ms...`);
       await new Promise((r) => setTimeout(r, delayMs));
       return withRetry(fn, retries - 1, delayMs * 1.5);
     }

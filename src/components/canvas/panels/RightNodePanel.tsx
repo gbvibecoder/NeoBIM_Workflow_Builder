@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, memo } from "react";
 import { ChevronLeft, ChevronRight, Layers3 } from "lucide-react";
 import { NodeLibrarySidebar } from "./NodeLibrarySidebar";
 import { useLocale } from "@/hooks/useLocale";
@@ -11,7 +11,7 @@ import { useUIStore } from "@/stores/ui-store";
  * Collapsed: visible tab with vertical "NODE LIBRARY" label and accent stripe.
  * Expanded: 280px panel with full search/filter/node list.
  */
-export function RightNodePanel() {
+export const RightNodePanel = memo(function RightNodePanel() {
   const { t } = useLocale();
   const isOpen = useUIStore((s) => s.isNodeLibraryOpen);
   const toggleNodeLibrary = useUIStore((s) => s.toggleNodeLibrary);
@@ -129,4 +129,4 @@ export function RightNodePanel() {
       </div>
     </div>
   );
-}
+});

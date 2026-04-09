@@ -104,7 +104,6 @@ describe("PIPELINE VERIFY — Prompt 1: 3BHK 1200sqft Vastu North-Facing", () =>
     { roomA: "Living Room", roomB: "Dining Room", reason: "open plan flow" },
   ], {
     isVastuRequested: true,
-    facingDirection: "north",
     totalAreaSqm: 111.5, // 1200 sqft
   });
 
@@ -226,9 +225,6 @@ describe("PIPELINE VERIFY — Prompt 2: 5BHK Duplex", () => {
   ], {
     numFloors: 2,
     isVastuRequested: true,
-    facingDirection: "east",
-    plotWidthM: 15.2,  // 50 feet
-    plotDepthM: 24.4,  // 80 feet
     totalAreaSqm: 325, // 3500 sqft
   });
 

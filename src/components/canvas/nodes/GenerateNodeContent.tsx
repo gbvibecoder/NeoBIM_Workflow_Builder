@@ -1,11 +1,11 @@
 "use client";
 
-import React, { useCallback, useMemo } from "react";
+import React, { useCallback, useMemo, memo } from "react";
 import { useWorkflowStore } from "@/stores/workflow-store";
 import { useLocale } from "@/hooks/useLocale";
 import type { WorkflowNodeData } from "@/types/nodes";
 
-export function ViewTypeSelect({ nodeId, data }: { nodeId: string; data: WorkflowNodeData }) {
+export const ViewTypeSelect = memo(function ViewTypeSelect({ nodeId, data }: { nodeId: string; data: WorkflowNodeData }) {
   const updateNode = useWorkflowStore(s => s.updateNode);
   const t = useLocale(s => s.t);
 
@@ -61,4 +61,4 @@ export function ViewTypeSelect({ nodeId, data }: { nodeId: string; data: Workflo
       ))}
     </select>
   );
-}
+});
