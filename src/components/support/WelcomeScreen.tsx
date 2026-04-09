@@ -9,8 +9,10 @@ import {
   AlertTriangle,
   Box,
   Bug,
+  MessageSquare,
 } from "lucide-react";
 import { useSupportStore } from "@/stores/support-store";
+import { useLiveChatStore } from "@/stores/live-chat-store";
 
 // ─── Topics ─────────────────────────────────────────────────────────────────
 
@@ -36,6 +38,8 @@ function getGreeting(): string {
 
 export default function WelcomeScreen() {
   const sendMessage = useSupportStore((s) => s.sendMessage);
+  const setChatView = useSupportStore((s) => s.setChatView);
+  const adminOnline = useLiveChatStore((s) => s.adminOnline);
   const greeting = useMemo(getGreeting, []);
 
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
@@ -194,6 +198,84 @@ export default function WelcomeScreen() {
             );
           })}
         </div>
+
+        {/* Live Chat with Us — full-width card */}
+        <motion.button
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, delay: 0.5 }}
+          whileHover={{
+            scale: 1.015,
+            borderColor: "rgba(34,197,94,0.35)",
+            backgroundColor: "rgba(34,197,94,0.07)",
+          }}
+          whileTap={{ scale: 0.98 }}
+          onClick={() => setChatView("live-chat")}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+            width: "100%",
+            padding: "14px 14px",
+            borderRadius: 12,
+            border: "1px solid rgba(34,197,94,0.22)",
+            background:
+              "linear-gradient(135deg, rgba(34,197,94,0.08) 0%, rgba(34,197,94,0.03) 100%)",
+            cursor: "pointer",
+            textAlign: "left",
+            transition: "all 0.2s",
+          }}
+        >
+          <div
+            style={{
+              width: 38,
+              height: 38,
+              borderRadius: 10,
+              background: "rgba(34,197,94,0.18)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              flexShrink: 0,
+            }}
+          >
+            <MessageSquare size={18} color="#22c55e" />
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <p
+              style={{
+                fontSize: 13,
+                fontWeight: 600,
+                color: "#F0F0F0",
+                margin: 0,
+                lineHeight: 1.3,
+              }}
+            >
+              Live Chat with Us
+            </p>
+            <p
+              style={{
+                fontSize: 11,
+                color: "rgba(255,255,255,0.5)",
+                margin: "2px 0 0",
+              }}
+            >
+              Talk to our support team directly
+            </p>
+          </div>
+          {adminOnline && (
+            <span
+              style={{
+                width: 8,
+                height: 8,
+                borderRadius: "50%",
+                background: "#22c55e",
+                boxShadow: "0 0 8px #22c55e",
+                flexShrink: 0,
+              }}
+              aria-label="Support online"
+            />
+          )}
+        </motion.button>
       </div>
     </div>
   );

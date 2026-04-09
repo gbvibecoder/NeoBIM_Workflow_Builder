@@ -22,9 +22,11 @@ import {
   FileBox,
   PenTool,
   Video,
+  MessageSquare,
 } from "lucide-react";
 import { PREBUILT_WORKFLOWS } from "@/constants/prebuilt-workflows";
 import { useLocale } from "@/hooks/useLocale";
+import { isPlatformAdmin } from "@/lib/platform-admin";
 
 // ─── Sidebar ─────────────────────────────────────────────────────────────────
 
@@ -42,9 +44,13 @@ export function Sidebar() {
     { href: "/dashboard/3d-render",  label: t("nav.3dRender"),    icon: Video,   badge: "New" },
   ];
 
+  const isAdmin = isPlatformAdmin(session?.user?.email);
   const SECONDARY_NAV = [
     { href: "/dashboard/community", label: t("nav.community"), icon: Globe, badge: "Beta" },
     { href: "/dashboard/feedback",  label: t("nav.feedback"),  icon: MessageSquareHeart, badge: "New" },
+    ...(isAdmin
+      ? [{ href: "/dashboard/admin/live-chat", label: "Live Chat", icon: MessageSquare, badge: "Admin" }]
+      : []),
     { href: "/dashboard/billing",   label: t("nav.billing"),   icon: CreditCard },
     { href: "/dashboard/settings",  label: t("nav.settings"),  icon: Settings },
   ];
