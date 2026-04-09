@@ -13,6 +13,7 @@
  */
 
 import type { FloorPlanGeometry } from "@/types/floor-plan";
+import { logger } from "@/lib/logger";
 import type {
   FloorPlanProject,
   Floor,
@@ -1535,7 +1536,7 @@ export function convertMultiFloorToProject(
   if (totalOutputRooms !== totalInputRooms) {
     console.error(`[STAGE-3] Multi-floor room loss: ${totalInputRooms} → ${totalOutputRooms}`);
   }
-  console.log(`[STAGE-3] Rooms in project: ${totalOutputRooms}`, floors.map(f => `Floor ${f.level}: ${f.rooms.map(r => r.name).join(", ")}`));
+  logger.debug(`[STAGE-3] Rooms in project: ${totalOutputRooms}`, floors.map(f => `Floor ${f.level}: ${f.rooms.map(r => r.name).join(", ")}`));
 
   // Build unified project with all floors
   const firstGeom = floorLayouts[0];
