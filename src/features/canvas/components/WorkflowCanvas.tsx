@@ -52,7 +52,7 @@ const ArchitecturalViewer = dynamic(
 );
 
 // Fullscreen video player — direct import to avoid dynamic() hook instability with React 19
-import { FullscreenVideoPlayer } from "@/components/canvas/artifacts/FullscreenVideoPlayer";
+import { FullscreenVideoPlayer } from "@/features/canvas/components/artifacts/FullscreenVideoPlayer";
 
 import { useWorkflowStore, isUntitledWorkflow } from "@/stores/workflow-store";
 import { PREBUILT_WORKFLOWS } from "@/constants/prebuilt-workflows";

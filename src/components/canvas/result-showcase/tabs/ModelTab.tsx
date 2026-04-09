@@ -10,22 +10,22 @@ import type { ShowcaseData, ProceduralModelData, GlbModelData, HtmlIframeModelDa
 import type { FloorPlanGeometry, FloorPlanRoom } from "@/features/floor-plan/types/floor-plan";
 
 const ArchitecturalViewer = dynamic(
-  () => import("../../artifacts/architectural-viewer/ArchitecturalViewer"),
+  () => import("@/components/canvas/artifacts/architectural-viewer/ArchitecturalViewer"),
   { ssr: false }
 );
 
 const Building3DViewer = dynamic(
-  () => import("../../artifacts/Building3DViewer"),
+  () => import("@/features/canvas/components/artifacts/Building3DViewer"),
   { ssr: false }
 );
 
 const BIMViewer = dynamic(
-  () => import("../../artifacts/BIMViewer"),
+  () => import("@/features/canvas/components/artifacts/BIMViewer"),
   { ssr: false }
 );
 
 const FloorPlanEditor = dynamic(
-  () => import("../../artifacts/FloorPlanEditor").then(m => ({ default: m.FloorPlanEditor })),
+  () => import("@/features/canvas/components/artifacts/FloorPlanEditor").then(m => ({ default: m.FloorPlanEditor })),
   { ssr: false }
 );
 
