@@ -4,15 +4,15 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { useUIStore } from "@/stores/ui-store";
-import { useExecutionStore } from "@/stores/execution-store";
+import { useExecutionStore } from "@/features/execution/stores/execution-store";
 import { useLocale } from "@/hooks/useLocale";
 import { generateId } from "@/lib/utils";
 import { logger } from "@/lib/logger";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import type { ExecutionArtifact } from "@/types/execution";
 import { useShowcaseData } from "@/components/canvas/result-showcase/useShowcaseData";
-import { ShowcaseHeader } from "@/components/canvas/result-showcase/ShowcaseHeader";
-import { TabBar } from "@/components/canvas/result-showcase/TabBar";
+import { ShowcaseHeader } from "@/features/execution/components/result-showcase/ShowcaseHeader";
+import { TabBar } from "@/features/execution/components/result-showcase/TabBar";
 import { COLORS, type TabId } from "@/components/canvas/result-showcase/constants";
 
 import { OverviewTab } from "@/components/canvas/result-showcase/tabs/OverviewTab";
@@ -181,7 +181,7 @@ export function ResultShowcase({ onClose }: ResultShowcaseProps) {
           description: t('toast.klingGenerating'),
           duration: 5000,
         });
-        const { retryPollVideoGeneration } = await import("@/hooks/useExecution");
+        const { retryPollVideoGeneration } = await import("@/features/execution/hooks/useExecution");
         retryPollVideoGeneration(
           nodeId,
           artData.exteriorTaskId as string,
@@ -260,7 +260,7 @@ export function ResultShowcase({ onClose }: ResultShowcaseProps) {
           description: t('toast.threejsRendering'),
           duration: 5000,
         });
-        const { retryRenderClientWalkthrough } = await import("@/hooks/useExecution");
+        const { retryRenderClientWalkthrough } = await import("@/features/execution/hooks/useExecution");
         retryRenderClientWalkthrough(
           nodeId,
           artData,
@@ -343,7 +343,7 @@ export function ResultShowcase({ onClose }: ResultShowcaseProps) {
           description: t('toast.klingGenerating'),
           duration: 5000,
         });
-        const { retryPollVideoGeneration } = await import("@/hooks/useExecution");
+        const { retryPollVideoGeneration } = await import("@/features/execution/hooks/useExecution");
         retryPollVideoGeneration(
           nodeId,
           artData.exteriorTaskId as string,
@@ -362,7 +362,7 @@ export function ResultShowcase({ onClose }: ResultShowcaseProps) {
           description: t('toast.threejsRendering'),
           duration: 5000,
         });
-        const { retryRenderClientWalkthrough } = await import("@/hooks/useExecution");
+        const { retryRenderClientWalkthrough } = await import("@/features/execution/hooks/useExecution");
         retryRenderClientWalkthrough(
           nodeId,
           artData,

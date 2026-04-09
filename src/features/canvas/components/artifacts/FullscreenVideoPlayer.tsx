@@ -4,7 +4,7 @@ import React, { useRef, useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Download, Clock, Clapperboard, Film, DollarSign, Building2, DoorOpen, Loader2 as Loader } from "lucide-react";
 import { useUIStore } from "@/stores/ui-store";
-import { useExecutionStore } from "@/stores/execution-store";
+import { useExecutionStore } from "@/features/execution/stores/execution-store";
 import type { VideoSegment } from "@/types/execution";
 
 export function FullscreenVideoPlayer() {

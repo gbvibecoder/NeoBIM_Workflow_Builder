@@ -4,7 +4,7 @@ import { useRef, useState, useCallback, useMemo } from "react";
 import { motion } from "framer-motion";
 import { Play, Maximize2, Loader2, Download, RefreshCw } from "lucide-react";
 import { useLocale } from "@/hooks/useLocale";
-import { useExecutionStore } from "@/stores/execution-store";
+import { useExecutionStore } from "@/features/execution/stores/execution-store";
 import { COLORS } from "@/components/canvas/result-showcase/constants";
 import type { VideoInfo } from "@/components/canvas/result-showcase/useShowcaseData";
 

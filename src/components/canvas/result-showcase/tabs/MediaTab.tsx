@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Maximize2, X, Download, ExternalLink, Loader2, ArrowLeft, Video, Sparkles, Share2 } from "lucide-react";
 import { toast } from "sonner";
 import { useLocale } from "@/hooks/useLocale";
-import { useExecutionStore } from "@/stores/execution-store";
+import { useExecutionStore } from "@/features/execution/stores/execution-store";
 import { COLORS } from "@/components/canvas/result-showcase/constants";
 import type { ShowcaseData } from "@/components/canvas/result-showcase/useShowcaseData";
 

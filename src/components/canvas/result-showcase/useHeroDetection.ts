@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { useExecutionStore } from "@/stores/execution-store";
+import { useExecutionStore } from "@/features/execution/stores/execution-store";
 import type { ShowcaseData } from "@/components/canvas/result-showcase/useShowcaseData";
 
 // ─── Types ───────────────────────────────────────────────────────────────────

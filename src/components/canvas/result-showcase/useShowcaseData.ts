@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { useExecutionStore } from "@/stores/execution-store";
+import { useExecutionStore } from "@/features/execution/stores/execution-store";
 import { useWorkflowStore } from "@/stores/workflow-store";
 import type { ExecutionArtifact } from "@/types/execution";
 import type { TabId } from "@/components/canvas/result-showcase/constants";

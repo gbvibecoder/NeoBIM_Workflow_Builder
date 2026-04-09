@@ -3,7 +3,7 @@
 import React, { useRef, useState, useCallback, useEffect } from "react";
 import { Download, Maximize2, Clock, DollarSign, Clapperboard, SkipForward, Loader2, Film } from "lucide-react";
 import { useUIStore } from "@/stores/ui-store";
-import { useExecutionStore } from "@/stores/execution-store";
+import { useExecutionStore } from "@/features/execution/stores/execution-store";
 import { useLocale } from "@/hooks/useLocale";
 import type { VideoArtifactData, VideoSegment } from "@/types/execution";
 

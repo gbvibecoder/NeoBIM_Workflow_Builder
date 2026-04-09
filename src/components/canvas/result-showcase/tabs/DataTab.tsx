@@ -5,7 +5,7 @@ import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { ChevronRight, ChevronDown, Download, Copy, Check, Table2, BarChart3, Code2, Pencil } from "lucide-react";
 import { useLocale } from "@/hooks/useLocale";
-import { useExecutionStore } from "@/stores/execution-store";
+import { useExecutionStore } from "@/features/execution/stores/execution-store";
 import { COLORS } from "@/components/canvas/result-showcase/constants";
 import { KpiStrip } from "@/components/canvas/result-showcase/sections/KpiStrip";
 import { CostBreakdownBars } from "@/components/canvas/result-showcase/sections/CostBreakdownBars";

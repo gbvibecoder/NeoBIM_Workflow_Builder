@@ -6,7 +6,7 @@ import {
   FileDown, Film, File, Download, Package, Image as ImageIcon,
   FileText, Table2, Code2, Layers, CheckCircle, Loader2, ArrowLeft, X,
 } from "lucide-react";
-import { useExecutionStore } from "@/stores/execution-store";
+import { useExecutionStore } from "@/features/execution/stores/execution-store";
 import { useWorkflowStore } from "@/stores/workflow-store";
 import { useLocale } from "@/hooks/useLocale";
 import { formatBytes } from "@/lib/utils";

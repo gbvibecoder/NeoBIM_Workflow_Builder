@@ -12,7 +12,7 @@ import * as LucideIcons from "lucide-react";
 import { NODE_CATALOGUE } from "@/constants/node-catalogue";
 import { PREBUILT_WORKFLOWS } from "@/constants/prebuilt-workflows";
 import { useWorkflowStore } from "@/stores/workflow-store";
-import { useExecution } from "@/hooks/useExecution";
+import { useExecution } from "@/features/execution/hooks/useExecution";
 import { useLocale } from "@/hooks/useLocale";
 
 // ─── Types ───────────────────────────────────────────────────────────────────

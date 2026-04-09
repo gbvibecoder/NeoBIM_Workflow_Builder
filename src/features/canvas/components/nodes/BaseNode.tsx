@@ -9,7 +9,7 @@ import type { WorkflowNodeData, NodeCategory, NodeStatus } from "@/types/nodes";
 import { InputNodeContent } from "@/features/canvas/components/nodes/InputNode";
 import { ViewTypeSelect } from "@/features/canvas/components/nodes/GenerateNodeContent";
 import { useLocale } from "@/hooks/useLocale";
-import { useExecutionStore } from "@/stores/execution-store";
+import { useExecutionStore } from "@/features/execution/stores/execution-store";
 import { useUIStore } from "@/stores/ui-store";
 import type { ExecutionArtifact } from "@/types/execution";
 

@@ -7,7 +7,7 @@ import { ArrowRight, Play } from "lucide-react";
 import { WorkflowCanvas } from "@/features/canvas/components/WorkflowCanvas";
 import { useWorkflowStore } from "@/stores/workflow-store";
 import { useUIStore } from "@/stores/ui-store";
-import { useExecutionStore } from "@/stores/execution-store";
+import { useExecutionStore } from "@/features/execution/stores/execution-store";
 import { PREBUILT_WORKFLOWS_MAP } from "@/constants/prebuilt-workflows";
 import { useLocale } from "@/hooks/useLocale";
 

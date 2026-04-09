@@ -3,9 +3,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useWorkflowStore } from "@/stores/workflow-store";
-import { useExecutionStore } from "@/stores/execution-store";
+import { useExecutionStore } from "@/features/execution/stores/execution-store";
 import { useUIStore } from "@/stores/ui-store";
-import { executeNode as mockExecuteNode } from "@/services/mock-executor";
+import { executeNode as mockExecuteNode } from "@/features/execution/services/mock-executor";
 import { inputFileStore, inputMultiFileStore, supplementaryIFCStore } from "@/features/canvas/components/nodes/InputNode";
 import { generateId } from "@/lib/utils";
 import { awardXP } from "@/lib/award-xp";
