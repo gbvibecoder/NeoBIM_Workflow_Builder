@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { stripe, getPlanByPriceId } from '@/lib/stripe';
+import { stripe, getPlanByPriceId } from '@/features/billing/lib/stripe';
 import { prisma } from '@/lib/db';
 import Stripe from 'stripe';
 import { formatErrorResponse, UserErrors } from "@/lib/user-errors";

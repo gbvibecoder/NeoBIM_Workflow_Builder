@@ -46,7 +46,7 @@ export async function POST(req: Request) {
     // Cancel active subscription if any
     if (user.stripeSubscriptionId) {
       try {
-        const { stripe } = await import("@/lib/stripe");
+        const { stripe } = await import("@/features/billing/lib/stripe");
         await stripe.subscriptions.cancel(user.stripeSubscriptionId);
       } catch (err) {
         console.warn("[delete-account] Failed to cancel Stripe subscription:", err);

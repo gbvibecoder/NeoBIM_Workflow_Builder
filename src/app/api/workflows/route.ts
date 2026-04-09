@@ -3,7 +3,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { trackFirstWorkflow } from "@/lib/analytics";
 import { checkEndpointRateLimit, isAdminUser } from "@/lib/rate-limit";
-import { STRIPE_PLANS } from "@/lib/stripe";
+import { STRIPE_PLANS } from "@/features/billing/lib/stripe";
 import {
   formatErrorResponse,
   UserErrors,

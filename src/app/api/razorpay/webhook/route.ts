@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { razorpay, verifyWebhookSignature, getRoleByRazorpayPlanId } from '@/lib/razorpay';
+import { razorpay, verifyWebhookSignature, getRoleByRazorpayPlanId } from '@/features/billing/lib/razorpay';
 import { prisma } from '@/lib/db';
 import { formatErrorResponse } from '@/lib/user-errors';
 import {
