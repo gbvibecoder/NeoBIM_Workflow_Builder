@@ -1,4 +1,4 @@
-import { PageSkeleton } from "@/components/ui/Skeleton";
+import { PageSkeleton } from "@/shared/components/ui/Skeleton";
 
 export default function CommunityLoading() {
   return <PageSkeleton cards={6} />;

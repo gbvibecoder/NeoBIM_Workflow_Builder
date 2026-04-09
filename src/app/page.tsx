@@ -15,7 +15,7 @@ import { PREBUILT_WORKFLOWS } from "@/features/workflows/constants/prebuilt-work
 import { useLocale } from '@/hooks/useLocale';
 import type { TranslationKey } from '@/lib/i18n';
 import { trackLead, trackViewContent } from '@/lib/meta-pixel';
-import { LanguageSwitcher } from '@/components/ui/LanguageSwitcher';
+import { LanguageSwitcher } from '@/shared/components/ui/LanguageSwitcher';
 import { PipelineSection } from '@/features/landing/components/PipelineSection';
 import { NewsletterSignup } from '@/features/landing/components/NewsletterSignup';
 import { TestimonialsSection } from '@/features/landing/components/TestimonialsSection';
