@@ -3,7 +3,7 @@
 import { useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Star } from "lucide-react";
-import { useSupportStore } from "@/stores/support-store";
+import { useSupportStore } from "@/features/support/stores/support-store";
 
 interface SatisfactionRatingProps {
   onClose: () => void;

@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { useSupportStore } from "@/stores/support-store";
+import { useSupportStore } from "@/features/support/stores/support-store";
 
 const containerVariants = {
   hidden: { opacity: 0 },

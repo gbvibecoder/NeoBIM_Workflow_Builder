@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { MessageCircle } from "lucide-react";
-import { useSupportStore } from "@/stores/support-store";
+import { useSupportStore } from "@/features/support/stores/support-store";
 
 interface ChatBubbleButtonProps {
   onClick: () => void;

@@ -3,7 +3,7 @@
 import { useEffect, useCallback } from "react";
 import { usePathname } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
-import { useSupportStore } from "@/stores/support-store";
+import { useSupportStore } from "@/features/support/stores/support-store";
 import { ChatBubbleButton } from "@/features/support/components/ChatBubbleButton";
 import { ChatWindow } from "@/features/support/components/ChatWindow";
 

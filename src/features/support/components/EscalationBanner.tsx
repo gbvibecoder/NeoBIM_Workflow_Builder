@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowRight, X, Send } from "lucide-react";
-import { useSupportStore } from "@/stores/support-store";
+import { useSupportStore } from "@/features/support/stores/support-store";
 import { toast } from "sonner";
 
 export default function EscalationBanner() {

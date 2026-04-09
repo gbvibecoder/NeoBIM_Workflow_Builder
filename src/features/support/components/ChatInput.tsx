@@ -2,7 +2,7 @@
 
 import { useRef, useCallback, KeyboardEvent, useEffect } from "react";
 import { Send } from "lucide-react";
-import { useSupportStore } from "@/stores/support-store";
+import { useSupportStore } from "@/features/support/stores/support-store";
 
 const MAX_CHARS = 3000;
 const CHAR_WARN_THRESHOLD = 2500;

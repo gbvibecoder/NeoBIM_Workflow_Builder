@@ -2,7 +2,7 @@
 
 import { motion } from "framer-motion";
 import { Bot, ChevronLeft, Minus, X } from "lucide-react";
-import { useSupportStore } from "@/stores/support-store";
+import { useSupportStore } from "@/features/support/stores/support-store";
 import type { SupportStatus } from "@/types/support";
 
 interface ChatHeaderProps {

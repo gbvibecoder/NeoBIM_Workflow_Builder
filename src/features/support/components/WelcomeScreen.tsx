@@ -10,7 +10,7 @@ import {
   Box,
   Bug,
 } from "lucide-react";
-import { useSupportStore } from "@/stores/support-store";
+import { useSupportStore } from "@/features/support/stores/support-store";
 
 // ─── Topics ─────────────────────────────────────────────────────────────────
 

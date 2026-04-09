@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { ArrowDown } from "lucide-react";
 import type { SupportMessage } from "@/types/support";
 import { MessageBubble } from "@/features/support/components/MessageBubble";
-import { TypingIndicator } from "@/components/support/TypingIndicator";
+import { TypingIndicator } from "@/features/support/components/TypingIndicator";
 
 interface MessageThreadProps {
   messages: SupportMessage[];
