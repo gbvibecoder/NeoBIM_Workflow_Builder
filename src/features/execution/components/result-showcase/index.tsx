@@ -3,7 +3,7 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
-import { useUIStore } from "@/stores/ui-store";
+import { useUIStore } from "@/shared/stores/ui-store";
 import { useExecutionStore } from "@/features/execution/stores/execution-store";
 import { useLocale } from "@/hooks/useLocale";
 import { generateId } from "@/lib/utils";

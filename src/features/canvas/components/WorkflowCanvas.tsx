@@ -60,7 +60,7 @@ import type { WorkflowTemplate } from "@/types/workflow";
 import { SaveWorkflowModal } from "@/features/canvas/components/modals/SaveWorkflowModal";
 import { ExecutionBlockModal } from "@/features/canvas/components/modals/ExecutionBlockModal";
 import { useExecutionStore } from "@/features/execution/stores/execution-store";
-import { useUIStore } from "@/stores/ui-store";
+import { useUIStore } from "@/shared/stores/ui-store";
 import { NODE_CATALOGUE_MAP, CATEGORY_CONFIG } from "@/features/workflows/constants/node-catalogue";
 import type { WorkflowNodeData, NodeCategory } from "@/types/nodes";
 import type { WorkflowNode, WorkflowEdge } from "@/types/nodes";

@@ -5,7 +5,7 @@ import { prisma } from "@/lib/db";
 import { checkEndpointRateLimit } from "@/lib/rate-limit";
 import { formatErrorResponse, UserErrors, FormErrors, AuthErrors } from "@/lib/user-errors";
 import { normalizePhone } from "@/lib/form-validation";
-import { sendVerificationEmail } from "@/services/email";
+import { sendVerificationEmail } from "@/shared/services/email";
 
 const MAX_IMAGE_BASE64_SIZE = 100 * 1024; // 100KB base64 string (~75KB image)
 const MAX_NAME_LENGTH = 100;

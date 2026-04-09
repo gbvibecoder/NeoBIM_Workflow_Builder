@@ -4,7 +4,7 @@ import crypto from "crypto";
 import { prisma } from "@/lib/db";
 import { trackSignup } from "@/lib/analytics";
 import { checkEndpointRateLimit } from "@/lib/rate-limit";
-import { sendVerificationEmail } from "@/services/email";
+import { sendVerificationEmail } from "@/shared/services/email";
 import { claimReferralCode } from "@/lib/referral";
 import {
   formatErrorResponse,

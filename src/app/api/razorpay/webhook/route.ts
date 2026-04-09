@@ -6,7 +6,7 @@ import {
   sendWelcomeEmail,
   sendPaymentFailedEmail,
   sendSubscriptionCanceledEmail,
-} from '@/services/email';
+} from '@/shared/services/email';
 import { checkWebhookIdempotency } from '@/lib/webhook-idempotency';
 
 export async function POST(req: NextRequest) {

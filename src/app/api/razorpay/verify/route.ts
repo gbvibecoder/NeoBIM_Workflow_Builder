@@ -4,7 +4,7 @@ import { razorpay, verifyPaymentSignature, getRoleByRazorpayPlanId } from '@/fea
 import { prisma } from '@/lib/db';
 import { checkEndpointRateLimit } from '@/lib/rate-limit';
 import { formatErrorResponse, UserErrors } from '@/lib/user-errors';
-import { sendWelcomeEmail } from '@/services/email';
+import { sendWelcomeEmail } from '@/shared/services/email';
 
 /**
  * POST — Verify Razorpay payment after checkout widget success.

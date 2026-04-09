@@ -4,7 +4,7 @@ import React, { useState, useRef, useCallback } from "react";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { Sparkles, X, Loader2 } from "lucide-react";
 import { useWorkflowStore } from "@/features/workflows/stores/workflow-store";
-import { useUIStore } from "@/stores/ui-store";
+import { useUIStore } from "@/shared/stores/ui-store";
 import { PREBUILT_WORKFLOWS } from "@/features/workflows/constants/prebuilt-workflows";
 import { generateId } from "@/lib/utils";
 import { toast } from "sonner";

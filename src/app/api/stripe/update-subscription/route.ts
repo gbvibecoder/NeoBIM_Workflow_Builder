@@ -4,7 +4,7 @@ import { stripe, getPlanByPriceId } from '@/features/billing/lib/stripe';
 import { prisma } from '@/lib/db';
 import { checkEndpointRateLimit } from '@/lib/rate-limit';
 import { formatErrorResponse, UserErrors } from '@/lib/user-errors';
-import { sendPlanChangedEmail } from '@/services/email';
+import { sendPlanChangedEmail } from '@/shared/services/email';
 
 const TIER_ORDER = ['FREE', 'MINI', 'STARTER', 'PRO', 'TEAM_ADMIN'] as const;
 

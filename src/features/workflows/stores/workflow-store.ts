@@ -8,7 +8,7 @@ import { generateId } from "@/lib/utils";
 import { api, ApiError } from "@/lib/api";
 import { awardXP } from "@/lib/award-xp";
 import { toast } from "sonner";
-import { useUIStore } from "@/stores/ui-store";
+import { useUIStore } from "@/shared/stores/ui-store";
 
 /** Returns true if the workflow name is empty, whitespace, or the default "Untitled Workflow" */
 export function isUntitledWorkflow(name: string | null | undefined): boolean {

@@ -3,7 +3,7 @@ import { prisma } from "@/lib/db";
 import { getAdminSession, unauthorizedResponse, logAudit } from "@/lib/admin-server";
 import { checkEndpointRateLimit } from "@/lib/rate-limit";
 import type { AuditAction } from "@/lib/admin-server";
-import { sendSupportResolvedEmail } from "@/services/email";
+import { sendSupportResolvedEmail } from "@/shared/services/email";
 
 const VALID_STATUSES = ["ACTIVE", "ESCALATED", "ADMIN_REPLIED", "RESOLVED", "CLOSED"];
 const VALID_CATEGORIES = [

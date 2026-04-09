@@ -10,7 +10,7 @@ import { InputNodeContent } from "@/features/canvas/components/nodes/InputNode";
 import { ViewTypeSelect } from "@/features/canvas/components/nodes/GenerateNodeContent";
 import { useLocale } from "@/hooks/useLocale";
 import { useExecutionStore } from "@/features/execution/stores/execution-store";
-import { useUIStore } from "@/stores/ui-store";
+import { useUIStore } from "@/shared/stores/ui-store";
 import type { ExecutionArtifact } from "@/types/execution";
 
 const INPUT_NODE_IDS = new Set(["IN-001","IN-002","IN-003","IN-004","IN-005","IN-006","IN-007","IN-008"]);

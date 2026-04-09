@@ -4,7 +4,7 @@ import React, { useState, memo } from "react";
 import { ChevronLeft, ChevronRight, Layers3 } from "lucide-react";
 import { NodeLibrarySidebar } from "@/features/canvas/components/panels/NodeLibrarySidebar";
 import { useLocale } from "@/hooks/useLocale";
-import { useUIStore } from "@/stores/ui-store";
+import { useUIStore } from "@/shared/stores/ui-store";
 
 /**
  * Right-side collapsible panel that houses the Node Library on the canvas page.
