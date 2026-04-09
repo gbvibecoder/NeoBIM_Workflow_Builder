@@ -5,7 +5,7 @@
  * procedural 3D renderer's style configuration.
  */
 
-import type { BuildingStyle } from "@/components/canvas/artifacts/architectural-viewer/types";
+import type { BuildingStyle } from "@/types/architectural-viewer";
 
 // ─── Pattern Libraries ──────────────────────────────────────────────────────
 

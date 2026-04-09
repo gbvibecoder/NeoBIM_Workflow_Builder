@@ -4,7 +4,7 @@ import { useEffect, useRef, useCallback, useState } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { PointerLockControls } from "three/examples/jsm/controls/PointerLockControls.js";
-import type { ArchitecturalViewerProps, DoorMesh, RoomDef, BuildingStyle } from "./types";
+import type { ArchitecturalViewerProps, DoorMesh, RoomDef, BuildingStyle } from "@/types/architectural-viewer";
 import { createMaterials, disposeMaterials } from "./materials";
 import { buildBuilding, getDefaultConfig, generateRoomsForBuilding } from "./building";
 import { addFurniture } from "./furniture";

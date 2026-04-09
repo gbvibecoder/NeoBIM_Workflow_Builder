@@ -54,7 +54,7 @@ import { addFurniture } from "@/components/canvas/artifacts/architectural-viewer
 import type {
   BuildingStyle,
   DoorMesh,
-} from "@/components/canvas/artifacts/architectural-viewer/types";
+} from "@/types/architectural-viewer";
 
 // ─── Hero building config ─────────────────────────────────────────────
 // Minimalist: a single elegant glass tower, no podium, no site context.

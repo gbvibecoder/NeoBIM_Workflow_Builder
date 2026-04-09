@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import type { RoomDef } from "./types";
+import type { RoomDef } from "@/types/architectural-viewer";
 import type { MaterialLibrary } from "./materials";
 
 // ─── Furniture Placement ──────────────────────────────────────────────────────

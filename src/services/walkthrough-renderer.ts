@@ -32,7 +32,7 @@ import {
 } from "@/components/canvas/artifacts/architectural-viewer/building";
 import { createMaterials, disposeMaterials } from "@/components/canvas/artifacts/architectural-viewer/materials";
 import { addFurniture } from "@/components/canvas/artifacts/architectural-viewer/furniture";
-import type { BuildingStyle } from "@/components/canvas/artifacts/architectural-viewer/types";
+import type { BuildingStyle } from "@/types/architectural-viewer";
 
 // ─── Public Types ────────────────────────────────────────────────────────────
 

@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import type { RoomDef, RoomType, DoorMesh, BuildingConfig, BuildingStyle } from "./types";
+import type { RoomDef, RoomType, DoorMesh, BuildingConfig, BuildingStyle } from "@/types/architectural-viewer";
 import type { MaterialLibrary } from "./materials";
 
 // ─── Default Style ───────────────────────────────────────────────────────────
