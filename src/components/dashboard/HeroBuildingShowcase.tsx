@@ -44,7 +44,7 @@ import {
   ScanLine,
   MousePointerClick,
 } from "lucide-react";
-import { createMaterials, disposeMaterials } from "@/components/canvas/artifacts/architectural-viewer/materials";
+import { createMaterials, disposeMaterials } from "@/lib/3d-generation/materials";
 import {
   buildBuilding,
   getDefaultConfig,

@@ -30,7 +30,7 @@ import {
   generateRoomsForBuilding,
   getDefaultConfig,
 } from "@/components/canvas/artifacts/architectural-viewer/building";
-import { createMaterials, disposeMaterials } from "@/components/canvas/artifacts/architectural-viewer/materials";
+import { createMaterials, disposeMaterials } from "@/lib/3d-generation/materials";
 import { addFurniture } from "@/components/canvas/artifacts/architectural-viewer/furniture";
 import type { BuildingStyle } from "@/types/architectural-viewer";
 
