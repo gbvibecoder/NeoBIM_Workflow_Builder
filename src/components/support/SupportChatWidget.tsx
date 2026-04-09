@@ -4,8 +4,8 @@ import { useEffect, useCallback } from "react";
 import { usePathname } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { useSupportStore } from "@/stores/support-store";
-import { ChatBubbleButton } from "./ChatBubbleButton";
-import { ChatWindow } from "./ChatWindow";
+import { ChatBubbleButton } from "@/features/support/components/ChatBubbleButton";
+import { ChatWindow } from "@/features/support/components/ChatWindow";
 
 export function SupportChatWidget() {
   const isOpen = useSupportStore((s) => s.isOpen);

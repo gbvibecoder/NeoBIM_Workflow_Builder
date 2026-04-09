@@ -3,14 +3,14 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useSupportStore } from "@/stores/support-store";
-import { ChatHeader } from "./ChatHeader";
-import ConversationListView from "./ConversationListView";
-import { MessageThread } from "./MessageThread";
-import { ChatInput } from "./ChatInput";
-import { SuggestedReplies } from "./SuggestedReplies";
-import EscalationBanner from "./EscalationBanner";
-import SatisfactionRating from "./SatisfactionRating";
-import WelcomeScreen from "./WelcomeScreen";
+import { ChatHeader } from "@/features/support/components/ChatHeader";
+import ConversationListView from "@/features/support/components/ConversationListView";
+import { MessageThread } from "@/components/support/MessageThread";
+import { ChatInput } from "@/features/support/components/ChatInput";
+import { SuggestedReplies } from "@/components/support/SuggestedReplies";
+import EscalationBanner from "@/components/support/EscalationBanner";
+import SatisfactionRating from "@/components/support/SatisfactionRating";
+import WelcomeScreen from "@/components/support/WelcomeScreen";
 import type { SupportMessage } from "@/types/support";
 
 type ViewMode = "welcome" | "list" | "chat" | "rating";
