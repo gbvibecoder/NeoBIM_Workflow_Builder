@@ -4,7 +4,7 @@ import React, { useState, useRef, useEffect, useCallback, type KeyboardEvent as 
 import { useRouter } from "next/navigation";
 import { useFloorPlanStore } from "@/stores/floor-plan-store";
 import type { ViewMode } from "@/types/floor-plan-cad";
-import { ExportMenu } from "@/components/floor-plan/ExportMenu";
+import { ExportMenu } from "@/features/floor-plan/components/ExportMenu";
 
 const VIEW_MODES: { id: ViewMode; label: string; shortcut: string }[] = [
   { id: "cad", label: "CAD", shortcut: "1" },

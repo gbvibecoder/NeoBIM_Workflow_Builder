@@ -2,13 +2,13 @@
 
 import React, { useEffect, useCallback, useMemo, useRef, useState } from "react";
 import { useFloorPlanStore } from "@/stores/floor-plan-store";
-import { FloorPlanCanvas } from "@/components/floor-plan/FloorPlanCanvas";
+import { FloorPlanCanvas } from "@/features/floor-plan/components/FloorPlanCanvas";
 import { Toolbar } from "@/components/floor-plan/Toolbar";
 import { StatusBar } from "@/components/floor-plan/StatusBar";
 import { ToolPanel } from "@/components/floor-plan/panels/ToolPanel";
 import { PropertiesPanel } from "@/components/floor-plan/panels/PropertiesPanel";
 import { LayerPanel } from "@/components/floor-plan/panels/LayerPanel";
-import { ContextMenu } from "@/components/floor-plan/ContextMenu";
+import { ContextMenu } from "@/features/floor-plan/components/ContextMenu";
 import { ShortcutOverlay } from "@/components/floor-plan/ShortcutOverlay";
 import { FurniturePanel } from "@/components/floor-plan/panels/FurniturePanel";
 import { VastuPanel } from "@/components/floor-plan/panels/VastuPanel";
@@ -20,7 +20,7 @@ import { WelcomeScreen } from "@/components/floor-plan/WelcomeScreen";
 import { GenerationLoader } from "@/components/floor-plan/GenerationLoader";
 import { getProjectIndex, importProjectFile } from "@/features/floor-plan/lib/project-persistence";
 import { getSampleProjectForPrompt } from "@/features/floor-plan/lib/sample-layouts";
-import { FloorPlanErrorBoundary } from "@/components/floor-plan/ErrorBoundary";
+import { FloorPlanErrorBoundary } from "@/features/floor-plan/components/ErrorBoundary";
 import { displayToMm, formatDimension, type DisplayUnit } from "@/features/floor-plan/lib/unit-conversion";
 import { worldToScreen, screenToWorld } from "@/features/floor-plan/lib/geometry";
 
