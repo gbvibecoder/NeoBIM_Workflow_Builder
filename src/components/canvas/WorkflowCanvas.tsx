@@ -379,7 +379,7 @@ function WorkflowCanvasInner({ workflowId: urlWorkflowId, templateId }: Workflow
     loadFromTemplate,
   } = useWorkflowStore();
 
-  const { artifacts, executionProgress, clearArtifacts, clearCurrentExecution, restoreArtifactsFromDB, hydrateQuantityOverrides } = useExecutionStore();
+  const { artifacts, executionProgress, clearArtifacts, clearCurrentExecution, restoreArtifactsFromDB, hydrateQuantityOverrides, hydrateVideoGenProgress } = useExecutionStore();
 
   const { t: tLocale } = useLocale();
 
@@ -428,7 +428,17 @@ function WorkflowCanvasInner({ workflowId: urlWorkflowId, templateId }: Workflow
       .then(res => res.ok ? res.json() : null)
       .then((data: { executions?: Array<{
         id: string; status: string; startedAt: string; completedAt?: string | null;
-        metadata?: { quantityOverrides?: Record<string, Record<string, number>> } | null;
+        metadata?: {
+          quantityOverrides?: Record<string, Record<string, number>>;
+          videoGenProgress?: Record<string, {
+            progress: number;
+            status: "submitting" | "processing" | "rendering" | "complete" | "failed";
+            phase?: string;
+            exteriorTaskId?: string;
+            interiorTaskId?: string;
+            failureMessage?: string;
+          }>;
+        } | null;
         artifacts?: Array<{
           tileInstanceId: string; nodeId: string; type: string;
           data: Record<string, unknown>; nodeLabel?: string | null;
@@ -445,18 +455,22 @@ function WorkflowCanvasInner({ workflowId: urlWorkflowId, templateId }: Workflow
             completedAt: latest.completedAt,
           });
         }
-        // Hydrate user quantity overrides from execution metadata so BOQ
-        // edits survive page reloads. The hydrate action is local-only and
-        // does NOT trigger a persist round-trip back to the server.
+        // Hydrate persisted UI state from execution.metadata so reload-time
+        // restores BOQ quantity edits AND in-flight video render progress.
+        // Both hydrate actions are local-only and do NOT trigger persist
+        // round-trips back to the server.
         if (latest.metadata?.quantityOverrides) {
           hydrateQuantityOverrides(latest.metadata.quantityOverrides);
+        }
+        if (latest.metadata?.videoGenProgress) {
+          hydrateVideoGenProgress(latest.metadata.videoGenProgress);
         }
       })
       .catch((err) => {
         if (err instanceof DOMException && err.name === "AbortError") return;
         /* Non-fatal — execution restore is best-effort */
       });
-  }, [restoreArtifactsFromDB, hydrateQuantityOverrides]);
+  }, [restoreArtifactsFromDB, hydrateQuantityOverrides, hydrateVideoGenProgress]);
 
   // ─── Load workflow from URL ?id= param ────────────────────────────
   const loadedUrlIdRef = useRef<string | null>(null);
