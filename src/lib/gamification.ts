@@ -45,7 +45,7 @@ export const MISSIONS: Mission[] = [
     title: "Initialize Node",
     description: "Create your first empty canvas to begin.",
     action: "workflow-created",
-    href: "/dashboard/workflows/new",
+    href: "/dashboard/canvas",
     icon: "check",
   },
   {
@@ -53,7 +53,7 @@ export const MISSIONS: Mission[] = [
     title: "AI Whispering",
     description: "Generate a workflow using a natural prompt.",
     action: "ai-prompt-used",
-    href: "/dashboard/workflows/new",
+    href: "/dashboard/canvas",
     icon: "sparkles",
   },
   {
@@ -69,7 +69,7 @@ export const MISSIONS: Mission[] = [
     title: "The Integrator",
     description: "Connect a 3rd party API node.",
     action: "render-generated",
-    href: "/dashboard/workflows/new",
+    href: "/dashboard/canvas",
     icon: "cable",
   },
 ];
@@ -104,10 +104,10 @@ export interface FlashEventDef {
 
 const FLASH_EVENTS: FlashEventDef[] = [
   { key: "run-3-workflows",    title: "Run 3 workflows today",     description: "Execute three different workflows before midnight UTC.", href: "/dashboard/workflows" },
-  { key: "generate-2-renders", title: "Generate 2 renders",        description: "Use the Neural Render node twice today.",               href: "/dashboard/workflows/new" },
-  { key: "try-ifc-pipeline",   title: "Try the IFC pipeline",      description: "Build and run a workflow with IFC parsing.",             href: "/dashboard/workflows/new" },
+  { key: "generate-2-renders", title: "Generate 2 renders",        description: "Use the Neural Render node twice today.",               href: "/dashboard/canvas" },
+  { key: "try-ifc-pipeline",   title: "Try the IFC pipeline",      description: "Build and run a workflow with IFC parsing.",             href: "/dashboard/canvas" },
   { key: "clone-2-templates",  title: "Clone 2 community templates", description: "Fork two blueprints from the community vault.",       href: "/dashboard/templates" },
-  { key: "ai-prompt-challenge",title: "AI Architect Challenge",     description: "Generate 2 workflows using AI prompts.",                href: "/dashboard/workflows/new" },
+  { key: "ai-prompt-challenge",title: "AI Architect Challenge",     description: "Generate 2 workflows using AI prompts.",                href: "/dashboard/canvas" },
 ];
 
 /** Returns today's flash event (rotates daily based on UTC date). */
