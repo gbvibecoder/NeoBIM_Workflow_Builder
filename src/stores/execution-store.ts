@@ -5,18 +5,15 @@ import { useWorkflowStore } from "@/stores/workflow-store";
 import type {
   Execution,
   ExecutionArtifact,
+  ExecutionMetadata,
   ExecutionStatus,
   TileExecutionResult,
+  VideoGenerationState,
 } from "@/types/execution";
 
-export interface VideoGenerationState {
-  progress: number; // 0-100
-  status: "submitting" | "processing" | "rendering" | "complete" | "failed";
-  phase?: string; // Current rendering phase label (e.g., "Exterior Pull-in")
-  exteriorTaskId?: string;
-  interiorTaskId?: string;
-  failureMessage?: string;
-}
+// Re-export so existing importers (e.g. useExecution.ts) keep working without
+// touching their import lines. The canonical definition lives in types/execution.
+export type { VideoGenerationState };
 
 interface ExecutionState {
   // Current execution

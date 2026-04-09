@@ -23,6 +23,19 @@ export interface TileExecutionResult {
   errorMessage?: string;
 }
 
+/** Per-node video generation progress (used by GN-009 walkthrough renders
+ *  and the result-showcase "Create Video" CTA path). Mirrors the live
+ *  in-memory state in useExecutionStore.videoGenProgress, and is persisted
+ *  to Execution.metadata so long renders can be observed after page reload. */
+export interface VideoGenerationState {
+  progress: number; // 0-100
+  status: "submitting" | "processing" | "rendering" | "complete" | "failed";
+  phase?: string; // Current rendering phase label (e.g., "Exterior Pull-in")
+  exteriorTaskId?: string;
+  interiorTaskId?: string;
+  failureMessage?: string;
+}
+
 /** Per-execution UI/state metadata persisted in Execution.metadata JSONB.
  *  Each field is optional so older executions without metadata stay valid. */
 export interface ExecutionMetadata {
@@ -33,6 +46,12 @@ export interface ExecutionMetadata {
    *  rehydrate the in-memory Map on result-showcase mount so edits survive
    *  page reloads. Persisted via PATCH /api/executions/[id]/metadata. */
   quantityOverrides?: Record<string, Record<string, number>>;
+  /** Per-node video generation progress, keyed by nodeId. Mirrors the live
+   *  useExecutionStore.videoGenProgress Map serialized as a plain record.
+   *  Persisted by the same debounced PATCH path so long video renders are
+   *  observable after page reload (and, if final, the failure message
+   *  remains visible). */
+  videoGenProgress?: Record<string, VideoGenerationState>;
 }
 
 export interface Execution {
