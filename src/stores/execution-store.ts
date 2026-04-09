@@ -53,6 +53,13 @@ interface ExecutionState {
   // Video generation progress
   setVideoGenProgress: (nodeId: string, state: VideoGenerationState) => void;
   clearVideoGenProgress: (nodeId: string) => void;
+  /** Replace the in-memory videoGenProgress Map with the contents of an
+   *  ExecutionMetadata.videoGenProgress record loaded from the server.
+   *  Called once on canvas mount alongside hydrateQuantityOverrides so the
+   *  user can see in-flight render progress (or final failure messages)
+   *  after a page reload. Pure local-state update — does NOT trigger a
+   *  persist round-trip. */
+  hydrateVideoGenProgress: (progress: Record<string, VideoGenerationState>) => void;
 
   // Regeneration
   incrementRegenCount: (tileInstanceId: string) => boolean; // returns false if at max
@@ -102,54 +109,77 @@ interface ExecutionState {
 
 const MAX_REGENERATIONS = 3;
 
-// ─── Quantity-overrides persistence (debounced PATCH) ───────────────────────
-// User edits to the BOQ quantity table are pushed to
-// Execution.metadata.quantityOverrides via the new
-// PATCH /api/executions/[id]/metadata endpoint, debounced 500ms so a rapid
-// edit burst (typing through several cells) batches into a single
-// network round-trip. The full snapshot of the current quantityOverrides
-// Map is sent each time — last-write-wins on the server side.
+// ─── Execution metadata persistence (debounced, field-aware PATCH) ──────────
+// Both user BOQ quantity edits (quantityOverrides) and live video render
+// progress (videoGenProgress) are pushed to Execution.metadata via
+// PATCH /api/executions/[id]/metadata, debounced 500ms so rapid bursts
+// batch into a single network round-trip.
 //
-// Best-effort: failures are swallowed because the in-memory Map is the
-// source of truth during the editing session. The next edit will retry
-// with a fresh snapshot. The previous fire-and-forget pattern is
-// preserved here for the same reason.
+// Field-aware: each setter passes the field name to schedulePersist(field).
+// At flush time we send ONLY the fields that had pending changes — this
+// avoids the multi-tab footgun where, e.g., a videoGenProgress poll cycle
+// in tab A would otherwise send an empty quantityOverrides snapshot and
+// wipe BOQ edits saved on tab B. The server's PATCH endpoint top-level
+// merges JSON fields, so partial bodies are correct.
+//
+// Best-effort: failures are swallowed because the in-memory state is the
+// source of truth during the editing session. The next change retries
+// with a fresh snapshot.
 
 const PERSIST_DEBOUNCE_MS = 500;
 let pendingPersistTimer: ReturnType<typeof setTimeout> | null = null;
+const pendingFields = new Set<keyof ExecutionMetadata>();
 
-function schedulePersist() {
+function schedulePersist(field: keyof ExecutionMetadata) {
   if (typeof window === "undefined") return; // SSR safety
+  pendingFields.add(field);
   if (pendingPersistTimer) clearTimeout(pendingPersistTimer);
   pendingPersistTimer = setTimeout(() => {
     pendingPersistTimer = null;
-    void persistQuantityOverrides();
+    void flushPersist();
   }, PERSIST_DEBOUNCE_MS);
 }
 
-async function persistQuantityOverrides() {
-  // Read state at flush time (not schedule time) so we always send the
-  // latest snapshot, even if more edits landed during the debounce window.
+async function flushPersist() {
+  // Snapshot + clear the pending set so any updates after this flush starts
+  // get scheduled into the next debounce cycle.
+  const fieldsToFlush = new Set(pendingFields);
+  pendingFields.clear();
+  if (fieldsToFlush.size === 0) return;
+
   const state = useExecutionStore.getState();
   const executionId = state.currentExecution?.id;
   if (!executionId) return; // No execution loaded → nothing to persist against
 
-  // Serialize Map<string, Map<number, number>> to nested JSON record
-  const serialized: Record<string, Record<string, number>> = {};
-  for (const [tileId, rowMap] of state.quantityOverrides) {
-    const inner: Record<string, number> = {};
-    for (const [row, val] of rowMap) inner[String(row)] = val;
-    serialized[tileId] = inner;
+  // Build the PATCH body with only the fields that had pending changes.
+  const body: Partial<ExecutionMetadata> = {};
+
+  if (fieldsToFlush.has("quantityOverrides")) {
+    const serialized: Record<string, Record<string, number>> = {};
+    for (const [tileId, rowMap] of state.quantityOverrides) {
+      const inner: Record<string, number> = {};
+      for (const [row, val] of rowMap) inner[String(row)] = val;
+      serialized[tileId] = inner;
+    }
+    body.quantityOverrides = serialized;
+  }
+
+  if (fieldsToFlush.has("videoGenProgress")) {
+    const serialized: Record<string, VideoGenerationState> = {};
+    for (const [nodeId, vgState] of state.videoGenProgress) {
+      serialized[nodeId] = vgState;
+    }
+    body.videoGenProgress = serialized;
   }
 
   try {
     await fetch(`/api/executions/${executionId}/metadata`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ quantityOverrides: serialized }),
+      body: JSON.stringify(body),
     });
   } catch {
-    // Best-effort: in-memory state is still correct, next edit retries
+    // Best-effort: in-memory state is still correct, next change retries
   }
 }
 
@@ -231,19 +261,36 @@ export const useExecutionStore = create<ExecutionState>()((set, get) => ({
 
   setProgress: (progress) => set({ executionProgress: progress }),
 
-  setVideoGenProgress: (nodeId, state) =>
+  setVideoGenProgress: (nodeId, state) => {
     set((s) => {
       const newMap = new Map(s.videoGenProgress);
       newMap.set(nodeId, state);
       return { videoGenProgress: newMap };
-    }),
+    });
+    schedulePersist("videoGenProgress");
+  },
 
-  clearVideoGenProgress: (nodeId) =>
+  clearVideoGenProgress: (nodeId) => {
     set((s) => {
       const newMap = new Map(s.videoGenProgress);
       newMap.delete(nodeId);
       return { videoGenProgress: newMap };
-    }),
+    });
+    schedulePersist("videoGenProgress");
+  },
+
+  hydrateVideoGenProgress: (progress) => {
+    // Convert the JSON record back to Map<string, VideoGenerationState>.
+    // Defensive: skip entries with non-finite progress or unknown status.
+    const newMap = new Map<string, VideoGenerationState>();
+    for (const [nodeId, vgState] of Object.entries(progress)) {
+      if (!vgState || typeof vgState !== "object") continue;
+      if (typeof vgState.progress !== "number" || !Number.isFinite(vgState.progress)) continue;
+      if (typeof vgState.status !== "string") continue;
+      newMap.set(nodeId, vgState);
+    }
+    set({ videoGenProgress: newMap });
+  },
 
   addToHistory: (execution) =>
     set((state) => ({
@@ -289,7 +336,7 @@ export const useExecutionStore = create<ExecutionState>()((set, get) => ({
       newOverrides.set(tileInstanceId, tileOverrides);
       return { quantityOverrides: newOverrides };
     });
-    schedulePersist();
+    schedulePersist("quantityOverrides");
   },
 
   clearQuantityOverrides: (tileInstanceId) => {
@@ -298,7 +345,7 @@ export const useExecutionStore = create<ExecutionState>()((set, get) => ({
       newOverrides.delete(tileInstanceId);
       return { quantityOverrides: newOverrides };
     });
-    schedulePersist();
+    schedulePersist("quantityOverrides");
   },
 
   getQuantityOverrides: (tileInstanceId) => {
