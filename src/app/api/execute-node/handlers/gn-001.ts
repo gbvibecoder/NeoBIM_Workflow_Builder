@@ -401,7 +401,7 @@ export const handleGN001: NodeHandler = async (ctx) => {
     let assetUrls: { glbUrl: string; ifcUrl: string; metadataUrl: string } | null = null;
     try {
       // Dynamic imports to avoid DOM polyfill at module load time
-      const { generateGLB } = await import("@/services/glb-generator");
+      const { generateGLB } = await import("@/features/3d-render/services/glb-generator");
       const { uploadBuildingAssets, isR2Configured: checkR2 } = await import("@/lib/r2");
 
       const metadata = extractMetadata(geometry);

@@ -8,7 +8,7 @@
 
 import { generateConceptImage, enhanceArchitecturalPrompt } from "@/services/openai";
 import type { BuildingDescription } from "@/services/openai";
-import { convertImageTo3D } from "@/services/sam3d-service";
+import { convertImageTo3D } from "@/features/3d-render/services/sam3d-service";
 import type { Sam3dConversionJob } from "@/types/sam3d";
 
 export interface TextTo3DInput {

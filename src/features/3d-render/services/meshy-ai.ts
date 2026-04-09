@@ -5,7 +5,7 @@
  * Meshy generates photorealistic 3D models from text descriptions with PBR textures.
  */
 
-import type { BuildingRequirements, ThreeDTaskResult, BuildingKPIs } from "./threedai-studio";
+import type { BuildingRequirements, ThreeDTaskResult, BuildingKPIs } from "@/services/threedai-studio";
 
 // ─── Constants ──────────────────────────────────────────────────────────────────
 

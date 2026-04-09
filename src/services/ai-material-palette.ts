@@ -8,7 +8,7 @@
  * and the AI palette provides photorealistic material assignments.
  */
 
-import type { PBRMaterialDef } from "./material-mapping";
+import type { PBRMaterialDef } from "@/services/material-mapping";
 
 export interface AIMaterialPalette {
   /** Hex colors per element type */

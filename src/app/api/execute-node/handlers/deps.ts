@@ -59,15 +59,15 @@ export {
 export type { BuildingDescription, RenderQAResult } from "@/services/openai";
 export { analyzeSite } from "@/services/site-analysis";
 export { generatePDFBase64 } from "@/services/pdf-report-server";
-export { reconstructHiFi3D, isMeshyConfigured } from "@/services/meshy-service";
-export { generateMassingGeometry } from "@/services/massing-generator";
+export { reconstructHiFi3D, isMeshyConfigured } from "@/features/3d-render/services/meshy-service";
+export { generateMassingGeometry } from "@/features/3d-render/services/massing-generator";
 export {
   generate3DModel,
   is3DAIConfigured,
   calculateKPIs,
 } from "@/services/threedai-studio";
 export type { BuildingRequirements } from "@/services/threedai-studio";
-export { generateWithMeshy, isMeshyTextTo3DConfigured } from "@/services/meshy-ai";
+export { generateWithMeshy, isMeshyTextTo3DConfigured } from "@/features/3d-render/services/meshy-ai";
 export { generateIFCFile } from "@/features/ifc/services/ifc-exporter";
 export { parsePromptToStyle } from "@/services/prompt-style-parser";
 export { extractMetadata } from "@/services/metadata-extractor";

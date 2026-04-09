@@ -14,7 +14,7 @@ vi.mock("@fal-ai/client", () => ({
 }));
 
 import { fal } from "@fal-ai/client";
-import { convertImageTo3D, getConcurrencyInfo, clearCache } from "@/services/sam3d-service";
+import { convertImageTo3D, getConcurrencyInfo, clearCache } from "@/features/3d-render/services/sam3d-service";
 
 describe("SAM 3D Service", () => {
   beforeEach(() => {
