@@ -3,7 +3,7 @@
 import React, { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Search, TrendingUp, Star, GitFork, Clock, MessageSquarePlus, X, ChevronDown } from "lucide-react";
-import { WorkflowCard } from "@/components/community/WorkflowCard";
+import { WorkflowCard } from "@/features/community/components/WorkflowCard";
 import { PREBUILT_WORKFLOWS } from "@/constants/prebuilt-workflows";
 import { toast } from "sonner";
 import { useWorkflowStore } from "@/stores/workflow-store";
