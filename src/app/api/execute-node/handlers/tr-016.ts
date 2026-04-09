@@ -27,7 +27,7 @@ export const handleTR016: NodeHandler = async (ctx) => {
         })
       );
 
-      const { detectClashesFromMultipleBuffers } = await import("@/services/clash-detector");
+      const { detectClashesFromMultipleBuffers } = await import("@/features/3d-render/services/clash-detector");
       const result = await detectClashesFromMultipleBuffers(modelBuffers, {
         tolerance: 0.025,
         maxClashes: 5000,
@@ -138,7 +138,7 @@ export const handleTR016: NodeHandler = async (ctx) => {
   }
 
   try {
-    const { detectClashesFromBuffer } = await import("@/services/clash-detector");
+    const { detectClashesFromBuffer } = await import("@/features/3d-render/services/clash-detector");
     const result = await detectClashesFromBuffer(ifcBuffer, {
       tolerance: 0.025,
       maxClashes: 5000,

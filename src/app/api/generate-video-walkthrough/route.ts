@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { checkEndpointRateLimit } from "@/lib/rate-limit";
 import { formatErrorResponse } from "@/lib/user-errors";
-import { submitDualWalkthrough } from "@/services/video-service";
+import { submitDualWalkthrough } from "@/features/3d-render/services/video-service";
 import { logger } from "@/lib/logger";
 
 /**

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { checkDualVideoStatus, checkDualTextVideoStatus, checkSingleVideoStatus } from "@/services/video-service";
+import { checkDualVideoStatus, checkDualTextVideoStatus, checkSingleVideoStatus } from "@/features/3d-render/services/video-service";
 import { checkEndpointRateLimit } from "@/lib/rate-limit";
 import { formatErrorResponse } from "@/lib/user-errors";
 

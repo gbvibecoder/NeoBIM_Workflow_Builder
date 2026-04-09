@@ -9,8 +9,8 @@
 
 import type { MassingGeometry, GeometryElement } from "@/types/geometry";
 import type * as THREEns from "three";
-import { getMaterialForElement } from "@/services/material-mapping";
-import type { PBRMaterialDef } from "@/services/material-mapping";
+import { getMaterialForElement } from "@/features/3d-render/services/material-mapping";
+import type { PBRMaterialDef } from "@/features/3d-render/services/material-mapping";
 
 /**
  * Apply minimal DOM/window polyfill for Three.js server-side usage.

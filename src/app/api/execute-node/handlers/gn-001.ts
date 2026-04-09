@@ -383,9 +383,9 @@ export const handleGN001: NodeHandler = async (ctx) => {
 
     // ── AI Material Palette: Generate concept render + extract color palette ──
     let aiThumbnailUrl: string | null = null;
-    let aiPalette: Record<string, Partial<import("@/services/material-mapping").PBRMaterialDef>> | null = null;
+    let aiPalette: Record<string, Partial<import("@/features/3d-render/services/material-mapping").PBRMaterialDef>> | null = null;
     try {
-      const { generateAIMaterialPalette, paletteToMaterialOverrides } = await import("@/services/ai-material-palette");
+      const { generateAIMaterialPalette, paletteToMaterialOverrides } = await import("@/features/3d-render/services/ai-material-palette");
       const { palette, imageUrl } = await generateAIMaterialPalette(
         textContent || `${buildingType}, ${floors} floors`,
         buildingType,
