@@ -1,5 +1,5 @@
 import React from "react";
-import { Sidebar } from "@/components/dashboard/Sidebar";
+import { Sidebar } from "@/features/dashboard/components/Sidebar";
 import { Header } from "@/features/dashboard/components/Header";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { CommandPaletteLoader } from "@/components/ui/CommandPaletteLoader";

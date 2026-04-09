@@ -15,8 +15,8 @@ import { awardXP } from "@/lib/award-xp";
 
 /* ── Lazy-loaded 3D scenes — three + @react-three/fiber are ~750KB,
        so split them out of the templates initial chunk. ── */
-const TemplatesHeroScene = lazy(() => import("@/components/dashboard/TemplatesHeroScene").then(m => ({ default: m.TemplatesHeroScene })));
-const CardScene3D = dynamic(() => import("@/components/dashboard/TemplateCardScene"), { ssr: false });
+const TemplatesHeroScene = lazy(() => import("@/features/dashboard/components/TemplatesHeroScene").then(m => ({ default: m.TemplatesHeroScene })));
+const CardScene3D = dynamic(() => import("@/features/dashboard/components/TemplateCardScene"), { ssr: false });
 
 /* ── Constants ── */
 

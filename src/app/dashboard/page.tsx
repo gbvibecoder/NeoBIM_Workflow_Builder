@@ -21,7 +21,7 @@ import type { WorkflowTemplate } from "@/types/workflow";
 const WorldCanvas = lazy(() => import("@/components/dashboard/WorldCanvas").then((m) => ({ default: m.WorldCanvas })));
 const FloorPlanScene = lazy(() => import("@/features/dashboard/components/FloorPlanScene").then((m) => ({ default: m.FloorPlanScene })));
 const IFCViewerScene = lazy(() => import("@/features/dashboard/components/IFCViewerScene").then((m) => ({ default: m.IFCViewerScene })));
-const VideoRenderScene = lazy(() => import("@/components/dashboard/VideoRenderScene").then((m) => ({ default: m.VideoRenderScene })));
+const VideoRenderScene = lazy(() => import("@/features/dashboard/components/VideoRenderScene").then((m) => ({ default: m.VideoRenderScene })));
 const HeroBuildingShowcase = lazy(() => import("@/features/dashboard/components/HeroBuildingShowcase").then((m) => ({ default: m.HeroBuildingShowcase })));
 import { scrollState } from "@/components/dashboard/WorldCanvas";
 
