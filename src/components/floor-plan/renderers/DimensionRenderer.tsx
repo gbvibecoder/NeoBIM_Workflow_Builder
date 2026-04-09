@@ -17,7 +17,7 @@ import {
 } from "@/features/floor-plan/lib/geometry";
 import { formatDimension } from "@/lib/floor-plan/unit-conversion";
 import type { DisplayUnit } from "@/lib/floor-plan/unit-conversion";
-import { lw } from "@/lib/floor-plan/line-weights";
+import { lw } from "@/features/floor-plan/lib/line-weights";
 
 interface DimensionRendererProps {
   rooms: Room[];

@@ -11,7 +11,7 @@
  * Pure synchronous function — no AI calls.
  */
 
-import type { PlacedRoom } from "@/lib/floor-plan/layout-engine";
+import type { PlacedRoom } from "@/features/floor-plan/lib/layout-engine";
 
 // ── Types ───────────────────────────────────────────────────────────────────
 

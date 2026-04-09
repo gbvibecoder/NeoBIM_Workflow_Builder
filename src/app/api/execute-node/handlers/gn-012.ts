@@ -57,7 +57,7 @@ export const handleGN012: NodeHandler = async (ctx) => {
 
         // Multi-floor: use BSP layout engine per floor (same as standalone API)
         if (roomProgram.numFloors > 1) {
-          const { layoutMultiFloor } = await import("@/lib/floor-plan/layout-engine");
+          const { layoutMultiFloor } = await import("@/features/floor-plan/lib/layout-engine");
           const { convertMultiFloorToProject } = await import("@/lib/floor-plan/pipeline-adapter");
           const multiFloor = layoutMultiFloor(roomProgram);
           logger.debug(`[GN-012][STAGE-2] Multi-floor: ${multiFloor.floors.reduce((s, f) => s + f.rooms.length, 0)} rooms placed`);

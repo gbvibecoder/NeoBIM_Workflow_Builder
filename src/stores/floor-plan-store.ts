@@ -20,8 +20,8 @@ import type {
 import { DEFAULT_LAYERS } from "@/types/floor-plan-cad";
 import { floorBounds, zoomToFit, distance, wallLength, type Viewport } from "@/features/floor-plan/lib/geometry";
 import type { SnapResult } from "@/lib/floor-plan/snap-engine";
-import type { HandleType } from "@/lib/floor-plan/hit-detection";
-import { findConnectedWalls } from "@/lib/floor-plan/hit-detection";
+import type { HandleType } from "@/features/floor-plan/lib/hit-detection";
+import { findConnectedWalls } from "@/features/floor-plan/lib/hit-detection";
 import type { FloorPlanGeometry } from "@/types/floor-plan";
 import { convertGeometryToProject } from "@/lib/floor-plan/pipeline-adapter";
 import { saveProject, loadProject } from "@/lib/floor-plan/project-persistence";

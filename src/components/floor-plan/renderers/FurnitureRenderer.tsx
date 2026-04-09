@@ -6,7 +6,7 @@ import type { FurnitureInstance, Floor, Point } from "@/types/floor-plan-cad";
 import type { Viewport } from "@/features/floor-plan/lib/geometry";
 import { worldToScreen } from "@/features/floor-plan/lib/geometry";
 import { getCatalogItem } from "@/features/floor-plan/lib/furniture-catalog";
-import { lw } from "@/lib/floor-plan/line-weights";
+import { lw } from "@/features/floor-plan/lib/line-weights";
 
 interface FurnitureRendererProps {
   floor: Floor;

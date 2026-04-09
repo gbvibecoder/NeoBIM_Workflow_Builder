@@ -4,7 +4,7 @@ import React, { useMemo } from "react";
 import { useFloorPlanStore } from "@/stores/floor-plan-store";
 import { polygonBounds, wallLength, polygonArea } from "@/features/floor-plan/lib/geometry";
 import type { Floor, Room, Wall } from "@/types/floor-plan-cad";
-import { analyzeNaturalLight, type LightAnalysisResult, type LightGrade } from "@/lib/floor-plan/light-analysis";
+import { analyzeNaturalLight, type LightAnalysisResult, type LightGrade } from "@/features/floor-plan/lib/light-analysis";
 
 // ============================================================
 // TYPES

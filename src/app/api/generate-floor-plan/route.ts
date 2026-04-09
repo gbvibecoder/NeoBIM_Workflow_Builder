@@ -20,7 +20,7 @@ import {
 } from "@/features/floor-plan/lib/ai-room-programmer";
 import type { EnhancedRoomProgram } from "@/features/floor-plan/lib/ai-room-programmer";
 import { convertGeometryToProject, convertMultiFloorToProject } from "@/lib/floor-plan/pipeline-adapter";
-import { layoutMultiFloor, scoreAdjacency } from "@/lib/floor-plan/layout-engine";
+import { layoutMultiFloor, scoreAdjacency } from "@/features/floor-plan/lib/layout-engine";
 import type { FloorPlanGeometry } from "@/types/floor-plan";
 import type { FloorPlanProject } from "@/types/floor-plan-cad";
 

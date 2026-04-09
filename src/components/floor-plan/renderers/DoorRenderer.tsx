@@ -13,7 +13,7 @@ import {
   scalePoint,
   wallAngle,
 } from "@/features/floor-plan/lib/geometry";
-import { lw } from "@/lib/floor-plan/line-weights";
+import { lw } from "@/features/floor-plan/lib/line-weights";
 
 interface DoorRendererProps {
   doors: Door[];

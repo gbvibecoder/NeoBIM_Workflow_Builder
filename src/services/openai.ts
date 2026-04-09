@@ -2134,12 +2134,12 @@ export async function generateFloorPlan(
     // Falls through to GPT-4o if the engine fails or isn't available.
     if (roomProgram) {
       try {
-        const { layoutFloorPlan } = await import("@/lib/floor-plan/layout-engine");
+        const { layoutFloorPlan } = await import("@/features/floor-plan/lib/layout-engine");
         const placed = layoutFloorPlan(roomProgram);
 
         if (placed.length > 0) {
           // Validate the deterministic layout
-          const { validateRoomLayout } = await import("@/lib/floor-plan/layout-validator");
+          const { validateRoomLayout } = await import("@/features/floor-plan/lib/layout-validator");
           const validation = validateRoomLayout(
             placed, placed.reduce((maxX, r) => Math.max(maxX, r.x + r.width), 0),
             placed.reduce((maxY, r) => Math.max(maxY, r.y + r.depth), 0),
@@ -2402,7 +2402,7 @@ CRITICAL CONSTRAINTS:
         }));
 
         // Stage 2b: Validate the layout
-        const { validateRoomLayout, formatValidationErrors } = await import("@/lib/floor-plan/layout-validator");
+        const { validateRoomLayout, formatValidationErrors } = await import("@/features/floor-plan/lib/layout-validator");
         const validation = validateRoomLayout(
           posRooms, fpWidthM, fpHeightM,
           roomProgram?.adjacency, roomProgram?.entranceRoom,
