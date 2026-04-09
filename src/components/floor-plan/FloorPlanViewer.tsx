@@ -18,7 +18,7 @@ import { BOQPanel } from "./panels/BOQPanel";
 import { ProgramPanel } from "./panels/ProgramPanel";
 import { WelcomeScreen } from "./WelcomeScreen";
 import { GenerationLoader } from "./GenerationLoader";
-import { getProjectIndex, importProjectFile } from "@/lib/floor-plan/project-persistence";
+import { getProjectIndex, importProjectFile } from "@/features/floor-plan/lib/project-persistence";
 import { getSampleProjectForPrompt } from "@/lib/floor-plan/sample-layouts";
 import { FloorPlanErrorBoundary } from "./ErrorBoundary";
 import { displayToMm, formatDimension, type DisplayUnit } from "@/lib/floor-plan/unit-conversion";

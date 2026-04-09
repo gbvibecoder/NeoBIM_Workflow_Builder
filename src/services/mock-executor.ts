@@ -7,7 +7,7 @@ import type { ExecutionArtifact, ArtifactType } from "@/types/execution";
 import type { FloorPlanGeometry, FloorPlanRoom } from "@/types/floor-plan";
 import { generateId } from "@/lib/utils";
 import { calculateBOQ } from "@/constants/unit-rates";
-import { convertGeometryToProject } from "@/lib/floor-plan/pipeline-adapter";
+import { convertGeometryToProject } from "@/features/floor-plan/lib/pipeline-adapter";
 
 const ARCHITECTURAL_IMAGES = [
   "https://picsum.photos/seed/arch1/600/400",

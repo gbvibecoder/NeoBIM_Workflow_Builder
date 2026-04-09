@@ -14,9 +14,9 @@ export const handleGN012: NodeHandler = async (ctx) => {
   // Stage 3: Architectural Detailing → walls, doors, windows (pipeline-adapter)
   // Falls back to adaptNodeInput() if AI generation fails entirely.
 
-  const { adaptNodeInput } = await import("@/lib/floor-plan/node-input-adapter");
-  const { convertGeometryToProject } = await import("@/lib/floor-plan/pipeline-adapter");
-  const { computeBOQQuantities, extractRoomSchedule, formatBOQForExporter, formatBOQAsTable } = await import("@/lib/floor-plan/node-output-adapter");
+  const { adaptNodeInput } = await import("@/features/floor-plan/lib/node-input-adapter");
+  const { convertGeometryToProject } = await import("@/features/floor-plan/lib/pipeline-adapter");
+  const { computeBOQQuantities, extractRoomSchedule, formatBOQForExporter, formatBOQAsTable } = await import("@/features/floor-plan/lib/node-output-adapter");
   const { convertFloorPlanToMassing } = await import("@/features/floor-plan/lib/floorplan-to-massing");
   const { exportFloorToSvg } = await import("@/features/floor-plan/lib/export-svg");
 
@@ -58,7 +58,7 @@ export const handleGN012: NodeHandler = async (ctx) => {
         // Multi-floor: use BSP layout engine per floor (same as standalone API)
         if (roomProgram.numFloors > 1) {
           const { layoutMultiFloor } = await import("@/features/floor-plan/lib/layout-engine");
-          const { convertMultiFloorToProject } = await import("@/lib/floor-plan/pipeline-adapter");
+          const { convertMultiFloorToProject } = await import("@/features/floor-plan/lib/pipeline-adapter");
           const multiFloor = layoutMultiFloor(roomProgram);
           logger.debug(`[GN-012][STAGE-2] Multi-floor: ${multiFloor.floors.reduce((s, f) => s + f.rooms.length, 0)} rooms placed`);
           project = convertMultiFloorToProject(multiFloor.floors, description.projectName, designBrief);

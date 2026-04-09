@@ -6,7 +6,7 @@
  */
 
 import type { FloorPlanGeometry } from "@/types/floor-plan";
-import { convertGeometryToProject } from "@/lib/floor-plan/pipeline-adapter";
+import { convertGeometryToProject } from "@/features/floor-plan/lib/pipeline-adapter";
 import type { FloorPlanProject } from "@/types/floor-plan-cad";
 
 // ============================================================

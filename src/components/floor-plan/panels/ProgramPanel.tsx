@@ -7,7 +7,7 @@ import {
   type ProgramValidationResult,
   type ProgramRequirement,
   type ProgramIssue,
-} from "@/lib/floor-plan/program-validator";
+} from "@/features/floor-plan/lib/program-validator";
 
 export function ProgramPanel() {
   const floor = useFloorPlanStore((s) => s.getActiveFloor());
