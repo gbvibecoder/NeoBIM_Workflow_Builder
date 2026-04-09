@@ -3,12 +3,12 @@
 import { useState, useCallback, useMemo, useRef } from "react";
 import { toast } from "sonner";
 import { BOQHeader } from "@/features/boq/components/BOQHeader";
-import { HeroStats } from "@/components/boq-visualizer/HeroStats";
+import { HeroStats } from "@/features/boq/components/HeroStats";
 import { PriceControls } from "@/components/boq-visualizer/PriceControls";
-import { CostDonutChart } from "@/components/boq-visualizer/CostDonutChart";
-import { DivisionBarChart } from "@/components/boq-visualizer/DivisionBarChart";
-import { MEPBreakdown } from "@/components/boq-visualizer/MEPBreakdown";
-import { IFCQualityCard } from "@/components/boq-visualizer/IFCQualityCard";
+import { CostDonutChart } from "@/features/boq/components/CostDonutChart";
+import { DivisionBarChart } from "@/features/boq/components/DivisionBarChart";
+import { MEPBreakdown } from "@/features/boq/components/MEPBreakdown";
+import { IFCQualityCard } from "@/features/boq/components/IFCQualityCard";
 import { BOQTable } from "@/features/boq/components/BOQTable";
 import { NLSummary } from "@/components/boq-visualizer/NLSummary";
 import { BOQFooter } from "@/features/boq/components/BOQFooter";
