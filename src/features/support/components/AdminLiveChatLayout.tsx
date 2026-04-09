@@ -671,6 +671,9 @@ export default function AdminLiveChatLayout() {
   const fetchConversations = useAdminLiveChatStore((s) => s.fetchConversations);
   const selectConversation = useAdminLiveChatStore((s) => s.selectConversation);
   const setMyUserId = useAdminLiveChatStore((s) => s.setMyUserId);
+  const startPolling = useAdminLiveChatStore((s) => s.startPolling);
+  const stopPolling = useAdminLiveChatStore((s) => s.stopPolling);
+  const refreshSelectedMessages = useAdminLiveChatStore((s) => s.refreshSelectedMessages);
 
   usePusherAdminLiveChat();
 
@@ -681,6 +684,30 @@ export default function AdminLiveChatLayout() {
   useEffect(() => {
     fetchConversations();
   }, [fetchConversations]);
+
+  // Polling fallback + visibility-based instant refetch — guarantees the
+  // admin sees new messages within ~5s even if Pusher is unavailable, and
+  // catches up immediately when the tab comes back to focus.
+  useEffect(() => {
+    startPolling();
+    const onVisible = () => {
+      if (document.visibilityState === "visible") {
+        fetchConversations();
+        refreshSelectedMessages();
+      }
+    };
+    const onFocus = () => {
+      fetchConversations();
+      refreshSelectedMessages();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", onFocus);
+    return () => {
+      stopPolling();
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", onFocus);
+    };
+  }, [startPolling, stopPolling, fetchConversations, refreshSelectedMessages]);
 
   const { waiting, active, closed } = useMemo(() => {
     const w: AdminLiveChatConversation[] = [];
