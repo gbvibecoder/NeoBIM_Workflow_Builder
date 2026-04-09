@@ -23,6 +23,18 @@ export interface TileExecutionResult {
   errorMessage?: string;
 }
 
+/** Per-execution UI/state metadata persisted in Execution.metadata JSONB.
+ *  Each field is optional so older executions without metadata stay valid. */
+export interface ExecutionMetadata {
+  /** Per-tile, per-row quantity overrides set by the user via the BOQ data
+   *  table. Outer key is tileInstanceId, inner key is the row index as a
+   *  string (JSON keys can't be numbers). Mirrors the shape of
+   *  useExecutionStore.quantityOverrides serialized for JSON. Used to
+   *  rehydrate the in-memory Map on result-showcase mount so edits survive
+   *  page reloads. Persisted via PATCH /api/executions/[id]/metadata. */
+  quantityOverrides?: Record<string, Record<string, number>>;
+}
+
 export interface Execution {
   id: string;
   workflowId: string;
@@ -32,6 +44,7 @@ export interface Execution {
   completedAt?: Date;
   tileResults: TileExecutionResult[];
   errorMessage?: string;
+  metadata?: ExecutionMetadata;
   createdAt: Date;
 }
 
