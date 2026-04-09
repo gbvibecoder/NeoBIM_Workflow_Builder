@@ -2,18 +2,18 @@
 
 import { useState, useCallback, useMemo, useRef } from "react";
 import { toast } from "sonner";
-import { BOQHeader } from "./BOQHeader";
-import { HeroStats } from "./HeroStats";
-import { PriceControls } from "./PriceControls";
-import { CostDonutChart } from "./CostDonutChart";
-import { DivisionBarChart } from "./DivisionBarChart";
-import { MEPBreakdown } from "./MEPBreakdown";
-import { IFCQualityCard } from "./IFCQualityCard";
-import { BOQTable } from "./BOQTable";
-import { NLSummary } from "./NLSummary";
-import { BOQFooter } from "./BOQFooter";
-import type { BOQData, PriceOverrides, RateOverride } from "./types";
-import { DEFAULT_PRICES, recalculateLines, computeTotals } from "./recalc-engine";
+import { BOQHeader } from "@/features/boq/components/BOQHeader";
+import { HeroStats } from "@/components/boq-visualizer/HeroStats";
+import { PriceControls } from "@/components/boq-visualizer/PriceControls";
+import { CostDonutChart } from "@/components/boq-visualizer/CostDonutChart";
+import { DivisionBarChart } from "@/components/boq-visualizer/DivisionBarChart";
+import { MEPBreakdown } from "@/components/boq-visualizer/MEPBreakdown";
+import { IFCQualityCard } from "@/components/boq-visualizer/IFCQualityCard";
+import { BOQTable } from "@/features/boq/components/BOQTable";
+import { NLSummary } from "@/components/boq-visualizer/NLSummary";
+import { BOQFooter } from "@/features/boq/components/BOQFooter";
+import type { BOQData, PriceOverrides, RateOverride } from "@/components/boq-visualizer/types";
+import { DEFAULT_PRICES, recalculateLines, computeTotals } from "@/components/boq-visualizer/recalc-engine";
 
 interface BOQVisualizerPageProps {
   data: BOQData;

@@ -1,7 +1,7 @@
 "use client";
 
 import { ShieldCheck, AlertTriangle, Plus } from "lucide-react";
-import type { BOQData } from "./types";
+import type { BOQData } from "@/components/boq-visualizer/types";
 
 interface IFCQualityCardProps {
   quality: NonNullable<BOQData["ifcQuality"]>;

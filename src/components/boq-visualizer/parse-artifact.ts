@@ -1,8 +1,8 @@
 // ─── Parse TR-008 Artifact → BOQData ────────────────────────────────────────
 // Transforms the raw execution artifact into the structured BOQData type.
 
-import type { BOQData, BOQLineItem, SourceType } from "./types";
-import { computeSensitivities, DEFAULT_PRICES, getDivisionCategory } from "./recalc-engine";
+import type { BOQData, BOQLineItem, SourceType } from "@/components/boq-visualizer/types";
+import { computeSensitivities, DEFAULT_PRICES, getDivisionCategory } from "@/components/boq-visualizer/recalc-engine";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 

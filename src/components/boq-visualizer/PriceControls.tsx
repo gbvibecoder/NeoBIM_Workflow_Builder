@@ -2,8 +2,8 @@
 
 import { useState, useCallback, useRef } from "react";
 import { Layers, Package, HardHat, Boxes, Mountain, TreePine, ChevronDown, TrendingDown, TrendingUp, RotateCcw } from "lucide-react";
-import type { PriceOverrides } from "./types";
-import { PRICE_RANGES } from "./recalc-engine";
+import type { PriceOverrides } from "@/components/boq-visualizer/types";
+import { PRICE_RANGES } from "@/components/boq-visualizer/recalc-engine";
 
 interface PriceControlsProps {
   prices: PriceOverrides;

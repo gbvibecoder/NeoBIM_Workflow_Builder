@@ -3,7 +3,7 @@
 import { ArrowLeft, Download, Share2, Building2, MapPin, Calendar } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import type { BOQData } from "./types";
+import type { BOQData } from "@/components/boq-visualizer/types";
 
 interface BOQHeaderProps {
   data: BOQData;
