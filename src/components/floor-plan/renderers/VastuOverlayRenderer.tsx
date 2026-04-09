@@ -3,8 +3,8 @@
 import React, { useMemo } from "react";
 import { Group, Rect, Text, Line, Circle } from "react-konva";
 import { useFloorPlanStore } from "@/stores/floor-plan-store";
-import { analyzeVastuCompliance } from "@/lib/floor-plan/vastu-analyzer";
-import { DIRECTION_LABELS, type VastuDirection } from "@/lib/floor-plan/vastu-rules";
+import { analyzeVastuCompliance } from "@/features/floor-plan/lib/vastu-analyzer";
+import { DIRECTION_LABELS, type VastuDirection } from "@/features/floor-plan/lib/vastu-rules";
 import { worldToScreen, worldToScreenDistance } from "@/features/floor-plan/lib/geometry";
 import type { Viewport } from "@/features/floor-plan/lib/geometry";
 

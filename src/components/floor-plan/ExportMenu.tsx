@@ -9,7 +9,7 @@ import type { DxfExportOptions } from "@/features/floor-plan/lib/export-dxf";
 import type { PdfExportOptions, PaperSize, PdfScale } from "@/features/floor-plan/lib/export-pdf";
 import type { SvgExportOptions } from "@/features/floor-plan/lib/export-svg";
 import type { PngDpi, PngExportOptions } from "@/features/floor-plan/lib/export-png";
-import type { DisplayUnit } from "@/lib/floor-plan/unit-conversion";
+import type { DisplayUnit } from "@/features/floor-plan/lib/unit-conversion";
 import type { FloorPlanProject, Floor } from "@/types/floor-plan-cad";
 
 type ExportFormat = "dxf" | "pdf" | "svg" | "png";

@@ -19,7 +19,7 @@ import type {
 } from "@/types/floor-plan-cad";
 import { DEFAULT_LAYERS } from "@/types/floor-plan-cad";
 import { floorBounds, zoomToFit, distance, wallLength, type Viewport } from "@/features/floor-plan/lib/geometry";
-import type { SnapResult } from "@/lib/floor-plan/snap-engine";
+import type { SnapResult } from "@/features/floor-plan/lib/snap-engine";
 import type { HandleType } from "@/features/floor-plan/lib/hit-detection";
 import { findConnectedWalls } from "@/features/floor-plan/lib/hit-detection";
 import type { FloorPlanGeometry } from "@/types/floor-plan";
@@ -1446,7 +1446,7 @@ export const useFloorPlanStore = create<FloorPlanState>()((set, get) => ({
     s.pushHistory();
 
     try {
-      const { smartPlaceDoors } = await import("@/lib/floor-plan/smart-placement");
+      const { smartPlaceDoors } = await import("@/features/floor-plan/lib/smart-placement");
       const result = smartPlaceDoors(floor);
 
       set({
@@ -1471,7 +1471,7 @@ export const useFloorPlanStore = create<FloorPlanState>()((set, get) => ({
     s.pushHistory();
 
     try {
-      const { smartPlaceWindows } = await import("@/lib/floor-plan/smart-placement");
+      const { smartPlaceWindows } = await import("@/features/floor-plan/lib/smart-placement");
       const result = smartPlaceWindows(floor);
 
       set({

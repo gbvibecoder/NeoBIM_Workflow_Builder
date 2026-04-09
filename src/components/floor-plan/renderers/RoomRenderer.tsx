@@ -6,8 +6,8 @@ import type { Room, ViewMode } from "@/types/floor-plan-cad";
 import { ROOM_COLORS } from "@/types/floor-plan-cad";
 import type { Viewport } from "@/features/floor-plan/lib/geometry";
 import { worldToScreen, worldToScreenDistance, polygonBounds } from "@/features/floor-plan/lib/geometry";
-import { formatArea, formatDimension } from "@/lib/floor-plan/unit-conversion";
-import type { DisplayUnit } from "@/lib/floor-plan/unit-conversion";
+import { formatArea, formatDimension } from "@/features/floor-plan/lib/unit-conversion";
+import type { DisplayUnit } from "@/features/floor-plan/lib/unit-conversion";
 
 interface RoomRendererProps {
   rooms: Room[];

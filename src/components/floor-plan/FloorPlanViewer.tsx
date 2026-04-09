@@ -21,7 +21,7 @@ import { GenerationLoader } from "./GenerationLoader";
 import { getProjectIndex, importProjectFile } from "@/features/floor-plan/lib/project-persistence";
 import { getSampleProjectForPrompt } from "@/features/floor-plan/lib/sample-layouts";
 import { FloorPlanErrorBoundary } from "./ErrorBoundary";
-import { displayToMm, formatDimension, type DisplayUnit } from "@/lib/floor-plan/unit-conversion";
+import { displayToMm, formatDimension, type DisplayUnit } from "@/features/floor-plan/lib/unit-conversion";
 import { worldToScreen, screenToWorld } from "@/features/floor-plan/lib/geometry";
 
 interface FloorPlanViewerProps {

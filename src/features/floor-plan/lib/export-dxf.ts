@@ -18,8 +18,8 @@ import {
   polygonBounds,
 } from "@/features/floor-plan/lib/geometry";
 import { getCatalogItem } from "@/features/floor-plan/lib/furniture-catalog";
-import { formatDimension } from "@/lib/floor-plan/unit-conversion";
-import type { DisplayUnit } from "@/lib/floor-plan/unit-conversion";
+import { formatDimension } from "@/features/floor-plan/lib/unit-conversion";
+import type { DisplayUnit } from "@/features/floor-plan/lib/unit-conversion";
 
 // ACI color indices
 const LAYER_DEFS: Array<{ name: string; color: number; lineweight: number }> = [

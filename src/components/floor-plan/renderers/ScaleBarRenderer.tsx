@@ -3,8 +3,8 @@
 import React, { useMemo } from "react";
 import { Group, Rect, Line as KLine, Text } from "react-konva";
 import type { Viewport } from "@/features/floor-plan/lib/geometry";
-import type { DisplayUnit } from "@/lib/floor-plan/unit-conversion";
-import { formatDimension } from "@/lib/floor-plan/unit-conversion";
+import type { DisplayUnit } from "@/features/floor-plan/lib/unit-conversion";
+import { formatDimension } from "@/features/floor-plan/lib/unit-conversion";
 
 interface ScaleBarRendererProps {
   viewport: Viewport;

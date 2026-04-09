@@ -17,9 +17,9 @@ import {
   scalePoint,
   wallAngle,
 } from "@/features/floor-plan/lib/geometry";
-import { formatDimension, formatArea } from "@/lib/floor-plan/unit-conversion";
+import { formatDimension, formatArea } from "@/features/floor-plan/lib/unit-conversion";
 import { getCatalogItem } from "@/features/floor-plan/lib/furniture-catalog";
-import type { DisplayUnit } from "@/lib/floor-plan/unit-conversion";
+import type { DisplayUnit } from "@/features/floor-plan/lib/unit-conversion";
 
 export type PaperSize = "A4" | "A3" | "A1";
 export type PdfScale = "1:50" | "1:100" | "1:200" | "auto";

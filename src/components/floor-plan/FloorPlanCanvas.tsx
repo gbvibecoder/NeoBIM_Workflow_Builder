@@ -6,7 +6,7 @@ import type Konva from "konva";
 import { useFloorPlanStore } from "@/stores/floor-plan-store";
 import { screenToWorld, worldToScreen, distance } from "@/features/floor-plan/lib/geometry";
 import { hitTest, hitTestHandles, findNearestWall, rubberBandSelect } from "@/features/floor-plan/lib/hit-detection";
-import { findSnap, applyOrthoConstraint } from "@/lib/floor-plan/snap-engine";
+import { findSnap, applyOrthoConstraint } from "@/features/floor-plan/lib/snap-engine";
 import type { HandleType } from "@/features/floor-plan/lib/hit-detection";
 import { GridRenderer } from "./renderers/GridRenderer";
 import { WallRenderer } from "./renderers/WallRenderer";

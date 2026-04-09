@@ -2,7 +2,7 @@
 
 import React from "react";
 import { useFloorPlanStore } from "@/stores/floor-plan-store";
-import { formatDimension } from "@/lib/floor-plan/unit-conversion";
+import { formatDimension } from "@/features/floor-plan/lib/unit-conversion";
 
 export function StatusBar() {
   const cursorWorldPos = useFloorPlanStore((s) => s.cursorWorldPos);

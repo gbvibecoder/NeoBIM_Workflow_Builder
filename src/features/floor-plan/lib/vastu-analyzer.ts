@@ -16,7 +16,7 @@ import {
   type VastuDirection,
   type VastuSeverity,
   type VastuRule,
-} from "@/lib/floor-plan/vastu-rules";
+} from "@/features/floor-plan/lib/vastu-rules";
 
 // ============================================================
 // TYPES

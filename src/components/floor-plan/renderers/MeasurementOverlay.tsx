@@ -6,7 +6,7 @@ import { useFloorPlanStore } from "@/stores/floor-plan-store";
 import type { Viewport } from "@/features/floor-plan/lib/geometry";
 import type { Point } from "@/types/floor-plan-cad";
 import { worldToScreen, distance } from "@/features/floor-plan/lib/geometry";
-import { formatDimension } from "@/lib/floor-plan/unit-conversion";
+import { formatDimension } from "@/features/floor-plan/lib/unit-conversion";
 
 interface MeasurementOverlayProps {
   viewport: Viewport;

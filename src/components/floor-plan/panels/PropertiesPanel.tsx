@@ -4,7 +4,7 @@ import React, { useState, useCallback, useRef, useEffect } from "react";
 import { useFloorPlanStore } from "@/stores/floor-plan-store";
 import { ROOM_COLORS } from "@/types/floor-plan-cad";
 import type { Wall, Room, Door, CadWindow, DoorType, WindowType, FurnitureInstance } from "@/types/floor-plan-cad";
-import { formatDimension, formatArea, type DisplayUnit } from "@/lib/floor-plan/unit-conversion";
+import { formatDimension, formatArea, type DisplayUnit } from "@/features/floor-plan/lib/unit-conversion";
 import { wallLength, polygonBounds } from "@/features/floor-plan/lib/geometry";
 import { getCatalogItem } from "@/features/floor-plan/lib/furniture-catalog";
 

@@ -24,7 +24,7 @@ import type {
   Point,
   RoomType,
 } from "@/types/floor-plan-cad";
-import { smartPlaceDoors, smartPlaceWindows } from "@/lib/floor-plan/smart-placement";
+import { smartPlaceDoors, smartPlaceWindows } from "@/features/floor-plan/lib/smart-placement";
 import { layoutAllFurniture } from "@/features/floor-plan/lib/furniture-layout";
 
 let _idCounter = 0;

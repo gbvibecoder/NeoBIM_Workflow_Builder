@@ -2,9 +2,9 @@
 
 import React, { useMemo } from "react";
 import { useFloorPlanStore } from "@/stores/floor-plan-store";
-import { analyzeVastuCompliance, type VastuReport, type VastuReportItem } from "@/lib/floor-plan/vastu-analyzer";
+import { analyzeVastuCompliance, type VastuReport, type VastuReportItem } from "@/features/floor-plan/lib/vastu-analyzer";
 import { suggestRoomSwaps, type SwapSuggestion } from "@/features/floor-plan/lib/room-optimizer";
-import { DIRECTION_LABELS } from "@/lib/floor-plan/vastu-rules";
+import { DIRECTION_LABELS } from "@/features/floor-plan/lib/vastu-rules";
 
 export function VastuPanel() {
   const floor = useFloorPlanStore((s) => s.getActiveFloor());
