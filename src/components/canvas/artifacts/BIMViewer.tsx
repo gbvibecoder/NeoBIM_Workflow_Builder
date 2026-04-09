@@ -22,7 +22,7 @@ import {
   Loader2, AlertCircle, RotateCcw, Maximize2, Minimize2,
   MousePointerClick, X, Download, Layers, Scissors, Eye,
 } from "lucide-react";
-import type { BIMMetadata, BIMElementMeta } from "@/services/metadata-extractor";
+import type { BIMMetadata, BIMElementMeta } from "@/features/ai/services/metadata-extractor";
 import { getDisciplineColor, getStoreyColor } from "@/features/3d-render/services/material-mapping";
 import {
   createBIMMaterials, getMaterialKey, disposeBIMMaterials,

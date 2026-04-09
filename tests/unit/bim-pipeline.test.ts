@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { getMaterialForElement, getMaterialByName, getDisciplineColor, getStoreyColor } from "@/features/3d-render/services/material-mapping";
-import { extractMetadata } from "@/services/metadata-extractor";
+import { extractMetadata } from "@/features/ai/services/metadata-extractor";
 import type { MassingGeometry } from "@/types/geometry";
 
 // ─── Material Mapping ────────────────────────────────────────────────────────

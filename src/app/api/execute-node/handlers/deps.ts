@@ -57,7 +57,7 @@ export {
   validateRenderWithClaude,
 } from "@/features/ai/services/openai";
 export type { BuildingDescription, RenderQAResult } from "@/features/ai/services/openai";
-export { analyzeSite } from "@/services/site-analysis";
+export { analyzeSite } from "@/features/ai/services/site-analysis";
 export { generatePDFBase64 } from "@/services/pdf-report-server";
 export { reconstructHiFi3D, isMeshyConfigured } from "@/features/3d-render/services/meshy-service";
 export { generateMassingGeometry } from "@/features/3d-render/services/massing-generator";
@@ -70,7 +70,7 @@ export type { BuildingRequirements } from "@/features/3d-render/services/threeda
 export { generateWithMeshy, isMeshyTextTo3DConfigured } from "@/features/3d-render/services/meshy-ai";
 export { generateIFCFile } from "@/features/ifc/services/ifc-exporter";
 export { parsePromptToStyle } from "@/features/3d-render/services/prompt-style-parser";
-export { extractMetadata } from "@/services/metadata-extractor";
+export { extractMetadata } from "@/features/ai/services/metadata-extractor";
 export {
   submitDualWalkthrough,
   submitDualTextToVideo,
