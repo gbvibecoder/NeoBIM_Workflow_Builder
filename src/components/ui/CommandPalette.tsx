@@ -109,7 +109,7 @@ export function CommandPalette() {
       {
         id: "act-new",   label: t('nav.newWorkflow'),  description: t('command.createWorkflow'),
         icon: <Plus size={14} />, badge: "⌘N",
-        action: () => { router.push("/dashboard/workflows/new"); close(); },
+        action: () => { router.push("/dashboard/canvas"); close(); },
       },
       {
         id: "act-run",   label: t('canvas.runWorkflow'),  description: t('command.executeWorkflow'),

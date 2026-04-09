@@ -376,7 +376,7 @@ export default function DashboardPage() {
               >
                 {/* Primary CTA */}
                 <Link
-                  href="/dashboard/workflows/new"
+                  href="/dashboard/canvas"
                   className="db-hero-cta db-hero-cta-primary"
                   style={{
                     position: "relative",
@@ -1054,7 +1054,7 @@ export default function DashboardPage() {
                 {t("dash.readyDesc")}
               </p>
               <Link
-                href="/dashboard/workflows/new"
+                href="/dashboard/canvas"
                 style={{
                   display: "inline-flex", alignItems: "center", gap: 10,
                   padding: "16px 44px", borderRadius: 16,
