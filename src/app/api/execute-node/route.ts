@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { auth } from "@/lib/auth";
+import { prisma } from "@/lib/db";
 import { checkRateLimit, logRateLimitHit, isExecutionAlreadyCounted, isAdminUser, checkNodeTypeLimit, consumeReferralBonus } from "@/lib/rate-limit";
 import { VIDEO_NODES, MODEL_3D_NODES, RENDER_NODES, getNodeTypeLimits } from "@/lib/stripe";
 import { assertValidInput } from "@/lib/validation";
@@ -8,6 +10,8 @@ import {
   logWorkflowStart, logRateLimit, logNodeStart, logNodeSuccess,
   logNodeError, logValidationError,
 } from "@/lib/workflow-logger";
+import { MAX_REGENERATIONS } from "@/constants/limits";
+import type { ExecutionMetadata } from "@/types/execution";
 import { nodeHandlers } from "./handlers";
 import type { NodeHandlerContext } from "./handlers";
 
@@ -59,12 +63,17 @@ export async function POST(req: NextRequest) {
   let rateLimitRemaining: number | null = null;
   let rateLimitTotal: number | null = null;
 
+  // Hoisted to outer scope so the regen-count check below can read it.
+  // Stays false for admins (they bypass that check too) and for the first
+  // node call of the execution (the fast-path skip).
+  let alreadyCounted = false;
+
   if (!isAdmin) {
     // Apply rate limiting — count once per workflow execution, not per node.
     // The first node in a workflow run consumes the rate limit slot.
     // Subsequent nodes in the same execution (same executionId) pass through.
     try {
-      const alreadyCounted = executionId
+      alreadyCounted = executionId
         ? await isExecutionAlreadyCounted(userId, executionId)
         : false;
 
@@ -162,6 +171,73 @@ export async function POST(req: NextRequest) {
           { status: 429 }
         );
       }
+    }
+  }
+
+  // ── Server-side regen-count enforcement ──────────────────────────────
+  // Phase 2 Task 4: blocks the F5-bypass that made the client-side regen
+  // cap toothless. Detection is honest: we read the existing tileResults
+  // for this execution and consider any (tileInstanceId, executionId) that
+  // already has an artifact entry to be a regeneration. The counter lives
+  // in Execution.metadata.regenerationCounts and is incremented atomically.
+  //
+  // Skip conditions (in priority order):
+  //   - admin                  → admins regen freely for testing
+  //   - missing executionId    → no anchor to enforce against
+  //   - missing tileInstanceId → can't key the counter
+  //   - !alreadyCounted        → fast-path: first node call of the execution
+  //                              can't possibly be a regen, save the DB tx
+  //
+  // Fail mode: open on Prisma errors. The regen cap is a soft-money-saver,
+  // not a security boundary. A brief Neon outage allowing one extra regen
+  // is better UX than blocking the user entirely on a transient DB hiccup.
+  if (!isAdmin && executionId && tileInstanceId && alreadyCounted) {
+    try {
+      const overLimit = await prisma.$transaction(async (tx) => {
+        const exec = await tx.execution.findFirst({
+          where: { id: executionId, userId },
+          select: { tileResults: true, metadata: true },
+        });
+        if (!exec) return false; // Demo / unsaved exec — no enforcement
+
+        const tileResults = Array.isArray(exec.tileResults)
+          ? (exec.tileResults as Array<{ nodeId?: string }>)
+          : [];
+        const hasExistingResult = tileResults.some(r => r?.nodeId === tileInstanceId);
+        if (!hasExistingResult) return false; // First run for this tile — not a regen
+
+        // It's a regen — increment + cap check
+        const metadata = (exec.metadata as ExecutionMetadata | null) ?? {};
+        const counts = { ...(metadata.regenerationCounts ?? {}) };
+        const newCount = (counts[tileInstanceId] ?? 0) + 1;
+
+        if (newCount > MAX_REGENERATIONS) {
+          return true; // Over cap — caller returns 429
+        }
+
+        counts[tileInstanceId] = newCount;
+        const updatedMetadata: ExecutionMetadata = { ...metadata, regenerationCounts: counts };
+        await tx.execution.update({
+          where: { id: executionId },
+          data: {
+            // Double-cast through unknown — Prisma.InputJsonValue is recursive
+            // and TypeScript can't simplify the ExecutionMetadata union to it.
+            // The metadata route uses the same pattern (see Task 2/3 commits).
+            metadata: updatedMetadata as unknown as Prisma.InputJsonValue,
+          },
+        });
+        return false;
+      });
+
+      if (overLimit) {
+        return NextResponse.json(
+          formatErrorResponse(UserErrors.REGEN_MAX_REACHED(MAX_REGENERATIONS)),
+          { status: 429 },
+        );
+      }
+    } catch (error) {
+      // Fail open: don't block the user on transient DB issues
+      console.warn("[execute-node] Regen check failed (allowing through):", error);
     }
   }
 
