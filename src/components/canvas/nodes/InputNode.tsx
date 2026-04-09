@@ -6,7 +6,7 @@
  * so React Flow doesn't interfere with typing/clicking.
  */
 
-import React, { useRef, useCallback, useMemo, useState, useEffect } from "react";
+import React, { useRef, useCallback, useMemo, useState, useEffect, memo } from "react";
 import { toast } from "sonner";
 import { useWorkflowStore } from "@/stores/workflow-store";
 import { useLocale } from "@/hooks/useLocale";
@@ -24,7 +24,7 @@ function stopAll(e: React.SyntheticEvent) {
 
 // ─── Text Prompt (IN-001) ────────────────────────────────────────────────────
 
-export function TextPromptInput({ nodeId, data }: { nodeId: string; data: WorkflowNodeData }) {
+export const TextPromptInput = memo(function TextPromptInput({ nodeId, data }: { nodeId: string; data: WorkflowNodeData }) {
   const updateNode = useWorkflowStore(s => s.updateNode);
   const t = useLocale(s => s.t);
   const value = (data.inputValue as string) ?? "";
@@ -65,7 +65,7 @@ export function TextPromptInput({ nodeId, data }: { nodeId: string; data: Workfl
       </div>
     </div>
   );
-}
+});
 
 // ─── File Upload (PDF, IFC, Image, DXF) ─────────────────────────────────────
 
@@ -78,7 +78,7 @@ interface FileUploadProps {
   showPreview?: boolean;
 }
 
-export function FileUploadInput({ nodeId, data, accept, label, maxMB = 20, showPreview }: FileUploadProps) {
+export const FileUploadInput = memo(function FileUploadInput({ nodeId, data, accept, label, maxMB = 20, showPreview }: FileUploadProps) {
   const updateNode = useWorkflowStore(s => s.updateNode);
   const t = useLocale(s => s.t);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -296,7 +296,7 @@ export function FileUploadInput({ nodeId, data, accept, label, maxMB = 20, showP
       )}
     </div>
   );
-}
+});
 
 // ─── Parameter Input (IN-005) ─────────────────────────────────────────────────
 
@@ -342,7 +342,7 @@ function NumericParamInput({
   );
 }
 
-export function ParameterInput({ nodeId, data }: { nodeId: string; data: WorkflowNodeData }) {
+export const ParameterInput = memo(function ParameterInput({ nodeId, data }: { nodeId: string; data: WorkflowNodeData }) {
   const updateNode = useWorkflowStore(s => s.updateNode);
   const t = useLocale(s => s.t);
 
@@ -426,7 +426,7 @@ export function ParameterInput({ nodeId, data }: { nodeId: string; data: Workflo
       ))}
     </div>
   );
-}
+});
 
 // ─── Supplementary IFC Upload (Build 5: Multi-IFC) ──────────────────────────
 
@@ -670,7 +670,7 @@ const labelStyle: React.CSSProperties = {
   fontSize: 9, color: "#3A3A4E", marginBottom: 2, display: "block",
 };
 
-export function LocationInput({ nodeId, data }: { nodeId: string; data: WorkflowNodeData }) {
+export const LocationInput = memo(function LocationInput({ nodeId, data }: { nodeId: string; data: WorkflowNodeData }) {
   const updateNode = useWorkflowStore(s => s.updateNode);
 
   // Parse stored JSON or default
@@ -846,11 +846,11 @@ export function LocationInput({ nodeId, data }: { nodeId: string; data: Workflow
       )}
     </div>
   );
-}
+});
 
 // ─── Multi-Image Upload (IN-008) ──────────────────────────────────────────────
 
-export function MultiImageUploadInput({ nodeId, data }: { nodeId: string; data: WorkflowNodeData }) {
+export const MultiImageUploadInput = memo(function MultiImageUploadInput({ nodeId, data }: { nodeId: string; data: WorkflowNodeData }) {
   const updateNode = useWorkflowStore(s => s.updateNode);
   const t = useLocale(s => s.t);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -1077,11 +1077,11 @@ export function MultiImageUploadInput({ nodeId, data }: { nodeId: string; data: 
       )}
     </div>
   );
-}
+});
 
 // ─── Selector: which component to render ─────────────────────────────────────
 
-export function InputNodeContent({ nodeId, data }: { nodeId: string; data: WorkflowNodeData }) {
+export const InputNodeContent = memo(function InputNodeContent({ nodeId, data }: { nodeId: string; data: WorkflowNodeData }) {
   switch (data.catalogueId) {
     case "IN-001":
       return <TextPromptInput nodeId={nodeId} data={data} />;
@@ -1107,4 +1107,4 @@ export function InputNodeContent({ nodeId, data }: { nodeId: string; data: Workf
     default:
       return null;
   }
-}
+});
