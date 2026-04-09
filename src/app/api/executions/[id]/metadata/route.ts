@@ -4,7 +4,11 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { checkEndpointRateLimit } from "@/lib/rate-limit";
 import { formatErrorResponse, UserErrors } from "@/lib/user-errors";
-import type { ExecutionMetadata } from "@/types/execution";
+import type { ExecutionMetadata, VideoGenerationState } from "@/types/execution";
+
+const VIDEO_STATUSES = new Set<VideoGenerationState["status"]>([
+  "submitting", "processing", "rendering", "complete", "failed",
+]);
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -61,6 +65,28 @@ export async function PATCH(req: NextRequest, { params }: Params) {
         }
       }
       patch.quantityOverrides = validated;
+    }
+    if (body.videoGenProgress && typeof body.videoGenProgress === "object") {
+      // Defensive shape validation: outer object of VideoGenerationState
+      const validated: Record<string, VideoGenerationState> = {};
+      for (const [nodeId, raw] of Object.entries(body.videoGenProgress)) {
+        if (!raw || typeof raw !== "object") continue;
+        // Treat raw as untrusted user input — the Partial<ExecutionMetadata>
+        // type on body is optimistic; we re-validate every field below.
+        const r = raw as unknown as Record<string, unknown>;
+        if (typeof r.progress !== "number" || !Number.isFinite(r.progress)) continue;
+        if (typeof r.status !== "string" || !VIDEO_STATUSES.has(r.status as VideoGenerationState["status"])) continue;
+        const entry: VideoGenerationState = {
+          progress: r.progress,
+          status: r.status as VideoGenerationState["status"],
+        };
+        if (typeof r.phase === "string") entry.phase = r.phase;
+        if (typeof r.exteriorTaskId === "string") entry.exteriorTaskId = r.exteriorTaskId;
+        if (typeof r.interiorTaskId === "string") entry.interiorTaskId = r.interiorTaskId;
+        if (typeof r.failureMessage === "string") entry.failureMessage = r.failureMessage;
+        validated[nodeId] = entry;
+      }
+      patch.videoGenProgress = validated;
     }
 
     // Verify ownership AND fetch existing metadata in one query
