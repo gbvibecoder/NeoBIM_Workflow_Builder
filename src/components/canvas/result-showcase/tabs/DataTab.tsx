@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from "react";
 import { motion } from "framer-motion";
+import { toast } from "sonner";
 import { ChevronRight, ChevronDown, Download, Copy, Check, Table2, BarChart3, Code2, Pencil } from "lucide-react";
 import { useLocale } from "@/hooks/useLocale";
 import { useExecutionStore } from "@/stores/execution-store";
@@ -346,6 +347,12 @@ function TableView({ table, index }: { table: TableDataItem; index: number }) {
                               const originalVal = parseFloat(String(cell));
                               const rowData = table.rows[ri];
                               if (!isNaN(originalVal) && originalVal > 0 && rowData) {
+                                // Persist correction to the analytical learning corpus.
+                                // Local UI state is already saved separately via the
+                                // execution-store debounced PATCH path, so this is a
+                                // best-effort secondary save — failures don't block the
+                                // edit but DO surface a toast so the user knows the
+                                // future-prediction quality won't reflect this correction.
                                 fetch("/api/quantity-corrections", {
                                   method: "POST",
                                   headers: { "Content-Type": "application/json" },
@@ -355,7 +362,14 @@ function TableView({ table, index }: { table: TableDataItem; index: number }) {
                                     correctedQty: val,
                                     unit: String(rowData[7] ?? rowData[table.headers.length - 1] ?? "EA"),
                                   }),
-                                }).catch(() => {}); // fire-and-forget
+                                }).then(res => {
+                                  // 401 is expected for not-signed-in users — quietly ignore
+                                  if (!res.ok && res.status !== 401) {
+                                    toast.error("Couldn't save correction for future estimates", { duration: 3000 });
+                                  }
+                                }).catch(() => {
+                                  toast.error("Network issue saving correction", { duration: 3000 });
+                                });
                               }
                             }
                             setEditingCell(null);
