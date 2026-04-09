@@ -49,7 +49,7 @@ import {
   buildBuilding,
   getDefaultConfig,
   generateRoomsForBuilding,
-} from "@/components/canvas/artifacts/architectural-viewer/building";
+} from "@/lib/3d-generation/building";
 import { addFurniture } from "@/components/canvas/artifacts/architectural-viewer/furniture";
 import type {
   BuildingStyle,
