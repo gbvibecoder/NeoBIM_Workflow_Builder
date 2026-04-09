@@ -379,7 +379,7 @@ function WorkflowCanvasInner({ workflowId: urlWorkflowId, templateId }: Workflow
     loadFromTemplate,
   } = useWorkflowStore();
 
-  const { artifacts, executionProgress, clearArtifacts, clearCurrentExecution, restoreArtifactsFromDB, hydrateQuantityOverrides, hydrateVideoGenProgress } = useExecutionStore();
+  const { artifacts, executionProgress, clearArtifacts, clearCurrentExecution, restoreArtifactsFromDB, hydrateQuantityOverrides, hydrateVideoGenProgress, hydrateRegenerationCounts } = useExecutionStore();
 
   const { t: tLocale } = useLocale();
 
@@ -438,6 +438,7 @@ function WorkflowCanvasInner({ workflowId: urlWorkflowId, templateId }: Workflow
             interiorTaskId?: string;
             failureMessage?: string;
           }>;
+          regenerationCounts?: Record<string, number>;
         } | null;
         artifacts?: Array<{
           tileInstanceId: string; nodeId: string; type: string;
@@ -456,21 +457,26 @@ function WorkflowCanvasInner({ workflowId: urlWorkflowId, templateId }: Workflow
           });
         }
         // Hydrate persisted UI state from execution.metadata so reload-time
-        // restores BOQ quantity edits AND in-flight video render progress.
-        // Both hydrate actions are local-only and do NOT trigger persist
-        // round-trips back to the server.
+        // restores BOQ quantity edits, in-flight video render progress,
+        // AND the per-node regen counter (so the "X regens left" UI is
+        // accurate after a refresh — which previously was the F5 bypass).
+        // All three hydrate actions are local-only and do NOT trigger
+        // persist round-trips back to the server.
         if (latest.metadata?.quantityOverrides) {
           hydrateQuantityOverrides(latest.metadata.quantityOverrides);
         }
         if (latest.metadata?.videoGenProgress) {
           hydrateVideoGenProgress(latest.metadata.videoGenProgress);
         }
+        if (latest.metadata?.regenerationCounts) {
+          hydrateRegenerationCounts(latest.metadata.regenerationCounts);
+        }
       })
       .catch((err) => {
         if (err instanceof DOMException && err.name === "AbortError") return;
         /* Non-fatal — execution restore is best-effort */
       });
-  }, [restoreArtifactsFromDB, hydrateQuantityOverrides, hydrateVideoGenProgress]);
+  }, [restoreArtifactsFromDB, hydrateQuantityOverrides, hydrateVideoGenProgress, hydrateRegenerationCounts]);
 
   // ─── Load workflow from URL ?id= param ────────────────────────────
   const loadedUrlIdRef = useRef<string | null>(null);
