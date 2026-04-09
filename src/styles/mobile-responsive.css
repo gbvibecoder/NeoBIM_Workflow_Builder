@@ -329,13 +329,18 @@
     display: block !important;
     min-height: 0 !important;
     height: auto !important;
-    /* Bottom padding must be tall enough that the LAST field (Confirm
-       Password) can scroll all the way up near the top of the viewport,
-       above the on-screen keyboard. Instagram/Meta in-app webviews do NOT
-       shrink the visual viewport when the keyboard opens, so we have to
-       create this headroom manually. 100vh guarantees every field can
-       reach the top of the page regardless of device size. */
-    padding: 20px 16px 100vh !important;
+    /* Normal padding when idle — extra scroll headroom for keyboard is
+       added dynamically by the focusin handler in (auth)/layout.tsx so
+       users don't see a giant blank area below the form when not typing. */
+    padding: 20px 16px 32px !important;
+  }
+
+  /* When any field inside the auth shell is focused, the focusin handler
+     toggles this class on <body> to grow the form area's bottom padding,
+     creating just enough scrollable room to lift the focused field above
+     the on-screen keyboard. Removed on blur. */
+  body.auth-keyboard-open .auth-form-area {
+    padding-bottom: 55vh !important;
   }
 
   .auth-form-inner {

@@ -34,24 +34,28 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
     if (typeof window === "undefined") return;
     if (window.innerWidth > 768) return;
 
-    const scrollFocusedToSafeArea = () => {
-      const el = document.activeElement as HTMLElement | null;
-      if (!el) return;
+    const isField = (el: Element | null): el is HTMLElement => {
+      if (!el) return false;
       const tag = el.tagName;
-      if (tag !== "INPUT" && tag !== "TEXTAREA") return;
+      return tag === "INPUT" || tag === "TEXTAREA";
+    };
+
+    const scrollFocusedToSafeArea = () => {
+      const el = document.activeElement;
+      if (!isField(el)) return;
       const rect = el.getBoundingClientRect();
-      // Target: 15% of the screen from the top, but at least 96px down so
-      // we don't hide the input behind the webview's own top bar.
-      const targetTop = Math.max(96, window.innerHeight * 0.15);
+      // Target: ~22% from the top of the screen — well above any realistic
+      // keyboard (40–55% of screen) and below the webview's top chrome.
+      const targetTop = Math.max(96, window.innerHeight * 0.22);
       const delta = rect.top - targetTop;
       if (Math.abs(delta) < 4) return;
       window.scrollBy({ top: delta, behavior: "smooth" });
     };
 
     const onFocusIn = (e: FocusEvent) => {
-      const t = e.target as HTMLElement | null;
-      if (!t) return;
-      if (t.tagName !== "INPUT" && t.tagName !== "TEXTAREA") return;
+      if (!isField(e.target as Element | null)) return;
+      // Grow scroll headroom only while a field is focused.
+      document.body.classList.add("auth-keyboard-open");
       // Multiple retries: the keyboard animation + the webview's own
       // auto-scroll can take up to ~700ms to settle, and we want to be
       // the LAST adjustment so the input ends up where we put it.
@@ -60,8 +64,22 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
       setTimeout(scrollFocusedToSafeArea, 750);
     };
 
+    const onFocusOut = () => {
+      // Defer so we don't flicker when focus moves between two fields.
+      setTimeout(() => {
+        if (!isField(document.activeElement)) {
+          document.body.classList.remove("auth-keyboard-open");
+        }
+      }, 120);
+    };
+
     document.addEventListener("focusin", onFocusIn);
-    return () => document.removeEventListener("focusin", onFocusIn);
+    document.addEventListener("focusout", onFocusOut);
+    return () => {
+      document.removeEventListener("focusin", onFocusIn);
+      document.removeEventListener("focusout", onFocusOut);
+      document.body.classList.remove("auth-keyboard-open");
+    };
   }, []);
 
   const stats = useMemo(() => [
