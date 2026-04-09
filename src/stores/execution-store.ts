@@ -72,11 +72,19 @@ interface ExecutionState {
   clearArtifacts: () => void;
 
   // Quantity overrides: tileInstanceId → Map<rowIndex, overrideValue>
-  // Allows users to correct TR-007 quantities before passing to TR-008
+  // Allows users to correct TR-007 quantities before passing to TR-008.
+  // Persisted to Execution.metadata.quantityOverrides via debounced PATCH
+  // (see schedulePersist below) so edits survive page reloads.
   quantityOverrides: Map<string, Map<number, number>>;
   setQuantityOverride: (tileInstanceId: string, rowIndex: number, value: number) => void;
   clearQuantityOverrides: (tileInstanceId: string) => void;
   getQuantityOverrides: (tileInstanceId: string) => Map<number, number>;
+  /** Replace the in-memory quantityOverrides Map with the contents of an
+   *  ExecutionMetadata.quantityOverrides object loaded from the server.
+   *  Called once on result-showcase mount after the execution metadata
+   *  is fetched. Pure local-state update — does NOT trigger a persist
+   *  (would create a no-op round-trip back to the server). */
+  hydrateQuantityOverrides: (overrides: Record<string, Record<string, number>>) => void;
 
   // Restore artifacts from DB (after loading a workflow)
   restoreArtifactsFromDB: (dbArtifacts: Array<{
@@ -96,6 +104,57 @@ interface ExecutionState {
 }
 
 const MAX_REGENERATIONS = 3;
+
+// ─── Quantity-overrides persistence (debounced PATCH) ───────────────────────
+// User edits to the BOQ quantity table are pushed to
+// Execution.metadata.quantityOverrides via the new
+// PATCH /api/executions/[id]/metadata endpoint, debounced 500ms so a rapid
+// edit burst (typing through several cells) batches into a single
+// network round-trip. The full snapshot of the current quantityOverrides
+// Map is sent each time — last-write-wins on the server side.
+//
+// Best-effort: failures are swallowed because the in-memory Map is the
+// source of truth during the editing session. The next edit will retry
+// with a fresh snapshot. The previous fire-and-forget pattern is
+// preserved here for the same reason.
+
+const PERSIST_DEBOUNCE_MS = 500;
+let pendingPersistTimer: ReturnType<typeof setTimeout> | null = null;
+
+function schedulePersist() {
+  if (typeof window === "undefined") return; // SSR safety
+  if (pendingPersistTimer) clearTimeout(pendingPersistTimer);
+  pendingPersistTimer = setTimeout(() => {
+    pendingPersistTimer = null;
+    void persistQuantityOverrides();
+  }, PERSIST_DEBOUNCE_MS);
+}
+
+async function persistQuantityOverrides() {
+  // Read state at flush time (not schedule time) so we always send the
+  // latest snapshot, even if more edits landed during the debounce window.
+  const state = useExecutionStore.getState();
+  const executionId = state.currentExecution?.id;
+  if (!executionId) return; // No execution loaded → nothing to persist against
+
+  // Serialize Map<string, Map<number, number>> to nested JSON record
+  const serialized: Record<string, Record<string, number>> = {};
+  for (const [tileId, rowMap] of state.quantityOverrides) {
+    const inner: Record<string, number> = {};
+    for (const [row, val] of rowMap) inner[String(row)] = val;
+    serialized[tileId] = inner;
+  }
+
+  try {
+    await fetch(`/api/executions/${executionId}/metadata`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ quantityOverrides: serialized }),
+    });
+  } catch {
+    // Best-effort: in-memory state is still correct, next edit retries
+  }
+}
 
 export const useExecutionStore = create<ExecutionState>()((set, get) => ({
   currentExecution: null,
@@ -225,24 +284,46 @@ export const useExecutionStore = create<ExecutionState>()((set, get) => ({
 
   clearArtifacts: () => set({ artifacts: new Map() }),
 
-  setQuantityOverride: (tileInstanceId, rowIndex, value) =>
+  setQuantityOverride: (tileInstanceId, rowIndex, value) => {
     set((state) => {
       const newOverrides = new Map(state.quantityOverrides);
       const tileOverrides = new Map(newOverrides.get(tileInstanceId) ?? new Map());
       tileOverrides.set(rowIndex, value);
       newOverrides.set(tileInstanceId, tileOverrides);
       return { quantityOverrides: newOverrides };
-    }),
+    });
+    schedulePersist();
+  },
 
-  clearQuantityOverrides: (tileInstanceId) =>
+  clearQuantityOverrides: (tileInstanceId) => {
     set((state) => {
       const newOverrides = new Map(state.quantityOverrides);
       newOverrides.delete(tileInstanceId);
       return { quantityOverrides: newOverrides };
-    }),
+    });
+    schedulePersist();
+  },
 
   getQuantityOverrides: (tileInstanceId) => {
     return get().quantityOverrides.get(tileInstanceId) ?? new Map();
+  },
+
+  hydrateQuantityOverrides: (overrides) => {
+    // Convert the serialized JSON form back to Map<string, Map<number, number>>.
+    // Defensive: skip non-numeric row keys and non-finite values.
+    const newOverrides = new Map<string, Map<number, number>>();
+    for (const [tileId, rowRecord] of Object.entries(overrides)) {
+      if (!rowRecord || typeof rowRecord !== "object") continue;
+      const inner = new Map<number, number>();
+      for (const [rowKey, val] of Object.entries(rowRecord)) {
+        const rowIdx = Number(rowKey);
+        if (Number.isInteger(rowIdx) && typeof val === "number" && Number.isFinite(val)) {
+          inner.set(rowIdx, val);
+        }
+      }
+      if (inner.size > 0) newOverrides.set(tileId, inner);
+    }
+    set({ quantityOverrides: newOverrides });
   },
 
   restoreArtifactsFromDB: (dbArtifacts, executionMeta) => {
