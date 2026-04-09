@@ -16,7 +16,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
 
     const { id } = await params;
     const workflow = await prisma.workflow.findFirst({
-      where: { id, ownerId: session.user.id },
+      where: { id, ownerId: session.user.id, deletedAt: null },
     });
 
     if (!workflow) {
@@ -49,7 +49,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
     const { name, description, tags, tileGraph } = body;
 
     const existing = await prisma.workflow.findFirst({
-      where: { id, ownerId: session.user.id },
+      where: { id, ownerId: session.user.id, deletedAt: null },
     });
 
     if (!existing) {
@@ -62,6 +62,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
         where: {
           ownerId: session.user.id,
           name: name.trim(),
+          deletedAt: null,
           NOT: { id },
         },
         select: { id: true },
@@ -130,6 +131,13 @@ export async function PUT(req: NextRequest, { params }: Params) {
 }
 
 // DELETE /api/workflows/[id]
+//
+// Soft-delete: marks the workflow as deleted from the user's view but
+// preserves the row + all related Execution and Artifact metadata so the
+// admin dashboard's audit trail stays intact. R2 cleanup for the bulk
+// path lives in /api/workflows/bulk-delete; for single deletes the
+// trade-off favours simplicity and consistency over freeing storage
+// (storage is reclaimed in bulk by the cleanup sweep).
 export async function DELETE(_req: NextRequest, { params }: Params) {
   try {
     const session = await auth();
@@ -139,17 +147,18 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
 
     const { id } = await params;
     const existing = await prisma.workflow.findFirst({
-      where: { id, ownerId: session.user.id },
+      where: { id, ownerId: session.user.id, deletedAt: null },
+      select: { id: true },
     });
 
     if (!existing) {
       return NextResponse.json(formatErrorResponse({ title: "Not found", message: "Workflow not found.", code: "NODE_001" }), { status: 404 });
     }
 
-    await prisma.$transaction([
-      prisma.execution.deleteMany({ where: { workflowId: id } }),
-      prisma.workflow.delete({ where: { id } }),
-    ]);
+    await prisma.workflow.update({
+      where: { id },
+      data: { deletedAt: new Date() },
+    });
 
     return NextResponse.json({ success: true });
   } catch (error) {

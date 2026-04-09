@@ -109,6 +109,12 @@ model Workflow {
   complexity   WorkflowComplexity     @default(SIMPLE)
   createdAt    DateTime               @default(now())
   updatedAt    DateTime               @updatedAt
+  // Soft-delete marker. When set, the workflow is hidden from the owning
+  // user's "My Workflows" view, but its row + all related Executions and
+  // Artifact metadata are intentionally preserved so admin/audit pages
+  // continue to show full historical activity. R2 storage is still wiped
+  // by the bulk-delete endpoint when this is set.
+  deletedAt    DateTime?
   publications CommunityPublication[]
   executions   Execution[]
   tiles        TileInstance[]
@@ -119,6 +125,7 @@ model Workflow {
   @@index([ownerId])
   @@index([isTemplate])
   @@index([createdAt])
+  @@index([deletedAt])
   @@map("workflows")
 }
 

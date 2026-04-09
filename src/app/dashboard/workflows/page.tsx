@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, Workflow, ArrowRight, Trash2, ExternalLink, Clock, Sparkles, Box, Image as ImageIcon, Search, FileText, Layers, Zap, ChevronRight } from "lucide-react";
+import { Plus, Workflow, ArrowRight, Trash2, ExternalLink, Clock, Sparkles, Box, Image as ImageIcon, Search, FileText, Layers, Zap, ChevronRight, CheckSquare, Square, X, AlertTriangle } from "lucide-react";
 import { api, type WorkflowSummary } from "@/lib/api";
 import { formatRelativeTime } from "@/lib/utils";
 import { toast } from "sonner";
@@ -58,6 +58,11 @@ export default function WorkflowsPage() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [showLimitModal, setShowLimitModal] = useState(false);
+  // ── Bulk-select state ───────────────────────────────────────────────
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [showBulkConfirm, setShowBulkConfirm] = useState(false);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
 
   const typeLabels = useMemo(() => ({
     pdf: t('workflows.typePdfReports'),
@@ -105,15 +110,84 @@ export default function WorkflowsPage() {
     }
   }
 
+  // ── Bulk select helpers ───────────────────────────────────────────
+  const toggleSelectMode = useCallback(() => {
+    setSelectMode((prev) => {
+      if (prev) setSelectedIds(new Set());
+      return !prev;
+    });
+  }, []);
+
+  const toggleSelected = useCallback((id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const exitSelectMode = useCallback(() => {
+    setSelectMode(false);
+    setSelectedIds(new Set());
+  }, []);
+
+  async function handleBulkDelete() {
+    if (selectedIds.size === 0) return;
+    setBulkDeleting(true);
+    const idsToDelete = Array.from(selectedIds);
+    try {
+      const res = await api.workflows.bulkDelete(idsToDelete);
+      // Drop from local list using the server's authoritative ownership filter:
+      // we passed N, server may have deleted fewer if some weren't owned. We
+      // still want the UI to reflect what was sent — re-fetch to be safe.
+      setWorkflows((prev) => prev.filter((w) => !selectedIds.has(w.id)));
+      toast.success(`Deleted ${res.deleted} workflow${res.deleted !== 1 ? "s" : ""} permanently`);
+      // Background refresh so counts/list always match server truth.
+      load();
+      exitSelectMode();
+    } catch {
+      toast.error("Failed to delete workflows. Please try again.");
+    } finally {
+      setBulkDeleting(false);
+      setShowBulkConfirm(false);
+    }
+  }
+
   const filteredWorkflows = workflows.filter(wf =>
     wf.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const { grouped, ungrouped } = useMemo(() => groupWorkflows(filteredWorkflows, typeLabels), [filteredWorkflows, typeLabels]);
 
+  const filteredIds = useMemo(() => filteredWorkflows.map((w) => w.id), [filteredWorkflows]);
+  const allFilteredSelected =
+    filteredIds.length > 0 && filteredIds.every((id) => selectedIds.has(id));
+
+  const selectAllFiltered = useCallback(() => {
+    if (allFilteredSelected) {
+      // Deselect only the filtered subset (preserve any selections outside the
+      // current search filter — defensive, even though filter is the main view).
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        for (const id of filteredIds) next.delete(id);
+        return next;
+      });
+    } else {
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        for (const id of filteredIds) next.add(id);
+        return next;
+      });
+    }
+  }, [allFilteredSelected, filteredIds]);
+
   // Render a single workflow card
   function renderCard(wf: WorkflowSummary, idx: number) {
     const wfType = getWorkflowType(wf.name, typeLabels);
+    const isSelected = selectedIds.has(wf.id);
+    const baseBorder = isSelected ? "rgba(239,68,68,0.55)" : "rgba(255,255,255,0.06)";
+    const baseBg = isSelected ? "rgba(239,68,68,0.08)" : "rgba(255,255,255,0.02)";
     return (
       <motion.div
         key={wf.id}
@@ -121,14 +195,17 @@ export default function WorkflowsPage() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: Math.min(idx * 0.03, 0.5), duration: 0.3 }}
         style={{
-          background: "rgba(255,255,255,0.02)",
-          border: "1px solid rgba(255,255,255,0.06)",
+          background: baseBg,
+          border: `1px solid ${baseBorder}`,
           borderRadius: 12, padding: 16, cursor: "pointer",
           transition: "all 0.2s ease",
           display: "flex", flexDirection: "column", gap: 10,
+          position: "relative",
+          boxShadow: isSelected ? "0 0 0 1px rgba(239,68,68,0.25), 0 4px 20px rgba(239,68,68,0.10)" : undefined,
         }}
         onMouseEnter={e => {
           const el = e.currentTarget as HTMLElement;
+          if (isSelected) return;
           el.style.borderColor = `${wfType.color}25`;
           el.style.background = "rgba(255,255,255,0.04)";
           el.style.transform = "translateY(-1px)";
@@ -136,13 +213,43 @@ export default function WorkflowsPage() {
         }}
         onMouseLeave={e => {
           const el = e.currentTarget as HTMLElement;
+          if (isSelected) return;
           el.style.borderColor = "rgba(255,255,255,0.06)";
           el.style.background = "rgba(255,255,255,0.02)";
           el.style.transform = "translateY(0)";
           el.style.boxShadow = "none";
         }}
-        onClick={() => router.push(`/dashboard/canvas?id=${wf.id}`)}
+        onClick={() => {
+          if (selectMode) {
+            toggleSelected(wf.id);
+            return;
+          }
+          router.push(`/dashboard/canvas?id=${wf.id}`);
+        }}
       >
+        {/* Selection indicator (visible only in select mode) */}
+        {selectMode && (
+          <div
+            aria-hidden
+            style={{
+              position: "absolute",
+              top: 10,
+              right: 10,
+              width: 22,
+              height: 22,
+              borderRadius: 6,
+              border: `1.5px solid ${isSelected ? "#EF4444" : "rgba(255,255,255,0.18)"}`,
+              background: isSelected ? "#EF4444" : "rgba(0,0,0,0.4)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              transition: "all 0.15s ease",
+              zIndex: 2,
+            }}
+          >
+            {isSelected && <CheckSquare size={13} color="#fff" strokeWidth={3} />}
+          </div>
+        )}
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10, flex: 1, minWidth: 0 }}>
             <div style={{
@@ -171,7 +278,7 @@ export default function WorkflowsPage() {
             </div>
           </div>
 
-          <div style={{ display: "flex", gap: 3, flexShrink: 0 }}>
+          <div style={{ display: selectMode ? "none" : "flex", gap: 3, flexShrink: 0 }}>
             <button
               onClick={e => { e.stopPropagation(); router.push(`/dashboard/canvas?id=${wf.id}`); }}
               style={{
@@ -418,8 +525,85 @@ export default function WorkflowsPage() {
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                 <span style={{ fontSize: 12, color: "#5C5C78", whiteSpace: "nowrap" }}>
-                  {filteredWorkflows.length} {filteredWorkflows.length !== 1 ? t('workflows.workflowsCount') : t('workflows.workflowCount')}
+                  {selectMode && selectedIds.size > 0
+                    ? `${selectedIds.size} selected`
+                    : `${filteredWorkflows.length} ${filteredWorkflows.length !== 1 ? t('workflows.workflowsCount') : t('workflows.workflowCount')}`}
                 </span>
+
+                {/* ── Bulk-select toolbar ── */}
+                {!selectMode ? (
+                  <button
+                    onClick={toggleSelectMode}
+                    title="Select workflows to delete"
+                    style={{
+                      display: "flex", alignItems: "center", gap: 6,
+                      padding: "7px 12px", borderRadius: 8,
+                      background: "rgba(255,255,255,0.03)",
+                      color: "#C0C0D8", fontSize: 12, fontWeight: 600,
+                      border: "1px solid rgba(255,255,255,0.08)",
+                      cursor: "pointer", transition: "all 0.18s ease",
+                    }}
+                    onMouseEnter={e => { e.currentTarget.style.borderColor = "rgba(239,68,68,0.35)"; e.currentTarget.style.color = "#fff"; }}
+                    onMouseLeave={e => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.08)"; e.currentTarget.style.color = "#C0C0D8"; }}
+                  >
+                    <CheckSquare size={13} />
+                    Select
+                  </button>
+                ) : (
+                  <>
+                    <button
+                      onClick={selectAllFiltered}
+                      style={{
+                        display: "flex", alignItems: "center", gap: 6,
+                        padding: "7px 12px", borderRadius: 8,
+                        background: "rgba(255,255,255,0.03)",
+                        color: "#C0C0D8", fontSize: 12, fontWeight: 600,
+                        border: "1px solid rgba(255,255,255,0.08)",
+                        cursor: "pointer", transition: "all 0.18s ease",
+                      }}
+                    >
+                      {allFilteredSelected ? <CheckSquare size={13} /> : <Square size={13} />}
+                      {allFilteredSelected ? "Deselect all" : "Select all"}
+                    </button>
+                    <button
+                      onClick={() => selectedIds.size > 0 && setShowBulkConfirm(true)}
+                      disabled={selectedIds.size === 0}
+                      style={{
+                        display: "flex", alignItems: "center", gap: 6,
+                        padding: "7px 14px", borderRadius: 8,
+                        background: selectedIds.size > 0
+                          ? "linear-gradient(135deg, #EF4444 0%, #B91C1C 100%)"
+                          : "rgba(239,68,68,0.15)",
+                        color: selectedIds.size > 0 ? "#fff" : "rgba(239,68,68,0.5)",
+                        fontSize: 12, fontWeight: 700,
+                        border: "1px solid rgba(239,68,68,0.3)",
+                        cursor: selectedIds.size > 0 ? "pointer" : "not-allowed",
+                        boxShadow: selectedIds.size > 0 ? "0 4px 14px rgba(239,68,68,0.25)" : "none",
+                        transition: "all 0.18s ease",
+                      }}
+                    >
+                      <Trash2 size={12} />
+                      Delete{selectedIds.size > 0 ? ` (${selectedIds.size})` : ""}
+                    </button>
+                    <button
+                      onClick={exitSelectMode}
+                      title="Exit selection"
+                      style={{
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        width: 30, height: 30, borderRadius: 8,
+                        background: "transparent",
+                        color: "#7C7C96",
+                        border: "1px solid rgba(255,255,255,0.08)",
+                        cursor: "pointer", transition: "all 0.18s ease",
+                      }}
+                      onMouseEnter={e => { e.currentTarget.style.color = "#fff"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.2)"; }}
+                      onMouseLeave={e => { e.currentTarget.style.color = "#7C7C96"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.08)"; }}
+                    >
+                      <X size={14} />
+                    </button>
+                  </>
+                )}
+
                 <button
                   onClick={handleNewWorkflow}
                   style={{
@@ -538,6 +722,133 @@ export default function WorkflowsPage() {
           </div>
         )}
       </main>
+
+      {/* ── Bulk Delete Confirmation Modal ── */}
+      <AnimatePresence>
+        {showBulkConfirm && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => !bulkDeleting && setShowBulkConfirm(false)}
+              style={{
+                position: "fixed", inset: 0,
+                background: "rgba(0,0,0,0.75)",
+                backdropFilter: "blur(8px)",
+                zIndex: 9990,
+              }}
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.92, y: 16 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.92, y: 16 }}
+              transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="bulk-delete-title"
+              style={{
+                position: "fixed", inset: 0, zIndex: 9991,
+                display: "flex", alignItems: "center", justifyContent: "center",
+                pointerEvents: "none", padding: 16,
+              }}
+            >
+              <div style={{
+                width: "100%", maxWidth: 460, borderRadius: 18, overflow: "hidden",
+                background: "linear-gradient(180deg, #14141F 0%, #0A0A14 100%)",
+                border: "1px solid rgba(239,68,68,0.25)",
+                boxShadow: "0 32px 100px rgba(0,0,0,0.7), 0 0 60px rgba(239,68,68,0.08)",
+                pointerEvents: "auto",
+              }}>
+                {/* Top accent bar */}
+                <div style={{ height: 3, background: "linear-gradient(90deg, #EF4444, #B91C1C, #EF4444)" }} />
+                <div style={{ padding: "28px 28px 8px", textAlign: "center" }}>
+                  <div
+                    style={{
+                      width: 56, height: 56, borderRadius: 14,
+                      background: "rgba(239,68,68,0.10)",
+                      border: "1px solid rgba(239,68,68,0.25)",
+                      display: "inline-flex", alignItems: "center", justifyContent: "center",
+                      marginBottom: 14,
+                    }}
+                  >
+                    <AlertTriangle size={26} color="#EF4444" />
+                  </div>
+                  <h2
+                    id="bulk-delete-title"
+                    style={{
+                      fontSize: 19, fontWeight: 800, color: "#F0F2F8",
+                      letterSpacing: "-0.02em", margin: "0 0 8px",
+                    }}
+                  >
+                    Delete {selectedIds.size} workflow{selectedIds.size !== 1 ? "s" : ""} permanently?
+                  </h2>
+                  <p style={{
+                    fontSize: 13, color: "#9898B0", lineHeight: 1.6, margin: 0,
+                    maxWidth: 360, marginLeft: "auto", marginRight: "auto",
+                  }}>
+                    The selected workflows will be removed from your account and their generated files will be wiped from cloud storage. <strong style={{ color: "#FCA5A5" }}>This action cannot be undone.</strong>
+                  </p>
+                </div>
+
+                <div style={{ padding: "18px 28px 24px" }}>
+                  <div
+                    style={{
+                      background: "rgba(239,68,68,0.05)",
+                      border: "1px solid rgba(239,68,68,0.15)",
+                      borderRadius: 10, padding: "12px 14px",
+                      margin: "0 0 18px",
+                    }}
+                  >
+                    <div style={{ display: "flex", flexDirection: "column", gap: 6, fontSize: 12, color: "#C0C0D8" }}>
+                      <div>• Removed from your workflow list</div>
+                      <div>• Generated files and uploaded media wiped from cloud storage</div>
+                      <div>• Cannot be reopened or recovered by you</div>
+                    </div>
+                  </div>
+
+                  <div style={{ display: "flex", gap: 10 }}>
+                    <button
+                      onClick={() => setShowBulkConfirm(false)}
+                      disabled={bulkDeleting}
+                      style={{
+                        flex: 1, padding: "12px", borderRadius: 10,
+                        background: "rgba(255,255,255,0.04)",
+                        color: "#C0C0D8", fontSize: 13, fontWeight: 600,
+                        border: "1px solid rgba(255,255,255,0.08)",
+                        cursor: bulkDeleting ? "not-allowed" : "pointer",
+                        transition: "all 0.18s ease",
+                        opacity: bulkDeleting ? 0.5 : 1,
+                      }}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleBulkDelete}
+                      disabled={bulkDeleting}
+                      style={{
+                        flex: 1.4, padding: "12px", borderRadius: 10,
+                        background: bulkDeleting
+                          ? "rgba(239,68,68,0.4)"
+                          : "linear-gradient(135deg, #EF4444 0%, #B91C1C 100%)",
+                        color: "#fff", fontSize: 13, fontWeight: 700,
+                        border: "1px solid rgba(239,68,68,0.4)",
+                        cursor: bulkDeleting ? "wait" : "pointer",
+                        boxShadow: "0 8px 24px rgba(239,68,68,0.30)",
+                        transition: "all 0.18s ease",
+                        display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                      }}
+                    >
+                      <Trash2 size={14} />
+                      {bulkDeleting ? "Deleting…" : `Delete ${selectedIds.size}`}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
 
       {/* ── Workflow Limit Modal — Creative ── */}
       <AnimatePresence>

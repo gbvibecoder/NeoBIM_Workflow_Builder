@@ -124,7 +124,7 @@ export async function POST(req: Request) {
 
     // Get user stats for context
     const [workflowCount, user] = await Promise.all([
-      prisma.workflow.count({ where: { ownerId: userId } }),
+      prisma.workflow.count({ where: { ownerId: userId, deletedAt: null } }),
       prisma.user.findUnique({ where: { id: userId }, select: { name: true } }),
     ]);
 

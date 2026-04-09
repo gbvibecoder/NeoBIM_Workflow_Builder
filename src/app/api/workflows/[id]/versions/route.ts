@@ -23,7 +23,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
 
     // Verify ownership
     const workflow = await prisma.workflow.findFirst({
-      where: { id, ownerId: session.user.id },
+      where: { id, ownerId: session.user.id, deletedAt: null },
       select: { id: true, version: true },
     });
 
@@ -73,7 +73,7 @@ export async function POST(req: NextRequest, { params }: Params) {
 
     // Verify ownership
     const workflow = await prisma.workflow.findFirst({
-      where: { id, ownerId: session.user.id },
+      where: { id, ownerId: session.user.id, deletedAt: null },
     });
 
     if (!workflow) {

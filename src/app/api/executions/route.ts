@@ -28,6 +28,10 @@ export async function GET(req: NextRequest) {
     const rawExecutions = await prisma.execution.findMany({
       where: {
         userId: session.user.id,
+        // Hide executions whose parent workflow has been soft-deleted from
+        // the user's view. Admin pages don't apply this filter, so they
+        // still see the historical activity.
+        workflow: { deletedAt: null },
         ...(workflowId && { workflowId }),
         ...(statusParam && { status: statusParam }),
       },
@@ -83,7 +87,7 @@ export async function POST(req: NextRequest) {
     }
 
     const workflow = await prisma.workflow.findFirst({
-      where: { id: workflowId, ownerId: session.user.id },
+      where: { id: workflowId, ownerId: session.user.id, deletedAt: null },
     });
 
     if (!workflow) {

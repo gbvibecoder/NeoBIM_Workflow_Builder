@@ -106,6 +106,12 @@ export const api = {
 
     delete: (id: string) =>
       apiFetch<{ success: boolean }>(`/api/workflows/${id}`, { method: "DELETE" }),
+
+    bulkDelete: (ids: string[]) =>
+      apiFetch<{ success: boolean; deleted: number; r2: { deleted: number; failed: number } }>(
+        "/api/workflows/bulk-delete",
+        { method: "POST", body: JSON.stringify({ ids }) },
+      ),
   },
 
   executions: {

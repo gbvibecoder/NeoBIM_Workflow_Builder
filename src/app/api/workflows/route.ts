@@ -27,7 +27,7 @@ export async function GET(req: NextRequest) {
 
     const [workflows, total] = await Promise.all([
       prisma.workflow.findMany({
-        where: { ownerId: session.user.id },
+        where: { ownerId: session.user.id, deletedAt: null },
         orderBy: { updatedAt: "desc" },
         skip: (page - 1) * limit,
         take: limit,
@@ -42,7 +42,7 @@ export async function GET(req: NextRequest) {
           _count: { select: { executions: true } },
         },
       }),
-      prisma.workflow.count({ where: { ownerId: session.user.id } }),
+      prisma.workflow.count({ where: { ownerId: session.user.id, deletedAt: null } }),
     ]);
 
     const response = NextResponse.json({ workflows, total, page, totalPages: Math.ceil(total / limit) });
@@ -84,8 +84,11 @@ export async function POST(req: NextRequest) {
       const planLimits = userRole === "STARTER" ? STRIPE_PLANS.STARTER.limits : userRole === "MINI" ? STRIPE_PLANS.MINI.limits : STRIPE_PLANS.FREE.limits;
       const maxWorkflows = planLimits.maxWorkflows;
       if (maxWorkflows > 0) {
+        // Limit only counts live (non-deleted) workflows — soft-deleted
+        // workflows still occupy a DB row but should not block the user
+        // from creating a new one.
         const currentCount = await prisma.workflow.count({
-          where: { ownerId: session.user.id },
+          where: { ownerId: session.user.id, deletedAt: null },
         });
         if (currentCount >= maxWorkflows) {
           return NextResponse.json(
@@ -115,8 +118,10 @@ export async function POST(req: NextRequest) {
     const requestedName = (typeof name === "string" && name.trim()) ? name.trim() : "Untitled Workflow";
 
     let finalName = requestedName;
+    // Name uniqueness only considers live (non-deleted) workflows so users
+    // can re-create workflows with the same name as ones they soft-deleted.
     const existingSame = await prisma.workflow.findFirst({
-      where: { ownerId: session.user.id, name: requestedName },
+      where: { ownerId: session.user.id, name: requestedName, deletedAt: null },
       select: { id: true },
     });
 
@@ -136,6 +141,7 @@ export async function POST(req: NextRequest) {
         where: {
           ownerId: session.user.id,
           name: { startsWith: requestedName },
+          deletedAt: null,
         },
         select: { name: true },
       });

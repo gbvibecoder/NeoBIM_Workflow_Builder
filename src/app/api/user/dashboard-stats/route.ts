@@ -37,10 +37,10 @@ export async function GET() {
           where: { userId },
           select: { action: true, xpAwarded: true, createdAt: true },
         }),
-        prisma.workflow.count({ where: { ownerId: userId } }),
-        prisma.execution.count({ where: { userId } }),
+        prisma.workflow.count({ where: { ownerId: userId, deletedAt: null } }),
+        prisma.execution.count({ where: { userId, workflow: { deletedAt: null } } }),
         prisma.workflow.findMany({
-          where: { ownerId: userId },
+          where: { ownerId: userId, deletedAt: null },
           orderBy: { updatedAt: "desc" },
           take: 3,
           select: {
