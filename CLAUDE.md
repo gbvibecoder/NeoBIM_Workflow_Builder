@@ -30,6 +30,102 @@ npx prisma migrate deploy                     # Apply pending migrations in CI /
 
 **What it does:** A visual workflow builder for BIM (Building Information Modeling). Users drag-and-drop nodes onto a canvas to build pipelines that parse IFC files, run AI analysis, generate reports, and export results.
 
+## Folder Structure Rules (MANDATORY)
+
+This project uses a feature-based folder structure. Every developer (human or AI) MUST follow these rules. No exceptions.
+
+### Where to put new files
+
+**Step 1: Does this file belong to a single feature?**
+- YES → Put it in `src/features/<feature-name>/<type>/`
+- NO (used by 2+ features) → Put it in `src/shared/<type>/` or `src/lib/`
+
+**Step 2: Pick the right subfolder by file type:**
+- React components → `components/`
+- Zustand stores → `stores/`
+- Custom hooks → `hooks/`
+- API/data services → `services/`
+- Utility/helper functions → `lib/`
+- TypeScript types/interfaces → `types/`
+- Constants/config → `constants/`
+
+**Example:** A new BOQ chart component → `src/features/boq/components/BOQChart.tsx`
+**Example:** A new shared date formatter → `src/lib/format-date.ts`
+**Example:** A new IFC parsing service → `src/features/ifc/services/ifc-parser-v2.ts`
+
+### The 17 feature folders
+
+```
+src/features/
+  3d-render/     — 3D rendering, video walkthroughs, GLB generation
+  admin/         — Admin dashboard, analytics, user management
+  ai/            — AI services (OpenAI, Claude), prompt handling, AI chat
+  billing/       — Stripe, Razorpay, subscriptions, pricing
+  boq/           — BOQ visualizer, cost estimation, quantity corrections
+  canvas/        — React Flow canvas, nodes, edges, panels, toolbar
+  community/     — Community marketplace, video sharing
+  dashboard/     — Dashboard home, sidebar, header, hero scenes
+  execution/     — Execution engine, result showcase, execution store
+  floor-plan/    — Floor plan editor, CAD tools, room layout
+  ifc/           — IFC viewer, parser, BIM tools
+  landing/       — Landing page sections
+  marketing/     — Exit intent, promotional modals
+  onboarding/    — User onboarding, tooltips, tours
+  referral/      — Referral system
+  support/       — Support chat, conversations
+  workflows/     — Workflow CRUD, workflow store, prebuilt workflows
+```
+
+### Shared code locations
+
+```
+src/shared/components/ui/   — Reusable UI primitives (Button, Card, Badge, etc.)
+src/shared/components/      — Cross-cutting components (ErrorBoundary, CookieConsent, etc.)
+src/shared/services/        — Cross-cutting services (email, email-templates)
+src/shared/stores/          — Cross-cutting stores (ui-store only)
+```
+
+### Cross-cutting hotspots (DO NOT MOVE)
+
+These files are imported by 15-75+ files. They stay where they are:
+
+```
+src/lib/db.ts, auth.ts, rate-limit.ts, user-errors.ts, utils.ts, r2.ts, logger.ts, i18n.ts, validation.ts
+src/hooks/useLocale.ts, useAvatar.ts
+src/types/workflow.ts, execution.ts, nodes.ts, floor-plan-cad.ts
+src/constants/limits.ts, design-tokens.ts
+```
+
+### Rules that MUST NOT be violated
+
+1. **NEVER create files directly in `src/components/`** — this directory no longer exists. Use `src/features/<feature>/components/` or `src/shared/components/`.
+2. **NEVER create feature-specific files in `src/lib/`** — `src/lib/` is for cross-cutting utilities only. Feature-specific logic goes in `src/features/<feature>/lib/`.
+3. **NEVER create feature-specific stores in `src/stores/`** — feature stores go in `src/features/<feature>/stores/`. Only `ui-store` lives in `src/shared/stores/`.
+4. **NEVER create feature-specific services in `src/services/`** — use `src/features/<feature>/services/`.
+5. **NEVER import from one feature into another feature** (e.g., `features/canvas/` importing from `features/floor-plan/`). If two features need the same code, move it to `src/shared/` or `src/lib/`.
+6. **API routes stay in `src/app/api/`** — Next.js requires this. Import feature logic from `src/features/`.
+7. **Pages stay in `src/app/`** — Next.js requires this. Import feature components from `src/features/`.
+8. **New Prisma models** go in `prisma/schema.prisma`. Always use `prisma migrate dev --name <descriptive_name>`. Never use `prisma db push`.
+9. **New constants** — if used by one feature, put in `features/<feature>/constants/`. If used by 2+ features, put in `src/constants/`.
+10. **New types** — if used by one feature, put in `features/<feature>/types/`. If shared, put in `src/types/`.
+
+### Database rules
+
+- All data persistence goes through Prisma → PostgreSQL (Neon). No localStorage for user data (floor-plan persistence is a known exception being migrated).
+- Execution UI state (quantity overrides, video progress, regen counts) persists via `Execution.metadata` JSONB column through `PATCH /api/executions/[id]/metadata`.
+- Community likes are tracked per-user via `CommunityVideoLike` join table. The `CommunityVideo.likes` counter is denormalized and maintained transactionally.
+- Rate limiting uses Upstash Redis. Never use in-memory Maps for rate limiting.
+- Regen limits are server-enforced via atomic Prisma transaction in `/api/execute-node`. Client-side counts are UX hints only.
+
+### Before creating any file, ask yourself:
+
+1. Which feature does this belong to?
+2. Is it a component, service, store, hook, type, constant, or lib utility?
+3. Is it feature-specific or shared across features?
+4. Does a similar file already exist in that feature folder?
+
+If unsure, default to the feature folder. It's easier to move something to shared/ later than to untangle a misplaced shared file.
+
 ### Key Architectural Patterns
 
 **Env validation:**
@@ -48,7 +144,7 @@ npx prisma migrate deploy                     # Apply pending migrations in CI /
 - Adding a new node: create `handlers/<id>.ts`, register it in `handlers/index.ts`, add to `REAL_NODE_IDS` in `route.ts`
 
 **Showcase Error Boundaries:**
-- `src/components/canvas/result-showcase/index.tsx` wraps each tab (`OverviewTab`, `MediaTab`, `DataTab`, `ModelTab`, `ExportTab`) in the shared `ErrorBoundary` from `src/components/ErrorBoundary.tsx`. A crash in one tab does not tear down the showcase or block users from switching to a working tab.
+- `src/features/execution/components/result-showcase/index.tsx` wraps each tab (`OverviewTab`, `MediaTab`, `DataTab`, `ModelTab`, `ExportTab`) in the shared `ErrorBoundary` from `src/shared/components/ErrorBoundary.tsx`. A crash in one tab does not tear down the showcase or block users from switching to a working tab.
 
 **Auth (split config pattern):**
 - `src/lib/auth.config.ts` — Lightweight, edge-safe config used by middleware
@@ -56,45 +152,91 @@ npx prisma migrate deploy                     # Apply pending migrations in CI /
 - `middleware.ts` — NextAuth edge middleware protecting `/dashboard` routes
 
 **State management (Zustand stores):**
-- `src/stores/workflow-store.ts` — Nodes, edges, undo/redo (50-step history), save state
-- `src/stores/execution-store.ts` — Execution results and artifacts
-- `src/stores/ui-store.ts` — UI state (modals, panels, sidebar)
+- `src/features/workflows/stores/workflow-store.ts` — Nodes, edges, undo/redo (50-step history), save state
+- `src/features/execution/stores/execution-store.ts` — Execution results and artifacts
+- `src/shared/stores/ui-store.ts` — UI state (modals, panels, sidebar)
+- `src/features/floor-plan/stores/floor-plan-store.ts` — Floor-plan editor state
+- `src/features/support/stores/support-store.ts` — Support chat state
+- `src/stores/index.ts` is a re-export barrel pointing at the new locations — `useWorkflowStore`, `useExecutionStore`, `useUIStore` can still be imported from `@/stores`.
 
 **API error handling:** All API routes return errors as structured `UserError` objects via `formatErrorResponse()` from `src/lib/user-errors.ts`. Error codes are namespaced: AUTH_001, VAL_001, RATE_001, OPENAI_001, NODE_001, NET_001, FORM_001, BILL_001.
 
-**Node catalogue:** `src/constants/node-catalogue.ts` defines all available workflow nodes with categories: input (blue), transform (purple), generate (green), export (amber). IDs follow pattern: `IN-001`, `TR-001`, `GE-001`, `EX-001`.
+**Node catalogue:** `src/features/workflows/constants/node-catalogue.ts` defines all available workflow nodes with categories: input (blue), transform (purple), generate (green), export (amber). IDs follow pattern: `IN-001`, `TR-001`, `GE-001`, `EX-001`.
 
 **Rate limiting:** Upstash Redis sliding window — 5/month (FREE), 10/month (MINI), 30/month (STARTER), 100/month (PRO). TEAM_ADMIN/PLATFORM_ADMIN bypass limits. Admin emails bypass limits. Per-node-type metered limits (video, 3D, render) use atomic Redis INCR with monthly auto-expiry. Logic in `src/lib/rate-limit.ts`.
 
 ### Source Layout
 
+> Phase 3 reorganized the codebase into feature folders. The authoritative
+> rules for **where new files go** live in **"## Folder Structure Rules
+> (MANDATORY)"** above. The tree below is a snapshot of the resulting
+> layout — read it together with those rules, not instead of them.
+
 ```
 src/
-├── app/
-│   ├── (auth)/           # Login/register (public routes)
-│   ├── dashboard/        # Main app (protected), [id]/ for workflow detail
-│   ├── demo/             # Public demo (no auth required)
+├── app/                                # Next.js routes (REQUIRED to live here)
+│   ├── (auth)/                         # Login/register (public)
+│   ├── dashboard/                      # Main app (protected), [id]/ for workflow detail
+│   ├── demo/                           # Public demo (no auth)
+│   ├── admin/                          # Admin console
 │   └── api/
-│       ├── auth/         # NextAuth + registration
-│       ├── workflows/    # CRUD + [id] routes
-│       ├── execute-node/ # Single node execution
-│       ├── parse-ifc/    # BIM file parsing
-│       ├── ai-chat/      # OpenAI chat
-│       ├── stripe/       # Billing webhooks & checkout
-│       └── user/         # Profile/settings
-├── components/
-│   ├── canvas/           # React Flow canvas, nodes/, edges/, artifacts/, panels/, toolbar/
-│   ├── dashboard/        # Header, Sidebar, FloatingNav
-│   ├── ui/               # CommandPalette (⌘K), shared widgets
-│   ├── community/        # Community workflow marketplace
-│   └── landing/          # Marketing/landing page
-├── stores/               # Zustand stores (workflow, execution, ui)
-├── services/             # OpenAI client, IFC parser, mock executor, PDF generation
-├── hooks/                # useExecution, useLocale
-├── lib/                  # Auth, DB, rate limiting, errors, validation, analytics, i18n
-├── types/                # nodes.ts, workflow.ts, execution.ts
-└── constants/            # node-catalogue, prebuilt-workflows, unit-rates
+│       ├── auth/                       # NextAuth + registration
+│       ├── workflows/                  # CRUD + [id] routes
+│       ├── execute-node/               # Single node execution + handlers/
+│       ├── executions/[id]/metadata/   # Execution.metadata persistence
+│       ├── parse-ifc/                  # BIM file parsing
+│       ├── ai-chat/                    # OpenAI chat
+│       ├── stripe/                     # Billing webhooks & checkout
+│       └── user/                       # Profile/settings
+│
+├── features/                           # 17 feature folders (see rules above)
+│   ├── 3d-render/    {constants, lib, services}
+│   ├── admin/        {components}
+│   ├── ai/           {components, services}
+│   ├── billing/      {lib}                                  # stripe, razorpay
+│   ├── boq/          {components, constants, lib, services} # BOQ visualizer + costing
+│   ├── canvas/       {components/{artifacts,edges,modals,nodes,panels,toolbar}}
+│   ├── community/    {components}
+│   ├── dashboard/    {components}                           # hero scenes, sidebar, header
+│   ├── execution/    {components/result-showcase, hooks, services, stores}
+│   ├── floor-plan/   {components/{panels,renderers}, lib, services, stores, types}
+│   ├── ifc/          {components, services}
+│   ├── landing/      {components, lib}
+│   ├── marketing/    {components}
+│   ├── onboarding/   {components}
+│   ├── referral/     {components}
+│   ├── support/      {components, services, stores}
+│   └── workflows/    {components, constants, stores}        # workflow-store, prebuilt-workflows, node-catalogue
+│
+├── shared/                             # Cross-cutting code (used by 2+ features)
+│   ├── components/
+│   │   ├── ui/                         # Button, Card, Badge, CommandPalette, …
+│   │   ├── providers/                  # SessionProvider
+│   │   └── (root)                      # ErrorBoundary, CookieConsent, MobileGate, TrackingScripts, UTMCapture
+│   ├── services/                       # email, email-templates, email-weekly-digest
+│   └── stores/                         # ui-store
+│
+├── lib/                                # Cross-cutting hotspots (DO NOT MOVE — see rules)
+│                                       # db, auth, auth.config, rate-limit, env, env-check,
+│                                       # validation, user-errors, utils, r2, logger, i18n,
+│                                       # analytics, api, share, track, utm, gamification,
+│                                       # admin-auth, admin-server, award-xp, cookie-consent,
+│                                       # form-validation, meta-pixel, referral, safe-error,
+│                                       # temp-image-store, ui-constants, webhook-idempotency,
+│                                       # workflow-logger
+├── hooks/                              # useAvatar, useLocale + index.ts barrel
+│                                       # (useExecution lives in features/execution/hooks/)
+├── stores/                             # index.ts barrel ONLY — re-exports from features/ + shared/
+├── services/                           # pdf-report.ts, pdf-report-server.ts (only)
+├── constants/                          # design-tokens.ts, limits.ts (only)
+├── types/                              # workflow, execution, nodes, sam3d, geometry,
+│                                       # ifc-viewer, support, architectural-viewer,
+│                                       # floor-plan-cad, gtag.d, index.ts barrel
+│                                       # (feature-specific types live under features/<f>/types/)
+└── styles/
 ```
+
+**Path alias:** `@/*` → `./src/*`. Imports in this codebase use absolute paths almost exclusively (e.g. `@/features/boq/services/boq-intelligence`); relative imports are reserved for tightly-coupled siblings inside the same directory.
 
 ### API Route Conventions
 
