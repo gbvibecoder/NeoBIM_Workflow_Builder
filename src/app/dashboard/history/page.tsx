@@ -10,7 +10,7 @@ import {
   ArrowRight, Activity, Share2,
 } from "lucide-react";
 import { shareHistoryToTwitter } from "@/lib/share";
-import { PageBackground } from "@/components/dashboard/PageBackground";
+import { PageBackground } from "@/features/dashboard/components/PageBackground";
 import { toast } from "sonner";
 import { useLocale } from "@/hooks/useLocale";
 import type { TranslationKey } from "@/lib/i18n";

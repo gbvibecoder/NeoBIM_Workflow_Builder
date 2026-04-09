@@ -1,6 +1,6 @@
 import React from "react";
 import { Sidebar } from "@/components/dashboard/Sidebar";
-import { Header } from "@/components/dashboard/Header";
+import { Header } from "@/features/dashboard/components/Header";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { CommandPaletteLoader } from "@/components/ui/CommandPaletteLoader";
 import { OnboardingModal } from "@/features/onboarding/components/OnboardingModal";
