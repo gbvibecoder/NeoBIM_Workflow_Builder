@@ -52,6 +52,16 @@ export interface ExecutionMetadata {
    *  observable after page reload (and, if final, the failure message
    *  remains visible). */
   videoGenProgress?: Record<string, VideoGenerationState>;
+  /** Per-node regeneration counter, keyed by tileInstanceId. Value is the
+   *  number of regenerations executed for this node within THIS execution
+   *  (not including the first run). Server-side enforced in
+   *  /api/execute-node — increments before dispatching the handler, returns
+   *  429 with REGEN_001 if it would exceed MAX_REGENERATIONS.
+   *
+   *  IMPORTANT: This field is server-managed only. Clients must NOT write
+   *  to it via the metadata PATCH endpoint — that would defeat enforcement.
+   *  The PATCH endpoint validator explicitly rejects this field in the body. */
+  regenerationCounts?: Record<string, number>;
 }
 
 export interface Execution {
