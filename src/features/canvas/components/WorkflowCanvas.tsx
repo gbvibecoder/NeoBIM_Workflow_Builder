@@ -27,8 +27,8 @@ import {
 import dynamic from "next/dynamic";
 import { BaseNode } from "@/features/canvas/components/nodes/BaseNode";
 import { AnimatedEdge } from "@/features/canvas/components/edges/AnimatedEdge";
-import { RightNodePanel } from "@/components/canvas/panels/RightNodePanel";
-import { CanvasToolbar } from "@/components/canvas/toolbar/CanvasToolbar";
+import { RightNodePanel } from "@/features/canvas/components/panels/RightNodePanel";
+import { CanvasToolbar } from "@/features/canvas/components/toolbar/CanvasToolbar";
 
 import { ExecutionLog } from "@/features/canvas/components/ExecutionLog";
 import { ResultShowcase } from "@/features/canvas/components/ResultShowcase";
