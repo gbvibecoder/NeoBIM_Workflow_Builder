@@ -31,7 +31,7 @@ import {
   getDefaultConfig,
 } from "@/lib/3d-generation/building";
 import { createMaterials, disposeMaterials } from "@/lib/3d-generation/materials";
-import { addFurniture } from "@/components/canvas/artifacts/architectural-viewer/furniture";
+import { addFurniture } from "@/lib/3d-generation/furniture";
 import type { BuildingStyle } from "@/types/architectural-viewer";
 
 // ─── Public Types ────────────────────────────────────────────────────────────

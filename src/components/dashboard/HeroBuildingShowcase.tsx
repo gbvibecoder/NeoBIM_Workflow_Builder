@@ -50,7 +50,7 @@ import {
   getDefaultConfig,
   generateRoomsForBuilding,
 } from "@/lib/3d-generation/building";
-import { addFurniture } from "@/components/canvas/artifacts/architectural-viewer/furniture";
+import { addFurniture } from "@/lib/3d-generation/furniture";
 import type {
   BuildingStyle,
   DoorMesh,

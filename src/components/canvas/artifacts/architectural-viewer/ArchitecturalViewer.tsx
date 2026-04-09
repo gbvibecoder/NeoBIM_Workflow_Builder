@@ -7,7 +7,7 @@ import { PointerLockControls } from "three/examples/jsm/controls/PointerLockCont
 import type { ArchitecturalViewerProps, DoorMesh, RoomDef, BuildingStyle } from "@/types/architectural-viewer";
 import { createMaterials, disposeMaterials } from "@/lib/3d-generation/materials";
 import { buildBuilding, getDefaultConfig, generateRoomsForBuilding } from "@/lib/3d-generation/building";
-import { addFurniture } from "./furniture";
+import { addFurniture } from "@/lib/3d-generation/furniture";
 
 // ─── Control Mode ─────────────────────────────────────────────────────────────
 
