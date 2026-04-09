@@ -170,6 +170,11 @@ model Execution {
   completedAt  DateTime?
   tileResults  Json            @default("[]")
   errorMessage String?
+  // Per-execution UI/state metadata (e.g. quantityOverrides for Task 2,
+  // videoGenProgress for Task 3). Nullable JSON column written via
+  // PATCH /api/executions/[id]/metadata. Stays null for executions
+  // created before this column existed.
+  metadata     Json?
   createdAt    DateTime        @default(now())
   artifacts    Artifact[]
   user         User            @relation(fields: [userId], references: [id], onDelete: Cascade)
