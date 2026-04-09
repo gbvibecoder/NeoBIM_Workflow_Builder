@@ -8,6 +8,7 @@ import {
   ArrowRight, Play, Plus, Zap, ChevronDown,
   Type, FileText, Image as ImageIcon, Box, Sliders, MapPin,
   Sparkles, Palette, Building2, FileSpreadsheet, X, ChevronRight,
+  Layers, Trophy, Crown,
 } from "lucide-react";
 import { PREBUILT_WORKFLOWS } from "@/constants/prebuilt-workflows";
 import { useWorkflowStore } from "@/stores/workflow-store";
@@ -290,7 +291,7 @@ export default function DashboardPage() {
                   maxWidth: "100%",
                 }}
               >
-                <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#06b6d4", boxShadow: "0 0 12px #06b6d4", flexShrink: 0 }} />
+                <span className="db-live-dot" style={{ width: 6, height: 6, borderRadius: "50%", background: "#06b6d4", boxShadow: "0 0 12px #06b6d4", flexShrink: 0 }} />
                 <span style={{
                   fontSize: isMobileLayout ? 9 : 10,
                   fontWeight: 600, letterSpacing: "0.22em", textTransform: "uppercase",
@@ -323,6 +324,7 @@ export default function DashboardPage() {
                 initial={{ opacity: 0, y: 18 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.36, duration: 0.8, ease }}
+                className="db-hero-name"
                 style={{
                   fontSize: isMobileLayout
                     ? "clamp(34px, 9vw, 52px)"
@@ -332,6 +334,11 @@ export default function DashboardPage() {
                   lineHeight: 1.02,
                   margin: "0 0 16px",
                   color: "#f5f7fb",
+                  backgroundImage: "linear-gradient(110deg, #ffffff 10%, #7dd3fc 35%, #c4b5fd 60%, #ffffff 90%)",
+                  backgroundSize: "200% 100%",
+                  WebkitBackgroundClip: "text",
+                  WebkitTextFillColor: "transparent",
+                  backgroundClip: "text",
                 }}
               >
                 {data.userName || t("dash.welcomeNew")}
@@ -370,24 +377,26 @@ export default function DashboardPage() {
                 {/* Primary CTA */}
                 <Link
                   href="/dashboard/workflows/new"
-                  className="db-hero-cta"
+                  className="db-hero-cta db-hero-cta-primary"
                   style={{
+                    position: "relative",
                     display: "inline-flex", alignItems: "center", gap: 10,
-                    padding: isMobileLayout ? "13px 22px" : "15px 30px",
+                    padding: isMobileLayout ? "13px 24px" : "15px 32px",
                     borderRadius: 999,
-                    background: "#F5F7FA",
-                    color: "#0A0A0F",
+                    background: "linear-gradient(110deg, #06b6d4 0%, #7dd3fc 50%, #a78bfa 100%)",
+                    backgroundSize: "200% 100%",
+                    color: "#04111a",
                     fontSize: isMobileLayout ? 13 : 14,
-                    fontWeight: 600,
+                    fontWeight: 700,
                     textDecoration: "none", letterSpacing: "-0.01em",
                     whiteSpace: "nowrap",
-                    boxShadow: "0 1px 0 rgba(255,255,255,0.6) inset, 0 18px 40px -12px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,255,255,0.08)",
+                    boxShadow: "0 0 0 1px rgba(125,249,255,0.35), 0 12px 32px -8px rgba(6,182,212,0.55), 0 24px 60px -18px rgba(167,139,250,0.45), inset 0 1px 0 rgba(255,255,255,0.5)",
                     border: "none",
-                    transition: "transform 0.35s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.35s cubic-bezier(0.22, 1, 0.36, 1)",
+                    transition: "transform 0.35s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.35s cubic-bezier(0.22, 1, 0.36, 1), background-position 0.6s ease",
                   }}
                 >
                   {t("dash.startBuilding")}
-                  <ArrowRight size={15} strokeWidth={2.4} />
+                  <ArrowRight size={15} strokeWidth={2.6} />
                 </Link>
 
                 {/* Secondary — templates */}
@@ -428,30 +437,91 @@ export default function DashboardPage() {
                   borderTop: "1px solid rgba(255,255,255,0.06)",
                 }}
               >
-                {[
-                  { label: "PLAN",       value: role,                  color: role === "FREE" ? "#7dd3fc" : "#a78bfa" },
-                  { label: "WORKFLOWS",  value: data.workflowCount,    color: "#4F8AFF" },
-                  { label: "EXECUTIONS", value: `${used}/${effectiveLimit}`, color: "#8B5CF6" },
-                  { label: "LEVEL",      value: data.level,            color: "#10B981" },
-                ].map((m) => (
-                  <div key={m.label} style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                    <span style={{
-                      fontSize: 9, letterSpacing: "0.18em",
-                      color: "rgba(255,255,255,0.4)",
-                      fontFamily: "var(--font-jetbrains), monospace",
-                    }}>
-                      {m.label}
-                    </span>
-                    <span style={{
-                      fontSize: 17, fontWeight: 700, color: "#F0F2F8",
-                      fontFamily: "var(--font-jetbrains), monospace",
-                      letterSpacing: "-0.01em",
-                      textShadow: `0 0 16px ${m.color}40`,
-                    }}>
-                      {m.value}
-                    </span>
-                  </div>
-                ))}
+                {(() => {
+                  const levelPct = Math.max(0, Math.min(1, data.xpForNext > 0 ? (data.xpInLevel / data.xpForNext) : (data.progress ?? 0)));
+                  const execPct = Math.max(0, Math.min(1, effectiveLimit > 0 ? used / effectiveLimit : 0));
+                  const stats: Array<{
+                    label: string; value: React.ReactNode; color: string; icon: React.ReactNode;
+                    extra?: React.ReactNode;
+                  }> = [
+                    { label: "PLAN",       value: role,               color: role === "FREE" ? "#7dd3fc" : "#a78bfa", icon: <Crown size={12} /> },
+                    { label: "WORKFLOWS",  value: data.workflowCount, color: "#4F8AFF", icon: <Layers size={12} /> },
+                    {
+                      label: "EXECUTIONS",
+                      value: `${used}/${effectiveLimit}`,
+                      color: "#8B5CF6",
+                      icon: <Zap size={12} />,
+                      extra: (
+                        <div style={{ marginTop: 6, width: 88, height: 3, borderRadius: 2, background: "rgba(255,255,255,0.06)", overflow: "hidden" }}>
+                          <div style={{ width: `${execPct * 100}%`, height: "100%", background: "linear-gradient(90deg, #8B5CF6, #c4b5fd)", boxShadow: "0 0 8px rgba(139,92,246,0.6)", transition: "width 0.6s ease" }} />
+                        </div>
+                      ),
+                    },
+                    { label: "LEVEL",      value: data.level,         color: "#10B981", icon: <Trophy size={12} /> },
+                  ];
+                  return stats.map((m) => {
+                    const isLevel = m.label === "LEVEL";
+                    return (
+                      <div key={m.label} style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                        {isLevel ? (
+                          <div style={{ position: "relative", width: 44, height: 44, flexShrink: 0 }}>
+                            <svg width="44" height="44" viewBox="0 0 44 44" style={{ position: "absolute", inset: 0, transform: "rotate(-90deg)" }}>
+                              <circle cx="22" cy="22" r="19" fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="2.5" />
+                              <circle
+                                cx="22" cy="22" r="19" fill="none"
+                                stroke="url(#db-level-grad)"
+                                strokeWidth="2.5"
+                                strokeLinecap="round"
+                                strokeDasharray={2 * Math.PI * 19}
+                                strokeDashoffset={2 * Math.PI * 19 * (1 - levelPct)}
+                                style={{ transition: "stroke-dashoffset 0.8s ease", filter: "drop-shadow(0 0 6px rgba(16,185,129,0.55))" }}
+                              />
+                              <defs>
+                                <linearGradient id="db-level-grad" x1="0" x2="1" y1="0" y2="1">
+                                  <stop offset="0%" stopColor="#10B981" />
+                                  <stop offset="100%" stopColor="#7dd3fc" />
+                                </linearGradient>
+                              </defs>
+                            </svg>
+                            <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 800, color: "#F0F2F8", fontFamily: "var(--font-jetbrains), monospace", letterSpacing: "-0.02em" }}>
+                              {data.level}
+                            </div>
+                          </div>
+                        ) : (
+                          <div style={{
+                            width: 32, height: 32, borderRadius: 10, flexShrink: 0,
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                            background: `linear-gradient(135deg, ${m.color}22, ${m.color}08)`,
+                            border: `1px solid ${m.color}33`,
+                            color: m.color,
+                            boxShadow: `0 0 18px ${m.color}26, inset 0 1px 0 rgba(255,255,255,0.06)`,
+                          }}>
+                            {m.icon}
+                          </div>
+                        )}
+                        <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                          <span style={{
+                            fontSize: 9, letterSpacing: "0.18em",
+                            color: "rgba(255,255,255,0.42)",
+                            fontFamily: "var(--font-jetbrains), monospace",
+                          }}>
+                            {m.label}
+                          </span>
+                          <span style={{
+                            fontSize: 17, fontWeight: 700,
+                            color: m.color,
+                            fontFamily: "var(--font-jetbrains), monospace",
+                            letterSpacing: "-0.01em",
+                            textShadow: `0 0 18px ${m.color}55`,
+                          }}>
+                            {m.value}
+                          </span>
+                          {m.extra}
+                        </div>
+                      </div>
+                    );
+                  });
+                })()}
               </motion.div>
             </div>
           </div>
@@ -1074,6 +1144,60 @@ export default function DashboardPage() {
         @keyframes db-cta-breathe {
           0%, 100% { box-shadow: 0 0 8px rgba(6,182,212,0.1); }
           50% { box-shadow: 0 0 20px rgba(6,182,212,0.18), 0 0 40px rgba(168,85,247,0.06); }
+        }
+
+        /* ── Primary hero CTA (gradient + animated glow) ── */
+        .db-hero-cta-primary {
+          background-position: 0% 50% !important;
+          animation: db-cta-shine 6s ease-in-out infinite !important;
+        }
+        .db-hero-cta-primary:hover {
+          background: linear-gradient(110deg, #06b6d4 0%, #7dd3fc 50%, #a78bfa 100%) !important;
+          background-size: 200% 100% !important;
+          background-position: 100% 50% !important;
+          border-color: transparent !important;
+          color: #04111a !important;
+          transform: translateY(-2px) scale(1.03) !important;
+          box-shadow:
+            0 0 0 1px rgba(125,249,255,0.55),
+            0 16px 40px -8px rgba(6,182,212,0.7),
+            0 28px 70px -16px rgba(167,139,250,0.55),
+            inset 0 1px 0 rgba(255,255,255,0.6) !important;
+        }
+        @keyframes db-cta-shine {
+          0%, 100% { background-position: 0% 50%; }
+          50% { background-position: 100% 50%; }
+        }
+
+        /* ── LIVE pulse dot ── */
+        .db-live-dot {
+          position: relative;
+          animation: db-live-pulse 2s ease-in-out infinite;
+        }
+        .db-live-dot::after {
+          content: "";
+          position: absolute;
+          inset: -4px;
+          border-radius: 50%;
+          border: 1px solid rgba(6,182,212,0.6);
+          animation: db-live-ring 2s ease-out infinite;
+        }
+        @keyframes db-live-pulse {
+          0%, 100% { box-shadow: 0 0 8px #06b6d4, 0 0 0 0 rgba(6,182,212,0.5); opacity: 1; }
+          50% { box-shadow: 0 0 16px #06b6d4, 0 0 0 4px rgba(6,182,212,0); opacity: 0.85; }
+        }
+        @keyframes db-live-ring {
+          0% { transform: scale(0.8); opacity: 0.9; }
+          100% { transform: scale(2.2); opacity: 0; }
+        }
+
+        /* ── Hero name shimmer ── */
+        .db-hero-name {
+          animation: db-name-shimmer 9s ease-in-out infinite;
+        }
+        @keyframes db-name-shimmer {
+          0%, 100% { background-position: 0% 50%; }
+          50% { background-position: 100% 50%; }
         }
 
         /* ── Section CTA (bottom of page) ── */
