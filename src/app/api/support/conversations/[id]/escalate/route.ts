@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { generateConversationSummary } from "@/services/support-chat-service";
+import { generateConversationSummary } from "@/features/support/services/support-chat-service";
 import { sendSupportEscalationEmail } from "@/services/email";
 
 export async function POST(
