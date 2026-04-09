@@ -15,11 +15,11 @@ import { ShowcaseHeader } from "@/features/execution/components/result-showcase/
 import { TabBar } from "@/features/execution/components/result-showcase/TabBar";
 import { COLORS, type TabId } from "@/features/execution/components/result-showcase/constants";
 
-import { OverviewTab } from "@/components/canvas/result-showcase/tabs/OverviewTab";
-import { MediaTab } from "@/components/canvas/result-showcase/tabs/MediaTab";
-import { DataTab } from "@/components/canvas/result-showcase/tabs/DataTab";
-import { ModelTab } from "@/components/canvas/result-showcase/tabs/ModelTab";
-import { ExportTab } from "@/components/canvas/result-showcase/tabs/ExportTab";
+import { OverviewTab } from "@/features/execution/components/result-showcase/tabs/OverviewTab";
+import { MediaTab } from "@/features/execution/components/result-showcase/tabs/MediaTab";
+import { DataTab } from "@/features/execution/components/result-showcase/tabs/DataTab";
+import { ModelTab } from "@/features/execution/components/result-showcase/tabs/ModelTab";
+import { ExportTab } from "@/features/execution/components/result-showcase/tabs/ExportTab";
 
 interface ResultShowcaseProps {
   onClose: () => void;
