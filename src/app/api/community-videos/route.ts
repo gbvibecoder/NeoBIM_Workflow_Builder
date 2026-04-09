@@ -7,10 +7,21 @@ import {
   UserErrors,
 } from "@/lib/user-errors";
 
-// ─── GET — List community videos (public) ───────────────────────────────────
+// ─── GET — List community videos (auth-aware) ───────────────────────────────
+//
+// Returns each video with `isLikedByMe: boolean` derived from the
+// CommunityVideoLike join table for the current session user. Anonymous
+// requests get `isLikedByMe: false` for every video.
+//
+// Cache-Control is private/no-store because the response now varies by user
+// (per-user like state). Returning the previous `public, s-maxage=30` would
+// leak one user's likes to another via the CDN.
 
 export async function GET() {
   try {
+    const session = await auth();
+    const userId = session?.user?.id ?? null;
+
     const videos = await prisma.communityVideo.findMany({
       where: { isApproved: true },
       orderBy: { createdAt: "desc" },
@@ -22,8 +33,26 @@ export async function GET() {
       },
     });
 
-    const response = NextResponse.json({ videos });
-    response.headers.set("Cache-Control", "public, s-maxage=30, stale-while-revalidate=60");
+    // Single batched query to fetch this user's likes for the videos in this page
+    let likedSet = new Set<string>();
+    if (userId && videos.length > 0) {
+      const likes = await prisma.communityVideoLike.findMany({
+        where: {
+          userId,
+          videoId: { in: videos.map(v => v.id) },
+        },
+        select: { videoId: true },
+      });
+      likedSet = new Set(likes.map(l => l.videoId));
+    }
+
+    const videosWithLikeState = videos.map(v => ({
+      ...v,
+      isLikedByMe: likedSet.has(v.id),
+    }));
+
+    const response = NextResponse.json({ videos: videosWithLikeState });
+    response.headers.set("Cache-Control", "private, no-store");
     return response;
   } catch (error) {
     console.error("[community-videos GET]", error);

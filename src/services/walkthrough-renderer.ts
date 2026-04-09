@@ -29,10 +29,10 @@ import {
   buildBuilding,
   generateRoomsForBuilding,
   getDefaultConfig,
-} from "@/components/canvas/artifacts/architectural-viewer/building";
-import { createMaterials, disposeMaterials } from "@/components/canvas/artifacts/architectural-viewer/materials";
-import { addFurniture } from "@/components/canvas/artifacts/architectural-viewer/furniture";
-import type { BuildingStyle } from "@/components/canvas/artifacts/architectural-viewer/types";
+} from "@/lib/3d-generation/building";
+import { createMaterials, disposeMaterials } from "@/lib/3d-generation/materials";
+import { addFurniture } from "@/lib/3d-generation/furniture";
+import type { BuildingStyle } from "@/types/architectural-viewer";
 
 // ─── Public Types ────────────────────────────────────────────────────────────
 

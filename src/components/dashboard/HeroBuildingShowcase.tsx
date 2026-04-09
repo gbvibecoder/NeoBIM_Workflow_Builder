@@ -44,17 +44,17 @@ import {
   ScanLine,
   MousePointerClick,
 } from "lucide-react";
-import { createMaterials, disposeMaterials } from "@/components/canvas/artifacts/architectural-viewer/materials";
+import { createMaterials, disposeMaterials } from "@/lib/3d-generation/materials";
 import {
   buildBuilding,
   getDefaultConfig,
   generateRoomsForBuilding,
-} from "@/components/canvas/artifacts/architectural-viewer/building";
-import { addFurniture } from "@/components/canvas/artifacts/architectural-viewer/furniture";
+} from "@/lib/3d-generation/building";
+import { addFurniture } from "@/lib/3d-generation/furniture";
 import type {
   BuildingStyle,
   DoorMesh,
-} from "@/components/canvas/artifacts/architectural-viewer/types";
+} from "@/types/architectural-viewer";
 
 // ─── Hero building config ─────────────────────────────────────────────
 // Minimalist: a single elegant glass tower, no podium, no site context.

@@ -88,6 +88,13 @@ export const UserErrors = {
     code: "RATE_002",
   }),
 
+  // Regeneration limits — server-enforced via Execution.metadata.regenerationCounts
+  REGEN_MAX_REACHED: (max: number): UserError => ({
+    title: "Maximum regeneration attempts reached",
+    message: `You can regenerate each node up to ${max} time${max === 1 ? "" : "s"} per execution. Run the workflow again to start over.`,
+    code: "REGEN_001",
+  }),
+
   // Node-type limits (video, 3D, renders)
   VIDEO_LIMIT_REACHED: (limit: number): UserError => ({
     title: "Video generation limit reached",

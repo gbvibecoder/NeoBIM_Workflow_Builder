@@ -88,6 +88,11 @@ interface CommunityVideoData {
   duration: string | null;
   views: number;
   likes: number;
+  /** True iff the current session user has liked this video. Returned by
+   *  the GET /api/community-videos endpoint via the CommunityVideoLike
+   *  join table. Optional so older API responses (none in tree, just
+   *  belt-and-suspenders) and unauthenticated users default to false. */
+  isLikedByMe?: boolean;
   createdAt: string;
   author: {
     id: string;
@@ -135,18 +140,23 @@ function CommunityVideoCard({
   const color = CAT_COLORS[video.category] || C.muted;
   const r = rgb(color);
   const [hovered, setHovered] = useState(false);
-  const [liked, setLiked] = useState(false);
+  // Initial liked state comes from the server (via CommunityVideoLike join table).
+  // Anonymous users always start as not-liked. localStorage is no longer consulted
+  // — the previous cv-likes cache was per-browser, not per-user, and could leak
+  // state across sessions on shared devices.
+  const [liked, setLiked] = useState(video.isLikedByMe ?? false);
   const [likeCount, setLikeCount] = useState(video.likes);
   const cardRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const inView = useInView(cardRef, { once: false, margin: "-10%" });
 
-  // Check localStorage for existing like
+  // Re-sync local state when the card is reused for a different video
+  // (filter/pagination changes the video prop). Same-video re-renders don't
+  // reset, so optimistic updates aren't clobbered by parent re-renders.
   useEffect(() => {
-    try {
-      const likes: string[] = JSON.parse(localStorage.getItem("cv-likes") || "[]");
-      setLiked(likes.includes(video.id));
-    } catch { /* ignore */ }
+    setLiked(video.isLikedByMe ?? false);
+    setLikeCount(video.likes);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [video.id]);
 
   // Hover-to-play
@@ -161,44 +171,50 @@ function CommunityVideoCard({
     }
   }, [hovered, inView]);
 
-  const handleLike = (e: React.MouseEvent) => {
+  const handleLike = async (e: React.MouseEvent) => {
     e.stopPropagation();
+    const isUnlike = liked;
+
+    // Optimistic UI update — no localStorage writes. Server is the source
+    // of truth via the per-user CommunityVideoLike join table.
+    setLiked(!isUnlike);
+    setLikeCount(c => isUnlike ? c - 1 : c + 1);
+
     try {
-      const isUnlike = liked;
-      const likes: string[] = JSON.parse(localStorage.getItem("cv-likes") || "[]");
-
-      // Optimistic UI update
-      if (isUnlike) {
-        localStorage.setItem("cv-likes", JSON.stringify(likes.filter(id => id !== video.id)));
-        setLiked(false);
-        setLikeCount(c => c - 1);
-      } else {
-        likes.push(video.id);
-        localStorage.setItem("cv-likes", JSON.stringify(likes));
-        setLiked(true);
-        setLikeCount(c => c + 1);
-      }
-
-      fetch(`/api/community-videos/${video.id}/like`, {
+      const res = await fetch(`/api/community-videos/${video.id}/like`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: isUnlike ? "unlike" : "like" }),
-      }).then(res => {
+      });
+
+      if (!res.ok) {
+        // Revert optimistic update on ANY non-2xx (was previously 401-only,
+        // which left the UI lying for 4xx/5xx/network failures).
+        setLiked(isUnlike);
+        setLikeCount(c => isUnlike ? c + 1 : c - 1);
         if (res.status === 401) {
-          // Revert optimistic update
-          if (isUnlike) { setLiked(true); setLikeCount(c => c + 1); }
-          else {
-            setLiked(false); setLikeCount(c => c - 1);
-            try {
-              localStorage.setItem("cv-likes", JSON.stringify(
-                JSON.parse(localStorage.getItem("cv-likes") || "[]").filter((id: string) => id !== video.id)
-              ));
-            } catch { /* ignore corrupted localStorage */ }
-          }
           toast("Sign in to like videos", { duration: 3000 });
+        } else if (res.status === 429) {
+          toast("Slow down — try again in a moment", { duration: 3000 });
+        } else {
+          toast.error("Couldn't update like", { duration: 3000 });
         }
-      }).catch(() => {});
-    } catch { /* ignore */ }
+        return;
+      }
+
+      // Sync to the authoritative server-side count + state. This corrects
+      // any drift if the optimistic +/-1 didn't match what actually happened
+      // server-side (e.g., the request was a no-op because the user already
+      // liked the video on another device).
+      const data: { likes: number; isLikedByMe: boolean } = await res.json();
+      setLikeCount(data.likes);
+      setLiked(data.isLikedByMe);
+    } catch {
+      // Network error — revert
+      setLiked(isUnlike);
+      setLikeCount(c => isUnlike ? c + 1 : c - 1);
+      toast.error("Network error — try again", { duration: 3000 });
+    }
   };
 
   return (
