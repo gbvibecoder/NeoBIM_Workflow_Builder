@@ -23,7 +23,7 @@ import { FAQSection } from '@/features/landing/components/FAQSection';
 import { HowItWorksSection } from '@/features/landing/components/HowItWorksSection';
 import { PricingSection } from '@/features/landing/components/PricingSection';
 import { LandingFooter } from '@/features/landing/components/LandingFooter';
-// import { ExitIntentModal } from '@/components/marketing/ExitIntentModal';
+// import { ExitIntentModal } from '@/features/marketing/components/ExitIntentModal';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
