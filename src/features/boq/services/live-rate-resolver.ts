@@ -93,7 +93,7 @@ async function setCache(key: string, rate: ResolvedRate, ttl: number): Promise<v
 
 async function getReferenceRate(query: RateQuery): Promise<ResolvedRate | null> {
   try {
-    const { getIS1200Rate } = await import("@/constants/is1200-rates");
+    const { getIS1200Rate } = await import("@/features/boq/constants/is1200-rates");
     if (!query.is1200Code) return null;
     const rate = getIS1200Rate(query.is1200Code);
     if (!rate) return null;

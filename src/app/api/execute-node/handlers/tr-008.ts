@@ -183,10 +183,10 @@ export const handleTR008: NodeHandler = async (ctx) => {
   const isIndianProject = locationData?.country?.toLowerCase() === "india"
     || currencyCode === "INR"
     || locationLabel.toLowerCase().includes("india");
-  let is1200Module: typeof import("@/constants/is1200-rates") | null = null;
+  let is1200Module: typeof import("@/features/boq/constants/is1200-rates") | null = null;
   let indianPricing: Awaited<ReturnType<typeof import("@/constants/indian-pricing-factors").calculateIndianPricingAdjustment>> | null = null;
   if (isIndianProject) {
-    is1200Module = await import("@/constants/is1200-rates");
+    is1200Module = await import("@/features/boq/constants/is1200-rates");
     const { calculateIndianPricingAdjustment } = await import("@/constants/indian-pricing-factors");
     const currentMonth = new Date().getMonth() + 1;
     indianPricing = calculateIndianPricingAdjustment(
@@ -717,7 +717,7 @@ export const handleTR008: NodeHandler = async (ctx) => {
 
   // ── Provisional Sums: MEP, Foundation, External Works ──
   // Skip provisional estimates when real data from structural/MEP IFC is available
-  const { estimateMEPCosts, estimateFoundationCosts, estimateExternalWorksCosts, checkQuantitySanity } = await import("@/services/boq-intelligence");
+  const { estimateMEPCosts, estimateFoundationCosts, estimateExternalWorksCosts, checkQuantitySanity } = await import("@/features/boq/services/boq-intelligence");
   const gfaForProvisional = elements.reduce((sum: number, e: unknown) => {
     const el = e as Record<string, unknown>;
     return sum + (String(el.description ?? "").toLowerCase().includes("slab") ? Number(el.grossArea ?? 0) : 0);
@@ -791,7 +791,7 @@ export const handleTR008: NodeHandler = async (ctx) => {
   if (upstreamMarket && upstreamMarket.steel_per_tonne) {
     marketData = upstreamMarket;
     try {
-      const { computeMarketAdjustments } = await import("@/services/market-intelligence");
+      const { computeMarketAdjustments } = await import("@/features/boq/services/market-intelligence");
       marketAdjustments = computeMarketAdjustments(marketData);
     } catch { /* non-fatal */ }
   } else if (isIndianProject) {
@@ -912,7 +912,7 @@ export const handleTR008: NodeHandler = async (ctx) => {
     }
   }
   // ── Rate Benchmark Validator (uses total project cost including soft costs) ──
-  const { validateBenchmark } = await import("@/services/boq-intelligence");
+  const { validateBenchmark } = await import("@/features/boq/services/boq-intelligence");
   // FIX 7: Pass dynamic benchmark from market agent when available
   const dynamicBench = marketData ? {
     rangeLow: Number(marketData.typical_range_min) || undefined,

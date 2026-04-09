@@ -42,7 +42,7 @@ export {
   buildDynamicDisclaimer,
   getWasteFactor,
   getCostBreakdown,
-} from "@/lib/cost-database";
+} from "@/features/boq/lib/cost-database";
 export { VIDEO_NODES, MODEL_3D_NODES, RENDER_NODES, getNodeTypeLimits } from "@/lib/stripe";
 
 // Services

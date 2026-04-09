@@ -16,7 +16,7 @@ import {
   IS1200_RATES,
   IS1200_MAPPINGS,
   INDIAN_DERIVED_RATES,
-} from "@/constants/is1200-rates";
+} from "@/features/boq/constants/is1200-rates";
 
 // ─── Unit Rate Database Tests ─────────────────────────────────────────────
 
