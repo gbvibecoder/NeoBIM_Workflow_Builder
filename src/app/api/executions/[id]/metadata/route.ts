@@ -33,11 +33,14 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       return NextResponse.json(formatErrorResponse(UserErrors.UNAUTHORIZED), { status: 401 });
     }
 
-    // 120/min = 2/sec ceiling, slightly more than the 500ms client-side
-    // debounce so a normal editing burst won't trip it. Higher than the
-    // existing execution-update limit (30/min) because metadata patches
-    // are smaller and fire more often during BOQ editing sessions.
-    const rl = await checkEndpointRateLimit(session.user.id, "execution-metadata-patch", 120, "1 m");
+    // 240/min = 4/sec ceiling. The 500ms client-side debounce caps a single
+    // store-field path at 2 PATCHes/sec; doubling the budget leaves headroom
+    // for two concurrent paths (e.g., a long video render polling
+    // videoGenProgress while a user is also typing into the BOQ data table)
+    // without sitting right at the ceiling. Still small enough to block
+    // genuine abuse. Higher than the existing execution-update limit
+    // (30/min) because metadata patches are smaller and fire more often.
+    const rl = await checkEndpointRateLimit(session.user.id, "execution-metadata-patch", 240, "1 m");
     if (!rl.success) {
       return NextResponse.json(
         formatErrorResponse({ title: "Too many requests", message: "Please try again in a moment.", code: "RATE_001" }),
