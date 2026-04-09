@@ -51,6 +51,22 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     const { id } = await params;
     const body = (await req.json().catch(() => ({}))) as Partial<ExecutionMetadata>;
 
+    // Defense in depth — regenerationCounts is server-managed only.
+    // /api/execute-node is the only path allowed to write this field.
+    // Accepting it here would let a malicious client reset their own
+    // counter via PATCH and bypass the regen cap entirely. Hard-reject
+    // (not silent-drop) so tampering attempts surface in logs.
+    if (Object.prototype.hasOwnProperty.call(body, "regenerationCounts")) {
+      return NextResponse.json(
+        formatErrorResponse({
+          title: "Forbidden field",
+          message: "regenerationCounts is server-managed and cannot be set via this endpoint.",
+          code: "VAL_001",
+        }),
+        { status: 400 },
+      );
+    }
+
     // Validate the body shape — only allow known metadata fields
     const patch: ExecutionMetadata = {};
     if (body.quantityOverrides && typeof body.quantityOverrides === "object") {
