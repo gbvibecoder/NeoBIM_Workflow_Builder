@@ -2,6 +2,7 @@
 
 import { create } from "zustand";
 import { useWorkflowStore } from "@/stores/workflow-store";
+import { MAX_REGENERATIONS } from "@/constants/limits";
 import type {
   Execution,
   ExecutionArtifact,
@@ -61,10 +62,21 @@ interface ExecutionState {
    *  persist round-trip. */
   hydrateVideoGenProgress: (progress: Record<string, VideoGenerationState>) => void;
 
-  // Regeneration
+  // Regeneration. The Zustand Map is a UX hint only — server-side enforcement
+  // lives in /api/execute-node. Both sides use MAX_REGENERATIONS from
+  // @/constants/limits as the single source of truth.
   incrementRegenCount: (tileInstanceId: string) => boolean; // returns false if at max
   getRegenRemaining: (tileInstanceId: string) => number;
   setRegeneratingNode: (nodeId: string | null) => void;
+  /** Roll back a local optimistic increment when the server rejects the
+   *  regen request (e.g., 429 REGEN_001 or any network failure during the
+   *  round-trip). Floors at 0 — never goes negative. */
+  decrementRegenCount: (tileInstanceId: string) => void;
+  /** Replace the in-memory regenerationCounts Map with the contents of an
+   *  ExecutionMetadata.regenerationCounts record loaded from the server.
+   *  Called once on canvas mount alongside the other hydrate actions so
+   *  the regen "X left" UI is correct after page reload. */
+  hydrateRegenerationCounts: (counts: Record<string, number>) => void;
 
   // History
   addToHistory: (execution: Execution) => void;
@@ -106,8 +118,6 @@ interface ExecutionState {
     completedAt?: string | null;
   }) => void;
 }
-
-const MAX_REGENERATIONS = 3;
 
 // ─── Execution metadata persistence (debounced, field-aware PATCH) ──────────
 // Both user BOQ quantity edits (quantityOverrides) and live video render
@@ -314,6 +324,26 @@ export const useExecutionStore = create<ExecutionState>()((set, get) => ({
   },
 
   setRegeneratingNode: (nodeId) => set({ regeneratingNodeId: nodeId }),
+
+  decrementRegenCount: (tileInstanceId) => {
+    const current = get().regenerationCounts.get(tileInstanceId) ?? 0;
+    if (current <= 0) return; // Floor at 0 — nothing to roll back
+    const newCounts = new Map(get().regenerationCounts);
+    newCounts.set(tileInstanceId, current - 1);
+    set({ regenerationCounts: newCounts });
+  },
+
+  hydrateRegenerationCounts: (counts) => {
+    // Convert the JSON record back to Map<string, number>. Defensive: skip
+    // entries with non-finite or non-integer values.
+    const newMap = new Map<string, number>();
+    for (const [tileId, val] of Object.entries(counts)) {
+      if (typeof val === "number" && Number.isInteger(val) && val >= 0) {
+        newMap.set(tileId, val);
+      }
+    }
+    set({ regenerationCounts: newMap });
+  },
 
   getArtifactForTile: (tileInstanceId) => {
     return get().artifacts.get(tileInstanceId);
