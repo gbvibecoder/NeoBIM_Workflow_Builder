@@ -10,20 +10,20 @@ import {
   ChevronUp, ChevronDown, ClipboardList, Send, Copy, Building2, Star,
   Film, Eye, Heart, Upload, Menu, X,
 } from "lucide-react";
-import { MiniWorkflowDiagram } from "@/components/shared/MiniWorkflowDiagram";
-import { PREBUILT_WORKFLOWS } from "@/constants/prebuilt-workflows";
+import { MiniWorkflowDiagram } from "@/features/workflows/components/MiniWorkflowDiagram";
+import { PREBUILT_WORKFLOWS } from "@/features/workflows/constants/prebuilt-workflows";
 import { useLocale } from '@/hooks/useLocale';
 import type { TranslationKey } from '@/lib/i18n';
 import { trackLead, trackViewContent } from '@/lib/meta-pixel';
-import { LanguageSwitcher } from '@/components/ui/LanguageSwitcher';
-import { PipelineSection } from '@/components/landing/PipelineSection';
-import { NewsletterSignup } from '@/components/landing/NewsletterSignup';
-import { TestimonialsSection } from '@/components/landing/TestimonialsSection';
-import { FAQSection } from '@/components/landing/FAQSection';
-import { HowItWorksSection } from '@/components/landing/HowItWorksSection';
-import { PricingSection } from '@/components/landing/PricingSection';
-import { LandingFooter } from '@/components/landing/LandingFooter';
-// import { ExitIntentModal } from '@/components/marketing/ExitIntentModal';
+import { LanguageSwitcher } from '@/shared/components/ui/LanguageSwitcher';
+import { PipelineSection } from '@/features/landing/components/PipelineSection';
+import { NewsletterSignup } from '@/features/landing/components/NewsletterSignup';
+import { TestimonialsSection } from '@/features/landing/components/TestimonialsSection';
+import { FAQSection } from '@/features/landing/components/FAQSection';
+import { HowItWorksSection } from '@/features/landing/components/HowItWorksSection';
+import { PricingSection } from '@/features/landing/components/PricingSection';
+import { LandingFooter } from '@/features/landing/components/LandingFooter';
+// import { ExitIntentModal } from '@/features/marketing/components/ExitIntentModal';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 

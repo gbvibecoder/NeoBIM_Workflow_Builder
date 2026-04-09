@@ -8,7 +8,7 @@ import { Mail, Lock, Chrome, Loader2, AlertCircle, Eye, EyeOff } from "lucide-re
 import { motion } from "framer-motion";
 import { validateEmail, validatePhone, normalizePhone } from "@/lib/form-validation";
 import { useLocale } from "@/hooks/useLocale";
-import { LanguageSwitcher } from "@/components/ui/LanguageSwitcher";
+import { LanguageSwitcher } from "@/shared/components/ui/LanguageSwitcher";
 import { trackLead } from "@/lib/meta-pixel";
 
 /** Returns "email" if input contains @, otherwise "phone" */

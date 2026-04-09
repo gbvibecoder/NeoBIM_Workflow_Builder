@@ -7,7 +7,7 @@ import Link from "next/link";
 import { Mail, Lock, User, Chrome, Loader2, Eye, EyeOff, Gift } from "lucide-react";
 import { motion } from "framer-motion";
 import { useLocale } from "@/hooks/useLocale";
-import { LanguageSwitcher } from "@/components/ui/LanguageSwitcher";
+import { LanguageSwitcher } from "@/shared/components/ui/LanguageSwitcher";
 import { trackCompleteRegistration, trackRegisterPageView } from "@/lib/meta-pixel";
 import { validateEmail, validatePhone, normalizePhone } from "@/lib/form-validation";
 

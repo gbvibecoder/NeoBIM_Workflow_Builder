@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parsePromptToStyle } from "@/services/prompt-style-parser";
+import { parsePromptToStyle } from "@/features/3d-render/services/prompt-style-parser";
 
 describe("parsePromptToStyle", () => {
   // ─── Material Detection ────────────────────────────────────────────────────

@@ -51,7 +51,7 @@ export const mockStripe = {
   },
 };
 
-vi.mock('@/lib/stripe', () => ({
+vi.mock('@/features/billing/lib/stripe', () => ({
   stripe: mockStripe,
   getPlanByPriceId: vi.fn((priceId) => {
     if (priceId === 'price_test_pro') return 'PRO';

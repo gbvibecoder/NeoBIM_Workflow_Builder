@@ -304,10 +304,10 @@ export const handleGN001: NodeHandler = async (ctx) => {
   if (!artifact && process.env.ENABLE_IMAGE_TO_3D_PIPELINE === "true" && process.env.OPENAI_API_KEY) {
     logger.debug("[GN-001] Trying Image-to-3D pipeline (DALL-E → SAM 3D) as fallback");
     try {
-      const { textTo3D } = await import("@/services/text-to-3d-service");
+      const { textTo3D } = await import("@/features/3d-render/services/text-to-3d-service");
       const img3dResult = await textTo3D({
         prompt: textContent || `${buildingType}, ${floors} floors`,
-        buildingDescription: rawData as unknown as import("@/services/openai").BuildingDescription | undefined,
+        buildingDescription: rawData as unknown as import("@/features/ai/services/openai").BuildingDescription | undefined,
         viewType: "exterior",
       });
 
@@ -383,9 +383,9 @@ export const handleGN001: NodeHandler = async (ctx) => {
 
     // ── AI Material Palette: Generate concept render + extract color palette ──
     let aiThumbnailUrl: string | null = null;
-    let aiPalette: Record<string, Partial<import("@/services/material-mapping").PBRMaterialDef>> | null = null;
+    let aiPalette: Record<string, Partial<import("@/features/3d-render/services/material-mapping").PBRMaterialDef>> | null = null;
     try {
-      const { generateAIMaterialPalette, paletteToMaterialOverrides } = await import("@/services/ai-material-palette");
+      const { generateAIMaterialPalette, paletteToMaterialOverrides } = await import("@/features/3d-render/services/ai-material-palette");
       const { palette, imageUrl } = await generateAIMaterialPalette(
         textContent || `${buildingType}, ${floors} floors`,
         buildingType,
@@ -401,7 +401,7 @@ export const handleGN001: NodeHandler = async (ctx) => {
     let assetUrls: { glbUrl: string; ifcUrl: string; metadataUrl: string } | null = null;
     try {
       // Dynamic imports to avoid DOM polyfill at module load time
-      const { generateGLB } = await import("@/services/glb-generator");
+      const { generateGLB } = await import("@/features/3d-render/services/glb-generator");
       const { uploadBuildingAssets, isR2Configured: checkR2 } = await import("@/lib/r2");
 
       const metadata = extractMetadata(geometry);

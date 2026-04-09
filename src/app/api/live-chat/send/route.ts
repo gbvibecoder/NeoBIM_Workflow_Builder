@@ -7,7 +7,7 @@ import { pusherTrigger } from "@/lib/pusher-server";
 import type {
   LiveChatMessage,
   AdminLiveChatConversation,
-} from "@/types/live-chat";
+} from "@/features/support/types/live-chat";
 
 const MAX_MESSAGE_LENGTH = 3000;
 const MAX_MESSAGES_PER_CONVERSATION = 200;

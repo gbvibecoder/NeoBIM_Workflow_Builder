@@ -6,7 +6,7 @@ import {
   generateSupportResponse,
   generateSubject,
   detectCategory,
-} from "@/services/support-chat-service";
+} from "@/features/support/services/support-chat-service";
 import type { SupportCategory } from "@/types/support";
 
 const MAX_MESSAGE_LENGTH = 3000;

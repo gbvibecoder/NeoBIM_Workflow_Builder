@@ -10,9 +10,9 @@ import {
 import { useLocale } from "@/hooks/useLocale";
 import dynamic from "next/dynamic";
 
-const SupportConversations = dynamic(() => import("@/components/admin/SupportConversations"), { ssr: false, loading: () => <div style={{ padding: 40, textAlign: "center", color: "#6B7280" }}>Loading conversations…</div> });
-const SupportAnalytics = dynamic(() => import("@/components/admin/SupportAnalytics"), { ssr: false, loading: () => <div style={{ padding: 40, textAlign: "center", color: "#6B7280" }}>Loading analytics…</div> });
-const SupportQuickReplies = dynamic(() => import("@/components/admin/SupportQuickReplies"), { ssr: false, loading: () => <div style={{ padding: 40, textAlign: "center", color: "#6B7280" }}>Loading quick replies…</div> });
+const SupportConversations = dynamic(() => import("@/features/admin/components/SupportConversations"), { ssr: false, loading: () => <div style={{ padding: 40, textAlign: "center", color: "#6B7280" }}>Loading conversations…</div> });
+const SupportAnalytics = dynamic(() => import("@/features/admin/components/SupportAnalytics"), { ssr: false, loading: () => <div style={{ padding: 40, textAlign: "center", color: "#6B7280" }}>Loading analytics…</div> });
+const SupportQuickReplies = dynamic(() => import("@/features/admin/components/SupportQuickReplies"), { ssr: false, loading: () => <div style={{ padding: 40, textAlign: "center", color: "#6B7280" }}>Loading quick replies…</div> });
 
 // ─── Types ──────────────────────────────────────────────────────────────
 type FeedbackType = "BUG" | "FEATURE" | "SUGGESTION";

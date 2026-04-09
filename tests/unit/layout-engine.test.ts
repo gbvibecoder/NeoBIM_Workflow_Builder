@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { layoutFloorPlan, layoutMultiFloor, scoreAdjacency, PlacedRoom } from "@/lib/floor-plan/layout-engine";
-import type { EnhancedRoomProgram, RoomSpec, AdjacencyRequirement } from "@/lib/floor-plan/ai-room-programmer";
+import { layoutFloorPlan, layoutMultiFloor, scoreAdjacency, PlacedRoom } from "@/features/floor-plan/lib/layout-engine";
+import type { EnhancedRoomProgram, RoomSpec, AdjacencyRequirement } from "@/features/floor-plan/lib/ai-room-programmer";
 
 // ── Helper to build a minimal EnhancedRoomProgram ────────────────────────────
 

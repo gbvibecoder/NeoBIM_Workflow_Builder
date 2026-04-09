@@ -4,7 +4,7 @@ import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { BarChart3, TrendingUp, CheckCircle2, XCircle, Clock, Workflow, ArrowRight, Activity } from "lucide-react";
-import { PageBackground } from "@/components/dashboard/PageBackground";
+import { PageBackground } from "@/features/dashboard/components/PageBackground";
 import { useLocale } from "@/hooks/useLocale";
 import dynamic from "next/dynamic";
 

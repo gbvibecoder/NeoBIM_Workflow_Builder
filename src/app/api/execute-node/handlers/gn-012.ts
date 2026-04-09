@@ -14,11 +14,11 @@ export const handleGN012: NodeHandler = async (ctx) => {
   // Stage 3: Architectural Detailing → walls, doors, windows (pipeline-adapter)
   // Falls back to adaptNodeInput() if AI generation fails entirely.
 
-  const { adaptNodeInput } = await import("@/lib/floor-plan/node-input-adapter");
-  const { convertGeometryToProject } = await import("@/lib/floor-plan/pipeline-adapter");
-  const { computeBOQQuantities, extractRoomSchedule, formatBOQForExporter, formatBOQAsTable } = await import("@/lib/floor-plan/node-output-adapter");
-  const { convertFloorPlanToMassing } = await import("@/lib/floor-plan/floorplan-to-massing");
-  const { exportFloorToSvg } = await import("@/lib/floor-plan/export-svg");
+  const { adaptNodeInput } = await import("@/features/floor-plan/lib/node-input-adapter");
+  const { convertGeometryToProject } = await import("@/features/floor-plan/lib/pipeline-adapter");
+  const { computeBOQQuantities, extractRoomSchedule, formatBOQForExporter, formatBOQAsTable } = await import("@/features/floor-plan/lib/node-output-adapter");
+  const { convertFloorPlanToMassing } = await import("@/features/floor-plan/lib/floorplan-to-massing");
+  const { exportFloorToSvg } = await import("@/features/floor-plan/lib/export-svg");
 
   // ── Extract text sources ──
   const originalPrompt = (typeof inputData?._originalPrompt === "string" ? inputData._originalPrompt : "")
@@ -42,8 +42,8 @@ export const handleGN012: NodeHandler = async (ctx) => {
         const promptForAI = originalPrompt || designBrief || "";
 
         // Stage 1: AI Room Programming (adjacency + zones)
-        const { programRooms, programRoomsFallback, programToDescription } = await import("@/lib/floor-plan/ai-room-programmer");
-        let roomProgram: import("@/lib/floor-plan/ai-room-programmer").EnhancedRoomProgram;
+        const { programRooms, programRoomsFallback, programToDescription } = await import("@/features/floor-plan/lib/ai-room-programmer");
+        let roomProgram: import("@/features/floor-plan/lib/ai-room-programmer").EnhancedRoomProgram;
         try {
           roomProgram = await programRooms(promptForAI, floorPlanApiKey);
         } catch (parseErr) {
@@ -57,8 +57,8 @@ export const handleGN012: NodeHandler = async (ctx) => {
 
         // Multi-floor: use BSP layout engine per floor (same as standalone API)
         if (roomProgram.numFloors > 1) {
-          const { layoutMultiFloor } = await import("@/lib/floor-plan/layout-engine");
-          const { convertMultiFloorToProject } = await import("@/lib/floor-plan/pipeline-adapter");
+          const { layoutMultiFloor } = await import("@/features/floor-plan/lib/layout-engine");
+          const { convertMultiFloorToProject } = await import("@/features/floor-plan/lib/pipeline-adapter");
           const multiFloor = layoutMultiFloor(roomProgram);
           logger.debug(`[GN-012][STAGE-2] Multi-floor: ${multiFloor.floors.reduce((s, f) => s + f.rooms.length, 0)} rooms placed`);
           project = convertMultiFloorToProject(multiFloor.floors, description.projectName, designBrief);
@@ -108,7 +108,7 @@ export const handleGN012: NodeHandler = async (ctx) => {
             bD = Math.round((fpArea / bW) * 10) / 10;
           }
 
-          const geometry: import("@/types/floor-plan").FloorPlanGeometry = {
+          const geometry: import("@/features/floor-plan/types/floor-plan").FloorPlanGeometry = {
             footprint: { width: bW, depth: bD },
             wallHeight: 3.0,
             walls: [], doors: [], windows: [],

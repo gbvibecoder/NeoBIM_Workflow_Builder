@@ -119,7 +119,7 @@ export const handleTR004: NodeHandler = async (ctx) => {
   if (!analysis.isFloorPlan && multiImages.length > 1) {
     try {
       logger.debug(`[TR-004] Multi-image: enhancing analysis with ${multiImages.length} photos`);
-      const { getClient } = await import("@/services/openai");
+      const { getClient } = await import("@/features/ai/services/openai");
       const multiClient = getClient(apiKey);
 
       // Build content blocks with ALL images
@@ -164,7 +164,7 @@ export const handleTR004: NodeHandler = async (ctx) => {
     let traceSucceeded = false;
     try {
       logger.debug("[TR-004] Starting Potrace + GPT-4o hybrid analysis...");
-      const { traceFloorPlanToSVG } = await import("@/services/floor-plan-tracer");
+      const { traceFloorPlanToSVG } = await import("@/features/floor-plan/services/floor-plan-tracer");
       const imageBuffer = Buffer.from(base64Data as string, "base64");
       const trace = await traceFloorPlanToSVG(imageBuffer);
 
@@ -180,7 +180,7 @@ export const handleTR004: NodeHandler = async (ctx) => {
 
       if (trace.enclosedRegions.length >= 1) {
         // GPT-4o labels the rooms Potrace found
-        const { labelFloorPlanRooms } = await import("@/services/openai");
+        const { labelFloorPlanRooms } = await import("@/features/ai/services/openai");
         const labels = await labelFloorPlanRooms(
           base64Data as string,
           typeof mimeType === "string" ? mimeType : "image/jpeg",
@@ -258,7 +258,7 @@ export const handleTR004: NodeHandler = async (ctx) => {
     // ── FALLBACK: Sharp pixel detection + GPT-4o labeling ──
     if (!traceSucceeded) {
       try {
-        const { detectFloorPlanGeometry } = await import("@/services/floor-plan-detector");
+        const { detectFloorPlanGeometry } = await import("@/features/floor-plan/services/floor-plan-detector");
         const sharpResult = await detectFloorPlanGeometry(
           base64Data as string,
           typeof mimeType === "string" ? mimeType : "image/jpeg",
@@ -277,7 +277,7 @@ export const handleTR004: NodeHandler = async (ctx) => {
           && sharpResult.geometry.rooms.length >= 2;
 
         if (useSharp) {
-          const { labelDetectedRooms } = await import("@/services/openai");
+          const { labelDetectedRooms } = await import("@/features/ai/services/openai");
           const labels = await labelDetectedRooms({
             roomCenters: sharpResult.geometry.rooms.map(r => ({
               center: r.center,
@@ -293,7 +293,7 @@ export const handleTR004: NodeHandler = async (ctx) => {
             return {
               ...room,
               name: label?.name ?? room.name,
-              type: (label?.type ?? room.type) as import("@/types/floor-plan").FloorPlanRoomType,
+              type: (label?.type ?? room.type) as import("@/features/floor-plan/types/floor-plan").FloorPlanRoomType,
               width: label?.refinedWidth ?? room.width,
               depth: label?.refinedDepth ?? room.depth,
             };

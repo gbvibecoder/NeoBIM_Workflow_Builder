@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
-import { stripe } from '@/lib/stripe';
+import { stripe } from '@/features/billing/lib/stripe';
 import { prisma } from '@/lib/db';
 import { checkEndpointRateLimit } from '@/lib/rate-limit';
 import { formatErrorResponse, UserErrors } from '@/lib/user-errors';

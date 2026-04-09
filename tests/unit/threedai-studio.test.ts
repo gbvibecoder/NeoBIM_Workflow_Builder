@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { buildPrompt, calculateKPIs, type BuildingRequirements } from "@/services/threedai-studio";
+import { buildPrompt, calculateKPIs, type BuildingRequirements } from "@/features/3d-render/services/threedai-studio";
 
 // ─── Prompt Generation ──────────────────────────────────────────────────────
 

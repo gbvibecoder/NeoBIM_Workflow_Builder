@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/db';
-import { stripe, isSubscriptionActive, getPlanByPriceId } from '@/lib/stripe';
+import { stripe, isSubscriptionActive, getPlanByPriceId } from '@/features/billing/lib/stripe';
 import { checkEndpointRateLimit } from "@/lib/rate-limit";
 import { formatErrorResponse, UserErrors } from "@/lib/user-errors";
 

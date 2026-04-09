@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { isPlatformAdmin } from "@/lib/platform-admin";
-import type { LiveChatMessage } from "@/types/live-chat";
+import type { LiveChatMessage } from "@/features/support/types/live-chat";
 
 export async function GET(
   _req: Request,

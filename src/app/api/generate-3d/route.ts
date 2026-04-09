@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { convertImageTo3D, getConcurrencyInfo } from "@/services/sam3d-service";
+import { convertImageTo3D, getConcurrencyInfo } from "@/features/3d-render/services/sam3d-service";
 import { generateId } from "@/lib/utils";
 import type { ExecutionArtifact } from "@/types/execution";
 import { checkRateLimit, logRateLimitHit } from "@/lib/rate-limit";

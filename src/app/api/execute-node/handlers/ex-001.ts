@@ -168,7 +168,7 @@ export const handleEX001: NodeHandler = async (ctx) => {
   }> = [];
 
   try {
-    const { generateIFCViaService } = await import("@/services/ifc-service-client");
+    const { generateIFCViaService } = await import("@/features/ifc/services/ifc-service-client");
     const serviceResult = await generateIFCViaService(
       resolvedGeometry,
       { projectName: resolvedProjectName, buildingName: resolvedBuildingType },
@@ -198,7 +198,7 @@ export const handleEX001: NodeHandler = async (ctx) => {
 
   // ── Fallback: TypeScript IFC exporter ──
   if (!ifcServiceUsed) {
-    const { generateMultipleIFCFiles: genMulti } = await import("@/services/ifc-exporter");
+    const { generateMultipleIFCFiles: genMulti } = await import("@/features/ifc/services/ifc-exporter");
     const ifcFiles = genMulti(resolvedGeometry, {
       projectName: resolvedProjectName, buildingName: resolvedBuildingType,
     });

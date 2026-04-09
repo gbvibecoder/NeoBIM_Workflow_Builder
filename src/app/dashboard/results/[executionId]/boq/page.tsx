@@ -2,9 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { useExecutionStore } from "@/stores/execution-store";
-import { BOQVisualizerPage, parseArtifactToBOQ, getMockBOQData } from "@/components/boq-visualizer";
-import type { BOQData } from "@/components/boq-visualizer";
+import { useExecutionStore } from "@/features/execution/stores/execution-store";
+import { BOQVisualizerPage, parseArtifactToBOQ, getMockBOQData } from "@/features/boq/components";
+import type { BOQData } from "@/features/boq/components";
 
 export default function BOQVisualizerRoute() {
   const params = useParams<{ executionId: string }>();

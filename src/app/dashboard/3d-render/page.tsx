@@ -3,7 +3,7 @@
 import dynamic from "next/dynamic";
 
 const VideoRenderStudio = dynamic(
-  () => import("@/components/dashboard/VideoRenderStudio"),
+  () => import("@/features/dashboard/components/VideoRenderStudio"),
   {
     ssr: false,
     loading: () => (

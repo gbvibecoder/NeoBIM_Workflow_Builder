@@ -1,11 +1,11 @@
 import React from "react";
-import { Sidebar } from "@/components/dashboard/Sidebar";
-import { Header } from "@/components/dashboard/Header";
-import { ErrorBoundary } from "@/components/ErrorBoundary";
-import { CommandPaletteLoader } from "@/components/ui/CommandPaletteLoader";
-import { OnboardingModal } from "@/components/dashboard/OnboardingModal";
-import { PendingReferralClaimer } from "@/components/referral/PendingReferralClaimer";
-import { SupportChatLoader } from "@/components/support/SupportChatLoader";
+import { Sidebar } from "@/features/dashboard/components/Sidebar";
+import { Header } from "@/features/dashboard/components/Header";
+import { ErrorBoundary } from "@/shared/components/ErrorBoundary";
+import { CommandPaletteLoader } from "@/shared/components/ui/CommandPaletteLoader";
+import { OnboardingModal } from "@/features/onboarding/components/OnboardingModal";
+import { PendingReferralClaimer } from "@/features/referral/components/PendingReferralClaimer";
+import { SupportChatLoader } from "@/features/support/components/SupportChatLoader";
 
 export default function DashboardLayout({
   children,

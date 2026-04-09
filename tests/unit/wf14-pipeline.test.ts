@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { generateMassingGeometry } from "@/services/massing-generator";
-import { generateIFCFile } from "@/services/ifc-exporter";
-import { PREBUILT_WORKFLOWS } from "@/constants/prebuilt-workflows";
+import { generateMassingGeometry } from "@/features/3d-render/services/massing-generator";
+import { generateIFCFile } from "@/features/ifc/services/ifc-exporter";
+import { PREBUILT_WORKFLOWS } from "@/features/workflows/constants/prebuilt-workflows";
 
 /**
  * Tests for wf-08: "Detailed PDF → 3D Video Walkthrough" pipeline.

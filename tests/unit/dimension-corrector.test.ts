@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { correctDimensions, RoomWithTarget } from "@/lib/floor-plan/dimension-corrector";
+import { correctDimensions, RoomWithTarget } from "@/features/floor-plan/lib/dimension-corrector";
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 

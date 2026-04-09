@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { isPlatformAdmin } from "@/lib/platform-admin";
-import AdminLiveChatLayout from "@/components/admin/live-chat/AdminLiveChatLayout";
+import AdminLiveChatLayout from "@/features/support/components/AdminLiveChatLayout";
 
 export const dynamic = "force-dynamic";
 

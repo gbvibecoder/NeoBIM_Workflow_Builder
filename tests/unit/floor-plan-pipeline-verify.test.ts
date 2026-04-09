@@ -6,9 +6,9 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { layoutFloorPlan, layoutMultiFloor } from "@/lib/floor-plan/layout-engine";
-import type { PlacedRoom } from "@/lib/floor-plan/layout-engine";
-import type { EnhancedRoomProgram, RoomSpec, AdjacencyRequirement } from "@/lib/floor-plan/ai-room-programmer";
+import { layoutFloorPlan, layoutMultiFloor } from "@/features/floor-plan/lib/layout-engine";
+import type { PlacedRoom } from "@/features/floor-plan/lib/layout-engine";
+import type { EnhancedRoomProgram, RoomSpec, AdjacencyRequirement } from "@/features/floor-plan/lib/ai-room-programmer";
 
 // ── Helpers ─────────────────────────────────────────────────
 

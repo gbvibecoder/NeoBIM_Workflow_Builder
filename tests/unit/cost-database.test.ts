@@ -9,7 +9,7 @@ import {
   calculateEscalation,
   calculateLineItemCost,
   CONCRETE_RATES,
-} from "@/lib/cost-database";
+} from "@/features/boq/lib/cost-database";
 
 describe("Cost Database — Waste Factors", () => {
   it("should return correct waste factor for Concrete (7%)", () => {

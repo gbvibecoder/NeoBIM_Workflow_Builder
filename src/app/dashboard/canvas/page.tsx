@@ -3,7 +3,7 @@
 import dynamic from "next/dynamic";
 import { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
-import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { ErrorBoundary } from "@/shared/components/ErrorBoundary";
 
 // ─── Skeleton Canvas Loading Screen ──────────────────────────────
 function CanvasSkeletonLoader() {
@@ -263,7 +263,7 @@ function CanvasSkeletonLoader() {
 // ─── Lazy Load Heavy Canvas Component ─────────────────────────────
 // @xyflow/react is 260KB - only load when user navigates to canvas
 const WorkflowCanvas = dynamic(
-  () => import("@/components/canvas/WorkflowCanvas").then((m) => ({ default: m.WorkflowCanvas })),
+  () => import("@/features/canvas/components/WorkflowCanvas").then((m) => ({ default: m.WorkflowCanvas })),
   {
     ssr: false,
     loading: () => <CanvasSkeletonLoader />,

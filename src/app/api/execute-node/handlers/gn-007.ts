@@ -25,7 +25,7 @@ export const handleGN007: NodeHandler = async (ctx) => {
     );
   }
 
-  const { convertImageTo3D } = await import("@/services/sam3d-service");
+  const { convertImageTo3D } = await import("@/features/3d-render/services/sam3d-service");
 
   let resolvedUrl = imageUrl;
   if (!resolvedUrl && imageBase64) {

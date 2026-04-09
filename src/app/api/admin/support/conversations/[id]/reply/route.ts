@@ -3,7 +3,7 @@ import { prisma } from "@/lib/db";
 import { getAdminSession, unauthorizedResponse, logAudit } from "@/lib/admin-server";
 import { checkEndpointRateLimit } from "@/lib/rate-limit";
 import type { AuditAction } from "@/lib/admin-server";
-import { sendSupportAdminReplyEmail } from "@/services/email";
+import { sendSupportAdminReplyEmail } from "@/shared/services/email";
 
 export async function POST(
   req: Request,

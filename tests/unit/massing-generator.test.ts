@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { generateMassingGeometry } from "@/services/massing-generator";
+import { generateMassingGeometry } from "@/features/3d-render/services/massing-generator";
 
 describe("Massing Generator", () => {
   describe("Basic geometry generation", () => {
