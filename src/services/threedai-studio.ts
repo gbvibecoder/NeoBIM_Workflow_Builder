@@ -7,6 +7,8 @@
  * Flow: Build prompt from building requirements → POST task → Poll → Download GLB
  */
 
+import { logger } from "@/lib/logger";
+
 // ─── Types ──────────────────────────────────────────────────────────────────────
 
 export interface BuildingRequirements {
@@ -590,8 +592,8 @@ export async function generate3DModel(
   const { prompt, negativePrompt, template } = buildPrompt(requirements);
   const startTime = Date.now();
 
-  console.log(`[3DAI] Prompt template: ${template}`);
-  console.log(`[3DAI] Prompt (${prompt.length} chars): ${prompt}`);
+  logger.debug(`[3DAI] Prompt template: ${template}`);
+  logger.debug(`[3DAI] Prompt (${prompt.length} chars): ${prompt}`);
 
   // Step 1: Create generation task (use Hunyuan 3D 3.5 for best quality + direct GLB)
   const createRes = await fetchWithRetry(`${API_BASE}${GENERATE_ENDPOINT}`, {
@@ -618,7 +620,7 @@ export async function generate3DModel(
   }
 
   const createData: TaskCreateResponse = await createRes.json();
-  console.log("[3DAI] Create task response:", JSON.stringify(createData, null, 2));
+  logger.debug("[3DAI] Create task response:", JSON.stringify(createData, null, 2));
   const taskId = createData.task_id ?? createData.id;
 
   if (!taskId) {
@@ -649,10 +651,10 @@ export async function generate3DModel(
 
     const pollData: TaskStatusResponse = await pollRes.json();
     const status = pollData.status?.toUpperCase() ?? "UNKNOWN";
-    console.log(`[3DAI] Poll #${pollAttempts}: status=${status}`);
+    logger.debug(`[3DAI] Poll #${pollAttempts}: status=${status}`);
 
     if (status === "FINISHED" || status === "COMPLETED" || status === "SUCCEEDED") {
-      console.log("[3DAI] Task finished. Full response:", JSON.stringify(pollData, null, 2));
+      logger.debug("[3DAI] Task finished. Full response:", JSON.stringify(pollData, null, 2));
       let assetUrl = extractAssetUrl(pollData);
 
       // The API sometimes returns FINISHED with asset=null on the first poll.
@@ -667,10 +669,10 @@ export async function generate3DModel(
           });
           if (retryRes.ok) {
             const retryData: TaskStatusResponse = await retryRes.json();
-            console.log(`[3DAI] Retry ${retry + 1} response:`, JSON.stringify(retryData, null, 2));
+            logger.debug(`[3DAI] Retry ${retry + 1} response:`, JSON.stringify(retryData, null, 2));
             assetUrl = extractAssetUrl(retryData);
             if (assetUrl) {
-              console.log("[3DAI] Asset URL found on retry:", assetUrl);
+              logger.debug("[3DAI] Asset URL found on retry:", assetUrl);
               break;
             }
           }
@@ -682,18 +684,18 @@ export async function generate3DModel(
         throw new Error("Task finished but no asset URL found after multiple polls. Response: " + JSON.stringify(pollData));
       }
 
-      console.log("[3DAI] Asset URL found:", assetUrl);
+      logger.debug("[3DAI] Asset URL found:", assetUrl);
 
       // Hunyuan 3D 3.5 returns GLB directly; older versions return ZIP (OBJ+textures).
       // If the asset is already GLB, skip conversion and re-upload directly.
       let glbUrl: string;
       const assetLower = assetUrl.toLowerCase();
       if (assetLower.endsWith(".glb") || assetLower.includes(".glb?") || assetLower.includes("format=glb")) {
-        console.log("[3DAI] Asset is already GLB, skipping conversion");
+        logger.debug("[3DAI] Asset is already GLB, skipping conversion");
         glbUrl = await reuploadToR2(assetUrl);
       } else {
         // Legacy: ZIP/OBJ archive — convert to GLB using the API's convert endpoint
-        console.log("[3DAI] Asset is archive, converting to GLB...");
+        logger.debug("[3DAI] Asset is archive, converting to GLB...");
         glbUrl = await convertToGlb(assetUrl, apiKey);
       }
 
