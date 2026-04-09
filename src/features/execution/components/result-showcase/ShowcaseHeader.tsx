@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
 import { motion } from "framer-motion";
 import { CheckCircle2, ArrowLeft } from "lucide-react";
 import { useLocale } from "@/hooks/useLocale";
-import { COLORS } from "@/components/canvas/result-showcase/constants";
+import { COLORS } from "@/features/execution/components/result-showcase/constants";
 
 interface ShowcaseHeaderProps {
   projectTitle: string;

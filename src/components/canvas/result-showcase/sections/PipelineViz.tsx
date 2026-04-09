@@ -3,8 +3,8 @@
 import { motion } from "framer-motion";
 import { CheckCircle2, XCircle, Loader2 } from "lucide-react";
 import { useLocale } from "@/hooks/useLocale";
-import { COLORS, CATEGORY_COLORS } from "@/components/canvas/result-showcase/constants";
-import type { PipelineStep } from "@/components/canvas/result-showcase/useShowcaseData";
+import { COLORS, CATEGORY_COLORS } from "@/features/execution/components/result-showcase/constants";
+import type { PipelineStep } from "@/features/execution/components/result-showcase/useShowcaseData";
 
 interface PipelineVizProps {
   steps: PipelineStep[];

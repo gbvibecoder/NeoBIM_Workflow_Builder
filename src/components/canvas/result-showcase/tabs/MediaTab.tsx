@@ -7,8 +7,8 @@ import { Maximize2, X, Download, ExternalLink, Loader2, ArrowLeft, Video, Sparkl
 import { toast } from "sonner";
 import { useLocale } from "@/hooks/useLocale";
 import { useExecutionStore } from "@/features/execution/stores/execution-store";
-import { COLORS } from "@/components/canvas/result-showcase/constants";
-import type { ShowcaseData } from "@/components/canvas/result-showcase/useShowcaseData";
+import { COLORS } from "@/features/execution/components/result-showcase/constants";
+import type { ShowcaseData } from "@/features/execution/components/result-showcase/useShowcaseData";
 
 interface MediaTabProps {
   data: ShowcaseData;

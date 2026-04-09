@@ -29,7 +29,7 @@ import {
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { useLocale } from "@/hooks/useLocale";
-import { COLORS } from "@/components/canvas/result-showcase/constants";
+import { COLORS } from "@/features/execution/components/result-showcase/constants";
 
 const FloorPlanViewer = dynamic(
   () => import("@/features/floor-plan/components/FloorPlanViewer").then(m => ({ default: m.FloorPlanViewer })),
@@ -38,11 +38,11 @@ const FloorPlanViewer = dynamic(
 import { HeroSection } from "@/components/canvas/result-showcase/sections/HeroSection";
 import { KpiStrip } from "@/components/canvas/result-showcase/sections/KpiStrip";
 import { PipelineViz } from "@/components/canvas/result-showcase/sections/PipelineViz";
-import { AnimatedNumber } from "@/components/canvas/result-showcase/sections/AnimatedNumber";
-import { useHeroDetection } from "@/components/canvas/result-showcase/useHeroDetection";
-import type { ShowcaseData } from "@/components/canvas/result-showcase/useShowcaseData";
-import type { TabId } from "@/components/canvas/result-showcase/constants";
-import type { HeroType, InsightMetric, FloorPlanMeta, RoomInfo } from "@/components/canvas/result-showcase/useHeroDetection";
+import { AnimatedNumber } from "@/features/execution/components/result-showcase/sections/AnimatedNumber";
+import { useHeroDetection } from "@/features/execution/components/result-showcase/useHeroDetection";
+import type { ShowcaseData } from "@/features/execution/components/result-showcase/useShowcaseData";
+import type { TabId } from "@/features/execution/components/result-showcase/constants";
+import type { HeroType, InsightMetric, FloorPlanMeta, RoomInfo } from "@/features/execution/components/result-showcase/useHeroDetection";
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 

@@ -4,7 +4,7 @@ import { useMemo } from "react";
 import { useExecutionStore } from "@/features/execution/stores/execution-store";
 import { useWorkflowStore } from "@/stores/workflow-store";
 import type { ExecutionArtifact } from "@/types/execution";
-import type { TabId } from "@/components/canvas/result-showcase/constants";
+import type { TabId } from "@/features/execution/components/result-showcase/constants";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 

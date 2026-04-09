@@ -5,8 +5,8 @@ import DOMPurify from "dompurify";
 import { motion } from "framer-motion";
 import dynamic from "next/dynamic";
 import { useLocale } from "@/hooks/useLocale";
-import { COLORS } from "@/components/canvas/result-showcase/constants";
-import type { ShowcaseData, ProceduralModelData, GlbModelData, HtmlIframeModelData, FloorPlanInteractiveData } from "@/components/canvas/result-showcase/useShowcaseData";
+import { COLORS } from "@/features/execution/components/result-showcase/constants";
+import type { ShowcaseData, ProceduralModelData, GlbModelData, HtmlIframeModelData, FloorPlanInteractiveData } from "@/features/execution/components/result-showcase/useShowcaseData";
 import type { FloorPlanGeometry, FloorPlanRoom } from "@/features/floor-plan/types/floor-plan";
 
 const ArchitecturalViewer = dynamic(

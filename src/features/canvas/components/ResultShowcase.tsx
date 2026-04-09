@@ -1,1 +1,1 @@
-export { ResultShowcase } from "@/components/canvas/result-showcase";
+export { ResultShowcase } from "@/features/execution/components/result-showcase";

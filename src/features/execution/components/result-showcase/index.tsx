@@ -10,10 +10,10 @@ import { generateId } from "@/lib/utils";
 import { logger } from "@/lib/logger";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import type { ExecutionArtifact } from "@/types/execution";
-import { useShowcaseData } from "@/components/canvas/result-showcase/useShowcaseData";
+import { useShowcaseData } from "@/features/execution/components/result-showcase/useShowcaseData";
 import { ShowcaseHeader } from "@/features/execution/components/result-showcase/ShowcaseHeader";
 import { TabBar } from "@/features/execution/components/result-showcase/TabBar";
-import { COLORS, type TabId } from "@/components/canvas/result-showcase/constants";
+import { COLORS, type TabId } from "@/features/execution/components/result-showcase/constants";
 
 import { OverviewTab } from "@/components/canvas/result-showcase/tabs/OverviewTab";
 import { MediaTab } from "@/components/canvas/result-showcase/tabs/MediaTab";
