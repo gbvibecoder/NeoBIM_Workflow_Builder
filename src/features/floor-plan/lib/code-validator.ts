@@ -7,7 +7,7 @@
  */
 
 import type { Floor, Room, Door, CadWindow, Stair, Wall } from "@/types/floor-plan-cad";
-import { polygonBounds, polygonCentroid, wallLength, lineDirection, addPoints, scalePoint } from "@/lib/floor-plan/geometry";
+import { polygonBounds, polygonCentroid, wallLength, lineDirection, addPoints, scalePoint } from "@/features/floor-plan/lib/geometry";
 import {
   ALL_BUILDING_CODE_RULES,
   CODE_CATEGORY_LABELS,

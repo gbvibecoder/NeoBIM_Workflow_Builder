@@ -3,7 +3,7 @@
 import React, { useMemo } from "react";
 import { Line as KLine, Rect, Circle, Group, Text } from "react-konva";
 import type { Floor, Point, Wall, Door, CadWindow, Room } from "@/types/floor-plan-cad";
-import type { Viewport } from "@/lib/floor-plan/geometry";
+import type { Viewport } from "@/features/floor-plan/lib/geometry";
 import {
   worldToScreen,
   wallToRectangle,
@@ -13,7 +13,7 @@ import {
   scalePoint,
   midpoint,
   polygonBounds,
-} from "@/lib/floor-plan/geometry";
+} from "@/features/floor-plan/lib/geometry";
 
 interface SelectionRendererProps {
   selectedIds: string[];

@@ -5,8 +5,8 @@ import { Line as KLine, Shape } from "react-konva";
 import type { Context } from "konva/lib/Context";
 import type { Shape as KonvaShape } from "konva/lib/Shape";
 import type { Wall, ViewMode } from "@/types/floor-plan-cad";
-import type { Viewport } from "@/lib/floor-plan/geometry";
-import { wallToRectangle, worldToScreen } from "@/lib/floor-plan/geometry";
+import type { Viewport } from "@/features/floor-plan/lib/geometry";
+import { wallToRectangle, worldToScreen } from "@/features/floor-plan/lib/geometry";
 import { lw, computeHatchSegments } from "@/lib/floor-plan/line-weights";
 
 interface WallRendererProps {

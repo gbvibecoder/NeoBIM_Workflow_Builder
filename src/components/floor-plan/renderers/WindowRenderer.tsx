@@ -3,7 +3,7 @@
 import React, { useMemo } from "react";
 import { Line as KLine, Group } from "react-konva";
 import type { CadWindow, Wall, ViewMode } from "@/types/floor-plan-cad";
-import type { Viewport } from "@/lib/floor-plan/geometry";
+import type { Viewport } from "@/features/floor-plan/lib/geometry";
 import {
   worldToScreen,
   worldToScreenDistance,
@@ -12,7 +12,7 @@ import {
   addPoints,
   scalePoint,
   midpoint,
-} from "@/lib/floor-plan/geometry";
+} from "@/features/floor-plan/lib/geometry";
 import { lw } from "@/lib/floor-plan/line-weights";
 
 interface WindowRendererProps {

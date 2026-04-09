@@ -18,7 +18,7 @@ import type {
   Point,
 } from "@/types/floor-plan-cad";
 import { DEFAULT_LAYERS } from "@/types/floor-plan-cad";
-import { floorBounds, zoomToFit, distance, wallLength, type Viewport } from "@/lib/floor-plan/geometry";
+import { floorBounds, zoomToFit, distance, wallLength, type Viewport } from "@/features/floor-plan/lib/geometry";
 import type { SnapResult } from "@/lib/floor-plan/snap-engine";
 import type { HandleType } from "@/lib/floor-plan/hit-detection";
 import { findConnectedWalls } from "@/lib/floor-plan/hit-detection";
@@ -1496,7 +1496,7 @@ export const useFloorPlanStore = create<FloorPlanState>()((set, get) => ({
     s.pushHistory();
 
     try {
-      const { layoutRoomFurniture } = await import("@/lib/floor-plan/furniture-layout");
+      const { layoutRoomFurniture } = await import("@/features/floor-plan/lib/furniture-layout");
       const room = floor.rooms.find((r) => r.id === roomId);
       if (!room) return;
 
@@ -1528,7 +1528,7 @@ export const useFloorPlanStore = create<FloorPlanState>()((set, get) => ({
     s.pushHistory();
 
     try {
-      const { layoutAllFurniture } = await import("@/lib/floor-plan/furniture-layout");
+      const { layoutAllFurniture } = await import("@/features/floor-plan/lib/furniture-layout");
       const result = layoutAllFurniture(floor);
 
       set({

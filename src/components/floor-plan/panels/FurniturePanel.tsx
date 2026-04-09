@@ -7,7 +7,7 @@ import {
   getCatalogByCategory,
   searchCatalog,
   type FurnitureCategory,
-} from "@/lib/floor-plan/furniture-catalog";
+} from "@/features/floor-plan/lib/furniture-catalog";
 import type { CatalogItem } from "@/types/floor-plan-cad";
 
 export function FurniturePanel() {

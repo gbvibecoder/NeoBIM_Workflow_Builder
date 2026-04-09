@@ -17,8 +17,8 @@ export const handleGN012: NodeHandler = async (ctx) => {
   const { adaptNodeInput } = await import("@/lib/floor-plan/node-input-adapter");
   const { convertGeometryToProject } = await import("@/lib/floor-plan/pipeline-adapter");
   const { computeBOQQuantities, extractRoomSchedule, formatBOQForExporter, formatBOQAsTable } = await import("@/lib/floor-plan/node-output-adapter");
-  const { convertFloorPlanToMassing } = await import("@/lib/floor-plan/floorplan-to-massing");
-  const { exportFloorToSvg } = await import("@/lib/floor-plan/export-svg");
+  const { convertFloorPlanToMassing } = await import("@/features/floor-plan/lib/floorplan-to-massing");
+  const { exportFloorToSvg } = await import("@/features/floor-plan/lib/export-svg");
 
   // ── Extract text sources ──
   const originalPrompt = (typeof inputData?._originalPrompt === "string" ? inputData._originalPrompt : "")

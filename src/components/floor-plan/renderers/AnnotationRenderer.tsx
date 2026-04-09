@@ -3,8 +3,8 @@
 import React from "react";
 import { Group, Text, Line as KLine, Circle } from "react-konva";
 import type { Annotation, Point } from "@/types/floor-plan-cad";
-import type { Viewport } from "@/lib/floor-plan/geometry";
-import { worldToScreen } from "@/lib/floor-plan/geometry";
+import type { Viewport } from "@/features/floor-plan/lib/geometry";
+import { worldToScreen } from "@/features/floor-plan/lib/geometry";
 import { lw } from "@/lib/floor-plan/line-weights";
 
 interface AnnotationRendererProps {

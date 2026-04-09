@@ -3,7 +3,7 @@
 import React, { useMemo } from "react";
 import { Line as KLine, Text, Group } from "react-konva";
 import type { Room, Wall, Door, CadWindow } from "@/types/floor-plan-cad";
-import type { Viewport } from "@/lib/floor-plan/geometry";
+import type { Viewport } from "@/features/floor-plan/lib/geometry";
 import {
   worldToScreen,
   worldToScreenDistance,
@@ -14,7 +14,7 @@ import {
   perpendicularLeft,
   addPoints,
   scalePoint,
-} from "@/lib/floor-plan/geometry";
+} from "@/features/floor-plan/lib/geometry";
 import { formatDimension } from "@/lib/floor-plan/unit-conversion";
 import type { DisplayUnit } from "@/lib/floor-plan/unit-conversion";
 import { lw } from "@/lib/floor-plan/line-weights";

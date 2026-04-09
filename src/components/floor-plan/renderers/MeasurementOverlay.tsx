@@ -3,9 +3,9 @@
 import React from "react";
 import { Line as KLine, Text, Circle, Group, Rect } from "react-konva";
 import { useFloorPlanStore } from "@/stores/floor-plan-store";
-import type { Viewport } from "@/lib/floor-plan/geometry";
+import type { Viewport } from "@/features/floor-plan/lib/geometry";
 import type { Point } from "@/types/floor-plan-cad";
-import { worldToScreen, distance } from "@/lib/floor-plan/geometry";
+import { worldToScreen, distance } from "@/features/floor-plan/lib/geometry";
 import { formatDimension } from "@/lib/floor-plan/unit-conversion";
 
 interface MeasurementOverlayProps {

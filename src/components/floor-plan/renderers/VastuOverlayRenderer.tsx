@@ -5,8 +5,8 @@ import { Group, Rect, Text, Line, Circle } from "react-konva";
 import { useFloorPlanStore } from "@/stores/floor-plan-store";
 import { analyzeVastuCompliance } from "@/lib/floor-plan/vastu-analyzer";
 import { DIRECTION_LABELS, type VastuDirection } from "@/lib/floor-plan/vastu-rules";
-import { worldToScreen, worldToScreenDistance } from "@/lib/floor-plan/geometry";
-import type { Viewport } from "@/lib/floor-plan/geometry";
+import { worldToScreen, worldToScreenDistance } from "@/features/floor-plan/lib/geometry";
+import type { Viewport } from "@/features/floor-plan/lib/geometry";
 
 interface Props {
   viewport: Viewport;

@@ -2,7 +2,7 @@
 
 import React, { useMemo } from "react";
 import { Group, Rect, Line as KLine, Text } from "react-konva";
-import type { Viewport } from "@/lib/floor-plan/geometry";
+import type { Viewport } from "@/features/floor-plan/lib/geometry";
 import type { DisplayUnit } from "@/lib/floor-plan/unit-conversion";
 import { formatDimension } from "@/lib/floor-plan/unit-conversion";
 

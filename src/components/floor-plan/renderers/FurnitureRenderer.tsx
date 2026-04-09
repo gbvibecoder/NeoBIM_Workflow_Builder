@@ -3,9 +3,9 @@
 import React from "react";
 import { Group, Rect, Line, Text } from "react-konva";
 import type { FurnitureInstance, Floor, Point } from "@/types/floor-plan-cad";
-import type { Viewport } from "@/lib/floor-plan/geometry";
-import { worldToScreen } from "@/lib/floor-plan/geometry";
-import { getCatalogItem } from "@/lib/floor-plan/furniture-catalog";
+import type { Viewport } from "@/features/floor-plan/lib/geometry";
+import { worldToScreen } from "@/features/floor-plan/lib/geometry";
+import { getCatalogItem } from "@/features/floor-plan/lib/furniture-catalog";
 import { lw } from "@/lib/floor-plan/line-weights";
 
 interface FurnitureRendererProps {

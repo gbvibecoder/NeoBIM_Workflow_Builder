@@ -2,8 +2,8 @@
 
 import React, { useMemo } from "react";
 import { Line, Text } from "react-konva";
-import type { Viewport } from "@/lib/floor-plan/geometry";
-import { worldToScreen, worldToScreenDistance } from "@/lib/floor-plan/geometry";
+import type { Viewport } from "@/features/floor-plan/lib/geometry";
+import { worldToScreen, worldToScreenDistance } from "@/features/floor-plan/lib/geometry";
 import type { ViewMode } from "@/types/floor-plan-cad";
 import { lw } from "@/lib/floor-plan/line-weights";
 

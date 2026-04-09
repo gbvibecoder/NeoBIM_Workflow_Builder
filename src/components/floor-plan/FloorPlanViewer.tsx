@@ -22,7 +22,7 @@ import { getProjectIndex, importProjectFile } from "@/lib/floor-plan/project-per
 import { getSampleProjectForPrompt } from "@/lib/floor-plan/sample-layouts";
 import { FloorPlanErrorBoundary } from "./ErrorBoundary";
 import { displayToMm, formatDimension, type DisplayUnit } from "@/lib/floor-plan/unit-conversion";
-import { worldToScreen, screenToWorld } from "@/lib/floor-plan/geometry";
+import { worldToScreen, screenToWorld } from "@/features/floor-plan/lib/geometry";
 
 interface FloorPlanViewerProps {
   /** Pre-loaded geometry from pipeline (e.g. navigated from result showcase) */

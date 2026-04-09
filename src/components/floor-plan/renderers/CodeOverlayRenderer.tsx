@@ -3,8 +3,8 @@
 import React, { useMemo } from "react";
 import { Rect, Group } from "react-konva";
 import { useFloorPlanStore } from "@/stores/floor-plan-store";
-import type { Viewport } from "@/lib/floor-plan/geometry";
-import { worldToScreen, polygonBounds } from "@/lib/floor-plan/geometry";
+import type { Viewport } from "@/features/floor-plan/lib/geometry";
+import { worldToScreen, polygonBounds } from "@/features/floor-plan/lib/geometry";
 import { validateBuildingCode } from "@/features/floor-plan/lib/code-validator";
 
 interface CodeOverlayRendererProps {

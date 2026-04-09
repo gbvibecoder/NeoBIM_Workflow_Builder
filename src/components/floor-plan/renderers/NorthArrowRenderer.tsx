@@ -3,7 +3,7 @@
 import React from "react";
 import { Group, Line as KLine, Text, Circle } from "react-konva";
 import { useFloorPlanStore } from "@/stores/floor-plan-store";
-import type { Viewport } from "@/lib/floor-plan/geometry";
+import type { Viewport } from "@/features/floor-plan/lib/geometry";
 
 interface NorthArrowRendererProps {
   viewport: Viewport;

@@ -10,7 +10,7 @@
  */
 
 import type { Floor, Wall, Door, CadWindow, Room, Column, Stair } from "@/types/floor-plan-cad";
-import { wallLength } from "@/lib/floor-plan/geometry";
+import { wallLength } from "@/features/floor-plan/lib/geometry";
 
 // ============================================================
 // TYPES

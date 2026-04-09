@@ -6,7 +6,7 @@
  */
 
 import type { Floor, Room } from "@/types/floor-plan-cad";
-import { polygonCentroid, polygonBounds, floorBounds } from "@/lib/floor-plan/geometry";
+import { polygonCentroid, polygonBounds, floorBounds } from "@/features/floor-plan/lib/geometry";
 import { analyzeVastuCompliance } from "@/lib/floor-plan/vastu-analyzer";
 import {
   ALL_VASTU_RULES,

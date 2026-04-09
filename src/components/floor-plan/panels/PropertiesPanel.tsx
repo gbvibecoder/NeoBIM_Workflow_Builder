@@ -5,8 +5,8 @@ import { useFloorPlanStore } from "@/stores/floor-plan-store";
 import { ROOM_COLORS } from "@/types/floor-plan-cad";
 import type { Wall, Room, Door, CadWindow, DoorType, WindowType, FurnitureInstance } from "@/types/floor-plan-cad";
 import { formatDimension, formatArea, type DisplayUnit } from "@/lib/floor-plan/unit-conversion";
-import { wallLength, polygonBounds } from "@/lib/floor-plan/geometry";
-import { getCatalogItem } from "@/lib/floor-plan/furniture-catalog";
+import { wallLength, polygonBounds } from "@/features/floor-plan/lib/geometry";
+import { getCatalogItem } from "@/features/floor-plan/lib/furniture-catalog";
 
 export function PropertiesPanel() {
   const project = useFloorPlanStore((s) => s.project);

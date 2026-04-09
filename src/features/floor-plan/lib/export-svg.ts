@@ -15,9 +15,9 @@ import {
   perpendicularLeft,
   addPoints,
   scalePoint,
-} from "@/lib/floor-plan/geometry";
+} from "@/features/floor-plan/lib/geometry";
 import { formatDimension, formatArea } from "@/lib/floor-plan/unit-conversion";
-import { getCatalogItem } from "@/lib/floor-plan/furniture-catalog";
+import { getCatalogItem } from "@/features/floor-plan/lib/furniture-catalog";
 import type { DisplayUnit } from "@/lib/floor-plan/unit-conversion";
 
 export interface SvgExportOptions {

@@ -3,7 +3,7 @@
 import React from "react";
 import { Line as KLine, Rect, Circle, Group, Text } from "react-konva";
 import { useFloorPlanStore } from "@/stores/floor-plan-store";
-import type { Viewport } from "@/lib/floor-plan/geometry";
+import type { Viewport } from "@/features/floor-plan/lib/geometry";
 import type { SnapResult } from "@/lib/floor-plan/snap-engine";
 import type { Floor } from "@/types/floor-plan-cad";
 import {
@@ -13,7 +13,7 @@ import {
   perpendicularLeft,
   addPoints,
   scalePoint,
-} from "@/lib/floor-plan/geometry";
+} from "@/features/floor-plan/lib/geometry";
 import { formatDimension } from "@/lib/floor-plan/unit-conversion";
 import type { DisplayUnit } from "@/lib/floor-plan/unit-conversion";
 import type { Point } from "@/types/floor-plan-cad";

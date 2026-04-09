@@ -9,7 +9,7 @@
  */
 
 import type { Floor, Room, Door, Wall, Point } from "@/types/floor-plan-cad";
-import { polygonCentroid, polygonBounds, floorBounds } from "@/lib/floor-plan/geometry";
+import { polygonCentroid, polygonBounds, floorBounds } from "@/features/floor-plan/lib/geometry";
 import {
   ALL_VASTU_RULES,
   DIRECTION_LABELS,
