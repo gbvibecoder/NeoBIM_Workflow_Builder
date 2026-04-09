@@ -9,10 +9,10 @@ import { hitTest, hitTestHandles, findNearestWall, rubberBandSelect } from "@/fe
 import { findSnap, applyOrthoConstraint } from "@/features/floor-plan/lib/snap-engine";
 import type { HandleType } from "@/features/floor-plan/lib/hit-detection";
 import { GridRenderer } from "@/features/floor-plan/components/renderers/GridRenderer";
-import { WallRenderer } from "@/components/floor-plan/renderers/WallRenderer";
+import { WallRenderer } from "@/features/floor-plan/components/renderers/WallRenderer";
 import { RoomRenderer } from "@/features/floor-plan/components/renderers/RoomRenderer";
 import { DoorRenderer } from "@/features/floor-plan/components/renderers/DoorRenderer";
-import { WindowRenderer } from "@/components/floor-plan/renderers/WindowRenderer";
+import { WindowRenderer } from "@/features/floor-plan/components/renderers/WindowRenderer";
 import { DimensionRenderer } from "@/features/floor-plan/components/renderers/DimensionRenderer";
 import { MeasurementOverlay } from "@/features/floor-plan/components/renderers/MeasurementOverlay";
 import { ScaleBarRenderer } from "@/features/floor-plan/components/renderers/ScaleBarRenderer";
@@ -22,7 +22,7 @@ import { InteractionOverlay } from "@/features/floor-plan/components/renderers/I
 import { FurnitureRenderer } from "@/features/floor-plan/components/renderers/FurnitureRenderer";
 import { StairRenderer } from "@/features/floor-plan/components/renderers/StairRenderer";
 import { ColumnRenderer } from "@/features/floor-plan/components/renderers/ColumnRenderer";
-import { VastuOverlayRenderer } from "@/components/floor-plan/renderers/VastuOverlayRenderer";
+import { VastuOverlayRenderer } from "@/features/floor-plan/components/renderers/VastuOverlayRenderer";
 import { AnnotationRenderer } from "@/features/floor-plan/components/renderers/AnnotationRenderer";
 import { LightOverlayRenderer } from "@/features/floor-plan/components/renderers/LightOverlayRenderer";
 import { CodeOverlayRenderer } from "@/features/floor-plan/components/renderers/CodeOverlayRenderer";
