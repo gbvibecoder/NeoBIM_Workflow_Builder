@@ -35,9 +35,9 @@ const FloorPlanViewer = dynamic(
   () => import("@/features/floor-plan/components/FloorPlanViewer").then(m => ({ default: m.FloorPlanViewer })),
   { ssr: false, loading: () => <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", color: "#888", fontSize: 13 }}>Loading Floor Plan Editor...</div> }
 );
-import { HeroSection } from "@/components/canvas/result-showcase/sections/HeroSection";
-import { KpiStrip } from "@/components/canvas/result-showcase/sections/KpiStrip";
-import { PipelineViz } from "@/components/canvas/result-showcase/sections/PipelineViz";
+import { HeroSection } from "@/features/execution/components/result-showcase/sections/HeroSection";
+import { KpiStrip } from "@/features/execution/components/result-showcase/sections/KpiStrip";
+import { PipelineViz } from "@/features/execution/components/result-showcase/sections/PipelineViz";
 import { AnimatedNumber } from "@/features/execution/components/result-showcase/sections/AnimatedNumber";
 import { useHeroDetection } from "@/features/execution/components/result-showcase/useHeroDetection";
 import type { ShowcaseData } from "@/features/execution/components/result-showcase/useShowcaseData";

@@ -7,9 +7,9 @@ import { ChevronRight, ChevronDown, Download, Copy, Check, Table2, BarChart3, Co
 import { useLocale } from "@/hooks/useLocale";
 import { useExecutionStore } from "@/features/execution/stores/execution-store";
 import { COLORS } from "@/features/execution/components/result-showcase/constants";
-import { KpiStrip } from "@/components/canvas/result-showcase/sections/KpiStrip";
-import { CostBreakdownBars } from "@/components/canvas/result-showcase/sections/CostBreakdownBars";
-import { ComplianceBadges } from "@/components/canvas/result-showcase/sections/ComplianceBadges";
+import { KpiStrip } from "@/features/execution/components/result-showcase/sections/KpiStrip";
+import { CostBreakdownBars } from "@/features/execution/components/result-showcase/sections/CostBreakdownBars";
+import { ComplianceBadges } from "@/features/execution/components/result-showcase/sections/ComplianceBadges";
 import type { ShowcaseData, TableDataItem } from "@/features/execution/components/result-showcase/useShowcaseData";
 
 interface DataTabProps {
