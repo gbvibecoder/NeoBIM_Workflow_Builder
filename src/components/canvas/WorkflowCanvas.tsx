@@ -25,18 +25,18 @@ import {
 } from "@/lib/share";
 
 import dynamic from "next/dynamic";
-import { BaseNode } from "./nodes/BaseNode";
-import { AnimatedEdge } from "./edges/AnimatedEdge";
-import { RightNodePanel } from "./panels/RightNodePanel";
-import { CanvasToolbar } from "./toolbar/CanvasToolbar";
+import { BaseNode } from "@/components/canvas/nodes/BaseNode";
+import { AnimatedEdge } from "@/components/canvas/edges/AnimatedEdge";
+import { RightNodePanel } from "@/components/canvas/panels/RightNodePanel";
+import { CanvasToolbar } from "@/components/canvas/toolbar/CanvasToolbar";
 
-import { ExecutionLog } from "./ExecutionLog";
-import { ResultShowcase } from "./ResultShowcase";
-import { OnboardingTour } from "./OnboardingTour";
-import { AIChatPanel } from "./panels/AIChatPanel";
-import type { ChatMessage } from "./panels/AIChatPanel";
-import type { LogEntry } from "./ExecutionLog";
-import type { ContextMenuState } from "./ContextMenu";
+import { ExecutionLog } from "@/components/canvas/ExecutionLog";
+import { ResultShowcase } from "@/components/canvas/ResultShowcase";
+import { OnboardingTour } from "@/components/canvas/OnboardingTour";
+import { AIChatPanel } from "@/components/canvas/panels/AIChatPanel";
+import type { ChatMessage } from "@/components/canvas/panels/AIChatPanel";
+import type { LogEntry } from "@/components/canvas/ExecutionLog";
+import type { ContextMenuState } from "@/components/canvas/ContextMenu";
 import { PromptInput } from "@/features/ai/components/PromptInput";
 
 // ContextMenu is right-click only — load lazily
@@ -52,13 +52,13 @@ const ArchitecturalViewer = dynamic(
 );
 
 // Fullscreen video player — direct import to avoid dynamic() hook instability with React 19
-import { FullscreenVideoPlayer } from "./artifacts/FullscreenVideoPlayer";
+import { FullscreenVideoPlayer } from "@/components/canvas/artifacts/FullscreenVideoPlayer";
 
 import { useWorkflowStore, isUntitledWorkflow } from "@/stores/workflow-store";
 import { PREBUILT_WORKFLOWS } from "@/constants/prebuilt-workflows";
 import type { WorkflowTemplate } from "@/types/workflow";
-import { SaveWorkflowModal } from "./modals/SaveWorkflowModal";
-import { ExecutionBlockModal } from "./modals/ExecutionBlockModal";
+import { SaveWorkflowModal } from "@/components/canvas/modals/SaveWorkflowModal";
+import { ExecutionBlockModal } from "@/components/canvas/modals/ExecutionBlockModal";
 import { useExecutionStore } from "@/stores/execution-store";
 import { useUIStore } from "@/stores/ui-store";
 import { NODE_CATALOGUE_MAP, CATEGORY_CONFIG } from "@/constants/node-catalogue";
