@@ -18,7 +18,7 @@ import { correctDimensions } from "@/features/floor-plan/lib/dimension-corrector
 import type { RoomWithTarget } from "@/features/floor-plan/lib/dimension-corrector";
 import { layoutCourtyardPlan, hasCourtyardRoom } from "@/features/floor-plan/lib/courtyard-layout";
 import { solveLayout } from "@/features/floor-plan/lib/constraint-solver";
-import { classifyRoom } from "@/lib/floor-plan/room-sizer";
+import { classifyRoom } from "@/features/floor-plan/lib/room-sizer";
 
 // ── Output type ──────────────────────────────────────────────────────────────
 
@@ -57,7 +57,7 @@ const DEFAULT_ASPECT = 1.33;    // footprint width:depth ratio
 const MAX_ROOM_AR = 2.8;        // max aspect ratio for non-corridor rooms
 
 // ── Room standards (centralized architectural minimums) ──────────────────────
-import { getMinDimMeters, getMinDepthMeters, getRoomStandardByName } from "@/lib/floor-plan/room-standards";
+import { getMinDimMeters, getMinDepthMeters, getRoomStandardByName } from "@/features/floor-plan/lib/room-standards";
 
 /** Get the furniture-aware minimum dimension (shorter side) for a room. */
 function getMinDimForType(type: string, name: string): number {

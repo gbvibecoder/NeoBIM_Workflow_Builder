@@ -3,7 +3,7 @@
 import React, { useMemo } from "react";
 import { useFloorPlanStore } from "@/stores/floor-plan-store";
 import { analyzeVastuCompliance, type VastuReport, type VastuReportItem } from "@/lib/floor-plan/vastu-analyzer";
-import { suggestRoomSwaps, type SwapSuggestion } from "@/lib/floor-plan/room-optimizer";
+import { suggestRoomSwaps, type SwapSuggestion } from "@/features/floor-plan/lib/room-optimizer";
 import { DIRECTION_LABELS } from "@/lib/floor-plan/vastu-rules";
 
 export function VastuPanel() {

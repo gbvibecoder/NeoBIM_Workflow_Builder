@@ -25,7 +25,7 @@ import { findConnectedWalls } from "@/features/floor-plan/lib/hit-detection";
 import type { FloorPlanGeometry } from "@/types/floor-plan";
 import { convertGeometryToProject } from "@/features/floor-plan/lib/pipeline-adapter";
 import { saveProject, loadProject } from "@/features/floor-plan/lib/project-persistence";
-import { createSample2BHK } from "@/lib/floor-plan/sample-data";
+import { createSample2BHK } from "@/features/floor-plan/lib/sample-data";
 
 // ============================================================
 // SAFE DEEP CLONE (structuredClone with JSON fallback)
