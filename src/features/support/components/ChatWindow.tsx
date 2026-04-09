@@ -11,9 +11,11 @@ import { SuggestedReplies } from "@/features/support/components/SuggestedReplies
 import EscalationBanner from "@/features/support/components/EscalationBanner";
 import SatisfactionRating from "@/features/support/components/SatisfactionRating";
 import WelcomeScreen from "@/features/support/components/WelcomeScreen";
+import LiveChatView from "@/features/support/components/LiveChatView";
+import { useLiveChatStore } from "@/features/support/stores/live-chat-store";
 import type { SupportMessage } from "@/types/support";
 
-type ViewMode = "welcome" | "list" | "chat" | "rating";
+type ViewMode = "welcome" | "list" | "chat" | "rating" | "live-chat";
 
 const viewInitial = { opacity: 0, x: 20 };
 const viewAnimate = { opacity: 1, x: 0 };
@@ -30,6 +32,9 @@ export function ChatWindow() {
   const isLoading = useSupportStore((s) => s.isLoading);
   const suggestions = useSupportStore((s) => s.suggestions);
   const loadConversations = useSupportStore((s) => s.loadConversations);
+  const chatView = useSupportStore((s) => s.chatView);
+  const setChatView = useSupportStore((s) => s.setChatView);
+  const closeLiveChat = useLiveChatStore((s) => s.closeLiveChat);
 
   // Select only the primitive fields we need — avoids returning a new object reference
   const activeConvStatus = useSupportStore((s) => {
@@ -65,6 +70,7 @@ export function ChatWindow() {
 
   // Derive current view
   const currentView: ViewMode = (() => {
+    if (chatView === "live-chat") return "live-chat";
     if (activeConversationId) {
       if (activeConvStatus === "RESOLVED" && activeConvSatisfaction === null) {
         return "rating";
@@ -80,7 +86,11 @@ export function ChatWindow() {
     return "welcome";
   })();
 
-  const resolvedView: ViewMode = viewOverride ?? currentView;
+  // chatView === "live-chat" must win over viewOverride so that clicking the
+  // "Live Chat with Us" card from the list-→welcome override path still routes
+  // into the live-chat view instead of getting stuck on "welcome".
+  const resolvedView: ViewMode =
+    chatView === "live-chat" ? "live-chat" : (viewOverride ?? currentView);
 
   // Whether we're in the chat view (either with an active conversation or pending send)
   const inChatView = resolvedView === "chat";
@@ -106,8 +116,16 @@ export function ChatWindow() {
       {/* Header */}
       <ChatHeader
         status={activeConvStatus}
-        showBack={inChatView || resolvedView === "rating"}
-        onBack={() => setViewOverride("list")}
+        showBack={inChatView || resolvedView === "rating" || resolvedView === "live-chat"}
+        onBack={() => {
+          if (resolvedView === "live-chat") {
+            closeLiveChat();
+            setChatView(null);
+            setViewOverride("welcome");
+          } else {
+            setViewOverride("list");
+          }
+        }}
       />
 
       {/* Content area */}
@@ -169,6 +187,19 @@ export function ChatWindow() {
                 activeConvStatus !== "RESOLVED" && (
                   <ChatInput conversationStatus={activeConvStatus ?? undefined} />
                 )}
+            </motion.div>
+          )}
+
+          {resolvedView === "live-chat" && (
+            <motion.div
+              key="live-chat"
+              initial={viewInitial}
+              animate={viewAnimate}
+              exit={viewExit}
+              transition={viewTransitionConfig}
+              style={{ height: "100%", display: "flex", flexDirection: "column", minHeight: 0 }}
+            >
+              <LiveChatView />
             </motion.div>
           )}
 

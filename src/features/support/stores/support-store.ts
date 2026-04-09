@@ -25,8 +25,10 @@ interface SupportState {
   pageContext: string;
   inputDraft: string;
   error: string | null;
+  chatView: "ai" | "live-chat" | null;
 
   // Actions
+  setChatView: (view: "ai" | "live-chat" | null) => void;
   toggle: () => void;
   open: () => void;
   close: () => void;
@@ -72,6 +74,9 @@ export const useSupportStore = create<SupportState>()((set, get) => ({
   pageContext: "dashboard",
   inputDraft: "",
   error: null,
+  chatView: null,
+
+  setChatView: (view) => set({ chatView: view }),
 
   toggle: () => {
     const { isOpen, isMinimized } = get();

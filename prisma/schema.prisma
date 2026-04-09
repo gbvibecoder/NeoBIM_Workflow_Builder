@@ -49,6 +49,7 @@ model User {
   referralsSent     Referral[]  @relation("ReferralsSent")
   referralsReceived Referral[]  @relation("ReferralReceived")
   supportConversations SupportConversation[]
+  liveChats         LiveChatConversation[] @relation("UserLiveChats")
   videoShareLinks   VideoShareLink[]
   videoLikes        CommunityVideoLike[]
 
@@ -640,6 +641,57 @@ model SupportQuickReply {
 
   @@index([category])
   @@map("support_quick_replies")
+}
+
+// ─── Live Chat (human-to-human support) ─────────────────────────────────────
+
+enum LiveChatStatus {
+  WAITING
+  ACTIVE
+  CLOSED
+}
+
+enum LiveChatRole {
+  USER
+  ADMIN
+}
+
+model LiveChatConversation {
+  id               String         @id @default(cuid())
+  userId           String
+  user             User           @relation("UserLiveChats", fields: [userId], references: [id], onDelete: Cascade)
+  status           LiveChatStatus @default(WAITING)
+  lastMessageAt    DateTime       @default(now())
+  lastAdminReplyAt DateTime?
+  repliedByAdminId String?
+  repliedByName    String?
+  closedByAdminId  String?
+  closedAt         DateTime?
+  pageContext      String?
+  userPlan         String?
+  messageCount     Int            @default(0)
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  messages         LiveChatMessage[]
+
+  @@index([userId])
+  @@index([status, lastMessageAt])
+  @@index([lastMessageAt(sort: Desc)])
+  @@map("live_chat_conversations")
+}
+
+model LiveChatMessage {
+  id             String                @id @default(cuid())
+  conversationId String
+  conversation   LiveChatConversation  @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  senderId       String
+  senderRole     LiveChatRole
+  senderName     String?
+  content        String                @db.VarChar(3000)
+  createdAt      DateTime              @default(now())
+
+  @@index([conversationId, createdAt])
+  @@map("live_chat_messages")
 }
 
 // ─── Video Share Links ──────────────────────────────────────────────────────

@@ -2,12 +2,19 @@
 
 import { useEffect, useCallback } from "react";
 import { usePathname } from "next/navigation";
+import { useSession } from "next-auth/react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useSupportStore } from "@/features/support/stores/support-store";
+import { usePusherLiveChat } from "@/features/support/hooks/usePusherLiveChat";
 import { ChatBubbleButton } from "@/features/support/components/ChatBubbleButton";
 import { ChatWindow } from "@/features/support/components/ChatWindow";
 
 export function SupportChatWidget() {
+  const { data: session } = useSession();
+  // Always-on Pusher subscription so admin replies arrive in real time even
+  // when the widget is closed/minimized or on a different view.
+  usePusherLiveChat(session?.user?.id);
+
   const isOpen = useSupportStore((s) => s.isOpen);
   const isMinimized = useSupportStore((s) => s.isMinimized);
   const toggle = useSupportStore((s) => s.toggle);
