@@ -25,7 +25,7 @@ import {
 } from "@/lib/share";
 
 import dynamic from "next/dynamic";
-import { BaseNode } from "@/components/canvas/nodes/BaseNode";
+import { BaseNode } from "@/features/canvas/components/nodes/BaseNode";
 import { AnimatedEdge } from "@/features/canvas/components/edges/AnimatedEdge";
 import { RightNodePanel } from "@/components/canvas/panels/RightNodePanel";
 import { CanvasToolbar } from "@/components/canvas/toolbar/CanvasToolbar";
@@ -33,8 +33,8 @@ import { CanvasToolbar } from "@/components/canvas/toolbar/CanvasToolbar";
 import { ExecutionLog } from "@/features/canvas/components/ExecutionLog";
 import { ResultShowcase } from "@/features/canvas/components/ResultShowcase";
 import { OnboardingTour } from "@/features/canvas/components/OnboardingTour";
-import { AIChatPanel } from "@/components/canvas/panels/AIChatPanel";
-import type { ChatMessage } from "@/components/canvas/panels/AIChatPanel";
+import { AIChatPanel } from "@/features/canvas/components/panels/AIChatPanel";
+import type { ChatMessage } from "@/features/canvas/components/panels/AIChatPanel";
 import type { LogEntry } from "@/features/canvas/components/ExecutionLog";
 import type { ContextMenuState } from "@/features/canvas/components/ContextMenu";
 import { PromptInput } from "@/features/ai/components/PromptInput";

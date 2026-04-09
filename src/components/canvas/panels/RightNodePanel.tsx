@@ -2,7 +2,7 @@
 
 import React, { useState, memo } from "react";
 import { ChevronLeft, ChevronRight, Layers3 } from "lucide-react";
-import { NodeLibrarySidebar } from "@/components/canvas/panels/NodeLibrarySidebar";
+import { NodeLibrarySidebar } from "@/features/canvas/components/panels/NodeLibrarySidebar";
 import { useLocale } from "@/hooks/useLocale";
 import { useUIStore } from "@/stores/ui-store";
 
