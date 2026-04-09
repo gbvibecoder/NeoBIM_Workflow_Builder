@@ -310,12 +310,49 @@
 }
 
 @media (max-width: 768px) {
+  /* Allow the auth page to scroll inside in-app webviews (Instagram, Meta,
+     Facebook, etc.). These webviews do NOT resize the visual viewport when
+     the on-screen keyboard appears, so a non-scrollable shell hides the
+     password fields behind the keyboard. */
+  .auth-shell {
+    overflow: visible !important;
+    overflow-y: auto !important;
+    min-height: 100svh !important;
+    height: auto !important;
+    -webkit-overflow-scrolling: touch;
+  }
+
   .auth-form-area {
-    padding: 20px 16px !important;
+    align-items: flex-start !important;
+    justify-content: flex-start !important;
+    min-height: 0 !important;
+    height: auto !important;
+    padding: 20px 16px 96px !important;
   }
 
   .auth-form-inner {
     padding: 24px 20px 28px !important;
+  }
+
+  /* Prevent iOS Safari / in-app webview from auto-zooming into inputs
+     (any input with font-size < 16px triggers a zoom that can leave the
+     layout shifted off-screen and unscrollable). Applies to every input
+     inside the auth shell. */
+  .auth-shell input,
+  .auth-shell textarea,
+  .auth-shell select {
+    font-size: 16px !important;
+  }
+}
+
+/* Some in-app webviews (Instagram, Facebook, Meta) ignore the small viewport
+   units when the keyboard opens. Use the dynamic viewport unit where
+   supported so the auth shell can grow with the visible area. */
+@supports (height: 100dvh) {
+  @media (max-width: 768px) {
+    .auth-shell {
+      min-height: 100dvh !important;
+    }
   }
 }
 
