@@ -117,7 +117,7 @@ export function SupportChatWidget() {
             animate={{ scale: 1, opacity: 1, y: 0 }}
             exit={{ scale: 0.95, opacity: 0, y: 20 }}
             transition={{ type: "spring", stiffness: 350, damping: 28 }}
-            className="fixed inset-0 z-50 sm:inset-auto sm:bottom-6 sm:right-6"
+            className="fixed top-[52px] left-0 right-0 bottom-0 z-50 sm:inset-auto sm:bottom-6 sm:right-6"
             style={{ transformOrigin: "bottom right" }}
           >
             <ChatWindow />
