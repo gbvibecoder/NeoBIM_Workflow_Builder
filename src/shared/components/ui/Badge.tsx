@@ -14,7 +14,7 @@ const badgeVariants = cva(
   {
     variants: {
       variant: {
-        default: "bg-[rgba(255,255,255,0.06)] text-[var(--text-secondary)] border border-[rgba(255,255,255,0.08)]",
+        default: "bg-[rgba(255,255,255,0.08)] text-[var(--text-secondary)] border border-[rgba(255,255,255,0.12)]",
         primary: "bg-[rgba(108,92,231,0.12)] text-[#A29BFE] border border-[rgba(108,92,231,0.2)]",
         success: "bg-[rgba(0,184,148,0.12)] text-[#00B894] border border-[rgba(0,184,148,0.2)]",
         danger: "bg-[rgba(255,107,107,0.12)] text-[#FF6B6B] border border-[rgba(255,107,107,0.2)]",

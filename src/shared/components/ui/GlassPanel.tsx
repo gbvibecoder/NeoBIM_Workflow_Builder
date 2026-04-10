@@ -14,7 +14,7 @@ const glassPanelVariants = cva(
   [
     "relative",
     "backdrop-blur-[20px] backdrop-saturate-[1.4]",
-    "border border-[rgba(255,255,255,0.06)]",
+    "border border-[rgba(255,255,255,0.1)]",
     "transition-all duration-200",
   ].join(" "),
   {
@@ -41,10 +41,10 @@ const glassPanelVariants = cva(
         xl: "p-8",
       },
       border: {
-        subtle: "border-[rgba(255,255,255,0.06)]",
-        default: "border-[rgba(255,255,255,0.1)]",
-        glow: "border-[rgba(108,92,231,0.2)]",
-        copper: "border-[rgba(184,115,51,0.15)]",
+        subtle: "border-[rgba(255,255,255,0.1)]",
+        default: "border-[rgba(255,255,255,0.14)]",
+        glow: "border-[rgba(108,92,231,0.25)]",
+        copper: "border-[rgba(184,115,51,0.2)]",
         none: "border-transparent",
       },
     },

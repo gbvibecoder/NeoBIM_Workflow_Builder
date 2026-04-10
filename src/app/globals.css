@@ -15,17 +15,17 @@
     --bg-surface: #0D0F11;
 
     /* ── Border hierarchy ─────────────────────────────────────── */
-    --border-subtle: rgba(184, 115, 51, 0.08);
-    --border-default: rgba(184, 115, 51, 0.15);
-    --border-hover: rgba(184, 115, 51, 0.25);
+    --border-subtle: rgba(184, 115, 51, 0.12);
+    --border-default: rgba(184, 115, 51, 0.2);
+    --border-hover: rgba(184, 115, 51, 0.32);
     --border-focus: rgba(0, 245, 255, 0.5);
 
     /* ── Text hierarchy ───────────────────────────────────────── */
-    --text-primary: #E2E8F0;
-    --text-secondary: #8898A8;
-    --text-tertiary: #556070;
-    --text-disabled: #3A4450;
-    --text-ghost: #2A3040;
+    --text-primary: #EDF2F7;
+    --text-secondary: #A0AEC0;
+    --text-tertiary: #718096;
+    --text-disabled: #4A5568;
+    --text-ghost: #374151;
 
     /* ── Accent (Atelier copper/cyan/amber) ────────────────────── */
     --accent-blue: #00F5FF;
@@ -1349,7 +1349,7 @@
   background: rgba(18,18,30,0.6);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.1);
   border-radius: 16px;
   padding: 24px;
   position: relative;
@@ -1357,7 +1357,7 @@
   transition: border-color 250ms ease, transform 250ms ease, box-shadow 250ms ease;
 }
 .dp-glass-card:hover {
-  border-color: rgba(255,255,255,0.1);
+  border-color: rgba(255,255,255,0.16);
   transform: translateY(-2px);
   box-shadow: 0 8px 32px rgba(0,0,0,0.3);
 }
@@ -1455,18 +1455,18 @@
 .dp-filter-btn {
   padding: 6px 16px;
   border-radius: 8px;
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 600;
   letter-spacing: 0.5px;
   border: 1px solid transparent;
   background: transparent;
-  color: rgba(255,255,255,0.3);
+  color: rgba(255,255,255,0.5);
   cursor: pointer;
   transition: all 180ms ease;
 }
 .dp-filter-btn:hover {
-  color: rgba(255,255,255,0.6);
-  background: rgba(255,255,255,0.04);
+  color: rgba(255,255,255,0.8);
+  background: rgba(255,255,255,0.06);
 }
 .dp-filter-btn[data-active="true"][data-color="blue"] {
   background: rgba(79,138,255,0.2);
@@ -1503,14 +1503,14 @@
 /* ── Execution row ─────────────────────────────────────────────── */
 .dp-exec-row {
   background: rgba(18,18,30,0.5);
-  border: 1px solid rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.09);
   border-radius: 12px;
   padding: 16px 20px;
   transition: all 200ms ease;
 }
 .dp-exec-row:hover {
-  background: rgba(27,79,255,0.04);
-  border-color: rgba(27,79,255,0.15);
+  background: rgba(27,79,255,0.06);
+  border-color: rgba(27,79,255,0.2);
   transform: translateX(2px);
 }
 
@@ -1520,7 +1520,7 @@
   border-radius: 10px;
   border: 1px solid transparent;
   background: transparent;
-  color: rgba(255,255,255,0.4);
+  color: rgba(255,255,255,0.6);
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
@@ -1532,8 +1532,8 @@
   transition: all 180ms ease;
 }
 .dp-settings-tab:hover {
-  color: rgba(255,255,255,0.7);
-  background: rgba(255,255,255,0.04);
+  color: rgba(255,255,255,0.85);
+  background: rgba(255,255,255,0.06);
 }
 .dp-settings-tab[data-active="true"] {
   color: #ffffff;

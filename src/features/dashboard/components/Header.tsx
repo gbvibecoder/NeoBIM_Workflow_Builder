@@ -97,7 +97,7 @@ export function Header({ title, subtitle }: HeaderProps) {
         background: "rgba(10,12,20,0.8)",
         backdropFilter: "blur(20px)",
         WebkitBackdropFilter: "blur(20px)",
-        borderBottom: "1px solid rgba(255,255,255,0.06)",
+        borderBottom: "1px solid rgba(255,255,255,0.1)",
         // Establish a stacking context above the canvas/ReactFlow area so the
         // canvas-toolbar dropdowns (Manual mode, Share, Run options) — which
         // are now portaled into this header — render above the canvas pane.
@@ -155,22 +155,22 @@ export function Header({ title, subtitle }: HeaderProps) {
           style={{
             width: 36, height: 36,
             borderRadius: 10,
-            border: "1px solid rgba(255,255,255,0.07)",
-            background: "rgba(255,255,255,0.03)",
-            color: "#B8C0CC",
+            border: "1px solid rgba(255,255,255,0.12)",
+            background: "rgba(255,255,255,0.05)",
+            color: "#CBD5E0",
           }}
           onClick={() => {
             document.dispatchEvent(new KeyboardEvent("keydown", { key: "k", metaKey: true, bubbles: true }));
           }}
           onMouseEnter={e => {
             e.currentTarget.style.borderColor = "rgba(255,191,0,0.25)";
-            e.currentTarget.style.background = "rgba(255,255,255,0.05)";
+            e.currentTarget.style.background = "rgba(255,255,255,0.08)";
             e.currentTarget.style.color = "#F0F0F5";
           }}
           onMouseLeave={e => {
-            e.currentTarget.style.borderColor = "rgba(255,255,255,0.07)";
-            e.currentTarget.style.background = "rgba(255,255,255,0.03)";
-            e.currentTarget.style.color = "#6B7A8D";
+            e.currentTarget.style.borderColor = "rgba(255,255,255,0.12)";
+            e.currentTarget.style.background = "rgba(255,255,255,0.05)";
+            e.currentTarget.style.color = "#CBD5E0";
           }}
         >
           <Search size={14} />
@@ -185,9 +185,9 @@ export function Header({ title, subtitle }: HeaderProps) {
             display: "flex", alignItems: "center", justifyContent: "center",
             height: 36, minWidth: 42, padding: "0 10px",
             borderRadius: 10,
-            border: "1px solid rgba(255,255,255,0.07)",
-            background: "rgba(255,255,255,0.03)",
-            color: "#8898AA",
+            border: "1px solid rgba(255,255,255,0.12)",
+            background: "rgba(255,255,255,0.05)",
+            color: "#A0AEC0",
             fontSize: 11, fontWeight: 700,
             cursor: "pointer",
             fontFamily: "var(--font-jetbrains), monospace",
@@ -200,9 +200,9 @@ export function Header({ title, subtitle }: HeaderProps) {
             e.currentTarget.style.background = "rgba(255,191,0,0.06)";
           }}
           onMouseLeave={e => {
-            e.currentTarget.style.borderColor = "rgba(255,255,255,0.07)";
-            e.currentTarget.style.color = "#8898AA";
-            e.currentTarget.style.background = "rgba(255,255,255,0.03)";
+            e.currentTarget.style.borderColor = "rgba(255,255,255,0.12)";
+            e.currentTarget.style.color = "#A0AEC0";
+            e.currentTarget.style.background = "rgba(255,255,255,0.05)";
           }}
         >
           {locale === "en" ? "EN" : "DE"}
