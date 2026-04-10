@@ -1,14 +1,54 @@
 "use client";
 
-import { useEffect, useRef, useCallback, KeyboardEvent } from "react";
+import { useEffect, useRef, useCallback, useState, KeyboardEvent } from "react";
 import { motion } from "framer-motion";
-import { Send, MessageSquare } from "lucide-react";
+import { Send, MessageSquare, ImagePlus, Loader2 } from "lucide-react";
 import { useLiveChatStore } from "@/features/support/stores/live-chat-store";
 import { useSupportStore } from "@/features/support/stores/support-store";
 import { TypingIndicator } from "./TypingIndicator";
 import type { LiveChatMessage } from "@/features/support/types/live-chat";
 
 const MAX_CHARS = 3000;
+
+// ─── Image helpers ──────────────────────────────────────────────────────────
+
+/** Detect if message content is an image URL (from imgbb upload) */
+function isImageMessage(content: string): boolean {
+  return /^https?:\/\/.*\.(jpg|jpeg|png|gif|webp|bmp)(\?.*)?$/i.test(content.trim())
+    || content.trim().startsWith("https://i.ibb.co/");
+}
+
+/** Compress an image file client-side using Canvas. Returns base64 string. */
+function compressImage(file: File, maxDim = 1024, quality = 0.8): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        let { width, height } = img;
+        if (width > maxDim || height > maxDim) {
+          if (width > height) {
+            height = Math.round((height / width) * maxDim);
+            width = maxDim;
+          } else {
+            width = Math.round((width / height) * maxDim);
+            height = maxDim;
+          }
+        }
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d")!;
+        ctx.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL("image/jpeg", quality));
+      };
+      img.onerror = reject;
+      img.src = reader.result as string;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
 
 function formatTime(iso: string): string {
   const d = new Date(iso);
@@ -31,6 +71,7 @@ function MessageBubble({ msg, mine }: { msg: LiveChatMessage; mine: boolean }) {
       </div>
     );
   }
+  const isImg = isImageMessage(msg.content);
   return (
     <motion.div
       initial={{ opacity: 0, y: 6 }}
@@ -56,6 +97,25 @@ function MessageBubble({ msg, mine }: { msg: LiveChatMessage; mine: boolean }) {
             {msg.senderName}
           </div>
         )}
+        {isImg ? (
+          <a href={msg.content.trim()} target="_blank" rel="noopener noreferrer">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={msg.content.trim()}
+              alt="Shared image"
+              style={{
+                maxWidth: "100%",
+                maxHeight: 240,
+                borderRadius: 12,
+                display: "block",
+                cursor: "pointer",
+                border: mine
+                  ? "2px solid rgba(79,138,255,0.4)"
+                  : "2px solid rgba(255,255,255,0.08)",
+              }}
+            />
+          </a>
+        ) : (
         <div
           style={{
             background: mine ? "rgba(79,138,255,0.85)" : "#1A1A2E",
@@ -72,6 +132,7 @@ function MessageBubble({ msg, mine }: { msg: LiveChatMessage; mine: boolean }) {
         >
           {msg.content}
         </div>
+        )}
         <div
           style={{
             fontSize: 10,
@@ -105,6 +166,49 @@ export default function LiveChatView() {
   const refreshMessages = useLiveChatStore((s) => s.refreshMessages);
   const pageContext = useSupportStore((s) => s.pageContext);
 
+  // Image upload state: preview first, then upload+send on confirm
+  const [isUploading, setIsUploading] = useState(false);
+  const [imagePreview, setImagePreview] = useState<{ dataUrl: string; base64: string } | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleImagePick = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !file.type.startsWith("image/")) return;
+    e.target.value = "";
+    try {
+      const dataUrl = await compressImage(file);
+      setImagePreview({ dataUrl, base64: dataUrl });
+    } catch (err) {
+      console.error("[live-chat] image compress failed:", err);
+    }
+  }, []);
+
+  const handleSendImage = useCallback(async () => {
+    if (!imagePreview || isUploading) return;
+    setIsUploading(true);
+    try {
+      const res = await fetch("/api/live-chat/upload-image", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ image: imagePreview.base64 }),
+      });
+      if (!res.ok) {
+        setIsUploading(false);
+        return;
+      }
+      const data = await res.json();
+      if (data.url) {
+        sendMessage(data.url, pageContext);
+      }
+    } catch (err) {
+      console.error("[live-chat] image upload failed:", err);
+    }
+    setImagePreview(null);
+    setIsUploading(false);
+  }, [imagePreview, isUploading, sendMessage, pageContext]);
+
+  const cancelImagePreview = useCallback(() => setImagePreview(null), []);
+
   // Open on mount. Pusher subscription is mounted globally in
   // SupportChatWidget so admin replies arrive even when this view is unmounted.
   useEffect(() => {
@@ -132,8 +236,19 @@ export default function LiveChatView() {
 
   // Auto-scroll
   const bottomRef = useRef<HTMLDivElement>(null);
+  // Instant scroll to bottom on first load (no animation — user shouldn't see it scroll)
+  const hasScrolledRef = useRef(false);
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (!isLoadingHistory && messages.length > 0 && !hasScrolledRef.current) {
+      bottomRef.current?.scrollIntoView({ behavior: "instant" });
+      hasScrolledRef.current = true;
+    }
+  }, [isLoadingHistory, messages.length]);
+  // Smooth scroll on new messages after initial load
+  useEffect(() => {
+    if (hasScrolledRef.current) {
+      bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
   }, [messages.length, adminTyping]);
 
   const isClosed = conversationStatus === "CLOSED";
@@ -170,27 +285,6 @@ export default function LiveChatView() {
         <MessageSquare size={14} color="#22c55e" />
         <span style={{ fontSize: 13, fontWeight: 600, color: "#F0F0F0" }}>
           Live Chat with our team
-        </span>
-        <span
-          style={{
-            marginLeft: "auto",
-            display: "flex",
-            alignItems: "center",
-            gap: 6,
-            fontSize: 11,
-            color: adminOnline ? "#22c55e" : "#6B7280",
-          }}
-        >
-          <span
-            style={{
-              width: 8,
-              height: 8,
-              borderRadius: "50%",
-              background: adminOnline ? "#22c55e" : "#6B7280",
-              boxShadow: adminOnline ? "0 0 8px #22c55e" : "none",
-            }}
-          />
-          {adminOnline ? "Support online" : "Support away"}
         </span>
       </div>
 
@@ -233,20 +327,28 @@ export default function LiveChatView() {
           ))
         )}
 
-        {conversationStatus === "WAITING" && messages.length > 0 && !isSending && (
+        {/* Reassurance banner — shows when the last message is from the user */}
+        {messages.length > 0 &&
+          messages[messages.length - 1]?.senderRole === "USER" &&
+          !isSending && (
           <div
             style={{
-              padding: "12px 16px",
-              margin: "8px 16px",
-              borderRadius: 12,
-              background: "rgba(251,191,36,0.08)",
-              border: "1px solid rgba(251,191,36,0.18)",
-              fontSize: 12,
-              color: "#FBBF24",
+              padding: "14px 18px",
+              margin: "12px 16px",
+              borderRadius: 14,
+              background: "linear-gradient(135deg, rgba(79,138,255,0.08), rgba(99,102,241,0.05))",
+              border: "1px solid rgba(79,138,255,0.15)",
+              fontSize: 13,
+              color: "#c4c8e0",
               textAlign: "center",
+              lineHeight: 1.6,
             }}
           >
-            Waiting for a team member to reply…
+            Our team has received your message and will reply shortly.
+            <br />
+            <span style={{ color: "#8890ab", fontSize: 11 }}>
+              Feel free to share more details — we typically respond within a few minutes.
+            </span>
           </div>
         )}
 
@@ -276,8 +378,120 @@ export default function LiveChatView() {
             display: "flex",
             alignItems: "flex-end",
             gap: 8,
+            position: "relative",
           }}
         >
+          {/* Hidden file input */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            style={{ display: "none" }}
+            onChange={handleImagePick}
+          />
+
+          {/* Image preview card (WhatsApp-style: shows before sending) */}
+          {imagePreview && (
+            <div
+              style={{
+                position: "absolute",
+                bottom: "100%",
+                left: 0,
+                right: 0,
+                padding: "12px",
+                background: "rgba(17,17,32,0.95)",
+                borderTop: "1px solid rgba(255,255,255,0.08)",
+                backdropFilter: "blur(8px)",
+                display: "flex",
+                alignItems: "flex-end",
+                gap: 10,
+              }}
+            >
+              <div style={{ position: "relative", flex: 1 }}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={imagePreview.dataUrl}
+                  alt="Preview"
+                  style={{
+                    maxWidth: "100%",
+                    maxHeight: 180,
+                    borderRadius: 10,
+                    display: "block",
+                    border: "2px solid rgba(79,138,255,0.3)",
+                  }}
+                />
+                {/* Cancel button */}
+                <button
+                  onClick={cancelImagePreview}
+                  style={{
+                    position: "absolute",
+                    top: -8,
+                    right: -8,
+                    width: 24,
+                    height: 24,
+                    borderRadius: "50%",
+                    border: "none",
+                    background: "#ef4444",
+                    color: "#fff",
+                    fontSize: 14,
+                    fontWeight: 700,
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    lineHeight: 1,
+                  }}
+                >
+                  x
+                </button>
+              </div>
+              {/* Send image button */}
+              <button
+                onClick={handleSendImage}
+                disabled={isUploading}
+                style={{
+                  width: 40,
+                  height: 40,
+                  borderRadius: 12,
+                  border: "none",
+                  cursor: isUploading ? "wait" : "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  background: isUploading ? "rgba(34,197,94,0.3)" : "rgba(34,197,94,0.85)",
+                  flexShrink: 0,
+                }}
+              >
+                {isUploading ? (
+                  <Loader2 size={18} color="#fff" style={{ animation: "spin 1s linear infinite" }} />
+                ) : (
+                  <Send size={18} color="#fff" />
+                )}
+              </button>
+            </div>
+          )}
+
+          {/* Image pick button */}
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isUploading || isSending || !!imagePreview}
+            aria-label="Attach image"
+            style={{
+              width: 40,
+              height: 40,
+              borderRadius: 12,
+              border: "none",
+              cursor: isUploading || imagePreview ? "not-allowed" : "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              background: "rgba(255,255,255,0.06)",
+              flexShrink: 0,
+              transition: "background 0.15s",
+            }}
+          >
+            <ImagePlus size={18} color="#9898B0" />
+          </button>
           <textarea
             aria-label="Type your message"
             value={inputDraft}
@@ -286,7 +500,7 @@ export default function LiveChatView() {
             }}
             onKeyDown={handleKey}
             placeholder="Type your message…"
-            disabled={isSending}
+            disabled={isSending || !!imagePreview}
             rows={1}
             style={{
               flex: 1,
@@ -304,22 +518,21 @@ export default function LiveChatView() {
             }}
           />
           <button
-            onClick={handleSend}
-            disabled={!inputDraft.trim() || isSending}
-            aria-label="Send message"
+            onClick={imagePreview ? handleSendImage : handleSend}
+            disabled={imagePreview ? isUploading : (!inputDraft.trim() || isSending)}
+            aria-label="Send"
             style={{
               width: 40,
               height: 40,
               borderRadius: 12,
               border: "none",
-              cursor: !inputDraft.trim() || isSending ? "not-allowed" : "pointer",
+              cursor: (imagePreview ? isUploading : (!inputDraft.trim() || isSending)) ? "not-allowed" : "pointer",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              background:
-                !inputDraft.trim() || isSending
-                  ? "rgba(34,197,94,0.2)"
-                  : "rgba(34,197,94,0.85)",
+              background: (imagePreview ? isUploading : (!inputDraft.trim() || isSending))
+                ? "rgba(34,197,94,0.2)"
+                : "rgba(34,197,94,0.85)",
               flexShrink: 0,
             }}
           >

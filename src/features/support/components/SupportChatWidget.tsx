@@ -63,8 +63,11 @@ export function SupportChatWidget() {
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [handleKeyDown]);
 
-  const showBubble = !isOpen;
-  const showWindow = isOpen && !isMinimized;
+  // Hide the entire widget on the admin live-chat page — the admin inbox has
+  // its own full-screen UI and the floating bubble/window would overlap the input.
+  const onAdminLiveChat = pathname === "/dashboard/admin/live-chat";
+  const showBubble = !isOpen && !onAdminLiveChat;
+  const showWindow = isOpen && !isMinimized && !onAdminLiveChat;
 
   return (
     <>
