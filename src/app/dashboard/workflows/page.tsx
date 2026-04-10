@@ -493,134 +493,141 @@ export default function WorkflowsPage() {
         ) : (
           /* ── Workflow List ────────────────────────────────────────────── */
           <div>
-            {/* Header row */}
+            {/* Header — stacks on mobile, single row on desktop */}
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 24 }}
+              style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 24 }}
             >
-              <div style={{ position: "relative", width: 280 }}>
-                <Search size={13} style={{
-                  position: "absolute", left: 11, top: "50%",
-                  transform: "translateY(-50%)", color: "#55556A",
-                  pointerEvents: "none",
-                }} />
-                <input
-                  value={searchQuery}
-                  onChange={e => setSearchQuery(e.target.value)}
-                  placeholder={t('workflows.searchPlaceholder')}
-                  aria-label={t('workflows.searchAriaLabel')}
+              {/* Row 1: Search + New Workflow */}
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <div style={{ position: "relative", flex: 1, minWidth: 0 }}>
+                  <Search size={13} style={{
+                    position: "absolute", left: 11, top: "50%",
+                    transform: "translateY(-50%)", color: "#718096",
+                    pointerEvents: "none",
+                  }} />
+                  <input
+                    value={searchQuery}
+                    onChange={e => setSearchQuery(e.target.value)}
+                    placeholder={t('workflows.searchPlaceholder')}
+                    aria-label={t('workflows.searchAriaLabel')}
+                    style={{
+                      width: "100%", paddingLeft: 34, paddingRight: 12,
+                      height: 38, borderRadius: 10,
+                      border: "1px solid rgba(255,255,255,0.1)",
+                      background: "rgba(255,255,255,0.04)", color: "#EDF2F7",
+                      fontSize: 13, outline: "none",
+                      boxSizing: "border-box",
+                      transition: "all 0.15s ease",
+                    }}
+                    onFocus={e => { e.currentTarget.style.borderColor = "rgba(0,245,255,0.3)"; e.currentTarget.style.boxShadow = "0 0 0 3px rgba(0,245,255,0.08)"; }}
+                    onBlur={e => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.1)"; e.currentTarget.style.boxShadow = "none"; }}
+                  />
+                </div>
+                <button
+                  onClick={handleNewWorkflow}
                   style={{
-                    width: "100%", paddingLeft: 34, paddingRight: 12,
-                    height: 36, borderRadius: 8,
-                    border: "1px solid rgba(255,255,255,0.06)",
-                    background: "rgba(255,255,255,0.03)", color: "#F0F0F5",
-                    fontSize: 12, outline: "none",
-                    boxSizing: "border-box",
-                    transition: "all 0.15s ease",
+                    display: "flex", alignItems: "center", gap: 6,
+                    padding: "8px 16px", borderRadius: 10,
+                    background: "linear-gradient(135deg, #00F5FF 0%, #0EA5E9 100%)",
+                    color: "#0a0c10", fontSize: 12.5, fontWeight: 700,
+                    border: "none", cursor: "pointer", flexShrink: 0,
+                    boxShadow: "0 0 12px rgba(0,245,255,0.12)",
+                    transition: "all 0.2s ease", whiteSpace: "nowrap",
                   }}
-                  onFocus={e => { e.currentTarget.style.borderColor = "rgba(0,245,255,0.25)"; }}
-                  onBlur={e => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.06)"; }}
-                />
+                  onMouseEnter={e => { e.currentTarget.style.boxShadow = "0 0 20px rgba(0,245,255,0.25)"; e.currentTarget.style.transform = "translateY(-1px)"; }}
+                  onMouseLeave={e => { e.currentTarget.style.boxShadow = "0 0 12px rgba(0,245,255,0.12)"; e.currentTarget.style.transform = "translateY(0)"; }}
+                >
+                  <Plus size={13} strokeWidth={2.5} />
+                  {t('workflows.newWorkflow')}
+                </button>
               </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <span style={{ fontSize: 12, color: "#5C5C78", whiteSpace: "nowrap" }}>
+
+              {/* Row 2: Count + Select/Bulk actions */}
+              <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                <span style={{ fontSize: 12, color: "#A0AEC0", whiteSpace: "nowrap" }}>
                   {selectMode && selectedIds.size > 0
                     ? `${selectedIds.size} selected`
                     : `${filteredWorkflows.length} ${filteredWorkflows.length !== 1 ? t('workflows.workflowsCount') : t('workflows.workflowCount')}`}
                 </span>
 
-                {/* ── Bulk-select toolbar ── */}
-                {!selectMode ? (
-                  <button
-                    onClick={toggleSelectMode}
-                    title="Select workflows to delete"
-                    style={{
-                      display: "flex", alignItems: "center", gap: 6,
-                      padding: "7px 12px", borderRadius: 8,
-                      background: "rgba(255,255,255,0.03)",
-                      color: "#C0C0D8", fontSize: 12, fontWeight: 600,
-                      border: "1px solid rgba(255,255,255,0.08)",
-                      cursor: "pointer", transition: "all 0.18s ease",
-                    }}
-                    onMouseEnter={e => { e.currentTarget.style.borderColor = "rgba(239,68,68,0.35)"; e.currentTarget.style.color = "#fff"; }}
-                    onMouseLeave={e => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.08)"; e.currentTarget.style.color = "#C0C0D8"; }}
-                  >
-                    <CheckSquare size={13} />
-                    Select
-                  </button>
-                ) : (
-                  <>
+                <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
+                  {/* ── Bulk-select toolbar ── */}
+                  {!selectMode ? (
                     <button
-                      onClick={selectAllFiltered}
+                      onClick={toggleSelectMode}
+                      title="Select workflows to delete"
                       style={{
                         display: "flex", alignItems: "center", gap: 6,
                         padding: "7px 12px", borderRadius: 8,
-                        background: "rgba(255,255,255,0.03)",
-                        color: "#C0C0D8", fontSize: 12, fontWeight: 600,
-                        border: "1px solid rgba(255,255,255,0.08)",
+                        background: "rgba(255,255,255,0.04)",
+                        color: "#CBD5E0", fontSize: 12, fontWeight: 600,
+                        border: "1px solid rgba(255,255,255,0.1)",
                         cursor: "pointer", transition: "all 0.18s ease",
                       }}
+                      onMouseEnter={e => { e.currentTarget.style.borderColor = "rgba(239,68,68,0.35)"; e.currentTarget.style.color = "#fff"; }}
+                      onMouseLeave={e => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.1)"; e.currentTarget.style.color = "#CBD5E0"; }}
                     >
-                      {allFilteredSelected ? <CheckSquare size={13} /> : <Square size={13} />}
-                      {allFilteredSelected ? "Deselect all" : "Select all"}
+                      <CheckSquare size={13} />
+                      Select
                     </button>
-                    <button
-                      onClick={() => selectedIds.size > 0 && setShowBulkConfirm(true)}
-                      disabled={selectedIds.size === 0}
-                      style={{
-                        display: "flex", alignItems: "center", gap: 6,
-                        padding: "7px 14px", borderRadius: 8,
-                        background: selectedIds.size > 0
-                          ? "linear-gradient(135deg, #EF4444 0%, #B91C1C 100%)"
-                          : "rgba(239,68,68,0.15)",
-                        color: selectedIds.size > 0 ? "#fff" : "rgba(239,68,68,0.5)",
-                        fontSize: 12, fontWeight: 700,
-                        border: "1px solid rgba(239,68,68,0.3)",
-                        cursor: selectedIds.size > 0 ? "pointer" : "not-allowed",
-                        boxShadow: selectedIds.size > 0 ? "0 4px 14px rgba(239,68,68,0.25)" : "none",
-                        transition: "all 0.18s ease",
-                      }}
-                    >
-                      <Trash2 size={12} />
-                      Delete{selectedIds.size > 0 ? ` (${selectedIds.size})` : ""}
-                    </button>
-                    <button
-                      onClick={exitSelectMode}
-                      title="Exit selection"
-                      style={{
-                        display: "flex", alignItems: "center", justifyContent: "center",
-                        width: 30, height: 30, borderRadius: 8,
-                        background: "transparent",
-                        color: "#7C7C96",
-                        border: "1px solid rgba(255,255,255,0.08)",
-                        cursor: "pointer", transition: "all 0.18s ease",
-                      }}
-                      onMouseEnter={e => { e.currentTarget.style.color = "#fff"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.2)"; }}
-                      onMouseLeave={e => { e.currentTarget.style.color = "#7C7C96"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.08)"; }}
-                    >
-                      <X size={14} />
-                    </button>
-                  </>
-                )}
-
-                <button
-                  onClick={handleNewWorkflow}
-                  style={{
-                    display: "flex", alignItems: "center", gap: 6,
-                    padding: "7px 14px", borderRadius: 8,
-                    background: "linear-gradient(135deg, #00F5FF 0%, #0EA5E9 100%)",
-                    color: "#0a0c10", fontSize: 12, fontWeight: 700,
-                    border: "none", cursor: "pointer",
-                    boxShadow: "0 0 12px rgba(0,245,255,0.12)",
-                    transition: "all 0.2s ease",
-                  }}
-                  onMouseEnter={e => { e.currentTarget.style.boxShadow = "0 0 20px rgba(0,245,255,0.25)"; e.currentTarget.style.transform = "translateY(-1px)"; }}
-                  onMouseLeave={e => { e.currentTarget.style.boxShadow = "0 0 12px rgba(0,245,255,0.12)"; e.currentTarget.style.transform = "translateY(0)"; }}
-                >
-                  <Plus size={12} strokeWidth={2.5} />
-                  {t('workflows.newWorkflow')}
-                </button>
+                  ) : (
+                    <>
+                      <button
+                        onClick={selectAllFiltered}
+                        style={{
+                          display: "flex", alignItems: "center", gap: 5,
+                          padding: "7px 10px", borderRadius: 8,
+                          background: "rgba(255,255,255,0.04)",
+                          color: "#CBD5E0", fontSize: 12, fontWeight: 600,
+                          border: "1px solid rgba(255,255,255,0.1)",
+                          cursor: "pointer", transition: "all 0.18s ease",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {allFilteredSelected ? <CheckSquare size={13} /> : <Square size={13} />}
+                        {allFilteredSelected ? "Deselect" : "All"}
+                      </button>
+                      <button
+                        onClick={() => selectedIds.size > 0 && setShowBulkConfirm(true)}
+                        disabled={selectedIds.size === 0}
+                        style={{
+                          display: "flex", alignItems: "center", gap: 5,
+                          padding: "7px 12px", borderRadius: 8,
+                          background: selectedIds.size > 0
+                            ? "linear-gradient(135deg, #EF4444 0%, #B91C1C 100%)"
+                            : "rgba(239,68,68,0.15)",
+                          color: selectedIds.size > 0 ? "#fff" : "rgba(239,68,68,0.5)",
+                          fontSize: 12, fontWeight: 700,
+                          border: "1px solid rgba(239,68,68,0.3)",
+                          cursor: selectedIds.size > 0 ? "pointer" : "not-allowed",
+                          boxShadow: selectedIds.size > 0 ? "0 4px 14px rgba(239,68,68,0.25)" : "none",
+                          transition: "all 0.18s ease", whiteSpace: "nowrap",
+                        }}
+                      >
+                        <Trash2 size={12} />
+                        {selectedIds.size > 0 ? `${selectedIds.size}` : "Delete"}
+                      </button>
+                      <button
+                        onClick={exitSelectMode}
+                        title="Exit selection"
+                        style={{
+                          display: "flex", alignItems: "center", justifyContent: "center",
+                          width: 30, height: 30, borderRadius: 8,
+                          background: "transparent",
+                          color: "#A0AEC0",
+                          border: "1px solid rgba(255,255,255,0.1)",
+                          cursor: "pointer", transition: "all 0.18s ease",
+                        }}
+                        onMouseEnter={e => { e.currentTarget.style.color = "#fff"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.2)"; }}
+                        onMouseLeave={e => { e.currentTarget.style.color = "#A0AEC0"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.1)"; }}
+                      >
+                        <X size={14} />
+                      </button>
+                    </>
+                  )}
+                </div>
               </div>
             </motion.div>
 
