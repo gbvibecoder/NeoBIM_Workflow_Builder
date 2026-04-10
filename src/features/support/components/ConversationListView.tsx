@@ -231,7 +231,7 @@ export default function ConversationListView({ onNewConversation }: Conversation
       </div>
 
       {/* + New Conversation Button — pinned to bottom */}
-      <div style={{ padding: "8px 16px 12px", flexShrink: 0 }}>
+      <div className="pb-[max(12px,env(safe-area-inset-bottom))] sm:pb-3" style={{ padding: "8px 16px 12px", flexShrink: 0 }}>
         <motion.button
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
