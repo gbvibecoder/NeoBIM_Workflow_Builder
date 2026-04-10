@@ -327,34 +327,28 @@ export default function LiveChatView() {
           ))
         )}
 
-        {/* Reassurance banner — shows when the last message is from the user */}
-        {messages.length > 0 &&
-          messages[messages.length - 1]?.senderRole === "USER" &&
-          !isSending && (
-          <div
-            style={{
-              padding: "14px 18px",
-              margin: "12px 16px",
-              borderRadius: 14,
-              background: "linear-gradient(135deg, rgba(79,138,255,0.08), rgba(99,102,241,0.05))",
-              border: "1px solid rgba(79,138,255,0.15)",
-              fontSize: 13,
-              color: "#c4c8e0",
-              textAlign: "center",
-              lineHeight: 1.6,
-            }}
-          >
-            Our team has received your message and will reply shortly.
-            <br />
-            <span style={{ color: "#8890ab", fontSize: 11 }}>
-              Feel free to share more details — we typically respond within a few minutes.
-            </span>
-          </div>
-        )}
-
         {adminTyping && <TypingIndicator />}
         <div ref={bottomRef} />
       </div>
+
+      {/* Reassurance banner — pinned above the input, outside scroll area */}
+      {messages.length > 0 &&
+        messages[messages.length - 1]?.senderRole === "USER" &&
+        !isSending && (
+        <div
+          style={{
+            padding: "10px 16px",
+            borderTop: "1px solid rgba(79,138,255,0.1)",
+            background: "linear-gradient(135deg, rgba(79,138,255,0.06), rgba(99,102,241,0.03))",
+            fontSize: 12,
+            color: "#9898B0",
+            textAlign: "center",
+            lineHeight: 1.5,
+          }}
+        >
+          Our team will reply shortly. Feel free to share more details.
+        </div>
+      )}
 
       {/* Input */}
       {isClosed ? (
