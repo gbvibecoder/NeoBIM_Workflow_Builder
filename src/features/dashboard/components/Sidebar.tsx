@@ -137,7 +137,7 @@ export function Sidebar() {
             background: "rgba(7,8,9,0.92)",
             backdropFilter: "blur(16px)",
             display: "flex", alignItems: "center", justifyContent: "center",
-            color: "rgba(255,255,255,0.5)", cursor: "pointer",
+            color: "rgba(255,255,255,0.7)", cursor: "pointer",
           }}
         >
           <Menu size={18} />
@@ -231,7 +231,7 @@ export function Sidebar() {
                 <span style={{
                   fontSize: 8, fontWeight: 600, letterSpacing: "2.5px",
                   textTransform: "uppercase" as const,
-                  color: "rgba(184,115,51,0.25)",
+                  color: "rgba(184,115,51,0.45)",
                   fontFamily: "var(--font-jetbrains), monospace",
                   marginTop: 3,
                 }}>
@@ -472,9 +472,9 @@ function NavItem({ href, label, badge, icon: Icon, isActive, collapsed, showLabe
         >
           <Icon
             size={isActive ? 15 : 17}
-            strokeWidth={isActive ? 2.2 : 1.6}
+            strokeWidth={isActive ? 2.2 : 1.7}
             style={{
-              color: isActive ? "#fff" : (hovered ? "rgba(255,255,255,0.7)" : "rgba(255,255,255,0.4)"),
+              color: isActive ? "#fff" : (hovered ? "rgba(255,255,255,0.85)" : "rgba(255,255,255,0.55)"),
               transition: "all 200ms ease",
               filter: isActive ? "drop-shadow(0 0 4px rgba(0,245,255,0.5))" : "none",
             }}
@@ -485,9 +485,9 @@ function NavItem({ href, label, badge, icon: Icon, isActive, collapsed, showLabe
           <>
             <span style={{
               flex: 1,
-              fontSize: 13,
-              fontWeight: isActive ? 600 : 450,
-              color: isActive ? "#E2E8F0" : (hovered ? "rgba(255,255,255,0.7)" : "rgba(255,255,255,0.4)"),
+              fontSize: 13.5,
+              fontWeight: isActive ? 650 : 500,
+              color: isActive ? "#F0F2FF" : (hovered ? "rgba(255,255,255,0.85)" : "rgba(255,255,255,0.6)"),
               whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
               transition: "all 200ms ease",
               letterSpacing: isActive ? "0.2px" : "0.1px",

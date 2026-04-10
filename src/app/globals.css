@@ -1071,20 +1071,21 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 24px;
-  height: 24px;
-  border-radius: 7px;
-  border: none;
-  background: transparent;
-  color: rgba(255,255,255,0.15);
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.06);
+  color: rgba(255,255,255,0.55);
   cursor: pointer;
   flex-shrink: 0;
   transition: all 180ms ease;
 }
 
 .sb-icon-btn:hover {
-  background: rgba(255,255,255,0.06);
-  color: rgba(255,255,255,0.55);
+  background: rgba(255,255,255,0.12);
+  border-color: rgba(255,255,255,0.15);
+  color: rgba(255,255,255,0.9);
 }
 
 /* ── Blueprint divider ─────────────────────────────────────────── */
@@ -1117,7 +1118,7 @@
 .sb-divider-subtle {
   height: 1px;
   margin: 10px 20px;
-  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.04), transparent);
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.08), transparent);
 }
 
 /* ── Section label ─────────────────────────────────────────────── */
@@ -1127,10 +1128,10 @@
   gap: 8px;
   padding: 14px 18px 6px;
   font-size: 9px;
-  font-weight: 600;
+  font-weight: 700;
   letter-spacing: 2.5px;
   text-transform: uppercase;
-  color: rgba(255,255,255,0.15);
+  color: rgba(255,255,255,0.35);
   font-family: var(--font-jetbrains), monospace;
 }
 
@@ -1175,7 +1176,8 @@
 }
 
 .sb-nav-item:hover:not(.sb-nav-active) {
-  background: rgba(255,255,255,0.025);
+  background: rgba(255,255,255,0.05);
+  border-color: rgba(255,255,255,0.04);
 }
 
 .sb-nav-active {
@@ -1204,16 +1206,17 @@
   margin-left: auto;
   font-weight: 700;
   font-family: var(--font-jetbrains), monospace;
-  background: rgba(139,92,246,0.12);
-  border: 1px solid rgba(139,92,246,0.2);
-  color: #A78BFA;
+  background: rgba(139,92,246,0.15);
+  border: 1px solid rgba(139,92,246,0.25);
+  color: #B794F4;
   letter-spacing: 0.5px;
   transition: all 200ms ease;
 }
 
 .sb-nav-active .sb-badge {
-  background: rgba(139,92,246,0.2);
-  border-color: rgba(139,92,246,0.35);
+  background: rgba(139,92,246,0.25);
+  border-color: rgba(139,92,246,0.4);
+  color: #D6BCFA;
 }
 
 /* ── User card ─────────────────────────────────────────────────── */
