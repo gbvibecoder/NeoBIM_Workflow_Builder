@@ -1039,11 +1039,12 @@ export default function DashboardPage() {
         {/* ═══════════════════════════════════════════════════════════════
             CTA — Bold final push
             ═══════════════════════════════════════════════════════════════ */}
-        <section style={{ padding: "80px 0 100px" }}>
+        <section className="px-4 sm:px-8 py-16 sm:py-20">
           <motion.div
             initial="hidden" whileInView="visible" viewport={{ once: true }}
             variants={fadeIn} transition={{ duration: 0.7, ease }}
-            style={{ maxWidth: 800, margin: "0 auto", padding: "64px 40px", textAlign: "center", borderRadius: 28, position: "relative", overflow: "hidden", background: "linear-gradient(135deg, rgba(79,138,255,0.05), rgba(139,92,246,0.04))", border: "1px solid rgba(79,138,255,0.1)" }}
+            className="px-5 py-10 sm:px-10 sm:py-16"
+            style={{ maxWidth: 800, margin: "0 auto", textAlign: "center", borderRadius: 28, position: "relative", overflow: "hidden", background: "linear-gradient(135deg, rgba(79,138,255,0.05), rgba(139,92,246,0.04))", border: "1px solid rgba(79,138,255,0.1)" }}
           >
             <div style={{ position: "absolute", inset: 0, backgroundImage: "linear-gradient(rgba(79,138,255,0.02) 1px, transparent 1px), linear-gradient(90deg, rgba(79,138,255,0.02) 1px, transparent 1px)", backgroundSize: "32px 32px", pointerEvents: "none" }} />
             <div style={{ position: "relative", zIndex: 1 }}>
@@ -1057,9 +1058,9 @@ export default function DashboardPage() {
                 href="/dashboard/canvas"
                 style={{
                   display: "inline-flex", alignItems: "center", gap: 10,
-                  padding: "16px 44px", borderRadius: 16,
+                  padding: "14px 32px", borderRadius: 16,
                   background: "linear-gradient(135deg, #4F8AFF, #6366F1)",
-                  color: "#fff", fontSize: 16, fontWeight: 800,
+                  color: "#fff", fontSize: 15, fontWeight: 800,
                   textDecoration: "none", letterSpacing: "-0.01em",
                   boxShadow: "0 4px 32px rgba(79,138,255,0.35), 0 0 80px rgba(99,102,241,0.1)",
                   transition: "all 0.3s ease",
