@@ -1039,11 +1039,12 @@ export default function DashboardPage() {
         {/* ═══════════════════════════════════════════════════════════════
             CTA — Bold final push
             ═══════════════════════════════════════════════════════════════ */}
-        <section style={{ padding: "80px 0 100px" }}>
+        <section className="px-4 sm:px-8 py-16 sm:py-20">
           <motion.div
             initial="hidden" whileInView="visible" viewport={{ once: true }}
             variants={fadeIn} transition={{ duration: 0.7, ease }}
-            style={{ maxWidth: 800, margin: "0 auto", padding: "64px 40px", textAlign: "center", borderRadius: 28, position: "relative", overflow: "hidden", background: "linear-gradient(135deg, rgba(79,138,255,0.05), rgba(139,92,246,0.04))", border: "1px solid rgba(79,138,255,0.1)" }}
+            className="px-5 py-10 sm:px-10 sm:py-16"
+            style={{ maxWidth: 800, margin: "0 auto", textAlign: "center", borderRadius: 28, position: "relative", overflow: "hidden", background: "linear-gradient(135deg, rgba(79,138,255,0.05), rgba(139,92,246,0.04))", border: "1px solid rgba(79,138,255,0.1)" }}
           >
             <div style={{ position: "absolute", inset: 0, backgroundImage: "linear-gradient(rgba(79,138,255,0.02) 1px, transparent 1px), linear-gradient(90deg, rgba(79,138,255,0.02) 1px, transparent 1px)", backgroundSize: "32px 32px", pointerEvents: "none" }} />
             <div style={{ position: "relative", zIndex: 1 }}>
@@ -1057,9 +1058,9 @@ export default function DashboardPage() {
                 href="/dashboard/canvas"
                 style={{
                   display: "inline-flex", alignItems: "center", gap: 10,
-                  padding: "16px 44px", borderRadius: 16,
+                  padding: "14px 32px", borderRadius: 16,
                   background: "linear-gradient(135deg, #4F8AFF, #6366F1)",
-                  color: "#fff", fontSize: 16, fontWeight: 800,
+                  color: "#fff", fontSize: 15, fontWeight: 800,
                   textDecoration: "none", letterSpacing: "-0.01em",
                   boxShadow: "0 4px 32px rgba(79,138,255,0.35), 0 0 80px rgba(99,102,241,0.1)",
                   transition: "all 0.3s ease",
@@ -1076,14 +1077,14 @@ export default function DashboardPage() {
             RECENT ACTIVITY
             ═══════════════════════════════════════════════════════════════ */}
         {(data.recentWorkflows ?? []).length > 0 && (
-          <section style={{ padding: "0 0 80px" }}>
-            <div style={{ maxWidth: 1100, margin: "0 auto", padding: "0 32px" }}>
+          <section className="pb-20 sm:pb-20">
+            <div style={{ maxWidth: 1100, margin: "0 auto" }} className="px-4 sm:px-8">
               <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={stagger}>
                 <motion.div variants={fadeIn} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
-                  <h3 style={{ fontSize: 20, fontWeight: 800, color: "#E2E8F0", letterSpacing: "-0.02em" }}>
+                  <h3 className="text-base sm:text-xl" style={{ fontWeight: 800, color: "#EDF2F7", letterSpacing: "-0.02em" }}>
                     {t("dash.recentActivity")}
                   </h3>
-                  <Link href="/dashboard/workflows" style={{ fontSize: 13, fontWeight: 600, color: "#4F8AFF", textDecoration: "none", display: "flex", alignItems: "center", gap: 4 }}>
+                  <Link href="/dashboard/workflows" style={{ fontSize: 13, fontWeight: 600, color: "#4F8AFF", textDecoration: "none", display: "flex", alignItems: "center", gap: 4, whiteSpace: "nowrap", flexShrink: 0 }}>
                     {t("dash.allWorkflows")} <ChevronRight size={14} />
                   </Link>
                 </motion.div>
@@ -1091,20 +1092,20 @@ export default function DashboardPage() {
                 <div className="db-recent-grid" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16 }}>
                   {(data.recentWorkflows ?? []).map((wf, i) => (
                     <motion.div key={wf.id} variants={fadeIn} transition={{ duration: 0.4, delay: i * 0.06, ease }}>
-                      <Link href={`/dashboard/canvas?id=${wf.id}`} className="db-glass-card" style={{ display: "block", background: "rgba(12,14,24,0.6)", backdropFilter: "blur(20px)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 16, overflow: "hidden", textDecoration: "none", transition: "all 350ms cubic-bezier(0.22, 1, 0.36, 1)" }}>
-                        <div style={{ padding: "14px 18px", background: "linear-gradient(135deg, rgba(79,138,255,0.05), rgba(99,102,241,0.02))", borderBottom: "1px solid rgba(79,138,255,0.06)", display: "flex", alignItems: "center", gap: 12 }}>
-                          <div style={{ width: 34, height: 34, borderRadius: 10, background: "rgba(79,138,255,0.1)", border: "1px solid rgba(79,138,255,0.15)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      <Link href={`/dashboard/canvas?id=${wf.id}`} className="db-glass-card" style={{ display: "block", background: "rgba(12,14,24,0.6)", backdropFilter: "blur(20px)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 16, overflow: "hidden", textDecoration: "none", transition: "all 350ms cubic-bezier(0.22, 1, 0.36, 1)" }}>
+                        <div className="p-3 sm:px-[18px] sm:py-[14px]" style={{ background: "linear-gradient(135deg, rgba(79,138,255,0.05), rgba(99,102,241,0.02))", borderBottom: "1px solid rgba(79,138,255,0.08)", display: "flex", alignItems: "center", gap: 12 }}>
+                          <div style={{ width: 34, height: 34, borderRadius: 10, background: "rgba(79,138,255,0.1)", border: "1px solid rgba(79,138,255,0.15)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                             <FileText size={14} style={{ color: "#4F8AFF" }} />
                           </div>
                           <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ fontSize: 14, fontWeight: 600, color: "#E2E8F0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{wf.name}</div>
+                            <div style={{ fontSize: 14, fontWeight: 600, color: "#EDF2F7", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{wf.name}</div>
                           </div>
                         </div>
-                        <div style={{ padding: "12px 18px", display: "flex", alignItems: "center", gap: 14 }}>
-                          <span style={{ fontSize: 11, color: "#556070", display: "flex", alignItems: "center", gap: 4, fontFamily: "var(--font-jetbrains), monospace" }}>
+                        <div className="px-3 py-2.5 sm:px-[18px] sm:py-3" style={{ display: "flex", alignItems: "center", gap: 14 }}>
+                          <span style={{ fontSize: 11, color: "#718096", display: "flex", alignItems: "center", gap: 4, fontFamily: "var(--font-jetbrains), monospace" }}>
                             <Zap size={10} style={{ color: "#4F8AFF" }} /> {wf.nodeCount} {t("dash.nodes")}
                           </span>
-                          <span style={{ fontSize: 11, color: "#556070", display: "flex", alignItems: "center", gap: 4, fontFamily: "var(--font-jetbrains), monospace" }}>
+                          <span style={{ fontSize: 11, color: "#718096", display: "flex", alignItems: "center", gap: 4, fontFamily: "var(--font-jetbrains), monospace" }}>
                             <Play size={9} style={{ color: "#10B981" }} /> {wf.executionCount} {t("dash.runs")}
                           </span>
                         </div>
