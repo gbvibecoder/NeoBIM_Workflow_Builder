@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, useRef, Suspense } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
@@ -56,9 +56,11 @@ function RegisterForm() {
   const [showConfirm, setShowConfirm] = useState(false);
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  const nameInputRef = useRef<HTMLInputElement>(null);
 
-  // Track page view on mount
+  // Autofocus name field and track page view on mount
   useEffect(() => {
+    nameInputRef.current?.focus();
     trackRegisterPageView();
   }, []);
 
@@ -314,10 +316,12 @@ function RegisterForm() {
           <div style={{ position: "relative" }}>
             <User size={15} style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", color: "#818CF8" }} />
             <input
+              ref={nameInputRef}
               type="text"
               value={name}
               onChange={e => setName(e.target.value)}
               placeholder="Jane Smith"
+              autoFocus
               style={inputStyle}
               onFocus={focusHandler}
               onBlur={blurHandler}

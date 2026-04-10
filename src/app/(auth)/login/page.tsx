@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useState, useRef, useEffect } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
@@ -21,6 +21,7 @@ function LoginForm() {
   const searchParams = useSearchParams();
   const callbackUrl = searchParams.get("callbackUrl") ?? "/dashboard";
   const { t } = useLocale();
+  const identifierInputRef = useRef<HTMLInputElement>(null);
 
   // Map NextAuth error codes to user-friendly messages
   const authErrorParam = searchParams.get("error");
@@ -45,6 +46,11 @@ function LoginForm() {
   const [googleLoading, setGoogleLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [touched, setTouched] = useState({ identifier: false, password: false });
+
+  // Autofocus identifier field on mount
+  useEffect(() => {
+    identifierInputRef.current?.focus();
+  }, []);
 
   function handleIdentifierChange(value: string) {
     setIdentifier(value);
@@ -137,6 +143,32 @@ function LoginForm() {
     }
   }
 
+  const inputStyle = {
+    width: "100%", padding: "12px 14px 12px 38px", height: 48,
+    borderRadius: 12, border: "1px solid rgba(255,255,255,0.12)",
+    background: "linear-gradient(180deg, rgba(14,15,24,0.95), rgba(10,11,20,0.95))",
+    color: "#FFFFFF",
+    fontSize: 15, fontWeight: 500, outline: "none", boxSizing: "border-box" as const,
+    transition: "border-color 0.2s, box-shadow 0.2s, background 0.2s",
+    boxShadow: "inset 0 1px 0 rgba(255,255,255,0.04), 0 1px 2px rgba(0,0,0,0.3)",
+  };
+
+  const labelStyle = {
+    display: "block", fontSize: 13, fontWeight: 600,
+    color: "#D4D4E8", marginBottom: 8, letterSpacing: "0.005em",
+  } as const;
+
+  const focusHandler = (e: React.FocusEvent<HTMLInputElement>) => {
+    if (!identifierError || e.currentTarget.name !== "identifier") {
+      e.currentTarget.style.borderColor = "rgba(99,102,241,0.6)";
+    }
+    e.currentTarget.style.boxShadow = "0 0 0 4px rgba(99,102,241,0.12), inset 0 1px 0 rgba(255,255,255,0.06)";
+  };
+  const blurHandler = (e: React.FocusEvent<HTMLInputElement>) => {
+    e.currentTarget.style.borderColor = "rgba(255,255,255,0.12)";
+    e.currentTarget.style.boxShadow = "inset 0 1px 0 rgba(255,255,255,0.04), 0 1px 2px rgba(0,0,0,0.3)";
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 24 }}
@@ -164,13 +196,22 @@ function LoginForm() {
       </div>
 
       <div className="auth-form-inner" style={{ padding: "32px 36px 36px" }}>
+      <style>{`
+        .auth-form-inner input::placeholder { color: #7878A0 !important; opacity: 1; font-weight: 500; }
+        .auth-form-inner input:-webkit-autofill { -webkit-text-fill-color: #FFFFFF !important; -webkit-box-shadow: 0 0 0 1000px #0E0F18 inset !important; }
+      `}</style>
 
       {/* Header */}
       <div style={{ marginBottom: 28 }}>
-        <h2 style={{ fontSize: 22, fontWeight: 700, color: "#F0F0F5", marginBottom: 6, letterSpacing: "-0.02em" }}>
+        <h2 style={{
+          fontSize: 28, fontWeight: 800, marginBottom: 8, letterSpacing: "-0.03em",
+          background: "linear-gradient(135deg, #FFFFFF 0%, #E0E7FF 50%, #A5B4FC 100%)",
+          WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
+          backgroundClip: "text", lineHeight: 1.15,
+        }}>
           {t('auth.welcomeBack')}
         </h2>
-        <p style={{ fontSize: 13.5, color: "#6C6C8A" }}>
+        <p style={{ fontSize: 14.5, color: "#A8A8C4", fontWeight: 500, lineHeight: 1.5 }}>
           {t('auth.signInToContinue')}
         </p>
       </div>
@@ -187,33 +228,35 @@ function LoginForm() {
         }}
         disabled={loading || googleLoading}
         style={{
-          width: "100%", padding: "10px 16px", height: 42,
-          borderRadius: 10, border: "1px solid rgba(255,255,255,0.06)",
-          background: "rgba(26,26,42,0.8)", color: "#E0E0EE",
-          fontSize: 13, fontWeight: 500, cursor: "pointer",
-          display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-          marginBottom: 22, opacity: (loading || googleLoading) ? 0.5 : 1,
-          transition: "all 0.2s ease",
-          boxShadow: "0 1px 2px rgba(0,0,0,0.1), inset 0 1px 0 rgba(255,255,255,0.02)",
+          width: "100%", padding: "12px 16px", height: 48,
+          borderRadius: 12, border: "1px solid rgba(255,255,255,0.14)",
+          background: "linear-gradient(180deg, rgba(36,38,58,0.95), rgba(26,28,46,0.95))",
+          color: "#FFFFFF",
+          fontSize: 14.5, fontWeight: 600, cursor: "pointer",
+          display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
+          marginBottom: 22, transition: "all 0.2s ease",
+          opacity: (loading || googleLoading) ? 0.5 : 1,
+          boxShadow: "0 2px 8px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.08)",
+          letterSpacing: "-0.005em",
         }}
       >
         {googleLoading ? (
           <>
-            <Loader2 size={14} className="animate-spin" />
+            <Loader2 size={16} className="animate-spin" />
             {t('auth.connecting')}
           </>
         ) : (
           <>
-            <Chrome size={14} />
+            <Chrome size={16} />
             {t('auth.continueWithGoogle')}
           </>
         )}
       </motion.button>
 
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 22 }}>
-        <div style={{ flex: 1, height: 1, background: "rgba(255,255,255,0.04)" }} />
-        <span style={{ fontSize: 10.5, color: "#3A3A50", letterSpacing: "0.04em", textTransform: "uppercase" as const, fontWeight: 500 }}>{t('auth.orEmail')}</span>
-        <div style={{ flex: 1, height: 1, background: "rgba(255,255,255,0.04)" }} />
+        <div style={{ flex: 1, height: 1, background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.12))" }} />
+        <span style={{ fontSize: 11.5, color: "#9494B4", letterSpacing: "0.12em", textTransform: "uppercase" as const, fontWeight: 700 }}>{t('auth.orEmail')}</span>
+        <div style={{ flex: 1, height: 1, background: "linear-gradient(90deg, rgba(255,255,255,0.12), transparent)" }} />
       </div>
 
       <form onSubmit={handleSubmit}>
@@ -224,32 +267,31 @@ function LoginForm() {
           transition={{ delay: 0.1, ease: [0.22, 1, 0.36, 1] }}
           style={{ marginBottom: 14 }}
         >
-          <label style={{ display: "block", fontSize: 12.5, fontWeight: 500, color: "#7C7C96", marginBottom: 6, letterSpacing: "-0.005em" }}>
+          <label style={labelStyle}>
             Email or Phone Number
           </label>
           <div style={{ position: "relative" }}>
-            <Mail size={13} style={{ position: "absolute", left: 13, top: "50%", transform: "translateY(-50%)", color: "#3A3A50" }} />
+            <Mail size={15} style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", color: "#818CF8" }} />
             <input
+              ref={identifierInputRef}
+              name="identifier"
               type="text"
               value={identifier}
               onChange={e => handleIdentifierChange(e.target.value)}
-              onBlur={handleIdentifierBlur}
-              onFocus={e => {
-                if (!identifierError) e.currentTarget.style.borderColor = "rgba(79,138,255,0.4)";
-                e.currentTarget.style.boxShadow = "0 0 0 3px rgba(79,138,255,0.08)";
+              onBlur={(e) => {
+                handleIdentifierBlur();
+                blurHandler(e);
               }}
+              onFocus={focusHandler}
               required
+              autoFocus
               placeholder="you@email.com or +91 phone number"
               autoComplete="username"
               aria-invalid={!!identifierError}
               aria-describedby={identifierError ? "identifier-error" : undefined}
               style={{
-                width: "100%", padding: "10px 14px 10px 36px", height: 44,
-                borderRadius: 10,
-                border: `1px solid ${identifierError ? "rgba(239,68,68,0.5)" : "rgba(255,255,255,0.06)"}`,
-                background: "#08080f", color: "#F0F0F5",
-                fontSize: 14, outline: "none", boxSizing: "border-box",
-                transition: "border-color 0.2s, box-shadow 0.2s",
+                ...inputStyle,
+                border: `1px solid ${identifierError ? "rgba(239,68,68,0.5)" : "rgba(255,255,255,0.12)"}`,
               }}
             />
           </div>
@@ -276,29 +318,21 @@ function LoginForm() {
           transition={{ delay: 0.15, ease: [0.22, 1, 0.36, 1] }}
           style={{ marginBottom: 8 }}
         >
-          <label style={{ display: "block", fontSize: 12.5, fontWeight: 500, color: "#7C7C96", marginBottom: 6, letterSpacing: "-0.005em" }}>
+          <label style={labelStyle}>
             {t('auth.password')}
           </label>
           <div style={{ position: "relative" }}>
-            <Lock size={13} style={{ position: "absolute", left: 13, top: "50%", transform: "translateY(-50%)", color: "#3A3A50" }} />
+            <Lock size={15} style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", color: "#818CF8" }} />
             <input
               type={showPassword ? "text" : "password"}
               value={password}
               onChange={e => { setPassword(e.target.value); setError(""); }}
-              onFocus={e => {
-                e.currentTarget.style.borderColor = "rgba(79,138,255,0.4)";
-                e.currentTarget.style.boxShadow = "0 0 0 3px rgba(79,138,255,0.08)";
-              }}
+              onFocus={focusHandler}
+              onBlur={blurHandler}
               required
-              placeholder="••••••••"
+              placeholder="Enter your password"
               autoComplete="current-password"
-              style={{
-                width: "100%", padding: "10px 40px 10px 36px", height: 44,
-                borderRadius: 10, border: "1px solid rgba(255,255,255,0.06)",
-                background: "#08080f", color: "#F0F0F5",
-                fontSize: 14, outline: "none", boxSizing: "border-box",
-                transition: "border-color 0.2s, box-shadow 0.2s",
-              }}
+              style={{ ...inputStyle, paddingRight: 40 }}
             />
             <button
               type="button"
@@ -308,7 +342,7 @@ function LoginForm() {
               style={{
                 position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)",
                 background: "none", border: "none", padding: 4,
-                cursor: "pointer", color: "#3A3A50",
+                cursor: "pointer", color: "#A5B4FC",
                 display: "flex", alignItems: "center", justifyContent: "center",
                 opacity: 0.7, transition: "opacity 0.15s ease",
               }}
@@ -321,8 +355,14 @@ function LoginForm() {
         </motion.div>
 
         {/* Forgot password hint */}
-        <div style={{ textAlign: "right", marginBottom: 14 }}>
-          <a href="/forgot-password" style={{ fontSize: 11.5, color: "#4F8AFF", textDecoration: "none" }}>
+        <div style={{ textAlign: "right", marginBottom: 22 }}>
+          <a
+            href="/forgot-password"
+            style={{
+              fontSize: 12.5, color: "#A5B4FC", textDecoration: "none", fontWeight: 600,
+              transition: "color 0.15s",
+            }}
+          >
             {t('auth.forgotPassword')}
           </a>
         </div>
@@ -350,16 +390,17 @@ function LoginForm() {
           type="submit"
           disabled={loading || googleLoading || !!identifierError}
           style={{
-            width: "100%", padding: "11px", height: 44, borderRadius: 10, border: "none",
+            width: "100%", padding: "14px", height: 52,
+            borderRadius: 12, border: "none",
             background: (loading || googleLoading || identifierError)
-              ? "rgba(79,138,255,0.3)"
-              : "linear-gradient(135deg, #4F8AFF 0%, #6366F1 100%)",
-            color: "#fff", fontSize: 13.5, fontWeight: 600,
+              ? "rgba(99,102,241,0.3)"
+              : "linear-gradient(135deg, #4F8AFF 0%, #6366F1 50%, #8B5CF6 100%)",
+            color: "#fff", fontSize: 15.5, fontWeight: 700,
             cursor: (loading || googleLoading || identifierError) ? "not-allowed" : "pointer",
             opacity: (loading || googleLoading || identifierError) ? 0.5 : 1,
             boxShadow: (loading || googleLoading || identifierError)
               ? "none"
-              : "0 1px 3px rgba(79,138,255,0.3), 0 4px 12px rgba(79,138,255,0.15), inset 0 1px 0 rgba(255,255,255,0.1)",
+              : "0 4px 16px rgba(99,102,241,0.4), 0 8px 32px rgba(99,102,241,0.2), inset 0 1px 0 rgba(255,255,255,0.2)",
             display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
             transition: "all 0.2s ease",
             letterSpacing: "-0.01em",
@@ -376,9 +417,9 @@ function LoginForm() {
         </motion.button>
       </form>
 
-      <p style={{ textAlign: "center", fontSize: 12.5, color: "#5C5C78", marginTop: 24 }}>
+      <p style={{ textAlign: "center", fontSize: 13.5, color: "#A8A8C4", marginTop: 24, fontWeight: 500 }}>
         {t('auth.noAccount')}{" "}
-        <Link href="/register" style={{ color: "#4F8AFF", textDecoration: "none", fontWeight: 600, transition: "color 0.15s" }}>
+        <Link href="/register" style={{ color: "#A5B4FC", textDecoration: "none", fontWeight: 700, transition: "color 0.15s" }}>
           {t('auth.createAccount')}
         </Link>
       </p>
