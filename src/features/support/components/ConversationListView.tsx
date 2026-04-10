@@ -55,40 +55,12 @@ export default function ConversationListView({ onNewConversation }: Conversation
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
-      {/* New Conversation Button */}
-      <div style={{ padding: "12px 16px 8px" }}>
-        <motion.button
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
-          onClick={handleNew}
-          style={{
-            width: "100%",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: 8,
-            padding: "10px 16px",
-            borderRadius: 10,
-            border: "none",
-            background: "#4F8AFF",
-            color: "#fff",
-            fontSize: 14,
-            fontWeight: 600,
-            cursor: "pointer",
-            letterSpacing: "0.01em",
-          }}
-        >
-          <Plus size={16} strokeWidth={2.5} />
-          New Conversation
-        </motion.button>
-      </div>
-
       {/* Conversation List */}
       <div
         style={{
           flex: 1,
           overflowY: "auto",
-          padding: "4px 8px 8px",
+          padding: "8px 8px 4px",
         }}
       >
         {conversations.length === 0 ? (
@@ -256,6 +228,34 @@ export default function ConversationListView({ onNewConversation }: Conversation
             );
           })
         )}
+      </div>
+
+      {/* + New Conversation Button — pinned to bottom */}
+      <div style={{ padding: "8px 16px 12px", flexShrink: 0 }}>
+        <motion.button
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
+          onClick={handleNew}
+          style={{
+            width: "100%",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 8,
+            padding: "10px 16px",
+            borderRadius: 10,
+            border: "none",
+            background: "#4F8AFF",
+            color: "#fff",
+            fontSize: 14,
+            fontWeight: 600,
+            cursor: "pointer",
+            letterSpacing: "0.01em",
+          }}
+        >
+          <Plus size={16} strokeWidth={2.5} />
+          New Conversation
+        </motion.button>
       </div>
     </div>
   );

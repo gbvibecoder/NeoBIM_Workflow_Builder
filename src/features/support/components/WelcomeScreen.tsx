@@ -11,8 +11,10 @@ import {
   Bug,
   MessageSquare,
 } from "lucide-react";
+import { useSession } from "next-auth/react";
 import { useSupportStore } from "@/features/support/stores/support-store";
 import { useLiveChatStore } from "@/features/support/stores/live-chat-store";
+import { isPlatformAdmin } from "@/lib/platform-admin";
 
 // ─── Topics ─────────────────────────────────────────────────────────────────
 
@@ -37,6 +39,8 @@ function getGreeting(): string {
 // ─── Component ──────────────────────────────────────────────────────────────
 
 export default function WelcomeScreen() {
+  const { data: session } = useSession();
+  const isAdmin = isPlatformAdmin(session?.user?.email);
   const sendMessage = useSupportStore((s) => s.sendMessage);
   const setChatView = useSupportStore((s) => s.setChatView);
   const adminOnline = useLiveChatStore((s) => s.adminOnline);
@@ -199,8 +203,8 @@ export default function WelcomeScreen() {
           })}
         </div>
 
-        {/* Live Chat with Us — full-width card */}
-        <motion.button
+        {/* Live Chat with Us — hidden for platform admins (they ARE the support team) */}
+        {!isAdmin && <motion.button
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3, delay: 0.5 }}
@@ -275,7 +279,7 @@ export default function WelcomeScreen() {
               aria-label="Support online"
             />
           )}
-        </motion.button>
+        </motion.button>}
       </div>
     </div>
   );

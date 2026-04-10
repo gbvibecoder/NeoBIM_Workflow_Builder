@@ -251,34 +251,38 @@ function ChatPane({ conversation }: { conversation: AdminLiveChatConversation | 
           flexDirection: "column",
           alignItems: "center",
           justifyContent: "center",
-          gap: 16,
+          gap: 20,
           color: "#6B7280",
-          padding: 24,
+          padding: 40,
           textAlign: "center",
-          background:
-            "radial-gradient(ellipse at center, rgba(79,138,255,0.04) 0%, transparent 60%), #0a0c14",
+          background: "#111520",
+          backgroundImage:
+            "radial-gradient(rgba(255,255,255,0.018) 1px, transparent 1px)",
+          backgroundSize: "24px 24px",
         }}
       >
         <div
           style={{
-            width: 72,
-            height: 72,
-            borderRadius: 20,
-            background: "linear-gradient(135deg, rgba(79,138,255,0.18), rgba(99,102,241,0.10))",
+            width: 88,
+            height: 88,
+            borderRadius: 24,
+            background: "linear-gradient(135deg, rgba(79,138,255,0.12), rgba(99,102,241,0.08))",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            border: "1px solid rgba(79,138,255,0.18)",
+            border: "1px solid rgba(79,138,255,0.12)",
+            boxShadow: "0 8px 32px rgba(79,138,255,0.1)",
           }}
         >
-          <MessageSquare size={32} color="#4F8AFF" />
+          <MessageSquare size={36} color="#4F8AFF" />
         </div>
         <div>
-          <p style={{ fontSize: 16, fontWeight: 600, color: "#E2E8F0", margin: "0 0 4px" }}>
+          <p style={{ fontSize: 18, fontWeight: 700, color: "#e2e5f0", margin: "0 0 6px", letterSpacing: "-0.01em" }}>
             Select a conversation
           </p>
-          <p style={{ fontSize: 13, color: "#6B7280", margin: 0 }}>
-            Choose a thread on the left to start replying
+          <p style={{ fontSize: 13, color: "#5a5d72", margin: 0, lineHeight: 1.5 }}>
+            Choose a thread from the left panel to start replying.<br />
+            New messages from users will appear automatically.
           </p>
         </div>
       </div>
@@ -321,7 +325,7 @@ function ChatPane({ conversation }: { conversation: AdminLiveChatConversation | 
         display: "flex",
         flexDirection: "column",
         minHeight: 0,
-        background: "#0a0c14",
+        background: "#111520",
         position: "relative",
       }}
     >
@@ -332,9 +336,9 @@ function ChatPane({ conversation }: { conversation: AdminLiveChatConversation | 
           display: "flex",
           alignItems: "center",
           gap: 14,
-          background: "linear-gradient(180deg, #11131e 0%, #0d0f1a 100%)",
-          borderBottom: "1px solid rgba(255,255,255,0.06)",
-          boxShadow: "0 1px 0 rgba(255,255,255,0.03), 0 8px 24px rgba(0,0,0,0.25)",
+          background: "linear-gradient(180deg, #181d2e 0%, #141824 100%)",
+          borderBottom: "1px solid rgba(255,255,255,0.07)",
+          boxShadow: "0 1px 0 rgba(255,255,255,0.03), 0 4px 16px rgba(0,0,0,0.2)",
           position: "relative",
           zIndex: 2,
         }}
@@ -367,7 +371,7 @@ function ChatPane({ conversation }: { conversation: AdminLiveChatConversation | 
               height: 12,
               borderRadius: "50%",
               background: "#22c55e",
-              border: "2px solid #11131e",
+              border: "2px solid #181d2e",
               boxShadow: "0 0 6px rgba(34,197,94,0.6)",
             }}
           />
@@ -467,11 +471,13 @@ function ChatPane({ conversation }: { conversation: AdminLiveChatConversation | 
           overflowY: "auto",
           minHeight: 0,
           padding: "20px 0 8px",
-          // Subtle dot pattern (WhatsApp-style)
-          backgroundImage:
-            "radial-gradient(rgba(255,255,255,0.025) 1px, transparent 1px)",
-          backgroundSize: "22px 22px",
-          backgroundPosition: "0 0",
+          // WhatsApp-style subtle wallpaper doodle pattern
+          backgroundColor: "#111520",
+          backgroundImage: `
+            radial-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
+            radial-gradient(rgba(79,138,255,0.015) 1px, transparent 1px)`,
+          backgroundSize: "24px 24px, 40px 40px",
+          backgroundPosition: "0 0, 12px 12px",
         }}
       >
         {messages.length === 0 ? (
@@ -527,8 +533,8 @@ function ChatPane({ conversation }: { conversation: AdminLiveChatConversation | 
                           maxWidth: "68%",
                           background: mine
                             ? "linear-gradient(135deg, #4F8AFF, #6366f1)"
-                            : "rgba(28,30,46,0.95)",
-                          color: mine ? "#ffffff" : "#E8EAF6",
+                            : "rgba(26,31,48,0.95)",
+                          color: mine ? "#ffffff" : "#e9edef",
                           padding: "9px 14px",
                           fontSize: 14,
                           lineHeight: 1.45,
@@ -541,9 +547,9 @@ function ChatPane({ conversation }: { conversation: AdminLiveChatConversation | 
                           borderBottomRightRadius: mine && isLast ? 6 : 16,
                           borderBottomLeftRadius: !mine && isLast ? 6 : 16,
                           boxShadow: mine
-                            ? "0 4px 16px rgba(79,138,255,0.25), 0 1px 0 rgba(255,255,255,0.08) inset"
-                            : "0 4px 16px rgba(0,0,0,0.35), 0 1px 0 rgba(255,255,255,0.04) inset",
-                          border: mine ? "none" : "1px solid rgba(255,255,255,0.04)",
+                            ? "0 4px 14px rgba(79,138,255,0.2), 0 1px 0 rgba(255,255,255,0.08) inset"
+                            : "0 2px 8px rgba(0,0,0,0.2), 0 1px 0 rgba(255,255,255,0.03) inset",
+                          border: mine ? "none" : "1px solid rgba(255,255,255,0.05)",
                         }}
                       >
                         {m.content}
@@ -580,7 +586,7 @@ function ChatPane({ conversation }: { conversation: AdminLiveChatConversation | 
             fontSize: 13,
             color: "#6B7280",
             fontStyle: "italic",
-            background: "linear-gradient(180deg, transparent, rgba(0,0,0,0.25))",
+            background: "#141824",
           }}
         >
           🔒 This conversation has been closed.
@@ -593,7 +599,7 @@ function ChatPane({ conversation }: { conversation: AdminLiveChatConversation | 
             display: "flex",
             alignItems: "flex-end",
             gap: 12,
-            background: "linear-gradient(180deg, #0d0f1a 0%, #11131e 100%)",
+            background: "linear-gradient(180deg, #141824 0%, #181d2e 100%)",
             position: "relative",
             zIndex: 2,
           }}
@@ -622,7 +628,7 @@ function ChatPane({ conversation }: { conversation: AdminLiveChatConversation | 
               fontSize: 14,
               lineHeight: "22px",
               color: "#F5F6FA",
-              background: "rgba(20,22,34,0.85)",
+              background: "rgba(18,20,32,0.9)",
               transition: "border-color 0.15s, box-shadow 0.15s",
               outline: "none",
               fontFamily: "inherit",
@@ -729,46 +735,63 @@ export default function AdminLiveChatLayout() {
     <div
       style={{
         display: "flex",
+        width: "100%",
         height: "100%",
-        background: "#0a0c10",
-        color: "#F0F0F0",
+        background: "#111520",
+        color: "#e9edef",
         minHeight: 0,
       }}
     >
-      {/* Conversation list */}
+      {/* ── Sidebar ─────────────────────────────────────────────── */}
       <aside
         style={{
-          width: 340,
+          width: 360,
           flexShrink: 0,
-          borderRight: "1px solid rgba(255,255,255,0.06)",
+          borderRight: "1px solid rgba(255,255,255,0.07)",
           display: "flex",
           flexDirection: "column",
-          background: "#070809",
+          background: "#0d1017",
           minHeight: 0,
         }}
       >
+        {/* Sidebar header */}
         <div
           style={{
-            padding: "18px 16px 14px",
+            padding: "16px 18px",
             borderBottom: "1px solid rgba(255,255,255,0.06)",
+            background: "linear-gradient(180deg, #141824 0%, #0d1017 100%)",
             display: "flex",
             alignItems: "center",
-            gap: 10,
+            gap: 12,
           }}
         >
-          <MessageSquare size={18} color="#4F8AFF" />
-          <h2 style={{ margin: 0, fontSize: 16, fontWeight: 700, flex: 1 }}>
+          <div
+            style={{
+              width: 36,
+              height: 36,
+              borderRadius: 10,
+              background: "linear-gradient(135deg, rgba(79,138,255,0.2), rgba(99,102,241,0.12))",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              border: "1px solid rgba(79,138,255,0.15)",
+            }}
+          >
+            <MessageSquare size={17} color="#4F8AFF" />
+          </div>
+          <h2 style={{ margin: 0, fontSize: 17, fontWeight: 700, flex: 1, letterSpacing: "-0.01em" }}>
             Live Chat
           </h2>
           {waiting.length > 0 && (
             <span
               style={{
-                background: "#F87171",
+                background: "linear-gradient(135deg, #ef4444, #dc2626)",
                 color: "#fff",
                 fontSize: 11,
                 fontWeight: 700,
-                padding: "2px 8px",
-                borderRadius: 10,
+                padding: "3px 10px",
+                borderRadius: 12,
+                boxShadow: "0 2px 8px rgba(239,68,68,0.35)",
               }}
             >
               {waiting.length} new
@@ -776,15 +799,35 @@ export default function AdminLiveChatLayout() {
           )}
         </div>
 
+        {/* Conversation list */}
         <div style={{ flex: 1, overflowY: "auto", minHeight: 0 }}>
           {isLoadingList && conversations.length === 0 && (
-            <div style={{ padding: 24, textAlign: "center", color: "#6B7280", fontSize: 13 }}>
-              Loading…
+            <div style={{ padding: 32, textAlign: "center", color: "#6B7280", fontSize: 13 }}>
+              Loading conversations…
             </div>
           )}
           {!isLoadingList && conversations.length === 0 && (
-            <div style={{ padding: 24, textAlign: "center", color: "#6B7280", fontSize: 13 }}>
-              No conversations yet
+            <div style={{ padding: 32, textAlign: "center" }}>
+              <div
+                style={{
+                  width: 52,
+                  height: 52,
+                  borderRadius: 14,
+                  background: "rgba(107,114,128,0.08)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  margin: "0 auto 12px",
+                }}
+              >
+                <MessageSquare size={24} color="#6B7280" />
+              </div>
+              <p style={{ color: "#6B7280", fontSize: 13, margin: 0 }}>
+                No conversations yet
+              </p>
+              <p style={{ color: "#4a4d5e", fontSize: 11, margin: "4px 0 0" }}>
+                Messages from users will appear here
+              </p>
             </div>
           )}
 
@@ -823,6 +866,7 @@ export default function AdminLiveChatLayout() {
         </div>
       </aside>
 
+      {/* ── Chat pane — fills all remaining space ───────────────── */}
       <ChatPane key={selected?.id || "empty"} conversation={selected} />
     </div>
   );
