@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useCallback } from "react";
+import { useEffect, useCallback, useRef } from "react";
 import { usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { AnimatePresence, motion } from "framer-motion";
@@ -8,6 +8,9 @@ import { useSupportStore } from "@/features/support/stores/support-store";
 import { usePusherLiveChat } from "@/features/support/hooks/usePusherLiveChat";
 import { ChatBubbleButton } from "@/features/support/components/ChatBubbleButton";
 import { ChatWindow } from "@/features/support/components/ChatWindow";
+
+/** Tailwind `sm` breakpoint — below this we treat viewport as mobile */
+const MOBILE_BREAKPOINT = 640;
 
 export function SupportChatWidget() {
   const { data: session } = useSession();
@@ -19,18 +22,31 @@ export function SupportChatWidget() {
   const isMinimized = useSupportStore((s) => s.isMinimized);
   const toggle = useSupportStore((s) => s.toggle);
   const open = useSupportStore((s) => s.open);
+  const close = useSupportStore((s) => s.close);
   const setPageContext = useSupportStore((s) => s.setPageContext);
   const openConversation = useSupportStore((s) => s.openConversation);
   const loadConversations = useSupportStore((s) => s.loadConversations);
 
   const pathname = usePathname();
+  const prevPathnameRef = useRef(pathname);
 
-  // Update page context from pathname
+  // Update page context from pathname + close chat on mobile route change
   useEffect(() => {
     if (pathname) {
       setPageContext(pathname);
     }
-  }, [pathname, setPageContext]);
+    // Close the full-screen chat on mobile when the user navigates (e.g. via
+    // the sidebar). Skip the initial mount so opening the chat page doesn't
+    // immediately dismiss it.
+    if (
+      prevPathnameRef.current !== pathname &&
+      typeof window !== "undefined" &&
+      window.innerWidth < MOBILE_BREAKPOINT
+    ) {
+      close();
+    }
+    prevPathnameRef.current = pathname;
+  }, [pathname, setPageContext, close]);
 
   // Deep link: ?support_conversation=ID
   useEffect(() => {
