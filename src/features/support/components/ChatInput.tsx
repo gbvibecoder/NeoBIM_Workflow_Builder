@@ -102,6 +102,7 @@ export function ChatInput({ conversationStatus }: ChatInputProps) {
 
   return (
     <div
+      className="pb-[max(8px,env(safe-area-inset-bottom))] sm:pb-2"
       style={{
         borderTop: "1px solid rgba(107, 114, 128, 0.15)",
         padding: "8px 12px",

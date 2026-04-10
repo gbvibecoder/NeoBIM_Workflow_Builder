@@ -98,20 +98,23 @@ export function ChatWindow() {
   return (
     <div
       style={{
-        width: "100vw",
-        height: "100vh",
-        maxHeight: "calc(100vh - 48px)",
-        borderRadius: 16,
+        width: "100%",
+        height: "100%",
         backgroundColor: "#111120",
-        border: "1px solid rgba(255, 255, 255, 0.08)",
-        boxShadow:
-          "0 24px 48px rgba(0, 0, 0, 0.5), 0 8px 16px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.05)",
         display: "flex",
         flexDirection: "column",
         overflow: "hidden",
         position: "relative",
       }}
-      className="sm:!w-[420px] sm:!h-[600px] sm:!max-h-[calc(100vh-48px)]"
+      className={[
+        // Mobile: full-screen, no border radius, safe area padding
+        "rounded-none",
+        "pb-[env(safe-area-inset-bottom)]",
+        // Desktop: fixed dimensions, rounded, elevated
+        "sm:w-[420px] sm:h-[600px] sm:max-h-[calc(100vh-48px)]",
+        "sm:rounded-2xl sm:border sm:border-white/[0.08]",
+        "sm:shadow-[0_24px_48px_rgba(0,0,0,0.5),0_8px_16px_rgba(0,0,0,0.3),0_0_0_1px_rgba(255,255,255,0.05)]",
+      ].join(" ")}
     >
       {/* Header */}
       <ChatHeader

@@ -92,7 +92,7 @@ export function SupportChatWidget() {
         )}
       </AnimatePresence>
 
-      {/* Chat window — fixed bottom-right, anchored to bottom */}
+      {/* Chat window — full-screen on mobile, fixed bottom-right on desktop */}
       <AnimatePresence>
         {showWindow && (
           <motion.div
@@ -101,13 +101,8 @@ export function SupportChatWidget() {
             animate={{ scale: 1, opacity: 1, y: 0 }}
             exit={{ scale: 0.95, opacity: 0, y: 20 }}
             transition={{ type: "spring", stiffness: 350, damping: 28 }}
-            style={{
-              position: "fixed",
-              bottom: 24,
-              right: 24,
-              zIndex: 50,
-              transformOrigin: "bottom right",
-            }}
+            className="fixed inset-0 z-50 sm:inset-auto sm:bottom-6 sm:right-6"
+            style={{ transformOrigin: "bottom right" }}
           >
             <ChatWindow />
           </motion.div>

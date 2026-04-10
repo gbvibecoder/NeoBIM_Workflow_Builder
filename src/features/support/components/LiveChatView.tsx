@@ -353,6 +353,7 @@ export default function LiveChatView() {
       {/* Input */}
       {isClosed ? (
         <div
+          className="pb-[max(14px,env(safe-area-inset-bottom))] sm:pb-3.5"
           style={{
             padding: "14px 16px",
             borderTop: "1px solid rgba(255,255,255,0.06)",
@@ -366,6 +367,7 @@ export default function LiveChatView() {
         </div>
       ) : (
         <div
+          className="pb-[max(8px,env(safe-area-inset-bottom))] sm:pb-2"
           style={{
             borderTop: "1px solid rgba(255,255,255,0.06)",
             padding: "8px 12px",
