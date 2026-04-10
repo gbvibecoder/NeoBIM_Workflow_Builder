@@ -80,9 +80,8 @@ export function ChatWindow() {
     if (isSending || activeMessages.length > 0) {
       return "chat";
     }
-    if (hasConversations) {
-      return "list";
-    }
+    // Always land on welcome screen — user can reach the conversation list
+    // via the back button from a chat or by starting a new conversation.
     return "welcome";
   })();
 
@@ -98,8 +97,6 @@ export function ChatWindow() {
   return (
     <div
       style={{
-        width: "100%",
-        height: "100%",
         backgroundColor: "#111120",
         display: "flex",
         flexDirection: "column",
@@ -108,10 +105,10 @@ export function ChatWindow() {
       }}
       className={[
         // Mobile: full-screen, no border radius, safe area padding
-        "rounded-none",
+        "w-full h-full rounded-none",
         "pb-[env(safe-area-inset-bottom)]",
         // Desktop: fixed dimensions, rounded, elevated
-        "sm:w-[420px] sm:h-[600px] sm:max-h-[calc(100vh-48px)]",
+        "sm:!w-[420px] sm:!h-[600px] sm:!max-h-[calc(100vh-48px)]",
         "sm:rounded-2xl sm:border sm:border-white/[0.08]",
         "sm:shadow-[0_24px_48px_rgba(0,0,0,0.5),0_8px_16px_rgba(0,0,0,0.3),0_0_0_1px_rgba(255,255,255,0.05)]",
       ].join(" ")}

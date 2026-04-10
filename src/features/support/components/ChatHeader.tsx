@@ -76,17 +76,20 @@ export function ChatHeader({
         {showBack && onBack && (
           <motion.button
             onClick={handleBack}
-            whileHover={{ scale: 1.1 }}
+            whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.9 }}
-            style={headerButtonStyle}
+            style={{
+              ...headerButtonStyle,
+              background: "rgba(255, 255, 255, 0.08)",
+              color: "#ffffff",
+              border: "1px solid rgba(255, 255, 255, 0.1)",
+            }}
             aria-label="Back to conversations"
             onMouseEnter={(e) => {
-              e.currentTarget.style.color = "#ffffff";
-              e.currentTarget.style.background = "rgba(255,255,255,0.08)";
+              e.currentTarget.style.background = "rgba(255,255,255,0.14)";
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.color = "rgba(255,255,255,0.6)";
-              e.currentTarget.style.background = "transparent";
+              e.currentTarget.style.background = "rgba(255,255,255,0.08)";
             }}
           >
             <ChevronLeft size={18} />
