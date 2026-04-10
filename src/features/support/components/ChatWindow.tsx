@@ -80,9 +80,8 @@ export function ChatWindow() {
     if (isSending || activeMessages.length > 0) {
       return "chat";
     }
-    if (hasConversations) {
-      return "list";
-    }
+    // Always land on welcome screen — user can reach the conversation list
+    // via the back button from a chat or by starting a new conversation.
     return "welcome";
   })();
 
