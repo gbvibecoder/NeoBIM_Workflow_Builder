@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState, KeyboardEvent } from "react";
 import { useSession } from "next-auth/react";
 import { motion } from "framer-motion";
-import { Send, Circle, X, MessageSquare } from "lucide-react";
+import { Send, MessageSquare } from "lucide-react";
 import { useAdminLiveChatStore } from "@/features/support/stores/admin-live-chat-store";
 import { usePusherAdminLiveChat } from "@/features/support/hooks/usePusherAdminLiveChat";
 import type {
@@ -40,31 +40,6 @@ function avatarColor(seed: string): string {
   return colors[Math.abs(h) % colors.length];
 }
 
-function StatusDot({ status }: { status: LiveChatStatus }) {
-  const map: Record<LiveChatStatus, { color: string; label: string }> = {
-    WAITING: { color: "#F87171", label: "New" },
-    ACTIVE: { color: "#22c55e", label: "Replied" },
-    CLOSED: { color: "#6B7280", label: "Closed" },
-  };
-  const m = map[status];
-  return (
-    <span
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        gap: 4,
-        fontSize: 10,
-        fontWeight: 700,
-        letterSpacing: "0.5px",
-        textTransform: "uppercase",
-        color: m.color,
-      }}
-    >
-      <Circle size={7} fill={m.color} stroke="none" />
-      {m.label}
-    </span>
-  );
-}
 
 function ConversationRow({
   conv,
@@ -76,19 +51,23 @@ function ConversationRow({
   onClick: () => void;
 }) {
   const color = avatarColor(conv.userId);
-  const isWaiting = conv.status === "WAITING";
+  const unread = useAdminLiveChatStore((s) => {
+    const c = s.conversations.find((x) => x.id === conv.id);
+    if (!c) return 0;
+    return Math.max(0, c.messageCount - (s.readCounts[conv.id] ?? 0));
+  });
+  const isUnread = unread > 0;
+  // Last message is from user (not admin) → bold the preview
+  const lastFromUser = conv.lastMessage?.senderRole === "USER";
   return (
     <button
       onClick={onClick}
       style={{
         display: "flex",
         gap: 12,
-        padding: "12px 14px",
-        background: selected ? "rgba(79,138,255,0.12)" : "transparent",
+        padding: "14px 16px",
+        background: selected ? "rgba(79,138,255,0.10)" : "transparent",
         border: "none",
-        borderLeft: selected
-          ? "3px solid #4F8AFF"
-          : "3px solid transparent",
         borderBottom: "1px solid rgba(255,255,255,0.04)",
         cursor: "pointer",
         textAlign: "left",
@@ -102,30 +81,33 @@ function ConversationRow({
         if (!selected) e.currentTarget.style.background = "transparent";
       }}
     >
-      <div
-        style={{
-          width: 38,
-          height: 38,
-          borderRadius: "50%",
-          background: color,
-          color: "#fff",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          fontSize: 13,
-          fontWeight: 700,
-          flexShrink: 0,
-        }}
-      >
-        {initials(conv.userName, conv.userEmail)}
+      {/* Avatar with online dot for unread */}
+      <div style={{ position: "relative", flexShrink: 0 }}>
+        <div
+          style={{
+            width: 44,
+            height: 44,
+            borderRadius: "50%",
+            background: `linear-gradient(135deg, ${color}, ${color}bb)`,
+            color: "#fff",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: 14,
+            fontWeight: 700,
+          }}
+        >
+          {initials(conv.userName, conv.userEmail)}
+        </div>
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
+        {/* Row 1: name + time */}
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <span
             style={{
-              fontSize: 13,
-              fontWeight: isWaiting ? 700 : 600,
-              color: "#F0F0F0",
+              fontSize: 14,
+              fontWeight: isUnread ? 700 : 500,
+              color: isUnread ? "#e9edef" : "#d1d5db",
               whiteSpace: "nowrap",
               overflow: "hidden",
               textOverflow: "ellipsis",
@@ -134,94 +116,59 @@ function ConversationRow({
           >
             {conv.userName || conv.userEmail}
           </span>
-          <span style={{ fontSize: 10, color: "#6B7280", flexShrink: 0 }}>
+          <span
+            style={{
+              fontSize: 11,
+              color: isUnread ? "#22c55e" : "#6B7280",
+              flexShrink: 0,
+              fontWeight: isUnread ? 600 : 400,
+            }}
+          >
             {relTime(conv.lastMessageAt)}
           </span>
         </div>
-        <div
-          style={{
-            fontSize: 12,
-            color: "#9898B0",
-            marginTop: 2,
-            whiteSpace: "nowrap",
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-          }}
-        >
-          {conv.lastMessage
-            ? `${conv.lastMessage.senderRole === "ADMIN" ? "You: " : ""}${conv.lastMessage.content}`
-            : "No messages yet"}
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4 }}>
-          <StatusDot status={conv.status} />
-          {conv.userPlan && (
+        {/* Row 2: last message preview + unread badge */}
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 3 }}>
+          <span
+            style={{
+              fontSize: 13,
+              color: isUnread && lastFromUser ? "#d1d5db" : "#7a7d92",
+              fontWeight: isUnread && lastFromUser ? 500 : 400,
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              flex: 1,
+            }}
+          >
+            {conv.lastMessage
+              ? `${conv.lastMessage.senderRole === "ADMIN" ? "You: " : ""}${conv.lastMessage.content}`
+              : "No messages yet"}
+          </span>
+          {/* Unread badge (WhatsApp-style green circle with count) */}
+          {isUnread && (
             <span
               style={{
-                fontSize: 9,
+                minWidth: 20,
+                height: 20,
+                borderRadius: 10,
+                background: "#22c55e",
+                color: "#fff",
+                fontSize: 11,
                 fontWeight: 700,
-                letterSpacing: "0.5px",
-                padding: "1px 6px",
-                borderRadius: 4,
-                background: "rgba(99,102,241,0.15)",
-                color: "#a5b4fc",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                padding: "0 6px",
+                flexShrink: 0,
+                boxShadow: "0 2px 6px rgba(34,197,94,0.35)",
               }}
             >
-              {conv.userPlan}
-            </span>
-          )}
-          {conv.repliedByName && conv.status === "ACTIVE" && (
-            <span style={{ fontSize: 10, color: "#6B7280" }}>
-              · {conv.repliedByName}
+              {unread}
             </span>
           )}
         </div>
       </div>
     </button>
-  );
-}
-
-function Section({
-  title,
-  count,
-  accent,
-  children,
-}: {
-  title: string;
-  count: number;
-  accent: string;
-  children: React.ReactNode;
-}) {
-  if (count === 0) return null;
-  return (
-    <div>
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 8,
-          padding: "12px 14px 8px",
-          fontSize: 10,
-          fontWeight: 700,
-          letterSpacing: "1.2px",
-          textTransform: "uppercase",
-          color: accent,
-        }}
-      >
-        <span>{title}</span>
-        <span
-          style={{
-            background: `${accent}22`,
-            color: accent,
-            padding: "1px 7px",
-            borderRadius: 10,
-            fontSize: 10,
-          }}
-        >
-          {count}
-        </span>
-      </div>
-      {children}
-    </div>
   );
 }
 
@@ -231,7 +178,6 @@ function ChatPane({ conversation }: { conversation: AdminLiveChatConversation | 
   );
   const isSending = useAdminLiveChatStore((s) => s.isSending);
   const sendReply = useAdminLiveChatStore((s) => s.sendReply);
-  const closeConversation = useAdminLiveChatStore((s) => s.closeConversation);
   const [draft, setDraft] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -289,10 +235,9 @@ function ChatPane({ conversation }: { conversation: AdminLiveChatConversation | 
     );
   }
 
-  const isClosed = conversation.status === "CLOSED";
   const handleSend = () => {
     const trimmed = draft.trim();
-    if (!trimmed || isSending || isClosed) return;
+    if (!trimmed || isSending) return;
     sendReply(conversation.id, trimmed);
     setDraft("");
   };
@@ -431,37 +376,6 @@ function ChatPane({ conversation }: { conversation: AdminLiveChatConversation | 
             )}
           </div>
         </div>
-        <StatusDot status={conversation.status} />
-        {!isClosed && (
-          <button
-            onClick={() => closeConversation(conversation.id)}
-            title="Close conversation"
-            style={{
-              background: "rgba(248,113,113,0.08)",
-              border: "1px solid rgba(248,113,113,0.22)",
-              color: "#F87171",
-              padding: "7px 13px",
-              borderRadius: 9,
-              fontSize: 12,
-              fontWeight: 600,
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              gap: 6,
-              transition: "all 0.15s",
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = "rgba(248,113,113,0.16)";
-              e.currentTarget.style.borderColor = "rgba(248,113,113,0.4)";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = "rgba(248,113,113,0.08)";
-              e.currentTarget.style.borderColor = "rgba(248,113,113,0.22)";
-            }}
-          >
-            <X size={13} /> Close
-          </button>
-        )}
       </div>
 
       {/* ── Messages ────────────────────────────────────────────── */}
@@ -577,22 +491,7 @@ function ChatPane({ conversation }: { conversation: AdminLiveChatConversation | 
       </div>
 
       {/* ── Input ───────────────────────────────────────────────── */}
-      {isClosed ? (
-        <div
-          style={{
-            padding: "20px",
-            borderTop: "1px solid rgba(255,255,255,0.06)",
-            textAlign: "center",
-            fontSize: 13,
-            color: "#6B7280",
-            fontStyle: "italic",
-            background: "#141824",
-          }}
-        >
-          🔒 This conversation has been closed.
-        </div>
-      ) : (
-        <div
+      <div
           style={{
             borderTop: "1px solid rgba(255,255,255,0.06)",
             padding: "14px 18px 16px",
@@ -664,7 +563,6 @@ function ChatPane({ conversation }: { conversation: AdminLiveChatConversation | 
             <Send size={18} color="#fff" />
           </motion.button>
         </div>
-      )}
     </div>
   );
 }
@@ -715,19 +613,16 @@ export default function AdminLiveChatLayout() {
     };
   }, [startPolling, stopPolling, fetchConversations, refreshSelectedMessages]);
 
-  const { waiting, active, closed } = useMemo(() => {
-    const w: AdminLiveChatConversation[] = [];
-    const a: AdminLiveChatConversation[] = [];
-    const c: AdminLiveChatConversation[] = [];
-    for (const conv of conversations) {
-      if (conv.status === "WAITING") w.push(conv);
-      else if (conv.status === "ACTIVE") a.push(conv);
-      else c.push(conv);
-    }
-    // Waiting: oldest first (FIFO support queue)
-    w.sort((x, y) => new Date(x.lastMessageAt).getTime() - new Date(y.lastMessageAt).getTime());
-    return { waiting: w, active: a, closed: c };
-  }, [conversations]);
+  const readCounts = useAdminLiveChatStore((s) => s.readCounts);
+  // Total unread messages across all conversations
+  const totalUnread = useMemo(
+    () =>
+      conversations.reduce((sum, c) => {
+        const lastRead = readCounts[c.id] ?? 0;
+        return sum + Math.max(0, c.messageCount - lastRead);
+      }, 0),
+    [conversations, readCounts],
+  );
 
   const selected = conversations.find((c) => c.id === selectedId) || null;
 
@@ -782,19 +677,19 @@ export default function AdminLiveChatLayout() {
           <h2 style={{ margin: 0, fontSize: 17, fontWeight: 700, flex: 1, letterSpacing: "-0.01em" }}>
             Live Chat
           </h2>
-          {waiting.length > 0 && (
+          {totalUnread > 0 && (
             <span
               style={{
-                background: "linear-gradient(135deg, #ef4444, #dc2626)",
+                background: "#22c55e",
                 color: "#fff",
                 fontSize: 11,
                 fontWeight: 700,
                 padding: "3px 10px",
                 borderRadius: 12,
-                boxShadow: "0 2px 8px rgba(239,68,68,0.35)",
+                boxShadow: "0 2px 8px rgba(34,197,94,0.35)",
               }}
             >
-              {waiting.length} new
+              {totalUnread}
             </span>
           )}
         </div>
@@ -831,38 +726,15 @@ export default function AdminLiveChatLayout() {
             </div>
           )}
 
-          <Section title="New" count={waiting.length} accent="#F87171">
-            {waiting.map((c) => (
-              <ConversationRow
-                key={c.id}
-                conv={c}
-                selected={c.id === selectedId}
-                onClick={() => selectConversation(c.id)}
-              />
-            ))}
-          </Section>
-
-          <Section title="Replied" count={active.length} accent="#22c55e">
-            {active.map((c) => (
-              <ConversationRow
-                key={c.id}
-                conv={c}
-                selected={c.id === selectedId}
-                onClick={() => selectConversation(c.id)}
-              />
-            ))}
-          </Section>
-
-          <Section title="Closed" count={closed.length} accent="#6B7280">
-            {closed.map((c) => (
-              <ConversationRow
-                key={c.id}
-                conv={c}
-                selected={c.id === selectedId}
-                onClick={() => selectConversation(c.id)}
-              />
-            ))}
-          </Section>
+          {/* Flat list sorted by most recent — like WhatsApp */}
+          {conversations.map((c) => (
+            <ConversationRow
+              key={c.id}
+              conv={c}
+              selected={c.id === selectedId}
+              onClick={() => selectConversation(c.id)}
+            />
+          ))}
         </div>
       </aside>
 

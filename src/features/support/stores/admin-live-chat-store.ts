@@ -31,8 +31,12 @@ interface AdminLiveChatState {
   isLoadingMessages: boolean;
   isSending: boolean;
   myUserId: string | null;
+  // Tracks the messageCount the admin last "saw" when they clicked each conv.
+  // Unread = conv.messageCount - (readCounts[convId] ?? 0).
+  readCounts: Record<string, number>;
 
   setMyUserId: (id: string) => void;
+  getUnreadCount: (convId: string) => number;
   fetchConversations: () => Promise<void>;
   selectConversation: (id: string) => Promise<void>;
   sendReply: (conversationId: string, content: string) => Promise<void>;
@@ -50,6 +54,28 @@ function sortByLastMessage(a: AdminLiveChatConversation, b: AdminLiveChatConvers
   return new Date(b.lastMessageAt).getTime() - new Date(a.lastMessageAt).getTime();
 }
 
+// ── Persist readCounts to localStorage so they survive page refresh ─────────
+const READ_COUNTS_KEY = "livechat-admin-read-counts";
+
+function loadReadCounts(): Record<string, number> {
+  if (typeof window === "undefined") return {};
+  try {
+    const raw = localStorage.getItem(READ_COUNTS_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
+
+function saveReadCounts(counts: Record<string, number>) {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(READ_COUNTS_KEY, JSON.stringify(counts));
+  } catch {
+    // localStorage full or blocked — degrade silently
+  }
+}
+
 export const useAdminLiveChatStore = create<AdminLiveChatState>()((set, get) => ({
   conversations: [],
   selectedConversationId: null,
@@ -58,8 +84,17 @@ export const useAdminLiveChatStore = create<AdminLiveChatState>()((set, get) => 
   isLoadingMessages: false,
   isSending: false,
   myUserId: null,
+  readCounts: loadReadCounts(),
 
   setMyUserId: (id) => set({ myUserId: id }),
+
+  getUnreadCount: (convId) => {
+    const { conversations, readCounts } = get();
+    const conv = conversations.find((c) => c.id === convId);
+    if (!conv) return 0;
+    const lastRead = readCounts[convId] ?? 0;
+    return Math.max(0, conv.messageCount - lastRead);
+  },
 
   fetchConversations: async () => {
     set({ isLoadingList: true });
@@ -70,9 +105,21 @@ export const useAdminLiveChatStore = create<AdminLiveChatState>()((set, get) => 
         return;
       }
       const data = await res.json();
+      const convs: AdminLiveChatConversation[] = (data.conversations || []).sort(sortByLastMessage);
+      // Auto-mark the currently-selected conversation as read so the badge
+      // doesn't flicker back after a poll refresh while the admin has the
+      // chat open (WhatsApp: if I'm looking at a chat, incoming = read).
+      const selId = get().selectedConversationId;
+      const updatedReadCounts = { ...get().readCounts };
+      if (selId) {
+        const selConv = convs.find((c) => c.id === selId);
+        if (selConv) updatedReadCounts[selId] = selConv.messageCount;
+      }
+      saveReadCounts(updatedReadCounts);
       set({
-        conversations: (data.conversations || []).sort(sortByLastMessage),
+        conversations: convs,
         isLoadingList: false,
+        readCounts: updatedReadCounts,
       });
     } catch (e) {
       console.error("[admin-live-chat] fetchConversations failed:", e);
@@ -81,7 +128,12 @@ export const useAdminLiveChatStore = create<AdminLiveChatState>()((set, get) => 
   },
 
   selectConversation: async (id) => {
-    set({ selectedConversationId: id, isLoadingMessages: true });
+    // Mark as read: snapshot the current messageCount so unread goes to 0
+    const conv = get().conversations.find((c) => c.id === id);
+    const updatedReadCounts = { ...get().readCounts };
+    if (conv) updatedReadCounts[id] = conv.messageCount;
+    saveReadCounts(updatedReadCounts);
+    set({ selectedConversationId: id, isLoadingMessages: true, readCounts: updatedReadCounts });
     try {
       const res = await fetch(`/api/live-chat/conversations/${id}/messages`);
       if (!res.ok) {
@@ -294,9 +346,18 @@ export const useAdminLiveChatStore = create<AdminLiveChatState>()((set, get) => 
       }
       conversations = [...conversations].sort(sortByLastMessage);
 
+      // If admin is currently viewing this conversation, auto-mark as read
+      const readCounts = { ...s.readCounts };
+      if (s.selectedConversationId === data.conversationId) {
+        const conv = conversations.find((c) => c.id === data.conversationId);
+        if (conv) readCounts[data.conversationId] = conv.messageCount;
+        saveReadCounts(readCounts);
+      }
+
       return {
         conversations,
         messages: { ...s.messages, [data.conversationId]: dedup },
+        readCounts,
       };
     });
   },
