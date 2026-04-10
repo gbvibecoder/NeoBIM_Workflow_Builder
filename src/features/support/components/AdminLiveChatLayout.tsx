@@ -24,6 +24,12 @@ function relTime(iso: string): string {
   return `${Math.floor(diff / 86400)}d ago`;
 }
 
+/** Detect if message content is an image URL (from imgbb upload) */
+function isImageMessage(content: string): boolean {
+  return /^https?:\/\/.*\.(jpg|jpeg|png|gif|webp|bmp)(\?.*)?$/i.test(content.trim())
+    || content.trim().startsWith("https://i.ibb.co/");
+}
+
 function initials(name: string | null, email: string): string {
   const src = name || email;
   const parts = src.split(/[\s@]+/).filter(Boolean);
@@ -466,7 +472,24 @@ function ChatPane({ conversation }: { conversation: AdminLiveChatConversation | 
                           border: mine ? "none" : "1px solid rgba(255,255,255,0.05)",
                         }}
                       >
-                        {m.content}
+                        {isImageMessage(m.content) ? (
+                          <a href={m.content.trim()} target="_blank" rel="noopener noreferrer">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={m.content.trim()}
+                              alt="Shared image"
+                              style={{
+                                maxWidth: "100%",
+                                maxHeight: 280,
+                                borderRadius: 10,
+                                display: "block",
+                                cursor: "pointer",
+                              }}
+                            />
+                          </a>
+                        ) : (
+                          m.content
+                        )}
                       </motion.div>
                     );
                   })}
