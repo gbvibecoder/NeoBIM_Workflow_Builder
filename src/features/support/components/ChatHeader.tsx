@@ -54,7 +54,7 @@ export function ChatHeader({
 
   return (
     <div
-      className="pt-[max(12px,env(safe-area-inset-top))] sm:pt-3"
+      className="sm:pt-3"
       style={{
         padding: "12px 16px",
         borderBottom: "1px solid rgba(255, 255, 255, 0.06)",
