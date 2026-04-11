@@ -1,0 +1,81 @@
+name: Apply Prisma Migrations
+
+# ─── When this runs ────────────────────────────────────────────────────────────
+# Triggers ONLY on push to `main` of the upstream repo, and ONLY when files
+# under `prisma/` change. This means:
+#   • Feature-branch pushes → no run
+#   • PRs (open/synchronize) → no run
+#   • Code-only merges (no schema/migration change) → no run
+#   • Merges that include a new migration file → AUTO-APPLY to production
+#
+# A `workflow_dispatch` trigger is included so admins can manually re-run a
+# migration from the GitHub Actions UI if a previous run was interrupted.
+#
+# ─── One-time setup required ───────────────────────────────────────────────────
+# Add a repository secret on the upstream repo so this workflow can connect
+# to the production Neon database:
+#
+#   1. Go to:
+#      https://github.com/rutikerole/NeoBIM_Workflow_Builder/settings/secrets/actions
+#   2. Click "New repository secret"
+#   3. Name:  DATABASE_URL
+#      Value: <production Neon connection string — same as in .env.local>
+#   4. Click "Add secret"
+#
+# After that, every merge to main with a new migration will auto-apply within
+# ~30 seconds — no more manual `prisma migrate deploy` required.
+# ──────────────────────────────────────────────────────────────────────────────
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'prisma/migrations/**'
+      - 'prisma/schema.prisma'
+  workflow_dispatch:
+
+# Serialize migration runs across the whole repo so two simultaneous merges
+# can never race against each other. We do NOT cancel in-progress runs — a
+# half-applied migration would leave the DB in an inconsistent state.
+concurrency:
+  group: prisma-migrate-prod
+  cancel-in-progress: false
+
+jobs:
+  migrate:
+    name: Migrate Production Database
+    runs-on: ubuntu-latest
+    # Safety: only run on the upstream repo. If anyone forks this repo, the
+    # workflow file gets copied but stays inert because their secrets won't
+    # match a real production DB anyway.
+    if: github.repository == 'rutikerole/NeoBIM_Workflow_Builder'
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Show migration status (before)
+        run: npx prisma migrate status
+        continue-on-error: true
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+      - name: Apply pending migrations
+        run: npx prisma migrate deploy
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+      - name: Verify migration status (after)
+        run: npx prisma migrate status
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
