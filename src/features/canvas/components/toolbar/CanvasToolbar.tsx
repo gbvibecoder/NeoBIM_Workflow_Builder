@@ -9,7 +9,12 @@ import {
   Loader2, CheckCircle2, Pencil,
 } from "lucide-react";
 import type { CreationMode } from "@/types/workflow";
-import { useWorkflowStore, isUntitledWorkflow } from "@/features/workflows/stores/workflow-store";
+import {
+  useWorkflowStore,
+  isUntitledWorkflow,
+  selectOpenSaveModal,
+  selectNodes as selectWfNodes,
+} from "@/features/workflows/stores/workflow-store";
 import { useLocale } from "@/hooks/useLocale";
 import {
   shareWorkflowToTwitter,
@@ -148,7 +153,7 @@ export function CanvasToolbar({
   const shareMenuRef = useRef<HTMLDivElement>(null);
   const nameInputRef = useRef<HTMLInputElement>(null);
 
-  const { openSaveModal } = useWorkflowStore();
+  const openSaveModal = useWorkflowStore(selectOpenSaveModal);
   const isUntitled = isUntitledWorkflow(workflowName);
 
   const handleSave = useCallback(() => {
@@ -201,7 +206,7 @@ export function CanvasToolbar({
 
   const currentMode = MODE_CONFIG[creationMode];
 
-  const { nodes } = useWorkflowStore();
+  const nodes = useWorkflowStore(selectWfNodes);
   const isWorkflowReady = nodes.length > 0 && !isExecuting;
 
   // Save button state

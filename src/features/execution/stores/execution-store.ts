@@ -449,6 +449,7 @@ export const useExecutionStore = create<ExecutionState>()((set, get) => ({
 }));
 
 // ─── Optimized selectors — prevent unnecessary re-renders (#45) ──────────────
+// State selectors (reactive)
 export const selectIsExecuting = (s: ExecutionState) => s.isExecuting;
 export const selectExecutionProgress = (s: ExecutionState) => s.executionProgress;
 export const selectIsRateLimited = (s: ExecutionState) => s.isRateLimited;
@@ -456,3 +457,23 @@ export const selectArtifacts = (s: ExecutionState) => s.artifacts;
 export const selectVideoGenProgress = (s: ExecutionState) => s.videoGenProgress;
 export const selectCurrentExecution = (s: ExecutionState) => s.currentExecution;
 export const selectRegeneratingNodeId = (s: ExecutionState) => s.regeneratingNodeId;
+
+// Action selectors (stable references)
+export const selectStartExecution = (s: ExecutionState) => s.startExecution;
+export const selectAddTileResult = (s: ExecutionState) => s.addTileResult;
+export const selectAddArtifact = (s: ExecutionState) => s.addArtifact;
+export const selectCompleteExecution = (s: ExecutionState) => s.completeExecution;
+export const selectSetProgress = (s: ExecutionState) => s.setProgress;
+export const selectSetRateLimited = (s: ExecutionState) => s.setRateLimited;
+export const selectSetVideoGenProgress = (s: ExecutionState) => s.setVideoGenProgress;
+export const selectClearVideoGenProgress = (s: ExecutionState) => s.clearVideoGenProgress;
+export const selectIncrementRegenCount = (s: ExecutionState) => s.incrementRegenCount;
+export const selectDecrementRegenCount = (s: ExecutionState) => s.decrementRegenCount;
+export const selectGetRegenRemaining = (s: ExecutionState) => s.getRegenRemaining;
+export const selectSetRegeneratingNode = (s: ExecutionState) => s.setRegeneratingNode;
+export const selectClearArtifacts = (s: ExecutionState) => s.clearArtifacts;
+export const selectClearCurrentExecution = (s: ExecutionState) => s.clearCurrentExecution;
+export const selectRestoreArtifactsFromDB = (s: ExecutionState) => s.restoreArtifactsFromDB;
+export const selectHydrateQuantityOverrides = (s: ExecutionState) => s.hydrateQuantityOverrides;
+export const selectHydrateVideoGenProgress = (s: ExecutionState) => s.hydrateVideoGenProgress;
+export const selectHydrateRegenerationCounts = (s: ExecutionState) => s.hydrateRegenerationCounts;

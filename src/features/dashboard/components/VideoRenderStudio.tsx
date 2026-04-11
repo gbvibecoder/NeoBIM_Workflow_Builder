@@ -9,7 +9,7 @@ import React, {
   Suspense,
 } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
-import * as THREE from "three";
+import { Group, Vector3, BufferGeometry, LineBasicMaterial, LineSegments, Points } from "three";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import Link from "next/link";
@@ -176,28 +176,28 @@ const VIDEO_STATUS_MESSAGES = [
 // ═══════════════════════════════════════════════════════════════════════════════
 
 function FloorPlanGrid() {
-  const groupRef = useRef<THREE.Group>(null);
+  const groupRef = useRef<Group>(null);
 
   const lineObjects = useMemo(() => {
     const wallColor = "#6366F1";
     const roomColor = "#A5B4FC";
     const accentColor = "#F59E0B";
 
-    const walls: THREE.Vector3[] = [
-      new THREE.Vector3(-3, 0, -2), new THREE.Vector3(3, 0, -2),
-      new THREE.Vector3(3, 0, -2), new THREE.Vector3(3, 0, 2),
-      new THREE.Vector3(3, 0, 2), new THREE.Vector3(-3, 0, 2),
-      new THREE.Vector3(-3, 0, 2), new THREE.Vector3(-3, 0, -2),
+    const walls: Vector3[] = [
+      new Vector3(-3, 0, -2), new Vector3(3, 0, -2),
+      new Vector3(3, 0, -2), new Vector3(3, 0, 2),
+      new Vector3(3, 0, 2), new Vector3(-3, 0, 2),
+      new Vector3(-3, 0, 2), new Vector3(-3, 0, -2),
     ];
-    const rooms: THREE.Vector3[] = [
-      new THREE.Vector3(0, 0, -2), new THREE.Vector3(0, 0, 0.5),
-      new THREE.Vector3(-3, 0, 0), new THREE.Vector3(-0.5, 0, 0),
-      new THREE.Vector3(1, 0, 0), new THREE.Vector3(3, 0, 0),
-      new THREE.Vector3(1.5, 0, -2), new THREE.Vector3(1.5, 0, 0),
+    const rooms: Vector3[] = [
+      new Vector3(0, 0, -2), new Vector3(0, 0, 0.5),
+      new Vector3(-3, 0, 0), new Vector3(-0.5, 0, 0),
+      new Vector3(1, 0, 0), new Vector3(3, 0, 0),
+      new Vector3(1.5, 0, -2), new Vector3(1.5, 0, 0),
     ];
-    const accents: THREE.Vector3[] = [
-      new THREE.Vector3(-0.5, 0, 0), new THREE.Vector3(0.2, 0, 0.5),
-      new THREE.Vector3(0.2, 0, 0.5), new THREE.Vector3(1, 0, 0),
+    const accents: Vector3[] = [
+      new Vector3(-0.5, 0, 0), new Vector3(0.2, 0, 0.5),
+      new Vector3(0.2, 0, 0.5), new Vector3(1, 0, 0),
     ];
 
     return [
@@ -205,9 +205,9 @@ function FloorPlanGrid() {
       { pts: rooms, color: roomColor, opacity: 0.5 },
       { pts: accents, color: accentColor, opacity: 0.6 },
     ].map(({ pts, color, opacity }) => {
-      const geo = new THREE.BufferGeometry().setFromPoints(pts);
-      const mat = new THREE.LineBasicMaterial({ color, transparent: true, opacity });
-      return new THREE.LineSegments(geo, mat);
+      const geo = new BufferGeometry().setFromPoints(pts);
+      const mat = new LineBasicMaterial({ color, transparent: true, opacity });
+      return new LineSegments(geo, mat);
     });
   }, []);
 
@@ -277,7 +277,7 @@ const POSITIONS_80 = createParticlePositions(80);
 const POSITIONS_50 = createParticlePositions(50);
 
 function FloatingParticles({ count = 80 }: { count?: number }) {
-  const ref = useRef<THREE.Points>(null);
+  const ref = useRef<Points>(null);
   const velRef = useRef<Float32Array | null>(null);
   const positions = count === 50 ? POSITIONS_50 : POSITIONS_80;
 
@@ -698,7 +698,7 @@ function UploadZone({
 // ═══════════════════════════════════════════════════════════════════════════════
 
 function MaterializingBuilding({ progress }: { progress: number }) {
-  const groupRef = useRef<THREE.Group>(null);
+  const groupRef = useRef<Group>(null);
   const materialized = progress / 100;
 
   const walls = useMemo(() => [

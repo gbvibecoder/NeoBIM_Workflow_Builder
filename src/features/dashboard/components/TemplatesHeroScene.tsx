@@ -3,7 +3,7 @@
 import { useRef, useMemo, useEffect, useState, Suspense } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { EffectComposer, Bloom } from "@react-three/postprocessing";
-import * as THREE from "three";
+import { Color, Vector3, CatmullRomCurve3, TubeGeometry, Object3D, AdditiveBlending, Group, Mesh, InstancedMesh } from "three";
 
 /* ═══════════════════════════════════════════════════════════════════
    SHARED STATE — mouse for parallax
@@ -80,9 +80,9 @@ function SceneLights() {
    GLOWING NODE SPHERE
    ═══════════════════════════════════════════════════════════════════ */
 function GlowNode({ node, delay }: { node: PipelineNode; delay: number }) {
-  const groupRef = useRef<THREE.Group>(null);
-  const innerRef = useRef<THREE.Mesh>(null);
-  const outerRef = useRef<THREE.Mesh>(null);
+  const groupRef = useRef<Group>(null);
+  const innerRef = useRef<Mesh>(null);
+  const outerRef = useRef<Mesh>(null);
 
   useFrame(({ clock }) => {
     const t = clock.getElapsedTime();
@@ -100,7 +100,7 @@ function GlowNode({ node, delay }: { node: PipelineNode; delay: number }) {
     }
   });
 
-  const color = new THREE.Color(node.color);
+  const color = new Color(node.color);
 
   return (
     <group ref={groupRef} position={node.position}>
@@ -136,7 +136,7 @@ function GlowNode({ node, delay }: { node: PipelineNode; delay: number }) {
           color={color}
           transparent
           opacity={0.06}
-          blending={THREE.AdditiveBlending}
+          blending={AdditiveBlending}
           depthWrite={false}
         />
       </mesh>
@@ -148,27 +148,27 @@ function GlowNode({ node, delay }: { node: PipelineNode; delay: number }) {
    CONNECTION TUBES — curved glowing lines between nodes
    ═══════════════════════════════════════════════════════════════════ */
 function ConnectionTube({ from, to, index }: { from: PipelineNode; to: PipelineNode; index: number }) {
-  const tubeRef = useRef<THREE.Mesh>(null);
+  const tubeRef = useRef<Mesh>(null);
 
   const { geometry, curve } = useMemo(() => {
-    const p0 = new THREE.Vector3(...from.position);
-    const p3 = new THREE.Vector3(...to.position);
-    const mid = new THREE.Vector3().addVectors(p0, p3).multiplyScalar(0.5);
+    const p0 = new Vector3(...from.position);
+    const p3 = new Vector3(...to.position);
+    const mid = new Vector3().addVectors(p0, p3).multiplyScalar(0.5);
     // Curve upward for visual interest
     const lift = 0.5 + Math.abs(p3.y - p0.y) * 0.3;
     const offset = (index % 2 === 0 ? 1 : -1) * 0.3;
-    const p1 = new THREE.Vector3(
+    const p1 = new Vector3(
       lerp(p0.x, mid.x, 0.33) + offset,
       lerp(p0.y, mid.y, 0.33) + lift,
       lerp(p0.z, mid.z, 0.33) + offset * 0.5,
     );
-    const p2 = new THREE.Vector3(
+    const p2 = new Vector3(
       lerp(mid.x, p3.x, 0.66) - offset,
       lerp(mid.y, p3.y, 0.66) + lift * 0.7,
       lerp(mid.z, p3.z, 0.66) - offset * 0.5,
     );
-    const c = new THREE.CatmullRomCurve3([p0, p1, p2, p3]);
-    const g = new THREE.TubeGeometry(c, 48, 0.018, 6, false);
+    const c = new CatmullRomCurve3([p0, p1, p2, p3]);
+    const g = new TubeGeometry(c, 48, 0.018, 6, false);
     return { geometry: g, curve: c };
   }, [from, to, index]);
 
@@ -181,7 +181,7 @@ function ConnectionTube({ from, to, index }: { from: PipelineNode; to: PipelineN
         color={color}
         transparent
         opacity={0.35}
-        blending={THREE.AdditiveBlending}
+        blending={AdditiveBlending}
         depthWrite={false}
       />
     </mesh>
@@ -192,26 +192,26 @@ function ConnectionTube({ from, to, index }: { from: PipelineNode; to: PipelineN
    FLOWING PARTICLES — animated dots traveling along connection paths
    ═══════════════════════════════════════════════════════════════════ */
 function FlowParticles({ from, to, index, count = 3 }: { from: PipelineNode; to: PipelineNode; index: number; count?: number }) {
-  const meshRef = useRef<THREE.InstancedMesh>(null);
-  const dummy = useMemo(() => new THREE.Object3D(), []);
+  const meshRef = useRef<InstancedMesh>(null);
+  const dummy = useMemo(() => new Object3D(), []);
 
   const curve = useMemo(() => {
-    const p0 = new THREE.Vector3(...from.position);
-    const p3 = new THREE.Vector3(...to.position);
-    const mid = new THREE.Vector3().addVectors(p0, p3).multiplyScalar(0.5);
+    const p0 = new Vector3(...from.position);
+    const p3 = new Vector3(...to.position);
+    const mid = new Vector3().addVectors(p0, p3).multiplyScalar(0.5);
     const lift = 0.5 + Math.abs(p3.y - p0.y) * 0.3;
     const offset = (index % 2 === 0 ? 1 : -1) * 0.3;
-    const p1 = new THREE.Vector3(
+    const p1 = new Vector3(
       lerp(p0.x, mid.x, 0.33) + offset,
       lerp(p0.y, mid.y, 0.33) + lift,
       lerp(p0.z, mid.z, 0.33) + offset * 0.5,
     );
-    const p2 = new THREE.Vector3(
+    const p2 = new Vector3(
       lerp(mid.x, p3.x, 0.66) - offset,
       lerp(mid.y, p3.y, 0.66) + lift * 0.7,
       lerp(mid.z, p3.z, 0.66) - offset * 0.5,
     );
-    return new THREE.CatmullRomCurve3([p0, p1, p2, p3]);
+    return new CatmullRomCurve3([p0, p1, p2, p3]);
   }, [from, to, index]);
 
   useFrame(({ clock }) => {
@@ -239,7 +239,7 @@ function FlowParticles({ from, to, index, count = 3 }: { from: PipelineNode; to:
         color={particleColor}
         transparent
         opacity={0.9}
-        blending={THREE.AdditiveBlending}
+        blending={AdditiveBlending}
         depthWrite={false}
       />
     </instancedMesh>
@@ -250,8 +250,8 @@ function FlowParticles({ from, to, index, count = 3 }: { from: PipelineNode; to:
    AMBIENT PARTICLES — floating background particles
    ═══════════════════════════════════════════════════════════════════ */
 function AmbientParticles({ count = 150 }: { count?: number }) {
-  const meshRef = useRef<THREE.InstancedMesh>(null);
-  const dummy = useMemo(() => new THREE.Object3D(), []);
+  const meshRef = useRef<InstancedMesh>(null);
+  const dummy = useMemo(() => new Object3D(), []);
 
   const particles = useMemo(() => {
     return Array.from({ length: count }, () => ({
@@ -288,7 +288,7 @@ function AmbientParticles({ count = 150 }: { count?: number }) {
         color="#a0c4e8"
         transparent
         opacity={0.35}
-        blending={THREE.AdditiveBlending}
+        blending={AdditiveBlending}
         depthWrite={false}
       />
     </instancedMesh>
@@ -302,7 +302,7 @@ function GroundGrid() {
   return (
     <group position={[0.5, -1.2, 0]}>
       <gridHelper
-        args={[20, 40, new THREE.Color("#06b6d4"), new THREE.Color("#06b6d4")]}
+        args={[20, 40, new Color("#06b6d4"), new Color("#06b6d4")]}
         rotation={[0, 0, 0]}
       />
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.01, 0]}>
@@ -317,7 +317,7 @@ function GroundGrid() {
    ROTATING PIPELINE GROUP — slowly spins everything
    ═══════════════════════════════════════════════════════════════════ */
 function PipelineNetwork() {
-  const groupRef = useRef<THREE.Group>(null);
+  const groupRef = useRef<Group>(null);
 
   useFrame(({ clock }) => {
     if (groupRef.current) {

@@ -3,7 +3,7 @@
 import { useRef, useMemo, useState, useEffect, Suspense } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { EffectComposer, Bloom, Vignette } from "@react-three/postprocessing";
-import * as THREE from "three";
+import { Group, Color, EdgesGeometry, CylinderGeometry, BoxGeometry, Mesh, MeshStandardMaterial, LineSegments, LineBasicMaterial, MeshBasicMaterial, CatmullRomCurve3, Vector3, TubeGeometry, AdditiveBlending, Points, BufferGeometry, Float32BufferAttribute, FogExp2 } from "three";
 
 /* ═══════════════════════════════════════════════════════════════════
    SHARED STATE
@@ -92,13 +92,13 @@ interface BuildingDef {
 }
 
 function ArchBuilding({ def, groupOpacity }: { def: BuildingDef; groupOpacity: number }) {
-  const meshRef = useRef<THREE.Group>(null);
+  const meshRef = useRef<Group>(null);
   const riseRef = useRef(0);
   const startTime = useRef(-1);
 
-  const edgeColor = useMemo(() => new THREE.Color(def.color), [def.color]);
+  const edgeColor = useMemo(() => new Color(def.color), [def.color]);
   const bodyColor = useMemo(() => {
-    const c = new THREE.Color(def.color);
+    const c = new Color(def.color);
     c.multiplyScalar(0.3);
     return c;
   }, [def.color]);
@@ -106,9 +106,9 @@ function ArchBuilding({ def, groupOpacity }: { def: BuildingDef; groupOpacity: n
   // Edge geometry
   const edgesGeo = useMemo(() => {
     if (def.type === "cylinder") {
-      return new THREE.EdgesGeometry(new THREE.CylinderGeometry(def.size[0] / 2, def.size[0] / 2, def.size[1], 12));
+      return new EdgesGeometry(new CylinderGeometry(def.size[0] / 2, def.size[0] / 2, def.size[1], 12));
     }
-    return new THREE.EdgesGeometry(new THREE.BoxGeometry(...def.size));
+    return new EdgesGeometry(new BoxGeometry(...def.size));
   }, [def.size, def.type]);
 
   useFrame(({ clock }) => {
@@ -135,11 +135,11 @@ function ArchBuilding({ def, groupOpacity }: { def: BuildingDef; groupOpacity: n
 
     // Update opacities
     meshRef.current.traverse((child) => {
-      if (child instanceof THREE.Mesh) {
-        const mat = child.material as THREE.MeshStandardMaterial;
+      if (child instanceof Mesh) {
+        const mat = child.material as MeshStandardMaterial;
         mat.opacity = groupOpacity * eased * 0.35;
-      } else if (child instanceof THREE.LineSegments) {
-        const mat = child.material as THREE.LineBasicMaterial;
+      } else if (child instanceof LineSegments) {
+        const mat = child.material as LineBasicMaterial;
         mat.opacity = groupOpacity * eased * 0.7;
       }
     });
@@ -174,7 +174,7 @@ function ArchBuilding({ def, groupOpacity }: { def: BuildingDef; groupOpacity: n
             <boxGeometry args={[def.size[0] * 0.65, def.size[1] * 0.35, def.size[2] * 0.65]} />
             <meshStandardMaterial color={bodyColor} transparent opacity={0.3} metalness={0.8} roughness={0.2} />
           </mesh>
-          <lineSegments geometry={new THREE.EdgesGeometry(new THREE.BoxGeometry(def.size[0] * 0.65, def.size[1] * 0.35, def.size[2] * 0.65))}>
+          <lineSegments geometry={new EdgesGeometry(new BoxGeometry(def.size[0] * 0.65, def.size[1] * 0.35, def.size[2] * 0.65))}>
             <lineBasicMaterial color={edgeColor} transparent opacity={0.6} />
           </lineSegments>
         </group>
@@ -215,7 +215,7 @@ const HERO_CITY: BuildingDef[] = [
 ];
 
 function HeroCity() {
-  const group = useRef<THREE.Group>(null);
+  const group = useRef<Group>(null);
   const [opacity, setOpacity] = useState(1);
 
   useFrame(({ clock }) => {
@@ -255,17 +255,17 @@ const FLOW_PATHS = [
 ];
 
 function DataFlows() {
-  const dotsRef = useRef<THREE.Mesh[]>([]);
-  const tubeRefs = useRef<THREE.Mesh[]>([]);
+  const dotsRef = useRef<Mesh[]>([]);
+  const tubeRefs = useRef<Mesh[]>([]);
 
   const curves = useMemo(() =>
-    FLOW_PATHS.map((fp) => new THREE.CatmullRomCurve3(
-      fp.points.map((p) => new THREE.Vector3(p[0], p[1], p[2]))
+    FLOW_PATHS.map((fp) => new CatmullRomCurve3(
+      fp.points.map((p) => new Vector3(p[0], p[1], p[2]))
     )),
   []);
 
   const tubeGeos = useMemo(() =>
-    curves.map((c) => new THREE.TubeGeometry(c, 48, 0.015, 6, false)),
+    curves.map((c) => new TubeGeometry(c, 48, 0.015, 6, false)),
   [curves]);
 
   useFrame(({ clock }) => {
@@ -279,12 +279,12 @@ function DataFlows() {
       const progress = ((t * 0.25 + i * 0.33) % 1);
       const point = curves[i].getPointAt(progress);
       dot.position.copy(point);
-      (dot.material as THREE.MeshBasicMaterial).opacity = vis * 0.9;
+      (dot.material as MeshBasicMaterial).opacity = vis * 0.9;
     });
 
     tubeRefs.current.forEach((tube) => {
       if (!tube) return;
-      (tube.material as THREE.MeshBasicMaterial).opacity = vis * 0.25;
+      (tube.material as MeshBasicMaterial).opacity = vis * 0.25;
     });
   });
 
@@ -297,7 +297,7 @@ function DataFlows() {
             geometry={tubeGeos[i]}
             ref={(el) => { if (el) tubeRefs.current[i] = el; }}
           >
-            <meshBasicMaterial color={fp.color} transparent opacity={0.25} blending={THREE.AdditiveBlending} depthWrite={false} />
+            <meshBasicMaterial color={fp.color} transparent opacity={0.25} blending={AdditiveBlending} depthWrite={false} />
           </mesh>
           {/* Traveling dot */}
           <mesh ref={(el) => { if (el) dotsRef.current[i] = el; }}>
@@ -336,7 +336,7 @@ for (let gx = -2; gx <= 2; gx++) {
 }
 
 function CityRise() {
-  const group = useRef<THREE.Group>(null);
+  const group = useRef<Group>(null);
   const [opacity, setOpacity] = useState(0);
 
   useFrame(({ clock }) => {
@@ -359,14 +359,14 @@ function CityRise() {
 }
 
 function CityRiseBuilding({ def, sectionOpacity }: { def: BuildingDef; sectionOpacity: number }) {
-  const meshRef = useRef<THREE.Mesh>(null);
-  const edgesRef = useRef<THREE.LineSegments>(null);
+  const meshRef = useRef<Mesh>(null);
+  const edgesRef = useRef<LineSegments>(null);
 
   const edgesGeo = useMemo(() => {
     if (def.type === "cylinder") {
-      return new THREE.EdgesGeometry(new THREE.CylinderGeometry(def.size[0] / 2, def.size[0] / 2, def.size[1], 10));
+      return new EdgesGeometry(new CylinderGeometry(def.size[0] / 2, def.size[0] / 2, def.size[1], 10));
     }
-    return new THREE.EdgesGeometry(new THREE.BoxGeometry(...def.size));
+    return new EdgesGeometry(new BoxGeometry(...def.size));
   }, [def.size, def.type]);
 
   useFrame(() => {
@@ -381,11 +381,11 @@ function CityRiseBuilding({ def, sectionOpacity }: { def: BuildingDef; sectionOp
     edgesRef.current.scale.y = Math.max(0.001, rise);
     edgesRef.current.position.y = (h * rise) / 2;
 
-    (meshRef.current.material as THREE.MeshStandardMaterial).opacity = sectionOpacity * 0.3 * rise;
-    (edgesRef.current.material as THREE.LineBasicMaterial).opacity = sectionOpacity * 0.65 * rise;
+    (meshRef.current.material as MeshStandardMaterial).opacity = sectionOpacity * 0.3 * rise;
+    (edgesRef.current.material as LineBasicMaterial).opacity = sectionOpacity * 0.65 * rise;
   });
 
-  const bodyColor = useMemo(() => { const c = new THREE.Color(def.color); c.multiplyScalar(0.3); return c; }, [def.color]);
+  const bodyColor = useMemo(() => { const c = new Color(def.color); c.multiplyScalar(0.3); return c; }, [def.color]);
 
   return (
     <group position={[def.pos[0], 0, def.pos[2]]}>
@@ -411,7 +411,7 @@ function CityRiseBuilding({ def, sectionOpacity }: { def: BuildingDef; sectionOp
 const NODE_COLORS = ["#4F8AFF", "#4F8AFF", "#4F8AFF", "#4F8AFF", "#8B5CF6", "#8B5CF6", "#10B981", "#10B981", "#F59E0B", "#F59E0B"];
 
 function NodeConstellation() {
-  const group = useRef<THREE.Group>(null);
+  const group = useRef<Group>(null);
 
   const nodes = useMemo(() =>
     NODE_COLORS.map((c, i) => {
@@ -428,8 +428,8 @@ function NodeConstellation() {
       pos.push(...nodes[i].position, ...nodes[next].position);
       if (i + 3 < nodes.length) pos.push(...nodes[i].position, ...nodes[i + 3].position);
     }
-    const geo = new THREE.BufferGeometry();
-    geo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+    const geo = new BufferGeometry();
+    geo.setAttribute("position", new Float32BufferAttribute(pos, 3));
     return geo;
   }, [nodes]);
 
@@ -441,11 +441,11 @@ function NodeConstellation() {
     group.current.rotation.y = clock.elapsedTime * 0.08;
 
     group.current.traverse((child) => {
-      if (child instanceof THREE.Mesh) {
-        const mat = child.material as THREE.MeshBasicMaterial;
+      if (child instanceof Mesh) {
+        const mat = child.material as MeshBasicMaterial;
         mat.opacity = vis * (mat.wireframe ? 0.7 : 0.8);
-      } else if (child instanceof THREE.LineSegments) {
-        (child.material as THREE.LineBasicMaterial).opacity = vis * 0.15;
+      } else if (child instanceof LineSegments) {
+        (child.material as LineBasicMaterial).opacity = vis * 0.15;
       }
     });
   });
@@ -465,7 +465,7 @@ function NodeConstellation() {
         </group>
       ))}
       <lineSegments geometry={lineGeo}>
-        <lineBasicMaterial color="#4F8AFF" transparent opacity={0} blending={THREE.AdditiveBlending} depthWrite={false} />
+        <lineBasicMaterial color="#4F8AFF" transparent opacity={0} blending={AdditiveBlending} depthWrite={false} />
       </lineSegments>
     </group>
   );
@@ -476,13 +476,13 @@ function NodeConstellation() {
    ═══════════════════════════════════════════════════════════════════ */
 
 function AmbientParticles({ count = 250 }: { count?: number }) {
-  const ref = useRef<THREE.Points>(null);
+  const ref = useRef<Points>(null);
 
   const { positions, velocities, colors } = useMemo(() => {
     const pos = new Float32Array(count * 3);
     const vel = new Float32Array(count * 3);
     const col = new Float32Array(count * 3);
-    const pal = [...PALETTE, "#ffffff", "#ffffff"].map((c) => new THREE.Color(c));
+    const pal = [...PALETTE, "#ffffff", "#ffffff"].map((c) => new Color(c));
     for (let i = 0; i < count; i++) {
       pos[i * 3] = (Math.random() - 0.5) * 20;
       pos[i * 3 + 1] = Math.random() * 10 - 1;
@@ -520,7 +520,7 @@ function AmbientParticles({ count = 250 }: { count?: number }) {
         <bufferAttribute attach="attributes-position" args={[positions, 3]} />
         <bufferAttribute attach="attributes-color" args={[colors, 3]} />
       </bufferGeometry>
-      <pointsMaterial size={0.03} vertexColors transparent opacity={0.4} blending={THREE.AdditiveBlending} depthWrite={false} sizeAttenuation />
+      <pointsMaterial size={0.03} vertexColors transparent opacity={0.4} blending={AdditiveBlending} depthWrite={false} sizeAttenuation />
     </points>
   );
 }
@@ -555,7 +555,7 @@ function Scene({ isMobile }: { isMobile: boolean }) {
 
   // Set fog for atmospheric depth
   useEffect(() => {
-    scene.fog = new THREE.FogExp2("#0a0c14", 0.035);
+    scene.fog = new FogExp2("#0a0c14", 0.035);
     return () => { scene.fog = null; };
   }, [scene]);
 

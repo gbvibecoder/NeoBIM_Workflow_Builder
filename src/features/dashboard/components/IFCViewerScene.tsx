@@ -3,7 +3,7 @@
 import { useRef, useMemo, useState, useEffect, Suspense } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { EffectComposer, Bloom } from "@react-three/postprocessing";
-import * as THREE from "three";
+import { BoxGeometry, EdgesGeometry, Vector3, Quaternion, AdditiveBlending } from "three";
 
 /* ═══════════════════════════════════════════════════════════════════
    IFC VIEWER SCENE — 2-story building assembles itself
@@ -76,8 +76,8 @@ function EdgeBox({ args, position, color, opacity, edgeOpacity, edgeColor, metal
   metalness?: number;
   roughness?: number;
 }) {
-  const geo = useMemo(() => new THREE.BoxGeometry(...args), [args]);
-  const edgesGeo = useMemo(() => new THREE.EdgesGeometry(geo), [geo]);
+  const geo = useMemo(() => new BoxGeometry(...args), [args]);
+  const edgesGeo = useMemo(() => new EdgesGeometry(geo), [geo]);
 
   return (
     <group position={position}>
@@ -234,9 +234,9 @@ function Staircase({ progress }: { progress: number }) {
   const vis = ss(progress, 0.65, 0.78);
   if (vis < 0.01) return null;
 
-  const steps: THREE.Vector3[] = [];
+  const steps: Vector3[] = [];
   for (let i = 0; i < 12; i++) {
-    steps.push(new THREE.Vector3(4.5, 0.35 + i * 0.25, 3.5 + i * 0.15));
+    steps.push(new Vector3(4.5, 0.35 + i * 0.25, 3.5 + i * 0.15));
   }
 
   return (
@@ -302,8 +302,8 @@ function MEP({ progress }: { progress: number }) {
         const cx = (p1[0] + p2[0]) / 2;
         const cy = (p1[1] + p2[1]) / 2;
         const cz = (p1[2] + p2[2]) / 2;
-        const dir = new THREE.Vector3(dx, dy, dz).normalize();
-        const quat = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
+        const dir = new Vector3(dx, dy, dz).normalize();
+        const quat = new Quaternion().setFromUnitVectors(new Vector3(0, 1, 0), dir);
         const radius = c === "#22c55e" ? 0.08 : 0.04;
 
         return (
@@ -315,7 +315,7 @@ function MEP({ progress }: { progress: number }) {
             {/* Glow shell */}
             <mesh>
               <cylinderGeometry args={[radius * 2.5, radius * 2.5, len, 8]} />
-              <meshBasicMaterial color={c} transparent opacity={vis * 0.08} blending={THREE.AdditiveBlending} depthWrite={false} />
+              <meshBasicMaterial color={c} transparent opacity={vis * 0.08} blending={AdditiveBlending} depthWrite={false} />
             </mesh>
           </group>
         );
@@ -346,7 +346,7 @@ function IFCCamera({ progress }: { progress: number }) {
     const x = 5 + Math.cos(orbitAngle) * r;
     const z = 4 + Math.sin(orbitAngle) * r;
 
-    camera.position.lerp(new THREE.Vector3(x, y, z), 0.03);
+    camera.position.lerp(new Vector3(x, y, z), 0.03);
     camera.lookAt(5, 2.5, 4);
   });
 

@@ -21,7 +21,7 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { useEffect, useRef, useState, useCallback } from "react";
-import * as THREE from "three";
+import { WebGLRenderer, Scene, PerspectiveCamera, Group, DirectionalLight, AmbientLight, HemisphereLight, Plane, Fog, Vector3, PCFSoftShadowMap, ACESFilmicToneMapping, SRGBColorSpace, PMREMGenerator, EquirectangularReflectionMapping, Mesh, MeshStandardMaterial, MeshPhysicalMaterial, Box3, CircleGeometry, RingGeometry, MeshBasicMaterial, DoubleSide, Vector2, Clock, Color, Material } from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { PointerLockControls } from "three/examples/jsm/controls/PointerLockControls.js";
 import { RGBELoader } from "three/examples/jsm/loaders/RGBELoader.js";
@@ -85,26 +85,26 @@ export function HeroBuildingShowcase() {
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Three.js refs
-  const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
+  const rendererRef = useRef<WebGLRenderer | null>(null);
   const composerRef = useRef<EffectComposer | null>(null);
-  const sceneRef = useRef<THREE.Scene | null>(null);
-  const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
+  const sceneRef = useRef<Scene | null>(null);
+  const cameraRef = useRef<PerspectiveCamera | null>(null);
   const orbitRef = useRef<OrbitControls | null>(null);
   const fpRef = useRef<PointerLockControls | null>(null);
-  const buildingGroupRef = useRef<THREE.Group | null>(null);
-  const roomLabelsRef = useRef<THREE.Group | null>(null);
+  const buildingGroupRef = useRef<Group | null>(null);
+  const roomLabelsRef = useRef<Group | null>(null);
   const doorsRef = useRef<DoorMesh[]>([]);
-  const sunLightRef = useRef<THREE.DirectionalLight | null>(null);
-  const ambientRef = useRef<THREE.AmbientLight | null>(null);
-  const hemiRef = useRef<THREE.HemisphereLight | null>(null);
-  const fillRef = useRef<THREE.DirectionalLight | null>(null);
-  const rimRef = useRef<THREE.DirectionalLight | null>(null);
+  const sunLightRef = useRef<DirectionalLight | null>(null);
+  const ambientRef = useRef<AmbientLight | null>(null);
+  const hemiRef = useRef<HemisphereLight | null>(null);
+  const fillRef = useRef<DirectionalLight | null>(null);
+  const rimRef = useRef<DirectionalLight | null>(null);
   const animFrameRef = useRef<number>(0);
   const isVisibleRef = useRef(true);
   const lastRenderRef = useRef(0);
   const introT = useRef(0);
   const explodeT = useRef(0);
-  const sectionPlaneRef = useRef<THREE.Plane | null>(null);
+  const sectionPlaneRef = useRef<Plane | null>(null);
   const matsRef = useRef<ReturnType<typeof createMaterials> | null>(null);
 
   // UI state (refs mirror so animate loop can read without re-running effect)
@@ -158,7 +158,7 @@ export function HeroBuildingShowcase() {
         fill.color.set(0x8aacdd); fill.intensity = 0.38;
         rim.color.set(0xffd090); rim.intensity = 0.32;
         renderer.toneMappingExposure = 0.82;
-        scene.fog = new THREE.Fog(0xb6d4ff, 80, 280);
+        scene.fog = new Fog(0xb6d4ff, 80, 280);
         break;
       case "dusk":
         sun.color.set(0xffd4a0); sun.intensity = 1.6;
@@ -168,7 +168,7 @@ export function HeroBuildingShowcase() {
         fill.color.set(0x8aacdd); fill.intensity = 0.35;
         rim.color.set(0xffd090); rim.intensity = 0.35;
         renderer.toneMappingExposure = 0.88;
-        scene.fog = new THREE.Fog(0xff9966, 80, 260);
+        scene.fog = new Fog(0xff9966, 80, 260);
         break;
       case "night":
         sun.color.set(0x4466aa); sun.intensity = 0.6;
@@ -178,7 +178,7 @@ export function HeroBuildingShowcase() {
         fill.color.set(0x556699); fill.intensity = 0.4;
         rim.color.set(0x88aaff); rim.intensity = 0.6;
         renderer.toneMappingExposure = 0.7;
-        scene.fog = new THREE.Fog(0x0a0a1a, 30, 160);
+        scene.fog = new Fog(0x0a0a1a, 30, 160);
         break;
     }
   }, [timeOfDay]);
@@ -214,14 +214,14 @@ export function HeroBuildingShowcase() {
     let onKeyUp: ((e: KeyboardEvent) => void) | null = null;
     let resizeTimer: ReturnType<typeof setTimeout> | null = null;
     const moveState = { f: false, b: false, l: false, r: false };
-    const velocity = new THREE.Vector3();
+    const velocity = new Vector3();
 
     try {
       const w = container.clientWidth || 1280;
       const h = container.clientHeight || 720;
 
       // ═══ Renderer ═══
-      const renderer = new THREE.WebGLRenderer({
+      const renderer = new WebGLRenderer({
         antialias: true,
         alpha: true,
         powerPreference: "high-performance",
@@ -229,35 +229,35 @@ export function HeroBuildingShowcase() {
       renderer.setSize(w, h);
       renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
       renderer.shadowMap.enabled = true;
-      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      renderer.shadowMap.type = PCFSoftShadowMap;
+      renderer.toneMapping = ACESFilmicToneMapping;
       renderer.toneMappingExposure = 0.85;
       renderer.localClippingEnabled = true;
-      renderer.outputColorSpace = THREE.SRGBColorSpace;
+      renderer.outputColorSpace = SRGBColorSpace;
       container.appendChild(renderer.domElement);
       rendererRef.current = renderer;
 
       // ═══ Scene ═══
-      const scene = new THREE.Scene();
+      const scene = new Scene();
       // No fog — minimalist dark void, no atmospheric haze
       // No background color — canvas is alpha:true and blends with the
       // dashboard's CSS gradient backdrop behind it.
       sceneRef.current = scene;
 
       // ═══ Camera — pulled back, framed slightly above mid-building ═══
-      const camera = new THREE.PerspectiveCamera(28, w / h, 0.1, 1000);
+      const camera = new PerspectiveCamera(28, w / h, 0.1, 1000);
       camera.position.set(110, 65, 110); // matches introStart for clean first frame
       cameraRef.current = camera;
 
       // ═══ HDRI — IBL ONLY, never as background ═══
-      const pmrem = new THREE.PMREMGenerator(renderer);
+      const pmrem = new PMREMGenerator(renderer);
       pmrem.compileEquirectangularShader();
       const rgbe = new RGBELoader();
       rgbe.load(
         "/textures/hdri/industrial_sunset_2k.hdr",
         (tex) => {
           if (disposed) { tex.dispose(); pmrem.dispose(); return; }
-          tex.mapping = THREE.EquirectangularReflectionMapping;
+          tex.mapping = EquirectangularReflectionMapping;
           const envMap = pmrem.fromEquirectangular(tex).texture;
           // ONLY environment — drives PBR reflections on the building.
           // No scene.background → canvas stays transparent, dashboard
@@ -274,15 +274,15 @@ export function HeroBuildingShowcase() {
       );
 
       // ═══ Cinematic 5-light rig (toned down — matte reads, no glare) ═══
-      const ambient = new THREE.AmbientLight(0xe8d8c8, 0.32);
+      const ambient = new AmbientLight(0xe8d8c8, 0.32);
       scene.add(ambient);
       ambientRef.current = ambient;
 
-      const hemi = new THREE.HemisphereLight(0xffe8c0, 0x3a5533, 0.55);
+      const hemi = new HemisphereLight(0xffe8c0, 0x3a5533, 0.55);
       scene.add(hemi);
       hemiRef.current = hemi;
 
-      const sun = new THREE.DirectionalLight(0xffd4a0, 1.6);
+      const sun = new DirectionalLight(0xffd4a0, 1.6);
       sun.position.set(60, 35, 50);
       sun.castShadow = true;
       sun.shadow.mapSize.width = 4096;
@@ -299,12 +299,12 @@ export function HeroBuildingShowcase() {
       scene.add(sun);
       sunLightRef.current = sun;
 
-      const fill = new THREE.DirectionalLight(0x8aacdd, 0.35);
+      const fill = new DirectionalLight(0x8aacdd, 0.35);
       fill.position.set(-30, 40, -20);
       scene.add(fill);
       fillRef.current = fill;
 
-      const rim = new THREE.DirectionalLight(0xffd090, 0.35);
+      const rim = new DirectionalLight(0xffd090, 0.35);
       rim.position.set(-20, 15, -40);
       scene.add(rim);
       rimRef.current = rim;
@@ -335,7 +335,7 @@ export function HeroBuildingShowcase() {
           // Dispose any disposable resources before removing
           scene.remove(child);
           child.traverse((obj) => {
-            if (obj instanceof THREE.Mesh) {
+            if (obj instanceof Mesh) {
               obj.geometry?.dispose();
             }
           });
@@ -347,11 +347,11 @@ export function HeroBuildingShowcase() {
       // hero. Walk the group once and tone down envMap reflections + bump
       // roughness so glass/metal read as architectural, not chrome.
       buildResult.buildingGroup.traverse((obj) => {
-        if (!(obj instanceof THREE.Mesh)) return;
+        if (!(obj instanceof Mesh)) return;
         const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
         for (const m of mats) {
           if (!m) continue;
-          const std = m as THREE.MeshStandardMaterial;
+          const std = m as MeshStandardMaterial;
           if (typeof std.envMapIntensity === "number") {
             std.envMapIntensity = Math.min(std.envMapIntensity, 0.18);
           }
@@ -362,7 +362,7 @@ export function HeroBuildingShowcase() {
             std.metalness = Math.max(0, std.metalness * 0.5);
           }
           // MeshPhysicalMaterial extras
-          const phys = m as THREE.MeshPhysicalMaterial;
+          const phys = m as MeshPhysicalMaterial;
           if (typeof phys.clearcoat === "number") {
             phys.clearcoat = Math.min(phys.clearcoat, 0.1);
           }
@@ -378,36 +378,36 @@ export function HeroBuildingShowcase() {
 
       // Center the building horizontally on world origin (it may have been
       // built off-center based on room coordinates)
-      const bbox = new THREE.Box3().setFromObject(buildResult.buildingGroup);
-      const center = bbox.getCenter(new THREE.Vector3());
+      const bbox = new Box3().setFromObject(buildResult.buildingGroup);
+      const center = bbox.getCenter(new Vector3());
       buildResult.buildingGroup.position.x -= center.x;
       buildResult.buildingGroup.position.z -= center.z;
 
       // ═══ Custom dark reflective ground disc ═══
       // A clean circular plane (not the harsh rectangular one from build)
       // that catches the sun shadows and provides a subtle ground anchor.
-      const groundGeo = new THREE.CircleGeometry(70, 96);
-      const groundMat = new THREE.MeshStandardMaterial({
+      const groundGeo = new CircleGeometry(70, 96);
+      const groundMat = new MeshStandardMaterial({
         color: 0x0a0d14,
         metalness: 0.55,
         roughness: 0.42,
         envMapIntensity: 0.6,
       });
-      const ground = new THREE.Mesh(groundGeo, groundMat);
+      const ground = new Mesh(groundGeo, groundMat);
       ground.rotation.x = -Math.PI / 2;
       ground.position.y = 0;
       ground.receiveShadow = true;
       scene.add(ground);
 
       // Soft cyan ring outline — subtle "BIM plot marker" hint
-      const ringGeo = new THREE.RingGeometry(18, 18.18, 96);
-      const ringMat = new THREE.MeshBasicMaterial({
+      const ringGeo = new RingGeometry(18, 18.18, 96);
+      const ringMat = new MeshBasicMaterial({
         color: 0x06b6d4,
         transparent: true,
         opacity: 0.35,
-        side: THREE.DoubleSide,
+        side: DoubleSide,
       });
-      const ring = new THREE.Mesh(ringGeo, ringMat);
+      const ring = new Mesh(ringGeo, ringMat);
       ring.rotation.x = -Math.PI / 2;
       ring.position.y = 0.005;
       scene.add(ring);
@@ -469,7 +469,7 @@ export function HeroBuildingShowcase() {
       document.addEventListener("keyup", onKeyUp);
 
       // ═══ Section plane ═══
-      const sectionPlane = new THREE.Plane(new THREE.Vector3(0, -1, 0), 8);
+      const sectionPlane = new Plane(new Vector3(0, -1, 0), 8);
       sectionPlaneRef.current = sectionPlane;
 
       // ═══ Postprocessing ═══
@@ -483,7 +483,7 @@ export function HeroBuildingShowcase() {
       ssao.output = SSAOPass.OUTPUT.Default;
       composer.addPass(ssao);
 
-      const bloom = new UnrealBloomPass(new THREE.Vector2(w, h), 0.18, 0.6, 0.85);
+      const bloom = new UnrealBloomPass(new Vector2(w, h), 0.18, 0.6, 0.85);
       composer.addPass(bloom);
 
       const fxaa = new ShaderPass(FXAAShader);
@@ -533,14 +533,14 @@ export function HeroBuildingShowcase() {
       resizeObserver.observe(container);
 
       // ═══ Animate loop ═══
-      const clock = new THREE.Clock();
-      const introStart = new THREE.Vector3(110, 65, 110);
-      const introEnd = new THREE.Vector3(56, 28, 60);
-      const introTarget = new THREE.Vector3(0, 13, 0);
+      const clock = new Clock();
+      const introStart = new Vector3(110, 65, 110);
+      const introEnd = new Vector3(56, 28, 60);
+      const introTarget = new Vector3(0, 13, 0);
       const introDuration = 3.0;
       camera.position.copy(introStart);
       camera.lookAt(introTarget);
-      const direction = new THREE.Vector3();
+      const direction = new Vector3();
       const FPS_TARGET = 16; // ms ≈ 60fps cap
 
       const animate = () => {
@@ -614,12 +614,12 @@ export function HeroBuildingShowcase() {
           lastXrayState.current = xrayRef.current;
           const on = xrayRef.current;
           buildingGroup?.traverse((child) => {
-            if (!(child instanceof THREE.Mesh) || !child.material) return;
+            if (!(child instanceof Mesh) || !child.material) return;
             const mats = Array.isArray(child.material) ? child.material : [child.material];
             mats.forEach((m) => {
-              const mat = m as THREE.Material & {
+              const mat = m as Material & {
                 transparent?: boolean; opacity?: number; depthWrite?: boolean;
-                emissive?: THREE.Color; emissiveIntensity?: number;
+                emissive?: Color; emissiveIntensity?: number;
               };
               const ud = (mat.userData ||= {});
               if (on) {
@@ -686,7 +686,7 @@ export function HeroBuildingShowcase() {
         fpRef.current?.dispose();
         orbitRef.current?.dispose();
         sceneRef.current?.traverse((obj) => {
-          if (obj instanceof THREE.Mesh) obj.geometry?.dispose();
+          if (obj instanceof Mesh) obj.geometry?.dispose();
         });
         sceneRef.current?.clear();
         rendererRef.current?.dispose();

@@ -6,7 +6,7 @@ import { Search, TrendingUp, Star, GitFork, Clock, MessageSquarePlus, X, Chevron
 import { WorkflowCard } from "@/features/community/components/WorkflowCard";
 import { PREBUILT_WORKFLOWS } from "@/features/workflows/constants/prebuilt-workflows";
 import { toast } from "sonner";
-import { useWorkflowStore } from "@/features/workflows/stores/workflow-store";
+import { useWorkflowStore, selectLoadFromTemplate } from "@/features/workflows/stores/workflow-store";
 import { useRouter } from "next/navigation";
 import type { WorkflowTemplate } from "@/types/workflow";
 import { useLocale } from "@/hooks/useLocale";
@@ -351,7 +351,7 @@ export default function CommunityPage() {
   const [showSort, setShowSort]   = useState(false);
   const [showRequest, setShowRequest] = useState(false);
 
-  const { loadFromTemplate } = useWorkflowStore();
+  const loadFromTemplate = useWorkflowStore(selectLoadFromTemplate);
   const router = useRouter();
 
   const filtered = useMemo(() => {

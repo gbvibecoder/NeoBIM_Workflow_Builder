@@ -1018,9 +1018,6 @@ export default function LandingPage() {
   return (
     <div style={{ minHeight: "100vh", background: "#07070D", color: "#F0F0F5", overflowX: "hidden", paddingBottom: 36 }}>
 
-      {/* ── Global noise texture overlay ─────────────────────────── */}
-      <div className="noise-texture" />
-
       {/* ── Navbar ─────────────────────────────────────────────────── */}
       <header>
         <nav style={{

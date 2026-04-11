@@ -184,6 +184,7 @@ model Execution {
   @@index([workflowId])
   @@index([userId])
   @@index([createdAt])
+  @@index([status])
   @@map("executions")
 }
 

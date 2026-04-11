@@ -7,7 +7,7 @@
  */
 
 import { useEffect, useRef, useCallback, useState } from "react";
-import * as THREE from "three";
+import { MeshStandardMaterial, DoubleSide, WebGLRenderer, Scene, PerspectiveCamera, Group, Material, Raycaster, Vector2, Mesh, PCFSoftShadowMap, ACESFilmicToneMapping, SRGBColorSpace, FogExp2, PMREMGenerator, SphereGeometry, MeshBasicMaterial, BackSide, EquirectangularReflectionMapping, PlaneGeometry, AmbientLight, HemisphereLight, DirectionalLight, Plane, Vector3, Box3, ShadowMaterial, MeshPhysicalMaterial, Texture } from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { RGBELoader } from "three/examples/jsm/loaders/RGBELoader.js";
@@ -43,7 +43,7 @@ type ColorMode = "default" | "discipline" | "storey";
 
 // ─── Highlight Material ──────────────────────────────────────────────────────
 
-const HIGHLIGHT_MAT = new THREE.MeshStandardMaterial({
+const HIGHLIGHT_MAT = new MeshStandardMaterial({
   color: 0x4FC3F7,
   emissive: 0x2288BB,
   emissiveIntensity: 0.4,
@@ -51,24 +51,24 @@ const HIGHLIGHT_MAT = new THREE.MeshStandardMaterial({
   metalness: 0.1,
   transparent: true,
   opacity: 0.85,
-  side: THREE.DoubleSide,
+  side: DoubleSide,
 });
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export default function BIMViewer({ glbUrl, metadataUrl, ifcUrl, height = 500 }: BIMViewerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
+  const rendererRef = useRef<WebGLRenderer | null>(null);
   const composerRef = useRef<EffectComposer | null>(null);
   const animFrameRef = useRef<number>(0);
   const controlsRef = useRef<OrbitControls | null>(null);
-  const sceneRef = useRef<THREE.Scene | null>(null);
-  const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
-  const modelRef = useRef<THREE.Group | null>(null);
+  const sceneRef = useRef<Scene | null>(null);
+  const cameraRef = useRef<PerspectiveCamera | null>(null);
+  const modelRef = useRef<Group | null>(null);
   const metadataRef = useRef<BIMMetadata | null>(null);
-  const originalMatsRef = useRef<Map<string, THREE.Material | THREE.Material[]>>(new Map());
-  const raycasterRef = useRef(new THREE.Raycaster());
-  const mouseRef = useRef(new THREE.Vector2());
+  const originalMatsRef = useRef<Map<string, Material | Material[]>>(new Map());
+  const raycasterRef = useRef(new Raycaster());
+  const mouseRef = useRef(new Vector2());
   const materialsRef = useRef<BIMMaterialLib | null>(null);
 
   const [loading, setLoading] = useState(true);
@@ -80,7 +80,7 @@ export default function BIMViewer({ glbUrl, metadataUrl, ifcUrl, height = 500 }:
   const [sectionEnabled, setSectionEnabled] = useState(false);
   const [sectionY, setSectionY] = useState(0.5);
 
-  const selectedMeshRef = useRef<THREE.Mesh | null>(null);
+  const selectedMeshRef = useRef<Mesh | null>(null);
 
   // ─── Load Metadata ─────────────────────────────────────────────────────────
 
@@ -133,7 +133,7 @@ export default function BIMViewer({ glbUrl, metadataUrl, ifcUrl, height = 500 }:
     if (!model) return;
 
     model.traverse((obj) => {
-      if (!(obj instanceof THREE.Mesh) || obj.name === "ground-plane") return;
+      if (!(obj instanceof Mesh) || obj.name === "ground-plane") return;
 
       if (mode === "default") {
         const orig = originalMatsRef.current.get(obj.name);
@@ -141,14 +141,14 @@ export default function BIMViewer({ glbUrl, metadataUrl, ifcUrl, height = 500 }:
       } else if (mode === "discipline") {
         const disc = obj.userData.discipline as string;
         const color = getDisciplineColor(disc);
-        obj.material = new THREE.MeshStandardMaterial({
-          color, roughness: 0.6, metalness: 0.1, side: THREE.DoubleSide,
+        obj.material = new MeshStandardMaterial({
+          color, roughness: 0.6, metalness: 0.1, side: DoubleSide,
         });
       } else if (mode === "storey") {
         const storeyIdx = obj.userData.storeyIndex as number;
         const color = getStoreyColor(storeyIdx ?? 0);
-        obj.material = new THREE.MeshStandardMaterial({
-          color, roughness: 0.6, metalness: 0.1, side: THREE.DoubleSide,
+        obj.material = new MeshStandardMaterial({
+          color, roughness: 0.6, metalness: 0.1, side: DoubleSide,
         });
       }
     });
@@ -174,7 +174,7 @@ export default function BIMViewer({ glbUrl, metadataUrl, ifcUrl, height = 500 }:
     materialsRef.current = mats;
 
     // ═══ Renderer (high quality) ═══
-    const renderer = new THREE.WebGLRenderer({
+    const renderer = new WebGLRenderer({
       antialias: true,
       alpha: false,
       powerPreference: "high-performance",
@@ -182,36 +182,36 @@ export default function BIMViewer({ glbUrl, metadataUrl, ifcUrl, height = 500 }:
     renderer.setSize(w, h);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.shadowMap.type = PCFSoftShadowMap;
+    renderer.toneMapping = ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.35; // Warm golden-hour exposure
     renderer.localClippingEnabled = true;
-    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.outputColorSpace = SRGBColorSpace;
     container.appendChild(renderer.domElement);
     rendererRef.current = renderer;
 
     // ═══ Scene ═══
-    const scene = new THREE.Scene();
-    scene.fog = new THREE.FogExp2(0xE8DDD0, 0.003); // Warm atmospheric haze
+    const scene = new Scene();
+    scene.fog = new FogExp2(0xE8DDD0, 0.003); // Warm atmospheric haze
     sceneRef.current = scene;
 
     // ═══ Real HDRI Environment (with procedural fallback) ═══
-    const pmremGenerator = new THREE.PMREMGenerator(renderer);
+    const pmremGenerator = new PMREMGenerator(renderer);
     pmremGenerator.compileEquirectangularShader();
 
     // Try loading real HDRI first, fall back to procedural
-    let envMap: THREE.Texture | null = null;
+    let envMap: Texture | null = null;
 
     // Procedural sky dome (always added as visible background)
-    const mainSkyGeo = new THREE.SphereGeometry(400, 64, 32);
+    const mainSkyGeo = new SphereGeometry(400, 64, 32);
     const mainSkyTex = createSkyTexture();
-    const mainSkyMat = new THREE.MeshBasicMaterial({
+    const mainSkyMat = new MeshBasicMaterial({
       map: mainSkyTex,
-      side: THREE.BackSide,
+      side: BackSide,
       fog: false,
       depthWrite: false,
     });
-    const mainSkyMesh = new THREE.Mesh(mainSkyGeo, mainSkyMat);
+    const mainSkyMesh = new Mesh(mainSkyGeo, mainSkyMat);
     mainSkyMesh.name = "sky-dome";
     mainSkyMesh.renderOrder = -1;
     scene.add(mainSkyMesh);
@@ -221,7 +221,7 @@ export default function BIMViewer({ glbUrl, metadataUrl, ifcUrl, height = 500 }:
     rgbeLoader.load(
       "/textures/hdri/industrial_sunset_2k.hdr",
       (hdrTexture) => {
-        hdrTexture.mapping = THREE.EquirectangularReflectionMapping;
+        hdrTexture.mapping = EquirectangularReflectionMapping;
         const hdrEnvMap = pmremGenerator.fromEquirectangular(hdrTexture).texture;
         scene.environment = hdrEnvMap;
         // Also use HDRI as visible background for ultra-realistic sky
@@ -237,14 +237,14 @@ export default function BIMViewer({ glbUrl, metadataUrl, ifcUrl, height = 500 }:
       () => {
         // HDRI load failed — fall back to procedural environment
         console.warn("[BIMViewer] HDRI load failed, using procedural sky environment");
-        const envScene = new THREE.Scene();
-        const skyGeo = new THREE.SphereGeometry(100, 64, 32);
+        const envScene = new Scene();
+        const skyGeo = new SphereGeometry(100, 64, 32);
         const skyTex = createSkyTexture();
-        skyTex.mapping = THREE.EquirectangularReflectionMapping;
-        envScene.add(new THREE.Mesh(skyGeo, new THREE.MeshBasicMaterial({ map: skyTex, side: THREE.BackSide })));
-        const envGround = new THREE.Mesh(
-          new THREE.PlaneGeometry(200, 200),
-          new THREE.MeshBasicMaterial({ color: 0x6B7A4A })
+        skyTex.mapping = EquirectangularReflectionMapping;
+        envScene.add(new Mesh(skyGeo, new MeshBasicMaterial({ map: skyTex, side: BackSide })));
+        const envGround = new Mesh(
+          new PlaneGeometry(200, 200),
+          new MeshBasicMaterial({ color: 0x6B7A4A })
         );
         envGround.rotation.x = -Math.PI / 2;
         envGround.position.y = -10;
@@ -256,7 +256,7 @@ export default function BIMViewer({ glbUrl, metadataUrl, ifcUrl, height = 500 }:
     );
 
     // ═══ Camera ═══
-    const camera = new THREE.PerspectiveCamera(35, w / h, 0.1, 1000); // Tighter FOV for architectural drama
+    const camera = new PerspectiveCamera(35, w / h, 0.1, 1000); // Tighter FOV for architectural drama
     camera.position.set(40, 20, 45); // Lower eye level for more imposing view
     cameraRef.current = camera;
 
@@ -274,15 +274,15 @@ export default function BIMViewer({ glbUrl, metadataUrl, ifcUrl, height = 500 }:
     // ═══ Lighting (cinematic golden-hour setup) ═══
 
     // Ambient — warm soft fill
-    const ambientLight = new THREE.AmbientLight(0xE8D8C8, 0.4);
+    const ambientLight = new AmbientLight(0xE8D8C8, 0.4);
     scene.add(ambientLight);
 
     // Hemisphere — warm sky / cool ground for contrast
-    const hemiLight = new THREE.HemisphereLight(0xFFE8C0, 0x3A5533, 0.9);
+    const hemiLight = new HemisphereLight(0xFFE8C0, 0x3A5533, 0.9);
     scene.add(hemiLight);
 
     // Sun — low-angle golden hour with dramatic shadows
-    const sunLight = new THREE.DirectionalLight(0xFFD4A0, 3.2);
+    const sunLight = new DirectionalLight(0xFFD4A0, 3.2);
     sunLight.position.set(60, 35, 50); // Lower angle = longer, more dramatic shadows
     sunLight.castShadow = true;
     sunLight.shadow.mapSize.width = 4096;
@@ -299,22 +299,22 @@ export default function BIMViewer({ glbUrl, metadataUrl, ifcUrl, height = 500 }:
     scene.add(sunLight);
 
     // Fill light — cool blue from opposite side for cinematic warm/cool contrast
-    const fillLight = new THREE.DirectionalLight(0x8AACDD, 0.6);
+    const fillLight = new DirectionalLight(0x8AACDD, 0.6);
     fillLight.position.set(-30, 40, -20);
     scene.add(fillLight);
 
     // Rim light — warm back-lighting for edge glow
-    const rimLight = new THREE.DirectionalLight(0xFFD090, 0.5);
+    const rimLight = new DirectionalLight(0xFFD090, 0.5);
     rimLight.position.set(-20, 15, -40);
     scene.add(rimLight);
 
     // Warm ground bounce light — stronger for ambient warmth
-    const bounceLight = new THREE.DirectionalLight(0xFFDDBB, 0.35);
+    const bounceLight = new DirectionalLight(0xFFDDBB, 0.35);
     bounceLight.position.set(0, -10, 0);
     scene.add(bounceLight);
 
     // Section plane (Y-axis cut)
-    const sectionPlane = new THREE.Plane(new THREE.Vector3(0, -1, 0), 100);
+    const sectionPlane = new Plane(new Vector3(0, -1, 0), 100);
 
     // ═══ Post-processing Pipeline ═══
     const composer = new EffectComposer(renderer);
@@ -332,7 +332,7 @@ export default function BIMViewer({ glbUrl, metadataUrl, ifcUrl, height = 500 }:
 
     // 3. Bloom — golden glow on glass edges, sun-lit surfaces
     const bloomPass = new UnrealBloomPass(
-      new THREE.Vector2(w, h), 0.08, 0.6, 0.9 // Lower threshold = more glow on bright areas
+      new Vector2(w, h), 0.08, 0.6, 0.9 // Lower threshold = more glow on bright areas
     );
     composer.addPass(bloomPass);
 
@@ -357,14 +357,14 @@ export default function BIMViewer({ glbUrl, metadataUrl, ifcUrl, height = 500 }:
         modelRef.current = model;
 
         // Compute bounding box for camera fitting
-        const box = new THREE.Box3().setFromObject(model);
-        const center = box.getCenter(new THREE.Vector3());
-        const size = box.getSize(new THREE.Vector3());
+        const box = new Box3().setFromObject(model);
+        const center = box.getCenter(new Vector3());
+        const size = box.getSize(new Vector3());
         const maxDim = Math.max(size.x, size.y, size.z);
 
         // ═══ MATERIAL REPLACEMENT — upgrade flat GLB materials to ultra-realistic PBR ═══
         model.traverse((child) => {
-          if (!(child instanceof THREE.Mesh)) return;
+          if (!(child instanceof Mesh)) return;
 
           child.castShadow = true;
           child.receiveShadow = true;
@@ -392,8 +392,8 @@ export default function BIMViewer({ glbUrl, metadataUrl, ifcUrl, height = 500 }:
             // scene.environment provides reflections automatically to all PBR materials.
             // Tune envMapIntensity and PBR properties for richer look.
             const mat = child.material;
-            if (mat && "isMeshStandardMaterial" in mat && (mat as THREE.MeshStandardMaterial).isMeshStandardMaterial) {
-              const stdMat = mat as THREE.MeshStandardMaterial;
+            if (mat && "isMeshStandardMaterial" in mat && (mat as MeshStandardMaterial).isMeshStandardMaterial) {
+              const stdMat = mat as MeshStandardMaterial;
               stdMat.envMapIntensity = 1.5;
               // Enhance roughness for more realistic look
               if (stdMat.roughness > 0.9) stdMat.roughness = 0.82;
@@ -404,8 +404,8 @@ export default function BIMViewer({ glbUrl, metadataUrl, ifcUrl, height = 500 }:
               }
               stdMat.needsUpdate = true;
             }
-            if (mat && "isMeshPhysicalMaterial" in mat && (mat as THREE.MeshPhysicalMaterial).isMeshPhysicalMaterial) {
-              const physMat = mat as THREE.MeshPhysicalMaterial;
+            if (mat && "isMeshPhysicalMaterial" in mat && (mat as MeshPhysicalMaterial).isMeshPhysicalMaterial) {
+              const physMat = mat as MeshPhysicalMaterial;
               physMat.envMapIntensity = 2.0;
               physMat.needsUpdate = true;
             }
@@ -421,14 +421,14 @@ export default function BIMViewer({ glbUrl, metadataUrl, ifcUrl, height = 500 }:
         // If the model has a ground-plane, scale it up; otherwise add one
         let hasGround = false;
         model.traverse((obj) => {
-          if (obj instanceof THREE.Mesh && obj.name === "ground-plane") {
+          if (obj instanceof Mesh && obj.name === "ground-plane") {
             hasGround = true;
           }
         });
         if (!hasGround) {
           const groundSize = Math.max(maxDim * 4, 100);
-          const groundMesh = new THREE.Mesh(
-            new THREE.PlaneGeometry(groundSize, groundSize),
+          const groundMesh = new Mesh(
+            new PlaneGeometry(groundSize, groundSize),
             mats.ground
           );
           groundMesh.rotation.x = -Math.PI / 2;
@@ -439,9 +439,9 @@ export default function BIMViewer({ glbUrl, metadataUrl, ifcUrl, height = 500 }:
         }
 
         // ═══ Contact Shadow Plane (soft ground shadow beneath building) ═══
-        const shadowPlane = new THREE.Mesh(
-          new THREE.PlaneGeometry(maxDim * 5, maxDim * 5),
-          new THREE.ShadowMaterial({ opacity: 0.25, color: 0x000000 })
+        const shadowPlane = new Mesh(
+          new PlaneGeometry(maxDim * 5, maxDim * 5),
+          new ShadowMaterial({ opacity: 0.25, color: 0x000000 })
         );
         shadowPlane.rotation.x = -Math.PI / 2;
         shadowPlane.position.y = box.min.y - 0.01;
@@ -493,7 +493,7 @@ export default function BIMViewer({ glbUrl, metadataUrl, ifcUrl, height = 500 }:
         );
 
         // Warm atmospheric haze scales with building size
-        (scene.fog as THREE.FogExp2).density = 0.4 / Math.max(maxDim, 30);
+        (scene.fog as FogExp2).density = 0.4 / Math.max(maxDim, 30);
 
         // Section plane default to mid-height
         setSectionY(center.y + size.y * 0.5);
@@ -525,9 +525,9 @@ export default function BIMViewer({ glbUrl, metadataUrl, ifcUrl, height = 500 }:
       const model = modelRef.current;
       if (!model) return;
 
-      const meshes: THREE.Mesh[] = [];
+      const meshes: Mesh[] = [];
       model.traverse((obj) => {
-        if (obj instanceof THREE.Mesh && obj.name && obj.name !== "ground-plane"
+        if (obj instanceof Mesh && obj.name && obj.name !== "ground-plane"
             && !obj.name.startsWith("tree-") && obj.name !== "sky-dome") {
           meshes.push(obj);
         }
@@ -537,7 +537,7 @@ export default function BIMViewer({ glbUrl, metadataUrl, ifcUrl, height = 500 }:
       deselectElement();
 
       if (intersects.length > 0) {
-        const hit = intersects[0].object as THREE.Mesh;
+        const hit = intersects[0].object as Mesh;
         const elementId = hit.name;
 
         originalMatsRef.current.set(hit.name, hit.material);
@@ -571,7 +571,7 @@ export default function BIMViewer({ glbUrl, metadataUrl, ifcUrl, height = 500 }:
 
       if (sectionPlane) {
         renderer.clippingPlanes = sectionEnabled
-          ? [new THREE.Plane(new THREE.Vector3(0, -1, 0), sectionY)]
+          ? [new Plane(new Vector3(0, -1, 0), sectionY)]
           : [];
       }
 
@@ -619,7 +619,7 @@ export default function BIMViewer({ glbUrl, metadataUrl, ifcUrl, height = 500 }:
     const renderer = rendererRef.current;
     if (renderer) {
       renderer.clippingPlanes = sectionEnabled
-        ? [new THREE.Plane(new THREE.Vector3(0, -1, 0), sectionY)]
+        ? [new Plane(new Vector3(0, -1, 0), sectionY)]
         : [];
     }
   }, [sectionEnabled, sectionY]);

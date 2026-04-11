@@ -38,13 +38,35 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // Email verification is now enforced via pre-execution check on the client.
-  // Unverified users get 1 free execution; subsequent runs are blocked by the frontend popup.
-  // Backend still allows execution through — the client is responsible for showing the modal.
-
   const userId: string = session.user.id;
   const userRole = (session.user as { role?: string }).role as "FREE" | "MINI" | "STARTER" | "PRO" | "TEAM_ADMIN" | "PLATFORM_ADMIN" || "FREE";
   const userEmail = session.user.email || "";
+
+  // Admin users bypass ALL rate limiting and verification — check early
+  const isAdmin = isAdminUser(userEmail) ||
+    userRole === "PLATFORM_ADMIN" ||
+    userRole === "TEAM_ADMIN";
+
+  // Server-side email/phone verification enforcement.
+  // Admins bypass. Phone-verified users bypass (they may not have email).
+  // This prevents abuse — client-side popup alone can be bypassed.
+  if (!isAdmin) {
+    const isEmailVerified = !!(session.user as { emailVerified?: boolean }).emailVerified;
+    const isPhoneVerified = !!(session.user as { phoneVerified?: boolean }).phoneVerified;
+
+    if (!isEmailVerified && !isPhoneVerified) {
+      return NextResponse.json(
+        formatErrorResponse({
+          title: "Email verification required",
+          message: "Please verify your email address before running workflows. Check your inbox for the verification link.",
+          code: "AUTH_001",
+          action: "Verify Email",
+          actionUrl: "/dashboard/settings",
+        }),
+        { status: 403 }
+      );
+    }
+  }
 
   // Parse body first so we can read executionId for rate-limit deduplication
   const { catalogueId, executionId, tileInstanceId, inputData, userApiKey } = await req.json();
@@ -53,11 +75,6 @@ export async function POST(req: NextRequest) {
   // ── Detailed file logging (dev only) ──
   await logWorkflowStart(executionId, userId, userRole, userEmail);
   await logNodeStart(executionId, catalogueId, tileInstanceId, inputData);
-
-  // Admin users bypass ALL rate limiting — check before any Redis calls
-  const isAdmin = isAdminUser(userEmail) ||
-    userRole === "PLATFORM_ADMIN" ||
-    userRole === "TEAM_ADMIN";
 
   // Track remaining executions for success response headers
   let rateLimitRemaining: number | null = null;

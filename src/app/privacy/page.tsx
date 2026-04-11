@@ -53,8 +53,6 @@ export default function PrivacyPage() {
         overflowX: "hidden",
       }}
     >
-      <div className="noise-texture" />
-
       {/* ── Navbar ─────────────────────────────────────────── */}
       <nav
         style={{

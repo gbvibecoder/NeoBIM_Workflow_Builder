@@ -11,7 +11,7 @@ import type { ComponentType } from "react";
 import * as LucideIcons from "lucide-react";
 import { NODE_CATALOGUE } from "@/features/workflows/constants/node-catalogue";
 import { PREBUILT_WORKFLOWS } from "@/features/workflows/constants/prebuilt-workflows";
-import { useWorkflowStore } from "@/features/workflows/stores/workflow-store";
+import { useWorkflowStore, selectResetCanvas, selectLoadFromTemplate } from "@/features/workflows/stores/workflow-store";
 import { useExecution } from "@/features/execution/hooks/useExecution";
 import { useLocale } from "@/hooks/useLocale";
 
@@ -62,7 +62,8 @@ export function CommandPalette() {
   const listRef  = useRef<HTMLDivElement>(null);
 
   const router = useRouter();
-  const { resetCanvas, loadFromTemplate } = useWorkflowStore();
+  const resetCanvas = useWorkflowStore(selectResetCanvas);
+  const loadFromTemplate = useWorkflowStore(selectLoadFromTemplate);
   const { runWorkflow } = useExecution();
   const { t } = useLocale();
 

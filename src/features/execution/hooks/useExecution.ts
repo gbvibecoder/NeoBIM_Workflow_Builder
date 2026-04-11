@@ -3,7 +3,25 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useWorkflowStore } from "@/features/workflows/stores/workflow-store";
-import { useExecutionStore } from "@/features/execution/stores/execution-store";
+import {
+  useExecutionStore,
+  selectIsExecuting,
+  selectIsRateLimited,
+  selectRegeneratingNodeId,
+  selectArtifacts,
+  selectStartExecution,
+  selectAddTileResult,
+  selectAddArtifact,
+  selectCompleteExecution,
+  selectSetProgress,
+  selectSetRateLimited,
+  selectIncrementRegenCount,
+  selectDecrementRegenCount,
+  selectGetRegenRemaining,
+  selectSetRegeneratingNode,
+  selectSetVideoGenProgress,
+  selectClearVideoGenProgress,
+} from "@/features/execution/stores/execution-store";
 import { useUIStore } from "@/shared/stores/ui-store";
 import { executeNode as mockExecuteNode } from "@/features/execution/services/mock-executor";
 import { inputFileStore, inputMultiFileStore, supplementaryIFCStore } from "@/features/canvas/components/nodes/InputNode";
@@ -1196,24 +1214,26 @@ export function useExecution({ onLog }: UseExecutionOptions = {}) {
   const currentWorkflow = useWorkflowStore(s => s.currentWorkflow);
   const updateNodeStatus = useWorkflowStore(s => s.updateNodeStatus);
   const setEdgeFlowing = useWorkflowStore(s => s.setEdgeFlowing);
-  const {
-    startExecution,
-    addTileResult,
-    addArtifact,
-    completeExecution,
-    setProgress,
-    isExecuting,
-    isRateLimited,
-    setRateLimited,
-    incrementRegenCount,
-    decrementRegenCount,
-    getRegenRemaining,
-    setRegeneratingNode,
-    regeneratingNodeId,
-    artifacts,
-    setVideoGenProgress,
-    clearVideoGenProgress,
-  } = useExecutionStore();
+  // ─── Execution store: selective subscriptions ──
+  // State (reactive — only re-render when specific slice changes)
+  const isExecuting = useExecutionStore(selectIsExecuting);
+  const isRateLimited = useExecutionStore(selectIsRateLimited);
+  const regeneratingNodeId = useExecutionStore(selectRegeneratingNodeId);
+  const artifacts = useExecutionStore(selectArtifacts);
+
+  // Actions (stable references — never cause re-renders)
+  const startExecution = useExecutionStore(selectStartExecution);
+  const addTileResult = useExecutionStore(selectAddTileResult);
+  const addArtifact = useExecutionStore(selectAddArtifact);
+  const completeExecution = useExecutionStore(selectCompleteExecution);
+  const setProgress = useExecutionStore(selectSetProgress);
+  const setRateLimited = useExecutionStore(selectSetRateLimited);
+  const incrementRegenCount = useExecutionStore(selectIncrementRegenCount);
+  const decrementRegenCount = useExecutionStore(selectDecrementRegenCount);
+  const getRegenRemaining = useExecutionStore(selectGetRegenRemaining);
+  const setRegeneratingNode = useExecutionStore(selectSetRegeneratingNode);
+  const setVideoGenProgress = useExecutionStore(selectSetVideoGenProgress);
+  const clearVideoGenProgress = useExecutionStore(selectClearVideoGenProgress);
   
   const isDemoMode = useUIStore(s => s.isDemoMode);
   const [rateLimitHit, setRateLimitHit] = useState<RateLimitInfo | null>(null);

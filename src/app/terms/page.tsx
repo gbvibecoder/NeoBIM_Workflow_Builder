@@ -121,8 +121,6 @@ export default function TermsPage() {
         overflowX: "hidden",
       }}
     >
-      <div className="noise-texture" />
-
       {/* ── Navbar ─────────────────────────────────────────── */}
       <nav
         style={{

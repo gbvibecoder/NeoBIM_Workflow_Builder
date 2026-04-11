@@ -3,7 +3,7 @@
 import { useRef, useMemo, useState, useEffect, Suspense } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { EffectComposer, Bloom } from "@react-three/postprocessing";
-import * as THREE from "three";
+import { BoxGeometry, EdgesGeometry, Vector3, DoubleSide, Mesh, LineSegments, MeshBasicMaterial, MeshStandardMaterial, LineBasicMaterial } from "three";
 
 /* ═══════════════════════════════════════════════════════════════════
    FLOOR PLAN SCENE — Real apartment layout that draws & rises
@@ -99,7 +99,7 @@ function BlueprintLine({ x1, z1, x2, z2, isInterior, drawStart, drawEnd, progres
   x1: number; z1: number; x2: number; z2: number; isInterior: boolean;
   drawStart: number; drawEnd: number; progress: number;
 }) {
-  const ref = useRef<THREE.Mesh>(null);
+  const ref = useRef<Mesh>(null);
   const dx = x2 - x1;
   const dz = z2 - z1;
   const fullLen = Math.sqrt(dx * dx + dz * dz);
@@ -110,7 +110,7 @@ function BlueprintLine({ x1, z1, x2, z2, isInterior, drawStart, drawEnd, progres
     const drawProgress = ss(progress, drawStart, drawEnd);
     const currentLen = fullLen * drawProgress;
     ref.current.scale.x = Math.max(0.001, drawProgress);
-    (ref.current.material as THREE.MeshBasicMaterial).opacity = drawProgress > 0.01 ? 0.9 : 0;
+    (ref.current.material as MeshBasicMaterial).opacity = drawProgress > 0.01 ? 0.9 : 0;
   });
 
   const cx = (x1 + x2) / 2;
@@ -122,7 +122,7 @@ function BlueprintLine({ x1, z1, x2, z2, isInterior, drawStart, drawEnd, progres
       <meshBasicMaterial
         color={isInterior ? "#a78bfa" : "#06b6d4"}
         transparent opacity={0}
-        side={THREE.DoubleSide}
+        side={DoubleSide}
       />
     </mesh>
   );
@@ -133,8 +133,8 @@ function RisingWall({ x1, z1, x2, z2, isInterior, riseOrder, progress }: {
   x1: number; z1: number; x2: number; z2: number;
   isInterior: boolean; riseOrder: number; progress: number;
 }) {
-  const meshRef = useRef<THREE.Mesh>(null);
-  const edgesRef = useRef<THREE.LineSegments>(null);
+  const meshRef = useRef<Mesh>(null);
+  const edgesRef = useRef<LineSegments>(null);
 
   const dx = x2 - x1;
   const dz = z2 - z1;
@@ -143,8 +143,8 @@ function RisingWall({ x1, z1, x2, z2, isInterior, riseOrder, progress }: {
   const cz = (z1 + z2) / 2;
   const angle = Math.atan2(dz, dx);
 
-  const geo = useMemo(() => new THREE.BoxGeometry(length, H, W), [length]);
-  const edgesGeo = useMemo(() => new THREE.EdgesGeometry(geo), [geo]);
+  const geo = useMemo(() => new BoxGeometry(length, H, W), [length]);
+  const edgesGeo = useMemo(() => new EdgesGeometry(geo), [geo]);
 
   const color = isInterior ? "#2d1f5e" : "#1a2940";
   const edgeColor = isInterior ? "#a78bfa" : "#06b6d4";
@@ -162,8 +162,8 @@ function RisingWall({ x1, z1, x2, z2, isInterior, riseOrder, progress }: {
     edgesRef.current.scale.y = Math.max(0.001, rise);
     edgesRef.current.position.y = (H * rise) / 2;
 
-    (meshRef.current.material as THREE.MeshStandardMaterial).opacity = rise * 0.85;
-    (edgesRef.current.material as THREE.LineBasicMaterial).opacity = rise * 0.8;
+    (meshRef.current.material as MeshStandardMaterial).opacity = rise * 0.85;
+    (edgesRef.current.material as LineBasicMaterial).opacity = rise * 0.8;
   });
 
   return (
@@ -189,7 +189,7 @@ function WindowFrame({ x, z, rot, w, progress }: { x: number; z: number; rot: nu
         <boxGeometry args={[w, H * 0.4, 0.06]} />
         <meshStandardMaterial color="#38bdf8" transparent opacity={vis * 0.2} metalness={0.9} roughness={0.1} />
       </mesh>
-      <lineSegments geometry={new THREE.EdgesGeometry(new THREE.BoxGeometry(w, H * 0.4, 0.06))}>
+      <lineSegments geometry={new EdgesGeometry(new BoxGeometry(w, H * 0.4, 0.06))}>
         <lineBasicMaterial color="#38bdf8" transparent opacity={vis * 0.7} />
       </lineSegments>
     </group>
@@ -204,7 +204,7 @@ function RoomLabel({ x, z, progress }: { x: number; z: number; name: string; pro
   return (
     <mesh position={[x, 0.04, z]} rotation={[-Math.PI / 2, 0, 0]}>
       <planeGeometry args={[2, 0.6]} />
-      <meshBasicMaterial color="#06b6d4" transparent opacity={vis * 0.05} side={THREE.DoubleSide} />
+      <meshBasicMaterial color="#06b6d4" transparent opacity={vis * 0.05} side={DoubleSide} />
     </mesh>
   );
 }
@@ -220,7 +220,7 @@ function FPCamera({ progress }: { progress: number }) {
     const y = 14 - t * 4;    // 14 (high overhead) → 10 (angled)
     const z = 5 + t * 8;
 
-    camera.position.lerp(new THREE.Vector3(x, y, z), 0.04);
+    camera.position.lerp(new Vector3(x, y, z), 0.04);
     camera.lookAt(6, 0, 5);
   });
 
