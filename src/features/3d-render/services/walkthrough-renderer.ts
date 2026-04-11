@@ -16,7 +16,7 @@
  * Renders at 1920×1080 / 30fps / VP9 8 Mbps for cinematic quality.
  */
 
-import * as THREE from "three";
+import { Vector3, Group, MeshStandardMaterial, BoxGeometry, Mesh, CylinderGeometry, DirectionalLight, HemisphereLight, AmbientLight, PointLight, CatmullRomCurve3, FogExp2, PlaneGeometry, Scene, PerspectiveCamera, WebGLRenderer, PMREMGenerator, Vector2, ACESFilmicToneMapping, PCFSoftShadowMap, MathUtils, MeshBasicMaterial, MeshPhysicalMaterial, Material } from "three";
 import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer.js";
 import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
@@ -94,34 +94,34 @@ function easeInOutQuart(t: number): number {
 }
 
 /** Tiny pseudo-handheld camera shake. Output is in world units (meters). */
-function cameraShake(timeSeconds: number, intensity: number): THREE.Vector3 {
+function cameraShake(timeSeconds: number, intensity: number): Vector3 {
   // Mix of sines at incommensurate frequencies → looks organic, not periodic.
   const sx = Math.sin(timeSeconds * 11.7) * Math.cos(timeSeconds * 4.3);
   const sy = Math.sin(timeSeconds * 13.4) * Math.cos(timeSeconds * 5.1);
   const sz = Math.sin(timeSeconds * 9.5)  * Math.cos(timeSeconds * 6.2);
-  return new THREE.Vector3(sx * intensity, sy * intensity, sz * intensity);
+  return new Vector3(sx * intensity, sy * intensity, sz * intensity);
 }
 
 // ─── MEP Services ────────────────────────────────────────────────────────────
 
 function addMEPServices(
-  scene: THREE.Scene,
+  scene: Scene,
   config: { floors: number; floorHeight: number; buildingWidth: number; buildingDepth: number }
 ) {
-  const mepGroup = new THREE.Group();
+  const mepGroup = new Group();
   mepGroup.name = "MEP_Services";
 
-  const ductMat = new THREE.MeshStandardMaterial({
+  const ductMat = new MeshStandardMaterial({
     color: 0xc0c0c0,
     metalness: 0.7,
     roughness: 0.3,
   });
-  const pipeMat = new THREE.MeshStandardMaterial({
+  const pipeMat = new MeshStandardMaterial({
     color: 0xb87333, // copper
     metalness: 0.85,
     roughness: 0.2,
   });
-  const cableTrayMat = new THREE.MeshStandardMaterial({
+  const cableTrayMat = new MeshStandardMaterial({
     color: 0x808080,
     metalness: 0.6,
     roughness: 0.4,
@@ -134,32 +134,32 @@ function addMEPServices(
     const ceilingY = (f + 1) * config.floorHeight - 0.3;
 
     // Main duct run (rectangular) along X axis
-    const ductGeo = new THREE.BoxGeometry(config.buildingWidth * 0.8, 0.3, 0.5);
-    const duct = new THREE.Mesh(ductGeo, ductMat);
+    const ductGeo = new BoxGeometry(config.buildingWidth * 0.8, 0.3, 0.5);
+    const duct = new Mesh(ductGeo, ductMat);
     duct.position.set(0, ceilingY, -halfD * 0.3);
     duct.castShadow = true;
     mepGroup.add(duct);
 
     // Branch ducts along Z
     for (let i = -2; i <= 2; i++) {
-      const branchGeo = new THREE.BoxGeometry(0.25, 0.2, config.buildingDepth * 0.4);
-      const branch = new THREE.Mesh(branchGeo, ductMat);
+      const branchGeo = new BoxGeometry(0.25, 0.2, config.buildingDepth * 0.4);
+      const branch = new Mesh(branchGeo, ductMat);
       branch.position.set(i * (halfW * 0.35), ceilingY - 0.05, 0);
       mepGroup.add(branch);
     }
 
     // Pipe runs (cylindrical) along X axis
-    const pipeGeo = new THREE.CylinderGeometry(0.04, 0.04, config.buildingWidth * 0.75, 8);
+    const pipeGeo = new CylinderGeometry(0.04, 0.04, config.buildingWidth * 0.75, 8);
     pipeGeo.rotateZ(Math.PI / 2);
     for (let p = 0; p < 3; p++) {
-      const pipe = new THREE.Mesh(pipeGeo, pipeMat);
+      const pipe = new Mesh(pipeGeo, pipeMat);
       pipe.position.set(0, ceilingY - 0.35 - p * 0.08, halfD * 0.2);
       mepGroup.add(pipe);
     }
 
     // Cable tray (flat channel) along X axis
-    const trayGeo = new THREE.BoxGeometry(config.buildingWidth * 0.7, 0.05, 0.3);
-    const tray = new THREE.Mesh(trayGeo, cableTrayMat);
+    const trayGeo = new BoxGeometry(config.buildingWidth * 0.7, 0.05, 0.3);
+    const tray = new Mesh(trayGeo, cableTrayMat);
     tray.position.set(0, ceilingY - 0.55, -halfD * 0.1);
     mepGroup.add(tray);
   }
@@ -178,27 +178,27 @@ function addMEPServices(
  * Material parameters loosely match threejs-builder.ts so the walkthrough
  * looks consistent with the main 3D viewer.
  */
-function upgradeToPBR(scene: THREE.Scene) {
+function upgradeToPBR(scene: Scene) {
   scene.traverse((obj) => {
-    if (!(obj instanceof THREE.Mesh)) return;
+    if (!(obj instanceof Mesh)) return;
     obj.castShadow = true;
     obj.receiveShadow = true;
 
-    const mat = obj.material as THREE.Material;
+    const mat = obj.material as Material;
 
     // Already a Standard or Physical material — just nudge the env map
     // contribution so it picks up reflections from the new sky env.
     if (
-      mat instanceof THREE.MeshStandardMaterial ||
-      mat instanceof THREE.MeshPhysicalMaterial
+      mat instanceof MeshStandardMaterial ||
+      mat instanceof MeshPhysicalMaterial
     ) {
       if (mat.envMapIntensity < 0.2) mat.envMapIntensity = 0.3;
       mat.needsUpdate = true;
       return;
     }
 
-    if (mat instanceof THREE.MeshBasicMaterial) {
-      const pbr = new THREE.MeshStandardMaterial({
+    if (mat instanceof MeshBasicMaterial) {
+      const pbr = new MeshStandardMaterial({
         color: mat.color.clone(),
         map: mat.map,
         transparent: mat.transparent,
@@ -251,7 +251,7 @@ function upgradeToPBR(scene: THREE.Scene) {
 // ─── Lighting Setup ──────────────────────────────────────────────────────────
 
 function setupLighting(
-  scene: THREE.Scene,
+  scene: Scene,
   buildingHeight: number,
   buildingWidth: number,
   buildingDepth: number,
@@ -261,7 +261,7 @@ function setupLighting(
   // ── Key light: warm golden-hour sun coming from the front-right ──
   // Color is a saturated 5500K → 4500K warm yellow. Strong intensity since
   // it's the dominant light. Casts soft shadows.
-  const sun = new THREE.DirectionalLight(0xffd28a, 3.4);
+  const sun = new DirectionalLight(0xffd28a, 3.4);
   sun.position.set(extent * 1.2, buildingHeight * 2.4 + 8, extent * 0.9);
   sun.castShadow = true;
   sun.shadow.mapSize.set(2048, 2048);
@@ -281,33 +281,33 @@ function setupLighting(
 
   // ── Cool sky fill from the opposite side (bounce light from the sky) ──
   // Lower intensity, cooler color. Doesn't cast shadows (perf).
-  const skyFill = new THREE.DirectionalLight(0x9bc4ff, 1.0);
+  const skyFill = new DirectionalLight(0x9bc4ff, 1.0);
   skyFill.position.set(-extent * 1.0, buildingHeight * 1.6 + 4, -extent * 0.6);
   scene.add(skyFill);
 
   // ── Subtle rim/back light for edge highlights on furniture ──
-  const rim = new THREE.DirectionalLight(0xfff2dd, 0.5);
+  const rim = new DirectionalLight(0xfff2dd, 0.5);
   rim.position.set(-extent * 0.4, buildingHeight * 1.0, extent * 1.4);
   scene.add(rim);
 
   // ── Hemisphere ambient (sky color from above, warm bounce from below) ──
-  const hemi = new THREE.HemisphereLight(0x9fc8ff, 0xffe1bd, 0.55);
+  const hemi = new HemisphereLight(0x9fc8ff, 0xffe1bd, 0.55);
   hemi.position.set(0, buildingHeight * 2, 0);
   scene.add(hemi);
 
   // ── Tiny global ambient fill so dark corners aren't pure black ──
-  const ambient = new THREE.AmbientLight(0xffffff, 0.12);
+  const ambient = new AmbientLight(0xffffff, 0.12);
   scene.add(ambient);
 
   // ── Interior warm point lights — one per floor, slightly off-center ──
   // Bumped intensity + range so interior reads as "lights are on" during
   // the walkthrough phase. Warm 2700K bulb color.
-  const interiorLights: THREE.PointLight[] = [];
+  const interiorLights: PointLight[] = [];
   const floorCount = Math.max(1, Math.min(8, Math.round(buildingHeight / 3.0)));
   for (let f = 0; f < floorCount; f++) {
     // Place 2 lights per floor for richer falloff
     for (let i = 0; i < 2; i++) {
-      const light = new THREE.PointLight(0xffd9a8, 0.7, Math.max(extent, 12), 1.5);
+      const light = new PointLight(0xffd9a8, 0.7, Math.max(extent, 12), 1.5);
       const offsetX = (i === 0 ? -1 : 1) * Math.min(buildingWidth * 0.2, 4);
       const offsetZ = (i === 0 ? 1 : -1) * Math.min(buildingDepth * 0.2, 4);
       light.position.set(offsetX, f * 3.0 + 2.4, offsetZ);
@@ -345,11 +345,11 @@ function buildCameraPath(
   // committing to a specific vantage yet.
   const aerialRadius = extent * 4.0;
   const aerialHeight = buildingHeight * 3.5 + 12;
-  const phase0Points: THREE.Vector3[] = [];
+  const phase0Points: Vector3[] = [];
   for (let i = 0; i <= 8; i++) {
     const t = i / 8;
     const angle = -Math.PI * 0.85 + t * Math.PI * 0.45; // ~80° arc
-    phase0Points.push(new THREE.Vector3(
+    phase0Points.push(new Vector3(
       Math.cos(angle) * aerialRadius,
       aerialHeight - t * (buildingHeight * 0.4), // gentle descent during arc
       Math.sin(angle) * aerialRadius,
@@ -363,10 +363,10 @@ function buildCameraPath(
   const heroHeight = buildingHeight * 1.3 + 4;
   const phase1Points = [
     phase0Points[phase0Points.length - 1].clone(), // continuity
-    new THREE.Vector3(extent * 2.8, buildingHeight * 2.2 + 6, extent * 2.0),
-    new THREE.Vector3(extent * 2.2, buildingHeight * 1.7 + 4, extent * 1.6),
-    new THREE.Vector3(extent * 1.8, heroHeight + 1, extent * 1.2),
-    new THREE.Vector3(heroRadius * 0.78, heroHeight, heroRadius * 0.78),
+    new Vector3(extent * 2.8, buildingHeight * 2.2 + 6, extent * 2.0),
+    new Vector3(extent * 2.2, buildingHeight * 1.7 + 4, extent * 1.6),
+    new Vector3(extent * 1.8, heroHeight + 1, extent * 1.2),
+    new Vector3(heroRadius * 0.78, heroHeight, heroRadius * 0.78),
   ];
 
   // ── Phase 2: 45° exterior orbit (7-12s) ──
@@ -375,7 +375,7 @@ function buildCameraPath(
   // interior approach in phase 3.
   const orbitRadius = extent * 2.4;
   const orbitHeight = buildingHeight * 1.05 + 3;
-  const orbitPoints: THREE.Vector3[] = [];
+  const orbitPoints: Vector3[] = [];
   const orbitSteps = 14;
   // Start angle aligned with end of phase 1, sweep ~270° clockwise
   const startAngle = Math.PI * 0.25;
@@ -385,7 +385,7 @@ function buildCameraPath(
     const angle = startAngle + t * sweep;
     // Subtle vertical bob (sine) keeps the orbit visually interesting
     const yBob = Math.sin(t * Math.PI) * 1.5;
-    orbitPoints.push(new THREE.Vector3(
+    orbitPoints.push(new Vector3(
       Math.cos(angle) * orbitRadius,
       orbitHeight + yBob,
       Math.sin(angle) * orbitRadius,
@@ -400,15 +400,15 @@ function buildCameraPath(
   const entryZ = hd * 1.4;
   const phase3Points = [
     orbitPoints[orbitPoints.length - 1].clone(), // continuity from orbit end
-    new THREE.Vector3(hw * 0.6, buildingHeight * 0.7, entryZ * 0.95),
-    new THREE.Vector3(hw * 0.4, eyeY + 1.0, hd * 0.85),     // approach front door
-    new THREE.Vector3(hw * 0.2, eyeY + 0.6, hd * 0.45),     // crossing entry
-    new THREE.Vector3(-hw * 0.1, eyeY + 0.4, hd * 0.15),    // entering main room
-    new THREE.Vector3(-hw * 0.4, eyeY + 0.4, -hd * 0.05),   // mid-house
-    new THREE.Vector3(-hw * 0.3, eyeY + 0.4, -hd * 0.4),    // back-left room
-    new THREE.Vector3(hw * 0.2, eyeY + 0.5, -hd * 0.55),    // back-right room
-    new THREE.Vector3(hw * 0.45, eyeY + 0.7, -hd * 0.25),   // corridor
-    new THREE.Vector3(hw * 0.55, eyeY + 1.2, hd * 0.2),     // rising as exit
+    new Vector3(hw * 0.6, buildingHeight * 0.7, entryZ * 0.95),
+    new Vector3(hw * 0.4, eyeY + 1.0, hd * 0.85),     // approach front door
+    new Vector3(hw * 0.2, eyeY + 0.6, hd * 0.45),     // crossing entry
+    new Vector3(-hw * 0.1, eyeY + 0.4, hd * 0.15),    // entering main room
+    new Vector3(-hw * 0.4, eyeY + 0.4, -hd * 0.05),   // mid-house
+    new Vector3(-hw * 0.3, eyeY + 0.4, -hd * 0.4),    // back-left room
+    new Vector3(hw * 0.2, eyeY + 0.5, -hd * 0.55),    // back-right room
+    new Vector3(hw * 0.45, eyeY + 0.7, -hd * 0.25),   // corridor
+    new Vector3(hw * 0.55, eyeY + 1.2, hd * 0.2),     // rising as exit
   ];
 
   // ── Phase 4: Pullback reveal (18-22s) ──
@@ -419,18 +419,18 @@ function buildCameraPath(
   const finalHeight = buildingHeight * 2.6 + 10;
   const phase4Points = [
     phase3Points[phase3Points.length - 1].clone(), // continuity
-    new THREE.Vector3(hw * 1.2, buildingHeight * 1.5 + 4, hd * 1.0),
-    new THREE.Vector3(extent * 1.8, buildingHeight * 2.0 + 6, extent * 1.6),
-    new THREE.Vector3(extent * 2.6, buildingHeight * 2.4 + 8, extent * 2.4),
-    new THREE.Vector3(finalRadius * 0.78, finalHeight, finalRadius * 0.78),
+    new Vector3(hw * 1.2, buildingHeight * 1.5 + 4, hd * 1.0),
+    new Vector3(extent * 1.8, buildingHeight * 2.0 + 6, extent * 1.6),
+    new Vector3(extent * 2.6, buildingHeight * 2.4 + 8, extent * 2.4),
+    new Vector3(finalRadius * 0.78, finalHeight, finalRadius * 0.78),
   ];
 
   return [
-    new THREE.CatmullRomCurve3(phase0Points, false, "centripetal"),
-    new THREE.CatmullRomCurve3(phase1Points, false, "centripetal"),
-    new THREE.CatmullRomCurve3(orbitPoints, false, "centripetal"),
-    new THREE.CatmullRomCurve3(phase3Points, false, "centripetal"),
-    new THREE.CatmullRomCurve3(phase4Points, false, "centripetal"),
+    new CatmullRomCurve3(phase0Points, false, "centripetal"),
+    new CatmullRomCurve3(phase1Points, false, "centripetal"),
+    new CatmullRomCurve3(orbitPoints, false, "centripetal"),
+    new CatmullRomCurve3(phase3Points, false, "centripetal"),
+    new CatmullRomCurve3(phase4Points, false, "centripetal"),
   ];
 }
 
@@ -444,7 +444,7 @@ function getCameraTarget(
   buildingWidth: number,
   buildingDepth: number,
   buildingHeight: number,
-): THREE.Vector3 {
+): Vector3 {
   const midH = buildingHeight / 2;
   const eyeY = Math.min(buildingHeight * 0.45, 1.65);
 
@@ -453,44 +453,44 @@ function getCameraTarget(
       // Aerial: look down at the building roof, slight forward drift
       const driftX = -buildingWidth * 0.05 * (1 - localT);
       const driftZ = -buildingDepth * 0.05 * (1 - localT);
-      return new THREE.Vector3(driftX, buildingHeight * 0.55, driftZ);
+      return new Vector3(driftX, buildingHeight * 0.55, driftZ);
     }
     case 1: {
       // Descent: target eases from roof level → mid building (matches camera)
-      const lookY = THREE.MathUtils.lerp(buildingHeight * 0.7, midH * 0.85, localT);
-      return new THREE.Vector3(0, lookY, 0);
+      const lookY = MathUtils.lerp(buildingHeight * 0.7, midH * 0.85, localT);
+      return new Vector3(0, lookY, 0);
     }
     case 2: {
       // Orbit: keep building center in frame; lift target slightly so we
       // include the roofline rather than centering on the ground.
-      return new THREE.Vector3(0, midH * 0.95, 0);
+      return new Vector3(0, midH * 0.95, 0);
     }
     case 3: {
       // Interior walkthrough: target leads the camera by a small offset
       // along its movement direction so the camera "looks where it's going".
-      const leadX = THREE.MathUtils.lerp(0, -buildingWidth * 0.1, localT);
-      const leadZ = THREE.MathUtils.lerp(0, -buildingDepth * 0.15, localT);
-      return new THREE.Vector3(leadX, eyeY + 0.3, leadZ);
+      const leadX = MathUtils.lerp(0, -buildingWidth * 0.1, localT);
+      const leadZ = MathUtils.lerp(0, -buildingDepth * 0.15, localT);
+      return new Vector3(leadX, eyeY + 0.3, leadZ);
     }
     case 4: {
       // Pullback: track from interior point → building center as we rise
-      const lookY = THREE.MathUtils.lerp(eyeY + 0.5, midH * 0.85, localT);
-      return new THREE.Vector3(0, lookY, 0);
+      const lookY = MathUtils.lerp(eyeY + 0.5, midH * 0.85, localT);
+      return new Vector3(0, lookY, 0);
     }
     default:
-      return new THREE.Vector3(0, midH, 0);
+      return new Vector3(0, midH, 0);
   }
 }
 
 // ─── Fog & Environment ───────────────────────────────────────────────────────
 
 function setupEnvironment(
-  scene: THREE.Scene,
-  renderer: THREE.WebGLRenderer,
+  scene: Scene,
+  renderer: WebGLRenderer,
 ) {
   // Warm haze fog matching the golden-hour palette. Distant objects fade
   // into amber so the building reads as "lit by warm sun".
-  scene.fog = new THREE.FogExp2(0xe5cca8, 0.0028);
+  scene.fog = new FogExp2(0xe5cca8, 0.0028);
 
   // ── Procedural sky (Preetham model) ──
   // The Sky shader produces a physically-plausible day-sky based on the
@@ -506,22 +506,22 @@ function setupEnvironment(
   // Sun position: ~12° above horizon, in front-right of the scene
   const sunElevationDeg = 12;
   const sunAzimuthDeg = 50;
-  const phi = THREE.MathUtils.degToRad(90 - sunElevationDeg);
-  const theta = THREE.MathUtils.degToRad(sunAzimuthDeg);
-  const sunVec = new THREE.Vector3();
+  const phi = MathUtils.degToRad(90 - sunElevationDeg);
+  const theta = MathUtils.degToRad(sunAzimuthDeg);
+  const sunVec = new Vector3();
   sunVec.setFromSphericalCoords(1, phi, theta);
-  (skyUniforms.sunPosition as { value: THREE.Vector3 }).value.copy(sunVec);
+  (skyUniforms.sunPosition as { value: Vector3 }).value.copy(sunVec);
   scene.add(sky);
 
   // ── Ground plane: warm taupe, slightly reflective ──
-  const groundGeo = new THREE.PlaneGeometry(800, 800);
-  const groundMat = new THREE.MeshStandardMaterial({
+  const groundGeo = new PlaneGeometry(800, 800);
+  const groundMat = new MeshStandardMaterial({
     color: 0x6b5a48,
     roughness: 0.86,
     metalness: 0.02,
     envMapIntensity: 0.4,
   });
-  const ground = new THREE.Mesh(groundGeo, groundMat);
+  const ground = new Mesh(groundGeo, groundMat);
   ground.rotation.x = -Math.PI / 2;
   ground.position.y = -0.01;
   ground.receiveShadow = true;
@@ -532,10 +532,10 @@ function setupEnvironment(
   // which is then used for reflections on glass / metal materials. Re-uses
   // the main renderer to avoid a second WebGL context (was a leak before).
   try {
-    const pmremGenerator = new THREE.PMREMGenerator(renderer);
+    const pmremGenerator = new PMREMGenerator(renderer);
     pmremGenerator.compileEquirectangularShader();
     // Render the sky alone (without the building) into the env map
-    const envScene = new THREE.Scene();
+    const envScene = new Scene();
     envScene.add(sky.clone());
     const envMap = pmremGenerator.fromScene(envScene, 0.04).texture;
     scene.environment = envMap;
@@ -543,7 +543,7 @@ function setupEnvironment(
   } catch (e) {
     console.warn("[walkthrough] PMREM env map failed, falling back to hemisphere:", e);
     // Fallback: a flat hemisphere env so PBR materials still get *some* reflection
-    const envHemi = new THREE.HemisphereLight(0x9fc8ff, 0xffe1bd, 1);
+    const envHemi = new HemisphereLight(0x9fc8ff, 0xffe1bd, 1);
     scene.add(envHemi);
   }
 
@@ -570,15 +570,15 @@ export async function renderWalkthrough(
   report(0, PHASE_LABELS[0]);
 
   // ── Scene Setup ──
-  const scene = new THREE.Scene();
+  const scene = new Scene();
   // Cinematic 35mm-equivalent FOV for less wide-angle distortion
-  const camera = new THREE.PerspectiveCamera(42, WIDTH / HEIGHT, 0.1, 4000);
+  const camera = new PerspectiveCamera(42, WIDTH / HEIGHT, 0.1, 4000);
 
   const canvas = document.createElement("canvas");
   canvas.width = WIDTH;
   canvas.height = HEIGHT;
 
-  const renderer = new THREE.WebGLRenderer({
+  const renderer = new WebGLRenderer({
     canvas,
     antialias: false, // Antialiasing handled by FXAAPass for better perf
     alpha: false,
@@ -587,11 +587,11 @@ export async function renderWalkthrough(
   });
   renderer.setSize(WIDTH, HEIGHT);
   renderer.setPixelRatio(1); // Pixel ratio 1 — already at 1080p, more would be wasted
-  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMapping = ACESFilmicToneMapping;
   // Slightly hot exposure for warm "architectural photography" look
   renderer.toneMappingExposure = 1.35;
   renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.shadowMap.type = PCFSoftShadowMap;
   renderer.localClippingEnabled = false; // No section cut in new camera path
 
   // ── Build the building ──
@@ -633,7 +633,7 @@ export async function renderWalkthrough(
   const { buildingGroup } = buildBuilding(buildingConfig, materials, scene);
 
   // Add furniture
-  const furnitureGroup = new THREE.Group();
+  const furnitureGroup = new Group();
   addFurniture(rooms, 0, 0, floorHeight, materials, furnitureGroup);
   buildingGroup.add(furnitureGroup);
 
@@ -665,7 +665,7 @@ export async function renderWalkthrough(
   // Soft, atmospheric bloom — picks up sun glints and interior point lights.
   // Half-res bloom resolution to halve the cost.
   const bloomPass = new UnrealBloomPass(
-    new THREE.Vector2(WIDTH / 2, HEIGHT / 2),
+    new Vector2(WIDTH / 2, HEIGHT / 2),
     0.55, // strength — noticeable but not blown out
     0.85, // radius — soft, wide glow
     0.78, // threshold — only highlights bloom
@@ -675,7 +675,7 @@ export async function renderWalkthrough(
   // Anti-aliasing on the composited image
   const fxaaPass = new FXAAPass();
   // FXAAShader uses resolution uniform — set it to inverse pixel size
-  const fxaaUniforms = fxaaPass.material.uniforms as { resolution?: { value: THREE.Vector2 } };
+  const fxaaUniforms = fxaaPass.material.uniforms as { resolution?: { value: Vector2 } };
   if (fxaaUniforms.resolution) {
     fxaaUniforms.resolution.value.set(1 / WIDTH, 1 / HEIGHT);
   }
@@ -801,9 +801,9 @@ export async function renderWalkthrough(
       // Per-phase bloom: interior walkthrough boosts strength (warm room
       // lights bloom more visibly), exterior phases use the base strength.
       if (phaseIndex === 3) {
-        bloomPass.strength = THREE.MathUtils.lerp(bloomBaseStrength, 0.85, easedT);
+        bloomPass.strength = MathUtils.lerp(bloomBaseStrength, 0.85, easedT);
       } else if (phaseIndex === 4) {
-        bloomPass.strength = THREE.MathUtils.lerp(0.85, bloomBaseStrength, easedT);
+        bloomPass.strength = MathUtils.lerp(0.85, bloomBaseStrength, easedT);
       } else {
         bloomPass.strength = bloomBaseStrength;
       }
@@ -840,7 +840,7 @@ export async function renderWalkthrough(
   mepMats.pipeMat.dispose();
   mepMats.cableTrayMat.dispose();
   scene.traverse((obj) => {
-    if (obj instanceof THREE.Mesh) {
+    if (obj instanceof Mesh) {
       obj.geometry?.dispose();
     }
   });

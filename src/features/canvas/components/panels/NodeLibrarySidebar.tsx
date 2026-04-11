@@ -44,7 +44,8 @@ interface NodeLibrarySidebarProps {
 
 export function NodeLibrarySidebar({ alwaysOpen = false }: NodeLibrarySidebarProps) {
   const { t } = useLocale();
-  const { isNodeLibraryOpen, toggleNodeLibrary } = useUIStore();
+  const isNodeLibraryOpen = useUIStore(s => s.isNodeLibraryOpen);
+  const toggleNodeLibrary = useUIStore(s => s.toggleNodeLibrary);
   const [search, setSearch] = useState("");
   const [activeFilter, setActiveFilter] = useState<FilterValue>("all");
 

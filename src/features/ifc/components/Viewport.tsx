@@ -7,7 +7,7 @@ import React, {
   forwardRef,
   useImperativeHandle,
 } from "react";
-import * as THREE from "three";
+import { Scene, Color, MeshStandardMaterial, Camera, ShaderMaterial, Mesh, PlaneGeometry, PerspectiveCamera, WebGLRenderer, AmbientLight, DirectionalLight, HemisphereLight, PMREMGenerator, ShadowMaterial, Raycaster, Vector2, Box3, Vector3, SphereGeometry, MeshBasicMaterial, BufferGeometry, BufferAttribute, Matrix4, EdgesGeometry, LineSegments, LineBasicMaterial, Line, CanvasTexture, SpriteMaterial, Sprite, Plane, PlaneHelper, Group, DoubleSide, PCFSoftShadowMap, ACESFilmicToneMapping, SRGBColorSpace, GridHelper, Material, Object3D } from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { SCENE, CATEGORY_COLORS, STOREY_COLORS } from "@/features/ifc/components/constants";
 import type {
@@ -123,15 +123,15 @@ const Viewport = forwardRef<ViewportHandle, ViewportProps>(function Viewport(
   ref
 ) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const sceneRef = useRef<THREE.Scene | null>(null);
-  const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
-  const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
+  const sceneRef = useRef<Scene | null>(null);
+  const cameraRef = useRef<PerspectiveCamera | null>(null);
+  const rendererRef = useRef<WebGLRenderer | null>(null);
   const controlsRef = useRef<OrbitControls | null>(null);
   const rafRef = useRef<number>(0);
-  const modelGroupRef = useRef<THREE.Group>(new THREE.Group());
-  const edgesGroupRef = useRef<THREE.Group>(new THREE.Group());
-  const measureGroupRef = useRef<THREE.Group>(new THREE.Group());
-  const gridRef = useRef<THREE.GridHelper | null>(null);
+  const modelGroupRef = useRef<Group>(new Group());
+  const edgesGroupRef = useRef<Group>(new Group());
+  const measureGroupRef = useRef<Group>(new Group());
+  const gridRef = useRef<GridHelper | null>(null);
 
   /* Worker */
   const workerRef = useRef<Worker | null>(null);
@@ -140,26 +140,26 @@ const Viewport = forwardRef<ViewportHandle, ViewportProps>(function Viewport(
 
   /* IFC refs */
   const modelIDRef = useRef<number>(-1);
-  const meshMapRef = useRef<Map<number, THREE.Mesh[]>>(new Map());
+  const meshMapRef = useRef<Map<number, Mesh[]>>(new Map());
   const expressIDToTypeRef = useRef<Map<number, number>>(new Map());
   const expressIDToStoreyRef = useRef<Map<number, number>>(new Map());
   const storeyIndexRef = useRef<Map<number, number>>(new Map());
-  const originalMaterialsRef = useRef<Map<string, THREE.Material | THREE.Material[]>>(new Map());
+  const originalMaterialsRef = useRef<Map<string, Material | Material[]>>(new Map());
   const hiddenRef = useRef<Set<number>>(new Set());
 
   /* Selection */
   const selectedIDRef = useRef<number | null>(null);
   const selectedIDsRef = useRef<Set<number>>(new Set());
   const highlightMatRef = useRef(
-    new THREE.MeshStandardMaterial({
+    new MeshStandardMaterial({
       color: SCENE.highlightColor,
-      emissive: new THREE.Color(SCENE.highlightEmissive),
+      emissive: new Color(SCENE.highlightEmissive),
       emissiveIntensity: 0.35,
       roughness: 0.4,
       metalness: 0.1,
       opacity: SCENE.selectionOpacity,
       transparent: true,
-      side: THREE.DoubleSide,
+      side: DoubleSide,
       depthTest: true,
     })
   );
@@ -167,15 +167,15 @@ const Viewport = forwardRef<ViewportHandle, ViewportProps>(function Viewport(
   /* Hover */
   const hoverIDRef = useRef<number | null>(null);
   const hoverMatRef = useRef(
-    new THREE.MeshStandardMaterial({
+    new MeshStandardMaterial({
       color: 0x6699cc,
-      emissive: new THREE.Color(0x223355),
+      emissive: new Color(0x223355),
       emissiveIntensity: 0.2,
       roughness: 0.5,
       metalness: 0.1,
       opacity: 0.8,
       transparent: true,
-      side: THREE.DoubleSide,
+      side: DoubleSide,
     })
   );
 
@@ -187,12 +187,12 @@ const Viewport = forwardRef<ViewportHandle, ViewportProps>(function Viewport(
   const projRef = useRef<ProjectionType>("perspective");
 
   /* Section planes */
-  const clippingPlanesRef = useRef<Map<SectionAxis, THREE.Plane>>(new Map());
-  const planeHelpersRef = useRef<Map<SectionAxis, THREE.PlaneHelper>>(new Map());
+  const clippingPlanesRef = useRef<Map<SectionAxis, Plane>>(new Map());
+  const planeHelpersRef = useRef<Map<SectionAxis, PlaneHelper>>(new Map());
 
   /* Measurement */
   const measureModeRef = useRef(false);
-  const measurePointRef = useRef<THREE.Vector3 | null>(null);
+  const measurePointRef = useRef<Vector3 | null>(null);
   const measureCountRef = useRef(0);
   const measureUnitRef = useRef<"m" | "ft">("m");
 
@@ -200,16 +200,16 @@ const Viewport = forwardRef<ViewportHandle, ViewportProps>(function Viewport(
   const onCameraChangeRef = useRef<((css: string) => void) | null>(null);
 
   /* Camera animation (smooth transitions) */
-  const cameraTargetPosRef = useRef<THREE.Vector3 | null>(null);
-  const controlsTargetRef = useRef<THREE.Vector3 | null>(null);
+  const cameraTargetPosRef = useRef<Vector3 | null>(null);
+  const controlsTargetRef = useRef<Vector3 | null>(null);
 
   /* Ground plane + shadow light */
-  const groundRef = useRef<THREE.Mesh | null>(null);
-  const keyLightRef = useRef<THREE.DirectionalLight | null>(null);
+  const groundRef = useRef<Mesh | null>(null);
+  const keyLightRef = useRef<DirectionalLight | null>(null);
 
   /* Background gradient scene (rendered separately, bypasses tonemapping) */
-  const bgSceneRef = useRef<THREE.Scene | null>(null);
-  const bgCameraRef = useRef<THREE.Camera | null>(null);
+  const bgSceneRef = useRef<Scene | null>(null);
+  const bgCameraRef = useRef<Camera | null>(null);
 
   /* ────────────────────────────────────────────────────────── */
   /* Scene setup                                                */
@@ -232,17 +232,17 @@ const Viewport = forwardRef<ViewportHandle, ViewportProps>(function Viewport(
       return;
     }
 
-    const scene = new THREE.Scene();
+    const scene = new Scene();
 
     /* Blueprint grid background — matches landing page .blueprint-grid
        Rendered in a SEPARATE scene with toneMapped:false to bypass ACES tonemapping.
        Uses gl_FragCoord for pixel-perfect grid lines (square cells). */
-    scene.background = new THREE.Color(0xf6f7f9);
+    scene.background = new Color(0xf6f7f9);
     sceneRef.current = scene;
 
-    const bgGradScene = new THREE.Scene();
-    const bgGradCamera = new THREE.Camera();
-    const bgGradMat = new THREE.ShaderMaterial({
+    const bgGradScene = new Scene();
+    const bgGradCamera = new Camera();
+    const bgGradMat = new ShaderMaterial({
       vertexShader: `varying vec2 vUv; void main() { vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }`,
       fragmentShader: `
         varying vec2 vUv;
@@ -289,11 +289,11 @@ const Viewport = forwardRef<ViewportHandle, ViewportProps>(function Viewport(
       depthTest: false,
       toneMapped: false,
     });
-    bgGradScene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), bgGradMat));
+    bgGradScene.add(new Mesh(new PlaneGeometry(2, 2), bgGradMat));
     bgSceneRef.current = bgGradScene;
     bgCameraRef.current = bgGradCamera;
 
-    const camera = new THREE.PerspectiveCamera(
+    const camera = new PerspectiveCamera(
       SCENE.cameraFov,
       container.clientWidth / container.clientHeight,
       SCENE.cameraNear,
@@ -303,7 +303,7 @@ const Viewport = forwardRef<ViewportHandle, ViewportProps>(function Viewport(
     cameraRef.current = camera;
 
     /* ── Renderer with shadows + tone mapping ── */
-    const renderer = new THREE.WebGLRenderer({
+    const renderer = new WebGLRenderer({
       antialias: true,
       alpha: false,
       preserveDrawingBuffer: true,
@@ -311,10 +311,10 @@ const Viewport = forwardRef<ViewportHandle, ViewportProps>(function Viewport(
     renderer.setSize(container.clientWidth, container.clientHeight);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, SCENE.maxPixelRatio));
     renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.shadowMap.type = PCFSoftShadowMap;
+    renderer.toneMapping = ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.0;
-    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.outputColorSpace = SRGBColorSpace;
     renderer.localClippingEnabled = true;
     renderer.autoClear = false;
     container.appendChild(renderer.domElement);
@@ -335,10 +335,10 @@ const Viewport = forwardRef<ViewportHandle, ViewportProps>(function Viewport(
     });
 
     /* ── Studio-quality 5-light rig ── */
-    const ambient = new THREE.AmbientLight(0xffffff, 0.3);
+    const ambient = new AmbientLight(0xffffff, 0.3);
     scene.add(ambient);
 
-    const keyLight = new THREE.DirectionalLight(0xfff5e6, 0.8);
+    const keyLight = new DirectionalLight(0xfff5e6, 0.8);
     keyLight.position.set(50, 80, 50);
     keyLight.castShadow = true;
     keyLight.shadow.mapSize.width = 2048;
@@ -354,29 +354,29 @@ const Viewport = forwardRef<ViewportHandle, ViewportProps>(function Viewport(
     scene.add(keyLight);
     keyLightRef.current = keyLight;
 
-    const fillLight = new THREE.DirectionalLight(0xe6eeff, 0.4);
+    const fillLight = new DirectionalLight(0xe6eeff, 0.4);
     fillLight.position.set(-30, 40, -30);
     scene.add(fillLight);
 
-    const rimLight = new THREE.DirectionalLight(0xffffff, 0.2);
+    const rimLight = new DirectionalLight(0xffffff, 0.2);
     rimLight.position.set(0, 10, -50);
     scene.add(rimLight);
 
-    const hemiLight = new THREE.HemisphereLight(0x4a5a6e, 0x1a1510, 0.25);
+    const hemiLight = new HemisphereLight(0x4a5a6e, 0x1a1510, 0.25);
     scene.add(hemiLight);
 
     /* ── Environment map for subtle reflections (dark, neutral) ── */
-    const pmremGenerator = new THREE.PMREMGenerator(renderer);
-    const envScene = new THREE.Scene();
-    envScene.background = new THREE.Color(0x2a2d3a);
+    const pmremGenerator = new PMREMGenerator(renderer);
+    const envScene = new Scene();
+    envScene.background = new Color(0x2a2d3a);
     const envMap = pmremGenerator.fromScene(envScene).texture;
     scene.environment = envMap;
     pmremGenerator.dispose();
 
     /* ── Ground plane (receives contact shadows) ── */
-    const groundGeo = new THREE.PlaneGeometry(500, 500);
-    const groundMat = new THREE.ShadowMaterial({ opacity: 0.15 });
-    const ground = new THREE.Mesh(groundGeo, groundMat);
+    const groundGeo = new PlaneGeometry(500, 500);
+    const groundMat = new ShadowMaterial({ opacity: 0.15 });
+    const ground = new Mesh(groundGeo, groundMat);
     ground.rotation.x = -Math.PI / 2;
     ground.position.y = -0.01;
     ground.receiveShadow = true;
@@ -389,14 +389,14 @@ const Viewport = forwardRef<ViewportHandle, ViewportProps>(function Viewport(
        a vertex shader that projects a quad onto Y=0, plus a fragment shader
        with LOD blending between two cell scales (auto-picked from camera
        distance). Lines stay crisp at any zoom and the grid never runs out. */
-    const gridGeo = new THREE.PlaneGeometry(2, 2);
-    const gridMat = new THREE.ShaderMaterial({
-      side: THREE.DoubleSide,
+    const gridGeo = new PlaneGeometry(2, 2);
+    const gridMat = new ShaderMaterial({
+      side: DoubleSide,
       transparent: true,
       depthWrite: false,
       uniforms: {
-        uMinorColor: { value: new THREE.Color(0xc4cad3) },
-        uMajorColor: { value: new THREE.Color(0x8a93a0) },
+        uMinorColor: { value: new Color(0xc4cad3) },
+        uMajorColor: { value: new Color(0x8a93a0) },
       },
       vertexShader: `
         varying vec3 vWorld;
@@ -463,9 +463,9 @@ const Viewport = forwardRef<ViewportHandle, ViewportProps>(function Viewport(
       `,
       extensions: { derivatives: true } as never,
     });
-    const grid = new THREE.Mesh(gridGeo, gridMat) as unknown as THREE.GridHelper;
-    (grid as unknown as THREE.Mesh).frustumCulled = false;
-    (grid as unknown as THREE.Mesh).renderOrder = -1;
+    const grid = new Mesh(gridGeo, gridMat) as unknown as GridHelper;
+    (grid as unknown as Mesh).frustumCulled = false;
+    (grid as unknown as Mesh).renderOrder = -1;
     scene.add(grid);
     gridRef.current = grid;
 
@@ -549,8 +549,8 @@ const Viewport = forwardRef<ViewportHandle, ViewportProps>(function Viewport(
     if (!renderer) return;
     const canvas = renderer.domElement;
 
-    const raycaster = new THREE.Raycaster();
-    const mouse = new THREE.Vector2();
+    const raycaster = new Raycaster();
+    const mouse = new Vector2();
 
     const raycast = (e: MouseEvent) => {
       const rect = canvas.getBoundingClientRect();
@@ -559,7 +559,7 @@ const Viewport = forwardRef<ViewportHandle, ViewportProps>(function Viewport(
       const camera = cameraRef.current;
       if (!camera) return [];
       raycaster.setFromCamera(mouse, camera);
-      const meshes = modelGroupRef.current.children.filter((c) => c.visible) as THREE.Mesh[];
+      const meshes = modelGroupRef.current.children.filter((c) => c.visible) as Mesh[];
       return raycaster.intersectObjects(meshes, false);
     };
 
@@ -602,7 +602,7 @@ const Viewport = forwardRef<ViewportHandle, ViewportProps>(function Viewport(
       }
 
       /* Selection mode */
-      const mesh = hit.object as THREE.Mesh;
+      const mesh = hit.object as Mesh;
       const expressID = mesh.userData.expressID as number | undefined;
       if (expressID !== undefined) {
         if (e.ctrlKey || e.metaKey) {
@@ -628,7 +628,7 @@ const Viewport = forwardRef<ViewportHandle, ViewportProps>(function Viewport(
 
       const intersects = raycast(e);
       const hitID = intersects.length > 0
-        ? (intersects[0].object as THREE.Mesh).userData.expressID as number | undefined
+        ? (intersects[0].object as Mesh).userData.expressID as number | undefined
         : undefined;
 
       const prevHover = hoverIDRef.current;
@@ -640,7 +640,7 @@ const Viewport = forwardRef<ViewportHandle, ViewportProps>(function Viewport(
         if (meshes) {
           meshes.forEach((m) => {
             const orig = originalMaterialsRef.current.get(m.uuid);
-            if (orig) m.material = orig as THREE.Material;
+            if (orig) m.material = orig as Material;
           });
         }
       }
@@ -651,7 +651,7 @@ const Viewport = forwardRef<ViewportHandle, ViewportProps>(function Viewport(
         if (meshes) {
           meshes.forEach((m) => {
             if (!originalMaterialsRef.current.has(m.uuid)) {
-              originalMaterialsRef.current.set(m.uuid, m.material as THREE.Material);
+              originalMaterialsRef.current.set(m.uuid, m.material as Material);
             }
             m.material = hoverMatRef.current;
           });
@@ -668,13 +668,13 @@ const Viewport = forwardRef<ViewportHandle, ViewportProps>(function Viewport(
     const onDblClick = (e: MouseEvent) => {
       const intersects = raycast(e);
       if (intersects.length === 0) return;
-      const mesh = intersects[0].object as THREE.Mesh;
+      const mesh = intersects[0].object as Mesh;
       const expressID = mesh.userData.expressID as number | undefined;
       if (expressID === undefined) return;
 
       /* Isolate */
       modelGroupRef.current.traverse((obj) => {
-        if (obj instanceof THREE.Mesh) {
+        if (obj instanceof Mesh) {
           const eid = obj.userData.expressID as number;
           obj.visible = eid === expressID;
           if (eid !== expressID) hiddenRef.current.add(eid);
@@ -685,12 +685,12 @@ const Viewport = forwardRef<ViewportHandle, ViewportProps>(function Viewport(
       selectElement(expressID);
       const meshes = meshMapRef.current.get(expressID);
       if (meshes && meshes.length > 0) {
-        const bbox = new THREE.Box3();
+        const bbox = new Box3();
         meshes.forEach((m) => bbox.expandByObject(m));
-        const center = bbox.getCenter(new THREE.Vector3());
-        const size = bbox.getSize(new THREE.Vector3());
+        const center = bbox.getCenter(new Vector3());
+        const size = bbox.getSize(new Vector3());
         const dist = Math.max(size.x, size.y, size.z, 2) * 2.5;
-        cameraTargetPosRef.current = new THREE.Vector3(
+        cameraTargetPosRef.current = new Vector3(
           center.x + dist * 0.4, center.y + dist * 0.4, center.z + dist * 0.4
         );
         controlsTargetRef.current = center.clone();
@@ -705,7 +705,7 @@ const Viewport = forwardRef<ViewportHandle, ViewportProps>(function Viewport(
         onContextMenu?.(null);
         return;
       }
-      const mesh = intersects[0].object as THREE.Mesh;
+      const mesh = intersects[0].object as Mesh;
       const expressID = mesh.userData.expressID as number | undefined;
       if (expressID === undefined) { onContextMenu?.(null); return; }
 
@@ -741,7 +741,7 @@ const Viewport = forwardRef<ViewportHandle, ViewportProps>(function Viewport(
       if (meshes) {
         meshes.forEach((m) => {
           const orig = originalMaterialsRef.current.get(m.uuid);
-          if (orig) m.material = orig as THREE.Material;
+          if (orig) m.material = orig as Material;
         });
       }
     }
@@ -753,7 +753,7 @@ const Viewport = forwardRef<ViewportHandle, ViewportProps>(function Viewport(
       if (meshes) {
         meshes.forEach((m) => {
           const orig = originalMaterialsRef.current.get(m.uuid);
-          if (orig) m.material = orig as THREE.Material;
+          if (orig) m.material = orig as Material;
         });
       }
     }
@@ -783,7 +783,7 @@ const Viewport = forwardRef<ViewportHandle, ViewportProps>(function Viewport(
       if (meshes) {
         meshes.forEach((m) => {
           if (!originalMaterialsRef.current.has(m.uuid)) {
-            originalMaterialsRef.current.set(m.uuid, m.material as THREE.Material);
+            originalMaterialsRef.current.set(m.uuid, m.material as Material);
           }
           m.material = highlightMatRef.current;
         });
@@ -800,7 +800,7 @@ const Viewport = forwardRef<ViewportHandle, ViewportProps>(function Viewport(
     if (meshes) {
       meshes.forEach((m) => {
         const orig = originalMaterialsRef.current.get(m.uuid);
-        if (orig) m.material = orig as THREE.Material;
+        if (orig) m.material = orig as Material;
       });
     }
     if (selectedIDsRef.current.size === 0 && selectedIDRef.current === null) {
@@ -814,7 +814,7 @@ const Viewport = forwardRef<ViewportHandle, ViewportProps>(function Viewport(
     if (meshes) {
       meshes.forEach((m) => {
         if (!originalMaterialsRef.current.has(m.uuid)) {
-          originalMaterialsRef.current.set(m.uuid, m.material as THREE.Material);
+          originalMaterialsRef.current.set(m.uuid, m.material as Material);
         }
         m.material = highlightMatRef.current;
       });
@@ -827,29 +827,29 @@ const Viewport = forwardRef<ViewportHandle, ViewportProps>(function Viewport(
   /* Measurement helpers                                        */
   /* ────────────────────────────────────────────────────────── */
 
-  const addMeasurePoint = useCallback((point: THREE.Vector3) => {
-    const sphere = new THREE.Mesh(
-      new THREE.SphereGeometry(0.05, 16, 16),
-      new THREE.MeshBasicMaterial({ color: 0xff4444 })
+  const addMeasurePoint = useCallback((point: Vector3) => {
+    const sphere = new Mesh(
+      new SphereGeometry(0.05, 16, 16),
+      new MeshBasicMaterial({ color: 0xff4444 })
     );
     sphere.position.copy(point);
     measureGroupRef.current.add(sphere);
   }, []);
 
-  const addMeasureLine = useCallback((start: THREE.Vector3, end: THREE.Vector3, dist: number) => {
+  const addMeasureLine = useCallback((start: Vector3, end: Vector3, dist: number) => {
     /* Line */
-    const geom = new THREE.BufferGeometry().setFromPoints([start, end]);
-    const line = new THREE.Line(
+    const geom = new BufferGeometry().setFromPoints([start, end]);
+    const line = new Line(
       geom,
-      new THREE.LineBasicMaterial({ color: 0xff4444, linewidth: 2, depthTest: false })
+      new LineBasicMaterial({ color: 0xff4444, linewidth: 2, depthTest: false })
     );
     line.renderOrder = 999;
     measureGroupRef.current.add(line);
 
     /* End sphere */
-    const sphere = new THREE.Mesh(
-      new THREE.SphereGeometry(0.05, 16, 16),
-      new THREE.MeshBasicMaterial({ color: 0xff4444 })
+    const sphere = new Mesh(
+      new SphereGeometry(0.05, 16, 16),
+      new MeshBasicMaterial({ color: 0xff4444 })
     );
     sphere.position.copy(end);
     measureGroupRef.current.add(sphere);
@@ -882,9 +882,9 @@ const Viewport = forwardRef<ViewportHandle, ViewportProps>(function Viewport(
     }
     ctx.fillText(label, 128, 32);
 
-    const texture = new THREE.CanvasTexture(canvas);
-    const spriteMat = new THREE.SpriteMaterial({ map: texture, depthTest: false });
-    const sprite = new THREE.Sprite(spriteMat);
+    const texture = new CanvasTexture(canvas);
+    const spriteMat = new SpriteMaterial({ map: texture, depthTest: false });
+    const sprite = new Sprite(spriteMat);
     const mid = start.clone().add(end).multiplyScalar(0.5);
     mid.y += 0.3;
     sprite.position.copy(mid);
@@ -898,112 +898,112 @@ const Viewport = forwardRef<ViewportHandle, ViewportProps>(function Viewport(
   /* ────────────────────────────────────────────────────────── */
 
   /* ── IFC type-based material presets ── */
-  const getMaterialPreset = useCallback((typeId: number | undefined, fallbackColor: THREE.Color, fallbackAlpha: number): THREE.MeshStandardMaterial => {
+  const getMaterialPreset = useCallback((typeId: number | undefined, fallbackColor: Color, fallbackAlpha: number): MeshStandardMaterial => {
     const typeName = typeId ? TYPE_ID_TO_NAME[typeId] : undefined;
 
     switch (typeName) {
       case "IFCWALL":
       case "IFCWALLSTANDARDCASE":
-        return new THREE.MeshStandardMaterial({
-          color: new THREE.Color(0xd4cfc8), roughness: 0.85, metalness: 0.0,
-          envMapIntensity: 0.3, side: THREE.DoubleSide,
+        return new MeshStandardMaterial({
+          color: new Color(0xd4cfc8), roughness: 0.85, metalness: 0.0,
+          envMapIntensity: 0.3, side: DoubleSide,
         });
       case "IFCWINDOW":
       case "IFCCURTAINWALL":
-        return new THREE.MeshStandardMaterial({
-          color: new THREE.Color(0xb8d8e8), roughness: 0.1, metalness: 0.1,
-          envMapIntensity: 1.0, opacity: 0.45, transparent: true, side: THREE.DoubleSide,
+        return new MeshStandardMaterial({
+          color: new Color(0xb8d8e8), roughness: 0.1, metalness: 0.1,
+          envMapIntensity: 1.0, opacity: 0.45, transparent: true, side: DoubleSide,
         });
       case "IFCDOOR":
-        return new THREE.MeshStandardMaterial({
-          color: new THREE.Color(0x8b6f4e), roughness: 0.75, metalness: 0.0,
-          envMapIntensity: 0.3, side: THREE.DoubleSide,
+        return new MeshStandardMaterial({
+          color: new Color(0x8b6f4e), roughness: 0.75, metalness: 0.0,
+          envMapIntensity: 0.3, side: DoubleSide,
         });
       case "IFCSLAB":
-        return new THREE.MeshStandardMaterial({
-          color: new THREE.Color(0xb0aba4), roughness: 0.9, metalness: 0.0,
-          envMapIntensity: 0.2, side: THREE.DoubleSide,
+        return new MeshStandardMaterial({
+          color: new Color(0xb0aba4), roughness: 0.9, metalness: 0.0,
+          envMapIntensity: 0.2, side: DoubleSide,
         });
       case "IFCCOLUMN":
       case "IFCBEAM":
       case "IFCMEMBER":
-        return new THREE.MeshStandardMaterial({
-          color: new THREE.Color(0xc8c0b8), roughness: 0.6, metalness: 0.25,
-          envMapIntensity: 0.5, side: THREE.DoubleSide,
+        return new MeshStandardMaterial({
+          color: new Color(0xc8c0b8), roughness: 0.6, metalness: 0.25,
+          envMapIntensity: 0.5, side: DoubleSide,
         });
       case "IFCPLATE":
-        return new THREE.MeshStandardMaterial({
-          color: new THREE.Color(0xa8a8b0), roughness: 0.35, metalness: 0.6,
-          envMapIntensity: 0.7, side: THREE.DoubleSide,
+        return new MeshStandardMaterial({
+          color: new Color(0xa8a8b0), roughness: 0.35, metalness: 0.6,
+          envMapIntensity: 0.7, side: DoubleSide,
         });
       case "IFCROOF":
-        return new THREE.MeshStandardMaterial({
-          color: new THREE.Color(0x8b5e3c), roughness: 0.8, metalness: 0.0,
-          envMapIntensity: 0.3, side: THREE.DoubleSide,
+        return new MeshStandardMaterial({
+          color: new Color(0x8b5e3c), roughness: 0.8, metalness: 0.0,
+          envMapIntensity: 0.3, side: DoubleSide,
         });
       case "IFCSTAIR":
       case "IFCSTAIRFLIGHT":
-        return new THREE.MeshStandardMaterial({
-          color: new THREE.Color(0xc0b8b0), roughness: 0.8, metalness: 0.05,
-          envMapIntensity: 0.3, side: THREE.DoubleSide,
+        return new MeshStandardMaterial({
+          color: new Color(0xc0b8b0), roughness: 0.8, metalness: 0.05,
+          envMapIntensity: 0.3, side: DoubleSide,
         });
       case "IFCRAILING":
-        return new THREE.MeshStandardMaterial({
-          color: new THREE.Color(0x888890), roughness: 0.4, metalness: 0.5,
-          envMapIntensity: 0.6, side: THREE.DoubleSide,
+        return new MeshStandardMaterial({
+          color: new Color(0x888890), roughness: 0.4, metalness: 0.5,
+          envMapIntensity: 0.6, side: DoubleSide,
         });
       case "IFCFOOTING":
-        return new THREE.MeshStandardMaterial({
-          color: new THREE.Color(0x9a9590), roughness: 0.95, metalness: 0.0,
-          envMapIntensity: 0.2, side: THREE.DoubleSide,
+        return new MeshStandardMaterial({
+          color: new Color(0x9a9590), roughness: 0.95, metalness: 0.0,
+          envMapIntensity: 0.2, side: DoubleSide,
         });
       case "IFCFURNISHINGELEMENT":
-        return new THREE.MeshStandardMaterial({
-          color: new THREE.Color(0xc4b896), roughness: 0.7, metalness: 0.0,
-          envMapIntensity: 0.4, side: THREE.DoubleSide,
+        return new MeshStandardMaterial({
+          color: new Color(0xc4b896), roughness: 0.7, metalness: 0.0,
+          envMapIntensity: 0.4, side: DoubleSide,
         });
       case "IFCFLOWSEGMENT":
       case "IFCFLOWTERMINAL":
       case "IFCFLOWFITTING":
-        return new THREE.MeshStandardMaterial({
-          color: new THREE.Color(0x7090a8), roughness: 0.4, metalness: 0.4,
-          envMapIntensity: 0.5, side: THREE.DoubleSide,
+        return new MeshStandardMaterial({
+          color: new Color(0x7090a8), roughness: 0.4, metalness: 0.4,
+          envMapIntensity: 0.5, side: DoubleSide,
         });
       case "IFCSPACE":
-        return new THREE.MeshStandardMaterial({
-          color: new THREE.Color(0xe0d8c8), roughness: 0.9, metalness: 0.0,
-          envMapIntensity: 0.2, opacity: 0.15, transparent: true, side: THREE.DoubleSide,
+        return new MeshStandardMaterial({
+          color: new Color(0xe0d8c8), roughness: 0.9, metalness: 0.0,
+          envMapIntensity: 0.2, opacity: 0.15, transparent: true, side: DoubleSide,
           depthWrite: false,
         });
       case "IFCCOVERING":
-        return new THREE.MeshStandardMaterial({
-          color: new THREE.Color(0xd8d0c0), roughness: 0.8, metalness: 0.0,
-          envMapIntensity: 0.3, side: THREE.DoubleSide,
+        return new MeshStandardMaterial({
+          color: new Color(0xd8d0c0), roughness: 0.8, metalness: 0.0,
+          envMapIntensity: 0.3, side: DoubleSide,
         });
       default:
-        return new THREE.MeshStandardMaterial({
+        return new MeshStandardMaterial({
           color: fallbackColor, roughness: 0.7, metalness: 0.1,
           envMapIntensity: 0.5, opacity: fallbackAlpha,
-          transparent: fallbackAlpha < 0.99, side: THREE.DoubleSide,
+          transparent: fallbackAlpha < 0.99, side: DoubleSide,
         });
     }
   }, []);
 
   const createMeshFromTransfer = useCallback(
     (geo: { expressID: number; positions: Float32Array; normals: Float32Array; indices: Uint32Array; color: [number, number, number, number]; transform: number[] }) => {
-      const bufferGeometry = new THREE.BufferGeometry();
-      bufferGeometry.setAttribute("position", new THREE.BufferAttribute(geo.positions, 3));
-      bufferGeometry.setAttribute("normal", new THREE.BufferAttribute(geo.normals, 3));
-      bufferGeometry.setIndex(new THREE.BufferAttribute(geo.indices, 1));
+      const bufferGeometry = new BufferGeometry();
+      bufferGeometry.setAttribute("position", new BufferAttribute(geo.positions, 3));
+      bufferGeometry.setAttribute("normal", new BufferAttribute(geo.normals, 3));
+      bufferGeometry.setIndex(new BufferAttribute(geo.indices, 1));
 
-      const matrix = new THREE.Matrix4().fromArray(geo.transform);
+      const matrix = new Matrix4().fromArray(geo.transform);
       bufferGeometry.applyMatrix4(matrix);
 
       const [r, g, b, a] = geo.color;
       const typeId = expressIDToTypeRef.current.get(geo.expressID);
-      const material = getMaterialPreset(typeId, new THREE.Color(r, g, b), a);
+      const material = getMaterialPreset(typeId, new Color(r, g, b), a);
 
-      const mesh = new THREE.Mesh(bufferGeometry, material);
+      const mesh = new Mesh(bufferGeometry, material);
       mesh.userData.expressID = geo.expressID;
       mesh.userData.ifcType = typeId;
       mesh.castShadow = true;
@@ -1025,7 +1025,7 @@ const Viewport = forwardRef<ViewportHandle, ViewportProps>(function Viewport(
   const clearModel = useCallback(() => {
     /* Dispose model geometries + materials */
     modelGroupRef.current.traverse((obj) => {
-      if (obj instanceof THREE.Mesh) {
+      if (obj instanceof Mesh) {
         obj.geometry.dispose();
         if (Array.isArray(obj.material)) obj.material.forEach((m) => m.dispose());
         else obj.material.dispose();
@@ -1035,23 +1035,23 @@ const Viewport = forwardRef<ViewportHandle, ViewportProps>(function Viewport(
 
     /* Dispose edges */
     edgesGroupRef.current.traverse((obj) => {
-      if (obj instanceof THREE.LineSegments) {
+      if (obj instanceof LineSegments) {
         obj.geometry.dispose();
-        (obj.material as THREE.Material).dispose();
+        (obj.material as Material).dispose();
       }
     });
     edgesGroupRef.current.clear();
 
     /* Dispose measurement objects (sprites have canvas textures) */
     measureGroupRef.current.traverse((obj) => {
-      if (obj instanceof THREE.Mesh) {
+      if (obj instanceof Mesh) {
         obj.geometry.dispose();
-        (obj.material as THREE.Material).dispose();
-      } else if (obj instanceof THREE.Line) {
+        (obj.material as Material).dispose();
+      } else if (obj instanceof Line) {
         obj.geometry.dispose();
-        (obj.material as THREE.Material).dispose();
-      } else if (obj instanceof THREE.Sprite) {
-        (obj.material as THREE.SpriteMaterial).map?.dispose();
+        (obj.material as Material).dispose();
+      } else if (obj instanceof Sprite) {
+        (obj.material as SpriteMaterial).map?.dispose();
         obj.material.dispose();
       }
     });
@@ -1172,10 +1172,10 @@ const Viewport = forwardRef<ViewportHandle, ViewportProps>(function Viewport(
                   return;
                 }
                 /* Smart camera fit — exclude site/road geometry, fit to building only */
-                const buildingBBox = new THREE.Box3();
+                const buildingBBox = new Box3();
                 let hasBuildingElements = false;
                 modelGroupRef.current.traverse((obj) => {
-                  if (!(obj instanceof THREE.Mesh)) return;
+                  if (!(obj instanceof Mesh)) return;
                   const eid = obj.userData.expressID as number;
                   const typeId = expressIDToTypeRef.current.get(eid);
                   const typeName = typeId ? TYPE_ID_TO_NAME[typeId] : undefined;
@@ -1185,10 +1185,10 @@ const Viewport = forwardRef<ViewportHandle, ViewportProps>(function Viewport(
                   hasBuildingElements = true;
                 });
                 /* Fallback to full model bbox if no building elements classified */
-                const bbox = hasBuildingElements ? buildingBBox : new THREE.Box3().setFromObject(modelGroupRef.current);
+                const bbox = hasBuildingElements ? buildingBBox : new Box3().setFromObject(modelGroupRef.current);
                 if (!bbox.isEmpty()) {
-                  const center = bbox.getCenter(new THREE.Vector3());
-                  const size = bbox.getSize(new THREE.Vector3());
+                  const center = bbox.getCenter(new Vector3());
+                  const size = bbox.getSize(new Vector3());
                   const maxDim = Math.max(size.x, size.y, size.z);
                   const dist = maxDim * 0.9;
                   const camera = cameraRef.current!;
@@ -1265,10 +1265,10 @@ const Viewport = forwardRef<ViewportHandle, ViewportProps>(function Viewport(
   const applyViewMode = useCallback((mode: ViewModeType) => {
     viewModeRef.current = mode;
     modelGroupRef.current.traverse((obj) => {
-      if (!(obj instanceof THREE.Mesh)) return;
+      if (!(obj instanceof Mesh)) return;
       const eid = obj.userData.expressID as number;
       if (selectedIDRef.current === eid || selectedIDsRef.current.has(eid)) return;
-      const orig = originalMaterialsRef.current.get(obj.uuid) as THREE.MeshStandardMaterial | undefined;
+      const orig = originalMaterialsRef.current.get(obj.uuid) as MeshStandardMaterial | undefined;
       if (!orig) return;
 
       switch (mode) {
@@ -1303,7 +1303,7 @@ const Viewport = forwardRef<ViewportHandle, ViewportProps>(function Viewport(
     }
 
     modelGroupRef.current.traverse((obj) => {
-      if (!(obj instanceof THREE.Mesh)) return;
+      if (!(obj instanceof Mesh)) return;
       const eid = obj.userData.expressID as number;
       if (selectedIDRef.current === eid || selectedIDsRef.current.has(eid)) return;
       const expressID = obj.userData.expressID as number;
@@ -1321,11 +1321,11 @@ const Viewport = forwardRef<ViewportHandle, ViewportProps>(function Viewport(
         }
       }
 
-      const mat = new THREE.MeshStandardMaterial({
-        color: new THREE.Color(color),
+      const mat = new MeshStandardMaterial({
+        color: new Color(color),
         roughness: 0.7,
         metalness: 0.1,
-        side: THREE.DoubleSide,
+        side: DoubleSide,
       });
       obj.material = mat;
     });
@@ -1354,19 +1354,19 @@ const Viewport = forwardRef<ViewportHandle, ViewportProps>(function Viewport(
       }
     } else {
       /* Add */
-      const bbox = new THREE.Box3().setFromObject(modelGroupRef.current);
-      const center = bbox.getCenter(new THREE.Vector3());
-      const normal = new THREE.Vector3(
+      const bbox = new Box3().setFromObject(modelGroupRef.current);
+      const center = bbox.getCenter(new Vector3());
+      const normal = new Vector3(
         axis === "x" ? -1 : 0,
         axis === "y" ? -1 : 0,
         axis === "z" ? -1 : 0
       );
-      const plane = new THREE.Plane(normal, axis === "x" ? center.x : axis === "y" ? center.y : center.z);
+      const plane = new Plane(normal, axis === "x" ? center.x : axis === "y" ? center.y : center.z);
       clippingPlanesRef.current.set(axis, plane);
 
-      const size = bbox.getSize(new THREE.Vector3());
+      const size = bbox.getSize(new Vector3());
       const maxDim = Math.max(size.x, size.y, size.z);
-      const helper = new THREE.PlaneHelper(plane, maxDim * 1.5, 0x4f8aff);
+      const helper = new PlaneHelper(plane, maxDim * 1.5, 0x4f8aff);
       helper.renderOrder = 998;
       sceneRef.current?.add(helper);
       planeHelpersRef.current.set(axis, helper);
@@ -1389,10 +1389,10 @@ const Viewport = forwardRef<ViewportHandle, ViewportProps>(function Viewport(
       loadFile,
       fitToView: () => {
         /* Smart fit — exclude site geometry */
-        const buildingBBox = new THREE.Box3();
+        const buildingBBox = new Box3();
         let hasBE = false;
         modelGroupRef.current.traverse((obj) => {
-          if (!(obj instanceof THREE.Mesh)) return;
+          if (!(obj instanceof Mesh)) return;
           const eid = obj.userData.expressID as number;
           const typeId = expressIDToTypeRef.current.get(eid);
           const tn = typeId ? TYPE_ID_TO_NAME[typeId] : undefined;
@@ -1400,13 +1400,13 @@ const Viewport = forwardRef<ViewportHandle, ViewportProps>(function Viewport(
           buildingBBox.expandByObject(obj);
           hasBE = true;
         });
-        const bbox = hasBE ? buildingBBox : new THREE.Box3().setFromObject(modelGroupRef.current);
+        const bbox = hasBE ? buildingBBox : new Box3().setFromObject(modelGroupRef.current);
         if (bbox.isEmpty()) return;
-        const center = bbox.getCenter(new THREE.Vector3());
-        const size = bbox.getSize(new THREE.Vector3());
+        const center = bbox.getCenter(new Vector3());
+        const size = bbox.getSize(new Vector3());
         const maxDim = Math.max(size.x, size.y, size.z);
         const dist = maxDim * 0.9;
-        cameraTargetPosRef.current = new THREE.Vector3(center.x + dist * 0.55, center.y + dist * 0.45, center.z + dist * 0.55);
+        cameraTargetPosRef.current = new Vector3(center.x + dist * 0.55, center.y + dist * 0.45, center.z + dist * 0.55);
         controlsTargetRef.current = center.clone();
       },
       fitToSelection: () => {
@@ -1414,12 +1414,12 @@ const Viewport = forwardRef<ViewportHandle, ViewportProps>(function Viewport(
         if (id === null) return;
         const meshes = meshMapRef.current.get(id);
         if (!meshes || meshes.length === 0) return;
-        const bbox = new THREE.Box3();
+        const bbox = new Box3();
         meshes.forEach((m) => bbox.expandByObject(m));
-        const center = bbox.getCenter(new THREE.Vector3());
-        const size = bbox.getSize(new THREE.Vector3());
+        const center = bbox.getCenter(new Vector3());
+        const size = bbox.getSize(new Vector3());
         const dist = Math.max(size.x, size.y, size.z, 2) * 2;
-        cameraTargetPosRef.current = new THREE.Vector3(center.x + dist * 0.4, center.y + dist * 0.4, center.z + dist * 0.4);
+        cameraTargetPosRef.current = new Vector3(center.x + dist * 0.4, center.y + dist * 0.4, center.z + dist * 0.4);
         controlsTargetRef.current = center.clone();
       },
       setViewMode: applyViewMode,
@@ -1428,11 +1428,11 @@ const Viewport = forwardRef<ViewportHandle, ViewportProps>(function Viewport(
         showEdgesRef.current = !showEdgesRef.current;
         if (showEdgesRef.current) {
           modelGroupRef.current.traverse((obj) => {
-            if (!(obj instanceof THREE.Mesh)) return;
-            const edges = new THREE.EdgesGeometry(obj.geometry, 30);
-            const line = new THREE.LineSegments(
+            if (!(obj instanceof Mesh)) return;
+            const edges = new EdgesGeometry(obj.geometry, 30);
+            const line = new LineSegments(
               edges,
-              new THREE.LineBasicMaterial({ color: 0x333344, transparent: true, opacity: 0.4 })
+              new LineBasicMaterial({ color: 0x333344, transparent: true, opacity: 0.4 })
             );
             line.position.copy(obj.position);
             line.rotation.copy(obj.rotation);
@@ -1441,9 +1441,9 @@ const Viewport = forwardRef<ViewportHandle, ViewportProps>(function Viewport(
           });
         } else {
           edgesGroupRef.current.traverse((obj) => {
-            if (obj instanceof THREE.LineSegments) {
+            if (obj instanceof LineSegments) {
               obj.geometry.dispose();
-              (obj.material as THREE.Material).dispose();
+              (obj.material as Material).dispose();
             }
           });
           edgesGroupRef.current.clear();
@@ -1462,14 +1462,14 @@ const Viewport = forwardRef<ViewportHandle, ViewportProps>(function Viewport(
       },
       clearMeasurements: () => {
         measureGroupRef.current.traverse((obj) => {
-          if (obj instanceof THREE.Mesh) {
+          if (obj instanceof Mesh) {
             obj.geometry.dispose();
-            (obj.material as THREE.Material).dispose();
-          } else if (obj instanceof THREE.Line) {
+            (obj.material as Material).dispose();
+          } else if (obj instanceof Line) {
             obj.geometry.dispose();
-            (obj.material as THREE.Material).dispose();
-          } else if (obj instanceof THREE.Sprite) {
-            (obj.material as THREE.SpriteMaterial).map?.dispose();
+            (obj.material as Material).dispose();
+          } else if (obj instanceof Sprite) {
+            (obj.material as SpriteMaterial).map?.dispose();
             obj.material.dispose();
           }
         });
@@ -1507,10 +1507,10 @@ const Viewport = forwardRef<ViewportHandle, ViewportProps>(function Viewport(
         camera.updateProjectionMatrix();
       },
       setPresetView: (view: PresetView) => {
-        const bbox = new THREE.Box3().setFromObject(modelGroupRef.current);
+        const bbox = new Box3().setFromObject(modelGroupRef.current);
         if (bbox.isEmpty()) return;
-        const center = bbox.getCenter(new THREE.Vector3());
-        const size = bbox.getSize(new THREE.Vector3());
+        const center = bbox.getCenter(new Vector3());
+        const size = bbox.getSize(new Vector3());
         const dist = Math.max(size.x, size.y, size.z) * 1.5;
 
         const positions: Record<PresetView, [number, number, number]> = {
@@ -1524,7 +1524,7 @@ const Viewport = forwardRef<ViewportHandle, ViewportProps>(function Viewport(
         };
 
         const pos = positions[view];
-        cameraTargetPosRef.current = new THREE.Vector3(pos[0], pos[1], pos[2]);
+        cameraTargetPosRef.current = new Vector3(pos[0], pos[1], pos[2]);
         controlsTargetRef.current = center.clone();
       },
       toggleGrid: () => {
@@ -1552,7 +1552,7 @@ const Viewport = forwardRef<ViewportHandle, ViewportProps>(function Viewport(
         for (const eid of selectedIDsRef.current) ids.add(eid);
         if (ids.size === 0) return;
         modelGroupRef.current.traverse((obj) => {
-          if (obj instanceof THREE.Mesh) {
+          if (obj instanceof Mesh) {
             const eid = obj.userData.expressID as number;
             obj.visible = ids.has(eid);
             if (!ids.has(eid)) hiddenRef.current.add(eid);
@@ -1561,7 +1561,7 @@ const Viewport = forwardRef<ViewportHandle, ViewportProps>(function Viewport(
       },
       showAll: () => {
         modelGroupRef.current.traverse((obj) => {
-          if (obj instanceof THREE.Mesh) obj.visible = true;
+          if (obj instanceof Mesh) obj.visible = true;
         });
         hiddenRef.current.clear();
       },
@@ -1570,12 +1570,12 @@ const Viewport = forwardRef<ViewportHandle, ViewportProps>(function Viewport(
         /* Smooth fly to selection */
         const meshes = meshMapRef.current.get(id);
         if (meshes && meshes.length > 0) {
-          const bbox = new THREE.Box3();
+          const bbox = new Box3();
           meshes.forEach((m) => bbox.expandByObject(m));
-          const center = bbox.getCenter(new THREE.Vector3());
-          const size = bbox.getSize(new THREE.Vector3());
+          const center = bbox.getCenter(new Vector3());
+          const size = bbox.getSize(new Vector3());
           const dist = Math.max(size.x, size.y, size.z, 2) * 2.5;
-          cameraTargetPosRef.current = new THREE.Vector3(center.x + dist * 0.4, center.y + dist * 0.4, center.z + dist * 0.4);
+          cameraTargetPosRef.current = new Vector3(center.x + dist * 0.4, center.y + dist * 0.4, center.z + dist * 0.4);
           controlsTargetRef.current = center.clone();
         }
       },
@@ -1591,7 +1591,7 @@ const Viewport = forwardRef<ViewportHandle, ViewportProps>(function Viewport(
             if (meshes) {
               meshes.forEach((m) => {
                 if (!originalMaterialsRef.current.has(m.uuid)) {
-                  originalMaterialsRef.current.set(m.uuid, m.material as THREE.Material);
+                  originalMaterialsRef.current.set(m.uuid, m.material as Material);
                 }
                 m.material = highlightMatRef.current;
               });

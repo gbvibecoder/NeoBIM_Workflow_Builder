@@ -3,7 +3,7 @@
 import React, { useState, useRef, useCallback } from "react";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { Sparkles, X, Loader2 } from "lucide-react";
-import { useWorkflowStore } from "@/features/workflows/stores/workflow-store";
+import { useWorkflowStore, selectAddNode, selectAddEdge, selectResetCanvas, selectUpdateNode } from "@/features/workflows/stores/workflow-store";
 import { useUIStore } from "@/shared/stores/ui-store";
 import { PREBUILT_WORKFLOWS } from "@/features/workflows/constants/prebuilt-workflows";
 import { generateId } from "@/lib/utils";
@@ -107,8 +107,11 @@ export function PromptInput({ onClose }: PromptInputProps) {
   const [previewNodes, setPreviewNodes] = useState<{ label: string; color: string }[]>([]);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  const { addNode, addEdge, resetCanvas, updateNode } = useWorkflowStore();
-  const { setPromptModeActive } = useUIStore();
+  const addNode = useWorkflowStore(selectAddNode);
+  const addEdge = useWorkflowStore(selectAddEdge);
+  const resetCanvas = useWorkflowStore(selectResetCanvas);
+  const updateNode = useWorkflowStore(selectUpdateNode);
+  const setPromptModeActive = useUIStore(s => s.setPromptModeActive);
 
   const handleSubmit = useCallback(async () => {
     if (!prompt.trim() || isGenerating) return;

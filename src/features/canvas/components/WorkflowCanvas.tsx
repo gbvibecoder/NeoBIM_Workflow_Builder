@@ -19,7 +19,6 @@ import {
 import "@xyflow/react/dist/style.css";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
-import { Layers3, Sparkles, BookOpen, X } from "lucide-react";
 import {
   shareExecutionToTwitter,
 } from "@/lib/share";
@@ -38,6 +37,8 @@ import type { ChatMessage } from "@/features/canvas/components/panels/AIChatPane
 import type { LogEntry } from "@/features/canvas/components/ExecutionLog";
 import type { ContextMenuState } from "@/features/canvas/components/ContextMenu";
 import { PromptInput } from "@/features/ai/components/PromptInput";
+import { CanvasEmptyState } from "@/features/canvas/components/CanvasEmptyState";
+import { FullscreenArtifactViewer } from "@/features/canvas/components/FullscreenArtifactViewer";
 
 // ContextMenu is right-click only — load lazily
 const ContextMenu = dynamic(
@@ -45,302 +46,61 @@ const ContextMenu = dynamic(
   { ssr: false }
 );
 
-// Architectural 3D walkthrough viewer — client-only
-const ArchitecturalViewer = dynamic(
-  () => import("@/features/canvas/components/artifacts/architectural-viewer/ArchitecturalViewer"),
-  { ssr: false }
-);
-
 // Fullscreen video player — direct import to avoid dynamic() hook instability with React 19
 import { FullscreenVideoPlayer } from "@/features/canvas/components/artifacts/FullscreenVideoPlayer";
 
-import { useWorkflowStore, isUntitledWorkflow } from "@/features/workflows/stores/workflow-store";
+import {
+  useWorkflowStore,
+  isUntitledWorkflow,
+  selectNodes as selectWfNodes,
+  selectEdges as selectWfEdges,
+  selectCurrentWorkflow,
+  selectCreationMode,
+  selectIsDirty,
+  selectIsSaving,
+  selectIsSaveModalOpen,
+  selectAddNode,
+  selectRemoveNode,
+  selectRemoveEdge,
+  selectUpdateNode,
+  selectAddEdge,
+  selectResetCanvas,
+  selectSetEdgeFlowing,
+  selectMarkDirty,
+  selectSetCreationMode,
+  selectSaveWorkflow,
+  selectLoadWorkflow,
+  selectUndo,
+  selectRedo,
+  selectOpenSaveModal,
+  selectCloseSaveModal,
+  selectLoadFromTemplate,
+} from "@/features/workflows/stores/workflow-store";
 import { PREBUILT_WORKFLOWS } from "@/features/workflows/constants/prebuilt-workflows";
 import type { WorkflowTemplate } from "@/types/workflow";
 import { SaveWorkflowModal } from "@/features/canvas/components/modals/SaveWorkflowModal";
 import { ExecutionBlockModal } from "@/features/canvas/components/modals/ExecutionBlockModal";
-import { useExecutionStore } from "@/features/execution/stores/execution-store";
+import {
+  useExecutionStore,
+  selectArtifacts,
+  selectExecutionProgress,
+  selectClearArtifacts,
+  selectClearCurrentExecution,
+  selectRestoreArtifactsFromDB,
+  selectHydrateQuantityOverrides,
+  selectHydrateVideoGenProgress,
+  selectHydrateRegenerationCounts,
+} from "@/features/execution/stores/execution-store";
 import { useUIStore } from "@/shared/stores/ui-store";
 import { NODE_CATALOGUE_MAP, CATEGORY_CONFIG } from "@/features/workflows/constants/node-catalogue";
 import type { WorkflowNodeData, NodeCategory } from "@/types/nodes";
 import type { WorkflowNode, WorkflowEdge } from "@/types/nodes";
 import { generateId } from "@/lib/utils";
-import Link from "next/link";
 import { useLocale } from "@/hooks/useLocale";
 
 // Register custom node and edge types (stable references outside component)
 const nodeTypes = { workflowNode: BaseNode };
 const edgeTypes = { animatedEdge: AnimatedEdge };
-
-// ─── Mini workflow diagram for empty state ─────────────────────────────────
-
-const DEMO_NODES = [
-  { label: "PDF Upload",  color: "#00F5FF" },
-  { label: "Doc Parser",  color: "#B87333" },
-  { label: "Massing Gen", color: "#FFBF00" },
-  { label: "IFC Export",  color: "#4FC3F7" },
-];
-
-function MiniWorkflowDiagram() {
-  const { t } = useLocale();
-  return (
-    <div className="flex items-center gap-0 mb-2">
-      {DEMO_NODES.map((node, i) => (
-        <React.Fragment key={node.label}>
-          <div
-            style={{
-              padding: "4px 10px",
-              borderRadius: 6,
-              background: `${node.color}18`,
-              border: `1px solid ${node.color}40`,
-              fontSize: 10,
-              color: node.color,
-              fontWeight: 500,
-              whiteSpace: "nowrap",
-            }}
-          >
-            {node.label}
-          </div>
-          {i < DEMO_NODES.length - 1 && (
-            <div style={{
-              display: "flex", alignItems: "center", gap: 0,
-              margin: "0 3px",
-            }}>
-              <div style={{ width: 14, height: 1, background: "rgba(184,115,51,0.3)" }} />
-              <div style={{
-                width: 0, height: 0,
-                borderLeft: "4px solid rgba(184,115,51,0.3)",
-                borderTop: "3px solid transparent",
-                borderBottom: "3px solid transparent",
-              }} />
-            </div>
-          )}
-        </React.Fragment>
-      ))}
-    </div>
-  );
-}
-
-// ─── Canvas Empty State ────────────────────────────────────────────────────
-
-interface EmptyStateProps {
-  onPromptMode: () => void;
-}
-
-function CanvasEmptyState({ onPromptMode }: EmptyStateProps) {
-  const { t } = useLocale();
-  return (
-    <motion.div
-      initial={{ opacity: 0, scale: 0.96 }}
-      animate={{ opacity: 1, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.94, transition: { duration: 0.25 } }}
-      transition={{ duration: 0.3, ease: "easeOut" }}
-      className="absolute inset-0 flex items-center justify-center pointer-events-none"
-      style={{ zIndex: 5 }}
-    >
-      <div
-        className="pointer-events-auto flex flex-col items-center text-center"
-        style={{ maxWidth: 440 }}
-      >
-        {/* Mini diagram preview */}
-        <div style={{
-          padding: "16px 20px",
-          borderRadius: 4,
-          background: "rgba(10, 12, 14, 0.7)",
-          border: "1px solid rgba(184,115,51,0.15)",
-          backdropFilter: "blur(12px)",
-          WebkitBackdropFilter: "blur(12px)",
-          marginBottom: 24,
-        }}>
-          <MiniWorkflowDiagram />
-          <div style={{ fontSize: 9, color: "rgba(184,115,51,0.4)", textAlign: "center", marginTop: 4, fontFamily: "'Space Mono', monospace", textTransform: "uppercase" as const, letterSpacing: "0.1em" }}>
-            {t('canvas.examplePipeline')}
-          </div>
-        </div>
-
-        {/* Icon */}
-        <div style={{
-          width: 52, height: 52, borderRadius: 4,
-          background: "rgba(184,115,51,0.08)",
-          border: "1px solid rgba(184,115,51,0.2)",
-          display: "flex", alignItems: "center", justifyContent: "center",
-          marginBottom: 16,
-        }}>
-          <Layers3 size={22} style={{ color: "#B87333" }} strokeWidth={1.5} />
-        </div>
-
-        {/* Headline */}
-        <h2 style={{
-          fontSize: 22, fontWeight: 400,
-          fontFamily: "'Playfair Display', serif",
-          fontStyle: "italic",
-          color: "#FFBF00", marginBottom: 8, lineHeight: 1.3,
-          letterSpacing: "0.05em",
-        }}>
-          {t('canvas.emptyTitle')}
-        </h2>
-
-        {/* Subtitle */}
-        <p style={{
-          fontSize: 12, color: "rgba(255,255,255,0.4)",
-          fontFamily: "'Space Mono', monospace",
-          lineHeight: 1.6, marginBottom: 24, maxWidth: 320,
-        }}>
-          {t('canvas.emptyDesc')}
-        </p>
-
-        {/* CTAs */}
-        <div style={{ display: "flex", gap: 10 }}>
-          <Link
-            href="/dashboard/templates"
-            style={{
-              display: "flex", alignItems: "center", gap: 7,
-              padding: "9px 18px", borderRadius: 4,
-              border: "1px solid rgba(184,115,51,0.4)",
-              background: "rgba(184,115,51,0.05)",
-              fontSize: 10, fontWeight: 400, color: "#B87333",
-              fontFamily: "'Space Mono', monospace",
-              textTransform: "uppercase" as const,
-              letterSpacing: "0.15em",
-              textDecoration: "none",
-              transition: "all 0.15s ease",
-            }}
-            onMouseEnter={(e) => {
-              (e.currentTarget as HTMLElement).style.background = "rgba(184,115,51,0.12)";
-              (e.currentTarget as HTMLElement).style.borderColor = "rgba(184,115,51,0.6)";
-            }}
-            onMouseLeave={(e) => {
-              (e.currentTarget as HTMLElement).style.background = "rgba(184,115,51,0.05)";
-              (e.currentTarget as HTMLElement).style.borderColor = "rgba(184,115,51,0.4)";
-            }}
-          >
-            <BookOpen size={14} />
-            {t('canvas.browseTemplates')}
-          </Link>
-          <button
-            onClick={onPromptMode}
-            style={{
-              display: "flex", alignItems: "center", gap: 7,
-              padding: "9px 18px", borderRadius: 4,
-              background: "transparent",
-              border: "1px solid rgba(0,245,255,0.4)",
-              fontSize: 10, fontWeight: 400, color: "#00F5FF",
-              fontFamily: "'Space Mono', monospace",
-              textTransform: "uppercase" as const,
-              letterSpacing: "0.15em",
-              cursor: "pointer",
-              transition: "all 0.15s ease",
-            }}
-            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = "rgba(0,245,255,0.08)"; }}
-            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "transparent"; }}
-          >
-            <Sparkles size={14} />
-            {t('canvas.tryAiPrompt')}
-          </button>
-        </div>
-      </div>
-    </motion.div>
-  );
-}
-
-// ─── Fullscreen 3D Artifact Viewer ─────────────────────────────────────────
-
-function FullscreenArtifactViewer() {
-  const nodeId = useUIStore(s => s.artifactViewerNodeId);
-  const close = useUIStore(s => s.setArtifactViewerNodeId);
-  const artifact = useExecutionStore(s => nodeId ? s.artifacts.get(nodeId) : undefined);
-
-  if (!nodeId || !artifact) return null;
-
-  const d = artifact.data as Record<string, unknown>;
-  const rawData = (d?._raw as Record<string, unknown>) ?? {};
-  const floors = (d?.floors as number) ?? (rawData.floors as number) ?? 2;
-  const totalArea = (d?.totalArea as number) ?? (rawData.totalArea as number) ?? 200;
-  const height = (d?.height as number) ?? (rawData.height as number) ?? floors * 3.0;
-  const footprint = (d?.footprint as number) ?? (rawData.footprint as number) ?? Math.round(totalArea / Math.max(floors, 1));
-  const gfa = (d?.gfa as number) ?? totalArea;
-  const buildingType = (d?.buildingType as string) ?? (rawData.buildingType as string) ?? "Residential";
-  const style = d?.style as Record<string, unknown> | undefined;
-
-  // Extract room data from GN-004 output for accurate 3D labels
-  const geometry = d?.geometry as Record<string, unknown> | undefined;
-  const roomListData = (d?.roomList ?? geometry?.rooms ?? []) as Array<Record<string, unknown>>;
-  const rooms = roomListData.length > 0 ? roomListData.map((r, i) => {
-    const area = Number(r.area ?? 10);
-    const w = Number(r.width ?? Math.sqrt(area * 1.2));
-    const dep = Number(r.depth ?? area / w);
-    return {
-      name: String(r.name ?? `Room ${i + 1}`),
-      type: String(r.type ?? "living"),
-      area,
-      width: w,
-      depth: dep,
-      x: Number(r.x ?? (i % 3) * (w + 0.2)),
-      z: Number(r.z ?? r.y ?? Math.floor(i / 3) * (dep + 0.2)),
-    };
-  }) : undefined;
-
-  return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      style={{
-        position: "absolute", inset: 0, zIndex: 60,
-        background: "rgba(4,4,8,0.98)",
-        display: "flex", flexDirection: "column",
-      }}
-    >
-      <div style={{
-        display: "flex", alignItems: "center", justifyContent: "space-between",
-        padding: "12px 20px",
-        borderBottom: "1px solid rgba(255,255,255,0.06)",
-      }}>
-        <span style={{ fontSize: 14, fontWeight: 600, color: "#F0F0F5" }}>
-          3D Architectural Walkthrough
-        </span>
-        <button
-          onClick={() => close(null)}
-          style={{
-            display: "flex", alignItems: "center", gap: 6,
-            padding: "6px 14px", borderRadius: 8,
-            background: "rgba(255,255,255,0.06)", border: "none",
-            color: "#8888A0", fontSize: 12, fontWeight: 500,
-            cursor: "pointer",
-          }}
-        >
-          <X size={12} /> Close
-        </button>
-      </div>
-      <div style={{ flex: 1 }}>
-        <ArchitecturalViewer
-          floors={floors}
-          height={height}
-          footprint={footprint}
-          gfa={gfa}
-          buildingType={buildingType}
-          rooms={rooms}
-          style={style ? {
-            glassHeavy: !!style.glassHeavy,
-            hasRiver: !!style.hasRiver,
-            hasLake: !!style.hasLake,
-            isModern: !!style.isModern,
-            isTower: !!style.isTower,
-            exteriorMaterial: (style.exteriorMaterial as string) ?? "mixed",
-            environment: (style.environment as string) ?? "suburban",
-            usage: (style.usage as string) ?? "mixed",
-            promptText: (style.promptText as string) ?? "",
-            typology: (style.typology as string) ?? "generic",
-            facadePattern: (style.facadePattern as string) ?? "none",
-            floorHeightOverride: style.floorHeightOverride ? Number(style.floorHeightOverride) : undefined,
-            maxFloorCap: Number(style.maxFloorCap ?? 30),
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          } as any : undefined}
-        />
-      </div>
-    </motion.div>
-  );
-}
 
 // ─── Inner Canvas ──────────────────────────────────────────────────────────
 
@@ -353,33 +113,42 @@ function WorkflowCanvasInner({ workflowId: urlWorkflowId, templateId }: Workflow
   const { fitView, screenToFlowPosition, zoomIn, zoomOut } = useReactFlow();
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
 
-  const {
-    nodes: storeNodes,
-    edges: storeEdges,
-    currentWorkflow,
-    creationMode,
-    addNode,
-    removeNode,
-    removeEdge: removeStoreEdge,
-    updateNode,
-    addEdge: addStoreEdge,
-    resetCanvas,
-    setEdgeFlowing,
-    isDirty,
-    isSaving,
-    markDirty,
-    setCreationMode,
-    saveWorkflow,
-    loadWorkflow,
-    undo,
-    redo,
-    isSaveModalOpen,
-    openSaveModal,
-    closeSaveModal,
-    loadFromTemplate,
-  } = useWorkflowStore();
+  // ─── Workflow store: selective subscriptions (only re-render when specific slice changes) ──
+  const storeNodes = useWorkflowStore(selectWfNodes);
+  const storeEdges = useWorkflowStore(selectWfEdges);
+  const currentWorkflow = useWorkflowStore(selectCurrentWorkflow);
+  const creationMode = useWorkflowStore(selectCreationMode);
+  const isDirty = useWorkflowStore(selectIsDirty);
+  const isSaving = useWorkflowStore(selectIsSaving);
+  const isSaveModalOpen = useWorkflowStore(selectIsSaveModalOpen);
 
-  const { artifacts, executionProgress, clearArtifacts, clearCurrentExecution, restoreArtifactsFromDB, hydrateQuantityOverrides, hydrateVideoGenProgress, hydrateRegenerationCounts } = useExecutionStore();
+  // Actions — stable references, never trigger re-renders
+  const addNode = useWorkflowStore(selectAddNode);
+  const removeNode = useWorkflowStore(selectRemoveNode);
+  const removeStoreEdge = useWorkflowStore(selectRemoveEdge);
+  const updateNode = useWorkflowStore(selectUpdateNode);
+  const addStoreEdge = useWorkflowStore(selectAddEdge);
+  const resetCanvas = useWorkflowStore(selectResetCanvas);
+  const setEdgeFlowing = useWorkflowStore(selectSetEdgeFlowing);
+  const markDirty = useWorkflowStore(selectMarkDirty);
+  const setCreationMode = useWorkflowStore(selectSetCreationMode);
+  const saveWorkflow = useWorkflowStore(selectSaveWorkflow);
+  const loadWorkflow = useWorkflowStore(selectLoadWorkflow);
+  const undo = useWorkflowStore(selectUndo);
+  const redo = useWorkflowStore(selectRedo);
+  const openSaveModal = useWorkflowStore(selectOpenSaveModal);
+  const closeSaveModal = useWorkflowStore(selectCloseSaveModal);
+  const loadFromTemplate = useWorkflowStore(selectLoadFromTemplate);
+
+  // ─── Execution store: selective subscriptions ──
+  const artifacts = useExecutionStore(selectArtifacts);
+  const executionProgress = useExecutionStore(selectExecutionProgress);
+  const clearArtifacts = useExecutionStore(selectClearArtifacts);
+  const clearCurrentExecution = useExecutionStore(selectClearCurrentExecution);
+  const restoreArtifactsFromDB = useExecutionStore(selectRestoreArtifactsFromDB);
+  const hydrateQuantityOverrides = useExecutionStore(selectHydrateQuantityOverrides);
+  const hydrateVideoGenProgress = useExecutionStore(selectHydrateVideoGenProgress);
+  const hydrateRegenerationCounts = useExecutionStore(selectHydrateRegenerationCounts);
 
   const { t: tLocale } = useLocale();
 

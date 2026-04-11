@@ -19,7 +19,7 @@
 import { useRef, useMemo, useState, Suspense } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { EffectComposer, Bloom } from "@react-three/postprocessing";
-import * as THREE from "three";
+import { Vector3, CatmullRomCurve3, TubeGeometry, BufferGeometry, BoxGeometry, PlaneGeometry, EdgesGeometry, AdditiveBlending, DoubleSide, Mesh, MeshBasicMaterial, Group } from "three";
 
 /* ── Smoothstep helper ── */
 function ss(x: number, lo: number, hi: number) {
@@ -95,7 +95,7 @@ function SubjectBuilding({ progress }: { progress: number }) {
 
       {/* Wireframe outline — gives the BIM/CAD hint */}
       <lineSegments position={[0, TOWER_H / 2, 0]}>
-        <edgesGeometry args={[new THREE.BoxGeometry(TOWER_W + 0.05, TOWER_H, TOWER_D + 0.05)]} />
+        <edgesGeometry args={[new BoxGeometry(TOWER_W + 0.05, TOWER_H, TOWER_D + 0.05)]} />
         <lineBasicMaterial color={AMBER_BRIGHT} transparent opacity={vis * 0.7} />
       </lineSegments>
     </group>
@@ -107,8 +107,8 @@ function SubjectBuilding({ progress }: { progress: number }) {
    to show the "rendering in progress" trope.
    ─────────────────────────────────────────────────────────────────── */
 function RenderScanLine({ progress }: { progress: number }) {
-  const ref = useRef<THREE.Mesh>(null);
-  const matRef = useRef<THREE.MeshBasicMaterial>(null);
+  const ref = useRef<Mesh>(null);
+  const matRef = useRef<MeshBasicMaterial>(null);
   const vis = ss(progress, 0.18, 0.3);
 
   useFrame(({ clock }) => {
@@ -127,7 +127,7 @@ function RenderScanLine({ progress }: { progress: number }) {
         color={AMBER_BRIGHT}
         transparent
         opacity={0}
-        blending={THREE.AdditiveBlending}
+        blending={AdditiveBlending}
         depthWrite={false}
       />
     </mesh>
@@ -144,20 +144,20 @@ function DollyTrack({ progress }: { progress: number }) {
 
   // Build a circle as a TubeGeometry along a CatmullRom curve
   const curve = useMemo(() => {
-    const pts: THREE.Vector3[] = [];
+    const pts: Vector3[] = [];
     const segs = 64;
     for (let i = 0; i <= segs; i++) {
       const a = (i / segs) * Math.PI * 2;
-      pts.push(new THREE.Vector3(Math.cos(a) * RADIUS, Y, Math.sin(a) * RADIUS));
+      pts.push(new Vector3(Math.cos(a) * RADIUS, Y, Math.sin(a) * RADIUS));
     }
-    return new THREE.CatmullRomCurve3(pts, true);
+    return new CatmullRomCurve3(pts, true);
   }, []);
 
-  const tubeGeo = useMemo(() => new THREE.TubeGeometry(curve, 96, 0.045, 8, true), [curve]);
+  const tubeGeo = useMemo(() => new TubeGeometry(curve, 96, 0.045, 8, true), [curve]);
 
   return (
     <mesh geometry={tubeGeo}>
-      <meshBasicMaterial color={AMBER} transparent opacity={vis * 0.55} blending={THREE.AdditiveBlending} depthWrite={false} />
+      <meshBasicMaterial color={AMBER} transparent opacity={vis * 0.55} blending={AdditiveBlending} depthWrite={false} />
     </mesh>
   );
 }
@@ -167,7 +167,7 @@ function DollyTrack({ progress }: { progress: number }) {
    lines pointing at the subject.
    ─────────────────────────────────────────────────────────────────── */
 function VirtualCamera({ progress }: { progress: number }) {
-  const groupRef = useRef<THREE.Group>(null);
+  const groupRef = useRef<Group>(null);
   const vis = ss(progress, 0.35, 0.5);
 
   const frustumPoints = useMemo(() => {
@@ -176,20 +176,20 @@ function VirtualCamera({ progress }: { progress: number }) {
     const w = 1.4;
     const h = 0.85;
     return [
-      new THREE.Vector3(0, 0, 0), new THREE.Vector3(w, h, -fwd),
-      new THREE.Vector3(0, 0, 0), new THREE.Vector3(-w, h, -fwd),
-      new THREE.Vector3(0, 0, 0), new THREE.Vector3(w, -h, -fwd),
-      new THREE.Vector3(0, 0, 0), new THREE.Vector3(-w, -h, -fwd),
+      new Vector3(0, 0, 0), new Vector3(w, h, -fwd),
+      new Vector3(0, 0, 0), new Vector3(-w, h, -fwd),
+      new Vector3(0, 0, 0), new Vector3(w, -h, -fwd),
+      new Vector3(0, 0, 0), new Vector3(-w, -h, -fwd),
       // Far plane rectangle
-      new THREE.Vector3(w, h, -fwd), new THREE.Vector3(-w, h, -fwd),
-      new THREE.Vector3(-w, h, -fwd), new THREE.Vector3(-w, -h, -fwd),
-      new THREE.Vector3(-w, -h, -fwd), new THREE.Vector3(w, -h, -fwd),
-      new THREE.Vector3(w, -h, -fwd), new THREE.Vector3(w, h, -fwd),
+      new Vector3(w, h, -fwd), new Vector3(-w, h, -fwd),
+      new Vector3(-w, h, -fwd), new Vector3(-w, -h, -fwd),
+      new Vector3(-w, -h, -fwd), new Vector3(w, -h, -fwd),
+      new Vector3(w, -h, -fwd), new Vector3(w, h, -fwd),
     ];
   }, []);
 
   const frustumGeo = useMemo(() => {
-    const g = new THREE.BufferGeometry().setFromPoints(frustumPoints);
+    const g = new BufferGeometry().setFromPoints(frustumPoints);
     return g;
   }, [frustumPoints]);
 
@@ -260,9 +260,9 @@ function RenderFrames({ progress }: { progress: number }) {
         const y = ARC_Y + Math.sin(t * Math.PI) * 1.5;
 
         // Slight tilt toward viewer
-        const lookAtCenter = new THREE.Vector3(0, 4, 0);
-        const pos = new THREE.Vector3(x, y, z);
-        const dir = new THREE.Vector3().subVectors(lookAtCenter, pos);
+        const lookAtCenter = new Vector3(0, 4, 0);
+        const pos = new Vector3(x, y, z);
+        const dir = new Vector3().subVectors(lookAtCenter, pos);
         const yaw = Math.atan2(dir.x, dir.z);
 
         return (
@@ -274,18 +274,18 @@ function RenderFrames({ progress }: { progress: number }) {
                 color="#0f172a"
                 transparent
                 opacity={v * 0.92}
-                side={THREE.DoubleSide}
+                side={DoubleSide}
               />
             </mesh>
             {/* Frame border */}
             <lineSegments>
-              <edgesGeometry args={[new THREE.PlaneGeometry(2.4, 1.5)]} />
+              <edgesGeometry args={[new PlaneGeometry(2.4, 1.5)]} />
               <lineBasicMaterial color={AMBER} transparent opacity={v * 0.85} />
             </lineSegments>
             {/* Inner gradient bar — fake "rendered image" preview */}
             <mesh position={[0, 0, 0.005]}>
               <planeGeometry args={[2.2, 1.3]} />
-              <meshBasicMaterial color={i % 2 === 0 ? "#1e293b" : "#0c1828"} transparent opacity={v * 0.8} side={THREE.DoubleSide} />
+              <meshBasicMaterial color={i % 2 === 0 ? "#1e293b" : "#0c1828"} transparent opacity={v * 0.8} side={DoubleSide} />
             </mesh>
             {/* Tiny amber accent line at bottom of frame (like a film label) */}
             <mesh position={[0, -0.6, 0.01]}>
@@ -296,7 +296,7 @@ function RenderFrames({ progress }: { progress: number }) {
             {[0, 1, 2].map((j) => (
               <mesh key={j} position={[-0.7 + j * 0.7, 0, 0.012]}>
                 <circleGeometry args={[0.18, 16]} />
-                <meshBasicMaterial color={AMBER} transparent opacity={v * 0.18} blending={THREE.AdditiveBlending} />
+                <meshBasicMaterial color={AMBER} transparent opacity={v * 0.18} blending={AdditiveBlending} />
               </mesh>
             ))}
           </group>
@@ -331,7 +331,7 @@ function SceneCamera({ progress }: { progress: number }) {
     const y = 7 + progress * 2;
     const x = Math.cos(orbitAngle) * r;
     const z = Math.sin(orbitAngle) * r;
-    camera.position.lerp(new THREE.Vector3(x, y, z), 0.04);
+    camera.position.lerp(new Vector3(x, y, z), 0.04);
     camera.lookAt(0, 4, 0);
   });
 

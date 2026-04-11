@@ -1,4 +1,4 @@
-import * as THREE from "three";
+import { BoxGeometry, Mesh, Group, MeshBasicMaterial, CylinderGeometry, PlaneGeometry, PointLight, CanvasTexture, SpriteMaterial, Sprite, SphereGeometry, Color, Vector3, MeshStandardMaterial, EdgesGeometry, DoubleSide, Material, Object3D, Scene } from "three";
 import type { RoomDef, RoomType, DoorMesh, BuildingConfig, BuildingStyle } from "@/types/architectural-viewer";
 import type { MaterialLibrary } from "@/features/3d-render/lib/materials";
 
@@ -412,7 +412,7 @@ export function getDefaultConfig(style?: BuildingStyle): BuildingConfig {
 
 // ─── Room Floor Material Mapping ──────────────────────────────────────────────
 
-function getFloorMaterial(type: RoomType, mats: MaterialLibrary): THREE.Material {
+function getFloorMaterial(type: RoomType, mats: MaterialLibrary): Material {
   switch (type) {
     case "living":
     case "dining":
@@ -453,7 +453,7 @@ function getFloorMaterial(type: RoomType, mats: MaterialLibrary): THREE.Material
   }
 }
 
-function getWallMaterial(type: RoomType, mats: MaterialLibrary, isAccent = false): THREE.Material {
+function getWallMaterial(type: RoomType, mats: MaterialLibrary, isAccent = false): Material {
   if (isAccent) return mats.accentWall;
   switch (type) {
     case "bathroom": return mats.tileFloor;
@@ -465,13 +465,13 @@ function getWallMaterial(type: RoomType, mats: MaterialLibrary, isAccent = false
 // ─── Brise-Soleil Facade ─────────────────────────────────────────────────────
 
 function createBriseSoleilFacade(
-  pos: THREE.Vector3,
+  pos: Vector3,
   length: number,
   height: number,
   isHorizontal: boolean,
   mats: MaterialLibrary,
-  parent: THREE.Group,
-  wallMat: THREE.Material
+  parent: Group,
+  wallMat: Material
 ) {
   const frameHeight = height - 0.24;
   const finSpacing = 0.4;
@@ -481,22 +481,22 @@ function createBriseSoleilFacade(
 
   if (isHorizontal) {
     // Back wall (recessed glazing)
-    const glassGeo = new THREE.BoxGeometry(length - 0.1, frameHeight, 0.02);
-    const glassMesh = new THREE.Mesh(glassGeo, mats.glass);
+    const glassGeo = new BoxGeometry(length - 0.1, frameHeight, 0.02);
+    const glassMesh = new Mesh(glassGeo, mats.glass);
     glassMesh.position.set(pos.x, pos.y, pos.z);
     parent.add(glassMesh);
 
     // Spandrel strip at slab level
-    const spandrelGeo = new THREE.BoxGeometry(length - 0.1, 0.3, 0.04);
-    const spandrelMesh = new THREE.Mesh(spandrelGeo, mats.spandrelPanel);
+    const spandrelGeo = new BoxGeometry(length - 0.1, 0.3, 0.04);
+    const spandrelMesh = new Mesh(spandrelGeo, mats.spandrelPanel);
     spandrelMesh.position.set(pos.x, pos.y - frameHeight / 2 + 0.15, pos.z);
     parent.add(spandrelMesh);
 
     // Horizontal fins (louvers)
     for (let i = 0; i < numFins; i++) {
       const fy = pos.y - frameHeight / 2 + (i + 0.5) * (frameHeight / numFins);
-      const finGeo = new THREE.BoxGeometry(length, finThickness, finDepth);
-      const finMesh = new THREE.Mesh(finGeo, mats.briseSoleilFin);
+      const finGeo = new BoxGeometry(length, finThickness, finDepth);
+      const finMesh = new Mesh(finGeo, mats.briseSoleilFin);
       finMesh.position.set(pos.x, fy, pos.z + finDepth / 2 + 0.02);
       // Tilt fins 15 degrees for solar shading
       finMesh.rotation.x = -Math.PI / 12;
@@ -507,27 +507,27 @@ function createBriseSoleilFacade(
     const mullionCount = Math.max(2, Math.floor(length / 1.5));
     for (let i = 0; i <= mullionCount; i++) {
       const mx = pos.x - length / 2 + (i / mullionCount) * length;
-      const mGeo = new THREE.BoxGeometry(0.04, frameHeight, finDepth + 0.04);
-      const mMesh = new THREE.Mesh(mGeo, mats.metal);
+      const mGeo = new BoxGeometry(0.04, frameHeight, finDepth + 0.04);
+      const mMesh = new Mesh(mGeo, mats.metal);
       mMesh.position.set(mx, pos.y, pos.z + finDepth / 2);
       parent.add(mMesh);
     }
   } else {
     // Same for vertical walls
-    const glassGeo = new THREE.BoxGeometry(0.02, frameHeight, length - 0.1);
-    const glassMesh = new THREE.Mesh(glassGeo, mats.glass);
+    const glassGeo = new BoxGeometry(0.02, frameHeight, length - 0.1);
+    const glassMesh = new Mesh(glassGeo, mats.glass);
     glassMesh.position.set(pos.x, pos.y, pos.z);
     parent.add(glassMesh);
 
-    const spandrelGeo = new THREE.BoxGeometry(0.04, 0.3, length - 0.1);
-    const spandrelMesh = new THREE.Mesh(spandrelGeo, mats.spandrelPanel);
+    const spandrelGeo = new BoxGeometry(0.04, 0.3, length - 0.1);
+    const spandrelMesh = new Mesh(spandrelGeo, mats.spandrelPanel);
     spandrelMesh.position.set(pos.x, pos.y - frameHeight / 2 + 0.15, pos.z);
     parent.add(spandrelMesh);
 
     for (let i = 0; i < numFins; i++) {
       const fy = pos.y - frameHeight / 2 + (i + 0.5) * (frameHeight / numFins);
-      const finGeo = new THREE.BoxGeometry(finDepth, finThickness, length);
-      const finMesh = new THREE.Mesh(finGeo, mats.briseSoleilFin);
+      const finGeo = new BoxGeometry(finDepth, finThickness, length);
+      const finMesh = new Mesh(finGeo, mats.briseSoleilFin);
       finMesh.position.set(pos.x + finDepth / 2 + 0.02, fy, pos.z);
       finMesh.rotation.z = Math.PI / 12;
       parent.add(finMesh);
@@ -536,8 +536,8 @@ function createBriseSoleilFacade(
     const mullionCount = Math.max(2, Math.floor(length / 1.5));
     for (let i = 0; i <= mullionCount; i++) {
       const mz = pos.z - length / 2 + (i / mullionCount) * length;
-      const mGeo = new THREE.BoxGeometry(finDepth + 0.04, frameHeight, 0.04);
-      const mMesh = new THREE.Mesh(mGeo, mats.metal);
+      const mGeo = new BoxGeometry(finDepth + 0.04, frameHeight, 0.04);
+      const mMesh = new Mesh(mGeo, mats.metal);
       mMesh.position.set(pos.x + finDepth / 2, pos.y, mz);
       parent.add(mMesh);
     }
@@ -547,14 +547,14 @@ function createBriseSoleilFacade(
 // ─── Ribbon Window Facade ────────────────────────────────────────────────────
 
 function createRibbonWindowFacade(
-  pos: THREE.Vector3,
+  pos: Vector3,
   length: number,
   height: number,
   thickness: number,
   isHorizontal: boolean,
   mats: MaterialLibrary,
-  parent: THREE.Group,
-  wallMat: THREE.Material
+  parent: Group,
+  wallMat: Material
 ) {
   const frameHeight = height - 0.12;
   // Ribbon windows: continuous horizontal glass band with solid wall above and below
@@ -565,22 +565,22 @@ function createRibbonWindowFacade(
   if (isHorizontal) {
     // Solid wall below (sill zone)
     if (sillH > 0.1) {
-      const sillGeo = new THREE.BoxGeometry(length, sillH, thickness);
-      const sillMesh = new THREE.Mesh(sillGeo, wallMat);
+      const sillGeo = new BoxGeometry(length, sillH, thickness);
+      const sillMesh = new Mesh(sillGeo, wallMat);
       sillMesh.position.set(pos.x, pos.y - frameHeight / 2 + sillH / 2 + 0.06, pos.z);
       parent.add(sillMesh);
     }
 
     // Continuous glass ribbon
-    const glassGeo = new THREE.BoxGeometry(length - 0.05, ribbonH, 0.02);
-    const glassMesh = new THREE.Mesh(glassGeo, mats.glass);
+    const glassGeo = new BoxGeometry(length - 0.05, ribbonH, 0.02);
+    const glassMesh = new Mesh(glassGeo, mats.glass);
     glassMesh.position.set(pos.x, pos.y - frameHeight / 2 + sillH + ribbonH / 2 + 0.06, pos.z);
     parent.add(glassMesh);
 
     // Thin metal frame at top and bottom of ribbon
     for (const oy of [0, ribbonH]) {
-      const frameMesh = new THREE.Mesh(
-        new THREE.BoxGeometry(length, 0.03, 0.05),
+      const frameMesh = new Mesh(
+        new BoxGeometry(length, 0.03, 0.05),
         mats.metal
       );
       frameMesh.position.set(pos.x, pos.y - frameHeight / 2 + sillH + oy + 0.06, pos.z);
@@ -589,8 +589,8 @@ function createRibbonWindowFacade(
 
     // Solid wall above (header zone)
     if (headerH > 0.1) {
-      const headerGeo = new THREE.BoxGeometry(length, headerH, thickness);
-      const headerMesh = new THREE.Mesh(headerGeo, wallMat);
+      const headerGeo = new BoxGeometry(length, headerH, thickness);
+      const headerMesh = new Mesh(headerGeo, wallMat);
       headerMesh.position.set(pos.x, pos.y + frameHeight / 2 - headerH / 2 - 0.06, pos.z);
       parent.add(headerMesh);
     }
@@ -599,8 +599,8 @@ function createRibbonWindowFacade(
     const divCount = Math.max(1, Math.floor(length / 2));
     for (let i = 1; i < divCount; i++) {
       const dx = pos.x - length / 2 + (i / divCount) * length;
-      const divMesh = new THREE.Mesh(
-        new THREE.BoxGeometry(0.02, ribbonH, 0.04),
+      const divMesh = new Mesh(
+        new BoxGeometry(0.02, ribbonH, 0.04),
         mats.metal
       );
       divMesh.position.set(dx, pos.y - frameHeight / 2 + sillH + ribbonH / 2 + 0.06, pos.z);
@@ -609,20 +609,20 @@ function createRibbonWindowFacade(
   } else {
     // Vertical wall version
     if (sillH > 0.1) {
-      const sillGeo = new THREE.BoxGeometry(thickness, sillH, length);
-      const sillMesh = new THREE.Mesh(sillGeo, wallMat);
+      const sillGeo = new BoxGeometry(thickness, sillH, length);
+      const sillMesh = new Mesh(sillGeo, wallMat);
       sillMesh.position.set(pos.x, pos.y - frameHeight / 2 + sillH / 2 + 0.06, pos.z);
       parent.add(sillMesh);
     }
 
-    const glassGeo = new THREE.BoxGeometry(0.02, ribbonH, length - 0.05);
-    const glassMesh = new THREE.Mesh(glassGeo, mats.glass);
+    const glassGeo = new BoxGeometry(0.02, ribbonH, length - 0.05);
+    const glassMesh = new Mesh(glassGeo, mats.glass);
     glassMesh.position.set(pos.x, pos.y - frameHeight / 2 + sillH + ribbonH / 2 + 0.06, pos.z);
     parent.add(glassMesh);
 
     for (const oy of [0, ribbonH]) {
-      const frameMesh = new THREE.Mesh(
-        new THREE.BoxGeometry(0.05, 0.03, length),
+      const frameMesh = new Mesh(
+        new BoxGeometry(0.05, 0.03, length),
         mats.metal
       );
       frameMesh.position.set(pos.x, pos.y - frameHeight / 2 + sillH + oy + 0.06, pos.z);
@@ -630,8 +630,8 @@ function createRibbonWindowFacade(
     }
 
     if (headerH > 0.1) {
-      const headerGeo = new THREE.BoxGeometry(thickness, headerH, length);
-      const headerMesh = new THREE.Mesh(headerGeo, wallMat);
+      const headerGeo = new BoxGeometry(thickness, headerH, length);
+      const headerMesh = new Mesh(headerGeo, wallMat);
       headerMesh.position.set(pos.x, pos.y + frameHeight / 2 - headerH / 2 - 0.06, pos.z);
       parent.add(headerMesh);
     }
@@ -639,8 +639,8 @@ function createRibbonWindowFacade(
     const divCount = Math.max(1, Math.floor(length / 2));
     for (let i = 1; i < divCount; i++) {
       const dz = pos.z - length / 2 + (i / divCount) * length;
-      const divMesh = new THREE.Mesh(
-        new THREE.BoxGeometry(0.04, ribbonH, 0.02),
+      const divMesh = new Mesh(
+        new BoxGeometry(0.04, ribbonH, 0.02),
         mats.metal
       );
       divMesh.position.set(pos.x, pos.y - frameHeight / 2 + sillH + ribbonH / 2 + 0.06, dz);
@@ -654,12 +654,12 @@ function createRibbonWindowFacade(
 export function buildBuilding(
   config: BuildingConfig,
   mats: MaterialLibrary,
-  scene: THREE.Scene
-): { doors: DoorMesh[]; roomLabels: THREE.Group; buildingGroup: THREE.Group } {
+  scene: Scene
+): { doors: DoorMesh[]; roomLabels: Group; buildingGroup: Group } {
   const { floorHeight, rooms, wallThickness, style } = config;
   const doors: DoorMesh[] = [];
-  const buildingGroup = new THREE.Group();
-  const roomLabels = new THREE.Group();
+  const buildingGroup = new Group();
+  const roomLabels = new Group();
 
   // Find building bounds
   let minX = Infinity, minZ = Infinity, maxX = -Infinity, maxZ = -Infinity;
@@ -677,13 +677,13 @@ export function buildBuilding(
 
   const isGlassBuilding = style.glassHeavy || style.exteriorMaterial === "glass";
 
-  const tagFloor = (obj: THREE.Object3D, floor: number) => {
+  const tagFloor = (obj: Object3D, floor: number) => {
     obj.userData.floor = floor;
     obj.userData.originalY = obj.position.y;
   };
 
   // Enable shadow casting/receiving on all added meshes
-  const addShadowMesh = (mesh: THREE.Mesh, parent: THREE.Object3D, cast = true, receive = true) => {
+  const addShadowMesh = (mesh: Mesh, parent: Object3D, cast = true, receive = true) => {
     mesh.castShadow = cast;
     mesh.receiveShadow = receive;
     parent.add(mesh);
@@ -713,8 +713,8 @@ export function buildBuilding(
       const rz = room.z - centerZ;
 
       // ─── Floor slab ──────────────────────────────────────────
-      const floorGeo = new THREE.BoxGeometry(room.width, 0.12, room.depth);
-      const floorMesh = new THREE.Mesh(floorGeo, getFloorMaterial(room.type, mats));
+      const floorGeo = new BoxGeometry(room.width, 0.12, room.depth);
+      const floorMesh = new Mesh(floorGeo, getFloorMaterial(room.type, mats));
       floorMesh.position.set(rx + room.width / 2, baseY + 0.06, rz + room.depth / 2);
 
       tagFloor(floorMesh, floorIdx);
@@ -722,8 +722,8 @@ export function buildBuilding(
 
       // ─── Ceiling ────────────────────────────────────────────
       if (room.hasCeiling !== false) {
-        const ceilGeo = new THREE.BoxGeometry(room.width - 0.02, 0.08, room.depth - 0.02);
-        const ceilMesh = new THREE.Mesh(ceilGeo, mats.ceiling);
+        const ceilGeo = new BoxGeometry(room.width - 0.02, 0.08, room.depth - 0.02);
+        const ceilMesh = new Mesh(ceilGeo, mats.ceiling);
         ceilMesh.position.set(rx + room.width / 2, baseY + floorHeight - 0.04, rz + room.depth / 2);
 
         tagFloor(ceilMesh, floorIdx);
@@ -769,19 +769,19 @@ export function buildBuilding(
         }
 
         // Wall geometry
-        let wallGeo: THREE.BoxGeometry;
-        let wallPos: THREE.Vector3;
+        let wallGeo: BoxGeometry;
+        let wallPos: Vector3;
 
         if (isHorizontal) {
-          wallGeo = new THREE.BoxGeometry(wallLen, floorHeight - 0.12, wt);
-          wallPos = new THREE.Vector3(
+          wallGeo = new BoxGeometry(wallLen, floorHeight - 0.12, wt);
+          wallPos = new Vector3(
             (wd.x1 + wd.x2) / 2,
             baseY + floorHeight / 2,
             wd.z1 + (wd.nz * wt / 2)
           );
         } else {
-          wallGeo = new THREE.BoxGeometry(wt, floorHeight - 0.12, wallLen);
-          wallPos = new THREE.Vector3(
+          wallGeo = new BoxGeometry(wt, floorHeight - 0.12, wallLen);
+          wallPos = new Vector3(
             wd.x1 + (wd.nx * wt / 2),
             baseY + floorHeight / 2,
             (wd.z1 + wd.z2) / 2
@@ -819,7 +819,7 @@ export function buildBuilding(
         } else {
           const isAccent = !isExterior && (wd.dir === "north") && (room.type === "living" || room.type === "bedroom");
           const wallMat = isExterior ? extWallMat : getWallMaterial(room.type, mats, isAccent);
-          const wallMesh = new THREE.Mesh(wallGeo, wallMat);
+          const wallMesh = new Mesh(wallGeo, wallMat);
           wallMesh.position.copy(wallPos);
 
           tagFloor(wallMesh, floorIdx);
@@ -850,8 +850,8 @@ export function buildBuilding(
           { w: bbD, d: room.depth, x: rx + room.width - bbD / 2, z: rz + room.depth / 2 },
         ];
         for (const bb of bbDefs) {
-          const bbMesh = new THREE.Mesh(
-            new THREE.BoxGeometry(bb.w, bbH, bb.d),
+          const bbMesh = new Mesh(
+            new BoxGeometry(bb.w, bbH, bb.d),
             mats.whiteWall
           );
           bbMesh.position.set(bb.x, baseY + 0.12 + bbH / 2, bb.z);
@@ -878,8 +878,8 @@ export function buildBuilding(
     { x: -hw - 0.05, z: hd + 0.05 },
     { x: hw + 0.05, z: hd + 0.05 },
   ]) {
-    const colMesh = new THREE.Mesh(
-      new THREE.BoxGeometry(cornerColSize, bldgHeightFull, cornerColSize),
+    const colMesh = new Mesh(
+      new BoxGeometry(cornerColSize, bldgHeightFull, cornerColSize),
       cornerMat
     );
     colMesh.position.set(corner.x, bldgHeightFull / 2, corner.z);
@@ -888,16 +888,16 @@ export function buildBuilding(
 
   // ─── Building Base / Plinth (ground floor differentiation) ──────
   const plinthH = 0.4;
-  const plinthMesh = new THREE.Mesh(
-    new THREE.BoxGeometry(buildingW + 0.6, plinthH, buildingD + 0.6),
+  const plinthMesh = new Mesh(
+    new BoxGeometry(buildingW + 0.6, plinthH, buildingD + 0.6),
     mats.concreteWall
   );
   plinthMesh.position.set(0, plinthH / 2, 0);
   buildingGroup.add(plinthMesh);
 
   // ─── Roof ────────────────────────────────────────────────────────
-  const roofGeo = new THREE.BoxGeometry(buildingW + 0.5, 0.2, buildingD + 0.5);
-  const roofMesh = new THREE.Mesh(roofGeo, mats.roofTop);
+  const roofGeo = new BoxGeometry(buildingW + 0.5, 0.2, buildingD + 0.5);
+  const roofMesh = new Mesh(roofGeo, mats.roofTop);
   roofMesh.position.set(0, config.floors * floorHeight + 0.1, 0);
 
   buildingGroup.add(roofMesh);
@@ -917,8 +917,8 @@ export function buildBuilding(
     { w: parapetT, d: buildingD + 0.5, x: -(buildingW + 0.5) / 2, z: 0 },
     { w: parapetT, d: buildingD + 0.5, x: (buildingW + 0.5) / 2, z: 0 },
   ].forEach(p => {
-    const pGeo = new THREE.BoxGeometry(p.w, parapetH, p.d);
-    const pMesh = new THREE.Mesh(pGeo, parapetMat);
+    const pGeo = new BoxGeometry(p.w, parapetH, p.d);
+    const pMesh = new Mesh(pGeo, parapetMat);
     pMesh.position.set(p.x, parapetY, p.z);
 
     buildingGroup.add(pMesh);
@@ -932,20 +932,20 @@ export function buildBuilding(
     const mechY = config.floors * floorHeight + 0.2 + mechH / 2;
 
     // Mechanical room enclosure
-    const mechGeo = new THREE.BoxGeometry(mechW, mechH, mechD);
-    const mechMesh = new THREE.Mesh(mechGeo, mats.concreteWall);
+    const mechGeo = new BoxGeometry(mechW, mechH, mechD);
+    const mechMesh = new Mesh(mechGeo, mats.concreteWall);
     mechMesh.position.set(buildingW * 0.15, mechY, buildingD * 0.1);
     buildingGroup.add(mechMesh);
 
     // Mechanical room roof
-    const mechRoofGeo = new THREE.BoxGeometry(mechW + 0.3, 0.1, mechD + 0.3);
-    const mechRoofMesh = new THREE.Mesh(mechRoofGeo, mats.roofTop);
+    const mechRoofGeo = new BoxGeometry(mechW + 0.3, 0.1, mechD + 0.3);
+    const mechRoofMesh = new Mesh(mechRoofGeo, mats.roofTop);
     mechRoofMesh.position.set(buildingW * 0.15, mechY + mechH / 2 + 0.05, buildingD * 0.1);
     buildingGroup.add(mechRoofMesh);
 
     // Louver vents on mechanical room
-    const ventGeo = new THREE.BoxGeometry(mechW * 0.6, mechH * 0.6, 0.05);
-    const ventMesh = new THREE.Mesh(ventGeo, mats.metal);
+    const ventGeo = new BoxGeometry(mechW * 0.6, mechH * 0.6, 0.05);
+    const ventMesh = new Mesh(ventGeo, mats.metal);
     ventMesh.position.set(buildingW * 0.15, mechY, buildingD * 0.1 - mechD / 2 - 0.03);
     buildingGroup.add(ventMesh);
   }
@@ -958,20 +958,20 @@ export function buildBuilding(
 
   // ─── Ground plane (adapts to environment) ────────────────────────
   const groundSize = Math.max(120, buildingW * 4, buildingD * 4, bldgHeight * 2);
-  const groundGeo = new THREE.PlaneGeometry(groundSize, groundSize);
+  const groundGeo = new PlaneGeometry(groundSize, groundSize);
   const groundMat = (() => {
     switch (style.environment) {
       case "urban": return mats.concreteFloor;
-      case "desert": return new THREE.MeshBasicMaterial({
-        color: 0xC4A55A, side: THREE.DoubleSide
+      case "desert": return new MeshBasicMaterial({
+        color: 0xC4A55A, side: DoubleSide
       });
-      case "coastal": return new THREE.MeshBasicMaterial({
-        color: 0xD4C8A0, side: THREE.DoubleSide
+      case "coastal": return new MeshBasicMaterial({
+        color: 0xD4C8A0, side: DoubleSide
       });
       default: return mats.grass;
     }
   })();
-  const groundMesh = new THREE.Mesh(groundGeo, groundMat);
+  const groundMesh = new Mesh(groundGeo, groundMat);
   groundMesh.rotation.x = -Math.PI / 2;
   groundMesh.position.y = -0.01;
   groundMesh.receiveShadow = true;
@@ -984,8 +984,8 @@ export function buildBuilding(
   }
 
   // Concrete pathway to entrance
-  const pathGeo = new THREE.BoxGeometry(3, 0.05, 15);
-  const pathMesh = new THREE.Mesh(pathGeo, mats.concreteFloor);
+  const pathGeo = new BoxGeometry(3, 0.05, 15);
+  const pathMesh = new Mesh(pathGeo, mats.concreteFloor);
   pathMesh.position.set(0, 0.025, -buildingD / 2 - 7.5);
 
   scene.add(pathMesh);
@@ -993,17 +993,17 @@ export function buildBuilding(
   // Front entrance canopy (scales slightly with building height)
   const canopyW = Math.min(buildingW * 0.5, Math.max(4, 3 + bldgHeight * 0.08));
   const canopyD = Math.min(4, 2 + bldgHeight * 0.05);
-  const canopyGeo = new THREE.BoxGeometry(canopyW, 0.12, canopyD);
+  const canopyGeo = new BoxGeometry(canopyW, 0.12, canopyD);
   const canopyMat = isGlassBuilding ? mats.brushedMetal : mats.concreteWall;
-  const canopyMesh = new THREE.Mesh(canopyGeo, canopyMat);
+  const canopyMesh = new Mesh(canopyGeo, canopyMat);
   canopyMesh.position.set(0, floorHeight * 0.85, -buildingD / 2 - canopyD / 2);
 
   scene.add(canopyMesh);
 
   // Canopy supports
   for (const cx of [-canopyW / 2 + 0.15, canopyW / 2 - 0.15]) {
-    const colMesh = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.06, 0.06, floorHeight * 0.85, 12),
+    const colMesh = new Mesh(
+      new CylinderGeometry(0.06, 0.06, floorHeight * 0.85, 12),
       mats.brushedMetal
     );
     colMesh.position.set(cx, floorHeight * 0.85 / 2, -buildingD / 2 - canopyD + 0.15);
@@ -1013,8 +1013,8 @@ export function buildBuilding(
 
   // Entry steps
   for (let s = 0; s < 3; s++) {
-    const stepMesh = new THREE.Mesh(
-      new THREE.BoxGeometry(canopyW, 0.08, 0.35),
+    const stepMesh = new Mesh(
+      new BoxGeometry(canopyW, 0.08, 0.35),
       mats.concreteFloor
     );
     stepMesh.position.set(0, s * 0.08 + 0.04, -buildingD / 2 - 0.2 - s * 0.35);
@@ -1023,8 +1023,8 @@ export function buildBuilding(
   }
 
   // Front door (glass)
-  const frontDoor = new THREE.Mesh(
-    new THREE.BoxGeometry(1.8, 2.4, 0.06),
+  const frontDoor = new Mesh(
+    new BoxGeometry(1.8, 2.4, 0.06),
     mats.darkGlass
   );
   frontDoor.position.set(0, 1.2, -buildingD / 2 - 0.03);
@@ -1032,22 +1032,22 @@ export function buildBuilding(
 
   // Door frame
   for (const fx of [-0.95, 0.95]) {
-    const frameSide = new THREE.Mesh(
-      new THREE.BoxGeometry(0.05, 2.5, 0.08),
+    const frameSide = new Mesh(
+      new BoxGeometry(0.05, 2.5, 0.08),
       mats.brushedMetal
     );
     frameSide.position.set(fx, 1.25, -buildingD / 2 - 0.03);
     scene.add(frameSide);
   }
-  const frameTop = new THREE.Mesh(
-    new THREE.BoxGeometry(1.95, 0.05, 0.08),
+  const frameTop = new Mesh(
+    new BoxGeometry(1.95, 0.05, 0.08),
     mats.brushedMetal
   );
   frameTop.position.set(0, 2.5, -buildingD / 2 - 0.03);
   scene.add(frameTop);
 
   // Entrance light (no shadow — only sunlight casts shadows to keep shader simple)
-  const entranceLight = new THREE.PointLight(0xFFE4B5, 0.8, Math.max(8, bldgHeight * 0.3));
+  const entranceLight = new PointLight(0xFFE4B5, 0.8, Math.max(8, bldgHeight * 0.3));
   entranceLight.position.set(0, floorHeight * 0.8, -buildingD / 2 - 1);
   scene.add(entranceLight);
 
@@ -1071,16 +1071,16 @@ export function buildBuilding(
   ];
 
   for (const lp of lightPositions) {
-    const bollard = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.05, 0.06, 0.8, 8),
+    const bollard = new Mesh(
+      new CylinderGeometry(0.05, 0.06, 0.8, 8),
       mats.brushedMetal
     );
     bollard.position.set(lp.x, 0.4, lp.z);
 
     scene.add(bollard);
 
-    const cap = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.07, 0.07, 0.04, 8),
+    const cap = new Mesh(
+      new CylinderGeometry(0.07, 0.07, 0.04, 8),
       mats.emissiveWarm
     );
     cap.position.set(lp.x, 0.82, lp.z);
@@ -1091,42 +1091,42 @@ export function buildBuilding(
   if (style.environment === "urban" || style.environment === "campus") {
     // Urban plaza surrounding building
     const plazaMargin = 4;
-    const plazaGeo = new THREE.BoxGeometry(buildingW + plazaMargin * 2, 0.06, buildingD + plazaMargin * 2);
-    const plazaMesh = new THREE.Mesh(plazaGeo, mats.concreteFloor);
+    const plazaGeo = new BoxGeometry(buildingW + plazaMargin * 2, 0.06, buildingD + plazaMargin * 2);
+    const plazaMesh = new Mesh(plazaGeo, mats.concreteFloor);
     plazaMesh.position.set(0, 0.03, 0);
     scene.add(plazaMesh);
 
     // Road in front of the building
-    const roadGeo = new THREE.BoxGeometry(buildingW * 2 + 20, 0.04, 8);
-    const roadMat = new THREE.MeshBasicMaterial({ color: 0x333333, side: THREE.DoubleSide });
-    const roadMesh = new THREE.Mesh(roadGeo, roadMat);
+    const roadGeo = new BoxGeometry(buildingW * 2 + 20, 0.04, 8);
+    const roadMat = new MeshBasicMaterial({ color: 0x333333, side: DoubleSide });
+    const roadMesh = new Mesh(roadGeo, roadMat);
     roadMesh.position.set(0, 0.02, -buildingD / 2 - plazaMargin - 6);
     scene.add(roadMesh);
 
     // Road markings
-    const markingMat = new THREE.MeshBasicMaterial({ color: 0xFFFFFF, side: THREE.DoubleSide });
-    const centerLineGeo = new THREE.BoxGeometry(buildingW * 2 + 20, 0.05, 0.12);
-    const centerLine = new THREE.Mesh(centerLineGeo, markingMat);
+    const markingMat = new MeshBasicMaterial({ color: 0xFFFFFF, side: DoubleSide });
+    const centerLineGeo = new BoxGeometry(buildingW * 2 + 20, 0.05, 0.12);
+    const centerLine = new Mesh(centerLineGeo, markingMat);
     centerLine.position.set(0, 0.045, -buildingD / 2 - plazaMargin - 6);
     scene.add(centerLine);
 
     // Sidewalk curb
-    const curbGeo = new THREE.BoxGeometry(buildingW * 2 + 20, 0.15, 0.2);
-    const curbMesh = new THREE.Mesh(curbGeo, mats.concreteFloor);
+    const curbGeo = new BoxGeometry(buildingW * 2 + 20, 0.15, 0.2);
+    const curbMesh = new Mesh(curbGeo, mats.concreteFloor);
     curbMesh.position.set(0, 0.075, -buildingD / 2 - plazaMargin - 2);
     scene.add(curbMesh);
   }
 
   // ─── Driveway ────────────────────────────────────────────────
-  const driveGeo = new THREE.BoxGeometry(5, 0.04, 10);
-  const driveMesh = new THREE.Mesh(driveGeo, mats.concreteFloor);
+  const driveGeo = new BoxGeometry(5, 0.04, 10);
+  const driveMesh = new Mesh(driveGeo, mats.concreteFloor);
   driveMesh.position.set(buildingW / 2 + 2, 0.02, -buildingD / 2 - 5);
 
   scene.add(driveMesh);
 
   // Enable shadows on all building meshes in one pass
   buildingGroup.traverse((obj) => {
-    if (obj instanceof THREE.Mesh) {
+    if (obj instanceof Mesh) {
       obj.castShadow = true;
       obj.receiveShadow = true;
     }
@@ -1145,7 +1145,7 @@ function buildWaterFeature(
   buildingW: number,
   buildingD: number,
   mats: MaterialLibrary,
-  scene: THREE.Scene
+  scene: Scene
 ) {
   if (style.hasRiver) {
     // Flowing river along one side (offset scales with building size)
@@ -1155,38 +1155,38 @@ function buildWaterFeature(
     const riverLen = Math.max(80, buildingW * 4);
 
     // River bed (slightly recessed)
-    const bedGeo = new THREE.BoxGeometry(riverLen, 0.3, riverW);
-    const bedMesh = new THREE.Mesh(bedGeo, new THREE.MeshBasicMaterial({ color: 0x3D5C3A }));
+    const bedGeo = new BoxGeometry(riverLen, 0.3, riverW);
+    const bedMesh = new Mesh(bedGeo, new MeshBasicMaterial({ color: 0x3D5C3A }));
     bedMesh.position.set(0, -0.4, riverZ);
 
     scene.add(bedMesh);
 
     // Water surface
-    const waterGeo = new THREE.BoxGeometry(riverLen, 0.06, riverW - 0.5);
-    const waterMesh = new THREE.Mesh(waterGeo, mats.water);
+    const waterGeo = new BoxGeometry(riverLen, 0.06, riverW - 0.5);
+    const waterMesh = new Mesh(waterGeo, mats.water);
     waterMesh.position.set(0, -0.12, riverZ);
     scene.add(waterMesh);
 
     // River banks - dirt/stone edges
     for (const side of [-1, 1]) {
-      const bankGeo = new THREE.BoxGeometry(riverLen, 0.4, 1.5);
-      const bankMesh = new THREE.Mesh(bankGeo, new THREE.MeshBasicMaterial({ color: 0x6B5C3D }));
+      const bankGeo = new BoxGeometry(riverLen, 0.4, 1.5);
+      const bankMesh = new Mesh(bankGeo, new MeshBasicMaterial({ color: 0x6B5C3D }));
       bankMesh.position.set(0, -0.1, riverZ + side * (riverW / 2 + 0.5));
 
       scene.add(bankMesh);
     }
 
     // Riverbank promenade / walkway
-    const promoGeo = new THREE.BoxGeometry(riverLen * 0.7, 0.06, 3);
-    const promoMesh = new THREE.Mesh(promoGeo, mats.concreteFloor);
+    const promoGeo = new BoxGeometry(riverLen * 0.7, 0.06, 3);
+    const promoMesh = new Mesh(promoGeo, mats.concreteFloor);
     promoMesh.position.set(0, 0.03, riverZ - riverW / 2 - 2.5);
 
     scene.add(promoMesh);
 
     // Railing along the promenade
     const railLen = riverLen * 0.65;
-    const railMesh = new THREE.Mesh(
-      new THREE.BoxGeometry(railLen, 0.04, 0.04),
+    const railMesh = new Mesh(
+      new BoxGeometry(railLen, 0.04, 0.04),
       mats.brushedMetal
     );
     railMesh.position.set(0, 1.0, riverZ - riverW / 2 - 1);
@@ -1195,8 +1195,8 @@ function buildWaterFeature(
     // Railing posts
     const postCount = Math.floor(railLen / 2);
     for (let i = 0; i < postCount; i++) {
-      const post = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.02, 0.02, 1.0, 6),
+      const post = new Mesh(
+        new CylinderGeometry(0.02, 0.02, 1.0, 6),
         mats.brushedMetal
       );
       post.position.set(
@@ -1226,14 +1226,14 @@ function buildWaterFeature(
     const lakeZ = buildingD / 2 + lakeR + Math.max(4, buildingD * 0.2);
 
     // Lake bed
-    const lakeBedGeo = new THREE.CylinderGeometry(lakeR, lakeR, 0.3, 32);
-    const lakeBedMesh = new THREE.Mesh(lakeBedGeo, new THREE.MeshBasicMaterial({ color: 0x3D5C3A }));
+    const lakeBedGeo = new CylinderGeometry(lakeR, lakeR, 0.3, 32);
+    const lakeBedMesh = new Mesh(lakeBedGeo, new MeshBasicMaterial({ color: 0x3D5C3A }));
     lakeBedMesh.position.set(0, -0.45, lakeZ);
     scene.add(lakeBedMesh);
 
     // Water surface
-    const lakeGeo = new THREE.CylinderGeometry(lakeR - 0.5, lakeR - 0.5, 0.06, 32);
-    const lakeMesh = new THREE.Mesh(lakeGeo, mats.water);
+    const lakeGeo = new CylinderGeometry(lakeR - 0.5, lakeR - 0.5, 0.06, 32);
+    const lakeMesh = new Mesh(lakeGeo, mats.water);
     lakeMesh.position.set(0, -0.12, lakeZ);
     scene.add(lakeMesh);
   }
@@ -1241,17 +1241,17 @@ function buildWaterFeature(
 
 // ─── Bench ───────────────────────────────────────────────────────────────────
 
-function createBench(mats: MaterialLibrary): THREE.Group {
-  const g = new THREE.Group();
-  const seatGeo = new THREE.BoxGeometry(1.5, 0.06, 0.4);
-  const seat = new THREE.Mesh(seatGeo, mats.wood);
+function createBench(mats: MaterialLibrary): Group {
+  const g = new Group();
+  const seatGeo = new BoxGeometry(1.5, 0.06, 0.4);
+  const seat = new Mesh(seatGeo, mats.wood);
   seat.position.y = 0.45;
 
   g.add(seat);
 
   for (const lx of [-0.6, 0.6]) {
-    const leg = new THREE.Mesh(
-      new THREE.BoxGeometry(0.06, 0.45, 0.35),
+    const leg = new Mesh(
+      new BoxGeometry(0.06, 0.45, 0.35),
       mats.brushedMetal
     );
     leg.position.set(lx, 0.225, 0);
@@ -1259,8 +1259,8 @@ function createBench(mats: MaterialLibrary): THREE.Group {
   }
 
   // Backrest
-  const back = new THREE.Mesh(
-    new THREE.BoxGeometry(1.5, 0.35, 0.04),
+  const back = new Mesh(
+    new BoxGeometry(1.5, 0.35, 0.04),
     mats.wood
   );
   back.position.set(0, 0.65, -0.18);
@@ -1319,13 +1319,13 @@ function generateTreePositions(
 
 // ─── Procedural Tree ──────────────────────────────────────────────────────────
 
-function createTree(mats: MaterialLibrary, height: number): THREE.Group {
-  const g = new THREE.Group();
+function createTree(mats: MaterialLibrary, height: number): Group {
+  const g = new Group();
 
   const trunkH = height * 0.4;
-  const trunk = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.08, 0.15, trunkH, 8),
-    new THREE.MeshBasicMaterial({ color: 0x5C3D1E })
+  const trunk = new Mesh(
+    new CylinderGeometry(0.08, 0.15, trunkH, 8),
+    new MeshBasicMaterial({ color: 0x5C3D1E })
   );
   trunk.position.y = trunkH / 2;
 
@@ -1340,10 +1340,10 @@ function createTree(mats: MaterialLibrary, height: number): THREE.Group {
 
   for (const layer of layers) {
     const shade = 0.85 + Math.random() * 0.3;
-    const c = new THREE.Color(foliageColor).multiplyScalar(shade);
-    const foliage = new THREE.Mesh(
-      new THREE.SphereGeometry(layer.r, 8, 6),
-      new THREE.MeshBasicMaterial({ color: c })
+    const c = new Color(foliageColor).multiplyScalar(shade);
+    const foliage = new Mesh(
+      new SphereGeometry(layer.r, 8, 6),
+      new MeshBasicMaterial({ color: c })
     );
     foliage.position.set(
       (Math.random() - 0.5) * 0.3,
@@ -1361,12 +1361,12 @@ function createTree(mats: MaterialLibrary, height: number): THREE.Group {
 // ─── Glass Curtain Wall ───────────────────────────────────────────────────────
 
 function createGlassCurtainWall(
-  pos: THREE.Vector3,
+  pos: Vector3,
   length: number,
   height: number,
   isHorizontal: boolean,
   mats: MaterialLibrary,
-  parent: THREE.Group,
+  parent: Group,
   _floorIdx?: number
 ) {
   const mullionSpacing = 1.5;
@@ -1380,85 +1380,85 @@ function createGlassCurtainWall(
 
   if (isHorizontal) {
     // Glass panel (above spandrel)
-    const glassGeo = new THREE.BoxGeometry(length - 0.1, glassH, 0.02);
-    const glassMesh = new THREE.Mesh(glassGeo, mats.glass);
+    const glassGeo = new BoxGeometry(length - 0.1, glassH, 0.02);
+    const glassMesh = new Mesh(glassGeo, mats.glass);
     glassMesh.position.set(pos.x, pos.y + spandrelH / 2, pos.z);
     parent.add(glassMesh);
 
     // Spandrel panel at floor slab line
-    const spandrelGeo = new THREE.BoxGeometry(length - 0.1, spandrelH, 0.04);
-    const spandrelMesh = new THREE.Mesh(spandrelGeo, mats.brushedMetal);
+    const spandrelGeo = new BoxGeometry(length - 0.1, spandrelH, 0.04);
+    const spandrelMesh = new Mesh(spandrelGeo, mats.brushedMetal);
     spandrelMesh.position.set(pos.x, pos.y - frameHeight / 2 + spandrelH / 2, pos.z);
     parent.add(spandrelMesh);
 
     // Vertical mullions
     for (let i = 0; i <= numMullions; i++) {
       const mx = pos.x - length / 2 + (i / numMullions) * length;
-      const mGeo = new THREE.BoxGeometry(mullionWidth, frameHeight, 0.05);
-      const mMesh = new THREE.Mesh(mGeo, mats.metal);
+      const mGeo = new BoxGeometry(mullionWidth, frameHeight, 0.05);
+      const mMesh = new Mesh(mGeo, mats.metal);
       mMesh.position.set(mx, pos.y, pos.z);
 
       parent.add(mMesh);
     }
 
     // Horizontal transom at spandrel/glass boundary
-    const tGeo = new THREE.BoxGeometry(length, mullionWidth, 0.05);
-    const tMesh = new THREE.Mesh(tGeo, mats.metal);
+    const tGeo = new BoxGeometry(length, mullionWidth, 0.05);
+    const tMesh = new Mesh(tGeo, mats.metal);
     tMesh.position.set(pos.x, pos.y - frameHeight / 2 + spandrelH, pos.z);
     parent.add(tMesh);
 
     // Top transom
-    const topGeo = new THREE.BoxGeometry(length, mullionWidth, 0.05);
-    const topMesh = new THREE.Mesh(topGeo, mats.metal);
+    const topGeo = new BoxGeometry(length, mullionWidth, 0.05);
+    const topMesh = new Mesh(topGeo, mats.metal);
     topMesh.position.set(pos.x, pos.y + frameHeight / 2, pos.z);
     parent.add(topMesh);
   } else {
     // Glass panel (above spandrel)
-    const glassGeo = new THREE.BoxGeometry(0.02, glassH, length - 0.1);
-    const glassMesh = new THREE.Mesh(glassGeo, mats.glass);
+    const glassGeo = new BoxGeometry(0.02, glassH, length - 0.1);
+    const glassMesh = new Mesh(glassGeo, mats.glass);
     glassMesh.position.set(pos.x, pos.y + spandrelH / 2, pos.z);
     parent.add(glassMesh);
 
     // Spandrel panel at floor slab line
-    const spandrelGeo = new THREE.BoxGeometry(0.04, spandrelH, length - 0.1);
-    const spandrelMesh = new THREE.Mesh(spandrelGeo, mats.brushedMetal);
+    const spandrelGeo = new BoxGeometry(0.04, spandrelH, length - 0.1);
+    const spandrelMesh = new Mesh(spandrelGeo, mats.brushedMetal);
     spandrelMesh.position.set(pos.x, pos.y - frameHeight / 2 + spandrelH / 2, pos.z);
     parent.add(spandrelMesh);
 
     // Vertical mullions
     for (let i = 0; i <= numMullions; i++) {
       const mz = pos.z - length / 2 + (i / numMullions) * length;
-      const mGeo = new THREE.BoxGeometry(0.05, frameHeight, mullionWidth);
-      const mMesh = new THREE.Mesh(mGeo, mats.metal);
+      const mGeo = new BoxGeometry(0.05, frameHeight, mullionWidth);
+      const mMesh = new Mesh(mGeo, mats.metal);
       mMesh.position.set(pos.x, pos.y, mz);
 
       parent.add(mMesh);
     }
 
     // Horizontal transom
-    const tGeo = new THREE.BoxGeometry(0.05, mullionWidth, length);
-    const tMesh = new THREE.Mesh(tGeo, mats.metal);
+    const tGeo = new BoxGeometry(0.05, mullionWidth, length);
+    const tMesh = new Mesh(tGeo, mats.metal);
     tMesh.position.set(pos.x, pos.y - frameHeight / 2 + spandrelH, pos.z);
     parent.add(tMesh);
 
     // Top transom
-    const topGeo = new THREE.BoxGeometry(0.05, mullionWidth, length);
-    const topMesh = new THREE.Mesh(topGeo, mats.metal);
+    const topGeo = new BoxGeometry(0.05, mullionWidth, length);
+    const topMesh = new Mesh(topGeo, mats.metal);
     topMesh.position.set(pos.x, pos.y + frameHeight / 2, pos.z);
     parent.add(topMesh);
   }
 
   // Sill
   if (isHorizontal) {
-    const sMesh = new THREE.Mesh(
-      new THREE.BoxGeometry(length + 0.1, 0.03, 0.15),
+    const sMesh = new Mesh(
+      new BoxGeometry(length + 0.1, 0.03, 0.15),
       mats.brushedMetal
     );
     sMesh.position.set(pos.x, pos.y - frameHeight / 2 - 0.02, pos.z);
     parent.add(sMesh);
   } else {
-    const sMesh = new THREE.Mesh(
-      new THREE.BoxGeometry(0.15, 0.03, length + 0.1),
+    const sMesh = new Mesh(
+      new BoxGeometry(0.15, 0.03, length + 0.1),
       mats.brushedMetal
     );
     sMesh.position.set(pos.x, pos.y - frameHeight / 2 - 0.02, pos.z);
@@ -1469,14 +1469,14 @@ function createGlassCurtainWall(
 // ─── Wall with Window Openings (AEC-quality) ─────────────────────────────────
 
 function createWallWithWindows(
-  pos: THREE.Vector3,
+  pos: Vector3,
   length: number,
   height: number,
   thickness: number,
   isHorizontal: boolean,
   mats: MaterialLibrary,
-  parent: THREE.Group,
-  wallMat: THREE.Material
+  parent: Group,
+  wallMat: Material
 ) {
   // AEC-standard window proportions
   const winW = 1.6, winH = 1.8, sillH = 0.85;
@@ -1489,15 +1489,15 @@ function createWallWithWindows(
   // ── Floor slab edge band (the horizontal line that makes it look real) ──
   const slabEdgeH = 0.18;
   if (isHorizontal) {
-    const slabEdge = new THREE.Mesh(
-      new THREE.BoxGeometry(length + 0.04, slabEdgeH, thickness + 0.03),
+    const slabEdge = new Mesh(
+      new BoxGeometry(length + 0.04, slabEdgeH, thickness + 0.03),
       mats.concreteWall
     );
     slabEdge.position.set(pos.x, pos.y - frameHeight / 2 + slabEdgeH / 2, pos.z);
     parent.add(slabEdge);
   } else {
-    const slabEdge = new THREE.Mesh(
-      new THREE.BoxGeometry(thickness + 0.03, slabEdgeH, length + 0.04),
+    const slabEdge = new Mesh(
+      new BoxGeometry(thickness + 0.03, slabEdgeH, length + 0.04),
       mats.concreteWall
     );
     slabEdge.position.set(pos.x, pos.y - frameHeight / 2 + slabEdgeH / 2, pos.z);
@@ -1508,13 +1508,13 @@ function createWallWithWindows(
   const sillWallH = sillH - slabEdgeH;
   if (sillWallH > 0.05) {
     if (isHorizontal) {
-      const sillGeo = new THREE.BoxGeometry(length, sillWallH, thickness);
-      const sillMesh = new THREE.Mesh(sillGeo, wallMat);
+      const sillGeo = new BoxGeometry(length, sillWallH, thickness);
+      const sillMesh = new Mesh(sillGeo, wallMat);
       sillMesh.position.set(pos.x, pos.y - frameHeight / 2 + slabEdgeH + sillWallH / 2, pos.z);
       parent.add(sillMesh);
     } else {
-      const sillGeo = new THREE.BoxGeometry(thickness, sillWallH, length);
-      const sillMesh = new THREE.Mesh(sillGeo, wallMat);
+      const sillGeo = new BoxGeometry(thickness, sillWallH, length);
+      const sillMesh = new Mesh(sillGeo, wallMat);
       sillMesh.position.set(pos.x, pos.y - frameHeight / 2 + slabEdgeH + sillWallH / 2, pos.z);
       parent.add(sillMesh);
     }
@@ -1524,13 +1524,13 @@ function createWallWithWindows(
   const aboveH = frameHeight - sillH - winH;
   if (aboveH > 0.05) {
     if (isHorizontal) {
-      const aboveGeo = new THREE.BoxGeometry(length, aboveH, thickness);
-      const aboveMesh = new THREE.Mesh(aboveGeo, wallMat);
+      const aboveGeo = new BoxGeometry(length, aboveH, thickness);
+      const aboveMesh = new Mesh(aboveGeo, wallMat);
       aboveMesh.position.set(pos.x, pos.y + frameHeight / 2 - aboveH / 2, pos.z);
       parent.add(aboveMesh);
     } else {
-      const aboveGeo = new THREE.BoxGeometry(thickness, aboveH, length);
-      const aboveMesh = new THREE.Mesh(aboveGeo, wallMat);
+      const aboveGeo = new BoxGeometry(thickness, aboveH, length);
+      const aboveMesh = new Mesh(aboveGeo, wallMat);
       aboveMesh.position.set(pos.x, pos.y + frameHeight / 2 - aboveH / 2, pos.z);
       parent.add(aboveMesh);
     }
@@ -1546,14 +1546,14 @@ function createWallWithWindows(
     if (pierW > 0.08) {
       if (isHorizontal) {
         const pierX = pos.x - length / 2 + i * spacing;
-        const pierGeo = new THREE.BoxGeometry(pierW, winH, thickness);
-        const pierMesh = new THREE.Mesh(pierGeo, wallMat);
+        const pierGeo = new BoxGeometry(pierW, winH, thickness);
+        const pierMesh = new Mesh(pierGeo, wallMat);
         pierMesh.position.set(pierX + pierW / 2, winCenterY, pos.z);
         parent.add(pierMesh);
       } else {
         const pierZ = pos.z - length / 2 + i * spacing;
-        const pierGeo = new THREE.BoxGeometry(thickness, winH, pierW);
-        const pierMesh = new THREE.Mesh(pierGeo, wallMat);
+        const pierGeo = new BoxGeometry(thickness, winH, pierW);
+        const pierMesh = new Mesh(pierGeo, wallMat);
         pierMesh.position.set(pos.x, winCenterY, pierZ + pierW / 2);
         parent.add(pierMesh);
       }
@@ -1566,8 +1566,8 @@ function createWallWithWindows(
       const wx = pos.x - length / 2 + i * spacing;
 
       // Recessed glass pane (set back from wall face for shadow)
-      const glassMesh = new THREE.Mesh(
-        new THREE.BoxGeometry(winW - frameT * 2, winH - frameT * 2, 0.01),
+      const glassMesh = new Mesh(
+        new BoxGeometry(winW - frameT * 2, winH - frameT * 2, 0.01),
         mats.glass
       );
       glassMesh.position.set(wx, winCenterY, pos.z - recessDepth * Math.sign(nDir || 1));
@@ -1576,73 +1576,73 @@ function createWallWithWindows(
       // Window reveal / recess walls (top, bottom, left, right) — creates depth shadow
       const revealMat = mats.concreteWall;
       // Top reveal
-      parent.add(Object.assign(new THREE.Mesh(
-        new THREE.BoxGeometry(winW, frameT, recessDepth), revealMat
-      ), { position: new THREE.Vector3(wx, winCenterY + winH / 2 - frameT / 2, pos.z - recessDepth / 2) }));
+      parent.add(Object.assign(new Mesh(
+        new BoxGeometry(winW, frameT, recessDepth), revealMat
+      ), { position: new Vector3(wx, winCenterY + winH / 2 - frameT / 2, pos.z - recessDepth / 2) }));
       // Bottom reveal (sill projection)
-      const sillMesh = new THREE.Mesh(
-        new THREE.BoxGeometry(winW + 0.06, 0.04, recessDepth + 0.06), mats.brushedMetal
+      const sillMesh = new Mesh(
+        new BoxGeometry(winW + 0.06, 0.04, recessDepth + 0.06), mats.brushedMetal
       );
       sillMesh.position.set(wx, winCenterY - winH / 2 + 0.02, pos.z - recessDepth / 2);
       parent.add(sillMesh);
 
       // Metal frame (4 sides) — visible profile around glass
       // Top frame
-      parent.add(Object.assign(new THREE.Mesh(
-        new THREE.BoxGeometry(winW, frameT, frameD), mats.metal
-      ), { position: new THREE.Vector3(wx, winCenterY + winH / 2 - frameT / 2, pos.z - recessDepth) }));
+      parent.add(Object.assign(new Mesh(
+        new BoxGeometry(winW, frameT, frameD), mats.metal
+      ), { position: new Vector3(wx, winCenterY + winH / 2 - frameT / 2, pos.z - recessDepth) }));
       // Bottom frame
-      parent.add(Object.assign(new THREE.Mesh(
-        new THREE.BoxGeometry(winW, frameT, frameD), mats.metal
-      ), { position: new THREE.Vector3(wx, winCenterY - winH / 2 + frameT / 2, pos.z - recessDepth) }));
+      parent.add(Object.assign(new Mesh(
+        new BoxGeometry(winW, frameT, frameD), mats.metal
+      ), { position: new Vector3(wx, winCenterY - winH / 2 + frameT / 2, pos.z - recessDepth) }));
       // Left frame
-      parent.add(Object.assign(new THREE.Mesh(
-        new THREE.BoxGeometry(frameT, winH, frameD), mats.metal
-      ), { position: new THREE.Vector3(wx - winW / 2 + frameT / 2, winCenterY, pos.z - recessDepth) }));
+      parent.add(Object.assign(new Mesh(
+        new BoxGeometry(frameT, winH, frameD), mats.metal
+      ), { position: new Vector3(wx - winW / 2 + frameT / 2, winCenterY, pos.z - recessDepth) }));
       // Right frame
-      parent.add(Object.assign(new THREE.Mesh(
-        new THREE.BoxGeometry(frameT, winH, frameD), mats.metal
-      ), { position: new THREE.Vector3(wx + winW / 2 - frameT / 2, winCenterY, pos.z - recessDepth) }));
+      parent.add(Object.assign(new Mesh(
+        new BoxGeometry(frameT, winH, frameD), mats.metal
+      ), { position: new Vector3(wx + winW / 2 - frameT / 2, winCenterY, pos.z - recessDepth) }));
       // Center mullion (horizontal)
-      parent.add(Object.assign(new THREE.Mesh(
-        new THREE.BoxGeometry(winW - frameT * 2, 0.03, frameD), mats.metal
-      ), { position: new THREE.Vector3(wx, winCenterY + 0.1, pos.z - recessDepth) }));
+      parent.add(Object.assign(new Mesh(
+        new BoxGeometry(winW - frameT * 2, 0.03, frameD), mats.metal
+      ), { position: new Vector3(wx, winCenterY + 0.1, pos.z - recessDepth) }));
 
     } else {
       const wz = pos.z - length / 2 + i * spacing;
 
       // Recessed glass
-      const glassMesh = new THREE.Mesh(
-        new THREE.BoxGeometry(0.01, winH - frameT * 2, winW - frameT * 2),
+      const glassMesh = new Mesh(
+        new BoxGeometry(0.01, winH - frameT * 2, winW - frameT * 2),
         mats.glass
       );
       glassMesh.position.set(pos.x - recessDepth * Math.sign(nDir || 1), winCenterY, wz);
       parent.add(glassMesh);
 
       // Sill projection
-      const sillMesh = new THREE.Mesh(
-        new THREE.BoxGeometry(recessDepth + 0.06, 0.04, winW + 0.06), mats.brushedMetal
+      const sillMesh = new Mesh(
+        new BoxGeometry(recessDepth + 0.06, 0.04, winW + 0.06), mats.brushedMetal
       );
       sillMesh.position.set(pos.x - recessDepth / 2, winCenterY - winH / 2 + 0.02, wz);
       parent.add(sillMesh);
 
       // Metal frames
-      parent.add(Object.assign(new THREE.Mesh(
-        new THREE.BoxGeometry(frameD, frameT, winW), mats.metal
-      ), { position: new THREE.Vector3(pos.x - recessDepth, winCenterY + winH / 2 - frameT / 2, wz) }));
-      parent.add(Object.assign(new THREE.Mesh(
-        new THREE.BoxGeometry(frameD, frameT, winW), mats.metal
-      ), { position: new THREE.Vector3(pos.x - recessDepth, winCenterY - winH / 2 + frameT / 2, wz) }));
-      parent.add(Object.assign(new THREE.Mesh(
-        new THREE.BoxGeometry(frameD, winH, frameT), mats.metal
-      ), { position: new THREE.Vector3(pos.x - recessDepth, winCenterY, wz - winW / 2 + frameT / 2) }));
-      parent.add(Object.assign(new THREE.Mesh(
-        new THREE.BoxGeometry(frameD, winH, frameT), mats.metal
-      ), { position: new THREE.Vector3(pos.x - recessDepth, winCenterY, wz + winW / 2 - frameT / 2) }));
+      parent.add(Object.assign(new Mesh(
+        new BoxGeometry(frameD, frameT, winW), mats.metal
+      ), { position: new Vector3(pos.x - recessDepth, winCenterY + winH / 2 - frameT / 2, wz) }));
+      parent.add(Object.assign(new Mesh(
+        new BoxGeometry(frameD, frameT, winW), mats.metal
+      ), { position: new Vector3(pos.x - recessDepth, winCenterY - winH / 2 + frameT / 2, wz) }));
+      parent.add(Object.assign(new Mesh(
+        new BoxGeometry(frameD, winH, frameT), mats.metal
+      ), { position: new Vector3(pos.x - recessDepth, winCenterY, wz - winW / 2 + frameT / 2) }));
+      parent.add(Object.assign(new Mesh(
+        new BoxGeometry(frameD, winH, frameT), mats.metal
+      ), { position: new Vector3(pos.x - recessDepth, winCenterY, wz + winW / 2 - frameT / 2) }));
       // Center mullion
-      parent.add(Object.assign(new THREE.Mesh(
-        new THREE.BoxGeometry(frameD, 0.03, winW - frameT * 2), mats.metal
-      ), { position: new THREE.Vector3(pos.x - recessDepth, winCenterY + 0.1, wz) }));
+      parent.add(Object.assign(new Mesh(
+        new BoxGeometry(frameD, 0.03, winW - frameT * 2), mats.metal
+      ), { position: new Vector3(pos.x - recessDepth, winCenterY + 0.1, wz) }));
     }
   }
 }
@@ -1650,7 +1650,7 @@ function createWallWithWindows(
 // ─── Door Creation ────────────────────────────────────────────────────────────
 
 function createDoor(
-  wallPos: THREE.Vector3,
+  wallPos: Vector3,
   _wallLen: number,
   isHorizontal: boolean,
   doorW: number,
@@ -1660,17 +1660,17 @@ function createDoor(
   mats: MaterialLibrary,
   roomName: string
 ): DoorMesh | null {
-  const doorGeo = new THREE.BoxGeometry(doorW, doorH, 0.05);
-  const doorMesh = new THREE.Mesh(doorGeo, mats.darkWood);
+  const doorGeo = new BoxGeometry(doorW, doorH, 0.05);
+  const doorMesh = new Mesh(doorGeo, mats.darkWood);
 
 
-  const handleGeo = new THREE.CylinderGeometry(0.015, 0.015, 0.12, 8);
-  const handleMesh = new THREE.Mesh(handleGeo, mats.brushedMetal);
+  const handleGeo = new CylinderGeometry(0.015, 0.015, 0.12, 8);
+  const handleMesh = new Mesh(handleGeo, mats.brushedMetal);
   handleMesh.rotation.x = Math.PI / 2;
   handleMesh.position.set(doorW / 2 - 0.08, 0, 0.04);
   doorMesh.add(handleMesh);
 
-  const pivot = new THREE.Group();
+  const pivot = new Group();
   doorMesh.position.set(doorW / 2, 0, 0);
   pivot.add(doorMesh);
 
@@ -1699,7 +1699,7 @@ function buildStairs(
   centerZ: number,
   floorHeight: number,
   mats: MaterialLibrary,
-  parent: THREE.Group
+  parent: Group
 ) {
   const rx = room.x - centerX;
   const rz = room.z - centerZ;
@@ -1711,8 +1711,8 @@ function buildStairs(
   const stepW = room.width - 0.3;
 
   for (let i = 0; i < numSteps; i++) {
-    const stepMesh = new THREE.Mesh(
-      new THREE.BoxGeometry(stepW, stepH, stepD),
+    const stepMesh = new Mesh(
+      new BoxGeometry(stepW, stepH, stepD),
       mats.wood
     );
     stepMesh.position.set(
@@ -1725,8 +1725,8 @@ function buildStairs(
   }
 
   // Railing
-  const railMesh = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.02, 0.02, room.depth * 1.2, 8),
+  const railMesh = new Mesh(
+    new CylinderGeometry(0.02, 0.02, room.depth * 1.2, 8),
     mats.brushedMetal
   );
   railMesh.rotation.x = Math.atan2(floorHeight, room.depth);
@@ -1740,7 +1740,7 @@ function buildStairs(
 
 // ─── Room Label Sprite ────────────────────────────────────────────────────────
 
-function createRoomLabel(name: string, area: number): THREE.Sprite {
+function createRoomLabel(name: string, area: number): Sprite {
   const canvas = document.createElement("canvas");
   canvas.width = 512;
   canvas.height = 128;
@@ -1762,14 +1762,14 @@ function createRoomLabel(name: string, area: number): THREE.Sprite {
   ctx.fillStyle = "rgba(255, 255, 255, 0.6)";
   ctx.fillText(`${Math.round(area)} m²`, 256, 90);
 
-  const texture = new THREE.CanvasTexture(canvas);
-  const material = new THREE.SpriteMaterial({
+  const texture = new CanvasTexture(canvas);
+  const material = new SpriteMaterial({
     map: texture,
     transparent: true,
     depthTest: false,
     sizeAttenuation: true,
   });
-  const sprite = new THREE.Sprite(material);
+  const sprite = new Sprite(material);
   sprite.scale.set(2.5, 0.65, 1);
   return sprite;
 }

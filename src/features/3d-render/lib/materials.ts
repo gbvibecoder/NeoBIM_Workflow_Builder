@@ -1,4 +1,4 @@
-import * as THREE from "three";
+import { CanvasTexture, Color, MeshStandardMaterial, MeshPhysicalMaterial, RepeatWrapping, SRGBColorSpace, DoubleSide, Material, Texture } from "three";
 
 // ─── Procedural Texture Generators ────────────────────────────────────────────
 
@@ -6,15 +6,15 @@ function createCanvasTexture(
   width: number,
   height: number,
   draw: (ctx: CanvasRenderingContext2D, w: number, h: number) => void
-): THREE.CanvasTexture {
+): CanvasTexture {
   const canvas = document.createElement("canvas");
   canvas.width = width;
   canvas.height = height;
   const ctx = canvas.getContext("2d")!;
   draw(ctx, width, height);
-  const tex = new THREE.CanvasTexture(canvas);
-  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-  tex.colorSpace = THREE.SRGBColorSpace;
+  const tex = new CanvasTexture(canvas);
+  tex.wrapS = tex.wrapT = RepeatWrapping;
+  tex.colorSpace = SRGBColorSpace;
   return tex;
 }
 
@@ -51,7 +51,7 @@ function fbmNoise(x: number, y: number, seed: number, octaves = 4): number {
 export function createWoodTexture(
   tint: string = "#8B6914",
   scale = 1
-): THREE.CanvasTexture {
+): CanvasTexture {
   return createCanvasTexture(512, 512, (ctx, w, h) => {
     // Base color
     ctx.fillStyle = tint;
@@ -92,7 +92,7 @@ export function createWoodTexture(
 
 export function createConcreteTexture(
   baseColor: string = "#B0AAA0"
-): THREE.CanvasTexture {
+): CanvasTexture {
   return createCanvasTexture(512, 512, (ctx, w, h) => {
     ctx.fillStyle = baseColor;
     ctx.fillRect(0, 0, w, h);
@@ -129,7 +129,7 @@ export function createTileTexture(
   tileColor: string = "#E8E0D0",
   groutColor: string = "#C8C0B0",
   tileSize = 64
-): THREE.CanvasTexture {
+): CanvasTexture {
   return createCanvasTexture(512, 512, (ctx, w, h) => {
     // Grout background
     ctx.fillStyle = groutColor;
@@ -140,7 +140,7 @@ export function createTileTexture(
     for (let tx = 0; tx < w; tx += tileSize) {
       for (let ty = 0; ty < h; ty += tileSize) {
         const shade = 0.95 + Math.random() * 0.1;
-        const c = new THREE.Color(tileColor);
+        const c = new Color(tileColor);
         c.multiplyScalar(shade);
         ctx.fillStyle = `rgb(${Math.round(c.r * 255)},${Math.round(c.g * 255)},${Math.round(c.b * 255)})`;
         ctx.fillRect(tx + grout, ty + grout, tileSize - grout * 2, tileSize - grout * 2);
@@ -151,7 +151,7 @@ export function createTileTexture(
 
 // ─── Marble Texture ───────────────────────────────────────────────────────────
 
-export function createMarbleTexture(): THREE.CanvasTexture {
+export function createMarbleTexture(): CanvasTexture {
   return createCanvasTexture(512, 512, (ctx, w, h) => {
     ctx.fillStyle = "#F0EDE8";
     ctx.fillRect(0, 0, w, h);
@@ -187,7 +187,7 @@ export function createMarbleTexture(): THREE.CanvasTexture {
 
 // ─── Herringbone Wood Floor ───────────────────────────────────────────────────
 
-export function createHerringboneTexture(): THREE.CanvasTexture {
+export function createHerringboneTexture(): CanvasTexture {
   return createCanvasTexture(512, 512, (ctx, w, h) => {
     ctx.fillStyle = "#3A2810";
     ctx.fillRect(0, 0, w, h);
@@ -207,7 +207,7 @@ export function createHerringboneTexture(): THREE.CanvasTexture {
 
         const color = colors[Math.floor(Math.random() * colors.length)];
         const shade = 0.9 + Math.random() * 0.2;
-        const c = new THREE.Color(color).multiplyScalar(shade);
+        const c = new Color(color).multiplyScalar(shade);
         ctx.fillStyle = `rgb(${Math.round(c.r * 255)},${Math.round(c.g * 255)},${Math.round(c.b * 255)})`;
         ctx.fillRect(-plankW / 2 + 1, -plankH / 2 + 1, plankW - 2, plankH - 2);
 
@@ -230,7 +230,7 @@ export function createHerringboneTexture(): THREE.CanvasTexture {
 
 // ─── Brick Texture ────────────────────────────────────────────────────────────
 
-export function createBrickTexture(): THREE.CanvasTexture {
+export function createBrickTexture(): CanvasTexture {
   return createCanvasTexture(512, 256, (ctx, w, h) => {
     ctx.fillStyle = "#8A8078";
     ctx.fillRect(0, 0, w, h);
@@ -245,7 +245,7 @@ export function createBrickTexture(): THREE.CanvasTexture {
         const y = row * brickH;
         const color = brickColors[Math.floor(Math.random() * brickColors.length)];
         const shade = 0.85 + Math.random() * 0.3;
-        const c = new THREE.Color(color).multiplyScalar(shade);
+        const c = new Color(color).multiplyScalar(shade);
         ctx.fillStyle = `rgb(${Math.round(c.r * 255)},${Math.round(c.g * 255)},${Math.round(c.b * 255)})`;
         ctx.fillRect(x + mortar, y + mortar, brickW - mortar * 2, brickH - mortar * 2);
       }
@@ -255,7 +255,7 @@ export function createBrickTexture(): THREE.CanvasTexture {
 
 // ─── Fabric / Carpet Texture ──────────────────────────────────────────────────
 
-export function createFabricTexture(color: string = "#4A5568"): THREE.CanvasTexture {
+export function createFabricTexture(color: string = "#4A5568"): CanvasTexture {
   return createCanvasTexture(256, 256, (ctx, w, h) => {
     ctx.fillStyle = color;
     ctx.fillRect(0, 0, w, h);
@@ -277,7 +277,7 @@ export function createFabricTexture(color: string = "#4A5568"): THREE.CanvasText
 
 // ─── Stone Texture ───────────────────────────────────────────────────────────
 
-export function createStoneTexture(): THREE.CanvasTexture {
+export function createStoneTexture(): CanvasTexture {
   return createCanvasTexture(512, 512, (ctx, w, h) => {
     ctx.fillStyle = "#C8BCA8";
     ctx.fillRect(0, 0, w, h);
@@ -292,7 +292,7 @@ export function createStoneTexture(): THREE.CanvasTexture {
       for (let col = -1; col < w / blockW + 2; col++) {
         const x = col * blockW + offset;
         const shade = 0.88 + Math.random() * 0.24;
-        const c = new THREE.Color("#C8BCA8").multiplyScalar(shade);
+        const c = new Color("#C8BCA8").multiplyScalar(shade);
         ctx.fillStyle = `rgb(${Math.round(c.r * 255)},${Math.round(c.g * 255)},${Math.round(c.b * 255)})`;
         ctx.fillRect(x + mortar, y + mortar, blockW - mortar * 2, courseH - mortar * 2);
       }
@@ -315,7 +315,7 @@ export function createStoneTexture(): THREE.CanvasTexture {
 
 // ─── Terracotta Texture ──────────────────────────────────────────────────────
 
-export function createTerracottaTexture(): THREE.CanvasTexture {
+export function createTerracottaTexture(): CanvasTexture {
   return createCanvasTexture(512, 512, (ctx, w, h) => {
     ctx.fillStyle = "#B86B4A";
     ctx.fillRect(0, 0, w, h);
@@ -326,7 +326,7 @@ export function createTerracottaTexture(): THREE.CanvasTexture {
     for (let col = 0; col < w / panelW + 1; col++) {
       const x = col * panelW;
       const shade = 0.9 + Math.random() * 0.2;
-      const c = new THREE.Color("#B86B4A").multiplyScalar(shade);
+      const c = new Color("#B86B4A").multiplyScalar(shade);
       ctx.fillStyle = `rgb(${Math.round(c.r * 255)},${Math.round(c.g * 255)},${Math.round(c.b * 255)})`;
       ctx.fillRect(x + gap / 2, 0, panelW - gap, h);
 
@@ -354,37 +354,37 @@ export function createTerracottaTexture(): THREE.CanvasTexture {
 // ─── Material Library ─────────────────────────────────────────────────────────
 
 export interface MaterialLibrary {
-  [key: string]: THREE.Material;
-  herringboneFloor: THREE.Material;
-  concreteFloor: THREE.Material;
-  tileFloor: THREE.Material;
-  marbleFloor: THREE.Material;
-  whiteWall: THREE.Material;
-  concreteWall: THREE.Material;
-  accentWall: THREE.Material;
-  exteriorWall: THREE.Material;
-  glass: THREE.Material;
-  darkGlass: THREE.Material;
-  metal: THREE.Material;
-  brushedMetal: THREE.Material;
-  wood: THREE.Material;
-  darkWood: THREE.Material;
-  fabric: THREE.Material;
-  fabricDark: THREE.Material;
-  leather: THREE.Material;
-  ceiling: THREE.Material;
-  roofTop: THREE.Material;
-  grass: THREE.Material;
-  water: THREE.Material;
-  emissiveWarm: THREE.Material;
-  emissiveCool: THREE.Material;
-  stoneWall: THREE.Material;
-  terracottaWall: THREE.Material;
-  briseSoleilFin: THREE.Material;
-  spandrelPanel: THREE.Material;
+  [key: string]: Material;
+  herringboneFloor: Material;
+  concreteFloor: Material;
+  tileFloor: Material;
+  marbleFloor: Material;
+  whiteWall: Material;
+  concreteWall: Material;
+  accentWall: Material;
+  exteriorWall: Material;
+  glass: Material;
+  darkGlass: Material;
+  metal: Material;
+  brushedMetal: Material;
+  wood: Material;
+  darkWood: Material;
+  fabric: Material;
+  fabricDark: Material;
+  leather: Material;
+  ceiling: Material;
+  roofTop: Material;
+  grass: Material;
+  water: Material;
+  emissiveWarm: Material;
+  emissiveCool: Material;
+  stoneWall: Material;
+  terracottaWall: Material;
+  briseSoleilFin: Material;
+  spandrelPanel: Material;
 }
 
-function createBumpMap(scale = 0.03): THREE.CanvasTexture {
+function createBumpMap(scale = 0.03): CanvasTexture {
   return createCanvasTexture(256, 256, (ctx, w, h) => {
     ctx.fillStyle = "#808080";
     ctx.fillRect(0, 0, w, h);
@@ -448,7 +448,7 @@ export function createMaterials(): MaterialLibrary {
   grassTex.repeat.set(20, 20);
 
   // MeshStandardMaterial — PBR rendering with realistic lighting, shadows, and reflections
-  const DS = THREE.DoubleSide;
+  const DS = DoubleSide;
 
   // Bump map for concrete/stone surfaces
   const bumpMap = createBumpMap(0.04);
@@ -456,95 +456,95 @@ export function createMaterials(): MaterialLibrary {
 
   return {
     // ─── Floors ──────────────────────────────────────────────────
-    herringboneFloor: new THREE.MeshStandardMaterial({
+    herringboneFloor: new MeshStandardMaterial({
       map: herringboneTex, side: DS, roughness: 0.6, metalness: 0.0,
     }),
-    concreteFloor: new THREE.MeshStandardMaterial({
+    concreteFloor: new MeshStandardMaterial({
       map: concreteTex, side: DS, roughness: 0.85, metalness: 0.0, bumpMap: concreteBump, bumpScale: 0.3,
     }),
-    tileFloor: new THREE.MeshStandardMaterial({
+    tileFloor: new MeshStandardMaterial({
       map: tileTex, side: DS, roughness: 0.4, metalness: 0.0,
     }),
-    marbleFloor: new THREE.MeshStandardMaterial({
+    marbleFloor: new MeshStandardMaterial({
       map: marbleTex, side: DS, roughness: 0.2, metalness: 0.05,
     }),
 
     // ─── Walls ───────────────────────────────────────────────────
-    whiteWall: new THREE.MeshStandardMaterial({
+    whiteWall: new MeshStandardMaterial({
       color: 0xF5F0EB, side: DS, roughness: 0.9, metalness: 0.0,
     }),
-    concreteWall: new THREE.MeshStandardMaterial({
+    concreteWall: new MeshStandardMaterial({
       map: wallConcreteTex, side: DS, roughness: 0.8, metalness: 0.0, bumpMap, bumpScale: 0.4,
     }),
-    accentWall: new THREE.MeshStandardMaterial({
+    accentWall: new MeshStandardMaterial({
       map: darkWoodTex, side: DS, roughness: 0.5, metalness: 0.0,
     }),
-    exteriorWall: new THREE.MeshStandardMaterial({
+    exteriorWall: new MeshStandardMaterial({
       map: brickTex, side: DS, roughness: 0.85, metalness: 0.0,
     }),
 
     // ─── Glass (physically-based transparency) ───────────────────
-    glass: new THREE.MeshPhysicalMaterial({
+    glass: new MeshPhysicalMaterial({
       color: 0x88CCEE, transparent: true, opacity: 0.25, side: DS,
       roughness: 0.05, metalness: 0.1, transmission: 0.8,
       reflectivity: 0.9, ior: 1.5,
     }),
-    darkGlass: new THREE.MeshPhysicalMaterial({
+    darkGlass: new MeshPhysicalMaterial({
       color: 0x223344, transparent: true, opacity: 0.35, side: DS,
       roughness: 0.05, metalness: 0.15, transmission: 0.6,
       reflectivity: 0.95, ior: 1.5,
     }),
 
     // ─── Metals ──────────────────────────────────────────────────
-    metal: new THREE.MeshStandardMaterial({
+    metal: new MeshStandardMaterial({
       color: 0x888888, side: DS, roughness: 0.4, metalness: 0.9,
     }),
-    brushedMetal: new THREE.MeshStandardMaterial({
+    brushedMetal: new MeshStandardMaterial({
       color: 0xBBBBBB, side: DS, roughness: 0.3, metalness: 0.85,
     }),
 
     // ─── Wood ────────────────────────────────────────────────────
-    wood: new THREE.MeshStandardMaterial({
+    wood: new MeshStandardMaterial({
       map: woodTex, side: DS, roughness: 0.55, metalness: 0.0,
     }),
-    darkWood: new THREE.MeshStandardMaterial({
+    darkWood: new MeshStandardMaterial({
       map: darkWoodTex, side: DS, roughness: 0.5, metalness: 0.0,
     }),
 
     // ─── Fabrics ─────────────────────────────────────────────────
-    fabric: new THREE.MeshStandardMaterial({
+    fabric: new MeshStandardMaterial({
       map: fabricTex, side: DS, roughness: 0.95, metalness: 0.0,
     }),
-    fabricDark: new THREE.MeshStandardMaterial({
+    fabricDark: new MeshStandardMaterial({
       map: fabricDarkTex, side: DS, roughness: 0.95, metalness: 0.0,
     }),
-    leather: new THREE.MeshStandardMaterial({
+    leather: new MeshStandardMaterial({
       color: 0x3A2820, side: DS, roughness: 0.6, metalness: 0.0,
     }),
 
     // ─── Ceiling & Roof ─────────────────────────────────────────
-    ceiling: new THREE.MeshStandardMaterial({
+    ceiling: new MeshStandardMaterial({
       color: 0xFAFAFA, side: DS, roughness: 0.95, metalness: 0.0,
     }),
-    roofTop: new THREE.MeshStandardMaterial({
+    roofTop: new MeshStandardMaterial({
       color: 0x404040, side: DS, roughness: 0.9, metalness: 0.1,
     }),
 
     // ─── Environment ─────────────────────────────────────────────
-    grass: new THREE.MeshStandardMaterial({
+    grass: new MeshStandardMaterial({
       map: grassTex, side: DS, roughness: 0.95, metalness: 0.0,
     }),
-    water: new THREE.MeshPhysicalMaterial({
+    water: new MeshPhysicalMaterial({
       color: 0x1A6B8A, transparent: true, opacity: 0.7, side: DS,
       roughness: 0.05, metalness: 0.2, transmission: 0.3,
     }),
 
     // ─── Emissive (lights / glow) ────────────────────────────────
-    emissiveWarm: new THREE.MeshStandardMaterial({
+    emissiveWarm: new MeshStandardMaterial({
       color: 0xFFD080, side: DS, emissive: 0xFFD080, emissiveIntensity: 0.8,
       roughness: 0.9, metalness: 0.0,
     }),
-    emissiveCool: new THREE.MeshStandardMaterial({
+    emissiveCool: new MeshStandardMaterial({
       color: 0xAABBDD, side: DS, emissive: 0xAABBDD, emissiveIntensity: 0.5,
       roughness: 0.9, metalness: 0.0,
     }),
@@ -552,16 +552,16 @@ export function createMaterials(): MaterialLibrary {
     // ─── Facade Materials ────────────────────────────────────────
     stoneWall: (() => {
       const t = createStoneTexture(); t.repeat.set(3, 3);
-      return new THREE.MeshStandardMaterial({ map: t, side: DS, roughness: 0.75, metalness: 0.0 });
+      return new MeshStandardMaterial({ map: t, side: DS, roughness: 0.75, metalness: 0.0 });
     })(),
     terracottaWall: (() => {
       const t = createTerracottaTexture(); t.repeat.set(2, 4);
-      return new THREE.MeshStandardMaterial({ map: t, side: DS, roughness: 0.7, metalness: 0.0 });
+      return new MeshStandardMaterial({ map: t, side: DS, roughness: 0.7, metalness: 0.0 });
     })(),
-    briseSoleilFin: new THREE.MeshStandardMaterial({
+    briseSoleilFin: new MeshStandardMaterial({
       color: 0xE0E0E0, side: DS, roughness: 0.5, metalness: 0.6,
     }),
-    spandrelPanel: new THREE.MeshStandardMaterial({
+    spandrelPanel: new MeshStandardMaterial({
       color: 0x1A1A1A, side: DS, roughness: 0.3, metalness: 0.8,
     }),
   };
@@ -569,8 +569,8 @@ export function createMaterials(): MaterialLibrary {
 
 export function disposeMaterials(lib: MaterialLibrary) {
   for (const mat of Object.values(lib)) {
-    if (mat instanceof THREE.Material) {
-      if ("map" in mat && mat.map) (mat.map as THREE.Texture).dispose();
+    if (mat instanceof Material) {
+      if ("map" in mat && mat.map) (mat.map as Texture).dispose();
       mat.dispose();
     }
   }

@@ -11,13 +11,13 @@
  * - Metal with anisotropic-style brushed appearance
  */
 
-import * as THREE from "three";
+import { CanvasTexture, Color, TextureLoader, MeshStandardMaterial, MeshPhysicalMaterial, Vector2, DoubleSide, RepeatWrapping, SRGBColorSpace, LinearSRGBColorSpace, Material, Texture } from "three";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const TEX_SIZE = 512;        // Balanced quality/performance (was 1024)
 const BUMP_SIZE = 256;       // Normal/roughness maps (was 512)
-const DS = THREE.DoubleSide;
+const DS = DoubleSide;
 
 // ─── Noise Utilities ──────────────────────────────────────────────────────────
 
@@ -54,14 +54,14 @@ function tex(
   w: number, h: number,
   draw: (ctx: CanvasRenderingContext2D, w: number, h: number) => void,
   repeat?: [number, number],
-): THREE.CanvasTexture {
+): CanvasTexture {
   const canvas = document.createElement("canvas");
   canvas.width = w; canvas.height = h;
   const ctx = canvas.getContext("2d")!;
   draw(ctx, w, h);
-  const t = new THREE.CanvasTexture(canvas);
-  t.wrapS = t.wrapT = THREE.RepeatWrapping;
-  t.colorSpace = THREE.SRGBColorSpace;
+  const t = new CanvasTexture(canvas);
+  t.wrapS = t.wrapT = RepeatWrapping;
+  t.colorSpace = SRGBColorSpace;
   if (repeat) t.repeat.set(repeat[0], repeat[1]);
   // Enable anisotropic filtering for crisp textures at angles
   t.anisotropy = 4;
@@ -74,7 +74,7 @@ function heightToNormalMap(
   heightCanvas: HTMLCanvasElement,
   strength: number = 2.0,
   repeat?: [number, number],
-): THREE.CanvasTexture {
+): CanvasTexture {
   const w = heightCanvas.width, h = heightCanvas.height;
   const src = heightCanvas.getContext("2d")!.getImageData(0, 0, w, h).data;
 
@@ -112,8 +112,8 @@ function heightToNormalMap(
   }
   ctx.putImageData(out, 0, 0);
 
-  const t = new THREE.CanvasTexture(normalCanvas);
-  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  const t = new CanvasTexture(normalCanvas);
+  t.wrapS = t.wrapT = RepeatWrapping;
   if (repeat) t.repeat.set(repeat[0], repeat[1]);
   return t;
 }
@@ -145,7 +145,7 @@ function noiseRoughnessMap(
   baseRoughness: number, variation: number,
   scale: number, seed: number,
   repeat?: [number, number],
-): THREE.CanvasTexture {
+): CanvasTexture {
   return tex(BUMP_SIZE, BUMP_SIZE, (ctx, w, h) => {
     const base = Math.round(baseRoughness * 255);
     ctx.fillStyle = `rgb(${base},${base},${base})`;
@@ -163,7 +163,7 @@ function noiseRoughnessMap(
 
 // ─── Concrete Texture (1024px) ────────────────────────────────────────────────
 
-function concreteTex(base: string, repeat?: [number, number]): THREE.CanvasTexture {
+function concreteTex(base: string, repeat?: [number, number]): CanvasTexture {
   return tex(TEX_SIZE, TEX_SIZE, (ctx, w, h) => {
     ctx.fillStyle = base;
     ctx.fillRect(0, 0, w, h);
@@ -195,7 +195,7 @@ function concreteTex(base: string, repeat?: [number, number]): THREE.CanvasTextu
 
 // ─── Plaster / Stucco Texture (1024px) ────────────────────────────────────────
 
-function plasterTex(base: string, repeat?: [number, number]): THREE.CanvasTexture {
+function plasterTex(base: string, repeat?: [number, number]): CanvasTexture {
   return tex(TEX_SIZE, TEX_SIZE, (ctx, w, h) => {
     ctx.fillStyle = base;
     ctx.fillRect(0, 0, w, h);
@@ -215,7 +215,7 @@ function plasterTex(base: string, repeat?: [number, number]): THREE.CanvasTextur
 
 // ─── Wood Texture (1024px) ────────────────────────────────────────────────────
 
-function woodTex(tint: string, repeat?: [number, number]): THREE.CanvasTexture {
+function woodTex(tint: string, repeat?: [number, number]): CanvasTexture {
   return tex(TEX_SIZE, TEX_SIZE, (ctx, w, h) => {
     ctx.fillStyle = tint;
     ctx.fillRect(0, 0, w, h);
@@ -242,7 +242,7 @@ function woodTex(tint: string, repeat?: [number, number]): THREE.CanvasTexture {
 
 // ─── Brick Texture (1024px) ───────────────────────────────────────────────────
 
-function brickTex(repeat?: [number, number]): THREE.CanvasTexture {
+function brickTex(repeat?: [number, number]): CanvasTexture {
   return tex(TEX_SIZE, TEX_SIZE / 2, (ctx, w, h) => {
     ctx.fillStyle = "#8A8078";
     ctx.fillRect(0, 0, w, h);
@@ -252,7 +252,7 @@ function brickTex(repeat?: [number, number]): THREE.CanvasTexture {
       const off = row % 2 === 0 ? 0 : bW / 2;
       for (let col = -1; col < w / bW + 2; col++) {
         const x = col * bW + off, y = row * bH;
-        const c = new THREE.Color(cols[Math.floor(Math.random() * cols.length)]);
+        const c = new Color(cols[Math.floor(Math.random() * cols.length)]);
         c.multiplyScalar(0.85 + Math.random() * 0.3);
         ctx.fillStyle = `rgb(${Math.round(c.r * 255)},${Math.round(c.g * 255)},${Math.round(c.b * 255)})`;
         ctx.fillRect(x + m, y + m, bW - m * 2, bH - m * 2);
@@ -263,7 +263,7 @@ function brickTex(repeat?: [number, number]): THREE.CanvasTexture {
 
 // ─── Brushed Metal Texture (1024px) ───────────────────────────────────────────
 
-function brushedMetalTex(repeat?: [number, number]): THREE.CanvasTexture {
+function brushedMetalTex(repeat?: [number, number]): CanvasTexture {
   return tex(TEX_SIZE / 2, TEX_SIZE / 2, (ctx, w, h) => {
     ctx.fillStyle = "#A8A8A8";
     ctx.fillRect(0, 0, w, h);
@@ -278,7 +278,7 @@ function brushedMetalTex(repeat?: [number, number]): THREE.CanvasTexture {
 
 // ─── Grass Texture (1024px) ───────────────────────────────────────────────────
 
-function grassTex(repeat?: [number, number]): THREE.CanvasTexture {
+function grassTex(repeat?: [number, number]): CanvasTexture {
   return tex(TEX_SIZE, TEX_SIZE, (ctx, w, h) => {
     ctx.fillStyle = "#2D5A16";
     ctx.fillRect(0, 0, w, h);
@@ -303,7 +303,7 @@ function grassTex(repeat?: [number, number]): THREE.CanvasTexture {
 
 // ─── Roof Membrane Texture (1024px) ──────────────────────────────────────────
 
-function roofTex(repeat?: [number, number]): THREE.CanvasTexture {
+function roofTex(repeat?: [number, number]): CanvasTexture {
   return tex(TEX_SIZE, TEX_SIZE, (ctx, w, h) => {
     ctx.fillStyle = "#3A3A3C";
     ctx.fillRect(0, 0, w, h);
@@ -328,7 +328,7 @@ function roofTex(repeat?: [number, number]): THREE.CanvasTexture {
 
 // ─── Sky Environment Texture (2048px for richer HDRI) ────────────────────────
 
-export function createSkyTexture(): THREE.CanvasTexture {
+export function createSkyTexture(): CanvasTexture {
   return tex(2048, 1024, (ctx, w, h) => {
     // Golden-hour sky gradient — rich warm tones
     const grad = ctx.createLinearGradient(0, 0, 0, h);
@@ -423,54 +423,54 @@ export function createSkyTexture(): THREE.CanvasTexture {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export interface BIMMaterialLib {
-  wall: THREE.Material;
-  wallInterior: THREE.Material;
-  wallExterior: THREE.Material;
-  slab: THREE.Material;
-  roof: THREE.Material;
-  window: THREE.Material;
-  door: THREE.Material;
-  column: THREE.Material;
-  beam: THREE.Material;
-  stair: THREE.Material;
-  space: THREE.Material;
-  parapet: THREE.Material;
-  canopy: THREE.Material;
-  balcony: THREE.Material;
-  duct: THREE.Material;
-  pipe: THREE.Material;
-  cableTray: THREE.Material;
-  equipment: THREE.Material;
-  ground: THREE.Material;
-  mullion: THREE.Material;
-  spandrel: THREE.Material;
-  treeCrown: THREE.Material;
-  treeTrunk: THREE.Material;
+  wall: Material;
+  wallInterior: Material;
+  wallExterior: Material;
+  slab: Material;
+  roof: Material;
+  window: Material;
+  door: Material;
+  column: Material;
+  beam: Material;
+  stair: Material;
+  space: Material;
+  parapet: Material;
+  canopy: Material;
+  balcony: Material;
+  duct: Material;
+  pipe: Material;
+  cableTray: Material;
+  equipment: Material;
+  ground: Material;
+  mullion: Material;
+  spandrel: Material;
+  treeCrown: Material;
+  treeTrunk: Material;
 }
 
 // ─── Real Texture Loader Helper ─────────────────────────────────────────────
 
-const textureLoader = new THREE.TextureLoader();
+const textureLoader = new TextureLoader();
 
 function loadPBR(
   folder: string,
   repeat: [number, number] = [2, 2],
   opts?: { hasAO?: boolean; hasMetalness?: boolean },
 ): {
-  map: THREE.Texture;
-  normalMap: THREE.Texture;
-  roughnessMap: THREE.Texture;
-  aoMap?: THREE.Texture;
-  metalnessMap?: THREE.Texture;
+  map: Texture;
+  normalMap: Texture;
+  roughnessMap: Texture;
+  aoMap?: Texture;
+  metalnessMap?: Texture;
 } {
   const base = `/textures/${folder}`;
 
-  function load(file: string): THREE.Texture {
+  function load(file: string): Texture {
     const t = textureLoader.load(`${base}/${file}`);
-    t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    t.wrapS = t.wrapT = RepeatWrapping;
     t.repeat.set(repeat[0], repeat[1]);
     t.anisotropy = 4;
-    t.colorSpace = file === "albedo.jpg" ? THREE.SRGBColorSpace : THREE.LinearSRGBColorSpace;
+    t.colorSpace = file === "albedo.jpg" ? SRGBColorSpace : LinearSRGBColorSpace;
     return t;
   }
 
@@ -502,38 +502,38 @@ export function createBIMMaterials(): BIMMaterialLib {
 
   return {
     // ── Walls — real plaster PBR ──
-    wall: new THREE.MeshStandardMaterial({
+    wall: new MeshStandardMaterial({
       ...plasterPBR, side: DS, roughness: 0.78, metalness: 0.0,
-      normalScale: new THREE.Vector2(1.2, 1.2),
+      normalScale: new Vector2(1.2, 1.2),
       envMapIntensity: 0.5,
     }),
-    wallInterior: new THREE.MeshStandardMaterial({
+    wallInterior: new MeshStandardMaterial({
       ...plasterPBR, side: DS, roughness: 0.88, metalness: 0.0,
-      normalScale: new THREE.Vector2(0.5, 0.5),
+      normalScale: new Vector2(0.5, 0.5),
       envMapIntensity: 0.3,
     }),
-    wallExterior: new THREE.MeshStandardMaterial({
+    wallExterior: new MeshStandardMaterial({
       ...brickPBR, side: DS, roughness: 0.82, metalness: 0.0,
-      normalScale: new THREE.Vector2(1.8, 1.8),
+      normalScale: new Vector2(1.8, 1.8),
       envMapIntensity: 0.4,
     }),
 
     // ── Slabs / Floors — real concrete PBR ──
-    slab: new THREE.MeshStandardMaterial({
+    slab: new MeshStandardMaterial({
       ...concretePBR, side: DS, roughness: 0.68, metalness: 0.03,
-      normalScale: new THREE.Vector2(1.4, 1.4),
+      normalScale: new Vector2(1.4, 1.4),
       envMapIntensity: 0.5,
     }),
 
     // ── Roof — real roof membrane PBR ──
-    roof: new THREE.MeshStandardMaterial({
+    roof: new MeshStandardMaterial({
       ...roofPBR, side: DS, roughness: 0.6, metalness: 0.15,
-      normalScale: new THREE.Vector2(1.2, 1.2),
+      normalScale: new Vector2(1.2, 1.2),
       envMapIntensity: 0.6,
     }),
 
     // ── Glass — dark reflective curtain-wall glass ──
-    window: new THREE.MeshPhysicalMaterial({
+    window: new MeshPhysicalMaterial({
       color: 0x3A6888,
       transparent: true,
       opacity: 0.65,
@@ -548,100 +548,100 @@ export function createBIMMaterials(): BIMMaterialLib {
       clearcoat: 1.0,
       clearcoatRoughness: 0.01,
       specularIntensity: 1.2,
-      specularColor: new THREE.Color(0xFFEEDD),
+      specularColor: new Color(0xFFEEDD),
       emissive: 0x102030,
       emissiveIntensity: 0.08,
     }),
 
     // ── Door — real wood PBR ──
-    door: new THREE.MeshStandardMaterial({
+    door: new MeshStandardMaterial({
       ...woodPBR, side: DS, roughness: 0.45, metalness: 0.0,
-      normalScale: new THREE.Vector2(1.0, 1.0),
+      normalScale: new Vector2(1.0, 1.0),
       envMapIntensity: 0.6,
     }),
 
     // ── Column — real concrete PBR (polished) ──
-    column: new THREE.MeshStandardMaterial({
+    column: new MeshStandardMaterial({
       ...concretePBR, side: DS, roughness: 0.5, metalness: 0.15,
-      normalScale: new THREE.Vector2(1.0, 1.0),
+      normalScale: new Vector2(1.0, 1.0),
       envMapIntensity: 0.8,
     }),
 
     // ── Beam — real brushed aluminum PBR ──
-    beam: new THREE.MeshStandardMaterial({
+    beam: new MeshStandardMaterial({
       ...metalPBR, side: DS, roughness: 0.35, metalness: 0.88,
-      normalScale: new THREE.Vector2(0.5, 0.5),
+      normalScale: new Vector2(0.5, 0.5),
       envMapIntensity: 1.3,
     }),
 
     // ── Stair — real stone PBR ──
-    stair: new THREE.MeshStandardMaterial({
+    stair: new MeshStandardMaterial({
       ...stonePBR, side: DS, roughness: 0.55, metalness: 0.02,
-      normalScale: new THREE.Vector2(1.0, 1.0),
+      normalScale: new Vector2(1.0, 1.0),
       envMapIntensity: 0.5,
     }),
 
     // ── Space (interior volume) ──
-    space: new THREE.MeshStandardMaterial({
+    space: new MeshStandardMaterial({
       color: 0xF0EDE8, side: DS, roughness: 0.95, metalness: 0.0,
       transparent: true, opacity: 0.15, depthWrite: false,
     }),
 
     // ── Parapet — real stone PBR ──
-    parapet: new THREE.MeshStandardMaterial({
+    parapet: new MeshStandardMaterial({
       ...stonePBR, side: DS, roughness: 0.65, metalness: 0.02,
-      normalScale: new THREE.Vector2(0.8, 0.8),
+      normalScale: new Vector2(0.8, 0.8),
       envMapIntensity: 0.5,
     }),
     // ── Canopy — real concrete ──
-    canopy: new THREE.MeshStandardMaterial({
+    canopy: new MeshStandardMaterial({
       ...concretePBR, side: DS, roughness: 0.5, metalness: 0.2,
       envMapIntensity: 0.8,
     }),
     // ── Balcony — real concrete with glass railing feel ──
-    balcony: new THREE.MeshStandardMaterial({
+    balcony: new MeshStandardMaterial({
       ...concretePBR, side: DS, roughness: 0.55, metalness: 0.15,
       envMapIntensity: 0.7,
     }),
 
     // ── MEP — real aluminum metal ──
-    duct: new THREE.MeshStandardMaterial({
+    duct: new MeshStandardMaterial({
       ...metalPBR, side: DS, roughness: 0.2, metalness: 0.88,
-      normalScale: new THREE.Vector2(0.3, 0.3),
+      normalScale: new Vector2(0.3, 0.3),
       envMapIntensity: 1.5,
     }),
-    pipe: new THREE.MeshStandardMaterial({
+    pipe: new MeshStandardMaterial({
       color: 0x3A8A5A, side: DS, roughness: 0.25, metalness: 0.75,
-      normalMap: metalNormal, normalScale: new THREE.Vector2(0.3, 0.3),
+      normalMap: metalNormal, normalScale: new Vector2(0.3, 0.3),
       roughnessMap: metalRoughness,
       envMapIntensity: 1.3,
     }),
-    cableTray: new THREE.MeshStandardMaterial({
+    cableTray: new MeshStandardMaterial({
       color: 0xCCA020, side: DS, roughness: 0.3, metalness: 0.65,
-      normalMap: metalNormal, normalScale: new THREE.Vector2(0.2, 0.2),
+      normalMap: metalNormal, normalScale: new Vector2(0.2, 0.2),
     }),
-    equipment: new THREE.MeshStandardMaterial({
+    equipment: new MeshStandardMaterial({
       color: 0x5080B0, side: DS, roughness: 0.3, metalness: 0.65,
       envMapIntensity: 1.0,
     }),
 
     // ── Ground — real grass PBR with AO ──
-    ground: new THREE.MeshStandardMaterial({
+    ground: new MeshStandardMaterial({
       ...grassPBR, side: DS, roughness: 0.85, metalness: 0.0,
-      normalScale: new THREE.Vector2(0.8, 0.8),
+      normalScale: new Vector2(0.8, 0.8),
       envMapIntensity: 0.3,
     }),
 
     // ── Facade detail — polished aluminum mullion ──
-    mullion: new THREE.MeshStandardMaterial({
+    mullion: new MeshStandardMaterial({
       ...metalPBR, side: DS, roughness: 0.12, metalness: 0.95,
       envMapIntensity: 2.5,
       emissive: 0xFFDDCC,
       emissiveIntensity: 0.06,
-      normalScale: new THREE.Vector2(0.2, 0.2),
+      normalScale: new Vector2(0.2, 0.2),
     }),
     // ── Dark spandrel panel ──
-    spandrel: new THREE.MeshStandardMaterial({
+    spandrel: new MeshStandardMaterial({
       color: 0x181820, side: DS, roughness: 0.18, metalness: 0.88,
       envMapIntensity: 1.8,
       emissive: 0x101018,
@@ -649,13 +649,13 @@ export function createBIMMaterials(): BIMMaterialLib {
     }),
 
     // ── Landscaping ──
-    treeCrown: new THREE.MeshStandardMaterial({
+    treeCrown: new MeshStandardMaterial({
       color: 0x2D6B1E, side: DS, roughness: 0.82, metalness: 0.0,
       emissive: 0x1A3A0A,
       emissiveIntensity: 0.05,
       envMapIntensity: 0.4,
     }),
-    treeTrunk: new THREE.MeshStandardMaterial({
+    treeTrunk: new MeshStandardMaterial({
       ...woodPBR, side: DS, roughness: 0.75, metalness: 0.0,
       envMapIntensity: 0.3,
     }),
@@ -695,8 +695,8 @@ export function getMaterialKey(elementType: string, isExterior?: boolean): keyof
  */
 export function disposeBIMMaterials(lib: BIMMaterialLib) {
   for (const mat of Object.values(lib)) {
-    if (mat instanceof THREE.Material) {
-      const m = mat as THREE.MeshStandardMaterial;
+    if (mat instanceof Material) {
+      const m = mat as MeshStandardMaterial;
       if (m.map) m.map.dispose();
       if (m.normalMap) m.normalMap.dispose();
       if (m.roughnessMap) m.roughnessMap.dispose();

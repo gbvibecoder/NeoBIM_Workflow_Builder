@@ -431,6 +431,7 @@ export const useWorkflowStore = create<WorkflowState>()(
 );
 
 // ─── Optimized selectors — prevent unnecessary re-renders (#45) ──────────────
+// State selectors (reactive — trigger re-render only when their specific slice changes)
 export const selectNodes = (s: WorkflowState) => s.nodes;
 export const selectEdges = (s: WorkflowState) => s.edges;
 export const selectCurrentWorkflow = (s: WorkflowState) => s.currentWorkflow;
@@ -438,3 +439,23 @@ export const selectIsDirty = (s: WorkflowState) => s.isDirty;
 export const selectIsSaving = (s: WorkflowState) => s.isSaving;
 export const selectCanUndo = (s: WorkflowState) => s._historyIndex > 0;
 export const selectCanRedo = (s: WorkflowState) => s._historyIndex < s._history.length - 1;
+export const selectCreationMode = (s: WorkflowState) => s.creationMode;
+export const selectIsSaveModalOpen = (s: WorkflowState) => s.isSaveModalOpen;
+
+// Action selectors (stable references — never cause re-renders)
+export const selectAddNode = (s: WorkflowState) => s.addNode;
+export const selectRemoveNode = (s: WorkflowState) => s.removeNode;
+export const selectRemoveEdge = (s: WorkflowState) => s.removeEdge;
+export const selectUpdateNode = (s: WorkflowState) => s.updateNode;
+export const selectAddEdge = (s: WorkflowState) => s.addEdge;
+export const selectResetCanvas = (s: WorkflowState) => s.resetCanvas;
+export const selectSetEdgeFlowing = (s: WorkflowState) => s.setEdgeFlowing;
+export const selectMarkDirty = (s: WorkflowState) => s.markDirty;
+export const selectSetCreationMode = (s: WorkflowState) => s.setCreationMode;
+export const selectSaveWorkflow = (s: WorkflowState) => s.saveWorkflow;
+export const selectLoadWorkflow = (s: WorkflowState) => s.loadWorkflow;
+export const selectUndo = (s: WorkflowState) => s.undo;
+export const selectRedo = (s: WorkflowState) => s.redo;
+export const selectOpenSaveModal = (s: WorkflowState) => s.openSaveModal;
+export const selectCloseSaveModal = (s: WorkflowState) => s.closeSaveModal;
+export const selectLoadFromTemplate = (s: WorkflowState) => s.loadFromTemplate;

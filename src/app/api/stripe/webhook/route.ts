@@ -10,6 +10,7 @@ import {
   sendPlanChangedEmail,
 } from '@/shared/services/email';
 import { checkWebhookIdempotency } from '@/lib/webhook-idempotency';
+import { logAudit } from "@/lib/admin-server";
 
 export async function POST(req: NextRequest) {
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
@@ -179,7 +180,10 @@ async function updateUserSubscription(
       status: subscription.status,
     });
 
-    const user = await prisma.user.findFirst({ where: { stripeCustomerId } });
+    const user = await prisma.user.findFirst({
+      where: { stripeCustomerId },
+      select: { id: true, role: true },
+    });
     if (!user) {
       console.error('[STRIPE_WEBHOOK] User not found for customer:', stripeCustomerId);
       return;
@@ -199,6 +203,17 @@ async function updateUserSubscription(
         role: 'FREE',
       },
     });
+
+    // Audit log the cancellation/downgrade
+    logAudit(null, "USER_ROLE_CHANGED", "user", user.id, {
+      source: "stripe_webhook",
+      previousRole: user.role,
+      newRole: "FREE",
+      reason: `subscription_${subscription.status}`,
+      subscriptionId: subscription.id,
+      isTerminal,
+    }).catch(() => {});
+
     return;
   }
 
@@ -230,18 +245,44 @@ async function updateUserSubscription(
     ?? (sub as unknown as { current_period_end?: number }).current_period_end
     ?? Math.floor(Date.now() / 1000);
 
-  // CRITICAL: If a paid subscription resolves to FREE, something is wrong with price ID mapping
+  // CRITICAL FIX: If a paid subscription resolves to FREE, the priceId doesn't
+  // match any env var. Do NOT downgrade the user — keep their current role and
+  // log a critical error so ops can investigate the price mapping.
   if (plan === 'FREE' && priceId) {
-    console.error('[STRIPE_WEBHOOK] CRITICAL: Paid subscription resolved to FREE role!', {
+    console.error('[STRIPE_WEBHOOK] CRITICAL: Paid subscription resolved to FREE role! Refusing to downgrade user.', {
       userId: user.id,
       priceId,
       subscriptionId: sub.id,
       subscriptionStatus: sub.status,
+      currentRole: previousRole,
       envMini: process.env.STRIPE_MINI_PRICE_ID,
       envStarter: process.env.STRIPE_STARTER_PRICE_ID,
       envPro: process.env.STRIPE_PRICE_ID,
       envTeam: process.env.STRIPE_TEAM_PRICE_ID,
     });
+
+    // Still update Stripe metadata (so we can retry later), but preserve the
+    // user's existing role instead of blindly setting FREE.
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        stripeSubscriptionId: sub.id,
+        stripePriceId: priceId,
+        stripeCurrentPeriodEnd: new Date(currentPeriodEnd * 1000),
+        // DO NOT change role — keep previousRole
+      },
+    });
+
+    // Audit log the failed mapping so admins can see it
+    logAudit(null, "USER_ROLE_CHANGED", "user", user.id, {
+      source: "stripe_webhook",
+      action: "BLOCKED — priceId not mapped",
+      priceId,
+      subscriptionId: sub.id,
+      currentRole: previousRole,
+    }).catch(() => {});
+
+    return; // Early return — do NOT update role
   }
 
   console.info('[STRIPE_WEBHOOK] Attempting role update:', {
@@ -269,6 +310,18 @@ async function updateUserSubscription(
       plan,
       subscriptionId: sub.id,
     });
+
+    // Audit log the role change so it's visible in admin dashboard
+    if (previousRole !== plan) {
+      logAudit(null, "USER_ROLE_CHANGED", "user", user.id, {
+        source: "stripe_webhook",
+        previousRole,
+        newRole: plan,
+        priceId,
+        subscriptionId: sub.id,
+        subscriptionStatus: sub.status,
+      }).catch(() => {});
+    }
 
     // Send plan changed email if role actually changed (fire-and-forget)
     if (previousRole !== plan && user.email) {

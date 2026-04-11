@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useCallback, useState } from "react";
-import * as THREE from "three";
+import { WebGLRenderer, PCFSoftShadowMap, ACESFilmicToneMapping, Scene, Color, PerspectiveCamera, AmbientLight, DirectionalLight, PlaneGeometry, MeshStandardMaterial, Mesh, GridHelper, Box3, Vector3 } from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { Loader2, AlertCircle, RotateCcw, Maximize2, Minimize2 } from "lucide-react";
@@ -20,7 +20,7 @@ export default function Building3DViewer({
 }: Building3DViewerProps) {
   const { t } = useLocale();
   const containerRef = useRef<HTMLDivElement>(null);
-  const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
+  const rendererRef = useRef<WebGLRenderer | null>(null);
   const animFrameRef = useRef<number>(0);
   const controlsRef = useRef<OrbitControls | null>(null);
 
@@ -55,22 +55,22 @@ export default function Building3DViewer({
     const h = expanded ? Math.min(window.innerHeight * 0.7, 600) : height;
 
     // Renderer
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+    const renderer = new WebGLRenderer({ antialias: true, alpha: false });
     renderer.setSize(w, h);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.shadowMap.type = PCFSoftShadowMap;
+    renderer.toneMapping = ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.2;
     container.appendChild(renderer.domElement);
     rendererRef.current = renderer;
 
     // Scene
-    const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x0d0d1a);
+    const scene = new Scene();
+    scene.background = new Color(0x0d0d1a);
 
     // Camera
-    const camera = new THREE.PerspectiveCamera(45, w / h, 0.01, 1000);
+    const camera = new PerspectiveCamera(45, w / h, 0.01, 1000);
     camera.position.set(3, 2, 3);
 
     // Controls
@@ -84,32 +84,32 @@ export default function Building3DViewer({
     controlsRef.current = controls;
 
     // Lighting
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+    const ambientLight = new AmbientLight(0xffffff, 0.5);
     scene.add(ambientLight);
 
-    const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
+    const dirLight = new DirectionalLight(0xffffff, 1.2);
     dirLight.position.set(5, 8, 5);
     dirLight.castShadow = true;
     scene.add(dirLight);
 
-    const fillLight = new THREE.DirectionalLight(0x4fc3f7, 0.4);
+    const fillLight = new DirectionalLight(0x4fc3f7, 0.4);
     fillLight.position.set(-3, 2, -3);
     scene.add(fillLight);
 
     // Ground plane
-    const groundGeometry = new THREE.PlaneGeometry(20, 20);
-    const groundMaterial = new THREE.MeshStandardMaterial({
+    const groundGeometry = new PlaneGeometry(20, 20);
+    const groundMaterial = new MeshStandardMaterial({
       color: 0x111122,
       roughness: 0.9,
       metalness: 0.1,
     });
-    const ground = new THREE.Mesh(groundGeometry, groundMaterial);
+    const ground = new Mesh(groundGeometry, groundMaterial);
     ground.rotation.x = -Math.PI / 2;
     ground.receiveShadow = true;
     scene.add(ground);
 
     // Grid helper
-    const gridHelper = new THREE.GridHelper(20, 40, 0x1a1a2e, 0x1a1a2e);
+    const gridHelper = new GridHelper(20, 40, 0x1a1a2e, 0x1a1a2e);
     gridHelper.position.y = 0.001;
     scene.add(gridHelper);
 
@@ -121,9 +121,9 @@ export default function Building3DViewer({
         const model = gltf.scene;
 
         // Compute bounding box and center/scale model
-        const box = new THREE.Box3().setFromObject(model);
-        const center = box.getCenter(new THREE.Vector3());
-        const size = box.getSize(new THREE.Vector3());
+        const box = new Box3().setFromObject(model);
+        const center = box.getCenter(new Vector3());
+        const size = box.getSize(new Vector3());
         const maxDim = Math.max(size.x, size.y, size.z);
         const scale = 2 / maxDim; // Normalize to ~2 units
 
@@ -133,7 +133,7 @@ export default function Building3DViewer({
 
         // Enable shadows
         model.traverse((child) => {
-          if (child instanceof THREE.Mesh) {
+          if (child instanceof Mesh) {
             child.castShadow = true;
             child.receiveShadow = true;
           }
@@ -142,9 +142,9 @@ export default function Building3DViewer({
         scene.add(model);
 
         // Adjust camera to fit model
-        const scaledBox = new THREE.Box3().setFromObject(model);
-        const scaledCenter = scaledBox.getCenter(new THREE.Vector3());
-        const scaledSize = scaledBox.getSize(new THREE.Vector3());
+        const scaledBox = new Box3().setFromObject(model);
+        const scaledCenter = scaledBox.getCenter(new Vector3());
+        const scaledSize = scaledBox.getSize(new Vector3());
         const maxScaledDim = Math.max(scaledSize.x, scaledSize.y, scaledSize.z);
 
         camera.position.set(

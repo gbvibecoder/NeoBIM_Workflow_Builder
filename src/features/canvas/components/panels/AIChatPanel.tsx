@@ -3,7 +3,14 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Sparkles, Send, X, MessageSquare, Trash2, Zap } from "lucide-react";
-import { useWorkflowStore } from "@/features/workflows/stores/workflow-store";
+import {
+  useWorkflowStore,
+  selectNodes as selectWfNodes,
+  selectEdges as selectWfEdges,
+  selectAddNode,
+  selectAddEdge,
+  selectRemoveNode,
+} from "@/features/workflows/stores/workflow-store";
 import { NODE_CATALOGUE_MAP } from "@/features/workflows/constants/node-catalogue";
 import type { WorkflowNodeData, NodeCategory } from "@/types/nodes";
 import type { WorkflowNode } from "@/types/nodes";
@@ -249,7 +256,11 @@ export function AIChatPanel({ messages, onAddMessage, onClear, isOpen, onToggle 
     document.addEventListener("mouseup", onUp);
   }, [dragOffset]);
 
-  const { nodes, edges, addNode, addEdge, removeNode } = useWorkflowStore();
+  const nodes = useWorkflowStore(selectWfNodes);
+  const edges = useWorkflowStore(selectWfEdges);
+  const addNode = useWorkflowStore(selectAddNode);
+  const addEdge = useWorkflowStore(selectAddEdge);
+  const removeNode = useWorkflowStore(selectRemoveNode);
 
   useEffect(() => {
     if (isOpen && !minimized) bottomRef.current?.scrollIntoView({ behavior: "smooth" });

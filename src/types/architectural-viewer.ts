@@ -1,4 +1,4 @@
-import * as THREE from "three";
+import type { Vector2, Mesh, Group } from "three";
 
 export interface RoomDef {
   name: string;
@@ -38,8 +38,8 @@ export type RoomType =
   | "spa";
 
 export interface WallSegment {
-  start: THREE.Vector2;
-  end: THREE.Vector2;
+  start: Vector2;
+  end: Vector2;
   floor: number;
   isExterior: boolean;
   thickness: number;
@@ -55,8 +55,8 @@ export interface Opening {
 }
 
 export interface DoorMesh {
-  mesh: THREE.Mesh;
-  pivot: THREE.Group;
+  mesh: Mesh;
+  pivot: Group;
   isOpen: boolean;
   targetAngle: number;
   currentAngle: number;

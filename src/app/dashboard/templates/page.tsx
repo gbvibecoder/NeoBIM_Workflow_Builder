@@ -6,7 +6,7 @@ import dynamic from "next/dynamic";
 import { ChevronDown, Building2, Ruler, Compass, HardHat, Layers, PenTool, Triangle, Lock, ArrowRight, MessageSquare, Sparkles, Zap } from "lucide-react";
 import { PREBUILT_WORKFLOWS } from "@/features/workflows/constants/prebuilt-workflows";
 import { toast } from "sonner";
-import { useWorkflowStore } from "@/features/workflows/stores/workflow-store";
+import { useWorkflowStore, selectLoadFromTemplate } from "@/features/workflows/stores/workflow-store";
 import { useRouter } from "next/navigation";
 import type { WorkflowTemplate } from "@/types/workflow";
 import { useLocale } from "@/hooks/useLocale";
@@ -688,7 +688,7 @@ export default function TemplatesPage() {
     return () => el.removeEventListener("scroll", onScroll);
   }, []);
 
-  const { loadFromTemplate } = useWorkflowStore();
+  const loadFromTemplate = useWorkflowStore(selectLoadFromTemplate);
   const router = useRouter();
 
   const filtered = useMemo(() => {
