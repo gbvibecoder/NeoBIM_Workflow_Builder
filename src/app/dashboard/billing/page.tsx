@@ -119,16 +119,19 @@ export default function BillingPage() {
   useEffect(() => {
     api.executions.list({ limit: 1000 })
       .then(({ executions }) => {
+        // Only count completed executions (SUCCESS/PARTIAL) — matches server enforcement.
+        // FAILED/PENDING/RUNNING don't count against the user's quota.
+        const completed = executions.filter(e => e.status === "SUCCESS" || e.status === "PARTIAL");
         const now = new Date();
         const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
         if (userRole === "FREE") {
           // FREE tier: 3 lifetime executions (not monthly)
-          setUsage({ used: executions.length, limit: 3, resetDate: "" });
+          setUsage({ used: completed.length, limit: 3, resetDate: "" });
         } else {
           const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-          const monthExecutions = executions.filter(e => new Date(e.startedAt) >= monthStart);
+          const monthCompleted = completed.filter(e => new Date(e.startedAt) >= monthStart);
           const limitMap: Record<string, number> = { MINI: 10, STARTER: 30, PRO: 100 };
-          setUsage({ used: monthExecutions.length, limit: limitMap[userRole] || 1000, resetDate: nextMonth.toISOString() });
+          setUsage({ used: monthCompleted.length, limit: limitMap[userRole] || 1000, resetDate: nextMonth.toISOString() });
         }
       })
       .catch(() => {
