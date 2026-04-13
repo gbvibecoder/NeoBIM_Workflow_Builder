@@ -168,7 +168,7 @@ export async function POST(req: Request) {
         customer: customerId,
         mode: 'subscription',
         line_items: [{ price: priceId, quantity: 1 }],
-        success_url: `${baseUrl}/dashboard/billing?success=true`,
+        success_url: `${baseUrl}/thank-you/subscription?plan=${normalizedPlan}`,
         cancel_url: `${baseUrl}/dashboard/billing?canceled=true`,
         ...(defaultCoupon
           ? { discounts: [{ coupon: defaultCoupon }] }

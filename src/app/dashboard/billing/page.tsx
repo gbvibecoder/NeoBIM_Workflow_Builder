@@ -13,7 +13,7 @@ import {
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { useLocale } from "@/hooks/useLocale";
-import { trackPurchase } from "@/lib/meta-pixel";
+// trackPurchase moved to /thank-you/subscription page
 
 interface UsageStats {
   used: number;
@@ -62,51 +62,16 @@ export default function BillingPage() {
   const currentPlan = userRole === "FREE" ? "Free" : userRole === "MINI" ? "Mini" : userRole === "STARTER" ? "Starter" : userRole === "PRO" ? "Pro" : "Team";
 
   // Handle success/cancel redirects from Stripe
+  // New Stripe checkouts go to /thank-you/subscription directly.
+  // This handler is backward-compatible for any cached ?success=true URLs.
   useEffect(() => {
     const success = searchParams.get("success");
     const canceled = searchParams.get("canceled");
 
     if (success === "true") {
-      toast.success(t('billing.paymentSuccess'), {
-        icon: <CheckCircle2 size={18} />,
-        duration: 5000,
-      });
-      trackPurchase({ content_name: "BuildFlow Subscription", currency: "INR" });
-
-      const syncSubscription = async (attempt = 1): Promise<void> => {
-        try {
-          const res = await fetch('/api/stripe/subscription', { method: 'POST' });
-          const data = await res.json();
-          console.info('[billing] Sync attempt', attempt, '→', data);
-
-          if (data.synced) {
-            // Subscription was updated in DB — refresh session and reload
-            console.info('[billing] Subscription synced:', data.role);
-            await updateSession();
-            window.location.reload();
-          } else if (data.reason === 'no_active_subscription' && attempt < 5) {
-            // Webhook hasn't processed yet — retry with back-off
-            setTimeout(() => syncSubscription(attempt + 1), attempt * 2000);
-          } else {
-            // already_synced or max retries — always refresh session + reload
-            // This ensures the page reflects the DB state even if webhook
-            // updated the role before our sync call ran.
-            await updateSession();
-            window.location.reload();
-          }
-        } catch {
-          if (attempt < 5) {
-            setTimeout(() => syncSubscription(attempt + 1), attempt * 2000);
-          } else {
-            // Final fallback — force refresh so JWT callback reads DB
-            await updateSession();
-            window.location.reload();
-          }
-        }
-      };
-
-      setTimeout(() => syncSubscription(1), 2000);
-      window.history.replaceState({}, "", "/dashboard/billing");
+      // Redirect to dedicated thank you page (handles sync + tracking there)
+      window.location.href = `/thank-you/subscription?plan=${userRole}`;
+      return;
     } else if (canceled === "true") {
       toast.error(t('billing.checkoutCanceled'), {
         icon: <XCircle size={18} />,
@@ -114,7 +79,7 @@ export default function BillingPage() {
       });
       window.history.replaceState({}, "", "/dashboard/billing");
     }
-  }, [searchParams, updateSession]);
+  }, [searchParams, userRole]);
 
   useEffect(() => {
     api.executions.list({ limit: 1000 })
@@ -270,10 +235,9 @@ export default function BillingPage() {
             toast.dismiss('razorpay-verify');
 
             if (verifyData.success) {
-              toast.success(t('billing.planUpgraded'), { icon: <CheckCircle2 size={18} />, duration: 5000 });
-              trackPurchase({ content_name: "BuildFlow Subscription", currency: "INR" });
+              toast.success(t('billing.planUpgraded'), { icon: <CheckCircle2 size={18} />, duration: 3000 });
               await updateSession();
-              window.location.reload();
+              window.location.href = `/thank-you/subscription?plan=${planKey}`;
             } else {
               toast.error(verifyData.error?.message || 'Payment verification failed. Contact support.');
             }
