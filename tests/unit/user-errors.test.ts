@@ -86,23 +86,23 @@ describe("UserErrors — Factory Functions", () => {
   });
 
   describe("RATE_LIMIT_FREE", () => {
-    it("should show days until reset", () => {
-      const error = UserErrors.RATE_LIMIT_FREE(12);
+    it("should show lifetime limit message", () => {
+      const error = UserErrors.RATE_LIMIT_FREE();
       expect(error.code).toBe("RATE_001");
-      expect(error.message).toContain("12 days");
+      expect(error.message).toContain("3 free workflow executions");
       expect(error.action).toBe("Upgrade to Mini");
       expect(error.actionUrl).toBe("/dashboard/billing");
     });
 
-    it("should use singular day for 1", () => {
-      const error = UserErrors.RATE_LIMIT_FREE(1);
-      expect(error.message).toContain("1 day");
-      expect(error.message).not.toContain("1 days");
+    it("should accept optional resetDays param without error", () => {
+      const error = UserErrors.RATE_LIMIT_FREE(12);
+      expect(error.code).toBe("RATE_001");
+      expect(error.message).toContain("Upgrade");
     });
 
-    it("should use plural days for > 1", () => {
+    it("should show upgrade action", () => {
       const error = UserErrors.RATE_LIMIT_FREE(5);
-      expect(error.message).toContain("5 days");
+      expect(error.title).toBe("Free executions used");
     });
   });
 
