@@ -788,56 +788,219 @@
     animation: spin-slow 8s linear infinite;
   }
 
-  /* ── Sonner Toasts ──────────────────────────────────────────── */
+  /* ── Sonner Toasts — Premium Glass ────────────────────────── */
 
-  /* Toast width — responsive, capped at 360px */
-  [data-sonner-toaster] {
-    --width: min(360px, calc(100vw - 32px)) !important;
-  }
-
-  [data-sonner-toast] {
-    width: min(360px, calc(100vw - 32px)) !important;
-  }
-
-  /* 3px left color bar per type */
+  /* ── Type-specific CSS variables ── */
   [data-sonner-toast][data-type="success"] {
-    border-left: 3px solid #34D399 !important;
+    --toast-accent: #34D399;
+    --toast-accent-rgb: 52, 211, 153;
   }
   [data-sonner-toast][data-type="error"] {
-    border-left: 3px solid #F87171 !important;
+    --toast-accent: #F87171;
+    --toast-accent-rgb: 248, 113, 113;
   }
   [data-sonner-toast][data-type="warning"] {
-    border-left: 3px solid #FBBF24 !important;
+    --toast-accent: #FBBF24;
+    --toast-accent-rgb: 251, 191, 36;
   }
   [data-sonner-toast][data-type="info"] {
-    border-left: 3px solid #4F8AFF !important;
+    --toast-accent: #4FC3F7;
+    --toast-accent-rgb: 79, 195, 247;
   }
   [data-sonner-toast][data-type="loading"] {
-    border-left: 3px solid var(--text-secondary) !important;
+    --toast-accent: #A0AEC0;
+    --toast-accent-rgb: 160, 174, 192;
   }
   [data-sonner-toast]:not([data-type]),
   [data-sonner-toast][data-type="default"] {
-    border-left: 3px solid #4F8AFF !important;
+    --toast-accent: #06B6D4;
+    --toast-accent-rgb: 6, 182, 212;
   }
 
-  /* Typography inside toasts */
+  /* ── Toaster width + stacking ── */
+  [data-sonner-toaster] {
+    --width: min(380px, calc(100vw - 32px)) !important;
+    z-index: 99999 !important;
+  }
+  [data-sonner-toast] {
+    width: min(380px, calc(100vw - 32px)) !important;
+  }
+
+  /* ── Base toast — glass-morphism ── */
+  [data-sonner-toast] {
+    background: linear-gradient(135deg, rgba(18, 18, 30, 0.95), rgba(13, 13, 26, 0.92)) !important;
+    border: 1px solid rgba(var(--toast-accent-rgb), 0.2) !important;
+    border-left: 4px solid var(--toast-accent) !important;
+    box-shadow:
+      0 16px 48px rgba(0, 0, 0, 0.4),
+      0 4px 16px rgba(0, 0, 0, 0.3),
+      0 0 24px rgba(var(--toast-accent-rgb), 0.08),
+      inset 4px 0 16px -6px rgba(var(--toast-accent-rgb), 0.1) !important;
+    backdrop-filter: blur(12px) saturate(1.2) !important;
+    -webkit-backdrop-filter: blur(12px) saturate(1.2) !important;
+    position: relative !important;
+    overflow: hidden !important;
+    transition: border-color 0.3s ease, box-shadow 0.3s ease !important;
+  }
+
+  /* ── Hover — intensify glow ── */
+  [data-sonner-toast]:hover {
+    border-color: rgba(var(--toast-accent-rgb), 0.35) !important;
+    box-shadow:
+      0 16px 48px rgba(0, 0, 0, 0.45),
+      0 4px 16px rgba(0, 0, 0, 0.35),
+      0 0 36px rgba(var(--toast-accent-rgb), 0.14),
+      inset 4px 0 20px -6px rgba(var(--toast-accent-rgb), 0.15) !important;
+  }
+
+  /* ── Progress bar (::before) — shrinks left-to-right ── */
+  [data-sonner-toast][data-mounted="true"]::before {
+    content: '' !important;
+    position: absolute !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    height: 2px !important;
+    background: linear-gradient(90deg, var(--toast-accent), rgba(var(--toast-accent-rgb), 0.2)) !important;
+    transform-origin: left !important;
+    animation: toast-progress 4s linear forwards !important;
+    border-radius: 0 0 14px 14px !important;
+    pointer-events: none !important;
+    z-index: 1 !important;
+  }
+  [data-sonner-toast]:hover::before {
+    animation-play-state: paused !important;
+  }
+  /* Hide progress on swiping — Sonner uses ::before for swipe hit area */
+  [data-sonner-toast][data-swiping="true"]::before {
+    animation: none !important;
+    background: transparent !important;
+  }
+
+  @keyframes toast-progress {
+    from { transform: scaleX(1); }
+    to { transform: scaleX(0); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    [data-sonner-toast]::before {
+      animation: none !important;
+    }
+  }
+
+  /* ── Icon — colored circle background ── */
+  [data-sonner-toast] [data-icon] {
+    width: 28px !important;
+    height: 28px !important;
+    min-width: 28px !important;
+    background: rgba(var(--toast-accent-rgb), 0.12) !important;
+    border-radius: 50% !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    box-shadow: 0 0 12px rgba(var(--toast-accent-rgb), 0.15) !important;
+    flex-shrink: 0 !important;
+  }
+  [data-sonner-toast] [data-icon] svg {
+    color: var(--toast-accent) !important;
+    width: 15px !important;
+    height: 15px !important;
+  }
+
+  /* ── Loading spinner ── */
+  [data-sonner-toast][data-type="loading"] .sonner-loading-bar {
+    background: var(--text-secondary) !important;
+  }
+
+  /* ── Typography ── */
   [data-sonner-toast] [data-title] {
-    font-size: 12.5px !important;
+    font-size: 13px !important;
     font-weight: 600 !important;
+    color: var(--text-primary) !important;
+    letter-spacing: -0.01em !important;
+    line-height: 1.4 !important;
+  }
+  [data-sonner-toast] [data-description] {
+    font-size: 11.5px !important;
+    color: var(--text-secondary) !important;
+    line-height: 1.45 !important;
+    margin-top: 3px !important;
+  }
+
+  /* ── Close button — fade in on hover ── */
+  [data-sonner-toast] [data-close-button] {
+    position: absolute !important;
+    top: 8px !important;
+    right: 8px !important;
+    left: unset !important;
+    transform: none !important;
+    background: rgba(255, 255, 255, 0.06) !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    border-radius: 6px !important;
+    width: 22px !important;
+    height: 22px !important;
+    color: var(--text-secondary) !important;
+    opacity: 0 !important;
+    transition: opacity 0.15s ease, background 0.15s ease !important;
+    cursor: pointer !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+  }
+  [data-sonner-toast]:hover [data-close-button] {
+    opacity: 1 !important;
+  }
+  [data-sonner-toast] [data-close-button]:hover {
+    background: rgba(255, 255, 255, 0.12) !important;
     color: var(--text-primary) !important;
   }
 
-  [data-sonner-toast] [data-description] {
-    font-size: 11px !important;
+  /* ── Action & cancel buttons ── */
+  [data-sonner-toast] [data-button][data-action] {
+    background: rgba(var(--toast-accent-rgb), 0.15) !important;
+    color: var(--toast-accent) !important;
+    border: 1px solid rgba(var(--toast-accent-rgb), 0.25) !important;
+    border-radius: 8px !important;
+    font-size: 12px !important;
+    font-weight: 600 !important;
+    padding: 4px 12px !important;
+    height: 28px !important;
+    transition: background 0.15s ease, border-color 0.15s ease !important;
+    cursor: pointer !important;
+  }
+  [data-sonner-toast] [data-button][data-action]:hover {
+    background: rgba(var(--toast-accent-rgb), 0.25) !important;
+    border-color: rgba(var(--toast-accent-rgb), 0.4) !important;
+  }
+  [data-sonner-toast] [data-button][data-cancel] {
+    background: rgba(255, 255, 255, 0.06) !important;
     color: var(--text-secondary) !important;
-    margin-top: 2px !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    border-radius: 8px !important;
+    font-size: 12px !important;
+    font-weight: 600 !important;
+    padding: 4px 12px !important;
+    height: 28px !important;
+    transition: background 0.15s ease !important;
+    cursor: pointer !important;
+  }
+  [data-sonner-toast] [data-button][data-cancel]:hover {
+    background: rgba(255, 255, 255, 0.1) !important;
   }
 
-  /* Icon color per type */
-  [data-sonner-toast][data-type="success"] [data-icon] svg { color: #34D399 !important; }
-  [data-sonner-toast][data-type="error"]   [data-icon] svg { color: #F87171 !important; }
-  [data-sonner-toast][data-type="warning"] [data-icon] svg { color: #FBBF24 !important; }
-  [data-sonner-toast][data-type="info"]    [data-icon] svg { color: #4F8AFF !important; }
+  /* ── Mobile — full width, proper z-index, clear header ── */
+  @media (max-width: 768px) {
+    [data-sonner-toaster] {
+      --width: calc(100vw - 24px) !important;
+      z-index: 99999 !important;
+      --offset: 72px !important;
+    }
+    [data-sonner-toast] {
+      width: calc(100vw - 24px) !important;
+      backdrop-filter: none !important;
+      -webkit-backdrop-filter: none !important;
+    }
+  }
 
   /* ── Node execution pulse ────────────────────────────────────── */
   @keyframes node-pulse {

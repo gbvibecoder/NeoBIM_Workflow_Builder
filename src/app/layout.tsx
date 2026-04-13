@@ -290,17 +290,18 @@ export default function RootLayout({
           position="bottom-right"
           theme="dark"
           duration={4000}
+          closeButton
+          visibleToasts={3}
+          gap={12}
+          offset={20}
           toastOptions={{
             style: {
-              background: "#12121E",
-              border: "1px solid rgba(255, 255, 255, 0.06)",
               color: "#F0F0F5",
-              fontSize: "14px",
+              fontSize: "13px",
               fontFamily: "var(--font-dm-sans), sans-serif",
-              borderRadius: "12px",
-              boxShadow: "0 16px 48px rgba(0,0,0,0.35), 0 4px 16px rgba(0,0,0,0.25)",
-              padding: "12px 14px",
-              gap: "10px",
+              borderRadius: "14px",
+              padding: "14px 16px",
+              gap: "12px",
             },
           }}
         />
