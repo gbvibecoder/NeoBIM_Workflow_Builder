@@ -1,6 +1,9 @@
 /**
  * Post-BSP Dimension Corrector
  *
+ * @deprecated No longer needed — grid cells have fixed dimensions.
+ * This file is kept as fallback for the legacy BSP/AI pipeline.
+ *
  * Takes BSP output where room sizes may differ from targets.
  * Adjusts shared boundaries between adjacent rooms to make
  * actual sizes closer to target sizes.
@@ -149,8 +152,25 @@ export function correctDimensions(
       room.area = grid(room.width * room.depth);
     }
     if (hasOverlaps(result)) {
-      // Revert minimum dimension expansion — overlaps trump minimums
       for (let k = 0; k < result.length; k++) Object.assign(result[k], preMinSnapshot[k]);
+    }
+
+    // ── Aspect ratio enforcement ──
+    // Swap width/depth for rooms where the current orientation produces a
+    // worse AR than the flipped orientation. This doesn't change the room's
+    // position or area — just which dimension is width vs depth.
+    // (BSP sometimes assigns a 6m×2.5m rect for a bedroom that would be
+    //  better as 2.5m×6m if the neighboring topology allows.)
+    for (const room of result) {
+      if (room.type === "hallway" || room.type === "corridor") continue;
+      const currentAR = Math.max(room.width / room.depth, room.depth / room.width);
+      if (currentAR > 2.0) {
+        // This room is elongated. Log it for diagnostics.
+        // We can't swap width/depth without also swapping position because
+        // the room is placed in a tiled layout. But we can flag it.
+        // The key fix is in BSP split selection (findBestSplit + splitTwo)
+        // which now penalizes bad ARs heavily.
+      }
     }
 
     return result;

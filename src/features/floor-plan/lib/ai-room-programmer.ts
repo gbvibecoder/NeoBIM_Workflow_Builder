@@ -469,6 +469,121 @@ export async function programRooms(
   return raw;
 }
 
+// ── Interpreter Self-Check ────────────────────────────────────────────────
+
+export interface InterpretationValidation {
+  valid: boolean;
+  confidence: number;
+  fixes: string[];
+  bedroomCountMatch: boolean;
+}
+
+/**
+ * Validate that the interpreted room program matches what the user asked for.
+ * Checks BHK count, attached bathroom expansion, and mentioned-room coverage.
+ * Mutates `program` to inject missing rooms if needed.
+ */
+export function validateInterpretation(
+  program: EnhancedRoomProgram,
+  originalPrompt: string,
+): InterpretationValidation {
+  const p = originalPrompt.toLowerCase();
+  const fixes: string[] = [];
+
+  // A. BHK / bedroom count match
+  let expectedBedrooms = 0;
+  const bhkMatch = p.match(/(\d+)\s*[-]?\s*bhk/);
+  if (bhkMatch) expectedBedrooms = parseInt(bhkMatch[1], 10);
+  const explicitBedMatch = p.match(/(\d+)\s+bed(?:room)?s?\b(?!\s*bhk)/i);
+  if (explicitBedMatch) expectedBedrooms = Math.max(expectedBedrooms, parseInt(explicitBedMatch[1], 10));
+
+  const actualBedrooms = program.rooms.filter(r => {
+    const cls = classifyRoom(r.type, r.name);
+    return ['bedroom', 'master_bedroom', 'guest_bedroom', 'children_bedroom'].includes(cls);
+  }).length;
+
+  let bedroomCountMatch = true;
+  if (expectedBedrooms > 0 && actualBedrooms < expectedBedrooms) {
+    bedroomCountMatch = false;
+    for (let i = actualBedrooms + 1; i <= expectedBedrooms; i++) {
+      const bedName = i === 1 ? 'Master Bedroom' : `Bedroom ${i}`;
+      if (!program.rooms.some(r => r.name === bedName)) {
+        program.rooms.push({
+          name: bedName,
+          type: 'bedroom',
+          areaSqm: i === 1 ? 15 : 12,
+          zone: 'private',
+          mustHaveExteriorWall: true,
+          adjacentTo: [],
+          preferNear: [],
+        });
+        fixes.push(`Injected ${bedName} (AI missed it)`);
+      }
+    }
+    enforceHardCaps(program.rooms);
+  }
+
+  // B. "each with attached bathroom" expansion
+  if (/each\s+with\s+(?:attached\s+)?bath|with\s+attached\s+bath(?:room)?s?\s+(?:each|for\s+all)/i.test(p)) {
+    const bedrooms = program.rooms.filter(r => {
+      const cls = classifyRoom(r.type, r.name);
+      return ['bedroom', 'master_bedroom', 'guest_bedroom', 'children_bedroom'].includes(cls);
+    });
+    const bathrooms = program.rooms.filter(r => {
+      const cls = classifyRoom(r.type, r.name);
+      return ['bathroom', 'master_bathroom', 'toilet'].includes(cls);
+    });
+    if (bathrooms.length < bedrooms.length) {
+      for (let i = bathrooms.length + 1; i <= bedrooms.length; i++) {
+        const bathName = i === 1 ? 'Master Bathroom' : `Bathroom ${i}`;
+        if (!program.rooms.some(r => r.name === bathName)) {
+          const pairedBed = bedrooms[i - 1];
+          program.rooms.push({
+            name: bathName,
+            type: 'bathroom',
+            areaSqm: i === 1 ? 5 : 4,
+            zone: 'service',
+            mustHaveExteriorWall: false,
+            adjacentTo: pairedBed ? [pairedBed.name] : [],
+            preferNear: [],
+          });
+          if (pairedBed) {
+            program.adjacency.push({ roomA: pairedBed.name, roomB: bathName, reason: 'attached bath' });
+          }
+          fixes.push(`Injected ${bathName} for ${pairedBed?.name ?? `Bedroom ${i}`}`);
+        }
+      }
+    }
+  }
+
+  // C. Mentioned room coverage
+  const mentioned = extractMentionedRooms(originalPrompt);
+  const programNames = program.rooms.map(r => r.name.toLowerCase());
+  let matched = 0;
+  for (const m of mentioned) {
+    const ml = m.toLowerCase();
+    if (programNames.some(pn => pn.includes(ml) || ml.includes(pn) ||
+        ml.split(/\s+/).some(w => w.length > 3 && pn.includes(w)))) {
+      matched++;
+    }
+  }
+
+  const confidence = mentioned.length > 0
+    ? matched / mentioned.length
+    : 0.9; // no rooms mentioned = generic prompt
+
+  if (fixes.length > 0) {
+    // Recalculate total area
+    const newTotal = program.rooms.reduce((s, r) => s + r.areaSqm, 0);
+    if (newTotal > program.totalAreaSqm) {
+      program.totalAreaSqm = newTotal;
+    }
+    console.log(`[INTERPRETER] Self-check fixed ${fixes.length} issues: ${fixes.join('; ')}`);
+  }
+
+  return { valid: confidence >= 0.7, confidence, fixes, bedroomCountMatch };
+}
+
 // ── Multi-call strategy for complex multi-floor prompts ─────────────────────
 
 /**
@@ -850,6 +965,7 @@ export function extractMentionedRooms(prompt: string): string[] {
     { pattern: /linen\s+(?:storage|closet|cupboard)/g, name: "Linen Storage" },
     { pattern: /breakfast\s+(?:bar|nook|area)/g, name: "Breakfast Bar" },
     { pattern: /swimming\s+pool|pool/g, name: "Swimming Pool" },
+    { pattern: /library|reading\s+room/g, name: "Library" },
     { pattern: /gym|fitness|workout/g, name: "Gym" },
     { pattern: /store\s*room|storage\s*room/g, name: "Store Room" },
     { pattern: /reception/g, name: "Reception" },
@@ -877,20 +993,44 @@ export function extractMentionedRooms(prompt: string): string[] {
     if (!seen.has(name)) { seen.add(name); found.push(name); }
   }
 
-  // Detect BHK patterns: "4bhk", "10bhk" etc. implies N bedrooms
+  // Detect explicit "N bedrooms" pattern (separate from BHK)
+  const explicitBedMatch = p.match(/(\d+)\s+bed(?:room)?s?\b(?!\s*bhk)/i);
   const bhkMatch = p.match(/(\d+)\s*[-]?\s*bhk/);
-  if (bhkMatch) {
-    const count = parseInt(bhkMatch[1], 10);
-    // Only add generic bedrooms if specific ones weren't found
+  const bedroomTarget = Math.max(
+    explicitBedMatch ? parseInt(explicitBedMatch[1], 10) : 0,
+    bhkMatch ? parseInt(bhkMatch[1], 10) : 0,
+  );
+
+  if (bedroomTarget > 0) {
     const specificBedrooms = found.filter(n =>
       n.toLowerCase().includes("bedroom") || n.toLowerCase().includes("master")
     ).length;
-    if (specificBedrooms < count) {
-      for (let i = specificBedrooms + 1; i <= count; i++) {
-        const name = `Bedroom ${i}`;
-        if (!seen.has(name)) { seen.add(name); found.push(name); }
-      }
+    // Add Master Bedroom if none found
+    if (specificBedrooms === 0 && !seen.has("Master Bedroom")) {
+      seen.add("Master Bedroom"); found.push("Master Bedroom");
     }
+    const currentBedCount = found.filter(n =>
+      n.toLowerCase().includes("bedroom") || n.toLowerCase().includes("master bed")
+    ).length;
+    for (let i = currentBedCount + 1; i <= bedroomTarget; i++) {
+      const name = `Bedroom ${i}`;
+      if (!seen.has(name)) { seen.add(name); found.push(name); }
+    }
+  }
+
+  // "each with attached bathroom" → add one bathroom per bedroom
+  if (/each\s+with\s+(?:attached\s+)?bath|with\s+attached\s+bath(?:room)?s?\s+(?:each|for\s+all)/i.test(p)) {
+    if (!seen.has("Master Bathroom")) { seen.add("Master Bathroom"); found.push("Master Bathroom"); }
+    for (let i = 2; i <= bedroomTarget; i++) {
+      const name = `Bathroom ${i}`;
+      if (!seen.has(name)) { seen.add(name); found.push(name); }
+    }
+  }
+
+  // "parking for N cars" → single parking entry
+  const parkingCarMatch = p.match(/parking\s+(?:for\s+)?(\d+)\s*car/i);
+  if (parkingCarMatch && !seen.has("Car Parking")) {
+    seen.add("Car Parking"); found.push("Car Parking");
   }
 
   return found;
@@ -1175,55 +1315,150 @@ export function programRoomsFallback(prompt: string): EnhancedRoomProgram {
   else if (p.includes("studio")) buildingType = "Studio Apartment";
   else if (p.includes("penthouse")) buildingType = "Penthouse";
 
+  // Detect user-specified total area from prompt (e.g., "350 sqm", "2000 sq ft")
+  let userArea: number | null = null;
+  const sqmMatch = p.match(/(\d[\d,]*(?:\.\d+)?)\s*(?:sq\.?\s*m|square\s*met(?:er|re)s?|sqm)/);
+  if (sqmMatch) userArea = parseFloat(sqmMatch[1].replace(/,/g, ""));
+  const sqftMatch = p.match(/(\d[\d,]*(?:\.\d+)?)\s*(?:sq\.?\s*ft|square\s*feet|sqft|sft)/);
+  if (sqftMatch) userArea = parseFloat(sqftMatch[1].replace(/,/g, "")) * 0.0929;
+
   const areaPerBhk: Record<number, number> = { 1: 55, 2: 90, 3: 140, 4: 200, 5: 280 };
-  const totalArea = areaPerBhk[bhk] ?? bhk * 45 + 20;
+  const defaultArea = areaPerBhk[bhk] ?? bhk * 45 + 20;
+  const totalArea = userArea ?? defaultArea;
+
+  // Detect "each with attached bathroom" / "with attached bath"
+  const attachedBath = /each\s+with\s+(?:attached\s+)?bath(?:room)?|with\s+attached\s+bath(?:room)?s?\s+(?:each|for\s+(?:all|every))/i.test(p);
+  // Detect "N bedrooms" explicitly (separate from BHK)
+  const explicitBedCount = p.match(/(\d+)\s+bed(?:room)?s?\b(?!\s*bhk)/i);
+  const requestedBedrooms = explicitBedCount ? parseInt(explicitBedCount[1], 10) : bhk;
+  const actualBhk = Math.max(bhk, requestedBedrooms);
+
+  // Detect "parking for N cars"
+  let parkingCars = 0;
+  const parkingMatch = p.match(/parking\s+(?:for\s+)?(\d+)\s*car/i);
+  if (parkingMatch) parkingCars = parseInt(parkingMatch[1], 10);
+  else if (/\bparking\b|\bgarage\b|\bcar\s*park/i.test(p)) parkingCars = 1;
 
   const rooms: RoomSpec[] = [];
   const adjacency: AdjacencyRequirement[] = [];
+  const roomNames = new Set<string>(); // track for dedup
 
-  // Public zone
-  if (bhk <= 2) {
+  // ── Public zone ──
+  const hasDrawingRoom = /drawing\s+room/i.test(p);
+  if (actualBhk <= 2 && !hasDrawingRoom) {
     rooms.push({ name: "Living + Dining Room", type: "living", areaSqm: Math.round(totalArea * 0.22), zone: "public", mustHaveExteriorWall: true, adjacentTo: ["Kitchen", "Foyer"], preferNear: [] });
+    roomNames.add("living + dining room");
   } else {
-    rooms.push({ name: "Living Room", type: "living", areaSqm: Math.round(totalArea * 0.15), zone: "public", mustHaveExteriorWall: true, adjacentTo: ["Dining Room", "Corridor"], preferNear: [] });
-    rooms.push({ name: "Dining Room", type: "dining", areaSqm: Math.round(totalArea * 0.08), zone: "public", mustHaveExteriorWall: true, adjacentTo: ["Living Room", "Kitchen"], preferNear: [] });
+    rooms.push({ name: "Living Room", type: "living", areaSqm: Math.round(totalArea * 0.12), zone: "public", mustHaveExteriorWall: true, adjacentTo: ["Dining Room", "Corridor"], preferNear: [] });
+    rooms.push({ name: "Dining Room", type: "dining", areaSqm: Math.round(totalArea * 0.06), zone: "public", mustHaveExteriorWall: true, adjacentTo: ["Living Room", "Kitchen"], preferNear: [] });
     adjacency.push({ roomA: "Living Room", roomB: "Dining Room", reason: "open plan flow" });
+    roomNames.add("living room"); roomNames.add("dining room");
+  }
+  if (hasDrawingRoom && !roomNames.has("drawing room")) {
+    rooms.push({ name: "Drawing Room", type: "living", areaSqm: Math.round(totalArea * 0.08), zone: "public", mustHaveExteriorWall: true, adjacentTo: [], preferNear: ["Foyer", "Living Room"] });
+    roomNames.add("drawing room");
   }
 
-  // Service zone
-  rooms.push({ name: "Kitchen", type: "kitchen", areaSqm: Math.max(8, Math.round(totalArea * 0.08)), zone: "service", mustHaveExteriorWall: true, adjacentTo: bhk <= 2 ? ["Living + Dining Room"] : ["Dining Room"], preferNear: ["Utility"] });
-  adjacency.push({ roomA: "Kitchen", roomB: bhk <= 2 ? "Living + Dining Room" : "Dining Room", reason: "serving access" });
+  // ── Service zone: Kitchen ──
+  rooms.push({ name: "Kitchen", type: "kitchen", areaSqm: Math.max(8, Math.round(totalArea * 0.06)), zone: "service", mustHaveExteriorWall: true, adjacentTo: actualBhk <= 2 && !hasDrawingRoom ? ["Living + Dining Room"] : ["Dining Room"], preferNear: ["Utility"] });
+  adjacency.push({ roomA: "Kitchen", roomB: actualBhk <= 2 && !hasDrawingRoom ? "Living + Dining Room" : "Dining Room", reason: "serving access" });
+  roomNames.add("kitchen");
 
-  // Private zone - bedrooms
-  rooms.push({ name: "Master Bedroom", type: "bedroom", areaSqm: Math.max(14, Math.round(totalArea * 0.14)), zone: "private", mustHaveExteriorWall: true, adjacentTo: ["Bathroom 1"], preferNear: [] });
-  adjacency.push({ roomA: "Master Bedroom", roomB: "Bathroom 1", reason: "attached bath" });
+  // ── Private zone: Bedrooms ──
+  // Master Bedroom
+  rooms.push({ name: "Master Bedroom", type: "bedroom", areaSqm: Math.max(14, Math.round(totalArea * 0.10)), zone: "private", mustHaveExteriorWall: true, adjacentTo: ["Master Bathroom"], preferNear: [] });
+  adjacency.push({ roomA: "Master Bedroom", roomB: "Master Bathroom", reason: "attached bath" });
+  roomNames.add("master bedroom");
 
-  for (let i = 2; i <= bhk; i++) {
-    rooms.push({ name: `Bedroom ${i}`, type: "bedroom", areaSqm: Math.max(10, Math.round(totalArea * 0.10)), zone: "private", mustHaveExteriorWall: true, adjacentTo: [], preferNear: [`Bathroom ${Math.min(i, bhk)}`] });
+  // Additional bedrooms
+  for (let i = 2; i <= actualBhk; i++) {
+    const bedName = `Bedroom ${i}`;
+    const bathName = attachedBath ? `Bathroom ${i}` : undefined;
+    rooms.push({ name: bedName, type: "bedroom", areaSqm: Math.max(10, Math.round(totalArea * 0.07)), zone: "private", mustHaveExteriorWall: true, adjacentTo: bathName ? [bathName] : [], preferNear: bathName ? [] : [`Bathroom ${Math.min(i, actualBhk)}`] });
+    if (bathName) {
+      adjacency.push({ roomA: bedName, roomB: bathName, reason: "attached bath" });
+    }
+    roomNames.add(bedName.toLowerCase());
   }
 
-  // Service zone - bathrooms
-  // Indian standard: 1 common + attached for master. 3BHK→2-3, 4BHK→3, 5BHK→4
-  const numBath = bhk <= 2 ? bhk : Math.ceil(bhk * 0.75);
-  for (let i = 1; i <= numBath; i++) {
-    const name = numBath === 1 ? "Bathroom" : `Bathroom ${i}`;
-    rooms.push({ name, type: "bathroom", areaSqm: i === 1 ? 5 : 4, zone: "service", mustHaveExteriorWall: false, adjacentTo: [], preferNear: [] });
+  // ── Service zone: Bathrooms ──
+  // If "each with attached bathroom" → one per bedroom
+  // Otherwise → Indian standard: master bath + common baths
+  const numBath = attachedBath ? actualBhk : (actualBhk <= 2 ? actualBhk : Math.ceil(actualBhk * 0.75));
+  rooms.push({ name: "Master Bathroom", type: "bathroom", areaSqm: 5, zone: "service", mustHaveExteriorWall: false, adjacentTo: ["Master Bedroom"], preferNear: [] });
+  roomNames.add("master bathroom");
+  for (let i = 2; i <= numBath; i++) {
+    const name = `Bathroom ${i}`;
+    rooms.push({ name, type: "bathroom", areaSqm: 4, zone: "service", mustHaveExteriorWall: false, adjacentTo: attachedBath ? [`Bedroom ${i}`] : [], preferNear: [] });
+    roomNames.add(name.toLowerCase());
   }
 
-  // Circulation
-  if (bhk >= 2) {
-    rooms.push({ name: "Corridor", type: "hallway", areaSqm: Math.round(totalArea * 0.06), zone: "circulation", mustHaveExteriorWall: false, adjacentTo: [], preferNear: [] });
+  // ── Circulation ──
+  if (actualBhk >= 2) {
+    rooms.push({ name: "Corridor", type: "hallway", areaSqm: Math.round(totalArea * 0.05), zone: "circulation", mustHaveExteriorWall: false, adjacentTo: [], preferNear: [] });
+    roomNames.add("corridor");
   }
 
-  // Utility
-  if (bhk >= 3) {
+  // ── Utility ──
+  if (actualBhk >= 3 || /utility/i.test(p)) {
     rooms.push({ name: "Utility", type: "utility", areaSqm: 4, zone: "service", mustHaveExteriorWall: false, adjacentTo: ["Kitchen"], preferNear: [] });
     adjacency.push({ roomA: "Kitchen", roomB: "Utility", reason: "service connection" });
+    roomNames.add("utility");
   }
 
-  // Verandah for villas/houses
+  // ── Verandah for villas/houses ──
   if (p.includes("villa") || p.includes("bungalow") || p.includes("house")) {
-    rooms.push({ name: "Verandah", type: "balcony", areaSqm: Math.round(totalArea * 0.06), zone: "public", mustHaveExteriorWall: true, adjacentTo: [], preferNear: ["Living Room", "Living + Dining Room"] });
+    rooms.push({ name: "Verandah", type: "balcony", areaSqm: Math.round(totalArea * 0.04), zone: "public", mustHaveExteriorWall: true, adjacentTo: [], preferNear: ["Living Room", "Living + Dining Room"] });
+    roomNames.add("verandah");
+  }
+
+  // ── Prompt-mentioned specialty rooms ──
+  // Scan the prompt for rooms not yet added
+  const specialtyRooms: Array<{ pattern: RegExp; name: string; type: string; area: number; zone: RoomSpec["zone"]; exterior: boolean; adjTo?: string[] }> = [
+    { pattern: /pooja\s+room|puja\s+room|prayer\s+room|mandir/, name: "Pooja Room", type: "other", area: 4, zone: "private", exterior: false },
+    { pattern: /servant\s+quarter|servants?\s+room|maid.?s?\s+room/, name: "Servant Quarter", type: "other", area: 9.5, zone: "service", exterior: true, adjTo: [] },
+    { pattern: /servant\s+toilet|maid.?s?\s+toilet/, name: "Servant Toilet", type: "bathroom", area: 2.5, zone: "service", exterior: false },
+    { pattern: /staircase|internal\s+staircase/, name: "Staircase", type: "staircase", area: 12, zone: "circulation", exterior: false },
+    { pattern: /terrace(?!\s+garden)/, name: "Terrace", type: "balcony", area: 15, zone: "public", exterior: true },
+    { pattern: /terrace\s+garden/, name: "Terrace Garden", type: "balcony", area: 20, zone: "public", exterior: true },
+    { pattern: /gym|fitness|workout/, name: "Gym", type: "other", area: 15, zone: "private", exterior: true },
+    { pattern: /home\s+theat(?:er|re)/, name: "Home Theater", type: "other", area: 20, zone: "private", exterior: false },
+    { pattern: /library|reading\s+room/, name: "Library", type: "other", area: 12, zone: "private", exterior: true },
+    { pattern: /study\s+room|study(?!\s)/, name: "Study", type: "office", area: 11, zone: "private", exterior: true },
+    { pattern: /walk[- ]?in\s+(?:closet|wardrobe)/, name: "Walk-in Closet", type: "storage", area: 5, zone: "private", exterior: false, adjTo: ["Master Bedroom"] },
+    { pattern: /balcony/, name: "Balcony", type: "balcony", area: 5, zone: "public", exterior: true },
+    { pattern: /foyer|entrance\s+(?:hall|area)/, name: "Foyer", type: "entrance", area: 6, zone: "circulation", exterior: true },
+    { pattern: /swimming\s+pool|pool/, name: "Swimming Pool", type: "other", area: 30, zone: "public", exterior: true },
+    { pattern: /store\s*room/, name: "Store Room", type: "storage", area: 4, zone: "service", exterior: false },
+    { pattern: /shoe\s+(?:rack|cabinet)/, name: "Shoe Rack", type: "storage", area: 2, zone: "circulation", exterior: false },
+    { pattern: /family\s+(?:lounge|room)|tv\s+lounge/, name: "Family Lounge", type: "living", area: 15, zone: "private", exterior: true },
+  ];
+
+  for (const sr of specialtyRooms) {
+    if (sr.pattern.test(p) && !roomNames.has(sr.name.toLowerCase())) {
+      rooms.push({ name: sr.name, type: sr.type, areaSqm: sr.area, zone: sr.zone, mustHaveExteriorWall: sr.exterior, adjacentTo: sr.adjTo ?? [], preferNear: [] });
+      roomNames.add(sr.name.toLowerCase());
+    }
+  }
+
+  // "servant quarter with toilet" → create adjacency
+  if (/servant\s+quarter\s*[\w\s]*(?:with|attached)\s*(?:\w+\s+)?toilet/i.test(p)) {
+    if (roomNames.has("servant quarter") && !roomNames.has("servant toilet")) {
+      rooms.push({ name: "Servant Toilet", type: "bathroom", areaSqm: 2.5, zone: "service", mustHaveExteriorWall: false, adjacentTo: ["Servant Quarter"], preferNear: [] });
+      roomNames.add("servant toilet");
+    }
+    adjacency.push({ roomA: "Servant Quarter", roomB: "Servant Toilet", reason: "attached bath" });
+  }
+
+  // Walk-in closet "for master bedroom" adjacency
+  if (roomNames.has("walk-in closet") && roomNames.has("master bedroom")) {
+    adjacency.push({ roomA: "Walk-in Closet", roomB: "Master Bedroom", reason: "attached closet" });
+  }
+
+  // ── Parking ──
+  if (parkingCars > 0 && !roomNames.has("car parking") && !roomNames.has("garage")) {
+    rooms.push({ name: "Parking", type: "other", areaSqm: parkingCars * 15, zone: "service", mustHaveExteriorWall: true, adjacentTo: [], preferNear: ["Foyer"] });
+    roomNames.add("parking");
   }
 
   // Multi-floor: assign floor numbers and add staircases

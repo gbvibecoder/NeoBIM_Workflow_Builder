@@ -14,6 +14,7 @@ import {
   wallLength, lineDirection, perpendicularLeft, addPoints, scalePoint,
   polygonBounds, polygonCentroid, wallAngle,
 } from "@/features/floor-plan/lib/geometry";
+import type { TemplateConnection } from "@/features/floor-plan/lib/typology-templates";
 
 // ============================================================
 // ID GENERATOR
@@ -268,6 +269,87 @@ function computeDoorSymbol(
 }
 
 // ============================================================
+// CIRCULATION PRIORITY RULES
+// ============================================================
+
+/**
+ * For each room type, the ordered priority list of neighbor types to prefer
+ * when choosing which wall gets the door. First match wins.
+ */
+const DOOR_WALL_PRIORITY: Partial<Record<string, string[]>> = {
+  bedroom: ["corridor", "hallway", "passage", "foyer"],
+  master_bedroom: ["corridor", "hallway", "passage", "foyer"],
+  guest_bedroom: ["corridor", "hallway", "passage", "foyer"],
+  children_bedroom: ["corridor", "hallway", "passage", "foyer"],
+
+  bathroom: ["bedroom", "master_bedroom", "guest_bedroom", "corridor", "hallway"],
+  master_bathroom: ["master_bedroom", "corridor", "hallway"],
+  toilet: ["corridor", "hallway", "passage", "foyer"],
+  powder_room: ["foyer", "corridor", "hallway"],
+
+  kitchen: ["dining_room", "corridor", "living_room", "hallway"],
+  living_room: ["foyer", "entrance_lobby", "corridor", "dining_room"],
+  dining_room: ["living_room", "kitchen", "corridor"],
+
+  utility: ["kitchen", "corridor", "hallway"],
+  laundry: ["kitchen", "utility", "corridor"],
+  store_room: ["kitchen", "corridor", "utility"],
+  servant_quarter: ["corridor", "hallway"],
+
+  balcony: ["living_room", "master_bedroom", "bedroom", "dining_room"],
+  verandah: ["living_room", "foyer", "corridor"],
+  terrace: ["corridor", "living_room", "bedroom"],
+
+  study: ["corridor", "hallway", "passage"],
+  home_office: ["corridor", "hallway", "passage"],
+  puja_room: ["corridor", "foyer", "living_room"],
+};
+
+/**
+ * Door position preference along the wall (mm from start).
+ * Bedrooms/bathrooms: near corner (leaves long wall for furniture).
+ * Kitchen: center (doesn't block counter).
+ * Living room: golden ratio position.
+ */
+function getPreferredDoorOffset(
+  roomType: string,
+  wLen: number,
+  doorWidth: number,
+): number | null {
+  const minFromCorner = 200;
+  const maxPos = wLen - doorWidth - minFromCorner;
+  if (maxPos < minFromCorner) return null;
+
+  switch (roomType) {
+    case "bedroom":
+    case "master_bedroom":
+    case "guest_bedroom":
+    case "children_bedroom":
+      // Near corner — leaves long wall for bed/wardrobe
+      return minFromCorner + 100; // 300mm from wall start
+
+    case "bathroom":
+    case "master_bathroom":
+    case "toilet":
+    case "powder_room":
+      // Near corner — leaves wall for fixtures
+      return minFromCorner;
+
+    case "kitchen":
+      // Center — doesn't block counter runs
+      return Math.round((wLen - doorWidth) / 2);
+
+    case "living_room":
+    case "drawing_room":
+      // Golden ratio from one end — creates balanced entry sight line
+      return Math.round(Math.min((wLen - doorWidth) * 0.382, maxPos));
+
+    default:
+      return null; // use default sweep logic
+  }
+}
+
+// ============================================================
 // SMART DOOR PLACEMENT
 // ============================================================
 
@@ -282,16 +364,33 @@ export interface DoorPlacementResult {
   issues: PlacementIssue[];
 }
 
-export function smartPlaceDoors(floor: Floor): DoorPlacementResult {
+/**
+ * Smart door placement with circulation-flow awareness.
+ *
+ * @param floor - The floor to place doors on (rooms + walls must be set)
+ * @param connections - Optional template connections (from TypologyTemplate)
+ *                      to guide which room pairs get doors and on which walls
+ */
+export function smartPlaceDoors(
+  floor: Floor,
+  connections?: TemplateConnection[],
+): DoorPlacementResult {
   const graph = buildAdjacencyGraph(floor);
   const doors: Door[] = [];
   const issues: PlacementIssue[] = [];
   const usedWallSegments: Map<string, Array<{ start: number; end: number }>> = new Map();
-
-  // Track which room pairs already have doors
   const connectedPairs = new Set<string>();
 
-  // 1. Find main entrance — exterior wall of lobby/foyer/living, or largest public room
+  // Build name→Room and type→Room[] lookups for connection matching
+  const roomByName = new Map<string, Room>();
+  const roomsByType = new Map<string, Room[]>();
+  for (const r of floor.rooms) {
+    roomByName.set(r.name, r);
+    if (!roomsByType.has(r.type)) roomsByType.set(r.type, []);
+    roomsByType.get(r.type)!.push(r);
+  }
+
+  // ── 1. Main entrance ──
   const entranceRoom = floor.rooms.find((r) => r.type === "foyer" || r.type === "lobby")
     ?? floor.rooms.find((r) => r.type === "living_room")
     ?? floor.rooms.filter((r) => isType(r.type, PUBLIC)).sort((a, b) => b.area_sqm - a.area_sqm)[0]
@@ -315,12 +414,19 @@ export function smartPlaceDoors(floor: Floor): DoorPlacementResult {
     }
   }
 
-  // 2. Place doors for all adjacency edges that should be connected
+  // ── 2. Connection-guided door placement (when template connections available) ──
+  if (connections && connections.length > 0) {
+    placeDoorsFromConnections(connections, floor, graph, doors, issues, usedWallSegments, connectedPairs, roomsByType);
+  }
+
+  // ── 3. Circulation-priority door placement (for any remaining unconnected rooms) ──
+  placeDoorsFromPriority(floor, graph, doors, issues, usedWallSegments, connectedPairs);
+
+  // ── 4. Fallback: standard adjacency-based placement for still-unconnected pairs ──
   for (const edge of graph.edges) {
     const roomA = floor.rooms.find((r) => r.id === edge.roomAId);
     const roomB = floor.rooms.find((r) => r.id === edge.roomBId);
     if (!roomA || !roomB) continue;
-
     if (!shouldConnect(roomA.type, roomB.type)) continue;
 
     const pairKey = [edge.roomAId, edge.roomBId].sort().join("|");
@@ -330,7 +436,8 @@ export function smartPlaceDoors(floor: Floor): DoorPlacementResult {
     if (!wall) continue;
 
     const doorWidth = getDoorWidthForConnection(roomA.type, roomB.type);
-    const pos = findDoorPosition(wall, doorWidth, usedWallSegments, floor);
+    const posType = isType(roomA.type, CIRCULATION) ? roomB.type : roomA.type;
+    const pos = findDoorPositionForRoom(wall, doorWidth, posType, usedWallSegments, floor);
     if (pos === null) {
       issues.push({ severity: "warning", message: `Cannot fit door between ${roomA.name} and ${roomB.name} — wall too short or occupied` });
       continue;
@@ -345,25 +452,23 @@ export function smartPlaceDoors(floor: Floor): DoorPlacementResult {
     connectedPairs.add(pairKey);
   }
 
-  // 3. Check connectivity — ensure all rooms are reachable, auto-fix with fallback doors
+  // ── 5. Connectivity guarantee — ensure all rooms are reachable ──
   const tempFloor = { ...floor, doors };
   const unreachable = findUnreachableRooms(tempFloor);
   for (const roomId of unreachable) {
     const room = floor.rooms.find((r) => r.id === roomId);
     if (!room) continue;
 
-    // Try to find a shared wall with any reachable room and place a fallback door
     let fixed = false;
     for (const edge of graph.edges) {
       const isEdgeForRoom = edge.roomAId === roomId || edge.roomBId === roomId;
       if (!isEdgeForRoom) continue;
       const otherRoomId = edge.roomAId === roomId ? edge.roomBId : edge.roomAId;
-      // Check if the other room is reachable (not in unreachable list)
       if (unreachable.includes(otherRoomId)) continue;
 
       const wall = floor.walls.find((w) => w.id === edge.wallId);
       if (!wall) continue;
-      const doorWidth = 800; // Standard fallback width
+      const doorWidth = 800;
       const pos = findDoorPosition(wall, doorWidth, usedWallSegments, floor);
       if (pos === null) continue;
 
@@ -391,10 +496,231 @@ export function smartPlaceDoors(floor: Floor): DoorPlacementResult {
     }
   }
 
-  // 4. Check for swing conflicts (doors on same wall whose arcs overlap)
+  // ── 6. Post-placement validation ──
   checkSwingConflicts(doors, floor, issues);
+  validateDoorPrivacy(doors, floor, issues);
 
   return { doors, issues };
+}
+
+// ============================================================
+// CONNECTION-GUIDED DOOR PLACEMENT
+// ============================================================
+
+/**
+ * Place doors guided by template connections (slot-based topology).
+ * Template connections use slot IDs (e.g., "bedroom1", "corridor").
+ * We match them to CAD rooms by type since slot IDs aren't preserved in CAD.
+ */
+function placeDoorsFromConnections(
+  connections: TemplateConnection[],
+  floor: Floor,
+  graph: AdjacencyGraph,
+  doors: Door[],
+  issues: PlacementIssue[],
+  usedWallSegments: Map<string, Array<{ start: number; end: number }>>,
+  connectedPairs: Set<string>,
+  roomsByType: Map<string, Room[]>,
+): void {
+  // Build a slot-to-roomType mapping from the connections
+  // Slot IDs like "bedroom1", "bath2", "living" map to room types
+  const slotToType = buildSlotTypeMap();
+
+  // Track which rooms have been used for each slot (to handle "bedroom1" vs "bedroom2")
+  const usedRoomsForType = new Map<string, Set<string>>();
+
+  // Sort connections: required first, then by connection type (door before open/adjacent)
+  const sorted = [...connections]
+    .filter(c => c.type === 'door')
+    .sort((a, b) => (b.required ? 1 : 0) - (a.required ? 1 : 0));
+
+  for (const conn of sorted) {
+    const typeFrom = slotToType.get(conn.from);
+    const typeTo = slotToType.get(conn.to);
+    if (!typeFrom || !typeTo) continue;
+
+    // Find actual rooms matching these types
+    const roomFrom = findUnusedRoom(typeFrom, roomsByType, usedRoomsForType);
+    const roomTo = findUnusedRoom(typeTo, roomsByType, usedRoomsForType);
+    if (!roomFrom || !roomTo) continue;
+
+    const pairKey = [roomFrom.id, roomTo.id].sort().join("|");
+    if (connectedPairs.has(pairKey)) continue;
+
+    // Find the shared wall between these rooms
+    const sharedEdge = graph.edges.find(
+      e => (e.roomAId === roomFrom.id && e.roomBId === roomTo.id) ||
+           (e.roomAId === roomTo.id && e.roomBId === roomFrom.id),
+    );
+    if (!sharedEdge) continue;
+
+    const wall = floor.walls.find(w => w.id === sharedEdge.wallId);
+    if (!wall) continue;
+
+    const doorWidth = getDoorWidthForConnection(roomFrom.type, roomTo.type);
+    // Use the non-circulation room's type for position preference (e.g., bedroom → near corner)
+    const posRoomType = isType(roomFrom.type, CIRCULATION) ? roomTo.type : roomFrom.type;
+    const pos = findDoorPositionForRoom(wall, doorWidth, posRoomType, usedWallSegments, floor);
+    if (pos === null) continue;
+
+    const doorType = getDoorType(roomFrom.type, roomTo.type, false);
+    const { swing, opensTo } = computeSwingDirection(roomFrom, roomTo, wall);
+
+    const door = createDoor(wall, pos, doorWidth, doorType, [roomFrom.id, roomTo.id], { swing, opensTo });
+    doors.push(door);
+    markUsed(wall.id, pos, doorWidth, usedWallSegments);
+    connectedPairs.add(pairKey);
+
+    // Mark these rooms as used for their slot
+    markRoomUsed(typeFrom, roomFrom.id, usedRoomsForType);
+    markRoomUsed(typeTo, roomTo.id, usedRoomsForType);
+  }
+}
+
+/** Map template slot IDs to canonical room types */
+function buildSlotTypeMap(): Map<string, string> {
+  const map = new Map<string, string>();
+  // Standard slot IDs used across all templates
+  const slotPatterns: Record<string, string> = {
+    bedroom1: "master_bedroom", bedroom2: "bedroom", bedroom3: "bedroom",
+    bedroom4: "bedroom", bedroom5: "bedroom",
+    bath1: "master_bathroom", bath2: "bathroom", bath3: "bathroom",
+    bath4: "bathroom", bath5: "bathroom",
+    living: "living_room", dining: "dining_room", kitchen: "kitchen",
+    corridor: "corridor", balcony: "balcony", utility: "utility",
+    pooja: "puja_room", staircase: "staircase",
+    servant: "servant_quarter", servant_bath: "servant_toilet",
+    drawing: "drawing_room", terrace: "terrace",
+    study: "study", foyer: "foyer",
+    // Commercial
+    cabin1: "cabin", cabin2: "cabin", conference: "conference_room",
+    workspace: "open_workspace", reception: "reception",
+    waiting: "waiting_area", toilet: "commercial_toilet",
+    pantry: "pantry", server: "server_room", breakroom: "break_room",
+    parking: "parking",
+  };
+  for (const [slot, type] of Object.entries(slotPatterns)) {
+    map.set(slot, type);
+  }
+  return map;
+}
+
+function findUnusedRoom(
+  roomType: string,
+  roomsByType: Map<string, Room[]>,
+  usedRooms: Map<string, Set<string>>,
+): Room | null {
+  const candidates = roomsByType.get(roomType);
+  if (!candidates) return null;
+  const used = usedRooms.get(roomType);
+  for (const room of candidates) {
+    if (!used || !used.has(room.id)) return room;
+  }
+  // All used — return first anyway (allow reuse for shared connections)
+  return candidates[0] ?? null;
+}
+
+function markRoomUsed(
+  roomType: string,
+  roomId: string,
+  usedRooms: Map<string, Set<string>>,
+): void {
+  if (!usedRooms.has(roomType)) usedRooms.set(roomType, new Set());
+  usedRooms.get(roomType)!.add(roomId);
+}
+
+// ============================================================
+// CIRCULATION-PRIORITY DOOR PLACEMENT
+// ============================================================
+
+/**
+ * For rooms not yet connected by the template path, use DOOR_WALL_PRIORITY
+ * to pick the best neighbor type for door placement.
+ */
+function placeDoorsFromPriority(
+  floor: Floor,
+  graph: AdjacencyGraph,
+  doors: Door[],
+  issues: PlacementIssue[],
+  usedWallSegments: Map<string, Array<{ start: number; end: number }>>,
+  connectedPairs: Set<string>,
+): void {
+  for (const room of floor.rooms) {
+    // Skip if room already has at least one door
+    const alreadyConnected = doors.some(d =>
+      d.connects_rooms.includes(room.id),
+    );
+    if (alreadyConnected) continue;
+
+    const priorities = DOOR_WALL_PRIORITY[room.type];
+    if (!priorities) continue;
+
+    const adjacentIds = graph.adjacencyMap.get(room.id) ?? [];
+    let placed = false;
+
+    // Try each priority neighbor type in order
+    for (const prefType of priorities) {
+      if (placed) break;
+      for (const adjId of adjacentIds) {
+        if (placed) break;
+        const adjRoom = floor.rooms.find(r => r.id === adjId);
+        if (!adjRoom || adjRoom.type !== prefType) continue;
+
+        const pairKey = [room.id, adjRoom.id].sort().join("|");
+        if (connectedPairs.has(pairKey)) { placed = true; break; }
+
+        // Find the shared wall
+        const edge = graph.edges.find(e =>
+          (e.roomAId === room.id && e.roomBId === adjRoom.id) ||
+          (e.roomAId === adjRoom.id && e.roomBId === room.id),
+        );
+        if (!edge) continue;
+
+        const wall = floor.walls.find(w => w.id === edge.wallId);
+        if (!wall) continue;
+
+        const doorWidth = getDoorWidthForConnection(room.type, adjRoom.type);
+        const pos = findDoorPositionForRoom(wall, doorWidth, room.type, usedWallSegments, floor);
+        if (pos === null) continue;
+
+        const doorType = getDoorType(room.type, adjRoom.type, false);
+        const { swing, opensTo } = computeSwingDirection(room, adjRoom, wall);
+
+        const door = createDoor(wall, pos, doorWidth, doorType, [room.id, adjRoom.id], { swing, opensTo });
+        doors.push(door);
+        markUsed(wall.id, pos, doorWidth, usedWallSegments);
+        connectedPairs.add(pairKey);
+        placed = true;
+      }
+    }
+  }
+}
+
+// ============================================================
+// POST-PLACEMENT VALIDATION
+// ============================================================
+
+/** Check that no bathroom door opens directly into a public living/dining area */
+function validateDoorPrivacy(doors: Door[], floor: Floor, issues: PlacementIssue[]): void {
+  for (const door of doors) {
+    const [idA, idB] = door.connects_rooms;
+    const roomA = floor.rooms.find(r => r.id === idA);
+    const roomB = floor.rooms.find(r => r.id === idB);
+    if (!roomA || !roomB) continue;
+
+    const hasBath = isType(roomA.type, WET) || isType(roomB.type, WET);
+    const hasPublic = isType(roomA.type, PUBLIC) || isType(roomB.type, PUBLIC);
+
+    if (hasBath && hasPublic) {
+      const bathRoom = isType(roomA.type, WET) ? roomA : roomB;
+      const pubRoom = isType(roomA.type, PUBLIC) ? roomA : roomB;
+      issues.push({
+        severity: "warning",
+        message: `Bathroom "${bathRoom.name}" door opens into public room "${pubRoom.name}" — privacy concern`,
+        roomId: bathRoom.id,
+      });
+    }
+  }
 }
 
 // ============================================================
@@ -498,6 +824,51 @@ function findDoorPosition(
   }
 
   return bestPos;
+}
+
+/**
+ * Find door position with room-type-aware preference.
+ *
+ * Uses getPreferredDoorOffset() to bias position (e.g., bedrooms near corner,
+ * kitchens centered), then falls back to the standard sweep if the preferred
+ * position is blocked.
+ */
+function findDoorPositionForRoom(
+  wall: Wall,
+  doorWidth: number,
+  roomType: string,
+  usedSegments: Map<string, Array<{ start: number; end: number }>>,
+  floor: Floor,
+): number | null {
+  const wLen = wallLength(wall);
+  const preferred = getPreferredDoorOffset(roomType, wLen, doorWidth);
+
+  if (preferred !== null) {
+    // Check if preferred position is clear
+    const MIN_GAP = 100;
+    const used = usedSegments.get(wall.id) ?? [];
+    const existingOnWall = [
+      ...floor.doors.filter(d => d.wall_id === wall.id).map(d => ({
+        start: d.position_along_wall_mm, end: d.position_along_wall_mm + d.width_mm,
+      })),
+      ...floor.windows.filter(w => w.wall_id === wall.id).map(w => ({
+        start: w.position_along_wall_mm, end: w.position_along_wall_mm + w.width_mm,
+      })),
+      ...used,
+    ];
+
+    const doorStart = preferred;
+    const doorEnd = preferred + doorWidth;
+    const fits = existingOnWall.every(
+      seg => doorEnd + MIN_GAP <= seg.start || doorStart >= seg.end + MIN_GAP,
+    );
+    if (fits && doorStart >= 200 && doorEnd <= wLen - 200) {
+      return preferred;
+    }
+  }
+
+  // Fall back to standard sweep
+  return findDoorPosition(wall, doorWidth, usedSegments, floor);
 }
 
 function markUsed(wallId: string, pos: number, width: number, map: Map<string, Array<{ start: number; end: number }>>) {
@@ -795,4 +1166,268 @@ export function smartPlaceWindows(floor: Floor): WindowPlacementResult {
   }
 
   return { windows, issues };
+}
+
+// ============================================================
+// ENHANCED VALIDATION — Phase 5 additions
+// ============================================================
+
+/**
+ * Validate door swing arcs against walls and other doors.
+ * IS:962 compliance — swing arcs must not collide with any obstacle.
+ *
+ * @returns Issues found during validation
+ */
+export function validateDoorSwingArcs(floor: Floor): PlacementIssue[] {
+  const issues: PlacementIssue[] = [];
+
+  for (let i = 0; i < floor.doors.length; i++) {
+    const door = floor.doors[i];
+    if (door.type === "sliding" || door.type === "pocket") continue; // no swing arc
+
+    const wall = floor.walls.find(w => w.id === door.wall_id);
+    if (!wall) continue;
+
+    const arcRadius = door.width_mm;
+
+    // Check against other doors on the same wall
+    for (let j = i + 1; j < floor.doors.length; j++) {
+      const other = floor.doors[j];
+      if (other.wall_id !== door.wall_id) continue;
+
+      // Check if swing arcs overlap
+      const doorCenter = door.position_along_wall_mm + door.width_mm / 2;
+      const otherCenter = other.position_along_wall_mm + other.width_mm / 2;
+      const minDist = (door.width_mm + other.width_mm) / 2 + 100; // 100mm clearance
+
+      if (Math.abs(doorCenter - otherCenter) < minDist) {
+        issues.push({
+          severity: "warning",
+          message: `Door swing conflict: ${door.id} and ${other.id} on same wall — arcs overlap. Consider sliding door.`,
+        });
+      }
+    }
+
+    // Check door-to-corner minimum distance
+    const wLen = wallLength(wall);
+    const doorStart = door.position_along_wall_mm;
+    const doorEnd = doorStart + door.width_mm;
+    const MIN_CORNER_DIST = door.type === "main_entrance" ? 300 : 200; // IS:962
+
+    if (doorStart < MIN_CORNER_DIST) {
+      issues.push({
+        severity: "warning",
+        message: `Door ${door.id} is ${doorStart}mm from wall start — minimum ${MIN_CORNER_DIST}mm from corner required (IS:962)`,
+      });
+    }
+    if (wLen - doorEnd < MIN_CORNER_DIST) {
+      issues.push({
+        severity: "warning",
+        message: `Door ${door.id} is ${Math.round(wLen - doorEnd)}mm from wall end — minimum ${MIN_CORNER_DIST}mm from corner required`,
+      });
+    }
+  }
+
+  return issues;
+}
+
+/**
+ * Validate egress door requirements.
+ * NBC 2016 Part 4 — door swing direction based on occupancy and room type.
+ */
+export function validateEgressDoors(floor: Floor): PlacementIssue[] {
+  const issues: PlacementIssue[] = [];
+
+  for (const door of floor.doors) {
+    const connectedRooms = door.connects_rooms.map(id =>
+      floor.rooms.find(r => r.id === id)
+    ).filter(Boolean) as Room[];
+
+    // Rooms >50 sqm: door should swing outward (direction of travel)
+    for (const room of connectedRooms) {
+      if (room.area_sqm > 50 && door.opens_to === "inside") {
+        issues.push({
+          severity: "warning",
+          message: `${room.name} (${room.area_sqm.toFixed(1)} sqm) > 50 sqm — door should swing outward for egress (NBC Part 4)`,
+          roomId: room.id,
+        });
+      }
+    }
+
+    // Bathrooms: should swing outward or be sliding (emergency access)
+    const wetRoom = connectedRooms.find(r => isType(r.type, WET));
+    if (wetRoom && door.opens_to === "inside" && door.type !== "sliding") {
+      // Only warn if it swings INTO the wet room (which blocks emergency access)
+      // The computeSwingDirection already handles this, but validate it
+      issues.push({
+        severity: "info",
+        message: `${wetRoom.name}: bathroom door should swing outward or be sliding for emergency access (IS:962)`,
+        roomId: wetRoom.id,
+      });
+    }
+  }
+
+  return issues;
+}
+
+/**
+ * Validate window sill heights per room type.
+ * NBC 2016 + IS:1038 compliance.
+ */
+export function validateWindowSillHeights(floor: Floor): PlacementIssue[] {
+  const issues: PlacementIssue[] = [];
+
+  for (const win of floor.windows) {
+    const wall = floor.walls.find(w => w.id === win.wall_id);
+    if (!wall) continue;
+
+    // Find the room this window belongs to
+    const roomId = wall.left_room_id ?? wall.right_room_id;
+    const room = roomId ? floor.rooms.find(r => r.id === roomId) : null;
+    if (!room) continue;
+
+    const sill = win.sill_height_mm;
+
+    // Bedrooms: sill ≤ 1000mm for egress
+    if (isType(room.type, PRIVATE) && sill > 1000) {
+      issues.push({
+        severity: "warning",
+        message: `${room.name}: window sill ${sill}mm exceeds 1000mm max for bedroom egress (NBC §8.4)`,
+        roomId: room.id,
+      });
+    }
+
+    // Bathrooms: sill ≥ 1200mm for privacy
+    if (isType(room.type, WET) && sill < 1200) {
+      issues.push({
+        severity: "info",
+        message: `${room.name}: bathroom window sill ${sill}mm — recommend ≥1200mm for privacy`,
+        roomId: room.id,
+      });
+    }
+
+    // Staircases: sill ≥ 1000mm for fall prevention
+    if (room.type === "staircase" && sill < 1000) {
+      issues.push({
+        severity: "warning",
+        message: `${room.name}: staircase window sill ${sill}mm — must be ≥1000mm for fall prevention`,
+        roomId: room.id,
+      });
+    }
+  }
+
+  return issues;
+}
+
+/**
+ * Validate that every bedroom has at least one egress window.
+ * NBC 2016 — safety critical requirement.
+ *
+ * Egress window: clear opening ≥ 500mm wide AND ≥ 500mm tall, sill ≤ 1000mm.
+ */
+export function validateEgressWindows(floor: Floor): PlacementIssue[] {
+  const issues: PlacementIssue[] = [];
+
+  const bedrooms = floor.rooms.filter(r => isType(r.type, PRIVATE));
+
+  for (const bedroom of bedrooms) {
+    const roomWallIds = new Set(bedroom.wall_ids);
+    const roomWindows = floor.windows.filter(w => {
+      const wall = floor.walls.find(wl => wl.id === w.wall_id);
+      if (!wall) return false;
+      return roomWallIds.has(wall.id) || wall.left_room_id === bedroom.id || wall.right_room_id === bedroom.id;
+    });
+
+    // Check if at least one window meets egress requirements
+    const hasEgressWindow = roomWindows.some(w =>
+      w.width_mm >= 500 && w.height_mm >= 500 && w.sill_height_mm <= 1000
+    );
+
+    if (!hasEgressWindow) {
+      issues.push({
+        severity: "error",
+        message: `${bedroom.name}: no egress window found. Every bedroom MUST have a window ≥500×500mm with sill ≤1000mm (NBC fire safety)`,
+        roomId: bedroom.id,
+      });
+    }
+  }
+
+  return issues;
+}
+
+/**
+ * Check ventilation operable area requirement.
+ * NBC 2016 §8.4.7 — openable area ≥ floor_area/20.
+ */
+export function validateOperableWindowArea(floor: Floor): PlacementIssue[] {
+  const issues: PlacementIssue[] = [];
+
+  for (const room of floor.rooms) {
+    if (!room.ventilation_required) continue;
+    if (isType(room.type, CIRCULATION)) continue;
+
+    const roomWallIds = new Set(room.wall_ids);
+    const roomWindows = floor.windows.filter(w => {
+      const wall = floor.walls.find(wl => wl.id === w.wall_id);
+      if (!wall) return false;
+      return roomWallIds.has(wall.id) || wall.left_room_id === room.id || wall.right_room_id === room.id;
+    });
+
+    // Calculate operable window area (only operable windows count)
+    const operableArea = roomWindows
+      .filter(w => w.operable)
+      .reduce((s, w) => s + (w.width_mm * w.height_mm) / 1_000_000, 0); // sqm
+
+    const minRequired = room.area_sqm / 20; // NBC §8.4.7
+
+    if (operableArea < minRequired && room.area_sqm > 0) {
+      issues.push({
+        severity: "warning",
+        message: `${room.name}: operable window area ${operableArea.toFixed(2)} sqm < required ${minRequired.toFixed(2)} sqm (floor_area/20, NBC §8.4.7)`,
+        roomId: room.id,
+      });
+    }
+  }
+
+  return issues;
+}
+
+/**
+ * Get door width for a connection, considering double-door rules.
+ * IS:962 — main entrance ≥1200mm uses double leaf.
+ */
+export function getEnhancedDoorWidth(typeA: RoomType, typeB: RoomType, isMainEntrance: boolean, roomArea?: number): { width: number; isDouble: boolean } {
+  if (isMainEntrance) {
+    return { width: 1200, isDouble: true }; // 2 × 600mm leaves
+  }
+
+  // Conference/board room > 20 sqm: double door
+  if (roomArea && roomArea > 20) {
+    if (typeA === "conference_room" || typeB === "conference_room" ||
+        typeA === "board_room" || typeB === "board_room") {
+      return { width: 1200, isDouble: true };
+    }
+  }
+
+  // Pooja room: traditionally double leaf
+  if (typeA === "puja_room" || typeB === "puja_room") {
+    return { width: 1000, isDouble: true };
+  }
+
+  // Standard sizing
+  return { width: getDoorWidthForConnection(typeA, typeB), isDouble: false };
+}
+
+/**
+ * Run all enhanced validations on a floor.
+ * @returns Combined issues from all validations
+ */
+export function runEnhancedPlacementValidation(floor: Floor): PlacementIssue[] {
+  return [
+    ...validateDoorSwingArcs(floor),
+    ...validateEgressDoors(floor),
+    ...validateWindowSillHeights(floor),
+    ...validateEgressWindows(floor),
+    ...validateOperableWindowArea(floor),
+  ];
 }

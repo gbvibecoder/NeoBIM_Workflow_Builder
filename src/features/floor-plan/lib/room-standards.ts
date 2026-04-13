@@ -1,6 +1,10 @@
 /**
  * Architectural Room Standards
  *
+ * @deprecated Use architectural-rules.ts ROOM_RULES instead.
+ * This file is kept for backward compatibility with existing code that imports
+ * getRoomStandard, getMinDimMeters, getMinDepthMeters.
+ *
  * Furniture-aware minimum dimensions per room type.
  * Based on: IS:7933 (Ergonomics), NBC 2016 Part 3, Neufert Architects' Data (metric),
  * and the furniture catalog dimensions in furniture-catalog.ts.

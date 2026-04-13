@@ -19,10 +19,41 @@ import {
   extractMentionedRooms,
 } from "@/features/floor-plan/lib/ai-room-programmer";
 import type { EnhancedRoomProgram } from "@/features/floor-plan/lib/ai-room-programmer";
-import { convertGeometryToProject, convertMultiFloorToProject } from "@/features/floor-plan/lib/pipeline-adapter";
-import { layoutMultiFloor, scoreAdjacency } from "@/features/floor-plan/lib/layout-engine";
+import {
+  convertGeometryToProject,
+  convertMultiFloorToProject,
+  buildGeometryFromGrid,
+  convertGridToProject,
+  convertGridFloorCoordinationToProject,
+} from "@/features/floor-plan/lib/pipeline-adapter";
+import { layoutFloorPlan, layoutMultiFloor, scoreAdjacency } from "@/features/floor-plan/lib/layout-engine";
+import { computeGridFromRooms, mapBSPRoomsToGridCells } from "@/features/floor-plan/lib/snap-to-grid";
 import type { FloorPlanGeometry } from "@/features/floor-plan/types/floor-plan";
 import type { FloorPlanProject } from "@/types/floor-plan-cad";
+
+// Grid-first pipeline imports
+import { generateStructuralGrid, optimizeBayDimensions } from "@/features/floor-plan/lib/grid-generator";
+import { assignRoomsToGrid } from "@/features/floor-plan/lib/grid-room-assigner";
+import { generateWallsFromGrid } from "@/features/floor-plan/lib/grid-wall-generator";
+import {
+  validateGrid,
+  validateRoomAssignment,
+  validateWallSystem,
+  validateOpenings,
+  validateFinal,
+  shouldRetry,
+  type ValidationFixAction,
+} from "@/features/floor-plan/lib/generation-validator";
+import { coordinateFloors } from "@/features/floor-plan/lib/multi-floor-coordinator";
+import { checkDesignQuality, type DesignFix } from "@/features/floor-plan/lib/design-quality-checker";
+import { validateInterpretation } from "@/features/floor-plan/lib/ai-room-programmer";
+
+// Template + Optimizer pipeline imports
+import { matchTypology } from "@/features/floor-plan/lib/typology-matcher";
+import { optimizeLayout } from "@/features/floor-plan/lib/layout-optimizer";
+import type { PlacedRoom as OptimizerPlacedRoom } from "@/features/floor-plan/lib/energy-function";
+import { getRoomRule } from "@/features/floor-plan/lib/architectural-rules";
+import { classifyRoom } from "@/features/floor-plan/lib/room-sizer";
 
 // ── Generation Feedback ────────────────────────────────────────────────────
 
@@ -127,8 +158,36 @@ export async function POST(req: NextRequest) {
       logger.debug(`[FAITHFULNESS] All ${mentionedRooms.length} mentioned rooms present in output`);
     }
 
+    // ── Agent 1 Self-Check: validate interpretation ──
+    const interpretation = validateInterpretation(roomProgram, prompt);
+    logger.debug(`[AGENT-1] Confidence: ${(interpretation.confidence * 100).toFixed(0)}%, BHK match: ${interpretation.bedroomCountMatch}, fixes: ${interpretation.fixes.length}`);
+    if (interpretation.fixes.length > 0) {
+      logger.debug(`[AGENT-1] Applied fixes: ${interpretation.fixes.join('; ')}`);
+    }
+
     // Convert to BuildingDescription for Stage 2
     const description = programToDescription(roomProgram);
+
+    // ═══════════════════════════════════════════════════════════════════
+    // MULTI-AGENT PIPELINE (primary path)
+    // Agent 2 (Designer) + Agent 3 (Checker) in a feedback loop.
+    // Falls back to BSP/AI pipeline on failure for backward compatibility.
+    // ═══════════════════════════════════════════════════════════════════
+    try {
+      const gridResult = await runGridFirstPipeline(roomProgram, description.projectName, prompt);
+      if (gridResult) {
+        logger.debug('[GRID-FIRST] Pipeline succeeded — returning grid-based floor plan');
+        return NextResponse.json(gridResult);
+      }
+      logger.debug('[GRID-FIRST] Pipeline returned null — falling back to BSP/AI pipeline');
+    } catch (gridErr) {
+      const msg = gridErr instanceof Error ? gridErr.message : String(gridErr);
+      console.warn(`[GRID-FIRST] Pipeline failed — falling back to BSP/AI pipeline. Error: ${msg}`);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // LEGACY BSP/AI PIPELINE (fallback)
+    // ═══════════════════════════════════════════════════════════════════
 
     // ── Multi-floor: BSP layout engine per floor (single path, no fallbacks) ──
     if (roomProgram.numFloors > 1) {
@@ -267,4 +326,397 @@ export async function POST(req: NextRequest) {
     const message = err instanceof Error ? err.message : String(err);
     return NextResponse.json({ error: message }, { status: 500 });
   }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// GRID-FIRST PIPELINE IMPLEMENTATION
+// ═══════════════════════════════════════════════════════════════════
+
+/**
+ * Multi-agent grid-first pipeline with feedback loop.
+ *
+ * Agent 2 (Designer): grid → assign → optimize bays → walls → project
+ * Agent 3 (Checker): code validation + design quality
+ * Coordinator: if critical issues, apply fixes and re-run Agent 2 (max 3 loops)
+ */
+async function runGridFirstPipeline(
+  roomProgram: EnhancedRoomProgram,
+  projectName: string,
+  originalPrompt: string,
+): Promise<{
+  project: FloorPlanProject;
+  geometry: FloorPlanGeometry;
+  svg: null;
+  feedback: ReturnType<typeof buildFeedback>;
+} | null> {
+  const MAX_GRID_RETRIES = 3;
+  const MAX_DESIGN_LOOPS = 3;
+
+  // Multi-floor path
+  if (roomProgram.numFloors > 1) {
+    return runGridMultiFloor(roomProgram, projectName, originalPrompt);
+  }
+
+  let bestProject: FloorPlanProject | null = null;
+  let bestGeometry: FloorPlanGeometry | null = null;
+  let bestScore = 0;
+  let bestFeedback: ReturnType<typeof buildFeedback> | null = null;
+  let bestDesignReport: ReturnType<typeof checkDesignQuality> | null = null;
+
+  // ── Coordinator outer loop: design iterations ──
+  for (let designLoop = 0; designLoop < MAX_DESIGN_LOOPS; designLoop++) {
+    logger.debug(`[COORDINATOR] Design loop ${designLoop + 1}/${MAX_DESIGN_LOOPS}`);
+
+    // ── Agent 2: Designer — Template + Optimizer → snap to grid ──
+    // Primary path: typology template → SA optimizer → grid snap
+    // Fallback: BSP → grid snap (existing path)
+
+    let layoutRooms: Array<{ name: string; type: string; x: number; y: number; width: number; depth: number }>;
+    let fpWidth: number;
+    let fpDepth: number;
+    let designerSource = 'template';
+
+    const templateMatch = matchTypology(roomProgram);
+
+    if (templateMatch && templateMatch.confidence >= 0.5) {
+      // ── Template path ──
+      logger.debug(`[AGENT-2] Template: ${templateMatch.template.id} (confidence ${templateMatch.confidence.toFixed(2)})`);
+
+      // Convert ScaledRoom[] to PlacedRoom[] for the optimizer
+      const placedRooms: OptimizerPlacedRoom[] = templateMatch.scaledRooms.map(sr => {
+        const spec = roomProgram.rooms.find(r => r.name === sr.name);
+        const cls = classifyRoom(sr.type, sr.name);
+        const rule = getRoomRule(cls);
+        return {
+          id: sr.slotId,
+          name: sr.name,
+          type: sr.type,
+          x: sr.x,
+          y: sr.y,
+          width: sr.width,
+          depth: sr.depth,
+          zone: sr.zone as OptimizerPlacedRoom['zone'],
+          targetArea: spec?.areaSqm ?? sr.width * sr.depth,
+          mustHaveExteriorWall: rule.exteriorWall === 'required',
+        };
+      });
+
+      fpWidth = templateMatch.footprint.width;
+      fpDepth = templateMatch.footprint.depth;
+
+      // Add overflow rooms (rooms in program but not in any template slot)
+      if (templateMatch.overflowRooms.length > 0) {
+        for (const overflowName of templateMatch.overflowRooms) {
+          const spec = roomProgram.rooms.find(r => r.name === overflowName);
+          if (!spec) continue;
+          const cls = classifyRoom(spec.type, spec.name);
+          const rule = getRoomRule(cls);
+          const w = Math.max(rule.width.min, Math.sqrt(spec.areaSqm));
+          const d = Math.max(rule.depth.min, spec.areaSqm / w);
+          placedRooms.push({
+            id: `overflow_${overflowName.toLowerCase().replace(/\s+/g, '_')}`,
+            name: overflowName,
+            type: cls,
+            x: 0,
+            y: 0,
+            width: Math.round(w * 10) / 10,
+            depth: Math.round(d * 10) / 10,
+            zone: (spec.zone as OptimizerPlacedRoom['zone']) ?? 'service',
+            targetArea: spec.areaSqm,
+            mustHaveExteriorWall: rule.exteriorWall === 'required',
+          });
+        }
+        // Expand footprint if needed to fit overflow rooms
+        const totalNeeded = placedRooms.reduce((s, r) => s + r.targetArea, 0);
+        const currentArea = fpWidth * fpDepth;
+        if (totalNeeded > currentArea * 0.9) {
+          const scale = Math.sqrt(totalNeeded / (currentArea * 0.85));
+          fpWidth = Math.round(fpWidth * scale * 10) / 10;
+          fpDepth = Math.round(fpDepth * scale * 10) / 10;
+        }
+      }
+
+      // Run optimizer
+      const optResult = optimizeLayout(placedRooms, { width: fpWidth, depth: fpDepth }, roomProgram);
+      const improvement = optResult.initialEnergy > 0
+        ? ((1 - optResult.energy.total / optResult.initialEnergy) * 100).toFixed(0)
+        : '0';
+      logger.debug(`[AGENT-2] Optimizer: ${optResult.initialEnergy.toFixed(0)} → ${optResult.energy.total.toFixed(0)} (${improvement}% improvement, ${optResult.timeMs.toFixed(0)}ms)`);
+
+      layoutRooms = optResult.rooms.map(r => ({
+        name: r.name, type: r.type, x: r.x, y: r.y, width: r.width, depth: r.depth,
+      }));
+    } else {
+      // ── BSP fallback path ──
+      designerSource = 'bsp';
+      logger.debug(`[AGENT-2] No template match — using BSP seed`);
+      const bspRooms = layoutFloorPlan(roomProgram);
+      if (bspRooms.length === 0) {
+        return bestProject ? { project: bestProject, geometry: bestGeometry!, svg: null, feedback: bestFeedback! } : null;
+      }
+
+      fpWidth = Math.max(...bspRooms.map(r => r.x + r.width));
+      fpDepth = Math.max(...bspRooms.map(r => r.y + r.depth));
+      logger.debug(`[AGENT-2] BSP: ${bspRooms.length} rooms, ${fpWidth.toFixed(1)}m × ${fpDepth.toFixed(1)}m`);
+
+      // Optimize BSP output
+      const placedRooms: OptimizerPlacedRoom[] = bspRooms.map(r => {
+        const cls = classifyRoom(r.type, r.name);
+        const rule = getRoomRule(cls);
+        return {
+          id: r.name.toLowerCase().replace(/\s+/g, '_'),
+          name: r.name,
+          type: cls,
+          x: r.x, y: r.y, width: r.width, depth: r.depth,
+          zone: inferZoneFromType(cls),
+          targetArea: r.area ?? r.width * r.depth,
+          mustHaveExteriorWall: rule.exteriorWall === 'required',
+        };
+      });
+
+      const optResult = optimizeLayout(placedRooms, { width: fpWidth, depth: fpDepth }, roomProgram);
+      logger.debug(`[AGENT-2] BSP+Optimizer: ${optResult.initialEnergy.toFixed(0)} → ${optResult.energy.total.toFixed(0)} (${optResult.timeMs.toFixed(0)}ms)`);
+
+      layoutRooms = optResult.rooms.map(r => ({
+        name: r.name, type: r.type, x: r.x, y: r.y, width: r.width, depth: r.depth,
+      }));
+    }
+
+    // Step B: Snap optimized rooms to structural grid
+    const grid = computeGridFromRooms(layoutRooms, fpWidth, fpDepth);
+    const assignment = mapBSPRoomsToGridCells(grid, layoutRooms);
+    logger.debug(`[AGENT-2] Grid: ${grid.gridCols}×${grid.gridRows} (${grid.cells.length} cells), mapped ${assignment.roomOrder.length} rooms, source: ${designerSource}`);
+
+    // Step C: Generate walls from the structural grid (guaranteed continuous)
+    const wallSystem = generateWallsFromGrid(grid, assignment);
+
+    // Step D: Build geometry + project
+    const geometry = buildGeometryFromGrid(grid, assignment, wallSystem);
+    const project = convertGridToProject(
+      grid, assignment, wallSystem, projectName, originalPrompt,
+      templateMatch?.template.connections,
+    );
+
+    const optimizedGrid = grid; // For feedback
+
+    if (!project) {
+      return bestProject ? { project: bestProject, geometry: bestGeometry!, svg: null, feedback: bestFeedback! } : null;
+    }
+
+    // ── Agent 3: Checker — code compliance + design quality ──
+    const codeReport = validateFinal(project);
+    const designReport = checkDesignQuality(project);
+    const combinedScore = Math.round(codeReport.score * 0.6 + designReport.score * 0.4);
+
+    logger.debug(`[AGENT-3] Code: ${codeReport.score}, Design: ${designReport.score} (${designReport.grade}), Combined: ${combinedScore}`);
+    if (designReport.issues.length > 0) {
+      const criticals = designReport.issues.filter(i => i.severity === 'critical');
+      const warnings = designReport.issues.filter(i => i.severity === 'warning');
+      logger.debug(`[AGENT-3] Design issues: ${criticals.length} critical, ${warnings.length} warnings`);
+    }
+
+    // Track best result
+    if (combinedScore > bestScore) {
+      bestScore = combinedScore;
+      bestProject = project;
+      bestGeometry = geometry;
+      bestDesignReport = designReport;
+      bestFeedback = buildFeedback(project, originalPrompt);
+      bestFeedback.tips.push(`Grid-first layout: ${optimizedGrid.gridCols}×${optimizedGrid.gridRows} structural grid`);
+      bestFeedback.tips.push(`Design quality: ${designReport.grade} (${designReport.score}/100)`);
+      if (codeReport.warnings.length > 0) {
+        bestFeedback.tips.push(`${codeReport.warnings.length} code warning(s) — review in Code panel`);
+      }
+      // Adjacency scoring
+      if (roomProgram.adjacency.length > 0) {
+        const placedRooms = geometry.rooms.map(r => ({
+          name: r.name, type: r.type,
+          x: r.x ?? r.center[0] - r.width / 2,
+          y: r.y ?? r.center[1] - r.depth / 2,
+          width: r.width, depth: r.depth,
+          area: r.area ?? r.width * r.depth,
+        }));
+        const adjScore = scoreAdjacency(placedRooms, roomProgram.adjacency);
+        if (adjScore.total > 0) {
+          bestFeedback.adjacency_score = {
+            total: adjScore.total, satisfied: adjScore.satisfied,
+            percentage: Math.round((adjScore.satisfied / adjScore.total) * 100),
+            unsatisfied: adjScore.unsatisfied.map(u => `${u.roomA} ↔ ${u.roomB}`),
+          };
+        }
+      }
+    }
+
+    // ── Coordinator: check if good enough or apply fixes ──
+    if (codeReport.critical.length === 0 && designReport.score >= 70) {
+      logger.debug(`[COORDINATOR] Score ${combinedScore} meets threshold — accepting`);
+      break;
+    }
+
+    // Collect fix actions from both reports
+    const fixes: Array<ValidationFixAction | DesignFix> = [];
+    for (const issue of codeReport.critical) {
+      if (issue.fixAction) fixes.push(issue.fixAction);
+    }
+    for (const issue of designReport.issues) {
+      if (issue.severity === 'critical' && issue.fixAction) fixes.push(issue.fixAction);
+    }
+
+    if (fixes.length === 0) {
+      logger.debug(`[COORDINATOR] No actionable fixes — using best result`);
+      break;
+    }
+
+    // Apply fixes to room program for next design iteration
+    logger.debug(`[COORDINATOR] Applying ${fixes.length} fixes for next iteration`);
+    for (const fix of fixes) {
+      applyFixToProgram(roomProgram, fix);
+    }
+  }
+
+  if (!bestProject || !bestGeometry || !bestFeedback) return null;
+
+  // Add design issues to feedback if any
+  if (bestDesignReport) {
+    const critDesign = bestDesignReport.issues.filter(i => i.severity === 'critical');
+    for (const issue of critDesign) {
+      bestFeedback.tips.push(`Design: ${issue.message}`);
+    }
+  }
+
+  return { project: bestProject, geometry: bestGeometry, svg: null, feedback: bestFeedback };
+}
+
+/**
+ * Apply a fix action to the room program for the next design iteration.
+ */
+function applyFixToProgram(
+  program: EnhancedRoomProgram,
+  fix: ValidationFixAction | DesignFix,
+): void {
+  switch (fix.type) {
+    case 'resize_room': {
+      const roomName = fix.params.room as string | undefined;
+      const targetArea = fix.params.targetArea as number | undefined;
+      if (roomName && targetArea) {
+        const room = program.rooms.find(r => r.name === roomName);
+        if (room && room.areaSqm < targetArea) {
+          room.areaSqm = targetArea;
+          // Update total area if needed
+          const newTotal = program.rooms.reduce((s, r) => s + r.areaSqm, 0);
+          if (newTotal > program.totalAreaSqm) program.totalAreaSqm = newTotal;
+        }
+      }
+      break;
+    }
+    case 'add_bay':
+      // Inflate total area to force larger grid on next attempt
+      program.totalAreaSqm *= 1.2;
+      break;
+    case 'swap_rooms':
+      // Swap rooms' zone preferences so the Designer places them differently
+      // The room needing perimeter gets zone 'public' (placed near entrance/perimeter)
+      {
+        const roomName = fix.params.room as string | undefined;
+        if (roomName) {
+          const room = program.rooms.find(r => r.name === roomName);
+          if (room) room.mustHaveExteriorWall = true;
+        }
+      }
+      break;
+    case 'add_adjacency': {
+      const roomA = fix.params.roomA as string | undefined;
+      const roomB = fix.params.roomB as string | undefined;
+      const reason = (fix.params.reason as string) ?? 'design quality fix';
+      if (roomA && roomB) {
+        const exists = program.adjacency.some(
+          a => (a.roomA === roomA && a.roomB === roomB) || (a.roomA === roomB && a.roomB === roomA)
+        );
+        if (!exists) {
+          program.adjacency.push({ roomA, roomB, reason });
+        }
+      }
+      break;
+    }
+    case 'move_room_to_perimeter': {
+      const roomName = fix.params.room as string | undefined;
+      if (roomName) {
+        const room = program.rooms.find(r => r.name === roomName);
+        if (room) room.mustHaveExteriorWall = true;
+      }
+      break;
+    }
+    case 'change_bay_size':
+      // Already handled by area inflation in the inner retry loop
+      break;
+  }
+}
+
+/**
+ * Grid-first pipeline for multi-floor buildings.
+ */
+function runGridMultiFloor(
+  roomProgram: EnhancedRoomProgram,
+  projectName: string,
+  originalPrompt: string,
+): {
+  project: FloorPlanProject;
+  geometry: FloorPlanGeometry;
+  svg: null;
+  feedback: ReturnType<typeof buildFeedback>;
+} | null {
+  try {
+    const coordination = coordinateFloors(roomProgram);
+
+    // Optimize bay dimensions per floor, then generate walls
+    const optimizedGrids: typeof coordination.grid[] = [];
+    const wallSystems = coordination.floors.map(fl => {
+      const optGrid = optimizeBayDimensions(coordination.grid, fl.assignment);
+      optimizedGrids.push(optGrid);
+      return generateWallsFromGrid(optGrid, fl.assignment);
+    });
+    // Use the ground floor's optimized grid as the reference
+    const refGrid = optimizedGrids[0] ?? coordination.grid;
+    coordination.grid = refGrid;
+
+    // Convert to project
+    const project = convertGridFloorCoordinationToProject(
+      coordination,
+      wallSystems,
+      projectName,
+      originalPrompt,
+    );
+
+    // Build ground floor geometry for backward-compatible rendering
+    const gf = coordination.floors.find(f => f.level === 0) ?? coordination.floors[0];
+    const geometry = buildGeometryFromGrid(refGrid, gf.assignment, wallSystems[0]);
+
+    const feedback = buildFeedback(project, originalPrompt);
+    feedback.tips.push(`Grid-first layout: ${coordination.grid.gridCols}×${coordination.grid.gridRows} structural grid, ${coordination.floors.length} floors`);
+
+    const finalValidation = validateFinal(project);
+    if (finalValidation.warnings.length > 0) {
+      feedback.tips.push(`${finalValidation.warnings.length} validation warning(s)`);
+    }
+
+    logger.debug('=== GRID-FIRST MULTI-FLOOR OUTPUT ===');
+    logger.debug(`Floors: ${project.floors.length}, Total rooms: ${project.floors.reduce((s, f) => s + f.rooms.length, 0)}`);
+
+    return { project, geometry, svg: null, feedback };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.warn(`[GRID-FIRST] Multi-floor pipeline failed: ${msg}`);
+    return null;
+  }
+}
+
+/**
+ * Infer room zone from classified type (for BSP fallback path).
+ */
+function inferZoneFromType(cls: string): OptimizerPlacedRoom['zone'] {
+  if (['living_room', 'dining_room', 'drawing_room', 'foyer', 'entrance_lobby'].includes(cls)) return 'public';
+  if (['bedroom', 'master_bedroom', 'guest_bedroom', 'children_bedroom', 'study', 'home_office'].includes(cls)) return 'private';
+  if (['corridor', 'hallway', 'passage', 'staircase', 'lift'].includes(cls)) return 'circulation';
+  if (['balcony', 'verandah', 'terrace', 'garden', 'parking', 'car_porch'].includes(cls)) return 'outdoor';
+  return 'service';
 }
