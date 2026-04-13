@@ -60,6 +60,7 @@ const recommendedSchema = z.object({
 
 const optionalSchema = z.object({
   NEXT_PUBLIC_SENTRY_DSN: z.string().optional(),
+  NEXT_PUBLIC_GTM_ID: z.string().optional(),
   NEXT_PUBLIC_GA_MEASUREMENT_ID: z.string().optional(),
   NEXT_PUBLIC_CLARITY_PROJECT_ID: z.string().optional(),
   FAL_KEY: z.string().optional(),

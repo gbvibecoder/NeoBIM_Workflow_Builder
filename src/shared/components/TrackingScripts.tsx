@@ -7,6 +7,7 @@ import { hasTrackingConsent } from "@/lib/cookie-consent";
 
 const GA_MEASUREMENT_ID = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID;
 const CLARITY_PROJECT_ID = process.env.NEXT_PUBLIC_CLARITY_PROJECT_ID;
+const GTM_ID = process.env.NEXT_PUBLIC_GTM_ID;
 
 // Use useSyncExternalStore to avoid setState-in-effect lint error
 function subscribeToConsent(callback: () => void) {
@@ -29,6 +30,19 @@ export function TrackingScripts() {
 
   return (
     <>
+      {/* Google Tag Manager — loaded first so GTM-managed tags fire in order */}
+      {GTM_ID && (
+        <Script id="google-tag-manager" strategy="afterInteractive">
+          {`
+            (function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+            new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+            j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+            'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+            })(window,document,'script','dataLayer','${GTM_ID}');
+          `}
+        </Script>
+      )}
+
       {/* Meta Pixel (Facebook) */}
       <Script id="meta-pixel" strategy="afterInteractive">
         {`

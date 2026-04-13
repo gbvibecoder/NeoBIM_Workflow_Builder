@@ -256,10 +256,36 @@ export default function RootLayout({
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />
-        {/* Tracking scripts (Meta Pixel + GA4) — loaded only after cookie consent */}
+        {/* Google Consent Mode v2 — defaults to denied BEFORE any tags load.
+            When user accepts cookies, cookie-consent.ts pushes a consent update. */}
+        <script
+          dangerouslySetInnerHTML={{ __html: `
+            window.dataLayer=window.dataLayer||[];
+            function gtag(){dataLayer.push(arguments);}
+            gtag('consent','default',{
+              'analytics_storage':'denied',
+              'ad_storage':'denied',
+              'ad_user_data':'denied',
+              'ad_personalization':'denied',
+              'wait_for_update':500
+            });
+          `}}
+        />
+        {/* Tracking scripts (GTM + Meta Pixel + GA4 + Clarity) — loaded only after cookie consent */}
         <TrackingScripts />
       </head>
       <body className={`${dmSans.variable} ${jetbrains.variable} ${syne.variable} ${spaceGrotesk.variable} font-body antialiased`} style={{ background: "#06080C", color: "#F0F4FF" }}>
+        {/* Google Tag Manager (noscript) — fallback for users without JS */}
+        {process.env.NEXT_PUBLIC_GTM_ID && (
+          <noscript>
+            <iframe
+              src={`https://www.googletagmanager.com/ns.html?id=${process.env.NEXT_PUBLIC_GTM_ID}`}
+              height="0"
+              width="0"
+              style={{ display: "none", visibility: "hidden" }}
+            />
+          </noscript>
+        )}
         {/* Skip-to-content link for keyboard/screen reader accessibility (#39) */}
         <a
           href="#main-content"
