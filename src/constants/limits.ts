@@ -17,3 +17,13 @@
  *  a fresh budget per workflow run.
  */
 export const MAX_REGENERATIONS = 3;
+
+/** Execution limits per plan. FREE is lifetime, others are per month. */
+export const PLAN_EXEC_LIMITS: Record<string, number> = {
+  FREE: 3, MINI: 10, STARTER: 30, PRO: 100, TEAM_ADMIN: -1, PLATFORM_ADMIN: -1,
+};
+
+/** Numeric rank for comparing plan tiers. Higher = more features. */
+export const PLAN_RANK: Record<string, number> = {
+  FREE: 0, MINI: 1, STARTER: 2, PRO: 3, TEAM_ADMIN: 4, PLATFORM_ADMIN: 5,
+};
