@@ -937,7 +937,7 @@ function WorkflowCanvasInner({ workflowId: urlWorkflowId, templateId }: Workflow
               >
                 <div className="flex flex-col items-center gap-3">
                   <div className="h-6 w-6 animate-spin rounded-full border-2 border-[#B87333]/20 border-t-[#B87333]" />
-                  <span style={{ fontSize: 11, color: "rgba(184,115,51,0.5)", fontFamily: "'Space Mono', monospace", letterSpacing: "0.1em", textTransform: "uppercase" as const }}>
+                  <span style={{ fontSize: 11, color: "rgba(184,115,51,0.5)", fontFamily: "var(--font-jetbrains), monospace", letterSpacing: "0.1em", textTransform: "uppercase" as const }}>
                     Restoring workflow...
                   </span>
                 </div>
@@ -1007,7 +1007,7 @@ function WorkflowCanvasInner({ workflowId: urlWorkflowId, templateId }: Workflow
                   fontSize: 14,
                   fontWeight: 700,
                   letterSpacing: "0.01em",
-                  fontFamily: "var(--font-inter), -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+                  fontFamily: "var(--font-dm-sans), sans-serif",
                   cursor: "pointer",
                   boxShadow:
                     "0 1px 0 rgba(255,255,255,0.45) inset, 0 -1px 0 rgba(0,0,0,0.2) inset, 0 10px 28px rgba(0,0,0,0.55), 0 0 0 1px rgba(0,245,255,0.35), 0 0 36px rgba(0,245,255,0.35)",

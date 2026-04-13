@@ -64,7 +64,7 @@ export function MeasurementOverlay({ viewport }: MeasurementOverlayProps) {
             width={240}
             text="Click to set start point"
             fontSize={12}
-            fontFamily="Inter, system-ui, sans-serif"
+            fontFamily="DM Sans, system-ui, sans-serif"
             fill="#FFFFFF"
             align="center"
           />
@@ -88,7 +88,7 @@ export function MeasurementOverlay({ viewport }: MeasurementOverlayProps) {
             width={280}
             text="Click end point \u00b7 Esc to cancel \u00b7 P to pin"
             fontSize={11}
-            fontFamily="Inter, system-ui, sans-serif"
+            fontFamily="DM Sans, system-ui, sans-serif"
             fill="#FFFFFF"
             align="center"
           />
@@ -166,7 +166,7 @@ function MeasurementLine({
         width={labelWidth}
         text={mainLabel}
         fontSize={12}
-        fontFamily="Inter, system-ui, sans-serif"
+        fontFamily="DM Sans, system-ui, sans-serif"
         fontStyle="bold"
         fill={color}
         align="center"
@@ -189,7 +189,7 @@ function MeasurementLine({
             width={180}
             text={`H: ${formatDimension(dx, displayUnit as "m")}  V: ${formatDimension(dy, displayUnit as "m")}  ${angleDeg.toFixed(1)}°`}
             fontSize={9}
-            fontFamily="Inter, system-ui, sans-serif"
+            fontFamily="DM Sans, system-ui, sans-serif"
             fill={color}
             align="center"
             opacity={0.8}

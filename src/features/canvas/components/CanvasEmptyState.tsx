@@ -86,7 +86,7 @@ export const CanvasEmptyState = React.memo(function CanvasEmptyState({ onPromptM
           marginBottom: 24,
         }}>
           <MiniWorkflowDiagram />
-          <div style={{ fontSize: 9, color: "rgba(184,115,51,0.4)", textAlign: "center", marginTop: 4, fontFamily: "'Space Mono', monospace", textTransform: "uppercase" as const, letterSpacing: "0.1em" }}>
+          <div style={{ fontSize: 9, color: "rgba(184,115,51,0.4)", textAlign: "center", marginTop: 4, fontFamily: "var(--font-jetbrains), monospace", textTransform: "uppercase" as const, letterSpacing: "0.1em" }}>
             {t('canvas.examplePipeline')}
           </div>
         </div>
@@ -105,7 +105,7 @@ export const CanvasEmptyState = React.memo(function CanvasEmptyState({ onPromptM
         {/* Headline */}
         <h2 style={{
           fontSize: 22, fontWeight: 400,
-          fontFamily: "'Playfair Display', serif",
+          fontFamily: "var(--font-dm-sans), sans-serif",
           fontStyle: "italic",
           color: "#FFBF00", marginBottom: 8, lineHeight: 1.3,
           letterSpacing: "0.05em",
@@ -116,7 +116,7 @@ export const CanvasEmptyState = React.memo(function CanvasEmptyState({ onPromptM
         {/* Subtitle */}
         <p style={{
           fontSize: 12, color: "rgba(255,255,255,0.4)",
-          fontFamily: "'Space Mono', monospace",
+          fontFamily: "var(--font-jetbrains), monospace",
           lineHeight: 1.6, marginBottom: 24, maxWidth: 320,
         }}>
           {t('canvas.emptyDesc')}
@@ -132,7 +132,7 @@ export const CanvasEmptyState = React.memo(function CanvasEmptyState({ onPromptM
               border: "1px solid rgba(184,115,51,0.4)",
               background: "rgba(184,115,51,0.05)",
               fontSize: 10, fontWeight: 400, color: "#B87333",
-              fontFamily: "'Space Mono', monospace",
+              fontFamily: "var(--font-jetbrains), monospace",
               textTransform: "uppercase" as const,
               letterSpacing: "0.15em",
               textDecoration: "none",
@@ -158,7 +158,7 @@ export const CanvasEmptyState = React.memo(function CanvasEmptyState({ onPromptM
               background: "transparent",
               border: "1px solid rgba(0,245,255,0.4)",
               fontSize: 10, fontWeight: 400, color: "#00F5FF",
-              fontFamily: "'Space Mono', monospace",
+              fontFamily: "var(--font-jetbrains), monospace",
               textTransform: "uppercase" as const,
               letterSpacing: "0.15em",
               cursor: "pointer",

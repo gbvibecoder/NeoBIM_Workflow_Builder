@@ -108,7 +108,7 @@ function RoomLightOverlay({
             y={y + h / 2 - 10}
             text={`${icon} ${score.score}`}
             fontSize={Math.min(14, Math.max(9, w * 0.12))}
-            fontFamily="Inter, system-ui, sans-serif"
+            fontFamily="DM Sans, system-ui, sans-serif"
             fontStyle="bold"
             fill={score.grade === "poor" ? "#64748B" : score.grade === "fair" ? "#3B82F6" : "#CA8A04"}
             listening={false}
@@ -119,7 +119,7 @@ function RoomLightOverlay({
               y={y + h / 2 + 6}
               text={label}
               fontSize={Math.min(10, Math.max(7, w * 0.08))}
-              fontFamily="Inter, system-ui, sans-serif"
+              fontFamily="DM Sans, system-ui, sans-serif"
               fill={score.grade === "poor" ? "#94A3B8" : "#78716C"}
               listening={false}
             />

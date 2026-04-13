@@ -152,7 +152,7 @@ function RoomRendererBase({
                   y={startY + circleR - numFontSize / 2}
                   text={roomNum}
                   fontSize={numFontSize}
-                  fontFamily="Inter, system-ui, sans-serif"
+                  fontFamily="DM Sans, system-ui, sans-serif"
                   fontStyle="bold"
                   fill="#FFFFFF"
                   align="center"
@@ -169,7 +169,7 @@ function RoomRendererBase({
               y={startY + circleBlock}
               text={displayName}
               fontSize={baseFontSize}
-              fontFamily="Inter, system-ui, sans-serif"
+              fontFamily="DM Sans, system-ui, sans-serif"
               fontStyle="600"
               fill={labelColor}
               align="center"
@@ -185,7 +185,7 @@ function RoomRendererBase({
                 y={startY + circleBlock + nameBlock}
                 text={`${formatDimension(roomW_mm, displayUnit)} × ${formatDimension(roomH_mm, displayUnit)}`}
                 fontSize={dimFontSize}
-                fontFamily="Inter, system-ui, sans-serif"
+                fontFamily="DM Sans, system-ui, sans-serif"
                 fontStyle="normal"
                 fill={dimColor}
                 align="center"
@@ -202,7 +202,7 @@ function RoomRendererBase({
                 y={startY + circleBlock + nameBlock + dimBlock}
                 text={formatArea(room.area_sqm, displayUnit)}
                 fontSize={areaFontSize}
-                fontFamily="Inter, system-ui, sans-serif"
+                fontFamily="DM Sans, system-ui, sans-serif"
                 fontStyle="bold"
                 fill={areaColor}
                 align="center"

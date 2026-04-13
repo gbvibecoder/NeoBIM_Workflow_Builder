@@ -329,7 +329,7 @@ function DimensionRendererBase({
               y={dim.textPos.y}
               text={dim.label}
               fontSize={textSize}
-              fontFamily="Inter, system-ui, sans-serif"
+              fontFamily="DM Sans, system-ui, sans-serif"
               fontStyle={dim.isOverall ? "bold" : "normal"}
               fill={color}
               align="center"

@@ -88,7 +88,7 @@ export function VastuOverlayRenderer({ viewport }: Props) {
                 y={topLeft.y + 3}
                 text={DIRECTION_LABELS[cell.direction]}
                 fontSize={smallFont}
-                fontFamily="Inter, sans-serif"
+                fontFamily="DM Sans, system-ui, sans-serif"
                 fontStyle="bold"
                 fill="rgba(100,116,139,0.7)"
               />
@@ -98,7 +98,7 @@ export function VastuOverlayRenderer({ viewport }: Props) {
                   y={topLeft.y + 3}
                   text={STATUS_ICONS[status]}
                   fontSize={fontSize}
-                  fontFamily="Inter, sans-serif"
+                  fontFamily="DM Sans, system-ui, sans-serif"
                   fontStyle="bold"
                   fill={
                     status === "pass"
@@ -138,7 +138,7 @@ export function VastuOverlayRenderer({ viewport }: Props) {
               y={screenPos.y - r * 1.5 - r * 0.6}
               text={item.status === "violation" ? "\u2717" : "!"}
               fontSize={r * 1.2}
-              fontFamily="Inter, sans-serif"
+              fontFamily="DM Sans, system-ui, sans-serif"
               fontStyle="bold"
               fill="white"
             />
@@ -173,7 +173,7 @@ function CompassRose({ x, y, size, northAngle }: { x: number; y: number; size: n
         text="N"
         fontSize={10}
         fontStyle="bold"
-        fontFamily="Inter, sans-serif"
+        fontFamily="DM Sans, system-ui, sans-serif"
         fill="#dc2626"
       />
       <Line

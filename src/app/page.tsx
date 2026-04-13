@@ -196,7 +196,7 @@ function AnimatedNumber({ value, decimals = 0, suffix = '', prefix = '', color }
     : Math.floor(display).toLocaleString();
 
   return (
-    <div ref={ref} style={{ fontSize: 32, fontWeight: 800, color, fontFamily: '"SF Mono", "Fira Code", monospace', letterSpacing: '-0.02em' }}>
+    <div ref={ref} style={{ fontSize: 32, fontWeight: 800, color, fontFamily: "var(--font-jetbrains), monospace", letterSpacing: '-0.02em' }}>
       {prefix}{formatted}{suffix}
     </div>
   );
@@ -768,7 +768,7 @@ function VoteCard({
           <div style={{ width: 8, height: 8, borderRadius: "50%", background: color, boxShadow: `0 0 8px ${color}` }} />
           <span style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "1px", color }}>{t(CATEGORY_LABELS[item.category])}</span>
         </div>
-        <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: "#5C5C78", fontWeight: 600 }}>{item.id}</span>
+        <span style={{ fontFamily: "var(--font-jetbrains), monospace", fontSize: 10, color: "#5C5C78", fontWeight: 600 }}>{item.id}</span>
       </div>
 
       {/* Blueprint overlay */}
@@ -798,7 +798,7 @@ function VoteCard({
         {/* Status + Revision */}
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
           <StatusBadge status={item.status} label={t(STATUS_LABELS[item.status])} />
-          <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, color: "#5C5C78" }}>
+          <span style={{ fontFamily: "var(--font-jetbrains), monospace", fontSize: 9, color: "#5C5C78" }}>
             {t('landing.roadmap.revision')} A
           </span>
         </div>
@@ -808,7 +808,7 @@ function VoteCard({
 
         {/* Vote row */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-          <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 14, fontWeight: 700, color: "#F0F0F5" }}>
+          <span style={{ fontFamily: "var(--font-jetbrains), monospace", fontSize: 14, fontWeight: 700, color: "#F0F0F5" }}>
             {votes.toLocaleString()}
             <span style={{ fontSize: 10, fontWeight: 500, color: "#5C5C78", marginLeft: 4 }}>{t('landing.roadmap.votes')}</span>
           </span>
@@ -1381,7 +1381,7 @@ export default function LandingPage() {
               <span style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1.5px', color: '#F59E0B' }}>{t('landing.costEstimate')}</span>
               <span style={{ marginLeft: 'auto', fontSize: 7, color: 'rgba(245,158,11,0.4)', fontFamily: 'monospace' }}>CSI</span>
             </div>
-            <div style={{ padding: '8px 10px', fontFamily: '"SF Mono", "Fira Code", monospace', fontSize: 9 }}>
+            <div style={{ padding: '8px 10px', fontFamily: "var(--font-jetbrains), monospace", fontSize: 9 }}>
               {/* Header */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 40px 55px', gap: 4, padding: '4px 4px 6px', borderBottom: '1px solid rgba(245,158,11,0.08)', color: '#5C5C78', fontSize: 7, textTransform: 'uppercase', letterSpacing: '0.1em' }}>
                 <span>{t('landing.description')}</span><span style={{ textAlign: 'right' }}>{t('landing.qty')}</span><span style={{ textAlign: 'right' }}>{t('landing.total')}</span>
@@ -1665,7 +1665,7 @@ export default function LandingPage() {
             <span style={{
               fontSize: 9, fontWeight: 700, letterSpacing: "2px", textTransform: "uppercase",
               color: "rgba(16,185,129,0.4)",
-              fontFamily: '"SF Mono", "Fira Code", monospace',
+              fontFamily: "var(--font-jetbrains), monospace",
             }}>
               {t('landing.scroll')}
             </span>
@@ -2234,7 +2234,7 @@ export default function LandingPage() {
                           minHeight: 64,
                         }}>
                           {item.previewType === 'text' && (
-                            <div style={{ fontFamily: '"SF Mono", "Fira Code", monospace', fontSize: 10, color: '#9898B0', lineHeight: 1.6 }}>
+                            <div style={{ fontFamily: "var(--font-jetbrains), monospace", fontSize: 10, color: '#9898B0', lineHeight: 1.6 }}>
                               <div style={{ color: '#3B82F6', fontSize: 8, marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.1em' }}>{t('landing.projectBrief')}</div>
                               <div>{t('landing.briefExample1')}</div>
                               <div>{t('landing.briefExample2')}</div>
@@ -2255,7 +2255,7 @@ export default function LandingPage() {
                                 { label: t('landing.kpiParking'), value: '120', unit: t('landing.kpiSpots') },
                               ].map(kpi => (
                                 <div key={kpi.label} style={{ textAlign: 'center', padding: '8px 4px', background: 'rgba(7,7,13,0.8)' }}>
-                                  <div style={{ fontSize: 15, fontWeight: 800, color: item.color, fontFamily: '"SF Mono", "Fira Code", monospace' }}>{kpi.value}</div>
+                                  <div style={{ fontSize: 15, fontWeight: 800, color: item.color, fontFamily: "var(--font-jetbrains), monospace" }}>{kpi.value}</div>
                                   <div style={{ fontSize: 7, color: '#5C5C78', textTransform: 'uppercase', letterSpacing: '0.1em', marginTop: 2 }}>
                                     {kpi.label}{kpi.unit && <span style={{ color: 'rgba(255,255,255,0.2)', marginLeft: 3 }}>{kpi.unit}</span>}
                                   </div>

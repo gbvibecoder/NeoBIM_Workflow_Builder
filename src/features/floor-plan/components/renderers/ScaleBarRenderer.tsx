@@ -87,7 +87,7 @@ function ScaleBarRendererBase({ viewport, displayUnit }: ScaleBarRendererProps) 
         y={bar.y0 - 14}
         text="0"
         fontSize={9}
-        fontFamily="Inter, system-ui, sans-serif"
+        fontFamily="DM Sans, system-ui, sans-serif"
         fill="#333333"
         align="center"
         width={20}
@@ -113,7 +113,7 @@ function ScaleBarRendererBase({ viewport, displayUnit }: ScaleBarRendererProps) 
             y={seg.y - 14}
             text={seg.label}
             fontSize={9}
-            fontFamily="Inter, system-ui, sans-serif"
+            fontFamily="DM Sans, system-ui, sans-serif"
             fill="#333333"
             align="center"
             width={60}

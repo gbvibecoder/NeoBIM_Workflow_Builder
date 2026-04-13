@@ -570,7 +570,7 @@ function FeedbackDetail({
                 color: "#F0F0F5",
                 margin: 0,
                 lineHeight: 1.35,
-                fontFamily: "var(--font-syne), sans-serif",
+                fontFamily: "var(--font-dm-sans), sans-serif",
                 letterSpacing: "-0.01em",
               }}
             >
@@ -1196,7 +1196,7 @@ function FeedbackTab() {
                 fontWeight: 700,
                 color: "#F0F0F5",
                 margin: 0,
-                fontFamily: "var(--font-syne), sans-serif",
+                fontFamily: "var(--font-dm-sans), sans-serif",
                 letterSpacing: "-0.02em",
               }}
             >

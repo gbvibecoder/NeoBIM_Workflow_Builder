@@ -56,8 +56,9 @@ const config: Config = {
         "accent-glow": "rgba(79, 138, 255, 0.15)",
       },
       fontFamily: {
+        sans: ["var(--font-dm-sans)", "DM Sans", "system-ui", "sans-serif"],
         display: ["var(--font-dm-sans)", "DM Sans", "sans-serif"],
-        body: ["var(--font-inter)", "Inter", "system-ui", "sans-serif"],
+        body: ["var(--font-dm-sans)", "DM Sans", "system-ui", "sans-serif"],
         mono: ["var(--font-jetbrains)", "JetBrains Mono", "Fira Code", "monospace"],
       },
       backgroundImage: {

@@ -350,7 +350,7 @@ function CommunityVideoCard({
         <h4 style={{
           fontSize: 13, fontWeight: 700, color: C.text,
           margin: "0 0 4px",
-          fontFamily: "var(--font-syne), sans-serif",
+          fontFamily: "var(--font-dm-sans), sans-serif",
           overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
         }}>
           {video.title}
@@ -680,7 +680,7 @@ function UploadModal({
             </div>
             <h3 style={{
               fontSize: 20, fontWeight: 800, margin: 0,
-              fontFamily: "var(--font-syne), sans-serif",
+              fontFamily: "var(--font-dm-sans), sans-serif",
               color: C.text,
             }}>
               Share Your{" "}
@@ -1107,7 +1107,7 @@ function CommunityVideoModal({
         </div>
         <span style={{
           fontSize: 14, fontWeight: 600, color: C.text,
-          fontFamily: "var(--font-syne), sans-serif",
+          fontFamily: "var(--font-dm-sans), sans-serif",
         }}>
           {video.title}
         </span>
@@ -1393,7 +1393,7 @@ export default function CommunityVideoSection() {
               fontWeight: 800,
               letterSpacing: "-0.03em",
               margin: "0 0 10px",
-              fontFamily: "var(--font-syne), sans-serif",
+              fontFamily: "var(--font-dm-sans), sans-serif",
             }}>
               Built by the{" "}
               <span style={{
@@ -1586,7 +1586,7 @@ export default function CommunityVideoSection() {
 
               <h3 style={{
                 fontSize: 18, fontWeight: 700, color: C.text,
-                fontFamily: "var(--font-syne), sans-serif",
+                fontFamily: "var(--font-dm-sans), sans-serif",
                 margin: "0 0 8px", position: "relative",
               }}>
                 Be the First to Share

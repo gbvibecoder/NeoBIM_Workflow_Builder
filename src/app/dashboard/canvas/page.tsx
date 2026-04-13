@@ -250,7 +250,7 @@ function CanvasSkeletonLoader() {
             color: "rgba(255,255,255,0.4)",
             letterSpacing: "0.02em",
             fontFamily:
-              '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+              "var(--font-dm-sans), sans-serif",
           }}
         >
           Loading your workspace...

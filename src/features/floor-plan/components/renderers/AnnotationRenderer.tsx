@@ -89,7 +89,7 @@ function AnnotationItem({
         y={screen.y - fontSize}
         text={annotation.text}
         fontSize={fontSize}
-        fontFamily="Inter, system-ui, sans-serif"
+        fontFamily="DM Sans, system-ui, sans-serif"
         fill={color}
         fontStyle={annotation.type === "callout" ? "bold" : "normal"}
         rotation={-annotation.rotation_deg}

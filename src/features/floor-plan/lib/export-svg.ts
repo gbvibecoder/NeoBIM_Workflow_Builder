@@ -49,7 +49,7 @@ export function exportFloorToSvg(
   w(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="${vbX} ${vbY} ${vbW} ${vbH}" width="${vbW}" height="${vbH}">`);
   w(`  <title>${escapeXml(projectName)} — Floor Plan</title>`);
   w(`  <style>`);
-  w(`    text { font-family: Inter, Helvetica, Arial, sans-serif; }`);
+  w(`    text { font-family: DM Sans, Helvetica, Arial, sans-serif; }`);
   w(`    .wall-ext { fill: #FFFFFF; stroke: #1A1A1A; stroke-width: 8; }`);
   w(`    .wall-int { fill: #FFFFFF; stroke: #333333; stroke-width: 5; }`);
   w(`    .door-leaf { stroke: #1A1A1A; stroke-width: 3; fill: none; }`);

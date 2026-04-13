@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { DM_Sans, JetBrains_Mono, Syne, Space_Grotesk } from "next/font/google";
+import { DM_Sans, JetBrains_Mono } from "next/font/google";
 
 import { Toaster } from "sonner";
 import { Analytics } from "@vercel/analytics/react";
@@ -26,19 +26,6 @@ const jetbrains = JetBrains_Mono({
   weight: ["400", "500", "600", "700"],
 });
 
-const syne = Syne({
-  subsets: ["latin"],
-  variable: "--font-syne",
-  display: "swap",
-  weight: ["400", "500", "600", "700", "800"],
-});
-
-const spaceGrotesk = Space_Grotesk({
-  subsets: ["latin"],
-  variable: "--font-space-grotesk",
-  display: "swap",
-  weight: ["400", "500", "600", "700"],
-});
 
 // 🔍 SEO OPTIMIZATION - Maximum Discoverability
 const siteUrl = process.env.NEXT_PUBLIC_APP_URL || "https://buildflow.vercel.app";
@@ -274,7 +261,7 @@ export default function RootLayout({
         {/* Tracking scripts (GTM + Meta Pixel + GA4 + Clarity) — loaded only after cookie consent */}
         <TrackingScripts />
       </head>
-      <body className={`${dmSans.variable} ${jetbrains.variable} ${syne.variable} ${spaceGrotesk.variable} font-body antialiased`} style={{ background: "#06080C", color: "#F0F4FF" }}>
+      <body className={`${dmSans.variable} ${jetbrains.variable} font-body antialiased`} style={{ background: "#06080C", color: "#F0F4FF" }}>
         {/* Google Tag Manager (noscript) — fallback for users without JS */}
         {process.env.NEXT_PUBLIC_GTM_ID && (
           <noscript>
@@ -309,7 +296,7 @@ export default function RootLayout({
               border: "1px solid rgba(255, 255, 255, 0.06)",
               color: "#F0F0F5",
               fontSize: "14px",
-              fontFamily: "var(--font-inter), sans-serif",
+              fontFamily: "var(--font-dm-sans), sans-serif",
               borderRadius: "12px",
               boxShadow: "0 16px 48px rgba(0,0,0,0.35), 0 4px 16px rgba(0,0,0,0.25)",
               padding: "12px 14px",

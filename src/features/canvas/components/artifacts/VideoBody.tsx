@@ -135,7 +135,7 @@ export function VideoBody({ data: rawData, nodeId }: VideoBodyProps) {
             fontWeight: 600,
             color: isFailed ? "#EF4444" : "#00F5FF",
             marginBottom: 4,
-            fontFamily: "'Space Mono', monospace",
+            fontFamily: "var(--font-jetbrains), monospace",
           }}>
             {isFailed ? t('showcase.generationFailed') : t('showcase.generatingVideo')}
           </div>
@@ -176,7 +176,7 @@ export function VideoBody({ data: rawData, nodeId }: VideoBodyProps) {
                 fontSize: 10,
                 fontWeight: 700,
                 color: "#00F5FF",
-                fontFamily: "'Space Mono', monospace",
+                fontFamily: "var(--font-jetbrains), monospace",
               }}>
                 {progress}%
               </div>
@@ -211,7 +211,7 @@ export function VideoBody({ data: rawData, nodeId }: VideoBodyProps) {
                         border: `1px solid ${isActive ? "rgba(0,245,255,0.2)" : isPast ? "rgba(139,92,246,0.15)" : "rgba(255,255,255,0.06)"}`,
                         fontSize: 7, fontWeight: 500,
                         color: isActive ? "#00F5FF" : isPast ? "#8B5CF6" : "#3C3C50",
-                        fontFamily: "'Space Mono', monospace",
+                        fontFamily: "var(--font-jetbrains), monospace",
                       }}>
                         {phaseLabels[phase] ?? phase} {isPast ? "\u2713" : isActive ? "..." : ""}
                       </span>
@@ -227,7 +227,7 @@ export function VideoBody({ data: rawData, nodeId }: VideoBodyProps) {
                     border: `1px solid ${progress >= 33 ? "rgba(0,245,255,0.2)" : "rgba(255,255,255,0.06)"}`,
                     fontSize: 8, fontWeight: 500,
                     color: progress >= 33 ? "#00F5FF" : "#3C3C50",
-                    fontFamily: "'Space Mono', monospace",
+                    fontFamily: "var(--font-jetbrains), monospace",
                   }}>
                     Exterior 5s {progress >= 33 ? (progress >= 50 ? "done" : "...") : "queued"}
                   </span>
@@ -237,7 +237,7 @@ export function VideoBody({ data: rawData, nodeId }: VideoBodyProps) {
                     border: `1px solid ${progress >= 67 ? "rgba(139,92,246,0.2)" : "rgba(255,255,255,0.06)"}`,
                     fontSize: 8, fontWeight: 500,
                     color: progress >= 67 ? "#8B5CF6" : "#3C3C50",
-                    fontFamily: "'Space Mono', monospace",
+                    fontFamily: "var(--font-jetbrains), monospace",
                   }}>
                     Interior 10s {progress >= 67 ? (progress >= 90 ? "done" : "...") : "queued"}
                   </span>
@@ -335,7 +335,7 @@ export function VideoBody({ data: rawData, nodeId }: VideoBodyProps) {
                   cursor: "pointer",
                   backdropFilter: "blur(4px)",
                   transition: "all 0.15s ease",
-                  fontFamily: "'Space Mono', monospace",
+                  fontFamily: "var(--font-jetbrains), monospace",
                 }}
               >
                 {String(seg.label?.split("—")[0]?.trim() ?? `Part ${i + 1}`)} ({seg.durationSeconds}s)
@@ -373,7 +373,7 @@ export function VideoBody({ data: rawData, nodeId }: VideoBodyProps) {
                 color: i === currentSegmentIndex ? "#00F5FF" : "#5C5C78",
                 cursor: "pointer",
                 transition: "all 0.15s ease",
-                fontFamily: "'Space Mono', monospace",
+                fontFamily: "var(--font-jetbrains), monospace",
               }}
             >
               {i < currentSegmentIndex ? null : i === currentSegmentIndex ? (
@@ -402,7 +402,7 @@ export function VideoBody({ data: rawData, nodeId }: VideoBodyProps) {
           background: "rgba(0,245,255,0.08)",
           border: "1px solid rgba(0,245,255,0.15)",
           fontSize: 9, fontWeight: 600, color: "#00F5FF",
-          fontFamily: "'Space Mono', monospace",
+          fontFamily: "var(--font-jetbrains), monospace",
         }}>
           <Clock size={8} />
           {totalDuration}s
@@ -415,7 +415,7 @@ export function VideoBody({ data: rawData, nodeId }: VideoBodyProps) {
           background: "rgba(255,191,0,0.08)",
           border: "1px solid rgba(255,191,0,0.15)",
           fontSize: 9, fontWeight: 600, color: "#FFBF00",
-          fontFamily: "'Space Mono', monospace",
+          fontFamily: "var(--font-jetbrains), monospace",
         }}>
           <Clapperboard size={8} />
           {shotCount} shots
@@ -428,7 +428,7 @@ export function VideoBody({ data: rawData, nodeId }: VideoBodyProps) {
           background: "rgba(139,92,246,0.08)",
           border: "1px solid rgba(139,92,246,0.15)",
           fontSize: 9, fontWeight: 500, color: "#8B5CF6",
-          fontFamily: "'Space Mono', monospace",
+          fontFamily: "var(--font-jetbrains), monospace",
         }}>
           {data?.pipeline?.includes("Three.js") ? "Three.js" : "Kling 3.0"}
         </span>
@@ -441,7 +441,7 @@ export function VideoBody({ data: rawData, nodeId }: VideoBodyProps) {
             background: "rgba(255,191,0,0.08)",
             border: "1px solid rgba(255,191,0,0.15)",
             fontSize: 9, fontWeight: 700, color: "#FFBF00",
-            fontFamily: "'Space Mono', monospace",
+            fontFamily: "var(--font-jetbrains), monospace",
           }}>
             <DollarSign size={8} />
             ${costUsd.toFixed(2)}

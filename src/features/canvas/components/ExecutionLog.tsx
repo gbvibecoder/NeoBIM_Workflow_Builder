@@ -95,7 +95,7 @@ export function ExecutionLog({ entries, isRunning, onClose, autoExpand }: Execut
         backdropFilter: "blur(24px) saturate(1.3)",
         WebkitBackdropFilter: "blur(24px) saturate(1.3)",
         boxShadow: "0 8px 32px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.03) inset",
-        fontFamily: "'JetBrains Mono', 'Fira Mono', 'Menlo', monospace",
+        fontFamily: "var(--font-jetbrains), monospace",
         transition: "border-radius 0.2s ease",
       }}
     >

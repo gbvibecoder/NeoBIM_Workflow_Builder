@@ -143,7 +143,7 @@ export function CardTitle({
   return (
     <h3
       className={cn(
-        "font-[var(--font-space-grotesk)] text-base font-bold text-[var(--text-primary)]",
+        "font-[var(--font-dm-sans)] text-base font-bold text-[var(--text-primary)]",
         className
       )}
     >
