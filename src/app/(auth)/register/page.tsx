@@ -143,13 +143,13 @@ function RegisterForm() {
         await signIn("credentials", {
           email: identifier.trim().toLowerCase(),
           password,
-          callbackUrl: "/dashboard",
+          callbackUrl: "/welcome",
         });
       } else {
         await signIn("credentials", {
           phone: normalizePhone(identifier) ?? identifier,
           password,
-          callbackUrl: "/dashboard",
+          callbackUrl: "/welcome",
         });
       }
     } catch (err) {
@@ -167,7 +167,7 @@ function RegisterForm() {
         localStorage.setItem("pending_referral_code", referralCode);
       }
       trackCompleteRegistration({ content_name: "google_signup" });
-      await signIn("google", { callbackUrl: "/dashboard" });
+      await signIn("google", { callbackUrl: "/welcome" });
     } catch (err) {
       setError(extractErrorMessage(err, t('auth.somethingWentWrong')));
       setGoogleLoading(false);

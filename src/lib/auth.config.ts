@@ -12,7 +12,10 @@ export const authConfig = {
     authorized({ auth, request: { nextUrl } }) {
       const isLoggedIn = !!auth?.user;
       const isDashboard = nextUrl.pathname.startsWith("/dashboard");
-      if (isDashboard) return isLoggedIn;
+      const isProtected = isDashboard
+        || nextUrl.pathname.startsWith("/welcome")
+        || nextUrl.pathname.startsWith("/thank-you");
+      if (isProtected) return isLoggedIn;
       return true;
     },
     session({ session, token }) {
