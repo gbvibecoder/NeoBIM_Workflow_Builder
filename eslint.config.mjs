@@ -12,6 +12,10 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Non-app directories that shouldn't block CI:
+    "scripts/**",
+    "coverage/**",
+    "tests/**",
   ]),
 ]);
 
