@@ -47,10 +47,15 @@ export async function POST(req: NextRequest) {
     userRole === "PLATFORM_ADMIN" ||
     userRole === "TEAM_ADMIN";
 
+  // Parse body first so we can read executionId for verification + rate-limit deduplication
+  const { catalogueId, executionId, tileInstanceId, inputData, userApiKey } = await req.json();
+
   // Server-side email/phone verification enforcement.
   // Admins bypass. Phone-verified users bypass (they may not have email).
   // Unverified users get 1 free trial execution before verification is required,
   // matching the pre-flight check in /api/check-execution-eligibility.
+  // NOTE: We exclude the current executionId from the count so that nodes within
+  // the user's first (free-trial) workflow don't block each other.
   if (!isAdmin) {
     const isEmailVerified = !!(session.user as { emailVerified?: boolean }).emailVerified;
     const isPhoneVerified = !!(session.user as { phoneVerified?: boolean }).phoneVerified;
@@ -64,6 +69,7 @@ export async function POST(req: NextRequest) {
           userId,
           createdAt: { gte: monthStart },
           status: { notIn: ["FAILED", "PENDING"] },
+          ...(executionId ? { id: { not: executionId } } : {}),
         },
       });
 
@@ -81,9 +87,6 @@ export async function POST(req: NextRequest) {
       }
     }
   }
-
-  // Parse body first so we can read executionId for rate-limit deduplication
-  const { catalogueId, executionId, tileInstanceId, inputData, userApiKey } = await req.json();
   const nodeStartTime = Date.now();
 
   // ── Detailed file logging (dev only) ──
