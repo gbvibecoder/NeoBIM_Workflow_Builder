@@ -333,7 +333,7 @@ export async function POST(req: NextRequest) {
       : pickRenderSize(originalWidth, originalHeight);
     const [renderedWidth, renderedHeight] = renderedSize.split("x").map((n) => parseInt(n, 10));
 
-    recordToolExecution(session.user.id, "3d-render").catch(() => {});
+    await recordToolExecution(session.user.id, "3d-render");
     return NextResponse.json({
       success: true,
       image: resultDataUrl,

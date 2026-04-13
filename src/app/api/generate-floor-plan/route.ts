@@ -336,7 +336,7 @@ export async function POST(req: NextRequest) {
         names: f.rooms.map(r => r.name)
       }))));
 
-      recordToolExecution(userId, "floor-plan").catch(() => {});
+      await recordToolExecution(userId, "floor-plan");
       return NextResponse.json({ project, geometry, svg: null, feedback });
     }
 
@@ -404,7 +404,7 @@ export async function POST(req: NextRequest) {
     }
     logger.debug('=== FLOOR PLAN GENERATION COMPLETE ===');
 
-    recordToolExecution(userId, "floor-plan").catch(() => {});
+    await recordToolExecution(userId, "floor-plan");
     return NextResponse.json({ project, geometry, svg: floorPlan.svg, feedback });
   } catch (err) {
     console.error("[generate-floor-plan] Error:", err);

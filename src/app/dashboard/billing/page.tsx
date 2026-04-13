@@ -542,7 +542,7 @@ export default function BillingPage() {
                     )}
                   </div>
                   <p className="text-sm text-[#7C7C96]">
-                    {loading ? t('billing.loadingUsage') : `${usage?.used || 0} of ${usage?.limit || 3} ${t('billing.runsUsed')}`}
+                    {loading ? t('billing.loadingUsage') : `${usage?.used || 0} of ${usage?.limit || 3} ${userRole === "FREE" ? "free runs used" : t('billing.runsUsed')}`}
                   </p>
                 </div>
                 <div className="text-right">

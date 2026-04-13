@@ -460,7 +460,7 @@ export async function POST(req: NextRequest) {
     `[CINEMATIC][${pipelineId}] State saved. overview=${state.stages.overview.status} lifestyle=${state.stages.lifestyle.status}`,
   );
 
-  recordToolExecution(session.user.id, "cinematic-walkthrough").catch(() => {});
+  await recordToolExecution(session.user.id, "cinematic-walkthrough");
   return NextResponse.json({
     pipelineId,
     status: "processing",
