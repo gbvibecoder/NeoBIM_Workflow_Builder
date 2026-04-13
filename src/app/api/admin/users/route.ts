@@ -54,7 +54,12 @@ export async function GET(req: Request) {
         razorpaySubscriptionId: true,
         paymentGateway: true,
         createdAt: true,
-        _count: { select: { workflows: true, executions: true } },
+        _count: {
+          select: {
+            workflows: true,
+            executions: { where: { status: { in: ["SUCCESS", "PARTIAL"] } } },
+          },
+        },
       },
       orderBy,
       skip: (page - 1) * limit,
