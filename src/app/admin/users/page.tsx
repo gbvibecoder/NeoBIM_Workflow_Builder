@@ -835,7 +835,7 @@ export default function AdminUsersPage() {
                         fontSize: 13, color: "#F0F0F5", fontWeight: 500,
                         fontFamily: "var(--font-jetbrains), monospace",
                       }}>
-                        {Math.max(user._count.executions, 2)}
+                        {user._count.executions}
                       </span>
                     </td>
 
