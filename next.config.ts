@@ -57,6 +57,12 @@ const nextConfig: NextConfig = {
       "lucide-react",
       "framer-motion",
       "three",
+      "@xyflow/react",
+      "@react-three/fiber",
+      "@react-three/postprocessing",
+      "recharts",
+      "konva",
+      "react-konva",
     ],
   },
 

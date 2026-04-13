@@ -380,7 +380,6 @@ export default function CommunityPage() {
     const wf = ALL_COMMUNITY.find(w => w.id === id);
     if (!wf) return;
     loadFromTemplate(wf as WorkflowTemplate);
-    toast.success(`"${wf.name}" ${t('toast.cloned')}`, { description: t('toast.openingCanvas') });
     awardXP("template-cloned");
     router.push("/dashboard/canvas");
   };

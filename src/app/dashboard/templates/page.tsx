@@ -5,7 +5,6 @@ import { motion, AnimatePresence } from "framer-motion";
 import dynamic from "next/dynamic";
 import { ChevronDown, Building2, Ruler, Compass, HardHat, Layers, PenTool, Triangle, Lock, ArrowRight, MessageSquare, Sparkles, Zap } from "lucide-react";
 import { PREBUILT_WORKFLOWS } from "@/features/workflows/constants/prebuilt-workflows";
-import { toast } from "sonner";
 import { useWorkflowStore, selectLoadFromTemplate } from "@/features/workflows/stores/workflow-store";
 import { useRouter } from "next/navigation";
 import type { WorkflowTemplate } from "@/types/workflow";
@@ -713,7 +712,6 @@ export default function TemplatesPage() {
     const template = PREBUILT_WORKFLOWS.find(w => w.id === wf.id);
     if (!template) return;
     loadFromTemplate(template as WorkflowTemplate);
-    toast.success(`"${template.name}" ${t("toast.cloned")}`, { description: t("toast.openingCanvas") });
     awardXP("template-cloned");
     router.push("/dashboard/canvas");
   };
@@ -911,18 +909,19 @@ export default function TemplatesPage() {
           }} />
 
           {/* Floating ambient particles — visible */}
-          <div className="tpl-particles" style={{ position: "absolute", inset: 0, pointerEvents: "none", overflow: "hidden", zIndex: 0 }}>
-            {Array.from({ length: 40 }).map((_, i) => (
+          <div className="tpl-particles" style={{ position: "absolute", inset: 0, pointerEvents: "none", overflow: "hidden", zIndex: 0, contain: "layout style" }}>
+            {Array.from({ length: 15 }).map((_, i) => (
               <div key={i} style={{
                 position: "absolute",
                 width: 3 + (i % 3) * 1.5,
                 height: 3 + (i % 3) * 1.5,
                 borderRadius: "50%",
                 background: i % 4 === 0 ? "rgba(6,182,212,0.5)" : i % 4 === 1 ? "rgba(139,92,246,0.45)" : i % 4 === 2 ? "rgba(79,138,255,0.4)" : "rgba(16,185,129,0.4)",
-                left: `${(i * 2.6 + 1) % 97}%`,
-                top: `${(i * 5.3 + 2) % 96}%`,
+                left: `${(i * 6.5 + 2) % 97}%`,
+                top: `${(i * 6.3 + 3) % 96}%`,
                 animation: `tpl-float-${i % 3} ${10 + (i % 5) * 3}s ease-in-out infinite`,
-                animationDelay: `${i * 0.5}s`,
+                animationDelay: `${i * 0.8}s`,
+                willChange: "transform",
               }} />
             ))}
           </div>

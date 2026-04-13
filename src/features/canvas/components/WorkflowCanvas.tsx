@@ -94,6 +94,13 @@ import {
 import { useUIStore } from "@/shared/stores/ui-store";
 import { NODE_CATALOGUE_MAP, CATEGORY_CONFIG } from "@/features/workflows/constants/node-catalogue";
 import type { WorkflowNodeData, NodeCategory } from "@/types/nodes";
+
+/* Module-level MiniMap color callback — stable reference, no re-renders */
+const miniMapNodeColor = (n: Node) => {
+  const d = n.data as WorkflowNodeData;
+  const cfg = CATEGORY_CONFIG[d?.category as NodeCategory];
+  return cfg?.color ?? "rgba(255,255,255,0.08)";
+};
 import type { WorkflowNode, WorkflowEdge } from "@/types/nodes";
 import { generateId } from "@/lib/utils";
 import { useLocale } from "@/hooks/useLocale";
@@ -302,7 +309,6 @@ function WorkflowCanvasInner({ workflowId: urlWorkflowId, templateId }: Workflow
     if (!template) return;
     templateLoadedRef.current = true;
     loadFromTemplate(template as WorkflowTemplate);
-    toast.success(`"${template.name}" loaded`, { description: "Template ready — customize and run" });
     setTimeout(() => fitView({ padding: 0.3, duration: 600 }), 300);
   }, [templateId, urlWorkflowId, loadFromTemplate, fitView]);
 
@@ -888,11 +894,7 @@ function WorkflowCanvasInner({ workflowId: urlWorkflowId, templateId }: Workflow
               <MiniMap
                 position="bottom-left"
                 nodeStrokeWidth={0}
-                nodeColor={(n) => {
-                  const d = n.data as WorkflowNodeData;
-                  const cfg = CATEGORY_CONFIG[d?.category as NodeCategory];
-                  return cfg?.color ?? "rgba(255,255,255,0.08)";
-                }}
+                nodeColor={miniMapNodeColor}
                 maskColor="rgba(7,8,9,0.7)"
                 className="canvas-minimap"
                 style={{

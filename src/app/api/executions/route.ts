@@ -88,6 +88,7 @@ export async function POST(req: NextRequest) {
 
     const workflow = await prisma.workflow.findFirst({
       where: { id: workflowId, ownerId: session.user.id, deletedAt: null },
+      select: { id: true },
     });
 
     if (!workflow) {
