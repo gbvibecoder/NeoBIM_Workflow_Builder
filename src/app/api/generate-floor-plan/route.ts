@@ -115,25 +115,38 @@ function buildFeedback(project: FloorPlanProject, prompt: string): GenerationFee
   };
 }
 
-/** Record a standalone tool use as an Execution so it appears in admin + billing.
- *  Uses a per-user hidden workflow (name starts with "__") that stays alive
- *  (deletedAt = null) so execution counts aren't filtered out by the dashboard
- *  and billing APIs which exclude soft-deleted workflows. */
+/** Record a standalone tool use as an Execution so it shows in dashboard + admin.
+ *  Uses a per-user workflow named "__standalone_tools__" (hidden from My Workflows
+ *  by name filter). Must have deletedAt = null so billing/executions APIs include it. */
 async function recordToolExecution(userId: string, toolName: string) {
   try {
+    // Find a non-deleted tracking workflow
     let wf = await prisma.workflow.findFirst({
-      where: { ownerId: userId, name: "__standalone_tools__" },
+      where: { ownerId: userId, name: "__standalone_tools__", deletedAt: null },
       select: { id: true },
     });
     if (!wf) {
-      wf = await prisma.workflow.create({
-        data: {
-          ownerId: userId,
-          name: "__standalone_tools__",
-          description: "Auto-created for standalone tool usage tracking",
-        },
+      // Fix legacy: un-delete any soft-deleted one from earlier code
+      const legacy = await prisma.workflow.findFirst({
+        where: { ownerId: userId, name: "__standalone_tools__" },
         select: { id: true },
       });
+      if (legacy) {
+        wf = await prisma.workflow.update({
+          where: { id: legacy.id },
+          data: { deletedAt: null },
+          select: { id: true },
+        });
+      } else {
+        wf = await prisma.workflow.create({
+          data: {
+            ownerId: userId,
+            name: "__standalone_tools__",
+            description: "Auto-created for standalone tool usage tracking",
+          },
+          select: { id: true },
+        });
+      }
     }
     await prisma.execution.create({
       data: {
@@ -146,6 +159,7 @@ async function recordToolExecution(userId: string, toolName: string) {
         metadata: { tool: toolName },
       },
     });
+    console.log(`[recordToolExecution] Recorded ${toolName} for user ${userId}`);
   } catch (err) {
     console.error("[recordToolExecution] Failed:", err);
   }

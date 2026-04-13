@@ -89,34 +89,35 @@ async function withRetry<T>(fn: () => Promise<T>, retries = 1, delayMs = 8000): 
   }
 }
 
-/** Record standalone tool use as an Execution for admin + billing visibility. */
+/** Record standalone tool use as an Execution for dashboard + admin visibility. */
 async function recordToolExecution(userId: string, toolName: string) {
   try {
     let wf = await prisma.workflow.findFirst({
-      where: { ownerId: userId, name: "__standalone_tools__" },
+      where: { ownerId: userId, name: "__standalone_tools__", deletedAt: null },
       select: { id: true },
     });
     if (!wf) {
-      wf = await prisma.workflow.create({
-        data: {
-          ownerId: userId,
-          name: "__standalone_tools__",
-          description: "Auto-created for standalone tool usage tracking",
-        },
+      const legacy = await prisma.workflow.findFirst({
+        where: { ownerId: userId, name: "__standalone_tools__" },
         select: { id: true },
       });
+      if (legacy) {
+        wf = await prisma.workflow.update({
+          where: { id: legacy.id },
+          data: { deletedAt: null },
+          select: { id: true },
+        });
+      } else {
+        wf = await prisma.workflow.create({
+          data: { ownerId: userId, name: "__standalone_tools__", description: "Auto-created for standalone tool usage tracking" },
+          select: { id: true },
+        });
+      }
     }
     await prisma.execution.create({
-      data: {
-        workflowId: wf.id,
-        userId,
-        status: "SUCCESS",
-        startedAt: new Date(),
-        completedAt: new Date(),
-        tileResults: [],
-        metadata: { tool: toolName },
-      },
+      data: { workflowId: wf.id, userId, status: "SUCCESS", startedAt: new Date(), completedAt: new Date(), tileResults: [], metadata: { tool: toolName } },
     });
+    console.log(`[recordToolExecution] Recorded ${toolName} for user ${userId}`);
   } catch (err) {
     console.error("[recordToolExecution] Failed:", err);
   }
