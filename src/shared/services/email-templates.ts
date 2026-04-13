@@ -2,6 +2,7 @@
  * Transactional email HTML templates for BuildFlow.
  * Minimal, dark-themed, AEC-branded.
  */
+import { CONTACT_EMAIL } from "@/constants/contact";
 
 const BASE_URL = process.env.NEXTAUTH_URL
   || (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : null)
@@ -133,7 +134,7 @@ export function welcomeEmail(name: string | null, plan: string): string {
     <!-- Support note -->
     <p style="font-size:12px;color:#55556A;text-align:center;line-height:1.5;margin-top:24px;">
       Questions? Just reply to this email — we're here to help.<br>
-      Or reach us at <a href="mailto:hello@trybuildflow.in" style="color:#4F8AFF;text-decoration:none;">hello@trybuildflow.in</a>
+      Or reach us at <a href="mailto:${CONTACT_EMAIL}" style="color:#4F8AFF;text-decoration:none;">${CONTACT_EMAIL}</a>
     </p>
   `);
 }

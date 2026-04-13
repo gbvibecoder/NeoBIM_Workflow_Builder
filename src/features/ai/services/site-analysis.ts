@@ -3,7 +3,9 @@
  * Uses: OpenStreetMap Nominatim (geocoding), Open-Meteo (weather/elevation).
  */
 
-const USER_AGENT = "BuildFlow/1.0 (contact@buildflow.app)";
+import { CONTACT_EMAIL } from "@/constants/contact";
+
+const USER_AGENT = `BuildFlow/1.0 (${CONTACT_EMAIL})`;
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 

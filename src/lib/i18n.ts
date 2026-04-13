@@ -1,3 +1,5 @@
+import { CONTACT_EMAIL } from "@/constants/contact";
+
 export type Locale = 'en' | 'de';
 
 export type TranslationKey = keyof typeof en;
@@ -2489,7 +2491,7 @@ const en = {
   'privacy.section07Title': 'Updates to This Policy',
   'privacy.section07P1': 'We may update this Privacy Policy to reflect changes in our practices or applicable regulations. Material changes will be communicated via email and an in-app notification at least 30 days before taking effect.',
   'privacy.section07P2': 'Your continued use of BuildFlow after changes become effective constitutes acceptance of the revised policy. We encourage you to review this page periodically.',
-  'privacy.section07P3': 'Last updated: March 2026. For questions about this policy, contact us at privacy@buildflow.app.',
+  'privacy.section07P3': `Last updated: March 2026. For questions about this policy, contact us at ${CONTACT_EMAIL}.`,
   'privacy.sectionLabel': 'SECTION',
   'privacy.effectiveDate': 'This Privacy Policy is effective as of',
   'privacy.effectiveDateValue': 'March 1, 2026',
@@ -5114,7 +5116,7 @@ const de: Record<keyof typeof en, string | string[]> = {
   'privacy.section07Title': 'Aktualisierungen dieser Richtlinie',
   'privacy.section07P1': 'Wir können diese Datenschutzrichtlinie aktualisieren, um Änderungen in unseren Praktiken oder geltenden Vorschriften widerzuspiegeln. Wesentliche Änderungen werden per E-Mail und In-App-Benachrichtigung mindestens 30 Tage vor Inkrafttreten mitgeteilt.',
   'privacy.section07P2': 'Ihre fortgesetzte Nutzung von BuildFlow nach Inkrafttreten der Änderungen gilt als Annahme der überarbeiteten Richtlinie. Wir empfehlen Ihnen, diese Seite regelmäßig zu überprüfen.',
-  'privacy.section07P3': 'Letzte Aktualisierung: März 2026. Bei Fragen zu dieser Richtlinie kontaktieren Sie uns unter privacy@buildflow.app.',
+  'privacy.section07P3': `Letzte Aktualisierung: März 2026. Bei Fragen zu dieser Richtlinie kontaktieren Sie uns unter ${CONTACT_EMAIL}.`,
   'privacy.sectionLabel': 'ABSCHNITT',
   'privacy.effectiveDate': 'Diese Datenschutzrichtlinie gilt ab',
   'privacy.effectiveDateValue': '1. März 2026',

@@ -7,6 +7,7 @@ import {
   verificationEmail,
   passwordResetEmail,
 } from './email-templates';
+import { CONTACT_EMAIL } from "@/constants/contact";
 
 // Initialize AutoSend client
 const autosend = new Autosend(process.env.AUTOSEND_API_KEY || 'AS_placeholder');
@@ -103,7 +104,7 @@ export async function sendSubscriptionCanceledEmail(email: string, name: string 
 
 // ── Inbound lead notification (book-demo, contact forms) ──────────────────────
 
-const TEAM_NOTIFICATION_EMAIL = process.env.TEAM_NOTIFICATION_EMAIL || 'hello@buildflow.app';
+const TEAM_NOTIFICATION_EMAIL = process.env.TEAM_NOTIFICATION_EMAIL || CONTACT_EMAIL;
 
 export async function sendInboundLeadNotification(data: {
   type: string;

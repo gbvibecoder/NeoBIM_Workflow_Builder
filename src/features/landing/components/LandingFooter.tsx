@@ -3,11 +3,12 @@
 import Link from "next/link";
 import { useLocale } from "@/hooks/useLocale";
 import { Instagram, Linkedin, Mail } from "lucide-react";
+import { CONTACT_EMAIL } from "@/constants/contact";
 
 const SOCIAL_LINKS = [
   { icon: Instagram, href: "https://www.instagram.com/buildflow_live/", label: "Instagram", color: "#E1306C" },
   { icon: Linkedin, href: "https://www.linkedin.com/in/buildflow/", label: "LinkedIn", color: "#0A66C2" },
-  { icon: Mail, href: "mailto:buildflow786@gmail.com", label: "Email", color: "#4F8AFF" },
+  { icon: Mail, href: `mailto:${CONTACT_EMAIL}`, label: "Email", color: "#4F8AFF" },
 ];
 
 export function LandingFooter() {

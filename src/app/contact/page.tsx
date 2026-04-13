@@ -23,6 +23,7 @@ import {
   Instagram,
   Linkedin,
 } from "lucide-react";
+import { CONTACT_EMAIL } from "@/constants/contact";
 
 const fadeUp = {
   hidden: { opacity: 0, y: 24 },
@@ -35,10 +36,10 @@ export default function ContactPage() {
   const { t } = useLocale();
 
   const contactChannels = [
-    { icon: Mail, color: "#4F8AFF", title: t('contact.channelEmailTitle'), description: t('contact.channelEmailDesc'), detail: "hello@buildflow.app", href: "mailto:hello@buildflow.app" },
-    { icon: Headphones, color: "#10B981", title: t('contact.channelSupportTitle'), description: t('contact.channelSupportDesc'), detail: "support@buildflow.app", href: "mailto:support@buildflow.app" },
-    { icon: Building2, color: "#8B5CF6", title: t('contact.channelSalesTitle'), description: t('contact.channelSalesDesc'), detail: "sales@buildflow.app", href: "mailto:sales@buildflow.app" },
-    { icon: FileQuestion, color: "#F59E0B", title: t('contact.channelLegalTitle'), description: t('contact.channelLegalDesc'), detail: "legal@buildflow.app", href: "mailto:legal@buildflow.app" },
+    { icon: Mail, color: "#4F8AFF", title: t('contact.channelEmailTitle'), description: t('contact.channelEmailDesc'), detail: CONTACT_EMAIL, href: `mailto:${CONTACT_EMAIL}` },
+    { icon: Headphones, color: "#10B981", title: t('contact.channelSupportTitle'), description: t('contact.channelSupportDesc'), detail: CONTACT_EMAIL, href: `mailto:${CONTACT_EMAIL}` },
+    { icon: Building2, color: "#8B5CF6", title: t('contact.channelSalesTitle'), description: t('contact.channelSalesDesc'), detail: CONTACT_EMAIL, href: `mailto:${CONTACT_EMAIL}` },
+    { icon: FileQuestion, color: "#F59E0B", title: t('contact.channelLegalTitle'), description: t('contact.channelLegalDesc'), detail: CONTACT_EMAIL, href: `mailto:${CONTACT_EMAIL}` },
   ];
 
   const officeInfo = [
@@ -816,7 +817,7 @@ export default function ContactPage() {
                 {[
                   { icon: Instagram, href: "https://www.instagram.com/buildflow_live/", label: "Instagram", color: "#E1306C" },
                   { icon: Linkedin, href: "https://www.linkedin.com/in/buildflow/", label: "LinkedIn", color: "#0A66C2" },
-                  { icon: Mail, href: "mailto:buildflow786@gmail.com", label: "Email", color: "#4F8AFF" },
+                  { icon: Mail, href: `mailto:${CONTACT_EMAIL}`, label: "Email", color: "#4F8AFF" },
                 ].map(s => (
                   <a
                     key={s.label}
@@ -985,7 +986,7 @@ export default function ContactPage() {
             {[
               { icon: Instagram, href: "https://www.instagram.com/buildflow_live/", label: "Instagram", color: "#E1306C" },
               { icon: Linkedin, href: "https://www.linkedin.com/in/buildflow/", label: "LinkedIn", color: "#0A66C2" },
-              { icon: Mail, href: "mailto:buildflow786@gmail.com", label: "Email", color: "#4F8AFF" },
+              { icon: Mail, href: `mailto:${CONTACT_EMAIL}`, label: "Email", color: "#4F8AFF" },
             ].map(s => (
               <a key={s.label} href={s.href} target={s.href.startsWith("mailto:") ? undefined : "_blank"} rel={s.href.startsWith("mailto:") ? undefined : "noopener noreferrer"} aria-label={s.label}
                 style={{ width: 30, height: 30, borderRadius: 8, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", display: "flex", alignItems: "center", justifyContent: "center", color: "#5C5C78", transition: "all 0.2s", textDecoration: "none" }}
