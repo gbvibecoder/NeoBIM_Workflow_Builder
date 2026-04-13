@@ -53,11 +53,11 @@ import {
  */
 export const maxDuration = 300;
 
-/** Record standalone tool use as an Execution for admin visibility. Fire-and-forget. */
+/** Record standalone tool use as an Execution for admin + billing visibility. */
 async function recordToolExecution(userId: string, toolName: string) {
   try {
     let wf = await prisma.workflow.findFirst({
-      where: { ownerId: userId, name: "__standalone_tools__", deletedAt: { not: null } },
+      where: { ownerId: userId, name: "__standalone_tools__" },
       select: { id: true },
     });
     if (!wf) {
@@ -66,7 +66,6 @@ async function recordToolExecution(userId: string, toolName: string) {
           ownerId: userId,
           name: "__standalone_tools__",
           description: "Auto-created for standalone tool usage tracking",
-          deletedAt: new Date(),
         },
         select: { id: true },
       });
@@ -82,7 +81,9 @@ async function recordToolExecution(userId: string, toolName: string) {
         metadata: { tool: toolName },
       },
     });
-  } catch { /* fire-and-forget */ }
+  } catch (err) {
+    console.error("[recordToolExecution] Failed:", err);
+  }
 }
 
 export async function POST(req: NextRequest) {

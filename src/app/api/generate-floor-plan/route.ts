@@ -115,12 +115,14 @@ function buildFeedback(project: FloorPlanProject, prompt: string): GenerationFee
   };
 }
 
-/** Record a standalone tool use as an Execution so it appears in admin panel. Fire-and-forget. */
+/** Record a standalone tool use as an Execution so it appears in admin + billing.
+ *  Uses a per-user hidden workflow (name starts with "__") that stays alive
+ *  (deletedAt = null) so execution counts aren't filtered out by the dashboard
+ *  and billing APIs which exclude soft-deleted workflows. */
 async function recordToolExecution(userId: string, toolName: string) {
   try {
-    // Lazily find or create a hidden "Standalone Tools" workflow per user
     let wf = await prisma.workflow.findFirst({
-      where: { ownerId: userId, name: "__standalone_tools__", deletedAt: { not: null } },
+      where: { ownerId: userId, name: "__standalone_tools__" },
       select: { id: true },
     });
     if (!wf) {
@@ -129,7 +131,6 @@ async function recordToolExecution(userId: string, toolName: string) {
           ownerId: userId,
           name: "__standalone_tools__",
           description: "Auto-created for standalone tool usage tracking",
-          deletedAt: new Date(), // hidden from "My Workflows"
         },
         select: { id: true },
       });
@@ -145,8 +146,8 @@ async function recordToolExecution(userId: string, toolName: string) {
         metadata: { tool: toolName },
       },
     });
-  } catch {
-    // Fire-and-forget — never block the user if tracking fails
+  } catch (err) {
+    console.error("[recordToolExecution] Failed:", err);
   }
 }
 

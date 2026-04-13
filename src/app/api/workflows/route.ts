@@ -27,7 +27,7 @@ export async function GET(req: NextRequest) {
 
     const [workflows, total] = await Promise.all([
       prisma.workflow.findMany({
-        where: { ownerId: session.user.id, deletedAt: null },
+        where: { ownerId: session.user.id, deletedAt: null, name: { not: "__standalone_tools__" } },
         orderBy: { updatedAt: "desc" },
         skip: (page - 1) * limit,
         take: limit,
