@@ -210,14 +210,14 @@ describe("IS 1200 Indian Standards", () => {
   it("Indian derived rates have correct structure", () => {
     expect(INDIAN_DERIVED_RATES.formwork.slab.rate).toBeGreaterThan(0);
     expect(INDIAN_DERIVED_RATES.rebar.slab.kgPerM3).toBeGreaterThan(0);
-    expect(INDIAN_DERIVED_RATES.rebar.slab.rate).toBe(88); // TMT Fe500 rate (calibrated from real BOQ 2025)
+    expect(INDIAN_DERIVED_RATES.rebar.slab.rate).toBe(98); // TMT Fe500 rate (CPWD DSR 2025-26)
   });
 
   it("calculates correct Indian wall cost for known area", () => {
     // Scenario: 100m² brick wall in India
-    // IS 1200 Part 3: Brick masonry 230mm = ₹1,250/m²
+    // IS 1200 Part 3: Brick masonry 230mm = ₹1,450/m² (CPWD DSR 2025-26)
     // Waste: 8% → 108 m²
-    // Cost: 108 × 1,250 = ₹1,35,000
+    // Cost: 108 × 1,450 = ₹1,56,600
     const rates = getIS1200RatesForElement("IfcWall", "Brick");
     const brickRate = rates.find(r => r.is1200Code === "IS1200-P3-BRICK-230");
     expect(brickRate).toBeDefined();
@@ -226,7 +226,7 @@ describe("IS 1200 Indian Standards", () => {
       const waste = 0.08;
       const adjQty = area * (1 + waste);
       const cost = adjQty * brickRate.rate;
-      expect(cost).toBeCloseTo(135000, -2); // ₹1,35,000 ± ₹100
+      expect(cost).toBeCloseTo(156600, -2); // ₹1,56,600 ± ₹100 (CPWD DSR 2025-26)
     }
   });
 });

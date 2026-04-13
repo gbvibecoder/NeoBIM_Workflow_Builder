@@ -331,16 +331,20 @@ export const handleEX002: NodeHandler = async (ctx) => {
         // Determine data source for transparency column
         const dataSource = l.division.includes("Structural IFC") ? "Structural IFC"
           : l.division.includes("MEP IFC") ? "MEP IFC"
-          : l.division.includes("PROVISIONAL") ? "Provisional"
+          : l.division.includes("PROVISIONAL") || l.division.includes("Provisional") ? "Provisional"
           : l.division.includes("Formwork") || l.division.includes("Rebar") || l.division.includes("Plaster") || l.division.includes("Reinforcement") ? "IFC Derived"
           : l.csiCode?.startsWith("IS1200") ? "IFC Geometry"
           : "Benchmark";
-        const confidence = dataSource === "IFC Geometry" ? "HIGH 90%"
-          : dataSource === "Structural IFC" ? "HIGH 88%"
-          : dataSource === "MEP IFC" ? "HIGH 85%"
-          : dataSource === "IFC Derived" ? "MED 72%"
-          : dataSource === "Provisional" ? "LOW 45%"
-          : "MED 60%";
+        // Phase 3: use structured confidence from TR-008 if available
+        const lineConf = (l as Record<string, unknown>).confidence as { score?: string; factors?: string[] } | undefined;
+        const confidence = lineConf?.score
+          ? `${lineConf.score.toUpperCase()}${lineConf.factors?.length ? " — " + lineConf.factors[0] : ""}`
+          : (dataSource === "IFC Geometry" ? "HIGH 90%"
+            : dataSource === "Structural IFC" ? "HIGH 88%"
+            : dataSource === "MEP IFC" ? "HIGH 85%"
+            : dataSource === "IFC Derived" ? "MED 72%"
+            : dataSource === "Provisional" ? "LOW 45%"
+            : "MED 60%");
 
         // Derive short division name for the Division column
         const divStr = String(l.division || "General");
@@ -507,21 +511,42 @@ export const handleEX002: NodeHandler = async (ctx) => {
   // ═══════════════════════════════════════════════════════════════════════
   // SHEET 5: ASSUMPTIONS LOG — Audit trail
   // ═══════════════════════════════════════════════════════════════════════
+  // Phase 3: Read pricing metadata for transparency
+  const pricingMd = (inputData as Record<string, unknown>)?._pricingMetadata as Record<string, unknown> | undefined;
+  const pricingSourceLabel = pricingMd?.source === "market_intelligence" ? "Live Market Intelligence (AI web search)"
+    : pricingMd?.source === "mixed" ? "Mixed — partial market intelligence + CPWD static rates"
+    : `CPWD DSR ${pricingMd?.staticRateVersion ?? "2025-26"} static rates`;
+
+  // Phase 3: Read model quality report
+  const mqReport = (inputData as Record<string, unknown>)?._modelQualityReport as Record<string, unknown> | undefined;
+
   const assumptionRows = [
     ["ASSUMPTIONS & BASIS OF ESTIMATE"],
     [""],
-    ["RATE BASIS"],
-    ["", isINR ? "CPWD Delhi Schedule of Rates (DSR) 2023-24" : "RSMeans 2024/2025"],
-    ["", isINR ? "IS 1200 Method of Measurement" : "CSI MasterFormat"],
+    ["PRICING SOURCE"],
+    ["", pricingSourceLabel, "", ""],
+    ["", isINR ? `Rate basis: ${String(pricingMd?.staticRateVersion ?? "CPWD DSR 2025-26")}` : "RSMeans 2024/2025", "", ""],
+    ["", isINR ? "IS 1200 Method of Measurement" : "CSI MasterFormat", "", ""],
+    ...(pricingMd?.staleDateWarning ? [["", `⚠ ${pricingMd.staleDateWarning}`, "", ""]] as (string | number)[][] : []),
+    ...(pricingMd?.lastMarketUpdate ? [["", `Last market update: ${pricingMd.lastMarketUpdate}`, "", ""]] as (string | number)[][] : []),
     ...(pricingInfo ? [["", `State PWD: ${pricingInfo.statePWD}`, "", ""], ["", `City: ${pricingInfo.cityTier}`, "", ""], ["", `Season: ${pricingInfo.seasonalNotes}`, "", ""]] as (string | number)[][] : []),
     [""],
-    ["WASTE FACTORS APPLIED"],
-    ["Material", "Waste %", "Notes", ""],
-    ["Concrete", "7%", "Spillage, over-pour, testing", ""],
-    ["Steel", "10%", "Cut-off, welding loss", ""],
-    ["Masonry", "8%", "Breakage, cutting, mortar", ""],
-    ["Finishes", "12%", "Cutting, pattern matching", ""],
-    ["Doors/Windows", "3%", "Factory-made", ""],
+    ["WASTE FACTORS APPLIED (Element-Specific, Phase 2 Upgrade)"],
+    ["Element", "Waste %", "Notes", ""],
+    ["Slab concrete", "4%", "Ground floor pumping loss", ""],
+    ["Column concrete", "7%", "Formwork spillage, compaction loss", ""],
+    ["Beam concrete", "5%", "Standard formwork loss", ""],
+    ["Wall concrete", "6%", "Standard formwork loss", ""],
+    ["Foundation concrete", "3%", "Open excavation, lower loss", ""],
+    ["Rebar (TMT Fe500)", "4%", "Cutting waste, lap lengths", ""],
+    ["Structural steel sections", "6%", "Fabrication waste", ""],
+    ["Brick masonry 230mm", "6%", "Breakage, cutting, mortar waste", ""],
+    ["AAC block", "4%", "Lightweight, less breakage", ""],
+    ["Plaster (12mm/20mm)", "11%", "Mixing loss, surface waste", ""],
+    ["Paint (emulsion/weathercoat)", "7%", "Application loss, touch-up", ""],
+    ["Vitrified tile 600×600", "13%", "Cutting, pattern matching, breakage", ""],
+    ["Marble flooring", "20%", "High breakage, irregular veining", ""],
+    ["Granite flooring", "16%", "Hard material, cutting waste", ""],
     [""],
     ["GST RATES APPLIED (all BOQ items are works contracts)"],
     ["Steel & Iron works", "18%", "Works contract rate", ""],
@@ -530,6 +555,13 @@ export const handleEX002: NodeHandler = async (ctx) => {
     ["Finishes (tiles, paint, plaster)", "18%", "Works contract rate", ""],
     ["MEP works", "18%", "Works contract rate", ""],
     [""],
+    ...(mqReport ? [
+      ["IFC MODEL QUALITY REPORT"],
+      ["Overall Grade", String(mqReport.overallGrade ?? "—"), "", ""],
+      ["Total Elements", String(mqReport.totalElements ?? 0), "", ""],
+      ...((mqReport.recommendations as string[] || []).map((r: string) => ["Recommendation", r, "", ""])),
+      [""],
+    ] as (string | number)[][] : []),
     ["EXCLUSIONS"],
     ["", "Land acquisition, financing, FF&E, specialty systems", "", ""],
     ["", "Off-site infrastructure, hazardous material abatement", "", ""],
@@ -542,6 +574,9 @@ export const handleEX002: NodeHandler = async (ctx) => {
         : " (architectural IFC only)"), "", ""],
     ["", "Valid for 90 days from date of preparation", "", ""],
     ["", "Engage a RICS/AACE certified QS for contract-grade pricing", "", ""],
+    [""],
+    ["DISCLAIMER"],
+    ["", String((inputData as Record<string, unknown>)?._disclaimer ?? boqData?.disclaimer ?? COST_DISCLAIMERS.full), "", ""],
   ];
   const assumSheet = XLSX.utils.aoa_to_sheet(assumptionRows);
   assumSheet["!cols"] = [{ wch: 22 }, { wch: 40 }, { wch: 30 }, { wch: 20 }];

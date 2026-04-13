@@ -235,16 +235,16 @@ describe("IS 1200 Rate Database", () => {
     }
   });
 
-  it("steel rebar rate ₹88/kg (calibrated from real BOQ)", () => {
+  it("steel rebar rate ₹98/kg (CPWD DSR 2025-26)", () => {
     const rebar = IS1200_RATES.find(r => r.is1200Code === "IS1200-P6-REBAR-500");
     expect(rebar).toBeDefined();
-    expect(rebar!.rate).toBe(88);
+    expect(rebar!.rate).toBe(98);
   });
 
-  it("structural steel rate ₹140/kg", () => {
+  it("structural steel rate ₹155/kg (CPWD DSR 2025-26)", () => {
     const steel = IS1200_RATES.find(r => r.is1200Code === "IS1200-P7-STRUCT-STEEL");
     expect(steel).toBeDefined();
-    expect(steel!.rate).toBe(140);
+    expect(steel!.rate).toBe(155);
   });
 
   it("piling rates exist", () => {

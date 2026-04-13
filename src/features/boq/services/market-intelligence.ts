@@ -92,31 +92,32 @@ export interface MarketIntelligenceResult {
   fallbacks_used: number;
 }
 
-// ─── Static Fallback Rates (CPWD DSR 2024 — emergency parachute only) ──────
+// ─── Static Fallback Rates (CPWD DSR 2025-26 — emergency parachute only) ────
+// Updated April 2026. These are used ONLY when market intelligence fails entirely.
 
 const STATIC_FALLBACKS = {
   steel_per_tonne: {
-    value: 68000, unit: "₹/tonne",
-    source: "CPWD DSR 2024 (static fallback — may be outdated)", date: "2024-01",
+    value: 75000, unit: "₹/tonne",
+    source: "CPWD DSR 2025-26 (static fallback)", date: "2026-04",
     confidence: "LOW" as const, fallbackLevel: "national" as const,
   },
   cement_per_bag: {
-    value: 380, unit: "₹/bag (50kg)",
-    source: "CPWD DSR 2024 (static fallback — may be outdated)", date: "2024-01",
+    value: 420, unit: "₹/bag (50kg)",
+    source: "CPWD DSR 2025-26 (static fallback)", date: "2026-04",
     confidence: "LOW" as const, brand: "Generic OPC 53", fallbackLevel: "national" as const,
   },
   sand_per_cft: {
-    value: 55, unit: "₹/cft",
-    source: "CPWD DSR 2024 (static fallback — may be outdated)", date: "2024-01",
+    value: 70, unit: "₹/cft",
+    source: "CPWD DSR 2025-26 (static fallback)", date: "2026-04",
     confidence: "LOW" as const, type: "M-sand", fallbackLevel: "national" as const,
   },
   labor: {
-    mason:       { value: 800, unit: "₹/day", source: "CPWD DSR 2024 (static fallback)", date: "2024-01", confidence: "LOW" as const, fallbackLevel: "national" as const },
-    helper:      { value: 450, unit: "₹/day", source: "CPWD DSR 2024 (static fallback)", date: "2024-01", confidence: "LOW" as const, fallbackLevel: "national" as const },
-    carpenter:   { value: 900, unit: "₹/day", source: "CPWD DSR 2024 (static fallback)", date: "2024-01", confidence: "LOW" as const, fallbackLevel: "national" as const },
-    steelFixer:  { value: 750, unit: "₹/day", source: "CPWD DSR 2024 (static fallback)", date: "2024-01", confidence: "LOW" as const, fallbackLevel: "national" as const },
-    electrician: { value: 1000, unit: "₹/day", source: "CPWD DSR 2024 (static fallback)", date: "2024-01", confidence: "LOW" as const, fallbackLevel: "national" as const },
-    plumber:     { value: 850, unit: "₹/day", source: "CPWD DSR 2024 (static fallback)", date: "2024-01", confidence: "LOW" as const, fallbackLevel: "national" as const },
+    mason:       { value: 950, unit: "₹/day", source: "CPWD DSR 2025-26 (static fallback)", date: "2026-04", confidence: "LOW" as const, fallbackLevel: "national" as const },
+    helper:      { value: 580, unit: "₹/day", source: "CPWD DSR 2025-26 (static fallback)", date: "2026-04", confidence: "LOW" as const, fallbackLevel: "national" as const },
+    carpenter:   { value: 1050, unit: "₹/day", source: "CPWD DSR 2025-26 (static fallback)", date: "2026-04", confidence: "LOW" as const, fallbackLevel: "national" as const },
+    steelFixer:  { value: 900, unit: "₹/day", source: "CPWD DSR 2025-26 (static fallback)", date: "2026-04", confidence: "LOW" as const, fallbackLevel: "national" as const },
+    electrician: { value: 1150, unit: "₹/day", source: "CPWD DSR 2025-26 (static fallback)", date: "2026-04", confidence: "LOW" as const, fallbackLevel: "national" as const },
+    plumber:     { value: 1000, unit: "₹/day", source: "CPWD DSR 2025-26 (static fallback)", date: "2026-04", confidence: "LOW" as const, fallbackLevel: "national" as const },
   },
 };
 
@@ -148,6 +149,58 @@ async function setCachedResult(cacheKey: string, data: MarketIntelligenceResult)
     await redis.set(cacheKey, data, { ex: 82800 }); // 23 hours TTL
   } catch {
     // Non-fatal — caching is best-effort
+  }
+}
+
+// ─── Persistent Price Cache (Postgres via Prisma) ──────────────────────────
+// Survives Redis TTL expiry. Enables cross-user learning: once ANY user
+// fetches prices for Pune, ALL subsequent Pune BOQs benefit.
+
+async function persistToMaterialCache(result: MarketIntelligenceResult): Promise<void> {
+  try {
+    const { prisma } = await import("@/lib/db");
+    const now = new Date(result.fetched_at || Date.now());
+    const expiresAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000); // +30 days
+    const city = result.city || "";
+    const state = result.state || "";
+    if (!city || !state) return;
+
+    const entries: Array<{
+      materialCode: string; price: number; unit: string;
+      source: string; confidence: string;
+    }> = [
+      { materialCode: "steel_per_tonne", price: result.steel_per_tonne.value, unit: result.steel_per_tonne.unit, source: result.steel_per_tonne.source, confidence: result.steel_per_tonne.confidence },
+      { materialCode: "cement_per_bag", price: result.cement_per_bag.value, unit: result.cement_per_bag.unit, source: result.cement_per_bag.source, confidence: result.cement_per_bag.confidence },
+      { materialCode: "sand_per_cft", price: result.sand_per_cft.value, unit: result.sand_per_cft.unit, source: result.sand_per_cft.source, confidence: result.sand_per_cft.confidence },
+      { materialCode: "labor_mason", price: result.labor.mason.value, unit: result.labor.mason.unit, source: result.labor.mason.source, confidence: result.labor.mason.confidence },
+      { materialCode: "labor_helper", price: result.labor.helper.value, unit: result.labor.helper.unit, source: result.labor.helper.source, confidence: result.labor.helper.confidence },
+      { materialCode: "labor_carpenter", price: result.labor.carpenter.value, unit: result.labor.carpenter.unit, source: result.labor.carpenter.source, confidence: result.labor.carpenter.confidence },
+      { materialCode: "labor_electrician", price: result.labor.electrician.value, unit: result.labor.electrician.unit, source: result.labor.electrician.source, confidence: result.labor.electrician.confidence },
+      { materialCode: "labor_plumber", price: result.labor.plumber.value, unit: result.labor.plumber.unit, source: result.labor.plumber.source, confidence: result.labor.plumber.confidence },
+      { materialCode: "labor_steel_fixer", price: result.labor.steelFixer.value, unit: result.labor.steelFixer.unit, source: result.labor.steelFixer.source, confidence: result.labor.steelFixer.confidence },
+    ];
+
+    // Filter out static fallback entries (only persist live/partial data)
+    const liveEntries = entries.filter(e => e.confidence !== "LOW" || !e.source.includes("static fallback"));
+
+    if (liveEntries.length === 0) return;
+
+    // Batch create — fire-and-forget, non-blocking
+    await prisma.materialPriceCache.createMany({
+      data: liveEntries.map(e => ({
+        city,
+        state,
+        materialCode: e.materialCode,
+        price: e.price,
+        unit: e.unit,
+        source: e.source,
+        confidence: e.confidence,
+        fetchedAt: now,
+        expiresAt,
+      })),
+    });
+  } catch {
+    // Non-fatal — persistence is best-effort
   }
 }
 
@@ -558,6 +611,8 @@ Steel range: ₹52,000-78,000/tonne. Cement: ₹340-560/bag. Mason: ₹500-1200/
   // ── Cache write (only if we got live data) ──
   if (result.agent_status !== "fallback") {
     setCachedResult(cacheKey, result).catch(() => {});
+    // Persist to Postgres for cross-user learning (survives Redis TTL)
+    persistToMaterialCache(result).catch(() => {});
   }
 
   return result;

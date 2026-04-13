@@ -68,12 +68,22 @@ export interface QuantityData {
     withWaste: number;
     unit: string;
   };
+  weight?: {
+    gross?: number;
+    net?: number;
+    unit: string; // "kg"
+  };
   length?: number;
   width?: number;
   height?: number;
   thickness?: number;
   perimeter?: number;
   openingArea?: number;
+  crossSectionArea?: number;
+  outerSurfaceArea?: number;
+  footprintArea?: number;
+  /** Where the primary quantity values came from */
+  quantitySource?: "qto_standard" | "custom" | "geometry_calculated";
   [key: string]: unknown;
 }
 
@@ -120,6 +130,38 @@ export interface BuildingStorey {
   elementCount: number;
 }
 
+/** Pre-extraction model quality assessment — flags modeling issues that
+ *  degrade BOQ accuracy. Computed during parsing, consumed by TR-008 and
+ *  the BOQ Visualizer's IFCQualityCard component. */
+export interface ModelQualityReport {
+  /** Elements with visual representation but zero or undefined volume */
+  zeroVolumeElements: { count: number; types: string[] };
+  /** Elements without any IfcMaterial / IfcMaterialLayerSet association */
+  noMaterialElements: { count: number; types: string[] };
+  /** Elements not linked to any IfcBuildingStorey via IfcRelContainedInSpatialStructure */
+  unassignedStoreyElements: { count: number; types: string[] };
+  /** Walls/slabs with implausible thickness (walls >1000mm or <50mm, slabs >500mm or <50mm) */
+  suspiciousDimensions: Array<{
+    elementType: string;
+    name: string;
+    dimension: string; // "thickness"
+    value: number;     // meters
+    expected: string;  // "50mm–1000mm"
+  }>;
+  /** Elements at same coordinates with same type (potential double-count) */
+  duplicateElements: { count: number; estimatedImpact: string };
+  /** Whether the project unit is non-metric and was converted */
+  unitConversion: {
+    detectedUnit: string;    // "METRE", "FOOT", "INCH", etc.
+    conversionApplied: boolean;
+    conversionFactor: number; // multiplier to get meters (1.0 if already metric)
+  };
+  /** Overall model quality score (0-100) derived from the checks above */
+  score: number;
+  /** Quality label derived from score */
+  label: "EXCELLENT" | "GOOD" | "FAIR" | "LIMITED";
+}
+
 export interface IFCParseResult {
   meta: {
     version: string;
@@ -148,6 +190,8 @@ export interface IFCParseResult {
   };
   divisions: CSIDivision[];
   buildingStoreys: BuildingStorey[];
+  /** Model quality assessment — flags issues that affect BOQ accuracy */
+  modelQuality?: ModelQualityReport;
 }
 
 // ============================================================================
@@ -456,10 +500,19 @@ const AREA_QUANTITY_NAMES = {
   gross: ["GrossSideArea", "GrossArea", "GrossFootprintArea", "GrossSurfaceArea", "TotalSurfaceArea"],
   net: ["NetSideArea", "NetArea", "NetFootprintArea", "NetSurfaceArea"],
   opening: ["TotalOpeningArea", "OpeningArea"],
-  general: ["Area"],
+  general: ["Area", "FootprintArea"],
 };
 
+/** Cross-section area (columns, beams, piles) — used for structural steel weight calc */
+const CROSS_SECTION_NAMES = ["CrossSectionArea", "GrossCrossSectionArea", "NetCrossSectionArea"];
+/** Outer surface area — used for painting/cladding takeoff */
+const OUTER_SURFACE_NAMES = ["OuterSurfaceArea"];
+/** Footprint area — used for excavation/waterproofing */
+const FOOTPRINT_NAMES = ["GrossFootprintArea", "NetFootprintArea", "FootprintArea"];
+
 const VOLUME_QUANTITY_NAMES = ["NetVolume", "GrossVolume", "Volume"];
+/** Weight quantities (IFC 4.x) — critical for structural steel BOQ in tonnes */
+const WEIGHT_QUANTITY_NAMES = ["GrossWeight", "NetWeight", "Weight"];
 const LENGTH_QUANTITY_NAMES = ["Length", "NominalLength"];
 const WIDTH_QUANTITY_NAMES = ["Width", "NominalWidth", "Thickness"];
 const HEIGHT_QUANTITY_NAMES = ["Height", "NominalHeight", "Depth"];
@@ -552,6 +605,17 @@ function extractQuantities(
   try {
     const propDefIds = propertyLookup.get(expressID) || [];
 
+    // ── Qto_* Prioritization ──
+    // IFC standard base quantity sets (Qto_WallBaseQuantities, Qto_SlabBaseQuantities, etc.)
+    // are computed by the authoring tool from parametric geometry — they are the gold standard.
+    // Custom IfcElementQuantity sets may be wrong, manually entered, or from plugins.
+    // Strategy: process ALL property sets, but track which values came from Qto_* sets.
+    // Qto_* values always overwrite custom values. Custom values only fill gaps.
+    let hasQtoValues = false;   // did we find any Qto_* quantity set?
+    let hasCustomValues = false; // did we find any custom quantity set?
+    // Track which fields have been set by a Qto_* standard set — these must not be overwritten
+    const qtoLockedFields = new Set<string>();
+
     for (const propDefId of propDefIds) {
       try {
         const propDef = ifcAPI.GetLine(modelID, propDefId, false);
@@ -588,6 +652,12 @@ function extractQuantities(
         const quantitiesRef = propDef.Quantities;
         if (!quantitiesRef) continue;
 
+        // Check if this is a Qto_* standard set (e.g. Qto_WallBaseQuantities)
+        const psetName = String(propDef.Name?.value ?? "");
+        const isQtoStandard = psetName.startsWith("Qto_");
+        if (isQtoStandard) hasQtoValues = true;
+        else hasCustomValues = true;
+
         const qRefs = Array.isArray(quantitiesRef) ? quantitiesRef : [quantitiesRef];
 
         for (const qRef of qRefs) {
@@ -603,47 +673,89 @@ function extractQuantities(
 
             if (value === 0) continue;
 
+            // Skip if this field was already set by a Qto_* set and current set is custom
+            const canWrite = (field: string) => {
+              if (isQtoStandard) {
+                qtoLockedFields.add(field);
+                return true; // Qto_* always writes
+              }
+              return !qtoLockedFields.has(field); // custom only writes if not locked
+            };
+
             // Match to known quantity names
             // Area — gross
             if (AREA_QUANTITY_NAMES.gross.some((n) => name === n)) {
-              if (!quantities.area) quantities.area = { unit: "m²" };
-              quantities.area.gross = value;
+              if (canWrite("area.gross")) {
+                if (!quantities.area) quantities.area = { unit: "m²" };
+                quantities.area.gross = value;
+              }
             }
             // Area — net
             else if (AREA_QUANTITY_NAMES.net.some((n) => name === n)) {
-              if (!quantities.area) quantities.area = { unit: "m²" };
-              quantities.area.net = value;
+              if (canWrite("area.net")) {
+                if (!quantities.area) quantities.area = { unit: "m²" };
+                quantities.area.net = value;
+              }
             }
             // Area — opening
             else if (AREA_QUANTITY_NAMES.opening.some((n) => name === n)) {
-              quantities.openingArea = value;
+              if (canWrite("openingArea")) {
+                quantities.openingArea = value;
+              }
             }
             // Area — general fallback
             else if (AREA_QUANTITY_NAMES.general.some((n) => name === n)) {
-              if (!quantities.area) quantities.area = { unit: "m²" };
-              if (!quantities.area.gross) quantities.area.gross = value;
+              if (canWrite("area.gross") && !quantities.area?.gross) {
+                if (!quantities.area) quantities.area = { unit: "m²" };
+                quantities.area.gross = value;
+              }
             }
             // Volume
             else if (VOLUME_QUANTITY_NAMES.some((n) => name === n)) {
-              if (!quantities.volume) quantities.volume = { base: 0, withWaste: 0, unit: "m³" };
-              quantities.volume.base = Math.max(quantities.volume.base, value);
+              if (canWrite("volume")) {
+                if (!quantities.volume) quantities.volume = { base: 0, withWaste: 0, unit: "m³" };
+                quantities.volume.base = Math.max(quantities.volume.base, value);
+              }
             }
             // Length
             else if (LENGTH_QUANTITY_NAMES.some((n) => name === n)) {
-              quantities.length = value;
+              if (canWrite("length")) quantities.length = value;
             }
             // Width / Thickness
             else if (WIDTH_QUANTITY_NAMES.some((n) => name === n)) {
-              quantities.width = value;
-              if (name === "Thickness") quantities.thickness = value;
+              if (canWrite("width")) {
+                quantities.width = value;
+                if (name === "Thickness") quantities.thickness = value;
+              }
             }
             // Height
             else if (HEIGHT_QUANTITY_NAMES.some((n) => name === n)) {
-              quantities.height = value;
+              if (canWrite("height")) quantities.height = value;
             }
             // Perimeter
             else if (PERIMETER_QUANTITY_NAMES.some((n) => name === n)) {
-              quantities.perimeter = value;
+              if (canWrite("perimeter")) quantities.perimeter = value;
+            }
+            // Weight (IFC 4.x — critical for structural steel BOQ)
+            else if (WEIGHT_QUANTITY_NAMES.some((n) => name === n)) {
+              if (canWrite("weight")) {
+                if (!quantities.weight) quantities.weight = { unit: "kg" };
+                if (name === "GrossWeight") quantities.weight.gross = value;
+                else if (name === "NetWeight") quantities.weight.net = value;
+                else if (!quantities.weight.gross) quantities.weight.gross = value; // generic "Weight"
+              }
+            }
+            // Cross-section area (columns, beams, piles)
+            else if (CROSS_SECTION_NAMES.some((n) => name === n)) {
+              if (canWrite("crossSectionArea")) quantities.crossSectionArea = value;
+            }
+            // Outer surface area (painting/cladding)
+            else if (OUTER_SURFACE_NAMES.some((n) => name === n)) {
+              if (canWrite("outerSurfaceArea")) quantities.outerSurfaceArea = value;
+            }
+            // Footprint area (excavation/waterproofing)
+            else if (FOOTPRINT_NAMES.some((n) => name === n)) {
+              if (canWrite("footprintArea")) quantities.footprintArea = value;
             }
           } catch {
             // Skip individual quantity parsing errors
@@ -654,12 +766,37 @@ function extractQuantities(
       }
     }
 
+    // Set quantitySource based on what was found
+    if (hasQtoValues) {
+      quantities.quantitySource = "qto_standard";
+    } else if (hasCustomValues) {
+      quantities.quantitySource = "custom";
+    }
+    // If neither found, will remain undefined — computeGeometricQuantities will set "geometry_calculated"
+
     // --- Calculate derived quantities when IFC didn't provide them ---
 
     // Net area for walls: gross - openings
     if (quantities.area?.gross && quantities.openingArea) {
       if (!quantities.area.net) {
         quantities.area.net = quantities.area.gross - quantities.openingArea;
+      }
+    }
+
+    // For steel members/plates: if we have Qto weight but no volume, derive volume from weight
+    // weight / density (7850 kg/m³) = volume — more accurate than geometric estimation
+    if (
+      (ifcType === "IfcMember" || ifcType === "IfcPlate") &&
+      !quantities.volume?.base &&
+      (quantities.weight?.gross ?? quantities.weight?.net)
+    ) {
+      const w = quantities.weight!.net ?? quantities.weight!.gross!;
+      if (w > 0) {
+        quantities.volume = {
+          base: w, // downstream uses this as kg for steel (IS1200-P7-STRUCT-STEEL)
+          withWaste: 0,
+          unit: "m³", // note: for steel elements TR-008 treats this as kg via density conversion
+        };
       }
     }
 
@@ -692,20 +829,31 @@ function extractQuantities(
       quantities.area.gross = quantities.width * quantities.height;
     }
 
-    // For IfcReinforcingBar: calculate weight from NominalDiameter × Length
+    // For IfcReinforcingBar: prefer Qto weight, else calculate from diameter × length
     // Weight = (π/4) × d² × length × 7850 kg/m³
     if (ifcType === "IfcReinforcingBar") {
-      const diam = quantities.width ?? 0; // NominalDiameter often mapped to width
-      const barLength = quantities.length ?? 0;
-      if (diam > 0 && barLength > 0) {
-        // diam may be in mm, convert to m for calculation
-        const d_m = diam > 1 ? diam / 1000 : diam; // if >1 likely mm
-        const weight = (Math.PI / 4) * d_m * d_m * barLength * 7850; // kg
+      // Priority 1: Use GrossWeight/NetWeight from Qto_ReinforcingElementBaseQuantities
+      const qtoWeight = quantities.weight?.net ?? quantities.weight?.gross;
+      if (qtoWeight && qtoWeight > 0) {
         if (!quantities.volume) quantities.volume = { base: 0, withWaste: 0, unit: "m³" };
-        quantities.volume.base = weight; // Store weight in volume.base for downstream (unit: kg)
-        quantities.rebarWeight = weight;
-        quantities.rebarDiameter = diam > 1 ? diam : diam * 1000; // store in mm
-        quantities.rebarSource = "extracted";
+        quantities.volume.base = qtoWeight; // Store weight in volume.base for downstream (unit: kg)
+        quantities.rebarWeight = qtoWeight;
+        quantities.rebarDiameter = quantities.width ? (quantities.width > 1 ? quantities.width : quantities.width * 1000) : undefined;
+        quantities.rebarSource = "qto_weight";
+      } else {
+        // Priority 2: Compute from NominalDiameter × Length × density
+        const diam = quantities.width ?? 0; // NominalDiameter often mapped to width
+        const barLength = quantities.length ?? 0;
+        if (diam > 0 && barLength > 0) {
+          // diam may be in mm, convert to m for calculation
+          const d_m = diam > 1 ? diam / 1000 : diam; // if >1 likely mm
+          const weight = (Math.PI / 4) * d_m * d_m * barLength * 7850; // kg
+          if (!quantities.volume) quantities.volume = { base: 0, withWaste: 0, unit: "m³" };
+          quantities.volume.base = weight; // Store weight in volume.base for downstream (unit: kg)
+          quantities.rebarWeight = weight;
+          quantities.rebarDiameter = diam > 1 ? diam : diam * 1000; // store in mm
+          quantities.rebarSource = "extracted";
+        }
       }
     }
 
@@ -765,6 +913,13 @@ function computeGeometricQuantities(
   const hasVolume = (quantities.volume?.base ?? 0) > 0;
   if (hasArea && hasVolume) return;
 
+  // If we're computing from geometry, mark the source (unless Qto already set it)
+  const markGeometrySource = () => {
+    if (!quantities.quantitySource) {
+      quantities.quantitySource = "geometry_calculated";
+    }
+  };
+
   try {
     const element = ifcAPI.GetLine(modelID, expressID, false);
     if (!element?.Representation?.value) return;
@@ -815,6 +970,7 @@ function computeGeometricQuantities(
           if (profileArea <= 0) continue;
 
           foundExtrusion = true;
+          markGeometrySource();
 
           // Volume = profileArea × depth
           if (!hasVolume) {
@@ -1176,6 +1332,182 @@ function getMaterialName(
 
 
 // ============================================================================
+// MODEL QUALITY VALIDATION
+// ============================================================================
+
+/**
+ * Assess model quality after element extraction. Flags issues that degrade
+ * BOQ accuracy: zero-volume elements, missing materials, unassigned storeys,
+ * suspicious dimensions, and potential duplicates.
+ */
+function buildModelQualityReport(
+  divisions: CSIDivision[],
+  _materialLookup: Map<number, string>,
+  _storeyLookup: Map<number, string>,
+  totalElements: number,
+  processedElements: number,
+  warnings: string[],
+  unitInfo: { detectedUnit: string; conversionApplied: boolean; conversionFactor: number },
+): ModelQualityReport {
+  // Collect all elements across all divisions
+  const allElements: IFCElementData[] = [];
+  for (const div of divisions) {
+    for (const cat of div.categories) {
+      allElements.push(...cat.elements);
+    }
+  }
+
+  // 1. Zero-volume elements: elements expected to have volume but don't
+  const volumeExpectedTypes = new Set([
+    "IfcWall", "IfcWallStandardCase", "IfcSlab", "IfcColumn", "IfcBeam",
+    "IfcFooting", "IfcStair",
+  ]);
+  const zeroVolumeTypes = new Map<string, number>();
+  for (const el of allElements) {
+    if (volumeExpectedTypes.has(el.type)) {
+      const vol = el.quantities.volume?.base ?? 0;
+      if (vol <= 0) {
+        zeroVolumeTypes.set(el.type, (zeroVolumeTypes.get(el.type) ?? 0) + 1);
+      }
+    }
+  }
+  const zeroVolumeCount = Array.from(zeroVolumeTypes.values()).reduce((s, v) => s + v, 0);
+
+  // 2. No-material elements: elements without material assignment
+  // We check by looking at the element's material field
+  const noMaterialTypes = new Map<string, number>();
+  for (const el of allElements) {
+    if (!el.material || el.material === "Unknown" || el.material === "") {
+      noMaterialTypes.set(el.type, (noMaterialTypes.get(el.type) ?? 0) + 1);
+    }
+  }
+  const noMaterialCount = Array.from(noMaterialTypes.values()).reduce((s, v) => s + v, 0);
+
+  // 3. Unassigned-storey elements
+  const unassignedTypes = new Map<string, number>();
+  for (const el of allElements) {
+    if (!el.storey || el.storey === "Unassigned") {
+      unassignedTypes.set(el.type, (unassignedTypes.get(el.type) ?? 0) + 1);
+    }
+  }
+  const unassignedCount = Array.from(unassignedTypes.values()).reduce((s, v) => s + v, 0);
+
+  // 4. Suspicious dimensions
+  const suspiciousDims: ModelQualityReport["suspiciousDimensions"] = [];
+  for (const el of allElements) {
+    const t = el.quantities.thickness;
+    if (t != null && t > 0) {
+      if ((el.type === "IfcWall" || el.type === "IfcWallStandardCase") && (t > 1.0 || t < 0.05)) {
+        suspiciousDims.push({
+          elementType: el.type,
+          name: el.name,
+          dimension: "thickness",
+          value: t,
+          expected: "50mm–1000mm",
+        });
+      }
+      if (el.type === "IfcSlab" && (t > 0.5 || t < 0.05)) {
+        suspiciousDims.push({
+          elementType: el.type,
+          name: el.name,
+          dimension: "thickness",
+          value: t,
+          expected: "50mm–500mm",
+        });
+      }
+    }
+  }
+  // Cap suspicious dimensions list to avoid noise
+  if (suspiciousDims.length > 20) suspiciousDims.length = 20;
+
+  // 5. Duplicate detection: elements at same position + type
+  // Lightweight heuristic: group by type + storey + rounded area + rounded volume
+  // If >1 element has identical signature, flag as potential duplicate
+  const signatureMap = new Map<string, number>();
+  for (const el of allElements) {
+    const area = Math.round((el.quantities.area?.gross ?? 0) * 100);
+    const vol = Math.round((el.quantities.volume?.base ?? 0) * 100);
+    const sig = `${el.type}|${el.storey}|${area}|${vol}`;
+    signatureMap.set(sig, (signatureMap.get(sig) ?? 0) + 1);
+  }
+  let duplicateCount = 0;
+  for (const [, count] of signatureMap) {
+    if (count > 1) duplicateCount += count - 1; // each extra is a potential duplicate
+  }
+  // Only report if ratio is suspiciously high (>20% duplicates)
+  const duplicateRatio = allElements.length > 0 ? duplicateCount / allElements.length : 0;
+  const reportedDuplicates = duplicateRatio > 0.20 ? duplicateCount : 0;
+
+  // Compute overall score (0-100)
+  let score = 100;
+  // Penalize for failed elements
+  if (totalElements > 0) {
+    const failedRatio = (totalElements - processedElements) / totalElements;
+    score -= Math.round(failedRatio * 30); // up to -30 for all elements failing
+  }
+  // Penalize for zero-volume elements
+  if (allElements.length > 0) {
+    score -= Math.min(20, Math.round((zeroVolumeCount / allElements.length) * 40));
+  }
+  // Penalize for no-material elements
+  if (allElements.length > 0) {
+    score -= Math.min(15, Math.round((noMaterialCount / allElements.length) * 30));
+  }
+  // Penalize for unassigned storeys
+  if (allElements.length > 0) {
+    score -= Math.min(10, Math.round((unassignedCount / allElements.length) * 20));
+  }
+  // Penalize for suspicious dimensions
+  score -= Math.min(10, suspiciousDims.length * 2);
+  // Penalize for duplicates
+  if (reportedDuplicates > 0) score -= Math.min(15, Math.round(duplicateRatio * 30));
+
+  score = Math.max(0, Math.min(100, score));
+
+  const label: ModelQualityReport["label"] =
+    score >= 85 ? "EXCELLENT" : score >= 65 ? "GOOD" : score >= 40 ? "FAIR" : "LIMITED";
+
+  // Add warnings for significant issues
+  if (zeroVolumeCount > 0) {
+    warnings.push(`Model quality: ${zeroVolumeCount} element(s) have zero volume (${Array.from(zeroVolumeTypes.keys()).join(", ")})`);
+  }
+  if (noMaterialCount > 5) {
+    warnings.push(`Model quality: ${noMaterialCount} element(s) have no material assignment — generic rates will be used`);
+  }
+  if (unassignedCount > 5) {
+    warnings.push(`Model quality: ${unassignedCount} element(s) not assigned to any storey — floor-wise breakdown incomplete`);
+  }
+  if (suspiciousDims.length > 0) {
+    warnings.push(`Model quality: ${suspiciousDims.length} element(s) have suspicious dimensions (e.g. wall thickness ${suspiciousDims[0].value > 1 ? ">1m" : "<50mm"})`);
+  }
+
+  return {
+    zeroVolumeElements: {
+      count: zeroVolumeCount,
+      types: Array.from(zeroVolumeTypes.keys()),
+    },
+    noMaterialElements: {
+      count: noMaterialCount,
+      types: Array.from(noMaterialTypes.keys()),
+    },
+    unassignedStoreyElements: {
+      count: unassignedCount,
+      types: Array.from(unassignedTypes.keys()),
+    },
+    suspiciousDimensions: suspiciousDims,
+    duplicateElements: {
+      count: reportedDuplicates,
+      estimatedImpact: reportedDuplicates > 0
+        ? `~${Math.round(duplicateRatio * 100)}% of elements may be duplicated — quantities could be over-counted`
+        : "none",
+    },
+    unitConversion: unitInfo,
+    score,
+    label,
+  };
+}
+
+// ============================================================================
 // MAIN PARSER
 // ============================================================================
 
@@ -1209,6 +1541,11 @@ export async function parseIFCBuffer(
   let projectName = "Unknown Project";
   let projectGuid = "";
 
+  // Unit detection state — set during project metadata extraction, used after
+  let detectedLengthUnit = "METRE";
+  let lengthConversionFactor = 1.0; // multiply to get meters
+  let unitConversionApplied = false;
+
   try {
     const projectIDs = ifcAPI.GetLineIDsWithType(modelID, IFCPROJECT);
     if (projectIDs.size() > 0) {
@@ -1219,6 +1556,75 @@ export async function parseIFCBuffer(
       }
       if (project?.GlobalId?.value) {
         projectGuid = project.GlobalId.value;
+      }
+
+      // ── Unit Consistency Check ──
+      // Read IfcUnitAssignment from IfcProject to detect length unit
+      // Most IFC files use METRE, but some (especially from US tools) use FOOT or INCH
+      const unitsRef = project?.UnitsInContext?.value;
+      if (typeof unitsRef === "number") {
+        try {
+          const unitAssignment = ifcAPI.GetLine(modelID, unitsRef, false);
+          const units = unitAssignment?.Units;
+          const unitRefs = Array.isArray(units) ? units : units ? [units] : [];
+          for (const uRef of unitRefs) {
+            const uId = (uRef as { value?: number })?.value;
+            if (typeof uId !== "number") continue;
+            try {
+              const unit = ifcAPI.GetLine(modelID, uId, false);
+              // IfcSIUnit or IfcConversionBasedUnit with UnitType = LENGTHUNIT
+              const unitType = unit?.UnitType?.value;
+              if (unitType !== ".LENGTHUNIT." && unitType !== "LENGTHUNIT") continue;
+
+              // Check for IfcSIUnit
+              const siName = unit?.Name?.value;
+              const prefix = unit?.Prefix?.value;
+              if (siName) {
+                const nameStr = String(siName).replace(/\./g, "").toUpperCase();
+                if (nameStr === "METRE" || nameStr === "METER") {
+                  if (prefix) {
+                    const prefixStr = String(prefix).replace(/\./g, "").toUpperCase();
+                    if (prefixStr === "MILLI") {
+                      detectedLengthUnit = "MILLIMETRE";
+                      lengthConversionFactor = 0.001;
+                      unitConversionApplied = true;
+                      warnings.push("IFC file uses MILLIMETRE units — quantities converted to metres");
+                    } else if (prefixStr === "CENTI") {
+                      detectedLengthUnit = "CENTIMETRE";
+                      lengthConversionFactor = 0.01;
+                      unitConversionApplied = true;
+                      warnings.push("IFC file uses CENTIMETRE units — quantities converted to metres");
+                    }
+                    // METRE with no prefix = standard (factor stays 1.0)
+                  } else {
+                    detectedLengthUnit = "METRE";
+                  }
+                }
+              }
+
+              // Check for IfcConversionBasedUnit (e.g. FOOT, INCH)
+              const convName = unit?.Name?.value;
+              if (typeof convName === "string") {
+                const cn = convName.toUpperCase();
+                if (cn.includes("FOOT") || cn.includes("FT")) {
+                  detectedLengthUnit = "FOOT";
+                  lengthConversionFactor = 0.3048;
+                  unitConversionApplied = true;
+                  warnings.push("IFC file uses FOOT units — quantities converted to metres");
+                } else if (cn.includes("INCH") || cn.includes("IN")) {
+                  detectedLengthUnit = "INCH";
+                  lengthConversionFactor = 0.0254;
+                  unitConversionApplied = true;
+                  warnings.push("IFC file uses INCH units — quantities converted to metres");
+                }
+              }
+
+              break; // Found the length unit, stop looking
+            } catch { /* skip individual unit */ }
+          }
+        } catch {
+          warnings.push("Failed to read IfcUnitAssignment — assuming METRE");
+        }
       }
     }
   } catch {
@@ -1383,6 +1789,26 @@ export async function parseIFCBuffer(
         // Geometric fallback: compute area/volume from shape representation
         // when Qto property sets are missing or incomplete
         computeGeometricQuantities(ifcAPI, modelID, expressID, label, quantities);
+
+        // ── Unit conversion: apply lengthConversionFactor if non-metric units detected ──
+        if (unitConversionApplied && lengthConversionFactor !== 1.0) {
+          const lf = lengthConversionFactor;        // e.g. 0.3048 for feet → meters
+          const af = lf * lf;                       // area conversion factor
+          const vf = lf * lf * lf;                  // volume conversion factor
+          if (quantities.length) quantities.length *= lf;
+          if (quantities.width) quantities.width *= lf;
+          if (quantities.height) quantities.height *= lf;
+          if (quantities.thickness) quantities.thickness *= lf;
+          if (quantities.perimeter) quantities.perimeter *= lf;
+          if (quantities.area?.gross) quantities.area.gross *= af;
+          if (quantities.area?.net) quantities.area.net *= af;
+          if (quantities.openingArea) quantities.openingArea *= af;
+          if (quantities.crossSectionArea) quantities.crossSectionArea *= af;
+          if (quantities.outerSurfaceArea) quantities.outerSurfaceArea *= af;
+          if (quantities.footprintArea) quantities.footprintArea *= af;
+          if (quantities.volume?.base) quantities.volume.base *= vf;
+          // Weight is always in kg, no conversion needed
+        }
 
         // Per-wall opening deduction: deduct opening area from THIS wall's gross area
         if ((label === "IfcWall" || label === "IfcWallStandardCase") && wallOpeningAreaLookup.has(expressID)) {
@@ -1599,6 +2025,18 @@ export async function parseIFCBuffer(
   const totalConcrete = slabDivision?.totalVolume;
   const totalMasonry = divisions.find((d) => d.code === "04")?.totalArea;
 
+  // ── Model Quality Validation ──
+  // Assess model quality BEFORE closing — flags issues that degrade BOQ accuracy
+  const modelQuality = buildModelQualityReport(
+    divisions,
+    elementMaterialLookup,
+    elementStoreyLookup,
+    totalElements,
+    processedElements,
+    warnings,
+    { detectedUnit: detectedLengthUnit, conversionApplied: unitConversionApplied, conversionFactor: lengthConversionFactor },
+  );
+
   // Close model
   ifcAPI.CloseModel(modelID);
 
@@ -1632,5 +2070,6 @@ export async function parseIFCBuffer(
     },
     divisions,
     buildingStoreys,
+    modelQuality,
   };
 }

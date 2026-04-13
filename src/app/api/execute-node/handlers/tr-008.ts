@@ -86,7 +86,49 @@ export const handleTR008: NodeHandler = async (ctx) => {
     }
   } catch (steelErr) {
     console.warn("[TR-008] Could not extract steel rate from market data:", steelErr);
-    // steelFromMarket stays false — will use static IS 1200 rates
+    // steelFromMarket stays false — will try fallback chain below
+  }
+
+  // ── Price Fallback Chain (Priorities 3-6) ──
+  // When TR-015 live data (Priority 1) and Redis cache (Priority 2) are both missing,
+  // query the MaterialPriceCache in Postgres before falling back to static rates.
+  // This enables cross-user learning: prices fetched by ANY user for a city
+  // benefit ALL subsequent BOQs for that city.
+  let fallbackChainUsed = false;
+  const fallbackSources: string[] = [];
+  if (!steelFromMarket) {
+    try {
+      // Extract location for fallback lookup
+      let fbCity = "";
+      let fbState = "";
+      let fbCityTier: string | undefined;
+      for (const field of [inputData?.content, inputData?.prompt, inputData?.region, inputData?.location]) {
+        if (typeof field === "string" && field.startsWith("{")) {
+          try {
+            const loc = JSON.parse(field);
+            fbCity = loc.city || "";
+            fbState = loc.state || "";
+            break;
+          } catch { /* not JSON */ }
+        }
+      }
+      if (fbCity && fbState) {
+        const { resolvePriceFallback } = await import("@/features/boq/services/price-fallback-chain");
+        const steelFallback = await resolvePriceFallback("steel_per_tonne", fbCity, fbState, fbCityTier);
+
+        if (steelFallback.price > 10000 && steelFallback.priorityLevel <= 5) {
+          // Use fallback chain steel price — better than static CPWD
+          marketSteelMaterialPerKg = Math.round(steelFallback.price / 1000 * 100) / 100;
+          marketTMTPerKg = Math.round((marketSteelMaterialPerKg + marketSteelLabourPerKg) * 100) / 100;
+          marketStructSteelPerKg = Math.round(marketSteelMaterialPerKg * 1.55 + 40);
+          steelFromMarket = true;
+          fallbackChainUsed = true;
+          fallbackSources.push(`Steel: ${steelFallback.sourceDescription} (Priority ${steelFallback.priorityLevel})`);
+        }
+      }
+    } catch {
+      // Non-fatal — fallback chain is best-effort, static IS 1200 rates still work
+    }
   }
 
   const elements = inputData?._elements ?? inputData?.elements ?? inputData?.rows ?? [];
@@ -241,9 +283,45 @@ export const handleTR008: NodeHandler = async (ctx) => {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   let costIS1200 = 0, costUSD = 0, costFallback = 0;
 
+  // ── Grade-aware rebar estimation lookup (used in both IS1200 loop and derived quantities) ──
+  const GRADE_REBAR_KG: Record<string, number> = {
+    M15: 60, M20: 80, M25: 100, M30: 130, M35: 150, M40: 160, M45: 170, M50: 180, M55: 185, M60: 190,
+    C20: 80, C25: 100, "C25/30": 100, C30: 130, "C30/37": 130, C35: 150, "C35/45": 150, C40: 160,
+    "Grade 20": 80, "Grade 25": 100, "Grade 30": 130, "Grade 35": 150, "Grade 40": 160,
+  };
+  const TYPE_REBAR_KG: Record<string, { wall: number; slab: number; column: number; beam: number }> = {
+    residential:  { wall: 90,  slab: 90,  column: 140, beam: 120 },
+    commercial:   { wall: 110, slab: 110, column: 160, beam: 140 },
+    hospital:     { wall: 130, slab: 130, column: 175, beam: 155 },
+    healthcare:   { wall: 130, slab: 130, column: 175, beam: 155 },
+    industrial:   { wall: 85,  slab: 85,  column: 130, beam: 110 },
+    warehouse:    { wall: 70,  slab: 70,  column: 110, beam: 100 },
+    institutional:{ wall: 120, slab: 120, column: 165, beam: 145 },
+    wellness:     { wall: 110, slab: 110, column: 155, beam: 135 },
+  };
+  const getRebarKgPerM3 = (elemType: string, concreteGrade: string | undefined, defaultKg: number): number => {
+    if (concreteGrade) {
+      const grade = concreteGrade.toUpperCase().replace(/\s+/g, "");
+      for (const [key, val] of Object.entries(GRADE_REBAR_KG)) {
+        if (grade.includes(key.toUpperCase())) return val;
+      }
+    }
+    const btKey = projectTypeInfo.type.toLowerCase();
+    const typeProfile = TYPE_REBAR_KG[btKey];
+    if (typeProfile) {
+      const et = elemType.toLowerCase();
+      if (et.includes("wall")) return typeProfile.wall;
+      if (et.includes("slab")) return typeProfile.slab;
+      if (et.includes("column")) return typeProfile.column;
+      if (et.includes("beam")) return typeProfile.beam;
+    }
+    return defaultKg;
+  };
+
   // Process each element (may include expanded material layers)
   for (const elem of expandedElements) {
     const description = typeof elem === "string" ? elem : elem.description ?? elem[0];
+    const descLower = (typeof description === "string" ? description : "").toLowerCase();
     const quantity = typeof elem === "object" ? (Number(elem.quantity) || Number(elem[2]) || 1) : 1;
     const sourceUnit = typeof elem === "object" ? ((elem as Record<string, unknown>).unit as string ?? "EA") : "EA";
     const sourceVolume = typeof elem === "object" ? Number((elem as Record<string, unknown>).totalVolume ?? 0) : 0;
@@ -274,12 +352,23 @@ export const handleTR008: NodeHandler = async (ctx) => {
             qty = sourceVolume > 0 ? sourceVolume : quantity;
           } else if (rate.unit === "kg") {
             // Steel: kg from volume × density (7850 kg/m³) or count × typical weight
-            // Rebar: estimated from concrete volume × kg/m³ ratio
+            // Rebar: multi-factor estimation (replaces fixed 150 kg/m³ heuristic)
             const isStructSteel = rate.subcategory === "Steel" && !rate.is1200Code.includes("REBAR");
-            if (isStructSteel && sourceVolume > 0) {
+            // Priority 1: Check for actual rebar weight from parser (Qto_ReinforcingElementBaseQuantities)
+            const elemRebarWeight = typeof elem === "object" ? Number((elem as Record<string, unknown>).rebarWeight ?? 0) : 0;
+            if (elemRebarWeight > 0) {
+              qty = elemRebarWeight; // Exact weight from IFC
+            } else if (isStructSteel && sourceVolume > 0) {
               qty = sourceVolume * 7850; // steel density 7850 kg/m³
             } else if (sourceVolume > 0) {
-              qty = sourceVolume * 150; // rebar estimate from concrete volume
+              // Grade-aware rebar estimation
+              const elemGrade = typeof elem === "object" ? ((elem as Record<string, unknown>).concreteGrade as string) : undefined;
+              const elemTypeForRebar = descLower.includes("column") ? "column"
+                : descLower.includes("beam") ? "beam"
+                : descLower.includes("slab") ? "slab"
+                : "wall";
+              const kgPerM3 = getRebarKgPerM3(elemTypeForRebar, elemGrade, 120);
+              qty = sourceVolume * kgPerM3;
             } else {
               qty = (elemCount || 1) * 50; // fallback: 50 kg per element
             }
@@ -289,9 +378,34 @@ export const handleTR008: NodeHandler = async (ctx) => {
             qty = quantity;
           }
 
-          const wasteFactor = is1200Module.getIS1200Rate(rate.is1200Code)
-            ? (({ "Concrete": 0.07, "Steel": 0.10, "Masonry": 0.08, "Finishes": 0.12, "Doors & Windows": 0.03 })[rate.subcategory] ?? 0.08)
-            : 0.08;
+          // Element-type-specific waste factors (replaces category-level defaults)
+          const getElementWaste = (): number => {
+            const code = rate.is1200Code;
+            // Concrete: slab 4%, column 7%, beam 5%, wall 6%, foundation 3%, stair 6%
+            if (code.includes("SLAB")) return 0.04;
+            if (code.includes("COLUMN") || code.includes("COL")) return 0.07;
+            if (code.includes("BEAM")) return 0.05;
+            if (code.includes("WALL") && rate.subcategory === "Concrete") return 0.06;
+            if (code.includes("FOOTING") || code.includes("PCC")) return 0.03;
+            if (code.includes("STAIR")) return 0.06;
+            // Steel: rebar 4%, structural 6%
+            if (code.includes("REBAR")) return 0.04;
+            if (code.includes("STRUCT-STEEL")) return 0.06;
+            // Masonry: brick 6%, AAC block 4%, concrete block 6%
+            if (code.includes("AAC")) return 0.04;
+            if (code.includes("BRICK") || code.includes("BLOCK")) return 0.06;
+            // Finishes: plaster 11%, paint 7%, tile 13%, marble 20%, granite 16%
+            if (code.includes("PLASTER")) return 0.11;
+            if (code.includes("PAINT")) return 0.07;
+            if (code.includes("MARBLE")) return 0.20;
+            if (code.includes("GRANITE")) return 0.16;
+            if (code.includes("TILE") || code.includes("VIT")) return 0.13;
+            if (code.includes("EPOXY")) return 0.08;
+            if (code.includes("CARPET")) return 0.05;
+            // Category-level fallback
+            return ({ "Concrete": 0.05, "Steel": 0.05, "Masonry": 0.06, "Finishes": 0.10, "Doors & Windows": 0.03 })[rate.subcategory] ?? 0.08;
+          };
+          const wasteFactor = getElementWaste();
           const adjQty = Math.round(qty * (1 + wasteFactor) * 100) / 100;
 
           // Apply state PWD + city tier + seasonal adjustment (category-specific)
@@ -583,18 +697,19 @@ export const handleTR008: NodeHandler = async (ctx) => {
   // For non-Indian, use DERIVED_RATES from regional-factors.ts.
   const { DERIVED_RATES } = await import("@/features/boq/constants/regional-factors");
 
-  // Fix 4: Plaster dedup — find storeys that already have plaster from IFC Geometry extraction
-  // (IfcCovering CEILING/FLOORING or explicit plaster elements). Skip derived plaster for those.
-  const storeysWithPlaster = new Set<string>();
-  const storeysWithCeiling = new Set<string>();
+  // Fix 4 (v2): Element-level plaster/ceiling dedup — track which descriptions already
+  // have plaster/ceiling from IFC coverings. Uses element description as key (not storey)
+  // to prevent both double-counting AND under-counting.
+  const descriptionsWithPlaster = new Set<string>();
+  const descriptionsWithCeiling = new Set<string>();
   for (const line of boqLines) {
     const d = line.description.toLowerCase();
-    const s = line.storey || "";
+    const lineKey = `${line.storey || ""}|${d}`;
     if (d.includes("plaster") && !d.includes("formwork") && !d.includes("rebar")) {
-      storeysWithPlaster.add(s);
+      descriptionsWithPlaster.add(lineKey);
     }
     if (d.includes("ceiling") && !d.includes("formwork")) {
-      storeysWithCeiling.add(s);
+      descriptionsWithCeiling.add(lineKey);
     }
   }
   const derivedLines: typeof boqLines = [];
@@ -617,10 +732,13 @@ export const handleTR008: NodeHandler = async (ctx) => {
     const st = (e.storey as string) || "";
     const desc = (e.description as string) || "";
     const area = Number(e.grossArea ?? 0);
+    const netArea = Number(e.netArea ?? 0);
     const vol = Number(e.totalVolume ?? 0);
     const descLower = desc.toLowerCase();
+    const elemIsExternal = e.isExternal === true;
+    const elemConcreteGrade = (e.concreteGrade as string) || undefined;
 
-    const applyDerived = (name: string, baseQty: number, rateUSD: number, dUnit: string, source: string, is1200Key: string) => {
+    const applyDerived = (name: string, baseQty: number, rateUSD: number, dUnit: string, source: string, is1200Key: string, customWaste?: number) => {
       if (baseQty <= 0) return;
       const ip = indianPricing;
 
@@ -640,15 +758,28 @@ export const handleTR008: NodeHandler = async (ctx) => {
         const fwRates: Record<string, number> = { "formwork-wall": 400, "formwork-slab": 380, "formwork-column": 480, "formwork-beam": 420 };
         const concFactor = ip?.concrete ?? ip?.overall ?? 1.0;
         adjRate = Math.round((fwRates[is1200Key] ?? 400) * concFactor * 100) / 100;
-      } else if (isIndianProject && (is1200Key === "plastering" || is1200Key === "ceiling-plaster") && is1200Module) {
+      } else if (isIndianProject && (is1200Key === "plastering-int" || is1200Key === "ceiling-plaster") && is1200Module) {
         const plastRate = is1200Module.getIS1200Rate("IS1200-P8-PLASTER");
         const finFactor = ip?.finishing ?? ip?.overall ?? 1.0;
         adjRate = plastRate ? Math.round(plastRate.rate * finFactor * 100) / 100 : Math.round(rateUSD * locationFactor * exchangeRate * 100) / 100;
+      } else if (isIndianProject && is1200Key === "plastering-ext" && is1200Module) {
+        const plastExtRate = is1200Module.getIS1200Rate("IS1200-P8-PLASTER-EXT");
+        const finFactor = ip?.finishing ?? ip?.overall ?? 1.0;
+        adjRate = plastExtRate ? Math.round(plastExtRate.rate * finFactor * 100) / 100 : Math.round(rateUSD * 1.44 * locationFactor * exchangeRate * 100) / 100;
+      } else if (isIndianProject && is1200Key === "painting-int" && is1200Module) {
+        const paintRate = is1200Module.getIS1200Rate("IS1200-P10-PAINT");
+        const finFactor = ip?.finishing ?? ip?.overall ?? 1.0;
+        adjRate = paintRate ? Math.round(paintRate.rate * finFactor * 100) / 100 : Math.round(3.50 * locationFactor * exchangeRate * 100) / 100;
+      } else if (isIndianProject && is1200Key === "painting-ext" && is1200Module) {
+        const paintExtRate = is1200Module.getIS1200Rate("IS1200-P10-PAINT-EXT");
+        const finFactor = ip?.finishing ?? ip?.overall ?? 1.0;
+        adjRate = paintExtRate ? Math.round(paintExtRate.rate * finFactor * 100) / 100 : Math.round(4.50 * locationFactor * exchangeRate * 100) / 100;
       } else {
         adjRate = Math.round(rateUSD * locationFactor * exchangeRate * 100) / 100;
       }
 
-      const waste = 0.05;
+      // Element-type-specific waste factors (replaces category-level defaults)
+      const waste = customWaste ?? 0.05;
       const adjQty = Math.round(baseQty * (1 + waste) * 100) / 100;
       // FIX 6: round rate to whole ₹, then multiply — displayed math checks out
       adjRate = Math.round(adjRate);
@@ -665,7 +796,15 @@ export const handleTR008: NodeHandler = async (ctx) => {
       hardCostSubtotal += total;
       totalMaterial += matC; totalLabor += labC; totalEquipment += eqpC;
 
-      const is1200Info = isIndianProject ? DERIVED_IS1200[is1200Key] : null;
+      // Map derived keys to IS 1200 codes for output
+      const derivedIS1200Lookup: Record<string, { code: string; division: string }> = {
+        ...DERIVED_IS1200,
+        "plastering-int":  { code: "IS1200-P8-PLASTER", division: "IS 1200 Part 8 — Internal Plaster" },
+        "plastering-ext":  { code: "IS1200-P8-PLASTER-EXT", division: "IS 1200 Part 8 — External Plaster" },
+        "painting-int":    { code: "IS1200-P10-PAINT", division: "IS 1200 Part 10 — Interior Paint" },
+        "painting-ext":    { code: "IS1200-P10-PAINT-EXT", division: "IS 1200 Part 10 — Exterior Paint" },
+      };
+      const is1200Info = isIndianProject ? derivedIS1200Lookup[is1200Key] : null;
       // For market-sourced rebar, show actual market material price (not % split)
       const derivedMatRate = (isRebarOrSteel && steelFromMarket && marketSteelMaterialPerKg !== null)
         ? marketSteelMaterialPerKg  // ₹62/kg — actual market material price
@@ -690,25 +829,59 @@ export const handleTR008: NodeHandler = async (ctx) => {
     };
 
     if (descLower.includes("wall")) {
-      applyDerived(`Formwork — ${desc}`, area * 2, DERIVED_RATES.formwork.wall.rate, "m²", "Formwork (Measured)", "formwork-wall");
-      applyDerived(`Rebar — ${desc} (Est.)`, vol * DERIVED_RATES.rebar.wall.kgPerM3, DERIVED_RATES.rebar.wall.rate, "kg", "Rebar (Estimated)", "rebar");
-      // Fix 4: Skip derived plaster if IFC already has plaster for this storey
-      if (!storeysWithPlaster.has(st)) {
-        applyDerived(`Plastering — ${desc}`, area * 2, DERIVED_RATES.finishing.plastering.rate, "m²", "Finishing (Measured)", "plastering");
+      // Formwork: both faces × area (element-specific waste: 5-7% for walls)
+      applyDerived(`Formwork — ${desc}`, area * 2, DERIVED_RATES.formwork.wall.rate, "m²", "Formwork (Measured)", "formwork-wall", 0.06);
+
+      // Rebar: grade-aware estimation (replaces fixed 150 kg/m³)
+      const rebarKg = getRebarKgPerM3("wall", elemConcreteGrade, DERIVED_RATES.rebar.wall.kgPerM3);
+      applyDerived(`Rebar — ${desc} (Est.)`, vol * rebarKg, DERIVED_RATES.rebar.wall.rate, "kg", "Rebar (Estimated)", "rebar", 0.04);
+
+      // Plaster & Paint — IsExternal differentiation
+      const plastKey = `${st}|${descLower}`;
+      const hasExistingPlaster = descriptionsWithPlaster.has(plastKey) ||
+        // Also check storey-level: if ANY plaster for this description exists
+        Array.from(descriptionsWithPlaster).some(k => k.includes(descLower.replace(/\s*\(external\)|\s*\(internal\)/g, "")));
+
+      if (!hasExistingPlaster) {
+        const wallNetArea = netArea > 0 ? netArea : area; // Use net area (minus openings) for finishing
+        if (elemIsExternal) {
+          // External wall: ext plaster + ext paint on outer face, int plaster + int paint on inner face
+          applyDerived(`Ext. Plaster (20mm CM 1:4) — ${desc}`, wallNetArea, DERIVED_RATES.finishing.plastering.rate * 1.44, "m²", "Finishing (External Face)", "plastering-ext", 0.11);
+          applyDerived(`Int. Plaster (12mm CM 1:6) — ${desc}`, wallNetArea, DERIVED_RATES.finishing.plastering.rate, "m²", "Finishing (Internal Face)", "plastering-int", 0.11);
+          applyDerived(`Ext. Weather Coat Paint — ${desc}`, wallNetArea, DERIVED_RATES.finishing.painting?.rate ?? 3.50, "m²", "Painting (External Face)", "painting-ext", 0.07);
+          applyDerived(`Int. Emulsion Paint — ${desc}`, wallNetArea, DERIVED_RATES.finishing.painting?.rate ?? 3.50, "m²", "Painting (Internal Face)", "painting-int", 0.07);
+        } else {
+          // Internal wall / partition: same plaster + paint on both faces
+          applyDerived(`Plastering — ${desc}`, wallNetArea * 2, DERIVED_RATES.finishing.plastering.rate, "m²", "Finishing (Measured)", "plastering-int", 0.11);
+          applyDerived(`Emulsion Paint — ${desc}`, wallNetArea * 2, DERIVED_RATES.finishing.painting?.rate ?? 3.50, "m²", "Painting (Measured)", "painting-int", 0.07);
+        }
       }
     } else if (descLower.includes("slab")) {
-      applyDerived(`Formwork — ${desc}`, area, DERIVED_RATES.formwork.slab.rate, "m²", "Formwork (Measured)", "formwork-slab");
-      applyDerived(`Rebar — ${desc} (Est.)`, vol * DERIVED_RATES.rebar.slab.kgPerM3, DERIVED_RATES.rebar.slab.rate, "kg", "Rebar (Estimated)", "rebar");
-      // Fix 4: Skip derived ceiling plaster if IFC already has ceiling for this storey
-      if (!storeysWithCeiling.has(st)) {
-        applyDerived(`Ceiling Plaster — ${desc}`, area, DERIVED_RATES.finishing.ceilingPlaster.rate, "m²", "Finishing (Measured)", "ceiling-plaster");
+      // Formwork: soffit only × area (element-specific waste: 4% for slabs)
+      applyDerived(`Formwork — ${desc}`, area, DERIVED_RATES.formwork.slab.rate, "m²", "Formwork (Measured)", "formwork-slab", 0.04);
+
+      // Rebar: grade-aware estimation
+      const rebarKg = getRebarKgPerM3("slab", elemConcreteGrade, DERIVED_RATES.rebar.slab.kgPerM3);
+      applyDerived(`Rebar — ${desc} (Est.)`, vol * rebarKg, DERIVED_RATES.rebar.slab.rate, "kg", "Rebar (Estimated)", "rebar", 0.04);
+
+      // Ceiling plaster — element-level dedup
+      const ceilKey = `${st}|${descLower}`;
+      if (!descriptionsWithCeiling.has(ceilKey)) {
+        applyDerived(`Ceiling Plaster — ${desc}`, area, DERIVED_RATES.finishing.ceilingPlaster.rate, "m²", "Finishing (Measured)", "ceiling-plaster", 0.11);
       }
     } else if (descLower.includes("column")) {
       const colHeight = Number(e.totalVolume ?? 0) > 0 ? 3.5 : 0;
       const colRadius = vol > 0 && colHeight > 0 ? Math.sqrt(vol / (Math.PI * colHeight)) : 0.3;
       const colFormworkArea = 2 * Math.PI * colRadius * colHeight * Number(e.elementCount ?? 1);
-      applyDerived(`Formwork — ${desc}`, colFormworkArea, DERIVED_RATES.formwork.column.rate, "m²", "Formwork (Measured)", "formwork-column");
-      applyDerived(`Rebar — ${desc} (Est.)`, vol * DERIVED_RATES.rebar.column.kgPerM3, DERIVED_RATES.rebar.column.rate, "kg", "Rebar (Estimated)", "rebar");
+      // Column formwork: element-specific waste 7%
+      applyDerived(`Formwork — ${desc}`, colFormworkArea, DERIVED_RATES.formwork.column.rate, "m²", "Formwork (Measured)", "formwork-column", 0.07);
+      // Rebar: grade-aware estimation for columns
+      const rebarKg = getRebarKgPerM3("column", elemConcreteGrade, DERIVED_RATES.rebar.column.kgPerM3);
+      applyDerived(`Rebar — ${desc} (Est.)`, vol * rebarKg, DERIVED_RATES.rebar.column.rate, "kg", "Rebar (Estimated)", "rebar", 0.04);
+    } else if (descLower.includes("beam")) {
+      // Beam rebar: grade-aware estimation
+      const rebarKg = getRebarKgPerM3("beam", elemConcreteGrade, DERIVED_RATES.rebar.beam?.kgPerM3 ?? 160);
+      applyDerived(`Rebar — ${desc} (Est.)`, vol * rebarKg, DERIVED_RATES.rebar.beam?.rate ?? DERIVED_RATES.rebar.slab.rate, "kg", "Rebar (Estimated)", "rebar", 0.04);
     }
   }
 
@@ -1028,6 +1201,139 @@ export const handleTR008: NodeHandler = async (ctx) => {
     anomalies.length === 0 ? `Quality Check: all ratios within expected ranges` : `Quality Check: ${anomalies.length} anomal${anomalies.length === 1 ? "y" : "ies"} — review recommended`,
   ].join("\n");
 
+  // ── Transparency Layer: Pricing Metadata ──
+  const marketIntelStatus = marketData?.agent_status as string | undefined;
+  const pricingSource: "market_intelligence" | "cpwd_static" | "mixed" =
+    marketIntelStatus === "success" ? "market_intelligence"
+    : marketIntelStatus === "partial" ? "mixed"
+    : fallbackChainUsed ? "mixed"  // Fallback chain found cached prices
+    : "cpwd_static";
+  const pricingMetadata = {
+    source: pricingSource,
+    marketIntelligenceStatus: (marketIntelStatus ?? (fallbackChainUsed ? "failed" : "failed")) as "success" | "partial" | "failed" | "timeout",
+    staticRateVersion: "CPWD DSR 2025-26",
+    ...(pricingSource === "cpwd_static" && {
+      staleDateWarning: "Using CPWD DSR 2025-26 static rates (April 2026). Actual prices may differ by 5-15% depending on city and market conditions.",
+    }),
+    ...(fallbackChainUsed && {
+      staleDateWarning: `Some prices from MaterialPriceCache (${fallbackSources.join("; ")}). Others from CPWD DSR 2025-26 static rates.`,
+    }),
+    ...(marketData?.fetched_at && { lastMarketUpdate: marketData.fetched_at }),
+    ...(locationData?.city && { cityUsed: locationData.city }),
+    ...(locationData?.state && { stateUsed: locationData.state }),
+  };
+
+  // ── Transparency Layer: Per-Line Confidence Scoring ──
+  const hasMarketIntel = pricingSource === "market_intelligence";
+  for (const line of boqLines) {
+    const factors: string[] = [];
+    let score: "high" | "medium" | "low" = "high";
+
+    // Rate source factor
+    if (line.is1200Code === "IS1200-P2-GENERIC" || line.is1200Code === "IS1200-EST") {
+      score = "low";
+      factors.push("Rate from generic fallback (unmapped element type)");
+    } else if (line.is1200Code === "PROV") {
+      score = "low";
+      factors.push("Provisional sum estimate — not from IFC data");
+    } else if (hasMarketIntel && (line.is1200Code?.includes("REBAR") || line.is1200Code?.includes("STRUCT-STEEL"))) {
+      factors.push(`Steel rate from live market data (${locationData?.city ?? "India"}, ${new Date().toLocaleDateString("en-IN", { month: "short", year: "numeric" })})`);
+    } else if (isIndianProject && line.is1200Code && !line.is1200Code.includes("DERIVED")) {
+      if (hasMarketIntel) {
+        factors.push("Rate from IS 1200 / CPWD with market-adjusted PWD factor");
+      } else {
+        score = score === "high" ? "medium" : score;
+        factors.push("Rate from CPWD DSR 2025-26 static rates (market intel unavailable)");
+      }
+    } else if (line.is1200Code?.includes("DERIVED")) {
+      score = score === "high" ? "medium" : score;
+      factors.push("Derived quantity (estimated from structural elements)");
+    }
+
+    // Quantity source factor
+    const desc = line.description.toLowerCase();
+    if (desc.includes("(est.)") || desc.includes("estimated")) {
+      score = score === "high" ? "medium" : score;
+      factors.push("Quantity estimated (not directly from IFC geometry)");
+    } else if (!desc.includes("provisional") && !desc.includes("[")) {
+      factors.push("Quantity from IFC model");
+    }
+
+    // Rebar-specific
+    if (desc.includes("rebar")) {
+      if (desc.includes("est.")) {
+        score = "medium";
+        factors.push("Rebar weight estimated from concrete grade / building type");
+      }
+    }
+
+    // Confidence override if no useful factors
+    if (factors.length === 0) {
+      factors.push("Standard IS 1200 rate applied");
+    }
+
+    // Store on line (using the [key: string] index signature pattern)
+    (line as Record<string, unknown>).confidence = { score, factors };
+  }
+
+  // Count confidence distribution for disclaimer
+  const highCount = boqLines.filter(l => (l as Record<string, unknown>).confidence && ((l as Record<string, unknown>).confidence as Record<string, unknown>).score === "high").length;
+  const highPct = boqLines.length > 0 ? Math.round((highCount / boqLines.length) * 100) : 0;
+
+  // ── Transparency Layer: Model Quality Report ──
+  const upstreamModelQuality = inputData?._modelQuality as Record<string, unknown> | undefined;
+  const mqIssueCount = (Number(upstreamModelQuality?.zeroVolumeElements && (upstreamModelQuality.zeroVolumeElements as Record<string, unknown>).count) || 0)
+    + (Number(upstreamModelQuality?.noMaterialElements && (upstreamModelQuality.noMaterialElements as Record<string, unknown>).count) || 0)
+    + (Number(upstreamModelQuality?.unassignedStoreyElements && (upstreamModelQuality.unassignedStoreyElements as Record<string, unknown>).count) || 0);
+  const mqPct = totalElems > 0 ? (mqIssueCount / totalElems) * 100 : 0;
+  const mqGrade = mqPct === 0 ? "A" : mqPct < 5 ? "B" : mqPct < 15 ? "C" : mqPct < 30 ? "D" : "F";
+
+  const mqRecommendations: string[] = [];
+  if (upstreamModelQuality) {
+    const zv = upstreamModelQuality.zeroVolumeElements as { count?: number; types?: string[] } | undefined;
+    if (zv?.count && zv.count > 0) {
+      mqRecommendations.push(`${zv.count} element(s) have zero volume (${zv.types?.join(", ") ?? "unknown"}) — check these elements have valid geometry in the authoring tool`);
+    }
+    const nm = upstreamModelQuality.noMaterialElements as { count?: number; types?: string[] } | undefined;
+    if (nm?.count && nm.count > 5) {
+      mqRecommendations.push(`${nm.count} element(s) have no material assigned — assign materials in Revit/ArchiCAD for accurate cost mapping`);
+    }
+    const us = upstreamModelQuality.unassignedStoreyElements as { count?: number } | undefined;
+    if (us?.count && us.count > 5) {
+      mqRecommendations.push(`${us.count} element(s) not assigned to any storey — assign to building storeys for accurate floor-wise breakdown`);
+    }
+    const sd = upstreamModelQuality.suspiciousDimensions as Array<Record<string, unknown>> | undefined;
+    if (sd && sd.length > 0) {
+      mqRecommendations.push(`${sd.length} element(s) have suspicious dimensions — verify wall thickness and slab depth in the model`);
+    }
+  }
+
+  const modelQualityReport = {
+    overallGrade: mqGrade,
+    totalElements: totalElems,
+    issuesFound: {
+      zeroVolumeElements: (upstreamModelQuality?.zeroVolumeElements as { count: number; types: string[] }) ?? { count: 0, types: [] },
+      duplicateElements: (upstreamModelQuality?.duplicateElements as { count: number; estimatedImpact: string }) ?? { count: 0, estimatedImpact: "none" },
+      noMaterialElements: (upstreamModelQuality?.noMaterialElements as { count: number; types: string[] }) ?? { count: 0, types: [] },
+      unassignedStoreyElements: { count: Number((upstreamModelQuality?.unassignedStoreyElements as Record<string, unknown>)?.count ?? 0) },
+      suspiciousDimensions: {
+        count: Array.isArray(upstreamModelQuality?.suspiciousDimensions) ? (upstreamModelQuality.suspiciousDimensions as unknown[]).length : 0,
+        details: Array.isArray(upstreamModelQuality?.suspiciousDimensions)
+          ? (upstreamModelQuality.suspiciousDimensions as Array<Record<string, unknown>>).slice(0, 5).map(d => `${d.elementType} "${d.name}": ${d.dimension} = ${Number(d.value) * 1000}mm (expected ${d.expected})`)
+          : [],
+      },
+      unitInconsistencies: !!(upstreamModelQuality?.unitConversion as Record<string, unknown>)?.conversionApplied,
+    },
+    recommendations: mqRecommendations,
+  };
+
+  // ── Transparency Layer: Honest Disclaimer ──
+  const honestDisclaimer = highPct > 80
+    ? `This estimate is suitable for preliminary budgeting and feasibility assessment (${aaceInfo.class}, ${aaceInfo.accuracy}). For tendering, verify with a qualified Quantity Surveyor.`
+    : highPct >= 50
+    ? `This estimate is suitable for early-stage cost planning (${aaceInfo.class}). ${boqLines.length - highCount} of ${boqLines.length} items have medium/low confidence — review flagged items before budgeting decisions.`
+    : `This estimate is indicative only (AACE Class 5). The IFC model has quality issues affecting accuracy. See Model Quality Report for details and recommended fixes.`;
+
   return {
     id: generateId(),
     executionId: executionId ?? "local",
@@ -1047,10 +1353,12 @@ export const handleTR008: NodeHandler = async (ctx) => {
       _locationFactor: locationFactor,
       _projectType: projectTypeInfo.type,
       _projectMultiplier: projectTypeInfo.multiplier,
-      _disclaimer: dynamicDisclaimer,
+      _disclaimer: honestDisclaimer,
       _aaceClass: aaceInfo.class,
       _aaceAccuracy: aaceInfo.accuracy,
       content: nlSummary,
+      _pricingMetadata: pricingMetadata,
+      _modelQualityReport: modelQualityReport,
       _boqData: {
         lines: boqLines,
         subtotalMaterial: Math.round(totalMaterial * 100) / 100,
@@ -1060,7 +1368,7 @@ export const handleTR008: NodeHandler = async (ctx) => {
         projectType: projectTypeInfo.type,
         projectMultiplier: projectTypeInfo.multiplier,
         grandTotal: costSummary.totalCost,
-        disclaimer: dynamicDisclaimer,
+        disclaimer: honestDisclaimer,
       },
       _gfa: gfaForProvisional,
       _ifcQuality: {

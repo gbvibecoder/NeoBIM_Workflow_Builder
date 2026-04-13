@@ -714,3 +714,26 @@ model VideoShareLink {
   @@index([createdAt])
   @@map("video_share_links")
 }
+
+/// Persistent material price cache — survives Redis TTL expiry.
+/// Written after every successful TR-015 market intelligence fetch.
+/// Queried by the price-fallback-chain when Redis cache misses.
+/// Enables cross-user learning: once ANY user fetches prices for Pune,
+/// ALL subsequent Pune BOQs benefit even if their own TR-015 fails.
+model MaterialPriceCache {
+  id            String   @id @default(cuid())
+  city          String                         // e.g. "Pune"
+  state         String                         // e.g. "Maharashtra"
+  materialCode  String                         // e.g. "steel_per_tonne", "cement_per_bag", "labor_mason"
+  price         Float                          // numeric price in INR
+  unit          String                         // e.g. "₹/tonne", "₹/bag", "₹/day"
+  source        String                         // e.g. "market_intelligence", "user_correction"
+  confidence    String                         // "HIGH", "MEDIUM", "LOW"
+  fetchedAt     DateTime @default(now())       // when price was fetched
+  expiresAt     DateTime                       // fetchedAt + 30 days
+
+  @@index([city, materialCode, fetchedAt])
+  @@index([state, materialCode, fetchedAt])
+  @@index([materialCode, fetchedAt])
+  @@map("material_price_cache")
+}
