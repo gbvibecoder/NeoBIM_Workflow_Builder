@@ -10,6 +10,10 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@/lib/auth";
+import { prisma } from "@/lib/db";
+import { checkEndpointRateLimit, isAdminUser } from "@/lib/rate-limit";
+import { formatErrorResponse, UserErrors } from "@/lib/user-errors";
 import { generateFloorPlan } from "@/features/ai/services/openai";
 import { logger } from "@/lib/logger";
 import {
@@ -111,8 +115,87 @@ function buildFeedback(project: FloorPlanProject, prompt: string): GenerationFee
   };
 }
 
+/** Record a standalone tool use as an Execution so it appears in admin panel. Fire-and-forget. */
+async function recordToolExecution(userId: string, toolName: string) {
+  try {
+    // Lazily find or create a hidden "Standalone Tools" workflow per user
+    let wf = await prisma.workflow.findFirst({
+      where: { ownerId: userId, name: "__standalone_tools__", deletedAt: { not: null } },
+      select: { id: true },
+    });
+    if (!wf) {
+      wf = await prisma.workflow.create({
+        data: {
+          ownerId: userId,
+          name: "__standalone_tools__",
+          description: "Auto-created for standalone tool usage tracking",
+          deletedAt: new Date(), // hidden from "My Workflows"
+        },
+        select: { id: true },
+      });
+    }
+    await prisma.execution.create({
+      data: {
+        workflowId: wf.id,
+        userId,
+        status: "SUCCESS",
+        startedAt: new Date(),
+        completedAt: new Date(),
+        tileResults: [],
+        metadata: { tool: toolName },
+      },
+    });
+  } catch {
+    // Fire-and-forget — never block the user if tracking fails
+  }
+}
+
 export async function POST(req: NextRequest) {
   try {
+    // ── Auth ──
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json(
+        formatErrorResponse(UserErrors.UNAUTHORIZED),
+        { status: 401 }
+      );
+    }
+
+    const userId = session.user.id;
+    const userRole = ((session.user as { role?: string }).role) || "FREE";
+    const userEmail = session.user.email || "";
+    const isAdmin = isAdminUser(userEmail) || userRole === "PLATFORM_ADMIN" || userRole === "TEAM_ADMIN";
+
+    // ── Rate limit: 5 floor plan generations per minute ──
+    if (!isAdmin) {
+      const rl = await checkEndpointRateLimit(userId, "generate-floor-plan", 5, "1 m");
+      if (!rl.success) {
+        return NextResponse.json(
+          { error: "Too many floor plan requests. Please wait a moment." },
+          { status: 429 }
+        );
+      }
+    }
+
+    // ── FREE tier lifetime gate (counts against 3 lifetime executions) ──
+    if (!isAdmin && userRole === "FREE") {
+      const lifetimeCompleted = await prisma.execution.count({
+        where: { userId, status: { in: ["SUCCESS", "PARTIAL"] } },
+      });
+      if (lifetimeCompleted >= 3) {
+        return NextResponse.json(
+          formatErrorResponse({
+            title: "Free executions used",
+            message: "You've used all 3 free executions. Upgrade to keep building!",
+            code: "RATE_001",
+            action: "View Plans",
+            actionUrl: "/dashboard/billing",
+          }),
+          { status: 429 }
+        );
+      }
+    }
+
     const body = await req.json();
     const prompt = body.prompt as string;
 
@@ -253,6 +336,7 @@ export async function POST(req: NextRequest) {
         names: f.rooms.map(r => r.name)
       }))));
 
+      recordToolExecution(userId, "floor-plan").catch(() => {});
       return NextResponse.json({ project, geometry, svg: null, feedback });
     }
 
@@ -320,6 +404,7 @@ export async function POST(req: NextRequest) {
     }
     logger.debug('=== FLOOR PLAN GENERATION COMPLETE ===');
 
+    recordToolExecution(userId, "floor-plan").catch(() => {});
     return NextResponse.json({ project, geometry, svg: floorPlan.svg, feedback });
   } catch (err) {
     console.error("[generate-floor-plan] Error:", err);

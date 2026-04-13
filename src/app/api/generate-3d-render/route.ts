@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { checkEndpointRateLimit } from "@/lib/rate-limit";
+import { prisma } from "@/lib/db";
+import { checkEndpointRateLimit, isAdminUser } from "@/lib/rate-limit";
 import { formatErrorResponse, UserErrors } from "@/lib/user-errors";
 import OpenAI from "openai";
 import { logger } from "@/lib/logger";
@@ -88,6 +89,38 @@ async function withRetry<T>(fn: () => Promise<T>, retries = 1, delayMs = 8000): 
   }
 }
 
+/** Record standalone tool use as an Execution for admin visibility. Fire-and-forget. */
+async function recordToolExecution(userId: string, toolName: string) {
+  try {
+    let wf = await prisma.workflow.findFirst({
+      where: { ownerId: userId, name: "__standalone_tools__", deletedAt: { not: null } },
+      select: { id: true },
+    });
+    if (!wf) {
+      wf = await prisma.workflow.create({
+        data: {
+          ownerId: userId,
+          name: "__standalone_tools__",
+          description: "Auto-created for standalone tool usage tracking",
+          deletedAt: new Date(),
+        },
+        select: { id: true },
+      });
+    }
+    await prisma.execution.create({
+      data: {
+        workflowId: wf.id,
+        userId,
+        status: "SUCCESS",
+        startedAt: new Date(),
+        completedAt: new Date(),
+        tileResults: [],
+        metadata: { tool: toolName },
+      },
+    });
+  } catch { /* fire-and-forget */ }
+}
+
 export async function POST(req: NextRequest) {
   try {
     // ── Auth ──
@@ -99,13 +132,38 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const userRole = ((session.user as { role?: string }).role) || "FREE";
+    const userEmail = session.user.email || "";
+    const isAdmin = isAdminUser(userEmail) || userRole === "PLATFORM_ADMIN" || userRole === "TEAM_ADMIN";
+
     // ── Rate limit: 10 renders per minute ──
-    const rl = await checkEndpointRateLimit(session.user.id, "generate-3d-render", 10, "1 m");
-    if (!rl.success) {
-      return NextResponse.json(
-        { error: "Too many render requests. Please wait a moment and try again." },
-        { status: 429 }
-      );
+    if (!isAdmin) {
+      const rl = await checkEndpointRateLimit(session.user.id, "generate-3d-render", 10, "1 m");
+      if (!rl.success) {
+        return NextResponse.json(
+          { error: "Too many render requests. Please wait a moment and try again." },
+          { status: 429 }
+        );
+      }
+    }
+
+    // ── Plan gate: FREE users get 1 render total (from stripe.ts rendersPerMonth: 1) ──
+    if (!isAdmin && userRole === "FREE") {
+      const lifetimeCompleted = await prisma.execution.count({
+        where: { userId: session.user.id, status: { in: ["SUCCESS", "PARTIAL"] } },
+      });
+      if (lifetimeCompleted >= 3) {
+        return NextResponse.json(
+          formatErrorResponse({
+            title: "Free executions used",
+            message: "You've used all 3 free executions. Upgrade to unlock unlimited renders!",
+            code: "RATE_001",
+            action: "View Plans",
+            actionUrl: "/dashboard/billing",
+          }),
+          { status: 429 }
+        );
+      }
     }
 
     // ── API key check ──
@@ -275,6 +333,7 @@ export async function POST(req: NextRequest) {
       : pickRenderSize(originalWidth, originalHeight);
     const [renderedWidth, renderedHeight] = renderedSize.split("x").map((n) => parseInt(n, 10));
 
+    recordToolExecution(session.user.id, "3d-render").catch(() => {});
     return NextResponse.json({
       success: true,
       image: resultDataUrl,

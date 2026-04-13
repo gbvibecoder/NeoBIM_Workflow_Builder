@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { checkEndpointRateLimit, isAdminUser } from "@/lib/rate-limit";
+import { prisma } from "@/lib/db";
 import { formatErrorResponse } from "@/lib/user-errors";
 import { logger } from "@/lib/logger";
 import { generateId } from "@/lib/utils";
@@ -52,6 +53,38 @@ import {
  */
 export const maxDuration = 300;
 
+/** Record standalone tool use as an Execution for admin visibility. Fire-and-forget. */
+async function recordToolExecution(userId: string, toolName: string) {
+  try {
+    let wf = await prisma.workflow.findFirst({
+      where: { ownerId: userId, name: "__standalone_tools__", deletedAt: { not: null } },
+      select: { id: true },
+    });
+    if (!wf) {
+      wf = await prisma.workflow.create({
+        data: {
+          ownerId: userId,
+          name: "__standalone_tools__",
+          description: "Auto-created for standalone tool usage tracking",
+          deletedAt: new Date(),
+        },
+        select: { id: true },
+      });
+    }
+    await prisma.execution.create({
+      data: {
+        workflowId: wf.id,
+        userId,
+        status: "SUCCESS",
+        startedAt: new Date(),
+        completedAt: new Date(),
+        tileResults: [],
+        metadata: { tool: toolName },
+      },
+    });
+  } catch { /* fire-and-forget */ }
+}
+
 export async function POST(req: NextRequest) {
   // ── Auth ──
   const session = await auth();
@@ -78,8 +111,24 @@ export async function POST(req: NextRequest) {
   //     team can demo and debug without hitting limits.
   //   • Development mode — bypassed entirely so local testing isn't
   //     blocked when iterating on the pipeline.
-  const isAdmin = isAdminUser(session.user.email ?? undefined);
+  const userRole = ((session.user as { role?: string }).role) || "FREE";
+  const isAdmin = isAdminUser(session.user.email ?? undefined) || userRole === "PLATFORM_ADMIN" || userRole === "TEAM_ADMIN";
   const isDev = process.env.NODE_ENV !== "production";
+
+  // ── Plan gate: FREE and MINI users can't generate cinematic walkthroughs ──
+  // (videoPerMonth: 0 for FREE and MINI in stripe.ts)
+  if (!isAdmin && !isDev && (userRole === "FREE" || userRole === "MINI")) {
+    return NextResponse.json(
+      formatErrorResponse({
+        title: "Upgrade required",
+        message: "Cinematic video walkthroughs are available on Starter and above. Upgrade to unlock cinematic building tours!",
+        code: "PLAN_001",
+        action: "View Plans",
+        actionUrl: "/dashboard/billing",
+      }),
+      { status: 403 },
+    );
+  }
 
   if (!isAdmin && !isDev) {
     const rl = await checkEndpointRateLimit(
@@ -411,6 +460,7 @@ export async function POST(req: NextRequest) {
     `[CINEMATIC][${pipelineId}] State saved. overview=${state.stages.overview.status} lifestyle=${state.stages.lifestyle.status}`,
   );
 
+  recordToolExecution(session.user.id, "cinematic-walkthrough").catch(() => {});
   return NextResponse.json({
     pipelineId,
     status: "processing",
