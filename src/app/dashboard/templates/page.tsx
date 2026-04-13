@@ -661,7 +661,12 @@ export default function TemplatesPage() {
   const mainRef = useRef<HTMLElement>(null);
   const heroRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => { setIsMobile(window.innerWidth < 768); }, []);
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
 
   useEffect(() => {
     fetch("/api/user/dashboard-stats").then(r => r.ok ? r.json() : null).then(d => { if (d?.userRole) setUserRole(d.userRole); }).catch(() => {});
@@ -1007,39 +1012,21 @@ export default function TemplatesPage() {
 
           {/* ════════════════════════════ FEEDBACK ════════════════════════════ */}
           <motion.div
+            className="tpl-feedback"
             initial={{ opacity: 0, y: 30 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
-            style={{
-              marginTop: 40, padding: "40px 36px", borderRadius: 24, position: "relative", overflow: "hidden", zIndex: 1,
-              background: "linear-gradient(135deg, rgba(14,18,30,0.9), rgba(10,12,20,0.95))",
-              border: "1px solid rgba(6,182,212,0.1)",
-              display: "flex", alignItems: "center", gap: 28,
-              boxShadow: "0 12px 48px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.04)",
-            }}
           >
             <div style={{ position: "absolute", top: 0, left: "15%", right: "15%", height: 1, background: "linear-gradient(90deg, transparent, rgba(6,182,212,0.2), rgba(139,92,246,0.15), transparent)", pointerEvents: "none" }} />
-            <div style={{
-              width: 56, height: 56, borderRadius: 18, flexShrink: 0,
-              background: "linear-gradient(135deg, rgba(6,182,212,0.12), rgba(139,92,246,0.08))",
-              border: "1px solid rgba(6,182,212,0.2)",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              boxShadow: "0 0 24px rgba(6,182,212,0.08)",
-            }}>
+            <div className="tpl-feedback-icon">
               <MessageSquare size={22} style={{ color: "#06B6D4" }} />
             </div>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 17, fontWeight: 700, color: "#F0F2F8", marginBottom: 6, letterSpacing: "-0.02em" }}>{t("dash.suggestTitle")}</div>
-              <div style={{ fontSize: 13, color: "rgba(160,175,200,0.5)", lineHeight: 1.65 }}>{t("dash.suggestDesc")}</div>
+            <div className="tpl-feedback-text">
+              <div className="tpl-feedback-title">{t("dash.suggestTitle")}</div>
+              <div className="tpl-feedback-desc">{t("dash.suggestDesc")}</div>
             </div>
-            <a href="#" onClick={e => { e.preventDefault(); router.push("/dashboard/feedback"); }} className="tpl-suggest-btn" style={{
-              display: "flex", alignItems: "center", gap: 8, padding: "12px 28px", borderRadius: 14, flexShrink: 0,
-              background: "linear-gradient(135deg, rgba(6,182,212,0.1), rgba(139,92,246,0.06))",
-              border: "1px solid rgba(6,182,212,0.25)", color: "#06B6D4", fontSize: 13, fontWeight: 700,
-              textDecoration: "none", fontFamily: "var(--font-jetbrains), monospace",
-              transition: "all 0.3s ease", cursor: "pointer", boxShadow: "0 0 24px rgba(6,182,212,0.06)",
-            }}>
+            <a href="#" onClick={e => { e.preventDefault(); router.push("/dashboard/feedback"); }} className="tpl-suggest-btn">
               {t("dash.suggestBtn")} <ArrowRight size={14} />
             </a>
           </motion.div>
@@ -1112,6 +1099,48 @@ export default function TemplatesPage() {
           transform: translateY(-2px);
         }
 
+        /* ── Feedback section (class-driven, no inline layout styles) ── */
+        .tpl-feedback {
+          margin-top: 40px;
+          padding: 40px 36px;
+          border-radius: 24px;
+          position: relative;
+          overflow: hidden;
+          z-index: 1;
+          background: linear-gradient(135deg, rgba(14,18,30,0.9), rgba(10,12,20,0.95));
+          border: 1px solid rgba(6,182,212,0.1);
+          box-shadow: 0 12px 48px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.04);
+          display: flex;
+          flex-direction: row;
+          align-items: center;
+          gap: 28px;
+        }
+        .tpl-feedback-icon {
+          width: 56px; height: 56px; border-radius: 18px; flex-shrink: 0;
+          background: linear-gradient(135deg, rgba(6,182,212,0.12), rgba(139,92,246,0.08));
+          border: 1px solid rgba(6,182,212,0.2);
+          display: flex; align-items: center; justify-content: center;
+          box-shadow: 0 0 24px rgba(6,182,212,0.08);
+        }
+        .tpl-feedback-text { flex: 1; min-width: 0; }
+        .tpl-feedback-title {
+          font-size: 17px; font-weight: 700; color: #F0F2F8;
+          margin-bottom: 6px; letter-spacing: -0.02em;
+        }
+        .tpl-feedback-desc {
+          font-size: 13px; color: rgba(160,175,200,0.5); line-height: 1.65;
+        }
+        .tpl-suggest-btn {
+          display: flex; align-items: center; gap: 8px;
+          padding: 12px 28px; border-radius: 14px; flex-shrink: 0;
+          background: linear-gradient(135deg, rgba(6,182,212,0.1), rgba(139,92,246,0.06));
+          border: 1px solid rgba(6,182,212,0.25); color: #06B6D4;
+          font-size: 13px; font-weight: 700; white-space: nowrap;
+          text-decoration: none; font-family: var(--font-jetbrains), monospace;
+          transition: all 0.3s ease; cursor: pointer;
+          box-shadow: 0 0 24px rgba(6,182,212,0.06);
+        }
+
         /* ── Mobile ── */
         @media (max-width: 768px) {
           .tpl-hero { min-height: 300px !important; padding: 40px 20px 28px !important; }
@@ -1125,6 +1154,24 @@ export default function TemplatesPage() {
           .tpl-featured { border-radius: 18px !important; }
           .tpl-featured-scene { min-height: 200px !important; }
           .tpl-particles { display: none !important; }
+
+          .tpl-feedback {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 16px;
+            padding: 24px 20px;
+            border-radius: 18px;
+            margin-top: 24px;
+          }
+          .tpl-feedback-icon { width: 44px; height: 44px; border-radius: 14px; }
+          .tpl-feedback-title { font-size: 15px; }
+          .tpl-feedback-desc { font-size: 12.5px; }
+          .tpl-suggest-btn {
+            width: 100%;
+            justify-content: center;
+            padding: 12px 20px;
+            border-radius: 12px;
+          }
         }
         @media (min-width: 769px) and (max-width: 1024px) {
           .tpl-hero-title { font-size: 34px !important; }
