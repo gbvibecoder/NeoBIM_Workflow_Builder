@@ -275,6 +275,7 @@ export async function POST(req: NextRequest) {
       const gridResult = await runGridFirstPipeline(roomProgram, description.projectName, prompt);
       if (gridResult) {
         logger.debug('[GRID-FIRST] Pipeline succeeded — returning grid-based floor plan');
+        await recordToolExecution(userId, "floor-plan");
         return NextResponse.json(gridResult);
       }
       logger.debug('[GRID-FIRST] Pipeline returned null — falling back to BSP/AI pipeline');
