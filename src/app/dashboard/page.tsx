@@ -59,7 +59,7 @@ const DEMO_VIDEOS = [
   { id: "dv-2", url: `${R2}/floor-plan-demo.mp4`, previewStart: 0, color: "#8B5CF6", rgb: "139,92,246" },
 ];
 
-const PLAN_LIMITS: Record<string, number> = { FREE: 5, MINI: 10, STARTER: 30, PRO: 100 };
+const PLAN_LIMITS: Record<string, number> = { FREE: 3, MINI: 10, STARTER: 30, PRO: 100 };
 
 const NODE_TYPES = [
   { icon: <Type size={22} />, name: "Text Prompt", color: "#4F8AFF", cat: "input" },

@@ -122,14 +122,14 @@ export default function BillingPage() {
         const now = new Date();
         const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
         const monthExecutions = executions.filter(e => new Date(e.startedAt) >= monthStart);
-        const limitMap: Record<string, number> = { FREE: 5, MINI: 10, STARTER: 30, PRO: 100 };
+        const limitMap: Record<string, number> = { FREE: 3, MINI: 10, STARTER: 30, PRO: 100 };
         const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
         setUsage({ used: monthExecutions.length, limit: limitMap[userRole] || 1000, resetDate: nextMonth.toISOString() });
       })
       .catch(() => {
         const now = new Date();
         const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-        const limitMap: Record<string, number> = { FREE: 5, MINI: 10, STARTER: 30, PRO: 100 };
+        const limitMap: Record<string, number> = { FREE: 3, MINI: 10, STARTER: 30, PRO: 100 };
         setUsage({ used: 0, limit: limitMap[userRole] || 1000, resetDate: nextMonth.toISOString() });
       })
       .finally(() => setLoading(false));
@@ -530,12 +530,12 @@ export default function BillingPage() {
                     )}
                   </div>
                   <p className="text-sm text-[#7C7C96]">
-                    {loading ? t('billing.loadingUsage') : `${usage?.used || 0} of ${usage?.limit || 5} ${t('billing.runsUsed')}`}
+                    {loading ? t('billing.loadingUsage') : `${usage?.used || 0} of ${usage?.limit || 3} ${t('billing.runsUsed')}`}
                   </p>
                 </div>
                 <div className="text-right">
                   <div className="text-3xl font-bold text-[#4F8AFF]">
-                    {loading ? "\u2014" : `${usage?.used || 0}/${usage?.limit || 5}`}
+                    {loading ? "\u2014" : `${usage?.used || 0}/${usage?.limit || 3}`}
                   </div>
                   <div className="text-xs text-[#7C7C96] mt-1">
                     {loading ? "" : `${t('billing.resets')} ${new Date(usage?.resetDate || "").toLocaleDateString()}`}
