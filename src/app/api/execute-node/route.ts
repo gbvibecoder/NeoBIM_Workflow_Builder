@@ -54,8 +54,12 @@ export async function POST(req: NextRequest) {
   // Admins bypass. Phone-verified users bypass (they may not have email).
   // Unverified users get 1 free trial execution before verification is required,
   // matching the pre-flight check in /api/check-execution-eligibility.
-  // NOTE: We exclude the current executionId from the count so that nodes within
-  // the user's first (free-trial) workflow don't block each other.
+  //
+  // IMPORTANT: We only count COMPLETED executions (SUCCESS / PARTIAL) — not
+  // RUNNING ones. The current execution is RUNNING while its nodes fire, so
+  // counting RUNNING would make node 2+ within the free-trial workflow block
+  // itself. The client-side executionId is a 7-char local ID that doesn't
+  // match the DB CUID, so we can't exclude by ID.
   if (!isAdmin) {
     const isEmailVerified = !!(session.user as { emailVerified?: boolean }).emailVerified;
     const isPhoneVerified = !!(session.user as { phoneVerified?: boolean }).phoneVerified;
@@ -64,16 +68,15 @@ export async function POST(req: NextRequest) {
       const monthStart = new Date();
       monthStart.setDate(1);
       monthStart.setHours(0, 0, 0, 0);
-      const executionCount = await prisma.execution.count({
+      const completedCount = await prisma.execution.count({
         where: {
           userId,
           createdAt: { gte: monthStart },
-          status: { notIn: ["FAILED", "PENDING"] },
-          ...(executionId ? { id: { not: executionId } } : {}),
+          status: { in: ["SUCCESS", "PARTIAL"] },
         },
       });
 
-      if (executionCount >= 1) {
+      if (completedCount >= 1) {
         return NextResponse.json(
           formatErrorResponse({
             title: "Email verification required",
