@@ -192,21 +192,30 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // ── FREE tier lifetime gate (counts against 3 lifetime executions) ──
+    // ── FREE tier: 3 lifetime executions (2 unverified + 1 after verification) ──
     if (!isAdmin && userRole === "FREE") {
       const lifetimeCompleted = await prisma.execution.count({
         where: { userId, status: { in: ["SUCCESS", "PARTIAL"] } },
       });
+
+      // Hard cap: 3 lifetime executions
       if (lifetimeCompleted >= 3) {
         return NextResponse.json(
-          formatErrorResponse({
-            title: "Free executions used",
-            message: "You've used all 3 free executions. Upgrade to keep building!",
-            code: "RATE_001",
-            action: "View Plans",
-            actionUrl: "/dashboard/billing",
-          }),
+          { error: "PLAN_LIMIT", title: "Free executions used", message: "You've used all 3 free executions. Upgrade to keep building amazing floor plans!", action: "View Plans", actionUrl: "/dashboard/billing" },
           { status: 429 }
+        );
+      }
+
+      // Verification gate: after 2, must verify email for the last one
+      let isEmailVerified = !!(session.user as { emailVerified?: boolean }).emailVerified;
+      if (!isEmailVerified) {
+        const dbUser = await prisma.user.findUnique({ where: { id: userId }, select: { emailVerified: true } });
+        isEmailVerified = !!dbUser?.emailVerified;
+      }
+      if (!isEmailVerified && lifetimeCompleted >= 2) {
+        return NextResponse.json(
+          { error: "EMAIL_VERIFY", title: "Verify your email", message: "You've used 2 of your 3 free executions. Verify your email to unlock your final free floor plan!", action: "Verify Email", actionUrl: "/dashboard/settings" },
+          { status: 403 }
         );
       }
     }

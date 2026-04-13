@@ -91,6 +91,7 @@ export function FloorPlanViewer({ initialGeometry, initialPrompt, initialProject
   }, [!project]); // Re-check when project presence changes
 
   const [fallbackBanner, setFallbackBanner] = React.useState<string | null>(null);
+  const [upgradeBlock, setUpgradeBlock] = React.useState<{ title: string; message: string; action: string; actionUrl: string } | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const [undoToast, setUndoToast] = useState<string | null>(null);
   const undoToastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -139,7 +140,15 @@ export function FloorPlanViewer({ initialGeometry, initialPrompt, initialProject
 
       if (!res.ok) {
         const data = await res.json().catch(() => ({ error: "Unknown error" }));
-        throw new Error(data.error || `HTTP ${res.status}`);
+        // Handle plan limit / email verification gates — show popup, don't fallback
+        if (data.error === "PLAN_LIMIT" || data.error === "EMAIL_VERIFY") {
+          for (const t of stepTimers) clearTimeout(t);
+          useFloorPlanStore.setState({ isGenerating: false });
+          setUpgradeBlock({ title: data.title, message: data.message, action: data.action, actionUrl: data.actionUrl });
+          return;
+        }
+        const errMsg = typeof data.error === "object" ? (data.error?.message || JSON.stringify(data.error)) : (data.error || `HTTP ${res.status}`);
+        throw new Error(errMsg);
       }
 
       const data = await res.json();
@@ -428,6 +437,23 @@ export function FloorPlanViewer({ initialGeometry, initialPrompt, initialProject
 
   return (
     <div className="flex h-screen flex-col bg-white overflow-hidden select-none print:overflow-visible">
+      {/* Upgrade / Verify email popup */}
+      {upgradeBlock && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.6)", backdropFilter: "blur(8px)" }}>
+          <div style={{ maxWidth: 420, width: "100%", borderRadius: 20, overflow: "hidden", background: "linear-gradient(180deg, #111125, #0A0A18)", border: "1px solid rgba(79,138,255,0.15)", boxShadow: "0 32px 100px rgba(0,0,0,0.7)", padding: "36px 32px 28px", textAlign: "center" }}>
+            <div style={{ fontSize: 48, marginBottom: 12 }}>{upgradeBlock.actionUrl.includes("billing") ? "\uD83D\uDE80" : "\uD83D\uDCEC"}</div>
+            <h2 style={{ fontSize: 22, fontWeight: 800, color: "#F0F2F8", marginBottom: 8 }}>{upgradeBlock.title}</h2>
+            <p style={{ fontSize: 13, color: "#9898B0", lineHeight: 1.6, marginBottom: 24 }}>{upgradeBlock.message}</p>
+            <a href={upgradeBlock.actionUrl} style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "14px 28px", borderRadius: 14, background: "linear-gradient(135deg, #4F8AFF, #6366F1)", color: "#fff", fontSize: 15, fontWeight: 700, textDecoration: "none", boxShadow: "0 8px 32px rgba(79,138,255,0.3)" }}>
+              {upgradeBlock.action} →
+            </a>
+            <div style={{ marginTop: 12 }}>
+              <button onClick={() => setUpgradeBlock(null)} style={{ background: "none", border: "none", color: "#44445A", fontSize: 12, cursor: "pointer" }}>Maybe later</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Fallback warning banner */}
       {fallbackBanner && (
         <div className="flex items-center gap-2 border-b border-amber-200 bg-amber-50 px-3 py-1.5 text-[11px] text-amber-700 print:hidden">
