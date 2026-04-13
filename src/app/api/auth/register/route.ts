@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import crypto from "crypto";
 import { prisma } from "@/lib/db";
 import { trackSignup } from "@/lib/analytics";
+import { trackServerSignup } from "@/lib/server-conversions";
 import { checkEndpointRateLimit } from "@/lib/rate-limit";
 import { sendVerificationEmail } from "@/shared/services/email";
 import { claimReferralCode } from "@/lib/referral";
@@ -124,6 +125,15 @@ export async function POST(req: NextRequest) {
 
     // Fire-and-forget: don't block registration response on analytics
     trackSignup(user.id, source).catch(err => console.warn("[analytics]", err));
+
+    // Server-side conversion: Meta CAPI (fire-and-forget, bypasses ad blockers)
+    trackServerSignup({
+      email: normalizedEmail,
+      phone: normalizedPhone,
+      firstName: name?.split(" ")[0],
+      ip,
+      userAgent: req.headers.get("user-agent") || undefined,
+    }).catch(err => console.warn("[meta-capi]", err));
 
     // Claim referral if a code was provided (awaited — ensures bonuses are granted)
     if (referralCode && typeof referralCode === "string") {

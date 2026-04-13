@@ -9,7 +9,7 @@ import {
   Sparkles, LayoutGrid, Globe, Share2, Copy, Check,
   ArrowRight, Mail, CheckCircle2, Zap,
 } from "lucide-react";
-import { pushToDataLayer } from "@/lib/gtm";
+import { pushToDataLayer, pushEnhancedConversionData } from "@/lib/gtm";
 
 /* ── Ambient particle canvas ─────────────────────────────────── */
 function AmbientParticles() {
@@ -143,6 +143,11 @@ export default function WelcomePage() {
 
   useEffect(() => {
     if (session?.user) {
+      // Enhanced Conversions: send hashed email for Google Ads matching
+      pushEnhancedConversionData({
+        email: session.user.email || undefined,
+        firstName: session.user.name?.split(" ")[0],
+      });
       pushToDataLayer("sign_up_complete", {
         method: session.user.image ? "google" : "credentials",
       });

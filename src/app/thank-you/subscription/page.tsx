@@ -9,7 +9,7 @@ import {
   CheckCircle2, Sparkles, Zap,
   Share2, Copy, Check, ArrowRight, Crown, Rocket,
 } from "lucide-react";
-import { pushToDataLayer } from "@/lib/gtm";
+import { pushToDataLayer, pushEnhancedConversionData } from "@/lib/gtm";
 import { trackPurchase } from "@/lib/meta-pixel";
 
 /* ── Confetti burst canvas ───────────────────────────────────── */
@@ -200,6 +200,11 @@ function Content() {
   useEffect(() => {
     if (!session?.user || firedRef.current) return;
     firedRef.current = true;
+    // Enhanced Conversions: send hashed email for Google Ads matching
+    pushEnhancedConversionData({
+      email: session.user.email || undefined,
+      firstName: session.user.name?.split(" ")[0],
+    });
     trackPurchase({ content_name: `BuildFlow ${plan?.name || "Subscription"}`, currency: "INR" });
     pushToDataLayer("purchase_complete", { plan: plan?.name || userRole, currency: "INR" });
   }, [session, plan, userRole]);

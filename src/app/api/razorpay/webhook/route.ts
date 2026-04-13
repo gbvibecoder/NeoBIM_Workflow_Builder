@@ -8,6 +8,7 @@ import {
   sendSubscriptionCanceledEmail,
 } from '@/shared/services/email';
 import { checkWebhookIdempotency } from '@/lib/webhook-idempotency';
+import { trackServerPurchase } from '@/lib/server-conversions';
 
 export async function POST(req: NextRequest) {
   const body = await req.text();
@@ -187,6 +188,14 @@ async function activateSubscription(subscription: {
   // Send welcome email on first activation
   if (previousRole === 'FREE' && user.email) {
     sendWelcomeEmail(user.email, user.name, newRole).catch((err) => console.error("[webhook] Failed to send welcome email:", err));
+
+    // Server-side conversion: Meta CAPI (fire-and-forget)
+    trackServerPurchase({
+      email: user.email,
+      firstName: user.name?.split(" ")[0],
+      plan: newRole,
+      currency: "INR",
+    }).catch(err => console.warn("[meta-capi]", err));
   }
 }
 
