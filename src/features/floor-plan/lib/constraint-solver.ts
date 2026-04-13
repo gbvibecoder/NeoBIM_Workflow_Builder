@@ -1,6 +1,9 @@
 /**
  * Constraint-Based Layout Solver
  *
+ * @deprecated Use grid-room-assigner.ts instead.
+ * This file is kept as fallback for the legacy BSP/AI pipeline.
+ *
  * Replaces sequential BSP → patch → patch approach with holistic constraint
  * solving.  Generates many candidate layouts via Zone-Row placement, scores
  * each against ALL constraints simultaneously, refines the top candidates,
@@ -246,8 +249,10 @@ function countHardViolations(layout: PlacedRoom[], fpW: number, fpH: number): nu
     if (room.width < mins.minWidth - TOL) v++;
     if (room.depth < mins.minDepth - TOL) v++;
     if (room.width * room.depth < mins.minArea * 0.8) v++; // 20% tolerance on area
-    // AR check (skip corridors, allow 0.5 tolerance for solver flexibility)
-    if (mins.maxAR < 10 && ar(room.width, room.depth) > mins.maxAR + 0.5) v++;
+    // AR check (skip corridors; small plans get more tolerance since limited footprint
+    // makes it harder to achieve ideal proportions)
+    const arTol = layout.length <= 5 ? 0.4 : 0.2;
+    if (mins.maxAR < 10 && ar(room.width, room.depth) > mins.maxAR + arTol) v++;
   }
 
   // Overlap check
@@ -319,15 +324,25 @@ function scoreLayout(
   else if (efficiency >= 0.85) efficiencyScore = 5;
   else efficiencyScore = 2;
 
-  // ── Proportion score (0-15) ──
+  // ── Proportion score (0-25) — increased weight for room shape quality ──
   let propPoints = 0;
   for (const room of layout) {
     const mins = getRoomMinimums(room.type, room.name);
     const roomAR = ar(room.width, room.depth);
-    if (roomAR <= mins.maxAR) propPoints += 1.5;
-    else if (roomAR <= mins.maxAR + 0.5) propPoints += 0.5;
+    const shortDim = Math.min(room.width, room.depth);
+    const longDim = Math.max(room.width, room.depth);
+
+    if (roomAR <= mins.maxAR && shortDim >= mins.minWidth - 0.1 && longDim >= mins.minDepth - 0.1) {
+      propPoints += 2.5; // Full marks: good AR AND meets minimum dimensions
+    } else if (roomAR <= mins.maxAR) {
+      propPoints += 1.5; // Good AR but missing a dimension
+    } else if (roomAR <= mins.maxAR + 0.3) {
+      propPoints += 0.5; // Slightly over AR limit
+    } else {
+      propPoints -= 1.0; // Bad proportions — penalize
+    }
   }
-  const proportionScore = Math.min(15, (propPoints / Math.max(layout.length, 1)) * 15);
+  const proportionScore = Math.max(0, Math.min(25, (propPoints / Math.max(layout.length, 1)) * 25));
 
   // ── Area accuracy score (0-20) — penalize oversized small rooms ──
   let areaAccPoints = 0;
@@ -382,10 +397,10 @@ function scoreLayout(
     zoneScore = 7;
   }
 
-  // Total: adjacency(25) + efficiency(15) + proportion(15) + areaMatch(20) + zone(10) = 85 max
+  // Total: adjacency(25) + efficiency(15) + proportion(25) + areaMatch(20) + zone(10) = 95 max
   // Normalize to ~100 scale
   const rawTotal = adjacencyScore + efficiencyScore + proportionScore + areaMatchScore + zoneScore;
-  const total = Math.round(Math.min(100, rawTotal * (100 / 85)));
+  const total = Math.round(Math.min(100, rawTotal * (100 / 95)));
 
   return { total, hardViolations: 0, adjacencyScore, efficiencyScore, proportionScore, areaMatchScore, zoneScore };
 }

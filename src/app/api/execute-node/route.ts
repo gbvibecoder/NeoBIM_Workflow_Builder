@@ -47,29 +47,49 @@ export async function POST(req: NextRequest) {
     userRole === "PLATFORM_ADMIN" ||
     userRole === "TEAM_ADMIN";
 
+  // Parse body first so we can read executionId for verification + rate-limit deduplication
+  const { catalogueId, executionId, tileInstanceId, inputData, userApiKey } = await req.json();
+
   // Server-side email/phone verification enforcement.
   // Admins bypass. Phone-verified users bypass (they may not have email).
-  // This prevents abuse — client-side popup alone can be bypassed.
+  // Unverified users get 1 free trial execution before verification is required,
+  // matching the pre-flight check in /api/check-execution-eligibility.
+  //
+  // IMPORTANT: We only count COMPLETED executions (SUCCESS / PARTIAL) — not
+  // RUNNING ones. The current execution is RUNNING while its nodes fire, so
+  // counting RUNNING would make node 2+ within the free-trial workflow block
+  // itself. The client-side executionId is a 7-char local ID that doesn't
+  // match the DB CUID, so we can't exclude by ID.
   if (!isAdmin) {
     const isEmailVerified = !!(session.user as { emailVerified?: boolean }).emailVerified;
     const isPhoneVerified = !!(session.user as { phoneVerified?: boolean }).phoneVerified;
 
     if (!isEmailVerified && !isPhoneVerified) {
-      return NextResponse.json(
-        formatErrorResponse({
-          title: "Email verification required",
-          message: "Please verify your email address before running workflows. Check your inbox for the verification link.",
-          code: "AUTH_001",
-          action: "Verify Email",
-          actionUrl: "/dashboard/settings",
-        }),
-        { status: 403 }
-      );
+      const monthStart = new Date();
+      monthStart.setDate(1);
+      monthStart.setHours(0, 0, 0, 0);
+      const completedCount = await prisma.execution.count({
+        where: {
+          userId,
+          createdAt: { gte: monthStart },
+          status: { in: ["SUCCESS", "PARTIAL"] },
+        },
+      });
+
+      if (completedCount >= 1) {
+        return NextResponse.json(
+          formatErrorResponse({
+            title: "Email verification required",
+            message: "You've used your free trial workflow! Please verify your email address to continue running workflows. Check your inbox for the verification link.",
+            code: "AUTH_001",
+            action: "Verify Email",
+            actionUrl: "/dashboard/settings",
+          }),
+          { status: 403 }
+        );
+      }
     }
   }
-
-  // Parse body first so we can read executionId for rate-limit deduplication
-  const { catalogueId, executionId, tileInstanceId, inputData, userApiKey } = await req.json();
   const nodeStartTime = Date.now();
 
   // ── Detailed file logging (dev only) ──

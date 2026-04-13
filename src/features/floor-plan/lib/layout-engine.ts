@@ -1,6 +1,9 @@
 /**
  * Deterministic Floor Plan Layout Engine
  *
+ * @deprecated Use grid-generator.ts + grid-room-assigner.ts instead.
+ * This file is kept as fallback for the legacy BSP/AI pipeline.
+ *
  * Replaces GPT-4o spatial reasoning with a BSP (Binary Space Partitioning)
  * algorithm that guarantees:
  *   - Zero gaps (every point belongs to exactly one room)
@@ -19,6 +22,7 @@ import type { RoomWithTarget } from "@/features/floor-plan/lib/dimension-correct
 import { layoutCourtyardPlan, hasCourtyardRoom } from "@/features/floor-plan/lib/courtyard-layout";
 import { solveLayout } from "@/features/floor-plan/lib/constraint-solver";
 import { classifyRoom } from "@/features/floor-plan/lib/room-sizer";
+import { getRoomRule } from "@/features/floor-plan/lib/architectural-rules";
 
 // ── Output type ──────────────────────────────────────────────────────────────
 
@@ -807,11 +811,31 @@ function scoreLayout(rooms: PlacedRoom[], adjacency: AdjacencyRequirement[]): nu
     score += roomsShareEdge(a, b, TOL) ? bonus : penalty;
   }
 
-  // 4. ASPECT RATIO PENALTY (weight: -3 per room with AR > 2.5)
+  // 4. ASPECT RATIO PENALTY — heavily penalize elongated rooms
   for (const room of rooms) {
     if (room.type === "hallway") continue;
     const roomAr = ar(room.width, room.depth);
-    if (roomAr > 2.5) score -= 3;
+    const cls = classifyRoom(room.type, room.name);
+    const rule = getRoomRule(cls);
+    const maxAR = rule.aspectRatio.max;
+
+    if (roomAr > maxAR + 0.3) {
+      score -= 25; // Hard penalty — room violates its type's AR limit
+    } else if (roomAr > maxAR) {
+      score -= 10; // Moderate penalty — just over limit
+    } else if (roomAr > 2.0 && maxAR <= 2.0) {
+      score -= 5;  // Mild penalty — approaching limit
+    } else if (roomAr <= 1.5) {
+      score += 3;  // Bonus for well-proportioned rooms
+    }
+
+    // Dimension range penalty — rooms below minimum width/depth
+    const minW = rule.width.min;
+    const minD = rule.depth.min;
+    const shortDim = Math.min(room.width, room.depth);
+    const longDim = Math.max(room.width, room.depth);
+    if (shortDim < minW - 0.1) score -= 15;
+    if (longDim < minD - 0.1) score -= 15;
   }
 
   // 5. WET WALL CLUSTERING: bathrooms near each other (weight: 5)
@@ -2388,6 +2412,11 @@ function splitTwo(a: RoomSpec, b: RoomSpec, rect: Rect): PlacedRoom[] {
   // Cross-axis penalty: both rooms inherit rect.w — penalize if it violates depth minimum
   if (rect.w < minA && hAh >= depthA) hScore += 2;
   if (rect.w < minB && hBh >= depthB) hScore += 2;
+  // Room-specific AR penalty: heavily penalize if either child exceeds its room's AR limit
+  const aMaxAR = getRoomRule(classifyRoom(a.type, a.name)).aspectRatio.max;
+  const bMaxAR = getRoomRule(classifyRoom(b.type, b.name)).aspectRatio.max;
+  if (ar(rect.w, hAh) > aMaxAR) hScore += (ar(rect.w, hAh) - aMaxAR) * 4;
+  if (ar(rect.w, hBh) > bMaxAR) hScore += (ar(rect.w, hBh) - bMaxAR) * 4;
 
   // Vertical split (with dimension clamping)
   let vAw = grid(rect.w * ratio);
@@ -2412,6 +2441,9 @@ function splitTwo(a: RoomSpec, b: RoomSpec, rect: Rect): PlacedRoom[] {
   // Cross-axis penalty: both rooms inherit rect.h — penalize if it violates depth minimum
   if (rect.h < minA && vAw >= depthA) vScore += 2;
   if (rect.h < minB && vBw >= depthB) vScore += 2;
+  // Room-specific AR penalty
+  if (ar(vAw, rect.h) > aMaxAR) vScore += (ar(vAw, rect.h) - aMaxAR) * 4;
+  if (ar(vBw, rect.h) > bMaxAR) vScore += (ar(vBw, rect.h) - bMaxAR) * 4;
 
   // Protect non-bedroom rooms from getting excessively large in any dimension
   // If enforcing bedroom minimum made the non-bedroom side much larger, prefer the other split
@@ -2478,11 +2510,20 @@ function findBestSplit(
 
     const adjPenalty = countAdjacencyBreaks(left, right, adjacency) * 0.3;
 
+    // Get the strictest AR limit among rooms in each child group
+    const leftMaxAR = Math.min(...left.map(r => getRoomRule(classifyRoom(r.type, r.name)).aspectRatio.max), 3.0);
+    const rightMaxAR = Math.min(...right.map(r => getRoomRule(classifyRoom(r.type, r.name)).aspectRatio.max), 3.0);
+
     // Horizontal split
     const hLH = grid(rect.h * ratio);
     const hRH = grid(rect.h - hLH);
     if (hLH >= MIN_BATHROOM_DIM && hRH >= MIN_BATHROOM_DIM) {
-      const score = Math.max(ar(rect.w, hLH), ar(rect.w, hRH)) + adjPenalty;
+      const leftAR = ar(rect.w, hLH);
+      const rightAR = ar(rect.w, hRH);
+      // Penalize if child AR exceeds the strictest room requirement in that child
+      let score = Math.max(leftAR, rightAR) + adjPenalty;
+      if (leftAR > leftMaxAR) score += (leftAR - leftMaxAR) * 5;
+      if (rightAR > rightMaxAR) score += (rightAR - rightMaxAR) * 5;
       if (score < bestScore) {
         bestScore = score;
         bestResult = {
@@ -2497,7 +2538,11 @@ function findBestSplit(
     const vLW = grid(rect.w * ratio);
     const vRW = grid(rect.w - vLW);
     if (vLW >= MIN_BATHROOM_DIM && vRW >= MIN_BATHROOM_DIM) {
-      const score = Math.max(ar(vLW, rect.h), ar(vRW, rect.h)) + adjPenalty;
+      const leftAR = ar(vLW, rect.h);
+      const rightAR = ar(vRW, rect.h);
+      let score = Math.max(leftAR, rightAR) + adjPenalty;
+      if (leftAR > leftMaxAR) score += (leftAR - leftMaxAR) * 5;
+      if (rightAR > rightMaxAR) score += (rightAR - rightMaxAR) * 5;
       if (score < bestScore) {
         bestScore = score;
         bestResult = {

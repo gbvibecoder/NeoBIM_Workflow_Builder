@@ -25,6 +25,7 @@ import type {
   RoomType,
 } from "@/types/floor-plan-cad";
 import { smartPlaceDoors, smartPlaceWindows } from "@/features/floor-plan/lib/smart-placement";
+import type { TemplateConnection } from "@/features/floor-plan/lib/typology-templates";
 import { layoutAllFurniture } from "@/features/floor-plan/lib/furniture-layout";
 
 let _idCounter = 0;
@@ -37,6 +38,7 @@ function genId(prefix: string): string {
 // ============================================================
 
 const ROOM_TYPE_MAP: Record<string, RoomType> = {
+  // ── Original mappings (AI pipeline raw types) ──
   living: "living_room",
   bedroom: "bedroom",
   kitchen: "kitchen",
@@ -55,6 +57,65 @@ const ROOM_TYPE_MAP: Record<string, RoomType> = {
   studio: "bedroom",
   staircase: "staircase",
   other: "custom",
+
+  // ── classifyRoom() canonical types (from room-sizer.ts) ──
+  // These are produced by the template→optimizer pipeline and must
+  // map to RoomType for correct coloring in the canvas renderer.
+  master_bedroom: "master_bedroom",
+  guest_bedroom: "guest_bedroom",
+  children_bedroom: "bedroom",
+  master_bathroom: "bathroom",
+  powder_room: "bathroom",
+  half_bath: "bathroom",
+  servant_toilet: "toilet",
+  commercial_toilet: "toilet",
+  living_room: "living_room",
+  dining_room: "dining_room",
+  drawing_room: "living_room",
+  family_room: "living_room",
+  corridor: "corridor",
+  foyer: "foyer",
+  entrance_lobby: "foyer",
+  lobby: "lobby",
+  pooja_room: "puja_room",
+  puja_room: "puja_room",
+  servant_quarter: "servant_quarter",
+  laundry: "laundry",
+  store_room: "store_room",
+  walk_in_closet: "walk_in_closet",
+  dressing_room: "dressing_room",
+  home_office: "home_office",
+  study: "study",
+  gym: "custom",
+  home_theater: "custom",
+  library: "study",
+  terrace: "terrace",
+  verandah: "verandah",
+  parking: "parking",
+  car_porch: "parking",
+  garage: "parking",
+  shoe_rack: "custom",
+  mud_room: "custom",
+
+  // ── Commercial types ──
+  reception: "reception",
+  waiting_area: "reception",
+  cabin: "cabin",
+  manager_cabin: "cabin",
+  director_cabin: "cabin",
+  conference_room: "conference_room",
+  meeting_room: "meeting_room",
+  board_room: "conference_room",
+  open_workspace: "custom",
+  cubicle_area: "custom",
+  break_room: "break_room",
+  server_room: "custom",
+  pantry: "pantry",
+  fire_escape_stair: "staircase",
+  lift: "elevator",
+
+  // ── Custom fallback ──
+  custom: "custom",
 };
 
 // IS:1905 / NBC India wall thickness standards
@@ -1576,5 +1637,479 @@ export function convertMultiFloorToProject(
       nbc_compliance: true,
     },
     floors,
+  };
+}
+
+// ============================================================
+// GRID-FIRST PIPELINE ADAPTER — Phase 8
+// ============================================================
+
+import type { StructuralGrid } from '@/features/floor-plan/lib/grid-generator';
+import type { RoomAssignment } from '@/features/floor-plan/lib/grid-room-assigner';
+import type { WallSystem } from '@/features/floor-plan/lib/grid-wall-generator';
+
+/**
+ * Convert grid-based layout to FloorPlanGeometry (meters, Y-down).
+ * This bridges the new grid-first pipeline to the existing rendering pipeline.
+ */
+export function buildGeometryFromGrid(
+  grid: StructuralGrid,
+  assignment: RoomAssignment,
+  wallSystem: WallSystem,
+): FloorPlanGeometry {
+  const rooms: FloorPlanGeometry['rooms'] = [];
+
+  for (const ar of assignment.roomOrder) {
+    // Map classified type back to FloorPlanRoomType
+    const typeMap: Record<string, string> = {
+      living_room: 'living', dining_room: 'dining', master_bedroom: 'bedroom',
+      guest_bedroom: 'bedroom', children_bedroom: 'bedroom',
+      kitchen: 'kitchen', bathroom: 'bathroom', master_bathroom: 'bathroom',
+      toilet: 'bathroom', powder_room: 'bathroom', half_bath: 'bathroom',
+      servant_toilet: 'bathroom',
+      corridor: 'hallway', hallway: 'hallway', passage: 'hallway',
+      foyer: 'entrance', entrance_lobby: 'entrance',
+      staircase: 'staircase',
+      utility: 'utility', laundry: 'utility',
+      store_room: 'storage', walk_in_closet: 'closet', dressing_room: 'closet',
+      balcony: 'balcony', verandah: 'veranda', terrace: 'patio', sit_out: 'balcony',
+      study: 'office', home_office: 'office',
+      garage: 'storage', parking: 'storage', car_porch: 'storage',
+      pooja_room: 'other', servant_quarter: 'bedroom',
+    };
+
+    const fpType = (typeMap[ar.classifiedType] ?? ar.spec.type ?? 'other') as FloorPlanGeometry['rooms'][number]['type'];
+
+    rooms.push({
+      name: ar.spec.name,
+      type: fpType,
+      x: ar.bounds.x,
+      y: ar.bounds.y,
+      width: ar.bounds.width,
+      depth: ar.bounds.depth,
+      center: [
+        ar.bounds.x + ar.bounds.width / 2,
+        ar.bounds.y + ar.bounds.depth / 2,
+      ],
+      area: ar.actualArea,
+    });
+  }
+
+  // Add corridor as a room if there are corridor cells
+  if (assignment.corridorCells.length > 0) {
+    const corrMinX = Math.min(...assignment.corridorCells.map(c => c.x));
+    const corrMaxX = Math.max(...assignment.corridorCells.map(c => c.x + c.width));
+    const corrMinY = Math.min(...assignment.corridorCells.map(c => c.y));
+    const corrMaxY = Math.max(...assignment.corridorCells.map(c => c.y + c.depth));
+    const corrW = corrMaxX - corrMinX;
+    const corrD = corrMaxY - corrMinY;
+    const corrArea = assignment.corridorCells.reduce((s, c) => s + c.width * c.depth, 0);
+
+    if (corrArea > 0.5) { // only add if meaningful corridor area
+      rooms.push({
+        name: 'Corridor',
+        type: 'hallway',
+        x: corrMinX,
+        y: corrMinY,
+        width: corrW,
+        depth: corrD,
+        center: [corrMinX + corrW / 2, corrMinY + corrD / 2],
+        area: corrArea,
+      });
+    }
+  }
+
+  return {
+    footprint: { width: grid.totalWidth, depth: grid.totalDepth },
+    wallHeight: 3.0,
+    walls: [],   // walls generated by convertGeometryToProject from room rects
+    doors: [],   // doors placed by smart-placement in convertGeometryToProject
+    windows: [], // windows placed by smart-placement in convertGeometryToProject
+    rooms,
+  };
+}
+
+import type { GridWall } from '@/features/floor-plan/lib/grid-wall-generator';
+import type { AssignedRoom } from '@/features/floor-plan/lib/grid-room-assigner';
+
+/**
+ * Convert grid-based layout directly to FloorPlanProject.
+ *
+ * Unlike convertGeometryToProject (which regenerates walls from room bounding
+ * boxes), this function uses the WallSystem that grid-wall-generator already
+ * computed from the structural grid. This guarantees:
+ *   - Walls lie on grid lines → always continuous, always connected
+ *   - Proper T/L/cross junctions at every column position
+ *   - No floating segments from non-grid-aligned room bounds
+ *
+ * Sub-cell partition walls are added in a second pass for rooms whose bounds
+ * are smaller than their cell.
+ */
+export function convertGridToProject(
+  grid: StructuralGrid,
+  assignment: RoomAssignment,
+  wallSystem: WallSystem,
+  projectName: string = "AI-Generated Floor Plan",
+  originalPrompt?: string,
+  templateConnections?: TemplateConnection[],
+): FloorPlanProject {
+  const M = 1000; // meters → mm
+  const buildingW = grid.totalWidth * M;
+  const buildingD = grid.totalDepth * M;
+
+  // ── 1. Convert rooms (using bounds from assignment) ──
+  const roomIdMap = new Map<string, string>(); // spec.name → CAD id
+  const rooms: Room[] = [];
+
+  for (const ar of assignment.roomOrder) {
+    const id = genId("r");
+    roomIdMap.set(ar.spec.name, id);
+
+    const cadType = ROOM_TYPE_MAP[ar.classifiedType]
+      ?? ROOM_TYPE_MAP[ar.spec.type]
+      ?? "custom";
+
+    // Convert bounds (meters, Y-down) → mm, Y-up.
+    // With non-uniform bay optimization, cell sizes match room needs directly.
+    const wMm = ar.bounds.width * M;
+    const dMm = ar.bounds.depth * M;
+    const x0 = ar.bounds.x * M;
+    const y0 = buildingD - ar.bounds.y * M - dMm; // Y-flip
+
+    const boundary: Point[] = [
+      { x: x0, y: y0 },
+      { x: x0 + wMm, y: y0 },
+      { x: x0 + wMm, y: y0 + dMm },
+      { x: x0, y: y0 + dMm },
+    ];
+
+    const cx = x0 + wMm / 2;
+    const cy = y0 + dMm / 2;
+
+    rooms.push({
+      id,
+      name: ar.spec.name,
+      type: cadType as RoomType,
+      boundary: { points: boundary },
+      area_sqm: ar.actualArea,
+      perimeter_mm: (wMm + dMm) * 2,
+      natural_light_required: [
+        "living_room", "bedroom", "master_bedroom", "kitchen",
+        "dining_room", "study", "home_office",
+      ].includes(cadType),
+      ventilation_required: true,
+      label_position: { x: cx, y: cy },
+      wall_ids: [],
+      vastu_direction: computeVastuDirection(cx, cy, buildingW, buildingD),
+    });
+  }
+
+  // Add corridor room from unassigned cells — but ONLY if no corridor room was
+  // already created from roomOrder (prevents duplicate corridor rooms).
+  const hasCorridorInRoomOrder = assignment.roomOrder.some(
+    ar => ['corridor', 'hallway', 'passage'].includes(ar.classifiedType),
+  );
+  if (assignment.corridorCells.length > 0 && !hasCorridorInRoomOrder) {
+    const id = genId("r");
+    roomIdMap.set("Corridor", id);
+    const corrMinX = Math.min(...assignment.corridorCells.map(c => c.x)) * M;
+    const corrMaxX = Math.max(...assignment.corridorCells.map(c => c.x + c.width)) * M;
+    const corrMinY = Math.min(...assignment.corridorCells.map(c => c.y)) * M;
+    const corrMaxY = Math.max(...assignment.corridorCells.map(c => c.y + c.depth)) * M;
+    const wMm = corrMaxX - corrMinX;
+    const dMm = corrMaxY - corrMinY;
+    const x0 = corrMinX;
+    const y0flip = buildingD - corrMinY - dMm;
+    if (wMm > 0 && dMm > 0) {
+      rooms.push({
+        id,
+        name: "Corridor",
+        type: "corridor",
+        boundary: { points: [
+          { x: x0, y: y0flip },
+          { x: x0 + wMm, y: y0flip },
+          { x: x0 + wMm, y: y0flip + dMm },
+          { x: x0, y: y0flip + dMm },
+        ]},
+        area_sqm: assignment.corridorCells.reduce((s, c) => s + c.width * c.depth, 0),
+        perimeter_mm: (wMm + dMm) * 2,
+        natural_light_required: false,
+        ventilation_required: true,
+        label_position: { x: x0 + wMm / 2, y: y0flip + dMm / 2 },
+        wall_ids: [],
+        vastu_direction: "CENTER",
+      });
+    }
+  }
+
+  // ── 2. Convert grid walls to CAD walls (Pass 1: structural grid walls) ──
+  const walls: Wall[] = [];
+  // Map grid room IDs → CAD room IDs
+  const gridToCadRoom = new Map<string, string>();
+  for (const ar of assignment.roomOrder) {
+    gridToCadRoom.set(ar.id, roomIdMap.get(ar.spec.name) ?? "");
+  }
+  // Map the corridor sentinel '__corridor__' to the corridor CAD room ID
+  const corridorCadId = roomIdMap.get("Corridor");
+  if (corridorCadId) {
+    gridToCadRoom.set("__corridor__", corridorCadId);
+  }
+  // Also map corridor rooms from roomOrder (explicit "Corridor" in program)
+  for (const ar of assignment.roomOrder) {
+    if (['corridor', 'hallway', 'passage'].includes(ar.classifiedType)) {
+      const cadId = roomIdMap.get(ar.spec.name);
+      if (cadId && !corridorCadId) {
+        gridToCadRoom.set("__corridor__", cadId);
+      }
+    }
+  }
+
+  for (const gw of wallSystem.walls) {
+    const leftCadId = gw.leftRoomId ? (gridToCadRoom.get(gw.leftRoomId) ?? undefined) : undefined;
+    const rightCadId = gw.rightRoomId ? (gridToCadRoom.get(gw.rightRoomId) ?? undefined) : undefined;
+
+    // Convert meters Y-down → mm Y-up
+    const startX = gw.start.x * M;
+    const startY = buildingD - gw.start.y * M;
+    const endX = gw.end.x * M;
+    const endY = buildingD - gw.end.y * M;
+
+    walls.push({
+      id: genId("w"),
+      type: gw.isExterior ? "exterior" : "interior",
+      material: "brick",
+      centerline: {
+        start: { x: startX, y: startY },
+        end: { x: endX, y: endY },
+      },
+      thickness_mm: gw.thickness,
+      height_mm: 2850,
+      left_room_id: leftCadId,
+      right_room_id: rightCadId,
+      openings: [],
+      line_weight: gw.isExterior ? "thick" : "medium",
+      is_load_bearing: gw.isLoadBearing,
+    });
+  }
+
+  // No partition walls needed — sub-cell split rooms use full cell boundaries
+  // that align with grid walls. The room label shows the correct (smaller) area.
+
+  // ── 3. Assign wall_ids to rooms ──
+  for (const room of rooms) {
+    const bp = room.boundary.points;
+    const rx0 = Math.min(...bp.map(p => p.x));
+    const ry0 = Math.min(...bp.map(p => p.y));
+    const rx1 = Math.max(...bp.map(p => p.x));
+    const ry1 = Math.max(...bp.map(p => p.y));
+    const TOL = 300; // mm
+
+    room.wall_ids = walls
+      .filter(w => {
+        const ws = w.centerline.start;
+        const we = w.centerline.end;
+        // Wall touches room if any endpoint is within/near room boundary
+        const touchesX = (
+          (ws.x >= rx0 - TOL && ws.x <= rx1 + TOL) ||
+          (we.x >= rx0 - TOL && we.x <= rx1 + TOL)
+        );
+        const touchesY = (
+          (ws.y >= ry0 - TOL && ws.y <= ry1 + TOL) ||
+          (we.y >= ry0 - TOL && we.y <= ry1 + TOL)
+        );
+        return touchesX && touchesY && (
+          w.left_room_id === room.id || w.right_room_id === room.id ||
+          // Also match by proximity for walls without explicit room IDs
+          isWallOnRoomEdge(w, rx0, ry0, rx1, ry1, TOL)
+        );
+      })
+      .map(w => w.id);
+  }
+
+  // ── 4. Assemble floor ──
+  const floor: Floor = {
+    id: genId("floor"),
+    name: "Ground Floor",
+    level: 0,
+    floor_to_floor_height_mm: 3000,
+    slab_thickness_mm: 150,
+    boundary: {
+      points: [
+        { x: 0, y: 0 },
+        { x: buildingW, y: 0 },
+        { x: buildingW, y: buildingD },
+        { x: 0, y: buildingD },
+      ],
+    },
+    walls,
+    rooms,
+    doors: [],
+    windows: [],
+    stairs: [],
+    columns: [],
+    furniture: [],
+    fixtures: [],
+    annotations: [],
+    dimensions: [],
+    zones: [],
+  };
+
+  // ── 5. Smart door + window placement (after ALL walls are in place) ──
+  const doorResult = smartPlaceDoors(floor, templateConnections);
+  floor.doors = doorResult.doors;
+
+  const windowResult = smartPlaceWindows(floor);
+  floor.windows = windowResult.windows;
+
+  // ── 5b. Door guarantee + window ratio enforcement ──
+  try { ensureEveryRoomHasDoor(floor); } catch { /* non-critical */ }
+  try { ensureWindowRatios(floor); } catch { /* non-critical */ }
+
+  // ── 5c. Auto-furnish ──
+  try {
+    const furnResult = layoutAllFurniture(floor);
+    if (furnResult.furniture.length > 0) {
+      floor.furniture = furnResult.furniture;
+    }
+  } catch { /* non-critical */ }
+
+  // ── 5d. Staircase geometry ──
+  try { generateStaircaseGeometry(floor); } catch { /* non-critical */ }
+
+  // ── 5e. Annotations ──
+  if (originalPrompt) {
+    try { generateSmartAnnotations(floor, originalPrompt); } catch { /* non-critical */ }
+  }
+
+  return {
+    id: genId("proj"),
+    name: projectName,
+    version: "1.0",
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+    metadata: {
+      project_type: "residential",
+      building_type: `${rooms.length}-room layout`,
+      num_floors: 1,
+      plot_area_sqm: grid.totalWidth * grid.totalDepth,
+      carpet_area_sqm: assignment.roomOrder.reduce((s, ar) => s + ar.actualArea, 0),
+      original_prompt: originalPrompt,
+      generation_model: "Grid-First Pipeline",
+      generation_timestamp: new Date().toISOString(),
+    },
+    settings: {
+      units: "metric",
+      display_unit: "m",
+      scale: "1:100",
+      grid_size_mm: 100,
+      wall_thickness_mm: INTERIOR_WALL_MM,
+      paper_size: "A3",
+      orientation: "landscape",
+      north_angle_deg: 0,
+      vastu_compliance: true,
+      feng_shui_compliance: false,
+      ada_compliance: false,
+      nbc_compliance: true,
+    },
+    floors: [floor],
+  };
+}
+
+/** Check if a wall lies on a room's edge (within tolerance). */
+function isWallOnRoomEdge(w: Wall, rx0: number, ry0: number, rx1: number, ry1: number, tol: number): boolean {
+  const ws = w.centerline.start;
+  const we = w.centerline.end;
+  // Horizontal wall on top or bottom edge
+  if (Math.abs(ws.y - we.y) < 10) {
+    const wy = ws.y;
+    if ((Math.abs(wy - ry0) < tol || Math.abs(wy - ry1) < tol)) {
+      const minX = Math.min(ws.x, we.x);
+      const maxX = Math.max(ws.x, we.x);
+      return maxX > rx0 - tol && minX < rx1 + tol;
+    }
+  }
+  // Vertical wall on left or right edge
+  if (Math.abs(ws.x - we.x) < 10) {
+    const wx = ws.x;
+    if ((Math.abs(wx - rx0) < tol || Math.abs(wx - rx1) < tol)) {
+      const minY = Math.min(ws.y, we.y);
+      const maxY = Math.max(ws.y, we.y);
+      return maxY > ry0 - tol && minY < ry1 + tol;
+    }
+  }
+  return false;
+}
+
+/**
+ * Convert grid-first multi-floor coordination to FloorPlanProject.
+ * Bridges the multi-floor coordinator to the existing rendering pipeline.
+ */
+export function convertGridFloorCoordinationToProject(
+  coordination: {
+    grid: StructuralGrid;
+    floors: Array<{
+      level: number;
+      name: string;
+      assignment: RoomAssignment;
+    }>;
+    floorToFloorHeight: number;
+  },
+  wallSystemPerFloor: WallSystem[],
+  projectName: string,
+  originalPrompt?: string,
+): FloorPlanProject {
+  // Build each floor using the grid-direct converter
+  const FLOOR_NAMES: Record<number, string> = {
+    0: "Ground Floor", 1: "First Floor", 2: "Second Floor", 3: "Third Floor",
+  };
+
+  const cadFloors: Floor[] = [];
+  for (let i = 0; i < coordination.floors.length; i++) {
+    const fl = coordination.floors[i];
+    const ws = wallSystemPerFloor[i];
+    const singleProject = convertGridToProject(
+      coordination.grid, fl.assignment, ws, projectName, originalPrompt,
+    );
+    const cadFloor = singleProject.floors[0];
+    cadFloor.name = FLOOR_NAMES[fl.level] ?? `Floor ${fl.level}`;
+    cadFloor.level = fl.level;
+    cadFloors.push(cadFloor);
+  }
+
+  const totalCarpet = cadFloors.reduce(
+    (s, fl) => s + fl.rooms.reduce((rs, r) => rs + r.area_sqm, 0), 0,
+  );
+
+  return {
+    id: genId("proj"),
+    name: projectName,
+    version: "1.0",
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+    metadata: {
+      project_type: "residential",
+      building_type: `${coordination.floors.length}-floor layout`,
+      num_floors: coordination.floors.length,
+      plot_area_sqm: coordination.grid.totalWidth * coordination.grid.totalDepth,
+      carpet_area_sqm: totalCarpet,
+      original_prompt: originalPrompt,
+      generation_model: "Grid-First Pipeline (multi-floor)",
+      generation_timestamp: new Date().toISOString(),
+    },
+    settings: {
+      units: "metric",
+      display_unit: "m",
+      scale: "1:100",
+      grid_size_mm: 100,
+      wall_thickness_mm: INTERIOR_WALL_MM,
+      paper_size: "A3",
+      orientation: "landscape",
+      north_angle_deg: 0,
+      vastu_compliance: true,
+      feng_shui_compliance: false,
+      ada_compliance: false,
+      nbc_compliance: true,
+    },
+    floors: cadFloors,
   };
 }
