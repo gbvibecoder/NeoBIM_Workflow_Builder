@@ -107,21 +107,27 @@ const FEATURE_HIGHLIGHTS: Record<string, Array<{ icon: string; text: string }>> 
   ],
 };
 
-// ── Confetti particle component ─────────────────────────────────────────────
-function ConfettiParticle({ delay, x }: { delay: number; x: number }) {
-  const colors = ["#4F8AFF", "#A855F7", "#F59E0B", "#10B981", "#EC4899", "#06B6D4"];
-  const color = colors[Math.floor(Math.random() * colors.length)];
-  const size = 4 + Math.random() * 4;
-  const rotation = Math.random() * 360;
+// ── Confetti seed data (pre-computed to avoid Math.random() during render) ──
+const CONFETTI_COLORS = ["#4F8AFF", "#A855F7", "#F59E0B", "#10B981", "#EC4899", "#06B6D4"];
+const CONFETTI_SEEDS = Array.from({ length: 16 }, (_, i) => ({
+  color: CONFETTI_COLORS[i % CONFETTI_COLORS.length],
+  size: 4 + (((i * 7 + 3) % 11) / 10) * 4,
+  rotation: ((i * 137 + 42) % 360),
+  drift: ((i * 53 + 17) % 100 - 50) * 0.8,
+  spin: 360 + ((i * 91 + 11) % 180),
+}));
+
+function ConfettiParticle({ delay, x, seed }: { delay: number; x: number; seed: number }) {
+  const s = CONFETTI_SEEDS[seed % CONFETTI_SEEDS.length];
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: -20, x, rotate: rotation, scale: 0 }}
+      initial={{ opacity: 0, y: -20, x, rotate: s.rotation, scale: 0 }}
       animate={{
         opacity: [0, 1, 1, 0],
         y: [0, 60, 120, 180],
-        x: [x, x + (Math.random() - 0.5) * 80],
-        rotate: rotation + 360 + Math.random() * 180,
+        x: [x, x + s.drift],
+        rotate: s.rotation + s.spin,
         scale: [0, 1, 0.8, 0],
       }}
       transition={{ duration: 2.5, delay, ease: "easeOut" }}
@@ -129,10 +135,10 @@ function ConfettiParticle({ delay, x }: { delay: number; x: number }) {
         position: "absolute",
         top: 0,
         left: "50%",
-        width: size,
-        height: size,
-        borderRadius: size > 6 ? 2 : "50%",
-        background: color,
+        width: s.size,
+        height: s.size,
+        borderRadius: s.size > 6 ? 2 : "50%",
+        background: s.color,
         pointerEvents: "none",
       }}
     />
@@ -236,7 +242,7 @@ function EmailVerificationContent({
         {/* Confetti particles */}
         <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "100%", overflow: "hidden", pointerEvents: "none" }}>
           {Array.from({ length: 16 }).map((_, i) => (
-            <ConfettiParticle key={i} delay={0.1 + i * 0.08} x={(i - 8) * 18} />
+            <ConfettiParticle key={i} delay={0.1 + i * 0.08} x={(i - 8) * 18} seed={i} />
           ))}
         </div>
 
