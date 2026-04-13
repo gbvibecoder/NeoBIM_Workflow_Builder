@@ -42,8 +42,7 @@ export function usePusherLiveChat(userId: string | undefined | null) {
     });
     presence.bind("pusher:member_added", () => store._setAdminOnline(true));
     presence.bind("pusher:member_removed", () => {
-      // @ts-expect-error pusher-js types lack .members on Channel union
-      const count = presence.members?.count ?? 0;
+      const count = (presence as unknown as { members?: { count: number } }).members?.count ?? 0;
       store._setAdminOnline(count > 0);
     });
 
