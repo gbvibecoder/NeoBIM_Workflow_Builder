@@ -58,9 +58,9 @@ export const UserErrors = {
   }),
 
   // Rate Limiting
-  RATE_LIMIT_FREE: (resetDays: number): UserError => ({
-    title: "Monthly limit reached",
-    message: `Free tier: 3 executions per month. Resets in ${resetDays} day${resetDays === 1 ? "" : "s"}.`,
+  RATE_LIMIT_FREE: (_resetDays?: number): UserError => ({
+    title: "Free executions used",
+    message: "You've used all 3 free workflow executions. Upgrade to a paid plan to keep building!",
     action: "Upgrade to Mini",
     actionUrl: "/dashboard/billing",
     code: "RATE_001",

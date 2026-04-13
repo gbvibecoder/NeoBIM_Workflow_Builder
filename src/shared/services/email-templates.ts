@@ -170,7 +170,7 @@ export function subscriptionCanceledEmail(name: string | null, plan: string): st
     <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:20px;margin:20px 0;">
       <div style="font-size:12px;font-weight:700;color:#9898B0;text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;">What You Still Get</div>
       <ul style="margin:0;padding:0 0 0 18px;color:#7C7C96;font-size:13px;line-height:2;">
-        <li>3 executions per month</li>
+        <li>3 free executions</li>
         <li>3 workflows</li>
         <li>Community templates</li>
         <li>1 concept render</li>

@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 
 export const metadata: Metadata = {
   title: "Pricing — Free, Pro & Enterprise Plans",
-  description: "BuildFlow pricing plans. Start free with 3 AI executions per month, upgrade for more runs, video walkthroughs, and 3D models.",
+  description: "BuildFlow pricing plans. Start free with 3 AI executions, upgrade for more runs, video walkthroughs, and 3D models.",
   openGraph: {
     title: "BuildFlow Pricing — Plans for Every Team",
     description: "Start free, upgrade when you need more. Pro plan at $29/month with unlimited workflows and priority support.",

@@ -36,8 +36,7 @@ export async function POST(req: NextRequest) {
   }
 
   // JWT session can be stale for up to 60s after verification (NextAuth JWT
-  // refresh throttle). If session says unverified, double-check with DB so a
-  // freshly-verified user never sees a false "verify email" popup.
+  // refresh throttle). If session says unverified, double-check with DB.
   if (!emailVerified) {
     const dbUser = await prisma.user.findUnique({
       where: { id: userId },
@@ -49,7 +48,51 @@ export async function POST(req: NextRequest) {
   const { catalogueIds } = await req.json().catch(() => ({ catalogueIds: [] }));
   const blocks: ExecutionBlock[] = [];
 
-  // ── 1. Count this month's executions from DB ──
+  const planConfig = STRIPE_PLANS[userRole] || STRIPE_PLANS.FREE;
+  const planLimit = planConfig.limits.runsPerMonth;
+
+  if (userRole === "FREE") {
+    // ── FREE tier: 3 LIFETIME executions ──
+    // 2 without verification → verify email gate → 1 more after → total 3
+    const lifetimeCount = await prisma.execution.count({
+      where: { userId, status: { notIn: ["FAILED", "PENDING"] } },
+    });
+
+    const remaining = Math.max(0, 3 - lifetimeCount);
+
+    // Hard cap: 3 lifetime executions
+    if (lifetimeCount >= 3) {
+      blocks.push({
+        type: "plan_limit",
+        title: "Free executions used",
+        message: "You've used all 3 free workflow executions. Upgrade to Mini to keep building!",
+        action: "Upgrade to Mini",
+        actionUrl: "/dashboard/billing",
+      });
+    }
+    // Verification gate: after 2 unverified executions, must verify for the 3rd
+    else if (!emailVerified && lifetimeCount >= 2) {
+      blocks.push({
+        type: "email_verification",
+        title: "Verify your email",
+        message: "You've used 2 of your 3 free executions. Verify your email to unlock your final free workflow!",
+        action: "Verify Email",
+        actionUrl: "/dashboard/settings",
+      });
+    }
+
+    return NextResponse.json({
+      canExecute: blocks.length === 0,
+      blocks,
+      remaining,
+      limit: 3,
+      used: lifetimeCount,
+      emailVerified,
+      role: userRole,
+    });
+  }
+
+  // ── Paid tiers (MINI/STARTER/PRO): monthly limits ──
   const now = new Date();
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
   const executionCount = await prisma.execution.count({
@@ -60,26 +103,22 @@ export async function POST(req: NextRequest) {
     },
   });
 
-  const planConfig = STRIPE_PLANS[userRole] || STRIPE_PLANS.FREE;
-  const planLimit = planConfig.limits.runsPerMonth;
   const remaining = planLimit < 0 ? 999 : Math.max(0, planLimit - executionCount);
 
-  // ── 2. Email verification check ──
-  // Unverified users get 1 free execution, then must verify for the rest
-  if (!emailVerified && executionCount >= 1) {
-    const totalFree = planLimit < 0 ? 999 : planLimit;
+  // Paid users: require email verification (no trial)
+  if (!emailVerified) {
     blocks.push({
       type: "email_verification",
       title: "Verify your email",
-      message: `You've used your free trial workflow! Verify your email to unlock the remaining ${Math.max(0, totalFree - 1)} workflow${totalFree - 1 !== 1 ? "s" : ""} on your ${planConfig.name} plan.`,
+      message: "Please verify your email address to run workflows. Check your inbox for the verification link.",
       action: "Verify Email",
       actionUrl: "/dashboard/settings",
     });
   }
 
-  // ── 3. Plan execution limit check ──
+  // Monthly plan limit
   if (planLimit >= 0 && executionCount >= planLimit) {
-    const nextPlan = userRole === "FREE" ? "Mini" : userRole === "MINI" ? "Starter" : userRole === "STARTER" ? "Pro" : null;
+    const nextPlan = userRole === "MINI" ? "Starter" : userRole === "STARTER" ? "Pro" : null;
     blocks.push({
       type: "plan_limit",
       title: "Monthly limit reached",
@@ -89,7 +128,7 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  // ── 4. Node-type limits (video, 3D, renders) ──
+  // ── Node-type limits (video, 3D, renders) ──
   if (Array.isArray(catalogueIds) && catalogueIds.length > 0 && redisConfigured) {
     const nodeLimits = getNodeTypeLimits(userRoleRaw) as { videoPerMonth: number; modelsPerMonth: number; rendersPerMonth: number };
     const monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
@@ -101,63 +140,27 @@ export async function POST(req: NextRequest) {
     if (hasVideo && nodeLimits.videoPerMonth >= 0) {
       const used = await redis.get<number>(`node-limit:${userId}:video:${monthKey}`) ?? 0;
       if (nodeLimits.videoPerMonth === 0) {
-        blocks.push({
-          type: "node_limit",
-          title: "Video not available",
-          message: "Video walkthroughs are not available on your current plan. Upgrade to Starter or higher to generate video walkthroughs.",
-          action: "Upgrade Plan",
-          actionUrl: "/dashboard/billing",
-        });
+        blocks.push({ type: "node_limit", title: "Video not available", message: "Video walkthroughs are not available on your current plan. Upgrade to Starter or higher to generate video walkthroughs.", action: "Upgrade Plan", actionUrl: "/dashboard/billing" });
       } else if (used >= nodeLimits.videoPerMonth) {
-        blocks.push({
-          type: "node_limit",
-          title: "Video limit reached",
-          message: `You've used all ${nodeLimits.videoPerMonth} video generations this month.`,
-          action: "Upgrade Plan",
-          actionUrl: "/dashboard/billing",
-        });
+        blocks.push({ type: "node_limit", title: "Video limit reached", message: `You've used all ${nodeLimits.videoPerMonth} video generations this month.`, action: "Upgrade Plan", actionUrl: "/dashboard/billing" });
       }
     }
 
     if (has3D && nodeLimits.modelsPerMonth >= 0) {
       const used = await redis.get<number>(`node-limit:${userId}:3d:${monthKey}`) ?? 0;
       if (nodeLimits.modelsPerMonth === 0) {
-        blocks.push({
-          type: "node_limit",
-          title: "3D models not available",
-          message: "3D model generation is not available on your current plan. Upgrade to Starter or higher.",
-          action: "Upgrade Plan",
-          actionUrl: "/dashboard/billing",
-        });
+        blocks.push({ type: "node_limit", title: "3D models not available", message: "3D model generation is not available on your current plan. Upgrade to Starter or higher.", action: "Upgrade Plan", actionUrl: "/dashboard/billing" });
       } else if (used >= nodeLimits.modelsPerMonth) {
-        blocks.push({
-          type: "node_limit",
-          title: "3D model limit reached",
-          message: `You've used all ${nodeLimits.modelsPerMonth} 3D model generations this month.`,
-          action: "Upgrade Plan",
-          actionUrl: "/dashboard/billing",
-        });
+        blocks.push({ type: "node_limit", title: "3D model limit reached", message: `You've used all ${nodeLimits.modelsPerMonth} 3D model generations this month.`, action: "Upgrade Plan", actionUrl: "/dashboard/billing" });
       }
     }
 
     if (hasRender && nodeLimits.rendersPerMonth >= 0) {
       const used = await redis.get<number>(`node-limit:${userId}:render:${monthKey}`) ?? 0;
       if (nodeLimits.rendersPerMonth === 0) {
-        blocks.push({
-          type: "node_limit",
-          title: "Renders not available",
-          message: "Concept renders are not available on your current plan.",
-          action: "Upgrade Plan",
-          actionUrl: "/dashboard/billing",
-        });
+        blocks.push({ type: "node_limit", title: "Renders not available", message: "Concept renders are not available on your current plan.", action: "Upgrade Plan", actionUrl: "/dashboard/billing" });
       } else if (used >= nodeLimits.rendersPerMonth) {
-        blocks.push({
-          type: "node_limit",
-          title: "Render limit reached",
-          message: `You've used all ${nodeLimits.rendersPerMonth} concept renders this month.`,
-          action: "Upgrade Plan",
-          actionUrl: "/dashboard/billing",
-        });
+        blocks.push({ type: "node_limit", title: "Render limit reached", message: `You've used all ${nodeLimits.rendersPerMonth} concept renders this month.`, action: "Upgrade Plan", actionUrl: "/dashboard/billing" });
       }
     }
   }

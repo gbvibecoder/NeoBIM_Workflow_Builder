@@ -19,7 +19,7 @@ export const STRIPE_PLANS = {
     currency: '₹',
     priceId: null, // No Stripe price ID for free tier
     features: [
-      '3 executions per month',
+      '3 free executions',
       'Basic tiles & nodes',
       'Community templates',
       '1 concept render',

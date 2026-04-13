@@ -50,14 +50,18 @@ export async function POST(req: NextRequest) {
   // Parse body first so we can read executionId for verification + rate-limit deduplication
   const { catalogueId, executionId, tileInstanceId, inputData, userApiKey } = await req.json();
 
-  // Server-side email/phone verification enforcement.
-  // Admins bypass. Phone-verified users bypass (they may not have email).
-  // Unverified users get 1 free trial execution before verification is required.
+  // ── Email verification + FREE tier lifetime gate ──────────────────────────
   //
-  // IMPORTANT: The JWT session can be stale for up to 60s after verification
-  // (NextAuth JWT refresh throttle). If the session says "unverified", we
-  // double-check the DB directly so a freshly-verified user is never blocked.
-  // Verified users (majority) skip the DB lookup entirely — zero cost.
+  // FREE users get 3 LIFETIME executions (not monthly):
+  //   • 2 without email verification  → experience the product
+  //   • verify email gate             → captures their email
+  //   • 1 more after verification     → total 3, then must upgrade
+  //
+  // Paid users (MINI/STARTER/PRO): must verify email/phone, no trial.
+  // Their monthly limits are enforced by the Redis rate limiter below.
+  //
+  // The JWT session can be stale for up to 60s after verification (NextAuth
+  // refresh throttle). When session says "unverified", we double-check DB.
   //
   // We count only COMPLETED executions (SUCCESS / PARTIAL) — not RUNNING —
   // so nodes within the current workflow don't block each other.
@@ -75,23 +79,46 @@ export async function POST(req: NextRequest) {
       isPhoneVerified = !!dbUser?.phoneVerified;
     }
 
-    if (!isEmailVerified && !isPhoneVerified) {
-      const monthStart = new Date();
-      monthStart.setDate(1);
-      monthStart.setHours(0, 0, 0, 0);
-      const completedCount = await prisma.execution.count({
-        where: {
-          userId,
-          createdAt: { gte: monthStart },
-          status: { in: ["SUCCESS", "PARTIAL"] },
-        },
+    if (userRole === "FREE") {
+      // Count ALL completed executions (lifetime, not monthly)
+      const lifetimeCompleted = await prisma.execution.count({
+        where: { userId, status: { in: ["SUCCESS", "PARTIAL"] } },
       });
 
-      if (completedCount >= 1) {
+      // Hard cap: 3 lifetime executions for FREE tier
+      if (lifetimeCompleted >= 3) {
+        return NextResponse.json(
+          formatErrorResponse({
+            title: "Free executions used",
+            message: "You've used all 3 free workflow executions. Upgrade to a paid plan to keep building amazing things!",
+            code: "RATE_001",
+            action: "View Plans",
+            actionUrl: "/dashboard/billing",
+          }),
+          { status: 429 }
+        );
+      }
+
+      // Verification gate: 2 free without verification, then must verify for the last one
+      if (!isEmailVerified && !isPhoneVerified && lifetimeCompleted >= 2) {
         return NextResponse.json(
           formatErrorResponse({
             title: "Email verification required",
-            message: "You've used your free trial workflow! Please verify your email address to continue running workflows. Check your inbox for the verification link.",
+            message: "You've used 2 of your 3 free executions. Verify your email to unlock your final free workflow!",
+            code: "AUTH_001",
+            action: "Verify Email",
+            actionUrl: "/dashboard/settings",
+          }),
+          { status: 403 }
+        );
+      }
+    } else {
+      // Paid users: email/phone verification required, no trial
+      if (!isEmailVerified && !isPhoneVerified) {
+        return NextResponse.json(
+          formatErrorResponse({
+            title: "Email verification required",
+            message: "Please verify your email address before running workflows. Check your inbox for the verification link.",
             code: "AUTH_001",
             action: "Verify Email",
             actionUrl: "/dashboard/settings",
@@ -125,7 +152,9 @@ export async function POST(req: NextRequest) {
         ? await isExecutionAlreadyCounted(userId, executionId)
         : false;
 
-      if (!alreadyCounted) {
+      // FREE users are gated by the lifetime DB check above — skip Redis.
+      // Paid users (MINI/STARTER/PRO) use the monthly Redis sliding window.
+      if (!alreadyCounted && userRole !== "FREE") {
         const rateLimitResult = await checkRateLimit(userId, userRole, userEmail);
 
         if (!rateLimitResult.success) {
@@ -143,9 +172,8 @@ export async function POST(req: NextRequest) {
               reset: rateLimitResult.reset, userRole,
             });
 
-            const rateLimitError = userRole === "FREE"
-              ? UserErrors.RATE_LIMIT_FREE(daysUntilReset)
-              : userRole === "MINI"
+            // FREE users never reach here (gated by lifetime DB check above)
+            const rateLimitError = userRole === "MINI"
               ? UserErrors.RATE_LIMIT_MINI(daysUntilReset)
               : userRole === "STARTER"
               ? UserErrors.RATE_LIMIT_STARTER(daysUntilReset)

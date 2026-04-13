@@ -120,17 +120,26 @@ export default function BillingPage() {
     api.executions.list({ limit: 1000 })
       .then(({ executions }) => {
         const now = new Date();
-        const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-        const monthExecutions = executions.filter(e => new Date(e.startedAt) >= monthStart);
-        const limitMap: Record<string, number> = { FREE: 3, MINI: 10, STARTER: 30, PRO: 100 };
         const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-        setUsage({ used: monthExecutions.length, limit: limitMap[userRole] || 1000, resetDate: nextMonth.toISOString() });
+        if (userRole === "FREE") {
+          // FREE tier: 3 lifetime executions (not monthly)
+          setUsage({ used: executions.length, limit: 3, resetDate: "" });
+        } else {
+          const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+          const monthExecutions = executions.filter(e => new Date(e.startedAt) >= monthStart);
+          const limitMap: Record<string, number> = { MINI: 10, STARTER: 30, PRO: 100 };
+          setUsage({ used: monthExecutions.length, limit: limitMap[userRole] || 1000, resetDate: nextMonth.toISOString() });
+        }
       })
       .catch(() => {
         const now = new Date();
         const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-        const limitMap: Record<string, number> = { FREE: 3, MINI: 10, STARTER: 30, PRO: 100 };
-        setUsage({ used: 0, limit: limitMap[userRole] || 1000, resetDate: nextMonth.toISOString() });
+        if (userRole === "FREE") {
+          setUsage({ used: 0, limit: 3, resetDate: "" });
+        } else {
+          const limitMap: Record<string, number> = { MINI: 10, STARTER: 30, PRO: 100 };
+          setUsage({ used: 0, limit: limitMap[userRole] || 1000, resetDate: nextMonth.toISOString() });
+        }
       })
       .finally(() => setLoading(false));
   }, [userRole]);
@@ -538,7 +547,7 @@ export default function BillingPage() {
                     {loading ? "\u2014" : `${usage?.used || 0}/${usage?.limit || 3}`}
                   </div>
                   <div className="text-xs text-[#7C7C96] mt-1">
-                    {loading ? "" : `${t('billing.resets')} ${new Date(usage?.resetDate || "").toLocaleDateString()}`}
+                    {loading ? "" : usage?.resetDate ? `${t('billing.resets')} ${new Date(usage.resetDate).toLocaleDateString()}` : "Lifetime limit"}
                   </div>
                 </div>
               </div>
