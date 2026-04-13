@@ -1754,8 +1754,8 @@ export default function VideoRenderStudio() {
 
       const data = await res.json();
 
-      // Intercept plan limit / email verification gates
-      if (!res.ok && data.error && typeof data.error === "object" && (data.error.code === "RATE_001" || data.error.code === "AUTH_001")) {
+      // Intercept plan gate / email verification / rate limit gates — show upgrade popup
+      if (!res.ok && data.error && typeof data.error === "object" && (data.error.code === "PLAN_001" || data.error.code === "RATE_001" || data.error.code === "AUTH_001")) {
         setUpgradeBlock({ title: data.error.title, message: data.error.message, action: data.error.action, actionUrl: data.error.actionUrl });
         throw new Error("__PLAN_GATE__");
       }

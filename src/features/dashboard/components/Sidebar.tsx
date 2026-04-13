@@ -352,7 +352,7 @@ export function Sidebar() {
               return (
                 <NavItem
                   key={item.href} href={item.href}
-                  label={item.label} badge={isPremiumLocked ? item.premiumTier! : item.badge} icon={item.icon}
+                  label={item.label} badge={isPremiumLocked ? "Pro" : item.badge} icon={item.icon}
                   isActive={isActive} collapsed={isEffectivelyCollapsed}
                   showLabels={effectiveShowLabels} index={idx}
                   isPremium={!!isPremiumLocked}
