@@ -97,8 +97,9 @@ export function HeroStats({
   recalculated,
 }: HeroStatsProps) {
   const costColor = getCostPerM2Color(costPerM2, benchmarkLow, benchmarkHigh);
-  const qualityLabel = ifcQualityScore >= 80 ? "EXCELLENT" : ifcQualityScore >= 60 ? "GOOD" : ifcQualityScore >= 40 ? "FAIR" : "LIMITED";
-  const qualityColor = ifcQualityScore >= 80 ? "#22C55E" : ifcQualityScore >= 60 ? "#00F5FF" : ifcQualityScore >= 40 ? "#F59E0B" : "#EF4444";
+  // Thresholds aligned with TR-008 (server-side) so NL summary and UI match
+  const qualityLabel = ifcQualityScore > 85 ? "EXCELLENT" : ifcQualityScore > 65 ? "GOOD" : ifcQualityScore > 40 ? "FAIR" : "LIMITED";
+  const qualityColor = ifcQualityScore > 85 ? "#22C55E" : ifcQualityScore > 65 ? "#00F5FF" : ifcQualityScore > 40 ? "#F59E0B" : "#EF4444";
 
   const cards = [
     {

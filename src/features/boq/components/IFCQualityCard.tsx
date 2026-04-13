@@ -8,8 +8,9 @@ interface IFCQualityCardProps {
 }
 
 export function IFCQualityCard({ quality }: IFCQualityCardProps) {
-  const scoreColor = quality.score >= 80 ? "#22C55E" : quality.score >= 60 ? "#00F5FF" : quality.score >= 40 ? "#F59E0B" : "#EF4444";
-  const scoreLabel = quality.score >= 80 ? "EXCELLENT" : quality.score >= 60 ? "GOOD" : quality.score >= 40 ? "FAIR" : "LIMITED";
+  // Thresholds aligned with TR-008 (server-side) so NL summary and UI match
+  const scoreColor = quality.score > 85 ? "#22C55E" : quality.score > 65 ? "#00F5FF" : quality.score > 40 ? "#F59E0B" : "#EF4444";
+  const scoreLabel = quality.score > 85 ? "EXCELLENT" : quality.score > 65 ? "GOOD" : quality.score > 40 ? "FAIR" : "LIMITED";
 
   return (
     <div

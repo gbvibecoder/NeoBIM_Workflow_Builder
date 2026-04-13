@@ -1063,6 +1063,18 @@ export const handleTR008: NodeHandler = async (ctx) => {
         disclaimer: dynamicDisclaimer,
       },
       _gfa: gfaForProvisional,
+      _ifcQuality: {
+        score: geometryPct,
+        qualityScore: geometryPct,
+        label: ifcQuality,
+        confidence: confidencePct,
+        elementCoverage: totalElems > 0 ? Math.round((withGeometry / totalElems) * 100) : 0,
+        withGeometry,
+        totalElements: totalElems,
+        missingFiles: [],
+        anomalies: anomalies.map((a: string) => a),
+      },
+      _confidenceLevel: aaceInfo.confidence === "HIGH" ? "HIGH" : aaceInfo.confidence === "MEDIUM-HIGH" ? "MEDIUM" : aaceInfo.confidence,
       _benchmark: {
         ...benchmarkResult,
         // Override with dynamic market data when available (from Claude AI)

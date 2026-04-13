@@ -26,18 +26,18 @@ export function BOQVisualizerPage({ data, executionId }: BOQVisualizerPageProps)
     steel: data.market?.steelPerTonne ?? DEFAULT_PRICES.steel,
     cement: data.market?.cementPerBag ?? DEFAULT_PRICES.cement,
     mason: data.market?.masonRate ?? DEFAULT_PRICES.mason,
-    bricks: DEFAULT_PRICES.bricks,
-    sand: DEFAULT_PRICES.sand,
-    timber: DEFAULT_PRICES.timber,
+    bricks: data.market?.bricksPerNos ?? DEFAULT_PRICES.bricks,
+    sand: data.market?.sandPerCft ?? DEFAULT_PRICES.sand,
+    timber: data.market?.timberPerSqm ?? DEFAULT_PRICES.timber,
   }));
 
   const basePrices = useRef<PriceOverrides>({
     steel: data.market?.steelPerTonne ?? DEFAULT_PRICES.steel,
     cement: data.market?.cementPerBag ?? DEFAULT_PRICES.cement,
     mason: data.market?.masonRate ?? DEFAULT_PRICES.mason,
-    bricks: DEFAULT_PRICES.bricks,
-    sand: DEFAULT_PRICES.sand,
-    timber: DEFAULT_PRICES.timber,
+    bricks: data.market?.bricksPerNos ?? DEFAULT_PRICES.bricks,
+    sand: data.market?.sandPerCft ?? DEFAULT_PRICES.sand,
+    timber: data.market?.timberPerSqm ?? DEFAULT_PRICES.timber,
   });
 
   // Rate override state
@@ -54,9 +54,10 @@ export function BOQVisualizerPage({ data, executionId }: BOQVisualizerPageProps)
 
   const totals = useMemo(() => computeTotals(recalcLines), [recalcLines]);
 
-  // Total project cost = recalculated hard costs + original soft costs
-  // Hard costs change with price sliders; soft costs stay fixed (% of original)
-  const softCostRatio = data.totalCost > 0 ? data.softCosts / data.totalCost : 0;
+  // Total project cost = recalculated hard costs + proportional soft costs
+  // Soft cost ratio is relative to hard costs (not total), so when hard costs
+  // change via price sliders the soft costs scale proportionally.
+  const softCostRatio = data.hardCosts > 0 ? data.softCosts / data.hardCosts : 0;
   const recalcTotalProject = totals.totalCost + totals.totalCost * softCostRatio;
   const costPerM2 = data.gfa > 0 ? recalcTotalProject / data.gfa : data.benchmark.costPerM2;
 

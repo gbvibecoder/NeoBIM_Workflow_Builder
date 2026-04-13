@@ -413,11 +413,15 @@ export const handleEX002: NodeHandler = async (ctx) => {
     // ═════════════════════════════════════════════════════════════════════
     // GFA from TR-008 (sum of slab areas) — never use hardcoded ₹35,000 fallback
     const gfa = Number(inputData?._gfa ?? 0) || 100; // 100m² absolute minimum fallback
-    const costPerSqm = hardTotal > 0 ? Math.round(hardTotal / gfa) : 0;
+    // Use total project cost (hard + soft) for cost/m² — matches TR-008 NL summary
+    const tr008Total = Number(inputData?._totalCost ?? 0);
+    const totalForPerSqm = tr008Total > 0 ? tr008Total : hardTotal;
+    const costPerSqm = totalForPerSqm > 0 ? Math.round(totalForPerSqm / gfa) : 0;
     // GST: use hardTotal + estimated GST (18% on materials ≈ 55% of hard cost)
     const estimatedGST = Math.round(hardTotal * 0.55 * 0.18); // 18% GST on ~55% material component
     const hardTotalInclGST = hardTotal + (totalGST > 0 ? totalGST : estimatedGST);
-    const costPerSqmInclGST = hardTotalInclGST > 0 ? Math.round(hardTotalInclGST / gfa) : 0;
+    const totalInclGST = totalForPerSqm + (totalGST > 0 ? totalGST : estimatedGST);
+    const costPerSqmInclGST = totalInclGST > 0 ? Math.round(totalInclGST / gfa) : 0;
     // FIX 4: Use TR-008's computed soft costs when available, not hardcoded 44%
     const tr008TotalCost = Number(inputData?._totalCost ?? 0);
     const tr008SoftCosts = Number(inputData?._softCosts ?? 0);
@@ -562,8 +566,8 @@ export const handleEX002: NodeHandler = async (ctx) => {
     ["Confidence:", String(pricingInfo?.confidence ?? "MEDIUM")],
     isINR ? ["Rate Basis:", `IS 1200 / CPWD DSR 2023-24 + ${pricingInfo?.statePWD ?? "State"} PWD SOR + AI market intelligence`] : ["Rate Basis:", "CSI MasterFormat + regional factors"],
     [""],
-    ["Total Cost:", `${currencySymbol}${Math.round(boqData?.grandTotal ?? 0).toLocaleString()} ${currencyCode}`],
-    ["Cost/m² GFA:", `${currencySymbol}${Math.round(hardTotal / Math.max(1, Number(inputData?._gfa ?? 100))).toLocaleString()}`],
+    ["Total Cost:", `${currencySymbol}${Math.round(Number(inputData?._totalCost ?? 0) || (boqData?.grandTotal ?? 0)).toLocaleString()} ${currencyCode}`],
+    ["Cost/m² GFA:", `${currencySymbol}${Math.round((Number(inputData?._totalCost ?? 0) || hardTotal) / Math.max(1, Number(inputData?._gfa ?? 100))).toLocaleString()}`],
     [""],
     [""],
     ["This estimate is for preliminary budgeting only."],

@@ -174,6 +174,10 @@ export function parseArtifactToBOQ(artifactData: any): BOQData | null {
     masonRate: market.labor?.mason?.value || DEFAULT_PRICES.mason,
     masonSource: market.labor?.mason?.source || "Local market",
     masonConfidence: market.labor?.mason?.confidence || "MEDIUM",
+    sandPerCft: market.sandPerCft || DEFAULT_PRICES.sand,
+    sandSource: market.sandSource || "Local market",
+    bricksPerNos: market.bricksPerNos || DEFAULT_PRICES.bricks,
+    timberPerSqm: market.timberPerSqm || DEFAULT_PRICES.timber,
   } : undefined;
 
   // Benchmark — read from TR-008 _benchmark (includes dynamic market overrides)

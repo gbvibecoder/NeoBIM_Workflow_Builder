@@ -75,6 +75,10 @@ export interface BOQData {
     masonRate: number;
     masonSource: string;
     masonConfidence: string;
+    sandPerCft?: number;
+    sandSource?: string;
+    bricksPerNos?: number;
+    timberPerSqm?: number;
   };
 
   // IFC Quality
