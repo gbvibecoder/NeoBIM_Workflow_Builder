@@ -1,6 +1,10 @@
 /**
  * Room Sizer — Simple Hard Caps
  *
+ * @deprecated Use architectural-rules.ts ROOM_RULES instead for area caps.
+ * This file is kept for backward compatibility — classifyRoom() is still
+ * the canonical fuzzy name classifier used across the codebase.
+ *
  * The AI (with few-shot examples) handles room sizing.
  * This module ONLY enforces absolute min/max caps per room type.
  *
