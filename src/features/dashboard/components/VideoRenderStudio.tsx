@@ -1650,6 +1650,7 @@ export default function VideoRenderStudio() {
   }, [videoMode, cinematicStatus]);
 
   const [renderError, setRenderError] = useState<string | null>(null);
+  const [upgradeBlock, setUpgradeBlock] = useState<{ title: string; message: string; action: string; actionUrl: string } | null>(null);
   const handleFileSelect = useCallback((file: File) => setUploadedFile(file), []);
 
   // ─── Wizard ↔ Browser History API Integration ─────────────────────────────
@@ -1753,13 +1754,22 @@ export default function VideoRenderStudio() {
 
       const data = await res.json();
 
+      // Intercept plan limit / email verification gates
+      if (!res.ok && data.error && typeof data.error === "object" && (data.error.code === "RATE_001" || data.error.code === "AUTH_001")) {
+        setUpgradeBlock({ title: data.error.title, message: data.error.message, action: data.error.action, actionUrl: data.error.actionUrl });
+        throw new Error("__PLAN_GATE__");
+      }
+
       if (res.status === 429 && retries > 0) {
         const waitMs = (3 - retries) * 15000;
         await delay(waitMs);
         return callRender(view, idx, cachedDesc, retries - 1);
       }
 
-      if (!res.ok) throw new Error(data.error || `Failed to generate ${view.label} render`);
+      if (!res.ok) {
+        const errMsg = typeof data.error === "object" ? (data.error?.message || "Render failed") : (data.error || `Failed to generate ${view.label} render`);
+        throw new Error(errMsg);
+      }
 
       results[idx] = { ...view, url: data.image };
       completed++;
@@ -1788,8 +1798,12 @@ export default function VideoRenderStudio() {
       goToStep("gallery");
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Render generation failed";
+      if (msg === "__PLAN_GATE__") {
+        // upgradeBlock already set — just go back to upload
+        setStep("upload");
+        return;
+      }
       setRenderError(msg);
-      // Going BACK to upload on error — base state, no history push
       setStep("upload");
     }
   }, [uploadedFile, uploadedDims, goToStep]);
@@ -2551,7 +2565,38 @@ export default function VideoRenderStudio() {
   return (
     <div className="h-full overflow-y-auto flex flex-col" style={{
       background: "linear-gradient(180deg, #FAFBFE 0%, #F0F1F8 50%, #FAFBFE 100%)",
+      position: "relative",
     }}>
+      {/* Upgrade / Verify popup */}
+      {upgradeBlock && (() => {
+        const isVerify = upgradeBlock.actionUrl?.includes("settings");
+        const isUp = !isVerify;
+        return (
+          <div style={{ position: "fixed", inset: 0, zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.75)", backdropFilter: "blur(12px)" }}>
+            <div style={{ maxWidth: 460, width: "100%", borderRadius: 28, overflow: "hidden", background: "linear-gradient(180deg, #0F0F2A, #080816)", border: "1px solid rgba(139,92,246,0.12)", boxShadow: "0 40px 120px rgba(0,0,0,0.8), 0 0 80px rgba(139,92,246,0.06)", position: "relative" }}>
+              <div style={{ height: 3, background: isUp ? "linear-gradient(90deg, #8B5CF6, #EC4899, #F59E0B, #8B5CF6)" : "linear-gradient(90deg, #4F8AFF, #A855F7, #10B981, #4F8AFF)", backgroundSize: "200% 100%", animation: "fp-shimmer 3s linear infinite" }} />
+              <div style={{ padding: "40px 32px 12px", textAlign: "center", background: isUp ? "radial-gradient(ellipse at 50% 0%, rgba(139,92,246,0.06) 0%, transparent 70%)" : "radial-gradient(ellipse at 50% 0%, rgba(79,138,255,0.06) 0%, transparent 70%)" }}>
+                <div style={{ fontSize: 64, lineHeight: 1, marginBottom: 8 }}>{isUp ? "\uD83C\uDFAC" : "\uD83D\uDCEC"}</div>
+                <div style={{ display: "flex", justifyContent: "center", gap: 6, marginBottom: 16 }}>{["\u2728", "\uD83C\uDFA8", "\uD83E\uDDCA", "\uD83C\uDFA8", "\u2728"].map((s, i) => <span key={i} style={{ fontSize: 14, opacity: 0.6 }}>{s}</span>)}</div>
+                <h2 style={{ fontSize: 24, fontWeight: 800, color: "#F0F2F8", letterSpacing: "-0.03em", margin: "0 0 8px" }}>{isUp ? "This feature needs a bigger engine" : "One quick thing before your render"}</h2>
+                <p style={{ fontSize: 13, color: "#8888A8", lineHeight: 1.65, margin: "0 auto 20px", maxWidth: 380 }}>{isUp ? "3D renders, cinematic walkthroughs, AI video — the premium stuff. You've tasted the free tier, now unlock the full creative arsenal." : "Verify your email to unlock your final free render. Quick click, back in 10 seconds."}</p>
+              </div>
+              <div style={{ padding: "0 32px 24px" }}>
+                <div style={{ background: isUp ? "rgba(139,92,246,0.04)" : "rgba(79,138,255,0.04)", border: `1px solid ${isUp ? "rgba(139,92,246,0.08)" : "rgba(79,138,255,0.08)"}`, borderRadius: 16, padding: "16px 20px", marginBottom: 20 }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "1.5px", marginBottom: 12, color: isUp ? "#8B5CF6" : "#4F8AFF" }}>{isUp ? "Unlock with Starter" : "After verification"}</div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                    {(isUp ? [{ icon: "\uD83C\uDFAC", text: "Cinematic video walkthroughs" }, { icon: "\uD83E\uDDCA", text: "Interactive 3D models" }, { icon: "\uD83C\uDFA8", text: "10 photorealistic renders/month" }, { icon: "\u26A1", text: "Priority render queue" }] : [{ icon: "\u2705", text: "Unlock your final free render" }, { icon: "\uD83D\uDD10", text: "Secure your account" }, { icon: "\uD83D\uDCE9", text: "Get notified on new features" }, { icon: "\u26A1", text: "Takes 10 seconds" }]).map((f, i) => <div key={i} style={{ display: "flex", alignItems: "center", gap: 12 }}><span style={{ fontSize: 16 }}>{f.icon}</span><span style={{ fontSize: 12.5, color: "#C0C0D8", fontWeight: 500 }}>{f.text}</span></div>)}
+                  </div>
+                </div>
+                <a href={upgradeBlock.actionUrl} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10, width: "100%", padding: "16px 24px", borderRadius: 16, background: isUp ? "linear-gradient(135deg, #8B5CF6, #EC4899)" : "linear-gradient(135deg, #4F8AFF, #A855F7)", color: "#fff", fontSize: 15, fontWeight: 800, textDecoration: "none", boxShadow: isUp ? "0 8px 32px rgba(139,92,246,0.3)" : "0 8px 32px rgba(79,138,255,0.3)", letterSpacing: "-0.01em" }}>{upgradeBlock.action} &rarr;</a>
+                <button onClick={() => setUpgradeBlock(null)} style={{ width: "100%", marginTop: 10, padding: "10px", borderRadius: 12, background: "transparent", border: "none", color: "#3A3A52", fontSize: 11, cursor: "pointer", fontStyle: "italic" }}>{isUp ? "I'll stick with blueprints and imagination" : "I'll verify later"}</button>
+              </div>
+              <style>{`@keyframes fp-shimmer { 0% { background-position: 0% 50%; } 100% { background-position: 200% 50%; } }`}</style>
+            </div>
+          </div>
+        );
+      })()}
+
       {/* ─── HERO — Three.js background + centered text ─── */}
       <div className="relative overflow-hidden" style={{ height: 220 }}>
         {/* Three.js scene — alive and breathing */}

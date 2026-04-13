@@ -437,22 +437,79 @@ export function FloorPlanViewer({ initialGeometry, initialPrompt, initialProject
 
   return (
     <div className="flex h-screen flex-col bg-white overflow-hidden select-none print:overflow-visible">
-      {/* Upgrade / Verify email popup */}
-      {upgradeBlock && (
-        <div style={{ position: "fixed", inset: 0, zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.6)", backdropFilter: "blur(8px)" }}>
-          <div style={{ maxWidth: 420, width: "100%", borderRadius: 20, overflow: "hidden", background: "linear-gradient(180deg, #111125, #0A0A18)", border: "1px solid rgba(79,138,255,0.15)", boxShadow: "0 32px 100px rgba(0,0,0,0.7)", padding: "36px 32px 28px", textAlign: "center" }}>
-            <div style={{ fontSize: 48, marginBottom: 12 }}>{upgradeBlock.actionUrl.includes("billing") ? "\uD83D\uDE80" : "\uD83D\uDCEC"}</div>
-            <h2 style={{ fontSize: 22, fontWeight: 800, color: "#F0F2F8", marginBottom: 8 }}>{upgradeBlock.title}</h2>
-            <p style={{ fontSize: 13, color: "#9898B0", lineHeight: 1.6, marginBottom: 24 }}>{upgradeBlock.message}</p>
-            <a href={upgradeBlock.actionUrl} style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "14px 28px", borderRadius: 14, background: "linear-gradient(135deg, #4F8AFF, #6366F1)", color: "#fff", fontSize: 15, fontWeight: 700, textDecoration: "none", boxShadow: "0 8px 32px rgba(79,138,255,0.3)" }}>
-              {upgradeBlock.action} →
-            </a>
-            <div style={{ marginTop: 12 }}>
-              <button onClick={() => setUpgradeBlock(null)} style={{ background: "none", border: "none", color: "#44445A", fontSize: 12, cursor: "pointer" }}>Maybe later</button>
+      {/* Upgrade / Verify email popup — creative & sarcastic */}
+      {upgradeBlock && (() => {
+        const isVerify = upgradeBlock.actionUrl?.includes("settings");
+        const isUpgrade = !isVerify;
+        return (
+          <div style={{ position: "fixed", inset: 0, zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.75)", backdropFilter: "blur(12px)" }}>
+            <div style={{ maxWidth: 460, width: "100%", borderRadius: 28, overflow: "hidden", background: "linear-gradient(180deg, #0F0F2A 0%, #080816 100%)", border: "1px solid rgba(79,138,255,0.12)", boxShadow: "0 40px 120px rgba(0,0,0,0.8), 0 0 80px rgba(79,138,255,0.06)", position: "relative" }}>
+              {/* Animated gradient bar */}
+              <div style={{ height: 3, background: isUpgrade ? "linear-gradient(90deg, #F59E0B, #EF4444, #8B5CF6, #F59E0B)" : "linear-gradient(90deg, #4F8AFF, #A855F7, #10B981, #4F8AFF)", backgroundSize: "200% 100%", animation: "shimmer 3s linear infinite" }} />
+
+              {/* Content */}
+              <div style={{ padding: "40px 32px 12px", textAlign: "center", background: isUpgrade ? "radial-gradient(ellipse at 50% 0%, rgba(245,158,11,0.06) 0%, transparent 70%)" : "radial-gradient(ellipse at 50% 0%, rgba(79,138,255,0.06) 0%, transparent 70%)" }}>
+                {/* Icon */}
+                <div style={{ fontSize: 64, lineHeight: 1, marginBottom: 8 }}>{isUpgrade ? "\uD83D\uDC77" : "\uD83D\uDCEC"}</div>
+                <div style={{ display: "flex", justifyContent: "center", gap: 6, marginBottom: 16 }}>
+                  {["\u2728", "\u2B50", "\uD83C\uDFD7\uFE0F", "\u2B50", "\u2728"].map((s, i) => (
+                    <span key={i} style={{ fontSize: 14, opacity: 0.6 }}>{s}</span>
+                  ))}
+                </div>
+
+                {/* Headline */}
+                <h2 style={{ fontSize: 24, fontWeight: 800, color: "#F0F2F8", letterSpacing: "-0.03em", margin: "0 0 8px", lineHeight: 1.3 }}>
+                  {isUpgrade ? "You're on fire! But the free fuel ran out" : "One quick thing before your next masterpiece"}
+                </h2>
+                <p style={{ fontSize: 13, color: "#8888A8", lineHeight: 1.65, margin: "0 auto 20px", maxWidth: 380 }}>
+                  {isUpgrade
+                    ? "3 floor plans in and already addicted? We get it. The AI is pretty good. Upgrade and keep the creative streak going — your future clients will thank you."
+                    : "You've used 2 of your 3 free floor plans. Quick email verification and the last one is yours. Takes literally 10 seconds."}
+                </p>
+              </div>
+
+              {/* What you unlock */}
+              <div style={{ padding: "0 32px 24px" }}>
+                <div style={{ background: isUpgrade ? "rgba(245,158,11,0.04)" : "rgba(79,138,255,0.04)", border: `1px solid ${isUpgrade ? "rgba(245,158,11,0.08)" : "rgba(79,138,255,0.08)"}`, borderRadius: 16, padding: "16px 20px", marginBottom: 20 }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "1.5px", marginBottom: 12, color: isUpgrade ? "#F59E0B" : "#4F8AFF" }}>
+                    {isUpgrade ? "What you unlock with Mini" : "After verification"}
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                    {(isUpgrade ? [
+                      { icon: "\uD83C\uDFD7\uFE0F", text: "10 AI floor plans per month" },
+                      { icon: "\uD83C\uDFA8", text: "3 photorealistic concept renders" },
+                      { icon: "\uD83D\uDCCA", text: "CSV & JSON data exports" },
+                      { icon: "\u26A1", text: "Starting at just \u20B999/month" },
+                    ] : [
+                      { icon: "\u2705", text: "Unlock your final free floor plan" },
+                      { icon: "\uD83D\uDD10", text: "Secure your account" },
+                      { icon: "\uD83D\uDCE9", text: "Get notified when AI improves" },
+                      { icon: "\u26A1", text: "Takes less than 10 seconds" },
+                    ]).map((f, i) => (
+                      <div key={i} style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                        <span style={{ fontSize: 16 }}>{f.icon}</span>
+                        <span style={{ fontSize: 12.5, color: "#C0C0D8", fontWeight: 500 }}>{f.text}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* CTA */}
+                <a href={upgradeBlock.actionUrl} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10, width: "100%", padding: "16px 24px", borderRadius: 16, background: isUpgrade ? "linear-gradient(135deg, #F59E0B, #EF4444)" : "linear-gradient(135deg, #4F8AFF, #A855F7)", color: "#fff", fontSize: 15, fontWeight: 800, textDecoration: "none", border: "none", boxShadow: isUpgrade ? "0 8px 32px rgba(245,158,11,0.3)" : "0 8px 32px rgba(79,138,255,0.3)", letterSpacing: "-0.01em" }}>
+                  {upgradeBlock.action} &rarr;
+                </a>
+
+                {/* Dismiss */}
+                <button onClick={() => setUpgradeBlock(null)} style={{ width: "100%", marginTop: 10, padding: "10px", borderRadius: 12, background: "transparent", border: "none", color: "#3A3A52", fontSize: 11, cursor: "pointer", fontStyle: "italic" }}>
+                  {isUpgrade ? "Nah, I'll sketch by hand like it's 1995" : "I'll verify later, promise"}
+                </button>
+              </div>
+
+              <style>{`@keyframes shimmer { 0% { background-position: 0% 50%; } 100% { background-position: 200% 50%; } }`}</style>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Fallback warning banner */}
       {fallbackBanner && (
