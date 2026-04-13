@@ -52,17 +52,28 @@ export async function POST(req: NextRequest) {
 
   // Server-side email/phone verification enforcement.
   // Admins bypass. Phone-verified users bypass (they may not have email).
-  // Unverified users get 1 free trial execution before verification is required,
-  // matching the pre-flight check in /api/check-execution-eligibility.
+  // Unverified users get 1 free trial execution before verification is required.
   //
-  // IMPORTANT: We only count COMPLETED executions (SUCCESS / PARTIAL) — not
-  // RUNNING ones. The current execution is RUNNING while its nodes fire, so
-  // counting RUNNING would make node 2+ within the free-trial workflow block
-  // itself. The client-side executionId is a 7-char local ID that doesn't
-  // match the DB CUID, so we can't exclude by ID.
+  // IMPORTANT: The JWT session can be stale for up to 60s after verification
+  // (NextAuth JWT refresh throttle). If the session says "unverified", we
+  // double-check the DB directly so a freshly-verified user is never blocked.
+  // Verified users (majority) skip the DB lookup entirely — zero cost.
+  //
+  // We count only COMPLETED executions (SUCCESS / PARTIAL) — not RUNNING —
+  // so nodes within the current workflow don't block each other.
   if (!isAdmin) {
-    const isEmailVerified = !!(session.user as { emailVerified?: boolean }).emailVerified;
-    const isPhoneVerified = !!(session.user as { phoneVerified?: boolean }).phoneVerified;
+    let isEmailVerified = !!(session.user as { emailVerified?: boolean }).emailVerified;
+    let isPhoneVerified = !!(session.user as { phoneVerified?: boolean }).phoneVerified;
+
+    // Session says unverified — but JWT could be stale. Confirm with DB.
+    if (!isEmailVerified && !isPhoneVerified) {
+      const dbUser = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { emailVerified: true, phoneVerified: true },
+      });
+      isEmailVerified = !!dbUser?.emailVerified;
+      isPhoneVerified = !!dbUser?.phoneVerified;
+    }
 
     if (!isEmailVerified && !isPhoneVerified) {
       const monthStart = new Date();

@@ -26,13 +26,24 @@ export async function POST(req: NextRequest) {
   const userId = session.user.id;
   const userRoleRaw = ((session.user as { role?: string }).role) || "FREE";
   const userEmail = session.user.email || "";
-  const emailVerified = !!(session.user as { emailVerified?: boolean }).emailVerified;
+  let emailVerified = !!(session.user as { emailVerified?: boolean }).emailVerified;
 
   // Admins bypass everything
   const isAdmin = isAdminUser(userEmail) || userRoleRaw === "PLATFORM_ADMIN" || userRoleRaw === "TEAM_ADMIN";
   const userRole = (userRoleRaw in STRIPE_PLANS ? userRoleRaw : "FREE") as keyof typeof STRIPE_PLANS;
   if (isAdmin) {
     return NextResponse.json({ canExecute: true, blocks: [], remaining: 999, limit: 999, emailVerified: true, role: userRole });
+  }
+
+  // JWT session can be stale for up to 60s after verification (NextAuth JWT
+  // refresh throttle). If session says unverified, double-check with DB so a
+  // freshly-verified user never sees a false "verify email" popup.
+  if (!emailVerified) {
+    const dbUser = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { emailVerified: true },
+    });
+    emailVerified = !!dbUser?.emailVerified;
   }
 
   const { catalogueIds } = await req.json().catch(() => ({ catalogueIds: [] }));
