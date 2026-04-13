@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import { useLocale } from "@/hooks/useLocale";
 import { trackViewContent } from "@/lib/meta-pixel";
 import { fadeUp, smoothEase } from "@/features/landing/lib/landing-helpers";
+import { CONTACT_EMAIL } from "@/constants/contact";
 
 export function PricingSection() {
   const { t, tArray } = useLocale();
@@ -159,7 +160,7 @@ export function PricingSection() {
               <div style={{ marginBottom: 24 }}>
                 <span style={{ fontSize: 32, fontWeight: 900, color: "#F0F0F5" }}>{t('landing.custom')}</span>
               </div>
-              <a href="mailto:sales@buildflow.com" style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "12px 20px", borderRadius: 12, border: "1px solid rgba(139,92,246,0.2)", background: "rgba(139,92,246,0.05)", color: "#F0F0F5", fontSize: 13, fontWeight: 700, textDecoration: "none", marginBottom: 24, transition: "all 0.2s" }}
+              <a href={`mailto:${CONTACT_EMAIL}`} style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "12px 20px", borderRadius: 12, border: "1px solid rgba(139,92,246,0.2)", background: "rgba(139,92,246,0.05)", color: "#F0F0F5", fontSize: 13, fontWeight: 700, textDecoration: "none", marginBottom: 24, transition: "all 0.2s" }}
                 onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.background = "rgba(139,92,246,0.1)"; }}
                 onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.background = "rgba(139,92,246,0.05)"; }}
                 onFocus={e => { const el = e.currentTarget as HTMLElement; el.style.background = "rgba(139,92,246,0.1)"; }}

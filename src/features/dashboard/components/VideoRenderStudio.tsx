@@ -1754,8 +1754,8 @@ export default function VideoRenderStudio() {
 
       const data = await res.json();
 
-      // Intercept plan limit / email verification gates
-      if (!res.ok && data.error && typeof data.error === "object" && (data.error.code === "RATE_001" || data.error.code === "AUTH_001")) {
+      // Intercept plan gate / email verification / rate limit gates — show upgrade popup
+      if (!res.ok && data.error && typeof data.error === "object" && (data.error.code === "PLAN_001" || data.error.code === "RATE_001" || data.error.code === "AUTH_001")) {
         setUpgradeBlock({ title: data.error.title, message: data.error.message, action: data.error.action, actionUrl: data.error.actionUrl });
         throw new Error("__PLAN_GATE__");
       }
@@ -2201,11 +2201,15 @@ export default function VideoRenderStudio() {
       });
       const data = await res.json();
       if (!res.ok) {
+        // Intercept plan gate / email verification — show upgrade popup
+        if (data?.error && typeof data.error === "object" && (data.error.code === "PLAN_001" || data.error.code === "RATE_001" || data.error.code === "AUTH_001")) {
+          setUpgradeBlock({ title: data.error.title, message: data.error.message, action: data.error.action, actionUrl: data.error.actionUrl });
+          setVideoMode(null);
+          return;
+        }
         const msg =
           data?.error?.message ?? data?.error ?? `HTTP ${res.status}`;
         const msgStr = typeof msg === "string" ? msg : "Cinematic submit failed";
-        // Tag the error so the catch handler can show a friendlier toast
-        // for rate-limit responses (vs. mistaking them for real failures).
         const tagged = res.status === 429 ? `RATE_LIMIT::${msgStr}` : msgStr;
         throw new Error(tagged);
       }

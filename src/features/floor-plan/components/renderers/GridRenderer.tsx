@@ -121,7 +121,7 @@ function GridRendererBase({ viewport, gridSize_mm, viewMode }: GridRendererProps
           y={label.y}
           text={label.text}
           fontSize={9}
-          fontFamily="Inter, system-ui, sans-serif"
+          fontFamily="DM Sans, system-ui, sans-serif"
           fill="#BBBBBB"
           listening={false}
         />

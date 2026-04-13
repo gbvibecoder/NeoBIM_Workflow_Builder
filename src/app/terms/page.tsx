@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { motion, useScroll, useTransform } from "framer-motion";
 import { useRef } from "react";
+import { CONTACT_EMAIL } from "@/constants/contact";
 import {
   Scale,
   FileCheck,
@@ -97,7 +98,7 @@ const sections = [
     title: "Governing Law & Disputes",
     content: [
       "These terms are governed by the laws of the Federal Republic of Germany. Any disputes shall be resolved in the courts of Berlin, Germany, unless mandatory consumer protection laws of your jurisdiction require otherwise.",
-      "Before initiating legal proceedings, you agree to attempt good-faith resolution through direct communication. Contact us at legal@buildflow.app for dispute resolution.",
+      `Before initiating legal proceedings, you agree to attempt good-faith resolution through direct communication. Contact us at ${CONTACT_EMAIL} for dispute resolution.`,
       "If any provision of these terms is found to be unenforceable, the remaining provisions shall continue in full force and effect. Our failure to enforce any right does not constitute a waiver of that right.",
     ],
   },
@@ -463,10 +464,10 @@ export default function TermsPage() {
             <strong style={{ color: "#9898B0" }}>March 1, 2026</strong>. For
             questions, contact{" "}
             <a
-              href="mailto:legal@buildflow.app"
+              href={`mailto:${CONTACT_EMAIL}`}
               style={{ color: "#8B5CF6", textDecoration: "none" }}
             >
-              legal@buildflow.app
+              {CONTACT_EMAIL}
             </a>
           </p>
         </motion.div>

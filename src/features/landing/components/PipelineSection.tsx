@@ -106,7 +106,7 @@ function AnimatedPercent({ value, color }: { value: number; color: string }) {
   }, [inView, value, count, rounded]);
 
   return (
-    <span ref={ref} style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 28, fontWeight: 800, color, letterSpacing: "-0.02em" }}>
+    <span ref={ref} style={{ fontFamily: "var(--font-jetbrains), monospace", fontSize: 28, fontWeight: 800, color, letterSpacing: "-0.02em" }}>
       {display}
       <span style={{ fontSize: 16, opacity: 0.6 }}>%</span>
     </span>
@@ -701,7 +701,7 @@ function WorkflowCard({
             fontSize: 9, fontWeight: 600, padding: "3px 10px",
             borderRadius: 20, background: `rgba(${rgb}, 0.08)`,
             color: `rgba(${rgb}, 0.9)`, border: `1px solid rgba(${rgb}, 0.12)`,
-            fontFamily: "'JetBrains Mono', monospace", letterSpacing: "1px",
+            fontFamily: "var(--font-jetbrains), monospace", letterSpacing: "1px",
           }}>
             {workflow.targetDate}
           </span>
@@ -724,7 +724,7 @@ function WorkflowCard({
         {/* Node ID + Title */}
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
           <span style={{
-            fontFamily: "'JetBrains Mono', monospace", fontSize: 9, fontWeight: 700,
+            fontFamily: "var(--font-jetbrains), monospace", fontSize: 9, fontWeight: 700,
             color: `rgba(${rgb}, 0.5)`, padding: "2px 6px", borderRadius: 4,
             background: `rgba(${rgb}, 0.06)`, border: `1px solid rgba(${rgb}, 0.08)`,
           }}>
@@ -785,13 +785,13 @@ function WorkflowCard({
           <div style={{ display: "flex", justifyContent: "space-between", marginTop: 8 }}>
             <span style={{
               fontSize: 9, fontWeight: 600, color: `rgba(${rgb}, 0.5)`,
-              fontFamily: "'JetBrains Mono', monospace",
+              fontFamily: "var(--font-jetbrains), monospace",
             }}>
               {workflow.floors}/{workflow.totalFloors} {t('landing.milestones')}
             </span>
             <span style={{
               fontSize: 9, fontWeight: 600, color: "#3A3A50",
-              fontFamily: "'JetBrains Mono', monospace",
+              fontFamily: "var(--font-jetbrains), monospace",
             }}>
               {workflow.status === "in-development" ? t('landing.targetingBeta') : workflow.status === "research" ? t('landing.prototyping') : t('landing.scoping')}
             </span>
@@ -933,7 +933,7 @@ function SectionTitle() {
           <span style={{
             fontSize: 10, fontWeight: 700, textTransform: "uppercase",
             letterSpacing: "2.5px", color: "#4F8AFF",
-            fontFamily: "'JetBrains Mono', monospace",
+            fontFamily: "var(--font-jetbrains), monospace",
           }}>
             {t('landing.thePipeline')}
           </span>
@@ -976,7 +976,7 @@ function SectionTitle() {
         <div style={{ width: 40, height: 1, background: "rgba(79,138,255,0.3)" }} />
         <span style={{
           fontSize: 8, fontWeight: 600, color: "#5C5C78", letterSpacing: "2px",
-          fontFamily: "'JetBrains Mono', monospace", textTransform: "uppercase",
+          fontFamily: "var(--font-jetbrains), monospace", textTransform: "uppercase",
         }}>
           {t('landing.inputProcessOutput')}
         </span>

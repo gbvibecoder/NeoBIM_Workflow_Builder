@@ -251,7 +251,7 @@ export function HeroSection({ videoData, heroImageUrl, onExpandVideo, onRetryVid
                 border: `1px solid ${i === segmentIndex ? "rgba(0,245,255,0.4)" : "rgba(255,255,255,0.1)"}`,
                 color: i === segmentIndex ? COLORS.CYAN : "#999",
                 fontSize: 9, fontWeight: 600, cursor: "pointer",
-                fontFamily: "'Space Mono', monospace",
+                fontFamily: "var(--font-jetbrains), monospace",
               }}
             >
               {seg.label} ({seg.durationSeconds}s)

@@ -157,7 +157,7 @@ export function FullscreenVideoPlayer() {
               background: "rgba(0,245,255,0.1)",
               border: "1px solid rgba(0,245,255,0.2)",
               fontSize: 10, fontWeight: 600, color: "#00F5FF",
-              fontFamily: "'Space Mono', monospace",
+              fontFamily: "var(--font-jetbrains), monospace",
             }}>
               {totalDurationSec}s / {segments.length} segments
             </span>
@@ -257,14 +257,14 @@ export function FullscreenVideoPlayer() {
                 fontSize: 11,
                 fontWeight: 600,
                 color: "#00F5FF",
-                fontFamily: "'Space Mono', monospace",
+                fontFamily: "var(--font-jetbrains), monospace",
               }}>
                 {String(currentSegment.label ?? "Segment")}
               </span>
               <span style={{
                 fontSize: 10,
                 color: "#5C5C78",
-                fontFamily: "'Space Mono', monospace",
+                fontFamily: "var(--font-jetbrains), monospace",
               }}>
                 ({currentSegment.durationSeconds}s)
               </span>
@@ -334,7 +334,7 @@ export function FullscreenVideoPlayer() {
                     position: "relative", zIndex: 1,
                     fontSize: 10, fontWeight: 600,
                     color: isActive ? "#00F5FF" : "#5C5C78",
-                    fontFamily: "'Space Mono', monospace",
+                    fontFamily: "var(--font-jetbrains), monospace",
                     textTransform: "uppercase",
                     letterSpacing: "0.03em",
                     whiteSpace: "nowrap",
@@ -346,7 +346,7 @@ export function FullscreenVideoPlayer() {
                   <span style={{
                     position: "relative", zIndex: 1,
                     fontSize: 9, color: isActive ? "rgba(0,245,255,0.6)" : "#3C3C50",
-                    fontFamily: "'Space Mono', monospace",
+                    fontFamily: "var(--font-jetbrains), monospace",
                   }}>
                     {seg.durationSeconds}s
                   </span>
@@ -371,7 +371,7 @@ export function FullscreenVideoPlayer() {
               <span style={{
                 position: "relative", zIndex: 1,
                 fontSize: 10, fontWeight: 600, color: "#00F5FF",
-                fontFamily: "'Space Mono', monospace",
+                fontFamily: "var(--font-jetbrains), monospace",
               }}>
                 Walkthrough
               </span>
@@ -439,7 +439,7 @@ export function FullscreenVideoPlayer() {
               <div style={{
                 fontSize: 18, fontWeight: 700, color: "#F0F0F5",
                 lineHeight: 1.1, marginBottom: 4,
-                fontFamily: "'Space Mono', monospace",
+                fontFamily: "var(--font-jetbrains), monospace",
               }}>
                 {card.value}
               </div>

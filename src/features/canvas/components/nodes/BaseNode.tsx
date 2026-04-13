@@ -365,7 +365,7 @@ const InlineResult = memo(function InlineResult({ artifact, nodeId }: { artifact
             transition={{ delay: i * 0.08, duration: 0.3 }}
             style={{
               fontSize: 10.5, color: "rgba(255,255,255,0.5)", lineHeight: 1.5,
-              fontFamily: "'Space Mono', monospace",
+              fontFamily: "var(--font-jetbrains), monospace",
               fontStyle: "italic",
               overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
             }}
@@ -374,7 +374,7 @@ const InlineResult = memo(function InlineResult({ artifact, nodeId }: { artifact
           </motion.div>
         ))}
         {text.split("\n").length > 4 && (
-          <div style={{ fontSize: 9, color: "#00F5FF", marginTop: 2, fontFamily: "'Space Mono', monospace" }}>+{text.split("\n").length - 4} more lines</div>
+          <div style={{ fontSize: 9, color: "#00F5FF", marginTop: 2, fontFamily: "var(--font-jetbrains), monospace" }}>+{text.split("\n").length - 4} more lines</div>
         )}
       </div>
     );
@@ -404,11 +404,11 @@ const InlineResult = memo(function InlineResult({ artifact, nodeId }: { artifact
               textAlign: "center",
             }}
           >
-            <div style={{ fontSize: 11, fontWeight: 700, color: "#FFBF00", lineHeight: 1.1, fontFamily: "'Space Mono', monospace" }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: "#FFBF00", lineHeight: 1.1, fontFamily: "var(--font-jetbrains), monospace" }}>
               {m.value}
               {m.unit && <span style={{ fontSize: 8, color: "rgba(255,255,255,0.4)", marginLeft: 2 }}>{m.unit}</span>}
             </div>
-            <div style={{ fontSize: 7, color: "rgba(255,255,255,0.4)", marginTop: 2, textTransform: "uppercase" as const, letterSpacing: "0.1em", fontFamily: "'Space Mono', monospace" }}>
+            <div style={{ fontSize: 7, color: "rgba(255,255,255,0.4)", marginTop: 2, textTransform: "uppercase" as const, letterSpacing: "0.1em", fontFamily: "var(--font-jetbrains), monospace" }}>
               {m.label}
             </div>
           </motion.div>
@@ -551,7 +551,7 @@ const InlineResult = memo(function InlineResult({ artifact, nodeId }: { artifact
             padding: "1px 5px", borderRadius: 3,
             background: "rgba(0,0,0,0.7)",
             fontSize: 9, fontWeight: 600, color: "#fff",
-            fontFamily: "'Space Mono', monospace",
+            fontFamily: "var(--font-jetbrains), monospace",
           }}>
             {durationSec}s
           </div>
@@ -902,7 +902,7 @@ export const BaseNode = memo(function BaseNode({ id, data, selected }: BaseNodeP
               {getIcon(data.icon, 16)}
             </div>
 
-            {/* Node name — Playfair Display italic (Atelier) */}
+            {/* Node name — DM Sans (Atelier) */}
             <span style={{
               fontSize: 14,
               fontWeight: 400,
@@ -915,7 +915,7 @@ export const BaseNode = memo(function BaseNode({ id, data, selected }: BaseNodeP
               WebkitBoxOrient: "vertical" as const,
               overflow: "hidden",
               lineHeight: 1.35,
-              fontFamily: "'Playfair Display', serif",
+              fontFamily: "var(--font-dm-sans), sans-serif",
               wordBreak: "break-word" as const,
             }}>
               {data.label}
@@ -932,7 +932,7 @@ export const BaseNode = memo(function BaseNode({ id, data, selected }: BaseNodeP
                 border: `1px solid rgba(${rgb}, 0.25)`,
                 letterSpacing: "0.15em",
                 textTransform: "uppercase" as const,
-                fontFamily: "'Space Mono', monospace",
+                fontFamily: "var(--font-jetbrains), monospace",
                 flexShrink: 0,
               }}>
                 {t('execution.inputLabel')}
@@ -951,7 +951,7 @@ export const BaseNode = memo(function BaseNode({ id, data, selected }: BaseNodeP
                 borderRadius: 2,
                 letterSpacing: "0.1em",
                 textTransform: "uppercase" as const,
-                fontFamily: "'Space Mono', monospace",
+                fontFamily: "var(--font-jetbrains), monospace",
                 flexShrink: 0,
               }}>
                 DEMO
@@ -1013,7 +1013,7 @@ export const BaseNode = memo(function BaseNode({ id, data, selected }: BaseNodeP
             </AnimatePresence>
           </div>
 
-          {/* Row 2: Subtitle — Space Mono, tiny, uppercase (Atelier) */}
+          {/* Row 2: Subtitle — JetBrains Mono, tiny, uppercase (Atelier) */}
           {typeLabel && (
             <div style={{
               fontSize: 9,
@@ -1027,7 +1027,7 @@ export const BaseNode = memo(function BaseNode({ id, data, selected }: BaseNodeP
               wordBreak: "break-word" as const,
               textTransform: "uppercase" as const,
               letterSpacing: "0.1em",
-              fontFamily: "'Space Mono', monospace",
+              fontFamily: "var(--font-jetbrains), monospace",
             }}>
               {typeLabel}
             </div>
@@ -1059,7 +1059,7 @@ export const BaseNode = memo(function BaseNode({ id, data, selected }: BaseNodeP
               background: "rgba(0,0,0,0.3)",
               border: `1px solid rgba(${rgb}, 0.18)`,
               letterSpacing: "0.05em",
-              fontFamily: "'Space Mono', monospace",
+              fontFamily: "var(--font-jetbrains), monospace",
               textTransform: "uppercase" as const,
             }}>
               {data.executionTime ?? "< 2s"}
@@ -1125,7 +1125,7 @@ export const BaseNode = memo(function BaseNode({ id, data, selected }: BaseNodeP
             <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
               <AlertCircle size={14} style={{ color: "#F87171", flexShrink: 0, marginTop: 1 }} />
               <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 11, fontWeight: 600, color: "#F87171", marginBottom: 3, fontFamily: "var(--font-space-grotesk, inherit)" }}>
+                <div style={{ fontSize: 11, fontWeight: 600, color: "#F87171", marginBottom: 3, fontFamily: "var(--font-dm-sans), sans-serif" }}>
                   {t('execution.executionError')}
                 </div>
                 <div style={{ fontSize: 10, color: "#E0B4B4", lineHeight: 1.5 }}>

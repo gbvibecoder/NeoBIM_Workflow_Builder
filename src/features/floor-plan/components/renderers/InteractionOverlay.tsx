@@ -221,7 +221,7 @@ function WallPreview({
             width={70}
             text={formatDimension(len, displayUnit)}
             fontSize={11}
-            fontFamily="Inter, system-ui, sans-serif"
+            fontFamily="DM Sans, system-ui, sans-serif"
             fontStyle="bold"
             fill="#FFFFFF"
             align="center"
@@ -246,7 +246,7 @@ function WallPreview({
             width={36}
             text={`${normalizedAngle}°`}
             fontSize={10}
-            fontFamily="Inter, system-ui, sans-serif"
+            fontFamily="DM Sans, system-ui, sans-serif"
             fill="#FFFFFF"
             align="center"
           />

@@ -149,29 +149,13 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // ── FREE tier: 3 lifetime executions (2 unverified + 1 after verification) ──
-    if (!isAdmin && userRole === "FREE") {
-      const lifetimeCompleted = await prisma.execution.count({
-        where: { userId: session.user.id, status: { in: ["SUCCESS", "PARTIAL"] } },
-      });
-      if (lifetimeCompleted >= 3) {
-        return NextResponse.json(
-          { error: { title: "Free executions used", message: "You've used all 3 free executions. Upgrade to unlock unlimited renders!", code: "RATE_001", action: "View Plans", actionUrl: "/dashboard/billing" } },
-          { status: 429 }
-        );
-      }
-      // Verification gate at 2
-      let isEmailVerified = !!(session.user as { emailVerified?: boolean }).emailVerified;
-      if (!isEmailVerified) {
-        const dbUser = await prisma.user.findUnique({ where: { id: session.user.id }, select: { emailVerified: true } });
-        isEmailVerified = !!dbUser?.emailVerified;
-      }
-      if (!isEmailVerified && lifetimeCompleted >= 2) {
-        return NextResponse.json(
-          { error: { title: "Verify your email", message: "Verify your email to unlock your final free execution!", code: "AUTH_001", action: "Verify Email", actionUrl: "/dashboard/settings" } },
-          { status: 403 }
-        );
-      }
+    // ── Plan gate: 3D renders require Starter or above ──
+    // FREE and MINI users are blocked entirely — this is a premium feature.
+    if (!isAdmin && (userRole === "FREE" || userRole === "MINI")) {
+      return NextResponse.json(
+        { error: { title: "Upgrade required", message: "3D photorealistic renders are available on Starter and above. Upgrade to turn your floor plans into stunning 3D visuals!", code: "PLAN_001", action: "View Plans", actionUrl: "/dashboard/billing" } },
+        { status: 403 }
+      );
     }
 
     // ── API key check ──

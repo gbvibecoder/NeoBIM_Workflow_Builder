@@ -691,7 +691,7 @@ function VideoCard({
           fontSize: isHero ? 24 : isWide ? 18 : 15,
           fontWeight: 700, color: C.text, margin: 0, marginBottom: 3,
           letterSpacing: "-0.02em",
-          fontFamily: "var(--font-syne), sans-serif",
+          fontFamily: "var(--font-dm-sans), sans-serif",
         }}>
           {video.title}
         </h3>
@@ -898,7 +898,7 @@ function VideoModal({ video, onClose }: { video: WFVideo; onClose: () => void })
         }}>
           {video.category}
         </div>
-        <span style={{ fontSize: 14, fontWeight: 600, color: C.text, fontFamily: "var(--font-syne), sans-serif" }}>
+        <span style={{ fontSize: 14, fontWeight: 600, color: C.text, fontFamily: "var(--font-dm-sans), sans-serif" }}>
           {video.title}
         </span>
       </motion.div>
@@ -1104,7 +1104,7 @@ export default function WorkflowShowcasePage() {
               <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "4px", color: C.dim, textTransform: "uppercase", fontFamily: "var(--font-jetbrains), monospace", marginBottom: 16 }}>
                 BUILDFLOW WORKFLOW SHOWCASE
               </div>
-              <h1 style={{ fontSize: "clamp(2.4rem, 6vw, 4.5rem)", fontWeight: 800, letterSpacing: "-0.04em", lineHeight: 1.05, margin: 0, fontFamily: "var(--font-syne), sans-serif" }}>
+              <h1 style={{ fontSize: "clamp(2.4rem, 6vw, 4.5rem)", fontWeight: 800, letterSpacing: "-0.04em", lineHeight: 1.05, margin: 0, fontFamily: "var(--font-dm-sans), sans-serif" }}>
                 <span style={{ color: C.text }}>Architect the</span><br />
                 <span style={{ background: `linear-gradient(135deg, ${C.cyan} 0%, ${C.blue} 40%, ${C.purple} 100%)`, WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", display: "inline-block" }}>
                   Impossible
@@ -1195,7 +1195,7 @@ export default function WorkflowShowcasePage() {
           <motion.div initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.6, ease }}
             style={{ position: "relative", zIndex: 1, maxWidth: 600, margin: "0 auto", textAlign: "center" }}>
             <SectionMarker label="B" color={C.green} />
-            <h2 style={{ fontSize: "clamp(1.5rem, 3vw, 2.2rem)", fontWeight: 800, letterSpacing: "-0.03em", margin: "28px 0 12px", fontFamily: "var(--font-syne), sans-serif" }}>
+            <h2 style={{ fontSize: "clamp(1.5rem, 3vw, 2.2rem)", fontWeight: 800, letterSpacing: "-0.03em", margin: "28px 0 12px", fontFamily: "var(--font-dm-sans), sans-serif" }}>
               Build Your Own{" "}
               <span style={{ background: `linear-gradient(135deg, ${C.green}, ${C.cyan})`, WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>Pipeline</span>
             </h2>

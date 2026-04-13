@@ -470,14 +470,14 @@ function FloorPlanLayout({
               }}>
                 <div style={{
                   fontSize: 18, fontWeight: 700, color: s.color,
-                  fontFamily: "Inter, system-ui, sans-serif", lineHeight: 1,
+                  fontFamily: "var(--font-dm-sans), system-ui, sans-serif", lineHeight: 1,
                 }}>
                   {s.value}
                 </div>
                 <div style={{
                   fontSize: 9, color: "#555570", marginTop: 4,
                   textTransform: "uppercase", letterSpacing: "0.1em",
-                  fontFamily: "Inter, system-ui, sans-serif",
+                  fontFamily: "var(--font-dm-sans), system-ui, sans-serif",
                 }}>
                   {s.label}
                 </div>
@@ -573,7 +573,7 @@ function FloorPlanLayout({
                   cursor: btn.disabled ? "not-allowed" : "pointer",
                   opacity: btn.disabled ? 0.5 : 1,
                   transition: "all 0.15s ease",
-                  fontFamily: "Inter, system-ui, sans-serif",
+                  fontFamily: "var(--font-dm-sans), system-ui, sans-serif",
                   letterSpacing: "0.01em",
                   pointerEvents: "auto",
                 }}
@@ -601,7 +601,7 @@ function FloorPlanLayout({
           <div style={{
             position: "absolute", bottom: 24, left: 16,
             fontSize: 10, color: "#2A2A40", letterSpacing: "0.02em",
-            fontFamily: "JetBrains Mono, monospace",
+            fontFamily: "var(--font-jetbrains), monospace",
           }}>
             Left drag: Orbit &middot; Right drag: Pan &middot; Scroll: Zoom &middot; Click: Focus room
           </div>
@@ -632,14 +632,14 @@ function FloorPlanLayout({
         }}>
           <span style={{
             fontSize: 12, fontWeight: 600, color: "#E8E8F0",
-            fontFamily: "Inter, system-ui, sans-serif",
+            fontFamily: "var(--font-dm-sans), system-ui, sans-serif",
             letterSpacing: "0.02em",
           }}>
             ROOM EXPLORER
           </span>
           <span style={{
             fontSize: 11, color: "#4F8AFF", fontWeight: 600,
-            fontFamily: "Inter, system-ui, sans-serif",
+            fontFamily: "var(--font-dm-sans), system-ui, sans-serif",
             background: "rgba(79,138,255,0.08)",
             padding: "3px 8px", borderRadius: 6,
           }}>
@@ -694,7 +694,7 @@ function FloorPlanLayout({
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{
                     fontSize: 13, fontWeight: 500, color: "#E0E0F0",
-                    fontFamily: "Inter, system-ui, sans-serif",
+                    fontFamily: "var(--font-dm-sans), system-ui, sans-serif",
                     overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
                   }}>
                     {room.name}
@@ -704,14 +704,14 @@ function FloorPlanLayout({
                   }}>
                     <span style={{
                       fontSize: 11, color: "#4A4A60",
-                      fontFamily: "JetBrains Mono, Inter, monospace",
+                      fontFamily: "var(--font-jetbrains), monospace",
                     }}>
                       {room.width?.toFixed(1)}&times;{room.depth?.toFixed(1)}m
                     </span>
                     <span style={{ fontSize: 11, color: "#333345" }}>&bull;</span>
                     <span style={{
                       fontSize: 11, color, fontWeight: 500,
-                      fontFamily: "JetBrains Mono, Inter, monospace",
+                      fontFamily: "var(--font-jetbrains), monospace",
                     }}>
                       {area}m&sup2;
                     </span>
@@ -722,7 +722,7 @@ function FloorPlanLayout({
           }) : (
             <div style={{
               padding: "20px 18px", color: "#5C5C78", fontSize: 12,
-              fontFamily: "Inter, system-ui, sans-serif", textAlign: "center",
+              fontFamily: "var(--font-dm-sans), system-ui, sans-serif", textAlign: "center",
             }}>
               {roomCount} rooms detected
             </div>
@@ -737,7 +737,7 @@ function FloorPlanLayout({
           <div style={{
             fontSize: 10, fontWeight: 600, color: "#333345",
             textTransform: "uppercase", letterSpacing: "0.12em",
-            marginBottom: 12, fontFamily: "Inter, system-ui, sans-serif",
+            marginBottom: 12, fontFamily: "var(--font-dm-sans), system-ui, sans-serif",
           }}>
             Building Specs
           </div>
@@ -753,13 +753,13 @@ function FloorPlanLayout({
                 <div style={{
                   fontSize: 9, color: "#333345",
                   textTransform: "uppercase", letterSpacing: "0.1em",
-                  fontFamily: "Inter, system-ui, sans-serif",
+                  fontFamily: "var(--font-dm-sans), system-ui, sans-serif",
                 }}>
                   {item.label}
                 </div>
                 <div style={{
                   fontSize: 15, color: item.color, fontWeight: 700,
-                  fontFamily: "Inter, system-ui, sans-serif", marginTop: 2,
+                  fontFamily: "var(--font-dm-sans), system-ui, sans-serif", marginTop: 2,
                 }}>
                   {item.value}
                 </div>
@@ -809,13 +809,13 @@ function FloorPlanLayout({
               <div style={{ flex: 1, textAlign: "left" }}>
                 <div style={{
                   fontSize: 12, fontWeight: 600, color: "#C0D4FF",
-                  fontFamily: "Inter, system-ui, sans-serif",
+                  fontFamily: "var(--font-dm-sans), system-ui, sans-serif",
                 }}>
                   Open in Floor Plan Editor
                 </div>
                 <div style={{
                   fontSize: 10, color: "#4A4A60",
-                  fontFamily: "Inter, system-ui, sans-serif",
+                  fontFamily: "var(--font-dm-sans), system-ui, sans-serif",
                   marginTop: 2,
                 }}>
                   CAD editor with Vastu &amp; BOQ analysis
@@ -843,7 +843,7 @@ function FloorPlanLayout({
           }} />
           <span style={{
             fontSize: 10, color: "#2A2A40",
-            fontFamily: "Inter, system-ui, sans-serif",
+            fontFamily: "var(--font-dm-sans), system-ui, sans-serif",
           }}>
             {t('showcase.buildflowEngineFooter')}
           </span>

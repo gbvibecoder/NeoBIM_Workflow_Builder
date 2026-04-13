@@ -4,6 +4,7 @@ import Link from "next/link";
 import { motion, useScroll, useTransform } from "framer-motion";
 import { useRef } from "react";
 import { useLocale } from "@/hooks";
+import { CONTACT_EMAIL } from "@/constants/contact";
 import {
   Shield,
   Lock,
@@ -394,10 +395,10 @@ export default function PrivacyPage() {
             {t('privacy.effectiveDate')} <strong style={{ color: "#9898B0" }}>{t('privacy.effectiveDateValue')}</strong>.
             {' '}{t('privacy.effectiveDatePost')}{" "}
             <a
-              href="mailto:privacy@buildflow.app"
+              href={`mailto:${CONTACT_EMAIL}`}
               style={{ color: "#4F8AFF", textDecoration: "none" }}
             >
-              privacy@buildflow.app
+              {CONTACT_EMAIL}
             </a>
           </p>
         </motion.div>

@@ -11,6 +11,7 @@ import {
 } from '@/shared/services/email';
 import { checkWebhookIdempotency } from '@/lib/webhook-idempotency';
 import { logAudit } from "@/lib/admin-server";
+import { trackServerPurchase } from "@/lib/server-conversions";
 
 export async function POST(req: NextRequest) {
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
@@ -74,10 +75,19 @@ export async function POST(req: NextRequest) {
           // Send welcome email (fire-and-forget)
           const checkoutUser = await prisma.user.findFirst({
             where: { stripeCustomerId: customerId },
-            select: { email: true, name: true, role: true },
+            select: { email: true, name: true, role: true, phoneNumber: true },
           });
           if (checkoutUser?.email) {
             sendWelcomeEmail(checkoutUser.email, checkoutUser.name, checkoutUser.role).catch((err) => console.error("[webhook] Failed to send welcome email:", err));
+
+            // Server-side conversion: Meta CAPI (fire-and-forget)
+            trackServerPurchase({
+              email: checkoutUser.email,
+              phone: checkoutUser.phoneNumber,
+              firstName: checkoutUser.name?.split(" ")[0],
+              plan: checkoutUser.role,
+              currency: "INR",
+            }).catch(err => console.warn("[meta-capi]", err));
           }
         }
         break;

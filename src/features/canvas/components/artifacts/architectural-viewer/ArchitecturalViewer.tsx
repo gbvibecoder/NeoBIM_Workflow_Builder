@@ -831,7 +831,7 @@ export default function ArchitecturalViewer({ floors, height, footprint, buildin
             pointerEvents: "none",
             boxShadow: "0 4px 20px rgba(0,0,0,0.3)",
           }}>
-            <div style={{ fontSize: 8, color: "rgba(0,245,255,0.5)", textTransform: "uppercase" as const, letterSpacing: "0.14em", marginBottom: 5, fontWeight: 700, fontFamily: "'Space Mono', monospace" }}>
+            <div style={{ fontSize: 8, color: "rgba(0,245,255,0.5)", textTransform: "uppercase" as const, letterSpacing: "0.14em", marginBottom: 5, fontWeight: 700, fontFamily: "var(--font-jetbrains), monospace" }}>
               Building Info
             </div>
             <div style={{ fontSize: 14, color: "#F0F0FA", fontWeight: 700, letterSpacing: "-0.01em" }}>
@@ -932,7 +932,7 @@ function GroupLabel({ children }: { children: React.ReactNode }) {
     <div style={{
       fontSize: 8, fontWeight: 700, color: "rgba(0,245,255,0.45)",
       textTransform: "uppercase" as const, letterSpacing: "0.14em",
-      padding: "0 4px 4px", fontFamily: "'Space Mono', monospace",
+      padding: "0 4px 4px", fontFamily: "var(--font-jetbrains), monospace",
     }}>
       {children}
     </div>

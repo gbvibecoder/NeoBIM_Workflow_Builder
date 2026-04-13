@@ -23,10 +23,12 @@ import {
   PenTool,
   Video,
   MessageSquare,
+  Zap,
 } from "lucide-react";
 import { PREBUILT_WORKFLOWS } from "@/features/workflows/constants/prebuilt-workflows";
 import { useLocale } from "@/hooks/useLocale";
 import { isPlatformAdmin } from "@/lib/platform-admin";
+import { PLAN_EXEC_LIMITS, PLAN_RANK } from "@/constants/limits";
 
 // ─── Sidebar ─────────────────────────────────────────────────────────────────
 
@@ -35,13 +37,21 @@ export function Sidebar() {
   const pathname = usePathname();
   const { data: session } = useSession();
 
-  const PRIMARY_NAV = [
+  const userRole = ((session?.user as { role?: string })?.role) || "FREE";
+  const userRank = PLAN_RANK[userRole] ?? 0;
+  const isFreeUser = userRole === "FREE";
+
+  // Nav items — premiumTier marks features that require a minimum plan
+  const PRIMARY_NAV: Array<{
+    href: string; label: string; icon: typeof LayoutDashboard;
+    exact?: boolean; badge?: string; premiumTier?: string;
+  }> = [
     { href: "/dashboard",           label: t("nav.dashboard"),   icon: LayoutDashboard, exact: true },
     { href: "/dashboard/templates", label: t("nav.templates"),   icon: BookOpen, badge: String(PREBUILT_WORKFLOWS.filter(w => w.id !== "wf-12").length) },
     { href: "/dashboard/workflows", label: t("nav.myWorkflows"), icon: Workflow },
     { href: "/dashboard/ifc-viewer", label: t("nav.ifcViewer"),   icon: FileBox, badge: "New" },
     { href: "/dashboard/floor-plan", label: "Floor Plan",         icon: PenTool, badge: "New" },
-    { href: "/dashboard/3d-render",  label: t("nav.3dRender"),    icon: Video,   badge: "New" },
+    { href: "/dashboard/3d-render",  label: t("nav.3dRender"),    icon: Video,   badge: "New", premiumTier: "STARTER" },
   ];
 
   const isAdmin = isPlatformAdmin(session?.user?.email);
@@ -61,6 +71,21 @@ export function Sidebar() {
   const [newBtnHover, setNewBtnHover] = useState(false);
   const [hoverExpanded, setHoverExpanded] = useState(false);
   const hoverTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // ── Execution usage for sidebar counter ──
+  const [usageData, setUsageData] = useState<{ used: number; limit: number } | null>(null);
+  useEffect(() => {
+    if (!session?.user) return;
+    fetch("/api/user/dashboard-stats")
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (data) {
+          const limit = PLAN_EXEC_LIMITS[userRole] ?? 3;
+          setUsageData({ used: data.executionCount ?? 0, limit });
+        }
+      })
+      .catch(() => {});
+  }, [session, userRole]);
 
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth < 769);
@@ -121,6 +146,11 @@ export function Sidebar() {
 
   // Compute showLabels from effective collapse state
   const effectiveShowLabels = !isEffectivelyCollapsed && showLabels;
+
+  // ── Usage counter helpers ──
+  const remaining = usageData ? Math.max(0, usageData.limit < 0 ? 999 : usageData.limit - usageData.used) : null;
+  const usagePercent = usageData && usageData.limit > 0 ? Math.min(100, (usageData.used / usageData.limit) * 100) : 0;
+  const usageColor = usagePercent >= 100 ? "#EF4444" : usagePercent >= 67 ? "#F59E0B" : "#00F5FF";
 
   return (
     <>
@@ -197,7 +227,7 @@ export function Sidebar() {
           pointerEvents: "none", zIndex: 2,
         }} />
 
-        {/* ── Logo ─────────────────────────────────────────────────── */}
+        {/* ── Logo + Plan tag ─────────────────────────────────────── */}
         <div style={{
           display: "flex", alignItems: "center",
           justifyContent: isEffectivelyCollapsed ? "center" : "space-between",
@@ -318,12 +348,14 @@ export function Sidebar() {
           <div style={{ display: "flex", flexDirection: "column", gap: 2, padding: "0 8px" }}>
             {PRIMARY_NAV.map((item, idx) => {
               const isActive = item.exact ? pathname === item.href : pathname.startsWith(item.href);
+              const isPremiumLocked = item.premiumTier && userRank < (PLAN_RANK[item.premiumTier] ?? 0);
               return (
                 <NavItem
                   key={item.href} href={item.href}
-                  label={item.label} badge={item.badge} icon={item.icon}
+                  label={item.label} badge={isPremiumLocked ? "Pro" : item.badge} icon={item.icon}
                   isActive={isActive} collapsed={isEffectivelyCollapsed}
                   showLabels={effectiveShowLabels} index={idx}
+                  isPremium={!!isPremiumLocked}
                 />
               );
             })}
@@ -360,37 +392,95 @@ export function Sidebar() {
           </div>
         </nav>
 
-        {/* ── Bottom: upgrade only ─────────────────────────────────── */}
-        {effectiveShowLabels && (
-          <div style={{ marginTop: "auto", flexShrink: 0, position: "relative", zIndex: 1 }}>
-            <div style={{
-              height: 1,
-              background: "linear-gradient(90deg, transparent 0%, rgba(184,115,51,0.12) 30%, rgba(255,191,0,0.12) 70%, transparent 100%)",
-            }} />
-            <div style={{ padding: "14px 12px 12px" }}>
+        {/* ── Bottom: usage counter + upgrade ─────────────────────── */}
+        <div style={{ marginTop: "auto", flexShrink: 0, position: "relative", zIndex: 1 }}>
+          <div style={{
+            height: 1,
+            background: "linear-gradient(90deg, transparent 0%, rgba(184,115,51,0.12) 30%, rgba(255,191,0,0.12) 70%, transparent 100%)",
+          }} />
+
+          {/* Execution counter (FREE users only, expanded mode) */}
+          {effectiveShowLabels && isFreeUser && usageData && usageData.limit > 0 && (
+            <div style={{ padding: "12px 12px 0" }}>
+              <Link
+                href={remaining === 0 ? "/dashboard/billing" : "#"}
+                onClick={remaining === 0 ? undefined : (e: React.MouseEvent) => e.preventDefault()}
+                style={{
+                  display: "block", padding: "10px 12px", borderRadius: 10,
+                  background: "rgba(255,255,255,0.02)",
+                  border: `1px solid ${remaining === 0 ? "rgba(239,68,68,0.15)" : "rgba(255,255,255,0.05)"}`,
+                  textDecoration: "none",
+                  transition: "all 200ms ease",
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+                  <span style={{ fontSize: 10, fontWeight: 600, color: "#7878A0", letterSpacing: "0.5px", fontFamily: "var(--font-jetbrains), monospace" }}>
+                    <Zap size={10} style={{ display: "inline", verticalAlign: "-1px", marginRight: 4, color: usageColor }} />
+                    {remaining === 0 ? "0 left \u2014 Upgrade" : `${remaining}/${usageData.limit} runs left`}
+                  </span>
+                </div>
+                {/* Progress bar */}
+                <div style={{ height: 3, borderRadius: 2, background: "rgba(255,255,255,0.06)", overflow: "hidden" }}>
+                  <div style={{
+                    height: "100%", borderRadius: 2,
+                    width: `${usagePercent}%`,
+                    background: usageColor,
+                    transition: "width 600ms ease, background 400ms ease",
+                    boxShadow: `0 0 8px ${usageColor}40`,
+                  }} />
+                </div>
+              </Link>
+            </div>
+          )}
+
+          {/* Upgrade button (expanded) */}
+          {effectiveShowLabels && isFreeUser && (
+            <div style={{ padding: "10px 12px 12px" }}>
               <Link href="/dashboard/billing" className="sb-upgrade-btn" style={{ textDecoration: "none" }}>
                 <span className="sb-upgrade-shimmer" />
                 <Crown size={12} style={{ position: "relative", zIndex: 1 }} />
                 <span style={{ position: "relative", zIndex: 1 }}>{t("nav.upgrade")}</span>
               </Link>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* ── Expand button (collapsed) ───────────────────────────── */}
-        {isEffectivelyCollapsed && (
-          <div style={{ padding: 8, borderTop: "1px solid rgba(184,115,51,0.1)", flexShrink: 0, position: "relative", zIndex: 1 }}>
-            <button
-              onClick={() => { setCollapsed(false); setHoverExpanded(false); }}
-              title={t("nav.expandSidebar")}
-              aria-label={t("nav.expandSidebar")}
-              className="sb-icon-btn"
-              style={{ width: "100%", justifyContent: "center", padding: "8px 0" }}
-            >
-              <ChevronRight size={14} />
-            </button>
-          </div>
-        )}
+          {/* Collapsed: crown icon for FREE users */}
+          {isEffectivelyCollapsed && isFreeUser && (
+            <div style={{ padding: "6px 8px 2px", display: "flex", justifyContent: "center" }}>
+              <Link
+                href="/dashboard/billing"
+                title="Upgrade your plan"
+                style={{
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  width: 36, height: 36, borderRadius: 10,
+                  background: "rgba(245,158,11,0.08)",
+                  border: "1px solid rgba(245,158,11,0.15)",
+                  color: "#F59E0B",
+                  transition: "all 200ms ease",
+                  animation: "sb-crown-pulse 3s ease-in-out infinite",
+                  textDecoration: "none",
+                }}
+              >
+                <Crown size={14} />
+              </Link>
+            </div>
+          )}
+
+          {/* Expand button (collapsed) */}
+          {isEffectivelyCollapsed && (
+            <div style={{ padding: 8, borderTop: "1px solid rgba(184,115,51,0.1)", flexShrink: 0, position: "relative", zIndex: 1 }}>
+              <button
+                onClick={() => { setCollapsed(false); setHoverExpanded(false); }}
+                title={t("nav.expandSidebar")}
+                aria-label={t("nav.expandSidebar")}
+                className="sb-icon-btn"
+                style={{ width: "100%", justifyContent: "center", padding: "8px 0" }}
+              >
+                <ChevronRight size={14} />
+              </button>
+            </div>
+          )}
+        </div>
       </motion.aside>
     </>
   );
@@ -407,9 +497,10 @@ interface NavItemProps {
   collapsed: boolean;
   showLabels: boolean;
   index: number;
+  isPremium?: boolean;
 }
 
-function NavItem({ href, label, badge, icon: Icon, isActive, collapsed, showLabels, index }: NavItemProps) {
+function NavItem({ href, label, badge, icon: Icon, isActive, collapsed, showLabels, index, isPremium }: NavItemProps) {
   const [hovered, setHovered] = useState(false);
 
   return (
@@ -497,7 +588,8 @@ function NavItem({ href, label, badge, icon: Icon, isActive, collapsed, showLabe
             </span>
 
             {badge && (
-              <span className="sb-badge">
+              <span className={isPremium ? "sb-badge-premium" : "sb-badge"}>
+                {isPremium && <Crown size={9} style={{ marginRight: 3, verticalAlign: "-1px" }} />}
                 {badge}
               </span>
             )}
