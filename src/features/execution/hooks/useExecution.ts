@@ -490,6 +490,8 @@ async function executeNode(
           const ppRaw = (parseResult as Record<string, unknown>).parserDiagnostics as
             | Record<string, unknown>
             | undefined;
+          // Breadcrumb: confirms parserDiagnostics made it from upload → workflow-run.
+          console.info(`[TR-007 client-fast-path] ifcParsed.parserDiagnostics=${!!ppRaw}; samples=${Array.isArray(ppRaw?.elementSamples) ? (ppRaw!.elementSamples as unknown[]).length : 0}`);
           const parserDiagEnvelope = ppRaw ? {
             executionId,
             startedAt: new Date().toISOString(),

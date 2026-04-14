@@ -85,7 +85,7 @@ export const FileUploadInput = memo(function FileUploadInput({ nodeId, data, acc
   const fileName = data.inputValue as string | undefined;
   const hasFile = !!fileName;
 
-  const handleFile = useCallback((file: File) => {
+  const handleFile = useCallback(async (file: File) => {
     if (maxMB && file.size > maxMB * 1024 * 1024) {
       toast.error(`${t('input.fileTooLarge')} ${maxMB}MB.`);
       return;
@@ -121,52 +121,93 @@ export const FileUploadInput = memo(function FileUploadInput({ nodeId, data, acc
     if (isIFCFile) {
       updateNode(nodeId, { data: { ...currentNode.data, inputValue: file.name, fileSize: file.size, fileName: file.name, mimeType: file.type } });
       const sizeLabel = formatBytes(file.size, 1);
-      toast.loading(`Reading IFC file (${sizeLabel})...`, { id: `ifc-parse-${nodeId}` });
+      toast.loading(`Uploading IFC (${sizeLabel}) for WASM parsing…`, { id: `ifc-parse-${nodeId}` });
 
-      // Read file as text and parse in the browser — zero server calls
-      const reader = new FileReader();
-      reader.onload = async () => {
-        try {
-          toast.loading(`Parsing building elements...`, { id: `ifc-parse-${nodeId}` });
-          const text = reader.result as string;
-          // Dynamic import to keep bundle size small
-          const { parseIFCText } = await import("@/features/ifc/services/ifc-text-parser");
-          const result = parseIFCText(text);
+      // ── Primary path: server-side WASM parser (/api/parse-ifc) ────────
+      // This is the ONLY path that produces a rich ParserDiagnosticCounters
+      // payload (geometry type breakdown, element samples, fallback chains,
+      // smart warnings, timings). The fallback text parser is regex-only and
+      // has no diagnostics surface.
+      //
+      // Fallback: if the server call fails for any reason (auth expired,
+      // rate limit, network, timeout, or >100MB file), we transparently fall
+      // back to the client-side text parser so the upload still works.
+      const handleParsedResult = (result: unknown, via: "wasm" | "text") => {
+        const node = useWorkflowStore.getState().nodes.find(n => n.id === nodeId);
+        if (!node) return;
+        const r = result as { summary?: { totalElements?: number; buildingStoreys?: number }; parserDiagnostics?: unknown };
+        const hasDiag = !!r.parserDiagnostics;
+        // Breadcrumb: confirms whether parserDiagnostics survived the hop.
+        console.info(`[InputNode] ifcParsed stored (via=${via}, hasParserDiagnostics=${hasDiag})`);
+        updateNode(nodeId, {
+          data: {
+            ...node.data,
+            inputValue: file.name,
+            fileSize: file.size,
+            fileName: file.name,
+            mimeType: file.type,
+            ifcParsed: result,
+            fileData: undefined,
+            ifcUrl: undefined,
+          },
+        });
+        const totalEls = r.summary?.totalElements ?? "?";
+        const storeys = r.summary?.buildingStoreys ?? "?";
+        const suffix = via === "wasm" ? " (WASM + diagnostics)" : " (text parser, no diagnostics)";
+        toast.success(
+          `IFC parsed: ${totalEls} elements, ${storeys} storeys${suffix}`,
+          { id: `ifc-parse-${nodeId}`, duration: 5000 },
+        );
+      };
 
-          const node = useWorkflowStore.getState().nodes.find(n => n.id === nodeId);
-          if (!node) return;
+      const runFallbackTextParser = async (reason: string) => {
+        console.warn(`[InputNode] /api/parse-ifc fallback — reason: ${reason}`);
+        toast.loading("Falling back to local text parser…", { id: `ifc-parse-${nodeId}` });
+        const reader = new FileReader();
+        reader.onload = async () => {
+          try {
+            const text = reader.result as string;
+            const { parseIFCText } = await import("@/features/ifc/services/ifc-text-parser");
+            const result = parseIFCText(text);
+            handleParsedResult(result, "text");
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : "Parse failed";
+            toast.error("Could not parse this IFC file", {
+              id: `ifc-parse-${nodeId}`,
+              description: "The file may be corrupted or in an unsupported format. Try re-exporting from your BIM software.",
+              duration: 8000,
+            });
+            console.warn("[IFC Parse] Technical error:", msg);
+          }
+        };
+        reader.onerror = () => toast.error("Failed to read IFC file", { id: `ifc-parse-${nodeId}` });
+        reader.readAsText(file);
+      };
 
-          updateNode(nodeId, {
-            data: {
-              ...node.data,
-              inputValue: file.name,
-              fileSize: file.size,
-              fileName: file.name,
-              mimeType: file.type,
-              ifcParsed: result, // Pre-parsed result — no base64, no server upload
-              fileData: undefined, // Never store large base64
-              ifcUrl: undefined,
-            },
-          });
-
-          toast.success(
-            `IFC parsed: ${result.summary.totalElements} elements, ${result.summary.buildingStoreys} storeys`,
-            { id: `ifc-parse-${nodeId}`, duration: 5000 }
-          );
-        } catch (err) {
-          const msg = err instanceof Error ? err.message : "Parse failed";
-          toast.error("Could not parse this IFC file", {
-            id: `ifc-parse-${nodeId}`,
-            description: "The file may be corrupted or in an unsupported format. Try re-exporting from your BIM software.",
-            duration: 8000,
-          });
-          console.warn("[IFC Parse] Technical error:", msg);
+      try {
+        const fd = new FormData();
+        fd.append("file", file);
+        // Vercel maxDuration is 180s for /api/parse-ifc — mirror that here.
+        const res = await fetch("/api/parse-ifc", {
+          method: "POST",
+          body: fd,
+          signal: AbortSignal.timeout(180_000),
+        });
+        if (!res.ok) {
+          await runFallbackTextParser(`HTTP ${res.status}`);
+          return;
         }
-      };
-      reader.onerror = () => {
-        toast.error("Failed to read IFC file", { id: `ifc-parse-${nodeId}` });
-      };
-      reader.readAsText(file);
+        const body = await res.json();
+        const result = body?.result;
+        if (!result || typeof result !== "object" || !result.divisions) {
+          await runFallbackTextParser("server response missing divisions");
+          return;
+        }
+        handleParsedResult(result, "wasm");
+      } catch (serverErr) {
+        const msg = serverErr instanceof Error ? serverErr.message : String(serverErr);
+        await runFallbackTextParser(msg);
+      }
     } else {
       // Small files / non-IFC: convert to base64 for inline transport
       const reader = new FileReader();

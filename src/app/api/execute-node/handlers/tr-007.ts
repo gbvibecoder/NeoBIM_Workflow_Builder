@@ -86,7 +86,16 @@ export const handleTR007: NodeHandler = async (ctx) => {
     });
     // If /api/parse-ifc returned parserDiagnostics counters, fold them in.
     const ppDiag = (preParsed as Record<string, unknown>).parserDiagnostics as
-      | { geometryTypes?: typeof diag.stages.parsing.geometryTypeBreakdown; materialTypes?: typeof diag.stages.parsing.materialTypeBreakdown; elementWarnings?: string[] }
+      | {
+          geometryTypes?: typeof diag.stages.parsing.geometryTypeBreakdown;
+          materialTypes?: typeof diag.stages.parsing.materialTypeBreakdown;
+          elementWarnings?: string[];
+          fileMetadata?: Record<string, unknown>;
+          elementSamples?: Array<Record<string, unknown>>;
+          timings?: Record<string, number>;
+          smartWarnings?: string[];
+          smartFixes?: string[];
+        }
       | undefined;
     if (ppDiag?.geometryTypes) {
       diag.stages.parsing.geometryTypeBreakdown = { ...diag.stages.parsing.geometryTypeBreakdown, ...ppDiag.geometryTypes };
@@ -97,6 +106,12 @@ export const handleTR007: NodeHandler = async (ctx) => {
     if (Array.isArray(ppDiag?.elementWarnings)) {
       diag.stages.parsing.warnings.push(...ppDiag!.elementWarnings.slice(0, 20));
     }
+    // Forward the deep-dive fields too — panel renders these.
+    if (ppDiag?.fileMetadata) diag.stages.parsing.fileMetadata = ppDiag.fileMetadata;
+    if (Array.isArray(ppDiag?.elementSamples)) diag.stages.parsing.elementSamples = ppDiag.elementSamples;
+    if (ppDiag?.timings) diag.stages.parsing.parserTimings = ppDiag.timings;
+    if (Array.isArray(ppDiag?.smartWarnings)) diag.stages.parsing.smartWarnings = ppDiag.smartWarnings;
+    if (Array.isArray(ppDiag?.smartFixes)) diag.stages.parsing.smartFixes = ppDiag.smartFixes;
     try {
       const parseResult = preParsed as {
         divisions: Array<{
