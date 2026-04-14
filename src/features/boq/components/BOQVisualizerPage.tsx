@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useMemo, useRef } from "react";
+import { motion, useInView } from "framer-motion";
 import { toast } from "sonner";
 import { BOQHeader } from "@/features/boq/components/BOQHeader";
 import { HeroStats } from "@/features/boq/components/HeroStats";
@@ -122,27 +123,12 @@ export function BOQVisualizerPage({ data, executionId }: BOQVisualizerPageProps)
   }, [recalcLines, data.projectName]);
 
   return (
-    <div
-      className="h-full overflow-y-auto"
-      style={{ background: "#FAFAF8" }}
-    >
+    <div className="h-full overflow-y-auto" style={{ background: "#FAFAF8" }}>
       {/* Header */}
       <BOQHeader data={data} onExportExcel={handleExportExcel} />
 
-      <div className="flex flex-col gap-6 py-6">
-        {/* Transparency: Model Quality + Pricing Source */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 px-6">
-          {data.modelQualityReport && (
-            <ModelQualityCard report={data.modelQualityReport} />
-          )}
-          {data.pricingMetadata && (
-            <div className="flex flex-col justify-center">
-              <PricingSourceBanner metadata={data.pricingMetadata} />
-            </div>
-          )}
-        </div>
-
-        {/* Hero Stats */}
+      <div className="max-w-[1360px] mx-auto flex flex-col gap-10 py-8 pb-16">
+        {/* Hero Stats — the showpiece */}
         <ErrorBoundary fallback={<SectionFallback section="Hero Stats" />}>
           <HeroStats
             totalCost={recalcTotalProject}
@@ -156,102 +142,115 @@ export function BOQVisualizerPage({ data, executionId }: BOQVisualizerPageProps)
           />
         </ErrorBoundary>
 
-        {/* Data Sources Summary */}
-        <ErrorBoundary fallback={<SectionFallback section="Data Sources" />}>
-          <div className="px-6">
-            <DataSourcesSummary data={data} />
+        {/* Transparency Row: Model Quality + Data Sources + Pricing Source */}
+        <ScrollReveal delay={0.1}>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 px-6">
+            <ErrorBoundary fallback={<SectionFallback section="Data Sources" />}>
+              <DataSourcesSummary data={data} />
+            </ErrorBoundary>
+            <div className="flex flex-col gap-4">
+              {data.modelQualityReport && <ModelQualityCard report={data.modelQualityReport} />}
+              {data.pricingMetadata && <PricingSourceBanner metadata={data.pricingMetadata} />}
+            </div>
           </div>
-        </ErrorBoundary>
+        </ScrollReveal>
 
         {/* Seasonal Adjustment Badge */}
         {data.seasonalAdjustment?.applied && (
-          <div className="mx-6 px-4 py-3 rounded-xl flex items-center gap-3" style={{
-            background: "#EFF6FF",
-            border: "1px solid #BFDBFE",
-          }}>
-            <span style={{ fontSize: 18 }}>🌧️</span>
-            <div>
-              <span className="text-xs font-semibold" style={{ color: "#1D4ED8" }}>
-                Monsoon adjustment: +{data.seasonalAdjustment.overallImpactPercent.toFixed(1)}% effective cost
-              </span>
-              <span className="text-[10px] ml-2" style={{ color: "#6B7280" }}>
-                {data.seasonalAdjustment.month} — labor productivity at {(1 / data.seasonalAdjustment.laborMultiplier * 100).toFixed(0)}%
-              </span>
+          <ScrollReveal delay={0.15}>
+            <div className="mx-6 px-5 py-3.5 rounded-xl flex items-center gap-3" style={{ background: "#EFF6FF", border: "1px solid #BFDBFE" }}>
+              <span style={{ fontSize: 20 }}>🌧️</span>
+              <div>
+                <span className="text-sm font-semibold" style={{ color: "#1D4ED8" }}>
+                  Monsoon adjustment: +{data.seasonalAdjustment.overallImpactPercent.toFixed(1)}%
+                </span>
+                <span className="text-xs ml-2" style={{ color: "#6B7280" }}>
+                  {data.seasonalAdjustment.month} — labor productivity at {(1 / data.seasonalAdjustment.laborMultiplier * 100).toFixed(0)}%
+                </span>
+              </div>
             </div>
-          </div>
+          </ScrollReveal>
         )}
 
         {/* Price Controls */}
-        <ErrorBoundary fallback={<SectionFallback section="Price Controls" />}>
-          <PriceControls
-            prices={prices}
-            basePrices={basePrices.current}
-            onChange={handlePriceChange}
-            totalSavings={data.totalCost - recalcTotalProject}
-            baseTotal={data.totalCost}
-            market={data.market ? {
-              steelSource: data.market.steelSource,
-              steelConfidence: data.market.steelConfidence,
-              cementBrand: data.market.cementBrand,
-              cementConfidence: data.market.cementConfidence,
-              masonSource: data.market.masonSource,
-              masonConfidence: data.market.masonConfidence,
-            } : undefined}
-          />
-        </ErrorBoundary>
+        <ScrollReveal delay={0.1}>
+          <ErrorBoundary fallback={<SectionFallback section="Price Controls" />}>
+            <PriceControls
+              prices={prices}
+              basePrices={basePrices.current}
+              onChange={handlePriceChange}
+              totalSavings={data.totalCost - recalcTotalProject}
+              baseTotal={data.totalCost}
+              market={data.market ? {
+                steelSource: data.market.steelSource,
+                steelConfidence: data.market.steelConfidence,
+                cementBrand: data.market.cementBrand,
+                cementConfidence: data.market.cementConfidence,
+                masonSource: data.market.masonSource,
+                masonConfidence: data.market.masonConfidence,
+              } : undefined}
+            />
+          </ErrorBoundary>
+        </ScrollReveal>
 
-        {/* Two Column Layout: Charts + Quality */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 px-6">
-          {/* Left Column */}
-          <div className="flex flex-col gap-6">
-            <ErrorBoundary fallback={<SectionFallback section="Cost Breakdown Chart" />}>
-              <CostDonutChart
-                material={totals.subtotalMaterial}
-                labor={totals.subtotalLabor}
-                equipment={totals.subtotalEquipment}
-              />
-            </ErrorBoundary>
-            <ErrorBoundary fallback={<SectionFallback section="Division Chart" />}>
-              <DivisionBarChart lines={recalcLines} />
-            </ErrorBoundary>
-          </div>
-
-          {/* Right Column */}
-          <div className="flex flex-col gap-6">
-            {data.mepBreakdown && (
-              <ErrorBoundary fallback={<SectionFallback section="MEP Breakdown" />}>
-                <MEPBreakdown mep={data.mepBreakdown} />
+        {/* Charts + Quality — Two Column */}
+        <ScrollReveal delay={0.1}>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 px-6">
+            <div className="flex flex-col gap-6">
+              <ErrorBoundary fallback={<SectionFallback section="Cost Chart" />}>
+                <CostDonutChart material={totals.subtotalMaterial} labor={totals.subtotalLabor} equipment={totals.subtotalEquipment} />
               </ErrorBoundary>
-            )}
-            {data.ifcQuality && (
-              <ErrorBoundary fallback={<SectionFallback section="IFC Quality" />}>
-                <IFCQualityCard quality={data.ifcQuality} />
+              <ErrorBoundary fallback={<SectionFallback section="Division Chart" />}>
+                <DivisionBarChart lines={recalcLines} />
               </ErrorBoundary>
-            )}
+            </div>
+            <div className="flex flex-col gap-6">
+              {data.mepBreakdown && (
+                <ErrorBoundary fallback={<SectionFallback section="MEP" />}>
+                  <MEPBreakdown mep={data.mepBreakdown} />
+                </ErrorBoundary>
+              )}
+              {data.ifcQuality && (
+                <ErrorBoundary fallback={<SectionFallback section="IFC Quality" />}>
+                  <IFCQualityCard quality={data.ifcQuality} />
+                </ErrorBoundary>
+              )}
+            </div>
           </div>
-        </div>
+        </ScrollReveal>
 
         {/* BOQ Table */}
-        <ErrorBoundary fallback={<SectionFallback section="BOQ Table" />}>
-          <BOQTable
-            lines={recalcLines}
-            rateOverrides={rateOverrides}
-            onRateOverride={handleRateOverride}
-            grandTotal={totals.totalCost}
-          />
-        </ErrorBoundary>
+        <ScrollReveal delay={0.05}>
+          <ErrorBoundary fallback={<SectionFallback section="BOQ Table" />}>
+            <BOQTable lines={recalcLines} rateOverrides={rateOverrides} onRateOverride={handleRateOverride} grandTotal={totals.totalCost} />
+          </ErrorBoundary>
+        </ScrollReveal>
 
-        {/* NL Summary */}
-        <NLSummary summary={data.summary} />
+        {/* Summary + Footer */}
+        <ScrollReveal delay={0.1}>
+          <NLSummary summary={data.summary} />
+        </ScrollReveal>
 
-        {/* Footer */}
-        <BOQFooter
-          disclaimer={data.disclaimer}
-          onExportExcel={handleExportExcel}
-          onExportPDF={handleExportPDF}
-          onExportCSV={handleExportCSV}
-        />
+        <ScrollReveal delay={0.05}>
+          <BOQFooter disclaimer={data.disclaimer} onExportExcel={handleExportExcel} onExportPDF={handleExportPDF} onExportCSV={handleExportCSV} />
+        </ScrollReveal>
       </div>
     </div>
+  );
+}
+
+// ─── Scroll Reveal Wrapper ───────────────────────────────────────────────────
+function ScrollReveal({ children, delay = 0 }: { children: React.ReactNode; delay?: number }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const isInView = useInView(ref, { once: true, margin: "-60px" });
+  return (
+    <motion.div
+      ref={ref}
+      initial={{ opacity: 0, y: 24 }}
+      animate={isInView ? { opacity: 1, y: 0 } : {}}
+      transition={{ duration: 0.55, delay, ease: [0.25, 0.46, 0.45, 0.94] as const }}
+    >
+      {children}
+    </motion.div>
   );
 }

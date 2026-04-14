@@ -1,5 +1,7 @@
 "use client";
 
+import { useRef } from "react";
+import { motion, useInView } from "framer-motion";
 import { IndianRupee, Ruler, Hammer, ShieldCheck, Check, AlertTriangle } from "lucide-react";
 import { AnimatedNumber } from "@/features/boq/components/AnimatedNumber";
 import { formatCrores } from "@/features/boq/components/recalc-engine";
@@ -23,262 +25,240 @@ function getCostPerM2Color(value: number, low: number, high: number): string {
   return "#D97706";
 }
 
-function getQualityThemeColor(score: number): { bg: string; text: string } {
-  if (score >= 70) return { bg: "#ECFDF5", text: "#059669" };
-  if (score >= 40) return { bg: "#FFFBEB", text: "#D97706" };
-  return { bg: "#FEF2F2", text: "#DC2626" };
+// ─── Cost Range Gauge ────────────────────────────────────────────────────────
+function CostRangeGauge({ low, best, high }: { low: number; high: number; best: number }) {
+  if (low <= 0 || high <= 0) return null;
+  const range = high - low;
+  const bestPos = range > 0 ? ((best - low) / range) * 100 : 50;
+
+  return (
+    <div className="mt-4 px-1">
+      {/* Labels */}
+      <div className="flex justify-between mb-1.5">
+        <span className="text-[10px] font-medium" style={{ color: "#9CA3AF" }}>
+          ₹{formatCrores(low)} Cr
+        </span>
+        <span className="text-[11px] font-bold" style={{ color: "#0D9488" }}>
+          ₹{formatCrores(best)} Cr
+        </span>
+        <span className="text-[10px] font-medium" style={{ color: "#9CA3AF" }}>
+          ₹{formatCrores(high)} Cr
+        </span>
+      </div>
+      {/* Track */}
+      <div className="relative h-2 rounded-full" style={{ background: "linear-gradient(90deg, #D1FAE5, #FEF3C7, #FEE2E2)" }}>
+        {/* Best estimate dot */}
+        <motion.div
+          className="absolute top-1/2 -translate-y-1/2"
+          style={{ left: `${bestPos}%` }}
+          initial={{ scale: 0, x: "-50%" }}
+          animate={{ scale: 1, x: "-50%" }}
+          transition={{ delay: 0.8, duration: 0.4, type: "spring", stiffness: 200 }}
+        >
+          <div
+            className="w-4 h-4 rounded-full border-[2.5px] border-white"
+            style={{
+              background: "#0D9488",
+              boxShadow: "0 0 0 3px rgba(13,148,136,0.2), 0 2px 4px rgba(0,0,0,0.1)",
+              animation: "pulseGlow 2.5s ease-in-out infinite",
+            }}
+          />
+        </motion.div>
+      </div>
+      <style>{`
+        @keyframes pulseGlow {
+          0%, 100% { box-shadow: 0 0 0 3px rgba(13,148,136,0.2), 0 2px 4px rgba(0,0,0,0.1); }
+          50% { box-shadow: 0 0 0 6px rgba(13,148,136,0.12), 0 2px 8px rgba(0,0,0,0.08); }
+        }
+      `}</style>
+    </div>
+  );
 }
 
+// ─── SVG Quality Ring ────────────────────────────────────────────────────────
+function QualityRing({ score, label }: { score: number; label: string }) {
+  const size = 96;
+  const strokeWidth = 7;
+  const radius = (size - strokeWidth) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const offset = circumference - (score / 100) * circumference;
+  const color = getIFCQualityColor(score);
+
+  return (
+    <div className="flex items-center gap-4">
+      <div className="relative" style={{ width: size, height: size }}>
+        <svg width={size} height={size}>
+          <circle
+            cx={size / 2} cy={size / 2} r={radius}
+            fill="none" stroke="#F3F4F6" strokeWidth={strokeWidth}
+          />
+          <motion.circle
+            cx={size / 2} cy={size / 2} r={radius}
+            fill="none" stroke={color} strokeWidth={strokeWidth}
+            strokeLinecap="round"
+            strokeDasharray={circumference}
+            initial={{ strokeDashoffset: circumference }}
+            animate={{ strokeDashoffset: offset }}
+            transition={{ duration: 1.2, delay: 0.5, ease: "easeOut" }}
+            transform={`rotate(-90 ${size / 2} ${size / 2})`}
+          />
+        </svg>
+        <div className="absolute inset-0 flex flex-col items-center justify-center">
+          <span className="text-lg font-bold" style={{ color, fontVariantNumeric: "tabular-nums" }}>
+            {score}%
+          </span>
+        </div>
+      </div>
+      <div>
+        <div className="text-xs font-medium" style={{ color: "#9CA3AF" }}>IFC Quality</div>
+        <div className="text-sm font-bold mt-0.5" style={{ color }}>
+          {label}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Benchmark Bar ───────────────────────────────────────────────────────────
 function BenchmarkBar({ value, low, high }: { value: number; low: number; high: number }) {
   if (low === 0 && high === 0) return null;
-
   const color = getCostPerM2Color(value, low, high);
   const isBelow = value < low;
   const isAbove = value > high;
   const isWithin = !isBelow && !isAbove;
-
-  // Position on a scale from 0.5*low to 1.3*high
   const scaleMin = low * 0.5;
   const scaleMax = high * 1.3;
   const pos = Math.min(100, Math.max(0, ((value - scaleMin) / (scaleMax - scaleMin)) * 100));
   const lowPos = ((low - scaleMin) / (scaleMax - scaleMin)) * 100;
   const highPos = ((high - scaleMin) / (scaleMax - scaleMin)) * 100;
-
-  const pctDiff = isBelow
-    ? Math.round(((low - value) / low) * 100)
-    : isAbove
-    ? Math.round(((value - high) / high) * 100)
-    : 0;
+  const pctDiff = isBelow ? Math.round(((low - value) / low) * 100) : isAbove ? Math.round(((value - high) / high) * 100) : 0;
 
   return (
-    <div className="mt-2">
-      {/* Bar */}
-      <div className="relative h-[6px] rounded-full" style={{ background: "rgba(0,0,0,0.04)" }}>
-        {/* Benchmark range (green zone) */}
-        <div
-          className="absolute h-full rounded-full"
-          style={{
-            left: `${lowPos}%`,
-            width: `${highPos - lowPos}%`,
-            background: "rgba(5, 150, 105, 0.12)",
-          }}
-        />
-        {/* Current value marker */}
-        <div
-          className="absolute top-1/2 -translate-y-1/2 w-2.5 h-2.5 rounded-full border-2"
-          style={{
-            left: `${pos}%`,
-            transform: `translateX(-50%) translateY(-50%)`,
-            background: color,
-            borderColor: "#FFFFFF",
-            boxShadow: `0 0 0 1px ${color}40, 0 1px 3px rgba(0,0,0,0.1)`,
-            transition: "left 0.3s ease",
-          }}
+    <div className="mt-3">
+      <div className="relative h-[6px] rounded-full" style={{ background: "#F3F4F6" }}>
+        <div className="absolute h-full rounded-full" style={{ left: `${lowPos}%`, width: `${highPos - lowPos}%`, background: "rgba(5,150,105,0.15)" }} />
+        <motion.div
+          className="absolute top-1/2 w-2.5 h-2.5 rounded-full border-2 border-white"
+          style={{ left: `${pos}%`, background: color, boxShadow: `0 0 0 2px ${color}30`, translateX: "-50%", translateY: "-50%" }}
+          initial={{ scale: 0 }}
+          animate={{ scale: 1 }}
+          transition={{ delay: 0.6, type: "spring", stiffness: 300 }}
         />
       </div>
-      {/* Status text */}
       <div className="flex items-center gap-1 mt-1.5">
-        {isWithin ? (
-          <Check size={9} color="#059669" />
-        ) : (
-          <AlertTriangle size={9} color={color} />
-        )}
+        {isWithin ? <Check size={9} color="#059669" /> : <AlertTriangle size={9} color={color} />}
         <span className="text-[10px] font-medium" style={{ color }}>
-          {isWithin
-            ? "Within metro benchmark"
-            : isBelow
-            ? `${pctDiff}% below benchmark — add structural/MEP IFC for accuracy`
-            : `${pctDiff}% above benchmark — review for optimization`}
+          {isWithin ? "Within benchmark" : isBelow ? `${pctDiff}% below benchmark` : `${pctDiff}% above benchmark`}
         </span>
       </div>
     </div>
   );
 }
 
-export function HeroStats({
-  totalCost,
-  costPerM2,
-  hardCosts,
-  ifcQualityScore,
-  benchmarkLow,
-  benchmarkHigh,
-  recalculated,
-  costRange,
-}: HeroStatsProps) {
-  const costColor = getCostPerM2Color(costPerM2, benchmarkLow, benchmarkHigh);
-  const qualityLabel = getIFCQualityLabel(ifcQualityScore);
-  const qualityColor = getIFCQualityColor(ifcQualityScore);
-  const qualityTheme = getQualityThemeColor(ifcQualityScore);
+// ─── Card Wrapper with entrance animation ────────────────────────────────────
+const cardVariants = {
+  hidden: { opacity: 0, y: 20, scale: 0.98 },
+  visible: (i: number) => ({
+    opacity: 1, y: 0, scale: 1,
+    transition: { delay: i * 0.1, duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] as const },
+  }),
+};
 
-  const cards = [
-    {
-      key: "total",
-      label: "Total Project Cost",
-      icon: IndianRupee,
-      color: "#0D9488",
-      value: totalCost,
-      formatter: (n: number) => `₹${formatCrores(n)} Cr`,
-      large: true,
-    },
-    {
-      key: "costm2",
-      label: "Cost per m²",
-      icon: Ruler,
-      color: costColor,
-      value: costPerM2,
-      formatter: (n: number) => `₹${n.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`,
-      hasBenchmarkBar: true,
-    },
-    {
-      key: "hard",
-      label: "Hard Cost Subtotal",
-      icon: Hammer,
-      color: "#B45309",
-      value: hardCosts,
-      formatter: (n: number) => `₹${formatCrores(n)} Cr`,
-    },
-    {
-      key: "quality",
-      label: "IFC Quality Score",
-      icon: ShieldCheck,
-      color: qualityColor,
-      value: ifcQualityScore,
-      formatter: (n: number) => `${qualityLabel} ${Math.round(n)}%`,
-      noAnimate: true,
-    },
-  ];
+// ─── Main Component ──────────────────────────────────────────────────────────
+export function HeroStats({
+  totalCost, costPerM2, hardCosts, ifcQualityScore,
+  benchmarkLow, benchmarkHigh, recalculated, costRange,
+}: HeroStatsProps) {
+  const ref = useRef(null);
+  const isInView = useInView(ref, { once: true, margin: "-30px" });
+  const qualityLabel = getIFCQualityLabel(ifcQualityScore);
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 px-6">
-      {cards.map((card, i) => (
-        <div
-          key={card.key}
-          className="relative overflow-hidden rounded-xl p-4 transition-all duration-300"
-          style={{
-            background: "#FFFFFF",
-            border: "1px solid rgba(0,0,0,0.06)",
-            boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
-            opacity: 0,
-            animation: `heroCardFadeIn 0.4s ease-out ${i * 0.08}s forwards`,
-          }}
-          onMouseEnter={e => {
-            e.currentTarget.style.boxShadow = "0 4px 6px -1px rgba(0,0,0,0.05)";
-            e.currentTarget.style.transform = "translateY(-1px)";
-          }}
-          onMouseLeave={e => {
-            e.currentTarget.style.boxShadow = "0 1px 3px rgba(0,0,0,0.04)";
-            e.currentTarget.style.transform = "translateY(0)";
-          }}
-        >
-          {/* Top accent line — teal gradient */}
-          <div
-            className="absolute top-0 left-0 right-0 h-[2px]"
-            style={{ background: "linear-gradient(90deg, transparent, #0D948860, transparent)" }}
-          />
-
-          {/* Recalculated glow — subtle teal */}
-          {recalculated && (
-            <div
-              className="absolute inset-0 pointer-events-none transition-opacity duration-500"
-              style={{
-                background: "rgba(13, 148, 136, 0.04)",
-              }}
-            />
-          )}
-
-          <div className="flex items-center gap-2 mb-3">
-            <div
-              className="flex items-center justify-center w-7 h-7 rounded-lg"
-              style={{
-                background: card.key === "quality" ? qualityTheme.bg :
-                  card.key === "hard" ? "#FFFBEB" :
-                  card.key === "total" ? "#CCFBF1" :
-                  "rgba(0,0,0,0.03)",
-              }}
-            >
-              <card.icon
-                size={14}
-                color={
-                  card.key === "quality" ? qualityTheme.text :
-                  card.key === "hard" ? "#B45309" :
-                  card.key === "total" ? "#0D9488" :
-                  card.color
-                }
-              />
-            </div>
-            <span className="text-xs font-medium" style={{ color: "#9CA3AF" }}>
-              {card.label}
+    <div ref={ref} className="px-6">
+      {/* Row 1: Total Cost — big hero card */}
+      <motion.div
+        variants={cardVariants} custom={0}
+        initial="hidden" animate={isInView ? "visible" : "hidden"}
+        className="rounded-2xl p-6 mb-4 relative overflow-hidden transition-shadow duration-300"
+        style={{
+          background: "#FFFFFF",
+          border: "1px solid rgba(0,0,0,0.06)",
+          boxShadow: recalculated
+            ? "0 0 0 2px rgba(13,148,136,0.15), 0 4px 12px rgba(0,0,0,0.06)"
+            : "0 2px 8px rgba(0,0,0,0.04)",
+        }}
+      >
+        <div className="flex items-center gap-2 mb-2">
+          <div className="flex items-center justify-center w-8 h-8 rounded-xl" style={{ background: "#F0FDFA" }}>
+            <IndianRupee size={16} color="#0D9488" />
+          </div>
+          <span className="text-xs font-medium tracking-wide uppercase" style={{ color: "#9CA3AF", letterSpacing: "0.05em" }}>
+            Total Project Cost
+          </span>
+          {costRange && costRange.uncertaintyPercent > 0 && (
+            <span className="ml-auto text-[10px] px-2 py-0.5 rounded-full font-medium" style={{ background: "#FEF3C7", color: "#D97706" }}>
+              ±{costRange.uncertaintyPercent}%
             </span>
-          </div>
-
-          <div
-            className={`${card.large ? "text-2xl" : "text-xl"} font-bold`}
-            style={{
-              color: card.key === "total" ? "#0D9488" :
-                card.key === "hard" ? "#B45309" :
-                card.key === "quality" ? qualityTheme.text :
-                "#1A1A1A",
-            }}
-          >
-            {card.noAnimate ? (
-              <span style={{ fontVariantNumeric: "tabular-nums" }}>
-                {card.formatter(card.value)}
-              </span>
-            ) : (
-              <AnimatedNumber value={card.value} formatter={card.formatter} duration={500} />
-            )}
-          </div>
-
-          {/* Cr label in serif for total card */}
-          {card.key === "total" && (
-            <style>{`
-              [data-card-total] .cr-label {
-                font-family: var(--font-dm-serif, 'DM Serif Display', serif);
-              }
-            `}</style>
-          )}
-
-          {/* Cost range for total card */}
-          {card.key === "total" && costRange && costRange.totalLow > 0 && (
-            <div className="mt-2">
-              <div className="text-[10px] font-medium" style={{ color: "#4B5563" }}>
-                Range: ₹{formatCrores(costRange.totalLow)} — ₹{formatCrores(costRange.totalHigh)} Cr
-              </div>
-              <div className="text-[10px]" style={{ color: "#9CA3AF" }}>
-                ±{costRange.uncertaintyPercent}% uncertainty
-              </div>
-            </div>
-          )}
-
-          {/* Quality label chip */}
-          {card.key === "quality" && (
-            <div className="mt-2">
-              <span
-                className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium"
-                style={{
-                  background: qualityTheme.bg,
-                  color: qualityTheme.text,
-                }}
-              >
-                {qualityLabel}
-              </span>
-            </div>
-          )}
-
-          {/* Benchmark bar for cost/m² card */}
-          {card.hasBenchmarkBar && (
-            <BenchmarkBar value={costPerM2} low={benchmarkLow} high={benchmarkHigh} />
           )}
         </div>
-      ))}
+        <div className="text-4xl font-bold tracking-tight" style={{ color: "#0D9488", fontVariantNumeric: "tabular-nums" }}>
+          <AnimatedNumber value={totalCost} formatter={(n: number) => `₹${formatCrores(n)} Cr`} duration={1200} />
+        </div>
+        {/* Cost Range Gauge */}
+        {costRange && costRange.totalLow > 0 && (
+          <CostRangeGauge low={costRange.totalLow} best={totalCost} high={costRange.totalHigh} />
+        )}
+      </motion.div>
 
-      {/* Simple opacity transition keyframes replacing the old dark fade-in */}
-      <style>{`
-        @keyframes heroCardFadeIn {
-          from { opacity: 0; transform: translateY(4px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-      `}</style>
+      {/* Row 2: Three metric cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        {/* Cost per m² */}
+        <motion.div
+          variants={cardVariants} custom={1}
+          initial="hidden" animate={isInView ? "visible" : "hidden"}
+          className="rounded-2xl p-5 transition-all duration-300 hover:shadow-md"
+          style={{ background: "#FFFFFF", border: "1px solid rgba(0,0,0,0.06)", boxShadow: "0 2px 8px rgba(0,0,0,0.04)" }}
+        >
+          <div className="flex items-center gap-2 mb-2">
+            <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: "#F3F4F6" }}>
+              <Ruler size={14} color="#4B5563" />
+            </div>
+            <span className="text-[11px] font-medium uppercase tracking-wide" style={{ color: "#9CA3AF" }}>Cost / m²</span>
+          </div>
+          <div className="text-2xl font-bold" style={{ color: "#111827", fontVariantNumeric: "tabular-nums" }}>
+            <AnimatedNumber value={costPerM2} formatter={(n: number) => `₹${n.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`} duration={800} />
+          </div>
+          <BenchmarkBar value={costPerM2} low={benchmarkLow} high={benchmarkHigh} />
+        </motion.div>
+
+        {/* Hard Costs */}
+        <motion.div
+          variants={cardVariants} custom={2}
+          initial="hidden" animate={isInView ? "visible" : "hidden"}
+          className="rounded-2xl p-5 transition-all duration-300 hover:shadow-md"
+          style={{ background: "#FFFFFF", border: "1px solid rgba(0,0,0,0.06)", boxShadow: "0 2px 8px rgba(0,0,0,0.04)" }}
+        >
+          <div className="flex items-center gap-2 mb-2">
+            <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: "#FEF3C7" }}>
+              <Hammer size={14} color="#D97706" />
+            </div>
+            <span className="text-[11px] font-medium uppercase tracking-wide" style={{ color: "#9CA3AF" }}>Hard Costs</span>
+          </div>
+          <div className="text-2xl font-bold" style={{ color: "#B45309", fontVariantNumeric: "tabular-nums" }}>
+            <AnimatedNumber value={hardCosts} formatter={(n: number) => `₹${formatCrores(n)} Cr`} duration={800} />
+          </div>
+        </motion.div>
+
+        {/* IFC Quality — with SVG ring */}
+        <motion.div
+          variants={cardVariants} custom={3}
+          initial="hidden" animate={isInView ? "visible" : "hidden"}
+          className="rounded-2xl p-5 transition-all duration-300 hover:shadow-md"
+          style={{ background: "#FFFFFF", border: "1px solid rgba(0,0,0,0.06)", boxShadow: "0 2px 8px rgba(0,0,0,0.04)" }}
+        >
+          <QualityRing score={ifcQualityScore} label={qualityLabel} />
+        </motion.div>
+      </div>
     </div>
   );
 }
