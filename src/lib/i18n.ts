@@ -1372,6 +1372,18 @@ const en = {
   'survey.scene4.pro.f4': 'BOQ & Excel export',
   'survey.scene4.pro.f5': 'Priority AI queue + support',
 
+  // ===== ADMIN SURVEY ANALYTICS =====
+  'admin.survey.eyebrow': 'Admin · Onboarding Survey',
+  'admin.survey.title': 'Onboarding Survey Analytics',
+  'admin.survey.subtitle': 'How users discover us and where they drop off.',
+  'admin.survey.range7': '7d',
+  'admin.survey.range30': '30d',
+  'admin.survey.range90': '90d',
+  'admin.survey.rangeAll': 'All time',
+  'admin.survey.funnel': 'Funnel · registration → completion',
+  'admin.survey.loading': 'Loading survey data…',
+  'admin.survey.loadError': 'Could not load survey analytics',
+
   // ===== COMMUNITY EXTRA =====
   'community.featured': 'FEATURED',
   'community.shareTemplate': 'Share template',
@@ -2058,6 +2070,7 @@ const en = {
   'admin.nav.workflows': 'Workflows',
   'admin.nav.growth': 'Growth',
   'admin.nav.analytics': 'Analytics',
+  'admin.nav.surveys': 'Surveys',
   'admin.nav.feedback': 'Feedback',
   'admin.nav.roadmap': 'AI Roadmap',
   'admin.nav.settings': 'Settings',
@@ -4125,6 +4138,18 @@ const de: Record<keyof typeof en, string | string[]> = {
   'survey.scene4.pro.f4': 'BOQ- & Excel-Export',
   'survey.scene4.pro.f5': 'Priorität in der KI-Schlange + Support',
 
+  // ===== ADMIN SURVEY ANALYTICS =====
+  'admin.survey.eyebrow': 'Admin · Onboarding-Umfrage',
+  'admin.survey.title': 'Onboarding-Umfrage — Analytik',
+  'admin.survey.subtitle': 'Wie Nutzer uns finden und wo sie abspringen.',
+  'admin.survey.range7': '7T',
+  'admin.survey.range30': '30T',
+  'admin.survey.range90': '90T',
+  'admin.survey.rangeAll': 'Alle',
+  'admin.survey.funnel': 'Funnel · Registrierung → Abschluss',
+  'admin.survey.loading': 'Lade Umfragedaten…',
+  'admin.survey.loadError': 'Umfrage-Analytik konnte nicht geladen werden',
+
   // ===== COMMUNITY EXTRA =====
   'community.featured': 'EMPFOHLEN',
   'community.shareTemplate': 'Vorlage teilen',
@@ -4808,6 +4833,7 @@ const de: Record<keyof typeof en, string | string[]> = {
   'admin.nav.workflows': 'Workflows',
   'admin.nav.growth': 'Wachstum',
   'admin.nav.analytics': 'Auswertungen',
+  'admin.nav.surveys': 'Umfragen',
   'admin.nav.feedback': 'Feedback',
   'admin.nav.roadmap': 'KI-Roadmap',
   'admin.nav.settings': 'Einstellungen',
