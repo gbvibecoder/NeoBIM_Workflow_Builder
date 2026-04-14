@@ -85,6 +85,7 @@ export const INDIAN_CITIES: IndianCity[] = [
 /** Find a city by name (case-insensitive, fuzzy-matches common variants) */
 export function findCity(name: string): IndianCity | undefined {
   const normalized = name.trim().toLowerCase();
+  if (!normalized) return undefined;
 
   // Exact match first
   const exact = INDIAN_CITIES.find(c => c.name.toLowerCase() === normalized);

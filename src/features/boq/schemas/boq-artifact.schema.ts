@@ -51,7 +51,7 @@ export type ValidatedBOQLine = z.infer<typeof BOQLineSchema>;
 // ── BOQ Data (the _boqData object from TR-008) ──────────────────────────────
 
 export const BOQDataPayloadSchema = z.object({
-  lines: z.array(BOQLineSchema).min(1, "BOQ must have at least one line item"),
+  lines: z.array(BOQLineSchema),
   subtotalMaterial: safeNumber,
   subtotalLabor: safeNumber,
   subtotalEquipment: safeNumber,
