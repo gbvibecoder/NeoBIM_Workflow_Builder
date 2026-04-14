@@ -9,6 +9,7 @@ import { motion } from "framer-motion";
 import { useLocale } from "@/hooks/useLocale";
 import { LanguageSwitcher } from "@/shared/components/ui/LanguageSwitcher";
 import { trackCompleteRegistration, trackRegisterPageView } from "@/lib/meta-pixel";
+import { pushToDataLayer, pushEnhancedConversionData } from "@/lib/gtm";
 import { validateEmail, validatePhone, normalizePhone } from "@/lib/form-validation";
 
 const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/;
@@ -138,18 +139,28 @@ function RegisterForm() {
         user_name: name.trim()
       });
 
+      // Signup-complete analytics — previously fired on the /welcome page
+      // which has been removed. Keep the event wired so Google Ads
+      // Enhanced Conversions and the sign_up_complete dataLayer signal
+      // still fire at the same funnel point.
+      pushEnhancedConversionData({
+        email: isEmail ? identifier.trim().toLowerCase() : undefined,
+        firstName: name.trim().split(" ")[0],
+      });
+      pushToDataLayer("sign_up_complete", { method: "credentials" });
+
       // Auto-login: for email use email creds, for phone use phone creds
       if (isEmail) {
         await signIn("credentials", {
           email: identifier.trim().toLowerCase(),
           password,
-          callbackUrl: "/welcome",
+          callbackUrl: "/dashboard",
         });
       } else {
         await signIn("credentials", {
           phone: normalizePhone(identifier) ?? identifier,
           password,
-          callbackUrl: "/welcome",
+          callbackUrl: "/dashboard",
         });
       }
     } catch (err) {
@@ -167,7 +178,11 @@ function RegisterForm() {
         localStorage.setItem("pending_referral_code", referralCode);
       }
       trackCompleteRegistration({ content_name: "google_signup" });
-      await signIn("google", { callbackUrl: "/welcome" });
+      // Fire sign_up_complete before Google redirect — no email available
+      // pre-OAuth, so Enhanced Conversions is skipped on the Google path
+      // (Google's own OAuth callback data covers that matching on the ad side).
+      pushToDataLayer("sign_up_complete", { method: "google" });
+      await signIn("google", { callbackUrl: "/dashboard" });
     } catch (err) {
       setError(extractErrorMessage(err, t('auth.somethingWentWrong')));
       setGoogleLoading(false);
