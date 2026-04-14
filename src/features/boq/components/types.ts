@@ -121,6 +121,30 @@ export interface BOQData {
   excelUrl?: string;
   pdfUrl?: string;
 
+  // ── Cost Ranges ──
+  /** Total project cost range (low — best — high) */
+  costRange?: {
+    totalLow: number;
+    totalHigh: number;
+    totalBest: number;
+    hardLow: number;
+    hardHigh: number;
+    hardBest: number;
+    uncertaintyPercent: number;
+  };
+
+  /** AACE class human-readable description */
+  aaceDescription?: string;
+
+  /** Seasonal adjustment metadata (if applied) */
+  seasonalAdjustment?: {
+    applied: boolean;
+    month: string;
+    laborMultiplier: number;
+    overallImpactPercent: number;
+    description: string;
+  };
+
   // ── Phase 3: Transparency Layer ──
 
   /** Pricing source indicator */

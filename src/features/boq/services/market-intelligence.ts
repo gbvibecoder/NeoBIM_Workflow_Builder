@@ -279,6 +279,105 @@ export async function fetchMarketPrices(
   }
   if (diag) diag.stages.marketIntelligence.cacheHit = false;
 
+  // ── Postgres MaterialPriceCache check (Sprint 3 addition) ──────────────
+  // If Redis missed but Postgres has recent data, use it and skip the Claude call.
+  // This saves 10-20s per request for cities previously fetched by any user.
+  try {
+    const { prisma } = await import("@/lib/db");
+    const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000); // 30 days
+
+    const cachedPrices = await prisma.materialPriceCache.findMany({
+      where: {
+        city: { equals: city, mode: "insensitive" as const },
+        state: { equals: state, mode: "insensitive" as const },
+        fetchedAt: { gte: cutoff },
+      },
+      orderBy: { fetchedAt: "desc" },
+      take: 20, // enough to cover all material codes
+    });
+
+    if (cachedPrices.length >= 3) {
+      // Reconstruct MarketIntelligenceResult from cached entries
+      const priceMap = new Map<string, { price: number; unit: string; source: string; confidence: string; fetchedAt: Date }>();
+      for (const p of cachedPrices) {
+        if (!priceMap.has(p.materialCode)) {
+          priceMap.set(p.materialCode, { price: p.price, unit: p.unit, source: p.source, confidence: p.confidence, fetchedAt: p.fetchedAt });
+        }
+      }
+
+      type Conf = "HIGH" | "MEDIUM" | "LOW";
+      const toConf = (c: string): Conf => (c === "HIGH" || c === "MEDIUM" ? c : "LOW");
+      const get = (code: string) => priceMap.get(code);
+      const steelEntry = get("steel_per_tonne");
+      const cementEntry = get("cement_per_bag");
+      const sandEntry = get("sand_per_cft");
+      const masonEntry = get("labor_mason");
+
+      if (steelEntry && cementEntry) {
+        const fetchedAt = cachedPrices[0].fetchedAt;
+        const ageMs = Date.now() - fetchedAt.getTime();
+        const ageDays = Math.round(ageMs / (1000 * 60 * 60 * 24));
+
+        const pgResult: MarketIntelligenceResult = {
+          steel_per_tonne: { value: steelEntry.price, unit: steelEntry.unit, source: `${steelEntry.source} (cached ${ageDays}d ago)`, date: fetchedAt.toISOString(), confidence: toConf(steelEntry.confidence) },
+          cement_per_bag: { value: cementEntry.price, unit: cementEntry.unit, source: `${cementEntry.source} (cached ${ageDays}d ago)`, date: fetchedAt.toISOString(), confidence: toConf(cementEntry.confidence) },
+          sand_per_cft: sandEntry
+            ? { value: sandEntry.price, unit: sandEntry.unit, source: `${sandEntry.source} (cached ${ageDays}d ago)`, date: fetchedAt.toISOString(), confidence: toConf(sandEntry.confidence) }
+            : { value: 70, unit: "₹/cft", source: "CPWD static fallback", date: new Date().toISOString(), confidence: "LOW" as const },
+          labor: {
+            mason: masonEntry
+              ? { value: masonEntry.price, unit: masonEntry.unit, source: `${masonEntry.source} (cached)`, date: fetchedAt.toISOString(), confidence: toConf(masonEntry.confidence) }
+              : { value: 950, unit: "₹/day", source: "CPWD static fallback", date: new Date().toISOString(), confidence: "LOW" as const },
+            helper: { value: get("labor_helper")?.price ?? 580, unit: "₹/day", source: "cached", date: fetchedAt.toISOString(), confidence: "MEDIUM" as const },
+            carpenter: { value: get("labor_carpenter")?.price ?? 1050, unit: "₹/day", source: "cached", date: fetchedAt.toISOString(), confidence: "MEDIUM" as const },
+            steelFixer: { value: get("labor_steel_fixer")?.price ?? 1000, unit: "₹/day", source: "cached", date: fetchedAt.toISOString(), confidence: "MEDIUM" as const },
+            electrician: { value: get("labor_electrician")?.price ?? 1150, unit: "₹/day", source: "cached", date: fetchedAt.toISOString(), confidence: "MEDIUM" as const },
+            plumber: { value: get("labor_plumber")?.price ?? 1050, unit: "₹/day", source: "cached", date: fetchedAt.toISOString(), confidence: "MEDIUM" as const },
+          },
+          benchmark_per_sqft: { value: 2500, range_low: 1800, range_high: 4500, source: "Estimated", building_type: buildingType },
+          cpwd_index: { factor: 1.0, source: "Cached (no live data)", year: new Date().getFullYear() },
+          minimum_cost_per_m2: 22000,
+          typical_range_min: 25000,
+          typical_range_max: 55000,
+          state_pwd_factor: 1.0,
+          absolute_minimum_cost: 18000,
+          building_type_factor: 1.0,
+          mep_percentage: 25,
+          benchmark_label: `${buildingType} in ${city}, ${state} (from cache)`,
+          sources_summary: [`Postgres MaterialPriceCache (${ageDays} days old, ${cachedPrices.length} entries)`],
+          fetched_at: fetchedAt.toISOString(),
+          city, state,
+          agent_status: ageDays <= 14 ? "success" as const : "partial" as const,
+          agent_notes: [
+            `📦 Prices from Postgres cache (${ageDays} days old)`,
+            `Steel ₹${steelEntry.price.toLocaleString()}/t · Cement ₹${cementEntry.price}/bag`,
+            ageDays > 14 ? "⚠️ Data aging — recommend manual refresh" : "✅ Fresh cached data",
+          ],
+          search_count: 0,
+          duration_ms: 0,
+          fallbacks_used: 0,
+        };
+
+        if (diag) {
+          diag.stages.marketIntelligence.status = pgResult.agent_status === "fallback" ? "failed" : pgResult.agent_status;
+          diag.stages.marketIntelligence.materialPriceCacheHit = true;
+          diag.stages.marketIntelligence.steelPrice = steelEntry.price;
+          diag.stages.marketIntelligence.cementPrice = cementEntry.price;
+          addLog(diag, "tr-015-market", "info", `Postgres cache HIT — ${cachedPrices.length} entries, ${ageDays} days old`, {
+            city, state, entriesFound: cachedPrices.length, ageDays,
+          });
+        }
+
+        // Also warm Redis so next call is even faster
+        setCachedResult(cacheKey, pgResult).catch(() => {});
+
+        return pgResult;
+      }
+    }
+  } catch (pgErr) {
+    // Non-fatal — Postgres lookup failure should never block the pipeline
+    console.warn("[TR-015] Postgres cache lookup failed (non-fatal):", pgErr);
+  }
 
   // Default result with static fallbacks
   const result: MarketIntelligenceResult = {

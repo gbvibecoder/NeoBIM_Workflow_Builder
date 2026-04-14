@@ -14,6 +14,7 @@ import { NLSummary } from "@/features/boq/components/NLSummary";
 import { BOQFooter } from "@/features/boq/components/BOQFooter";
 import { ModelQualityCard } from "@/features/boq/components/ModelQualityCard";
 import { PricingSourceBanner } from "@/features/boq/components/PricingSourceBanner";
+import { DataSourcesSummary } from "@/features/boq/components/DataSourcesSummary";
 import type { BOQData, PriceOverrides, RateOverride } from "@/features/boq/components/types";
 import { DEFAULT_PRICES, recalculateLines, computeTotals } from "@/features/boq/components/recalc-engine";
 import { ErrorBoundary } from "@/shared/components/ErrorBoundary";
@@ -151,7 +152,15 @@ export function BOQVisualizerPage({ data, executionId }: BOQVisualizerPageProps)
             benchmarkLow={data.benchmark.benchmarkLow}
             benchmarkHigh={data.benchmark.benchmarkHigh}
             recalculated={recalculated}
+            costRange={data.costRange}
           />
+        </ErrorBoundary>
+
+        {/* Data Sources Summary */}
+        <ErrorBoundary fallback={<SectionFallback section="Data Sources" />}>
+          <div className="px-6">
+            <DataSourcesSummary data={data} />
+          </div>
         </ErrorBoundary>
 
         {/* Price Controls */}

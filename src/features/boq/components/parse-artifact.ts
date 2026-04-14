@@ -5,6 +5,7 @@ import type { BOQData, BOQLineItem, SourceType } from "@/features/boq/components
 import { computeSensitivities, DEFAULT_PRICES, getDivisionCategory } from "@/features/boq/components/recalc-engine";
 import { getConfidenceLevelFromIFCScore, type ConfidenceLevel } from "@/features/boq/constants/quality-thresholds";
 import { validateBOQArtifact } from "@/features/boq/schemas/boq-artifact.schema";
+import { calculateBOQRange, getAACEDescription } from "@/features/boq/lib/cost-range";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -234,6 +235,11 @@ export function parseArtifactToBOQ(artifactData: any): BOQData | null {
   const confLevel: ConfidenceLevel = data._confidenceLevel ||
     (ifcQuality ? getConfidenceLevelFromIFCScore(ifcQuality.score) : "LOW");
 
+  // ── Cost Range Calculation ─────────────────────────────────────────────
+  const softCostRatio = hardCosts > 0 ? softCosts / hardCosts : 0;
+  const rangeResult = calculateBOQRange(linesWithSensitivity, softCostRatio);
+  const aaceClassStr = data._aaceClass || "Class 4";
+
   return {
     projectName: data._projectName || projectTypeMatch?.[1]?.trim() || data._projectType || "Construction Project",
     location: data._region || locationMatch?.[1] || "India",
@@ -269,8 +275,19 @@ export function parseArtifactToBOQ(artifactData: any): BOQData | null {
     ifcQuality,
     mepBreakdown,
 
-    aaceClass: data._aaceClass || "Class 4",
+    aaceClass: aaceClassStr,
+    aaceDescription: getAACEDescription(aaceClassStr),
     confidenceLevel: confLevel,
+
+    costRange: {
+      totalLow: rangeResult.total.low,
+      totalHigh: rangeResult.total.high,
+      totalBest: rangeResult.total.best,
+      hardLow: rangeResult.hardCosts.low,
+      hardHigh: rangeResult.hardCosts.high,
+      hardBest: rangeResult.hardCosts.best,
+      uncertaintyPercent: rangeResult.total.uncertaintyPercent,
+    },
 
     summary: data.content || data._summary || "",
     disclaimer: data._disclaimer || boqData.disclaimer || "This is an AI-generated estimate for preliminary budgeting purposes only. Verify all quantities with detailed measurement before procurement.",

@@ -13,6 +13,7 @@ interface HeroStatsProps {
   benchmarkLow: number;
   benchmarkHigh: number;
   recalculated: boolean;
+  costRange?: { totalLow: number; totalHigh: number; uncertaintyPercent: number };
 }
 
 function getCostPerM2Color(value: number, low: number, high: number): string {
@@ -96,6 +97,7 @@ export function HeroStats({
   benchmarkLow,
   benchmarkHigh,
   recalculated,
+  costRange,
 }: HeroStatsProps) {
   const costColor = getCostPerM2Color(costPerM2, benchmarkLow, benchmarkHigh);
   const qualityLabel = getIFCQualityLabel(ifcQualityScore);
@@ -189,6 +191,18 @@ export function HeroStats({
               <AnimatedNumber value={card.value} formatter={card.formatter} duration={500} />
             )}
           </div>
+
+          {/* Cost range for total card */}
+          {card.key === "total" && costRange && costRange.totalLow > 0 && (
+            <div className="mt-2">
+              <div className="text-[10px] font-medium" style={{ color: "#9898B0" }}>
+                Range: ₹{formatCrores(costRange.totalLow)} — ₹{formatCrores(costRange.totalHigh)} Cr
+              </div>
+              <div className="text-[10px]" style={{ color: "#5C5C78" }}>
+                ±{costRange.uncertaintyPercent}% uncertainty
+              </div>
+            </div>
+          )}
 
           {/* Benchmark bar for cost/m² card */}
           {card.hasBenchmarkBar && (
