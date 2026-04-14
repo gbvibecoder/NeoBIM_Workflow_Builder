@@ -267,6 +267,7 @@ export function parseArtifactToBOQ(artifactData: any): BOQData | null {
     // Phase 3: Transparency layer
     ...(data._pricingMetadata && { pricingMetadata: data._pricingMetadata }),
     ...(data._modelQualityReport && { modelQualityReport: data._modelQualityReport }),
+    ...(data._diagnostics && { diagnostics: data._diagnostics }),
   };
 }
 

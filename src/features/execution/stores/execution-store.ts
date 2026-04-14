@@ -11,6 +11,7 @@ import type {
   TileExecutionResult,
   VideoGenerationState,
 } from "@/types/execution";
+import type { ExecutionTrace } from "@/lib/execution-diagnostics";
 
 // Re-export so existing importers (e.g. useExecution.ts) keep working without
 // touching their import lines. The canonical definition lives in types/execution.
@@ -101,6 +102,21 @@ interface ExecutionState {
    *  is fetched. Pure local-state update — does NOT trigger a persist
    *  (would create a no-op round-trip back to the server). */
   hydrateQuantityOverrides: (overrides: Record<string, Record<string, number>>) => void;
+
+  // ── Universal Execution Diagnostics ────────────────────────────────
+  /** Current run's structured trace. Populated incrementally by useExecution
+   *  during the node loop, then persisted into Execution.metadata.diagnostics
+   *  via the same debounced PATCH path used by quantityOverrides etc. */
+  currentTrace: ExecutionTrace | null;
+  /** Replace the entire trace (used at start, after each node, and on hydrate). */
+  setExecutionTrace: (trace: ExecutionTrace | null) => void;
+  /** Persist the current trace via PATCH /api/executions/[id]/metadata.
+   *  Called once when execution finishes (no debounce — we want this written
+   *  before the user navigates to the results page). */
+  persistDiagnostics: () => Promise<void>;
+  /** Replace the in-memory trace with one loaded from server metadata.
+   *  Pure local-state update — does NOT trigger a persist round-trip. */
+  hydrateDiagnostics: (trace: ExecutionTrace) => void;
 
   // Restore artifacts from DB (after loading a workflow)
   restoreArtifactsFromDB: (dbArtifacts: Array<{
@@ -205,6 +221,7 @@ export const useExecutionStore = create<ExecutionState>()((set, get) => ({
   regeneratingNodeId: null,
   history: [],
   quantityOverrides: new Map(),
+  currentTrace: null,
 
   setRateLimited: (value) => set({ isRateLimited: value }),
 
@@ -219,6 +236,7 @@ export const useExecutionStore = create<ExecutionState>()((set, get) => ({
       artifacts: new Map(),
       videoGenProgress: new Map(),
       regenerationCounts: new Map(),
+      currentTrace: null, // reset — useExecution will create a fresh trace
     })),
 
   updateExecutionStatus: (status) =>
@@ -400,6 +418,28 @@ export const useExecutionStore = create<ExecutionState>()((set, get) => ({
     set({ quantityOverrides: newOverrides });
   },
 
+  // ── Universal Execution Diagnostics ──────────────────────────────────────
+  setExecutionTrace: (trace) => set({ currentTrace: trace }),
+
+  hydrateDiagnostics: (trace) => set({ currentTrace: trace }),
+
+  persistDiagnostics: async () => {
+    if (typeof window === "undefined") return;
+    const state = get();
+    const executionId = state.currentExecution?.id;
+    const trace = state.currentTrace;
+    if (!executionId || !trace) return;
+    try {
+      await fetch(`/api/executions/${executionId}/metadata`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ diagnostics: trace }),
+      });
+    } catch {
+      // Best-effort — in-memory trace is still the source of truth this session.
+    }
+  },
+
   restoreArtifactsFromDB: (dbArtifacts, executionMeta) => {
     const newArtifacts = new Map<string, ExecutionArtifact>();
     const restoredNodeIds: string[] = [];
@@ -466,6 +506,12 @@ export const selectCompleteExecution = (s: ExecutionState) => s.completeExecutio
 export const selectSetProgress = (s: ExecutionState) => s.setProgress;
 export const selectSetRateLimited = (s: ExecutionState) => s.setRateLimited;
 export const selectSetVideoGenProgress = (s: ExecutionState) => s.setVideoGenProgress;
+
+// Diagnostics selectors
+export const selectCurrentTrace = (s: ExecutionState) => s.currentTrace;
+export const selectSetExecutionTrace = (s: ExecutionState) => s.setExecutionTrace;
+export const selectPersistDiagnostics = (s: ExecutionState) => s.persistDiagnostics;
+export const selectHydrateDiagnostics = (s: ExecutionState) => s.hydrateDiagnostics;
 export const selectClearVideoGenProgress = (s: ExecutionState) => s.clearVideoGenProgress;
 export const selectIncrementRegenCount = (s: ExecutionState) => s.incrementRegenCount;
 export const selectDecrementRegenCount = (s: ExecutionState) => s.decrementRegenCount;

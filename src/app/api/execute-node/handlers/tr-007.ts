@@ -1,5 +1,11 @@
 import { NextResponse, formatErrorResponse, generateId } from "./deps";
 import type { NodeHandler } from "./types";
+import {
+  createDiagnostics,
+  addLog,
+  finalizeDiagnostics,
+  type PipelineDiagnostics,
+} from "@/features/boq/services/pipeline-diagnostics";
 
 /**
  * TR-007 — Quantity Extractor (real IFC parsing with net area calculations)
@@ -19,6 +25,15 @@ export const handleTR007: NodeHandler = async (ctx) => {
   const hasIfcUrl = !!inputData?.ifcUrl;
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const hasFileData = !!inputData?.fileData;
+
+  // ── Diagnostics: track every decision the parser & aggregator make ──
+  const diag: PipelineDiagnostics = createDiagnostics(executionId ?? "local");
+  addLog(diag, "ifc-upload", "info", "TR-007 dispatched", {
+    hasPreParsed,
+    hasIfcUrl,
+    hasFileData,
+    fileName: typeof inputData?.fileName === "string" ? inputData.fileName : undefined,
+  });
 
   let ifcData: Record<string, unknown> | null = (inputData?.ifcData as Record<string, unknown>) ?? null;
 
@@ -63,6 +78,40 @@ export const handleTR007: NodeHandler = async (ctx) => {
   // We skip re-parsing and use the result directly.
   const preParsed = inputData?.ifcParsed as Record<string, unknown> | undefined;
   if (preParsed && typeof preParsed === "object" && (preParsed as Record<string, unknown>).divisions) {
+    diag.stages.parsing.parserUsed = "pre-parsed";
+    diag.stages.parsing.wasmSuccess = true;
+    addLog(diag, "tr-007-parse", "info", "Using pre-parsed IFC result from /api/parse-ifc", {
+      hasModelQuality: !!(preParsed as Record<string, unknown>).modelQuality,
+      hasParserDiagnostics: !!(preParsed as Record<string, unknown>).parserDiagnostics,
+    });
+    // If /api/parse-ifc returned parserDiagnostics counters, fold them in.
+    const ppDiag = (preParsed as Record<string, unknown>).parserDiagnostics as
+      | {
+          geometryTypes?: typeof diag.stages.parsing.geometryTypeBreakdown;
+          materialTypes?: typeof diag.stages.parsing.materialTypeBreakdown;
+          elementWarnings?: string[];
+          fileMetadata?: Record<string, unknown>;
+          elementSamples?: Array<Record<string, unknown>>;
+          timings?: Record<string, number>;
+          smartWarnings?: string[];
+          smartFixes?: string[];
+        }
+      | undefined;
+    if (ppDiag?.geometryTypes) {
+      diag.stages.parsing.geometryTypeBreakdown = { ...diag.stages.parsing.geometryTypeBreakdown, ...ppDiag.geometryTypes };
+    }
+    if (ppDiag?.materialTypes) {
+      diag.stages.parsing.materialTypeBreakdown = { ...diag.stages.parsing.materialTypeBreakdown, ...ppDiag.materialTypes };
+    }
+    if (Array.isArray(ppDiag?.elementWarnings)) {
+      diag.stages.parsing.warnings.push(...ppDiag!.elementWarnings.slice(0, 20));
+    }
+    // Forward the deep-dive fields too — panel renders these.
+    if (ppDiag?.fileMetadata) diag.stages.parsing.fileMetadata = ppDiag.fileMetadata;
+    if (Array.isArray(ppDiag?.elementSamples)) diag.stages.parsing.elementSamples = ppDiag.elementSamples;
+    if (ppDiag?.timings) diag.stages.parsing.parserTimings = ppDiag.timings;
+    if (Array.isArray(ppDiag?.smartWarnings)) diag.stages.parsing.smartWarnings = ppDiag.smartWarnings;
+    if (Array.isArray(ppDiag?.smartFixes)) diag.stages.parsing.smartFixes = ppDiag.smartFixes;
     try {
       const parseResult = preParsed as {
         divisions: Array<{
@@ -172,9 +221,15 @@ export const handleTR007: NodeHandler = async (ctx) => {
 
       parseSummary = `Parsed ${parseResult.summary?.processedElements ?? "?"} of ${parseResult.summary?.totalElements ?? "?"} elements from ${parseResult.summary?.buildingStoreys ?? "?"} storeys (${parseResult.meta?.ifcSchema ?? "IFC"}) — pre-parsed via R2 upload`;
       modelQuality = (preParsed as Record<string, unknown>).modelQuality ?? undefined;
+      // Diagnostic: populate parsing stage from pre-parsed summary
+      diag.stages.parsing.elementsFound = parseResult.summary?.processedElements ?? 0;
+      if (modelQuality) diag.stages.parsing.modelQuality = modelQuality as Record<string, unknown>;
     } catch (preParseErr) {
       console.error("[TR-007] Failed to process pre-parsed result:", preParseErr);
       parseSummary = "⚠️ Pre-parsed IFC data was corrupted. Please re-upload the file.";
+      addLog(diag, "tr-007-parse", "error", "Failed to process pre-parsed result", {
+        error: preParseErr instanceof Error ? preParseErr.message : String(preParseErr),
+      });
     }
   }
 
@@ -194,9 +249,23 @@ export const handleTR007: NodeHandler = async (ctx) => {
   if (rows.length === 0 && ifcData && typeof ifcData === "object" && ifcData.buffer) {
     // Real IFC file — parse it
     try {
-      const { parseIFCBuffer } = await import("@/features/ifc/services/ifc-parser");
+      const { parseIFCBuffer, createParserDiagnosticCounters } = await import("@/features/ifc/services/ifc-parser");
       const buffer = new Uint8Array(ifcData.buffer as ArrayLike<number>);
-      const parseResult = await parseIFCBuffer(buffer, inputData?.fileName as string ?? "uploaded.ifc");
+      const parserCounters = createParserDiagnosticCounters();
+      diag.stages.parsing.parserUsed = "web-ifc-wasm";
+      addLog(diag, "tr-007-parse", "info", "Starting WASM parser", { bufferBytes: buffer.byteLength });
+      const parseResult = await parseIFCBuffer(buffer, inputData?.fileName as string ?? "uploaded.ifc", undefined, parserCounters);
+      diag.stages.parsing.wasmSuccess = true;
+      // Fold parser counters into diagnostics
+      diag.stages.parsing.geometryTypeBreakdown = { ...diag.stages.parsing.geometryTypeBreakdown, ...parserCounters.geometryTypes };
+      diag.stages.parsing.materialTypeBreakdown = { ...diag.stages.parsing.materialTypeBreakdown, ...parserCounters.materialTypes };
+      diag.stages.parsing.warnings.push(...parserCounters.elementWarnings.slice(0, 30));
+      // Deep-dive fields surfaced via the universal "Behind the Scenes" panel
+      diag.stages.parsing.fileMetadata = parserCounters.fileMetadata as Record<string, unknown> | undefined;
+      diag.stages.parsing.elementSamples = parserCounters.elementSamples as unknown as Array<Record<string, unknown>>;
+      diag.stages.parsing.parserTimings = parserCounters.timings as unknown as Record<string, number>;
+      diag.stages.parsing.smartWarnings = parserCounters.smartWarnings;
+      diag.stages.parsing.smartFixes = parserCounters.smartFixes;
 
       // Aggregate elements by type + storey for per-floor BOQ breakdown
       const typeAggregates = new Map<string, {
@@ -309,10 +378,25 @@ export const handleTR007: NodeHandler = async (ctx) => {
 
       parseSummary = `Parsed ${parseResult.summary.processedElements} of ${parseResult.summary.totalElements} elements from ${parseResult.summary.buildingStoreys} storeys (${parseResult.meta.ifcSchema})`;
       modelQuality = parseResult.modelQuality ?? undefined;
+      // Populate parsing-stage stats from the parser result
+      diag.stages.parsing.elementsFound = parseResult.summary.processedElements;
+      if (modelQuality) diag.stages.parsing.modelQuality = modelQuality as Record<string, unknown>;
+      // Storeys + unit
+      try {
+        diag.stages.parsing.storeys = parseResult.buildingStoreys.map(s => s.name);
+        const mq = modelQuality as Record<string, unknown> | undefined;
+        const uc = mq?.unitConversion as { detectedUnit?: string; conversionApplied?: boolean } | undefined;
+        if (uc?.detectedUnit) diag.stages.parsing.unitDetected = uc.detectedUnit;
+        if (uc?.conversionApplied) diag.stages.parsing.conversionApplied = true;
+      } catch { /* non-fatal */ }
+      addLog(diag, "tr-007-parse", "info", parseSummary);
     } catch (parseError) {
       const errMsg = parseError instanceof Error ? parseError.message : String(parseError);
       console.error("[TR-007] IFC parsing failed:", errMsg);
       parseSummary = `⚠️ IFC parsing encountered errors: ${errMsg.slice(0, 200)}. Partial results may be shown.`;
+      diag.stages.parsing.wasmSuccess = false;
+      diag.stages.parsing.wasmError = errMsg.slice(0, 500);
+      addLog(diag, "tr-007-parse", "error", "IFC WASM parsing failed", { error: errMsg.slice(0, 500) });
     }
   }
 
@@ -426,6 +510,39 @@ export const handleTR007: NodeHandler = async (ctx) => {
     console.warn("[TR-007] QS correction lookup failed (non-fatal):", corrErr instanceof Error ? corrErr.message : corrErr);
   }
 
+  // ── Aggregation diagnostics ──
+  const elementsWithArea = elements.filter(e => (e.grossArea ?? 0) > 0).length;
+  const elementsWithVolume = elements.filter(e => (e.totalVolume ?? 0) > 0).length;
+  const elementsWithMaterial = elements.filter(e => Array.isArray(e.materialLayers) && e.materialLayers.length > 0).length;
+  const elementsZero = elements.filter(e => (e.grossArea ?? 0) === 0 && (e.totalVolume ?? 0) === 0).length;
+  const externalWalls = elements.filter(e => e.isExternal === true && (e.ifcType?.includes("Wall") ?? false)).length;
+  const internalWalls = elements.filter(e => e.isExternal === false && (e.ifcType?.includes("Wall") ?? false)).length;
+
+  diag.stages.parsing.elementsWithArea = elementsWithArea;
+  diag.stages.parsing.elementsWithVolume = elementsWithVolume;
+  diag.stages.parsing.elementsWithMaterial = elementsWithMaterial;
+  diag.stages.parsing.elementsWithZeroQuantity = elementsZero;
+
+  diag.stages.aggregation = {
+    inputElements: diag.stages.parsing.elementsFound,
+    outputGroups: elements.length,
+    externalWalls,
+    internalWalls,
+    elementsLost: Math.max(0, diag.stages.parsing.elementsFound - elements.reduce((s, e) => s + (e.elementCount ?? 0), 0)),
+  };
+
+  addLog(diag, "tr-007-aggregate", "info", `Aggregated ${diag.stages.parsing.elementsFound} elements into ${elements.length} groups`, {
+    externalWalls, internalWalls, elementsWithArea, elementsWithVolume, elementsZero,
+  });
+
+  if (elementsZero > 0) {
+    addLog(diag, "tr-007-aggregate", "warn", `${elementsZero} elements have zero area & volume`, {
+      geometryTypeBreakdown: diag.stages.parsing.geometryTypeBreakdown,
+    });
+  }
+
+  finalizeDiagnostics(diag);
+
   return {
     id: generateId(),
     executionId: executionId ?? "local",
@@ -438,6 +555,7 @@ export const handleTR007: NodeHandler = async (ctx) => {
       _elements: elements,
       _hasStructuralFoundation: hasStructuralFoundation,
       _hasMEPData: hasMEPData,
+      _parserDiagnostics: diag,
       _ifcContext: (() => {
         const slabArea = elements.reduce((s: number, e: unknown) => s + (String((e as Record<string, unknown>).description ?? "").toLowerCase().includes("slab") ? Number((e as Record<string, unknown>).grossArea ?? 0) : 0), 0);
         const wallArea = elements.reduce((s: number, e: unknown) => s + (String((e as Record<string, unknown>).description ?? "").toLowerCase().includes("wall") ? Number((e as Record<string, unknown>).grossArea ?? 0) : 0), 0);

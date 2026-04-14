@@ -36,9 +36,20 @@ export interface VideoGenerationState {
   failureMessage?: string;
 }
 
+/** Forward-declared here to avoid a circular import with src/lib/execution-diagnostics.
+ *  The full type lives in @/lib/execution-diagnostics; persisted shape is identical. */
+export type SerializedExecutionTrace = import("@/lib/execution-diagnostics").ExecutionTrace;
+
 /** Per-execution UI/state metadata persisted in Execution.metadata JSONB.
  *  Each field is optional so older executions without metadata stay valid. */
 export interface ExecutionMetadata {
+  /** Universal execution diagnostics — what each node attempted, what API
+   *  calls fired, what flowed between nodes. Populated client-side by
+   *  useExecution and pushed via the same debounced metadata PATCH path
+   *  used for quantityOverrides / videoGenProgress. Hydrated on results
+   *  pages so the "Behind the Scenes" panel shows the run's full story
+   *  even after a page reload. */
+  diagnostics?: SerializedExecutionTrace;
   /** Per-tile, per-row quantity overrides set by the user via the BOQ data
    *  table. Outer key is tileInstanceId, inner key is the row index as a
    *  string (JSON keys can't be numbers). Mirrors the shape of

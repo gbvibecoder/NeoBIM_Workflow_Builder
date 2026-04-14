@@ -85,7 +85,7 @@ export const FileUploadInput = memo(function FileUploadInput({ nodeId, data, acc
   const fileName = data.inputValue as string | undefined;
   const hasFile = !!fileName;
 
-  const handleFile = useCallback((file: File) => {
+  const handleFile = useCallback(async (file: File) => {
     if (maxMB && file.size > maxMB * 1024 * 1024) {
       toast.error(`${t('input.fileTooLarge')} ${maxMB}MB.`);
       return;
@@ -121,52 +121,173 @@ export const FileUploadInput = memo(function FileUploadInput({ nodeId, data, acc
     if (isIFCFile) {
       updateNode(nodeId, { data: { ...currentNode.data, inputValue: file.name, fileSize: file.size, fileName: file.name, mimeType: file.type } });
       const sizeLabel = formatBytes(file.size, 1);
-      toast.loading(`Reading IFC file (${sizeLabel})...`, { id: `ifc-parse-${nodeId}` });
+      toast.loading(`Preparing IFC upload (${sizeLabel})…`, { id: `ifc-parse-${nodeId}` });
 
-      // Read file as text and parse in the browser — zero server calls
-      const reader = new FileReader();
-      reader.onload = async () => {
+      // ── IFC upload flow (three-tier) ───────────────────────────────────
+      // Tier 1 (primary): R2 presigned upload → parse-by-URL.
+      //   Browser asks /api/parse-ifc/upload-url for a presigned R2 URL, PUTs
+      //   the file directly to R2 via the /r2-upload/* rewrite (which bypasses
+      //   Vercel's 4.5 MB body cap because the rewrite routes at the edge),
+      //   then POSTs the URL to /api/parse-ifc as JSON. Result includes the
+      //   full ParserDiagnosticCounters. Works for any file up to 100 MB.
+      //
+      // Tier 2 (small-file fallback): direct FormData POST to /api/parse-ifc.
+      //   For files < 4 MB where R2 is not configured (e.g., local dev without
+      //   R2 keys). Still produces full diagnostics.
+      //
+      // Tier 3 (last resort): client-side parseIFCText.
+      //   Regex parser, no diagnostics, but handles ANY size and works offline.
+      const FORMDATA_SAFE_MAX = 4 * 1024 * 1024; // 4 MB — leaves headroom below Vercel's 4.5 MB cap
+
+      const handleParsedResult = (result: unknown, via: "wasm-r2" | "wasm-direct" | "text", ifcUrl?: string) => {
+        const node = useWorkflowStore.getState().nodes.find(n => n.id === nodeId);
+        if (!node) return;
+        const r = result as { summary?: { totalElements?: number; buildingStoreys?: number }; parserDiagnostics?: unknown };
+        const hasDiag = !!r.parserDiagnostics;
+        console.info(`[InputNode] ifcParsed stored (via=${via}, hasParserDiagnostics=${hasDiag}${ifcUrl ? `, ifcUrl=${ifcUrl.slice(0, 60)}…` : ""})`);
+        updateNode(nodeId, {
+          data: {
+            ...node.data,
+            inputValue: file.name,
+            fileSize: file.size,
+            fileName: file.name,
+            mimeType: file.type,
+            ifcParsed: result,
+            fileData: undefined,
+            ifcUrl: ifcUrl ?? undefined,
+          },
+        });
+        const totalEls = r.summary?.totalElements ?? "?";
+        const storeys = r.summary?.buildingStoreys ?? "?";
+        const suffix = via === "text" ? " (text parser, no diagnostics)" : " (WASM + diagnostics)";
+        toast.success(
+          `IFC parsed: ${totalEls} elements, ${storeys} storeys${suffix}`,
+          { id: `ifc-parse-${nodeId}`, duration: 5000 },
+        );
+      };
+
+      const runTextFallback = async (reason: string) => {
+        console.warn(`[InputNode] Falling back to text parser — reason: ${reason}`);
+        toast.loading("Falling back to local text parser…", { id: `ifc-parse-${nodeId}` });
+        const reader = new FileReader();
+        reader.onload = async () => {
+          try {
+            const text = reader.result as string;
+            const { parseIFCText } = await import("@/features/ifc/services/ifc-text-parser");
+            const result = parseIFCText(text);
+            handleParsedResult(result, "text");
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : "Parse failed";
+            toast.error("Could not parse this IFC file", {
+              id: `ifc-parse-${nodeId}`,
+              description: "The file may be corrupted or in an unsupported format. Try re-exporting from your BIM software.",
+              duration: 8000,
+            });
+            console.warn("[IFC Parse] Technical error:", msg);
+          }
+        };
+        reader.onerror = () => toast.error("Failed to read IFC file", { id: `ifc-parse-${nodeId}` });
+        reader.readAsText(file);
+      };
+
+      const tryDirectFormData = async (reason: string): Promise<boolean> => {
+        if (file.size > FORMDATA_SAFE_MAX) {
+          console.warn(`[InputNode] Direct FormData skipped — file too large (${file.size} > ${FORMDATA_SAFE_MAX}): ${reason}`);
+          return false;
+        }
+        console.warn(`[InputNode] Falling back to direct FormData upload — reason: ${reason}`);
+        toast.loading(`Parsing IFC (direct upload, ${sizeLabel})…`, { id: `ifc-parse-${nodeId}` });
         try {
-          toast.loading(`Parsing building elements...`, { id: `ifc-parse-${nodeId}` });
-          const text = reader.result as string;
-          // Dynamic import to keep bundle size small
-          const { parseIFCText } = await import("@/features/ifc/services/ifc-text-parser");
-          const result = parseIFCText(text);
-
-          const node = useWorkflowStore.getState().nodes.find(n => n.id === nodeId);
-          if (!node) return;
-
-          updateNode(nodeId, {
-            data: {
-              ...node.data,
-              inputValue: file.name,
-              fileSize: file.size,
-              fileName: file.name,
-              mimeType: file.type,
-              ifcParsed: result, // Pre-parsed result — no base64, no server upload
-              fileData: undefined, // Never store large base64
-              ifcUrl: undefined,
-            },
-          });
-
-          toast.success(
-            `IFC parsed: ${result.summary.totalElements} elements, ${result.summary.buildingStoreys} storeys`,
-            { id: `ifc-parse-${nodeId}`, duration: 5000 }
-          );
+          const fd = new FormData();
+          fd.append("file", file);
+          const res = await fetch("/api/parse-ifc", { method: "POST", body: fd, signal: AbortSignal.timeout(180_000) });
+          if (!res.ok) {
+            console.warn(`[InputNode] Direct FormData failed — HTTP ${res.status}`);
+            return false;
+          }
+          const body = await res.json();
+          const result = body?.result;
+          if (!result || typeof result !== "object" || !result.divisions) {
+            console.warn("[InputNode] Direct FormData response missing divisions");
+            return false;
+          }
+          handleParsedResult(result, "wasm-direct");
+          return true;
         } catch (err) {
-          const msg = err instanceof Error ? err.message : "Parse failed";
-          toast.error("Could not parse this IFC file", {
-            id: `ifc-parse-${nodeId}`,
-            description: "The file may be corrupted or in an unsupported format. Try re-exporting from your BIM software.",
-            duration: 8000,
-          });
-          console.warn("[IFC Parse] Technical error:", msg);
+          console.warn("[InputNode] Direct FormData threw:", err);
+          return false;
         }
       };
-      reader.onerror = () => {
-        toast.error("Failed to read IFC file", { id: `ifc-parse-${nodeId}` });
-      };
-      reader.readAsText(file);
+
+      // ── Tier 1: R2 presigned URL → PUT → parse-by-URL ────────────────
+      try {
+        toast.loading(`Requesting upload URL (${sizeLabel})…`, { id: `ifc-parse-${nodeId}` });
+        const urlRes = await fetch("/api/parse-ifc/upload-url", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ filename: file.name, fileSize: file.size, contentType: "application/octet-stream" }),
+          signal: AbortSignal.timeout(15_000),
+        });
+
+        if (!urlRes.ok) {
+          // 500 typically means R2 isn't configured (local dev). Try direct.
+          if (urlRes.status === 500 || urlRes.status === 404) {
+            const handled = await tryDirectFormData(`presigned URL endpoint HTTP ${urlRes.status}`);
+            if (!handled) await runTextFallback(`presigned HTTP ${urlRes.status} and FormData failed`);
+            return;
+          }
+          const errBody = await urlRes.json().catch(() => null) as { error?: { message?: string } } | null;
+          await runTextFallback(`presigned HTTP ${urlRes.status}: ${errBody?.error?.message ?? "unknown"}`);
+          return;
+        }
+
+        const { uploadUrl, publicUrl, contentType: signedContentType } = await urlRes.json() as {
+          uploadUrl: string; publicUrl: string; contentType: string;
+        };
+
+        // PUT the file directly to R2. `/r2-upload/*` is a Next.js rewrite
+        // that proxies to R2 at the Vercel edge — no serverless function,
+        // no 4.5 MB body cap.
+        toast.loading(`Uploading ${sizeLabel} to storage…`, { id: `ifc-parse-${nodeId}` });
+        const putRes = await fetch(uploadUrl, {
+          method: "PUT",
+          headers: { "Content-Type": signedContentType },
+          body: file,
+          signal: AbortSignal.timeout(300_000), // 5 min for very large uploads over slow networks
+        });
+        if (!putRes.ok) {
+          console.warn(`[InputNode] R2 PUT failed — HTTP ${putRes.status}`);
+          const handled = await tryDirectFormData(`R2 PUT HTTP ${putRes.status}`);
+          if (!handled) await runTextFallback(`R2 PUT HTTP ${putRes.status} and FormData failed`);
+          return;
+        }
+
+        // ── Parse via URL (no body transfer — just the URL) ────────────
+        toast.loading("Parsing IFC on server (WASM)…", { id: `ifc-parse-${nodeId}` });
+        const parseRes = await fetch("/api/parse-ifc", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ifcUrl: publicUrl, fileName: file.name }),
+          signal: AbortSignal.timeout(180_000),
+        });
+        if (!parseRes.ok) {
+          const errBody = await parseRes.json().catch(() => null) as { error?: { message?: string } } | null;
+          console.warn(`[InputNode] parse-ifc (URL path) HTTP ${parseRes.status}: ${errBody?.error?.message ?? "unknown"}`);
+          await runTextFallback(`parse HTTP ${parseRes.status}`);
+          return;
+        }
+        const parseBody = await parseRes.json();
+        const result = parseBody?.result;
+        if (!result || typeof result !== "object" || !result.divisions) {
+          await runTextFallback("parse-ifc response missing divisions");
+          return;
+        }
+        handleParsedResult(result, "wasm-r2", publicUrl);
+      } catch (tier1Err) {
+        const msg = tier1Err instanceof Error ? tier1Err.message : String(tier1Err);
+        const handled = await tryDirectFormData(`Tier 1 threw: ${msg}`);
+        if (!handled) await runTextFallback(`Tier 1 + FormData both failed: ${msg}`);
+      }
     } else {
       // Small files / non-IFC: convert to base64 for inline transport
       const reader = new FileReader();

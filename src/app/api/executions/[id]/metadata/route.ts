@@ -85,6 +85,26 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       }
       patch.quantityOverrides = validated;
     }
+    // Diagnostics: user-scoped opaque trace object. We only enforce a
+    // light shape check + a hard size cap so a runaway client log can't
+    // bloat the row. The full schema lives in @/lib/execution-diagnostics
+    // and is reconstructed on the client at hydration time.
+    if (body.diagnostics && typeof body.diagnostics === "object") {
+      const d = body.diagnostics as unknown as Record<string, unknown>;
+      if (typeof d.executionId === "string"
+        && typeof d.startedAt === "string"
+        && Array.isArray(d.nodes)
+        && Array.isArray(d.dataFlows)
+      ) {
+        // Cap at ~512 KB serialized — generous for a 30-node trace, but
+        // forecloses pathological logging from blowing up the JSONB column.
+        let size = 0;
+        try { size = JSON.stringify(body.diagnostics).length; } catch { size = Infinity; }
+        if (size <= 512 * 1024) {
+          patch.diagnostics = body.diagnostics as ExecutionMetadata["diagnostics"];
+        }
+      }
+    }
     if (body.videoGenProgress && typeof body.videoGenProgress === "object") {
       // Defensive shape validation: outer object of VideoGenerationState
       const validated: Record<string, VideoGenerationState> = {};

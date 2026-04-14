@@ -249,8 +249,13 @@ export function ExecutionLog({ entries, isRunning, onClose, autoExpand }: Execut
                         "#5C5C78",
                       flex: 1,
                       overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      whiteSpace: "nowrap",
+                      // Wrap long smart-summary lines (e.g. "TR-008: 155 line items
+                      // mapped — ₹3.20 Cr (₹64,000/m²)") instead of truncating them.
+                      // Capped to two lines so the panel stays compact.
+                      display: "-webkit-box",
+                      WebkitBoxOrient: "vertical",
+                      WebkitLineClamp: 2,
+                      wordBreak: "break-word",
                     }}
                   >
                     {entry.message}

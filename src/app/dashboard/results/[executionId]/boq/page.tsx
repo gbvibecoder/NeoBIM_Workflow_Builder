@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { useExecutionStore } from "@/features/execution/stores/execution-store";
+import { useExecutionStore, selectHydrateDiagnostics } from "@/features/execution/stores/execution-store";
 import { BOQVisualizerPage, parseArtifactToBOQ, getMockBOQData } from "@/features/boq/components";
 import type { BOQData } from "@/features/boq/components";
+import { ExecutionDiagnosticsPanel } from "@/components/diagnostics/ExecutionDiagnosticsPanel";
 
 export default function BOQVisualizerRoute() {
   const params = useParams<{ executionId: string }>();
@@ -13,6 +14,24 @@ export default function BOQVisualizerRoute() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const artifacts = useExecutionStore((s) => s.artifacts);
+  const hydrateDiagnostics = useExecutionStore(selectHydrateDiagnostics);
+
+  // Hydrate the universal execution trace from server metadata if the user
+  // is opening this page fresh (no in-memory trace from a live run).
+  useEffect(() => {
+    if (!executionId || executionId === "demo") return;
+    const existing = useExecutionStore.getState().currentTrace;
+    if (existing && existing.executionId === executionId) return;
+    let cancelled = false;
+    fetch(`/api/executions/${executionId}`)
+      .then(r => r.ok ? r.json() : null)
+      .then((exec) => {
+        if (cancelled || !exec?.metadata?.diagnostics) return;
+        hydrateDiagnostics(exec.metadata.diagnostics);
+      })
+      .catch(() => { /* non-fatal */ });
+    return () => { cancelled = true; };
+  }, [executionId, hydrateDiagnostics]);
 
   useEffect(() => {
     // Scan all artifacts for BOQ table data + Excel/PDF download URLs
@@ -136,5 +155,11 @@ export default function BOQVisualizerRoute() {
     );
   }
 
-  return <BOQVisualizerPage data={boqData} executionId={executionId} />;
+  return (
+    <>
+      <BOQVisualizerPage data={boqData} executionId={executionId} />
+      {/* Universal execution diagnostics — floating "Behind the Scenes" launcher */}
+      <ExecutionDiagnosticsPanel />
+    </>
+  );
 }
