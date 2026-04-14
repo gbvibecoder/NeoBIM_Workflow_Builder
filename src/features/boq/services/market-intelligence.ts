@@ -398,29 +398,48 @@ Use the report_construction_prices tool to return your findings.`;
   // ── Primary: Claude Sonnet with web_search — SHORT prompt for speed ──
   // The long reasoning prompt was causing 40s+ timeouts on Vercel.
   // Web search results provide the context — no need for reasoning steps in prompt.
-  const webSearchPrompt = `Search for current construction material prices in ${city}, ${state}, India (${monthYear}).
+  const webSearchPrompt = `You MUST search the web before answering. Do NOT use your training data for prices — training data is stale and inaccurate.
+
+Search for current construction material prices in ${city}, ${state}, India (${monthYear}).
 Search: "TMT steel price ${city} ${state} today" and "cement price ${city} today".
-Then use the report_construction_prices tool with your findings.
+After searching, use the report_construction_prices tool with your findings.
 Building type: ${buildingType}. All benchmark values in INR per SQUARE METRE (m²), not sqft.
 Steel range: ₹52,000-78,000/tonne. Cement: ₹340-560/bag. Mason: ₹500-1200/day.`;
 
-  // ── Primary: Haiku + web_search (Sonnet times out on Vercel cold starts) ──
+  // ── Primary: Haiku + web_search (with 1 retry for transient failures) ──
+  // 45s timeout allows for 3 web searches (3-8s each) + reasoning (3-5s).
+  // Vercel maxDuration is 600s — plenty of headroom.
   try {
     const callStart = Date.now();
 
-    const ctrl1 = new AbortController();
-    const t1 = setTimeout(() => ctrl1.abort(), 20_000);
-    const resp = await client.messages.create({
-      model: "claude-haiku-4-5-20251001",
-      max_tokens: 2048,
-      tools: [
-        { type: "web_search_20250305", name: "web_search", max_uses: 3 },
-        priceTool,
-      ],
-      tool_choice: { type: "auto" },
-      messages: [{ role: "user", content: webSearchPrompt }],
-    }, { signal: ctrl1.signal });
-    clearTimeout(t1);
+    const makeWebSearchCall = async () => {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 45_000);
+      try {
+        return await client.messages.create({
+          model: "claude-haiku-4-5-20251001",
+          max_tokens: 2048,
+          tools: [
+            { type: "web_search_20250305", name: "web_search", max_uses: 3 },
+            priceTool,
+          ],
+          tool_choice: { type: "any" },
+          messages: [{ role: "user", content: webSearchPrompt }],
+        }, { signal: ctrl.signal });
+      } finally {
+        clearTimeout(timer);
+      }
+    };
+
+    // Try up to 2 attempts (initial + 1 retry with 3s backoff)
+    let resp;
+    try {
+      resp = await makeWebSearchCall();
+    } catch (firstErr) {
+      console.warn(`[TR-015] Attempt 1 failed (${firstErr instanceof Error ? firstErr.message : firstErr}), retrying in 3s...`);
+      await new Promise(r => setTimeout(r, 3000));
+      resp = await makeWebSearchCall();
+    }
 
     const callMs = Date.now() - callStart;
     for (const block of resp.content) {
@@ -445,7 +464,7 @@ Steel range: ₹52,000-78,000/tonne. Cement: ₹340-560/bag. Mason: ₹500-1200/
     try {
       const haikuStart = Date.now();
       const ctrl2 = new AbortController();
-      const t2 = setTimeout(() => ctrl2.abort(), 12_000);
+      const t2 = setTimeout(() => ctrl2.abort(), 25_000);
       const resp2 = await client.messages.create({
         model: "claude-haiku-4-5-20251001",
         max_tokens: 1024,

@@ -206,19 +206,21 @@ export function calculateIndianPricingAdjustment(
   }
 
   // Calculate per-category factors
+  // NOTE: Seasonal factors are NOT applied to unit rates. A BOQ uses standard
+  // rates — the same building must produce the same cost whether estimated in
+  // January or July. Seasonal effects (monsoon productivity loss, material demand
+  // spikes) impact project SCHEDULE and site overhead, not unit rates.
+  // The seasonal data is still returned for informational display.
   const sf = stateFactor;
-  const laborSeasonalPenalty = 1 / seasonal.laborProductivity; // lower productivity = higher cost per unit
-  const materialSeasonalPremium = seasonal.materialDemand;
 
-  const concrete = (sf?.concreteFactor ?? 1.0) * cityTierFactor * materialSeasonalPremium;
-  const steel = (sf?.steelFactor ?? 1.0) * cityTierFactor * materialSeasonalPremium;
-  const masonry = (sf?.masonryFactor ?? 1.0) * cityTierFactor * materialSeasonalPremium;
+  const concrete = (sf?.concreteFactor ?? 1.0) * cityTierFactor;
+  const steel = (sf?.steelFactor ?? 1.0) * cityTierFactor;
+  const masonry = (sf?.masonryFactor ?? 1.0) * cityTierFactor;
   const finishing = (sf?.finishingFactor ?? 1.0) * cityTierFactor;
-  const labor = (sf?.laborFactor ?? 1.0) * cityTierFactor * laborSeasonalPenalty;
+  const labor = (sf?.laborFactor ?? 1.0) * cityTierFactor;
 
-  // Overall = weighted average (concrete work dominates most projects)
-  const overall = (sf?.overallFactor ?? 1.0) * cityTierFactor *
-    (materialSeasonalPremium * 0.6 + laborSeasonalPenalty * 0.4);
+  // Overall = state PWD factor × city tier (no seasonal component)
+  const overall = (sf?.overallFactor ?? 1.0) * cityTierFactor;
 
   // Confidence assessment
   let confidence: "high" | "medium" | "low" = "medium";
@@ -234,7 +236,7 @@ export function calculateIndianPricingAdjustment(
   }
 
   notes.push(`City tier: ${cityTier} (${(cityTierFactor).toFixed(2)}x)`);
-  notes.push(`Season: ${seasonal.notes} (labor ${(seasonal.laborProductivity * 100).toFixed(0)}%, material demand ${(seasonal.materialDemand * 100).toFixed(0)}%)`);
+  notes.push(`Season (info only — not applied to unit rates): ${seasonal.notes}`);
 
   return {
     overall: Math.round(overall * 1000) / 1000,
