@@ -1,5 +1,18 @@
 "use client";
 
+// Konva shape registration — required because Next.js 16's bundler tree-shakes
+// the `import 'konva'` side-effect from react-konva (konva's package.json has
+// no `sideEffects` field), leaving Konva.Node.factory without Rect/Line/Text/
+// Circle/Arc/Arrow/Path. Without these, react-konva silently falls back to
+// Group for every shape and nothing visible renders.
+import "konva/lib/shapes/Rect";
+import "konva/lib/shapes/Circle";
+import "konva/lib/shapes/Line";
+import "konva/lib/shapes/Text";
+import "konva/lib/shapes/Arc";
+import "konva/lib/shapes/Arrow";
+import "konva/lib/shapes/Path";
+
 import React, { useRef, useCallback, useEffect, useState } from "react";
 import { Stage, Layer } from "react-konva";
 import type Konva from "konva";
@@ -660,50 +673,6 @@ export function FloorPlanCanvas() {
   const showRoomLabels = isLayerVisible("A-ROOM-NAME");
   const showDimensions = isLayerVisible("A-DIM") && (viewMode === "construction" || viewMode === "cad");
   const showGrid = isLayerVisible("A-GRID") || useFloorPlanStore.getState().gridVisible;
-
-  if (process.env.NODE_ENV === "development") {
-    const firstRoom = floor.rooms[0];
-    const firstDoor = floor.doors[0];
-    const wallIds = new Set(floor.walls.map((w) => w.id));
-    const orphanDoors = floor.doors.filter((d) => !wallIds.has(d.wall_id)).length;
-    const orphanWindows = floor.windows.filter((w) => !wallIds.has(w.wall_id)).length;
-    // eslint-disable-next-line no-console
-    console.log("[CANVAS DEBUG]", {
-      viewMode,
-      viewport,
-      flags: { showRoomFills, showRoomLabels, showDimensions, showGrid },
-      counts: {
-        rooms: floor.rooms.length,
-        walls: floor.walls.length,
-        doors: floor.doors.length,
-        windows: floor.windows.length,
-        furniture: floor.furniture.length,
-      },
-      firstRoom: firstRoom && {
-        id: firstRoom.id,
-        name: firstRoom.name,
-        type: firstRoom.type,
-        pointCount: firstRoom.boundary?.points?.length,
-        firstPoints: firstRoom.boundary?.points?.slice(0, 2),
-        label_position: firstRoom.label_position,
-        fill_opacity: firstRoom.fill_opacity,
-      },
-      firstDoor: firstDoor && {
-        id: firstDoor.id,
-        wall_id: firstDoor.wall_id,
-        wallExists: wallIds.has(firstDoor.wall_id),
-        position_along_wall_mm: firstDoor.position_along_wall_mm,
-        width_mm: firstDoor.width_mm,
-      },
-      orphanDoors,
-      orphanWindows,
-      layers: Object.fromEntries(
-        ["A-ROOM-FILL", "A-ROOM-NAME", "A-DOOR", "A-WIND", "A-WALL-EXTR", "A-WALL-INTR", "A-FURN"].map(
-          (k) => [k, isLayerVisible(k)],
-        ),
-      ),
-    });
-  }
 
   // Cursor style per tool (Space key overrides to grab hand)
   const cursorStyle =
