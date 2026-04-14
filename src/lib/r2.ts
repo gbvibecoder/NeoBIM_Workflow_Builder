@@ -183,6 +183,7 @@ export async function createPresignedUploadUrl(
   contentType: string,
   expiresIn = 600, // 10 minutes
   keyPrefix = "videos",
+  useDirectUrl = false,
 ): Promise<{ uploadUrl: string; key: string; publicUrl: string } | null> {
   const client = getClient();
   if (!client) return null;
@@ -204,10 +205,22 @@ export async function createPresignedUploadUrl(
 
     const rawUrl = await getSignedUrl(client, command, { expiresIn });
 
-    // Route through our domain's /r2-upload proxy (next.config.ts rewrite)
-    // to eliminate CORS — browser sees same-origin, Vercel proxies to R2.
-    const r2Base = `https://${ACCOUNT_ID}.r2.cloudflarestorage.com/${BUCKET_NAME}/`;
-    const uploadUrl = rawUrl.replace(r2Base, "/r2-upload/");
+    // ── uploadUrl mode selector ────────────────────────────────────────
+    // Default (false): same-origin /r2-upload/ proxy. Avoids browser CORS
+    //   preflight and is the historical path used for community-videos.
+    //   DOWNSIDE: routes through Vercel infrastructure, which enforces a
+    //   ~4.5 MB body cap even on rewrites — anything larger 413s.
+    // useDirectUrl=true: return the raw R2 endpoint so the browser PUTs
+    //   straight to Cloudflare R2. Required for files larger than the
+    //   Vercel body cap (e.g., 18 MB IFC files). Requires R2 bucket CORS
+    //   to allow PUT from the calling origin — handled by ensureBucketCors.
+    let uploadUrl: string;
+    if (useDirectUrl) {
+      uploadUrl = rawUrl;
+    } else {
+      const r2Base = `https://${ACCOUNT_ID}.r2.cloudflarestorage.com/${BUCKET_NAME}/`;
+      uploadUrl = rawUrl.replace(r2Base, "/r2-upload/");
+    }
 
     const publicUrl = PUBLIC_URL
       ? `${PUBLIC_URL}/${key}`

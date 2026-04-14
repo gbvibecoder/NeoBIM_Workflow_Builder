@@ -73,7 +73,13 @@ export async function POST(request: NextRequest) {
     const baseName = rawFilename.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 120);
     const filename = baseName.toLowerCase().endsWith(".ifc") ? baseName : `${baseName}.ifc`;
 
-    const result = await createPresignedUploadUrl(filename, contentType, 600, "ifc");
+    // useDirectUrl=true: return the raw R2 endpoint so the browser PUTs
+    // straight to Cloudflare R2. The /r2-upload/* same-origin proxy hits
+    // Vercel's ~4.5 MB body cap even though it's a rewrite — fatal for
+    // IFC files larger than ~4 MB. Direct PUT bypasses Vercel entirely.
+    // CORS is configured by ensureCorsOnce above (allows PUT from
+    // trybuildflow.in + localhost).
+    const result = await createPresignedUploadUrl(filename, contentType, 600, "ifc", true);
     if (!result) {
       return NextResponse.json(
         formatErrorResponse({ title: "Upload URL unavailable", message: "Storage is not configured. Contact support.", code: "NET_001" }),

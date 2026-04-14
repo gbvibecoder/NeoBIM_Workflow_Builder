@@ -123,28 +123,63 @@ export const FileUploadInput = memo(function FileUploadInput({ nodeId, data, acc
       const sizeLabel = formatBytes(file.size, 1);
       toast.loading(`Preparing IFC upload (${sizeLabel})…`, { id: `ifc-parse-${nodeId}` });
 
-      // ── IFC upload flow (three-tier) ───────────────────────────────────
-      // Tier 1 (primary): R2 presigned upload → parse-by-URL.
-      //   Browser asks /api/parse-ifc/upload-url for a presigned R2 URL, PUTs
-      //   the file directly to R2 via the /r2-upload/* rewrite (which bypasses
-      //   Vercel's 4.5 MB body cap because the rewrite routes at the edge),
-      //   then POSTs the URL to /api/parse-ifc as JSON. Result includes the
-      //   full ParserDiagnosticCounters. Works for any file up to 100 MB.
-      //
-      // Tier 2 (small-file fallback): direct FormData POST to /api/parse-ifc.
-      //   For files < 4 MB where R2 is not configured (e.g., local dev without
-      //   R2 keys). Still produces full diagnostics.
-      //
-      // Tier 3 (last resort): client-side parseIFCText.
-      //   Regex parser, no diagnostics, but handles ANY size and works offline.
-      const FORMDATA_SAFE_MAX = 4 * 1024 * 1024; // 4 MB — leaves headroom below Vercel's 4.5 MB cap
+      // ── IFC upload flow (three-tier) — see boq diagnostics doc ──────────
+      // Tier 1 (primary, any size up to 100 MB): direct R2 presigned PUT.
+      //   POST /api/parse-ifc/upload-url → presigned URL pointing straight to
+      //   <account>.r2.cloudflarestorage.com (NOT the /r2-upload/ proxy —
+      //   that goes through Vercel and gets 413'd at 4.5 MB).
+      //   Then POST /api/parse-ifc {ifcUrl} → server fetches from R2, runs
+      //   WASM parser, returns result with full ParserDiagnosticCounters.
+      // Tier 2 (small files only, no R2 config): direct FormData to /api/parse-ifc.
+      // Tier 3 (last resort): client-side parseIFCText (no diagnostics, always works).
+      const FORMDATA_SAFE_MAX = 4 * 1024 * 1024; // headroom below Vercel 4.5 MB cap
+
+      // ── Structured upload trace — every phase, every timing, every URL ──
+      // Single grep target: search browser console for "[BOQ-UPLOAD]" to
+      // see the entire decision trail. Final console.table dumps the whole
+      // trace at the end so the user doesn't have to scrub through warnings.
+      type TracePhase =
+        | "init" | "presign-request" | "presign-response"
+        | "r2-put" | "r2-put-result"
+        | "parse-request" | "parse-response"
+        | "formdata-fallback" | "text-fallback"
+        | "complete" | "error";
+      interface TraceRow {
+        ts: string;
+        elapsedMs: number;
+        phase: TracePhase;
+        status: "ok" | "warn" | "fail" | "skip";
+        detail: string;
+      }
+      const t0 = performance.now();
+      const trace: TraceRow[] = [];
+      const log = (phase: TracePhase, status: TraceRow["status"], detail: string) => {
+        const elapsedMs = Math.round(performance.now() - t0);
+        const ts = new Date().toISOString().slice(11, 23);
+        const row: TraceRow = { ts, elapsedMs, phase, status, detail };
+        trace.push(row);
+        const tag = status === "fail" ? "❌" : status === "warn" ? "⚠️" : status === "skip" ? "⊘" : "✓";
+        const emit = status === "fail" ? console.error : status === "warn" ? console.warn : console.log;
+        emit(`[BOQ-UPLOAD] ${tag} ${phase.padEnd(18)} +${elapsedMs}ms — ${detail}`);
+      };
+      const dumpTrace = () => {
+        try {
+          console.groupCollapsed(`[BOQ-UPLOAD] full trace · ${file.name} · ${sizeLabel} · ${trace.length} steps · ${Math.round(performance.now() - t0)}ms total`);
+          console.table(trace);
+          console.groupEnd();
+        } catch { /* console.table not always available */ }
+      };
+
+      log("init", "ok", `nodeId=${nodeId} file=${file.name} size=${file.size}B (${sizeLabel}) type=${file.type || "<empty>"}`);
 
       const handleParsedResult = (result: unknown, via: "wasm-r2" | "wasm-direct" | "text", ifcUrl?: string) => {
         const node = useWorkflowStore.getState().nodes.find(n => n.id === nodeId);
         if (!node) return;
         const r = result as { summary?: { totalElements?: number; buildingStoreys?: number }; parserDiagnostics?: unknown };
         const hasDiag = !!r.parserDiagnostics;
-        console.info(`[InputNode] ifcParsed stored (via=${via}, hasParserDiagnostics=${hasDiag}${ifcUrl ? `, ifcUrl=${ifcUrl.slice(0, 60)}…` : ""})`);
+        log("complete", hasDiag ? "ok" : "warn",
+          `via=${via} hasParserDiagnostics=${hasDiag} elements=${r.summary?.totalElements ?? "?"} storeys=${r.summary?.buildingStoreys ?? "?"}${ifcUrl ? ` ifcUrl=${ifcUrl.slice(0, 80)}` : ""}`);
+        dumpTrace();
         updateNode(nodeId, {
           data: {
             ...node.data,
@@ -167,7 +202,7 @@ export const FileUploadInput = memo(function FileUploadInput({ nodeId, data, acc
       };
 
       const runTextFallback = async (reason: string) => {
-        console.warn(`[InputNode] Falling back to text parser — reason: ${reason}`);
+        log("text-fallback", "warn", `reason=${reason}`);
         toast.loading("Falling back to local text parser…", { id: `ifc-parse-${nodeId}` });
         const reader = new FileReader();
         reader.onload = async () => {
@@ -178,61 +213,69 @@ export const FileUploadInput = memo(function FileUploadInput({ nodeId, data, acc
             handleParsedResult(result, "text");
           } catch (err) {
             const msg = err instanceof Error ? err.message : "Parse failed";
+            log("error", "fail", `text parser threw: ${msg}`);
+            dumpTrace();
             toast.error("Could not parse this IFC file", {
               id: `ifc-parse-${nodeId}`,
               description: "The file may be corrupted or in an unsupported format. Try re-exporting from your BIM software.",
               duration: 8000,
             });
-            console.warn("[IFC Parse] Technical error:", msg);
           }
         };
-        reader.onerror = () => toast.error("Failed to read IFC file", { id: `ifc-parse-${nodeId}` });
+        reader.onerror = () => {
+          log("error", "fail", "FileReader.onerror — could not read file");
+          dumpTrace();
+          toast.error("Failed to read IFC file", { id: `ifc-parse-${nodeId}` });
+        };
         reader.readAsText(file);
       };
 
       const tryDirectFormData = async (reason: string): Promise<boolean> => {
         if (file.size > FORMDATA_SAFE_MAX) {
-          console.warn(`[InputNode] Direct FormData skipped — file too large (${file.size} > ${FORMDATA_SAFE_MAX}): ${reason}`);
+          log("formdata-fallback", "skip", `file too large (${file.size}B > ${FORMDATA_SAFE_MAX}B); reason=${reason}`);
           return false;
         }
-        console.warn(`[InputNode] Falling back to direct FormData upload — reason: ${reason}`);
+        log("formdata-fallback", "warn", `attempting direct FormData; reason=${reason}`);
         toast.loading(`Parsing IFC (direct upload, ${sizeLabel})…`, { id: `ifc-parse-${nodeId}` });
         try {
           const fd = new FormData();
           fd.append("file", file);
           const res = await fetch("/api/parse-ifc", { method: "POST", body: fd, signal: AbortSignal.timeout(180_000) });
           if (!res.ok) {
-            console.warn(`[InputNode] Direct FormData failed — HTTP ${res.status}`);
+            log("formdata-fallback", "fail", `HTTP ${res.status} ${res.statusText}`);
             return false;
           }
           const body = await res.json();
           const result = body?.result;
           if (!result || typeof result !== "object" || !result.divisions) {
-            console.warn("[InputNode] Direct FormData response missing divisions");
+            log("formdata-fallback", "fail", "response missing divisions");
             return false;
           }
           handleParsedResult(result, "wasm-direct");
           return true;
         } catch (err) {
-          console.warn("[InputNode] Direct FormData threw:", err);
+          log("formdata-fallback", "fail", `threw: ${err instanceof Error ? err.message : String(err)}`);
           return false;
         }
       };
 
-      // ── Tier 1: R2 presigned URL → PUT → parse-by-URL ────────────────
+      // ── Tier 1: R2 presigned URL → direct PUT to R2 → parse-by-URL ────
       try {
         toast.loading(`Requesting upload URL (${sizeLabel})…`, { id: `ifc-parse-${nodeId}` });
+        log("presign-request", "ok", `POST /api/parse-ifc/upload-url filename=${file.name} fileSize=${file.size}`);
+        const presignStart = performance.now();
         const urlRes = await fetch("/api/parse-ifc/upload-url", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ filename: file.name, fileSize: file.size, contentType: "application/octet-stream" }),
           signal: AbortSignal.timeout(15_000),
         });
+        const presignMs = Math.round(performance.now() - presignStart);
 
         if (!urlRes.ok) {
-          // 500 typically means R2 isn't configured (local dev). Try direct.
+          log("presign-response", "fail", `HTTP ${urlRes.status} in ${presignMs}ms`);
           if (urlRes.status === 500 || urlRes.status === 404) {
-            const handled = await tryDirectFormData(`presigned URL endpoint HTTP ${urlRes.status}`);
+            const handled = await tryDirectFormData(`presigned URL endpoint HTTP ${urlRes.status} (R2 likely not configured)`);
             if (!handled) await runTextFallback(`presigned HTTP ${urlRes.status} and FormData failed`);
             return;
           }
@@ -244,47 +287,64 @@ export const FileUploadInput = memo(function FileUploadInput({ nodeId, data, acc
         const { uploadUrl, publicUrl, contentType: signedContentType } = await urlRes.json() as {
           uploadUrl: string; publicUrl: string; contentType: string;
         };
+        // Diagnostic: surface the upload URL host so it's obvious whether
+        // we got the direct R2 endpoint (good — bypasses Vercel) or the
+        // legacy /r2-upload/ proxy (bad — will 413 above ~4.5 MB).
+        const uploadHost = uploadUrl.startsWith("/")
+          ? "<same-origin proxy /r2-upload/ — WILL FAIL ABOVE 4.5MB>"
+          : (() => { try { return new URL(uploadUrl).hostname; } catch { return "<unparseable>"; } })();
+        log("presign-response", "ok", `${presignMs}ms · uploadHost=${uploadHost} · publicUrl=${publicUrl.slice(0, 80)} · ctype=${signedContentType}`);
 
-        // PUT the file directly to R2. `/r2-upload/*` is a Next.js rewrite
-        // that proxies to R2 at the Vercel edge — no serverless function,
-        // no 4.5 MB body cap.
-        toast.loading(`Uploading ${sizeLabel} to storage…`, { id: `ifc-parse-${nodeId}` });
+        // ── PUT the file directly to R2 ──────────────────────────────────
+        toast.loading(`Uploading ${sizeLabel} directly to R2 storage…`, { id: `ifc-parse-${nodeId}` });
+        log("r2-put", "ok", `PUT ${uploadUrl.slice(0, 100)}${uploadUrl.length > 100 ? "…" : ""} (body=${file.size}B)`);
+        const putStart = performance.now();
         const putRes = await fetch(uploadUrl, {
           method: "PUT",
           headers: { "Content-Type": signedContentType },
           body: file,
-          signal: AbortSignal.timeout(300_000), // 5 min for very large uploads over slow networks
+          signal: AbortSignal.timeout(300_000),
         });
+        const putMs = Math.round(performance.now() - putStart);
+        const etag = putRes.headers.get("etag") ?? "<none>";
         if (!putRes.ok) {
-          console.warn(`[InputNode] R2 PUT failed — HTTP ${putRes.status}`);
+          log("r2-put-result", "fail", `HTTP ${putRes.status} ${putRes.statusText} in ${putMs}ms · etag=${etag}`);
           const handled = await tryDirectFormData(`R2 PUT HTTP ${putRes.status}`);
           if (!handled) await runTextFallback(`R2 PUT HTTP ${putRes.status} and FormData failed`);
           return;
         }
+        log("r2-put-result", "ok", `${putMs}ms · etag=${etag} · throughput=${(file.size / 1024 / 1024 / (putMs / 1000)).toFixed(1)}MB/s`);
 
-        // ── Parse via URL (no body transfer — just the URL) ────────────
+        // ── Parse-by-URL: tiny JSON request, server fetches from R2 ─────
         toast.loading("Parsing IFC on server (WASM)…", { id: `ifc-parse-${nodeId}` });
+        log("parse-request", "ok", `POST /api/parse-ifc {ifcUrl: ${publicUrl.slice(0, 80)}…}`);
+        const parseStart = performance.now();
         const parseRes = await fetch("/api/parse-ifc", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ ifcUrl: publicUrl, fileName: file.name }),
           signal: AbortSignal.timeout(180_000),
         });
+        const parseMs = Math.round(performance.now() - parseStart);
         if (!parseRes.ok) {
           const errBody = await parseRes.json().catch(() => null) as { error?: { message?: string } } | null;
-          console.warn(`[InputNode] parse-ifc (URL path) HTTP ${parseRes.status}: ${errBody?.error?.message ?? "unknown"}`);
+          log("parse-response", "fail", `HTTP ${parseRes.status} in ${parseMs}ms: ${errBody?.error?.message ?? "unknown"}`);
           await runTextFallback(`parse HTTP ${parseRes.status}`);
           return;
         }
         const parseBody = await parseRes.json();
         const result = parseBody?.result;
         if (!result || typeof result !== "object" || !result.divisions) {
+          log("parse-response", "fail", `${parseMs}ms · response missing .divisions`);
           await runTextFallback("parse-ifc response missing divisions");
           return;
         }
+        const pdInResult = !!(result as Record<string, unknown>).parserDiagnostics;
+        log("parse-response", pdInResult ? "ok" : "warn", `${parseMs}ms · parserDiagnostics=${pdInResult} · parser=${parseBody?.meta?.parser ?? "?"}`);
         handleParsedResult(result, "wasm-r2", publicUrl);
       } catch (tier1Err) {
         const msg = tier1Err instanceof Error ? tier1Err.message : String(tier1Err);
+        log("error", "fail", `Tier 1 threw: ${msg}`);
         const handled = await tryDirectFormData(`Tier 1 threw: ${msg}`);
         if (!handled) await runTextFallback(`Tier 1 + FormData both failed: ${msg}`);
       }
