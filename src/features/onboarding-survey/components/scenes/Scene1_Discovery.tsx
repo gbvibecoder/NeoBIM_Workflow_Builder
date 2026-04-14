@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useLocale } from "@/hooks/useLocale";
 import { LivingCard } from "@/features/onboarding-survey/components/primitives/LivingCard";
 import { useKeyboardNav } from "@/features/onboarding-survey/hooks/useKeyboardNav";
+import { trackSceneView } from "@/features/onboarding-survey/lib/survey-analytics";
 import {
   DISCOVERY_OPTIONS,
 } from "@/features/onboarding-survey/lib/survey-constants";
@@ -67,6 +68,10 @@ export function Scene1_Discovery({
     },
     [onAdvance, onHoverChange, onPatch, onTrack, otherText]
   );
+
+  useEffect(() => {
+    trackSceneView(1, "discovery");
+  }, []);
 
   useEffect(() => {
     return () => {

@@ -6,6 +6,7 @@ import { useLocale } from "@/hooks/useLocale";
 import { HoneycombTile } from "@/features/onboarding-survey/components/primitives/HoneycombTile";
 import { TypewriterText } from "@/features/onboarding-survey/components/primitives/TypewriterText";
 import { useKeyboardNav } from "@/features/onboarding-survey/hooks/useKeyboardNav";
+import { trackSceneView } from "@/features/onboarding-survey/lib/survey-analytics";
 import { PROFESSION_OPTIONS } from "@/features/onboarding-survey/lib/survey-constants";
 import {
   cardContainer,
@@ -54,6 +55,10 @@ export function Scene2_Profession({ initial, onPatch, onAdvance, onTrack }: Scen
     },
     [onAdvance, onPatch, onTrack, otherText]
   );
+
+  useEffect(() => {
+    trackSceneView(2, "profession");
+  }, []);
 
   useEffect(() => {
     return () => {

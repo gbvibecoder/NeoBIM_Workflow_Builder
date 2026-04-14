@@ -6,6 +6,10 @@ import { useLocale } from "@/hooks/useLocale";
 import { PlanCard } from "@/features/onboarding-survey/components/primitives/PlanCard";
 import { ConfettiBurst } from "@/features/onboarding-survey/components/primitives/ConfettiBurst";
 import { ScrollingAvatars } from "@/features/onboarding-survey/components/primitives/ScrollingAvatars";
+import {
+  trackPricingView,
+  trackSceneView,
+} from "@/features/onboarding-survey/lib/survey-analytics";
 import { textPullFocus } from "@/features/onboarding-survey/lib/scene-motion";
 import type { PricingAction } from "@/features/onboarding-survey/types/survey";
 
@@ -17,6 +21,11 @@ export function Scene4_Pricing({ onPick }: Scene4Props) {
   const { t } = useLocale();
   // Pre-flight celebratory moment: fires on entry, fades after ~1.5s.
   const [celebrating, setCelebrating] = useState(true);
+
+  useEffect(() => {
+    trackSceneView(4, "pricing");
+    trackPricingView();
+  }, []);
 
   useEffect(() => {
     const t1 = setTimeout(() => setCelebrating(false), 1500);

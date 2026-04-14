@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { useLocale } from "@/hooks/useLocale";
@@ -21,8 +21,10 @@ import {
   trackComplete,
   trackDiscovery,
   trackPricing,
+  trackPricingClick,
   trackProfession,
   trackSkip,
+  trackSurveyStart,
   trackTeamSize,
 } from "@/features/onboarding-survey/lib/survey-analytics";
 import type { PricingAction, SceneNumber, SurveyRecord } from "@/features/onboarding-survey/types/survey";
@@ -39,6 +41,11 @@ export function SurveyShell({ initial }: SurveyShellProps) {
 
   const [redirecting, setRedirecting] = useState(false);
   const [hoverRgb, setHoverRgb] = useState<string | null>(null);
+
+  // Funnel top — fire once on mount so GA4 can measure register → survey_start drop-off.
+  useEffect(() => {
+    trackSurveyStart();
+  }, []);
 
   // Which scenes the user has answered — drives dot fill / heartbeat.
   const completed = useMemo(() => {
@@ -76,12 +83,17 @@ export function SurveyShell({ initial }: SurveyShellProps) {
         trackSkip(scene);
         await finalize({ skippedAtScene: scene });
       } else {
-        trackComplete(timer.elapsedSeconds());
+        trackComplete(timer.elapsedSeconds(), {
+          discovery_source: state.discoverySource,
+          profession: state.profession,
+          team_size: state.teamSize,
+          pricing_action: state.pricingAction,
+        });
         await finalize({ completedAt: true });
       }
       router.push("/dashboard");
     },
-    [finalize, markOnboarded, redirecting, router, scene, timer]
+    [finalize, markOnboarded, redirecting, router, scene, state, timer]
   );
 
   // Scene 4 pick → track + finalize + route Pro to billing, Free to dashboard.
@@ -90,12 +102,23 @@ export function SurveyShell({ initial }: SurveyShellProps) {
       if (redirecting) return;
       setRedirecting(true);
       markOnboarded();
+
+      // Pricing click — Meta InitiateCheckout on Pro, GA4 pricing_cta_click always.
+      trackPricingClick(action === "chose_pro" ? "pro" : "free");
+      // Legacy pricing-action event (kept for existing GTM tags).
       trackPricing(action);
-      trackComplete(timer.elapsedSeconds());
+      // Terminal survey_complete with full profile + Meta Lead + user properties.
+      trackComplete(timer.elapsedSeconds(), {
+        discovery_source: state.discoverySource,
+        profession: state.profession,
+        team_size: state.teamSize,
+        pricing_action: action,
+      });
+
       await finalize({ pricingAction: action, completedAt: true });
       router.push(action === "chose_pro" ? "/dashboard/billing" : "/dashboard");
     },
-    [finalize, markOnboarded, redirecting, router, timer]
+    [finalize, markOnboarded, redirecting, router, state, timer]
   );
 
   // ── Keyboard nav ────────────────────────────────────────────────────────

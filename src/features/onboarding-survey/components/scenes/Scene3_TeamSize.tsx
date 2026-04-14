@@ -6,6 +6,7 @@ import { useLocale } from "@/hooks/useLocale";
 import { ScalePill } from "@/features/onboarding-survey/components/primitives/ScalePill";
 import { TeamIllustration } from "@/features/onboarding-survey/components/primitives/TeamIllustration";
 import { useKeyboardNav } from "@/features/onboarding-survey/hooks/useKeyboardNav";
+import { trackSceneView } from "@/features/onboarding-survey/lib/survey-analytics";
 import { TEAM_SIZE_OPTIONS } from "@/features/onboarding-survey/lib/survey-constants";
 import {
   cardContainer,
@@ -58,6 +59,10 @@ export function Scene3_TeamSize({ initial, onPatch, onAdvance, onTrack }: Scene3
     },
     [onAdvance, onPatch, onTrack, preview]
   );
+
+  useEffect(() => {
+    trackSceneView(3, "team_size");
+  }, []);
 
   useEffect(() => {
     return () => {

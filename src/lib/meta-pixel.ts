@@ -61,4 +61,10 @@ export function trackPurchase(params?: Record<string, string | number | boolean>
   pushToDataLayer("purchase", params);
 }
 
+/** Track intent-to-purchase — fires when user clicks a paid-plan CTA. */
+export function trackInitiateCheckout(params?: Record<string, string | number | boolean>) {
+  fbq("track", "InitiateCheckout", params);
+  pushToDataLayer("begin_checkout", params);
+}
+
 export { META_PIXEL_ID };
