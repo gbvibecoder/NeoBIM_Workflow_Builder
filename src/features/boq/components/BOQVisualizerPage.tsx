@@ -20,6 +20,7 @@ import type { BOQData, PriceOverrides, RateOverride } from "@/features/boq/compo
 import { DEFAULT_PRICES, recalculateLines, computeTotals } from "@/features/boq/components/recalc-engine";
 import { ErrorBoundary } from "@/shared/components/ErrorBoundary";
 import { SectionFallback } from "@/features/boq/components/SectionFallback";
+import { InteractiveDotGrid } from "@/features/boq/components/InteractiveDotGrid";
 
 interface BOQVisualizerPageProps {
   data: BOQData;
@@ -123,7 +124,10 @@ export function BOQVisualizerPage({ data, executionId }: BOQVisualizerPageProps)
   }, [recalcLines, data.projectName]);
 
   return (
-    <div className="h-full overflow-y-auto" style={{ background: "#FAFAF8" }}>
+    <div className="h-full overflow-y-auto relative" style={{ background: "#FAFAF8" }}>
+      <InteractiveDotGrid />
+
+      <div className="relative" style={{ zIndex: 1 }}>
       {/* Header */}
       <BOQHeader data={data} onExportExcel={handleExportExcel} />
 
@@ -234,6 +238,7 @@ export function BOQVisualizerPage({ data, executionId }: BOQVisualizerPageProps)
         <ScrollReveal delay={0.05}>
           <BOQFooter disclaimer={data.disclaimer} onExportExcel={handleExportExcel} onExportPDF={handleExportPDF} onExportCSV={handleExportCSV} />
         </ScrollReveal>
+      </div>
       </div>
     </div>
   );
