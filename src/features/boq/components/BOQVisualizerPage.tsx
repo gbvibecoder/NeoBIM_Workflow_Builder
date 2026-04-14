@@ -16,6 +16,8 @@ import { ModelQualityCard } from "@/features/boq/components/ModelQualityCard";
 import { PricingSourceBanner } from "@/features/boq/components/PricingSourceBanner";
 import type { BOQData, PriceOverrides, RateOverride } from "@/features/boq/components/types";
 import { DEFAULT_PRICES, recalculateLines, computeTotals } from "@/features/boq/components/recalc-engine";
+import { ErrorBoundary } from "@/shared/components/ErrorBoundary";
+import { SectionFallback } from "@/features/boq/components/SectionFallback";
 
 interface BOQVisualizerPageProps {
   data: BOQData;
@@ -140,63 +142,77 @@ export function BOQVisualizerPage({ data, executionId }: BOQVisualizerPageProps)
         </div>
 
         {/* Hero Stats */}
-        <HeroStats
-          totalCost={recalcTotalProject}
-          costPerM2={costPerM2}
-          hardCosts={totals.totalCost}
-          ifcQualityScore={data.ifcQuality?.score ?? 0}
-          benchmarkLow={data.benchmark.benchmarkLow}
-          benchmarkHigh={data.benchmark.benchmarkHigh}
-          recalculated={recalculated}
-        />
+        <ErrorBoundary fallback={<SectionFallback section="Hero Stats" />}>
+          <HeroStats
+            totalCost={recalcTotalProject}
+            costPerM2={costPerM2}
+            hardCosts={totals.totalCost}
+            ifcQualityScore={data.ifcQuality?.score ?? 0}
+            benchmarkLow={data.benchmark.benchmarkLow}
+            benchmarkHigh={data.benchmark.benchmarkHigh}
+            recalculated={recalculated}
+          />
+        </ErrorBoundary>
 
         {/* Price Controls */}
-        <PriceControls
-          prices={prices}
-          basePrices={basePrices.current}
-          onChange={handlePriceChange}
-          totalSavings={data.totalCost - recalcTotalProject}
-          baseTotal={data.totalCost}
-          market={data.market ? {
-            steelSource: data.market.steelSource,
-            steelConfidence: data.market.steelConfidence,
-            cementBrand: data.market.cementBrand,
-            cementConfidence: data.market.cementConfidence,
-            masonSource: data.market.masonSource,
-            masonConfidence: data.market.masonConfidence,
-          } : undefined}
-        />
+        <ErrorBoundary fallback={<SectionFallback section="Price Controls" />}>
+          <PriceControls
+            prices={prices}
+            basePrices={basePrices.current}
+            onChange={handlePriceChange}
+            totalSavings={data.totalCost - recalcTotalProject}
+            baseTotal={data.totalCost}
+            market={data.market ? {
+              steelSource: data.market.steelSource,
+              steelConfidence: data.market.steelConfidence,
+              cementBrand: data.market.cementBrand,
+              cementConfidence: data.market.cementConfidence,
+              masonSource: data.market.masonSource,
+              masonConfidence: data.market.masonConfidence,
+            } : undefined}
+          />
+        </ErrorBoundary>
 
         {/* Two Column Layout: Charts + Quality */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 px-6">
           {/* Left Column */}
           <div className="flex flex-col gap-6">
-            <CostDonutChart
-              material={totals.subtotalMaterial}
-              labor={totals.subtotalLabor}
-              equipment={totals.subtotalEquipment}
-            />
-            <DivisionBarChart lines={recalcLines} />
+            <ErrorBoundary fallback={<SectionFallback section="Cost Breakdown Chart" />}>
+              <CostDonutChart
+                material={totals.subtotalMaterial}
+                labor={totals.subtotalLabor}
+                equipment={totals.subtotalEquipment}
+              />
+            </ErrorBoundary>
+            <ErrorBoundary fallback={<SectionFallback section="Division Chart" />}>
+              <DivisionBarChart lines={recalcLines} />
+            </ErrorBoundary>
           </div>
 
           {/* Right Column */}
           <div className="flex flex-col gap-6">
             {data.mepBreakdown && (
-              <MEPBreakdown mep={data.mepBreakdown} />
+              <ErrorBoundary fallback={<SectionFallback section="MEP Breakdown" />}>
+                <MEPBreakdown mep={data.mepBreakdown} />
+              </ErrorBoundary>
             )}
             {data.ifcQuality && (
-              <IFCQualityCard quality={data.ifcQuality} />
+              <ErrorBoundary fallback={<SectionFallback section="IFC Quality" />}>
+                <IFCQualityCard quality={data.ifcQuality} />
+              </ErrorBoundary>
             )}
           </div>
         </div>
 
         {/* BOQ Table */}
-        <BOQTable
-          lines={recalcLines}
-          rateOverrides={rateOverrides}
-          onRateOverride={handleRateOverride}
-          grandTotal={totals.totalCost}
-        />
+        <ErrorBoundary fallback={<SectionFallback section="BOQ Table" />}>
+          <BOQTable
+            lines={recalcLines}
+            rateOverrides={rateOverrides}
+            onRateOverride={handleRateOverride}
+            grandTotal={totals.totalCost}
+          />
+        </ErrorBoundary>
 
         {/* NL Summary */}
         <NLSummary summary={data.summary} />

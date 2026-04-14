@@ -4,6 +4,7 @@
 import type { BOQData, BOQLineItem, SourceType } from "@/features/boq/components/types";
 import { computeSensitivities, DEFAULT_PRICES, getDivisionCategory } from "@/features/boq/components/recalc-engine";
 import { getConfidenceLevelFromIFCScore, type ConfidenceLevel } from "@/features/boq/constants/quality-thresholds";
+import { validateBOQArtifact } from "@/features/boq/schemas/boq-artifact.schema";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -108,6 +109,16 @@ function extractIfcQuality(data: any): BOQData["ifcQuality"] | undefined {
 
 export function parseArtifactToBOQ(artifactData: any): BOQData | null {
   if (!artifactData) return null;
+
+  // ── Zod validation at boundary ─────────────────────────────────────────
+  const validation = validateBOQArtifact(artifactData);
+  if (validation.warnings.length > 0) {
+    console.warn("[parseArtifactToBOQ] Validation warnings:", validation.warnings);
+  }
+  if (!validation.success) {
+    console.error("[parseArtifactToBOQ] Validation failed:", validation.errors);
+    // Don't return null immediately — try legacy parsing as fallback
+  }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let data: Record<string, any>;
