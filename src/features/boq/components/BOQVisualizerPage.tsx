@@ -88,14 +88,63 @@ export function BOQVisualizerPage({ data, executionId }: BOQVisualizerPageProps)
     flashTimer.current = setTimeout(() => setRecalculated(false), 600);
   }, []);
 
-  // Export handlers — use pre-generated artifact URLs from EX-002/EX-003
-  const handleExportExcel = useCallback(() => {
+  // Export handlers — use pre-generated artifact URLs from EX-002/EX-003, fallback to client-side generation
+  const handleExportExcel = useCallback(async () => {
     if (data.excelUrl) {
       window.open(data.excelUrl, "_blank");
-    } else {
-      toast.error("Excel not available", { description: "Run the BOQ Spreadsheet Exporter (EX-002) node in your workflow to generate the Excel file." });
+      return;
     }
-  }, [data.excelUrl]);
+    // Client-side fallback: generate Excel from loaded BOQ data
+    try {
+      const XLSX = await import("xlsx");
+      const wb = XLSX.utils.book_new();
+
+      // BOQ sheet
+      const boqHeaders = ["IS Code", "Description", "Unit", "Qty", "Waste %", "Adj Qty", "Rate (₹)", "Material (₹)", "Labour (₹)", "Equipment (₹)", "Amount (₹)", "Source", "Confidence"];
+      const boqRows = recalcLines.map(l => [
+        l.isCode || "", l.description, l.unit,
+        l.quantity, `${(l.wasteFactor * 100).toFixed(0)}%`, l.adjustedQty,
+        l.unitRate, l.materialCost, l.laborCost, l.equipmentCost, l.totalCost,
+        l.source, `${l.confidence}%`,
+      ]);
+      const boqSheet = XLSX.utils.aoa_to_sheet([boqHeaders, ...boqRows]);
+      boqSheet["!cols"] = [{ wch: 16 }, { wch: 40 }, { wch: 6 }, { wch: 10 }, { wch: 8 }, { wch: 10 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 16 }, { wch: 14 }, { wch: 10 }];
+      XLSX.utils.book_append_sheet(wb, boqSheet, "Bill of Quantities");
+
+      // Summary sheet
+      const summaryData = [
+        ["Project", data.projectName],
+        ["Location", data.location],
+        ["Date", data.date],
+        ["GFA (m²)", data.gfa],
+        [""],
+        ["Hard Costs (₹)", totals.totalCost],
+        ["Material (₹)", totals.subtotalMaterial],
+        ["Labour (₹)", totals.subtotalLabor],
+        ["Equipment (₹)", totals.subtotalEquipment],
+        ["Soft Costs (₹)", data.softCosts],
+        ["Total Project Cost (₹)", recalcTotalProject],
+        [""],
+        ["AACE Class", data.aaceClass || "Class 4"],
+        ["Confidence", data.confidenceLevel || "MEDIUM"],
+        ["Line Items", recalcLines.length],
+      ];
+      const summarySheet = XLSX.utils.aoa_to_sheet(summaryData);
+      summarySheet["!cols"] = [{ wch: 22 }, { wch: 30 }];
+      XLSX.utils.book_append_sheet(wb, summarySheet, "Summary");
+
+      const buf = XLSX.write(wb, { type: "array", bookType: "xlsx" });
+      const blob = new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `BOQ_${data.projectName.replace(/\s+/g, "_")}.xlsx`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      toast.error("Excel generation failed", { description: "Could not generate Excel file. Try running the EX-002 node in your workflow." });
+    }
+  }, [data.excelUrl, data.projectName, data.location, data.date, data.gfa, data.softCosts, data.aaceClass, data.confidenceLevel, recalcLines, recalcTotalProject, totals]);
 
   const handleExportPDF = useCallback(() => {
     if (data.pdfUrl) {
