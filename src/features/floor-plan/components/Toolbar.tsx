@@ -83,11 +83,11 @@ export function Toolbar() {
   };
 
   return (
-    <div className="flex h-11 items-center border-b border-gray-200 bg-white px-3 gap-2 text-sm print:hidden">
+    <div className="flex h-11 items-center border-b border-gray-200 bg-white px-3 gap-1.5 text-sm print:hidden">
       {/* Back button */}
       <button
         onClick={handleBack}
-        className="flex items-center gap-1 rounded px-2 py-1 text-gray-500 hover:bg-gray-100 hover:text-gray-700"
+        className="flex shrink-0 items-center gap-1 rounded px-2 py-1 text-gray-500 hover:bg-gray-100 hover:text-gray-700"
       >
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
           <path d="M10 12L6 8L10 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
@@ -96,11 +96,11 @@ export function Toolbar() {
       </button>
 
       {/* Separator */}
-      <div className="h-5 w-px bg-gray-200" />
+      <div className="h-5 w-px shrink-0 bg-gray-200" />
 
       {/* Project name + save indicator */}
-      <div className="flex items-center gap-1.5">
-        <span className="font-medium text-gray-800 truncate max-w-[200px]">{project.name}</span>
+      <div className="flex shrink-0 items-center gap-1.5">
+        <span className="font-medium text-gray-800 truncate max-w-[120px] 2xl:max-w-[200px]">{project.name}</span>
         {projectModified ? (
           <span className="text-[9px] font-medium text-amber-500">Modified</span>
         ) : (
@@ -109,7 +109,7 @@ export function Toolbar() {
       </div>
 
       {/* Floor selector + management */}
-      <div className="flex items-center gap-1">
+      <div className="flex shrink-0 items-center gap-1">
         <select
           value={activeFloorId ?? ""}
           onChange={(e) => setActiveFloor(e.target.value)}
@@ -143,10 +143,10 @@ export function Toolbar() {
       </div>
 
       {/* Separator */}
-      <div className="h-5 w-px bg-gray-200" />
+      <div className="h-5 w-px shrink-0 bg-gray-200" />
 
-      {/* View mode tabs */}
-      <div className="flex rounded-md border border-gray-200 overflow-hidden">
+      {/* View mode tabs — critical, never shrink */}
+      <div className="flex shrink-0 rounded-md border border-gray-200 overflow-hidden">
         {VIEW_MODES.map((mode) => (
           <button
             key={mode.id}
@@ -169,26 +169,26 @@ export function Toolbar() {
       {/* Save button */}
       <button
         onClick={saveToStorage}
-        className={`rounded px-2 py-1 text-xs font-medium transition-colors ${
+        className={`shrink-0 rounded px-2 py-1 text-xs font-medium transition-colors ${
           projectModified
             ? "bg-blue-50 text-blue-700 hover:bg-blue-100"
             : "text-gray-400 hover:bg-gray-100"
         }`}
         title="Save (Ctrl+S)"
       >
-        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="inline-block mr-1">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="inline-block 2xl:mr-1">
           <path d="M11 12H3a1 1 0 01-1-1V3a1 1 0 011-1h6l3 3v7a1 1 0 01-1 1z" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
           <path d="M9 12V8H5v4" stroke="currentColor" strokeWidth="1.2"/>
           <path d="M5 2v3h3" stroke="currentColor" strokeWidth="1.2"/>
         </svg>
-        Save
+        <span className="hidden 2xl:inline">Save</span>
       </button>
 
       {/* Separator */}
-      <div className="h-5 w-px bg-gray-200" />
+      <div className="h-5 w-px shrink-0 bg-gray-200" />
 
       {/* Undo/Redo */}
-      <div className="flex items-center gap-1">
+      <div className="flex shrink-0 items-center gap-1">
         <button
           onClick={undo}
           disabled={!canUndo}
@@ -216,10 +216,10 @@ export function Toolbar() {
       </div>
 
       {/* Separator */}
-      <div className="h-5 w-px bg-gray-200" />
+      <div className="h-5 w-px shrink-0 bg-gray-200" />
 
       {/* Zoom controls */}
-      <div className="flex items-center gap-1">
+      <div className="flex shrink-0 items-center gap-1">
         <button onClick={zoomOut} className="rounded p-1 text-gray-500 hover:bg-gray-100" title="Zoom Out" aria-label="Zoom Out">
           <svg width="14" height="14" viewBox="0 0 14 14"><path d="M3 7H11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
         </button>
@@ -250,9 +250,11 @@ export function Toolbar() {
         </button>
       </div>
 
-      {/* Mirror / Flip */}
-      <div className="h-5 w-px bg-gray-200" />
-      <div className="flex items-center gap-0.5">
+      {/* Separator (always — divides zoom from export) */}
+      <div className="h-5 w-px shrink-0 bg-gray-200" />
+
+      {/* Mirror / Flip — monitor only, moves into More dropdown below 2xl */}
+      <div className="hidden 2xl:flex shrink-0 items-center gap-0.5">
         <button
           onClick={() => mirrorFloor("horizontal")}
           className="rounded p-1 text-gray-500 hover:bg-gray-100"
@@ -279,11 +281,11 @@ export function Toolbar() {
         </button>
       </div>
 
-      {/* Separator */}
-      <div className="h-5 w-px bg-gray-200" />
+      {/* Separator (monitor-only, pairs with Mirror) */}
+      <div className="hidden 2xl:block h-5 w-px shrink-0 bg-gray-200" />
 
       {/* Export */}
-      <div className="relative">
+      <div className="relative shrink-0">
         <button
           onClick={() => setExportMenuOpen(!exportMenuOpen)}
           className={`flex items-center gap-1.5 rounded px-2.5 py-1 text-xs font-medium transition-colors ${
@@ -305,13 +307,13 @@ export function Toolbar() {
         <ExportMenu />
       </div>
 
-      {/* Separator */}
-      <div className="h-5 w-px bg-gray-200" />
+      {/* Separator (monitor-only — pairs with Print) */}
+      <div className="hidden 2xl:block h-5 w-px shrink-0 bg-gray-200" />
 
-      {/* Print */}
+      {/* Print — monitor only */}
       <button
         onClick={() => window.print()}
-        className="rounded px-2 py-1 text-xs font-medium text-gray-500 hover:bg-gray-100 transition-colors"
+        className="hidden 2xl:inline-block shrink-0 rounded px-2 py-1 text-xs font-medium text-gray-500 hover:bg-gray-100 transition-colors"
         title="Print (Ctrl+P)"
       >
         <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="inline-block mr-1">
@@ -321,13 +323,13 @@ export function Toolbar() {
         Print
       </button>
 
-      {/* Separator */}
-      <div className="h-5 w-px bg-gray-200" />
+      {/* Separator (monitor-only — pairs with Furniture) */}
+      <div className="hidden 2xl:block h-5 w-px shrink-0 bg-gray-200" />
 
-      {/* Furniture panel toggle */}
+      {/* Furniture panel toggle — monitor only */}
       <button
         onClick={toggleFurniturePanel}
-        className={`rounded px-2 py-1 text-xs font-medium transition-colors ${
+        className={`hidden 2xl:inline-block shrink-0 rounded px-2 py-1 text-xs font-medium transition-colors ${
           furniturePanelOpen
             ? "bg-amber-100 text-amber-700"
             : "text-gray-500 hover:bg-gray-100"
@@ -342,19 +344,19 @@ export function Toolbar() {
         Furniture
       </button>
 
-      {/* Separator */}
-      <div className="h-5 w-px bg-gray-200" />
+      {/* Separator (monitor-only — separates hidden Furniture from always-visible AI) */}
+      <div className="hidden 2xl:block h-5 w-px shrink-0 bg-gray-200" />
 
-      {/* AI Actions dropdown */}
+      {/* AI Actions dropdown — always visible */}
       <AIDropdown />
 
-      {/* Separator */}
-      <div className="h-5 w-px bg-gray-200" />
+      {/* Separator (monitor-only — pairs with Analysis tabs) */}
+      <div className="hidden 2xl:block h-5 w-px shrink-0 bg-gray-200" />
 
-      {/* Analysis buttons */}
+      {/* Analysis buttons — monitor only */}
       <button
         onClick={() => setRightPanelTab("vastu")}
-        className={`rounded px-2 py-1 text-xs font-medium transition-colors ${
+        className={`hidden 2xl:inline-block shrink-0 rounded px-2 py-1 text-xs font-medium transition-colors ${
           rightPanelTab === "vastu"
             ? "bg-orange-100 text-orange-700"
             : "text-gray-500 hover:bg-gray-100"
@@ -371,7 +373,7 @@ export function Toolbar() {
       </button>
       <button
         onClick={() => setRightPanelTab("code")}
-        className={`rounded px-2 py-1 text-xs font-medium transition-colors ${
+        className={`hidden 2xl:inline-block shrink-0 rounded px-2 py-1 text-xs font-medium transition-colors ${
           rightPanelTab === "code"
             ? "bg-blue-100 text-blue-700"
             : "text-gray-500 hover:bg-gray-100"
@@ -387,7 +389,7 @@ export function Toolbar() {
       </button>
       <button
         onClick={() => setRightPanelTab("analytics")}
-        className={`rounded px-2 py-1 text-xs font-medium transition-colors ${
+        className={`hidden 2xl:inline-block shrink-0 rounded px-2 py-1 text-xs font-medium transition-colors ${
           rightPanelTab === "analytics"
             ? "bg-purple-100 text-purple-700"
             : "text-gray-500 hover:bg-gray-100"
@@ -403,7 +405,7 @@ export function Toolbar() {
       </button>
       <button
         onClick={() => setRightPanelTab("boq")}
-        className={`rounded px-2 py-1 text-xs font-medium transition-colors ${
+        className={`hidden 2xl:inline-block shrink-0 rounded px-2 py-1 text-xs font-medium transition-colors ${
           rightPanelTab === "boq"
             ? "bg-green-100 text-green-700"
             : "text-gray-500 hover:bg-gray-100"
@@ -417,13 +419,16 @@ export function Toolbar() {
         BOQ
       </button>
 
+      {/* More dropdown — shown below 2xl to hold the items hidden above */}
+      <MoreDropdown />
+
       {/* Separator */}
-      <div className="h-5 w-px bg-gray-200" />
+      <div className="h-5 w-px shrink-0 bg-gray-200" />
 
       {/* Panel toggles */}
       <button
         onClick={toggleLeftPanel}
-        className={`rounded p-1 ${leftPanelOpen ? "bg-gray-100 text-gray-700" : "text-gray-400 hover:bg-gray-50"}`}
+        className={`shrink-0 rounded p-1 ${leftPanelOpen ? "bg-gray-100 text-gray-700" : "text-gray-400 hover:bg-gray-50"}`}
         title="Toggle Tools Panel"
         aria-label="Toggle Tools Panel"
       >
@@ -434,7 +439,7 @@ export function Toolbar() {
       </button>
       <button
         onClick={toggleRightPanel}
-        className={`rounded p-1 ${rightPanelOpen ? "bg-gray-100 text-gray-700" : "text-gray-400 hover:bg-gray-50"}`}
+        className={`shrink-0 rounded p-1 ${rightPanelOpen ? "bg-gray-100 text-gray-700" : "text-gray-400 hover:bg-gray-50"}`}
         title="Toggle Properties Panel"
         aria-label="Toggle Properties Panel"
       >
@@ -526,6 +531,165 @@ function AIDropdown() {
               Natural Light Heatmap
             </span>
             {lightOverlayVisible && <span className="text-[10px] text-green-600 font-medium">ON</span>}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ============================================================
+// MORE DROPDOWN — below 2xl breakpoint only
+// Holds low-priority actions that don't fit inline on narrower
+// screens (Mac 100%, split-screen monitors).
+// ============================================================
+
+function MoreDropdown() {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  const mirrorFloor = useFloorPlanStore((s) => s.mirrorFloor);
+  const furniturePanelOpen = useFloorPlanStore((s) => s.furniturePanelOpen);
+  const toggleFurniturePanel = useFloorPlanStore((s) => s.toggleFurniturePanel);
+  const rightPanelTab = useFloorPlanStore((s) => s.rightPanelTab);
+  const setRightPanelTab = useFloorPlanStore((s) => s.setRightPanelTab);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+
+  return (
+    <div className="relative 2xl:hidden shrink-0" ref={ref}>
+      <button
+        onClick={() => setOpen(!open)}
+        className={`flex items-center gap-1 rounded p-1.5 text-xs font-medium transition-colors ${
+          open ? "bg-gray-100 text-gray-700" : "text-gray-500 hover:bg-gray-100"
+        }`}
+        title="More tools"
+        aria-label="More tools"
+      >
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+          <circle cx="3.5" cy="8" r="1.3" fill="currentColor" />
+          <circle cx="8" cy="8" r="1.3" fill="currentColor" />
+          <circle cx="12.5" cy="8" r="1.3" fill="currentColor" />
+        </svg>
+      </button>
+
+      {open && (
+        <div className="absolute top-full right-0 mt-1 w-60 rounded-md border border-gray-200 bg-white py-1 shadow-lg z-50">
+          <div className="px-3 py-1.5 text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Transform</div>
+          <button
+            onClick={() => { mirrorFloor("horizontal"); setOpen(false); }}
+            className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-50"
+          >
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="text-gray-500">
+              <line x1="7" y1="1" x2="7" y2="13" stroke="currentColor" strokeWidth="1" strokeDasharray="2 1"/>
+              <path d="M5 4H2L2 10H5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M9 4H12V10H9" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            Mirror Horizontal
+          </button>
+          <button
+            onClick={() => { mirrorFloor("vertical"); setOpen(false); }}
+            className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-50"
+          >
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="text-gray-500">
+              <line x1="1" y1="7" x2="13" y2="7" stroke="currentColor" strokeWidth="1" strokeDasharray="2 1"/>
+              <path d="M4 5V2H10V5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M4 9V12H10V9" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            Mirror Vertical
+          </button>
+
+          <div className="my-1 h-px bg-gray-100" />
+          <div className="px-3 py-1.5 text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Output</div>
+          <button
+            onClick={() => { window.print(); setOpen(false); }}
+            className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-50"
+          >
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="text-gray-500">
+              <path d="M3.5 5V2h7v3M3.5 10H2.5a1 1 0 01-1-1V6.5a1 1 0 011-1h9a1 1 0 011 1V9a1 1 0 01-1 1h-1" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" strokeLinejoin="round"/>
+              <rect x="3.5" y="8.5" width="7" height="3.5" rx="0.5" stroke="currentColor" strokeWidth="1.1"/>
+            </svg>
+            Print
+          </button>
+          <button
+            onClick={() => { toggleFurniturePanel(); setOpen(false); }}
+            className="flex w-full items-center justify-between px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-50"
+          >
+            <span className="flex items-center gap-2">
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="text-gray-500">
+                <rect x="2" y="5" width="10" height="5" rx="0.5" stroke="currentColor" strokeWidth="1.2"/>
+                <line x1="4" y1="10" x2="4" y2="12" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+                <line x1="10" y1="10" x2="10" y2="12" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+              </svg>
+              Furniture Library
+            </span>
+            {furniturePanelOpen && <span className="text-[10px] text-amber-600 font-medium">ON</span>}
+          </button>
+
+          <div className="my-1 h-px bg-gray-100" />
+          <div className="px-3 py-1.5 text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Analysis</div>
+          <button
+            onClick={() => { setRightPanelTab("vastu"); setOpen(false); }}
+            className={`flex w-full items-center justify-between px-3 py-1.5 text-xs hover:bg-gray-50 ${rightPanelTab === "vastu" ? "text-orange-700" : "text-gray-700"}`}
+          >
+            <span className="flex items-center gap-2">
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className={rightPanelTab === "vastu" ? "text-orange-600" : "text-gray-500"}>
+                <circle cx="7" cy="7" r="5.5" stroke="currentColor" strokeWidth="1.2"/>
+                <line x1="7" y1="1.5" x2="7" y2="12.5" stroke="currentColor" strokeWidth="0.8" opacity="0.5"/>
+                <line x1="1.5" y1="7" x2="12.5" y2="7" stroke="currentColor" strokeWidth="0.8" opacity="0.5"/>
+                <line x1="7" y1="1.5" x2="7" y2="4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+              </svg>
+              Vastu Compliance
+            </span>
+            {rightPanelTab === "vastu" && <span className="text-[10px] text-orange-600 font-medium">●</span>}
+          </button>
+          <button
+            onClick={() => { setRightPanelTab("code"); setOpen(false); }}
+            className={`flex w-full items-center justify-between px-3 py-1.5 text-xs hover:bg-gray-50 ${rightPanelTab === "code" ? "text-blue-700" : "text-gray-700"}`}
+          >
+            <span className="flex items-center gap-2">
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className={rightPanelTab === "code" ? "text-blue-600" : "text-gray-500"}>
+                <rect x="2" y="1" width="10" height="12" rx="1" stroke="currentColor" strokeWidth="1.2"/>
+                <path d="M5 5L6.5 6.5L5 8" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                <line x1="7.5" y1="8" x2="9.5" y2="8" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+              </svg>
+              NBC Code Check
+            </span>
+            {rightPanelTab === "code" && <span className="text-[10px] text-blue-600 font-medium">●</span>}
+          </button>
+          <button
+            onClick={() => { setRightPanelTab("analytics"); setOpen(false); }}
+            className={`flex w-full items-center justify-between px-3 py-1.5 text-xs hover:bg-gray-50 ${rightPanelTab === "analytics" ? "text-purple-700" : "text-gray-700"}`}
+          >
+            <span className="flex items-center gap-2">
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className={rightPanelTab === "analytics" ? "text-purple-600" : "text-gray-500"}>
+                <rect x="1" y="8" width="3" height="4" rx="0.5" stroke="currentColor" strokeWidth="1.1"/>
+                <rect x="5.5" y="5" width="3" height="7" rx="0.5" stroke="currentColor" strokeWidth="1.1"/>
+                <rect x="10" y="2" width="3" height="10" rx="0.5" stroke="currentColor" strokeWidth="1.1"/>
+              </svg>
+              Analytics
+            </span>
+            {rightPanelTab === "analytics" && <span className="text-[10px] text-purple-600 font-medium">●</span>}
+          </button>
+          <button
+            onClick={() => { setRightPanelTab("boq"); setOpen(false); }}
+            className={`flex w-full items-center justify-between px-3 py-1.5 text-xs hover:bg-gray-50 ${rightPanelTab === "boq" ? "text-green-700" : "text-gray-700"}`}
+          >
+            <span className="flex items-center gap-2">
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className={rightPanelTab === "boq" ? "text-green-600" : "text-gray-500"}>
+                <path d="M2 2h10v10H2V2z" stroke="currentColor" strokeWidth="1.1"/>
+                <path d="M2 5h10M2 8h10M5 2v10M8 2v10" stroke="currentColor" strokeWidth="0.8" opacity="0.5"/>
+              </svg>
+              Bill of Quantities
+            </span>
+            {rightPanelTab === "boq" && <span className="text-[10px] text-green-600 font-medium">●</span>}
           </button>
         </div>
       )}
