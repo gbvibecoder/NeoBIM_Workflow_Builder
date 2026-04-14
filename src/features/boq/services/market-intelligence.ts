@@ -318,21 +318,37 @@ export async function fetchMarketPrices(
         const ageMs = Date.now() - fetchedAt.getTime();
         const ageDays = Math.round(ageMs / (1000 * 60 * 60 * 24));
 
+        // Apply price escalation for stale cached data (>14 days old)
+        let steelPrice = steelEntry.price;
+        let cementPrice = cementEntry.price;
+        let sandPrice = sandEntry?.price ?? 70;
+        let masonPrice = masonEntry?.price ?? 950;
+        let escalationNote = "";
+        if (ageDays > 14) {
+          const { escalatePrice } = await import("@/features/boq/lib/price-escalation");
+          const steelEsc = escalatePrice(steelEntry.price, fetchedAt, "steel_per_tonne");
+          const cementEsc = escalatePrice(cementEntry.price, fetchedAt, "cement_per_bag");
+          const sandEsc = escalatePrice(sandEntry?.price ?? 70, fetchedAt, "sand_per_cft");
+          const masonEsc = escalatePrice(masonEntry?.price ?? 950, fetchedAt, "labor_mason");
+          steelPrice = steelEsc.escalatedPrice;
+          cementPrice = cementEsc.escalatedPrice;
+          sandPrice = sandEsc.escalatedPrice;
+          masonPrice = masonEsc.escalatedPrice;
+          escalationNote = ` +${steelEsc.escalationPercent.toFixed(1)}% escalated`;
+        }
+        const confForAge: Conf = ageDays <= 7 ? "HIGH" : ageDays <= 30 ? "MEDIUM" : "LOW";
+
         const pgResult: MarketIntelligenceResult = {
-          steel_per_tonne: { value: steelEntry.price, unit: steelEntry.unit, source: `${steelEntry.source} (cached ${ageDays}d ago)`, date: fetchedAt.toISOString(), confidence: toConf(steelEntry.confidence) },
-          cement_per_bag: { value: cementEntry.price, unit: cementEntry.unit, source: `${cementEntry.source} (cached ${ageDays}d ago)`, date: fetchedAt.toISOString(), confidence: toConf(cementEntry.confidence) },
-          sand_per_cft: sandEntry
-            ? { value: sandEntry.price, unit: sandEntry.unit, source: `${sandEntry.source} (cached ${ageDays}d ago)`, date: fetchedAt.toISOString(), confidence: toConf(sandEntry.confidence) }
-            : { value: 70, unit: "₹/cft", source: "CPWD static fallback", date: new Date().toISOString(), confidence: "LOW" as const },
+          steel_per_tonne: { value: steelPrice, unit: steelEntry.unit, source: `${steelEntry.source} (cached ${ageDays}d${escalationNote})`, date: fetchedAt.toISOString(), confidence: confForAge },
+          cement_per_bag: { value: cementPrice, unit: cementEntry.unit, source: `${cementEntry.source} (cached ${ageDays}d${escalationNote})`, date: fetchedAt.toISOString(), confidence: confForAge },
+          sand_per_cft: { value: sandPrice, unit: sandEntry?.unit ?? "₹/cft", source: sandEntry ? `${sandEntry.source} (cached ${ageDays}d${escalationNote})` : "CPWD static fallback", date: fetchedAt.toISOString(), confidence: confForAge },
           labor: {
-            mason: masonEntry
-              ? { value: masonEntry.price, unit: masonEntry.unit, source: `${masonEntry.source} (cached)`, date: fetchedAt.toISOString(), confidence: toConf(masonEntry.confidence) }
-              : { value: 950, unit: "₹/day", source: "CPWD static fallback", date: new Date().toISOString(), confidence: "LOW" as const },
-            helper: { value: get("labor_helper")?.price ?? 580, unit: "₹/day", source: "cached", date: fetchedAt.toISOString(), confidence: "MEDIUM" as const },
-            carpenter: { value: get("labor_carpenter")?.price ?? 1050, unit: "₹/day", source: "cached", date: fetchedAt.toISOString(), confidence: "MEDIUM" as const },
-            steelFixer: { value: get("labor_steel_fixer")?.price ?? 1000, unit: "₹/day", source: "cached", date: fetchedAt.toISOString(), confidence: "MEDIUM" as const },
-            electrician: { value: get("labor_electrician")?.price ?? 1150, unit: "₹/day", source: "cached", date: fetchedAt.toISOString(), confidence: "MEDIUM" as const },
-            plumber: { value: get("labor_plumber")?.price ?? 1050, unit: "₹/day", source: "cached", date: fetchedAt.toISOString(), confidence: "MEDIUM" as const },
+            mason: { value: masonPrice, unit: masonEntry?.unit ?? "₹/day", source: masonEntry ? `${masonEntry.source} (cached${escalationNote})` : "CPWD static fallback", date: fetchedAt.toISOString(), confidence: confForAge },
+            helper: { value: Math.round(masonPrice * 0.55), unit: "₹/day", source: "Derived from mason (cached)", date: fetchedAt.toISOString(), confidence: confForAge },
+            carpenter: { value: Math.round(masonPrice * 1.10), unit: "₹/day", source: "Derived from mason (cached)", date: fetchedAt.toISOString(), confidence: confForAge },
+            steelFixer: { value: Math.round(masonPrice * 0.95), unit: "₹/day", source: "Derived from mason (cached)", date: fetchedAt.toISOString(), confidence: confForAge },
+            electrician: { value: Math.round(masonPrice * 1.25), unit: "₹/day", source: "Derived from mason (cached)", date: fetchedAt.toISOString(), confidence: confForAge },
+            plumber: { value: Math.round(masonPrice * 1.05), unit: "₹/day", source: "Derived from mason (cached)", date: fetchedAt.toISOString(), confidence: confForAge },
           },
           benchmark_per_sqft: { value: 2500, range_low: 1800, range_high: 4500, source: "Estimated", building_type: buildingType },
           cpwd_index: { factor: 1.0, source: "Cached (no live data)", year: new Date().getFullYear() },

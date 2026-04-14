@@ -88,16 +88,49 @@ export function BOQHeader({ data, onExportExcel }: BOQHeaderProps) {
           {data.confidenceLevel}
         </div>
 
-        {/* AACE Class Badge */}
-        <div
-          className="px-2.5 py-1 rounded-full text-xs font-medium"
-          style={{
-            background: "rgba(139, 92, 246, 0.12)",
-            border: "1px solid rgba(139, 92, 246, 0.3)",
-            color: "#A78BFA",
-          }}
-        >
-          AACE {data.aaceClass}
+        {/* AACE Class Badge with tooltip */}
+        <div className="relative group/aace">
+          <div
+            className="px-2.5 py-1 rounded-full text-xs font-medium cursor-help"
+            style={{
+              background: "rgba(139, 92, 246, 0.12)",
+              border: "1px solid rgba(139, 92, 246, 0.3)",
+              color: "#A78BFA",
+            }}
+          >
+            AACE {data.aaceClass}
+          </div>
+          <div
+            className="absolute top-full right-0 mt-2 hidden group-hover/aace:block z-50"
+            style={{
+              background: "rgba(12,12,20,0.97)",
+              border: "1px solid rgba(139,92,246,0.25)",
+              borderRadius: 10,
+              padding: "10px 12px",
+              width: 280,
+              boxShadow: "0 8px 24px rgba(0,0,0,0.6)",
+            }}
+          >
+            <div className="text-[11px] font-semibold mb-1.5" style={{ color: "#A78BFA" }}>
+              AACE {data.aaceClass} Estimate
+            </div>
+            <div className="text-[10px] leading-relaxed mb-2" style={{ color: "#B0B0C8" }}>
+              {data.aaceDescription || "Feasibility study — accuracy ±25-30%. Suitable for early-stage cost planning."}
+            </div>
+            {data.costRange && data.costRange.totalLow > 0 && (
+              <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: 6 }}>
+                <div className="text-[10px]" style={{ color: "#9898B0" }}>
+                  Estimated range: ₹{(data.costRange.totalLow / 10000000).toFixed(1)} — ₹{(data.costRange.totalHigh / 10000000).toFixed(1)} Cr
+                </div>
+                <div className="text-[10px]" style={{ color: "#5C5C78" }}>
+                  Best estimate: ₹{(data.costRange.totalBest / 10000000).toFixed(2)} Cr
+                </div>
+              </div>
+            )}
+            <div className="text-[9px] mt-2" style={{ color: "#5C5C78" }}>
+              Not suitable for tender submission or procurement.
+            </div>
+          </div>
         </div>
 
         {/* Download Excel */}

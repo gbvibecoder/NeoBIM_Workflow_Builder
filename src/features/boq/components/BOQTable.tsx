@@ -5,6 +5,7 @@ import { ChevronDown, ChevronUp, Pencil, Check, X, ChevronLeft, ChevronRight } f
 import type { BOQLineItem, BOQFilterTab, BOQSortKey, BOQSortDir, SourceType, RateOverride } from "@/features/boq/components/types";
 import { formatINRFull, getDivisionCategory } from "@/features/boq/components/recalc-engine";
 import { getLineConfidenceScore, getLineConfidenceColor } from "@/features/boq/constants/quality-thresholds";
+import { ProvenanceTooltip } from "@/features/boq/components/ProvenanceTooltip";
 
 interface BOQTableProps {
   lines: BOQLineItem[];
@@ -343,26 +344,28 @@ export function BOQTable({ lines, rateOverrides, onRateOverride, grandTotal: gra
                         </button>
                       </div>
                     ) : (
-                      <div
-                        className="flex items-center gap-1 cursor-pointer group/rate"
-                        onClick={() => startEdit(line)}
-                      >
-                        {hasOverride && (
-                          <Pencil size={10} color="#00F5FF" className="shrink-0" />
-                        )}
-                        <span style={{
-                          color: hasOverride ? "#00F5FF" : "#F0F0F5",
-                          fontVariantNumeric: "tabular-nums",
-                        }}>
-                          ₹{(override?.newRate ?? line.unitRate).toLocaleString("en-IN", { maximumFractionDigits: 0 })}
-                        </span>
-                        {hasOverride && (
-                          <span className="text-[10px] line-through" style={{ color: "#5C5C78" }}>
-                            ₹{line.unitRate.toLocaleString("en-IN", { maximumFractionDigits: 0 })}
+                      <ProvenanceTooltip line={line}>
+                        <div
+                          className="flex items-center gap-1 cursor-pointer group/rate"
+                          onClick={() => startEdit(line)}
+                        >
+                          {hasOverride && (
+                            <Pencil size={10} color="#00F5FF" className="shrink-0" />
+                          )}
+                          <span style={{
+                            color: hasOverride ? "#00F5FF" : "#F0F0F5",
+                            fontVariantNumeric: "tabular-nums",
+                          }}>
+                            ₹{(override?.newRate ?? line.unitRate).toLocaleString("en-IN", { maximumFractionDigits: 0 })}
                           </span>
-                        )}
-                        <Pencil size={10} color="#5C5C78" className="opacity-0 group-hover/rate:opacity-100 transition-opacity shrink-0" />
-                      </div>
+                          {hasOverride && (
+                            <span className="text-[10px] line-through" style={{ color: "#5C5C78" }}>
+                              ₹{line.unitRate.toLocaleString("en-IN", { maximumFractionDigits: 0 })}
+                            </span>
+                          )}
+                          <Pencil size={10} color="#5C5C78" className="opacity-0 group-hover/rate:opacity-100 transition-opacity shrink-0" />
+                        </div>
+                      </ProvenanceTooltip>
                     )}
                   </td>
 

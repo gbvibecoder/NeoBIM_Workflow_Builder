@@ -163,6 +163,24 @@ export function BOQVisualizerPage({ data, executionId }: BOQVisualizerPageProps)
           </div>
         </ErrorBoundary>
 
+        {/* Seasonal Adjustment Badge */}
+        {data.seasonalAdjustment?.applied && (
+          <div className="mx-6 px-4 py-2.5 rounded-lg flex items-center gap-3" style={{
+            background: "rgba(59, 130, 246, 0.06)",
+            border: "1px solid rgba(59, 130, 246, 0.15)",
+          }}>
+            <span style={{ fontSize: 16 }}>🌧️</span>
+            <div>
+              <span className="text-xs font-medium" style={{ color: "#60A5FA" }}>
+                Monsoon adjustment active: +{data.seasonalAdjustment.overallImpactPercent.toFixed(1)}% effective cost
+              </span>
+              <span className="text-[10px] ml-2" style={{ color: "#5C5C78" }}>
+                {data.seasonalAdjustment.month} — labor productivity ×{(1 / data.seasonalAdjustment.laborMultiplier * 100).toFixed(0)}%
+              </span>
+            </div>
+          </div>
+        )}
+
         {/* Price Controls */}
         <ErrorBoundary fallback={<SectionFallback section="Price Controls" />}>
           <PriceControls
