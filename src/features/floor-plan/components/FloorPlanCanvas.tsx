@@ -1,20 +1,11 @@
 "use client";
 
-// Konva shape registration — belt-and-suspenders. react-konva's own
-// `import 'konva'` loads the full bundle (registering every shape), but any
-// tree-shaker that treats konva as side-effect-free will strip those imports
-// and every Rect/Line/Text/Circle/Arc falls back to Group. We use NAMED
-// imports and reference them below so bundlers must keep the modules, which
-// runs each shape's module-level `_registerNode(...)` call.
-import { Rect as _KRect } from "konva/lib/shapes/Rect";
-import { Line as _KLine } from "konva/lib/shapes/Line";
-import { Text as _KText } from "konva/lib/shapes/Text";
-import { Circle as _KCircle } from "konva/lib/shapes/Circle";
-import { Arc as _KArc } from "konva/lib/shapes/Arc";
-import { Arrow as _KArrow } from "konva/lib/shapes/Arrow";
-import { Path as _KPath } from "konva/lib/shapes/Path";
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-const _KONVA_SHAPES = [_KRect, _KLine, _KText, _KCircle, _KArc, _KArrow, _KPath];
+// Konva shape registration — MUST evaluate before the first react-konva
+// render. See src/features/floor-plan/lib/konva-register.ts for details.
+// We reference KONVA_READY in a throw so no bundler can tree-shake the
+// registration module out of the dependency graph.
+import { KONVA_READY } from "@/features/floor-plan/lib/konva-register";
+if (!KONVA_READY) throw new Error("Konva shapes failed to register");
 
 import React, { useRef, useCallback, useEffect, useState } from "react";
 import { Stage, Layer } from "react-konva";
