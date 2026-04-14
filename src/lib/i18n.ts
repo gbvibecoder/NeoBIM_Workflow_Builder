@@ -1267,6 +1267,17 @@ const en = {
   'showcase.partialSuffix': 'succeeded',
   'showcase.partialLabel': 'Partial',
 
+  // ===== ONBOARDING SURVEY — shell keys (full copy lands in a later commit) =====
+  'survey.skipToDashboard': 'Skip to dashboard',
+  'survey.saving': 'Saving…',
+  'survey.next': 'Next',
+  'survey.finish': 'Take me in',
+  'survey.back': 'Back',
+  'survey.scene1.placeholder': 'So… how’d you end up here?',
+  'survey.scene2.placeholder': 'What’s your superpower?',
+  'survey.scene3.placeholder': 'Flying solo or bringing the crew?',
+  'survey.scene4.placeholder': 'Pick your weapon.',
+
   // ===== COMMUNITY EXTRA =====
   'community.featured': 'FEATURED',
   'community.shareTemplate': 'Share template',
@@ -3914,6 +3925,17 @@ const de: Record<keyof typeof en, string | string[]> = {
   // ===== SHOWCASE PARTIAL =====
   'showcase.partialSuffix': 'erfolgreich',
   'showcase.partialLabel': 'Teilweise',
+
+  // ===== ONBOARDING SURVEY — shell keys =====
+  'survey.skipToDashboard': 'Weiter zum Dashboard',
+  'survey.saving': 'Speichere…',
+  'survey.next': 'Weiter',
+  'survey.finish': 'Los geht’s',
+  'survey.back': 'Zurück',
+  'survey.scene1.placeholder': 'Also… wie bist du hier gelandet?',
+  'survey.scene2.placeholder': 'Was ist deine Superkraft?',
+  'survey.scene3.placeholder': 'Allein unterwegs oder mit Crew?',
+  'survey.scene4.placeholder': 'Wähl deine Waffe.',
 
   // ===== COMMUNITY EXTRA =====
   'community.featured': 'EMPFOHLEN',
