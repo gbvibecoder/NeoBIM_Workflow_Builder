@@ -52,8 +52,31 @@ model User {
   liveChats         LiveChatConversation[] @relation("UserLiveChats")
   videoShareLinks   VideoShareLink[]
   videoLikes        CommunityVideoLike[]
+  survey            UserSurvey?
 
   @@map("users")
+}
+
+model UserSurvey {
+  id               String    @id @default(cuid())
+  userId           String    @unique
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  discoverySource  String?
+  discoveryOther   String?
+  profession       String?
+  professionOther  String?
+  teamSize         String?
+  pricingAction    String?
+  completedAt      DateTime?
+  skippedAt        DateTime?
+  skippedAtScene   Int?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@map("user_surveys")
+  @@index([userId])
+  @@index([completedAt])
+  @@index([createdAt])
 }
 
 model Account {
