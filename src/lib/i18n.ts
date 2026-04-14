@@ -1335,6 +1335,17 @@ const en = {
   'survey.profession.other':           'Something cooler',
   'survey.profession.otherSub':        'Tell us what you call it',
 
+  // ===== SCENE 3 — team size =====
+  'survey.scene3.eyebrow': 'Step 3 of 4 · Your setup',
+  'survey.scene3.headline': 'Flying solo or bringing the crew?',
+  'survey.scene3.subheadline': 'Helps us tune collaboration features (or leave you alone).',
+  'survey.scene3.listAria': 'Team size',
+  'survey.teamSize.solo':     'Just me, myself, and I',
+  'survey.teamSize.squad':    'Small squad (2–10)',
+  'survey.teamSize.company':  'The whole company (10+)',
+  'survey.teamSize.academic': 'Research / academia',
+  'survey.teamSize.browsing': 'Just window shopping',
+
   // ===== COMMUNITY EXTRA =====
   'community.featured': 'FEATURED',
   'community.shareTemplate': 'Share template',
@@ -4050,6 +4061,17 @@ const de: Record<keyof typeof en, string | string[]> = {
   'survey.profession.developerSub':    'Unterschreibt die Schecks',
   'survey.profession.other':           'Etwas cooleres',
   'survey.profession.otherSub':        'Sag uns, wie du’s nennst',
+
+  // ===== SCENE 3 — Teamgröße =====
+  'survey.scene3.eyebrow': 'Schritt 3 von 4 · Dein Setup',
+  'survey.scene3.headline': 'Allein unterwegs oder mit Crew?',
+  'survey.scene3.subheadline': 'Hilft uns, Kollaborationsfeatures abzustimmen (oder dich in Ruhe zu lassen).',
+  'survey.scene3.listAria': 'Teamgröße',
+  'survey.teamSize.solo':     'Nur ich, ich selbst und ich',
+  'survey.teamSize.squad':    'Kleine Truppe (2–10)',
+  'survey.teamSize.company':  'Das ganze Unternehmen (10+)',
+  'survey.teamSize.academic': 'Forschung / Akademie',
+  'survey.teamSize.browsing': 'Nur am Stöbern',
 
   // ===== COMMUNITY EXTRA =====
   'community.featured': 'EMPFOHLEN',
