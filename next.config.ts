@@ -61,8 +61,11 @@ const nextConfig: NextConfig = {
       "@react-three/fiber",
       "@react-three/postprocessing",
       "recharts",
-      "konva",
-      "react-konva",
+      // NOTE: do NOT add "konva" or "react-konva" here. optimizePackageImports
+      // strips side-effect-only imports, which breaks Konva's shape registration
+      // (each shape module runs _registerNode() at module top-level). Without
+      // these side-effects, react-konva silently falls back to Group for every
+      // Rect/Line/Text/Circle/Arc and nothing visible renders on the canvas.
     ],
   },
 
