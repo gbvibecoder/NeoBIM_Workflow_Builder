@@ -185,7 +185,7 @@ export function BOQHeader({ data, onExportExcel, onExportPDF, onExportCSV }: BOQ
 
         {/* Export button group */}
         <div style={{ position: "relative" }} data-export-menu>
-          <div style={{ display: "flex", alignItems: "center" }}>
+          <div style={{ display: "flex", alignItems: "stretch" }}>
             <button
               onClick={onExportExcel}
               style={{
@@ -204,7 +204,7 @@ export function BOQHeader({ data, onExportExcel, onExportPDF, onExportCSV }: BOQ
               onClick={() => setShowExportMenu(v => !v)}
               style={{
                 display: "flex", alignItems: "center", justifyContent: "center",
-                padding: "7px 6px", borderRadius: "0 10px 10px 0", fontSize: 12,
+                padding: "0 7px", borderRadius: "0 10px 10px 0", fontSize: 12,
                 background: "#0F766E", color: "#FFFFFF", border: "none", borderLeft: "1px solid rgba(255,255,255,0.2)",
                 cursor: "pointer", transition: "all 0.2s",
               }}
