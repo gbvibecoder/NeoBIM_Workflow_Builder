@@ -409,13 +409,16 @@ export function BOQTable({ lines, rateOverrides, onRateOverride, grandTotal: gra
                     e.currentTarget.style.transform = "translateX(0)";
                   }}
                 >
-                  {/* IS Code */}
+                  {/* IS Code — deemphasized, truncated */}
                   <td
+                    title={line.isCode || undefined}
                     style={{
-                      padding: "10px 14px",
-                      color: "#6B7280",
-                      fontFamily: "var(--font-jetbrains, 'JetBrains Mono', monospace)",
+                      padding: "10px 12px",
+                      color: "#9CA3AF",
                       fontSize: 10,
+                      maxWidth: 100,
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
                       whiteSpace: "nowrap" as const,
                     }}
                   >

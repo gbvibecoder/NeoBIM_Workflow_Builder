@@ -2398,3 +2398,28 @@
   background: rgba(108, 92, 231, 0.5);
 }
 
+/* ─── BOQ Print Stylesheet ──────────────────────────────────────────────── */
+@media print {
+  /* Hide interactive + decorative elements */
+  canvas,
+  .boq-slider,
+  button:not([data-print-show]) { display: none !important; }
+
+  /* Force white backgrounds, remove shadows */
+  * {
+    box-shadow: none !important;
+    animation: none !important;
+    transition: none !important;
+  }
+
+  /* Remove page background image/pattern */
+  body, [data-boq-scroll] { background: white !important; }
+
+  /* Table: show all rows (override pagination) */
+  table { page-break-inside: auto; }
+  tr { page-break-inside: avoid; }
+
+  /* Section page breaks */
+  .rounded-2xl { page-break-inside: avoid; }
+}
+

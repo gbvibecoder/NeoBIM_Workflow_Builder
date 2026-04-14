@@ -1,6 +1,7 @@
 "use client";
 
-import { ArrowLeft, Download, Share2, Building2, MapPin, Calendar } from "lucide-react";
+import { useState } from "react";
+import { ArrowLeft, Download, Share2, Building2, MapPin, Calendar, ChevronDown, FileText, FileSpreadsheet } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import type { BOQData } from "@/features/boq/components/types";
@@ -8,10 +9,13 @@ import type { BOQData } from "@/features/boq/components/types";
 interface BOQHeaderProps {
   data: BOQData;
   onExportExcel: () => void;
+  onExportPDF?: () => void;
+  onExportCSV?: () => void;
 }
 
-export function BOQHeader({ data, onExportExcel }: BOQHeaderProps) {
+export function BOQHeader({ data, onExportExcel, onExportPDF, onExportCSV }: BOQHeaderProps) {
   const router = useRouter();
+  const [showExportMenu, setShowExportMenu] = useState(false);
 
   const copyLink = () => {
     navigator.clipboard.writeText(window.location.href).then(() => {
@@ -169,36 +173,78 @@ export function BOQHeader({ data, onExportExcel }: BOQHeaderProps) {
           </div>
         </div>
 
-        {/* Download Excel */}
-        <button
-          onClick={onExportExcel}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            padding: "8px 16px",
-            borderRadius: 12,
-            fontSize: 13,
-            fontWeight: 500,
-            background: "#0D9488",
-            color: "#FFFFFF",
-            border: "none",
-            cursor: "pointer",
-            boxShadow: "0 1px 2px rgba(0, 0, 0, 0.05)",
-            transition: "all 0.2s",
-          }}
-          onMouseEnter={e => {
-            e.currentTarget.style.background = "#0F766E";
-            e.currentTarget.style.boxShadow = "0 4px 8px rgba(13, 148, 136, 0.25)";
-          }}
-          onMouseLeave={e => {
-            e.currentTarget.style.background = "#0D9488";
-            e.currentTarget.style.boxShadow = "0 1px 2px rgba(0, 0, 0, 0.05)";
-          }}
-        >
-          <Download size={14} />
-          Download Excel
-        </button>
+        {/* Export button group */}
+        <div style={{ position: "relative" }}>
+          <div style={{ display: "flex", alignItems: "center" }}>
+            <button
+              onClick={onExportExcel}
+              style={{
+                display: "flex", alignItems: "center", gap: 8,
+                padding: "8px 16px", borderRadius: "12px 0 0 12px", fontSize: 13, fontWeight: 500,
+                background: "#0D9488", color: "#FFFFFF", border: "none", cursor: "pointer",
+                boxShadow: "0 1px 2px rgba(0,0,0,0.05)", transition: "all 0.2s",
+              }}
+              onMouseEnter={e => { e.currentTarget.style.background = "#0F766E"; }}
+              onMouseLeave={e => { e.currentTarget.style.background = "#0D9488"; }}
+            >
+              <Download size={14} />
+              Excel
+            </button>
+            <button
+              onClick={() => setShowExportMenu(v => !v)}
+              style={{
+                display: "flex", alignItems: "center", justifyContent: "center",
+                padding: "8px 8px", borderRadius: "0 12px 12px 0", fontSize: 13,
+                background: "#0F766E", color: "#FFFFFF", border: "none", borderLeft: "1px solid rgba(255,255,255,0.2)",
+                cursor: "pointer", transition: "all 0.2s",
+              }}
+              onMouseEnter={e => { e.currentTarget.style.background = "#115E59"; }}
+              onMouseLeave={e => { e.currentTarget.style.background = "#0F766E"; }}
+            >
+              <ChevronDown size={14} />
+            </button>
+          </div>
+          {showExportMenu && (
+            <div
+              style={{
+                position: "absolute", top: "100%", right: 0, marginTop: 4,
+                background: "#FFFFFF", borderRadius: 12, boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
+                border: "1px solid rgba(0,0,0,0.08)", padding: 4, zIndex: 50, minWidth: 140,
+              }}
+            >
+              {onExportPDF && (
+                <button
+                  onClick={() => { onExportPDF(); setShowExportMenu(false); }}
+                  style={{
+                    display: "flex", alignItems: "center", gap: 8, width: "100%",
+                    padding: "8px 12px", borderRadius: 8, fontSize: 13, color: "#4B5563",
+                    background: "transparent", border: "none", cursor: "pointer", transition: "background 0.15s",
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.background = "#F9FAFB"; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}
+                >
+                  <FileText size={14} color="#DC2626" />
+                  PDF
+                </button>
+              )}
+              {onExportCSV && (
+                <button
+                  onClick={() => { onExportCSV(); setShowExportMenu(false); }}
+                  style={{
+                    display: "flex", alignItems: "center", gap: 8, width: "100%",
+                    padding: "8px 12px", borderRadius: 8, fontSize: 13, color: "#4B5563",
+                    background: "transparent", border: "none", cursor: "pointer", transition: "background 0.15s",
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.background = "#F9FAFB"; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}
+                >
+                  <FileSpreadsheet size={14} color="#2563EB" />
+                  CSV
+                </button>
+              )}
+            </div>
+          )}
+        </div>
 
         {/* Share */}
         <button

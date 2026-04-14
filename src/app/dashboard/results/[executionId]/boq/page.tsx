@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import { useExecutionStore, selectHydrateDiagnostics } from "@/features/execution/stores/execution-store";
 import { BOQVisualizerPage, parseArtifactToBOQ, getMockBOQData } from "@/features/boq/components";
 import type { BOQData } from "@/features/boq/components";
+import { BOQSkeleton } from "@/features/boq/components/BOQSkeleton";
 import { ExecutionDiagnosticsPanel } from "@/components/diagnostics/ExecutionDiagnosticsPanel";
 
 export default function BOQVisualizerRoute() {
@@ -121,30 +122,14 @@ export default function BOQVisualizerRoute() {
   }, [executionId, artifacts]);
 
   if (loading) {
-    return (
-      <div className="flex-1 flex items-center justify-center" style={{ background: "#070809" }}>
-        <div className="flex flex-col items-center gap-4">
-          <div
-            className="w-10 h-10 rounded-full border-2 border-t-transparent"
-            style={{
-              borderColor: "rgba(0, 245, 255, 0.3)",
-              borderTopColor: "transparent",
-              animation: "spin 1s linear infinite",
-            }}
-          />
-          <span className="text-sm" style={{ color: "#9898B0" }}>
-            Loading BOQ data...
-          </span>
-        </div>
-      </div>
-    );
+    return <BOQSkeleton />;
   }
 
   if (error || !boqData) {
     return (
-      <div className="flex-1 flex items-center justify-center" style={{ background: "#070809" }}>
+      <div className="flex-1 flex items-center justify-center" style={{ background: "#FAFAF8" }}>
         <div className="text-center">
-          <p className="text-sm" style={{ color: "#EF4444" }}>
+          <p className="text-sm" style={{ color: "#DC2626" }}>
             {error || "No BOQ data available"}
           </p>
           <p className="text-xs mt-2" style={{ color: "#5C5C78" }}>

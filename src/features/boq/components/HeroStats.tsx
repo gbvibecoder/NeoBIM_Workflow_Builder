@@ -186,10 +186,13 @@ export function HeroStats({
           background: "#FFFFFF",
           border: "1px solid rgba(0,0,0,0.06)",
           boxShadow: recalculated
-            ? "0 0 0 2px rgba(13,148,136,0.15), 0 4px 12px rgba(0,0,0,0.06)"
-            : "0 2px 8px rgba(0,0,0,0.04)",
+            ? "0 0 0 2px rgba(13,148,136,0.15), 0 4px 16px rgba(0,0,0,0.08)"
+            : "0 4px 16px rgba(0,0,0,0.06)",
         }}
       >
+        {/* Top accent gradient */}
+        <div className="absolute top-0 left-0 right-0 h-[2px]" style={{ background: "linear-gradient(90deg, #0D9488, #0D948840, transparent)" }} />
+
         <div className="flex items-center gap-2 mb-2">
           <div className="flex items-center justify-center w-8 h-8 rounded-xl" style={{ background: "#F0FDFA" }}>
             <IndianRupee size={16} color="#0D9488" />
@@ -203,7 +206,7 @@ export function HeroStats({
             </span>
           )}
         </div>
-        <div className="text-4xl font-bold tracking-tight" style={{ color: "#0D9488", fontVariantNumeric: "tabular-nums" }}>
+        <div className="text-5xl font-bold tracking-tight" style={{ color: "#0D9488", fontVariantNumeric: "tabular-nums" }}>
           <AnimatedNumber value={totalCost} formatter={(n: number) => `₹${formatCrores(n)} Cr`} duration={1200} />
         </div>
         {/* Cost Range Gauge */}

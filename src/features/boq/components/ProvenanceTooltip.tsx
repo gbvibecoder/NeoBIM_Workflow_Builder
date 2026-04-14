@@ -105,11 +105,15 @@ export function ProvenanceTooltip({ line, children }: ProvenanceTooltipProps & {
             </div>
           )}
 
-          {/* IS Code */}
+          {/* IS Code as pill badge */}
           {line.isCode && (
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, marginBottom: 5 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 11, marginBottom: 5 }}>
               <span style={{ color: "#6B7280" }}>IS Code</span>
-              <span style={{ color: "#0D9488", fontFamily: "var(--font-jetbrains, 'JetBrains Mono', monospace)", fontSize: 10 }}>
+              <span style={{
+                display: "inline-flex", padding: "2px 8px", borderRadius: 6,
+                background: "#F3F4F6", color: "#4B5563", fontSize: 9,
+                fontFamily: "var(--font-jetbrains, 'JetBrains Mono', monospace)",
+              }}>
                 {line.isCode}
               </span>
             </div>

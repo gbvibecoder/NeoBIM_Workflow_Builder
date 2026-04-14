@@ -142,7 +142,19 @@ export function parseArtifactToBOQ(artifactData: any): BOQData | null {
   }
 
   const parsedLines: BOQLineItem[] = lines.map((line: any, idx: number) => {
-    const conf = line.confidence ?? inferConfidence("", line.division || "", line.description || "");
+    // Derive numeric confidence: prefer explicit number, then structured score, then source-aware default
+    let conf: number = typeof line.confidence === "number" ? line.confidence : 0;
+    if (!conf && line.confidence?.score) {
+      conf = line.confidence.score === "high" ? 85 : line.confidence.score === "medium" ? 65 : 35;
+    }
+    if (!conf) {
+      // Source-aware default so cost ranges are always meaningful
+      const src = (line.source || line.division || "").toLowerCase();
+      if (src.includes("ifc") && src.includes("geometry")) conf = 85;
+      else if (src.includes("ifc") && src.includes("derived")) conf = 70;
+      else if (src.includes("provisional")) conf = 30;
+      else conf = inferConfidence("", line.division || "", line.description || "");
+    }
     return {
       id: `boq-${idx}`,
       division: line.division || "Unclassified",

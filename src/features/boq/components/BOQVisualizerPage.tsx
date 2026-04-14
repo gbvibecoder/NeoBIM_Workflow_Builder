@@ -301,7 +301,7 @@ export function BOQVisualizerPage({ data, executionId }: BOQVisualizerPageProps)
 
       <div className="relative" style={{ zIndex: 1 }}>
       {/* Header */}
-      <BOQHeader data={data} onExportExcel={handleExportExcel} />
+      <BOQHeader data={data} onExportExcel={handleExportExcel} onExportPDF={handleExportPDF} onExportCSV={handleExportCSV} />
 
       <div className="max-w-[1360px] mx-auto flex flex-col gap-10 py-8 pb-16">
         {/* Hero Stats — the showpiece */}

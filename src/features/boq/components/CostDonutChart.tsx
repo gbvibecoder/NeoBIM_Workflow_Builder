@@ -94,8 +94,8 @@ export function CostDonutChart({ material, labor, equipment }: CostDonutChartPro
         <div
           style={{
             position: "relative",
-            width: 140,
-            height: 140,
+            width: 170,
+            height: 170,
             flexShrink: 0,
           }}
         >
