@@ -21,61 +21,74 @@ export function BOQHeader({ data, onExportExcel }: BOQHeaderProps) {
 
   const confidenceBg =
     data.confidenceLevel === "HIGH" ? "#ECFDF5" :
-    data.confidenceLevel === "MEDIUM" ? "#FFFBEB" : "#FEF2F2";
+    data.confidenceLevel === "MEDIUM" ? "#FEF3C7" : "#FEE2E2";
   const confidenceText =
     data.confidenceLevel === "HIGH" ? "#059669" :
     data.confidenceLevel === "MEDIUM" ? "#D97706" : "#DC2626";
 
   return (
     <div
-      className="sticky top-0 z-20 flex items-center justify-between px-6 py-4"
       style={{
+        position: "sticky",
+        top: 0,
+        zIndex: 20,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        padding: "16px 24px",
         background: "#FFFFFF",
-        boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
-        borderBottom: "1px solid rgba(0,0,0,0.06)",
+        boxShadow: "0 1px 3px rgba(0, 0, 0, 0.04)",
+        borderBottom: "1px solid rgba(0, 0, 0, 0.06)",
       }}
     >
       {/* Left: Back + Project Info */}
-      <div className="flex items-center gap-4">
+      <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
         <button
           onClick={() => router.back()}
-          className="flex items-center justify-center w-9 h-9 rounded-lg transition-all duration-200"
           style={{
-            background: "transparent",
-            border: "1px solid #0D9488",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            width: 40,
+            height: 40,
+            borderRadius: 9999,
+            background: "#F9FAFB",
+            border: "1px solid rgba(0, 0, 0, 0.06)",
+            cursor: "pointer",
+            transition: "all 0.2s",
           }}
           onMouseEnter={e => {
-            e.currentTarget.style.background = "#CCFBF1";
-            e.currentTarget.style.borderColor = "#0F766E";
+            e.currentTarget.style.background = "#F3F4F6";
+            e.currentTarget.style.borderColor = "rgba(0, 0, 0, 0.1)";
           }}
           onMouseLeave={e => {
-            e.currentTarget.style.background = "transparent";
-            e.currentTarget.style.borderColor = "#0D9488";
+            e.currentTarget.style.background = "#F9FAFB";
+            e.currentTarget.style.borderColor = "rgba(0, 0, 0, 0.06)";
           }}
         >
-          <ArrowLeft size={16} color="#0D9488" />
+          <ArrowLeft size={16} color="#4B5563" />
         </button>
 
-        <div className="flex flex-col">
-          <div className="flex items-center gap-2">
-            <Building2 size={14} style={{ color: "#0D9488" }} />
+        <div style={{ display: "flex", flexDirection: "column" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <Building2 size={14} color="#0D9488" />
             <span
-              className="text-sm font-semibold"
               style={{
-                color: "#1A1A1A",
-                fontFamily: "var(--font-dm-serif, 'DM Serif Display', serif)",
+                fontSize: 18,
+                fontWeight: 600,
+                color: "#111827",
               }}
             >
               {data.projectName}
             </span>
           </div>
-          <div className="flex items-center gap-3 mt-0.5">
-            <span className="flex items-center gap-1 text-xs" style={{ color: "#4B5563" }}>
-              <MapPin size={10} />
+          <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 2 }}>
+            <span style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 13, color: "#9CA3AF" }}>
+              <MapPin size={11} color="#9CA3AF" />
               {data.location}
             </span>
-            <span className="flex items-center gap-1 text-xs" style={{ color: "#4B5563" }}>
-              <Calendar size={10} />
+            <span style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 13, color: "#9CA3AF" }}>
+              <Calendar size={11} color="#9CA3AF" />
               {data.date}
             </span>
           </div>
@@ -83,58 +96,74 @@ export function BOQHeader({ data, onExportExcel }: BOQHeaderProps) {
       </div>
 
       {/* Right: Badges + Actions */}
-      <div className="flex items-center gap-3">
+      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
         {/* Confidence Badge */}
         <div
-          className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium"
           style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+            padding: "4px 10px",
+            borderRadius: 9999,
+            fontSize: 12,
+            fontWeight: 500,
             background: confidenceBg,
             color: confidenceText,
           }}
         >
-          <div className="w-1.5 h-1.5 rounded-full" style={{ background: confidenceText }} />
+          <div style={{ width: 6, height: 6, borderRadius: 9999, background: confidenceText }} />
           {data.confidenceLevel}
         </div>
 
         {/* AACE Class Badge with tooltip */}
-        <div className="relative group/aace">
+        <div className="relative group/aace" style={{ position: "relative" }}>
           <div
-            className="px-2.5 py-1 rounded-full text-xs font-medium cursor-help"
             style={{
+              padding: "4px 10px",
+              borderRadius: 9999,
+              fontSize: 12,
+              fontWeight: 500,
               background: "#F0FDFA",
               color: "#0D9488",
+              border: "1px solid rgba(13, 148, 136, 0.15)",
+              cursor: "help",
             }}
           >
             AACE {data.aaceClass}
           </div>
           <div
-            className="absolute top-full right-0 mt-2 hidden group-hover/aace:block z-50"
+            className="hidden group-hover/aace:block"
             style={{
+              position: "absolute",
+              top: "100%",
+              right: 0,
+              marginTop: 8,
+              zIndex: 50,
               background: "#FFFFFF",
-              border: "1px solid rgba(0,0,0,0.06)",
+              border: "1px solid rgba(0, 0, 0, 0.08)",
               borderRadius: 12,
-              padding: "10px 12px",
+              padding: "12px 14px",
               width: 280,
-              boxShadow: "0 10px 15px -3px rgba(0,0,0,0.06)",
+              boxShadow: "0 12px 24px -4px rgba(0, 0, 0, 0.08), 0 4px 8px -2px rgba(0, 0, 0, 0.04)",
             }}
           >
-            <div className="text-[11px] font-semibold mb-1.5" style={{ color: "#0D9488" }}>
+            <div style={{ fontSize: 12, fontWeight: 600, color: "#0D9488", marginBottom: 6 }}>
               AACE {data.aaceClass} Estimate
             </div>
-            <div className="text-[10px] leading-relaxed mb-2" style={{ color: "#4B5563" }}>
+            <div style={{ fontSize: 11, lineHeight: 1.6, color: "#4B5563", marginBottom: 8 }}>
               {data.aaceDescription || "Feasibility study — accuracy ±25-30%. Suitable for early-stage cost planning."}
             </div>
             {data.costRange && data.costRange.totalLow > 0 && (
-              <div style={{ borderTop: "1px solid rgba(0,0,0,0.06)", paddingTop: 6 }}>
-                <div className="text-[10px]" style={{ color: "#4B5563" }}>
+              <div style={{ borderTop: "1px solid rgba(0, 0, 0, 0.06)", paddingTop: 8 }}>
+                <div style={{ fontSize: 11, color: "#4B5563" }}>
                   Estimated range: ₹{(data.costRange.totalLow / 10000000).toFixed(1)} — ₹{(data.costRange.totalHigh / 10000000).toFixed(1)} Cr
                 </div>
-                <div className="text-[10px]" style={{ color: "#9CA3AF" }}>
+                <div style={{ fontSize: 11, color: "#9CA3AF", marginTop: 2 }}>
                   Best estimate: ₹{(data.costRange.totalBest / 10000000).toFixed(2)} Cr
                 </div>
               </div>
             )}
-            <div className="text-[9px] mt-2" style={{ color: "#9CA3AF" }}>
+            <div style={{ fontSize: 10, color: "#9CA3AF", marginTop: 8 }}>
               Not suitable for tender submission or procurement.
             </div>
           </div>
@@ -143,39 +172,56 @@ export function BOQHeader({ data, onExportExcel }: BOQHeaderProps) {
         {/* Download Excel */}
         <button
           onClick={onExportExcel}
-          className="flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-medium transition-all duration-200"
           style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            padding: "8px 16px",
+            borderRadius: 12,
+            fontSize: 13,
+            fontWeight: 500,
             background: "#0D9488",
             color: "#FFFFFF",
+            border: "none",
+            cursor: "pointer",
+            boxShadow: "0 1px 2px rgba(0, 0, 0, 0.05)",
+            transition: "all 0.2s",
           }}
           onMouseEnter={e => {
             e.currentTarget.style.background = "#0F766E";
-            e.currentTarget.style.boxShadow = "0 4px 6px -1px rgba(13,148,136,0.25)";
+            e.currentTarget.style.boxShadow = "0 4px 8px rgba(13, 148, 136, 0.25)";
           }}
           onMouseLeave={e => {
             e.currentTarget.style.background = "#0D9488";
-            e.currentTarget.style.boxShadow = "none";
+            e.currentTarget.style.boxShadow = "0 1px 2px rgba(0, 0, 0, 0.05)";
           }}
         >
-          <Download size={13} />
+          <Download size={14} />
           Download Excel
         </button>
 
         {/* Share */}
         <button
           onClick={copyLink}
-          className="flex items-center justify-center w-9 h-9 rounded-lg transition-all duration-200"
           style={{
-            background: "transparent",
-            border: "1px solid rgba(0,0,0,0.06)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            width: 40,
+            height: 40,
+            borderRadius: 9999,
+            background: "#F9FAFB",
+            border: "1px solid rgba(0, 0, 0, 0.06)",
+            cursor: "pointer",
+            transition: "all 0.2s",
           }}
           onMouseEnter={e => {
-            e.currentTarget.style.background = "#FAFAF8";
-            e.currentTarget.style.borderColor = "rgba(0,0,0,0.12)";
+            e.currentTarget.style.background = "#F3F4F6";
+            e.currentTarget.style.borderColor = "rgba(0, 0, 0, 0.1)";
           }}
           onMouseLeave={e => {
-            e.currentTarget.style.background = "transparent";
-            e.currentTarget.style.borderColor = "rgba(0,0,0,0.06)";
+            e.currentTarget.style.background = "#F9FAFB";
+            e.currentTarget.style.borderColor = "rgba(0, 0, 0, 0.06)";
           }}
           title="Copy link"
         >

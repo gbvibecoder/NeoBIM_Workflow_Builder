@@ -7,12 +7,16 @@ import { formatINRFull, getDivisionCategory } from "@/features/boq/components/re
 import { getLineConfidenceScore, getLineConfidenceColor } from "@/features/boq/constants/quality-thresholds";
 import { ProvenanceTooltip } from "@/features/boq/components/ProvenanceTooltip";
 
+/* ─── Props ─────────────────────────────────────────────────────────────────── */
+
 interface BOQTableProps {
   lines: BOQLineItem[];
   rateOverrides: Map<string, RateOverride>;
   onRateOverride: (lineId: string, newRate: number, originalRate: number) => void;
   grandTotal?: number;
 }
+
+/* ─── Constants ─────────────────────────────────────────────────────────────── */
 
 const TABS: { id: BOQFilterTab; label: string }[] = [
   { id: "all", label: "All" },
@@ -24,16 +28,20 @@ const TABS: { id: BOQFilterTab; label: string }[] = [
 
 const SOURCE_BADGE: Record<SourceType, { label: string; color: string; bg: string }> = {
   "ifc-geometry": { label: "IFC Geometry", color: "#0D9488", bg: "#F0FDFA" },
-  "ifc-derived": { label: "IFC Derived", color: "#D97706", bg: "#FFFBEB" },
+  "ifc-derived": { label: "IFC Derived", color: "#D97706", bg: "#FEF3C7" },
   "benchmark": { label: "Benchmark", color: "#6B7280", bg: "#F3F4F6" },
-  "provisional": { label: "Provisional", color: "#DC2626", bg: "#FEF2F2" },
+  "provisional": { label: "Provisional", color: "#DC2626", bg: "#FEE2E2" },
 };
 
 const CONFIDENCE_THEME = {
   HIGH: { bg: "#ECFDF5", color: "#059669" },
-  MEDIUM: { bg: "#FFFBEB", color: "#D97706" },
-  LOW: { bg: "#FEF2F2", color: "#DC2626" },
+  MEDIUM: { bg: "#FEF3C7", color: "#D97706" },
+  LOW: { bg: "#FEE2E2", color: "#DC2626" },
 };
+
+const PAGE_SIZE = 25;
+
+/* ─── ConfidenceBadge ───────────────────────────────────────────────────────── */
 
 function ConfidenceBadge({ confidence, lineConfidence }: { confidence: number; lineConfidence?: BOQLineItem["lineConfidence"] }) {
   const score = lineConfidence?.score ?? getLineConfidenceScore(confidence);
@@ -43,18 +51,16 @@ function ConfidenceBadge({ confidence, lineConfidence }: { confidence: number; l
   const factors = lineConfidence?.factors ?? [];
   return (
     <span className="relative group/conf inline-flex items-center gap-1.5">
-      {/* Colored dot */}
       <span
         className="inline-block rounded-full shrink-0"
-        style={{ width: 8, height: 8, background: theme.color }}
+        style={{ width: 6, height: 6, background: theme.color }}
       />
       <span
-        className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold"
-        style={{ background: theme.bg, color: theme.color }}
+        className="inline-flex items-center px-2 py-0.5 rounded-full font-medium"
+        style={{ background: theme.bg, color: theme.color, fontSize: 10 }}
       >
         {label}
       </span>
-      {/* Tooltip on hover */}
       {factors.length > 0 && (
         <div
           className="absolute bottom-full left-0 mb-2 hidden group-hover/conf:block z-50"
@@ -67,11 +73,11 @@ function ConfidenceBadge({ confidence, lineConfidence }: { confidence: number; l
             boxShadow: "0 10px 25px rgba(0,0,0,0.1), 0 4px 10px rgba(0,0,0,0.05)",
           }}
         >
-          <div className="text-[10px] font-semibold mb-1.5" style={{ color: theme.color }}>
+          <div className="font-semibold mb-1.5" style={{ color: theme.color, fontSize: 10 }}>
             {label} Confidence
           </div>
           {factors.map((f, i) => (
-            <div key={i} className="text-[10px] leading-[1.4]" style={{ color: "#4B5563", marginBottom: 2 }}>
+            <div key={i} className="leading-[1.4]" style={{ color: "#4B5563", marginBottom: 2, fontSize: 10 }}>
               • {f}
             </div>
           ))}
@@ -81,9 +87,23 @@ function ConfidenceBadge({ confidence, lineConfidence }: { confidence: number; l
   );
 }
 
-const PAGE_SIZE = 25;
+/* ─── Column definitions ────────────────────────────────────────────────────── */
+
+const COLUMNS: { label: string; sortable?: BOQSortKey }[] = [
+  { label: "IS Code" },
+  { label: "Description", sortable: "description" },
+  { label: "Unit" },
+  { label: "Qty" },
+  { label: "Rate" },
+  { label: "Amount", sortable: "amount" },
+  { label: "Source" },
+  { label: "Confidence", sortable: "confidence" },
+];
+
+/* ─── BOQTable ──────────────────────────────────────────────────────────────── */
 
 export function BOQTable({ lines, rateOverrides, onRateOverride, grandTotal: grandTotalProp }: BOQTableProps) {
+  /* State */
   const [activeTab, setActiveTab] = useState<BOQFilterTab>("all");
   const [sortKey, setSortKey] = useState<BOQSortKey>("amount");
   const [sortDir, setSortDir] = useState<BOQSortDir>("desc");
@@ -98,7 +118,7 @@ export function BOQTable({ lines, rateOverrides, onRateOverride, grandTotal: gra
     return () => clearTimeout(timer);
   }, []);
 
-  // Filter
+  /* Filter */
   const filtered = useMemo(() => {
     let result = lines;
 
@@ -117,7 +137,7 @@ export function BOQTable({ lines, rateOverrides, onRateOverride, grandTotal: gra
     return result;
   }, [lines, activeTab, sourceFilter]);
 
-  // Sort
+  /* Sort */
   const sorted = useMemo(() => {
     return [...filtered].sort((a, b) => {
       const dir = sortDir === "asc" ? 1 : -1;
@@ -127,14 +147,22 @@ export function BOQTable({ lines, rateOverrides, onRateOverride, grandTotal: gra
     });
   }, [filtered, sortKey, sortDir]);
 
-  // Pagination
+  /* Pagination */
   const totalPages = Math.ceil(sorted.length / PAGE_SIZE);
   const paginated = sorted.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
   const filteredTotal = filtered.reduce((s, l) => s + l.totalCost, 0);
   const grandTotal = grandTotalProp ?? filteredTotal;
 
-  // Reset page when filter changes
+  /* Reset page when filter changes */
   useEffect(() => { setPage(0); }, [activeTab, sourceFilter, sortKey, sortDir]);
+
+  /* Confidence counts */
+  const confidenceCounts = useMemo(() => {
+    const high = filtered.filter(l => (l.lineConfidence?.score ?? getLineConfidenceScore(l.confidence)) === "high").length;
+    const med = filtered.filter(l => (l.lineConfidence?.score ?? getLineConfidenceScore(l.confidence)) === "medium").length;
+    const low = filtered.length - high - med;
+    return { high, med, low };
+  }, [filtered]);
 
   const toggleSort = useCallback((key: BOQSortKey) => {
     if (sortKey === key) {
@@ -171,53 +199,87 @@ export function BOQTable({ lines, rateOverrides, onRateOverride, grandTotal: gra
 
   return (
     <div
-      className="mx-6 rounded-xl overflow-hidden"
+      className="mx-6 rounded-2xl overflow-hidden"
       style={{
         background: "#FFFFFF",
         border: "1px solid rgba(0, 0, 0, 0.06)",
-        boxShadow: "0 4px 6px -1px rgba(0,0,0,0.05)",
+        boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
       }}
     >
-      {/* Hint + Tabs + Source Filter */}
+      {/* ── Hint Row ─────────────────────────────────────────────────────────── */}
       <div
-        className="flex items-center justify-between px-5 py-3"
-        style={{ borderBottom: "1px solid rgba(0, 0, 0, 0.06)" }}
+        className="flex items-center px-5"
+        style={{
+          borderBottom: "1px solid rgba(0, 0, 0, 0.06)",
+          paddingTop: 10,
+          paddingBottom: 10,
+        }}
       >
-        <div className="flex items-center gap-1.5 mr-3">
-          <Pencil size={9} color="#9CA3AF" />
-          <span className="text-[10px]" style={{ color: "#9CA3AF" }}>Click any Rate cell to override</span>
-        </div>
+        <Pencil size={10} color="#9CA3AF" className="shrink-0" />
+        <span
+          className="ml-1.5"
+          style={{ color: "#9CA3AF", fontSize: 11 }}
+        >
+          Click any Rate cell to override
+        </span>
       </div>
+
+      {/* ── Filter Tabs + Source Dropdown ─────────────────────────────────────── */}
       <div
         className="flex items-center justify-between px-5 py-3"
         style={{ borderBottom: "1px solid rgba(0, 0, 0, 0.06)" }}
       >
-        <div className="flex items-center gap-1">
-          {TABS.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200"
-              style={{
-                background: activeTab === tab.id ? "#F0FDFA" : "transparent",
-                color: activeTab === tab.id ? "#0D9488" : "#9CA3AF",
-                border: activeTab === tab.id ? "1px solid rgba(13, 148, 136, 0.2)" : "1px solid transparent",
-              }}
-            >
-              {tab.label}
-            </button>
-          ))}
+        <div className="flex items-center gap-1.5">
+          {TABS.map((tab) => {
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className="rounded-full px-4 transition-all duration-200"
+                style={{
+                  paddingTop: 6,
+                  paddingBottom: 6,
+                  fontSize: 12,
+                  fontWeight: 500,
+                  background: isActive ? "#0D9488" : "#FFFFFF",
+                  color: isActive ? "#FFFFFF" : "#4B5563",
+                  border: isActive ? "1px solid #0D9488" : "1px solid rgba(0, 0, 0, 0.08)",
+                  boxShadow: isActive ? "0 1px 2px rgba(0,0,0,0.05)" : "none",
+                  cursor: "pointer",
+                }}
+                onMouseEnter={(e) => {
+                  if (!isActive) {
+                    e.currentTarget.style.background = "#F9FAFB";
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!isActive) {
+                    e.currentTarget.style.background = "#FFFFFF";
+                  }
+                }}
+              >
+                {tab.label}
+              </button>
+            );
+          })}
         </div>
 
         {/* Source filter dropdown */}
         <select
           value={sourceFilter}
           onChange={(e) => setSourceFilter(e.target.value as SourceType | "all")}
-          className="text-xs rounded-lg px-2.5 py-1.5 outline-none cursor-pointer"
+          className="outline-none cursor-pointer"
           style={{
             background: "#FFFFFF",
             border: "1px solid rgba(0, 0, 0, 0.1)",
             color: "#4B5563",
+            borderRadius: 8,
+            fontSize: 12,
+            paddingLeft: 10,
+            paddingRight: 10,
+            paddingTop: 6,
+            paddingBottom: 6,
           }}
         >
           <option value="all">All Sources</option>
@@ -228,77 +290,88 @@ export function BOQTable({ lines, rateOverrides, onRateOverride, grandTotal: gra
         </select>
       </div>
 
-      {/* Confidence Summary Bar */}
-      {(() => {
-        const high = filtered.filter(l => (l.lineConfidence?.score ?? getLineConfidenceScore(l.confidence)) === "high").length;
-        const med = filtered.filter(l => (l.lineConfidence?.score ?? getLineConfidenceScore(l.confidence)) === "medium").length;
-        const low = filtered.length - high - med;
-        return (
-          <div
-            className="flex items-center justify-between px-5 py-2"
-            style={{ borderBottom: "1px solid rgba(0, 0, 0, 0.06)", background: "#F9FAFB" }}
+      {/* ── Confidence Summary Bar ───────────────────────────────────────────── */}
+      <div
+        className="flex items-center justify-between px-5 py-2"
+        style={{ borderBottom: "1px solid rgba(0, 0, 0, 0.06)" }}
+      >
+        <div className="flex items-center gap-3">
+          {/* High pill */}
+          <span
+            className="inline-flex items-center gap-1.5 px-2.5 rounded-full font-medium"
+            style={{
+              background: CONFIDENCE_THEME.HIGH.bg,
+              color: CONFIDENCE_THEME.HIGH.color,
+              fontSize: 11,
+              paddingTop: 3,
+              paddingBottom: 3,
+            }}
           >
-            <div className="flex items-center gap-4 text-[10px]">
-              <span
-                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-medium"
-                style={{ background: CONFIDENCE_THEME.HIGH.bg, color: CONFIDENCE_THEME.HIGH.color }}
-              >
-                <span style={{ width: 6, height: 6, borderRadius: "50%", background: CONFIDENCE_THEME.HIGH.color, display: "inline-block" }} />
-                {high} high
-              </span>
-              <span
-                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-medium"
-                style={{ background: CONFIDENCE_THEME.MEDIUM.bg, color: CONFIDENCE_THEME.MEDIUM.color }}
-              >
-                <span style={{ width: 6, height: 6, borderRadius: "50%", background: CONFIDENCE_THEME.MEDIUM.color, display: "inline-block" }} />
-                {med} medium
-              </span>
-              <span
-                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-medium"
-                style={{ background: CONFIDENCE_THEME.LOW.bg, color: CONFIDENCE_THEME.LOW.color }}
-              >
-                <span style={{ width: 6, height: 6, borderRadius: "50%", background: CONFIDENCE_THEME.LOW.color, display: "inline-block" }} />
-                {low} low
-              </span>
-            </div>
-            <div className="flex items-center gap-4 text-[10px]" style={{ color: "#9CA3AF" }}>
-              {filtered.length} of {lines.length} items shown
-            </div>
-          </div>
-        );
-      })()}
+            <span style={{ width: 6, height: 6, borderRadius: "50%", background: CONFIDENCE_THEME.HIGH.color, display: "inline-block", flexShrink: 0 }} />
+            {confidenceCounts.high} high
+          </span>
+          {/* Medium pill */}
+          <span
+            className="inline-flex items-center gap-1.5 px-2.5 rounded-full font-medium"
+            style={{
+              background: CONFIDENCE_THEME.MEDIUM.bg,
+              color: CONFIDENCE_THEME.MEDIUM.color,
+              fontSize: 11,
+              paddingTop: 3,
+              paddingBottom: 3,
+            }}
+          >
+            <span style={{ width: 6, height: 6, borderRadius: "50%", background: CONFIDENCE_THEME.MEDIUM.color, display: "inline-block", flexShrink: 0 }} />
+            {confidenceCounts.med} medium
+          </span>
+          {/* Low pill */}
+          <span
+            className="inline-flex items-center gap-1.5 px-2.5 rounded-full font-medium"
+            style={{
+              background: CONFIDENCE_THEME.LOW.bg,
+              color: CONFIDENCE_THEME.LOW.color,
+              fontSize: 11,
+              paddingTop: 3,
+              paddingBottom: 3,
+            }}
+          >
+            <span style={{ width: 6, height: 6, borderRadius: "50%", background: CONFIDENCE_THEME.LOW.color, display: "inline-block", flexShrink: 0 }} />
+            {confidenceCounts.low} low
+          </span>
+        </div>
+        <span style={{ color: "#9CA3AF", fontSize: 11 }}>
+          {filtered.length} of {lines.length} items shown
+        </span>
+      </div>
 
-      {/* Table */}
+      {/* ── Table ────────────────────────────────────────────────────────────── */}
       <div className="overflow-x-auto">
-        <table className="w-full text-xs" style={{ minWidth: 900 }}>
+        <table style={{ width: "100%", minWidth: 960, borderCollapse: "collapse" }}>
           <thead>
             <tr style={{ borderBottom: "1px solid rgba(0, 0, 0, 0.06)" }}>
-              {[
-                { label: "IS Code", width: "w-24" },
-                { label: "Description", width: "flex-1", sortable: "description" as BOQSortKey },
-                { label: "Unit", width: "w-14" },
-                { label: "Qty", width: "w-16" },
-                { label: "Rate", width: "w-24" },
-                { label: "Amount", width: "w-28", sortable: "amount" as BOQSortKey },
-                { label: "Source", width: "w-24" },
-                { label: "Confidence", width: "w-24", sortable: "confidence" as BOQSortKey },
-              ].map((col) => (
+              {COLUMNS.map((col) => (
                 <th
                   key={col.label}
-                  className={`px-3 py-3 text-left font-semibold ${col.width} ${col.sortable ? "cursor-pointer select-none" : ""}`}
+                  onClick={col.sortable ? () => toggleSort(col.sortable!) : undefined}
                   style={{
+                    textAlign: "left",
+                    padding: "10px 14px",
                     color: "#9CA3AF",
                     fontSize: 10,
-                    letterSpacing: "0.05em",
-                    textTransform: "uppercase",
-                    position: "sticky",
+                    fontWeight: 500,
+                    letterSpacing: "0.06em",
+                    textTransform: "uppercase" as const,
+                    position: "sticky" as const,
                     top: 0,
                     background: "#FFFFFF",
                     zIndex: 10,
+                    borderBottom: "1px solid rgba(0, 0, 0, 0.06)",
+                    cursor: col.sortable ? "pointer" : "default",
+                    userSelect: col.sortable ? "none" : undefined,
+                    whiteSpace: "nowrap" as const,
                   }}
-                  onClick={col.sortable ? () => toggleSort(col.sortable!) : undefined}
                 >
-                  <span className="flex items-center gap-1">
+                  <span className="inline-flex items-center gap-1">
                     {col.label}
                     {col.sortable && <SortIcon col={col.sortable} />}
                   </span>
@@ -306,60 +379,80 @@ export function BOQTable({ lines, rateOverrides, onRateOverride, grandTotal: gra
               ))}
             </tr>
           </thead>
+
           <tbody>
             {paginated.map((line, i) => {
               const override = rateOverrides.get(line.id);
               const isEditing = editingId === line.id;
               const hasOverride = !!override;
+              const altBg = i % 2 === 1 ? "#FAFAF8" : "#FFFFFF";
 
               return (
                 <tr
                   key={line.id}
-                  className="group transition-colors duration-150"
+                  className="group"
                   style={{
                     borderBottom: "1px solid rgba(0, 0, 0, 0.04)",
                     opacity: rowsVisible ? 1 : 0,
-                    transform: rowsVisible ? "translateY(0)" : "translateY(4px)",
-                    transition: `opacity 0.3s ease ${i * 20}ms, transform 0.3s ease ${i * 20}ms, background-color 0.15s, border-left 0.15s`,
-                    backgroundColor: i % 2 === 1 ? "#F9FAFB" : "#FFFFFF",
-                    borderLeft: "3px solid transparent",
+                    transform: rowsVisible ? "translateX(0)" : "translateX(-2px)",
+                    transition: `opacity 0.3s ease ${i * 15}ms, transform 0.3s ease ${i * 15}ms, background-color 0.15s ease`,
+                    backgroundColor: altBg,
                   }}
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = "#F5F5F3";
-                    e.currentTarget.style.borderLeft = "3px solid #0D9488";
+                    e.currentTarget.style.backgroundColor = "#F0FDF9";
+                    e.currentTarget.style.boxShadow = "inset 3px 0 0 0 #0D9488";
+                    e.currentTarget.style.transform = "translateX(1px)";
                   }}
                   onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = i % 2 === 1 ? "#F9FAFB" : "#FFFFFF";
-                    e.currentTarget.style.borderLeft = "3px solid transparent";
+                    e.currentTarget.style.backgroundColor = altBg;
+                    e.currentTarget.style.boxShadow = "none";
+                    e.currentTarget.style.transform = "translateX(0)";
                   }}
                 >
                   {/* IS Code */}
-                  <td className="px-3 py-2.5" style={{ color: "#9CA3AF", fontFamily: "var(--font-jetbrains, 'JetBrains Mono', monospace)", fontSize: 10 }}>
+                  <td
+                    style={{
+                      padding: "10px 14px",
+                      color: "#9CA3AF",
+                      fontFamily: "var(--font-jetbrains, 'JetBrains Mono', monospace)",
+                      fontSize: 10,
+                      whiteSpace: "nowrap" as const,
+                    }}
+                  >
                     {line.isCode || "\u2014"}
                   </td>
 
-                  {/* Description */}
-                  <td className="px-3 py-2.5" style={{ color: "#1A1A1A" }}>
-                    {line.description}
+                  {/* Description + Storey */}
+                  <td style={{ padding: "10px 14px" }}>
+                    <span style={{ color: "#111827", fontSize: 13 }}>
+                      {line.description}
+                    </span>
                     {line.storey && (
-                      <span className="ml-2 text-[10px]" style={{ color: "#9CA3AF" }}>
+                      <span style={{ color: "#9CA3AF", fontSize: 10, marginLeft: 8 }}>
                         {line.storey}
                       </span>
                     )}
                   </td>
 
                   {/* Unit */}
-                  <td className="px-3 py-2.5" style={{ color: "#4B5563" }}>
+                  <td style={{ padding: "10px 14px", color: "#4B5563", fontSize: 13 }}>
                     {line.unit}
                   </td>
 
                   {/* Qty */}
-                  <td className="px-3 py-2.5" style={{ color: "#1A1A1A", fontVariantNumeric: "tabular-nums" }}>
+                  <td
+                    style={{
+                      padding: "10px 14px",
+                      color: "#111827",
+                      fontVariantNumeric: "tabular-nums",
+                      fontSize: 13,
+                    }}
+                  >
                     {line.adjustedQty.toLocaleString("en-IN", { maximumFractionDigits: 1 })}
                   </td>
 
                   {/* Rate (editable) */}
-                  <td className="px-3 py-2.5">
+                  <td style={{ padding: "10px 14px" }}>
                     {isEditing ? (
                       <div className="flex items-center gap-1">
                         <input
@@ -370,42 +463,77 @@ export function BOQTable({ lines, rateOverrides, onRateOverride, grandTotal: gra
                             if (e.key === "Enter") confirmEdit(line);
                             if (e.key === "Escape") cancelEdit();
                           }}
-                          className="w-16 px-1.5 py-0.5 rounded text-xs outline-none"
+                          className="outline-none"
                           style={{
+                            width: 72,
+                            padding: "3px 6px",
+                            borderRadius: 6,
+                            fontSize: 12,
                             background: "#F0FDFA",
                             border: "1px solid #0D9488",
-                            color: "#1A1A1A",
+                            color: "#111827",
                           }}
                           autoFocus
                         />
-                        <button onClick={() => confirmEdit(line)} className="p-0.5">
-                          <Check size={12} color="#059669" />
+                        <button
+                          onClick={() => confirmEdit(line)}
+                          style={{ padding: 2, display: "flex", alignItems: "center", cursor: "pointer", background: "none", border: "none" }}
+                        >
+                          <Check size={13} color="#059669" />
                         </button>
-                        <button onClick={cancelEdit} className="p-0.5">
-                          <X size={12} color="#DC2626" />
+                        <button
+                          onClick={cancelEdit}
+                          style={{ padding: 2, display: "flex", alignItems: "center", cursor: "pointer", background: "none", border: "none" }}
+                        >
+                          <X size={13} color="#DC2626" />
                         </button>
                       </div>
                     ) : (
                       <ProvenanceTooltip line={line}>
                         <div
-                          className="flex items-center gap-1 cursor-pointer group/rate"
+                          className="group/rate"
                           onClick={() => startEdit(line)}
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 4,
+                            cursor: "pointer",
+                            borderRadius: 6,
+                            padding: "2px 4px",
+                            marginLeft: -4,
+                            transition: "background-color 0.15s ease",
+                          }}
+                          onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "#F0FDF9"; }}
+                          onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "transparent"; }}
                         >
                           {hasOverride && (
                             <Pencil size={10} color="#0D9488" className="shrink-0" />
                           )}
-                          <span style={{
-                            color: hasOverride ? "#0D9488" : "#1A1A1A",
-                            fontVariantNumeric: "tabular-nums",
-                          }}>
-                            \u20B9{(override?.newRate ?? line.unitRate).toLocaleString("en-IN", { maximumFractionDigits: 0 })}
+                          <span
+                            style={{
+                              color: hasOverride ? "#0D9488" : "#111827",
+                              fontVariantNumeric: "tabular-nums",
+                              fontSize: 13,
+                            }}
+                          >
+                            {"\u20B9"}{(override?.newRate ?? line.unitRate).toLocaleString("en-IN", { maximumFractionDigits: 0 })}
                           </span>
                           {hasOverride && (
-                            <span className="text-[10px] line-through" style={{ color: "#9CA3AF" }}>
-                              \u20B9{line.unitRate.toLocaleString("en-IN", { maximumFractionDigits: 0 })}
+                            <span
+                              style={{
+                                color: "#9CA3AF",
+                                fontSize: 10,
+                                textDecoration: "line-through",
+                              }}
+                            >
+                              {"\u20B9"}{line.unitRate.toLocaleString("en-IN", { maximumFractionDigits: 0 })}
                             </span>
                           )}
-                          <Pencil size={10} color="#9CA3AF" className="opacity-0 group-hover/rate:opacity-100 transition-opacity shrink-0" />
+                          <Pencil
+                            size={10}
+                            color="#9CA3AF"
+                            className="shrink-0 opacity-0 group-hover/rate:opacity-100 transition-opacity"
+                          />
                         </div>
                       </ProvenanceTooltip>
                     )}
@@ -413,19 +541,30 @@ export function BOQTable({ lines, rateOverrides, onRateOverride, grandTotal: gra
 
                   {/* Amount */}
                   <td
-                    className="px-3 py-2.5 font-bold transition-colors duration-300"
-                    style={{ color: "#1A1A1A", fontVariantNumeric: "tabular-nums" }}
+                    style={{
+                      padding: "10px 14px",
+                      color: "#111827",
+                      fontWeight: 600,
+                      fontVariantNumeric: "tabular-nums",
+                      fontSize: 13,
+                    }}
                   >
                     {formatINRFull(line.totalCost)}
                   </td>
 
                   {/* Source */}
-                  <td className="px-3 py-2.5">
+                  <td style={{ padding: "10px 14px" }}>
                     <span
-                      className="inline-flex px-1.5 py-0.5 rounded-full text-[10px] font-medium"
                       style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        padding: "2px 8px",
+                        borderRadius: 9999,
+                        fontSize: 10,
+                        fontWeight: 500,
                         background: SOURCE_BADGE[line.source].bg,
                         color: SOURCE_BADGE[line.source].color,
+                        whiteSpace: "nowrap" as const,
                       }}
                     >
                       {SOURCE_BADGE[line.source].label}
@@ -433,27 +572,49 @@ export function BOQTable({ lines, rateOverrides, onRateOverride, grandTotal: gra
                   </td>
 
                   {/* Confidence */}
-                  <td className="px-3 py-2.5">
+                  <td style={{ padding: "10px 14px" }}>
                     <ConfidenceBadge confidence={line.confidence} lineConfidence={line.lineConfidence} />
                   </td>
                 </tr>
               );
             })}
 
-            {/* Grand Total Row */}
+            {/* ── Grand Total Row ──────────────────────────────────────────────── */}
             <tr
               style={{
                 borderTop: "2px solid rgba(13, 148, 136, 0.2)",
                 background: "#F0FDFA",
               }}
             >
-              <td className="px-3 py-3 font-bold" style={{ color: "#0D9488" }}>
+              <td
+                style={{
+                  padding: "12px 14px",
+                  color: "#0D9488",
+                  fontWeight: 700,
+                  fontSize: 13,
+                }}
+              >
                 TOTAL
               </td>
-              <td colSpan={4} className="px-3 py-3" style={{ color: "#4B5563" }}>
+              <td
+                colSpan={4}
+                style={{
+                  padding: "12px 14px",
+                  color: "#4B5563",
+                  fontSize: 12,
+                }}
+              >
                 {filtered.length} line items
               </td>
-              <td className="px-3 py-3 font-bold" style={{ color: "#0D9488", fontVariantNumeric: "tabular-nums" }}>
+              <td
+                style={{
+                  padding: "12px 14px",
+                  color: "#0D9488",
+                  fontWeight: 700,
+                  fontVariantNumeric: "tabular-nums",
+                  fontSize: 16,
+                }}
+              >
                 {formatINRFull(grandTotal)}
               </td>
               <td colSpan={2} />
@@ -462,55 +623,76 @@ export function BOQTable({ lines, rateOverrides, onRateOverride, grandTotal: gra
         </table>
       </div>
 
-      {/* Pagination */}
+      {/* ── Pagination ───────────────────────────────────────────────────────── */}
       {totalPages > 1 && (
         <div
           className="flex items-center justify-between px-5 py-3"
           style={{ borderTop: "1px solid rgba(0, 0, 0, 0.06)" }}
         >
-          <span className="text-xs" style={{ color: "#9CA3AF" }}>
-            Showing {page * PAGE_SIZE + 1}\u2013{Math.min((page + 1) * PAGE_SIZE, sorted.length)} of {sorted.length}
+          <span style={{ color: "#9CA3AF", fontSize: 12 }}>
+            Showing {page * PAGE_SIZE + 1}{"\u2013"}{Math.min((page + 1) * PAGE_SIZE, sorted.length)} of {sorted.length}
           </span>
-          <div className="flex items-center gap-2">
+
+          <div className="flex items-center gap-1.5">
+            {/* Prev arrow */}
             <button
               onClick={() => setPage(Math.max(0, page - 1))}
               disabled={page === 0}
-              className="flex items-center justify-center w-7 h-7 rounded-lg transition-all"
+              className="flex items-center justify-center"
               style={{
-                background: page === 0 ? "transparent" : "#F9FAFB",
-                border: "1px solid rgba(0,0,0,0.08)",
-                opacity: page === 0 ? 0.3 : 1,
+                width: 30,
+                height: 30,
+                borderRadius: 8,
+                background: page === 0 ? "#FFFFFF" : "#FFFFFF",
+                border: "1px solid rgba(0,0,0,0.06)",
+                opacity: page === 0 ? 0.35 : 1,
                 cursor: page === 0 ? "default" : "pointer",
+                transition: "all 0.15s ease",
               }}
             >
               <ChevronLeft size={14} color="#4B5563" />
             </button>
+
+            {/* Page numbers */}
             {Array.from({ length: Math.min(totalPages, 7) }, (_, i) => {
               const pageNum = totalPages <= 7 ? i : Math.max(0, Math.min(page - 3, totalPages - 7)) + i;
+              const isCurrent = page === pageNum;
               return (
                 <button
                   key={pageNum}
                   onClick={() => setPage(pageNum)}
-                  className="w-7 h-7 rounded-lg text-xs font-medium transition-all"
                   style={{
-                    background: page === pageNum ? "#F0FDFA" : "transparent",
-                    color: page === pageNum ? "#0D9488" : "#9CA3AF",
-                    border: page === pageNum ? "1px solid rgba(13, 148, 136, 0.25)" : "1px solid transparent",
+                    width: 30,
+                    height: 30,
+                    borderRadius: 8,
+                    fontSize: 12,
+                    fontWeight: 500,
+                    background: isCurrent ? "#0D9488" : "#FFFFFF",
+                    color: isCurrent ? "#FFFFFF" : "#4B5563",
+                    border: isCurrent ? "1px solid #0D9488" : "1px solid rgba(0,0,0,0.06)",
+                    cursor: "pointer",
+                    transition: "all 0.15s ease",
                   }}
                 >
                   {pageNum + 1}
                 </button>
               );
             })}
+
+            {/* Next arrow */}
             <button
               onClick={() => setPage(Math.min(totalPages - 1, page + 1))}
               disabled={page >= totalPages - 1}
-              className="flex items-center justify-center w-7 h-7 rounded-lg transition-all"
+              className="flex items-center justify-center"
               style={{
-                background: page >= totalPages - 1 ? "transparent" : "#F9FAFB",
-                border: "1px solid rgba(0,0,0,0.08)",
-                opacity: page >= totalPages - 1 ? 0.3 : 1,
+                width: 30,
+                height: 30,
+                borderRadius: 8,
+                background: "#FFFFFF",
+                border: "1px solid rgba(0,0,0,0.06)",
+                opacity: page >= totalPages - 1 ? 0.35 : 1,
                 cursor: page >= totalPages - 1 ? "default" : "pointer",
+                transition: "all 0.15s ease",
               }}
             >
               <ChevronRight size={14} color="#4B5563" />

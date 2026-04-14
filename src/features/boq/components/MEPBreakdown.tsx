@@ -1,5 +1,7 @@
 "use client";
 
+import { useRef } from "react";
+import { motion, useInView } from "framer-motion";
 import { Wind, Zap, Droplets, Flame, ArrowUpDown } from "lucide-react";
 import { formatINR } from "@/features/boq/components/recalc-engine";
 import type { BOQData } from "@/features/boq/components/types";
@@ -17,71 +19,173 @@ const MEP_ITEMS = [
 ];
 
 export function MEPBreakdown({ mep }: MEPBreakdownProps) {
+  const ref = useRef(null);
+  const isInView = useInView(ref, { once: true });
+
   const maxPct = Math.max(...MEP_ITEMS.map((m) => mep[m.key].percentage));
 
   return (
-    <div
-      className="rounded-xl p-5"
+    <motion.div
+      ref={ref}
+      initial={{ opacity: 0, y: 16 }}
+      animate={isInView ? { opacity: 1, y: 0 } : {}}
+      transition={{ duration: 0.5, ease: "easeOut" }}
       style={{
         background: "#FFFFFF",
-        border: "1px solid rgba(0, 0, 0, 0.06)",
-        boxShadow: "0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -2px rgba(0,0,0,0.03)",
+        borderRadius: 16,
+        boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
+        border: "1px solid rgba(0,0,0,0.06)",
+        padding: 24,
       }}
     >
-      <h3 className="text-sm font-semibold mb-4" style={{ color: "#1A1A1A" }}>
+      <h3
+        style={{
+          color: "#111827",
+          fontSize: 15,
+          fontWeight: 600,
+          margin: 0,
+          marginBottom: 20,
+        }}
+      >
         MEP Breakdown
       </h3>
 
-      <div className="flex flex-col gap-3.5">
-        {MEP_ITEMS.map((item) => {
+      <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+        {MEP_ITEMS.map((item, index) => {
           const data = mep[item.key];
           const barWidth = maxPct > 0 ? (data.percentage / maxPct) * 100 : 0;
 
           return (
-            <div key={item.key} className="group">
-              <div className="flex items-center gap-3">
+            <motion.div
+              key={item.key}
+              className="group"
+              initial={{ opacity: 0, x: -8 }}
+              animate={isInView ? { opacity: 1, x: 0 } : {}}
+              transition={{
+                duration: 0.4,
+                delay: index * 0.08,
+                ease: "easeOut",
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 12,
+                }}
+              >
+                {/* Icon */}
                 <div
-                  className="flex items-center justify-center w-7 h-7 rounded-lg shrink-0"
-                  style={{ background: `${item.color}12` }}
+                  style={{
+                    width: 24,
+                    height: 24,
+                    borderRadius: "50%",
+                    background: `${item.color}14`,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    flexShrink: 0,
+                  }}
                 >
-                  <item.icon size={13} color={item.color} />
+                  <item.icon size={12} color={item.color} />
                 </div>
 
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs font-medium" style={{ color: "#1A1A1A" }}>
+                {/* Label + bar + stats */}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      marginBottom: 4,
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontSize: 13,
+                        fontWeight: 500,
+                        color: "#111827",
+                      }}
+                    >
                       {item.label}
                     </span>
-                    <span className="text-xs" style={{ color: item.color, fontVariantNumeric: "tabular-nums" }}>
-                      {data.percentage.toFixed(1)}% · {formatINR(data.cost)}
-                    </span>
+
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "baseline",
+                        gap: 6,
+                      }}
+                    >
+                      <span
+                        style={{
+                          fontSize: 13,
+                          fontWeight: 700,
+                          color: item.color,
+                          fontVariantNumeric: "tabular-nums",
+                        }}
+                      >
+                        {data.percentage.toFixed(1)}%
+                      </span>
+                      <span
+                        style={{
+                          fontSize: 12,
+                          color: "#4B5563",
+                          fontVariantNumeric: "tabular-nums",
+                        }}
+                      >
+                        {formatINR(data.cost)}
+                      </span>
+                    </div>
                   </div>
 
-                  <div className="h-[5px] rounded-full overflow-hidden" style={{ background: "#F3F4F6" }}>
-                    <div
-                      className="h-full rounded-full"
+                  {/* Bar track */}
+                  <div
+                    style={{
+                      height: 6,
+                      borderRadius: 9999,
+                      background: "#F3F4F6",
+                      overflow: "hidden",
+                    }}
+                  >
+                    <motion.div
+                      initial={{ width: 0 }}
+                      animate={isInView ? { width: `${barWidth}%` } : {}}
+                      transition={{
+                        duration: 0.7,
+                        delay: index * 0.08,
+                        ease: "easeOut",
+                      }}
                       style={{
-                        width: `${barWidth}%`,
-                        background: `linear-gradient(90deg, ${item.color}60, ${item.color})`,
-                        transition: "width 0.6s ease-out",
+                        height: "100%",
+                        borderRadius: 9999,
+                        background: item.color,
                       }}
                     />
                   </div>
                 </div>
               </div>
 
-              {/* Reasoning tooltip on hover */}
+              {/* Reasoning tooltip on hover — slides down via maxHeight */}
               <div
                 className="overflow-hidden transition-all duration-200 max-h-0 group-hover:max-h-10"
               >
-                <p className="text-[10px] mt-1.5 ml-10" style={{ color: "#4B5563" }}>
+                <p
+                  style={{
+                    fontSize: 10,
+                    color: "#4B5563",
+                    margin: 0,
+                    marginTop: 6,
+                    marginLeft: 36,
+                  }}
+                >
                   {data.reasoning}
                 </p>
               </div>
-            </div>
+            </motion.div>
           );
         })}
       </div>
-    </div>
+    </motion.div>
   );
 }

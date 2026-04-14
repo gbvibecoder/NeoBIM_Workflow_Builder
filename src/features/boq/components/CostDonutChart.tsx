@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import { motion, useInView } from "framer-motion";
 import { formatINR } from "@/features/boq/components/recalc-engine";
 
 interface CostDonutChartProps {
@@ -16,10 +17,14 @@ const SEGMENTS = [
 ] as const;
 
 export function CostDonutChart({ material, labor, equipment }: CostDonutChartProps) {
+  const ref = useRef(null);
+  const isInView = useInView(ref, { once: true });
   const [animProgress, setAnimProgress] = useState(0);
   const [hoveredSegment, setHoveredSegment] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!isInView) return;
+
     let start: number | null = null;
     const duration = 600;
     const animate = (ts: number) => {
@@ -30,7 +35,7 @@ export function CostDonutChart({ material, labor, equipment }: CostDonutChartPro
       if (p < 1) requestAnimationFrame(animate);
     };
     requestAnimationFrame(animate);
-  }, []);
+  }, [isInView]);
 
   const total = material + labor + equipment;
   if (total === 0) return null;
@@ -59,25 +64,47 @@ export function CostDonutChart({ material, labor, equipment }: CostDonutChartPro
   });
 
   return (
-    <div
-      className="rounded-xl p-5"
+    <motion.div
+      ref={ref}
+      initial={{ opacity: 0, y: 16 }}
+      animate={isInView ? { opacity: 1, y: 0 } : {}}
+      transition={{ duration: 0.5, ease: "easeOut" }}
       style={{
         background: "#FFFFFF",
-        border: "1px solid rgba(0, 0, 0, 0.06)",
-        boxShadow: "0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -2px rgba(0,0,0,0.03)",
+        borderRadius: 16,
+        boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
+        border: "1px solid rgba(0,0,0,0.06)",
+        padding: 24,
       }}
     >
-      <h3 className="text-sm font-semibold mb-4" style={{ color: "#1A1A1A" }}>
+      <h3
+        style={{
+          color: "#111827",
+          fontSize: 15,
+          fontWeight: 600,
+          margin: 0,
+          marginBottom: 20,
+        }}
+      >
         Cost Breakdown
       </h3>
 
-      <div className="flex items-center gap-6">
+      <div style={{ display: "flex", alignItems: "center", gap: 24 }}>
         {/* SVG Donut */}
-        <div className="relative w-[140px] h-[140px] shrink-0">
-          <svg viewBox="0 0 200 200" className="w-full h-full">
+        <div
+          style={{
+            position: "relative",
+            width: 140,
+            height: 140,
+            flexShrink: 0,
+          }}
+        >
+          <svg viewBox="0 0 200 200" style={{ width: "100%", height: "100%" }}>
             {/* Background track */}
             <circle
-              cx={cx} cy={cy} r={r}
+              cx={cx}
+              cy={cy}
+              r={r}
               fill="none"
               stroke="#F3F4F6"
               strokeWidth={strokeWidth}
@@ -86,16 +113,24 @@ export function CostDonutChart({ material, labor, equipment }: CostDonutChartPro
             {arcs.map((arc) => (
               <circle
                 key={arc.key}
-                cx={cx} cy={cy} r={r}
+                cx={cx}
+                cy={cy}
+                r={r}
                 fill="none"
                 stroke={arc.color}
-                strokeWidth={hoveredSegment === arc.key ? strokeWidth + 4 : strokeWidth}
+                strokeWidth={
+                  hoveredSegment === arc.key ? strokeWidth + 4 : strokeWidth
+                }
                 strokeDasharray={`${arc.length} ${arc.gap}`}
                 strokeLinecap="round"
                 transform={`rotate(${arc.rotation} ${cx} ${cy})`}
                 style={{
-                  transition: "stroke-width 0.2s ease, stroke-dasharray 0.4s ease",
-                  filter: hoveredSegment === arc.key ? `drop-shadow(0 0 6px ${arc.color}30)` : "none",
+                  transition:
+                    "stroke-width 0.2s ease, stroke-dasharray 0.4s ease",
+                  filter:
+                    hoveredSegment === arc.key
+                      ? `drop-shadow(0 0 6px ${arc.color}30)`
+                      : "none",
                   cursor: "pointer",
                 }}
                 onMouseEnter={() => setHoveredSegment(arc.key)}
@@ -105,45 +140,113 @@ export function CostDonutChart({ material, labor, equipment }: CostDonutChartPro
           </svg>
 
           {/* Center text */}
-          <div className="absolute inset-0 flex flex-col items-center justify-center">
-            <span className="text-[10px]" style={{ color: "#9CA3AF" }}>Total</span>
-            <span className="text-sm font-bold" style={{ color: "#1A1A1A", fontVariantNumeric: "tabular-nums", fontFamily: "Georgia, 'Times New Roman', serif" }}>
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <span style={{ fontSize: 10, color: "#9CA3AF" }}>Total</span>
+            <span
+              style={{
+                fontSize: 18,
+                fontWeight: 700,
+                color: "#111827",
+                fontVariantNumeric: "tabular-nums",
+              }}
+            >
               {formatINR(total)}
             </span>
           </div>
         </div>
 
         {/* Legend */}
-        <div className="flex flex-col gap-3 flex-1">
-          {arcs.map((arc) => (
-            <div
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: 4,
+            flex: 1,
+          }}
+        >
+          {arcs.map((arc, index) => (
+            <motion.div
               key={arc.key}
-              className="flex items-center gap-3 cursor-pointer rounded-lg px-2 py-1.5 transition-all duration-200"
-              style={{
-                background: hoveredSegment === arc.key ? `${arc.color}08` : "transparent",
+              initial={{ opacity: 0, x: 12 }}
+              animate={isInView ? { opacity: 1, x: 0 } : {}}
+              transition={{
+                duration: 0.4,
+                delay: 0.3 + index * 0.1,
+                ease: "easeOut",
               }}
               onMouseEnter={() => setHoveredSegment(arc.key)}
               onMouseLeave={() => setHoveredSegment(null)}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+                cursor: "pointer",
+                borderRadius: 8,
+                padding: "6px 8px",
+                background:
+                  hoveredSegment === arc.key
+                    ? "rgba(0,0,0,0.02)"
+                    : "transparent",
+                transition: "background 0.15s ease",
+              }}
             >
+              {/* Color dot */}
               <div
-                className="w-2.5 h-2.5 rounded-full shrink-0"
-                style={{ background: arc.color }}
+                style={{
+                  width: 8,
+                  height: 8,
+                  borderRadius: "50%",
+                  background: arc.color,
+                  flexShrink: 0,
+                }}
               />
-              <div className="flex flex-col flex-1 min-w-0">
-                <span className="text-xs font-medium" style={{ color: "#4B5563" }}>
+
+              {/* Label + sub-amount */}
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  flex: 1,
+                  minWidth: 0,
+                }}
+              >
+                <span
+                  style={{
+                    fontSize: 13,
+                    color: "#111827",
+                  }}
+                >
                   {arc.label}
                 </span>
-                <span className="text-[10px]" style={{ color: "#9CA3AF" }}>
+                <span style={{ fontSize: 12, color: "#9CA3AF" }}>
                   {formatINR(arc.value)}
                 </span>
               </div>
-              <span className="text-xs font-bold" style={{ color: arc.color, fontVariantNumeric: "tabular-nums" }}>
+
+              {/* Percentage */}
+              <span
+                style={{
+                  fontSize: 13,
+                  fontWeight: 700,
+                  color: "#4B5563",
+                  fontVariantNumeric: "tabular-nums",
+                }}
+              >
                 {(arc.fraction * 100).toFixed(1)}%
               </span>
-            </div>
+            </motion.div>
           ))}
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 }

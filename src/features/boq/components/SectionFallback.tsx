@@ -9,31 +9,52 @@ interface SectionFallbackProps {
 export function SectionFallback({ section }: SectionFallbackProps) {
   return (
     <div
-      className="mx-6 rounded-xl p-6 flex items-center gap-4"
       style={{
+        margin: "0 24px",
+        borderRadius: 12,
+        padding: "16px 20px",
+        display: "flex",
+        alignItems: "center",
+        gap: 16,
         background: "#FEF2F2",
-        border: "1px solid rgba(220, 38, 38, 0.12)",
+        border: "1px solid rgba(220, 38, 38, 0.15)",
       }}
     >
-      <AlertTriangle size={18} color="#DC2626" className="shrink-0" />
-      <div className="flex-1">
-        <p className="text-xs font-medium" style={{ color: "#DC2626" }}>
+      <AlertTriangle size={18} color="#DC2626" style={{ flexShrink: 0 }} />
+      <div style={{ flex: 1 }}>
+        <p style={{ fontSize: 13, fontWeight: 500, color: "#DC2626", margin: 0 }}>
           {section} failed to render
         </p>
-        <p className="text-[10px] mt-0.5" style={{ color: "#4B5563" }}>
+        <p style={{ fontSize: 11, color: "#9CA3AF", margin: 0, marginTop: 2 }}>
           Other sections are unaffected. Try reloading the page.
         </p>
       </div>
       <button
         onClick={() => window.location.reload()}
-        className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs transition-all"
         style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 6,
+          padding: "6px 14px",
+          borderRadius: 8,
+          fontSize: 12,
+          fontWeight: 500,
           background: "#FFFFFF",
-          border: "1px solid rgba(0, 0, 0, 0.12)",
+          border: "1px solid rgba(0, 0, 0, 0.1)",
           color: "#4B5563",
+          cursor: "pointer",
+          transition: "all 0.2s",
+        }}
+        onMouseEnter={e => {
+          e.currentTarget.style.background = "#F9FAFB";
+          e.currentTarget.style.borderColor = "rgba(0, 0, 0, 0.15)";
+        }}
+        onMouseLeave={e => {
+          e.currentTarget.style.background = "#FFFFFF";
+          e.currentTarget.style.borderColor = "rgba(0, 0, 0, 0.1)";
         }}
       >
-        <RotateCcw size={10} />
+        <RotateCcw size={11} />
         Reload
       </button>
     </div>

@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useCallback, useRef } from "react";
-import { Layers, Package, HardHat, Boxes, Mountain, TreePine, ChevronDown, TrendingDown, TrendingUp, RotateCcw } from "lucide-react";
+import { motion } from "framer-motion";
+import { Layers, Package, HardHat, LayoutGrid, Mountain, TreePine, ChevronDown, TrendingDown, TrendingUp, RotateCcw } from "lucide-react";
 import type { PriceOverrides } from "@/features/boq/components/types";
 import { PRICE_RANGES } from "@/features/boq/components/recalc-engine";
 
@@ -28,7 +29,7 @@ const SLIDERS = [
     icon: Layers,
     color: "#0D9488",
     range: PRICE_RANGES.steel,
-    formatValue: (v: number) => `₹${(v / 1000).toFixed(0)}K/t`,
+    formatValue: (v: number) => `\u20B9${(v / 1000).toFixed(0)}K/t`,
     formatDelta: (v: number) => `${(v / 1000).toFixed(1)}K`,
   },
   {
@@ -37,8 +38,8 @@ const SLIDERS = [
     icon: Package,
     color: "#B45309",
     range: PRICE_RANGES.cement,
-    formatValue: (v: number) => `₹${v}/bag`,
-    formatDelta: (v: number) => `₹${Math.abs(v).toFixed(0)}`,
+    formatValue: (v: number) => `\u20B9${v}/bag`,
+    formatDelta: (v: number) => `\u20B9${Math.abs(v).toFixed(0)}`,
   },
   {
     key: "mason" as const,
@@ -46,17 +47,17 @@ const SLIDERS = [
     icon: HardHat,
     color: "#D97706",
     range: PRICE_RANGES.mason,
-    formatValue: (v: number) => `₹${v}/day`,
-    formatDelta: (v: number) => `₹${Math.abs(v).toFixed(0)}`,
+    formatValue: (v: number) => `\u20B9${v}/day`,
+    formatDelta: (v: number) => `\u20B9${Math.abs(v).toFixed(0)}`,
   },
   {
     key: "bricks" as const,
     label: "Bricks / Blocks",
-    icon: Boxes,
+    icon: LayoutGrid,
     color: "#DC2626",
     range: PRICE_RANGES.bricks,
-    formatValue: (v: number) => `₹${v.toFixed(1)}/nos`,
-    formatDelta: (v: number) => `₹${Math.abs(v).toFixed(1)}`,
+    formatValue: (v: number) => `\u20B9${v.toFixed(1)}/nos`,
+    formatDelta: (v: number) => `\u20B9${Math.abs(v).toFixed(1)}`,
   },
   {
     key: "sand" as const,
@@ -64,8 +65,8 @@ const SLIDERS = [
     icon: Mountain,
     color: "#7C3AED",
     range: PRICE_RANGES.sand,
-    formatValue: (v: number) => `₹${v}/cft`,
-    formatDelta: (v: number) => `₹${Math.abs(v).toFixed(0)}`,
+    formatValue: (v: number) => `\u20B9${v}/cft`,
+    formatDelta: (v: number) => `\u20B9${Math.abs(v).toFixed(0)}`,
   },
   {
     key: "timber" as const,
@@ -73,8 +74,8 @@ const SLIDERS = [
     icon: TreePine,
     color: "#059669",
     range: PRICE_RANGES.timber,
-    formatValue: (v: number) => `₹${v.toLocaleString("en-IN")}/m²`,
-    formatDelta: (v: number) => `₹${Math.abs(v).toFixed(0)}`,
+    formatValue: (v: number) => `\u20B9${v.toLocaleString("en-IN")}/m\u00B2`,
+    formatDelta: (v: number) => `\u20B9${Math.abs(v).toFixed(0)}`,
   },
 ] as const;
 
@@ -98,73 +99,129 @@ export function PriceControls({ prices, basePrices, onChange, totalSavings, base
 
   const getSourceShort = (key: string): string => {
     if (!market) return "";
-    if (key === "steel") return `${market.steelSource} · ${market.steelConfidence}`;
-    if (key === "cement") return `${market.cementBrand} · ${market.cementConfidence}`;
-    if (key === "mason") return `${market.masonSource} · ${market.masonConfidence}`;
+    if (key === "steel") return `${market.steelSource} \u00B7 ${market.steelConfidence}`;
+    if (key === "cement") return `${market.cementBrand} \u00B7 ${market.cementConfidence}`;
+    if (key === "mason") return `${market.masonSource} \u00B7 ${market.masonConfidence}`;
     return "Benchmark rate";
   };
 
   const hasSavings = Math.abs(totalSavings) > 1000;
   const isSaving = totalSavings > 0;
   const savingsLabel = Math.abs(totalSavings) >= 100000
-    ? `₹${(Math.abs(totalSavings) / 100000).toFixed(1)} L`
-    : `₹${Math.abs(totalSavings).toLocaleString("en-IN", { maximumFractionDigits: 0 })}`;
+    ? `\u20B9${(Math.abs(totalSavings) / 100000).toFixed(1)} L`
+    : `\u20B9${Math.abs(totalSavings).toLocaleString("en-IN", { maximumFractionDigits: 0 })}`;
   const savingsPct = totalSavings !== 0 && baseTotal > 0 ? (Math.abs(totalSavings) / baseTotal * 100).toFixed(1) : "0";
 
   const hasAnyChange = SLIDERS.some(s => prices[s.key] !== basePrices[s.key]);
 
   return (
-    <div
-      className="mx-6 rounded-xl overflow-hidden"
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.35, ease: "easeOut" }}
       style={{
         background: "#FFFFFF",
-        border: "1px solid rgba(0, 0, 0, 0.06)",
-        boxShadow: "0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -2px rgba(0,0,0,0.03)",
+        borderRadius: 16,
+        boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
+        border: "1px solid rgba(0,0,0,0.06)",
+        padding: "20px 24px",
+        margin: "0 24px",
+        overflow: "hidden",
       }}
     >
       {/* Header */}
-      <div className="flex items-center justify-between px-5 py-3.5" style={{ borderBottom: "1px solid rgba(0, 0, 0, 0.06)" }}>
-        <div className="flex items-center gap-3">
-          <div className="relative flex items-center justify-center">
-            <div
-              className="w-2 h-2 rounded-full"
-              style={{
-                background: "#0D9488",
-                boxShadow: "0 0 6px rgba(13, 148, 136, 0.4)",
-                animation: "pulse-node 2s cubic-bezier(0.4, 0, 0.6, 1) infinite",
-              }}
-            />
-          </div>
-          <span className="text-sm font-semibold" style={{ color: "#1A1A1A" }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          paddingBottom: 16,
+          marginBottom: 16,
+          borderBottom: "1px solid rgba(0,0,0,0.06)",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div
+            style={{
+              width: 8,
+              height: 8,
+              borderRadius: "50%",
+              background: "#059669",
+              boxShadow: "0 0 8px rgba(5,150,105,0.5)",
+              animation: "pulse-node 2s cubic-bezier(0.4, 0, 0.6, 1) infinite",
+            }}
+          />
+          <span
+            style={{
+              fontSize: 14,
+              fontWeight: 600,
+              color: "#111827",
+              letterSpacing: "-0.01em",
+            }}
+          >
             Live Price Controls
           </span>
-          <span className="text-[10px] px-2 py-0.5 rounded-full font-medium" style={{ background: "rgba(13, 148, 136, 0.08)", color: "#0D9488" }}>
+          <span
+            style={{
+              fontSize: 10,
+              fontWeight: 600,
+              padding: "2px 8px",
+              borderRadius: 9999,
+              background: "#ECFDF5",
+              color: "#059669",
+              letterSpacing: "0.04em",
+            }}
+          >
             LIVE
           </span>
         </div>
 
         {/* Reset button */}
         {hasAnyChange && (
-          <button
+          <motion.button
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.2 }}
             onClick={handleReset}
-            className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-medium transition-all duration-200"
             style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              padding: "5px 12px",
+              borderRadius: 8,
+              fontSize: 11,
+              fontWeight: 500,
               background: "#FFFFFF",
-              border: "1px solid rgba(0, 0, 0, 0.1)",
-              color: "#9CA3AF",
+              border: "1px solid rgba(0,0,0,0.1)",
+              color: "#6B7280",
+              cursor: "pointer",
+              transition: "all 0.2s ease",
             }}
-            onMouseEnter={e => { e.currentTarget.style.borderColor = "#0D9488"; e.currentTarget.style.color = "#0D9488"; }}
-            onMouseLeave={e => { e.currentTarget.style.borderColor = "rgba(0,0,0,0.1)"; e.currentTarget.style.color = "#9CA3AF"; }}
+            onMouseEnter={e => {
+              e.currentTarget.style.borderColor = "#0D9488";
+              e.currentTarget.style.color = "#0D9488";
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.borderColor = "rgba(0,0,0,0.1)";
+              e.currentTarget.style.color = "#6B7280";
+            }}
           >
-            <RotateCcw size={10} />
+            <RotateCcw size={11} />
             Reset all
-          </button>
+          </motion.button>
         )}
       </div>
 
-      {/* Sliders — 2-column grid on desktop */}
-      <div className="p-5 grid grid-cols-1 lg:grid-cols-2 gap-x-8 gap-y-4">
-        {SLIDERS.map((slider) => {
+      {/* Sliders -- 2-column grid on desktop */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(1, 1fr)",
+          gap: "20px 32px",
+        }}
+        className="lg:!grid-cols-2"
+      >
+        {SLIDERS.map((slider, index) => {
           const value = prices[slider.key];
           const base = basePrices[slider.key];
           const pct = ((value - slider.range.min) / (slider.range.max - slider.range.min)) * 100;
@@ -174,39 +231,76 @@ export function PriceControls({ prices, basePrices, onChange, totalSavings, base
           const hasChanged = Math.abs(delta) > 0.01;
 
           return (
-            <div key={slider.key}>
-              <div className="flex items-center gap-3">
-                {/* Icon */}
+            <motion.div
+              key={slider.key}
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3, delay: index * 0.04 }}
+            >
+              {/* Top row: icon + label + value */}
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                {/* Icon with colored background */}
                 <div
-                  className="flex items-center justify-center w-8 h-8 rounded-lg shrink-0"
-                  style={{ background: `${slider.color}0F` }}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    width: 32,
+                    height: 32,
+                    borderRadius: 10,
+                    flexShrink: 0,
+                    background: `${slider.color}14`,
+                  }}
                 >
-                  <slider.icon size={14} color={slider.color} />
+                  <slider.icon size={15} color={slider.color} strokeWidth={2} />
                 </div>
 
                 {/* Label + source toggle */}
-                <div className="flex flex-col min-w-[100px] flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-medium" style={{ color: "#1A1A1A" }}>
+                <div style={{ display: "flex", flexDirection: "column", minWidth: 100, flex: 1 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <span
+                      style={{
+                        fontSize: 12,
+                        fontWeight: 500,
+                        color: "#111827",
+                      }}
+                    >
                       {slider.label}
                     </span>
                     {/* Delta badge */}
                     {hasChanged && (
-                      <span
-                        className="text-[9px] font-semibold px-1.5 py-0.5 rounded transition-all duration-200"
+                      <motion.span
+                        initial={{ opacity: 0, scale: 0.85 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={{ duration: 0.2 }}
                         style={{
-                          background: delta < 0 ? "rgba(22, 163, 74, 0.08)" : "rgba(220, 38, 38, 0.08)",
-                          color: delta < 0 ? "#16A34A" : "#DC2626",
+                          fontSize: 9,
+                          fontWeight: 600,
+                          padding: "2px 6px",
+                          borderRadius: 4,
+                          background: delta < 0 ? "#D1FAE5" : "#FEF3C7",
+                          color: delta < 0 ? "#059669" : "#D97706",
                         }}
                       >
                         {delta < 0 ? `${deltaPct}% cheaper` : `+${deltaPct}% costlier`}
-                      </span>
+                      </motion.span>
                     )}
                   </div>
                   <button
-                    className="flex items-center gap-0.5 text-[10px] text-left w-fit"
-                    style={{ color: "#9CA3AF" }}
                     onClick={() => setExpandedKey(isExpanded ? null : slider.key)}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 3,
+                      fontSize: 10,
+                      color: "#9CA3AF",
+                      background: "none",
+                      border: "none",
+                      padding: 0,
+                      cursor: "pointer",
+                      textAlign: "left",
+                      width: "fit-content",
+                    }}
                   >
                     {getSourceShort(slider.key)}
                     <ChevronDown
@@ -219,26 +313,55 @@ export function PriceControls({ prices, basePrices, onChange, totalSavings, base
                   </button>
                 </div>
 
-                {/* Value */}
+                {/* Value -- right-aligned, slider color */}
                 <div
-                  className="text-sm font-bold shrink-0 text-right transition-colors duration-200"
-                  style={{ color: slider.color, fontVariantNumeric: "tabular-nums", minWidth: 70 }}
+                  style={{
+                    fontSize: 14,
+                    fontWeight: 700,
+                    color: slider.color,
+                    flexShrink: 0,
+                    textAlign: "right",
+                    minWidth: 75,
+                    fontVariantNumeric: "tabular-nums",
+                    transition: "color 0.2s ease",
+                  }}
                 >
                   {slider.formatValue(value)}
                 </div>
               </div>
 
               {/* Slider track */}
-              <div className="relative h-7 flex items-center mt-1 ml-11">
+              <div
+                style={{
+                  position: "relative",
+                  height: 28,
+                  display: "flex",
+                  alignItems: "center",
+                  marginTop: 6,
+                  marginLeft: 44,
+                }}
+              >
+                {/* Background track */}
                 <div
-                  className="absolute left-0 right-0 h-[5px] rounded-full"
-                  style={{ background: "#E5E7EB" }}
-                />
-                <div
-                  className="absolute left-0 h-[5px] rounded-full transition-all duration-75"
                   style={{
+                    position: "absolute",
+                    left: 0,
+                    right: 0,
+                    height: 5,
+                    borderRadius: 9999,
+                    background: "#F3F4F6",
+                  }}
+                />
+                {/* Filled portion -- gradient */}
+                <div
+                  style={{
+                    position: "absolute",
+                    left: 0,
+                    height: 5,
+                    borderRadius: 9999,
                     width: `${pct}%`,
-                    background: `linear-gradient(90deg, ${slider.color}80, ${slider.color})`,
+                    background: `linear-gradient(90deg, ${slider.color}60, ${slider.color})`,
+                    transition: "width 75ms ease",
                   }}
                 />
                 <input
@@ -248,55 +371,115 @@ export function PriceControls({ prices, basePrices, onChange, totalSavings, base
                   step={slider.range.step}
                   value={value}
                   onChange={(e) => handleSliderChange(slider.key, e.target.value)}
-                  className="boq-slider absolute w-full h-7 cursor-pointer"
-                  style={{ appearance: "none", WebkitAppearance: "none", background: "transparent", zIndex: 2 }}
+                  className="boq-slider"
+                  style={{
+                    position: "absolute",
+                    width: "100%",
+                    height: 28,
+                    cursor: "pointer",
+                    appearance: "none",
+                    WebkitAppearance: "none",
+                    background: "transparent",
+                    zIndex: 2,
+                  }}
                 />
-                {/* Min/Max labels */}
-                <span className="absolute -bottom-3 left-0 text-[8px]" style={{ color: "#9CA3AF" }}>
+                {/* Min label */}
+                <span
+                  style={{
+                    position: "absolute",
+                    bottom: -4,
+                    left: 0,
+                    fontSize: 9,
+                    color: "#D1D5DB",
+                  }}
+                >
                   {slider.formatValue(slider.range.min)}
                 </span>
-                <span className="absolute -bottom-3 right-0 text-[8px]" style={{ color: "#9CA3AF" }}>
+                {/* Max label */}
+                <span
+                  style={{
+                    position: "absolute",
+                    bottom: -4,
+                    right: 0,
+                    fontSize: 9,
+                    color: "#D1D5DB",
+                  }}
+                >
                   {slider.formatValue(slider.range.max)}
                 </span>
               </div>
 
               {/* Expandable reasoning */}
               <div
-                className="overflow-hidden transition-all duration-200"
-                style={{ maxHeight: isExpanded ? 32 : 0, opacity: isExpanded ? 1 : 0 }}
+                style={{
+                  overflow: "hidden",
+                  maxHeight: isExpanded ? 36 : 0,
+                  opacity: isExpanded ? 1 : 0,
+                  transition: "all 0.2s ease",
+                }}
               >
-                <p className="text-[10px] mt-2 ml-11" style={{ color: "#9CA3AF" }}>
-                  Range: {slider.formatValue(slider.range.min)} – {slider.formatValue(slider.range.max)} · Base: {slider.formatValue(base)}
+                <p
+                  style={{
+                    fontSize: 10,
+                    marginTop: 8,
+                    marginLeft: 44,
+                    color: "#4B5563",
+                  }}
+                >
+                  Range: {slider.formatValue(slider.range.min)} &ndash; {slider.formatValue(slider.range.max)} &middot; Base: {slider.formatValue(base)}
                 </p>
               </div>
-            </div>
+            </motion.div>
           );
         })}
       </div>
 
-      {/* Total impact bar */}
+      {/* Total impact / savings bar */}
       {hasSavings && (
-        <div
-          className="px-5 py-3 flex items-center justify-between transition-all duration-300"
+        <motion.div
+          initial={{ opacity: 0, y: 4 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.25, delay: 0.1 }}
           style={{
-            borderTop: "1px solid rgba(0, 0, 0, 0.06)",
-            background: isSaving ? "rgba(22, 163, 74, 0.05)" : "rgba(220, 38, 38, 0.05)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            marginTop: 16,
+            padding: "12px 16px",
+            borderRadius: 12,
+            background: isSaving ? "#F0FDF4" : "#FFFBEB",
+            transition: "background 0.3s ease",
           }}
         >
-          <div className="flex items-center gap-2">
-            {isSaving ? <TrendingDown size={14} color="#16A34A" /> : <TrendingUp size={14} color="#DC2626" />}
-            <span className="text-xs font-semibold" style={{ color: isSaving ? "#16A34A" : "#DC2626" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            {isSaving ? (
+              <TrendingDown size={14} color="#059669" />
+            ) : (
+              <TrendingUp size={14} color="#D97706" />
+            )}
+            <span
+              style={{
+                fontSize: 12,
+                fontWeight: 600,
+                color: isSaving ? "#059669" : "#D97706",
+              }}
+            >
               {isSaving ? `Save ${savingsLabel}` : `Extra ${savingsLabel}`}
             </span>
-            <span className="text-[10px]" style={{ color: isSaving ? "rgba(22,163,74,0.7)" : "rgba(220,38,38,0.7)" }}>
+            <span
+              style={{
+                fontSize: 10,
+                color: isSaving ? "rgba(5,150,105,0.7)" : "rgba(217,119,6,0.7)",
+              }}
+            >
               ({isSaving ? "-" : "+"}{savingsPct}%)
             </span>
           </div>
-          <span className="text-[10px]" style={{ color: "#9CA3AF" }}>
+          <span style={{ fontSize: 10, color: "#9CA3AF" }}>
             vs. base market rates
           </span>
-        </div>
+        </motion.div>
       )}
-    </div>
+    </motion.div>
   );
 }

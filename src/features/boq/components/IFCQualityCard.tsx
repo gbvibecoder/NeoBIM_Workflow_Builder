@@ -1,6 +1,8 @@
 "use client";
 
-import { ShieldCheck, AlertTriangle } from "lucide-react";
+import { useRef, useState } from "react";
+import { motion, useInView } from "framer-motion";
+import { ShieldCheck, AlertTriangle, FileX, ChevronDown } from "lucide-react";
 import type { BOQData } from "@/features/boq/components/types";
 import { getIFCQualityLabel, getIFCQualityColor } from "@/features/boq/constants/quality-thresholds";
 
@@ -11,115 +13,247 @@ interface IFCQualityCardProps {
 export function IFCQualityCard({ quality }: IFCQualityCardProps) {
   const scoreColor = getIFCQualityColor(quality.score);
   const scoreLabel = getIFCQualityLabel(quality.score);
+  const ref = useRef<HTMLDivElement>(null);
+  const isInView = useInView(ref, { once: true });
+  const [anomaliesExpanded, setAnomaliesExpanded] = useState(false);
 
-  // Map dark-theme quality colors to light-theme equivalents
-  const lightScoreColor = quality.score >= 80 ? "#0D9488" : quality.score >= 50 ? "#B45309" : "#DC2626";
+  const lightScoreColor = quality.score >= 80 ? "#0D9488" : quality.score >= 50 ? "#D97706" : "#DC2626";
+
+  // SVG progress ring params
+  const ringSize = 80;
+  const strokeWidth = 6;
+  const radius = (ringSize - strokeWidth) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const strokeDashoffset = circumference - (quality.score / 100) * circumference;
 
   return (
     <div
-      className="rounded-xl p-5"
+      ref={ref}
       style={{
         background: "#FFFFFF",
+        borderRadius: 16,
         border: "1px solid rgba(0, 0, 0, 0.06)",
-        boxShadow: "0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -2px rgba(0,0,0,0.03)",
+        boxShadow: "0 2px 8px rgba(0, 0, 0, 0.04)",
+        padding: 24,
       }}
     >
-      <h3 className="text-sm font-semibold mb-4" style={{ color: "#1A1A1A" }}>
+      <h3
+        style={{
+          fontSize: 14,
+          fontWeight: 600,
+          color: "#111827",
+          marginBottom: 20,
+        }}
+      >
         IFC Quality Assessment
       </h3>
 
-      {/* Score + Confidence */}
-      <div className="flex items-center gap-4 mb-4">
-        <div className="flex flex-col items-center">
+      {/* Score ring + Confidence */}
+      <div style={{ display: "flex", alignItems: "center", gap: 20, marginBottom: 20 }}>
+        {/* SVG Progress Ring */}
+        <div style={{ position: "relative", width: ringSize, height: ringSize, flexShrink: 0 }}>
+          <svg width={ringSize} height={ringSize} style={{ transform: "rotate(-90deg)" }}>
+            {/* Background track */}
+            <circle
+              cx={ringSize / 2}
+              cy={ringSize / 2}
+              r={radius}
+              fill="none"
+              stroke="#F3F4F6"
+              strokeWidth={strokeWidth}
+            />
+            {/* Animated progress arc */}
+            <motion.circle
+              cx={ringSize / 2}
+              cy={ringSize / 2}
+              r={radius}
+              fill="none"
+              stroke={lightScoreColor}
+              strokeWidth={strokeWidth}
+              strokeLinecap="round"
+              strokeDasharray={circumference}
+              initial={{ strokeDashoffset: circumference }}
+              animate={{ strokeDashoffset: isInView ? strokeDashoffset : circumference }}
+              transition={{ duration: 1.2, ease: "easeOut", delay: 0.2 }}
+            />
+          </svg>
+          {/* Score number inside ring */}
           <div
-            className="text-2xl font-bold"
             style={{
-              color: lightScoreColor,
-              fontVariantNumeric: "tabular-nums",
-              fontFamily: "var(--font-dm-serif, 'DM Serif Display', serif)",
+              position: "absolute",
+              inset: 0,
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
             }}
           >
-            {quality.score}%
+            <span
+              style={{
+                fontSize: 20,
+                fontWeight: 700,
+                color: lightScoreColor,
+                fontVariantNumeric: "tabular-nums",
+                lineHeight: 1,
+              }}
+            >
+              {quality.score}
+            </span>
+            <span style={{ fontSize: 9, color: "#9CA3AF", marginTop: 2 }}>/ 100</span>
           </div>
-          <span className="text-[10px] font-medium" style={{ color: lightScoreColor }}>
-            {scoreLabel}
-          </span>
         </div>
 
-        <div className="flex-1">
-          <div className="flex items-center justify-between mb-1">
-            <span className="text-[10px]" style={{ color: "#9CA3AF" }}>Quality Score</span>
-            <span className="text-[10px]" style={{ color: "#4B5563" }}>
+        {/* Label + Confidence */}
+        <div style={{ flex: 1 }}>
+          <div
+            style={{
+              fontSize: 13,
+              fontWeight: 600,
+              color: lightScoreColor,
+              marginBottom: 4,
+            }}
+          >
+            {scoreLabel}
+          </div>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+            <span style={{ fontSize: 11, color: "#9CA3AF" }}>Quality Score</span>
+            <span style={{ fontSize: 11, color: "#4B5563" }}>
               Confidence: {quality.confidence}%
             </span>
           </div>
-          <div className="h-2 rounded-full overflow-hidden" style={{ background: "#F3F4F6" }}>
-            <div
-              className="h-full rounded-full"
+          <div style={{ height: 6, borderRadius: 9999, background: "#F3F4F6", overflow: "hidden" }}>
+            <motion.div
               style={{
-                width: `${quality.score}%`,
+                height: "100%",
+                borderRadius: 9999,
                 background: `linear-gradient(90deg, ${lightScoreColor}80, ${lightScoreColor})`,
-                transition: "width 0.6s ease-out",
               }}
+              initial={{ width: 0 }}
+              animate={{ width: isInView ? `${quality.score}%` : 0 }}
+              transition={{ duration: 1, ease: "easeOut", delay: 0.3 }}
             />
           </div>
         </div>
       </div>
 
       {/* Element Coverage */}
-      <div className="mb-4">
-        <div className="flex items-center justify-between mb-1">
-          <span className="text-[10px] font-medium" style={{ color: "#9CA3AF" }}>
-            <ShieldCheck size={10} className="inline mr-1" />
+      <div style={{ marginBottom: 20 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+          <span style={{ fontSize: 11, fontWeight: 500, color: "#9CA3AF", display: "flex", alignItems: "center", gap: 4 }}>
+            <ShieldCheck size={12} color="#0D9488" />
             Element Coverage
           </span>
-          <span className="text-[10px]" style={{ color: "#1A1A1A", fontVariantNumeric: "tabular-nums" }}>
+          <span style={{ fontSize: 11, fontWeight: 600, color: "#111827", fontVariantNumeric: "tabular-nums" }}>
             {quality.elementCoverage}%
           </span>
         </div>
-        <div className="h-1.5 rounded-full overflow-hidden" style={{ background: "#F3F4F6" }}>
-          <div
-            className="h-full rounded-full"
+        <div style={{ height: 6, borderRadius: 9999, background: "#F3F4F6", overflow: "hidden" }}>
+          <motion.div
             style={{
-              width: `${quality.elementCoverage}%`,
-              background: "linear-gradient(90deg, #0D948880, #0D9488)",
+              height: "100%",
+              borderRadius: 9999,
+              background: "linear-gradient(90deg, #0D948860, #0D9488)",
             }}
+            initial={{ width: 0 }}
+            animate={{ width: isInView ? `${quality.elementCoverage}%` : 0 }}
+            transition={{ duration: 1, ease: "easeOut", delay: 0.5 }}
           />
         </div>
       </div>
 
       {/* Missing Files */}
       {quality.missingFiles.length > 0 && (
-        <div>
-          <span className="text-[10px] font-medium flex items-center gap-1 mb-2" style={{ color: "#B45309" }}>
-            <AlertTriangle size={10} />
+        <div style={{ marginBottom: quality.anomalies.length > 0 ? 16 : 0 }}>
+          <span
+            style={{
+              fontSize: 11,
+              fontWeight: 500,
+              color: "#D97706",
+              display: "flex",
+              alignItems: "center",
+              gap: 4,
+              marginBottom: 8,
+            }}
+          >
+            <FileX size={12} />
             Missing Files
           </span>
-          <div className="flex flex-col gap-1.5">
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             {quality.missingFiles.map((file) => (
               <div
                 key={file}
-                className="flex items-center justify-between px-2.5 py-1.5 rounded-lg"
-                style={{ background: "#FFFBEB", border: "1px solid rgba(180, 83, 9, 0.15)" }}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  padding: "8px 12px",
+                  borderRadius: 10,
+                  background: "#FEF3C7",
+                  border: "1px solid rgba(217, 119, 6, 0.12)",
+                }}
               >
-                <span className="text-[10px]" style={{ color: "#B45309" }}>{file}</span>
+                <FileX size={12} color="#D97706" style={{ flexShrink: 0 }} />
+                <span style={{ fontSize: 11, color: "#92400E" }}>{file}</span>
               </div>
             ))}
           </div>
         </div>
       )}
 
-      {/* Anomalies */}
+      {/* Anomalies — expandable */}
       {quality.anomalies.length > 0 && (
-        <div className="mt-3">
-          <span className="text-[10px] font-medium mb-1.5 block" style={{ color: "#9CA3AF" }}>
-            Anomalies Detected
-          </span>
-          {quality.anomalies.slice(0, 3).map((a, i) => (
-            <p key={i} className="text-[10px] mb-0.5" style={{ color: "#4B5563" }}>
-              &bull; {a}
-            </p>
-          ))}
+        <div>
+          <button
+            onClick={() => setAnomaliesExpanded(!anomaliesExpanded)}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 4,
+              fontSize: 11,
+              fontWeight: 500,
+              color: "#9CA3AF",
+              marginBottom: 8,
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              padding: 0,
+            }}
+          >
+            <AlertTriangle size={12} color="#9CA3AF" />
+            Anomalies Detected ({quality.anomalies.length})
+            <motion.span
+              animate={{ rotate: anomaliesExpanded ? 180 : 0 }}
+              transition={{ duration: 0.2 }}
+              style={{ display: "inline-flex" }}
+            >
+              <ChevronDown size={12} />
+            </motion.span>
+          </button>
+          <motion.div
+            initial={false}
+            animate={{ height: anomaliesExpanded ? "auto" : 0, opacity: anomaliesExpanded ? 1 : 0 }}
+            transition={{ duration: 0.25, ease: "easeInOut" }}
+            style={{ overflow: "hidden" }}
+          >
+            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+              {quality.anomalies.map((a, i) => (
+                <div
+                  key={i}
+                  style={{
+                    display: "flex",
+                    alignItems: "flex-start",
+                    gap: 6,
+                    fontSize: 11,
+                    color: "#4B5563",
+                    lineHeight: 1.5,
+                  }}
+                >
+                  <AlertTriangle size={10} color="#9CA3AF" style={{ flexShrink: 0, marginTop: 3 }} />
+                  <span>{a}</span>
+                </div>
+              ))}
+            </div>
+          </motion.div>
         </div>
       )}
     </div>
