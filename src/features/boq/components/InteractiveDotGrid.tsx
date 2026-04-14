@@ -12,10 +12,10 @@ interface InteractiveDotGridProps {
 }
 
 export function InteractiveDotGrid({
-  dotColor = "rgba(0,0,0,0.06)",
-  activeColor = "rgba(13,148,136,0.35)",
-  dotSize = 0.8,
-  activeDotSize = 2.4,
+  dotColor = "rgba(0,0,0,0.15)",
+  activeColor = "rgba(13,148,136,0.5)",
+  dotSize = 1.3,
+  activeDotSize = 3,
   spacing = 24,
   glowRadius = 90,
 }: InteractiveDotGridProps) {
