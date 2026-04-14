@@ -10,6 +10,7 @@ interface PriceControlsProps {
   basePrices: PriceOverrides;
   onChange: (prices: PriceOverrides) => void;
   totalSavings: number;
+  baseTotal: number;
   market?: {
     steelSource: string;
     steelConfidence: string;
@@ -77,7 +78,7 @@ const SLIDERS = [
   },
 ] as const;
 
-export function PriceControls({ prices, basePrices, onChange, totalSavings, market }: PriceControlsProps) {
+export function PriceControls({ prices, basePrices, onChange, totalSavings, baseTotal, market }: PriceControlsProps) {
   const rafRef = useRef<number>(0);
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
 
@@ -108,7 +109,7 @@ export function PriceControls({ prices, basePrices, onChange, totalSavings, mark
   const savingsLabel = Math.abs(totalSavings) >= 100000
     ? `₹${(Math.abs(totalSavings) / 100000).toFixed(1)} L`
     : `₹${Math.abs(totalSavings).toLocaleString("en-IN", { maximumFractionDigits: 0 })}`;
-  const savingsPct = totalSavings !== 0 ? Math.abs(totalSavings / (totalSavings + Math.abs(totalSavings)) * 100).toFixed(1) : "0";
+  const savingsPct = totalSavings !== 0 && baseTotal > 0 ? (Math.abs(totalSavings) / baseTotal * 100).toFixed(1) : "0";
 
   const hasAnyChange = SLIDERS.some(s => prices[s.key] !== basePrices[s.key]);
 

@@ -4,11 +4,13 @@ import { useState, useMemo, useCallback, useEffect } from "react";
 import { ChevronDown, ChevronUp, Pencil, Check, X, ChevronLeft, ChevronRight } from "lucide-react";
 import type { BOQLineItem, BOQFilterTab, BOQSortKey, BOQSortDir, SourceType, RateOverride } from "@/features/boq/components/types";
 import { formatINRFull, getDivisionCategory } from "@/features/boq/components/recalc-engine";
+import { getLineConfidenceScore, getLineConfidenceColor } from "@/features/boq/constants/quality-thresholds";
 
 interface BOQTableProps {
   lines: BOQLineItem[];
   rateOverrides: Map<string, RateOverride>;
   onRateOverride: (lineId: string, newRate: number, originalRate: number) => void;
+  grandTotal?: number;
 }
 
 const TABS: { id: BOQFilterTab; label: string }[] = [
@@ -27,9 +29,9 @@ const SOURCE_BADGE: Record<SourceType, { label: string; color: string; bg: strin
 };
 
 function ConfidenceBadge({ confidence, lineConfidence }: { confidence: number; lineConfidence?: BOQLineItem["lineConfidence"] }) {
-  const score = lineConfidence?.score ?? (confidence >= 80 ? "high" : confidence >= 55 ? "medium" : "low");
+  const score = lineConfidence?.score ?? getLineConfidenceScore(confidence);
   const label = score.toUpperCase();
-  const color = score === "high" ? "#22C55E" : score === "medium" ? "#F59E0B" : "#EF4444";
+  const color = getLineConfidenceColor(score);
   const factors = lineConfidence?.factors ?? [];
   return (
     <span className="relative group/conf inline-flex items-center gap-1.5">
@@ -73,7 +75,7 @@ function ConfidenceBadge({ confidence, lineConfidence }: { confidence: number; l
 
 const PAGE_SIZE = 25;
 
-export function BOQTable({ lines, rateOverrides, onRateOverride }: BOQTableProps) {
+export function BOQTable({ lines, rateOverrides, onRateOverride, grandTotal: grandTotalProp }: BOQTableProps) {
   const [activeTab, setActiveTab] = useState<BOQFilterTab>("all");
   const [sortKey, setSortKey] = useState<BOQSortKey>("amount");
   const [sortDir, setSortDir] = useState<BOQSortDir>("desc");
@@ -120,7 +122,8 @@ export function BOQTable({ lines, rateOverrides, onRateOverride }: BOQTableProps
   // Pagination
   const totalPages = Math.ceil(sorted.length / PAGE_SIZE);
   const paginated = sorted.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
-  const grandTotal = filtered.reduce((s, l) => s + l.totalCost, 0);
+  const filteredTotal = filtered.reduce((s, l) => s + l.totalCost, 0);
+  const grandTotal = grandTotalProp ?? filteredTotal;
 
   // Reset page when filter changes
   useEffect(() => { setPage(0); }, [activeTab, sourceFilter, sortKey, sortDir]);
@@ -218,8 +221,8 @@ export function BOQTable({ lines, rateOverrides, onRateOverride }: BOQTableProps
 
       {/* Confidence Summary Bar */}
       {(() => {
-        const high = filtered.filter(l => (l.lineConfidence?.score ?? (l.confidence >= 80 ? "high" : l.confidence >= 55 ? "medium" : "low")) === "high").length;
-        const med = filtered.filter(l => (l.lineConfidence?.score ?? (l.confidence >= 80 ? "high" : l.confidence >= 55 ? "medium" : "low")) === "medium").length;
+        const high = filtered.filter(l => (l.lineConfidence?.score ?? getLineConfidenceScore(l.confidence)) === "high").length;
+        const med = filtered.filter(l => (l.lineConfidence?.score ?? getLineConfidenceScore(l.confidence)) === "medium").length;
         const low = filtered.length - high - med;
         return (
           <div

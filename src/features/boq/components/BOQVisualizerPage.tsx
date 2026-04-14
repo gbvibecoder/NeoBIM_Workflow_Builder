@@ -156,6 +156,7 @@ export function BOQVisualizerPage({ data, executionId }: BOQVisualizerPageProps)
           basePrices={basePrices.current}
           onChange={handlePriceChange}
           totalSavings={data.totalCost - recalcTotalProject}
+          baseTotal={data.totalCost}
           market={data.market ? {
             steelSource: data.market.steelSource,
             steelConfidence: data.market.steelConfidence,
@@ -194,6 +195,7 @@ export function BOQVisualizerPage({ data, executionId }: BOQVisualizerPageProps)
           lines={recalcLines}
           rateOverrides={rateOverrides}
           onRateOverride={handleRateOverride}
+          grandTotal={totals.totalCost}
         />
 
         {/* NL Summary */}

@@ -1,16 +1,16 @@
 "use client";
 
-import { ShieldCheck, AlertTriangle, Plus } from "lucide-react";
+import { ShieldCheck, AlertTriangle } from "lucide-react";
 import type { BOQData } from "@/features/boq/components/types";
+import { getIFCQualityLabel, getIFCQualityColor } from "@/features/boq/constants/quality-thresholds";
 
 interface IFCQualityCardProps {
   quality: NonNullable<BOQData["ifcQuality"]>;
 }
 
 export function IFCQualityCard({ quality }: IFCQualityCardProps) {
-  // Thresholds aligned with TR-008 (server-side) so NL summary and UI match
-  const scoreColor = quality.score > 85 ? "#22C55E" : quality.score > 65 ? "#00F5FF" : quality.score > 40 ? "#F59E0B" : "#EF4444";
-  const scoreLabel = quality.score > 85 ? "EXCELLENT" : quality.score > 65 ? "GOOD" : quality.score > 40 ? "FAIR" : "LIMITED";
+  const scoreColor = getIFCQualityColor(quality.score);
+  const scoreLabel = getIFCQualityLabel(quality.score);
 
   return (
     <div
@@ -95,12 +95,6 @@ export function IFCQualityCard({ quality }: IFCQualityCardProps) {
                 style={{ background: "rgba(245, 158, 11, 0.06)", border: "1px solid rgba(245, 158, 11, 0.15)" }}
               >
                 <span className="text-[10px]" style={{ color: "#F59E0B" }}>{file}</span>
-                <button
-                  className="flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded"
-                  style={{ background: "rgba(245, 158, 11, 0.15)", color: "#F59E0B" }}
-                >
-                  <Plus size={8} /> Add
-                </button>
               </div>
             ))}
           </div>

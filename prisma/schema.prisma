@@ -721,16 +721,22 @@ model VideoShareLink {
 /// Enables cross-user learning: once ANY user fetches prices for Pune,
 /// ALL subsequent Pune BOQs benefit even if their own TR-015 fails.
 model MaterialPriceCache {
-  id            String   @id @default(cuid())
-  city          String                         // e.g. "Pune"
-  state         String                         // e.g. "Maharashtra"
-  materialCode  String                         // e.g. "steel_per_tonne", "cement_per_bag", "labor_mason"
-  price         Float                          // numeric price in INR
-  unit          String                         // e.g. "₹/tonne", "₹/bag", "₹/day"
-  source        String                         // e.g. "market_intelligence", "user_correction"
-  confidence    String                         // "HIGH", "MEDIUM", "LOW"
-  fetchedAt     DateTime @default(now())       // when price was fetched
-  expiresAt     DateTime                       // fetchedAt + 30 days
+  id              String   @id @default(cuid())
+  city            String                         // e.g. "Pune"
+  state           String                         // e.g. "Maharashtra"
+  materialCode    String                         // e.g. "steel_per_tonne", "cement_per_bag", "labor_mason"
+  price           Float                          // numeric price in INR
+  unit            String                         // e.g. "₹/tonne", "₹/bag", "₹/day"
+  source          String                         // e.g. "market_intelligence", "user_correction"
+  confidence      String                         // "HIGH", "MEDIUM", "LOW"
+  fetchedAt       DateTime @default(now())       // when price was fetched
+  expiresAt       DateTime                       // fetchedAt + 30 days
+
+  // ── Provenance fields (Sprint 1 addition) ───────────────────────────────
+  sourceUrl       String?                        // URL where price was found
+  rawResponse     Json?                          // full AI/scraper response for audit
+  confidenceScore Float?                         // 0-100 numeric confidence score
+  method          String?                        // AI_SEARCH | PWD_TENDER | DEALER_PORTAL | CPWD_STATIC | USER_CORRECTION | INTERPOLATED
 
   @@index([city, materialCode, fetchedAt])
   @@index([state, materialCode, fetchedAt])

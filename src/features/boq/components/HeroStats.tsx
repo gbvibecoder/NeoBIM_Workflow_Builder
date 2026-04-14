@@ -3,6 +3,7 @@
 import { IndianRupee, Ruler, Hammer, ShieldCheck, Check, AlertTriangle } from "lucide-react";
 import { AnimatedNumber } from "@/features/boq/components/AnimatedNumber";
 import { formatCrores } from "@/features/boq/components/recalc-engine";
+import { getIFCQualityLabel, getIFCQualityColor } from "@/features/boq/constants/quality-thresholds";
 
 interface HeroStatsProps {
   totalCost: number;
@@ -97,9 +98,8 @@ export function HeroStats({
   recalculated,
 }: HeroStatsProps) {
   const costColor = getCostPerM2Color(costPerM2, benchmarkLow, benchmarkHigh);
-  // Thresholds aligned with TR-008 (server-side) so NL summary and UI match
-  const qualityLabel = ifcQualityScore > 85 ? "EXCELLENT" : ifcQualityScore > 65 ? "GOOD" : ifcQualityScore > 40 ? "FAIR" : "LIMITED";
-  const qualityColor = ifcQualityScore > 85 ? "#22C55E" : ifcQualityScore > 65 ? "#00F5FF" : ifcQualityScore > 40 ? "#F59E0B" : "#EF4444";
+  const qualityLabel = getIFCQualityLabel(ifcQualityScore);
+  const qualityColor = getIFCQualityColor(ifcQualityScore);
 
   const cards = [
     {

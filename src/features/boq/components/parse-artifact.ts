@@ -3,6 +3,7 @@
 
 import type { BOQData, BOQLineItem, SourceType } from "@/features/boq/components/types";
 import { computeSensitivities, DEFAULT_PRICES, getDivisionCategory } from "@/features/boq/components/recalc-engine";
+import { getConfidenceLevelFromIFCScore, type ConfidenceLevel } from "@/features/boq/constants/quality-thresholds";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -219,9 +220,8 @@ export function parseArtifactToBOQ(artifactData: any): BOQData | null {
   const totalProjectCost = data._totalCost || (hardCosts + softCosts);
 
   // Confidence level — derive from IFC quality if available
-  const confLevel: "LOW" | "MEDIUM" | "HIGH" = data._confidenceLevel ||
-    (ifcQuality && ifcQuality.score >= 80 ? "HIGH" :
-     ifcQuality && ifcQuality.score >= 55 ? "MEDIUM" : "LOW");
+  const confLevel: ConfidenceLevel = data._confidenceLevel ||
+    (ifcQuality ? getConfidenceLevelFromIFCScore(ifcQuality.score) : "LOW");
 
   return {
     projectName: data._projectName || projectTypeMatch?.[1]?.trim() || data._projectType || "Construction Project",
