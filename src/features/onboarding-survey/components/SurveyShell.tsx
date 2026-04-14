@@ -11,6 +11,7 @@ import { BackButton } from "@/features/onboarding-survey/components/BackButton";
 import { Scene1_Discovery } from "@/features/onboarding-survey/components/scenes/Scene1_Discovery";
 import { Scene2_Profession } from "@/features/onboarding-survey/components/scenes/Scene2_Profession";
 import { Scene3_TeamSize } from "@/features/onboarding-survey/components/scenes/Scene3_TeamSize";
+import { Scene4_Pricing } from "@/features/onboarding-survey/components/scenes/Scene4_Pricing";
 import { useSurveyState } from "@/features/onboarding-survey/hooks/useSurveyState";
 import { useKeyboardNav } from "@/features/onboarding-survey/hooks/useKeyboardNav";
 import { useSceneTimer } from "@/features/onboarding-survey/hooks/useSceneTimer";
@@ -19,41 +20,15 @@ import { DASHBOARD_ONBOARDED_KEY } from "@/features/onboarding-survey/lib/survey
 import {
   trackComplete,
   trackDiscovery,
+  trackPricing,
   trackProfession,
   trackSkip,
   trackTeamSize,
 } from "@/features/onboarding-survey/lib/survey-analytics";
-import type { SceneNumber, SurveyRecord } from "@/features/onboarding-survey/types/survey";
+import type { PricingAction, SceneNumber, SurveyRecord } from "@/features/onboarding-survey/types/survey";
 
 interface SurveyShellProps {
   initial: SurveyRecord | null;
-}
-
-/**
- * Stub scenes — real implementations land in subsequent commits.
- * Keeping them here lets the shell + motion + auto-save ship end-to-end first.
- */
-function SceneStub({ n, title }: { n: number; title: string }) {
-  return (
-    <div
-      style={{
-        minHeight: "60vh",
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-        color: "var(--text-secondary)",
-        fontSize: 14,
-        gap: 8,
-      }}
-    >
-      <div style={{ fontSize: 48, opacity: 0.5 }}>0{n}</div>
-      <div>{title}</div>
-      <div style={{ fontSize: 11, color: "var(--text-tertiary)" }}>
-        Scene implementation lands in a later commit.
-      </div>
-    </div>
-  );
 }
 
 export function SurveyShell({ initial }: SurveyShellProps) {
@@ -107,6 +82,20 @@ export function SurveyShell({ initial }: SurveyShellProps) {
       router.push("/dashboard");
     },
     [finalize, markOnboarded, redirecting, router, scene, timer]
+  );
+
+  // Scene 4 pick → track + finalize + route Pro to billing, Free to dashboard.
+  const handlePricingPick = useCallback(
+    async (action: PricingAction) => {
+      if (redirecting) return;
+      setRedirecting(true);
+      markOnboarded();
+      trackPricing(action);
+      trackComplete(timer.elapsedSeconds());
+      await finalize({ pricingAction: action, completedAt: true });
+      router.push(action === "chose_pro" ? "/dashboard/billing" : "/dashboard");
+    },
+    [finalize, markOnboarded, redirecting, router, timer]
   );
 
   // ── Keyboard nav ────────────────────────────────────────────────────────
@@ -221,69 +210,12 @@ export function SurveyShell({ initial }: SurveyShellProps) {
                 onTrack={trackTeamSize}
               />
             )}
-            {scene === 4 && (
-              <SceneStub n={4} title={t("survey.scene4.placeholder")} />
-            )}
+            {scene === 4 && <Scene4_Pricing onPick={handlePricingPick} />}
           </motion.section>
         </AnimatePresence>
       </main>
 
       <SkipLink onSkip={() => void goToDashboard("skip")} disabled={redirecting} />
-
-      {/* Temporary next-button so the shell is navigable before scenes ship.
-          Replaced by per-scene confirm UI in later commits. */}
-      {scene < 4 && (
-        <motion.button
-          type="button"
-          onClick={advance}
-          disabled={redirecting}
-          whileHover={{ x: 2 }}
-          whileTap={{ scale: 0.97 }}
-          style={{
-            position: "fixed",
-            bottom: 24,
-            right: 24,
-            zIndex: 40,
-            padding: "10px 16px",
-            borderRadius: 10,
-            background: "rgba(79,138,255,0.12)",
-            border: "1px solid rgba(79,138,255,0.3)",
-            color: "#A5B4FC",
-            fontSize: 12.5,
-            fontWeight: 600,
-            cursor: "pointer",
-          }}
-        >
-          {t("survey.next")} →
-        </motion.button>
-      )}
-      {scene === 4 && (
-        <motion.button
-          type="button"
-          onClick={() => void goToDashboard("complete")}
-          disabled={redirecting}
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.97 }}
-          style={{
-            position: "fixed",
-            bottom: 24,
-            right: 24,
-            zIndex: 40,
-            padding: "10px 18px",
-            borderRadius: 10,
-            background: "linear-gradient(135deg, #4F8AFF, #6366F1, #8B5CF6)",
-            border: "none",
-            color: "#fff",
-            fontSize: 13,
-            fontWeight: 700,
-            cursor: "pointer",
-            boxShadow: "0 4px 16px rgba(79,138,255,0.35)",
-          }}
-        >
-          {t("survey.finish")} →
-        </motion.button>
-      )}
-
     </div>
   );
 }

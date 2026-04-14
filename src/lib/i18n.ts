@@ -1346,6 +1346,32 @@ const en = {
   'survey.teamSize.academic': 'Research / academia',
   'survey.teamSize.browsing': 'Just window shopping',
 
+  // ===== SCENE 4 — pricing =====
+  'survey.scene4.celebration': '✨ Nice. You’re all set. One last thing…',
+  'survey.scene4.eyebrow': 'Step 4 of 4 · Pricing',
+  'survey.scene4.headline': 'Pick your weapon',
+  'survey.scene4.subheadline': 'No guilt, no dark patterns. Free gets you exploring. Pro if you’re shipping.',
+  'survey.scene4.socialProof': 'Join 500+ AEC professionals already building with us',
+
+  'survey.scene4.free.label': 'Free',
+  'survey.scene4.free.price': 'Free',
+  'survey.scene4.free.tagline': 'Enough to explore. Limited to get you hungry.',
+  'survey.scene4.free.cta': 'Start Free',
+  'survey.scene4.free.ctaSub': 'No credit card. Upgrade anytime.',
+  'survey.scene4.free.honest': 'Three prebuilt workflows. Five monthly runs. Perfect for poking around.',
+
+  'survey.scene4.pro.label': 'Pro',
+  'survey.scene4.pro.priceSuffix': '/month',
+  'survey.scene4.pro.tagline': 'Everything unlocked. Built for the real work.',
+  'survey.scene4.pro.cta': 'Go Pro',
+  'survey.scene4.pro.ctaSub': '14-day money-back guarantee.',
+  'survey.scene4.pro.honest': 'Still beta. Things break. We listen.',
+  'survey.scene4.pro.f1': 'Unlimited AI workflows',
+  'survey.scene4.pro.f2': 'Photorealistic 3D concept renders',
+  'survey.scene4.pro.f3': 'Cinematic walkthrough videos',
+  'survey.scene4.pro.f4': 'BOQ & Excel export',
+  'survey.scene4.pro.f5': 'Priority AI queue + support',
+
   // ===== COMMUNITY EXTRA =====
   'community.featured': 'FEATURED',
   'community.shareTemplate': 'Share template',
@@ -4072,6 +4098,32 @@ const de: Record<keyof typeof en, string | string[]> = {
   'survey.teamSize.company':  'Das ganze Unternehmen (10+)',
   'survey.teamSize.academic': 'Forschung / Akademie',
   'survey.teamSize.browsing': 'Nur am Stöbern',
+
+  // ===== SCENE 4 — Preise =====
+  'survey.scene4.celebration': '✨ Nice. Alles bereit. Noch eine Kleinigkeit…',
+  'survey.scene4.eyebrow': 'Schritt 4 von 4 · Preise',
+  'survey.scene4.headline': 'Wähl deine Waffe',
+  'survey.scene4.subheadline': 'Keine Schuldgefühle, keine Dark Patterns. Free zum Erkunden. Pro wenn’s ernst wird.',
+  'survey.scene4.socialProof': 'Mit über 500 AEC-Profis, die schon bauen',
+
+  'survey.scene4.free.label': 'Free',
+  'survey.scene4.free.price': 'Kostenlos',
+  'survey.scene4.free.tagline': 'Genug zum Erkunden. Limitiert, damit du Hunger bekommst.',
+  'survey.scene4.free.cta': 'Kostenlos starten',
+  'survey.scene4.free.ctaSub': 'Keine Kreditkarte. Jederzeit upgraden.',
+  'survey.scene4.free.honest': 'Drei fertige Workflows. Fünf Läufe pro Monat. Perfekt zum Ausprobieren.',
+
+  'survey.scene4.pro.label': 'Pro',
+  'survey.scene4.pro.priceSuffix': '/Monat',
+  'survey.scene4.pro.tagline': 'Alles freigeschaltet. Gebaut für echte Arbeit.',
+  'survey.scene4.pro.cta': 'Pro holen',
+  'survey.scene4.pro.ctaSub': '14 Tage Geld-zurück-Garantie.',
+  'survey.scene4.pro.honest': 'Noch Beta. Sachen kaputt. Wir hören zu.',
+  'survey.scene4.pro.f1': 'Unbegrenzte KI-Workflows',
+  'survey.scene4.pro.f2': 'Fotorealistische 3D-Konzept-Renderings',
+  'survey.scene4.pro.f3': 'Cinematische Walkthrough-Videos',
+  'survey.scene4.pro.f4': 'BOQ- & Excel-Export',
+  'survey.scene4.pro.f5': 'Priorität in der KI-Schlange + Support',
 
   // ===== COMMUNITY EXTRA =====
   'community.featured': 'EMPFOHLEN',
