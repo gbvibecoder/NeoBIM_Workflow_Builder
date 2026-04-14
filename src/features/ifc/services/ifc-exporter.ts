@@ -115,6 +115,27 @@ export interface IFCExportOptions {
     mep?: string;
     landscape?: string;
   };
+  /**
+   * When true, emit IfcReinforcingBar with IfcExtrudedAreaSolid body geometry.
+   * When false (DEFAULT), bars are emitted with Representation=$ (no geometry) but
+   * Pset_BuildFlow_BBS metadata intact — prevents the "cloud of cylinders at origin"
+   * artefact that auto-generated rebar creates on circular / non-rectangular buildings.
+   * BBS tools (Excel export, takeoff software) read the Pset, not the geometry.
+   */
+  emitRebarGeometry?: boolean;
+  /**
+   * When true, auto-emit sample MEP fixtures (sprinklers, WCs, pumps, AHU, lights, MCB,
+   * solar), sample plant-room equipment (chiller, boiler, transformer), demo furniture,
+   * demo curtain wall decomposition, demo shading device, and sample M20 bolt/fillet weld.
+   * Default FALSE. These are placed at schematic bbox-derived coordinates and can appear
+   * as "flying debris" on non-rectangular buildings (circular/L-shape/curved). Enable only
+   * when the input massing is a conventional rectangular floor plate or when the caller has
+   * explicitly supplied positioned fixture geometry.
+   *
+   * Note: legitimate architectural elements (lifts when NBC-mandated, RPWD entry ramp,
+   * per-column footings, per-column pile-caps) continue to emit regardless of this flag.
+   */
+  autoEmitDemoContent?: boolean;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -1188,6 +1209,13 @@ interface ExportContext {
     fireprotection: number[];
   };
 
+  // v4 cleanup — emission flags controlling demo/placeholder content
+  emitRebarGeometry: boolean;
+  autoEmitDemoContent: boolean;
+
+  // v4 cleanup — actual building bounding box for positioning any opt-in demo content
+  boundingBox: { minX: number; minY: number; maxX: number; maxY: number };
+
   safeName: (s: string) => string;
 }
 
@@ -1404,6 +1432,14 @@ export function generateIFCFile(
     costEntityIds: new Map(),
     equipmentByKind: new Map(),
     assetMembers: { hvac: [], electrical: [], plumbing: [], fireprotection: [] },
+    emitRebarGeometry: options.emitRebarGeometry ?? false,
+    autoEmitDemoContent: options.autoEmitDemoContent ?? false,
+    boundingBox: {
+      minX: geometry.boundingBox?.min?.x ?? 0,
+      minY: geometry.boundingBox?.min?.y ?? 0,
+      maxX: geometry.boundingBox?.max?.x ?? 20,
+      maxY: geometry.boundingBox?.max?.y ?? 20,
+    },
     safeName,
   };
 
@@ -1522,10 +1558,14 @@ export function generateIFCFile(
     }
 
     // v3 Tier 2: auto-emit MEP fixtures per storey (fire/plumbing/HVAC/electrical)
-    if (filter === "all" || filter === "mep") {
+    // GATED (v4-cleanup): placeholder fixtures are visually disruptive on non-rectangular buildings;
+    // caller must opt in explicitly via autoEmitDemoContent when MassingGeometry is simple.
+    if ((filter === "all" || filter === "mep") && ctx.autoEmitDemoContent) {
       emitMEPFixturesForStorey(storey, storeyId, storeyPlacementId, ctx, geometry.totalHeight);
     }
-    // v3 Tier 4: auto-emit elevators/ramps/foundations/furniture/curtain wall/shading
+    // v3 Tier 4: elevators/ramps/foundations (always emitted — these are legitimate
+    // architectural elements positioned at real coordinates) + furniture/curtain-wall/
+    // shading demos (gated behind autoEmitDemoContent).
     if (filter === "all" || filter === "architectural" || filter === "structural") {
       emitMissingBuildingElements(geometry, storey, storeyId, storeyPlacementId, ctx);
     }
@@ -1577,11 +1617,16 @@ export function generateIFCFile(
   emitIndianEPDReferences(ctx);                                                     // Tier 2
   emitBuildingEmbodiedCarbonSummary(geometry, buildingId, ctx);                     // Tier 2
   emitProjectLibraryAndFederation(projectId, ctx, options);                         // Tier 3
-  emitStructuralAnalysisModel(geometry, ctx);                                       // Tier 4
-  emitLoadCasesAndCombinations(ctx);                                                // Tier 4
-  emitSampleMechanicalFasteners(ctx);                                               // Tier 4
-  emitAdvancedMEPComponents(buildingId, ctx);                                       // Tier 5
-  emitMEPPortConnectivity(ctx);                                                     // Tier 5
+  emitStructuralAnalysisModel(geometry, ctx);                                       // Tier 4 (metadata only — no geometry)
+  emitLoadCasesAndCombinations(ctx);                                                // Tier 4 (metadata only)
+  // GATED (v4-cleanup): the next three emit geometric placeholder entities at
+  // bbox-derived coordinates. Keep them off when the caller wants a clean IFC
+  // reflecting only the actual building; enable via autoEmitDemoContent for LOD scaffolds.
+  if (ctx.autoEmitDemoContent) {
+    emitSampleMechanicalFasteners(ctx);                                             // Tier 4 demo
+    emitAdvancedMEPComponents(buildingId, ctx);                                     // Tier 5 demo
+    emitMEPPortConnectivity(ctx);                                                   // Tier 5 demo (depends on equipment)
+  }
   emitTaskElementLinkage(ctx);                                                      // Tier 7
   emitCostElementLinkage(ctx);                                                      // Tier 7
   emitConstructionResources(ctx);                                                   // Tier 7
@@ -3620,36 +3665,43 @@ function emitReinforcingBars(bars: GeneratedBar[], hostElementId: number, storey
   const rebarIds: number[] = [];
 
   for (const bar of bars) {
-    // Circle profile for the bar cross-section
-    const profCenterId = id.next();
-    lines.push(`#${profCenterId}=IFCCARTESIANPOINT((0.,0.));`);
-    const profPlacementId = id.next();
-    lines.push(`#${profPlacementId}=IFCAXIS2PLACEMENT2D(#${profCenterId},$);`);
-    const profileId = id.next();
-    const rMeters = (bar.diameter / 2) / 1000;
-    lines.push(`#${profileId}=IFCCIRCLEPROFILEDEF(.AREA.,'${bar.grade} d${bar.diameter}',#${profPlacementId},${f(rMeters, 5)});`);
+    const crossSectionAreaM2 = Math.PI * (bar.diameter * bar.diameter) / 4 / 1_000_000;
+    const barName = `${hostTag}-${bar.barMark}`;
 
-    // Sweep solid along cutting length (approximation: straight bar of specified length)
-    const extDirId = id.next();
-    lines.push(`#${extDirId}=IFCDIRECTION((1.,0.,0.));`);
-    const solidId = id.next();
-    lines.push(`#${solidId}=IFCEXTRUDEDAREASOLID(#${profileId},$,#${extDirId},${f(bar.cuttingLengthMm / 1000)});`);
-    const shapeRepId = id.next();
-    lines.push(`#${shapeRepId}=IFCSHAPEREPRESENTATION(#${ctx.bodyContextId},'Body','SweptSolid',(#${solidId}));`);
-    const prodShapeId = id.next();
-    lines.push(`#${prodShapeId}=IFCPRODUCTDEFINITIONSHAPE($,$,(#${shapeRepId}));`);
+    let prodShapeRef = "$";     // default: no geometry (Pset-only rebar — BBS still works)
+    let placementRef = "$";
 
-    const originId = id.next();
-    lines.push(`#${originId}=IFCCARTESIANPOINT((0.,0.,0.));`);
-    const axisId = id.next();
-    lines.push(`#${axisId}=IFCAXIS2PLACEMENT3D(#${originId},$,$);`);
-    const placementId = id.next();
-    lines.push(`#${placementId}=IFCLOCALPLACEMENT(#${storeyPlacementId},#${axisId});`);
+    if (ctx.emitRebarGeometry) {
+      // Opt-in body geometry: IfcExtrudedAreaSolid along cutting length (straight-bar approximation)
+      const profCenterId = id.next();
+      lines.push(`#${profCenterId}=IFCCARTESIANPOINT((0.,0.));`);
+      const profPlacementId = id.next();
+      lines.push(`#${profPlacementId}=IFCAXIS2PLACEMENT2D(#${profCenterId},$);`);
+      const profileId = id.next();
+      const rMeters = (bar.diameter / 2) / 1000;
+      lines.push(`#${profileId}=IFCCIRCLEPROFILEDEF(.AREA.,'${bar.grade} d${bar.diameter}',#${profPlacementId},${f(rMeters, 5)});`);
+
+      const extDirId = id.next();
+      lines.push(`#${extDirId}=IFCDIRECTION((1.,0.,0.));`);
+      const solidId = id.next();
+      lines.push(`#${solidId}=IFCEXTRUDEDAREASOLID(#${profileId},$,#${extDirId},${f(bar.cuttingLengthMm / 1000)});`);
+      const shapeRepId = id.next();
+      lines.push(`#${shapeRepId}=IFCSHAPEREPRESENTATION(#${ctx.bodyContextId},'Body','SweptSolid',(#${solidId}));`);
+      const prodShapeId = id.next();
+      lines.push(`#${prodShapeId}=IFCPRODUCTDEFINITIONSHAPE($,$,(#${shapeRepId}));`);
+      prodShapeRef = `#${prodShapeId}`;
+
+      const originId = id.next();
+      lines.push(`#${originId}=IFCCARTESIANPOINT((0.,0.,0.));`);
+      const axisId = id.next();
+      lines.push(`#${axisId}=IFCAXIS2PLACEMENT3D(#${originId},$,$);`);
+      const placementId = id.next();
+      lines.push(`#${placementId}=IFCLOCALPLACEMENT(#${storeyPlacementId},#${axisId});`);
+      placementRef = `#${placementId}`;
+    }
 
     const barId = id.next();
-    const barName = `${hostTag}-${bar.barMark}`;
-    const crossSectionAreaM2 = Math.PI * (bar.diameter * bar.diameter) / 4 / 1_000_000;
-    lines.push(`#${barId}=IFCREINFORCINGBAR('${guid.fresh()}',#${ctx.ownerHistId},'${barName}','${bar.role} rebar ${bar.diameter}mm ${bar.grade}',$,#${placementId},#${prodShapeId},'${barName}',${f(crossSectionAreaM2, 6)},${f(bar.cuttingLengthMm / 1000, 4)},.${bar.role}.,.TEXTURED.);`);
+    lines.push(`#${barId}=IFCREINFORCINGBAR('${guid.fresh()}',#${ctx.ownerHistId},'${barName}','${bar.role} rebar ${bar.diameter}mm ${bar.grade}',$,${placementRef},${prodShapeRef},'${barName}',${f(crossSectionAreaM2, 6)},${f(bar.cuttingLengthMm / 1000, 4)},.${bar.role}.,.TEXTURED.);`);
 
     // Material association
     associateMaterial(ctx, barId, steelMatId);
@@ -4272,9 +4324,13 @@ export function emitMEPFixturesForStorey(
     return eid;
   };
 
+  // v4-cleanup: use actual building envelope (populated from geometry.boundingBox)
+  // so opt-in demo fixtures respect the real footprint instead of flying at (0–20, 0–10).
   const bbox = {
-    minX: 0, minY: 0,
-    maxX: 20, maxY: 10,   // default envelope; real code would use geometry.boundingBox
+    minX: ctx.boundingBox.minX,
+    minY: ctx.boundingBox.minY,
+    maxX: ctx.boundingBox.maxX,
+    maxY: ctx.boundingBox.maxY,
   };
 
   // ─── Fire Protection (NBC Part 4 mandates for >15m buildings) ───
@@ -4604,8 +4660,8 @@ export function emitMissingBuildingElements(
     }
   }
 
-  // Pile sample (only in basement when site bearing is poor — flag via rera presence as proxy)
-  if ((storey.isBasement || storey.index === 0) && ctx.rera) {
+  // Pile sample — emitted at hardcoded (0.3, 0.3). Gated behind autoEmitDemoContent.
+  if ((storey.isBasement || storey.index === 0) && ctx.rera && ctx.autoEmitDemoContent) {
     const pileId = writeElement("IFCPILE", `PILE-${storeyCode(storey)}-P01`, 0.3, 0.3, -8, 0.6, 15, 0.6, `,.CAST_IN_PLACE.`, ctx.matIds.concrete);
     ids.push(pileId);
 
@@ -4625,18 +4681,18 @@ export function emitMissingBuildingElements(
     lines.push(`#${relPile}=IFCRELDEFINESBYPROPERTIES('${guid.fresh()}',#${ctx.ownerHistId},$,$,(#${pileId}),#${psetPile});`);
   }
 
-  // Furniture — sample bed in residential-looking spaces
+  // Furniture — sample bed at hardcoded (6,3,0) / desk at (8,3,0). Gated.
   const hasResidential = storey.elements.some(e => e.type === "space" && /bed|living|flat|apartment/i.test((e.properties.spaceName ?? e.properties.spaceUsage ?? "")));
-  if (hasResidential) {
+  if (hasResidential && ctx.autoEmitDemoContent) {
     const bedId = writeElement("IFCFURNITURE", `FUR-BED-${storeyCode(storey)}-BR01`, 6, 3, 0, 1.8, 0.6, 2.1, `,.BED.`, ctx.matIds.timberDoor);
     ids.push(bedId);
     const deskId = writeElement("IFCFURNITURE", `FUR-DESK-${storeyCode(storey)}-OFF01`, 8, 3, 0, 1.4, 0.75, 0.7, `,.DESK.`, ctx.matIds.timberDoor);
     ids.push(deskId);
   }
 
-  // Curtain wall + decomposition (only on first storey where exterior wall >0)
+  // Curtain wall demo + decomposition at origin (not aligned with real exterior walls). Gated.
   const extWalls = storey.elements.filter(e => e.type === "wall" && !e.properties.isPartition);
-  if (extWalls.length > 0 && storey.index === 0) {
+  if (extWalls.length > 0 && storey.index === 0 && ctx.autoEmitDemoContent) {
     const cwId = id.next();
     lines.push(`#${cwId}=IFCCURTAINWALL('${guid.fresh()}',#${ctx.ownerHistId},'CW-FACADE-${storeyCode(storey)}-NORTH','Curtain wall system',$,#${storeyPlacementId},$,'CW-NORTH',.NOTDEFINED.);`);
 
@@ -4652,8 +4708,8 @@ export function emitMissingBuildingElements(
     ids.push(cwId);
   }
 
-  // Shading device — ECBC 2017 horizontal louver
-  if (extWalls.length > 0) {
+  // Shading device demo at origin — gated (would need real facade placement).
+  if (extWalls.length > 0 && ctx.autoEmitDemoContent) {
     const shadeId = writeElement("IFCSHADINGDEVICE", `SHD-LOUVER-${storeyCode(storey)}-W-001`, 0, 0.3, storey.height - 0.5, 3.0, 0.02, 0.6, `,.LOUVER.`, ctx.matIds.structuralSteel);
     ids.push(shadeId);
 
