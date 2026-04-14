@@ -136,6 +136,18 @@ export interface IFCExportOptions {
    * per-column footings, per-column pile-caps) continue to emit regardless of this flag.
    */
   autoEmitDemoContent?: boolean;
+  /**
+   * When true, curtain-wall sub-components (mullion + spandrel inputs) emit with body
+   * geometry. Default FALSE: they emit as IfcMember(.MULLION.) / IfcPlate(.CURTAIN_PANEL.)
+   * with Representation=$ — metadata present for BIM takeoff, but no individual body
+   * prisms rendered (a facade with 900+ mullions otherwise appears as flying stick chaos
+   * in viewers because each mullion is a separate thin rectangular solid).
+   *
+   * The merged perimeter wall shell (emitted when input walls form a closed chain) already
+   * represents the curtain-wall facade visually; the individual mullions are preserved as
+   * metadata entities aggregated under an IfcCurtainWall container per storey.
+   */
+  emitCurtainWallGeometry?: boolean;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -1338,6 +1350,7 @@ interface ExportContext {
   // v4 cleanup — emission flags controlling demo/placeholder content
   emitRebarGeometry: boolean;
   autoEmitDemoContent: boolean;
+  emitCurtainWallGeometry: boolean;
 
   // v4 cleanup — actual building bounding box for positioning any opt-in demo content
   boundingBox: { minX: number; minY: number; maxX: number; maxY: number };
@@ -1560,6 +1573,7 @@ export function generateIFCFile(
     assetMembers: { hvac: [], electrical: [], plumbing: [], fireprotection: [] },
     emitRebarGeometry: options.emitRebarGeometry ?? false,
     autoEmitDemoContent: options.autoEmitDemoContent ?? false,
+    emitCurtainWallGeometry: options.emitCurtainWallGeometry ?? false,
     boundingBox: {
       minX: geometry.boundingBox?.min?.x ?? 0,
       minY: geometry.boundingBox?.min?.y ?? 0,
@@ -1700,7 +1714,10 @@ export function generateIFCFile(
           break;
         }
         case "mullion": case "spandrel":
-          eid = writeBeamEntity(element, storeyPlacementId, ctx);
+          // Curtain-wall sub-components: emit as IfcMember(.MULLION.) / IfcPlate(.CURTAIN_PANEL.)
+          // with Representation=$ by default. This prevents hundreds of individual thin
+          // rectangular prisms from rendering as flying stick chaos in the viewer.
+          eid = writeCurtainWallComponent(element, storeyPlacementId, ctx);
           break;
       }
       if (eid != null) physicalIds.push(eid);
@@ -2834,38 +2851,53 @@ function writeBeamEntity(
     lines.push(`#${profileId}=IFCRECTANGLEPROFILEDEF(.AREA.,'Beam Profile',#${profPlacementId},${f(beamWidth)},${f(beamDepth)});`);
   }
 
+  // Use actual 3D vertex-to-vertex direction (including Z) — previous world-axis-aligned
+  // logic mis-extruded vertical mullions along +Y and angled beams along cardinal axes,
+  // producing flying rectangular sticks in the viewer. Extrusion LENGTH remains from
+  // element.properties.length (massing generators use vertices only as direction markers,
+  // not as start/end endpoints, so vertex distance is an unreliable length source).
   const v0 = element.vertices[0];
   const v1 = element.vertices[1];
-  const lenX = Math.abs(v1.x - v0.x);
-  const lenY = Math.abs(v1.y - v0.y);
+  const dax = v1.x - v0.x, day = v1.y - v0.y, daz = v1.z - v0.z;
+  const axLen = Math.hypot(dax, day, daz);
+  const actualLen = beamLength;   // always use properties.length (defaulted to 6m)
+  const axNx = axLen > 0.001 ? dax / axLen : 1;
+  const axNy = axLen > 0.001 ? day / axLen : 0;
+  const axNz = axLen > 0.001 ? daz / axLen : 0;
 
-  let beamDirX: number, beamDirY: number, beamStartX: number, beamStartY: number;
-  if (lenX > lenY) {
-    beamDirX = v1.x > v0.x ? 1 : -1;
-    beamDirY = 0;
-    beamStartX = Math.min(v0.x, v1.x);
-    beamStartY = v0.y;
+  // Pick a local X-direction perpendicular to the axis (the profile's XY plane will
+  // be perpendicular to the axis). Default to rotating the axis 90° in the XY plane;
+  // for vertical beams use world +X as the reference.
+  let lxDx: number, lxDy: number, lxDz: number;
+  if (Math.abs(axNz) < 0.9) {
+    // Axis mostly horizontal → local X is the in-plane perpendicular
+    lxDx = -axNy; lxDy = axNx; lxDz = 0;
+    const l = Math.hypot(lxDx, lxDy) || 1;
+    lxDx /= l; lxDy /= l;
   } else {
-    beamDirX = 0;
-    beamDirY = 1;
-    beamStartX = v0.x;
-    beamStartY = Math.min(v0.y, v1.y);
+    // Axis mostly vertical → local X is world +X
+    lxDx = 1; lxDy = 0; lxDz = 0;
   }
-  const beamZ = v0.z;
 
   const extDirId = id.next();
-  lines.push(`#${extDirId}=IFCDIRECTION((${f(beamDirX, 6)},${f(beamDirY, 6)},0.));`);
+  lines.push(`#${extDirId}=IFCDIRECTION((0.,0.,1.));`);  // extrude along local Z axis
   const solidId = id.next();
-  lines.push(`#${solidId}=IFCEXTRUDEDAREASOLID(#${profileId},$,#${extDirId},${f(beamLength)});`);
+  lines.push(`#${solidId}=IFCEXTRUDEDAREASOLID(#${profileId},$,#${extDirId},${f(actualLen)});`);
   const shapeRepId = id.next();
   lines.push(`#${shapeRepId}=IFCSHAPEREPRESENTATION(#${ctx.bodyContextId},'Body','SweptSolid',(#${solidId}));`);
   const prodShapeId = id.next();
   lines.push(`#${prodShapeId}=IFCPRODUCTDEFINITIONSHAPE($,$,(#${shapeRepId}));`);
 
+  // Placement: origin at v0, local Z aligned to the beam axis direction (so extruding
+  // along (0,0,1) in local coords = along the real beam axis in world coords).
   const beamOriginId = id.next();
-  lines.push(`#${beamOriginId}=IFCCARTESIANPOINT((${f(beamStartX)},${f(beamStartY)},${f(beamZ)}));`);
+  lines.push(`#${beamOriginId}=IFCCARTESIANPOINT((${f(v0.x)},${f(v0.y)},${f(v0.z)}));`);
+  const beamZDirId = id.next();
+  lines.push(`#${beamZDirId}=IFCDIRECTION((${f(axNx, 6)},${f(axNy, 6)},${f(axNz, 6)}));`);
+  const beamXDirId = id.next();
+  lines.push(`#${beamXDirId}=IFCDIRECTION((${f(lxDx, 6)},${f(lxDy, 6)},${f(lxDz, 6)}));`);
   const beamAxisId = id.next();
-  lines.push(`#${beamAxisId}=IFCAXIS2PLACEMENT3D(#${beamOriginId},#${ctx.zDirId},$);`);
+  lines.push(`#${beamAxisId}=IFCAXIS2PLACEMENT3D(#${beamOriginId},#${beamZDirId},#${beamXDirId});`);
   const beamPlacementId = id.next();
   lines.push(`#${beamPlacementId}=IFCLOCALPLACEMENT(#${storeyPlacementId},#${beamAxisId});`);
 
@@ -2899,6 +2931,95 @@ function writeBeamEntity(
   }
 
   return beamId;
+}
+
+// ─────────── Curtain Wall Sub-Component Writer (mullion / spandrel) ───────────
+//
+// Massing generators can produce hundreds of mullion + spandrel elements per storey to
+// discretise a glass facade. Routing them through writeBeamEntity emits each as a
+// standalone rectangular extrusion — the cumulative effect in any IFC viewer is a
+// "flying stick" appearance because (a) each piece is a separate thin solid and (b) the
+// old beam writer's world-axis extrusion bug mis-oriented them entirely.
+//
+// This writer emits them semantically correctly as IfcMember / IfcPlate with
+// Representation=$ by default. The merged perimeter wall shell already represents the
+// facade visually; these sub-components remain present as BIM metadata for curtain-wall
+// schedule / takeoff but are invisible to the renderer.
+function writeCurtainWallComponent(
+  element: GeometryElement,
+  storeyPlacementId: number,
+  ctx: ExportContext
+): number {
+  const { id, lines, guid } = ctx;
+  const isMullion = element.type === "mullion";
+  const entityClass = isMullion ? "IFCMEMBER" : "IFCPLATE";
+  const predefinedType = isMullion ? ".MULLION." : ".CURTAIN_PANEL.";
+  const name = element.properties.name ?? (isMullion ? "Mullion" : "Spandrel");
+  const tag = name.substring(0, 30);
+
+  let representationRef = "$";
+  let placementRef = "$";
+
+  if (ctx.emitCurtainWallGeometry) {
+    // Opt-in body emission — uses the same 3D-axis logic as the fixed beam writer
+    const v0 = element.vertices[0];
+    const v1 = element.vertices[1];
+    const widthM = element.properties.width ?? 0.05;
+    const depthM = element.properties.thickness ?? 0.03;
+
+    const profCenterId = id.next();
+    lines.push(`#${profCenterId}=IFCCARTESIANPOINT((${f(widthM / 2)},${f(depthM / 2)}));`);
+    const profPlaceId = id.next();
+    lines.push(`#${profPlaceId}=IFCAXIS2PLACEMENT2D(#${profCenterId},$);`);
+    const profileId = id.next();
+    lines.push(`#${profileId}=IFCRECTANGLEPROFILEDEF(.AREA.,'${tag} Profile',#${profPlaceId},${f(widthM)},${f(depthM)});`);
+
+    const dax = v1.x - v0.x, day = v1.y - v0.y, daz = v1.z - v0.z;
+    const axLen = Math.hypot(dax, day, daz) || (element.properties.length ?? 1);
+    const axNx = dax / axLen || 0, axNy = day / axLen || 0, axNz = daz / axLen || 1;
+    let lxDx: number, lxDy: number, lxDz: number;
+    if (Math.abs(axNz) < 0.9) {
+      lxDx = -axNy; lxDy = axNx; lxDz = 0;
+      const l = Math.hypot(lxDx, lxDy) || 1; lxDx /= l; lxDy /= l;
+    } else {
+      lxDx = 1; lxDy = 0; lxDz = 0;
+    }
+
+    const extDirId = id.next();
+    lines.push(`#${extDirId}=IFCDIRECTION((0.,0.,1.));`);
+    const solidId = id.next();
+    lines.push(`#${solidId}=IFCEXTRUDEDAREASOLID(#${profileId},$,#${extDirId},${f(axLen)});`);
+    const shapeRepId = id.next();
+    lines.push(`#${shapeRepId}=IFCSHAPEREPRESENTATION(#${ctx.bodyContextId},'Body','SweptSolid',(#${solidId}));`);
+    const prodShapeId = id.next();
+    lines.push(`#${prodShapeId}=IFCPRODUCTDEFINITIONSHAPE($,$,(#${shapeRepId}));`);
+    representationRef = `#${prodShapeId}`;
+
+    const originId = id.next();
+    lines.push(`#${originId}=IFCCARTESIANPOINT((${f(v0.x)},${f(v0.y)},${f(v0.z)}));`);
+    const zDirId = id.next();
+    lines.push(`#${zDirId}=IFCDIRECTION((${f(axNx, 6)},${f(axNy, 6)},${f(axNz, 6)}));`);
+    const xDirId = id.next();
+    lines.push(`#${xDirId}=IFCDIRECTION((${f(lxDx, 6)},${f(lxDy, 6)},${f(lxDz, 6)}));`);
+    const axisId = id.next();
+    lines.push(`#${axisId}=IFCAXIS2PLACEMENT3D(#${originId},#${zDirId},#${xDirId});`);
+    const placementId = id.next();
+    lines.push(`#${placementId}=IFCLOCALPLACEMENT(#${storeyPlacementId},#${axisId});`);
+    placementRef = `#${placementId}`;
+  }
+
+  const entityId = id.next();
+  lines.push(`#${entityId}=${entityClass}('${guid.stable(`cw:${element.id}`)}',#${ctx.ownerHistId},'${ctx.safeName(name)}',$,$,${placementRef},${representationRef},'${ctx.safeName(tag)}',${predefinedType});`);
+
+  // Material association — glazing for spandrels, aluminium/steel for mullions
+  const materialId = isMullion ? ctx.matIds.structuralSteel : ctx.matIds.glazing;
+  associateMaterial(ctx, entityId, materialId);
+
+  // Classification
+  const classType = isMullion ? "member" : "plate";
+  associateClassification(ctx, entityId, classType, isMullion ? ctx.materials.structuralSteel : ctx.materials.glazing);
+
+  return entityId;
 }
 
 // ─────────── Window Writer (with opening + relationships) ───────────
