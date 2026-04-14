@@ -209,7 +209,7 @@ export const NODE_CATALOGUE: NodeCatalogueItem[] = [
   {
     id: "TR-008",
     name: "BOQ / Cost Mapper",
-    description: "Map extracted quantities to cost codes and unit prices",
+    description: "Map quantities to cost codes and unit prices (AI-estimated — verify with a quantity surveyor before tendering)",
     category: "transform",
     icon: "DollarSign",
     inputs: [
@@ -387,7 +387,7 @@ export const NODE_CATALOGUE: NodeCatalogueItem[] = [
   {
     id: "GN-003",
     name: "Concept Render Generator",
-    description: "Generate photorealistic architectural concept renders from building descriptions with 4 view types: exterior, floor plan, site plan, interior",
+    description: "AI concept renders (not photorealistic) from building descriptions — 4 view types: exterior, floor plan, site plan, interior",
     category: "generate",
     icon: "Palette",
     inputs: [
@@ -403,7 +403,7 @@ export const NODE_CATALOGUE: NodeCatalogueItem[] = [
   {
     id: "GN-004",
     name: "Floor Plan Generator",
-    description: "Generate 2D floor plan layouts from room program and footprint",
+    description: "Generate 2D floor plan layouts from room program and footprint (experimental — for design exploration)",
     category: "generate",
     icon: "LayoutGrid",
     inputs: [{ id: "prog-in", label: "Room Program", type: "json" }],
