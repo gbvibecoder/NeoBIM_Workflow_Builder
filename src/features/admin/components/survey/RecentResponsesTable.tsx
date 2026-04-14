@@ -18,6 +18,10 @@ interface ResponseRow {
   skippedAtScene: number | null;
   createdAt: string;
   updatedAt: string;
+  utmSource?: string | null;
+  utmCampaign?: string | null;
+  country?: string | null;
+  deviceType?: string | null;
 }
 
 interface RecentResponsesTableProps {
@@ -94,6 +98,7 @@ export function RecentResponsesTable({ rows, pageSize = 10 }: RecentResponsesTab
           <thead>
             <tr style={{ textAlign: "left", color: "var(--text-tertiary)", fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase" }}>
               <th style={{ padding: "8px 8px", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>User</th>
+              <th style={{ padding: "8px 8px", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>Source</th>
               <th style={{ padding: "8px 8px", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>Discovery</th>
               <th style={{ padding: "8px 8px", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>Profession</th>
               <th style={{ padding: "8px 8px", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>Team</th>
@@ -105,7 +110,7 @@ export function RecentResponsesTable({ rows, pageSize = 10 }: RecentResponsesTab
           <tbody>
             {slice.length === 0 && (
               <tr>
-                <td colSpan={7} style={{ padding: 24, textAlign: "center", color: "var(--text-disabled)" }}>
+                <td colSpan={8} style={{ padding: 24, textAlign: "center", color: "var(--text-disabled)" }}>
                   No responses in this range yet.
                 </td>
               </tr>
@@ -118,6 +123,13 @@ export function RecentResponsesTable({ rows, pageSize = 10 }: RecentResponsesTab
                   <td style={{ padding: "10px 8px", color: "var(--text-primary)" }}>
                     <div style={{ fontWeight: 600 }}>{r.userName ?? "—"}</div>
                     <div style={{ fontSize: 11, color: "var(--text-tertiary)" }}>{r.userEmail ?? "—"}</div>
+                  </td>
+                  <td style={{ padding: "10px 8px", color: "var(--text-secondary)" }}>
+                    <div>{r.utmSource || "direct"}</div>
+                    {r.utmCampaign && <div style={{ fontSize: 10.5, color: "var(--text-tertiary)" }}>{r.utmCampaign}</div>}
+                    <div style={{ fontSize: 10.5, color: "var(--text-tertiary)", fontFamily: "var(--font-jetbrains), monospace" }}>
+                      {[r.country, r.deviceType].filter(Boolean).join(" · ") || "—"}
+                    </div>
                   </td>
                   <td style={{ padding: "10px 8px", color: "var(--text-secondary)" }}>
                     {r.discovery ?? "—"}

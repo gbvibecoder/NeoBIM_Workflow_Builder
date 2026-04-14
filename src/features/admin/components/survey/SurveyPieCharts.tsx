@@ -12,6 +12,9 @@ interface SurveyPieChartsProps {
   profession: PieBucket[];
   teamSize: PieBucket[];
   pricing: PieBucket[];
+  utmSource: PieBucket[];
+  country: PieBucket[];
+  deviceType: PieBucket[];
 }
 
 const PALETTE = [
@@ -105,19 +108,73 @@ function PiePanel({ title, data }: { title: string; data: PieBucket[] }) {
   );
 }
 
-export function SurveyPieCharts({ discovery, profession, teamSize, pricing }: SurveyPieChartsProps) {
+export function SurveyPieCharts({
+  discovery,
+  profession,
+  teamSize,
+  pricing,
+  utmSource,
+  country,
+  deviceType,
+}: SurveyPieChartsProps) {
   return (
-    <div
-      style={{
-        display: "grid",
-        gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
-        gap: 16,
-      }}
-    >
-      <PiePanel title="Discovery" data={discovery} />
-      <PiePanel title="Profession" data={profession} />
-      <PiePanel title="Team Size" data={teamSize} />
-      <PiePanel title="Pricing Action" data={pricing} />
+    <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+      {/* Primary cohort insights */}
+      <div>
+        <div
+          style={{
+            fontSize: 11,
+            fontWeight: 700,
+            letterSpacing: "0.12em",
+            textTransform: "uppercase",
+            color: "var(--text-tertiary)",
+            fontFamily: "var(--font-jetbrains), monospace",
+            marginBottom: 10,
+          }}
+        >
+          Cohort breakdown
+        </div>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+            gap: 16,
+          }}
+        >
+          <PiePanel title="Discovery" data={discovery} />
+          <PiePanel title="Profession" data={profession} />
+          <PiePanel title="Team Size" data={teamSize} />
+          <PiePanel title="Pricing Action" data={pricing} />
+        </div>
+      </div>
+
+      {/* Attribution */}
+      <div>
+        <div
+          style={{
+            fontSize: 11,
+            fontWeight: 700,
+            letterSpacing: "0.12em",
+            textTransform: "uppercase",
+            color: "var(--text-tertiary)",
+            fontFamily: "var(--font-jetbrains), monospace",
+            marginBottom: 10,
+          }}
+        >
+          Attribution
+        </div>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+            gap: 16,
+          }}
+        >
+          <PiePanel title="UTM Source" data={utmSource} />
+          <PiePanel title="Country" data={country} />
+          <PiePanel title="Device" data={deviceType} />
+        </div>
+      </div>
     </div>
   );
 }

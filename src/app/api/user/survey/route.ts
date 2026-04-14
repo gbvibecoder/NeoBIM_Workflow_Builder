@@ -18,6 +18,48 @@ function num(v: unknown): number | null {
 
 const ALLOWED_PRICING = new Set(["chose_free", "chose_pro", "skipped"]);
 
+// ── First-touch attribution helpers ────────────────────────────────────
+// Keep UA length short in storage (some bots send monster strings).
+const MAX_UA = 500;
+
+function detectDevice(ua: string | null): "mobile" | "tablet" | "desktop" | null {
+  if (!ua) return null;
+  // Tablet detection first (iPad reports "Mobile" too, so order matters).
+  if (/iPad|Tablet|PlayBook|Silk|(?:Android(?!.*Mobile))/i.test(ua)) return "tablet";
+  if (/Mobi|Android|iPhone|iPod|IEMobile|BlackBerry/i.test(ua)) return "mobile";
+  return "desktop";
+}
+
+interface Attribution {
+  utmSource: string | null;
+  utmMedium: string | null;
+  utmCampaign: string | null;
+  utmTerm: string | null;
+  utmContent: string | null;
+  referrer: string | null;
+  country: string | null;
+  city: string | null;
+  deviceType: "mobile" | "tablet" | "desktop" | null;
+  userAgent: string | null;
+}
+
+function extractAttribution(body: Record<string, unknown>, req: NextRequest): Attribution {
+  const ua = req.headers.get("user-agent");
+  return {
+    utmSource:   str(body.utmSource, 200),
+    utmMedium:   str(body.utmMedium, 200),
+    utmCampaign: str(body.utmCampaign, 200),
+    utmTerm:     str(body.utmTerm, 200),
+    utmContent:  str(body.utmContent, 200),
+    referrer:    str(body.referrer, 500),
+    // Vercel edge headers — free, present on prod. Null in local dev is fine.
+    country:     req.headers.get("x-vercel-ip-country") || null,
+    city:        req.headers.get("x-vercel-ip-city") || null,
+    deviceType:  detectDevice(ua),
+    userAgent:   ua ? ua.slice(0, MAX_UA) : null,
+  };
+}
+
 export async function GET() {
   const session = await auth();
   if (!session?.user?.id) {
@@ -69,6 +111,10 @@ export async function POST(req: NextRequest) {
       if (v !== undefined) cleanUpdate[k] = v;
     }
 
+    // Attribution — persisted ONLY on CREATE. First-touch wins; subsequent
+    // auto-saves in the same session cannot overwrite it.
+    const attr = extractAttribution(body, req);
+
     const survey = await prisma.userSurvey.upsert({
       where: { userId: session.user.id },
       create: {
@@ -82,6 +128,16 @@ export async function POST(req: NextRequest) {
         completedAt:     data.completedAt ?? null,
         skippedAt:       data.skippedAt ?? null,
         skippedAtScene:  data.skippedAtScene,
+        utmSource:       attr.utmSource,
+        utmMedium:       attr.utmMedium,
+        utmCampaign:     attr.utmCampaign,
+        utmTerm:         attr.utmTerm,
+        utmContent:      attr.utmContent,
+        referrer:        attr.referrer,
+        country:         attr.country,
+        city:            attr.city,
+        deviceType:      attr.deviceType,
+        userAgent:       attr.userAgent,
       },
       update: cleanUpdate,
     });

@@ -58,6 +58,12 @@ export async function GET(req: NextRequest) {
         skippedAtScene: true,
         createdAt: true,
         updatedAt: true,
+        utmSource: true,
+        utmMedium: true,
+        utmCampaign: true,
+        country: true,
+        deviceType: true,
+        referrer: true,
       },
     }),
     prisma.userSurvey.findMany({
@@ -99,11 +105,17 @@ export async function GET(req: NextRequest) {
       .sort((a, b) => b.count - a.count);
   };
 
+  // Normalise UTM source: null/empty → "direct" so the pie stays readable.
+  const utmLabel = (v: string | null) => (v && v.trim() ? v : "direct");
+
   const pies = {
     discovery: bucket(surveyRows.map((r) => r.discoverySource)),
     profession: bucket(surveyRows.map((r) => r.profession)),
     teamSize: bucket(surveyRows.map((r) => r.teamSize)),
     pricing: bucket(surveyRows.map((r) => r.pricingAction)),
+    utmSource: bucket(surveyRows.map((r) => utmLabel(r.utmSource))),
+    country: bucket(surveyRows.map((r) => r.country)),
+    deviceType: bucket(surveyRows.map((r) => r.deviceType)),
   };
 
   // ── Stats ───────────────────────────────────────────────────────────
@@ -160,6 +172,10 @@ export async function GET(req: NextRequest) {
     skippedAtScene: r.skippedAtScene,
     createdAt: r.createdAt,
     updatedAt: r.updatedAt,
+    utmSource: r.utmSource,
+    utmCampaign: r.utmCampaign,
+    country: r.country,
+    deviceType: r.deviceType,
   }));
 
   return NextResponse.json({ funnel, pies, stats, recent });

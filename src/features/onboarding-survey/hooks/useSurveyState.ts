@@ -1,7 +1,25 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { getUTMProperties } from "@/lib/utm";
 import type { SceneNumber, SurveyPatch, SurveyRecord } from "@/features/onboarding-survey/types/survey";
+
+/**
+ * First-touch attribution: read UTM params from sessionStorage (populated by
+ * <UTMCapture /> on landing) and document.referrer once. Attached to every
+ * POST; the server only persists these on CREATE, so auto-save won't clobber
+ * the real first-touch values.
+ */
+function collectAttribution(): Record<string, string> {
+  if (typeof window === "undefined") return {};
+  const utms = getUTMProperties();
+  const attribution: Record<string, string> = { ...utms };
+  if (document.referrer) {
+    // Truncate to 500 chars — some ad networks append giant query strings.
+    attribution.referrer = document.referrer.slice(0, 500);
+  }
+  return attribution;
+}
 
 const EMPTY: SurveyRecord = {
   discoverySource: null,
@@ -42,7 +60,7 @@ export function useSurveyState(initial: SurveyRecord | null) {
       await fetch("/api/user/survey", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(patch),
+        body: JSON.stringify({ ...patch, ...collectAttribution() }),
       });
     } catch {
       /* auto-save is best-effort; user can still finish the flow */
@@ -94,7 +112,7 @@ export function useSurveyState(initial: SurveyRecord | null) {
         await fetch("/api/user/survey", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(merged),
+          body: JSON.stringify({ ...merged, ...collectAttribution() }),
         });
       } catch {
         /* even if final save fails, redirect anyway — don't trap user */
@@ -114,7 +132,7 @@ export function useSurveyState(initial: SurveyRecord | null) {
           fetch("/api/user/survey", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(pendingPatchRef.current),
+            body: JSON.stringify({ ...pendingPatchRef.current, ...collectAttribution() }),
             keepalive: true,
           });
         } catch { /* best-effort */ }

@@ -24,6 +24,9 @@ interface ApiResponse {
     profession: PieBucket[];
     teamSize: PieBucket[];
     pricing: PieBucket[];
+    utmSource: PieBucket[];
+    country: PieBucket[];
+    deviceType: PieBucket[];
   };
   stats: StatsShape;
   recent: Parameters<typeof RecentResponsesTable>[0]["rows"];
@@ -162,6 +165,9 @@ export default function SurveyAnalyticsPage() {
             profession={data.pies.profession}
             teamSize={data.pies.teamSize}
             pricing={data.pies.pricing}
+            utmSource={data.pies.utmSource}
+            country={data.pies.country}
+            deviceType={data.pies.deviceType}
           />
         </>
       )}
