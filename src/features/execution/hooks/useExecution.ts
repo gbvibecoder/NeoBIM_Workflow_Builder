@@ -483,6 +483,53 @@ async function executeNode(
 
           const parseSummary = `Parsed ${summary.processedElements ?? "?"} of ${summary.totalElements ?? "?"} elements from ${summary.buildingStoreys ?? "?"} storeys (${meta.ifcSchema ?? "IFC"})`;
 
+          // Surface parser diagnostics from /api/parse-ifc into the artifact so
+          // the universal "Behind the Scenes" panel can render the IFC Parser
+          // Deep Dive section. Wrapped in a PipelineDiagnostics-shaped envelope
+          // so the existing TR-007 merge path picks it up unchanged.
+          const ppRaw = (parseResult as Record<string, unknown>).parserDiagnostics as
+            | Record<string, unknown>
+            | undefined;
+          const parserDiagEnvelope = ppRaw ? {
+            executionId,
+            startedAt: new Date().toISOString(),
+            stages: {
+              parsing: {
+                parserUsed: "web-ifc-wasm",
+                wasmSuccess: true,
+                regexFallbackUsed: false,
+                elementsFound: Number(summary.processedElements ?? elements.length),
+                elementsWithArea: elements.filter(e => Number((e.grossArea as number | undefined) ?? 0) > 0).length,
+                elementsWithVolume: elements.filter(e => Number((e.totalVolume as number | undefined) ?? 0) > 0).length,
+                elementsWithMaterial: elements.filter(e => Array.isArray(e.materialLayers) && (e.materialLayers as unknown[]).length > 0).length,
+                elementsWithZeroQuantity: elements.filter(e =>
+                  Number((e.grossArea as number | undefined) ?? 0) === 0 &&
+                  Number((e.totalVolume as number | undefined) ?? 0) === 0
+                ).length,
+                quantitySourceBreakdown: { qtoStandard: 0, custom: 0, geometryCalculated: 0, none: 0 },
+                materialTypeBreakdown: ppRaw.materialTypes ?? { ifcMaterial: 0, layerSet: 0, constituentSet: 0, profileSet: 0, materialList: 0, none: 0 },
+                geometryTypeBreakdown: ppRaw.geometryTypes ?? { extrudedAreaSolid: 0, booleanResult: 0, facetedBrep: 0, mappedItem: 0, boundingBox: 0, other: 0, failed: 0 },
+                storeys: [] as string[],
+                modelQuality: (parseResult as Record<string, unknown>).modelQuality ?? {},
+                unitDetected: "METRE",
+                conversionApplied: false,
+                warnings: ((ppRaw.elementWarnings as string[] | undefined) ?? []).slice(0, 30),
+                // ── New deep-dive fields surfaced via the panel ──
+                fileMetadata: ppRaw.fileMetadata,
+                elementSamples: ppRaw.elementSamples ?? [],
+                parserTimings: ppRaw.timings,
+                smartWarnings: ppRaw.smartWarnings ?? [],
+                smartFixes: ppRaw.smartFixes ?? [],
+              },
+              aggregation: {
+                inputElements: Number(summary.processedElements ?? elements.length),
+                outputGroups: elements.length,
+                externalWalls: 0, internalWalls: 0, elementsLost: 0,
+              },
+            },
+            log: [],
+          } : undefined;
+
           return {
             id: `art_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
             executionId,
@@ -494,6 +541,7 @@ async function executeNode(
               rows,
               _elements: elements,
               content: parseSummary,
+              ...(parserDiagEnvelope ? { _parserDiagnostics: parserDiagEnvelope } : {}),
             },
             metadata: { model: "ifc-parser-v2-client", real: true },
             createdAt: new Date(),

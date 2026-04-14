@@ -264,6 +264,311 @@ function StatRow({ label, value, color }: { label: string; value: React.ReactNod
   );
 }
 
+// ─── IFC Parser Deep Dive ──────────────────────────────────────────────────
+// Renders the file metadata, geometry/material breakdowns, smart warnings,
+// sample elements with fallback chains, and parser timings. Surfaced when
+// any parsing-stage diagnostics are populated on the selected node.
+
+function bytesLabel(b: number | undefined): string {
+  if (!b || !Number.isFinite(b)) return "?";
+  if (b < 1024) return `${b} B`;
+  if (b < 1024 * 1024) return `${Math.round(b / 1024)} KB`;
+  return `${(b / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function IFCParserDeepDive({ parsing }: { parsing: Record<string, unknown> }) {
+  const fm = parsing.fileMetadata as Record<string, unknown> | undefined;
+  const samples = (parsing.elementSamples as Array<Record<string, unknown>> | undefined) ?? [];
+  const timings = parsing.parserTimings as Record<string, number> | undefined;
+  const smartWarnings = (parsing.smartWarnings as string[] | undefined) ?? [];
+  const smartFixes = (parsing.smartFixes as string[] | undefined) ?? [];
+  const gtb = (parsing.geometryTypeBreakdown as Record<string, number> | undefined) ?? {};
+  const mtb = (parsing.materialTypeBreakdown as Record<string, number> | undefined) ?? {};
+  const qsb = (parsing.quantitySourceBreakdown as Record<string, number> | undefined) ?? {};
+  const elementsFound = (parsing.elementsFound as number | undefined) ?? 0;
+  const zero = (parsing.elementsWithZeroQuantity as number | undefined) ?? 0;
+
+  return (
+    <div style={{
+      background: "rgba(0,245,255,0.04)",
+      border: "1px solid rgba(0,245,255,0.18)",
+      borderRadius: 10,
+      padding: 14,
+      marginBottom: 12,
+    }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+        <Cpu size={14} color={COLORS.cyan} />
+        <span style={{ fontSize: 12, fontWeight: 600, color: COLORS.cyan, fontFamily: MONO, letterSpacing: 0.5, textTransform: "uppercase" }}>
+          IFC Parser Deep Dive
+        </span>
+      </div>
+
+      {/* File metadata header line */}
+      {fm ? (
+        <div style={{ background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 6, padding: 10, marginBottom: 10 }}>
+          <div style={{ fontSize: 12, fontFamily: MONO, color: COLORS.text, marginBottom: 4 }}>
+            <strong style={{ color: COLORS.cyan }}>FILE:</strong> {String(fm.fileName ?? "?")} ({bytesLabel(fm.fileSizeBytes as number)})
+          </div>
+          <div style={{ fontSize: 11, fontFamily: MONO, color: COLORS.textDim, lineHeight: 1.7 }}>
+            <span><strong>Schema:</strong> {String(fm.ifcSchema ?? "?")}</span>
+            {" · "}
+            <span><strong>Author:</strong> {String(fm.authoringApplication ?? "Unknown")}{fm.authoringApplicationVersion ? ` ${fm.authoringApplicationVersion}` : ""}</span>
+            <br />
+            <span><strong>Entities:</strong> {(fm.totalEntityCount as number ?? 0).toLocaleString()}</span>
+            {" | "}
+            <span><strong>Products:</strong> {fm.totalProductCount as number ?? 0}</span>
+            {" | "}
+            <span><strong>PropertySets:</strong> {fm.propertySetCount as number ?? 0}</span>
+            {fm.hasIfcSpaces ? <span> · <strong>Spaces:</strong> ✓</span> : null}
+          </div>
+        </div>
+      ) : null}
+
+      {/* Quantities pipeline */}
+      <div style={{ background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 6, padding: 10, marginBottom: 10 }}>
+        <div style={{ fontSize: 11, color: COLORS.textMuted, fontFamily: MONO, marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.5 }}>
+          Quantities Pipeline
+        </div>
+        <PipelineRow
+          label="Qto_* Base Quantities"
+          value={(fm?.qtoBaseSetCount as number) ?? 0}
+          ok={((fm?.qtoBaseSetCount as number) ?? 0) > 0}
+          note={((fm?.qtoBaseSetCount as number) ?? 0) === 0 ? "NONE FOUND — primary quantity source unavailable" : `${(fm?.qtoBaseSetCount as number) ?? 0} sets found`}
+        />
+        <PipelineRow
+          label="Custom Property Quants"
+          value={(fm?.customQuantitySetCount as number) ?? 0}
+          ok={((fm?.customQuantitySetCount as number) ?? 0) > 0}
+          note={`${(fm?.customQuantitySetCount as number) ?? 0} usable`}
+        />
+        <PipelineRow
+          label="Geometry Computation"
+          value={`${qsb.geometryCalculated ?? 0} of ${elementsFound}`}
+          ok={(qsb.geometryCalculated ?? 0) > 0}
+          note={(qsb.geometryCalculated ?? 0) === 0 && elementsFound > 0 ? "All geometry computation failed" : ""}
+        />
+        <div style={{ marginTop: 10, paddingTop: 8, borderTop: `1px dashed ${COLORS.border}` }}>
+          <div style={{ fontSize: 11, color: COLORS.textMuted, fontFamily: MONO, marginBottom: 4 }}>GEOMETRY TYPES:</div>
+          {gtb.extrudedAreaSolid ? <GeomRow name="IfcExtrudedAreaSolid" count={gtb.extrudedAreaSolid} ok /> : null}
+          {gtb.mappedItem ? <GeomRow name="IfcMappedItem" count={gtb.mappedItem} ok note="(via mapping source)" /> : null}
+          {gtb.boundingBox ? <GeomRow name="IfcBoundingBox" count={gtb.boundingBox} ok /> : null}
+          {gtb.facetedBrep ? <GeomRow name="IfcFacetedBrep" count={gtb.facetedBrep} note="(not supported by WASM)" /> : null}
+          {gtb.booleanResult ? <GeomRow name="IfcBooleanResult" count={gtb.booleanResult} note="(not supported by WASM)" /> : null}
+          {gtb.failed ? <GeomRow name="No representation" count={gtb.failed} note="(no shape items found)" /> : null}
+          {gtb.other ? <GeomRow name="Other" count={gtb.other} /> : null}
+          {!Object.values(gtb).some(v => v > 0) ? <div style={{ fontSize: 11, color: COLORS.textMuted, fontFamily: MONO, padding: "4px 0" }}>No geometry strategy fired (all elements relied on Qto sets or have no shape).</div> : null}
+        </div>
+      </div>
+
+      {/* Materials breakdown */}
+      <div style={{ background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 6, padding: 10, marginBottom: 10 }}>
+        <div style={{ fontSize: 11, color: COLORS.textMuted, fontFamily: MONO, marginBottom: 4, textTransform: "uppercase", letterSpacing: 0.5 }}>Materials</div>
+        <div style={{ fontSize: 11, fontFamily: MONO, color: COLORS.textDim, lineHeight: 1.7 }}>
+          {mtb.ifcMaterial ? <span style={{ color: COLORS.green }}>IfcMaterial: {mtb.ifcMaterial} ✓ </span> : null}
+          {mtb.layerSet ? <span style={{ color: COLORS.green }}> | LayerSet: {mtb.layerSet} ✓ </span> : null}
+          {mtb.constituentSet ? <span style={{ color: COLORS.green }}> | ConstituentSet: {mtb.constituentSet} ✓ </span> : null}
+          {mtb.profileSet ? <span style={{ color: COLORS.green }}> | ProfileSet: {mtb.profileSet} ✓ </span> : null}
+          {mtb.materialList ? <span style={{ color: COLORS.green }}> | MaterialList: {mtb.materialList} ✓ </span> : null}
+          {mtb.none ? <span style={{ color: COLORS.yellow }}> | None: {mtb.none} ⚠ </span> : null}
+        </div>
+      </div>
+
+      {/* Smart warnings + fixes */}
+      {smartWarnings.length > 0 ? (
+        <div style={{ marginBottom: 10 }}>
+          {smartWarnings.map((w, i) => (
+            <div key={`sw${i}`} style={{
+              background: w.startsWith("⚠ CRITICAL") ? "rgba(239,68,68,0.10)" : "rgba(245,158,11,0.08)",
+              border: `1px solid ${w.startsWith("⚠ CRITICAL") ? "rgba(239,68,68,0.35)" : "rgba(245,158,11,0.30)"}`,
+              borderRadius: 6,
+              padding: "8px 10px",
+              fontSize: 11,
+              fontFamily: MONO,
+              color: w.startsWith("⚠ CRITICAL") ? COLORS.red : COLORS.yellow,
+              marginBottom: 6,
+              lineHeight: 1.5,
+              whiteSpace: "pre-wrap",
+            }}>
+              {w}
+            </div>
+          ))}
+          {smartFixes.map((f, i) => (
+            <div key={`sf${i}`} style={{
+              background: "rgba(34,197,94,0.06)",
+              border: "1px solid rgba(34,197,94,0.25)",
+              borderRadius: 6,
+              padding: "8px 10px",
+              fontSize: 11,
+              fontFamily: MONO,
+              color: COLORS.green,
+              marginBottom: 6,
+              lineHeight: 1.5,
+              whiteSpace: "pre-wrap",
+            }}>
+              {f}
+            </div>
+          ))}
+        </div>
+      ) : null}
+
+      {/* Sample elements */}
+      {samples.length > 0 ? (
+        <div style={{ background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 6, padding: 10, marginBottom: 10 }}>
+          <div style={{ fontSize: 11, color: COLORS.textMuted, fontFamily: MONO, marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.5 }}>
+            Sample Elements (first {samples.length} of {elementsFound})
+          </div>
+          <div style={{ maxHeight: 200, overflowY: "auto" }}>
+            {samples.map((s, i) => {
+              const isZero = s.hasZeroQuantity === true;
+              return (
+                <div key={i} style={{ fontSize: 11, fontFamily: MONO, padding: "3px 0", color: isZero ? COLORS.yellow : COLORS.textDim, lineHeight: 1.5 }}>
+                  <span style={{ color: COLORS.textMuted }}>#{String(s.expressId)}</span>{" "}
+                  <span style={{ color: COLORS.text }}>{String(s.ifcType)}</span>
+                  <span style={{ color: COLORS.textMuted }}> {String(s.storey)}:</span>{" "}
+                  <span>{s.geometryType ? String(s.geometryType) : "no geom"}</span>
+                  <span style={{ color: COLORS.textMuted }}> →</span>{" "}
+                  <span>area={Number(s.grossArea ?? 0).toFixed(2)}m² vol={Number(s.volume ?? 0).toFixed(2)}m³</span>{" "}
+                  <span style={{ color: isZero ? COLORS.red : COLORS.green, fontWeight: 600 }}>{isZero ? "✗" : "✓"}</span>
+                  {s.failureReason ? (
+                    <div style={{ paddingLeft: 14, color: COLORS.textMuted, fontSize: 10, marginTop: 1 }}>
+                      → {String(s.failureReason)}
+                    </div>
+                  ) : null}
+                  {Array.isArray(s.fallbackChain) && (s.fallbackChain as unknown[]).length > 0 ? (
+                    <div style={{ paddingLeft: 14, color: COLORS.textMuted, fontSize: 10, marginTop: 1 }}>
+                      chain: {(s.fallbackChain as string[]).join(" → ")}
+                    </div>
+                  ) : null}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ) : null}
+
+      {/* Parser timing */}
+      {timings ? (
+        <div style={{ background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 6, padding: 10 }}>
+          <div style={{ fontSize: 11, color: COLORS.textMuted, fontFamily: MONO, marginBottom: 4, textTransform: "uppercase", letterSpacing: 0.5 }}>Parser Timing</div>
+          <div style={{ fontSize: 11, fontFamily: MONO, color: COLORS.textDim, lineHeight: 1.7 }}>
+            {timings.wasmInitMs ? <span>WASM Init: <span style={{ color: COLORS.text }}>{timings.wasmInitMs}ms</span> | </span> : null}
+            {timings.modelLoadMs ? <span>Model Load: <span style={{ color: COLORS.text }}>{timings.modelLoadMs}ms</span> | </span> : null}
+            {timings.metadataScanMs ? <span>Metadata: <span style={{ color: COLORS.text }}>{timings.metadataScanMs}ms</span> | </span> : null}
+            {timings.materialResolveMs ? <span>Materials: <span style={{ color: COLORS.text }}>{timings.materialResolveMs}ms</span> | </span> : null}
+            {timings.propertyExtractMs ? <span>Properties: <span style={{ color: COLORS.text }}>{timings.propertyExtractMs}ms</span> | </span> : null}
+            {timings.elementProcessMs ? <span>Elements: <span style={{ color: COLORS.text }}>{timings.elementProcessMs}ms</span> | </span> : null}
+            {timings.aggregationMs ? <span>Aggregate: <span style={{ color: COLORS.text }}>{timings.aggregationMs}ms</span> | </span> : null}
+            {timings.totalMs ? <span><strong>Total: <span style={{ color: COLORS.green }}>{timings.totalMs}ms</span></strong></span> : null}
+          </div>
+        </div>
+      ) : null}
+
+      {/* Aggregate footer */}
+      {elementsFound > 0 ? (
+        <div style={{ fontSize: 11, fontFamily: MONO, color: COLORS.textMuted, marginTop: 8, textAlign: "center" }}>
+          {elementsFound} elements processed · {zero} with zero quantities · {samples.length} samples shown
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function PipelineRow({ label, value, ok, note }: { label: string; value: number | string; ok: boolean; note?: string }) {
+  return (
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "3px 0", fontSize: 11, fontFamily: MONO }}>
+      <span style={{ color: COLORS.textDim }}>{label}:</span>
+      <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <span style={{ color: ok ? COLORS.green : COLORS.red, fontWeight: 600 }}>{value}</span>
+        <span style={{ color: ok ? COLORS.green : COLORS.red }}>{ok ? "✓" : "✗"}</span>
+        {note ? <span style={{ color: COLORS.textMuted, fontSize: 10 }}>{note}</span> : null}
+      </span>
+    </div>
+  );
+}
+
+function GeomRow({ name, count, ok, note }: { name: string; count: number; ok?: boolean; note?: string }) {
+  return (
+    <div style={{ fontSize: 11, fontFamily: MONO, padding: "2px 0", color: COLORS.textDim }}>
+      <span>  {name}:</span>{" "}
+      <span style={{ color: ok ? COLORS.green : COLORS.red, fontWeight: 600 }}>{count}</span>{" "}
+      <span style={{ color: ok ? COLORS.green : COLORS.red }}>{ok ? "✓" : "✗"}</span>
+      {note ? <span style={{ color: COLORS.textMuted, marginLeft: 4 }}>{note}</span> : null}
+    </div>
+  );
+}
+
+// ─── Market Intelligence Deep Dive ──────────────────────────────────────────
+
+function MarketIntelligenceDeepDive({ market }: { market: Record<string, unknown> }) {
+  const ms = market.primaryCallMs as number | undefined;
+  const cacheHit = market.cacheHit;
+  const fallbackUsed = market.fallbackCallUsed;
+  const retryUsed = market.retryUsed;
+  const searches = (market.webSearchesPerformed as number | undefined) ?? 0;
+  const status = String(market.status ?? "?");
+  const fallbackChain = market.fallbackChainUsed;
+  return (
+    <div style={{
+      background: "rgba(167,139,250,0.04)",
+      border: "1px solid rgba(167,139,250,0.18)",
+      borderRadius: 10,
+      padding: 14,
+      marginBottom: 12,
+    }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+        <Sparkles size={14} color={COLORS.purple} />
+        <span style={{ fontSize: 12, fontWeight: 600, color: COLORS.purple, fontFamily: MONO, letterSpacing: 0.5, textTransform: "uppercase" }}>
+          Market Intelligence Deep Dive
+        </span>
+      </div>
+
+      <div style={{ background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 6, padding: 10, marginBottom: 10 }}>
+        <div style={{ fontSize: 11, color: COLORS.textMuted, fontFamily: MONO, marginBottom: 4, textTransform: "uppercase", letterSpacing: 0.5 }}>
+          Pricing Pipeline
+        </div>
+        <div style={{ fontSize: 11, fontFamily: MONO, color: COLORS.textDim, lineHeight: 1.8 }}>
+          <span><strong style={{ color: COLORS.text }}>Cache:</strong> </span>
+          <span style={{ color: cacheHit ? COLORS.cyan : COLORS.textMuted }}>{cacheHit ? "HIT" : "MISS"}</span>
+          {" → "}
+          <span style={{ color: COLORS.text }}>{String(market.toolChoiceUsed ?? "Claude Haiku + web_search")}</span>
+          {" → "}
+          <span style={{ color: status === "success" ? COLORS.green : status === "partial" ? COLORS.yellow : COLORS.red, fontWeight: 600 }}>
+            {status.toUpperCase()}
+          </span>
+          <br />
+          <span><strong>Duration:</strong> <span style={{ color: COLORS.text }}>{ms ? `${(ms / 1000).toFixed(1)}s` : "—"}</span> (timeout: 45s)</span>
+          {" | "}
+          <span><strong>Searches:</strong> <span style={{ color: COLORS.text }}>{searches}</span></span>
+          <br />
+          <span><strong>Retry:</strong> <span style={{ color: retryUsed ? COLORS.yellow : COLORS.textMuted }}>{retryUsed ? "yes" : "not needed"}</span></span>
+          {" | "}
+          <span><strong>Fallback (no-search):</strong> <span style={{ color: fallbackUsed ? COLORS.yellow : COLORS.textMuted }}>{fallbackUsed ? "used" : "not needed"}</span></span>
+          {" | "}
+          <span><strong>Fallback chain (DB cache):</strong> <span style={{ color: fallbackChain ? COLORS.yellow : COLORS.textMuted }}>{fallbackChain ? "used" : "not needed"}</span></span>
+        </div>
+      </div>
+
+      <div style={{ background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 6, padding: 10 }}>
+        <div style={{ fontSize: 11, color: COLORS.textMuted, fontFamily: MONO, marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.5 }}>
+          Prices Fetched
+        </div>
+        {market.steelPrice ? (
+          <div style={{ fontSize: 11, fontFamily: MONO, padding: "3px 0", color: COLORS.textDim }}>
+            <strong style={{ color: COLORS.text }}>Steel:</strong> ₹{(market.steelPrice as number).toLocaleString()}/t
+            {market.steelSource ? <span style={{ color: COLORS.textMuted }}> [{String(market.steelSource).slice(0, 80)}]</span> : null}
+          </div>
+        ) : null}
+        {market.cementPrice ? (
+          <div style={{ fontSize: 11, fontFamily: MONO, padding: "3px 0", color: COLORS.textDim }}>
+            <strong style={{ color: COLORS.text }}>Cement:</strong> ₹{market.cementPrice as number}/bag
+            {market.cementSource ? <span style={{ color: COLORS.textMuted }}> [{String(market.cementSource).slice(0, 80)}]</span> : null}
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 function NodeDetail({ node, baseTs }: { node: NodeTrace; baseTs: number }) {
   const meta = STATUS_META[node.status];
   const Icon = meta.icon;
@@ -351,6 +656,14 @@ function NodeDetail({ node, baseTs }: { node: NodeTrace; baseTs: number }) {
             </span>
           ) : null}
         </div>
+      ) : null}
+
+      {/* ── Deep-dive sections (only shown when rich data is present) ── */}
+      {parsing?.fileMetadata || (parsing?.elementSamples && (parsing.elementSamples as unknown[]).length > 0) ? (
+        <IFCParserDeepDive parsing={parsing as Record<string, unknown>} />
+      ) : null}
+      {market && (market.steelPrice || market.cementPrice || market.primaryCallMs) ? (
+        <MarketIntelligenceDeepDive market={market as Record<string, unknown>} />
       ) : null}
 
       {/* Two-column grid: attempts & API calls / stats & data flow */}

@@ -57,8 +57,13 @@ export async function POST(req: NextRequest) {
     let parserUsed = "web-ifc";
 
     try {
-      const { parseIFCBuffer } = await import("@/features/ifc/services/ifc-parser");
-      result = await parseIFCBuffer(buffer, file.name);
+      const { parseIFCBuffer, createParserDiagnosticCounters } = await import("@/features/ifc/services/ifc-parser");
+      // Diagnostic counters captured at upload time. The result already returns
+      // them via `result.parserDiagnostics`, but we explicitly create + pass so
+      // the parser stays in the diagnostics-on path even when called via this
+      // upload-time endpoint (instead of TR-007's inline branch).
+      const counters = createParserDiagnosticCounters();
+      result = await parseIFCBuffer(buffer, file.name, undefined, counters);
     } catch (wasmErr) {
       // web-ifc failed (memory, timeout, unsupported geometry) — use text parser
       console.warn(`[parse-ifc] web-ifc WASM failed: ${wasmErr instanceof Error ? wasmErr.message : wasmErr}`);

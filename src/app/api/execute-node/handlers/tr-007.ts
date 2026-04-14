@@ -245,6 +245,12 @@ export const handleTR007: NodeHandler = async (ctx) => {
       diag.stages.parsing.geometryTypeBreakdown = { ...diag.stages.parsing.geometryTypeBreakdown, ...parserCounters.geometryTypes };
       diag.stages.parsing.materialTypeBreakdown = { ...diag.stages.parsing.materialTypeBreakdown, ...parserCounters.materialTypes };
       diag.stages.parsing.warnings.push(...parserCounters.elementWarnings.slice(0, 30));
+      // Deep-dive fields surfaced via the universal "Behind the Scenes" panel
+      diag.stages.parsing.fileMetadata = parserCounters.fileMetadata as Record<string, unknown> | undefined;
+      diag.stages.parsing.elementSamples = parserCounters.elementSamples as unknown as Array<Record<string, unknown>>;
+      diag.stages.parsing.parserTimings = parserCounters.timings as unknown as Record<string, number>;
+      diag.stages.parsing.smartWarnings = parserCounters.smartWarnings;
+      diag.stages.parsing.smartFixes = parserCounters.smartFixes;
 
       // Aggregate elements by type + storey for per-floor BOQ breakdown
       const typeAggregates = new Map<string, {
