@@ -300,6 +300,20 @@ function polygonAreaCalc(points: FootprintPoint[]): number {
   return Math.abs(area) / 2;
 }
 
+/** Standard ray-cast point-in-polygon test (closed polygon, vertex order doesn't matter). */
+function pointInPolygon(px: number, py: number, polygon: FootprintPoint[]): boolean {
+  let inside = false;
+  const n = polygon.length;
+  for (let i = 0, j = n - 1; i < n; j = i++) {
+    const xi = polygon[i].x, yi = polygon[i].y;
+    const xj = polygon[j].x, yj = polygon[j].y;
+    const intersect = ((yi > py) !== (yj > py)) &&
+      (px < ((xj - xi) * (py - yi)) / ((yj - yi) || 1e-9) + xi);
+    if (intersect) inside = !inside;
+  }
+  return inside;
+}
+
 /** Signed polygon area — positive = CCW, negative = CW. */
 function signedPolygonArea(points: FootprintPoint[]): number {
   let area = 0;
@@ -1372,6 +1386,9 @@ interface ExportContext {
 
   // v4 cleanup — actual building bounding box for positioning any opt-in demo content
   boundingBox: { minX: number; minY: number; maxX: number; maxY: number };
+  /** Building footprint polygon — used by per-column footing emission to skip columns
+   *  that fall outside the actual (possibly non-rectangular) footprint. */
+  footprintPolygon: FootprintPoint[];
 
   safeName: (s: string) => string;
 }
@@ -1599,6 +1616,7 @@ export function generateIFCFile(
       maxX: geometry.boundingBox?.max?.x ?? 20,
       maxY: geometry.boundingBox?.max?.y ?? 20,
     },
+    footprintPolygon: geometry.footprint ?? [],
     safeName,
   };
 
@@ -3409,7 +3427,12 @@ function writeStairEntity(
   const landingProdId = id.next();
   lines.push(`#${landingProdId}=IFCPRODUCTDEFINITIONSHAPE($,$,(#${landingShapeRepId}));`);
   const landingOriginId = id.next();
-  lines.push(`#${landingOriginId}=IFCCARTESIANPOINT((${f(v0.x)},${f(v0.y + stairLength)},${f(stairHeight)}));`);
+  // Place landing TOP at storey + stairHeight (== floor level above) by setting its base
+  // at stairHeight - landingThickness. Previously placed at stairHeight + extruded UP,
+  // which projected the landing 0.15m above the roof on the topmost-storey stair —
+  // visible as a small slab on top of the building.
+  const landingThickness = 0.150;
+  lines.push(`#${landingOriginId}=IFCCARTESIANPOINT((${f(v0.x)},${f(v0.y + stairLength)},${f(stairHeight - landingThickness)}));`);
   const landingAxisId = id.next();
   lines.push(`#${landingAxisId}=IFCAXIS2PLACEMENT3D(#${landingOriginId},#${ctx.zDirId},$);`);
   const landingPlacementId = id.next();
@@ -5084,8 +5107,11 @@ export function emitMissingBuildingElements(
     return eid;
   };
 
-  // Elevator — NBC Part 4 mandates when storeys > 4 OR height > 15m
-  if (geometry.floors > 4 || geometry.totalHeight > 15) {
+  // Elevator — NBC Part 4 mandates when storeys > 4 OR height > 15m, BUT we placed it
+  // at hardcoded storey-local (10, 0.5) which lands outside non-rectangular footprints.
+  // Gated behind autoEmitDemoContent; without real lift-shaft input we shouldn't fabricate
+  // a position. The mandate metadata can still be expressed via Pset on the building.
+  if ((geometry.floors > 4 || geometry.totalHeight > 15) && ctx.autoEmitDemoContent) {
     const liftId = writeElement("IFCTRANSPORTELEMENT", `LIFT-${storeyCode(storey)}-01`, 10, 0.5, 0, 2.1, storey.height, 2.4, `,.ELEVATOR.`, ctx.matIds.structuralSteel);
     ids.push(liftId);
 
@@ -5108,8 +5134,11 @@ export function emitMissingBuildingElements(
     lines.push(`#${relLift}=IFCRELDEFINESBYPROPERTIES('${guid.fresh()}',#${ctx.ownerHistId},$,$,(#${liftId}),#${psetLift});`);
   }
 
-  // Ramp — RPWD 2016 + NBC Part 3 mandate accessibility at ground-level entrance only
-  if (storey.index === 0) {
+  // Ramp — RPWD 2016 + NBC Part 3 mandate accessibility at ground-level entrance, but we
+  // emit at hardcoded storey-local (0, 0, -0.15) which sits outside non-rectangular
+  // footprints (visible as a small concrete box on the ground next to circular buildings).
+  // Gated behind autoEmitDemoContent; entrance-ramp position requires real entrance input.
+  if (storey.index === 0 && ctx.autoEmitDemoContent) {
     const rampId = id.next();
     lines.push(`#${rampId}=IFCRAMP('${guid.fresh()}',#${ctx.ownerHistId},'RAMP-${storeyCode(storey)}-ENTRY-001','Accessibility ramp per RPWD',$,#${storeyPlacementId},$,'RAMP-ENTRY',.STRAIGHT_RUN_RAMP.);`);
     // Child IfcRampFlight
@@ -5139,13 +5168,25 @@ export function emitMissingBuildingElements(
     ids.push(rampId);
   }
 
-  // Foundations — emit per column a pad footing (only in basement or ground storey)
+  // Foundations — emit per column a pad footing (only in basement or ground storey).
+  // Filter columns to those genuinely INSIDE the building footprint polygon, not just
+  // the bounding box. A circular building has a 30m × 21m bbox but the actual footprint
+  // is the inscribed circle; a misplaced massing-generator column at world (0,0) sits
+  // inside the bbox-corner but outside the circle. Use ray-cast point-in-polygon test
+  // against the actual footprint polygon. Falls back to bbox check if no polygon.
   if (storey.index === 0 || storey.isBasement) {
     const colElements = storey.elements.filter(e => e.type === "column");
+    const fp = ctx.footprintPolygon;
+    const bb = ctx.boundingBox;
+    const margin = 0.5;
     for (let i = 0; i < colElements.length; i++) {
       const col = colElements[i];
       const cx = col.vertices.reduce((s, v) => s + v.x, 0) / (col.vertices.length || 1);
       const cy = col.vertices.reduce((s, v) => s + v.y, 0) / (col.vertices.length || 1);
+      const insidePolygon = fp.length >= 3 ? pointInPolygon(cx, cy, fp) : true;
+      const insideBbox = (cx >= bb.minX - margin && cx <= bb.maxX + margin &&
+                         cy >= bb.minY - margin && cy <= bb.maxY + margin);
+      if (!insidePolygon || !insideBbox) continue;
       const ftId = writeElement("IFCFOOTING", `FTG-${storeyCode(storey)}-C${String(i + 1).padStart(2, "0")}`, cx - 0.9, cy - 0.9, -0.6, 1.8, 0.6, 1.8, `,.PAD_FOOTING.`, ctx.matIds.concrete);
       ids.push(ftId);
 
