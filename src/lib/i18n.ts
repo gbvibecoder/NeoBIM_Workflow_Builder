@@ -1371,6 +1371,7 @@ const en = {
   'survey.scene4.pro.f3': 'Cinematic walkthrough videos',
   'survey.scene4.pro.f4': 'BOQ & Excel export',
   'survey.scene4.pro.f5': 'Priority AI queue + support',
+  'survey.scene4.pro.recommended': 'Recommended',
 
   // ===== ADMIN SURVEY ANALYTICS =====
   'admin.survey.eyebrow': 'Admin · Onboarding Survey',
@@ -4137,6 +4138,7 @@ const de: Record<keyof typeof en, string | string[]> = {
   'survey.scene4.pro.f3': 'Cinematische Walkthrough-Videos',
   'survey.scene4.pro.f4': 'BOQ- & Excel-Export',
   'survey.scene4.pro.f5': 'Priorität in der KI-Schlange + Support',
+  'survey.scene4.pro.recommended': 'Empfohlen',
 
   // ===== ADMIN SURVEY ANALYTICS =====
   'admin.survey.eyebrow': 'Admin · Onboarding-Umfrage',

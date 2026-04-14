@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Check, Sparkles, Box, Film, FileSpreadsheet, Zap, ArrowRight } from "lucide-react";
+import { useLocale } from "@/hooks/useLocale";
 import { SPRING } from "@/features/onboarding-survey/lib/scene-motion";
 import { PREBUILT_WORKFLOWS_MAP } from "@/features/workflows/constants/prebuilt-workflows";
 
@@ -138,6 +139,7 @@ function FreePlan(props: PlanCardProps) {
 
 // ── Pro plan ───────────────────────────────────────────────────────────
 function ProPlan(props: PlanCardProps) {
+  const { t } = useLocale();
   const [price, setPrice] = useState(0);
   const target = props.priceNumeric ?? 0;
 
@@ -214,7 +216,7 @@ function ProPlan(props: PlanCardProps) {
         }}
       >
         <Sparkles size={10} />
-        Recommended
+        {t("survey.scene4.pro.recommended")}
       </div>
 
       <div>
