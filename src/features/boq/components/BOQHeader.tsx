@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ArrowLeft, Download, Share2, Building2, MapPin, Calendar, ChevronDown, FileText, FileSpreadsheet } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -16,6 +16,16 @@ interface BOQHeaderProps {
 export function BOQHeader({ data, onExportExcel, onExportPDF, onExportCSV }: BOQHeaderProps) {
   const router = useRouter();
   const [showExportMenu, setShowExportMenu] = useState(false);
+
+  useEffect(() => {
+    if (!showExportMenu) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest("[data-export-menu]")) setShowExportMenu(false);
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [showExportMenu]);
 
   const copyLink = () => {
     navigator.clipboard.writeText(window.location.href).then(() => {
@@ -174,34 +184,34 @@ export function BOQHeader({ data, onExportExcel, onExportPDF, onExportCSV }: BOQ
         </div>
 
         {/* Export button group */}
-        <div style={{ position: "relative" }}>
+        <div style={{ position: "relative" }} data-export-menu>
           <div style={{ display: "flex", alignItems: "center" }}>
             <button
               onClick={onExportExcel}
               style={{
-                display: "flex", alignItems: "center", gap: 8,
-                padding: "8px 16px", borderRadius: "12px 0 0 12px", fontSize: 13, fontWeight: 500,
+                display: "flex", alignItems: "center", gap: 6,
+                padding: "7px 14px", borderRadius: "10px 0 0 10px", fontSize: 12, fontWeight: 500,
                 background: "#0D9488", color: "#FFFFFF", border: "none", cursor: "pointer",
                 boxShadow: "0 1px 2px rgba(0,0,0,0.05)", transition: "all 0.2s",
               }}
               onMouseEnter={e => { e.currentTarget.style.background = "#0F766E"; }}
               onMouseLeave={e => { e.currentTarget.style.background = "#0D9488"; }}
             >
-              <Download size={14} />
+              <Download size={13} />
               Excel
             </button>
             <button
               onClick={() => setShowExportMenu(v => !v)}
               style={{
                 display: "flex", alignItems: "center", justifyContent: "center",
-                padding: "8px 8px", borderRadius: "0 12px 12px 0", fontSize: 13,
+                padding: "7px 6px", borderRadius: "0 10px 10px 0", fontSize: 12,
                 background: "#0F766E", color: "#FFFFFF", border: "none", borderLeft: "1px solid rgba(255,255,255,0.2)",
                 cursor: "pointer", transition: "all 0.2s",
               }}
               onMouseEnter={e => { e.currentTarget.style.background = "#115E59"; }}
               onMouseLeave={e => { e.currentTarget.style.background = "#0F766E"; }}
             >
-              <ChevronDown size={14} />
+              <ChevronDown size={12} />
             </button>
           </div>
           {showExportMenu && (
