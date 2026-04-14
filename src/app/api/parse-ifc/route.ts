@@ -64,6 +64,10 @@ export async function POST(req: NextRequest) {
       // upload-time endpoint (instead of TR-007's inline branch).
       const counters = createParserDiagnosticCounters();
       result = await parseIFCBuffer(buffer, file.name, undefined, counters);
+      // Breadcrumb: confirms parserDiagnostics populated on the way out.
+      const r = result as unknown as Record<string, unknown>;
+      const pd = r.parserDiagnostics as Record<string, unknown> | undefined;
+      console.info(`[parse-ifc] parserDiagnostics present: ${!!pd}; samples=${Array.isArray(pd?.elementSamples) ? (pd!.elementSamples as unknown[]).length : 0}; smartWarnings=${Array.isArray(pd?.smartWarnings) ? (pd!.smartWarnings as unknown[]).length : 0}`);
     } catch (wasmErr) {
       // web-ifc failed (memory, timeout, unsupported geometry) — use text parser
       console.warn(`[parse-ifc] web-ifc WASM failed: ${wasmErr instanceof Error ? wasmErr.message : wasmErr}`);
