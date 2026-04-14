@@ -182,6 +182,7 @@ export async function createPresignedUploadUrl(
   filename: string,
   contentType: string,
   expiresIn = 600, // 10 minutes
+  keyPrefix = "videos",
 ): Promise<{ uploadUrl: string; key: string; publicUrl: string } | null> {
   const client = getClient();
   if (!client) return null;
@@ -189,7 +190,8 @@ export async function createPresignedUploadUrl(
   const now = new Date();
   const datePath = `${now.getFullYear()}/${String(now.getMonth() + 1).padStart(2, "0")}/${String(now.getDate()).padStart(2, "0")}`;
   const uniqueId = crypto.randomUUID().replace(/-/g, "").slice(0, 12);
-  const key = `videos/${datePath}/${uniqueId}-${filename}`;
+  const safePrefix = keyPrefix.replace(/^\/+|\/+$/g, ""); // strip leading/trailing slashes
+  const key = `${safePrefix}/${datePath}/${uniqueId}-${filename}`;
 
   try {
     // NOTE: Do NOT include Metadata here — presigned URLs sign x-amz-meta-*
