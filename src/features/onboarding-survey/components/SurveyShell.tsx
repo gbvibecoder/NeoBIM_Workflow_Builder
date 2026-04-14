@@ -9,12 +9,13 @@ import { ProgressDots } from "@/features/onboarding-survey/components/ProgressDo
 import { SkipLink } from "@/features/onboarding-survey/components/SkipLink";
 import { BackButton } from "@/features/onboarding-survey/components/BackButton";
 import { Scene1_Discovery } from "@/features/onboarding-survey/components/scenes/Scene1_Discovery";
+import { Scene2_Profession } from "@/features/onboarding-survey/components/scenes/Scene2_Profession";
 import { useSurveyState } from "@/features/onboarding-survey/hooks/useSurveyState";
 import { useKeyboardNav } from "@/features/onboarding-survey/hooks/useKeyboardNav";
 import { useSceneTimer } from "@/features/onboarding-survey/hooks/useSceneTimer";
 import { sceneSlide } from "@/features/onboarding-survey/lib/scene-motion";
 import { DASHBOARD_ONBOARDED_KEY } from "@/features/onboarding-survey/lib/survey-constants";
-import { trackComplete, trackDiscovery, trackSkip } from "@/features/onboarding-survey/lib/survey-analytics";
+import { trackComplete, trackDiscovery, trackProfession, trackSkip } from "@/features/onboarding-survey/lib/survey-analytics";
 import type { SceneNumber, SurveyRecord } from "@/features/onboarding-survey/types/survey";
 
 interface SurveyShellProps {
@@ -198,7 +199,12 @@ export function SurveyShell({ initial }: SurveyShellProps) {
               />
             )}
             {scene === 2 && (
-              <SceneStub n={2} title={t("survey.scene2.placeholder")} />
+              <Scene2_Profession
+                initial={{ profession: state.profession, other: state.professionOther }}
+                onPatch={patch}
+                onAdvance={advance}
+                onTrack={trackProfession}
+              />
             )}
             {scene === 3 && (
               <SceneStub n={3} title={t("survey.scene3.placeholder")} />
