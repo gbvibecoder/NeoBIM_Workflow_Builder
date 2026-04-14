@@ -305,6 +305,20 @@ export const handleEX002: NodeHandler = async (ctx) => {
     let grandTotalInclGST = 0;
     let totalGST = 0;
 
+    // ── Track row positions for Excel formula injection ──
+    // Formula cells (Adj Qty, Unit Rate, Costs) reference editable cells (Qty, Waste%, Rates)
+    // so when a QS changes any input, all dependent values recalculate automatically.
+    const dataRowNums: number[] = [];  // Excel row numbers (1-indexed) for data rows
+    const divBounds: Array<{ headerRow: number; subtotalRow: number }> = [];
+    let curDivHeaderRow = -1;
+
+    // Column positions (0-indexed) — differ by 1 when IS1200 code column is present
+    const FC = hasIS1200
+      ? { qty: 4, waste: 5, adjQty: 6, matRate: 7, labRate: 8, eqpRate: 9, unitRate: 10,
+          matCost: 11, labCost: 12, eqpCost: 13, subtotal: 14, gstPct: 15, gstAmt: 16, total: 17 }
+      : { qty: 3, waste: 4, adjQty: 5, matRate: 6, labRate: 7, eqpRate: 8, unitRate: 9,
+          matCost: 10, labCost: 11, eqpCost: 12, subtotal: 13, gstPct: 14, gstAmt: 15, total: 16 };
+
     // Group by division
     const divGroups = new Map<string, typeof boqLines>();
     for (const l of boqLines) {
@@ -316,16 +330,19 @@ export const handleEX002: NodeHandler = async (ctx) => {
     for (const [divName, lines] of divGroups) {
       const emptyCols = hasIS1200 ? 20 : 19;
       boqTableRows.push([divName.toUpperCase(), ...Array(emptyCols).fill("")]);
+      curDivHeaderRow = boqTableRows.length + 1; // Excel row (row 1 = header)
 
       let divMat = 0, divLab = 0, divEqp = 0, divSub = 0, divGST = 0, divTotal = 0;
 
       for (const l of lines) {
-        const wasteStr = l.wasteFactor ? `${(l.wasteFactor * 100).toFixed(0)}%` : "—";
+        // Waste% as decimal (0.07) — Excel formula reads this directly. Format: 0%.
+        const wasteNum = l.wasteFactor ?? 0;
         const adjQty = l.adjustedQty ?? l.quantity;
         const countLabel = l.elementCount ? ` (${l.elementCount} nr)` : "";
         const subtotal = l.totalCost;
+        // GST% as decimal (0.18) — Excel formula reads this directly. Format: 0%.
         const gstRate = getGSTRate(l.description, l.division);
-        const gstAmt = Math.round(l.materialCost * gstRate * 100) / 100; // GST on material only
+        const gstAmt = Math.round(l.materialCost * gstRate * 100) / 100;
         const totalInclGST = Math.round((subtotal + gstAmt) * 100) / 100;
 
         // Determine data source for transparency column
@@ -335,7 +352,6 @@ export const handleEX002: NodeHandler = async (ctx) => {
           : l.division.includes("Formwork") || l.division.includes("Rebar") || l.division.includes("Plaster") || l.division.includes("Reinforcement") ? "IFC Derived"
           : l.csiCode?.startsWith("IS1200") ? "IFC Geometry"
           : "Benchmark";
-        // Phase 3: use structured confidence from TR-008 if available
         const lineConf = (l as Record<string, unknown>).confidence as { score?: string; factors?: string[] } | undefined;
         const confidence = lineConf?.score
           ? `${lineConf.score.toUpperCase()}${lineConf.factors?.length ? " — " + lineConf.factors[0] : ""}`
@@ -346,7 +362,6 @@ export const handleEX002: NodeHandler = async (ctx) => {
             : dataSource === "Provisional" ? "LOW 45%"
             : "MED 60%");
 
-        // Derive short division name for the Division column
         const divStr = String(l.division || "General");
         const divShort = divStr.includes("Concrete") || divStr.includes("Part 2") ? "Structural"
           : divStr.includes("Masonry") || divStr.includes("Part 3") ? "Masonry"
@@ -360,26 +375,28 @@ export const handleEX002: NodeHandler = async (ctx) => {
           : divStr.includes("PROVISIONAL") ? "Provisional"
           : divStr.split("—")[0]?.trim().slice(0, 15) || "General";
 
-        // Sanitize NaN — Excel shows "NaN" for undefined/NaN numbers
         const safeNum = (v: number) => (Number.isFinite(v) ? v : 0);
 
+        // Numeric waste% and GST% (not strings) — required for Excel formulas
         const row: (string | number)[] = hasIS1200
           ? [l.is1200Code ?? "", divShort, `${l.description}${countLabel}`, l.unit,
-             safeNum(l.quantity), wasteStr, safeNum(adjQty),
+             safeNum(l.quantity), wasteNum, safeNum(adjQty),
              safeNum(l.materialRate), safeNum(l.laborRate), safeNum(l.equipmentRate), safeNum(l.unitRate),
              safeNum(l.materialCost), safeNum(l.laborCost), safeNum(l.equipmentCost), safeNum(subtotal),
-             `${(gstRate * 100).toFixed(0)}%`, safeNum(gstAmt), safeNum(totalInclGST), dataSource, confidence]
-          : ["", `${l.description}${countLabel}`, l.unit,
-             safeNum(l.quantity), wasteStr, safeNum(adjQty),
+             gstRate, safeNum(gstAmt), safeNum(totalInclGST), dataSource, confidence]
+          : [divShort, `${l.description}${countLabel}`, l.unit,
+             safeNum(l.quantity), wasteNum, safeNum(adjQty),
              safeNum(l.materialRate), safeNum(l.laborRate), safeNum(l.equipmentRate), safeNum(l.unitRate),
              safeNum(l.materialCost), safeNum(l.laborCost), safeNum(l.equipmentCost), safeNum(subtotal),
-             `${(gstRate * 100).toFixed(0)}%`, safeNum(gstAmt), safeNum(totalInclGST), dataSource, confidence];
+             gstRate, safeNum(gstAmt), safeNum(totalInclGST), dataSource, confidence];
 
         boqTableRows.push(row);
+        dataRowNums.push(boqTableRows.length + 1); // Excel row (header = row 1)
         divMat += l.materialCost; divLab += l.laborCost; divEqp += l.equipmentCost;
         divSub += subtotal; divGST += gstAmt; divTotal += totalInclGST;
       }
 
+      // Division subtotal row — values are cached; formulas injected after sheet creation
       const subRow = hasIS1200
         ? ["", "", `${divName} SUBTOTAL`, "", "", "", "",
            "", "", "", "", Math.round(divMat), Math.round(divLab), Math.round(divEqp),
@@ -388,12 +405,14 @@ export const handleEX002: NodeHandler = async (ctx) => {
            "", "", "", "", Math.round(divMat), Math.round(divLab), Math.round(divEqp),
            Math.round(divSub), "", Math.round(divGST), Math.round(divTotal), "", ""];
       boqTableRows.push(subRow);
+      divBounds.push({ headerRow: curDivHeaderRow, subtotalRow: boqTableRows.length + 1 });
+
       boqTableRows.push(Array(hasIS1200 ? 21 : 20).fill(""));
       grandTotalInclGST += divTotal;
       totalGST += divGST;
     }
 
-    // Grand total row
+    // Grand total row — values are cached; formulas injected after sheet creation
     const gtRow = hasIS1200
       ? ["", "", "GRAND TOTAL", "", "", "", "", "", "", "", "",
          Math.round(boqData?.subtotalMaterial ?? 0), Math.round(boqData?.subtotalLabor ?? 0),
@@ -404,12 +423,111 @@ export const handleEX002: NodeHandler = async (ctx) => {
          Math.round(boqData?.subtotalEquipment ?? 0), Math.round(hardTotal),
          "", Math.round(totalGST), Math.round(grandTotalInclGST), "", ""];
     boqTableRows.push(gtRow);
+    const gtExcelRow = boqTableRows.length + 1;
 
     const boqSheet = XLSX.utils.aoa_to_sheet([boqHeaders, ...boqTableRows]);
-    const colCount = hasIS1200 ? 18 : 17;
-    boqSheet["!cols"] = Array.from({ length: colCount }, (_, i) => ({
-      wch: i <= 2 ? (hasIS1200 && i === 0 ? 20 : i === (hasIS1200 ? 2 : 1) ? 35 : 16) : i <= 6 ? 10 : 13,
-    }));
+
+    // ══════════════════════════════════════════════════════════════════════
+    // FORMULA INJECTION — Makes Qty × Rate = Amount recalculate in Excel
+    // ══════════════════════════════════════════════════════════════════════
+    const cl = XLSX.utils.encode_col; // column index → letter ("A", "B", ...)
+    const ec = XLSX.utils.encode_cell; // {r, c} → "A1" (0-indexed r,c)
+
+    // ── Per-line-item formulas: Adj Qty, Unit Rate, all Cost columns ──
+    for (const r of dataRowNums) {
+      const ri = r - 1; // 0-indexed row for encode_cell
+
+      const setF = (col: number, f: string, fmt: string, cached?: number) => {
+        const cell: { t: string; f: string; z: string; v?: number } = { t: "n", f, z: fmt };
+        if (cached !== undefined && Number.isFinite(cached)) cell.v = cached;
+        boqSheet[ec({ r: ri, c: col })] = cell;
+      };
+
+      // Read cached values from the static row for v (pre-calculated fallback)
+      const cv = (col: number): number => {
+        const ref = ec({ r: ri, c: col });
+        const cell = boqSheet[ref] as { v?: number } | undefined;
+        return Number(cell?.v ?? 0);
+      };
+
+      // Adj Qty = Base Qty × (1 + Waste%)
+      setF(FC.adjQty, `${cl(FC.qty)}${r}*(1+${cl(FC.waste)}${r})`, "#,##0.00", cv(FC.adjQty));
+      // Unit Rate = Mat Rate + Lab Rate + Eqp Rate
+      setF(FC.unitRate, `${cl(FC.matRate)}${r}+${cl(FC.labRate)}${r}+${cl(FC.eqpRate)}${r}`, "#,##0.00", cv(FC.unitRate));
+      // Material Cost = Adj Qty × Mat Rate
+      setF(FC.matCost, `${cl(FC.adjQty)}${r}*${cl(FC.matRate)}${r}`, "#,##0", cv(FC.matCost));
+      // Labor Cost = Adj Qty × Lab Rate
+      setF(FC.labCost, `${cl(FC.adjQty)}${r}*${cl(FC.labRate)}${r}`, "#,##0", cv(FC.labCost));
+      // Equipment Cost = Adj Qty × Eqp Rate
+      setF(FC.eqpCost, `${cl(FC.adjQty)}${r}*${cl(FC.eqpRate)}${r}`, "#,##0", cv(FC.eqpCost));
+      // Subtotal = Adj Qty × Unit Rate
+      setF(FC.subtotal, `${cl(FC.adjQty)}${r}*${cl(FC.unitRate)}${r}`, "#,##0", cv(FC.subtotal));
+      // GST Amount = Material Cost × GST%
+      setF(FC.gstAmt, `${cl(FC.matCost)}${r}*${cl(FC.gstPct)}${r}`, "#,##0", cv(FC.gstAmt));
+      // Total incl GST = Subtotal + GST Amount
+      setF(FC.total, `${cl(FC.subtotal)}${r}+${cl(FC.gstAmt)}${r}`, "#,##0", cv(FC.total));
+
+      // Apply percentage format to waste% and GST% cells
+      const wasteCellRef = ec({ r: ri, c: FC.waste });
+      if (boqSheet[wasteCellRef]) (boqSheet[wasteCellRef] as { z?: string }).z = "0%";
+      const gstCellRef = ec({ r: ri, c: FC.gstPct });
+      if (boqSheet[gstCellRef]) (boqSheet[gstCellRef] as { z?: string }).z = "0%";
+    }
+
+    // ── Division subtotal formulas: SUM over data rows in each division ──
+    for (const db of divBounds) {
+      const si = db.subtotalRow - 1; // 0-indexed
+      const divDataRows = dataRowNums.filter(r => r > db.headerRow && r < db.subtotalRow);
+      if (divDataRows.length === 0) continue;
+      const first = divDataRows[0];
+      const last = divDataRows[divDataRows.length - 1];
+
+      for (const col of [FC.matCost, FC.labCost, FC.eqpCost, FC.subtotal, FC.gstAmt, FC.total]) {
+        const ref = ec({ r: si, c: col });
+        const cached = Number((boqSheet[ref] as { v?: number } | undefined)?.v ?? 0);
+        boqSheet[ref] = { t: "n", f: `SUM(${cl(col)}${first}:${cl(col)}${last})`, z: "#,##0", v: cached };
+      }
+    }
+
+    // ── Grand total formulas: sum of division subtotals ──
+    if (divBounds.length > 0) {
+      const gti = gtExcelRow - 1; // 0-indexed
+      for (const col of [FC.matCost, FC.labCost, FC.eqpCost, FC.subtotal, FC.gstAmt, FC.total]) {
+        const refs = divBounds.map(d => `${cl(col)}${d.subtotalRow}`).join("+");
+        const ref = ec({ r: gti, c: col });
+        const cached = Number((boqSheet[ref] as { v?: number } | undefined)?.v ?? 0);
+        boqSheet[ref] = { t: "n", f: refs, z: "#,##0", v: cached };
+      }
+    }
+
+    // ── Column widths (optimized for readability) ──
+    boqSheet["!cols"] = [
+      ...(hasIS1200 ? [{ wch: 18 }] : []),  // IS 1200 Code
+      { wch: 12 },   // Division
+      { wch: 45 },   // Description
+      { wch: 6 },    // Unit
+      { wch: 12 },   // Base Qty
+      { wch: 8 },    // Waste %
+      { wch: 12 },   // Adj Qty
+      { wch: 12 },   // Mat Rate
+      { wch: 12 },   // Lab Rate
+      { wch: 12 },   // Eqp Rate
+      { wch: 12 },   // Unit Rate
+      { wch: 14 },   // Material ₹
+      { wch: 14 },   // Labour ₹
+      { wch: 14 },   // Equip ₹
+      { wch: 14 },   // Subtotal ₹
+      { wch: 7 },    // GST %
+      { wch: 14 },   // GST ₹
+      { wch: 15 },   // Total incl GST
+      { wch: 14 },   // Data Source
+      { wch: 12 },   // Confidence
+    ];
+
+    // ── Auto-filter on header row ──
+    const lastColLetter = cl(boqHeaders.length - 1);
+    boqSheet["!autofilter"] = { ref: `A1:${lastColLetter}${gtExcelRow}` };
+
     XLSX.utils.book_append_sheet(wb, boqSheet, "Bill of Quantities");
 
     // ═════════════════════════════════════════════════════════════════════
