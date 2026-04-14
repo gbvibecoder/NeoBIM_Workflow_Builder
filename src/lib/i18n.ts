@@ -1247,6 +1247,26 @@ const en = {
   'artifact.interactive3dModel': 'Interactive 3D Model',
   'artifact.pipelineLabel': 'Pipeline',
 
+  // ===== BETA BANNER =====
+  'banner.betaTitle': "You're using BuildFlow Beta",
+  'banner.betaMessage': 'Workflows are improving daily. Some outputs are AI-generated estimates — always verify before production use.',
+  'banner.betaFeedback': 'Give Feedback',
+  'banner.betaChangelog': "What's New",
+  'banner.betaDismiss': 'Dismiss beta banner',
+
+  // ===== CONFIDENCE BADGES =====
+  'confidence.aiEstimate': 'AI-Generated Estimate',
+  'confidence.aiEstimateTooltip': 'These KPIs are AI-inferred from your inputs. Verify critical numbers before contract or construction use.',
+  'confidence.aiConcept': 'AI Concept Art — Not Photorealistic',
+  'confidence.aiConceptTooltip': 'Generated with DALL-E 3 for concept exploration. Not to scale. Not architecturally accurate.',
+  'confidence.experimental3d': 'Experimental 3D Preview',
+  'confidence.experimental3dTooltip': 'Procedurally generated preview. Geometry is approximate and still improving.',
+  'confidence.boqPreliminary': 'Preliminary Estimate (±25-30%)',
+
+  // ===== SHOWCASE PARTIAL =====
+  'showcase.partialSuffix': 'succeeded',
+  'showcase.partialLabel': 'Partial',
+
   // ===== COMMUNITY EXTRA =====
   'community.featured': 'FEATURED',
   'community.shareTemplate': 'Share template',
@@ -3874,6 +3894,26 @@ const de: Record<keyof typeof en, string | string[]> = {
   'artifact.walls': 'Wände',
   'artifact.interactive3dModel': 'Interaktives 3D-Modell',
   'artifact.pipelineLabel': 'Pipeline',
+
+  // ===== BETA BANNER =====
+  'banner.betaTitle': 'Sie nutzen die BuildFlow Beta',
+  'banner.betaMessage': 'Workflows werden täglich verbessert. Einige Ergebnisse sind KI-generierte Schätzungen — vor dem Produktionseinsatz immer prüfen.',
+  'banner.betaFeedback': 'Feedback geben',
+  'banner.betaChangelog': 'Was ist neu',
+  'banner.betaDismiss': 'Beta-Banner ausblenden',
+
+  // ===== CONFIDENCE BADGES =====
+  'confidence.aiEstimate': 'KI-generierte Schätzung',
+  'confidence.aiEstimateTooltip': 'Diese Kennzahlen sind KI-geschätzt. Kritische Werte vor Vertrag oder Bau prüfen.',
+  'confidence.aiConcept': 'KI-Konzeptbild — nicht fotorealistisch',
+  'confidence.aiConceptTooltip': 'Mit DALL-E 3 für Konzeptexploration erstellt. Nicht maßstabsgetreu. Nicht architektonisch präzise.',
+  'confidence.experimental3d': 'Experimentelle 3D-Vorschau',
+  'confidence.experimental3dTooltip': 'Prozedural erzeugte Vorschau. Geometrie ist näherungsweise und wird verbessert.',
+  'confidence.boqPreliminary': 'Vorläufige Schätzung (±25-30%)',
+
+  // ===== SHOWCASE PARTIAL =====
+  'showcase.partialSuffix': 'erfolgreich',
+  'showcase.partialLabel': 'Teilweise',
 
   // ===== COMMUNITY EXTRA =====
   'community.featured': 'EMPFOHLEN',
