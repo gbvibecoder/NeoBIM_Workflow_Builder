@@ -1,17 +1,11 @@
 "use client";
 
-// Konva shape registration — required because Next.js 16's bundler tree-shakes
-// the `import 'konva'` side-effect from react-konva (konva's package.json has
-// no `sideEffects` field), leaving Konva.Node.factory without Rect/Line/Text/
-// Circle/Arc/Arrow/Path. Without these, react-konva silently falls back to
-// Group for every shape and nothing visible renders.
-import "konva/lib/shapes/Rect";
-import "konva/lib/shapes/Circle";
-import "konva/lib/shapes/Line";
-import "konva/lib/shapes/Text";
-import "konva/lib/shapes/Arc";
-import "konva/lib/shapes/Arrow";
-import "konva/lib/shapes/Path";
+// Konva shape registration — MUST evaluate before the first react-konva
+// render. See src/features/floor-plan/lib/konva-register.ts for details.
+// We reference KONVA_READY in a throw so no bundler can tree-shake the
+// registration module out of the dependency graph.
+import { KONVA_READY } from "@/features/floor-plan/lib/konva-register";
+if (!KONVA_READY) throw new Error("Konva shapes failed to register");
 
 import React, { useRef, useCallback, useEffect, useState } from "react";
 import { Stage, Layer } from "react-konva";
