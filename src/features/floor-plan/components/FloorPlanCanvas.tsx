@@ -656,7 +656,7 @@ export function FloorPlanCanvas() {
 
   if (!floor) return null;
 
-  const showRoomFills = isLayerVisible("A-ROOM-FILL") && viewMode === "presentation";
+  const showRoomFills = isLayerVisible("A-ROOM-FILL");
   const showRoomLabels = isLayerVisible("A-ROOM-NAME");
   const showDimensions = isLayerVisible("A-DIM") && (viewMode === "construction" || viewMode === "cad");
   const showGrid = isLayerVisible("A-GRID") || useFloorPlanStore.getState().gridVisible;
