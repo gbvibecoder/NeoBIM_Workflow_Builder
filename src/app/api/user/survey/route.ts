@@ -144,6 +144,10 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ survey });
   } catch (err) {
+    // Explicit stack trace to stdout so the dev-server terminal shows
+    // exactly what failed. Previously the catch only surfaced the
+    // message in the JSON response body, which was easy to miss.
+    console.error("[/api/user/survey POST] failed:", err);
     const message = err instanceof Error ? err.message : "Unknown error";
     return NextResponse.json(
       formatErrorResponse({ title: "Save failed", message, code: "NODE_001" }),
