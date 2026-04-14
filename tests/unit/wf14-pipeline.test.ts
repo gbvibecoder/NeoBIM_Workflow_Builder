@@ -395,9 +395,15 @@ describe("wf-08: PDF → Video Walkthrough + IFC Pipeline", () => {
     it("all GlobalIds are unique 22-char strings", () => {
       const geometry = generateMassingGeometry({ floors: 5, footprint_m2: 500 });
       const ifc = generateIFCFile(geometry);
-      const guidMatches = ifc.match(/'[0-9A-Za-z_$]{22}'/g);
-      expect(guidMatches).toBeDefined();
-      expect(new Set(guidMatches).size).toBe(guidMatches!.length);
+      // Only entities that declare a GlobalId as first argument carry a true GUID.
+      // Exclude IfcPropertySingleValue / IfcElementQuantity / IfcQuantity* / IfcProperty*
+      // (whose first arg is a descriptive *name* string — Pset/Qto property names like
+      // `MaterialRate_INR_per_m` legitimately repeat across rows and incidentally match
+      // the 22-char IFC alphabet regex).
+      const raw = ifc.match(/=IFC[A-Z]+\('([0-9A-Za-z_$]{22})'/g) ?? [];
+      const guidMatches = raw.filter(m => !/^=IFC(PROPERTY|QUANTITY|ELEMENTQUANTITY)/.test(m));
+      expect(guidMatches.length).toBeGreaterThan(0);
+      expect(new Set(guidMatches).size).toBe(guidMatches.length);
     });
 
     it("special characters in names are sanitized for STEP format", () => {
@@ -421,9 +427,10 @@ describe("wf-08: PDF → Video Walkthrough + IFC Pipeline", () => {
       });
       const ifc = generateIFCFile(geometry);
 
-      // Check property values match geometry
+      // Check property values match geometry. Exporter v2 uses IFCLABEL for OccupancyType
+      // (standard Pset_BuildingCommon name) since it is a short classifier, not arbitrary text.
       expect(ifc).toContain(`IFCINTEGER(${geometry.floors})`);
-      expect(ifc).toContain(`IFCTEXT('${geometry.buildingType}')`);
+      expect(ifc).toContain(`IFCLABEL('${geometry.buildingType}')`);
       expect(ifc).toContain("IFCLENGTHMEASURE");
       expect(ifc).toContain("IFCAREAMEASURE");
     });
