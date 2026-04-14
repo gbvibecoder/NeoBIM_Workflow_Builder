@@ -6,8 +6,7 @@ import { computeSensitivities, DEFAULT_PRICES, getDivisionCategory } from "@/fea
 import { getConfidenceLevelFromIFCScore, type ConfidenceLevel } from "@/features/boq/constants/quality-thresholds";
 import { validateBOQArtifact } from "@/features/boq/schemas/boq-artifact.schema";
 import { calculateBOQRange, getAACEDescription } from "@/features/boq/lib/cost-range";
-// seasonal-adjustment.ts exists and is tested, but NOT wired into TR-008 cost calculation yet.
-// Re-enable import once handler applies seasonal multipliers to M/L/E costs.
+import { computeSeasonalAdjustment } from "@/features/boq/lib/seasonal-adjustment";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -155,23 +154,33 @@ export function parseArtifactToBOQ(artifactData: any): BOQData | null {
       else if (src.includes("provisional")) conf = 30;
       else conf = inferConfidence("", line.division || "", line.description || "");
     }
+    // Final NaN guard — confidence must always be a valid number
+    if (!conf || !Number.isFinite(conf) || conf < 0) conf = 50;
+
+    // Safe number helper — protects against undefined/NaN/null from upstream
+    const n = (v: unknown): number => { const num = Number(v); return Number.isFinite(num) ? num : 0; };
+
+    const matRate = n(line.materialRate);
+    const labRate = n(line.laborRate);
+    const eqpRate = n(line.equipmentRate);
+
     return {
       id: `boq-${idx}`,
       division: line.division || "Unclassified",
       isCode: line.is1200Code || line.csiCode || line.isCode || "",
       description: line.description || "",
       unit: line.unit || "LS",
-      quantity: line.quantity || 0,
-      wasteFactor: line.wasteFactor || 0.05,
-      adjustedQty: line.adjustedQty || line.quantity || 0,
-      materialRate: line.materialRate || 0,
-      laborRate: line.laborRate || 0,
-      equipmentRate: line.equipmentRate || 0,
-      unitRate: line.unitRate || line.materialRate + line.laborRate + line.equipmentRate || 0,
-      materialCost: line.materialCost || 0,
-      laborCost: line.laborCost || 0,
-      equipmentCost: line.equipmentCost || 0,
-      totalCost: line.totalCost || 0,
+      quantity: n(line.quantity),
+      wasteFactor: n(line.wasteFactor) || 0.05,
+      adjustedQty: n(line.adjustedQty) || n(line.quantity),
+      materialRate: matRate,
+      laborRate: labRate,
+      equipmentRate: eqpRate,
+      unitRate: n(line.unitRate) || (matRate + labRate + eqpRate),
+      materialCost: n(line.materialCost),
+      laborCost: n(line.laborCost),
+      equipmentCost: n(line.equipmentCost),
+      totalCost: n(line.totalCost),
       storey: line.storey,
       elementCount: line.elementCount,
       source: inferSource(line.description || "", line.division || "", conf),
@@ -306,8 +315,22 @@ export function parseArtifactToBOQ(artifactData: any): BOQData | null {
     summary: data.content || data._summary || "",
     disclaimer: data._disclaimer || boqData.disclaimer || "This is an AI-generated estimate for preliminary budgeting purposes only. Verify all quantities with detailed measurement before procurement.",
 
-    // Seasonal adjustment: NOT computed here until TR-008 actually applies cost adjustments.
-    // Displaying metadata without cost impact is misleading. See seasonal-adjustment.ts.
+    // Seasonal info — informational only (costs NOT adjusted by TR-008 yet)
+    ...(() => {
+      const locState = data._pricingMetadata?.stateUsed || data._region || "";
+      if (!locState) return {};
+      const seasonal = computeSeasonalAdjustment(locState);
+      if (!seasonal.applied) return {};
+      return {
+        seasonalAdjustment: {
+          applied: true,
+          month: seasonal.monthName,
+          laborMultiplier: seasonal.laborMultiplier,
+          overallImpactPercent: seasonal.overallImpactPercent,
+          description: `Informational only — standard rates used. ${seasonal.description}`,
+        },
+      };
+    })(),
 
     // Phase 3: Transparency layer
     ...(data._pricingMetadata && { pricingMetadata: data._pricingMetadata }),

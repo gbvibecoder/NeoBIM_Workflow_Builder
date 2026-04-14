@@ -331,9 +331,22 @@ export function BOQVisualizerPage({ data, executionId }: BOQVisualizerPageProps)
           </div>
         </ScrollReveal>
 
-        {/* Seasonal badge removed — costs are not actually adjusted by TR-008 yet.
-           Displaying it would mislead users into thinking costs include monsoon impact.
-           Re-enable once seasonal factors are wired into the handler. */}
+        {/* Monsoon season info — informational only, costs NOT adjusted */}
+        {data.seasonalAdjustment?.applied && (
+          <ScrollReveal delay={0.1}>
+            <div className="mx-6 px-5 py-3.5 rounded-xl flex items-center gap-3" style={{ background: "#EFF6FF", border: "1px solid #BFDBFE" }}>
+              <span style={{ fontSize: 18 }}>🌧️</span>
+              <div>
+                <span className="text-sm font-semibold" style={{ color: "#1E40AF" }}>
+                  Monsoon season note
+                </span>
+                <p className="text-xs mt-0.5" style={{ color: "#4B5563", lineHeight: 1.5 }}>
+                  Labor productivity in {data.pricingMetadata?.stateUsed || "this region"} typically drops {Math.round((1 - 1 / data.seasonalAdjustment.laborMultiplier) * 100)}% during {data.seasonalAdjustment.month}. This estimate uses standard rates — factor this into project timelines.
+                </p>
+              </div>
+            </div>
+          </ScrollReveal>
+        )}
 
         {/* Price Controls */}
         <ScrollReveal delay={0.1}>
