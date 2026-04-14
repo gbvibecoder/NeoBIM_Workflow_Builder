@@ -146,13 +146,136 @@ export function BOQVisualizerPage({ data, executionId }: BOQVisualizerPageProps)
     }
   }, [data.excelUrl, data.projectName, data.location, data.date, data.gfa, data.softCosts, data.aaceClass, data.confidenceLevel, recalcLines, recalcTotalProject, totals]);
 
-  const handleExportPDF = useCallback(() => {
+  const handleExportPDF = useCallback(async () => {
     if (data.pdfUrl) {
       window.open(data.pdfUrl, "_blank");
-    } else {
-      toast.error("PDF not available", { description: "Run the PDF Report Exporter (EX-003) node in your workflow to generate the PDF." });
+      return;
     }
-  }, [data.pdfUrl]);
+    // Client-side fallback: generate PDF from loaded BOQ data
+    try {
+      const { jsPDF } = await import("jspdf");
+      const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+      const pw = doc.internal.pageSize.getWidth();
+      const margin = 16;
+      let y = 20;
+
+      const fmtINR = (n: number) => `₹${n.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`;
+      const addPage = () => { doc.addPage(); y = 20; };
+      const checkPage = (need: number) => { if (y + need > 275) addPage(); };
+
+      // Header
+      doc.setFontSize(18);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(17, 24, 39);
+      doc.text("Bill of Quantities", margin, y);
+      y += 8;
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(107, 114, 128);
+      doc.text(`${data.projectName}  •  ${data.location}  •  ${data.date}`, margin, y);
+      y += 5;
+      doc.text(`AACE ${data.aaceClass || "Class 4"}  •  Confidence: ${data.confidenceLevel || "MEDIUM"}`, margin, y);
+      y += 10;
+
+      // Summary box
+      doc.setFillColor(249, 250, 251);
+      doc.roundedRect(margin, y, pw - margin * 2, 28, 3, 3, "F");
+      doc.setFontSize(9);
+      doc.setTextColor(75, 85, 99);
+      doc.text("Total Project Cost", margin + 4, y + 6);
+      doc.text("Hard Costs", margin + 55, y + 6);
+      doc.text("Soft Costs", margin + 105, y + 6);
+      doc.text("GFA", margin + 145, y + 6);
+      doc.setFontSize(12);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(13, 148, 136);
+      doc.text(fmtINR(recalcTotalProject), margin + 4, y + 14);
+      doc.setTextColor(17, 24, 39);
+      doc.text(fmtINR(totals.totalCost), margin + 55, y + 14);
+      doc.text(fmtINR(data.softCosts), margin + 105, y + 14);
+      doc.text(`${data.gfa.toLocaleString()} m²`, margin + 145, y + 14);
+      doc.setFontSize(8);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(156, 163, 175);
+      doc.text(`Material: ${fmtINR(totals.subtotalMaterial)}  •  Labour: ${fmtINR(totals.subtotalLabor)}  •  Equipment: ${fmtINR(totals.subtotalEquipment)}`, margin + 4, y + 22);
+      y += 36;
+
+      // Table header
+      const cols = [
+        { label: "IS CODE", x: margin, w: 22 },
+        { label: "DESCRIPTION", x: margin + 22, w: 58 },
+        { label: "UNIT", x: margin + 80, w: 12 },
+        { label: "QTY", x: margin + 92, w: 18 },
+        { label: "RATE", x: margin + 110, w: 22 },
+        { label: "AMOUNT", x: margin + 132, w: 28 },
+        { label: "CONFIDENCE", x: margin + 160, w: 20 },
+      ];
+      doc.setFillColor(249, 250, 251);
+      doc.rect(margin, y, pw - margin * 2, 7, "F");
+      doc.setFontSize(7);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(156, 163, 175);
+      cols.forEach(c => doc.text(c.label, c.x + 1, y + 5));
+      y += 9;
+
+      // Table rows
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(7.5);
+      for (let i = 0; i < recalcLines.length; i++) {
+        checkPage(7);
+        const l = recalcLines[i];
+        if (i % 2 === 1) {
+          doc.setFillColor(250, 250, 248);
+          doc.rect(margin, y - 1.5, pw - margin * 2, 6, "F");
+        }
+        doc.setTextColor(156, 163, 175);
+        doc.text((l.isCode || "—").substring(0, 18), cols[0].x + 1, y + 2);
+        doc.setTextColor(17, 24, 39);
+        doc.text(l.description.substring(0, 45), cols[1].x + 1, y + 2);
+        doc.setTextColor(75, 85, 99);
+        doc.text(l.unit, cols[2].x + 1, y + 2);
+        doc.text(l.adjustedQty.toLocaleString("en-IN", { maximumFractionDigits: 1 }), cols[3].x + 1, y + 2);
+        doc.text(fmtINR(l.unitRate), cols[4].x + 1, y + 2);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(17, 24, 39);
+        doc.text(fmtINR(l.totalCost), cols[5].x + 1, y + 2);
+        doc.setFont("helvetica", "normal");
+        const confColor = l.confidence >= 80 ? [5, 150, 105] : l.confidence >= 55 ? [217, 119, 6] : [220, 38, 38];
+        doc.setTextColor(confColor[0], confColor[1], confColor[2]);
+        doc.text(l.confidence >= 80 ? "HIGH" : l.confidence >= 55 ? "MED" : "LOW", cols[6].x + 1, y + 2);
+        y += 5.5;
+      }
+
+      // Grand total
+      checkPage(10);
+      doc.setDrawColor(13, 148, 136);
+      doc.setLineWidth(0.4);
+      doc.line(margin, y, pw - margin, y);
+      y += 5;
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(13, 148, 136);
+      doc.text("TOTAL", margin + 1, y);
+      doc.text(fmtINR(totals.totalCost), cols[5].x + 1, y);
+      y += 10;
+
+      // Disclaimer
+      checkPage(15);
+      doc.setFontSize(7);
+      doc.setFont("helvetica", "italic");
+      doc.setTextColor(156, 163, 175);
+      const disclaimer = data.disclaimer || "This is an AI-generated estimate for preliminary budgeting purposes only.";
+      const splitDisclaimer = doc.splitTextToSize(disclaimer, pw - margin * 2);
+      doc.text(splitDisclaimer, margin, y);
+      y += splitDisclaimer.length * 3.5 + 5;
+      doc.setFont("helvetica", "normal");
+      doc.text(`Generated by BuildFlow  •  ${recalcLines.length} line items  •  ${new Date().toLocaleDateString("en-IN")}`, margin, y);
+
+      doc.save(`BOQ_${data.projectName.replace(/\s+/g, "_")}.pdf`);
+    } catch {
+      toast.error("PDF generation failed", { description: "Could not generate PDF. Try running the EX-003 node in your workflow." });
+    }
+  }, [data.pdfUrl, data.projectName, data.location, data.date, data.gfa, data.softCosts, data.aaceClass, data.confidenceLevel, data.disclaimer, recalcLines, recalcTotalProject, totals]);
 
   const handleExportCSV = useCallback(() => {
     // Generate CSV from current recalculated lines
