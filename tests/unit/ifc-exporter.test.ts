@@ -26,11 +26,13 @@ describe("IFC Exporter", () => {
       expect(ifc).toContain("END-ISO-10303-21;");
     });
 
-    it("includes FILE_DESCRIPTION with CoordinationView", () => {
+    it("includes FILE_DESCRIPTION with DesignTransferView view definition", () => {
       const geometry = createTestGeometry();
       const ifc = generateIFCFile(geometry);
 
-      expect(ifc).toContain("FILE_DESCRIPTION(('ViewDefinition [DesignTransferView_V1]'),'2;1');");
+      // New output declares both ViewDefinition and ExchangeRequirement
+      expect(ifc).toContain("ViewDefinition [DesignTransferView_V1]");
+      expect(ifc).toContain("ExchangeRequirement");
     });
 
     it("includes FILE_NAME with custom building name", () => {
@@ -197,12 +199,13 @@ describe("IFC Exporter", () => {
       const geometry = createTestGeometry();
       const ifc = generateIFCFile(geometry);
 
-      expect(ifc).toContain("'BuildFlow_BuildingInfo'");
-      expect(ifc).toContain("'NumberOfFloors'");
-      expect(ifc).toContain("'TotalHeight'");
-      expect(ifc).toContain("'GrossFloorArea'");
+      // Exporter v2 emits standard IFC4 Pset_BuildingCommon (not the custom BuildFlow_BuildingInfo).
+      expect(ifc).toContain("'Pset_BuildingCommon'");
+      expect(ifc).toContain("'NumberOfStoreys'");
+      expect(ifc).toContain("'BuildingHeight'");
+      expect(ifc).toContain("'GrossPlannedArea'");
       expect(ifc).toContain("'FootprintArea'");
-      expect(ifc).toContain("'BuildingType'");
+      expect(ifc).toContain("'OccupancyType'");
     });
 
     it("contains IfcRelDefinesByProperties", () => {
