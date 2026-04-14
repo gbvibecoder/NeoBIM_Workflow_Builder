@@ -149,6 +149,9 @@ export function parseArtifactToBOQ(artifactData: any): BOQData | null {
       elementCount: line.elementCount,
       source: inferSource(line.description || "", line.division || "", conf),
       confidence: conf,
+      lineConfidence: line.confidence && typeof line.confidence === "object"
+        ? { score: line.confidence.score || "medium", factors: line.confidence.factors || [] }
+        : undefined,
       steelSensitivity: 0,
       cementSensitivity: 0,
       masonSensitivity: 0,
@@ -260,6 +263,10 @@ export function parseArtifactToBOQ(artifactData: any): BOQData | null {
 
     summary: data.content || data._summary || "",
     disclaimer: data._disclaimer || boqData.disclaimer || "This is an AI-generated estimate for preliminary budgeting purposes only. Verify all quantities with detailed measurement before procurement.",
+
+    // Phase 3: Transparency layer
+    ...(data._pricingMetadata && { pricingMetadata: data._pricingMetadata }),
+    ...(data._modelQualityReport && { modelQualityReport: data._modelQualityReport }),
   };
 }
 

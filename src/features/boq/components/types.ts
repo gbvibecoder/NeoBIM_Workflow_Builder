@@ -1,5 +1,11 @@
 // ─── BOQ Visualizer Types ───────────────────────────────────────────────────
 
+/** Per-line confidence from Phase 3 transparency layer */
+export interface LineConfidence {
+  score: "high" | "medium" | "low";
+  factors: string[];
+}
+
 export interface BOQLineItem {
   id: string;
   division: string;
@@ -20,7 +26,9 @@ export interface BOQLineItem {
   storey?: string;
   elementCount?: number;
   source: "ifc-geometry" | "ifc-derived" | "benchmark" | "provisional";
-  confidence: number; // 0-100
+  confidence: number; // 0-100 (legacy numeric)
+  /** Phase 3: structured confidence with human-readable factors */
+  lineConfidence?: LineConfidence;
   // Sensitivity coefficients: how much totalCost changes per 1% change in material price
   steelSensitivity: number;
   cementSensitivity: number;
@@ -110,6 +118,34 @@ export interface BOQData {
   // Download URLs (from EX-002/EX-003 artifacts)
   excelUrl?: string;
   pdfUrl?: string;
+
+  // ── Phase 3: Transparency Layer ──
+
+  /** Pricing source indicator */
+  pricingMetadata?: {
+    source: "market_intelligence" | "cpwd_static" | "mixed";
+    marketIntelligenceStatus: "success" | "partial" | "failed" | "timeout";
+    staticRateVersion: string;
+    staleDateWarning?: string;
+    lastMarketUpdate?: string;
+    cityUsed?: string;
+    stateUsed?: string;
+  };
+
+  /** IFC model quality assessment from parser */
+  modelQualityReport?: {
+    overallGrade: "A" | "B" | "C" | "D" | "F";
+    totalElements: number;
+    issuesFound: {
+      zeroVolumeElements: { count: number; types: string[] };
+      duplicateElements: { count: number; estimatedImpact: string };
+      noMaterialElements: { count: number; types: string[] };
+      unassignedStoreyElements: { count: number };
+      suspiciousDimensions: { count: number; details: string[] };
+      unitInconsistencies: boolean;
+    };
+    recommendations: string[];
+  };
 }
 
 export interface PriceOverrides {

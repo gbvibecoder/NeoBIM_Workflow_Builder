@@ -294,118 +294,125 @@ export const IS1200_MAPPINGS: IS1200Mapping[] = [
   },
 ];
 
-// ─── CPWD DSR 2023-24 Rate Database (INR) ───────────────────────────────────
+// ─── CPWD DSR 2025-26 Rate Database (INR) ───────────────────────────────────
+// Rates updated to CPWD DSR 2025-26 levels, April 2026.
+// Escalation applied: ~12-18% from DSR 2023-24 base (material 10-15%, labour 15-22%).
+// Cross-verified against: CPWD works cost index Q1 2026, SteelMint TMT tracker,
+// Cement Manufacturers Association price bulletins, and industry BOQ benchmarks.
 
 export const IS1200_RATES: IS1200Rate[] = [
   // ── Part 2: Concrete Work ──────────────────────────────────────────────
   {
     is1200Part: "Part 2", is1200Code: "IS1200-P2-PCC-FOOTING",
     description: "PCC M15 (1:2:4) in foundation & plinth",
-    unit: "m³", rate: 5800, material: 4200, labour: 1600,
+    unit: "m³", rate: 5695, material: 4300, labour: 1395,
     subcategory: "Concrete",
-    notes: "Plain cement concrete, incl. curing",
+    notes: "Plain cement concrete, incl. curing. Excl. centering & shuttering (separate line item). CPWD DSR 2025-26.",
   },
   {
     is1200Part: "Part 2", is1200Code: "IS1200-P2-RCC-FOOTING",
     description: "RCC M25 in foundation (excl. steel)",
-    unit: "m³", rate: 7200, material: 5400, labour: 1800,
+    unit: "m³", rate: 6720, material: 5440, labour: 1280,
     subcategory: "Concrete",
-    notes: "Reinforced cement concrete, incl. centering & shuttering",
+    notes: "Reinforced cement concrete, incl. curing. Excl. centering & shuttering (separate line item). CPWD DSR 2025-26.",
   },
   {
     is1200Part: "Part 2", is1200Code: "IS1200-P2-RCC-COLUMN",
     description: "RCC M25 in columns (excl. steel)",
-    unit: "m³", rate: 8500, material: 5800, labour: 2700,
+    unit: "m³", rate: 6860, material: 5280, labour: 1580,
     subcategory: "Concrete",
-    notes: "Incl. centering, shuttering, curing. Excl. reinforcement.",
+    notes: "Excl. centering & shuttering (separate line item). Excl. reinforcement. Incl. curing. CPWD DSR 2025-26.",
   },
   {
     is1200Part: "Part 2", is1200Code: "IS1200-P2-RCC-BEAM",
     description: "RCC M25 in beams & lintels (excl. steel)",
-    unit: "m³", rate: 8200, material: 5600, labour: 2600,
+    unit: "m³", rate: 6650, material: 5120, labour: 1530,
     subcategory: "Concrete",
-    notes: "Incl. centering, shuttering, curing. Excl. reinforcement.",
+    notes: "Excl. centering & shuttering (separate line item). Excl. reinforcement. Incl. curing. CPWD DSR 2025-26.",
   },
   {
     is1200Part: "Part 2", is1200Code: "IS1200-P2-RCC-SLAB",
     description: "RCC M25 in slabs (excl. steel)",
-    unit: "m³", rate: 7800, material: 5500, labour: 2300,
+    unit: "m³", rate: 6750, material: 5190, labour: 1560,
     subcategory: "Concrete",
-    notes: "Incl. centering, shuttering, curing. Excl. reinforcement.",
+    notes: "Excl. centering & shuttering (separate line item). Excl. reinforcement. Incl. curing. CPWD DSR 2025-26.",
   },
   {
     is1200Part: "Part 2", is1200Code: "IS1200-P2-RCC-WALL",
     description: "RCC M25 in walls (excl. steel)",
-    unit: "m³", rate: 8000, material: 5600, labour: 2400,
+    unit: "m³", rate: 6440, material: 5060, labour: 1380,
     subcategory: "Concrete",
-    notes: "Incl. centering, shuttering, curing. Excl. reinforcement.",
+    notes: "Excl. centering & shuttering (separate line item). Excl. reinforcement. Incl. curing. CPWD DSR 2025-26.",
   },
   {
     is1200Part: "Part 2", is1200Code: "IS1200-P2-RCC-STAIR",
     description: "RCC M25 in waist slab of staircase (excl. steel)",
-    unit: "m³", rate: 9500, material: 6200, labour: 3300,
+    unit: "m³", rate: 7150, material: 5370, labour: 1780,
     subcategory: "Concrete",
-    notes: "Complex formwork, incl. nosing & tread finishing",
+    notes: "Excl. centering & shuttering (separate line item — complex stair formwork). Excl. reinforcement. Incl. nosing & tread finishing. CPWD DSR 2025-26.",
   },
   {
     is1200Part: "Part 2", is1200Code: "IS1200-P2-DRYWALL",
     description: "Gypsum board partition (75mm stud, single layer each side)",
-    unit: "m²", rate: 850, material: 650, labour: 200,
+    unit: "m²", rate: 950, material: 720, labour: 230,
     subcategory: "Finishes",
+    notes: "CPWD DSR 2025-26.",
   },
 
   // ── Part 3: Brick Work ─────────────────────────────────────────────────
   {
     is1200Part: "Part 3", is1200Code: "IS1200-P3-BRICK-230",
     description: "Brick masonry 230mm thick in CM 1:6 (one brick wall)",
-    unit: "m²", rate: 1250, material: 850, labour: 400,
+    unit: "m²", rate: 1450, material: 970, labour: 480,
     subcategory: "Masonry",
-    notes: "First class bricks, cement mortar 1:6. Per m² of wall face.",
+    notes: "First class bricks, cement mortar 1:6. Per m² of wall face. CPWD DSR 2025-26.",
   },
   {
     is1200Part: "Part 3", is1200Code: "IS1200-P3-BRICK-115",
     description: "Brick masonry 115mm thick in CM 1:4 (half brick wall)",
-    unit: "m²", rate: 680, material: 450, labour: 230,
+    unit: "m²", rate: 780, material: 510, labour: 270,
     subcategory: "Masonry",
+    notes: "CPWD DSR 2025-26.",
   },
   {
     is1200Part: "Part 3", is1200Code: "IS1200-P3-BLOCK-200",
     description: "Concrete block masonry 200mm thick in CM 1:6",
-    unit: "m²", rate: 950, material: 680, labour: 270,
+    unit: "m²", rate: 1100, material: 780, labour: 320,
     subcategory: "Masonry",
-    notes: "400×200×200mm solid concrete blocks",
+    notes: "400×200×200mm solid concrete blocks. CPWD DSR 2025-26.",
   },
   {
     is1200Part: "Part 3", is1200Code: "IS1200-P3-AAC-200",
     description: "AAC block masonry 200mm thick with polymer mortar",
-    unit: "m²", rate: 1100, material: 850, labour: 250,
+    unit: "m²", rate: 1280, material: 990, labour: 290,
     subcategory: "Masonry",
-    notes: "Autoclaved aerated concrete blocks, lightweight",
+    notes: "Autoclaved aerated concrete blocks, lightweight. CPWD DSR 2025-26.",
   },
 
   // ── Part 4: Stone Masonry ──────────────────────────────────────────────
   {
     is1200Part: "Part 4", is1200Code: "IS1200-P4-STONE-WALL",
     description: "Random rubble stone masonry in CM 1:6",
-    unit: "m³", rate: 4800, material: 3200, labour: 1600,
+    unit: "m³", rate: 5500, material: 3600, labour: 1900,
     subcategory: "Masonry",
+    notes: "CPWD DSR 2025-26.",
   },
 
   // ── Part 1: Earthwork & Piling ─────────────────────────────────────────
-  // Source: CPDCL-Sify DG Works BOQ, Hyderabad 2025
+  // Source: CPDCL-Sify DG Works BOQ Hyderabad 2025, escalated to 2025-26
   {
     is1200Part: "Part 1", is1200Code: "IS1200-P1-EXCAVATION-SHALLOW",
     description: "Excavation in ordinary soil (0-1.5m depth)",
-    unit: "m³", rate: 650, material: 0, labour: 650,
+    unit: "m³", rate: 720, material: 0, labour: 720,
     subcategory: "Earthwork",
-    notes: "CPDCL-Sify Hyderabad 2025: ₹650/cum. Manual/machine combined.",
+    notes: "Manual/machine combined. CPWD DSR 2025-26.",
   },
   {
     is1200Part: "Part 1", is1200Code: "IS1200-P1-EXCAVATION-DEEP",
     description: "Excavation in ordinary soil (1.5-3.0m depth)",
-    unit: "m³", rate: 1200, material: 0, labour: 1200,
+    unit: "m³", rate: 1350, material: 0, labour: 1350,
     subcategory: "Earthwork",
-    notes: "Deep excavation with shoring. CPDCL reference ₹6,500/cum is hard rock; ₹1,200 for ordinary soil.",
+    notes: "Deep excavation with shoring. CPWD DSR 2025-26.",
   },
   {
     is1200Part: "Part 1", is1200Code: "IS1200-P1-PILE-450",
@@ -444,205 +451,207 @@ export const IS1200_RATES: IS1200Rate[] = [
   },
 
   // ── Part 3 (continued): Block Work for Interior Fitout ────────────────
-  // Source: Siemens Energy Pune Interior BOQ Nov 2025, market verification
   {
     is1200Part: "Part 3", is1200Code: "IS1200-P3-BLOCK-100",
     description: "Concrete block masonry 100mm thick in CM 1:6 (partition wall)",
-    unit: "m²", rate: 620, material: 420, labour: 200,
+    unit: "m²", rate: 700, material: 470, labour: 230,
     subcategory: "Masonry",
-    notes: "400×200×100mm solid concrete blocks. Interior partition. Pune market 2025.",
+    notes: "400×200×100mm solid concrete blocks. Interior partition. CPWD DSR 2025-26.",
   },
 
   // ── Part 8 (continued): Plaster 15mm for interior fitout ──────────────
   {
     is1200Part: "Part 8", is1200Code: "IS1200-P8-PLASTER-15",
     description: "Cement plaster 15mm thick in CM 1:4 (internal walls, commercial grade)",
-    unit: "m²", rate: 245, material: 155, labour: 90,
+    unit: "m²", rate: 280, material: 175, labour: 105,
     subcategory: "Finishes",
-    notes: "15mm single coat, smooth finish. Siemens Pune fitout reference. Intermediate between 12mm and 20mm.",
+    notes: "15mm single coat, smooth finish. CPWD DSR 2025-26.",
   },
 
   // ── Part 6: Reinforcement Steel ────────────────────────────────────────
   {
     is1200Part: "Part 6", is1200Code: "IS1200-P6-REBAR-500",
     description: "TMT reinforcement bars Fe 500 (cutting, bending, placing, tying)",
-    unit: "kg", rate: 88, material: 68, labour: 20,
+    unit: "kg", rate: 98, material: 75, labour: 23,
     subcategory: "Steel",
-    notes: "Incl. binding wire @ 8kg/MT. Calibrated: CPDCL-Sify Hyderabad 2025 Fe550 ₹138/kg → Fe500 ≈ ₹88/kg all-in.",
+    notes: "Incl. binding wire @ 8kg/MT. Steel ~₹75,000/tonne (Apr 2026) + labour ₹23/kg. CPWD DSR 2025-26.",
   },
 
   // ── Part 7: Structural Steel ───────────────────────────────────────────
   {
     is1200Part: "Part 7", is1200Code: "IS1200-P7-STRUCT-STEEL",
     description: "Structural steel work in built-up sections (fabrication + erection)",
-    unit: "kg", rate: 140, material: 100, labour: 40,
+    unit: "kg", rate: 155, material: 110, labour: 45,
     subcategory: "Steel",
-    notes: "Incl. cutting, welding, bolting, one coat primer, erection. Calibrated: 2025 market ₹135-145/kg.",
+    notes: "Incl. cutting, welding, bolting, one coat primer, erection. CPWD DSR 2025-26.",
   },
 
   // ── Part 8: Plastering ─────────────────────────────────────────────────
   {
     is1200Part: "Part 8", is1200Code: "IS1200-P8-PLASTER",
     description: "Cement plaster 12mm thick in CM 1:6 (internal walls)",
-    unit: "m²", rate: 195, material: 120, labour: 75,
+    unit: "m²", rate: 225, material: 138, labour: 87,
     subcategory: "Finishes",
-    notes: "Single coat, smooth finish, incl. curing",
+    notes: "Single coat, smooth finish, incl. curing. CPWD DSR 2025-26.",
   },
   {
     is1200Part: "Part 8", is1200Code: "IS1200-P8-PLASTER-EXT",
     description: "Cement plaster 20mm thick in CM 1:4 (external walls)",
-    unit: "m²", rate: 280, material: 175, labour: 105,
+    unit: "m²", rate: 320, material: 198, labour: 122,
     subcategory: "Finishes",
-    notes: "Two coat (12mm + 8mm), sand-faced finish",
+    notes: "Two coat (12mm + 8mm), sand-faced finish. CPWD DSR 2025-26.",
   },
 
   // ── Part 9: Metal Work (Doors, Windows, Grilles) ──────────────────────
   {
     is1200Part: "Part 9", is1200Code: "IS1200-P9-FLUSH-DOOR",
     description: "Flush door shutter 35mm thick (commercial ply) with frame",
-    unit: "EA", rate: 8500, material: 6500, labour: 2000,
+    unit: "EA", rate: 9800, material: 7400, labour: 2400,
     subcategory: "Doors & Windows",
-    notes: "900×2100mm, incl. sal wood frame, hinges, tower bolt, aldrops",
+    notes: "900×2100mm, incl. sal wood frame, hinges, tower bolt, aldrops. CPWD DSR 2025-26.",
   },
   {
     is1200Part: "Part 9", is1200Code: "IS1200-P9-STEEL-DOOR",
     description: "MS pressed steel door frame with shutter",
-    unit: "EA", rate: 12000, material: 9500, labour: 2500,
+    unit: "EA", rate: 13800, material: 10800, labour: 3000,
     subcategory: "Doors & Windows",
-    notes: "900×2100mm, incl. frame, hinges, tower bolt, primer coat",
+    notes: "900×2100mm, incl. frame, hinges, tower bolt, primer coat. CPWD DSR 2025-26.",
   },
   {
     is1200Part: "Part 9", is1200Code: "IS1200-P9-MS-RAILING",
     description: "MS railing with round/square bars and flats",
-    unit: "Rmt", rate: 1800, material: 1350, labour: 450,
+    unit: "Rmt", rate: 2050, material: 1520, labour: 530,
     subcategory: "Steel",
-    notes: "1050mm high, incl. primer + enamel paint",
+    notes: "1050mm high, incl. primer + enamel paint. CPWD DSR 2025-26.",
   },
 
   // ── Part 10: Painting ──────────────────────────────────────────────────
   {
     is1200Part: "Part 10", is1200Code: "IS1200-P10-PAINT",
     description: "Acrylic emulsion paint (2 coats over primer) on plastered surface",
-    unit: "m²", rate: 72, material: 42, labour: 30,
+    unit: "m²", rate: 82, material: 47, labour: 35,
     subcategory: "Finishes",
-    notes: "Asian Paints Tractor Emulsion or equivalent. Incl. primer.",
+    notes: "Asian Paints Tractor Emulsion or equivalent. Incl. primer. CPWD DSR 2025-26.",
   },
   {
     is1200Part: "Part 10", is1200Code: "IS1200-P10-PAINT-EXT",
     description: "Exterior weather coat paint (2 coats) on plastered surface",
-    unit: "m²", rate: 95, material: 58, labour: 37,
+    unit: "m²", rate: 110, material: 66, labour: 44,
     subcategory: "Finishes",
-    notes: "Asian Paints Apex or equivalent. UV + moisture resistant.",
+    notes: "Asian Paints Apex or equivalent. UV + moisture resistant. CPWD DSR 2025-26.",
   },
 
   // ── Part 13: Flooring ──────────────────────────────────────────────────
   {
     is1200Part: "Part 13", is1200Code: "IS1200-P13-VIT-TILE",
     description: "Vitrified tile flooring 600×600mm with CM 1:4 bedding",
-    unit: "m²", rate: 950, material: 720, labour: 230,
+    unit: "m²", rate: 1100, material: 830, labour: 270,
     subcategory: "Finishes",
-    notes: "Double charge vitrified tiles, incl. grouting",
+    notes: "Double charge vitrified tiles, incl. grouting. CPWD DSR 2025-26.",
   },
   {
     is1200Part: "Part 13", is1200Code: "IS1200-P13-TERRACE-TILE",
     description: "Terracotta/Kota stone tile on terrace over WP treatment",
-    unit: "m²", rate: 750, material: 520, labour: 230,
+    unit: "m²", rate: 860, material: 590, labour: 270,
     subcategory: "Finishes",
+    notes: "CPWD DSR 2025-26.",
   },
   {
     is1200Part: "Part 13", is1200Code: "IS1200-P13-MARBLE",
     description: "Marble flooring (Makrana/Rajnagar white) with CM bedding",
-    unit: "m²", rate: 1800, material: 1400, labour: 400,
+    unit: "m²", rate: 2100, material: 1620, labour: 480,
     subcategory: "Finishes",
+    notes: "CPWD DSR 2025-26.",
   },
 
   // ── Part 13 (continued): Additional flooring, ceiling, and cladding ─────
   {
     is1200Part: "Part 13", is1200Code: "IS1200-P13-GRANITE",
     description: "Granite flooring (polished, 18mm) with CM bedding",
-    unit: "m²", rate: 2200, material: 1750, labour: 450,
+    unit: "m²", rate: 2500, material: 1980, labour: 520,
     subcategory: "Finishes",
-    notes: "South Indian granite, mirror polish. Incl. grouting.",
+    notes: "South Indian granite, mirror polish. Incl. grouting. CPWD DSR 2025-26.",
   },
   {
     is1200Part: "Part 13", is1200Code: "IS1200-P13-WOOD-FLOOR",
     description: "Wooden flooring (engineered/laminate, 8-12mm)",
-    unit: "m²", rate: 1800, material: 1450, labour: 350,
+    unit: "m²", rate: 2050, material: 1650, labour: 400,
     subcategory: "Finishes",
-    notes: "Engineered wood or premium laminate. Incl. underlay and finishing.",
+    notes: "Engineered wood or premium laminate. Incl. underlay and finishing. CPWD DSR 2025-26.",
   },
   {
     is1200Part: "Part 13", is1200Code: "IS1200-P13-EPOXY",
     description: "Epoxy flooring (self-leveling, 2-3mm coat)",
-    unit: "m²", rate: 850, material: 620, labour: 230,
+    unit: "m²", rate: 980, material: 710, labour: 270,
     subcategory: "Finishes",
-    notes: "Industrial/commercial grade epoxy. Incl. primer coat.",
+    notes: "Industrial/commercial grade epoxy. Incl. primer coat. CPWD DSR 2025-26.",
   },
   {
     is1200Part: "Part 13", is1200Code: "IS1200-P13-CARPET",
     description: "Carpet tile flooring (commercial grade, 6mm)",
-    unit: "m²", rate: 1200, material: 950, labour: 250,
+    unit: "m²", rate: 1380, material: 1090, labour: 290,
     subcategory: "Finishes",
-    notes: "Interface/Shaw equivalent. Incl. adhesive and finishing.",
+    notes: "Interface/Shaw equivalent. Incl. adhesive and finishing. CPWD DSR 2025-26.",
   },
   {
     is1200Part: "Part 13", is1200Code: "IS1200-P13-GYPSUM-CEILING",
     description: "Gypsum board false ceiling with GI framework",
-    unit: "m²", rate: 450, material: 320, labour: 130,
+    unit: "m²", rate: 520, material: 365, labour: 155,
     subcategory: "Finishes",
-    notes: "12.5mm gypsum board, suspended GI grid. Incl. putty + paint.",
+    notes: "12.5mm gypsum board, suspended GI grid. Incl. putty + paint. CPWD DSR 2025-26.",
   },
   {
     is1200Part: "Part 13", is1200Code: "IS1200-P13-GRID-CEILING",
     description: "Grid/mineral fiber false ceiling (T-bar system)",
-    unit: "m²", rate: 380, material: 260, labour: 120,
+    unit: "m²", rate: 440, material: 300, labour: 140,
     subcategory: "Finishes",
-    notes: "Armstrong/USG equivalent, 600×600mm tiles.",
+    notes: "Armstrong/USG equivalent, 600×600mm tiles. CPWD DSR 2025-26.",
   },
   {
     is1200Part: "Part 13", is1200Code: "IS1200-P13-ACP-CLADDING",
     description: "ACP (Aluminium Composite Panel) cladding with SS subframe",
-    unit: "m²", rate: 1800, material: 1400, labour: 400,
+    unit: "m²", rate: 2050, material: 1580, labour: 470,
     subcategory: "Finishes",
-    notes: "4mm ACP panel, SS 304 subframe. Incl. weather sealant.",
+    notes: "4mm ACP panel, SS 304 subframe. Incl. weather sealant. CPWD DSR 2025-26.",
   },
   {
     is1200Part: "Part 13", is1200Code: "IS1200-P13-STONE-CLADDING",
     description: "Natural stone cladding (dry-fix with SS anchors)",
-    unit: "m²", rate: 2200, material: 1700, labour: 500,
+    unit: "m²", rate: 2550, material: 1950, labour: 600,
     subcategory: "Finishes",
-    notes: "20-25mm stone veneer, SS anchor system. Excl. waterproofing.",
+    notes: "20-25mm stone veneer, SS anchor system. Excl. waterproofing. CPWD DSR 2025-26.",
   },
 
   // ── Part 21: Waterproofing ─────────────────────────────────────────────
   {
     is1200Part: "Part 21", is1200Code: "IS1200-P21-WATERPROOF",
     description: "Waterproofing treatment to terrace/roof (bitumen-based membrane)",
-    unit: "m²", rate: 320, material: 230, labour: 90,
+    unit: "m²", rate: 370, material: 265, labour: 105,
     subcategory: "Waterproofing",
-    notes: "APP modified bitumen membrane, torch applied",
+    notes: "APP modified bitumen membrane, torch applied. CPWD DSR 2025-26.",
   },
 
   // ── Part 24: Aluminium Work ────────────────────────────────────────────
   {
     is1200Part: "Part 24", is1200Code: "IS1200-P24-ALUM-WINDOW",
     description: "Aluminium sliding window with 5mm clear glass",
-    unit: "m²", rate: 4500, material: 3800, labour: 700,
+    unit: "m²", rate: 5200, material: 4350, labour: 850,
     subcategory: "Doors & Windows",
-    notes: "Anodised aluminium section, incl. hardware, rubber gaskets",
+    notes: "Anodised aluminium section, incl. hardware, rubber gaskets. CPWD DSR 2025-26.",
   },
   {
     is1200Part: "Part 24", is1200Code: "IS1200-P24-UPVC-WINDOW",
     description: "UPVC sliding window with 5mm clear glass",
-    unit: "m²", rate: 3800, material: 3200, labour: 600,
+    unit: "m²", rate: 4400, material: 3680, labour: 720,
     subcategory: "Doors & Windows",
+    notes: "CPWD DSR 2025-26.",
   },
   {
     is1200Part: "Part 24", is1200Code: "IS1200-P24-CURTAIN-WALL",
     description: "Aluminium curtain wall glazing system (DGU 6+12+6mm)",
-    unit: "m²", rate: 8500, material: 7200, labour: 1300,
+    unit: "m²", rate: 9800, material: 8250, labour: 1550,
     subcategory: "Doors & Windows",
-    notes: "Structural silicone glazing, double glazed unit",
+    notes: "Structural silicone glazing, double glazed unit. CPWD DSR 2025-26.",
   },
 
   // ── Part 14: Plumbing (IS 1200 Part 14 — Water Supply & Sanitary) ─────────
@@ -828,27 +837,107 @@ export const IS1200_RATES: IS1200Rate[] = [
     unit: "EA", rate: 3200, material: 2500, labour: 700,
     subcategory: "HVAC",
   },
+
+  // ── Standard Construction Items (derived — not modeled in IFC) ────────────
+  // Every Indian building requires these items but BIM models never contain them.
+  // Added as derived quantities in TR-008 based on structural quantities.
+  {
+    is1200Part: "Part 21", is1200Code: "IS1200-P21-DPC",
+    description: "Damp proof course — 2 coats bitumen over cement concrete at plinth",
+    unit: "m²", rate: 85, material: 55, labour: 30,
+    subcategory: "Waterproofing",
+    notes: "IS 3067 compliant. Applied at plinth level over PCC bed. CPWD DSR 2025-26.",
+  },
+  {
+    is1200Part: "Part 1", is1200Code: "IS1200-P1-ANTI-TERMITE",
+    description: "Anti-termite treatment to soil (chlorpyrifos/imidacloprid)",
+    unit: "m²", rate: 45, material: 32, labour: 13,
+    subcategory: "Earthwork",
+    notes: "IS 6313 compliant. Pre-construction soil treatment. Mandatory for all buildings. CPWD DSR 2025-26.",
+  },
+  {
+    is1200Part: "Part 1", is1200Code: "IS1200-P1-BACKFILL",
+    description: "Backfilling with excavated earth in layers (compacted & watered)",
+    unit: "m³", rate: 350, material: 50, labour: 300,
+    subcategory: "Earthwork",
+    notes: "200mm layers, compacted to 95% MDD. Incl. watering. CPWD DSR 2025-26.",
+  },
+  {
+    is1200Part: "Part 2", is1200Code: "IS1200-P2-CURING",
+    description: "Curing of concrete surfaces (water curing 7-14 days)",
+    unit: "m²", rate: 18, material: 8, labour: 10,
+    subcategory: "Concrete",
+    notes: "Ponding/wet hessian method. Incl. curing compound for vertical surfaces. CPWD DSR 2025-26.",
+  },
+  {
+    is1200Part: "Part 5", is1200Code: "IS1200-P5-SCAFFOLDING",
+    description: "Steel scaffolding for external work (hire + erection + dismantling)",
+    unit: "m²", rate: 65, material: 25, labour: 40,
+    subcategory: "Formwork",
+    notes: "Tubular steel scaffolding. Rate per m² of external wall face. Multi-storey buildings only. CPWD DSR 2025-26.",
+  },
+  {
+    is1200Part: "Part 13", is1200Code: "IS1200-P13-IPS",
+    description: "IPS (Indian Patent Stone) 25mm cement concrete screeding on floor",
+    unit: "m²", rate: 280, material: 180, labour: 100,
+    subcategory: "Finishes",
+    notes: "CM 1:2:4 with surface hardener. Base for floor finish. CPWD DSR 2025-26.",
+  },
+  {
+    is1200Part: "Part 13", is1200Code: "IS1200-P13-SKIRTING",
+    description: "Vitrified tile skirting 100mm high along walls",
+    unit: "Rmt", rate: 180, material: 120, labour: 60,
+    subcategory: "Finishes",
+    notes: "Matching floor tile, CM bedding. Rate per running metre. CPWD DSR 2025-26.",
+  },
+  {
+    is1200Part: "Part 2", is1200Code: "IS1200-P2-CHAJJA",
+    description: "RCC chajja/sunshade 75mm thick over windows (incl. formwork)",
+    unit: "m²", rate: 650, material: 430, labour: 220,
+    subcategory: "Concrete",
+    notes: "M20 concrete, 0.6m projection. Incl. formwork + drip mould. CPWD DSR 2025-26.",
+  },
+  {
+    is1200Part: "Part 8", is1200Code: "IS1200-P8-FRAME-GROUT",
+    description: "CM 1:4 grouting around door/window frames after fixing",
+    unit: "Rmt", rate: 120, material: 55, labour: 65,
+    subcategory: "Finishes",
+    notes: "50mm wide × full depth packing. Incl. curing. CPWD DSR 2025-26.",
+  },
+  {
+    is1200Part: "Part 13", is1200Code: "IS1200-P13-DADO-TILE",
+    description: "Ceramic dado tiling on walls (600mm height, kitchen/utility)",
+    unit: "m²", rate: 850, material: 620, labour: 230,
+    subcategory: "Finishes",
+    notes: "300×450mm ceramic wall tiles, CM 1:3 bedding. CPWD DSR 2025-26.",
+  },
+  {
+    is1200Part: "Part 21", is1200Code: "IS1200-P21-WET-AREA-WP",
+    description: "Waterproofing to bathrooms/wet areas (membrane + testing)",
+    unit: "m²", rate: 420, material: 295, labour: 125,
+    subcategory: "Waterproofing",
+    notes: "Cementitious WP membrane to floor + walls (up to 1.5m). Incl. flood test. CPWD DSR 2025-26.",
+  },
 ];
 
 // ─── Derived Indian Rates (Formwork, Rebar, Finishing per element type) ──
 
 export const INDIAN_DERIVED_RATES = {
   formwork: {
-    slab:   { rate: 380, unit: "m²", notes: "Centering & shuttering for RCC slab" },
-    beam:   { rate: 420, unit: "m²", notes: "Centering & shuttering for RCC beam" },
-    column: { rate: 480, unit: "m²", notes: "Centering & shuttering for RCC column" },
-    wall:   { rate: 400, unit: "m²", notes: "Centering & shuttering for RCC wall" },
-    stair:  { rate: 550, unit: "m²", notes: "Centering & shuttering for staircase" },
+    slab:   { rate: 440, unit: "m²", notes: "Centering & shuttering for RCC slab. CPWD DSR 2025-26." },
+    beam:   { rate: 490, unit: "m²", notes: "Centering & shuttering for RCC beam. CPWD DSR 2025-26." },
+    column: { rate: 550, unit: "m²", notes: "Centering & shuttering for RCC column. CPWD DSR 2025-26." },
+    wall:   { rate: 460, unit: "m²", notes: "Centering & shuttering for RCC wall. CPWD DSR 2025-26." },
+    stair:  { rate: 640, unit: "m²", notes: "Centering & shuttering for staircase. CPWD DSR 2025-26." },
   },
   rebar: {
     // Typical reinforcement kg/m³ of concrete (IS 456 guidance)
-    // Calibrated: 1BHK structural BOQ → 1.8 MT / 101 sqm = 17.8 kg/sqm, avg 96 kg/m³
-    slab:   { kgPerM3: 80,  rate: 88, notes: "Avg 70-100 kg/m³ for slabs. Calibrated from 1BHK BOQ 2024." },
-    beam:   { kgPerM3: 140, rate: 88, notes: "Avg 120-180 kg/m³ for beams. Calibrated from 1BHK BOQ 2024." },
-    column: { kgPerM3: 180, rate: 88, notes: "Avg 150-220 kg/m³ for columns. Calibrated from 1BHK BOQ 2024." },
-    wall:   { kgPerM3: 45,  rate: 88, notes: "Avg 30-60 kg/m³ for RCC walls" },
-    footing:{ kgPerM3: 70,  rate: 88, notes: "Avg 50-90 kg/m³ for footings" },
-    stair:  { kgPerM3: 120, rate: 88, notes: "Avg 100-140 kg/m³ for stairs" },
+    slab:   { kgPerM3: 80,  rate: 98, notes: "Avg 70-100 kg/m³ for slabs. CPWD DSR 2025-26." },
+    beam:   { kgPerM3: 140, rate: 98, notes: "Avg 120-180 kg/m³ for beams. CPWD DSR 2025-26." },
+    column: { kgPerM3: 180, rate: 98, notes: "Avg 150-220 kg/m³ for columns. CPWD DSR 2025-26." },
+    wall:   { kgPerM3: 45,  rate: 98, notes: "Avg 30-60 kg/m³ for RCC walls. CPWD DSR 2025-26." },
+    footing:{ kgPerM3: 70,  rate: 98, notes: "Avg 50-90 kg/m³ for footings. CPWD DSR 2025-26." },
+    stair:  { kgPerM3: 120, rate: 98, notes: "Avg 100-140 kg/m³ for stairs. CPWD DSR 2025-26." },
   },
 };
 

@@ -345,11 +345,95 @@ export function parseIFCText(text: string): TextParseResult {
   }
 
   // ── Extract materials ──
+  // Step 1: Parse all direct IfcMaterial entities
   const materialNames = new Map<number, string>();
   const matRegex = /^#(\d+)=\s*IFCMATERIAL\('([^']*)'/gmi;
   let matMatch;
   while ((matMatch = matRegex.exec(text)) !== null) {
     materialNames.set(parseInt(matMatch[1]), matMatch[2]);
+  }
+
+  // Step 2: Resolve composite material types so that materialNames
+  // maps LayerSet/ConstituentSet/ProfileSet/List IDs to actual material names.
+  // This enables the association lookup below to work for ALL material types.
+
+  // IfcMaterialLayer → layer material ref
+  const layerMatMap = new Map<number, string>();
+  const layerRegex = /^#(\d+)=\s*IFCMATERIALLAYER\(#(\d+)/gmi;
+  let lyrMatch;
+  while ((lyrMatch = layerRegex.exec(text)) !== null) {
+    const name = materialNames.get(parseInt(lyrMatch[2]));
+    if (name) layerMatMap.set(parseInt(lyrMatch[1]), name);
+  }
+
+  // IfcMaterialLayerSet → resolve to first layer's material
+  const layerSetRegex = /^#(\d+)=\s*IFCMATERIALLAYERSET\(\(([^)]+)\)/gmi;
+  let lsMatch;
+  while ((lsMatch = layerSetRegex.exec(text)) !== null) {
+    const layerRefs = [...lsMatch[2].matchAll(/#(\d+)/g)].map(m => parseInt(m[1]));
+    for (const lid of layerRefs) {
+      const name = layerMatMap.get(lid);
+      if (name) { materialNames.set(parseInt(lsMatch[1]), name); break; }
+    }
+  }
+
+  // IfcMaterialLayerSetUsage → redirect to layer set
+  const usageRegex = /^#(\d+)=\s*IFCMATERIALLAYERSETUSAGE\(#(\d+)/gmi;
+  let usageMatch;
+  while ((usageMatch = usageRegex.exec(text)) !== null) {
+    const name = materialNames.get(parseInt(usageMatch[2]));
+    if (name) materialNames.set(parseInt(usageMatch[1]), name);
+  }
+
+  // IfcMaterialConstituent → constituent material ref (Material is 3rd param)
+  const constMatMap = new Map<number, string>();
+  const constRegex = /^#(\d+)=\s*IFCMATERIALCONSTITUENT\([^,]*,[^,]*,#(\d+)/gmi;
+  let constMatch;
+  while ((constMatch = constRegex.exec(text)) !== null) {
+    const name = materialNames.get(parseInt(constMatch[2]));
+    if (name) constMatMap.set(parseInt(constMatch[1]), name);
+  }
+
+  // IfcMaterialConstituentSet → resolve to first constituent's material
+  const constSetRegex = /^#(\d+)=\s*IFCMATERIALCONSTITUENTSET\([^,]*,[^,]*,\(([^)]+)\)/gmi;
+  let csMatch;
+  while ((csMatch = constSetRegex.exec(text)) !== null) {
+    const constRefs = [...csMatch[2].matchAll(/#(\d+)/g)].map(m => parseInt(m[1]));
+    for (const cid of constRefs) {
+      const name = constMatMap.get(cid);
+      if (name) { materialNames.set(parseInt(csMatch[1]), name); break; }
+    }
+  }
+
+  // IfcMaterialProfile → profile material ref (Material is 3rd param)
+  const profMatMap = new Map<number, string>();
+  const profRegex = /^#(\d+)=\s*IFCMATERIALPROFILE\([^,]*,[^,]*,#(\d+)/gmi;
+  let profMatch;
+  while ((profMatch = profRegex.exec(text)) !== null) {
+    const name = materialNames.get(parseInt(profMatch[2]));
+    if (name) profMatMap.set(parseInt(profMatch[1]), name);
+  }
+
+  // IfcMaterialProfileSet → resolve to first profile's material
+  const profSetRegex = /^#(\d+)=\s*IFCMATERIALPROFILESET\([^,]*,[^,]*,\(([^)]+)\)/gmi;
+  let psMatch;
+  while ((psMatch = profSetRegex.exec(text)) !== null) {
+    const profRefs = [...psMatch[2].matchAll(/#(\d+)/g)].map(m => parseInt(m[1]));
+    for (const pid of profRefs) {
+      const name = profMatMap.get(pid);
+      if (name) { materialNames.set(parseInt(psMatch[1]), name); break; }
+    }
+  }
+
+  // IfcMaterialList → resolve to first material in list
+  const matListRegex = /^#(\d+)=\s*IFCMATERIALLIST\(\(([^)]+)\)\)/gmi;
+  let mlMatch;
+  while ((mlMatch = matListRegex.exec(text)) !== null) {
+    const matRefs = [...mlMatch[2].matchAll(/#(\d+)/g)].map(m => parseInt(m[1]));
+    for (const mid of matRefs) {
+      const name = materialNames.get(mid);
+      if (name) { materialNames.set(parseInt(mlMatch[1]), name); break; }
+    }
   }
 
   // Material associations: element → material

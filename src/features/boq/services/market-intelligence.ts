@@ -92,31 +92,32 @@ export interface MarketIntelligenceResult {
   fallbacks_used: number;
 }
 
-// ─── Static Fallback Rates (CPWD DSR 2024 — emergency parachute only) ──────
+// ─── Static Fallback Rates (CPWD DSR 2025-26 — emergency parachute only) ────
+// Updated April 2026. These are used ONLY when market intelligence fails entirely.
 
 const STATIC_FALLBACKS = {
   steel_per_tonne: {
-    value: 68000, unit: "₹/tonne",
-    source: "CPWD DSR 2024 (static fallback — may be outdated)", date: "2024-01",
+    value: 75000, unit: "₹/tonne",
+    source: "CPWD DSR 2025-26 (static fallback)", date: "2026-04",
     confidence: "LOW" as const, fallbackLevel: "national" as const,
   },
   cement_per_bag: {
-    value: 380, unit: "₹/bag (50kg)",
-    source: "CPWD DSR 2024 (static fallback — may be outdated)", date: "2024-01",
+    value: 420, unit: "₹/bag (50kg)",
+    source: "CPWD DSR 2025-26 (static fallback)", date: "2026-04",
     confidence: "LOW" as const, brand: "Generic OPC 53", fallbackLevel: "national" as const,
   },
   sand_per_cft: {
-    value: 55, unit: "₹/cft",
-    source: "CPWD DSR 2024 (static fallback — may be outdated)", date: "2024-01",
+    value: 70, unit: "₹/cft",
+    source: "CPWD DSR 2025-26 (static fallback)", date: "2026-04",
     confidence: "LOW" as const, type: "M-sand", fallbackLevel: "national" as const,
   },
   labor: {
-    mason:       { value: 800, unit: "₹/day", source: "CPWD DSR 2024 (static fallback)", date: "2024-01", confidence: "LOW" as const, fallbackLevel: "national" as const },
-    helper:      { value: 450, unit: "₹/day", source: "CPWD DSR 2024 (static fallback)", date: "2024-01", confidence: "LOW" as const, fallbackLevel: "national" as const },
-    carpenter:   { value: 900, unit: "₹/day", source: "CPWD DSR 2024 (static fallback)", date: "2024-01", confidence: "LOW" as const, fallbackLevel: "national" as const },
-    steelFixer:  { value: 750, unit: "₹/day", source: "CPWD DSR 2024 (static fallback)", date: "2024-01", confidence: "LOW" as const, fallbackLevel: "national" as const },
-    electrician: { value: 1000, unit: "₹/day", source: "CPWD DSR 2024 (static fallback)", date: "2024-01", confidence: "LOW" as const, fallbackLevel: "national" as const },
-    plumber:     { value: 850, unit: "₹/day", source: "CPWD DSR 2024 (static fallback)", date: "2024-01", confidence: "LOW" as const, fallbackLevel: "national" as const },
+    mason:       { value: 950, unit: "₹/day", source: "CPWD DSR 2025-26 (static fallback)", date: "2026-04", confidence: "LOW" as const, fallbackLevel: "national" as const },
+    helper:      { value: 580, unit: "₹/day", source: "CPWD DSR 2025-26 (static fallback)", date: "2026-04", confidence: "LOW" as const, fallbackLevel: "national" as const },
+    carpenter:   { value: 1050, unit: "₹/day", source: "CPWD DSR 2025-26 (static fallback)", date: "2026-04", confidence: "LOW" as const, fallbackLevel: "national" as const },
+    steelFixer:  { value: 900, unit: "₹/day", source: "CPWD DSR 2025-26 (static fallback)", date: "2026-04", confidence: "LOW" as const, fallbackLevel: "national" as const },
+    electrician: { value: 1150, unit: "₹/day", source: "CPWD DSR 2025-26 (static fallback)", date: "2026-04", confidence: "LOW" as const, fallbackLevel: "national" as const },
+    plumber:     { value: 1000, unit: "₹/day", source: "CPWD DSR 2025-26 (static fallback)", date: "2026-04", confidence: "LOW" as const, fallbackLevel: "national" as const },
   },
 };
 
@@ -148,6 +149,58 @@ async function setCachedResult(cacheKey: string, data: MarketIntelligenceResult)
     await redis.set(cacheKey, data, { ex: 82800 }); // 23 hours TTL
   } catch {
     // Non-fatal — caching is best-effort
+  }
+}
+
+// ─── Persistent Price Cache (Postgres via Prisma) ──────────────────────────
+// Survives Redis TTL expiry. Enables cross-user learning: once ANY user
+// fetches prices for Pune, ALL subsequent Pune BOQs benefit.
+
+async function persistToMaterialCache(result: MarketIntelligenceResult): Promise<void> {
+  try {
+    const { prisma } = await import("@/lib/db");
+    const now = new Date(result.fetched_at || Date.now());
+    const expiresAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000); // +30 days
+    const city = result.city || "";
+    const state = result.state || "";
+    if (!city || !state) return;
+
+    const entries: Array<{
+      materialCode: string; price: number; unit: string;
+      source: string; confidence: string;
+    }> = [
+      { materialCode: "steel_per_tonne", price: result.steel_per_tonne.value, unit: result.steel_per_tonne.unit, source: result.steel_per_tonne.source, confidence: result.steel_per_tonne.confidence },
+      { materialCode: "cement_per_bag", price: result.cement_per_bag.value, unit: result.cement_per_bag.unit, source: result.cement_per_bag.source, confidence: result.cement_per_bag.confidence },
+      { materialCode: "sand_per_cft", price: result.sand_per_cft.value, unit: result.sand_per_cft.unit, source: result.sand_per_cft.source, confidence: result.sand_per_cft.confidence },
+      { materialCode: "labor_mason", price: result.labor.mason.value, unit: result.labor.mason.unit, source: result.labor.mason.source, confidence: result.labor.mason.confidence },
+      { materialCode: "labor_helper", price: result.labor.helper.value, unit: result.labor.helper.unit, source: result.labor.helper.source, confidence: result.labor.helper.confidence },
+      { materialCode: "labor_carpenter", price: result.labor.carpenter.value, unit: result.labor.carpenter.unit, source: result.labor.carpenter.source, confidence: result.labor.carpenter.confidence },
+      { materialCode: "labor_electrician", price: result.labor.electrician.value, unit: result.labor.electrician.unit, source: result.labor.electrician.source, confidence: result.labor.electrician.confidence },
+      { materialCode: "labor_plumber", price: result.labor.plumber.value, unit: result.labor.plumber.unit, source: result.labor.plumber.source, confidence: result.labor.plumber.confidence },
+      { materialCode: "labor_steel_fixer", price: result.labor.steelFixer.value, unit: result.labor.steelFixer.unit, source: result.labor.steelFixer.source, confidence: result.labor.steelFixer.confidence },
+    ];
+
+    // Filter out static fallback entries (only persist live/partial data)
+    const liveEntries = entries.filter(e => e.confidence !== "LOW" || !e.source.includes("static fallback"));
+
+    if (liveEntries.length === 0) return;
+
+    // Batch create — fire-and-forget, non-blocking
+    await prisma.materialPriceCache.createMany({
+      data: liveEntries.map(e => ({
+        city,
+        state,
+        materialCode: e.materialCode,
+        price: e.price,
+        unit: e.unit,
+        source: e.source,
+        confidence: e.confidence,
+        fetchedAt: now,
+        expiresAt,
+      })),
+    });
+  } catch {
+    // Non-fatal — persistence is best-effort
   }
 }
 
@@ -345,29 +398,48 @@ Use the report_construction_prices tool to return your findings.`;
   // ── Primary: Claude Sonnet with web_search — SHORT prompt for speed ──
   // The long reasoning prompt was causing 40s+ timeouts on Vercel.
   // Web search results provide the context — no need for reasoning steps in prompt.
-  const webSearchPrompt = `Search for current construction material prices in ${city}, ${state}, India (${monthYear}).
+  const webSearchPrompt = `You MUST search the web before answering. Do NOT use your training data for prices — training data is stale and inaccurate.
+
+Search for current construction material prices in ${city}, ${state}, India (${monthYear}).
 Search: "TMT steel price ${city} ${state} today" and "cement price ${city} today".
-Then use the report_construction_prices tool with your findings.
+After searching, use the report_construction_prices tool with your findings.
 Building type: ${buildingType}. All benchmark values in INR per SQUARE METRE (m²), not sqft.
 Steel range: ₹52,000-78,000/tonne. Cement: ₹340-560/bag. Mason: ₹500-1200/day.`;
 
-  // ── Primary: Haiku + web_search (Sonnet times out on Vercel cold starts) ──
+  // ── Primary: Haiku + web_search (with 1 retry for transient failures) ──
+  // 45s timeout allows for 3 web searches (3-8s each) + reasoning (3-5s).
+  // Vercel maxDuration is 600s — plenty of headroom.
   try {
     const callStart = Date.now();
 
-    const ctrl1 = new AbortController();
-    const t1 = setTimeout(() => ctrl1.abort(), 20_000);
-    const resp = await client.messages.create({
-      model: "claude-haiku-4-5-20251001",
-      max_tokens: 2048,
-      tools: [
-        { type: "web_search_20250305", name: "web_search", max_uses: 3 },
-        priceTool,
-      ],
-      tool_choice: { type: "auto" },
-      messages: [{ role: "user", content: webSearchPrompt }],
-    }, { signal: ctrl1.signal });
-    clearTimeout(t1);
+    const makeWebSearchCall = async () => {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 45_000);
+      try {
+        return await client.messages.create({
+          model: "claude-haiku-4-5-20251001",
+          max_tokens: 2048,
+          tools: [
+            { type: "web_search_20250305", name: "web_search", max_uses: 3 },
+            priceTool,
+          ],
+          tool_choice: { type: "any" },
+          messages: [{ role: "user", content: webSearchPrompt }],
+        }, { signal: ctrl.signal });
+      } finally {
+        clearTimeout(timer);
+      }
+    };
+
+    // Try up to 2 attempts (initial + 1 retry with 3s backoff)
+    let resp;
+    try {
+      resp = await makeWebSearchCall();
+    } catch (firstErr) {
+      console.warn(`[TR-015] Attempt 1 failed (${firstErr instanceof Error ? firstErr.message : firstErr}), retrying in 3s...`);
+      await new Promise(r => setTimeout(r, 3000));
+      resp = await makeWebSearchCall();
+    }
 
     const callMs = Date.now() - callStart;
     for (const block of resp.content) {
@@ -392,7 +464,7 @@ Steel range: ₹52,000-78,000/tonne. Cement: ₹340-560/bag. Mason: ₹500-1200/
     try {
       const haikuStart = Date.now();
       const ctrl2 = new AbortController();
-      const t2 = setTimeout(() => ctrl2.abort(), 12_000);
+      const t2 = setTimeout(() => ctrl2.abort(), 25_000);
       const resp2 = await client.messages.create({
         model: "claude-haiku-4-5-20251001",
         max_tokens: 1024,
@@ -558,6 +630,8 @@ Steel range: ₹52,000-78,000/tonne. Cement: ₹340-560/bag. Mason: ₹500-1200/
   // ── Cache write (only if we got live data) ──
   if (result.agent_status !== "fallback") {
     setCachedResult(cacheKey, result).catch(() => {});
+    // Persist to Postgres for cross-user learning (survives Redis TTL)
+    persistToMaterialCache(result).catch(() => {});
   }
 
   return result;

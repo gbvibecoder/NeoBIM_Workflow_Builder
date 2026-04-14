@@ -12,6 +12,8 @@ import { IFCQualityCard } from "@/features/boq/components/IFCQualityCard";
 import { BOQTable } from "@/features/boq/components/BOQTable";
 import { NLSummary } from "@/features/boq/components/NLSummary";
 import { BOQFooter } from "@/features/boq/components/BOQFooter";
+import { ModelQualityCard } from "@/features/boq/components/ModelQualityCard";
+import { PricingSourceBanner } from "@/features/boq/components/PricingSourceBanner";
 import type { BOQData, PriceOverrides, RateOverride } from "@/features/boq/components/types";
 import { DEFAULT_PRICES, recalculateLines, computeTotals } from "@/features/boq/components/recalc-engine";
 
@@ -125,6 +127,18 @@ export function BOQVisualizerPage({ data, executionId }: BOQVisualizerPageProps)
       <BOQHeader data={data} onExportExcel={handleExportExcel} />
 
       <div className="flex flex-col gap-6 py-6">
+        {/* Transparency: Model Quality + Pricing Source */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 px-6">
+          {data.modelQualityReport && (
+            <ModelQualityCard report={data.modelQualityReport} />
+          )}
+          {data.pricingMetadata && (
+            <div className="flex flex-col justify-center">
+              <PricingSourceBanner metadata={data.pricingMetadata} />
+            </div>
+          )}
+        </div>
+
         {/* Hero Stats */}
         <HeroStats
           totalCost={recalcTotalProject}

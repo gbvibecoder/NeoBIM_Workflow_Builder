@@ -26,15 +26,47 @@ const SOURCE_BADGE: Record<SourceType, { label: string; color: string; bg: strin
   "provisional": { label: "Provisional", color: "#F59E0B", bg: "rgba(245,158,11,0.1)" },
 };
 
-function ConfidenceBadge({ confidence }: { confidence: number }) {
-  const level = confidence >= 80 ? "HIGH" : confidence >= 55 ? "MEDIUM" : "LOW";
-  const color = confidence >= 80 ? "#22C55E" : confidence >= 55 ? "#F59E0B" : "#EF4444";
+function ConfidenceBadge({ confidence, lineConfidence }: { confidence: number; lineConfidence?: BOQLineItem["lineConfidence"] }) {
+  const score = lineConfidence?.score ?? (confidence >= 80 ? "high" : confidence >= 55 ? "medium" : "low");
+  const label = score.toUpperCase();
+  const color = score === "high" ? "#22C55E" : score === "medium" ? "#F59E0B" : "#EF4444";
+  const factors = lineConfidence?.factors ?? [];
   return (
-    <span
-      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium"
-      style={{ background: `${color}15`, color }}
-    >
-      {level} {Math.round(confidence)}%
+    <span className="relative group/conf inline-flex items-center gap-1.5">
+      {/* Colored dot */}
+      <span
+        className="inline-block rounded-full shrink-0"
+        style={{ width: 8, height: 8, background: color, boxShadow: `0 0 4px ${color}40` }}
+      />
+      <span
+        className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium"
+        style={{ background: `${color}15`, color }}
+      >
+        {label}
+      </span>
+      {/* Tooltip on hover */}
+      {factors.length > 0 && (
+        <div
+          className="absolute bottom-full left-0 mb-2 hidden group-hover/conf:block z-50"
+          style={{
+            background: "rgba(12,12,20,0.96)",
+            border: "1px solid rgba(255,255,255,0.12)",
+            borderRadius: 8,
+            padding: "8px 10px",
+            width: 240,
+            boxShadow: "0 8px 24px rgba(0,0,0,0.5)",
+          }}
+        >
+          <div className="text-[10px] font-semibold mb-1.5" style={{ color }}>
+            {label} Confidence
+          </div>
+          {factors.map((f, i) => (
+            <div key={i} className="text-[10px] leading-[1.4]" style={{ color: "#B0B0C8", marginBottom: 2 }}>
+              • {f}
+            </div>
+          ))}
+        </div>
+      )}
     </span>
   );
 }
@@ -184,6 +216,28 @@ export function BOQTable({ lines, rateOverrides, onRateOverride }: BOQTableProps
         </select>
       </div>
 
+      {/* Confidence Summary Bar */}
+      {(() => {
+        const high = filtered.filter(l => (l.lineConfidence?.score ?? (l.confidence >= 80 ? "high" : l.confidence >= 55 ? "medium" : "low")) === "high").length;
+        const med = filtered.filter(l => (l.lineConfidence?.score ?? (l.confidence >= 80 ? "high" : l.confidence >= 55 ? "medium" : "low")) === "medium").length;
+        const low = filtered.length - high - med;
+        return (
+          <div
+            className="flex items-center justify-between px-5 py-2"
+            style={{ borderBottom: "1px solid rgba(255, 255, 255, 0.06)", background: "rgba(255,255,255,0.01)" }}
+          >
+            <div className="flex items-center gap-4 text-[10px]">
+              <span style={{ color: "#22C55E" }}>● {high} high</span>
+              <span style={{ color: "#F59E0B" }}>● {med} medium</span>
+              <span style={{ color: "#EF4444" }}>● {low} low</span>
+            </div>
+            <div className="flex items-center gap-4 text-[10px]" style={{ color: "#5C5C78" }}>
+              {filtered.length} of {lines.length} items shown
+            </div>
+          </div>
+        );
+      })()}
+
       {/* Table */}
       <div className="overflow-x-auto">
         <table className="w-full text-xs" style={{ minWidth: 900 }}>
@@ -332,7 +386,7 @@ export function BOQTable({ lines, rateOverrides, onRateOverride }: BOQTableProps
 
                   {/* Confidence */}
                   <td className="px-3 py-2.5">
-                    <ConfidenceBadge confidence={line.confidence} />
+                    <ConfidenceBadge confidence={line.confidence} lineConfidence={line.lineConfidence} />
                   </td>
                 </tr>
               );

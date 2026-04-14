@@ -42,8 +42,12 @@ export const handleTR007: NodeHandler = async (ctx) => {
     grossArea?: number; netArea?: number; openingArea?: number; totalVolume?: number;
     storey?: string; elementCount?: number;
     materialLayers?: Array<{name: string; thickness: number}>;
+    coveringType?: string; concreteGrade?: string;
+    isExternal?: boolean; ifcType?: string;
   }> = [];
   let parseSummary = "";
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let modelQuality: any = undefined; // Forwarded from parser for TR-008 transparency layer
 
   // Normalize IFC storey names — fixes typos like "Grond floor" → "Ground Floor"
   const normalizeStorey = (s: string): string => {
@@ -87,23 +91,30 @@ export const handleTR007: NodeHandler = async (ctx) => {
         materialLayers?: Array<{name: string; thickness: number}>;
         coveringType?: string;
         concreteGrade?: string;
+        isExternal?: boolean;
       }>();
 
       for (const division of parseResult.divisions) {
         for (const category of division.categories) {
           for (const element of category.elements) {
-            const coveringType = element.type === "IfcCovering" && (element as unknown as Record<string, unknown>).properties
-              ? String(((element as unknown as Record<string, unknown>).properties as Record<string, unknown>)?.PredefinedType ?? "")
+            const elProps = (element as unknown as Record<string, unknown>).properties as Record<string, unknown> | undefined;
+            const coveringType = element.type === "IfcCovering" && elProps
+              ? String(elProps?.PredefinedType ?? "")
               : "";
-            const key = `${element.type}${coveringType ? ":" + coveringType : ""}|${normalizeStorey(element.storey)}`;
-            const concreteGrade = (element as unknown as Record<string, unknown>).properties
-              ? String(((element as unknown as Record<string, unknown>).properties as Record<string, unknown>)?.concreteGrade ?? "")
+            // Split external vs internal walls into separate aggregation groups
+            const isExternal = elProps?.isExternal === true || (element.quantities as Record<string, unknown>)?.isExternal === true;
+            const isWallType = element.type === "IfcWall" || element.type === "IfcWallStandardCase";
+            const extSuffix = isWallType ? (isExternal ? "|ext" : "|int") : "";
+            const key = `${element.type}${coveringType ? ":" + coveringType : ""}|${normalizeStorey(element.storey)}${extSuffix}`;
+            const concreteGrade = elProps
+              ? String(elProps?.concreteGrade ?? "")
               : "";
             const existing = typeAggregates.get(key) || {
               count: 0, grossArea: 0, netArea: 0, openingArea: 0, volume: 0, length: 0,
               divisionName: division.name, storey: normalizeStorey(element.storey), elementType: element.type,
               coveringType,
               concreteGrade: concreteGrade || undefined,
+              isExternal: isWallType ? isExternal : undefined,
             };
             existing.count += element.quantities.count ?? 1;
             existing.grossArea += element.quantities.area?.gross ?? 0;
@@ -131,6 +142,8 @@ export const handleTR007: NodeHandler = async (ctx) => {
           const ctLabel: Record<string, string> = { FLOORING: "Flooring", CEILING: "Ceiling", CLADDING: "Cladding", ROOFING: "Roof Covering" };
           description = ctLabel[agg.coveringType] ?? `Covering (${agg.coveringType})`;
         }
+        if (agg.isExternal === true) description += " (External)";
+        else if (agg.isExternal === false) description += " (Internal)";
         let primaryQty: number;
         let unit: string;
         if (LINEAR_TYPES_P.has(agg.elementType) && agg.length > 0.5) {
@@ -152,10 +165,13 @@ export const handleTR007: NodeHandler = async (ctx) => {
           storey: agg.storey, elementCount: agg.count, materialLayers: agg.materialLayers,
           ...(agg.coveringType ? { coveringType: agg.coveringType } : {}),
           ...(agg.concreteGrade ? { concreteGrade: agg.concreteGrade } : {}),
+          ...(agg.isExternal !== undefined ? { isExternal: agg.isExternal } : {}),
+          ifcType: agg.elementType,
         });
       }
 
       parseSummary = `Parsed ${parseResult.summary?.processedElements ?? "?"} of ${parseResult.summary?.totalElements ?? "?"} elements from ${parseResult.summary?.buildingStoreys ?? "?"} storeys (${parseResult.meta?.ifcSchema ?? "IFC"}) — pre-parsed via R2 upload`;
+      modelQuality = (preParsed as Record<string, unknown>).modelQuality ?? undefined;
     } catch (preParseErr) {
       console.error("[TR-007] Failed to process pre-parsed result:", preParseErr);
       parseSummary = "⚠️ Pre-parsed IFC data was corrupted. Please re-upload the file.";
@@ -189,23 +205,30 @@ export const handleTR007: NodeHandler = async (ctx) => {
         materialLayers?: Array<{name: string; thickness: number}>;
         coveringType?: string;
         concreteGrade?: string;
+        isExternal?: boolean;
       }>();
 
       for (const division of parseResult.divisions) {
         for (const category of division.categories) {
           for (const element of category.elements) {
-            const coveringType = element.type === "IfcCovering" && (element as unknown as Record<string, unknown>).properties
-              ? String(((element as unknown as Record<string, unknown>).properties as Record<string, unknown>)?.PredefinedType ?? "")
+            const elProps = (element as unknown as Record<string, unknown>).properties as Record<string, unknown> | undefined;
+            const coveringType = element.type === "IfcCovering" && elProps
+              ? String(elProps?.PredefinedType ?? "")
               : "";
-            const concreteGradeInline = (element as unknown as Record<string, unknown>).properties
-              ? String(((element as unknown as Record<string, unknown>).properties as Record<string, unknown>)?.concreteGrade ?? "")
+            const concreteGradeInline = elProps
+              ? String(elProps?.concreteGrade ?? "")
               : "";
-            const key = `${element.type}${coveringType ? ":" + coveringType : ""}|${normalizeStorey(element.storey)}`;
+            // Split external vs internal walls into separate aggregation groups
+            const isExternal = elProps?.isExternal === true || (element.quantities as Record<string, unknown>)?.isExternal === true;
+            const isWallType = element.type === "IfcWall" || element.type === "IfcWallStandardCase";
+            const extSuffix = isWallType ? (isExternal ? "|ext" : "|int") : "";
+            const key = `${element.type}${coveringType ? ":" + coveringType : ""}|${normalizeStorey(element.storey)}${extSuffix}`;
             const existing = typeAggregates.get(key) || {
               count: 0, grossArea: 0, netArea: 0, openingArea: 0, volume: 0, length: 0,
               divisionName: division.name, storey: normalizeStorey(element.storey), elementType: element.type,
               coveringType,
               concreteGrade: concreteGradeInline || undefined,
+              isExternal: isWallType ? isExternal : undefined,
             };
             existing.count += element.quantities.count ?? 1;
             existing.grossArea += element.quantities.area?.gross ?? 0;
@@ -235,6 +258,8 @@ export const handleTR007: NodeHandler = async (ctx) => {
           const ctLabel: Record<string, string> = { FLOORING: "Flooring", CEILING: "Ceiling", CLADDING: "Cladding", ROOFING: "Roof Covering" };
           description = ctLabel[agg.coveringType] ?? `Covering (${agg.coveringType})`;
         }
+        if (agg.isExternal === true) description += " (External)";
+        else if (agg.isExternal === false) description += " (Internal)";
         // Railings and members: use length as primary quantity in Rmt
         let primaryQty: number;
         let unit: string;
@@ -277,10 +302,13 @@ export const handleTR007: NodeHandler = async (ctx) => {
           materialLayers: agg.materialLayers,
           ...(agg.coveringType ? { coveringType: agg.coveringType } : {}),
           ...(agg.concreteGrade ? { concreteGrade: agg.concreteGrade } : {}),
+          ...(agg.isExternal !== undefined ? { isExternal: agg.isExternal } : {}),
+          ifcType: agg.elementType,
         });
       }
 
       parseSummary = `Parsed ${parseResult.summary.processedElements} of ${parseResult.summary.totalElements} elements from ${parseResult.summary.buildingStoreys} storeys (${parseResult.meta.ifcSchema})`;
+      modelQuality = parseResult.modelQuality ?? undefined;
     } catch (parseError) {
       const errMsg = parseError instanceof Error ? parseError.message : String(parseError);
       console.error("[TR-007] IFC parsing failed:", errMsg);
@@ -426,6 +454,7 @@ export const handleTR007: NodeHandler = async (ctx) => {
         };
       })(),
       content: parseSummary,
+      ...(modelQuality && { _modelQuality: modelQuality }),
     },
     metadata: {
       model: "ifc-parser-v2",
