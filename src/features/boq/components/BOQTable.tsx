@@ -23,27 +23,34 @@ const TABS: { id: BOQFilterTab; label: string }[] = [
 ];
 
 const SOURCE_BADGE: Record<SourceType, { label: string; color: string; bg: string }> = {
-  "ifc-geometry": { label: "IFC Geometry", color: "#00F5FF", bg: "rgba(0,245,255,0.1)" },
-  "ifc-derived": { label: "IFC Derived", color: "#FFBF00", bg: "rgba(255,191,0,0.1)" },
-  "benchmark": { label: "Benchmark", color: "#9898B0", bg: "rgba(255,255,255,0.06)" },
-  "provisional": { label: "Provisional", color: "#F59E0B", bg: "rgba(245,158,11,0.1)" },
+  "ifc-geometry": { label: "IFC Geometry", color: "#0D9488", bg: "#F0FDFA" },
+  "ifc-derived": { label: "IFC Derived", color: "#D97706", bg: "#FFFBEB" },
+  "benchmark": { label: "Benchmark", color: "#6B7280", bg: "#F3F4F6" },
+  "provisional": { label: "Provisional", color: "#DC2626", bg: "#FEF2F2" },
+};
+
+const CONFIDENCE_THEME = {
+  HIGH: { bg: "#ECFDF5", color: "#059669" },
+  MEDIUM: { bg: "#FFFBEB", color: "#D97706" },
+  LOW: { bg: "#FEF2F2", color: "#DC2626" },
 };
 
 function ConfidenceBadge({ confidence, lineConfidence }: { confidence: number; lineConfidence?: BOQLineItem["lineConfidence"] }) {
   const score = lineConfidence?.score ?? getLineConfidenceScore(confidence);
-  const label = score.toUpperCase();
-  const color = getLineConfidenceColor(score);
+  const label = score.toUpperCase() as keyof typeof CONFIDENCE_THEME;
+  const _legacyColor = getLineConfidenceColor(score);
+  const theme = CONFIDENCE_THEME[label] ?? CONFIDENCE_THEME.LOW;
   const factors = lineConfidence?.factors ?? [];
   return (
     <span className="relative group/conf inline-flex items-center gap-1.5">
       {/* Colored dot */}
       <span
         className="inline-block rounded-full shrink-0"
-        style={{ width: 8, height: 8, background: color, boxShadow: `0 0 4px ${color}40` }}
+        style={{ width: 8, height: 8, background: theme.color }}
       />
       <span
-        className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium"
-        style={{ background: `${color}15`, color }}
+        className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold"
+        style={{ background: theme.bg, color: theme.color }}
       >
         {label}
       </span>
@@ -52,19 +59,19 @@ function ConfidenceBadge({ confidence, lineConfidence }: { confidence: number; l
         <div
           className="absolute bottom-full left-0 mb-2 hidden group-hover/conf:block z-50"
           style={{
-            background: "rgba(12,12,20,0.96)",
-            border: "1px solid rgba(255,255,255,0.12)",
+            background: "#FFFFFF",
+            border: "1px solid rgba(0,0,0,0.08)",
             borderRadius: 8,
             padding: "8px 10px",
             width: 240,
-            boxShadow: "0 8px 24px rgba(0,0,0,0.5)",
+            boxShadow: "0 10px 25px rgba(0,0,0,0.1), 0 4px 10px rgba(0,0,0,0.05)",
           }}
         >
-          <div className="text-[10px] font-semibold mb-1.5" style={{ color }}>
+          <div className="text-[10px] font-semibold mb-1.5" style={{ color: theme.color }}>
             {label} Confidence
           </div>
           {factors.map((f, i) => (
-            <div key={i} className="text-[10px] leading-[1.4]" style={{ color: "#B0B0C8", marginBottom: 2 }}>
+            <div key={i} className="text-[10px] leading-[1.4]" style={{ color: "#4B5563", marginBottom: 2 }}>
               • {f}
             </div>
           ))}
@@ -159,30 +166,31 @@ export function BOQTable({ lines, rateOverrides, onRateOverride, grandTotal: gra
 
   const SortIcon = ({ col }: { col: BOQSortKey }) => {
     if (sortKey !== col) return <ChevronDown size={12} style={{ opacity: 0.3 }} />;
-    return sortDir === "asc" ? <ChevronUp size={12} color="#00F5FF" /> : <ChevronDown size={12} color="#00F5FF" />;
+    return sortDir === "asc" ? <ChevronUp size={12} color="#0D9488" /> : <ChevronDown size={12} color="#0D9488" />;
   };
 
   return (
     <div
       className="mx-6 rounded-xl overflow-hidden"
       style={{
-        background: "rgba(255, 255, 255, 0.03)",
-        border: "1px solid rgba(255, 255, 255, 0.06)",
+        background: "#FFFFFF",
+        border: "1px solid rgba(0, 0, 0, 0.06)",
+        boxShadow: "0 4px 6px -1px rgba(0,0,0,0.05)",
       }}
     >
       {/* Hint + Tabs + Source Filter */}
       <div
         className="flex items-center justify-between px-5 py-3"
-        style={{ borderBottom: "1px solid rgba(255, 255, 255, 0.06)" }}
+        style={{ borderBottom: "1px solid rgba(0, 0, 0, 0.06)" }}
       >
         <div className="flex items-center gap-1.5 mr-3">
-          <Pencil size={9} color="#5C5C78" />
-          <span className="text-[10px]" style={{ color: "#5C5C78" }}>Click any Rate cell to override</span>
+          <Pencil size={9} color="#9CA3AF" />
+          <span className="text-[10px]" style={{ color: "#9CA3AF" }}>Click any Rate cell to override</span>
         </div>
       </div>
       <div
         className="flex items-center justify-between px-5 py-3"
-        style={{ borderBottom: "1px solid rgba(255, 255, 255, 0.06)" }}
+        style={{ borderBottom: "1px solid rgba(0, 0, 0, 0.06)" }}
       >
         <div className="flex items-center gap-1">
           {TABS.map((tab) => (
@@ -191,9 +199,9 @@ export function BOQTable({ lines, rateOverrides, onRateOverride, grandTotal: gra
               onClick={() => setActiveTab(tab.id)}
               className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200"
               style={{
-                background: activeTab === tab.id ? "rgba(0, 245, 255, 0.1)" : "transparent",
-                color: activeTab === tab.id ? "#00F5FF" : "#9898B0",
-                border: activeTab === tab.id ? "1px solid rgba(0, 245, 255, 0.25)" : "1px solid transparent",
+                background: activeTab === tab.id ? "#F0FDFA" : "transparent",
+                color: activeTab === tab.id ? "#0D9488" : "#9CA3AF",
+                border: activeTab === tab.id ? "1px solid rgba(13, 148, 136, 0.2)" : "1px solid transparent",
               }}
             >
               {tab.label}
@@ -207,9 +215,9 @@ export function BOQTable({ lines, rateOverrides, onRateOverride, grandTotal: gra
           onChange={(e) => setSourceFilter(e.target.value as SourceType | "all")}
           className="text-xs rounded-lg px-2.5 py-1.5 outline-none cursor-pointer"
           style={{
-            background: "rgba(255, 255, 255, 0.05)",
-            border: "1px solid rgba(255, 255, 255, 0.1)",
-            color: "#9898B0",
+            background: "#FFFFFF",
+            border: "1px solid rgba(0, 0, 0, 0.1)",
+            color: "#4B5563",
           }}
         >
           <option value="all">All Sources</option>
@@ -228,14 +236,32 @@ export function BOQTable({ lines, rateOverrides, onRateOverride, grandTotal: gra
         return (
           <div
             className="flex items-center justify-between px-5 py-2"
-            style={{ borderBottom: "1px solid rgba(255, 255, 255, 0.06)", background: "rgba(255,255,255,0.01)" }}
+            style={{ borderBottom: "1px solid rgba(0, 0, 0, 0.06)", background: "#F9FAFB" }}
           >
             <div className="flex items-center gap-4 text-[10px]">
-              <span style={{ color: "#22C55E" }}>● {high} high</span>
-              <span style={{ color: "#F59E0B" }}>● {med} medium</span>
-              <span style={{ color: "#EF4444" }}>● {low} low</span>
+              <span
+                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-medium"
+                style={{ background: CONFIDENCE_THEME.HIGH.bg, color: CONFIDENCE_THEME.HIGH.color }}
+              >
+                <span style={{ width: 6, height: 6, borderRadius: "50%", background: CONFIDENCE_THEME.HIGH.color, display: "inline-block" }} />
+                {high} high
+              </span>
+              <span
+                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-medium"
+                style={{ background: CONFIDENCE_THEME.MEDIUM.bg, color: CONFIDENCE_THEME.MEDIUM.color }}
+              >
+                <span style={{ width: 6, height: 6, borderRadius: "50%", background: CONFIDENCE_THEME.MEDIUM.color, display: "inline-block" }} />
+                {med} medium
+              </span>
+              <span
+                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-medium"
+                style={{ background: CONFIDENCE_THEME.LOW.bg, color: CONFIDENCE_THEME.LOW.color }}
+              >
+                <span style={{ width: 6, height: 6, borderRadius: "50%", background: CONFIDENCE_THEME.LOW.color, display: "inline-block" }} />
+                {low} low
+              </span>
             </div>
-            <div className="flex items-center gap-4 text-[10px]" style={{ color: "#5C5C78" }}>
+            <div className="flex items-center gap-4 text-[10px]" style={{ color: "#9CA3AF" }}>
               {filtered.length} of {lines.length} items shown
             </div>
           </div>
@@ -246,7 +272,7 @@ export function BOQTable({ lines, rateOverrides, onRateOverride, grandTotal: gra
       <div className="overflow-x-auto">
         <table className="w-full text-xs" style={{ minWidth: 900 }}>
           <thead>
-            <tr style={{ borderBottom: "1px solid rgba(255, 255, 255, 0.06)" }}>
+            <tr style={{ borderBottom: "1px solid rgba(0, 0, 0, 0.06)" }}>
               {[
                 { label: "IS Code", width: "w-24" },
                 { label: "Description", width: "flex-1", sortable: "description" as BOQSortKey },
@@ -259,8 +285,17 @@ export function BOQTable({ lines, rateOverrides, onRateOverride, grandTotal: gra
               ].map((col) => (
                 <th
                   key={col.label}
-                  className={`px-3 py-3 text-left font-medium ${col.width} ${col.sortable ? "cursor-pointer select-none" : ""}`}
-                  style={{ color: "#5C5C78" }}
+                  className={`px-3 py-3 text-left font-semibold ${col.width} ${col.sortable ? "cursor-pointer select-none" : ""}`}
+                  style={{
+                    color: "#9CA3AF",
+                    fontSize: 10,
+                    letterSpacing: "0.05em",
+                    textTransform: "uppercase",
+                    position: "sticky",
+                    top: 0,
+                    background: "#FFFFFF",
+                    zIndex: 10,
+                  }}
                   onClick={col.sortable ? () => toggleSort(col.sortable!) : undefined}
                 >
                   <span className="flex items-center gap-1">
@@ -282,37 +317,44 @@ export function BOQTable({ lines, rateOverrides, onRateOverride, grandTotal: gra
                   key={line.id}
                   className="group transition-colors duration-150"
                   style={{
-                    borderBottom: "1px solid rgba(255, 255, 255, 0.03)",
+                    borderBottom: "1px solid rgba(0, 0, 0, 0.04)",
                     opacity: rowsVisible ? 1 : 0,
                     transform: rowsVisible ? "translateY(0)" : "translateY(4px)",
-                    transition: `opacity 0.3s ease ${i * 20}ms, transform 0.3s ease ${i * 20}ms, background-color 0.15s`,
-                    backgroundColor: "transparent",
+                    transition: `opacity 0.3s ease ${i * 20}ms, transform 0.3s ease ${i * 20}ms, background-color 0.15s, border-left 0.15s`,
+                    backgroundColor: i % 2 === 1 ? "#F9FAFB" : "#FFFFFF",
+                    borderLeft: "3px solid transparent",
                   }}
-                  onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.02)"; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "transparent"; }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = "#F5F5F3";
+                    e.currentTarget.style.borderLeft = "3px solid #0D9488";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = i % 2 === 1 ? "#F9FAFB" : "#FFFFFF";
+                    e.currentTarget.style.borderLeft = "3px solid transparent";
+                  }}
                 >
                   {/* IS Code */}
-                  <td className="px-3 py-2.5" style={{ color: "#5C5C78", fontFamily: "var(--font-jetbrains, monospace)", fontSize: 10 }}>
-                    {line.isCode || "—"}
+                  <td className="px-3 py-2.5" style={{ color: "#9CA3AF", fontFamily: "var(--font-jetbrains, 'JetBrains Mono', monospace)", fontSize: 10 }}>
+                    {line.isCode || "\u2014"}
                   </td>
 
                   {/* Description */}
-                  <td className="px-3 py-2.5" style={{ color: "#F0F0F5" }}>
+                  <td className="px-3 py-2.5" style={{ color: "#1A1A1A" }}>
                     {line.description}
                     {line.storey && (
-                      <span className="ml-2 text-[10px]" style={{ color: "#5C5C78" }}>
+                      <span className="ml-2 text-[10px]" style={{ color: "#9CA3AF" }}>
                         {line.storey}
                       </span>
                     )}
                   </td>
 
                   {/* Unit */}
-                  <td className="px-3 py-2.5" style={{ color: "#9898B0" }}>
+                  <td className="px-3 py-2.5" style={{ color: "#4B5563" }}>
                     {line.unit}
                   </td>
 
                   {/* Qty */}
-                  <td className="px-3 py-2.5" style={{ color: "#F0F0F5", fontVariantNumeric: "tabular-nums" }}>
+                  <td className="px-3 py-2.5" style={{ color: "#1A1A1A", fontVariantNumeric: "tabular-nums" }}>
                     {line.adjustedQty.toLocaleString("en-IN", { maximumFractionDigits: 1 })}
                   </td>
 
@@ -330,17 +372,17 @@ export function BOQTable({ lines, rateOverrides, onRateOverride, grandTotal: gra
                           }}
                           className="w-16 px-1.5 py-0.5 rounded text-xs outline-none"
                           style={{
-                            background: "rgba(0, 245, 255, 0.1)",
-                            border: "1px solid rgba(0, 245, 255, 0.4)",
-                            color: "#F0F0F5",
+                            background: "#F0FDFA",
+                            border: "1px solid #0D9488",
+                            color: "#1A1A1A",
                           }}
                           autoFocus
                         />
                         <button onClick={() => confirmEdit(line)} className="p-0.5">
-                          <Check size={12} color="#22C55E" />
+                          <Check size={12} color="#059669" />
                         </button>
                         <button onClick={cancelEdit} className="p-0.5">
-                          <X size={12} color="#EF4444" />
+                          <X size={12} color="#DC2626" />
                         </button>
                       </div>
                     ) : (
@@ -350,20 +392,20 @@ export function BOQTable({ lines, rateOverrides, onRateOverride, grandTotal: gra
                           onClick={() => startEdit(line)}
                         >
                           {hasOverride && (
-                            <Pencil size={10} color="#00F5FF" className="shrink-0" />
+                            <Pencil size={10} color="#0D9488" className="shrink-0" />
                           )}
                           <span style={{
-                            color: hasOverride ? "#00F5FF" : "#F0F0F5",
+                            color: hasOverride ? "#0D9488" : "#1A1A1A",
                             fontVariantNumeric: "tabular-nums",
                           }}>
-                            ₹{(override?.newRate ?? line.unitRate).toLocaleString("en-IN", { maximumFractionDigits: 0 })}
+                            \u20B9{(override?.newRate ?? line.unitRate).toLocaleString("en-IN", { maximumFractionDigits: 0 })}
                           </span>
                           {hasOverride && (
-                            <span className="text-[10px] line-through" style={{ color: "#5C5C78" }}>
-                              ₹{line.unitRate.toLocaleString("en-IN", { maximumFractionDigits: 0 })}
+                            <span className="text-[10px] line-through" style={{ color: "#9CA3AF" }}>
+                              \u20B9{line.unitRate.toLocaleString("en-IN", { maximumFractionDigits: 0 })}
                             </span>
                           )}
-                          <Pencil size={10} color="#5C5C78" className="opacity-0 group-hover/rate:opacity-100 transition-opacity shrink-0" />
+                          <Pencil size={10} color="#9CA3AF" className="opacity-0 group-hover/rate:opacity-100 transition-opacity shrink-0" />
                         </div>
                       </ProvenanceTooltip>
                     )}
@@ -371,8 +413,8 @@ export function BOQTable({ lines, rateOverrides, onRateOverride, grandTotal: gra
 
                   {/* Amount */}
                   <td
-                    className="px-3 py-2.5 font-medium transition-colors duration-300"
-                    style={{ color: "#F0F0F5", fontVariantNumeric: "tabular-nums" }}
+                    className="px-3 py-2.5 font-bold transition-colors duration-300"
+                    style={{ color: "#1A1A1A", fontVariantNumeric: "tabular-nums" }}
                   >
                     {formatINRFull(line.totalCost)}
                   </td>
@@ -380,7 +422,7 @@ export function BOQTable({ lines, rateOverrides, onRateOverride, grandTotal: gra
                   {/* Source */}
                   <td className="px-3 py-2.5">
                     <span
-                      className="inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium"
+                      className="inline-flex px-1.5 py-0.5 rounded-full text-[10px] font-medium"
                       style={{
                         background: SOURCE_BADGE[line.source].bg,
                         color: SOURCE_BADGE[line.source].color,
@@ -401,17 +443,17 @@ export function BOQTable({ lines, rateOverrides, onRateOverride, grandTotal: gra
             {/* Grand Total Row */}
             <tr
               style={{
-                borderTop: "2px solid rgba(0, 245, 255, 0.2)",
-                background: "rgba(0, 245, 255, 0.03)",
+                borderTop: "2px solid rgba(13, 148, 136, 0.2)",
+                background: "#F0FDFA",
               }}
             >
-              <td className="px-3 py-3 font-bold" style={{ color: "#00F5FF" }}>
+              <td className="px-3 py-3 font-bold" style={{ color: "#0D9488" }}>
                 TOTAL
               </td>
-              <td colSpan={4} className="px-3 py-3" style={{ color: "#9898B0" }}>
+              <td colSpan={4} className="px-3 py-3" style={{ color: "#4B5563" }}>
                 {filtered.length} line items
               </td>
-              <td className="px-3 py-3 font-bold" style={{ color: "#00F5FF", fontVariantNumeric: "tabular-nums" }}>
+              <td className="px-3 py-3 font-bold" style={{ color: "#0D9488", fontVariantNumeric: "tabular-nums" }}>
                 {formatINRFull(grandTotal)}
               </td>
               <td colSpan={2} />
@@ -424,10 +466,10 @@ export function BOQTable({ lines, rateOverrides, onRateOverride, grandTotal: gra
       {totalPages > 1 && (
         <div
           className="flex items-center justify-between px-5 py-3"
-          style={{ borderTop: "1px solid rgba(255, 255, 255, 0.06)" }}
+          style={{ borderTop: "1px solid rgba(0, 0, 0, 0.06)" }}
         >
-          <span className="text-xs" style={{ color: "#5C5C78" }}>
-            Showing {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, sorted.length)} of {sorted.length}
+          <span className="text-xs" style={{ color: "#9CA3AF" }}>
+            Showing {page * PAGE_SIZE + 1}\u2013{Math.min((page + 1) * PAGE_SIZE, sorted.length)} of {sorted.length}
           </span>
           <div className="flex items-center gap-2">
             <button
@@ -435,13 +477,13 @@ export function BOQTable({ lines, rateOverrides, onRateOverride, grandTotal: gra
               disabled={page === 0}
               className="flex items-center justify-center w-7 h-7 rounded-lg transition-all"
               style={{
-                background: page === 0 ? "transparent" : "rgba(255,255,255,0.05)",
-                border: "1px solid rgba(255,255,255,0.08)",
+                background: page === 0 ? "transparent" : "#F9FAFB",
+                border: "1px solid rgba(0,0,0,0.08)",
                 opacity: page === 0 ? 0.3 : 1,
                 cursor: page === 0 ? "default" : "pointer",
               }}
             >
-              <ChevronLeft size={14} color="#9898B0" />
+              <ChevronLeft size={14} color="#4B5563" />
             </button>
             {Array.from({ length: Math.min(totalPages, 7) }, (_, i) => {
               const pageNum = totalPages <= 7 ? i : Math.max(0, Math.min(page - 3, totalPages - 7)) + i;
@@ -451,9 +493,9 @@ export function BOQTable({ lines, rateOverrides, onRateOverride, grandTotal: gra
                   onClick={() => setPage(pageNum)}
                   className="w-7 h-7 rounded-lg text-xs font-medium transition-all"
                   style={{
-                    background: page === pageNum ? "rgba(0, 245, 255, 0.15)" : "transparent",
-                    color: page === pageNum ? "#00F5FF" : "#9898B0",
-                    border: page === pageNum ? "1px solid rgba(0, 245, 255, 0.3)" : "1px solid transparent",
+                    background: page === pageNum ? "#F0FDFA" : "transparent",
+                    color: page === pageNum ? "#0D9488" : "#9CA3AF",
+                    border: page === pageNum ? "1px solid rgba(13, 148, 136, 0.25)" : "1px solid transparent",
                   }}
                 >
                   {pageNum + 1}
@@ -465,13 +507,13 @@ export function BOQTable({ lines, rateOverrides, onRateOverride, grandTotal: gra
               disabled={page >= totalPages - 1}
               className="flex items-center justify-center w-7 h-7 rounded-lg transition-all"
               style={{
-                background: page >= totalPages - 1 ? "transparent" : "rgba(255,255,255,0.05)",
-                border: "1px solid rgba(255,255,255,0.08)",
+                background: page >= totalPages - 1 ? "transparent" : "#F9FAFB",
+                border: "1px solid rgba(0,0,0,0.08)",
                 opacity: page >= totalPages - 1 ? 0.3 : 1,
                 cursor: page >= totalPages - 1 ? "default" : "pointer",
               }}
             >
-              <ChevronRight size={14} color="#9898B0" />
+              <ChevronRight size={14} color="#4B5563" />
             </button>
           </div>
         </div>

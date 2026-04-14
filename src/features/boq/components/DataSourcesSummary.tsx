@@ -30,49 +30,50 @@ export function DataSourcesSummary({ data }: DataSourcesSummaryProps) {
     <div
       className="rounded-xl p-5"
       style={{
-        background: "rgba(255, 255, 255, 0.03)",
-        border: "1px solid rgba(255, 255, 255, 0.06)",
+        background: "#FFFFFF",
+        border: "1px solid rgba(0, 0, 0, 0.06)",
+        boxShadow: "0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -2px rgba(0,0,0,0.03)",
       }}
     >
       <div className="flex items-center gap-2 mb-4">
-        <Database size={14} color="#00F5FF" />
-        <h3 className="text-sm font-semibold" style={{ color: "#F0F0F5" }}>Data Sources</h3>
+        <Database size={14} color="#0D9488" />
+        <h3 className="text-sm font-semibold" style={{ color: "#1A1A1A" }}>Data Sources</h3>
       </div>
 
       {/* Source breakdown bar */}
-      <div className="h-2 rounded-full overflow-hidden flex mb-3" style={{ background: "rgba(255,255,255,0.04)" }}>
+      <div className="h-2 rounded-full overflow-hidden flex mb-3" style={{ background: "#F3F4F6" }}>
         {livePercent > 0 && (
-          <div style={{ width: `${livePercent}%`, background: "#22C55E" }} title={`IFC Measured: ${livePercent}%`} />
+          <div style={{ width: `${livePercent}%`, background: "#0D9488" }} title={`IFC Measured: ${livePercent}%`} />
         )}
         {benchmarkPercent > 0 && (
-          <div style={{ width: `${benchmarkPercent}%`, background: "#F59E0B" }} title={`Benchmark: ${benchmarkPercent}%`} />
+          <div style={{ width: `${benchmarkPercent}%`, background: "#D97706" }} title={`Benchmark: ${benchmarkPercent}%`} />
         )}
         {provisionalPercent > 0 && (
-          <div style={{ width: `${provisionalPercent}%`, background: "#EF4444" }} title={`Provisional: ${provisionalPercent}%`} />
+          <div style={{ width: `${provisionalPercent}%`, background: "#DC2626" }} title={`Provisional: ${provisionalPercent}%`} />
         )}
       </div>
 
       {/* Legend */}
       <div className="flex flex-wrap gap-x-4 gap-y-1 mb-4">
         <span className="flex items-center gap-1.5 text-[10px]">
-          <span className="w-2 h-2 rounded-full" style={{ background: "#22C55E" }} />
-          <span style={{ color: "#9898B0" }}>IFC Measured {livePercent}%</span>
+          <span className="w-2 h-2 rounded-full" style={{ background: "#0D9488" }} />
+          <span style={{ color: "#4B5563" }}>IFC Measured {livePercent}%</span>
         </span>
         <span className="flex items-center gap-1.5 text-[10px]">
-          <span className="w-2 h-2 rounded-full" style={{ background: "#F59E0B" }} />
-          <span style={{ color: "#9898B0" }}>Benchmark {benchmarkPercent}%</span>
+          <span className="w-2 h-2 rounded-full" style={{ background: "#D97706" }} />
+          <span style={{ color: "#4B5563" }}>Benchmark {benchmarkPercent}%</span>
         </span>
         <span className="flex items-center gap-1.5 text-[10px]">
-          <span className="w-2 h-2 rounded-full" style={{ background: "#EF4444" }} />
-          <span style={{ color: "#9898B0" }}>Provisional {provisionalPercent}%</span>
+          <span className="w-2 h-2 rounded-full" style={{ background: "#DC2626" }} />
+          <span style={{ color: "#4B5563" }}>Provisional {provisionalPercent}%</span>
         </span>
       </div>
 
       {/* Pricing & AACE */}
       <div className="flex flex-col gap-2">
         <div className="flex items-center gap-2">
-          <Wifi size={10} color={pricingSource === "market_intelligence" ? "#22C55E" : pricingSource === "mixed" ? "#F59E0B" : "#9898B0"} />
-          <span className="text-[10px]" style={{ color: "#9898B0" }}>
+          <Wifi size={10} color={pricingSource === "market_intelligence" ? "#059669" : pricingSource === "mixed" ? "#D97706" : "#9CA3AF"} />
+          <span className="text-[10px]" style={{ color: "#4B5563" }}>
             Pricing: {pricingSource === "market_intelligence" ? "Live Market Intelligence" : pricingSource === "mixed" ? "Mixed (live + static)" : "CPWD Static Rates"}
             {marketStatus === "success" && " ✓"}
             {city && ` — ${city}`}
@@ -80,27 +81,27 @@ export function DataSourcesSummary({ data }: DataSourcesSummaryProps) {
           </span>
         </div>
         <div className="flex items-center gap-2 group relative">
-          <FileText size={10} color="#00F5FF" />
-          <span className="text-[10px] font-medium" style={{ color: "#00F5FF" }}>
+          <FileText size={10} color="#0D9488" />
+          <span className="text-[10px] font-medium" style={{ color: "#0D9488" }}>
             {aaceClass}
           </span>
-          <Info size={8} color="#5C5C78" />
+          <Info size={8} color="#9CA3AF" />
           {/* AACE tooltip */}
           <div
             className="absolute bottom-full left-0 mb-2 hidden group-hover:block z-50"
             style={{
-              background: "rgba(12,12,20,0.96)",
-              border: "1px solid rgba(255,255,255,0.12)",
+              background: "#FFFFFF",
+              border: "1px solid rgba(0, 0, 0, 0.06)",
               borderRadius: 8,
               padding: "8px 10px",
               width: 280,
-              boxShadow: "0 8px 24px rgba(0,0,0,0.5)",
+              boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
             }}
           >
-            <div className="text-[10px] font-semibold mb-1" style={{ color: "#00F5FF" }}>
+            <div className="text-[10px] font-semibold mb-1" style={{ color: "#0D9488" }}>
               {aaceClass} Estimate
             </div>
-            <div className="text-[10px] leading-relaxed" style={{ color: "#B0B0C8" }}>
+            <div className="text-[10px] leading-relaxed" style={{ color: "#4B5563" }}>
               {aaceDesc}
             </div>
           </div>
@@ -109,7 +110,7 @@ export function DataSourcesSummary({ data }: DataSourcesSummaryProps) {
         {/* Uncertainty */}
         {data.costRange && data.costRange.uncertaintyPercent > 0 && (
           <div className="flex items-center gap-2">
-            <span className="text-[10px]" style={{ color: "#5C5C78" }}>
+            <span className="text-[10px]" style={{ color: "#9CA3AF" }}>
               Estimate uncertainty: ±{data.costRange.uncertaintyPercent}% — {data.lines.length} line items
             </span>
           </div>

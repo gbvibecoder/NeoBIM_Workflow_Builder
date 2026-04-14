@@ -11,16 +11,16 @@ export function SectionFallback({ section }: SectionFallbackProps) {
     <div
       className="mx-6 rounded-xl p-6 flex items-center gap-4"
       style={{
-        background: "rgba(239, 68, 68, 0.05)",
-        border: "1px solid rgba(239, 68, 68, 0.15)",
+        background: "#FEF2F2",
+        border: "1px solid rgba(220, 38, 38, 0.12)",
       }}
     >
-      <AlertTriangle size={18} color="#EF4444" className="shrink-0" />
+      <AlertTriangle size={18} color="#DC2626" className="shrink-0" />
       <div className="flex-1">
-        <p className="text-xs font-medium" style={{ color: "#EF4444" }}>
+        <p className="text-xs font-medium" style={{ color: "#DC2626" }}>
           {section} failed to render
         </p>
-        <p className="text-[10px] mt-0.5" style={{ color: "#9898B0" }}>
+        <p className="text-[10px] mt-0.5" style={{ color: "#4B5563" }}>
           Other sections are unaffected. Try reloading the page.
         </p>
       </div>
@@ -28,9 +28,9 @@ export function SectionFallback({ section }: SectionFallbackProps) {
         onClick={() => window.location.reload()}
         className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs transition-all"
         style={{
-          background: "rgba(255, 255, 255, 0.05)",
-          border: "1px solid rgba(255, 255, 255, 0.1)",
-          color: "#9898B0",
+          background: "#FFFFFF",
+          border: "1px solid rgba(0, 0, 0, 0.12)",
+          color: "#4B5563",
         }}
       >
         <RotateCcw size={10} />

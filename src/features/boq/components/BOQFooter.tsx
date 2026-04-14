@@ -11,9 +11,9 @@ interface BOQFooterProps {
 
 export function BOQFooter({ disclaimer, onExportExcel, onExportPDF, onExportCSV }: BOQFooterProps) {
   const buttons = [
-    { label: "Excel", icon: Table2, color: "#22C55E", onClick: onExportExcel },
-    { label: "PDF", icon: FileText, color: "#EF4444", onClick: onExportPDF },
-    { label: "CSV", icon: Download, color: "#00F5FF", onClick: onExportCSV },
+    { label: "Excel", icon: Table2, color: "#0D9488", bg: "rgba(13, 148, 136, 0.08)", borderColor: "rgba(13, 148, 136, 0.2)", hoverBg: "rgba(13, 148, 136, 0.14)", onClick: onExportExcel },
+    { label: "PDF", icon: FileText, color: "#DC2626", bg: "rgba(220, 38, 38, 0.06)", borderColor: "rgba(220, 38, 38, 0.15)", hoverBg: "rgba(220, 38, 38, 0.10)", onClick: onExportPDF },
+    { label: "CSV", icon: Download, color: "#2563EB", bg: "rgba(37, 99, 235, 0.06)", borderColor: "rgba(37, 99, 235, 0.15)", hoverBg: "rgba(37, 99, 235, 0.10)", onClick: onExportCSV },
   ];
 
   return (
@@ -22,18 +22,18 @@ export function BOQFooter({ disclaimer, onExportExcel, onExportPDF, onExportCSV 
       <div
         className="rounded-xl px-5 py-4 mb-4"
         style={{
-          background: "rgba(255, 255, 255, 0.02)",
-          border: "1px solid rgba(255, 255, 255, 0.04)",
+          background: "#F9FAFB",
+          border: "1px solid rgba(0, 0, 0, 0.06)",
         }}
       >
-        <p className="text-[10px] leading-relaxed" style={{ color: "#5C5C78" }}>
+        <p className="text-[10px] leading-relaxed" style={{ color: "#4B5563" }}>
           {disclaimer}
         </p>
       </div>
 
       {/* Export buttons + Attribution */}
       <div className="flex items-center justify-between">
-        <span className="text-[10px]" style={{ color: "#3A3A50" }}>
+        <span className="text-[10px]" style={{ color: "#9CA3AF" }}>
           Prepared by BuildFlow &middot; trybuildflow.in
         </span>
 
@@ -44,16 +44,16 @@ export function BOQFooter({ disclaimer, onExportExcel, onExportPDF, onExportCSV 
               onClick={btn.onClick}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200"
               style={{
-                background: `${btn.color}10`,
-                border: `1px solid ${btn.color}30`,
+                background: btn.bg,
+                border: `1px solid ${btn.borderColor}`,
                 color: btn.color,
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.background = `${btn.color}20`;
-                e.currentTarget.style.boxShadow = `0 0 12px ${btn.color}15`;
+                e.currentTarget.style.background = btn.hoverBg;
+                e.currentTarget.style.boxShadow = `0 2px 8px ${btn.borderColor}`;
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.background = `${btn.color}10`;
+                e.currentTarget.style.background = btn.bg;
                 e.currentTarget.style.boxShadow = "none";
               }}
             >

@@ -10,9 +10,9 @@ interface CostDonutChartProps {
 }
 
 const SEGMENTS = [
-  { key: "material", label: "Material", color: "#00F5FF" },
-  { key: "labor", label: "Labour", color: "#B87333" },
-  { key: "equipment", label: "Equipment", color: "#FFBF00" },
+  { key: "material", label: "Material", color: "#0D9488" },
+  { key: "labor", label: "Labour", color: "#D97706" },
+  { key: "equipment", label: "Equipment", color: "#7C3AED" },
 ] as const;
 
 export function CostDonutChart({ material, labor, equipment }: CostDonutChartProps) {
@@ -62,11 +62,12 @@ export function CostDonutChart({ material, labor, equipment }: CostDonutChartPro
     <div
       className="rounded-xl p-5"
       style={{
-        background: "rgba(255, 255, 255, 0.03)",
-        border: "1px solid rgba(255, 255, 255, 0.06)",
+        background: "#FFFFFF",
+        border: "1px solid rgba(0, 0, 0, 0.06)",
+        boxShadow: "0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -2px rgba(0,0,0,0.03)",
       }}
     >
-      <h3 className="text-sm font-semibold mb-4" style={{ color: "#F0F0F5" }}>
+      <h3 className="text-sm font-semibold mb-4" style={{ color: "#1A1A1A" }}>
         Cost Breakdown
       </h3>
 
@@ -78,7 +79,7 @@ export function CostDonutChart({ material, labor, equipment }: CostDonutChartPro
             <circle
               cx={cx} cy={cy} r={r}
               fill="none"
-              stroke="rgba(255,255,255,0.04)"
+              stroke="#F3F4F6"
               strokeWidth={strokeWidth}
             />
             {/* Segments */}
@@ -94,7 +95,7 @@ export function CostDonutChart({ material, labor, equipment }: CostDonutChartPro
                 transform={`rotate(${arc.rotation} ${cx} ${cy})`}
                 style={{
                   transition: "stroke-width 0.2s ease, stroke-dasharray 0.4s ease",
-                  filter: hoveredSegment === arc.key ? `drop-shadow(0 0 8px ${arc.color}60)` : "none",
+                  filter: hoveredSegment === arc.key ? `drop-shadow(0 0 6px ${arc.color}30)` : "none",
                   cursor: "pointer",
                 }}
                 onMouseEnter={() => setHoveredSegment(arc.key)}
@@ -105,8 +106,8 @@ export function CostDonutChart({ material, labor, equipment }: CostDonutChartPro
 
           {/* Center text */}
           <div className="absolute inset-0 flex flex-col items-center justify-center">
-            <span className="text-[10px]" style={{ color: "#5C5C78" }}>Total</span>
-            <span className="text-sm font-bold" style={{ color: "#F0F0F5", fontVariantNumeric: "tabular-nums" }}>
+            <span className="text-[10px]" style={{ color: "#9CA3AF" }}>Total</span>
+            <span className="text-sm font-bold" style={{ color: "#1A1A1A", fontVariantNumeric: "tabular-nums", fontFamily: "Georgia, 'Times New Roman', serif" }}>
               {formatINR(total)}
             </span>
           </div>
@@ -125,14 +126,14 @@ export function CostDonutChart({ material, labor, equipment }: CostDonutChartPro
               onMouseLeave={() => setHoveredSegment(null)}
             >
               <div
-                className="w-2.5 h-2.5 rounded-sm shrink-0"
+                className="w-2.5 h-2.5 rounded-full shrink-0"
                 style={{ background: arc.color }}
               />
               <div className="flex flex-col flex-1 min-w-0">
-                <span className="text-xs font-medium" style={{ color: "#F0F0F5" }}>
+                <span className="text-xs font-medium" style={{ color: "#4B5563" }}>
                   {arc.label}
                 </span>
-                <span className="text-[10px]" style={{ color: "#5C5C78" }}>
+                <span className="text-[10px]" style={{ color: "#9CA3AF" }}>
                   {formatINR(arc.value)}
                 </span>
               </div>

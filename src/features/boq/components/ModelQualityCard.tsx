@@ -9,11 +9,11 @@ interface ModelQualityCardProps {
 }
 
 const GRADE_CONFIG = {
-  A: { color: "#22C55E", label: "Excellent", bg: "rgba(34,197,94,0.08)", border: "rgba(34,197,94,0.2)" },
-  B: { color: "#3B82F6", label: "Good", bg: "rgba(59,130,246,0.08)", border: "rgba(59,130,246,0.2)" },
-  C: { color: "#F59E0B", label: "Fair", bg: "rgba(245,158,11,0.08)", border: "rgba(245,158,11,0.2)" },
-  D: { color: "#F97316", label: "Needs Work", bg: "rgba(249,115,22,0.08)", border: "rgba(249,115,22,0.2)" },
-  F: { color: "#EF4444", label: "Poor", bg: "rgba(239,68,68,0.08)", border: "rgba(239,68,68,0.2)" },
+  A: { color: "#059669", label: "Excellent", bg: "#ECFDF5", border: "rgba(5,150,105,0.2)" },
+  B: { color: "#2563EB", label: "Good", bg: "rgba(37,99,235,0.06)", border: "rgba(37,99,235,0.2)" },
+  C: { color: "#D97706", label: "Fair", bg: "#FFFBEB", border: "rgba(217,119,6,0.2)" },
+  D: { color: "#EA580C", label: "Needs Work", bg: "rgba(234,88,12,0.06)", border: "rgba(234,88,12,0.2)" },
+  F: { color: "#DC2626", label: "Poor", bg: "#FEF2F2", border: "rgba(220,38,38,0.2)" },
 } as const;
 
 export function ModelQualityCard({ report }: ModelQualityCardProps) {
@@ -30,24 +30,20 @@ export function ModelQualityCard({ report }: ModelQualityCardProps) {
 
   return (
     <div style={{
-      background: "rgba(255,255,255,0.03)",
-      border: `1px solid ${grade.border}`,
+      background: "#FFFFFF",
+      border: `1px solid rgba(0, 0, 0, 0.06)`,
+      borderTop: `3px solid ${grade.color}`,
       borderRadius: 12,
       padding: 20,
       position: "relative",
       overflow: "hidden",
+      boxShadow: "0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -2px rgba(0,0,0,0.03)",
     }}>
-      {/* Top accent line */}
-      <div style={{
-        position: "absolute", top: 0, left: 0, right: 0, height: 2,
-        background: `linear-gradient(90deg, transparent, ${grade.color}60, transparent)`,
-      }} />
-
       {/* Header row */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <ShieldAlert size={16} color={grade.color} />
-          <span style={{ fontSize: 13, fontWeight: 600, color: "#F0F0F5" }}>IFC Model Quality</span>
+          <span style={{ fontSize: 13, fontWeight: 600, color: "#1A1A1A" }}>IFC Model Quality</span>
         </div>
         {/* Grade badge */}
         <div style={{
@@ -66,13 +62,13 @@ export function ModelQualityCard({ report }: ModelQualityCardProps) {
       {showWarningBanner && (
         <div style={{
           display: "flex", alignItems: "center", gap: 8,
-          background: "rgba(239,68,68,0.06)",
-          border: "1px solid rgba(239,68,68,0.15)",
+          background: "#FEF2F2",
+          border: "1px solid rgba(220,38,38,0.12)",
           borderRadius: 8,
           padding: "8px 12px",
           marginBottom: 12,
           fontSize: 12,
-          color: "#F87171",
+          color: "#DC2626",
         }}>
           <AlertTriangle size={14} />
           Model quality issues are affecting BOQ accuracy. See recommendations below.
@@ -80,9 +76,9 @@ export function ModelQualityCard({ report }: ModelQualityCardProps) {
       )}
 
       {/* Summary */}
-      <div style={{ fontSize: 12, color: "#9898B0", marginBottom: 12 }}>
+      <div style={{ fontSize: 12, color: "#4B5563", marginBottom: 12 }}>
         {totalIssues === 0
-          ? <span style={{ color: "#22C55E" }}>No issues found — {report.totalElements} elements processed cleanly</span>
+          ? <span style={{ color: "#059669" }}>No issues found — {report.totalElements} elements processed cleanly</span>
           : <span>{totalIssues} issue{totalIssues !== 1 ? "s" : ""} found across {report.totalElements} elements</span>
         }
       </div>
@@ -93,7 +89,7 @@ export function ModelQualityCard({ report }: ModelQualityCardProps) {
         style={{
           display: "flex", alignItems: "center", gap: 6,
           background: "none", border: "none", cursor: "pointer",
-          fontSize: 11, color: "#00F5FF", padding: 0,
+          fontSize: 11, color: "#0D9488", padding: 0,
         }}
       >
         {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
@@ -105,49 +101,49 @@ export function ModelQualityCard({ report }: ModelQualityCardProps) {
           {/* Issue categories */}
           {issuesFound.zeroVolumeElements.count > 0 && (
             <IssueRow
-              icon={<XCircle size={13} color="#EF4444" />}
+              icon={<XCircle size={13} color="#DC2626" />}
               label={`${issuesFound.zeroVolumeElements.count} zero-volume elements`}
               detail={issuesFound.zeroVolumeElements.types.join(", ")}
             />
           )}
           {issuesFound.noMaterialElements.count > 0 && (
             <IssueRow
-              icon={<AlertTriangle size={13} color="#F59E0B" />}
+              icon={<AlertTriangle size={13} color="#D97706" />}
               label={`${issuesFound.noMaterialElements.count} elements without material`}
               detail={issuesFound.noMaterialElements.types.join(", ")}
             />
           )}
           {issuesFound.unassignedStoreyElements.count > 0 && (
             <IssueRow
-              icon={<Info size={13} color="#F59E0B" />}
+              icon={<Info size={13} color="#D97706" />}
               label={`${issuesFound.unassignedStoreyElements.count} elements not assigned to storey`}
               detail="Floor-wise breakdown may be incomplete"
             />
           )}
           {issuesFound.duplicateElements.count > 0 && (
             <IssueRow
-              icon={<AlertTriangle size={13} color="#F97316" />}
+              icon={<AlertTriangle size={13} color="#EA580C" />}
               label={`${issuesFound.duplicateElements.count} potential duplicates`}
               detail={issuesFound.duplicateElements.estimatedImpact}
             />
           )}
           {issuesFound.suspiciousDimensions.count > 0 && (
             <IssueRow
-              icon={<AlertTriangle size={13} color="#F59E0B" />}
+              icon={<AlertTriangle size={13} color="#D97706" />}
               label={`${issuesFound.suspiciousDimensions.count} suspicious dimensions`}
               detail={issuesFound.suspiciousDimensions.details[0] || "Check wall/slab thicknesses"}
             />
           )}
           {issuesFound.unitInconsistencies && (
             <IssueRow
-              icon={<Info size={13} color="#3B82F6" />}
+              icon={<Info size={13} color="#2563EB" />}
               label="Unit conversion applied"
               detail="Non-metric units detected and converted to metres"
             />
           )}
           {totalIssues === 0 && (
             <IssueRow
-              icon={<CheckCircle2 size={13} color="#22C55E" />}
+              icon={<CheckCircle2 size={13} color="#059669" />}
               label="All checks passed"
               detail="Model is well-structured for quantity takeoff"
             />
@@ -156,11 +152,11 @@ export function ModelQualityCard({ report }: ModelQualityCardProps) {
           {/* Recommendations */}
           {report.recommendations.length > 0 && (
             <div style={{ marginTop: 8 }}>
-              <div style={{ fontSize: 11, fontWeight: 600, color: "#9898B0", marginBottom: 6 }}>Recommendations</div>
+              <div style={{ fontSize: 11, fontWeight: 600, color: "#4B5563", marginBottom: 6 }}>Recommendations</div>
               {report.recommendations.map((rec, i) => (
                 <div key={i} style={{
-                  fontSize: 11, color: "#B0B0C8", lineHeight: 1.5,
-                  paddingLeft: 12, borderLeft: "2px solid rgba(0,245,255,0.2)",
+                  fontSize: 11, color: "#4B5563", lineHeight: 1.5,
+                  paddingLeft: 12, borderLeft: "2px solid rgba(13,148,136,0.3)",
                   marginBottom: 4,
                 }}>
                   {rec}
@@ -179,13 +175,13 @@ function IssueRow({ icon, label, detail }: { icon: React.ReactNode; label: strin
     <div style={{
       display: "flex", alignItems: "flex-start", gap: 8,
       padding: "6px 10px",
-      background: "rgba(255,255,255,0.02)",
+      background: "#F9FAFB",
       borderRadius: 6,
     }}>
       <div style={{ marginTop: 1 }}>{icon}</div>
       <div>
-        <div style={{ fontSize: 12, color: "#E0E0F0", fontWeight: 500 }}>{label}</div>
-        <div style={{ fontSize: 10, color: "#7878A0" }}>{detail}</div>
+        <div style={{ fontSize: 12, color: "#1A1A1A", fontWeight: 500 }}>{label}</div>
+        <div style={{ fontSize: 10, color: "#9CA3AF" }}>{detail}</div>
       </div>
     </div>
   );

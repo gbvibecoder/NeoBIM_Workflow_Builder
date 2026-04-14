@@ -13,7 +13,7 @@ function highlightNumbers(text: string): (string | React.ReactElement)[] {
   return parts.map((part, i) => {
     if (i % 2 === 1) {
       return (
-        <span key={i} style={{ color: "#00F5FF", fontWeight: 700 }}>
+        <span key={i} style={{ color: "#0D9488", fontWeight: 700 }}>
           {part}
         </span>
       );
@@ -29,31 +29,35 @@ export function NLSummary({ summary }: NLSummaryProps) {
     <div
       className="mx-6 rounded-xl p-6 relative overflow-hidden"
       style={{
-        background: "rgba(0, 245, 255, 0.03)",
-        border: "1px solid rgba(0, 245, 255, 0.1)",
+        background: "#FFFFFF",
+        border: "1px solid rgba(0, 0, 0, 0.06)",
+        boxShadow: "0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -2px rgba(0,0,0,0.03)",
       }}
     >
       {/* Decorative quote mark */}
       <Quote
         size={48}
         className="absolute top-4 right-4"
-        style={{ color: "rgba(0, 245, 255, 0.08)" }}
+        style={{
+          color: "rgba(13, 148, 136, 0.10)",
+          fontFamily: "var(--font-dm-serif, 'DM Serif Display', serif)",
+        }}
       />
 
       {/* Left accent bar */}
       <div
-        className="absolute left-0 top-0 bottom-0 w-[3px]"
-        style={{ background: "linear-gradient(180deg, #00F5FF, rgba(0,245,255,0.2))" }}
+        className="absolute left-0 top-0 bottom-0 w-[4px]"
+        style={{ background: "linear-gradient(180deg, #0D9488, rgba(13,148,136,0.3))" }}
       />
 
-      <h3 className="text-sm font-semibold mb-3 flex items-center gap-2" style={{ color: "#F0F0F5" }}>
-        <Quote size={14} color="#00F5FF" />
+      <h3 className="text-sm font-semibold mb-3 flex items-center gap-2" style={{ color: "#1A1A1A" }}>
+        <Quote size={14} color="#0D9488" />
         Quantity Surveyor Summary
       </h3>
 
       <div
         className="text-sm leading-relaxed"
-        style={{ color: "#9898B0" }}
+        style={{ color: "#4B5563" }}
       >
         {summary.split("\n").map((paragraph, i) => (
           <p key={i} className={i > 0 ? "mt-2" : ""}>

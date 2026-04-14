@@ -124,7 +124,7 @@ export function BOQVisualizerPage({ data, executionId }: BOQVisualizerPageProps)
   return (
     <div
       className="h-full overflow-y-auto"
-      style={{ background: "#070809" }}
+      style={{ background: "#FAFAF8" }}
     >
       {/* Header */}
       <BOQHeader data={data} onExportExcel={handleExportExcel} />
@@ -165,17 +165,17 @@ export function BOQVisualizerPage({ data, executionId }: BOQVisualizerPageProps)
 
         {/* Seasonal Adjustment Badge */}
         {data.seasonalAdjustment?.applied && (
-          <div className="mx-6 px-4 py-2.5 rounded-lg flex items-center gap-3" style={{
-            background: "rgba(59, 130, 246, 0.06)",
-            border: "1px solid rgba(59, 130, 246, 0.15)",
+          <div className="mx-6 px-4 py-3 rounded-xl flex items-center gap-3" style={{
+            background: "#EFF6FF",
+            border: "1px solid #BFDBFE",
           }}>
-            <span style={{ fontSize: 16 }}>🌧️</span>
+            <span style={{ fontSize: 18 }}>🌧️</span>
             <div>
-              <span className="text-xs font-medium" style={{ color: "#60A5FA" }}>
-                Monsoon adjustment active: +{data.seasonalAdjustment.overallImpactPercent.toFixed(1)}% effective cost
+              <span className="text-xs font-semibold" style={{ color: "#1D4ED8" }}>
+                Monsoon adjustment: +{data.seasonalAdjustment.overallImpactPercent.toFixed(1)}% effective cost
               </span>
-              <span className="text-[10px] ml-2" style={{ color: "#5C5C78" }}>
-                {data.seasonalAdjustment.month} — labor productivity ×{(1 / data.seasonalAdjustment.laborMultiplier * 100).toFixed(0)}%
+              <span className="text-[10px] ml-2" style={{ color: "#6B7280" }}>
+                {data.seasonalAdjustment.month} — labor productivity at {(1 / data.seasonalAdjustment.laborMultiplier * 100).toFixed(0)}%
               </span>
             </div>
           </div>

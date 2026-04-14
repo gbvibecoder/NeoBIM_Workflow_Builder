@@ -44,7 +44,13 @@ export function AnimatedNumber({ value, duration = 500, formatter, className }: 
   const formatted = formatter ? formatter(display) : display.toFixed(0);
 
   return (
-    <span className={className} style={{ fontVariantNumeric: "tabular-nums" }}>
+    <span
+      className={className}
+      style={{
+        fontVariantNumeric: "tabular-nums",
+        fontFamily: "var(--font-dm-sans, 'DM Sans', sans-serif)",
+      }}
+    >
       {formatted}
     </span>
   );

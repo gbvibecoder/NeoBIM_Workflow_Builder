@@ -9,11 +9,11 @@ interface MEPBreakdownProps {
 }
 
 const MEP_ITEMS = [
-  { key: "hvac" as const, label: "HVAC", icon: Wind, color: "#00F5FF" },
-  { key: "electrical" as const, label: "Electrical", icon: Zap, color: "#FFBF00" },
-  { key: "plumbing" as const, label: "Plumbing", icon: Droplets, color: "#4FC3F7" },
-  { key: "fire" as const, label: "Fire Safety", icon: Flame, color: "#EF4444" },
-  { key: "lifts" as const, label: "Lifts", icon: ArrowUpDown, color: "#8B5CF6" },
+  { key: "hvac" as const, label: "HVAC", icon: Wind, color: "#0D9488" },
+  { key: "electrical" as const, label: "Electrical", icon: Zap, color: "#D97706" },
+  { key: "plumbing" as const, label: "Plumbing", icon: Droplets, color: "#2563EB" },
+  { key: "fire" as const, label: "Fire Safety", icon: Flame, color: "#DC2626" },
+  { key: "lifts" as const, label: "Lifts", icon: ArrowUpDown, color: "#7C3AED" },
 ];
 
 export function MEPBreakdown({ mep }: MEPBreakdownProps) {
@@ -23,11 +23,12 @@ export function MEPBreakdown({ mep }: MEPBreakdownProps) {
     <div
       className="rounded-xl p-5"
       style={{
-        background: "rgba(255, 255, 255, 0.03)",
-        border: "1px solid rgba(255, 255, 255, 0.06)",
+        background: "#FFFFFF",
+        border: "1px solid rgba(0, 0, 0, 0.06)",
+        boxShadow: "0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -2px rgba(0,0,0,0.03)",
       }}
     >
-      <h3 className="text-sm font-semibold mb-4" style={{ color: "#F0F0F5" }}>
+      <h3 className="text-sm font-semibold mb-4" style={{ color: "#1A1A1A" }}>
         MEP Breakdown
       </h3>
 
@@ -48,7 +49,7 @@ export function MEPBreakdown({ mep }: MEPBreakdownProps) {
 
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs font-medium" style={{ color: "#F0F0F5" }}>
+                    <span className="text-xs font-medium" style={{ color: "#1A1A1A" }}>
                       {item.label}
                     </span>
                     <span className="text-xs" style={{ color: item.color, fontVariantNumeric: "tabular-nums" }}>
@@ -56,12 +57,12 @@ export function MEPBreakdown({ mep }: MEPBreakdownProps) {
                     </span>
                   </div>
 
-                  <div className="h-[5px] rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.04)" }}>
+                  <div className="h-[5px] rounded-full overflow-hidden" style={{ background: "#F3F4F6" }}>
                     <div
                       className="h-full rounded-full"
                       style={{
                         width: `${barWidth}%`,
-                        background: `linear-gradient(90deg, ${item.color}50, ${item.color})`,
+                        background: `linear-gradient(90deg, ${item.color}60, ${item.color})`,
                         transition: "width 0.6s ease-out",
                       }}
                     />
@@ -73,7 +74,7 @@ export function MEPBreakdown({ mep }: MEPBreakdownProps) {
               <div
                 className="overflow-hidden transition-all duration-200 max-h-0 group-hover:max-h-10"
               >
-                <p className="text-[10px] mt-1.5 ml-10" style={{ color: "#5C5C78" }}>
+                <p className="text-[10px] mt-1.5 ml-10" style={{ color: "#4B5563" }}>
                   {data.reasoning}
                 </p>
               </div>

@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { DM_Sans, JetBrains_Mono } from "next/font/google";
+import { DM_Sans, DM_Serif_Display, JetBrains_Mono } from "next/font/google";
 
 import { Toaster } from "sonner";
 import { Analytics } from "@vercel/analytics/react";
@@ -17,6 +17,13 @@ const dmSans = DM_Sans({
   variable: "--font-dm-sans",
   display: "swap",
   weight: ["400", "500", "600", "700"],
+});
+
+const dmSerif = DM_Serif_Display({
+  subsets: ["latin"],
+  variable: "--font-dm-serif",
+  display: "swap",
+  weight: ["400"],
 });
 
 const jetbrains = JetBrains_Mono({
@@ -261,7 +268,7 @@ export default function RootLayout({
         {/* Tracking scripts (GTM + Meta Pixel + GA4 + Clarity) — loaded only after cookie consent */}
         <TrackingScripts />
       </head>
-      <body className={`${dmSans.variable} ${jetbrains.variable} font-body antialiased`} style={{ background: "#06080C", color: "#F0F4FF" }}>
+      <body className={`${dmSans.variable} ${dmSerif.variable} ${jetbrains.variable} font-body antialiased`} style={{ background: "#06080C", color: "#F0F4FF" }}>
         {/* Google Tag Manager (noscript) — fallback for users without JS */}
         {process.env.NEXT_PUBLIC_GTM_ID && (
           <noscript>

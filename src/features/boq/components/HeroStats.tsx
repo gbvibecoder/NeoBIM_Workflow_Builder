@@ -17,10 +17,16 @@ interface HeroStatsProps {
 }
 
 function getCostPerM2Color(value: number, low: number, high: number): string {
-  if (low === 0 && high === 0) return "#F0F0F5";
-  if (value >= low && value <= high) return "#22C55E";
-  if (value > high * 1.1 || value < low * 0.9) return "#EF4444";
-  return "#F59E0B";
+  if (low === 0 && high === 0) return "#1A1A1A";
+  if (value >= low && value <= high) return "#059669";
+  if (value > high * 1.1 || value < low * 0.9) return "#DC2626";
+  return "#D97706";
+}
+
+function getQualityThemeColor(score: number): { bg: string; text: string } {
+  if (score >= 70) return { bg: "#ECFDF5", text: "#059669" };
+  if (score >= 40) return { bg: "#FFFBEB", text: "#D97706" };
+  return { bg: "#FEF2F2", text: "#DC2626" };
 }
 
 function BenchmarkBar({ value, low, high }: { value: number; low: number; high: number }) {
@@ -47,14 +53,14 @@ function BenchmarkBar({ value, low, high }: { value: number; low: number; high: 
   return (
     <div className="mt-2">
       {/* Bar */}
-      <div className="relative h-[6px] rounded-full" style={{ background: "rgba(255,255,255,0.04)" }}>
+      <div className="relative h-[6px] rounded-full" style={{ background: "rgba(0,0,0,0.04)" }}>
         {/* Benchmark range (green zone) */}
         <div
           className="absolute h-full rounded-full"
           style={{
             left: `${lowPos}%`,
             width: `${highPos - lowPos}%`,
-            background: "rgba(34, 197, 94, 0.15)",
+            background: "rgba(5, 150, 105, 0.12)",
           }}
         />
         {/* Current value marker */}
@@ -64,8 +70,8 @@ function BenchmarkBar({ value, low, high }: { value: number; low: number; high: 
             left: `${pos}%`,
             transform: `translateX(-50%) translateY(-50%)`,
             background: color,
-            borderColor: `${color}80`,
-            boxShadow: `0 0 8px ${color}40`,
+            borderColor: "#FFFFFF",
+            boxShadow: `0 0 0 1px ${color}40, 0 1px 3px rgba(0,0,0,0.1)`,
             transition: "left 0.3s ease",
           }}
         />
@@ -73,11 +79,11 @@ function BenchmarkBar({ value, low, high }: { value: number; low: number; high: 
       {/* Status text */}
       <div className="flex items-center gap-1 mt-1.5">
         {isWithin ? (
-          <Check size={9} color="#22C55E" />
+          <Check size={9} color="#059669" />
         ) : (
           <AlertTriangle size={9} color={color} />
         )}
-        <span className="text-[10px]" style={{ color }}>
+        <span className="text-[10px] font-medium" style={{ color }}>
           {isWithin
             ? "Within metro benchmark"
             : isBelow
@@ -102,13 +108,14 @@ export function HeroStats({
   const costColor = getCostPerM2Color(costPerM2, benchmarkLow, benchmarkHigh);
   const qualityLabel = getIFCQualityLabel(ifcQualityScore);
   const qualityColor = getIFCQualityColor(ifcQualityScore);
+  const qualityTheme = getQualityThemeColor(ifcQualityScore);
 
   const cards = [
     {
       key: "total",
       label: "Total Project Cost",
       icon: IndianRupee,
-      color: "#00F5FF",
+      color: "#0D9488",
       value: totalCost,
       formatter: (n: number) => `₹${formatCrores(n)} Cr`,
       large: true,
@@ -126,7 +133,7 @@ export function HeroStats({
       key: "hard",
       label: "Hard Cost Subtotal",
       icon: Hammer,
-      color: "#B87333",
+      color: "#B45309",
       value: hardCosts,
       formatter: (n: number) => `₹${formatCrores(n)} Cr`,
     },
@@ -148,24 +155,33 @@ export function HeroStats({
           key={card.key}
           className="relative overflow-hidden rounded-xl p-4 transition-all duration-300"
           style={{
-            background: "rgba(255, 255, 255, 0.03)",
-            border: "1px solid rgba(255, 255, 255, 0.06)",
-            animation: `fade-in 0.5s ease-out ${i * 0.1}s both`,
+            background: "#FFFFFF",
+            border: "1px solid rgba(0,0,0,0.06)",
+            boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+            opacity: 0,
+            animation: `heroCardFadeIn 0.4s ease-out ${i * 0.08}s forwards`,
+          }}
+          onMouseEnter={e => {
+            e.currentTarget.style.boxShadow = "0 4px 6px -1px rgba(0,0,0,0.05)";
+            e.currentTarget.style.transform = "translateY(-1px)";
+          }}
+          onMouseLeave={e => {
+            e.currentTarget.style.boxShadow = "0 1px 3px rgba(0,0,0,0.04)";
+            e.currentTarget.style.transform = "translateY(0)";
           }}
         >
-          {/* Top glow line */}
+          {/* Top accent line — teal gradient */}
           <div
             className="absolute top-0 left-0 right-0 h-[2px]"
-            style={{ background: `linear-gradient(90deg, transparent, ${card.color}60, transparent)` }}
+            style={{ background: "linear-gradient(90deg, transparent, #0D948860, transparent)" }}
           />
 
-          {/* Recalculated flash */}
+          {/* Recalculated glow — subtle teal */}
           {recalculated && (
             <div
-              className="absolute inset-0 pointer-events-none"
+              className="absolute inset-0 pointer-events-none transition-opacity duration-500"
               style={{
-                background: `${card.color}08`,
-                animation: "fade-in 0.2s ease-out",
+                background: "rgba(13, 148, 136, 0.04)",
               }}
             />
           )}
@@ -173,16 +189,37 @@ export function HeroStats({
           <div className="flex items-center gap-2 mb-3">
             <div
               className="flex items-center justify-center w-7 h-7 rounded-lg"
-              style={{ background: `${card.color}15` }}
+              style={{
+                background: card.key === "quality" ? qualityTheme.bg :
+                  card.key === "hard" ? "#FFFBEB" :
+                  card.key === "total" ? "#CCFBF1" :
+                  "rgba(0,0,0,0.03)",
+              }}
             >
-              <card.icon size={14} color={card.color} />
+              <card.icon
+                size={14}
+                color={
+                  card.key === "quality" ? qualityTheme.text :
+                  card.key === "hard" ? "#B45309" :
+                  card.key === "total" ? "#0D9488" :
+                  card.color
+                }
+              />
             </div>
-            <span className="text-xs font-medium" style={{ color: "#9898B0" }}>
+            <span className="text-xs font-medium" style={{ color: "#9CA3AF" }}>
               {card.label}
             </span>
           </div>
 
-          <div className={`${card.large ? "text-2xl" : "text-xl"} font-bold`} style={{ color: card.color }}>
+          <div
+            className={`${card.large ? "text-2xl" : "text-xl"} font-bold`}
+            style={{
+              color: card.key === "total" ? "#0D9488" :
+                card.key === "hard" ? "#B45309" :
+                card.key === "quality" ? qualityTheme.text :
+                "#1A1A1A",
+            }}
+          >
             {card.noAnimate ? (
               <span style={{ fontVariantNumeric: "tabular-nums" }}>
                 {card.formatter(card.value)}
@@ -192,15 +229,39 @@ export function HeroStats({
             )}
           </div>
 
+          {/* Cr label in serif for total card */}
+          {card.key === "total" && (
+            <style>{`
+              [data-card-total] .cr-label {
+                font-family: var(--font-dm-serif, 'DM Serif Display', serif);
+              }
+            `}</style>
+          )}
+
           {/* Cost range for total card */}
           {card.key === "total" && costRange && costRange.totalLow > 0 && (
             <div className="mt-2">
-              <div className="text-[10px] font-medium" style={{ color: "#9898B0" }}>
+              <div className="text-[10px] font-medium" style={{ color: "#4B5563" }}>
                 Range: ₹{formatCrores(costRange.totalLow)} — ₹{formatCrores(costRange.totalHigh)} Cr
               </div>
-              <div className="text-[10px]" style={{ color: "#5C5C78" }}>
+              <div className="text-[10px]" style={{ color: "#9CA3AF" }}>
                 ±{costRange.uncertaintyPercent}% uncertainty
               </div>
+            </div>
+          )}
+
+          {/* Quality label chip */}
+          {card.key === "quality" && (
+            <div className="mt-2">
+              <span
+                className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium"
+                style={{
+                  background: qualityTheme.bg,
+                  color: qualityTheme.text,
+                }}
+              >
+                {qualityLabel}
+              </span>
             </div>
           )}
 
@@ -210,6 +271,14 @@ export function HeroStats({
           )}
         </div>
       ))}
+
+      {/* Simple opacity transition keyframes replacing the old dark fade-in */}
+      <style>{`
+        @keyframes heroCardFadeIn {
+          from { opacity: 0; transform: translateY(4px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
     </div>
   );
 }

@@ -26,7 +26,7 @@ const SLIDERS = [
     key: "steel" as const,
     label: "TMT Steel Fe500",
     icon: Layers,
-    color: "#00F5FF",
+    color: "#0D9488",
     range: PRICE_RANGES.steel,
     formatValue: (v: number) => `₹${(v / 1000).toFixed(0)}K/t`,
     formatDelta: (v: number) => `${(v / 1000).toFixed(1)}K`,
@@ -35,7 +35,7 @@ const SLIDERS = [
     key: "cement" as const,
     label: "Cement",
     icon: Package,
-    color: "#B87333",
+    color: "#B45309",
     range: PRICE_RANGES.cement,
     formatValue: (v: number) => `₹${v}/bag`,
     formatDelta: (v: number) => `₹${Math.abs(v).toFixed(0)}`,
@@ -44,7 +44,7 @@ const SLIDERS = [
     key: "mason" as const,
     label: "Mason Daily Wage",
     icon: HardHat,
-    color: "#FFBF00",
+    color: "#D97706",
     range: PRICE_RANGES.mason,
     formatValue: (v: number) => `₹${v}/day`,
     formatDelta: (v: number) => `₹${Math.abs(v).toFixed(0)}`,
@@ -53,7 +53,7 @@ const SLIDERS = [
     key: "bricks" as const,
     label: "Bricks / Blocks",
     icon: Boxes,
-    color: "#F59E0B",
+    color: "#DC2626",
     range: PRICE_RANGES.bricks,
     formatValue: (v: number) => `₹${v.toFixed(1)}/nos`,
     formatDelta: (v: number) => `₹${Math.abs(v).toFixed(1)}`,
@@ -62,7 +62,7 @@ const SLIDERS = [
     key: "sand" as const,
     label: "River Sand / M-Sand",
     icon: Mountain,
-    color: "#8B5CF6",
+    color: "#7C3AED",
     range: PRICE_RANGES.sand,
     formatValue: (v: number) => `₹${v}/cft`,
     formatDelta: (v: number) => `₹${Math.abs(v).toFixed(0)}`,
@@ -71,7 +71,7 @@ const SLIDERS = [
     key: "timber" as const,
     label: "Timber / Formwork",
     icon: TreePine,
-    color: "#10B981",
+    color: "#059669",
     range: PRICE_RANGES.timber,
     formatValue: (v: number) => `₹${v.toLocaleString("en-IN")}/m²`,
     formatDelta: (v: number) => `₹${Math.abs(v).toFixed(0)}`,
@@ -117,27 +117,28 @@ export function PriceControls({ prices, basePrices, onChange, totalSavings, base
     <div
       className="mx-6 rounded-xl overflow-hidden"
       style={{
-        background: "rgba(255, 255, 255, 0.03)",
-        border: "1px solid rgba(255, 255, 255, 0.06)",
+        background: "#FFFFFF",
+        border: "1px solid rgba(0, 0, 0, 0.06)",
+        boxShadow: "0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -2px rgba(0,0,0,0.03)",
       }}
     >
       {/* Header */}
-      <div className="flex items-center justify-between px-5 py-3.5" style={{ borderBottom: "1px solid rgba(255, 255, 255, 0.06)" }}>
+      <div className="flex items-center justify-between px-5 py-3.5" style={{ borderBottom: "1px solid rgba(0, 0, 0, 0.06)" }}>
         <div className="flex items-center gap-3">
           <div className="relative flex items-center justify-center">
             <div
               className="w-2 h-2 rounded-full"
               style={{
-                background: "#22C55E",
-                boxShadow: "0 0 8px rgba(34, 197, 94, 0.5)",
+                background: "#0D9488",
+                boxShadow: "0 0 6px rgba(13, 148, 136, 0.4)",
                 animation: "pulse-node 2s cubic-bezier(0.4, 0, 0.6, 1) infinite",
               }}
             />
           </div>
-          <span className="text-sm font-semibold" style={{ color: "#F0F0F5" }}>
+          <span className="text-sm font-semibold" style={{ color: "#1A1A1A" }}>
             Live Price Controls
           </span>
-          <span className="text-[10px] px-2 py-0.5 rounded-full" style={{ background: "rgba(34, 197, 94, 0.12)", color: "#22C55E" }}>
+          <span className="text-[10px] px-2 py-0.5 rounded-full font-medium" style={{ background: "rgba(13, 148, 136, 0.08)", color: "#0D9488" }}>
             LIVE
           </span>
         </div>
@@ -148,12 +149,12 @@ export function PriceControls({ prices, basePrices, onChange, totalSavings, base
             onClick={handleReset}
             className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-medium transition-all duration-200"
             style={{
-              background: "rgba(255, 255, 255, 0.05)",
-              border: "1px solid rgba(255, 255, 255, 0.1)",
-              color: "#9898B0",
+              background: "#FFFFFF",
+              border: "1px solid rgba(0, 0, 0, 0.1)",
+              color: "#9CA3AF",
             }}
-            onMouseEnter={e => { e.currentTarget.style.borderColor = "rgba(0,245,255,0.3)"; e.currentTarget.style.color = "#00F5FF"; }}
-            onMouseLeave={e => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.1)"; e.currentTarget.style.color = "#9898B0"; }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = "#0D9488"; e.currentTarget.style.color = "#0D9488"; }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = "rgba(0,0,0,0.1)"; e.currentTarget.style.color = "#9CA3AF"; }}
           >
             <RotateCcw size={10} />
             Reset all
@@ -178,7 +179,7 @@ export function PriceControls({ prices, basePrices, onChange, totalSavings, base
                 {/* Icon */}
                 <div
                   className="flex items-center justify-center w-8 h-8 rounded-lg shrink-0"
-                  style={{ background: `${slider.color}12` }}
+                  style={{ background: `${slider.color}0F` }}
                 >
                   <slider.icon size={14} color={slider.color} />
                 </div>
@@ -186,7 +187,7 @@ export function PriceControls({ prices, basePrices, onChange, totalSavings, base
                 {/* Label + source toggle */}
                 <div className="flex flex-col min-w-[100px] flex-1">
                   <div className="flex items-center gap-2">
-                    <span className="text-xs font-medium" style={{ color: "#F0F0F5" }}>
+                    <span className="text-xs font-medium" style={{ color: "#1A1A1A" }}>
                       {slider.label}
                     </span>
                     {/* Delta badge */}
@@ -194,8 +195,8 @@ export function PriceControls({ prices, basePrices, onChange, totalSavings, base
                       <span
                         className="text-[9px] font-semibold px-1.5 py-0.5 rounded transition-all duration-200"
                         style={{
-                          background: delta < 0 ? "rgba(34,197,94,0.1)" : "rgba(239,68,68,0.1)",
-                          color: delta < 0 ? "#22C55E" : "#EF4444",
+                          background: delta < 0 ? "rgba(22, 163, 74, 0.08)" : "rgba(220, 38, 38, 0.08)",
+                          color: delta < 0 ? "#16A34A" : "#DC2626",
                         }}
                       >
                         {delta < 0 ? `${deltaPct}% cheaper` : `+${deltaPct}% costlier`}
@@ -204,7 +205,7 @@ export function PriceControls({ prices, basePrices, onChange, totalSavings, base
                   </div>
                   <button
                     className="flex items-center gap-0.5 text-[10px] text-left w-fit"
-                    style={{ color: "#5C5C78" }}
+                    style={{ color: "#9CA3AF" }}
                     onClick={() => setExpandedKey(isExpanded ? null : slider.key)}
                   >
                     {getSourceShort(slider.key)}
@@ -231,14 +232,13 @@ export function PriceControls({ prices, basePrices, onChange, totalSavings, base
               <div className="relative h-7 flex items-center mt-1 ml-11">
                 <div
                   className="absolute left-0 right-0 h-[5px] rounded-full"
-                  style={{ background: "rgba(255, 255, 255, 0.06)" }}
+                  style={{ background: "#E5E7EB" }}
                 />
                 <div
                   className="absolute left-0 h-[5px] rounded-full transition-all duration-75"
                   style={{
                     width: `${pct}%`,
-                    background: `linear-gradient(90deg, ${slider.color}50, ${slider.color})`,
-                    boxShadow: `0 0 10px ${slider.color}20`,
+                    background: `linear-gradient(90deg, ${slider.color}80, ${slider.color})`,
                   }}
                 />
                 <input
@@ -252,10 +252,10 @@ export function PriceControls({ prices, basePrices, onChange, totalSavings, base
                   style={{ appearance: "none", WebkitAppearance: "none", background: "transparent", zIndex: 2 }}
                 />
                 {/* Min/Max labels */}
-                <span className="absolute -bottom-3 left-0 text-[8px]" style={{ color: "#3A3A50" }}>
+                <span className="absolute -bottom-3 left-0 text-[8px]" style={{ color: "#9CA3AF" }}>
                   {slider.formatValue(slider.range.min)}
                 </span>
-                <span className="absolute -bottom-3 right-0 text-[8px]" style={{ color: "#3A3A50" }}>
+                <span className="absolute -bottom-3 right-0 text-[8px]" style={{ color: "#9CA3AF" }}>
                   {slider.formatValue(slider.range.max)}
                 </span>
               </div>
@@ -265,7 +265,7 @@ export function PriceControls({ prices, basePrices, onChange, totalSavings, base
                 className="overflow-hidden transition-all duration-200"
                 style={{ maxHeight: isExpanded ? 32 : 0, opacity: isExpanded ? 1 : 0 }}
               >
-                <p className="text-[10px] mt-2 ml-11" style={{ color: "#5C5C78" }}>
+                <p className="text-[10px] mt-2 ml-11" style={{ color: "#9CA3AF" }}>
                   Range: {slider.formatValue(slider.range.min)} – {slider.formatValue(slider.range.max)} · Base: {slider.formatValue(base)}
                 </p>
               </div>
@@ -279,20 +279,20 @@ export function PriceControls({ prices, basePrices, onChange, totalSavings, base
         <div
           className="px-5 py-3 flex items-center justify-between transition-all duration-300"
           style={{
-            borderTop: "1px solid rgba(255, 255, 255, 0.06)",
-            background: isSaving ? "rgba(34,197,94,0.04)" : "rgba(239,68,68,0.04)",
+            borderTop: "1px solid rgba(0, 0, 0, 0.06)",
+            background: isSaving ? "rgba(22, 163, 74, 0.05)" : "rgba(220, 38, 38, 0.05)",
           }}
         >
           <div className="flex items-center gap-2">
-            {isSaving ? <TrendingDown size={14} color="#22C55E" /> : <TrendingUp size={14} color="#EF4444" />}
-            <span className="text-xs font-semibold" style={{ color: isSaving ? "#22C55E" : "#EF4444" }}>
+            {isSaving ? <TrendingDown size={14} color="#16A34A" /> : <TrendingUp size={14} color="#DC2626" />}
+            <span className="text-xs font-semibold" style={{ color: isSaving ? "#16A34A" : "#DC2626" }}>
               {isSaving ? `Save ${savingsLabel}` : `Extra ${savingsLabel}`}
             </span>
-            <span className="text-[10px]" style={{ color: isSaving ? "rgba(34,197,94,0.7)" : "rgba(239,68,68,0.7)" }}>
+            <span className="text-[10px]" style={{ color: isSaving ? "rgba(22,163,74,0.7)" : "rgba(220,38,38,0.7)" }}>
               ({isSaving ? "-" : "+"}{savingsPct}%)
             </span>
           </div>
-          <span className="text-[10px]" style={{ color: "#5C5C78" }}>
+          <span className="text-[10px]" style={{ color: "#9CA3AF" }}>
             vs. base market rates
           </span>
         </div>
