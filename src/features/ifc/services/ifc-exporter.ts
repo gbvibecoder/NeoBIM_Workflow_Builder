@@ -148,6 +148,23 @@ export interface IFCExportOptions {
    * metadata entities aggregated under an IfcCurtainWall container per storey.
    */
   emitCurtainWallGeometry?: boolean;
+  /**
+   * When true, MEP segment / pipe / cable-tray / equipment elements emit with body
+   * geometry. Default FALSE: emitted as proper IFC entities (IfcDuctSegment / IfcPipeSegment /
+   * IfcCableCarrierSegment / IfcFlowTerminal) with Representation=$ — present for BIM
+   * takeoff, system grouping, COBie equipment scheduling, and IfcRelConnectsPorts wiring,
+   * but no body prisms rendered.
+   *
+   * Reason: massing-generator MEP outputs typically supply only v0 + properties.length, so
+   * the actual extrusion direction is unknown. Defaulting to world +X (ducts) or +Z (pipes)
+   * produced floating ladder-like horizontal lines stretching beyond the building footprint
+   * on circular / non-rectangular plans. Without reliable direction, bodyless emission is
+   * the safest visual default.
+   *
+   * Enable for projects where a routed MEP authoring tool has provided real (v0, v1)
+   * vertex pairs with correct orientation.
+   */
+  emitMEPGeometry?: boolean;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -1351,6 +1368,7 @@ interface ExportContext {
   emitRebarGeometry: boolean;
   autoEmitDemoContent: boolean;
   emitCurtainWallGeometry: boolean;
+  emitMEPGeometry: boolean;
 
   // v4 cleanup — actual building bounding box for positioning any opt-in demo content
   boundingBox: { minX: number; minY: number; maxX: number; maxY: number };
@@ -1574,6 +1592,7 @@ export function generateIFCFile(
     emitRebarGeometry: options.emitRebarGeometry ?? false,
     autoEmitDemoContent: options.autoEmitDemoContent ?? false,
     emitCurtainWallGeometry: options.emitCurtainWallGeometry ?? false,
+    emitMEPGeometry: options.emitMEPGeometry ?? false,
     boundingBox: {
       minX: geometry.boundingBox?.min?.x ?? 0,
       minY: geometry.boundingBox?.min?.y ?? 0,
@@ -3616,46 +3635,63 @@ function writeMEPSegmentEntity(
   const segLen = element.properties.length ?? 5;
   const name = element.properties.name ?? "MEP Segment";
 
-  const profCenterId = id.next();
-  lines.push(`#${profCenterId}=IFCCARTESIANPOINT((${f(segW / 2)},${f(segH / 2)}));`);
-  const profPlacementId = id.next();
-  lines.push(`#${profPlacementId}=IFCAXIS2PLACEMENT2D(#${profCenterId},$);`);
-  const profileId = id.next();
-  lines.push(`#${profileId}=IFCRECTANGLEPROFILEDEF(.AREA.,'${ifcEntityName} Profile',#${profPlacementId},${f(segW)},${f(segH)});`);
+  let prodShapeRef = "$";
+  let placementRef = "$";
 
-  const extDirId = id.next();
-  lines.push(`#${extDirId}=IFCDIRECTION((1.,0.,0.));`);
-  const solidId = id.next();
-  lines.push(`#${solidId}=IFCEXTRUDEDAREASOLID(#${profileId},$,#${extDirId},${f(segLen)});`);
-  const shapeRepId = id.next();
-  lines.push(`#${shapeRepId}=IFCSHAPEREPRESENTATION(#${ctx.bodyContextId},'Body','SweptSolid',(#${solidId}));`);
-  const prodShapeId = id.next();
-  lines.push(`#${prodShapeId}=IFCPRODUCTDEFINITIONSHAPE($,$,(#${shapeRepId}));`);
+  if (ctx.emitMEPGeometry) {
+    const profCenterId = id.next();
+    lines.push(`#${profCenterId}=IFCCARTESIANPOINT((${f(segW / 2)},${f(segH / 2)}));`);
+    const profPlacementId = id.next();
+    lines.push(`#${profPlacementId}=IFCAXIS2PLACEMENT2D(#${profCenterId},$);`);
+    const profileId = id.next();
+    lines.push(`#${profileId}=IFCRECTANGLEPROFILEDEF(.AREA.,'${ifcEntityName} Profile',#${profPlacementId},${f(segW)},${f(segH)});`);
 
-  const v = element.vertices[0] ?? { x: 0, y: 0, z: 0 };
-  const originId = id.next();
-  lines.push(`#${originId}=IFCCARTESIANPOINT((${f(v.x)},${f(v.y)},${f(v.z)}));`);
-  const axisId = id.next();
-  lines.push(`#${axisId}=IFCAXIS2PLACEMENT3D(#${originId},#${ctx.zDirId},$);`);
-  const placementId = id.next();
-  lines.push(`#${placementId}=IFCLOCALPLACEMENT(#${storeyPlacementId},#${axisId});`);
+    // Use 3D vertex direction when v1 exists; otherwise default to +X
+    const v0 = element.vertices[0] ?? { x: 0, y: 0, z: 0 };
+    const v1 = element.vertices[1];
+    let dx = 1, dy = 0, dz = 0;
+    if (v1) {
+      const ax = v1.x - v0.x, ay = v1.y - v0.y, az = v1.z - v0.z;
+      const al = Math.hypot(ax, ay, az) || 1;
+      dx = ax / al; dy = ay / al; dz = az / al;
+    }
+    let lxDx: number, lxDy: number, lxDz: number;
+    if (Math.abs(dz) < 0.9) { lxDx = -dy; lxDy = dx; lxDz = 0; const l = Math.hypot(lxDx, lxDy) || 1; lxDx /= l; lxDy /= l; }
+    else { lxDx = 1; lxDy = 0; lxDz = 0; }
+
+    const extDirId = id.next();
+    lines.push(`#${extDirId}=IFCDIRECTION((0.,0.,1.));`);
+    const solidId = id.next();
+    lines.push(`#${solidId}=IFCEXTRUDEDAREASOLID(#${profileId},$,#${extDirId},${f(segLen)});`);
+    const shapeRepId = id.next();
+    lines.push(`#${shapeRepId}=IFCSHAPEREPRESENTATION(#${ctx.bodyContextId},'Body','SweptSolid',(#${solidId}));`);
+    const prodShapeId = id.next();
+    lines.push(`#${prodShapeId}=IFCPRODUCTDEFINITIONSHAPE($,$,(#${shapeRepId}));`);
+    prodShapeRef = `#${prodShapeId}`;
+
+    const originId = id.next();
+    lines.push(`#${originId}=IFCCARTESIANPOINT((${f(v0.x)},${f(v0.y)},${f(v0.z)}));`);
+    const zdId = id.next();
+    lines.push(`#${zdId}=IFCDIRECTION((${f(dx, 6)},${f(dy, 6)},${f(dz, 6)}));`);
+    const xdId = id.next();
+    lines.push(`#${xdId}=IFCDIRECTION((${f(lxDx, 6)},${f(lxDy, 6)},${f(lxDz, 6)}));`);
+    const axisId = id.next();
+    lines.push(`#${axisId}=IFCAXIS2PLACEMENT3D(#${originId},#${zdId},#${xdId});`);
+    const placementId = id.next();
+    lines.push(`#${placementId}=IFCLOCALPLACEMENT(#${storeyPlacementId},#${axisId});`);
+    placementRef = `#${placementId}`;
+
+    if (kind === "duct") ctx.presentationLayers["M-DUCT"].push(shapeRepId);
+    else ctx.presentationLayers["E-CABL"].push(shapeRepId);
+  }
 
   const entityId = id.next();
   const elementTag = name.substring(0, 30);
   const stableKey = kind === "duct" ? `duct:${element.id}` : `cable:${element.id}`;
-  lines.push(`#${entityId}=${ifcEntityName}('${guid.stable(stableKey)}',#${ctx.ownerHistId},'${ctx.safeName(name)}',$,$,#${placementId},#${prodShapeId},'${ctx.safeName(elementTag)}',.NOTDEFINED.);`);
+  lines.push(`#${entityId}=${ifcEntityName}('${guid.stable(stableKey)}',#${ctx.ownerHistId},'${ctx.safeName(name)}',$,$,${placementRef},${prodShapeRef},'${ctx.safeName(elementTag)}',.NOTDEFINED.);`);
 
-  // Presentation layer
-  if (kind === "duct") ctx.presentationLayers["M-DUCT"].push(shapeRepId);
-  else ctx.presentationLayers["E-CABL"].push(shapeRepId);
-
-  // Material: galvanized steel for ducts, steel for cable trays
   associateMaterial(ctx, entityId, ctx.matIds.structuralSteel);
-
-  // Classification
   associateClassification(ctx, entityId, kind, ctx.materials.structuralSteel);
-
-  // System assignment (Fix 8)
   const systemKey = mepSystemFor(element);
   if (systemKey) assignToSystem(ctx, entityId, systemKey);
 
@@ -3672,36 +3708,42 @@ function writeMEPPipeEntity(
   const pipeHeight = element.properties.height ?? element.properties.length ?? 3.6;
   const name = element.properties.name ?? "Pipe";
 
-  const profCenterId = id.next();
-  lines.push(`#${profCenterId}=IFCCARTESIANPOINT((0.,0.));`);
-  const profPlacementId = id.next();
-  lines.push(`#${profPlacementId}=IFCAXIS2PLACEMENT2D(#${profCenterId},$);`);
-  const profileId = id.next();
-  lines.push(`#${profileId}=IFCCIRCLEPROFILEDEF(.AREA.,'Pipe Profile',#${profPlacementId},${f(diameter / 2)});`);
+  let prodShapeRef = "$";
+  let placementRef = "$";
 
-  const solidId = id.next();
-  lines.push(`#${solidId}=IFCEXTRUDEDAREASOLID(#${profileId},$,#${ctx.zDirId},${f(pipeHeight)});`);
-  const shapeRepId = id.next();
-  lines.push(`#${shapeRepId}=IFCSHAPEREPRESENTATION(#${ctx.bodyContextId},'Body','SweptSolid',(#${solidId}));`);
-  const prodShapeId = id.next();
-  lines.push(`#${prodShapeId}=IFCPRODUCTDEFINITIONSHAPE($,$,(#${shapeRepId}));`);
+  if (ctx.emitMEPGeometry) {
+    const profCenterId = id.next();
+    lines.push(`#${profCenterId}=IFCCARTESIANPOINT((0.,0.));`);
+    const profPlacementId = id.next();
+    lines.push(`#${profPlacementId}=IFCAXIS2PLACEMENT2D(#${profCenterId},$);`);
+    const profileId = id.next();
+    lines.push(`#${profileId}=IFCCIRCLEPROFILEDEF(.AREA.,'Pipe Profile',#${profPlacementId},${f(diameter / 2)});`);
 
-  const v = element.vertices[0] ?? { x: 0, y: 0, z: 0 };
-  const originId = id.next();
-  lines.push(`#${originId}=IFCCARTESIANPOINT((${f(v.x)},${f(v.y)},${f(v.z)}));`);
-  const axisId = id.next();
-  lines.push(`#${axisId}=IFCAXIS2PLACEMENT3D(#${originId},#${ctx.zDirId},$);`);
-  const placementId = id.next();
-  lines.push(`#${placementId}=IFCLOCALPLACEMENT(#${storeyPlacementId},#${axisId});`);
+    const solidId = id.next();
+    lines.push(`#${solidId}=IFCEXTRUDEDAREASOLID(#${profileId},$,#${ctx.zDirId},${f(pipeHeight)});`);
+    const shapeRepId = id.next();
+    lines.push(`#${shapeRepId}=IFCSHAPEREPRESENTATION(#${ctx.bodyContextId},'Body','SweptSolid',(#${solidId}));`);
+    const prodShapeId = id.next();
+    lines.push(`#${prodShapeId}=IFCPRODUCTDEFINITIONSHAPE($,$,(#${shapeRepId}));`);
+    prodShapeRef = `#${prodShapeId}`;
+
+    const v = element.vertices[0] ?? { x: 0, y: 0, z: 0 };
+    const originId = id.next();
+    lines.push(`#${originId}=IFCCARTESIANPOINT((${f(v.x)},${f(v.y)},${f(v.z)}));`);
+    const axisId = id.next();
+    lines.push(`#${axisId}=IFCAXIS2PLACEMENT3D(#${originId},#${ctx.zDirId},$);`);
+    const placementId = id.next();
+    lines.push(`#${placementId}=IFCLOCALPLACEMENT(#${storeyPlacementId},#${axisId});`);
+    placementRef = `#${placementId}`;
+    ctx.presentationLayers["M-PIPE"].push(shapeRepId);
+  }
 
   const entityId = id.next();
   const elementTag = name.substring(0, 30);
-  lines.push(`#${entityId}=IFCPIPESEGMENT('${guid.stable(`pipe:${element.id}`)}',#${ctx.ownerHistId},'${ctx.safeName(name)}',$,$,#${placementId},#${prodShapeId},'${ctx.safeName(elementTag)}',.NOTDEFINED.);`);
-  ctx.presentationLayers["M-PIPE"].push(shapeRepId);
+  lines.push(`#${entityId}=IFCPIPESEGMENT('${guid.stable(`pipe:${element.id}`)}',#${ctx.ownerHistId},'${ctx.safeName(name)}',$,$,${placementRef},${prodShapeRef},'${ctx.safeName(elementTag)}',.NOTDEFINED.);`);
 
   associateMaterial(ctx, entityId, ctx.matIds.structuralSteel);
   associateClassification(ctx, entityId, "pipe", ctx.materials.structuralSteel);
-
   const systemKey = mepSystemFor(element);
   if (systemKey) assignToSystem(ctx, entityId, systemKey);
 
@@ -3719,32 +3761,39 @@ function writeMEPEquipmentEntity(
   const eqL = element.properties.length ?? 1.5;
   const name = element.properties.name ?? "Equipment";
 
-  const profCenterId = id.next();
-  lines.push(`#${profCenterId}=IFCCARTESIANPOINT((${f(eqW / 2)},${f(eqL / 2)}));`);
-  const profPlacementId = id.next();
-  lines.push(`#${profPlacementId}=IFCAXIS2PLACEMENT2D(#${profCenterId},$);`);
-  const profileId = id.next();
-  lines.push(`#${profileId}=IFCRECTANGLEPROFILEDEF(.AREA.,'Equipment Profile',#${profPlacementId},${f(eqW)},${f(eqL)});`);
+  let prodShapeRef = "$";
+  let placementRef = "$";
 
-  const solidId = id.next();
-  lines.push(`#${solidId}=IFCEXTRUDEDAREASOLID(#${profileId},$,#${ctx.zDirId},${f(eqH)});`);
-  const shapeRepId = id.next();
-  lines.push(`#${shapeRepId}=IFCSHAPEREPRESENTATION(#${ctx.bodyContextId},'Body','SweptSolid',(#${solidId}));`);
-  const prodShapeId = id.next();
-  lines.push(`#${prodShapeId}=IFCPRODUCTDEFINITIONSHAPE($,$,(#${shapeRepId}));`);
+  if (ctx.emitMEPGeometry) {
+    const profCenterId = id.next();
+    lines.push(`#${profCenterId}=IFCCARTESIANPOINT((${f(eqW / 2)},${f(eqL / 2)}));`);
+    const profPlacementId = id.next();
+    lines.push(`#${profPlacementId}=IFCAXIS2PLACEMENT2D(#${profCenterId},$);`);
+    const profileId = id.next();
+    lines.push(`#${profileId}=IFCRECTANGLEPROFILEDEF(.AREA.,'Equipment Profile',#${profPlacementId},${f(eqW)},${f(eqL)});`);
 
-  const v = element.vertices[0] ?? { x: 0, y: 0, z: 0 };
-  const originId = id.next();
-  lines.push(`#${originId}=IFCCARTESIANPOINT((${f(v.x)},${f(v.y)},${f(v.z)}));`);
-  const axisId = id.next();
-  lines.push(`#${axisId}=IFCAXIS2PLACEMENT3D(#${originId},#${ctx.zDirId},$);`);
-  const placementId = id.next();
-  lines.push(`#${placementId}=IFCLOCALPLACEMENT(#${storeyPlacementId},#${axisId});`);
+    const solidId = id.next();
+    lines.push(`#${solidId}=IFCEXTRUDEDAREASOLID(#${profileId},$,#${ctx.zDirId},${f(eqH)});`);
+    const shapeRepId = id.next();
+    lines.push(`#${shapeRepId}=IFCSHAPEREPRESENTATION(#${ctx.bodyContextId},'Body','SweptSolid',(#${solidId}));`);
+    const prodShapeId = id.next();
+    lines.push(`#${prodShapeId}=IFCPRODUCTDEFINITIONSHAPE($,$,(#${shapeRepId}));`);
+    prodShapeRef = `#${prodShapeId}`;
+
+    const v = element.vertices[0] ?? { x: 0, y: 0, z: 0 };
+    const originId = id.next();
+    lines.push(`#${originId}=IFCCARTESIANPOINT((${f(v.x)},${f(v.y)},${f(v.z)}));`);
+    const axisId = id.next();
+    lines.push(`#${axisId}=IFCAXIS2PLACEMENT3D(#${originId},#${ctx.zDirId},$);`);
+    const placementId = id.next();
+    lines.push(`#${placementId}=IFCLOCALPLACEMENT(#${storeyPlacementId},#${axisId});`);
+    placementRef = `#${placementId}`;
+    ctx.presentationLayers["M-EQPT"].push(shapeRepId);
+  }
 
   const entityId = id.next();
   const elementTag = name.substring(0, 30);
-  lines.push(`#${entityId}=IFCFLOWTERMINAL('${guid.stable(`eq:${element.id}`)}',#${ctx.ownerHistId},'${ctx.safeName(name)}',$,$,#${placementId},#${prodShapeId},'${ctx.safeName(elementTag)}',.NOTDEFINED.);`);
-  ctx.presentationLayers["M-EQPT"].push(shapeRepId);
+  lines.push(`#${entityId}=IFCFLOWTERMINAL('${guid.stable(`eq:${element.id}`)}',#${ctx.ownerHistId},'${ctx.safeName(name)}',$,$,${placementRef},${prodShapeRef},'${ctx.safeName(elementTag)}',.NOTDEFINED.);`);
 
   associateMaterial(ctx, entityId, ctx.matIds.structuralSteel);
   associateClassification(ctx, entityId, "equipment", ctx.materials.structuralSteel);
