@@ -52,8 +52,44 @@ model User {
   liveChats         LiveChatConversation[] @relation("UserLiveChats")
   videoShareLinks   VideoShareLink[]
   videoLikes        CommunityVideoLike[]
+  survey            UserSurvey?
 
   @@map("users")
+}
+
+model UserSurvey {
+  id               String    @id @default(cuid())
+  userId           String    @unique
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  discoverySource  String?
+  discoveryOther   String?
+  profession       String?
+  professionOther  String?
+  teamSize         String?
+  pricingAction    String?
+  completedAt      DateTime?
+  skippedAt        DateTime?
+  skippedAtScene   Int?
+  // ── Attribution — first-touch only, never overwritten on auto-save ──
+  utmSource        String?
+  utmMedium        String?
+  utmCampaign      String?
+  utmTerm          String?
+  utmContent       String?
+  referrer         String?
+  country          String?
+  city             String?
+  deviceType       String?
+  userAgent        String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@map("user_surveys")
+  @@index([userId])
+  @@index([completedAt])
+  @@index([createdAt])
+  @@index([utmSource])
+  @@index([country])
 }
 
 model Account {

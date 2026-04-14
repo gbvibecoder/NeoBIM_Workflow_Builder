@@ -5,6 +5,7 @@ import DOMPurify from "dompurify";
 import { motion } from "framer-motion";
 import dynamic from "next/dynamic";
 import { useLocale } from "@/hooks/useLocale";
+import { ConfidenceBadge } from "@/shared/components/ui/ConfidenceBadge";
 import { COLORS } from "@/features/execution/components/result-showcase/constants";
 import type { ShowcaseData, ProceduralModelData, GlbModelData, HtmlIframeModelData, FloorPlanInteractiveData } from "@/features/execution/components/result-showcase/useShowcaseData";
 import type { FloorPlanGeometry, FloorPlanRoom } from "@/features/floor-plan/types/floor-plan";
@@ -232,6 +233,20 @@ export function ModelTab({ data }: ModelTabProps) {
       boxShadow: "0 20px 60px rgba(0,0,0,0.4)",
     }}>
       <div style={{ flex: 1, position: "relative", overflow: "hidden" }}>
+        {/* Honest beta notice: experimental 3D preview */}
+        <div style={{
+          position: "absolute",
+          top: 12,
+          left: 12,
+          zIndex: 20,
+          pointerEvents: "auto",
+        }}>
+          <ConfidenceBadge
+            tone="experimental"
+            label={t("confidence.experimental3d")}
+            tooltip={t("confidence.experimental3dTooltip")}
+          />
+        </div>
         {model?.kind === "procedural" && <ProceduralViewer model={model} />}
         {model?.kind === "glb" && <GlbViewer model={model} />}
         {model?.kind === "html-iframe" && <HtmlIframeViewer model={model} />}

@@ -1031,20 +1031,22 @@
   /* Remove default outline everywhere */
   *:focus { outline: none; }
 
-  /* Show ring only on keyboard focus */
+  /* Show ring only on keyboard focus.
+     !important on outline forces visibility past Tailwind `outline-none`
+     and inline `outline: none` that otherwise silently defeat WCAG 2.4.7. */
   *:focus-visible {
-    outline: 2px solid rgba(79, 138, 255, 0.6);
-    outline-offset: 2px;
+    outline: 2px solid var(--border-focus) !important;
+    outline-offset: 2px !important;
     border-radius: 4px;
   }
 
   button:focus-visible,
   a:focus-visible,
   [role="button"]:focus-visible {
-    outline: 2px solid rgba(79, 138, 255, 0.6);
-    outline-offset: 2px;
+    outline: 2px solid var(--border-focus) !important;
+    outline-offset: 2px !important;
     border-radius: 6px;
-    box-shadow: 0 0 0 4px rgba(79, 138, 255, 0.1);
+    box-shadow: 0 0 0 4px rgba(0, 245, 255, 0.12);
   }
 
   /* ── Reduced motion ──────────────────────────────────────────── */

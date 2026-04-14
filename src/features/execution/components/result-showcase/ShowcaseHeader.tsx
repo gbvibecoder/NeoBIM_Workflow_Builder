@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { motion } from "framer-motion";
-import { CheckCircle2, ArrowLeft } from "lucide-react";
+import { CheckCircle2, AlertTriangle, ArrowLeft } from "lucide-react";
 import { useLocale } from "@/hooks/useLocale";
 import { COLORS } from "@/features/execution/components/result-showcase/constants";
 
@@ -110,23 +110,37 @@ export function ShowcaseHeader({
             {projectTitle}
           </h1>
 
-          <div
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 4,
-              padding: "2px 8px",
-              borderRadius: 12,
-              background: "rgba(16,185,129,0.08)",
-              border: "1px solid rgba(16,185,129,0.15)",
-              flexShrink: 0,
-            }}
-          >
-            <CheckCircle2 size={10} style={{ color: COLORS.EMERALD }} />
-            <span style={{ fontSize: 10, fontWeight: 600, color: COLORS.EMERALD }}>
-              {t('showcase.complete')}
-            </span>
-          </div>
+          {(() => {
+            // Honest status: green only when all nodes succeeded. Otherwise amber
+            // with real count so users aren't misled by a "Complete" label on
+            // partial runs.
+            const isPartial = totalNodes > 0 && successNodes < totalNodes;
+            const accent = isPartial ? "253,203,110" : "16,185,129";
+            const fg = isPartial ? "#FDCB6E" : COLORS.EMERALD;
+            const Icon = isPartial ? AlertTriangle : CheckCircle2;
+            const label = isPartial
+              ? `${successNodes} / ${totalNodes} ${t('showcase.partialSuffix')}`
+              : t('showcase.complete');
+            return (
+              <div
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 4,
+                  padding: "2px 8px",
+                  borderRadius: 12,
+                  background: `rgba(${accent},0.08)`,
+                  border: `1px solid rgba(${accent},0.2)`,
+                  flexShrink: 0,
+                }}
+              >
+                <Icon size={10} style={{ color: fg }} />
+                <span style={{ fontSize: 10, fontWeight: 600, color: fg }}>
+                  {label}
+                </span>
+              </div>
+            );
+          })()}
         </div>
       </div>
 

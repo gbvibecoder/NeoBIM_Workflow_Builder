@@ -3,6 +3,7 @@ import { Sidebar } from "@/features/dashboard/components/Sidebar";
 import { Header } from "@/features/dashboard/components/Header";
 import { ErrorBoundary } from "@/shared/components/ErrorBoundary";
 import { CommandPaletteLoader } from "@/shared/components/ui/CommandPaletteLoader";
+import { BetaBanner } from "@/shared/components/ui/BetaBanner";
 import { OnboardingModal } from "@/features/onboarding/components/OnboardingModal";
 import { PendingReferralClaimer } from "@/features/referral/components/PendingReferralClaimer";
 import { SupportChatLoader } from "@/features/support/components/SupportChatLoader";
@@ -17,6 +18,7 @@ export default function DashboardLayout({
       <Sidebar />
       <ErrorBoundary>
         <div className="flex flex-col flex-1 min-w-0 overflow-hidden" style={{ transition: "flex 0.3s cubic-bezier(0.4, 0, 0.2, 1)" }}>
+          <BetaBanner />
           <Header />
           <div className="flex-1 min-h-0 overflow-hidden">
             {children}
