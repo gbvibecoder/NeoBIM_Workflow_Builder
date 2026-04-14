@@ -1197,8 +1197,15 @@ function computeProfileMetrics(
 }
 
 /**
- * Resolve material name from an IfcMaterial, IfcMaterialLayerSet,
- * IfcMaterialLayerSetUsage, IfcMaterialList, or IfcMaterialProfileSet.
+ * Resolve material name from any IFC material association type:
+ * IfcMaterial, IfcMaterialLayerSet, IfcMaterialLayerSetUsage,
+ * IfcMaterialConstituentSet (IFC4), IfcMaterialProfileSet (IFC4),
+ * or IfcMaterialList.
+ *
+ * Composite types (LayerSet, ConstituentSet, ProfileSet) are checked BEFORE
+ * the generic Name property, because composite entities may have a Name like
+ * "Wall Composite" that is useless for CSI mapping — we want the actual
+ * constituent material name (e.g., "Concrete M25").
  */
 function resolveMaterialName(
   ifcAPI: IfcAPI,
@@ -1209,10 +1216,9 @@ function resolveMaterialName(
     const mat = ifcAPI.GetLine(modelID, matId, false);
     if (!mat) return "";
 
-    // IfcMaterial → direct Name
-    if (mat.Name?.value && typeof mat.Name.value === "string") {
-      return mat.Name.value;
-    }
+    // ── Composite material types checked FIRST ──
+    // These may also have a Name property, but the constituent material
+    // names are more useful for BOQ cost mapping.
 
     // IfcMaterialLayerSet → join layer material names
     if (mat.MaterialLayers) {
@@ -1236,7 +1242,35 @@ function resolveMaterialName(
       return resolveMaterialName(ifcAPI, modelID, mat.ForLayerSet.value);
     }
 
-    // IfcMaterialProfileSet → first profile's material
+    // IfcMaterialConstituentSet (IFC4 — ArchiCAD, newer Revit IFC4 exports)
+    // Structure: MaterialConstituents[] → each IfcMaterialConstituent has Material → IfcMaterial
+    // Returns the constituent with the highest Fraction as primary material.
+    // web-ifc may expose the array as "MaterialConstituents" or "Constituents"
+    const rawConstituents = mat.MaterialConstituents ?? mat.Constituents;
+    if (rawConstituents) {
+      const constituents = Array.isArray(rawConstituents) ? rawConstituents : [rawConstituents];
+      let bestName = "";
+      let bestFraction = -1;
+      for (const constRef of constituents) {
+        const constId = (constRef as { value?: number })?.value;
+        if (typeof constId !== "number") continue;
+        const constituent = ifcAPI.GetLine(modelID, constId, false);
+        const constMatRef = constituent?.Material?.value;
+        if (typeof constMatRef !== "number") continue;
+        const constMat = ifcAPI.GetLine(modelID, constMatRef, false);
+        const name = constMat?.Name?.value;
+        if (!name || typeof name !== "string") continue;
+        const fraction = Number(constituent?.Fraction?.value ?? 0);
+        if (fraction > bestFraction) {
+          bestName = name;
+          bestFraction = fraction;
+        }
+      }
+      if (bestName) return bestName;
+    }
+
+    // IfcMaterialProfileSet (IFC4 — Tekla, structural Revit exports)
+    // Structure: MaterialProfiles[] → each IfcMaterialProfile has Material → IfcMaterial
     if (mat.MaterialProfiles) {
       const profiles = Array.isArray(mat.MaterialProfiles) ? mat.MaterialProfiles : [mat.MaterialProfiles];
       for (const profRef of profiles) {
@@ -1251,7 +1285,7 @@ function resolveMaterialName(
       }
     }
 
-    // IfcMaterialList → first material
+    // IfcMaterialList → first material in the list
     if (mat.Materials) {
       const materials = Array.isArray(mat.Materials) ? mat.Materials : [mat.Materials];
       for (const mRef of materials) {
@@ -1262,6 +1296,12 @@ function resolveMaterialName(
       }
     }
 
+    // IfcMaterial → direct Name (checked LAST to avoid catching composite set names
+    // like "Wall Composite" when constituent-level names are available)
+    if (mat.Name?.value && typeof mat.Name.value === "string") {
+      return mat.Name.value;
+    }
+
     return "";
   } catch {
     return "";
@@ -1269,8 +1309,16 @@ function resolveMaterialName(
 }
 
 /**
- * Resolve material layers from an IfcMaterialLayerSet or IfcMaterialLayerSetUsage.
+ * Resolve material layers from any IFC material association type.
  * Returns individual layers with name + thickness for per-layer BOQ decomposition.
+ *
+ * - IfcMaterialLayerSet/Usage → layers with real thickness in metres
+ * - IfcMaterialConstituentSet → constituents with Fraction as pseudo-thickness (0.0–1.0)
+ * - IfcMaterialProfileSet → profiles with thickness = 0 (cross-section, not layer)
+ * - IfcMaterialList → materials with thickness = 0
+ *
+ * Preference: LayerSet > ConstituentSet > ProfileSet > MaterialList
+ * (LayerSet has physical thickness which is most useful for BOQ)
  */
 function resolveMaterialLayers(
   ifcAPI: IfcAPI,
@@ -1286,7 +1334,7 @@ function resolveMaterialLayers(
       return resolveMaterialLayers(ifcAPI, modelID, mat.ForLayerSet.value);
     }
 
-    // IfcMaterialLayerSet → extract each layer
+    // IfcMaterialLayerSet → extract each layer (PREFERRED — has real thickness)
     if (mat.MaterialLayers) {
       const layers = Array.isArray(mat.MaterialLayers) ? mat.MaterialLayers : [mat.MaterialLayers];
       const result: MaterialLayer[] = [];
@@ -1303,6 +1351,65 @@ function resolveMaterialLayers(
         }
         if (thickness > 0) {
           result.push({ name, thickness });
+        }
+      }
+      return result;
+    }
+
+    // IfcMaterialConstituentSet (IFC4) → constituents with Fraction as pseudo-thickness
+    const rawConstituents = mat.MaterialConstituents ?? mat.Constituents;
+    if (rawConstituents) {
+      const constituents = Array.isArray(rawConstituents) ? rawConstituents : [rawConstituents];
+      const result: MaterialLayer[] = [];
+      for (const constRef of constituents) {
+        const constId = (constRef as { value?: number })?.value;
+        if (typeof constId !== "number") continue;
+        const constituent = ifcAPI.GetLine(modelID, constId, false);
+        const constMatRef = constituent?.Material?.value;
+        let name = "Unknown";
+        if (typeof constMatRef === "number") {
+          const constMat = ifcAPI.GetLine(modelID, constMatRef, false);
+          if (constMat?.Name?.value) name = constMat.Name.value;
+        }
+        // Fraction (0.0–1.0) stored as pseudo-thickness for downstream proportional analysis
+        const fraction = Number(constituent?.Fraction?.value ?? 0);
+        result.push({ name, thickness: fraction });
+      }
+      return result;
+    }
+
+    // IfcMaterialProfileSet (IFC4) → profiles (no meaningful thickness for layers)
+    if (mat.MaterialProfiles) {
+      const profiles = Array.isArray(mat.MaterialProfiles) ? mat.MaterialProfiles : [mat.MaterialProfiles];
+      const result: MaterialLayer[] = [];
+      for (const profRef of profiles) {
+        const profId = (profRef as { value?: number })?.value;
+        if (typeof profId !== "number") continue;
+        const prof = ifcAPI.GetLine(modelID, profId, false);
+        const profMatRef = prof?.Material?.value;
+        let name = "Unknown";
+        if (typeof profMatRef === "number") {
+          const profMat = ifcAPI.GetLine(modelID, profMatRef, false);
+          if (profMat?.Name?.value) name = profMat.Name.value;
+        }
+        // Profile name (e.g., "ISMB 300") — useful for structural steel BOQ
+        const profName = prof?.Name?.value;
+        if (profName && typeof profName === "string") name = `${name} (${profName})`;
+        result.push({ name, thickness: 0 });
+      }
+      return result;
+    }
+
+    // IfcMaterialList → simple list of materials (no thickness info)
+    if (mat.Materials) {
+      const materials = Array.isArray(mat.Materials) ? mat.Materials : [mat.Materials];
+      const result: MaterialLayer[] = [];
+      for (const mRef of materials) {
+        const mId = (mRef as { value?: number })?.value;
+        if (typeof mId !== "number") continue;
+        const m = ifcAPI.GetLine(modelID, mId, false);
+        if (m?.Name?.value) {
+          result.push({ name: m.Name.value, thickness: 0 });
         }
       }
       return result;
