@@ -38,6 +38,14 @@ import {
 
 // ─── Additional IFC type constants (not directly exported) ──────────────────
 const IFCREINFORCINGBAR = 979691226;
+// Geometry representation type IDs — used by diagnostics to classify why
+// `computeGeometricQuantities` either succeeded or failed for an element.
+const IFC_GEOM_BOOLEAN_RESULT = 2736907675;
+const IFC_GEOM_BOOLEAN_CLIPPING_RESULT = 4182860854;
+const IFC_GEOM_FACETED_BREP = 807026263;
+const IFC_GEOM_EXTRUDED_AREA_SOLID = 477187591;
+const IFC_GEOM_MAPPED_ITEM = 1525564444;
+const IFC_GEOM_BOUNDING_BOX = 2581212453;
 const IFCDUCTSEGMENT = 3518393246;
 const IFCPIPESEGMENT = 3612865200;
 const IFCCABLESEGMENT = 4217484030;
@@ -192,6 +200,62 @@ export interface IFCParseResult {
   buildingStoreys: BuildingStorey[];
   /** Model quality assessment — flags issues that affect BOQ accuracy */
   modelQuality?: ModelQualityReport;
+  /** Optional diagnostic counters populated when caller passes a diagnostics object */
+  parserDiagnostics?: ParserDiagnosticCounters;
+}
+
+/**
+ * Diagnostic counters mutated in-place during parsing. When the caller passes
+ * one of these to `parseIFCBuffer`, the parser populates per-element breakdowns
+ * (geometry strategy used, material association type) so downstream nodes can
+ * surface why specific elements ended up with zero quantities.
+ */
+export interface ParserDiagnosticCounters {
+  geometryTypes: {
+    extrudedAreaSolid: number;
+    booleanResult: number;
+    facetedBrep: number;
+    mappedItem: number;
+    boundingBox: number;
+    other: number;
+    failed: number;
+  };
+  materialTypes: {
+    ifcMaterial: number;
+    layerSet: number;
+    constituentSet: number;
+    profileSet: number;
+    materialList: number;
+    none: number;
+  };
+  /** Per-element warnings — capped to first 50 to keep payload bounded */
+  elementWarnings: string[];
+}
+
+export function createParserDiagnosticCounters(): ParserDiagnosticCounters {
+  return {
+    geometryTypes: { extrudedAreaSolid: 0, booleanResult: 0, facetedBrep: 0, mappedItem: 0, boundingBox: 0, other: 0, failed: 0 },
+    materialTypes: { ifcMaterial: 0, layerSet: 0, constituentSet: 0, profileSet: 0, materialList: 0, none: 0 },
+    elementWarnings: [],
+  };
+}
+
+/** Identify which IFC material association entity an element uses. */
+function classifyMaterialAssociation(
+  ifcAPI: IfcAPI,
+  modelID: number,
+  matId: number,
+): "ifcMaterial" | "layerSet" | "constituentSet" | "profileSet" | "materialList" | "none" {
+  try {
+    const mat = ifcAPI.GetLine(modelID, matId, false);
+    if (!mat) return "none";
+    if (mat.MaterialLayers || mat.ForLayerSet?.value != null) return "layerSet";
+    if (mat.MaterialConstituents ?? mat.Constituents) return "constituentSet";
+    if (mat.MaterialProfiles) return "profileSet";
+    if (mat.Materials) return "materialList";
+    if (mat.Name?.value) return "ifcMaterial";
+  } catch { /* fall through */ }
+  return "none";
 }
 
 // ============================================================================
@@ -906,12 +970,21 @@ function computeGeometricQuantities(
   modelID: number,
   expressID: number,
   ifcType: string,
-  quantities: QuantityData
+  quantities: QuantityData,
+  diagCounters?: ParserDiagnosticCounters,
 ): void {
   // Only fall back if Qto gave us nothing useful
   const hasArea = (quantities.area?.gross ?? 0) > 0;
   const hasVolume = (quantities.volume?.base ?? 0) > 0;
   if (hasArea && hasVolume) return;
+
+  // Track which strategy ultimately produced (or failed to produce) geometry
+  let geometryRecorded = false;
+  const recordGeom = (kind: keyof ParserDiagnosticCounters["geometryTypes"]) => {
+    if (geometryRecorded || !diagCounters) return;
+    diagCounters.geometryTypes[kind] = (diagCounters.geometryTypes[kind] ?? 0) + 1;
+    geometryRecorded = true;
+  };
 
   // If we're computing from geometry, mark the source (unless Qto already set it)
   const markGeometrySource = () => {
@@ -953,8 +1026,27 @@ function computeGeometricQuantities(
         const item = ifcAPI.GetLine(modelID, itemId, false);
         if (!item) continue;
 
+        // Diagnostic: classify the representation type even if extraction fails.
+        // We only record once per element via recordGeom (first matching strategy wins).
+        if (diagCounters && !geometryRecorded) {
+          try {
+            const geomTypeId = ifcAPI.GetLineType(modelID, itemId);
+            if (geomTypeId === IFC_GEOM_BOOLEAN_RESULT || geomTypeId === IFC_GEOM_BOOLEAN_CLIPPING_RESULT) {
+              recordGeom("booleanResult");
+            } else if (geomTypeId === IFC_GEOM_FACETED_BREP) {
+              recordGeom("facetedBrep");
+            }
+            // Other types are recorded by the strategy branch that handles them.
+            void geomTypeId;
+            void IFC_GEOM_EXTRUDED_AREA_SOLID;
+            void IFC_GEOM_MAPPED_ITEM;
+            void IFC_GEOM_BOUNDING_BOX;
+          } catch { /* GetLineType not always available — fall back to property sniffing */ }
+        }
+
         // ── Strategy 1: IfcExtrudedAreaSolid (standard walls, slabs, columns) ──
         if (item.Depth?.value != null) {
+          recordGeom("extrudedAreaSolid");
           const depth = Number(item.Depth.value);
           if (depth <= 0) continue;
 
@@ -1024,6 +1116,7 @@ function computeGeometricQuantities(
         // ── Strategy 2: Bounding box (IfcBoundingBox) — fallback for complex geometry ──
         // Curtain walls often use IfcFacetedBrep or decomposed geometry
         if (item.Corner?.value != null || item.XDim?.value != null) {
+          recordGeom("boundingBox");
           const xd = Number(item.XDim?.value ?? 0);
           const yd = Number(item.YDim?.value ?? 0);
           const zd = Number(item.ZDim?.value ?? 0);
@@ -1036,6 +1129,7 @@ function computeGeometricQuantities(
 
         // ── Strategy 3: IfcMappedItem — follow the mapping source ──
         if (item.MappingSource?.value != null) {
+          recordGeom("mappedItem");
           try {
             const mapSource = ifcAPI.GetLine(modelID, item.MappingSource.value, false);
             if (mapSource?.MappedRepresentation?.value) {
@@ -1104,6 +1198,14 @@ function computeGeometricQuantities(
     }
   } catch {
     // Geometry extraction failed — silently fall back to count-only
+  }
+
+  // Record final outcome if no strategy claimed this element earlier
+  if (!geometryRecorded && diagCounters) {
+    const aGross = quantities.area?.gross ?? 0;
+    const vBase = quantities.volume?.base ?? 0;
+    if (aGross === 0 && vBase === 0) recordGeom("failed");
+    else recordGeom("other");
   }
 }
 
@@ -1621,13 +1723,20 @@ function buildModelQualityReport(
 export async function parseIFCBuffer(
   buffer: Uint8Array,
   filename: string,
-  customWasteFactors?: Record<string, number>
+  customWasteFactors?: Record<string, number>,
+  diagnostics?: ParserDiagnosticCounters,
 ): Promise<IFCParseResult> {
   void filename;
   void customWasteFactors;
   const startTime = Date.now();
   const warnings: string[] = [];
   const errors: string[] = [];
+
+  // Diagnostic counters (always present internally, optionally surfaced via caller)
+  const diag: ParserDiagnosticCounters = diagnostics ?? createParserDiagnosticCounters();
+  const pushElementWarning = (msg: string) => {
+    if (diag.elementWarnings.length < 50) diag.elementWarnings.push(msg);
+  };
 
   // Initialize web-ifc API with correct WASM path for Next.js
   const ifcAPI = new IfcAPI();
@@ -1812,6 +1921,7 @@ export async function parseIFCBuffer(
         if (typeof matRef !== "number") continue;
         const matName = resolveMaterialName(ifcAPI, modelID, matRef);
         const layers = resolveMaterialLayers(ifcAPI, modelID, matRef);
+        const matKind = classifyMaterialAssociation(ifcAPI, modelID, matRef);
         if (!matName) continue;
         const relatedObjects = rel?.RelatedObjects;
         const refs = Array.isArray(relatedObjects) ? relatedObjects : [relatedObjects];
@@ -1820,6 +1930,7 @@ export async function parseIFCBuffer(
           if (typeof elId === "number") {
             elementMaterialLookup.set(elId, matName);
             if (layers.length > 0) elementMaterialLayersLookup.set(elId, layers);
+            diag.materialTypes[matKind] = (diag.materialTypes[matKind] ?? 0) + 1;
           }
         }
       } catch { /* skip */ }
@@ -1895,7 +2006,14 @@ export async function parseIFCBuffer(
 
         // Geometric fallback: compute area/volume from shape representation
         // when Qto property sets are missing or incomplete
-        computeGeometricQuantities(ifcAPI, modelID, expressID, label, quantities);
+        computeGeometricQuantities(ifcAPI, modelID, expressID, label, quantities, diag);
+
+        // Per-element zero-quantity warning — captures WHY this element has no quantities
+        const aGross = quantities.area?.gross ?? 0;
+        const vBase = quantities.volume?.base ?? 0;
+        if (aGross === 0 && vBase === 0 && label !== "IfcDoor" && label !== "IfcWindow" && label !== "IfcRailing") {
+          pushElementWarning(`${label} #${expressID}: zero area & volume (quantitySource=${quantities.quantitySource ?? "none"})`);
+        }
 
         // ── Unit conversion: apply lengthConversionFactor if non-metric units detected ──
         if (unitConversionApplied && lengthConversionFactor !== 1.0) {
@@ -2178,5 +2296,6 @@ export async function parseIFCBuffer(
     divisions,
     buildingStoreys,
     modelQuality,
+    parserDiagnostics: diag,
   };
 }

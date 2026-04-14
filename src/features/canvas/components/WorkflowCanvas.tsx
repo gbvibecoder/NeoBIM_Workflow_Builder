@@ -31,6 +31,7 @@ import { CanvasToolbar } from "@/features/canvas/components/toolbar/CanvasToolba
 
 import { ExecutionLog } from "@/features/canvas/components/ExecutionLog";
 import { ResultShowcase } from "@/features/canvas/components/ResultShowcase";
+import { ExecutionDiagnosticsPanel } from "@/components/diagnostics/ExecutionDiagnosticsPanel";
 import { OnboardingTour } from "@/features/canvas/components/OnboardingTour";
 import { AIChatPanel } from "@/features/canvas/components/panels/AIChatPanel";
 import type { ChatMessage } from "@/features/canvas/components/panels/AIChatPanel";
@@ -972,6 +973,11 @@ function WorkflowCanvasInner({ workflowId: urlWorkflowId, templateId }: Workflow
               <ResultShowcase onClose={() => setShowShowcase(false)} />
             )}
           </AnimatePresence>
+
+          {/* Universal "Behind the Scenes" diagnostics — floats bottom-right
+              during AND after execution. Reads from useExecutionStore.currentTrace
+              so it shows up the moment the first node starts. */}
+          <ExecutionDiagnosticsPanel />
 
           {/* "View Results" floating CTA — clean, professional, true-centered */}
           <AnimatePresence>

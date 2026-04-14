@@ -1,5 +1,10 @@
 import { generateId } from "./deps";
 import type { NodeHandler } from "./types";
+import {
+  createDiagnostics,
+  finalizeDiagnostics,
+  addLog,
+} from "@/features/boq/services/pipeline-diagnostics";
 
 /**
  * TR-015 — Market Intelligence Agent (live construction material prices via Claude web search)
@@ -56,9 +61,12 @@ export const handleTR015: NodeHandler = async (ctx) => {
     buildingDesc = `${miBuildingType} (${ifcCtx.totalFloors ?? "?"} floors, ${ifcCtx.totalGFA ?? "?"}m² GFA, ${ifcCtx.dominantStructure ?? "RCC"}, ~${ifcCtx.estimatedHeight ?? "?"}m height)`;
   }
 
-  const marketData = await fetchMarketPrices(miCity, miState, buildingDesc);
+  const marketDiag = createDiagnostics(executionId ?? "local");
+  addLog(marketDiag, "tr-015-market", "info", `TR-015 dispatched for ${miCity}, ${miState}`, { buildingDesc });
+  const marketData = await fetchMarketPrices(miCity, miState, buildingDesc, marketDiag);
   const adjustments = computeMarketAdjustments(marketData);
   const durationSec = (marketData.duration_ms / 1000).toFixed(1);
+  finalizeDiagnostics(marketDiag);
 
   // Build a transparent, formatted table output
   const miHeaders = ["Material", "Price", "Source", "Date", "Confidence"];
@@ -134,6 +142,7 @@ export const handleTR015: NodeHandler = async (ctx) => {
       content: reportLines.join("\n"),
       _marketData: marketData,
       _adjustments: adjustments,
+      _marketDiagnostics: marketDiag,
     },
     metadata: {
       model: "claude-web-search-agent",

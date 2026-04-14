@@ -21,7 +21,27 @@ import {
   selectSetRegeneratingNode,
   selectSetVideoGenProgress,
   selectClearVideoGenProgress,
+  selectSetExecutionTrace,
+  selectPersistDiagnostics,
 } from "@/features/execution/stores/execution-store";
+import {
+  createExecutionTrace,
+  createNodeTrace,
+  startNodeTrace,
+  finishNodeTrace,
+  appendLog,
+  appendAttempt,
+  appendDataFlow,
+  finalizeExecutionTrace,
+  estimatePayloadSize,
+  pickSampleFields,
+  pickRecordCount,
+  classifyArtifactDataType,
+  formatCanvasLogLines,
+  type ExecutionTrace,
+  type NodeTrace,
+} from "@/lib/execution-diagnostics";
+import { NODE_CATALOGUE } from "@/features/workflows/constants/node-catalogue";
 import { useUIStore } from "@/shared/stores/ui-store";
 import { executeNode as mockExecuteNode } from "@/features/execution/services/mock-executor";
 import { inputFileStore, inputMultiFileStore, supplementaryIFCStore } from "@/features/canvas/components/nodes/InputNode";
@@ -1234,6 +1254,8 @@ export function useExecution({ onLog }: UseExecutionOptions = {}) {
   const setRegeneratingNode = useExecutionStore(selectSetRegeneratingNode);
   const setVideoGenProgress = useExecutionStore(selectSetVideoGenProgress);
   const clearVideoGenProgress = useExecutionStore(selectClearVideoGenProgress);
+  const setExecutionTrace = useExecutionStore(selectSetExecutionTrace);
+  const persistDiagnostics = useExecutionStore(selectPersistDiagnostics);
   
   const isDemoMode = useUIStore(s => s.isDemoMode);
   const [rateLimitHit, setRateLimitHit] = useState<RateLimitInfo | null>(null);
@@ -1385,6 +1407,21 @@ export function useExecution({ onLog }: UseExecutionOptions = {}) {
     startExecution(execution);
     log("start", "Workflow execution started", `${nodes.length} nodes queued`);
 
+    // ── Initialize universal execution trace ──────────────────────────────
+    // Captures every node's attempts, API calls, timings, and the data that
+    // flowed between nodes. Surfaced via the "Behind the Scenes" panel on
+    // results pages and persisted to Execution.metadata.diagnostics.
+    const trace: ExecutionTrace = createExecutionTrace(
+      executionId,
+      currentWorkflow?.name ?? "Untitled Workflow",
+    );
+    const nodeTraceMap = new Map<string, NodeTrace>();
+    setExecutionTrace(trace);
+    const resolveNodeName = (catalogueId: string, fallback: string): string => {
+      const entry = NODE_CATALOGUE.find(n => n.id === catalogueId);
+      return entry?.name ?? fallback;
+    };
+
     // Determine if we should use real execution (OPENAI_API_KEY configured)
     const useReal = process.env.NEXT_PUBLIC_ENABLE_MOCK_EXECUTION !== "true";
 
@@ -1449,9 +1486,49 @@ export function useExecution({ onLog }: UseExecutionOptions = {}) {
       updateNodeStatus(node.id, "running");
       log("running", `Running: ${node.data.label}`, node.data.catalogueId);
 
+      // ── Node trace lifecycle ──────────────────────────────────────────
+      const nodeTrace = createNodeTrace(
+        node.id,
+        node.data.catalogueId,
+        resolveNodeName(node.data.catalogueId, node.data.label),
+      );
+      startNodeTrace(nodeTrace);
+      trace.nodes.push(nodeTrace);
+      nodeTraceMap.set(node.id, nodeTrace);
+      // Re-publish the trace so subscribers see the in-progress node appear
+      setExecutionTrace({ ...trace });
+
       try {
         // Get upstream data from connected nodes (via edges), not just previous in array
         const upstreamArtifact = getUpstreamArtifact(node.id, workflowEdges, artifactMap);
+
+        // Diagnostics: capture per-edge data flow from upstream nodes
+        const incomingEdges = workflowEdges.filter(e => e.target === node.id);
+        for (const edge of incomingEdges) {
+          const src = artifactMap.get(edge.source);
+          if (!src) continue;
+          appendDataFlow(trace, {
+            fromNodeId: edge.source,
+            toNodeId: node.id,
+            dataType: classifyArtifactDataType(src.type, src.data),
+            recordCount: pickRecordCount(src.data),
+            dataSizeEstimate: estimatePayloadSize(src.data),
+            sampleFields: pickSampleFields(src.data),
+          });
+        }
+
+        // Diagnostics: input summary
+        if (upstreamArtifact) {
+          const fields = pickSampleFields(upstreamArtifact.data, 5);
+          const size = estimatePayloadSize(upstreamArtifact.data);
+          const records = pickRecordCount(upstreamArtifact.data);
+          nodeTrace.inputSummary = `Received ${size} ${classifyArtifactDataType(upstreamArtifact.type, upstreamArtifact.data)}${records !== undefined ? ` (${records} records)` : ""}${fields.length ? ` — fields: ${fields.join(", ")}` : ""}`;
+        } else {
+          nodeTrace.inputSummary = INPUT_NODE_IDS.has(node.data.catalogueId)
+            ? "User input (no upstream node)"
+            : "No upstream input";
+        }
+        appendLog(nodeTrace, "info", `Starting ${nodeTrace.nodeName}`);
 
         // ── Cache check for image nodes (GN-003) — reuse DALL-E render if upstream unchanged ──
         const nodeCatalogueId = (node.data as { catalogueId: string }).catalogueId;
@@ -1480,6 +1557,18 @@ export function useExecution({ onLog }: UseExecutionOptions = {}) {
               updateNodeStatus(node.id, "success");
               setEdgeFlowing(node.id, true);
               setTimeout(() => setEdgeFlowing(node.id, false), FLOW_DURATION_MS);
+              // Diagnostics: cache-hit short-circuit
+              appendAttempt(nodeTrace, {
+                action: "cache lookup",
+                status: "success",
+                durationMs: Date.now() - new Date(nodeTrace.startedAt!).getTime(),
+                detail: "Upstream unchanged — reused previous render",
+              });
+              nodeTrace.isCacheHit = true;
+              nodeTrace.summary = "Reused cached render (upstream unchanged)";
+              nodeTrace.outputSummary = `Reused ${prevArtifact.type} from previous run`;
+              finishNodeTrace(nodeTrace, "success");
+              setExecutionTrace({ ...trace });
               continue;
             }
           }
@@ -1512,6 +1601,39 @@ export function useExecution({ onLog }: UseExecutionOptions = {}) {
         const artifact = await executeNode(node, executionId, upstreamArtifact, useReal, isDemoMode);
         artifactMap.set(node.id, artifact);
 
+        // Diagnostics: capture output summary + fold any node-emitted deep
+        // diagnostics into NodeTrace.stats. The TR-007/TR-015/TR-008 handlers
+        // already publish `_parserDiagnostics`, `_marketDiagnostics`, and
+        // `_diagnostics` payloads — we surface them here under stats so the
+        // panel can render the rich per-stage breakdowns when present.
+        try {
+          const data = (artifact.data as Record<string, unknown> | undefined) ?? {};
+          const outFields = pickSampleFields(data, 6);
+          const outSize = estimatePayloadSize(data);
+          const outRecords = pickRecordCount(data);
+          nodeTrace.outputSummary = `Produced ${outSize} ${classifyArtifactDataType(artifact.type, data)}${outRecords !== undefined ? ` (${outRecords} records)` : ""}${outFields.length ? ` — fields: ${outFields.join(", ")}` : ""}`;
+          if (data._parserDiagnostics) (nodeTrace.stats as Record<string, unknown>).parserDiagnostics = data._parserDiagnostics;
+          if (data._marketDiagnostics) (nodeTrace.stats as Record<string, unknown>).marketDiagnostics = data._marketDiagnostics;
+          if (data._diagnostics) (nodeTrace.stats as Record<string, unknown>).pipelineDiagnostics = data._diagnostics;
+          // Headline numbers shown on the node card
+          if (typeof data._totalCost === "number") (nodeTrace.stats as Record<string, unknown>).totalCost = data._totalCost;
+          if (typeof data._gfa === "number") (nodeTrace.stats as Record<string, unknown>).gfa = data._gfa;
+          if (typeof data._aaceClass === "string") (nodeTrace.stats as Record<string, unknown>).aaceClass = data._aaceClass;
+
+          // Surface per-node-type smart canvas log lines AND pipe them to the
+          // workflow log (they're the "what actually happened" lines, not just
+          // "X done"). Skip the generic "X completed" toast handled below.
+          const canvasLines = formatCanvasLogLines({ nodeName: nodeTrace.nodeName, nodeTypeId: nodeTrace.nodeTypeId, trace: nodeTrace, output: data });
+          for (const line of canvasLines) {
+            const t = line.level === "error" ? "error"
+              : line.level === "warn" ? "info"
+              : line.level === "success" ? "success"
+              : "info";
+            log(t as LogEntry["type"], line.message, line.detail);
+            appendLog(nodeTrace, line.level, line.message);
+          }
+        } catch { /* non-fatal: diagnostics are best-effort */ }
+
         // Stamp upstream hash on image artifacts for future cache detection
         if (nodeCatalogueId === "GN-003" && artifact.type === "image") {
           const upHash = simpleHash(
@@ -1534,6 +1656,20 @@ export function useExecution({ onLog }: UseExecutionOptions = {}) {
         updateNodeStatus(node.id, "success");
         log("success", `${node.data.label} completed`, String(artifact.type));
         trackNodeUsed(node.data.catalogueId, node.data.label);
+
+        // Diagnostics: finalize node trace
+        const warnings = (artifact.metadata?.warnings as unknown[] | undefined);
+        const hadWarnings = Array.isArray(warnings) && warnings.length > 0;
+        appendAttempt(nodeTrace, {
+          action: useReal && REAL_NODE_IDS.has(node.data.catalogueId) ? "real handler" : "mock executor",
+          status: "success",
+          durationMs: Date.now() - new Date(nodeTrace.startedAt!).getTime(),
+          detail: hadWarnings ? `Completed with ${warnings!.length} warning(s)` : undefined,
+        });
+        nodeTrace.isMock = !(useReal && REAL_NODE_IDS.has(node.data.catalogueId));
+        nodeTrace.summary = nodeTrace.outputSummary || `Completed ${nodeTrace.nodeName}`;
+        finishNodeTrace(nodeTrace, hadWarnings ? "warning" : "success");
+        setExecutionTrace({ ...trace });
 
         // If this is a video node with background generation, start polling or client rendering
         const artData = artifact.data as Record<string, unknown> | undefined;
@@ -1702,6 +1838,18 @@ export function useExecution({ onLog }: UseExecutionOptions = {}) {
             completedAt: new Date(),
             errorMessage: errMsg,
           });
+          // Diagnostics
+          appendAttempt(nodeTrace, {
+            action: "real handler",
+            status: "failed",
+            durationMs: Date.now() - new Date(nodeTrace.startedAt!).getTime(),
+            detail: `Rate limited — ${errMsg}`,
+          });
+          appendLog(nodeTrace, "error", "Rate limit exceeded", { error: errMsg });
+          nodeTrace.summary = `Rate limited: ${errMsg}`;
+          finishNodeTrace(nodeTrace, "error");
+          trace.errors.push(`${nodeTrace.nodeName}: rate limit exceeded`);
+          setExecutionTrace({ ...trace });
           break;
         }
 
@@ -1725,6 +1873,18 @@ export function useExecution({ onLog }: UseExecutionOptions = {}) {
             completedAt: new Date(),
             errorMessage: errMsg,
           });
+          // Diagnostics: hard-fail (LIVE node, no mock fallback)
+          appendAttempt(nodeTrace, {
+            action: "real handler",
+            status: "failed",
+            durationMs: Date.now() - new Date(nodeTrace.startedAt!).getTime(),
+            detail: errMsg,
+          });
+          appendLog(nodeTrace, "error", `${nodeTrace.nodeName} failed`, { error: errMsg });
+          nodeTrace.summary = `Failed: ${errMsg}`;
+          finishNodeTrace(nodeTrace, "error");
+          trace.errors.push(`${nodeTrace.nodeName}: ${errMsg}`);
+          setExecutionTrace({ ...trace });
           break;
         }
 
@@ -1760,6 +1920,28 @@ export function useExecution({ onLog }: UseExecutionOptions = {}) {
           });
           updateNodeStatus(node.id, "success");
           log("info", `${node.data.label} completed with mock fallback`);
+
+          // Diagnostics: real failed → mock fallback succeeded
+          appendAttempt(nodeTrace, {
+            action: "real handler",
+            status: "failed",
+            durationMs: Date.now() - new Date(nodeTrace.startedAt!).getTime(),
+            detail: errMsg,
+            fallbackUsed: "mock executor",
+          });
+          appendAttempt(nodeTrace, {
+            action: "mock executor",
+            status: "success",
+            durationMs: 0,
+            detail: "Returned mock data after real handler failed",
+          });
+          nodeTrace.fellBackToMock = true;
+          nodeTrace.outputSummary = `Produced ${estimatePayloadSize(mockArtifact.data)} (mock) ${classifyArtifactDataType(mockArtifact.type, mockArtifact.data)}`;
+          nodeTrace.summary = `Real handler failed (${errMsg.slice(0, 80)}) — using mock data`;
+          appendLog(nodeTrace, "warn", "Real handler failed — falling back to mock", { error: errMsg });
+          finishNodeTrace(nodeTrace, "warning");
+          trace.warnings.push(`${nodeTrace.nodeName}: fell back to mock (${errMsg.slice(0, 80)})`);
+          setExecutionTrace({ ...trace });
 
           // Check if mock artifact requires background video generation (same as success path)
           const mockArtData = mockArtifact.data as Record<string, unknown> | undefined;
@@ -1801,6 +1983,18 @@ export function useExecution({ onLog }: UseExecutionOptions = {}) {
             completedAt: new Date(),
             errorMessage: errMsg,
           });
+          // Diagnostics: both real and mock failed
+          appendAttempt(nodeTrace, {
+            action: "mock executor",
+            status: "failed",
+            durationMs: 0,
+            detail: "Mock fallback also failed",
+          });
+          appendLog(nodeTrace, "error", "Mock fallback also failed", { error: errMsg });
+          nodeTrace.summary = `Failed (real + mock): ${errMsg}`;
+          finishNodeTrace(nodeTrace, "error");
+          trace.errors.push(`${nodeTrace.nodeName}: ${errMsg}`);
+          setExecutionTrace({ ...trace });
         }
       }
     }
@@ -1811,6 +2005,15 @@ export function useExecution({ onLog }: UseExecutionOptions = {}) {
       hasError ? "Workflow completed with errors" : "Workflow completed successfully",
       `${orderedNodes.length} nodes executed`
     );
+
+    // Diagnostics: finalize trace and persist to Execution.metadata.
+    // Suppress unused-Map warning — nodeTraceMap was used to publish updates
+    // in the loop; the trace.nodes array is the canonical store.
+    void nodeTraceMap;
+    finalizeExecutionTrace(trace);
+    setExecutionTrace({ ...trace });
+    // Fire-and-forget persist — non-blocking so the user reaches results fast.
+    persistDiagnostics().catch(() => {});
 
     // Update DB execution status
     if (dbExecutionId) {
@@ -1861,6 +2064,8 @@ export function useExecution({ onLog }: UseExecutionOptions = {}) {
     setVideoGenProgress,
     clearVideoGenProgress,
     log,
+    setExecutionTrace,
+    persistDiagnostics,
   ]);
 
   const regenerateNode = useCallback(async (nodeId: string) => {
