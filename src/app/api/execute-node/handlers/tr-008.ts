@@ -10,6 +10,15 @@ import {
   detectRegionFromText,
 } from "./deps";
 import type { NodeHandler } from "./types";
+import {
+  createDiagnostics,
+  addLog,
+  finalizeDiagnostics,
+  mergeParserDiagnostics,
+  mergeMarketDiagnostics,
+  buildExecutionLogSummary,
+  type PipelineDiagnostics,
+} from "@/features/boq/services/pipeline-diagnostics";
 
 /**
  * TR-008 — BOQ Cost Mapper (Professional QS-grade)
@@ -32,6 +41,17 @@ import type { NodeHandler } from "./types";
 export const handleTR008: NodeHandler = async (ctx) => {
   const { inputData, tileInstanceId, executionId } = ctx;
   // BOQ Cost Mapper — Professional QS-grade with waste, M/L/E breakdown, escalation, project type
+
+  // ── Unified pipeline diagnostics — merges upstream parser + market traces ──
+  const diag: PipelineDiagnostics = createDiagnostics(executionId ?? "local");
+  mergeParserDiagnostics(diag, inputData?._parserDiagnostics as Partial<PipelineDiagnostics> | undefined);
+  mergeMarketDiagnostics(diag, inputData?._marketDiagnostics as Partial<PipelineDiagnostics> | undefined);
+  addLog(diag, "tr-008-cost", "info", "TR-008 dispatched", {
+    hasParserDiagnostics: !!inputData?._parserDiagnostics,
+    hasMarketDiagnostics: !!inputData?._marketDiagnostics,
+    hasMarketData: !!inputData?._marketData,
+    elementCount: Array.isArray(inputData?._elements) ? inputData._elements.length : 0,
+  });
 
   // FIX 11: Indian number formatting (Cr/L) for QS summary
   const formatINR = (value: number): string => {
@@ -1524,6 +1544,53 @@ export const handleTR008: NodeHandler = async (ctx) => {
     ? `This estimate is suitable for early-stage cost planning (${aaceInfo.class}). ${boqLines.length - highCount} of ${boqLines.length} items have medium/low confidence — review flagged items before budgeting decisions.`
     : `This estimate is indicative only (AACE Class 5). The IFC model has quality issues affecting accuracy. See Model Quality Report for details and recommended fixes.`;
 
+  // ── Cost mapping diagnostics — derived from the final boqLines ──
+  {
+    const cm = diag.stages.costMapping;
+    cm.totalLineItems = boqLines.length;
+    cm.is1200Mapped = boqLines.filter(l => l.is1200Code && !l.is1200Code.includes("GENERIC") && !l.is1200Code.includes("EST") && l.is1200Code !== "PROV").length;
+    cm.genericFallback = boqLines.filter(l => l.is1200Code === "IS1200-P2-GENERIC" || l.is1200Code === "IS1200-EST").length;
+    cm.derivedItems = boqLines.filter(l => l.is1200Code?.includes("DERIVED") || l.is1200Code?.includes("FW-") || (l.is1200Code === "IS1200-P6-REBAR-500" && l.description.includes("Est."))).length;
+    cm.standardItems = boqLines.filter(l => l.description.includes("[STANDARD]")).length;
+    cm.provisionalItems = boqLines.filter(l => l.is1200Code === "PROV").length;
+    cm.formworkItems = boqLines.filter(l => l.is1200Code?.includes("FW-")).length;
+    cm.rebarItems = boqLines.filter(l => l.is1200Code?.includes("REBAR")).length;
+    cm.externalWallItems = boqLines.filter(l => l.description.toLowerCase().includes("(external)") || l.description.toLowerCase().includes("ext. plaster") || l.description.toLowerCase().includes("ext. weather")).length;
+    cm.internalWallItems = boqLines.filter(l => l.description.toLowerCase().includes("(internal)") || l.description.toLowerCase().includes("int. plaster") || l.description.toLowerCase().includes("int. emulsion")).length;
+    cm.isExternalDifferentiated = cm.externalWallItems > 0 && cm.internalWallItems > 0;
+    cm.totalHardCost = Math.round(hardCostSubtotal);
+    cm.costPerSqm = gfaForProvisional > 0 ? Math.round(hardCostSubtotal / gfaForProvisional) : 0;
+    // Confidence breakdown from the per-line `confidence` set above
+    for (const l of boqLines) {
+      const c = (l as Record<string, unknown>).confidence as { score?: string } | undefined;
+      const k = c?.score === "high" ? "high" : c?.score === "low" ? "low" : "medium";
+      cm.confidenceBreakdown[k]++;
+    }
+    // Rebar sources: `grade_based` if concreteGrade present on the source element, else `heuristic`
+    const elemsWithGrade = (elements as Array<Record<string, unknown>>).filter(e => typeof e.concreteGrade === "string" && (e.concreteGrade as string).length > 0).length;
+    cm.rebarSources = {
+      grade_based: elemsWithGrade,
+      heuristic: Math.max(0, cm.rebarItems - elemsWithGrade),
+      ...(steelFromMarket ? { market_rate: cm.rebarItems } : {}),
+    };
+    if (cm.genericFallback > 0) cm.warnings.push(`${cm.genericFallback} line items used generic fallback rates`);
+    if (cm.provisionalItems > cm.totalLineItems * 0.4) cm.warnings.push(`Provisional sums make up >40% of line items — add structural/MEP IFC for precision`);
+
+    addLog(diag, "tr-008-cost", "info", `Cost mapping complete: ${cm.totalLineItems} lines (${cm.is1200Mapped} IS1200, ${cm.standardItems} std, ${cm.provisionalItems} prov)`, {
+      hardCost: cm.totalHardCost, costPerSqm: cm.costPerSqm,
+    });
+  }
+
+  finalizeDiagnostics(diag);
+
+  // Append a compact diagnostic summary into the NL summary so the
+  // existing Execution Log panel surfaces the key facts without diving
+  // into the BOQ visualizer's diagnostics panel.
+  const diagLogLines = buildExecutionLogSummary(diag);
+  const nlSummaryWithDiag = diagLogLines.length > 0
+    ? `${nlSummary}\n\n── Pipeline Diagnostics ──\n${diagLogLines.join("\n")}`
+    : nlSummary;
+
   return {
     id: generateId(),
     executionId: executionId ?? "local",
@@ -1546,9 +1613,10 @@ export const handleTR008: NodeHandler = async (ctx) => {
       _disclaimer: honestDisclaimer,
       _aaceClass: aaceInfo.class,
       _aaceAccuracy: aaceInfo.accuracy,
-      content: nlSummary,
+      content: nlSummaryWithDiag,
       _pricingMetadata: pricingMetadata,
       _modelQualityReport: modelQualityReport,
+      _diagnostics: diag,
       _boqData: {
         lines: boqLines,
         subtotalMaterial: Math.round(totalMaterial * 100) / 100,

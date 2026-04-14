@@ -17,6 +17,10 @@
  */
 
 import Anthropic from "@anthropic-ai/sdk";
+import {
+  addLog,
+  type PipelineDiagnostics,
+} from "@/features/boq/services/pipeline-diagnostics";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -230,6 +234,7 @@ export async function fetchMarketPrices(
   city: string,
   state: string,
   buildingType: string,
+  diag?: PipelineDiagnostics,
 ): Promise<MarketIntelligenceResult> {
   const apiKey = process.env.ANTHROPIC_API_KEY || "";
   const now = new Date();
@@ -237,7 +242,12 @@ export async function fetchMarketPrices(
   const yearStr = String(now.getFullYear());
   const dateStr = now.toISOString().split("T")[0];
 
-  // ── Diagnostic logging ──
+  if (diag) {
+    diag.stages.marketIntelligence.attempted = true;
+    addLog(diag, "tr-015-market", "info", `Fetching market prices for ${city}, ${state}`, {
+      buildingType, monthYear, hasApiKey: !!apiKey,
+    });
+  }
 
   // ── Cache check ──
   const norm = (s: string) => s.toLowerCase().trim().replace(/\s+/g, "_");
@@ -251,11 +261,23 @@ export async function fetchMarketPrices(
       `Prices refresh daily at midnight IST`,
     ];
     cached.duration_ms = 0; // instant from cache
+    if (diag) {
+      diag.stages.marketIntelligence.cacheHit = true;
+      diag.stages.marketIntelligence.status = cached.agent_status === "fallback" ? "failed" : cached.agent_status;
+      diag.stages.marketIntelligence.steelPrice = cached.steel_per_tonne?.value;
+      diag.stages.marketIntelligence.steelSource = cached.steel_per_tonne?.source;
+      diag.stages.marketIntelligence.cementPrice = cached.cement_per_bag?.value;
+      diag.stages.marketIntelligence.cementSource = cached.cement_per_bag?.source;
+      addLog(diag, "tr-015-market", "info", "Redis cache HIT — returning cached prices", {
+        fetchedAt: cached.fetched_at,
+      });
+    }
     return cached;
   }
   if (cached) {
     console.warn(`[TR-015] Cache key matched but city/state mismatch — ignoring cache`);
   }
+  if (diag) diag.stages.marketIntelligence.cacheHit = false;
 
 
   // Default result with static fallbacks
@@ -297,6 +319,11 @@ export async function fetchMarketPrices(
   if (!apiKey) {
     console.warn("[TR-015] ANTHROPIC_API_KEY is empty/missing — returning static rates");
     result.agent_notes.push("⚠️ LIVE PRICES NOT FETCHED: ANTHROPIC_API_KEY not configured in environment. Using CPWD 2024 static fallback rates — may be inaccurate for your location. Set the key in Vercel Settings → Environment Variables.");
+    if (diag) {
+      diag.stages.marketIntelligence.status = "failed";
+      diag.stages.marketIntelligence.error = "ANTHROPIC_API_KEY missing";
+      addLog(diag, "tr-015-market", "error", "ANTHROPIC_API_KEY not configured — using static fallback");
+    }
     return result;
   }
 
@@ -306,6 +333,11 @@ export async function fetchMarketPrices(
       "⚠️ LIVE PRICES NOT FETCHED: ANTHROPIC_API_KEY is not a valid API key (must start with sk-ant-api03-). " +
       "Get one from console.anthropic.com/settings/keys. Using static fallback rates."
     );
+    if (diag) {
+      diag.stages.marketIntelligence.status = "failed";
+      diag.stages.marketIntelligence.error = "ANTHROPIC_API_KEY invalid format";
+      addLog(diag, "tr-015-market", "error", "ANTHROPIC_API_KEY has invalid format");
+    }
     return result;
   }
 
@@ -409,6 +441,15 @@ Steel range: ₹52,000-78,000/tonne. Cement: ₹340-560/bag. Mason: ₹500-1200/
   // ── Primary: Haiku + web_search (with 1 retry for transient failures) ──
   // 45s timeout allows for 3 web searches (3-8s each) + reasoning (3-5s).
   // Vercel maxDuration is 600s — plenty of headroom.
+  if (diag) {
+    diag.stages.marketIntelligence.toolChoiceUsed = "any (web_search + report_construction_prices)";
+    addLog(diag, "tr-015-market", "info", "Calling Claude Haiku with web_search", {
+      timeoutMs: 45_000,
+      maxTokens: 2048,
+      maxWebSearchUses: 3,
+    });
+  }
+
   try {
     const callStart = Date.now();
 
@@ -437,13 +478,21 @@ Steel range: ₹52,000-78,000/tonne. Cement: ₹340-560/bag. Mason: ₹500-1200/
       resp = await makeWebSearchCall();
     } catch (firstErr) {
       console.warn(`[TR-015] Attempt 1 failed (${firstErr instanceof Error ? firstErr.message : firstErr}), retrying in 3s...`);
+      if (diag) {
+        diag.stages.marketIntelligence.retryUsed = true;
+        addLog(diag, "tr-015-market", "warn", "Primary call failed — retrying after 3s", {
+          error: firstErr instanceof Error ? firstErr.message : String(firstErr),
+        });
+      }
       await new Promise(r => setTimeout(r, 3000));
       resp = await makeWebSearchCall();
     }
 
     const callMs = Date.now() - callStart;
+    let webSearchCount = 0;
     for (const block of resp.content) {
       const bt = block.type as string;
+      if (bt === "web_search_tool_result") webSearchCount++;
       if (bt === "web_search_tool_result" || bt === "server_tool_use") usedWebSearch = true;
       if (block.type === "tool_use" && block.name === "report_construction_prices") {
         jsonText = JSON.stringify(block.input);
@@ -455,10 +504,23 @@ Steel range: ₹52,000-78,000/tonne. Cement: ₹340-560/bag. Mason: ₹500-1200/
       }
     }
     result.search_count = usedWebSearch ? 3 : 0;
+    if (diag) {
+      diag.stages.marketIntelligence.primaryCallMs = callMs;
+      diag.stages.marketIntelligence.webSearchesPerformed = webSearchCount;
+      addLog(diag, "tr-015-market", "info", `Primary call returned in ${(callMs / 1000).toFixed(1)}s`, {
+        usedWebSearch, webSearchCount, hasToolUse: !!jsonText,
+      });
+    }
     result.agent_notes.push(`✨ Market Intelligence — ${city}, ${state} · ${monthYear} · ${usedWebSearch ? "web search" : "Claude AI"} · ±${usedWebSearch ? "10-15" : "15-25"}%`);
   } catch (err) {
     const errMsg = err instanceof Error ? err.message : String(err);
     console.error(`[TR-015] Haiku + web_search failed after ${Date.now() - startTime}ms: ${errMsg}`);
+    if (diag) {
+      diag.stages.marketIntelligence.fallbackCallUsed = true;
+      addLog(diag, "tr-015-market", "warn", "Web search call failed — falling back to Haiku without search", {
+        error: errMsg.slice(0, 300),
+      });
+    }
 
     // ── Fallback: Haiku WITHOUT web_search ──
     try {
@@ -480,11 +542,23 @@ Steel range: ₹52,000-78,000/tonne. Cement: ₹340-560/bag. Mason: ₹500-1200/
         }
       }
       result.search_count = 0;
+      if (diag) {
+        addLog(diag, "tr-015-market", "info", `Fallback (Haiku no-search) returned in ${(Date.now() - haikuStart)}ms`, {
+          hasToolUse: !!jsonText,
+        });
+      }
       result.agent_notes.push(`✨ Market Intelligence — ${city}, ${state} · ${monthYear} · Claude AI · ±15-25%`);
     } catch (fallbackErr) {
       const fbMsg = fallbackErr instanceof Error ? fallbackErr.message : String(fallbackErr);
       result.agent_notes.push(`Using CPWD 2024 static rates (AI unavailable — ${fbMsg})`);
       console.error(`[TR-015] All attempts failed after ${Date.now() - startTime}ms: ${fbMsg}`);
+      if (diag) {
+        diag.stages.marketIntelligence.status = "failed";
+        diag.stages.marketIntelligence.error = fbMsg.slice(0, 300);
+        addLog(diag, "tr-015-market", "error", "All Haiku attempts failed — using static CPWD rates", {
+          error: fbMsg.slice(0, 300),
+        });
+      }
     }
   }
 
@@ -626,6 +700,25 @@ Steel range: ₹52,000-78,000/tonne. Cement: ₹340-560/bag. Mason: ₹500-1200/
   }
 
   result.duration_ms = Date.now() - startTime;
+
+  // ── Final diagnostics population ──
+  if (diag) {
+    diag.stages.marketIntelligence.status =
+      result.agent_status === "success" ? "success"
+      : result.agent_status === "partial" ? "partial"
+      : "failed";
+    diag.stages.marketIntelligence.steelPrice = result.steel_per_tonne.value;
+    diag.stages.marketIntelligence.steelSource = result.steel_per_tonne.source;
+    diag.stages.marketIntelligence.cementPrice = result.cement_per_bag.value;
+    diag.stages.marketIntelligence.cementSource = result.cement_per_bag.source;
+    addLog(diag, "tr-015-market", "info", `Market intelligence completed: ${result.agent_status}`, {
+      durationMs: result.duration_ms,
+      steel: result.steel_per_tonne.value,
+      cement: result.cement_per_bag.value,
+      mason: result.labor.mason.value,
+      sand: result.sand_per_cft.value,
+    });
+  }
 
   // ── Cache write (only if we got live data) ──
   if (result.agent_status !== "fallback") {

@@ -1,5 +1,7 @@
 // ─── BOQ Visualizer Types ───────────────────────────────────────────────────
 
+import type { PipelineDiagnostics } from "@/features/boq/services/pipeline-diagnostics";
+
 /** Per-line confidence from Phase 3 transparency layer */
 export interface LineConfidence {
   score: "high" | "medium" | "low";
@@ -131,6 +133,9 @@ export interface BOQData {
     cityUsed?: string;
     stateUsed?: string;
   };
+
+  /** Full pipeline execution trace — surfaced in the diagnostics panel */
+  diagnostics?: PipelineDiagnostics;
 
   /** IFC model quality assessment from parser */
   modelQualityReport?: {
