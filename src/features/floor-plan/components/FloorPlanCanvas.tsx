@@ -1,12 +1,5 @@
 "use client";
 
-// Konva shape registration — MUST evaluate before the first react-konva
-// render. See src/features/floor-plan/lib/konva-register.ts for details.
-// We reference KONVA_READY in a throw so no bundler can tree-shake the
-// registration module out of the dependency graph.
-import { KONVA_READY } from "@/features/floor-plan/lib/konva-register";
-if (!KONVA_READY) throw new Error("Konva shapes failed to register");
-
 import React, { useRef, useCallback, useEffect, useState } from "react";
 import { Stage, Layer } from "react-konva";
 import type Konva from "konva";
