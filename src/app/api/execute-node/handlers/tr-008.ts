@@ -888,21 +888,211 @@ export const handleTR008: NodeHandler = async (ctx) => {
   // Add derived lines to boqLines
   boqLines.push(...derivedLines);
 
-  // ── Provisional Sums: MEP, Foundation, External Works ──
-  // Skip provisional estimates when real data from structural/MEP IFC is available
-  const { estimateMEPCosts, estimateFoundationCosts, estimateExternalWorksCosts, checkQuantitySanity } = await import("@/features/boq/services/boq-intelligence");
+  // ── Pre-compute aggregate values needed by both standard items and provisional sums ──
   const gfaForProvisional = elements.reduce((sum: number, e: unknown) => {
     const el = e as Record<string, unknown>;
     return sum + (String(el.description ?? "").toLowerCase().includes("slab") ? Number(el.grossArea ?? 0) : 0);
   }, 0) || 500;
   const floorCountForProv = new Set(elements.map((e: unknown) => (e as Record<string, unknown>).storey).filter(Boolean)).size || 1;
   const cityTierForProv = indianPricing?.cityTier ?? "city";
-
-  // Diagnostic: cost per m² tracing
-
-  // Check flags from TR-007 multi-IFC merge
   const hasStructuralFoundation = !!(inputData?._hasStructuralFoundation);
   const hasMEPData = !!(inputData?._hasMEPData);
+
+  // ── Standard Construction Items (not modeled in IFC but required for every Indian project) ──
+  // A QS adds these to every BOQ — DPC, anti-termite, curing, scaffolding, skirting, etc.
+  // Quantities are derived from the structural elements already extracted above.
+  if (isIndianProject && is1200Module) {
+    // Aggregate IFC quantities for standard item derivation
+    let stdSlabArea = 0, stdWallArea = 0, stdExtWallArea = 0, stdIntWallLength = 0;
+    let stdConcreteVol = 0, stdDoorCount = 0, stdWindowCount = 0;
+    let stdWindowArea = 0, stdFootingVol = 0;
+    let stdGroundSlabArea = 0, stdHasRoofCovering = false, stdHasFlooring = false;
+
+    for (const elem of elements) {
+      const e = elem as Record<string, unknown>;
+      const dsc = String(e.description ?? "").toLowerCase();
+      const eArea = Number(e.grossArea ?? 0);
+      const eVol = Number(e.totalVolume ?? 0);
+      const eCount = Number(e.elementCount ?? 1);
+      const eSt = String(e.storey ?? "").toLowerCase();
+      const eIfcType = String(e.ifcType ?? "");
+
+      if (dsc.includes("slab") || eIfcType === "IfcSlab") {
+        stdSlabArea += eArea;
+        // Ground floor slab for DPC / anti-termite footprint
+        if (eSt.includes("ground") || eSt.includes("level 0") || eSt.includes("floor 0") || eSt === "gf" || eSt.includes("plinth")) {
+          stdGroundSlabArea += eArea;
+        }
+      }
+      if (dsc.includes("wall") || eIfcType === "IfcWall" || eIfcType === "IfcWallStandardCase") {
+        stdWallArea += eArea;
+        if (e.isExternal === true) stdExtWallArea += eArea;
+        else stdIntWallLength += eArea / 3.0; // wall length ≈ area ÷ typical 3.0m storey height
+      }
+      if (["column", "beam", "slab", "wall", "footing", "stair"].some(t => dsc.includes(t))) {
+        stdConcreteVol += eVol;
+      }
+      if (eIfcType === "IfcDoor" || dsc.includes("door")) stdDoorCount += eCount;
+      if (eIfcType === "IfcWindow" || dsc.includes("window")) {
+        stdWindowCount += eCount;
+        stdWindowArea += eArea;
+      }
+      if (eIfcType === "IfcFooting" || dsc.includes("footing")) stdFootingVol += eVol;
+      if (String(e.coveringType ?? "").toUpperCase() === "ROOFING") stdHasRoofCovering = true;
+      if (String(e.coveringType ?? "").toUpperCase() === "FLOORING") stdHasFlooring = true;
+    }
+
+    // If no ground floor detected, estimate from total slab area ÷ floor count
+    if (stdGroundSlabArea === 0 && floorCountForProv > 0) {
+      stdGroundSlabArea = stdSlabArea / floorCountForProv;
+    }
+    const stdTopSlabArea = floorCountForProv > 0 ? stdSlabArea / floorCountForProv : 0;
+    // Building perimeter estimate: assume roughly square plan (sqrt(area) × 4)
+    const stdPerimeter = stdGroundSlabArea > 0 ? Math.sqrt(stdGroundSlabArea) * 4 : 0;
+    const stdIsResidential = ["residential", "housing", "apartment"].some(t =>
+      projectTypeInfo.type.toLowerCase().includes(t));
+    // Residential units estimate: GFA ÷ ~70 m² avg unit size
+    const stdResUnits = stdIsResidential && gfaForProvisional > 0
+      ? Math.max(1, Math.round(gfaForProvisional / 70)) : 0;
+
+    // Helper: push a standard construction item to boqLines with IS 1200 rate + regional adjustment
+    const addStdItem = (code: string, div: string, desc: string, unit: string, qty: number, waste: number) => {
+      if (qty <= 0) return;
+      const stdRate = is1200Module!.getIS1200Rate(code);
+      if (!stdRate) return;
+      const cf = indianPricing?.overall ?? 1.0;
+      const lf = indianPricing?.labor ?? cf;
+      const adjQty = Math.round(qty * (1 + waste) * 100) / 100;
+      const adjRate = Math.round(stdRate.rate * cf);
+      const total = Math.round(adjQty * adjRate * 100) / 100;
+      const matC = Math.round(adjQty * stdRate.material * cf * 100) / 100;
+      const labC = Math.round(adjQty * stdRate.labour * lf * 100) / 100;
+      const eqpC = Math.round((total - matC - labC) * 100) / 100;
+      hardCostSubtotal += total;
+      totalMaterial += matC;
+      totalLabor += labC;
+      totalEquipment += Math.max(0, eqpC);
+      boqLines.push({
+        division: div, csiCode: code, description: `${desc} [STANDARD]`,
+        unit, quantity: Math.round(qty * 100) / 100, wasteFactor: waste, adjustedQty: adjQty,
+        materialRate: Math.round(stdRate.material * cf * 100) / 100,
+        laborRate: Math.round(stdRate.labour * lf * 100) / 100,
+        equipmentRate: Math.max(0, Math.round((adjRate - stdRate.material * cf - stdRate.labour * lf) * 100) / 100),
+        unitRate: adjRate, materialCost: matC, laborCost: labC,
+        equipmentCost: Math.max(0, eqpC), totalCost: total,
+        is1200Code: code,
+      });
+    };
+
+    // 1. DPC — 2 coats bitumen at plinth level over ground floor footprint
+    addStdItem("IS1200-P21-DPC", "IS 1200 Part 21 — DPC",
+      "Damp proof course (2 coats bitumen) at plinth level", "m²", stdGroundSlabArea, 0.05);
+
+    // 2. Anti-termite — chemical treatment to soil (footprint + 1m perimeter strip)
+    const antiTermiteArea = stdGroundSlabArea + stdPerimeter * 1.0;
+    addStdItem("IS1200-P1-ANTI-TERMITE", "IS 1200 Part 1 — Anti-termite",
+      "Anti-termite soil treatment (IS 6313)", "m²", antiTermiteArea, 0);
+
+    // 3. Backfilling — only when real foundation data exists (provisionals handle it otherwise)
+    if (hasStructuralFoundation && stdFootingVol > 0) {
+      // Excavation vol ≈ 2× foundation concrete; 70% backfilled (30% occupied by concrete)
+      const backfillVol = stdFootingVol * 2.0 * 0.70;
+      addStdItem("IS1200-P1-BACKFILL", "IS 1200 Part 1 — Earthwork",
+        "Backfilling with excavated earth (compacted in 200mm layers)", "m³", backfillVol, 0);
+    }
+
+    // 4. Curing — all exposed concrete surfaces (slab tops + wall both faces)
+    const curingArea = stdSlabArea + stdWallArea * 2;
+    addStdItem("IS1200-P2-CURING", "IS 1200 Part 2 — Curing",
+      "Curing of concrete surfaces (water curing 7-14 days)", "m²", curingArea, 0);
+
+    // 5. Scaffolding — external walls above GF, multi-storey only (85% coverage)
+    if (floorCountForProv > 1 && stdExtWallArea > 0) {
+      const scaffoldArea = stdExtWallArea * 0.85;
+      addStdItem("IS1200-P5-SCAFFOLDING", "IS 1200 Part 5 — Scaffolding",
+        "Steel scaffolding for external plaster/paint (hire + erect + dismantle)", "m²", scaffoldArea, 0);
+    }
+
+    // 6. IPS screeding — base for floor finish, only if no explicit IfcCovering:FLOORING in IFC
+    if (!stdHasFlooring) {
+      addStdItem("IS1200-P13-IPS", "IS 1200 Part 13 — Flooring",
+        "IPS 25mm cement concrete screeding (base for floor finish)", "m²", stdSlabArea, 0.05);
+    }
+
+    // 7. Skirting — 100mm tile skirting along internal walls on all floors
+    if (stdIntWallLength > 0) {
+      addStdItem("IS1200-P13-SKIRTING", "IS 1200 Part 13 — Skirting",
+        "Vitrified tile skirting 100mm high along internal walls", "Rmt",
+        stdIntWallLength * floorCountForProv, 0.10);
+    }
+
+    // 8. Parapet wall — 230mm brick on terrace perimeter, 1.0m high
+    if (stdPerimeter > 0) {
+      // Area = perimeter × 1.0m height; uses existing brick masonry rate
+      addStdItem("IS1200-P3-BRICK-230", "IS 1200 Part 3 — Masonry",
+        "Parapet wall 230mm brick at terrace perimeter (1.0m height)", "m²",
+        stdPerimeter * 1.0, 0.06);
+    }
+
+    // 9. Terrace waterproofing — top floor slab (skip if IFC has IfcCovering:ROOFING)
+    if (!stdHasRoofCovering && stdTopSlabArea > 0) {
+      addStdItem("IS1200-P21-WATERPROOF", "IS 1200 Part 21 — Waterproofing",
+        "Terrace waterproofing (bitumen membrane) on top floor slab", "m²",
+        stdTopSlabArea, 0.05);
+    }
+
+    // 10. Chajja / sunshade — RCC projection over windows (0.6m × window width)
+    if (stdWindowCount > 0) {
+      // Avg window width from area/count/height, fallback 1.2m
+      const avgWinWidth = stdWindowArea > 0 ? (stdWindowArea / stdWindowCount / 1.2) : 1.2;
+      const chajjaArea = stdWindowCount * avgWinWidth * 0.6;
+      addStdItem("IS1200-P2-CHAJJA", "IS 1200 Part 2 — Concrete",
+        "RCC chajja/sunshade 75mm over windows (0.6m projection)", "m²", chajjaArea, 0.05);
+    }
+
+    // 11. Door/window frame grouting — CM 1:4 packing around frames
+    if (stdDoorCount + stdWindowCount > 0) {
+      // Avg door perimeter ≈ 5.2 Rmt (0.9+2.1+0.9+2.1-0.8), window ≈ 4.0 Rmt
+      const groutRmt = stdDoorCount * 5.2 + stdWindowCount * 4.0;
+      addStdItem("IS1200-P8-FRAME-GROUT", "IS 1200 Part 8 — Plastering",
+        "CM 1:4 grouting around door/window frames", "Rmt", groutRmt, 0.10);
+    }
+
+    // 12. Kitchen dado tiling — residential only (1 kitchen/unit, ~4.8 m² dado)
+    if (stdIsResidential && stdResUnits > 0) {
+      const dadoArea = stdResUnits * 4.8;
+      addStdItem("IS1200-P13-DADO-TILE", "IS 1200 Part 13 — Finishes",
+        "Kitchen dado tiling (ceramic, 600mm above counter)", "m²", dadoArea, 0.13);
+    }
+
+    // 13. Bathroom waterproofing — residential only (2 baths/unit, ~16 m² each)
+    if (stdIsResidential && stdResUnits > 0) {
+      // 4 m² floor + 12 m² walls (to 1.5m height) = 16 m² per bathroom
+      const bathWPArea = stdResUnits * 2 * 16;
+      addStdItem("IS1200-P21-WET-AREA-WP", "IS 1200 Part 21 — Waterproofing",
+        "Bathroom/wet area waterproofing (membrane + flood test)", "m²", bathWPArea, 0.05);
+    }
+
+    // 14. Plinth protection — 600mm wide PCC apron around building perimeter
+    if (stdPerimeter > 0) {
+      // Volume = perimeter × 0.6m width × 0.075m thickness
+      const plinthProtVol = stdPerimeter * 0.6 * 0.075;
+      addStdItem("IS1200-P2-PCC-FOOTING", "IS 1200 Part 2 — Concrete",
+        "Plinth protection — 600mm wide PCC apron around building", "m³", plinthProtVol, 0.05);
+    }
+
+    // 15. Excavation — only when real foundation IFC data exists (provisionals handle it otherwise)
+    if (hasStructuralFoundation && stdFootingVol > 0) {
+      // Excavation volume ≈ 2× foundation concrete volume (trench/pit)
+      const excavVol = stdFootingVol * 2.0;
+      addStdItem("IS1200-P1-EXCAVATION-SHALLOW", "IS 1200 Part 1 — Earthwork",
+        "Excavation in ordinary soil for foundation (0-1.5m depth)", "m³", excavVol, 0);
+    }
+  }
+
+  // ── Provisional Sums: MEP, Foundation, External Works ──
+  // Skip provisional estimates when real data from structural/MEP IFC is available
+  const { estimateMEPCosts, estimateFoundationCosts, estimateExternalWorksCosts, checkQuantitySanity } = await import("@/features/boq/services/boq-intelligence");
 
   // MEP: skip provisional if real MEP IFC data exists
   const mepSums = hasMEPData ? [] : estimateMEPCosts(gfaForProvisional, projectTypeInfo.type, floorCountForProv, cityTierForProv, isIndianProject);

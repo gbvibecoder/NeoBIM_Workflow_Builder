@@ -837,6 +837,87 @@ export const IS1200_RATES: IS1200Rate[] = [
     unit: "EA", rate: 3200, material: 2500, labour: 700,
     subcategory: "HVAC",
   },
+
+  // ── Standard Construction Items (derived — not modeled in IFC) ────────────
+  // Every Indian building requires these items but BIM models never contain them.
+  // Added as derived quantities in TR-008 based on structural quantities.
+  {
+    is1200Part: "Part 21", is1200Code: "IS1200-P21-DPC",
+    description: "Damp proof course — 2 coats bitumen over cement concrete at plinth",
+    unit: "m²", rate: 85, material: 55, labour: 30,
+    subcategory: "Waterproofing",
+    notes: "IS 3067 compliant. Applied at plinth level over PCC bed. CPWD DSR 2025-26.",
+  },
+  {
+    is1200Part: "Part 1", is1200Code: "IS1200-P1-ANTI-TERMITE",
+    description: "Anti-termite treatment to soil (chlorpyrifos/imidacloprid)",
+    unit: "m²", rate: 45, material: 32, labour: 13,
+    subcategory: "Earthwork",
+    notes: "IS 6313 compliant. Pre-construction soil treatment. Mandatory for all buildings. CPWD DSR 2025-26.",
+  },
+  {
+    is1200Part: "Part 1", is1200Code: "IS1200-P1-BACKFILL",
+    description: "Backfilling with excavated earth in layers (compacted & watered)",
+    unit: "m³", rate: 350, material: 50, labour: 300,
+    subcategory: "Earthwork",
+    notes: "200mm layers, compacted to 95% MDD. Incl. watering. CPWD DSR 2025-26.",
+  },
+  {
+    is1200Part: "Part 2", is1200Code: "IS1200-P2-CURING",
+    description: "Curing of concrete surfaces (water curing 7-14 days)",
+    unit: "m²", rate: 18, material: 8, labour: 10,
+    subcategory: "Concrete",
+    notes: "Ponding/wet hessian method. Incl. curing compound for vertical surfaces. CPWD DSR 2025-26.",
+  },
+  {
+    is1200Part: "Part 5", is1200Code: "IS1200-P5-SCAFFOLDING",
+    description: "Steel scaffolding for external work (hire + erection + dismantling)",
+    unit: "m²", rate: 65, material: 25, labour: 40,
+    subcategory: "Formwork",
+    notes: "Tubular steel scaffolding. Rate per m² of external wall face. Multi-storey buildings only. CPWD DSR 2025-26.",
+  },
+  {
+    is1200Part: "Part 13", is1200Code: "IS1200-P13-IPS",
+    description: "IPS (Indian Patent Stone) 25mm cement concrete screeding on floor",
+    unit: "m²", rate: 280, material: 180, labour: 100,
+    subcategory: "Finishes",
+    notes: "CM 1:2:4 with surface hardener. Base for floor finish. CPWD DSR 2025-26.",
+  },
+  {
+    is1200Part: "Part 13", is1200Code: "IS1200-P13-SKIRTING",
+    description: "Vitrified tile skirting 100mm high along walls",
+    unit: "Rmt", rate: 180, material: 120, labour: 60,
+    subcategory: "Finishes",
+    notes: "Matching floor tile, CM bedding. Rate per running metre. CPWD DSR 2025-26.",
+  },
+  {
+    is1200Part: "Part 2", is1200Code: "IS1200-P2-CHAJJA",
+    description: "RCC chajja/sunshade 75mm thick over windows (incl. formwork)",
+    unit: "m²", rate: 650, material: 430, labour: 220,
+    subcategory: "Concrete",
+    notes: "M20 concrete, 0.6m projection. Incl. formwork + drip mould. CPWD DSR 2025-26.",
+  },
+  {
+    is1200Part: "Part 8", is1200Code: "IS1200-P8-FRAME-GROUT",
+    description: "CM 1:4 grouting around door/window frames after fixing",
+    unit: "Rmt", rate: 120, material: 55, labour: 65,
+    subcategory: "Finishes",
+    notes: "50mm wide × full depth packing. Incl. curing. CPWD DSR 2025-26.",
+  },
+  {
+    is1200Part: "Part 13", is1200Code: "IS1200-P13-DADO-TILE",
+    description: "Ceramic dado tiling on walls (600mm height, kitchen/utility)",
+    unit: "m²", rate: 850, material: 620, labour: 230,
+    subcategory: "Finishes",
+    notes: "300×450mm ceramic wall tiles, CM 1:3 bedding. CPWD DSR 2025-26.",
+  },
+  {
+    is1200Part: "Part 21", is1200Code: "IS1200-P21-WET-AREA-WP",
+    description: "Waterproofing to bathrooms/wet areas (membrane + testing)",
+    unit: "m²", rate: 420, material: 295, labour: 125,
+    subcategory: "Waterproofing",
+    notes: "Cementitious WP membrane to floor + walls (up to 1.5m). Incl. flood test. CPWD DSR 2025-26.",
+  },
 ];
 
 // ─── Derived Indian Rates (Formwork, Rebar, Finishing per element type) ──
