@@ -154,13 +154,13 @@ function RegisterForm() {
         await signIn("credentials", {
           email: identifier.trim().toLowerCase(),
           password,
-          callbackUrl: "/dashboard",
+          callbackUrl: "/onboard",
         });
       } else {
         await signIn("credentials", {
           phone: normalizePhone(identifier) ?? identifier,
           password,
-          callbackUrl: "/dashboard",
+          callbackUrl: "/onboard",
         });
       }
     } catch (err) {
@@ -182,7 +182,7 @@ function RegisterForm() {
       // pre-OAuth, so Enhanced Conversions is skipped on the Google path
       // (Google's own OAuth callback data covers that matching on the ad side).
       pushToDataLayer("sign_up_complete", { method: "google" });
-      await signIn("google", { callbackUrl: "/dashboard" });
+      await signIn("google", { callbackUrl: "/onboard" });
     } catch (err) {
       setError(extractErrorMessage(err, t('auth.somethingWentWrong')));
       setGoogleLoading(false);
