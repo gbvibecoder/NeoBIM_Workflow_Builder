@@ -305,32 +305,85 @@ export function formatCanvasLogLines(p: CanvasLogPayload): CanvasLogLine[] {
       const elementsFound = (parsing?.elementsFound as number) ?? elements;
       const withArea = (parsing?.elementsWithArea as number) ?? 0;
       const zero = (parsing?.elementsWithZeroQuantity as number) ?? 0;
+      const fileMeta = parsing?.fileMetadata as Record<string, unknown> | undefined;
+      const storeys = (parsing?.storeys as string[] | undefined)?.length ?? 0;
+
+      // File-context line — what kind of file are we even looking at?
+      if (fileMeta) {
+        const sizeKB = (fileMeta.fileSizeBytes as number | undefined);
+        const sizeStr = sizeKB ? (sizeKB > 1024 * 1024 ? `${(sizeKB / 1024 / 1024).toFixed(1)}MB` : `${Math.round(sizeKB / 1024)}KB`) : "?";
+        const author = (fileMeta.authoringApplication as string | undefined) ?? "unknown tool";
+        const schema = (fileMeta.ifcSchema as string | undefined) ?? "IFC";
+        lines.push({ level: "info", message: `${nodeName}: ${schema} file (${sizeStr}) authored by ${author}` });
+      }
+
       lines.push({
         level: zero > 0 ? "warn" : "success",
-        message: `${nodeName}: ${elementsFound} elements found, ${withArea} with geometry`,
+        message: `${nodeName}: ${elementsFound} elements found${storeys > 0 ? ` across ${storeys} storeys` : ""}, ${withArea} with geometry`,
       });
+
+      // Qto presence — the single most important fact about quantity provenance
+      const qtoCount = (fileMeta?.qtoBaseSetCount as number | undefined) ?? 0;
+      if (fileMeta && qtoCount === 0 && elementsFound > 0) {
+        lines.push({ level: "warn", message: `${nodeName}: ⚠ No Qto_* base quantities in file — measurements rely on geometry computation` });
+      }
+
       if (zero > 0) {
         const gtb = (parsing?.geometryTypeBreakdown as Record<string, number> | undefined);
         const failedTypes: string[] = [];
-        if (gtb?.booleanResult) failedTypes.push(`IfcBooleanResult × ${gtb.booleanResult}`);
-        if (gtb?.facetedBrep) failedTypes.push(`IfcFacetedBrep × ${gtb.facetedBrep}`);
+        if (gtb?.facetedBrep) failedTypes.push(`${gtb.facetedBrep} FacetedBrep`);
+        if (gtb?.booleanResult) failedTypes.push(`${gtb.booleanResult} BooleanResult`);
+        if (gtb?.failed) failedTypes.push(`${gtb.failed} unrecognized`);
         lines.push({
           level: "warn",
-          message: `⚠ ${zero} elements zero volume${failedTypes.length ? ` (${failedTypes.join(", ")})` : ""}`,
+          message: `${nodeName}: ⚠ ${zero} of ${elementsFound} elements have zero geometric quantities${failedTypes.length ? ` (${failedTypes.join(", ")} — not supported by WASM)` : ""}`,
         });
+        if (zero === elementsFound) {
+          lines.push({ level: "warn", message: `${nodeName}: Using element COUNTS as quantities — accuracy severely limited` });
+        }
+      }
+
+      // Surface the first smart warning prominently (the most actionable insight)
+      const sw = parsing?.smartWarnings as string[] | undefined;
+      if (sw && sw.length > 0) {
+        lines.push({ level: "warn", message: `${nodeName}: ${sw[0]}` });
+      }
+      const fixes = parsing?.smartFixes as string[] | undefined;
+      if (fixes && fixes.length > 0) {
+        lines.push({ level: "info", message: `${nodeName}: ${fixes[0]}` });
       }
       break;
     }
     case "TR-015": {
       const md = (out._marketData as Record<string, unknown> | undefined);
       const status = (md?.agent_status as string | undefined) ?? "?";
-      const steel = (md?.steel_per_tonne as { value?: number } | undefined)?.value;
+      const steel = (md?.steel_per_tonne as { value?: number; source?: string } | undefined);
       const cement = (md?.cement_per_bag as { value?: number; brand?: string } | undefined);
-      const steelStr = steel ? `Steel ₹${Math.round(steel / 1000)}K/t` : "";
+      const md2 = (out._marketDiagnostics as Record<string, unknown> | undefined);
+      const stages = (md2?.stages as Record<string, unknown> | undefined);
+      const market = (stages?.marketIntelligence as Record<string, unknown> | undefined);
+      const searches = (market?.webSearchesPerformed as number | undefined) ?? 0;
+      const cacheHit = market?.cacheHit;
+      const city = (md?.city as string | undefined) ?? (md?.cityUsed as string | undefined);
+      const state = (md?.state as string | undefined) ?? (md?.stateUsed as string | undefined);
+
+      // Pre-call line — sets context before the result line
+      if (city || state) {
+        lines.push({
+          level: "info",
+          message: `${nodeName}: ${cacheHit ? "Reading cached prices for" : "Fetching live prices for"} ${[city, state].filter(Boolean).join(", ")}…`,
+        });
+      }
+
+      const steelStr = steel?.value ? `Steel ₹${Math.round(steel.value / 1000)}K/t` : "";
       const cementStr = cement?.value ? `Cement ₹${cement.value}${cement.brand ? ` (${cement.brand})` : ""}` : "";
+      const detailParts: string[] = [];
+      if (searches > 0) detailParts.push(`${searches} web search${searches === 1 ? "" : "es"}`);
+      if (cacheHit) detailParts.push("cache HIT");
+      const detail = detailParts.length ? ` · ${detailParts.join(", ")}` : "";
       lines.push({
         level: status === "success" ? "success" : status === "partial" ? "warn" : "error",
-        message: `${nodeName}: ${status.toUpperCase()} in ${sec}s — ${[steelStr, cementStr].filter(Boolean).join(", ")}`,
+        message: `${nodeName}: ${status.toUpperCase()} in ${sec}s — ${[steelStr, cementStr].filter(Boolean).join(", ")}${detail}`,
       });
       break;
     }
@@ -341,14 +394,33 @@ export function formatCanvasLogLines(p: CanvasLogPayload): CanvasLogLine[] {
       const gfa = out._gfa as number | undefined;
       const aace = out._aaceClass as string | undefined;
       const perSqm = total && gfa ? Math.round(total / gfa) : 0;
+      const pd = (out._diagnostics as Record<string, unknown> | undefined);
+      const stages = (pd?.stages as Record<string, unknown> | undefined);
+      const cm = (stages?.costMapping as Record<string, unknown> | undefined);
+      const breakdown: string[] = [];
+      if (cm) {
+        if (cm.is1200Mapped) breakdown.push(`${cm.is1200Mapped} IS1200`);
+        if (cm.genericFallback) breakdown.push(`${cm.genericFallback} generic`);
+        if (cm.standardItems) breakdown.push(`${cm.standardItems} std`);
+        if (cm.provisionalItems) breakdown.push(`${cm.provisionalItems} prov`);
+      }
       lines.push({
         level: "success",
-        message: `${nodeName}: ${lineCount} BOQ line items mapped`,
+        message: `${nodeName}: ${lineCount} BOQ line items mapped${breakdown.length ? ` (${breakdown.join(", ")})` : ""}`,
       });
       if (total) {
         const cr = total >= 1e7 ? `₹${(total / 1e7).toFixed(2)} Cr` : `₹${Math.round(total / 1e5)}L`;
         const sqm = perSqm ? ` (₹${perSqm.toLocaleString()}/m²)` : "";
         lines.push({ level: "info", message: `${nodeName}: ${cr} total${sqm} — ${aace ?? "AACE Class 4"}` });
+      }
+      // Benchmark sanity check — flag if cost/sqm is far above expected range
+      const bench = out._benchmark as Record<string, unknown> | undefined;
+      if (perSqm > 0 && bench) {
+        const high = (bench.rangeHigh as number | undefined) ?? (bench.benchmarkHigh as number | undefined);
+        if (high && perSqm > high * 1.3) {
+          const overPct = Math.round(((perSqm - high) / high) * 100);
+          lines.push({ level: "warn", message: `${nodeName}: ⚠ Cost/m² is ${overPct}% above benchmark — likely due to element-count quantities` });
+        }
       }
       break;
     }

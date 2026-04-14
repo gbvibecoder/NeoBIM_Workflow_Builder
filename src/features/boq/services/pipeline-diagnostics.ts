@@ -71,6 +71,18 @@ export interface ParsingStage {
   unitDetected: string;
   conversionApplied: boolean;
   warnings: string[];
+  /** File-level metadata captured by the WASM parser (Part 2 of diagnostics).
+   *  Intentionally typed as Record so this module stays free of an ifc-parser
+   *  import (avoids a server↔shared-lib cycle). */
+  fileMetadata?: Record<string, unknown>;
+  /** First N element diagnostics (capped, prioritizes failures). */
+  elementSamples?: Array<Record<string, unknown>>;
+  /** Phase timings from the WASM parser. */
+  parserTimings?: Record<string, number>;
+  /** Smart, actionable warnings derived from the diagnostic data. */
+  smartWarnings?: string[];
+  /** Suggested fixes, parallel to smartWarnings. */
+  smartFixes?: string[];
 }
 
 export interface AggregationStage {
@@ -157,6 +169,9 @@ function emptyParsing(): ParsingStage {
     unitDetected: "METRE",
     conversionApplied: false,
     warnings: [],
+    elementSamples: [],
+    smartWarnings: [],
+    smartFixes: [],
   };
 }
 
