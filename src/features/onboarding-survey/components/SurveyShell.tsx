@@ -8,12 +8,13 @@ import { SceneBackdrop } from "@/features/onboarding-survey/components/SceneBack
 import { ProgressDots } from "@/features/onboarding-survey/components/ProgressDots";
 import { SkipLink } from "@/features/onboarding-survey/components/SkipLink";
 import { BackButton } from "@/features/onboarding-survey/components/BackButton";
+import { Scene1_Discovery } from "@/features/onboarding-survey/components/scenes/Scene1_Discovery";
 import { useSurveyState } from "@/features/onboarding-survey/hooks/useSurveyState";
 import { useKeyboardNav } from "@/features/onboarding-survey/hooks/useKeyboardNav";
 import { useSceneTimer } from "@/features/onboarding-survey/hooks/useSceneTimer";
 import { sceneSlide } from "@/features/onboarding-survey/lib/scene-motion";
 import { DASHBOARD_ONBOARDED_KEY } from "@/features/onboarding-survey/lib/survey-constants";
-import { trackComplete, trackSkip } from "@/features/onboarding-survey/lib/survey-analytics";
+import { trackComplete, trackDiscovery, trackSkip } from "@/features/onboarding-survey/lib/survey-analytics";
 import type { SceneNumber, SurveyRecord } from "@/features/onboarding-survey/types/survey";
 
 interface SurveyShellProps {
@@ -54,6 +55,7 @@ export function SurveyShell({ initial }: SurveyShellProps) {
   const timer = useSceneTimer();
 
   const [redirecting, setRedirecting] = useState(false);
+  const [hoverRgb, setHoverRgb] = useState<string | null>(null);
 
   // Which scenes the user has answered — drives dot fill / heartbeat.
   const completed = useMemo(() => {
@@ -119,7 +121,7 @@ export function SurveyShell({ initial }: SurveyShellProps) {
         overflow: "hidden",
       }}
     >
-      <SceneBackdrop scene={scene} />
+      <SceneBackdrop scene={scene} overrideRgb={hoverRgb} />
 
       {/* ── Top bar — back button + progress dots ─────────────────────── */}
       <div
@@ -187,7 +189,13 @@ export function SurveyShell({ initial }: SurveyShellProps) {
             {/* Scenes land in separate commits. Wiring hooks first.       */}
             {/* setHoverRgb is passed through once the real scenes exist.  */}
             {scene === 1 && (
-              <SceneStub n={1} title={t("survey.scene1.placeholder")} />
+              <Scene1_Discovery
+                initial={{ source: state.discoverySource, other: state.discoveryOther }}
+                onHoverChange={setHoverRgb}
+                onPatch={patch}
+                onAdvance={advance}
+                onTrack={trackDiscovery}
+              />
             )}
             {scene === 2 && (
               <SceneStub n={2} title={t("survey.scene2.placeholder")} />
