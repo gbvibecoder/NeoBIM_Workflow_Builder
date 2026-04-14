@@ -271,6 +271,132 @@ function polygonAreaCalc(points: FootprintPoint[]): number {
   return Math.abs(area) / 2;
 }
 
+/** Signed polygon area — positive = CCW, negative = CW. */
+function signedPolygonArea(points: FootprintPoint[]): number {
+  let area = 0;
+  const n = points.length;
+  for (let i = 0; i < n; i++) {
+    const j = (i + 1) % n;
+    area += points[i].x * points[j].y - points[j].x * points[i].y;
+  }
+  return area / 2;
+}
+
+/**
+ * Offset a closed polygon inward by `offset` metres via per-vertex miter-bisector.
+ * For a CCW polygon the interior is on the LEFT of each edge direction; we rotate
+ * each edge 90° CCW to get the inward normal and compute bisector distance as
+ * offset / cos(half-turn-angle) to ensure both adjacent edges are offset by exactly
+ * `offset` perpendicular distance. Returns a polygon with the same vertex count.
+ */
+function offsetClosedPolygonInward(poly: FootprintPoint[], offset: number): FootprintPoint[] {
+  const n = poly.length;
+  if (n < 3) return poly.map(p => ({ x: p.x, y: p.y }));
+  const sign = signedPolygonArea(poly) > 0 ? 1 : -1;
+
+  const inner: FootprintPoint[] = [];
+  for (let i = 0; i < n; i++) {
+    const prev = poly[(i - 1 + n) % n];
+    const curr = poly[i];
+    const next = poly[(i + 1) % n];
+
+    const e1x = curr.x - prev.x, e1y = curr.y - prev.y;
+    const e1Len = Math.hypot(e1x, e1y) || 1e-9;
+    const e2x = next.x - curr.x, e2y = next.y - curr.y;
+    const e2Len = Math.hypot(e2x, e2y) || 1e-9;
+
+    // Inward normal: rotate edge 90° CCW → (-dy, dx); flipped for CW polygon
+    const n1x = -e1y / e1Len * sign, n1y = e1x / e1Len * sign;
+    const n2x = -e2y / e2Len * sign, n2y = e2x / e2Len * sign;
+
+    const bxRaw = n1x + n2x, byRaw = n1y + n2y;
+    const bLen = Math.hypot(bxRaw, byRaw);
+    if (bLen < 1e-6) {
+      inner.push({ x: curr.x + n1x * offset, y: curr.y + n1y * offset });
+      continue;
+    }
+    const bx = bxRaw / bLen, by = byRaw / bLen;
+    const cosHalf = bx * n1x + by * n1y;   // |bx*n1x + by*n1y|
+    const miter = Math.abs(cosHalf) > 0.01 ? offset / cosHalf : offset * 50;
+    // Clamp miter to avoid extreme spikes on near-180° reflex corners
+    const clamped = Math.min(Math.max(miter, offset * 0.5), offset * 10);
+    inner.push({ x: curr.x + bx * clamped, y: curr.y + by * clamped });
+  }
+  return inner;
+}
+
+/**
+ * Walk a flat list of wall GeometryElements and group them into chains where
+ * each wall's end-vertex touches the next wall's start-vertex within tolerance,
+ * and both walls share the same thickness + height. Used to detect closed
+ * exterior perimeters that should be emitted as a single merged IfcWall shell
+ * rather than N separate rectangular prisms (which visually facet badly on
+ * circular / curved buildings).
+ */
+function detectWallChains(walls: GeometryElement[]): GeometryElement[][] {
+  const TOL = 0.02;   // 20mm tolerance for end-to-start matching
+  const used = new Set<string>();
+  const chains: GeometryElement[][] = [];
+
+  const sameSpec = (a: GeometryElement, b: GeometryElement) =>
+    Math.abs((a.properties.thickness ?? 0.25) - (b.properties.thickness ?? 0.25)) < 0.001 &&
+    Math.abs((a.properties.height ?? 0) - (b.properties.height ?? 0)) < 0.001;
+
+  for (const seed of walls) {
+    if (!seed.id || used.has(seed.id) || seed.vertices.length < 2) continue;
+    const chain: GeometryElement[] = [seed];
+    used.add(seed.id);
+
+    // Extend forward
+    let advanced = true;
+    while (advanced) {
+      advanced = false;
+      const last = chain[chain.length - 1];
+      const endV = last.vertices[1];
+      for (const cand of walls) {
+        if (!cand.id || used.has(cand.id) || cand.vertices.length < 2) continue;
+        if (!sameSpec(last, cand)) continue;
+        const sv = cand.vertices[0];
+        if (Math.hypot(sv.x - endV.x, sv.y - endV.y) < TOL) {
+          chain.push(cand);
+          used.add(cand.id);
+          advanced = true;
+          break;
+        }
+      }
+    }
+
+    // Extend backward
+    advanced = true;
+    while (advanced) {
+      advanced = false;
+      const first = chain[0];
+      const startV = first.vertices[0];
+      for (const cand of walls) {
+        if (!cand.id || used.has(cand.id) || cand.vertices.length < 2) continue;
+        if (!sameSpec(first, cand)) continue;
+        const ev = cand.vertices[1];
+        if (Math.hypot(ev.x - startV.x, ev.y - startV.y) < TOL) {
+          chain.unshift(cand);
+          used.add(cand.id);
+          advanced = true;
+          break;
+        }
+      }
+    }
+
+    chains.push(chain);
+  }
+  return chains;
+}
+
+function chainIsClosed(chain: GeometryElement[]): boolean {
+  if (chain.length < 3) return false;
+  const first = chain[0].vertices[0];
+  const last = chain[chain.length - 1].vertices[1];
+  return Math.hypot(first.x - last.x, first.y - last.y) < 0.05;
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // DISCIPLINE FILTER SETS
 // ═══════════════════════════════════════════════════════════════════════════
@@ -1479,11 +1605,34 @@ export function generateIFCFile(
       else others.push(element);
     }
 
-    // PASS 1 — walls (so openings can look up host wall entity IDs)
-    for (const element of walls) {
-      const wallId = writeWallEntity(element, storey, storeyPlacementId, ctx);
-      physicalIds.push(wallId);
-      if (element.id) ctx.wallsByParentId.set(element.id, wallId);
+    // PASS 1 — walls (so openings can look up host wall entity IDs).
+    // Detect wall chains: if exterior walls form a closed loop of ≥4 segments,
+    // emit as ONE merged IfcWall shell (visually continuous) instead of N
+    // individual rectangular prisms with visible facet lines. Partition walls
+    // always stay individual.
+    const exteriorWalls = walls.filter(w => !w.properties.isPartition);
+    const partitionWalls = walls.filter(w => w.properties.isPartition);
+
+    const extChains = detectWallChains(exteriorWalls);
+    for (const chain of extChains) {
+      if (chain.length >= 4 && chainIsClosed(chain)) {
+        const mergedId = writeMergedWallShell(chain, storey, storeyPlacementId, ctx);
+        physicalIds.push(mergedId);
+        for (const w of chain) {
+          if (w.id) ctx.wallsByParentId.set(w.id, mergedId);
+        }
+      } else {
+        for (const w of chain) {
+          const wid = writeWallEntity(w, storey, storeyPlacementId, ctx);
+          physicalIds.push(wid);
+          if (w.id) ctx.wallsByParentId.set(w.id, wid);
+        }
+      }
+    }
+    for (const w of partitionWalls) {
+      const wid = writeWallEntity(w, storey, storeyPlacementId, ctx);
+      physicalIds.push(wid);
+      if (w.id) ctx.wallsByParentId.set(w.id, wid);
     }
 
     // PASS 2 — openings (windows / doors) with IfcOpeningElement + relationships
@@ -2186,6 +2335,201 @@ function writeWallEntity(
   lines.push(`#${wallPsetId}=IFCPROPERTYSET('${guid.fresh()}',#${ctx.ownerHistId},'Pset_WallCommon',$,(#${propReference},#${propIsExt},#${propLoadBearing},#${propExtendStruct},#${propFireRating},#${propAcoustic},#${propThermal},#${propCombustible},#${propSurfaceSpread}));`);
   const relWallPsetId = id.next();
   lines.push(`#${relWallPsetId}=IFCRELDEFINESBYPROPERTIES('${guid.fresh()}',#${ctx.ownerHistId},$,$,(#${wallId}),#${wallPsetId});`);
+
+  return wallId;
+}
+
+/**
+ * Merged-shell writer — emits a single IfcWall whose Body is an IfcExtrudedAreaSolid
+ * with IfcArbitraryProfileDefWithVoids (outer polygon + inner polygon as a void), and
+ * whose Axis is the outer polyline. Produces ONE wall entity that looks visually
+ * continuous across 32+ facets of a circular/curved building instead of 32 separate
+ * rectangular prisms with visible corner mismatches.
+ *
+ * All original wall IDs in the chain should be mapped to the returned entity ID via
+ * ctx.wallsByParentId so door / window openings continue to attach correctly.
+ */
+function writeMergedWallShell(
+  chain: GeometryElement[],
+  storey: MassingStorey,
+  storeyPlacementId: number,
+  ctx: ExportContext
+): number {
+  const { id, lines, guid } = ctx;
+  const first = chain[0];
+  const thickness = first.properties.thickness ?? 0.25;
+  const height = first.properties.height ?? storey.height;
+
+  // Outer polyline from chain vertices (start of first + end of each)
+  const outerLoop: FootprintPoint[] = [{ x: first.vertices[0].x, y: first.vertices[0].y }];
+  for (const w of chain) outerLoop.push({ x: w.vertices[1].x, y: w.vertices[1].y });
+
+  // Drop closing duplicate if chain is closed
+  const firstV = outerLoop[0];
+  const lastV = outerLoop[outerLoop.length - 1];
+  if (Math.hypot(firstV.x - lastV.x, firstV.y - lastV.y) < 0.05) {
+    outerLoop.pop();
+  }
+
+  const innerLoop = offsetClosedPolygonInward(outerLoop, thickness);
+
+  // Emit outer polyline cartesian points
+  const outerPtIds = outerLoop.map(p => {
+    const pid = id.next();
+    lines.push(`#${pid}=IFCCARTESIANPOINT((${f(p.x)},${f(p.y)}));`);
+    return pid;
+  });
+  outerPtIds.push(outerPtIds[0]);
+  const outerPolyId = id.next();
+  lines.push(`#${outerPolyId}=IFCPOLYLINE((${outerPtIds.map(i => `#${i}`).join(",")}));`);
+
+  // Emit inner polyline — IFC4 ArbitraryProfileDefWithVoids requires inner loop
+  // to have OPPOSITE winding of outer loop. Reverse the inner polygon to ensure this.
+  const innerLoopCW = [...innerLoop].reverse();
+  const innerPtIds = innerLoopCW.map(p => {
+    const pid = id.next();
+    lines.push(`#${pid}=IFCCARTESIANPOINT((${f(p.x)},${f(p.y)}));`);
+    return pid;
+  });
+  innerPtIds.push(innerPtIds[0]);
+  const innerPolyId = id.next();
+  lines.push(`#${innerPolyId}=IFCPOLYLINE((${innerPtIds.map(i => `#${i}`).join(",")}));`);
+
+  // Profile with void
+  const profileId = id.next();
+  lines.push(`#${profileId}=IFCARBITRARYPROFILEDEFWITHVOIDS(.AREA.,'Perimeter Wall Shell',#${outerPolyId},(#${innerPolyId}));`);
+
+  // Body extrusion
+  const extDirId = id.next();
+  lines.push(`#${extDirId}=IFCDIRECTION((0.,0.,1.));`);
+  const solidId = id.next();
+  lines.push(`#${solidId}=IFCEXTRUDEDAREASOLID(#${profileId},$,#${extDirId},${f(height)});`);
+  const bodyRepId = id.next();
+  lines.push(`#${bodyRepId}=IFCSHAPEREPRESENTATION(#${ctx.bodyContextId},'Body','SweptSolid',(#${solidId}));`);
+
+  // Axis representation — reuse outer polyline
+  const axisRepId = id.next();
+  lines.push(`#${axisRepId}=IFCSHAPEREPRESENTATION(#${ctx.axisContextId},'Axis','Curve2D',(#${outerPolyId}));`);
+
+  // Footprint representation — for 2D plan view
+  const footprintRepId = id.next();
+  lines.push(`#${footprintRepId}=IFCSHAPEREPRESENTATION(#${ctx.footprintContextId},'FootPrint','Curve2D',(#${outerPolyId}));`);
+
+  // Multi-rep product definition shape (Axis + Body + FootPrint)
+  const prodShapeId = id.next();
+  lines.push(`#${prodShapeId}=IFCPRODUCTDEFINITIONSHAPE($,$,(#${axisRepId},#${bodyRepId},#${footprintRepId}));`);
+
+  // Placement at storey origin (the polyline vertices are already in storey-local coords)
+  const originId = id.next();
+  lines.push(`#${originId}=IFCCARTESIANPOINT((0.,0.,0.));`);
+  const placeAxisId = id.next();
+  lines.push(`#${placeAxisId}=IFCAXIS2PLACEMENT3D(#${originId},#${ctx.zDirId},#${ctx.xDirId});`);
+  const placementId = id.next();
+  lines.push(`#${placementId}=IFCLOCALPLACEMENT(#${storeyPlacementId},#${placeAxisId});`);
+
+  // Systematic name (shares counter with regular exterior walls)
+  const disc = "ARC";
+  const typeCode = "EW";
+  const dimToken = `${Math.round(thickness * 1000)}`;
+  const matToken = materialToken(ctx.materials.concrete);
+  const scode = storeyCode(storey);
+  const counterKey = `${disc}:${typeCode}:${scode}`;
+  const seq = (ctx.nameCounters.get(counterKey) ?? 0) + 1;
+  ctx.nameCounters.set(counterKey, seq);
+  const sysName = systematicName({ discipline: disc, typeCode, dimension: dimToken, material: matToken, storey: scode, sequence: seq });
+  const shortTag = `PW-${scode}-${String(seq).padStart(3, "0")}`;
+
+  // IfcWall — use IFC4 (merged walls only emitted in IFC4 path; IFC2X3 falls back via caller)
+  const wallEntityName = ctx.schema === "IFC2X3" ? "IFCWALLSTANDARDCASE" : "IFCWALL";
+  const predefinedTypeArg = ctx.schema === "IFC2X3" ? "" : `,.STANDARD.`;
+  const wallId = id.next();
+  lines.push(`#${wallId}=${wallEntityName}('${guid.stable(`mergedwall:${storey.index}:${first.id}`)}',#${ctx.ownerHistId},'${ctx.safeName(sysName)}','Perimeter Wall Shell (${chain.length} segments merged)',$,#${placementId},#${prodShapeId},'${shortTag}'${predefinedTypeArg});`);
+
+  // Presentation layer
+  ctx.presentationLayers["A-WALL"].push(bodyRepId, axisRepId, footprintRepId);
+
+  // Wall record — approximate as one record spanning first-to-last vertex (for connection detection)
+  ctx.wallRecords.push({
+    entityId: wallId,
+    startX: outerLoop[0].x, startY: outerLoop[0].y,
+    endX: outerLoop[outerLoop.length - 1].x, endY: outerLoop[outerLoop.length - 1].y,
+    thickness, storeyIndex: storey.index,
+  });
+
+  // Type + material + classification
+  const materialUsageId = ctx.materialLayerSets.wallExterior;
+  const typeResult = getOrCreateWallType(ctx, thickness, false, materialUsageId);
+  addTypeOccurrence(ctx.typeClusters.walls, typeResult.key, wallId);
+  associateMaterial(ctx, wallId, materialUsageId);
+  associateClassification(ctx, wallId, "wall", ctx.materials.concrete);
+  for (const doc of codeDocsFor("wall", ctx.materials.concrete)) {
+    const list = ctx.documentAssociations.get(doc) ?? [];
+    list.push(wallId);
+    ctx.documentAssociations.set(doc, list);
+  }
+
+  // Aggregate quantities
+  let totalLength = 0;
+  for (let i = 0; i < outerLoop.length; i++) {
+    const p = outerLoop[i], q = outerLoop[(i + 1) % outerLoop.length];
+    totalLength += Math.hypot(q.x - p.x, q.y - p.y);
+  }
+  const wallSideArea = totalLength * height;
+  const outerArea = polygonAreaCalc(outerLoop);
+  const innerArea = polygonAreaCalc(innerLoop);
+  const wallFootprintArea = Math.max(0, outerArea - innerArea);
+  const wallVolume = wallFootprintArea * height;
+
+  let openingArea = 0;
+  for (const w of chain) openingArea += computeWallOpeningArea(w, storey);
+  const netArea = Math.max(0, wallSideArea - openingArea);
+
+  const qLength = id.next();
+  lines.push(`#${qLength}=IFCQUANTITYLENGTH('Length',$,$,${f(totalLength)},$);`);
+  const qHeight = id.next();
+  lines.push(`#${qHeight}=IFCQUANTITYLENGTH('Height',$,$,${f(height)},$);`);
+  const qWidth = id.next();
+  lines.push(`#${qWidth}=IFCQUANTITYLENGTH('Width',$,$,${f(thickness)},$);`);
+  const qGrossArea = id.next();
+  lines.push(`#${qGrossArea}=IFCQUANTITYAREA('GrossSideArea',$,$,${f(wallSideArea, 2)},$);`);
+  const qNetArea = id.next();
+  lines.push(`#${qNetArea}=IFCQUANTITYAREA('NetSideArea',$,$,${f(netArea, 2)},$);`);
+  const qGrossVolume = id.next();
+  lines.push(`#${qGrossVolume}=IFCQUANTITYVOLUME('GrossVolume',$,$,${f(wallVolume, 4)},$);`);
+  const qNetVolume = id.next();
+  lines.push(`#${qNetVolume}=IFCQUANTITYVOLUME('NetVolume',$,$,${f(netArea * thickness, 4)},$);`);
+
+  const qtoId = id.next();
+  lines.push(`#${qtoId}=IFCELEMENTQUANTITY('${guid.fresh()}',#${ctx.ownerHistId},'Qto_WallBaseQuantities',$,$,(#${qLength},#${qHeight},#${qWidth},#${qGrossArea},#${qNetArea},#${qGrossVolume},#${qNetVolume}));`);
+  const relQtoId = id.next();
+  lines.push(`#${relQtoId}=IFCRELDEFINESBYPROPERTIES('${guid.fresh()}',#${ctx.ownerHistId},$,$,(#${wallId}),#${qtoId});`);
+
+  // Pset_WallCommon (parity with writeWallEntity)
+  const code = elementCodeData("wall", ctx.materials.concrete, true);
+  const pRef = id.next();
+  lines.push(`#${pRef}=IFCPROPERTYSINGLEVALUE('Reference',$,IFCIDENTIFIER('${shortTag}'),$);`);
+  const pIsExt = id.next();
+  lines.push(`#${pIsExt}=IFCPROPERTYSINGLEVALUE('IsExternal',$,IFCBOOLEAN(.T.),$);`);
+  const pLB = id.next();
+  lines.push(`#${pLB}=IFCPROPERTYSINGLEVALUE('LoadBearing',$,IFCBOOLEAN(.T.),$);`);
+  const pExt = id.next();
+  lines.push(`#${pExt}=IFCPROPERTYSINGLEVALUE('ExtendToStructure',$,IFCBOOLEAN(.T.),$);`);
+  const pFR = id.next();
+  lines.push(`#${pFR}=IFCPROPERTYSINGLEVALUE('FireRating',$,IFCLABEL('${code.fireRating}'),$);`);
+  const pAc = id.next();
+  lines.push(`#${pAc}=IFCPROPERTYSINGLEVALUE('AcousticRating',$,IFCLABEL('STC ${code.acousticRatingSTC ?? 40}'),$);`);
+  const pTh = id.next();
+  lines.push(`#${pTh}=IFCPROPERTYSINGLEVALUE('ThermalTransmittance',$,IFCTHERMALTRANSMITTANCEMEASURE(${f(code.thermalTransmittanceU, 3)}),$);`);
+  const pComb = id.next();
+  lines.push(`#${pComb}=IFCPROPERTYSINGLEVALUE('Combustible',$,IFCBOOLEAN(.F.),$);`);
+  const pSSF = id.next();
+  lines.push(`#${pSSF}=IFCPROPERTYSINGLEVALUE('SurfaceSpreadOfFlame',$,IFCLABEL('Class 0'),$);`);
+  const pMerged = id.next();
+  lines.push(`#${pMerged}=IFCPROPERTYSINGLEVALUE('MergedSegmentCount',$,IFCINTEGER(${chain.length}),$);`);
+  const psetWallId = id.next();
+  lines.push(`#${psetWallId}=IFCPROPERTYSET('${guid.fresh()}',#${ctx.ownerHistId},'Pset_WallCommon',$,(#${pRef},#${pIsExt},#${pLB},#${pExt},#${pFR},#${pAc},#${pTh},#${pComb},#${pSSF},#${pMerged}));`);
+  const relPsetId = id.next();
+  lines.push(`#${relPsetId}=IFCRELDEFINESBYPROPERTIES('${guid.fresh()}',#${ctx.ownerHistId},$,$,(#${wallId}),#${psetWallId});`);
 
   return wallId;
 }
