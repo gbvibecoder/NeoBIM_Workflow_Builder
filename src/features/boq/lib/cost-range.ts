@@ -168,6 +168,7 @@ export function calculateBOQRange(
 
 // ── Format Helpers ───────────────────────────────────────────────────────────
 
+/** @remarks Used in tests — not yet wired to production UI */
 export function formatRangeINR(range: CostRange): string {
   const fmt = (n: number) => {
     if (n >= 10000000) return `₹${(n / 10000000).toFixed(1)} Cr`;

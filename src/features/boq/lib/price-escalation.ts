@@ -184,6 +184,7 @@ export function escalatePrice(
 
 /**
  * Get the appropriate freshness label for display.
+ * @remarks Used in tests — not yet wired to production UI
  */
 export function getFreshnessLabel(daysOld: number): "fresh" | "recent" | "stale" | "very_stale" {
   if (daysOld < 30) return "fresh";
@@ -194,6 +195,7 @@ export function getFreshnessLabel(daysOld: number): "fresh" | "recent" | "stale"
 
 /**
  * Get display color for freshness badges.
+ * @remarks Used in tests — not yet wired to production UI
  */
 export function getFreshnessColor(label: "fresh" | "recent" | "stale" | "very_stale"): string {
   switch (label) {
@@ -206,6 +208,7 @@ export function getFreshnessColor(label: "fresh" | "recent" | "stale" | "very_st
 
 /**
  * Get the annual inflation rate for a material category (for display/info).
+ * @remarks Used in tests — not yet wired to production UI
  */
 export function getInflationRate(materialCode: string): number {
   const category = inferCategory(materialCode);

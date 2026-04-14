@@ -42,7 +42,7 @@ export function BOQFooter({ disclaimer, onExportExcel, onExportPDF, onExportCSV 
             fontSize: 12,
             fontStyle: "italic",
             lineHeight: 1.6,
-            color: "#9CA3AF",
+            color: "#6B7280",
             margin: 0,
           }}
         >
@@ -52,7 +52,7 @@ export function BOQFooter({ disclaimer, onExportExcel, onExportPDF, onExportCSV 
 
       {/* Export buttons + Attribution */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <span style={{ fontSize: 11, color: "#9CA3AF" }}>
+        <span style={{ fontSize: 11, color: "#6B7280" }}>
           Prepared by BuildFlow &middot; trybuildflow.in
         </span>
 

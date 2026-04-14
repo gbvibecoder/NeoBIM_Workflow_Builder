@@ -63,7 +63,7 @@ export function ProvenanceTooltip({ line, children }: ProvenanceTooltipProps & {
             <div style={{ borderBottom: "1px solid rgba(0, 0, 0, 0.06)", paddingBottom: 8, marginBottom: 8, display: "flex", flexDirection: "column", gap: 5 }}>
               {line.materialRate > 0 && (
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 11 }}>
-                  <span style={{ display: "flex", alignItems: "center", gap: 6, color: "#9CA3AF" }}>
+                  <span style={{ display: "flex", alignItems: "center", gap: 6, color: "#6B7280" }}>
                     <span style={{ width: 6, height: 6, borderRadius: 9999, background: "#0D9488", flexShrink: 0 }} />
                     Material
                   </span>
@@ -74,7 +74,7 @@ export function ProvenanceTooltip({ line, children }: ProvenanceTooltipProps & {
               )}
               {line.laborRate > 0 && (
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 11 }}>
-                  <span style={{ display: "flex", alignItems: "center", gap: 6, color: "#9CA3AF" }}>
+                  <span style={{ display: "flex", alignItems: "center", gap: 6, color: "#6B7280" }}>
                     <span style={{ width: 6, height: 6, borderRadius: 9999, background: "#D97706", flexShrink: 0 }} />
                     Labour
                   </span>
@@ -85,7 +85,7 @@ export function ProvenanceTooltip({ line, children }: ProvenanceTooltipProps & {
               )}
               {line.equipmentRate > 0 && (
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 11 }}>
-                  <span style={{ display: "flex", alignItems: "center", gap: 6, color: "#9CA3AF" }}>
+                  <span style={{ display: "flex", alignItems: "center", gap: 6, color: "#6B7280" }}>
                     <span style={{ width: 6, height: 6, borderRadius: 9999, background: "#7C3AED", flexShrink: 0 }} />
                     Equipment
                   </span>
@@ -100,7 +100,7 @@ export function ProvenanceTooltip({ line, children }: ProvenanceTooltipProps & {
           {/* Waste */}
           {line.wasteFactor > 0 && (
             <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, marginBottom: 5 }}>
-              <span style={{ color: "#9CA3AF" }}>Waste</span>
+              <span style={{ color: "#6B7280" }}>Waste</span>
               <span style={{ color: "#D97706", fontWeight: 600 }}>+{(line.wasteFactor * 100).toFixed(0)}%</span>
             </div>
           )}
@@ -108,7 +108,7 @@ export function ProvenanceTooltip({ line, children }: ProvenanceTooltipProps & {
           {/* IS Code */}
           {line.isCode && (
             <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, marginBottom: 5 }}>
-              <span style={{ color: "#9CA3AF" }}>IS Code</span>
+              <span style={{ color: "#6B7280" }}>IS Code</span>
               <span style={{ color: "#0D9488", fontFamily: "var(--font-jetbrains, 'JetBrains Mono', monospace)", fontSize: 10 }}>
                 {line.isCode}
               </span>
@@ -117,7 +117,7 @@ export function ProvenanceTooltip({ line, children }: ProvenanceTooltipProps & {
 
           {/* Confidence */}
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 11, marginBottom: 5 }}>
-            <span style={{ color: "#9CA3AF" }}>Confidence</span>
+            <span style={{ color: "#6B7280" }}>Confidence</span>
             <span
               style={{
                 display: "inline-flex",
@@ -138,7 +138,7 @@ export function ProvenanceTooltip({ line, children }: ProvenanceTooltipProps & {
           {factors.length > 0 && (
             <div style={{ borderTop: "1px solid rgba(0, 0, 0, 0.06)", paddingTop: 6, marginTop: 6 }}>
               {factors.map((f, i) => (
-                <div key={i} style={{ fontSize: 9, lineHeight: 1.5, color: "#9CA3AF" }}>
+                <div key={i} style={{ fontSize: 9, lineHeight: 1.5, color: "#6B7280" }}>
                   &bull; {f}
                 </div>
               ))}

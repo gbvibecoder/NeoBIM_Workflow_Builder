@@ -151,6 +151,7 @@ export function computeSeasonalAdjustment(
  * @param laborCost - Base labor cost
  * @param equipmentCost - Base equipment cost
  * @param adjustment - Seasonal adjustment from computeSeasonalAdjustment()
+ * @remarks Used in tests — not yet wired to TR-008 handler
  */
 export function applySeasonalToCosts(
   materialCost: number,

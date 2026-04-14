@@ -33,7 +33,7 @@ export function DataSourcesSummary({ data }: DataSourcesSummaryProps) {
 
   const pricingIconColor =
     pricingSource === "market_intelligence" ? "#059669" :
-    pricingSource === "mixed" ? "#D97706" : "#9CA3AF";
+    pricingSource === "mixed" ? "#D97706" : "#6B7280";
 
   return (
     <div
@@ -109,7 +109,7 @@ export function DataSourcesSummary({ data }: DataSourcesSummaryProps) {
           >
             <span style={{ width: 8, height: 8, borderRadius: 9999, background: item.color, flexShrink: 0 }} />
             <span style={{ color: "#4B5563" }}>{item.label}</span>
-            <span style={{ color: "#9CA3AF" }}>{item.value}%</span>
+            <span style={{ color: "#6B7280" }}>{item.value}%</span>
           </span>
         ))}
       </div>
@@ -141,7 +141,7 @@ export function DataSourcesSummary({ data }: DataSourcesSummaryProps) {
           >
             {aaceClass}
           </span>
-          <Info size={10} color="#9CA3AF" style={{ cursor: "help" }} />
+          <Info size={10} color="#6B7280" style={{ cursor: "help" }} />
           {/* AACE tooltip */}
           <div
             className="hidden group-hover:block"
@@ -171,7 +171,7 @@ export function DataSourcesSummary({ data }: DataSourcesSummaryProps) {
         {/* Uncertainty */}
         {data.costRange && data.costRange.uncertaintyPercent > 0 && (
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <span style={{ fontSize: 11, color: "#9CA3AF" }}>
+            <span style={{ fontSize: 11, color: "#6B7280" }}>
               Estimate uncertainty: ±{data.costRange.uncertaintyPercent}% — {data.lines.length} line items
             </span>
           </div>

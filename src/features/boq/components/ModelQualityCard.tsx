@@ -181,7 +181,7 @@ function IssueRow({ icon, label, detail }: { icon: React.ReactNode; label: strin
       <div style={{ marginTop: 1 }}>{icon}</div>
       <div>
         <div style={{ fontSize: 12, color: "#1A1A1A", fontWeight: 500 }}>{label}</div>
-        <div style={{ fontSize: 10, color: "#9CA3AF" }}>{detail}</div>
+        <div style={{ fontSize: 10, color: "#6B7280" }}>{detail}</div>
       </div>
     </div>
   );

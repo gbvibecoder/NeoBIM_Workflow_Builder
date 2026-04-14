@@ -99,7 +99,7 @@ export function IFCQualityCard({ quality }: IFCQualityCardProps) {
             >
               {quality.score}
             </span>
-            <span style={{ fontSize: 9, color: "#9CA3AF", marginTop: 2 }}>/ 100</span>
+            <span style={{ fontSize: 9, color: "#6B7280", marginTop: 2 }}>/ 100</span>
           </div>
         </div>
 
@@ -116,7 +116,7 @@ export function IFCQualityCard({ quality }: IFCQualityCardProps) {
             {scoreLabel}
           </div>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
-            <span style={{ fontSize: 11, color: "#9CA3AF" }}>Quality Score</span>
+            <span style={{ fontSize: 11, color: "#6B7280" }}>Quality Score</span>
             <span style={{ fontSize: 11, color: "#4B5563" }}>
               Confidence: {quality.confidence}%
             </span>
@@ -139,7 +139,7 @@ export function IFCQualityCard({ quality }: IFCQualityCardProps) {
       {/* Element Coverage */}
       <div style={{ marginBottom: 20 }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
-          <span style={{ fontSize: 11, fontWeight: 500, color: "#9CA3AF", display: "flex", alignItems: "center", gap: 4 }}>
+          <span style={{ fontSize: 11, fontWeight: 500, color: "#6B7280", display: "flex", alignItems: "center", gap: 4 }}>
             <ShieldCheck size={12} color="#0D9488" />
             Element Coverage
           </span>
@@ -211,7 +211,7 @@ export function IFCQualityCard({ quality }: IFCQualityCardProps) {
               gap: 4,
               fontSize: 11,
               fontWeight: 500,
-              color: "#9CA3AF",
+              color: "#6B7280",
               marginBottom: 8,
               background: "none",
               border: "none",
@@ -219,7 +219,7 @@ export function IFCQualityCard({ quality }: IFCQualityCardProps) {
               padding: 0,
             }}
           >
-            <AlertTriangle size={12} color="#9CA3AF" />
+            <AlertTriangle size={12} color="#6B7280" />
             Anomalies Detected ({quality.anomalies.length})
             <motion.span
               animate={{ rotate: anomaliesExpanded ? 180 : 0 }}
@@ -248,7 +248,7 @@ export function IFCQualityCard({ quality }: IFCQualityCardProps) {
                     lineHeight: 1.5,
                   }}
                 >
-                  <AlertTriangle size={10} color="#9CA3AF" style={{ flexShrink: 0, marginTop: 3 }} />
+                  <AlertTriangle size={10} color="#6B7280" style={{ flexShrink: 0, marginTop: 3 }} />
                   <span>{a}</span>
                 </div>
               ))}

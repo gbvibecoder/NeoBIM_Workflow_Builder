@@ -25,7 +25,7 @@ export function SectionFallback({ section }: SectionFallbackProps) {
         <p style={{ fontSize: 13, fontWeight: 500, color: "#DC2626", margin: 0 }}>
           {section} failed to render
         </p>
-        <p style={{ fontSize: 11, color: "#9CA3AF", margin: 0, marginTop: 2 }}>
+        <p style={{ fontSize: 11, color: "#6B7280", margin: 0, marginTop: 2 }}>
           Other sections are unaffected. Try reloading the page.
         </p>
       </div>

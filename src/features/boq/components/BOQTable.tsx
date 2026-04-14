@@ -215,10 +215,10 @@ export function BOQTable({ lines, rateOverrides, onRateOverride, grandTotal: gra
           paddingBottom: 10,
         }}
       >
-        <Pencil size={10} color="#9CA3AF" className="shrink-0" />
+        <Pencil size={10} color="#6B7280" className="shrink-0" />
         <span
           className="ml-1.5"
-          style={{ color: "#9CA3AF", fontSize: 11 }}
+          style={{ color: "#6B7280", fontSize: 11 }}
         >
           Click any Rate cell to override
         </span>
@@ -339,7 +339,7 @@ export function BOQTable({ lines, rateOverrides, onRateOverride, grandTotal: gra
             {confidenceCounts.low} low
           </span>
         </div>
-        <span style={{ color: "#9CA3AF", fontSize: 11 }}>
+        <span style={{ color: "#6B7280", fontSize: 11 }}>
           {filtered.length} of {lines.length} items shown
         </span>
       </div>
@@ -356,7 +356,7 @@ export function BOQTable({ lines, rateOverrides, onRateOverride, grandTotal: gra
                   style={{
                     textAlign: "left",
                     padding: "10px 14px",
-                    color: "#9CA3AF",
+                    color: "#6B7280",
                     fontSize: 10,
                     fontWeight: 500,
                     letterSpacing: "0.06em",
@@ -413,7 +413,7 @@ export function BOQTable({ lines, rateOverrides, onRateOverride, grandTotal: gra
                   <td
                     style={{
                       padding: "10px 14px",
-                      color: "#9CA3AF",
+                      color: "#6B7280",
                       fontFamily: "var(--font-jetbrains, 'JetBrains Mono', monospace)",
                       fontSize: 10,
                       whiteSpace: "nowrap" as const,
@@ -428,7 +428,7 @@ export function BOQTable({ lines, rateOverrides, onRateOverride, grandTotal: gra
                       {line.description}
                     </span>
                     {line.storey && (
-                      <span style={{ color: "#9CA3AF", fontSize: 10, marginLeft: 8 }}>
+                      <span style={{ color: "#6B7280", fontSize: 10, marginLeft: 8 }}>
                         {line.storey}
                       </span>
                     )}
@@ -521,7 +521,7 @@ export function BOQTable({ lines, rateOverrides, onRateOverride, grandTotal: gra
                           {hasOverride && (
                             <span
                               style={{
-                                color: "#9CA3AF",
+                                color: "#6B7280",
                                 fontSize: 10,
                                 textDecoration: "line-through",
                               }}
@@ -531,7 +531,7 @@ export function BOQTable({ lines, rateOverrides, onRateOverride, grandTotal: gra
                           )}
                           <Pencil
                             size={10}
-                            color="#9CA3AF"
+                            color="#6B7280"
                             className="shrink-0 opacity-0 group-hover/rate:opacity-100 transition-opacity"
                           />
                         </div>
@@ -629,7 +629,7 @@ export function BOQTable({ lines, rateOverrides, onRateOverride, grandTotal: gra
           className="flex items-center justify-between px-5 py-3"
           style={{ borderTop: "1px solid rgba(0, 0, 0, 0.06)" }}
         >
-          <span style={{ color: "#9CA3AF", fontSize: 12 }}>
+          <span style={{ color: "#6B7280", fontSize: 12 }}>
             Showing {page * PAGE_SIZE + 1}{"\u2013"}{Math.min((page + 1) * PAGE_SIZE, sorted.length)} of {sorted.length}
           </span>
 

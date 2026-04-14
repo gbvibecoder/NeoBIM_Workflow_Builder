@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef } from "react";
-import { motion, useInView } from "framer-motion";
+import { motion, useInView, useReducedMotion } from "framer-motion";
 import { IndianRupee, Ruler, Hammer, ShieldCheck, Check, AlertTriangle } from "lucide-react";
 import { AnimatedNumber } from "@/features/boq/components/AnimatedNumber";
 import { formatCrores } from "@/features/boq/components/recalc-engine";
@@ -35,13 +35,13 @@ function CostRangeGauge({ low, best, high }: { low: number; high: number; best: 
     <div className="mt-4 px-1">
       {/* Labels */}
       <div className="flex justify-between mb-1.5">
-        <span className="text-[10px] font-medium" style={{ color: "#9CA3AF" }}>
+        <span className="text-[10px] font-medium" style={{ color: "#6B7280" }}>
           ₹{formatCrores(low)} Cr
         </span>
         <span className="text-[11px] font-bold" style={{ color: "#0D9488" }}>
           ₹{formatCrores(best)} Cr
         </span>
-        <span className="text-[10px] font-medium" style={{ color: "#9CA3AF" }}>
+        <span className="text-[10px] font-medium" style={{ color: "#6B7280" }}>
           ₹{formatCrores(high)} Cr
         </span>
       </div>
@@ -110,7 +110,7 @@ function QualityRing({ score, label }: { score: number; label: string }) {
         </div>
       </div>
       <div>
-        <div className="text-xs font-medium" style={{ color: "#9CA3AF" }}>IFC Quality</div>
+        <div className="text-xs font-medium" style={{ color: "#6B7280" }}>IFC Quality</div>
         <div className="text-sm font-bold mt-0.5" style={{ color }}>
           {label}
         </div>
@@ -171,6 +171,8 @@ export function HeroStats({
 }: HeroStatsProps) {
   const ref = useRef(null);
   const isInView = useInView(ref, { once: true, margin: "-30px" });
+  const prefersReduced = useReducedMotion();
+  const shouldAnimate = isInView && !prefersReduced;
   const qualityLabel = getIFCQualityLabel(ifcQualityScore);
 
   return (
@@ -178,7 +180,7 @@ export function HeroStats({
       {/* Row 1: Total Cost — big hero card */}
       <motion.div
         variants={cardVariants} custom={0}
-        initial="hidden" animate={isInView ? "visible" : "hidden"}
+        initial="hidden" animate={shouldAnimate ? "visible" : "hidden"}
         className="rounded-2xl p-6 mb-4 relative overflow-hidden transition-shadow duration-300"
         style={{
           background: "#FFFFFF",
@@ -192,7 +194,7 @@ export function HeroStats({
           <div className="flex items-center justify-center w-8 h-8 rounded-xl" style={{ background: "#F0FDFA" }}>
             <IndianRupee size={16} color="#0D9488" />
           </div>
-          <span className="text-xs font-medium tracking-wide uppercase" style={{ color: "#9CA3AF", letterSpacing: "0.05em" }}>
+          <span className="text-xs font-medium tracking-wide uppercase" style={{ color: "#6B7280", letterSpacing: "0.05em" }}>
             Total Project Cost
           </span>
           {costRange && costRange.uncertaintyPercent > 0 && (
@@ -215,7 +217,7 @@ export function HeroStats({
         {/* Cost per m² */}
         <motion.div
           variants={cardVariants} custom={1}
-          initial="hidden" animate={isInView ? "visible" : "hidden"}
+          initial="hidden" animate={shouldAnimate ? "visible" : "hidden"}
           className="rounded-2xl p-5 transition-all duration-300 hover:shadow-md"
           style={{ background: "#FFFFFF", border: "1px solid rgba(0,0,0,0.06)", boxShadow: "0 2px 8px rgba(0,0,0,0.04)" }}
         >
@@ -223,7 +225,7 @@ export function HeroStats({
             <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: "#F3F4F6" }}>
               <Ruler size={14} color="#4B5563" />
             </div>
-            <span className="text-[11px] font-medium uppercase tracking-wide" style={{ color: "#9CA3AF" }}>Cost / m²</span>
+            <span className="text-[11px] font-medium uppercase tracking-wide" style={{ color: "#6B7280" }}>Cost / m²</span>
           </div>
           <div className="text-2xl font-bold" style={{ color: "#111827", fontVariantNumeric: "tabular-nums" }}>
             <AnimatedNumber value={costPerM2} formatter={(n: number) => `₹${n.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`} duration={800} />
@@ -234,7 +236,7 @@ export function HeroStats({
         {/* Hard Costs */}
         <motion.div
           variants={cardVariants} custom={2}
-          initial="hidden" animate={isInView ? "visible" : "hidden"}
+          initial="hidden" animate={shouldAnimate ? "visible" : "hidden"}
           className="rounded-2xl p-5 transition-all duration-300 hover:shadow-md"
           style={{ background: "#FFFFFF", border: "1px solid rgba(0,0,0,0.06)", boxShadow: "0 2px 8px rgba(0,0,0,0.04)" }}
         >
@@ -242,7 +244,7 @@ export function HeroStats({
             <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: "#FEF3C7" }}>
               <Hammer size={14} color="#D97706" />
             </div>
-            <span className="text-[11px] font-medium uppercase tracking-wide" style={{ color: "#9CA3AF" }}>Hard Costs</span>
+            <span className="text-[11px] font-medium uppercase tracking-wide" style={{ color: "#6B7280" }}>Hard Costs</span>
           </div>
           <div className="text-2xl font-bold" style={{ color: "#B45309", fontVariantNumeric: "tabular-nums" }}>
             <AnimatedNumber value={hardCosts} formatter={(n: number) => `₹${formatCrores(n)} Cr`} duration={800} />
@@ -252,7 +254,7 @@ export function HeroStats({
         {/* IFC Quality — with SVG ring */}
         <motion.div
           variants={cardVariants} custom={3}
-          initial="hidden" animate={isInView ? "visible" : "hidden"}
+          initial="hidden" animate={shouldAnimate ? "visible" : "hidden"}
           className="rounded-2xl p-5 transition-all duration-300 hover:shadow-md"
           style={{ background: "#FFFFFF", border: "1px solid rgba(0,0,0,0.06)", boxShadow: "0 2px 8px rgba(0,0,0,0.04)" }}
         >

@@ -83,12 +83,12 @@ export function BOQHeader({ data, onExportExcel }: BOQHeaderProps) {
             </span>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 2 }}>
-            <span style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 13, color: "#9CA3AF" }}>
-              <MapPin size={11} color="#9CA3AF" />
+            <span style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 13, color: "#6B7280" }}>
+              <MapPin size={11} color="#6B7280" />
               {data.location}
             </span>
-            <span style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 13, color: "#9CA3AF" }}>
-              <Calendar size={11} color="#9CA3AF" />
+            <span style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 13, color: "#6B7280" }}>
+              <Calendar size={11} color="#6B7280" />
               {data.date}
             </span>
           </div>
@@ -158,12 +158,12 @@ export function BOQHeader({ data, onExportExcel }: BOQHeaderProps) {
                 <div style={{ fontSize: 11, color: "#4B5563" }}>
                   Estimated range: ₹{(data.costRange.totalLow / 10000000).toFixed(1)} — ₹{(data.costRange.totalHigh / 10000000).toFixed(1)} Cr
                 </div>
-                <div style={{ fontSize: 11, color: "#9CA3AF", marginTop: 2 }}>
+                <div style={{ fontSize: 11, color: "#6B7280", marginTop: 2 }}>
                   Best estimate: ₹{(data.costRange.totalBest / 10000000).toFixed(2)} Cr
                 </div>
               </div>
             )}
-            <div style={{ fontSize: 10, color: "#9CA3AF", marginTop: 8 }}>
+            <div style={{ fontSize: 10, color: "#6B7280", marginTop: 8 }}>
               Not suitable for tender submission or procurement.
             </div>
           </div>
@@ -225,7 +225,7 @@ export function BOQHeader({ data, onExportExcel }: BOQHeaderProps) {
           }}
           title="Copy link"
         >
-          <Share2 size={14} color="#9CA3AF" />
+          <Share2 size={14} color="#6B7280" />
         </button>
       </div>
     </div>

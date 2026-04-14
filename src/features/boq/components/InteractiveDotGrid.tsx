@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useEffect, useCallback } from "react";
+import { useReducedMotion } from "framer-motion";
 
 interface InteractiveDotGridProps {
   dotColor?: string;
@@ -19,9 +20,13 @@ export function InteractiveDotGrid({
   spacing = 24,
   glowRadius = 90,
 }: InteractiveDotGridProps) {
+  const prefersReduced = useReducedMotion();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const mouseRef = useRef({ x: -9999, y: -9999 });
   const rafRef = useRef<number>(0);
+
+  // Don't render the animated grid if user prefers reduced motion
+  if (prefersReduced) return null;
 
   const draw = useCallback(() => {
     const canvas = canvasRef.current;
@@ -98,6 +103,16 @@ export function InteractiveDotGrid({
     window.addEventListener("mousemove", handleMouse);
     document.addEventListener("mouseleave", handleLeave);
 
+    // Pause RAF when tab is hidden to save battery
+    const handleVisibility = () => {
+      if (document.hidden) {
+        cancelAnimationFrame(rafRef.current);
+      } else {
+        rafRef.current = requestAnimationFrame(draw);
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+
     rafRef.current = requestAnimationFrame(draw);
 
     return () => {
@@ -105,6 +120,7 @@ export function InteractiveDotGrid({
       window.removeEventListener("resize", resize);
       window.removeEventListener("mousemove", handleMouse);
       document.removeEventListener("mouseleave", handleLeave);
+      document.removeEventListener("visibilitychange", handleVisibility);
     };
   }, [draw]);
 

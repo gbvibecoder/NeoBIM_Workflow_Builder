@@ -150,7 +150,7 @@ export function CostDonutChart({ material, labor, equipment }: CostDonutChartPro
               justifyContent: "center",
             }}
           >
-            <span style={{ fontSize: 10, color: "#9CA3AF" }}>Total</span>
+            <span style={{ fontSize: 10, color: "#6B7280" }}>Total</span>
             <span
               style={{
                 fontSize: 18,
@@ -227,7 +227,7 @@ export function CostDonutChart({ material, labor, equipment }: CostDonutChartPro
                 >
                   {arc.label}
                 </span>
-                <span style={{ fontSize: 12, color: "#9CA3AF" }}>
+                <span style={{ fontSize: 12, color: "#6B7280" }}>
                   {formatINR(arc.value)}
                 </span>
               </div>

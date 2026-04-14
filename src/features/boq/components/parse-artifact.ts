@@ -6,7 +6,8 @@ import { computeSensitivities, DEFAULT_PRICES, getDivisionCategory } from "@/fea
 import { getConfidenceLevelFromIFCScore, type ConfidenceLevel } from "@/features/boq/constants/quality-thresholds";
 import { validateBOQArtifact } from "@/features/boq/schemas/boq-artifact.schema";
 import { calculateBOQRange, getAACEDescription } from "@/features/boq/lib/cost-range";
-import { computeSeasonalAdjustment } from "@/features/boq/lib/seasonal-adjustment";
+// seasonal-adjustment.ts exists and is tested, but NOT wired into TR-008 cost calculation yet.
+// Re-enable import once handler applies seasonal multipliers to M/L/E costs.
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -114,7 +115,7 @@ export function parseArtifactToBOQ(artifactData: any): BOQData | null {
 
   // ── Zod validation at boundary ─────────────────────────────────────────
   const validation = validateBOQArtifact(artifactData);
-  if (validation.warnings.length > 0) {
+  if (validation.warnings.length > 0 && process.env.NODE_ENV === "development") {
     console.warn("[parseArtifactToBOQ] Validation warnings:", validation.warnings);
   }
   if (!validation.success) {
@@ -293,22 +294,8 @@ export function parseArtifactToBOQ(artifactData: any): BOQData | null {
     summary: data.content || data._summary || "",
     disclaimer: data._disclaimer || boqData.disclaimer || "This is an AI-generated estimate for preliminary budgeting purposes only. Verify all quantities with detailed measurement before procurement.",
 
-    // Seasonal adjustment metadata (compute from location + current month)
-    ...(() => {
-      const locState = data._pricingMetadata?.stateUsed || data._region || "";
-      if (!locState) return {};
-      const seasonal = computeSeasonalAdjustment(locState);
-      if (!seasonal.applied) return {};
-      return {
-        seasonalAdjustment: {
-          applied: true,
-          month: seasonal.monthName,
-          laborMultiplier: seasonal.laborMultiplier,
-          overallImpactPercent: seasonal.overallImpactPercent,
-          description: seasonal.description,
-        },
-      };
-    })(),
+    // Seasonal adjustment: NOT computed here until TR-008 actually applies cost adjustments.
+    // Displaying metadata without cost impact is misleading. See seasonal-adjustment.ts.
 
     // Phase 3: Transparency layer
     ...(data._pricingMetadata && { pricingMetadata: data._pricingMetadata }),

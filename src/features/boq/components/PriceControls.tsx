@@ -293,7 +293,7 @@ export function PriceControls({ prices, basePrices, onChange, totalSavings, base
                       alignItems: "center",
                       gap: 3,
                       fontSize: 10,
-                      color: "#9CA3AF",
+                      color: "#6B7280",
                       background: "none",
                       border: "none",
                       padding: 0,
@@ -475,7 +475,7 @@ export function PriceControls({ prices, basePrices, onChange, totalSavings, base
               ({isSaving ? "-" : "+"}{savingsPct}%)
             </span>
           </div>
-          <span style={{ fontSize: 10, color: "#9CA3AF" }}>
+          <span style={{ fontSize: 10, color: "#6B7280" }}>
             vs. base market rates
           </span>
         </motion.div>

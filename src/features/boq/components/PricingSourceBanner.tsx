@@ -31,10 +31,10 @@ export function PricingSourceBanner({ metadata }: PricingSourceBannerProps) {
     },
     cpwd_static: {
       icon: WifiOff,
-      color: "#9CA3AF",
+      color: "#6B7280",
       bg: "#FFFFFF",
       border: "rgba(0, 0, 0, 0.06)",
-      leftBorder: "#9CA3AF",
+      leftBorder: "#6B7280",
       label: `Using ${metadata.staticRateVersion} Static Rates`,
       sub: metadata.staleDateWarning || "Live pricing unavailable. Prices may differ by 5-15% from current market.",
     },
@@ -56,7 +56,7 @@ export function PricingSourceBanner({ metadata }: PricingSourceBannerProps) {
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: 12, fontWeight: 600, color: config.color }}>{config.label}</div>
         {config.sub && (
-          <div style={{ fontSize: 10, color: "#9CA3AF", marginTop: 2 }}>{config.sub}</div>
+          <div style={{ fontSize: 10, color: "#6B7280", marginTop: 2 }}>{config.sub}</div>
         )}
       </div>
       {/* Pulsing dot for live */}

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback, useMemo, useRef } from "react";
-import { motion, useInView } from "framer-motion";
+import { motion, useInView, useReducedMotion } from "framer-motion";
 import { toast } from "sonner";
 import { BOQHeader } from "@/features/boq/components/BOQHeader";
 import { HeroStats } from "@/features/boq/components/HeroStats";
@@ -331,22 +331,9 @@ export function BOQVisualizerPage({ data, executionId }: BOQVisualizerPageProps)
           </div>
         </ScrollReveal>
 
-        {/* Seasonal Adjustment Badge */}
-        {data.seasonalAdjustment?.applied && (
-          <ScrollReveal delay={0.15}>
-            <div className="mx-6 px-5 py-3.5 rounded-xl flex items-center gap-3" style={{ background: "#EFF6FF", border: "1px solid #BFDBFE" }}>
-              <span style={{ fontSize: 20 }}>🌧️</span>
-              <div>
-                <span className="text-sm font-semibold" style={{ color: "#1D4ED8" }}>
-                  Monsoon adjustment: +{data.seasonalAdjustment.overallImpactPercent.toFixed(1)}%
-                </span>
-                <span className="text-xs ml-2" style={{ color: "#6B7280" }}>
-                  {data.seasonalAdjustment.month} — labor productivity at {(1 / data.seasonalAdjustment.laborMultiplier * 100).toFixed(0)}%
-                </span>
-              </div>
-            </div>
-          </ScrollReveal>
-        )}
+        {/* Seasonal badge removed — costs are not actually adjusted by TR-008 yet.
+           Displaying it would mislead users into thinking costs include monsoon impact.
+           Re-enable once seasonal factors are wired into the handler. */}
 
         {/* Price Controls */}
         <ScrollReveal delay={0.1}>
@@ -420,12 +407,13 @@ export function BOQVisualizerPage({ data, executionId }: BOQVisualizerPageProps)
 function ScrollReveal({ children, delay = 0 }: { children: React.ReactNode; delay?: number }) {
   const ref = useRef<HTMLDivElement>(null);
   const isInView = useInView(ref, { once: true, margin: "-60px" });
+  const prefersReduced = useReducedMotion();
   return (
     <motion.div
       ref={ref}
-      initial={{ opacity: 0, y: 24 }}
+      initial={prefersReduced ? { opacity: 1, y: 0 } : { opacity: 0, y: 24 }}
       animate={isInView ? { opacity: 1, y: 0 } : {}}
-      transition={{ duration: 0.55, delay, ease: [0.25, 0.46, 0.45, 0.94] as const }}
+      transition={prefersReduced ? { duration: 0 } : { duration: 0.55, delay, ease: [0.25, 0.46, 0.45, 0.94] as const }}
     >
       {children}
     </motion.div>

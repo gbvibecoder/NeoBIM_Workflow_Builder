@@ -33,7 +33,7 @@ export function DivisionBarChart({ lines }: DivisionBarChartProps) {
     .map(([name, cost]) => ({
       name,
       cost,
-      color: DIVISION_COLORS[name] || "#9CA3AF",
+      color: DIVISION_COLORS[name] || "#6B7280",
     }))
     .sort((a, b) => b.cost - a.cost);
 
