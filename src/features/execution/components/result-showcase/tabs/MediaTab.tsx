@@ -7,6 +7,7 @@ import { Maximize2, X, Download, ExternalLink, Loader2, ArrowLeft, Video, Sparkl
 import { toast } from "sonner";
 import { useLocale } from "@/hooks/useLocale";
 import { useExecutionStore } from "@/features/execution/stores/execution-store";
+import { ConfidenceBadge } from "@/shared/components/ui/ConfidenceBadge";
 import { COLORS } from "@/features/execution/components/result-showcase/constants";
 import type { ShowcaseData } from "@/features/execution/components/result-showcase/useShowcaseData";
 
@@ -109,6 +110,14 @@ export function MediaTab({ data, onExpandVideo, onCreateVideo, isCreatingVideo =
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 28, maxWidth: "100%" }}>
+      {/* ── Honest beta notice: AI concept art, not photorealistic ── */}
+      <ConfidenceBadge
+        tone="ai-concept"
+        label={t("confidence.aiConcept")}
+        tooltip={t("confidence.aiConceptTooltip")}
+        fullWidth
+      />
+
       {/* Create Video Walkthrough CTA — appears when a 3D model exists but no video yet */}
       {canShowCreateCTA && (
         <CreateVideoCTA

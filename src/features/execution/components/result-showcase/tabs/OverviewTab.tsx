@@ -40,6 +40,7 @@ import { KpiStrip } from "@/features/execution/components/result-showcase/sectio
 import { PipelineViz } from "@/features/execution/components/result-showcase/sections/PipelineViz";
 import { AnimatedNumber } from "@/features/execution/components/result-showcase/sections/AnimatedNumber";
 import { useHeroDetection } from "@/features/execution/components/result-showcase/useHeroDetection";
+import { ConfidenceBadge } from "@/shared/components/ui/ConfidenceBadge";
 import type { ShowcaseData } from "@/features/execution/components/result-showcase/useShowcaseData";
 import type { TabId } from "@/features/execution/components/result-showcase/constants";
 import type { HeroType, InsightMetric, FloorPlanMeta, RoomInfo } from "@/features/execution/components/result-showcase/useHeroDetection";
@@ -158,6 +159,14 @@ export function OverviewTab({
           }
         }
       `}</style>
+
+      {/* ── Honest beta notice: AI-generated estimate ── */}
+      <ConfidenceBadge
+        tone="ai-estimate"
+        label={t("confidence.aiEstimate")}
+        tooltip={t("confidence.aiEstimateTooltip")}
+        fullWidth
+      />
 
       {/* ═══ HERO: Primary Result ═══ */}
       {hero.type === "floor-plan-interactive" && data.model3dData?.kind === "floor-plan-interactive" && (
