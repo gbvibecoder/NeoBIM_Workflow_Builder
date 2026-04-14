@@ -1,5 +1,18 @@
 "use client";
 
+// Konva shape registration — required because Next.js 16's bundler tree-shakes
+// the `import 'konva'` side-effect from react-konva (konva's package.json has
+// no `sideEffects` field), leaving Konva.Node.factory without Rect/Line/Text/
+// Circle/Arc/Arrow/Path. Without these, react-konva silently falls back to
+// Group for every shape and nothing visible renders.
+import "konva/lib/shapes/Rect";
+import "konva/lib/shapes/Circle";
+import "konva/lib/shapes/Line";
+import "konva/lib/shapes/Text";
+import "konva/lib/shapes/Arc";
+import "konva/lib/shapes/Arrow";
+import "konva/lib/shapes/Path";
+
 import React, { useRef, useCallback, useEffect, useState } from "react";
 import { Stage, Layer } from "react-konva";
 import type Konva from "konva";
@@ -656,7 +669,7 @@ export function FloorPlanCanvas() {
 
   if (!floor) return null;
 
-  const showRoomFills = isLayerVisible("A-ROOM-FILL") && viewMode === "presentation";
+  const showRoomFills = isLayerVisible("A-ROOM-FILL");
   const showRoomLabels = isLayerVisible("A-ROOM-NAME");
   const showDimensions = isLayerVisible("A-DIM") && (viewMode === "construction" || viewMode === "cad");
   const showGrid = isLayerVisible("A-GRID") || useFloorPlanStore.getState().gridVisible;
