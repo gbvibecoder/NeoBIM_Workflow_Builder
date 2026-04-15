@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Sparkles, X, FileSpreadsheet, Video, DollarSign } from "lucide-react";
+import { Sparkles, X, DollarSign } from "lucide-react";
 import { UI } from "@/features/ifc/components/constants";
 
 const DISMISSED_KEY = "buildflow-ifc-viewer-banner-dismissed";
@@ -24,24 +24,16 @@ export function IntegrationBanner({ visible }: IntegrationBannerProps) {
     localStorage.setItem(DISMISSED_KEY, "true");
   };
 
+  /* autoAttachIFC=1 tells the canvas to pull the currently-loaded IFC out of
+     IndexedDB (same-origin, shared with this tab) and wire it into the
+     template's IFC Upload node so the user doesn't re-upload the same file
+     they're already viewing. */
   const actions = [
     {
-      label: "Generate BOQ",
-      icon: FileSpreadsheet,
-      desc: "Extract quantities & costs",
-      onClick: () => window.open("/dashboard/canvas?template=wf-09", "_blank"),
-    },
-    {
-      label: "Create Renders",
-      icon: Video,
-      desc: "AI-powered visualizations",
-      onClick: () => window.open("/dashboard/canvas?template=wf-06", "_blank"),
-    },
-    {
-      label: "Estimate Costs",
+      label: "Estimate Costs / Generate BOQ",
       icon: DollarSign,
-      desc: "Regional cost analysis",
-      onClick: () => window.open("/dashboard/canvas?template=wf-09", "_blank"),
+      desc: "Quantities, regional pricing & BOQ",
+      onClick: () => window.open("/dashboard/canvas?template=wf-09&autoAttachIFC=1", "_blank"),
     },
   ];
 

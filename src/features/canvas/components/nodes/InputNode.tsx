@@ -84,6 +84,7 @@ export const FileUploadInput = memo(function FileUploadInput({ nodeId, data, acc
   const inputRef = useRef<HTMLInputElement>(null);
   const fileName = data.inputValue as string | undefined;
   const hasFile = !!fileName;
+  const autoAttachedRef = useRef(false);
 
   const handleFile = useCallback(async (file: File) => {
     if (maxMB && file.size > maxMB * 1024 * 1024) {
@@ -204,6 +205,57 @@ export const FileUploadInput = memo(function FileUploadInput({ nodeId, data, acc
       updateNode(nodeId, { data: { ...currentNode.data, inputValue: file.name, fileSize: file.size } });
     }
   }, [nodeId, updateNode, maxMB, t]);
+
+  /* Auto-attach the file the user is viewing in the IFC Viewer (bridged via
+     the shared IndexedDB cache). This effect lives in the node itself so we
+     don't have to race with template-load / React Flow mount timing from
+     the parent canvas — by the time this fires, this specific IFC Upload
+     input is already mounted in the DOM. The cross-tab handoff works
+     because IndexedDB is same-origin shared between the viewer tab and the
+     canvas tab opened by the banner's `window.open`. */
+  useEffect(() => {
+    if (autoAttachedRef.current) return;
+    if (accept !== ".ifc") return;
+    autoAttachedRef.current = true;
+
+    const params = typeof window !== "undefined"
+      ? new URLSearchParams(window.location.search)
+      : new URLSearchParams();
+    const force = params.get("autoAttachIFC") === "1";
+
+    void (async () => {
+      /* Give React one commit so the node's initial render settles before
+         we mutate its data from the same effect. */
+      await new Promise((r) => setTimeout(r, 50));
+
+      const latest = useWorkflowStore.getState().nodes.find((n) => n.id === nodeId);
+      if (!latest) return;
+      if (!force && latest.data.inputValue) {
+        console.info(`[IFC auto-attach] ${nodeId} already has a file — skipping`);
+        return;
+      }
+
+      try {
+        const { loadLastIFCFile } = await import("@/features/ifc/lib/ifc-cache");
+        const cached = await loadLastIFCFile();
+        if (!cached?.buffer || cached.buffer.byteLength === 0) {
+          console.info("[IFC auto-attach] no cached IFC in IndexedDB — skipping");
+          return;
+        }
+        console.info(`[IFC auto-attach] ${nodeId}: attaching ${cached.name} (${cached.buffer.byteLength} bytes)`);
+        const file = new File([cached.buffer], cached.name, { type: "application/octet-stream" });
+        /* Reuse handleFile verbatim so the drag-drop and auto-attach paths
+           write identical state into the store (parse diagnostics, toasts,
+           inputFileStore entry, etc.). */
+        await handleFile(file);
+      } catch (err) {
+        console.warn("[IFC auto-attach] failed:", err);
+      }
+    })();
+    // `handleFile`'s identity churns on every locale-function change; we
+    // only want to fire once per node mount, so it's intentionally omitted.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nodeId, accept]);
 
   const onFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
