@@ -139,10 +139,6 @@ function RegisterForm() {
         user_name: name.trim()
       });
 
-      // Signup-complete analytics — previously fired on the /welcome page
-      // which has been removed. Keep the event wired so Google Ads
-      // Enhanced Conversions and the sign_up_complete dataLayer signal
-      // still fire at the same funnel point.
       pushEnhancedConversionData({
         email: isEmail ? identifier.trim().toLowerCase() : undefined,
         firstName: name.trim().split(" ")[0],

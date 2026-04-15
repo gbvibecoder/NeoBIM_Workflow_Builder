@@ -4,7 +4,6 @@ import { razorpay, verifyPaymentSignature, getRoleByRazorpayPlanId } from '@/fea
 import { prisma } from '@/lib/db';
 import { checkEndpointRateLimit } from '@/lib/rate-limit';
 import { formatErrorResponse, UserErrors } from '@/lib/user-errors';
-import { sendWelcomeEmail } from '@/shared/services/email';
 
 /**
  * POST — Verify Razorpay payment after checkout widget success.
@@ -129,10 +128,10 @@ export async function POST(req: Request) {
       planId,
     });
 
-    // Send welcome email (fire-and-forget)
-    if (user.email) {
-      sendWelcomeEmail(user.email, user.name, newRole).catch((err) => console.error("[webhook] Failed to send welcome email:", err));
-    }
+    // Welcome email is sent by the Razorpay webhook on `subscription.activated`
+    // (src/app/api/razorpay/webhook/route.ts). Razorpay retries failed webhook
+    // deliveries, so that's the reliable path — sending it here too was
+    // causing every new subscriber to receive two welcome emails.
 
     return NextResponse.json({
       success: true,

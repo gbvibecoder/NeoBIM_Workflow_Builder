@@ -2,16 +2,18 @@
 
 import React, { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Check, Sparkles, Box, Film, FileSpreadsheet, Zap, ArrowRight } from "lucide-react";
+import { Check, Sparkles, Box, Film, FileSpreadsheet, Zap, ArrowRight, Loader2 } from "lucide-react";
 import { useLocale } from "@/hooks/useLocale";
 import { SPRING } from "@/features/onboarding-survey/lib/scene-motion";
 import { PREBUILT_WORKFLOWS_MAP } from "@/features/workflows/constants/prebuilt-workflows";
 
+type PlanKind = "free" | "starter" | "pro";
+
 interface PlanCardProps {
-  kind: "free" | "pro";
+  kind: PlanKind;
   label: string;          // plan name
-  priceLabel?: string;    // for pro: currency + price (animated), for free: "Free"
-  priceNumeric?: number;  // for pro only — count-up target
+  priceLabel?: string;    // for paid: currency symbol; for free: "Free"
+  priceNumeric?: number;  // for paid only — count-up target
   priceSuffix?: string;   // e.g. "/month"
   tagline: string;
   ctaLabel: string;
@@ -19,18 +21,63 @@ interface PlanCardProps {
   honestNote: string;
   featureLabels: string[];
   onSelect: () => void;
-  emphasized?: boolean;
+  emphasized?: boolean;   // visually dominant card (Most Popular)
+  badgeLabel?: string;    // "Most Popular" / "Premium" — paid plans only
+  loading?: boolean;      // CTA shows spinner + disables when true
 }
 
 const FEATURE_ICONS = [Sparkles, Box, Film, FileSpreadsheet, Zap, Check];
 
+/** Aurora-themed colour palette for paid plans — keeps the onboarding mood. */
+const PAID_THEME = {
+  starter: {
+    bgGradient:
+      "linear-gradient(145deg, rgba(16,185,129,0.08), rgba(20,184,166,0.06), rgba(34,211,238,0.06))",
+    border: "rgba(16,185,129,0.4)",
+    shadow:
+      "0 18px 56px rgba(0,0,0,0.45), 0 0 44px rgba(16,185,129,0.15), inset 0 1px 0 rgba(255,255,255,0.06)",
+    auroraGradient:
+      "linear-gradient(90deg, transparent, rgba(16,185,129,0.95), rgba(45,212,191,0.95), rgba(34,211,238,0.95), transparent)",
+    accentText: "#5EEAD4",
+    priceGradient: "linear-gradient(135deg, #10B981, #2DD4BF, #5EEAD4)",
+    iconBg: "rgba(16,185,129,0.16)",
+    iconBorder: "rgba(16,185,129,0.3)",
+    iconColor: "#5EEAD4",
+    ctaGradient: "linear-gradient(135deg, #10B981 0%, #14B8A6 50%, #06B6D4 100%)",
+    ctaShadow: "0 8px 28px rgba(16,185,129,0.4), inset 0 1px 0 rgba(255,255,255,0.2)",
+    badgeBg: "linear-gradient(135deg, rgba(16,185,129,0.28), rgba(45,212,191,0.28))",
+    badgeBorder: "rgba(16,185,129,0.5)",
+    badgeText: "#A7F3D0",
+  },
+  pro: {
+    bgGradient:
+      "linear-gradient(145deg, rgba(79,138,255,0.06), rgba(139,92,246,0.05), rgba(236,72,153,0.05))",
+    border: "rgba(79,138,255,0.3)",
+    shadow:
+      "0 18px 56px rgba(0,0,0,0.45), 0 0 40px rgba(79,138,255,0.08), inset 0 1px 0 rgba(255,255,255,0.06)",
+    auroraGradient:
+      "linear-gradient(90deg, transparent, rgba(79,138,255,0.9), rgba(139,92,246,0.9), rgba(236,72,153,0.9), transparent)",
+    accentText: "#A5B4FC",
+    priceGradient: "linear-gradient(135deg, #4F8AFF, #8B5CF6, #EC4899)",
+    iconBg: "rgba(79,138,255,0.14)",
+    iconBorder: "rgba(79,138,255,0.25)",
+    iconColor: "#A5B4FC",
+    ctaGradient: "linear-gradient(135deg, #4F8AFF 0%, #6366F1 50%, #8B5CF6 100%)",
+    ctaShadow: "0 8px 28px rgba(79,138,255,0.4), inset 0 1px 0 rgba(255,255,255,0.2)",
+    badgeBg: "linear-gradient(135deg, rgba(79,138,255,0.2), rgba(139,92,246,0.2))",
+    badgeBorder: "rgba(79,138,255,0.35)",
+    badgeText: "#A5B4FC",
+  },
+} as const;
+
 /**
  * Free plan visual: 3 actual prebuilt workflow thumbnails as mini chain
  * SVGs (real data — the user sees what Free actually unlocks).
- * Pro plan visual: aurora-shimmer border + animated feature icons.
+ * Paid plans: aurora-shimmer border + animated feature icons, themed per tier.
  */
 export function PlanCard(props: PlanCardProps) {
-  return props.kind === "free" ? <FreePlan {...props} /> : <ProPlan {...props} />;
+  if (props.kind === "free") return <FreePlan {...props} />;
+  return <PaidPlan {...props} kind={props.kind} />;
 }
 
 // ── Free plan ──────────────────────────────────────────────────────────
@@ -108,8 +155,9 @@ function FreePlan(props: PlanCardProps) {
       <motion.button
         type="button"
         onClick={props.onSelect}
-        whileHover={{ scale: 1.01 }}
-        whileTap={{ scale: 0.98 }}
+        disabled={props.loading}
+        whileHover={{ scale: props.loading ? 1 : 1.01 }}
+        whileTap={{ scale: props.loading ? 1 : 0.98 }}
         style={{
           padding: "12px 18px",
           borderRadius: 12,
@@ -118,15 +166,17 @@ function FreePlan(props: PlanCardProps) {
           color: "var(--text-primary)",
           fontSize: 14,
           fontWeight: 700,
-          cursor: "pointer",
+          cursor: props.loading ? "wait" : "pointer",
+          opacity: props.loading ? 0.7 : 1,
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
           gap: 8,
         }}
       >
+        {props.loading ? <Loader2 size={14} className="spin-anim" /> : null}
         {props.ctaLabel}
-        <ArrowRight size={14} />
+        {!props.loading && <ArrowRight size={14} />}
       </motion.button>
       {props.ctaSubtitle && (
         <div style={{ fontSize: 11, color: "var(--text-disabled)", textAlign: "center", marginTop: -8 }}>
@@ -137,11 +187,13 @@ function FreePlan(props: PlanCardProps) {
   );
 }
 
-// ── Pro plan ───────────────────────────────────────────────────────────
-function ProPlan(props: PlanCardProps) {
+// ── Paid plan (Starter or Pro, themed) ─────────────────────────────────
+function PaidPlan(props: PlanCardProps & { kind: "starter" | "pro" }) {
   const { t } = useLocale();
+  const theme = PAID_THEME[props.kind];
   const [price, setPrice] = useState(0);
   const target = props.priceNumeric ?? 0;
+  const emphasized = Boolean(props.emphasized);
 
   useEffect(() => {
     if (target === 0) return;
@@ -160,77 +212,97 @@ function ProPlan(props: PlanCardProps) {
 
   return (
     <motion.div
-      whileHover={{ y: -8 }}
+      whileHover={{ y: emphasized ? -10 : -6 }}
       transition={SPRING.smooth}
       style={{
         position: "relative",
-        padding: "32px 28px",
+        padding: emphasized ? "34px 28px" : "30px 26px",
         borderRadius: 20,
-        background: "linear-gradient(145deg, rgba(79,138,255,0.06), rgba(139,92,246,0.05), rgba(236,72,153,0.05))",
-        border: "1px solid rgba(79,138,255,0.3)",
+        background: theme.bgGradient,
+        border: `1px solid ${theme.border}`,
         backdropFilter: "blur(16px) saturate(1.4)",
         WebkitBackdropFilter: "blur(16px) saturate(1.4)",
-        boxShadow: "0 18px 56px rgba(0,0,0,0.45), 0 0 40px rgba(79,138,255,0.08), inset 0 1px 0 rgba(255,255,255,0.06)",
+        boxShadow: theme.shadow,
         display: "flex",
         flexDirection: "column",
         gap: 18,
         color: "var(--text-primary)",
         overflow: "hidden",
+        // Subtle scale-up for the emphasized card so the eye lands there first.
+        transform: emphasized ? "translateY(-6px)" : undefined,
       }}
     >
-      {/* Aurora shimmer sweep across the border */}
+      {/* Aurora shimmer sweep across the top border */}
       <motion.div
         aria-hidden="true"
         animate={{ x: ["-120%", "120%"] }}
-        transition={{ duration: 3.5, repeat: Infinity, ease: "linear" }}
+        transition={{ duration: emphasized ? 2.6 : 3.5, repeat: Infinity, ease: "linear" }}
         style={{
           position: "absolute",
           top: 0,
           left: 0,
           width: "45%",
           height: 2,
-          background: "linear-gradient(90deg, transparent, rgba(79,138,255,0.9), rgba(139,92,246,0.9), rgba(236,72,153,0.9), transparent)",
+          background: theme.auroraGradient,
           filter: "blur(0.5px)",
           pointerEvents: "none",
         }}
       />
 
-      {/* Recommended badge */}
-      <div
-        style={{
-          position: "absolute",
-          top: 16,
-          right: 16,
-          display: "inline-flex",
-          alignItems: "center",
-          gap: 5,
-          padding: "3px 10px",
-          borderRadius: 999,
-          background: "linear-gradient(135deg, rgba(79,138,255,0.2), rgba(139,92,246,0.2))",
-          border: "1px solid rgba(79,138,255,0.35)",
-          fontSize: 10,
-          fontWeight: 700,
-          letterSpacing: "0.12em",
-          textTransform: "uppercase",
-          color: "#A5B4FC",
-        }}
-      >
-        <Sparkles size={10} />
-        {t("survey.scene4.pro.recommended")}
-      </div>
+      {/* Badge — Most Popular / Premium / Recommended */}
+      {props.badgeLabel && (
+        <motion.div
+          initial={{ opacity: 0, y: -4 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1, duration: 0.4 }}
+          style={{
+            position: "absolute",
+            top: emphasized ? -1 : 16,
+            right: emphasized ? "50%" : 16,
+            transform: emphasized ? "translate(50%, -50%)" : undefined,
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 5,
+            padding: emphasized ? "5px 14px" : "3px 10px",
+            borderRadius: 999,
+            background: theme.badgeBg,
+            border: `1px solid ${theme.badgeBorder}`,
+            fontSize: emphasized ? 10.5 : 10,
+            fontWeight: 700,
+            letterSpacing: "0.14em",
+            textTransform: "uppercase",
+            color: theme.badgeText,
+            whiteSpace: "nowrap",
+            backdropFilter: "blur(6px)",
+            WebkitBackdropFilter: "blur(6px)",
+          }}
+        >
+          <Sparkles size={10} />
+          {props.badgeLabel}
+        </motion.div>
+      )}
 
-      <div>
-        <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.16em", textTransform: "uppercase", color: "#A5B4FC", fontFamily: "var(--font-jetbrains), monospace" }}>
+      <div style={{ marginTop: emphasized && props.badgeLabel ? 8 : 0 }}>
+        <div
+          style={{
+            fontSize: 11,
+            fontWeight: 700,
+            letterSpacing: "0.16em",
+            textTransform: "uppercase",
+            color: theme.accentText,
+            fontFamily: "var(--font-jetbrains), monospace",
+          }}
+        >
           {props.label}
         </div>
         <div style={{ display: "flex", alignItems: "baseline", gap: 6, marginTop: 8 }}>
           <span style={{ fontSize: 18, color: "var(--text-secondary)" }}>{props.priceLabel}</span>
           <span
             style={{
-              fontSize: 48,
+              fontSize: emphasized ? 50 : 44,
               fontWeight: 800,
               letterSpacing: "-0.04em",
-              background: "linear-gradient(135deg, #4F8AFF, #8B5CF6, #EC4899)",
+              background: theme.priceGradient,
               WebkitBackgroundClip: "text",
               WebkitTextFillColor: "transparent",
               backgroundClip: "text",
@@ -238,7 +310,7 @@ function ProPlan(props: PlanCardProps) {
               fontVariantNumeric: "tabular-nums",
             }}
           >
-            {price}
+            {price.toLocaleString("en-IN")}
           </span>
           <span style={{ fontSize: 14, color: "var(--text-tertiary)" }}>{props.priceSuffix}</span>
         </div>
@@ -264,12 +336,12 @@ function ProPlan(props: PlanCardProps) {
                   width: 26,
                   height: 26,
                   borderRadius: 8,
-                  background: "rgba(79,138,255,0.14)",
-                  border: "1px solid rgba(79,138,255,0.25)",
+                  background: theme.iconBg,
+                  border: `1px solid ${theme.iconBorder}`,
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  color: "#A5B4FC",
+                  color: theme.iconColor,
                   flexShrink: 0,
                 }}
               >
@@ -288,33 +360,54 @@ function ProPlan(props: PlanCardProps) {
       <motion.button
         type="button"
         onClick={props.onSelect}
-        whileHover={{ scale: 1.02 }}
-        whileTap={{ scale: 0.97 }}
+        disabled={props.loading}
+        whileHover={{ scale: props.loading ? 1 : 1.02 }}
+        whileTap={{ scale: props.loading ? 1 : 0.97 }}
         style={{
           padding: "14px 22px",
           borderRadius: 12,
-          background: "linear-gradient(135deg, #4F8AFF 0%, #6366F1 50%, #8B5CF6 100%)",
+          background: theme.ctaGradient,
           border: "none",
           color: "#fff",
           fontSize: 14.5,
           fontWeight: 700,
-          cursor: "pointer",
+          cursor: props.loading ? "wait" : "pointer",
+          opacity: props.loading ? 0.85 : 1,
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
           gap: 8,
-          boxShadow: "0 8px 28px rgba(79,138,255,0.4), inset 0 1px 0 rgba(255,255,255,0.2)",
+          boxShadow: theme.ctaShadow,
           letterSpacing: "-0.005em",
         }}
       >
-        {props.ctaLabel}
-        <ArrowRight size={14} />
+        {props.loading ? (
+          <>
+            <Loader2 size={14} className="spin-anim" />
+            {t("survey.scene4.processing")}
+          </>
+        ) : (
+          <>
+            {props.ctaLabel}
+            <ArrowRight size={14} />
+          </>
+        )}
       </motion.button>
       {props.ctaSubtitle && (
         <div style={{ fontSize: 11, color: "var(--text-disabled)", textAlign: "center", marginTop: -8 }}>
           {props.ctaSubtitle}
         </div>
       )}
+
+      <style jsx>{`
+        @keyframes plancardSpin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+        :global(.spin-anim) {
+          animation: plancardSpin 0.9s linear infinite;
+        }
+      `}</style>
     </motion.div>
   );
 }
