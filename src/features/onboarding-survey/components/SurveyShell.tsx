@@ -114,8 +114,10 @@ export function SurveyShell({ initial }: SurveyShellProps) {
    * Open Razorpay checkout for a paid plan directly from the onboarding step.
    * Mirrors the dashboard billing flow:
    *   POST /api/razorpay/checkout → open widget → verify → /thank-you/subscription.
-   * The survey itself is finalized first so we have an attribution row even
-   * if the user closes the widget mid-checkout.
+   * The survey is finalized ONLY after /api/razorpay/verify returns success,
+   * so a dismissed or failed payment does not persist a false `chose_pro` /
+   * `chose_starter` completion in the DB. If the user dismisses the widget,
+   * the survey stays in-progress and they can come back later.
    */
   const openRazorpay = useCallback(
     async (planKey: PaidPlanKey, action: PricingAction) => {
@@ -162,6 +164,11 @@ export function SurveyShell({ initial }: SurveyShellProps) {
               });
               const verifyData = await verifyRes.json();
               if (verifyData.success) {
+                // Payment verified — only NOW persist the pricing action and
+                // mark the survey complete. Keeps admin analytics honest:
+                // no paid-conversion rows without an actual payment.
+                markOnboarded();
+                await finalize({ pricingAction: action, completedAt: true });
                 // Hard-redirect so /thank-you owns the GA4 purchase event +
                 // forces the next session refresh to pick up the new role.
                 window.location.href = `/thank-you/subscription?plan=${planKey}`;
@@ -176,6 +183,7 @@ export function SurveyShell({ initial }: SurveyShellProps) {
           },
           modal: {
             // User dismissed without paying — let them retry / pick another plan.
+            // Survey intentionally NOT finalized here, so they can come back.
             ondismiss: () => {
               setLoadingPlan(null);
             },
@@ -192,10 +200,8 @@ export function SurveyShell({ initial }: SurveyShellProps) {
         toast.error(t("survey.scene4.checkoutError"));
         setLoadingPlan(null);
       }
-      // Action is referenced for analytics symmetry / future webhook tagging.
-      void action;
     },
-    [t]
+    [finalize, markOnboarded, t]
   );
 
   // Scene 4 pick → track + finalize, then route based on action.
@@ -225,12 +231,12 @@ export function SurveyShell({ initial }: SurveyShellProps) {
         return;
       }
 
-      // Paid plan → finalize survey first (attribution), then open Razorpay.
+      // Paid plan → open Razorpay immediately. Survey completion is deferred
+      // to the verify-success handler inside openRazorpay, so a dismissed
+      // widget or failed payment does NOT persist a `chose_pro` /
+      // `chose_starter` row in the DB. Don't flip `redirecting`: the user
+      // must be able to dismiss and retry without reloading the page.
       if (action === "chose_starter" || action === "chose_pro") {
-        markOnboarded();
-        // Don't flip `redirecting`: the user must be able to dismiss the
-        // Razorpay widget and retry without reloading the page.
-        await finalize({ pricingAction: action, completedAt: true });
         const planKey: PaidPlanKey = action === "chose_pro" ? "PRO" : "STARTER";
         await openRazorpay(planKey, action);
       }
