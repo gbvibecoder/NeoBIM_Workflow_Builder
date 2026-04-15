@@ -13,14 +13,18 @@ export function setTrackingConsent(value: "accepted" | "rejected") {
   if (typeof window === "undefined") return;
   localStorage.setItem(CONSENT_KEY, value);
 
-  // Update Google Consent Mode v2 — GTM and GA4 listen for this
   const granted = value === "accepted";
+
+  // Google Consent Mode v2 — GTM, GA4, and Google Ads listen for this
   window.gtag?.("consent", "update", {
     analytics_storage: granted ? "granted" : "denied",
     ad_storage: granted ? "granted" : "denied",
     ad_user_data: granted ? "granted" : "denied",
     ad_personalization: granted ? "granted" : "denied",
   });
+
+  // Meta Pixel granular consent — matches the revoke-by-default in TrackingScripts
+  window.fbq?.("consent", granted ? "grant" : "revoke");
 
   window.dispatchEvent(new CustomEvent("cookie-consent-change", { detail: value }));
 }
