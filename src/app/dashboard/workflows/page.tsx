@@ -83,7 +83,7 @@ export default function WorkflowsPage() {
       setShowLimitModal(true);
       return;
     }
-    router.push("/dashboard/canvas");
+    router.push("/dashboard/canvas?new=1");
   }, [isAtLimit, router]);
 
   const load = useCallback(async () => {

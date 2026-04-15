@@ -294,7 +294,7 @@ export function Sidebar() {
         <div style={{ padding: isEffectivelyCollapsed ? "14px 8px" : "14px 14px", flexShrink: 0, position: "relative", zIndex: 1 }}>
           <motion.div whileHover={{ scale: 1.015, y: -1 }} whileTap={{ scale: 0.975 }}>
             <Link
-              href="/dashboard/canvas"
+              href="/dashboard/canvas?new=1"
               onMouseEnter={() => setNewBtnHover(true)}
               onMouseLeave={() => setNewBtnHover(false)}
               className="sb-new-btn"
