@@ -12,9 +12,16 @@ import { toast } from "sonner";
 interface HeaderProps {
   title?: string;
   subtitle?: string;
+  /**
+   * When true, the header becomes a transparent overlay — no background,
+   * no border, absolutely positioned. Used on immersive pages (dashboard
+   * landing hero) where the 3D scene should fill the full viewport and
+   * only the right-side action pill needs to float above it.
+   */
+  floating?: boolean;
 }
 
-export function Header({ title, subtitle }: HeaderProps) {
+export function Header({ title, subtitle, floating = false }: HeaderProps) {
   const router = useRouter();
   const { t, locale, setLocale } = useLocale();
   const { data: session } = useSession();
@@ -92,17 +99,25 @@ export function Header({ title, subtitle }: HeaderProps) {
     <header
       className="flex items-center justify-between px-5 dashboard-header"
       style={{
-        minHeight: 52,
+        minHeight: floating ? 48 : 52,
         flexShrink: 0,
-        background: "rgba(10,12,20,0.8)",
-        backdropFilter: "blur(20px)",
-        WebkitBackdropFilter: "blur(20px)",
-        borderBottom: "1px solid rgba(255,255,255,0.1)",
+        // Transparent overlay for immersive landing — full dark bar otherwise.
+        background: floating ? "transparent" : "rgba(10,12,20,0.8)",
+        backdropFilter: floating ? "none" : "blur(20px)",
+        WebkitBackdropFilter: floating ? "none" : "blur(20px)",
+        borderBottom: floating ? "none" : "1px solid rgba(255,255,255,0.1)",
+        // Floating mode: absolute over the hero so content can fill the full
+        // viewport. Static mode: relative in the flex flow.
+        position: floating ? "absolute" : "relative",
+        top: floating ? 0 : undefined,
+        left: floating ? 0 : undefined,
+        right: floating ? 0 : undefined,
+        paddingTop: floating ? 10 : undefined,
         // Establish a stacking context above the canvas/ReactFlow area so the
         // canvas-toolbar dropdowns (Manual mode, Share, Run options) — which
         // are now portaled into this header — render above the canvas pane.
-        position: "relative",
         zIndex: 40,
+        pointerEvents: floating ? "none" : undefined,
       }}
     >
       {/* Left — Title (optional). Collapses when empty so the center toolbar
@@ -146,7 +161,7 @@ export function Header({ title, subtitle }: HeaderProps) {
       />
 
       {/* Right — Actions */}
-      <div className="flex items-center gap-2.5">
+      <div className="flex items-center gap-2.5" style={{ pointerEvents: "auto" }}>
         {/* Search — icon-only trigger for ⌘K command palette */}
         <button
           className="flex items-center justify-center transition-all"
