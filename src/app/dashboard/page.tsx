@@ -264,19 +264,23 @@ export default function DashboardPage() {
           )}
 
           {/* ─── Apple/Linear-style overlay — left side only ─── */}
-          <div style={{
-            position: "absolute", inset: 0, zIndex: 3,
-            display: "flex",
-            alignItems: isMobileLayout ? "flex-start" : "center",
-            padding: isMobileLayout ? "78px 22px 80px 22px" : "0 clamp(32px, 6vw, 110px)",
-            pointerEvents: "none",
-            overflowY: isMobileLayout ? "auto" : "visible",
-          }}>
-            {/* ── LEFT: identity + CTA — full width on mobile, hard-capped on desktop ── */}
-            <div style={{
-              pointerEvents: "auto",
-              width: isMobileLayout ? "100%" : "min(560px, 46%)",
+          <div
+            className="db-hero-overlay"
+            style={{
+              position: "absolute", inset: 0, zIndex: 3,
+              display: "flex",
+              alignItems: isMobileLayout ? "flex-start" : "center",
+              padding: isMobileLayout ? "78px 22px 80px 22px" : "0 clamp(32px, 6vw, 110px)",
+              pointerEvents: "none",
+              overflowY: isMobileLayout ? "auto" : "visible",
             }}>
+            {/* ── LEFT: identity + CTA — full width on mobile, hard-capped on desktop ── */}
+            <div
+              className="db-hero-left"
+              style={{
+                pointerEvents: "auto",
+                width: isMobileLayout ? "100%" : "min(560px, 46%)",
+              }}>
               {/* Eyebrow — transformation story */}
               <motion.div
                 initial={{ opacity: 0, x: -16 }}
@@ -1262,6 +1266,20 @@ export default function DashboardPage() {
         @keyframes db-shimmer {
           0% { background-position: 200% center; }
           100% { background-position: -200% center; }
+        }
+
+        /* ── Hero overlay — deterministic mobile layout (avoids SSR→hydration flash
+             where content briefly appears vertically centered before JS kicks in
+             and flips to top-aligned). CSS matches the JS breakpoint (<820px). ── */
+        @media (max-width: 819px) {
+          .db-hero-overlay {
+            align-items: flex-start !important;
+            padding: 78px 22px 80px 22px !important;
+            overflow-y: auto !important;
+          }
+          .db-hero-left {
+            width: 100% !important;
+          }
         }
 
         /* ── Responsive ── */
