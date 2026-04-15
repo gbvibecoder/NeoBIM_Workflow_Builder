@@ -99,22 +99,24 @@ export async function POST(req: NextRequest) {
     const completed = body.completedAt === true;
     const skippedAtScene = num(body.skippedAtScene);
 
-    const data = {
-      discoverySource: str(body.discoverySource, 64),
-      discoveryOther:  str(body.discoveryOther, 400),
-      profession:      str(body.profession, 64),
-      professionOther: str(body.professionOther, 400),
-      teamSize:        str(body.teamSize, 64),
-      pricingAction,
-      completedAt:     completed ? new Date() : undefined,
-      skippedAt:       skippedAtScene !== null ? new Date() : undefined,
-      skippedAtScene:  skippedAtScene,
-    };
-
-    // Filter undefined so auto-save patches without clobbering terminal timestamps.
-    const cleanUpdate: Record<string, unknown> = {};
-    for (const [k, v] of Object.entries(data)) {
-      if (v !== undefined) cleanUpdate[k] = v;
+    // Build the write set from ONLY the fields the client explicitly sent.
+    // Previously we ran every field through `str()` unconditionally, which
+    // turned `undefined` into `null` — so a Scene 2 patch (`{ profession }`)
+    // silently cleared discoverySource, and a Scene 3 patch wiped both.
+    // Users who answered three scenes and refreshed were thrown back to
+    // Scene 1 because the DB row really was mostly null. Fix: only include
+    // keys that appear in the incoming body.
+    const surveyData: Record<string, unknown> = {};
+    if ("discoverySource" in body)  surveyData.discoverySource  = str(body.discoverySource, 64);
+    if ("discoveryOther"  in body)  surveyData.discoveryOther   = str(body.discoveryOther, 400);
+    if ("profession"      in body)  surveyData.profession       = str(body.profession, 64);
+    if ("professionOther" in body)  surveyData.professionOther  = str(body.professionOther, 400);
+    if ("teamSize"        in body)  surveyData.teamSize         = str(body.teamSize, 64);
+    if ("pricingAction"   in body)  surveyData.pricingAction    = pricingAction;
+    if (completed)                  surveyData.completedAt      = new Date();
+    if (skippedAtScene !== null) {
+      surveyData.skippedAt      = new Date();
+      surveyData.skippedAtScene = skippedAtScene;
     }
 
     // Attribution — persisted ONLY on CREATE. First-touch wins; subsequent
@@ -125,15 +127,7 @@ export async function POST(req: NextRequest) {
       where: { userId: session.user.id },
       create: {
         userId: session.user.id,
-        discoverySource: data.discoverySource,
-        discoveryOther:  data.discoveryOther,
-        profession:      data.profession,
-        professionOther: data.professionOther,
-        teamSize:        data.teamSize,
-        pricingAction:   data.pricingAction,
-        completedAt:     data.completedAt ?? null,
-        skippedAt:       data.skippedAt ?? null,
-        skippedAtScene:  data.skippedAtScene,
+        ...surveyData,
         utmSource:       attr.utmSource,
         utmMedium:       attr.utmMedium,
         utmCampaign:     attr.utmCampaign,
@@ -145,7 +139,7 @@ export async function POST(req: NextRequest) {
         deviceType:      attr.deviceType,
         userAgent:       attr.userAgent,
       },
-      update: cleanUpdate,
+      update: surveyData,
     });
 
     return NextResponse.json({ survey });
