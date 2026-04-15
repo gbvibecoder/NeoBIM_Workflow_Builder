@@ -46,9 +46,17 @@ export function Toolbar() {
   const router = useRouter();
 
   const handleBack = useCallback(() => {
-    // Reset store state so the welcome screen shows when user returns
+    // Back means "show me the floor-plan welcome screen", NOT "leave the
+    // floor-plan page entirely". resetToWelcome() nulls the in-memory
+    // project (which flips FloorPlanViewer's render over to <WelcomeScreen/>
+    // since it shows whenever `!project`) and clears the active-project
+    // pointer so a subsequent refresh won't re-hydrate the editor.
     resetToWelcome();
-    router.push("/dashboard");
+    // Strip any ?projectId= / ?source= / ?prompt= params the user arrived
+    // with — otherwise a later refresh would re-load the editor from the
+    // URL hint, effectively undoing their Back click. replace() avoids
+    // pushing an extra history entry.
+    router.replace("/dashboard/floor-plan");
   }, [resetToWelcome, router]);
 
   if (!project) return null;
