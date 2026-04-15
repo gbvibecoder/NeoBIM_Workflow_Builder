@@ -16,7 +16,13 @@ function num(v: unknown): number | null {
   return v;
 }
 
-const ALLOWED_PRICING = new Set(["chose_free", "chose_pro", "skipped"]);
+const ALLOWED_PRICING = new Set([
+  "chose_free",
+  "chose_starter",
+  "chose_pro",
+  "explore_more",
+  "skipped",
+]);
 
 // ── First-touch attribution helpers ────────────────────────────────────
 // Keep UA length short in storage (some bots send monster strings).
