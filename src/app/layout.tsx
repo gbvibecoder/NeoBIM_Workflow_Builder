@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import Script from "next/script";
 import { DM_Sans, DM_Serif_Display, JetBrains_Mono } from "next/font/google";
 
 import { Toaster } from "sonner";
@@ -9,7 +10,6 @@ import { SessionProvider } from "@/shared/components/providers/SessionProvider";
 import { TrackingScripts } from "@/shared/components/TrackingScripts";
 import { CookieConsent } from "@/shared/components/CookieConsent";
 import { UTMCapture } from "@/shared/components/UTMCapture";
-import { PageViewTracker } from "@/shared/components/PageViewTracker";
 import "./globals.css";
 import "@/lib/env-check";
 
@@ -252,9 +252,11 @@ export default function RootLayout({
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />
         {/* Google Consent Mode v2 — defaults to denied BEFORE any tags load.
-            When user accepts cookies, cookie-consent.ts pushes a consent update. */}
-        <script
-          dangerouslySetInnerHTML={{ __html: `
+            When user accepts cookies, cookie-consent.ts pushes a consent update.
+            Uses next/script instead of raw <script> so React 19 doesn't try to
+            hoist it during reconciliation (which crashes sibling client refs). */}
+        <Script id="consent-mode-default" strategy="beforeInteractive">
+          {`
             window.dataLayer=window.dataLayer||[];
             function gtag(){dataLayer.push(arguments);}
             gtag('consent','default',{
@@ -264,8 +266,8 @@ export default function RootLayout({
               'ad_personalization':'denied',
               'wait_for_update':500
             });
-          `}}
-        />
+          `}
+        </Script>
         {/* Tracking scripts (GTM + Meta Pixel + GA4 + Clarity) — loaded only after cookie consent */}
         <TrackingScripts />
       </head>
@@ -317,7 +319,6 @@ export default function RootLayout({
         <Analytics />
         <SpeedInsights />
         <UTMCapture />
-        <PageViewTracker />
         <CookieConsent />
       </body>
     </html>
