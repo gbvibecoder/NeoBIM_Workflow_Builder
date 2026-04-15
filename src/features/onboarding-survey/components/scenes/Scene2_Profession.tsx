@@ -21,7 +21,7 @@ import type {
 
 interface Scene2Props {
   initial: { profession: string | null; other: string | null };
-  onPatch: (p: SurveyPatch) => void;
+  onPatch: (p: SurveyPatch, opts?: { immediate?: boolean }) => Promise<void>;
   onAdvance: () => void;
   onTrack: (profession: string) => void;
 }
@@ -42,16 +42,26 @@ export function Scene2_Profession({ initial, onPatch, onAdvance, onTrack }: Scen
       onTrack(opt.id);
 
       if (opt.isOther) {
-        onPatch({ profession: opt.id, professionOther: otherText || null });
+        // "Other" reveals the textarea — debounced save is fine; user
+        // confirms via the Continue button which awaits.
+        void onPatch({ profession: opt.id, professionOther: otherText || null });
         setShowOtherInput(true);
         return;
       }
 
-      onPatch({ profession: opt.id, professionOther: null });
+      // Scene-completing pick: immediate awaitable save so the answer is
+      // durable before the scene advances. See useSurveyState::patch.
+      const savePromise = onPatch(
+        { profession: opt.id, professionOther: null },
+        { immediate: true }
+      );
       setShowOtherInput(false);
 
       if (advanceTimerRef.current) clearTimeout(advanceTimerRef.current);
-      advanceTimerRef.current = setTimeout(() => onAdvance(), AUTO_ADVANCE_MS);
+      advanceTimerRef.current = setTimeout(async () => {
+        await savePromise;
+        onAdvance();
+      }, AUTO_ADVANCE_MS);
     },
     [onAdvance, onPatch, onTrack, otherText]
   );
@@ -73,9 +83,12 @@ export function Scene2_Profession({ initial, onPatch, onAdvance, onTrack }: Scen
     }
   }, [showOtherInput]);
 
-  const handleOtherSubmit = useCallback(() => {
+  const handleOtherSubmit = useCallback(async () => {
     if (!otherText.trim()) return;
-    onPatch({ profession: "other", professionOther: otherText.trim() });
+    await onPatch(
+      { profession: "other", professionOther: otherText.trim() },
+      { immediate: true }
+    );
     onAdvance();
   }, [onAdvance, onPatch, otherText]);
 
@@ -220,7 +233,7 @@ export function Scene2_Profession({ initial, onPatch, onAdvance, onTrack }: Scen
                 value={otherText}
                 onChange={(e) => {
                   setOtherText(e.target.value);
-                  onPatch({ profession: "other", professionOther: e.target.value || null });
+                  void onPatch({ profession: "other", professionOther: e.target.value || null });
                 }}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {

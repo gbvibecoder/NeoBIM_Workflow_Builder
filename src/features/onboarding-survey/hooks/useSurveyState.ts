@@ -51,38 +51,50 @@ export function useSurveyState(initial: SurveyRecord | null) {
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingPatchRef = useRef<SurveyPatch>({});
 
-  const flushSave = useCallback(async () => {
-    const patch = pendingPatchRef.current;
-    if (!Object.keys(patch).length) return;
-    pendingPatchRef.current = {};
+  /**
+   * Flush whatever is in pendingPatchRef to the server and return a Promise
+   * that resolves when the POST settles. Unlike the previous implementation,
+   * the ref is NOT cleared until the POST succeeds (res.ok): if the network
+   * drops or the server returns 4xx/5xx, the patch stays queued so a later
+   * flush (or the pagehide keepalive) can retry it. Patches that accumulate
+   * mid-flight are preserved — only the keys in the snapshot are cleared.
+   */
+  const flushSave = useCallback(async (): Promise<void> => {
+    const snapshot: SurveyPatch = { ...pendingPatchRef.current };
+    const snapshotKeys = Object.keys(snapshot) as (keyof SurveyPatch)[];
+    if (!snapshotKeys.length) return;
     setSaving(true);
     try {
-      await fetch("/api/user/survey", {
+      const res = await fetch("/api/user/survey", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...patch, ...collectAttribution() }),
+        body: JSON.stringify({ ...snapshot, ...collectAttribution() }),
       });
+      if (res.ok) {
+        for (const k of snapshotKeys) {
+          delete (pendingPatchRef.current as Record<string, unknown>)[k];
+        }
+      }
+      // Non-ok: pending data stays queued for the next attempt.
     } catch {
-      /* auto-save is best-effort; user can still finish the flow */
+      // Network error: pending data stays queued for the next attempt.
     } finally {
       setSaving(false);
     }
   }, []);
 
-  // Debounced autosave — 500ms per spec.
-  const scheduleSave = useCallback(
-    (patch: SurveyPatch) => {
-      pendingPatchRef.current = { ...pendingPatchRef.current, ...patch };
-      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-      saveTimerRef.current = setTimeout(() => {
-        void flushSave();
-      }, 500);
-    },
-    [flushSave]
-  );
-
+  /**
+   * Patch survey state. Two call shapes:
+   *   - patch(p)                  → debounced 500ms save, fire-and-forget
+   *     (use this for high-frequency input like "other" text typing)
+   *   - patch(p, { immediate })   → cancels any pending debounce and awaits
+   *     the POST. Callers SHOULD await the returned promise before advancing
+   *     the UI, so the user's answer is durable before the scene moves on.
+   *     This eliminates the "refresh within 500ms of picking → data lost"
+   *     race that prod users were hitting.
+   */
   const patch = useCallback(
-    (p: SurveyPatch) => {
+    async (p: SurveyPatch, opts?: { immediate?: boolean }): Promise<void> => {
       setState((prev) => ({
         ...prev,
         ...("discoverySource" in p ? { discoverySource: p.discoverySource ?? null } : {}),
@@ -92,9 +104,21 @@ export function useSurveyState(initial: SurveyRecord | null) {
         ...("teamSize" in p ? { teamSize: p.teamSize ?? null } : {}),
         ...("pricingAction" in p ? { pricingAction: p.pricingAction ?? null } : {}),
       }));
-      scheduleSave(p);
+      pendingPatchRef.current = { ...pendingPatchRef.current, ...p };
+
+      if (opts?.immediate) {
+        if (saveTimerRef.current) {
+          clearTimeout(saveTimerRef.current);
+          saveTimerRef.current = null;
+        }
+        await flushSave();
+        return;
+      }
+
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = setTimeout(() => void flushSave(), 500);
     },
-    [scheduleSave]
+    [flushSave]
   );
 
   // Terminal save — fire synchronously (no debounce) and wait for completion.

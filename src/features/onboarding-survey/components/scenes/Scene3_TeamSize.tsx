@@ -20,7 +20,7 @@ import type {
 
 interface Scene3Props {
   initial: { teamSize: string | null };
-  onPatch: (p: SurveyPatch) => void;
+  onPatch: (p: SurveyPatch, opts?: { immediate?: boolean }) => Promise<void>;
   onAdvance: () => void;
   onTrack: (team_size: string) => void;
 }
@@ -53,9 +53,14 @@ export function Scene3_TeamSize({ initial, onPatch, onAdvance, onTrack }: Scene3
       setSelected(opt.id);
       preview(opt);
       onTrack(opt.id);
-      onPatch({ teamSize: opt.id });
+      // Scene-completing pick: immediate awaitable save so the answer is
+      // in the DB before we hand off to Scene 4. See useSurveyState::patch.
+      const savePromise = onPatch({ teamSize: opt.id }, { immediate: true });
       if (advanceTimerRef.current) clearTimeout(advanceTimerRef.current);
-      advanceTimerRef.current = setTimeout(() => onAdvance(), AUTO_ADVANCE_MS);
+      advanceTimerRef.current = setTimeout(async () => {
+        await savePromise;
+        onAdvance();
+      }, AUTO_ADVANCE_MS);
     },
     [onAdvance, onPatch, onTrack, preview]
   );
