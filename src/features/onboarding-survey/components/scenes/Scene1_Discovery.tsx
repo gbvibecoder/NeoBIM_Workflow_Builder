@@ -23,7 +23,7 @@ import type {
 interface Scene1Props {
   initial: { source: string | null; other: string | null };
   onHoverChange: (rgb: string | null) => void;
-  onPatch: (p: SurveyPatch) => void;
+  onPatch: (p: SurveyPatch, opts?: { immediate?: boolean }) => Promise<void>;
   onAdvance: () => void;
   onTrack: (source: string) => void;
 }
@@ -51,17 +51,27 @@ export function Scene1_Discovery({
       onTrack(opt.id);
 
       if (opt.isOther) {
-        onPatch({ discoverySource: opt.id, discoveryOther: otherText || null });
+        // "Other" just reveals the text input — debounced save is fine here,
+        // the user will confirm with the Continue button which awaits.
+        void onPatch({ discoverySource: opt.id, discoveryOther: otherText || null });
         setShowOtherInput(true);
-        // Don't auto-advance — user needs to type + confirm
         return;
       }
 
-      onPatch({ discoverySource: opt.id, discoveryOther: null });
+      // Scene-completing pick: fire an immediate, awaitable save so the
+      // user's answer is in the DB before we advance the UI. The animation
+      // delay (AUTO_ADVANCE_MS) gives the save time to settle; we also
+      // await the promise inside the timeout so a slow network can't race
+      // the scene transition.
+      const savePromise = onPatch(
+        { discoverySource: opt.id, discoveryOther: null },
+        { immediate: true }
+      );
       setShowOtherInput(false);
 
       if (advanceTimerRef.current) clearTimeout(advanceTimerRef.current);
-      advanceTimerRef.current = setTimeout(() => {
+      advanceTimerRef.current = setTimeout(async () => {
+        await savePromise;
         onHoverChange(null);
         onAdvance();
       }, AUTO_ADVANCE_MS);
@@ -87,9 +97,12 @@ export function Scene1_Discovery({
     }
   }, [showOtherInput]);
 
-  const handleOtherSubmit = useCallback(() => {
+  const handleOtherSubmit = useCallback(async () => {
     if (!otherText.trim()) return;
-    onPatch({ discoverySource: "other", discoveryOther: otherText.trim() });
+    await onPatch(
+      { discoverySource: "other", discoveryOther: otherText.trim() },
+      { immediate: true }
+    );
     onHoverChange(null);
     onAdvance();
   }, [onAdvance, onHoverChange, onPatch, otherText]);
@@ -226,7 +239,7 @@ export function Scene1_Discovery({
                 value={otherText}
                 onChange={(e) => {
                   setOtherText(e.target.value);
-                  onPatch({ discoverySource: "other", discoveryOther: e.target.value || null });
+                  void onPatch({ discoverySource: "other", discoveryOther: e.target.value || null });
                 }}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
