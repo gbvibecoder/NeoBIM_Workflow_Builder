@@ -7,7 +7,7 @@
  *
  * - Meta Conversions API (CAPI): requires META_CAPI_ACCESS_TOKEN
  * - Google Enhanced Conversions: handled client-side via dataLayer
- *   (hashed email sent from welcome/thank-you pages)
+ *   (hashed email sent from the register and thank-you pages)
  */
 
 import crypto from "crypto";

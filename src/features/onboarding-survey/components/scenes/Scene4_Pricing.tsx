@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { ArrowUpRight } from "lucide-react";
 import { useLocale } from "@/hooks/useLocale";
 import { PlanCard } from "@/features/onboarding-survey/components/primitives/PlanCard";
 import { ConfettiBurst } from "@/features/onboarding-survey/components/primitives/ConfettiBurst";
@@ -15,9 +16,11 @@ import type { PricingAction } from "@/features/onboarding-survey/types/survey";
 
 interface Scene4Props {
   onPick: (action: PricingAction) => void;
+  /** Which paid plan is mid-checkout — used to show per-card spinner. */
+  loadingPlan?: "starter" | "pro" | null;
 }
 
-export function Scene4_Pricing({ onPick }: Scene4Props) {
+export function Scene4_Pricing({ onPick, loadingPlan }: Scene4Props) {
   const { t } = useLocale();
   // Pre-flight celebratory moment: fires on entry, fades after ~1.5s.
   const [celebrating, setCelebrating] = useState(true);
@@ -32,6 +35,14 @@ export function Scene4_Pricing({ onPick }: Scene4Props) {
     return () => clearTimeout(t1);
   }, []);
 
+  const starterFeatures = [
+    t("survey.scene4.starter.f1"),
+    t("survey.scene4.starter.f2"),
+    t("survey.scene4.starter.f3"),
+    t("survey.scene4.starter.f4"),
+    t("survey.scene4.starter.f5"),
+  ];
+
   const proFeatures = [
     t("survey.scene4.pro.f1"),
     t("survey.scene4.pro.f2"),
@@ -40,8 +51,10 @@ export function Scene4_Pricing({ onPick }: Scene4Props) {
     t("survey.scene4.pro.f5"),
   ];
 
+  const anyLoading = Boolean(loadingPlan);
+
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 40, alignItems: "center", position: "relative" }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 36, alignItems: "center", position: "relative" }}>
       {/* Brief celebratory burst on entry */}
       <AnimatePresence>
         {celebrating && (
@@ -71,7 +84,7 @@ export function Scene4_Pricing({ onPick }: Scene4Props) {
         variants={textPullFocus}
         initial="initial"
         animate="animate"
-        style={{ textAlign: "center", maxWidth: 680 }}
+        style={{ textAlign: "center", maxWidth: 720 }}
       >
         <motion.div
           initial={{ opacity: 0, y: -6 }}
@@ -121,17 +134,17 @@ export function Scene4_Pricing({ onPick }: Scene4Props) {
         </p>
       </motion.div>
 
-      {/* Plans */}
-      <div className="survey-plans-grid" style={{ width: "100%", maxWidth: 820 }}>
+      {/* Plans — Free / Starter (Most Popular) / Pro */}
+      <div className="survey-plans-grid" style={{ width: "100%", maxWidth: 1080 }}>
         <style>{`
           .survey-plans-grid {
             display: grid;
-            grid-template-columns: 1fr 1.1fr;
-            gap: 18px;
+            grid-template-columns: 1fr 1.18fr 1fr;
+            gap: 16px;
             align-items: stretch;
           }
-          @media (max-width: 720px) {
-            .survey-plans-grid { grid-template-columns: 1fr; }
+          @media (max-width: 980px) {
+            .survey-plans-grid { grid-template-columns: 1fr; max-width: 480px; margin: 0 auto; }
           }
         `}</style>
 
@@ -145,13 +158,31 @@ export function Scene4_Pricing({ onPick }: Scene4Props) {
           honestNote={t("survey.scene4.free.honest")}
           featureLabels={[]}
           onSelect={() => onPick("chose_free")}
+          loading={false}
+        />
+
+        <PlanCard
+          kind="starter"
+          label={t("survey.scene4.starter.label")}
+          priceLabel="₹"
+          priceNumeric={799}
+          priceSuffix={t("survey.scene4.starter.priceSuffix")}
+          tagline={t("survey.scene4.starter.tagline")}
+          ctaLabel={t("survey.scene4.starter.cta")}
+          ctaSubtitle={t("survey.scene4.starter.ctaSub")}
+          honestNote={t("survey.scene4.starter.honest")}
+          featureLabels={starterFeatures}
+          onSelect={() => onPick("chose_starter")}
+          emphasized
+          badgeLabel={t("survey.scene4.starter.badge")}
+          loading={loadingPlan === "starter"}
         />
 
         <PlanCard
           kind="pro"
           label={t("survey.scene4.pro.label")}
           priceLabel="₹"
-          priceNumeric={499}
+          priceNumeric={1999}
           priceSuffix={t("survey.scene4.pro.priceSuffix")}
           tagline={t("survey.scene4.pro.tagline")}
           ctaLabel={t("survey.scene4.pro.cta")}
@@ -159,8 +190,50 @@ export function Scene4_Pricing({ onPick }: Scene4Props) {
           honestNote={t("survey.scene4.pro.honest")}
           featureLabels={proFeatures}
           onSelect={() => onPick("chose_pro")}
-          emphasized
+          badgeLabel={t("survey.scene4.pro.recommended")}
+          loading={loadingPlan === "pro"}
         />
+      </div>
+
+      {/* Explore-more tertiary affordance — routes to full /dashboard/billing */}
+      <motion.button
+        type="button"
+        onClick={() => onPick("explore_more")}
+        disabled={anyLoading}
+        initial={{ opacity: 0, y: 6 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.5, duration: 0.5 }}
+        whileHover={{ y: anyLoading ? 0 : -1, color: anyLoading ? undefined : "var(--text-primary)" }}
+        whileTap={{ scale: anyLoading ? 1 : 0.98 }}
+        style={{
+          marginTop: -8,
+          padding: "10px 18px",
+          borderRadius: 999,
+          background: "rgba(255,255,255,0.03)",
+          border: "1px dashed rgba(255,255,255,0.18)",
+          color: "var(--text-secondary)",
+          fontSize: 13,
+          fontWeight: 600,
+          cursor: anyLoading ? "not-allowed" : "pointer",
+          opacity: anyLoading ? 0.5 : 1,
+          display: "inline-flex",
+          alignItems: "center",
+          gap: 8,
+          letterSpacing: "0.005em",
+        }}
+      >
+        {t("survey.scene4.exploreMore")}
+        <ArrowUpRight size={14} />
+      </motion.button>
+      <div
+        style={{
+          marginTop: -28,
+          fontSize: 11,
+          color: "var(--text-tertiary)",
+          textAlign: "center",
+        }}
+      >
+        {t("survey.scene4.exploreMoreSub")}
       </div>
 
       {/* Social proof */}

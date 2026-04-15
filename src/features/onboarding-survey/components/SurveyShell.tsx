@@ -2,7 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import Script from "next/script";
 import { motion, AnimatePresence } from "framer-motion";
+import { toast } from "sonner";
 import { useLocale } from "@/hooks/useLocale";
 import { SceneBackdrop } from "@/features/onboarding-survey/components/SceneBackdrop";
 import { ProgressDots } from "@/features/onboarding-survey/components/ProgressDots";
@@ -33,6 +35,17 @@ interface SurveyShellProps {
   initial: SurveyRecord | null;
 }
 
+/** Razorpay plan key as understood by /api/razorpay/checkout. */
+type PaidPlanKey = "STARTER" | "PRO";
+
+interface RazorpayInstance {
+  open: () => void;
+  on: (event: string, cb: () => void) => void;
+}
+interface RazorpayCtor {
+  new (opts: Record<string, unknown>): RazorpayInstance;
+}
+
 export function SurveyShell({ initial }: SurveyShellProps) {
   const { t } = useLocale();
   const router = useRouter();
@@ -40,6 +53,7 @@ export function SurveyShell({ initial }: SurveyShellProps) {
   const timer = useSceneTimer();
 
   const [redirecting, setRedirecting] = useState(false);
+  const [loadingPlan, setLoadingPlan] = useState<"starter" | "pro" | null>(null);
   const [hoverRgb, setHoverRgb] = useState<string | null>(null);
 
   // Funnel top — fire once on mount so GA4 can measure register → survey_start drop-off.
@@ -96,18 +110,105 @@ export function SurveyShell({ initial }: SurveyShellProps) {
     [finalize, markOnboarded, redirecting, router, scene, state, timer]
   );
 
-  // Scene 4 pick → track + finalize + route Pro to billing, Free to dashboard.
+  /**
+   * Open Razorpay checkout for a paid plan directly from the onboarding step.
+   * Mirrors the dashboard billing flow:
+   *   POST /api/razorpay/checkout → open widget → verify → /thank-you/subscription.
+   * The survey itself is finalized first so we have an attribution row even
+   * if the user closes the widget mid-checkout.
+   */
+  const openRazorpay = useCallback(
+    async (planKey: PaidPlanKey, action: PricingAction) => {
+      const planLower = planKey.toLowerCase() as "starter" | "pro";
+      setLoadingPlan(planLower);
+      try {
+        const res = await fetch("/api/razorpay/checkout", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ plan: planKey }),
+        });
+        const data = await res.json();
+        if (!res.ok || !data.subscriptionId || !data.razorpayKeyId) {
+          throw new Error(data?.error?.message || "checkout init failed");
+        }
+
+        const Razorpay = (window as unknown as { Razorpay?: RazorpayCtor }).Razorpay;
+        if (!Razorpay) {
+          toast.error(t("survey.scene4.checkoutError"));
+          setLoadingPlan(null);
+          return;
+        }
+
+        const rzp = new Razorpay({
+          key: data.razorpayKeyId,
+          subscription_id: data.subscriptionId,
+          name: "BuildFlow",
+          description: `${planKey} Plan Subscription`,
+          prefill: {
+            email: data.email || "",
+            name: data.name || "",
+          },
+          theme: { color: planKey === "STARTER" ? "#10B981" : "#4F8AFF" },
+          handler: async (response: {
+            razorpay_payment_id: string;
+            razorpay_subscription_id: string;
+            razorpay_signature: string;
+          }) => {
+            try {
+              const verifyRes = await fetch("/api/razorpay/verify", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(response),
+              });
+              const verifyData = await verifyRes.json();
+              if (verifyData.success) {
+                // Hard-redirect so /thank-you owns the GA4 purchase event +
+                // forces the next session refresh to pick up the new role.
+                window.location.href = `/thank-you/subscription?plan=${planKey}`;
+              } else {
+                toast.error(verifyData?.error?.message || t("survey.scene4.checkoutError"));
+                setLoadingPlan(null);
+              }
+            } catch {
+              toast.error(t("survey.scene4.checkoutError"));
+              setLoadingPlan(null);
+            }
+          },
+          modal: {
+            // User dismissed without paying — let them retry / pick another plan.
+            ondismiss: () => {
+              setLoadingPlan(null);
+            },
+          },
+        });
+
+        rzp.on("payment.failed", () => {
+          toast.error(t("survey.scene4.checkoutError"));
+          setLoadingPlan(null);
+        });
+
+        rzp.open();
+      } catch {
+        toast.error(t("survey.scene4.checkoutError"));
+        setLoadingPlan(null);
+      }
+      // Action is referenced for analytics symmetry / future webhook tagging.
+      void action;
+    },
+    [t]
+  );
+
+  // Scene 4 pick → track + finalize, then route based on action.
   const handlePricingPick = useCallback(
     async (action: PricingAction) => {
-      if (redirecting) return;
-      setRedirecting(true);
-      markOnboarded();
+      if (redirecting || loadingPlan) return;
 
-      // Pricing click — Meta InitiateCheckout on Pro, GA4 pricing_cta_click always.
-      trackPricingClick(action === "chose_pro" ? "pro" : "free");
-      // Legacy pricing-action event (kept for existing GTM tags).
+      // Analytics — fire before any await so events land even if checkout aborts.
+      if (action === "chose_pro") trackPricingClick("pro");
+      else if (action === "chose_starter") trackPricingClick("starter");
+      else if (action === "explore_more") trackPricingClick("explore_more");
+      else trackPricingClick("free");
       trackPricing(action);
-      // Terminal survey_complete with full profile + Meta Lead + user properties.
       trackComplete(timer.elapsedSeconds(), {
         discovery_source: state.discoverySource,
         profession: state.profession,
@@ -115,10 +216,35 @@ export function SurveyShell({ initial }: SurveyShellProps) {
         pricing_action: action,
       });
 
-      await finalize({ pricingAction: action, completedAt: true });
-      router.push(action === "chose_pro" ? "/dashboard/billing" : "/dashboard");
+      // Free / explore_more → simple route; finalize then redirect.
+      if (action === "chose_free" || action === "explore_more") {
+        setRedirecting(true);
+        markOnboarded();
+        await finalize({ pricingAction: action, completedAt: true });
+        router.push(action === "explore_more" ? "/dashboard/billing" : "/dashboard");
+        return;
+      }
+
+      // Paid plan → finalize survey first (attribution), then open Razorpay.
+      if (action === "chose_starter" || action === "chose_pro") {
+        markOnboarded();
+        // Don't flip `redirecting`: the user must be able to dismiss the
+        // Razorpay widget and retry without reloading the page.
+        await finalize({ pricingAction: action, completedAt: true });
+        const planKey: PaidPlanKey = action === "chose_pro" ? "PRO" : "STARTER";
+        await openRazorpay(planKey, action);
+      }
     },
-    [finalize, markOnboarded, redirecting, router, state, timer]
+    [
+      finalize,
+      loadingPlan,
+      markOnboarded,
+      openRazorpay,
+      redirecting,
+      router,
+      state,
+      timer,
+    ]
   );
 
   // ── Keyboard nav ────────────────────────────────────────────────────────
@@ -126,7 +252,7 @@ export function SurveyShell({ initial }: SurveyShellProps) {
     onPrev: scene > 1 ? goBack : undefined,
     onNext: scene < 4 ? advance : undefined,
     onSkip: () => void goToDashboard("skip"),
-    enabled: !redirecting,
+    enabled: !redirecting && !loadingPlan,
   });
 
   return (
@@ -141,6 +267,13 @@ export function SurveyShell({ initial }: SurveyShellProps) {
         overflow: "hidden",
       }}
     >
+      {/* Razorpay widget loader — needed only because Scene 4 can fire a
+          direct UPI/card checkout. Cheap script (~12kb), one-time load. */}
+      <Script
+        src="https://checkout.razorpay.com/v1/checkout.js"
+        strategy="afterInteractive"
+      />
+
       <SceneBackdrop scene={scene} overrideRgb={hoverRgb} />
 
       {/* ── Top bar — back button + progress dots ─────────────────────── */}
@@ -156,7 +289,7 @@ export function SurveyShell({ initial }: SurveyShellProps) {
         }}
       >
         <div style={{ minWidth: 80 }}>
-          <BackButton onBack={goBack} visible={scene > 1 && !redirecting} />
+          <BackButton onBack={goBack} visible={scene > 1 && !redirecting && !loadingPlan} />
         </div>
 
         <ProgressDots current={scene} completed={completed} />
@@ -203,11 +336,9 @@ export function SurveyShell({ initial }: SurveyShellProps) {
             aria-atomic="true"
             style={{
               width: "100%",
-              maxWidth: 1040,
+              maxWidth: 1100,
             }}
           >
-            {/* Scenes land in separate commits. Wiring hooks first.       */}
-            {/* setHoverRgb is passed through once the real scenes exist.  */}
             {scene === 1 && (
               <Scene1_Discovery
                 initial={{ source: state.discoverySource, other: state.discoveryOther }}
@@ -233,12 +364,14 @@ export function SurveyShell({ initial }: SurveyShellProps) {
                 onTrack={trackTeamSize}
               />
             )}
-            {scene === 4 && <Scene4_Pricing onPick={handlePricingPick} />}
+            {scene === 4 && (
+              <Scene4_Pricing onPick={handlePricingPick} loadingPlan={loadingPlan} />
+            )}
           </motion.section>
         </AnimatePresence>
       </main>
 
-      <SkipLink onSkip={() => void goToDashboard("skip")} disabled={redirecting} />
+      <SkipLink onSkip={() => void goToDashboard("skip")} disabled={redirecting || Boolean(loadingPlan)} />
     </div>
   );
 }
