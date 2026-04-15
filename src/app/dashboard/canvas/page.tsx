@@ -274,11 +274,12 @@ export default function CanvasPage() {
   const searchParams = useSearchParams();
   const workflowId = searchParams.get("id") ?? undefined;
   const templateId = searchParams.get("template") ?? undefined;
+  const forceNew = searchParams.get("new") === "1";
 
   return (
     <ErrorBoundary showHomeButton showSupportButton>
       <Suspense fallback={<CanvasSkeletonLoader />}>
-        <WorkflowCanvas workflowId={workflowId} templateId={templateId} />
+        <WorkflowCanvas workflowId={workflowId} templateId={templateId} forceNew={forceNew} />
       </Suspense>
     </ErrorBoundary>
   );

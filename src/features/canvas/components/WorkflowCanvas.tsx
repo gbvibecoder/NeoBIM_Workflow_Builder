@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useCallback, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { ErrorBoundary } from "@/shared/components/ErrorBoundary";
 import { useExecution } from "@/features/execution/hooks/useExecution";
 import {
@@ -115,9 +116,11 @@ const edgeTypes = { animatedEdge: AnimatedEdge };
 interface WorkflowCanvasInnerProps {
   workflowId?: string;
   templateId?: string;
+  forceNew?: boolean;
 }
 
-function WorkflowCanvasInner({ workflowId: urlWorkflowId, templateId }: WorkflowCanvasInnerProps) {
+function WorkflowCanvasInner({ workflowId: urlWorkflowId, templateId, forceNew = false }: WorkflowCanvasInnerProps) {
+  const router = useRouter();
   const { fitView, screenToFlowPosition, zoomIn, zoomOut } = useReactFlow();
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
 
@@ -258,6 +261,29 @@ function WorkflowCanvasInner({ workflowId: urlWorkflowId, templateId }: Workflow
   // ─── Load workflow from URL ?id= param ────────────────────────────
   const loadedUrlIdRef = useRef<string | null>(null);
   const artifactsRestoredRef = useRef(false);
+  const templateLoadedRef = useRef(false);
+
+  // ─── Fresh "New Workflow" intent via ?new=1 ───────────────────────
+  // A hard refresh of /dashboard/canvas (no flag) intentionally restores the
+  // in-progress canvas from localStorage (via the store's persist middleware).
+  // When the user explicitly clicks "New Workflow", callers navigate to
+  // /dashboard/canvas?new=1 — that tells us to wipe the canvas regardless of
+  // any persisted state. We strip the flag immediately so refresh/back don't
+  // re-trigger the reset on the same mount.
+  const forceNewHandledRef = useRef(false);
+  React.useLayoutEffect(() => {
+    if (!forceNew) { forceNewHandledRef.current = false; return; }
+    if (urlWorkflowId || templateId) return; // explicit target wins over "new"
+    if (forceNewHandledRef.current) return;
+    forceNewHandledRef.current = true;
+    resetCanvas();
+    clearArtifacts();
+    clearCurrentExecution();
+    loadedUrlIdRef.current = null;
+    artifactsRestoredRef.current = false;
+    templateLoadedRef.current = false;
+    router.replace("/dashboard/canvas", { scroll: false });
+  }, [forceNew, urlWorkflowId, templateId, resetCanvas, clearArtifacts, clearCurrentExecution, router]);
   React.useEffect(() => {
     if (!urlWorkflowId) {
       // New/empty canvas — clear any stale execution results from a previous workflow
@@ -303,7 +329,6 @@ function WorkflowCanvasInner({ workflowId: urlWorkflowId, templateId }: Workflow
   }, []);
 
   // ─── Load from template query param (?template=wf-09) ──────────
-  const templateLoadedRef = useRef(false);
   React.useEffect(() => {
     if (!templateId || urlWorkflowId || templateLoadedRef.current) return;
     const template = PREBUILT_WORKFLOWS.find(w => w.id === templateId);
@@ -1085,12 +1110,13 @@ function WorkflowCanvasInner({ workflowId: urlWorkflowId, templateId }: Workflow
 interface WorkflowCanvasProps {
   workflowId?: string;
   templateId?: string;
+  forceNew?: boolean;
 }
 
-export function WorkflowCanvas({ workflowId, templateId }: WorkflowCanvasProps) {
+export function WorkflowCanvas({ workflowId, templateId, forceNew }: WorkflowCanvasProps) {
   return (
     <ReactFlowProvider>
-      <WorkflowCanvasInner workflowId={workflowId} templateId={templateId} />
+      <WorkflowCanvasInner workflowId={workflowId} templateId={templateId} forceNew={forceNew} />
     </ReactFlowProvider>
   );
 }
