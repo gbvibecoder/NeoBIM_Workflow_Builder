@@ -336,6 +336,11 @@ function WorkflowCanvasInner({ workflowId: urlWorkflowId, templateId, forceNew =
     templateLoadedRef.current = true;
     loadFromTemplate(template as WorkflowTemplate);
     setTimeout(() => fitView({ padding: 0.3, duration: 600 }), 300);
+    /* Auto-attach of a viewer-cached IFC file is handled per-node inside
+       FileUploadInput (InputNode.tsx) — the node's own mount effect sees
+       `?autoAttachIFC=1` on the URL and pulls the buffer from the shared
+       IndexedDB cache. Placing it there avoids racing template load /
+       React Flow commit / Zustand persist rehydration from here. */
   }, [templateId, urlWorkflowId, loadFromTemplate, fitView]);
 
   const isNodeLibraryOpen = useUIStore(s => s.isNodeLibraryOpen);
@@ -1116,7 +1121,11 @@ interface WorkflowCanvasProps {
 export function WorkflowCanvas({ workflowId, templateId, forceNew }: WorkflowCanvasProps) {
   return (
     <ReactFlowProvider>
-      <WorkflowCanvasInner workflowId={workflowId} templateId={templateId} forceNew={forceNew} />
+      <WorkflowCanvasInner
+        workflowId={workflowId}
+        templateId={templateId}
+        forceNew={forceNew}
+      />
     </ReactFlowProvider>
   );
 }
