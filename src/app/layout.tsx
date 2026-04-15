@@ -9,6 +9,7 @@ import { SessionProvider } from "@/shared/components/providers/SessionProvider";
 import { TrackingScripts } from "@/shared/components/TrackingScripts";
 import { CookieConsent } from "@/shared/components/CookieConsent";
 import { UTMCapture } from "@/shared/components/UTMCapture";
+import { PageViewTracker } from "@/shared/components/PageViewTracker";
 import "./globals.css";
 import "@/lib/env-check";
 
@@ -316,6 +317,7 @@ export default function RootLayout({
         <Analytics />
         <SpeedInsights />
         <UTMCapture />
+        <PageViewTracker />
         <CookieConsent />
       </body>
     </html>

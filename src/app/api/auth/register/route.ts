@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { name, email, password, source, referralCode, phoneNumber: rawPhone } = await req.json();
+    const { name, email, password, source, referralCode, phoneNumber: rawPhone, signupEventId } = await req.json();
 
     // Validate required fields
     if (!email || !email.trim()) {
@@ -127,12 +127,14 @@ export async function POST(req: NextRequest) {
     trackSignup(user.id, source).catch(err => console.warn("[analytics]", err));
 
     // Server-side conversion: Meta CAPI (fire-and-forget, bypasses ad blockers)
+    // Use event_id from client so Meta dedups browser pixel + server event.
     trackServerSignup({
       email: normalizedEmail,
       phone: normalizedPhone,
       firstName: name?.split(" ")[0],
       ip,
       userAgent: req.headers.get("user-agent") || undefined,
+      eventId: typeof signupEventId === "string" ? signupEventId : undefined,
     }).catch(err => console.warn("[meta-capi]", err));
 
     // Claim referral if a code was provided (awaited — ensures bonuses are granted)
