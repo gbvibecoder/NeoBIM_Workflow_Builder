@@ -8,6 +8,7 @@ import { hasTrackingConsent } from "@/lib/cookie-consent";
 const GA_MEASUREMENT_ID = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID;
 const CLARITY_PROJECT_ID = process.env.NEXT_PUBLIC_CLARITY_PROJECT_ID;
 const GTM_ID = process.env.NEXT_PUBLIC_GTM_ID;
+const GOOGLE_ADS_ID = process.env.NEXT_PUBLIC_GOOGLE_ADS_ID;
 
 // Use useSyncExternalStore to avoid setState-in-effect lint error
 function subscribeToConsent(callback: () => void) {
@@ -85,6 +86,24 @@ export function TrackingScripts() {
               function gtag(){dataLayer.push(arguments);}
               gtag('js', new Date());
               gtag('config', '${GA_MEASUREMENT_ID}');
+            `}
+          </Script>
+        </>
+      )}
+
+      {/* Google Ads (gtag.js) — conversion tracking. Shares dataLayer with GA4 + GTM. */}
+      {GOOGLE_ADS_ID && (
+        <>
+          <Script
+            src={`https://www.googletagmanager.com/gtag/js?id=${GOOGLE_ADS_ID}`}
+            strategy="afterInteractive"
+          />
+          <Script id="google-ads-init" strategy="afterInteractive">
+            {`
+              window.dataLayer = window.dataLayer || [];
+              function gtag(){dataLayer.push(arguments);}
+              gtag('js', new Date());
+              gtag('config', '${GOOGLE_ADS_ID}');
             `}
           </Script>
         </>
