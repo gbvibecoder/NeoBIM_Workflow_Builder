@@ -2,8 +2,12 @@
 
 import dynamic from "next/dynamic";
 import { useSearchParams } from "next/navigation";
-import { Suspense, useEffect, useMemo } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { useFloorPlanStore } from "@/features/floor-plan/stores/floor-plan-store";
+import {
+  getActiveProjectId,
+  loadProject,
+} from "@/features/floor-plan/lib/project-persistence";
 
 const FloorPlanViewer = dynamic(
   () => import("@/features/floor-plan/components/FloorPlanViewer").then((m) => m.FloorPlanViewer),
@@ -20,13 +24,36 @@ const FloorPlanViewer = dynamic(
 function FloorPlanPageInner() {
   const searchParams = useSearchParams();
 
-  const initialProjectId = searchParams.get("projectId") ?? undefined;
+  const urlProjectId = searchParams.get("projectId") ?? undefined;
   const source = searchParams.get("source"); // "pipeline" | "saved"
 
-  // When navigating from sidebar (no source param, no projectId), reset store
-  // so the welcome screen always shows instead of stale data
+  // Refresh-time restore: when there are no URL params, the user either
+  // navigated in fresh (sidebar → welcome screen expected) or hard-refreshed
+  // while working on a floor plan (editor expected). We disambiguate using
+  // a dedicated `buildflow-fp-active` pointer written whenever a project is
+  // loaded into the store and cleared when the user explicitly goes back
+  // to the welcome screen.
+  const [restoredProjectId] = useState<string | undefined>(() => {
+    if (typeof window === "undefined") return undefined;
+    const url = new URL(window.location.href);
+    if (url.searchParams.get("source") || url.searchParams.get("projectId")) {
+      return undefined;
+    }
+    const activeId = getActiveProjectId();
+    if (!activeId) return undefined;
+    // Make sure the project actually exists in localStorage — otherwise we'd
+    // ask FloorPlanViewer to load a ghost id, and it would silently fall
+    // back to the welcome screen anyway.
+    return loadProject(activeId) ? activeId : undefined;
+  });
+
+  const initialProjectId = urlProjectId ?? restoredProjectId;
+
+  // When there's genuinely nothing to restore and the URL has no hint, clear
+  // the store so the welcome screen renders cleanly (the store may still
+  // hold stale in-memory state from a previous navigation).
   useEffect(() => {
-    if (!source && !initialProjectId) {
+    if (!source && !urlProjectId && !restoredProjectId) {
       useFloorPlanStore.getState().resetToWelcome();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

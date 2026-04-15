@@ -12,6 +12,7 @@ import type { FloorPlanProject } from "@/types/floor-plan-cad";
 
 const STORAGE_PREFIX = "buildflow-fp-";
 const INDEX_KEY = "buildflow-fp-index";
+const ACTIVE_KEY = "buildflow-fp-active";
 
 // ============================================================
 // PROJECT INDEX
@@ -109,12 +110,54 @@ export function deleteProject(projectId: string): void {
   localStorage.removeItem(STORAGE_PREFIX + projectId);
   const index = getProjectIndex().filter((e) => e.id !== projectId);
   setProjectIndex(index);
+  // If the user just deleted the project that was last on-screen, forget it
+  // so the next page load doesn't try to restore a project we no longer have.
+  try {
+    if (typeof window !== "undefined" && localStorage.getItem(ACTIVE_KEY) === projectId) {
+      localStorage.removeItem(ACTIVE_KEY);
+    }
+  } catch { /* best-effort */ }
 }
 
 export function getLastProjectId(): string | null {
   const index = getProjectIndex();
   if (index.length === 0) return null;
   return index.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0].id;
+}
+
+// ============================================================
+// ACTIVE PROJECT TRACKING
+// ============================================================
+//
+// A separate pointer that records which project the user currently has
+// on-screen. Distinct from the full project index because "most recently
+// updated" isn't the same as "currently open" — a user who hits Back from
+// the editor expects the Welcome screen next, even though the project is
+// still in the index.
+
+export function setActiveProjectId(projectId: string): void {
+  try {
+    if (typeof window !== "undefined") {
+      localStorage.setItem(ACTIVE_KEY, projectId);
+    }
+  } catch { /* best-effort */ }
+}
+
+export function getActiveProjectId(): string | null {
+  try {
+    if (typeof window === "undefined") return null;
+    return localStorage.getItem(ACTIVE_KEY);
+  } catch {
+    return null;
+  }
+}
+
+export function clearActiveProjectId(): void {
+  try {
+    if (typeof window !== "undefined") {
+      localStorage.removeItem(ACTIVE_KEY);
+    }
+  } catch { /* best-effort */ }
 }
 
 // ============================================================
