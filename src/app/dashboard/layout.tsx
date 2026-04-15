@@ -1,4 +1,7 @@
+"use client";
+
 import React from "react";
+import { usePathname } from "next/navigation";
 import { Sidebar } from "@/features/dashboard/components/Sidebar";
 import { Header } from "@/features/dashboard/components/Header";
 import { ErrorBoundary } from "@/shared/components/ErrorBoundary";
@@ -13,14 +16,21 @@ export default function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
+  const pathname = usePathname();
+  // The dashboard landing page is an immersive 3D hero — the header bar
+  // should overlay the scene (transparent) instead of reserving 52px of
+  // empty black space above it.
+  const isImmersive = pathname === "/dashboard";
+
   return (
     <div className="flex h-screen overflow-hidden" style={{ minHeight: "-webkit-fill-available", background: "#0a0c10" }}>
       <Sidebar />
       <ErrorBoundary>
         <div className="flex flex-col flex-1 min-w-0 overflow-hidden" style={{ transition: "flex 0.3s cubic-bezier(0.4, 0, 0.2, 1)" }}>
           <BetaBanner />
-          <Header />
-          <div className="flex-1 min-h-0 overflow-hidden">
+          {!isImmersive && <Header />}
+          <div className="flex-1 min-h-0 overflow-hidden" style={{ position: "relative" }}>
+            {isImmersive && <Header floating />}
             {children}
           </div>
         </div>

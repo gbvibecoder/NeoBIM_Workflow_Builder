@@ -752,8 +752,12 @@ export function HeroBuildingShowcase() {
               transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1], delay: 0.15 }}
               style={{
                 position: "absolute",
-                top: 28,
-                right: 28,
+                // Sits below the dashboard's floating header (~58px) with
+                // breathing room, so the 3D viewport controls and the global
+                // nav pill don't collide in the top-right corner. Right edge
+                // aligns with the header pill (Header uses px-5 → 20px).
+                top: 72,
+                right: 20,
                 zIndex: 5,
                 display: "flex",
                 alignItems: "center",
@@ -787,8 +791,10 @@ export function HeroBuildingShowcase() {
               transition={{ duration: 0.7, delay: 0.9 }}
               style={{
                 position: "absolute",
-                top: 78,
-                right: 28,
+                // Follows the HUD's vertical shift (top:72) — stays the same
+                // ~50px below the HUD for the "drag to orbit" cue.
+                top: 122,
+                right: 20,
                 zIndex: 5,
                 display: "flex",
                 alignItems: "center",
