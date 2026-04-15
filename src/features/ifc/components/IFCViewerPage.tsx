@@ -10,6 +10,11 @@ import { IntegrationBanner } from "@/features/ifc/components/IntegrationBanner";
 import { ContextMenu, type ContextMenuData } from "@/features/ifc/components/ContextMenu";
 import { ViewCube } from "@/features/ifc/components/ViewCube";
 import { UI, SHORTCUTS } from "@/features/ifc/components/constants";
+import {
+  saveLastIFCFile,
+  loadLastIFCFile,
+  clearLastIFCFile,
+} from "@/features/ifc/lib/ifc-cache";
 import type {
   ViewportHandle,
   IFCElementData,
@@ -78,34 +83,131 @@ export default function IFCViewerPage() {
 
   const hasModel = modelInfo !== null;
 
-  /* Callbacks */
-  const handleFileSelected = useCallback(async (file: File) => {
-    setLoading(true);
-    setLoadProgress(0);
-    setLoadMessage("Reading file...");
-    setError(null);
+  /* Directly hand an already-read buffer to the 3D viewer. Used both by the
+     normal upload flow (after FileReader finishes) and by the refresh-time
+     cache restore (no FileReader needed — we persisted the bytes). */
+  const loadBufferIntoViewer = useCallback(
+    async (buffer: ArrayBuffer, filename: string, opts?: { cache?: boolean }) => {
+      /* Persist BEFORE the transfer. saveLastIFCFile copies the bytes
+         into a Blob synchronously (before any await), so the snapshot is
+         captured in-microtask — before loadFile's postMessage detaches
+         the original buffer. */
+      if (opts?.cache !== false) {
+        void saveLastIFCFile(buffer, filename);
+      }
+      if (!viewportRef.current?.loadFile) {
+        console.warn("[ifc-restore] loadBufferIntoViewer called but viewport not ready");
+        setLoading(false);
+        return;
+      }
+      try {
+        await viewportRef.current.loadFile(buffer, filename);
+        console.info("[ifc-restore] loadFile dispatched to worker");
+      } catch (err) {
+        console.warn("[ifc-restore] loadFile threw:", err);
+        setError(err instanceof Error ? err.message : "Failed to load file");
+        setLoading(false);
+        void clearLastIFCFile();
+      }
+    },
+    []
+  );
 
-    try {
-      /* Read file with progress tracking */
-      const buffer = await new Promise<ArrayBuffer>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onprogress = (e) => {
-          if (e.lengthComputable) {
-            const pct = Math.round((e.loaded / e.total) * 100);
-            setLoadProgress(Math.min(pct * 0.05, 5)); // 0-5% for reading
-            setLoadMessage(`Reading file... ${pct}%`);
-          }
-        };
-        reader.onload = () => resolve(reader.result as ArrayBuffer);
-        reader.onerror = () => reject(new Error("Failed to read file"));
-        reader.readAsArrayBuffer(file);
-      });
-      await viewportRef.current?.loadFile(buffer, file.name);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load file");
-      setLoading(false);
-    }
-  }, []);
+  /* Callbacks */
+  const handleFileSelected = useCallback(
+    async (file: File) => {
+      setLoading(true);
+      setLoadProgress(0);
+      setLoadMessage("Reading file...");
+      setError(null);
+
+      try {
+        /* Read file with progress tracking */
+        const buffer = await new Promise<ArrayBuffer>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onprogress = (e) => {
+            if (e.lengthComputable) {
+              const pct = Math.round((e.loaded / e.total) * 100);
+              setLoadProgress(Math.min(pct * 0.05, 5)); // 0-5% for reading
+              setLoadMessage(`Reading file... ${pct}%`);
+            }
+          };
+          reader.onload = () => resolve(reader.result as ArrayBuffer);
+          reader.onerror = () => reject(new Error("Failed to read file"));
+          reader.readAsArrayBuffer(file);
+        });
+        await loadBufferIntoViewer(buffer, file.name);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to load file");
+        setLoading(false);
+        /* Clear the cached file on load failure so the next refresh doesn't
+           retry the same broken file and wedge the viewer in an error state. */
+        void clearLastIFCFile();
+      }
+    },
+    [loadBufferIntoViewer]
+  );
+
+  /* On mount, rehydrate the last-opened file so a page refresh doesn't drop
+     the user back to an empty upload screen.
+
+     No restoreAttemptedRef-style guard: Next.js dev enables React Strict
+     Mode (mount → cleanup → remount). A flag-based guard flipped on mount
+     #1 combined with mount #1's cleanup cancelling the async IIFE would
+     starve the restore of oxygen — mount #2 would early-return on the
+     flag. The per-closure `cancelled` lets mount #2 re-attempt with a
+     fresh closure, and `viewport.loadFile()` calls `clearModel()` first,
+     so even a double-run is idempotent (just mildly wasteful). */
+  useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      /* Flip loading UI on IMMEDIATELY. The IDB open + cache read takes a
+         few ms and the viewport readiness poll takes at least one tick;
+         without this, the empty upload screen flashes before the restore
+         kicks in — which is exactly what the user is seeing. */
+      setLoading(true);
+      setLoadProgress(0);
+      setLoadMessage("Checking for last model...");
+      setError(null);
+
+      console.info("[ifc-restore] mount — checking cache");
+      const cached = await loadLastIFCFile();
+      if (cancelled) { console.info("[ifc-restore] cancelled after cache read"); return; }
+      if (!cached || !cached.buffer || cached.buffer.byteLength === 0) {
+        console.info("[ifc-restore] no cached file — showing upload zone");
+        setLoading(false);
+        return;
+      }
+      console.info(`[ifc-restore] cache hit: ${cached.name} (${cached.buffer.byteLength} bytes)`);
+
+      /* Wait briefly for Viewport's mount effect to wire up the imperative
+         handle (useImperativeHandle) and initialize the Three.js scene. */
+      const waitForViewport = async (): Promise<boolean> => {
+        for (let i = 0; i < 50; i++) { // up to ~5s
+          if (cancelled) return false;
+          if (viewportRef.current?.loadFile) return true;
+          await new Promise((r) => setTimeout(r, 100));
+        }
+        return false;
+      };
+
+      const ready = await waitForViewport();
+      if (!ready || cancelled) {
+        console.warn("[ifc-restore] viewport never became ready — aborting restore");
+        setLoading(false);
+        return;
+      }
+      console.info("[ifc-restore] viewport ready — dispatching to loadFile");
+
+      setLoadMessage("Restoring last model...");
+      await loadBufferIntoViewer(cached.buffer, cached.name, { cache: false });
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [loadBufferIntoViewer]);
 
   const handleProgress = useCallback((progress: number, message: string) => {
     setLoadProgress(progress);
@@ -167,6 +269,9 @@ export default function IFCViewerPage() {
     setSpatialTree([]);
     setBottomPanelOpen(false);
     setError(null);
+    /* User explicitly closed the model — drop the cached file so the next
+       refresh shows the empty upload screen again. */
+    void clearLastIFCFile();
   }, []);
 
   const handleFileInput = useCallback(

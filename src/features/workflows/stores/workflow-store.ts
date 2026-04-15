@@ -1,7 +1,7 @@
 "use client";
 
 import { create } from "zustand";
-import { subscribeWithSelector } from "zustand/middleware";
+import { subscribeWithSelector, persist, createJSONStorage } from "zustand/middleware";
 import type { WorkflowNode, WorkflowEdge, NodeStatus } from "@/types/nodes";
 import type { Workflow, WorkflowTemplate, CreationMode } from "@/types/workflow";
 import { generateId } from "@/lib/utils";
@@ -98,7 +98,8 @@ interface WorkflowState {
 }
 
 export const useWorkflowStore = create<WorkflowState>()(
-  subscribeWithSelector((set, get) => ({
+  persist(
+    subscribeWithSelector((set, get) => ({
     currentWorkflow: null,
     nodes: [],
     edges: [],
@@ -427,7 +428,22 @@ export const useWorkflowStore = create<WorkflowState>()(
       // Clear stale selection IDs from UI store
       useUIStore.getState().setSelectedNodeIds([]);
     },
-  }))
+  })),
+    {
+      // localStorage snapshot so a hard refresh doesn't wipe an in-progress
+      // canvas. URL ?id= / ?template= still take precedence when present —
+      // this only restores state when the URL has no hint.
+      name: "neobim-workflow-state",
+      storage: createJSONStorage(() => (typeof window !== "undefined" ? window.localStorage : (undefined as unknown as Storage))),
+      version: 1,
+      partialize: (state) => ({
+        currentWorkflow: state.currentWorkflow,
+        nodes: state.nodes,
+        edges: state.edges,
+        creationMode: state.creationMode,
+      }),
+    }
+  )
 );
 
 // ─── Optimized selectors — prevent unnecessary re-renders (#45) ──────────────
