@@ -1,37 +1,27 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
 import Script from "next/script";
 import { META_PIXEL_ID } from "@/lib/meta-pixel";
-import { hasTrackingConsent } from "@/lib/cookie-consent";
 
 const GA_MEASUREMENT_ID = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID;
 const CLARITY_PROJECT_ID = process.env.NEXT_PUBLIC_CLARITY_PROJECT_ID;
 const GTM_ID = process.env.NEXT_PUBLIC_GTM_ID;
 const GOOGLE_ADS_ID = process.env.NEXT_PUBLIC_GOOGLE_ADS_ID;
 
-// Use useSyncExternalStore to avoid setState-in-effect lint error
-function subscribeToConsent(callback: () => void) {
-  window.addEventListener("cookie-consent-change", callback);
-  return () => window.removeEventListener("cookie-consent-change", callback);
-}
-
-function getConsentSnapshot() {
-  return hasTrackingConsent();
-}
-
-function getServerSnapshot() {
-  return false;
-}
-
+/**
+ * Load marketing tags unconditionally — Consent Mode v2 handles privacy.
+ *
+ * Google Consent Mode v2 defaults to all-denied in layout.tsx before these
+ * scripts load; cookie-consent.ts fires `consent update` + `fbq consent grant`
+ * on accept. Loading tags at denied-default is required for:
+ *   - Google / Meta tag verifiers to detect the pixel on the page
+ *   - Cookieless pings that power Google's conversion modeling
+ *   - Meta's limited-data-use signal
+ */
 export function TrackingScripts() {
-  const consented = useSyncExternalStore(subscribeToConsent, getConsentSnapshot, getServerSnapshot);
-
-  if (!consented) return null;
-
   return (
     <>
-      {/* Google Tag Manager — loaded first so GTM-managed tags fire in order */}
+      {/* Google Tag Manager */}
       {GTM_ID && (
         <Script id="google-tag-manager" strategy="afterInteractive">
           {`
@@ -44,7 +34,7 @@ export function TrackingScripts() {
         </Script>
       )}
 
-      {/* Meta Pixel (Facebook) */}
+      {/* Meta Pixel (Facebook) — revoke consent by default, cookie-consent.ts grants on accept */}
       <Script id="meta-pixel" strategy="afterInteractive">
         {`
           !function(f,b,e,v,n,t,s)
@@ -55,6 +45,7 @@ export function TrackingScripts() {
           t.src=v;s=b.getElementsByTagName(e)[0];
           s.parentNode.insertBefore(t,s)}(window, document,'script',
           'https://connect.facebook.net/en_US/fbevents.js');
+          fbq('consent', 'revoke');
           fbq('init', '${META_PIXEL_ID}');
           fbq('track', 'PageView');
         `}

@@ -108,7 +108,10 @@ function RegisterForm() {
       // For now, email is always required by the backend, so if the user enters a phone,
       // we'll send the phone as phoneNumber and require them to also have an email.
       // Actually — let's detect and send properly:
-      const body: Record<string, string> = { name, password };
+      // Shared event_id so client pixel + server CAPI dedup as one event in Meta.
+      const signupEventId = `signup_${crypto.randomUUID()}`;
+
+      const body: Record<string, string> = { name, password, signupEventId };
       if (isEmail) {
         body.email = identifier.trim().toLowerCase();
       } else {
@@ -133,17 +136,20 @@ function RegisterForm() {
         return;
       }
 
-      trackCompleteRegistration({
-        content_name: isEmail ? "email_signup" : "phone_signup",
-        ...(isEmail && { user_email: identifier.trim().toLowerCase() }),
-        user_name: name.trim()
-      });
+      trackCompleteRegistration(
+        {
+          content_name: isEmail ? "email_signup" : "phone_signup",
+          ...(isEmail && { user_email: identifier.trim().toLowerCase() }),
+          user_name: name.trim(),
+        },
+        { eventID: signupEventId },
+      );
 
       pushEnhancedConversionData({
         email: isEmail ? identifier.trim().toLowerCase() : undefined,
         firstName: name.trim().split(" ")[0],
       });
-      pushToDataLayer("sign_up_complete", { method: "credentials" });
+      pushToDataLayer("sign_up_complete", { method: "credentials", event_id: signupEventId });
 
       // Auto-login: for email use email creds, for phone use phone creds
       if (isEmail) {

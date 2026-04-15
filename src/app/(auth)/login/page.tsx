@@ -9,7 +9,7 @@ import { motion } from "framer-motion";
 import { validateEmail, validatePhone, normalizePhone } from "@/lib/form-validation";
 import { useLocale } from "@/hooks/useLocale";
 import { LanguageSwitcher } from "@/shared/components/ui/LanguageSwitcher";
-import { trackLead } from "@/lib/meta-pixel";
+import { trackLogin } from "@/lib/meta-pixel";
 
 /** Returns "email" if input contains @, otherwise "phone" */
 function detectIdentifierType(value: string): "email" | "phone" {
@@ -121,7 +121,7 @@ function LoginForm() {
       if (res?.error) {
         setError("Invalid email/phone or password. Please try again.");
       } else {
-        trackLead({ content_name: type === "email" ? "email_login" : "phone_login" });
+        trackLogin({ method: type === "email" ? "email" : "phone" });
         router.push(callbackUrl);
         router.refresh();
       }

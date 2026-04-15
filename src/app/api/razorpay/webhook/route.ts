@@ -9,6 +9,7 @@ import {
 } from '@/shared/services/email';
 import { checkWebhookIdempotency } from '@/lib/webhook-idempotency';
 import { trackServerPurchase } from '@/lib/server-conversions';
+import { getPlanValueINR } from '@/lib/plan-pricing';
 
 export async function POST(req: NextRequest) {
   const body = await req.text();
@@ -191,10 +192,12 @@ async function activateSubscription(subscription: {
 
     // Server-side conversion: Meta CAPI (fire-and-forget)
     trackServerPurchase({
+      userId: user.id,
       email: user.email,
       firstName: user.name?.split(" ")[0],
       plan: newRole,
       currency: "INR",
+      value: getPlanValueINR(newRole),
     }).catch(err => console.warn("[meta-capi]", err));
   }
 }

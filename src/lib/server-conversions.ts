@@ -11,6 +11,7 @@
  */
 
 import crypto from "crypto";
+import { getPurchaseEventId } from "@/lib/plan-pricing";
 
 const META_PIXEL_ID = "2072969213494487";
 const META_API_VERSION = "v21.0";
@@ -98,8 +99,10 @@ export async function trackServerSignup(params: {
   firstName?: string;
   ip?: string;
   userAgent?: string;
+  /** Pass the same event_id from the client pixel so Meta dedups both fires. */
+  eventId?: string;
 }): Promise<void> {
-  const eventId = `signup_${crypto.randomUUID()}`;
+  const eventId = params.eventId || `signup_${crypto.randomUUID()}`;
 
   await sendMetaConversion({
     eventName: "CompleteRegistration",
@@ -120,6 +123,7 @@ export async function trackServerSignup(params: {
 }
 
 export async function trackServerPurchase(params: {
+  userId: string;
   email: string;
   phone?: string | null;
   firstName?: string;
@@ -129,7 +133,7 @@ export async function trackServerPurchase(params: {
   ip?: string;
   userAgent?: string;
 }): Promise<void> {
-  const eventId = `purchase_${crypto.randomUUID()}`;
+  const eventId = getPurchaseEventId(params.userId, params.plan);
 
   await sendMetaConversion({
     eventName: "Purchase",

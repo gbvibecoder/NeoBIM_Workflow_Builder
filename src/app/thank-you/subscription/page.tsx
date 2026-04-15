@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { pushToDataLayer, pushEnhancedConversionData } from "@/lib/gtm";
 import { trackPurchase } from "@/lib/meta-pixel";
+import { getPurchaseEventId, getPlanValueINR } from "@/lib/plan-pricing";
 
 /* ── Confetti burst canvas ───────────────────────────────────── */
 function ConfettiBurst() {
@@ -205,9 +206,27 @@ function Content() {
       email: session.user.email || undefined,
       firstName: session.user.name?.split(" ")[0],
     });
-    trackPurchase({ content_name: `BuildFlow ${plan?.name || "Subscription"}`, currency: "INR" });
-    pushToDataLayer("purchase_complete", { plan: plan?.name || userRole, currency: "INR" });
-  }, [session, plan, userRole]);
+
+    const userId = (session.user as { id?: string }).id;
+    const planKey = planFromUrl || userRole;
+    const value = getPlanValueINR(planKey);
+    const eventID = userId ? getPurchaseEventId(userId, planKey) : undefined;
+
+    trackPurchase(
+      {
+        content_name: `BuildFlow ${plan?.name || "Subscription"}`,
+        currency: "INR",
+        value,
+      },
+      eventID ? { eventID } : undefined,
+    );
+    pushToDataLayer("purchase_complete", {
+      plan: plan?.name || userRole,
+      currency: "INR",
+      value,
+      ...(eventID && { event_id: eventID }),
+    });
+  }, [session, plan, userRole, planFromUrl]);
 
   useEffect(() => {
     if (!session?.user) return;
