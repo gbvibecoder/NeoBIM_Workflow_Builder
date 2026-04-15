@@ -22,7 +22,7 @@ const WorldCanvas = lazy(() => import("@/features/dashboard/components/WorldCanv
 const FloorPlanScene = lazy(() => import("@/features/dashboard/components/FloorPlanScene").then((m) => ({ default: m.FloorPlanScene })));
 const IFCViewerScene = lazy(() => import("@/features/dashboard/components/IFCViewerScene").then((m) => ({ default: m.IFCViewerScene })));
 const VideoRenderScene = lazy(() => import("@/features/dashboard/components/VideoRenderScene").then((m) => ({ default: m.VideoRenderScene })));
-const HeroBuildingShowcase = lazy(() => import("@/features/dashboard/components/HeroBuildingShowcase").then((m) => ({ default: m.HeroBuildingShowcase })));
+import { HeroBlueprintScene } from "@/features/dashboard/components/HeroBlueprintScene";
 import { scrollState } from "@/features/dashboard/components/WorldCanvas";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -239,11 +239,9 @@ export default function DashboardPage() {
             `,
           }} />
 
-          {/* Dedicated hero 3D scene — eats its own dog food: real BuildFlow BIM model */}
-          <div style={{ position: "absolute", inset: 0, zIndex: 1, pointerEvents: "auto" }}>
-            <Suspense fallback={<div style={{ width: "100%", height: "100%", background: "#03050c" }} />}>
-              <HeroBuildingShowcase />
-            </Suspense>
+          {/* Dedicated hero background — animated blueprint + hero video panel */}
+          <div style={{ position: "absolute", inset: 0, zIndex: 1, pointerEvents: "none" }}>
+            <HeroBlueprintScene />
           </div>
 
           {/* Bottom fade — connects to next section. NOTE: top is intentionally
