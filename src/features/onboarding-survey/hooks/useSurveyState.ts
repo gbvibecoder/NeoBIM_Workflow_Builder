@@ -123,6 +123,37 @@ export function useSurveyState(initial: SurveyRecord | null) {
     []
   );
 
+  // Mount-time rehydration: catch the race where the user refreshes faster
+  // than the 500ms auto-save debounce settled. If SSR saw an empty row but
+  // the server now has fields we're missing locally, merge them in and
+  // jump scene forward. Never downgrades — user edits since mount win.
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/user/survey", { credentials: "same-origin" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (cancelled || !data?.survey) return;
+        const s = data.survey as Partial<SurveyRecord>;
+        setState((prev) => ({
+          ...prev,
+          discoverySource: prev.discoverySource ?? s.discoverySource ?? null,
+          discoveryOther:  prev.discoveryOther  ?? s.discoveryOther  ?? null,
+          profession:      prev.profession      ?? s.profession      ?? null,
+          professionOther: prev.professionOther ?? s.professionOther ?? null,
+          teamSize:        prev.teamSize        ?? s.teamSize        ?? null,
+        }));
+        const fetchedScene = resumeScene({
+          ...EMPTY,
+          discoverySource: s.discoverySource ?? null,
+          profession:      s.profession      ?? null,
+          teamSize:        s.teamSize        ?? null,
+        });
+        setScene((cur) => (Math.max(cur, fetchedScene) as SceneNumber));
+      })
+      .catch(() => { /* best-effort */ });
+    return () => { cancelled = true; };
+  }, []);
+
   // Flush pending save on unmount / tab close.
   useEffect(() => {
     const onHide = () => {
