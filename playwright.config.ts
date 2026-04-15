@@ -22,7 +22,7 @@ export default defineConfig({
     },
   ],
 
-  // Start dev server for local testing
+  // Start dev server for Local testing
   webServer: process.env.CI
     ? undefined
     : {
