@@ -307,7 +307,7 @@ export default function BillingPage() {
   const currentIndex = TIER_ORDER.indexOf(currentPlan);
 
   const plans = useMemo(() => {
-    const _isUpgrade = (planName: string) => TIER_ORDER.indexOf(planName) > currentIndex;
+    const _isDowngrade = (planName: string) => currentIndex >= 0 && TIER_ORDER.indexOf(planName) < currentIndex;
     return [
     {
       name: t('billing.mini'),
@@ -328,8 +328,9 @@ export default function BillingPage() {
         { icon: <Box size={13} />, label: t('billing.modelCredits'), value: "0" },
         { icon: <Image size={13} />, label: t('billing.renderCredits'), value: "2" },
       ],
-      cta: currentPlan === "Mini" ? t('billing.currentPlan') : _isUpgrade("Mini") ? t('billing.upgradeToMini') : t('billing.downgrade'),
+      cta: currentPlan === "Mini" ? t('billing.currentPlan') : t('billing.upgradeToMini'),
       ctaDisabled: currentPlan === "Mini",
+      isDowngrade: _isDowngrade("Mini"),
       highlighted: false,
       color: "#F59E0B",
       colorRgb: "245,158,11",
@@ -356,8 +357,9 @@ export default function BillingPage() {
         { icon: <Box size={13} />, label: t('billing.modelCredits'), value: "3" },
         { icon: <Image size={13} />, label: t('billing.renderCredits'), value: "10" },
       ],
-      cta: currentPlan === "Starter" ? t('billing.currentPlan') : _isUpgrade("Starter") ? t('billing.upgradeToStarter') : t('billing.downgrade'),
+      cta: currentPlan === "Starter" ? t('billing.currentPlan') : t('billing.upgradeToStarter'),
       ctaDisabled: currentPlan === "Starter",
+      isDowngrade: _isDowngrade("Starter"),
       highlighted: false,
       color: "#10B981",
       colorRgb: "16,185,129",
@@ -385,8 +387,9 @@ export default function BillingPage() {
         { icon: <Box size={13} />, label: t('billing.modelCredits'), value: "10" },
         { icon: <Image size={13} />, label: t('billing.renderCredits'), value: "30" },
       ],
-      cta: currentPlan === "Pro" ? t('billing.currentPlan') : _isUpgrade("Pro") ? t('billing.upgradeToPro') : t('billing.downgrade'),
+      cta: currentPlan === "Pro" ? t('billing.currentPlan') : t('billing.upgradeToPro'),
       ctaDisabled: currentPlan === "Pro",
+      isDowngrade: _isDowngrade("Pro"),
       highlighted: true,
       color: "#4F8AFF",
       colorRgb: "79,138,255",
@@ -414,8 +417,9 @@ export default function BillingPage() {
         { icon: <Box size={13} />, label: t('billing.modelCredits'), value: "30" },
         { icon: <Image size={13} />, label: t('billing.renderCredits'), value: "\u221E" },
       ],
-      cta: currentPlan === "Team" ? t('billing.currentPlan') : _isUpgrade("Team") ? t('billing.upgradeToTeam') : t('billing.downgrade'),
+      cta: currentPlan === "Team" ? t('billing.currentPlan') : t('billing.upgradeToTeam'),
       ctaDisabled: currentPlan === "Team",
+      isDowngrade: _isDowngrade("Team"),
       highlighted: false,
       color: "#8B5CF6",
       colorRgb: "139,92,246",
@@ -603,10 +607,12 @@ export default function BillingPage() {
                   transition={{ delay: 0.25 + index * 0.1, type: "spring", stiffness: 200, damping: 20 }}
                   onMouseEnter={() => setHoveredPlan(plan.tier)}
                   onMouseLeave={() => setHoveredPlan(null)}
-                  className="relative rounded-[20px] border overflow-hidden transition-all duration-300"
+                  className="relative rounded-[20px] border overflow-hidden transition-all duration-300 flex flex-col h-full"
                   style={{
                     borderColor: isActive
                       ? plan.color
+                      : isHovered
+                      ? `rgba(${plan.colorRgb},0.9)`
                       : plan.highlighted
                       ? `rgba(${plan.colorRgb},0.4)`
                       : "rgba(255,255,255,0.06)",
@@ -616,7 +622,7 @@ export default function BillingPage() {
                     boxShadow: isActive
                       ? `0 8px 40px rgba(${plan.colorRgb},0.15), 0 0 0 1px rgba(${plan.colorRgb},0.1)`
                       : isHovered
-                      ? `0 20px 60px rgba(0,0,0,0.4), 0 0 30px rgba(${plan.colorRgb},0.08)`
+                      ? `0 0 0 1px rgba(${plan.colorRgb},0.6), 0 16px 36px rgba(0,0,0,0.4)`
                       : "0 4px 20px rgba(0,0,0,0.2)",
                   }}
                 >
@@ -679,7 +685,7 @@ export default function BillingPage() {
                   ) : null}
 
                   {/* Card content */}
-                  <div className="relative z-10 p-6 pt-7">
+                  <div className="relative z-10 p-6 pt-7 flex-1 flex flex-col">
                     {/* Plan icon + name */}
                     <div className="flex items-center gap-3 mb-4">
                       <motion.div
@@ -781,45 +787,70 @@ export default function BillingPage() {
                       ))}
                     </ul>
 
-                    {/* CTA Button */}
-                    <motion.button
-                      whileHover={!isActive && upgradingTo === null ? { scale: 1.02 } : {}}
-                      whileTap={!isActive && upgradingTo === null ? { scale: 0.98 } : {}}
-                      disabled={isActive || upgradingTo !== null}
-                      onClick={() => plan.planType && handleUpgrade(plan.planType as 'MINI' | 'STARTER' | 'PRO' | 'TEAM_ADMIN')}
-                      className="w-full py-3.5 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2"
-                      style={
-                        isActive
-                          ? {
-                              background: `rgba(${plan.colorRgb},0.08)`,
-                              border: `1px solid rgba(${plan.colorRgb},0.2)`,
-                              color: plan.color,
-                              cursor: "default",
-                            }
-                          : plan.highlighted && upgradingTo === null
-                          ? {
-                              background: plan.gradient,
-                              color: "#fff",
-                              boxShadow: `0 4px 20px rgba(${plan.colorRgb},0.3)`,
-                            }
-                          : {
-                              background: "#16162A",
-                              color: "#F0F0F5",
-                              border: "1px solid rgba(255,255,255,0.06)",
-                            }
-                      }
-                    >
-                      {upgradingTo === plan.planType ? (
-                        <><Loader2 size={16} className="animate-spin" />{t('billing.processing')}</>
-                      ) : isActive ? (
-                        <><CheckCircle2 size={15} />{plan.cta}</>
-                      ) : (
-                        <>
-                          {plan.cta}
-                          <ArrowRight size={14} style={{ opacity: 0.6 }} />
-                        </>
-                      )}
-                    </motion.button>
+                    {/* CTA Button — mt-auto pushes the button to the bottom so all cards
+                        align on the same horizontal line. Lower-tier plans are disabled and faded. */}
+                    <div className="mt-auto">
+                      <motion.button
+                        whileHover={
+                          !isActive && !plan.isDowngrade && upgradingTo === null
+                            ? {
+                                scale: 1.02,
+                                boxShadow: plan.highlighted
+                                  ? `0 0 0 1px rgba(${plan.colorRgb},0.95), 0 4px 14px rgba(0,0,0,0.35)`
+                                  : `0 0 0 1px rgba(${plan.colorRgb},0.9), 0 3px 10px rgba(0,0,0,0.3)`,
+                              }
+                            : {}
+                        }
+                        whileTap={!isActive && !plan.isDowngrade && upgradingTo === null ? { scale: 0.98 } : {}}
+                        disabled={isActive || plan.isDowngrade || upgradingTo !== null}
+                        onClick={() => plan.planType && handleUpgrade(plan.planType as 'MINI' | 'STARTER' | 'PRO' | 'TEAM_ADMIN')}
+                        className="w-full py-3.5 rounded-xl font-extrabold text-[15px] leading-none transition-all flex items-center justify-center gap-2"
+                        style={
+                          isActive
+                            ? {
+                                background: plan.color,
+                                color: "#fff",
+                                cursor: "default",
+                                boxShadow: `inset 0 1px 0 rgba(255,255,255,0.22), inset 0 -1px 0 rgba(0,0,0,0.18), 0 6px 20px rgba(${plan.colorRgb},0.5)`,
+                                letterSpacing: "0.02em",
+                              }
+                            : plan.isDowngrade
+                            ? {
+                                background: "#13132A",
+                                color: "#55556A",
+                                border: "1px solid rgba(255,255,255,0.04)",
+                                cursor: "not-allowed",
+                                opacity: 0.5,
+                              }
+                            : plan.highlighted && upgradingTo === null
+                            ? {
+                                background: plan.color,
+                                color: "#fff",
+                                boxShadow: `inset 0 1px 0 rgba(255,255,255,0.25), inset 0 -1px 0 rgba(0,0,0,0.2), 0 0 0 1px rgba(${plan.colorRgb},0.5), 0 10px 28px rgba(${plan.colorRgb},0.6)`,
+                                letterSpacing: "0.02em",
+                              }
+                            : {
+                                background: plan.color,
+                                color: "#fff",
+                                boxShadow: `inset 0 1px 0 rgba(255,255,255,0.2), inset 0 -1px 0 rgba(0,0,0,0.18), 0 6px 18px rgba(${plan.colorRgb},0.45)`,
+                                letterSpacing: "0.02em",
+                              }
+                        }
+                      >
+                        {upgradingTo === plan.planType ? (
+                          <><Loader2 size={18} className="animate-spin" />{t('billing.processing')}</>
+                        ) : isActive ? (
+                          <><CheckCircle2 size={18} strokeWidth={2.5} />{plan.cta}</>
+                        ) : plan.isDowngrade ? (
+                          <>{plan.cta}</>
+                        ) : (
+                          <>
+                            {plan.cta}
+                            <ArrowRight size={17} strokeWidth={2.5} style={{ opacity: 0.9 }} />
+                          </>
+                        )}
+                      </motion.button>
+                    </div>
                   </div>
                 </motion.div>
               );
