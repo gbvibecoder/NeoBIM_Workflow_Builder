@@ -24,7 +24,12 @@ import type { HandleType } from "@/features/floor-plan/lib/hit-detection";
 import { findConnectedWalls } from "@/features/floor-plan/lib/hit-detection";
 import type { FloorPlanGeometry } from "@/features/floor-plan/types/floor-plan";
 import { convertGeometryToProject } from "@/features/floor-plan/lib/pipeline-adapter";
-import { saveProject, loadProject } from "@/features/floor-plan/lib/project-persistence";
+import {
+  saveProject,
+  loadProject,
+  setActiveProjectId,
+  clearActiveProjectId,
+} from "@/features/floor-plan/lib/project-persistence";
 import { createSample2BHK } from "@/features/floor-plan/lib/sample-data";
 
 // ============================================================
@@ -362,28 +367,38 @@ export const useFloorPlanStore = create<FloorPlanState>()((set, get) => ({
   _clipboard: null,
 
   // ---- Project ----
-  setProject: (project) => set({
-    project,
-    activeFloorId: project.floors[0]?.id ?? null,
-    layers: [...DEFAULT_LAYERS],
-    projectModified: true,
-  }),
+  setProject: (project) => {
+    set({
+      project,
+      activeFloorId: project.floors[0]?.id ?? null,
+      layers: [...DEFAULT_LAYERS],
+      projectModified: true,
+    });
+    // Persist synchronously so a refresh before the 3s auto-save still restores.
+    try { saveProject(project); } catch { /* best-effort */ }
+    setActiveProjectId(project.id);
+  },
 
-  resetToWelcome: () => set({
-    project: null,
-    activeFloorId: null,
-    dataSource: null,
-    originalPrompt: null,
-    isGenerating: false,
-    generationStep: "",
-    generationProgress: 0,
-    projectModified: false,
-    selectedIds: [],
-    hoveredId: null,
-    _history: [],
-    _historyIndex: -1,
-    activeTool: "select",
-  }),
+  resetToWelcome: () => {
+    // User explicitly went back to the welcome screen — forget which project
+    // was active so the next page load doesn't silently restore them into it.
+    clearActiveProjectId();
+    set({
+      project: null,
+      activeFloorId: null,
+      dataSource: null,
+      originalPrompt: null,
+      isGenerating: false,
+      generationStep: "",
+      generationProgress: 0,
+      projectModified: false,
+      selectedIds: [],
+      hoveredId: null,
+      _history: [],
+      _historyIndex: -1,
+      activeTool: "select",
+    });
+  },
 
   setActiveFloor: (floorId) => set({ activeFloorId: floorId }),
 
@@ -1610,8 +1625,10 @@ export const useFloorPlanStore = create<FloorPlanState>()((set, get) => ({
       generationProgress: 100,
       projectModified: false,
     });
-    // Auto-save after loading
-    setTimeout(() => get().saveToStorage(), 100);
+    // Persist immediately — a refresh right after generation would otherwise
+    // find no saved record and drop the user back on the welcome screen.
+    try { saveProject(project); } catch { /* best-effort */ }
+    setActiveProjectId(project.id);
   },
 
   loadFromSaved: (projectId) => {
@@ -1625,6 +1642,7 @@ export const useFloorPlanStore = create<FloorPlanState>()((set, get) => ({
         originalPrompt: null,
         projectModified: false,
       });
+      setActiveProjectId(project.id);
     }
   },
 
@@ -1638,6 +1656,8 @@ export const useFloorPlanStore = create<FloorPlanState>()((set, get) => ({
       originalPrompt: null,
       projectModified: false,
     });
+    try { saveProject(project); } catch { /* best-effort */ }
+    setActiveProjectId(project.id);
   },
 
   startBlank: () => {
@@ -1696,6 +1716,8 @@ export const useFloorPlanStore = create<FloorPlanState>()((set, get) => ({
       originalPrompt: null,
       projectModified: false,
     });
+    try { saveProject(blankProject); } catch { /* best-effort */ }
+    setActiveProjectId(blankProject.id);
   },
 
   startGeneration: (prompt) => set({
@@ -1719,6 +1741,7 @@ export const useFloorPlanStore = create<FloorPlanState>()((set, get) => ({
     if (!project) return;
     try {
       saveProject(project);
+      setActiveProjectId(project.id);
     } catch (e) {
       console.warn("Failed to save project:", e);
     }
