@@ -2,176 +2,680 @@
 
 import Link from "next/link";
 import { motion } from "framer-motion";
+import {
+  ArrowRight,
+  Check,
+  Sparkles,
+  Zap,
+  Building2,
+  Crown,
+  Users,
+  Video,
+  Box,
+  Image as ImageIcon,
+} from "lucide-react";
 import { useLocale } from "@/hooks/useLocale";
 import { trackViewContent } from "@/lib/meta-pixel";
 import { fadeUp, smoothEase } from "@/features/landing/lib/landing-helpers";
-import { CONTACT_EMAIL } from "@/constants/contact";
+
+// Shared CTA button style — mirrors dashboard/billing buttons:
+// solid plan color + inset highlight/shadow + outer color glow.
+const ctaBase: React.CSSProperties = {
+  width: "100%",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: 8,
+  padding: "14px 20px",
+  borderRadius: 12,
+  color: "white",
+  fontSize: 15,
+  fontWeight: 800,
+  lineHeight: 1,
+  letterSpacing: "0.02em",
+  textDecoration: "none",
+  cursor: "pointer",
+  transition: "box-shadow 0.2s, transform 0.2s",
+};
+
+function ctaStyle(colorHex: string, rgb: string, highlighted = false): React.CSSProperties {
+  const baseShadow = highlighted
+    ? `inset 0 1px 0 rgba(255,255,255,0.25), inset 0 -1px 0 rgba(0,0,0,0.2), 0 10px 28px rgba(${rgb},0.6)`
+    : `inset 0 1px 0 rgba(255,255,255,0.2), inset 0 -1px 0 rgba(0,0,0,0.18), 0 6px 18px rgba(${rgb},0.45)`;
+  return { ...ctaBase, background: colorHex, boxShadow: baseShadow };
+}
+// Hover = amplify the resting glow (higher opacity + halo ring at same position).
+// We deliberately keep offset/blur close to the resting shadow so the light
+// doesn't disperse on hover — it just pulses brighter. No 1px colored outline
+// ring — that read as a harsh border-highlight on hover.
+function ctaHoverShadow(rgb: string, highlighted = false) {
+  return highlighted
+    ? `inset 0 1px 0 rgba(255,255,255,0.3), inset 0 -1px 0 rgba(0,0,0,0.22), 0 10px 30px rgba(${rgb},0.85), 0 0 22px rgba(${rgb},0.5)`
+    : `inset 0 1px 0 rgba(255,255,255,0.25), inset 0 -1px 0 rgba(0,0,0,0.22), 0 6px 22px rgba(${rgb},0.75), 0 0 18px rgba(${rgb},0.4)`;
+}
+
+interface Credit {
+  icon: React.ReactNode;
+  label: string;
+  value: string; // "0" → em-dash, "∞" → green, else plan color
+}
+
+interface Plan {
+  tier: string;
+  name: string;
+  desc: string;
+  price: string;
+  isCustom: boolean;
+  savings: string | null;
+  color: string;
+  rgb: string;
+  gradient: string;
+  icon: React.ReactNode;
+  credits: Credit[];
+  features: readonly string[];
+  cta: string;
+  ctaHref: string;
+  ctaTrack: string | null;
+  ctaIsLink: boolean;
+  ctaIcon: React.ReactNode;
+  ctaIconPosition: "left" | "right";
+  badge: string | null;
+  highlighted: boolean;
+}
 
 export function PricingSection() {
   const { t, tArray } = useLocale();
 
+  const plans: Plan[] = [
+    {
+      tier: "Mini",
+      name: t("landing.miniTitle"),
+      desc: t("landing.miniDesc"),
+      price: t("landing.miniPrice"),
+      isCustom: false,
+      savings: t("landing.miniHighlight"),
+      color: "#F59E0B",
+      rgb: "245,158,11",
+      gradient: "linear-gradient(135deg, #F59E0B 0%, #FBBF24 100%)",
+      icon: <Zap size={18} />,
+      credits: [
+        { icon: <Video size={13} />, label: t("billing.videoCredits"), value: "0" },
+        { icon: <Box size={13} />, label: t("billing.modelCredits"), value: "0" },
+        { icon: <ImageIcon size={13} />, label: t("billing.renderCredits"), value: "2" },
+      ],
+      features: tArray("landing.miniFeatures"),
+      cta: t("landing.startNow"),
+      ctaHref: "/dashboard",
+      ctaTrack: "pricing_cta_mini",
+      ctaIsLink: true,
+      ctaIcon: <ArrowRight size={17} strokeWidth={2.5} style={{ opacity: 0.9 }} />,
+      ctaIconPosition: "right",
+      badge: null,
+      highlighted: false,
+    },
+    {
+      tier: "Starter",
+      name: t("landing.starterTitle"),
+      desc: t("landing.starterDesc"),
+      price: t("landing.starterPrice"),
+      isCustom: false,
+      savings: t("landing.starterHighlight"),
+      color: "#10B981",
+      rgb: "16,185,129",
+      gradient: "linear-gradient(135deg, #10B981 0%, #34D399 100%)",
+      icon: <Building2 size={18} />,
+      credits: [
+        { icon: <Video size={13} />, label: t("billing.videoCredits"), value: "2" },
+        { icon: <Box size={13} />, label: t("billing.modelCredits"), value: "3" },
+        { icon: <ImageIcon size={13} />, label: t("billing.renderCredits"), value: "10" },
+      ],
+      features: tArray("landing.starterFeatures"),
+      cta: t("landing.startNow"),
+      ctaHref: "/dashboard",
+      ctaTrack: "pricing_cta_starter",
+      ctaIsLink: true,
+      ctaIcon: <ArrowRight size={17} strokeWidth={2.5} style={{ opacity: 0.9 }} />,
+      ctaIconPosition: "right",
+      badge: null,
+      highlighted: false,
+    },
+    {
+      tier: "Pro",
+      name: t("landing.proTitle"),
+      desc: t("landing.proDesc"),
+      price: t("landing.proPrice"),
+      isCustom: false,
+      savings: t("landing.proHighlight"),
+      color: "#4F8AFF",
+      rgb: "79,138,255",
+      gradient: "linear-gradient(135deg, #4F8AFF 0%, #6366F1 100%)",
+      icon: <Crown size={18} />,
+      credits: [
+        { icon: <Video size={13} />, label: t("billing.videoCredits"), value: "5" },
+        { icon: <Box size={13} />, label: t("billing.modelCredits"), value: "10" },
+        { icon: <ImageIcon size={13} />, label: t("billing.renderCredits"), value: "30" },
+      ],
+      features: tArray("landing.proFeatures"),
+      cta: t("landing.startNow"),
+      ctaHref: "/dashboard",
+      ctaTrack: "pricing_cta_pro",
+      ctaIsLink: true,
+      ctaIcon: <ArrowRight size={17} strokeWidth={2.5} style={{ opacity: 0.9 }} />,
+      ctaIconPosition: "right",
+      badge: t("landing.mostPopular"),
+      highlighted: true,
+    },
+    {
+      tier: "Team",
+      name: t("billing.team"),
+      desc: t("billing.teamDesc"),
+      price: "4,999",
+      isCustom: false,
+      savings: null,
+      color: "#8B5CF6",
+      rgb: "139,92,246",
+      gradient: "linear-gradient(135deg, #8B5CF6 0%, #A78BFA 100%)",
+      icon: <Users size={18} />,
+      credits: [
+        { icon: <Video size={13} />, label: t("billing.videoCredits"), value: "15" },
+        { icon: <Box size={13} />, label: t("billing.modelCredits"), value: "30" },
+        { icon: <ImageIcon size={13} />, label: t("billing.renderCredits"), value: "\u221E" },
+      ],
+      features: [
+        t("billing.teamFeature1"),
+        t("billing.teamFeature2"),
+        t("billing.teamFeature3"),
+        t("billing.teamFeature4"),
+        t("billing.teamFeature5"),
+        t("billing.teamFeature6"),
+      ],
+      cta: t("landing.startNow"),
+      ctaHref: "/dashboard",
+      ctaTrack: "pricing_cta_team",
+      ctaIsLink: true,
+      ctaIcon: <ArrowRight size={17} strokeWidth={2.5} style={{ opacity: 0.9 }} />,
+      ctaIconPosition: "right",
+      badge: null,
+      highlighted: false,
+    },
+  ];
+
   return (
-    <section id="pricing" className="landing-section" style={{
-      padding: "120px 48px", position: "relative", overflow: "hidden",
-      background: "linear-gradient(180deg, #07070D 0%, #0A0A14 50%, #07070D 100%)",
-    }}>
+    <section
+      id="pricing"
+      className="landing-section"
+      style={{
+        padding: "120px 48px",
+        position: "relative",
+        overflow: "hidden",
+        background: "linear-gradient(180deg, #07070D 0%, #0A0A14 50%, #07070D 100%)",
+      }}
+    >
       <div style={{ position: "absolute", inset: 0, pointerEvents: "none" }}>
         <div className="isometric-grid" style={{ opacity: 0.25 }} />
-        <svg style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }} viewBox="0 0 1440 800" fill="none" preserveAspectRatio="xMidYMid slice">
-          <path d="M200 400 Q720 300 1240 400" stroke="rgba(79,138,255,0.06)" strokeWidth="80" strokeLinecap="round" fill="none" />
-          <path d="M200 400 Q720 300 1240 400" stroke="rgba(79,138,255,0.1)" strokeWidth="1.5" fill="none" className="wire-animate" />
+        <svg
+          style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}
+          viewBox="0 0 1440 800"
+          fill="none"
+          preserveAspectRatio="xMidYMid slice"
+        >
+          <path
+            d="M200 400 Q720 300 1240 400"
+            stroke="rgba(79,138,255,0.06)"
+            strokeWidth="80"
+            strokeLinecap="round"
+            fill="none"
+          />
+          <path
+            d="M200 400 Q720 300 1240 400"
+            stroke="rgba(79,138,255,0.1)"
+            strokeWidth="1.5"
+            fill="none"
+            className="wire-animate"
+          />
           <line x1="300" y1="700" x2="500" y2="700" stroke="rgba(79,138,255,0.1)" strokeWidth="0.5" />
-          <text x="400" y="720" className="dimension-label" textAnchor="middle">{t('landing.svgStarter')}</text>
+          <text x="400" y="720" className="dimension-label" textAnchor="middle">
+            {t("landing.svgStarter")}
+          </text>
           <line x1="600" y1="700" x2="840" y2="700" stroke="rgba(79,138,255,0.15)" strokeWidth="0.5" />
-          <text x="720" y="720" className="dimension-label" textAnchor="middle">{t('landing.svgProfessional')}</text>
+          <text x="720" y="720" className="dimension-label" textAnchor="middle">
+            {t("landing.svgProfessional")}
+          </text>
           <line x1="940" y1="700" x2="1140" y2="700" stroke="rgba(139,92,246,0.1)" strokeWidth="0.5" />
-          <text x="1040" y="720" className="dimension-label" textAnchor="middle">{t('landing.svgEnterprise')}</text>
+          <text x="1040" y="720" className="dimension-label" textAnchor="middle">
+            {t("landing.svgEnterprise")}
+          </text>
         </svg>
-        <div className="orb-drift-2" style={{ position: "absolute", top: "5%", left: "5%", width: 400, height: 400, borderRadius: "50%", background: "radial-gradient(circle, rgba(79,138,255,0.08) 0%, transparent 70%)", filter: "blur(25px)" }} />
-        <div className="orb-drift-3" style={{ position: "absolute", bottom: "10%", right: "5%", width: 350, height: 350, borderRadius: "50%", background: "radial-gradient(circle, rgba(139,92,246,0.08) 0%, transparent 70%)", filter: "blur(20px)" }} />
+        <div
+          className="orb-drift-2"
+          style={{
+            position: "absolute",
+            top: "5%",
+            left: "5%",
+            width: 400,
+            height: 400,
+            borderRadius: "50%",
+            background: "radial-gradient(circle, rgba(79,138,255,0.08) 0%, transparent 70%)",
+            filter: "blur(25px)",
+          }}
+        />
+        <div
+          className="orb-drift-3"
+          style={{
+            position: "absolute",
+            bottom: "10%",
+            right: "5%",
+            width: 350,
+            height: 350,
+            borderRadius: "50%",
+            background: "radial-gradient(circle, rgba(139,92,246,0.08) 0%, transparent 70%)",
+            filter: "blur(20px)",
+          }}
+        />
       </div>
 
       <div style={{ maxWidth: 1200, margin: "0 auto", position: "relative", zIndex: 1 }}>
         <motion.div
-          initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-80px" }}
-          variants={fadeUp} transition={{ duration: 0.6, ease: smoothEase }}
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true, margin: "-80px" }}
+          variants={fadeUp}
+          transition={{ duration: 0.6, ease: smoothEase }}
           style={{ textAlign: "center", marginBottom: 80 }}
         >
           <span className="blueprint-annotation" style={{ marginBottom: 16, display: "block" }}>
-            {t('landing.pricingSection')}
+            {t("landing.pricingSection")}
           </span>
           <div className="accent-line" />
-          <h2 style={{ fontSize: "clamp(2.2rem, 4.5vw, 3.5rem)", fontWeight: 900, color: "#F0F0F5", letterSpacing: "-0.04em", lineHeight: 1.05, marginBottom: 16 }}>
-            {t('landing.simpleTransparent')}<span style={{ background: "linear-gradient(135deg, #4F8AFF, #A78BFA)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>{t('landing.transparent')}</span>{t('landing.pricingTitle')}
+          <h2
+            style={{
+              fontSize: "clamp(2.2rem, 4.5vw, 3.5rem)",
+              fontWeight: 900,
+              color: "#F0F0F5",
+              letterSpacing: "-0.04em",
+              lineHeight: 1.05,
+              marginBottom: 16,
+            }}
+          >
+            {t("landing.simpleTransparent")}
+            <span
+              style={{
+                background: "linear-gradient(135deg, #4F8AFF, #A78BFA)",
+                WebkitBackgroundClip: "text",
+                WebkitTextFillColor: "transparent",
+                backgroundClip: "text",
+              }}
+            >
+              {t("landing.transparent")}
+            </span>
+            {t("landing.pricingTitle")}
           </h2>
-          <p style={{ fontSize: 16, color: "#7C7C96", marginBottom: 12 }}>{t('landing.choosePlan')}</p>
-          <div style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "8px 20px", borderRadius: 100, background: "rgba(79,138,255,0.04)", border: "1px solid rgba(79,138,255,0.1)" }}>
-            <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#4F8AFF", boxShadow: "0 0 6px rgba(79,138,255,0.5)" }} />
-            <span style={{ fontSize: 13, color: "#9898B0" }}>{t('billing.freeTierNote')}</span>
+          <p style={{ fontSize: 16, color: "#7C7C96", marginBottom: 12 }}>{t("landing.choosePlan")}</p>
+          <div
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 8,
+              padding: "8px 20px",
+              borderRadius: 100,
+              background: "rgba(79,138,255,0.04)",
+              border: "1px solid rgba(79,138,255,0.1)",
+            }}
+          >
+            <div
+              style={{
+                width: 6,
+                height: 6,
+                borderRadius: "50%",
+                background: "#4F8AFF",
+                boxShadow: "0 0 6px rgba(79,138,255,0.5)",
+              }}
+            />
+            <span style={{ fontSize: 13, color: "#9898B0" }}>{t("billing.freeTierNote")}</span>
           </div>
         </motion.div>
 
         <motion.div
-          initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-40px" }}
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true, margin: "-40px" }}
           variants={{ visible: { transition: { staggerChildren: 0.1 } } }}
           className="landing-grid-4"
-          style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 20, alignItems: "start" }}
+          style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 20, alignItems: "stretch" }}
         >
-          {/* MINI */}
-          <motion.div variants={fadeUp} transition={{ duration: 0.5, ease: smoothEase }} className="node-card" style={{ '--node-port-color': '#F59E0B' } as React.CSSProperties}>
-            <div className="node-header" style={{ background: "linear-gradient(135deg, rgba(245,158,11,0.1), rgba(245,158,11,0.03))", borderBottom: "1px solid rgba(245,158,11,0.12)", borderRadius: "16px 16px 0 0" }}>
-              <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#F59E0B", boxShadow: "0 0 8px #F59E0B" }} />
-              <span style={{ color: "#F59E0B" }}>MINI</span>
-            </div>
-            <div style={{ padding: "20px 16px" }}>
-              <h3 style={{ fontSize: 18, fontWeight: 800, color: "#F0F0F5", marginBottom: 4 }}>{t('landing.miniTitle')}</h3>
-              <p style={{ fontSize: 11, color: "#7878A0", marginBottom: 16 }}>{t('landing.miniDesc')}</p>
-              <div style={{ marginBottom: 14 }}>
-                <span style={{ fontSize: 36, fontWeight: 900, color: "#F0F0F5", letterSpacing: "-0.03em" }}>{t('landing.miniPrice')}</span>
-                <span style={{ fontSize: 12, color: "#5C5C78", marginLeft: 4 }}>{t('landing.perMonth')}</span>
-              </div>
-              <div style={{ marginBottom: 16, padding: "6px 10px", borderRadius: 8, background: "rgba(245,158,11,0.06)", border: "1px solid rgba(245,158,11,0.15)" }}>
-                <span style={{ fontSize: 10, color: "#F59E0B", fontWeight: 700 }}>{t('landing.miniHighlight')}</span>
-              </div>
-              <Link href="/dashboard" style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "10px 16px", borderRadius: 12, background: "linear-gradient(135deg, #F59E0B 0%, #FBBF24 100%)", color: "white", fontSize: 12, fontWeight: 700, textDecoration: "none", marginBottom: 20, boxShadow: "0 4px 16px rgba(245,158,11,0.25)", transition: "all 0.2s" }}
-                onClick={() => trackViewContent({ content_name: "pricing_cta_mini" })}
-                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.boxShadow = "0 6px 24px rgba(245,158,11,0.35)"; }}
-                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.boxShadow = "0 4px 16px rgba(245,158,11,0.25)"; }}
-                onFocus={e => { (e.currentTarget as HTMLElement).style.boxShadow = "0 6px 24px rgba(245,158,11,0.35)"; }}
-                onBlur={e => { (e.currentTarget as HTMLElement).style.boxShadow = "0 4px 16px rgba(245,158,11,0.25)"; }}
-              >{t('landing.getStartedFree')}</Link>
-              <div style={{ borderTop: "1px solid rgba(245,158,11,0.08)", paddingTop: 14 }}>
-                <div style={{ fontSize: 8, fontWeight: 700, color: "#5C5C78", marginBottom: 10, textTransform: "uppercase", letterSpacing: "1.5px", fontFamily: "monospace" }}>{t('landing.miniIncludes')}</div>
-                {tArray('landing.miniFeatures').map(f => (<div key={f} style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}><div style={{ width: 12, height: 12, borderRadius: 3, background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.15)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><div style={{ width: 3, height: 3, borderRadius: "50%", background: "#F59E0B" }} /></div><span style={{ fontSize: 11, color: "#9898B0" }}>{f}</span></div>))}
-              </div>
-            </div>
-          </motion.div>
+          {plans.map((plan) => {
+            const cardBase: React.CSSProperties = {
+              position: "relative",
+              borderRadius: 20,
+              border: plan.highlighted
+                ? `2px solid rgba(${plan.rgb},0.4)`
+                : "1px solid rgba(255,255,255,0.06)",
+              background: "#0D0D1A",
+              overflow: "hidden",
+              display: "flex",
+              flexDirection: "column",
+              boxShadow: plan.highlighted
+                ? `0 16px 48px rgba(${plan.rgb},0.12), 0 0 0 1px rgba(${plan.rgb},0.15)`
+                : "0 4px 20px rgba(0,0,0,0.25)",
+            };
 
-          {/* STARTER */}
-          <motion.div variants={fadeUp} transition={{ duration: 0.5, ease: smoothEase }} className="node-card" style={{ '--node-port-color': '#10B981' } as React.CSSProperties}>
-            <div className="node-header" style={{ background: "linear-gradient(135deg, rgba(16,185,129,0.1), rgba(16,185,129,0.03))", borderBottom: "1px solid rgba(16,185,129,0.12)", borderRadius: "16px 16px 0 0" }}>
-              <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#10B981", boxShadow: "0 0 8px #10B981" }} />
-              <span style={{ color: "#10B981" }}>STARTER</span>
-            </div>
-            <div style={{ padding: "24px 20px" }}>
-              <h3 style={{ fontSize: 20, fontWeight: 800, color: "#F0F0F5", marginBottom: 6 }}>{t('landing.starterTitle')}</h3>
-              <p style={{ fontSize: 12, color: "#7878A0", marginBottom: 20 }}>{t('landing.starterDesc')}</p>
-              <div style={{ marginBottom: 16 }}>
-                <span style={{ fontSize: 40, fontWeight: 900, color: "#F0F0F5", letterSpacing: "-0.03em" }}>{t('landing.starterPrice')}</span>
-                <span style={{ fontSize: 14, color: "#5C5C78", marginLeft: 6 }}>{t('landing.perMonth')}</span>
-              </div>
-              <div style={{ marginBottom: 20, padding: "8px 12px", borderRadius: 8, background: "rgba(16,185,129,0.06)", border: "1px solid rgba(16,185,129,0.15)" }}>
-                <span style={{ fontSize: 11, color: "#10B981", fontWeight: 700 }}>{t('landing.starterHighlight')}</span>
-              </div>
-              <Link href="/dashboard" style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "12px 20px", borderRadius: 12, background: "linear-gradient(135deg, #10B981 0%, #34D399 100%)", color: "white", fontSize: 13, fontWeight: 700, textDecoration: "none", marginBottom: 24, boxShadow: "0 4px 16px rgba(16,185,129,0.25)", transition: "all 0.2s" }}
-                onClick={() => trackViewContent({ content_name: "pricing_cta_starter" })}
-                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.boxShadow = "0 6px 24px rgba(16,185,129,0.35)"; }}
-                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.boxShadow = "0 4px 16px rgba(16,185,129,0.25)"; }}
-                onFocus={e => { (e.currentTarget as HTMLElement).style.boxShadow = "0 6px 24px rgba(16,185,129,0.35)"; }}
-                onBlur={e => { (e.currentTarget as HTMLElement).style.boxShadow = "0 4px 16px rgba(16,185,129,0.25)"; }}
-              >{t('landing.startNow')}</Link>
-              <div style={{ borderTop: "1px solid rgba(16,185,129,0.08)", paddingTop: 16 }}>
-                <div style={{ fontSize: 9, fontWeight: 700, color: "#5C5C78", marginBottom: 12, textTransform: "uppercase", letterSpacing: "1.5px", fontFamily: "monospace" }}>{t('landing.starterIncludes')}</div>
-                {tArray('landing.starterFeatures').map(f => (<div key={f} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}><div style={{ width: 14, height: 14, borderRadius: 3, background: "rgba(16,185,129,0.08)", border: "1px solid rgba(16,185,129,0.15)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><div style={{ width: 3, height: 3, borderRadius: "50%", background: "#10B981" }} /></div><span style={{ fontSize: 12, color: "#B0B0C8" }}>{f}</span></div>))}
-              </div>
-            </div>
-          </motion.div>
+            return (
+              <motion.div
+                key={plan.tier}
+                variants={fadeUp}
+                transition={{ duration: 0.5, ease: smoothEase }}
+                style={cardBase}
+              >
+                {/* Top accent gradient bar */}
+                <div
+                  style={{
+                    position: "absolute",
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    height: 3,
+                    background: plan.gradient,
+                    zIndex: 2,
+                  }}
+                />
 
-          {/* PRO */}
-          <motion.div variants={fadeUp} transition={{ duration: 0.5, ease: smoothEase }} className="node-card" style={{ '--node-port-color': '#4F8AFF', border: "1.5px solid rgba(79,138,255,0.2)", boxShadow: "0 0 60px rgba(79,138,255,0.06)", transform: "scale(1.02)" } as React.CSSProperties}>
-            <div className="node-header" style={{ background: "linear-gradient(135deg, rgba(79,138,255,0.15), rgba(99,102,241,0.08))", borderBottom: "1px solid rgba(79,138,255,0.15)", borderRadius: "15px 15px 0 0" }}>
-              <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#4F8AFF", boxShadow: "0 0 8px #4F8AFF" }} />
-              <span style={{ color: "#4F8AFF" }}>PRO</span>
-              <span style={{ marginLeft: "auto", fontSize: 8, padding: "2px 8px", borderRadius: 10, background: "linear-gradient(135deg, #4F8AFF, #6366F1)", color: "white", fontWeight: 700 }}>{t('landing.mostPopular')}</span>
-            </div>
-            <div style={{ padding: "24px 20px" }}>
-              <h3 style={{ fontSize: 20, fontWeight: 800, color: "#F0F0F5", marginBottom: 6 }}>{t('landing.proTitle')}</h3>
-              <p style={{ fontSize: 12, color: "#7878A0", marginBottom: 20 }}>{t('landing.proDesc')}</p>
-              <div style={{ marginBottom: 16 }}>
-                <span style={{ fontSize: 40, fontWeight: 900, color: "#F0F0F5", letterSpacing: "-0.03em" }}>{t('landing.proPrice')}</span>
-                <span style={{ fontSize: 14, color: "#5C5C78", marginLeft: 6 }}>{t('landing.perMonth')}</span>
-              </div>
-              <div style={{ marginBottom: 20, padding: "8px 12px", borderRadius: 8, background: "rgba(16,185,129,0.06)", border: "1px solid rgba(16,185,129,0.15)" }}>
-                <span style={{ fontSize: 11, color: "#10B981", fontWeight: 700 }}>{t('landing.proHighlight')}</span>
-              </div>
-              <Link href="/dashboard" style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "12px 20px", borderRadius: 12, background: "linear-gradient(135deg, #4F8AFF 0%, #6366F1 100%)", color: "white", fontSize: 13, fontWeight: 700, textDecoration: "none", marginBottom: 24, boxShadow: "0 4px 20px rgba(79,138,255,0.3)", transition: "all 0.2s" }}
-                onClick={() => trackViewContent({ content_name: "pricing_cta_pro" })}
-                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.boxShadow = "0 8px 30px rgba(79,138,255,0.4)"; }}
-                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.boxShadow = "0 4px 20px rgba(79,138,255,0.3)"; }}
-                onFocus={e => { (e.currentTarget as HTMLElement).style.boxShadow = "0 8px 30px rgba(79,138,255,0.4)"; }}
-                onBlur={e => { (e.currentTarget as HTMLElement).style.boxShadow = "0 4px 20px rgba(79,138,255,0.3)"; }}
-              >{t('landing.startNow')}</Link>
-              <div style={{ borderTop: "1px solid rgba(79,138,255,0.1)", paddingTop: 16 }}>
-                <div style={{ fontSize: 9, fontWeight: 700, color: "#5C5C78", marginBottom: 12, textTransform: "uppercase", letterSpacing: "1.5px", fontFamily: "monospace" }}>{t('landing.proIncludes')}</div>
-                {tArray('landing.proFeatures').map(f => (<div key={f} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}><div style={{ width: 14, height: 14, borderRadius: 3, background: "rgba(79,138,255,0.1)", border: "1px solid rgba(79,138,255,0.2)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><div style={{ width: 3, height: 3, borderRadius: "50%", background: "#4F8AFF" }} /></div><span style={{ fontSize: 12, color: "#D0D0E0" }}>{f}</span></div>))}
-              </div>
-            </div>
-          </motion.div>
+                {/* Badge (Most Popular / etc.) */}
+                {plan.badge && (
+                  <div
+                    style={{
+                      position: "absolute",
+                      top: 0,
+                      left: "50%",
+                      transform: "translateX(-50%)",
+                      zIndex: 20,
+                      background: plan.gradient,
+                      color: "white",
+                      padding: "6px 14px",
+                      borderRadius: "0 0 10px 10px",
+                      fontSize: 10,
+                      fontWeight: 800,
+                      letterSpacing: "0.12em",
+                      textTransform: "uppercase",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 6,
+                      whiteSpace: "nowrap",
+                      lineHeight: 1,
+                    }}
+                  >
+                    <Sparkles size={11} />
+                    {plan.badge}
+                  </div>
+                )}
 
-          {/* ENTERPRISE */}
-          <motion.div variants={fadeUp} transition={{ duration: 0.5, ease: smoothEase }} className="node-card" style={{ '--node-port-color': '#8B5CF6' } as React.CSSProperties}>
-            <div className="node-header" style={{ background: "linear-gradient(135deg, rgba(139,92,246,0.1), rgba(139,92,246,0.03))", borderBottom: "1px solid rgba(139,92,246,0.1)", borderRadius: "16px 16px 0 0" }}>
-              <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#8B5CF6", boxShadow: "0 0 8px #8B5CF6" }} />
-              <span style={{ color: "#8B5CF6" }}>ENTERPRISE</span>
-            </div>
-            <div style={{ padding: "24px 20px" }}>
-              <h3 style={{ fontSize: 20, fontWeight: 800, color: "#F0F0F5", marginBottom: 6 }}>{t('landing.enterprise')}</h3>
-              <p style={{ fontSize: 12, color: "#7878A0", marginBottom: 20 }}>{t('landing.enterpriseDesc')}</p>
-              <div style={{ marginBottom: 24 }}>
-                <span style={{ fontSize: 32, fontWeight: 900, color: "#F0F0F5" }}>{t('landing.custom')}</span>
-              </div>
-              <a href={`mailto:${CONTACT_EMAIL}`} style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "12px 20px", borderRadius: 12, border: "1px solid rgba(139,92,246,0.2)", background: "rgba(139,92,246,0.05)", color: "#F0F0F5", fontSize: 13, fontWeight: 700, textDecoration: "none", marginBottom: 24, transition: "all 0.2s" }}
-                onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.background = "rgba(139,92,246,0.1)"; }}
-                onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.background = "rgba(139,92,246,0.05)"; }}
-                onFocus={e => { const el = e.currentTarget as HTMLElement; el.style.background = "rgba(139,92,246,0.1)"; }}
-                onBlur={e => { const el = e.currentTarget as HTMLElement; el.style.background = "rgba(139,92,246,0.05)"; }}
-              >{t('landing.contactSales')}</a>
-              <div style={{ borderTop: "1px solid rgba(139,92,246,0.08)", paddingTop: 16 }}>
-                <div style={{ fontSize: 9, fontWeight: 700, color: "#5C5C78", marginBottom: 12, textTransform: "uppercase", letterSpacing: "1.5px", fontFamily: "monospace" }}>{t('landing.enterpriseIncludes')}</div>
-                {tArray('landing.enterpriseFeatures').map(f => (<div key={f} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}><div style={{ width: 14, height: 14, borderRadius: 3, background: "rgba(139,92,246,0.08)", border: "1px solid rgba(139,92,246,0.15)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><div style={{ width: 3, height: 3, borderRadius: "50%", background: "#8B5CF6" }} /></div><span style={{ fontSize: 12, color: "#9898B0" }}>{f}</span></div>))}
-              </div>
-            </div>
-          </motion.div>
+                {/* Content */}
+                <div
+                  style={{
+                    position: "relative",
+                    zIndex: 10,
+                    padding: "32px 20px 24px",
+                    flex: 1,
+                    display: "flex",
+                    flexDirection: "column",
+                  }}
+                >
+                  {/* Icon tile + name */}
+                  <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
+                    <div
+                      style={{
+                        width: 40,
+                        height: 40,
+                        borderRadius: 12,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        background: `linear-gradient(135deg, rgba(${plan.rgb},0.15) 0%, rgba(${plan.rgb},0.05) 100%)`,
+                        border: `1px solid rgba(${plan.rgb},0.2)`,
+                        color: plan.color,
+                        flexShrink: 0,
+                      }}
+                    >
+                      {plan.icon}
+                    </div>
+                    <div style={{ minWidth: 0 }}>
+                      <h3
+                        style={{
+                          fontSize: 17,
+                          fontWeight: 800,
+                          color: "#F0F0F5",
+                          marginBottom: 2,
+                          letterSpacing: "-0.01em",
+                        }}
+                      >
+                        {plan.name}
+                      </h3>
+                      <p style={{ fontSize: 11, color: "#7C7C96", margin: 0, lineHeight: 1.3 }}>{plan.desc}</p>
+                    </div>
+                  </div>
+
+                  {/* Price */}
+                  <div style={{ marginBottom: 20 }}>
+                    {plan.isCustom ? (
+                      <span
+                        style={{
+                          fontSize: 34,
+                          fontWeight: 900,
+                          color: "#F0F0F5",
+                          letterSpacing: "-0.03em",
+                        }}
+                      >
+                        {plan.price}
+                      </span>
+                    ) : (
+                      <div style={{ display: "flex", alignItems: "baseline", gap: 2 }}>
+                        <span
+                          style={{
+                            fontSize: 14,
+                            color: "#7C7C96",
+                            fontWeight: 500,
+                          }}
+                        >
+                          ₹
+                        </span>
+                        <span
+                          style={{
+                            fontSize: 38,
+                            fontWeight: 900,
+                            color: "#F0F0F5",
+                            letterSpacing: "-0.03em",
+                            lineHeight: 1,
+                          }}
+                        >
+                          {plan.price}
+                        </span>
+                        <span style={{ fontSize: 12, color: "#55556A", marginLeft: 4 }}>
+                          / {t("billing.perMonthShort")}
+                        </span>
+                      </div>
+                    )}
+                    {plan.savings && (
+                      <div
+                        style={{
+                          marginTop: 6,
+                          fontSize: 11,
+                          fontWeight: 700,
+                          color: plan.color,
+                        }}
+                      >
+                        {plan.savings}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* AI Credits box */}
+                  <div
+                    style={{
+                      marginBottom: 20,
+                      padding: 12,
+                      borderRadius: 12,
+                      background: `linear-gradient(135deg, rgba(${plan.rgb},0.04) 0%, rgba(${plan.rgb},0.01) 100%)`,
+                      border: `1px solid rgba(${plan.rgb},0.08)`,
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontSize: 10,
+                        fontWeight: 800,
+                        color: "#5C5C78",
+                        marginBottom: 10,
+                        textTransform: "uppercase",
+                        letterSpacing: "0.12em",
+                      }}
+                    >
+                      {t("billing.aiCredits")}
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                      {plan.credits.map((c, i) => {
+                        const valueColor =
+                          c.value === "0"
+                            ? "#3A3A50"
+                            : c.value === "\u221E"
+                            ? "#10B981"
+                            : plan.color;
+                        const displayValue =
+                          c.value === "0"
+                            ? "\u2014"
+                            : c.value === "\u221E"
+                            ? "\u221E"
+                            : `${c.value}/${t("billing.perMonthShort")}`;
+                        return (
+                          <div
+                            key={i}
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "space-between",
+                              fontSize: 12,
+                            }}
+                          >
+                            <div style={{ display: "flex", alignItems: "center", gap: 6, color: "#9898B0" }}>
+                              {c.icon}
+                              <span>{c.label}</span>
+                            </div>
+                            <span style={{ fontWeight: 800, color: valueColor }}>{displayValue}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Features */}
+                  <ul
+                    style={{
+                      listStyle: "none",
+                      margin: "0 0 24px 0",
+                      padding: 0,
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 10,
+                    }}
+                  >
+                    {plan.features.map((f, i) => (
+                      <li key={i} style={{ display: "flex", alignItems: "flex-start", gap: 10, fontSize: 12 }}>
+                        <div
+                          style={{
+                            width: 16,
+                            height: 16,
+                            borderRadius: "50%",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            flexShrink: 0,
+                            marginTop: 1,
+                            background: `rgba(${plan.rgb},0.12)`,
+                          }}
+                        >
+                          <Check size={10} strokeWidth={3} style={{ color: plan.color }} />
+                        </div>
+                        <span style={{ color: "#C0C0D0", lineHeight: 1.45 }}>{f}</span>
+                      </li>
+                    ))}
+                  </ul>
+
+                  {/* CTA at bottom */}
+                  <div style={{ marginTop: "auto" }}>
+                    {plan.ctaIsLink ? (
+                      <Link
+                        href={plan.ctaHref}
+                        style={ctaStyle(plan.color, plan.rgb, plan.highlighted)}
+                        onClick={() => plan.ctaTrack && trackViewContent({ content_name: plan.ctaTrack })}
+                        onMouseEnter={(e) => {
+                          (e.currentTarget as HTMLElement).style.boxShadow = ctaHoverShadow(
+                            plan.rgb,
+                            plan.highlighted,
+                          );
+                        }}
+                        onMouseLeave={(e) => {
+                          (e.currentTarget as HTMLElement).style.boxShadow = ctaStyle(
+                            plan.color,
+                            plan.rgb,
+                            plan.highlighted,
+                          ).boxShadow as string;
+                        }}
+                        onFocus={(e) => {
+                          (e.currentTarget as HTMLElement).style.boxShadow = ctaHoverShadow(
+                            plan.rgb,
+                            plan.highlighted,
+                          );
+                        }}
+                        onBlur={(e) => {
+                          (e.currentTarget as HTMLElement).style.boxShadow = ctaStyle(
+                            plan.color,
+                            plan.rgb,
+                            plan.highlighted,
+                          ).boxShadow as string;
+                        }}
+                      >
+                        {plan.ctaIconPosition === "left" && plan.ctaIcon}
+                        {plan.cta}
+                        {plan.ctaIconPosition === "right" && plan.ctaIcon}
+                      </Link>
+                    ) : (
+                      <a
+                        href={plan.ctaHref}
+                        style={ctaStyle(plan.color, plan.rgb, plan.highlighted)}
+                        onMouseEnter={(e) => {
+                          (e.currentTarget as HTMLElement).style.boxShadow = ctaHoverShadow(
+                            plan.rgb,
+                            plan.highlighted,
+                          );
+                        }}
+                        onMouseLeave={(e) => {
+                          (e.currentTarget as HTMLElement).style.boxShadow = ctaStyle(
+                            plan.color,
+                            plan.rgb,
+                            plan.highlighted,
+                          ).boxShadow as string;
+                        }}
+                        onFocus={(e) => {
+                          (e.currentTarget as HTMLElement).style.boxShadow = ctaHoverShadow(
+                            plan.rgb,
+                            plan.highlighted,
+                          );
+                        }}
+                        onBlur={(e) => {
+                          (e.currentTarget as HTMLElement).style.boxShadow = ctaStyle(
+                            plan.color,
+                            plan.rgb,
+                            plan.highlighted,
+                          ).boxShadow as string;
+                        }}
+                      >
+                        {plan.ctaIconPosition === "left" && plan.ctaIcon}
+                        {plan.cta}
+                        {plan.ctaIconPosition === "right" && plan.ctaIcon}
+                      </a>
+                    )}
+                  </div>
+                </div>
+              </motion.div>
+            );
+          })}
         </motion.div>
       </div>
     </section>
