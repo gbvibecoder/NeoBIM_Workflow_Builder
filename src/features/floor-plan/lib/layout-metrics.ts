@@ -545,3 +545,119 @@ export function topFlagSeverity(flags: QualityFlag[]): QualitySeverity | null {
 // Used to flag CIRCULATION_TYPES when consumers want to render a "service"
 // breakdown later — exported for parity with design-quality-checker.
 export { CIRCULATION_TYPES };
+
+// ───────────────────────────────────────────────────────────────────────────
+// HONEST SCORE
+// ───────────────────────────────────────────────────────────────────────────
+
+export type HonestGrade = "A" | "B" | "C" | "D" | "F";
+
+export interface HonestScore {
+  score: number;       // 0–100
+  grade: HonestGrade;
+  rationale: string[]; // human-readable contributions ("efficiency 56% → -25")
+}
+
+/**
+ * Phase 1 honest scoring.
+ *
+ * Independent of `design-quality-checker.computeDesignScore` (which only
+ * measures design heuristics like privacy and corridor ratio). This score
+ * REWARDS plot-level fidelity:
+ *   - void / efficiency
+ *   - door coverage
+ *   - orphan rooms (cap penalty so a layout doesn't go negative)
+ *   - area / dim deviation against the user spec
+ *   - adjacency satisfaction
+ *
+ * It collapses the metric severities AND adds a few graded penalties so
+ * "everything just barely passes" doesn't read as 100/100.
+ */
+export function computeHonestScore(metrics: LayoutMetrics): HonestScore {
+  const rationale: string[] = [];
+  let score = 100;
+
+  // Efficiency band — graded, not just on/off.
+  if (metrics.efficiency_pct < 50) {
+    score -= 35;
+    rationale.push(`Efficiency ${metrics.efficiency_pct}% (<50): -35`);
+  } else if (metrics.efficiency_pct < 70) {
+    score -= 20;
+    rationale.push(`Efficiency ${metrics.efficiency_pct}% (<70): -20`);
+  } else if (metrics.efficiency_pct < 80) {
+    score -= 8;
+    rationale.push(`Efficiency ${metrics.efficiency_pct}% (<80): -8`);
+  }
+
+  // Door coverage — a layout where rooms can't be reached is broken.
+  if (metrics.total_rooms > 0) {
+    if (metrics.door_coverage_pct < 60) {
+      score -= 30;
+      rationale.push(`Door coverage ${metrics.door_coverage_pct}% (<60): -30`);
+    } else if (metrics.door_coverage_pct < 80) {
+      score -= 15;
+      rationale.push(`Door coverage ${metrics.door_coverage_pct}% (<80): -15`);
+    } else if (metrics.door_coverage_pct < 95) {
+      score -= 5;
+      rationale.push(`Door coverage ${metrics.door_coverage_pct}% (<95): -5`);
+    }
+  }
+
+  // Orphan rooms — capped at -20 so a single broken room doesn't tank the score.
+  if (metrics.orphan_rooms.length > 0) {
+    const penalty = Math.min(20, metrics.orphan_rooms.length * 5);
+    score -= penalty;
+    rationale.push(`${metrics.orphan_rooms.length} orphan room(s): -${penalty}`);
+  }
+
+  // Voids — a small amount is OK, large voids signal layout failure.
+  if (metrics.void_area_sqft > 600) {
+    score -= 10;
+    rationale.push(`Voids ${metrics.void_area_sqft} sqft (>600): -10`);
+  } else if (metrics.void_area_sqft > 300) {
+    score -= 5;
+    rationale.push(`Voids ${metrics.void_area_sqft} sqft (>300): -5`);
+  }
+
+  // Area fidelity vs user spec.
+  if (metrics.area_deviation_pct > 30) {
+    score -= 10;
+    rationale.push(`Area deviation ${metrics.area_deviation_pct}% (>30): -10`);
+  } else if (metrics.area_deviation_pct > 15) {
+    score -= 5;
+    rationale.push(`Area deviation ${metrics.area_deviation_pct}% (>15): -5`);
+  }
+
+  // Adjacency satisfaction (only if there were any required adjacencies).
+  if (metrics.required_adjacencies > 0) {
+    if (metrics.adjacency_satisfaction_pct < 50) {
+      score -= 12;
+      rationale.push(`Adjacency satisfaction ${metrics.adjacency_satisfaction_pct}% (<50): -12`);
+    } else if (metrics.adjacency_satisfaction_pct < 80) {
+      score -= 6;
+      rationale.push(`Adjacency satisfaction ${metrics.adjacency_satisfaction_pct}% (<80): -6`);
+    }
+  }
+
+  // Dim deviation (only if SPECIFIC prompt with explicit dims).
+  if (metrics.dim_deviations.length > 0) {
+    if (metrics.mean_dim_deviation_pct > 20) {
+      score -= 8;
+      rationale.push(`Mean dim deviation ${metrics.mean_dim_deviation_pct}% (>20): -8`);
+    } else if (metrics.mean_dim_deviation_pct > 10) {
+      score -= 4;
+      rationale.push(`Mean dim deviation ${metrics.mean_dim_deviation_pct}% (>10): -4`);
+    }
+  }
+
+  score = Math.max(0, Math.min(100, Math.round(score)));
+  return { score, grade: gradeFor(score), rationale };
+}
+
+function gradeFor(score: number): HonestGrade {
+  if (score >= 90) return "A";
+  if (score >= 75) return "B";
+  if (score >= 60) return "C";
+  if (score >= 40) return "D";
+  return "F";
+}

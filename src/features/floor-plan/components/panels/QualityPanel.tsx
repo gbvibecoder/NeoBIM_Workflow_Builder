@@ -10,7 +10,7 @@
  */
 import React from "react";
 import { useFloorPlanStore } from "@/features/floor-plan/stores/floor-plan-store";
-import type { QualityFlag, QualitySeverity } from "@/features/floor-plan/lib/layout-metrics";
+import { computeHonestScore, type QualityFlag, type QualitySeverity } from "@/features/floor-plan/lib/layout-metrics";
 
 const SEVERITY_STYLES: Record<QualitySeverity, { bg: string; border: string; text: string; icon: string; label: string }> = {
   critical: { bg: "bg-red-50",   border: "border-red-200",   text: "text-red-800",   icon: "⚠️", label: "Critical" },
@@ -79,8 +79,45 @@ export function QualityPanel() {
     metrics.door_coverage_pct < 95 ? "text-amber-600" :
     "text-green-600";
 
+  const honest = computeHonestScore(metrics);
+  const gradeColor =
+    honest.grade === "A" ? "text-green-600 bg-green-50 border-green-200" :
+    honest.grade === "B" ? "text-emerald-600 bg-emerald-50 border-emerald-200" :
+    honest.grade === "C" ? "text-amber-600 bg-amber-50 border-amber-200" :
+    honest.grade === "D" ? "text-orange-600 bg-orange-50 border-orange-200" :
+    "text-red-600 bg-red-50 border-red-200";
+
   return (
     <div className="px-3 py-3 space-y-3">
+      {/* Phase 1 — Honest Score header */}
+      <div className={`rounded-md border ${gradeColor} px-3 py-2.5 flex items-center gap-3`}>
+        <div className={`text-3xl font-black leading-none ${gradeColor.split(" ")[0]}`}>
+          {honest.grade}
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-baseline gap-1">
+            <span className="text-lg font-bold text-gray-800">{honest.score}</span>
+            <span className="text-[10px] text-gray-500">/ 100 honest score</span>
+          </div>
+          <div className="text-[10px] text-gray-500 leading-tight">
+            Plot fidelity + connectivity + adjacency. Not the design-checks score.
+          </div>
+        </div>
+      </div>
+
+      {honest.rationale.length > 0 && (
+        <details className="rounded-md border border-gray-200 bg-white">
+          <summary className="cursor-pointer px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-gray-500">
+            Score breakdown ({honest.rationale.length})
+          </summary>
+          <div className="border-t border-gray-100 px-3 py-2 space-y-0.5">
+            {honest.rationale.map((line, i) => (
+              <div key={i} className="text-[10px] font-mono text-gray-700">{line}</div>
+            ))}
+          </div>
+        </details>
+      )}
+
       <div>
         <div className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-gray-500">
           Headline metrics
