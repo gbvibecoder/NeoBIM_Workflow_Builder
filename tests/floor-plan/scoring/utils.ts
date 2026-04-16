@@ -29,7 +29,14 @@ export function roomCentroid(room: Room): { x: number; y: number } {
 
 export function projectBbox(project: FloorPlanProject) {
   const floor = project.floors[0];
-  if (!floor || floor.rooms.length === 0) return null;
+  if (!floor) return null;
+  // Prefer the plot boundary (floor.boundary) — matches what the solver was
+  // targeting. Falls back to rooms bbox for legacy projects without a floor
+  // boundary (Pipeline A paths may omit it).
+  if (floor.boundary && floor.boundary.points.length > 0) {
+    return bbox(floor.boundary.points);
+  }
+  if (floor.rooms.length === 0) return null;
   const allPoints: Point[] = floor.rooms.flatMap(r => r.boundary.points);
   return bbox(allPoints);
 }
