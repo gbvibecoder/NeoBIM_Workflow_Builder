@@ -24,6 +24,27 @@ const MIN_PARENT_DEPTH_FT = 7;
 const MIN_CHILD_WIDTH_FT = 4;
 const MIN_CHILD_DEPTH_FT = 4;
 
+/**
+ * Phase 3B fix #3 — sub-room guards.
+ *
+ * The previous carve enumerator handed the child the parent's FULL width
+ * (or depth) on the carve side, which inflated the child far past requested
+ * AND shrank the parent below livable size. Three guards now apply:
+ *   A. Parent area after carve ≥ 70% of parent's requested area.
+ *   B. Child area after carve ≤ 130% of child's requested area.
+ *   C. Parent area after carve > Child area after carve.
+ *
+ * Children are also CLIPPED to their requested dimensions so they don't
+ * stretch across the parent's full edge — the leftover slice becomes a
+ * micro-void that the void-filler reclaims.
+ *
+ * If every carve fails all three guards, the least-bad option (smallest
+ * combined distortion) is accepted with a warning. Better than skipping
+ * the child entirely or letting it cannibalize the parent.
+ */
+const PARENT_MIN_AREA_RATIO = 0.70;
+const CHILD_MAX_AREA_RATIO = 1.30;
+
 type Side = "north" | "south" | "east" | "west";
 
 interface CarveCandidate {
@@ -75,26 +96,64 @@ export function attachSubRooms(input: AttachInput): AttachOutput {
       continue;
     }
 
-    const candidates = enumerateCarves(parent.placed, child, child.is_wet);
-    const feasible = candidates.filter(c =>
+    const candidates = enumerateCarves(parent.placed, child);
+    const feasibleByGeometry = candidates.filter(c =>
       isInside(c.parent, input.plot) &&
       isInside(c.child, input.plot) &&
       !overlapsAny(c.parent, all, parent.id) &&
       !overlapsAny(c.child, all, parent.id, child.id),
     );
-    if (feasible.length === 0) {
+    if (feasibleByGeometry.length === 0) {
       warnings.push(`${child.name}: no feasible carve option from parent ${parent.name} — left unplaced`);
       continue;
     }
 
-    // Prefer the side away from the hallway, then by aspect score.
-    feasible.sort((a, b) => {
-      const aPref = sideAwayFromHallway(facing, parent.placed!, input.spine) === a.side ? 0 : 1;
-      const bPref = sideAwayFromHallway(facing, parent.placed!, input.spine) === b.side ? 0 : 1;
-      if (aPref !== bPref) return aPref - bPref;
-      return a.aspectScore - b.aspectScore;
+    // Apply the three Phase 3B guards.
+    const parentReqArea = parent.requested_area_sqft || (parent.placed.width * parent.placed.depth);
+    const childReqArea  = child.requested_area_sqft  || (child.requested_width_ft * child.requested_depth_ft);
+    const parentMinArea = parentReqArea * PARENT_MIN_AREA_RATIO;
+    const childMaxArea  = childReqArea  * CHILD_MAX_AREA_RATIO;
+
+    const annotated = feasibleByGeometry.map(c => {
+      const pa = c.parent.width * c.parent.depth;
+      const ca = c.child.width * c.child.depth;
+      return {
+        ...c,
+        parentArea: pa,
+        childArea: ca,
+        guardA: pa >= parentMinArea,
+        guardB: ca <= childMaxArea,
+        guardC: pa > ca,
+        // Combined penalty for graceful degradation when no candidate passes:
+        // weighted parent shrinkage + child overgrowth + aspect distortion.
+        penalty:
+          Math.max(0, parentMinArea - pa) / Math.max(1, parentReqArea) * 2 +
+          Math.max(0, ca - childMaxArea) / Math.max(1, childReqArea) +
+          c.aspectScore * 0.3,
+      };
     });
-    const winner = feasible[0];
+
+    const passing = annotated.filter(c => c.guardA && c.guardB && c.guardC);
+    let pool = passing;
+    if (pool.length === 0) {
+      // Graceful degradation: pick the LEAST-violating option, log warning.
+      pool = [...annotated].sort((a, b) => a.penalty - b.penalty).slice(0, 1);
+      warnings.push(
+        `${child.name} attached to ${parent.name}: no carve passes all guards — picked least-bad ` +
+        `(parent ${pool[0].parentArea.toFixed(0)}/${parentReqArea.toFixed(0)} sqft, ` +
+        `child ${pool[0].childArea.toFixed(0)}/${childReqArea.toFixed(0)} sqft)`,
+      );
+    }
+
+    // Prefer the side away from the hallway, then by penalty (lower is better).
+    pool.sort((a, b) => {
+      const awayFrom = sideAwayFromHallway(facing, parent.placed!, input.spine);
+      const aPref = a.side === awayFrom ? 0 : 1;
+      const bPref = b.side === awayFrom ? 0 : 1;
+      if (aPref !== bPref) return aPref - bPref;
+      return a.penalty - b.penalty;
+    });
+    const winner = pool[0];
 
     parent.placed = winner.parent;
     parent.actual_area_sqft = winner.parent.width * winner.parent.depth;
@@ -114,36 +173,43 @@ export function attachSubRooms(input: AttachInput): AttachOutput {
 // CARVE OPTIONS
 // ───────────────────────────────────────────────────────────────────────────
 
-function enumerateCarves(parent: Rect, child: StripPackRoom, _isWet: boolean): CarveCandidate[] {
-  const cw = Math.max(MIN_CHILD_WIDTH_FT, child.requested_width_ft);
-  const cd = Math.max(MIN_CHILD_DEPTH_FT, child.requested_depth_ft);
+function enumerateCarves(parent: Rect, child: StripPackRoom): CarveCandidate[] {
+  const reqW = Math.max(MIN_CHILD_WIDTH_FT, child.requested_width_ft);
+  const reqD = Math.max(MIN_CHILD_DEPTH_FT, child.requested_depth_ft);
   const out: CarveCandidate[] = [];
 
-  // SOUTH: shrink parent on its south edge; child stretches across parent width.
-  if (parent.depth - cd >= MIN_PARENT_DEPTH_FT) {
-    const newParent: Rect = { x: parent.x, y: parent.y + cd, width: parent.width, depth: parent.depth - cd };
-    const newChild:  Rect = { x: parent.x, y: parent.y, width: parent.width, depth: cd };
+  // For SOUTH/NORTH carves the child takes a horizontal slice of depth `cd`.
+  // We CLIP the child's width to its requested width (left-aligned). The
+  // residual (parent.width - child.width) × cd becomes a void to the east
+  // of the child, which the void-filler reclaims in Fix 7.
+  const childWClipped = Math.min(parent.width, reqW);
+  const childDClipped = Math.min(parent.depth, reqD);
+
+  // SOUTH: parent shrinks on its south edge by reqD; child sits in SW corner.
+  if (parent.depth - reqD >= MIN_PARENT_DEPTH_FT) {
+    const newParent: Rect = { x: parent.x, y: parent.y + reqD, width: parent.width, depth: parent.depth - reqD };
+    const newChild:  Rect = { x: parent.x, y: parent.y, width: childWClipped, depth: reqD };
     out.push({ side: "south", parent: newParent, child: newChild, aspectScore: aspectDistortion(parent, newParent) });
   }
 
-  // NORTH: shrink parent on its north edge.
-  if (parent.depth - cd >= MIN_PARENT_DEPTH_FT) {
-    const newParent: Rect = { x: parent.x, y: parent.y, width: parent.width, depth: parent.depth - cd };
-    const newChild:  Rect = { x: parent.x, y: parent.y + parent.depth - cd, width: parent.width, depth: cd };
+  // NORTH: parent shrinks on its north edge; child sits in NW corner.
+  if (parent.depth - reqD >= MIN_PARENT_DEPTH_FT) {
+    const newParent: Rect = { x: parent.x, y: parent.y, width: parent.width, depth: parent.depth - reqD };
+    const newChild:  Rect = { x: parent.x, y: parent.y + parent.depth - reqD, width: childWClipped, depth: reqD };
     out.push({ side: "north", parent: newParent, child: newChild, aspectScore: aspectDistortion(parent, newParent) });
   }
 
-  // EAST: shrink parent on its east edge; child stretches across parent depth.
-  if (parent.width - cw >= MIN_PARENT_WIDTH_FT) {
-    const newParent: Rect = { x: parent.x, y: parent.y, width: parent.width - cw, depth: parent.depth };
-    const newChild:  Rect = { x: parent.x + parent.width - cw, y: parent.y, width: cw, depth: parent.depth };
+  // EAST: parent shrinks on its east edge; child sits in SE corner.
+  if (parent.width - reqW >= MIN_PARENT_WIDTH_FT) {
+    const newParent: Rect = { x: parent.x, y: parent.y, width: parent.width - reqW, depth: parent.depth };
+    const newChild:  Rect = { x: parent.x + parent.width - reqW, y: parent.y, width: reqW, depth: childDClipped };
     out.push({ side: "east", parent: newParent, child: newChild, aspectScore: aspectDistortion(parent, newParent) });
   }
 
-  // WEST: shrink parent on its west edge.
-  if (parent.width - cw >= MIN_PARENT_WIDTH_FT) {
-    const newParent: Rect = { x: parent.x + cw, y: parent.y, width: parent.width - cw, depth: parent.depth };
-    const newChild:  Rect = { x: parent.x, y: parent.y, width: cw, depth: parent.depth };
+  // WEST: parent shrinks on its west edge; child sits in SW corner.
+  if (parent.width - reqW >= MIN_PARENT_WIDTH_FT) {
+    const newParent: Rect = { x: parent.x + reqW, y: parent.y, width: parent.width - reqW, depth: parent.depth };
+    const newChild:  Rect = { x: parent.x, y: parent.y, width: reqW, depth: childDClipped };
     out.push({ side: "west", parent: newParent, child: newChild, aspectScore: aspectDistortion(parent, newParent) });
   }
 
