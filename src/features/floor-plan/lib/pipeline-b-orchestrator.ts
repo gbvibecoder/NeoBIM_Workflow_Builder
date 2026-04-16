@@ -1,21 +1,26 @@
 import type { FloorPlanProject, Floor, Room, Polygon, Point } from "@/types/floor-plan-cad";
 import { parseConstraints, type ParsedConstraints, type ParsedRoom } from "./structured-parser";
 import { detectInfeasibility, type InfeasibilityReport } from "./infeasibility-detector";
+import { solveMandalaCSP, type MandalaAssignment, type CellIdx, cellCoords } from "./csp-solver";
 import { logger } from "@/lib/logger";
 
-export type PipelineBStage = "parse" | "infeasibility" | "stub-placement" | "complete";
+export type PipelineBStage = "parse" | "infeasibility" | "mandala" | "placement" | "complete";
 
 export interface PipelineBResult {
   project: FloorPlanProject | null;
-  pipelineUsed: "B-stub" | "B-unsat";
+  pipelineUsed: "B-mandala" | "B-stub" | "B-unsat";
   relaxationsApplied: string[];
   infeasibilityReason: string | null;
   infeasibilityKind: InfeasibilityReport["kind"] | null;
+  cspConflict: string | null;
+  cspRuleIds: string[];
   constraintsExtracted: number;
   parseAuditAttempts: number;
+  mandalaAssignments: MandalaAssignment[] | null;
   timings: {
     parse_ms: number;
     detector_ms: number;
+    csp_ms: number;
     placement_ms: number;
     total_ms: number;
   };
@@ -68,6 +73,11 @@ function buildStubPolygon(xMm: number, yMm: number, wMm: number, dMm: number): P
   return { points };
 }
 
+function directionFromCell(cell: CellIdx): "N" | "NE" | "E" | "SE" | "S" | "SW" | "W" | "NW" | "CENTER" {
+  const labels = ["NW", "N", "NE", "W", "CENTER", "E", "SW", "S", "SE"] as const;
+  return labels[cell];
+}
+
 function functionToRoomType(fn: string): Room["type"] {
   const map: Record<string, Room["type"]> = {
     bedroom: "bedroom",
@@ -99,52 +109,114 @@ function functionToRoomType(fn: string): Room["type"] {
 }
 
 /**
- * Stub placement: pack rooms in a grid from (0,0) without solving. Renderable
- * but obviously unsolved — purpose is to validate the request->response contract
- * and exercise downstream rendering code before the CSP solver lands.
+ * Mandala placement: each room placed within its CSP-assigned mandala cell.
+ * Plot is divided into a 3x3 grid; each cell holds one or more rooms.
+ * Multiple rooms in the same cell are packed along the cell's width axis
+ * (overlaps possible on single-cell-width rooms — Stage 3B will resolve).
+ *
+ * Falls back to sequential stub packing when assignments is null (pre-CSP).
  */
-function stubPlacementProject(constraints: ParsedConstraints, projectName: string): FloorPlanProject {
-  const sortedRooms = [...constraints.rooms].sort((a, b) => {
-    const [aw, ad] = roomDimsFt(a);
-    const [bw, bd] = roomDimsFt(b);
-    return bw * bd - aw * ad;
-  });
-
+function placementProject(
+  constraints: ParsedConstraints,
+  projectName: string,
+  assignments: MandalaAssignment[] | null,
+): FloorPlanProject {
   const plotWidthFt = constraints.plot.width_ft ?? 50;
+  const plotDepthFt = constraints.plot.depth_ft ?? plotWidthFt;
 
-  let cursorX = 0;
-  let cursorY = 0;
-  let rowMaxDepth = 0;
+  const rooms: Room[] = [];
 
-  const rooms: Room[] = sortedRooms.map((r, idx) => {
-    const [wFt, dFt] = roomDimsFt(r);
-    if (cursorX + wFt > plotWidthFt) {
-      cursorX = 0;
-      cursorY += rowMaxDepth + 1;
-      rowMaxDepth = 0;
+  if (assignments) {
+    // Group rooms by mandala cell
+    const byCell = new Map<CellIdx, { room: ParsedRoom; dims: [number, number] }[]>();
+    const byId = new Map(constraints.rooms.map(r => [r.id, r]));
+    for (const a of assignments) {
+      const room = byId.get(a.room_id);
+      if (!room) continue;
+      const list = byCell.get(a.cell) ?? [];
+      list.push({ room, dims: roomDimsFt(room) });
+      byCell.set(a.cell, list);
     }
-    const xMm = cursorX * FT_TO_MM;
-    const yMm = cursorY * FT_TO_MM;
-    const wMm = wFt * FT_TO_MM;
-    const dMm = dFt * FT_TO_MM;
 
-    cursorX += wFt + 1;
-    rowMaxDepth = Math.max(rowMaxDepth, dFt);
+    const cellWidthFt = plotWidthFt / 3;
+    const cellDepthFt = plotDepthFt / 3;
 
-    const room: Room = {
-      id: r.id || `stub-room-${idx}`,
-      name: r.name,
-      type: functionToRoomType(r.function),
-      boundary: buildStubPolygon(xMm, yMm, wMm, dMm),
-      area_sqm: (wFt * dFt) * 0.092903,
-      perimeter_mm: 2 * (wMm + dMm),
-      natural_light_required: !["bathroom", "master_bathroom", "powder_room", "store", "utility"].includes(r.function),
-      ventilation_required: true,
-      label_position: { x: xMm + wMm / 2, y: yMm + dMm / 2 },
-      wall_ids: [],
-    };
-    return room;
-  });
+    for (const [cellIdx, list] of byCell.entries()) {
+      const { col, row } = cellCoords(cellIdx);
+      const cellOriginXFt = col * cellWidthFt;
+      const cellOriginYFt = row * cellDepthFt;
+
+      // Sort cell's rooms by area descending (bigger anchors the cell)
+      list.sort((a, b) => b.dims[0] * b.dims[1] - a.dims[0] * a.dims[1]);
+
+      let packX = 0;
+      let packY = 0;
+      let rowMax = 0;
+      for (const { room, dims } of list) {
+        const [wFt, dFt] = dims;
+        if (packX + wFt > cellWidthFt && packX > 0) {
+          packX = 0;
+          packY += rowMax + 0.5;
+          rowMax = 0;
+        }
+        const xMm = (cellOriginXFt + packX) * FT_TO_MM;
+        const yMm = (cellOriginYFt + packY) * FT_TO_MM;
+        const wMm = wFt * FT_TO_MM;
+        const dMm = dFt * FT_TO_MM;
+        rooms.push({
+          id: room.id || `room-${rooms.length}`,
+          name: room.name,
+          type: functionToRoomType(room.function),
+          boundary: buildStubPolygon(xMm, yMm, wMm, dMm),
+          area_sqm: wFt * dFt * 0.092903,
+          perimeter_mm: 2 * (wMm + dMm),
+          natural_light_required: !["bathroom", "master_bathroom", "powder_room", "store", "utility"].includes(room.function),
+          ventilation_required: true,
+          label_position: { x: xMm + wMm / 2, y: yMm + dMm / 2 },
+          wall_ids: [],
+          vastu_direction: directionFromCell(cellIdx),
+        });
+        packX += wFt + 0.5;
+        rowMax = Math.max(rowMax, dFt);
+      }
+    }
+  } else {
+    // Legacy stub path (retained for B-unsat fallback visualization)
+    let cursorX = 0;
+    let cursorY = 0;
+    let rowMaxDepth = 0;
+    const sorted = [...constraints.rooms].sort((a, b) => {
+      const [aw, ad] = roomDimsFt(a);
+      const [bw, bd] = roomDimsFt(b);
+      return bw * bd - aw * ad;
+    });
+    for (const r of sorted) {
+      const [wFt, dFt] = roomDimsFt(r);
+      if (cursorX + wFt > plotWidthFt) {
+        cursorX = 0;
+        cursorY += rowMaxDepth + 1;
+        rowMaxDepth = 0;
+      }
+      const xMm = cursorX * FT_TO_MM;
+      const yMm = cursorY * FT_TO_MM;
+      const wMm = wFt * FT_TO_MM;
+      const dMm = dFt * FT_TO_MM;
+      rooms.push({
+        id: r.id || `stub-room-${rooms.length}`,
+        name: r.name,
+        type: functionToRoomType(r.function),
+        boundary: buildStubPolygon(xMm, yMm, wMm, dMm),
+        area_sqm: wFt * dFt * 0.092903,
+        perimeter_mm: 2 * (wMm + dMm),
+        natural_light_required: !["bathroom", "master_bathroom", "powder_room", "store", "utility"].includes(r.function),
+        ventilation_required: true,
+        label_position: { x: xMm + wMm / 2, y: yMm + dMm / 2 },
+        wall_ids: [],
+      });
+      cursorX += wFt + 1;
+      rowMaxDepth = Math.max(rowMaxDepth, dFt);
+    }
+  }
 
   const totalWidthMm = Math.max(...rooms.flatMap(r => r.boundary.points.map(p => p.x)));
   const totalDepthMm = Math.max(...rooms.flatMap(r => r.boundary.points.map(p => p.y)));
@@ -216,6 +288,7 @@ export async function runPipelineB(prompt: string, apiKey: string): Promise<Pipe
   const totalStart = Date.now();
   let parse_ms = 0;
   let detector_ms = 0;
+  let csp_ms = 0;
   let placement_ms = 0;
 
   const parseStart = Date.now();
@@ -233,9 +306,12 @@ export async function runPipelineB(prompt: string, apiKey: string): Promise<Pipe
       relaxationsApplied: [],
       infeasibilityReason: null,
       infeasibilityKind: null,
+      cspConflict: null,
+      cspRuleIds: [],
       constraintsExtracted: 0,
       parseAuditAttempts: 0,
-      timings: { parse_ms, detector_ms: 0, placement_ms: 0, total_ms: Date.now() - totalStart },
+      mandalaAssignments: null,
+      timings: { parse_ms, detector_ms: 0, csp_ms: 0, placement_ms: 0, total_ms: Date.now() - totalStart },
       error: `parser_failed: ${err instanceof Error ? err.message : String(err)}`,
     };
   }
@@ -254,29 +330,66 @@ export async function runPipelineB(prompt: string, apiKey: string): Promise<Pipe
       relaxationsApplied: [],
       infeasibilityReason: infeasibility.reason ?? "infeasible",
       infeasibilityKind: infeasibility.kind ?? null,
+      cspConflict: null,
+      cspRuleIds: [],
       constraintsExtracted: constraints.rooms.length,
       parseAuditAttempts,
-      timings: { parse_ms, detector_ms, placement_ms: 0, total_ms: Date.now() - totalStart },
+      mandalaAssignments: null,
+      timings: { parse_ms, detector_ms, csp_ms: 0, placement_ms: 0, total_ms: Date.now() - totalStart },
       error: null,
     };
   }
+
+  // ── Stage 3A: Mandala CSP ──
+  const cspStart = Date.now();
+  const relaxationsApplied: string[] = [];
+  let solveResult = solveMandalaCSP(constraints);
+  if (!solveResult.feasible && constraints.vastu_required) {
+    logger.debug(`[PIPELINE-B] CSP UNSAT with vastu_required — retrying with vastu relaxed`);
+    relaxationsApplied.push("vastu_required: relaxed (Stage 3A infeasible with Vastu hard rules)");
+    solveResult = solveMandalaCSP(constraints, { vastuRequired: false });
+  }
+  csp_ms = Date.now() - cspStart;
+
+  if (!solveResult.feasible) {
+    logger.debug(`[PIPELINE-B] CSP UNSAT (final): ${solveResult.conflict?.human_reason}`);
+    return {
+      project: null,
+      pipelineUsed: "B-unsat",
+      relaxationsApplied,
+      infeasibilityReason: solveResult.conflict?.human_reason ?? "CSP_UNSAT_STAGE_3A",
+      infeasibilityKind: null,
+      cspConflict: solveResult.conflict?.human_reason ?? null,
+      cspRuleIds: solveResult.conflict?.rule_ids ?? [],
+      constraintsExtracted: constraints.rooms.length,
+      parseAuditAttempts,
+      mandalaAssignments: null,
+      timings: { parse_ms, detector_ms, csp_ms, placement_ms: 0, total_ms: Date.now() - totalStart },
+      error: null,
+    };
+  }
+
+  logger.debug(`[PIPELINE-B] CSP feasible: ${solveResult.assignments.length} mandala assignments in ${solveResult.iterations} iters, ${solveResult.elapsed_ms}ms, vastu_applied=${solveResult.vastu_applied}`);
 
   const placementStart = Date.now();
   const projectName = constraints.plot.facing
     ? `${constraints.plot.facing}-facing plan`
     : "Pipeline B plan";
-  const project = stubPlacementProject(constraints, projectName);
+  const project = placementProject(constraints, projectName, solveResult.assignments);
   placement_ms = Date.now() - placementStart;
 
   return {
     project,
-    pipelineUsed: "B-stub",
-    relaxationsApplied: ["stub-placement: rooms placed without solver — Day 3 skeleton"],
+    pipelineUsed: "B-mandala",
+    relaxationsApplied,
     infeasibilityReason: null,
     infeasibilityKind: null,
+    cspConflict: null,
+    cspRuleIds: [],
     constraintsExtracted: constraints.rooms.length,
     parseAuditAttempts,
-    timings: { parse_ms, detector_ms, placement_ms, total_ms: Date.now() - totalStart },
+    mandalaAssignments: solveResult.assignments,
+    timings: { parse_ms, detector_ms, csp_ms, placement_ms, total_ms: Date.now() - totalStart },
     error: null,
   };
 }
