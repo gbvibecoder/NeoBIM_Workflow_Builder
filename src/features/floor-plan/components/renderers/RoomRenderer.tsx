@@ -65,9 +65,25 @@ function RoomRendererBase({
   }
 
   // ── Labels mode: professional room tags ──
+  // Precompute visible room numbers so labels stay sequential across LOD-hidden
+  // small rooms (bathrooms, wardrobes). Without this, `roomIdx + 1` skips
+  // numbers whenever a smaller room is filtered by minDim < 20.
+  const visibleRoomNumber = new Map<string, number>();
+  {
+    let nextNum = 1;
+    for (const room of rooms) {
+      const rb = polygonBounds(room.boundary.points);
+      const sw = worldToScreenDistance(rb.width, viewport.zoom);
+      const sh = worldToScreenDistance(rb.height, viewport.zoom);
+      if (Math.min(sw, sh) >= 20) {
+        visibleRoomNumber.set(room.id, nextNum++);
+      }
+    }
+  }
+
   return (
     <>
-      {rooms.map((room, roomIdx) => {
+      {rooms.map((room) => {
         const colors = ROOM_COLORS[room.type] ?? ROOM_COLORS.custom;
         const labelScreen = worldToScreen(room.label_position, viewport);
 
@@ -104,7 +120,7 @@ function RoomRendererBase({
         // Room number circle radius
         const circleR = Math.max(6, baseFontSize * 0.65);
         const numFontSize = circleR * 1.2;
-        const roomNum = String(roomIdx + 1);
+        const roomNum = String(visibleRoomNumber.get(room.id) ?? "?");
 
         // Show circle only when there's room for it
         const showCircle = lod === "full" || lod === "compact";
