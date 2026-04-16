@@ -10,9 +10,9 @@
       "audit_findings_messages": [],
       "rooms_count": 15,
       "hallucinated_rooms": [],
-      "constraint_budget_total": 50,
+      "constraint_budget_total": 47,
       "vastu_required": true,
-      "elapsed_ms": 15550,
+      "elapsed_ms": 17550,
       "error": null
     },
     {
@@ -25,9 +25,9 @@
       "audit_findings_messages": [],
       "rooms_count": 13,
       "hallucinated_rooms": [],
-      "constraint_budget_total": 14,
+      "constraint_budget_total": 15,
       "vastu_required": true,
-      "elapsed_ms": 11750,
+      "elapsed_ms": 12206,
       "error": null
     },
     {
@@ -35,14 +35,14 @@
       "prompt_summary": "Spacious 5BHK villa around 3000 sqft, modern open plan, double-height living, at",
       "schema_parse_ok": true,
       "audit_passed": true,
-      "audit_attempts": 2,
+      "audit_attempts": 1,
       "audit_findings_first_attempt": 0,
       "audit_findings_messages": [],
-      "rooms_count": 6,
+      "rooms_count": 12,
       "hallucinated_rooms": [],
-      "constraint_budget_total": 0,
+      "constraint_budget_total": 5,
       "vastu_required": false,
-      "elapsed_ms": 21923,
+      "elapsed_ms": 10312,
       "error": null
     },
     {
@@ -50,14 +50,14 @@
       "prompt_summary": "4BHK on 40ft x 60ft north-facing plot, 2200 sqft, Vastu compliant. Master 16ft x",
       "schema_parse_ok": true,
       "audit_passed": true,
-      "audit_attempts": 2,
+      "audit_attempts": 1,
       "audit_findings_first_attempt": 0,
       "audit_findings_messages": [],
       "rooms_count": 8,
       "hallucinated_rooms": [],
       "constraint_budget_total": 28,
       "vastu_required": true,
-      "elapsed_ms": 16472,
+      "elapsed_ms": 12695,
       "error": null
     },
     {
@@ -65,14 +65,14 @@
       "prompt_summary": "4BHK Vastu compliant, 2000 sqft, plot facing east, kitchen southeast, master sou",
       "schema_parse_ok": true,
       "audit_passed": true,
-      "audit_attempts": 2,
+      "audit_attempts": 1,
       "audit_findings_first_attempt": 0,
       "audit_findings_messages": [],
-      "rooms_count": 5,
+      "rooms_count": 6,
       "hallucinated_rooms": [],
       "constraint_budget_total": 8,
       "vastu_required": true,
-      "elapsed_ms": 12696,
+      "elapsed_ms": 9011,
       "error": null
     },
     {
@@ -83,11 +83,11 @@
       "audit_attempts": 1,
       "audit_findings_first_attempt": 0,
       "audit_findings_messages": [],
-      "rooms_count": 10,
+      "rooms_count": 11,
       "hallucinated_rooms": [],
       "constraint_budget_total": 3,
       "vastu_required": false,
-      "elapsed_ms": 9933,
+      "elapsed_ms": 10241,
       "error": null
     },
     {
@@ -100,9 +100,9 @@
       "audit_findings_messages": [],
       "rooms_count": 6,
       "hallucinated_rooms": [],
-      "constraint_budget_total": 23,
+      "constraint_budget_total": 24,
       "vastu_required": true,
-      "elapsed_ms": 5836,
+      "elapsed_ms": 4969,
       "error": null
     },
     {
@@ -113,11 +113,11 @@
       "audit_attempts": 1,
       "audit_findings_first_attempt": 0,
       "audit_findings_messages": [],
-      "rooms_count": 10,
+      "rooms_count": 9,
       "hallucinated_rooms": [],
-      "constraint_budget_total": 20,
+      "constraint_budget_total": 18,
       "vastu_required": false,
-      "elapsed_ms": 8500,
+      "elapsed_ms": 8424,
       "error": null
     },
     {
@@ -125,14 +125,14 @@
       "prompt_summary": "2BHK 900 sqft Vastu compliant, master southwest, kitchen southeast, north-facing",
       "schema_parse_ok": true,
       "audit_passed": true,
-      "audit_attempts": 2,
+      "audit_attempts": 1,
       "audit_findings_first_attempt": 0,
       "audit_findings_messages": [],
-      "rooms_count": 3,
+      "rooms_count": 4,
       "hallucinated_rooms": [],
       "constraint_budget_total": 8,
       "vastu_required": true,
-      "elapsed_ms": 10137,
+      "elapsed_ms": 4312,
       "error": null
     },
     {
@@ -147,10 +147,10 @@
       "hallucinated_rooms": [],
       "constraint_budget_total": 0,
       "vastu_required": false,
-      "elapsed_ms": 8396,
+      "elapsed_ms": 6051,
       "error": null
     }
   ],
-  "git_sha": "64474cf",
-  "created_at": "2026-04-16T06:21:12.010Z"
+  "git_sha": "c2db13d",
+  "created_at": "2026-04-16T06:44:57.403Z"
 }

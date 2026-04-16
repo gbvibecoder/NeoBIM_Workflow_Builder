@@ -66,20 +66,14 @@ describe("Pipeline B Parser Validation", () => {
 
         const elapsed_ms = Date.now() - start;
 
-        let hallucinated: string[] = [];
-        if (result) {
-          const promptLower = expectation.prompt.toLowerCase();
-          for (const room of result.constraints.rooms) {
-            const forms = getSurfaceForms(room.function);
-            const matched = forms.some(f => {
-              const pat = f.requires_word_boundary
-                ? new RegExp(`\\b${f.text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i")
-                : new RegExp(f.text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
-              return pat.test(promptLower);
-            });
-            if (!matched) hallucinated.push(`${room.name} (${room.function})`);
-          }
-        }
+        // Hallucination = audit's room_no_surface_form findings on the FINAL
+        // parsed output (after BHK allowance and subtype fallback). Aligns with
+        // the user's success criterion "verified against vocabulary".
+        const hallucinated: string[] = result
+          ? result.audit.findings
+              .filter(f => f.kind === "room_no_surface_form")
+              .map(f => f.message.replace(/^Room "/, "").split('"')[0])
+          : [];
 
         reports.push({
           id: expectation.id,
@@ -90,7 +84,9 @@ describe("Pipeline B Parser Validation", () => {
           audit_findings_first_attempt: result && result.audit_attempts === 1
             ? result.audit.findings.length
             : (result?.audit.findings.length ?? 0),
-          audit_findings_messages: result?.audit.findings.map(f => `[${f.kind}] ${f.message}`) ?? [],
+          audit_findings_messages: result?.audit_attempts === 1
+            ? []
+            : result?.first_attempt_findings.map(f => `[${f.kind}] ${f.message}`) ?? [],
           rooms_count: result?.constraints.rooms.length ?? 0,
           hallucinated_rooms: hallucinated,
           constraint_budget_total: result?.constraints.constraint_budget.total ?? 0,

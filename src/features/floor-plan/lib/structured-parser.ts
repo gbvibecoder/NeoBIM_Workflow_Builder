@@ -1,7 +1,8 @@
 import { getClient } from "@/features/ai/services/openai";
 import { logger } from "@/lib/logger";
 import { auditConstraints, summarizeFindings, type AuditResult } from "./parser-audit";
-import type { RoomFunction } from "./room-vocabulary";
+import { getSurfaceForms, type RoomFunction } from "./room-vocabulary";
+import { findRoomAnchors, dimNearAnchors, positionNearAnchors } from "./parser-text-utils";
 
 export const PARSER_MODEL = "gpt-4o-2024-08-06";
 export const PARSER_TEMPERATURE = 0;
@@ -82,21 +83,24 @@ export interface ParsedConstraints {
 export interface ParseResult {
   constraints: ParsedConstraints;
   audit: AuditResult;
+  first_attempt_findings: AuditResult["findings"];
   audit_attempts: number;
   raw_response: string;
   parser_model: string;
 }
 
-export const PARSER_SYSTEM_PROMPT = `You are a constraint extractor, not a designer. Your only job is to convert the user's prompt into a structured JSON object that lists what the user *explicitly stated*. You make zero design decisions.
+export const PARSER_SYSTEM_PROMPT = `You are a constraint extractor, not a designer. Your only job is to convert the user's prompt into a structured JSON object that lists what the user wrote. You make zero design decisions.
 
 HARD RULES:
 1. Do NOT add any room the user did not name. If the user said "bungalow" — do NOT add a verandah, porch, foyer, or staircase unless they wrote that word.
-2. Do NOT infer dimensions. If the user did not give a dimension, set dim_width_ft: null, dim_depth_ft: null, user_explicit_dims: false.
-3. Do NOT infer zones or directions for rooms the user didn't position. Set position_type: "unspecified", position_direction: null, user_explicit_position: false.
+2. Extract dimensions only if the user gave them. If the user did not give a dimension for a room, set dim_width_ft: null and dim_depth_ft: null.
+3. Extract positions only if the user gave them. If the user did not position a room, set position_type: "unspecified" and position_direction: null.
 4. Do NOT consolidate, merge, or rename rooms. "Walk-in Wardrobe" stays "Walk-in Wardrobe". Never output "Walk-in Closet" if the user wrote "wardrobe". Never split "open-plan living-dining" into two rooms.
 5. If the user mentions Vastu/Vaastu anywhere, set vastu_required: true.
 6. Convert all dimensions to feet. 9 inches = 0.75 ft. Always include internal_walls_ft and external_walls_ft if user gives them.
 7. Each room id is a slug like "bed-master", "bath-1", "kitchen", "living". Stable across the document. attached_to_room_id and adjacency_pairs reference these ids.
+
+You DO NOT emit user_explicit_dims or user_explicit_position fields. A separate deterministic post-processor sets those flags by checking your output against the original prompt text. Just emit dim_width_ft / dim_depth_ft / position_direction values when the user provides them, and leave them null when they don't.
 
 DIRECTION EXTRACTION EXAMPLES:
 - "in the southwest corner" → position_type: "corner", position_direction: "SW"
@@ -134,7 +138,7 @@ If you find yourself wanting to add a room "for completeness" — DO NOT. Output
 
 BHK SHORTHAND (Indian usage): "NBHK" or "N BHK" means N bedrooms + 1 hall (living) + 1 kitchen. When you see "4BHK", you may emit 4 bedroom-class rooms (one master_bedroom + three bedroom) PLUS 1 living + 1 kitchen, even if not individually named — this is established meaning, not invention. But:
 - The room.name field for these implicit rooms should be "Master Bedroom", "Bedroom 2", "Bedroom 3", etc.
-- Set user_explicit_dims: false and user_explicit_position: false unless the prompt also gives dims/positions
+- Leave dim_width_ft / dim_depth_ft / position_direction null unless the prompt explicitly states them
 - DO NOT add bathrooms unless the prompt mentions them (Indian BHK does not strictly include bath count)
 
 NEVER CREATE A ROOM FROM THE BUILDING TYPE: "5BHK Villa", "3BHK Apartment", "Penthouse", "Bungalow" describe the project, not a room. Never emit a room whose name is the building type. plot.shape and plot.facing capture project-level context.`;
@@ -166,7 +170,6 @@ const SCHEMA = {
           "position_type", "position_direction", "attached_to_room_id",
           "must_have_window_on", "external_walls_ft", "internal_walls_ft",
           "doors", "windows", "is_wet", "is_sacred", "is_circulation",
-          "user_explicit_dims", "user_explicit_position",
         ],
         properties: {
           id: { type: "string" },
@@ -218,8 +221,6 @@ const SCHEMA = {
           is_wet: { type: "boolean" },
           is_sacred: { type: "boolean" },
           is_circulation: { type: "boolean" },
-          user_explicit_dims: { type: "boolean" },
-          user_explicit_position: { type: "boolean" },
         },
       },
     },
@@ -297,8 +298,36 @@ async function callParser(
 
   const raw = completion.choices[0]?.message?.content;
   if (!raw) throw new Error("Parser returned empty response");
-  const constraints = JSON.parse(raw) as ParsedConstraints;
-  return { constraints, raw };
+  const parsed = JSON.parse(raw) as ParsedConstraints;
+  for (const room of parsed.rooms) {
+    room.user_explicit_dims = false;
+    room.user_explicit_position = false;
+  }
+  inferExplicitFlags(parsed, prompt);
+  return { constraints: parsed, raw };
+}
+
+/**
+ * Deterministically set user_explicit_dims and user_explicit_position by
+ * checking the original prompt text against each room's anchors. Replaces
+ * the model's prior self-judged flags, which were unreliable on vague prompts.
+ */
+export function inferExplicitFlags(constraints: ParsedConstraints, originalPrompt: string): void {
+  const promptLower = originalPrompt.toLowerCase();
+  for (const room of constraints.rooms) {
+    const forms = getSurfaceForms(room.function as RoomFunction);
+    const m = findRoomAnchors(promptLower, room.name, forms);
+
+    room.user_explicit_dims =
+      room.dim_width_ft != null && room.dim_depth_ft != null
+        ? dimNearAnchors(originalPrompt, room.dim_width_ft, room.dim_depth_ft, m.anchor_positions)
+        : false;
+
+    room.user_explicit_position =
+      room.position_direction != null
+        ? positionNearAnchors(originalPrompt, room.position_direction, m.anchor_positions)
+        : false;
+  }
 }
 
 export async function parseConstraints(
@@ -315,6 +344,7 @@ export async function parseConstraints(
     return {
       constraints: first.constraints,
       audit: firstAudit,
+      first_attempt_findings: [],
       audit_attempts: 1,
       raw_response: first.raw,
       parser_model: PARSER_MODEL,
@@ -329,6 +359,7 @@ export async function parseConstraints(
   return {
     constraints: second.constraints,
     audit: secondAudit,
+    first_attempt_findings: firstAudit.findings,
     audit_attempts: 2,
     raw_response: second.raw,
     parser_model: PARSER_MODEL,
