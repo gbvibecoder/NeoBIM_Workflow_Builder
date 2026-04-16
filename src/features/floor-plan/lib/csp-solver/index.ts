@@ -6,6 +6,8 @@ export { alignBoundaries } from "./boundary-aligner";
 export type { AlignmentResult } from "./boundary-aligner";
 export { generateWalls } from "./wall-generator";
 export type { WallGenOptions } from "./wall-generator";
+export { placeOpenings } from "./opening-placer";
+export type { OpeningResult } from "./opening-placer";
 export type { ConflictSet } from "./unsat-explainer";
 export type { Rect } from "./geometry-utils";
 export {
