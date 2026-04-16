@@ -92,6 +92,10 @@ export interface Stage3BOptions {
   timeLimitMs?: number;
   slackFt?: number;
   dimToleranceFactor?: number;
+  /** Phase 7: disable connects_all edge-share enforcement. Used by the final
+   * relaxation escalation when tight plots can't satisfy full hub-and-spoke.
+   */
+  disableConnectsAll?: boolean;
 }
 
 export interface Stage3BResult {
@@ -440,10 +444,12 @@ function orderValues(
 
 // ── Main solver ──
 
+type FullStage3BOptions = Required<Omit<Stage3BOptions, "disableConnectsAll">> & { disableConnectsAll: boolean };
+
 function tryOnce(
   constraints: ParsedConstraints,
   mandalaAssignments: MandalaAssignment[],
-  options: Required<Stage3BOptions>,
+  options: FullStage3BOptions,
 ): Stage3BResult {
   const startTime = Date.now();
   const plotW = constraints.plot.width_ft ?? 50;
@@ -607,10 +613,12 @@ function tryOnce(
               };
               dead = true;
             } else {
-              const connects = pruneConnectsAll(
-                ordered.filter(o => !assigned.has(o.id)),
-                placedRects, assigned, constraints.connects_all_groups, v.id,
-              );
+              const connects = options.disableConnectsAll
+                ? { prunedBy: new Map<string, number[]>(), deadVarId: null }
+                : pruneConnectsAll(
+                    ordered.filter(o => !assigned.has(o.id)),
+                    placedRects, assigned, constraints.connects_all_groups, v.id,
+                  );
               relationalResults.push(connects);
               if (connects.deadVarId) {
                 wdeg.set(connects.deadVarId, (wdeg.get(connects.deadVarId) ?? 0) + 1);
@@ -691,9 +699,11 @@ export function solveStage3B(
   const timeLimitMs = options.timeLimitMs ?? DEFAULT_TIME_LIMIT_MS;
   const relaxations: string[] = [];
 
-  // Try 1: default slack
+  const baseOpts = { timeLimitMs, disableConnectsAll: false };
+
+  // Try 1: default slack, full constraints
   let res = tryOnce(constraints, mandalaAssignments, {
-    timeLimitMs, slackFt: options.slackFt ?? DEFAULT_SLACK_FT, dimToleranceFactor: options.dimToleranceFactor ?? DIM_TOLERANCE,
+    ...baseOpts, slackFt: options.slackFt ?? DEFAULT_SLACK_FT, dimToleranceFactor: options.dimToleranceFactor ?? DIM_TOLERANCE,
   });
   if (res.feasible) {
     logger.debug(`[CSP-3B] feasible on first try: ${res.placements.length} rooms in ${res.elapsed_ms}ms`);
@@ -703,7 +713,7 @@ export function solveStage3B(
   // Try 2: larger slack
   relaxations.push("slack_ft: 2.0 -> 5.0 (mandala cell boundaries expanded)");
   res = tryOnce(constraints, mandalaAssignments, {
-    timeLimitMs, slackFt: 5.0, dimToleranceFactor: options.dimToleranceFactor ?? DIM_TOLERANCE,
+    ...baseOpts, slackFt: 5.0, dimToleranceFactor: options.dimToleranceFactor ?? DIM_TOLERANCE,
   });
   if (res.feasible) {
     logger.debug(`[CSP-3B] feasible with slack=5: ${res.placements.length} rooms in ${res.elapsed_ms}ms`);
@@ -722,11 +732,24 @@ export function solveStage3B(
     }),
   };
   res = tryOnce(shrunkConstraints, mandalaAssignments, {
-    timeLimitMs, slackFt: 5.0, dimToleranceFactor: 0.1,
+    ...baseOpts, slackFt: 5.0, dimToleranceFactor: 0.1,
   });
   if (res.feasible) {
     logger.debug(`[CSP-3B] feasible with dim-shrink: ${res.placements.length} rooms in ${res.elapsed_ms}ms`);
     return { ...res, relaxations_applied: relaxations };
+  }
+
+  // Try 4 (Phase 7): disable connects_all hard enforcement — hallway may not
+  // share edges with every connected room, but the layout will at least exist.
+  if (constraints.connects_all_groups.length > 0) {
+    relaxations.push("connects_all: disabled (hub-and-spoke edge-share requirement dropped — tight plot)");
+    res = tryOnce(shrunkConstraints, mandalaAssignments, {
+      timeLimitMs, slackFt: 5.0, dimToleranceFactor: 0.1, disableConnectsAll: true,
+    });
+    if (res.feasible) {
+      logger.debug(`[CSP-3B] feasible with connects_all disabled: ${res.placements.length} rooms in ${res.elapsed_ms}ms`);
+      return { ...res, relaxations_applied: relaxations };
+    }
   }
 
   return { ...res, relaxations_applied: relaxations };
