@@ -20,6 +20,7 @@
  */
 import type { DoorPlacement, Facing, Rect, SpineLayout, StripPackRoom, WallSegment } from "./types";
 import { feq } from "./types";
+import { HALLWAY_SENTINEL_ID } from "./wall-builder";
 
 const DEFAULT_DOOR_WIDTH_FT = 3;
 const NARROW_DOOR_WIDTH_FT = 2.5;
@@ -89,12 +90,18 @@ export function placeDoors(input: DoorPlaceInput): DoorPlaceOutput {
       continue;
     }
     const otherId = wall.room_ids.find(id => id !== room.id) ?? "neighbor";
-    const otherName = roomById.get(otherId)?.name ?? "neighbor";
+    const otherName = otherId === HALLWAY_SENTINEL_ID
+      ? "hallway"
+      : roomById.get(otherId)?.name ?? "neighbor";
     const door = makeDoorOnWall(wall, [room.name, otherName], DEFAULT_DOOR_WIDTH_FT, warnings);
     if (door) {
       doors.push(door);
       servedRooms.add(room.id);
-      warnings.push(`${room.name}: door fallback to ${otherName} (no hallway adjacency)`);
+      // Don't tag as a "fallback" warning when we still ended up on the
+      // hallway — that's the desired outcome.
+      if (otherName !== "hallway") {
+        warnings.push(`${room.name}: door fallback to ${otherName} (no hallway adjacency)`);
+      }
     }
   }
 
@@ -132,11 +139,32 @@ function findInternalWallBetween(walls: WallSegment[], aId: string, bId: string)
   return null;
 }
 
+/**
+ * Phase 3B fix #4 — find any wall whose owner-set includes BOTH this room
+ * AND the hallway sentinel. The wall-builder now keeps HALLWAY_SENTINEL_ID
+ * in WallSegment.room_ids precisely so this check is robust on both sides
+ * of the spine. The fallback (geometric isOnSpineEdge check against rooms
+ * with HALLWAY-only walls — e.g. when an entire spine edge ended up with
+ * empty real owners) is still applied as a safety net.
+ */
 function findHallwayWallFor(walls: WallSegment[], spine: SpineLayout, roomId: string): WallSegment | null {
-  // A "hallway-bordering" wall has its line on one of the 4 edges of the
-  // spine rectangle AND its owner-set contains the room.
   let best: WallSegment | null = null;
   let bestLen = 0;
+  for (const w of walls) {
+    if (w.type !== "internal") continue;
+    const ownsRoom = w.room_ids.includes(roomId);
+    const ownsHallway = w.room_ids.includes(HALLWAY_SENTINEL_ID);
+    if (!ownsRoom || !ownsHallway) continue;
+    const len = wallLength(w);
+    if (len > bestLen) {
+      bestLen = len;
+      best = w;
+    }
+  }
+  if (best) return best;
+
+  // Geometric fallback: a wall on the spine edge whose owner-set contains
+  // the room (covers any case where wall-builder dropped the hallway tag).
   for (const w of walls) {
     if (w.type !== "internal") continue;
     if (!w.room_ids.includes(roomId)) continue;
@@ -156,7 +184,11 @@ function findAnyInternalWallFor(walls: WallSegment[], roomId: string): WallSegme
   for (const w of walls) {
     if (w.type !== "internal") continue;
     if (!w.room_ids.includes(roomId)) continue;
-    if (w.room_ids.length < 2) continue; // need a neighbor
+    // Need at least one OTHER owner besides this room. The other owner may
+    // be a real room id or HALLWAY_SENTINEL_ID — either is acceptable as a
+    // door target.
+    const others = w.room_ids.filter(id => id !== roomId);
+    if (others.length === 0) continue;
     const len = wallLength(w);
     if (len > bestLen) {
       bestLen = len;

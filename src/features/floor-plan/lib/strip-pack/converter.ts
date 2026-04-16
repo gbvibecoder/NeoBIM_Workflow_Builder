@@ -228,6 +228,9 @@ function rectToPolygon(rect: Rect): Polygon {
 function buildWallObjects(segments: WallSegment[], rooms: Room[]): Wall[] {
   const roomIdSet = new Set(rooms.map(r => r.id));
   return segments.map((seg): Wall => {
+    // Phase 3B fix #4: WallSegment.room_ids may include HALLWAY_SENTINEL_ID
+    // (which IS a room — the corridor — and is in roomIdSet). Just trust the
+    // owner set, but cap at 2 owners for left/right slots.
     const owners = seg.room_ids.filter(id => roomIdSet.has(id));
     const start = { x: seg.start.x * FT_TO_MM, y: seg.start.y * FT_TO_MM };
     const end   = { x: seg.end.x   * FT_TO_MM, y: seg.end.y   * FT_TO_MM };

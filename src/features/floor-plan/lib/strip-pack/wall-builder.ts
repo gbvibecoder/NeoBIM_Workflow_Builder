@@ -26,7 +26,16 @@ import {
   feq,
 } from "./types";
 
-const HALLWAY_ID = "_HALLWAY_";
+/**
+ * Sentinel id used for walls bordering the hallway spine. Kept in the
+ * WallSegment.room_ids field so the door-placer (Fix 4) can identify
+ * room↔hallway walls without re-running geometry checks. The converter
+ * filters this sentinel out when emitting Wall.left_room_id /
+ * Wall.right_room_id, so it never leaks into the FloorPlanProject.
+ */
+export const HALLWAY_SENTINEL_ID = "_HALLWAY_";
+
+const HALLWAY_ID = HALLWAY_SENTINEL_ID;
 
 interface RawEdge {
   axis: "horizontal" | "vertical";
@@ -73,7 +82,10 @@ export function buildWalls(input: WallBuildInput): WallSegment[] {
         end:   { x: seg.b, y: seg.k },
         thickness_ft: classifyThickness(seg.owners, isOnPlot),
         type: classifyType(seg.owners, isOnPlot),
-        room_ids: seg.owners.filter(o => o !== HALLWAY_ID),
+        // Phase 3B fix #4: keep HALLWAY_SENTINEL_ID in owners so the
+        // door-placer can identify room↔hallway walls. The converter strips
+        // it before emitting Wall.left_room_id / Wall.right_room_id.
+        room_ids: [...seg.owners],
         orientation: "horizontal",
       });
     }
@@ -90,7 +102,10 @@ export function buildWalls(input: WallBuildInput): WallSegment[] {
         end:   { x: seg.k, y: seg.b },
         thickness_ft: classifyThickness(seg.owners, isOnPlot),
         type: classifyType(seg.owners, isOnPlot),
-        room_ids: seg.owners.filter(o => o !== HALLWAY_ID),
+        // Phase 3B fix #4: keep HALLWAY_SENTINEL_ID in owners so the
+        // door-placer can identify room↔hallway walls. The converter strips
+        // it before emitting Wall.left_room_id / Wall.right_room_id.
+        room_ids: [...seg.owners],
         orientation: "vertical",
       });
     }
