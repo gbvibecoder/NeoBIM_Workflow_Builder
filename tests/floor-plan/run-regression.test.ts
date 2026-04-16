@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeAll } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
 import { execSync } from "node:child_process";
@@ -6,6 +6,22 @@ import { NextRequest } from "next/server";
 import { REGRESSION_PROMPTS } from "./regression-prompts";
 import { scoreAll } from "./scoring";
 import type { PromptResult, SnapshotFile } from "./types";
+
+// FLAG 1 mitigation: tests/setup.ts mocks OPENAI_API_KEY to a fake value,
+// forcing programRoomsFallback (regex). To exercise the real AI pipeline,
+// set OPENAI_API_KEY_REAL to a real sk- key in the environment. This
+// beforeAll runs AFTER the global setup, so the override sticks.
+beforeAll(() => {
+  const real = process.env.OPENAI_API_KEY_REAL;
+  if (real && real.startsWith("sk-")) {
+    process.env.OPENAI_API_KEY = real;
+    // eslint-disable-next-line no-console
+    console.log("[harness] OPENAI_API_KEY_REAL detected — exercising real AI pipeline");
+  } else {
+    // eslint-disable-next-line no-console
+    console.log("[harness] OPENAI_API_KEY_REAL not set — using mock key (regex fallback path)");
+  }
+});
 
 vi.mock("@/lib/auth", () => ({
   auth: () =>
