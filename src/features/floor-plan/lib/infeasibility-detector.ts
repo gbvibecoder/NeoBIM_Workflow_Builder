@@ -6,11 +6,27 @@ export type InfeasibilityKind =
   | "POSITION_CONFLICT"
   | "VASTU_CONFLICT";
 
+/**
+ * Non-blocking signals from the detector. Warnings DO NOT cause a 422 — the
+ * pipeline still runs. They are surfaced through the API response so the
+ * client UI can show them alongside layoutMetrics quality flags.
+ */
+export type InfeasibilityWarningKind = "UNDER_FULL";
+
+export interface InfeasibilityWarning {
+  kind: InfeasibilityWarningKind;
+  severity: "info" | "warning";
+  message: string;
+  details: Record<string, unknown>;
+}
+
 export interface InfeasibilityReport {
   feasible: boolean;
   kind?: InfeasibilityKind;
   reason?: string;
   details?: Record<string, unknown>;
+  /** Non-blocking warnings collected even when feasible=true. */
+  warnings?: InfeasibilityWarning[];
 }
 
 interface HardVastuRule {
@@ -179,11 +195,57 @@ function checkVastuConflict(c: ParsedConstraints): InfeasibilityReport | null {
   return null;
 }
 
+/**
+ * UNDER_FULL — the requested rooms cover much less area than the plot.
+ *
+ * Non-blocking. The pipeline still proceeds; the warning is surfaced through
+ * the API response so the client can disclose the void problem to the user.
+ * This is the exact failure mode behind the investor-demo 5BHK plan
+ * (1528 ft² of rooms in a 2600 ft² plot).
+ */
+const UNDER_FULL_THRESHOLD = 0.65;
+
+function checkAreaUnderfilled(c: ParsedConstraints): InfeasibilityWarning | null {
+  const plotArea = c.plot.total_built_up_sqft
+    ?? (c.plot.width_ft != null && c.plot.depth_ft != null ? c.plot.width_ft * c.plot.depth_ft : null);
+  if (plotArea == null || plotArea <= 0) return null;
+
+  const totalRoomArea = c.rooms.reduce((s, r) => s + roomAreaSqft(r), 0);
+  if (totalRoomArea <= 0) return null;
+
+  const ratio = totalRoomArea / plotArea;
+  if (ratio < UNDER_FULL_THRESHOLD) {
+    const slackSqft = Math.round(plotArea - totalRoomArea);
+    return {
+      kind: "UNDER_FULL",
+      severity: "warning",
+      message: `Room areas total ${Math.round(totalRoomArea)} sqft but plot is ${Math.round(plotArea)} sqft (${Math.round(ratio * 100)}% fill). ${slackSqft} sqft of slack will become voids unless circulation/extra rooms are added.`,
+      details: {
+        plotArea: Math.round(plotArea),
+        totalRoomArea: Math.round(totalRoomArea),
+        ratio: Math.round(ratio * 100) / 100,
+        slack_sqft: slackSqft,
+        threshold: UNDER_FULL_THRESHOLD,
+      },
+    };
+  }
+  return null;
+}
+
 export function detectInfeasibility(c: ParsedConstraints): InfeasibilityReport {
+  // Hard checks first — any one of these returns a blocking report.
   const checks = [checkAreaImpossible, checkRoomTooBig, checkPositionConflict, checkVastuConflict];
   for (const check of checks) {
     const result = check(c);
     if (result) return result;
   }
-  return { feasible: true };
+
+  // Soft checks — collected even on a feasible report.
+  const warnings: InfeasibilityWarning[] = [];
+  const underfill = checkAreaUnderfilled(c);
+  if (underfill) warnings.push(underfill);
+
+  return warnings.length > 0
+    ? { feasible: true, warnings }
+    : { feasible: true };
 }
