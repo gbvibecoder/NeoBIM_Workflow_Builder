@@ -33,6 +33,30 @@ const MIN_ROOM_WIDTH_FT = 4;
 const MIN_ROOM_DEPTH_FT = 4;
 const SMALL_GAP_THRESHOLD_FT = 2;
 
+/**
+ * Phase 3B fix #1 — dimension hard cap on row normalization + slack absorption.
+ *
+ * User dimensions are HARD constraints. Voids are acceptable. So when a row
+ * has a deep room next to a shallow room, we don't stretch the shallow one
+ * past 115% of its requested area to match. We cap and accept a micro-void
+ * above the shallower room (which Fix 7's smart void handler will deal with).
+ */
+const AREA_CAP_RATIO_ROW = 1.15;
+
+/** Maximum depth a room may take in row-depth normalization, capped to 115%
+ *  of its requested area at its current width. Returns +Infinity when the
+ *  room has no requested area to anchor against. */
+function maxAllowedDepthFor(room: StripPackRoom, currentWidth: number): number {
+  if (room.requested_area_sqft <= 0 || currentWidth <= 0) return Infinity;
+  return (room.requested_area_sqft * AREA_CAP_RATIO_ROW) / currentWidth;
+}
+
+/** Maximum width a room may take in slack absorption. Same cap rationale. */
+function maxAllowedWidthFor(room: StripPackRoom, currentDepth: number): number {
+  if (room.requested_area_sqft <= 0 || currentDepth <= 0) return Infinity;
+  return (room.requested_area_sqft * AREA_CAP_RATIO_ROW) / currentDepth;
+}
+
 export interface PackInput {
   /** Available rectangles in CANONICAL coords. Packer fills them in given order. */
   available: Rect[];
@@ -210,44 +234,58 @@ function placeAt(room: StripPackRoom, x: number, y: number, w: number, d: number
 function finalizeRow(row: RowState, rect: Rect): void {
   if (row.rooms.length === 0) return;
 
-  // 1. Normalize depth — give all rooms the row's max depth.
+  // ── 1. Normalize depth (CAPPED). ────────────────────────────────────────
+  // Each room takes min(row.depth, area-cap-derived-depth). A room shorter
+  // than the row leaves a micro-void above it (handled by void-filler),
+  // but never blows up past 115% of the user's requested area.
   for (const r of row.rooms) {
-    if (r.placed) {
-      r.placed.depth = row.depth;
-      r.actual_area_sqft = r.placed.width * r.placed.depth;
-    }
+    if (!r.placed) continue;
+    const cap = maxAllowedDepthFor(r, r.placed.width);
+    r.placed.depth = Math.min(row.depth, cap);
+    r.actual_area_sqft = r.placed.width * r.placed.depth;
   }
 
-  // 2. Absorb right-edge slack.
-  const slack = row.remainingWidth;
+  // ── 2. Absorb right-edge slack (CAPPED, may leave residual). ────────────
+  let slack = row.remainingWidth;
   if (slack <= 0.001) return;
 
   if (slack < SMALL_GAP_THRESHOLD_FT) {
-    // Small slack — stretch the last room.
+    // Small slack — try to stretch the last room, but only within its cap.
     const last = row.rooms[row.rooms.length - 1];
-    if (last.placed) {
-      last.placed.width += slack;
+    if (last?.placed) {
+      const cap = maxAllowedWidthFor(last, last.placed.depth);
+      const allowed = Math.max(0, cap - last.placed.width);
+      const grow = Math.min(slack, allowed);
+      last.placed.width += grow;
       last.actual_area_sqft = last.placed.width * last.placed.depth;
+      slack -= grow;
     }
-    row.remainingWidth = 0;
+    row.remainingWidth = slack;
+    // Any residual slack stays as a thin strip on the right — void-filler
+    // (Fix 7) will reclaim it.
     return;
   }
 
-  // Larger slack — stretch the WIDEST room (best for aspect-ratio).
-  let widest = row.rooms[0];
-  for (const r of row.rooms) {
-    if ((r.placed?.width ?? 0) > (widest.placed?.width ?? 0)) widest = r;
-  }
-  if (widest.placed) {
-    const widestIdx = row.rooms.indexOf(widest);
-    widest.placed.width += slack;
-    widest.actual_area_sqft = widest.placed.width * widest.placed.depth;
-    // Shift every room after `widest` by `slack` to keep them contiguous.
-    for (let i = widestIdx + 1; i < row.rooms.length; i++) {
-      const r = row.rooms[i];
-      if (r.placed) r.placed.x += slack;
+  // Larger slack — try every room widest-first, stopping when slack is gone
+  // or every candidate is at its cap.
+  const ranked = [...row.rooms].sort((a, b) => (b.placed?.width ?? 0) - (a.placed?.width ?? 0));
+  for (const r of ranked) {
+    if (slack <= 0.001) break;
+    if (!r.placed) continue;
+    const cap = maxAllowedWidthFor(r, r.placed.depth);
+    const allowed = Math.max(0, cap - r.placed.width);
+    if (allowed <= 0.001) continue;
+    const grow = Math.min(slack, allowed);
+    r.placed.width += grow;
+    r.actual_area_sqft = r.placed.width * r.placed.depth;
+    // Shift every room placed AFTER this one (in row order) rightward by grow.
+    const idxInRow = row.rooms.indexOf(r);
+    for (let i = idxInRow + 1; i < row.rooms.length; i++) {
+      const k = row.rooms[i];
+      if (k.placed) k.placed.x += grow;
     }
+    slack -= grow;
   }
-  row.remainingWidth = 0;
+  row.remainingWidth = slack;
   void rect;
 }
