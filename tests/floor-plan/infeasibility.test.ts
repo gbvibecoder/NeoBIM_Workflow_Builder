@@ -36,6 +36,7 @@ function makeConstraints(rooms: ParsedRoom[], plot: Partial<ParsedConstraints["p
     },
     rooms,
     adjacency_pairs: [],
+    connects_all_groups: [],
     vastu_required: vastu,
     special_features: [],
     constraint_budget: { dimensional: 0, positional: 0, adjacency: 0, vastu: 0, total: 0 },

@@ -41,6 +41,7 @@ function mkConstraints(rooms: ParsedRoom[], facing: ParsedConstraints["plot"]["f
     plot: { width_ft: 40, depth_ft: 40, facing, shape: null, total_built_up_sqft: null },
     rooms,
     adjacency_pairs: pairs,
+    connects_all_groups: [],
     vastu_required: false,
     special_features: [],
     constraint_budget: { dimensional: 0, positional: 0, adjacency: 0, vastu: 0, total: 0 },
@@ -88,7 +89,7 @@ describe("Opening placer (Stage 3D)", () => {
         mkRoom({ id: "b", function: "master_bathroom", attached_to_room_id: "m" }),
       ],
       "N",
-      [{ room_a_id: "m", room_b_id: "b", relationship: "attached_ensuite", user_explicit: true }],
+      [{ room_a_id: "m", room_b_id: "b", relationship: "attached_ensuite", user_explicit: true, direction: null, third_room_id: null }],
     );
     const result = placeOpenings(c, placements, walls, 40, 40);
     const interior = result.doors.filter(d => d.type === "single_swing");
@@ -123,7 +124,7 @@ describe("Opening placer (Stage 3D)", () => {
     const c = mkConstraints(
       [mkRoom({ id: "a" }), mkRoom({ id: "b" })],
       "N",
-      [{ room_a_id: "a", room_b_id: "b", relationship: "door_connects", user_explicit: true }],
+      [{ room_a_id: "a", room_b_id: "b", relationship: "door_connects", user_explicit: true, direction: null, third_room_id: null }],
     );
     const result = placeOpenings(c, placements, walls, 40, 40);
     const betweenAB = result.doors.find(d => d.connects_rooms.includes("a") && d.connects_rooms.includes("b"));

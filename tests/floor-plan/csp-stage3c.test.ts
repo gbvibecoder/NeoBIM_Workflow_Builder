@@ -40,6 +40,7 @@ function makeConstraints(roomIds: string[], userExplicitIds: string[] = []): Par
     plot: { width_ft: 40, depth_ft: 40, facing: null, shape: null, total_built_up_sqft: null },
     rooms: roomIds.map(id => makeRoom(id, userExplicitIds.includes(id))),
     adjacency_pairs: [],
+    connects_all_groups: [],
     vastu_required: false,
     special_features: [],
     constraint_budget: { dimensional: 0, positional: 0, adjacency: 0, vastu: 0, total: 0 },

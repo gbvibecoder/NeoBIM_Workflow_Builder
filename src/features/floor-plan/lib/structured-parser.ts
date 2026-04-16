@@ -47,8 +47,18 @@ export interface ParsedRoom {
 export interface ParsedAdjacency {
   room_a_id: string;
   room_b_id: string;
-  relationship: "shared_wall" | "door_connects" | "attached_ensuite" | "leads_to" | "behind" | "flowing_into";
+  relationship: "shared_wall" | "door_connects" | "attached_ensuite" | "leads_to" | "behind" | "flowing_into" | "between";
   user_explicit: boolean;
+  /** Compass direction from room_a toward room_b, null when not directional. */
+  direction: CompassDirection | null;
+  /** For relationship="between": the third room. A is between B and C. room_a=A, room_b=B, third_room_id=C. */
+  third_room_id: string | null;
+}
+
+export interface ConnectsAllGroup {
+  /** The connector room (hallway/corridor) that shares edges with every connected room. */
+  connector_id: string;
+  connected_room_ids: string[];
 }
 
 export interface ParsedSpecialFeature {
@@ -74,6 +84,7 @@ export interface ParsedConstraints {
   };
   rooms: ParsedRoom[];
   adjacency_pairs: ParsedAdjacency[];
+  connects_all_groups: ConnectsAllGroup[];
   vastu_required: boolean;
   special_features: ParsedSpecialFeature[];
   constraint_budget: ConstraintBudget;
@@ -111,9 +122,28 @@ DIRECTION EXTRACTION EXAMPLES:
 - "north-facing plot" → plot.facing: "N" (NOT a room position)
 
 ATTACHMENT RULES:
-- "attached <X>" or "ensuite <X>" → set attached_to_room_id of X to the parent room's id, and add adjacency_pairs[] with relationship: "attached_ensuite", user_explicit: true.
-- "behind the kitchen" → position_direction: null, but add adjacency_pairs[] with relationship: "behind", room_a_id = utility, room_b_id = kitchen.
+- "attached <X>" or "ensuite <X>" → set attached_to_room_id of X to the parent room's id, and add adjacency_pairs[] with relationship: "attached_ensuite", user_explicit: true, direction: null, third_room_id: null.
+- "behind the kitchen" → position_direction: null, adjacency_pairs[] with relationship: "behind", room_a_id = utility (the room behind), room_b_id = kitchen (the reference room). Set direction: null — a deterministic post-processor infers direction from plot.facing.
 - "flowing east into" / "leads into" → adjacency_pairs[] with relationship: "flowing_into" or "leads_to", user_explicit: true.
+
+DIRECTIONAL ADJACENCY (new in Phase 7):
+- When the prompt explicitly states a cardinal direction between two rooms, SET the direction field on the adjacency_pair:
+  - "dining connecting west from the living room" → { room_a: "dining", room_b: "living", relationship: "leads_to", direction: "W", user_explicit: true }
+  - "kitchen east of living room" → { room_a: "kitchen", room_b: "living", relationship: "leads_to", direction: "E", user_explicit: true }
+  - "bathroom south of the kitchen" → direction: "S"
+- direction is ALWAYS absolute compass ("W" means room_a is west of room_b). Not relative to plot.facing.
+- Leave direction: null when the prompt says only "leads into" / "connects to" without cardinal.
+
+BETWEEN RELATIONSHIPS (new):
+- "A between B and C" → adjacency_pairs[] entry: { room_a_id: A, room_b_id: B, relationship: "between", third_room_id: C, direction: null, user_explicit: true }.
+- Example: "common bathroom sits between bedroom 3 and bedroom 4" →
+  { room_a_id: "bath-common", room_b_id: "bed-3", relationship: "between", third_room_id: "bed-4", user_explicit: true, direction: null }
+
+CONNECTS_ALL GROUPS (new, top-level field):
+- When the prompt says a connector (hallway, corridor, central passage) "connects all bedrooms" or "connects bedrooms X, Y, Z", populate connects_all_groups[] at the top level:
+  { connector_id: "hallway", connected_room_ids: ["bed-master", "bed-2", "bed-3", "bed-4"] }
+- Do NOT also add individual adjacency_pairs for each hallway-bedroom pair — the connects_all_group is authoritative.
+- Leave connects_all_groups as an empty array when no such relationship is stated.
 
 CONSTRAINT BUDGET (count exactly):
 - dimensional: each room with both dim_width_ft and dim_depth_ft set = 2; each with one set = 1
@@ -146,7 +176,7 @@ NEVER CREATE A ROOM FROM THE BUILDING TYPE: "5BHK Villa", "3BHK Apartment", "Pen
 const SCHEMA = {
   type: "object",
   additionalProperties: false,
-  required: ["plot", "rooms", "adjacency_pairs", "vastu_required", "special_features", "constraint_budget", "extraction_notes"],
+  required: ["plot", "rooms", "adjacency_pairs", "connects_all_groups", "vastu_required", "special_features", "constraint_budget", "extraction_notes"],
   properties: {
     plot: {
       type: "object",
@@ -229,15 +259,29 @@ const SCHEMA = {
       items: {
         type: "object",
         additionalProperties: false,
-        required: ["room_a_id", "room_b_id", "relationship", "user_explicit"],
+        required: ["room_a_id", "room_b_id", "relationship", "user_explicit", "direction", "third_room_id"],
         properties: {
           room_a_id: { type: "string" },
           room_b_id: { type: "string" },
           relationship: {
             type: "string",
-            enum: ["shared_wall", "door_connects", "attached_ensuite", "leads_to", "behind", "flowing_into"],
+            enum: ["shared_wall", "door_connects", "attached_ensuite", "leads_to", "behind", "flowing_into", "between"],
           },
           user_explicit: { type: "boolean" },
+          direction: { type: ["string", "null"], enum: ["N", "S", "E", "W", "NE", "NW", "SE", "SW", null] },
+          third_room_id: { type: ["string", "null"] },
+        },
+      },
+    },
+    connects_all_groups: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["connector_id", "connected_room_ids"],
+        properties: {
+          connector_id: { type: "string" },
+          connected_room_ids: { type: "array", items: { type: "string" } },
         },
       },
     },
@@ -303,8 +347,37 @@ async function callParser(
     room.user_explicit_dims = false;
     room.user_explicit_position = false;
   }
+  // Defensive defaults for fields older model snapshots might omit.
+  if (!Array.isArray(parsed.connects_all_groups)) parsed.connects_all_groups = [];
+  for (const adj of parsed.adjacency_pairs) {
+    if (adj.direction === undefined) adj.direction = null;
+    if (adj.third_room_id === undefined) adj.third_room_id = null;
+  }
   inferExplicitFlags(parsed, prompt);
+  inferBehindDirection(parsed);
   return { constraints: parsed, raw };
+}
+
+/**
+ * "Behind" semantics relative to plot.facing. If plot faces E, behind means
+ * further west (away from entrance). This inference runs AFTER the LLM call so
+ * it's deterministic, not dependent on the model's reasoning.
+ */
+const BEHIND_FROM_FACING: Partial<Record<CompassDirection, CompassDirection>> = {
+  N: "S", S: "N", E: "W", W: "E",
+  NE: "SW", NW: "SE", SE: "NW", SW: "NE",
+};
+
+export function inferBehindDirection(constraints: ParsedConstraints): void {
+  const facing = constraints.plot.facing;
+  if (!facing) return;
+  const behindDir = BEHIND_FROM_FACING[facing];
+  if (!behindDir) return;
+  for (const adj of constraints.adjacency_pairs) {
+    if (adj.relationship === "behind" && adj.direction == null) {
+      adj.direction = behindDir;
+    }
+  }
 }
 
 /**

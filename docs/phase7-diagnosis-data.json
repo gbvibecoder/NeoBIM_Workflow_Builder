@@ -1,0 +1,773 @@
+{
+  "prompt": "A single-storey 4BHK residential villa on a 45ft x 55ft east-facing plot with total built-up area of 2200 sq ft. Vastu compliant. The main entrance is a 4ft wide door on the east wall opening into a 10ft x 8ft foyer. The living room is 18ft x 14ft in the northeast with large windows on the north and east walls. The dining room is 12ft x 10ft connecting west from the living room. The kitchen is 12ft x 10ft in the southeast corner with a window on the east wall and a door leading to a 6ft x 5ft utility room behind it. The master bedroom is 15ft x 13ft in the southwest corner with an attached 8ft x 6ft master bathroom and a 6ft x 5ft walk-in wardrobe. Bedroom 2 is 12ft x 11ft in the south with an attached 7ft x 5ft bathroom. Bedroom 3 is 12ft x 10ft in the west with a window on the west wall. Bedroom 4 is 11ft x 10ft in the northwest with a window on the north wall. A common bathroom 6ft x 5ft sits between bedrooms 3 and 4. A pooja room 5ft x 4ft in the northeast corner. A 4ft wide hallway runs east-west connecting all bedrooms. All external walls 9 inches, internal walls 5 inches, all interior doors 3ft wide.",
+  "parser_output": {
+    "plot": {
+      "width_ft": 45,
+      "depth_ft": 55,
+      "facing": "E",
+      "shape": null,
+      "total_built_up_sqft": 2200
+    },
+    "vastu_required": true,
+    "constraint_budget": {
+      "dimensional": 28,
+      "positional": 8,
+      "adjacency": 5,
+      "vastu": 5,
+      "total": 46
+    },
+    "rooms": [
+      {
+        "id": "foyer",
+        "name": "Foyer",
+        "function": "foyer",
+        "dim_width_ft": 10,
+        "dim_depth_ft": 8,
+        "position_type": "unspecified",
+        "position_direction": null,
+        "attached_to_room_id": null,
+        "must_have_window_on": null,
+        "doors": [
+          {
+            "width_ft": 4,
+            "leads_to_room_id": null,
+            "is_main_entrance": true
+          }
+        ],
+        "windows": [],
+        "user_explicit_dims": true,
+        "user_explicit_position": false
+      },
+      {
+        "id": "living",
+        "name": "Living Room",
+        "function": "living",
+        "dim_width_ft": 18,
+        "dim_depth_ft": 14,
+        "position_type": "zone",
+        "position_direction": "NE",
+        "attached_to_room_id": null,
+        "must_have_window_on": null,
+        "doors": [],
+        "windows": [
+          {
+            "wall_direction": "N",
+            "is_large": true
+          },
+          {
+            "wall_direction": "E",
+            "is_large": true
+          }
+        ],
+        "user_explicit_dims": true,
+        "user_explicit_position": true
+      },
+      {
+        "id": "dining",
+        "name": "Dining Room",
+        "function": "dining",
+        "dim_width_ft": 12,
+        "dim_depth_ft": 10,
+        "position_type": "unspecified",
+        "position_direction": null,
+        "attached_to_room_id": null,
+        "must_have_window_on": null,
+        "doors": [],
+        "windows": [],
+        "user_explicit_dims": true,
+        "user_explicit_position": false
+      },
+      {
+        "id": "kitchen",
+        "name": "Kitchen",
+        "function": "kitchen",
+        "dim_width_ft": 12,
+        "dim_depth_ft": 10,
+        "position_type": "corner",
+        "position_direction": "SE",
+        "attached_to_room_id": null,
+        "must_have_window_on": "E",
+        "doors": [
+          {
+            "width_ft": 3,
+            "leads_to_room_id": "utility",
+            "is_main_entrance": false
+          }
+        ],
+        "windows": [
+          {
+            "wall_direction": "E",
+            "is_large": false
+          }
+        ],
+        "user_explicit_dims": true,
+        "user_explicit_position": true
+      },
+      {
+        "id": "utility",
+        "name": "Utility Room",
+        "function": "utility",
+        "dim_width_ft": 6,
+        "dim_depth_ft": 5,
+        "position_type": "unspecified",
+        "position_direction": null,
+        "attached_to_room_id": null,
+        "must_have_window_on": null,
+        "doors": [],
+        "windows": [],
+        "user_explicit_dims": true,
+        "user_explicit_position": false
+      },
+      {
+        "id": "bed-master",
+        "name": "Master Bedroom",
+        "function": "master_bedroom",
+        "dim_width_ft": 15,
+        "dim_depth_ft": 13,
+        "position_type": "corner",
+        "position_direction": "SW",
+        "attached_to_room_id": null,
+        "must_have_window_on": null,
+        "doors": [],
+        "windows": [],
+        "user_explicit_dims": true,
+        "user_explicit_position": true
+      },
+      {
+        "id": "bath-master",
+        "name": "Master Bathroom",
+        "function": "master_bathroom",
+        "dim_width_ft": 8,
+        "dim_depth_ft": 6,
+        "position_type": "unspecified",
+        "position_direction": null,
+        "attached_to_room_id": "bed-master",
+        "must_have_window_on": null,
+        "doors": [],
+        "windows": [],
+        "user_explicit_dims": true,
+        "user_explicit_position": false
+      },
+      {
+        "id": "wardrobe-master",
+        "name": "Walk-in Wardrobe",
+        "function": "walk_in_wardrobe",
+        "dim_width_ft": 6,
+        "dim_depth_ft": 5,
+        "position_type": "unspecified",
+        "position_direction": null,
+        "attached_to_room_id": "bed-master",
+        "must_have_window_on": null,
+        "doors": [],
+        "windows": [],
+        "user_explicit_dims": true,
+        "user_explicit_position": false
+      },
+      {
+        "id": "bed-2",
+        "name": "Bedroom 2",
+        "function": "bedroom",
+        "dim_width_ft": 12,
+        "dim_depth_ft": 11,
+        "position_type": "zone",
+        "position_direction": "S",
+        "attached_to_room_id": null,
+        "must_have_window_on": null,
+        "doors": [],
+        "windows": [],
+        "user_explicit_dims": true,
+        "user_explicit_position": true
+      },
+      {
+        "id": "bath-2",
+        "name": "Bathroom 2",
+        "function": "bathroom",
+        "dim_width_ft": 7,
+        "dim_depth_ft": 5,
+        "position_type": "unspecified",
+        "position_direction": null,
+        "attached_to_room_id": "bed-2",
+        "must_have_window_on": null,
+        "doors": [],
+        "windows": [],
+        "user_explicit_dims": true,
+        "user_explicit_position": false
+      },
+      {
+        "id": "bed-3",
+        "name": "Bedroom 3",
+        "function": "bedroom",
+        "dim_width_ft": 12,
+        "dim_depth_ft": 10,
+        "position_type": "zone",
+        "position_direction": "W",
+        "attached_to_room_id": null,
+        "must_have_window_on": "W",
+        "doors": [],
+        "windows": [
+          {
+            "wall_direction": "W",
+            "is_large": false
+          }
+        ],
+        "user_explicit_dims": true,
+        "user_explicit_position": true
+      },
+      {
+        "id": "bed-4",
+        "name": "Bedroom 4",
+        "function": "bedroom",
+        "dim_width_ft": 11,
+        "dim_depth_ft": 10,
+        "position_type": "zone",
+        "position_direction": "NW",
+        "attached_to_room_id": null,
+        "must_have_window_on": "N",
+        "doors": [],
+        "windows": [
+          {
+            "wall_direction": "N",
+            "is_large": false
+          }
+        ],
+        "user_explicit_dims": true,
+        "user_explicit_position": true
+      },
+      {
+        "id": "bath-common",
+        "name": "Common Bathroom",
+        "function": "bathroom",
+        "dim_width_ft": 6,
+        "dim_depth_ft": 5,
+        "position_type": "unspecified",
+        "position_direction": null,
+        "attached_to_room_id": null,
+        "must_have_window_on": null,
+        "doors": [],
+        "windows": [],
+        "user_explicit_dims": true,
+        "user_explicit_position": false
+      },
+      {
+        "id": "pooja",
+        "name": "Pooja Room",
+        "function": "pooja",
+        "dim_width_ft": 5,
+        "dim_depth_ft": 4,
+        "position_type": "corner",
+        "position_direction": "NE",
+        "attached_to_room_id": null,
+        "must_have_window_on": null,
+        "doors": [],
+        "windows": [],
+        "user_explicit_dims": true,
+        "user_explicit_position": true
+      },
+      {
+        "id": "hallway",
+        "name": "Hallway",
+        "function": "corridor",
+        "dim_width_ft": 4,
+        "dim_depth_ft": null,
+        "position_type": "unspecified",
+        "position_direction": null,
+        "attached_to_room_id": null,
+        "must_have_window_on": null,
+        "doors": [],
+        "windows": [],
+        "user_explicit_dims": false,
+        "user_explicit_position": false
+      }
+    ],
+    "adjacency_pairs": [
+      {
+        "room_a_id": "living",
+        "room_b_id": "dining",
+        "relationship": "leads_to",
+        "user_explicit": true
+      },
+      {
+        "room_a_id": "kitchen",
+        "room_b_id": "utility",
+        "relationship": "behind",
+        "user_explicit": true
+      },
+      {
+        "room_a_id": "bed-master",
+        "room_b_id": "bath-master",
+        "relationship": "attached_ensuite",
+        "user_explicit": true
+      },
+      {
+        "room_a_id": "bed-master",
+        "room_b_id": "wardrobe-master",
+        "relationship": "attached_ensuite",
+        "user_explicit": true
+      },
+      {
+        "room_a_id": "bed-2",
+        "room_b_id": "bath-2",
+        "relationship": "attached_ensuite",
+        "user_explicit": true
+      }
+    ],
+    "special_features": []
+  },
+  "parser_audit": {
+    "attempts": 1,
+    "passed": true,
+    "findings": []
+  },
+  "mandala": [
+    {
+      "room_id": "foyer",
+      "room_name": "Foyer",
+      "function": "foyer",
+      "cell_direction": "NW"
+    },
+    {
+      "room_id": "living",
+      "room_name": "Living Room",
+      "function": "living",
+      "cell_direction": "NE"
+    },
+    {
+      "room_id": "dining",
+      "room_name": "Dining Room",
+      "function": "dining",
+      "cell_direction": "N"
+    },
+    {
+      "room_id": "kitchen",
+      "room_name": "Kitchen",
+      "function": "kitchen",
+      "cell_direction": "SE"
+    },
+    {
+      "room_id": "utility",
+      "room_name": "Utility Room",
+      "function": "utility",
+      "cell_direction": "SE"
+    },
+    {
+      "room_id": "bed-master",
+      "room_name": "Master Bedroom",
+      "function": "master_bedroom",
+      "cell_direction": "SW"
+    },
+    {
+      "room_id": "bath-master",
+      "room_name": "Master Bathroom",
+      "function": "master_bathroom",
+      "cell_direction": "S"
+    },
+    {
+      "room_id": "wardrobe-master",
+      "room_name": "Walk-in Wardrobe",
+      "function": "walk_in_wardrobe",
+      "cell_direction": "W"
+    },
+    {
+      "room_id": "bed-2",
+      "room_name": "Bedroom 2",
+      "function": "bedroom",
+      "cell_direction": "S"
+    },
+    {
+      "room_id": "bath-2",
+      "room_name": "Bathroom 2",
+      "function": "bathroom",
+      "cell_direction": "S"
+    },
+    {
+      "room_id": "bed-3",
+      "room_name": "Bedroom 3",
+      "function": "bedroom",
+      "cell_direction": "W"
+    },
+    {
+      "room_id": "bed-4",
+      "room_name": "Bedroom 4",
+      "function": "bedroom",
+      "cell_direction": "NW"
+    },
+    {
+      "room_id": "bath-common",
+      "room_name": "Common Bathroom",
+      "function": "bathroom",
+      "cell_direction": "S"
+    },
+    {
+      "room_id": "pooja",
+      "room_name": "Pooja Room",
+      "function": "pooja",
+      "cell_direction": "NE"
+    },
+    {
+      "room_id": "hallway",
+      "room_name": "Hallway",
+      "function": "corridor",
+      "cell_direction": "N"
+    }
+  ],
+  "fine_placements": [
+    {
+      "room_id": "foyer",
+      "room_name": "Foyer",
+      "function": "foyer",
+      "mandala_direction": "NW",
+      "x_ft": 7,
+      "y_ft": 11,
+      "width_ft": 10,
+      "depth_ft": 8
+    },
+    {
+      "room_id": "living",
+      "room_name": "Living Room",
+      "function": "living",
+      "mandala_direction": "NE",
+      "x_ft": 27,
+      "y_ft": 4,
+      "width_ft": 18,
+      "depth_ft": 14
+    },
+    {
+      "room_id": "dining",
+      "room_name": "Dining Room",
+      "function": "dining",
+      "mandala_direction": "N",
+      "x_ft": 15,
+      "y_ft": 0,
+      "width_ft": 12,
+      "depth_ft": 10
+    },
+    {
+      "room_id": "kitchen",
+      "room_name": "Kitchen",
+      "function": "kitchen",
+      "mandala_direction": "SE",
+      "x_ft": 33,
+      "y_ft": 45,
+      "width_ft": 12,
+      "depth_ft": 10
+    },
+    {
+      "room_id": "utility",
+      "room_name": "Utility Room",
+      "function": "utility",
+      "mandala_direction": "SE",
+      "x_ft": 34.5,
+      "y_ft": 40,
+      "width_ft": 6,
+      "depth_ft": 5
+    },
+    {
+      "room_id": "bed-master",
+      "room_name": "Master Bedroom",
+      "function": "master_bedroom",
+      "mandala_direction": "SW",
+      "x_ft": 0,
+      "y_ft": 42,
+      "width_ft": 15,
+      "depth_ft": 13
+    },
+    {
+      "room_id": "bath-master",
+      "room_name": "Master Bathroom",
+      "function": "master_bathroom",
+      "mandala_direction": "S",
+      "x_ft": 15,
+      "y_ft": 43,
+      "width_ft": 8,
+      "depth_ft": 6
+    },
+    {
+      "room_id": "wardrobe-master",
+      "room_name": "Walk-in Wardrobe",
+      "function": "walk_in_wardrobe",
+      "mandala_direction": "W",
+      "x_ft": 0,
+      "y_ft": 37,
+      "width_ft": 6,
+      "depth_ft": 5
+    },
+    {
+      "room_id": "bed-2",
+      "room_name": "Bedroom 2",
+      "function": "bedroom",
+      "mandala_direction": "S",
+      "x_ft": 0,
+      "y_ft": 0,
+      "width_ft": 12,
+      "depth_ft": 11
+    },
+    {
+      "room_id": "bath-2",
+      "room_name": "Bathroom 2",
+      "function": "bathroom",
+      "mandala_direction": "S",
+      "x_ft": 0,
+      "y_ft": 11,
+      "width_ft": 7,
+      "depth_ft": 5
+    },
+    {
+      "room_id": "bed-3",
+      "room_name": "Bedroom 3",
+      "function": "bedroom",
+      "mandala_direction": "W",
+      "x_ft": 0,
+      "y_ft": 22.5,
+      "width_ft": 12,
+      "depth_ft": 10
+    },
+    {
+      "room_id": "bed-4",
+      "room_name": "Bedroom 4",
+      "function": "bedroom",
+      "mandala_direction": "NW",
+      "x_ft": 34,
+      "y_ft": 18,
+      "width_ft": 11,
+      "depth_ft": 10
+    },
+    {
+      "room_id": "bath-common",
+      "room_name": "Common Bathroom",
+      "function": "bathroom",
+      "mandala_direction": "S",
+      "x_ft": 23,
+      "y_ft": 43.5,
+      "width_ft": 6,
+      "depth_ft": 5
+    },
+    {
+      "room_id": "pooja",
+      "room_name": "Pooja Room",
+      "function": "pooja",
+      "mandala_direction": "NE",
+      "x_ft": 40,
+      "y_ft": 0,
+      "width_ft": 5,
+      "depth_ft": 4
+    },
+    {
+      "room_id": "hallway",
+      "room_name": "Hallway",
+      "function": "corridor",
+      "mandala_direction": "N",
+      "x_ft": 17,
+      "y_ft": 18,
+      "width_ft": 12,
+      "depth_ft": 4
+    }
+  ],
+  "aligned_placements": [
+    {
+      "room_id": "foyer",
+      "room_name": "Foyer",
+      "x_ft": 7,
+      "y_ft": 11,
+      "width_ft": 10,
+      "depth_ft": 8
+    },
+    {
+      "room_id": "living",
+      "room_name": "Living Room",
+      "x_ft": 27,
+      "y_ft": 4,
+      "width_ft": 18,
+      "depth_ft": 14
+    },
+    {
+      "room_id": "dining",
+      "room_name": "Dining Room",
+      "x_ft": 15,
+      "y_ft": 0,
+      "width_ft": 12,
+      "depth_ft": 10
+    },
+    {
+      "room_id": "kitchen",
+      "room_name": "Kitchen",
+      "x_ft": 33,
+      "y_ft": 45,
+      "width_ft": 12,
+      "depth_ft": 10
+    },
+    {
+      "room_id": "utility",
+      "room_name": "Utility Room",
+      "x_ft": 34.5,
+      "y_ft": 40,
+      "width_ft": 6,
+      "depth_ft": 5
+    },
+    {
+      "room_id": "bed-master",
+      "room_name": "Master Bedroom",
+      "x_ft": 0,
+      "y_ft": 42,
+      "width_ft": 15,
+      "depth_ft": 13
+    },
+    {
+      "room_id": "bath-master",
+      "room_name": "Master Bathroom",
+      "x_ft": 15,
+      "y_ft": 43,
+      "width_ft": 8,
+      "depth_ft": 6
+    },
+    {
+      "room_id": "wardrobe-master",
+      "room_name": "Walk-in Wardrobe",
+      "x_ft": 0,
+      "y_ft": 37,
+      "width_ft": 6,
+      "depth_ft": 5
+    },
+    {
+      "room_id": "bed-2",
+      "room_name": "Bedroom 2",
+      "x_ft": 0,
+      "y_ft": 0,
+      "width_ft": 12,
+      "depth_ft": 11
+    },
+    {
+      "room_id": "bath-2",
+      "room_name": "Bathroom 2",
+      "x_ft": 0,
+      "y_ft": 11,
+      "width_ft": 7,
+      "depth_ft": 5
+    },
+    {
+      "room_id": "bed-3",
+      "room_name": "Bedroom 3",
+      "x_ft": 0,
+      "y_ft": 22.5,
+      "width_ft": 12,
+      "depth_ft": 10
+    },
+    {
+      "room_id": "bed-4",
+      "room_name": "Bedroom 4",
+      "x_ft": 34,
+      "y_ft": 18,
+      "width_ft": 11,
+      "depth_ft": 10
+    },
+    {
+      "room_id": "bath-common",
+      "room_name": "Common Bathroom",
+      "x_ft": 23,
+      "y_ft": 43.5,
+      "width_ft": 6,
+      "depth_ft": 5
+    },
+    {
+      "room_id": "pooja",
+      "room_name": "Pooja Room",
+      "x_ft": 40,
+      "y_ft": 0,
+      "width_ft": 5,
+      "depth_ft": 4
+    },
+    {
+      "room_id": "hallway",
+      "room_name": "Hallway",
+      "x_ft": 17,
+      "y_ft": 18,
+      "width_ft": 12,
+      "depth_ft": 4
+    }
+  ],
+  "alignment_warnings": [],
+  "walls_count": 72,
+  "walls_sample": [
+    {
+      "id": "wall-0",
+      "type": "interior",
+      "start": {
+        "x": 0,
+        "y": 3352.8
+      },
+      "end": {
+        "x": 2133.6,
+        "y": 3352.8
+      }
+    },
+    {
+      "id": "wall-1",
+      "type": "interior",
+      "start": {
+        "x": 2133.6,
+        "y": 3352.8
+      },
+      "end": {
+        "x": 3657.6000000000004,
+        "y": 3352.8
+      }
+    },
+    {
+      "id": "wall-2",
+      "type": "interior",
+      "start": {
+        "x": 3657.6000000000004,
+        "y": 3352.8
+      },
+      "end": {
+        "x": 5181.6,
+        "y": 3352.8
+      }
+    },
+    {
+      "id": "wall-3",
+      "type": "interior",
+      "start": {
+        "x": 2133.6,
+        "y": 5791.2
+      },
+      "end": {
+        "x": 5181.6,
+        "y": 5791.2
+      }
+    },
+    {
+      "id": "wall-4",
+      "type": "interior",
+      "start": {
+        "x": 2133.6,
+        "y": 3352.8
+      },
+      "end": {
+        "x": 2133.6,
+        "y": 4876.8
+      }
+    },
+    {
+      "id": "wall-5",
+      "type": "interior",
+      "start": {
+        "x": 2133.6,
+        "y": 4876.8
+      },
+      "end": {
+        "x": 2133.6,
+        "y": 5791.2
+      }
+    }
+  ],
+  "openings": {
+    "doors_count": 4,
+    "windows_count": 3,
+    "main_entrance": null,
+    "warnings": [
+      "Main entrance: \"Foyer\" has no external wall at all; skipped",
+      "Window on \"Living Room\"/N: wall is internal (shared with adjacent room), window dropped",
+      "Window on \"Bedroom 4\"/N: wall is internal (shared with adjacent room), window dropped"
+    ]
+  }
+}
