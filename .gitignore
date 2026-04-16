@@ -53,6 +53,7 @@ coverage/
 test-results/
 playwright-report/
 blob-report/
+tests/floor-plan/snapshots/snapshot-*.json
 
 # Logs
 *.log
