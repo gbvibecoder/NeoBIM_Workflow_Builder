@@ -79,7 +79,7 @@ describe("Floor Plan Regression Suite", () => {
         const start = Date.now();
         let project = null;
         let error: string | null = null;
-        let pipelineUsed: "A" | "B" | "unknown" = "unknown";
+        let pipelineUsed: string = "A";
 
         try {
           const req = new NextRequest("http://localhost/api/generate-floor-plan", {
@@ -91,8 +91,7 @@ describe("Floor Plan Regression Suite", () => {
           const data = (await res.json()) as { project?: typeof project; error?: string; pipelineUsed?: string };
           if (data.error) error = data.error;
           if (data.project) project = data.project;
-          if (data.pipelineUsed === "A" || data.pipelineUsed === "B") pipelineUsed = data.pipelineUsed;
-          else pipelineUsed = "A";
+          pipelineUsed = data.pipelineUsed ?? "A";
         } catch (err) {
           error = err instanceof Error ? `${err.message}\n${err.stack?.split("\n").slice(0, 3).join("\n")}` : String(err);
         }

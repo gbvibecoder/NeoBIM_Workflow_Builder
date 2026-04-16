@@ -61,6 +61,10 @@ import type { PlacedRoom as OptimizerPlacedRoom } from "@/features/floor-plan/li
 import { getRoomRule } from "@/features/floor-plan/lib/architectural-rules";
 import { classifyRoom } from "@/features/floor-plan/lib/room-sizer";
 
+// Pipeline B (CSP / parser-driven) imports — Day 3 skeleton
+import { routePrompt } from "@/features/floor-plan/lib/pipeline-router";
+import { runPipelineB } from "@/features/floor-plan/lib/pipeline-b-orchestrator";
+
 // ── Generation Feedback ────────────────────────────────────────────────────
 
 interface GenerationFeedback {
@@ -232,6 +236,40 @@ export async function POST(req: NextRequest) {
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) {
       return NextResponse.json({ error: "NO_API_KEY" }, { status: 503 });
+    }
+
+    // ── Pipeline Router (Day 3 — Pipeline B skeleton) ────────────────
+    // Routes high-constraint prompts (>=5 explicit signals) to the new
+    // structured-parser + CSP pipeline. Vague prompts continue to use
+    // the existing template+SA Pipeline A unchanged.
+    const routing = routePrompt(prompt);
+    logger.debug(`[ROUTER] pipeline=${routing.pipeline} signals=${routing.constraint_signals}`);
+    if (routing.pipeline === "B") {
+      const bResult = await runPipelineB(prompt, apiKey);
+      logger.debug(`[PIPELINE-B] ${bResult.pipelineUsed} parse=${bResult.timings.parse_ms}ms detector=${bResult.timings.detector_ms}ms placement=${bResult.timings.placement_ms}ms total=${bResult.timings.total_ms}ms`);
+      await recordToolExecution(userId, "floor-plan");
+      if (bResult.project) {
+        const feedback = buildFeedback(bResult.project, prompt);
+        feedback.tips.push(`Pipeline B (${bResult.pipelineUsed}): parsed ${bResult.constraintsExtracted} rooms in ${bResult.timings.total_ms}ms. CSP solver pending.`);
+        return NextResponse.json({
+          project: bResult.project,
+          geometry: null,
+          svg: null,
+          feedback,
+          pipelineUsed: bResult.pipelineUsed,
+          relaxationsApplied: bResult.relaxationsApplied,
+          infeasibilityReason: null,
+          routerSignals: routing.constraint_signals,
+        });
+      }
+      return NextResponse.json({
+        error: bResult.infeasibilityReason ?? bResult.error ?? "Pipeline B failed",
+        pipelineUsed: bResult.pipelineUsed,
+        relaxationsApplied: bResult.relaxationsApplied,
+        infeasibilityReason: bResult.infeasibilityReason,
+        infeasibilityKind: bResult.infeasibilityKind,
+        routerSignals: routing.constraint_signals,
+      }, { status: 422 });
     }
 
     // ── Stage 1: AI Room Programming ──────────────────────────────────

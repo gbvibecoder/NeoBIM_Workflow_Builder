@@ -52,7 +52,7 @@ export interface PromptResult {
   prompt_summary: string;
   elapsed_ms: number;
   error: string | null;
-  pipeline_used: "A" | "B" | "unknown";
+  pipeline_used: string;
   score: ScoreReport | null;
   project: FloorPlanProject | null;
 }
