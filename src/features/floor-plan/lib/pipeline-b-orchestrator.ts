@@ -138,25 +138,67 @@ function fineProject(
   plotWidthFt: number,
   plotDepthFt: number,
 ): FloorPlanProject {
+  // Solver's internal convention is Y-DOWN (y=0 at north, y=plotD at south),
+  // matching the existing codebase convention in energy-function.ts. But the
+  // renderer's worldToScreen treats world coords as Y-UP (high y = north on
+  // screen). Flip Y here so the project leaves the solver in Y-UP convention.
+  //
+  // See src/features/floor-plan/lib/geometry.ts:356 for the renderer contract.
+  const plotDMm = plotDepthFt * FT_TO_MM;
+  const flipY = (yMm: number) => plotDMm - yMm;
+
   const rooms: Room[] = placements.map(p => {
     const xMm = p.x_ft * FT_TO_MM;
-    const yMm = p.y_ft * FT_TO_MM;
+    const ySolverMm = p.y_ft * FT_TO_MM;
     const wMm = p.width_ft * FT_TO_MM;
     const dMm = p.depth_ft * FT_TO_MM;
+    // In Y-UP: the "origin" (lower-left visually) is at y=flipY(y_solver + depth),
+    // and the room extends UP by `dMm`.
+    const yWorldOriginMm = flipY(ySolverMm + dMm);
     return {
       id: p.room_id,
       name: p.room_name,
       type: functionToRoomType(p.function),
-      boundary: buildStubPolygon(xMm, yMm, wMm, dMm),
+      boundary: buildStubPolygon(xMm, yWorldOriginMm, wMm, dMm),
       area_sqm: p.width_ft * p.depth_ft * 0.092903,
       perimeter_mm: 2 * (wMm + dMm),
       natural_light_required: !["bathroom", "master_bathroom", "powder_room", "store", "utility"].includes(p.function),
       ventilation_required: true,
-      label_position: { x: xMm + wMm / 2, y: yMm + dMm / 2 },
+      label_position: { x: xMm + wMm / 2, y: yWorldOriginMm + dMm / 2 },
       wall_ids: [],
       vastu_direction: p.mandala_direction,
     };
   });
+
+  // Flip walls in-place (Y-DOWN solver coords → Y-UP world coords).
+  const flippedWalls: Wall[] = walls.map(w => ({
+    ...w,
+    centerline: {
+      start: { x: w.centerline.start.x, y: flipY(w.centerline.start.y) },
+      end: { x: w.centerline.end.x, y: flipY(w.centerline.end.y) },
+    },
+  }));
+
+  // Flip door symbol points (hinge + leaf end). position_along_wall_mm is a
+  // scalar offset from centerline.start along the wall's direction; since
+  // start/end both flipped, offset semantics are preserved (see PR notes).
+  const flippedDoors: Door[] = doors.map(d => ({
+    ...d,
+    symbol: {
+      ...d.symbol,
+      hinge_point: { x: d.symbol.hinge_point.x, y: flipY(d.symbol.hinge_point.y) },
+      leaf_end_point: { x: d.symbol.leaf_end_point.x, y: flipY(d.symbol.leaf_end_point.y) },
+    },
+  }));
+
+  const flippedWindows: CadWindow[] = windows.map(w => ({
+    ...w,
+    symbol: {
+      ...w.symbol,
+      start_point: { x: w.symbol.start_point.x, y: flipY(w.symbol.start_point.y) },
+      end_point: { x: w.symbol.end_point.x, y: flipY(w.symbol.end_point.y) },
+    },
+  }));
 
   const plotW_mm = plotWidthFt * FT_TO_MM;
   const plotD_mm = plotDepthFt * FT_TO_MM;
@@ -176,10 +218,10 @@ function fineProject(
     floor_to_floor_height_mm: 3000,
     slab_thickness_mm: 150,
     boundary: floorBoundary,
-    walls,
+    walls: flippedWalls,
     rooms,
-    doors,
-    windows,
+    doors: flippedDoors,
+    windows: flippedWindows,
     stairs: [],
     columns: [],
     furniture: [],
@@ -233,6 +275,10 @@ function placementProject(
   projectName: string,
   assignments: MandalaAssignment[] | null,
 ): FloorPlanProject {
+  // Same Y-flip concern as fineProject — solver is Y-DOWN, renderer is Y-UP.
+  const plotDepthFtLocal = constraints.plot.depth_ft ?? 50;
+  const plotDMmLocal = plotDepthFtLocal * FT_TO_MM;
+  const flipY = (yMm: number) => plotDMmLocal - yMm;
   const plotWidthFt = constraints.plot.width_ft ?? 50;
   const plotDepthFt = constraints.plot.depth_ft ?? plotWidthFt;
 
@@ -272,19 +318,20 @@ function placementProject(
           rowMax = 0;
         }
         const xMm = (cellOriginXFt + packX) * FT_TO_MM;
-        const yMm = (cellOriginYFt + packY) * FT_TO_MM;
+        const ySolverMm = (cellOriginYFt + packY) * FT_TO_MM;
         const wMm = wFt * FT_TO_MM;
         const dMm = dFt * FT_TO_MM;
+        const yWorldMm = flipY(ySolverMm + dMm);
         rooms.push({
           id: room.id || `room-${rooms.length}`,
           name: room.name,
           type: functionToRoomType(room.function),
-          boundary: buildStubPolygon(xMm, yMm, wMm, dMm),
+          boundary: buildStubPolygon(xMm, yWorldMm, wMm, dMm),
           area_sqm: wFt * dFt * 0.092903,
           perimeter_mm: 2 * (wMm + dMm),
           natural_light_required: !["bathroom", "master_bathroom", "powder_room", "store", "utility"].includes(room.function),
           ventilation_required: true,
-          label_position: { x: xMm + wMm / 2, y: yMm + dMm / 2 },
+          label_position: { x: xMm + wMm / 2, y: yWorldMm + dMm / 2 },
           wall_ids: [],
           vastu_direction: directionFromCell(cellIdx),
         });
@@ -310,19 +357,20 @@ function placementProject(
         rowMaxDepth = 0;
       }
       const xMm = cursorX * FT_TO_MM;
-      const yMm = cursorY * FT_TO_MM;
+      const ySolverMm = cursorY * FT_TO_MM;
       const wMm = wFt * FT_TO_MM;
       const dMm = dFt * FT_TO_MM;
+      const yWorldMm = flipY(ySolverMm + dMm);
       rooms.push({
         id: r.id || `stub-room-${rooms.length}`,
         name: r.name,
         type: functionToRoomType(r.function),
-        boundary: buildStubPolygon(xMm, yMm, wMm, dMm),
+        boundary: buildStubPolygon(xMm, yWorldMm, wMm, dMm),
         area_sqm: wFt * dFt * 0.092903,
         perimeter_mm: 2 * (wMm + dMm),
         natural_light_required: !["bathroom", "master_bathroom", "powder_room", "store", "utility"].includes(r.function),
         ventilation_required: true,
-        label_position: { x: xMm + wMm / 2, y: yMm + dMm / 2 },
+        label_position: { x: xMm + wMm / 2, y: yWorldMm + dMm / 2 },
         wall_ids: [],
       });
       cursorX += wFt + 1;

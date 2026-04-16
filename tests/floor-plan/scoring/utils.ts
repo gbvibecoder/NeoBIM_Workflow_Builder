@@ -48,8 +48,11 @@ export function quadrantOf(room: Room, project: FloorPlanProject): CompassDirect
   const nx = (c.x - pb.minX) / Math.max(pb.width, 1);
   const ny = (c.y - pb.minY) / Math.max(pb.height, 1);
 
+  // World convention (per geometry.ts:356 worldToScreen): Y-UP — higher world y
+  // renders HIGHER on screen. In architectural N-up drawings, top = North,
+  // so high y = NORTH and low y = SOUTH.
   const xBand = nx < 1 / 3 ? "W" : nx < 2 / 3 ? "M" : "E";
-  const yBand = ny < 1 / 3 ? "N" : ny < 2 / 3 ? "M" : "S";
+  const yBand = ny < 1 / 3 ? "S" : ny < 2 / 3 ? "M" : "N";
 
   if (yBand === "N") {
     if (xBand === "W") return "NW";

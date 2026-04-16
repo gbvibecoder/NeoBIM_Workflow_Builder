@@ -54,20 +54,18 @@ function makeProject(rooms: Room[], plotW: number, plotD: number): FloorPlanProj
 }
 
 describe("Scorer utils — plot-boundary quadrant classification", () => {
-  it("single room in NE corner of 50x60 plot classifies as NE (plot-centered)", () => {
-    // Plot 50x60 (mm for test — ratio-only), room near NE corner
-    const room = makeRoom("ne", 40, 0, 10, 10);
+  it("single room in NE corner of 50x60 plot classifies as NE (Y-UP, plot-centered)", () => {
+    // Y-UP world convention: high y = north. NE corner = high x, high y.
+    const room = makeRoom("ne", 40, 50, 10, 10);
     const project = makeProject([room], 50, 60);
     expect(quadrantOf(room, project)).toBe("NE");
   });
 
   it("same NE room with OTHER rooms clustering SW still classifies as NE", () => {
-    const ne = makeRoom("ne", 40, 0, 10, 10);
-    const sw1 = makeRoom("sw1", 0, 50, 10, 10);
-    const sw2 = makeRoom("sw2", 10, 50, 10, 10);
+    const ne = makeRoom("ne", 40, 50, 10, 10);
+    const sw1 = makeRoom("sw1", 0, 0, 10, 10);
+    const sw2 = makeRoom("sw2", 10, 0, 10, 10);
     const project = makeProject([ne, sw1, sw2], 50, 60);
-    // Without plot-boundary fix, bbox of rooms would shift scorer quadrants;
-    // with fix, scorer uses plot bbox (0,0)-(50,60), NE stays NE.
     expect(quadrantOf(ne, project)).toBe("NE");
   });
 
