@@ -15,6 +15,11 @@ import {
   rectsSharedEdgeLength,
   type Rect,
 } from "./geometry-utils";
+import {
+  pruneDirectionalAdjacency,
+  pruneBetween,
+  pruneConnectsAll,
+} from "./propagators-relational";
 
 // ── Constants ──
 
@@ -546,6 +551,7 @@ function tryOnce(
       let attachedRes: { prunedBy: Map<string, number[]>; deadVarId: string | null } | null = null;
       let dead = false;
 
+      const relationalResults: Array<{ prunedBy: Map<string, number[]>; deadVarId: string | null }> = [];
       if (noOverlapRes.deadVarId) {
         wdeg.set(noOverlapRes.deadVarId, (wdeg.get(noOverlapRes.deadVarId) ?? 0) + 1);
         const deadV = ordered.find(o => o.id === noOverlapRes.deadVarId);
@@ -570,6 +576,53 @@ function tryOnce(
             };
           }
           dead = true;
+        } else {
+          // Phase 7 relational propagators — fire in order directional/between/connects-all.
+          // Each can dead-end; first dead stops the chain.
+          const directional = pruneDirectionalAdjacency(
+            ordered.filter(o => !assigned.has(o.id) || o.id === v.id),
+            placedRects, assigned, constraints.adjacency_pairs, v.id,
+          );
+          relationalResults.push(directional);
+          if (directional.deadVarId) {
+            wdeg.set(directional.deadVarId, (wdeg.get(directional.deadVarId) ?? 0) + 1);
+            lastConflict = {
+              variables: [directional.deadVarId, v.id],
+              rule_ids: ["H_DIRECTIONAL_ADJACENCY"],
+              human_reason: `Directional adjacency conflict after placing "${v.room.name}" — a related room has no origin satisfying its direction constraint.`,
+            };
+            dead = true;
+          } else {
+            const between = pruneBetween(
+              ordered.filter(o => !assigned.has(o.id)),
+              placedRects, assigned, constraints.adjacency_pairs,
+            );
+            relationalResults.push(between);
+            if (between.deadVarId) {
+              wdeg.set(between.deadVarId, (wdeg.get(between.deadVarId) ?? 0) + 1);
+              lastConflict = {
+                variables: [between.deadVarId, v.id],
+                rule_ids: ["H_BETWEEN"],
+                human_reason: `Between-relationship conflict: "${between.deadVarId}" has no origin between its two anchors.`,
+              };
+              dead = true;
+            } else {
+              const connects = pruneConnectsAll(
+                ordered.filter(o => !assigned.has(o.id)),
+                placedRects, assigned, constraints.connects_all_groups, v.id,
+              );
+              relationalResults.push(connects);
+              if (connects.deadVarId) {
+                wdeg.set(connects.deadVarId, (wdeg.get(connects.deadVarId) ?? 0) + 1);
+                lastConflict = {
+                  variables: [connects.deadVarId, v.id],
+                  rule_ids: ["H_CONNECTS_ALL"],
+                  human_reason: `Hub-and-spoke connectivity conflict: "${connects.deadVarId}" cannot share required edge with connector.`,
+                };
+                dead = true;
+              }
+            }
+          }
         }
       }
 
@@ -581,6 +634,7 @@ function tryOnce(
       v.domain = myPrevDomain;
       restoreDomains(unassigned, noOverlapRes.prunedBy);
       if (attachedRes) restoreDomains(unassigned, attachedRes.prunedBy);
+      for (const r of relationalResults) restoreDomains(ordered, r.prunedBy);
     }
 
     return false;
