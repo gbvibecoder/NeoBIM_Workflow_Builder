@@ -344,18 +344,24 @@ function valueScore(
   const rect: Rect = { x, y, width: v.width_ft, depth: v.depth_ft };
   let score = 0;
 
-  if (NEEDS_EXTERIOR_WALL.has(v.room.function as RoomFunction)) {
-    const touchesPerim = x <= 0.01 || y <= 0.01 ||
-      x + v.width_ft >= plotW - 0.01 || y + v.depth_ft >= plotD - 0.01;
-    if (touchesPerim) score += 50;
-  }
-
+  // Mandala-cell proximity (Phase 5 Sub-goal A): strong gravity toward the
+  // Stage-3A-assigned cell center. Without this dominating, zone-positioned
+  // rooms would drift to perimeter corners that happen to be in the wrong
+  // mandala cell, degrading the scorecard's position component.
   const bbox = cellToBBox(v.mandala_cell, plotW, plotD);
   const cellCx = (bbox.x1 + bbox.x2) / 2;
   const cellCy = (bbox.y1 + bbox.y2) / 2;
   const rectC = rectCenter(rect);
   const dist = Math.hypot(rectC.x - cellCx, rectC.y - cellCy);
-  score -= dist * 2;
+  const cellRadius = Math.min(plotW, plotD) / 6;
+  const mandalaProximity = Math.max(0, 1 - dist / (cellRadius * 1.5));
+  score += 100 * mandalaProximity;
+
+  if (NEEDS_EXTERIOR_WALL.has(v.room.function as RoomFunction)) {
+    const touchesPerim = x <= 0.01 || y <= 0.01 ||
+      x + v.width_ft >= plotW - 0.01 || y + v.depth_ft >= plotD - 0.01;
+    if (touchesPerim) score += 30;
+  }
 
   for (const adj of constraints.adjacency_pairs) {
     let otherId: string | null = null;
