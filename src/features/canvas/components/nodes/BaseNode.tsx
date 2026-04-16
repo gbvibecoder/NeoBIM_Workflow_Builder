@@ -17,6 +17,7 @@ const INPUT_NODE_IDS = new Set(["IN-001","IN-002","IN-003","IN-004","IN-005","IN
 
 import { CATEGORY_COLORS, hexToRgb } from "@/lib/ui-constants";
 import { LIVE_NODES } from "@/features/workflows/constants/node-catalogue";
+import { nodeText } from "@/features/canvas/components/nodes/node-text-styles";
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -364,17 +365,18 @@ const InlineResult = memo(function InlineResult({ artifact, nodeId }: { artifact
             animate={{ opacity: 1 }}
             transition={{ delay: i * 0.08, duration: 0.3 }}
             style={{
-              fontSize: 10.5, color: "rgba(255,255,255,0.5)", lineHeight: 1.5,
+              fontSize: 11, color: "rgba(240,242,248,0.88)", lineHeight: 1.5,
               fontFamily: "var(--font-jetbrains), monospace",
               fontStyle: "italic",
               overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+              textShadow: "0 1px 2px rgba(0,0,0,0.55)",
             }}
           >
             {line || "\u00A0"}
           </motion.div>
         ))}
         {text.split("\n").length > 4 && (
-          <div style={{ fontSize: 9, color: "#00F5FF", marginTop: 2, fontFamily: "var(--font-jetbrains), monospace" }}>+{text.split("\n").length - 4} more lines</div>
+          <div style={{ fontSize: 10, fontWeight: 600, color: "#4FE8F5", marginTop: 3, fontFamily: "var(--font-jetbrains), monospace", letterSpacing: "0.02em" }}>+{text.split("\n").length - 4} more lines</div>
         )}
       </div>
     );
@@ -404,11 +406,11 @@ const InlineResult = memo(function InlineResult({ artifact, nodeId }: { artifact
               textAlign: "center",
             }}
           >
-            <div style={{ fontSize: 11, fontWeight: 700, color: "#FFBF00", lineHeight: 1.1, fontFamily: "var(--font-jetbrains), monospace" }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: "#FFD24D", lineHeight: 1.1, fontFamily: "var(--font-jetbrains), monospace" }}>
               {m.value}
-              {m.unit && <span style={{ fontSize: 8, color: "rgba(255,255,255,0.4)", marginLeft: 2 }}>{m.unit}</span>}
+              {m.unit && <span style={{ fontSize: 9, fontWeight: 500, color: "rgba(240,242,248,0.72)", marginLeft: 3 }}>{m.unit}</span>}
             </div>
-            <div style={{ fontSize: 7, color: "rgba(255,255,255,0.4)", marginTop: 2, textTransform: "uppercase" as const, letterSpacing: "0.1em", fontFamily: "var(--font-jetbrains), monospace" }}>
+            <div style={{ fontSize: 9, fontWeight: 600, color: "rgba(240,242,248,0.65)", marginTop: 3, textTransform: "uppercase" as const, letterSpacing: "0.1em", fontFamily: "var(--font-jetbrains), monospace", textShadow: "0 1px 2px rgba(0,0,0,0.6)" }}>
               {m.label}
             </div>
           </motion.div>
@@ -436,7 +438,7 @@ const InlineResult = memo(function InlineResult({ artifact, nodeId }: { artifact
             <img src={url} alt="Result" style={{ width: "100%", height: 90, objectFit: "cover", borderRadius: 8 }} />
           ) : (
             <div style={{ height: 60, background: "rgba(255,255,255,0.03)", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <span style={{ fontSize: 10, color: "#5C5C78" }}>No preview</span>
+              <span style={nodeText.helper}>No preview</span>
             </div>
           )}
           <div style={{
@@ -492,17 +494,19 @@ const InlineResult = memo(function InlineResult({ artifact, nodeId }: { artifact
           animate={{ opacity: 1 }}
           transition={{ duration: 0.3 }}
           style={{
-            fontSize: 9, color: "#5C5C78",
-            background: "rgba(0,0,0,0.2)",
+            fontSize: 10, color: "rgba(240,242,248,0.82)",
+            background: "rgba(0,0,0,0.3)",
             borderRadius: 6, padding: "6px 8px",
             overflow: "hidden", maxHeight: 60,
+            fontFamily: "var(--font-jetbrains), monospace",
+            lineHeight: 1.5,
           }}
         >
-          <div style={{ fontWeight: 600, color: "#8888A0" }}>{headers.slice(0, 4).join(" | ")}</div>
+          <div style={{ fontWeight: 700, color: "#B8BECC", letterSpacing: "0.03em" }}>{headers.slice(0, 4).join(" | ")}</div>
           {rows.slice(0, 2).map((row, i) => (
             <div key={i}>{row.slice(0, 4).join(" | ")}</div>
           ))}
-          {rows.length > 2 && <div style={{ color: "#4F8AFF", marginTop: 2 }}>+{rows.length - 2} rows</div>}
+          {rows.length > 2 && <div style={{ color: "#7FAAFF", marginTop: 3, fontWeight: 600 }}>+{rows.length - 2} rows</div>}
         </motion.div>
       </div>
     );
@@ -588,12 +592,12 @@ const InlineResult = memo(function InlineResult({ artifact, nodeId }: { artifact
             borderRadius: 6, padding: "6px 8px",
           }}
         >
-          <Download size={11} style={{ color: "#4F8AFF", flexShrink: 0 }} />
-          <div style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 10, color: "#8888A0" }}>
+          <Download size={12} style={{ color: "#7FAAFF", flexShrink: 0 }} />
+          <div style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 11, fontWeight: 500, color: "#D6DAE4", letterSpacing: "0.01em" }}>
             {name}
           </div>
-          <span style={{ fontSize: 9, color: "#3A3A50", flexShrink: 0 }}>
-            {size ? `${(size / 1024).toFixed(0)}KB` : ""}
+          <span style={nodeText.meta}>
+            {size ? `${(size / 1024).toFixed(0)} KB` : ""}
           </span>
         </motion.div>
       </div>
@@ -617,15 +621,16 @@ const InlineResult = memo(function InlineResult({ artifact, nodeId }: { artifact
             useUIStore.getState().setArtifactViewerNodeId(nodeId);
           }}
           style={{
-            display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
-            background: "rgba(0,245,255,0.06)",
-            border: "1px solid rgba(0,245,255,0.15)",
-            borderRadius: 6, padding: "8px",
-            fontSize: 10, fontWeight: 500, color: "#00F5FF",
+            display: "flex", alignItems: "center", justifyContent: "center", gap: 7,
+            background: "rgba(0,245,255,0.1)",
+            border: "1px solid rgba(0,245,255,0.28)",
+            borderRadius: 6, padding: "9px",
+            fontSize: 11, fontWeight: 600, color: "#4FE8F5",
             cursor: "pointer",
+            letterSpacing: "0.02em",
           }}
         >
-          <Box size={11} />
+          <Box size={12} />
           Explore 3D Model{roomCount ? ` (${roomCount} rooms)` : ""}
         </motion.div>
       </div>
@@ -649,11 +654,12 @@ const InlineResult = memo(function InlineResult({ artifact, nodeId }: { artifact
           }}
           style={{
             display: "flex", alignItems: "center", justifyContent: "center",
-            background: "rgba(79,138,255,0.06)",
-            border: "1px solid rgba(79,138,255,0.15)",
-            borderRadius: 6, padding: "8px",
-            fontSize: 10, fontWeight: 500, color: "#4F8AFF",
+            background: "rgba(79,138,255,0.12)",
+            border: "1px solid rgba(79,138,255,0.32)",
+            borderRadius: 6, padding: "9px",
+            fontSize: 11, fontWeight: 600, color: "#7FAAFF",
             cursor: "pointer",
+            letterSpacing: "0.02em",
           }}
         >
           {artifact.type === "svg" ? "View Floor Plan" : "View 3D Model"}
@@ -924,16 +930,17 @@ export const BaseNode = memo(function BaseNode({ id, data, selected }: BaseNodeP
             {/* INPUT badge — Atelier style */}
             {isInput && (
               <span style={{
-                fontSize: 7,
-                fontWeight: 400,
+                fontSize: 9,
+                fontWeight: 700,
                 color,
-                padding: "3px 8px",
-                background: `rgba(${rgb}, 0.15)`,
-                border: `1px solid rgba(${rgb}, 0.25)`,
-                letterSpacing: "0.15em",
+                padding: "3px 9px",
+                background: `rgba(${rgb}, 0.18)`,
+                border: `1px solid rgba(${rgb}, 0.4)`,
+                letterSpacing: "0.14em",
                 textTransform: "uppercase" as const,
                 fontFamily: "var(--font-jetbrains), monospace",
                 flexShrink: 0,
+                textShadow: "0 1px 2px rgba(0,0,0,0.55)",
               }}>
                 {t('execution.inputLabel')}
               </span>
@@ -942,17 +949,18 @@ export const BaseNode = memo(function BaseNode({ id, data, selected }: BaseNodeP
             {/* DEMO badge for non-live nodes (mocked execution) */}
             {!isInput && !LIVE_NODES.has(data.catalogueId) && (
               <span style={{
-                fontSize: 7,
-                fontWeight: 600,
-                color: "#F59E0B",
-                padding: "2px 6px",
-                background: "rgba(245,158,11,0.08)",
-                border: "1px solid rgba(245,158,11,0.2)",
+                fontSize: 9,
+                fontWeight: 700,
+                color: "#FBBF4B",
+                padding: "2px 7px",
+                background: "rgba(245,158,11,0.14)",
+                border: "1px solid rgba(245,158,11,0.35)",
                 borderRadius: 2,
-                letterSpacing: "0.1em",
+                letterSpacing: "0.12em",
                 textTransform: "uppercase" as const,
                 fontFamily: "var(--font-jetbrains), monospace",
                 flexShrink: 0,
+                textShadow: "0 1px 2px rgba(0,0,0,0.55)",
               }}>
                 DEMO
               </span>
@@ -1016,9 +1024,10 @@ export const BaseNode = memo(function BaseNode({ id, data, selected }: BaseNodeP
           {/* Row 2: Subtitle — JetBrains Mono, tiny, uppercase (Atelier) */}
           {typeLabel && (
             <div style={{
-              fontSize: 9,
-              color: `rgba(${rgb}, 0.65)`,
-              marginTop: 4,
+              fontSize: 10,
+              fontWeight: 600,
+              color: `rgba(${rgb}, 0.9)`,
+              marginTop: 5,
               lineHeight: 1.4,
               display: "-webkit-box",
               WebkitLineClamp: 2,
@@ -1026,8 +1035,9 @@ export const BaseNode = memo(function BaseNode({ id, data, selected }: BaseNodeP
               overflow: "hidden",
               wordBreak: "break-word" as const,
               textTransform: "uppercase" as const,
-              letterSpacing: "0.1em",
+              letterSpacing: "0.12em",
               fontFamily: "var(--font-jetbrains), monospace",
+              textShadow: "0 1px 2px rgba(0,0,0,0.6)",
             }}>
               {typeLabel}
             </div>
@@ -1049,18 +1059,19 @@ export const BaseNode = memo(function BaseNode({ id, data, selected }: BaseNodeP
             <div style={{ flex: 1 }} />
             {/* Time pill — Atelier */}
             <span style={{
-              fontSize: 8,
-              color: "rgba(255,255,255,0.45)",
+              fontSize: 10,
+              color: "rgba(240,242,248,0.78)",
               whiteSpace: "nowrap",
               flexShrink: 0,
-              fontWeight: 400,
-              padding: "2px 8px",
-              borderRadius: 2,
-              background: "rgba(0,0,0,0.3)",
-              border: `1px solid rgba(${rgb}, 0.18)`,
-              letterSpacing: "0.05em",
+              fontWeight: 600,
+              padding: "3px 9px",
+              borderRadius: 3,
+              background: "rgba(0,0,0,0.5)",
+              border: `1px solid rgba(${rgb}, 0.35)`,
+              letterSpacing: "0.08em",
               fontFamily: "var(--font-jetbrains), monospace",
               textTransform: "uppercase" as const,
+              textShadow: "0 1px 2px rgba(0,0,0,0.55)",
             }}>
               {data.executionTime ?? "< 2s"}
             </span>
@@ -1128,7 +1139,7 @@ export const BaseNode = memo(function BaseNode({ id, data, selected }: BaseNodeP
                 <div style={{ fontSize: 11, fontWeight: 600, color: "#F87171", marginBottom: 3, fontFamily: "var(--font-dm-sans), sans-serif" }}>
                   {t('execution.executionError')}
                 </div>
-                <div style={{ fontSize: 10, color: "#E0B4B4", lineHeight: 1.5 }}>
+                <div style={{ fontSize: 11, color: "#FCA5A5", lineHeight: 1.55, letterSpacing: "0.01em" }}>
                   {errorMessage}
                 </div>
               </div>
