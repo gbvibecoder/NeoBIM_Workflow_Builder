@@ -27,6 +27,13 @@ const MIN_VOID_AREA_TO_FILL_SQFT = 1;       // ignore smaller than 1 sqft (numer
 const MAX_VOID_TO_AUTO_FILL_SQFT = 200;     // larger than this: warn, don't try
 const ASPECT_DISTORTION_THRESHOLD = 1.5;    // log() ratio diff above this — degraded
 
+/** Phase 3B fix #7 — voids ≥ this area get a synthesized utility/store/passage
+ *  room when no adjacent room can absorb them within its 120% cap. Below this,
+ *  the void is left as dead space (acceptable cosmetic gap). */
+const NEW_ROOM_THRESHOLD_SQFT = 50;
+const DEAD_SPACE_THRESHOLD_SQFT = 15;
+const PASSAGE_ASPECT_RATIO = 2.5;
+
 /**
  * Phase 3B fix #2 — area cap for void-fill expansion.
  *
@@ -81,6 +88,8 @@ export function fillVoids(input: FillInput): FillOutput {
   const regions = findEmptyRegions(grid, input.plot);
 
   let remainingVoid = 0;
+  let autoRoomIdx = 0;
+
   for (const region of regions) {
     if (region.area_sqft < MIN_VOID_AREA_TO_FILL_SQFT) continue;
     if (region.area_sqft > MAX_VOID_TO_AUTO_FILL_SQFT) {
@@ -88,11 +97,29 @@ export function fillVoids(input: FillInput): FillOutput {
       remainingVoid += region.area_sqft;
       continue;
     }
-    const filled = absorbInto(region, rooms, input.plot);
-    if (!filled) {
-      warnings.push(`void of ${region.area_sqft.toFixed(0)} sqft at (${region.bbox.x.toFixed(1)}, ${region.bbox.y.toFixed(1)}) — no adjacent room could absorb it`);
-      remainingVoid += region.area_sqft;
+
+    // Phase 3B fix #7 priority order:
+    //   1. Absorb into the BEST adjacent room (the absorbInto candidate
+    //      sort already prefers under-sized rooms via Fix 2).
+    //   2. (deferred) hallway extension — needs spine geometry rework.
+    //   3. Insert a synthesized utility/store/passage room when ≥ 50 sqft.
+    //   4. Leave as dead space (≥ 15 sqft logged, < 15 silent).
+    const absorbed = absorbInto(region, rooms, input.plot);
+    if (absorbed) continue;
+
+    if (region.area_sqft >= NEW_ROOM_THRESHOLD_SQFT) {
+      const inserted = insertSynthesizedRoom(region, rooms, input.plot, autoRoomIdx);
+      if (inserted) {
+        autoRoomIdx++;
+        warnings.push(`inserted ${inserted.name} (${region.area_sqft.toFixed(0)} sqft) into a void no adjacent room could absorb`);
+        continue;
+      }
     }
+
+    if (region.area_sqft >= DEAD_SPACE_THRESHOLD_SQFT) {
+      warnings.push(`void of ${region.area_sqft.toFixed(0)} sqft at (${region.bbox.x.toFixed(1)}, ${region.bbox.y.toFixed(1)}) — left as dead space`);
+    }
+    remainingVoid += region.area_sqft;
   }
 
   // Recompute area_sqft on rooms whose placed changed.
@@ -101,6 +128,53 @@ export function fillVoids(input: FillInput): FillOutput {
   }
 
   return { rooms, warnings, remainingVoidSqft: remainingVoid };
+}
+
+// ───────────────────────────────────────────────────────────────────────────
+// SYNTHESIZED UTILITY / STORE / PASSAGE ROOM (Phase 3B fix #7 step 3)
+// ───────────────────────────────────────────────────────────────────────────
+
+function insertSynthesizedRoom(
+  region: VoidRegion,
+  rooms: StripPackRoom[],
+  plot: Rect,
+  idx: number,
+): StripPackRoom | null {
+  if (!isInside(region.bbox, plot)) return null;
+  // Defensive overlap check — shouldn't happen since we just flood-filled
+  // empty grid cells, but numerical edges can be tricky.
+  for (const r of rooms) {
+    if (!r.placed) continue;
+    if (rectOverlap(region.bbox, r.placed) > 1e-2) return null;
+  }
+  const aspect = region.bbox.width >= region.bbox.depth
+    ? region.bbox.width / Math.max(region.bbox.depth, 0.01)
+    : region.bbox.depth / Math.max(region.bbox.width, 0.01);
+  const type =
+    aspect >= PASSAGE_ASPECT_RATIO ? "passage" :
+    aspect <= 1.4 ? "store" :
+    "utility";
+  const name = type === "passage" ? `Passage ${idx + 1}`
+    : type === "store" ? `Store ${idx + 1}`
+    : `Utility ${idx + 1}`;
+  const room: StripPackRoom = {
+    id: `auto_${type}_${idx + 1}`,
+    name,
+    type,
+    requested_width_ft: region.bbox.width,
+    requested_depth_ft: region.bbox.depth,
+    requested_area_sqft: region.area_sqft,
+    zone: "SERVICE",
+    strip: "BACK", // strip is informational only at this point
+    adjacencies: [],
+    needs_exterior_wall: false,
+    is_wet: false,
+    is_sacred: false,
+    placed: { ...region.bbox },
+    actual_area_sqft: region.area_sqft,
+  };
+  rooms.push(room);
+  return room;
 }
 
 // ───────────────────────────────────────────────────────────────────────────
