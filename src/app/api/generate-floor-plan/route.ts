@@ -250,8 +250,10 @@ export async function POST(req: NextRequest) {
       await recordToolExecution(userId, "floor-plan");
       if (bResult.project) {
         const feedback = buildFeedback(bResult.project, prompt);
-        const summary = bResult.pipelineUsed === "B-mandala"
-          ? `Pipeline B (mandala-CSP): ${bResult.constraintsExtracted} rooms placed across 3x3 mandala in ${bResult.timings.csp_ms}ms`
+        const summary = bResult.pipelineUsed === "B-fine"
+          ? `Pipeline B (3A+3B fine): ${bResult.constraintsExtracted} rooms, mandala=${bResult.timings.csp_3a_ms}ms, fine=${bResult.timings.csp_3b_ms}ms`
+          : bResult.pipelineUsed === "B-mandala"
+          ? `Pipeline B (3A mandala only): ${bResult.constraintsExtracted} rooms, mandala=${bResult.timings.csp_3a_ms}ms`
           : `Pipeline B (${bResult.pipelineUsed}): ${bResult.constraintsExtracted} rooms in ${bResult.timings.total_ms}ms`;
         feedback.tips.push(summary);
         if (bResult.relaxationsApplied.length > 0) {

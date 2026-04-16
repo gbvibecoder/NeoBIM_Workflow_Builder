@@ -1,14 +1,14 @@
 import type { FloorPlanProject, Floor, Room, Polygon, Point } from "@/types/floor-plan-cad";
 import { parseConstraints, type ParsedConstraints, type ParsedRoom } from "./structured-parser";
 import { detectInfeasibility, type InfeasibilityReport } from "./infeasibility-detector";
-import { solveMandalaCSP, type MandalaAssignment, type CellIdx, cellCoords } from "./csp-solver";
+import { solveMandalaCSP, solveStage3B, type MandalaAssignment, type FinePlacement, type CellIdx, cellCoords } from "./csp-solver";
 import { logger } from "@/lib/logger";
 
 export type PipelineBStage = "parse" | "infeasibility" | "mandala" | "placement" | "complete";
 
 export interface PipelineBResult {
   project: FloorPlanProject | null;
-  pipelineUsed: "B-mandala" | "B-stub" | "B-unsat";
+  pipelineUsed: "B-fine" | "B-mandala" | "B-stub" | "B-unsat";
   relaxationsApplied: string[];
   infeasibilityReason: string | null;
   infeasibilityKind: InfeasibilityReport["kind"] | null;
@@ -17,10 +17,12 @@ export interface PipelineBResult {
   constraintsExtracted: number;
   parseAuditAttempts: number;
   mandalaAssignments: MandalaAssignment[] | null;
+  finePlacements: FinePlacement[] | null;
   timings: {
     parse_ms: number;
     detector_ms: number;
-    csp_ms: number;
+    csp_3a_ms: number;
+    csp_3b_ms: number;
     placement_ms: number;
     total_ms: number;
   };
@@ -109,12 +111,106 @@ function functionToRoomType(fn: string): Room["type"] {
 }
 
 /**
+ * Fine placement from Stage 3B output: each room placed at an exact
+ * (x, y, width, depth) with no overlaps, user-explicit dims honored,
+ * attached-ensuites sharing an edge with parent.
+ */
+function fineProject(
+  constraints: ParsedConstraints,
+  projectName: string,
+  placements: FinePlacement[],
+  plotWidthFt: number,
+  plotDepthFt: number,
+): FloorPlanProject {
+  const rooms: Room[] = placements.map(p => {
+    const xMm = p.x_ft * FT_TO_MM;
+    const yMm = p.y_ft * FT_TO_MM;
+    const wMm = p.width_ft * FT_TO_MM;
+    const dMm = p.depth_ft * FT_TO_MM;
+    return {
+      id: p.room_id,
+      name: p.room_name,
+      type: functionToRoomType(p.function),
+      boundary: buildStubPolygon(xMm, yMm, wMm, dMm),
+      area_sqm: p.width_ft * p.depth_ft * 0.092903,
+      perimeter_mm: 2 * (wMm + dMm),
+      natural_light_required: !["bathroom", "master_bathroom", "powder_room", "store", "utility"].includes(p.function),
+      ventilation_required: true,
+      label_position: { x: xMm + wMm / 2, y: yMm + dMm / 2 },
+      wall_ids: [],
+      vastu_direction: p.mandala_direction,
+    };
+  });
+
+  const plotW_mm = plotWidthFt * FT_TO_MM;
+  const plotD_mm = plotDepthFt * FT_TO_MM;
+  const floorBoundary: Polygon = {
+    points: [
+      { x: 0, y: 0 },
+      { x: plotW_mm, y: 0 },
+      { x: plotW_mm, y: plotD_mm },
+      { x: 0, y: plotD_mm },
+    ],
+  };
+
+  const floor: Floor = {
+    id: "floor-0",
+    name: "Ground Floor",
+    level: 0,
+    floor_to_floor_height_mm: 3000,
+    slab_thickness_mm: 150,
+    boundary: floorBoundary,
+    walls: [],
+    rooms,
+    doors: [],
+    windows: [],
+    stairs: [],
+    columns: [],
+    furniture: [],
+    fixtures: [],
+    annotations: [],
+    dimensions: [],
+    zones: [],
+  };
+
+  const totalAreaSqm = rooms.reduce((s, r) => s + r.area_sqm, 0);
+
+  return {
+    id: `pipelineB-fine-${Date.now()}`,
+    name: projectName,
+    version: "1.0.0",
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+    metadata: {
+      project_type: "residential",
+      building_type: "apartment",
+      built_up_area_sqm: totalAreaSqm,
+      carpet_area_sqm: totalAreaSqm * 0.85,
+      num_floors: 1,
+      generation_model: "pipeline-b-stage-3b",
+      generation_timestamp: new Date().toISOString(),
+    },
+    settings: {
+      units: "metric",
+      display_unit: "ft",
+      scale: "1:100",
+      grid_size_mm: 152,
+      wall_thickness_mm: 150,
+      paper_size: "A3",
+      orientation: "landscape",
+      north_angle_deg: 0,
+      vastu_compliance: false,
+      feng_shui_compliance: false,
+      ada_compliance: false,
+      nbc_compliance: false,
+    },
+    floors: [floor],
+  };
+}
+
+/**
  * Mandala placement: each room placed within its CSP-assigned mandala cell.
- * Plot is divided into a 3x3 grid; each cell holds one or more rooms.
- * Multiple rooms in the same cell are packed along the cell's width axis
- * (overlaps possible on single-cell-width rooms — Stage 3B will resolve).
- *
- * Falls back to sequential stub packing when assignments is null (pre-CSP).
+ * Used as Stage 3B fallback when fine placement fails.
  */
 function placementProject(
   constraints: ParsedConstraints,
@@ -288,7 +384,8 @@ export async function runPipelineB(prompt: string, apiKey: string): Promise<Pipe
   const totalStart = Date.now();
   let parse_ms = 0;
   let detector_ms = 0;
-  let csp_ms = 0;
+  let csp_3a_ms = 0;
+  let csp_3b_ms = 0;
   let placement_ms = 0;
 
   const parseStart = Date.now();
@@ -311,7 +408,8 @@ export async function runPipelineB(prompt: string, apiKey: string): Promise<Pipe
       constraintsExtracted: 0,
       parseAuditAttempts: 0,
       mandalaAssignments: null,
-      timings: { parse_ms, detector_ms: 0, csp_ms: 0, placement_ms: 0, total_ms: Date.now() - totalStart },
+      finePlacements: null,
+      timings: { parse_ms, detector_ms: 0, csp_3a_ms: 0, csp_3b_ms: 0, placement_ms: 0, total_ms: Date.now() - totalStart },
       error: `parser_failed: ${err instanceof Error ? err.message : String(err)}`,
     };
   }
@@ -335,47 +433,87 @@ export async function runPipelineB(prompt: string, apiKey: string): Promise<Pipe
       constraintsExtracted: constraints.rooms.length,
       parseAuditAttempts,
       mandalaAssignments: null,
-      timings: { parse_ms, detector_ms, csp_ms: 0, placement_ms: 0, total_ms: Date.now() - totalStart },
+      finePlacements: null,
+      timings: { parse_ms, detector_ms, csp_3a_ms: 0, csp_3b_ms: 0, placement_ms: 0, total_ms: Date.now() - totalStart },
       error: null,
     };
   }
 
   // ── Stage 3A: Mandala CSP ──
-  const cspStart = Date.now();
+  const csp3aStart = Date.now();
   const relaxationsApplied: string[] = [];
-  let solveResult = solveMandalaCSP(constraints);
-  if (!solveResult.feasible && constraints.vastu_required) {
-    logger.debug(`[PIPELINE-B] CSP UNSAT with vastu_required — retrying with vastu relaxed`);
+  let mandalaResult = solveMandalaCSP(constraints);
+  if (!mandalaResult.feasible && constraints.vastu_required) {
+    logger.debug(`[PIPELINE-B] CSP-3A UNSAT with vastu_required — retrying with vastu relaxed`);
     relaxationsApplied.push("vastu_required: relaxed (Stage 3A infeasible with Vastu hard rules)");
-    solveResult = solveMandalaCSP(constraints, { vastuRequired: false });
+    mandalaResult = solveMandalaCSP(constraints, { vastuRequired: false });
   }
-  csp_ms = Date.now() - cspStart;
+  csp_3a_ms = Date.now() - csp3aStart;
 
-  if (!solveResult.feasible) {
-    logger.debug(`[PIPELINE-B] CSP UNSAT (final): ${solveResult.conflict?.human_reason}`);
+  if (!mandalaResult.feasible) {
+    logger.debug(`[PIPELINE-B] CSP-3A UNSAT (final): ${mandalaResult.conflict?.human_reason}`);
     return {
       project: null,
       pipelineUsed: "B-unsat",
       relaxationsApplied,
-      infeasibilityReason: solveResult.conflict?.human_reason ?? "CSP_UNSAT_STAGE_3A",
+      infeasibilityReason: mandalaResult.conflict?.human_reason ?? "CSP_UNSAT_STAGE_3A",
       infeasibilityKind: null,
-      cspConflict: solveResult.conflict?.human_reason ?? null,
-      cspRuleIds: solveResult.conflict?.rule_ids ?? [],
+      cspConflict: mandalaResult.conflict?.human_reason ?? null,
+      cspRuleIds: mandalaResult.conflict?.rule_ids ?? [],
       constraintsExtracted: constraints.rooms.length,
       parseAuditAttempts,
       mandalaAssignments: null,
-      timings: { parse_ms, detector_ms, csp_ms, placement_ms: 0, total_ms: Date.now() - totalStart },
+      finePlacements: null,
+      timings: { parse_ms, detector_ms, csp_3a_ms, csp_3b_ms: 0, placement_ms: 0, total_ms: Date.now() - totalStart },
       error: null,
     };
   }
 
-  logger.debug(`[PIPELINE-B] CSP feasible: ${solveResult.assignments.length} mandala assignments in ${solveResult.iterations} iters, ${solveResult.elapsed_ms}ms, vastu_applied=${solveResult.vastu_applied}`);
+  logger.debug(`[PIPELINE-B] CSP-3A feasible: ${mandalaResult.assignments.length} mandala assignments in ${mandalaResult.iterations} iters, ${mandalaResult.elapsed_ms}ms`);
 
-  const placementStart = Date.now();
+  // ── Stage 3B: Cell-level fine placement ──
+  const csp3bStart = Date.now();
+  const fineResult = solveStage3B(constraints, mandalaResult.assignments);
+  csp_3b_ms = Date.now() - csp3bStart;
+  for (const rx of fineResult.relaxations_applied) relaxationsApplied.push(rx);
+
   const projectName = constraints.plot.facing
     ? `${constraints.plot.facing}-facing plan`
     : "Pipeline B plan";
-  const project = placementProject(constraints, projectName, solveResult.assignments);
+
+  if (fineResult.feasible) {
+    logger.debug(`[PIPELINE-B] CSP-3B feasible: ${fineResult.placements.length} placements in ${fineResult.iterations} iters, ${fineResult.elapsed_ms}ms`);
+    const placementStart = Date.now();
+    const project = fineProject(
+      constraints,
+      projectName,
+      fineResult.placements,
+      fineResult.plot_width_ft,
+      fineResult.plot_depth_ft,
+    );
+    placement_ms = Date.now() - placementStart;
+    return {
+      project,
+      pipelineUsed: "B-fine",
+      relaxationsApplied,
+      infeasibilityReason: null,
+      infeasibilityKind: null,
+      cspConflict: null,
+      cspRuleIds: [],
+      constraintsExtracted: constraints.rooms.length,
+      parseAuditAttempts,
+      mandalaAssignments: mandalaResult.assignments,
+      finePlacements: fineResult.placements,
+      timings: { parse_ms, detector_ms, csp_3a_ms, csp_3b_ms, placement_ms, total_ms: Date.now() - totalStart },
+      error: null,
+    };
+  }
+
+  logger.debug(`[PIPELINE-B] CSP-3B UNSAT — falling back to mandala coarse placement: ${fineResult.conflict?.human_reason}`);
+  relaxationsApplied.push("stage_3b: infeasible — using coarse mandala placement (no fine layout)");
+
+  const placementStart = Date.now();
+  const project = placementProject(constraints, projectName, mandalaResult.assignments);
   placement_ms = Date.now() - placementStart;
 
   return {
@@ -384,12 +522,13 @@ export async function runPipelineB(prompt: string, apiKey: string): Promise<Pipe
     relaxationsApplied,
     infeasibilityReason: null,
     infeasibilityKind: null,
-    cspConflict: null,
-    cspRuleIds: [],
+    cspConflict: fineResult.conflict?.human_reason ?? null,
+    cspRuleIds: fineResult.conflict?.rule_ids ?? [],
     constraintsExtracted: constraints.rooms.length,
     parseAuditAttempts,
-    mandalaAssignments: solveResult.assignments,
-    timings: { parse_ms, detector_ms, csp_ms, placement_ms, total_ms: Date.now() - totalStart },
+    mandalaAssignments: mandalaResult.assignments,
+    finePlacements: null,
+    timings: { parse_ms, detector_ms, csp_3a_ms, csp_3b_ms, placement_ms, total_ms: Date.now() - totalStart },
     error: null,
   };
 }
