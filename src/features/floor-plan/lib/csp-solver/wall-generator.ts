@@ -50,6 +50,102 @@ function mergeSegments(segs: RawSeg[]): RawSeg[] {
   return merged;
 }
 
+/**
+ * Split walls at T-junctions AND cross-junctions so every wall endpoint
+ * coincides with another wall endpoint (or the plot corner). Without this,
+ * a long horizontal wall crossing a perpendicular wall would leave the
+ * intersection as an interior point — the gaps scorer counts those as
+ * unterminated.
+ *
+ * Junction points come from two sources:
+ *   1. Wall endpoints (T-junctions when a wall ends mid-another-wall)
+ *   2. Perpendicular wall crossings (cross-junctions where two merged long
+ *      walls pass through the same point, neither having an endpoint there)
+ */
+function splitAtJunctions(segs: RawSeg[]): RawSeg[] {
+  const endpoints = new Map<string, { x: number; y: number }>();
+
+  // Source 1: every wall endpoint
+  for (const s of segs) {
+    const pts = s.orientation === "horizontal"
+      ? [{ x: s.start, y: s.axis }, { x: s.end, y: s.axis }]
+      : [{ x: s.axis, y: s.start }, { x: s.axis, y: s.end }];
+    for (const p of pts) {
+      const key = `${p.x.toFixed(2)}|${p.y.toFixed(2)}`;
+      if (!endpoints.has(key)) endpoints.set(key, p);
+    }
+  }
+
+  // Source 2: perpendicular wall crossings (cross-junctions)
+  const horizontals = segs.filter(s => s.orientation === "horizontal");
+  const verticals = segs.filter(s => s.orientation === "vertical");
+  for (const h of horizontals) {
+    for (const v of verticals) {
+      const vertCrossesH = v.axis >= h.start - MERGE_TOL && v.axis <= h.end + MERGE_TOL;
+      const horizCrossesV = h.axis >= v.start - MERGE_TOL && h.axis <= v.end + MERGE_TOL;
+      if (vertCrossesH && horizCrossesV) {
+        const cx = v.axis;
+        const cy = h.axis;
+        const key = `${cx.toFixed(2)}|${cy.toFixed(2)}`;
+        if (!endpoints.has(key)) endpoints.set(key, { x: cx, y: cy });
+      }
+    }
+  }
+
+  const result: RawSeg[] = [];
+  for (const s of segs) {
+    const splitPositions: number[] = [];
+    for (const pt of endpoints.values()) {
+      let pos: number;
+      if (s.orientation === "horizontal") {
+        if (Math.abs(pt.y - s.axis) > MERGE_TOL) continue;
+        pos = pt.x;
+      } else {
+        if (Math.abs(pt.x - s.axis) > MERGE_TOL) continue;
+        pos = pt.y;
+      }
+      if (pos > s.start + MERGE_TOL && pos < s.end - MERGE_TOL) {
+        splitPositions.push(pos);
+      }
+    }
+
+    if (splitPositions.length === 0) {
+      result.push(s);
+      continue;
+    }
+
+    splitPositions.sort((a, b) => a - b);
+    // Deduplicate close positions
+    const unique: number[] = [];
+    for (const p of splitPositions) {
+      if (unique.length === 0 || p - unique[unique.length - 1] > MERGE_TOL * 2) {
+        unique.push(p);
+      }
+    }
+
+    let cursor = s.start;
+    for (const sp of unique) {
+      result.push({
+        orientation: s.orientation,
+        axis: s.axis,
+        start: cursor,
+        end: sp,
+        rooms: [...s.rooms],
+      });
+      cursor = sp;
+    }
+    result.push({
+      orientation: s.orientation,
+      axis: s.axis,
+      start: cursor,
+      end: s.end,
+      rooms: [...s.rooms],
+    });
+  }
+
+  return result;
+}
+
 function isOnPlotBoundary(s: RawSeg, plotW: number, plotD: number): boolean {
   if (s.orientation === "horizontal") {
     return Math.abs(s.axis) < MERGE_TOL || Math.abs(s.axis - plotD) < MERGE_TOL;
@@ -98,10 +194,11 @@ export function generateWalls(placements: FinePlacement[], options: WallGenOptio
   raw.push({ orientation: "vertical", axis: plotW, start: 0, end: plotD, rooms: [] });
 
   const merged = mergeSegments(raw);
+  const split = splitAtJunctions(merged);
 
   const walls: Wall[] = [];
   let idx = 0;
-  for (const s of merged) {
+  for (const s of split) {
     const onBoundary = isOnPlotBoundary(s, plotW, plotD);
     const thicknessFt = onBoundary ? externalFt : internalFt;
     const { start, end } = segToPoints(s);

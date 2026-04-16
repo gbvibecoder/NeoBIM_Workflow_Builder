@@ -44,7 +44,7 @@ describe("Wall generator", () => {
     expect(sharedAtX10).toBeDefined();
   });
 
-  it("4 quadrant rooms produce 4 ext + 2 int walls (cross pattern)", () => {
+  it("4 quadrant rooms produce split walls at T-junctions", () => {
     const placements = [
       mk({ room_id: "a", x_ft: 0, y_ft: 0, width_ft: 10, depth_ft: 10 }),
       mk({ room_id: "b", x_ft: 10, y_ft: 0, width_ft: 10, depth_ft: 10 }),
@@ -54,10 +54,34 @@ describe("Wall generator", () => {
     const walls = generateWalls(placements, { plot_width_ft: 20, plot_depth_ft: 20 });
     const exterior = walls.filter(w => w.type === "exterior");
     const interior = walls.filter(w => w.type === "interior");
-    // 4 exterior walls (merged across matching room edges)
-    expect(exterior.length).toBe(4);
-    // Interior: one full vertical at x=10, one full horizontal at y=10
-    expect(interior.length).toBe(2);
+    // With T-junction splitting at (10, 10):
+    //   2 horizontal exterior (y=0) split at x=10 → 2 segments
+    //   2 horizontal exterior (y=20) split at x=10 → 2 segments
+    //   2 vertical exterior (x=0) split at y=10 → 2 segments
+    //   2 vertical exterior (x=20) split at y=10 → 2 segments
+    //   1 interior horizontal (y=10) split at x=10 → 2 segments
+    //   1 interior vertical (x=10) split at y=10 → 2 segments
+    expect(exterior.length).toBe(8);
+    expect(interior.length).toBe(4);
+  });
+
+  it("T-junction: interior wall terminates at exterior — endpoints not dangling", () => {
+    // Single room not spanning plot creates T-junctions where room walls
+    // meet the plot perimeter on the interior side.
+    const placements = [mk({ room_id: "a", x_ft: 5, y_ft: 5, width_ft: 10, depth_ft: 10 })];
+    const walls = generateWalls(placements, { plot_width_ft: 20, plot_depth_ft: 20 });
+
+    // Count endpoint occurrences across all walls
+    const endpointCount = new Map<string, number>();
+    for (const w of walls) {
+      const k1 = `${w.centerline.start.x.toFixed(1)}|${w.centerline.start.y.toFixed(1)}`;
+      const k2 = `${w.centerline.end.x.toFixed(1)}|${w.centerline.end.y.toFixed(1)}`;
+      endpointCount.set(k1, (endpointCount.get(k1) ?? 0) + 1);
+      endpointCount.set(k2, (endpointCount.get(k2) ?? 0) + 1);
+    }
+    // Every endpoint should be touched by ≥ 2 walls (T-junction or corner)
+    const dangling = [...endpointCount.values()].filter(c => c < 2).length;
+    expect(dangling).toBe(0);
   });
 
   it("no dangling zero-length segments", () => {
