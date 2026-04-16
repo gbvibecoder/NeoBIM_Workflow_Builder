@@ -116,7 +116,15 @@ function LoginForm() {
         ? { email: identifier.trim().toLowerCase(), password, redirect: false as const }
         : { phone: normalizePhone(identifier) ?? identifier, password, redirect: false as const };
 
-      const res = await signIn("credentials", credentials);
+      let res;
+      try {
+        res = await signIn("credentials", credentials);
+      } catch {
+        // NextAuth v5 beta can throw CredentialsSignin instead of returning it
+        // when the authorize function returns null (wrong password / user not found)
+        setError("Invalid email/phone or password. Please try again.");
+        return;
+      }
 
       if (res?.error) {
         setError("Invalid email/phone or password. Please try again.");

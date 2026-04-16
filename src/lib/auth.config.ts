@@ -4,6 +4,8 @@ import type { NextAuthConfig } from "next-auth";
 export const authConfig = {
   // Accept both NextAuth v4 (NEXTAUTH_SECRET) and v5 (AUTH_SECRET) naming
   secret: process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET,
+  // Required for localhost / non-Vercel deployments in Auth.js v5
+  trustHost: true,
   pages: {
     signIn: "/login",
     error: "/login",

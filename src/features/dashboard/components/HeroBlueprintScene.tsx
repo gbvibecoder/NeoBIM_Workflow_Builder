@@ -1,42 +1,22 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
-
-// Space in filename → URL-encoded
-const DASHBOARD_VIDEO_URL = "/videos/dashboard%20video.mp4";
 
 /**
  * HeroBlueprintScene — dashboard hero background.
  *
  * Layers (back → front):
  *  1. Drifting cyan + violet radial glows (ambient color)
- *  2. Dual blueprint grid (48 px main + 12 px fine), masked to the right
+ *  2. Dual blueprint grid (48 px main + 12 px fine), masked to center
  *  3. Architect corner marks + dimension-line fragment
  *  4. Slow vertical scan-line sweep
- *  5. Single prominent product-preview video panel on the right 40%
  *
- * Pure CSS + SVG + HTML5 video. No WebGL, no 3D libraries.
+ * Pure CSS + SVG. No WebGL, no 3D libraries.
+ * Video is now rendered in the page layout itself for proper centering.
  */
 export function HeroBlueprintScene() {
-  const [showPanel, setShowPanel] = useState(false);
-  const videoRef = useRef<HTMLVideoElement | null>(null);
-
-  useEffect(() => {
-    const mq = window.matchMedia("(min-width: 960px)");
-    const update = () => setShowPanel(mq.matches);
-    update();
-    mq.addEventListener("change", update);
-    return () => mq.removeEventListener("change", update);
-  }, []);
-
-  useEffect(() => {
-    if (!showPanel) return;
-    videoRef.current?.play().catch(() => {});
-  }, [showPanel]);
-
   const gridMask =
-    "radial-gradient(ellipse 78% 82% at 72% 50%, #000 30%, transparent 80%)";
+    "radial-gradient(ellipse 90% 82% at 50% 50%, #000 30%, transparent 80%)";
 
   return (
     <div
@@ -57,7 +37,7 @@ export function HeroBlueprintScene() {
           position: "absolute",
           inset: 0,
           background:
-            "radial-gradient(ellipse 52% 56% at 72% 48%, rgba(6,182,212,0.22) 0%, transparent 62%)",
+            "radial-gradient(ellipse 52% 56% at 50% 38%, rgba(6,182,212,0.18) 0%, transparent 62%)",
         }}
       />
       <motion.div
@@ -67,7 +47,7 @@ export function HeroBlueprintScene() {
           position: "absolute",
           inset: 0,
           background:
-            "radial-gradient(ellipse 42% 44% at 66% 58%, rgba(168,85,247,0.16) 0%, transparent 58%)",
+            "radial-gradient(ellipse 42% 44% at 55% 60%, rgba(168,85,247,0.14) 0%, transparent 58%)",
         }}
       />
 
@@ -77,7 +57,7 @@ export function HeroBlueprintScene() {
           position: "absolute",
           inset: 0,
           backgroundImage:
-            "linear-gradient(rgba(125,249,255,0.06) 1px, transparent 1px), linear-gradient(90deg, rgba(125,249,255,0.06) 1px, transparent 1px)",
+            "linear-gradient(rgba(125,249,255,0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(125,249,255,0.05) 1px, transparent 1px)",
           backgroundSize: "48px 48px",
           maskImage: gridMask,
           WebkitMaskImage: gridMask,
@@ -88,7 +68,7 @@ export function HeroBlueprintScene() {
           position: "absolute",
           inset: 0,
           backgroundImage:
-            "linear-gradient(rgba(125,249,255,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(125,249,255,0.03) 1px, transparent 1px)",
+            "linear-gradient(rgba(125,249,255,0.025) 1px, transparent 1px), linear-gradient(90deg, rgba(125,249,255,0.025) 1px, transparent 1px)",
           backgroundSize: "12px 12px",
           maskImage: gridMask,
           WebkitMaskImage: gridMask,
@@ -100,10 +80,10 @@ export function HeroBlueprintScene() {
         style={{
           position: "absolute",
           top: "6%",
-          right: "4%",
+          right: "6%",
           width: 160,
           height: 160,
-          opacity: 0.45,
+          opacity: 0.35,
         }}
         viewBox="0 0 160 160"
         fill="none"
@@ -115,11 +95,26 @@ export function HeroBlueprintScene() {
       <svg
         style={{
           position: "absolute",
-          bottom: "6%",
-          right: "4%",
+          top: "6%",
+          left: "6%",
           width: 140,
           height: 140,
-          opacity: 0.4,
+          opacity: 0.3,
+        }}
+        viewBox="0 0 140 140"
+        fill="none"
+      >
+        <path d="M0,0 L0,32 M0,0 L32,0" stroke="rgba(168,85,247,0.4)" strokeWidth="1" />
+        <circle cx="16" cy="16" r="2" fill="rgba(168,85,247,0.5)" />
+      </svg>
+      <svg
+        style={{
+          position: "absolute",
+          bottom: "6%",
+          right: "6%",
+          width: 140,
+          height: 140,
+          opacity: 0.35,
         }}
         viewBox="0 0 140 140"
         fill="none"
@@ -137,106 +132,14 @@ export function HeroBlueprintScene() {
           position: "absolute",
           top: 0,
           bottom: 0,
-          left: "40%",
+          left: "20%",
           width: 2,
           background:
-            "linear-gradient(180deg, transparent 0%, rgba(125,249,255,0.25) 50%, transparent 100%)",
+            "linear-gradient(180deg, transparent 0%, rgba(125,249,255,0.2) 50%, transparent 100%)",
           filter: "blur(2px)",
           mixBlendMode: "screen",
         }}
       />
-
-      {/* ── Hero video panel — single prominent frame on the right ───── */}
-      {showPanel && (
-        <motion.div
-          initial={{ opacity: 0, y: 28, scale: 0.98 }}
-          animate={{ opacity: 1, y: [0, -6, 0], scale: 1 }}
-          transition={{
-            opacity: { duration: 0.9, delay: 0.25, ease: [0.22, 1, 0.36, 1] },
-            scale: { duration: 0.9, delay: 0.25, ease: [0.22, 1, 0.36, 1] },
-            y: { duration: 9, repeat: Infinity, ease: "easeInOut", delay: 1.2 },
-          }}
-          style={{
-            position: "absolute",
-            top: "50%",
-            right: "clamp(24px, 4vw, 56px)",
-            transform: "translateY(-50%)",
-            width: "min(42vw, 640px)",
-            aspectRatio: "16 / 9",
-            borderRadius: 22,
-            overflow: "hidden",
-            background: "#05070e",
-            border: "1px solid rgba(125, 249, 255, 0.22)",
-            boxShadow: [
-              "0 40px 80px rgba(0, 0, 0, 0.6)",
-              "0 12px 32px rgba(0, 0, 0, 0.35)",
-              "inset 0 1px 0 rgba(255, 255, 255, 0.05)",
-              "0 0 80px rgba(6, 182, 212, 0.18)",
-              "0 0 160px rgba(168, 85, 247, 0.08)",
-            ].join(", "),
-          }}
-        >
-          {/* Top accent line */}
-          <div
-            style={{
-              position: "absolute",
-              top: 0,
-              left: "10%",
-              right: "10%",
-              height: 1,
-              background:
-                "linear-gradient(90deg, transparent 0%, rgba(125,249,255,0.7) 50%, transparent 100%)",
-              zIndex: 2,
-              pointerEvents: "none",
-            }}
-          />
-
-          {/* The video itself */}
-          <video
-            ref={videoRef}
-            src={DASHBOARD_VIDEO_URL}
-            muted
-            loop
-            playsInline
-            preload="metadata"
-            style={{
-              position: "absolute",
-              inset: 0,
-              width: "100%",
-              height: "100%",
-              objectFit: "cover",
-            }}
-          />
-
-          {/* Subtle inner edge glow */}
-          <div
-            style={{
-              position: "absolute",
-              inset: 0,
-              borderRadius: 22,
-              boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.04)",
-              pointerEvents: "none",
-            }}
-          />
-
-          {/* Corner tick marks for that architect-spec-sheet feel */}
-          <svg
-            style={{ position: "absolute", top: 10, left: 10, width: 22, height: 22, opacity: 0.7, pointerEvents: "none" }}
-            viewBox="0 0 22 22"
-            fill="none"
-          >
-            <path d="M0,0 L0,8 M0,0 L8,0" stroke="rgba(125,249,255,0.9)" strokeWidth="1.2" />
-          </svg>
-          <svg
-            style={{ position: "absolute", bottom: 10, right: 10, width: 22, height: 22, opacity: 0.7, pointerEvents: "none" }}
-            viewBox="0 0 22 22"
-            fill="none"
-          >
-            <path d="M22,22 L22,14 M22,22 L14,22" stroke="rgba(125,249,255,0.9)" strokeWidth="1.2" />
-          </svg>
-        </motion.div>
-      )}
     </div>
   );
 }
-

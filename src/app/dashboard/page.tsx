@@ -221,76 +221,62 @@ export default function DashboardPage() {
       <main ref={mainRef} className="db-scroll" style={{ position: "relative", zIndex: 1, height: "100%", overflowY: "auto", overflowX: "hidden" }}>
 
         {/* ═══════════════════════════════════════════════════════════════
-            HERO — "The BIM Holotable" · dedicated 3D scene + asymmetric UI
+            HERO — Split layout: text left · video right
             ═══════════════════════════════════════════════════════════════ */}
         <motion.section
           ref={heroRef}
           style={{ position: "relative", height: "100%", overflow: "hidden", opacity: heroOpacity, scale: heroScale }}
         >
-          {/* Opaque backdrop — clean dark void behind the building.
-              Subtle warm radial at building location to ground the scene
-              and a faint cyan accent on the left to support the text. */}
+          {/* Opaque backdrop */}
           <div style={{
             position: "absolute", inset: 0, zIndex: 0,
             background: `
-              radial-gradient(ellipse 60% 55% at 68% 52%, rgba(255,184,108,0.08) 0%, transparent 60%),
-              radial-gradient(ellipse 55% 50% at 22% 45%, rgba(125,249,255,0.04) 0%, transparent 55%),
+              radial-gradient(ellipse 60% 55% at 72% 50%, rgba(6,182,212,0.08) 0%, transparent 60%),
+              radial-gradient(ellipse 50% 45% at 25% 55%, rgba(168,85,247,0.05) 0%, transparent 55%),
               radial-gradient(ellipse 100% 80% at 50% 50%, #0a0d16 0%, #05070e 55%, #02030a 100%)
             `,
           }} />
 
-          {/* Dedicated hero background — animated blueprint + hero video panel */}
+          {/* Blueprint background */}
           <div style={{ position: "absolute", inset: 0, zIndex: 1, pointerEvents: "none" }}>
             <HeroBlueprintScene />
           </div>
 
-          {/* Bottom fade — connects to next section. NOTE: top is intentionally
-              clean so the building's sky and the HUD have unobstructed reading. */}
+          {/* Bottom fade */}
           <div style={{
             position: "absolute", inset: 0, zIndex: 2, pointerEvents: "none",
-            background: "linear-gradient(180deg, transparent 0%, transparent 72%, rgba(3,4,10,0.95) 100%)",
+            background: "linear-gradient(180deg, transparent 0%, transparent 82%, rgba(3,4,10,0.95) 100%)",
           }} />
-          {/* Left protected zone — strong dark mask covers ONLY the left half so
-              the text overlay always reads regardless of where the building's
-              shadows fall, while leaving the right (building + HUD) untouched.
-              On mobile there's no 3D scene to fade into, so this mask is skipped. */}
-          {!isMobileLayout && (
-            <div style={{
-              position: "absolute", inset: 0, zIndex: 2, pointerEvents: "none",
-              background: "linear-gradient(90deg, rgba(3,4,10,0.92) 0%, rgba(3,4,10,0.78) 22%, rgba(3,4,10,0.42) 38%, transparent 50%)",
-            }} />
-          )}
 
-          {/* ─── Apple/Linear-style overlay — left side only ─── */}
+          {/* ─── Split layout: text left (compact), video right (large) ─── */}
           <div
-            className="db-hero-overlay"
             style={{
-              position: "absolute", inset: 0, zIndex: 3,
-              display: "flex",
-              alignItems: isMobileLayout ? "flex-start" : "center",
-              padding: isMobileLayout ? "78px 22px 80px 22px" : "0 clamp(32px, 6vw, 110px)",
-              pointerEvents: "none",
+              position: "relative", zIndex: 3,
+              display: "grid",
+              gridTemplateColumns: isMobileLayout ? "1fr" : "minmax(0, 0.8fr) minmax(0, 1.55fr)",
+              alignItems: "center",
+              gap: isMobileLayout ? 28 : "clamp(24px, 3vw, 48px)",
+              padding: isMobileLayout
+                ? "60px 22px 80px 22px"
+                : "0 clamp(32px, 4vw, 72px)",
+              height: "100%",
               overflowY: isMobileLayout ? "auto" : "visible",
-            }}>
-            {/* ── LEFT: identity + CTA — full width on mobile, hard-capped on desktop ── */}
-            <div
-              className="db-hero-left"
-              style={{
-                pointerEvents: "auto",
-                width: isMobileLayout ? "100%" : "min(560px, 46%)",
-              }}>
-              {/* Eyebrow — transformation story */}
+            }}
+          >
+            {/* ── LEFT: Text content (compact) ── */}
+            <div style={{ maxWidth: isMobileLayout ? "100%" : 440 }}>
+              {/* Eyebrow badge */}
               <motion.div
                 initial={{ opacity: 0, x: -16 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: 0.15, duration: 0.7, ease }}
-                style={{ display: "inline-flex", alignItems: "center", gap: 10, marginBottom: 24,
-                  padding: "6px 12px 6px 10px", borderRadius: 999,
+                style={{
+                  display: "inline-flex", alignItems: "center", gap: 10,
+                  padding: "6px 14px 6px 10px", borderRadius: 999,
+                  marginBottom: isMobileLayout ? 18 : 22,
                   background: "rgba(125,249,255,0.04)",
                   border: "1px solid rgba(125,249,255,0.12)",
                   backdropFilter: "blur(8px)",
-                  whiteSpace: "nowrap",
-                  maxWidth: "100%",
                 }}
               >
                 <span className="db-live-dot" style={{ width: 6, height: 6, borderRadius: "50%", background: "#06b6d4", boxShadow: "0 0 12px #06b6d4", flexShrink: 0 }} />
@@ -298,7 +284,6 @@ export default function DashboardPage() {
                   fontSize: isMobileLayout ? 9 : 10,
                   fontWeight: 600, letterSpacing: "0.22em", textTransform: "uppercase",
                   color: "rgba(125,249,255,0.85)", fontFamily: "var(--font-jetbrains), monospace",
-                  whiteSpace: "nowrap",
                 }}>
                   PROMPT → BIM MODEL · LIVE
                 </span>
@@ -312,16 +297,16 @@ export default function DashboardPage() {
               >
                 <span style={{
                   display: "block",
-                  fontSize: 13, fontWeight: 400, letterSpacing: "0.18em", textTransform: "uppercase",
+                  fontSize: 11, fontWeight: 400, letterSpacing: "0.18em", textTransform: "uppercase",
                   color: "rgba(255,255,255,0.42)",
                   fontFamily: "var(--font-jetbrains), monospace",
-                  marginBottom: 10,
+                  marginBottom: 6,
                 }}>
                   {data.userName ? t("dash.welcomeBack") : ""}
                 </span>
               </motion.div>
 
-              {/* Display name — AEC-tech restraint (Inter SemiBold feel) */}
+              {/* Display name */}
               <motion.h1
                 initial={{ opacity: 0, y: 18 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -329,12 +314,12 @@ export default function DashboardPage() {
                 className="db-hero-name"
                 style={{
                   fontSize: isMobileLayout
-                    ? "clamp(34px, 9vw, 52px)"
-                    : "clamp(40px, 4.6vw, 68px)",
+                    ? "clamp(30px, 8vw, 44px)"
+                    : "clamp(30px, 3vw, 46px)",
                   fontWeight: 600,
                   letterSpacing: "-0.035em",
-                  lineHeight: 1.02,
-                  margin: "0 0 16px",
+                  lineHeight: 1.04,
+                  margin: "0 0 12px",
                   color: "#f5f7fb",
                   backgroundImage: "linear-gradient(110deg, #ffffff 10%, #7dd3fc 35%, #c4b5fd 60%, #ffffff 90%)",
                   backgroundSize: "200% 100%",
@@ -346,17 +331,17 @@ export default function DashboardPage() {
                 {data.userName || t("dash.welcomeNew")}
               </motion.h1>
 
-              {/* Subtitle — single line, restrained, factual */}
+              {/* Subtitle */}
               <motion.p
                 initial={{ opacity: 0, y: 14 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.5, duration: 0.6, ease }}
                 style={{
-                  fontSize: isMobileLayout ? 14 : 16,
+                  fontSize: isMobileLayout ? 13 : 13.5,
                   color: "rgba(203,213,225,0.62)",
                   lineHeight: 1.55,
-                  margin: isMobileLayout ? "0 0 26px" : "0 0 36px",
-                  maxWidth: 480,
+                  margin: isMobileLayout ? "0 0 20px" : "0 0 24px",
+                  maxWidth: 420,
                   fontWeight: 400,
                   letterSpacing: "-0.003em",
                 }}
@@ -370,25 +355,22 @@ export default function DashboardPage() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.7, duration: 0.6, ease }}
                 style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: isMobileLayout ? 10 : 14,
-                  flexWrap: "wrap",
+                  display: "flex", alignItems: "center",
+                  gap: isMobileLayout ? 10 : 12, flexWrap: "wrap",
                 }}
               >
-                {/* Primary CTA */}
                 <Link
                   href="/dashboard/canvas?new=1"
                   className="db-hero-cta db-hero-cta-primary"
                   style={{
                     position: "relative",
-                    display: "inline-flex", alignItems: "center", gap: 10,
-                    padding: isMobileLayout ? "13px 24px" : "15px 32px",
+                    display: "inline-flex", alignItems: "center", gap: 8,
+                    padding: isMobileLayout ? "12px 22px" : "12px 22px",
                     borderRadius: 999,
                     background: "linear-gradient(110deg, #06b6d4 0%, #7dd3fc 50%, #a78bfa 100%)",
                     backgroundSize: "200% 100%",
                     color: "#04111a",
-                    fontSize: isMobileLayout ? 13 : 14,
+                    fontSize: isMobileLayout ? 12.5 : 13,
                     fontWeight: 700,
                     textDecoration: "none", letterSpacing: "-0.01em",
                     whiteSpace: "nowrap",
@@ -398,20 +380,19 @@ export default function DashboardPage() {
                   }}
                 >
                   {t("dash.startBuilding")}
-                  <ArrowRight size={15} strokeWidth={2.6} />
+                  <ArrowRight size={14} strokeWidth={2.6} />
                 </Link>
 
-                {/* Secondary — templates */}
                 <Link
                   href="/dashboard/templates"
                   style={{
-                    display: "inline-flex", alignItems: "center", gap: 10,
-                    padding: isMobileLayout ? "12px 18px" : "15px 26px",
-                    borderRadius: 14,
+                    display: "inline-flex", alignItems: "center", gap: 8,
+                    padding: isMobileLayout ? "11px 16px" : "11px 18px",
+                    borderRadius: 12,
                     background: "rgba(255,255,255,0.03)",
                     border: "1px solid rgba(255,255,255,0.10)",
                     color: "rgba(226,232,240,0.85)",
-                    fontSize: isMobileLayout ? 12 : 13,
+                    fontSize: isMobileLayout ? 11.5 : 12,
                     fontWeight: 600,
                     textDecoration: "none", letterSpacing: "0.01em",
                     whiteSpace: "nowrap",
@@ -419,23 +400,22 @@ export default function DashboardPage() {
                     transition: "all 0.3s cubic-bezier(0.22, 1, 0.36, 1)",
                   }}
                 >
-                  <Sparkles size={14} /> Browse Templates
+                  <Sparkles size={13} /> Browse Templates
                 </Link>
-
               </motion.div>
 
-              {/* ── Inline metric strip — flex row on desktop, 2x2 grid on mobile ── */}
+              {/* Metric strip */}
               <motion.div
                 initial={{ opacity: 0, y: 14 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.85, duration: 0.6, ease }}
                 style={{
-                  marginTop: isMobileLayout ? 28 : 38,
+                  marginTop: isMobileLayout ? 22 : 26,
                   display: isMobileLayout ? "grid" : "flex",
                   ...(isMobileLayout
-                    ? { gridTemplateColumns: "repeat(2, 1fr)", rowGap: 18, columnGap: 14 }
-                    : { alignItems: "center", gap: 28, flexWrap: "wrap" }),
-                  paddingTop: 22,
+                    ? { gridTemplateColumns: "repeat(2, 1fr)", rowGap: 14, columnGap: 12 }
+                    : { alignItems: "center", gap: 18, flexWrap: "wrap" }),
+                  paddingTop: 16,
                   borderTop: "1px solid rgba(255,255,255,0.06)",
                 }}
               >
@@ -454,7 +434,7 @@ export default function DashboardPage() {
                       color: "#8B5CF6",
                       icon: <Zap size={12} />,
                       extra: (
-                        <div style={{ marginTop: 6, width: 88, height: 3, borderRadius: 2, background: "rgba(255,255,255,0.06)", overflow: "hidden" }}>
+                        <div style={{ marginTop: 4, width: 60, height: 2.5, borderRadius: 2, background: "rgba(255,255,255,0.06)", overflow: "hidden" }}>
                           <div style={{ width: `${execPct * 100}%`, height: "100%", background: "linear-gradient(90deg, #8B5CF6, #c4b5fd)", boxShadow: "0 0 8px rgba(139,92,246,0.6)", transition: "width 0.6s ease" }} />
                         </div>
                       ),
@@ -464,18 +444,18 @@ export default function DashboardPage() {
                   return stats.map((m) => {
                     const isLevel = m.label === "LEVEL";
                     return (
-                      <div key={m.label} style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                      <div key={m.label} style={{ display: "flex", alignItems: "center", gap: 8 }}>
                         {isLevel ? (
-                          <div style={{ position: "relative", width: 44, height: 44, flexShrink: 0 }}>
-                            <svg width="44" height="44" viewBox="0 0 44 44" style={{ position: "absolute", inset: 0, transform: "rotate(-90deg)" }}>
-                              <circle cx="22" cy="22" r="19" fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="2.5" />
+                          <div style={{ position: "relative", width: 32, height: 32, flexShrink: 0 }}>
+                            <svg width="32" height="32" viewBox="0 0 32 32" style={{ position: "absolute", inset: 0, transform: "rotate(-90deg)" }}>
+                              <circle cx="16" cy="16" r="13" fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="2" />
                               <circle
-                                cx="22" cy="22" r="19" fill="none"
+                                cx="16" cy="16" r="13" fill="none"
                                 stroke="url(#db-level-grad)"
-                                strokeWidth="2.5"
+                                strokeWidth="2"
                                 strokeLinecap="round"
-                                strokeDasharray={2 * Math.PI * 19}
-                                strokeDashoffset={2 * Math.PI * 19 * (1 - levelPct)}
+                                strokeDasharray={2 * Math.PI * 13}
+                                strokeDashoffset={2 * Math.PI * 13 * (1 - levelPct)}
                                 style={{ transition: "stroke-dashoffset 0.8s ease", filter: "drop-shadow(0 0 6px rgba(16,185,129,0.55))" }}
                               />
                               <defs>
@@ -485,13 +465,13 @@ export default function DashboardPage() {
                                 </linearGradient>
                               </defs>
                             </svg>
-                            <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 800, color: "#F0F2F8", fontFamily: "var(--font-jetbrains), monospace", letterSpacing: "-0.02em" }}>
+                            <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10.5, fontWeight: 800, color: "#F0F2F8", fontFamily: "var(--font-jetbrains), monospace", letterSpacing: "-0.02em" }}>
                               {data.level}
                             </div>
                           </div>
                         ) : (
                           <div style={{
-                            width: 32, height: 32, borderRadius: 10, flexShrink: 0,
+                            width: 24, height: 24, borderRadius: 7, flexShrink: 0,
                             display: "flex", alignItems: "center", justifyContent: "center",
                             background: `linear-gradient(135deg, ${m.color}22, ${m.color}08)`,
                             border: `1px solid ${m.color}33`,
@@ -501,16 +481,16 @@ export default function DashboardPage() {
                             {m.icon}
                           </div>
                         )}
-                        <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                        <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
                           <span style={{
-                            fontSize: 9, letterSpacing: "0.18em",
+                            fontSize: 8.5, letterSpacing: "0.18em",
                             color: "rgba(255,255,255,0.42)",
                             fontFamily: "var(--font-jetbrains), monospace",
                           }}>
                             {m.label}
                           </span>
                           <span style={{
-                            fontSize: 17, fontWeight: 700,
+                            fontSize: 13, fontWeight: 700,
                             color: m.color,
                             fontFamily: "var(--font-jetbrains), monospace",
                             letterSpacing: "-0.01em",
@@ -526,6 +506,72 @@ export default function DashboardPage() {
                 })()}
               </motion.div>
             </div>
+
+            {/* ── RIGHT: Video player — dominant, auto-playing ── */}
+            <motion.div
+              initial={{ opacity: 0, x: 32, scale: 0.96 }}
+              animate={{ opacity: 1, x: 0, scale: 1 }}
+              transition={{ delay: 0.5, duration: 1, ease }}
+              style={{
+                width: "100%",
+                aspectRatio: "16 / 9",
+                maxHeight: isMobileLayout ? "auto" : "min(84vh, 840px)",
+                borderRadius: isMobileLayout ? 14 : 22,
+                overflow: "hidden",
+                position: "relative",
+                background: "#05070e",
+                border: "1px solid rgba(125, 249, 255, 0.22)",
+                boxShadow: [
+                  "0 56px 120px rgba(0, 0, 0, 0.7)",
+                  "0 20px 48px rgba(0, 0, 0, 0.45)",
+                  "inset 0 1px 0 rgba(255, 255, 255, 0.05)",
+                  "0 0 140px rgba(6, 182, 212, 0.24)",
+                  "0 0 260px rgba(168, 85, 247, 0.1)",
+                ].join(", "),
+                justifySelf: isMobileLayout ? "stretch" : "end",
+              }}
+            >
+              {/* Top accent line */}
+              <div style={{
+                position: "absolute", top: 0, left: "10%", right: "10%", height: 1, zIndex: 2, pointerEvents: "none",
+                background: "linear-gradient(90deg, transparent 0%, rgba(125,249,255,0.7) 50%, transparent 100%)",
+              }} />
+
+              {/* Video — autoPlay + muted for guaranteed browser autoplay */}
+              <video
+                autoPlay
+                muted
+                loop
+                playsInline
+                preload="auto"
+                src="/videos/dashboard%20video.mp4"
+                style={{
+                  position: "absolute", inset: 0,
+                  width: "100%", height: "100%",
+                  objectFit: "cover",
+                }}
+              />
+
+              {/* Inner edge glow */}
+              <div style={{
+                position: "absolute", inset: 0, borderRadius: isMobileLayout ? 14 : 22, pointerEvents: "none",
+                boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.04)",
+              }} />
+
+              {/* Corner tick marks — all four corners */}
+              <svg style={{ position: "absolute", top: 12, left: 12, width: 22, height: 22, opacity: 0.7, pointerEvents: "none" }} viewBox="0 0 22 22" fill="none">
+                <path d="M0,0 L0,8 M0,0 L8,0" stroke="rgba(125,249,255,0.9)" strokeWidth="1.2" />
+              </svg>
+              <svg style={{ position: "absolute", top: 12, right: 12, width: 22, height: 22, opacity: 0.7, pointerEvents: "none" }} viewBox="0 0 22 22" fill="none">
+                <path d="M22,0 L22,8 M22,0 L14,0" stroke="rgba(125,249,255,0.9)" strokeWidth="1.2" />
+              </svg>
+              <svg style={{ position: "absolute", bottom: 12, left: 12, width: 22, height: 22, opacity: 0.7, pointerEvents: "none" }} viewBox="0 0 22 22" fill="none">
+                <path d="M0,22 L0,14 M0,22 L8,22" stroke="rgba(125,249,255,0.9)" strokeWidth="1.2" />
+              </svg>
+              <svg style={{ position: "absolute", bottom: 12, right: 12, width: 22, height: 22, opacity: 0.7, pointerEvents: "none" }} viewBox="0 0 22 22" fill="none">
+                <path d="M22,22 L22,14 M22,22 L14,22" stroke="rgba(125,249,255,0.9)" strokeWidth="1.2" />
+              </svg>
+            </motion.div>
           </div>
 
           {/* ── Scroll indicator ── */}
@@ -533,7 +579,7 @@ export default function DashboardPage() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 1.2, duration: 0.6 }}
-            style={{ position: "absolute", bottom: 28, left: "50%", transform: "translateX(-50%)", zIndex: 4, display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}
+            style={{ position: "absolute", bottom: 24, left: "50%", transform: "translateX(-50%)", zIndex: 4, display: "flex", flexDirection: "column", alignItems: "center", gap: 8, pointerEvents: "none" }}
           >
             <span style={{ fontSize: 9, color: "rgba(255,255,255,0.35)", letterSpacing: "0.22em", textTransform: "uppercase", fontFamily: "var(--font-jetbrains), monospace" }}>
               {t("dash.scrollExplore")}
