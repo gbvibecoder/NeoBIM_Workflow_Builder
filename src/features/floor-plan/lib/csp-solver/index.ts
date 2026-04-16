@@ -1,6 +1,9 @@
 export { solveMandalaCSP } from "./mandala-csp";
 export type { MandalaAssignment, SolveResult, SolveOptions } from "./mandala-csp";
+export { solveStage3B } from "./cell-csp";
+export type { FinePlacement, Stage3BResult, Stage3BOptions } from "./cell-csp";
 export type { ConflictSet } from "./unsat-explainer";
+export type { Rect } from "./geometry-utils";
 export {
   directionToCell,
   cellToDirection,
