@@ -19,6 +19,12 @@ export type PipelineBStage = "parse" | "infeasibility" | "mandala" | "placement"
 
 export interface PipelineBResult {
   project: FloorPlanProject | null;
+  /**
+   * The parsed constraints extracted in the parse stage. Exposed here so the
+   * caller can pass them to layout-metrics (adjacency satisfaction + dim
+   * deviation checks need them). null only when the parser itself failed.
+   */
+  parsedConstraints: ParsedConstraints | null;
   pipelineUsed: "B-fine" | "B-mandala" | "B-stub" | "B-unsat";
   relaxationsApplied: string[];
   infeasibilityReason: string | null;
@@ -463,6 +469,7 @@ export async function runPipelineB(prompt: string, apiKey: string): Promise<Pipe
     parse_ms = Date.now() - parseStart;
     return {
       project: null,
+      parsedConstraints: null,
       pipelineUsed: "B-unsat",
       relaxationsApplied: [],
       infeasibilityReason: null,
@@ -488,6 +495,7 @@ export async function runPipelineB(prompt: string, apiKey: string): Promise<Pipe
     logger.debug(`[PIPELINE-B] Infeasible: ${infeasibility.kind} — ${infeasibility.reason}`);
     return {
       project: null,
+      parsedConstraints: constraints,
       pipelineUsed: "B-unsat",
       relaxationsApplied: [],
       infeasibilityReason: infeasibility.reason ?? "infeasible",
@@ -518,6 +526,7 @@ export async function runPipelineB(prompt: string, apiKey: string): Promise<Pipe
     logger.debug(`[PIPELINE-B] CSP-3A UNSAT (final): ${mandalaResult.conflict?.human_reason}`);
     return {
       project: null,
+      parsedConstraints: constraints,
       pipelineUsed: "B-unsat",
       relaxationsApplied,
       infeasibilityReason: mandalaResult.conflict?.human_reason ?? "CSP_UNSAT_STAGE_3A",
@@ -596,6 +605,7 @@ export async function runPipelineB(prompt: string, apiKey: string): Promise<Pipe
     placement_ms = Date.now() - placementStart;
     return {
       project,
+      parsedConstraints: constraints,
       pipelineUsed: "B-fine",
       relaxationsApplied,
       infeasibilityReason: null,
@@ -620,6 +630,7 @@ export async function runPipelineB(prompt: string, apiKey: string): Promise<Pipe
 
   return {
     project,
+    parsedConstraints: constraints,
     pipelineUsed: "B-mandala",
     relaxationsApplied,
     infeasibilityReason: null,

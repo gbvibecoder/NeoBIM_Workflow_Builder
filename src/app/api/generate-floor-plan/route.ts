@@ -65,6 +65,9 @@ import { classifyRoom } from "@/features/floor-plan/lib/room-sizer";
 import { routePrompt } from "@/features/floor-plan/lib/pipeline-router";
 import { runPipelineB } from "@/features/floor-plan/lib/pipeline-b-orchestrator";
 
+// Phase 1 — post-solve honest metrics (pipeline-agnostic)
+import { computeLayoutMetrics } from "@/features/floor-plan/lib/layout-metrics";
+
 // ── Generation Feedback ────────────────────────────────────────────────────
 
 interface GenerationFeedback {
@@ -259,11 +262,17 @@ export async function POST(req: NextRequest) {
         if (bResult.relaxationsApplied.length > 0) {
           feedback.tips.push(`Relaxations: ${bResult.relaxationsApplied.join("; ")}`);
         }
+        const layoutMetrics = computeLayoutMetrics(
+          bResult.project,
+          bResult.parsedConstraints ?? undefined,
+        );
         return NextResponse.json({
           project: bResult.project,
           geometry: null,
           svg: null,
           feedback,
+          layoutMetrics,
+          qualityFlags: layoutMetrics.quality_flags,
           pipelineUsed: bResult.pipelineUsed,
           relaxationsApplied: bResult.relaxationsApplied,
           infeasibilityReason: null,
@@ -336,7 +345,12 @@ export async function POST(req: NextRequest) {
       if (gridResult) {
         logger.debug('[GRID-FIRST] Pipeline succeeded — returning grid-based floor plan');
         await recordToolExecution(userId, "floor-plan");
-        return NextResponse.json(gridResult);
+        const layoutMetrics = computeLayoutMetrics(gridResult.project);
+        return NextResponse.json({
+          ...gridResult,
+          layoutMetrics,
+          qualityFlags: layoutMetrics.quality_flags,
+        });
       }
       logger.debug('[GRID-FIRST] Pipeline returned null — falling back to BSP/AI pipeline');
     } catch (gridErr) {
@@ -413,7 +427,15 @@ export async function POST(req: NextRequest) {
       }))));
 
       await recordToolExecution(userId, "floor-plan");
-      return NextResponse.json({ project, geometry, svg: null, feedback });
+      const layoutMetrics = computeLayoutMetrics(project);
+      return NextResponse.json({
+        project,
+        geometry,
+        svg: null,
+        feedback,
+        layoutMetrics,
+        qualityFlags: layoutMetrics.quality_flags,
+      });
     }
 
     // ── Stage 2: AI Spatial Layout (single floor) ──────────────────
@@ -481,7 +503,15 @@ export async function POST(req: NextRequest) {
     logger.debug('=== FLOOR PLAN GENERATION COMPLETE ===');
 
     await recordToolExecution(userId, "floor-plan");
-    return NextResponse.json({ project, geometry, svg: floorPlan.svg, feedback });
+    const layoutMetrics = computeLayoutMetrics(project);
+    return NextResponse.json({
+      project,
+      geometry,
+      svg: floorPlan.svg,
+      feedback,
+      layoutMetrics,
+      qualityFlags: layoutMetrics.quality_flags,
+    });
   } catch (err) {
     console.error("[generate-floor-plan] Error:", err);
     const message = err instanceof Error ? err.message : String(err);
