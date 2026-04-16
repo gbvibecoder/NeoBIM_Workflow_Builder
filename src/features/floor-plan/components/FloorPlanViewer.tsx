@@ -16,6 +16,7 @@ import { CodeCompliancePanel } from "@/features/floor-plan/components/panels/Cod
 import { AnalyticsPanel } from "@/features/floor-plan/components/panels/AnalyticsPanel";
 import { BOQPanel } from "@/features/floor-plan/components/panels/BOQPanel";
 import { ProgramPanel } from "@/features/floor-plan/components/panels/ProgramPanel";
+import { QualityPanel } from "@/features/floor-plan/components/panels/QualityPanel";
 import { WelcomeScreen } from "@/features/floor-plan/components/WelcomeScreen";
 import { GenerationLoader } from "@/features/floor-plan/components/GenerationLoader";
 import { getProjectIndex, importProjectFile } from "@/features/floor-plan/lib/project-persistence";
@@ -45,6 +46,8 @@ export function FloorPlanViewer({ initialGeometry, initialPrompt, initialProject
   const generationProgress = useFloorPlanStore((s) => s.generationProgress);
   const originalPrompt = useFloorPlanStore((s) => s.originalPrompt);
   const dataSource = useFloorPlanStore((s) => s.dataSource);
+  const lastQualityFlags = useFloorPlanStore((s) => s.lastQualityFlags);
+  const lastFeasibilityWarnings = useFloorPlanStore((s) => s.lastFeasibilityWarnings);
 
   const loadFromGeometry = useFloorPlanStore((s) => s.loadFromGeometry);
   const loadFromSaved = useFloorPlanStore((s) => s.loadFromSaved);
@@ -120,20 +123,9 @@ export function FloorPlanViewer({ initialGeometry, initialPrompt, initialProject
     setFallbackBanner(null);
     setGenerationError(null);
 
-    // Show progress steps while API call runs
-    const stepTimers: ReturnType<typeof setTimeout>[] = [];
-    const steps = [
-      { step: "analyzing", progress: 10, delay: 300 },
-      { step: "generating", progress: 25, delay: 500 },
-      { step: "placing_walls", progress: 40, delay: 600 },
-      { step: "adding_rooms", progress: 55, delay: 700 },
-      { step: "doors_windows", progress: 70, delay: 800 },
-    ];
-    let cum = 0;
-    for (const s of steps) {
-      cum += s.delay;
-      stepTimers.push(setTimeout(() => store.updateGenerationStep(s.step, s.progress), cum));
-    }
+    // Phase 1 — NO setTimeout-driven fake stages. The loader shows an honest
+    // indeterminate progress bar while the single backend POST runs. Real
+    // per-stage progress is a Phase 3 concern (multi-agent pipeline + SSE).
 
     try {
       const res = await fetch("/api/generate-floor-plan", {
@@ -143,14 +135,10 @@ export function FloorPlanViewer({ initialGeometry, initialPrompt, initialProject
         signal: controller.signal,
       });
 
-      // Clear animation timers
-      for (const t of stepTimers) clearTimeout(t);
-
       if (!res.ok) {
         const data = await res.json().catch(() => ({ error: "Unknown error" }));
         // Handle plan limit / email verification gates — show popup, don't fallback
         if (data.error === "PLAN_LIMIT" || data.error === "EMAIL_VERIFY") {
-          for (const t of stepTimers) clearTimeout(t);
           useFloorPlanStore.setState({ isGenerating: false });
           setUpgradeBlock({ title: data.title, message: data.message, action: data.action, actionUrl: data.actionUrl });
           return;
@@ -160,15 +148,14 @@ export function FloorPlanViewer({ initialGeometry, initialPrompt, initialProject
       }
 
       const data = await res.json();
-      store.updateGenerationStep("finalizing", 90);
 
-      // Brief pause to show finalizing step
-      await new Promise((r) => setTimeout(r, 400));
-      store.updateGenerationStep("complete", 100);
-      await new Promise((r) => setTimeout(r, 600));
-
-      // Load the AI-generated project
+      // Load the AI-generated project + Phase 1 honest metrics in one shot.
       store.setProject(data.project);
+      store.setQualityResults(
+        data.layoutMetrics ?? null,
+        Array.isArray(data.qualityFlags) ? data.qualityFlags : [],
+        Array.isArray(data.feasibilityWarnings) ? data.feasibilityWarnings : [],
+      );
       useFloorPlanStore.setState({
         isGenerating: false,
         dataSource: "pipeline",
@@ -176,9 +163,6 @@ export function FloorPlanViewer({ initialGeometry, initialPrompt, initialProject
         projectModified: false,
       });
     } catch (err) {
-      // Clear animation timers
-      for (const t of stepTimers) clearTimeout(t);
-
       if (controller.signal.aborted) return; // User navigated away
 
       const message = err instanceof Error ? err.message : String(err);
@@ -606,6 +590,54 @@ export function FloorPlanViewer({ initialGeometry, initialPrompt, initialProject
         </div>
       )}
 
+      {/* Phase 1 — quality banner. Surfaces honest layoutMetrics flags. */}
+      {dataSource === "pipeline" && (lastQualityFlags.length > 0 || lastFeasibilityWarnings.length > 0) && (() => {
+        const critCount = lastQualityFlags.filter(f => f.severity === "critical").length;
+        const warnCount = lastQualityFlags.filter(f => f.severity === "warning").length + lastFeasibilityWarnings.length;
+        const hasCritical = critCount > 0;
+        const total = critCount + warnCount;
+        return (
+          <div
+            className={`flex items-center gap-2 border-b px-3 py-1.5 text-[11px] print:hidden ${
+              hasCritical
+                ? "border-amber-200 bg-amber-50 text-amber-800"
+                : "border-blue-100 bg-blue-50/70 text-blue-700"
+            }`}
+          >
+            <span className="shrink-0">{hasCritical ? "⚠️" : "ℹ"}</span>
+            <span className="truncate">
+              {hasCritical
+                ? `This layout has ${total} issue${total === 1 ? "" : "s"} that need attention${critCount > 0 ? ` (${critCount} critical)` : ""}.`
+                : `${total} suggestion${total === 1 ? "" : "s"} available for this layout.`}
+            </span>
+            <button
+              onClick={() => setRightPanelTab("quality")}
+              className={`ml-auto shrink-0 rounded px-2 py-0.5 text-[10px] font-semibold transition-colors ${
+                hasCritical
+                  ? "text-amber-700 hover:bg-amber-100"
+                  : "text-blue-600 hover:bg-blue-100"
+              }`}
+            >
+              View details
+            </button>
+          </div>
+        );
+      })()}
+
+      {/* Phase 1 — green confirmation banner when no flags AND we have metrics. */}
+      {dataSource === "pipeline" && lastQualityFlags.length === 0 && lastFeasibilityWarnings.length === 0 && (
+        <div className="flex items-center gap-2 border-b border-green-100 bg-green-50/70 px-3 py-1.5 text-[11px] text-green-700 print:hidden">
+          <span className="shrink-0">✓</span>
+          <span className="truncate">Layout meets all Phase 1 quality checks.</span>
+          <button
+            onClick={() => setRightPanelTab("quality")}
+            className="ml-auto shrink-0 rounded px-2 py-0.5 text-[10px] font-semibold text-green-700 hover:bg-green-100 transition-colors"
+          >
+            See metrics
+          </button>
+        </div>
+      )}
+
       {/* Top Toolbar */}
       <Toolbar />
 
@@ -665,6 +697,7 @@ export function FloorPlanViewer({ initialGeometry, initialPrompt, initialProject
             <div className="flex border-b border-gray-200 bg-white shrink-0">
               {([
                 { id: "properties", label: "Props" },
+                { id: "quality", label: "Quality" },
                 { id: "vastu", label: "Vastu" },
                 { id: "code", label: "Code" },
                 { id: "analytics", label: "Stats" },
@@ -688,6 +721,7 @@ export function FloorPlanViewer({ initialGeometry, initialPrompt, initialProject
             <div className="flex-1 overflow-y-auto">
               <FloorPlanErrorBoundary fallbackLabel="Panel">
                 {rightPanelTab === "properties" && <PropertiesPanel />}
+                {rightPanelTab === "quality" && <QualityPanel />}
                 {rightPanelTab === "vastu" && <VastuPanel />}
                 {rightPanelTab === "code" && <CodeCompliancePanel />}
                 {rightPanelTab === "analytics" && <AnalyticsPanel />}
