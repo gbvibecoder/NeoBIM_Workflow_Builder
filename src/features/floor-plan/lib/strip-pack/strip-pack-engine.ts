@@ -50,6 +50,15 @@ export async function runStripPackEngine(parsed: ParsedConstraints): Promise<Str
   // ── Step 1: classify ───────────────────────────────────────────────────
   const classified = classifyRooms(parsed);
 
+  // ── Step 1b: build adjacency groups + coerce strips (Phase 3B fix #6) ──
+  // Members of a connected adjacency component are coerced to the same strip
+  // (largest room with a position preference wins; otherwise the largest
+  // overall). Then group_id is set so the sorter keeps them contiguous, so
+  // the greedy packer puts them in the same row whenever it fits — which is
+  // exactly what the door-placer needs to find a shared wall for the
+  // adjacency door later.
+  applyAdjacencyGroups(classified, parsed.adjacency_pairs.map(p => ({ a: p.room_a_id, b: p.room_b_id })), warnings);
+
   // ── Step 2: spine ──────────────────────────────────────────────────────
   const spine = planSpine({ width_ft: plotW, depth_ft: plotD, facing: validFacing }, classified);
 
@@ -140,6 +149,80 @@ export async function runStripPackEngine(parsed: ParsedConstraints): Promise<Str
     metrics,
     warnings,
   };
+}
+
+// ───────────────────────────────────────────────────────────────────────────
+// ADJACENCY GROUPS (Phase 3B fix #6)
+// ───────────────────────────────────────────────────────────────────────────
+
+/**
+ * Builds connected components from adjacency pairs over the room set, then:
+ *   1. coerces every member of a multi-member group to the SAME strip
+ *      (largest room with a position preference dictates; otherwise largest
+ *      overall),
+ *   2. tags each grouped room with `group_id = <root id>` so the sorter
+ *      keeps them contiguous in the input queue.
+ *
+ * Attached rooms (sub-rooms of a parent) are excluded from grouping — the
+ * sub-room-attacher handles those independently.
+ */
+function applyAdjacencyGroups(
+  rooms: StripPackRoom[],
+  pairs: Array<{ a: string; b: string }>,
+  warnings: string[],
+): void {
+  if (pairs.length === 0) return;
+  const eligible = rooms.filter(r => r.strip !== "ATTACHED" && r.strip !== "SPINE");
+  const eligibleIds = new Set(eligible.map(r => r.id));
+  if (eligible.length === 0) return;
+
+  // Union-find
+  const parent = new Map<string, string>();
+  const find = (x: string): string => {
+    let cur = x;
+    while (parent.get(cur) !== cur) {
+      const p = parent.get(cur)!;
+      parent.set(cur, parent.get(p)!);
+      cur = parent.get(cur)!;
+    }
+    return cur;
+  };
+  for (const r of eligible) parent.set(r.id, r.id);
+  for (const { a, b } of pairs) {
+    if (!eligibleIds.has(a) || !eligibleIds.has(b)) continue;
+    const ra = find(a);
+    const rb = find(b);
+    if (ra !== rb) parent.set(ra, rb);
+  }
+
+  // Bucket by root
+  const buckets = new Map<string, StripPackRoom[]>();
+  for (const r of eligible) {
+    const root = find(r.id);
+    if (!buckets.has(root)) buckets.set(root, []);
+    buckets.get(root)!.push(r);
+  }
+
+  for (const [root, members] of buckets) {
+    if (members.length < 2) continue;
+    // Strip coercion: largest room with position preference wins; otherwise
+    // largest overall.
+    const withPos = members.filter(r => !!r.position_preference);
+    const leader = (withPos.length > 0 ? withPos : members)
+      .reduce((best, cur) => (cur.requested_area_sqft > best.requested_area_sqft ? cur : best));
+    const target = leader.strip;
+    let coerced = 0;
+    for (const r of members) {
+      if (r.strip !== target && r.strip !== "ATTACHED" && r.strip !== "SPINE") {
+        r.strip = target;
+        coerced++;
+      }
+      r.group_id = root;
+    }
+    if (coerced > 0) {
+      warnings.push(`adjacency group [${members.map(m => m.name).join(", ")}]: coerced ${coerced} room(s) to ${target} strip (leader: ${leader.name})`);
+    }
+  }
 }
 
 // ───────────────────────────────────────────────────────────────────────────

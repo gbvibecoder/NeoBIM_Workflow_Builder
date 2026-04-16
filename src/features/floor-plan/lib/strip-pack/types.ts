@@ -76,6 +76,14 @@ export interface StripPackRoom {
    * by the classifier).
    */
   anchor_edge?: "west" | "east" | "none";
+  /**
+   * Phase 3B fix #6 — adjacency group id. Set by the orchestrator after
+   * union-find over parsed.adjacency_pairs. Group members get coerced to
+   * the same strip (largest room with a position preference wins) and
+   * sorted contiguously so the greedy packer places them in the same row
+   * whenever it fits. Singleton groups stay undefined.
+   */
+  group_id?: string;
 
   // ── Filled in by the placer ───────────────────────────────────────────
   placed?: Rect;

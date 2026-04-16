@@ -43,6 +43,7 @@ function hasAnchorPreference(room: StripPackRoom): boolean {
 
 interface SortKey {
   hasPosition: 0 | 1;   // 0 wins (sorted first)
+  groupKey: string;     // group root id, or singleton id (for stability)
   negArea: number;      // larger area → more negative → sorted earlier
   zoneRank: number;
   parserOrder: number;  // tiebreaker for stability across runtimes
@@ -51,6 +52,7 @@ interface SortKey {
 function keyFor(room: StripPackRoom, idx: number): SortKey {
   return {
     hasPosition: hasAnchorPreference(room) ? 0 : 1,
+    groupKey: room.group_id ?? `__solo_${room.id}`,
     negArea: -room.requested_area_sqft,
     zoneRank: ZONE_AFFINITY_RANK[room.zone] ?? 99,
     parserOrder: idx,
@@ -59,6 +61,7 @@ function keyFor(room: StripPackRoom, idx: number): SortKey {
 
 function compareKeys(a: SortKey, b: SortKey): number {
   if (a.hasPosition !== b.hasPosition) return a.hasPosition - b.hasPosition;
+  if (a.groupKey    !== b.groupKey)    return a.groupKey < b.groupKey ? -1 : 1;
   if (a.negArea     !== b.negArea)     return a.negArea - b.negArea;
   if (a.zoneRank    !== b.zoneRank)    return a.zoneRank - b.zoneRank;
   return a.parserOrder - b.parserOrder;
