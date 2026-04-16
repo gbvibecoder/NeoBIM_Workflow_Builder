@@ -9,6 +9,8 @@
  * Stage 3: Architectural Detailing (code) — geometry → FloorPlanProject (walls, doors, windows)
  */
 
+export const maxDuration = 60;
+
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
