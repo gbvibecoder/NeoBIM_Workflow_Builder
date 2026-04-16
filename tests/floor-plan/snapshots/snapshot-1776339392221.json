@@ -1,0 +1,247 @@
+{
+  "snapshot_name": "snapshot-1776339392221",
+  "created_at": "2026-04-16T11:36:40.720Z",
+  "git_sha": "372a565",
+  "results": [
+    {
+      "id": "P01",
+      "prompt_summary": "A single-storey 5BHK residential bungalow on a 55ft x 50ft north-facing plot wit",
+      "elapsed_ms": 1001,
+      "error": "parser_failed: 401 Incorrect API key provided: sk-test-***********-key. You can find your API key at https://platform.openai.com/account/api-keys.",
+      "pipeline_used": "B-unsat",
+      "score": null,
+      "project": null
+    },
+    {
+      "id": "P02",
+      "prompt_summary": "5BHK villa on 50ft x 60ft east-facing plot, 2800 sqft, Vastu compliant. Master b",
+      "elapsed_ms": 816,
+      "error": "parser_failed: 401 Incorrect API key provided: sk-test-***********-key. You can find your API key at https://platform.openai.com/account/api-keys.",
+      "pipeline_used": "B-unsat",
+      "score": null,
+      "project": null
+    },
+    {
+      "id": "P03",
+      "prompt_summary": "Spacious 5BHK villa around 3000 sqft, modern open plan, double-height living, at",
+      "elapsed_ms": 872,
+      "error": null,
+      "pipeline_used": "A",
+      "score": {
+        "total": 94,
+        "components": {
+          "completeness": 20,
+          "vastu": 20,
+          "dims": 15,
+          "positions": 10,
+          "hallucinations": 2,
+          "gaps": 2,
+          "relational": 10,
+          "main_entrance": 5,
+          "hallway": 5,
+          "windows": 5
+        },
+        "details": {
+          "completeness": [
+            "matched 5/5 expected rooms"
+          ],
+          "vastu": [
+            "vastu not required"
+          ],
+          "dims": [
+            "no dim expectations"
+          ],
+          "positions": [
+            "no position expectations"
+          ],
+          "hallucinations": [
+            "0 forbidden, 3 extra rooms",
+            "EXTRA: Corridor (corridor)",
+            "EXTRA: Dining Room (dining_room)",
+            "EXTRA: Utility (utility)"
+          ],
+          "gaps": [
+            "walls=79, rooms=16, doors=19",
+            "10 dangling wall endpoints"
+          ],
+          "relational": [
+            "no relational expectations"
+          ],
+          "main_entrance": [
+            "no main_entrance expectation"
+          ],
+          "hallway": [
+            "no hallway connectivity expectation"
+          ],
+          "windows": [
+            "no window expectations"
+          ]
+        }
+      },
+      "project": null
+    },
+    {
+      "id": "P04",
+      "prompt_summary": "4BHK on 40ft x 60ft north-facing plot, 2200 sqft, Vastu compliant. Master 16ft x",
+      "elapsed_ms": 766,
+      "error": "parser_failed: 401 Incorrect API key provided: sk-test-***********-key. You can find your API key at https://platform.openai.com/account/api-keys.",
+      "pipeline_used": "B-unsat",
+      "score": null,
+      "project": null
+    },
+    {
+      "id": "P05",
+      "prompt_summary": "4BHK Vastu compliant, 2000 sqft, plot facing east, kitchen southeast, master sou",
+      "elapsed_ms": 721,
+      "error": "parser_failed: 401 Incorrect API key provided: sk-test-***********-key. You can find your API key at https://platform.openai.com/account/api-keys.",
+      "pipeline_used": "B-unsat",
+      "score": null,
+      "project": null
+    },
+    {
+      "id": "P06",
+      "prompt_summary": "4BHK contemporary apartment 1800 sqft, large living-dining, modular kitchen, thr",
+      "elapsed_ms": 812,
+      "error": null,
+      "pipeline_used": "A",
+      "score": {
+        "total": 92,
+        "components": {
+          "completeness": 20,
+          "vastu": 20,
+          "dims": 15,
+          "positions": 10,
+          "hallucinations": 0,
+          "gaps": 2,
+          "relational": 10,
+          "main_entrance": 5,
+          "hallway": 5,
+          "windows": 5
+        },
+        "details": {
+          "completeness": [
+            "matched 7/7 expected rooms"
+          ],
+          "vastu": [
+            "vastu not required"
+          ],
+          "dims": [
+            "no dim expectations"
+          ],
+          "positions": [
+            "no position expectations"
+          ],
+          "hallucinations": [
+            "0 forbidden, 5 extra rooms",
+            "EXTRA: Bathroom 2 (bathroom)",
+            "EXTRA: Corridor (corridor)",
+            "EXTRA: Utility (utility)",
+            "EXTRA: Bathroom 3 (bathroom)",
+            "EXTRA: Common Bathroom (bathroom)"
+          ],
+          "gaps": [
+            "walls=77, rooms=15, doors=19",
+            "11 dangling wall endpoints"
+          ],
+          "relational": [
+            "no relational expectations"
+          ],
+          "main_entrance": [
+            "no main_entrance expectation"
+          ],
+          "hallway": [
+            "no hallway connectivity expectation"
+          ],
+          "windows": [
+            "no window expectations"
+          ]
+        }
+      },
+      "project": null
+    },
+    {
+      "id": "P07",
+      "prompt_summary": "3BHK 1500 sqft on 35ft x 45ft north-facing plot. Master 14ft x 12ft SW. Bedroom ",
+      "elapsed_ms": 764,
+      "error": "parser_failed: 401 Incorrect API key provided: sk-test-***********-key. You can find your API key at https://platform.openai.com/account/api-keys.",
+      "pipeline_used": "B-unsat",
+      "score": null,
+      "project": null
+    },
+    {
+      "id": "P08",
+      "prompt_summary": "3BHK 1400 sqft. Master bedroom 14ft x 12ft. Two more bedrooms 12ft x 10ft each. ",
+      "elapsed_ms": 676,
+      "error": "parser_failed: 401 Incorrect API key provided: sk-test-***********-key. You can find your API key at https://platform.openai.com/account/api-keys.",
+      "pipeline_used": "B-unsat",
+      "score": null,
+      "project": null
+    },
+    {
+      "id": "P09",
+      "prompt_summary": "2BHK 900 sqft Vastu compliant, master southwest, kitchen southeast, north-facing",
+      "elapsed_ms": 759,
+      "error": "parser_failed: 401 Incorrect API key provided: sk-test-***********-key. You can find your API key at https://platform.openai.com/account/api-keys.",
+      "pipeline_used": "B-unsat",
+      "score": null,
+      "project": null
+    },
+    {
+      "id": "P10",
+      "prompt_summary": "Compact 2BHK 850 sqft, open plan living-kitchen, two bedrooms, two baths, balcon",
+      "elapsed_ms": 900,
+      "error": null,
+      "pipeline_used": "A",
+      "score": {
+        "total": 99,
+        "components": {
+          "completeness": 20,
+          "vastu": 20,
+          "dims": 15,
+          "positions": 10,
+          "hallucinations": 4,
+          "gaps": 5,
+          "relational": 10,
+          "main_entrance": 5,
+          "hallway": 5,
+          "windows": 5
+        },
+        "details": {
+          "completeness": [
+            "matched 5/5 expected rooms"
+          ],
+          "vastu": [
+            "vastu not required"
+          ],
+          "dims": [
+            "no dim expectations"
+          ],
+          "positions": [
+            "no position expectations"
+          ],
+          "hallucinations": [
+            "0 forbidden, 1 extra rooms",
+            "EXTRA: Corridor (corridor)"
+          ],
+          "gaps": [
+            "walls=34, rooms=8, doors=13"
+          ],
+          "relational": [
+            "no relational expectations"
+          ],
+          "main_entrance": [
+            "no main_entrance expectation"
+          ],
+          "hallway": [
+            "no hallway connectivity expectation"
+          ],
+          "windows": [
+            "no window expectations"
+          ]
+        }
+      },
+      "project": null
+    }
+  ],
+  "average": 95
+}
