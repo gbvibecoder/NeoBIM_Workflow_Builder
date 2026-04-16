@@ -1,6 +1,10 @@
 import type { FloorPlanProject, Floor, Room, Polygon, Point } from "@/types/floor-plan-cad";
 import { parseConstraints, type ParsedConstraints, type ParsedRoom } from "./structured-parser";
-import { detectInfeasibility, type InfeasibilityReport } from "./infeasibility-detector";
+import {
+  detectInfeasibility,
+  type InfeasibilityReport,
+  type InfeasibilityWarning,
+} from "./infeasibility-detector";
 import {
   solveMandalaCSP,
   solveStage3B,
@@ -19,6 +23,18 @@ export type PipelineBStage = "parse" | "infeasibility" | "mandala" | "placement"
 
 export interface PipelineBResult {
   project: FloorPlanProject | null;
+  /**
+   * The parsed constraints extracted in the parse stage. Exposed here so the
+   * caller can pass them to layout-metrics (adjacency satisfaction + dim
+   * deviation checks need them). null only when the parser itself failed.
+   */
+  parsedConstraints: ParsedConstraints | null;
+  /**
+   * Non-blocking warnings collected from the infeasibility detector. Surfaced
+   * to the API response so the client can disclose to the user (e.g. UNDER_FULL
+   * for low room-to-plot fill ratios).
+   */
+  feasibilityWarnings: InfeasibilityWarning[];
   pipelineUsed: "B-fine" | "B-mandala" | "B-stub" | "B-unsat";
   relaxationsApplied: string[];
   infeasibilityReason: string | null;
@@ -463,6 +479,8 @@ export async function runPipelineB(prompt: string, apiKey: string): Promise<Pipe
     parse_ms = Date.now() - parseStart;
     return {
       project: null,
+      parsedConstraints: null,
+      feasibilityWarnings: [],
       pipelineUsed: "B-unsat",
       relaxationsApplied: [],
       infeasibilityReason: null,
@@ -483,11 +501,14 @@ export async function runPipelineB(prompt: string, apiKey: string): Promise<Pipe
   const detectorStart = Date.now();
   const infeasibility = detectInfeasibility(constraints);
   detector_ms = Date.now() - detectorStart;
+  const feasibilityWarnings: InfeasibilityWarning[] = infeasibility.warnings ?? [];
 
   if (!infeasibility.feasible) {
     logger.debug(`[PIPELINE-B] Infeasible: ${infeasibility.kind} — ${infeasibility.reason}`);
     return {
       project: null,
+      parsedConstraints: constraints,
+      feasibilityWarnings,
       pipelineUsed: "B-unsat",
       relaxationsApplied: [],
       infeasibilityReason: infeasibility.reason ?? "infeasible",
@@ -518,6 +539,8 @@ export async function runPipelineB(prompt: string, apiKey: string): Promise<Pipe
     logger.debug(`[PIPELINE-B] CSP-3A UNSAT (final): ${mandalaResult.conflict?.human_reason}`);
     return {
       project: null,
+      parsedConstraints: constraints,
+      feasibilityWarnings,
       pipelineUsed: "B-unsat",
       relaxationsApplied,
       infeasibilityReason: mandalaResult.conflict?.human_reason ?? "CSP_UNSAT_STAGE_3A",
@@ -596,6 +619,8 @@ export async function runPipelineB(prompt: string, apiKey: string): Promise<Pipe
     placement_ms = Date.now() - placementStart;
     return {
       project,
+      parsedConstraints: constraints,
+      feasibilityWarnings,
       pipelineUsed: "B-fine",
       relaxationsApplied,
       infeasibilityReason: null,
@@ -620,6 +645,8 @@ export async function runPipelineB(prompt: string, apiKey: string): Promise<Pipe
 
   return {
     project,
+    parsedConstraints: constraints,
+    feasibilityWarnings,
     pipelineUsed: "B-mandala",
     relaxationsApplied,
     infeasibilityReason: null,
