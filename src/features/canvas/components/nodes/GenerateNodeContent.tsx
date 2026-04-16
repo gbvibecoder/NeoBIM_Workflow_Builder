@@ -38,20 +38,22 @@ export const ViewTypeSelect = memo(function ViewTypeSelect({ nodeId, data }: { n
       style={{
         width: "100%",
         marginTop: 8,
-        padding: "4px 8px",
-        background: "#1A1A2A",
-        border: "1px solid rgba(255,255,255,0.1)",
+        padding: "6px 10px",
+        background: "rgba(0,0,0,0.4)",
+        border: "1px solid rgba(255,255,255,0.14)",
         borderRadius: 6,
-        fontSize: 11,
-        color: "#d1d5db",
+        fontSize: 12,
+        fontWeight: 500,
+        color: "#E6E9F0",
         cursor: "pointer",
         outline: "none",
+        letterSpacing: "0.01em",
       }}
       onFocus={(e) => {
-        (e.currentTarget as HTMLSelectElement).style.borderColor = "rgba(255,255,255,0.2)";
+        (e.currentTarget as HTMLSelectElement).style.borderColor = "rgba(0,245,255,0.4)";
       }}
       onBlur={(e) => {
-        (e.currentTarget as HTMLSelectElement).style.borderColor = "rgba(255,255,255,0.1)";
+        (e.currentTarget as HTMLSelectElement).style.borderColor = "rgba(255,255,255,0.14)";
       }}
     >
       {VIEW_TYPE_OPTIONS.map((opt) => (

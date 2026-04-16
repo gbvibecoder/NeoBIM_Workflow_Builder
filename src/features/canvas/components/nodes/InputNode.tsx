@@ -12,6 +12,7 @@ import { useWorkflowStore } from "@/features/workflows/stores/workflow-store";
 import { useLocale } from "@/hooks/useLocale";
 import type { WorkflowNodeData } from "@/types/nodes";
 import { formatBytes } from "@/lib/utils";
+import { nodeText } from "@/features/canvas/components/nodes/node-text-styles";
 
 // ─── File store (module-level, not in Zustand — files can't serialize) ───────
 export const inputFileStore = new Map<string, File>();
@@ -59,7 +60,8 @@ export const TextPromptInput = memo(function TextPromptInput({ nodeId, data }: {
         }}
       />
       <div style={{
-        textAlign: "right", fontSize: 9, color: "#3A3A4E", marginTop: 2,
+        ...nodeText.meta,
+        textAlign: "right", marginTop: 4,
       }}>
         {value.length} / 2000
       </div>
@@ -316,23 +318,25 @@ export const FileUploadInput = memo(function FileUploadInput({ nodeId, data, acc
               background: "#10B981", flexShrink: 0,
             }} />
             <span style={{
-              fontSize: 10, color: "#10B981", flex: 1,
+              fontSize: 11, fontWeight: 500, color: "#34D399", flex: 1,
               overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+              letterSpacing: "0.01em",
             }}>
               {fileName}
             </span>
             <button
               onClick={onRemove}
               style={{
-                fontSize: 9, color: "#55556A", background: "none",
-                border: "none", cursor: "pointer", padding: 0,
+                ...nodeText.helper,
+                background: "none",
+                border: "none", cursor: "pointer", padding: "0 4px",
               }}
             >
               ✕
             </button>
           </div>
           {(data.fileSize as number | undefined) && (
-            <span style={{ fontSize: 9, color: "#55556A" }}>
+            <span style={nodeText.meta}>
               {((data.fileSize as number) / 1024).toFixed(1)} KB
             </span>
           )}
@@ -358,10 +362,10 @@ export const FileUploadInput = memo(function FileUploadInput({ nodeId, data, acc
             (e.currentTarget as HTMLElement).style.background = "rgba(0,245,255,0.03)";
           }}
         >
-          <div style={{ fontSize: 9, color: "#55556A", lineHeight: 1.5 }}>
-            Drop {label} {t('input.dropHereOr')} <span style={{ color: "#00F5FF" }}>{t('input.clickToBrowse')}</span>
+          <div style={nodeText.helper}>
+            Drop {label} {t('input.dropHereOr')} <span style={nodeText.hintLink}>{t('input.clickToBrowse')}</span>
           </div>
-          <div style={{ fontSize: 8, color: "#3A3A4E", marginTop: 2 }}>
+          <div style={{ ...nodeText.meta, marginTop: 3 }}>
             {accept} · max {maxMB}MB
           </div>
         </div>
@@ -455,8 +459,8 @@ export const ParameterInput = memo(function ParameterInput({ nodeId, data }: { n
   const inputStyle: React.CSSProperties = {
     width: "100%", boxSizing: "border-box",
     padding: "6px 12px", borderRadius: 4,
-    border: "1px solid rgba(255,255,255,0.08)",
-    background: "rgba(0,0,0,0.3)", color: "#F0F0F5",
+    border: "1px solid rgba(255,255,255,0.12)",
+    background: "rgba(0,0,0,0.35)", color: "#F2F4F8",
     fontSize: 13, outline: "none", fontFamily: "inherit",
     transition: "all 150ms ease",
   };
@@ -472,11 +476,11 @@ export const ParameterInput = memo(function ParameterInput({ nodeId, data }: { n
     <div
       className="nodrag nowheel nopan"
       onMouseDown={stopAll} onClick={stopAll} onKeyDown={stopAll}
-      style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 5 }}
+      style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 6 }}
     >
       {rows.map(row => (
         <div key={row.key} style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <label style={{ fontSize: 11, color: "#5C5C78", fontWeight: 500, width: 60, flexShrink: 0 }}>
+          <label style={{ ...nodeText.label, width: 64, flexShrink: 0 }}>
             {row.label}
           </label>
           {row.type === "number" ? (
@@ -564,7 +568,7 @@ function SupplementaryIFCUpload({ nodeId }: { nodeId: string }) {
 
       {/* ── Accuracy Meter ── */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 4 }}>
-        <span style={{ fontSize: 9, color: "#8888A0", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em" }}>Estimate Accuracy</span>
+        <span style={nodeText.sectionHdr}>Estimate Accuracy</span>
         <span style={{ fontSize: 14, fontWeight: 800, color: barColor, fontFamily: "monospace" }}>~{totalAccuracy}%</span>
       </div>
       <div style={{ height: 4, background: "rgba(255,255,255,0.06)", borderRadius: 2, overflow: "hidden", marginBottom: 10 }}>
@@ -573,8 +577,8 @@ function SupplementaryIFCUpload({ nodeId }: { nodeId: string }) {
 
       {/* ── Boost Accuracy Header ── */}
       <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
-        <span style={{ fontSize: 8, color: "#555570", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", whiteSpace: "nowrap" }}>Boost Accuracy</span>
-        <div style={{ flex: 1, height: 1, background: "rgba(255,255,255,0.06)" }} />
+        <span style={{ ...nodeText.sectionHdr, whiteSpace: "nowrap" }}>Boost Accuracy</span>
+        <div style={{ flex: 1, height: 1, background: "rgba(255,255,255,0.08)" }} />
       </div>
 
       {/* ── Structural IFC Drop Zone ── */}
@@ -597,25 +601,28 @@ function SupplementaryIFCUpload({ nodeId }: { nodeId: string }) {
             <span style={{ fontSize: 13, opacity: structural ? 1 : 0.4 }}>{structural ? "✓" : "⊞"}</span>
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-              <span style={{ fontSize: 10, fontWeight: 700, color: structural ? "#34D399" : "#C0C0D0" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <span style={{ fontSize: 11, fontWeight: 700, color: structural ? "#34D399" : "#D6DAE4", letterSpacing: "0.01em" }}>
                 {structural ? structural : "Structural IFC"}
               </span>
-              {!structural && <span style={{ fontSize: 8, color: "#555570" }}>optional</span>}
+              {!structural && (
+                <span style={{ ...nodeText.helper, fontStyle: "italic", opacity: 0.9 }}>optional</span>
+              )}
             </div>
-            <div style={{ fontSize: 8, color: "#555570", marginTop: 1 }}>
+            <div style={{ ...nodeText.helper, marginTop: 2 }}>
               {structural ? "Foundation, rebar, columns, beams" : "Foundations, rebar, columns, beams"}
             </div>
             {!structural && (
-              <div style={{ fontSize: 8, color: "#555570", marginTop: 2, display: "flex", alignItems: "center", gap: 3 }}>
-                <span style={{ fontSize: 9 }}>↑</span> Click or drag to upload
+              <div style={{ ...nodeText.helper, marginTop: 3, display: "flex", alignItems: "center", gap: 4, color: "#00F5FF", opacity: 0.85 }}>
+                <span style={{ fontSize: 10 }}>↑</span> Click or drag to upload
               </div>
             )}
           </div>
           <span style={{
-            fontSize: 9, fontWeight: 700, padding: "2px 6px", borderRadius: 4, flexShrink: 0, marginTop: 2,
-            background: structural ? "rgba(16,185,129,0.15)" : "rgba(0,245,255,0.08)",
-            color: structural ? "#10B981" : "#00F5FF",
+            fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 4, flexShrink: 0, marginTop: 2,
+            background: structural ? "rgba(16,185,129,0.18)" : "rgba(0,245,255,0.12)",
+            color: structural ? "#34D399" : "#4FE8F5",
+            letterSpacing: "0.02em",
           }}>
             {structural ? "✓ +12%" : "+12%"}
           </span>
@@ -642,25 +649,28 @@ function SupplementaryIFCUpload({ nodeId }: { nodeId: string }) {
             <span style={{ fontSize: 13, opacity: mep ? 1 : 0.4 }}>{mep ? "✓" : "⚙"}</span>
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-              <span style={{ fontSize: 10, fontWeight: 700, color: mep ? "#34D399" : "#C0C0D0" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <span style={{ fontSize: 11, fontWeight: 700, color: mep ? "#34D399" : "#D6DAE4", letterSpacing: "0.01em" }}>
                 {mep ? mep : "MEP IFC"}
               </span>
-              {!mep && <span style={{ fontSize: 8, color: "#555570" }}>optional</span>}
+              {!mep && (
+                <span style={{ ...nodeText.helper, fontStyle: "italic", opacity: 0.9 }}>optional</span>
+              )}
             </div>
-            <div style={{ fontSize: 8, color: "#555570", marginTop: 1 }}>
+            <div style={{ ...nodeText.helper, marginTop: 2 }}>
               {mep ? "Plumbing, electrical, HVAC, fire" : "Plumbing, electrical, HVAC, fire"}
             </div>
             {!mep && (
-              <div style={{ fontSize: 8, color: "#555570", marginTop: 2, display: "flex", alignItems: "center", gap: 3 }}>
-                <span style={{ fontSize: 9 }}>↑</span> Click or drag to upload
+              <div style={{ ...nodeText.helper, marginTop: 3, display: "flex", alignItems: "center", gap: 4, color: "#00F5FF", opacity: 0.85 }}>
+                <span style={{ fontSize: 10 }}>↑</span> Click or drag to upload
               </div>
             )}
           </div>
           <span style={{
-            fontSize: 9, fontWeight: 700, padding: "2px 6px", borderRadius: 4, flexShrink: 0, marginTop: 2,
-            background: mep ? "rgba(16,185,129,0.15)" : "rgba(0,245,255,0.08)",
-            color: mep ? "#10B981" : "#00F5FF",
+            fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 4, flexShrink: 0, marginTop: 2,
+            background: mep ? "rgba(16,185,129,0.18)" : "rgba(0,245,255,0.12)",
+            color: mep ? "#34D399" : "#4FE8F5",
+            letterSpacing: "0.02em",
           }}>
             {mep ? "✓ +10%" : "+10%"}
           </span>
@@ -681,17 +691,18 @@ function SupplementaryIFCUpload({ nodeId }: { nodeId: string }) {
             <span style={{ fontSize: 12, opacity: 0.7 }}>✎</span>
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-              <span style={{ fontSize: 10, fontWeight: 700, color: "#FFBF00" }}>QS corrections</span>
-              <span style={{ fontSize: 8, color: "#8888A0" }}>builds over time</span>
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <span style={{ fontSize: 11, fontWeight: 700, color: "#FFBF00", letterSpacing: "0.01em" }}>QS corrections</span>
+              <span style={{ ...nodeText.helper, fontStyle: "italic", opacity: 0.95 }}>builds over time</span>
             </div>
-            <div style={{ fontSize: 8, color: "#555570", marginTop: 1 }}>
+            <div style={{ ...nodeText.helper, marginTop: 2 }}>
               Edit rates in BOQ results to train the system
             </div>
           </div>
           <span style={{
-            fontSize: 8, fontWeight: 700, padding: "2px 6px", borderRadius: 4, flexShrink: 0, marginTop: 2,
-            background: "rgba(255,191,0,0.1)", color: "#FFBF00",
+            fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 4, flexShrink: 0, marginTop: 2,
+            background: "rgba(255,191,0,0.14)", color: "#FFD24D",
+            letterSpacing: "0.02em",
           }}>
             +5% over time
           </span>
@@ -727,11 +738,12 @@ const LOCATION_COUNTRIES = [
 
 const selectStyle: React.CSSProperties = {
   width: "100%", boxSizing: "border-box" as const,
-  padding: "5px 6px", borderRadius: 4,
-  border: "1px solid rgba(255,255,255,0.07)",
-  background: "rgba(0,0,0,0.4)", color: "#C0C0D0",
-  fontSize: 10, outline: "none", fontFamily: "inherit",
+  padding: "7px 8px", borderRadius: 4,
+  border: "1px solid rgba(255,255,255,0.12)",
+  background: "rgba(0,0,0,0.4)", color: "#E6E9F0",
+  fontSize: 12, fontWeight: 500, outline: "none", fontFamily: "inherit",
   cursor: "pointer",
+  letterSpacing: "0.01em",
 };
 
 const inputStyle: React.CSSProperties = {
@@ -739,7 +751,7 @@ const inputStyle: React.CSSProperties = {
 };
 
 const labelStyle: React.CSSProperties = {
-  fontSize: 9, color: "#3A3A4E", marginBottom: 2, display: "block",
+  ...nodeText.label, marginBottom: 4, display: "block",
 };
 
 export const LocationInput = memo(function LocationInput({ nodeId, data }: { nodeId: string; data: WorkflowNodeData }) {
@@ -912,7 +924,12 @@ export const LocationInput = memo(function LocationInput({ nodeId, data }: { nod
       )}
       {/* Summary */}
       {hasLocation && stored.city && (
-        <div style={{ fontSize: 9, color: "#00F5FF", opacity: 0.7, textAlign: "center", marginTop: 2 }}>
+        <div style={{
+          fontSize: 11, fontWeight: 500, color: "#4FE8F5",
+          textAlign: "center", marginTop: 6,
+          letterSpacing: "0.02em",
+          textShadow: "0 1px 2px rgba(0,0,0,0.65)",
+        }}>
           📍 {stored.city}{stored.state ? ", " + stored.state : ""}, {stored.country} ({stored.currency})
         </div>
       )}
@@ -1095,8 +1112,10 @@ export const MultiImageUploadInput = memo(function MultiImageUploadInput({ nodeI
                 ✕
               </button>
               <div style={{
-                fontSize: 8, color: "#10B981", padding: "2px 4px",
+                fontSize: 10, fontWeight: 500, color: "#34D399",
+                padding: "3px 6px",
                 overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                letterSpacing: "0.01em",
               }}>
                 {file.name}
               </div>
@@ -1128,14 +1147,14 @@ export const MultiImageUploadInput = memo(function MultiImageUploadInput({ nodeI
           (e.currentTarget as HTMLElement).style.background = "rgba(0,245,255,0.03)";
         }}
       >
-        <div style={{ fontSize: 9, color: "#55556A", lineHeight: 1.5 }}>
+        <div style={nodeText.helper}>
           {imageCount > 0
-            ? <><span style={{ color: "#00F5FF" }}>+ Add more images</span></>
-            : <>Drop images {t('input.dropHereOr')} <span style={{ color: "#00F5FF" }}>{t('input.clickToBrowse')}</span></>
+            ? <><span style={nodeText.hintLink}>+ Add more images</span></>
+            : <>Drop images {t('input.dropHereOr')} <span style={nodeText.hintLink}>{t('input.clickToBrowse')}</span></>
           }
         </div>
         {imageCount === 0 && (
-          <div style={{ fontSize: 8, color: "#3A3A4E", marginTop: 2 }}>
+          <div style={{ ...nodeText.meta, marginTop: 3 }}>
             .png,.jpg,.jpeg,.webp · max {maxMB}MB each · multiple allowed
           </div>
         )}
@@ -1143,7 +1162,7 @@ export const MultiImageUploadInput = memo(function MultiImageUploadInput({ nodeI
 
       {/* Summary */}
       {imageCount > 0 && (
-        <div style={{ fontSize: 9, color: "#10B981", marginTop: 4, textAlign: "center" }}>
+        <div style={{ fontSize: 11, fontWeight: 500, color: "#34D399", marginTop: 6, textAlign: "center", letterSpacing: "0.02em" }}>
           {imageCount} image{imageCount > 1 ? "s" : ""} · {((data.fileSizes as number[] | undefined)?.reduce((a, b) => a + b, 0) ?? 0 / 1024).toFixed(0)} KB total
         </div>
       )}

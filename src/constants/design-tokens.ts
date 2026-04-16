@@ -34,6 +34,18 @@ export const colors = {
   textMuted: "#5C5C78",
   textDim: "#3A3A50",
 
+  // Canvas-node text — WCAG AA guaranteed on rgba(10,12,14,0.75) node bg.
+  // Use these inside BaseNode / InputNode content, not textDim/textMuted
+  // (those are reserved for disabled/placeholder on lighter surfaces).
+  nodeText: {
+    primary:   "#F2F4F8",   // values, filenames                      — 14:1
+    value:     "#E6E9F0",   // dropdown selection, parameter values   — 12:1
+    label:     "#B8BECC",   // field labels (Country, Floors)         — 8.4:1
+    secondary: "#9098AC",   // section headers (BOOST ACCURACY)       — 5.6:1
+    helper:    "#7A8298",   // hints, "max 100MB", "optional"         — 4.6:1
+    hint:      "#00F5FF",   // cyan CTA accent ("click to browse")
+  },
+
   // Borders
   borderSubtle: "rgba(255, 255, 255, 0.06)",
   borderLight: "rgba(255, 255, 255, 0.10)",
