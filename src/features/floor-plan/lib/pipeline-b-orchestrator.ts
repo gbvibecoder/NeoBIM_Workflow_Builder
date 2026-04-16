@@ -6,12 +6,13 @@ import {
   solveStage3B,
   alignBoundaries,
   generateWalls,
+  placeOpenings,
   type MandalaAssignment,
   type FinePlacement,
   type CellIdx,
   cellCoords,
 } from "./csp-solver";
-import type { Wall } from "@/types/floor-plan-cad";
+import type { Wall, Door, CadWindow } from "@/types/floor-plan-cad";
 import { logger } from "@/lib/logger";
 
 export type PipelineBStage = "parse" | "infeasibility" | "mandala" | "placement" | "complete";
@@ -132,6 +133,8 @@ function fineProject(
   projectName: string,
   placements: FinePlacement[],
   walls: Wall[],
+  doors: Door[],
+  windows: CadWindow[],
   plotWidthFt: number,
   plotDepthFt: number,
 ): FloorPlanProject {
@@ -175,8 +178,8 @@ function fineProject(
     boundary: floorBoundary,
     walls,
     rooms,
-    doors: [],
-    windows: [],
+    doors,
+    windows,
     stairs: [],
     columns: [],
     furniture: [],
@@ -520,12 +523,25 @@ export async function runPipelineB(prompt: string, apiKey: string): Promise<Pipe
     const wall_gen_ms = Date.now() - wallGenStart;
     logger.debug(`[PIPELINE-B] Wall gen: ${walls.length} walls in ${wall_gen_ms}ms`);
 
+    // ── Stage 3D: Opening placement (doors + windows) ──
+    const openings = placeOpenings(
+      constraints,
+      aligned.placements,
+      walls,
+      fineResult.plot_width_ft,
+      fineResult.plot_depth_ft,
+    );
+    for (const w of openings.warnings) relaxationsApplied.push(`openings: ${w}`);
+    logger.debug(`[PIPELINE-B] Openings: ${openings.doors.length} doors, ${openings.windows.length} windows, ${openings.warnings.length} warnings`);
+
     const placementStart = Date.now();
     const project = fineProject(
       constraints,
       projectName,
       aligned.placements,
       walls,
+      openings.doors,
+      openings.windows,
       fineResult.plot_width_ft,
       fineResult.plot_depth_ft,
     );
