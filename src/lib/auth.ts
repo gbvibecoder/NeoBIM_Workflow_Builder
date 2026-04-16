@@ -113,38 +113,57 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         password: { label: "Password", type: "password" },
       },
       async authorize(credentials) {
-        if (!credentials?.password) return null;
+        // Dev-friendly tag so the dev terminal shows which case fired on every
+        // login attempt. Helps diagnose the canonical "I can't login" cases
+        // without having to add ad-hoc logging each time:
+        //   no-password-given / no-identifier / phone-bad-format / user-not-found
+        //   / no-password-on-account (Google-only) / password-mismatch / ok
+        const tag = (reason: string, detail?: string) =>
+          console.warn(`[auth] credentials reject — ${reason}${detail ? ` :: ${detail}` : ""}`);
+
+        if (!credentials?.password) {
+          tag("no-password-given");
+          return null;
+        }
 
         const email = credentials.email as string | undefined;
         const phone = credentials.phone as string | undefined;
 
-        // Must provide either email or phone
-        if (!email && !phone) return null;
+        if (!email && !phone) {
+          tag("no-identifier");
+          return null;
+        }
 
         let user;
 
         if (phone) {
-          // Phone + password login
           const normalizedPhone = normalizePhone(phone);
           if (!normalizedPhone) {
-            console.warn("[auth] Invalid phone format:", phone);
+            tag("phone-bad-format", String(phone));
             return null;
           }
           user = await prisma.user.findUnique({
             where: { phoneNumber: normalizedPhone },
           });
-          if (!user || !user.password) {
-            console.warn("[auth] Failed phone login for:", normalizedPhone);
+          if (!user) {
+            tag("user-not-found", `phone=${normalizedPhone}`);
+            return null;
+          }
+          if (!user.password) {
+            tag("no-password-on-account", `phone=${normalizedPhone} — likely Google-only account; use 'Continue with Google' instead`);
             return null;
           }
         } else {
-          // Email + password login (existing flow)
           const normalizedEmail = (email as string).trim().toLowerCase();
           user = await prisma.user.findUnique({
             where: { email: normalizedEmail },
           });
-          if (!user || !user.password) {
-            console.warn("[auth] Failed login attempt for:", normalizedEmail);
+          if (!user) {
+            tag("user-not-found", `email=${normalizedEmail}`);
+            return null;
+          }
+          if (!user.password) {
+            tag("no-password-on-account", `email=${normalizedEmail} — likely Google-only account; use 'Continue with Google' instead`);
             return null;
           }
         }
@@ -155,9 +174,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         );
 
         if (!passwordsMatch) {
-          console.warn("[auth] Invalid password for:", user.email ?? user.phoneNumber);
+          tag("password-mismatch", `id=${user.id} email=${user.email ?? "-"} phone=${user.phoneNumber ?? "-"}`);
           return null;
         }
+
+        console.log(`[auth] credentials OK — id=${user.id} email=${user.email ?? "-"} role=${user.role}`);
 
         return {
           id: user.id,

@@ -30,6 +30,11 @@ function LoginForm() {
     OAuthAccountNotLinked: t('auth.oauthAccountNotLinked'),
     OAuthCallback: t('auth.oauthCallback'),
     OAuthSignin: t('auth.oauthSignin'),
+    // Map the credentials-failure code (was missing — fell through to "Default"
+    // which obscures what's actually wrong). Server-side logs in auth.ts now
+    // tag the exact reason (user-not-found / no-password-on-account /
+    // password-mismatch) so the dev terminal disambiguates.
+    CredentialsSignin: "Email/phone or password is incorrect. If you signed up with Google, use 'Continue with Google' instead.",
     Default: t('auth.defaultAuthError'),
   };
   const initialError = expiredParam === "true"
