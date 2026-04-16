@@ -220,6 +220,28 @@ describe("CSP Stage 3B — Fine placement", () => {
     if (stage3B?.feasible) assertNoOverlaps(stage3B.placements);
   });
 
+  it("H_MAIN_ENTRANCE_ROOM: foyer with main-entrance door on E-facing plot touches east wall", () => {
+    const foyer = makeRoom({
+      id: "foyer", name: "Foyer", function: "foyer",
+      dim_width_ft: 10, dim_depth_ft: 8,
+      doors: [{ width_ft: 4, leads_to_room_id: null, is_main_entrance: true }],
+    });
+    const c: ParsedConstraints = {
+      plot: { width_ft: 45, depth_ft: 55, facing: "E", shape: null, total_built_up_sqft: null },
+      rooms: [foyer],
+      adjacency_pairs: [],
+      connects_all_groups: [],
+      vastu_required: true,
+      special_features: [],
+      constraint_budget: { dimensional: 0, positional: 0, adjacency: 0, vastu: 0, total: 0 },
+      extraction_notes: "",
+    };
+    const { stage3B } = solveFull(c);
+    expect(stage3B?.feasible).toBe(true);
+    const p = stage3B!.placements[0];
+    expect(p.x_ft + p.width_ft).toBeGreaterThanOrEqual(45 - 0.01);
+  });
+
   it("plot bounds: all placements stay inside plot", () => {
     const c = makeConstraints([
       makeRoom({ id: "r1", name: "A", function: "bedroom", dim_width_ft: 12, dim_depth_ft: 10 }),

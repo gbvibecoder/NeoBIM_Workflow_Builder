@@ -46,7 +46,7 @@ export function solveMandalaCSP(constraints: ParsedConstraints, options: SolveOp
   const varLookup = new Map<string, ParsedRoom>();
   const initialRuleIds = new Map<string, string[]>();
   for (const room of constraints.rooms) {
-    const { initialDomain, appliedRules } = computeInitialDomain(room, vastuRequired);
+    const { initialDomain, appliedRules } = computeInitialDomain(room, vastuRequired, constraints.plot.facing);
     variables.push({ id: room.id, room, domain: initialDomain });
     varLookup.set(room.id, room);
     initialRuleIds.set(room.id, appliedRules);

@@ -1,5 +1,7 @@
-import type { ParsedRoom, ParsedConstraints } from "../structured-parser";
+import type { ParsedRoom, ParsedConstraints, CompassDirection, CenterDirection } from "../structured-parser";
 import type { RoomFunction } from "../room-vocabulary";
+
+type CompassOrCenter = CenterDirection;
 import {
   ALL_CELLS,
   CELL_CENTER,
@@ -33,6 +35,23 @@ const HARD_VASTU_AVOID: Partial<Record<RoomFunction, CellIdx[]>> = {
 const ENTRANCE_FUNCTIONS: Set<RoomFunction> = new Set(["foyer", "porch"]);
 const ENTRANCE_AVOID: CellIdx[] = [CELL_S, CELL_SW, CELL_W];
 
+// Mandala cells allowed per plot.facing for the main-entrance room.
+// Diagonal facings (NE/NW/SE/SW) allow the three surrounding cells.
+export const FACING_MANDALA_CELLS: Partial<Record<string, CellIdx[]>> = {
+  N:  [CELL_N, CELL_NW, CELL_NE],
+  S:  [CELL_S, CELL_SW, CELL_SE],
+  E:  [CELL_E, CELL_NE, CELL_SE],
+  W:  [CELL_W, CELL_NW, CELL_SW],
+  NE: [CELL_NE, CELL_N, CELL_E],
+  NW: [CELL_NW, CELL_N, CELL_W],
+  SE: [CELL_SE, CELL_S, CELL_E],
+  SW: [CELL_SW, CELL_S, CELL_W],
+};
+
+export function hasMainEntranceDoor(room: ParsedRoom): boolean {
+  return (room.doors ?? []).some(d => d.is_main_entrance === true);
+}
+
 const BRAHMASTHAN_FORBIDDEN: Set<RoomFunction> = new Set([
   "kitchen", "bathroom", "master_bathroom", "powder_room", "staircase", "store",
 ]);
@@ -56,11 +75,18 @@ export interface VariableInit {
 }
 
 /**
- * Compute initial domain for a single room variable by applying H4/H5/H7/H8.
- * Returns empty domain (0) if the room's hard constraints contradict each other
- * before search even begins.
+ * Compute initial domain for a single room variable by applying H4/H5/H7/H8
+ * plus H_MAIN_ENTRANCE_ROOM (Phase 7) for the room owning the main-entrance
+ * door on a plot with an explicit facing direction.
+ *
+ * Returns empty domain (0) if the room's hard constraints contradict each
+ * other before search even begins.
  */
-export function computeInitialDomain(room: ParsedRoom, vastuRequired: boolean): VariableInit {
+export function computeInitialDomain(
+  room: ParsedRoom,
+  vastuRequired: boolean,
+  plotFacing: CompassOrCenter | null = null,
+): VariableInit {
   let d: Domain = ALL_CELLS;
   const appliedRules: string[] = [];
   const fn = room.function as RoomFunction;
@@ -78,6 +104,16 @@ export function computeInitialDomain(room: ParsedRoom, vastuRequired: boolean): 
     const c = directionToCell(room.position_direction);
     d = singleton(c);
     appliedRules.push(`H5(wall_centered=${room.position_direction})`);
+  }
+
+  // H_MAIN_ENTRANCE_ROOM (Phase 7) — room with is_main_entrance door must be in
+  // a mandala cell on the plot.facing side. Skipped when user has explicit position.
+  if (plotFacing && plotFacing !== "CENTER" && hasMainEntranceDoor(room) && !room.user_explicit_position) {
+    const allowed = FACING_MANDALA_CELLS[plotFacing];
+    if (allowed) {
+      d = domainIntersect(d, maskOf(allowed));
+      appliedRules.push(`H_MAIN_ENTRANCE_ROOM(facing=${plotFacing})`);
+    }
   }
 
   // H7 — Vastu avoid (only if vastu_required AND no explicit user position)

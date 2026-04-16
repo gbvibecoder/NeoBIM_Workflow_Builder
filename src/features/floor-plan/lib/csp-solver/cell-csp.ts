@@ -171,6 +171,13 @@ function buildFullPlotDomain(widthFt: number, depthFt: number, plotW: number, pl
   return dom;
 }
 
+// Map plot.facing diagonals to a single cardinal axis for Stage 3B wall-touch
+// restriction (e.g. NE plot-facing → foyer touches east wall; SE → east; NW/SW → west).
+const FACING_TO_WALL_SIDE: Record<string, "N" | "S" | "E" | "W"> = {
+  N: "N", S: "S", E: "E", W: "W",
+  NE: "E", SE: "E", NW: "W", SW: "W",
+};
+
 function buildInitialDomain(
   room: ParsedRoom,
   widthFt: number,
@@ -180,6 +187,8 @@ function buildInitialDomain(
   plotD: number,
   slackFt: number,
   hasParent: boolean,
+  plotFacing: string | null,
+  isMainEntrance: boolean,
 ): Set<number> {
   const yStride = Math.floor(plotD * STEPS_PER_FT) + 1;
 
@@ -227,13 +236,42 @@ function buildInitialDomain(
     }
   }
 
+  // H_MAIN_ENTRANCE_ROOM (Phase 7) — if this room owns the main-entrance door
+  // and plot.facing is set, restrict origins so the room touches the facing wall.
+  if (isMainEntrance && plotFacing && !room.user_explicit_position) {
+    const side = FACING_TO_WALL_SIDE[plotFacing];
+    if (side) {
+      return buildWallTouchDomain(side, widthFt, depthFt, plotW, plotD, yStride);
+    }
+  }
+
   // No user hard constraint and attached children: full plot domain.
-  // Mandala assignment remains advisory via value ordering (prefers origins near
-  // assigned cell center). This avoids the over-constraint problem when Stage 3A
-  // clusters multiple rooms in the same cell — they could never all fit in one
-  // cell's bbox plus slack. Unconstrained rooms get the whole plot as candidate
-  // space; H1 no-overlap + soft score distribute them sensibly.
   return buildFullPlotDomain(widthFt, depthFt, plotW, plotD, yStride);
+}
+
+function buildWallTouchDomain(
+  side: "N" | "S" | "E" | "W",
+  widthFt: number,
+  depthFt: number,
+  plotW: number,
+  plotD: number,
+  yStride: number,
+): Set<number> {
+  const dom = new Set<number>();
+  const xMaxIdx = Math.floor((plotW - widthFt) * STEPS_PER_FT);
+  const yMaxIdx = Math.floor((plotD - depthFt) * STEPS_PER_FT);
+  if (xMaxIdx < 0 || yMaxIdx < 0) return dom;
+
+  if (side === "N") {
+    for (let xi = 0; xi <= xMaxIdx; xi++) dom.add(originKey(xi, 0, yStride));
+  } else if (side === "S") {
+    for (let xi = 0; xi <= xMaxIdx; xi++) dom.add(originKey(xi, yMaxIdx, yStride));
+  } else if (side === "W") {
+    for (let yi = 0; yi <= yMaxIdx; yi++) dom.add(originKey(0, yi, yStride));
+  } else {
+    for (let yi = 0; yi <= yMaxIdx; yi++) dom.add(originKey(xMaxIdx, yi, yStride));
+  }
+  return dom;
 }
 
 // ── Propagators ──
@@ -423,7 +461,13 @@ function tryOnce(
     w = snap(Math.max(w, MIN_DIM_FT[room.function] ?? 5));
     d = snap(Math.max(d, MIN_DIM_FT[room.function] ?? 5));
 
-    const domain = buildInitialDomain(room, w, d, a.cell, plotW, plotD, options.slackFt, !!room.attached_to_room_id);
+    const isMainEntrance = (room.doors ?? []).some(dr => dr.is_main_entrance === true);
+    const domain = buildInitialDomain(
+      room, w, d, a.cell, plotW, plotD, options.slackFt,
+      !!room.attached_to_room_id,
+      constraints.plot.facing ?? null,
+      isMainEntrance,
+    );
     variables.push({
       id: room.id,
       room,
