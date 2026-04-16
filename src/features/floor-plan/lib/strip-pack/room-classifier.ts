@@ -129,6 +129,30 @@ function backDirections(facing: Facing): Set<string> {
   }
 }
 
+/**
+ * Phase 3B fix #5 — translate position_direction → within-row anchor edge.
+ *
+ * The strip-packer's "west"/"east" are along its canonical X axis, which is
+ *   - the plot's east-west direction for horizontal-spine layouts (N/S facing)
+ *   - the plot's north-south direction for vertical-spine layouts (E/W facing)
+ *
+ * So a "south-east" room in an east-facing plot wants the SOUTH end of the
+ * back strip — which in canonical maps to the WEST anchor edge.
+ */
+function anchorEdgeFor(dir: string | null | undefined, facing: Facing): "west" | "east" | "none" {
+  if (!dir) return "none";
+  const isHorizontalSpine = facing === "north" || facing === "south";
+  if (isHorizontalSpine) {
+    if (dir === "W" || dir === "NW" || dir === "SW") return "west";
+    if (dir === "E" || dir === "NE" || dir === "SE") return "east";
+    return "none";
+  }
+  // Vertical-spine layouts: canonical X = plot Y
+  if (dir === "S" || dir === "SW" || dir === "SE") return "west";
+  if (dir === "N" || dir === "NW" || dir === "NE") return "east";
+  return "none";
+}
+
 /** Strip routing logic — see Section 5.1 of the brief. */
 function stripFor(
   room: ParsedRoom,
@@ -236,6 +260,7 @@ export function classifyRooms(parsed: ParsedConstraints): StripPackRoom[] {
       needs_exterior_wall: r.must_have_window_on != null || zone === "PUBLIC" || fn.includes("bedroom"),
       is_wet: r.is_wet,
       is_sacred: r.is_sacred,
+      anchor_edge: anchorEdgeFor(r.position_direction, validFacing),
     };
   });
 }

@@ -68,6 +68,14 @@ export interface StripPackRoom {
   is_wet: boolean;
   /** Cached parser flag — pooja and similar. */
   is_sacred: boolean;
+  /**
+   * Phase 3B fix #5 — within-row anchor edge derived from position_preference.
+   * 'west' = pack toward x=0 of the canonical strip; 'east' = pack toward
+   * x=strip.width; 'none' = unanchored, fills the middle. The translation
+   * from compass direction → canonical anchor depends on facing (handled
+   * by the classifier).
+   */
+  anchor_edge?: "west" | "east" | "none";
 
   // ── Filled in by the placer ───────────────────────────────────────────
   placed?: Rect;

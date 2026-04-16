@@ -202,7 +202,52 @@ function packIntoRect(
   finalizeRow(row, rect);
   rows.push(row);
 
+  // Phase 3B fix #5 — anchor fixup. Re-position rooms within each row so
+  // west-anchored land at the strip's west edge and east-anchored land at
+  // the strip's east edge (highest-priority east-anchored at the very end).
+  // Unanchored rooms fill the middle. The greedy packer above already chose
+  // WHICH rooms go in which row; this pass just rearranges them.
+  for (const r of rows) applyAnchorFixup(r, rect);
+
   return { placed, leftover, warns };
+}
+
+function applyAnchorFixup(row: RowState, rect: Rect): void {
+  if (row.rooms.length === 0) return;
+  const west = row.rooms.filter(r => r.anchor_edge === "west");
+  const east = row.rooms.filter(r => r.anchor_edge === "east");
+  const mid  = row.rooms.filter(r => !r.anchor_edge || r.anchor_edge === "none");
+
+  // Skip when there's nothing to anchor (no fixup needed = no behavior change
+  // from pre-Fix-5).
+  if (west.length === 0 && east.length === 0) return;
+
+  let cursor = rect.x;
+  // 1. west-anchored, in their existing in-row order (which is sort priority).
+  for (const r of west) {
+    if (!r.placed) continue;
+    r.placed.x = cursor;
+    cursor += r.placed.width;
+  }
+
+  // 2. east-anchored, placed RIGHT-TO-LEFT so the highest-priority (FIRST in
+  //    sort order) ends up furthest east.
+  let rightCursor = rect.x + rect.width;
+  for (const r of east) {
+    if (!r.placed) continue;
+    rightCursor -= r.placed.width;
+    r.placed.x = rightCursor;
+  }
+
+  // 3. Unanchored fill the middle. If there's overflow (sum of widths >
+  //    rect.width), unanchored rooms simply pack from `cursor` and may
+  //    overlap east-anchored — but the greedy fitter would already have
+  //    rejected such overflow upstream, so this is unlikely in practice.
+  for (const r of mid) {
+    if (!r.placed) continue;
+    r.placed.x = cursor;
+    cursor += r.placed.width;
+  }
 }
 
 // ───────────────────────────────────────────────────────────────────────────
