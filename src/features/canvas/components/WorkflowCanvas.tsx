@@ -411,7 +411,10 @@ function WorkflowCanvasInner({ workflowId: urlWorkflowId, templateId, forceNew =
 
   // Show showcase when execution finishes + post-execution scene
   React.useEffect(() => {
-    if (prevExecutingRef.current && !isExecuting && artifacts.size > 0) {
+    const wasExecuting = prevExecutingRef.current;
+    prevExecutingRef.current = isExecuting;
+
+    if (wasExecuting && !isExecuting && artifacts.size > 0) {
       toast.success("Workflow Complete", { duration: 2000 });
 
       // Edge completion wave
@@ -425,7 +428,6 @@ function WorkflowCanvasInner({ workflowId: urlWorkflowId, templateId, forceNew =
       const timer = setTimeout(() => setShowShowcase(true), 500);
       return () => { clearTimeout(timer); };
     }
-    prevExecutingRef.current = isExecuting;
   }, [isExecuting, artifacts, storeNodes, setEdgeFlowing]);
   const [nodes, setNodes, onNodesChange] = useNodesState(storeNodes as unknown as Node[]);
   const [edges, setEdges, onEdgesChange] = useEdgesState(storeEdges as Edge[]);
