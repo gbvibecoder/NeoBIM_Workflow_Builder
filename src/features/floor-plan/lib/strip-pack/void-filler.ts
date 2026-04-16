@@ -27,6 +27,25 @@ const MIN_VOID_AREA_TO_FILL_SQFT = 1;       // ignore smaller than 1 sqft (numer
 const MAX_VOID_TO_AUTO_FILL_SQFT = 200;     // larger than this: warn, don't try
 const ASPECT_DISTORTION_THRESHOLD = 1.5;    // log() ratio diff above this — degraded
 
+/**
+ * Phase 3B fix #2 — area cap for void-fill expansion.
+ *
+ * The void-filler used to absorb voids into adjacent rooms with no size
+ * limit; bedrooms were doubled. Now an absorbing room may grow to AT MOST
+ * 120% of its REQUESTED area. If every adjacent room is at its cap, the
+ * void is left behind (Fix 7's smart void handler picks it up later).
+ */
+const AREA_CAP_RATIO_VOID_FILL = 1.20;
+
+function maxAllowedAreaForFill(room: StripPackRoom): number {
+  if (room.requested_area_sqft <= 0) return Infinity;
+  return room.requested_area_sqft * AREA_CAP_RATIO_VOID_FILL;
+}
+
+function rectAreaSqft(r: Rect): number {
+  return r.width * r.depth;
+}
+
 export interface FillInput {
   plot: Rect;
   rooms: StripPackRoom[];
@@ -181,15 +200,26 @@ function absorbInto(region: VoidRegion, rooms: StripPackRoom[], plot: Rect): boo
     .map(r => {
       const expanded = unionRect(r.placed!, region.bbox);
       const distortion = aspectDistortion(r.placed!, expanded);
-      return { room: r, expanded, distortion };
+      const expandedArea = rectAreaSqft(expanded);
+      const cap = maxAllowedAreaForFill(r);
+      return { room: r, expanded, distortion, expandedArea, cap };
     })
+    .filter(c => c.expandedArea <= c.cap)
     .filter(c => c.distortion < ASPECT_DISTORTION_THRESHOLD)
     .filter(c => isInside(c.expanded, plot))
     .filter(c => !overlapsAnyExcept(c.expanded, rooms, c.room.id));
 
   if (candidates.length === 0) return false;
 
-  candidates.sort((a, b) => a.distortion - b.distortion);
+  // Prefer the candidate that ends up CLOSEST to its requested area
+  // (least distortion is a tiebreaker). This means under-sized rooms get
+  // the void first — naturally restoring rooms to their target size.
+  candidates.sort((a, b) => {
+    const aGap = Math.abs(a.expandedArea - a.room.requested_area_sqft);
+    const bGap = Math.abs(b.expandedArea - b.room.requested_area_sqft);
+    if (aGap !== bGap) return aGap - bGap;
+    return a.distortion - b.distortion;
+  });
   const winner = candidates[0];
   winner.room.placed = winner.expanded;
   return true;
