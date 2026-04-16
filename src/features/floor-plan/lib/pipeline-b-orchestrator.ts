@@ -1,7 +1,17 @@
 import type { FloorPlanProject, Floor, Room, Polygon, Point } from "@/types/floor-plan-cad";
 import { parseConstraints, type ParsedConstraints, type ParsedRoom } from "./structured-parser";
 import { detectInfeasibility, type InfeasibilityReport } from "./infeasibility-detector";
-import { solveMandalaCSP, solveStage3B, type MandalaAssignment, type FinePlacement, type CellIdx, cellCoords } from "./csp-solver";
+import {
+  solveMandalaCSP,
+  solveStage3B,
+  alignBoundaries,
+  generateWalls,
+  type MandalaAssignment,
+  type FinePlacement,
+  type CellIdx,
+  cellCoords,
+} from "./csp-solver";
+import type { Wall } from "@/types/floor-plan-cad";
 import { logger } from "@/lib/logger";
 
 export type PipelineBStage = "parse" | "infeasibility" | "mandala" | "placement" | "complete";
@@ -23,6 +33,8 @@ export interface PipelineBResult {
     detector_ms: number;
     csp_3a_ms: number;
     csp_3b_ms: number;
+    csp_3c_ms: number;
+    wall_gen_ms: number;
     placement_ms: number;
     total_ms: number;
   };
@@ -119,6 +131,7 @@ function fineProject(
   constraints: ParsedConstraints,
   projectName: string,
   placements: FinePlacement[],
+  walls: Wall[],
   plotWidthFt: number,
   plotDepthFt: number,
 ): FloorPlanProject {
@@ -160,7 +173,7 @@ function fineProject(
     floor_to_floor_height_mm: 3000,
     slab_thickness_mm: 150,
     boundary: floorBoundary,
-    walls: [],
+    walls,
     rooms,
     doors: [],
     windows: [],
@@ -187,7 +200,7 @@ function fineProject(
       built_up_area_sqm: totalAreaSqm,
       carpet_area_sqm: totalAreaSqm * 0.85,
       num_floors: 1,
-      generation_model: "pipeline-b-stage-3b",
+      generation_model: "pipeline-b-stage-3c",
       generation_timestamp: new Date().toISOString(),
     },
     settings: {
@@ -409,7 +422,7 @@ export async function runPipelineB(prompt: string, apiKey: string): Promise<Pipe
       parseAuditAttempts: 0,
       mandalaAssignments: null,
       finePlacements: null,
-      timings: { parse_ms, detector_ms: 0, csp_3a_ms: 0, csp_3b_ms: 0, placement_ms: 0, total_ms: Date.now() - totalStart },
+      timings: { parse_ms, detector_ms: 0, csp_3a_ms: 0, csp_3b_ms: 0, csp_3c_ms: 0, wall_gen_ms: 0, placement_ms: 0, total_ms: Date.now() - totalStart },
       error: `parser_failed: ${err instanceof Error ? err.message : String(err)}`,
     };
   }
@@ -434,7 +447,7 @@ export async function runPipelineB(prompt: string, apiKey: string): Promise<Pipe
       parseAuditAttempts,
       mandalaAssignments: null,
       finePlacements: null,
-      timings: { parse_ms, detector_ms, csp_3a_ms: 0, csp_3b_ms: 0, placement_ms: 0, total_ms: Date.now() - totalStart },
+      timings: { parse_ms, detector_ms, csp_3a_ms: 0, csp_3b_ms: 0, csp_3c_ms: 0, wall_gen_ms: 0, placement_ms: 0, total_ms: Date.now() - totalStart },
       error: null,
     };
   }
@@ -464,7 +477,7 @@ export async function runPipelineB(prompt: string, apiKey: string): Promise<Pipe
       parseAuditAttempts,
       mandalaAssignments: null,
       finePlacements: null,
-      timings: { parse_ms, detector_ms, csp_3a_ms, csp_3b_ms: 0, placement_ms: 0, total_ms: Date.now() - totalStart },
+      timings: { parse_ms, detector_ms, csp_3a_ms, csp_3b_ms: 0, csp_3c_ms: 0, wall_gen_ms: 0, placement_ms: 0, total_ms: Date.now() - totalStart },
       error: null,
     };
   }
@@ -483,11 +496,36 @@ export async function runPipelineB(prompt: string, apiKey: string): Promise<Pipe
 
   if (fineResult.feasible) {
     logger.debug(`[PIPELINE-B] CSP-3B feasible: ${fineResult.placements.length} placements in ${fineResult.iterations} iters, ${fineResult.elapsed_ms}ms`);
+
+    // ── Stage 3C: Boundary alignment ──
+    const csp3cStart = Date.now();
+    const aligned = alignBoundaries(
+      fineResult.placements,
+      constraints,
+      fineResult.plot_width_ft,
+      fineResult.plot_depth_ft,
+    );
+    const csp_3c_ms = Date.now() - csp3cStart;
+    for (const w of aligned.warnings) relaxationsApplied.push(`boundary-align: ${w}`);
+    logger.debug(`[PIPELINE-B] CSP-3C snapped ${aligned.snaps_applied} boundaries in ${csp_3c_ms}ms, ${aligned.warnings.length} warnings`);
+
+    // ── Wall geometry ──
+    const wallGenStart = Date.now();
+    const walls = generateWalls(aligned.placements, {
+      plot_width_ft: fineResult.plot_width_ft,
+      plot_depth_ft: fineResult.plot_depth_ft,
+      external_walls_ft: constraints.rooms[0]?.external_walls_ft ?? null,
+      internal_walls_ft: constraints.rooms[0]?.internal_walls_ft ?? null,
+    });
+    const wall_gen_ms = Date.now() - wallGenStart;
+    logger.debug(`[PIPELINE-B] Wall gen: ${walls.length} walls in ${wall_gen_ms}ms`);
+
     const placementStart = Date.now();
     const project = fineProject(
       constraints,
       projectName,
-      fineResult.placements,
+      aligned.placements,
+      walls,
       fineResult.plot_width_ft,
       fineResult.plot_depth_ft,
     );
@@ -503,8 +541,8 @@ export async function runPipelineB(prompt: string, apiKey: string): Promise<Pipe
       constraintsExtracted: constraints.rooms.length,
       parseAuditAttempts,
       mandalaAssignments: mandalaResult.assignments,
-      finePlacements: fineResult.placements,
-      timings: { parse_ms, detector_ms, csp_3a_ms, csp_3b_ms, placement_ms, total_ms: Date.now() - totalStart },
+      finePlacements: aligned.placements,
+      timings: { parse_ms, detector_ms, csp_3a_ms, csp_3b_ms, csp_3c_ms, wall_gen_ms, placement_ms, total_ms: Date.now() - totalStart },
       error: null,
     };
   }
@@ -528,7 +566,7 @@ export async function runPipelineB(prompt: string, apiKey: string): Promise<Pipe
     parseAuditAttempts,
     mandalaAssignments: mandalaResult.assignments,
     finePlacements: null,
-    timings: { parse_ms, detector_ms, csp_3a_ms, csp_3b_ms, placement_ms, total_ms: Date.now() - totalStart },
+    timings: { parse_ms, detector_ms, csp_3a_ms, csp_3b_ms, csp_3c_ms: 0, wall_gen_ms: 0, placement_ms, total_ms: Date.now() - totalStart },
     error: null,
   };
 }
