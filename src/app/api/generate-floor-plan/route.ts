@@ -68,6 +68,11 @@ import { runPipelineB } from "@/features/floor-plan/lib/pipeline-b-orchestrator"
 // Phase 1 — post-solve honest metrics (pipeline-agnostic)
 import { computeLayoutMetrics } from "@/features/floor-plan/lib/layout-metrics";
 
+// Phase 3 — strip-pack engine (PIPELINE_T1 feature flag)
+import { runStripPackEngine, fillDoorMetrics } from "@/features/floor-plan/lib/strip-pack/strip-pack-engine";
+import { toFloorPlanProject as toFloorPlanProjectT1 } from "@/features/floor-plan/lib/strip-pack/converter";
+import { parseConstraints } from "@/features/floor-plan/lib/structured-parser";
+
 // ── Generation Feedback ────────────────────────────────────────────────────
 
 interface GenerationFeedback {
@@ -247,6 +252,59 @@ export async function POST(req: NextRequest) {
     // the existing template+SA Pipeline A unchanged.
     const routing = routePrompt(prompt);
     logger.debug(`[ROUTER] pipeline=${routing.pipeline} signals=${routing.constraint_signals}`);
+
+    // ── Phase 3 — Strip-Pack Engine (PIPELINE_T1) ────────────────────────
+    // Tried only on Pipeline B routing (high-signal prompts) so we get the
+    // structured parser for free. If it produces a layout meeting the
+    // efficiency + door coverage thresholds, we ship it. Otherwise we fall
+    // through to the existing Pipeline B / Grid-First / BSP cascade — the
+    // engine is purely additive, not destructive.
+    if (process.env.PIPELINE_T1 === "true" && routing.pipeline === "B") {
+      try {
+        const t1Start = Date.now();
+        const parseRes = await parseConstraints(prompt, apiKey);
+        const t1ParseMs = Date.now() - t1Start;
+        const engineStart = Date.now();
+        const rawResult = await runStripPackEngine(parseRes.constraints);
+        const t1Result = fillDoorMetrics(rawResult);
+        const t1EngineMs = Date.now() - engineStart;
+        logger.debug(`[T1] parse=${t1ParseMs}ms engine=${t1EngineMs}ms eff=${t1Result.metrics.efficiency_pct}% doors=${t1Result.metrics.door_coverage_pct}% rooms=${t1Result.rooms.length}`);
+
+        const passesGates =
+          t1Result.metrics.efficiency_pct >= 70 &&
+          t1Result.metrics.door_coverage_pct >= 80;
+
+        if (passesGates) {
+          const project = toFloorPlanProjectT1(t1Result, parseRes.constraints);
+          const layoutMetrics = computeLayoutMetrics(project, parseRes.constraints);
+          const feedback = buildFeedback(project, prompt);
+          feedback.tips.push(`T1 strip-pack: ${t1Result.rooms.length} rooms, ${t1Result.doors.length} doors, ${t1Result.metrics.efficiency_pct}% efficiency in ${t1ParseMs + t1EngineMs}ms`);
+          if (t1Result.warnings.length > 0) {
+            feedback.tips.push(`T1 warnings: ${t1Result.warnings.slice(0, 3).join("; ")}${t1Result.warnings.length > 3 ? "…" : ""}`);
+          }
+          await recordToolExecution(userId, "floor-plan");
+          return NextResponse.json({
+            project,
+            geometry: null,
+            svg: null,
+            feedback,
+            layoutMetrics,
+            qualityFlags: layoutMetrics.quality_flags,
+            feasibilityWarnings: [],
+            pipelineUsed: "T1-strip-pack",
+            relaxationsApplied: t1Result.warnings,
+            infeasibilityReason: null,
+            mandalaAssignments: null,
+            routerSignals: routing.constraint_signals,
+          });
+        }
+        logger.debug(`[T1] subpar metrics — falling through to Pipeline B`);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.warn(`[T1] error — falling through to Pipeline B: ${msg}`);
+      }
+    }
+
     if (routing.pipeline === "B") {
       const bResult = await runPipelineB(prompt, apiKey);
       logger.debug(`[PIPELINE-B] ${bResult.pipelineUsed} parse=${bResult.timings.parse_ms}ms detector=${bResult.timings.detector_ms}ms placement=${bResult.timings.placement_ms}ms total=${bResult.timings.total_ms}ms`);
