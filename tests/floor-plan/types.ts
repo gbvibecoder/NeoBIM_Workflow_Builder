@@ -11,6 +11,21 @@ export interface ExpectedRoom {
   must_have_window_on?: "N" | "S" | "E" | "W";
 }
 
+export interface ExpectedRelationalAdjacency {
+  /** Name substring of room A. */
+  a: string;
+  /** Name substring of room B. */
+  b: string;
+  /** Compass direction from A toward B (absolute). */
+  direction: CompassDirection;
+}
+
+export interface ExpectedWindow {
+  /** Name substring of the room. */
+  room: string;
+  wall: "N" | "S" | "E" | "W";
+}
+
 export interface PromptExpectation {
   id: string;
   prompt: string;
@@ -19,6 +34,14 @@ export interface PromptExpectation {
   expected_rooms: ExpectedRoom[];
   forbidden_rooms: string[];
   expected_pipeline: "A" | "B";
+  /** Phase 7: directional adjacency expectations (A west of B, etc.). */
+  expected_relational?: ExpectedRelationalAdjacency[];
+  /** Phase 7: if set, main entrance door should be on this plot wall. */
+  expected_main_entrance_side?: "N" | "S" | "E" | "W";
+  /** Phase 7: hallway/corridor should share edge with each of these room name-substrings. */
+  expected_hallway_connects?: string[];
+  /** Phase 7: windows expected on specific room walls. */
+  expected_windows?: ExpectedWindow[];
 }
 
 export interface MetricResult {
@@ -36,6 +59,10 @@ export interface ScoreReport {
     positions: number;
     hallucinations: number;
     gaps: number;
+    relational: number;
+    main_entrance: number;
+    hallway: number;
+    windows: number;
   };
   details: {
     completeness: string[];
@@ -44,6 +71,10 @@ export interface ScoreReport {
     positions: string[];
     hallucinations: string[];
     gaps: string[];
+    relational: string[];
+    main_entrance: string[];
+    hallway: string[];
+    windows: string[];
   };
 }
 

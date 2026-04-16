@@ -3,7 +3,7 @@ import type { MetricResult, PromptExpectation } from "../types";
 import { findMatchingRoom, getAllRooms } from "./utils";
 
 export function scoreCompleteness(project: FloorPlanProject, expectation: PromptExpectation): MetricResult {
-  const MAX = 25;
+  const MAX = 20;
   const rooms = getAllRooms(project);
   const total = expectation.expected_rooms.length;
   if (total === 0) return { score: MAX, max: MAX, details: ["no expected rooms"] };

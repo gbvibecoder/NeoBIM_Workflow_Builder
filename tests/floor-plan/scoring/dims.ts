@@ -5,7 +5,7 @@ import { findMatchingRoom, roomDimsFt, getAllRooms } from "./utils";
 const TOLERANCE = 0.05;
 
 export function scoreDims(project: FloorPlanProject, expectation: PromptExpectation): MetricResult {
-  const MAX = 20;
+  const MAX = 15;
   const rooms = getAllRooms(project);
   const expectedWithDims = expectation.expected_rooms.filter(r => r.dim_width_ft && r.dim_depth_ft);
   if (expectedWithDims.length === 0) return { score: MAX, max: MAX, details: ["no dim expectations"] };

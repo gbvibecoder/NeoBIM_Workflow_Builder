@@ -25,6 +25,12 @@ export const REGRESSION_PROMPTS: PromptExpectation[] = [
     ],
     forbidden_rooms: ["Drawing Room", "Verandah", "Walk-in Closet"],
     expected_pipeline: "B",
+    expected_main_entrance_side: "N",
+    expected_hallway_connects: ["master", "bedroom 2", "bedroom 3", "bedroom 4", "bedroom 5"],
+    expected_windows: [
+      { room: "living", wall: "N" },
+      { room: "bedroom 4", wall: "E" },
+    ],
   },
   {
     id: "P02",

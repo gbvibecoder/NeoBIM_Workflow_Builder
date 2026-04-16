@@ -3,7 +3,7 @@ import type { MetricResult, PromptExpectation } from "../types";
 import { findMatchingRoom, quadrantOf, getAllRooms } from "./utils";
 
 export function scorePositions(project: FloorPlanProject, expectation: PromptExpectation): MetricResult {
-  const MAX = 15;
+  const MAX = 10;
   const rooms = getAllRooms(project);
   const expectedWithPos = expectation.expected_rooms.filter(r => r.position_direction);
   if (expectedWithPos.length === 0) return { score: MAX, max: MAX, details: ["no position expectations"] };

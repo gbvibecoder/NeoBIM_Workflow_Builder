@@ -3,7 +3,7 @@ import type { MetricResult, PromptExpectation } from "../types";
 import { findMatchingRoom, getAllRooms } from "./utils";
 
 export function scoreHallucinations(project: FloorPlanProject, expectation: PromptExpectation): MetricResult {
-  const MAX = 10;
+  const MAX = 5;
   const rooms = getAllRooms(project);
   const details: string[] = [];
 
@@ -30,7 +30,7 @@ export function scoreHallucinations(project: FloorPlanProject, expectation: Prom
     }
   }
 
-  const score = Math.max(0, MAX - 5 * forbiddenHits - 1 * extraRooms);
+  const score = Math.max(0, MAX - 2 * forbiddenHits - 1 * extraRooms);
   details.unshift(`${forbiddenHits} forbidden, ${extraRooms} extra rooms`);
   return { score, max: MAX, details };
 }

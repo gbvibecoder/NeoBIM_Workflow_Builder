@@ -56,7 +56,7 @@ const CRITICAL_RULES: CriticalRule[] = [
 ];
 
 export function scoreVastu(project: FloorPlanProject, expectation: PromptExpectation): MetricResult {
-  const MAX = 25;
+  const MAX = 20;
   if (!expectation.vastu_required) {
     return { score: MAX, max: MAX, details: ["vastu not required"] };
   }
