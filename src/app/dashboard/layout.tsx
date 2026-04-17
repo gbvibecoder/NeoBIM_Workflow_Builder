@@ -10,6 +10,7 @@ import { BetaBanner } from "@/shared/components/ui/BetaBanner";
 import { OnboardingModal } from "@/features/onboarding/components/OnboardingModal";
 import { PendingReferralClaimer } from "@/features/referral/components/PendingReferralClaimer";
 import { SupportChatLoader } from "@/features/support/components/SupportChatLoader";
+import { SubscriptionSelfHeal } from "@/features/billing/components/SubscriptionSelfHeal";
 
 export default function DashboardLayout({
   children,
@@ -39,6 +40,7 @@ export default function DashboardLayout({
       <OnboardingModal />
       <PendingReferralClaimer />
       <SupportChatLoader />
+      <SubscriptionSelfHeal />
     </div>
   );
 }
