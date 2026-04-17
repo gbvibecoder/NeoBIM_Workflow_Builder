@@ -52,7 +52,10 @@ interface SortKey {
 function keyFor(room: StripPackRoom, idx: number): SortKey {
   return {
     hasPosition: hasAnchorPreference(room) ? 0 : 1,
-    groupKey: room.group_id ?? `__solo_${room.id}`,
+    // Empty string for singletons so the group tiebreaker doesn't alphabetize
+    // by room id — that used to put the largest room (e.g. Master Bedroom)
+    // *after* smaller bedrooms simply because "master" > "bed2" lexically.
+    groupKey: room.group_id ?? "",
     negArea: -room.requested_area_sqft,
     zoneRank: ZONE_AFFINITY_RANK[room.zone] ?? 99,
     parserOrder: idx,
@@ -61,9 +64,13 @@ function keyFor(room: StripPackRoom, idx: number): SortKey {
 
 function compareKeys(a: SortKey, b: SortKey): number {
   if (a.hasPosition !== b.hasPosition) return a.hasPosition - b.hasPosition;
-  if (a.groupKey    !== b.groupKey)    return a.groupKey < b.groupKey ? -1 : 1;
-  if (a.negArea     !== b.negArea)     return a.negArea - b.negArea;
-  if (a.zoneRank    !== b.zoneRank)    return a.zoneRank - b.zoneRank;
+  // Only use groupKey as a tiebreaker when BOTH rooms are in actual
+  // adjacency groups. Singletons (empty groupKey) fall through to area sort.
+  if (a.groupKey && b.groupKey && a.groupKey !== b.groupKey) {
+    return a.groupKey < b.groupKey ? -1 : 1;
+  }
+  if (a.negArea  !== b.negArea)  return a.negArea - b.negArea;
+  if (a.zoneRank !== b.zoneRank) return a.zoneRank - b.zoneRank;
   return a.parserOrder - b.parserOrder;
 }
 

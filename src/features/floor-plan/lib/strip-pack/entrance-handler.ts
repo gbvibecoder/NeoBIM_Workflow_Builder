@@ -103,33 +103,42 @@ export function placeEntrance(
     return { remainingFront: [front] };
   }
 
-  // Decide cutout dimensions:
-  //   width  = max of porch.width, foyer.width (centered)
-  //   depth  = sum of porch.depth + foyer.depth (or whichever exists)
-  // Clamp width to the front strip width.
+  // Decide cutout dimensions — axis of stacking depends on facing:
+  //   n/s-facing  — porch/foyer stack vertically inside the cutout →
+  //                 cutoutWidth  = max(pW, fW), cutoutDepth = pD + fD
+  //   e/w-facing  — porch/foyer stack horizontally →
+  //                 cutoutWidth  = pW + fW, cutoutDepth = max(pD, fD)
   const pW = porch?.requested_width_ft ?? 0;
-  const fW = foyer?.requested_width_ft ?? 0;
+  const fW0 = foyer?.requested_width_ft ?? 0;
   const pD = porch?.requested_depth_ft ?? 0;
-  let   fD = foyer?.requested_depth_ft ?? 0;
+  const fD0 = foyer?.requested_depth_ft ?? 0;
+  let fW = fW0;
+  let fD = fD0;
 
-  // Phase 3D fix — foyer-to-hallway connectivity for n/s-facing plots.
-  // If the natural cutout (porch + foyer) is shallower than the front strip,
-  // the foyer sits in the middle of the strip with a gap between its
-  // hallway-side edge and the spine. The door-placer then can't find a
-  // shared wall for the foyer → hallway door, and BFS from the main
-  // entrance gets stuck at the foyer, orphaning every other room.
-  //
-  // Extend the foyer depth so the cutout spans the full front-strip depth —
-  // architecturally the foyer IS the vestibule that bridges the entrance
-  // to circulation, and a deeper foyer is a valid trade against topological
-  // correctness. For e/w-facing the INNER rect is typically wide enough to
-  // absorb a regular room, so no extension is needed there.
-  if ((facing === "north" || facing === "south") && porch && foyer && pD + fD < front.depth) {
-    fD = front.depth - pD;
+  // Phase 3D fix — foyer-to-hallway connectivity. If the natural cutout
+  // leaves a gap between the foyer and the spine, the door-placer can't
+  // find a shared wall foyer→hallway and BFS from the main entrance dies
+  // at the foyer, orphaning every interior room. Extend the foyer along
+  // the spine-perpendicular axis so its far edge touches the spine.
+  //   n/s-facing: extend foyer depth until pD + fD = front.depth
+  //   e/w-facing: extend foyer width until pW + fW = front.width
+  if (porch && foyer) {
+    if ((facing === "north" || facing === "south") && pD + fD < front.depth) {
+      fD = front.depth - pD;
+    } else if ((facing === "east" || facing === "west") && pW + fW < front.width) {
+      fW = front.width - pW;
+    }
   }
 
-  const cutoutWidth = Math.min(front.width, Math.max(pW, fW, MIN_USABLE_DIMENSION_FT));
-  const cutoutDepth = Math.min(front.depth, pD + fD);
+  let cutoutWidth: number;
+  let cutoutDepth: number;
+  if (facing === "north" || facing === "south") {
+    cutoutWidth = Math.min(front.width, Math.max(pW, fW, MIN_USABLE_DIMENSION_FT));
+    cutoutDepth = Math.min(front.depth, pD + fD);
+  } else {
+    cutoutWidth = Math.min(front.width, pW + fW);
+    cutoutDepth = Math.min(front.depth, Math.max(pD, fD, MIN_USABLE_DIMENSION_FT));
+  }
 
   if (cutoutDepth <= 0 || cutoutWidth <= 0) {
     return { remainingFront: [front] };
@@ -181,10 +190,15 @@ export function placeEntrance(
   }
 
   if (foyer) {
-    const w = Math.min(foyer.requested_width_ft, cutoutWidth);
-    // Use the (possibly extended) `fD` — see the connectivity fix above.
-    const d = Math.min(fD, cutoutDepth - (porch?.requested_depth_ft ?? 0));
-    const safeDepth = Math.max(MIN_USABLE_DIMENSION_FT, d);
+    // Use (possibly extended) fW/fD — see connectivity fix above.
+    const rawW = facing === "north" || facing === "south"
+      ? Math.min(fW, cutoutWidth)
+      : Math.min(fW, cutoutWidth - (porch?.requested_width_ft ?? 0));
+    const w = Math.max(MIN_USABLE_DIMENSION_FT, rawW);
+    const rawD = facing === "north" || facing === "south"
+      ? Math.min(fD, cutoutDepth - (porch?.requested_depth_ft ?? 0))
+      : Math.min(fD, cutoutDepth);
+    const safeDepth = Math.max(MIN_USABLE_DIMENSION_FT, rawD);
     let fx = cutoutX + (cutoutWidth - w) / 2;
     let fy: number;
     if (facing === "north")      fy = cutoutY + cutoutDepth - (porch?.requested_depth_ft ?? 0) - safeDepth;
