@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { razorpay, verifyWebhookSignature, getRoleByRazorpayPlanId } from '@/features/billing/lib/razorpay';
 import { prisma } from '@/lib/db';
+import { invalidateUserRoleCache } from '@/lib/auth';
 import { formatErrorResponse } from '@/lib/user-errors';
 import {
   sendWelcomeEmail,
@@ -35,7 +36,16 @@ export async function POST(req: NextRequest) {
   }
 
   const eventType = event.event as string;
-  const eventId = event.event_id || `${eventType}_${Date.now()}`;
+  // Razorpay's real delivery ID is in the X-Razorpay-Event-Id header, not the
+  // body. Falling back to Date.now() would make idempotency a no-op, so
+  // combine the stable subscription/payment ID with the event type as a
+  // best-effort fallback (prevents duplicate processing of a given status
+  // change on a given subscription even if the header is missing).
+  const headerEventId = req.headers.get('x-razorpay-event-id');
+  const subId =
+    (event.payload?.subscription?.entity?.id as string | undefined) ||
+    (event.payload?.payment?.entity?.id as string | undefined);
+  const eventId = headerEventId || (subId ? `${eventType}:${subId}` : `${eventType}_${Date.now()}`);
   console.info('[RAZORPAY_WEBHOOK] Event received:', eventType, eventId);
 
   // Idempotency: skip already-processed events
@@ -70,7 +80,6 @@ export async function POST(req: NextRequest) {
         const subscription = event.payload?.subscription?.entity;
         if (!subscription?.id) break;
 
-        // Pause = downgrade to FREE but keep subscription ID for resume
         await pauseSubscription(subscription);
         break;
       }
@@ -155,18 +164,38 @@ async function activateSubscription(subscription: {
   const newRole = getRoleByRazorpayPlanId(planId || null);
   const previousRole = user.role;
 
-  if (newRole === 'FREE' && planId) {
-    console.error('[RAZORPAY_WEBHOOK] CRITICAL: Paid subscription resolved to FREE!', {
-      userId: user.id,
-      planId,
-      subscriptionId: subscription.id,
-    });
-  }
-
   const periodEnd = subscription.current_end || subscription.charge_at;
   const currentPeriodEnd = periodEnd
     ? new Date(periodEnd * 1000)
     : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+
+  // If a paid Razorpay plan_id can't be mapped to a role, refuse to downgrade.
+  // Persist the subscription metadata so ops can backfill after fixing env vars,
+  // but keep the user's existing role. Mirrors the Stripe webhook guard.
+  if (newRole === 'FREE' && planId) {
+    console.error('[RAZORPAY_WEBHOOK] CRITICAL: Paid subscription resolved to FREE — refusing to downgrade user.', {
+      userId: user.id,
+      planId,
+      subscriptionId: subscription.id,
+      currentRole: previousRole,
+      envMini: process.env.RAZORPAY_MINI_PLAN_ID ? 'set' : 'MISSING',
+      envStarter: process.env.RAZORPAY_STARTER_PLAN_ID ? 'set' : 'MISSING',
+      envPro: process.env.RAZORPAY_PRO_PLAN_ID ? 'set' : 'MISSING',
+      envTeam: process.env.RAZORPAY_TEAM_PLAN_ID ? 'set' : 'MISSING',
+    });
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        razorpaySubscriptionId: subscription.id,
+        razorpayPlanId: planId,
+        paymentGateway: 'razorpay',
+        stripeCurrentPeriodEnd: currentPeriodEnd,
+        // role deliberately NOT touched
+      },
+    });
+    return;
+  }
 
   await prisma.user.update({
     where: { id: user.id },
@@ -178,6 +207,7 @@ async function activateSubscription(subscription: {
       stripeCurrentPeriodEnd: currentPeriodEnd,
     },
   });
+  invalidateUserRoleCache(user.id);
 
   console.info('[RAZORPAY_WEBHOOK] Subscription activated:', {
     userId: user.id,
@@ -222,8 +252,10 @@ async function cancelSubscription(subscription: { id: string }) {
       razorpaySubscriptionId: null,
       razorpayPlanId: null,
       stripeCurrentPeriodEnd: null,
+      paymentGateway: null,
     },
   });
+  invalidateUserRoleCache(user.id);
 
   console.info('[RAZORPAY_WEBHOOK] Subscription cancelled:', {
     userId: user.id,
@@ -239,20 +271,19 @@ async function cancelSubscription(subscription: { id: string }) {
 async function pauseSubscription(subscription: { id: string }) {
   const user = await prisma.user.findFirst({
     where: { razorpaySubscriptionId: subscription.id },
-    select: { id: true, role: true },
+    select: { id: true, role: true, stripeCurrentPeriodEnd: true },
   });
 
   if (!user) return;
 
-  // Keep subscription ID so it can be resumed, but downgrade role
-  await prisma.user.update({
-    where: { id: user.id },
-    data: { role: 'FREE' },
-  });
-
-  console.info('[RAZORPAY_WEBHOOK] Subscription paused:', {
+  // DO NOT downgrade the role. The user has already paid for the current
+  // billing period — pausing the e-mandate only stops future renewals.
+  // The role stays active until stripeCurrentPeriodEnd expires, at which
+  // point the cancel/halt webhook (or the reconcile cron) will downgrade.
+  console.info('[RAZORPAY_WEBHOOK] Subscription paused — role preserved until period end:', {
     userId: user.id,
-    previousRole: user.role,
+    currentRole: user.role,
+    periodEnd: user.stripeCurrentPeriodEnd,
     subscriptionId: subscription.id,
   });
 }

@@ -50,8 +50,10 @@ export async function GET(req: Request) {
         xp: true,
         level: true,
         stripeSubscriptionId: true,
+        stripePriceId: true,
         stripeCurrentPeriodEnd: true,
         razorpaySubscriptionId: true,
+        razorpayPlanId: true,
         paymentGateway: true,
         createdAt: true,
         _count: {

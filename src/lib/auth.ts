@@ -8,13 +8,25 @@ import { authConfig } from "@/lib/auth.config";
 import { trackLogin } from "@/lib/analytics";
 import { normalizePhone } from "@/lib/form-validation";
 
-// Throttle DB role lookups: refresh at most once per 60 seconds per user.
-// This avoids a DB query on every single authenticated request while still
-// catching subscription changes (webhook, manual fix) within ~1 minute.
+// Throttle DB role lookups: refresh at most once per 15 seconds per user.
+// This keeps the DB query cost bounded while ensuring subscription changes
+// (webhook, reconcile, manual fix) are reflected in sessions quickly.
 // Bounded to 10,000 entries to prevent unbounded memory growth.
 const MAX_ROLE_CACHE_SIZE = 10_000;
 const roleRefreshCache = new Map<string, number>();
-const ROLE_REFRESH_INTERVAL_MS = 60_000; // 60 seconds
+const ROLE_REFRESH_INTERVAL_MS = 15_000; // 15 seconds
+
+/**
+ * Clear a specific user's cache entry so the NEXT auth() call on this lambda
+ * will force a DB read. Called from every server path that writes
+ * User.role — webhooks, reconcile, manual bind — so upgrades become visible
+ * immediately instead of waiting out the throttle. Serverless is per-instance
+ * so this clears only the local lambda's cache, but combined with the shorter
+ * 15s ROLE_REFRESH_INTERVAL_MS it's sufficient in practice.
+ */
+export function invalidateUserRoleCache(userId: string): void {
+  roleRefreshCache.delete(userId);
+}
 
 /** Evict oldest entries when the cache exceeds MAX_ROLE_CACHE_SIZE.
  *  Map iteration order is insertion order, so the first entries are oldest. */

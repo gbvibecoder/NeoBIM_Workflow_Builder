@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { auth } from '@/lib/auth';
+import { auth, invalidateUserRoleCache } from '@/lib/auth';
 import { razorpay, verifyPaymentSignature, getRoleByRazorpayPlanId } from '@/features/billing/lib/razorpay';
 import { prisma } from '@/lib/db';
 import { checkEndpointRateLimit } from '@/lib/rate-limit';
@@ -82,14 +82,6 @@ export async function POST(req: Request) {
     const planId = subscription.plan_id;
     const newRole = getRoleByRazorpayPlanId(planId);
 
-    if (newRole === 'FREE' && planId) {
-      console.error('[razorpay/verify] CRITICAL: Paid subscription resolved to FREE!', {
-        userId: session.user.id,
-        planId,
-        subscriptionId: razorpay_subscription_id,
-      });
-    }
-
     // Step 4: Calculate period end
     // Razorpay charge_at is the next charge timestamp; current_end is period end
     const periodEndTimestamp = subscription.current_end || subscription.charge_at;
@@ -110,6 +102,44 @@ export async function POST(req: Request) {
       );
     }
 
+    // If a paid Razorpay plan_id can't be mapped to a role (env var drift,
+    // wrong RAZORPAY_*_PLAN_ID in prod, regenerated plan), do NOT downgrade
+    // the user to FREE. Store the subscription metadata so ops can re-run a
+    // backfill once env vars are corrected, and preserve the existing role.
+    // Mirrors the Stripe webhook guard in src/app/api/stripe/webhook/route.ts.
+    if (newRole === 'FREE' && planId) {
+      console.error('[razorpay/verify] CRITICAL: Paid subscription resolved to FREE — refusing to downgrade user.', {
+        userId: session.user.id,
+        planId,
+        subscriptionId: razorpay_subscription_id,
+        currentRole: user.role,
+        envMini: process.env.RAZORPAY_MINI_PLAN_ID ? 'set' : 'MISSING',
+        envStarter: process.env.RAZORPAY_STARTER_PLAN_ID ? 'set' : 'MISSING',
+        envPro: process.env.RAZORPAY_PRO_PLAN_ID ? 'set' : 'MISSING',
+        envTeam: process.env.RAZORPAY_TEAM_PLAN_ID ? 'set' : 'MISSING',
+      });
+
+      await prisma.user.update({
+        where: { id: session.user.id },
+        data: {
+          razorpaySubscriptionId: razorpay_subscription_id,
+          razorpayPlanId: planId,
+          paymentGateway: 'razorpay',
+          stripeCurrentPeriodEnd: currentPeriodEnd,
+          // role deliberately NOT touched — keep user's existing role
+        },
+      });
+
+      return NextResponse.json(
+        formatErrorResponse({
+          title: 'Plan activation needs attention',
+          message: 'Your payment succeeded but your plan could not be activated automatically. Our team has been notified — please contact support.',
+          code: 'RAZORPAY_PLAN_UNMAPPED',
+        }),
+        { status: 502 },
+      );
+    }
+
     await prisma.user.update({
       where: { id: session.user.id },
       data: {
@@ -120,6 +150,7 @@ export async function POST(req: Request) {
         stripeCurrentPeriodEnd: currentPeriodEnd, // Reuse this field for period tracking
       },
     });
+    invalidateUserRoleCache(session.user.id);
 
     console.info('[razorpay/verify] Subscription activated:', {
       userId: session.user.id,

@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Search, ChevronUp, ChevronDown, ChevronLeft, ChevronRight,
   Download, Users, Filter, Shield, Star, Zap, Trash2, AlertTriangle,
-  X, Loader2, CreditCard, FolderKanban,
+  X, Loader2, CreditCard, FolderKanban, RefreshCw, Smartphone, CheckCircle2,
 } from "lucide-react";
 import { useLocale } from "@/hooks/useLocale";
 
@@ -21,7 +21,11 @@ interface ApiUser {
   xp: number;
   level: number;
   stripeSubscriptionId: string | null;
+  stripePriceId: string | null;
   stripeCurrentPeriodEnd: string | null;
+  razorpaySubscriptionId: string | null;
+  razorpayPlanId: string | null;
+  paymentGateway: string | null;
   createdAt: string;
   _count: { workflows: number; executions: number };
 }
@@ -272,6 +276,196 @@ function DeleteConfirmModal({ user, onConfirm, onCancel, isDeleting, t }: {
   );
 }
 
+// ─── Orphan Card (with inline Bind-to-user form) ─────────────────────────────
+interface OrphanOutcome {
+  gateway?: string;
+  subscriptionId?: string;
+  customerId?: string;
+  customerEmail?: string | null;
+  subscriptionStatus?: string;
+  priceId?: string | null;
+  planId?: string | null;
+  notes?: Record<string, unknown>;
+  paymentEmails?: string[];
+  paymentContacts?: string[];
+  attempted?: Record<string, string | null>;
+  hint?: string;
+}
+
+function OrphanCard({
+  entry,
+  onBound,
+}: {
+  entry: { userId?: string; email: string | null; outcome: unknown };
+  onBound: () => void | Promise<void>;
+}) {
+  const o = entry.outcome as OrphanOutcome;
+  const [email, setEmail] = useState<string>(
+    o.customerEmail ||
+      entry.email ||
+      (typeof o.notes?.email === "string" ? (o.notes.email as string) : "") ||
+      (Array.isArray(o.paymentEmails) ? o.paymentEmails[0] ?? "" : "") ||
+      "",
+  );
+  const [submitting, setSubmitting] = useState(false);
+  const [result, setResult] = useState<{ ok: boolean; message: string } | null>(null);
+
+  async function handleBind() {
+    if (!email.trim() || !o.gateway || !o.subscriptionId || submitting) return;
+    setSubmitting(true);
+    setResult(null);
+    try {
+      const res = await fetch("/api/admin/subscriptions/bind", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          gateway: o.gateway,
+          subscriptionId: o.subscriptionId,
+          userEmail: email.trim(),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setResult({ ok: false, message: data.error || `Bind failed (${res.status})` });
+      } else if (data.bound) {
+        setResult({
+          ok: true,
+          message: `Bound → ${data.user?.email ?? email} · ${data.previousRole} → ${data.newRole}`,
+        });
+        await onBound();
+      } else {
+        setResult({ ok: false, message: data.message || `Not bound (${data.reason})` });
+      }
+    } catch (err) {
+      setResult({
+        ok: false,
+        message: err instanceof Error ? err.message : "Request failed",
+      });
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <li style={{
+      padding: "10px 12px", borderRadius: 8,
+      background: "rgba(167,139,250,0.05)",
+      border: "1px solid rgba(167,139,250,0.12)",
+      display: "flex", flexDirection: "column", gap: 6,
+    }}>
+      <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
+        <span style={{ fontSize: 12, color: "#F0F0F5", fontWeight: 700, fontFamily: "var(--font-jetbrains), monospace" }}>
+          {o.gateway?.toUpperCase()} · {o.subscriptionId}
+        </span>
+        <span style={{ fontSize: 10, color: "#A78BFA", fontFamily: "var(--font-jetbrains), monospace", textTransform: "uppercase", letterSpacing: 1 }}>
+          {o.subscriptionStatus}
+        </span>
+        {(o.priceId || o.planId) && (
+          <span style={{ fontSize: 10, color: "#9898B0", fontFamily: "var(--font-jetbrains), monospace" }}>
+            plan/price: {o.priceId || o.planId}
+          </span>
+        )}
+      </div>
+
+      {o.attempted && (
+        <div style={{
+          fontSize: 10, color: "#9898B0",
+          fontFamily: "var(--font-jetbrains), monospace",
+          background: "rgba(255,255,255,0.02)",
+          border: "1px solid rgba(255,255,255,0.04)",
+          borderRadius: 6, padding: "6px 8px",
+          display: "flex", flexDirection: "column", gap: 2,
+        }}>
+          <div style={{ color: "#5C5C78", fontSize: 9, letterSpacing: 1 }}>TRIED:</div>
+          {Object.entries(o.attempted).map(([k, v]) => (
+            <div key={k}><span style={{ color: "#5C5C78" }}>{k}</span> = <span style={{ color: v ? "#F0F0F5" : "#5C5C78" }}>{v || "—"}</span></div>
+          ))}
+        </div>
+      )}
+
+      {o.notes && Object.keys(o.notes).length > 0 && (
+        <div style={{
+          fontSize: 10, color: "#9898B0",
+          fontFamily: "var(--font-jetbrains), monospace",
+          wordBreak: "break-all",
+        }}>
+          <span style={{ color: "#5C5C78" }}>notes:</span> {JSON.stringify(o.notes)}
+        </div>
+      )}
+
+      {(o.paymentEmails?.length || o.paymentContacts?.length) && (
+        <div style={{
+          fontSize: 10, color: "#9898B0",
+          fontFamily: "var(--font-jetbrains), monospace",
+          wordBreak: "break-all",
+          background: "rgba(16,185,129,0.04)",
+          border: "1px solid rgba(16,185,129,0.08)",
+          borderRadius: 6, padding: "6px 8px",
+          display: "flex", flexDirection: "column", gap: 2,
+        }}>
+          <div style={{ color: "#34D399", fontSize: 9, letterSpacing: 1 }}>FROM PAYMENTS:</div>
+          {o.paymentEmails && o.paymentEmails.length > 0 && (
+            <div><span style={{ color: "#5C5C78" }}>email:</span> {o.paymentEmails.join(", ")}</div>
+          )}
+          {o.paymentContacts && o.paymentContacts.length > 0 && (
+            <div><span style={{ color: "#5C5C78" }}>contact:</span> {o.paymentContacts.join(", ")}</div>
+          )}
+        </div>
+      )}
+
+      {/* Bind-to-user form */}
+      <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+        <input
+          type="email"
+          placeholder="User email in DB (case-insensitive)"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          disabled={submitting}
+          style={{
+            flex: "1 1 220px",
+            padding: "7px 10px", borderRadius: 7,
+            background: "rgba(255,255,255,0.04)",
+            border: "1px solid rgba(255,255,255,0.08)",
+            color: "#F0F0F5", fontSize: 12, outline: "none",
+            fontFamily: "var(--font-dm-sans), sans-serif",
+          }}
+        />
+        <button
+          onClick={handleBind}
+          disabled={!email.trim() || submitting}
+          style={{
+            padding: "7px 14px", borderRadius: 7,
+            background: submitting ? "rgba(167,139,250,0.08)" : "rgba(167,139,250,0.15)",
+            border: "1px solid rgba(167,139,250,0.25)",
+            color: "#A78BFA", fontSize: 11, fontWeight: 700,
+            cursor: !email.trim() || submitting ? "not-allowed" : "pointer",
+            opacity: !email.trim() || submitting ? 0.5 : 1,
+            fontFamily: "var(--font-dm-sans), sans-serif",
+            display: "flex", alignItems: "center", gap: 5,
+          }}
+        >
+          {submitting ? (
+            <Loader2 size={12} style={{ animation: "spin 1s linear infinite" }} />
+          ) : (
+            <CheckCircle2 size={12} />
+          )}
+          Bind to user
+        </button>
+      </div>
+
+      {result && (
+        <div style={{
+          fontSize: 11,
+          color: result.ok ? "#34D399" : "#F87171",
+          fontFamily: "var(--font-dm-sans), sans-serif",
+        }}>
+          {result.ok ? "✓ " : "✗ "}{result.message}
+        </div>
+      )}
+    </li>
+  );
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 export default function AdminUsersPage() {
   const { t } = useLocale();
@@ -293,6 +487,20 @@ export default function AdminUsersPage() {
   const [deleteTarget, setDeleteTarget] = useState<ApiUser | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [changingRoleId, setChangingRoleId] = useState<string | null>(null);
+
+  // ── Reconcile state ─────────────────────────────────────────────────────
+  const [reconcilingUserId, setReconcilingUserId] = useState<string | null>(null);
+  const [bulkReconciling, setBulkReconciling] = useState(false);
+  const [reconcileReport, setReconcileReport] = useState<{
+    title: string;
+    subtitle?: string;
+    counts: { reconciled: number; unresolved: number; orphans?: number; errors: number; skipped: number };
+    reconciled: { userId?: string; email: string | null; outcome: unknown }[];
+    unresolved: { userId?: string; email: string | null; outcome: unknown }[];
+    orphans?: { userId?: string; email: string | null; outcome: unknown }[];
+    errors: { userId?: string; email: string | null; outcome: unknown }[];
+  } | null>(null);
+  const [stuckCount, setStuckCount] = useState<number | null>(null);
 
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -373,6 +581,118 @@ export default function AdminUsersPage() {
     }
   }
 
+  // ── Reconcile: load count of stuck users ────────────────────────────────
+  const fetchStuckCount = useCallback(async () => {
+    try {
+      const res = await fetch("/api/admin/reconcile-subscriptions");
+      if (!res.ok) return;
+      const data = await res.json();
+      setStuckCount(typeof data.total === "number" ? data.total : null);
+    } catch {
+      // non-critical; banner just won't appear
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchStuckCount();
+  }, [fetchStuckCount]);
+
+  // ── Reconcile: bulk backfill via provider-first DEEP SCAN ───────────────
+  // Discovers paid users even when no subscription ID was ever written to the
+  // DB (webhook never fired, verify call died mid-redirect). Queries Stripe
+  // and Razorpay directly and matches live subscriptions back to users.
+  async function handleBulkReconcile() {
+    if (bulkReconciling) return;
+    const confirmed = window.confirm(
+      "Run a DEEP SCAN of Stripe and Razorpay?\n\n" +
+        "This lists every live subscription in your payment accounts and matches them back to users — " +
+        "fixing cases where a user paid but nothing was ever written to our DB.\n\n" +
+        "Subscriptions that don't match any user are reported as 'orphans'. " +
+        "Subscriptions whose plan_id / price_id don't map to any env var are reported as 'unresolved'.",
+    );
+    if (!confirmed) return;
+    setBulkReconciling(true);
+    try {
+      const res = await fetch("/api/admin/reconcile-subscriptions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || `Reconcile failed (${res.status})`);
+      const s = data.summary || {};
+      setReconcileReport({
+        title: `Deep scan complete`,
+        subtitle: `Stripe: ${s.stripeSubsSeen ?? 0} live subs · Razorpay: ${s.razorpaySubsSeen ?? 0} subs (${s.razorpaySubsLive ?? 0} live)`,
+        counts: data.counts,
+        reconciled: data.reconciled || [],
+        unresolved: data.unresolved || [],
+        orphans: data.orphans || [],
+        errors: data.errors || [],
+      });
+      await Promise.all([fetchUsers(), fetchStuckCount()]);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to run reconcile");
+    } finally {
+      setBulkReconciling(false);
+    }
+  }
+
+  // ── Reconcile: single user force re-sync ────────────────────────────────
+  async function handleReconcileUser(userId: string, email: string | null) {
+    if (reconcilingUserId) return;
+    setReconcilingUserId(userId);
+    try {
+      const res = await fetch(`/api/admin/users/${userId}/reconcile`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || `Reconcile failed (${res.status})`);
+      const outcome = data.outcome;
+      const status = outcome?.status ?? "unknown";
+      if (status === "reconciled") {
+        setReconcileReport({
+          title: `Reconciled ${email || userId}`,
+          counts: { reconciled: 1, unresolved: 0, errors: 0, skipped: 0 },
+          reconciled: [{ userId, email, outcome }],
+          unresolved: [],
+          errors: [],
+        });
+      } else if (status === "unresolved") {
+        setReconcileReport({
+          title: `Could not resolve ${email || userId}`,
+          counts: { reconciled: 0, unresolved: 1, errors: 0, skipped: 0 },
+          reconciled: [],
+          unresolved: [{ userId, email, outcome }],
+          errors: [],
+        });
+      } else if (status === "error") {
+        setReconcileReport({
+          title: `Error reconciling ${email || userId}`,
+          counts: { reconciled: 0, unresolved: 0, errors: 1, skipped: 0 },
+          reconciled: [],
+          unresolved: [],
+          errors: [{ userId, email, outcome }],
+        });
+      } else {
+        setReconcileReport({
+          title: `${email || userId}: ${status}`,
+          counts: { reconciled: 0, unresolved: 0, errors: 0, skipped: 1 },
+          reconciled: [],
+          unresolved: [],
+          errors: [],
+        });
+      }
+      await Promise.all([fetchUsers(), fetchStuckCount()]);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to reconcile user");
+    } finally {
+      setReconcilingUserId(null);
+    }
+  }
+
   // ── Delete user ─────────────────────────────────────────────────────────
   async function handleDeleteConfirm() {
     if (!deleteTarget) return;
@@ -410,11 +730,12 @@ export default function AdminUsersPage() {
       if (!res.ok) throw new Error("Failed to fetch users for export");
       const data: UsersResponse = await res.json();
 
-      const header = "Name,Email,Role,Workflows,Executions,XP,Level,Subscription,Joined";
+      const header = "Name,Email,Role,Workflows,Executions,XP,Level,Subscription,Gateway,StripeSubId,RazorpaySubId,RazorpayPlanId,Joined";
       const csv = [
         header,
-        ...data.users.map(u =>
-          [
+        ...data.users.map(u => {
+          const hasSub = Boolean(u.stripeSubscriptionId || u.razorpaySubscriptionId);
+          return [
             `"${(u.name || "").replace(/"/g, '""')}"`,
             `"${(u.email || "").replace(/"/g, '""')}"`,
             u.role,
@@ -422,10 +743,14 @@ export default function AdminUsersPage() {
             u._count.executions,
             u.xp,
             u.level,
-            u.stripeSubscriptionId ? "Active" : "None",
+            hasSub ? "Active" : "None",
+            u.paymentGateway || "",
+            u.stripeSubscriptionId || "",
+            u.razorpaySubscriptionId || "",
+            u.razorpayPlanId || "",
             formatDate(u.createdAt),
-          ].join(",")
-        ),
+          ].join(",");
+        }),
       ].join("\n");
 
       const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
@@ -469,6 +794,264 @@ export default function AdminUsersPage() {
             isDeleting={isDeleting}
             t={t as (key: string) => string}
           />
+        )}
+      </AnimatePresence>
+
+      {/* ── Reconcile Report Modal ─────────────────────────────────────── */}
+      <AnimatePresence>
+        {reconcileReport && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            style={{
+              position: "fixed", inset: 0, zIndex: 9999,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              background: "rgba(0,0,0,0.7)", backdropFilter: "blur(8px)",
+              padding: 16,
+            }}
+            onClick={(e) => { if (e.target === e.currentTarget) setReconcileReport(null); }}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 12 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 12 }}
+              transition={{ duration: 0.25, ease: smoothEase }}
+              style={{
+                width: 640, maxWidth: "100%", maxHeight: "80vh",
+                background: "rgba(18,18,30,0.96)",
+                backdropFilter: "blur(24px) saturate(1.3)",
+                border: "1px solid rgba(0,245,255,0.15)",
+                borderRadius: 14, padding: 24,
+                display: "flex", flexDirection: "column", gap: 16,
+                boxShadow: "0 24px 80px rgba(0,0,0,0.6)",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <div style={{
+                  width: 36, height: 36, borderRadius: 10,
+                  background: "rgba(0,245,255,0.08)",
+                  border: "1px solid rgba(0,245,255,0.15)",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                }}>
+                  <CheckCircle2 size={16} style={{ color: "#00F5FF" }} />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <h3 style={{
+                    fontSize: 15, fontWeight: 700, color: "#F0F0F5", margin: 0,
+                    fontFamily: "var(--font-dm-sans), sans-serif",
+                  }}>
+                    {reconcileReport.title}
+                  </h3>
+                  {reconcileReport.subtitle && (
+                    <p style={{ fontSize: 11, color: "#9898B0", margin: "2px 0 0", fontFamily: "var(--font-dm-sans), sans-serif" }}>
+                      {reconcileReport.subtitle}
+                    </p>
+                  )}
+                  <p style={{ fontSize: 11, color: "#5C5C78", margin: "2px 0 0", fontFamily: "var(--font-jetbrains), monospace" }}>
+                    RECONCILED {reconcileReport.counts.reconciled} · UNRESOLVED {reconcileReport.counts.unresolved}
+                    {typeof reconcileReport.counts.orphans === "number" && <> · ORPHANS {reconcileReport.counts.orphans}</>}
+                    {' '}· ERRORS {reconcileReport.counts.errors} · SKIPPED {reconcileReport.counts.skipped}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setReconcileReport(null)}
+                  style={{
+                    background: "none", border: "none", cursor: "pointer",
+                    color: "#5C5C78", display: "flex", padding: 4,
+                  }}
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              {/* Reconciled */}
+              {reconcileReport.reconciled.length > 0 && (
+                <div>
+                  <div style={{ fontSize: 10, color: "#34D399", fontWeight: 700, letterSpacing: "1.5px", marginBottom: 6, fontFamily: "var(--font-jetbrains), monospace" }}>
+                    FIXED ({reconcileReport.reconciled.length})
+                  </div>
+                  <ul style={{ listStyle: "none", padding: 0, margin: 0, maxHeight: 160, overflowY: "auto" }}>
+                    {reconcileReport.reconciled.map((entry) => {
+                      const o = entry.outcome as { previousRole?: string; newRole?: string; gateway?: string; subscriptionId?: string };
+                      return (
+                        <li key={entry.userId} style={{
+                          padding: "6px 10px", borderRadius: 6,
+                          background: "rgba(16,185,129,0.05)",
+                          border: "1px solid rgba(16,185,129,0.08)",
+                          marginBottom: 4,
+                          display: "flex", flexDirection: "column", gap: 2,
+                        }}>
+                          <span style={{ fontSize: 12, color: "#F0F0F5", fontWeight: 500 }}>{entry.email || entry.userId}</span>
+                          <span style={{ fontSize: 10, color: "#9898B0", fontFamily: "var(--font-jetbrains), monospace" }}>
+                            {o.gateway?.toUpperCase()} · {o.previousRole} → {o.newRole}
+                          </span>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              )}
+
+              {/* Unresolved */}
+              {reconcileReport.unresolved.length > 0 && (
+                <div>
+                  <div style={{ fontSize: 10, color: "#F59E0B", fontWeight: 700, letterSpacing: "1.5px", marginBottom: 6, fontFamily: "var(--font-jetbrains), monospace" }}>
+                    NEEDS ATTENTION ({reconcileReport.unresolved.length})
+                  </div>
+                  <p style={{ fontSize: 11, color: "#9898B0", margin: "0 0 6px", lineHeight: 1.5 }}>
+                    Live subscription found, but the plan / price ID couldn&apos;t be mapped to a role. Likely env-var drift — cross-check each <code style={{ background: "rgba(255,255,255,0.05)", padding: "1px 4px", borderRadius: 4 }}>planId</code> below against <code style={{ background: "rgba(255,255,255,0.05)", padding: "1px 4px", borderRadius: 4 }}>RAZORPAY_*_PLAN_ID</code> / <code style={{ background: "rgba(255,255,255,0.05)", padding: "1px 4px", borderRadius: 4 }}>STRIPE_*_PRICE_ID</code> in Vercel.
+                  </p>
+                  <ul style={{ listStyle: "none", padding: 0, margin: 0, maxHeight: 200, overflowY: "auto" }}>
+                    {reconcileReport.unresolved.map((entry) => {
+                      const o = entry.outcome as { reason?: string; gateway?: string; details?: Record<string, unknown> };
+                      return (
+                        <li key={entry.userId} style={{
+                          padding: "6px 10px", borderRadius: 6,
+                          background: "rgba(245,158,11,0.05)",
+                          border: "1px solid rgba(245,158,11,0.08)",
+                          marginBottom: 4,
+                          display: "flex", flexDirection: "column", gap: 2,
+                        }}>
+                          <span style={{ fontSize: 12, color: "#F0F0F5", fontWeight: 500 }}>{entry.email || entry.userId}</span>
+                          <span style={{ fontSize: 10, color: "#9898B0", fontFamily: "var(--font-jetbrains), monospace" }}>
+                            {o.gateway?.toUpperCase()} · {o.reason} · {JSON.stringify(o.details || {})}
+                          </span>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              )}
+
+              {/* Orphans — live sub exists on provider but no matching user.
+                  Each card has a diagnostic trail + an inline "Bind to user"
+                  form so you can paste the paying user's DB email and attach
+                  the orphan subscription to them directly. */}
+              {reconcileReport.orphans && reconcileReport.orphans.length > 0 && (
+                <div>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+                    <div style={{ fontSize: 10, color: "#A78BFA", fontWeight: 700, letterSpacing: "1.5px", fontFamily: "var(--font-jetbrains), monospace" }}>
+                      ORPHAN SUBSCRIPTIONS ({reconcileReport.orphans.length})
+                    </div>
+                    <button
+                      onClick={async () => {
+                        if (!reconcileReport.orphans) return;
+                        const candidates = reconcileReport.orphans
+                          .map((entry) => {
+                            const o = entry.outcome as OrphanOutcome;
+                            const notesEmail = typeof o.notes?.email === "string" ? (o.notes.email as string) : "";
+                            const paymentEmail = Array.isArray((o as { paymentEmails?: string[] }).paymentEmails)
+                              ? (o as { paymentEmails?: string[] }).paymentEmails?.[0] ?? ""
+                              : "";
+                            const email = o.customerEmail || entry.email || notesEmail || paymentEmail || "";
+                            return { entry, o, email };
+                          })
+                          .filter((c) => c.email && c.o.gateway && c.o.subscriptionId);
+                        if (candidates.length === 0) {
+                          alert("No orphans with an auto-detectable email. Bind each one manually.");
+                          return;
+                        }
+                        const confirmed = window.confirm(
+                          `Auto-match ${candidates.length} orphan(s) using the email we detected from notes / customer / payment records?`,
+                        );
+                        if (!confirmed) return;
+                        let ok = 0, fail = 0;
+                        for (const { o, email } of candidates) {
+                          try {
+                            const res = await fetch("/api/admin/subscriptions/bind", {
+                              method: "POST",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({
+                                gateway: o.gateway,
+                                subscriptionId: o.subscriptionId,
+                                userEmail: email,
+                              }),
+                            });
+                            const data = await res.json();
+                            if (res.ok && data.bound) ok++; else fail++;
+                          } catch { fail++; }
+                        }
+                        alert(`Auto-match complete — ${ok} bound, ${fail} failed.`);
+                        await Promise.all([fetchUsers(), fetchStuckCount()]);
+                        setReconcileReport(null);
+                      }}
+                      style={{
+                        display: "flex", alignItems: "center", gap: 6,
+                        padding: "6px 12px", borderRadius: 8,
+                        background: "rgba(167,139,250,0.12)",
+                        border: "1px solid rgba(167,139,250,0.25)",
+                        color: "#A78BFA", fontSize: 11, fontWeight: 700,
+                        cursor: "pointer",
+                        fontFamily: "var(--font-dm-sans), sans-serif",
+                      }}
+                    >
+                      Auto-match all
+                    </button>
+                  </div>
+                  <p style={{ fontSize: 11, color: "#9898B0", margin: "0 0 8px", lineHeight: 1.5 }}>
+                    These live subscriptions exist on Stripe / Razorpay but couldn&apos;t be matched to any user in the DB. <strong>Auto-match all</strong> tries to bind each one using the email we detected (notes, customer, or payment record). Otherwise use the inline <strong>Bind to user</strong> input to assign manually.
+                  </p>
+                  <ul style={{ listStyle: "none", padding: 0, margin: 0, maxHeight: 400, overflowY: "auto", display: "flex", flexDirection: "column", gap: 8 }}>
+                    {reconcileReport.orphans.map((entry, idx) => (
+                      <OrphanCard
+                        key={`${idx}`}
+                        entry={entry}
+                        onBound={async () => {
+                          await Promise.all([fetchUsers(), fetchStuckCount()]);
+                        }}
+                      />
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Errors */}
+              {reconcileReport.errors.length > 0 && (
+                <div>
+                  <div style={{ fontSize: 10, color: "#F87171", fontWeight: 700, letterSpacing: "1.5px", marginBottom: 6, fontFamily: "var(--font-jetbrains), monospace" }}>
+                    ERRORS ({reconcileReport.errors.length})
+                  </div>
+                  <ul style={{ listStyle: "none", padding: 0, margin: 0, maxHeight: 160, overflowY: "auto" }}>
+                    {reconcileReport.errors.map((entry) => {
+                      const o = entry.outcome as { error?: string; gateway?: string };
+                      return (
+                        <li key={entry.userId} style={{
+                          padding: "6px 10px", borderRadius: 6,
+                          background: "rgba(248,113,113,0.05)",
+                          border: "1px solid rgba(248,113,113,0.08)",
+                          marginBottom: 4,
+                          display: "flex", flexDirection: "column", gap: 2,
+                        }}>
+                          <span style={{ fontSize: 12, color: "#F0F0F5", fontWeight: 500 }}>{entry.email || entry.userId}</span>
+                          <span style={{ fontSize: 10, color: "#F87171", fontFamily: "var(--font-jetbrains), monospace" }}>
+                            {o.gateway?.toUpperCase()} · {o.error}
+                          </span>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              )}
+
+              <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                <button
+                  onClick={() => setReconcileReport(null)}
+                  style={{
+                    padding: "8px 18px", borderRadius: 10,
+                    background: "rgba(0,245,255,0.08)",
+                    border: "1px solid rgba(0,245,255,0.15)",
+                    color: "#00F5FF", fontSize: 12, fontWeight: 600,
+                    cursor: "pointer",
+                    fontFamily: "var(--font-dm-sans), sans-serif",
+                  }}
+                >
+                  Close
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
         )}
       </AnimatePresence>
 
@@ -591,6 +1174,43 @@ export default function AdminUsersPage() {
 
         {/* Spacer */}
         <div style={{ flex: 1 }} />
+
+        {/* Deep Scan — provider-first subscription reconcile */}
+        <button
+          onClick={handleBulkReconcile}
+          disabled={bulkReconciling}
+          title="Lists every live subscription in Stripe + Razorpay, matches them back to users, and writes role + subscription IDs into the DB. Use this to recover paid users whose webhook never landed or whose verify call failed mid-redirect."
+          style={{
+            display: "flex", alignItems: "center", gap: 6,
+            padding: "8px 16px", borderRadius: 10,
+            cursor: bulkReconciling ? "wait" : "pointer",
+            background: "rgba(245,158,11,0.12)",
+            border: "1px solid rgba(245,158,11,0.25)",
+            color: "#F59E0B",
+            fontSize: 12, fontWeight: 600,
+            fontFamily: "var(--font-dm-sans), sans-serif",
+            transition: "all 0.15s ease",
+            opacity: bulkReconciling ? 0.6 : 1,
+          }}
+        >
+          {bulkReconciling ? (
+            <Loader2 size={13} style={{ animation: "spin 1s linear infinite" }} />
+          ) : (
+            <RefreshCw size={13} />
+          )}
+          Deep Scan Subs
+          {typeof stuckCount === "number" && stuckCount > 0 && (
+            <span style={{
+              display: "inline-flex", alignItems: "center", justifyContent: "center",
+              minWidth: 18, height: 18, padding: "0 6px", borderRadius: 9,
+              background: "rgba(245,158,11,0.25)",
+              fontSize: 10, fontWeight: 700, color: "#F59E0B",
+              fontFamily: "var(--font-jetbrains), monospace",
+            }}>
+              {stuckCount}
+            </span>
+          )}
+        </button>
 
         {/* Export CSV */}
         <button
@@ -860,36 +1480,79 @@ export default function AdminUsersPage() {
                       </div>
                     </td>
 
-                    {/* Subscription */}
+                    {/* Subscription — shows BOTH Stripe and Razorpay. Highlights
+                        "STUCK" (has a sub ID but role=FREE) so admins can
+                        force-reconcile in one click via the actions column. */}
                     <td style={{ padding: "12px 12px" }} className="col-sub">
-                      {user.stripeSubscriptionId ? (
-                        <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                          <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                            <CreditCard size={10} style={{ color: "#34D399" }} />
+                      {(() => {
+                        const hasStripe = Boolean(user.stripeSubscriptionId);
+                        const hasRazorpay = Boolean(user.razorpaySubscriptionId);
+                        const hasAny = hasStripe || hasRazorpay;
+                        const isStuck = hasAny && user.role === "FREE";
+
+                        if (!hasAny) {
+                          return (
                             <span style={{
-                              fontSize: 11, color: "#34D399", fontWeight: 600,
+                              fontSize: 11, color: "#5C5C78",
                               fontFamily: "var(--font-jetbrains), monospace",
                             }}>
-                              {t('admin.users.active')}
+                              {t('admin.users.none')}
                             </span>
+                          );
+                        }
+
+                        const gatewayIcon = hasRazorpay
+                          ? <Smartphone size={10} style={{ color: isStuck ? "#F59E0B" : "#34D399" }} />
+                          : <CreditCard size={10} style={{ color: isStuck ? "#F59E0B" : "#34D399" }} />;
+                        const gatewayLabel = user.paymentGateway
+                          ? user.paymentGateway.toUpperCase()
+                          : hasRazorpay ? "RAZORPAY" : "STRIPE";
+
+                        return (
+                          <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                              {gatewayIcon}
+                              <span style={{
+                                fontSize: 11,
+                                color: isStuck ? "#F59E0B" : "#34D399",
+                                fontWeight: 700,
+                                fontFamily: "var(--font-jetbrains), monospace",
+                              }}>
+                                {isStuck ? "STUCK — PAID BUT FREE" : gatewayLabel}
+                              </span>
+                            </div>
+                            {isStuck && (
+                              <span style={{
+                                fontSize: 9, color: "#F59E0B", opacity: 0.85,
+                                fontFamily: "var(--font-jetbrains), monospace",
+                              }}>
+                                Click ⟳ in actions to re-sync
+                              </span>
+                            )}
+                            {!isStuck && user.stripeCurrentPeriodEnd && (
+                              <span style={{
+                                fontSize: 9, color: "#5C5C78",
+                                fontFamily: "var(--font-jetbrains), monospace",
+                              }}>
+                                Until {formatDate(user.stripeCurrentPeriodEnd)}
+                              </span>
+                            )}
+                            {hasRazorpay && user.razorpayPlanId && (
+                              <span
+                                title="Razorpay plan_id — cross-check against RAZORPAY_*_PLAN_ID env vars if stuck"
+                                style={{
+                                  fontSize: 9, color: "#5C5C78",
+                                  fontFamily: "var(--font-jetbrains), monospace",
+                                  whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+                                  maxWidth: 160,
+                                }}
+                              >
+                                {user.razorpayPlanId}
+                              </span>
+                            )}
                           </div>
-                          {user.stripeCurrentPeriodEnd && (
-                            <span style={{
-                              fontSize: 9, color: "#5C5C78",
-                              fontFamily: "var(--font-jetbrains), monospace",
-                            }}>
-                              Until {formatDate(user.stripeCurrentPeriodEnd)}
-                            </span>
-                          )}
-                        </div>
-                      ) : (
-                        <span style={{
-                          fontSize: 11, color: "#5C5C78",
-                          fontFamily: "var(--font-jetbrains), monospace",
-                        }}>
-                          {t('admin.users.none')}
-                        </span>
-                      )}
+                        );
+                      })()}
                     </td>
 
                     {/* Joined */}
@@ -947,6 +1610,41 @@ export default function AdminUsersPage() {
                             />
                           )}
                         </div>
+
+                        {/* Reconcile (force re-sync from payment provider) —
+                            only shown when the user has any subscription ID.
+                            Glows amber when the user looks stuck (has sub but role=FREE). */}
+                        {(user.stripeSubscriptionId || user.razorpaySubscriptionId) && (
+                          <button
+                            onClick={() => handleReconcileUser(user.id, user.email)}
+                            disabled={reconcilingUserId === user.id}
+                            title={
+                              user.role === "FREE"
+                                ? "User has an active subscription but is on FREE — click to force re-sync from the payment provider"
+                                : "Force re-sync subscription from the payment provider"
+                            }
+                            style={{
+                              display: "flex", alignItems: "center", justifyContent: "center",
+                              width: 28, height: 28, borderRadius: 7,
+                              background: user.role === "FREE"
+                                ? "rgba(245,158,11,0.12)"
+                                : "rgba(255,255,255,0.02)",
+                              border: user.role === "FREE"
+                                ? "1px solid rgba(245,158,11,0.22)"
+                                : "1px solid rgba(184,115,51,0.08)",
+                              color: user.role === "FREE" ? "#F59E0B" : "#5C5C78",
+                              cursor: reconcilingUserId === user.id ? "wait" : "pointer",
+                              transition: "all 0.15s ease",
+                              opacity: reconcilingUserId === user.id ? 0.6 : 1,
+                            }}
+                          >
+                            {reconcilingUserId === user.id ? (
+                              <Loader2 size={13} style={{ animation: "spin 1s linear infinite" }} />
+                            ) : (
+                              <RefreshCw size={13} />
+                            )}
+                          </button>
+                        )}
 
                         {/* Delete button */}
                         <button
