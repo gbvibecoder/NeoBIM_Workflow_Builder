@@ -47,17 +47,18 @@ export async function runStripPackEngine(parsed: ParsedConstraints): Promise<Str
   // ── Step 1: classify ───────────────────────────────────────────────────
   const classified = classifyRooms(parsed);
 
+  // ── Step 2: spine ──────────────────────────────────────────────────────
+  // Spine is computed before adjacency grouping so strip capacities can be
+  // checked during coercion (Phase 3C fix A).
+  const spine = planSpine({ width_ft: plotW, depth_ft: plotD, facing: validFacing }, classified);
+
   // ── Step 1b: build adjacency groups + coerce strips (Phase 3B fix #6) ──
   // Members of a connected adjacency component are coerced to the same strip
-  // (largest room with a position preference wins; otherwise the largest
-  // overall). Then group_id is set so the sorter keeps them contiguous, so
-  // the greedy packer puts them in the same row whenever it fits — which is
-  // exactly what the door-placer needs to find a shared wall for the
-  // adjacency door later.
-  applyAdjacencyGroups(classified, parsed.adjacency_pairs.map(p => ({ a: p.room_a_id, b: p.room_b_id })), warnings);
-
-  // ── Step 2: spine ──────────────────────────────────────────────────────
-  const spine = planSpine({ width_ft: plotW, depth_ft: plotD, facing: validFacing }, classified);
+  // IFF the strip has capacity to hold them (Phase 3C fix A). Otherwise rooms
+  // keep their natural strip assignment and the adjacency is satisfied via a
+  // hallway door — still architecturally valid, just not a shared wall.
+  // group_id is set regardless so the sorter keeps siblings contiguous.
+  applyAdjacencyGroups(classified, parsed.adjacency_pairs.map(p => ({ a: p.room_a_id, b: p.room_b_id })), spine, warnings);
 
   // ── Step 3: entrance carve-out ─────────────────────────────────────────
   const ent = placeEntrance(spine, classified);
@@ -166,6 +167,7 @@ export async function runStripPackEngine(parsed: ParsedConstraints): Promise<Str
 function applyAdjacencyGroups(
   rooms: StripPackRoom[],
   pairs: Array<{ a: string; b: string }>,
+  spine: SpineLayout,
   warnings: string[],
 ): void {
   if (pairs.length === 0) return;
@@ -200,6 +202,12 @@ function applyAdjacencyGroups(
     buckets.get(root)!.push(r);
   }
 
+  // Phase 3C fix A — capacity threshold for coercion. 85% leaves margin for
+  // entrance cutout, row-packing gaps, and sub-room attachment.
+  const CAPACITY_UTILIZATION = 0.85;
+  const frontCap = spine.front_strip.width * spine.front_strip.depth;
+  const backCap  = spine.back_strip.width  * spine.back_strip.depth;
+
   for (const [root, members] of buckets) {
     if (members.length < 2) continue;
     // Strip coercion: largest room with position preference wins; otherwise
@@ -208,6 +216,28 @@ function applyAdjacencyGroups(
     const leader = (withPos.length > 0 ? withPos : members)
       .reduce((best, cur) => (cur.requested_area_sqft > best.requested_area_sqft ? cur : best));
     const target = leader.strip;
+
+    // Capacity check: can the target strip actually hold the group?
+    if (target === "FRONT" || target === "BACK") {
+      const memberIds = new Set(members.map(m => m.id));
+      const existingAreaInStrip = rooms
+        .filter(r => r.strip === target && !memberIds.has(r.id))
+        .reduce((s, r) => s + r.requested_area_sqft, 0);
+      const groupArea = members.reduce((s, r) => s + r.requested_area_sqft, 0);
+      const cap = target === "FRONT" ? frontCap : backCap;
+      if (existingAreaInStrip + groupArea > cap * CAPACITY_UTILIZATION) {
+        // Too much — keep natural strip assignments. Still tag with group_id
+        // so the sorter keeps siblings contiguous inside each strip.
+        for (const r of members) r.group_id = root;
+        warnings.push(
+          `adjacency group [${members.map(m => m.name).join(", ")}]: too large for ${target} strip ` +
+          `(${Math.round(existingAreaInStrip + groupArea)} sqft vs ${Math.round(cap * CAPACITY_UTILIZATION)} sqft usable). ` +
+          `Keeping natural strips — adjacency via hallway.`
+        );
+        continue;
+      }
+    }
+
     let coerced = 0;
     for (const r of members) {
       if (r.strip !== target && r.strip !== "ATTACHED" && r.strip !== "SPINE") {
