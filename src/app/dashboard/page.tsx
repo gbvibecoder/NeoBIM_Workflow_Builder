@@ -544,7 +544,7 @@ export default function DashboardPage() {
                 loop
                 playsInline
                 preload="auto"
-                src="/videos/dashboard%20video.mp4"
+                src={`${R2}/dashboard-video.mp4`}
                 style={{
                   position: "absolute", inset: 0,
                   width: "100%", height: "100%",
