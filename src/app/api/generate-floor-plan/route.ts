@@ -265,7 +265,7 @@ export async function POST(req: NextRequest) {
         const parseRes = await parseConstraints(prompt, apiKey);
         const t1ParseMs = Date.now() - t1Start;
         const engineStart = Date.now();
-        const rawResult = await runStripPackEngine(parseRes.constraints);
+        const rawResult = await runStripPackEngine(parseRes.constraints, prompt);
         const t1Result = fillDoorMetrics(rawResult);
         const t1EngineMs = Date.now() - engineStart;
         logger.debug(`[T1] parse=${t1ParseMs}ms engine=${t1EngineMs}ms eff=${t1Result.metrics.efficiency_pct}% doors=${t1Result.metrics.door_coverage_pct}% rooms=${t1Result.rooms.length}`);

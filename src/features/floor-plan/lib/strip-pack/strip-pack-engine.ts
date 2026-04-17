@@ -10,7 +10,7 @@
  *   plot coordinates. Four explicit cases (one per facing) — no clever
  *   coordinate hackery.
  */
-import type { ParsedConstraints } from "../structured-parser";
+import type { ParsedConstraints, ParsedRoom } from "../structured-parser";
 import type {
   Facing,
   Rect,
@@ -35,8 +35,16 @@ import { placeWindows } from "./window-placer";
 // PUBLIC API
 // ───────────────────────────────────────────────────────────────────────────
 
-export async function runStripPackEngine(parsed: ParsedConstraints): Promise<StripPackResult> {
+export async function runStripPackEngine(
+  rawParsed: ParsedConstraints,
+  prompt?: string,
+): Promise<StripPackResult> {
   const warnings: string[] = [];
+
+  // Phase 3F — repair known parser→engine mismatches on the input side before
+  // any classification runs. Keeps room-classifier pure and avoids every
+  // downstream module having to know about parser quirks.
+  const parsed = preprocessConstraints(rawParsed, prompt, warnings);
 
   const validFacing: Facing = normalizeFacing(parsed.plot.facing);
 
@@ -51,6 +59,12 @@ export async function runStripPackEngine(parsed: ParsedConstraints): Promise<Str
   // Spine is computed before adjacency grouping so strip capacities can be
   // checked during coercion (Phase 3C fix A).
   const spine = planSpine({ width_ft: plotW, depth_ft: plotD, facing: validFacing }, classified);
+
+  // ── Step 2b: strip rebalancing (Phase 3F fix #3) ───────────────────────
+  // Move unanchored rooms between strips when one is overloaded and the other
+  // has free capacity. Protects against parser dumps that accidentally skew
+  // too many rooms to FRONT (public + service floating defaults).
+  rebalanceStrips(classified, spine, warnings);
 
   // ── Step 1b: build adjacency groups + coerce strips (Phase 3B fix #6) ──
   // Members of a connected adjacency component are coerced to the same strip
@@ -552,4 +566,189 @@ function scanPlotForFit(
     }
   }
   return null;
+}
+
+// ───────────────────────────────────────────────────────────────────────────
+// INPUT PREPROCESSOR (Phase 3F)
+// ───────────────────────────────────────────────────────────────────────────
+
+/**
+ * Deep-clone the parser output and repair known parser→engine mismatches:
+ *
+ *   Fix 1 — Inverted attachment. When a bedroom has `attached_to_room_id`
+ *           pointing to a bathroom (parser frequently emits this backwards
+ *           for "attached ensuite" phrases), flip the relationship. Without
+ *           this, room-classifier marks the bedroom as ATTACHED, the
+ *           attacher looks for a non-existent bathroom-parent, and BOTH
+ *           rooms fall out of the layout.
+ *
+ *   Fix 2 — Missing porch. When `special_features` lists a porch/verandah
+ *           but no room of that function exists, synthesize one. Extract
+ *           dimensions from the prompt via regex when available; otherwise
+ *           fall back to 6×5 ft (a reasonable residential default). Without
+ *           this, the entrance-handler runs with no porch, no cutout, and
+ *           the main entrance door never gets placed on the façade.
+ */
+function preprocessConstraints(
+  raw: ParsedConstraints,
+  prompt: string | undefined,
+  warnings: string[],
+): ParsedConstraints {
+  // Deep-ish clone — everything we'll mutate below.
+  const parsed: ParsedConstraints = {
+    ...raw,
+    plot: { ...raw.plot },
+    rooms: raw.rooms.map(r => ({
+      ...r,
+      doors: r.doors.map(d => ({ ...d })),
+      windows: r.windows.map(w => ({ ...w })),
+    })),
+    adjacency_pairs: raw.adjacency_pairs.map(a => ({ ...a })),
+    connects_all_groups: raw.connects_all_groups.map(g => ({
+      ...g,
+      connected_room_ids: [...g.connected_room_ids],
+    })),
+    special_features: raw.special_features.map(f => ({ ...f })),
+    constraint_budget: { ...raw.constraint_budget },
+  };
+
+  flipInvertedAttachments(parsed, warnings);
+  synthesizeMissingPorch(parsed, prompt, warnings);
+
+  return parsed;
+}
+
+const PARENT_FUNCTIONS: ReadonlySet<string> = new Set([
+  "master_bedroom",
+  "bedroom",
+  "guest_bedroom",
+  "kids_bedroom",
+]);
+const CHILD_FUNCTIONS: ReadonlySet<string> = new Set([
+  "bathroom",
+  "master_bathroom",
+  "powder_room",
+  "walk_in_wardrobe",
+  "walk_in_closet",
+]);
+
+function flipInvertedAttachments(parsed: ParsedConstraints, warnings: string[]): void {
+  const byId = new Map(parsed.rooms.map(r => [r.id, r]));
+  for (const room of parsed.rooms) {
+    if (!room.attached_to_room_id) continue;
+    const target = byId.get(room.attached_to_room_id);
+    if (!target) continue;
+
+    const roomIsParent = PARENT_FUNCTIONS.has(room.function);
+    const targetIsChild = CHILD_FUNCTIONS.has(target.function);
+    if (!roomIsParent || !targetIsChild) continue;
+
+    // Inverted: parent room points at its child. Flip the pointer.
+    room.attached_to_room_id = null;
+    if (!target.attached_to_room_id) {
+      target.attached_to_room_id = room.id;
+    }
+    warnings.push(
+      `flipped inverted attachment: ${room.name} → ${target.name} (${target.name} is now attached to ${room.name})`,
+    );
+  }
+}
+
+function synthesizeMissingPorch(
+  parsed: ParsedConstraints,
+  prompt: string | undefined,
+  warnings: string[],
+): void {
+  const hasPorchRoom = parsed.rooms.some(
+    r => r.function === "porch" || r.function === "verandah" || r.name.toLowerCase().includes("porch"),
+  );
+  if (hasPorchRoom) return;
+
+  const hasPorchFeature = parsed.special_features.some(
+    f => (f.feature === "porch" || f.feature === "verandah") && f.mentioned_verbatim,
+  );
+  if (!hasPorchFeature) return;
+
+  // Try to read dims out of the prompt (e.g. "6ft x 5ft porch").
+  let w = 6;
+  let d = 5;
+  if (prompt) {
+    const m = prompt.match(
+      /(\d+(?:\.\d+)?)\s*(?:ft|feet|')?\s*[x×]\s*(\d+(?:\.\d+)?)\s*(?:ft|feet|')?\s+(?:wide\s+)?(?:porch|verandah)/i,
+    );
+    if (m) {
+      const pw = parseFloat(m[1]);
+      const pd = parseFloat(m[2]);
+      if (pw > 0 && pw < 50) w = pw;
+      if (pd > 0 && pd < 50) d = pd;
+    }
+  }
+
+  // Porch goes on the entrance wall — the plot's facing direction.
+  const porch: ParsedRoom = {
+    id: "__synth_porch",
+    name: "Porch",
+    function: "porch",
+    dim_width_ft: w,
+    dim_depth_ft: d,
+    position_type: "wall_centered",
+    position_direction: parsed.plot.facing,
+    attached_to_room_id: null,
+    must_have_window_on: null,
+    external_walls_ft: null,
+    internal_walls_ft: null,
+    doors: [],
+    windows: [],
+    is_wet: false,
+    is_sacred: false,
+    is_circulation: false,
+    user_explicit_dims: !!prompt,
+    user_explicit_position: true,
+  };
+  parsed.rooms.push(porch);
+  warnings.push(`synthesized missing porch (${w}×${d}ft) from special_features`);
+}
+
+// ───────────────────────────────────────────────────────────────────────────
+// STRIP REBALANCING (Phase 3F fix #3)
+// ───────────────────────────────────────────────────────────────────────────
+
+/**
+ * Move unanchored rooms between FRONT and BACK when one strip is overloaded
+ * and the other has free capacity. Protects against parser-output skew where
+ * too many zone-default rooms pile into one strip. Position-anchored rooms
+ * are never moved — the user's explicit NE/SW/etc. wins.
+ */
+function rebalanceStrips(
+  rooms: StripPackRoom[],
+  spine: SpineLayout,
+  warnings: string[],
+): void {
+  const HARD = 0.90;
+  const SOFT = 0.70;
+  const TARGET = 0.80;
+  const frontCap = spine.front_strip.width * spine.front_strip.depth;
+  const backCap = spine.back_strip.width * spine.back_strip.depth;
+
+  const stripArea = (s: "FRONT" | "BACK") =>
+    rooms.filter(r => r.strip === s).reduce((n, r) => n + r.requested_area_sqft, 0);
+
+  const move = (from: "FRONT" | "BACK", to: "FRONT" | "BACK", fromCap: number) => {
+    let fromArea = stripArea(from);
+    const movable = rooms
+      .filter(r => r.strip === from && !r.position_preference)
+      .sort((a, b) => a.requested_area_sqft - b.requested_area_sqft);
+    while (fromArea > fromCap * TARGET && movable.length > 0) {
+      const r = movable.shift()!;
+      r.strip = to;
+      fromArea -= r.requested_area_sqft;
+      warnings.push(`${r.name}: moved ${from}→${to} for strip balance`);
+    }
+  };
+
+  if (stripArea("FRONT") > frontCap * HARD && stripArea("BACK") < backCap * SOFT) {
+    move("FRONT", "BACK", frontCap);
+  } else if (stripArea("BACK") > backCap * HARD && stripArea("FRONT") < frontCap * SOFT) {
+    move("BACK", "FRONT", backCap);
+  }
 }
