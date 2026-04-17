@@ -66,7 +66,7 @@ import { routePrompt } from "@/features/floor-plan/lib/pipeline-router";
 import { runPipelineB } from "@/features/floor-plan/lib/pipeline-b-orchestrator";
 
 // Phase 1 — post-solve honest metrics (pipeline-agnostic)
-import { computeLayoutMetrics } from "@/features/floor-plan/lib/layout-metrics";
+import { computeLayoutMetrics, computeHonestScore } from "@/features/floor-plan/lib/layout-metrics";
 
 // Phase 3 — strip-pack engine (PIPELINE_T1 feature flag)
 import { runStripPackEngine, fillDoorMetrics } from "@/features/floor-plan/lib/strip-pack/strip-pack-engine";
@@ -254,11 +254,29 @@ export async function POST(req: NextRequest) {
     logger.debug(`[ROUTER] pipeline=${routing.pipeline} signals=${routing.constraint_signals}`);
 
     // ── Phase 3 — Strip-Pack Engine (PIPELINE_T1) ────────────────────────
-    // Tried only on Pipeline B routing (high-signal prompts) so we get the
-    // structured parser for free. If it produces a layout meeting the
-    // efficiency + door coverage + room-coverage thresholds, we ship it.
-    // Otherwise we fall through to the existing Pipeline B / Grid-First / BSP
-    // cascade — the engine is purely additive, not destructive.
+    // Strategy (Phase 3G — race & compare):
+    //   1. Run T1. If it clearly wins the fast gates, ship it immediately —
+    //      no point paying for Pipeline B.
+    //   2. If T1 doesn't hit the fast gates (or throws), log EXACTLY which
+    //      metric missed, then ALSO run Pipeline B.
+    //   3. Compare both outputs by honest score (void + door coverage +
+    //      orphans + adjacency + dim deviation — the same scoring function
+    //      the UI uses). Return whichever scores higher. Fall back to 422
+    //      only when neither pipeline produced a project.
+    type T1Bundle = {
+      result: Awaited<ReturnType<typeof fillDoorMetrics>>;
+      project: ReturnType<typeof toFloorPlanProjectT1>;
+      layoutMetrics: ReturnType<typeof computeLayoutMetrics>;
+      score: ReturnType<typeof computeHonestScore>;
+      parseRes: Awaited<ReturnType<typeof parseConstraints>>;
+      parseMs: number;
+      engineMs: number;
+      passesFastGates: boolean;
+    };
+
+    let t1Bundle: T1Bundle | null = null;
+    let t1Error: string | null = null;
+
     if (process.env.PIPELINE_T1 === "true" && routing.pipeline === "B") {
       try {
         const t1Start = Date.now();
@@ -268,59 +286,182 @@ export async function POST(req: NextRequest) {
         const rawResult = await runStripPackEngine(parseRes.constraints, prompt);
         const t1Result = fillDoorMetrics(rawResult);
         const t1EngineMs = Date.now() - engineStart;
-        logger.debug(`[T1] parse=${t1ParseMs}ms engine=${t1EngineMs}ms eff=${t1Result.metrics.efficiency_pct}% doors=${t1Result.metrics.door_coverage_pct}% rooms=${t1Result.rooms.length}`);
 
-        // Phase 3C fix C — more realistic gates. Efficiency alone isn't a
-        // quality signal for sparse plots (user requested 1500 sqft of rooms
-        // on a 2475 sqft plot → 60% is the best possible). Room coverage
-        // guards against engine bugs that drop rooms.
+        const t1Project = toFloorPlanProjectT1(t1Result, parseRes.constraints);
+        const t1LayoutMetrics = computeLayoutMetrics(t1Project, parseRes.constraints);
+        const t1Score = computeHonestScore(t1LayoutMetrics);
+
         const roomsPlaced = t1Result.rooms.filter(r => r.placed).length;
         const roomsExpected = parseRes.constraints.rooms?.length ?? 0;
         const roomCoverage = roomsExpected > 0 ? roomsPlaced / roomsExpected : 1;
-        const passesGates =
-          t1Result.metrics.efficiency_pct >= 55 &&
-          t1Result.metrics.door_coverage_pct >= 70 &&
-          roomCoverage >= 0.90;
+        const gateEff      = t1Result.metrics.efficiency_pct      >= 55;
+        const gateDoors    = t1Result.metrics.door_coverage_pct   >= 70;
+        const gateCoverage = roomCoverage                          >= 0.90;
+        const passesFastGates = gateEff && gateDoors && gateCoverage;
 
-        if (passesGates) {
-          console.log(
-            `[T1] ACCEPTED: eff=${t1Result.metrics.efficiency_pct}% ` +
-            `doors=${t1Result.metrics.door_coverage_pct}% ` +
-            `rooms=${roomsPlaced}/${roomsExpected} (${Math.round(roomCoverage * 100)}%)`,
-          );
-          const project = toFloorPlanProjectT1(t1Result, parseRes.constraints);
-          const layoutMetrics = computeLayoutMetrics(project, parseRes.constraints);
-          const feedback = buildFeedback(project, prompt);
-          feedback.tips.push(`T1 strip-pack: ${t1Result.rooms.length} rooms, ${t1Result.doors.length} doors, ${t1Result.metrics.efficiency_pct}% efficiency in ${t1ParseMs + t1EngineMs}ms`);
-          if (t1Result.warnings.length > 0) {
-            feedback.tips.push(`T1 warnings: ${t1Result.warnings.slice(0, 3).join("; ")}${t1Result.warnings.length > 3 ? "…" : ""}`);
-          }
-          await recordToolExecution(userId, "floor-plan");
-          return NextResponse.json({
-            project,
-            geometry: null,
-            svg: null,
-            feedback,
-            layoutMetrics,
-            qualityFlags: layoutMetrics.quality_flags,
-            feasibilityWarnings: [],
-            pipelineUsed: "T1-strip-pack",
-            relaxationsApplied: t1Result.warnings,
-            infeasibilityReason: null,
-            mandalaAssignments: null,
-            routerSignals: routing.constraint_signals,
-          });
-        }
-        console.warn(
-          `[T1] REJECTED: eff=${t1Result.metrics.efficiency_pct}% ` +
-          `doors=${t1Result.metrics.door_coverage_pct}% ` +
-          `rooms=${roomsPlaced}/${roomsExpected} — falling through to Pipeline B`,
+        logger.debug(`[T1] parse=${t1ParseMs}ms engine=${t1EngineMs}ms eff=${t1Result.metrics.efficiency_pct}% doors=${t1Result.metrics.door_coverage_pct}% rooms=${roomsPlaced}/${roomsExpected}`);
+        console.log(
+          `[T1] metrics: eff=${t1Result.metrics.efficiency_pct}% (gate>=55 ${gateEff ? "✓" : "✗"}), ` +
+          `doors=${t1Result.metrics.door_coverage_pct}% (>=70 ${gateDoors ? "✓" : "✗"}), ` +
+          `coverage=${roomsPlaced}/${roomsExpected} (${Math.round(roomCoverage * 100)}%, >=90 ${gateCoverage ? "✓" : "✗"}), ` +
+          `ui-orphans=${t1LayoutMetrics.orphan_rooms.length}, honest=${t1Score.score}/100 (${t1Score.grade})`,
         );
+        if (!passesFastGates) {
+          const missed: string[] = [];
+          if (!gateEff)      missed.push(`eff ${t1Result.metrics.efficiency_pct}% < 55%`);
+          if (!gateDoors)    missed.push(`doors ${t1Result.metrics.door_coverage_pct}% < 70%`);
+          if (!gateCoverage) missed.push(`coverage ${roomsPlaced}/${roomsExpected} < 90%`);
+          console.warn(`[T1] fast-gate miss: ${missed.join("; ")} — racing Pipeline B`);
+        }
+
+        t1Bundle = {
+          result: t1Result,
+          project: t1Project,
+          layoutMetrics: t1LayoutMetrics,
+          score: t1Score,
+          parseRes,
+          parseMs: t1ParseMs,
+          engineMs: t1EngineMs,
+          passesFastGates,
+        };
       } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
+        t1Error = err instanceof Error ? err.message : String(err);
         const stack = err instanceof Error ? err.stack : String(err);
-        console.warn(`[T1] error — falling through to Pipeline B: ${msg}\n${stack}`);
+        console.warn(`[T1] engine error — falling back to Pipeline B only: ${t1Error}\n${stack ?? ""}`);
       }
+
+      // Fast path — T1 clearly passes gates, no need to pay for Pipeline B.
+      if (t1Bundle && t1Bundle.passesFastGates) {
+        console.log(
+          `[T1] ACCEPTED via fast gates: honest=${t1Bundle.score.score}/100 (${t1Bundle.score.grade}), ` +
+          `orphans=${t1Bundle.layoutMetrics.orphan_rooms.length}`,
+        );
+        const { result: t1Result, project, layoutMetrics, parseMs, engineMs } = t1Bundle;
+        const feedback = buildFeedback(project, prompt);
+        feedback.tips.push(`T1 strip-pack: ${t1Result.rooms.length} rooms, ${t1Result.doors.length} doors, ${t1Result.metrics.efficiency_pct}% efficiency in ${parseMs + engineMs}ms`);
+        if (t1Result.warnings.length > 0) {
+          feedback.tips.push(`T1 warnings: ${t1Result.warnings.slice(0, 3).join("; ")}${t1Result.warnings.length > 3 ? "…" : ""}`);
+        }
+        await recordToolExecution(userId, "floor-plan");
+        return NextResponse.json({
+          project,
+          geometry: null,
+          svg: null,
+          feedback,
+          layoutMetrics,
+          qualityFlags: layoutMetrics.quality_flags,
+          feasibilityWarnings: [],
+          pipelineUsed: "T1-strip-pack",
+          relaxationsApplied: t1Result.warnings,
+          infeasibilityReason: null,
+          mandalaAssignments: null,
+          routerSignals: routing.constraint_signals,
+          honestScore: t1Bundle.score,
+        });
+      }
+
+      // Race path — either T1 failed gates or errored. Run Pipeline B and
+      // compare honest scores.
+      console.log(`[SCOREBOARD] T1 ${t1Bundle ? "below fast gates" : "errored"} — running Pipeline B for head-to-head`);
+      const bResult = await runPipelineB(prompt, apiKey);
+      logger.debug(`[PIPELINE-B] ${bResult.pipelineUsed} parse=${bResult.timings.parse_ms}ms total=${bResult.timings.total_ms}ms`);
+
+      const bLayoutMetrics = bResult.project
+        ? computeLayoutMetrics(bResult.project, bResult.parsedConstraints ?? undefined)
+        : null;
+      const bScore = bLayoutMetrics ? computeHonestScore(bLayoutMetrics) : null;
+
+      // Log the scoreboard for both candidates.
+      const t1Summary = t1Bundle
+        ? `T1: score=${t1Bundle.score.score}/100 (${t1Bundle.score.grade}) orphans=${t1Bundle.layoutMetrics.orphan_rooms.length} doors=${t1Bundle.result.doors.length} eff=${t1Bundle.layoutMetrics.efficiency_pct}%`
+        : `T1: ERROR (${t1Error})`;
+      const bSummary = bScore && bLayoutMetrics && bResult.project
+        ? `B:  score=${bScore.score}/100 (${bScore.grade}) orphans=${bLayoutMetrics.orphan_rooms.length} doors=${bResult.project.floors[0]?.doors.length ?? 0} eff=${bLayoutMetrics.efficiency_pct}%`
+        : `B:  INFEASIBLE (${bResult.infeasibilityReason ?? bResult.error ?? "no project"})`;
+      console.log(`[SCOREBOARD] ${t1Summary}`);
+      console.log(`[SCOREBOARD] ${bSummary}`);
+
+      // Decide the winner. Prefer higher honest score; tie goes to T1 (fewer
+      // warning-grade orphans by construction, and parser work is already
+      // amortized). Fall back to whichever side produced a project at all.
+      const useT1 = (() => {
+        if (t1Bundle && bScore) return t1Bundle.score.score >= bScore.score;
+        if (t1Bundle) return true;
+        return false;
+      })();
+
+      if (useT1 && t1Bundle) {
+        const bScoreStr = bScore ? `${bScore.score}` : "n/a";
+        console.log(`[SCOREBOARD] WINNER=T1 (honest ${t1Bundle.score.score} vs B ${bScoreStr})`);
+        const { result: t1Result, project, layoutMetrics, parseMs, engineMs } = t1Bundle;
+        const feedback = buildFeedback(project, prompt);
+        feedback.tips.push(`T1 strip-pack (score ${t1Bundle.score.score}/100, grade ${t1Bundle.score.grade}): ${t1Result.rooms.length} rooms, ${t1Result.doors.length} doors, ${t1Result.metrics.efficiency_pct}% efficiency in ${parseMs + engineMs}ms`);
+        feedback.tips.push(`Beat Pipeline B ${bScoreStr}/100 on honest score`);
+        if (t1Result.warnings.length > 0) {
+          feedback.tips.push(`T1 warnings: ${t1Result.warnings.slice(0, 3).join("; ")}${t1Result.warnings.length > 3 ? "…" : ""}`);
+        }
+        await recordToolExecution(userId, "floor-plan");
+        return NextResponse.json({
+          project,
+          geometry: null,
+          svg: null,
+          feedback,
+          layoutMetrics,
+          qualityFlags: layoutMetrics.quality_flags,
+          feasibilityWarnings: [],
+          pipelineUsed: "T1-strip-pack",
+          relaxationsApplied: t1Result.warnings,
+          infeasibilityReason: null,
+          mandalaAssignments: null,
+          routerSignals: routing.constraint_signals,
+          honestScore: t1Bundle.score,
+        });
+      }
+
+      if (bResult.project && bLayoutMetrics && bScore) {
+        console.log(`[SCOREBOARD] WINNER=B (honest ${bScore.score} vs T1 ${t1Bundle ? t1Bundle.score.score : "err"})`);
+        const feedback = buildFeedback(bResult.project, prompt);
+        const summary = bResult.pipelineUsed === "B-fine"
+          ? `Pipeline B (3A+3B fine): ${bResult.constraintsExtracted} rooms, mandala=${bResult.timings.csp_3a_ms}ms, fine=${bResult.timings.csp_3b_ms}ms`
+          : bResult.pipelineUsed === "B-mandala"
+          ? `Pipeline B (3A mandala only): ${bResult.constraintsExtracted} rooms, mandala=${bResult.timings.csp_3a_ms}ms`
+          : `Pipeline B (${bResult.pipelineUsed}): ${bResult.constraintsExtracted} rooms in ${bResult.timings.total_ms}ms`;
+        feedback.tips.push(`${summary} — score ${bScore.score}/100 (${bScore.grade})`);
+        feedback.tips.push(`Beat T1 strip-pack ${t1Bundle ? `${t1Bundle.score.score}/100` : "error"} on honest score`);
+        if (bResult.relaxationsApplied.length > 0) {
+          feedback.tips.push(`Relaxations: ${bResult.relaxationsApplied.join("; ")}`);
+        }
+        await recordToolExecution(userId, "floor-plan");
+        return NextResponse.json({
+          project: bResult.project,
+          geometry: null,
+          svg: null,
+          feedback,
+          layoutMetrics: bLayoutMetrics,
+          qualityFlags: bLayoutMetrics.quality_flags,
+          feasibilityWarnings: bResult.feasibilityWarnings,
+          pipelineUsed: bResult.pipelineUsed,
+          relaxationsApplied: bResult.relaxationsApplied,
+          infeasibilityReason: null,
+          mandalaAssignments: bResult.mandalaAssignments,
+          routerSignals: routing.constraint_signals,
+          honestScore: bScore,
+        });
+      }
+
+      // Neither produced a project — 422.
+      console.warn(`[SCOREBOARD] BOTH PIPELINES INFEASIBLE (T1 err: ${t1Error ?? "n/a"}; B: ${bResult.infeasibilityReason ?? bResult.error ?? "no project"})`);
+      return NextResponse.json({
+        error: bResult.infeasibilityReason ?? bResult.error ?? t1Error ?? "Both pipelines failed",
+        pipelineUsed: bResult.pipelineUsed,
+        relaxationsApplied: bResult.relaxationsApplied,
+        feasibilityWarnings: bResult.feasibilityWarnings,
+        infeasibilityReason: bResult.infeasibilityReason,
+        infeasibilityKind: bResult.infeasibilityKind,
+        cspConflict: bResult.cspConflict,
+        cspRuleIds: bResult.cspRuleIds,
+        routerSignals: routing.constraint_signals,
+      }, { status: 422 });
     }
 
     if (routing.pipeline === "B") {
