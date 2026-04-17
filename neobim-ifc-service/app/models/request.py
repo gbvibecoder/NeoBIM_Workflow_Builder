@@ -68,6 +68,10 @@ ElementType = Literal[
     "wall", "slab", "column", "roof", "space", "window", "door",
     "beam", "stair", "balcony", "canopy", "parapet",
     "duct", "pipe", "cable-tray", "equipment",
+    # Curtain-wall facade sub-elements emitted by src/features/3d-render/services/massing-generator.ts.
+    # Accepted here so payloads validate; the builder currently skips them (the parent
+    # IfcWall carries the facade), logging a warning rather than crashing.
+    "mullion", "spandrel",
 ]
 
 IfcTypeStr = Literal[

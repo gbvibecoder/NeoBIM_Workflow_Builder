@@ -59,3 +59,14 @@ from app.routers import health, export  # noqa: E402
 
 app.include_router(health.router)
 app.include_router(export.router, prefix="/api/v1")
+
+
+@app.get("/")
+async def root():
+    return {
+        "service": "neobim-ifc-service",
+        "status": "ok",
+        "version": app.version,
+        "docs": "/docs",
+        "health": "/health",
+    }
