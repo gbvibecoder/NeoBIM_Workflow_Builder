@@ -1021,12 +1021,12 @@ export const BaseNode = memo(function BaseNode({ id, data, selected }: BaseNodeP
             </AnimatePresence>
           </div>
 
-          {/* Row 2: Subtitle — JetBrains Mono, tiny, uppercase (Atelier) */}
+          {/* Row 2: Subtitle — JetBrains Mono, uppercase (Atelier) */}
           {typeLabel && (
             <div style={{
-              fontSize: 10,
+              fontSize: 12,
               fontWeight: 600,
-              color: `rgba(${rgb}, 0.9)`,
+              color: `rgba(${rgb}, 1)`,
               marginTop: 5,
               lineHeight: 1.4,
               display: "-webkit-box",

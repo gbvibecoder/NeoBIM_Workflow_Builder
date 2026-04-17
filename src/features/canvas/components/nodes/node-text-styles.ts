@@ -20,7 +20,7 @@ const SHADOW_SMALL = "0 1px 2px rgba(0,0,0,0.65)";
 export const nodeText = {
   /** Primary form value — textarea content, selected dropdown values. */
   value: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: 400,
     color: colors.nodeText.value,
     letterSpacing: "0.005em",
@@ -28,7 +28,7 @@ export const nodeText = {
 
   /** Section header — "ESTIMATE ACCURACY", "BOOST ACCURACY". */
   sectionHdr: {
-    fontSize: 10,
+    fontSize: 12,
     fontWeight: 700,
     color: colors.nodeText.secondary,
     letterSpacing: "0.1em",
@@ -37,7 +37,7 @@ export const nodeText = {
 
   /** Field label above an input — "Country", "City", "Floors". */
   label: {
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: 500,
     color: colors.nodeText.label,
     letterSpacing: "0.02em",
@@ -46,7 +46,7 @@ export const nodeText = {
 
   /** Helper / hint text — "optional", "max 100MB", drop-zone prompts. */
   helper: {
-    fontSize: 10,
+    fontSize: 12,
     fontWeight: 400,
     color: colors.nodeText.helper,
     lineHeight: 1.5,
@@ -61,7 +61,7 @@ export const nodeText = {
 
   /** Small meta pill — time badge "< 2s", character counter. */
   meta: {
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: 500,
     color: colors.nodeText.helper,
     fontFamily: "var(--font-jetbrains), monospace",

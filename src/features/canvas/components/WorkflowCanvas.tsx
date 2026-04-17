@@ -830,70 +830,28 @@ function WorkflowCanvasInner({ workflowId: urlWorkflowId, templateId, forceNew =
         <div
           className="absolute inset-0"
         >
-          {/* Blueprint base gradient — navy with a warm copper-tinted center
-              so nodes cast clear shadows against the canvas instead of
-              disappearing into a void. Center ~L16%, edges ~L8% — ~2x the
-              brightness of the previous near-black canvas, while remaining
-              dark enough for cyan/amber accents to glow. */}
+          {/* Base — single deep-slate color. Calm, professional, easy on eyes. */}
           <div
             style={{
               position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 0,
-              background: 'radial-gradient(ellipse 90% 70% at 50% 45%, #1E2F44 0%, #17263A 35%, #0F1C2E 70%, #0A1420 100%)',
+              background: '#0E1A2D',
             }}
           />
-          {/* Dot grid — cool blueprint blue, stronger presence so the canvas
-              reads as a true drafting surface instead of a black hole. */}
+          {/* Dot grid — clean blueprint surface, single accent color. */}
           <div
             className="absolute inset-0 pointer-events-none"
             style={{
               zIndex: 0,
-              backgroundImage: 'radial-gradient(circle, rgba(170,200,235,0.32) 1.2px, transparent 1.2px)',
+              backgroundImage: 'radial-gradient(circle, rgba(180,220,255,0.32) 1.3px, transparent 1.3px)',
               backgroundSize: '22px 22px',
-              maskImage: 'radial-gradient(ellipse 95% 85% at 50% 50%, #000 55%, transparent 100%)',
-              WebkitMaskImage: 'radial-gradient(ellipse 95% 85% at 50% 50%, #000 55%, transparent 100%)',
             }}
           />
-          {/* Architectural major lines — copper drafting grid, lifted so the
-              blueprint identity is actually visible, not a subliminal whisper. */}
+          {/* Soft vignette — gentle frame, almost invisible, just enough depth. */}
           <div
             className="absolute inset-0 pointer-events-none"
             style={{
               zIndex: 0,
-              backgroundImage: `
-                linear-gradient(rgba(184,115,51,0.10) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(184,115,51,0.10) 1px, transparent 1px)
-              `,
-              backgroundSize: '220px 220px',
-            }}
-          />
-          {/* Warm atmospheric glow (copper) — gives the canvas center a
-              lit-drafting-table feel. */}
-          <div
-            className="absolute inset-0 pointer-events-none"
-            style={{
-              zIndex: 0,
-              background: isExecuting
-                ? 'radial-gradient(ellipse 60% 50% at 50% 50%, rgba(184,115,51,0.18) 0%, transparent 70%)'
-                : 'radial-gradient(ellipse 60% 50% at 50% 50%, rgba(184,115,51,0.11) 0%, transparent 70%)',
-              animation: 'atelier-glow-pulse 8s ease-in-out infinite',
-              transition: 'background 1s ease',
-            }}
-          />
-          {/* Cyan accent glow — bottom-left blueprint cool light */}
-          <div
-            className="absolute inset-0 pointer-events-none"
-            style={{
-              zIndex: 0,
-              background: 'radial-gradient(circle at 15% 80%, rgba(0,245,255,0.08) 0%, transparent 45%)',
-            }}
-          />
-          {/* Edge vignette — softened so corners stay readable. Previously
-              0.4 opacity crushed anything placed near the edges. */}
-          <div
-            className="absolute inset-0 pointer-events-none"
-            style={{
-              zIndex: 0,
-              background: 'radial-gradient(ellipse at center, transparent 50%, rgba(0,0,0,0.28) 100%)',
+              background: 'radial-gradient(ellipse 130% 110% at center, transparent 65%, rgba(0,0,0,0.30) 100%)',
             }}
           />
 
