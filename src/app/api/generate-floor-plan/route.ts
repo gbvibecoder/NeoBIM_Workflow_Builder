@@ -256,9 +256,9 @@ export async function POST(req: NextRequest) {
     // ── Phase 3 — Strip-Pack Engine (PIPELINE_T1) ────────────────────────
     // Tried only on Pipeline B routing (high-signal prompts) so we get the
     // structured parser for free. If it produces a layout meeting the
-    // efficiency + door coverage thresholds, we ship it. Otherwise we fall
-    // through to the existing Pipeline B / Grid-First / BSP cascade — the
-    // engine is purely additive, not destructive.
+    // efficiency + door coverage + room-coverage thresholds, we ship it.
+    // Otherwise we fall through to the existing Pipeline B / Grid-First / BSP
+    // cascade — the engine is purely additive, not destructive.
     if (process.env.PIPELINE_T1 === "true" && routing.pipeline === "B") {
       try {
         const t1Start = Date.now();
@@ -270,11 +270,24 @@ export async function POST(req: NextRequest) {
         const t1EngineMs = Date.now() - engineStart;
         logger.debug(`[T1] parse=${t1ParseMs}ms engine=${t1EngineMs}ms eff=${t1Result.metrics.efficiency_pct}% doors=${t1Result.metrics.door_coverage_pct}% rooms=${t1Result.rooms.length}`);
 
+        // Phase 3C fix C — more realistic gates. Efficiency alone isn't a
+        // quality signal for sparse plots (user requested 1500 sqft of rooms
+        // on a 2475 sqft plot → 60% is the best possible). Room coverage
+        // guards against engine bugs that drop rooms.
+        const roomsPlaced = t1Result.rooms.filter(r => r.placed).length;
+        const roomsExpected = parseRes.constraints.rooms?.length ?? 0;
+        const roomCoverage = roomsExpected > 0 ? roomsPlaced / roomsExpected : 1;
         const passesGates =
-          t1Result.metrics.efficiency_pct >= 70 &&
-          t1Result.metrics.door_coverage_pct >= 80;
+          t1Result.metrics.efficiency_pct >= 55 &&
+          t1Result.metrics.door_coverage_pct >= 70 &&
+          roomCoverage >= 0.90;
 
         if (passesGates) {
+          console.log(
+            `[T1] ACCEPTED: eff=${t1Result.metrics.efficiency_pct}% ` +
+            `doors=${t1Result.metrics.door_coverage_pct}% ` +
+            `rooms=${roomsPlaced}/${roomsExpected} (${Math.round(roomCoverage * 100)}%)`,
+          );
           const project = toFloorPlanProjectT1(t1Result, parseRes.constraints);
           const layoutMetrics = computeLayoutMetrics(project, parseRes.constraints);
           const feedback = buildFeedback(project, prompt);
@@ -298,10 +311,15 @@ export async function POST(req: NextRequest) {
             routerSignals: routing.constraint_signals,
           });
         }
-        logger.debug(`[T1] subpar metrics — falling through to Pipeline B`);
+        console.warn(
+          `[T1] REJECTED: eff=${t1Result.metrics.efficiency_pct}% ` +
+          `doors=${t1Result.metrics.door_coverage_pct}% ` +
+          `rooms=${roomsPlaced}/${roomsExpected} — falling through to Pipeline B`,
+        );
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
-        console.warn(`[T1] error — falling through to Pipeline B: ${msg}`);
+        const stack = err instanceof Error ? err.stack : String(err);
+        console.warn(`[T1] error — falling through to Pipeline B: ${msg}\n${stack}`);
       }
     }
 
