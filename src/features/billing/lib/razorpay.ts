@@ -97,12 +97,20 @@ export function verifyPaymentSignature(params: {
 /**
  * Verify Razorpay webhook signature.
  * sig = HMAC-SHA256(request_body, webhook_secret)
+ *
+ * Fails closed in production — a missing secret is a deployment error, not a
+ * reason to trust unauthenticated callers. Locally we still allow webhooks
+ * through so contributors can run the flow without setting up ngrok + a live
+ * Razorpay webhook secret.
  */
 export function verifyWebhookSignature(body: string, signature: string): boolean {
   const secret = process.env.RAZORPAY_WEBHOOK_SECRET;
   if (!secret) {
-    // No webhook secret configured — fall back to API verification
-    console.warn('[razorpay] No RAZORPAY_WEBHOOK_SECRET configured, skipping signature verification');
+    if (process.env.NODE_ENV === 'production') {
+      console.error('[razorpay] RAZORPAY_WEBHOOK_SECRET is missing in production — rejecting webhook');
+      return false;
+    }
+    console.warn('[razorpay] No RAZORPAY_WEBHOOK_SECRET configured (dev) — skipping signature verification');
     return true;
   }
 

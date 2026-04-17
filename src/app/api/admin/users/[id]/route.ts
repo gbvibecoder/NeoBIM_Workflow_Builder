@@ -19,7 +19,7 @@ export async function PATCH(
   });
 
   const allowedUpdates: Record<string, unknown> = {};
-  if (body.role && ["FREE", "PRO", "TEAM_ADMIN", "PLATFORM_ADMIN"].includes(body.role)) {
+  if (body.role && ["FREE", "MINI", "STARTER", "PRO", "TEAM_ADMIN", "PLATFORM_ADMIN"].includes(body.role)) {
     allowedUpdates.role = body.role;
   }
 

@@ -230,13 +230,25 @@ function Content() {
 
   useEffect(() => {
     if (!session?.user) return;
+    // Safety-net sync: re-query both payment providers in parallel. Whichever
+    // reports synced=true wins — e.g. a Razorpay user whose /verify call
+    // failed mid-redirect is recovered here without waiting for the webhook.
     const sync = async (attempt = 1) => {
       try {
-        const res = await fetch("/api/stripe/subscription", { method: "POST" });
-        const data = await res.json();
-        if (data.synced || attempt >= 3) await updateSession();
+        const [stripeJson, razorpayJson] = await Promise.all([
+          fetch("/api/stripe/subscription", { method: "POST" })
+            .then((r) => r.json())
+            .catch(() => null),
+          fetch("/api/razorpay/subscription", { method: "POST" })
+            .then((r) => r.json())
+            .catch(() => null),
+        ]);
+        const synced = Boolean(stripeJson?.synced) || Boolean(razorpayJson?.synced);
+        if (synced || attempt >= 3) await updateSession();
         else setTimeout(() => sync(attempt + 1), attempt * 2000);
-      } catch { if (attempt < 3) setTimeout(() => sync(attempt + 1), attempt * 2000); }
+      } catch {
+        if (attempt < 3) setTimeout(() => sync(attempt + 1), attempt * 2000);
+      }
     };
     sync();
   }, [session, updateSession]);

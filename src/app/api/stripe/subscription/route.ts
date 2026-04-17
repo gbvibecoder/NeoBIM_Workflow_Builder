@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { auth } from '@/lib/auth';
+import { auth, invalidateUserRoleCache } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { stripe, isSubscriptionActive, getPlanByPriceId } from '@/features/billing/lib/stripe';
 import { checkEndpointRateLimit } from "@/lib/rate-limit";
@@ -215,6 +215,7 @@ export async function POST() {
             stripeCurrentPeriodEnd: new Date(activeSubscription.currentPeriodEnd * 1000),
           },
         });
+        invalidateUserRoleCache(user.id);
 
         console.info('[STRIPE_SYNC] Synced subscription for user:', {
           userId: user.id,

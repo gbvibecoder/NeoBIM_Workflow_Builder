@@ -10,6 +10,7 @@ import {
   sendPlanChangedEmail,
 } from '@/shared/services/email';
 import { checkWebhookIdempotency } from '@/lib/webhook-idempotency';
+import { invalidateUserRoleCache } from '@/lib/auth';
 import { logAudit } from "@/lib/admin-server";
 import { trackServerPurchase } from "@/lib/server-conversions";
 import { getPlanValueINR } from "@/lib/plan-pricing";
@@ -186,8 +187,13 @@ async function updateUserSubscription(
   stripeCustomerId: string,
   subscription: Stripe.Subscription
 ) {
-  // Only grant paid role for active/trialing; downgrade for all other statuses
-  const paidStatuses: Stripe.Subscription.Status[] = ['active', 'trialing'];
+  // Paid tier stays granted for active/trialing AND past_due — Stripe's Smart
+  // Retries keep the subscription in past_due for up to ~3 weeks while it
+  // re-attempts the failed renewal. Downgrading immediately would kick paying
+  // users off the plan for a transient card decline. When retries truly fail,
+  // Stripe transitions to canceled/unpaid and fires customer.subscription.deleted,
+  // which is handled separately via cancelUserSubscription().
+  const paidStatuses: Stripe.Subscription.Status[] = ['active', 'trialing', 'past_due'];
   if (!paidStatuses.includes(subscription.status)) {
     console.info('[STRIPE_WEBHOOK] Non-active subscription status, downgrading to FREE:', {
       customerId: stripeCustomerId,
@@ -215,9 +221,11 @@ async function updateUserSubscription(
         stripeSubscriptionId: isTerminal ? null : subscription.id,
         stripePriceId: isTerminal ? null : undefined,
         stripeCurrentPeriodEnd: isTerminal ? null : undefined,
+        paymentGateway: isTerminal ? null : undefined,
         role: 'FREE',
       },
     });
+    invalidateUserRoleCache(user.id);
 
     // Audit log the cancellation/downgrade
     logAudit(null, "USER_ROLE_CHANGED", "user", user.id, {
@@ -319,6 +327,7 @@ async function updateUserSubscription(
         role: plan,
       },
     });
+    invalidateUserRoleCache(user.id);
 
     console.info('[STRIPE_WEBHOOK] Successfully updated user subscription:', {
       userId: user.id,
@@ -374,9 +383,11 @@ async function cancelUserSubscription(stripeCustomerId: string) {
       stripeSubscriptionId: null,
       stripePriceId: null,
       stripeCurrentPeriodEnd: null,
+      paymentGateway: null,
       role: 'FREE',
     },
   });
+  invalidateUserRoleCache(user.id);
 
   console.info('[STRIPE_WEBHOOK] Canceled user subscription:', user.id);
 
