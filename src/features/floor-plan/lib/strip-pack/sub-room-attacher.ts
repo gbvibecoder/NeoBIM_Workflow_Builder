@@ -134,20 +134,24 @@ export function attachSubRooms(input: AttachInput): AttachOutput {
     });
 
     const passing = annotated.filter(c => c.guardA && c.guardB && c.guardC);
+    const awayFrom = sideAwayFromHallway(facing, parent.placed!, input.spine);
     let pool = passing;
     if (pool.length === 0) {
-      // Graceful degradation: pick the LEAST-violating option, log warning.
-      pool = [...annotated].sort((a, b) => a.penalty - b.penalty).slice(0, 1);
+      // Graceful degradation. Filter to AWAY-from-hallway sides first so the
+      // parent retains its spine adjacency even when no candidate passes the
+      // size guards. Otherwise the parent becomes orphaned from circulation.
+      const awayCandidates = annotated.filter(c => c.side === awayFrom);
+      const base = awayCandidates.length > 0 ? awayCandidates : annotated;
+      pool = [...base].sort((a, b) => a.penalty - b.penalty).slice(0, 1);
       warnings.push(
         `${child.name} attached to ${parent.name}: no carve passes all guards — picked least-bad ` +
         `(parent ${pool[0].parentArea.toFixed(0)}/${parentReqArea.toFixed(0)} sqft, ` +
-        `child ${pool[0].childArea.toFixed(0)}/${childReqArea.toFixed(0)} sqft)`,
+        `child ${pool[0].childArea.toFixed(0)}/${childReqArea.toFixed(0)} sqft, side=${pool[0].side})`,
       );
     }
 
     // Prefer the side away from the hallway, then by penalty (lower is better).
     pool.sort((a, b) => {
-      const awayFrom = sideAwayFromHallway(facing, parent.placed!, input.spine);
       const aPref = a.side === awayFrom ? 0 : 1;
       const bPref = b.side === awayFrom ? 0 : 1;
       if (aPref !== bPref) return aPref - bPref;
@@ -178,38 +182,42 @@ function enumerateCarves(parent: Rect, child: StripPackRoom): CarveCandidate[] {
   const reqD = Math.max(MIN_CHILD_DEPTH_FT, child.requested_depth_ft);
   const out: CarveCandidate[] = [];
 
-  // For SOUTH/NORTH carves the child takes a horizontal slice of depth `cd`.
-  // We CLIP the child's width to its requested width (left-aligned). The
-  // residual (parent.width - child.width) × cd becomes a void to the east
-  // of the child, which the void-filler reclaims in Fix 7.
+  // CLIP the child to its requested dimensions. The residual between the
+  // child and the carved parent edge becomes a void that void-filler
+  // reclaims. Center-anchor the child along the shared edge — previously
+  // the child was west/south-corner anchored, which meant a sibling's later
+  // perpendicular carve on that same corner destroyed the shared wall
+  // between child and parent (Phase 3E fix — Ensuite-Master short-wall).
   const childWClipped = Math.min(parent.width, reqW);
   const childDClipped = Math.min(parent.depth, reqD);
+  const xCenter = parent.x + (parent.width - childWClipped) / 2;
+  const yCenter = parent.y + (parent.depth - childDClipped) / 2;
 
-  // SOUTH: parent shrinks on its south edge by reqD; child sits in SW corner.
+  // SOUTH: parent shrinks on its south edge; child at south, centered in x.
   if (parent.depth - reqD >= MIN_PARENT_DEPTH_FT) {
     const newParent: Rect = { x: parent.x, y: parent.y + reqD, width: parent.width, depth: parent.depth - reqD };
-    const newChild:  Rect = { x: parent.x, y: parent.y, width: childWClipped, depth: reqD };
+    const newChild:  Rect = { x: xCenter, y: parent.y, width: childWClipped, depth: reqD };
     out.push({ side: "south", parent: newParent, child: newChild, aspectScore: aspectDistortion(parent, newParent) });
   }
 
-  // NORTH: parent shrinks on its north edge; child sits in NW corner.
+  // NORTH: parent shrinks on its north edge; child at north, centered in x.
   if (parent.depth - reqD >= MIN_PARENT_DEPTH_FT) {
     const newParent: Rect = { x: parent.x, y: parent.y, width: parent.width, depth: parent.depth - reqD };
-    const newChild:  Rect = { x: parent.x, y: parent.y + parent.depth - reqD, width: childWClipped, depth: reqD };
+    const newChild:  Rect = { x: xCenter, y: parent.y + parent.depth - reqD, width: childWClipped, depth: reqD };
     out.push({ side: "north", parent: newParent, child: newChild, aspectScore: aspectDistortion(parent, newParent) });
   }
 
-  // EAST: parent shrinks on its east edge; child sits in SE corner.
+  // EAST: parent shrinks on its east edge; child at east, centered in y.
   if (parent.width - reqW >= MIN_PARENT_WIDTH_FT) {
     const newParent: Rect = { x: parent.x, y: parent.y, width: parent.width - reqW, depth: parent.depth };
-    const newChild:  Rect = { x: parent.x + parent.width - reqW, y: parent.y, width: reqW, depth: childDClipped };
+    const newChild:  Rect = { x: parent.x + parent.width - reqW, y: yCenter, width: reqW, depth: childDClipped };
     out.push({ side: "east", parent: newParent, child: newChild, aspectScore: aspectDistortion(parent, newParent) });
   }
 
-  // WEST: parent shrinks on its west edge; child sits in SW corner.
+  // WEST: parent shrinks on its west edge; child at west, centered in y.
   if (parent.width - reqW >= MIN_PARENT_WIDTH_FT) {
     const newParent: Rect = { x: parent.x + reqW, y: parent.y, width: parent.width - reqW, depth: parent.depth };
-    const newChild:  Rect = { x: parent.x, y: parent.y, width: reqW, depth: childDClipped };
+    const newChild:  Rect = { x: parent.x, y: yCenter, width: reqW, depth: childDClipped };
     out.push({ side: "west", parent: newParent, child: newChild, aspectScore: aspectDistortion(parent, newParent) });
   }
 
@@ -243,20 +251,16 @@ function overlapsAny(rect: Rect, rooms: StripPackRoom[], ...excludeIds: string[]
  * AWAY from the hallway. We prefer to carve on this side so the parent keeps
  * its door to the hallway intact.
  */
-function sideAwayFromHallway(facing: Facing, _parent: Rect, _spine: SpineLayout): Side {
-  // For north-facing: hallway is between front (north) and back (south) strips.
-  //   - Front-strip rooms have hallway on their SOUTH → "away" = NORTH.
-  //   - Back-strip rooms have hallway on their NORTH → "away" = SOUTH.
-  // We don't know which strip the parent was in without checking, but the
-  // parent's y vs spine.y tells us:
-  if (facing === "north") {
-    return _parent.y >= _spine.spine.y + _spine.spine.depth ? "north" : "south";
+function sideAwayFromHallway(facing: Facing, parent: Rect, spine: SpineLayout): Side {
+  // "Away" means the parent edge opposite to where the spine (hallway) lies.
+  // Identify which side of the spine the parent is on, then return the
+  // parent edge pointing AWAY from the spine.
+  if (facing === "north" || facing === "south") {
+    const spineTop = spine.spine.y + spine.spine.depth;
+    // Parent north of spine → hallway is on its south → AWAY = north.
+    return parent.y >= spineTop ? "north" : "south";
   }
-  if (facing === "south") {
-    return _parent.y >= _spine.spine.y + _spine.spine.depth ? "south" : "north";
-  }
-  if (facing === "east") {
-    return _parent.x >= _spine.spine.x + _spine.spine.width ? "east" : "west";
-  }
-  return _parent.x >= _spine.spine.x + _spine.spine.width ? "west" : "east";
+  const spineRight = spine.spine.x + spine.spine.width;
+  // Parent east of spine → hallway is on its west → AWAY = east.
+  return parent.x >= spineRight ? "east" : "west";
 }

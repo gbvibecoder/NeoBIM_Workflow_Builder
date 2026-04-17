@@ -715,25 +715,9 @@ function SupplementaryIFCUpload({ nodeId }: { nodeId: string }) {
 
 // ─── Location Input (IN-006) ─────────────────────────────────────────────────
 
+// India-only: regional factors + IS-1200 codes are India-specific.
 const LOCATION_COUNTRIES = [
-  { label: "USA", code: "US", currency: "USD", symbol: "$" },
   { label: "India", code: "IN", currency: "INR", symbol: "₹" },
-  { label: "UK", code: "GB", currency: "GBP", symbol: "£" },
-  { label: "UAE", code: "AE", currency: "AED", symbol: "د.إ" },
-  { label: "Australia", code: "AU", currency: "AUD", symbol: "A$" },
-  { label: "Canada", code: "CA", currency: "CAD", symbol: "C$" },
-  { label: "Germany", code: "DE", currency: "EUR", symbol: "€" },
-  { label: "Saudi Arabia", code: "SA", currency: "SAR", symbol: "﷼" },
-  { label: "Singapore", code: "SG", currency: "SGD", symbol: "S$" },
-  { label: "Japan", code: "JP", currency: "JPY", symbol: "¥" },
-  { label: "China", code: "CN", currency: "CNY", symbol: "¥" },
-  { label: "Brazil", code: "BR", currency: "BRL", symbol: "R$" },
-  { label: "France", code: "FR", currency: "EUR", symbol: "€" },
-  { label: "South Korea", code: "KR", currency: "KRW", symbol: "₩" },
-  { label: "Mexico", code: "MX", currency: "MXN", symbol: "$" },
-  { label: "Qatar", code: "QA", currency: "QAR", symbol: "﷼" },
-  { label: "Nigeria", code: "NG", currency: "NGN", symbol: "₦" },
-  { label: "South Africa", code: "ZA", currency: "ZAR", symbol: "R" },
 ];
 
 const selectStyle: React.CSSProperties = {
@@ -837,6 +821,22 @@ export const LocationInput = memo(function LocationInput({ nodeId, data }: { nod
             <option key={c.code} value={c.label}>{c.label}</option>
           ))}
         </select>
+        <div style={{
+          marginTop: 6,
+          padding: "7px 9px",
+          borderRadius: 4,
+          border: "1px solid rgba(125, 249, 255, 0.22)",
+          background: "rgba(125, 249, 255, 0.06)",
+          color: "rgba(232, 236, 244, 0.92)",
+          fontSize: 12,
+          lineHeight: 1.45,
+          fontStyle: "italic",
+          letterSpacing: "0.01em",
+        }}>
+          Heads up: we&apos;re currently live in India only. Faking your
+          country&apos;s construction costs felt wrong (our moms taught us
+          better) — your region is on the roadmap. Pinky promise.
+        </div>
       </div>
       {/* State dropdown (only for countries with states) */}
       {hasLocation && hasStates && (

@@ -40,9 +40,9 @@ export const colors = {
   nodeText: {
     primary:   "#F2F4F8",   // values, filenames                      — 14:1
     value:     "#E6E9F0",   // dropdown selection, parameter values   — 12:1
-    label:     "#B8BECC",   // field labels (Country, Floors)         — 8.4:1
-    secondary: "#9098AC",   // section headers (BOOST ACCURACY)       — 5.6:1
-    helper:    "#7A8298",   // hints, "max 100MB", "optional"         — 4.6:1
+    label:     "#C8CEDC",   // field labels (Country, Floors)         — 10:1
+    secondary: "#B8C0D0",   // section headers (BOOST ACCURACY)       — 8.6:1
+    helper:    "#A8B0C4",   // hints, "max 100MB", "optional"         — 7.3:1
     hint:      "#00F5FF",   // cyan CTA accent ("click to browse")
   },
 

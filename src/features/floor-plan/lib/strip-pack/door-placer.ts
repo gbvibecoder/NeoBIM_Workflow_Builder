@@ -67,10 +67,53 @@ export function placeDoors(input: DoorPlaceInput): DoorPlaceOutput {
     }
   }
 
-  // ── 2. Hallway doors for unserved rooms ────────────────────────────────
+  // ── 1.5 — Foyer MUST have a hallway door ───────────────────────────────
+  // The Porch↔Foyer adjacency in step 1 marks foyer as "served", but the
+  // foyer's architectural job is to BRIDGE the entrance to the interior.
+  // Without a foyer→hallway door, BFS from the main entrance dead-ends at
+  // the foyer and every interior room becomes orphaned. Force a hallway
+  // door here when a shared wall exists (the entrance-handler already
+  // extends the foyer to the spine for n/s-facing plots).
+  if (input.foyerId) {
+    const foyer = roomById.get(input.foyerId);
+    if (foyer) {
+      const hasHallwayDoor = doors.some(
+        d =>
+          (d.between[0] === foyer.name || d.between[1] === foyer.name) &&
+          (d.between[0] === "hallway" || d.between[1] === "hallway"),
+      );
+      if (!hasHallwayDoor) {
+        const wall = findHallwayWallFor(input.walls, input.spine, input.foyerId);
+        if (wall) {
+          const door = makeDoorOnWall(wall, [foyer.name, "hallway"], DEFAULT_DOOR_WIDTH_FT, warnings);
+          if (door) {
+            doors.push(door);
+            servedRooms.add(input.foyerId);
+          }
+        } else {
+          warnings.push(`foyer ${foyer.name}: no shared wall with hallway — vestibule disconnected from interior`);
+        }
+      }
+    }
+  }
+
+  // ── 2. Hallway doors for rooms adjacent to the spine ───────────────────
+  // Previously skipped any room already "served" by a step-1 adjacency door.
+  // That broke connectivity: Dining↔Living (adjacency door) + Living and
+  // Dining both share a wall with the hallway, but NEITHER got a hallway
+  // door, leaving the whole cluster orphaned from the circulation graph.
+  //
+  // New rule: skip only when the room ALREADY has a door to the hallway.
+  // A room adjacent to the spine deserves a hallway door regardless of any
+  // adjacency doors it may also have.
   for (const room of input.rooms) {
     if (!room.placed) continue;
-    if (servedRooms.has(room.id)) continue;
+    const alreadyHasHallwayDoor = doors.some(
+      d =>
+        (d.between[0] === room.name || d.between[1] === room.name) &&
+        (d.between[0] === "hallway" || d.between[1] === "hallway"),
+    );
+    if (alreadyHasHallwayDoor) continue;
     const wall = findHallwayWallFor(input.walls, input.spine, room.id);
     if (!wall) continue;
     const door = makeDoorOnWall(wall, [room.name, "hallway"], DEFAULT_DOOR_WIDTH_FT, warnings);
