@@ -25,6 +25,28 @@ export interface Rect {
 
 export type Facing = "north" | "south" | "east" | "west";
 
+/**
+ * Normalize any facing-ish value from upstream (parser "E"/"NE", users "north-facing",
+ * null/undefined) to the canonical Facing union the engine works in.
+ *
+ * Intercardinals fall back to the dominant cardinal for spine orientation purposes:
+ *   NE → east, NW → north, SE → east, SW → south.
+ * Unknown / missing → "north" (safe default).
+ */
+export function normalizeFacing(raw: string | null | undefined): Facing {
+  if (!raw) return "north";
+  const s = String(raw).trim().toLowerCase();
+  if (s === "n" || s === "north" || s === "n-facing" || s === "north-facing") return "north";
+  if (s === "s" || s === "south" || s === "s-facing" || s === "south-facing") return "south";
+  if (s === "e" || s === "east"  || s === "e-facing" || s === "east-facing")  return "east";
+  if (s === "w" || s === "west"  || s === "w-facing" || s === "west-facing")  return "west";
+  if (s === "ne" || s === "northeast") return "east";
+  if (s === "nw" || s === "northwest") return "north";
+  if (s === "se" || s === "southeast") return "east";
+  if (s === "sw" || s === "southwest") return "south";
+  return "north";
+}
+
 export type RoomZone =
   | "PUBLIC"
   | "PRIVATE"

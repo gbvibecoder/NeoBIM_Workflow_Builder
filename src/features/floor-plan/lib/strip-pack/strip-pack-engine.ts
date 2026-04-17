@@ -19,7 +19,7 @@ import type {
   StripPackMetrics,
   SpineLayout,
 } from "./types";
-import { rectArea } from "./types";
+import { rectArea, normalizeFacing } from "./types";
 import { classifyRooms, splitByStrip } from "./room-classifier";
 import { planSpine } from "./spine-placer";
 import { placeEntrance } from "./entrance-handler";
@@ -38,10 +38,7 @@ import { placeWindows } from "./window-placer";
 export async function runStripPackEngine(parsed: ParsedConstraints): Promise<StripPackResult> {
   const warnings: string[] = [];
 
-  const facing = (parsed.plot.facing ?? "north").toLowerCase() as Facing;
-  const validFacing: Facing = (["north", "south", "east", "west"] as const).includes(facing)
-    ? facing
-    : "north";
+  const validFacing: Facing = normalizeFacing(parsed.plot.facing);
 
   const plotW = parsed.plot.width_ft ?? 40;
   const plotD = parsed.plot.depth_ft ?? 50;

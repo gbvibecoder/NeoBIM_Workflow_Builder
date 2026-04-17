@@ -11,6 +11,7 @@
  */
 import type { ParsedRoom, ParsedConstraints } from "../structured-parser";
 import type { StripPackRoom, RoomZone, StripAssignment, Facing } from "./types";
+import { normalizeFacing } from "./types";
 
 // ───────────────────────────────────────────────────────────────────────────
 // LOOKUP TABLES
@@ -217,10 +218,7 @@ function detectAttachedParent(room: ParsedRoom, allRooms: ParsedRoom[]): string 
 // ───────────────────────────────────────────────────────────────────────────
 
 export function classifyRooms(parsed: ParsedConstraints): StripPackRoom[] {
-  const facing = (parsed.plot.facing ?? "north").toLowerCase() as Facing;
-  const validFacing: Facing = (["north", "south", "east", "west"] as const).includes(facing)
-    ? facing
-    : "north";
+  const validFacing: Facing = normalizeFacing(parsed.plot.facing);
 
   const adjacencyByRoomId = new Map<string, string[]>();
   for (const adj of parsed.adjacency_pairs) {
