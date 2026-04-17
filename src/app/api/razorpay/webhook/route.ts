@@ -8,7 +8,7 @@ import {
   sendPaymentFailedEmail,
   sendSubscriptionCanceledEmail,
 } from '@/shared/services/email';
-import { checkWebhookIdempotency } from '@/lib/webhook-idempotency';
+import { checkWebhookIdempotency, clearWebhookIdempotency } from '@/lib/webhook-idempotency';
 import { trackServerPurchase } from '@/lib/server-conversions';
 import { getPlanValueINR } from '@/lib/plan-pricing';
 
@@ -118,6 +118,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ received: true });
   } catch (error) {
     console.error('[RAZORPAY_WEBHOOK] Error processing webhook:', error);
+    await clearWebhookIdempotency('razorpay', eventId);
     return NextResponse.json(
       formatErrorResponse({ title: 'Webhook error', message: 'Internal error processing webhook.', code: 'NET_001' }),
       { status: 500 },

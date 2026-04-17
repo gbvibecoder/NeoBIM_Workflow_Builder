@@ -10,10 +10,10 @@ interface CronReport {
   stripeLiveSubs: number;
   razorpaySubs: number;
   razorpayLiveSubs: number;
-  reconciled: { userId: string; email: string | null; previousRole: string; newRole: string; gateway: 'stripe' | 'razorpay'; subscriptionId: string }[];
-  unresolved: { gateway: 'stripe' | 'razorpay'; subscriptionId: string; reason: string; planOrPriceId?: string | null; notes?: unknown }[];
-  orphans: { gateway: 'stripe' | 'razorpay'; subscriptionId: string; hint?: string }[];
-  errors: { gateway?: 'stripe' | 'razorpay'; error: string; subscriptionId?: string }[];
+  reconciled: { userId: string; email: string | null; previousRole: string; newRole: string; gateway: string; subscriptionId: string }[];
+  unresolved: { gateway: string; subscriptionId: string; reason: string; planOrPriceId?: string | null; notes?: unknown }[];
+  orphans: { gateway: string; subscriptionId: string; hint?: string }[];
+  errors: { gateway?: string; error: string; subscriptionId?: string }[];
   durationMs: number;
 }
 
@@ -318,6 +318,75 @@ export async function runCronReconcile(): Promise<CronReport> {
     } catch (err) {
       report.errors.push({ gateway: 'razorpay', subscriptionId: sub.id, error: err instanceof Error ? err.message : String(err) });
     }
+  }
+
+  // ── STALE-ROLE SWEEP ──────────────────────────────────────────────
+  // Catch users whose cancellation webhook was missed: they have a paid
+  // role but their subscription period has expired. Check the provider
+  // to confirm before downgrading.
+  const ADMIN_ROLES_SWEEP = new Set(['PLATFORM_ADMIN', 'TEAM_ADMIN']);
+  try {
+    const staleUsers = await prisma.user.findMany({
+      where: {
+        role: { notIn: ['FREE', 'PLATFORM_ADMIN', 'TEAM_ADMIN'] },
+        stripeCurrentPeriodEnd: { lt: new Date() },
+      },
+      select: {
+        id: true, email: true, role: true,
+        stripeSubscriptionId: true, razorpaySubscriptionId: true,
+      },
+      take: 50,
+    });
+
+    for (const u of staleUsers) {
+      if (ADMIN_ROLES_SWEEP.has(u.role)) continue;
+      try {
+        let stillActive = false;
+
+        if (u.razorpaySubscriptionId) {
+          try {
+            const sub = await razorpay.subscriptions.fetch(u.razorpaySubscriptionId);
+            stillActive = ['active', 'authenticated', 'pending'].includes(sub.status);
+          } catch { /* treat as inactive */ }
+        }
+
+        if (!stillActive && u.stripeSubscriptionId) {
+          try {
+            const sub = await stripe.subscriptions.retrieve(u.stripeSubscriptionId);
+            stillActive = ['active', 'trialing', 'past_due'].includes(sub.status);
+          } catch { /* treat as inactive */ }
+        }
+
+        if (!stillActive) {
+          await prisma.user.update({
+            where: { id: u.id },
+            data: {
+              role: 'FREE',
+              stripeSubscriptionId: null,
+              stripePriceId: null,
+              razorpaySubscriptionId: null,
+              razorpayPlanId: null,
+              stripeCurrentPeriodEnd: null,
+              paymentGateway: null,
+            },
+          });
+          invalidateUserRoleCache(u.id);
+          report.reconciled.push({
+            userId: u.id,
+            email: u.email,
+            previousRole: u.role,
+            newRole: 'FREE',
+            gateway: 'sweep',
+            subscriptionId: u.stripeSubscriptionId || u.razorpaySubscriptionId || 'none',
+          });
+          console.info('[CRON_RECONCILE] Stale-role sweep downgraded user:', { userId: u.id, previousRole: u.role });
+        }
+      } catch (err) {
+        report.errors.push({ gateway: 'sweep', subscriptionId: u.id, error: err instanceof Error ? err.message : String(err) });
+      }
+    }
+  } catch (err) {
+    report.errors.push({ gateway: 'sweep', subscriptionId: 'scan', error: err instanceof Error ? err.message : String(err) });
   }
 
   report.durationMs = Date.now() - t0;

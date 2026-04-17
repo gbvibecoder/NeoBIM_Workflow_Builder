@@ -65,7 +65,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         token.phoneVerified = !!(user as { phoneVerified?: Date | null }).phoneVerified;
       }
       // Refresh role from DB so subscription changes are reflected without sign-out.
-      // Throttled to once per 60s to avoid excessive DB queries. Explicit session
+      // Throttled to once per 15s to avoid excessive DB queries. Explicit session
       // updates (trigger === "update") always bypass the throttle.
       if (token.sub) {
         const now = Date.now();

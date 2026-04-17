@@ -91,7 +91,14 @@ export function verifyPaymentSignature(params: {
     .update(body)
     .digest('hex');
 
-  return expectedSignature === params.razorpay_signature;
+  try {
+    return crypto.timingSafeEqual(
+      Buffer.from(expectedSignature, 'hex'),
+      Buffer.from(params.razorpay_signature, 'hex'),
+    );
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -119,5 +126,12 @@ export function verifyWebhookSignature(body: string, signature: string): boolean
     .update(body)
     .digest('hex');
 
-  return expectedSignature === signature;
+  try {
+    return crypto.timingSafeEqual(
+      Buffer.from(expectedSignature, 'hex'),
+      Buffer.from(signature, 'hex'),
+    );
+  } catch {
+    return false;
+  }
 }
