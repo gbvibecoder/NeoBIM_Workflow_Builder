@@ -68,7 +68,8 @@ export async function POST(req: NextRequest) {
 
       case 'subscription.cancelled':
       case 'subscription.completed':
-      case 'subscription.expired': {
+      case 'subscription.expired':
+      case 'subscription.halted': {
         const subscription = event.payload?.subscription?.entity;
         if (!subscription?.id) break;
 
