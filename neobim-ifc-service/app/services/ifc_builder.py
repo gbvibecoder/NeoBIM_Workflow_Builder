@@ -24,7 +24,7 @@ from app.models.request import (
     MassingGeometry,
     MassingStorey,
 )
-from app.models.response import EntityCounts
+from app.models.response import BuildFailure, EntityCounts
 from app.services.wall_builder import create_wall
 from app.services.slab_builder import create_slab
 from app.services.column_builder import create_column
@@ -87,10 +87,11 @@ def build_ifc(
     site_name: str = "Default Site",
     author: str = "NeoBIM",
     discipline: Discipline = "combined",
-) -> tuple[ifcopenshell.file, EntityCounts]:
+) -> tuple[ifcopenshell.file, EntityCounts, list[BuildFailure]]:
     """Build a complete IFC4 model from MassingGeometry.
 
-    Returns the IfcOpenShell file object and entity counts.
+    Returns (ifc_file, entity_counts, per_element_failures). Per-element
+    failures do not abort the build — unrecoverable failures raise instead.
     """
     start = time.monotonic()
 
@@ -159,6 +160,7 @@ def build_ifc(
 
     # ── Element creation ─────────────────────────────────────────
     counts = EntityCounts()
+    failures: list[BuildFailure] = []
     wall_lookup: dict[str, ifcopenshell.entity_instance] = {}
     mep_elements: dict[str, list[ifcopenshell.entity_instance]] = {
         "HVAC": [],
@@ -182,7 +184,21 @@ def build_ifc(
                 add_wall_psets(model, ifc_wall, elem, building_type)
                 counts.IfcWall += 1
             except Exception as e:
-                log.warning("wall_creation_failed", elem_id=elem.id, error=str(e))
+                log.warning(
+                    "wall_creation_failed",
+                    elem_id=elem.id,
+                    error=str(e),
+                    error_type=type(e).__name__,
+                    exc_info=True,
+                )
+                failures.append(
+                    BuildFailure(
+                        element_id=elem.id,
+                        element_type=elem.type,
+                        error_type=type(e).__name__,
+                        error=str(e),
+                    )
+                )
 
         # Second pass: all other elements
         for elem in storey_data.elements:
@@ -266,7 +282,22 @@ def build_ifc(
                     assign_to_storey(model, ifc_storey, proxy)
 
             except Exception as e:
-                log.warning("element_creation_failed", elem_id=elem.id, elem_type=elem.type, error=str(e))
+                log.warning(
+                    "element_creation_failed",
+                    elem_id=elem.id,
+                    elem_type=elem.type,
+                    error=str(e),
+                    error_type=type(e).__name__,
+                    exc_info=True,
+                )
+                failures.append(
+                    BuildFailure(
+                        element_id=elem.id,
+                        element_type=elem.type,
+                        error_type=type(e).__name__,
+                        error=str(e),
+                    )
+                )
 
     # ── MEP systems ──────────────────────────────────────────────
     if discipline in ("mep", "combined"):
@@ -282,10 +313,11 @@ def build_ifc(
         walls=counts.IfcWall,
         windows=counts.IfcWindow,
         openings=counts.IfcOpeningElement,
+        failures=len(failures),
         elapsed_ms=elapsed,
     )
 
-    return model, counts
+    return model, counts, failures
 
 
 # ── Multi-file export ────────────────────────────────────────────────
@@ -293,15 +325,16 @@ def build_ifc(
 
 def build_multi_discipline(
     request: ExportIFCRequest,
-) -> dict[str, tuple[bytes, EntityCounts]]:
+) -> dict[str, tuple[bytes, EntityCounts, list[BuildFailure]]]:
     """Build IFC files for each requested discipline.
 
-    Returns a dict mapping discipline name to (ifc_bytes, entity_counts).
+    Returns a dict mapping discipline name to
+    (ifc_bytes, entity_counts, per_element_failures).
     """
-    results: dict[str, tuple[bytes, EntityCounts]] = {}
+    results: dict[str, tuple[bytes, EntityCounts, list[BuildFailure]]] = {}
 
     for discipline in request.options.disciplines:
-        model, counts = build_ifc(
+        model, counts, failures = build_ifc(
             geometry=request.geometry,
             project_name=request.options.project_name,
             building_name=request.options.building_name,
@@ -316,6 +349,6 @@ def build_multi_discipline(
             tmp.seek(0)
             ifc_bytes = tmp.read()
 
-        results[discipline] = (ifc_bytes, counts)
+        results[discipline] = (ifc_bytes, counts, failures)
 
     return results
