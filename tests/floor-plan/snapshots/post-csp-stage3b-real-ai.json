@@ -1,0 +1,444 @@
+{
+  "snapshot_name": "post-csp-stage3b-real-ai",
+  "created_at": "2026-04-16T09:04:04.908Z",
+  "git_sha": "a6f657f",
+  "results": [
+    {
+      "id": "P01",
+      "prompt_summary": "A single-storey 5BHK residential bungalow on a 55ft x 50ft north-facing plot wit",
+      "elapsed_ms": 24990,
+      "error": null,
+      "pipeline_used": "B-fine",
+      "score": {
+        "total": 88,
+        "components": {
+          "completeness": 25,
+          "vastu": 21,
+          "dims": 19,
+          "positions": 13,
+          "hallucinations": 10,
+          "gaps": 0
+        },
+        "details": {
+          "completeness": [
+            "matched 15/15 expected rooms"
+          ],
+          "vastu": [
+            "1 violations across 6 critical rules",
+            "VIOLATION ENTRANCE_IN_N_E_NE: Foyer placed in W"
+          ],
+          "dims": [
+            "14/15 dims within ±5%",
+            "MISS (dim): bathroom 2 expected 8x5ft, got 9.0x6.0ft"
+          ],
+          "positions": [
+            "7/8 positions matched",
+            "MISS (pos): bedroom 3 expected SE, got NE"
+          ],
+          "hallucinations": [
+            "0 forbidden, 0 extra rooms"
+          ],
+          "gaps": [
+            "walls=0, rooms=15, doors=0",
+            "only 0 doors for 15 rooms",
+            "no walls generated at all"
+          ]
+        }
+      },
+      "project": null
+    },
+    {
+      "id": "P02",
+      "prompt_summary": "5BHK villa on 50ft x 60ft east-facing plot, 2800 sqft, Vastu compliant. Master b",
+      "elapsed_ms": 19695,
+      "error": null,
+      "pipeline_used": "B-fine",
+      "score": {
+        "total": 91,
+        "components": {
+          "completeness": 25,
+          "vastu": 25,
+          "dims": 20,
+          "positions": 15,
+          "hallucinations": 6,
+          "gaps": 0
+        },
+        "details": {
+          "completeness": [
+            "matched 5/5 expected rooms"
+          ],
+          "vastu": [
+            "0 violations across 6 critical rules"
+          ],
+          "dims": [
+            "no dim expectations"
+          ],
+          "positions": [
+            "4/4 positions matched"
+          ],
+          "hallucinations": [
+            "0 forbidden, 4 extra rooms",
+            "EXTRA: Bathroom 2 (bathroom)",
+            "EXTRA: Bathroom 3 (bathroom)",
+            "EXTRA: Bathroom 4 (bathroom)",
+            "EXTRA: Bathroom 5 (bathroom)"
+          ],
+          "gaps": [
+            "walls=0, rooms=13, doors=0",
+            "only 0 doors for 13 rooms",
+            "no walls generated at all"
+          ]
+        }
+      },
+      "project": null
+    },
+    {
+      "id": "P03",
+      "prompt_summary": "Spacious 5BHK villa around 3000 sqft, modern open plan, double-height living, at",
+      "elapsed_ms": 31396,
+      "error": null,
+      "pipeline_used": "A",
+      "score": {
+        "total": 92,
+        "components": {
+          "completeness": 25,
+          "vastu": 25,
+          "dims": 20,
+          "positions": 15,
+          "hallucinations": 5,
+          "gaps": 2
+        },
+        "details": {
+          "completeness": [
+            "matched 5/5 expected rooms"
+          ],
+          "vastu": [
+            "vastu not required"
+          ],
+          "dims": [
+            "no dim expectations"
+          ],
+          "positions": [
+            "no position expectations"
+          ],
+          "hallucinations": [
+            "0 forbidden, 5 extra rooms",
+            "EXTRA: Corridor (corridor)",
+            "EXTRA: Dining Room (dining_room)",
+            "EXTRA: Utility (utility)",
+            "EXTRA: Walk-in Wardrobe (walk_in_closet)",
+            "EXTRA: Foyer (foyer)"
+          ],
+          "gaps": [
+            "walls=93, rooms=18, doors=24",
+            "10 dangling wall endpoints"
+          ]
+        }
+      },
+      "project": null
+    },
+    {
+      "id": "P04",
+      "prompt_summary": "4BHK on 40ft x 60ft north-facing plot, 2200 sqft, Vastu compliant. Master 16ft x",
+      "elapsed_ms": 20233,
+      "error": null,
+      "pipeline_used": "B-fine",
+      "score": {
+        "total": 88,
+        "components": {
+          "completeness": 25,
+          "vastu": 25,
+          "dims": 20,
+          "positions": 8,
+          "hallucinations": 10,
+          "gaps": 0
+        },
+        "details": {
+          "completeness": [
+            "matched 7/7 expected rooms"
+          ],
+          "vastu": [
+            "0 violations across 6 critical rules"
+          ],
+          "dims": [
+            "7/7 dims within ±5%"
+          ],
+          "positions": [
+            "3/6 positions matched",
+            "MISS (pos): bedroom 2 expected NW, got W",
+            "MISS (pos): bedroom 3 expected N, got E",
+            "MISS (pos): bedroom 4 expected NE, got E"
+          ],
+          "hallucinations": [
+            "0 forbidden, 0 extra rooms"
+          ],
+          "gaps": [
+            "walls=0, rooms=8, doors=0",
+            "only 0 doors for 8 rooms",
+            "no walls generated at all"
+          ]
+        }
+      },
+      "project": null
+    },
+    {
+      "id": "P05",
+      "prompt_summary": "4BHK Vastu compliant, 2000 sqft, plot facing east, kitchen southeast, master sou",
+      "elapsed_ms": 16124,
+      "error": null,
+      "pipeline_used": "B-fine",
+      "score": {
+        "total": 94,
+        "components": {
+          "completeness": 25,
+          "vastu": 25,
+          "dims": 20,
+          "positions": 15,
+          "hallucinations": 9,
+          "gaps": 0
+        },
+        "details": {
+          "completeness": [
+            "matched 3/3 expected rooms"
+          ],
+          "vastu": [
+            "0 violations across 6 critical rules"
+          ],
+          "dims": [
+            "no dim expectations"
+          ],
+          "positions": [
+            "2/2 positions matched"
+          ],
+          "hallucinations": [
+            "0 forbidden, 1 extra rooms",
+            "EXTRA: Living Room (living_room)"
+          ],
+          "gaps": [
+            "walls=0, rooms=6, doors=0",
+            "only 0 doors for 6 rooms",
+            "no walls generated at all"
+          ]
+        }
+      },
+      "project": null
+    },
+    {
+      "id": "P06",
+      "prompt_summary": "4BHK contemporary apartment 1800 sqft, large living-dining, modular kitchen, thr",
+      "elapsed_ms": 31005,
+      "error": null,
+      "pipeline_used": "A",
+      "score": {
+        "total": 92,
+        "components": {
+          "completeness": 25,
+          "vastu": 25,
+          "dims": 20,
+          "positions": 15,
+          "hallucinations": 5,
+          "gaps": 2
+        },
+        "details": {
+          "completeness": [
+            "matched 7/7 expected rooms"
+          ],
+          "vastu": [
+            "vastu not required"
+          ],
+          "dims": [
+            "no dim expectations"
+          ],
+          "positions": [
+            "no position expectations"
+          ],
+          "hallucinations": [
+            "0 forbidden, 5 extra rooms",
+            "EXTRA: Bathroom 2 (bathroom)",
+            "EXTRA: Corridor (corridor)",
+            "EXTRA: Bathroom 3 (bathroom)",
+            "EXTRA: Common Bathroom (bathroom)",
+            "EXTRA: Walk-in Wardrobe (walk_in_closet)"
+          ],
+          "gaps": [
+            "walls=71, rooms=15, doors=23",
+            "9 dangling wall endpoints"
+          ]
+        }
+      },
+      "project": null
+    },
+    {
+      "id": "P07",
+      "prompt_summary": "3BHK 1500 sqft on 35ft x 45ft north-facing plot. Master 14ft x 12ft SW. Bedroom ",
+      "elapsed_ms": 8811,
+      "error": null,
+      "pipeline_used": "B-fine",
+      "score": {
+        "total": 90,
+        "components": {
+          "completeness": 25,
+          "vastu": 25,
+          "dims": 20,
+          "positions": 10,
+          "hallucinations": 10,
+          "gaps": 0
+        },
+        "details": {
+          "completeness": [
+            "matched 6/6 expected rooms"
+          ],
+          "vastu": [
+            "0 violations across 6 critical rules"
+          ],
+          "dims": [
+            "6/6 dims within ±5%"
+          ],
+          "positions": [
+            "4/6 positions matched",
+            "MISS (pos): bedroom 3 expected N, got W",
+            "MISS (pos): pooja expected NE, got E"
+          ],
+          "hallucinations": [
+            "0 forbidden, 0 extra rooms"
+          ],
+          "gaps": [
+            "walls=0, rooms=6, doors=0",
+            "only 0 doors for 6 rooms",
+            "no walls generated at all"
+          ]
+        }
+      },
+      "project": null
+    },
+    {
+      "id": "P08",
+      "prompt_summary": "3BHK 1400 sqft. Master bedroom 14ft x 12ft. Two more bedrooms 12ft x 10ft each. ",
+      "elapsed_ms": 11951,
+      "error": null,
+      "pipeline_used": "B-fine",
+      "score": {
+        "total": 85,
+        "components": {
+          "completeness": 21,
+          "vastu": 25,
+          "dims": 17,
+          "positions": 15,
+          "hallucinations": 7,
+          "gaps": 0
+        },
+        "details": {
+          "completeness": [
+            "matched 6/7 expected rooms",
+            "MISSING: balcony (balcony)"
+          ],
+          "vastu": [
+            "vastu not required"
+          ],
+          "dims": [
+            "6/7 dims within ±5%",
+            "MISS (no room): balcony"
+          ],
+          "positions": [
+            "no position expectations"
+          ],
+          "hallucinations": [
+            "0 forbidden, 3 extra rooms",
+            "EXTRA: Bathroom 1 (bathroom)",
+            "EXTRA: Bathroom 2 (bathroom)",
+            "EXTRA: Bathroom 3 (bathroom)"
+          ],
+          "gaps": [
+            "walls=0, rooms=9, doors=0",
+            "only 0 doors for 9 rooms",
+            "no walls generated at all"
+          ]
+        }
+      },
+      "project": null
+    },
+    {
+      "id": "P09",
+      "prompt_summary": "2BHK 900 sqft Vastu compliant, master southwest, kitchen southeast, north-facing",
+      "elapsed_ms": 7297,
+      "error": null,
+      "pipeline_used": "B-fine",
+      "score": {
+        "total": 94,
+        "components": {
+          "completeness": 25,
+          "vastu": 25,
+          "dims": 20,
+          "positions": 15,
+          "hallucinations": 9,
+          "gaps": 0
+        },
+        "details": {
+          "completeness": [
+            "matched 3/3 expected rooms"
+          ],
+          "vastu": [
+            "0 violations across 6 critical rules"
+          ],
+          "dims": [
+            "no dim expectations"
+          ],
+          "positions": [
+            "2/2 positions matched"
+          ],
+          "hallucinations": [
+            "0 forbidden, 1 extra rooms",
+            "EXTRA: Living Room (living_room)"
+          ],
+          "gaps": [
+            "walls=0, rooms=4, doors=0",
+            "only 0 doors for 4 rooms",
+            "no walls generated at all"
+          ]
+        }
+      },
+      "project": null
+    },
+    {
+      "id": "P10",
+      "prompt_summary": "Compact 2BHK 850 sqft, open plan living-kitchen, two bedrooms, two baths, balcon",
+      "elapsed_ms": 17071,
+      "error": null,
+      "pipeline_used": "A",
+      "score": {
+        "total": 99,
+        "components": {
+          "completeness": 25,
+          "vastu": 25,
+          "dims": 20,
+          "positions": 15,
+          "hallucinations": 9,
+          "gaps": 5
+        },
+        "details": {
+          "completeness": [
+            "matched 5/5 expected rooms"
+          ],
+          "vastu": [
+            "vastu not required"
+          ],
+          "dims": [
+            "no dim expectations"
+          ],
+          "positions": [
+            "no position expectations"
+          ],
+          "hallucinations": [
+            "0 forbidden, 1 extra rooms",
+            "EXTRA: Corridor (corridor)"
+          ],
+          "gaps": [
+            "walls=42, rooms=8, doors=12"
+          ]
+        }
+      },
+      "project": null
+    }
+  ],
+  "average": 91.3
+}

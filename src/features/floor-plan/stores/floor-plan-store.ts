@@ -31,6 +31,8 @@ import {
   clearActiveProjectId,
 } from "@/features/floor-plan/lib/project-persistence";
 import { createSample2BHK } from "@/features/floor-plan/lib/sample-data";
+import type { LayoutMetrics, QualityFlag } from "@/features/floor-plan/lib/layout-metrics";
+import type { InfeasibilityWarning } from "@/features/floor-plan/lib/infeasibility-detector";
 
 // ============================================================
 // SAFE DEEP CLONE (structuredClone with JSON fallback)
@@ -138,7 +140,7 @@ interface FloorPlanState {
   showAdjacentFloor: boolean;
 
   // Right panel tab system
-  rightPanelTab: "properties" | "vastu" | "code" | "analytics" | "boq" | "program";
+  rightPanelTab: "properties" | "vastu" | "code" | "analytics" | "boq" | "program" | "quality";
 
   // Vastu overlay
   vastuOverlayVisible: boolean;
@@ -150,6 +152,11 @@ interface FloorPlanState {
   generationProgress: number;
   originalPrompt: string | null;
   projectModified: boolean;
+
+  // Phase 1 — honest post-solve metrics surfaced from /api/generate-floor-plan
+  lastLayoutMetrics: LayoutMetrics | null;
+  lastQualityFlags: QualityFlag[];
+  lastFeasibilityWarnings: InfeasibilityWarning[];
 
   // ========== ACTIONS ==========
 
@@ -274,7 +281,7 @@ interface FloorPlanState {
   toggleFurniturePanel: () => void;
 
   // Right panel tabs
-  setRightPanelTab: (tab: "properties" | "vastu" | "code" | "analytics" | "boq" | "program") => void;
+  setRightPanelTab: (tab: "properties" | "vastu" | "code" | "analytics" | "boq" | "program" | "quality") => void;
 
   // Vastu overlay
   toggleVastuOverlay: () => void;
@@ -302,6 +309,11 @@ interface FloorPlanState {
   startBlank: () => void;
   startGeneration: (prompt: string) => void;
   updateGenerationStep: (step: string, progress: number) => void;
+  setQualityResults: (
+    metrics: LayoutMetrics | null,
+    flags: QualityFlag[],
+    warnings: InfeasibilityWarning[],
+  ) => void;
   completeGeneration: (geometry: FloorPlanGeometry, name?: string) => void;
   saveToStorage: () => void;
   setProjectModified: (v: boolean) => void;
@@ -364,6 +376,9 @@ export const useFloorPlanStore = create<FloorPlanState>()((set, get) => ({
   generationProgress: 0,
   originalPrompt: null,
   projectModified: false,
+  lastLayoutMetrics: null,
+  lastQualityFlags: [],
+  lastFeasibilityWarnings: [],
   _clipboard: null,
 
   // ---- Project ----
@@ -1722,14 +1737,30 @@ export const useFloorPlanStore = create<FloorPlanState>()((set, get) => ({
 
   startGeneration: (prompt) => set({
     isGenerating: true,
-    generationStep: "analyzing",
-    generationProgress: 5,
+    // Phase 1 — single honest "working" state, no fake stage labels.
+    generationStep: "working",
+    generationProgress: 0,
     originalPrompt: prompt,
+    // Reset the previous generation's metrics so we never accidentally show
+    // them under a new project.
+    lastLayoutMetrics: null,
+    lastQualityFlags: [],
+    lastFeasibilityWarnings: [],
   }),
 
   updateGenerationStep: (step, progress) => set({
     generationStep: step,
     generationProgress: progress,
+  }),
+
+  setQualityResults: (
+    metrics: LayoutMetrics | null,
+    flags: QualityFlag[],
+    warnings: InfeasibilityWarning[],
+  ) => set({
+    lastLayoutMetrics: metrics,
+    lastQualityFlags: flags,
+    lastFeasibilityWarnings: warnings,
   }),
 
   completeGeneration: (geometry, name) => {

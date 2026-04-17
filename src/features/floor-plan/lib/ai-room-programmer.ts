@@ -86,13 +86,11 @@ USER-SPECIFIED DIMENSIONS:
 - Do NOT override user-specified sizes with your own estimates
 - These are HARD preferences — the layout engine will try to match them within 20%
 
-ESSENTIAL ROOMS TO ADD (if user didn't mention them):
-- Residential: kitchen (if missing), at least 1 bathroom, living area, corridor (if 5+ rooms per floor)
-- Commercial: reception, restrooms, server/utility room
+ESSENTIAL ROOMS TO ADD (only if user did not mention them AND a residential plan strictly requires them):
+- Residential: kitchen (if missing), at least 1 bathroom
+- Commercial: reception, restrooms
 - Medical: waiting area, reception, restroom
-- Any building: at least one entrance/foyer area
-- For villa/bungalow/house: add verandah/porch
-- For 3+ bedrooms: add utility room
+NEVER add verandah, porch, foyer, drawing room, or utility room unless the user explicitly named them in the prompt.
 
 ROOM TYPES (use ONLY these): living, dining, kitchen, bedroom, bathroom, hallway, entrance, utility, balcony, office, storage, staircase, other
 
@@ -174,14 +172,6 @@ Ground: Living 28, Dining 14, Kitchen 12, Guest Bed 12, Bath 4, Pooja 4, Utility
 Servant Quarter 9, Servant Toilet 2.5, Shoe Rack 2, Staircase 10, Corridor 9
 First: Master Bed 20, Master Bath 5.5, Walk-in 5, Bed2 15, Bath2 4, Bed3 14, Bath3 4,
 Bed4 13, Bath4 3.8, Study 10, Family Sitting 16, Balcony 6, Staircase 10, Corridor 10
-
-SIZING EXAMPLE — 5BHK duplex 3500 sqft (325 sqm):
-Ground: Drawing 22, Living 25, Dining 16, Kitchen 14, Guest Bed 13, Guest Bath 4,
-Pooja 4.5, Utility 4, Store 4, Servant Quarter 10, Servant Toilet 2.5, Verandah 10,
-Staircase 10, Corridor 10
-First: Master Bed 22, Master Bath 6, Walk-in 5.5, Bed2 16, Bath2 4.5, Bed3 15, Bath3 4,
-Bed4 14, Bath4 4, Bed5 13, Bath5 3.5, Study 10, Family Room 18, Balcony1 6, Balcony2 5,
-Staircase 10, Corridor 10
 
 MULTI-FLOOR BUILDINGS:
 For duplex, multi-story, or 2+ floor buildings, assign each room a "floor" field:
@@ -1406,11 +1396,9 @@ export function programRoomsFallback(prompt: string): EnhancedRoomProgram {
     roomNames.add("utility");
   }
 
-  // ── Verandah for villas/houses ──
-  if (p.includes("villa") || p.includes("bungalow") || p.includes("house")) {
-    rooms.push({ name: "Verandah", type: "balcony", areaSqm: Math.round(totalArea * 0.04), zone: "public", mustHaveExteriorWall: true, adjacentTo: [], preferNear: ["Living Room", "Living + Dining Room"] });
-    roomNames.add("verandah");
-  }
+  // Verandah is no longer auto-injected for villa/bungalow/house — the user must
+  // mention "verandah" / "porch" / "sit-out" explicitly. The specialty-rooms scan
+  // below picks them up when present.
 
   // ── Prompt-mentioned specialty rooms ──
   // Scan the prompt for rooms not yet added

@@ -9,6 +9,8 @@
  * Stage 3: Architectural Detailing (code) — geometry → FloorPlanProject (walls, doors, windows)
  */
 
+export const maxDuration = 60;
+
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
@@ -58,6 +60,18 @@ import { optimizeLayout } from "@/features/floor-plan/lib/layout-optimizer";
 import type { PlacedRoom as OptimizerPlacedRoom } from "@/features/floor-plan/lib/energy-function";
 import { getRoomRule } from "@/features/floor-plan/lib/architectural-rules";
 import { classifyRoom } from "@/features/floor-plan/lib/room-sizer";
+
+// Pipeline B (CSP / parser-driven) imports — Day 3 skeleton
+import { routePrompt } from "@/features/floor-plan/lib/pipeline-router";
+import { runPipelineB } from "@/features/floor-plan/lib/pipeline-b-orchestrator";
+
+// Phase 1 — post-solve honest metrics (pipeline-agnostic)
+import { computeLayoutMetrics } from "@/features/floor-plan/lib/layout-metrics";
+
+// Phase 3 — strip-pack engine (PIPELINE_T1 feature flag)
+import { runStripPackEngine, fillDoorMetrics } from "@/features/floor-plan/lib/strip-pack/strip-pack-engine";
+import { toFloorPlanProject as toFloorPlanProjectT1 } from "@/features/floor-plan/lib/strip-pack/converter";
+import { parseConstraints } from "@/features/floor-plan/lib/structured-parser";
 
 // ── Generation Feedback ────────────────────────────────────────────────────
 
@@ -232,6 +246,112 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "NO_API_KEY" }, { status: 503 });
     }
 
+    // ── Pipeline Router (Day 3 — Pipeline B skeleton) ────────────────
+    // Routes high-constraint prompts (>=5 explicit signals) to the new
+    // structured-parser + CSP pipeline. Vague prompts continue to use
+    // the existing template+SA Pipeline A unchanged.
+    const routing = routePrompt(prompt);
+    logger.debug(`[ROUTER] pipeline=${routing.pipeline} signals=${routing.constraint_signals}`);
+
+    // ── Phase 3 — Strip-Pack Engine (PIPELINE_T1) ────────────────────────
+    // Tried only on Pipeline B routing (high-signal prompts) so we get the
+    // structured parser for free. If it produces a layout meeting the
+    // efficiency + door coverage thresholds, we ship it. Otherwise we fall
+    // through to the existing Pipeline B / Grid-First / BSP cascade — the
+    // engine is purely additive, not destructive.
+    if (process.env.PIPELINE_T1 === "true" && routing.pipeline === "B") {
+      try {
+        const t1Start = Date.now();
+        const parseRes = await parseConstraints(prompt, apiKey);
+        const t1ParseMs = Date.now() - t1Start;
+        const engineStart = Date.now();
+        const rawResult = await runStripPackEngine(parseRes.constraints);
+        const t1Result = fillDoorMetrics(rawResult);
+        const t1EngineMs = Date.now() - engineStart;
+        logger.debug(`[T1] parse=${t1ParseMs}ms engine=${t1EngineMs}ms eff=${t1Result.metrics.efficiency_pct}% doors=${t1Result.metrics.door_coverage_pct}% rooms=${t1Result.rooms.length}`);
+
+        const passesGates =
+          t1Result.metrics.efficiency_pct >= 70 &&
+          t1Result.metrics.door_coverage_pct >= 80;
+
+        if (passesGates) {
+          const project = toFloorPlanProjectT1(t1Result, parseRes.constraints);
+          const layoutMetrics = computeLayoutMetrics(project, parseRes.constraints);
+          const feedback = buildFeedback(project, prompt);
+          feedback.tips.push(`T1 strip-pack: ${t1Result.rooms.length} rooms, ${t1Result.doors.length} doors, ${t1Result.metrics.efficiency_pct}% efficiency in ${t1ParseMs + t1EngineMs}ms`);
+          if (t1Result.warnings.length > 0) {
+            feedback.tips.push(`T1 warnings: ${t1Result.warnings.slice(0, 3).join("; ")}${t1Result.warnings.length > 3 ? "…" : ""}`);
+          }
+          await recordToolExecution(userId, "floor-plan");
+          return NextResponse.json({
+            project,
+            geometry: null,
+            svg: null,
+            feedback,
+            layoutMetrics,
+            qualityFlags: layoutMetrics.quality_flags,
+            feasibilityWarnings: [],
+            pipelineUsed: "T1-strip-pack",
+            relaxationsApplied: t1Result.warnings,
+            infeasibilityReason: null,
+            mandalaAssignments: null,
+            routerSignals: routing.constraint_signals,
+          });
+        }
+        logger.debug(`[T1] subpar metrics — falling through to Pipeline B`);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.warn(`[T1] error — falling through to Pipeline B: ${msg}`);
+      }
+    }
+
+    if (routing.pipeline === "B") {
+      const bResult = await runPipelineB(prompt, apiKey);
+      logger.debug(`[PIPELINE-B] ${bResult.pipelineUsed} parse=${bResult.timings.parse_ms}ms detector=${bResult.timings.detector_ms}ms placement=${bResult.timings.placement_ms}ms total=${bResult.timings.total_ms}ms`);
+      await recordToolExecution(userId, "floor-plan");
+      if (bResult.project) {
+        const feedback = buildFeedback(bResult.project, prompt);
+        const summary = bResult.pipelineUsed === "B-fine"
+          ? `Pipeline B (3A+3B fine): ${bResult.constraintsExtracted} rooms, mandala=${bResult.timings.csp_3a_ms}ms, fine=${bResult.timings.csp_3b_ms}ms`
+          : bResult.pipelineUsed === "B-mandala"
+          ? `Pipeline B (3A mandala only): ${bResult.constraintsExtracted} rooms, mandala=${bResult.timings.csp_3a_ms}ms`
+          : `Pipeline B (${bResult.pipelineUsed}): ${bResult.constraintsExtracted} rooms in ${bResult.timings.total_ms}ms`;
+        feedback.tips.push(summary);
+        if (bResult.relaxationsApplied.length > 0) {
+          feedback.tips.push(`Relaxations: ${bResult.relaxationsApplied.join("; ")}`);
+        }
+        const layoutMetrics = computeLayoutMetrics(
+          bResult.project,
+          bResult.parsedConstraints ?? undefined,
+        );
+        return NextResponse.json({
+          project: bResult.project,
+          geometry: null,
+          svg: null,
+          feedback,
+          layoutMetrics,
+          qualityFlags: layoutMetrics.quality_flags,
+          feasibilityWarnings: bResult.feasibilityWarnings,
+          pipelineUsed: bResult.pipelineUsed,
+          relaxationsApplied: bResult.relaxationsApplied,
+          infeasibilityReason: null,
+          mandalaAssignments: bResult.mandalaAssignments,
+          routerSignals: routing.constraint_signals,
+        });
+      }
+      return NextResponse.json({
+        error: bResult.infeasibilityReason ?? bResult.error ?? "Pipeline B failed",
+        pipelineUsed: bResult.pipelineUsed,
+        relaxationsApplied: bResult.relaxationsApplied,
+        feasibilityWarnings: bResult.feasibilityWarnings,
+        infeasibilityReason: bResult.infeasibilityReason,
+        infeasibilityKind: bResult.infeasibilityKind,
+        cspConflict: bResult.cspConflict,
+        cspRuleIds: bResult.cspRuleIds,
+        routerSignals: routing.constraint_signals,
+      }, { status: 422 });
+    }
+
     // ── Stage 1: AI Room Programming ──────────────────────────────────
     // Primary: AI parsing (GPT-4o-mini) with adjacency + zones
     // Fallback: regex parsing (offline, no API key needed)
@@ -285,7 +405,12 @@ export async function POST(req: NextRequest) {
       if (gridResult) {
         logger.debug('[GRID-FIRST] Pipeline succeeded — returning grid-based floor plan');
         await recordToolExecution(userId, "floor-plan");
-        return NextResponse.json(gridResult);
+        const layoutMetrics = computeLayoutMetrics(gridResult.project);
+        return NextResponse.json({
+          ...gridResult,
+          layoutMetrics,
+          qualityFlags: layoutMetrics.quality_flags,
+        });
       }
       logger.debug('[GRID-FIRST] Pipeline returned null — falling back to BSP/AI pipeline');
     } catch (gridErr) {
@@ -362,7 +487,15 @@ export async function POST(req: NextRequest) {
       }))));
 
       await recordToolExecution(userId, "floor-plan");
-      return NextResponse.json({ project, geometry, svg: null, feedback });
+      const layoutMetrics = computeLayoutMetrics(project);
+      return NextResponse.json({
+        project,
+        geometry,
+        svg: null,
+        feedback,
+        layoutMetrics,
+        qualityFlags: layoutMetrics.quality_flags,
+      });
     }
 
     // ── Stage 2: AI Spatial Layout (single floor) ──────────────────
@@ -430,7 +563,15 @@ export async function POST(req: NextRequest) {
     logger.debug('=== FLOOR PLAN GENERATION COMPLETE ===');
 
     await recordToolExecution(userId, "floor-plan");
-    return NextResponse.json({ project, geometry, svg: floorPlan.svg, feedback });
+    const layoutMetrics = computeLayoutMetrics(project);
+    return NextResponse.json({
+      project,
+      geometry,
+      svg: floorPlan.svg,
+      feedback,
+      layoutMetrics,
+      qualityFlags: layoutMetrics.quality_flags,
+    });
   } catch (err) {
     console.error("[generate-floor-plan] Error:", err);
     const message = err instanceof Error ? err.message : String(err);

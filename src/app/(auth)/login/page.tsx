@@ -30,6 +30,11 @@ function LoginForm() {
     OAuthAccountNotLinked: t('auth.oauthAccountNotLinked'),
     OAuthCallback: t('auth.oauthCallback'),
     OAuthSignin: t('auth.oauthSignin'),
+    // Map the credentials-failure code (was missing — fell through to "Default"
+    // which obscures what's actually wrong). Server-side logs in auth.ts now
+    // tag the exact reason (user-not-found / no-password-on-account /
+    // password-mismatch) so the dev terminal disambiguates.
+    CredentialsSignin: "Email/phone or password is incorrect. If you signed up with Google, use 'Continue with Google' instead.",
     Default: t('auth.defaultAuthError'),
   };
   const initialError = expiredParam === "true"
@@ -119,22 +124,61 @@ function LoginForm() {
       let res;
       try {
         res = await signIn("credentials", credentials);
-      } catch {
+      } catch (signInErr) {
         // NextAuth v5 beta can throw CredentialsSignin instead of returning it
-        // when the authorize function returns null (wrong password / user not found)
-        setError("Invalid email/phone or password. Please try again.");
+        // when the authorize function returns null. Distinguish that from any
+        // other thrown error so the dev terminal + browser console show why.
+        const errName = (signInErr instanceof Error ? signInErr.name : "") || "";
+        const errMsg  = (signInErr instanceof Error ? signInErr.message : String(signInErr));
+        if (/credentials/i.test(errName) || /credentials/i.test(errMsg)) {
+          setError("Invalid email/phone or password. If you signed up with Google, use 'Continue with Google' instead.");
+        } else {
+          console.error("[login] signIn threw an unexpected error:", signInErr);
+          setError(`Sign-in failed: ${errMsg.slice(0, 200) || "unknown error"}`);
+        }
         return;
       }
 
       if (res?.error) {
-        setError("Invalid email/phone or password. Please try again.");
-      } else {
+        setError("Invalid email/phone or password. If you signed up with Google, use 'Continue with Google' instead.");
+        return;
+      }
+
+      // ── Success path. The session cookie is set at this point. The user
+      // IS logged in — anything that fails from here on must NOT block them
+      // from reaching /dashboard.
+
+      // 1. Analytics — wrapped in its own try-catch. Tracking failure cannot
+      //    surface as "Something went wrong" — the user just logged in.
+      try {
         trackLogin({ method: type === "email" ? "email" : "phone" });
+      } catch (trackErr) {
+        console.warn("[login] analytics trackLogin failed (ignored):", trackErr);
+      }
+
+      // 2. Navigate. Try the App Router first; fall back to a hard navigate
+      //    if router.push throws (Next.js 16 + React 19 + NextAuth v5 beta
+      //    can throw on this combo). Hard navigate ALWAYS works because the
+      //    cookie is already set and the dashboard route picks it up.
+      try {
         router.push(callbackUrl);
         router.refresh();
+      } catch (navErr) {
+        console.warn("[login] router.push failed; falling back to hard navigate:", navErr);
+        window.location.href = callbackUrl;
       }
-    } catch {
-      setError(t('auth.genericError'));
+    } catch (outerErr) {
+      // Last-resort guard. We log the real error so we can see it in the
+      // browser console next time, instead of swallowing it silently.
+      console.error("[login] outer handler caught an unexpected error:", outerErr);
+      // Even here, if the signIn cookie was set, hard-navigate so the user
+      // doesn't get stuck on /login.
+      try {
+        window.location.href = callbackUrl;
+        return;
+      } catch {
+        setError(t('auth.genericError'));
+      }
     } finally {
       setLoading(false);
     }
@@ -145,7 +189,9 @@ function LoginForm() {
     setError("");
     try {
       await signIn("google", { callbackUrl });
-    } catch {
+    } catch (gErr) {
+      // Same diagnostic discipline as the credentials path.
+      console.error("[login] signIn('google') threw:", gErr);
       setError(t('auth.googleError'));
       setGoogleLoading(false);
     }

@@ -16,6 +16,7 @@ import { CodeCompliancePanel } from "@/features/floor-plan/components/panels/Cod
 import { AnalyticsPanel } from "@/features/floor-plan/components/panels/AnalyticsPanel";
 import { BOQPanel } from "@/features/floor-plan/components/panels/BOQPanel";
 import { ProgramPanel } from "@/features/floor-plan/components/panels/ProgramPanel";
+import { QualityPanel } from "@/features/floor-plan/components/panels/QualityPanel";
 import { WelcomeScreen } from "@/features/floor-plan/components/WelcomeScreen";
 import { GenerationLoader } from "@/features/floor-plan/components/GenerationLoader";
 import { getProjectIndex, importProjectFile } from "@/features/floor-plan/lib/project-persistence";
@@ -45,6 +46,8 @@ export function FloorPlanViewer({ initialGeometry, initialPrompt, initialProject
   const generationProgress = useFloorPlanStore((s) => s.generationProgress);
   const originalPrompt = useFloorPlanStore((s) => s.originalPrompt);
   const dataSource = useFloorPlanStore((s) => s.dataSource);
+  const lastQualityFlags = useFloorPlanStore((s) => s.lastQualityFlags);
+  const lastFeasibilityWarnings = useFloorPlanStore((s) => s.lastFeasibilityWarnings);
 
   const loadFromGeometry = useFloorPlanStore((s) => s.loadFromGeometry);
   const loadFromSaved = useFloorPlanStore((s) => s.loadFromSaved);
@@ -92,6 +95,13 @@ export function FloorPlanViewer({ initialGeometry, initialPrompt, initialProject
 
   const [fallbackBanner, setFallbackBanner] = React.useState<string | null>(null);
   const [upgradeBlock, setUpgradeBlock] = React.useState<{ title: string; message: string; action: string; actionUrl: string } | null>(null);
+  /**
+   * Phase 1 — explicit error UI replaces the silent sample fallback.
+   * When generation fails, we show a card the user must explicitly resolve
+   * (retry / use a sample on purpose / edit the prompt). We never substitute
+   * a sample plan and call it "AI-generated".
+   */
+  const [generationError, setGenerationError] = React.useState<{ message: string; prompt: string } | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const [undoToast, setUndoToast] = useState<string | null>(null);
   const undoToastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -111,21 +121,11 @@ export function FloorPlanViewer({ initialGeometry, initialPrompt, initialProject
     const store = useFloorPlanStore.getState();
     store.startGeneration(prompt);
     setFallbackBanner(null);
+    setGenerationError(null);
 
-    // Show progress steps while API call runs
-    const stepTimers: ReturnType<typeof setTimeout>[] = [];
-    const steps = [
-      { step: "analyzing", progress: 10, delay: 300 },
-      { step: "generating", progress: 25, delay: 500 },
-      { step: "placing_walls", progress: 40, delay: 600 },
-      { step: "adding_rooms", progress: 55, delay: 700 },
-      { step: "doors_windows", progress: 70, delay: 800 },
-    ];
-    let cum = 0;
-    for (const s of steps) {
-      cum += s.delay;
-      stepTimers.push(setTimeout(() => store.updateGenerationStep(s.step, s.progress), cum));
-    }
+    // Phase 1 — NO setTimeout-driven fake stages. The loader shows an honest
+    // indeterminate progress bar while the single backend POST runs. Real
+    // per-stage progress is a Phase 3 concern (multi-agent pipeline + SSE).
 
     try {
       const res = await fetch("/api/generate-floor-plan", {
@@ -135,14 +135,10 @@ export function FloorPlanViewer({ initialGeometry, initialPrompt, initialProject
         signal: controller.signal,
       });
 
-      // Clear animation timers
-      for (const t of stepTimers) clearTimeout(t);
-
       if (!res.ok) {
         const data = await res.json().catch(() => ({ error: "Unknown error" }));
         // Handle plan limit / email verification gates — show popup, don't fallback
         if (data.error === "PLAN_LIMIT" || data.error === "EMAIL_VERIFY") {
-          for (const t of stepTimers) clearTimeout(t);
           useFloorPlanStore.setState({ isGenerating: false });
           setUpgradeBlock({ title: data.title, message: data.message, action: data.action, actionUrl: data.actionUrl });
           return;
@@ -152,15 +148,14 @@ export function FloorPlanViewer({ initialGeometry, initialPrompt, initialProject
       }
 
       const data = await res.json();
-      store.updateGenerationStep("finalizing", 90);
 
-      // Brief pause to show finalizing step
-      await new Promise((r) => setTimeout(r, 400));
-      store.updateGenerationStep("complete", 100);
-      await new Promise((r) => setTimeout(r, 600));
-
-      // Load the AI-generated project
+      // Load the AI-generated project + Phase 1 honest metrics in one shot.
       store.setProject(data.project);
+      store.setQualityResults(
+        data.layoutMetrics ?? null,
+        Array.isArray(data.qualityFlags) ? data.qualityFlags : [],
+        Array.isArray(data.feasibilityWarnings) ? data.feasibilityWarnings : [],
+      );
       useFloorPlanStore.setState({
         isGenerating: false,
         dataSource: "pipeline",
@@ -168,35 +163,34 @@ export function FloorPlanViewer({ initialGeometry, initialPrompt, initialProject
         projectModified: false,
       });
     } catch (err) {
-      // Clear animation timers
-      for (const t of stepTimers) clearTimeout(t);
-
       if (controller.signal.aborted) return; // User navigated away
 
-      console.warn("[FloorPlanViewer] AI generation failed, using BHK-matched sample:", err);
-
-      // Fallback: load BHK-matched sample data instead of always 2BHK
-      store.updateGenerationStep("finalizing", 90);
-      await new Promise((r) => setTimeout(r, 300));
-      store.updateGenerationStep("complete", 100);
-      await new Promise((r) => setTimeout(r, 500));
-
-      const fallbackProject = getSampleProjectForPrompt(prompt);
-      store.setProject(fallbackProject);
-      useFloorPlanStore.setState({
-        isGenerating: false,
-        dataSource: "sample",
-        originalPrompt: prompt,
-        projectModified: false,
-      });
-
       const message = err instanceof Error ? err.message : String(err);
-      if (message === "NO_API_KEY") {
-        setFallbackBanner("AI generation unavailable (no API key configured). Showing sample layout.");
-      } else {
-        setFallbackBanner(`AI generation failed: ${message}. Showing sample layout.`);
-      }
+      console.warn("[FloorPlanViewer] AI generation failed:", message);
+
+      // Phase 1 — NO silent sample swap. Surface the error so the user must
+      // explicitly choose: retry, use a sample on purpose, or edit the prompt.
+      useFloorPlanStore.setState({ isGenerating: false });
+      setGenerationError({ message, prompt });
     }
+  }, []);
+
+  /**
+   * Explicit "load a sample plan" action — only ever fires from the error UI
+   * after the user clicks "Use sample layout". Sets dataSource: "sample" and
+   * shows a banner that clearly says it's a sample, not AI-generated.
+   */
+  const handleUseSampleExplicit = useCallback((prompt: string) => {
+    const store = useFloorPlanStore.getState();
+    const sampleProject = getSampleProjectForPrompt(prompt);
+    store.setProject(sampleProject);
+    useFloorPlanStore.setState({
+      dataSource: "sample",
+      originalPrompt: prompt,
+      projectModified: false,
+    });
+    setGenerationError(null);
+    setFallbackBanner("This is a pre-built sample layout, not AI-generated.");
   }, []);
 
   const handleImportFile = useCallback(async () => {
@@ -406,6 +400,23 @@ export function FloorPlanViewer({ initialGeometry, initialPrompt, initialProject
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [handleKeyDown]);
 
+  // Phase 1 — explicit error overlay. Renders on top of whatever screen the
+  // user was looking at, regardless of whether a project was previously loaded.
+  // Replaces the silent sample-swap behavior that hid generation failures.
+  const errorOverlay = generationError ? (
+    <GenerationErrorCard
+      message={generationError.message}
+      prompt={generationError.prompt}
+      onRetry={() => {
+        const p = generationError.prompt;
+        setGenerationError(null);
+        handleGenerateFromPrompt(p);
+      }}
+      onUseSample={() => handleUseSampleExplicit(generationError.prompt)}
+      onEditPrompt={() => setGenerationError(null)}
+    />
+  ) : null;
+
   // Show generation loader
   if (isGenerating) {
     return (
@@ -415,6 +426,7 @@ export function FloorPlanViewer({ initialGeometry, initialPrompt, initialProject
           progress={generationProgress}
           prompt={originalPrompt ?? undefined}
         />
+        {errorOverlay}
       </div>
     );
   }
@@ -460,6 +472,7 @@ export function FloorPlanViewer({ initialGeometry, initialPrompt, initialProject
           onImportFile={handleImportFile}
           savedProjects={savedProjects}
         />
+        {errorOverlay}
       </div>
     );
   }
@@ -540,6 +553,9 @@ export function FloorPlanViewer({ initialGeometry, initialPrompt, initialProject
         );
       })()}
 
+      {/* Phase 1 — explicit generation-error overlay */}
+      {errorOverlay}
+
       {/* Fallback warning banner */}
       {fallbackBanner && (
         <div className="flex items-center gap-2 border-b border-amber-200 bg-amber-50 px-3 py-1.5 text-[11px] text-amber-700 print:hidden">
@@ -570,6 +586,54 @@ export function FloorPlanViewer({ initialGeometry, initialPrompt, initialProject
             className="ml-auto shrink-0 rounded px-2 py-0.5 text-[10px] font-semibold text-blue-600 hover:bg-blue-100 transition-colors"
           >
             Regenerate
+          </button>
+        </div>
+      )}
+
+      {/* Phase 1 — quality banner. Surfaces honest layoutMetrics flags. */}
+      {dataSource === "pipeline" && (lastQualityFlags.length > 0 || lastFeasibilityWarnings.length > 0) && (() => {
+        const critCount = lastQualityFlags.filter(f => f.severity === "critical").length;
+        const warnCount = lastQualityFlags.filter(f => f.severity === "warning").length + lastFeasibilityWarnings.length;
+        const hasCritical = critCount > 0;
+        const total = critCount + warnCount;
+        return (
+          <div
+            className={`flex items-center gap-2 border-b px-3 py-1.5 text-[11px] print:hidden ${
+              hasCritical
+                ? "border-amber-200 bg-amber-50 text-amber-800"
+                : "border-blue-100 bg-blue-50/70 text-blue-700"
+            }`}
+          >
+            <span className="shrink-0">{hasCritical ? "⚠️" : "ℹ"}</span>
+            <span className="truncate">
+              {hasCritical
+                ? `This layout has ${total} issue${total === 1 ? "" : "s"} that need attention${critCount > 0 ? ` (${critCount} critical)` : ""}.`
+                : `${total} suggestion${total === 1 ? "" : "s"} available for this layout.`}
+            </span>
+            <button
+              onClick={() => setRightPanelTab("quality")}
+              className={`ml-auto shrink-0 rounded px-2 py-0.5 text-[10px] font-semibold transition-colors ${
+                hasCritical
+                  ? "text-amber-700 hover:bg-amber-100"
+                  : "text-blue-600 hover:bg-blue-100"
+              }`}
+            >
+              View details
+            </button>
+          </div>
+        );
+      })()}
+
+      {/* Phase 1 — green confirmation banner when no flags AND we have metrics. */}
+      {dataSource === "pipeline" && lastQualityFlags.length === 0 && lastFeasibilityWarnings.length === 0 && (
+        <div className="flex items-center gap-2 border-b border-green-100 bg-green-50/70 px-3 py-1.5 text-[11px] text-green-700 print:hidden">
+          <span className="shrink-0">✓</span>
+          <span className="truncate">Layout meets all Phase 1 quality checks.</span>
+          <button
+            onClick={() => setRightPanelTab("quality")}
+            className="ml-auto shrink-0 rounded px-2 py-0.5 text-[10px] font-semibold text-green-700 hover:bg-green-100 transition-colors"
+          >
+            See metrics
           </button>
         </div>
       )}
@@ -633,6 +697,7 @@ export function FloorPlanViewer({ initialGeometry, initialPrompt, initialProject
             <div className="flex border-b border-gray-200 bg-white shrink-0">
               {([
                 { id: "properties", label: "Props" },
+                { id: "quality", label: "Quality" },
                 { id: "vastu", label: "Vastu" },
                 { id: "code", label: "Code" },
                 { id: "analytics", label: "Stats" },
@@ -656,6 +721,7 @@ export function FloorPlanViewer({ initialGeometry, initialPrompt, initialProject
             <div className="flex-1 overflow-y-auto">
               <FloorPlanErrorBoundary fallbackLabel="Panel">
                 {rightPanelTab === "properties" && <PropertiesPanel />}
+                {rightPanelTab === "quality" && <QualityPanel />}
                 {rightPanelTab === "vastu" && <VastuPanel />}
                 {rightPanelTab === "code" && <CodeCompliancePanel />}
                 {rightPanelTab === "analytics" && <AnalyticsPanel />}
@@ -913,5 +979,174 @@ function RulerOverlay() {
         style={{ width: RULER_SIZE, height: RULER_SIZE }}
       />
     </>
+  );
+}
+
+// ============================================================
+// GENERATION ERROR CARD (Phase 1 — replaces silent sample swap)
+// ============================================================
+
+function GenerationErrorCard({
+  message,
+  prompt,
+  onRetry,
+  onUseSample,
+  onEditPrompt,
+}: {
+  message: string;
+  prompt: string;
+  onRetry: () => void;
+  onUseSample: () => void;
+  onEditPrompt: () => void;
+}) {
+  // Friendly messages for the two known sentinel errors.
+  const isNoApiKey = message === "NO_API_KEY";
+  const headline = isNoApiKey
+    ? "AI generation unavailable"
+    : "We couldn't generate your floor plan";
+  const detail = isNoApiKey
+    ? "The OpenAI API key isn't configured for this environment. The AI engine can't run, but you can still load a sample layout to explore the editor."
+    : message;
+
+  return (
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 9999,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        background: "rgba(0,0,0,0.75)",
+        backdropFilter: "blur(12px)",
+        padding: 24,
+      }}
+    >
+      <div
+        style={{
+          maxWidth: 480,
+          width: "100%",
+          borderRadius: 24,
+          overflow: "hidden",
+          background: "linear-gradient(180deg, #1A1530 0%, #0B0817 100%)",
+          border: "1px solid rgba(245,158,11,0.18)",
+          boxShadow: "0 40px 120px rgba(0,0,0,0.85), 0 0 80px rgba(245,158,11,0.05)",
+        }}
+      >
+        <div
+          style={{
+            height: 3,
+            background: "linear-gradient(90deg, #F59E0B, #EF4444, #F59E0B)",
+            backgroundSize: "200% 100%",
+            animation: "fp-err-shimmer 3s linear infinite",
+          }}
+        />
+        <div style={{ padding: "32px 32px 12px", textAlign: "center" }}>
+          <div style={{ fontSize: 56, lineHeight: 1, marginBottom: 12 }}>⚠️</div>
+          <h2
+            style={{
+              fontSize: 22,
+              fontWeight: 800,
+              color: "#F0F2F8",
+              letterSpacing: "-0.02em",
+              margin: "0 0 10px",
+              lineHeight: 1.3,
+            }}
+          >
+            {headline}
+          </h2>
+          <p
+            style={{
+              fontSize: 13,
+              color: "#9090B0",
+              lineHeight: 1.55,
+              margin: "0 auto 8px",
+              maxWidth: 380,
+              wordBreak: "break-word",
+            }}
+          >
+            {detail}
+          </p>
+          {prompt && (
+            <p
+              style={{
+                fontSize: 11,
+                color: "#5A5A78",
+                fontStyle: "italic",
+                margin: "12px 0 0",
+                padding: "10px 14px",
+                borderRadius: 10,
+                background: "rgba(255,255,255,0.03)",
+                border: "1px solid rgba(255,255,255,0.06)",
+                maxHeight: 80,
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                display: "-webkit-box",
+                WebkitLineClamp: 3,
+                WebkitBoxOrient: "vertical",
+                textAlign: "left",
+              }}
+            >
+              &ldquo;{prompt}&rdquo;
+            </p>
+          )}
+        </div>
+        <div style={{ padding: "12px 24px 24px", display: "flex", flexDirection: "column", gap: 10 }}>
+          {!isNoApiKey && (
+            <button
+              onClick={onRetry}
+              style={{
+                width: "100%",
+                padding: "14px 20px",
+                borderRadius: 14,
+                background: "linear-gradient(135deg, #4F8AFF, #A855F7)",
+                color: "#fff",
+                fontSize: 14,
+                fontWeight: 700,
+                cursor: "pointer",
+                border: "none",
+                boxShadow: "0 8px 24px rgba(79,138,255,0.28)",
+                letterSpacing: "-0.01em",
+              }}
+            >
+              Retry generation
+            </button>
+          )}
+          <button
+            onClick={onUseSample}
+            style={{
+              width: "100%",
+              padding: "12px 20px",
+              borderRadius: 14,
+              background: "rgba(255,255,255,0.06)",
+              color: "#D5D7E5",
+              fontSize: 13,
+              fontWeight: 600,
+              cursor: "pointer",
+              border: "1px solid rgba(255,255,255,0.12)",
+            }}
+          >
+            Use a pre-built sample layout
+          </button>
+          <button
+            onClick={onEditPrompt}
+            style={{
+              width: "100%",
+              padding: "10px",
+              borderRadius: 12,
+              background: "transparent",
+              border: "none",
+              color: "#6868A0",
+              fontSize: 12,
+              cursor: "pointer",
+              fontWeight: 500,
+            }}
+          >
+            Edit prompt and try again
+          </button>
+        </div>
+        <style>{`@keyframes fp-err-shimmer { 0% { background-position: 0% 50%; } 100% { background-position: 200% 50%; } }`}</style>
+      </div>
+    </div>
   );
 }

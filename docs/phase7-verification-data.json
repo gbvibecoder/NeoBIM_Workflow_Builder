@@ -1,0 +1,163 @@
+{
+  "feasible_3b": true,
+  "relaxations": [
+    "slack_ft: 2.0 -> 5.0 (mandala cell boundaries expanded)",
+    "dim_tolerance: 5% -> 10% (room dims may differ from user spec by up to 10%)",
+    "connects_all: disabled (hub-and-spoke edge-share requirement dropped — tight plot)"
+  ],
+  "placements": [
+    {
+      "name": "Foyer",
+      "x_ft": 36,
+      "y_ft": 5.5,
+      "width_ft": 9,
+      "depth_ft": 7,
+      "mandala": "NE"
+    },
+    {
+      "name": "Living Room",
+      "x_ft": 29,
+      "y_ft": 12.5,
+      "width_ft": 16,
+      "depth_ft": 12.5,
+      "mandala": "NE"
+    },
+    {
+      "name": "Dining Room",
+      "x_ft": 18,
+      "y_ft": 6.5,
+      "width_ft": 11,
+      "depth_ft": 9,
+      "mandala": "N"
+    },
+    {
+      "name": "Kitchen",
+      "x_ft": 34,
+      "y_ft": 46,
+      "width_ft": 11,
+      "depth_ft": 9,
+      "mandala": "SE"
+    },
+    {
+      "name": "Utility Room",
+      "x_ft": 34.5,
+      "y_ft": 41.5,
+      "width_ft": 5.5,
+      "depth_ft": 4.5,
+      "mandala": "SE"
+    },
+    {
+      "name": "Master Bedroom",
+      "x_ft": 0,
+      "y_ft": 43.5,
+      "width_ft": 13.5,
+      "depth_ft": 11.5,
+      "mandala": "SW"
+    },
+    {
+      "name": "Master Bathroom",
+      "x_ft": 13.5,
+      "y_ft": 43,
+      "width_ft": 7,
+      "depth_ft": 5.5,
+      "mandala": "S"
+    },
+    {
+      "name": "Walk-in Wardrobe",
+      "x_ft": 0,
+      "y_ft": 39,
+      "width_ft": 5.5,
+      "depth_ft": 4.5,
+      "mandala": "NW"
+    },
+    {
+      "name": "Bedroom 2",
+      "x_ft": 20.5,
+      "y_ft": 45,
+      "width_ft": 11,
+      "depth_ft": 10,
+      "mandala": "S"
+    },
+    {
+      "name": "Bathroom 2",
+      "x_ft": 20.5,
+      "y_ft": 40.5,
+      "width_ft": 6.5,
+      "depth_ft": 4.5,
+      "mandala": "S"
+    },
+    {
+      "name": "Bedroom 3",
+      "x_ft": 0,
+      "y_ft": 23,
+      "width_ft": 11,
+      "depth_ft": 9,
+      "mandala": "W"
+    },
+    {
+      "name": "Bedroom 4",
+      "x_ft": 0,
+      "y_ft": 4.5,
+      "width_ft": 10,
+      "depth_ft": 9,
+      "mandala": "NW"
+    },
+    {
+      "name": "Common Bathroom",
+      "x_ft": 2,
+      "y_ft": 18.5,
+      "width_ft": 5.5,
+      "depth_ft": 4.5,
+      "mandala": "S"
+    },
+    {
+      "name": "Pooja Room",
+      "x_ft": 40.5,
+      "y_ft": 0,
+      "width_ft": 4.5,
+      "depth_ft": 3.5,
+      "mandala": "NE"
+    },
+    {
+      "name": "Hallway",
+      "x_ft": 16.5,
+      "y_ft": 2.5,
+      "width_ft": 12,
+      "depth_ft": 4,
+      "mandala": "N"
+    }
+  ],
+  "main_entrance": {
+    "id": "door-main-1776338675163",
+    "type": "main_entrance",
+    "wall_id": "wall-5",
+    "width_mm": 1066.8,
+    "height_mm": 2100,
+    "thickness_mm": 40,
+    "position_along_wall_mm": 1066.8000000000002,
+    "swing_direction": "right",
+    "swing_angle_deg": 90,
+    "opens_to": "inside",
+    "symbol": {
+      "hinge_point": {
+        "x": 13716,
+        "y": 2133.6
+      },
+      "arc_radius_mm": 900,
+      "arc_start_angle_deg": 0,
+      "arc_end_angle_deg": 90,
+      "leaf_end_point": {
+        "x": 14616,
+        "y": 2133.6
+      }
+    },
+    "connects_rooms": [
+      "foyer",
+      "outside"
+    ]
+  },
+  "opening_warnings": [
+    "Window on \"Living Room\"/N: wall is internal (shared with adjacent room), window dropped",
+    "Window on \"Bedroom 4\"/N: wall is internal (shared with adjacent room), window dropped"
+  ]
+}

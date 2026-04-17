@@ -452,6 +452,15 @@ function checkCrossVentilation(floor: Floor, issues: DesignIssue[]): void {
 // SCORING
 // ============================================================
 
+/**
+ * NOTE (Phase 1): this scorer measures *design quality* checks (corridor
+ * efficiency, master-bedroom size, bathroom privacy, etc.) — it does NOT
+ * measure plot-level fidelity. It has no term for void area, door coverage,
+ * orphan rooms, or area shortfall. A layout that floats rooms with 56%
+ * efficiency and 2 doors for 15 rooms can still score ~94/100 here. Use
+ * `computeHonestScore` from `layout-metrics.ts` for the user-facing quality
+ * banner; this score is reserved for the Coordinator's design-iteration loop.
+ */
 function computeDesignScore(issues: DesignIssue[]): number {
   let score = 100;
   for (const issue of issues) {
