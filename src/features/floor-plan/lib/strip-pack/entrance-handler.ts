@@ -110,7 +110,24 @@ export function placeEntrance(
   const pW = porch?.requested_width_ft ?? 0;
   const fW = foyer?.requested_width_ft ?? 0;
   const pD = porch?.requested_depth_ft ?? 0;
-  const fD = foyer?.requested_depth_ft ?? 0;
+  let   fD = foyer?.requested_depth_ft ?? 0;
+
+  // Phase 3D fix — foyer-to-hallway connectivity for n/s-facing plots.
+  // If the natural cutout (porch + foyer) is shallower than the front strip,
+  // the foyer sits in the middle of the strip with a gap between its
+  // hallway-side edge and the spine. The door-placer then can't find a
+  // shared wall for the foyer → hallway door, and BFS from the main
+  // entrance gets stuck at the foyer, orphaning every other room.
+  //
+  // Extend the foyer depth so the cutout spans the full front-strip depth —
+  // architecturally the foyer IS the vestibule that bridges the entrance
+  // to circulation, and a deeper foyer is a valid trade against topological
+  // correctness. For e/w-facing the INNER rect is typically wide enough to
+  // absorb a regular room, so no extension is needed there.
+  if ((facing === "north" || facing === "south") && porch && foyer && pD + fD < front.depth) {
+    fD = front.depth - pD;
+  }
+
   const cutoutWidth = Math.min(front.width, Math.max(pW, fW, MIN_USABLE_DIMENSION_FT));
   const cutoutDepth = Math.min(front.depth, pD + fD);
 
@@ -165,7 +182,8 @@ export function placeEntrance(
 
   if (foyer) {
     const w = Math.min(foyer.requested_width_ft, cutoutWidth);
-    const d = Math.min(foyer.requested_depth_ft, cutoutDepth - (porch?.requested_depth_ft ?? 0));
+    // Use the (possibly extended) `fD` — see the connectivity fix above.
+    const d = Math.min(fD, cutoutDepth - (porch?.requested_depth_ft ?? 0));
     const safeDepth = Math.max(MIN_USABLE_DIMENSION_FT, d);
     let fx = cutoutX + (cutoutWidth - w) / 2;
     let fy: number;
