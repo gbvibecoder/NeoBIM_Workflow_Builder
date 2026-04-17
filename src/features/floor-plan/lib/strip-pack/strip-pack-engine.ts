@@ -19,7 +19,7 @@ import type {
   StripPackMetrics,
   SpineLayout,
 } from "./types";
-import { rectArea, normalizeFacing } from "./types";
+import { rectArea, rectOverlap, normalizeFacing } from "./types";
 import { classifyRooms, splitByStrip } from "./room-classifier";
 import { planSpine } from "./spine-placer";
 import { placeEntrance } from "./entrance-handler";
@@ -81,11 +81,26 @@ export async function runStripPackEngine(parsed: ParsedConstraints): Promise<Str
   const backSorted  = sortForPacking(back);
 
   // ── Steps 6 + 7: pack front + back through canonical transform ─────────
-  const frontPlaced = packInStrip(spine.remaining_front, frontSorted, validFacing, "FRONT", spine, warnings);
-  const backPlaced  = packInStrip([spine.back_strip],     backSorted,  validFacing, "BACK",  spine, warnings);
+  const frontResult = packInStrip(spine.remaining_front, frontSorted, validFacing, "FRONT", spine, warnings);
+  const backResult  = packInStrip([spine.back_strip],     backSorted,  validFacing, "BACK",  spine, warnings);
+
+  // ── Step 7b: overflow placement (Phase 3C fix B) ────────────────────────
+  // Rooms that wouldn't fit in their assigned strip get a second chance in
+  // any empty rectangle of the plot — including the opposite strip. Rule:
+  // never silently skip a room. Shrink to 80% and rotate as fallbacks.
+  const overflowCandidates = [...frontResult.unplaced, ...backResult.unplaced];
+  const overflowPlaced = overflowCandidates.length > 0
+    ? placeOverflowRooms(
+        overflowCandidates,
+        [...preplaced, ...frontResult.placed, ...backResult.placed],
+        plot,
+        spine,
+        warnings,
+      )
+    : [];
 
   // ── Step 8: attach sub-rooms ───────────────────────────────────────────
-  const allBeforeAttach = [...preplaced, ...frontPlaced, ...backPlaced];
+  const allBeforeAttach = [...preplaced, ...frontResult.placed, ...backResult.placed, ...overflowPlaced];
   const attachOut = attachSubRooms({
     allPlaced: allBeforeAttach,
     attached,
@@ -269,8 +284,8 @@ function packInStrip(
   strip: "FRONT" | "BACK",
   spine: SpineLayout,
   warnings: string[],
-): StripPackRoom[] {
-  if (rooms.length === 0 || rects.length === 0) return [];
+): { placed: StripPackRoom[]; unplaced: StripPackRoom[] } {
+  if (rooms.length === 0 || rects.length === 0) return { placed: [], unplaced: rooms };
 
   // Build the plot-space hallway-edge for this strip.
   const isHorizontalSpine = facing === "north" || facing === "south";
@@ -333,8 +348,10 @@ function packInStrip(
 
   const packed = packStrip({ available: canonicalRects, rooms });
   warnings.push(...packed.warnings);
-  for (const r of packed.unplaced) {
-    warnings.push(`${r.name}: could not fit in ${strip.toLowerCase()} strip`);
+  // NOTE: unplaced rooms are NOT warned here — overflow placement will retry
+  // them in the opposite strip / plot voids before giving up (Phase 3C fix B).
+  if (packed.unplaced.length > 0) {
+    warnings.push(`${strip} strip: ${packed.unplaced.length} room(s) pushed to overflow (${packed.unplaced.map(r => r.name).join(", ")})`);
   }
 
   // Transform placed canonical rects back to plot coordinates.
@@ -352,7 +369,7 @@ function packInStrip(
     room.actual_area_sqft = room.placed.width * room.placed.depth;
   }
 
-  return packed.placed;
+  return { placed: packed.placed, unplaced: packed.unplaced };
 }
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -431,4 +448,108 @@ export function fillDoorMetrics(result: StripPackResult): StripPackResult {
       adjacency_satisfaction_pct,
     },
   };
+}
+
+// ───────────────────────────────────────────────────────────────────────────
+// OVERFLOW PLACEMENT (Phase 3C fix B)
+// ───────────────────────────────────────────────────────────────────────────
+
+/**
+ * Last-resort placement for rooms the strip-packer couldn't fit. Scans the
+ * whole plot for the first empty axis-aligned rectangle large enough to hold
+ * the room, in this order: original, rotated, 80% shrunk, 80% shrunk rotated.
+ * Rule: never silently skip a room.
+ *
+ * Blockers are the spine and every already-placed room rect. Attached rooms
+ * (which haven't been placed yet) are NOT considered — they're small and
+ * attachSubRooms has its own fallback logic.
+ */
+function placeOverflowRooms(
+  unplaced: StripPackRoom[],
+  placedRooms: StripPackRoom[],
+  plot: Rect,
+  spine: SpineLayout,
+  warnings: string[],
+): StripPackRoom[] {
+  const newlyPlaced: StripPackRoom[] = [];
+  const STEP = 0.5;
+  const MIN_DIM = 4;
+  const SHRINK = 0.8;
+
+  // Sort unplaced biggest-first so large rooms get the biggest voids.
+  const queue = [...unplaced].sort(
+    (a, b) => b.requested_area_sqft - a.requested_area_sqft,
+  );
+
+  for (const room of queue) {
+    const blockers: Rect[] = [spine.spine];
+    for (const r of placedRooms) if (r.placed) blockers.push(r.placed);
+    for (const r of newlyPlaced) if (r.placed) blockers.push(r.placed);
+
+    const w = Math.max(room.requested_width_ft, MIN_DIM);
+    const d = Math.max(room.requested_depth_ft, MIN_DIM);
+
+    const attempts: Array<{ w: number; d: number; tag: string }> = [
+      { w, d, tag: "original" },
+      { w: d, d: w, tag: "rotated" },
+    ];
+    const sw = w * SHRINK;
+    const sd = d * SHRINK;
+    if (sw >= MIN_DIM && sd >= MIN_DIM) {
+      attempts.push({ w: sw, d: sd, tag: "shrunk 20%" });
+      attempts.push({ w: sd, d: sw, tag: "shrunk 20% rotated" });
+    }
+
+    let placed: Rect | null = null;
+    let placedTag = "";
+    for (const a of attempts) {
+      const fit = scanPlotForFit(a.w, a.d, plot, blockers, STEP);
+      if (fit) {
+        placed = fit;
+        placedTag = a.tag;
+        break;
+      }
+    }
+
+    if (!placed) {
+      warnings.push(`${room.name}: COULD NOT PLACE — no void large enough anywhere in plot (critical failure)`);
+      continue;
+    }
+
+    room.placed = placed;
+    room.actual_area_sqft = placed.width * placed.depth;
+    newlyPlaced.push(room);
+    warnings.push(`${room.name}: overflow-placed (${placedTag}) at (${placed.x.toFixed(1)}, ${placed.y.toFixed(1)}) ${placed.width.toFixed(1)}×${placed.depth.toFixed(1)}ft`);
+  }
+
+  return newlyPlaced;
+}
+
+/** Grid-scan the plot for the first position where a w×d rect fits without
+ *  overlapping any blocker. Returns null if no such position exists. */
+function scanPlotForFit(
+  w: number,
+  d: number,
+  plot: Rect,
+  blockers: Rect[],
+  step: number,
+): Rect | null {
+  if (w + plot.x > plot.width + plot.x + 1e-6) return null;
+  if (d + plot.y > plot.depth + plot.y + 1e-6) return null;
+  const xEnd = plot.x + plot.width - w;
+  const yEnd = plot.y + plot.depth - d;
+  for (let y = plot.y; y <= yEnd + 1e-6; y += step) {
+    for (let x = plot.x; x <= xEnd + 1e-6; x += step) {
+      const candidate: Rect = { x, y, width: w, depth: d };
+      let blocked = false;
+      for (const b of blockers) {
+        if (rectOverlap(candidate, b) > 1e-3) {
+          blocked = true;
+          break;
+        }
+      }
+      if (!blocked) return candidate;
+    }
+  }
+  return null;
 }
