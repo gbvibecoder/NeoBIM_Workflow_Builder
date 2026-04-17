@@ -2425,3 +2425,24 @@
   .rounded-2xl { page-break-inside: avoid; }
 }
 
+/* ═══════════════════════════════════════════════════════════════════
+   CANVAS SURFACE — UNLAYERED (outside @layer) so it wins over
+   xyflow's unlayered defaults. Rules inside @layer always lose to
+   unlayered rules, even with !important. This is the cascade-layer
+   gotcha that caused hours of debugging.
+   ═══════════════════════════════════════════════════════════════════ */
+.bf-canvas-surface {
+  background-color: #0E0E10 !important;
+  background-image: radial-gradient(circle, rgba(255, 255, 255, 0.22) 1.3px, transparent 1.3px) !important;
+  background-size: 22px 22px !important;
+}
+.bf-canvas-surface .react-flow,
+.bf-canvas-surface .react-flow__pane,
+.bf-canvas-surface .react-flow__viewport,
+.bf-canvas-surface .react-flow__renderer,
+.bf-canvas-surface .react-flow__background {
+  background: transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
+}
+

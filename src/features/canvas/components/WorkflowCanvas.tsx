@@ -758,7 +758,7 @@ function WorkflowCanvasInner({ workflowId: urlWorkflowId, templateId, forceNew =
       {/* Canvas area */}
       <div
         ref={reactFlowWrapper}
-        className="flex-1 relative"
+        className="flex-1 relative bf-canvas-surface"
         onDrop={onDrop}
         onDragOver={onDragOver}
         onTouchStartCapture={onTouchStartCapture}
@@ -826,34 +826,12 @@ function WorkflowCanvasInner({ workflowId: urlWorkflowId, templateId, forceNew =
           )}
         </AnimatePresence>
 
-        {/* React Flow canvas */}
+        {/* React Flow canvas — bg handled by .bf-canvas-surface on the
+            outer wrapper. This div is transparent so the bg shows through. */}
         <div
           className="absolute inset-0"
+          data-canvas-bg="v6-outer"
         >
-          {/* Base — single deep-slate color. Calm, professional, easy on eyes. */}
-          <div
-            style={{
-              position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 0,
-              background: '#0E1A2D',
-            }}
-          />
-          {/* Dot grid — clean blueprint surface, single accent color. */}
-          <div
-            className="absolute inset-0 pointer-events-none"
-            style={{
-              zIndex: 0,
-              backgroundImage: 'radial-gradient(circle, rgba(180,220,255,0.32) 1.3px, transparent 1.3px)',
-              backgroundSize: '22px 22px',
-            }}
-          />
-          {/* Soft vignette — gentle frame, almost invisible, just enough depth. */}
-          <div
-            className="absolute inset-0 pointer-events-none"
-            style={{
-              zIndex: 0,
-              background: 'radial-gradient(ellipse 130% 110% at center, transparent 65%, rgba(0,0,0,0.30) 100%)',
-            }}
-          />
 
           <ReactFlow
             nodes={nodes}

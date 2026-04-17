@@ -770,11 +770,11 @@ export const BaseNode = memo(function BaseNode({ id, data, selected }: BaseNodeP
           pointerEvents: "none", zIndex: 0,
         }} />
 
-        {/* ── Glow behind node (Atelier) ── */}
-        <div style={{
-          position: "absolute", inset: "-30px",
-          background: `radial-gradient(ellipse, rgba(${rgb}, 0.08) 0%, transparent 70%)`,
-          filter: "blur(20px)", pointerEvents: "none", zIndex: -1,
+        {/* ── Glow behind node — truly subtle, contained halo ── */}
+        <div data-node-halo="v4" style={{
+          position: "absolute", inset: "-16px",
+          background: `radial-gradient(ellipse, rgba(${rgb}, 0.14) 0%, rgba(${rgb}, 0.04) 50%, transparent 80%)`,
+          filter: "blur(10px)", pointerEvents: "none", zIndex: -1,
           animation: "atelier-pulse 6s ease-in-out infinite",
         }} />
 
