@@ -194,12 +194,19 @@ export async function POST() {
     // Map price ID to plan role
     const newRole = getPlanByPriceId(activeSubscription.priceId);
 
-    // CRITICAL: If an active paid subscription resolves to FREE, log it clearly
+    // CRITICAL: If an active paid subscription resolves to FREE, refuse to downgrade.
+    // Same guard as the webhook handler — prevents env-var drift from stripping paid access.
     if (newRole === 'FREE' && activeSubscription.priceId) {
-      console.error('[STRIPE_SYNC] CRITICAL: Active subscription resolved to FREE!', {
+      console.error('[STRIPE_SYNC] CRITICAL: Active subscription resolved to FREE — refusing to downgrade.', {
         userId: user.id,
         priceId: activeSubscription.priceId,
         subscriptionId: activeSubscription.id,
+      });
+      return NextResponse.json({
+        role: user.role,
+        synced: false,
+        reason: 'unmapped_price_id',
+        priceId: activeSubscription.priceId,
       });
     }
 

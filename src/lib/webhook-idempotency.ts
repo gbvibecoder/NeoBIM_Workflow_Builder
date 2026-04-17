@@ -37,3 +37,23 @@ export async function checkWebhookIdempotency(
     return false; // On error, allow processing (fail-open to not block payments)
   }
 }
+
+/**
+ * Clear an idempotency key so the event can be retried.
+ * Call this when webhook processing FAILS — otherwise the provider's
+ * retry would be blocked as a "duplicate" even though we never
+ * successfully processed the event.
+ */
+export async function clearWebhookIdempotency(
+  provider: "stripe" | "razorpay",
+  eventId: string,
+): Promise<void> {
+  if (!redis) return;
+  const key = `webhook:${provider}:${eventId}`;
+  try {
+    await redis.del(key);
+  } catch {
+    // Best-effort — if this fails, the retry will be blocked for up to 48h
+    // but the reconcile cron provides a safety net.
+  }
+}

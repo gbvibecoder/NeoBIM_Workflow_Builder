@@ -73,6 +73,11 @@ export async function reconcileUserSubscription(
         return { status: 'already_synced', gateway: 'razorpay', role: user.role };
       }
 
+      const ADMIN_ROLES = new Set(['PLATFORM_ADMIN', 'TEAM_ADMIN']);
+      if (ADMIN_ROLES.has(user.role) && !ADMIN_ROLES.has(newRole)) {
+        return { status: 'already_synced', gateway: 'razorpay', role: user.role };
+      }
+
       if (!dryRun) {
         await prisma.user.update({
           where: { id: user.id },
@@ -135,6 +140,11 @@ export async function reconcileUserSubscription(
         Math.floor(Date.now() / 1000);
 
       if (user.role === newRole) {
+        return { status: 'already_synced', gateway: 'stripe', role: user.role };
+      }
+
+      const ADMIN_ROLES_S = new Set(['PLATFORM_ADMIN', 'TEAM_ADMIN']);
+      if (ADMIN_ROLES_S.has(user.role) && !ADMIN_ROLES_S.has(newRole)) {
         return { status: 'already_synced', gateway: 'stripe', role: user.role };
       }
 

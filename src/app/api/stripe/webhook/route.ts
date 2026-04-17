@@ -9,7 +9,7 @@ import {
   sendSubscriptionCanceledEmail,
   sendPlanChangedEmail,
 } from '@/shared/services/email';
-import { checkWebhookIdempotency } from '@/lib/webhook-idempotency';
+import { checkWebhookIdempotency, clearWebhookIdempotency } from '@/lib/webhook-idempotency';
 import { invalidateUserRoleCache } from '@/lib/auth';
 import { logAudit } from "@/lib/admin-server";
 import { trackServerPurchase } from "@/lib/server-conversions";
@@ -176,6 +176,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ received: true });
   } catch (error) {
     console.error('[STRIPE_WEBHOOK] Error processing webhook:', error);
+    await clearWebhookIdempotency('stripe', event.id);
     return NextResponse.json(
       formatErrorResponse(UserErrors.INTERNAL_ERROR),
       { status: 500 }
@@ -324,6 +325,7 @@ async function updateUserSubscription(
         stripeSubscriptionId: sub.id,
         stripePriceId: priceId,
         stripeCurrentPeriodEnd: new Date(currentPeriodEnd * 1000),
+        paymentGateway: 'stripe',
         role: plan,
       },
     });

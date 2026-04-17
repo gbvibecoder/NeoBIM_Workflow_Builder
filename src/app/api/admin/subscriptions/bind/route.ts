@@ -91,6 +91,16 @@ export async function POST(req: Request) {
       );
     }
 
+    const STRIPE_LIVE = new Set(['active', 'trialing', 'past_due']);
+    if (!STRIPE_LIVE.has(sub.status)) {
+      return NextResponse.json({
+        bound: false,
+        reason: 'subscription_not_active',
+        status: sub.status,
+        message: `Subscription status is "${sub.status}" — cannot bind a non-active subscription.`,
+      }, { status: 400 });
+    }
+
     const firstItem = sub.items?.data?.[0];
     const priceId = firstItem?.price?.id ?? null;
     const newRole = getPlanByPriceId(priceId);
@@ -163,6 +173,16 @@ export async function POST(req: Request) {
       { error: `Razorpay fetch failed: ${err instanceof Error ? err.message : String(err)}` },
       { status: 502 },
     );
+  }
+
+  const RZP_LIVE = new Set(['active', 'authenticated', 'pending']);
+  if (!RZP_LIVE.has(sub.status)) {
+    return NextResponse.json({
+      bound: false,
+      reason: 'subscription_not_active',
+      status: sub.status,
+      message: `Subscription status is "${sub.status}" — cannot bind a non-active subscription.`,
+    }, { status: 400 });
   }
 
   const planId = sub.plan_id ?? null;
