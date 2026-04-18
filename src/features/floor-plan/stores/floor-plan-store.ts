@@ -140,7 +140,7 @@ interface FloorPlanState {
   showAdjacentFloor: boolean;
 
   // Right panel tab system
-  rightPanelTab: "properties" | "vastu" | "code" | "analytics" | "boq" | "program" | "quality";
+  rightPanelTab: "properties" | "vastu" | "code" | "analytics" | "boq" | "program" | "quality" | "explain";
 
   // Vastu overlay
   vastuOverlayVisible: boolean;
@@ -281,7 +281,7 @@ interface FloorPlanState {
   toggleFurniturePanel: () => void;
 
   // Right panel tabs
-  setRightPanelTab: (tab: "properties" | "vastu" | "code" | "analytics" | "boq" | "program" | "quality") => void;
+  setRightPanelTab: (tab: "properties" | "vastu" | "code" | "analytics" | "boq" | "program" | "quality" | "explain") => void;
 
   // Vastu overlay
   toggleVastuOverlay: () => void;

@@ -17,6 +17,7 @@ import { AnalyticsPanel } from "@/features/floor-plan/components/panels/Analytic
 import { BOQPanel } from "@/features/floor-plan/components/panels/BOQPanel";
 import { ProgramPanel } from "@/features/floor-plan/components/panels/ProgramPanel";
 import { QualityPanel } from "@/features/floor-plan/components/panels/QualityPanel";
+import { ExplainPanel } from "@/features/floor-plan/components/panels/ExplainPanel";
 import { WelcomeScreen } from "@/features/floor-plan/components/WelcomeScreen";
 import { GenerationLoader } from "@/features/floor-plan/components/GenerationLoader";
 import { getProjectIndex, importProjectFile } from "@/features/floor-plan/lib/project-persistence";
@@ -698,6 +699,7 @@ export function FloorPlanViewer({ initialGeometry, initialPrompt, initialProject
               {([
                 { id: "properties", label: "Props" },
                 { id: "quality", label: "Quality" },
+                { id: "explain", label: "Explain" },
                 { id: "vastu", label: "Vastu" },
                 { id: "code", label: "Code" },
                 { id: "analytics", label: "Stats" },
@@ -722,6 +724,7 @@ export function FloorPlanViewer({ initialGeometry, initialPrompt, initialProject
               <FloorPlanErrorBoundary fallbackLabel="Panel">
                 {rightPanelTab === "properties" && <PropertiesPanel />}
                 {rightPanelTab === "quality" && <QualityPanel />}
+                {rightPanelTab === "explain" && <ExplainPanel />}
                 {rightPanelTab === "vastu" && <VastuPanel />}
                 {rightPanelTab === "code" && <CodeCompliancePanel />}
                 {rightPanelTab === "analytics" && <AnalyticsPanel />}
