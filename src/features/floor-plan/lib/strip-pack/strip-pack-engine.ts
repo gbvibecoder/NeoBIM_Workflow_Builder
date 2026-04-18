@@ -80,10 +80,20 @@ export async function runStripPackEngine(
   spine.remaining_front = ent.remainingFront;
 
   // ── Step 4: separate attached + entrance rooms from main packing list ──
-  const { front, back, attached } = splitByStrip(classified);
+  const splits = splitByStrip(classified);
+  const { back, attached } = splits;
   // Pull porch/foyer (placed by entrance) out of the front list.
   const placedEntranceIds = new Set([ent.porch?.id, ent.foyer?.id].filter((x): x is string => !!x));
-  const frontMain = front.filter(r => !placedEntranceIds.has(r.id));
+
+  // Phase 3H fix: rescue ENTRANCE-strip rooms that aren't porch/foyer.
+  // Without this, rooms like Pooja (coerced to ENTRANCE by adjacency grouping
+  // with Foyer) are silently dropped — they never go through the strip packer.
+  const rescuedFromEntrance = splits.entrance.filter(r => !placedEntranceIds.has(r.id));
+  for (const r of rescuedFromEntrance) {
+    r.strip = "FRONT";
+    warnings.push(`${r.name}: rescued from ENTRANCE strip → FRONT (only porch/foyer belong in ENTRANCE)`);
+  }
+  const frontMain = [...splits.front.filter(r => !placedEntranceIds.has(r.id)), ...rescuedFromEntrance];
 
   // Pre-placed rooms from the entrance handler.
   const preplaced: StripPackRoom[] = [];
@@ -250,7 +260,12 @@ function applyAdjacencyGroups(
   warnings: string[],
 ): void {
   if (pairs.length === 0) return;
-  const eligible = rooms.filter(r => r.strip !== "ATTACHED" && r.strip !== "SPINE");
+  // Phase 3H: also exclude ENTRANCE rooms from adjacency coercion. The foyer
+  // and porch have special placement logic in the entrance handler. If another
+  // room (e.g., Pooja) is in an adjacency group with the foyer and gets coerced
+  // to ENTRANCE strip, it will be silently dropped — the engine only processes
+  // porch and foyer from ENTRANCE, everything else falls through the cracks.
+  const eligible = rooms.filter(r => r.strip !== "ATTACHED" && r.strip !== "SPINE" && r.strip !== "ENTRANCE");
   const eligibleIds = new Set(eligible.map(r => r.id));
   if (eligible.length === 0) return;
 

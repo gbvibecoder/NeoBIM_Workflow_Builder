@@ -19,7 +19,17 @@
 import type { Facing, Rect, SpineLayout, StripPackRoom } from "./types";
 import { findHallwayWidth } from "./room-classifier";
 
-const FRONT_FRACTION = 0.45;
+/**
+ * Phase 3H: split fraction depends on spine orientation.
+ * For horizontal spines (N/S-facing), the pack-depth is the plot depth which
+ * is typically 35-50ft — plenty for 2-3 rows. 45/55 works well.
+ * For vertical spines (E/W-facing), the pack-depth is the strip WIDTH which
+ * is only 20-25ft. With 45%, only ~20ft is available — one row of 13ft rooms
+ * leaves just 7ft, crushing second-row rooms. 50% gives ~23ft, enough for
+ * 13ft + 10ft rows.
+ */
+const FRONT_FRACTION_HORIZONTAL = 0.45;
+const FRONT_FRACTION_VERTICAL   = 0.50;
 const DEFAULT_HALLWAY_WIDTH_FT = 4;
 const MIN_HALLWAY_WIDTH_FT = 3;
 const MAX_HALLWAY_WIDTH_FT = 6;
@@ -39,7 +49,10 @@ export function planSpine(plot: PlotInput, rooms: StripPackRoom[]): SpineLayout 
     Math.min(MAX_HALLWAY_WIDTH_FT, hallwayWidthRaw),
   );
 
-  if (plot.facing === "north" || plot.facing === "south") {
+  const isHorizontal = plot.facing === "north" || plot.facing === "south";
+  const frontFraction = isHorizontal ? FRONT_FRACTION_HORIZONTAL : FRONT_FRACTION_VERTICAL;
+
+  if (isHorizontal) {
     // Horizontal spine (runs E–W across the full plot width).
     const usable = plot.depth_ft - hallwayWidth;
     if (usable <= 0) throw new Error(`spine-placer: plot too shallow for hallway (depth=${plot.depth_ft}ft, hallway=${hallwayWidth}ft)`);
@@ -50,15 +63,15 @@ export function planSpine(plot: PlotInput, rooms: StripPackRoom[]): SpineLayout 
 
     if (plot.facing === "north") {
       // Entrance at y = plot.depth_ft (top). Front above spine, back below.
-      backDepth  = usable * (1 - FRONT_FRACTION);   // 55%
-      frontDepth = usable * FRONT_FRACTION;         // 45%
+      backDepth  = usable * (1 - frontFraction);   // 55%
+      frontDepth = usable * frontFraction;         // 45%
       spineY     = backDepth;                       // spine sits above the back strip
       backY      = 0;
       frontY     = spineY + hallwayWidth;
     } else {
       // facing === "south" → entrance at y = 0. Front below spine, back above.
-      frontDepth = usable * FRONT_FRACTION;
-      backDepth  = usable * (1 - FRONT_FRACTION);
+      frontDepth = usable * frontFraction;
+      backDepth  = usable * (1 - frontFraction);
       spineY     = frontDepth;
       frontY     = 0;
       backY      = spineY + hallwayWidth;
@@ -90,15 +103,15 @@ export function planSpine(plot: PlotInput, rooms: StripPackRoom[]): SpineLayout 
 
   if (plot.facing === "east") {
     // Entrance at x = plot.width_ft (right). Front to the east, back to the west.
-    backWidth  = usable * (1 - FRONT_FRACTION);
-    frontWidth = usable * FRONT_FRACTION;
+    backWidth  = usable * (1 - frontFraction);
+    frontWidth = usable * frontFraction;
     spineX     = backWidth;
     backX      = 0;
     frontX     = spineX + hallwayWidth;
   } else {
     // facing === "west" → entrance at x = 0. Front to the west, back to the east.
-    frontWidth = usable * FRONT_FRACTION;
-    backWidth  = usable * (1 - FRONT_FRACTION);
+    frontWidth = usable * frontFraction;
+    backWidth  = usable * (1 - frontFraction);
     spineX     = frontWidth;
     frontX     = 0;
     backX      = spineX + hallwayWidth;
