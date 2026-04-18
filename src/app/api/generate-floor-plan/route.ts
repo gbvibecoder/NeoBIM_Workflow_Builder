@@ -73,6 +73,9 @@ import { runStripPackEngine, fillDoorMetrics } from "@/features/floor-plan/lib/s
 import { toFloorPlanProject as toFloorPlanProjectT1 } from "@/features/floor-plan/lib/strip-pack/converter";
 import { parseConstraints } from "@/features/floor-plan/lib/structured-parser";
 
+// Phase 3H — LLM layout engine (PIPELINE_LLM feature flag)
+import { runLLMLayoutEngine } from "@/features/floor-plan/lib/llm-layout-engine";
+
 // ── Generation Feedback ────────────────────────────────────────────────────
 
 interface GenerationFeedback {
@@ -252,6 +255,66 @@ export async function POST(req: NextRequest) {
     // the existing template+SA Pipeline A unchanged.
     const routing = routePrompt(prompt);
     logger.debug(`[ROUTER] pipeline=${routing.pipeline} signals=${routing.constraint_signals}`);
+
+    // ── Phase 3H — LLM Layout Engine (PIPELINE_LLM) ────────────────────
+    // Strategy: let GPT-4o act as the architect, placing rooms directly.
+    // If score >= 50, ship immediately. Otherwise fall through to T1/B.
+    if (process.env.PIPELINE_LLM === "true" && routing.pipeline === "B") {
+      try {
+        const llmStart = Date.now();
+        const llmParseRes = await parseConstraints(prompt, apiKey);
+        const llmParseMs = Date.now() - llmStart;
+
+        const llmEngineStart = Date.now();
+        const llmRawResult = await runLLMLayoutEngine(prompt, llmParseRes.constraints, apiKey);
+        const llmResult = fillDoorMetrics(llmRawResult);
+        const llmEngineMs = Date.now() - llmEngineStart;
+
+        const llmProject = toFloorPlanProjectT1(llmResult, llmParseRes.constraints);
+        const llmLayoutMetrics = computeLayoutMetrics(llmProject, llmParseRes.constraints);
+        const llmScore = computeHonestScore(llmLayoutMetrics);
+
+        console.log(
+          `[LLM-LAYOUT] parse=${llmParseMs}ms engine=${llmEngineMs}ms ` +
+          `score=${llmScore.score}/100 (${llmScore.grade}) eff=${llmLayoutMetrics.efficiency_pct}% ` +
+          `doors=${llmLayoutMetrics.door_coverage_pct}% orphans=${llmLayoutMetrics.orphan_rooms.length} ` +
+          `rooms=${llmResult.rooms.length}`,
+        );
+
+        // Ship LLM only if it clearly succeeds. Low scores (50-64) may have
+        // orphan clusters — let T1 strip-pack try instead (it guarantees 0
+        // orphans by construction).
+        if (llmScore.score >= 65 && llmLayoutMetrics.orphan_rooms.length <= 2) {
+          console.log(`[LLM-LAYOUT] ACCEPTED: ${llmScore.score}/100 (${llmScore.grade})`);
+          const feedback = buildFeedback(llmProject, prompt);
+          feedback.tips.push(
+            `LLM-layout: ${llmResult.rooms.length} rooms, ${llmResult.doors.length} doors, ` +
+            `${llmLayoutMetrics.efficiency_pct}% efficiency in ${llmParseMs + llmEngineMs}ms`,
+          );
+          await recordToolExecution(userId, "floor-plan");
+          return NextResponse.json({
+            project: llmProject,
+            geometry: null,
+            svg: null,
+            feedback,
+            layoutMetrics: llmLayoutMetrics,
+            qualityFlags: llmLayoutMetrics.quality_flags,
+            feasibilityWarnings: [],
+            pipelineUsed: "LLM-layout",
+            relaxationsApplied: llmResult.warnings,
+            infeasibilityReason: null,
+            mandalaAssignments: null,
+            routerSignals: routing.constraint_signals,
+            honestScore: llmScore,
+          });
+        }
+
+        console.warn(`[LLM-LAYOUT] score ${llmScore.score} < 50 — falling through to T1/B`);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.warn(`[LLM-LAYOUT] error — falling through to T1/B: ${msg}`);
+      }
+    }
 
     // ── Phase 3 — Strip-Pack Engine (PIPELINE_T1) ────────────────────────
     // Strategy (Phase 3G — race & compare):
