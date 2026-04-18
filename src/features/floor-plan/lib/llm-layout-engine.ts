@@ -106,13 +106,22 @@ export async function runLLMLayoutEngine(
   });
   warnings.push(...doorOut.warnings);
 
-  // Count orphans to decide if retry is needed
+  // Check quality triggers for retry: orphans, compactness, hallway span
   const orphanCount = countOrphans(rooms, doorOut.doors);
-  if (orphanCount > 3) {
-    warnings.push(`First attempt: ${orphanCount} orphans — retrying with feedback`);
-    const feedback = buildFeedbackMessage(rooms, doorOut.doors, spine);
+  const compactness = measureCompactness(llmRooms);
+  const hwSpan = measureHallwaySpan(hallway, plot);
+  const needsRetry = orphanCount > 3 || compactness < 0.75 || hwSpan < 0.8;
+
+  if (needsRetry) {
+    const feedbackParts: string[] = [];
+    if (orphanCount > 3) feedbackParts.push(`${orphanCount} rooms are disconnected from the hallway.`);
+    if (compactness < 0.75) feedbackParts.push(`Building is L-shaped — rooms only cover ${Math.round(compactness * 100)}% of bounding box. Place ALL rooms so they form ONE rectangle: both sides of the hallway must span y=0 to y=${plot.depth} (or x=0 to x=${plot.width}).`);
+    if (hwSpan < 0.8) feedbackParts.push(`Hallway only spans ${Math.round(hwSpan * 100)}% of the building. Extend it wall-to-wall.`);
+    warnings.push(`First attempt issues: ${feedbackParts.join(" ")} — retrying`);
+
+    const feedbackMsg = `PREVIOUS ATTEMPT FAILED:\n${feedbackParts.join("\n")}\nFix these issues. Ensure ONE compact rectangle, hallway spanning full ${hallway.width > hallway.depth ? "width" : "depth"}, zero gaps.`;
     const retryStart = Date.now();
-    let retryRooms = await callGPT4o(systemPrompt, prompt + "\n\n" + feedback, roomList, apiKey);
+    let retryRooms = await callGPT4o(systemPrompt, prompt + "\n\n" + feedbackMsg, roomList, apiKey);
     warnings.push(`Retry call: ${Date.now() - retryStart}ms, ${retryRooms.length} rooms`);
     retryRooms = repair(retryRooms, plot, hallway, facing, fixedParsed, warnings);
 
@@ -125,14 +134,16 @@ export async function runLLMLayoutEngine(
     });
 
     const retryOrphans = countOrphans(retry.rooms, retryDoors.doors);
-    if (retryOrphans < orphanCount) {
+    const retryCompact = measureCompactness(retryRooms);
+    // Accept retry if it improves on ANY metric
+    if (retryOrphans <= orphanCount && retryCompact >= compactness) {
       rooms = retry.rooms;
       spine = retry.spine;
       walls = retryWalls;
       doorOut = retryDoors;
-      warnings.push(`Retry improved: ${orphanCount} → ${retryOrphans} orphans`);
+      warnings.push(`Retry improved: orphans ${orphanCount}→${retryOrphans}, compactness ${Math.round(compactness * 100)}→${Math.round(retryCompact * 100)}%`);
     } else {
-      warnings.push(`Retry didn't improve (${retryOrphans} orphans) — keeping first attempt`);
+      warnings.push(`Retry didn't improve — keeping first attempt`);
     }
     warnings.push(...retryDoors.warnings);
   }
@@ -175,119 +186,118 @@ function buildSystemPrompt(
   plotW: number, plotD: number,
   facing: Facing, hallway: Rect,
 ): string {
-  const hwJson = JSON.stringify(hallway);
   const isH = hallway.width > hallway.depth;
+  const hwL = hallway.x;
+  const hwR = hallway.x + hallway.width;
+  const hwB = hallway.y;
+  const hwT = hallway.y + hallway.depth;
   const entranceSide = { north: "top (high Y)", south: "bottom (low Y)", east: "right (high X)", west: "left (low X)" }[facing];
   const backSide = { north: "bottom (low Y)", south: "top (high Y)", east: "left (low X)", west: "right (high X)" }[facing];
 
-  // Build a worked example for the specific facing direction
-  const example = buildWorkedExample(plotW, plotD, facing, hallway);
+  // Build concrete few-shot example with exact coordinates for this facing
+  const example = isH ? buildHorizontalExample(plotW, plotD, facing, hwB, hwT) : buildVerticalExample(plotW, plotD, facing, hwL, hwR);
 
-  return `You are an expert residential architect. Place rooms on a rectangular plot as JSON coordinates.
+  return `You are an expert residential architect. Place rooms on a rectangular plot as JSON.
 
-PLOT: ${plotW}ft wide (X axis) × ${plotD}ft deep (Y axis)
-ORIGIN: (0,0) = SOUTHWEST corner. X grows EAST. Y grows NORTH.
-FACING: ${facing} — entrance/road on the ${entranceSide}
+PLOT: ${plotW}ft wide (X) × ${plotD}ft deep (Y). Origin (0,0) = SW corner. X→EAST, Y→NORTH.
+FACING: ${facing} — entrance on ${entranceSide}
 
-HALLWAY — USE THESE EXACT COORDINATES:
-${hwJson}
-The hallway is type "corridor". It runs ${isH ? "east-west" : "north-south"} across the FULL plot.
+HALLWAY (use EXACT coordinates):
+{ "name": "Hallway", "type": "corridor", "x": ${hallway.x}, "y": ${hallway.y}, "width": ${hallway.width}, "depth": ${hallway.depth} }
+${isH ? `Runs EAST-WEST, full width x=0..${plotW}.` : `Runs NORTH-SOUTH, full depth y=0..${plotD}.`}
 
 ZONES:
-- ENTRANCE SIDE (${entranceSide}): porch, foyer, living, dining, pooja — between entrance wall and hallway
-- BACK SIDE (${backSide}): bedrooms, kitchen, bathrooms, utility — between hallway and far wall
+- Entrance side (${entranceSide}): porch, foyer, living, dining, pooja
+- Back side (${backSide}): bedrooms, kitchen, bathrooms, utility
 
-RULES (read ALL before generating):
+═══════════════════════════════════════════
+RULES — READ ALL BEFORE GENERATING
+═══════════════════════════════════════════
 
-1. COMPACT RECTANGLE — MOST CRITICAL RULE:
-   The building footprint MUST be a SINGLE COMPACT RECTANGLE. No L-shapes, no T-shapes, no staircase shapes.
-   ALL rooms on BOTH sides of the hallway must share the SAME vertical range (for east/west facing) or the SAME horizontal range (for north/south facing).
+RULE 1 — COMPACT RECTANGLE (MOST CRITICAL):
+The building MUST be a SINGLE COMPACT RECTANGLE. NO L-shapes, T-shapes, or staircases.
 ${isH
-  ? `   For this ${facing}-facing plot: every room must have y between 0 and ${plotD}. The left edge of the leftmost room = 0. The right edge of the rightmost room = ${plotW}. No room should stick out beyond the others.`
-  : `   For this ${facing}-facing plot: every room must have y between 0 and ${plotD}. Rooms on BOTH sides of the hallway must start at y=0 and end at y=${plotD}. No room should stick out beyond the others — the top edges must align and the bottom edges must align.`}
+  ? `Every room: x between 0 and ${plotW}. Rooms ABOVE hallway: top edges at y=${plotD}. Rooms BELOW hallway: bottom edges at y=0.`
+  : `Every room: y between 0 and ${plotD}. Rooms LEFT of hallway: left edges at x=0. Rooms RIGHT of hallway: right edges at x=${plotW}.
+CRITICAL for ${facing}-facing: rooms on BOTH sides must span y=0 to y=${plotD}. If the left side has rooms from y=5 to y=40 but the right side has rooms from y=0 to y=35, that creates an L-shape. WRONG. Both sides: y=0 to y=${plotD}.`}
 
-2. EDGE ALIGNMENT:
-   Adjacent rooms MUST have IDENTICAL edge coordinates. No gaps, not even 0.1ft.
-   Example: Room A at x=0 width=14. Room B MUST start at x=14.
-   Rooms must tile the plot like a jigsaw — minimize empty space.
+RULE 2 — HALLWAY SPANS FULL ${isH ? "WIDTH" : "DEPTH"}:
+${isH ? `x=0 to x=${plotW}, width=${plotW}ft.` : `y=0 to y=${plotD}, depth=${plotD}ft.`}
 
-3. HALLWAY SPAN:
+RULE 3 — EDGE ALIGNMENT (zero gaps):
+Adjacent rooms share EXACT edge coordinates. Room A ends at x=14 → Room B starts at x=14. NOT 14.1, NOT 13.9.
+
+RULE 4 — ROW PACKING:
 ${isH
-  ? `   The hallway MUST span the FULL WIDTH of the plot: x=0 to x=${plotW}. Width=${plotW}ft exactly.`
-  : `   The hallway MUST span the FULL DEPTH of the plot: y=0 to y=${plotD}. Depth=${plotD}ft exactly.`}
-   Rooms on each side must fill from the hallway edge to the plot boundary.
+  ? `ABOVE hallway: pack rooms LEFT to RIGHT in rows. Row 1 starts at y=${hwT}, rooms fill to y=${plotD}. Each room in a row has the same y and depth. Next row stacks on top.
+BELOW hallway: pack rooms LEFT to RIGHT. Row 1 starts at y=0 with depth filling up to y=${hwB}.`
+  : `RIGHT of hallway: pack rooms BOTTOM to TOP. First room at y=0, next room at y=firstRoom.depth, etc. All rooms have x=${hwR} and width fills to x=${plotW}.
+LEFT of hallway: pack rooms BOTTOM to TOP. All rooms have x=0 and width fills to x=${hwL}.`}
 
-4. CONNECTIVITY CHAIN:
-   Porch → Foyer → Hallway → every other room.
-   The foyer MUST share an edge with the hallway.
-${facing === "north" ? `   Foyer bottom edge y = ${hallway.y + hallway.depth}.` :
-  facing === "south" ? `   Foyer top edge (y + depth) = ${hallway.y}.` :
-  facing === "east" ? `   Foyer left edge x = ${hallway.x + hallway.width}.` :
-  `   Foyer right edge (x + width) = ${hallway.x}.`}
+RULE 5 — CONNECTIVITY: Porch → Foyer → Hallway → all rooms.
+${facing === "north" ? `Foyer bottom edge y=${hwT}.` : facing === "south" ? `Foyer top edge y+d=${hwB}.` : facing === "east" ? `Foyer left edge x=${hwR}.` : `Foyer right edge x+w=${hwL}.`}
 
-5. ALL rooms INSIDE plot: 0 ≤ x, 0 ≤ y, x+width ≤ ${plotW}, y+depth ≤ ${plotD}
-6. NO overlapping rooms
-7. Room dimensions within ±15% of requested. Never below 70% of requested area.
-8. Porch on the ${facing} wall, INSIDE the plot boundary
-9. Ensuite/wardrobe share a wall with their parent bedroom
-10. Rooms + hallway should cover ≥ 85% of the plot area
+RULE 6 — ALL rooms INSIDE plot. No overlaps. Dimensions ±15% of requested.
+RULE 7 — Ensuite/wardrobe share a wall with parent bedroom.
+RULE 8 — Rooms + hallway cover ≥85% of plot.
 
 ${example}
 
-OUTPUT: ONLY valid JSON, no markdown, no backticks:
-{
-  "rooms": [
-    { "name": "Hallway", "type": "corridor", "x": ${hallway.x}, "y": ${hallway.y}, "width": ${hallway.width}, "depth": ${hallway.depth} },
-    ...all rooms including porch, foyer...
-  ]
+OUTPUT — ONLY valid JSON, no markdown:
+{ "rooms": [ { "name": "Hallway", "type": "corridor", "x": ${hallway.x}, "y": ${hallway.y}, "width": ${hallway.width}, "depth": ${hallway.depth} }, ...all rooms... ] }
+
+FINAL CHECK: Is every room inside the plot? Does the hallway span full ${isH ? "width" : "depth"}? Are outer edges aligned to plot boundary? Is it ONE rectangle, NOT an L? Fix before outputting.`;
 }
 
-Start the rooms array with the hallway using the exact coordinates above.
-All coordinates in feet. All rooms are axis-aligned rectangles.`;
+function buildHorizontalExample(plotW: number, plotD: number, facing: Facing, hwB: number, hwT: number): string {
+  // N/S facing — horizontal hallway
+  const frontLabel = facing === "north" ? "ABOVE" : "BELOW";
+  const backLabel = facing === "north" ? "BELOW" : "ABOVE";
+  const frontY = facing === "north" ? hwT : 0;
+  const frontH = facing === "north" ? plotD - hwT : hwB;
+  const backY = facing === "north" ? 0 : hwT;
+  const backH = facing === "north" ? hwB : plotD - hwT;
+
+  return `WORKED EXAMPLE — ${facing}-facing, 40×40 plot, hallway at y=${hwB}..${hwT}:
+${frontLabel} hallway (entrance side): rooms from y=${frontY}, fill to y=${facing === "north" ? plotD : hwB}
+  {"name":"Porch","type":"porch","x":17,"y":${facing === "north" ? plotD - 5 : 0},"width":6,"depth":5}
+  {"name":"Foyer","type":"foyer","x":17,"y":${facing === "north" ? hwT : hwB - 5},"width":6,"depth":5}
+  {"name":"Living Room","type":"living","x":0,"y":${frontY},"width":14,"depth":${frontH}}
+  {"name":"Bedroom 2","type":"bedroom","x":14,"y":${frontY},"width":12,"depth":${Math.round(frontH * 0.6)}}
+  {"name":"Bedroom 3","type":"bedroom","x":26,"y":${frontY},"width":14,"depth":${frontH}}
+${backLabel} hallway (back side): rooms from y=${backY}, fill to y=${backY + backH}
+  {"name":"Master Bedroom","type":"master_bedroom","x":0,"y":${backY},"width":13,"depth":${backH}}
+  {"name":"Kitchen","type":"kitchen","x":13,"y":${backY},"width":12,"depth":${Math.round(backH * 0.5)}}
+  {"name":"Dining Room","type":"dining","x":25,"y":${backY},"width":15,"depth":${backH}}
+
+KEY: Both sides span x=0..${plotW}. All edges align to plot boundary. ONE rectangle.`;
 }
 
-function buildWorkedExample(plotW: number, plotD: number, facing: Facing, hallway: Rect): string {
-  const isH = hallway.width > hallway.depth;
-  if (!isH) {
-    // East/West facing — vertical hallway — THIS is where L-shapes happen
-    const hwL = hallway.x;
-    const hwR = hallway.x + hallway.width;
-    if (facing === "east") {
-      return `CORRECT EXAMPLE (east-facing, vertical hallway):
-The hallway runs from y=0 to y=${plotD} at x=${hwL}..${hwR}.
-Rooms on the RIGHT (entrance side) span y=0 to y=${plotD}:
-  { "x": ${hwR}, "y": 0, "width": 14, "depth": 13 }     ← starts at y=0
-  { "x": ${hwR}, "y": 13, "width": 14, "depth": 12 }    ← stacks above
-  ...all the way to y=${plotD}
-Rooms on the LEFT (back side) also span y=0 to y=${plotD}:
-  { "x": 0, "y": 0, "width": ${hwL}, "depth": 15 }      ← starts at y=0
-  { "x": 0, "y": 15, "width": ${hwL}, "depth": 13 }     ← stacks above
-  ...all the way to y=${plotD}
-BOTH sides start at y=0 and end at y=${plotD}. The building is ONE rectangle, not an L.`;
-    }
-    return `CORRECT EXAMPLE (west-facing, vertical hallway):
-The hallway runs from y=0 to y=${plotD} at x=${hwL}..${hwR}.
-Rooms on the LEFT (entrance side) span y=0 to y=${plotD}:
-  { "x": 0, "y": 0, "width": ${hwL}, "depth": 13 }
-  { "x": 0, "y": 13, "width": ${hwL}, "depth": 12 }
-  ...all the way to y=${plotD}
-Rooms on the RIGHT (back side) also span y=0 to y=${plotD}:
-  { "x": ${hwR}, "y": 0, "width": ${Math.round(plotW - hwR)}, "depth": 15 }
-  { "x": ${hwR}, "y": 15, "width": ${Math.round(plotW - hwR)}, "depth": 13 }
-  ...all the way to y=${plotD}
-BOTH sides start at y=0 and end at y=${plotD}. ONE rectangle, NOT an L-shape.`;
-  }
+function buildVerticalExample(plotW: number, plotD: number, facing: Facing, hwL: number, hwR: number): string {
+  // E/W facing — vertical hallway
+  const frontLabel = facing === "east" ? "RIGHT" : "LEFT";
+  const backLabel = facing === "east" ? "LEFT" : "RIGHT";
+  const frontX = facing === "east" ? hwR : 0;
+  const frontW = facing === "east" ? plotW - hwR : hwL;
+  const backX = facing === "east" ? 0 : hwR;
+  const backW = facing === "east" ? hwL : plotW - hwR;
 
-  // North/South facing — horizontal hallway
-  const hwB = hallway.y;
-  const hwT = hallway.y + hallway.depth;
-  return `CORRECT EXAMPLE (${facing}-facing, horizontal hallway):
-The hallway runs from x=0 to x=${plotW} at y=${hwB}..${hwT}.
-Rooms ${facing === "north" ? "ABOVE" : "BELOW"} hallway span x=0 to x=${plotW}:
-  Rooms pack left-to-right, all aligned to the same y range.
-Rooms ${facing === "north" ? "BELOW" : "ABOVE"} hallway also span x=0 to x=${plotW}:
-  Same pattern — all rooms share the same x range (0 to ${plotW}).
-The building is ONE rectangle from (0,0) to (${plotW},${plotD}).`;
+  return `WORKED EXAMPLE — ${facing}-facing, ${plotW}×${plotD} plot, hallway at x=${hwL}..${hwR}:
+${frontLabel} of hallway (entrance side, x=${frontX}..${frontX + frontW}): stack rooms y=0 to y=${plotD}
+  {"name":"Kitchen","type":"kitchen","x":${frontX},"y":0,"width":${frontW},"depth":11}
+  {"name":"Porch","type":"porch","x":${facing === "east" ? plotW - 6 : 0},"y":11,"width":6,"depth":5}
+  {"name":"Foyer","type":"foyer","x":${facing === "east" ? hwR : hwL - 8},"y":11,"width":8,"depth":6}
+  {"name":"Living Room","type":"living","x":${frontX},"y":17,"width":${frontW},"depth":14}
+  {"name":"Dining Room","type":"dining","x":${frontX},"y":31,"width":${frontW},"depth":${plotD - 31}}
+${backLabel} of hallway (back side, x=${backX}..${backX + backW}): stack rooms y=0 to y=${plotD}
+  {"name":"Master Bedroom","type":"master_bedroom","x":${backX},"y":0,"width":${backW},"depth":13}
+  {"name":"Ensuite","type":"master_bathroom","x":${backX},"y":0,"width":8,"depth":6}
+  {"name":"Bedroom 2","type":"bedroom","x":${backX},"y":13,"width":${backW},"depth":12}
+  {"name":"Bedroom 3","type":"bedroom","x":${backX},"y":25,"width":${backW},"depth":11}
+  {"name":"Common Bath","type":"bathroom","x":${backX},"y":36,"width":7,"depth":5}
+  {"name":"Utility","type":"utility","x":${backX + 7},"y":36,"width":${backW - 7},"depth":${plotD - 36}}
+
+KEY: BOTH sides span y=0 to y=${plotD}. Left edges at x=${backX}, right edges at x=${frontX + frontW}. ONE rectangle, NO L-shape.`;
 }
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -579,6 +589,29 @@ function repair(
 // ───────────────────────────────────────────────────────────────────────────
 // GEOMETRY HELPERS
 // ───────────────────────────────────────────────────────────────────────────
+
+/** Ratio of total room area to bounding-box area. 1.0 = perfect rectangle, <0.75 = L-shape. */
+function measureCompactness(rooms: LLMRoom[]): number {
+  const real = rooms.filter(r => r.type !== "corridor" && r.type !== "hallway");
+  if (real.length === 0) return 1;
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  let totalArea = 0;
+  for (const r of real) {
+    minX = Math.min(minX, r.x);
+    minY = Math.min(minY, r.y);
+    maxX = Math.max(maxX, r.x + r.width);
+    maxY = Math.max(maxY, r.y + r.depth);
+    totalArea += r.width * r.depth;
+  }
+  const bboxArea = (maxX - minX) * (maxY - minY);
+  return bboxArea > 0 ? totalArea / bboxArea : 1;
+}
+
+/** Ratio of hallway length to plot's spanning dimension. */
+function measureHallwaySpan(hw: Rect, plot: Rect): number {
+  const isH = hw.width > hw.depth;
+  return isH ? hw.width / plot.width : hw.depth / plot.depth;
+}
 
 function touchesRect(a: LLMRoom | Rect, b: LLMRoom | Rect): boolean {
   const eps = 0.3;
