@@ -1,515 +1,805 @@
-# IFC Feature — Technical Forensics Report
+# IFC Generation & Creation — Technical Report
 
-**Author:** Senior-engineer forensics pass (read-only audit)
-**Date:** 2026-04-17
-**Branch:** `better-3d-model`
-**Scope:** Complete IFC creation + generation pipeline — upload, parse, quantity extract, BOQ mapping, massing → IFC, IFC export, clash detection, viewer.
-**Read-only:** no changes, no PRs, no commits. Every claim cites file:line.
+**Audience:** Senior engineers, BIM architects, QS domain experts contributing to improvements.
+**Status as of:** 2026-04-18 (Phase 1 Track A complete on `feature/rich-ifc-phase-1`; Python microservice live on Railway at git SHA `f00bc4871b0f`).
+**Purpose:** Complete current-state reference with file:line citations. Reads as a map of every IFC-related code path, entity emitter, data contract, and improvement lever.
 
 ---
 
-## 1. Architecture Overview
+## 1. Executive Summary
 
-### 1.1 Component map
+NeoBIM's IFC capability has two complementary paths:
+
+- **Write path (EX-001 → IFC4 files).** A Python FastAPI microservice (`neobim-ifc-service/`) built on `ifcopenshell 0.8.5` is the primary engine. A 6,328-LOC hand-rolled TypeScript STEP writer (`src/features/ifc/services/ifc-exporter.ts`) is the emergency fallback. Phase 1 Track A added a pre-flight probe + UI indicator so users always see which path ran.
+
+- **Read path (TR-007 parse / TR-016 clash / `/ifc-viewer`).** Browser-side `web-ifc` WASM with a regex-based text-parser fallback. Unchanged in Phase 1.
+
+**Key architectural tension revealed by the Phase 0 audit:** the TS exporter actually contains richer emitters (structural analysis model, MEP ports, rebar, curtain-wall decomposition, classifications, 4D/5D tasks) than the Python service — but four gate flags (`emitRebarGeometry`, `autoEmitDemoContent`, `emitCurtainWallGeometry`, `emitMEPGeometry`) default to `false`, and `ex-001.ts:172-176` never sets them. Phase 1 Track B will plumb these flags through. Phases 2-4 will grow the Python service to feature parity.
+
+**What changed in Phase 1 Track A (complete):**
+1. Pre-flight `/ready` probe with 60 s cache, so a down Python service fails over in ≤5 s instead of burning the 30 s export timeout.
+2. Rich/Lean badge on EX-001's download card — amber with tooltip when TS fallback ran, green when IfcOpenShell ran.
+3. New metadata fields stamped on every EX-001 artifact: `ifcServicePath`, `ifcServiceProbeMs`, `ifcServiceSkipped`, `ifcServiceSkipReason`.
+4. `.env.example` now documents `IFC_SERVICE_URL`, `IFC_SERVICE_API_KEY`, `IFC_RICH_MODE`.
+5. `getServiceHealthStatus()` helper reserved for a future admin dashboard.
+
+---
+
+## 2. Architecture Overview (post Phase 1 Track A)
 
 ```
-┌────────────────────────────────────────────────────────────────────────┐
-│                       CLIENT  (browser, Next.js)                       │
-│                                                                        │
-│  ┌───────────────┐  ┌───────────────────┐  ┌───────────────────────┐  │
-│  │ IN-004 input  │  │ /dashboard/       │  │ Canvas artifact       │  │
-│  │ (InputNode)   │  │  ifc-viewer       │  │ IFCBIMViewer          │  │
-│  │               │  │  (IFCViewerPage)  │  │                       │  │
-│  └──────┬────────┘  └────────┬──────────┘  └──────────┬────────────┘  │
-│         │                    │ IndexedDB (ifc-cache)  │               │
-│         │                    ▼                        │               │
-│         │         ┌──────────────────┐                │               │
-│         │         │ Web Worker:      │                │               │
-│         │         │ ifc-worker.ts    │                │               │
-│         │         │  web-ifc WASM    │◄───────────────┘               │
-│         │         └──────────────────┘                                │
-│         │                                                             │
-│         │  client-side parseIFCText()  ──► ifcParsed stored on node   │
-│         │                                                             │
-│         │  TR-007 fast-path (useExecution.ts): if large file,         │
-│         │  upload via FormData to /api/parse-ifc, then construct      │
-│         │  artifact directly without hitting /api/execute-node.       │
-│         ▼                                                             │
-└─────────┼─────────────────────────────────────────────────────────────┘
-          │
-          │   POST /api/upload-ifc    (multipart, max 100 MB)
-          │   POST /api/parse-ifc     (JSON {ifcUrl} OR multipart)
-          │   POST /api/execute-node  (catalogueId + inputData)
-          ▼
-┌─────────────────────────────────────────────────────────────────────────┐
-│                  SERVER  (Next.js API routes, Vercel)                   │
-│                                                                         │
-│  /api/upload-ifc  ─► uploadIFCToR2()  ──►  Cloudflare R2 (ifc/ prefix)  │
-│                                                                         │
-│  /api/parse-ifc   ─► parseIFCBuffer (WASM, web-ifc)                     │
-│                     └── on WASM failure ─► parseIFCText (regex)         │
-│                                                                         │
-│  /api/execute-node                                                      │
-│     ├─ TR-007  handlers/tr-007.ts    ─► reuses parseIFCBuffer           │
-│     ├─ TR-008  handlers/tr-008.ts    ─► pure TS cost mapper             │
-│     ├─ TR-016  handlers/tr-016.ts    ─► clash-detector.ts (web-ifc AABB)│
-│     ├─ GN-001  handlers/gn-001.ts    ─► generateIFCFile (TS) + GLB      │
-│     ├─ GN-012  handlers/gn-012.ts    ─► floor-plan → MassingGeometry    │
-│     └─ EX-001  handlers/ex-001.ts    ─► generateIFCViaService (HTTP)    │
-│                                        └── fallback: generateMultiple-  │
-│                                            IFCFiles (TS)                │
-└──────────────────────────────────┬──────────────────────────────────────┘
-                                   │  POST {IFC_SERVICE_URL}/api/v1/export-ifc
+┌───────────────────────────────────────────────────────────────────────────┐
+│                       CLIENT  (browser, Next.js 16)                       │
+│                                                                           │
+│  ┌───────────────┐  ┌───────────────────┐  ┌──────────────────────────┐   │
+│  │ IN-004 input  │  │ /dashboard/       │  │ Canvas artifact card     │   │
+│  │ (InputNode)   │  │  ifc-viewer       │  │   ↳ ExportTab.tsx        │   │
+│  │               │  │  (IFCViewerPage)  │  │   ↳ Rich/Lean badge ◄NEW │   │
+│  └──────┬────────┘  └────────┬──────────┘  └──────────┬───────────────┘   │
+│         │                    │                         │                  │
+│         │ client-side        │ Web Worker + WASM       │ reads            │
+│         │ parseIFCText()     │ for interactive view    │ artifact.metadata│
+│         ▼                    ▼                         │ .ifcServicePath  │
+│  ┌───────────────────────────────────────┐             │                  │
+│  │ useWorkflowStore.ifcParsed            │             │                  │
+│  │ (Zustand) — pre-parsed divisions      │             │                  │
+│  └──────────────┬────────────────────────┘             │                  │
+│                 │                                      │                  │
+│                 │ workflow run                         │                  │
+│                 ▼                                      │                  │
+│  ┌───────────────────────────────────────┐             │                  │
+│  │ useExecution — dispatches per-node    │             │                  │
+│  │ (TR-007 fast-path, TR-016, etc.)      │             │                  │
+│  └──────────────┬────────────────────────┘             │                  │
+│                 │                                      │                  │
+└─────────────────┼──────────────────────────────────────┘                  │
+                  │   POST /api/parse-ifc, /api/upload-ifc, /api/execute-node│
+                  ▼                                                         │
+┌─────────────────────────────────────────────────────────────────────────┐ │
+│                  SERVER  (Next.js API on Vercel)                        │ │
+│                                                                         │ │
+│  /api/execute-node  → handlers/ex-001.ts                                │ │
+│     1. resolve MassingGeometry from upstream                            │ │
+│     2. ◄NEW await isServiceReady({5s timeout, 60s cache})               │ │
+│     3a. probe.ok  → generateIFCViaService(...) ──→ Python (primary)     │ │
+│     3b. probe.fail → skip (generateMultipleIFCFiles TS fallback)        │ │
+│     4. stamp artifact.metadata: engine, ifcServicePath,                 │ │
+│                                 ifcServiceProbeMs, ifcServiceSkipped,   │ │
+│                                 ifcServiceSkipReason                    │ │
+│                                                                         │ │
+│  /api/parse-ifc  → parseIFCBuffer (web-ifc WASM)                        │ │
+│     └── on WASM failure ── parseIFCText (regex)                         │ │
+│                                                                         │ │
+│  /api/upload-ifc → uploadIFCToR2 → Cloudflare R2 (ifc/ prefix)          │ │
+└──────────────────────────────────┬──────────────────────────────────────┘ │
+                                   │ POST {IFC_SERVICE_URL}/api/v1/export-ifc
+                                   │   Authorization: Bearer <IFC_SERVICE_API_KEY>
                                    ▼
 ┌─────────────────────────────────────────────────────────────────────────┐
-│           PYTHON MICROSERVICE  (neobim-ifc-service/, FastAPI)           │
+│   PYTHON MICROSERVICE (neobim-ifc-service/, FastAPI, ifcopenshell)      │
+│   Deployed to Railway: https://buildflow-python-server.up.railway.app   │
+│   Probe endpoint: GET /ready (public)                                   │
+│   Health endpoint: GET /health (public, rich diagnostics)               │
 │                                                                         │
-│  routers/export.py  ─► ifc_builder.build_multi_discipline()             │
-│                        ├─ wall_builder.create_wall                      │
-│                        ├─ slab_builder.create_slab                      │
-│                        ├─ column_builder / beam_builder / stair_builder │
-│                        ├─ opening_builder.create_window / create_door   │
-│                        ├─ mep_builder.create_duct / pipe / tray         │
-│                        ├─ space_builder.create_space                    │
-│                        ├─ material_library (IfcMaterialLayerSet)        │
-│                        └─ property_sets (Pset_*Common)                  │
+│   Middleware order (outermost → innermost):                             │
+│     ApiKey → CORS → RequestId → handler                                 │
 │                                                                         │
-│  Produces IFC4 bytes per discipline (architectural / structural / mep / │
-│  combined), uploads via r2_uploader, returns {download_url, ...}.       │
+│   POST /api/v1/export-ifc → ifc_builder.build_multi_discipline()        │
+│        ├─ wall_builder.create_wall (+ create_opening_in_wall)           │
+│        ├─ slab_builder.create_slab (floor + roof)                       │
+│        ├─ column_builder.create_column                                  │
+│        ├─ beam_builder.create_beam (IShape profile)                     │
+│        ├─ stair_builder.create_stair (stepped polyline)                 │
+│        ├─ opening_builder.create_window/create_door                     │
+│        ├─ space_builder.create_space                                    │
+│        ├─ mep_builder.create_duct/pipe/cable_tray/equipment             │
+│        ├─ material_library.create_material_layer_set                    │
+│        └─ property_sets.add_*_psets                                     │
+│   → r2_uploader.upload_ifc_to_r2 (boto3) OR base64 data URI fallback    │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
-### 1.2 Where each piece runs
+### Where each piece runs
 
-| Concern | Where | Evidence |
+| Concern | Runtime | Evidence |
 |---|---|---|
-| IFC file chosen by user | Browser | `src/features/canvas/components/nodes/InputNode.tsx:83-209` (IN-004 `FileUploadInput`) |
-| Raw `File` held in memory | Browser (module-level `Map`) | `InputNode.tsx:17-18` `inputFileStore`, `inputMultiFileStore`; `:510` `supplementaryIFCStore` |
-| Text-regex parse on upload | Browser main thread | `InputNode.tsx:136-192` calls `parseIFCText` |
-| WASM parse (interactive viewer) | Browser Web Worker | `src/features/ifc/components/ifc-worker.ts` + `Viewport.tsx:1-60` loads web-ifc WASM client-side |
-| WASM parse (server side for BOQ) | Node.js on Vercel | `src/features/ifc/services/ifc-parser.ts:1927-1934` — `new IfcAPI(); SetWasmPath(.../node_modules/web-ifc/); await Init()` |
-| STEP text fallback parse | Server or browser | `src/features/ifc/services/ifc-text-parser.ts` |
-| IFC generation (TypeScript, always on) | Node.js / Vercel | `src/features/ifc/services/ifc-exporter.ts:1400-1854` writes STEP text by hand |
-| IFC generation (Python, when `IFC_SERVICE_URL` set) | Separate service (Docker, Railway) | `neobim-ifc-service/app/services/ifc_builder.py:83-288` via `IfcOpenShell` |
-| R2 upload (IFC) | Node.js | `src/lib/r2.ts:273-313` `uploadIFCToR2`; `:328-383` `uploadBuildingAssets` |
-| R2 upload (Python path) | Python service | `neobim-ifc-service/app/services/r2_uploader.py:27-57` |
-| IFC cache for page refresh | Browser IndexedDB | `src/features/ifc/lib/ifc-cache.ts:21-151` |
+| IN-004 file drop | Browser | `src/features/canvas/components/nodes/InputNode.tsx:83-209` |
+| Client-side IFC parse (small files) | Browser main thread | `InputNode.tsx:136-192` calls `parseIFCText` |
+| WASM parse (interactive viewer) | Browser Web Worker | `src/features/ifc/components/ifc-worker.ts` |
+| WASM parse (server-side BOQ) | Node.js / Vercel lambda | `src/features/ifc/services/ifc-parser.ts:1927-1934` |
+| Pre-flight probe | Node.js / Vercel lambda | `src/features/ifc/services/ifc-service-client.ts:62-152` ◄NEW |
+| IFC generation (Python, primary) | Railway container | `neobim-ifc-service/app/services/ifc_builder.py:83-288` |
+| IFC generation (TS, fallback) | Node.js / Vercel lambda | `src/features/ifc/services/ifc-exporter.ts:1400-1854` |
+| R2 upload (TS path) | Node.js | `src/lib/r2.ts:273-313`, `328-383` |
+| R2 upload (Python path) | Railway container | `neobim-ifc-service/app/services/r2_uploader.py:27-57` |
+| Badge render | Browser | `src/features/execution/components/result-showcase/tabs/ExportTab.tsx:680-708` ◄NEW |
 
 ---
 
-## 2. File-by-File Breakdown
+## 3. Production Infrastructure
 
-### 2.1 API routes
+### 3.1 Vercel (Next.js app)
 
-#### `src/app/api/parse-ifc/route.ts` (189 LOC)
+- **Deploys from:** `rutikerole/NeoBIM_Workflow_Builder` main branch ONLY.
+- **Cron jobs:** `/api/files/cleanup` daily at 03:00 UTC, `/api/cron/refresh-prices` 2×/month, `/api/cron/reconcile-subscriptions` every 30 minutes (`vercel.json:2-15`).
+- **maxDuration:** `/api/parse-ifc` = 180 s (`src/app/api/parse-ifc/route.ts:7`), `/api/execute-node` = 600 s (`src/app/api/execute-node/route.ts:28`), `/api/upload-ifc` = 60 s (`src/app/api/upload-ifc/route.ts:7`).
+- **Relevant env vars:** `IFC_SERVICE_URL`, `IFC_SERVICE_API_KEY`, `R2_*`, `UPSTASH_REDIS_*`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `IFC_RICH_MODE` (Phase 1 Track B).
 
-- **Purpose:** Accept an IFC file (multipart or JSON `{ifcUrl}`), return `{result, meta}` with parsed divisions + diagnostics.
-- **Exports:** `POST`, `maxDuration = 180` (L7).
-- **Auth / rate limit:** `auth()` + `checkEndpointRateLimit(userId, "parse-ifc", 10, "1 m")` (L76-84).
-- **SSRF guard:** `isAllowedIfcUrl` (L20-42) restricts `ifcUrl` to same-origin relative paths, `R2_PUBLIC_URL` prefix, the `<account>.r2.cloudflarestorage.com` host, or `*.r2.dev`.
-- **Validation:** header must start with `ISO-10303-21;` (L70-73), max 100 MB (L9), empty buffer rejected (L118-120).
-- **Parse pipeline:** `parseBuffer` (L51-68) first calls `parseIFCBuffer` (WASM). On any throw, falls back to `parseIFCText` and marks `parserUsed: "text-regex"`. Both paths return the same structured result.
-- **Side effects:** fetches from R2 with `AbortSignal.timeout(60_000)` (L110). Emits `console.info`/`console.warn` with breadcrumb `[parse-ifc]`. No DB writes.
+### 3.2 Railway (Python microservice)
 
-#### `src/app/api/upload-ifc/route.ts` (77 LOC)
+- **URL:** `https://buildflow-python-server.up.railway.app`.
+- **Docker image:** `python:3.11-slim` + `libgomp1` + 2 uvicorn workers on port 8000 (`neobim-ifc-service/Dockerfile`).
+- **Deployed versions (verified via GET /health):** `ifcopenshell 0.8.5`, Python 3.11.15, Linux 6.18.5.
+- **R2 bucket used on Python side:** `buildflow-models` (different from TS side's `buildflow-files`).
+- **Memory footprint:** ~180 MB RSS at idle (`curl /health`).
+- **Cold start:** 5-30 s on free tier; paid plan eliminates this.
+- **Auth:** Bearer token in `Authorization` header matching Railway `API_KEY` env var. When unset, service runs in open mode (`neobim-ifc-service/app/auth.py:17-19`).
+- **Public endpoints (no auth):** `/`, `/health`, `/ready`, `/docs`, `/openapi.json` (per `auth.py:9` PUBLIC_PATHS).
 
-- **Purpose:** Multipart upload endpoint that proxies a `.ifc` file to R2 under the `ifc/` prefix.
-- **Max duration:** 60s (L7), 100 MB cap (L38-43).
-- **Auth + rate limit:** same shape as parse-ifc with limit `"upload-ifc", 10, "1 m"`.
-- **Side effects:** `uploadIFCToR2(buffer, file.name)` writes to R2 (L57).
-- **Return:** `{ifcUrl, fileName, fileSize}` (L65-69).
-- **Used by:** `useExecution.ts:571-582` for TR-016 clash detection when only the raw File is available client-side.
+### 3.3 Cloudflare R2
 
-#### `src/app/api/execute-node/route.ts` (414 LOC)
+- **Buckets:** `buildflow-files` (TS side: PDFs, xlsx, IFCs via `uploadIFCToR2`), `buildflow-models` (Python side: IFCs + GLBs).
+- **Key layout:**
+  - TS-side IFC uploads: `ifc/{yyyy}/{mm}/{dd}/{uuid-short}-{filename}.ifc` (`src/lib/r2.ts:290`)
+  - GN-001 bundle: `buildings/{yyyy}/{mm}/{dd}/{buildingId}/model.{glb,ifc,json}` (`src/lib/r2.ts:344-347`)
+  - Python service: `ifc/{yyyy}/{mm}/{dd}/{filename}.ifc` (`r2_uploader.py:41`)
+- **Retention:** `CLEANUP_DAYS_IFC = 3` (`r2.ts:36`). Actual cleanup cron path: `/api/files/cleanup` (`vercel.json:4-6`). Whether it deletes the `ifc/` prefix is UNKNOWN without reading the handler.
+- **Fallback:** every write path gracefully degrades to base64 `data:application/x-step;base64,...` URI if R2 is unconfigured.
 
-- **Purpose:** Dispatcher. After auth, rate-limit, and regen-cap checks, looks up the handler in `nodeHandlers` and calls it.
-- **Real node allow-list:** `REAL_NODE_IDS` (L19) — includes TR-007, TR-008, TR-016, GN-001, GN-012, EX-001 among the IFC-adjacent ones.
-- **IFC-relevant timeouts:** `maxDuration = 600` (L28).
-- **Error contract:** wraps `APIError` via `formatErrorResponse` (L391-394) and returns 500 with `SYS_001` for generic throws (L402-412).
-- **Regen cap:** enforced via `Execution.metadata.regenerationCounts` (L270-318). Fail-open on Prisma errors (L314-317).
+### 3.4 Neon PostgreSQL (Prisma)
 
-#### `src/app/api/execute-node/handlers/tr-007.ts` (585 LOC) — Quantity Extractor
+- Only touched by TR-007's QS corrections lookup (`handlers/tr-007.ts:478-511`).
+- `Execution.metadata.regenerationCounts` JSONB for regen cap (`route.ts:286-306`).
 
-- **Export:** `handleTR007: NodeHandler` (L19).
-- **Three input modes:** pre-parsed (`inputData.ifcParsed`), R2 URL (`inputData.ifcUrl`), inline base64 (`inputData.fileData`).
-- **Mode 1 (L79-234):** reuses `preParsed.divisions`, folds in parser diagnostics (`geometryTypes`, `materialTypes`, `elementWarnings`, `fileMetadata`, `elementSamples`, `smartWarnings`, `smartFixes`). Aggregates by `elementType + storey + external/internal wall suffix + IfcCovering PredefinedType`.
-- **Mode 2 (L237-246):** `fetch(ifcUrl)` then feed the buffer into Mode 3.
-- **Mode 3 (L249-401):** imports `parseIFCBuffer` dynamically and calls it with a fresh `ParserDiagnosticCounters`.
-- **Supplementary merge (L419-473):** walks `structuralIFCParsed` and `mepIFCParsed` (from `supplementaryIFCStore`) to add foundation / MEP rows.
-- **QS corrections (L478-511):** looks up `prisma.quantityCorrection` by `elementType`, takes the last 20, trims min/max, applies average ratio if ≥ 3 corrections and |Δ| > 5%.
-- **Error contract:** if no rows are produced, returns `NextResponse.json(formatErrorResponse({code:"NODE_001", …}), {status:422})` (L408-415).
-- **Side effects:** Prisma read (`quantityCorrection.findMany`), diagnostic object assembled in memory, returns `type: "table"` artifact with `_parserDiagnostics`, `_ifcContext`, `_modelQuality`.
+### 3.5 Upstash Redis
 
-#### `src/app/api/execute-node/handlers/tr-008.ts` (1720 LOC) — BOQ Cost Mapper
+- `/api/parse-ifc`: 10/min per user (`parse-ifc/route.ts:81-84`).
+- `/api/upload-ifc`: 10/min per user (`upload-ifc/route.ts:15-21`).
+- `/api/execute-node`: monthly sliding window, plan-tier-based (5/mo FREE, 10/mo MINI, 30/mo STARTER, 100/mo PRO).
 
-- **Export:** `handleTR008: NodeHandler` (L41).
-- **Input:** expects `_elements` from TR-007, plus optional `_marketData` (from TR-015), `_parserDiagnostics`, `_marketDiagnostics`, location JSON.
-- **Fallback chain for prices (L112-152):** TR-015 live → Redis cache → Postgres `MaterialPriceCache` via `resolvePriceFallback` → static IS 1200 / CPWD rates.
-- **IS 1200 steel rate formula (L103-105):** `marketSteelMaterialPerKg + 20 labour = marketTMTPerKg`; structural steel = material × 1.55 + ₹40 fabrication labour.
-- **Diagnostics merged (L46-54):** `mergeParserDiagnostics`, `mergeMarketDiagnostics`.
-- **Output (inferred from size and inputs):** table + summary of BOQ lines; persists `BoQAnalytics` fire-and-forget (per file comment L31-39).
+---
 
-#### `src/app/api/execute-node/handlers/tr-016.ts` (193 LOC) — Clash Detector
+## 4. Component Inventory
 
-- **Export:** `handleTR016` (L10).
-- **Two modes:**
-  - Multi-model (L16-88): `ifcModels[]` array, fetches all in parallel, calls `detectClashesFromMultipleBuffers` with `{tolerance:0.025, maxClashes:5000}` (`src/features/3d-render/services/clash-detector.ts:579`).
-  - Single-model (L90-192): accepts `fileData` base64, `ifcUrl`, `ifcData.buffer`, or `ifcParsed.ifcUrl`. Calls `detectClashesFromBuffer` (`clash-detector.ts:544`).
-- **Engine (`clash-detector.ts:382-538`):** `IfcAPI().OpenModel()`, enumerates element types, calls `StreamAllMeshes` to compute AABBs, then `detectClashes` with spatial grid (`:268`) and `aabbOverlap` (`:138`) with severity `classifySeverity` (`:162`).
-- **Error contract:** throws `APIError(CLASH_DETECTION_FAILED, 500)` (L86, 191) or `APIError(NO_GEOMETRY_FOR_CLASHES, 400)` (L137).
+### 4.1 Next.js — IFC write path
 
-#### `src/app/api/execute-node/handlers/ex-001.ts` (265 LOC) — IFC Exporter
+| File | LOC | Phase 1 status |
+|---|---|---|
+| `src/app/api/execute-node/handlers/ex-001.ts` | 296 (was 265) | **Modified** Track A.2 |
+| `src/features/ifc/services/ifc-service-client.ts` | 252 (was 114) | **Modified** Track A.1 |
+| `src/features/ifc/services/ifc-service-health.ts` | 51 | **NEW** Track A.5 |
+| `src/features/ifc/services/ifc-exporter.ts` | 6328 | Unchanged |
+| `src/app/api/execute-node/handlers/gn-001.ts` | 469 | Unchanged |
+| `src/app/api/execute-node/handlers/gn-012.ts` | 231 | Unchanged |
 
-- **Export:** `handleEX001` (L19).
-- **Four paths:**
-  - Path 0 (L30-49): reuse `inputData.ifcUrl` if upstream GN-001 already wrote to R2. **Note the verbatim comment L14-18:** "the original Path 0 sets an artifact then falls through and the later branches always overwrite it." Behaviour is preserved but observable.
-  - Path A (L57-62): real geometry (`_geometry.storeys` + `_geometry.footprint`) from GN-001.
-  - Path B/C (L63-156): extracts floors/footprint/height/GFA via regex + `ParsedBrief.programme` summation + `extractBuildingTypeFromText`, then calls `generateMassingGeometry` (from `deps`).
-- **Generation (L170-233):** tries `generateIFCViaService` first (Python). If `IFC_SERVICE_URL` unset or service returns non-OK, falls back to `generateMultipleIFCFiles` from `ifc-exporter.ts` which produces 4 discipline strings (architectural / structural / mep / combined). TS fallback uploads each via `uploadBase64ToR2` with `application/x-step`.
-- **Output artifact (L237-262):** `type: "file"` with `files: [{name, type:"IFC 4", size, downloadUrl, discipline, _ifcContent}]`, top-level backward-compat fields, `metadata.ifcServiceUsed` flag.
-- **Data-URI fallback (L222):** if R2 is not configured, `downloadUrl` becomes `data:application/x-step;base64,…`.
-
-#### `src/app/api/execute-node/handlers/gn-001.ts` (469 LOC) — Massing Generator (writes IFC)
-
-- **Path 3 — unified BIM pipeline (L362-466):** calls `generateIFCFile(geometry, {...})` (from `ifc-exporter.ts`) in parallel with `generateGLB`, then uploads both + metadata JSON via `uploadBuildingAssets` (`src/lib/r2.ts:328-383`).
-- **Result:** artifact type `3d` with `{glbUrl, ifcUrl, metadataUrl}` — downstream EX-001 can pass through this `ifcUrl` via Path 0.
-
-#### `src/app/api/execute-node/handlers/gn-012.ts` (231 LOC) — Floor Plan Editor
-
-- **Stages:** (1) AI room programmer → (2) AI spatial layout (GPT-4o with retry) or multi-floor BSP layout → (3) architectural detailing.
-- **IFC-adjacent output:** `convertFloorPlanToMassing(project)` (L149) produces `massingGeometry` which is the same `MassingGeometry` shape consumed by EX-001 Path A. Emitted under `_outputs["geo-out"]` (L212). Downstream EX-001 therefore builds IFC from GN-012 output too.
-- **No direct IFC write here** — it only produces `MassingGeometry` + `FloorPlanProject`.
-
-### 2.2 Services
-
-#### `src/features/ifc/services/ifc-parser.ts` (2680 LOC)
-
-- **Exports:** `QuantityData`, `MaterialLayer`, `IFCElementData`, `CSICategory`, `CSIDivision`, `BuildingStorey`, `ModelQualityReport`, `IFCParseResult`, `ParserFileMetadata`, `ElementDiagnostic`, `ParserTimings`, `ParserDiagnosticCounters`, `createParserDiagnosticCounters`, `parseIFCBuffer` (L1896).
-- **Schema consumed:** IFC2X3 / IFC4 via `web-ifc`'s `GetModelSchema`.
-- **WASM bootstrap (L1927-1934):** `new IfcAPI(); SetWasmPath(path.resolve(process.cwd(), "node_modules/web-ifc") + "/", true); await Init(); OpenModel(buffer, {COORDINATE_TO_ORIGIN:true})`. Depends on serverless bundler placing `node_modules/web-ifc` alongside the handler.
-- **Diagnostics:** populates geometry type counts (`IfcExtrudedAreaSolid`, `IfcBooleanResult`, `IfcFacetedBrep`, `IfcMappedItem`, `IfcBoundingBox`), material association types, file metadata (`authoringApplication`, `qtoBaseSetCount`, `customQuantitySetCount`, etc.), per-element samples with fallback chains, phase timings.
-- **Smart warnings (L321-414):** authoring-tool-aware messages (Revit, ArchiCAD, BIMcollab, Solibri) with suggested fixes including referencing `docs/ifcopenshell-microservice-architecture.md`.
-- **CSI mapping (L446-L~650):** `DEFAULT_WASTE_FACTORS` per CSI division, `IfcWall`/`IfcColumn`/`IfcBeam` material-based overrides, MEP mappings (div 22/23), `IfcBuildingElementProxy` inference by material name.
-- **Unit handling (L2022+):** reads `IfcUnitAssignment` from project; detects `FOOT`, `INCH`, `METRE`; applies `lengthConversionFactor`.
-
-#### `src/features/ifc/services/ifc-text-parser.ts` (1133 LOC)
-
-- Regex over raw STEP text. Emits `TextParseResult` with the same `divisions → categories → elements` shape as the WASM parser, plus its own `ParserDiagnosticCounters`. Called both from `parse-ifc` route (on WASM error) and directly from the browser via `InputNode.tsx` to avoid a server round-trip.
-
-#### `src/features/ifc/services/ifc-exporter.ts` (6328 LOC)
-
-- **Top-level exports:** `generateIFCFile` (L1400), `emitMEPFixturesForStorey` (L4818), `emitMissingBuildingElements` (L5068), `generateMultipleIFCFiles` (L6318).
-- **Strategy:** pure string builder — no library. Writes `ISO-10303-21` STEP text by hand. Header at L1428-1437, ends with `END-ISO-10303-21;` at L1854.
-- **Schema switch:** `IFC4` default, `IFC2X3` legacy. Wall entity `IFCWALL` for IFC4 vs `IFCWALLSTANDARDCASE` for IFC2X3 (L2304, L2497).
-- **Features (per header comment L1-20):** `IfcRelAssociatesMaterial`, `IfcOpeningElement` + `IfcRelVoidsElement` + `IfcRelFillsElement`, type objects (`IfcWallType` etc.), UUID v4 + v5 GUIDs compressed to 22-char base-64 (`BUILDFLOW_NAMESPACE` L177, `compressGuid` L185-199), dual CSI+NBC classification, `IfcDistributionSystem` for MEP, IS-808 steel profiles, `Pset_SpaceCommon`, Body/Axis/FootPrint subcontexts.
-- **Options (L65-168):** `schema`, `filter` (architectural|structural|mep|all), `region` (india|eu|us), `geoReference`, `rera`, `currency`, `projectPhase`, `enableMappedItems`, `permit`, `federatedFiles`, plus three guard flags `emitRebarGeometry`, `autoEmitDemoContent`, `emitCurtainWallGeometry`, `emitMEPGeometry` — **all default `false`** because the comments document a past incident of "flying debris" on non-rectangular buildings when these were on (L123-168).
-- **International classifications (L6121-6207):** hard-coded Uniclass 2015, OmniClass 2013, Uniformat II 2009, DIN 276-1:2018, NATSPEC 2023.
-- **Indian EPDs, IS 1893 seismic, IS 875 wind, IS 456 load combos (L6101-6244):** all hard-coded sample catalogues.
-- **COBie manufacturer catalogue (L6261-6312):** Indian brand placeholders (Kirloskar, Voltas, Blue Star, Havells, Schneider, Legrand, ABB, Waaree, Otis, Tyco).
-
-#### `src/features/ifc/services/ifc-service-client.ts` (114 LOC)
-
-- **Export:** `generateIFCViaService(geometry, options, filePrefix)` (L47).
-- **Behaviour:** returns `null` when `IFC_SERVICE_URL` is unset (L56-58) — triggers the TS fallback. Timeout 30 s (L39). Forwards geometry shape verbatim to Python `POST /api/v1/export-ifc`.
-- **Auth:** `Bearer ${IFC_SERVICE_API_KEY}` when configured.
-- **Result:** `{status, files[], metadata}` where each file already has an R2 `download_url` (or base64 data URI fallback).
-
-#### `src/features/ifc/lib/ifc-cache.ts` (151 LOC)
-
-- **Exports:** `saveLastIFCFile`, `loadLastIFCFile`, `clearLastIFCFile`, `CachedIFCFile`.
-- **Why IndexedDB:** IFC files routinely exceed 5 MB localStorage limit (L15-19). Stores a `Blob` synchronously before any `await` so it survives when the same buffer is transferred into a Web Worker (L66-98).
-- **Cross-tab usage:** the viewer tab caches; the canvas IN-004 auto-attach reads via `loadLastIFCFile` (`InputNode.tsx:241-256`).
-
-### 2.3 Client components
-
-- `IFCViewerPage.tsx` (735) — standalone page at `/dashboard/ifc-viewer`. Dynamic-imported with `ssr:false` (`src/app/dashboard/ifc-viewer/page.tsx:6-26`).
-- `Viewport.tsx` (1651) — Three.js + web-ifc. Imports web-ifc type IDs inline (L27-60) to avoid `import 'web-ifc'` at module top (SSR safety).
-- `ifc-worker.ts` (583) — Web Worker duplicating the same type constants (L9-41). Runs parsing off the main thread.
-- `UploadZone`, `Toolbar`, `ModelTree`, `PropertiesPanel`, `ViewCube`, `ContextMenu`, `IntegrationBanner` — viewer chrome.
-- `src/features/canvas/components/artifacts/IFCBIMViewer.tsx` — inline viewer on artifact cards; fetches `ifcUrl` or uses raw text `content`.
-
-### 2.4 Python microservice (`neobim-ifc-service/`)
+### 4.2 Next.js — IFC read / viewer path
 
 | File | LOC | Purpose |
 |---|---|---|
-| `app/main.py` | 61 | FastAPI app, CORS allowing trybuildflow.in + localhost:3000/3001, `ApiKeyMiddleware`, mounts `health` + `export` routers under `/api/v1`. |
-| `app/auth.py` | 29 | Bearer-token middleware; `/health`, `/ready`, `/docs`, `/openapi.json` are public. No API key configured ⇒ dev mode (open). |
-| `app/config.py` | 38 | Pydantic settings for API key, R2 creds, port, log level. |
-| `app/routers/export.py` | 98 | `POST /api/v1/export-ifc`. Validates ≥ 1 storey and ≤ 100 storeys (L32-41). Calls `build_multi_discipline`. Uploads each discipline to R2; data-URI fallback via `ifc_to_base64_data_uri`. |
-| `app/routers/health.py` | 34 | `/health` (liveness + `ifcopenshell.version`), `/ready` (creates an IFC in-memory as a smoke test). |
-| `app/models/request.py` | 156 | Mirrors `MassingGeometry`/`GeometryElement` TS types. `ElementType` literal includes `wall, slab, column, roof, space, window, door, beam, stair, balcony, canopy, parapet, duct, pipe, cable-tray, equipment`. |
-| `app/models/response.py` | 47 | `ExportedFile`, `EntityCounts` (12 named entity fields), `ExportMetadata`, `ExportIFCResponse`. |
-| `app/services/ifc_builder.py` | 321 | Orchestrator. Creates IfcProject/Site/Building/Storey; two-pass element creation (walls first so openings can reference them). Groups MEP into systems (L272-275). |
-| `app/services/wall_builder.py` | 197 | `create_wall` uses vertex pair to derive length + direction (L30-40); extrudes `IfcRectangleProfileDef` along Z by `height`. `create_opening_in_wall` + `fill_opening` implement the IfcRelVoidsElement/IfcRelFillsElement pair. |
-| `app/services/slab_builder.py` | 104 | `create_slab` accepts optional `footprint` for `IfcArbitraryClosedProfileDef`, extruded by `thickness`. `is_roof` inferred from `elem.type` or name. |
-| `app/services/column_builder.py` | 75 | IfcColumn via rectangular profile + extrusion. |
-| `app/services/beam_builder.py` | 93 | IfcBeam. |
-| `app/services/opening_builder.py` | 192 | IfcWindow + IfcDoor tied to parent wall via the opening helper. |
-| `app/services/space_builder.py` | 98 | IfcSpace with footprint polyline. |
-| `app/services/stair_builder.py` | 97 | IfcStairFlight (rise/tread from props if supplied). |
-| `app/services/mep_builder.py` | 291 | Duct, pipe, cable-tray, equipment + `create_mep_system` which builds `IfcDistributionSystem` + `IfcRelAssignsToGroup`. |
-| `app/services/material_library.py` | 224 | `WALL_PRESETS`, slab, roof presets by building type → IfcMaterialLayerSet via `api.run('material.add_material', …)`. |
-| `app/services/property_sets.py` | 239 | Pset_WallCommon, Pset_SlabCommon, Pset_WindowCommon, Pset_DoorCommon, Pset_SpaceCommon, Pset_BeamCommon, Pset_ColumnCommon. |
-| `app/services/r2_uploader.py` | 63 | boto3 S3 client to `{account}.r2.cloudflarestorage.com`, key `ifc/{yyyy}/{mm}/{dd}/{filename}`, fallback `ifc_to_base64_data_uri`. |
-| `app/utils/guid.py` | 25 | `new_guid()` returning IfcOpenShell's compressed GUID. |
-| `app/utils/geometry.py` | 67 | Vertex helpers. |
-| `app/utils/ifc_helpers.py` | 51 | `assign_to_storey` wraps `IfcRelContainedInSpatialStructure`. |
+| `src/app/api/parse-ifc/route.ts` | 189 | WASM parse + text-regex fallback |
+| `src/app/api/upload-ifc/route.ts` | 77 | Multipart upload to R2 |
+| `src/features/ifc/services/ifc-parser.ts` | 2680 | WASM parser + diagnostics |
+| `src/features/ifc/services/ifc-text-parser.ts` | 1133 | Regex-based STEP fallback |
+| `src/features/ifc/lib/ifc-cache.ts` | 151 | IndexedDB cache |
+| `src/features/ifc/components/IFCViewerPage.tsx` | 735 | Standalone viewer |
+| `src/features/ifc/components/Viewport.tsx` | 1651 | Three.js + web-ifc glue |
+| `src/features/ifc/components/ifc-worker.ts` | 583 | Web Worker |
 
-### 2.5 Tests present
+### 4.3 UI — result showcase (Phase 1 Track A touched)
 
-- `tests/unit/ifc-exporter.test.ts` — covers generator.
-- `tests/unit/ifc-multi-export.test.ts` — covers `generateMultipleIFCFiles`.
-- `tests/unit/ifc-cost-pipeline.test.ts` — covers TR-007 → TR-008 mapping.
-- `neobim-ifc-service/tests/` directory exists but only `fixtures/` is populated; no `.py` test files are listed — **UNKNOWN coverage for the Python service.**
+| File | LOC | Phase 1 status |
+|---|---|---|
+| `src/features/execution/components/result-showcase/useShowcaseData.ts` | 547 (was 533) | **Modified** Track A.3 |
+| `src/features/execution/components/result-showcase/tabs/ExportTab.tsx` | 796 (was 688) | **Modified** Track A.3 |
+| `src/features/execution/components/result-showcase/constants.ts` | 44 | Unchanged (COLORS.EMERALD + AMBER used) |
+
+### 4.4 Python microservice
+
+**Production-hardened** post-Phase 0 (deployed at git SHA `f00bc4871b0f`):
+
+| File | LOC | Notes |
+|---|---|---|
+| `app/main.py` | 242 (was 61) | Lifespan self-test, 3 global exception handlers, RequestIdMiddleware, `/` root endpoint |
+| `app/auth.py` | 29 | Bearer auth; public paths bypass |
+| `app/middleware.py` | UNKNOWN | RequestId middleware — stamps `request.state.request_id` + `X-Request-ID` header |
+| `app/config.py` | 38 | Pydantic settings (api_key, R2 creds) |
+| `app/routers/health.py` | 100 (was 34) | `/health` now returns ifcopenshell version, git SHA, memory RSS; `/ready` exercises ifcopenshell, returns 503 on failure |
+| `app/routers/export.py` | 98 | `POST /api/v1/export-ifc` dispatcher |
+| `app/models/request.py` | 156 | Pydantic models |
+| `app/models/response.py` | 47 | `ExportIFCResponse`, `EntityCounts` |
+| `app/services/ifc_builder.py` | 321 | Two-pass orchestrator |
+| `app/services/wall_builder.py` | 197 | `IfcWall` + opening + fill |
+| `app/services/slab_builder.py` | 104 | `IfcSlab` FLOOR + ROOF |
+| `app/services/column_builder.py` | 75 | Circular columns only |
+| `app/services/beam_builder.py` | 93 | I-section, hard-coded web/flange thickness |
+| `app/services/opening_builder.py` | 192 | Window + Door tied to parent wall |
+| `app/services/space_builder.py` | 98 | `IfcSpace` polygon footprint |
+| `app/services/stair_builder.py` | 97 | Stepped polyline extrusion |
+| `app/services/mep_builder.py` | 291 | Segments + `IfcSystem` + `IfcRelAssignsToGroup` |
+| `app/services/material_library.py` | 224 | 5 wall × 5 slab × 1 roof preset, IfcMaterialLayerSet |
+| `app/services/property_sets.py` | 239 | Pset_*Common + Qto_*BaseQuantities |
+| `app/services/r2_uploader.py` | 63 | boto3 S3 → `buildflow-models` bucket |
+| `app/utils/geometry.py` | 67 | Polygon area/centroid/perimeter |
+| `app/utils/guid.py` | 25 | UUID v4 (random) → 22-char base64 |
+| `app/utils/ifc_helpers.py` | 51 | `assign_to_storey` router |
 
 ---
 
-## 3. Data Contracts
+## 5. Request Lifecycle — Write Path (EX-001)
 
-### 3.1 Parser → consumers
+### 5.1 Phase 1 Track A flow (post-probe)
+
+```
+Client workflow run
+    ├─ executeNode(EX-001, executionId, tileInstanceId, inputData)
+    ▼
+POST /api/execute-node  {catalogueId:"EX-001", inputData}
+    ▼
+execute-node/route.ts
+    ├─ auth + rate-limit checks
+    ├─ assertValidInput("EX-001", inputData)
+    ├─ dispatch to handleEX001
+    ▼
+handlers/ex-001.ts
+    ├─ L28: let artifact: ExecutionArtifact | undefined
+    ├─ L31-49: Path 0 — if upstream ifcUrl, short-circuit (DEAD — overwritten below)
+    ├─ L57-62: Path A — real _geometry from GN-001
+    ├─ L63-156: Path B/C — extract floors/footprint from TR-001/TR-003
+    ├─ L159-161: compute bldgNameSlug + dateStr + filePrefix
+    ├─ L164-168: init ifcServiceUsed=false, files=[]
+    ├─ L170-172: dynamic import {isServiceReady, generateIFCViaService}
+    ├─ L173: const readiness = await isServiceReady()                  ◄ NEW
+    ├─ L175: if (readiness.ready) {
+    │         L177-196: try { generateIFCViaService(...)
+    │                          if (serviceResult) {
+    │                            ifcServiceUsed = true
+    │                            files = serviceResult.files.map(...)
+    │                          }
+    │                        } catch { TS fallback }
+    │       }
+    ├─ L201-204: else { logger.debug("skipping Python — probe failed")  ◄ NEW
+    │          }
+    ├─ L206-233: if (!ifcServiceUsed) { TS fallback:
+    │             import generateMultipleIFCFiles
+    │             loop disciplines → base64 → uploadBase64ToR2
+    │           }
+    ├─ L235: combinedFile = files.find(d=="combined") ?? files[0]
+    ├─ L237-263: build artifact with metadata:
+    │             engine, ifcServiceUsed (existed)
+    │             ifcServicePath, ifcServiceProbeMs,                   ◄ NEW
+    │             ifcServiceSkipped, ifcServiceSkipReason              ◄ NEW
+    ▼
+execute-node/route.ts → persist via Execution.tileResults (Prisma)
+    ▼
+Client (useExecution.ts) → store in useExecutionStore.artifacts (Map)
+    ▼
+ExportTab.tsx (via useShowcaseData.ts)
+    ├─ findAllByType(artifacts, "file")
+    ├─ read each a.metadata                                             ◄ NEW
+    ├─ emit FileDownload[] with ifcEngine, ifcServicePath attached
+    ├─ ExportTab loops fileDownloads → downloadCards with ifcBadge      ◄ NEW
+    ├─ DownloadCard renders IfcEngineBadge inline                       ◄ NEW
+```
+
+### 5.2 The probe itself
+
+`src/features/ifc/services/ifc-service-client.ts:62-152`:
+
+- **Target:** `GET ${IFC_SERVICE_URL}/ready` (public — no auth header sent).
+- **Cache:** `Map<string, ServiceReadinessResult>` keyed by URL, 60 s TTL. Module-level — per-lambda, not global.
+- **Contract:** never throws. Returns a fixed `reason` union:
+  - `"ok"` — HTTP 200 + body `ready === true`
+  - `"not-configured"` — env var unset; zero network I/O
+  - `"timeout"` — `AbortSignal.timeout(5_000)` fired
+  - `"http-error"` — non-200 status OR 200 with body.ready !== true
+  - `"parse-error"` — JSON parse failed
+  - `"network-error"` — any other fetch failure
+
+### 5.3 UI propagation chain (two files)
+
+`useShowcaseData.ts:420-448` — extends `FileDownload` with IFC metadata fields; `ExportTab.tsx:213-243` — derives `ifcBadge` from `ifcEngine`; `ExportTab.tsx:680-708` — renders `IfcEngineBadge` component using existing `COLORS.EMERALD` / `COLORS.AMBER` tokens (no new colors added).
+
+---
+
+## 6. Request Lifecycle — Read Path (TR-007)
+
+Unchanged in Phase 1. Summary: drop → pre-parse client-side (text-regex) → fast-path artifact OR POST to `/api/parse-ifc` for WASM → QS corrections → `type:"table"` artifact with `_elements`, `_parserDiagnostics`, `_ifcContext`, `_modelQuality`.
+
+---
+
+## 7. Data Contracts
+
+### 7.1 `MassingGeometry` (TS — `geometry.ts:95-112`)
 
 ```ts
-// src/features/ifc/services/ifc-parser.ts:178-210
-interface IFCParseResult {
-  meta: { version; timestamp; processingTimeMs; ifcSchema;
-          projectName; projectGuid;
-          units: {length; area; volume}; warnings: string[]; errors: string[] };
-  summary: { totalElements; processedElements; failedElements;
-             divisionsFound: string[]; buildingStoreys; grossFloorArea;
-             totalConcrete?; totalMasonry? };
-  divisions: CSIDivision[];              // code → categories → elements[]
-  buildingStoreys: BuildingStorey[];
-  modelQuality?: ModelQualityReport;     // L149-176
-  parserDiagnostics?: ParserDiagnosticCounters;  // L264-295
-}
-
-interface IFCElementData {                // L108
-  id: string; type: string; name: string; storey: string;
-  material: string; materialLayers?: MaterialLayer[];
-  quantities: QuantityData;               // L72 — area {gross,net}, volume {base,withWaste}, …
-  properties?: Record<string, unknown>;
+interface MassingGeometry {
+  buildingType: string;
+  floors: number;
+  totalHeight: number;
+  footprintArea: number;
+  gfa: number;
+  footprint: FootprintPoint[];
+  storeys: MassingStorey[];
+  boundingBox: { min: Vertex; max: Vertex };
+  metrics: Array<{ label; value; unit? }>;
 }
 ```
 
-### 3.2 TR-007 artifact (client fast-path AND server handler produce the same shape)
+### 7.2 `GeometryElement` (TS — `geometry.ts:17-76`)
 
 ```ts
-// tr-007.ts:546-584, useExecution.ts:535-550
-{ type: "table",
+interface GeometryElement {
+  id: string;
+  type: "wall" | "slab" | "column" | "roof" | "space" | "window" | "door" |
+        "beam" | "stair" | "balcony" | "canopy" | "parapet" |
+        "duct" | "pipe" | "cable-tray" | "equipment" |
+        "mullion" | "spandrel";   // ← Python rejects until Track C.3 lands
+  vertices: Vertex[];
+  faces: Face[];
+  ifcType: "IfcWall" | "IfcSlab" | "IfcColumn" | "IfcBuildingElementProxy" |
+           "IfcSpace" | "IfcWindow" | "IfcDoor" | "IfcBeam" | "IfcStairFlight" |
+           "IfcRailing" | "IfcCovering" | "IfcFooting" | "IfcDuctSegment" |
+           "IfcPipeSegment" | "IfcCableCarrierSegment" | "IfcFlowTerminal";
+  properties: ElementProperties;
+}
+```
+
+### 7.3 `ElementProperties` (current state — Phase 1 Track C will expand)
+
+Currently 27 fields, all mirrored 1:1 in Python `request.py:31-62`:
+`name, storeyIndex, height, width, length, thickness, area, volume, isPartition, radius, spaceName, spaceUsage, spaceFootprint, sillHeight, wallOffset, parentWallId, wallDirectionX/Y, wallOriginX/Y, material, discipline, diameter, isExterior, riserCount, riserHeight, treadDepth`.
+
+**Phase 1 Track C will add (not yet landed):**
+
+Architectural: `fireRatingMinutes`, `acousticRatingDb`, `thermalUValue`, `classificationCode`, `classificationSystem`, `zoneName`, `isLoadBearing`.
+
+Structural: `materialGrade`, `profileType`, `designLoadKnPerM`, `designLoadKn`, `spanType`, `supportType`, `rebarRatio`, `rebarSpec{mainBars, stirrups}`.
+
+MEP: `systemName`, `systemPredefinedType`, `flowDirection`, `upstreamElementId`, `downstreamElementIds[]`, `diameterMm`, `widthMm`, `heightMm`, `insulationThicknessMm`, `designFlowRate`, `designPressure`.
+
+### 7.4 EX-001 artifact `data` shape (post Phase 1 Track A)
+
+```ts
+{
+  type: "file",
   data: {
-    label: "Extracted Quantities (IFC)",
-    headers: ["Category","Element","Gross Area (m²)","Opening Area (m²)",
-              "Net Area (m²)","Volume (m³)","Qty","Unit"],
-    rows: string[][],
-    _elements: [{description, category, quantity, unit,
-                 grossArea?, netArea?, openingArea?, totalVolume?,
-                 storey, elementCount, materialLayers?, ifcType, …}],
-    _hasStructuralFoundation: boolean,
-    _hasMEPData: boolean,
-    _parserDiagnostics: PipelineDiagnostics,
-    _ifcContext: {totalFloors, totalGFA, estimatedHeight,
-                  dominantStructure, openingRatio, slabToWallRatio},
-    content: parseSummary,                // string
-    _modelQuality?: ModelQualityReport,
+    files: [                                   // 4 discipline IFCs
+      { name, type: "IFC 4", size, downloadUrl,
+        label, discipline: "architectural"|"structural"|"mep"|"combined",
+        _ifcContent?: string },
+      ...
+    ],
+    label: "IFC Export (4 Discipline Files)",
+    totalSize: number,
+    // Backward-compat top-level fields from combined file
+    name, type: "IFC 4", size, downloadUrl, _ifcContent,
   },
-  metadata: { model: "ifc-parser-v2", real: true,
-              hasStructuralIFC, hasMEPIFC } }
+  metadata: {
+    engine: "ifcopenshell" | "ifc-exporter",
+    real: true,
+    schema: "IFC4",
+    multiFile: true,
+    ifcServiceUsed: boolean,
+    ifcServicePath: "python" | "ts-fallback",      // ◄ NEW
+    ifcServiceProbeMs: number,                     // ◄ NEW
+    ifcServiceSkipped: boolean,                    // ◄ NEW
+    ifcServiceSkipReason?: ServiceReadinessReason, // ◄ NEW
+  }
+}
 ```
 
-### 3.3 TR-016 artifact
+### 7.5 Python service contracts
 
-```ts
-// tr-016.ts:62-82, 168-189
-{ type: "table",
-  data: {
-    label: "Clash Detection Report" | "Cross-Model Clash Report (N models)",
-    headers: [...],
-    rows: [[#, severity, elemA, idA, (modelA)?, elemB, idB, (modelB)?,
-            storey, overlapM3], ...],
-    _clashes: ClashResult[], _meta: ClashDetectionMeta,
-    content: summaryString },
-  metadata: { real: true, processingTimeMs, totalElements,
-              clashesFound, modelCount?, crossModelClashes? } }
-```
-
-### 3.4 MassingGeometry → EX-001 → IFC
-
-```ts
-// src/types/geometry.ts (mirrored in neobim-ifc-service/app/models/request.py)
-MassingGeometry {
-  buildingType, floors, totalHeight, footprintArea, gfa,
-  footprint: FootprintPoint[],
-  storeys: MassingStorey[{index, name, elevation, height,
-    elements: GeometryElement[{id, type, vertices, faces?,
-      ifcType: "IfcWall" | "IfcSlab" | "IfcColumn" | … ,
-      properties: ElementProperties}] }],
-  boundingBox?, metrics? }
-```
-
-EX-001 emits `files: [{name, type:"IFC 4", size, downloadUrl, label, discipline: "architectural"|"structural"|"mep"|"combined", _ifcContent?: string}]` (`ex-001.ts:237-262`).
-
-### 3.5 Python service request / response
-
-See `neobim-ifc-service/app/models/request.py:151-156` for `ExportIFCRequest` and `response.py:42-47` for `ExportIFCResponse`. Response `files[i].download_url` is either an R2 URL or a data URI starting with `data:application/x-step;base64,` (`r2_uploader.py:60-63`).
+**Request** (`ExportIFCRequest`, `request.py:151-156`): `{geometry, options, filePrefix}`.
+**Response** (`ExportIFCResponse`, `response.py:42-47`): `{status, files[], metadata, error?, code?}`.
+**`EntityCounts`** (`response.py:19-32`): 12 tracked types (`IfcWall, IfcSlab, IfcColumn, IfcBeam, IfcWindow, IfcDoor, IfcOpeningElement, IfcSpace, IfcStairFlight, IfcDuctSegment, IfcPipeSegment, IfcFooting`).
 
 ---
 
-## 4. Execution Flow
+## 8. IFC Entity Coverage Matrix
 
-### 4.1 WF-09 `IFC Model → BOQ Cost Estimate` (`prebuilt-workflows.ts:300-408`)
+Three columns: Python service (today), TS exporter with default flags (`off`), TS exporter with all flags on (`full`).
 
-Topology:
-```
-IN-004 (IFC Upload)  ──► TR-007 (Quantity Extractor) ──┐
-IN-006 (Location)    ──► TR-015 (Market Intelligence)  │
-                                     └─► TR-008 (BOQ Cost Mapper) ──► EX-002 (XLSX)
-```
+| Entity | Python | TS `off` | TS `full` |
+|---|---|---|---|
+| IfcProject / Site / Building / BuildingStorey | ✅ | ✅ | ✅ |
+| IfcGrid | ❌ | ✅ (`ifc-exporter.ts:1816`) | ✅ |
+| IfcWall + PredefinedType | ✅ (`wall_builder.py:43`) | ✅ | ✅ |
+| IfcOpeningElement + IfcRelVoids/Fills | ✅ | ✅ | ✅ |
+| IfcSlab (FLOOR + ROOF) | ✅ (`slab_builder.py:29`) | ✅ | ✅ |
+| IfcColumn (circular only on Python) | ✅ | ✅ | ✅ |
+| IfcBeam + IfcIShapeProfileDef | ✅ (`beam_builder.py:26`) | ✅ | ✅ |
+| IfcWindow + IfcDoor + OperationType | ✅ | ✅ | ✅ |
+| IfcStairFlight (stepped) | ✅ (`stair_builder.py:27`) | ✅ | ✅ |
+| IfcSpace + CompositionType | ✅ (`space_builder.py:22`) | ✅ | ✅ |
+| IfcDuctSegment / PipeSegment / CableCarrierSegment | ✅ (body) | ✅ ($-rep) | ✅ (body) |
+| IfcFlowTerminal | ✅ | ✅ | ✅ |
+| **IfcDuctFitting / IfcPipeFitting** | ❌ | ❌ | ✅ (`ifc-exporter.ts:4961, 4982`) |
+| **IfcValve (GATE, CHECK)** | ❌ | ❌ | ✅ (`ifc-exporter.ts:4966`) |
+| IfcCableCarrierFitting / IfcFlowController | ❌ | ❌ | ❌ |
+| **IfcDistributionPort** | ❌ | ❌ | ✅ (`ifc-exporter.ts:5747`) |
+| **IfcRelConnectsPorts** | ❌ | ❌ | ✅ (`ifc-exporter.ts:5764`) |
+| IfcSystem / IfcRelAssignsToGroup / IfcRelServicesBuildings | ✅ | ✅ | ✅ |
+| IfcBuildingElementProxy (balcony/canopy/parapet) | ✅ | ✅ | ✅ |
+| IfcMaterialLayer / LayerSet / LayerSetUsage / RelAssociatesMaterial | ✅ | ✅ | ✅ |
+| **IfcMaterialProfileSet** | ❌ | ❌ | ❌ |
+| **IfcReinforcingBar** | ❌ | ✅ (Pset-only) | ✅ (body via emitRebarGeometry) |
+| **IfcReinforcingMesh** | ❌ | ✅ Pset-only | ✅ body |
+| **IfcCurtainWall** | ❌ | ✅ container | ✅ (body via emitCurtainWallGeometry) |
+| IfcMember (MULLION) / IfcPlate (CURTAIN_PANEL) | ❌ | ✅ Pset-only | ✅ body |
+| **IfcRailing** | ❌ | ✅ (`ifc-exporter.ts:3467`) | ✅ |
+| **IfcFurniture** | ❌ | ❌ | ✅ (gated `autoEmitDemoContent`) |
+| **IfcFooting** | ❌ (proxy) | ✅ (`ifc-exporter.ts:5190`) | ✅ |
+| **IfcStructuralAnalysisModel** | ❌ | ✅ (`ifc-exporter.ts:5569`) | ✅ |
+| IfcStructuralLoadGroup (LOAD_CASE + LOAD_COMBINATION) | ❌ | ✅ | ✅ |
+| IfcStructuralCurveMember / SurfaceMember / Action | ❌ | ❌ | ❌ |
+| IfcBoundaryCondition | ❌ | ❌ | ❌ |
+| IfcMechanicalFastener | ❌ | ❌ | ✅ (gated) |
+| **IfcClassification + IfcClassificationReference + IfcRelAssociatesClassification** | ❌ | ✅ (`ifc-exporter.ts:2049, 5405`) | ✅ |
+| IfcZone | ❌ | ❌ | ❌ |
+| IfcTask + IfcRelAssignsToControl (4D) | ❌ | ✅ (`ifc-exporter.ts:1810`) | ✅ |
+| IfcCostSchedule + IfcCostItem (5D) | ❌ | ✅ (`ifc-exporter.ts:1811`) | ✅ |
+| IfcLaborResource | ❌ | ✅ (`ifc-exporter.ts:5808`) | ✅ |
+| IfcPermit / IfcApproval (Indian compliance) | ❌ | ✅ | ✅ |
+| IfcDocumentReference (federation) | ❌ | ✅ | ✅ |
+| IfcMapConversion + IfcProjectedCRS (georeference) | ❌ | ✅ (when opted in) | ✅ |
+| Pset_EnvironmentalImpactValues (embodied carbon) | ❌ | ✅ (`ifc-exporter.ts:1818`) | ✅ |
+| Pset_WallCommon / SlabCommon / ColumnCommon / BeamCommon / WindowCommon / DoorCommon / SpaceCommon | ✅ | ✅ | ✅ |
+| Pset_SpaceThermalRequirements | ❌ | ✅ | ✅ |
+| Qto_WallBaseQuantities / SlabBaseQuantities / ColumnBaseQuantities / BeamBaseQuantities | ✅ | ✅ | ✅ |
+| IfcRelSpaceBoundary (1st level) | ❌ | ✅ | ✅ |
+| **IfcRelSpaceBoundary2ndLevel** | ❌ | ❌ | ❌ |
 
-Walkthrough:
-
-1. **User drops file in IN-004.** `FileUploadInput.handleFile` (`InputNode.tsx:91-209`) stores the `File` in `inputFileStore`, reads via `FileReader.readAsText`, calls `parseIFCText` **client-side** to produce `ifcParsed` which is written to `node.data.ifcParsed` (L162-173). `ifcUrl`/`fileData` are cleared.
-2. **Workflow run triggers `useExecution`** (`useExecution.ts`). For TR-007 it skips the server round-trip when `ifcParsed` exists or the file is "large" (`>1.5 MB base64`, L359). Otherwise, it uploads via multipart to `/api/parse-ifc` (L378-390).
-3. **Server parses** — `parse-ifc/route.ts:136` calls `parseBuffer` → `parseIFCBuffer(buffer, fileName, undefined, counters)` (WASM). Regex fallback kicks in on any throw.
-4. **TR-007 artifact is synthesised** either on the client fast-path (`useExecution.ts:535-550`) or via `handleTR007` on the server. Both shapes are identical (L3.2).
-5. **TR-008 (`handlers/tr-008.ts`)** merges `_elements` from TR-007 with `_marketData` from TR-015 and location JSON from IN-006. Applies fallback chain (L119-152) → computes unit costs → persists `BoQAnalytics`.
-6. **EX-002** writes xlsx via `handlers/ex-002.ts` and uploads via `uploadBase64ToR2` (`ex-002.ts:740`).
-
-Storage per step:
-| Step | Persistence |
-|---|---|
-| IN-004 drop | Browser `inputFileStore` Map + `node.data.ifcParsed` in Zustand (`useWorkflowStore`) |
-| Optional R2 upload | R2 `ifc/{yyyy}/{mm}/{dd}/{uuid}-{filename}` (`uploadIFCToR2`, 3-day cleanup per constants L35-36 in `r2.ts`) |
-| TR-007 result | Stored in `Execution.tileResults[]` row by `useExecution.ts` save path (UNKNOWN exact row — not inspected) |
-| TR-008 result | Same mechanism; plus `BoQAnalytics` fire-and-forget |
-| EX-002 output | R2 `files/{date}/uuid-filename.xlsx` via `uploadBase64ToR2` |
-| Regen counts | `Execution.metadata.regenerationCounts` JSONB (`execute-node/route.ts:286-306`) |
-
-### 4.2 EX-001 path (massing → IFC download)
-
-Topology (wf-08, wf-10, wf-13 all wire GN-001 or TR-001 → EX-001 via `geo-in` / `meta-in`).
-
-1. **EX-001 receives** `inputData` merged from upstream. Path 0 reuses `ifcUrl` if GN-001 already uploaded (ex-001.ts:30-49) — but a later branch overwrites `artifact` unconditionally (comment L14-18).
-2. **Geometry resolution**: Path A uses `_geometry`; Path B/C extracts via regex from `content`/`_raw.programme`.
-3. **Generation attempt 1**: `generateIFCViaService(resolvedGeometry, options, filePrefix)` (L172). When the Python service is reachable, it returns a `IFCServiceResponse` with R2 download URLs already populated.
-4. **Generation attempt 2 (fallback)**: `generateMultipleIFCFiles(resolvedGeometry, {projectName, buildingName})` produces 4 IFC strings. Each is base64-encoded and sent through `uploadBase64ToR2(…, "application/x-step")`. If R2 is not configured, the function returns the data URI unchanged (`r2.ts:246`) and EX-001 uses it as `downloadUrl`.
-5. **Side effect**: writes through R2 client. No DB write here — the execution record is created higher up in `useExecution`.
-
-Timeouts / retries:
-- `/api/parse-ifc`: `maxDuration = 180` (route L7), fetch timeout 60 s (L110).
-- `/api/upload-ifc`: `maxDuration = 60` (L7).
-- `/api/execute-node`: `maxDuration = 600` (route L28).
-- `ifc-service-client.ts`: `AbortSignal.timeout(30_000)` (L39, L91).
-- Regen cap: `MAX_REGENERATIONS` from `@/constants/limits` (execute-node route L13).
-
-### 4.3 WF-12 Clash Detection
-
-```
-IN-004 (IFC Upload) ──► TR-016 (Clash Detector)
-```
-
-Client path (`useExecution.ts:557-650`):
-1. TR-016 requires raw file buffer, not text-parsed divisions. The client checks `inputFileStore` for the source IN-004 file.
-2. Uploads primary file via `/api/upload-ifc` (multipart). If `supplementaryIFCStore` holds Structural / MEP siblings, they are uploaded too and bundled as `ifcModels: [{ifcUrl, discipline, fileName}]`.
-3. TR-016 handler either (a) fetches all buffers in parallel and runs `detectClashesFromMultipleBuffers`, or (b) fetches single buffer → `detectClashesFromBuffer`.
+**Headline finding:** Python path covers spatial hierarchy + 12 core building elements with correct geometry + Common Psets/Qtos. Everything beyond (classifications, structural analysis, MEP topology, rebar bodies, curtain-wall decomposition, 4D/5D, carbon) is TS-only territory, and visually-enriching items are behind gate flags.
 
 ---
 
-## 5. Real vs Mock Matrix
+## 9. TS Exporter Gate Flags — Reference
 
-| catalogueId | Name | Real / Mock | Engine | Evidence (file:line) |
-|---|---|---|---|---|
-| IN-004 | IFC Upload | Real (client) | `parseIFCText` + `inputFileStore` | `InputNode.tsx:124-192` |
-| TR-006 | Zoning Compliance | **Not implemented** | — | Absent from `nodeHandlers` (`handlers/index.ts:40-64`), absent from `REAL_NODE_IDS` (`execute-node/route.ts:19`). Catalogue labels it "Coming Soon" (`node-catalogue.ts:184`). |
-| TR-007 | Quantity Extractor | Real, LIVE | `web-ifc` WASM server-side + `parseIFCText` fallback | `handlers/tr-007.ts:252-257`; `useExecution.ts:63` in `LIVE_NODE_IDS` |
-| TR-008 | BOQ / Cost Mapper | Real, LIVE | TS cost engine + Anthropic (via TR-015) + OpenAI narrative (deep in handler) | `handlers/tr-008.ts:41-…` |
-| TR-009 | BIM Query Engine | **Not implemented** | — | Absent from `handlers/index.ts` and `REAL_NODE_IDS` |
-| TR-010 | Delta Comparator | **Not implemented** | — | Absent from registry |
-| TR-011 | Material / Carbon | **Not implemented** | — | Absent from registry |
-| TR-016 | Clash Detector | Real, LIVE | `web-ifc` AABB | `clash-detector.ts:382-538` |
-| GN-001 | Massing Generator (emits IFC) | Real, LIVE | `generateMassingGeometry` + `generateIFCFile` + `generateGLB` | `handlers/gn-001.ts:411-429` |
-| GN-006 | IFC-to-Web Converter | **Not implemented** | — | Absent from `handlers/index.ts` and `REAL_NODE_IDS` |
-| GN-012 | Floor Plan Editor (→ MassingGeometry) | Real, LIVE | TS + GPT-4o | `handlers/gn-012.ts` |
-| EX-001 | IFC Exporter | Real, LIVE | Python `IfcOpenShell` (when `IFC_SERVICE_URL` set) → TS fallback | `handlers/ex-001.ts:170-233` |
-| EX-004 | Speckle Publisher | **Not implemented** | — | Absent from registry |
+`src/features/ifc/services/ifc-exporter.ts:65-168` (options), `1609-1612` (defaults), `1828-1832` (gate branches).
 
-**Catalogue/runtime disagreement flag:** `node-catalogue.ts:681` defines `LIVE_NODES = {TR-003, TR-007, TR-008, TR-015, TR-016, GN-001, GN-003, GN-007, GN-008, GN-009, GN-010, EX-001, EX-002}`. `useExecution.ts:60-74` defines a different `LIVE_NODE_IDS` that **adds** `TR-001`, `GN-012`, removes `GN-007`, `GN-008`, `EX-002`. Two sources of truth — **consider consolidating.**
+### 9.1 `emitRebarGeometry` (default `false`)
 
-**Mock executor:** `src/features/execution/services/mock-executor.ts` exists and is invoked from `useExecution.ts:46` when neither `LIVE_NODE_IDS` nor `useReal` (gated by `NEXT_PUBLIC_ENABLE_MOCK_EXECUTION !== "true"`) apply. For IFC-path nodes, the LIVE set ensures real execution always wins.
+- **Off:** `IfcReinforcingBar` emits with `Representation=$` (no body). BBS metadata in `Pset_BuildFlow_BBS` intact.
+- **On:** bars emit as `IfcExtrudedAreaSolid` (L4211-4240).
+- **Risk of on:** "cloud of cylinders at origin" artefact on non-rectangular buildings.
 
----
+### 9.2 `autoEmitDemoContent` (default `false`)
 
-## 6. Known Gaps, Bugs, Tech Debt (visible in the code)
+- **Off:** skips sample bolts/welds, plant-room equipment, MEP port topology (L1829-1831), per-storey MEP fixtures (L1766-1768), sample lifts/ramps/pile-caps/furniture/curtain-wall demos (L5112-5267).
+- **On:** all above emit at hard-coded bbox-derived coordinates.
+- **Risk of on:** "flying debris" on non-rectangular buildings.
 
-1. **EX-001 Path 0 is dead** — `ex-001.ts:30-49` assigns `artifact` when upstream `ifcUrl` exists, but the later code (L170-233) always overwrites it. The comment at L14-18 explicitly acknowledges this. The net effect: the short-circuit pass-through advertised in the file header doesn't actually happen, so every EX-001 run regenerates IFC from geometry. **Not a bug per se** — behaviour is "preserved verbatim" — but the optimisation intent is lost.
+### 9.3 `emitCurtainWallGeometry` (default `false`)
 
-2. **WF-08 graph is incomplete** (`prebuilt-workflows.ts:21-… for wf-08`). The edges shown only connect `n1→n2→n3a/b` but no downstream walkthrough node is wired despite the `expectedOutputs` claiming a video. Review pending — I only read the first 80 lines.
+- **Off:** mullions emit as `IfcMember(.MULLION.)`, spandrels as `IfcPlate(.CURTAIN_PANEL.)` with `Representation=$`. Aggregated under `IfcCurtainWall` container.
+- **On:** each gets body prism.
+- **Risk of on:** facade with 900+ mullions = flying stick chaos.
 
-3. **Two `LIVE_NODES` definitions out of sync** — see § 5 above.
+### 9.4 `emitMEPGeometry` (default `false`)
 
-4. **Text-parser import cycle risk** — `ifc-text-parser.ts:15` imports `ParserDiagnosticCounters, ElementDiagnostic` from `./ifc-parser`. `ifc-parser.ts` itself imports constants from `web-ifc` unconditionally (L14-37), so any bundle that pulls the text parser also pulls the WASM parser's type surface. Tree-shaking saves runtime but type-level coupling means the fallback is not fully independent of the WASM side.
+- **Off:** segments + terminals emit as entities with `Representation=$`. COBie / takeoff works on metadata.
+- **On:** body prisms extruded along world +X (ducts) or +Z (pipes).
+- **Risk of on:** floating horizontal ladders stretching beyond footprint.
 
-5. **`IN-004` → TR-007 "large file" threshold is inconsistent.** `useExecution.ts:359` defines "large" as `fileData.length > 1_500_000` (≈ 1 MB binary after base64). But `InputNode.tsx:124-192` already parses *every* IFC client-side and stores `ifcParsed` regardless of size; `fileData` is cleared (L170-171). So the TR-007 large-file branch rarely fires in the happy path — it's a safety net for when `ifcParsed` is missing (loaded from old workflow snapshot, etc.). Worth documenting.
-
-6. **Python service auth is open by default.** `app/auth.py:17-19` — if `settings.api_key` is empty, the middleware allows everything. Fine for local dev, risky in production if operators forget the env var.
-
-7. **`IFC_SERVICE_URL` has no health pre-check.** `ifc-service-client.ts:47-113` just tries the POST and catches. On cold start (Railway / Render scales to zero), the first EX-001 call in a while will incur a >30 s TCP / boot delay and then time out (L39), silently falling back to TS. No `/ready` probe is performed.
-
-8. **Hard-coded `emit*Geometry: false` defaults** (`ifc-exporter.ts:119-167`). The comments describe past "flying debris" incidents on non-rectangular buildings, so the TS exporter *intentionally* emits rebar, mullions, MEP segments as metadata-only (`Representation=$`). Viewers will show entity names but no geometry. **This is by design, not a bug** — it matches Govind's locked IFC visual-quality milestone from project memory — but it means the TS fallback visually differs from the Python path.
-
-9. **Two WASM init sites** — both `ifc-parser.ts:1927-1934` and `clash-detector.ts:383-388` resolve `path.resolve(process.cwd(), "node_modules", "web-ifc")`. Works on Vercel because `web-ifc` is kept in the bundle, but any bundler change that tree-shakes `node_modules/web-ifc` breaks both at once.
-
-10. **CSI mapping + CSI diagnostics duplicate work.** `ifc-parser.ts` owns CSI mapping (L446-650) and `tr-007.ts` re-describes results by building a second division/category structure that the client fast-path also re-aggregates (`useExecution.ts:420-482`). Three similar aggregation passes — kept in sync by hand.
-
-11. **`neobim-ifc-service/tests/` has fixtures but no test files** (see § 2.5). The Python service ships with no automated regression coverage.
-
-12. **`IN-004` client-side parse runs on the main thread** (`InputNode.tsx:136-192` uses `FileReader.readAsText` + synchronous `parseIFCText(text)`). For very large files this can freeze the canvas. The standalone viewer (`/dashboard/ifc-viewer`) correctly uses a Web Worker (`ifc-worker.ts`) — asymmetric design.
-
-13. **`MAX_IFC_SIZE` drift.** `src/lib/r2.ts:34` = 100 MB. `parse-ifc/route.ts:9` = 100 MB. `upload-ifc/route.ts:38` = 100 MB. But the comment above `uploadIFCToR2` in `r2.ts:267-272` says "Max 50MB" — outdated comment.
-
-14. **`isAllowedIfcUrl` hostname allowlist** (`parse-ifc/route.ts:33-36`) accepts any `*.r2.dev` and any `*.r2.cloudflarestorage.com` without pinning bucket or account. Trade-off: flexibility vs tighter SSRF surface.
+**Phase 1 Track B** introduces `IFC_RICH_MODE` that maps to preset flag bundles: `off` / `arch-only` / `mep` / `structural` / `full`.
 
 ---
 
-## 7. External Integrations
+## 10. Python Microservice Deep Dive
 
-### 7.1 web-ifc usage
+### 10.1 FastAPI app (`app/main.py`)
 
-- **Server (`ifc-parser.ts`, `clash-detector.ts`)**: `IfcAPI().Init()` + `OpenModel(buffer, {COORDINATE_TO_ORIGIN:true})` + `GetAllLines`, `GetLineIDsWithType`, `GetLine`, `GetModelSchema`, `StreamAllMeshes`, `GetGeometry`, `GetVertexArray`. WASM binaries served from `node_modules/web-ifc` directly (no CDN).
-- **Client Web Worker (`ifc-worker.ts`)**: same API, but runs in worker scope. Transfers the `ArrayBuffer` via `postMessage(..., [buffer])` (detaches it — reason for the `ifc-cache.ts` pre-copy in `saveLastIFCFile`).
-- **Pattern duplication**: IFC type IDs are redeclared in three places (`ifc-parser.ts:40-66`, `clash-detector.ts:32-…`, `ifc-worker.ts:9-41`, `Viewport.tsx:27-60`) because `import { IFCWALL } from 'web-ifc'` is only safe in Node (triggers WASM init at import time in browser). Comment at `Viewport.tsx:27` explains.
+**Lifespan self-test** (`main.py:40-50`): creates minimal IFC in-memory to verify ifcopenshell works. Failure logs error; `/ready` reports unhealthy; Railway retries.
 
-### 7.2 IfcOpenShell / Python microservice
+**Middleware chain** (outermost to innermost, per `main.py:97-114`):
+1. **CORS** — allowlist `trybuildflow.in`, `www.trybuildflow.in`, `localhost:3000/3001`; `GET POST`; exposes `X-Request-ID`.
+2. **RequestIdMiddleware** — stamps `request.state.request_id` + `X-Request-ID` response header.
+3. **ApiKeyMiddleware** — Bearer auth; bypasses public paths (`/health`, `/ready`, `/docs`, `/openapi.json`, `/`).
 
-- **Scaffolding present**: `neobim-ifc-service/` is a complete FastAPI app that can be deployed (Dockerfile ships with Python 3.11-slim + `libgomp1` + 2 uvicorn workers suiting Railway free tier).
-- **Integration point**: `ifc-service-client.ts:47-113` in the Next.js app calls `POST {IFC_SERVICE_URL}/api/v1/export-ifc`. Only EX-001 uses it.
-- **Not wired to TR-007.** The architecture doc `docs/ifcopenshell-microservice-architecture.md:66-80` outlines when TR-007 should call the service (geometry fallback, large files), but no such call exists in `handlers/tr-007.ts`. The doc is marked "Design Document (not yet implemented)" at L3.
-- **No import of `ifcopenshell` from TypeScript code** — the only bridge is HTTP via `ifc-service-client.ts`.
+**Exception handlers** (`main.py:120-222`):
+- `StarletteHTTPException` → structured JSON with `error_code: "HTTP_<code>"`.
+- `RequestValidationError` → 422 with per-field `loc`, `msg`, `type`, `input_preview` + hint flagging ElementType literal drift as common cause.
+- Global `Exception` → 500 with `error_type`, `error_code: "INTERNAL_SERVER_ERROR"`, traceback preview logged server-side.
 
-### 7.3 OpenAI / Anthropic calls inside the IFC path
+**Root endpoint** (`main.py:232-241`): public `GET /` returns `{service, status, version, docs, health, ready}`.
 
-- **TR-008**: uses OpenAI for narrative/reasoning (not verified in full, file is 1720 LOC). Sends market data for cost justification.
-- **TR-015**: Anthropic Claude + web search produces `_marketData` feeding TR-008.
-- **GN-012**: `programRooms` (OpenAI GPT-4o-mini) → `generateFloorPlan` (GPT-4o) → geometry → `convertFloorPlanToMassing` → IFC shape.
-- **TR-007**: **no AI calls** (pure WASM + CSI mapping).
-- **TR-016**: **no AI calls** (pure AABB).
-- **EX-001**: **no AI calls** — purely geometric + regex extraction.
+### 10.2 Health endpoints (`app/routers/health.py`)
 
-### 7.4 File storage (R2)
+**GET /health** (L50-69): rich diagnostics — `ifcopenshell_version`, `python_version`, `platform`, `uptime_seconds`, `git_sha`, `config.{api_key_configured, r2_configured, r2_bucket, log_level}`, `memory.max_rss_kb`.
 
-- Keys used:
-  - `ifc/{yyyy}/{mm}/{dd}/{uuid}-{filename}` for raw uploads (`r2.ts:290`).
-  - `buildings/{yyyy}/{mm}/{dd}/{buildingId}/model.ifc` for GN-001 bundled uploads (`r2.ts:344-347`).
-  - `ifc/{yyyy}/{mm}/{dd}/{filename}` from the Python service (`r2_uploader.py:41`).
-- Lifetime: `CLEANUP_DAYS_IFC = 3` per constant (`r2.ts:36`), but the **cleanup cron is UNKNOWN — need to confirm**. A search for a cron that deletes `ifc/` prefix keys wasn't part of this pass.
-- Fallback: every IFC upload path gracefully degrades to inline base64 data URI if R2 is unconfigured.
+**GET /ready** (L72-99): exercises ifcopenshell. Creates `ifcopenshell.file(schema="IFC4")` + `api.run("root.create_entity", ifc_class="IfcProject")`. Returns `{ready:true, ifc_creation_test_ms, git_sha}` or 503 with hint mentioning `libgomp1` requirement on slim images.
+
+### 10.3 Export router (`app/routers/export.py`)
+
+Validation (L32-41): ≥1 storey, ≤100 storeys. Dispatches to `ifc_builder.build_multi_discipline(request)`. Uploads each discipline bytes via `upload_ifc_to_r2`; base64 fallback.
+
+### 10.4 Builder orchestrator (`app/services/ifc_builder.py`)
+
+**Discipline filter** (L63-67):
+- architectural = {wall, window, door, space, balcony, canopy, parapet}
+- structural = {column, beam, slab, roof, stair}
+- mep = {duct, pipe, cable-tray, equipment}
+
+Element-level override via `elem.properties.discipline` (L75). `"combined"` emits all.
+
+**Two-pass element creation** (L175-269): walls first (so windows/doors can reference `wall_lookup`), then everything else.
+
+**MEP grouping** (L272-275): hard-coded 3 systems (HVAC, Plumbing, Electrical). Phase 1 Track C.1c will add per-element `systemName`.
+
+### 10.5 Individual builders
+
+**`wall_builder.create_wall` (L14-105):** derives length from first two vertices; extrudes `IfcRectangleProfileDef(XDim=length, YDim=thickness)` along Z. `PredefinedType = PARTITIONING` or `STANDARD`.
+
+**`wall_builder.create_opening_in_wall` (L108-183):** `IfcOpeningElement` at `(offset_along_wall, 0, sill_height)` relative to wall. Void shape is rectangular profile (width × 1.0 m — wider than wall to guarantee through-cut) extruded by opening_height. Links via `IfcRelVoidsElement`.
+
+**`wall_builder.fill_opening` (L186-198):** `IfcRelFillsElement` opening → window/door.
+
+**`slab_builder.create_slab` (L14-105):** `PredefinedType = ROOF | FLOOR`. `IfcArbitraryClosedProfileDef` when footprint ≥3 points, else 20×20 m rectangle fallback. Extruded along Z by thickness.
+
+**`column_builder.create_column` (L14-75):** circular only. `IfcCircleProfileDef(Radius)` extruded along Z by height. **Width/length props ignored** — gap flagged in § 11.
+
+**`beam_builder.create_beam` (L14-93):** I-section with hard-coded `FlangeThickness=0.015 m`, `WebThickness=0.010 m`. Orientation derived from vertices; extrusion along +Z by length.
+
+**`opening_builder.create_window/create_door` (L13-192):** hooks parent_wall via opening + fill. Window: `OverallHeight` + `OverallWidth` attrs + simplified glass panel geometry. Door: `OperationType = DOUBLE_DOOR_SINGLE_SWING` when width≥1.8 else `SINGLE_SWING_LEFT`.
+
+**`space_builder.create_space` (L12-98):** `CompositionType = ELEMENT`. `LongName = spaceUsage`. Profile from `spaceFootprint` polygon or element vertices or 4.47×4.47 m fallback.
+
+**`stair_builder.create_stair` (L12-97):** `IfcStairFlight` with `NumberOfRisers`, `RiserHeight`, `TreadLength`. **Real stepped polyline** extruded along +Y by width — the only builder that emits a stepped profile.
+
+**`mep_builder.create_duct` (L14-73):** rectangular profile, extruded along **world +X** by length — the "direction unknown" problem. Same for pipes (L76-134) and cable trays (L137-196).
+
+**`mep_builder.create_equipment` (L199-258):** `IfcFlowTerminal`, box extruded along +Z.
+
+**`mep_builder.create_mep_system` (L261-291):** `IfcSystem` + `IfcRelAssignsToGroup(group, members)` + `IfcRelServicesBuildings`.
+
+### 10.6 Material library
+
+5 wall presets (residential / office / commercial / industrial / healthcare), 1 partition preset, 5 slab presets, 1 roof preset. Each 3-4 layers (finish / structure / insulation / finish) with thicknesses in metres and category tags.
+
+**Preset resolver** (L145-157): case-insensitive substring match on `building_type`. Fallback = office.
+
+**Association** (L206-224): `IfcMaterialLayerSetUsage` wrapping `IfcMaterialLayerSet`, linked via `IfcRelAssociatesMaterial`. Direction `AXIS2 / POSITIVE / OffsetFromReferenceLine=0`.
+
+### 10.7 Property sets — current hard-coded values
+
+| Element | Attribute | Current Value | Input field that would replace it |
+|---|---|---|---|
+| Wall exterior | FireRating | "REI 120" | `fireRatingMinutes` → "REI <n>" |
+| Wall interior | FireRating | "EI 60" | `fireRatingMinutes` → "EI <n>" |
+| Slab | FireRating | "REI 120" | `fireRatingMinutes` |
+| Column | FireRating | "R 120" | `fireRatingMinutes` |
+| Beam | FireRating | "R 90" | `fireRatingMinutes` |
+| Door | FireRating | "EI 30" | `fireRatingMinutes` |
+| Wall exterior | ThermalTransmittance | 0.25 W/m²K | `thermalUValue` |
+| Slab roof | ThermalTransmittance | 0.20 W/m²K | `thermalUValue` |
+| Window | ThermalTransmittance | 1.4 W/m²K | `thermalUValue` |
+| Window | GlazingAreaFraction | 0.85 | UNKNOWN — would need new field |
+
+All become input-driven in Phase 1 Track C.
+
+### 10.8 `IfcSpace` routing via `aggregate` vs `container`
+
+IFC4 requires `IfcSpace` to use `IfcRelAggregates`, not `IfcRelContainedInSpatialStructure`. Helper at `ifc_helpers.py:14-51` routes based on `element.is_a()`. Raw `create_entity` fallback for API-version drift.
 
 ---
 
-## 8. Open Items / UNKNOWN
+## 11. Known Gaps & Tech Debt
 
-- Whether `IN-004` client-side text parse is used in the *viewer* page or only in the *canvas* IN-004 node — likely only canvas, but `IFCViewerPage.tsx` flow past L120 wasn't traced.
-- Exact Prisma persistence of `TR-007`/`TR-008` results into `Execution.tileResults` — only inferred from context.
-- Existence of an R2 cleanup job for `ifc/` prefix — **UNKNOWN, need to confirm**.
-- Python service tests — directory exists, files not inspected; **UNKNOWN coverage**.
+1. **EX-001 Path 0 is dead.** `ex-001.ts:30-49` assigns artifact but L206-233 always overwrites.
+2. **Non-deterministic GUIDs on Python.** `guid.py:13-15` uses UUID v4 random. TS exporter uses UUID v5 + namespace when `projectIdentifier` set (`ifc-exporter.ts:177-199`). Model-versioning tools see every re-export as new model. **Regression on Python path.**
+3. **Two `LIVE_NODES` sources of truth drift** (catalogue vs executor).
+4. **TR-007 client-side parse on main thread** — can freeze canvas on large files. Viewer correctly uses Web Worker.
+5. **`MAX_IFC_SIZE` drift** — `r2.ts:34` = 100 MB; comment at L267-272 says "Max 50MB".
+6. **SSRF allowlist permissive** — any `*.r2.dev` / `*.r2.cloudflarestorage.com` accepted.
+7. **IFC4.3 / IFC5 not supported.** Python pinned to IFC4 (no `schema` field in `request.py`).
+8. **`mullion` / `spandrel` rejected by Python.** `massing-generator.ts:1088, 1197` produces them. `request.py:67-71` rejects. Phase 1 Track C.3 fixes.
+9. **Rectangular columns not supported on Python.** `column_builder.py:46` only emits circle. Should branch on `radius` vs `width+length`.
+10. **MEP direction always world +X.** `mep_builder.py:58, 119, 181` extrudes `(1, 0, 0)`. Should derive from vertices.
+11. **Beam I-section hard-coded.** `beam_builder.py:59-60` uses 15/10 mm flanges/web regardless of profile.
+12. **Python builder failures silent.** `ifc_builder.py:268-269` — any exception logged at warning + element skipped; no indicator to user.
+13. **`ExportOptions` doesn't declare `rich_mode`.** Pydantic default `extra='ignore'` safe today; a future `extra='forbid'` would break. Track C pre-emptively adds.
+14. **Probe cache per-lambda.** Cold-start burst fires probes in parallel. Acceptable.
+15. **Rich/Lean badge only on "combined" file.** Four discipline files inside `a.data.files[]` are not expanded in `useShowcaseData.ts:418-448`.
+
+---
+
+## 12. Roadmap to Ultra-Realistic IFC
+
+Prioritized by impact-on-visual-richness × effort.
+
+### 12.1 Immediate wins (Phase 1 Track B — pending)
+
+- **Ship `IFC_RICH_MODE`** — unlocks existing TS exporter features already written. `full` = rebar bodies + curtain-wall decomposition + MEP bodies + demo fixtures visible in viewers. Code ready at `ifc-exporter.ts:123-167` (flags) + `1828-1832` (gates); only plumbing in `ex-001.ts` remains.
+
+### 12.2 Short-horizon (Phase 2 — Python parity pass)
+
+Each bullet = one new builder file + 2-4 new entities + ElementProperties field:
+
+- **`roof_builder.py`** — proper `IfcRoof` (distinct from IfcSlab) + `IfcRoofType` with `FLAT_ROOF`/`SHED_ROOF`/`GABLE_ROOF`. Input: `roofPitchDeg`, `roofForm`. Replaces current "roof via IfcSlab" heuristic at `slab_builder.py:27`.
+- **`railing_builder.py`** — `IfcRailing` + `PredefinedType` (HANDRAIL, GUARDRAIL, BALUSTRADE). Host via `IfcRelConnectsElements`. Input: `railingHeight`, `railingPredefinedType`.
+- **`footing_builder.py`** — proper `IfcFooting` with `PredefinedType` (PAD_FOOTING, STRIP_FOOTING, CAISSON, PILE_CAP). Today routes via proxy.
+- **`furniture_builder.py`** — `IfcFurniture` with `FurnitureType` (BED, DESK, CHAIR, TABLE, CABINET). Enables COBie.
+- **Rectangular column support** in `column_builder.py` — branch on `width + length + depth` presence. 10-line change.
+- **Proper MEP extrusion direction** — derive vector from first two vertices when `len(vertices) >= 2`, fall back to world axis only when length-only.
+- **Deterministic GUIDs on Python side** — port UUID v5 + buildingSMART 22-char compression from `ifc-exporter.ts:185-199`. New `utils/guid.py` with `projectIdentifier` namespace.
+
+### 12.3 Medium-horizon (Phase 3 — structural analysis layer)
+
+- **`structural_builder.py`** — `IfcStructuralAnalysisModel` root + `IfcStructuralCurveMember` (beams/columns) + `IfcStructuralSurfaceMember` (walls/slabs). Connectivity via `IfcRelConnectsStructuralMember`.
+- **Load cases** — `IfcStructuralLoadCase` + `IfcStructuralLoadGroup` per IS 456. Factors per IS 1893.
+- **Boundary conditions** — `IfcBoundaryCondition` at footings + supports, driven by `supportType`.
+- **Applied actions** — `IfcStructuralLinearAction` (UDL) + `IfcStructuralPointAction` from `designLoadKnPerM` / `designLoadKn`.
+- **Rebar** — `IfcReinforcingBar` + `IfcReinforcingMesh`. Host via `IfcRelProjectsElement` or `IfcRelAssignsToElement`. Port TS exporter logic at `ifc-exporter.ts:4196-4329`.
+
+### 12.4 Medium-horizon (Phase 4 — MEP topology)
+
+- **Per-segment `IfcDistributionPort`** — two ports (IN at v0, OUT at v1). `FlowDirection` from input.
+- **`IfcRelConnectsPortToElement`** — wire each port to its owning segment.
+- **`IfcRelConnectsPorts`** — wire segment ports to fitting/terminal ports. Real topology from `upstreamElementId` / `downstreamElementIds`.
+- **`fitting_builder.py`** — `IfcDuctFitting`, `IfcPipeFitting`, `IfcCableCarrierFitting` with `PredefinedType` (BEND, TEE, CROSS, REDUCER).
+- **Flow devices** — `IfcValve` (GATE, CHECK, BALL, BUTTERFLY, GLOBE), `IfcFlowController`, `IfcFlowMovingDevice` (pump, fan), `IfcFlowStorageDevice` (tank), `IfcFlowTreatmentDevice` (filter).
+- **`IfcDistributionSystem`** replacing/complementing generic `IfcSystem`. Proper `PredefinedType` enum from `systemPredefinedType`.
+
+### 12.5 Classification + regional compliance
+
+- **`IfcClassification` + `IfcClassificationReference`** — support CSI, NBC India Part 4, Uniclass 2015, OmniClass, Uniformat II, DIN 276. TS exporter has all six at `ifc-exporter.ts:6121-6207`; Python needs wrapper pattern.
+- **`IfcPermit`** for Indian RERA/NBC approvals.
+- **`IfcApproval`** for design review stamps.
+
+### 12.6 Visual quality (biggest perceived "ultra-realism" impact)
+
+Each of these is what separates a schematic IFC from a photorealistic one when opened in viewers:
+
+- **Per-element styled items** — `IfcStyledItem` + `IfcSurfaceStyle` + `IfcSurfaceStyleShading` with `DiffuseColour`, `Transparency`, `SpecularHighlight`. Drives viewer colors without needing Cycles materials.
+- **Textures** — `IfcSurfaceStyleWithTextures` + `IfcImageTexture` with R2-hosted texture URLs. BlenderBIM renders via Cycles; Navisworks partially; Revit doesn't support textures in IFC round-trip.
+- **Presentation layers** — `IfcPresentationLayerWithStyle` per discipline. Enables layer-on/off toggling in Navisworks + ArchiCAD.
+- **Proper curtain wall decomposition** — individual mullion/spandrel body geometry + `IfcRelAggregates` linking children back to IfcCurtainWall container.
+- **Lighting fixtures** — `IfcLightFixture` + `IfcLightSource` (POINT, DIRECTIONAL, SPOT). Enables lighting simulation in BlenderBIM.
+- **Vegetation** — `IfcGeographicElement(TERRAIN)` + `IfcBuildingElementProxy` for trees/planters.
+- **2D annotations + dimensions** — `IfcAnnotation` with `IfcDraughtingPreDefinedColour`. Enables 2D plan export from IFC.
+- **Railings + handrails** — already planned in 12.2; visually important for stairs/balconies.
+- **Furniture populated by space type** — bedroom → bed+desk+wardrobe, office → desk+chair+cabinet, living → sofa+table+tv-unit. Input: `roomType` + `furnitureSet` preset name.
+
+### 12.7 Topological correctness (Phase 5 — topologicpy decision point)
+
+- **2nd-level `IfcRelSpaceBoundary`** — today TS exports 1st-level only (`ifc-exporter.ts:1804`). 2nd-level requires topological intersection between space and bounding walls/slabs. `topologicpy` provides this natively.
+- **Space connectivity graphs** — `IfcRelSpaceBoundary` chains let energy tools walk adjacency for EnergyPlus / IES VE.
+- **Clash-free routing** — cell-complex-based MEP routing through spaces avoiding structural elements.
+- **Apertures preserved through booleans** — doors/windows whose opening relationship survives complex boolean subtractions.
+- **Cost:** topologicpy adds ~1.5 GB to Docker image, 20-90 s to generation time. Decision deferred per prompt.
+
+### 12.8 Per-building-type realism presets
+
+Beyond materials, building types could drive entirely different element sets:
+
+- **Residential** — furniture sets per room, sanitary fixtures, electrical outlets, ceiling fans, landscaping.
+- **Office** — workstation clusters, meeting room tables, reception furniture, printer/copier rooms, pantry layout.
+- **Retail** — display units, POS counters, changing rooms, backlit signage.
+- **Healthcare** — beds with headwall units, nurses' station, crash carts, oxygen outlets.
+- **Industrial** — pallet racks, overhead cranes, floor markings, safety barriers.
+
+Each preset maps to a JSON list of `IfcFurniture` + `IfcFlowTerminal` + `IfcLightFixture` placements relative to space bounds. Can be generated procedurally or authored as a library.
+
+---
+
+## 13. Observability Layer (Phase 1 Track A)
+
+### 13.1 Probe
+
+File: `src/features/ifc/services/ifc-service-client.ts:62-152`. 60 s cache per URL, never throws, returns structured `ServiceReadinessResult` with fixed `reason` union.
+
+### 13.2 Metadata stamps
+
+Five fields on EX-001 artifact (`handlers/ex-001.ts:255-260`) — `engine`, `ifcServiceUsed`, `ifcServicePath`, `ifcServiceProbeMs`, `ifcServiceSkipped`, `ifcServiceSkipReason`.
+
+### 13.3 UI badge
+
+`IfcEngineBadge` at `ExportTab.tsx:680-708`. Rich = EMERALD + Sparkles; Lean = AMBER + AlertTriangle. Tooltip includes skip reason + points at `IFC_SERVICE_URL`.
+
+### 13.4 Reserved helper
+
+`src/features/ifc/services/ifc-service-health.ts:34-50` — `getServiceHealthStatus()` returning `{ready, latencyMs, lastChecked, lastError, reason, statusCode}`. Future admin dashboard.
+
+---
+
+## 14. Performance & Cost
+
+### 14.1 Latency budgets (observed)
+
+- `/ready` probe (Railway warm): 300-700 ms.
+- `/ready` probe (Railway cold): 5-30 s → classified as `timeout` → TS fallback.
+- `/api/v1/export-ifc` (Python): 800 ms-3 s small, 3-10 s medium, 10-30 s large.
+- TS fallback × 4 disciplines: 200 ms-2 s.
+- TR-007 server WASM parse: 2-8 s.
+- TR-016 clash detection: 4-20 s.
+
+### 14.2 Memory
+
+- Python idle: ~180 MB RSS. Under load: 300-500 MB. Railway free tier 512 MB = tight for 50k-element buildings.
+- TS exporter: `lines: string[]` peak ~50-150 MB V8 heap. Vercel Node 1024 MB = safe.
+
+### 14.3 Cost
+
+- Railway: $5-20/mo for always-on. Currently free-tier.
+- Vercel: ~$0 incremental.
+- R2: well inside free tier for current scale.
+
+---
+
+## 15. Security
+
+- **SSRF:** `parse-ifc/route.ts:20-42` — same-origin / R2 URLs only.
+- **Auth:** NextAuth v5 session for user APIs; shared Bearer for Vercel ↔ Railway.
+- **Rate limits:** see § 3.5.
+- **Admin bypass:** rate limits only, not input validation (`execute-node/route.ts:46-48`).
+- **IFC header check:** both parse + upload verify `ISO-10303-21;` prefix.
+
+---
+
+## 16. Testing
+
+### 16.1 TS suite
+
+`tests/unit/ifc-exporter.test.ts`, `ifc-multi-export.test.ts`, `ifc-cost-pipeline.test.ts`. Full run post-Track A: **70 files, 1,958 tests, 9.21 s wall time, all passing.**
+
+### 16.2 Python service
+
+`neobim-ifc-service/tests/` has only `fixtures/sample_geometry.json` + `__init__.py`. **No test files. No regression coverage against real IFC fixtures.**
+
+### 16.3 Planned Phase 1 Track D
+
+- `scripts/count-ifc-entities.py` — JSON entity-count summary.
+- `neobim-ifc-service/tests/fixtures/baseline/phase0/*.ifc` — regression baseline.
+- `tests/fixtures/baseline/phase0/entity_counts.md` — Markdown entity matrix (baseline for growth tracking).
+
+### 16.4 Integration tests (Phase 1 Track B / C)
+
+- `tests/integration/ifc-rich-mode.test.ts` — per-richMode flag assertion.
+- `tests/integration/ifc-service-client-forwards-new-fields.test.ts` — TS→Python boundary field survival.
+
+---
+
+## 17. Open Questions
+
+1. **Python R2 bucket drift:** Python uses `buildflow-models`, TS uses `buildflow-files`. Intentional or historical?
+2. **Does `/api/files/cleanup` actually purge `ifc/` prefix?**
+3. **Railway free vs paid tier** — cold starts matter at user-visible scale.
+4. **Discipline selection** — currently all 4 always generated. Most users want only Combined. Track B could expose this.
+5. **Should `IFC_RICH_MODE` default to `full`** once positioning input lands?
+6. **TS exporter sunset path** — at what point after Phase 4 do we freeze/retire?
+
+---
+
+## 18. Diff Summary — what changed since Phase 0 audit
+
+| Area | Phase 0 state | Current |
+|---|---|---|
+| `.env.example` | Silent on IFC service | Documents `IFC_SERVICE_URL` + `IFC_SERVICE_API_KEY` + `IFC_RICH_MODE` |
+| `ifc-service-client.ts` | 114 LOC, only `generateIFCViaService` | 252 LOC, + `isServiceReady` + types |
+| `ex-001.ts` probe | None — unconditional Python call | Probe-gated, 5 new metadata fields stamped |
+| UI IFC badge | Didn't exist; path fully opaque | Rich/Lean chip on every IFC download |
+| `useShowcaseData.ts` | Stripped `a.metadata` | Propagates 4 IFC-specific fields |
+| `ExportTab.tsx` | No IfcEngineBadge | New component (L680-708) |
+| `ifc-service-health.ts` | Didn't exist | New — `getServiceHealthStatus()` helper |
+| `main.py` | 61 LOC — basic CORS + api-key | 242 LOC — RequestId, 3 exception handlers, lifespan self-test, `/` root endpoint |
+| `routers/health.py` | 34 LOC | 100 LOC — rich diagnostics on `/health` |
+
+**No Python builder changed. No geometry code changed.** Python-path output is byte-identical to Phase 0 — only observability layer is new.
+
+---
+
+## 19. Reading Index (for contributors)
+
+1. `docs/RICH_IFC_IMPLEMENTATION_PLAN.md` — multi-phase roadmap.
+2. `docs/ifc-phase-0-audit.md` — capability audit.
+3. `docs/ifc-phase-1-subplan.md` — Phase 1 track breakdown.
+4. This file — current-state reference.
+5. `docs/ifc-feature-functional-report.md` — non-code companion.
+6. `src/features/ifc/services/ifc-service-client.ts` — probe + export entry.
+7. `src/app/api/execute-node/handlers/ex-001.ts` — orchestrator.
+8. `neobim-ifc-service/app/services/ifc_builder.py` — Python orchestrator.
+9. `neobim-ifc-service/app/services/*_builder.py` — per-entity builders.
+10. `src/features/ifc/services/ifc-exporter.ts` — 6,328-LOC reference for what rich IFC looks like.
 
 ---
