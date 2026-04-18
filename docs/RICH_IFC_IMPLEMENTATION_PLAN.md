@@ -1,5 +1,10 @@
 # Rich IFC Generation — Implementation Plan
 
+> ⚠️ **SUPERSEDED by [v2](./RICH_IFC_IMPLEMENTATION_PLAN_v2.md) as of 2026-04-18.**
+> **Do not execute from this file.** Key change in v2: Python-primary strategy
+> replacing the TS gate-flag unlock approach. See v2 for the authoritative roadmap.
+> Further amendments tracked in [v2.1 amendments](./RICH_IFC_IMPLEMENTATION_PLAN_v2_1_AMENDMENTS.md).
+
 **Goal:** BuildFlow's IFC Exporter (EX-001) should produce a **federated, multi-discipline IFC 4** file containing:
 - **Architectural**: full spatial hierarchy, walls/doors/windows/floors/roofs/stairs/railings/furniture with real geometry, materials with fire/acoustic/thermal ratings, classifications, zones.
 - **Structural**: physical + analytical model, beams/columns/slabs/foundations with material grades (IS 456 concrete, IS 808/2062 steel), `IfcStructuralAnalysisModel` with loads / supports / boundary conditions, analytical representations, reinforcement where appropriate.
