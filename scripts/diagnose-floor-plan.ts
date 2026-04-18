@@ -41,22 +41,10 @@ import { toFloorPlanProject } from "../src/features/floor-plan/lib/strip-pack/co
 import { computeLayoutMetrics, computeHonestScore } from "../src/features/floor-plan/lib/layout-metrics";
 
 const TEST_PROMPTS = [
-  {
-    name: "W (4BHK west)",
-    text: `A single-storey 4BHK residential house on a 50ft x 45ft west-facing plot with total built-up area of 2000 sq ft. The main entrance is a 8ft x 5ft porch on the west wall leading into a 8ft x 6ft foyer. The living room is 16ft x 13ft in the southwest corner with a large west-facing window, flowing north into a 13ft x 11ft dining room. The kitchen is 12ft x 10ft adjacent to the dining room in the northwest area with a window on the north wall. A 5ft x 4ft pantry sits adjacent to the kitchen. A 6ft x 5ft utility room is behind the kitchen. The master bedroom is 15ft x 12ft in the southeast corner with an attached 8ft x 6ft ensuite bathroom and a 5ft x 4ft walk-in wardrobe. Bedroom 2 is 13ft x 11ft in the northeast corner. Bedroom 3 is 12ft x 10ft east-center. Bedroom 4 is 11ft x 10ft south-center, doubles as a study. A common bathroom 7ft x 5ft sits on the central hallway accessible to all bedrooms. A 5ft x 5ft pooja room adjacent to the foyer. A 4ft wide hallway runs north-south connecting all rooms. All external walls 9 inches, internal walls 5 inches, all doors 3ft wide.`,
-  },
-  {
-    name: "1 (3BHK north)",
-    text: `A single-storey 3BHK residential house on a 40ft x 40ft north-facing plot with total built-up area of 1400 sq ft. The main entrance is a 6ft x 5ft porch centered on the north wall leading directly into a 6ft x 5ft foyer which opens into the hallway. The hallway is 4ft wide running east-west connecting all rooms. The living room is 14ft x 12ft on the west side of the hallway with a north-facing window. The dining room is 12ft x 10ft adjacent to the living room on its south side. The kitchen is 10ft x 9ft adjacent to the dining room in the southeast area with a window on the east wall. A 5ft x 4ft utility room is adjacent to the kitchen. The master bedroom is 13ft x 11ft in the southwest corner with an attached 7ft x 5ft ensuite bathroom on its south side. Bedroom 2 is 12ft x 10ft in the northwest area. Bedroom 3 is 11ft x 9ft in the northeast area. A common bathroom 6ft x 5ft is on the hallway between bedrooms 2 and 3. All external walls 9 inches, internal walls 5 inches, all doors 3ft wide.`,
-  },
-  {
-    name: "3 (2BHK simple)",
-    text: `2BHK apartment, 30ft x 35ft north-facing, 900 sqft. Living room, kitchen, 2 bedrooms, 1 bathroom, small balcony.`,
-  },
-  {
-    name: "4 (3BHK generic)",
-    text: `3BHK villa, 1200 sqft, north-facing plot 35ft x 40ft.`,
-  },
+  { name: "P1 3BHK-N", text: `A single-storey 3BHK residential house on a 40ft x 40ft north-facing plot with total built-up area of 1400 sq ft. The main entrance is a 6ft x 5ft porch centered on the north wall leading directly into a 6ft x 5ft foyer which opens into the hallway. The hallway is 4ft wide running east-west connecting all rooms. The living room is 14ft x 12ft on the west side of the hallway with a north-facing window. The dining room is 12ft x 10ft adjacent to the living room on its south side. The kitchen is 10ft x 9ft adjacent to the dining room in the southeast area with a window on the east wall. A 5ft x 4ft utility room is adjacent to the kitchen. The master bedroom is 13ft x 11ft in the southwest corner with an attached 7ft x 5ft ensuite bathroom on its south side. Bedroom 2 is 12ft x 10ft in the northwest area. Bedroom 3 is 11ft x 9ft in the northeast area. A common bathroom 6ft x 5ft is on the hallway between bedrooms 2 and 3. All external walls 9 inches, internal walls 5 inches, all doors 3ft wide.` },
+  { name: "P3 4BHK-W", text: `A single-storey 4BHK residential house on a 50ft x 45ft west-facing plot with total built-up area of 2000 sq ft. The main entrance is a 8ft x 5ft porch on the west wall leading into a 8ft x 6ft foyer. The living room is 16ft x 13ft in the southwest corner with a large west-facing window, flowing north into a 13ft x 11ft dining room. The kitchen is 12ft x 10ft adjacent to the dining room in the northwest area with a window on the north wall. A 5ft x 4ft pantry sits adjacent to the kitchen. A 6ft x 5ft utility room is behind the kitchen. The master bedroom is 15ft x 12ft in the southeast corner with an attached 8ft x 6ft ensuite bathroom and a 5ft x 4ft walk-in wardrobe. Bedroom 2 is 13ft x 11ft in the northeast corner. Bedroom 3 is 12ft x 10ft east-center. Bedroom 4 is 11ft x 10ft south-center, doubles as a study. A common bathroom 7ft x 5ft sits on the central hallway accessible to all bedrooms. A 5ft x 5ft pooja room adjacent to the foyer. A 4ft wide hallway runs north-south connecting all rooms. All external walls 9 inches, internal walls 5 inches, all doors 3ft wide.` },
+  { name: "P4 2BHK", text: `2BHK apartment, 30ft x 35ft north-facing, 900 sqft. Living room, kitchen, 2 bedrooms, 1 bathroom, small balcony.` },
+  { name: "P5 3BHK", text: `3BHK villa, 1200 sqft, north-facing plot 35ft x 40ft.` },
 ];
 
 async function diagnose(prompt: string, runNumber: number) {

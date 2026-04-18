@@ -1,34 +1,18 @@
 /**
- * LLM-driven floor plan layout engine.
+ * LLM-driven floor plan layout engine (v2).
  *
- * Instead of encoding architectural knowledge in a strip-pack algorithm,
- * this engine asks GPT-4o to place rooms on the plot. The LLM has been
- * trained on millions of floor plans and already knows architectural
- * conventions (master bedroom away from entrance, kitchen near dining,
- * hallway connects everything, rooms tile the plot with shared walls).
- *
- * Pipeline:
- *   1. Build a precise system prompt with plot dims, room list, adjacency
- *   2. Call GPT-4o with structured JSON output (temperature 0.3)
- *   3. Validate + repair the LLM output (snap edges, clamp to plot, fix overlaps)
- *   4. Convert to StripPackRoom[] + SpineLayout
- *   5. Call existing wall-builder, door-placer, window-placer
- *   6. Return StripPackResult (same type as the strip-pack engine)
- *
- * The existing converter.ts then turns StripPackResult → FloorPlanProject.
+ * Asks GPT-4o to place rooms on the plot as JSON coordinates, then feeds
+ * those coordinates through the existing wall-builder → door-placer →
+ * window-placer pipeline. Includes validate-and-repair to fix the LLM's
+ * typical errors (small gaps, overlaps, rooms outside plot) and retry-with-
+ * feedback when connectivity is poor.
  */
 
 import { getClient } from "@/features/ai/services/openai";
 import type { ParsedConstraints, ParsedRoom } from "./structured-parser";
 import type {
-  Facing,
-  Rect,
-  StripPackResult,
-  StripPackRoom,
-  StripPackMetrics,
-  SpineLayout,
-  RoomZone,
-  StripAssignment,
+  Facing, Rect, StripPackResult, StripPackRoom,
+  StripPackMetrics, SpineLayout, RoomZone, StripAssignment,
 } from "./strip-pack/types";
 import { normalizeFacing, rectArea, rectOverlap } from "./strip-pack/types";
 import { buildWalls } from "./strip-pack/wall-builder";
@@ -50,7 +34,6 @@ interface LLMRoom {
 
 interface LLMLayoutResponse {
   rooms: LLMRoom[];
-  hallway: { x: number; y: number; width: number; depth: number };
 }
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -60,10 +43,10 @@ interface LLMLayoutResponse {
 const LLM_MODEL = "gpt-4o";
 const LLM_TEMPERATURE = 0.3;
 const LLM_MAX_TOKENS = 4096;
-const LLM_TIMEOUT_MS = 30_000;
-const SNAP_THRESHOLD_FT = 0.5;
+const LLM_TIMEOUT_MS = 45_000;
+const SNAP_THRESHOLD = 0.5;
 
-const ZONE_BY_TYPE: Record<string, RoomZone> = {
+const ZONE_MAP: Record<string, RoomZone> = {
   master_bedroom: "PRIVATE", bedroom: "PRIVATE", guest_bedroom: "PRIVATE",
   kids_bedroom: "PRIVATE", study: "PRIVATE",
   living: "PUBLIC", dining: "PUBLIC", drawing_room: "PUBLIC",
@@ -76,16 +59,6 @@ const ZONE_BY_TYPE: Record<string, RoomZone> = {
   balcony: "OUTDOOR", sit_out: "OUTDOOR",
   walk_in_wardrobe: "PRIVATE", walk_in_closet: "PRIVATE",
   staircase: "SERVICE", other: "PRIVATE",
-};
-
-const DEFAULT_DIMS: Record<string, [number, number]> = {
-  bedroom: [12, 11], master_bedroom: [14, 13], guest_bedroom: [12, 11],
-  kids_bedroom: [11, 10], living: [16, 13], dining: [12, 11],
-  kitchen: [10, 9], bathroom: [7, 5], master_bathroom: [9, 6],
-  powder_room: [5, 4], walk_in_wardrobe: [7, 5], walk_in_closet: [7, 5],
-  foyer: [8, 7], porch: [9, 6], verandah: [12, 8], balcony: [10, 4],
-  corridor: [12, 4], utility: [6, 5], store: [6, 5], laundry: [6, 5],
-  pantry: [6, 5], pooja: [5, 4], study: [10, 9], other: [10, 8],
 };
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -103,64 +76,94 @@ export async function runLLMLayoutEngine(
   const plotD = parsed.plot.depth_ft ?? 50;
   const plot: Rect = { x: 0, y: 0, width: plotW, depth: plotD };
 
-  // Step 1: Build prompt
-  const systemPrompt = buildSystemPrompt(parsed, plotW, plotD, facing);
-  const roomListStr = formatRoomList(parsed);
+  // Preprocess: fix known parser bugs (inverted attachments, missing porch)
+  const fixedParsed = preprocessParsed(parsed, prompt, warnings);
 
-  // Step 2: Call LLM
+  // Step 1: Build prompt + call GPT-4o
+  const hallway = computeHallwayRect(plotW, plotD, facing);
+  const systemPrompt = buildSystemPrompt(fixedParsed, plotW, plotD, facing, hallway);
+  const roomList = formatRoomList(fixedParsed);
+
   const llmStart = Date.now();
-  let layout = await callLLMForLayout(systemPrompt, prompt, roomListStr, apiKey);
-  const llmMs = Date.now() - llmStart;
-  warnings.push(`LLM layout call: ${llmMs}ms, ${layout.rooms.length} rooms returned`);
+  let llmRooms = await callGPT4o(systemPrompt, prompt, roomList, apiKey);
+  warnings.push(`LLM call: ${Date.now() - llmStart}ms, ${llmRooms.length} rooms`);
 
-  // Step 3: Validate and repair
-  layout = validateAndRepair(layout, plot, parsed, warnings);
+  // Step 2: Validate + repair
+  llmRooms = repair(llmRooms, plot, hallway, facing, fixedParsed, warnings);
 
-  // Step 4: Convert to StripPackRoom[] + SpineLayout
-  const { rooms, spine } = llmToStripPack(layout, parsed, facing, plot, warnings);
+  // Step 3: Check connectivity — retry with feedback if too many orphans
+  let { rooms, spine } = toStripPack(llmRooms, hallway, fixedParsed, facing, plot);
+  let walls = buildWalls({ rooms, spine, plot });
+  wireWallIds(rooms, walls);
 
-  // Step 4b: Ensure every room shares a wall with the hallway or a hallway-
-  //          touching room. This prevents orphan cascades caused by small gaps.
-  ensureHallwayConnectivity(rooms, spine, plot, warnings);
-
-  // Step 5: Build walls, doors, windows using existing proven pipeline
-  const walls = buildWalls({ rooms, spine, plot });
-
-  // Wire wall_ids
-  const wallsByRoom = new Map<string, string[]>();
-  for (const w of walls) {
-    for (const id of w.room_ids) {
-      if (!wallsByRoom.has(id)) wallsByRoom.set(id, []);
-      wallsByRoom.get(id)!.push(w.id);
-    }
-  }
-  for (const r of rooms) r.wall_ids = wallsByRoom.get(r.id) ?? [];
-
-  const adjacencyPairs = parsed.adjacency_pairs.map(p => ({ a: p.room_a_id, b: p.room_b_id }));
+  const adjPairs = fixedParsed.adjacency_pairs.map(p => ({ a: p.room_a_id, b: p.room_b_id }));
   const porchRoom = rooms.find(r => r.type === "porch" || r.type === "verandah");
   const foyerRoom = rooms.find(r => r.type === "foyer");
 
-  const doorOut = placeDoors({
-    rooms, walls, spine, adjacencyPairs,
-    porchId: porchRoom?.id,
-    foyerId: foyerRoom?.id,
+  let doorOut = placeDoors({
+    rooms, walls, spine, adjacencyPairs: adjPairs,
+    porchId: porchRoom?.id, foyerId: foyerRoom?.id,
   });
   warnings.push(...doorOut.warnings);
 
-  const winOut = placeWindows({
-    rooms, walls, doors: doorOut.doors, facing,
-  });
+  // Count orphans to decide if retry is needed
+  const orphanCount = countOrphans(rooms, doorOut.doors);
+  if (orphanCount > 3) {
+    warnings.push(`First attempt: ${orphanCount} orphans — retrying with feedback`);
+    const feedback = buildFeedbackMessage(rooms, doorOut.doors, spine);
+    const retryStart = Date.now();
+    let retryRooms = await callGPT4o(systemPrompt, prompt + "\n\n" + feedback, roomList, apiKey);
+    warnings.push(`Retry call: ${Date.now() - retryStart}ms, ${retryRooms.length} rooms`);
+    retryRooms = repair(retryRooms, plot, hallway, facing, fixedParsed, warnings);
+
+    const retry = toStripPack(retryRooms, hallway, fixedParsed, facing, plot);
+    const retryWalls = buildWalls({ rooms: retry.rooms, spine: retry.spine, plot });
+    wireWallIds(retry.rooms, retryWalls);
+    const retryDoors = placeDoors({
+      rooms: retry.rooms, walls: retryWalls, spine: retry.spine,
+      adjacencyPairs: adjPairs, porchId: porchRoom?.id, foyerId: foyerRoom?.id,
+    });
+
+    const retryOrphans = countOrphans(retry.rooms, retryDoors.doors);
+    if (retryOrphans < orphanCount) {
+      rooms = retry.rooms;
+      spine = retry.spine;
+      walls = retryWalls;
+      doorOut = retryDoors;
+      warnings.push(`Retry improved: ${orphanCount} → ${retryOrphans} orphans`);
+    } else {
+      warnings.push(`Retry didn't improve (${retryOrphans} orphans) — keeping first attempt`);
+    }
+    warnings.push(...retryDoors.warnings);
+  }
+
+  // Step 4: Windows
+  const winOut = placeWindows({ rooms, walls, doors: doorOut.doors, facing });
   warnings.push(...winOut.warnings);
 
-  // Step 6: Compute metrics
-  const metrics = computeMetrics(rooms, spine, plot, adjacencyPairs.length);
+  // Step 5: Metrics
+  const metrics = computeMetrics(rooms, spine, plot, adjPairs.length);
 
-  return {
-    rooms, spine, walls,
-    doors: doorOut.doors,
-    windows: winOut.windows,
-    plot, metrics, warnings,
-  };
+  return { rooms, spine, walls, doors: doorOut.doors, windows: winOut.windows, plot, metrics, warnings };
+}
+
+// ───────────────────────────────────────────────────────────────────────────
+// HALLWAY COMPUTATION
+// ───────────────────────────────────────────────────────────────────────────
+
+function computeHallwayRect(plotW: number, plotD: number, facing: Facing): Rect {
+  const hw = 4;
+  const isHorizontal = facing === "north" || facing === "south";
+  if (isHorizontal) {
+    const spineY = facing === "north"
+      ? Math.round(plotD * 0.55)
+      : Math.round(plotD * 0.45);
+    return { x: 0, y: spineY, width: plotW, depth: hw };
+  }
+  const spineX = facing === "east"
+    ? Math.round(plotW * 0.55)
+    : Math.round(plotW * 0.45);
+  return { x: spineX, y: 0, width: hw, depth: plotD };
 }
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -169,788 +172,538 @@ export async function runLLMLayoutEngine(
 
 function buildSystemPrompt(
   parsed: ParsedConstraints,
-  plotW: number,
-  plotD: number,
-  facing: Facing,
+  plotW: number, plotD: number,
+  facing: Facing, hallway: Rect,
 ): string {
-  const hallwayDir = (facing === "north" || facing === "south") ? "EAST-WEST" : "NORTH-SOUTH";
-  const hallwayDim = (facing === "north" || facing === "south")
-    ? `width=${plotW}ft (full plot width), depth=4ft`
-    : `width=4ft, depth=${plotD}ft (full plot depth)`;
+  const hwJson = JSON.stringify(hallway);
+  const isH = hallway.width > hallway.depth;
+  const entranceSide = { north: "top (high Y)", south: "bottom (low Y)", east: "right (high X)", west: "left (low X)" }[facing];
+  const backSide = { north: "bottom (low Y)", south: "top (high Y)", east: "left (low X)", west: "right (high X)" }[facing];
 
-  const facingDescriptions: Record<Facing, string> = {
-    north: `NORTH (road at top, y=${plotD}). Porch at top, INSIDE plot (y + depth ≤ ${plotD}). Foyer directly below porch, touching hallway's top edge.`,
-    south: `SOUTH (road at bottom, y=0). Porch at bottom, INSIDE plot (y ≥ 0). Foyer directly above porch, touching hallway's bottom edge.`,
-    east:  `EAST (road at right, x=${plotW}). Porch at right, INSIDE plot (x + width ≤ ${plotW}). Foyer directly left of porch, touching hallway's right edge.`,
-    west:  `WEST (road at left, x=0). Porch at left, INSIDE plot (x ≥ 0). Foyer directly right of porch, touching hallway's left edge.`,
-  };
+  return `You are an expert residential architect. Place rooms on a rectangular plot as JSON coordinates.
 
-  return `You are an expert residential architect. Place rooms on a rectangular plot to create a professional floor plan.
+PLOT: ${plotW}ft wide (X axis) × ${plotD}ft deep (Y axis)
+ORIGIN: (0,0) = SOUTHWEST corner. X grows EAST. Y grows NORTH.
+FACING: ${facing} — entrance/road on the ${entranceSide}
 
-COORDINATE SYSTEM:
-- Origin (0,0) is the SOUTHWEST corner
-- X grows EAST (0 = west edge, ${plotW} = east edge)
-- Y grows NORTH (0 = south edge, ${plotD} = north edge)
-- All dimensions in FEET
+HALLWAY — USE THESE EXACT COORDINATES:
+${hwJson}
+The hallway is type "corridor". It runs ${isH ? "east-west" : "north-south"} across the FULL plot.
 
-PLOT: ${plotW}ft wide × ${plotD}ft deep
-FACING: ${facingDescriptions[facing]}
-TOTAL AREA: ${parsed.plot.total_built_up_sqft ?? plotW * plotD} sqft
+ZONES:
+- ENTRANCE SIDE (${entranceSide}): porch, foyer, living, dining, pooja — between entrance wall and hallway
+- BACK SIDE (${backSide}): bedrooms, kitchen, bathrooms, utility — between hallway and far wall
 
-HALLWAY (use these EXACT coordinates):
-- Runs ${hallwayDir} across the FULL plot
-${facing === "north" ? `- hallway: { "x": 0, "y": ${Math.round(plotD * 0.55)}, "width": ${plotW}, "depth": 4 }
-- Entrance-side rooms go ABOVE hallway (y > ${Math.round(plotD * 0.55) + 4})
-- Back-side rooms go BELOW hallway (y < ${Math.round(plotD * 0.55)})` :
-  facing === "south" ? `- hallway: { "x": 0, "y": ${Math.round(plotD * 0.45)}, "width": ${plotW}, "depth": 4 }
-- Entrance-side rooms go BELOW hallway (y < ${Math.round(plotD * 0.45)})
-- Back-side rooms go ABOVE hallway (y > ${Math.round(plotD * 0.45) + 4})` :
-  facing === "east" ? `- hallway: { "x": ${Math.round(plotW * 0.55)}, "y": 0, "width": 4, "depth": ${plotD} }
-- Entrance-side rooms go RIGHT of hallway (x > ${Math.round(plotW * 0.55) + 4})
-- Back-side rooms go LEFT of hallway (x < ${Math.round(plotW * 0.55)})` :
-  `- hallway: { "x": ${Math.round(plotW * 0.45)}, "y": 0, "width": 4, "depth": ${plotD} }
-- Entrance-side rooms go LEFT of hallway (x < ${Math.round(plotW * 0.45)})
-- Back-side rooms go RIGHT of hallway (x > ${Math.round(plotW * 0.45) + 4})`}
-- Foyer MUST have one edge touching the hallway edge exactly
+RULES (read ALL before generating):
 
-RULES (follow ALL):
+1. EDGE ALIGNMENT — MOST IMPORTANT RULE:
+   Adjacent rooms MUST have IDENTICAL edge coordinates. No gaps, not even 0.1ft.
+   Example: Room A at x=0 width=14. Room B MUST start at x=14, not 14.1 or 13.9.
+   Rooms must tile the plot like a jigsaw — minimize empty space.
 
-1. WALL SHARING — THE MOST CRITICAL RULE:
-   - Adjacent rooms MUST have edges that are MATHEMATICALLY IDENTICAL
-   - If Room A ends at x=14, Room B starts at x=14 EXACTLY — no gaps
-   - Rooms must TILE the plot like a jigsaw puzzle
-   - The union of all rooms + hallway should cover ≥85% of the plot
+2. CONNECTIVITY CHAIN:
+   Porch → touches Foyer → Foyer touches Hallway → every other room touches hallway or a hallway-adjacent room.
+   The foyer MUST share an edge with the hallway.
+${facing === "north" ? `   Foyer bottom edge y = ${hallway.y + hallway.depth} (= hallway top edge).` :
+  facing === "south" ? `   Foyer top edge (y + depth) = ${hallway.y} (= hallway bottom edge).` :
+  facing === "east" ? `   Foyer left edge x = ${hallway.x + hallway.width} (= hallway right edge).` :
+  `   Foyer right edge (x + width) = ${hallway.x} (= hallway left edge).`}
 
-2. CONNECTIVITY (CRITICAL):
-   - The foyer MUST share a wall with the hallway — their edges must touch exactly
-   - The porch MUST share a wall with the foyer
-   - The porch MUST be INSIDE the plot boundary (not extending beyond)
-   - EVERY room must share a wall with the hallway OR with a room that touches the hallway
-   - Path must exist: Porch → Foyer → Hallway → every other room
-   - For north-facing: foyer's bottom edge = hallway's top edge (same Y coordinate)
-   - For south-facing: foyer's top edge = hallway's bottom edge
-   - For east-facing: foyer's left edge = hallway's right edge
-   - For west-facing: foyer's right edge = hallway's left edge
+3. ALL rooms INSIDE plot: 0 ≤ x, 0 ≤ y, x+width ≤ ${plotW}, y+depth ≤ ${plotD}
+4. NO overlapping rooms
+5. Room dimensions within ±15% of requested. Never below 70% of requested area.
+6. Porch on the ${facing} wall, INSIDE the plot boundary
+7. Ensuite/wardrobe share a wall with their parent bedroom
+8. Rooms + hallway should cover ≥ 85% of the plot
+9. Every room on the entrance side: its edge nearest the hallway must touch the hallway (or touch a room that touches the hallway)
+10. Every room on the back side: same rule — must connect to hallway via shared walls
 
-3. PLACEMENT ZONES:
-   - ENTRANCE SIDE: Living, dining, foyer, porch, pooja
-   - BACK SIDE: Bedrooms, kitchen, bathrooms, utility
-   - Attached rooms (ensuite, wardrobe) share a wall with their parent bedroom
-
-4. GEOMETRY:
-   - All rooms are rectangles (axis-aligned)
-   - No room outside plot boundary
-   - No overlapping rooms
-   - No room smaller than 4ft in any dimension
-   - Aspect ratio no worse than 3:1
-
-5. DIMENSIONS:
-   - Use user-specified dimensions (±15% adjustment OK for fit)
-   - Never shrink below 70% of requested area
-
-OUTPUT: Return ONLY valid JSON (no markdown, no backticks, no explanation):
+OUTPUT: ONLY valid JSON, no markdown, no backticks:
 {
   "rooms": [
-    { "name": "Room Name", "type": "room_function", "x": 0, "y": 0, "width": 10, "depth": 8 }
-  ],
-  "hallway": { "x": 0, "y": 18, "width": ${plotW}, "depth": 4 }
+    { "name": "Hallway", "type": "corridor", "x": ${hallway.x}, "y": ${hallway.y}, "width": ${hallway.width}, "depth": ${hallway.depth} },
+    { "name": "Living Room", "type": "living", "x": 0, "y": ${hallway.y + hallway.depth}, "width": 16, "depth": 13 },
+    ...
+  ]
 }
 
-Include hallway BOTH as "hallway" object AND in rooms array (type "corridor").
-Include porch and foyer in rooms array.
-Double-check: no overlaps, no gaps between adjacent rooms, all rooms inside plot.`;
+Start the rooms array with the hallway using the exact coordinates above.
+Include porch (type "porch") and foyer (type "foyer").
+All coordinates in feet. All rooms are axis-aligned rectangles.`;
 }
 
 // ───────────────────────────────────────────────────────────────────────────
-// ROOM LIST FORMATTING
+// ROOM LIST
 // ───────────────────────────────────────────────────────────────────────────
 
 function formatRoomList(parsed: ParsedConstraints): string {
-  const lines: string[] = ["ROOMS TO PLACE:"];
-
-  for (const room of parsed.rooms) {
-    if (room.is_circulation) continue; // hallway handled in system prompt
-    const w = room.dim_width_ft;
-    const d = room.dim_depth_ft;
-    const dims = (w && d) ? `${w}ft × ${d}ft` : `use default size for ${room.function}`;
-    const pos = room.position_direction
-      ? ` [position: ${normalizePositionLabel(room.position_direction)}]`
-      : "";
-    const attached = room.attached_to_room_id
-      ? ` [ATTACHED to ${findRoomNameById(parsed, room.attached_to_room_id)}]`
-      : "";
-    lines.push(`- ${room.name}: ${dims}${pos}${attached} (type: ${room.function})`);
+  const lines: string[] = ["ROOMS:"];
+  for (const r of parsed.rooms) {
+    if (r.is_circulation) continue;
+    const dims = (r.dim_width_ft && r.dim_depth_ft) ? `${r.dim_width_ft}×${r.dim_depth_ft}ft` : "default size";
+    const pos = r.position_direction ? ` [${posLabel(r.position_direction)}]` : "";
+    const att = r.attached_to_room_id ? ` [ATTACHED to ${parsed.rooms.find(x => x.id === r.attached_to_room_id)?.name ?? r.attached_to_room_id}]` : "";
+    lines.push(`- ${r.name}: ${dims}${pos}${att} (type: ${r.function})`);
   }
-
-  // Synthesize porch if missing
-  const hasPorch = parsed.rooms.some(r => r.function === "porch" || r.function === "verandah");
-  if (!hasPorch) {
-    lines.push(`- Porch: 6ft × 5ft [position: ${parsed.plot.facing ?? "N"} wall centered] (type: porch)`);
+  if (!parsed.rooms.some(r => r.function === "porch")) {
+    lines.push(`- Porch: 6×5ft [${parsed.plot.facing ?? "N"} wall centered] (type: porch)`);
   }
-
   if (parsed.adjacency_pairs.length > 0) {
-    lines.push("\nADJACENCY (rooms that MUST share a wall):");
-    for (const adj of parsed.adjacency_pairs) {
-      if (adj.relationship === "attached_ensuite") continue; // handled by [ATTACHED]
-      const a = findRoomNameById(parsed, adj.room_a_id);
-      const b = findRoomNameById(parsed, adj.room_b_id);
-      if (a && b) lines.push(`- ${a} adjacent to ${b}`);
+    lines.push("\nADJACENCY (must share a wall):");
+    for (const a of parsed.adjacency_pairs) {
+      if (a.relationship === "attached_ensuite") continue;
+      const na = parsed.rooms.find(r => r.id === a.room_a_id)?.name;
+      const nb = parsed.rooms.find(r => r.id === a.room_b_id)?.name;
+      if (na && nb) lines.push(`- ${na} ↔ ${nb}`);
     }
   }
-
   return lines.join("\n");
 }
 
-function normalizePositionLabel(dir: string): string {
-  const map: Record<string, string> = {
-    N: "north side", S: "south side", E: "east side", W: "west side",
-    NE: "northeast corner", NW: "northwest corner",
-    SE: "southeast corner", SW: "southwest corner",
-    CENTER: "center",
-  };
-  return map[dir] ?? dir;
-}
-
-function findRoomNameById(parsed: ParsedConstraints, id: string): string | null {
-  return parsed.rooms.find(r => r.id === id)?.name ?? null;
+function posLabel(d: string): string {
+  return { N: "north", S: "south", E: "east", W: "west", NE: "northeast", NW: "northwest", SE: "southeast", SW: "southwest", CENTER: "center" }[d] ?? d;
 }
 
 // ───────────────────────────────────────────────────────────────────────────
-// LLM CALL
+// GPT-4o CALL
 // ───────────────────────────────────────────────────────────────────────────
 
-async function callLLMForLayout(
-  systemPrompt: string,
-  userPrompt: string,
-  roomListStr: string,
-  apiKey: string,
-): Promise<LLMLayoutResponse> {
-  const client = getClient(apiKey, LLM_TIMEOUT_MS);
-
-  const completion = await client.chat.completions.create({
+async function callGPT4o(sys: string, user: string, roomList: string, key: string): Promise<LLMRoom[]> {
+  const client = getClient(key, LLM_TIMEOUT_MS);
+  const resp = await client.chat.completions.create({
     model: LLM_MODEL,
     temperature: LLM_TEMPERATURE,
     max_tokens: LLM_MAX_TOKENS,
     response_format: { type: "json_object" },
     messages: [
-      { role: "system", content: systemPrompt },
-      { role: "user", content: `Create a floor plan layout for:\n\n${userPrompt}\n\n${roomListStr}` },
+      { role: "system", content: sys },
+      { role: "user", content: `Design this house:\n\n${user}\n\n${roomList}` },
     ],
   });
-
-  const raw = completion.choices[0]?.message?.content;
-  if (!raw) throw new Error("LLM returned empty content");
-
-  const cleaned = raw.replace(/```json\s*|```\s*/g, "").trim();
-  const layout = JSON.parse(cleaned) as LLMLayoutResponse;
-
-  if (!layout.rooms || !Array.isArray(layout.rooms)) {
-    throw new Error("LLM response missing rooms array");
-  }
-
-  return layout;
+  const raw = resp.choices[0]?.message?.content;
+  if (!raw) throw new Error("GPT-4o returned empty content");
+  const data = JSON.parse(raw.replace(/```json\s*|```\s*/g, "").trim()) as LLMLayoutResponse;
+  if (!Array.isArray(data.rooms)) throw new Error("GPT-4o response missing rooms array");
+  return data.rooms;
 }
 
 // ───────────────────────────────────────────────────────────────────────────
-// VALIDATE AND REPAIR
+// VALIDATE + REPAIR
 // ───────────────────────────────────────────────────────────────────────────
 
-function validateAndRepair(
-  layout: LLMLayoutResponse,
-  plot: Rect,
-  parsed: ParsedConstraints,
-  warnings: string[],
-): LLMLayoutResponse {
-  const rooms = layout.rooms;
-
-  // 1. Ensure hallway exists
-  if (!layout.hallway) {
-    const corridorRoom = rooms.find(r =>
-      r.type === "corridor" || r.type === "hallway" || r.name.toLowerCase().includes("hallway"),
-    );
-    if (corridorRoom) {
-      layout.hallway = { x: corridorRoom.x, y: corridorRoom.y, width: corridorRoom.width, depth: corridorRoom.depth };
-      warnings.push("Extracted hallway from corridor room in rooms array");
-    } else {
-      warnings.push("No hallway in LLM output — synthesizing");
-      const hw = 4;
-      const facing = normalizeFacing(parsed.plot.facing);
-      if (facing === "north" || facing === "south") {
-        layout.hallway = { x: 0, y: plot.depth * 0.45, width: plot.width, depth: hw };
-      } else {
-        layout.hallway = { x: plot.width * 0.45, y: 0, width: hw, depth: plot.depth };
-      }
-      rooms.push({ name: "Hallway", type: "corridor", ...layout.hallway });
-    }
+function repair(
+  rooms: LLMRoom[], plot: Rect, hallway: Rect,
+  facing: Facing, parsed: ParsedConstraints, warnings: string[],
+): LLMRoom[] {
+  // 1. Ensure hallway in rooms
+  if (!rooms.find(r => r.type === "corridor" || r.type === "hallway")) {
+    rooms.unshift({ name: "Hallway", type: "corridor", ...hallway });
+    warnings.push("Hallway missing — injected");
+  } else {
+    // Force hallway to exact coordinates
+    const hw = rooms.find(r => r.type === "corridor" || r.type === "hallway")!;
+    hw.x = hallway.x; hw.y = hallway.y; hw.width = hallway.width; hw.depth = hallway.depth;
   }
 
-  // 2. Ensure hallway is in rooms array
-  const hasCorridorInRooms = rooms.some(r => r.type === "corridor" || r.type === "hallway");
-  if (!hasCorridorInRooms) {
-    rooms.push({ name: "Hallway", type: "corridor", ...layout.hallway });
+  // 2. Round to 0.5ft grid
+  for (const r of rooms) {
+    r.x = Math.round(r.x * 2) / 2;
+    r.y = Math.round(r.y * 2) / 2;
+    r.width = Math.round(r.width * 2) / 2;
+    r.depth = Math.round(r.depth * 2) / 2;
+    r.width = Math.max(r.width, 4);
+    r.depth = Math.max(r.depth, 4);
   }
 
-  // 3. Round all coordinates to nearest 0.5ft to eliminate floating-point
-  //    gaps and micro-overlaps. Rooms align better on a clean grid.
-  for (const room of rooms) {
-    room.x = Math.round(room.x * 2) / 2;
-    room.y = Math.round(room.y * 2) / 2;
-    room.width = Math.round(room.width * 2) / 2;
-    room.depth = Math.round(room.depth * 2) / 2;
+  // 3. Clamp to plot (MOVE inside, don't shrink)
+  for (const r of rooms) {
+    if (r.type === "corridor") continue; // hallway is authoritative
+    if (r.x < 0) r.x = 0;
+    if (r.y < 0) r.y = 0;
+    if (r.x + r.width > plot.width) r.x = Math.max(0, plot.width - r.width);
+    if (r.y + r.depth > plot.depth) r.y = Math.max(0, plot.depth - r.depth);
   }
 
-  // 4. Clamp all rooms to plot boundary (move inside, don't shrink)
-  for (const room of rooms) {
-    if (room.x < 0) room.x = 0;
-    if (room.y < 0) room.y = 0;
-    if (room.x + room.width > plot.width) {
-      room.x = Math.max(0, plot.width - room.width);
-    }
-    if (room.y + room.depth > plot.depth) {
-      room.y = Math.max(0, plot.depth - room.depth);
-    }
-    room.width = Math.max(room.width, 4);
-    room.depth = Math.max(room.depth, 4);
-  }
-
-  // 5. Snap near-miss edge alignment
+  // 4. Snap near-miss edges
   for (let i = 0; i < rooms.length; i++) {
     for (let j = i + 1; j < rooms.length; j++) {
-      snapEdges(rooms[i], rooms[j], SNAP_THRESHOLD_FT);
+      snapEdgePair(rooms[i], rooms[j], SNAP_THRESHOLD);
     }
   }
 
-  // 5b. Resolve overlaps — nudge the smaller room to share an edge
-  //     instead of shrinking (shrinking creates gaps that break connectivity)
+  // 5. Resolve overlaps (skip hallway — it's authoritative)
   for (let pass = 0; pass < 3; pass++) {
     for (let i = 0; i < rooms.length; i++) {
       for (let j = i + 1; j < rooms.length; j++) {
-        const overlap = computeRectOverlap(rooms[i], rooms[j]);
-        if (overlap > 2.0) {
-          resolveOverlap(rooms[i], rooms[j], plot, warnings);
-        }
+        if (rooms[i].type === "corridor" || rooms[j].type === "corridor") continue;
+        const ov = overlapArea(rooms[i], rooms[j]);
+        if (ov > 2) nudgeApart(rooms[i], rooms[j], plot, warnings);
       }
     }
   }
 
-  // 6. CRITICAL: Force foyer to touch hallway (prevents orphan cascade)
-  const facing = normalizeFacing(parsed.plot.facing);
-  const hw = layout.hallway;
-  const foyer = rooms.find(r => r.type === "foyer" || r.name.toLowerCase().includes("foyer"));
-  if (foyer && hw) {
-    const isHorizontal = hw.width > hw.depth;
-    if (isHorizontal) {
-      // Hallway runs E-W. Foyer must touch hallway's top or bottom edge.
-      const hwTop = hw.y + hw.depth;
-      const hwBot = hw.y;
-      const foyerBot = foyer.y;
-      const foyerTop = foyer.y + foyer.depth;
-      if (facing === "north") {
-        // Foyer should be ABOVE hallway → foyer.y = hwTop
-        if (Math.abs(foyerBot - hwTop) > 0.01) {
-          foyer.depth = foyerTop - hwTop;
-          foyer.y = hwTop;
-          if (foyer.depth < 4) foyer.depth = 5;
-          warnings.push(`Foyer: y adjusted to ${hwTop} to touch hallway top edge`);
-        }
-      } else {
-        // south: foyer below hallway → foyer.y + foyer.depth = hwBot
-        if (Math.abs(foyerTop - hwBot) > 0.01) {
-          foyer.y = hwBot - foyer.depth;
-          if (foyer.y < 0) { foyer.y = 0; foyer.depth = hwBot; }
-          warnings.push(`Foyer: adjusted to touch hallway bottom edge`);
-        }
-      }
+  // 6. Force foyer→hallway connectivity
+  const foyer = rooms.find(r => r.type === "foyer" || r.name.toLowerCase() === "foyer");
+  if (foyer) {
+    const isH = hallway.width > hallway.depth;
+    if (isH) {
+      if (facing === "north") foyer.y = hallway.y + hallway.depth;
+      else foyer.y = hallway.y - foyer.depth;
+      if (foyer.y < 0) { foyer.y = 0; foyer.depth = hallway.y; }
     } else {
-      // Hallway runs N-S. Foyer must touch hallway's left or right edge.
-      const hwRight = hw.x + hw.width;
-      const hwLeft = hw.x;
-      if (facing === "east") {
-        // Foyer east of hallway → foyer.x = hwRight
-        if (Math.abs(foyer.x - hwRight) > 0.01) {
-          const oldRight = foyer.x + foyer.width;
-          foyer.x = hwRight;
-          foyer.width = Math.max(5, oldRight - hwRight);
-          warnings.push(`Foyer: x adjusted to ${hwRight} to touch hallway right edge`);
-        }
-      } else {
-        // west: foyer west of hallway → foyer.x + foyer.width = hwLeft
-        if (Math.abs(foyer.x + foyer.width - hwLeft) > 0.01) {
-          foyer.x = hwLeft - foyer.width;
-          if (foyer.x < 0) { foyer.width = hwLeft; foyer.x = 0; }
-          warnings.push(`Foyer: adjusted to touch hallway left edge`);
-        }
-      }
+      if (facing === "east") foyer.x = hallway.x + hallway.width;
+      else foyer.x = hallway.x - foyer.width;
+      if (foyer.x < 0) { foyer.x = 0; foyer.width = hallway.x; }
     }
   }
 
-  // 7. Fix porch placement — must be INSIDE plot and touching foyer
-  const porch = rooms.find(r => r.type === "porch" || r.name.toLowerCase().includes("porch"));
-  if (porch) {
-    // If porch extends beyond plot, move it inside
-    if (porch.y + porch.depth > plot.depth) {
-      porch.y = plot.depth - porch.depth;
-      warnings.push(`Porch: moved inside plot (y=${porch.y.toFixed(1)})`);
-    }
-    if (porch.x + porch.width > plot.width) {
-      porch.x = plot.width - porch.width;
-      warnings.push(`Porch: moved inside plot (x=${porch.x.toFixed(1)})`);
-    }
-    if (porch.y < 0) porch.y = 0;
-    if (porch.x < 0) porch.x = 0;
-
-    // Ensure porch touches foyer
-    if (foyer) {
+  // 7. Force porch→foyer connectivity + inside plot
+  const porch = rooms.find(r => r.type === "porch");
+  if (porch && foyer) {
+    const isH = hallway.width > hallway.depth;
+    if (isH) {
       if (facing === "north") {
         porch.y = foyer.y + foyer.depth;
         if (porch.y + porch.depth > plot.depth) porch.depth = plot.depth - porch.y;
-      } else if (facing === "south") {
+      } else {
         porch.y = foyer.y - porch.depth;
         if (porch.y < 0) { porch.depth = foyer.y; porch.y = 0; }
-      } else if (facing === "east") {
+      }
+      porch.x = foyer.x + (foyer.width - porch.width) / 2;
+      porch.x = Math.max(0, Math.min(porch.x, plot.width - porch.width));
+    } else {
+      if (facing === "east") {
         porch.x = foyer.x + foyer.width;
         if (porch.x + porch.width > plot.width) porch.width = plot.width - porch.x;
       } else {
         porch.x = foyer.x - porch.width;
         if (porch.x < 0) { porch.width = foyer.x; porch.x = 0; }
       }
-      // Center porch on foyer
-      if (facing === "north" || facing === "south") {
-        porch.x = foyer.x + (foyer.width - porch.width) / 2;
-        porch.x = Math.max(0, Math.min(porch.x, plot.width - porch.width));
-      } else {
-        porch.y = foyer.y + (foyer.depth - porch.depth) / 2;
-        porch.y = Math.max(0, Math.min(porch.y, plot.depth - porch.depth));
+      porch.y = foyer.y + (foyer.depth - porch.depth) / 2;
+      porch.y = Math.max(0, Math.min(porch.y, plot.depth - porch.depth));
+    }
+  }
+
+  // 8. Extend disconnected rooms toward hallway
+  const isH = hallway.width > hallway.depth;
+  for (const r of rooms) {
+    if (r.type === "corridor" || r.type === "porch" || r.type === "foyer") continue;
+    if (touchesRect(r, hallway)) continue;
+    // Check if touches any room that touches hallway
+    const touchesConnected = rooms.some(other =>
+      other !== r && touchesRect(r, other) && touchesRect(other, hallway),
+    );
+    if (touchesConnected) continue;
+
+    // Extend toward hallway
+    if (isH) {
+      const hwTop = hallway.y + hallway.depth;
+      const hwBot = hallway.y;
+      if (r.y >= hwTop) {
+        const gap = r.y - hwTop;
+        if (gap < 15) { r.depth += gap; r.y = hwTop; }
+      } else if (r.y + r.depth <= hwBot) {
+        const gap = hwBot - (r.y + r.depth);
+        if (gap < 15) r.depth += gap;
+      }
+    } else {
+      const hwRight = hallway.x + hallway.width;
+      const hwLeft = hallway.x;
+      if (r.x >= hwRight) {
+        const gap = r.x - hwRight;
+        if (gap < 15) { r.width += gap; r.x = hwRight; }
+      } else if (r.x + r.width <= hwLeft) {
+        const gap = hwLeft - (r.x + r.width);
+        if (gap < 15) r.width += gap;
       }
     }
   }
 
-  // 8. Ensure all parsed rooms are represented
+  // 9. Synthesize missing rooms
   for (const pr of parsed.rooms) {
     if (pr.is_circulation) continue;
-    const found = rooms.find(r =>
-      r.name.toLowerCase() === pr.name.toLowerCase() ||
-      r.type === pr.function ||
-      r.name.toLowerCase().includes(pr.name.toLowerCase().split(" ")[0]),
-    );
+    const found = rooms.find(r => matchesRoom(r, pr));
     if (!found) {
-      warnings.push(`${pr.name}: missing from LLM output — synthesizing`);
-      const [dw, dd] = DEFAULT_DIMS[pr.function] ?? [10, 8];
-      const w = pr.dim_width_ft ?? dw;
-      const d = pr.dim_depth_ft ?? dd;
-      // Place at first available position (overflow-style)
-      const pos = findOpenPosition(w, d, rooms, layout.hallway, plot);
+      warnings.push(`${pr.name}: missing from LLM — synthesized`);
+      const w = pr.dim_width_ft ?? 10;
+      const d = pr.dim_depth_ft ?? 8;
+      const pos = findOpen(w, d, rooms, plot);
       rooms.push({ name: pr.name, type: pr.function, x: pos.x, y: pos.y, width: w, depth: d });
     }
   }
 
-  return layout;
+  return rooms;
 }
 
-function snapEdges(a: LLMRoom, b: LLMRoom, threshold: number): void {
-  // A right ≈ B left
-  const arbl = (a.x + a.width) - b.x;
-  if (Math.abs(arbl) < threshold && Math.abs(arbl) > 0.01) {
-    const mid = a.x + a.width - arbl / 2;
-    a.width = mid - a.x;
-    b.width += b.x - mid;
-    b.x = mid;
+// ───────────────────────────────────────────────────────────────────────────
+// GEOMETRY HELPERS
+// ───────────────────────────────────────────────────────────────────────────
+
+function touchesRect(a: LLMRoom | Rect, b: LLMRoom | Rect): boolean {
+  const eps = 0.3;
+  const minLen = 0.5;
+  const ax2 = a.x + a.width, ay2 = a.y + a.depth;
+  const bx2 = b.x + b.width, by2 = b.y + b.depth;
+  // Horizontal edge
+  if (Math.abs(ay2 - b.y) < eps || Math.abs(by2 - a.y) < eps) {
+    const o = Math.min(ax2, bx2) - Math.max(a.x, b.x);
+    if (o > minLen) return true;
   }
-  // B right ≈ A left
-  const bral = (b.x + b.width) - a.x;
-  if (Math.abs(bral) < threshold && Math.abs(bral) > 0.01) {
-    const mid = b.x + b.width - bral / 2;
-    b.width = mid - b.x;
-    a.width += a.x - mid;
-    a.x = mid;
+  // Vertical edge
+  if (Math.abs(ax2 - b.x) < eps || Math.abs(bx2 - a.x) < eps) {
+    const o = Math.min(ay2, by2) - Math.max(a.y, b.y);
+    if (o > minLen) return true;
   }
-  // A top ≈ B bottom
-  const atbb = (a.y + a.depth) - b.y;
-  if (Math.abs(atbb) < threshold && Math.abs(atbb) > 0.01) {
-    const mid = a.y + a.depth - atbb / 2;
-    a.depth = mid - a.y;
-    b.depth += b.y - mid;
-    b.y = mid;
-  }
-  // B top ≈ A bottom
-  const btab = (b.y + b.depth) - a.y;
-  if (Math.abs(btab) < threshold && Math.abs(btab) > 0.01) {
-    const mid = b.y + b.depth - btab / 2;
-    b.depth = mid - b.y;
-    a.depth += a.y - mid;
-    a.y = mid;
+  return false;
+}
+
+function snapEdgePair(a: LLMRoom, b: LLMRoom, thr: number): void {
+  const pairs = [
+    { get: () => (a.x + a.width) - b.x, fix: (d: number) => { a.width -= d / 2; b.x -= d / 2; b.width += d / 2; } },
+    { get: () => (b.x + b.width) - a.x, fix: (d: number) => { b.width -= d / 2; a.x -= d / 2; a.width += d / 2; } },
+    { get: () => (a.y + a.depth) - b.y, fix: (d: number) => { a.depth -= d / 2; b.y -= d / 2; b.depth += d / 2; } },
+    { get: () => (b.y + b.depth) - a.y, fix: (d: number) => { b.depth -= d / 2; a.y -= d / 2; a.depth += d / 2; } },
+  ];
+  for (const p of pairs) {
+    const diff = p.get();
+    if (Math.abs(diff) > 0.01 && Math.abs(diff) < thr) p.fix(diff);
   }
 }
 
-function computeRectOverlap(a: LLMRoom, b: LLMRoom): number {
-  const x0 = Math.max(a.x, b.x);
-  const x1 = Math.min(a.x + a.width, b.x + b.width);
-  const y0 = Math.max(a.y, b.y);
-  const y1 = Math.min(a.y + a.depth, b.y + b.depth);
-  if (x1 <= x0 || y1 <= y0) return 0;
-  return (x1 - x0) * (y1 - y0);
+function overlapArea(a: LLMRoom, b: LLMRoom): number {
+  const x0 = Math.max(a.x, b.x), x1 = Math.min(a.x + a.width, b.x + b.width);
+  const y0 = Math.max(a.y, b.y), y1 = Math.min(a.y + a.depth, b.y + b.depth);
+  return x1 > x0 && y1 > y0 ? (x1 - x0) * (y1 - y0) : 0;
 }
 
-function resolveOverlap(a: LLMRoom, b: LLMRoom, plot: Rect, warnings: string[]): void {
-  const aArea = a.width * a.depth;
-  const bArea = b.width * b.depth;
-  const smaller = aArea < bArea ? a : b;
+function nudgeApart(a: LLMRoom, b: LLMRoom, plot: Rect, warnings: string[]): void {
+  const smaller = (a.width * a.depth) < (b.width * b.depth) ? a : b;
   const larger = smaller === a ? b : a;
-
-  // Find which edge of the larger room the smaller overlaps least on,
-  // then nudge the smaller to that edge
-  const overlapX = Math.min(smaller.x + smaller.width, larger.x + larger.width) - Math.max(smaller.x, larger.x);
-  const overlapY = Math.min(smaller.y + smaller.depth, larger.y + larger.depth) - Math.max(smaller.y, larger.y);
-
-  if (overlapX < overlapY) {
-    // Nudge horizontally
-    if (smaller.x < larger.x) {
-      smaller.width = larger.x - smaller.x;
-    } else {
-      const newX = larger.x + larger.width;
-      smaller.width = Math.max(4, smaller.x + smaller.width - newX);
-      smaller.x = newX;
-    }
+  const ox = Math.min(smaller.x + smaller.width, larger.x + larger.width) - Math.max(smaller.x, larger.x);
+  const oy = Math.min(smaller.y + smaller.depth, larger.y + larger.depth) - Math.max(smaller.y, larger.y);
+  if (ox < oy) {
+    if (smaller.x < larger.x) smaller.x = larger.x - smaller.width;
+    else smaller.x = larger.x + larger.width;
   } else {
-    // Nudge vertically
-    if (smaller.y < larger.y) {
-      smaller.depth = larger.y - smaller.y;
-    } else {
-      const newY = larger.y + larger.depth;
-      smaller.depth = Math.max(4, smaller.y + smaller.depth - newY);
-      smaller.y = newY;
-    }
+    if (smaller.y < larger.y) smaller.y = larger.y - smaller.depth;
+    else smaller.y = larger.y + larger.depth;
   }
-
-  // Clamp to plot
-  if (smaller.x + smaller.width > plot.width) smaller.width = plot.width - smaller.x;
-  if (smaller.y + smaller.depth > plot.depth) smaller.depth = plot.depth - smaller.y;
-
-  warnings.push(`${smaller.name}: resized to resolve overlap with ${larger.name}`);
+  smaller.x = Math.max(0, Math.min(smaller.x, plot.width - smaller.width));
+  smaller.y = Math.max(0, Math.min(smaller.y, plot.depth - smaller.depth));
+  warnings.push(`${smaller.name}: nudged away from ${larger.name}`);
 }
 
-function findOpenPosition(
-  w: number, d: number,
-  rooms: LLMRoom[],
-  hallway: { x: number; y: number; width: number; depth: number },
-  plot: Rect,
-): { x: number; y: number } {
-  const blockers = rooms.map(r => ({ x: r.x, y: r.y, width: r.width, depth: r.depth }));
-  blockers.push(hallway);
-  const step = 1;
-  for (let y = 0; y <= plot.depth - d; y += step) {
-    for (let x = 0; x <= plot.width - w; x += step) {
-      const cand = { x, y, width: w, depth: d };
-      let blocked = false;
-      for (const b of blockers) {
-        if (computeRectOverlap(
-          { name: "", type: "", ...cand },
-          { name: "", type: "", ...b },
-        ) > 0.1) {
-          blocked = true;
-          break;
-        }
-      }
-      if (!blocked) return { x, y };
+function matchesRoom(llm: LLMRoom, pr: ParsedRoom): boolean {
+  const a = llm.name.toLowerCase(), b = pr.name.toLowerCase();
+  if (a === b) return true;
+  if (llm.type === pr.function) return true;
+  const aToks = a.split(/\s+/).filter(t => t.length >= 3);
+  const bToks = b.split(/\s+/).filter(t => t.length >= 3);
+  return aToks.some(t => bToks.includes(t));
+}
+
+function findOpen(w: number, d: number, rooms: LLMRoom[], plot: Rect): { x: number; y: number } {
+  for (let y = 0; y <= plot.depth - d; y += 2) {
+    for (let x = 0; x <= plot.width - w; x += 2) {
+      const cand = { x, y, width: w, depth: d, name: "", type: "" };
+      if (rooms.every(r => overlapArea(cand, r) < 0.1)) return { x, y };
     }
   }
-  return { x: 0, y: 0 }; // last resort
+  return { x: 0, y: 0 };
 }
 
 // ───────────────────────────────────────────────────────────────────────────
-// CONVERT LLM OUTPUT → STRIP-PACK TYPES
+// RETRY FEEDBACK
 // ───────────────────────────────────────────────────────────────────────────
 
-function llmToStripPack(
-  layout: LLMLayoutResponse,
-  parsed: ParsedConstraints,
-  facing: Facing,
-  plot: Rect,
-  warnings: string[],
+function countOrphans(rooms: StripPackRoom[], doors: { between: [string, string] }[]): number {
+  const adj = new Map<string, Set<string>>();
+  for (const r of rooms) if (r.placed) adj.set(r.name, new Set());
+  for (const d of doors) {
+    const [a, b] = d.between;
+    adj.get(a)?.add(b);
+    adj.get(b)?.add(a);
+  }
+  // BFS from any room with a hallway door
+  const seed = doors.find(d => d.between.includes("hallway") || d.between.includes("exterior"));
+  if (!seed) return rooms.filter(r => r.placed).length;
+  const start = seed.between[0] === "hallway" || seed.between[0] === "exterior" ? seed.between[1] : seed.between[0];
+  const visited = new Set<string>([start]);
+  const queue = [start];
+  while (queue.length > 0) {
+    const cur = queue.shift()!;
+    for (const n of adj.get(cur) ?? []) {
+      if (!visited.has(n)) { visited.add(n); queue.push(n); }
+    }
+  }
+  return rooms.filter(r => r.placed && !visited.has(r.name)).length;
+}
+
+function buildFeedbackMessage(rooms: StripPackRoom[], doors: { between: [string, string] }[], spine: SpineLayout): string {
+  const orphanNames: string[] = [];
+  const adj = new Map<string, Set<string>>();
+  for (const r of rooms) if (r.placed) adj.set(r.name, new Set());
+  for (const d of doors) {
+    adj.get(d.between[0])?.add(d.between[1]);
+    adj.get(d.between[1])?.add(d.between[0]);
+  }
+  const seed = doors.find(d => d.between.includes("hallway"));
+  if (seed) {
+    const start = seed.between[0] === "hallway" ? seed.between[1] : seed.between[0];
+    const visited = new Set([start]);
+    const q = [start];
+    while (q.length > 0) { const c = q.shift()!; for (const n of adj.get(c) ?? []) { if (!visited.has(n)) { visited.add(n); q.push(n); } } }
+    for (const r of rooms) if (r.placed && !visited.has(r.name)) orphanNames.push(r.name);
+  }
+  return `PREVIOUS ATTEMPT FAILED — ${orphanNames.length} rooms are disconnected: ${orphanNames.join(", ")}.\nThese rooms have gaps between them and the hallway. Fix by making their edges touch the hallway or touch a room that touches the hallway. Ensure ZERO gaps between adjacent rooms.`;
+}
+
+// ───────────────────────────────────────────────────────────────────────────
+// CONVERT TO STRIP-PACK TYPES
+// ───────────────────────────────────────────────────────────────────────────
+
+function toStripPack(
+  llmRooms: LLMRoom[], hallway: Rect,
+  parsed: ParsedConstraints, facing: Facing, plot: Rect,
 ): { rooms: StripPackRoom[]; spine: SpineLayout } {
-  const hw = layout.hallway;
-  const spineRect: Rect = { x: hw.x, y: hw.y, width: hw.width, depth: hw.depth };
-
-  // Build front/back strips from hallway position
-  const isHorizontal = hw.width > hw.depth;
-  let frontStrip: Rect;
-  let backStrip: Rect;
-
-  if (isHorizontal) {
-    // Hallway runs E-W
-    if (facing === "north") {
-      frontStrip = { x: 0, y: hw.y + hw.depth, width: plot.width, depth: plot.depth - (hw.y + hw.depth) };
-      backStrip = { x: 0, y: 0, width: plot.width, depth: hw.y };
-    } else {
-      frontStrip = { x: 0, y: 0, width: plot.width, depth: hw.y };
-      backStrip = { x: 0, y: hw.y + hw.depth, width: plot.width, depth: plot.depth - (hw.y + hw.depth) };
-    }
-  } else {
-    // Hallway runs N-S
-    if (facing === "east") {
-      frontStrip = { x: hw.x + hw.width, y: 0, width: plot.width - (hw.x + hw.width), depth: plot.depth };
-      backStrip = { x: 0, y: 0, width: hw.x, depth: plot.depth };
-    } else {
-      frontStrip = { x: 0, y: 0, width: hw.x, depth: plot.depth };
-      backStrip = { x: hw.x + hw.width, y: 0, width: plot.width - (hw.x + hw.width), depth: plot.depth };
-    }
-  }
-
+  const isH = hallway.width > hallway.depth;
   const spine: SpineLayout = {
-    spine: spineRect,
-    front_strip: frontStrip,
-    back_strip: backStrip,
+    spine: hallway,
+    front_strip: isH
+      ? (facing === "north"
+        ? { x: 0, y: hallway.y + hallway.depth, width: plot.width, depth: plot.depth - hallway.y - hallway.depth }
+        : { x: 0, y: 0, width: plot.width, depth: hallway.y })
+      : (facing === "east"
+        ? { x: hallway.x + hallway.width, y: 0, width: plot.width - hallway.x - hallway.width, depth: plot.depth }
+        : { x: 0, y: 0, width: hallway.x, depth: plot.depth }),
+    back_strip: isH
+      ? (facing === "north"
+        ? { x: 0, y: 0, width: plot.width, depth: hallway.y }
+        : { x: 0, y: hallway.y + hallway.depth, width: plot.width, depth: plot.depth - hallway.y - hallway.depth })
+      : (facing === "east"
+        ? { x: 0, y: 0, width: hallway.x, depth: plot.depth }
+        : { x: hallway.x + hallway.width, y: 0, width: plot.width - hallway.x - hallway.width, depth: plot.depth }),
     entrance_rooms: [],
-    remaining_front: [frontStrip],
-    orientation: isHorizontal ? "horizontal" : "vertical",
+    remaining_front: [],
+    orientation: isH ? "horizontal" : "vertical",
     entrance_side: facing,
-    hallway_width_ft: isHorizontal ? hw.depth : hw.width,
+    hallway_width_ft: isH ? hallway.depth : hallway.width,
   };
 
-  // Convert LLM rooms to StripPackRoom[]
   const rooms: StripPackRoom[] = [];
-  const parsedByName = new Map<string, ParsedRoom>();
-  for (const pr of parsed.rooms) {
-    parsedByName.set(pr.name.toLowerCase(), pr);
-  }
-
-  for (const llmRoom of layout.rooms) {
-    // Skip the hallway/corridor — it's the spine, not a packable room
-    if (llmRoom.type === "corridor" || llmRoom.type === "hallway") continue;
-
-    const pr = matchParsedRoom(llmRoom, parsed);
-    const fn = pr?.function ?? llmRoom.type ?? "other";
-    const zone = ZONE_BY_TYPE[fn] ?? "PRIVATE";
-    const strip = inferStripFromPosition(llmRoom, spineRect, isHorizontal, facing);
-
-    const reqW = pr?.dim_width_ft ?? llmRoom.width;
-    const reqD = pr?.dim_depth_ft ?? llmRoom.depth;
-
-    const room: StripPackRoom = {
-      id: pr?.id ?? `llm_${llmRoom.name.toLowerCase().replace(/[^a-z0-9]+/g, "_")}`,
-      name: llmRoom.name,
-      type: fn,
-      requested_width_ft: reqW,
-      requested_depth_ft: reqD,
-      requested_area_sqft: reqW * reqD,
-      zone,
-      strip,
+  for (const lr of llmRooms) {
+    if (lr.type === "corridor" || lr.type === "hallway") continue;
+    const pr = parsed.rooms.find(r => matchesRoom(lr, r));
+    const fn = pr?.function ?? lr.type ?? "other";
+    rooms.push({
+      id: pr?.id ?? `llm_${lr.name.toLowerCase().replace(/[^a-z0-9]+/g, "_")}`,
+      name: lr.name, type: fn,
+      requested_width_ft: pr?.dim_width_ft ?? lr.width,
+      requested_depth_ft: pr?.dim_depth_ft ?? lr.depth,
+      requested_area_sqft: (pr?.dim_width_ft ?? lr.width) * (pr?.dim_depth_ft ?? lr.depth),
+      zone: ZONE_MAP[fn] ?? "PRIVATE",
+      strip: inferStrip(lr, hallway, isH, facing),
       position_preference: pr?.position_direction ?? undefined,
-      adjacencies: pr ? getAdjacencies(pr.id, parsed) : [],
+      adjacencies: pr ? getAdj(pr.id, parsed) : [],
       is_attached_to: pr?.attached_to_room_id ?? undefined,
-      needs_exterior_wall: zone === "PUBLIC" || fn.includes("bedroom"),
-      is_wet: pr?.is_wet ?? (fn.includes("bath") || fn === "kitchen"),
-      is_sacred: pr?.is_sacred ?? (fn === "pooja"),
-      placed: { x: llmRoom.x, y: llmRoom.y, width: llmRoom.width, depth: llmRoom.depth },
-      actual_area_sqft: llmRoom.width * llmRoom.depth,
-    };
-    rooms.push(room);
+      needs_exterior_wall: (ZONE_MAP[fn] === "PUBLIC") || fn.includes("bedroom"),
+      is_wet: pr?.is_wet ?? fn.includes("bath"),
+      is_sacred: pr?.is_sacred ?? fn === "pooja",
+      placed: { x: lr.x, y: lr.y, width: lr.width, depth: lr.depth },
+      actual_area_sqft: lr.width * lr.depth,
+    });
   }
-
   return { rooms, spine };
 }
 
-function matchParsedRoom(llm: LLMRoom, parsed: ParsedConstraints): ParsedRoom | undefined {
-  const llmNameLower = llm.name.toLowerCase();
-  // Exact name match
-  let match = parsed.rooms.find(r => r.name.toLowerCase() === llmNameLower);
-  if (match) return match;
-  // Function match
-  match = parsed.rooms.find(r => r.function === llm.type && !r.is_circulation);
-  if (match) return match;
-  // Partial name match
-  match = parsed.rooms.find(r => {
-    const rLower = r.name.toLowerCase();
-    return rLower.includes(llmNameLower) || llmNameLower.includes(rLower);
-  });
-  if (match) return match;
-  // Token overlap
-  const llmTokens = llmNameLower.split(/\s+/).filter(t => t.length >= 3);
-  for (const pr of parsed.rooms) {
-    const prTokens = pr.name.toLowerCase().split(/\s+/).filter(t => t.length >= 3);
-    const overlap = llmTokens.filter(t => prTokens.includes(t)).length;
-    if (overlap > 0) return pr;
+function inferStrip(r: LLMRoom, hw: Rect, isH: boolean, facing: Facing): StripAssignment {
+  if (r.type === "porch" || r.type === "foyer") return "ENTRANCE";
+  const cx = r.x + r.width / 2, cy = r.y + r.depth / 2;
+  if (isH) {
+    const mid = hw.y + hw.depth / 2;
+    return facing === "north" ? (cy > mid ? "FRONT" : "BACK") : (cy < mid ? "FRONT" : "BACK");
   }
-  return undefined;
+  const mid = hw.x + hw.width / 2;
+  return facing === "east" ? (cx > mid ? "FRONT" : "BACK") : (cx < mid ? "FRONT" : "BACK");
 }
 
-function getAdjacencies(roomId: string, parsed: ParsedConstraints): string[] {
-  const adj: string[] = [];
-  for (const p of parsed.adjacency_pairs) {
-    if (p.room_a_id === roomId) adj.push(p.room_b_id);
-    if (p.room_b_id === roomId) adj.push(p.room_a_id);
+function getAdj(id: string, p: ParsedConstraints): string[] {
+  const out: string[] = [];
+  for (const a of p.adjacency_pairs) {
+    if (a.room_a_id === id) out.push(a.room_b_id);
+    if (a.room_b_id === id) out.push(a.room_a_id);
   }
-  return adj;
+  return out;
 }
 
-function inferStripFromPosition(
-  room: LLMRoom,
-  spine: Rect,
-  isHorizontal: boolean,
-  facing: Facing,
-): StripAssignment {
-  if (room.type === "porch" || room.type === "verandah" || room.type === "foyer") return "ENTRANCE";
+function wireWallIds(rooms: StripPackRoom[], walls: { id: string; room_ids: string[] }[]): void {
+  const m = new Map<string, string[]>();
+  for (const w of walls) for (const id of w.room_ids) { if (!m.has(id)) m.set(id, []); m.get(id)!.push(w.id); }
+  for (const r of rooms) r.wall_ids = m.get(r.id) ?? [];
+}
 
-  const roomCenterX = room.x + room.width / 2;
-  const roomCenterY = room.y + room.depth / 2;
+// ───────────────────────────────────────────────────────────────────────────
+// PREPROCESSOR (from strip-pack-engine)
+// ───────────────────────────────────────────────────────────────────────────
 
-  if (isHorizontal) {
-    const spineY = spine.y + spine.depth / 2;
-    if (facing === "north") return roomCenterY > spineY ? "FRONT" : "BACK";
-    return roomCenterY < spineY ? "FRONT" : "BACK";
-  } else {
-    const spineX = spine.x + spine.width / 2;
-    if (facing === "east") return roomCenterX > spineX ? "FRONT" : "BACK";
-    return roomCenterX < spineX ? "FRONT" : "BACK";
+function preprocessParsed(raw: ParsedConstraints, prompt: string | undefined, warnings: string[]): ParsedConstraints {
+  const parsed: ParsedConstraints = {
+    ...raw, plot: { ...raw.plot },
+    rooms: raw.rooms.map(r => ({ ...r, doors: r.doors.map(d => ({ ...d })), windows: r.windows.map(w => ({ ...w })) })),
+    adjacency_pairs: raw.adjacency_pairs.map(a => ({ ...a })),
+    connects_all_groups: raw.connects_all_groups.map(g => ({ ...g, connected_room_ids: [...g.connected_room_ids] })),
+    special_features: raw.special_features.map(f => ({ ...f })),
+    constraint_budget: { ...raw.constraint_budget },
+  };
+  // Flip inverted attachments
+  const PARENTS = new Set(["master_bedroom", "bedroom", "guest_bedroom", "kids_bedroom"]);
+  const CHILDREN = new Set(["bathroom", "master_bathroom", "powder_room", "walk_in_wardrobe", "walk_in_closet"]);
+  const byId = new Map(parsed.rooms.map(r => [r.id, r]));
+  for (const r of parsed.rooms) {
+    if (!r.attached_to_room_id) continue;
+    const t = byId.get(r.attached_to_room_id);
+    if (t && PARENTS.has(r.function) && CHILDREN.has(t.function)) {
+      r.attached_to_room_id = null;
+      if (!t.attached_to_room_id) t.attached_to_room_id = r.id;
+      warnings.push(`Flipped inverted attachment: ${r.name} → ${t.name}`);
+    }
   }
+  // Synthesize missing porch
+  if (!parsed.rooms.some(r => r.function === "porch" || r.function === "verandah")) {
+    const hasFeat = parsed.special_features.some(f => (f.feature === "porch" || f.feature === "verandah") && f.mentioned_verbatim);
+    if (hasFeat || (prompt && /porch/i.test(prompt))) {
+      let w = 6, d = 5;
+      if (prompt) {
+        const m = prompt.match(/(\d+)\s*(?:ft)?\s*[x×]\s*(\d+)\s*(?:ft)?\s+(?:porch|verandah)/i);
+        if (m) { w = +m[1] || 6; d = +m[2] || 5; }
+      }
+      parsed.rooms.push({
+        id: "__synth_porch", name: "Porch", function: "porch",
+        dim_width_ft: w, dim_depth_ft: d, position_type: "wall_centered",
+        position_direction: parsed.plot.facing, attached_to_room_id: null,
+        must_have_window_on: null, external_walls_ft: null, internal_walls_ft: null,
+        doors: [], windows: [], is_wet: false, is_sacred: false, is_circulation: false,
+        user_explicit_dims: true, user_explicit_position: true,
+      });
+      warnings.push(`Synthesized porch (${w}×${d}ft)`);
+    }
+  }
+  return parsed;
 }
 
 // ───────────────────────────────────────────────────────────────────────────
 // METRICS
 // ───────────────────────────────────────────────────────────────────────────
 
-function computeMetrics(
-  rooms: StripPackRoom[],
-  spine: SpineLayout,
-  plot: Rect,
-  requiredAdjacencies: number,
-): StripPackMetrics {
-  let occupied = spine.spine.width * spine.spine.depth;
-  for (const r of rooms) if (r.placed) occupied += r.placed.width * r.placed.depth;
-  const plotArea = rectArea(plot);
-  const efficiency_pct = plotArea > 0 ? Math.min(100, (occupied / plotArea) * 100) : 0;
-  const void_area_sqft = Math.max(0, plotArea - occupied);
-
+function computeMetrics(rooms: StripPackRoom[], spine: SpineLayout, plot: Rect, reqAdj: number): StripPackMetrics {
+  let occ = spine.spine.width * spine.spine.depth;
+  for (const r of rooms) if (r.placed) occ += r.placed.width * r.placed.depth;
+  const pa = rectArea(plot);
   return {
-    efficiency_pct: Math.round(efficiency_pct * 10) / 10,
-    void_area_sqft: Math.round(void_area_sqft),
-    door_coverage_pct: 0,
-    orphan_rooms: [],
-    adjacency_satisfaction_pct: 0,
-    total_rooms: rooms.length,
-    rooms_with_doors: 0,
-    required_adjacencies: requiredAdjacencies,
-    satisfied_adjacencies: 0,
+    efficiency_pct: Math.round(Math.min(100, (occ / pa) * 100) * 10) / 10,
+    void_area_sqft: Math.round(Math.max(0, pa - occ)),
+    door_coverage_pct: 0, orphan_rooms: [], adjacency_satisfaction_pct: 0,
+    total_rooms: rooms.length, rooms_with_doors: 0,
+    required_adjacencies: reqAdj, satisfied_adjacencies: 0,
   };
-}
-
-// ───────────────────────────────────────────────────────────────────────────
-// HALLWAY CONNECTIVITY REPAIR
-// ───────────────────────────────────────────────────────────────────────────
-
-/**
- * Ensure every room is reachable from the hallway via shared walls. If a
- * room doesn't share an edge with the hallway or with any hallway-connected
- * room, extend or nudge it to create the connection.
- *
- * This fixes the most common LLM error: rooms placed with 1-3ft gaps from
- * the hallway that prevent wall/door generation.
- */
-function ensureHallwayConnectivity(
-  rooms: StripPackRoom[],
-  spine: SpineLayout,
-  plot: Rect,
-  warnings: string[],
-): void {
-  const spineRect = spine.spine;
-
-  // Build connectivity graph. A room is "connected" if it shares an edge
-  // (>0.5ft overlap) with the hallway or with any connected room.
-  const sharesEdge = (a: Rect, b: Rect): boolean => {
-    const eps = 0.2;
-    const minLen = 0.5;
-    // Horizontal edge
-    if (Math.abs(a.y + a.depth - b.y) < eps || Math.abs(b.y + b.depth - a.y) < eps) {
-      const o = Math.min(a.x + a.width, b.x + b.width) - Math.max(a.x, b.x);
-      if (o > minLen) return true;
-    }
-    // Vertical edge
-    if (Math.abs(a.x + a.width - b.x) < eps || Math.abs(b.x + b.width - a.x) < eps) {
-      const o = Math.min(a.y + a.depth, b.y + b.depth) - Math.max(a.y, b.y);
-      if (o > minLen) return true;
-    }
-    return false;
-  };
-
-  // BFS from hallway to find all connected rooms
-  const connected = new Set<string>();
-  const queue: string[] = [];
-
-  // Seed: rooms that touch the hallway
-  for (const r of rooms) {
-    if (!r.placed) continue;
-    if (sharesEdge(r.placed, spineRect)) {
-      connected.add(r.id);
-      queue.push(r.id);
-    }
-  }
-
-  // Expand: rooms that touch connected rooms
-  while (queue.length > 0) {
-    const curId = queue.shift()!;
-    const curRoom = rooms.find(r => r.id === curId);
-    if (!curRoom?.placed) continue;
-    for (const other of rooms) {
-      if (!other.placed || connected.has(other.id)) continue;
-      if (sharesEdge(curRoom.placed, other.placed)) {
-        connected.add(other.id);
-        queue.push(other.id);
-      }
-    }
-  }
-
-  // For each disconnected room, extend it toward the hallway
-  for (const room of rooms) {
-    if (!room.placed || connected.has(room.id)) continue;
-
-    const p = room.placed;
-    const isHorizontal = spine.orientation === "horizontal";
-
-    // Try to extend toward the hallway
-    if (isHorizontal) {
-      const hwTop = spineRect.y + spineRect.depth;
-      const hwBot = spineRect.y;
-      const roomBot = p.y;
-      const roomTop = p.y + p.depth;
-
-      if (roomBot > hwTop) {
-        // Room is above hallway — extend downward
-        const gap = roomBot - hwTop;
-        if (gap < 10) {
-          p.depth += gap;
-          p.y = hwTop;
-          warnings.push(`${room.name}: extended ${gap.toFixed(1)}ft down to touch hallway`);
-        }
-      } else if (roomTop < hwBot) {
-        // Room is below hallway — extend upward
-        const gap = hwBot - roomTop;
-        if (gap < 10) {
-          p.depth += gap;
-          warnings.push(`${room.name}: extended ${gap.toFixed(1)}ft up to touch hallway`);
-        }
-      }
-    } else {
-      const hwRight = spineRect.x + spineRect.width;
-      const hwLeft = spineRect.x;
-      const roomLeft = p.x;
-      const roomRight = p.x + p.width;
-
-      if (roomLeft > hwRight) {
-        const gap = roomLeft - hwRight;
-        if (gap < 10) {
-          p.width += gap;
-          p.x = hwRight;
-          warnings.push(`${room.name}: extended ${gap.toFixed(1)}ft left to touch hallway`);
-        }
-      } else if (roomRight < hwLeft) {
-        const gap = hwLeft - roomRight;
-        if (gap < 10) {
-          p.width += gap;
-          warnings.push(`${room.name}: extended ${gap.toFixed(1)}ft right to touch hallway`);
-        }
-      }
-    }
-
-    room.actual_area_sqft = p.width * p.depth;
-  }
 }

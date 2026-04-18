@@ -281,10 +281,9 @@ export async function POST(req: NextRequest) {
           `rooms=${llmResult.rooms.length}`,
         );
 
-        // Ship LLM only if it clearly succeeds. Low scores (50-64) may have
-        // orphan clusters — let T1 strip-pack try instead (it guarantees 0
-        // orphans by construction).
-        if (llmScore.score >= 65 && llmLayoutMetrics.orphan_rooms.length <= 2) {
+        // Ship LLM if it produces a decent result. The LLM engine now has
+        // retry-with-feedback logic for orphan clusters.
+        if (llmScore.score >= 55 && llmLayoutMetrics.orphan_rooms.length <= 2) {
           console.log(`[LLM-LAYOUT] ACCEPTED: ${llmScore.score}/100 (${llmScore.grade})`);
           const feedback = buildFeedback(llmProject, prompt);
           feedback.tips.push(
