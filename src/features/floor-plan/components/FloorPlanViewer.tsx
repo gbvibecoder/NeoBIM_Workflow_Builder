@@ -18,6 +18,7 @@ import { BOQPanel } from "@/features/floor-plan/components/panels/BOQPanel";
 import { ProgramPanel } from "@/features/floor-plan/components/panels/ProgramPanel";
 import { QualityPanel } from "@/features/floor-plan/components/panels/QualityPanel";
 import { ExplainPanel } from "@/features/floor-plan/components/panels/ExplainPanel";
+import { ValidationDialog, type ValidationResult } from "@/features/floor-plan/components/ValidationDialog";
 import { WelcomeScreen } from "@/features/floor-plan/components/WelcomeScreen";
 import { GenerationLoader } from "@/features/floor-plan/components/GenerationLoader";
 import { getProjectIndex, importProjectFile } from "@/features/floor-plan/lib/project-persistence";
@@ -103,6 +104,7 @@ export function FloorPlanViewer({ initialGeometry, initialPrompt, initialProject
    * a sample plan and call it "AI-generated".
    */
   const [generationError, setGenerationError] = React.useState<{ message: string; prompt: string } | null>(null);
+  const [validationPending, setValidationPending] = useState<{ result: ValidationResult; prompt: string } | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const [undoToast, setUndoToast] = useState<string | null>(null);
   const undoToastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -113,8 +115,11 @@ export function FloorPlanViewer({ initialGeometry, initialPrompt, initialProject
     return () => { abortRef.current?.abort(); };
   }, []);
 
-  const handleGenerateFromPrompt = useCallback(async (prompt: string) => {
-    // Abort any in-flight request
+  /**
+   * Core generation function — calls /api/generate-floor-plan and loads result.
+   * Used by both the validation flow and the direct (skip/template) flow.
+   */
+  const executeGeneration = useCallback(async (prompt: string) => {
     abortRef.current?.abort();
     const controller = new AbortController();
     abortRef.current = controller;
@@ -123,10 +128,6 @@ export function FloorPlanViewer({ initialGeometry, initialPrompt, initialProject
     store.startGeneration(prompt);
     setFallbackBanner(null);
     setGenerationError(null);
-
-    // Phase 1 — NO setTimeout-driven fake stages. The loader shows an honest
-    // indeterminate progress bar while the single backend POST runs. Real
-    // per-stage progress is a Phase 3 concern (multi-agent pipeline + SSE).
 
     try {
       const res = await fetch("/api/generate-floor-plan", {
@@ -138,7 +139,6 @@ export function FloorPlanViewer({ initialGeometry, initialPrompt, initialProject
 
       if (!res.ok) {
         const data = await res.json().catch(() => ({ error: "Unknown error" }));
-        // Handle plan limit / email verification gates — show popup, don't fallback
         if (data.error === "PLAN_LIMIT" || data.error === "EMAIL_VERIFY") {
           useFloorPlanStore.setState({ isGenerating: false });
           setUpgradeBlock({ title: data.title, message: data.message, action: data.action, actionUrl: data.actionUrl });
@@ -149,8 +149,6 @@ export function FloorPlanViewer({ initialGeometry, initialPrompt, initialProject
       }
 
       const data = await res.json();
-
-      // Load the AI-generated project + Phase 1 honest metrics in one shot.
       store.setProject(data.project);
       store.setQualityResults(
         data.layoutMetrics ?? null,
@@ -164,17 +162,53 @@ export function FloorPlanViewer({ initialGeometry, initialPrompt, initialProject
         projectModified: false,
       });
     } catch (err) {
-      if (controller.signal.aborted) return; // User navigated away
-
+      if (controller.signal.aborted) return;
       const message = err instanceof Error ? err.message : String(err);
       console.warn("[FloorPlanViewer] AI generation failed:", message);
-
-      // Phase 1 — NO silent sample swap. Surface the error so the user must
-      // explicitly choose: retry, use a sample on purpose, or edit the prompt.
       useFloorPlanStore.setState({ isGenerating: false });
       setGenerationError({ message, prompt });
     }
   }, []);
+
+  /**
+   * Prompt-based generation — calls validate first, shows dialog if
+   * there are issues or adjustments, then proceeds to generation.
+   */
+  const handleGenerateFromPrompt = useCallback(async (prompt: string) => {
+    setValidationPending(null);
+    setGenerationError(null);
+    try {
+      const res = await fetch("/api/validate-floor-plan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt }),
+      });
+      if (res.ok) {
+        const result: ValidationResult = await res.json();
+        // Show dialog if there are non-trivial issues or adjustments
+        const hasAdjustments = result.adjustments.some(a => a.type !== "unchanged");
+        const hasIssues = result.issues.length > 0;
+        if (hasAdjustments || hasIssues) {
+          setValidationPending({ result, prompt });
+          return;
+        }
+      }
+    } catch {
+      // Validation failed — proceed directly to generation (non-blocking)
+      console.warn("[FloorPlanViewer] Validation API failed — skipping review");
+    }
+    // No issues or validation unavailable — generate directly
+    executeGeneration(prompt);
+  }, [executeGeneration]);
+
+  /**
+   * Direct generation — bypasses validation. Used by Quick Templates
+   * and the "Skip review" link in the validation dialog.
+   */
+  const handleDirectGenerate = useCallback((prompt: string) => {
+    setValidationPending(null);
+    executeGeneration(prompt);
+  }, [executeGeneration]);
 
   /**
    * Explicit "load a sample plan" action — only ever fires from the error UI
@@ -467,12 +501,29 @@ export function FloorPlanViewer({ initialGeometry, initialPrompt, initialProject
         })()}
         <WelcomeScreen
           onGenerateFromPrompt={handleGenerateFromPrompt}
+          onDirectGenerate={handleDirectGenerate}
           onOpenSample={loadSample}
           onStartBlank={startBlank}
           onOpenSaved={loadFromSaved}
           onImportFile={handleImportFile}
           savedProjects={savedProjects}
         />
+        {validationPending && (
+          <ValidationDialog
+            result={validationPending.result}
+            onGenerate={() => {
+              const prompt = validationPending.prompt;
+              setValidationPending(null);
+              executeGeneration(prompt);
+            }}
+            onEditPrompt={() => setValidationPending(null)}
+            onSkip={() => {
+              const prompt = validationPending.prompt;
+              setValidationPending(null);
+              executeGeneration(prompt);
+            }}
+          />
+        )}
         {errorOverlay}
       </div>
     );

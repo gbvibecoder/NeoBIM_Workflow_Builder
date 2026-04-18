@@ -4,6 +4,8 @@ import React, { useState } from "react";
 
 interface WelcomeScreenProps {
   onGenerateFromPrompt: (prompt: string) => void;
+  /** Direct generation bypassing validation — used by Quick Templates. */
+  onDirectGenerate?: (prompt: string) => void;
   onOpenSample: () => void;
   onStartBlank: () => void;
   onOpenSaved: (projectId: string) => void;
@@ -21,12 +23,14 @@ const TEMPLATES = [
 
 export function WelcomeScreen({
   onGenerateFromPrompt,
+  onDirectGenerate,
   onOpenSample,
   onStartBlank,
   onOpenSaved,
   onImportFile,
   savedProjects,
 }: WelcomeScreenProps) {
+  const handleTemplate = onDirectGenerate ?? onGenerateFromPrompt;
   const [prompt, setPrompt] = useState("");
   const [showSaved, setShowSaved] = useState(false);
 
@@ -87,7 +91,7 @@ export function WelcomeScreen({
             {TEMPLATES.map((tpl) => (
               <button
                 key={tpl.label}
-                onClick={() => onGenerateFromPrompt(tpl.prompt)}
+                onClick={() => handleTemplate(tpl.prompt)}
                 className="group flex flex-col items-center gap-2 rounded-xl border border-gray-100 bg-white p-3 text-center shadow-sm transition-all hover:border-blue-200 hover:shadow-md"
               >
                 <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gray-50 transition-colors group-hover:bg-blue-50">
