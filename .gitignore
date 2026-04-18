@@ -70,6 +70,7 @@ analytics-logs/
 *_GUIDE.md
 *_PLAN.md
 !docs/RICH_IFC_IMPLEMENTATION_PLAN.md
+!docs/RICH_IFC_IMPLEMENTATION_PLAN_v2.md
 *_FIXES.md
 *_TESTING.md
 *_REFERENCE.md
