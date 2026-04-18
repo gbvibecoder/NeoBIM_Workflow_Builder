@@ -24,7 +24,7 @@ import { rectOverlap } from "./types";
 
 const GRID_RESOLUTION_FT = 0.5;
 const MIN_VOID_AREA_TO_FILL_SQFT = 1;       // ignore smaller than 1 sqft (numerical drift)
-const MAX_VOID_TO_AUTO_FILL_SQFT = 200;     // larger than this: warn, don't try
+const MAX_VOID_TO_AUTO_FILL_SQFT = 500;     // Phase 3H: raised from 200 to 500 (large plots need this)
 const ASPECT_DISTORTION_THRESHOLD = 1.5;    // log() ratio diff above this — degraded
 
 /** Phase 3B fix #7 — voids ≥ this area get a synthesized utility/store/passage
@@ -42,7 +42,7 @@ const PASSAGE_ASPECT_RATIO = 2.5;
  * 120% of its REQUESTED area. If every adjacent room is at its cap, the
  * void is left behind (Fix 7's smart void handler picks it up later).
  */
-const AREA_CAP_RATIO_VOID_FILL = 1.20;
+const AREA_CAP_RATIO_VOID_FILL = 1.35;  // Phase 3H: raised from 1.20 to allow under-sized rooms to grow back
 
 function maxAllowedAreaForFill(room: StripPackRoom): number {
   if (room.requested_area_sqft <= 0) return Infinity;

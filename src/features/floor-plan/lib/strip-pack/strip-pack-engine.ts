@@ -90,6 +90,14 @@ export async function runStripPackEngine(
   if (ent.porch) preplaced.push(ent.porch);
   if (ent.foyer) preplaced.push(ent.foyer);
 
+  // ── Step 4b: scale rooms to fit strips (Phase 3H) ─────────────────────
+  // After entrance carve, the remaining front rects define the actual
+  // capacity. If rooms won't fit, scale them proportionally. This prevents
+  // the packer from crushing depths (e.g., Living 14×12 → 17×6.2) or
+  // pushing rooms to overflow.
+  scaleRoomsToFitStrip(frontMain, spine.remaining_front, warnings, "FRONT");
+  scaleRoomsToFitStrip(back, [spine.back_strip], warnings, "BACK");
+
   // ── Step 5: sort front + back ──────────────────────────────────────────
   const frontSorted = sortForPacking(frontMain);
   const backSorted  = sortForPacking(back);
@@ -129,22 +137,31 @@ export async function runStripPackEngine(
   warnings.push(...fillOut.warnings);
   allRooms = fillOut.rooms;
 
+  // ── Step 9b: snap floating rooms (Phase 3H) ───────────────────────────
+  // After all placement + void fill, some rooms (especially overflow-placed
+  // ones) may not share any edge with another room or the hallway. Move
+  // them to share an edge so walls and doors can be created.
+  snapFloatingRooms(allRooms, spine, plot, warnings);
+
   // ── Step 10: walls ─────────────────────────────────────────────────────
-  const walls = buildWalls({ rooms: allRooms, spine, plot });
+  let walls = buildWalls({ rooms: allRooms, spine, plot });
 
   // Wire wall_ids back onto rooms for consumers that want them.
-  const wallsByRoom = new Map<string, string[]>();
-  for (const w of walls) {
-    for (const id of w.room_ids) {
-      if (!wallsByRoom.has(id)) wallsByRoom.set(id, []);
-      wallsByRoom.get(id)!.push(w.id);
+  const wireWallIds = (ws: typeof walls) => {
+    const wallsByRoom = new Map<string, string[]>();
+    for (const w of ws) {
+      for (const id of w.room_ids) {
+        if (!wallsByRoom.has(id)) wallsByRoom.set(id, []);
+        wallsByRoom.get(id)!.push(w.id);
+      }
     }
-  }
-  for (const r of allRooms) r.wall_ids = wallsByRoom.get(r.id) ?? [];
+    for (const r of allRooms) r.wall_ids = wallsByRoom.get(r.id) ?? [];
+  };
+  wireWallIds(walls);
 
   // ── Step 11: doors ─────────────────────────────────────────────────────
   const adjacencyPairs = parsed.adjacency_pairs.map(p => ({ a: p.room_a_id, b: p.room_b_id }));
-  const doorOut = placeDoors({
+  let doorOut = placeDoors({
     rooms: allRooms,
     walls,
     spine,
@@ -153,6 +170,39 @@ export async function runStripPackEngine(
     foyerId: ent.foyer?.id,
   });
   warnings.push(...doorOut.warnings);
+
+  // ── Step 11b: door repair (Phase 3H) ──────────────────────────────────
+  // If any placed rooms still lack a door, try harder: snap them to the
+  // hallway or a neighbor, rebuild walls, and redo doors for those rooms.
+  const roomsWithDoors = new Set<string>();
+  for (const d of doorOut.doors) {
+    for (const n of d.between) {
+      if (n !== "hallway" && n !== "exterior") roomsWithDoors.add(n);
+    }
+  }
+  const doorlessRooms = allRooms.filter(r => r.placed && !roomsWithDoors.has(r.name));
+  if (doorlessRooms.length > 0) {
+    warnings.push(`Phase 3H door repair: ${doorlessRooms.length} doorless room(s) — attempting snap+redoor`);
+    let snapped = false;
+    for (const room of doorlessRooms) {
+      if (snapToHallwayOrNeighbor(room, allRooms, spine, plot, warnings)) {
+        snapped = true;
+      }
+    }
+    if (snapped) {
+      // Rebuild walls and redo ALL doors from scratch.
+      walls = buildWalls({ rooms: allRooms, spine, plot });
+      wireWallIds(walls);
+      doorOut = placeDoors({
+        rooms: allRooms,
+        walls,
+        spine,
+        adjacencyPairs,
+        porchId: ent.porch?.id,
+        foyerId: ent.foyer?.id,
+      });
+    }
+  }
 
   // ── Step 12: windows ───────────────────────────────────────────────────
   const winOut = placeWindows({
@@ -465,6 +515,236 @@ export function fillDoorMetrics(result: StripPackResult): StripPackResult {
 }
 
 // ───────────────────────────────────────────────────────────────────────────
+// PRE-PACK ROOM SCALING (Phase 3H)
+// ───────────────────────────────────────────────────────────────────────────
+
+/**
+ * Scale room dimensions proportionally when total room area exceeds the
+ * available strip capacity. Without this, the packer crushes individual room
+ * depths or pushes rooms to overflow placement (creating floating rooms).
+ *
+ * The scale factor preserves aspect ratios: both width and depth are
+ * multiplied by sqrt(scaleFactor).
+ */
+function scaleRoomsToFitStrip(
+  rooms: StripPackRoom[],
+  availableRects: Rect[],
+  warnings: string[],
+  stripName: string,
+): void {
+  if (rooms.length === 0 || availableRects.length === 0) return;
+
+  const capacity = availableRects.reduce((s, r) => s + r.width * r.depth, 0);
+  const totalRequested = rooms.reduce((s, r) => s + r.requested_area_sqft, 0);
+
+  // Only scale if rooms exceed 90% of capacity (leave 10% margin for
+  // row-packing gaps and slack absorption).
+  if (totalRequested <= capacity * 0.90) return;
+
+  const targetArea = capacity * 0.85;
+  const scaleFactor = Math.sqrt(targetArea / totalRequested);
+
+  // Don't scale below 70% — at that point the layout is fundamentally too small.
+  if (scaleFactor < 0.70) {
+    warnings.push(`${stripName}: rooms need ${Math.round(totalRequested)}sqft but strip has ${Math.round(capacity)}sqft — scaling limited to 70%`);
+  }
+  const clampedScale = Math.max(0.70, scaleFactor);
+
+  for (const room of rooms) {
+    room.requested_width_ft = Math.max(4, room.requested_width_ft * clampedScale);
+    room.requested_depth_ft = Math.max(4, room.requested_depth_ft * clampedScale);
+    room.requested_area_sqft = room.requested_width_ft * room.requested_depth_ft;
+  }
+  warnings.push(
+    `${stripName}: scaled ${rooms.length} rooms by ${(clampedScale * 100).toFixed(0)}% ` +
+    `(${Math.round(totalRequested)}sqft → ${Math.round(rooms.reduce((s, r) => s + r.requested_area_sqft, 0))}sqft, cap=${Math.round(capacity)}sqft)`,
+  );
+}
+
+// ───────────────────────────────────────────────────────────────────────────
+// POST-PLACEMENT REPAIR (Phase 3H)
+// ───────────────────────────────────────────────────────────────────────────
+
+/**
+ * Check if two axis-aligned rectangles share a non-trivial edge
+ * (>0.5ft of overlap along the shared boundary).
+ */
+function rectsShareEdge(a: Rect, b: Rect): boolean {
+  const eps = 0.15;
+  const minOverlap = 0.5;
+  // Horizontal shared edge
+  if (Math.abs(a.y + a.depth - b.y) < eps || Math.abs(b.y + b.depth - a.y) < eps) {
+    const overlapStart = Math.max(a.x, b.x);
+    const overlapEnd = Math.min(a.x + a.width, b.x + b.width);
+    if (overlapEnd - overlapStart > minOverlap) return true;
+  }
+  // Vertical shared edge
+  if (Math.abs(a.x + a.width - b.x) < eps || Math.abs(b.x + b.width - a.x) < eps) {
+    const overlapStart = Math.max(a.y, b.y);
+    const overlapEnd = Math.min(a.y + a.depth, b.y + b.depth);
+    if (overlapEnd - overlapStart > minOverlap) return true;
+  }
+  return false;
+}
+
+/**
+ * After all placement, snap any "floating" room (no shared edge with any
+ * other room or the hallway) to the nearest placed room or the spine.
+ * This guarantees every room can have walls built against it.
+ */
+function snapFloatingRooms(
+  rooms: StripPackRoom[],
+  spine: SpineLayout,
+  plot: Rect,
+  warnings: string[],
+): void {
+  const placed = rooms.filter(r => r.placed);
+  if (placed.length === 0) return;
+
+  for (const room of placed) {
+    if (!room.placed) continue;
+    let connected = rectsShareEdge(room.placed, spine.spine);
+    if (!connected) {
+      for (const other of placed) {
+        if (other.id === room.id || !other.placed) continue;
+        if (rectsShareEdge(room.placed, other.placed)) {
+          connected = true;
+          break;
+        }
+      }
+    }
+    if (connected) continue;
+
+    // Room is floating. Find closest target to snap against.
+    const best = findBestSnapPosition(room, placed, spine, plot);
+    if (best) {
+      const old = { ...room.placed };
+      room.placed = best;
+      room.actual_area_sqft = best.width * best.depth;
+      warnings.push(
+        `${room.name}: snapped from (${old.x.toFixed(1)},${old.y.toFixed(1)}) ` +
+        `to (${best.x.toFixed(1)},${best.y.toFixed(1)}) to share wall`,
+      );
+    }
+  }
+}
+
+/**
+ * Find the best position to snap a floating room against the nearest
+ * target (another room or the hallway spine).
+ */
+function findBestSnapPosition(
+  room: StripPackRoom,
+  allPlaced: StripPackRoom[],
+  spine: SpineLayout,
+  plot: Rect,
+): Rect | null {
+  if (!room.placed) return null;
+  const w = room.placed.width;
+  const d = room.placed.depth;
+  const roomCx = room.placed.x + w / 2;
+  const roomCy = room.placed.y + d / 2;
+
+  // Collect all targets: placed rooms + hallway spine
+  const targets: Rect[] = [spine.spine];
+  for (const r of allPlaced) {
+    if (r.id !== room.id && r.placed) targets.push(r.placed);
+  }
+
+  // Blockers: everything except this room
+  const blockers: Rect[] = [spine.spine];
+  for (const r of allPlaced) {
+    if (r.id !== room.id && r.placed) blockers.push(r.placed);
+  }
+
+  let bestPos: Rect | null = null;
+  let bestDist = Infinity;
+
+  for (const target of targets) {
+    // Try 4 positions: north, south, east, west of target
+    const candidates: Rect[] = [
+      // North of target
+      { x: Math.max(plot.x, Math.min(target.x + target.width / 2 - w / 2, plot.x + plot.width - w)),
+        y: target.y + target.depth, width: w, depth: d },
+      // South of target
+      { x: Math.max(plot.x, Math.min(target.x + target.width / 2 - w / 2, plot.x + plot.width - w)),
+        y: target.y - d, width: w, depth: d },
+      // East of target
+      { x: target.x + target.width,
+        y: Math.max(plot.y, Math.min(target.y + target.depth / 2 - d / 2, plot.y + plot.depth - d)),
+        width: w, depth: d },
+      // West of target
+      { x: target.x - w,
+        y: Math.max(plot.y, Math.min(target.y + target.depth / 2 - d / 2, plot.y + plot.depth - d)),
+        width: w, depth: d },
+    ];
+
+    for (const cand of candidates) {
+      // Must be inside plot
+      if (cand.x < plot.x - 0.01 || cand.y < plot.y - 0.01) continue;
+      if (cand.x + cand.width > plot.x + plot.width + 0.01) continue;
+      if (cand.y + cand.depth > plot.y + plot.depth + 0.01) continue;
+
+      // Must not overlap any blocker
+      let overlaps = false;
+      for (const b of blockers) {
+        if (rectOverlap(cand, b) > 0.1) {
+          overlaps = true;
+          break;
+        }
+      }
+      if (overlaps) continue;
+
+      // Must share edge with target
+      if (!rectsShareEdge(cand, target)) continue;
+
+      const cx = cand.x + cand.width / 2;
+      const cy = cand.y + cand.depth / 2;
+      const dist = Math.hypot(cx - roomCx, cy - roomCy);
+      if (dist < bestDist) {
+        bestDist = dist;
+        bestPos = cand;
+      }
+    }
+  }
+
+  return bestPos;
+}
+
+/**
+ * Last-resort snap for a doorless room: move it to touch the hallway or
+ * the nearest neighbor. Returns true if the room was moved.
+ */
+function snapToHallwayOrNeighbor(
+  room: StripPackRoom,
+  allRooms: StripPackRoom[],
+  spine: SpineLayout,
+  plot: Rect,
+  warnings: string[],
+): boolean {
+  if (!room.placed) return false;
+
+  // Already shares edge with hallway? No snap needed.
+  if (rectsShareEdge(room.placed, spine.spine)) return false;
+
+  // Check if it shares edge with any other room
+  for (const other of allRooms) {
+    if (other.id === room.id || !other.placed) continue;
+    if (rectsShareEdge(room.placed, other.placed)) return false;
+  }
+
+  // Truly isolated — snap to nearest target
+  const best = findBestSnapPosition(room, allRooms.filter(r => r.id !== room.id), spine, plot);
+  if (best) {
+    room.placed = best;
+    room.actual_area_sqft = best.width * best.depth;
+    warnings.push(`${room.name}: door-repair snapped to (${best.x.toFixed(1)},${best.y.toFixed(1)})`);
+    return true;
+  }
+  return false;
+}
+
+// ───────────────────────────────────────────────────────────────────────────
 // OVERFLOW PLACEMENT (Phase 3C fix B)
 // ───────────────────────────────────────────────────────────────────────────
 
@@ -718,17 +998,30 @@ function synthesizeMissingPorch(
  * and the other has free capacity. Protects against parser-output skew where
  * too many zone-default rooms pile into one strip. Position-anchored rooms
  * are never moved — the user's explicit NE/SW/etc. wins.
+ *
+ * Phase 3H fix: accounts for entrance carve-out when computing front capacity.
+ * The entrance handler will remove the porch+foyer area from the front strip,
+ * but rebalancing runs BEFORE that. Without this correction, rebalancing thinks
+ * FRONT has ~650 sqft when it effectively has ~550 sqft post-carve, causing
+ * rooms to be squeezed or overflow-placed.
  */
 function rebalanceStrips(
   rooms: StripPackRoom[],
   spine: SpineLayout,
   warnings: string[],
 ): void {
-  const HARD = 0.90;
-  const SOFT = 0.70;
-  const TARGET = 0.80;
-  const frontCap = spine.front_strip.width * spine.front_strip.depth;
+  const HARD = 0.80;   // lowered from 0.90 — triggers earlier
+  const SOFT = 0.60;   // lowered from 0.70 — more willing to accept transfers
+  const TARGET = 0.75;
+  const rawFrontCap = spine.front_strip.width * spine.front_strip.depth;
   const backCap = spine.back_strip.width * spine.back_strip.depth;
+
+  // Estimate entrance carve-out: porch + foyer will be carved from the FRONT
+  // strip by the entrance handler. Subtract their area so capacity reflects
+  // what the packer actually gets to work with.
+  const entranceRooms = rooms.filter(r => r.strip === "ENTRANCE");
+  const entranceArea = entranceRooms.reduce((s, r) => s + r.requested_area_sqft, 0);
+  const frontCap = Math.max(rawFrontCap - entranceArea, rawFrontCap * 0.5);
 
   const stripArea = (s: "FRONT" | "BACK") =>
     rooms.filter(r => r.strip === s).reduce((n, r) => n + r.requested_area_sqft, 0);
@@ -746,9 +1039,23 @@ function rebalanceStrips(
     }
   };
 
-  if (stripArea("FRONT") > frontCap * HARD && stripArea("BACK") < backCap * SOFT) {
+  const frontArea = stripArea("FRONT");
+  const backArea = stripArea("BACK");
+
+  if (frontArea > frontCap * HARD && backArea < backCap * SOFT) {
     move("FRONT", "BACK", frontCap);
-  } else if (stripArea("BACK") > backCap * HARD && stripArea("FRONT") < frontCap * SOFT) {
+  } else if (backArea > backCap * HARD && frontArea < frontCap * SOFT) {
     move("BACK", "FRONT", backCap);
   }
+
+  // Second pass: even if neither triggered, check absolute imbalance.
+  // If one strip is >90% full and the other is <50%, force a move.
+  const frontArea2 = stripArea("FRONT");
+  const backArea2 = stripArea("BACK");
+  if (frontArea2 > frontCap * 0.90 && backArea2 < backCap * 0.50) {
+    move("FRONT", "BACK", frontCap);
+  } else if (backArea2 > backCap * 0.90 && frontArea2 < frontCap * 0.50) {
+    move("BACK", "FRONT", backCap);
+  }
+
 }
