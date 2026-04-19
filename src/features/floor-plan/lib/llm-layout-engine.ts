@@ -307,9 +307,10 @@ RULE 5 — CONNECTIVITY: Porch → Foyer → Hallway → all rooms.
 ${facing === "north" ? `Foyer bottom edge y=${hwT}.` : facing === "south" ? `Foyer top edge y+d=${hwB}.` : facing === "east" ? `Foyer left edge x=${hwR}.` : `Foyer right edge x+w=${hwL}.`}
 
 RULE 6 — ALL rooms INSIDE plot. No overlaps. Dimensions ±15% of requested.
-RULE 7 — ROOM SIZING: use requested dimensions exactly. NEVER inflate a room beyond +30%. Small rooms stay small: utility 15-40sqft, bathroom 25-50sqft, store 15-35sqft, pooja 15-35sqft, pantry 15-30sqft. If there's leftover space, leave it as void — do NOT stretch rooms to fill.
-RULE 8 — Ensuite/wardrobe share a wall with parent bedroom.
-RULE 9 — Rooms + hallway cover ≥85% of plot.
+RULE 7 — ROOM SIZING: use requested dimensions exactly. NEVER inflate a room beyond +30%. Small rooms stay small: utility 15-40sqft, bathroom 25-50sqft, store 15-35sqft, pooja 15-35sqft. If there's leftover space, leave it as void — do NOT stretch rooms.
+RULE 8 — ROOM PROPORTIONS: every room must have aspect ratio between 1:1 and 2.5:1. A bedroom is ~13x11, NOT 5x29. A bathroom is ~7x5, NOT 3x20. NEVER stretch a small room to fill a large void.
+RULE 9 — Ensuite/wardrobe share a wall with parent bedroom.
+RULE 10 — Rooms + hallway cover ≥80% of plot. Voids up to 15% are acceptable — they are better than distorted rooms.
 
 ${example}
 
@@ -585,40 +586,43 @@ function repair(
     }
   }
 
-  // 8. Extend disconnected rooms toward hallway (skip for no-hallway —
-  //    zero-size hallway makes touchesRect always true at origin)
+  // 8. Extend disconnected rooms toward hallway (skip for no-hallway).
+  //    GUARDED: only extend if the extension doesn't inflate area > 30%.
   if (!noHallway) {
     const isH = hallway.width > hallway.depth;
     for (const r of rooms) {
       if (r.type === "corridor" || r.type === "porch" || r.type === "foyer") continue;
       if (touchesRect(r, hallway)) continue;
-      // Check if touches any room that touches hallway
       const touchesConnected = rooms.some(other =>
         other !== r && touchesRect(r, other) && touchesRect(other, hallway),
       );
       if (touchesConnected) continue;
 
-      // Extend toward hallway
+      const beforeArea = r.width * r.depth;
       if (isH) {
         const hwTop = hallway.y + hallway.depth;
         const hwBot = hallway.y;
         if (r.y >= hwTop) {
           const gap = r.y - hwTop;
-          if (gap < 15) { r.depth += gap; r.y = hwTop; }
+          if (gap < 15 && gap <= r.depth * 0.5) { r.depth += gap; r.y = hwTop; }
         } else if (r.y + r.depth <= hwBot) {
           const gap = hwBot - (r.y + r.depth);
-          if (gap < 15) r.depth += gap;
+          if (gap < 15 && gap <= r.depth * 0.5) r.depth += gap;
         }
       } else {
         const hwRight = hallway.x + hallway.width;
         const hwLeft = hallway.x;
         if (r.x >= hwRight) {
           const gap = r.x - hwRight;
-          if (gap < 15) { r.width += gap; r.x = hwRight; }
+          if (gap < 15 && gap <= r.width * 0.5) { r.width += gap; r.x = hwRight; }
         } else if (r.x + r.width <= hwLeft) {
           const gap = hwLeft - (r.x + r.width);
-          if (gap < 15) r.width += gap;
+          if (gap < 15 && gap <= r.width * 0.5) r.width += gap;
         }
+      }
+      // Hard guard: revert if area inflated > 30%
+      if (r.width * r.depth > beforeArea * 1.3) {
+        warnings.push(`${r.name}: step 8 reverted — would inflate ${Math.round(beforeArea)}→${Math.round(r.width * r.depth)}sqft`);
       }
     }
   }
@@ -647,13 +651,33 @@ function repair(
     if (r.y + r.depth > plot.depth) r.y = Math.max(0, plot.depth - r.depth);
   }
 
-  // 10. Compact rectangle check — fix L-shaped layouts
-  // For E/W facing, rooms on both sides of the hallway should span the
-  // same Y range (0..plotD). For N/S facing, same X range (0..plotW).
-  // If not, stretch/move rooms to fill the full range.
+  // 10. Gentle L-shape fix — GUARDED. Only extends boundary rooms by up
+  //     to 50% of their original dimension. Never creates barcode layouts.
+  //     Voids are acceptable; distorted rooms are not.
   const isVertical = hallway.depth > hallway.width;
   const nonCorridorRooms = rooms.filter(r => r.type !== "corridor" && r.type !== "hallway");
-  if (nonCorridorRooms.length > 0) {
+
+  // Helper: try to extend a room, but revert if it distorts proportions
+  function guardedExtend(r: LLMRoom, field: "depth" | "width", newVal: number, reason: string) {
+    const before = field === "depth" ? r.depth : r.width;
+    const beforeArea = r.width * r.depth;
+    if (newVal <= before) return; // not actually extending
+    // Limit extension to 50% of original dimension
+    const maxVal = before * 1.5;
+    const clamped = Math.min(newVal, maxVal);
+    if (field === "depth") r.depth = clamped;
+    else r.width = clamped;
+    const afterArea = r.width * r.depth;
+    const aspect = Math.max(r.width, r.depth) / Math.min(r.width, r.depth);
+    if (afterArea > beforeArea * 1.5 || aspect > 3.5) {
+      // Revert — extension would distort the room
+      if (field === "depth") r.depth = before;
+      else r.width = before;
+      warnings.push(`${r.name}: ${reason} skipped — would distort (${before.toFixed(0)}→${newVal.toFixed(0)}ft)`);
+    }
+  }
+
+  if (nonCorridorRooms.length > 0 && !noHallway) {
     const bbox = {
       xMin: Math.min(...nonCorridorRooms.map(r => r.x)),
       yMin: Math.min(...nonCorridorRooms.map(r => r.y)),
@@ -665,15 +689,10 @@ function repair(
       + hallway.width * hallway.depth;
     const wasteRatio = bboxArea > 0 ? 1 - totalRoomArea / bboxArea : 0;
 
-    if (wasteRatio > 0.15) {
-      warnings.push(
-        `L-shape detected: bounding box ${Math.round(bboxArea)}sqft but rooms only ${Math.round(totalRoomArea)}sqft ` +
-        `(${Math.round(wasteRatio * 100)}% waste). Aligning rooms to compact rectangle.`,
-      );
+    if (wasteRatio > 0.20) {
+      warnings.push(`L-shape detected (${Math.round(wasteRatio * 100)}% waste). Applying gentle fixes.`);
 
-      // Fix: align all rooms to plot boundaries AND hallway edges
       if (isVertical) {
-        // E/W facing — ensure all rooms span y=0..plotD
         const hwLeft = hallway.x;
         const hwRight = hallway.x + hallway.width;
         for (const side of ["left", "right"] as const) {
@@ -682,40 +701,24 @@ function repair(
             return side === "left" ? cx < hwLeft : cx > hwRight;
           });
           if (sideRooms.length === 0) continue;
-
-          // Sort by y to find bottom-most and top-most
           sideRooms.sort((a, b) => a.y - b.y);
-          const bottomRoom = sideRooms[0];
-          const topRoom = sideRooms[sideRooms.length - 1];
+          const bottom = sideRooms[0];
+          const top = sideRooms[sideRooms.length - 1];
 
-          // Extend bottom room to y=0
-          if (bottomRoom.y > 0.5) {
-            bottomRoom.depth += bottomRoom.y;
-            bottomRoom.y = 0;
+          // Gently extend boundary rooms toward plot edges
+          if (bottom.y > 0.5) {
+            const ext = bottom.y;
+            guardedExtend(bottom, "depth", bottom.depth + ext, "L-fix y=0");
+            if (bottom.depth > bottom.y) bottom.y = bottom.y - (bottom.depth - (bottom.depth - ext)); // only move if extended
+            bottom.y = Math.max(0, bottom.y - ext);
+            if (bottom.y > 0) bottom.y = 0; // final snap
           }
-
-          // Extend top room to y=plotD
-          const topEdge = topRoom.y + topRoom.depth;
+          const topEdge = top.y + top.depth;
           if (topEdge < plot.depth - 0.5) {
-            topRoom.depth = plot.depth - topRoom.y;
-          }
-
-          // Align room widths to plot/hallway boundary (close inner gaps)
-          for (const r of sideRooms) {
-            if (side === "left") {
-              if (r.x > 0.5) { r.width += r.x; r.x = 0; }
-              const rightEdge = r.x + r.width;
-              if (rightEdge < hwLeft - 0.5) { r.width = hwLeft - r.x; }
-            } else {
-              if (r.x > hwRight + 0.5) { r.width += r.x - hwRight; r.x = hwRight; }
-              if (r.x < hwRight - 0.5 && r.x > hwRight - 2) { r.width += r.x - hwRight; r.x = hwRight; }
-              const re = r.x + r.width;
-              if (re < plot.width - 0.5) { r.width = plot.width - r.x; }
-            }
+            guardedExtend(top, "depth", plot.depth - top.y, "L-fix y=plotD");
           }
         }
       } else {
-        // N/S facing — ensure all rooms span x=0..plotW
         const hwBot = hallway.y;
         const hwTop = hallway.y + hallway.depth;
         for (const side of ["below", "above"] as const) {
@@ -724,41 +727,28 @@ function repair(
             return side === "below" ? cy < hwBot : cy > hwTop;
           });
           if (sideRooms.length === 0) continue;
-
           sideRooms.sort((a, b) => a.x - b.x);
-          const leftRoom = sideRooms[0];
-          const rightRoom = sideRooms[sideRooms.length - 1];
+          const left = sideRooms[0];
+          const right = sideRooms[sideRooms.length - 1];
 
-          if (leftRoom.x > 0.5) {
-            leftRoom.width += leftRoom.x;
-            leftRoom.x = 0;
+          if (left.x > 0.5) {
+            const ext = left.x;
+            guardedExtend(left, "width", left.width + ext, "L-fix x=0");
+            left.x = Math.max(0, left.x - ext);
+            if (left.x > 0) left.x = 0;
           }
-          const rightEdge = rightRoom.x + rightRoom.width;
+          const rightEdge = right.x + right.width;
           if (rightEdge < plot.width - 0.5) {
-            rightRoom.width = plot.width - rightRoom.x;
-          }
-
-          // Align room depths to plot/hallway boundary (close inner gaps)
-          for (const r of sideRooms) {
-            if (side === "below") {
-              if (r.y > 0.5) { r.depth += r.y; r.y = 0; }
-              const te = r.y + r.depth;
-              if (te < hwBot - 0.5) { r.depth = hwBot - r.y; }
-            } else {
-              if (r.y > hwTop + 0.5) { r.depth += r.y - hwTop; r.y = hwTop; }
-              if (r.y < hwTop - 0.5 && r.y > hwTop - 2) { r.depth += r.y - hwTop; r.y = hwTop; }
-              const be = r.y + r.depth;
-              if (be < plot.depth - 0.5) { r.depth = plot.depth - r.y; }
-            }
+            guardedExtend(right, "width", plot.width - right.x, "L-fix x=plotW");
           }
         }
       }
     }
   }
 
-  // 10.5. Fill vertical/horizontal gaps between rooms on the same side of hallway.
-  // The L-shape repair (step 10) fixes boundary rooms but doesn't close gaps
-  // BETWEEN rooms in the middle of a strip — producing T-shaped buildings.
+  // 10.5. Fill SMALL gaps between rooms on the same side of hallway.
+  //       GUARDED: only close gaps that are ≤30% of the room's dimension.
+  //       Large gaps are left as voids — better than barcode rooms.
   if (!noHallway) {
     const isVert = hallway.depth > hallway.width;
     const hwCenterVal = isVert
@@ -777,16 +767,11 @@ function repair(
           const cur = sideRooms[i];
           const nxt = sideRooms[i + 1];
           const gap = nxt.y - (cur.y + cur.depth);
-          if (gap > 0.5) {
-            // Extend the smaller room to close the gap
-            if (cur.width * cur.depth <= nxt.width * nxt.depth) {
-              cur.depth = nxt.y - cur.y;
-            } else {
-              const oldY = nxt.y;
-              nxt.y = cur.y + cur.depth;
-              nxt.depth += oldY - nxt.y;
-            }
-            warnings.push(`Gap ${gap.toFixed(1)}ft closed between ${cur.name} and ${nxt.name}`);
+          if (gap > 0.5 && gap <= cur.depth * 0.3) {
+            cur.depth = nxt.y - cur.y;
+            warnings.push(`Small gap ${gap.toFixed(1)}ft closed between ${cur.name} and ${nxt.name}`);
+          } else if (gap > 0.5) {
+            warnings.push(`Gap ${gap.toFixed(1)}ft between ${cur.name} and ${nxt.name} — left as void (too large to fill safely)`);
           }
         }
       } else {
@@ -795,18 +780,24 @@ function repair(
           const cur = sideRooms[i];
           const nxt = sideRooms[i + 1];
           const gap = nxt.x - (cur.x + cur.width);
-          if (gap > 0.5) {
-            if (cur.width * cur.depth <= nxt.width * nxt.depth) {
-              cur.width = nxt.x - cur.x;
-            } else {
-              const oldX = nxt.x;
-              nxt.x = cur.x + cur.width;
-              nxt.width += oldX - nxt.x;
-            }
-            warnings.push(`Gap ${gap.toFixed(1)}ft closed between ${cur.name} and ${nxt.name}`);
+          if (gap > 0.5 && gap <= cur.width * 0.3) {
+            cur.width = nxt.x - cur.x;
+            warnings.push(`Small gap ${gap.toFixed(1)}ft closed between ${cur.name} and ${nxt.name}`);
+          } else if (gap > 0.5) {
+            warnings.push(`Gap ${gap.toFixed(1)}ft between ${cur.name} and ${nxt.name} — left as void`);
           }
         }
       }
+    }
+  }
+
+  // 11. Final sanity check — warn on distorted rooms but DON'T try to fix
+  //     (fixing would cascade into more problems).
+  for (const r of rooms) {
+    if (r.type === "corridor" || r.type === "hallway") continue;
+    const aspect = Math.max(r.width, r.depth) / Math.min(r.width, r.depth);
+    if (aspect > 3.5) {
+      warnings.push(`${r.name}: distorted aspect ${aspect.toFixed(1)}:1 (${r.width.toFixed(1)}x${r.depth.toFixed(1)}ft)`);
     }
   }
 
