@@ -76,6 +76,9 @@ import { parseConstraints } from "@/features/floor-plan/lib/structured-parser";
 // Phase 3H — LLM layout engine (PIPELINE_LLM feature flag)
 import { runLLMLayoutEngine } from "@/features/floor-plan/lib/llm-layout-engine";
 
+// Phase 5 — Grid-Pack engine (PIPELINE_GRID feature flag)
+import { runGridPackEngine } from "@/features/floor-plan/lib/grid-pack-engine";
+
 // ── Generation Feedback ────────────────────────────────────────────────────
 
 interface GenerationFeedback {
@@ -289,6 +292,58 @@ export async function POST(req: NextRequest) {
     // the existing template+SA Pipeline A unchanged.
     const routing = routePrompt(prompt);
     logger.debug(`[ROUTER] pipeline=${routing.pipeline} signals=${routing.constraint_signals}`);
+
+    // ── Phase 5 — Grid-Pack Engine (PIPELINE_GRID) ─────────────────────
+    // LLM decides row grouping, algorithm computes exact coordinates.
+    // Zero floating rooms, zero gaps BY CONSTRUCTION.
+    if (process.env.PIPELINE_GRID === "true" && routing.pipeline === "B") {
+      try {
+        const gpStart = Date.now();
+        const gpParseRes = await parseConstraints(prompt, apiKey);
+        const gpParseMs = Date.now() - gpStart;
+
+        const feasibility = checkPromptFeasibility(gpParseRes.constraints);
+        if (!feasibility.feasible) {
+          console.warn(`[GRID-PACK][INFEASIBILITY] ${feasibility.reason}`);
+          return NextResponse.json({
+            error: feasibility.reason,
+            infeasibilityReason: feasibility.reason,
+          }, { status: 422 });
+        }
+
+        const gpEngineStart = Date.now();
+        const gpResult = await runGridPackEngine(prompt, gpParseRes.constraints, apiKey);
+        const gpEngineMs = Date.now() - gpEngineStart;
+
+        const gpProject = toFloorPlanProjectT1(gpResult, gpParseRes.constraints);
+        const gpLayoutMetrics = computeLayoutMetrics(gpProject, gpParseRes.constraints);
+        const gpScore = computeHonestScore(gpLayoutMetrics);
+
+        logger.debug(`[GRID-PACK] parse=${gpParseMs}ms engine=${gpEngineMs}ms eff=${gpResult.metrics.efficiency_pct}% doors=${gpResult.metrics.door_coverage_pct}% score=${gpScore.score}`);
+        console.log(`[GRID-PACK] Rooms: ${gpResult.rooms.filter(r => r.placed).length}/${gpParseRes.constraints.rooms.length}, warnings: ${gpResult.warnings.length}`);
+
+        const feedback = buildFeedback(gpProject, prompt);
+        feedback.tips.push(`Grid-Pack engine: score ${gpScore.score}/100, ${gpResult.metrics.efficiency_pct}% efficiency`);
+        await recordToolExecution(userId, "floor-plan");
+
+        return NextResponse.json({
+          project: gpProject,
+          geometry: null,
+          feedback,
+          pipeline: "grid-pack",
+          pipeline_timing: {
+            parse_ms: gpParseMs,
+            engine_ms: gpEngineMs,
+            total_ms: Date.now() - gpStart,
+          },
+          score: gpScore,
+          warnings: gpResult.warnings,
+        });
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.warn(`[GRID-PACK] error — falling through to LLM/T1: ${msg}`);
+      }
+    }
 
     // ── Phase 4 — Multi-Option LLM Layout Engine ("Midjourney approach") ─
     // Generate 3 options in parallel with temperature diversity.
