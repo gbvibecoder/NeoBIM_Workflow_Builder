@@ -25,6 +25,11 @@ import { resolveRichMode } from "@/features/ifc/lib/rich-mode";
 export const handleEX001: NodeHandler = async (ctx) => {
   const { inputData, tileInstanceId, executionId } = ctx;
 
+  // Phase 1 Track B.4 — structured-log start timer. Captured at the top
+  // of the handler so totalMs below reflects the whole invocation, not
+  // just generation time.
+  const ex001Start = Date.now();
+
   // Phase 1 Track B — resolve rich mode once per invocation.
   // Source tracking (override/env/default) feeds logs + artifact metadata
   // so operators can verify which code path selected the current flags.
@@ -318,6 +323,24 @@ export const handleEX001: NodeHandler = async (ctx) => {
     },
     createdAt: new Date(),
   };
+
+  // Phase 1 Track B.4 — single structured log line per EX-001 invocation.
+  // Gives operations + future admin dashboards a one-liner-per-run summary
+  // with every observability field in a single JSON object. Parseable from
+  // Vercel log explorer.
+  logger.info("[ex-001] completed", {
+    richMode: richMode.mode,
+    richModeSource: richMode.source,
+    richFlags: richMode.flags,
+    path: ifcServiceUsed ? "python" : "ts-fallback",
+    probeMs: readiness.latencyMs,
+    probeReason: readiness.reason,
+    totalMs: Date.now() - ex001Start,
+    filesGenerated: files.length,
+    totalBytes: files.reduce((s, f) => s + f.size, 0),
+    skipped: !readiness.ready,
+    skipReason: readiness.ready ? undefined : readiness.reason,
+  });
 
   return artifact;
 };
