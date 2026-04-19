@@ -24,6 +24,7 @@ import { GenerationLoader } from "@/features/floor-plan/components/GenerationLoa
 import { getProjectIndex, importProjectFile } from "@/features/floor-plan/lib/project-persistence";
 import { getSampleProjectForPrompt } from "@/features/floor-plan/lib/sample-layouts";
 import { FloorPlanErrorBoundary } from "@/features/floor-plan/components/ErrorBoundary";
+import { OptionPicker, type FloorPlanOption } from "@/features/floor-plan/components/OptionPicker";
 import { displayToMm, formatDimension, type DisplayUnit } from "@/features/floor-plan/lib/unit-conversion";
 import { worldToScreen, screenToWorld } from "@/features/floor-plan/lib/geometry";
 
@@ -104,6 +105,7 @@ export function FloorPlanViewer({ initialGeometry, initialPrompt, initialProject
    * a sample plan and call it "AI-generated".
    */
   const [generationError, setGenerationError] = React.useState<{ message: string; prompt: string } | null>(null);
+  const [pendingOptions, setPendingOptions] = useState<{ options: FloorPlanOption[]; prompt: string; layoutMetrics: unknown; qualityFlags: unknown[]; feasibilityWarnings: unknown[] } | null>(null);
   const [validationPending, setValidationPending] = useState<{ result: ValidationResult; prompt: string } | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const [undoToast, setUndoToast] = useState<string | null>(null);
@@ -149,6 +151,21 @@ export function FloorPlanViewer({ initialGeometry, initialPrompt, initialProject
       }
 
       const data = await res.json();
+
+      // Multi-option: show picker if API returned multiple options
+      if (Array.isArray(data.options) && data.options.length > 1) {
+        useFloorPlanStore.setState({ isGenerating: false, originalPrompt: prompt });
+        setPendingOptions({
+          options: data.options as FloorPlanOption[],
+          prompt,
+          layoutMetrics: data.layoutMetrics,
+          qualityFlags: Array.isArray(data.qualityFlags) ? data.qualityFlags : [],
+          feasibilityWarnings: Array.isArray(data.feasibilityWarnings) ? data.feasibilityWarnings : [],
+        });
+        return;
+      }
+
+      // Single option (template/fallback): load directly
       store.setProject(data.project);
       store.setQualityResults(
         data.layoutMetrics ?? null,
@@ -227,6 +244,26 @@ export function FloorPlanViewer({ initialGeometry, initialPrompt, initialProject
     setGenerationError(null);
     setFallbackBanner("This is a pre-built sample layout, not AI-generated.");
   }, []);
+
+  /** Select a specific option from the multi-option picker. */
+  const handleSelectOption = useCallback((option: FloorPlanOption) => {
+    const store = useFloorPlanStore.getState();
+    store.setProject(option.project);
+    // Use the best option's metrics for quality display (already sorted)
+    if (pendingOptions) {
+      store.setQualityResults(
+        pendingOptions.layoutMetrics as import("@/features/floor-plan/lib/layout-metrics").LayoutMetrics | null,
+        pendingOptions.qualityFlags as import("@/features/floor-plan/lib/layout-metrics").QualityFlag[],
+        pendingOptions.feasibilityWarnings as import("@/features/floor-plan/lib/infeasibility-detector").InfeasibilityWarning[],
+      );
+    }
+    useFloorPlanStore.setState({
+      dataSource: "pipeline",
+      originalPrompt: pendingOptions?.prompt ?? null,
+      projectModified: false,
+    });
+    setPendingOptions(null);
+  }, [pendingOptions]);
 
   const handleImportFile = useCallback(async () => {
     const project = await importProjectFile();
@@ -451,6 +488,30 @@ export function FloorPlanViewer({ initialGeometry, initialPrompt, initialProject
       onEditPrompt={() => setGenerationError(null)}
     />
   ) : null;
+
+  // Show multi-option picker (Phase 2 — Midjourney approach)
+  if (pendingOptions) {
+    return (
+      <div className="flex h-screen flex-col bg-[#0A0A14] overflow-hidden select-none">
+        <OptionPicker
+          options={pendingOptions.options}
+          prompt={pendingOptions.prompt}
+          onSelect={handleSelectOption}
+          onRegenerate={() => {
+            const p = pendingOptions.prompt;
+            setPendingOptions(null);
+            handleGenerateFromPrompt(p);
+          }}
+          onSkip={() => {
+            // Auto-select best (index 0 — already sorted by score)
+            if (pendingOptions.options.length > 0) {
+              handleSelectOption(pendingOptions.options[0]);
+            }
+          }}
+        />
+      </div>
+    );
+  }
 
   // Show generation loader
   if (isGenerating) {
