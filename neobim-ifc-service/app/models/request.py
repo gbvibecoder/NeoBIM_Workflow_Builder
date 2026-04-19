@@ -211,6 +211,13 @@ class ExportOptions(BaseModel):
     disciplines: list[Discipline] = [
         "architectural", "structural", "mep", "combined"
     ]
+    # Phase 1 Track D — reserve the `richMode` field so future tightening of
+    # extra='forbid' doesn't silently break EX-001. The TS client forwards
+    # this today under options.richMode (camelCase → snake_case via alias).
+    # Accepted values are validated at the caller (TS side, richModeToFlags);
+    # kept as Optional[str] here to keep the service loose at the boundary.
+    # No builder consumes this yet — Phase 2+ grows dispatch.
+    rich_mode: Optional[str] = Field(alias="richMode", default=None)
 
     model_config = {"populate_by_name": True}
 

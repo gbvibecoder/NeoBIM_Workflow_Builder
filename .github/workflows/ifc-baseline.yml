@@ -1,0 +1,122 @@
+name: IFC Baseline
+
+# Phase 1 Track D — gate the IFC pipeline against regressions.
+#
+# Triggers on:
+#   * changes under neobim-ifc-service/** (Python service, fixtures, tests)
+#   * src/types/geometry.ts (wire contract with Python ExportIFCRequest)
+#   * tests/integration/ifc-*.test.ts (TS-side boundary tests)
+#
+# The path filter keeps CI cheap — unrelated PRs (UI, docs, billing, …) don't
+# spin up Python. But any edit that could shift the boundary in either
+# direction triggers both sides of the contract.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "neobim-ifc-service/**"
+      - "src/types/geometry.ts"
+      - "tests/integration/ifc-*.test.ts"
+      - ".github/workflows/ifc-baseline.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "neobim-ifc-service/**"
+      - "src/types/geometry.ts"
+      - "tests/integration/ifc-*.test.ts"
+      - ".github/workflows/ifc-baseline.yml"
+
+jobs:
+  python-baseline:
+    name: Python baseline quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: neobim-ifc-service
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+          cache-dependency-path: neobim-ifc-service/pyproject.toml
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Show ifcopenshell version
+        run: python -c "import ifcopenshell; print('ifcopenshell', ifcopenshell.version)"
+
+      - name: Run Track C boundary test
+        run: pytest tests/test_track_c_fields.py -v
+
+      - name: Run Track D baseline quality test
+        run: pytest tests/test_baseline_quality.py -v
+
+      - name: Emit entity counts for baseline run (artifact preview)
+        if: always()
+        run: |
+          python - <<'PY'
+          import json, tempfile
+          from pathlib import Path
+          from app.models.request import ExportIFCRequest
+          from app.services.ifc_builder import build_multi_discipline
+          from scripts.count_ifc_entities import count_entities
+
+          fixture = Path("tests/fixtures/baseline_building.json")
+          raw = json.loads(fixture.read_text())
+          raw.pop("_comment", None)
+          req = ExportIFCRequest.model_validate(raw)
+
+          summary = {}
+          for discipline, (data, counts, failures) in build_multi_discipline(req).items():
+              with tempfile.NamedTemporaryFile(suffix=".ifc", delete=False) as t:
+                  t.write(data)
+                  t.flush()
+                  import ifcopenshell
+                  model = ifcopenshell.open(t.name)
+              summary[discipline] = {
+                  "size_bytes": len(data),
+                  "failures": len(failures),
+                  "counts": count_entities(model),
+              }
+          print(json.dumps(summary, indent=2, default=str))
+          PY
+
+  ts-boundary:
+    name: TS boundary tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma client
+        run: npx prisma generate
+        env:
+          DATABASE_URL: "postgresql://placeholder:placeholder@localhost:5432/placeholder"
+          NEXTAUTH_SECRET: "ci-build-secret"
+
+      - name: Type-check
+        run: npx tsc --noEmit
+
+      - name: Run IFC boundary tests
+        run: npx vitest run tests/integration/ifc-rich-mode.test.ts tests/integration/ifc-track-c-boundary.test.ts tests/integration/ifc-ex-001-payload.test.ts
+        env:
+          DATABASE_URL: "postgresql://placeholder:placeholder@localhost:5432/placeholder"
+          NEXTAUTH_SECRET: "ci-build-secret"
+          NEXTAUTH_URL: "http://localhost:3000"
