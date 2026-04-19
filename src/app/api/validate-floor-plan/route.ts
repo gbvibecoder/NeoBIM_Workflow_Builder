@@ -346,6 +346,35 @@ function buildValidation(parsed: ParsedConstraints, prompt: string): Omit<Valida
     });
   }
 
+  // Detect rooms the user explicitly mentioned in their prompt but the parser missed.
+  // These get added as checked-by-default optional rooms so the user sees them.
+  const DETECTABLE_ROOMS: Array<{ keywords: string[]; name: string; sqft: number; w: number; d: number; type: string; desc: string }> = [
+    { keywords: ["parking", "car park", "garage"], name: "Parking", sqft: 120, w: 12, d: 10, type: "parking", desc: "Covered car parking area" },
+    { keywords: ["sitout", "sit-out", "sit out"], name: "Sit-out Area", sqft: 50, w: 10, d: 5, type: "balcony", desc: "Open-air sitting area" },
+    { keywords: ["garden", "lawn"], name: "Garden Area", sqft: 80, w: 10, d: 8, type: "garden", desc: "Outdoor garden / lawn" },
+    { keywords: ["terrace"], name: "Terrace", sqft: 60, w: 10, d: 6, type: "terrace", desc: "Open roof terrace" },
+    { keywords: ["servant room", "maid room", "servant quarter"], name: "Servant Room", sqft: 60, w: 8, d: 8, type: "servant_quarter", desc: "Staff accommodation" },
+    { keywords: ["gym", "exercise room"], name: "Gym Room", sqft: 80, w: 10, d: 8, type: "other", desc: "Exercise / fitness room" },
+    { keywords: ["home office", "work from home"], name: "Home Office", sqft: 80, w: 10, d: 8, type: "study", desc: "Dedicated workspace" },
+    { keywords: ["wash area", "laundry"], name: "Wash Area", sqft: 30, w: 6, d: 5, type: "utility", desc: "Clothes washing / drying" },
+    { keywords: ["courtyard", "internal courtyard"], name: "Internal Courtyard", sqft: 60, w: 8, d: 8, type: "courtyard", desc: "Open-to-sky internal court" },
+  ];
+  const promptLower = prompt.toLowerCase();
+  const existingNames = rooms.map(r => r.name.toLowerCase());
+  for (const det of DETECTABLE_ROOMS) {
+    const mentioned = det.keywords.some(kw => promptLower.includes(kw));
+    const alreadyParsed = existingTypes.has(det.type) ||
+      det.keywords.some(kw => existingNames.some(n => n.includes(kw)));
+    if (mentioned && !alreadyParsed) {
+      optionalRooms.push({
+        name: det.name, type: det.type, default_sqft: det.sqft,
+        default_width: det.w, default_depth: det.d,
+        description: det.desc,
+        checked_by_default: true, // auto-check since user explicitly asked
+      });
+    }
+  }
+
   // Mark unchanged rooms
   for (const room of rooms) {
     if (!adjustments.some(a => a.room_name === room.name)) {
