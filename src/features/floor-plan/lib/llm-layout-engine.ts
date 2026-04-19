@@ -121,9 +121,9 @@ export async function runLLMLayoutEngine(
 
   if (needsRetry) {
     const feedbackParts: string[] = [];
-    if (orphanCount > 3) feedbackParts.push(`${orphanCount} rooms are disconnected from the hallway.`);
+    if (orphanCount > 2) feedbackParts.push(`${orphanCount} rooms are disconnected from the hallway.`);
     if (compactness < 0.75) feedbackParts.push(`Building is L-shaped — rooms only cover ${Math.round(compactness * 100)}% of bounding box. Place ALL rooms so they form ONE rectangle: both sides of the hallway must span y=0 to y=${plot.depth} (or x=0 to x=${plot.width}).`);
-    if (hwSpan < 0.8) feedbackParts.push(`Hallway only spans ${Math.round(hwSpan * 100)}% of the building. Extend it wall-to-wall.`);
+    if (hwSpan < 0.85) feedbackParts.push(`Hallway only spans ${Math.round(hwSpan * 100)}% of the building. Extend it wall-to-wall.`);
     warnings.push(`First attempt issues: ${feedbackParts.join(" ")} — retrying`);
 
     const feedbackMsg = `PREVIOUS ATTEMPT FAILED:\n${feedbackParts.join("\n")}\nFix these issues. Ensure ONE compact rectangle, hallway spanning full ${hallway.width > hallway.depth ? "width" : "depth"}, zero gaps.`;
