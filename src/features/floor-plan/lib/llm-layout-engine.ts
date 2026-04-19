@@ -478,9 +478,10 @@ function repair(
     }
   }
 
-  // 6. Force foyer→hallway connectivity
+  // 6. Force foyer→hallway connectivity (skip for no-hallway small layouts —
+  //    positioning relative to a zero-size hallway creates degenerate 0-width rooms)
   const foyer = rooms.find(r => r.type === "foyer" || r.name.toLowerCase() === "foyer");
-  if (foyer) {
+  if (foyer && !noHallway) {
     const isH = hallway.width > hallway.depth;
     if (isH) {
       if (facing === "north") foyer.y = hallway.y + hallway.depth;
@@ -493,9 +494,9 @@ function repair(
     }
   }
 
-  // 7. Force porch→foyer connectivity + inside plot
+  // 7. Force porch→foyer connectivity + inside plot (skip for no-hallway)
   const porch = rooms.find(r => r.type === "porch");
-  if (porch && foyer) {
+  if (porch && foyer && !noHallway) {
     const isH = hallway.width > hallway.depth;
     if (isH) {
       if (facing === "north") {
@@ -520,37 +521,40 @@ function repair(
     }
   }
 
-  // 8. Extend disconnected rooms toward hallway
-  const isH = hallway.width > hallway.depth;
-  for (const r of rooms) {
-    if (r.type === "corridor" || r.type === "porch" || r.type === "foyer") continue;
-    if (touchesRect(r, hallway)) continue;
-    // Check if touches any room that touches hallway
-    const touchesConnected = rooms.some(other =>
-      other !== r && touchesRect(r, other) && touchesRect(other, hallway),
-    );
-    if (touchesConnected) continue;
+  // 8. Extend disconnected rooms toward hallway (skip for no-hallway —
+  //    zero-size hallway makes touchesRect always true at origin)
+  if (!noHallway) {
+    const isH = hallway.width > hallway.depth;
+    for (const r of rooms) {
+      if (r.type === "corridor" || r.type === "porch" || r.type === "foyer") continue;
+      if (touchesRect(r, hallway)) continue;
+      // Check if touches any room that touches hallway
+      const touchesConnected = rooms.some(other =>
+        other !== r && touchesRect(r, other) && touchesRect(other, hallway),
+      );
+      if (touchesConnected) continue;
 
-    // Extend toward hallway
-    if (isH) {
-      const hwTop = hallway.y + hallway.depth;
-      const hwBot = hallway.y;
-      if (r.y >= hwTop) {
-        const gap = r.y - hwTop;
-        if (gap < 15) { r.depth += gap; r.y = hwTop; }
-      } else if (r.y + r.depth <= hwBot) {
-        const gap = hwBot - (r.y + r.depth);
-        if (gap < 15) r.depth += gap;
-      }
-    } else {
-      const hwRight = hallway.x + hallway.width;
-      const hwLeft = hallway.x;
-      if (r.x >= hwRight) {
-        const gap = r.x - hwRight;
-        if (gap < 15) { r.width += gap; r.x = hwRight; }
-      } else if (r.x + r.width <= hwLeft) {
-        const gap = hwLeft - (r.x + r.width);
-        if (gap < 15) r.width += gap;
+      // Extend toward hallway
+      if (isH) {
+        const hwTop = hallway.y + hallway.depth;
+        const hwBot = hallway.y;
+        if (r.y >= hwTop) {
+          const gap = r.y - hwTop;
+          if (gap < 15) { r.depth += gap; r.y = hwTop; }
+        } else if (r.y + r.depth <= hwBot) {
+          const gap = hwBot - (r.y + r.depth);
+          if (gap < 15) r.depth += gap;
+        }
+      } else {
+        const hwRight = hallway.x + hallway.width;
+        const hwLeft = hallway.x;
+        if (r.x >= hwRight) {
+          const gap = r.x - hwRight;
+          if (gap < 15) { r.width += gap; r.x = hwRight; }
+        } else if (r.x + r.width <= hwLeft) {
+          const gap = hwLeft - (r.x + r.width);
+          if (gap < 15) r.width += gap;
+        }
       }
     }
   }
