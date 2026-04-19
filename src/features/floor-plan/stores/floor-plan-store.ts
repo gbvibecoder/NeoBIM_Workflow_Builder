@@ -33,6 +33,7 @@ import {
 import { createSample2BHK } from "@/features/floor-plan/lib/sample-data";
 import type { LayoutMetrics, QualityFlag } from "@/features/floor-plan/lib/layout-metrics";
 import type { InfeasibilityWarning } from "@/features/floor-plan/lib/infeasibility-detector";
+import type { FloorPlanOption } from "@/features/floor-plan/components/OptionPicker";
 
 // ============================================================
 // SAFE DEEP CLONE (structuredClone with JSON fallback)
@@ -140,7 +141,7 @@ interface FloorPlanState {
   showAdjacentFloor: boolean;
 
   // Right panel tab system
-  rightPanelTab: "properties" | "vastu" | "code" | "analytics" | "boq" | "program" | "quality";
+  rightPanelTab: "properties" | "vastu" | "code" | "analytics" | "boq" | "program" | "quality" | "explain";
 
   // Vastu overlay
   vastuOverlayVisible: boolean;
@@ -157,6 +158,12 @@ interface FloorPlanState {
   lastLayoutMetrics: LayoutMetrics | null;
   lastQualityFlags: QualityFlag[];
   lastFeasibilityWarnings: InfeasibilityWarning[];
+
+  // Phase 2 — multi-option generation (Midjourney approach)
+  generatedOptions: FloorPlanOption[] | null;
+  selectedOptionIndex: number;
+  setGeneratedOptions: (options: FloorPlanOption[] | null) => void;
+  setSelectedOptionIndex: (index: number) => void;
 
   // ========== ACTIONS ==========
 
@@ -281,7 +288,7 @@ interface FloorPlanState {
   toggleFurniturePanel: () => void;
 
   // Right panel tabs
-  setRightPanelTab: (tab: "properties" | "vastu" | "code" | "analytics" | "boq" | "program" | "quality") => void;
+  setRightPanelTab: (tab: "properties" | "vastu" | "code" | "analytics" | "boq" | "program" | "quality" | "explain") => void;
 
   // Vastu overlay
   toggleVastuOverlay: () => void;
@@ -379,7 +386,13 @@ export const useFloorPlanStore = create<FloorPlanState>()((set, get) => ({
   lastLayoutMetrics: null,
   lastQualityFlags: [],
   lastFeasibilityWarnings: [],
+  generatedOptions: null,
+  selectedOptionIndex: 0,
   _clipboard: null,
+
+  // ---- Multi-option ----
+  setGeneratedOptions: (options) => set({ generatedOptions: options }),
+  setSelectedOptionIndex: (index) => set({ selectedOptionIndex: index }),
 
   // ---- Project ----
   setProject: (project) => {
@@ -395,8 +408,8 @@ export const useFloorPlanStore = create<FloorPlanState>()((set, get) => ({
   },
 
   resetToWelcome: () => {
-    // User explicitly went back to the welcome screen — forget which project
-    // was active so the next page load doesn't silently restore them into it.
+    // Wipe ALL user-specific state. Called on back-navigation, session
+    // change (cross-user data leak prevention), and login page mount.
     clearActiveProjectId();
     set({
       project: null,
@@ -412,6 +425,11 @@ export const useFloorPlanStore = create<FloorPlanState>()((set, get) => ({
       _history: [],
       _historyIndex: -1,
       activeTool: "select",
+      generatedOptions: null,
+      selectedOptionIndex: 0,
+      lastLayoutMetrics: null,
+      lastQualityFlags: [],
+      lastFeasibilityWarnings: [],
     });
   },
 

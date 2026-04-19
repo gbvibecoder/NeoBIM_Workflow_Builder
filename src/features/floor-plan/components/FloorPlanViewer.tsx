@@ -17,11 +17,14 @@ import { AnalyticsPanel } from "@/features/floor-plan/components/panels/Analytic
 import { BOQPanel } from "@/features/floor-plan/components/panels/BOQPanel";
 import { ProgramPanel } from "@/features/floor-plan/components/panels/ProgramPanel";
 import { QualityPanel } from "@/features/floor-plan/components/panels/QualityPanel";
+import { ExplainPanel } from "@/features/floor-plan/components/panels/ExplainPanel";
+import { ValidationDialog, type ValidationResult } from "@/features/floor-plan/components/ValidationDialog";
 import { WelcomeScreen } from "@/features/floor-plan/components/WelcomeScreen";
 import { GenerationLoader } from "@/features/floor-plan/components/GenerationLoader";
 import { getProjectIndex, importProjectFile } from "@/features/floor-plan/lib/project-persistence";
 import { getSampleProjectForPrompt } from "@/features/floor-plan/lib/sample-layouts";
 import { FloorPlanErrorBoundary } from "@/features/floor-plan/components/ErrorBoundary";
+import { OptionPicker, type FloorPlanOption } from "@/features/floor-plan/components/OptionPicker";
 import { displayToMm, formatDimension, type DisplayUnit } from "@/features/floor-plan/lib/unit-conversion";
 import { worldToScreen, screenToWorld } from "@/features/floor-plan/lib/geometry";
 
@@ -54,7 +57,10 @@ export function FloorPlanViewer({ initialGeometry, initialPrompt, initialProject
   const loadSample = useFloorPlanStore((s) => s.loadSample);
   const startBlank = useFloorPlanStore((s) => s.startBlank);
 
-  // Load from props on mount (e.g. navigated from result showcase or URL params)
+  // Load from props on mount (e.g. navigated from result showcase or URL params).
+  // When no props are provided, RESET the store so the user always sees the
+  // WelcomeScreen — prevents stale floor plans from previous generations
+  // lingering across SPA navigations.
   useEffect(() => {
     if (initialProject) {
       // Direct FloorPlanProject from workflow node (GN-012)
@@ -69,6 +75,9 @@ export function FloorPlanViewer({ initialGeometry, initialPrompt, initialProject
       loadFromGeometry(initialGeometry, undefined, initialPrompt);
     } else if (initialProjectId) {
       loadFromSaved(initialProjectId);
+    } else {
+      // No props → fresh visit. Reset so user sees WelcomeScreen, not stale data.
+      useFloorPlanStore.getState().resetToWelcome();
     }
     // Only run on mount
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -102,6 +111,8 @@ export function FloorPlanViewer({ initialGeometry, initialPrompt, initialProject
    * a sample plan and call it "AI-generated".
    */
   const [generationError, setGenerationError] = React.useState<{ message: string; prompt: string } | null>(null);
+  const [pendingOptions, setPendingOptions] = useState<{ options: FloorPlanOption[]; prompt: string; layoutMetrics: unknown; qualityFlags: unknown[]; feasibilityWarnings: unknown[] } | null>(null);
+  const [validationPending, setValidationPending] = useState<{ result: ValidationResult; prompt: string } | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const [undoToast, setUndoToast] = useState<string | null>(null);
   const undoToastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -112,8 +123,11 @@ export function FloorPlanViewer({ initialGeometry, initialPrompt, initialProject
     return () => { abortRef.current?.abort(); };
   }, []);
 
-  const handleGenerateFromPrompt = useCallback(async (prompt: string) => {
-    // Abort any in-flight request
+  /**
+   * Core generation function — calls /api/generate-floor-plan and loads result.
+   * Used by both the validation flow and the direct (skip/template) flow.
+   */
+  const executeGeneration = useCallback(async (prompt: string) => {
     abortRef.current?.abort();
     const controller = new AbortController();
     abortRef.current = controller;
@@ -122,10 +136,6 @@ export function FloorPlanViewer({ initialGeometry, initialPrompt, initialProject
     store.startGeneration(prompt);
     setFallbackBanner(null);
     setGenerationError(null);
-
-    // Phase 1 — NO setTimeout-driven fake stages. The loader shows an honest
-    // indeterminate progress bar while the single backend POST runs. Real
-    // per-stage progress is a Phase 3 concern (multi-agent pipeline + SSE).
 
     try {
       const res = await fetch("/api/generate-floor-plan", {
@@ -137,7 +147,6 @@ export function FloorPlanViewer({ initialGeometry, initialPrompt, initialProject
 
       if (!res.ok) {
         const data = await res.json().catch(() => ({ error: "Unknown error" }));
-        // Handle plan limit / email verification gates — show popup, don't fallback
         if (data.error === "PLAN_LIMIT" || data.error === "EMAIL_VERIFY") {
           useFloorPlanStore.setState({ isGenerating: false });
           setUpgradeBlock({ title: data.title, message: data.message, action: data.action, actionUrl: data.actionUrl });
@@ -149,7 +158,20 @@ export function FloorPlanViewer({ initialGeometry, initialPrompt, initialProject
 
       const data = await res.json();
 
-      // Load the AI-generated project + Phase 1 honest metrics in one shot.
+      // Multi-option: show picker if API returned multiple options
+      if (Array.isArray(data.options) && data.options.length > 1) {
+        useFloorPlanStore.setState({ isGenerating: false, originalPrompt: prompt });
+        setPendingOptions({
+          options: data.options as FloorPlanOption[],
+          prompt,
+          layoutMetrics: data.layoutMetrics,
+          qualityFlags: Array.isArray(data.qualityFlags) ? data.qualityFlags : [],
+          feasibilityWarnings: Array.isArray(data.feasibilityWarnings) ? data.feasibilityWarnings : [],
+        });
+        return;
+      }
+
+      // Single option (template/fallback): load directly
       store.setProject(data.project);
       store.setQualityResults(
         data.layoutMetrics ?? null,
@@ -163,17 +185,66 @@ export function FloorPlanViewer({ initialGeometry, initialPrompt, initialProject
         projectModified: false,
       });
     } catch (err) {
-      if (controller.signal.aborted) return; // User navigated away
-
+      if (controller.signal.aborted) return;
       const message = err instanceof Error ? err.message : String(err);
       console.warn("[FloorPlanViewer] AI generation failed:", message);
-
-      // Phase 1 — NO silent sample swap. Surface the error so the user must
-      // explicitly choose: retry, use a sample on purpose, or edit the prompt.
       useFloorPlanStore.setState({ isGenerating: false });
       setGenerationError({ message, prompt });
     }
   }, []);
+
+  /**
+   * Prompt-based generation — shows loading state IMMEDIATELY, then
+   * calls validate, shows dialog if there are issues, then proceeds.
+   */
+  const handleGenerateFromPrompt = useCallback(async (prompt: string) => {
+    setValidationPending(null);
+    setGenerationError(null);
+    setPendingOptions(null);
+
+    // Show loading state IMMEDIATELY so user sees feedback within 100ms
+    useFloorPlanStore.setState({
+      isGenerating: true,
+      generationStep: "working",
+      generationProgress: 0,
+      originalPrompt: prompt,
+    });
+
+    try {
+      const res = await fetch("/api/validate-floor-plan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt }),
+      });
+      if (res.ok) {
+        const result: ValidationResult = await res.json();
+        // Show dialog if there are non-trivial issues or adjustments
+        const hasAdjustments = result.adjustments.some(a => a.type !== "unchanged");
+        const hasIssues = result.issues.length > 0;
+        if (hasAdjustments || hasIssues) {
+          // Pause loading — show validation dialog instead
+          useFloorPlanStore.setState({ isGenerating: false });
+          setValidationPending({ result, prompt });
+          return;
+        }
+      }
+    } catch {
+      // Validation failed — proceed directly to generation (non-blocking)
+      console.warn("[FloorPlanViewer] Validation API failed — skipping review");
+    }
+    // No issues or validation unavailable — proceed to generation
+    // (isGenerating already true from above, executeGeneration will re-set it)
+    executeGeneration(prompt);
+  }, [executeGeneration]);
+
+  /**
+   * Direct generation — bypasses validation. Used by Quick Templates
+   * and the "Skip review" link in the validation dialog.
+   */
+  const handleDirectGenerate = useCallback((prompt: string) => {
+    setValidationPending(null);
+    executeGeneration(prompt);
+  }, [executeGeneration]);
 
   /**
    * Explicit "load a sample plan" action — only ever fires from the error UI
@@ -192,6 +263,26 @@ export function FloorPlanViewer({ initialGeometry, initialPrompt, initialProject
     setGenerationError(null);
     setFallbackBanner("This is a pre-built sample layout, not AI-generated.");
   }, []);
+
+  /** Select a specific option from the multi-option picker. */
+  const handleSelectOption = useCallback((option: FloorPlanOption) => {
+    const store = useFloorPlanStore.getState();
+    store.setProject(option.project);
+    // Use the best option's metrics for quality display (already sorted)
+    if (pendingOptions) {
+      store.setQualityResults(
+        pendingOptions.layoutMetrics as import("@/features/floor-plan/lib/layout-metrics").LayoutMetrics | null,
+        pendingOptions.qualityFlags as import("@/features/floor-plan/lib/layout-metrics").QualityFlag[],
+        pendingOptions.feasibilityWarnings as import("@/features/floor-plan/lib/infeasibility-detector").InfeasibilityWarning[],
+      );
+    }
+    useFloorPlanStore.setState({
+      dataSource: "pipeline",
+      originalPrompt: pendingOptions?.prompt ?? null,
+      projectModified: false,
+    });
+    setPendingOptions(null);
+  }, [pendingOptions]);
 
   const handleImportFile = useCallback(async () => {
     const project = await importProjectFile();
@@ -417,6 +508,30 @@ export function FloorPlanViewer({ initialGeometry, initialPrompt, initialProject
     />
   ) : null;
 
+  // Show multi-option picker (Phase 2 — Midjourney approach)
+  if (pendingOptions) {
+    return (
+      <div className="flex h-screen flex-col bg-[#0A0A14] overflow-hidden select-none">
+        <OptionPicker
+          options={pendingOptions.options}
+          prompt={pendingOptions.prompt}
+          onSelect={handleSelectOption}
+          onRegenerate={() => {
+            const p = pendingOptions.prompt;
+            setPendingOptions(null);
+            handleGenerateFromPrompt(p);
+          }}
+          onSkip={() => {
+            // Auto-select best (index 0 — already sorted by score)
+            if (pendingOptions.options.length > 0) {
+              handleSelectOption(pendingOptions.options[0]);
+            }
+          }}
+        />
+      </div>
+    );
+  }
+
   // Show generation loader
   if (isGenerating) {
     return (
@@ -466,12 +581,29 @@ export function FloorPlanViewer({ initialGeometry, initialPrompt, initialProject
         })()}
         <WelcomeScreen
           onGenerateFromPrompt={handleGenerateFromPrompt}
+          onDirectGenerate={handleDirectGenerate}
           onOpenSample={loadSample}
           onStartBlank={startBlank}
           onOpenSaved={loadFromSaved}
           onImportFile={handleImportFile}
           savedProjects={savedProjects}
         />
+        {validationPending && (
+          <ValidationDialog
+            result={validationPending.result}
+            onGenerate={() => {
+              const prompt = validationPending.prompt;
+              setValidationPending(null);
+              executeGeneration(prompt);
+            }}
+            onEditPrompt={() => setValidationPending(null)}
+            onSkip={() => {
+              const prompt = validationPending.prompt;
+              setValidationPending(null);
+              executeGeneration(prompt);
+            }}
+          />
+        )}
         {errorOverlay}
       </div>
     );
@@ -698,6 +830,7 @@ export function FloorPlanViewer({ initialGeometry, initialPrompt, initialProject
               {([
                 { id: "properties", label: "Props" },
                 { id: "quality", label: "Quality" },
+                { id: "explain", label: "Explain" },
                 { id: "vastu", label: "Vastu" },
                 { id: "code", label: "Code" },
                 { id: "analytics", label: "Stats" },
@@ -722,6 +855,7 @@ export function FloorPlanViewer({ initialGeometry, initialPrompt, initialProject
               <FloorPlanErrorBoundary fallbackLabel="Panel">
                 {rightPanelTab === "properties" && <PropertiesPanel />}
                 {rightPanelTab === "quality" && <QualityPanel />}
+                {rightPanelTab === "explain" && <ExplainPanel />}
                 {rightPanelTab === "vastu" && <VastuPanel />}
                 {rightPanelTab === "code" && <CodeCompliancePanel />}
                 {rightPanelTab === "analytics" && <AnalyticsPanel />}

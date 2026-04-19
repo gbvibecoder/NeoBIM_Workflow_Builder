@@ -592,20 +592,22 @@ export function computeHonestScore(metrics: LayoutMetrics): HonestScore {
   // Door coverage — a layout where rooms can't be reached is broken.
   if (metrics.total_rooms > 0) {
     if (metrics.door_coverage_pct < 60) {
-      score -= 30;
-      rationale.push(`Door coverage ${metrics.door_coverage_pct}% (<60): -30`);
+      score -= 35;
+      rationale.push(`Door coverage ${metrics.door_coverage_pct}% (<60): -35`);
     } else if (metrics.door_coverage_pct < 80) {
-      score -= 15;
-      rationale.push(`Door coverage ${metrics.door_coverage_pct}% (<80): -15`);
+      score -= 20;
+      rationale.push(`Door coverage ${metrics.door_coverage_pct}% (<80): -20`);
     } else if (metrics.door_coverage_pct < 95) {
-      score -= 5;
-      rationale.push(`Door coverage ${metrics.door_coverage_pct}% (<95): -5`);
+      score -= 10;
+      rationale.push(`Door coverage ${metrics.door_coverage_pct}% (<95): -10`);
     }
+    // Bonus: 100% coverage = no penalty (reward fully connected plans)
   }
 
-  // Orphan rooms — capped at -20 so a single broken room doesn't tank the score.
+  // Orphan rooms — unreachable rooms are the WORST defect. An architect
+  // would never approve a room you can't walk to. Heavy penalty.
   if (metrics.orphan_rooms.length > 0) {
-    const penalty = Math.min(20, metrics.orphan_rooms.length * 5);
+    const penalty = Math.min(45, metrics.orphan_rooms.length * 15);
     score -= penalty;
     rationale.push(`${metrics.orphan_rooms.length} orphan room(s): -${penalty}`);
   }

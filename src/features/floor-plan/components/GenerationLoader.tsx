@@ -1,25 +1,38 @@
 "use client";
 
 /**
- * GenerationLoader — Phase 1 honest indeterminate progress.
+ * GenerationLoader — multi-option pipeline progress.
  *
- * Replaces the previous 8-step theatrical UI that fired fake stage labels on
- * fixed setTimeout delays. The backend is currently one HTTP POST, so we show
- * a single honest "working" state with an indeterminate progress bar. Real
- * per-stage progress will come back when the multi-agent pipeline ships
- * (Phase 3) and can drive milestones via SSE.
+ * Shows rotating status messages that reflect the actual pipeline stages
+ * while the backend generates 3 layout options in parallel.
  */
-import React from "react";
+import React, { useEffect, useState } from "react";
 
 interface GenerationLoaderProps {
-  /** Reserved for future per-stage drive (e.g. SSE milestones). Phase 1 ignores it. */
   step: string;
-  /** Reserved. Phase 1 uses an indeterminate bar instead. */
   progress: number;
   prompt?: string;
 }
 
+const MESSAGES = [
+  "Analyzing your requirements...",
+  "Our AI architect is designing 3 layout options...",
+  "Placing rooms and optimizing adjacency...",
+  "Adding doors, windows, and hallways...",
+  "Scoring each option for quality...",
+  "Almost there — picking the best layouts...",
+];
+
 export function GenerationLoader({ prompt }: GenerationLoaderProps) {
+  const [msgIdx, setMsgIdx] = useState(0);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setMsgIdx(prev => (prev + 1) % MESSAGES.length);
+    }, 2200);
+    return () => clearInterval(timer);
+  }, []);
+
   return (
     <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-gray-50 via-white to-blue-50/30">
       <div className="w-full max-w-md px-6 text-center">
@@ -37,18 +50,26 @@ export function GenerationLoader({ prompt }: GenerationLoaderProps) {
 
         <h2 className="mb-1 text-lg font-bold text-gray-900">Generating your floor plan…</h2>
         {prompt && (
-          <p className="mb-6 text-xs text-gray-500 truncate max-w-sm mx-auto">
+          <p className="mb-4 text-xs text-gray-500 truncate max-w-sm mx-auto">
             &ldquo;{prompt}&rdquo;
           </p>
         )}
 
-        {/* Indeterminate progress bar — visible motion, no fake percentage. */}
+        {/* Rotating status message */}
+        <p
+          className="mb-5 text-sm font-medium text-gray-600 transition-opacity duration-300"
+          key={msgIdx}
+        >
+          {MESSAGES[msgIdx]}
+        </p>
+
+        {/* Indeterminate progress bar */}
         <div className="mx-auto mb-4 w-full max-w-xs overflow-hidden rounded-full bg-gray-100 h-1.5">
           <div className="h-full w-1/3 rounded-full bg-gradient-to-r from-blue-500 to-indigo-500 animate-[fp-loader-bar_1.4s_ease-in-out_infinite]" />
         </div>
 
-        <p className="text-[11px] text-gray-500">
-          This usually takes 10–30 seconds. We&rsquo;ll show real metrics once the plan is ready.
+        <p className="text-[11px] text-gray-400">
+          Creating 3 options in parallel — usually takes 8–15 seconds
         </p>
       </div>
 

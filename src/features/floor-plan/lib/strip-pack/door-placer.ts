@@ -26,7 +26,11 @@ const DEFAULT_DOOR_WIDTH_FT = 3;
 const NARROW_DOOR_WIDTH_FT = 2.5;
 const MAIN_ENTRANCE_DOOR_WIDTH_FT = 3.5;
 const CORNER_CLEARANCE_FT = 0.5;
+/** Phase 3H: tighter clearance for short walls connecting isolated rooms.
+ *  0.25ft (3in) each side — architecturally acceptable for internal doors. */
+const TIGHT_CORNER_CLEARANCE_FT = 0.25;
 const MIN_WALL_FOR_NARROW_DOOR_FT = NARROW_DOOR_WIDTH_FT + 2 * CORNER_CLEARANCE_FT;
+const MIN_WALL_FOR_TIGHT_DOOR_FT = NARROW_DOOR_WIDTH_FT + 2 * TIGHT_CORNER_CLEARANCE_FT;
 
 export interface DoorPlaceInput {
   rooms: StripPackRoom[];
@@ -59,7 +63,7 @@ export function placeDoors(input: DoorPlaceInput): DoorPlaceOutput {
       warnings.push(`adjacency ${ra.name} ↔ ${rb.name}: no shared wall — door skipped`);
       continue;
     }
-    const door = makeDoorOnWall(wall, [ra.name, rb.name], DEFAULT_DOOR_WIDTH_FT, warnings);
+    const door = makeDoorOnWall(wall, [ra.name, rb.name], DEFAULT_DOOR_WIDTH_FT, warnings, doors);
     if (door) {
       doors.push(door);
       servedRooms.add(pair.a);
@@ -85,7 +89,7 @@ export function placeDoors(input: DoorPlaceInput): DoorPlaceOutput {
       if (!hasHallwayDoor) {
         const wall = findHallwayWallFor(input.walls, input.spine, input.foyerId);
         if (wall) {
-          const door = makeDoorOnWall(wall, [foyer.name, "hallway"], DEFAULT_DOOR_WIDTH_FT, warnings);
+          const door = makeDoorOnWall(wall, [foyer.name, "hallway"], DEFAULT_DOOR_WIDTH_FT, warnings, doors);
           if (door) {
             doors.push(door);
             servedRooms.add(input.foyerId);
@@ -116,7 +120,7 @@ export function placeDoors(input: DoorPlaceInput): DoorPlaceOutput {
     if (alreadyHasHallwayDoor) continue;
     const wall = findHallwayWallFor(input.walls, input.spine, room.id);
     if (!wall) continue;
-    const door = makeDoorOnWall(wall, [room.name, "hallway"], DEFAULT_DOOR_WIDTH_FT, warnings);
+    const door = makeDoorOnWall(wall, [room.name, "hallway"], DEFAULT_DOOR_WIDTH_FT, warnings, doors);
     if (door) {
       doors.push(door);
       servedRooms.add(room.id);
@@ -124,28 +128,41 @@ export function placeDoors(input: DoorPlaceInput): DoorPlaceOutput {
   }
 
   // ── 3. Fallback: any internal wall ─────────────────────────────────────
-  for (const room of input.rooms) {
-    if (!room.placed) continue;
-    if (servedRooms.has(room.id)) continue;
-    const wall = findAnyInternalWallFor(input.walls, room.id);
-    if (!wall) {
-      warnings.push(`${room.name}: no shared wall available — room is unreachable`);
-      continue;
-    }
-    const otherId = wall.room_ids.find(id => id !== room.id) ?? "neighbor";
-    const otherName = otherId === HALLWAY_SENTINEL_ID
-      ? "hallway"
-      : roomById.get(otherId)?.name ?? "neighbor";
-    const door = makeDoorOnWall(wall, [room.name, otherName], DEFAULT_DOOR_WIDTH_FT, warnings);
-    if (door) {
-      doors.push(door);
-      servedRooms.add(room.id);
-      // Don't tag as a "fallback" warning when we still ended up on the
-      // hallway — that's the desired outcome.
-      if (otherName !== "hallway") {
-        warnings.push(`${room.name}: door fallback to ${otherName} (no hallway adjacency)`);
+  // Phase 3H fix: prefer walls connecting to rooms ALREADY served (connected
+  // to circulation). Without this, rooms in BACK row 1 (Bed4, CommonBath)
+  // connect to each other but never to a hallway-connected room, creating
+  // an isolated orphan cluster. Run multiple passes — each pass connects at
+  // least one new room to the served graph, expanding the reachable set.
+  const unservedCount = input.rooms.filter(r => r.placed && !servedRooms.has(r.id)).length;
+  for (let pass = 0; pass < unservedCount + 1; pass++) {
+    let progress = false;
+    for (const room of input.rooms) {
+      if (!room.placed) continue;
+      if (servedRooms.has(room.id)) continue;
+      // Prefer walls connecting to a served room (connected to circulation).
+      const wall = findConnectedInternalWallFor(input.walls, room.id, servedRooms)
+        ?? findAnyInternalWallFor(input.walls, room.id);
+      if (!wall) {
+        if (pass === unservedCount) {
+          warnings.push(`${room.name}: no shared wall available — room is unreachable`);
+        }
+        continue;
+      }
+      const otherId = wall.room_ids.find(id => id !== room.id) ?? "neighbor";
+      const otherName = otherId === HALLWAY_SENTINEL_ID
+        ? "hallway"
+        : roomById.get(otherId)?.name ?? "neighbor";
+      const door = makeDoorOnWall(wall, [room.name, otherName], DEFAULT_DOOR_WIDTH_FT, warnings, doors);
+      if (door) {
+        doors.push(door);
+        servedRooms.add(room.id);
+        progress = true;
+        if (otherName !== "hallway") {
+          warnings.push(`${room.name}: door fallback to ${otherName} (no hallway adjacency)`);
+        }
       }
     }
+    if (!progress) break;
   }
 
   // ── 4. Main entrance ───────────────────────────────────────────────────
@@ -157,7 +174,7 @@ export function placeDoors(input: DoorPlaceInput): DoorPlaceOutput {
   if (entry && entry.placed) {
     const wall = findExternalEntranceWall(input.walls, entry, input.spine.entrance_side);
     if (wall) {
-      const door = makeDoorOnWall(wall, [entry.name, "exterior"], MAIN_ENTRANCE_DOOR_WIDTH_FT, warnings);
+      const door = makeDoorOnWall(wall, [entry.name, "exterior"], MAIN_ENTRANCE_DOOR_WIDTH_FT, warnings, doors);
       if (door) {
         door.is_main_entrance = true;
         doors.push(door);
@@ -213,6 +230,40 @@ function findHallwayWallFor(walls: WallSegment[], spine: SpineLayout, roomId: st
     if (!w.room_ids.includes(roomId)) continue;
     if (!isOnSpineEdge(w, spine.spine)) continue;
     const len = wallLength(w);
+    if (len > bestLen) {
+      bestLen = len;
+      best = w;
+    }
+  }
+  return best;
+}
+
+/**
+ * Phase 3H: prefer walls connecting to rooms already in the served set
+ * (connected to circulation). This prevents isolated orphan clusters where
+ * rooms connect to each other but never to the hallway-connected graph.
+ */
+function findConnectedInternalWallFor(
+  walls: WallSegment[],
+  roomId: string,
+  servedRooms: Set<string>,
+): WallSegment | null {
+  let best: WallSegment | null = null;
+  let bestLen = 0;
+  for (const w of walls) {
+    if (w.type !== "internal") continue;
+    if (!w.room_ids.includes(roomId)) continue;
+    const others = w.room_ids.filter(id => id !== roomId);
+    // At least one other owner must be served (connected to circulation)
+    // or be the hallway itself.
+    const connected = others.some(id => id === HALLWAY_SENTINEL_ID || servedRooms.has(id));
+    if (!connected) continue;
+    const len = wallLength(w);
+    // Phase 3H: only return walls long enough for a door. Otherwise the
+    // caller gets a connected wall, tries to place a door, fails (too
+    // short), and falls through to an unconnected wall — creating an
+    // orphan cluster.
+    if (len < MIN_WALL_FOR_TIGHT_DOOR_FT) continue;
     if (len > bestLen) {
       bestLen = len;
       best = w;
@@ -297,20 +348,49 @@ function makeDoorOnWall(
   between: [string, string],
   preferredWidth: number,
   warnings: string[],
+  existingDoors?: DoorPlacement[],
 ): DoorPlacement | null {
   const len = wallLength(wall);
   let width = preferredWidth;
+  let clearance = CORNER_CLEARANCE_FT;
   if (len < width + 2 * CORNER_CLEARANCE_FT) {
     if (len >= MIN_WALL_FOR_NARROW_DOOR_FT) {
       width = NARROW_DOOR_WIDTH_FT;
+    } else if (len >= MIN_WALL_FOR_TIGHT_DOOR_FT) {
+      // Phase 3H: tight clearance for short walls — prevents orphan clusters
+      // when the only wall connecting to the main graph is 3ft.
+      width = NARROW_DOOR_WIDTH_FT;
+      clearance = TIGHT_CORNER_CLEARANCE_FT;
     } else {
       warnings.push(`wall ${wall.id}: ${len.toFixed(1)}ft too short for door between ${between[0]} and ${between[1]}`);
       return null;
     }
   }
+
+  // Check for existing doors on this wall and offset to avoid overlap
+  const doorsOnWall = existingDoors?.filter(d => d.wall_id === wall.id) ?? [];
   const halfDoor = width / 2;
+
   if (wall.orientation === "horizontal") {
-    const cx = (wall.start.x + wall.end.x) / 2;
+    let cx = (wall.start.x + wall.end.x) / 2;
+    // Offset if overlapping an existing door
+    for (const existing of doorsOnWall) {
+      const eCx = (existing.start.x + existing.end.x) / 2;
+      const minDist = halfDoor + existing.width_ft / 2 + CORNER_CLEARANCE_FT;
+      if (Math.abs(cx - eCx) < minDist) {
+        // Try placing to the right of the existing door
+        const rightCx = eCx + minDist;
+        const leftCx = eCx - minDist;
+        const wallMin = Math.min(wall.start.x, wall.end.x) + clearance + halfDoor;
+        const wallMax = Math.max(wall.start.x, wall.end.x) - clearance - halfDoor;
+        if (rightCx <= wallMax) cx = rightCx;
+        else if (leftCx >= wallMin) cx = leftCx;
+        else {
+          warnings.push(`wall ${wall.id}: no room for second door between ${between[0]} and ${between[1]}`);
+          return null;
+        }
+      }
+    }
     return {
       start: { x: cx - halfDoor, y: wall.start.y },
       end:   { x: cx + halfDoor, y: wall.start.y },
@@ -320,7 +400,24 @@ function makeDoorOnWall(
       wall_id: wall.id,
     };
   }
-  const cy = (wall.start.y + wall.end.y) / 2;
+  let cy = (wall.start.y + wall.end.y) / 2;
+  // Offset if overlapping an existing door
+  for (const existing of doorsOnWall) {
+    const eCy = (existing.start.y + existing.end.y) / 2;
+    const minDist = halfDoor + existing.width_ft / 2 + CORNER_CLEARANCE_FT;
+    if (Math.abs(cy - eCy) < minDist) {
+      const upCy = eCy + minDist;
+      const downCy = eCy - minDist;
+      const wallMin = Math.min(wall.start.y, wall.end.y) + clearance + halfDoor;
+      const wallMax = Math.max(wall.start.y, wall.end.y) - clearance - halfDoor;
+      if (upCy <= wallMax) cy = upCy;
+      else if (downCy >= wallMin) cy = downCy;
+      else {
+        warnings.push(`wall ${wall.id}: no room for second door between ${between[0]} and ${between[1]}`);
+        return null;
+      }
+    }
+  }
   return {
     start: { x: wall.start.x, y: cy - halfDoor },
     end:   { x: wall.start.x, y: cy + halfDoor },

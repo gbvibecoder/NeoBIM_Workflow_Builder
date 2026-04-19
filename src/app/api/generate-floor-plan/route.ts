@@ -73,6 +73,12 @@ import { runStripPackEngine, fillDoorMetrics } from "@/features/floor-plan/lib/s
 import { toFloorPlanProject as toFloorPlanProjectT1 } from "@/features/floor-plan/lib/strip-pack/converter";
 import { parseConstraints } from "@/features/floor-plan/lib/structured-parser";
 
+// Phase 3H — LLM layout engine (PIPELINE_LLM feature flag)
+import { runLLMLayoutEngine } from "@/features/floor-plan/lib/llm-layout-engine";
+
+// Phase 5 — Grid-Pack engine (PIPELINE_GRID feature flag)
+import { runGridPackEngine } from "@/features/floor-plan/lib/grid-pack-engine";
+
 // ── Generation Feedback ────────────────────────────────────────────────────
 
 interface GenerationFeedback {
@@ -127,6 +133,40 @@ function buildFeedback(project: FloorPlanProject, prompt: string): GenerationFee
     has_staircase: hasStaircase,
     tips,
   };
+}
+
+/** Pre-flight feasibility check — catches impossible prompts before spending on GPT-4o calls. */
+function checkPromptFeasibility(parsed: import("@/features/floor-plan/lib/structured-parser").ParsedConstraints): { feasible: boolean; reason?: string } {
+  const plotW = parsed.plot.width_ft ?? 40;
+  const plotD = parsed.plot.depth_ft ?? 50;
+  const plotArea = plotW * plotD;
+  const nonCircRooms = parsed.rooms.filter(r => !r.is_circulation);
+  const roomCount = nonCircRooms.length;
+
+  // Sum of requested room areas
+  const roomArea = nonCircRooms.reduce((s, r) => {
+    const w = r.dim_width_ft ?? 10;
+    const d = r.dim_depth_ft ?? 8;
+    return s + w * d;
+  }, 0);
+
+  // Rooms take more than 130% of plot — impossible
+  if (roomArea > plotArea * 1.3) {
+    return {
+      feasible: false,
+      reason: `Your rooms total ~${Math.round(roomArea)} sqft but your plot is only ${Math.round(plotArea)} sqft. Reduce room sizes or use a larger plot.`,
+    };
+  }
+
+  // Plot too small for the number of rooms (minimum 25sqft per room = 5x5ft)
+  if (plotArea < roomCount * 25) {
+    return {
+      feasible: false,
+      reason: `${roomCount} rooms need at least ${roomCount * 25} sqft but your plot is only ${Math.round(plotArea)} sqft. Use a larger plot or fewer rooms.`,
+    };
+  }
+
+  return { feasible: true };
 }
 
 /** Record a standalone tool use as an Execution so it shows in dashboard + admin.
@@ -252,6 +292,237 @@ export async function POST(req: NextRequest) {
     // the existing template+SA Pipeline A unchanged.
     const routing = routePrompt(prompt);
     logger.debug(`[ROUTER] pipeline=${routing.pipeline} signals=${routing.constraint_signals}`);
+
+    // ── Phase 5 — Grid-Pack Engine (PIPELINE_GRID) ─────────────────────
+    // LLM decides row grouping, algorithm computes exact coordinates.
+    // Zero floating rooms, zero gaps BY CONSTRUCTION.
+    if (process.env.PIPELINE_GRID === "true" && routing.pipeline === "B") {
+      try {
+        const gpStart = Date.now();
+        const gpParseRes = await parseConstraints(prompt, apiKey);
+        const gpParseMs = Date.now() - gpStart;
+
+        const feasibility = checkPromptFeasibility(gpParseRes.constraints);
+        if (!feasibility.feasible) {
+          console.warn(`[GRID-PACK][INFEASIBILITY] ${feasibility.reason}`);
+          return NextResponse.json({
+            error: feasibility.reason,
+            infeasibilityReason: feasibility.reason,
+          }, { status: 422 });
+        }
+
+        const gpEngineStart = Date.now();
+        const gpResult = await runGridPackEngine(prompt, gpParseRes.constraints, apiKey);
+        const gpEngineMs = Date.now() - gpEngineStart;
+
+        const gpProject = toFloorPlanProjectT1(gpResult, gpParseRes.constraints);
+        const gpLayoutMetrics = computeLayoutMetrics(gpProject, gpParseRes.constraints);
+        const gpScore = computeHonestScore(gpLayoutMetrics);
+
+        logger.debug(`[GRID-PACK] parse=${gpParseMs}ms engine=${gpEngineMs}ms eff=${gpResult.metrics.efficiency_pct}% doors=${gpResult.metrics.door_coverage_pct}% score=${gpScore.score}`);
+        console.log(`[GRID-PACK] Rooms: ${gpResult.rooms.filter(r => r.placed).length}/${gpParseRes.constraints.rooms.length}, warnings: ${gpResult.warnings.length}`);
+
+        const feedback = buildFeedback(gpProject, prompt);
+        feedback.tips.push(`Grid-Pack engine: score ${gpScore.score}/100, ${gpResult.metrics.efficiency_pct}% efficiency`);
+        await recordToolExecution(userId, "floor-plan");
+
+        return NextResponse.json({
+          project: gpProject,
+          geometry: null,
+          feedback,
+          pipeline: "grid-pack",
+          pipeline_timing: {
+            parse_ms: gpParseMs,
+            engine_ms: gpEngineMs,
+            total_ms: Date.now() - gpStart,
+          },
+          score: gpScore,
+          warnings: gpResult.warnings,
+        });
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.warn(`[GRID-PACK] error — falling through to LLM/T1: ${msg}`);
+      }
+    }
+
+    // ── Phase 4 — Multi-Option LLM Layout Engine ("Midjourney approach") ─
+    // Generate 3 options in parallel with temperature diversity.
+    // Score them all, return the best. Non-determinism becomes a feature.
+    // Math: if P(good) = 70%, then P(≥1 good in 3) = 1 - 0.3³ = 97.3%.
+    if (process.env.PIPELINE_LLM === "true" && routing.pipeline === "B") {
+      try {
+        const llmStart = Date.now();
+        const llmParseRes = await parseConstraints(prompt, apiKey);
+        const llmParseMs = Date.now() - llmStart;
+
+        // Infeasibility guard — catch impossible prompts before spending on GPT-4o
+        const feasibility = checkPromptFeasibility(llmParseRes.constraints);
+        if (!feasibility.feasible) {
+          console.warn(`[INFEASIBILITY] ${feasibility.reason}`);
+          return NextResponse.json({
+            error: feasibility.reason,
+            infeasibilityReason: feasibility.reason,
+            pipelineUsed: "LLM-multi-option",
+            routerSignals: routing.constraint_signals,
+          }, { status: 422 });
+        }
+
+        // Generate 3 options in parallel with different temperatures
+        const NUM_OPTIONS = 3;
+        const temperatures = [0.2, 0.4, 0.6];
+        const llmEngineStart = Date.now();
+
+        const optionPromises = Array.from({ length: NUM_OPTIONS }, (_, i) => {
+          const temp = temperatures[i % temperatures.length];
+          const optStart = Date.now();
+          return runLLMLayoutEngine(prompt, llmParseRes.constraints, apiKey, { temperature: temp, variant: i })
+            .then(result => {
+              console.log(`[OPTION-${i}] done in ${Date.now() - optStart}ms (temp=${temp})`);
+              return { result, index: i, temp };
+            })
+            .catch(err => {
+              console.warn(`[OPTION-${i}] failed (temp=${temp}): ${err instanceof Error ? err.message : String(err)}`);
+              return null;
+            });
+        });
+
+        const rawOptions = await Promise.all(optionPromises);
+        const llmEngineMs = Date.now() - llmEngineStart;
+
+        // Filter out failures, score each, sort by honest score
+        const scoredOptions = rawOptions
+          .filter((opt): opt is NonNullable<typeof opt> => opt !== null)
+          .map(opt => {
+            const filled = fillDoorMetrics(opt.result);
+            const project = toFloorPlanProjectT1(filled, llmParseRes.constraints);
+            const metrics = computeLayoutMetrics(project, llmParseRes.constraints);
+            const score = computeHonestScore(metrics);
+            return { ...opt, result: filled, project, metrics, score };
+          })
+          .sort((a, b) => {
+            // Primary: honest score (higher wins)
+            if (b.score.score !== a.score.score) return b.score.score - a.score.score;
+            // Tiebreaker 1: fewer orphans wins (orphans = worst defect)
+            if (a.metrics.orphan_rooms.length !== b.metrics.orphan_rooms.length)
+              return a.metrics.orphan_rooms.length - b.metrics.orphan_rooms.length;
+            // Tiebreaker 2: higher door coverage wins
+            if (b.metrics.door_coverage_pct !== a.metrics.door_coverage_pct)
+              return b.metrics.door_coverage_pct - a.metrics.door_coverage_pct;
+            // Tiebreaker 3: higher efficiency wins
+            return b.metrics.efficiency_pct - a.metrics.efficiency_pct;
+          });
+
+        console.log(`[OPTIONS] Generated ${scoredOptions.length}/${NUM_OPTIONS} options in ${llmEngineMs}ms (parse=${llmParseMs}ms):`);
+        for (const opt of scoredOptions) {
+          console.log(
+            `  Option-${opt.index} (temp=${opt.temp}): score=${opt.score.score}/100 (${opt.score.grade}) ` +
+            `doors=${opt.metrics.door_coverage_pct}% orphans=${opt.metrics.orphan_rooms.length} ` +
+            `eff=${opt.metrics.efficiency_pct}% rooms=${opt.result.rooms.length}`,
+          );
+        }
+
+        if (scoredOptions.length > 0) {
+          const best = scoredOptions[0];
+
+          // Accept if best option meets minimum quality bar
+          if (best.score.score >= 45 && best.metrics.orphan_rooms.length <= 3) {
+            console.log(`[OPTIONS] ACCEPTED best: Option-${best.index} score=${best.score.score}/100 (${best.score.grade})`);
+            const feedback = buildFeedback(best.project, prompt);
+            feedback.tips.push(
+              `LLM multi-option: best of ${scoredOptions.length} (Option-${best.index}, temp=${best.temp}), ` +
+              `${best.result.rooms.length} rooms, ${best.result.doors.length} doors, ` +
+              `${best.metrics.efficiency_pct}% efficiency in ${llmParseMs + llmEngineMs}ms`,
+            );
+            if (scoredOptions.length > 1) {
+              const worst = scoredOptions[scoredOptions.length - 1];
+              feedback.tips.push(
+                `Score range: ${worst.score.score}–${best.score.score} (Δ${best.score.score - worst.score.score})`,
+              );
+            }
+            await recordToolExecution(userId, "floor-plan");
+            return NextResponse.json({
+              // Best option (backward compatible — existing UI shows this)
+              project: best.project,
+              geometry: null,
+              svg: null,
+              feedback,
+              layoutMetrics: best.metrics,
+              qualityFlags: best.metrics.quality_flags,
+              feasibilityWarnings: [],
+              pipelineUsed: "LLM-multi-option",
+              relaxationsApplied: best.result.warnings,
+              infeasibilityReason: null,
+              mandalaAssignments: null,
+              routerSignals: routing.constraint_signals,
+              honestScore: best.score,
+
+              // ALL options for future option picker UI (Phase 2)
+              options: scoredOptions.map((opt, i) => ({
+                index: i,
+                project: opt.project,
+                score: opt.score.score,
+                grade: opt.score.grade,
+                efficiency: opt.metrics.efficiency_pct,
+                doorCoverage: opt.metrics.door_coverage_pct,
+                orphanCount: opt.metrics.orphan_rooms.length,
+                voidArea: opt.metrics.void_area_sqft,
+                roomCount: opt.project.floors[0]?.rooms.length ?? 0,
+              })),
+            });
+          }
+
+          // Score too low for auto-accept — but still ship if T1/B also
+          // won't produce anything better (the downstream race will compare).
+          // Log and fall through.
+          console.warn(`[OPTIONS] Best score ${best.score.score} below threshold — falling through to T1/B`);
+        } else {
+          console.warn(`[OPTIONS] All ${NUM_OPTIONS} options failed — falling through to T1/B`);
+        }
+
+        // Emergency fallback: if T1/B is disabled and we DO have a scored
+        // option (even a bad one), ship it rather than returning nothing.
+        if (
+          scoredOptions.length > 0 &&
+          process.env.PIPELINE_T1 !== "true" &&
+          scoredOptions[0].score.score > 0
+        ) {
+          const emergency = scoredOptions[0];
+          console.warn(`[OPTIONS] Emergency ship: score=${emergency.score.score} (no T1/B fallback available)`);
+          const feedback = buildFeedback(emergency.project, prompt);
+          feedback.tips.push(`Emergency fallback: score ${emergency.score.score}/100 — below target but best available`);
+          await recordToolExecution(userId, "floor-plan");
+          return NextResponse.json({
+            project: emergency.project,
+            geometry: null,
+            svg: null,
+            feedback,
+            layoutMetrics: emergency.metrics,
+            qualityFlags: emergency.metrics.quality_flags,
+            feasibilityWarnings: [],
+            pipelineUsed: "LLM-multi-option-emergency",
+            relaxationsApplied: emergency.result.warnings,
+            infeasibilityReason: null,
+            mandalaAssignments: null,
+            routerSignals: routing.constraint_signals,
+            honestScore: emergency.score,
+            options: scoredOptions.map((opt, i) => ({
+              index: i,
+              project: opt.project,
+              score: opt.score.score,
+              grade: opt.score.grade,
+              efficiency: opt.metrics.efficiency_pct,
+              doorCoverage: opt.metrics.door_coverage_pct,
+              orphanCount: opt.metrics.orphan_rooms.length,
+              voidArea: opt.metrics.void_area_sqft,
+              roomCount: opt.project.floors[0]?.rooms.length ?? 0,
+            })),
+          });
+        }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.warn(`[LLM-MULTI] error — falling through to T1/B: ${msg}`);
+      }
+    }
 
     // ── Phase 3 — Strip-Pack Engine (PIPELINE_T1) ────────────────────────
     // Strategy (Phase 3G — race & compare):
