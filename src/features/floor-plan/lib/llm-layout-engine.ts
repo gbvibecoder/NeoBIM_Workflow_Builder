@@ -69,6 +69,7 @@ export async function runLLMLayoutEngine(
   prompt: string,
   parsed: ParsedConstraints,
   apiKey: string,
+  options?: { temperature?: number },
 ): Promise<StripPackResult> {
   const warnings: string[] = [];
   const facing = normalizeFacing(parsed.plot.facing);
@@ -84,9 +85,11 @@ export async function runLLMLayoutEngine(
   const systemPrompt = buildSystemPrompt(fixedParsed, plotW, plotD, facing, hallway);
   const roomList = formatRoomList(fixedParsed);
 
+  const temperature = options?.temperature ?? LLM_TEMPERATURE;
+
   const llmStart = Date.now();
-  let llmRooms = await callGPT4o(systemPrompt, prompt, roomList, apiKey);
-  warnings.push(`LLM call: ${Date.now() - llmStart}ms, ${llmRooms.length} rooms`);
+  let llmRooms = await callGPT4o(systemPrompt, prompt, roomList, apiKey, temperature);
+  warnings.push(`LLM call: ${Date.now() - llmStart}ms, ${llmRooms.length} rooms, temp=${temperature}`);
 
   // Step 2: Validate + repair
   llmRooms = repair(llmRooms, plot, hallway, facing, fixedParsed, warnings);
@@ -121,7 +124,7 @@ export async function runLLMLayoutEngine(
 
     const feedbackMsg = `PREVIOUS ATTEMPT FAILED:\n${feedbackParts.join("\n")}\nFix these issues. Ensure ONE compact rectangle, hallway spanning full ${hallway.width > hallway.depth ? "width" : "depth"}, zero gaps.`;
     const retryStart = Date.now();
-    let retryRooms = await callGPT4o(systemPrompt, prompt + "\n\n" + feedbackMsg, roomList, apiKey);
+    let retryRooms = await callGPT4o(systemPrompt, prompt + "\n\n" + feedbackMsg, roomList, apiKey, temperature);
     warnings.push(`Retry call: ${Date.now() - retryStart}ms, ${retryRooms.length} rooms`);
     retryRooms = repair(retryRooms, plot, hallway, facing, fixedParsed, warnings);
 
@@ -336,11 +339,11 @@ function posLabel(d: string): string {
 // GPT-4o CALL
 // ───────────────────────────────────────────────────────────────────────────
 
-async function callGPT4o(sys: string, user: string, roomList: string, key: string): Promise<LLMRoom[]> {
+async function callGPT4o(sys: string, user: string, roomList: string, key: string, temperature: number = LLM_TEMPERATURE): Promise<LLMRoom[]> {
   const client = getClient(key, LLM_TIMEOUT_MS);
   const resp = await client.chat.completions.create({
     model: LLM_MODEL,
-    temperature: LLM_TEMPERATURE,
+    temperature,
     max_tokens: LLM_MAX_TOKENS,
     response_format: { type: "json_object" },
     messages: [

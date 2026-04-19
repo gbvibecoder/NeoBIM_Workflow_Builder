@@ -256,62 +256,116 @@ export async function POST(req: NextRequest) {
     const routing = routePrompt(prompt);
     logger.debug(`[ROUTER] pipeline=${routing.pipeline} signals=${routing.constraint_signals}`);
 
-    // ── Phase 3H — LLM Layout Engine (PIPELINE_LLM) ────────────────────
-    // Strategy: let GPT-4o act as the architect, placing rooms directly.
-    // If score >= 50, ship immediately. Otherwise fall through to T1/B.
+    // ── Phase 4 — Multi-Option LLM Layout Engine ("Midjourney approach") ─
+    // Generate 3 options in parallel with temperature diversity.
+    // Score them all, return the best. Non-determinism becomes a feature.
+    // Math: if P(good) = 70%, then P(≥1 good in 3) = 1 - 0.3³ = 97.3%.
     if (process.env.PIPELINE_LLM === "true" && routing.pipeline === "B") {
       try {
         const llmStart = Date.now();
         const llmParseRes = await parseConstraints(prompt, apiKey);
         const llmParseMs = Date.now() - llmStart;
 
+        // Generate 3 options in parallel with different temperatures
+        const NUM_OPTIONS = 3;
+        const temperatures = [0.2, 0.4, 0.6];
         const llmEngineStart = Date.now();
-        const llmRawResult = await runLLMLayoutEngine(prompt, llmParseRes.constraints, apiKey);
-        const llmResult = fillDoorMetrics(llmRawResult);
+
+        const optionPromises = Array.from({ length: NUM_OPTIONS }, (_, i) => {
+          const temp = temperatures[i % temperatures.length];
+          const optStart = Date.now();
+          return runLLMLayoutEngine(prompt, llmParseRes.constraints, apiKey, { temperature: temp })
+            .then(result => {
+              console.log(`[OPTION-${i}] done in ${Date.now() - optStart}ms (temp=${temp})`);
+              return { result, index: i, temp };
+            })
+            .catch(err => {
+              console.warn(`[OPTION-${i}] failed (temp=${temp}): ${err instanceof Error ? err.message : String(err)}`);
+              return null;
+            });
+        });
+
+        const rawOptions = await Promise.all(optionPromises);
         const llmEngineMs = Date.now() - llmEngineStart;
 
-        const llmProject = toFloorPlanProjectT1(llmResult, llmParseRes.constraints);
-        const llmLayoutMetrics = computeLayoutMetrics(llmProject, llmParseRes.constraints);
-        const llmScore = computeHonestScore(llmLayoutMetrics);
+        // Filter out failures, score each, sort by honest score
+        const scoredOptions = rawOptions
+          .filter((opt): opt is NonNullable<typeof opt> => opt !== null)
+          .map(opt => {
+            const filled = fillDoorMetrics(opt.result);
+            const project = toFloorPlanProjectT1(filled, llmParseRes.constraints);
+            const metrics = computeLayoutMetrics(project, llmParseRes.constraints);
+            const score = computeHonestScore(metrics);
+            return { ...opt, result: filled, project, metrics, score };
+          })
+          .sort((a, b) => b.score.score - a.score.score);
 
-        console.log(
-          `[LLM-LAYOUT] parse=${llmParseMs}ms engine=${llmEngineMs}ms ` +
-          `score=${llmScore.score}/100 (${llmScore.grade}) eff=${llmLayoutMetrics.efficiency_pct}% ` +
-          `doors=${llmLayoutMetrics.door_coverage_pct}% orphans=${llmLayoutMetrics.orphan_rooms.length} ` +
-          `rooms=${llmResult.rooms.length}`,
-        );
-
-        // Ship LLM if it produces a decent result. The LLM engine now has
-        // retry-with-feedback logic for orphan clusters.
-        if (llmScore.score >= 55 && llmLayoutMetrics.orphan_rooms.length <= 2) {
-          console.log(`[LLM-LAYOUT] ACCEPTED: ${llmScore.score}/100 (${llmScore.grade})`);
-          const feedback = buildFeedback(llmProject, prompt);
-          feedback.tips.push(
-            `LLM-layout: ${llmResult.rooms.length} rooms, ${llmResult.doors.length} doors, ` +
-            `${llmLayoutMetrics.efficiency_pct}% efficiency in ${llmParseMs + llmEngineMs}ms`,
+        console.log(`[OPTIONS] Generated ${scoredOptions.length}/${NUM_OPTIONS} options in ${llmEngineMs}ms (parse=${llmParseMs}ms):`);
+        for (const opt of scoredOptions) {
+          console.log(
+            `  Option-${opt.index} (temp=${opt.temp}): score=${opt.score.score}/100 (${opt.score.grade}) ` +
+            `doors=${opt.metrics.door_coverage_pct}% orphans=${opt.metrics.orphan_rooms.length} ` +
+            `eff=${opt.metrics.efficiency_pct}% rooms=${opt.result.rooms.length}`,
           );
-          await recordToolExecution(userId, "floor-plan");
-          return NextResponse.json({
-            project: llmProject,
-            geometry: null,
-            svg: null,
-            feedback,
-            layoutMetrics: llmLayoutMetrics,
-            qualityFlags: llmLayoutMetrics.quality_flags,
-            feasibilityWarnings: [],
-            pipelineUsed: "LLM-layout",
-            relaxationsApplied: llmResult.warnings,
-            infeasibilityReason: null,
-            mandalaAssignments: null,
-            routerSignals: routing.constraint_signals,
-            honestScore: llmScore,
-          });
         }
 
-        console.warn(`[LLM-LAYOUT] score ${llmScore.score} < 50 — falling through to T1/B`);
+        if (scoredOptions.length > 0) {
+          const best = scoredOptions[0];
+
+          // Accept if best option meets minimum quality bar
+          if (best.score.score >= 45 && best.metrics.orphan_rooms.length <= 3) {
+            console.log(`[OPTIONS] ACCEPTED best: Option-${best.index} score=${best.score.score}/100 (${best.score.grade})`);
+            const feedback = buildFeedback(best.project, prompt);
+            feedback.tips.push(
+              `LLM multi-option: best of ${scoredOptions.length} (Option-${best.index}, temp=${best.temp}), ` +
+              `${best.result.rooms.length} rooms, ${best.result.doors.length} doors, ` +
+              `${best.metrics.efficiency_pct}% efficiency in ${llmParseMs + llmEngineMs}ms`,
+            );
+            if (scoredOptions.length > 1) {
+              const worst = scoredOptions[scoredOptions.length - 1];
+              feedback.tips.push(
+                `Score range: ${worst.score.score}–${best.score.score} (Δ${best.score.score - worst.score.score})`,
+              );
+            }
+            await recordToolExecution(userId, "floor-plan");
+            return NextResponse.json({
+              // Best option (backward compatible — existing UI shows this)
+              project: best.project,
+              geometry: null,
+              svg: null,
+              feedback,
+              layoutMetrics: best.metrics,
+              qualityFlags: best.metrics.quality_flags,
+              feasibilityWarnings: [],
+              pipelineUsed: "LLM-multi-option",
+              relaxationsApplied: best.result.warnings,
+              infeasibilityReason: null,
+              mandalaAssignments: null,
+              routerSignals: routing.constraint_signals,
+              honestScore: best.score,
+
+              // ALL options for future option picker UI (Phase 2)
+              options: scoredOptions.map((opt, i) => ({
+                index: i,
+                project: opt.project,
+                score: opt.score.score,
+                grade: opt.score.grade,
+                efficiency: opt.metrics.efficiency_pct,
+                doorCoverage: opt.metrics.door_coverage_pct,
+                orphanCount: opt.metrics.orphan_rooms.length,
+                voidArea: opt.metrics.void_area_sqft,
+                roomCount: opt.project.floors[0]?.rooms.length ?? 0,
+              })),
+            });
+          }
+
+          console.warn(`[OPTIONS] Best score ${best.score.score} too low — falling through to T1/B`);
+        } else {
+          console.warn(`[OPTIONS] All ${NUM_OPTIONS} options failed — falling through to T1/B`);
+        }
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
-        console.warn(`[LLM-LAYOUT] error — falling through to T1/B: ${msg}`);
+        console.warn(`[LLM-MULTI] error — falling through to T1/B: ${msg}`);
       }
     }
 
