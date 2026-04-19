@@ -756,6 +756,60 @@ function repair(
     }
   }
 
+  // 10.5. Fill vertical/horizontal gaps between rooms on the same side of hallway.
+  // The L-shape repair (step 10) fixes boundary rooms but doesn't close gaps
+  // BETWEEN rooms in the middle of a strip — producing T-shaped buildings.
+  if (!noHallway) {
+    const isVert = hallway.depth > hallway.width;
+    const hwCenterVal = isVert
+      ? hallway.x + hallway.width / 2
+      : hallway.y + hallway.depth / 2;
+    const ncRooms = rooms.filter(r => r.type !== "corridor" && r.type !== "hallway");
+
+    const sideA = ncRooms.filter(r => isVert ? r.x + r.width / 2 < hwCenterVal : r.y + r.depth / 2 < hwCenterVal);
+    const sideB = ncRooms.filter(r => isVert ? r.x + r.width / 2 >= hwCenterVal : r.y + r.depth / 2 >= hwCenterVal);
+
+    for (const sideRooms of [sideA, sideB]) {
+      if (sideRooms.length < 2) continue;
+      if (isVert) {
+        sideRooms.sort((a, b) => a.y - b.y);
+        for (let i = 0; i < sideRooms.length - 1; i++) {
+          const cur = sideRooms[i];
+          const nxt = sideRooms[i + 1];
+          const gap = nxt.y - (cur.y + cur.depth);
+          if (gap > 0.5) {
+            // Extend the smaller room to close the gap
+            if (cur.width * cur.depth <= nxt.width * nxt.depth) {
+              cur.depth = nxt.y - cur.y;
+            } else {
+              const oldY = nxt.y;
+              nxt.y = cur.y + cur.depth;
+              nxt.depth += oldY - nxt.y;
+            }
+            warnings.push(`Gap ${gap.toFixed(1)}ft closed between ${cur.name} and ${nxt.name}`);
+          }
+        }
+      } else {
+        sideRooms.sort((a, b) => a.x - b.x);
+        for (let i = 0; i < sideRooms.length - 1; i++) {
+          const cur = sideRooms[i];
+          const nxt = sideRooms[i + 1];
+          const gap = nxt.x - (cur.x + cur.width);
+          if (gap > 0.5) {
+            if (cur.width * cur.depth <= nxt.width * nxt.depth) {
+              cur.width = nxt.x - cur.x;
+            } else {
+              const oldX = nxt.x;
+              nxt.x = cur.x + cur.width;
+              nxt.width += oldX - nxt.x;
+            }
+            warnings.push(`Gap ${gap.toFixed(1)}ft closed between ${cur.name} and ${nxt.name}`);
+          }
+        }
+      }
+    }
+  }
+
   return rooms;
 }
 
