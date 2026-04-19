@@ -405,9 +405,52 @@ export async function POST(req: NextRequest) {
             });
           }
 
-          console.warn(`[OPTIONS] Best score ${best.score.score} too low — falling through to T1/B`);
+          // Score too low for auto-accept — but still ship if T1/B also
+          // won't produce anything better (the downstream race will compare).
+          // Log and fall through.
+          console.warn(`[OPTIONS] Best score ${best.score.score} below threshold — falling through to T1/B`);
         } else {
           console.warn(`[OPTIONS] All ${NUM_OPTIONS} options failed — falling through to T1/B`);
+        }
+
+        // Emergency fallback: if T1/B is disabled and we DO have a scored
+        // option (even a bad one), ship it rather than returning nothing.
+        if (
+          scoredOptions.length > 0 &&
+          process.env.PIPELINE_T1 !== "true" &&
+          scoredOptions[0].score.score > 0
+        ) {
+          const emergency = scoredOptions[0];
+          console.warn(`[OPTIONS] Emergency ship: score=${emergency.score.score} (no T1/B fallback available)`);
+          const feedback = buildFeedback(emergency.project, prompt);
+          feedback.tips.push(`Emergency fallback: score ${emergency.score.score}/100 — below target but best available`);
+          await recordToolExecution(userId, "floor-plan");
+          return NextResponse.json({
+            project: emergency.project,
+            geometry: null,
+            svg: null,
+            feedback,
+            layoutMetrics: emergency.metrics,
+            qualityFlags: emergency.metrics.quality_flags,
+            feasibilityWarnings: [],
+            pipelineUsed: "LLM-multi-option-emergency",
+            relaxationsApplied: emergency.result.warnings,
+            infeasibilityReason: null,
+            mandalaAssignments: null,
+            routerSignals: routing.constraint_signals,
+            honestScore: emergency.score,
+            options: scoredOptions.map((opt, i) => ({
+              index: i,
+              project: opt.project,
+              score: opt.score.score,
+              grade: opt.score.grade,
+              efficiency: opt.metrics.efficiency_pct,
+              doorCoverage: opt.metrics.door_coverage_pct,
+              orphanCount: opt.metrics.orphan_rooms.length,
+              voidArea: opt.metrics.void_area_sqft,
+              roomCount: opt.project.floors[0]?.rooms.length ?? 0,
+            })),
+          });
         }
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
