@@ -133,7 +133,7 @@ export function placeDoors(input: DoorPlaceInput): DoorPlaceOutput {
   // connect to each other but never to a hallway-connected room, creating
   // an isolated orphan cluster. Run multiple passes — each pass connects at
   // least one new room to the served graph, expanding the reachable set.
-  let unservedCount = input.rooms.filter(r => r.placed && !servedRooms.has(r.id)).length;
+  const unservedCount = input.rooms.filter(r => r.placed && !servedRooms.has(r.id)).length;
   for (let pass = 0; pass < unservedCount + 1; pass++) {
     let progress = false;
     for (const room of input.rooms) {
