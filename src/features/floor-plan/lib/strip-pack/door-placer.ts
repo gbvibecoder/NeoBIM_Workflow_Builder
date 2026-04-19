@@ -63,7 +63,7 @@ export function placeDoors(input: DoorPlaceInput): DoorPlaceOutput {
       warnings.push(`adjacency ${ra.name} ↔ ${rb.name}: no shared wall — door skipped`);
       continue;
     }
-    const door = makeDoorOnWall(wall, [ra.name, rb.name], DEFAULT_DOOR_WIDTH_FT, warnings);
+    const door = makeDoorOnWall(wall, [ra.name, rb.name], DEFAULT_DOOR_WIDTH_FT, warnings, doors);
     if (door) {
       doors.push(door);
       servedRooms.add(pair.a);
@@ -89,7 +89,7 @@ export function placeDoors(input: DoorPlaceInput): DoorPlaceOutput {
       if (!hasHallwayDoor) {
         const wall = findHallwayWallFor(input.walls, input.spine, input.foyerId);
         if (wall) {
-          const door = makeDoorOnWall(wall, [foyer.name, "hallway"], DEFAULT_DOOR_WIDTH_FT, warnings);
+          const door = makeDoorOnWall(wall, [foyer.name, "hallway"], DEFAULT_DOOR_WIDTH_FT, warnings, doors);
           if (door) {
             doors.push(door);
             servedRooms.add(input.foyerId);
@@ -120,7 +120,7 @@ export function placeDoors(input: DoorPlaceInput): DoorPlaceOutput {
     if (alreadyHasHallwayDoor) continue;
     const wall = findHallwayWallFor(input.walls, input.spine, room.id);
     if (!wall) continue;
-    const door = makeDoorOnWall(wall, [room.name, "hallway"], DEFAULT_DOOR_WIDTH_FT, warnings);
+    const door = makeDoorOnWall(wall, [room.name, "hallway"], DEFAULT_DOOR_WIDTH_FT, warnings, doors);
     if (door) {
       doors.push(door);
       servedRooms.add(room.id);
@@ -152,7 +152,7 @@ export function placeDoors(input: DoorPlaceInput): DoorPlaceOutput {
       const otherName = otherId === HALLWAY_SENTINEL_ID
         ? "hallway"
         : roomById.get(otherId)?.name ?? "neighbor";
-      const door = makeDoorOnWall(wall, [room.name, otherName], DEFAULT_DOOR_WIDTH_FT, warnings);
+      const door = makeDoorOnWall(wall, [room.name, otherName], DEFAULT_DOOR_WIDTH_FT, warnings, doors);
       if (door) {
         doors.push(door);
         servedRooms.add(room.id);
@@ -174,7 +174,7 @@ export function placeDoors(input: DoorPlaceInput): DoorPlaceOutput {
   if (entry && entry.placed) {
     const wall = findExternalEntranceWall(input.walls, entry, input.spine.entrance_side);
     if (wall) {
-      const door = makeDoorOnWall(wall, [entry.name, "exterior"], MAIN_ENTRANCE_DOOR_WIDTH_FT, warnings);
+      const door = makeDoorOnWall(wall, [entry.name, "exterior"], MAIN_ENTRANCE_DOOR_WIDTH_FT, warnings, doors);
       if (door) {
         door.is_main_entrance = true;
         doors.push(door);
@@ -348,6 +348,7 @@ function makeDoorOnWall(
   between: [string, string],
   preferredWidth: number,
   warnings: string[],
+  existingDoors?: DoorPlacement[],
 ): DoorPlacement | null {
   const len = wallLength(wall);
   let width = preferredWidth;
@@ -365,9 +366,31 @@ function makeDoorOnWall(
       return null;
     }
   }
+
+  // Check for existing doors on this wall and offset to avoid overlap
+  const doorsOnWall = existingDoors?.filter(d => d.wall_id === wall.id) ?? [];
   const halfDoor = width / 2;
+
   if (wall.orientation === "horizontal") {
-    const cx = (wall.start.x + wall.end.x) / 2;
+    let cx = (wall.start.x + wall.end.x) / 2;
+    // Offset if overlapping an existing door
+    for (const existing of doorsOnWall) {
+      const eCx = (existing.start.x + existing.end.x) / 2;
+      const minDist = halfDoor + existing.width_ft / 2 + CORNER_CLEARANCE_FT;
+      if (Math.abs(cx - eCx) < minDist) {
+        // Try placing to the right of the existing door
+        const rightCx = eCx + minDist;
+        const leftCx = eCx - minDist;
+        const wallMin = Math.min(wall.start.x, wall.end.x) + clearance + halfDoor;
+        const wallMax = Math.max(wall.start.x, wall.end.x) - clearance - halfDoor;
+        if (rightCx <= wallMax) cx = rightCx;
+        else if (leftCx >= wallMin) cx = leftCx;
+        else {
+          warnings.push(`wall ${wall.id}: no room for second door between ${between[0]} and ${between[1]}`);
+          return null;
+        }
+      }
+    }
     return {
       start: { x: cx - halfDoor, y: wall.start.y },
       end:   { x: cx + halfDoor, y: wall.start.y },
@@ -377,7 +400,24 @@ function makeDoorOnWall(
       wall_id: wall.id,
     };
   }
-  const cy = (wall.start.y + wall.end.y) / 2;
+  let cy = (wall.start.y + wall.end.y) / 2;
+  // Offset if overlapping an existing door
+  for (const existing of doorsOnWall) {
+    const eCy = (existing.start.y + existing.end.y) / 2;
+    const minDist = halfDoor + existing.width_ft / 2 + CORNER_CLEARANCE_FT;
+    if (Math.abs(cy - eCy) < minDist) {
+      const upCy = eCy + minDist;
+      const downCy = eCy - minDist;
+      const wallMin = Math.min(wall.start.y, wall.end.y) + clearance + halfDoor;
+      const wallMax = Math.max(wall.start.y, wall.end.y) - clearance - halfDoor;
+      if (upCy <= wallMax) cy = upCy;
+      else if (downCy >= wallMin) cy = downCy;
+      else {
+        warnings.push(`wall ${wall.id}: no room for second door between ${between[0]} and ${between[1]}`);
+        return null;
+      }
+    }
+  }
   return {
     start: { x: wall.start.x, y: cy - halfDoor },
     end:   { x: wall.start.x, y: cy + halfDoor },
