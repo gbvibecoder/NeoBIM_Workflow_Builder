@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from "next";
 import Script from "next/script";
 import { DM_Sans, DM_Serif_Display, JetBrains_Mono } from "next/font/google";
 
-import { Toaster } from "sonner";
+import { ClientToaster } from "@/shared/components/ClientToaster";
 import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { MobileGate } from "@/shared/components/MobileGate";
@@ -296,7 +296,7 @@ export default function RootLayout({
             <MobileGate>{children}</MobileGate>
           </div>
         </SessionProvider>
-        <Toaster
+        <ClientToaster
           position="bottom-right"
           theme="dark"
           duration={4000}

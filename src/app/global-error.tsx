@@ -1,8 +1,7 @@
 'use client';
 
-import * as Sentry from "@sentry/nextjs";
 import { useEffect } from 'react';
-import { useLocale } from '@/hooks';
+import { useLocale } from '@/hooks/useLocale';
 
 export default function GlobalError({
   error,
@@ -14,7 +13,18 @@ export default function GlobalError({
   const { t } = useLocale();
 
   useEffect(() => {
-    Sentry.captureException(error);
+    // Dynamic Sentry import: a top-level `import * as Sentry` would pull
+    // @sentry/nextjs → @sentry/node → @opentelemetry/instrumentation into
+    // webpack's SSR bundle at compile time, which crashes Next.js 16 dev
+    // with `TypeError: document.querySelector is not a function` inside
+    // pages.runtime.dev.js — even when NEXT_PUBLIC_SENTRY_DSN is unset
+    // and next.config.ts skips withSentryConfig wrapping.
+    // Dynamic-import confines the package graph to the browser.
+    if (typeof window !== 'undefined' && process.env.NEXT_PUBLIC_SENTRY_DSN) {
+      void import('@sentry/nextjs')
+        .then((mod) => mod.captureException(error))
+        .catch(() => { /* ignore — reporting is best-effort */ });
+    }
     console.error('[Global Error]', error);
   }, [error]);
 
