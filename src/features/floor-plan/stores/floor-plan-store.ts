@@ -33,6 +33,7 @@ import {
 import { createSample2BHK } from "@/features/floor-plan/lib/sample-data";
 import type { LayoutMetrics, QualityFlag } from "@/features/floor-plan/lib/layout-metrics";
 import type { InfeasibilityWarning } from "@/features/floor-plan/lib/infeasibility-detector";
+import type { FloorPlanOption } from "@/features/floor-plan/components/OptionPicker";
 
 // ============================================================
 // SAFE DEEP CLONE (structuredClone with JSON fallback)
@@ -157,6 +158,12 @@ interface FloorPlanState {
   lastLayoutMetrics: LayoutMetrics | null;
   lastQualityFlags: QualityFlag[];
   lastFeasibilityWarnings: InfeasibilityWarning[];
+
+  // Phase 2 — multi-option generation (Midjourney approach)
+  generatedOptions: FloorPlanOption[] | null;
+  selectedOptionIndex: number;
+  setGeneratedOptions: (options: FloorPlanOption[] | null) => void;
+  setSelectedOptionIndex: (index: number) => void;
 
   // ========== ACTIONS ==========
 
@@ -379,7 +386,13 @@ export const useFloorPlanStore = create<FloorPlanState>()((set, get) => ({
   lastLayoutMetrics: null,
   lastQualityFlags: [],
   lastFeasibilityWarnings: [],
+  generatedOptions: null,
+  selectedOptionIndex: 0,
   _clipboard: null,
+
+  // ---- Multi-option ----
+  setGeneratedOptions: (options) => set({ generatedOptions: options }),
+  setSelectedOptionIndex: (index) => set({ selectedOptionIndex: index }),
 
   // ---- Project ----
   setProject: (project) => {
@@ -412,6 +425,8 @@ export const useFloorPlanStore = create<FloorPlanState>()((set, get) => ({
       _history: [],
       _historyIndex: -1,
       activeTool: "select",
+      generatedOptions: null,
+      selectedOptionIndex: 0,
     });
   },
 
