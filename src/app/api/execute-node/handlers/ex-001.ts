@@ -7,6 +7,7 @@ import {
   type ExecutionArtifact,
 } from "./deps";
 import type { NodeHandler } from "./types";
+import { resolveRichMode } from "@/features/ifc/lib/rich-mode";
 
 /**
  * EX-001 — IFC Exporter (multi-discipline IFC generation + R2 upload)
@@ -15,9 +16,19 @@ import type { NodeHandler } from "./types";
  * NOTE: the original Path 0 (`if (upstreamIfcUrl ...) { artifact = ... }`) sets
  * an artifact then falls through and the later branches always overwrite it.
  * That overwrite behaviour is preserved verbatim — no logic changes.
+ *
+ * Phase 1 Track A added the pre-flight /ready probe + Rich/Lean metadata.
+ * Phase 1 Track B adds rich-mode plumbing (env IFC_RICH_MODE + per-run
+ * override) through to the TS exporter's four gate flags. Default "off"
+ * preserves pre-Track-B production behaviour.
  */
 export const handleEX001: NodeHandler = async (ctx) => {
   const { inputData, tileInstanceId, executionId } = ctx;
+
+  // Phase 1 Track B — resolve rich mode once per invocation.
+  // Source tracking (override/env/default) feeds logs + artifact metadata
+  // so operators can verify which code path selected the current flags.
+  const richMode = resolveRichMode(inputData);
   // ── IFC Exporter ──────────────────────────────────────────────────
   // Generates a downloadable .ifc file from upstream data.
   // Path 0: If upstream GN-001 already uploaded IFC to R2, pass through the URL
@@ -219,10 +230,16 @@ export const handleEX001: NodeHandler = async (ctx) => {
   }
 
   // ── Fallback: TypeScript IFC exporter ──
+  // Phase 1 Track B: pass the richMode-resolved flag bundle. Default
+  // richMode="off" yields all-false flags, matching pre-Track-B behaviour
+  // exactly. Only `IFC_RICH_MODE=<non-off>` or an explicit override flips
+  // the TS exporter's emitter gates. See src/features/ifc/lib/rich-mode.ts.
   if (!ifcServiceUsed) {
     const { generateMultipleIFCFiles: genMulti } = await import("@/features/ifc/services/ifc-exporter");
     const ifcFiles = genMulti(resolvedGeometry, {
-      projectName: resolvedProjectName, buildingName: resolvedBuildingType,
+      projectName: resolvedProjectName,
+      buildingName: resolvedBuildingType,
+      ...richMode.flags,
     });
 
     const disciplines = [
@@ -285,6 +302,13 @@ export const handleEX001: NodeHandler = async (ctx) => {
       ifcServiceProbeMs: readiness.latencyMs,
       ifcServiceSkipped: !readiness.ready,
       ifcServiceSkipReason: readiness.ready ? undefined : readiness.reason,
+      // Phase 1 Track B — rich-mode plumbing. `richMode` is the resolved
+      // literal, `richModeSource` tells operators where it came from
+      // (override / env / default), `richFlags` is the four-flag bundle
+      // actually passed to the TS exporter.
+      richMode: richMode.mode,
+      richModeSource: richMode.source,
+      richFlags: richMode.flags,
     },
     createdAt: new Date(),
   };
