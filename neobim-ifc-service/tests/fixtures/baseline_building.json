@@ -1,0 +1,665 @@
+{
+  "_comment": "Phase 1 Track D baseline fixture. 3-storey mixed-use building exercising every builder the Python service dispatches today + Track C ElementProperties. Assertions in tests/test_baseline_quality.py are the floor — when a feature raises the floor intentionally, regenerate via docs/ifc-baseline-regeneration.md.",
+  "geometry": {
+    "buildingType": "Office Building",
+    "floors": 2,
+    "totalHeight": 7.2,
+    "footprintArea": 100.0,
+    "gfa": 200.0,
+    "footprint": [
+      {"x": 0, "y": 0},
+      {"x": 10, "y": 0},
+      {"x": 10, "y": 10},
+      {"x": 0, "y": 10}
+    ],
+    "storeys": [
+      {
+        "index": 0,
+        "name": "Ground Floor",
+        "elevation": 0.0,
+        "height": 3.6,
+        "elements": [
+          {
+            "id": "wall-gf-n",
+            "type": "wall",
+            "ifcType": "IfcWall",
+            "vertices": [{"x": 0, "y": 0, "z": 0}, {"x": 10, "y": 0, "z": 0}],
+            "faces": [],
+            "properties": {
+              "name": "Wall North GF",
+              "storeyIndex": 0,
+              "length": 10.0,
+              "thickness": 0.25,
+              "height": 3.6,
+              "isPartition": false,
+              "isExterior": true,
+              "wallType": "exterior",
+              "loadBearing": true,
+              "fireRating": "2HR",
+              "uValue": 0.28,
+              "finishMaterial": "paint"
+            }
+          },
+          {
+            "id": "wall-gf-e",
+            "type": "wall",
+            "ifcType": "IfcWall",
+            "vertices": [{"x": 10, "y": 0, "z": 0}, {"x": 10, "y": 10, "z": 0}],
+            "faces": [],
+            "properties": {
+              "name": "Wall East GF",
+              "storeyIndex": 0,
+              "length": 10.0,
+              "thickness": 0.25,
+              "height": 3.6,
+              "isPartition": false,
+              "isExterior": true,
+              "wallType": "exterior",
+              "loadBearing": true,
+              "fireRating": "2HR",
+              "uValue": 0.28
+            }
+          },
+          {
+            "id": "wall-gf-s",
+            "type": "wall",
+            "ifcType": "IfcWall",
+            "vertices": [{"x": 10, "y": 10, "z": 0}, {"x": 0, "y": 10, "z": 0}],
+            "faces": [],
+            "properties": {
+              "name": "Wall South GF",
+              "storeyIndex": 0,
+              "length": 10.0,
+              "thickness": 0.25,
+              "height": 3.6,
+              "isPartition": false,
+              "isExterior": true,
+              "wallType": "exterior",
+              "loadBearing": true,
+              "fireRating": "2HR",
+              "uValue": 0.28
+            }
+          },
+          {
+            "id": "wall-gf-w",
+            "type": "wall",
+            "ifcType": "IfcWall",
+            "vertices": [{"x": 0, "y": 10, "z": 0}, {"x": 0, "y": 0, "z": 0}],
+            "faces": [],
+            "properties": {
+              "name": "Wall West GF",
+              "storeyIndex": 0,
+              "length": 10.0,
+              "thickness": 0.25,
+              "height": 3.6,
+              "isPartition": false,
+              "isExterior": true,
+              "wallType": "exterior",
+              "loadBearing": true,
+              "fireRating": "2HR",
+              "uValue": 0.28
+            }
+          },
+          {
+            "id": "wall-gf-partition",
+            "type": "wall",
+            "ifcType": "IfcWall",
+            "vertices": [{"x": 0, "y": 5, "z": 0}, {"x": 10, "y": 5, "z": 0}],
+            "faces": [],
+            "properties": {
+              "name": "Interior Partition GF",
+              "storeyIndex": 0,
+              "length": 10.0,
+              "thickness": 0.1,
+              "height": 3.6,
+              "isPartition": true,
+              "isExterior": false,
+              "wallType": "partition",
+              "loadBearing": false,
+              "acousticRating": "STC-45"
+            }
+          },
+          {
+            "id": "win-gf-n-1",
+            "type": "window",
+            "ifcType": "IfcWindow",
+            "vertices": [{"x": 3, "y": 0, "z": 0.9}],
+            "faces": [],
+            "properties": {
+              "name": "Window N1",
+              "storeyIndex": 0,
+              "width": 1.5,
+              "height": 1.5,
+              "sillHeight": 0.9,
+              "wallOffset": 3.0,
+              "parentWallId": "wall-gf-n",
+              "glazingType": "double-low-e",
+              "frameMaterial": "aluminum",
+              "operationType": "casement",
+              "uValue": 1.4
+            }
+          },
+          {
+            "id": "door-gf-s",
+            "type": "door",
+            "ifcType": "IfcDoor",
+            "vertices": [{"x": 4, "y": 10, "z": 0}],
+            "faces": [],
+            "properties": {
+              "name": "Main Entrance",
+              "storeyIndex": 0,
+              "width": 2.0,
+              "height": 2.4,
+              "wallOffset": 4.0,
+              "parentWallId": "wall-gf-s",
+              "isExterior": true,
+              "frameMaterial": "aluminum",
+              "operationType": "sliding",
+              "handedness": "right",
+              "fireRating": "1HR"
+            }
+          },
+          {
+            "id": "slab-gf",
+            "type": "slab",
+            "ifcType": "IfcSlab",
+            "vertices": [],
+            "faces": [],
+            "properties": {
+              "name": "Ground Floor Slab",
+              "storeyIndex": 0,
+              "thickness": 0.3,
+              "area": 100.0,
+              "structuralMaterial": "concrete",
+              "materialGrade": "C30/37",
+              "concreteStrength": 30,
+              "rebarRatio": 85
+            }
+          },
+          {
+            "id": "col-gf-1",
+            "type": "column",
+            "ifcType": "IfcColumn",
+            "vertices": [{"x": 0.5, "y": 0.5, "z": 0}],
+            "faces": [],
+            "properties": {
+              "name": "Column GF-1",
+              "storeyIndex": 0,
+              "height": 3.6,
+              "width": 0.4,
+              "length": 0.4,
+              "structuralMaterial": "concrete",
+              "materialGrade": "C30/37",
+              "memberRole": "primary",
+              "axialLoad": 1200
+            }
+          },
+          {
+            "id": "col-gf-2",
+            "type": "column",
+            "ifcType": "IfcColumn",
+            "vertices": [{"x": 9.5, "y": 0.5, "z": 0}],
+            "faces": [],
+            "properties": {
+              "name": "Column GF-2",
+              "storeyIndex": 0,
+              "height": 3.6,
+              "width": 0.4,
+              "length": 0.4,
+              "structuralMaterial": "concrete",
+              "materialGrade": "C30/37",
+              "memberRole": "primary",
+              "axialLoad": 1100
+            }
+          },
+          {
+            "id": "col-gf-3",
+            "type": "column",
+            "ifcType": "IfcColumn",
+            "vertices": [{"x": 9.5, "y": 9.5, "z": 0}],
+            "faces": [],
+            "properties": {
+              "name": "Column GF-3",
+              "storeyIndex": 0,
+              "height": 3.6,
+              "width": 0.4,
+              "length": 0.4,
+              "structuralMaterial": "concrete",
+              "materialGrade": "C30/37",
+              "memberRole": "primary",
+              "axialLoad": 1150
+            }
+          },
+          {
+            "id": "col-gf-4",
+            "type": "column",
+            "ifcType": "IfcColumn",
+            "vertices": [{"x": 0.5, "y": 9.5, "z": 0}],
+            "faces": [],
+            "properties": {
+              "name": "Column GF-4",
+              "storeyIndex": 0,
+              "height": 3.6,
+              "width": 0.4,
+              "length": 0.4,
+              "structuralMaterial": "concrete",
+              "materialGrade": "C30/37",
+              "memberRole": "primary",
+              "axialLoad": 1180
+            }
+          },
+          {
+            "id": "beam-gf-1",
+            "type": "beam",
+            "ifcType": "IfcBeam",
+            "vertices": [{"x": 0.5, "y": 0.5, "z": 3.6}, {"x": 9.5, "y": 0.5, "z": 3.6}],
+            "faces": [],
+            "properties": {
+              "name": "Beam GF-Header-N",
+              "storeyIndex": 0,
+              "length": 9.0,
+              "width": 0.3,
+              "height": 0.5,
+              "structuralMaterial": "concrete",
+              "materialGrade": "C30/37",
+              "memberRole": "primary",
+              "spanLength": 9.0
+            }
+          },
+          {
+            "id": "beam-gf-2",
+            "type": "beam",
+            "ifcType": "IfcBeam",
+            "vertices": [{"x": 0.5, "y": 9.5, "z": 3.6}, {"x": 9.5, "y": 9.5, "z": 3.6}],
+            "faces": [],
+            "properties": {
+              "name": "Beam GF-Header-S",
+              "storeyIndex": 0,
+              "length": 9.0,
+              "width": 0.3,
+              "height": 0.5,
+              "structuralMaterial": "concrete",
+              "materialGrade": "C30/37",
+              "memberRole": "primary",
+              "spanLength": 9.0
+            }
+          },
+          {
+            "id": "space-gf-lobby",
+            "type": "space",
+            "ifcType": "IfcSpace",
+            "vertices": [
+              {"x": 0, "y": 0, "z": 0},
+              {"x": 10, "y": 0, "z": 0},
+              {"x": 10, "y": 5, "z": 0},
+              {"x": 0, "y": 5, "z": 0}
+            ],
+            "faces": [],
+            "properties": {
+              "name": "Lobby",
+              "storeyIndex": 0,
+              "spaceName": "Main Lobby",
+              "spaceUsage": "CIRCULATION",
+              "area": 50.0,
+              "height": 3.6,
+              "occupancyType": "lobby",
+              "finishMaterial": "tile"
+            }
+          },
+          {
+            "id": "space-gf-office",
+            "type": "space",
+            "ifcType": "IfcSpace",
+            "vertices": [
+              {"x": 0, "y": 5, "z": 0},
+              {"x": 10, "y": 5, "z": 0},
+              {"x": 10, "y": 10, "z": 0},
+              {"x": 0, "y": 10, "z": 0}
+            ],
+            "faces": [],
+            "properties": {
+              "name": "Open Office",
+              "storeyIndex": 0,
+              "spaceName": "Office Area",
+              "spaceUsage": "OFFICE",
+              "area": 50.0,
+              "height": 3.6,
+              "occupancyType": "office"
+            }
+          },
+          {
+            "id": "stair-gf",
+            "type": "stair",
+            "ifcType": "IfcStairFlight",
+            "vertices": [{"x": 4, "y": 4, "z": 0}, {"x": 4, "y": 6, "z": 3.6}],
+            "faces": [],
+            "properties": {
+              "name": "Main Stair GF-L1",
+              "storeyIndex": 0,
+              "riserCount": 18,
+              "riserHeight": 0.2,
+              "treadDepth": 0.28,
+              "width": 1.2,
+              "length": 5.0
+            }
+          },
+          {
+            "id": "duct-gf-hvac",
+            "type": "duct",
+            "ifcType": "IfcDuctSegment",
+            "vertices": [{"x": 1, "y": 5, "z": 3.2}, {"x": 9, "y": 5, "z": 3.2}],
+            "faces": [],
+            "properties": {
+              "name": "HVAC Supply Duct GF",
+              "storeyIndex": 0,
+              "length": 8.0,
+              "width": 0.4,
+              "height": 0.3,
+              "mepSystem": "hvac-supply",
+              "flowRate": 0.5,
+              "pressure": 250,
+              "insulationThickness": 0.025
+            }
+          },
+          {
+            "id": "pipe-gf-water",
+            "type": "pipe",
+            "ifcType": "IfcPipeSegment",
+            "vertices": [{"x": 1, "y": 3, "z": 0.2}, {"x": 9, "y": 3, "z": 0.2}],
+            "faces": [],
+            "properties": {
+              "name": "Cold Water Supply GF",
+              "storeyIndex": 0,
+              "length": 8.0,
+              "diameter": 0.05,
+              "mepSystem": "plumbing-cold",
+              "flowRate": 0.1,
+              "connectionSize": 50
+            }
+          }
+        ]
+      },
+      {
+        "index": 1,
+        "name": "Level 1",
+        "elevation": 3.6,
+        "height": 3.6,
+        "elements": [
+          {
+            "id": "wall-l1-n",
+            "type": "wall",
+            "ifcType": "IfcWall",
+            "vertices": [{"x": 0, "y": 0, "z": 3.6}, {"x": 10, "y": 0, "z": 3.6}],
+            "faces": [],
+            "properties": {
+              "name": "Wall North L1",
+              "storeyIndex": 1,
+              "length": 10.0,
+              "thickness": 0.25,
+              "height": 3.6,
+              "isPartition": false,
+              "isExterior": true,
+              "wallType": "exterior",
+              "loadBearing": true,
+              "fireRating": "2HR",
+              "uValue": 0.28
+            }
+          },
+          {
+            "id": "wall-l1-e",
+            "type": "wall",
+            "ifcType": "IfcWall",
+            "vertices": [{"x": 10, "y": 0, "z": 3.6}, {"x": 10, "y": 10, "z": 3.6}],
+            "faces": [],
+            "properties": {
+              "name": "Wall East L1",
+              "storeyIndex": 1,
+              "length": 10.0,
+              "thickness": 0.25,
+              "height": 3.6,
+              "isPartition": false,
+              "isExterior": true,
+              "wallType": "exterior",
+              "loadBearing": true
+            }
+          },
+          {
+            "id": "wall-l1-s",
+            "type": "wall",
+            "ifcType": "IfcWall",
+            "vertices": [{"x": 10, "y": 10, "z": 3.6}, {"x": 0, "y": 10, "z": 3.6}],
+            "faces": [],
+            "properties": {
+              "name": "Wall South L1",
+              "storeyIndex": 1,
+              "length": 10.0,
+              "thickness": 0.25,
+              "height": 3.6,
+              "isPartition": false,
+              "isExterior": true,
+              "wallType": "exterior",
+              "loadBearing": true
+            }
+          },
+          {
+            "id": "wall-l1-w",
+            "type": "wall",
+            "ifcType": "IfcWall",
+            "vertices": [{"x": 0, "y": 10, "z": 3.6}, {"x": 0, "y": 0, "z": 3.6}],
+            "faces": [],
+            "properties": {
+              "name": "Wall West L1",
+              "storeyIndex": 1,
+              "length": 10.0,
+              "thickness": 0.25,
+              "height": 3.6,
+              "isPartition": false,
+              "isExterior": true,
+              "wallType": "exterior",
+              "loadBearing": true
+            }
+          },
+          {
+            "id": "slab-l1",
+            "type": "slab",
+            "ifcType": "IfcSlab",
+            "vertices": [],
+            "faces": [],
+            "properties": {
+              "name": "Level 1 Slab",
+              "storeyIndex": 1,
+              "thickness": 0.3,
+              "area": 100.0,
+              "structuralMaterial": "concrete",
+              "materialGrade": "C30/37"
+            }
+          },
+          {
+            "id": "col-l1-1",
+            "type": "column",
+            "ifcType": "IfcColumn",
+            "vertices": [{"x": 0.5, "y": 0.5, "z": 3.6}],
+            "faces": [],
+            "properties": {
+              "name": "Column L1-1",
+              "storeyIndex": 1,
+              "height": 3.6,
+              "width": 0.4,
+              "length": 0.4,
+              "structuralMaterial": "concrete",
+              "materialGrade": "C30/37",
+              "memberRole": "primary"
+            }
+          },
+          {
+            "id": "col-l1-2",
+            "type": "column",
+            "ifcType": "IfcColumn",
+            "vertices": [{"x": 9.5, "y": 0.5, "z": 3.6}],
+            "faces": [],
+            "properties": {
+              "name": "Column L1-2",
+              "storeyIndex": 1,
+              "height": 3.6,
+              "width": 0.4,
+              "length": 0.4,
+              "structuralMaterial": "concrete",
+              "materialGrade": "C30/37",
+              "memberRole": "primary"
+            }
+          },
+          {
+            "id": "col-l1-3",
+            "type": "column",
+            "ifcType": "IfcColumn",
+            "vertices": [{"x": 9.5, "y": 9.5, "z": 3.6}],
+            "faces": [],
+            "properties": {
+              "name": "Column L1-3",
+              "storeyIndex": 1,
+              "height": 3.6,
+              "width": 0.4,
+              "length": 0.4,
+              "structuralMaterial": "concrete",
+              "materialGrade": "C30/37",
+              "memberRole": "primary"
+            }
+          },
+          {
+            "id": "col-l1-4",
+            "type": "column",
+            "ifcType": "IfcColumn",
+            "vertices": [{"x": 0.5, "y": 9.5, "z": 3.6}],
+            "faces": [],
+            "properties": {
+              "name": "Column L1-4",
+              "storeyIndex": 1,
+              "height": 3.6,
+              "width": 0.4,
+              "length": 0.4,
+              "structuralMaterial": "concrete",
+              "materialGrade": "C30/37",
+              "memberRole": "primary"
+            }
+          },
+          {
+            "id": "beam-l1-1",
+            "type": "beam",
+            "ifcType": "IfcBeam",
+            "vertices": [{"x": 0.5, "y": 0.5, "z": 7.2}, {"x": 9.5, "y": 0.5, "z": 7.2}],
+            "faces": [],
+            "properties": {
+              "name": "Beam L1-Header-N",
+              "storeyIndex": 1,
+              "length": 9.0,
+              "width": 0.3,
+              "height": 0.5,
+              "structuralMaterial": "concrete",
+              "materialGrade": "C30/37",
+              "memberRole": "primary",
+              "spanLength": 9.0
+            }
+          },
+          {
+            "id": "beam-l1-2",
+            "type": "beam",
+            "ifcType": "IfcBeam",
+            "vertices": [{"x": 0.5, "y": 9.5, "z": 7.2}, {"x": 9.5, "y": 9.5, "z": 7.2}],
+            "faces": [],
+            "properties": {
+              "name": "Beam L1-Header-S",
+              "storeyIndex": 1,
+              "length": 9.0,
+              "width": 0.3,
+              "height": 0.5,
+              "structuralMaterial": "concrete",
+              "materialGrade": "C30/37",
+              "memberRole": "primary",
+              "spanLength": 9.0
+            }
+          },
+          {
+            "id": "space-l1-office",
+            "type": "space",
+            "ifcType": "IfcSpace",
+            "vertices": [
+              {"x": 0, "y": 0, "z": 3.6},
+              {"x": 10, "y": 0, "z": 3.6},
+              {"x": 10, "y": 10, "z": 3.6},
+              {"x": 0, "y": 10, "z": 3.6}
+            ],
+            "faces": [],
+            "properties": {
+              "name": "Level 1 Office",
+              "storeyIndex": 1,
+              "spaceName": "Open Office L1",
+              "spaceUsage": "OFFICE",
+              "area": 100.0,
+              "height": 3.6,
+              "occupancyType": "office",
+              "finishMaterial": "carpet"
+            }
+          },
+          {
+            "id": "tray-l1-elec",
+            "type": "cable-tray",
+            "ifcType": "IfcCableCarrierSegment",
+            "vertices": [{"x": 1, "y": 5, "z": 6.9}, {"x": 9, "y": 5, "z": 6.9}],
+            "faces": [],
+            "properties": {
+              "name": "Electrical Tray L1",
+              "storeyIndex": 1,
+              "length": 8.0,
+              "width": 0.3,
+              "height": 0.1,
+              "mepSystem": "electrical-power",
+              "voltage": 415,
+              "powerRating": 5000
+            }
+          }
+        ]
+      },
+      {
+        "index": 2,
+        "name": "Roof",
+        "elevation": 7.2,
+        "height": 0.0,
+        "elements": [
+          {
+            "id": "slab-roof",
+            "type": "roof",
+            "ifcType": "IfcSlab",
+            "vertices": [],
+            "faces": [],
+            "properties": {
+              "name": "Roof Slab",
+              "storeyIndex": 2,
+              "thickness": 0.35,
+              "area": 100.0,
+              "structuralMaterial": "concrete",
+              "materialGrade": "C30/37",
+              "uValue": 0.18
+            }
+          }
+        ]
+      }
+    ],
+    "boundingBox": {
+      "min": {"x": 0, "y": 0, "z": 0},
+      "max": {"x": 10, "y": 10, "z": 7.55}
+    },
+    "metrics": [
+      {"label": "Footprint", "value": 100.0, "unit": "m²"},
+      {"label": "GFA", "value": 200.0, "unit": "m²"},
+      {"label": "Storeys", "value": 2}
+    ]
+  },
+  "options": {
+    "projectName": "BuildFlow Baseline",
+    "buildingName": "Baseline Office",
+    "siteName": "Baseline Site",
+    "author": "BuildFlow CI",
+    "disciplines": ["architectural", "structural", "mep", "combined"]
+  },
+  "filePrefix": "baseline_phase1"
+}

@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   FileDown, Film, File, Download, Package, Image as ImageIcon,
   FileText, Table2, Code2, Layers, CheckCircle, Loader2, ArrowLeft, X,
+  Sparkles, AlertTriangle,
 } from "lucide-react";
 import { useExecutionStore } from "@/features/execution/stores/execution-store";
 import { useWorkflowStore } from "@/features/workflows/stores/workflow-store";
@@ -116,6 +117,8 @@ export function ExportTab({ data }: ExportTabProps) {
     id: string;
     badge?: string;
     previewType?: "image" | "video";
+    // Phase 1 Track A — Rich/Lean chip for IFC files.
+    ifcBadge?: { variant: "rich" | "lean"; tooltip?: string };
   }> = [];
 
   // 1. PDF Report — always first and primary
@@ -240,6 +243,20 @@ export function ExportTab({ data }: ExportTabProps) {
       }, 0);
     } : undefined;
 
+    // Phase 1 Track A — derive Rich/Lean chip only for IFC files. Every
+    // other file type leaves `ifcBadge` undefined and renders unchanged.
+    const ifcBadge: { variant: "rich" | "lean"; tooltip?: string } | undefined = file.ifcEngine
+      ? {
+          variant: file.ifcEngine === "ifcopenshell" ? "rich" : "lean",
+          tooltip:
+            file.ifcEngine === "ifcopenshell"
+              ? "Generated via IfcOpenShell (Python). Full geometry including proper openings and material layer sets."
+              : `Python IFC service unavailable${
+                  file.ifcServiceSkipReason ? ` (${file.ifcServiceSkipReason})` : ""
+                }. File is still valid IFC4, but rebar, curtain-wall, and MEP detail are reduced vs the rich path. Ask admin to check IFC_SERVICE_URL.`,
+        }
+      : undefined;
+
     downloadCards.push({
       id: `file-${i}`,
       icon: <File size={20} />,
@@ -247,6 +264,7 @@ export function ExportTab({ data }: ExportTabProps) {
       subtitle: file.size > 0 ? formatBytes(file.size) : file.type || "File",
       color: "#64748B",
       action: blobAction ?? file.downloadUrl ?? "#",
+      ifcBadge,
     });
   });
 
@@ -574,6 +592,7 @@ function DownloadCard({
   subtitle,
   color,
   isGenerating,
+  ifcBadge,
 }: {
   icon: React.ReactNode;
   title: string;
@@ -581,6 +600,7 @@ function DownloadCard({
   color: string;
   primary?: boolean;
   isGenerating?: boolean;
+  ifcBadge?: { variant: "rich" | "lean"; tooltip?: string };
 }) {
   return (
     <div
@@ -622,15 +642,24 @@ function DownloadCard({
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{
-          fontSize: 12,
-          fontWeight: 600,
-          color: COLORS.TEXT_PRIMARY,
+          display: "flex",
+          alignItems: "center",
+          gap: 6,
           marginBottom: 2,
-          overflow: "hidden",
-          textOverflow: "ellipsis",
-          whiteSpace: "nowrap",
         }}>
-          {title}
+          <div style={{
+            fontSize: 12,
+            fontWeight: 600,
+            color: COLORS.TEXT_PRIMARY,
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+            flex: 1,
+            minWidth: 0,
+          }}>
+            {title}
+          </div>
+          {ifcBadge && <IfcEngineBadge variant={ifcBadge.variant} tooltip={ifcBadge.tooltip} />}
         </div>
         <div style={{
           fontSize: 10,
@@ -644,6 +673,43 @@ function DownloadCard({
       </div>
       <Download size={15} style={{ color: COLORS.TEXT_MUTED, flexShrink: 0, opacity: 0.6 }} />
     </div>
+  );
+}
+
+// ─── IFC Engine Badge (Phase 1 Track A) ─────────────────────────────────────
+// Small pill indicating which code path generated the IFC file.
+// Uses existing COLORS tokens (EMERALD for rich, AMBER for lean).
+
+function IfcEngineBadge({ variant, tooltip }: { variant: "rich" | "lean"; tooltip?: string }) {
+  const isRich = variant === "rich";
+  const color = isRich ? COLORS.EMERALD : COLORS.AMBER;
+  const bg = isRich ? `${COLORS.EMERALD}18` : `${COLORS.AMBER}18`;
+  const label = isRich ? "Rich" : "Lean";
+  const Icon = isRich ? Sparkles : AlertTriangle;
+  return (
+    <span
+      title={tooltip}
+      aria-label={isRich ? "Generated via IfcOpenShell" : "Generated via TypeScript fallback"}
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 3,
+        padding: "2px 6px",
+        borderRadius: 4,
+        background: bg,
+        color,
+        fontSize: 9,
+        fontWeight: 700,
+        letterSpacing: "0.04em",
+        textTransform: "uppercase",
+        flexShrink: 0,
+        cursor: tooltip ? "help" : "default",
+        border: `1px solid ${color}30`,
+      }}
+    >
+      <Icon size={9} />
+      {label}
+    </span>
   );
 }
 

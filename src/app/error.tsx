@@ -3,7 +3,7 @@
 import { useEffect } from 'react';
 import { AlertTriangle } from 'lucide-react';
 import Link from 'next/link';
-import { useLocale } from '@/hooks';
+import { useLocale } from '@/hooks/useLocale';
 
 export default function Error({
   error,

@@ -37,6 +37,142 @@ export interface IFCServiceResponse {
 const IFC_SERVICE_URL = process.env.IFC_SERVICE_URL;
 const IFC_SERVICE_API_KEY = process.env.IFC_SERVICE_API_KEY;
 const TIMEOUT_MS = 30_000;
+const READY_PROBE_TIMEOUT_MS = 5_000;
+const READY_CACHE_TTL_MS = 60_000;
+
+// ═══════════════════════════════════════════════════════════════════════
+// Pre-flight readiness probe (Phase 1 Track A.1)
+// ═══════════════════════════════════════════════════════════════════════
+
+export type ServiceReadinessReason =
+  | "ok"
+  | "not-configured"
+  | "timeout"
+  | "http-error"
+  | "parse-error"
+  | "network-error";
+
+export interface ServiceReadinessResult {
+  /** true only when the service replied 200 with a JSON body whose `ready === true`. */
+  ready: boolean;
+  /** Coarse classification for logs and UI — never free-form. */
+  reason: ServiceReadinessReason;
+  /** HTTP status when the probe got a response; undefined for network-layer failures. */
+  statusCode?: number;
+  /** Wall-clock latency of the probe in ms. 0 when reason is "not-configured". */
+  latencyMs: number;
+  /** Date.now() at the moment the result was finalized — feeds the 60 s cache. */
+  checkedAt: number;
+  /** Short error message for observability. Stack traces are never attached. */
+  error?: string;
+}
+
+// Module-level cache keyed by IFC_SERVICE_URL. In Vercel serverless this
+// only deduplicates probes within a single warm lambda — cold starts
+// reset it, which is the right trade-off (a 5 s probe on cold start is
+// cheaper than a 30 s export-ifc timeout on cold start).
+const READINESS_CACHE = new Map<string, ServiceReadinessResult>();
+
+/**
+ * Probe the IFC service's /ready endpoint to confirm it can actually
+ * generate IFC files before EX-001 invests in a full export request.
+ *
+ * Cache: 60 s per URL. Avoids hammering the service on bursts of EX-001
+ * runs from the same process.
+ *
+ * Contract: never throws. Callers always get a ServiceReadinessResult
+ * describing success or the failure mode. `reason` is a fixed set so
+ * downstream code can branch on it without string-matching.
+ *
+ * Endpoint: GET {IFC_SERVICE_URL}/ready (public, no auth per
+ * neobim-ifc-service/app/auth.py PUBLIC_PATHS). We deliberately do NOT
+ * send the API key to keep the probe independent of auth correctness —
+ * if API keys drift out of sync, the probe still works and the real
+ * export call surfaces the auth failure later with a proper 401.
+ */
+export async function isServiceReady(
+  timeoutMs: number = READY_PROBE_TIMEOUT_MS,
+): Promise<ServiceReadinessResult> {
+  if (!IFC_SERVICE_URL) {
+    return {
+      ready: false,
+      reason: "not-configured",
+      latencyMs: 0,
+      checkedAt: Date.now(),
+    };
+  }
+
+  const cached = READINESS_CACHE.get(IFC_SERVICE_URL);
+  if (cached && Date.now() - cached.checkedAt < READY_CACHE_TTL_MS) {
+    return cached;
+  }
+
+  const start = Date.now();
+  let result: ServiceReadinessResult;
+  try {
+    const response = await fetch(`${IFC_SERVICE_URL}/ready`, {
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+
+    if (!response.ok) {
+      result = {
+        ready: false,
+        reason: "http-error",
+        statusCode: response.status,
+        latencyMs: Date.now() - start,
+        checkedAt: Date.now(),
+        error: `${response.status} ${response.statusText}`,
+      };
+    } else {
+      let parsed: unknown;
+      try {
+        parsed = await response.json();
+      } catch (parseErr) {
+        result = {
+          ready: false,
+          reason: "parse-error",
+          statusCode: response.status,
+          latencyMs: Date.now() - start,
+          checkedAt: Date.now(),
+          error: parseErr instanceof Error ? parseErr.message : String(parseErr),
+        };
+        READINESS_CACHE.set(IFC_SERVICE_URL, result);
+        return result;
+      }
+
+      const ready =
+        typeof parsed === "object" &&
+        parsed !== null &&
+        (parsed as Record<string, unknown>).ready === true;
+
+      result = {
+        ready,
+        reason: ready ? "ok" : "http-error",
+        statusCode: response.status,
+        latencyMs: Date.now() - start,
+        checkedAt: Date.now(),
+        error: ready ? undefined : "Service replied 200 but body.ready !== true",
+      };
+    }
+  } catch (err) {
+    const isAbort =
+      err instanceof DOMException && err.name === "AbortError";
+    result = {
+      ready: false,
+      reason: isAbort ? "timeout" : "network-error",
+      latencyMs: Date.now() - start,
+      checkedAt: Date.now(),
+      error: err instanceof Error ? err.message : String(err),
+    };
+  }
+
+  READINESS_CACHE.set(IFC_SERVICE_URL, result);
+  return result;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// Export generation (primary API — unchanged in Phase 1)
+// ═══════════════════════════════════════════════════════════════════════
 
 /**
  * Generate IFC files via the Python IfcOpenShell microservice.
@@ -50,6 +186,18 @@ export async function generateIFCViaService(
     projectName: string;
     buildingName: string;
     author?: string;
+    /**
+     * Phase 1 Track B — rich-mode hint forwarded to the Python service.
+     * Currently untyped as `string` because:
+     *   1. This is the boundary to an external service — loose is safer.
+     *   2. Python `ExportOptions` (neobim-ifc-service/app/models/request.py)
+     *      does NOT yet declare a `richMode` field. Pydantic v2's default
+     *      `extra='ignore'` silently drops it — we can forward safely now,
+     *      and Python will start acting on it once Track C adds the field
+     *      + Phase 2+ builders actually consume it. Until then this is a
+     *      no-op on the Python side; exists here so the channel is ready.
+     */
+    richMode?: string;
   },
   filePrefix: string,
 ): Promise<IFCServiceResponse | null> {
@@ -75,6 +223,9 @@ export async function generateIFCViaService(
         buildingName: options.buildingName,
         author: options.author || "NeoBIM",
         disciplines: ["architectural", "structural", "mep", "combined"],
+        // Phase 1 Track B — forward richMode. Python drops the unknown
+        // field via Pydantic extra='ignore'; no-op until Track C + Phase 2+.
+        ...(options.richMode ? { richMode: options.richMode } : {}),
       },
       filePrefix,
     });

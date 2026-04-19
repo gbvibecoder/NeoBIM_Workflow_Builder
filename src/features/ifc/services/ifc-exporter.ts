@@ -1,4 +1,40 @@
 /**
+ * ⚠ DEPRECATED AFTER PHASE 1 — see docs/adr/0001-ts-exporter-freeze.md
+ *
+ * This exporter is FROZEN at its Phase 1 Track B state. Do NOT:
+ *   - Add new ElementProperties field consumers
+ *   - Add new entity emitters for Phase 2+ Python-side entity types
+ *   - Extend IFCExportOptions with new flags
+ *
+ * You CAN:
+ *   - Fix correctness bugs in existing emitters
+ *   - Patch security issues
+ *
+ * Post-Phase-1 IFC richness work lands on the Python microservice at
+ * `neobim-ifc-service/`. Users who receive TS-fallback output see the
+ * amber "Lean" badge shipped in Phase 1 Track A (see
+ * src/features/execution/components/result-showcase/tabs/ExportTab.tsx
+ * → IfcEngineBadge) with a tooltip explicitly stating the file is a
+ * reduced-richness snapshot and pointing at IFC_SERVICE_URL as the
+ * config lever.
+ *
+ * Rationale: the 6,328 LOC below contains sophisticated emitters gated
+ * behind four defaults-off flags due to unresolved "flying debris"
+ * geometry-positioning problems on non-rectangular buildings
+ * (emitRebarGeometry, autoEmitDemoContent, emitCurtainWallGeometry,
+ * emitMEPGeometry). Maintaining parity with the Python path through
+ * Phases 2-7 would double engineering work and re-surface those
+ * geometric problems per new entity type. Freezing here and relying on
+ * the Rich/Lean badge for user visibility is the cleaner architecture.
+ *
+ * See also:
+ *   - docs/RICH_IFC_IMPLEMENTATION_PLAN_v2.md (strategy)
+ *   - docs/RICH_IFC_IMPLEMENTATION_PLAN_v2_1_AMENDMENTS.md § C1 (resolution)
+ *   - docs/ifc-phase-0-audit.md (discovery of the inversion)
+ *   - src/app/api/execute-node/handlers/ex-001.ts:255-260 (metadata stamps)
+ */
+
+/**
  * IFC Exporter — Production-grade IFC4 ADD2 TC1 STEP Physical File generator.
  *
  * Implements the R&D production-quality plan:

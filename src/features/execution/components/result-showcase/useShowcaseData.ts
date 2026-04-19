@@ -30,6 +30,17 @@ export interface FileDownload {
   downloadUrl?: string;
   /** Raw file content for client-side blob download (used when R2 is unavailable) */
   _rawContent?: string;
+  // ── Phase 1 Track A — IFC engine metadata (feeds Rich/Lean badge) ──
+  // Populated only for EX-001 IFC artifacts; undefined for every other
+  // file type (PDFs, xlsx, html, etc.).
+  /** Which engine generated the IFC: ifcopenshell = Python microservice (rich geometry), ifc-exporter = TS fallback (lean geometry). */
+  ifcEngine?: "ifcopenshell" | "ifc-exporter";
+  /** Alias for ifcEngine semantics — which code path the handler actually ran. */
+  ifcServicePath?: "python" | "ts-fallback";
+  /** True when EX-001 actually succeeded via the Python service. False when the TS fallback produced the file. */
+  ifcServiceUsed?: boolean;
+  /** Why the Python path was skipped (for the Lean tooltip): not-configured, timeout, http-error, parse-error, network-error. */
+  ifcServiceSkipReason?: string;
 }
 
 export interface VideoSegmentInfo {
@@ -416,12 +427,30 @@ export function useShowcaseData(): ShowcaseData {
     const fileArtifacts = findAllByType(artifacts, "file");
     const fileDownloads: FileDownload[] = fileArtifacts.map(a => {
       const d = asRecord(a.data);
+      const m = asRecord(a.metadata);
+      // IFC metadata is only present on EX-001 artifacts — narrow the
+      // loose string reads into the tight union types expected by the UI.
+      const engineRaw = m.engine;
+      const ifcEngine =
+        engineRaw === "ifcopenshell" || engineRaw === "ifc-exporter"
+          ? engineRaw
+          : undefined;
+      const pathRaw = m.ifcServicePath;
+      const ifcServicePath =
+        pathRaw === "python" || pathRaw === "ts-fallback"
+          ? pathRaw
+          : undefined;
       return {
         name: (d.fileName as string) ?? (d.name as string) ?? "file",
         type: (d.type as string) ?? "",
         size: (d.size as number) ?? 0,
         downloadUrl: (d.downloadUrl as string) ?? (d.url as string) ?? undefined,
         _rawContent: (d._ifcContent as string | undefined) ?? (d._rawContent as string | undefined),
+        ifcEngine,
+        ifcServicePath,
+        ifcServiceUsed: typeof m.ifcServiceUsed === "boolean" ? m.ifcServiceUsed : undefined,
+        ifcServiceSkipReason:
+          typeof m.ifcServiceSkipReason === "string" ? m.ifcServiceSkipReason : undefined,
       };
     });
 

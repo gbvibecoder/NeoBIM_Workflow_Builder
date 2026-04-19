@@ -7,6 +7,7 @@ import {
   type ExecutionArtifact,
 } from "./deps";
 import type { NodeHandler } from "./types";
+import { resolveRichMode } from "@/features/ifc/lib/rich-mode";
 
 /**
  * EX-001 — IFC Exporter (multi-discipline IFC generation + R2 upload)
@@ -15,9 +16,24 @@ import type { NodeHandler } from "./types";
  * NOTE: the original Path 0 (`if (upstreamIfcUrl ...) { artifact = ... }`) sets
  * an artifact then falls through and the later branches always overwrite it.
  * That overwrite behaviour is preserved verbatim — no logic changes.
+ *
+ * Phase 1 Track A added the pre-flight /ready probe + Rich/Lean metadata.
+ * Phase 1 Track B adds rich-mode plumbing (env IFC_RICH_MODE + per-run
+ * override) through to the TS exporter's four gate flags. Default "off"
+ * preserves pre-Track-B production behaviour.
  */
 export const handleEX001: NodeHandler = async (ctx) => {
   const { inputData, tileInstanceId, executionId } = ctx;
+
+  // Phase 1 Track B.4 — structured-log start timer. Captured at the top
+  // of the handler so totalMs below reflects the whole invocation, not
+  // just generation time.
+  const ex001Start = Date.now();
+
+  // Phase 1 Track B — resolve rich mode once per invocation.
+  // Source tracking (override/env/default) feeds logs + artifact metadata
+  // so operators can verify which code path selected the current flags.
+  const richMode = resolveRichMode(inputData);
   // ── IFC Exporter ──────────────────────────────────────────────────
   // Generates a downloadable .ifc file from upstream data.
   // Path 0: If upstream GN-001 already uploaded IFC to R2, pass through the URL
@@ -161,46 +177,80 @@ export const handleEX001: NodeHandler = async (ctx) => {
   const filePrefix = `${bldgNameSlug}_${dateStr}`;
 
   // ── Try Python IfcOpenShell service first (production-quality IFC) ──
+  // Phase 1 Track A.2 — pre-flight /ready probe before committing to the
+  // full 30 s export call. If the service is down, unreachable, or not
+  // configured, skip the try block entirely and fall through to the TS
+  // exporter without burning the export-ifc timeout. The probe result is
+  // stamped into artifact.metadata so the UI can surface the "Lean (TS
+  // fallback)" state with a concrete reason.
   let ifcServiceUsed = false;
   let files: Array<{
     name: string; type: string; size: number; downloadUrl: string;
     label: string; discipline: string; _ifcContent?: string;
   }> = [];
 
-  try {
-    const { generateIFCViaService } = await import("@/features/ifc/services/ifc-service-client");
-    const serviceResult = await generateIFCViaService(
-      resolvedGeometry,
-      { projectName: resolvedProjectName, buildingName: resolvedBuildingType },
-      filePrefix,
-    );
+  const { isServiceReady, generateIFCViaService } = await import(
+    "@/features/ifc/services/ifc-service-client"
+  );
+  const readiness = await isServiceReady();
 
-    if (serviceResult) {
-      ifcServiceUsed = true;
-      files = serviceResult.files.map(f => ({
-        name: f.file_name,
-        type: "IFC 4",
-        size: f.size,
-        downloadUrl: f.download_url,
-        label: `${f.discipline.charAt(0).toUpperCase() + f.discipline.slice(1)} IFC`,
-        discipline: f.discipline,
-        _ifcContent: undefined as unknown as string,
-      }));
-      logger.debug("[EX-001] IFC generated via IfcOpenShell service", {
-        files: files.length,
-        engine: serviceResult.metadata.engine,
-        timeMs: serviceResult.metadata.generation_time_ms,
-      });
+  if (readiness.ready) {
+    try {
+      const serviceResult = await generateIFCViaService(
+        resolvedGeometry,
+        {
+          projectName: resolvedProjectName,
+          buildingName: resolvedBuildingType,
+          // Phase 1 Track B — forward richMode. Python currently drops it
+          // (extra='ignore'); Phase 2+ builders will consume it.
+          richMode: richMode.mode,
+        },
+        filePrefix,
+      );
+
+      if (serviceResult) {
+        ifcServiceUsed = true;
+        files = serviceResult.files.map(f => ({
+          name: f.file_name,
+          type: "IFC 4",
+          size: f.size,
+          downloadUrl: f.download_url,
+          label: `${f.discipline.charAt(0).toUpperCase() + f.discipline.slice(1)} IFC`,
+          discipline: f.discipline,
+          _ifcContent: undefined as unknown as string,
+        }));
+        logger.debug("[EX-001] IFC generated via IfcOpenShell service", {
+          files: files.length,
+          engine: serviceResult.metadata.engine,
+          timeMs: serviceResult.metadata.generation_time_ms,
+          probeMs: readiness.latencyMs,
+        });
+      } else {
+        logger.debug("[EX-001] service probe ready but export returned null — using TS fallback");
+      }
+    } catch (err) {
+      logger.debug("[EX-001] IfcOpenShell service unavailable mid-export, using TS fallback", { error: String(err) });
     }
-  } catch (err) {
-    logger.debug("[EX-001] IfcOpenShell service unavailable, using TS fallback", { error: String(err) });
+  } else {
+    logger.debug("[EX-001] skipping Python path (probe failed)", {
+      reason: readiness.reason,
+      statusCode: readiness.statusCode,
+      probeMs: readiness.latencyMs,
+      error: readiness.error,
+    });
   }
 
   // ── Fallback: TypeScript IFC exporter ──
+  // Phase 1 Track B: pass the richMode-resolved flag bundle. Default
+  // richMode="off" yields all-false flags, matching pre-Track-B behaviour
+  // exactly. Only `IFC_RICH_MODE=<non-off>` or an explicit override flips
+  // the TS exporter's emitter gates. See src/features/ifc/lib/rich-mode.ts.
   if (!ifcServiceUsed) {
     const { generateMultipleIFCFiles: genMulti } = await import("@/features/ifc/services/ifc-exporter");
     const ifcFiles = genMulti(resolvedGeometry, {
-      projectName: resolvedProjectName, buildingName: resolvedBuildingType,
+      projectName: resolvedProjectName,
+      buildingName: resolvedBuildingType,
+      ...richMode.flags,
     });
 
     const disciplines = [
@@ -257,9 +307,40 @@ export const handleEX001: NodeHandler = async (ctx) => {
       schema: "IFC4",
       multiFile: true,
       ifcServiceUsed,
+      // Phase 1 Track A observability fields — feed the Rich/Lean badge
+      // and any future admin dashboard.
+      ifcServicePath: ifcServiceUsed ? "python" : "ts-fallback",
+      ifcServiceProbeMs: readiness.latencyMs,
+      ifcServiceSkipped: !readiness.ready,
+      ifcServiceSkipReason: readiness.ready ? undefined : readiness.reason,
+      // Phase 1 Track B — rich-mode plumbing. `richMode` is the resolved
+      // literal, `richModeSource` tells operators where it came from
+      // (override / env / default), `richFlags` is the four-flag bundle
+      // actually passed to the TS exporter.
+      richMode: richMode.mode,
+      richModeSource: richMode.source,
+      richFlags: richMode.flags,
     },
     createdAt: new Date(),
   };
+
+  // Phase 1 Track B.4 — single structured log line per EX-001 invocation.
+  // Gives operations + future admin dashboards a one-liner-per-run summary
+  // with every observability field in a single JSON object. Parseable from
+  // Vercel log explorer.
+  logger.info("[ex-001] completed", {
+    richMode: richMode.mode,
+    richModeSource: richMode.source,
+    richFlags: richMode.flags,
+    path: ifcServiceUsed ? "python" : "ts-fallback",
+    probeMs: readiness.latencyMs,
+    probeReason: readiness.reason,
+    totalMs: Date.now() - ex001Start,
+    filesGenerated: files.length,
+    totalBytes: files.reduce((s, f) => s + f.size, 0),
+    skipped: !readiness.ready,
+    skipReason: readiness.ready ? undefined : readiness.reason,
+  });
 
   return artifact;
 };
