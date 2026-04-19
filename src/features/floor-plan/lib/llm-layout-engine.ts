@@ -69,7 +69,7 @@ export async function runLLMLayoutEngine(
   prompt: string,
   parsed: ParsedConstraints,
   apiKey: string,
-  options?: { temperature?: number },
+  options?: { temperature?: number; variant?: number },
 ): Promise<StripPackResult> {
   const warnings: string[] = [];
   const facing = normalizeFacing(parsed.plot.facing);
@@ -88,10 +88,25 @@ export async function runLLMLayoutEngine(
   const roomList = formatRoomList(fixedParsed);
 
   const temperature = options?.temperature ?? LLM_TEMPERATURE;
+  const variant = options?.variant ?? 0;
 
   const llmStart = Date.now();
-  let llmRooms = await callGPT4o(systemPrompt, prompt, roomList, apiKey, temperature);
+  let llmRooms = await callGPT4o(systemPrompt, prompt, roomList, apiKey, temperature, variant);
   warnings.push(`LLM call: ${Date.now() - llmStart}ms, ${llmRooms.length} rooms, temp=${temperature}`);
+
+  // Step 1.5: Deduplicate — GPT-4o sometimes returns the same room name twice
+  // (e.g., placing "Master Bedroom" on both sides of the hallway). Keep first occurrence.
+  const beforeDedup = llmRooms.length;
+  const seenNames = new Set<string>();
+  llmRooms = llmRooms.filter(r => {
+    const key = r.name.toLowerCase();
+    if (seenNames.has(key)) return false;
+    seenNames.add(key);
+    return true;
+  });
+  if (llmRooms.length < beforeDedup) {
+    warnings.push(`Deduplication: removed ${beforeDedup - llmRooms.length} duplicate room(s)`);
+  }
 
   // Step 2: Validate + repair
   llmRooms = repair(llmRooms, plot, hallway, facing, fixedParsed, warnings);
@@ -128,7 +143,7 @@ export async function runLLMLayoutEngine(
 
     const feedbackMsg = `PREVIOUS ATTEMPT FAILED:\n${feedbackParts.join("\n")}\nFix these issues. Ensure ONE compact rectangle, hallway spanning full ${hallway.width > hallway.depth ? "width" : "depth"}, zero gaps.`;
     const retryStart = Date.now();
-    let retryRooms = await callGPT4o(systemPrompt, prompt + "\n\n" + feedbackMsg, roomList, apiKey, temperature);
+    let retryRooms = await callGPT4o(systemPrompt, prompt + "\n\n" + feedbackMsg, roomList, apiKey, temperature, variant);
     warnings.push(`Retry call: ${Date.now() - retryStart}ms, ${retryRooms.length} rooms`);
     retryRooms = repair(retryRooms, plot, hallway, facing, fixedParsed, warnings);
 
@@ -399,7 +414,17 @@ function posLabel(d: string): string {
 // GPT-4o CALL
 // ───────────────────────────────────────────────────────────────────────────
 
-async function callGPT4o(sys: string, user: string, roomList: string, key: string, temperature: number = LLM_TEMPERATURE): Promise<LLMRoom[]> {
+/** Diversity hints appended to the user message per variant.
+ *  Forces GPT-4o to explore different spatial arrangements even when
+ *  constrained JSON decoding would normally produce identical outputs. */
+const DIVERSITY_HINTS = [
+  "", // variant 0: standard arrangement
+  "\n\nDIVERSITY INSTRUCTION: For this variant, swap the zone assignment — place BEDROOMS on the entrance side and LIVING/DINING on the back side. Keep all other rules. This creates a different layout from the standard arrangement.",
+  "\n\nDIVERSITY INSTRUCTION: For this variant, place the LARGEST rooms (living, master bedroom) in the CORNERS of the plot and smaller rooms (bathroom, utility, store) in the CENTER near the hallway. Keep all other rules.",
+];
+
+async function callGPT4o(sys: string, user: string, roomList: string, key: string, temperature: number = LLM_TEMPERATURE, variant: number = 0): Promise<LLMRoom[]> {
+  const hint = DIVERSITY_HINTS[variant % DIVERSITY_HINTS.length] ?? "";
   const client = getClient(key, LLM_TIMEOUT_MS);
   const resp = await client.chat.completions.create({
     model: LLM_MODEL,
@@ -408,13 +433,15 @@ async function callGPT4o(sys: string, user: string, roomList: string, key: strin
     response_format: { type: "json_object" },
     messages: [
       { role: "system", content: sys },
-      { role: "user", content: `Design this house:\n\n${user}\n\n${roomList}` },
+      { role: "user", content: `Design this house:\n\n${user}\n\n${roomList}${hint}` },
     ],
   });
   const raw = resp.choices[0]?.message?.content;
   if (!raw) throw new Error("GPT-4o returned empty content");
   const data = JSON.parse(raw.replace(/```json\s*|```\s*/g, "").trim()) as LLMLayoutResponse;
   if (!Array.isArray(data.rooms)) throw new Error("GPT-4o response missing rooms array");
+  // Log room summary for diversity verification
+  console.log(`[GPT4o v${variant} t=${temperature}] ${data.rooms.length} rooms: ${data.rooms.map(r => `${r.name}(${r.x},${r.y})`).join(", ")}`);
   return data.rooms;
 }
 
@@ -570,6 +597,17 @@ function repair(
       const pos = findOpen(w, d, rooms, plot);
       rooms.push({ name: pr.name, type: pr.function, x: pos.x, y: pos.y, width: w, depth: d });
     }
+  }
+
+  // 9.5. Re-clamp after synthesis — synthesized rooms from step 9 skip the
+  // step 3 clamp and step 5 overlap resolution, so they can be at (0,0)
+  // overlapping existing rooms. Clamp + nudge them now.
+  for (const r of rooms) {
+    if (r.type === "corridor") continue;
+    if (r.x < 0) r.x = 0;
+    if (r.y < 0) r.y = 0;
+    if (r.x + r.width > plot.width) r.x = Math.max(0, plot.width - r.width);
+    if (r.y + r.depth > plot.depth) r.y = Math.max(0, plot.depth - r.depth);
   }
 
   // 10. Compact rectangle check — fix L-shaped layouts
@@ -768,10 +806,20 @@ function nudgeApart(a: LLMRoom, b: LLMRoom, plot: Rect, warnings: string[]): voi
 function matchesRoom(llm: LLMRoom, pr: ParsedRoom): boolean {
   const a = llm.name.toLowerCase(), b = pr.name.toLowerCase();
   if (a === b) return true;
-  if (llm.type === pr.function) return true;
+  // Token overlap — at least one 3+ char word in common
   const aToks = a.split(/\s+/).filter(t => t.length >= 3);
   const bToks = b.split(/\s+/).filter(t => t.length >= 3);
-  return aToks.some(t => bToks.includes(t));
+  if (aToks.some(t => bToks.includes(t))) return true;
+  // Type match ONLY for singleton types (types that appear at most once).
+  // Matching on type alone for "bedroom" would make ALL bedrooms match
+  // the first one, causing false positives and synthesis of duplicates.
+  const SINGLETON_TYPES = new Set([
+    "master_bedroom", "living", "dining", "kitchen", "pooja", "prayer",
+    "foyer", "porch", "verandah", "utility", "laundry", "servant_quarter",
+    "staircase", "drawing_room", "study", "pantry", "store",
+  ]);
+  if (SINGLETON_TYPES.has(pr.function) && llm.type === pr.function) return true;
+  return false;
 }
 
 function findOpen(w: number, d: number, rooms: LLMRoom[], plot: Rect): { x: number; y: number } {

@@ -320,7 +320,7 @@ export async function POST(req: NextRequest) {
         const optionPromises = Array.from({ length: NUM_OPTIONS }, (_, i) => {
           const temp = temperatures[i % temperatures.length];
           const optStart = Date.now();
-          return runLLMLayoutEngine(prompt, llmParseRes.constraints, apiKey, { temperature: temp })
+          return runLLMLayoutEngine(prompt, llmParseRes.constraints, apiKey, { temperature: temp, variant: i })
             .then(result => {
               console.log(`[OPTION-${i}] done in ${Date.now() - optStart}ms (temp=${temp})`);
               return { result, index: i, temp };
