@@ -307,8 +307,9 @@ RULE 5 — CONNECTIVITY: Porch → Foyer → Hallway → all rooms.
 ${facing === "north" ? `Foyer bottom edge y=${hwT}.` : facing === "south" ? `Foyer top edge y+d=${hwB}.` : facing === "east" ? `Foyer left edge x=${hwR}.` : `Foyer right edge x+w=${hwL}.`}
 
 RULE 6 — ALL rooms INSIDE plot. No overlaps. Dimensions ±15% of requested.
-RULE 7 — Ensuite/wardrobe share a wall with parent bedroom.
-RULE 8 — Rooms + hallway cover ≥85% of plot.
+RULE 7 — ROOM SIZING: use requested dimensions exactly. NEVER inflate a room beyond +30%. Small rooms stay small: utility 15-40sqft, bathroom 25-50sqft, store 15-35sqft, pooja 15-35sqft, pantry 15-30sqft. If there's leftover space, leave it as void — do NOT stretch rooms to fill.
+RULE 8 — Ensuite/wardrobe share a wall with parent bedroom.
+RULE 9 — Rooms + hallway cover ≥85% of plot.
 
 ${example}
 
@@ -501,6 +502,42 @@ function repair(
         if (rooms[i].type === "corridor" || rooms[j].type === "corridor") continue;
         const ov = overlapArea(rooms[i], rooms[j]);
         if (ov > 2) nudgeApart(rooms[i], rooms[j], plot, warnings);
+      }
+    }
+  }
+
+  // 5.5. Cap room sizes — GPT-4o inflates rooms to fill the plot, producing
+  // absurd sizes (168sqft utility, 420sqft dining). Cap at 150% of requested
+  // area (if user gave dims) or type-based max (for default-sized rooms).
+  const TYPE_MAX_SQFT: Record<string, number> = {
+    utility: 45, store: 45, pantry: 35, powder_room: 30,
+    bathroom: 55, master_bathroom: 70, pooja: 40, prayer: 40, mandir: 40,
+    porch: 60, foyer: 80, laundry: 40, wash_area: 35,
+    balcony: 60, sit_out: 50, walk_in_wardrobe: 50, walk_in_closet: 50,
+  };
+  for (const r of rooms) {
+    if (r.type === "corridor" || r.type === "hallway") continue;
+    const currentArea = r.width * r.depth;
+
+    // Check against parsed room's requested area (150% cap)
+    const pr = parsed.rooms.find(p => matchesRoom(r, p));
+    if (pr?.dim_width_ft && pr?.dim_depth_ft) {
+      const requestedArea = pr.dim_width_ft * pr.dim_depth_ft;
+      const maxArea = requestedArea * 1.5;
+      if (currentArea > maxArea) {
+        const scale = Math.sqrt(maxArea / currentArea);
+        r.width = Math.max(4, Math.round(r.width * scale * 2) / 2);
+        r.depth = Math.max(4, Math.round(r.depth * scale * 2) / 2);
+        warnings.push(`${r.name}: ${Math.round(currentArea)}sqft capped to ${Math.round(r.width * r.depth)}sqft (150% of ${Math.round(requestedArea)}sqft)`);
+      }
+    } else {
+      // No explicit dims — use type-based max
+      const typeMax = TYPE_MAX_SQFT[r.type];
+      if (typeMax && currentArea > typeMax * 2) {
+        const scale = Math.sqrt((typeMax * 1.5) / currentArea);
+        r.width = Math.max(4, Math.round(r.width * scale * 2) / 2);
+        r.depth = Math.max(4, Math.round(r.depth * scale * 2) / 2);
+        warnings.push(`${r.name}: type "${r.type}" capped from ${Math.round(currentArea)}sqft to ${Math.round(r.width * r.depth)}sqft`);
       }
     }
   }
