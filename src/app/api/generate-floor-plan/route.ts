@@ -132,6 +132,40 @@ function buildFeedback(project: FloorPlanProject, prompt: string): GenerationFee
   };
 }
 
+/** Pre-flight feasibility check — catches impossible prompts before spending on GPT-4o calls. */
+function checkPromptFeasibility(parsed: import("@/features/floor-plan/lib/structured-parser").ParsedConstraints): { feasible: boolean; reason?: string } {
+  const plotW = parsed.plot.width_ft ?? 40;
+  const plotD = parsed.plot.depth_ft ?? 50;
+  const plotArea = plotW * plotD;
+  const nonCircRooms = parsed.rooms.filter(r => !r.is_circulation);
+  const roomCount = nonCircRooms.length;
+
+  // Sum of requested room areas
+  const roomArea = nonCircRooms.reduce((s, r) => {
+    const w = r.dim_width_ft ?? 10;
+    const d = r.dim_depth_ft ?? 8;
+    return s + w * d;
+  }, 0);
+
+  // Rooms take more than 130% of plot — impossible
+  if (roomArea > plotArea * 1.3) {
+    return {
+      feasible: false,
+      reason: `Your rooms total ~${Math.round(roomArea)} sqft but your plot is only ${Math.round(plotArea)} sqft. Reduce room sizes or use a larger plot.`,
+    };
+  }
+
+  // Plot too small for the number of rooms (minimum 25sqft per room = 5x5ft)
+  if (plotArea < roomCount * 25) {
+    return {
+      feasible: false,
+      reason: `${roomCount} rooms need at least ${roomCount * 25} sqft but your plot is only ${Math.round(plotArea)} sqft. Use a larger plot or fewer rooms.`,
+    };
+  }
+
+  return { feasible: true };
+}
+
 /** Record a standalone tool use as an Execution so it shows in dashboard + admin.
  *  Uses a per-user workflow named "__standalone_tools__" (hidden from My Workflows
  *  by name filter). Must have deletedAt = null so billing/executions APIs include it. */
@@ -265,6 +299,18 @@ export async function POST(req: NextRequest) {
         const llmStart = Date.now();
         const llmParseRes = await parseConstraints(prompt, apiKey);
         const llmParseMs = Date.now() - llmStart;
+
+        // Infeasibility guard — catch impossible prompts before spending on GPT-4o
+        const feasibility = checkPromptFeasibility(llmParseRes.constraints);
+        if (!feasibility.feasible) {
+          console.warn(`[INFEASIBILITY] ${feasibility.reason}`);
+          return NextResponse.json({
+            error: feasibility.reason,
+            infeasibilityReason: feasibility.reason,
+            pipelineUsed: "LLM-multi-option",
+            routerSignals: routing.constraint_signals,
+          }, { status: 422 });
+        }
 
         // Generate 3 options in parallel with different temperatures
         const NUM_OPTIONS = 3;
