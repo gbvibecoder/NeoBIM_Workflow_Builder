@@ -249,7 +249,16 @@ ${example}
 OUTPUT — ONLY valid JSON, no markdown:
 { "rooms": [ { "name": "Hallway", "type": "corridor", "x": ${hallway.x}, "y": ${hallway.y}, "width": ${hallway.width}, "depth": ${hallway.depth} }, ...all rooms... ] }
 
-FINAL CHECK: Is every room inside the plot? Does the hallway span full ${isH ? "width" : "depth"}? Are outer edges aligned to plot boundary? Is it ONE rectangle, NOT an L? Fix before outputting.`;
+BEFORE YOU OUTPUT, CHECK EACH ONE:
+1. Is EVERY room inside the plot? (0 ≤ x, 0 ≤ y, x+width ≤ ${plotW}, y+depth ≤ ${plotD})
+2. Does the hallway span the FULL ${isH ? `width (x=0..${plotW})` : `depth (y=0..${plotD})`}?
+3. ${isH
+  ? `Do rooms ABOVE and BELOW hallway each span x=0 to x=${plotW}?`
+  : `Do rooms on EACH SIDE of hallway span y=0 to y=${plotD}?`}
+4. Is the building a SINGLE RECTANGLE with NO L-shapes or voids?
+5. Does every room share a wall with the hallway or with a hallway-adjacent room?
+6. Are all edge coordinates EXACT integers or halves (no .1 or .9 gaps)?
+If ANY answer is NO — FIX IT before outputting.`;
 }
 
 function buildHorizontalExample(plotW: number, plotD: number, facing: Facing, hwB: number, hwT: number): string {
