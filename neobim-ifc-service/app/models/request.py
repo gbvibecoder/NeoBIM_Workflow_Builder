@@ -59,6 +59,62 @@ class ElementProperties(BaseModel):
     riser_height: Optional[float] = Field(alias="riserHeight", default=None)
     tread_depth: Optional[float] = Field(alias="treadDepth", default=None)
 
+    # ── Phase 1 Track C: architectural fields ───────────────────────
+    # All optional — payloads produced against the pre-Track-C schema still
+    # validate. Emitters set these in Phase 2+; the builder consumes them
+    # on the gated rich-mode path.
+    wall_type: Optional[Literal["exterior", "interior", "partition", "shear", "curtain"]] = Field(
+        alias="wallType", default=None
+    )
+    load_bearing: Optional[bool] = Field(alias="loadBearing", default=None)
+    fire_rating: Optional[str] = Field(alias="fireRating", default=None)
+    acoustic_rating: Optional[str] = Field(alias="acousticRating", default=None)
+    u_value: Optional[float] = Field(alias="uValue", default=None)
+    glazing_type: Optional[str] = Field(alias="glazingType", default=None)
+    frame_material: Optional[str] = Field(alias="frameMaterial", default=None)
+    operation_type: Optional[str] = Field(alias="operationType", default=None)
+    handedness: Optional[Literal["left", "right"]] = None
+    finish_material: Optional[str] = Field(alias="finishMaterial", default=None)
+    occupancy_type: Optional[str] = Field(alias="occupancyType", default=None)
+
+    # ── Phase 1 Track C: structural fields ──────────────────────────
+    structural_material: Optional[
+        Literal["concrete", "steel", "timber", "masonry", "composite"]
+    ] = Field(alias="structuralMaterial", default=None)
+    material_grade: Optional[str] = Field(alias="materialGrade", default=None)
+    section_profile: Optional[str] = Field(alias="sectionProfile", default=None)
+    rebar_ratio: Optional[float] = Field(alias="rebarRatio", default=None)
+    concrete_strength: Optional[float] = Field(alias="concreteStrength", default=None)
+    member_role: Optional[Literal["primary", "secondary", "tertiary"]] = Field(
+        alias="memberRole", default=None
+    )
+    axial_load: Optional[float] = Field(alias="axialLoad", default=None)
+    span_length: Optional[float] = Field(alias="spanLength", default=None)
+
+    # ── Phase 1 Track C: MEP fields ─────────────────────────────────
+    mep_system: Optional[
+        Literal[
+            "hvac-supply",
+            "hvac-return",
+            "hvac-exhaust",
+            "plumbing-cold",
+            "plumbing-hot",
+            "plumbing-waste",
+            "plumbing-vent",
+            "electrical-power",
+            "electrical-lighting",
+            "electrical-low-voltage",
+            "fire-protection",
+            "data",
+        ]
+    ] = Field(alias="mepSystem", default=None)
+    flow_rate: Optional[float] = Field(alias="flowRate", default=None)
+    pressure: Optional[float] = None
+    voltage: Optional[float] = None
+    power_rating: Optional[float] = Field(alias="powerRating", default=None)
+    insulation_thickness: Optional[float] = Field(alias="insulationThickness", default=None)
+    connection_size: Optional[float] = Field(alias="connectionSize", default=None)
+
     model_config = {"populate_by_name": True}
 
 
@@ -72,6 +128,13 @@ ElementType = Literal[
     # Accepted here so payloads validate; the builder currently skips them (the parent
     # IfcWall carries the facade), logging a warning rather than crashing.
     "mullion", "spandrel",
+    # Phase 1 Track C: new entity-type literals. Accepted here so Track C+
+    # emitters can begin producing them without extra='ignore' silently
+    # dropping the whole element. Builder dispatches what it knows; unknown
+    # (type, ifc_type) pairs fall back to IfcBuildingElementProxy with a warn.
+    "railing", "ramp", "covering-ceiling", "covering-floor", "furniture",
+    "plate", "member", "footing", "curtain-wall",
+    "sanitary-terminal", "light-fixture", "air-terminal", "flow-terminal",
 ]
 
 IfcTypeStr = Literal[
@@ -79,6 +142,9 @@ IfcTypeStr = Literal[
     "IfcWindow", "IfcDoor", "IfcBeam", "IfcStairFlight", "IfcRailing",
     "IfcCovering", "IfcFooting", "IfcDuctSegment", "IfcPipeSegment",
     "IfcCableCarrierSegment", "IfcFlowTerminal",
+    # Phase 1 Track C: new IFC4 classes matching the ElementType additions above.
+    "IfcRamp", "IfcFurniture", "IfcPlate", "IfcMember", "IfcCurtainWall",
+    "IfcSanitaryTerminal", "IfcLightFixture", "IfcAirTerminal",
 ]
 
 
