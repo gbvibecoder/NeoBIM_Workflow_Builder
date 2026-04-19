@@ -57,6 +57,22 @@ function LoginForm() {
     identifierInputRef.current?.focus();
   }, []);
 
+  // Clear all user-specific client state on login page mount.
+  // If a user reaches the login page, any previous user's data must be wiped
+  // to prevent cross-user data leaks on shared devices.
+  useEffect(() => {
+    try {
+      const keys = Object.keys(localStorage);
+      for (const key of keys) {
+        if (key.startsWith("buildflow-fp-")) localStorage.removeItem(key);
+      }
+      localStorage.removeItem("neobim-workflow-state");
+      sessionStorage.removeItem("floorPlanProject");
+      sessionStorage.removeItem("fp-editor-geometry");
+      sessionStorage.removeItem("fp-editor-prompt");
+    } catch { /* best-effort */ }
+  }, []);
+
   function handleIdentifierChange(value: string) {
     setIdentifier(value);
     setError("");

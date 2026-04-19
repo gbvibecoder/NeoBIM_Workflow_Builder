@@ -408,8 +408,8 @@ export const useFloorPlanStore = create<FloorPlanState>()((set, get) => ({
   },
 
   resetToWelcome: () => {
-    // User explicitly went back to the welcome screen — forget which project
-    // was active so the next page load doesn't silently restore them into it.
+    // Wipe ALL user-specific state. Called on back-navigation, session
+    // change (cross-user data leak prevention), and login page mount.
     clearActiveProjectId();
     set({
       project: null,
@@ -427,6 +427,9 @@ export const useFloorPlanStore = create<FloorPlanState>()((set, get) => ({
       activeTool: "select",
       generatedOptions: null,
       selectedOptionIndex: 0,
+      lastLayoutMetrics: null,
+      lastQualityFlags: [],
+      lastFeasibilityWarnings: [],
     });
   },
 

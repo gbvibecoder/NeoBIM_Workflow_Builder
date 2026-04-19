@@ -11,6 +11,7 @@ import { OnboardingModal } from "@/features/onboarding/components/OnboardingModa
 import { PendingReferralClaimer } from "@/features/referral/components/PendingReferralClaimer";
 import { SupportChatLoader } from "@/features/support/components/SupportChatLoader";
 import { SubscriptionSelfHeal } from "@/features/billing/components/SubscriptionSelfHeal";
+import { SessionGuard } from "@/shared/components/SessionGuard";
 
 export default function DashboardLayout({
   children,
@@ -37,6 +38,7 @@ export default function DashboardLayout({
         </div>
       </ErrorBoundary>
       <CommandPaletteLoader />
+      <SessionGuard />
       <OnboardingModal />
       <PendingReferralClaimer />
       <SupportChatLoader />

@@ -372,7 +372,21 @@ export function Header({ title, subtitle, floating = false }: HeaderProps) {
               {/* Sign out */}
               <div style={{ padding: "0 4px 4px", borderTop: "1px solid rgba(255,255,255,0.04)" }}>
                 <button
-                  onClick={() => signOut({ callbackUrl: "/login" })}
+                  onClick={() => {
+                    // Clear all user-specific client state BEFORE signing out
+                    // to prevent cross-user data leaks on shared devices.
+                    try {
+                      const keys = Object.keys(localStorage);
+                      for (const key of keys) {
+                        if (key.startsWith("buildflow-fp-")) localStorage.removeItem(key);
+                      }
+                      localStorage.removeItem("neobim-workflow-state");
+                      sessionStorage.removeItem("floorPlanProject");
+                      sessionStorage.removeItem("fp-editor-geometry");
+                      sessionStorage.removeItem("fp-editor-prompt");
+                    } catch { /* best-effort */ }
+                    signOut({ callbackUrl: "/login" });
+                  }}
                   style={{
                     display: "flex", alignItems: "center", gap: 8, width: "100%",
                     padding: "8px 10px", borderRadius: 8, marginTop: 4,
