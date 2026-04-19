@@ -57,7 +57,10 @@ export function FloorPlanViewer({ initialGeometry, initialPrompt, initialProject
   const loadSample = useFloorPlanStore((s) => s.loadSample);
   const startBlank = useFloorPlanStore((s) => s.startBlank);
 
-  // Load from props on mount (e.g. navigated from result showcase or URL params)
+  // Load from props on mount (e.g. navigated from result showcase or URL params).
+  // When no props are provided, RESET the store so the user always sees the
+  // WelcomeScreen — prevents stale floor plans from previous generations
+  // lingering across SPA navigations.
   useEffect(() => {
     if (initialProject) {
       // Direct FloorPlanProject from workflow node (GN-012)
@@ -72,6 +75,9 @@ export function FloorPlanViewer({ initialGeometry, initialPrompt, initialProject
       loadFromGeometry(initialGeometry, undefined, initialPrompt);
     } else if (initialProjectId) {
       loadFromSaved(initialProjectId);
+    } else {
+      // No props → fresh visit. Reset so user sees WelcomeScreen, not stale data.
+      useFloorPlanStore.getState().resetToWelcome();
     }
     // Only run on mount
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -188,12 +194,22 @@ export function FloorPlanViewer({ initialGeometry, initialPrompt, initialProject
   }, []);
 
   /**
-   * Prompt-based generation — calls validate first, shows dialog if
-   * there are issues or adjustments, then proceeds to generation.
+   * Prompt-based generation — shows loading state IMMEDIATELY, then
+   * calls validate, shows dialog if there are issues, then proceeds.
    */
   const handleGenerateFromPrompt = useCallback(async (prompt: string) => {
     setValidationPending(null);
     setGenerationError(null);
+    setPendingOptions(null);
+
+    // Show loading state IMMEDIATELY so user sees feedback within 100ms
+    useFloorPlanStore.setState({
+      isGenerating: true,
+      generationStep: "working",
+      generationProgress: 0,
+      originalPrompt: prompt,
+    });
+
     try {
       const res = await fetch("/api/validate-floor-plan", {
         method: "POST",
@@ -206,6 +222,8 @@ export function FloorPlanViewer({ initialGeometry, initialPrompt, initialProject
         const hasAdjustments = result.adjustments.some(a => a.type !== "unchanged");
         const hasIssues = result.issues.length > 0;
         if (hasAdjustments || hasIssues) {
+          // Pause loading — show validation dialog instead
+          useFloorPlanStore.setState({ isGenerating: false });
           setValidationPending({ result, prompt });
           return;
         }
@@ -214,7 +232,8 @@ export function FloorPlanViewer({ initialGeometry, initialPrompt, initialProject
       // Validation failed — proceed directly to generation (non-blocking)
       console.warn("[FloorPlanViewer] Validation API failed — skipping review");
     }
-    // No issues or validation unavailable — generate directly
+    // No issues or validation unavailable — proceed to generation
+    // (isGenerating already true from above, executeGeneration will re-set it)
     executeGeneration(prompt);
   }, [executeGeneration]);
 
