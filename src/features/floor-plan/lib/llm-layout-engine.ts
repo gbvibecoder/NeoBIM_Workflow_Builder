@@ -81,7 +81,9 @@ export async function runLLMLayoutEngine(
   const fixedParsed = preprocessParsed(parsed, prompt, warnings);
 
   // Step 1: Build prompt + call GPT-4o
-  const hallway = computeHallwayRect(plotW, plotD, facing);
+  const hallway = computeHallwayRect(plotW, plotD, facing, fixedParsed);
+  const noHallway = hallway.width === 0 && hallway.depth === 0;
+  if (noHallway) warnings.push("Small layout — no hallway (rooms connect directly)");
   const systemPrompt = buildSystemPrompt(fixedParsed, plotW, plotD, facing, hallway);
   const roomList = formatRoomList(fixedParsed);
 
@@ -114,8 +116,8 @@ export async function runLLMLayoutEngine(
   // independently — the outer loop picks the best scored result.
   const orphanCount = countOrphans(rooms, doorOut.doors);
   const compactness = measureCompactness(llmRooms);
-  const hwSpan = measureHallwaySpan(hallway, plot);
-  const needsRetry = orphanCount > 2 || compactness < 0.75 || hwSpan < 0.85;
+  const hwSpan = noHallway ? 1 : measureHallwaySpan(hallway, plot);
+  const needsRetry = orphanCount > 2 || compactness < 0.75 || (!noHallway && hwSpan < 0.85);
 
   if (needsRetry) {
     const feedbackParts: string[] = [];
@@ -167,8 +169,26 @@ export async function runLLMLayoutEngine(
 // HALLWAY COMPUTATION
 // ───────────────────────────────────────────────────────────────────────────
 
-function computeHallwayRect(plotW: number, plotD: number, facing: Facing): Rect {
-  const hw = 4;
+/** Compute hallway width: skip for tiny layouts, narrow for small, standard for normal. */
+function computeHallwayWidth(totalNonCircRooms: number, plotArea: number): number {
+  if (totalNonCircRooms <= 3 || plotArea < 600) return 0; // no hallway
+  if (totalNonCircRooms <= 5 || plotArea < 1000) return 3; // narrow
+  return 4; // standard
+}
+
+function computeHallwayRect(
+  plotW: number, plotD: number, facing: Facing,
+  parsed?: ParsedConstraints,
+): Rect {
+  const totalRooms = parsed
+    ? parsed.rooms.filter(r => !r.is_circulation).length
+    : 99; // default to standard
+  const plotArea = plotW * plotD;
+  const hw = computeHallwayWidth(totalRooms, plotArea);
+
+  // No hallway needed for tiny layouts — return zero-area sentinel
+  if (hw === 0) return { x: 0, y: 0, width: 0, depth: 0 };
+
   const isHorizontal = facing === "north" || facing === "south";
   if (isHorizontal) {
     const spineY = facing === "north"
@@ -191,13 +211,42 @@ function buildSystemPrompt(
   plotW: number, plotD: number,
   facing: Facing, hallway: Rect,
 ): string {
+  const noHallway = hallway.width === 0 && hallway.depth === 0;
+  const entranceSide = { north: "top (high Y)", south: "bottom (low Y)", east: "right (high X)", west: "left (low X)" }[facing];
+  const backSide = { north: "bottom (low Y)", south: "top (high Y)", east: "left (low X)", west: "right (high X)" }[facing];
+
+  // ── Small-layout prompt (no hallway) ──────────────────────────────────
+  if (noHallway) {
+    return `You are an expert residential architect. Place rooms on a rectangular plot as JSON.
+
+PLOT: ${plotW}ft wide (X) × ${plotD}ft deep (Y). Origin (0,0) = SW corner. X→EAST, Y→NORTH.
+FACING: ${facing} — entrance on ${entranceSide}
+
+NO HALLWAY — this is a small layout. Rooms connect directly via shared walls.
+
+RULES:
+1. COMPACT RECTANGLE: all rooms fill the plot from (0,0) to (${plotW},${plotD}). No gaps, no L-shapes.
+2. EDGE-TO-EDGE: rooms share exact edge coordinates. No gaps > 0.
+3. ALL rooms INSIDE plot. No overlaps. Rooms cover ≥90% of plot area.
+4. Entrance room (porch/foyer/living) touches the ${entranceSide} edge.
+5. Bathroom/kitchen share a wall with at least one other room.
+
+OUTPUT — ONLY valid JSON, no markdown:
+{ "rooms": [ { "name": "...", "type": "...", "x": ..., "y": ..., "width": ..., "depth": ... }, ... ] }
+
+BEFORE YOU OUTPUT, CHECK:
+1. Every room inside plot? (0 ≤ x, 0 ≤ y, x+width ≤ ${plotW}, y+depth ≤ ${plotD})
+2. Total room area ≥ ${Math.round(plotW * plotD * 0.9)} sqft?
+3. No gaps between rooms? All edges shared exactly?
+Fix before outputting.`;
+  }
+
+  // ── Standard prompt (with hallway) ────────────────────────────────────
   const isH = hallway.width > hallway.depth;
   const hwL = hallway.x;
   const hwR = hallway.x + hallway.width;
   const hwB = hallway.y;
   const hwT = hallway.y + hallway.depth;
-  const entranceSide = { north: "top (high Y)", south: "bottom (low Y)", east: "right (high X)", west: "left (low X)" }[facing];
-  const backSide = { north: "bottom (low Y)", south: "top (high Y)", east: "left (low X)", west: "right (high X)" }[facing];
 
   // Build concrete few-shot example with exact coordinates for this facing
   const example = isH ? buildHorizontalExample(plotW, plotD, facing, hwB, hwT) : buildVerticalExample(plotW, plotD, facing, hwL, hwR);
@@ -377,8 +426,13 @@ function repair(
   rooms: LLMRoom[], plot: Rect, hallway: Rect,
   facing: Facing, parsed: ParsedConstraints, warnings: string[],
 ): LLMRoom[] {
-  // 1. Ensure hallway in rooms
-  if (!rooms.find(r => r.type === "corridor" || r.type === "hallway")) {
+  // 1. Ensure hallway in rooms (skip for no-hallway small layouts)
+  const noHallway = hallway.width === 0 && hallway.depth === 0;
+  if (noHallway) {
+    // Remove any LLM-generated corridor — small layouts don't need one
+    const idx = rooms.findIndex(r => r.type === "corridor" || r.type === "hallway");
+    if (idx >= 0) { rooms.splice(idx, 1); warnings.push("Removed LLM-generated corridor (small layout)"); }
+  } else if (!rooms.find(r => r.type === "corridor" || r.type === "hallway")) {
     rooms.unshift({ name: "Hallway", type: "corridor", ...hallway });
     warnings.push("Hallway missing — injected");
   } else {
