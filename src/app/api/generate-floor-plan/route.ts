@@ -344,7 +344,18 @@ export async function POST(req: NextRequest) {
             const score = computeHonestScore(metrics);
             return { ...opt, result: filled, project, metrics, score };
           })
-          .sort((a, b) => b.score.score - a.score.score);
+          .sort((a, b) => {
+            // Primary: honest score (higher wins)
+            if (b.score.score !== a.score.score) return b.score.score - a.score.score;
+            // Tiebreaker 1: fewer orphans wins (orphans = worst defect)
+            if (a.metrics.orphan_rooms.length !== b.metrics.orphan_rooms.length)
+              return a.metrics.orphan_rooms.length - b.metrics.orphan_rooms.length;
+            // Tiebreaker 2: higher door coverage wins
+            if (b.metrics.door_coverage_pct !== a.metrics.door_coverage_pct)
+              return b.metrics.door_coverage_pct - a.metrics.door_coverage_pct;
+            // Tiebreaker 3: higher efficiency wins
+            return b.metrics.efficiency_pct - a.metrics.efficiency_pct;
+          });
 
         console.log(`[OPTIONS] Generated ${scoredOptions.length}/${NUM_OPTIONS} options in ${llmEngineMs}ms (parse=${llmParseMs}ms):`);
         for (const opt of scoredOptions) {
