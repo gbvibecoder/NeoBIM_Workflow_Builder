@@ -110,10 +110,12 @@ export async function runLLMLayoutEngine(
   warnings.push(...doorOut.warnings);
 
   // Check quality triggers for retry: orphans, compactness, hallway span
+  // With multi-option generation (3 parallel calls), each option retries
+  // independently — the outer loop picks the best scored result.
   const orphanCount = countOrphans(rooms, doorOut.doors);
   const compactness = measureCompactness(llmRooms);
   const hwSpan = measureHallwaySpan(hallway, plot);
-  const needsRetry = orphanCount > 3 || compactness < 0.75 || hwSpan < 0.8;
+  const needsRetry = orphanCount > 2 || compactness < 0.75 || hwSpan < 0.85;
 
   if (needsRetry) {
     const feedbackParts: string[] = [];
