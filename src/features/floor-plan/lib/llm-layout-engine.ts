@@ -536,11 +536,9 @@ function repair(
         `(${Math.round(wasteRatio * 100)}% waste). Aligning rooms to compact rectangle.`,
       );
 
-      // Fix: align all rooms to plot boundaries
+      // Fix: align all rooms to plot boundaries AND hallway edges
       if (isVertical) {
         // E/W facing — ensure all rooms span y=0..plotD
-        // Find rooms whose y doesn't start at 0 or whose y+depth doesn't reach plotD
-        // on each side of the hallway
         const hwLeft = hallway.x;
         const hwRight = hallway.x + hallway.width;
         for (const side of ["left", "right"] as const) {
@@ -566,6 +564,20 @@ function repair(
           if (topEdge < plot.depth - 0.5) {
             topRoom.depth = plot.depth - topRoom.y;
           }
+
+          // Align room widths to plot/hallway boundary (close inner gaps)
+          for (const r of sideRooms) {
+            if (side === "left") {
+              if (r.x > 0.5) { r.width += r.x; r.x = 0; }
+              const rightEdge = r.x + r.width;
+              if (rightEdge < hwLeft - 0.5) { r.width = hwLeft - r.x; }
+            } else {
+              if (r.x > hwRight + 0.5) { r.width += r.x - hwRight; r.x = hwRight; }
+              if (r.x < hwRight - 0.5 && r.x > hwRight - 2) { r.width += r.x - hwRight; r.x = hwRight; }
+              const re = r.x + r.width;
+              if (re < plot.width - 0.5) { r.width = plot.width - r.x; }
+            }
+          }
         }
       } else {
         // N/S facing — ensure all rooms span x=0..plotW
@@ -589,6 +601,20 @@ function repair(
           const rightEdge = rightRoom.x + rightRoom.width;
           if (rightEdge < plot.width - 0.5) {
             rightRoom.width = plot.width - rightRoom.x;
+          }
+
+          // Align room depths to plot/hallway boundary (close inner gaps)
+          for (const r of sideRooms) {
+            if (side === "below") {
+              if (r.y > 0.5) { r.depth += r.y; r.y = 0; }
+              const te = r.y + r.depth;
+              if (te < hwBot - 0.5) { r.depth = hwBot - r.y; }
+            } else {
+              if (r.y > hwTop + 0.5) { r.depth += r.y - hwTop; r.y = hwTop; }
+              if (r.y < hwTop - 0.5 && r.y > hwTop - 2) { r.depth += r.y - hwTop; r.y = hwTop; }
+              const be = r.y + r.depth;
+              if (be < plot.depth - 0.5) { r.depth = plot.depth - r.y; }
+            }
           }
         }
       }
