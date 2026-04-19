@@ -186,6 +186,18 @@ export async function generateIFCViaService(
     projectName: string;
     buildingName: string;
     author?: string;
+    /**
+     * Phase 1 Track B — rich-mode hint forwarded to the Python service.
+     * Currently untyped as `string` because:
+     *   1. This is the boundary to an external service — loose is safer.
+     *   2. Python `ExportOptions` (neobim-ifc-service/app/models/request.py)
+     *      does NOT yet declare a `richMode` field. Pydantic v2's default
+     *      `extra='ignore'` silently drops it — we can forward safely now,
+     *      and Python will start acting on it once Track C adds the field
+     *      + Phase 2+ builders actually consume it. Until then this is a
+     *      no-op on the Python side; exists here so the channel is ready.
+     */
+    richMode?: string;
   },
   filePrefix: string,
 ): Promise<IFCServiceResponse | null> {
@@ -211,6 +223,9 @@ export async function generateIFCViaService(
         buildingName: options.buildingName,
         author: options.author || "NeoBIM",
         disciplines: ["architectural", "structural", "mep", "combined"],
+        // Phase 1 Track B — forward richMode. Python drops the unknown
+        // field via Pydantic extra='ignore'; no-op until Track C + Phase 2+.
+        ...(options.richMode ? { richMode: options.richMode } : {}),
       },
       filePrefix,
     });

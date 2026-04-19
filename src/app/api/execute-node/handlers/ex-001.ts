@@ -193,7 +193,13 @@ export const handleEX001: NodeHandler = async (ctx) => {
     try {
       const serviceResult = await generateIFCViaService(
         resolvedGeometry,
-        { projectName: resolvedProjectName, buildingName: resolvedBuildingType },
+        {
+          projectName: resolvedProjectName,
+          buildingName: resolvedBuildingType,
+          // Phase 1 Track B — forward richMode. Python currently drops it
+          // (extra='ignore'); Phase 2+ builders will consume it.
+          richMode: richMode.mode,
+        },
         filePrefix,
       );
 
