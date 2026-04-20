@@ -51,6 +51,16 @@ interface RenderResult {
   url: string | null;
 }
 
+// Mirror of StructuralAnalysisSchema in /api/generate-3d-render. Only the
+// fields the client actually consumes are listed here; extras are ignored.
+interface StructuralAnalysis {
+  buildingType: "residential" | "commercial" | "mixed-use" | "industrial" | "other";
+  roomCount: number;
+  rooms: string[];
+  footprint: "rectangle" | "L-shape" | "U-shape" | "irregular";
+  openingsVisible: boolean;
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // CINEMATIC PIPELINE TYPES (mirror /api/cinematic-status response)
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -143,12 +153,37 @@ const COPY = {
   },
 };
 
-const RENDER_VIEWS: Omit<RenderResult, "url">[] = [
+// Full-layout slot is pinned at id "r4" because the cinematic walkthrough
+// pipeline (startCinematicGeneration) selects it by id. Do not re-id.
+const FULL_LAYOUT_VIEW: Omit<RenderResult, "url"> = {
+  id: "r4",
+  label: "Full Layout",
+  angle: "Top Down",
+  apiAngle: "topDown",
+};
+
+// Last-resort hardcoded rooms, used only when GPT-4o structural analysis
+// yields zero detected rooms. Matches the pre-fix behavior so the UI never
+// degrades to an empty gallery.
+const FALLBACK_ROOM_VIEWS: Omit<RenderResult, "url">[] = [
   { id: "r1", label: "Living Room", angle: "Interior View", apiAngle: "roomInterior:Living Room" },
   { id: "r2", label: "Kitchen", angle: "Interior View", apiAngle: "roomInterior:Kitchen" },
   { id: "r3", label: "Bedroom", angle: "Interior View", apiAngle: "roomInterior:Bedroom" },
-  { id: "r4", label: "Full Layout", angle: "Top Down", apiAngle: "topDown" },
 ];
+
+const MAX_ROOM_VIEWS = 3;
+
+/** Build up to MAX_ROOM_VIEWS room interior views from detected room names. */
+function buildRoomViewsFromStructural(
+  rooms: readonly string[]
+): Omit<RenderResult, "url">[] {
+  return rooms.slice(0, MAX_ROOM_VIEWS).map((name, i) => ({
+    id: `r${i + 1}`,
+    label: name,
+    angle: "Interior View",
+    apiAngle: `roomInterior:${name}`,
+  }));
+}
 
 // Witty status messages cycled during real video generation. Same tone as
 // COPY.processing.stages so the video step feels consistent with rendering.
@@ -908,8 +943,16 @@ function RenderGallery({
     "linear-gradient(135deg, #d1fae5, #a7f3d0)",
   ];
 
+  // Column count tracks the number of renders so detected-room fallbacks
+  // (e.g. a plan with only 1 room + Full Layout = 2 tiles) don't stretch
+  // weirdly. Uses inline grid-template-columns instead of a Tailwind class
+  // because Tailwind JIT can't generate arbitrary grid-cols-N at build time.
+  const columns = Math.max(1, renders.length);
   return (
-    <div className="grid grid-cols-4 gap-2.5 mt-5 max-w-3xl mx-auto">
+    <div
+      className="grid gap-2.5 mt-5 max-w-3xl mx-auto"
+      style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}
+    >
       {renders.map((r, i) => {
         const active = selectedId === r.id;
         return (
@@ -1556,6 +1599,9 @@ export default function VideoRenderStudio() {
   const [videoElapsed, setVideoElapsed] = useState(0);
   const [isSharingVideo, setIsSharingVideo] = useState(false);
   const [fullDescription, setFullDescription] = useState<string>("");
+  // Structural analysis from the first (full-layout) API call. Drives the
+  // dynamic room thumbnails and seeds the cinematic pipeline's buildingType.
+  const [structural, setStructural] = useState<StructuralAnalysis | null>(null);
   const videoElementRef = useRef<HTMLVideoElement | null>(null);
   const videoAbortRef = useRef<AbortController | null>(null);
   const videoTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -1723,23 +1769,25 @@ export default function VideoRenderStudio() {
     setStep("processing");
     setRenderProgress(0);
     setRenderError(null);
-
-    const results: RenderResult[] = RENDER_VIEWS.map((v) => ({ ...v, url: null }));
-    let completed = 0;
-    const total = RENDER_VIEWS.length;
+    setStructural(null);
 
     const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+    /**
+     * POST one render to /api/generate-3d-render. Handles plan-gate / rate
+     * limit / retry exactly like the old implementation, but returns the
+     * parsed response so the caller can read structural / image / description.
+     */
     const callRender = async (
-      view: (typeof RENDER_VIEWS)[number],
-      idx: number,
-      cachedDesc?: string,
+      apiAngle: string,
+      label: string,
+      cachedStructuralJson: string | null,
       retries = 2
-    ): Promise<string> => {
+    ): Promise<{ image: string; structural?: StructuralAnalysis; fullDescription?: string }> => {
       const formData = new FormData();
       formData.append("image", uploadedFile);
-      formData.append("angle", view.apiAngle);
-      if (cachedDesc) formData.append("cachedDescription", cachedDesc);
+      formData.append("angle", apiAngle);
+      if (cachedStructuralJson) formData.append("cachedStructural", cachedStructuralJson);
       // Send original dimensions so the API can pick a matching output size
       // (1024×1024, 1536×1024, or 1024×1536). Critical for slider alignment.
       if (uploadedDims) {
@@ -1763,37 +1811,71 @@ export default function VideoRenderStudio() {
       if (res.status === 429 && retries > 0) {
         const waitMs = (3 - retries) * 15000;
         await delay(waitMs);
-        return callRender(view, idx, cachedDesc, retries - 1);
+        return callRender(apiAngle, label, cachedStructuralJson, retries - 1);
       }
 
       if (!res.ok) {
-        const errMsg = typeof data.error === "object" ? (data.error?.message || "Render failed") : (data.error || `Failed to generate ${view.label} render`);
+        const errMsg = typeof data.error === "object" ? (data.error?.message || "Render failed") : (data.error || `Failed to generate ${label} render`);
         throw new Error(errMsg);
       }
 
-      results[idx] = { ...view, url: data.image };
-      completed++;
-      setRenderProgress((completed / total) * 100);
-      return data.fullDescription as string;
+      return {
+        image: data.image as string,
+        structural: data.structural as StructuralAnalysis | undefined,
+        fullDescription: data.fullDescription as string | undefined,
+      };
     };
 
     try {
-      const fullLayoutIdx = RENDER_VIEWS.findIndex((v) => v.id === "r4");
-      const desc = await callRender(RENDER_VIEWS[fullLayoutIdx], fullLayoutIdx);
-      // Save the GPT-4o floor-plan analysis so the video step can prime Kling
-      // with rich room/material context without re-calling /api/generate-3d-render.
-      setFullDescription(desc ?? "");
+      // ── 1. Full-layout call first — also returns the structural analysis ──
+      const first = await callRender(FULL_LAYOUT_VIEW.apiAngle, FULL_LAYOUT_VIEW.label, null);
+      const detected = first.structural ?? null;
+      setStructural(detected);
+      setFullDescription(first.fullDescription ?? "");
 
-      const roomViews = RENDER_VIEWS.map((v, i) => ({ view: v, idx: i })).filter(
-        (_, i) => i !== fullLayoutIdx
-      );
-
-      for (const { view, idx } of roomViews) {
-        await delay(2000);
-        await callRender(view, idx, desc);
+      // DEV: remove in Commit 5 — helps localhost testing of the room detection.
+      if (process.env.NODE_ENV !== "production") {
+        // eslint-disable-next-line no-console
+        console.log("[3d-render] structural", detected);
       }
 
-      setRenders(results);
+      // ── 2. Decide which rooms to render ──
+      // If detection returned at least one room, use the first N detected;
+      // otherwise fall back to the pre-fix hardcoded residential three so the
+      // gallery never renders empty. The full-layout render still works
+      // either way because it doesn't depend on room names.
+      const roomViewTemplates: Omit<RenderResult, "url">[] =
+        detected && detected.rooms.length > 0
+          ? buildRoomViewsFromStructural(detected.rooms)
+          : FALLBACK_ROOM_VIEWS;
+
+      const total = 1 + roomViewTemplates.length;
+      let completed = 1;
+      setRenderProgress((completed / total) * 100);
+
+      // Seed the results array now so the first (full-layout) tile has its URL.
+      const roomResults: RenderResult[] = roomViewTemplates.map((v) => ({ ...v, url: null }));
+      const fullLayoutResult: RenderResult = { ...FULL_LAYOUT_VIEW, url: first.image };
+
+      // Cache the structural JSON so the server can skip GPT-4o on follow-up
+      // room-interior calls (those calls ignore structural internally, but
+      // forwarding it keeps the cross-call contract self-consistent).
+      const cachedStructuralJson = detected ? JSON.stringify(detected) : null;
+
+      // ── 3. Sequentially render each room interior ──
+      for (let i = 0; i < roomResults.length; i++) {
+        await delay(2000);
+        const rv = roomResults[i];
+        const r = await callRender(rv.apiAngle, rv.label, cachedStructuralJson);
+        roomResults[i] = { ...rv, url: r.image };
+        completed++;
+        setRenderProgress((completed / total) * 100);
+      }
+
+      // ── 4. Commit final gallery ordering: rooms first, Full Layout last ──
+      // The previous behavior also put Full Layout at the end of the grid;
+      // preserving that so users see identical ordering.
+      setRenders([...roomResults, fullLayoutResult]);
       setSelectedRender("r4");
       goToStep("gallery");
     } catch (err: unknown) {
@@ -2183,6 +2265,15 @@ export default function VideoRenderStudio() {
         description: "Generating the eye-level lifestyle render...",
         duration: 4000,
       });
+      // Derive building type from the GPT-4o structural analysis when
+      // available — otherwise fall back to a neutral "building" so the
+      // downstream cinematic pipeline does not assume a modern apartment
+      // for commercial / mixed-use / industrial floor plans.
+      const detectedBuildingType =
+        structural && structural.buildingType !== "other"
+          ? structural.buildingType
+          : "building";
+
       const res = await fetch("/api/generate-cinematic-walkthrough", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -2194,7 +2285,7 @@ export default function VideoRenderStudio() {
           floorPlanImage: floorPlanDataUrl,
           description: fullDescription,
           rooms,
-          buildingType: "modern apartment",
+          buildingType: detectedBuildingType,
           primaryRoom,
         }),
         signal: submitAbort.signal,
@@ -2364,7 +2455,7 @@ export default function VideoRenderStudio() {
         return;
       }
     }
-  }, [renders, uploadedFile, fullDescription]);
+  }, [renders, uploadedFile, fullDescription, structural]);
 
   // ── Action handlers (download / preview / share / 4K) ──
   // Real download — fetch the bytes and trigger a same-origin blob download.
