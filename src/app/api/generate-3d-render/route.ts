@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { checkEndpointRateLimit, isAdminUser } from "@/lib/rate-limit";
 import { formatErrorResponse, UserErrors } from "@/lib/user-errors";
 import OpenAI from "openai";
+import { z } from "zod";
 import { logger } from "@/lib/logger";
 
 // ─── Floor Plan → 3D Photorealistic Render ──────────────────────────────────
@@ -83,6 +84,87 @@ const ROOM_INTERIOR_PROMPT =
   "Realistic materials and furnishings appropriate to the room's function. " +
   "Natural soft daylight. Professional architectural photography, sharp detail. " +
   "No text, no labels, no annotations.";
+
+// ─── Structural analysis schema ──────────────────────────────────────────────
+// GPT-4o's JSON output is validated and coerced through this schema. Every
+// field has a `.catch()` default so a malformed model response still yields
+// a usable object — the render continues, only the UI labels are weaker.
+const StructuralAnalysisSchema = z.object({
+  buildingType: z
+    .enum(["residential", "commercial", "mixed-use", "industrial", "other"])
+    .catch("other"),
+  roomCount: z.number().int().nonnegative().max(64).catch(0),
+  rooms: z.array(z.string().min(1).max(80)).max(12).catch([]),
+  footprint: z
+    .enum(["rectangle", "L-shape", "U-shape", "irregular"])
+    .catch("irregular"),
+  openingsVisible: z.boolean().catch(true),
+});
+
+type StructuralAnalysis = z.infer<typeof StructuralAnalysisSchema>;
+
+const DEFAULT_STRUCTURAL: StructuralAnalysis = {
+  buildingType: "other",
+  roomCount: 0,
+  rooms: [],
+  footprint: "irregular",
+  openingsVisible: true,
+};
+
+/**
+ * Locate the first JSON object inside a raw GPT response. Handles ```json
+ * fences``` and preamble prose that ignores our "no prose" instruction.
+ */
+function extractJsonObject(raw: string): string | null {
+  const trimmed = raw.trim();
+  const fence = trimmed.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+  if (fence) return fence[1].trim();
+  const first = trimmed.indexOf("{");
+  const last = trimmed.lastIndexOf("}");
+  if (first === -1 || last === -1 || last <= first) return null;
+  return trimmed.slice(first, last + 1);
+}
+
+/** Parse + validate GPT-4o JSON. Never throws — falls back to defaults. */
+function parseStructural(raw: string): StructuralAnalysis {
+  const json = extractJsonObject(raw);
+  if (!json) {
+    logger.debug(
+      "[generate-3d-render] No JSON object found in GPT-4o analysis response"
+    );
+    return DEFAULT_STRUCTURAL;
+  }
+  let candidate: unknown;
+  try {
+    candidate = JSON.parse(json);
+  } catch (err) {
+    logger.debug(
+      `[generate-3d-render] GPT-4o JSON.parse failed: ${err instanceof Error ? err.message : String(err)}`
+    );
+    return DEFAULT_STRUCTURAL;
+  }
+  const result = StructuralAnalysisSchema.safeParse(candidate);
+  if (!result.success) {
+    logger.debug(
+      `[generate-3d-render] Structural schema rejected payload: ${result.error.message}`
+    );
+    return DEFAULT_STRUCTURAL;
+  }
+  // Keep roomCount consistent with the rooms array we actually kept.
+  const rooms = result.data.rooms;
+  return { ...result.data, roomCount: rooms.length > 0 ? rooms.length : result.data.roomCount };
+}
+
+/**
+ * Short, neutral prose description derived from the structural JSON. Used as
+ * `fullDescription` in the API response so the cinematic walkthrough pipeline
+ * (which reads `description.slice(0, 600)`) keeps receiving a sensible string
+ * without any residential bias from the previous prompt.
+ */
+function buildNeutralProse(s: StructuralAnalysis): string {
+  const rooms = s.rooms.length > 0 ? s.rooms.join(", ") : "rooms not enumerated";
+  return `Floor plan analysis — building type: ${s.buildingType}; footprint: ${s.footprint}; room count: ${s.roomCount}; rooms: ${rooms}.`;
+}
 
 // Retry helper for transient OpenAI rate limits (429) — does NOT retry billing/quota errors
 async function withRetry<T>(fn: () => Promise<T>, retries = 1, delayMs = 8000): Promise<T> {
@@ -189,7 +271,16 @@ export async function POST(req: NextRequest) {
     const formData = await req.formData();
     const imageFile = formData.get("image") as File | null;
     const angle = (formData.get("angle") as string) || "birdsEye";
-    const cachedDescription = (formData.get("cachedDescription") as string) || null;
+    // The client caches the structural JSON from the first call so follow-up
+    // calls (room interiors) can skip GPT-4o entirely. Room-interior renders
+    // do not need the structural payload either — they only use ROOM_NAME in
+    // the prompt — but we still accept + reuse it so the response stays
+    // self-consistent across a render session.
+    const cachedStructuralRaw = formData.get("cachedStructural");
+    const cachedStructural =
+      typeof cachedStructuralRaw === "string" && cachedStructuralRaw.length > 0
+        ? cachedStructuralRaw
+        : null;
 
     // Optional original-image dimensions sent by the client (read from
     // <img>.naturalWidth/Height on upload). Used to pick a non-square output
@@ -231,40 +322,49 @@ export async function POST(req: NextRequest) {
     const roomName = isRoomInterior ? angle.split(":")[1] : null;
     const layoutAngle = isRoomInterior ? null : angle;
 
-    // ── STEP 1: GPT-4o Vision extracts room names + furniture details ──
-    // If the frontend already has a cached description from a prior call, skip GPT-4o.
-    // This avoids 4x redundant GPT-4o calls when rendering all views.
-    let roomDescription: string;
+    // ── STEP 1: Structural analysis (full-layout only) ──
+    // Room-interior renders do not need structural data — their prompt only
+    // uses ROOM_NAME, which the client already knows. Skipping GPT-4o here
+    // cuts ~1-3 seconds and one vision call per room.
+    //
+    // For the full-layout call we either reuse a client-supplied cached
+    // structural JSON or run GPT-4o with response_format=json_object. Every
+    // parse failure falls through to DEFAULT_STRUCTURAL so the image render
+    // still proceeds.
+    let structural: StructuralAnalysis = DEFAULT_STRUCTURAL;
 
-    if (cachedDescription) {
-      roomDescription = cachedDescription;
-    } else {
-      const analysis = await client.chat.completions.create({
-        model: "gpt-4o",
-        messages: [
-          {
-            role: "user",
-            content: [
-              {
-                type: "image_url",
-                image_url: { url: dataUrl, detail: "high" },
-              },
-              { type: "text", text: ANALYSIS_PROMPT },
-            ],
-          },
-        ],
-        max_tokens: 1200,
-        temperature: 0.1,
-      });
+    if (!isRoomInterior) {
+      if (cachedStructural) {
+        structural = parseStructural(cachedStructural);
+      } else {
+        const analysis = await client.chat.completions.create({
+          model: "gpt-4o",
+          messages: [
+            {
+              role: "user",
+              content: [
+                {
+                  type: "image_url",
+                  image_url: { url: dataUrl, detail: "high" },
+                },
+                { type: "text", text: ANALYSIS_PROMPT },
+              ],
+            },
+          ],
+          max_tokens: 400,
+          temperature: 0.1,
+          response_format: { type: "json_object" },
+        });
 
-      const desc = analysis.choices[0]?.message?.content;
-      if (!desc) {
-        return NextResponse.json(
-          { error: "Failed to analyze floor plan. GPT-4o returned no description." },
-          { status: 502 }
-        );
+        const raw = analysis.choices[0]?.message?.content;
+        if (!raw) {
+          logger.debug(
+            "[generate-3d-render] GPT-4o returned empty analysis — using defaults"
+          );
+        } else {
+          structural = parseStructural(raw);
+        }
       }
-      roomDescription = desc;
     }
 
     // ── STEP 2: Generate render ──
@@ -272,9 +372,7 @@ export async function POST(req: NextRequest) {
 
     if (isRoomInterior && roomName) {
       // ── Room-specific interior: zoomed-in eye-level view of ONE room ──
-      const roomPrompt = ROOM_INTERIOR_PROMPT
-        .replace(/ROOM_NAME/g, roomName)
-        .replace("LAYOUT_DESC", roomDescription.substring(0, 2000));
+      const roomPrompt = ROOM_INTERIOR_PROMPT.replace(/ROOM_NAME/g, roomName);
 
       render = await withRetry(() =>
         client.images.edit({
@@ -288,8 +386,11 @@ export async function POST(req: NextRequest) {
       );
     } else {
       // ── Full-layout view: top-down or bird's eye of entire floor plan ──
-      const renderTemplate = RENDER_PROMPTS[layoutAngle || "topDown"] || RENDER_PROMPTS.topDown;
-      const renderPrompt = renderTemplate.replace("LAYOUT_DESC", roomDescription.substring(0, 2000));
+      // Prompts are intentionally static + neutral — no structural text is
+      // injected here. The model sees the floor plan image and must preserve
+      // its geometry from the image alone.
+      const renderPrompt =
+        RENDER_PROMPTS[layoutAngle || "topDown"] || RENDER_PROMPTS.topDown;
 
       // Pick the closest GPT-Image-1 size for the original floor plan ratio
       // so the rendered building visually aligns with the BEFORE in the
@@ -344,12 +445,23 @@ export async function POST(req: NextRequest) {
     const [renderedWidth, renderedHeight] = renderedSize.split("x").map((n) => parseInt(n, 10));
 
     await recordToolExecution(session.user.id, "3d-render");
+
+    // Neutral prose derived from the structural JSON — kept in the response
+    // for backward compatibility with the cinematic walkthrough pipeline,
+    // which reads `description.slice(0, 600)`. Room-interior calls skip the
+    // structural analysis entirely, so they return the DEFAULT_STRUCTURAL
+    // prose stub; that's fine because the client caches structural from the
+    // first (full-layout) call and forwards it to the cinematic endpoint
+    // itself.
+    const fullDescription = buildNeutralProse(structural);
+
     return NextResponse.json({
       success: true,
       image: resultDataUrl,
       angle,
-      description: roomDescription.substring(0, 500),
-      fullDescription: roomDescription, // Frontend caches this to avoid redundant GPT-4o calls
+      description: fullDescription.substring(0, 500),
+      fullDescription,
+      structural, // { buildingType, roomCount, rooms, footprint, openingsVisible }
       renderedSize,
       renderedWidth,
       renderedHeight,
