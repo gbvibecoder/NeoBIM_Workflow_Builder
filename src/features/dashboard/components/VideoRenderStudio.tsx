@@ -1833,12 +1833,6 @@ export default function VideoRenderStudio() {
       setStructural(detected);
       setFullDescription(first.fullDescription ?? "");
 
-      // DEV: remove in Commit 5 — helps localhost testing of the room detection.
-      if (process.env.NODE_ENV !== "production") {
-        // eslint-disable-next-line no-console
-        console.log("[3d-render] structural", detected);
-      }
-
       // ── 2. Decide which rooms to render ──
       // If detection returned at least one room, use the first N detected;
       // otherwise fall back to the pre-fix hardcoded residential three so the
