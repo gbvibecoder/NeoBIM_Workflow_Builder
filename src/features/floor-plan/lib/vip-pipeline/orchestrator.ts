@@ -11,16 +11,55 @@
  * Phase 1.4: Stage 2 (Parallel Image Generation) implemented.
  * Phase 1.5: 2-provider alignment (GPT Image 1.5 + Imagen 4).
  * Phase 1.6: Stage 3 (Extraction Readiness Jury) implemented.
- * Phase 1.7+: remaining stages implemented incrementally.
+ * Phase 1.7: Stage 4 (Room Extraction with GPT-4o Vision) implemented.
+ * Phase 1.8+: remaining stages implemented incrementally.
  */
 
-import type { VIPPipelineConfig, VIPPipelineResult } from "./types";
+import type { VIPPipelineConfig, VIPPipelineResult, GeneratedImage } from "./types";
+import type { Stage1Output } from "./types";
 import { VIPLogger } from "./logger";
 import type { VIPGenerationRecord } from "./logger";
 import { prisma } from "@/lib/db";
 import { runStage1PromptIntelligence } from "./stage-1-prompt";
 import { runStage2ParallelImageGen } from "./stage-2-images";
 import { runStage3ExtractionJury } from "./stage-3-jury";
+import { runStage4RoomExtraction } from "./stage-4-extract";
+
+/** Run Stage 4 extraction on a GPT image. Returns duration in ms. */
+async function runStage4Block(
+  gptImage: GeneratedImage,
+  stage1Output: Stage1Output,
+  log: VIPLogger,
+): Promise<number> {
+  log.logStageStart(4);
+  const start = Date.now();
+  try {
+    const { output: stage4Output, metrics: stage4Metrics } =
+      await runStage4RoomExtraction(
+        { image: gptImage, brief: stage1Output.brief },
+        log,
+      );
+    const ms = Date.now() - start;
+    const ext = stage4Output.extraction;
+    log.logStageSuccess(4, ms, {
+      rooms: ext.rooms.length,
+      missing: ext.expectedRoomsMissing.length,
+      unexpected: ext.unexpectedRoomsFound.length,
+      issues: ext.issues.length,
+      cost: `$${stage4Metrics.costUsd.toFixed(3)}`,
+    });
+    log.logFallThrough(
+      `Stages 5-7 not yet implemented — S1+S2+S3+S4 succeeded (${ext.rooms.length} rooms), falling through`,
+    );
+    return ms;
+  } catch (err) {
+    const ms = Date.now() - start;
+    const msg = err instanceof Error ? err.message : String(err);
+    log.logStageFailure(4, ms, msg);
+    log.logFallThrough(`Stage 4 failed: ${msg}`);
+    return ms;
+  }
+}
 
 export async function runVIPPipeline(
   config: VIPPipelineConfig,
@@ -38,6 +77,7 @@ export async function runVIPPipeline(
     let stage1Ms: number | undefined;
     let stage2Ms: number | undefined;
     let stage3Ms: number | undefined;
+    let stage4Ms: number | undefined;
 
     try {
       const { output: stage1Output, metrics: stage1Metrics } =
@@ -111,9 +151,11 @@ export async function runVIPPipeline(
             });
 
             if (v.recommendation === "pass") {
-              // Branch 1a: PASS — Stages 4-7 not yet implemented
-              log.logFallThrough(
-                `Stages 4-7 not yet implemented — jury PASS (score=${v.score}), falling through`,
+              // Branch 1a: PASS — run Stage 4 on original GPT image
+              stage4Ms = await runStage4Block(
+                gptImage,
+                stage1Output,
+                log,
               );
             } else if (v.recommendation === "retry") {
               // Branch 1b: RETRY — re-run Stage 2 GPT only (max 1 retry this phase)
@@ -141,6 +183,22 @@ export async function runVIPPipeline(
                     images: retryOutput.images.length,
                     note: "GPT retry after jury RETRY verdict",
                   });
+
+                  // Run Stage 4 on the retried GPT image
+                  const retriedGpt = retryOutput.images.find(
+                    (i) => i.model === "gpt-image-1.5",
+                  );
+                  if (retriedGpt?.base64) {
+                    stage4Ms = await runStage4Block(
+                      retriedGpt,
+                      stage1Output,
+                      log,
+                    );
+                  } else {
+                    log.logFallThrough(
+                      `Jury RETRY: GPT re-gen succeeded but no base64 — falling through`,
+                    );
+                  }
                 }
               } catch (retryErr) {
                 const msg =
@@ -152,10 +210,10 @@ export async function runVIPPipeline(
                   Date.now() - retryStart,
                   `GPT retry failed: ${msg}`,
                 );
+                log.logFallThrough(
+                  `Jury RETRY: GPT re-gen failed — falling through`,
+                );
               }
-              log.logFallThrough(
-                `Stages 4-7 not yet implemented — jury RETRY (score=${v.score}), falling through`,
-              );
             } else {
               // Branch 1c: FAIL
               log.logFallThrough(
@@ -190,9 +248,9 @@ export async function runVIPPipeline(
 
     const result: VIPPipelineResult = {
       success: false,
-      error: "VIP pipeline Stages 4-7 not yet implemented",
+      error: "VIP pipeline Stages 5-7 not yet implemented",
       shouldFallThrough: true,
-      timing: { stage1Ms, stage2Ms, stage3Ms, totalMs: Date.now() - startMs },
+      timing: { stage1Ms, stage2Ms, stage3Ms, stage4Ms, totalMs: Date.now() - startMs },
     };
 
     // Fire-and-forget DB persist — never blocks the response
