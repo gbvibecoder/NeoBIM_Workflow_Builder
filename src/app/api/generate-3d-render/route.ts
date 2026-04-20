@@ -376,7 +376,7 @@ export async function POST(req: NextRequest) {
 
       render = await withRetry(() =>
         client.images.edit({
-          model: "gpt-image-1",
+          model: "gpt-image-1.5",
           image: editImageFile,
           prompt: roomPrompt,
           size: "1024x1024",
@@ -400,7 +400,7 @@ export async function POST(req: NextRequest) {
       render = await withRetry(async () => {
         try {
           return await client.images.edit({
-            model: "gpt-image-1",
+            model: "gpt-image-1.5",
             image: editImageFile,
             prompt: renderPrompt,
             size: layoutSize,
@@ -408,12 +408,13 @@ export async function POST(req: NextRequest) {
             input_fidelity: "high",
           });
         } catch {
-          // Fallback to square if the model rejects the non-square request
+          // Fallback: let the model choose the best size itself rather than
+          // forcing 1024x1024 (which mangles rectangular plans).
           return await client.images.edit({
-            model: "gpt-image-1",
+            model: "gpt-image-1.5",
             image: editImageFile,
             prompt: renderPrompt,
-            size: "1024x1024",
+            size: "auto",
             quality: "high",
             input_fidelity: "high",
           });
