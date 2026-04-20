@@ -11,10 +11,11 @@
  * Planned implementation: Phase 1.6
  */
 
-import Anthropic from "@anthropic-ai/sdk";
+import type Anthropic from "@anthropic-ai/sdk";
 import type { Stage3Input, Stage3Output, JuryDimension } from "./types";
 import type { VIPLogger } from "./logger";
 import { Stage3RawOutputSchema } from "./schemas";
+import { createAnthropicClient } from "./clients";
 
 // ─── Constants ───────────────────────────────────────────────────
 
@@ -118,17 +119,6 @@ const TOOL_SCHEMA: Anthropic.Tool = {
     },
   },
 };
-
-// ─── Anthropic Client ────────────────────────────────────────────
-
-function createAnthropicClient(): Anthropic {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) throw new Error("ANTHROPIC_API_KEY is not set.");
-  const isOAuth = apiKey.startsWith("sk-ant-oat01-");
-  return isOAuth
-    ? new Anthropic({ authToken: apiKey, apiKey: undefined })
-    : new Anthropic({ apiKey });
-}
 
 // ─── Score Calculator ────────────────────────────────────────────
 

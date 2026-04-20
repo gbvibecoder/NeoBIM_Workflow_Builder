@@ -38,7 +38,7 @@ export async function scheduleVipWorker(jobId: string): Promise<string> {
   const result = await client.publishJSON({
     url: workerUrl,
     body: { jobId },
-    retries: 1,
+    retries: 0,
     timeout: "10m",
   });
 

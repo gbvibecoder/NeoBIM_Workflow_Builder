@@ -53,7 +53,6 @@ export function useVipGeneration() {
   const [currentStage, setCurrentStage] = useState<string | null>(null);
   const [stageLabel, setStageLabel] = useState("");
   const [costUsd, setCostUsd] = useState(0);
-  const [qualityScore, setQualityScore] = useState<number | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [project, setProject] = useState<FloorPlanProject | null>(null);
 
@@ -130,7 +129,6 @@ export function useVipGeneration() {
     setCurrentStage(null);
     setStageLabel("Submitting your request...");
     setCostUsd(0);
-    setQualityScore(null);
     setErrorMessage(null);
     setProject(null);
     stopPolling();
@@ -184,7 +182,6 @@ export function useVipGeneration() {
     currentStage,
     stageLabel,
     costUsd,
-    qualityScore,
     errorMessage,
     project,
     startGeneration,

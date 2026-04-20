@@ -300,10 +300,7 @@ export async function runStage5Synthesis(
   // Step 3: Resolve duplicates
   resolveDuplicates(transformed, [...extraction.expectedRoomsMissing], issues);
 
-  // Step 4: Populate room types from brief
-  const briefMap = new Map(
-    input.extraction.rooms.map((r) => [r.name.toLowerCase(), r]),
-  );
+  // Step 4: Populate room types from parsed constraints
   for (const room of transformed) {
     const briefRoom = input.parsedConstraints.rooms?.find(
       (pr) => pr.name.toLowerCase() === room.name.toLowerCase(),

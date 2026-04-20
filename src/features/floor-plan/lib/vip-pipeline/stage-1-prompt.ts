@@ -11,11 +11,12 @@
  * Planned implementation: Phase 1.3
  */
 
-import Anthropic from "@anthropic-ai/sdk";
+import type Anthropic from "@anthropic-ai/sdk";
 import type { Stage1Input, Stage1Output } from "./types";
 import type { VIPLogger } from "./logger";
 import { ARCHITECT_BRIEF_SYSTEM_PROMPT } from "./prompts/architect-brief";
 import { Stage1OutputSchema } from "./schemas";
+import { createAnthropicClient } from "./clients";
 
 // ─── Cost Constants (Claude Sonnet 4.6) ──────────────────────────
 
@@ -110,17 +111,6 @@ const TOOL_SCHEMA: Anthropic.Tool = {
     },
   },
 };
-
-// ─── Anthropic Client (matches claude-vision.ts pattern) ─────────
-
-function createAnthropicClient(): Anthropic {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) throw new Error("ANTHROPIC_API_KEY is not set.");
-  const isOAuth = apiKey.startsWith("sk-ant-oat01-");
-  return isOAuth
-    ? new Anthropic({ authToken: apiKey, apiKey: undefined })
-    : new Anthropic({ apiKey });
-}
 
 // ─── User Message Builder ────────────────────────────────────────
 

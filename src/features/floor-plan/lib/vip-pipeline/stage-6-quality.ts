@@ -9,7 +9,7 @@
  * FAIL (<45): VipJob marked FAILED
  */
 
-import Anthropic from "@anthropic-ai/sdk";
+import type Anthropic from "@anthropic-ai/sdk";
 import type {
   Stage6Input,
   Stage6Output,
@@ -19,6 +19,7 @@ import type { VIPLogger } from "./logger";
 import type { FloorPlanProject } from "@/types/floor-plan-cad";
 import type { ArchitectBrief } from "./types";
 import { Stage6RawOutputSchema } from "./schemas";
+import { createAnthropicClient } from "./clients";
 
 // ─── Constants ───────────────────────────────────────────────────
 
@@ -83,17 +84,6 @@ const TOOL_SCHEMA: Anthropic.Tool = {
     },
   },
 };
-
-// ─── Anthropic Client ────────────────────────────────────────────
-
-function createAnthropicClient(): Anthropic {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) throw new Error("ANTHROPIC_API_KEY is not set.");
-  const isOAuth = apiKey.startsWith("sk-ant-oat01-");
-  return isOAuth
-    ? new Anthropic({ authToken: apiKey, apiKey: undefined })
-    : new Anthropic({ apiKey });
-}
 
 // ─── Project Summary Builder ─────────────────────────────────────
 
