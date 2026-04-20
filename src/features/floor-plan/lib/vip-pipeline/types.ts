@@ -18,6 +18,11 @@ import type { FloorPlanProject } from "@/types/floor-plan-cad";
 export interface VIPPipelineConfig {
   prompt: string;
   parsedConstraints: ParsedConstraints;
+  /** Observability context — grouped for clean extensibility (experiment IDs, trace IDs, etc.) */
+  logContext: {
+    requestId: string;
+    userId: string;
+  };
 }
 
 // ─── Stage 1: Prompt Intelligence ────────────────────────────────
