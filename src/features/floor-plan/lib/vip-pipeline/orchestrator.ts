@@ -69,7 +69,7 @@ async function runStage4And5Block(
       issues: ext.issues.length,
       cost: `$${stage4Metrics.costUsd.toFixed(3)}`,
     });
-    await fireProgress(config, 90, "stage4");
+    await fireProgress(config, 60, "stage4");
   } catch (err) {
     stage4Ms = Date.now() - s4Start;
     const msg = err instanceof Error ? err.message : String(err);
@@ -101,7 +101,7 @@ async function runStage4And5Block(
       windows: s5Metrics.windowCount,
       issues: s5Output.issues.length,
     });
-    await fireProgress(config, 80, "stage5");
+    await fireProgress(config, 75, "stage5");
 
     return { stage4Ms, stage5Ms, project: s5Output.project };
   } catch (err) {
@@ -165,7 +165,7 @@ export async function runVIPPipeline(
         prompts: s1Out.imagePrompts.length,
         cost: `$${stage1Metrics.costUsd.toFixed(3)}`,
       });
-      await fireProgress(config, 25, "stage1");
+      await fireProgress(config, 20, "stage1");
 
       // ── Stage 2: Parallel Image Generation ────────────────────────
       log.logStageStart(2);
@@ -190,7 +190,7 @@ export async function runVIPPipeline(
           failed: failedModels.length > 0 ? failedModels.join(", ") : "none",
           cost: `$${stage2Metrics.totalCostUsd.toFixed(3)}`,
         });
-        await fireProgress(config, 50, "stage2");
+        await fireProgress(config, 35, "stage2");
 
         // ── Stage 3: Extraction Readiness Jury ────────────────────────
         const gptImage = stage2Output.images.find(
@@ -224,7 +224,7 @@ export async function runVIPPipeline(
                 v.weakAreas.length > 0 ? v.weakAreas.join(", ") : "none",
               cost: `$${stage3Metrics.costUsd.toFixed(3)}`,
             });
-            await fireProgress(config, 70, "stage3");
+            await fireProgress(config, 45, "stage3");
 
             if (v.recommendation === "pass") {
               // Branch 1a: PASS — run Stages 4+5 on original GPT image
@@ -299,14 +299,14 @@ export async function runVIPPipeline(
           weakAreas: s6Output.verdict.weakAreas.length > 0 ? s6Output.verdict.weakAreas.join(", ") : "none",
           cost: `$${s6Metrics.costUsd.toFixed(3)}`,
         });
-        await fireProgress(config, 90, "stage6");
+        await fireProgress(config, 85, "stage6");
 
         if (s6Output.verdict.recommendation === "pass") {
           finalProject = candidateProject;
         } else if (s6Output.verdict.recommendation === "retry" && retryCount === 0) {
           // ── RETRY LOOP (max 1) ──
           retryCount = 1;
-          await fireProgress(config, 35, "stage2-retry");
+          await fireProgress(config, 86, "retry");
           log.logStageStart(2, "Stage 2 GPT retry (quality gate)");
 
           try {
@@ -318,12 +318,12 @@ export async function runVIPPipeline(
               );
               const retriedGpt = retryS2.images.find((i) => i.model === "gpt-image-1.5");
               if (retriedGpt?.base64) {
-                await fireProgress(config, 50, "stage3-retry");
+                await fireProgress(config, 90, "retry");
                 const retryS45 = await runStage4And5Block(
                   retriedGpt, stage1Output!, config, config.parsedConstraints, log,
                 );
                 if (retryS45.project) {
-                  await fireProgress(config, 80, "stage5-retry");
+                  await fireProgress(config, 95, "retry");
                   // Re-run Stage 6 on retry result
                   log.logStageStart(6, "Quality Gate (retry)");
                   const { output: retryS6 } = await runStage6QualityGate(
