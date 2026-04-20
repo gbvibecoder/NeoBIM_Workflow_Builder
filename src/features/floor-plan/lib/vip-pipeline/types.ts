@@ -9,7 +9,6 @@
  * Stage 7 (Delivery) converts via toFloorPlanProject() → millimeters for the renderer.
  */
 
-import type { StripPackResult } from "../strip-pack/types";
 import type { ParsedConstraints } from "../structured-parser";
 import type { FloorPlanProject } from "@/types/floor-plan-cad";
 
