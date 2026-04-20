@@ -189,7 +189,7 @@ function buildUserMessage(input: Stage1Input): string {
   lines.push("");
   lines.push(
     "Produce the architect brief and exactly 3 image generation prompts " +
-      "(gpt-image-1, gemini-imagen, nano-banana).",
+      "(gpt-image-1.5, imagen-4.0-generate-001, gemini-3-pro-image-preview).",
   );
 
   return lines.join("\n");

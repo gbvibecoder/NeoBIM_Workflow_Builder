@@ -135,7 +135,7 @@ analyze to extract room positions. Images must be:
 
 PROMPT STRUCTURE FOR EACH MODEL:
 
-gpt-image-1 (model string: "gpt-image-1"):
+GPT Image 1.5 (model string: "gpt-image-1.5"):
 - Start with: "Architectural floor plan, top-down orthographic view, blueprint style."
 - Describe spatially: "Entrance on the [facing] side. Living room in the [zone]..."
 - Include ALL rooms with approximate relative sizes and positions.
@@ -144,7 +144,7 @@ gpt-image-1 (model string: "gpt-image-1"):
 - GPT responds well to scene descriptions and architectural vocabulary.
 - Prompt should be 80-150 words.
 
-gemini-imagen (model string: "gemini-imagen"):
+Imagen 4 Standard (model string: "imagen-4.0-generate-001"):
 - Start with: "Technical 2D floor plan diagram."
 - Use precise specifications: "[W]ft × [D]ft plot. Scale: precise proportions."
 - List rooms with positions: "Master Bedroom (14×12ft) in SW quadrant.
@@ -153,7 +153,7 @@ gemini-imagen (model string: "gemini-imagen"):
 - Gemini responds well to technical precision and structured data.
 - Prompt should be 80-150 words.
 
-nano-banana (model string: "nano-banana"):
+Nano Banana Pro (model string: "gemini-3-pro-image-preview"):
 - Start with: "Generate a floor plan layout drawing."
 - Use step-by-step narrative: "The plot is [W]×[D] feet. The entrance is
   on the [facing] wall. The plan has a central hallway dividing public and
@@ -170,9 +170,12 @@ NEGATIVE PROMPTS (include for ALL 3 models):
 rendering, decoration, landscaping, exterior view, cross-section"
 
 styleGuide for each model should be a short string like:
-- gpt-image-1: "blueprint, black-on-white, professional architectural drawing"
-- gemini-imagen: "technical diagram, precise proportions, minimal style"
-- nano-banana: "clean layout drawing, labeled rooms, high contrast"
+- gpt-image-1.5: "blueprint, black-on-white, professional architectural drawing"
+- imagen-4.0-generate-001: "technical diagram, precise proportions, minimal style"
+- gemini-3-pro-image-preview: "clean layout drawing, labeled rooms, high contrast"
+
+You MUST produce exactly 3 imagePrompts with these exact model strings:
+  "gpt-image-1.5", "imagen-4.0-generate-001", "gemini-3-pro-image-preview"
 
 ═══════════════════════════════════════════════════════════════
 EDGE CASE HANDLING
