@@ -159,34 +159,47 @@ export interface Stage5Output {
 
 // ─── Stage 6: Quality Gate ───────────────────────────────────────
 
+export type QualityDimension =
+  | "roomCountMatch"
+  | "noDuplicateNames"
+  | "dimensionPlausibility"
+  | "vastuCompliance"
+  | "orientationCorrect"
+  | "connectivity"
+  | "exteriorWindows";
+
+export interface QualityVerdict {
+  score: number; // 0-100 weighted average
+  dimensions: Record<QualityDimension, number>; // each 1-10
+  reasoning: string;
+  recommendation: "pass" | "retry" | "fail";
+  weakAreas: string[];
+}
+
 export interface Stage6Input {
-  result: StripPackResult;
+  project: FloorPlanProject;
   brief: ArchitectBrief;
-}
-
-export interface QualityIssue {
-  severity: "critical" | "warning" | "info";
-  category: string;
-  message: string;
-  suggestion?: string;
-}
-
-export interface Stage6Output {
-  passed: boolean;
-  score: number;
-  issues: QualityIssue[];
-  shouldRetry: boolean;
-}
-
-// ─── Stage 7: Delivery ──────────────────────────────────────────
-// Converts StripPackResult → FloorPlanProject via existing converter
-
-export interface Stage7Input {
-  result: StripPackResult;
   parsedConstraints: ParsedConstraints;
 }
 
-// Stage7Output = FloorPlanProject (no wrapper needed)
+export interface Stage6Output {
+  verdict: QualityVerdict;
+}
+
+// ─── Stage 7: Delivery ──────────────────────────────────────────
+
+export interface Stage7Input {
+  project: FloorPlanProject;
+  qualityScore: number;
+  totalCostUsd: number;
+  totalMs: number;
+  retried: boolean;
+  weakAreas: string[];
+}
+
+export interface Stage7Output {
+  project: FloorPlanProject;
+}
 
 // ─── Pipeline Timing ─────────────────────────────────────────────
 
@@ -209,6 +222,8 @@ export type VIPPipelineResult =
   | {
       success: true;
       project: FloorPlanProject;
+      qualityScore: number;
+      retried: boolean;
       timing: VIPTiming;
       warnings: string[];
     }
