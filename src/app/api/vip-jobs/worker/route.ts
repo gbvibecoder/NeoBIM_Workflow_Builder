@@ -93,6 +93,8 @@ export async function POST(req: NextRequest) {
 
     if (result.success) {
       // ── SUCCESS ──
+      const meta = result.project.metadata as unknown as Record<string, unknown>;
+      const costUsd = typeof meta.generation_cost_usd === "number" ? meta.generation_cost_usd : 0;
       await prisma.vipJob.update({
         where: { id: jobId },
         data: {
@@ -100,10 +102,11 @@ export async function POST(req: NextRequest) {
           progress: 100,
           currentStage: "complete",
           resultProject: JSON.parse(JSON.stringify(result.project)),
+          costUsd,
           completedAt: new Date(),
         },
       });
-      return NextResponse.json({ status: "COMPLETED" });
+      return NextResponse.json({ status: "COMPLETED", qualityScore: result.qualityScore });
     }
 
     // ── FALL_THROUGH or FAILURE ──

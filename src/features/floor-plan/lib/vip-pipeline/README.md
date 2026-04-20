@@ -53,12 +53,15 @@ Stage 7: Delivery
 
 ## Fail-Safe Design
 
-The orchestrator wraps all stages in try/catch. If ANY stage throws:
-1. Error is logged with stage context
-2. Returns `{ success: false, shouldFallThrough: true }`
-3. Route handler falls through to PIPELINE_REF (current production)
+The orchestrator wraps all stages in try/catch. On success:
+1. Returns `{ success: true, project, qualityScore, retried }`
+2. VipJob transitions to COMPLETED with resultProject
 
-VIP errors never 500 the endpoint. PIPELINE_REF is the safety net.
+On failure:
+1. Returns `{ success: false, shouldFallThrough: true }`
+2. Route handler falls through to PIPELINE_REF (safety net)
+
+VIP errors never 500 the endpoint. PIPELINE_REF is the fallback.
 
 ## API Keys
 
