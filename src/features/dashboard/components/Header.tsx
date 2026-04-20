@@ -111,8 +111,12 @@ export function Header({ title, subtitle, floating = false, theme = "dark" }: He
   // in both themes because it's a floating overlay.
   const isLight = theme === "light";
   const p = {
-    barBg: isLight ? "rgba(250,251,254,0.92)" : "rgba(10,12,20,0.8)",
-    barBorder: isLight ? "1px solid rgba(17,24,39,0.06)" : "1px solid rgba(255,255,255,0.1)",
+    // Light theme: no chrome. The header sits directly on the page's light
+    // gradient — no bg, no border, no blur — so the nav reads as part of
+    // the content surface instead of a distinct strip. Dark theme keeps
+    // its glass bar for contrast against page content.
+    barBg: isLight ? "transparent" : "rgba(10,12,20,0.8)",
+    barBorder: isLight ? "none" : "1px solid rgba(255,255,255,0.1)",
     iconBorder: isLight ? "rgba(17,24,39,0.08)" : "rgba(255,255,255,0.12)",
     iconBg: isLight ? "rgba(17,24,39,0.03)" : "rgba(255,255,255,0.05)",
     iconBorderHover: isLight ? "rgba(99,102,241,0.25)" : "rgba(255,191,0,0.25)",
@@ -149,10 +153,13 @@ export function Header({ title, subtitle, floating = false, theme = "dark" }: He
         minHeight: floating ? 48 : 52,
         flexShrink: 0,
         // Transparent overlay for immersive landing — otherwise dark or light
-        // bar depending on the page's content surface (theme prop).
+        // bar depending on the page's content surface (theme prop). Light
+        // theme drops the blur too — it's a glass effect designed for dark
+        // chrome over content, and on a fully-transparent light bar it only
+        // adds a perf tax with no visual benefit.
         background: floating ? "transparent" : p.barBg,
-        backdropFilter: floating ? "none" : "blur(20px)",
-        WebkitBackdropFilter: floating ? "none" : "blur(20px)",
+        backdropFilter: floating || isLight ? "none" : "blur(20px)",
+        WebkitBackdropFilter: floating || isLight ? "none" : "blur(20px)",
         borderBottom: floating ? "none" : p.barBorder,
         // Floating mode: absolute over the hero so content can fill the full
         // viewport. Static mode: relative in the flex flow.
