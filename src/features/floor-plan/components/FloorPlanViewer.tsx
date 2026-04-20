@@ -125,6 +125,14 @@ export function FloorPlanViewer({ initialGeometry, initialPrompt, initialProject
   const featureFlags = useFeatureFlags();
   const vip = useVipGeneration();
 
+  // Ref keeps current flag value readable from stale useCallback closures.
+  // Without this, executeGeneration (memoized with []) captures the initial
+  // false from before the async feature-flags fetch completes.
+  const vipEnabledRef = useRef(featureFlags.vipJobsEnabled);
+  useEffect(() => {
+    vipEnabledRef.current = featureFlags.vipJobsEnabled;
+  }, [featureFlags.vipJobsEnabled]);
+
   // Clean up on unmount
   useEffect(() => {
     return () => { abortRef.current?.abort(); };
@@ -152,7 +160,8 @@ export function FloorPlanViewer({ initialGeometry, initialPrompt, initialProject
    */
   const executeGeneration = useCallback(async (prompt: string) => {
     // ── VIP async path (feature-flagged) ──
-    if (featureFlags.vipJobsEnabled) {
+    // Read from ref (not closure) — see vipEnabledRef comment above.
+    if (vipEnabledRef.current) {
       const store = useFloorPlanStore.getState();
       store.startGeneration(prompt);
       setGenerationError(null);
