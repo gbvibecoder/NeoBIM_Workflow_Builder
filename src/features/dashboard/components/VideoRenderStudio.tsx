@@ -350,9 +350,18 @@ function HeroScene() {
 function ComparisonSlider({
   beforeSrc,
   afterSrc,
+  fullWidth = false,
 }: {
   beforeSrc: string | null;
   afterSrc: string | null;
+  /**
+   * When true, the slider fills its parent container's width instead of
+   * capping at `max-w-3xl`, and the after-image always uses `object-cover`
+   * so the render fills the frame instead of letterboxing when its aspect
+   * ratio differs from the uploaded plan. Used on the gallery step where
+   * the Full Layout render is the hero of the screen.
+   */
+  fullWidth?: boolean;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [sliderPos, setSliderPos] = useState(50);
@@ -382,7 +391,11 @@ function ComparisonSlider({
   // the floor plan ratio, use `cover` so the AFTER fills the container at
   // the same scale as BEFORE (cropping a thin band of empty render edge).
   // Beyond 20%, fall back to `contain` so we don't crop the actual building.
+  //
+  // `fullWidth` (gallery step) forces `cover` regardless of the diff — the
+  // caller has opted in to the crop in exchange for no gray letterbox bars.
   const afterFit: "cover" | "contain" = (() => {
+    if (fullWidth) return "cover";
     if (!afterAspect || imageAspect <= 0) return "contain";
     const diff = Math.abs(afterAspect - imageAspect) / imageAspect;
     return diff < 0.2 ? "cover" : "contain";
@@ -437,7 +450,7 @@ function ComparisonSlider({
   }, [beforeSrc, afterSrc, hasRevealed]);
 
   return (
-    <div className="w-full max-w-3xl mx-auto">
+    <div className={fullWidth ? "w-full" : "w-full max-w-3xl mx-auto"}>
       <div
         ref={containerRef}
         className="relative w-full overflow-hidden rounded-2xl select-none"
@@ -447,8 +460,11 @@ function ComparisonSlider({
           // maxHeight cap below, the full image is always shown — letterboxed
           // against #f8f8f8 in the unused dimension. This works for ANY
           // shape: square, wide panorama, tall portrait, triangle, L, U, etc.
+          //
+          // `fullWidth` lifts the height cap so the slider can scale with
+          // a wider parent without the aspect ratio being squashed.
           aspectRatio: imageAspect,
-          maxHeight: "min(70vh, 600px)",
+          maxHeight: fullWidth ? "min(80vh, 760px)" : "min(70vh, 600px)",
           minHeight: "240px",
           width: "100%",
           background: "#f8f8f8",
@@ -2684,7 +2700,11 @@ export default function VideoRenderStudio() {
                 <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.1 }}
                   className="text-sm text-gray-500 mt-1.5 max-w-md mx-auto italic">{COPY.gallery.subtitle}</motion.p>
               </div>
-              <ComparisonSlider beforeSrc={previewUrl} afterSrc={renders.find(r => r.id === selectedRender)?.url ?? null} />
+              <ComparisonSlider
+                beforeSrc={previewUrl}
+                afterSrc={renders.find(r => r.id === selectedRender)?.url ?? null}
+                fullWidth
+              />
               <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="flex justify-center mt-8">
                 <motion.button whileHover={{ scale: 1.04, y: -2 }} whileTap={{ scale: 0.96 }}
                   onClick={() => goToStep("video")}
