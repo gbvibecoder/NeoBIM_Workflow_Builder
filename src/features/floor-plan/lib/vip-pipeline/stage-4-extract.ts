@@ -130,9 +130,9 @@ const TOOL_FUNCTION: OpenAI.Chat.Completions.ChatCompletionTool = {
 // ─── Fuzzy Name Matching ─────────────────────────────────────────
 
 function wordOverlapScore(a: string, b: string): number {
-  const wordsA = a.toLowerCase().split(/\s+/).filter((w) => w.length > 1);
+  const wordsA = a.toLowerCase().split(/\s+/).filter((w) => w.length >= 1);
   const wordsB = new Set(
-    b.toLowerCase().split(/\s+/).filter((w) => w.length > 1),
+    b.toLowerCase().split(/\s+/).filter((w) => w.length >= 1),
   );
   if (wordsA.length === 0) return 0;
   let matches = 0;
