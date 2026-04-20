@@ -9,7 +9,9 @@
  * Phase 1.2: adds structured logging + DB persistence.
  * Phase 1.3: Stage 1 (Prompt Intelligence) implemented.
  * Phase 1.4: Stage 2 (Parallel Image Generation) implemented.
- * Phase 1.5+: remaining stages implemented incrementally.
+ * Phase 1.5: 2-provider alignment (GPT Image 1.5 + Imagen 4).
+ * Phase 1.6: Stage 3 (Extraction Readiness Jury) implemented.
+ * Phase 1.7+: remaining stages implemented incrementally.
  */
 
 import type { VIPPipelineConfig, VIPPipelineResult } from "./types";
@@ -18,6 +20,7 @@ import type { VIPGenerationRecord } from "./logger";
 import { prisma } from "@/lib/db";
 import { runStage1PromptIntelligence } from "./stage-1-prompt";
 import { runStage2ParallelImageGen } from "./stage-2-images";
+import { runStage3ExtractionJury } from "./stage-3-jury";
 
 export async function runVIPPipeline(
   config: VIPPipelineConfig,
@@ -34,6 +37,7 @@ export async function runVIPPipeline(
     const stage1Start = Date.now();
     let stage1Ms: number | undefined;
     let stage2Ms: number | undefined;
+    let stage3Ms: number | undefined;
 
     try {
       const { output: stage1Output, metrics: stage1Metrics } =
@@ -73,13 +77,102 @@ export async function runVIPPipeline(
           cost: `$${stage2Metrics.totalCostUsd.toFixed(3)}`,
         });
 
-        // Stage 2 succeeded. Stages 3-7 not yet implemented — fall through.
-        // NOTE: If future phases introduce async stages that can hang
-        // (Vercel timeout, API hang, etc.), we will need a "heartbeat" pattern:
-        // persist a RUNNING row on entry, update status on completion.
-        log.logFallThrough(
-          "Stages 3-7 not yet implemented — Stage 1+2 succeeded, falling through",
+        // ── Stage 3: Extraction Readiness Jury ────────────────────────
+        const gptImage = stage2Output.images.find(
+          (i) => i.model === "gpt-image-1.5",
         );
+
+        if (!gptImage || !gptImage.base64) {
+          // Branch 2: GPT image missing — only Imagen succeeded
+          log.logStageStart(3);
+          log.logStageFailure(3, 0, "No GPT image to evaluate — skipping jury");
+          log.logFallThrough(
+            "Stage 3 skipped: no GPT image for extraction jury",
+          );
+        } else {
+          log.logStageStart(3);
+          const stage3Start = Date.now();
+
+          try {
+            const { output: stage3Output, metrics: stage3Metrics } =
+              await runStage3ExtractionJury(
+                { gptImage, brief: stage1Output.brief },
+                log,
+              );
+            stage3Ms = Date.now() - stage3Start;
+
+            const v = stage3Output.verdict;
+            log.logStageSuccess(3, stage3Ms, {
+              score: v.score,
+              recommendation: v.recommendation,
+              weakAreas:
+                v.weakAreas.length > 0 ? v.weakAreas.join(", ") : "none",
+              cost: `$${stage3Metrics.costUsd.toFixed(3)}`,
+            });
+
+            if (v.recommendation === "pass") {
+              // Branch 1a: PASS — Stages 4-7 not yet implemented
+              log.logFallThrough(
+                `Stages 4-7 not yet implemented — jury PASS (score=${v.score}), falling through`,
+              );
+            } else if (v.recommendation === "retry") {
+              // Branch 1b: RETRY — re-run Stage 2 GPT only (max 1 retry this phase)
+              log.logStageStart(2, "Parallel Image Gen (GPT retry)");
+              const retryStart = Date.now();
+              try {
+                const gptPrompt = stage1Output.imagePrompts.find(
+                  (p) => p.model === "gpt-image-1.5",
+                );
+                if (gptPrompt) {
+                  const weakHint =
+                    v.weakAreas.length > 0
+                      ? `\n\nIMPORTANT: Previous attempt scored poorly on: ${v.weakAreas.join(", ")}. Pay extra attention to these areas.`
+                      : "";
+                  const amendedPrompts = [
+                    { ...gptPrompt, prompt: gptPrompt.prompt + weakHint },
+                  ];
+                  const { output: retryOutput } =
+                    await runStage2ParallelImageGen(
+                      { imagePrompts: amendedPrompts },
+                      log,
+                    );
+                  const retryMs = Date.now() - retryStart;
+                  log.logStageSuccess(2, retryMs, {
+                    images: retryOutput.images.length,
+                    note: "GPT retry after jury RETRY verdict",
+                  });
+                }
+              } catch (retryErr) {
+                const msg =
+                  retryErr instanceof Error
+                    ? retryErr.message
+                    : String(retryErr);
+                log.logStageFailure(
+                  2,
+                  Date.now() - retryStart,
+                  `GPT retry failed: ${msg}`,
+                );
+              }
+              log.logFallThrough(
+                `Stages 4-7 not yet implemented — jury RETRY (score=${v.score}), falling through`,
+              );
+            } else {
+              // Branch 1c: FAIL
+              log.logFallThrough(
+                `Jury FAIL (score=${v.score}): ${v.reasoning.slice(0, 100)}`,
+              );
+            }
+          } catch (stage3Err) {
+            // Branch 3: Stage 3 API failure — fall through, don't retry
+            stage3Ms = Date.now() - stage3Start;
+            const msg =
+              stage3Err instanceof Error
+                ? stage3Err.message
+                : String(stage3Err);
+            log.logStageFailure(3, stage3Ms, msg);
+            log.logFallThrough(`Stage 3 API failed: ${msg}`);
+          }
+        }
       } catch (stage2Err) {
         stage2Ms = Date.now() - stage2Start;
         const msg =
@@ -97,9 +190,9 @@ export async function runVIPPipeline(
 
     const result: VIPPipelineResult = {
       success: false,
-      error: "VIP pipeline Stages 3-7 not yet implemented",
+      error: "VIP pipeline Stages 4-7 not yet implemented",
       shouldFallThrough: true,
-      timing: { stage1Ms, stage2Ms, totalMs: Date.now() - startMs },
+      timing: { stage1Ms, stage2Ms, stage3Ms, totalMs: Date.now() - startMs },
     };
 
     // Fire-and-forget DB persist — never blocks the response
