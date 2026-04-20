@@ -107,33 +107,43 @@ export interface Stage3Output {
 
 // ─── Stage 4: Room Extraction ────────────────────────────────────
 
+export interface RectPx {
+  x: number; // left edge, pixels from image left
+  y: number; // top edge, pixels from image top (Y grows DOWN)
+  w: number; // width in pixels
+  h: number; // height in pixels
+}
+
+export interface ExtractedRoom {
+  name: string; // canonical name matched to brief.roomList
+  rectPx: RectPx;
+  confidence: number; // 0-1, Vision's self-assessed confidence
+  labelAsShown: string; // text as visible in image (may differ from name)
+}
+
+export interface ExtractedRooms {
+  imageSize: { width: number; height: number };
+  plotBoundsPx: RectPx | null;
+  rooms: ExtractedRoom[];
+  issues: string[];
+  expectedRoomsMissing: string[];
+  unexpectedRoomsFound: string[];
+}
+
 export interface Stage4Input {
   image: GeneratedImage;
   brief: ArchitectBrief;
 }
 
-export interface ExtractedRoom {
-  name: string;
-  type: string;
-  /** Normalized 0–1 coordinates (same convention as reference engine) */
-  nx: number;
-  ny: number;
-  nw: number;
-  nd: number;
-}
-
 export interface Stage4Output {
-  rooms: ExtractedRoom[];
-  hallway: { nx: number; ny: number; nw: number; nd: number } | null;
-  confidenceScore: number;
+  extraction: ExtractedRooms;
 }
 
 // ─── Stage 5: Synthesis ──────────────────────────────────────────
 // Output IS StripPackResult — reuses existing wall-builder/door-placer/window-placer
 
 export interface Stage5Input {
-  rooms: ExtractedRoom[];
-  hallway: Stage4Output["hallway"];
+  extraction: ExtractedRooms;
   plotWidthFt: number;
   plotDepthFt: number;
   facing: string;
