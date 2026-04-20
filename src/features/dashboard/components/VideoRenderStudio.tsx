@@ -134,10 +134,6 @@ const COPY = {
       "Almost done. Our AI just needed a coffee break.",
     ],
   },
-  gallery: {
-    title: "Plot Twist: Your Design Actually Looks Good",
-    subtitle: "Drag the slider to witness the glow-up. Left = your plan. Right = what we made of it.",
-  },
   video: {
     title: "Now in Cinematic Universe",
     subtitle: "Because static images are so 2024. Let's turn this into a walkthrough that'll make your clients weep.",
