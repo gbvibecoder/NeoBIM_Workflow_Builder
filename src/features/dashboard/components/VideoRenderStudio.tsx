@@ -24,13 +24,11 @@ import {
   Zap,
   Eye,
   Layers,
-  Camera,
   Check,
   MoveHorizontal,
   PenTool,
   Share2,
   Film,
-  Maximize2,
   AlertTriangle,
 } from "lucide-react";
 
@@ -161,29 +159,6 @@ const FULL_LAYOUT_VIEW: Omit<RenderResult, "url"> = {
   angle: "Top Down",
   apiAngle: "topDown",
 };
-
-// Last-resort hardcoded rooms, used only when GPT-4o structural analysis
-// yields zero detected rooms. Matches the pre-fix behavior so the UI never
-// degrades to an empty gallery.
-const FALLBACK_ROOM_VIEWS: Omit<RenderResult, "url">[] = [
-  { id: "r1", label: "Living Room", angle: "Interior View", apiAngle: "roomInterior:Living Room" },
-  { id: "r2", label: "Kitchen", angle: "Interior View", apiAngle: "roomInterior:Kitchen" },
-  { id: "r3", label: "Bedroom", angle: "Interior View", apiAngle: "roomInterior:Bedroom" },
-];
-
-const MAX_ROOM_VIEWS = 3;
-
-/** Build up to MAX_ROOM_VIEWS room interior views from detected room names. */
-function buildRoomViewsFromStructural(
-  rooms: readonly string[]
-): Omit<RenderResult, "url">[] {
-  return rooms.slice(0, MAX_ROOM_VIEWS).map((name, i) => ({
-    id: `r${i + 1}`,
-    label: name,
-    angle: "Interior View",
-    apiAngle: `roomInterior:${name}`,
-  }));
-}
 
 // Witty status messages cycled during real video generation. Same tone as
 // COPY.processing.stages so the video step feels consistent with rendering.
@@ -917,85 +892,6 @@ function ProcessingView({ progress }: { progress: number }) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// RENDER GALLERY
-// ═══════════════════════════════════════════════════════════════════════════════
-
-function RenderGallery({
-  renders,
-  selectedId,
-  onSelect,
-}: {
-  renders: RenderResult[];
-  selectedId: string;
-  onSelect: (id: string) => void;
-}) {
-  const roomIcons: Record<string, React.ReactNode> = {
-    "Living Room": <Layers size={14} />,
-    "Kitchen": <Camera size={14} />,
-    "Bedroom": <Eye size={14} />,
-    "Full Layout": <Maximize2 size={14} />,
-  };
-
-  const gradients = [
-    "linear-gradient(135deg, #fef3c7, #fde68a)",
-    "linear-gradient(135deg, #dbeafe, #bfdbfe)",
-    "linear-gradient(135deg, #ede9fe, #ddd6fe)",
-    "linear-gradient(135deg, #d1fae5, #a7f3d0)",
-  ];
-
-  // Column count tracks the number of renders so detected-room fallbacks
-  // (e.g. a plan with only 1 room + Full Layout = 2 tiles) don't stretch
-  // weirdly. Uses inline grid-template-columns instead of a Tailwind class
-  // because Tailwind JIT can't generate arbitrary grid-cols-N at build time.
-  const columns = Math.max(1, renders.length);
-  return (
-    <div
-      className="grid gap-2.5 mt-5 max-w-3xl mx-auto"
-      style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}
-    >
-      {renders.map((r, i) => {
-        const active = selectedId === r.id;
-        return (
-          <motion.button
-            key={r.id}
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: i * 0.08 }}
-            whileHover={{ y: -4, scale: 1.02 }}
-            whileTap={{ scale: 0.97 }}
-            onClick={() => onSelect(r.id)}
-            className={`relative rounded-xl overflow-hidden border-2 transition-all text-left ${
-              active ? "border-indigo-500 shadow-lg shadow-indigo-100 scale-[1.03]" : "border-gray-150 hover:border-indigo-200"
-            }`}
-          >
-            <div
-              className="aspect-[4/3] flex items-center justify-center overflow-hidden"
-              style={{ background: r.url ? undefined : (active ? gradients[i] : "#F9FAFB") }}
-            >
-              {r.url ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={r.url} alt={r.label} className="w-full h-full object-cover" draggable={false} />
-              ) : (
-                <div className="text-center">
-                  <div className={active ? "text-indigo-500" : "text-gray-300"}>{roomIcons[r.label] || <Camera size={14} />}</div>
-                  <p className={`text-[10px] mt-1 font-semibold ${active ? "text-indigo-600" : "text-gray-400"}`}>{r.angle}</p>
-                </div>
-              )}
-            </div>
-            <div className="px-2.5 py-1.5 bg-white border-t border-gray-100">
-              <div className="flex items-center gap-1.5">
-                <span className={active ? "text-indigo-500" : "text-gray-300"}>{roomIcons[r.label]}</span>
-                <p className="text-[11px] font-bold text-gray-700 truncate">{r.label}</p>
-              </div>
-            </div>
-          </motion.button>
-        );
-      })}
-    </div>
-  );
-}
-
-// ═══════════════════════════════════════════════════════════════════════════════
 // CINEMATIC STAGE INDICATOR
 // ═══════════════════════════════════════════════════════════════════════════════
 //
@@ -1589,7 +1485,7 @@ export default function VideoRenderStudio() {
   const [uploadedDims, setUploadedDims] = useState<{ width: number; height: number } | null>(null);
   const [renderProgress, setRenderProgress] = useState(0);
   const [renders, setRenders] = useState<RenderResult[]>([]);
-  const [selectedRender, setSelectedRender] = useState("r1");
+  const [selectedRender, setSelectedRender] = useState("r4");
   const [videoProgress, setVideoProgress] = useState(0);
   const [videoReady, setVideoReady] = useState(false);
   // ── Video state (real pipeline) ──
@@ -1827,49 +1723,19 @@ export default function VideoRenderStudio() {
     };
 
     try {
-      // ── 1. Full-layout call first — also returns the structural analysis ──
+      // Full Layout is the only render we produce now. The GPT-4o structural
+      // analysis is still returned in this response — we keep it (and the
+      // detected buildingType in particular) so the cinematic walkthrough
+      // pipeline downstream can consume it. Room-interior renders used to
+      // follow this call; they're gone because the Full Layout alone already
+      // tells the story the user needs before cinematic.
       const first = await callRender(FULL_LAYOUT_VIEW.apiAngle, FULL_LAYOUT_VIEW.label, null);
-      const detected = first.structural ?? null;
-      setStructural(detected);
+      setStructural(first.structural ?? null);
       setFullDescription(first.fullDescription ?? "");
 
-      // ── 2. Decide which rooms to render ──
-      // If detection returned at least one room, use the first N detected;
-      // otherwise fall back to the pre-fix hardcoded residential three so the
-      // gallery never renders empty. The full-layout render still works
-      // either way because it doesn't depend on room names.
-      const roomViewTemplates: Omit<RenderResult, "url">[] =
-        detected && detected.rooms.length > 0
-          ? buildRoomViewsFromStructural(detected.rooms)
-          : FALLBACK_ROOM_VIEWS;
-
-      const total = 1 + roomViewTemplates.length;
-      let completed = 1;
-      setRenderProgress((completed / total) * 100);
-
-      // Seed the results array now so the first (full-layout) tile has its URL.
-      const roomResults: RenderResult[] = roomViewTemplates.map((v) => ({ ...v, url: null }));
       const fullLayoutResult: RenderResult = { ...FULL_LAYOUT_VIEW, url: first.image };
-
-      // Cache the structural JSON so the server can skip GPT-4o on follow-up
-      // room-interior calls (those calls ignore structural internally, but
-      // forwarding it keeps the cross-call contract self-consistent).
-      const cachedStructuralJson = detected ? JSON.stringify(detected) : null;
-
-      // ── 3. Sequentially render each room interior ──
-      for (let i = 0; i < roomResults.length; i++) {
-        await delay(2000);
-        const rv = roomResults[i];
-        const r = await callRender(rv.apiAngle, rv.label, cachedStructuralJson);
-        roomResults[i] = { ...rv, url: r.image };
-        completed++;
-        setRenderProgress((completed / total) * 100);
-      }
-
-      // ── 4. Commit final gallery ordering: rooms first, Full Layout last ──
-      // The previous behavior also put Full Layout at the end of the grid;
-      // preserving that so users see identical ordering.
-      setRenders([...roomResults, fullLayoutResult]);
+      setRenderProgress(100);
+      setRenders([fullLayoutResult]);
       setSelectedRender("r4");
       goToStep("gallery");
     } catch (err: unknown) {
@@ -2637,7 +2503,7 @@ export default function VideoRenderStudio() {
     setUploadedDims(null);
     setRenderProgress(0);
     setRenders([]);
-    setSelectedRender("r1");
+    setSelectedRender("r4");
     setVideoProgress(0);
     setVideoReady(false);
     setVideoUrl(null);
@@ -2819,7 +2685,6 @@ export default function VideoRenderStudio() {
                   className="text-sm text-gray-500 mt-1.5 max-w-md mx-auto italic">{COPY.gallery.subtitle}</motion.p>
               </div>
               <ComparisonSlider beforeSrc={previewUrl} afterSrc={renders.find(r => r.id === selectedRender)?.url ?? null} />
-              <RenderGallery renders={renders} selectedId={selectedRender} onSelect={setSelectedRender} />
               <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="flex justify-center mt-8">
                 <motion.button whileHover={{ scale: 1.04, y: -2 }} whileTap={{ scale: 0.96 }}
                   onClick={() => goToStep("video")}
