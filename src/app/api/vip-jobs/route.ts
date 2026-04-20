@@ -15,15 +15,29 @@ import { prisma } from "@/lib/db";
 import { formatErrorResponse, UserErrors } from "@/lib/user-errors";
 import { scheduleVipWorker } from "@/lib/qstash";
 import { validateVipEnvVars } from "@/features/floor-plan/lib/vip-pipeline/env-check";
+import { shouldUserSeeVip } from "@/features/floor-plan/lib/vip-pipeline/canary";
 
 export async function POST(req: NextRequest) {
-  // Feature flag gate
-  if (process.env.PIPELINE_VIP_JOBS !== "true") {
+  // Auth first (needed for canary check)
+  const session = await auth();
+  if (!session?.user?.id) {
     return NextResponse.json(
-      { error: "VIP job queue is not enabled" },
+      formatErrorResponse(UserErrors.UNAUTHORIZED),
+      { status: 401 },
+    );
+  }
+  const userId = session.user.id;
+  const userEmail = session.user.email ?? null;
+
+  // Canary gate: master switch + allowlist/admin check
+  if (!shouldUserSeeVip(userEmail, userId)) {
+    console.log(`[vip-jobs] User ${userEmail ?? userId} — denied (not in VIP allowlist)`);
+    return NextResponse.json(
+      { error: "VIP generation not available" },
       { status: 503 },
     );
   }
+  console.log(`[vip-jobs] User ${userEmail ?? userId} — allowed`);
 
   // Validate required env vars (cached after first call)
   try {
@@ -33,16 +47,6 @@ export async function POST(req: NextRequest) {
     console.error("[vip-jobs]", msg);
     return NextResponse.json({ error: msg }, { status: 503 });
   }
-
-  // Auth
-  const session = await auth();
-  if (!session?.user?.id) {
-    return NextResponse.json(
-      formatErrorResponse(UserErrors.UNAUTHORIZED),
-      { status: 401 },
-    );
-  }
-  const userId = session.user.id;
 
   // Parse body
   const MAX_PROMPT_LENGTH = 2000;
