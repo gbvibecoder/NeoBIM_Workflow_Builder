@@ -19,9 +19,19 @@ interface HeaderProps {
    * only the right-side action pill needs to float above it.
    */
   floating?: boolean;
+  /**
+   * Color theme for the header chrome (background, borders, button
+   * colors, separator, profile trigger). Defaults to "dark" — white
+   * icons on the standard dark bar. Use "light" on pages whose content
+   * surface is light (e.g. /dashboard/3d-render) so the nav blends into
+   * the page instead of forming a dark strip above it. The profile
+   * dropdown (rendered in a portal) stays dark in both themes — it's a
+   * floating overlay and reads cleanly on any background.
+   */
+  theme?: "dark" | "light";
 }
 
-export function Header({ title, subtitle, floating = false }: HeaderProps) {
+export function Header({ title, subtitle, floating = false, theme = "dark" }: HeaderProps) {
   const router = useRouter();
   const { t, locale, setLocale } = useLocale();
   const { data: session } = useSession();
@@ -95,17 +105,55 @@ export function Header({ title, subtitle, floating = false }: HeaderProps) {
   const userEmail = session?.user?.email ?? "";
   const initial = (userName[0] ?? "U").toUpperCase();
 
+  // Light theme uses cool-grey chrome that sits on top of the page's light
+  // gradient surface (see /dashboard/3d-render). The dropdown portal is
+  // intentionally excluded from this palette — it keeps the dark styling
+  // in both themes because it's a floating overlay.
+  const isLight = theme === "light";
+  const p = {
+    barBg: isLight ? "rgba(250,251,254,0.92)" : "rgba(10,12,20,0.8)",
+    barBorder: isLight ? "1px solid rgba(17,24,39,0.06)" : "1px solid rgba(255,255,255,0.1)",
+    iconBorder: isLight ? "rgba(17,24,39,0.08)" : "rgba(255,255,255,0.12)",
+    iconBg: isLight ? "rgba(17,24,39,0.03)" : "rgba(255,255,255,0.05)",
+    iconBorderHover: isLight ? "rgba(99,102,241,0.25)" : "rgba(255,191,0,0.25)",
+    iconBgHover: isLight ? "rgba(99,102,241,0.06)" : "rgba(255,255,255,0.08)",
+    iconColor: isLight ? "#4B5563" : "#CBD5E0",
+    iconColorHover: isLight ? "#312E81" : "#F0F0F5",
+    langColor: isLight ? "#4B5563" : "#A0AEC0",
+    langColorHover: isLight ? "#6366F1" : "#FFBF00",
+    langBorderHover: isLight ? "rgba(99,102,241,0.25)" : "rgba(255,191,0,0.25)",
+    langBgHover: isLight ? "rgba(99,102,241,0.06)" : "rgba(255,191,0,0.06)",
+    separator: isLight ? "rgba(17,24,39,0.08)" : "rgba(255,255,255,0.06)",
+    profileBorder: isLight ? "1px solid rgba(17,24,39,0.08)" : "1px solid rgba(255,255,255,0.07)",
+    profileBorderActive: isLight ? "1px solid rgba(99,102,241,0.3)" : "1px solid rgba(255,191,0,0.3)",
+    profileBg: isLight ? "rgba(17,24,39,0.02)" : "rgba(255,255,255,0.03)",
+    profileBgActive: isLight ? "rgba(99,102,241,0.06)" : "rgba(255,191,0,0.06)",
+    profileHoverBorder: isLight ? "rgba(17,24,39,0.14)" : "rgba(255,255,255,0.12)",
+    profileHoverBg: isLight ? "rgba(17,24,39,0.04)" : "rgba(255,255,255,0.05)",
+    nameColor: isLight ? "#374151" : "#C8CDD8",
+    chevronColor: isLight ? "#6B7280" : "#9090A8",
+    avatarBg: isLight ? "linear-gradient(135deg, rgba(99,102,241,0.14), rgba(99,102,241,0.06))" : "linear-gradient(135deg, rgba(255,191,0,0.15), rgba(255,191,0,0.08))",
+    avatarBorder: isLight ? "1px solid rgba(99,102,241,0.18)" : "1px solid rgba(255,191,0,0.12)",
+    avatarInitialColor: isLight ? "#4338CA" : "#FFBF00",
+    titleColor: isLight ? "#1F2937" : "#F0F0F5",
+    subtitleColor: isLight ? "#6B7280" : "#9090A8",
+    betaColor: isLight ? "#B45309" : "#FFBF00",
+    betaBorder: isLight ? "1px solid rgba(180,83,9,0.2)" : "1px solid rgba(255,191,0,0.2)",
+    betaBg: isLight ? "rgba(180,83,9,0.06)" : "rgba(255,191,0,0.06)",
+  };
+
   return (
     <header
       className="flex items-center justify-between px-5 dashboard-header"
       style={{
         minHeight: floating ? 48 : 52,
         flexShrink: 0,
-        // Transparent overlay for immersive landing — full dark bar otherwise.
-        background: floating ? "transparent" : "rgba(10,12,20,0.8)",
+        // Transparent overlay for immersive landing — otherwise dark or light
+        // bar depending on the page's content surface (theme prop).
+        background: floating ? "transparent" : p.barBg,
         backdropFilter: floating ? "none" : "blur(20px)",
         WebkitBackdropFilter: floating ? "none" : "blur(20px)",
-        borderBottom: floating ? "none" : "1px solid rgba(255,255,255,0.1)",
+        borderBottom: floating ? "none" : p.barBorder,
         // Floating mode: absolute over the hero so content can fill the full
         // viewport. Static mode: relative in the flex flow.
         position: floating ? "absolute" : "relative",
@@ -125,7 +173,7 @@ export function Header({ title, subtitle, floating = false }: HeaderProps) {
       <div style={{ minWidth: 0, flex: title || subtitle ? 1 : "0 0 auto" }}>
         {title && (
           <div className="flex items-center gap-2.5">
-            <h1 style={{ fontSize: 18, fontWeight: 700, color: "#F0F0F5", letterSpacing: "-0.02em" }}>{title}</h1>
+            <h1 style={{ fontSize: 18, fontWeight: 700, color: p.titleColor, letterSpacing: "-0.02em" }}>{title}</h1>
             <span
               className="beta-badge"
               style={{
@@ -135,9 +183,9 @@ export function Header({ title, subtitle, floating = false }: HeaderProps) {
                 fontWeight: 700,
                 letterSpacing: "0.08em",
                 textTransform: "uppercase" as const,
-                color: "#FFBF00",
-                border: "1px solid rgba(255,191,0,0.2)",
-                background: "rgba(255,191,0,0.06)",
+                color: p.betaColor,
+                border: p.betaBorder,
+                background: p.betaBg,
                 fontFamily: "var(--font-jetbrains), monospace",
               }}
             >
@@ -146,7 +194,7 @@ export function Header({ title, subtitle, floating = false }: HeaderProps) {
           </div>
         )}
         {subtitle && (
-          <p className="font-mono-data" style={{ fontSize: 11, color: "#9090A8", marginTop: 1, letterSpacing: "0.02em" }}>{subtitle}</p>
+          <p className="font-mono-data" style={{ fontSize: 11, color: p.subtitleColor, marginTop: 1, letterSpacing: "0.02em" }}>{subtitle}</p>
         )}
       </div>
 
@@ -170,22 +218,22 @@ export function Header({ title, subtitle, floating = false }: HeaderProps) {
           style={{
             width: 36, height: 36,
             borderRadius: 10,
-            border: "1px solid rgba(255,255,255,0.12)",
-            background: "rgba(255,255,255,0.05)",
-            color: "#CBD5E0",
+            border: `1px solid ${p.iconBorder}`,
+            background: p.iconBg,
+            color: p.iconColor,
           }}
           onClick={() => {
             document.dispatchEvent(new KeyboardEvent("keydown", { key: "k", metaKey: true, bubbles: true }));
           }}
           onMouseEnter={e => {
-            e.currentTarget.style.borderColor = "rgba(255,191,0,0.25)";
-            e.currentTarget.style.background = "rgba(255,255,255,0.08)";
-            e.currentTarget.style.color = "#F0F0F5";
+            e.currentTarget.style.borderColor = p.iconBorderHover;
+            e.currentTarget.style.background = p.iconBgHover;
+            e.currentTarget.style.color = p.iconColorHover;
           }}
           onMouseLeave={e => {
-            e.currentTarget.style.borderColor = "rgba(255,255,255,0.12)";
-            e.currentTarget.style.background = "rgba(255,255,255,0.05)";
-            e.currentTarget.style.color = "#CBD5E0";
+            e.currentTarget.style.borderColor = p.iconBorder;
+            e.currentTarget.style.background = p.iconBg;
+            e.currentTarget.style.color = p.iconColor;
           }}
         >
           <Search size={14} />
@@ -200,9 +248,9 @@ export function Header({ title, subtitle, floating = false }: HeaderProps) {
             display: "flex", alignItems: "center", justifyContent: "center",
             height: 36, minWidth: 42, padding: "0 10px",
             borderRadius: 10,
-            border: "1px solid rgba(255,255,255,0.12)",
-            background: "rgba(255,255,255,0.05)",
-            color: "#A0AEC0",
+            border: `1px solid ${p.iconBorder}`,
+            background: p.iconBg,
+            color: p.langColor,
             fontSize: 11, fontWeight: 700,
             cursor: "pointer",
             fontFamily: "var(--font-jetbrains), monospace",
@@ -210,21 +258,21 @@ export function Header({ title, subtitle, floating = false }: HeaderProps) {
             transition: "all 0.2s ease",
           }}
           onMouseEnter={e => {
-            e.currentTarget.style.borderColor = "rgba(255,191,0,0.25)";
-            e.currentTarget.style.color = "#FFBF00";
-            e.currentTarget.style.background = "rgba(255,191,0,0.06)";
+            e.currentTarget.style.borderColor = p.langBorderHover;
+            e.currentTarget.style.color = p.langColorHover;
+            e.currentTarget.style.background = p.langBgHover;
           }}
           onMouseLeave={e => {
-            e.currentTarget.style.borderColor = "rgba(255,255,255,0.12)";
-            e.currentTarget.style.color = "#A0AEC0";
-            e.currentTarget.style.background = "rgba(255,255,255,0.05)";
+            e.currentTarget.style.borderColor = p.iconBorder;
+            e.currentTarget.style.color = p.langColor;
+            e.currentTarget.style.background = p.iconBg;
           }}
         >
           {locale === "en" ? "EN" : "DE"}
         </button>
 
         {/* Separator */}
-        <div style={{ width: 1, height: 20, background: "rgba(255,255,255,0.06)" }} />
+        <div style={{ width: 1, height: 20, background: p.separator }} />
 
         {/* Profile dropdown */}
         <div style={{ position: "relative" }}>
@@ -235,31 +283,33 @@ export function Header({ title, subtitle, floating = false }: HeaderProps) {
             style={{
               padding: "3px 8px 3px 3px",
               borderRadius: 10,
-              border: profileOpen ? "1px solid rgba(255,191,0,0.3)" : "1px solid rgba(255,255,255,0.07)",
-              background: profileOpen ? "rgba(255,191,0,0.06)" : "rgba(255,255,255,0.03)",
+              border: profileOpen ? p.profileBorderActive : p.profileBorder,
+              background: profileOpen ? p.profileBgActive : p.profileBg,
               cursor: "pointer",
               transition: "all 0.2s ease",
             }}
             onMouseEnter={e => {
               if (!profileOpen) {
-                e.currentTarget.style.borderColor = "rgba(255,255,255,0.12)";
-                e.currentTarget.style.background = "rgba(255,255,255,0.05)";
+                e.currentTarget.style.borderColor = p.profileHoverBorder;
+                e.currentTarget.style.background = p.profileHoverBg;
               }
             }}
             onMouseLeave={e => {
               if (!profileOpen) {
-                e.currentTarget.style.borderColor = "rgba(255,255,255,0.07)";
-                e.currentTarget.style.background = "rgba(255,255,255,0.03)";
+                // Re-extract from palette border strings (they include "1px solid ")
+                const baseBorder = p.profileBorder.replace(/^1px solid /, "");
+                e.currentTarget.style.borderColor = baseBorder;
+                e.currentTarget.style.background = p.profileBg;
               }
             }}
           >
             {/* Avatar */}
             <div style={{
               width: 30, height: 30, borderRadius: 8, overflow: "hidden",
-              background: "linear-gradient(135deg, rgba(255,191,0,0.15), rgba(255,191,0,0.08))",
-              border: "1px solid rgba(255,191,0,0.12)",
+              background: p.avatarBg,
+              border: p.avatarBorder,
               display: "flex", alignItems: "center", justifyContent: "center",
-              fontSize: 12, fontWeight: 700, color: "#FFBF00",
+              fontSize: 12, fontWeight: 700, color: p.avatarInitialColor,
               flexShrink: 0,
             }}>
               {avatarSrc ? (
@@ -270,13 +320,13 @@ export function Header({ title, subtitle, floating = false }: HeaderProps) {
               )}
             </div>
             <span className="profile-name-text" style={{
-              fontSize: 12, fontWeight: 600, color: "#C8CDD8",
+              fontSize: 12, fontWeight: 600, color: p.nameColor,
               maxWidth: 100, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
             }}>
               {userName.split(" ")[0]}
             </span>
             <ChevronDown size={11} style={{
-              color: "#9090A8",
+              color: p.chevronColor,
               transition: "transform 0.2s",
               transform: profileOpen ? "rotate(180deg)" : "rotate(0deg)",
             }} />
