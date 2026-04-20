@@ -2569,77 +2569,82 @@ export default function VideoRenderStudio() {
       })()}
 
       {/* ─── HERO — Three.js background + centered text ─── */}
-      {/* minHeight (not fixed height) so the badge + title + subtitle + stats
-          row can't get clipped on narrow or tall-fonted viewports. The Canvas
-          and radial fade both use `absolute inset-0` so they stretch with the
-          parent — no layout coupling to the previous 220px value. */}
-      <div className="relative overflow-hidden" style={{ minHeight: 220 }}>
-        {/* Three.js scene — alive and breathing */}
-        <div className="absolute inset-0" style={{ opacity: 0.55 }}>
-          <HeroScene />
+      {/* Rendered only on the Upload step. On Render/Gallery/Video the hero
+          is purely decorative and costs ~220px of vertical space that's
+          needed for the progress ring, the full-width render comparison,
+          and the video player. HeroScene + radial-fade + content hooks
+          have no side effects, so unmounting them on step change is safe;
+          the Canvas fully re-initializes when the user returns to Upload
+          via "Start Over". */}
+      {step === "upload" && (
+        <div className="relative overflow-hidden" style={{ minHeight: 220 }}>
+          {/* Three.js scene — alive and breathing */}
+          <div className="absolute inset-0" style={{ opacity: 0.55 }}>
+            <HeroScene />
+          </div>
+
+          {/* Radial fade overlay for text readability */}
+          <div className="absolute inset-0 pointer-events-none" style={{
+            background: "radial-gradient(ellipse 60% 70% at 50% 55%, rgba(250,251,254,0.15) 0%, rgba(250,251,254,0.88) 65%, rgba(250,251,254,0.97) 100%)",
+          }} />
+
+          {/* Content */}
+          <div className="relative z-10 h-full flex flex-col items-center justify-center text-center px-6">
+            {/* Badge */}
+            <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} className="flex items-center justify-center gap-2 mb-3">
+              <div style={{ width: 24, height: 1.5, background: "linear-gradient(90deg, transparent, #6366F1)", borderRadius: 1 }} />
+              <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: "3px", textTransform: "uppercase", color: "#6366F1", fontFamily: "var(--font-jetbrains, monospace)" }}>
+                AI-Powered Render Engine
+              </span>
+              <div style={{ width: 24, height: 1.5, background: "linear-gradient(90deg, #6366F1, transparent)", borderRadius: 1 }} />
+            </motion.div>
+
+            {/* Title */}
+            <motion.h1
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.1, duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+              className="text-2xl sm:text-3xl font-black leading-[1.12] tracking-tight"
+              style={{
+                background: "linear-gradient(135deg, #1E1B4B 0%, #312E81 40%, #4338CA 80%, #6366F1 100%)",
+                WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text",
+              }}
+            >
+              Your Floor Plan Deserves Better
+            </motion.h1>
+
+            {/* Subtitle */}
+            <motion.p
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2, duration: 0.5 }}
+              className="text-sm mt-2 max-w-lg mx-auto leading-relaxed"
+              style={{ color: "#6B7280" }}
+            >
+              2D to 3D in under 3 minutes.{" "}
+              <span className="italic" style={{ color: "#9CA3AF" }}>A glow-up they&apos;ve been needing since AutoCAD.</span>
+            </motion.p>
+
+            {/* Stats row */}
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.35 }}
+              className="flex items-center justify-center gap-5 mt-3">
+              {[
+                { value: "< 3 min", label: "Render" },
+                { value: "4 Angles", label: "Views" },
+                { value: "4K", label: "Quality" },
+              ].map((stat, i) => (
+                <React.Fragment key={stat.label}>
+                  {i > 0 && <div style={{ width: 1, height: 20, background: "rgba(99,102,241,0.1)" }} />}
+                  <div className="text-center">
+                    <div className="text-sm font-black" style={{ color: "#312E81" }}>{stat.value}</div>
+                    <div className="text-[8px] font-semibold uppercase tracking-widest" style={{ color: "#B0B0B8" }}>{stat.label}</div>
+                  </div>
+                </React.Fragment>
+              ))}
+            </motion.div>
+          </div>
         </div>
-
-        {/* Radial fade overlay for text readability */}
-        <div className="absolute inset-0 pointer-events-none" style={{
-          background: "radial-gradient(ellipse 60% 70% at 50% 55%, rgba(250,251,254,0.15) 0%, rgba(250,251,254,0.88) 65%, rgba(250,251,254,0.97) 100%)",
-        }} />
-
-        {/* Content */}
-        <div className="relative z-10 h-full flex flex-col items-center justify-center text-center px-6">
-          {/* Badge */}
-          <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} className="flex items-center justify-center gap-2 mb-3">
-            <div style={{ width: 24, height: 1.5, background: "linear-gradient(90deg, transparent, #6366F1)", borderRadius: 1 }} />
-            <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: "3px", textTransform: "uppercase", color: "#6366F1", fontFamily: "var(--font-jetbrains, monospace)" }}>
-              AI-Powered Render Engine
-            </span>
-            <div style={{ width: 24, height: 1.5, background: "linear-gradient(90deg, #6366F1, transparent)", borderRadius: 1 }} />
-          </motion.div>
-
-          {/* Title */}
-          <motion.h1
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1, duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-            className="text-2xl sm:text-3xl font-black leading-[1.12] tracking-tight"
-            style={{
-              background: "linear-gradient(135deg, #1E1B4B 0%, #312E81 40%, #4338CA 80%, #6366F1 100%)",
-              WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text",
-            }}
-          >
-            Your Floor Plan Deserves Better
-          </motion.h1>
-
-          {/* Subtitle */}
-          <motion.p
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2, duration: 0.5 }}
-            className="text-sm mt-2 max-w-lg mx-auto leading-relaxed"
-            style={{ color: "#6B7280" }}
-          >
-            2D to 3D in under 3 minutes.{" "}
-            <span className="italic" style={{ color: "#9CA3AF" }}>A glow-up they&apos;ve been needing since AutoCAD.</span>
-          </motion.p>
-
-          {/* Stats row */}
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.35 }}
-            className="flex items-center justify-center gap-5 mt-3">
-            {[
-              { value: "< 3 min", label: "Render" },
-              { value: "4 Angles", label: "Views" },
-              { value: "4K", label: "Quality" },
-            ].map((stat, i) => (
-              <React.Fragment key={stat.label}>
-                {i > 0 && <div style={{ width: 1, height: 20, background: "rgba(99,102,241,0.1)" }} />}
-                <div className="text-center">
-                  <div className="text-sm font-black" style={{ color: "#312E81" }}>{stat.value}</div>
-                  <div className="text-[8px] font-semibold uppercase tracking-widest" style={{ color: "#B0B0B8" }}>{stat.label}</div>
-                </div>
-              </React.Fragment>
-            ))}
-          </motion.div>
-        </div>
-      </div>
+      )}
 
       {/* ─── CONTENT — grows to push footer down ─── */}
       <div className="flex-1 max-w-4xl mx-auto px-6 pb-12 pt-6 w-full">
