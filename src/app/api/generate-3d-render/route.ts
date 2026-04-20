@@ -9,33 +9,48 @@ import { logger } from "@/lib/logger";
 // ─── Floor Plan → 3D Photorealistic Render ──────────────────────────────────
 // Pipeline: GPT-Image-1 images.edit — the model SEES the floor plan image
 // directly, preserving exact room layout, proportions, and adjacencies.
-// GPT-4o Vision provides a short room description for furniture/material detail.
+// GPT-4o Vision extracts STRUCTURAL metadata (room count, room names, footprint,
+// building type) used only for UI labels and downstream context — never
+// injected into the image-generation prompt, to keep it neutral and
+// geometry-first regardless of whether the plan is residential, commercial,
+// or mixed-use.
 // ─────────────────────────────────────────────────────────────────────────────
 
-// ─── GPT-4o extracts room names + furniture for the render prompt ───────────
-const ANALYSIS_PROMPT = `You are an expert architectural analyst. Look at this 2D floor plan and list:
+// ─── GPT-4o extracts STRUCTURAL metadata as JSON ─────────────────────────────
+// JSON-only output is parsed downstream. No furniture, no materials, no
+// residential assumptions — those biases leaked into the image prompt on the
+// previous version and caused complex commercial plans to hallucinate as
+// generic 2-bedroom apartments.
+const ANALYSIS_PROMPT = `You are an architectural analyst. Look at this 2D floor plan and extract STRUCTURAL information only. Output EXACTLY this JSON object and nothing else — no prose, no markdown fences:
 
-1. Every room name and its approximate dimensions
-2. What furniture belongs in each room (be specific: "king bed centered, 2 nightstands, wardrobe on east wall")
-3. Flooring type per room (hardwood for living/bedrooms, tile for kitchen/bath)
-4. Door and window positions per room
+{"buildingType":"residential|commercial|mixed-use|industrial|other","roomCount":<integer>,"rooms":[<up to 8 room names as they appear in the drawing, using generic labels like "Room 1", "Bathroom", "Corridor" if the room is unlabeled>],"footprint":"rectangle|L-shape|U-shape|irregular","openingsVisible":<boolean>}
 
-Keep it SHORT — under 800 words. Focus on room names, furniture, and materials. Do NOT describe room positions/layout — the image itself will handle spatial accuracy.`;
+Rules:
+- Do NOT invent rooms that are not clearly enclosed in the drawing.
+- Do NOT guess furniture, materials, or finishes.
+- Use the labels printed on the drawing when present; otherwise use a generic descriptor.
+- roomCount must equal the length of the rooms array.`;
 
 // ─── Render prompts ─────────────────────────────────────────────────────────
-// Full-layout views use images.edit with high fidelity (model SEES the floor plan).
-// Room-specific views generate zoomed-in interior renders of individual rooms.
+// Full-layout views use images.edit with high fidelity (model SEES the floor
+// plan). Room-specific views generate zoomed-in interior renders of individual
+// rooms.
+//
+// Neutral, geometry-first prompts: they never prescribe materials (no "oak",
+// no "tile"), never assume building type, and never inject upstream text
+// descriptions. The model's only job is to reproduce the input's walls,
+// rooms, openings, and footprint photorealistically.
 //
 // The "FILL CANVAS" instruction is critical for slider alignment: when the
 // route picks a non-square output size to match the floor plan ratio
-// (1536×1024 landscape or 1024×1536 portrait), we need GPT-Image-1 to fill
-// the entire frame edge-to-edge so the rendered building lines up with the
-// 2D floor plan in the BEFORE/AFTER comparison.
+// (1536×1024 landscape or 1024×1536 portrait), the image must fill the frame
+// so the rendered building aligns with the 2D plan in the BEFORE/AFTER
+// comparison.
 const RENDER_PROMPTS: Record<string, string> = {
   topDown:
-    "Transform this 2D floor plan into a photorealistic 3D top-down view from directly above with roof removed. LAYOUT_DESC. CRITICAL: This must be the original floor plan brought to life in 3D — SAME room positions, SAME proportions, SAME wall positions, SAME adjacencies. The 3D render MUST FILL THE ENTIRE IMAGE CANVAS edge-to-edge — no empty borders, no whitespace, no margins, no centered framing. The complete floor plan should occupy the FULL frame at the same proportions as the source image. Realistic furniture, flooring textures, proper shadows. Professional interior design rendering.",
+    "Photorealistic 3D top-down architectural render of the provided 2D floor plan. The result must EXACTLY match the input floor plan: same walls in the same positions, same room count, same room shapes, same openings, same overall footprint and proportions. Render realistic materials appropriate to each room's apparent function. Natural soft daylight. The render must fill the entire image canvas edge-to-edge with no borders, no whitespace, no margins, no centered framing. Roof removed. No text, no labels, no dimension lines, no annotations.",
   birdsEye:
-    "Transform this 2D floor plan into a photorealistic 3D isometric bird's-eye cutaway view at exactly 45 degrees with the roof removed, showing ALL rooms simultaneously. LAYOUT_DESC. CRITICAL: Preserve the EXACT room arrangement, sizes, proportions, and wall positions from the floor plan — do NOT move, resize, add, or remove any room. The 3D render MUST FILL THE ENTIRE IMAGE CANVAS edge-to-edge — no empty borders, no whitespace, no margins. Realistic furniture as described, warm oak flooring in living areas, tile in bathrooms/kitchen, warm natural lighting. Include room name labels. Ultra-detailed architectural rendering.",
+    "Photorealistic 3D isometric bird's-eye cutaway render of the provided 2D floor plan at exactly 45 degrees, roof removed, showing every enclosed space simultaneously. The result must EXACTLY match the input floor plan: same walls in the same positions, same room count, same room shapes, same openings, same overall footprint and proportions. Render realistic materials appropriate to each room's apparent function. Natural soft daylight. Ultra-detailed architectural visualization. The render must fill the entire image canvas edge-to-edge with no borders, no whitespace, no margins. No text, no labels, no dimension lines, no annotations.",
 };
 
 // ─── Output size selection ──────────────────────────────────────────────────
@@ -56,15 +71,18 @@ function pickRenderSize(width: number, height: number): RenderSize {
   return "1024x1024";
 }
 
-// Room-specific interior render prompt — ROOM_NAME and LAYOUT_DESC get replaced
+// Room-specific interior render prompt — ROOM_NAME gets replaced at call-site.
+// No LAYOUT_DESC injection, no material prescriptions, no residential styling
+// cues. The model sees the source image and must preserve the room's real
+// shape and openings on its own.
 const ROOM_INTERIOR_PROMPT =
-  "Photorealistic 3D interior photograph of ONLY the ROOM_NAME from this floor plan. " +
-  "Camera at eye level (1.5m height), standing inside the ROOM_NAME looking across the room. " +
+  "Photorealistic eye-level interior photograph of the ROOM_NAME in the provided floor plan. " +
+  "Camera at approximately 1.5 meters height, standing inside ROOM_NAME looking across the room. " +
   "Show ONLY this one room — do NOT show other rooms or the full layout. " +
-  "LAYOUT_DESC. " +
-  "Realistic materials, warm natural lighting from windows, modern furniture exactly as described for this room. " +
-  "The room dimensions and shape must match the floor plan. " +
-  "Professional interior design photography, sharp detail, 8K quality. No text or labels.";
+  "The room's shape, walls, and openings must match the floor plan exactly. " +
+  "Realistic materials and furnishings appropriate to the room's function. " +
+  "Natural soft daylight. Professional architectural photography, sharp detail. " +
+  "No text, no labels, no annotations.";
 
 // Retry helper for transient OpenAI rate limits (429) — does NOT retry billing/quota errors
 async function withRetry<T>(fn: () => Promise<T>, retries = 1, delayMs = 8000): Promise<T> {
