@@ -462,9 +462,12 @@ function ComparisonSlider({
           // shape: square, wide panorama, tall portrait, triangle, L, U, etc.
           //
           // `fullWidth` lifts the height cap so the slider can scale with
-          // a wider parent without the aspect ratio being squashed.
+          // a wider parent without the aspect ratio being squashed. 90vh
+          // lets the render truly dominate the viewport on laptops — at
+          // 720p that's ~648px, at 800p ~720px, which is the "big" the
+          // user asked for.
           aspectRatio: imageAspect,
-          maxHeight: fullWidth ? "min(80vh, 760px)" : "min(70vh, 600px)",
+          maxHeight: fullWidth ? "min(90vh, 1100px)" : "min(70vh, 600px)",
           minHeight: "240px",
           width: "100%",
           background: "#f8f8f8",
@@ -2647,25 +2650,34 @@ export default function VideoRenderStudio() {
       )}
 
       {/* ─── CONTENT — grows to push footer down ─── */}
-      <div className="flex-1 max-w-4xl mx-auto px-6 pb-12 pt-6 w-full">
-        <StepIndicator step={step} />
+      {/* Outer wrapper is full-width (no max-w cap) so the Gallery step can
+          expand the render frame edge-to-edge. Each inner block — stepper,
+          start-over button, per-step content — sets its OWN max-width so
+          the step's width tracks the content it holds. The stepper's width
+          follows the active step's cap (4xl for Upload/Processing/Video,
+          1400px for Gallery) so the progress bar stays visually anchored
+          to the content below it instead of being a narrower island. */}
+      <div className="flex-1 w-full pb-12 pt-6">
+        <div className={step === "gallery" ? "max-w-[1400px] mx-auto px-4 sm:px-6" : "max-w-4xl mx-auto px-6"}>
+          <StepIndicator step={step} />
 
-        {step !== "upload" && (
-          <div className="flex justify-end mb-3">
-            <motion.button
-              initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-              whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
-              onClick={handleReset}
-              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold text-gray-500 bg-white border border-gray-200 hover:border-gray-300 transition-colors shadow-sm"
-            >
-              <RotateCcw size={11} /> Start Over
-            </motion.button>
-          </div>
-        )}
+          {step !== "upload" && (
+            <div className="flex justify-end mb-3">
+              <motion.button
+                initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+                whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
+                onClick={handleReset}
+                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold text-gray-500 bg-white border border-gray-200 hover:border-gray-300 transition-colors shadow-sm"
+              >
+                <RotateCcw size={11} /> Start Over
+              </motion.button>
+            </div>
+          )}
+        </div>
 
         <AnimatePresence mode="wait">
           {step === "upload" && (
-            <motion.div key="upload" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, x: -40 }}>
+            <motion.div key="upload" className="max-w-4xl mx-auto px-6" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, x: -40 }}>
               {renderError && (
                 <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
                   className="mb-4 p-4 rounded-xl border border-red-200 bg-red-50 max-w-2xl mx-auto">
@@ -2697,18 +2709,17 @@ export default function VideoRenderStudio() {
           )}
 
           {step === "processing" && (
-            <motion.div key="processing" initial={{ opacity: 0, x: 40 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -40 }}>
+            <motion.div key="processing" className="max-w-4xl mx-auto px-6" initial={{ opacity: 0, x: 40 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -40 }}>
               <ProcessingView progress={renderProgress} />
             </motion.div>
           )}
 
           {step === "gallery" && (
-            <motion.div key="gallery" initial={{ opacity: 0, x: 40 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -40 }}>
-              <div className="text-center mb-6">
-                <motion.h2 initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-xl font-bold text-gray-900">{COPY.gallery.title}</motion.h2>
-                <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.1 }}
-                  className="text-sm text-gray-500 mt-1.5 max-w-md mx-auto italic">{COPY.gallery.subtitle}</motion.p>
-              </div>
+            <motion.div key="gallery" className="max-w-[1400px] mx-auto px-4 sm:px-6" initial={{ opacity: 0, x: 40 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -40 }}>
+              {/* Heading block dropped intentionally: the slider's own
+                  BEFORE/AFTER labels convey the comparison, and dropping
+                  ~80-100px of heading gives the render that vertical space
+                  on laptop viewports (720p). */}
               <ComparisonSlider
                 beforeSrc={previewUrl}
                 afterSrc={renders.find(r => r.id === selectedRender)?.url ?? null}
@@ -2726,7 +2737,7 @@ export default function VideoRenderStudio() {
           )}
 
           {step === "video" && (
-            <motion.div key="video" initial={{ opacity: 0, x: 40 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -40 }}>
+            <motion.div key="video" className="max-w-4xl mx-auto px-6" initial={{ opacity: 0, x: 40 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -40 }}>
               <ComparisonSlider beforeSrc={previewUrl} afterSrc={renders.find(r => r.id === selectedRender)?.url ?? null} />
               <VideoSection
                 mode={videoMode}
