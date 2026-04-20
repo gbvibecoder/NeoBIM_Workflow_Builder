@@ -54,6 +54,7 @@ model User {
   videoLikes        CommunityVideoLike[]
   survey            UserSurvey?
   vipGenerations    VipGeneration[]
+  vipJobs           VipJob[]
 
   @@map("users")
 }
@@ -812,4 +813,37 @@ model VipGeneration {
   @@index([userId, createdAt(sort: Desc)])
   @@index([status])
   @@map("vip_generations")
+}
+
+// ─── VIP Background Jobs ────────────────────────────────────────
+
+enum VipJobStatus {
+  QUEUED
+  RUNNING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+model VipJob {
+  id             String       @id @default(cuid())
+  userId         String
+  requestId      String       @unique
+  prompt         String
+  status         VipJobStatus @default(QUEUED)
+  progress       Int          @default(0)
+  currentStage   String?
+  resultProject  Json?
+  errorMessage   String?
+  costUsd        Float        @default(0)
+  startedAt      DateTime?
+  completedAt    DateTime?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([status])
+  @@map("vip_jobs")
 }
