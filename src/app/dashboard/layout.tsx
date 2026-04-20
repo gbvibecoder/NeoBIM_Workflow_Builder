@@ -34,7 +34,7 @@ export default function DashboardLayout({
       <Sidebar />
       <ErrorBoundary>
         <div className="flex flex-col flex-1 min-w-0 overflow-hidden" style={{ transition: "flex 0.3s cubic-bezier(0.4, 0, 0.2, 1)" }}>
-          {!isImmersive && <BetaBanner />}
+          {!isImmersive && !isLightSurface && <BetaBanner />}
           {!isImmersive && <Header theme={isLightSurface ? "light" : "dark"} />}
           <div className="flex-1 min-h-0 overflow-hidden" style={{ position: "relative" }}>
             {isImmersive && <Header floating />}
