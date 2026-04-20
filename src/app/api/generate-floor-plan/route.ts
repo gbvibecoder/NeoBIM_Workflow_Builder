@@ -79,6 +79,9 @@ import { runLLMLayoutEngine } from "@/features/floor-plan/lib/llm-layout-engine"
 // Phase 5 — Grid-Pack engine (PIPELINE_GRID feature flag)
 import { runGridPackEngine } from "@/features/floor-plan/lib/grid-pack-engine";
 
+// Phase 6 — Reference + Adapt engine (PIPELINE_REF feature flag)
+import { runReferenceEngine } from "@/features/floor-plan/lib/dynamic-reference-engine";
+
 // ── Generation Feedback ────────────────────────────────────────────────────
 
 interface GenerationFeedback {
@@ -292,6 +295,62 @@ export async function POST(req: NextRequest) {
     // the existing template+SA Pipeline A unchanged.
     const routing = routePrompt(prompt);
     logger.debug(`[ROUTER] pipeline=${routing.pipeline} signals=${routing.constraint_signals}`);
+
+    // ── Phase 6 — Reference + Adapt Engine (PIPELINE_REF) ──────────────
+    // THE FINAL ENGINE. Combines ALL learnings from 16 previous approaches:
+    // - GPT-4o generates using real reference plans as few-shot examples
+    // - Normalized (0-1) coords scale perfectly to any plot size
+    // - Strict validation catches bad output BEFORE it reaches the user
+    // - Retry with error feedback recovers most failures
+    // - Static reference fallback guarantees output for 100% of prompts
+    // Runs for ALL prompts (no routing gate).
+    if (process.env.PIPELINE_REF === "true") {
+      try {
+        const refStart = Date.now();
+        const refParseRes = await parseConstraints(prompt, apiKey);
+        const refParseMs = Date.now() - refStart;
+
+        const feasibility = checkPromptFeasibility(refParseRes.constraints);
+        if (!feasibility.feasible) {
+          return NextResponse.json({
+            error: feasibility.reason,
+            infeasibilityReason: feasibility.reason,
+          }, { status: 422 });
+        }
+
+        const refEngineStart = Date.now();
+        const result = await runReferenceEngine(prompt, refParseRes.constraints, apiKey);
+        const refEngineMs = Date.now() - refEngineStart;
+
+        const project = toFloorPlanProjectT1(result, refParseRes.constraints);
+        const layoutMetrics = computeLayoutMetrics(project, refParseRes.constraints);
+        const score = computeHonestScore(layoutMetrics);
+
+        logger.debug(`[REF-ENGINE] parse=${refParseMs}ms engine=${refEngineMs}ms eff=${result.metrics.efficiency_pct}% score=${score.score}`);
+        console.log(`[REF-ENGINE] ${result.rooms.length} rooms, ${result.walls.length} walls, ${result.doors.length} doors, score=${score.score}/100`);
+
+        const feedback = buildFeedback(project, prompt);
+        feedback.tips.push(`Reference Engine: ${result.metrics.efficiency_pct}% efficiency, honest score ${score.score}/100`);
+        await recordToolExecution(userId, "floor-plan");
+
+        return NextResponse.json({
+          project,
+          geometry: null,
+          feedback,
+          pipeline: "reference-engine",
+          pipeline_timing: {
+            parse_ms: refParseMs,
+            engine_ms: refEngineMs,
+            total_ms: Date.now() - refStart,
+          },
+          score,
+          warnings: result.warnings,
+        });
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.warn(`[REF-ENGINE] error — falling through: ${msg}`);
+      }
+    }
 
     // ── Phase 5 — Grid-Pack Engine (PIPELINE_GRID) ─────────────────────
     // LLM decides row grouping, algorithm computes exact coordinates.
