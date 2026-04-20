@@ -122,8 +122,8 @@ BRIEF PRODUCTION RULES
 IMAGE GENERATION PROMPT GUIDELINES
 ═══════════════════════════════════════════════════════════════
 
-You must produce exactly 3 image prompts. Each targets a different AI image model.
-All 3 must describe the SAME architectural layout but styled for each model's strengths.
+You must produce exactly 2 image prompts. Each targets a different AI image model.
+Both must describe the SAME architectural layout but styled for each model's strengths.
 
 The goal: generate a clean 2D floor plan IMAGE that a computer vision model can later
 analyze to extract room positions. Images must be:
@@ -134,6 +134,10 @@ analyze to extract room positions. Images must be:
 - NO furniture, NO people, NO shadows, NO 3D perspective
 
 PROMPT STRUCTURE FOR EACH MODEL:
+
+Produce imagePrompts in this exact order:
+  [0] gpt-image-1.5    — primary generator, GPT native multimodal
+  [1] imagen-4.0-generate-001 — secondary generator, Google diffusion
 
 GPT Image 1.5 (model string: "gpt-image-1.5"):
 - Start with: "Architectural floor plan, top-down orthographic view, blueprint style."
@@ -150,32 +154,19 @@ Imagen 4 Standard (model string: "imagen-4.0-generate-001"):
 - List rooms with positions: "Master Bedroom (14×12ft) in SW quadrant.
   Kitchen (10×8ft) in SE quadrant. Central hallway running E-W..."
 - End with: "Clean technical drawing, labeled rooms, minimal decoration."
-- Gemini responds well to technical precision and structured data.
+- Imagen responds well to technical precision and structured data.
 - Prompt should be 80-150 words.
 
-Nano Banana Pro (model string: "gemini-3-pro-image-preview"):
-- Start with: "Generate a floor plan layout drawing."
-- Use step-by-step narrative: "The plot is [W]×[D] feet. The entrance is
-  on the [facing] wall. The plan has a central hallway dividing public and
-  private zones..."
-- Describe the flow: "Entering from [facing], you pass through the foyer
-  into the hallway. Public rooms (living, dining, kitchen) are on the
-  [entrance side]. Private rooms (bedrooms) are on the [far side]."
-- End with: "2D plan view, labeled rooms, black walls, white background."
-- NanoBanana responds well to narrative, instruction-following prompts.
-- Prompt should be 80-150 words.
-
-NEGATIVE PROMPTS (include for ALL 3 models):
+NEGATIVE PROMPTS (include for BOTH models):
 "3D view, isometric, perspective, furniture, people, shadows, photorealistic,
 rendering, decoration, landscaping, exterior view, cross-section"
 
 styleGuide for each model should be a short string like:
 - gpt-image-1.5: "blueprint, black-on-white, professional architectural drawing"
 - imagen-4.0-generate-001: "technical diagram, precise proportions, minimal style"
-- gemini-3-pro-image-preview: "clean layout drawing, labeled rooms, high contrast"
 
-You MUST produce exactly 3 imagePrompts with these exact model strings:
-  "gpt-image-1.5", "imagen-4.0-generate-001", "gemini-3-pro-image-preview"
+You MUST produce exactly 2 imagePrompts with these exact model strings in this order:
+  [0] "gpt-image-1.5", [1] "imagen-4.0-generate-001"
 
 ═══════════════════════════════════════════════════════════════
 EDGE CASE HANDLING

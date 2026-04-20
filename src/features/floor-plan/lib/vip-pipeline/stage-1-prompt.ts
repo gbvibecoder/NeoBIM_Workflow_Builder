@@ -37,7 +37,7 @@ const TOOL_SCHEMA: Anthropic.Tool = {
   name: "produce_architect_brief",
   description:
     "Produce an architect brief and exactly 3 image generation prompts for a floor plan request. " +
-    "Call this tool with the complete brief and all 3 image prompts.",
+    "Call this tool with the complete brief and both image prompts.",
   input_schema: {
     type: "object" as const,
     required: ["brief", "imagePrompts"],
@@ -91,8 +91,8 @@ const TOOL_SCHEMA: Anthropic.Tool = {
       },
       imagePrompts: {
         type: "array" as const,
-        minItems: 3,
-        maxItems: 3,
+        minItems: 2,
+        maxItems: 2,
         items: {
           type: "object" as const,
           required: ["model", "prompt", "styleGuide"],
@@ -104,7 +104,7 @@ const TOOL_SCHEMA: Anthropic.Tool = {
           },
         },
         description:
-          "Exactly 3 prompts, one per model: gpt-image-1, gemini-imagen, nano-banana.",
+          "Exactly 2 prompts in order: [0] gpt-image-1.5, [1] imagen-4.0-generate-001.",
       },
     },
   },
@@ -189,7 +189,7 @@ function buildUserMessage(input: Stage1Input): string {
   lines.push("");
   lines.push(
     "Produce the architect brief and exactly 3 image generation prompts " +
-      "(gpt-image-1.5, imagen-4.0-generate-001, gemini-3-pro-image-preview).",
+      "(gpt-image-1.5 FIRST, imagen-4.0-generate-001 SECOND).",
   );
 
   return lines.join("\n");
@@ -254,9 +254,9 @@ export async function runStage1PromptIntelligence(
     if (!output.brief.roomList || output.brief.roomList.length === 0) {
       throw new Error("Stage 1: Claude produced empty roomList");
     }
-    if (!output.imagePrompts || output.imagePrompts.length !== 3) {
+    if (!output.imagePrompts || output.imagePrompts.length !== 2) {
       throw new Error(
-        `Stage 1: expected exactly 3 image prompts, got ${output.imagePrompts?.length ?? 0}`,
+        `Stage 1: expected exactly 2 image prompts, got ${output.imagePrompts?.length ?? 0}`,
       );
     }
 

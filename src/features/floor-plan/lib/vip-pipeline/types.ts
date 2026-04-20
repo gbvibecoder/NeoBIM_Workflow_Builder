@@ -43,7 +43,7 @@ export interface ArchitectBrief {
 }
 
 export interface ImageGenPrompt {
-  model: string; // e.g., "gpt-image-1", "gemini-imagen", "nano-banana"
+  model: string; // e.g., "gpt-image-1.5", "imagen-4.0-generate-001"
   prompt: string;
   negativePrompt?: string;
   styleGuide: string;
