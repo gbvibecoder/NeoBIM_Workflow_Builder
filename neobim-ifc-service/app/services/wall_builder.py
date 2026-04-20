@@ -16,11 +16,14 @@ def create_wall(
     elem: GeometryElement,
     storey: ifcopenshell.entity_instance,
     context: ifcopenshell.entity_instance,
+    storey_elevation: float = 0.0,
 ) -> ifcopenshell.entity_instance:
     """Create an IfcWall with extruded area solid representation.
 
     The wall is positioned along two vertices (start → end) with the given
-    thickness and height from element properties.
+    thickness and height from element properties. `storey_elevation` lifts
+    the wall onto its storey — without it, every wall collapses to Z=0 and
+    produces the "flying floor plates" bug.
     """
     props = elem.properties
     height = props.height or 3.0
@@ -49,8 +52,13 @@ def create_wall(
     from app.utils.ifc_helpers import assign_to_storey
     assign_to_storey(model, storey, wall)
 
-    # Build placement at wall origin
-    origin = model.create_entity("IfcCartesianPoint", Coordinates=(v0.x if v0 else 0.0, v0.y if v0 else 0.0, 0.0))
+    # Build placement at wall origin. Emitters (TS massing-generator + the
+    # baseline fixture) already put the absolute world Z on v0.z. When the
+    # vertex carries an explicit Z we trust it; when it's zero we fall back
+    # to the storey elevation so storey-local emitters still work.
+    v0_z = v0.z if v0 else 0.0
+    base_z = v0_z if v0_z else storey_elevation
+    origin = model.create_entity("IfcCartesianPoint", Coordinates=(v0.x if v0 else 0.0, v0.y if v0 else 0.0, base_z))
     dir_len = math.sqrt(dx * dx + dy * dy) if (dx * dx + dy * dy) > 1e-12 else 1.0
     ref_dir = model.create_entity("IfcDirection", DirectionRatios=(dx / dir_len, dy / dir_len, 0.0))
     axis = model.create_entity("IfcDirection", DirectionRatios=(0.0, 0.0, 1.0))

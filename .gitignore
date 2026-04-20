@@ -77,3 +77,6 @@ analytics-logs/
 *_VALIDATION.md
 *_AUDIT.md
 *_REQUIREMENTS.md
+*.pyc
+__pycache__/
+*.egg-info/
