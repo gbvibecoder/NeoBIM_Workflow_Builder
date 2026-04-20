@@ -12,7 +12,8 @@
  * Phase 1.5: 2-provider alignment (GPT Image 1.5 + Imagen 4).
  * Phase 1.6: Stage 3 (Extraction Readiness Jury) implemented.
  * Phase 1.7: Stage 4 (Room Extraction with GPT-4o Vision) implemented.
- * Phase 1.8+: remaining stages implemented incrementally.
+ * Phase 1.8: Stage 5 (Synthesis: pixels → feet → FloorPlanProject).
+ * Phase 1.9+: remaining stages implemented incrementally.
  */
 
 import type { VIPPipelineConfig, VIPPipelineResult, GeneratedImage } from "./types";
@@ -24,40 +25,89 @@ import { runStage1PromptIntelligence } from "./stage-1-prompt";
 import { runStage2ParallelImageGen } from "./stage-2-images";
 import { runStage3ExtractionJury } from "./stage-3-jury";
 import { runStage4RoomExtraction } from "./stage-4-extract";
+import { runStage5Synthesis } from "./stage-5-synthesis";
+import type { ParsedConstraints } from "../structured-parser";
+import type { FloorPlanProject } from "@/types/floor-plan-cad";
 
-/** Run Stage 4 extraction on a GPT image. Returns duration in ms. */
-async function runStage4Block(
+interface Stage4And5Result {
+  stage4Ms: number;
+  stage5Ms: number;
+  project?: FloorPlanProject;
+}
+
+/** Run Stage 4 extraction + Stage 5 synthesis on a GPT image. */
+async function runStage4And5Block(
   gptImage: GeneratedImage,
   stage1Output: Stage1Output,
+  parsedConstraints: ParsedConstraints,
   log: VIPLogger,
-): Promise<number> {
+): Promise<Stage4And5Result> {
+  let stage4Ms = 0;
+  let stage5Ms = 0;
+
+  // ── Stage 4: Room Extraction ──
   log.logStageStart(4);
-  const start = Date.now();
+  const s4Start = Date.now();
+  let stage4Output: Awaited<ReturnType<typeof runStage4RoomExtraction>>["output"];
   try {
-    const { output: stage4Output, metrics: stage4Metrics } =
+    const { output, metrics: stage4Metrics } =
       await runStage4RoomExtraction(
         { image: gptImage, brief: stage1Output.brief },
         log,
       );
-    const ms = Date.now() - start;
-    const ext = stage4Output.extraction;
-    log.logStageSuccess(4, ms, {
+    stage4Ms = Date.now() - s4Start;
+    stage4Output = output;
+    const ext = output.extraction;
+    log.logStageSuccess(4, stage4Ms, {
       rooms: ext.rooms.length,
       missing: ext.expectedRoomsMissing.length,
       unexpected: ext.unexpectedRoomsFound.length,
       issues: ext.issues.length,
       cost: `$${stage4Metrics.costUsd.toFixed(3)}`,
     });
-    log.logFallThrough(
-      `Stages 5-7 not yet implemented — S1+S2+S3+S4 succeeded (${ext.rooms.length} rooms), falling through`,
-    );
-    return ms;
   } catch (err) {
-    const ms = Date.now() - start;
+    stage4Ms = Date.now() - s4Start;
     const msg = err instanceof Error ? err.message : String(err);
-    log.logStageFailure(4, ms, msg);
+    log.logStageFailure(4, stage4Ms, msg);
     log.logFallThrough(`Stage 4 failed: ${msg}`);
-    return ms;
+    return { stage4Ms, stage5Ms };
+  }
+
+  // ── Stage 5: Synthesis ──
+  log.logStageStart(5);
+  const s5Start = Date.now();
+  try {
+    const { output: s5Output, metrics: s5Metrics } =
+      await runStage5Synthesis(
+        {
+          extraction: stage4Output.extraction,
+          plotWidthFt: stage1Output.brief.plotWidthFt,
+          plotDepthFt: stage1Output.brief.plotDepthFt,
+          facing: stage1Output.brief.facing,
+          parsedConstraints,
+        },
+        log,
+      );
+    stage5Ms = Date.now() - s5Start;
+    log.logStageSuccess(5, stage5Ms, {
+      rooms: s5Metrics.roomCount,
+      walls: s5Metrics.wallCount,
+      doors: s5Metrics.doorCount,
+      windows: s5Metrics.windowCount,
+      issues: s5Output.issues.length,
+    });
+
+    // Stages 6-7 not yet implemented
+    log.logFallThrough(
+      `Stages 6-7 not yet implemented — S1-S5 succeeded (${s5Metrics.roomCount} rooms, ${s5Metrics.wallCount} walls), falling through`,
+    );
+    return { stage4Ms, stage5Ms, project: s5Output.project };
+  } catch (err) {
+    stage5Ms = Date.now() - s5Start;
+    const msg = err instanceof Error ? err.message : String(err);
+    log.logStageFailure(5, stage5Ms, msg);
+    log.logFallThrough(`Stage 5 failed: ${msg}`);
+    return { stage4Ms, stage5Ms };
   }
 }
 
@@ -78,6 +128,7 @@ export async function runVIPPipeline(
     let stage2Ms: number | undefined;
     let stage3Ms: number | undefined;
     let stage4Ms: number | undefined;
+    let stage5Ms: number | undefined;
 
     try {
       const { output: stage1Output, metrics: stage1Metrics } =
@@ -151,12 +202,15 @@ export async function runVIPPipeline(
             });
 
             if (v.recommendation === "pass") {
-              // Branch 1a: PASS — run Stage 4 on original GPT image
-              stage4Ms = await runStage4Block(
+              // Branch 1a: PASS — run Stage 4+5 on original GPT image
+              const s45 = await runStage4And5Block(
                 gptImage,
                 stage1Output,
+                config.parsedConstraints,
                 log,
               );
+              stage4Ms = s45.stage4Ms;
+              stage5Ms = s45.stage5Ms;
             } else if (v.recommendation === "retry") {
               // Branch 1b: RETRY — re-run Stage 2 GPT only (max 1 retry this phase)
               log.logStageStart(2, "Parallel Image Gen (GPT retry)");
@@ -189,11 +243,14 @@ export async function runVIPPipeline(
                     (i) => i.model === "gpt-image-1.5",
                   );
                   if (retriedGpt?.base64) {
-                    stage4Ms = await runStage4Block(
+                    const s45 = await runStage4And5Block(
                       retriedGpt,
                       stage1Output,
+                      config.parsedConstraints,
                       log,
                     );
+                    stage4Ms = s45.stage4Ms;
+                    stage5Ms = s45.stage5Ms;
                   } else {
                     log.logFallThrough(
                       `Jury RETRY: GPT re-gen succeeded but no base64 — falling through`,
@@ -248,9 +305,9 @@ export async function runVIPPipeline(
 
     const result: VIPPipelineResult = {
       success: false,
-      error: "VIP pipeline Stages 5-7 not yet implemented",
+      error: "VIP pipeline Stages 6-7 not yet implemented",
       shouldFallThrough: true,
-      timing: { stage1Ms, stage2Ms, stage3Ms, stage4Ms, totalMs: Date.now() - startMs },
+      timing: { stage1Ms, stage2Ms, stage3Ms, stage4Ms, stage5Ms, totalMs: Date.now() - startMs },
     };
 
     // Fire-and-forget DB persist — never blocks the response
