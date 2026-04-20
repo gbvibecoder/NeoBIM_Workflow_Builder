@@ -2569,7 +2569,11 @@ export default function VideoRenderStudio() {
       })()}
 
       {/* ─── HERO — Three.js background + centered text ─── */}
-      <div className="relative overflow-hidden" style={{ height: 220 }}>
+      {/* minHeight (not fixed height) so the badge + title + subtitle + stats
+          row can't get clipped on narrow or tall-fonted viewports. The Canvas
+          and radial fade both use `absolute inset-0` so they stretch with the
+          parent — no layout coupling to the previous 220px value. */}
+      <div className="relative overflow-hidden" style={{ minHeight: 220 }}>
         {/* Three.js scene — alive and breathing */}
         <div className="absolute inset-0" style={{ opacity: 0.55 }}>
           <HeroScene />
