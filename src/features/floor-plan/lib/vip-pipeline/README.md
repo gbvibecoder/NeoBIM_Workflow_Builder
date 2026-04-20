@@ -20,7 +20,7 @@ Stage 1: Prompt Intelligence
 
 Stage 2: Parallel Image Generation
   Fire all image models in parallel (GPT-Image-1, Gemini Imagen,
-  NanoBanana Pro, etc.). Each produces a floor plan image.
+  Imagen 4 Standard). Each produces a floor plan image.
 
 Stage 3: Vision Jury
   Claude Sonnet evaluates all generated images and picks the best
@@ -104,6 +104,21 @@ Console output uses VIPLogger:
 
 **Future**: Phase 1.7 will add Upstash Redis hot counters for real-time
 success rate / latency percentiles and a Grafana-style admin dashboard.
+
+## Provider Configuration
+
+Stage 2 runs 2 image generators in parallel (Phase 1.5 decision):
+- **gpt-image-1.5** (OpenAI) — $0.034/image, primary generator
+- **imagen-4.0-generate-001** (Google) — $0.04/image, secondary generator
+
+Nano Banana Pro (`gemini-3-pro-image-preview`) was removed in Phase 1.5:
+preview model, frequent 503s, 3.9x more expensive than Imagen 4.
+
+To re-add a provider, create a new file in `providers/` and add one line
+to the `PROVIDERS` registry in `stage-2-images.ts`:
+```ts
+// "gemini-3-pro-image-preview": { generate: nanoBanana.generateImage, costPerImage: 0.134 },
+```
 
 ## Retention Policy
 

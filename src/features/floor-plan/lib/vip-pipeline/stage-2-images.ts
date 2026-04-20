@@ -17,7 +17,6 @@ import type {
 import type { VIPLogger } from "./logger";
 import { ImageGenError } from "./providers/types";
 import * as gptImage from "./providers/gpt-image";
-import * as nanoBanana from "./providers/nano-banana";
 import * as imagen from "./providers/imagen";
 
 // ─── Public Types ────────────────────────────────────────────────
@@ -49,10 +48,6 @@ const PROVIDERS: Record<
   "gpt-image-1.5": {
     generate: gptImage.generateImage,
     costPerImage: gptImage.COST_PER_IMAGE,
-  },
-  "gemini-3-pro-image-preview": {
-    generate: nanoBanana.generateImage,
-    costPerImage: nanoBanana.COST_PER_IMAGE,
   },
   "imagen-4.0-generate-001": {
     generate: imagen.generateImage,
