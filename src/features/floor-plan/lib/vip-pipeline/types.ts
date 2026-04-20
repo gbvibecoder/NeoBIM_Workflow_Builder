@@ -75,18 +75,34 @@ export interface Stage2Output {
   images: GeneratedImage[];
 }
 
-// ─── Stage 3: Vision Jury ────────────────────────────────────────
+// ─── Stage 3: Extraction Readiness Jury ──────────────────────────
+
+export type JuryDimension =
+  | "roomCountMatch"
+  | "labelLegibility"
+  | "noDuplicateLabels"
+  | "orientation"
+  | "vastuCompliance"
+  | "wallCompleteness"
+  | "proportionalHierarchy"
+  | "extractability";
+
+export interface JuryVerdict {
+  score: number; // 0-100 weighted average
+  dimensions: Record<JuryDimension, number>; // each 1-10
+  reasoning: string;
+  recommendation: "pass" | "retry" | "fail";
+  /** Dimension names scoring < 6/10 — used by retry prompt amendment */
+  weakAreas: string[];
+}
 
 export interface Stage3Input {
-  images: GeneratedImage[];
+  gptImage: GeneratedImage;
   brief: ArchitectBrief;
 }
 
 export interface Stage3Output {
-  winnerIndex: number;
-  winnerImage: GeneratedImage;
-  reasoning: string;
-  scores: Array<{ index: number; score: number; rationale: string }>;
+  verdict: JuryVerdict;
 }
 
 // ─── Stage 4: Room Extraction ────────────────────────────────────
