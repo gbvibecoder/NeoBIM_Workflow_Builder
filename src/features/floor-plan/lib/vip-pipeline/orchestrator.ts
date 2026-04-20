@@ -366,10 +366,11 @@ export async function runVIPPipeline(
     if (finalProject) {
       log.logStageStart(7);
       const s7Start = Date.now();
+      const totalCostUsd = log.computeTotalCost();
       const { output: s7Output } = runStage7Delivery({
         project: finalProject,
         qualityScore,
-        totalCostUsd: log.toDbRecord().totalCostUsd ?? 0,
+        totalCostUsd,
         totalMs: Date.now() - startMs,
         retried: retryCount > 0,
         weakAreas: [],

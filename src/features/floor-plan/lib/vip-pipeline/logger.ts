@@ -197,10 +197,15 @@ export class VIPLogger {
     };
   }
 
+  /** Sum all stage costs accumulated so far. Public for Stage 7 to read live total. */
+  computeTotalCost(): number {
+    return Object.values(this.stageCosts).reduce((s, c) => s + c, 0);
+  }
+
   // ── Private ────────────────────────────────────────────────────
 
   private sumCosts(): number {
-    return Object.values(this.stageCosts).reduce((s, c) => s + c, 0);
+    return this.computeTotalCost();
   }
 
   private json(lvl: string, event: string, data: Record<string, unknown>): void {
