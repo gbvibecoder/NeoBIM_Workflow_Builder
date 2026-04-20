@@ -13,7 +13,8 @@
  * Phase 1.6: Stage 3 (Extraction Readiness Jury) implemented.
  * Phase 1.7: Stage 4 (Room Extraction with GPT-4o Vision) implemented.
  * Phase 1.8: Stage 5 (Synthesis: pixels → feet → FloorPlanProject).
- * Phase 1.9+: remaining stages implemented incrementally.
+ * Phase 1.9: Background jobs (QStash + VipJob).
+ * Phase 1.10: Stage 6 (Quality Gate) + Stage 7 (Delivery) + retry loop.
  */
 
 import type { VIPPipelineConfig, VIPPipelineResult, GeneratedImage } from "./types";
@@ -26,6 +27,8 @@ import { runStage2ParallelImageGen } from "./stage-2-images";
 import { runStage3ExtractionJury } from "./stage-3-jury";
 import { runStage4RoomExtraction } from "./stage-4-extract";
 import { runStage5Synthesis } from "./stage-5-synthesis";
+import { runStage6QualityGate } from "./stage-6-quality";
+import { runStage7Delivery } from "./stage-7-deliver";
 import type { ParsedConstraints } from "../structured-parser";
 import type { FloorPlanProject } from "@/types/floor-plan-cad";
 
@@ -98,12 +101,8 @@ async function runStage4And5Block(
       windows: s5Metrics.windowCount,
       issues: s5Output.issues.length,
     });
-    await fireProgress(config, 100, "stage5");
+    await fireProgress(config, 80, "stage5");
 
-    // Stages 6-7 not yet implemented
-    log.logFallThrough(
-      `Stages 6-7 not yet implemented — S1-S5 succeeded (${s5Metrics.roomCount} rooms, ${s5Metrics.wallCount} walls), falling through`,
-    );
     return { stage4Ms, stage5Ms, project: s5Output.project };
   } catch (err) {
     stage5Ms = Date.now() - s5Start;
@@ -149,18 +148,21 @@ export async function runVIPPipeline(
     let stage3Ms: number | undefined;
     let stage4Ms: number | undefined;
     let stage5Ms: number | undefined;
+    let candidateProject: FloorPlanProject | undefined;
+    let stage1Output: Awaited<ReturnType<typeof runStage1PromptIntelligence>>["output"] | undefined;
 
     try {
-      const { output: stage1Output, metrics: stage1Metrics } =
+      const { output: s1Out, metrics: stage1Metrics } =
         await runStage1PromptIntelligence(
           { prompt: config.prompt, parsedConstraints: config.parsedConstraints },
           log,
         );
+      stage1Output = s1Out;
       stage1Ms = Date.now() - stage1Start;
 
       log.logStageSuccess(1, stage1Ms, {
-        rooms: stage1Output.brief.roomList.length,
-        prompts: stage1Output.imagePrompts.length,
+        rooms: s1Out.brief.roomList.length,
+        prompts: s1Out.imagePrompts.length,
         cost: `$${stage1Metrics.costUsd.toFixed(3)}`,
       });
       await fireProgress(config, 25, "stage1");
@@ -225,120 +227,180 @@ export async function runVIPPipeline(
             await fireProgress(config, 70, "stage3");
 
             if (v.recommendation === "pass") {
-              // Branch 1a: PASS — run Stage 4+5 on original GPT image
+              // Branch 1a: PASS — run Stages 4+5 on original GPT image
               const s45 = await runStage4And5Block(
-                gptImage,
-                stage1Output,
-                config,
-                config.parsedConstraints,
-                log,
+                gptImage, stage1Output, config, config.parsedConstraints, log,
               );
               stage4Ms = s45.stage4Ms;
               stage5Ms = s45.stage5Ms;
+              if (s45.project) candidateProject = s45.project;
             } else if (v.recommendation === "retry") {
-              // Branch 1b: RETRY — re-run Stage 2 GPT only (max 1 retry this phase)
-              log.logStageStart(2, "Parallel Image Gen (GPT retry)");
-              const retryStart = Date.now();
-              try {
-                const gptPrompt = stage1Output.imagePrompts.find(
-                  (p) => p.model === "gpt-image-1.5",
-                );
-                if (gptPrompt) {
-                  const weakHint =
-                    v.weakAreas.length > 0
-                      ? `\n\nIMPORTANT: Previous attempt scored poorly on: ${v.weakAreas.join(", ")}. Pay extra attention to these areas.`
-                      : "";
-                  const amendedPrompts = [
-                    { ...gptPrompt, prompt: gptPrompt.prompt + weakHint },
-                  ];
-                  const { output: retryOutput } =
-                    await runStage2ParallelImageGen(
-                      { imagePrompts: amendedPrompts },
-                      log,
-                    );
-                  const retryMs = Date.now() - retryStart;
-                  log.logStageSuccess(2, retryMs, {
-                    images: retryOutput.images.length,
-                    note: "GPT retry after jury RETRY verdict",
-                  });
-
-                  // Run Stage 4 on the retried GPT image
-                  const retriedGpt = retryOutput.images.find(
-                    (i) => i.model === "gpt-image-1.5",
-                  );
-                  if (retriedGpt?.base64) {
-                    const s45 = await runStage4And5Block(
-                      retriedGpt,
-                      stage1Output,
-                      config,
-                      config.parsedConstraints,
-                      log,
-                    );
-                    stage4Ms = s45.stage4Ms;
-                    stage5Ms = s45.stage5Ms;
-                  } else {
-                    log.logFallThrough(
-                      `Jury RETRY: GPT re-gen succeeded but no base64 — falling through`,
-                    );
-                  }
-                }
-              } catch (retryErr) {
-                const msg =
-                  retryErr instanceof Error
-                    ? retryErr.message
-                    : String(retryErr);
-                log.logStageFailure(
-                  2,
-                  Date.now() - retryStart,
-                  `GPT retry failed: ${msg}`,
-                );
-                log.logFallThrough(
-                  `Jury RETRY: GPT re-gen failed — falling through`,
-                );
-              }
-            } else {
-              // Branch 1c: FAIL
-              log.logFallThrough(
-                `Jury FAIL (score=${v.score}): ${v.reasoning.slice(0, 100)}`,
+              // Branch 1b: RETRY — run on original first, then retry
+              const s45First = await runStage4And5Block(
+                gptImage, stage1Output, config, config.parsedConstraints, log,
               );
+              stage4Ms = s45First.stage4Ms;
+              stage5Ms = s45First.stage5Ms;
+              if (s45First.project) candidateProject = s45First.project;
+            } else {
+              // Branch 1c: Stage 3 FAIL — run Stages 4+5 anyway (let Stage 6 decide)
+              const s45 = await runStage4And5Block(
+                gptImage, stage1Output, config, config.parsedConstraints, log,
+              );
+              stage4Ms = s45.stage4Ms;
+              stage5Ms = s45.stage5Ms;
+              if (s45.project) candidateProject = s45.project;
             }
           } catch (stage3Err) {
-            // Branch 3: Stage 3 API failure — fall through, don't retry
+            // Branch 3: Stage 3 API failure — skip jury, run S4+5 directly
             stage3Ms = Date.now() - stage3Start;
-            const msg =
-              stage3Err instanceof Error
-                ? stage3Err.message
-                : String(stage3Err);
+            const msg = stage3Err instanceof Error ? stage3Err.message : String(stage3Err);
             log.logStageFailure(3, stage3Ms, msg);
-            log.logFallThrough(`Stage 3 API failed: ${msg}`);
+            // Still try S4+5 without jury feedback
+            const s45 = await runStage4And5Block(
+              gptImage, stage1Output, config, config.parsedConstraints, log,
+            );
+            stage4Ms = s45.stage4Ms;
+            stage5Ms = s45.stage5Ms;
+            if (s45.project) candidateProject = s45.project;
           }
         }
       } catch (stage2Err) {
         stage2Ms = Date.now() - stage2Start;
-        const msg =
-          stage2Err instanceof Error ? stage2Err.message : String(stage2Err);
+        const msg = stage2Err instanceof Error ? stage2Err.message : String(stage2Err);
         log.logStageFailure(2, stage2Ms, msg);
-        log.logFallThrough(`Stage 2 failed: ${msg}`);
       }
     } catch (stage1Err) {
       stage1Ms = Date.now() - stage1Start;
-      const msg =
-        stage1Err instanceof Error ? stage1Err.message : String(stage1Err);
+      const msg = stage1Err instanceof Error ? stage1Err.message : String(stage1Err);
       log.logStageFailure(1, stage1Ms, msg);
-      log.logFallThrough(`Stage 1 failed: ${msg}`);
     }
 
-    const result: VIPPipelineResult = {
-      success: false,
-      error: "VIP pipeline Stages 6-7 not yet implemented",
-      shouldFallThrough: true,
-      timing: { stage1Ms, stage2Ms, stage3Ms, stage4Ms, stage5Ms, totalMs: Date.now() - startMs },
-    };
+    // ── Stage 6: Quality Gate ────────────────────────────────────
+    let stage6Ms: number | undefined;
+    let stage7Ms: number | undefined;
+    let qualityScore = 0;
+    let retryCount = 0;
+    let finalProject: FloorPlanProject | undefined;
 
-    // Fire-and-forget DB persist — never blocks the response
+    if (candidateProject) {
+      log.logStageStart(6);
+      const s6Start = Date.now();
+      try {
+        const { output: s6Output, metrics: s6Metrics } = await runStage6QualityGate(
+          { project: candidateProject, brief: stage1Output!.brief, parsedConstraints: config.parsedConstraints },
+          log,
+        );
+        stage6Ms = Date.now() - s6Start;
+        qualityScore = s6Output.verdict.score;
+        log.logStageSuccess(6, stage6Ms, {
+          score: qualityScore,
+          recommendation: s6Output.verdict.recommendation,
+          weakAreas: s6Output.verdict.weakAreas.length > 0 ? s6Output.verdict.weakAreas.join(", ") : "none",
+          cost: `$${s6Metrics.costUsd.toFixed(3)}`,
+        });
+        await fireProgress(config, 90, "stage6");
+
+        if (s6Output.verdict.recommendation === "pass") {
+          finalProject = candidateProject;
+        } else if (s6Output.verdict.recommendation === "retry" && retryCount === 0) {
+          // ── RETRY LOOP (max 1) ──
+          retryCount = 1;
+          await fireProgress(config, 35, "stage2-retry");
+          log.logStageStart(2, "Stage 2 GPT retry (quality gate)");
+
+          try {
+            const gptPrompt = stage1Output!.imagePrompts.find((p) => p.model === "gpt-image-1.5");
+            if (gptPrompt) {
+              const weakHint = `\n\nIMPORTANT: Previous attempt scored ${qualityScore}/100. Scored poorly on: ${s6Output.verdict.weakAreas.join(", ")}. Pay extra attention.`;
+              const { output: retryS2 } = await runStage2ParallelImageGen(
+                { imagePrompts: [{ ...gptPrompt, prompt: gptPrompt.prompt + weakHint }] }, log,
+              );
+              const retriedGpt = retryS2.images.find((i) => i.model === "gpt-image-1.5");
+              if (retriedGpt?.base64) {
+                await fireProgress(config, 50, "stage3-retry");
+                const retryS45 = await runStage4And5Block(
+                  retriedGpt, stage1Output!, config, config.parsedConstraints, log,
+                );
+                if (retryS45.project) {
+                  await fireProgress(config, 80, "stage5-retry");
+                  // Re-run Stage 6 on retry result
+                  log.logStageStart(6, "Quality Gate (retry)");
+                  const { output: retryS6 } = await runStage6QualityGate(
+                    { project: retryS45.project, brief: stage1Output!.brief, parsedConstraints: config.parsedConstraints }, log,
+                  );
+                  const retryScore = retryS6.verdict.score;
+                  log.logStageSuccess(6, Date.now() - s6Start, { score: retryScore, note: "retry attempt" });
+                  // Keep the better result
+                  if (retryScore > qualityScore) {
+                    finalProject = retryS45.project;
+                    qualityScore = retryScore;
+                  } else {
+                    finalProject = candidateProject;
+                  }
+                }
+              }
+            }
+          } catch (retryErr) {
+            const msg = retryErr instanceof Error ? retryErr.message : String(retryErr);
+            log.logStageFailure(2, 0, `Retry loop failed: ${msg}`);
+            // Keep original candidateProject
+            finalProject = candidateProject;
+          }
+          if (!finalProject) finalProject = candidateProject;
+        } else if (s6Output.verdict.recommendation === "fail") {
+          // Quality gate failed — but still deliver if score > 0
+          if (qualityScore > 0) finalProject = candidateProject;
+        }
+      } catch (s6Err) {
+        stage6Ms = Date.now() - s6Start;
+        const msg = s6Err instanceof Error ? s6Err.message : String(s6Err);
+        log.logStageFailure(6, stage6Ms, msg);
+        // Stage 6 API failure — deliver candidate without quality score
+        finalProject = candidateProject;
+        qualityScore = 0;
+      }
+    }
+
+    // ── Stage 7: Delivery ────────────────────────────────────────
+    if (finalProject) {
+      log.logStageStart(7);
+      const s7Start = Date.now();
+      const { output: s7Output } = runStage7Delivery({
+        project: finalProject,
+        qualityScore,
+        totalCostUsd: log.toDbRecord().totalCostUsd ?? 0,
+        totalMs: Date.now() - startMs,
+        retried: retryCount > 0,
+        weakAreas: [],
+      }, log);
+      stage7Ms = Date.now() - s7Start;
+      log.logStageSuccess(7, stage7Ms, { qualityScore });
+      await fireProgress(config, 100, "stage7");
+      log.logSuccess(qualityScore);
+
+      persistRecord(log.toDbRecord()).catch(() => {});
+
+      return {
+        success: true,
+        project: s7Output.project,
+        qualityScore,
+        retried: retryCount > 0,
+        timing: { stage1Ms, stage2Ms, stage3Ms, stage4Ms, stage5Ms, stage6Ms, stage7Ms, totalMs: Date.now() - startMs },
+        warnings: [],
+      };
+    }
+
+    // ── No project produced — fall through ──
+    log.logFallThrough("Pipeline produced no project");
     persistRecord(log.toDbRecord()).catch(() => {});
 
-    return result;
+    return {
+      success: false,
+      error: "Pipeline produced no project",
+      shouldFallThrough: true,
+      timing: { stage1Ms, stage2Ms, stage3Ms, stage4Ms, stage5Ms, stage6Ms, totalMs: Date.now() - startMs },
+    };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     log.logFailure(message);
