@@ -14,6 +14,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import type { Stage3Input, Stage3Output, JuryDimension } from "./types";
 import type { VIPLogger } from "./logger";
+import { Stage3RawOutputSchema } from "./schemas";
 
 // ─── Constants ───────────────────────────────────────────────────
 
@@ -268,20 +269,24 @@ export async function runStage3ExtractionJury(
       );
     }
 
-    const raw = toolUse.input as {
-      dimensions: Record<JuryDimension, number>;
-      reasoning: string;
-    };
+    // ── Validate LLM output against Zod schema ──
+    const parsed = Stage3RawOutputSchema.safeParse(toolUse.input);
+    if (!parsed.success) {
+      throw new Error(
+        `Stage 3: LLM returned malformed output: ${parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ")}`,
+      );
+    }
+    const raw = parsed.data;
 
-    // ── Runtime validation — default missing dimensions to 5 ──
+    // ── Clamp dimensions to 1-10, default missing to 5 ──
     const safeDimensions = {} as Record<JuryDimension, number>;
     for (const dim of ALL_DIMS) {
-      const val = raw.dimensions?.[dim];
+      const val = raw.dimensions[dim as keyof typeof raw.dimensions];
       safeDimensions[dim] =
         typeof val === "number" ? Math.max(1, Math.min(10, val)) : 5;
     }
 
-    const output = computeVerdict(safeDimensions, raw.reasoning ?? "");
+    const output = computeVerdict(safeDimensions, raw.reasoning);
 
     return {
       output,

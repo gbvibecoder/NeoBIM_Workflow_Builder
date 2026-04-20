@@ -15,6 +15,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import type { Stage1Input, Stage1Output } from "./types";
 import type { VIPLogger } from "./logger";
 import { ARCHITECT_BRIEF_SYSTEM_PROMPT } from "./prompts/architect-brief";
+import { Stage1OutputSchema } from "./schemas";
 
 // ─── Cost Constants (Claude Sonnet 4.6) ──────────────────────────
 
@@ -243,7 +244,14 @@ export async function runStage1PromptIntelligence(
       );
     }
 
-    const output = toolUse.input as Stage1Output;
+    // ── Validate LLM output against Zod schema ──
+    const parsed = Stage1OutputSchema.safeParse(toolUse.input);
+    if (!parsed.success) {
+      throw new Error(
+        `Stage 1: LLM returned malformed output: ${parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ")}`,
+      );
+    }
+    const output: Stage1Output = parsed.data;
 
     // ── Post-call validation ──
     if (output.brief.projectType === "NOT_FLOOR_PLAN") {
@@ -251,12 +259,12 @@ export async function runStage1PromptIntelligence(
         `Stage 1: prompt is not a floor plan request: "${input.prompt.slice(0, 80)}"`,
       );
     }
-    if (!output.brief.roomList || output.brief.roomList.length === 0) {
+    if (output.brief.roomList.length === 0) {
       throw new Error("Stage 1: Claude produced empty roomList");
     }
-    if (!output.imagePrompts || output.imagePrompts.length !== 2) {
+    if (output.imagePrompts.length !== 2) {
       throw new Error(
-        `Stage 1: expected exactly 2 image prompts, got ${output.imagePrompts?.length ?? 0}`,
+        `Stage 1: expected exactly 2 image prompts, got ${output.imagePrompts.length}`,
       );
     }
 

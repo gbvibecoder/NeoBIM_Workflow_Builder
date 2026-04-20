@@ -18,6 +18,7 @@ import type {
 import type { VIPLogger } from "./logger";
 import type { FloorPlanProject } from "@/types/floor-plan-cad";
 import type { ArchitectBrief } from "./types";
+import { Stage6RawOutputSchema } from "./schemas";
 
 // ─── Constants ───────────────────────────────────────────────────
 
@@ -214,14 +215,22 @@ ${input.brief.styleCues.some((s) => s.toLowerCase().includes("vastu"))
       throw new Error("Stage 6: Claude did not use the tool. Raw: " + JSON.stringify(response.content).slice(0, 300));
     }
 
-    const raw = toolUse.input as { dimensions: Record<QualityDimension, number>; reasoning: string };
+    // ── Validate LLM output against Zod schema ──
+    const parsed = Stage6RawOutputSchema.safeParse(toolUse.input);
+    if (!parsed.success) {
+      throw new Error(
+        `Stage 6: LLM returned malformed output: ${parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ")}`,
+      );
+    }
+    const raw = parsed.data;
+
     const safeDimensions = {} as Record<QualityDimension, number>;
     for (const dim of ALL_DIMS) {
-      const val = raw.dimensions?.[dim];
+      const val = raw.dimensions[dim as keyof typeof raw.dimensions];
       safeDimensions[dim] = typeof val === "number" ? Math.max(1, Math.min(10, val)) : 5;
     }
 
-    return { output: computeVerdict(safeDimensions, raw.reasoning ?? ""), metrics: { inputTokens, outputTokens, costUsd } };
+    return { output: computeVerdict(safeDimensions, raw.reasoning), metrics: { inputTokens, outputTokens, costUsd } };
   } finally {
     clearTimeout(timer);
   }
