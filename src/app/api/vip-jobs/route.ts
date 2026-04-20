@@ -14,6 +14,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { formatErrorResponse, UserErrors } from "@/lib/user-errors";
 import { scheduleVipWorker } from "@/lib/qstash";
+import { validateVipEnvVars } from "@/features/floor-plan/lib/vip-pipeline/env-check";
 
 export async function POST(req: NextRequest) {
   // Feature flag gate
@@ -22,6 +23,15 @@ export async function POST(req: NextRequest) {
       { error: "VIP job queue is not enabled" },
       { status: 503 },
     );
+  }
+
+  // Validate required env vars (cached after first call)
+  try {
+    validateVipEnvVars();
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "VIP pipeline misconfigured";
+    console.error("[vip-jobs]", msg);
+    return NextResponse.json({ error: msg }, { status: 503 });
   }
 
   // Auth
