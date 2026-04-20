@@ -82,6 +82,9 @@ import { runGridPackEngine } from "@/features/floor-plan/lib/grid-pack-engine";
 // Phase 6 — Reference + Adapt engine (PIPELINE_REF feature flag)
 import { runReferenceEngine } from "@/features/floor-plan/lib/dynamic-reference-engine";
 
+// Phase 7 — Visual Intelligence Pipeline (PIPELINE_VIP feature flag)
+import { runVIPPipeline } from "@/features/floor-plan/lib/vip-pipeline/orchestrator";
+
 // ── Generation Feedback ────────────────────────────────────────────────────
 
 interface GenerationFeedback {
@@ -296,37 +299,90 @@ export async function POST(req: NextRequest) {
     const routing = routePrompt(prompt);
     logger.debug(`[ROUTER] pipeline=${routing.pipeline} signals=${routing.constraint_signals}`);
 
-    // ── Phase 6 — Reference + Adapt Engine (PIPELINE_REF) ──────────────
-    // THE FINAL ENGINE. Combines ALL learnings from 16 previous approaches:
-    // - GPT-4o generates using real reference plans as few-shot examples
-    // - Normalized (0-1) coords scale perfectly to any plot size
-    // - Strict validation catches bad output BEFORE it reaches the user
-    // - Retry with error feedback recovers most failures
-    // - Static reference fallback guarantees output for 100% of prompts
-    // Runs for ALL prompts (no routing gate).
-    if (process.env.PIPELINE_REF === "true") {
+    // ── Shared structured parse (VIP + REF) ────────────────────────────
+    // Hoisted above both pipeline guards to avoid double-parsing on
+    // fall-through. GRID/LLM/T1 keep their own parse calls (different
+    // gating conditions, rare fall-through path).
+    let sharedParse: Awaited<ReturnType<typeof parseConstraints>> | null = null;
+    let sharedParseMs = 0;
+    if (process.env.PIPELINE_VIP === "true" || process.env.PIPELINE_REF === "true") {
       try {
-        const refStart = Date.now();
-        const refParseRes = await parseConstraints(prompt, apiKey);
-        const refParseMs = Date.now() - refStart;
+        const parseStart = Date.now();
+        sharedParse = await parseConstraints(prompt, apiKey);
+        sharedParseMs = Date.now() - parseStart;
 
-        const feasibility = checkPromptFeasibility(refParseRes.constraints);
+        const feasibility = checkPromptFeasibility(sharedParse.constraints);
         if (!feasibility.feasible) {
           return NextResponse.json({
             error: feasibility.reason,
             infeasibilityReason: feasibility.reason,
           }, { status: 422 });
         }
+      } catch (parseErr) {
+        const msg = parseErr instanceof Error ? parseErr.message : String(parseErr);
+        console.warn(`[SHARED-PARSE] structured parse failed — VIP+REF will skip: ${msg}`);
+      }
+    }
 
+    // ── Phase 7 — Visual Intelligence Pipeline (PIPELINE_VIP) ──────────
+    // Image models decide room layout → existing code synthesizes geometry.
+    // Falls through to PIPELINE_REF (current production) on any failure.
+    if (process.env.PIPELINE_VIP === "true" && sharedParse) {
+      try {
+        const vipEngineStart = Date.now();
+        const vipResult = await runVIPPipeline({
+          prompt,
+          parsedConstraints: sharedParse.constraints,
+        });
+
+        if (vipResult.success) {
+          const vipEngineMs = Date.now() - vipEngineStart;
+          const vipMetrics = computeLayoutMetrics(vipResult.project, sharedParse.constraints);
+          const vipScore = computeHonestScore(vipMetrics);
+
+          logger.debug(`[VIP] parse=${sharedParseMs}ms engine=${vipEngineMs}ms score=${vipScore.score}`);
+
+          const feedback = buildFeedback(vipResult.project, prompt);
+          feedback.tips.push(`VIP pipeline: score ${vipScore.score}/100 in ${sharedParseMs + vipEngineMs}ms`);
+          await recordToolExecution(userId, "floor-plan");
+
+          return NextResponse.json({
+            project: vipResult.project,
+            geometry: null,
+            feedback,
+            pipeline: "vip",
+            pipeline_timing: {
+              parse_ms: sharedParseMs,
+              engine_ms: vipEngineMs,
+              total_ms: sharedParseMs + vipEngineMs,
+            },
+            score: vipScore,
+            warnings: vipResult.warnings,
+          });
+        }
+
+        // VIP returned shouldFallThrough — continue to PIPELINE_REF
+        console.warn(`[VIP] ${vipResult.error} — falling through to PIPELINE_REF`);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.warn(`[VIP] unexpected error — falling through: ${msg}`);
+      }
+    }
+
+    // ── Phase 6 — Reference + Adapt Engine (PIPELINE_REF) ──────────────
+    // THE FINAL ENGINE. Combines ALL learnings from 16 previous approaches.
+    // Uses sharedParse (hoisted above) — no redundant parseConstraints call.
+    if (process.env.PIPELINE_REF === "true" && sharedParse) {
+      try {
         const refEngineStart = Date.now();
-        const result = await runReferenceEngine(prompt, refParseRes.constraints, apiKey);
+        const result = await runReferenceEngine(prompt, sharedParse.constraints, apiKey);
         const refEngineMs = Date.now() - refEngineStart;
 
-        const project = toFloorPlanProjectT1(result, refParseRes.constraints);
-        const layoutMetrics = computeLayoutMetrics(project, refParseRes.constraints);
+        const project = toFloorPlanProjectT1(result, sharedParse.constraints);
+        const layoutMetrics = computeLayoutMetrics(project, sharedParse.constraints);
         const score = computeHonestScore(layoutMetrics);
 
-        logger.debug(`[REF-ENGINE] parse=${refParseMs}ms engine=${refEngineMs}ms eff=${result.metrics.efficiency_pct}% score=${score.score}`);
+        logger.debug(`[REF-ENGINE] parse=${sharedParseMs}ms engine=${refEngineMs}ms eff=${result.metrics.efficiency_pct}% score=${score.score}`);
         console.log(`[REF-ENGINE] ${result.rooms.length} rooms, ${result.walls.length} walls, ${result.doors.length} doors, score=${score.score}/100`);
 
         const feedback = buildFeedback(project, prompt);
@@ -339,9 +395,9 @@ export async function POST(req: NextRequest) {
           feedback,
           pipeline: "reference-engine",
           pipeline_timing: {
-            parse_ms: refParseMs,
+            parse_ms: sharedParseMs,
             engine_ms: refEngineMs,
-            total_ms: Date.now() - refStart,
+            total_ms: sharedParseMs + refEngineMs,
           },
           score,
           warnings: result.warnings,
