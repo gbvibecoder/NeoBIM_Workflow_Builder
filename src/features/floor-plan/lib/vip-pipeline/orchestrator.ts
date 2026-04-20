@@ -39,6 +39,7 @@ interface Stage4And5Result {
 async function runStage4And5Block(
   gptImage: GeneratedImage,
   stage1Output: Stage1Output,
+  config: VIPPipelineConfig,
   parsedConstraints: ParsedConstraints,
   log: VIPLogger,
 ): Promise<Stage4And5Result> {
@@ -65,6 +66,7 @@ async function runStage4And5Block(
       issues: ext.issues.length,
       cost: `$${stage4Metrics.costUsd.toFixed(3)}`,
     });
+    await fireProgress(config, 90, "stage4");
   } catch (err) {
     stage4Ms = Date.now() - s4Start;
     const msg = err instanceof Error ? err.message : String(err);
@@ -96,6 +98,7 @@ async function runStage4And5Block(
       windows: s5Metrics.windowCount,
       issues: s5Output.issues.length,
     });
+    await fireProgress(config, 100, "stage5");
 
     // Stages 6-7 not yet implemented
     log.logFallThrough(
@@ -108,6 +111,23 @@ async function runStage4And5Block(
     log.logStageFailure(5, stage5Ms, msg);
     log.logFallThrough(`Stage 5 failed: ${msg}`);
     return { stage4Ms, stage5Ms };
+  }
+}
+
+/** Fire progress callback. Never throws — errors are logged and swallowed. */
+async function fireProgress(
+  config: VIPPipelineConfig,
+  progress: number,
+  stage: string,
+): Promise<void> {
+  if (!config.onProgress) return;
+  try {
+    await config.onProgress(progress, stage);
+  } catch (err) {
+    console.warn(
+      `[VIP] onProgress(${progress}, ${stage}) failed:`,
+      err instanceof Error ? err.message : err,
+    );
   }
 }
 
@@ -143,6 +163,7 @@ export async function runVIPPipeline(
         prompts: stage1Output.imagePrompts.length,
         cost: `$${stage1Metrics.costUsd.toFixed(3)}`,
       });
+      await fireProgress(config, 25, "stage1");
 
       // ── Stage 2: Parallel Image Generation ────────────────────────
       log.logStageStart(2);
@@ -167,6 +188,7 @@ export async function runVIPPipeline(
           failed: failedModels.length > 0 ? failedModels.join(", ") : "none",
           cost: `$${stage2Metrics.totalCostUsd.toFixed(3)}`,
         });
+        await fireProgress(config, 50, "stage2");
 
         // ── Stage 3: Extraction Readiness Jury ────────────────────────
         const gptImage = stage2Output.images.find(
@@ -200,12 +222,14 @@ export async function runVIPPipeline(
                 v.weakAreas.length > 0 ? v.weakAreas.join(", ") : "none",
               cost: `$${stage3Metrics.costUsd.toFixed(3)}`,
             });
+            await fireProgress(config, 70, "stage3");
 
             if (v.recommendation === "pass") {
               // Branch 1a: PASS — run Stage 4+5 on original GPT image
               const s45 = await runStage4And5Block(
                 gptImage,
                 stage1Output,
+                config,
                 config.parsedConstraints,
                 log,
               );
@@ -246,6 +270,7 @@ export async function runVIPPipeline(
                     const s45 = await runStage4And5Block(
                       retriedGpt,
                       stage1Output,
+                      config,
                       config.parsedConstraints,
                       log,
                     );

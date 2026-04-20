@@ -23,6 +23,8 @@ export interface VIPPipelineConfig {
     requestId: string;
     userId: string;
   };
+  /** Optional progress callback for background job progress reporting. Fire-and-forget — errors are logged, not thrown. */
+  onProgress?: (progress: number, stage: string) => Promise<void>;
 }
 
 // ─── Stage 1: Prompt Intelligence ────────────────────────────────
