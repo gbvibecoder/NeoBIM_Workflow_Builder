@@ -16,8 +16,14 @@ def create_window(
     storey: ifcopenshell.entity_instance,
     context: ifcopenshell.entity_instance,
     parent_wall: ifcopenshell.entity_instance | None = None,
+    storey_elevation: float = 0.0,
 ) -> ifcopenshell.entity_instance:
-    """Create an IfcWindow, optionally cutting an opening in the parent wall."""
+    """Create an IfcWindow, optionally cutting an opening in the parent wall.
+
+    When a `parent_wall` is supplied the window inherits the wall's placement
+    (which already carries the storey elevation). The standalone branch uses
+    `storey_elevation` directly so glazing doesn't collapse to Z=0.
+    """
     props = elem.properties
     width = props.width or 1.2
     height = props.height or 1.5
@@ -55,10 +61,14 @@ def create_window(
 
         fill_opening(model, opening, window)
     else:
-        # Standalone window (no parent wall found)
-        cx, cy, cz = 0.0, 0.0, sill_height
+        # Standalone window (no parent wall). Emitter puts absolute Z on v0.
+        cx, cy = 0.0, 0.0
+        base_z = storey_elevation
         if elem.vertices:
-            cx, cy = elem.vertices[0].x, elem.vertices[0].y
+            v0 = elem.vertices[0]
+            cx, cy = v0.x, v0.y
+            base_z = v0.z if v0.z else storey_elevation
+        cz = base_z + sill_height
 
         window.ObjectPlacement = model.create_entity(
             "IfcLocalPlacement",
@@ -110,8 +120,14 @@ def create_door(
     storey: ifcopenshell.entity_instance,
     context: ifcopenshell.entity_instance,
     parent_wall: ifcopenshell.entity_instance | None = None,
+    storey_elevation: float = 0.0,
 ) -> ifcopenshell.entity_instance:
-    """Create an IfcDoor, optionally cutting an opening in the parent wall."""
+    """Create an IfcDoor, optionally cutting an opening in the parent wall.
+
+    When a `parent_wall` is supplied the door inherits the wall's placement
+    (which already carries the storey elevation). The standalone branch
+    uses `storey_elevation` so orphaned doors don't stack at Z=0.
+    """
     props = elem.properties
     width = props.width or 1.0
     height = props.height or 2.1
@@ -146,13 +162,16 @@ def create_door(
         fill_opening(model, opening, door)
     else:
         cx, cy = 0.0, 0.0
+        cz = storey_elevation
         if elem.vertices:
-            cx, cy = elem.vertices[0].x, elem.vertices[0].y
+            v0 = elem.vertices[0]
+            cx, cy = v0.x, v0.y
+            cz = v0.z if v0.z else storey_elevation
         door.ObjectPlacement = model.create_entity(
             "IfcLocalPlacement",
             RelativePlacement=model.create_entity(
                 "IfcAxis2Placement3D",
-                Location=model.create_entity("IfcCartesianPoint", Coordinates=(cx, cy, 0.0)),
+                Location=model.create_entity("IfcCartesianPoint", Coordinates=(cx, cy, cz)),
             ),
         )
 

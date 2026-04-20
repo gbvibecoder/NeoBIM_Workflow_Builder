@@ -14,6 +14,7 @@ def create_space(
     elem: GeometryElement,
     storey: ifcopenshell.entity_instance,
     context: ifcopenshell.entity_instance,
+    storey_elevation: float = 0.0,
 ) -> ifcopenshell.entity_instance:
     """Create an IfcSpace representing an interior room volume."""
     props = elem.properties
@@ -28,17 +29,21 @@ def create_space(
     from app.utils.ifc_helpers import assign_to_storey
     assign_to_storey(model, storey, space)
 
-    # Position from vertices
-    cx, cy = 0.0, 0.0
+    # Position from vertex centroid. Emitters put absolute world Z on each
+    # vertex, so the min-Z of the polygon is the floor level for this space.
+    # Fall back to storey_elevation if no vertices or vertices carry z=0.
+    cx, cy, cz = 0.0, 0.0, storey_elevation
     if elem.vertices:
         cx = sum(v.x for v in elem.vertices) / len(elem.vertices)
         cy = sum(v.y for v in elem.vertices) / len(elem.vertices)
+        vz = min(v.z for v in elem.vertices)
+        cz = vz if vz else storey_elevation
 
     space.ObjectPlacement = model.create_entity(
         "IfcLocalPlacement",
         RelativePlacement=model.create_entity(
             "IfcAxis2Placement3D",
-            Location=model.create_entity("IfcCartesianPoint", Coordinates=(cx, cy, 0.0)),
+            Location=model.create_entity("IfcCartesianPoint", Coordinates=(cx, cy, cz)),
         ),
     )
 
