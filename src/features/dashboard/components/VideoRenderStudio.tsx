@@ -24,13 +24,11 @@ import {
   Zap,
   Eye,
   Layers,
-  Camera,
   Check,
   MoveHorizontal,
   PenTool,
   Share2,
   Film,
-  Maximize2,
   AlertTriangle,
 } from "lucide-react";
 
@@ -49,6 +47,16 @@ interface RenderResult {
   angle: string;
   apiAngle: string;
   url: string | null;
+}
+
+// Mirror of StructuralAnalysisSchema in /api/generate-3d-render. Only the
+// fields the client actually consumes are listed here; extras are ignored.
+interface StructuralAnalysis {
+  buildingType: "residential" | "commercial" | "mixed-use" | "industrial" | "other";
+  roomCount: number;
+  rooms: string[];
+  footprint: "rectangle" | "L-shape" | "U-shape" | "irregular";
+  openingsVisible: boolean;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -126,10 +134,6 @@ const COPY = {
       "Almost done. Our AI just needed a coffee break.",
     ],
   },
-  gallery: {
-    title: "Plot Twist: Your Design Actually Looks Good",
-    subtitle: "Drag the slider to witness the glow-up. Left = your plan. Right = what we made of it.",
-  },
   video: {
     title: "Now in Cinematic Universe",
     subtitle: "Because static images are so 2024. Let's turn this into a walkthrough that'll make your clients weep.",
@@ -143,12 +147,14 @@ const COPY = {
   },
 };
 
-const RENDER_VIEWS: Omit<RenderResult, "url">[] = [
-  { id: "r1", label: "Living Room", angle: "Interior View", apiAngle: "roomInterior:Living Room" },
-  { id: "r2", label: "Kitchen", angle: "Interior View", apiAngle: "roomInterior:Kitchen" },
-  { id: "r3", label: "Bedroom", angle: "Interior View", apiAngle: "roomInterior:Bedroom" },
-  { id: "r4", label: "Full Layout", angle: "Top Down", apiAngle: "topDown" },
-];
+// Full-layout slot is pinned at id "r4" because the cinematic walkthrough
+// pipeline (startCinematicGeneration) selects it by id. Do not re-id.
+const FULL_LAYOUT_VIEW: Omit<RenderResult, "url"> = {
+  id: "r4",
+  label: "Full Layout",
+  angle: "Top Down",
+  apiAngle: "topDown",
+};
 
 // Witty status messages cycled during real video generation. Same tone as
 // COPY.processing.stages so the video step feels consistent with rendering.
@@ -340,9 +346,18 @@ function HeroScene() {
 function ComparisonSlider({
   beforeSrc,
   afterSrc,
+  fullWidth = false,
 }: {
   beforeSrc: string | null;
   afterSrc: string | null;
+  /**
+   * When true, the slider fills its parent container's width instead of
+   * capping at `max-w-3xl`, and the after-image always uses `object-cover`
+   * so the render fills the frame instead of letterboxing when its aspect
+   * ratio differs from the uploaded plan. Used on the gallery step where
+   * the Full Layout render is the hero of the screen.
+   */
+  fullWidth?: boolean;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [sliderPos, setSliderPos] = useState(50);
@@ -372,7 +387,11 @@ function ComparisonSlider({
   // the floor plan ratio, use `cover` so the AFTER fills the container at
   // the same scale as BEFORE (cropping a thin band of empty render edge).
   // Beyond 20%, fall back to `contain` so we don't crop the actual building.
+  //
+  // `fullWidth` (gallery step) forces `cover` regardless of the diff — the
+  // caller has opted in to the crop in exchange for no gray letterbox bars.
   const afterFit: "cover" | "contain" = (() => {
+    if (fullWidth) return "cover";
     if (!afterAspect || imageAspect <= 0) return "contain";
     const diff = Math.abs(afterAspect - imageAspect) / imageAspect;
     return diff < 0.2 ? "cover" : "contain";
@@ -427,7 +446,7 @@ function ComparisonSlider({
   }, [beforeSrc, afterSrc, hasRevealed]);
 
   return (
-    <div className="w-full max-w-3xl mx-auto">
+    <div className={fullWidth ? "w-full" : "w-full max-w-3xl mx-auto"}>
       <div
         ref={containerRef}
         className="relative w-full overflow-hidden rounded-2xl select-none"
@@ -437,8 +456,14 @@ function ComparisonSlider({
           // maxHeight cap below, the full image is always shown — letterboxed
           // against #f8f8f8 in the unused dimension. This works for ANY
           // shape: square, wide panorama, tall portrait, triangle, L, U, etc.
+          //
+          // `fullWidth` lifts the height cap so the slider can scale with
+          // a wider parent without the aspect ratio being squashed. 90vh
+          // lets the render truly dominate the viewport on laptops — at
+          // 720p that's ~648px, at 800p ~720px, which is the "big" the
+          // user asked for.
           aspectRatio: imageAspect,
-          maxHeight: "min(70vh, 600px)",
+          maxHeight: fullWidth ? "min(90vh, 1100px)" : "min(70vh, 600px)",
           minHeight: "240px",
           width: "100%",
           background: "#f8f8f8",
@@ -878,77 +903,6 @@ function ProcessingView({ progress }: { progress: number }) {
         </div>
       </div>
     </motion.div>
-  );
-}
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// RENDER GALLERY
-// ═══════════════════════════════════════════════════════════════════════════════
-
-function RenderGallery({
-  renders,
-  selectedId,
-  onSelect,
-}: {
-  renders: RenderResult[];
-  selectedId: string;
-  onSelect: (id: string) => void;
-}) {
-  const roomIcons: Record<string, React.ReactNode> = {
-    "Living Room": <Layers size={14} />,
-    "Kitchen": <Camera size={14} />,
-    "Bedroom": <Eye size={14} />,
-    "Full Layout": <Maximize2 size={14} />,
-  };
-
-  const gradients = [
-    "linear-gradient(135deg, #fef3c7, #fde68a)",
-    "linear-gradient(135deg, #dbeafe, #bfdbfe)",
-    "linear-gradient(135deg, #ede9fe, #ddd6fe)",
-    "linear-gradient(135deg, #d1fae5, #a7f3d0)",
-  ];
-
-  return (
-    <div className="grid grid-cols-4 gap-2.5 mt-5 max-w-3xl mx-auto">
-      {renders.map((r, i) => {
-        const active = selectedId === r.id;
-        return (
-          <motion.button
-            key={r.id}
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: i * 0.08 }}
-            whileHover={{ y: -4, scale: 1.02 }}
-            whileTap={{ scale: 0.97 }}
-            onClick={() => onSelect(r.id)}
-            className={`relative rounded-xl overflow-hidden border-2 transition-all text-left ${
-              active ? "border-indigo-500 shadow-lg shadow-indigo-100 scale-[1.03]" : "border-gray-150 hover:border-indigo-200"
-            }`}
-          >
-            <div
-              className="aspect-[4/3] flex items-center justify-center overflow-hidden"
-              style={{ background: r.url ? undefined : (active ? gradients[i] : "#F9FAFB") }}
-            >
-              {r.url ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={r.url} alt={r.label} className="w-full h-full object-cover" draggable={false} />
-              ) : (
-                <div className="text-center">
-                  <div className={active ? "text-indigo-500" : "text-gray-300"}>{roomIcons[r.label] || <Camera size={14} />}</div>
-                  <p className={`text-[10px] mt-1 font-semibold ${active ? "text-indigo-600" : "text-gray-400"}`}>{r.angle}</p>
-                </div>
-              )}
-            </div>
-            <div className="px-2.5 py-1.5 bg-white border-t border-gray-100">
-              <div className="flex items-center gap-1.5">
-                <span className={active ? "text-indigo-500" : "text-gray-300"}>{roomIcons[r.label]}</span>
-                <p className="text-[11px] font-bold text-gray-700 truncate">{r.label}</p>
-              </div>
-            </div>
-          </motion.button>
-        );
-      })}
-    </div>
   );
 }
 
@@ -1546,7 +1500,7 @@ export default function VideoRenderStudio() {
   const [uploadedDims, setUploadedDims] = useState<{ width: number; height: number } | null>(null);
   const [renderProgress, setRenderProgress] = useState(0);
   const [renders, setRenders] = useState<RenderResult[]>([]);
-  const [selectedRender, setSelectedRender] = useState("r1");
+  const [selectedRender, setSelectedRender] = useState("r4");
   const [videoProgress, setVideoProgress] = useState(0);
   const [videoReady, setVideoReady] = useState(false);
   // ── Video state (real pipeline) ──
@@ -1556,6 +1510,9 @@ export default function VideoRenderStudio() {
   const [videoElapsed, setVideoElapsed] = useState(0);
   const [isSharingVideo, setIsSharingVideo] = useState(false);
   const [fullDescription, setFullDescription] = useState<string>("");
+  // Structural analysis from the first (full-layout) API call. Drives the
+  // dynamic room thumbnails and seeds the cinematic pipeline's buildingType.
+  const [structural, setStructural] = useState<StructuralAnalysis | null>(null);
   const videoElementRef = useRef<HTMLVideoElement | null>(null);
   const videoAbortRef = useRef<AbortController | null>(null);
   const videoTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -1723,23 +1680,25 @@ export default function VideoRenderStudio() {
     setStep("processing");
     setRenderProgress(0);
     setRenderError(null);
-
-    const results: RenderResult[] = RENDER_VIEWS.map((v) => ({ ...v, url: null }));
-    let completed = 0;
-    const total = RENDER_VIEWS.length;
+    setStructural(null);
 
     const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+    /**
+     * POST one render to /api/generate-3d-render. Handles plan-gate / rate
+     * limit / retry exactly like the old implementation, but returns the
+     * parsed response so the caller can read structural / image / description.
+     */
     const callRender = async (
-      view: (typeof RENDER_VIEWS)[number],
-      idx: number,
-      cachedDesc?: string,
+      apiAngle: string,
+      label: string,
+      cachedStructuralJson: string | null,
       retries = 2
-    ): Promise<string> => {
+    ): Promise<{ image: string; structural?: StructuralAnalysis; fullDescription?: string }> => {
       const formData = new FormData();
       formData.append("image", uploadedFile);
-      formData.append("angle", view.apiAngle);
-      if (cachedDesc) formData.append("cachedDescription", cachedDesc);
+      formData.append("angle", apiAngle);
+      if (cachedStructuralJson) formData.append("cachedStructural", cachedStructuralJson);
       // Send original dimensions so the API can pick a matching output size
       // (1024×1024, 1536×1024, or 1024×1536). Critical for slider alignment.
       if (uploadedDims) {
@@ -1763,37 +1722,35 @@ export default function VideoRenderStudio() {
       if (res.status === 429 && retries > 0) {
         const waitMs = (3 - retries) * 15000;
         await delay(waitMs);
-        return callRender(view, idx, cachedDesc, retries - 1);
+        return callRender(apiAngle, label, cachedStructuralJson, retries - 1);
       }
 
       if (!res.ok) {
-        const errMsg = typeof data.error === "object" ? (data.error?.message || "Render failed") : (data.error || `Failed to generate ${view.label} render`);
+        const errMsg = typeof data.error === "object" ? (data.error?.message || "Render failed") : (data.error || `Failed to generate ${label} render`);
         throw new Error(errMsg);
       }
 
-      results[idx] = { ...view, url: data.image };
-      completed++;
-      setRenderProgress((completed / total) * 100);
-      return data.fullDescription as string;
+      return {
+        image: data.image as string,
+        structural: data.structural as StructuralAnalysis | undefined,
+        fullDescription: data.fullDescription as string | undefined,
+      };
     };
 
     try {
-      const fullLayoutIdx = RENDER_VIEWS.findIndex((v) => v.id === "r4");
-      const desc = await callRender(RENDER_VIEWS[fullLayoutIdx], fullLayoutIdx);
-      // Save the GPT-4o floor-plan analysis so the video step can prime Kling
-      // with rich room/material context without re-calling /api/generate-3d-render.
-      setFullDescription(desc ?? "");
+      // Full Layout is the only render we produce now. The GPT-4o structural
+      // analysis is still returned in this response — we keep it (and the
+      // detected buildingType in particular) so the cinematic walkthrough
+      // pipeline downstream can consume it. Room-interior renders used to
+      // follow this call; they're gone because the Full Layout alone already
+      // tells the story the user needs before cinematic.
+      const first = await callRender(FULL_LAYOUT_VIEW.apiAngle, FULL_LAYOUT_VIEW.label, null);
+      setStructural(first.structural ?? null);
+      setFullDescription(first.fullDescription ?? "");
 
-      const roomViews = RENDER_VIEWS.map((v, i) => ({ view: v, idx: i })).filter(
-        (_, i) => i !== fullLayoutIdx
-      );
-
-      for (const { view, idx } of roomViews) {
-        await delay(2000);
-        await callRender(view, idx, desc);
-      }
-
-      setRenders(results);
+      const fullLayoutResult: RenderResult = { ...FULL_LAYOUT_VIEW, url: first.image };
+      setRenderProgress(100);
+      setRenders([fullLayoutResult]);
       setSelectedRender("r4");
       goToStep("gallery");
     } catch (err: unknown) {
@@ -2183,6 +2140,15 @@ export default function VideoRenderStudio() {
         description: "Generating the eye-level lifestyle render...",
         duration: 4000,
       });
+      // Derive building type from the GPT-4o structural analysis when
+      // available — otherwise fall back to a neutral "building" so the
+      // downstream cinematic pipeline does not assume a modern apartment
+      // for commercial / mixed-use / industrial floor plans.
+      const detectedBuildingType =
+        structural && structural.buildingType !== "other"
+          ? structural.buildingType
+          : "building";
+
       const res = await fetch("/api/generate-cinematic-walkthrough", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -2194,7 +2160,7 @@ export default function VideoRenderStudio() {
           floorPlanImage: floorPlanDataUrl,
           description: fullDescription,
           rooms,
-          buildingType: "modern apartment",
+          buildingType: detectedBuildingType,
           primaryRoom,
         }),
         signal: submitAbort.signal,
@@ -2364,7 +2330,7 @@ export default function VideoRenderStudio() {
         return;
       }
     }
-  }, [renders, uploadedFile, fullDescription]);
+  }, [renders, uploadedFile, fullDescription, structural]);
 
   // ── Action handlers (download / preview / share / 4K) ──
   // Real download — fetch the bytes and trigger a same-origin blob download.
@@ -2552,7 +2518,7 @@ export default function VideoRenderStudio() {
     setUploadedDims(null);
     setRenderProgress(0);
     setRenders([]);
-    setSelectedRender("r1");
+    setSelectedRender("r4");
     setVideoProgress(0);
     setVideoReady(false);
     setVideoUrl(null);
@@ -2602,94 +2568,112 @@ export default function VideoRenderStudio() {
       })()}
 
       {/* ─── HERO — Three.js background + centered text ─── */}
-      <div className="relative overflow-hidden" style={{ height: 220 }}>
-        {/* Three.js scene — alive and breathing */}
-        <div className="absolute inset-0" style={{ opacity: 0.55 }}>
-          <HeroScene />
+      {/* Rendered only on the Upload step. On Render/Gallery/Video the hero
+          is purely decorative and costs ~220px of vertical space that's
+          needed for the progress ring, the full-width render comparison,
+          and the video player. HeroScene + radial-fade + content hooks
+          have no side effects, so unmounting them on step change is safe;
+          the Canvas fully re-initializes when the user returns to Upload
+          via "Start Over". */}
+      {step === "upload" && (
+        <div className="relative overflow-hidden" style={{ minHeight: 220 }}>
+          {/* Three.js scene — alive and breathing */}
+          <div className="absolute inset-0" style={{ opacity: 0.55 }}>
+            <HeroScene />
+          </div>
+
+          {/* Radial fade overlay for text readability */}
+          <div className="absolute inset-0 pointer-events-none" style={{
+            background: "radial-gradient(ellipse 60% 70% at 50% 55%, rgba(250,251,254,0.15) 0%, rgba(250,251,254,0.88) 65%, rgba(250,251,254,0.97) 100%)",
+          }} />
+
+          {/* Content */}
+          <div className="relative z-10 h-full flex flex-col items-center justify-center text-center px-6">
+            {/* Badge */}
+            <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} className="flex items-center justify-center gap-2 mb-3">
+              <div style={{ width: 24, height: 1.5, background: "linear-gradient(90deg, transparent, #6366F1)", borderRadius: 1 }} />
+              <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: "3px", textTransform: "uppercase", color: "#6366F1", fontFamily: "var(--font-jetbrains, monospace)" }}>
+                AI-Powered Render Engine
+              </span>
+              <div style={{ width: 24, height: 1.5, background: "linear-gradient(90deg, #6366F1, transparent)", borderRadius: 1 }} />
+            </motion.div>
+
+            {/* Title */}
+            <motion.h1
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.1, duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+              className="text-2xl sm:text-3xl font-black leading-[1.12] tracking-tight"
+              style={{
+                background: "linear-gradient(135deg, #1E1B4B 0%, #312E81 40%, #4338CA 80%, #6366F1 100%)",
+                WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text",
+              }}
+            >
+              Your Floor Plan Deserves Better
+            </motion.h1>
+
+            {/* Subtitle */}
+            <motion.p
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2, duration: 0.5 }}
+              className="text-sm mt-2 max-w-lg mx-auto leading-relaxed"
+              style={{ color: "#6B7280" }}
+            >
+              2D to 3D in under 3 minutes.{" "}
+              <span className="italic" style={{ color: "#9CA3AF" }}>A glow-up they&apos;ve been needing since AutoCAD.</span>
+            </motion.p>
+
+            {/* Stats row */}
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.35 }}
+              className="flex items-center justify-center gap-5 mt-3">
+              {[
+                { value: "< 3 min", label: "Render" },
+                { value: "4 Angles", label: "Views" },
+                { value: "4K", label: "Quality" },
+              ].map((stat, i) => (
+                <React.Fragment key={stat.label}>
+                  {i > 0 && <div style={{ width: 1, height: 20, background: "rgba(99,102,241,0.1)" }} />}
+                  <div className="text-center">
+                    <div className="text-sm font-black" style={{ color: "#312E81" }}>{stat.value}</div>
+                    <div className="text-[8px] font-semibold uppercase tracking-widest" style={{ color: "#B0B0B8" }}>{stat.label}</div>
+                  </div>
+                </React.Fragment>
+              ))}
+            </motion.div>
+          </div>
         </div>
-
-        {/* Radial fade overlay for text readability */}
-        <div className="absolute inset-0 pointer-events-none" style={{
-          background: "radial-gradient(ellipse 60% 70% at 50% 55%, rgba(250,251,254,0.15) 0%, rgba(250,251,254,0.88) 65%, rgba(250,251,254,0.97) 100%)",
-        }} />
-
-        {/* Content */}
-        <div className="relative z-10 h-full flex flex-col items-center justify-center text-center px-6">
-          {/* Badge */}
-          <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} className="flex items-center justify-center gap-2 mb-3">
-            <div style={{ width: 24, height: 1.5, background: "linear-gradient(90deg, transparent, #6366F1)", borderRadius: 1 }} />
-            <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: "3px", textTransform: "uppercase", color: "#6366F1", fontFamily: "var(--font-jetbrains, monospace)" }}>
-              AI-Powered Render Engine
-            </span>
-            <div style={{ width: 24, height: 1.5, background: "linear-gradient(90deg, #6366F1, transparent)", borderRadius: 1 }} />
-          </motion.div>
-
-          {/* Title */}
-          <motion.h1
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1, duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-            className="text-2xl sm:text-3xl font-black leading-[1.12] tracking-tight"
-            style={{
-              background: "linear-gradient(135deg, #1E1B4B 0%, #312E81 40%, #4338CA 80%, #6366F1 100%)",
-              WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text",
-            }}
-          >
-            Your Floor Plan Deserves Better
-          </motion.h1>
-
-          {/* Subtitle */}
-          <motion.p
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2, duration: 0.5 }}
-            className="text-sm mt-2 max-w-lg mx-auto leading-relaxed"
-            style={{ color: "#6B7280" }}
-          >
-            2D to 3D in under 3 minutes.{" "}
-            <span className="italic" style={{ color: "#9CA3AF" }}>A glow-up they&apos;ve been needing since AutoCAD.</span>
-          </motion.p>
-
-          {/* Stats row */}
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.35 }}
-            className="flex items-center justify-center gap-5 mt-3">
-            {[
-              { value: "< 3 min", label: "Render" },
-              { value: "4 Angles", label: "Views" },
-              { value: "4K", label: "Quality" },
-            ].map((stat, i) => (
-              <React.Fragment key={stat.label}>
-                {i > 0 && <div style={{ width: 1, height: 20, background: "rgba(99,102,241,0.1)" }} />}
-                <div className="text-center">
-                  <div className="text-sm font-black" style={{ color: "#312E81" }}>{stat.value}</div>
-                  <div className="text-[8px] font-semibold uppercase tracking-widest" style={{ color: "#B0B0B8" }}>{stat.label}</div>
-                </div>
-              </React.Fragment>
-            ))}
-          </motion.div>
-        </div>
-      </div>
+      )}
 
       {/* ─── CONTENT — grows to push footer down ─── */}
-      <div className="flex-1 max-w-4xl mx-auto px-6 pb-12 pt-6 w-full">
-        <StepIndicator step={step} />
+      {/* Outer wrapper is full-width (no max-w cap) so the Gallery step can
+          expand the render frame edge-to-edge. Each inner block — stepper,
+          start-over button, per-step content — sets its OWN max-width so
+          the step's width tracks the content it holds. The stepper's width
+          follows the active step's cap (4xl for Upload/Processing/Video,
+          1400px for Gallery) so the progress bar stays visually anchored
+          to the content below it instead of being a narrower island. */}
+      <div className="flex-1 w-full pb-12 pt-6">
+        <div className={step === "gallery" ? "max-w-[1400px] mx-auto px-4 sm:px-6" : "max-w-4xl mx-auto px-6"}>
+          <StepIndicator step={step} />
 
-        {step !== "upload" && (
-          <div className="flex justify-end mb-3">
-            <motion.button
-              initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-              whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
-              onClick={handleReset}
-              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold text-gray-500 bg-white border border-gray-200 hover:border-gray-300 transition-colors shadow-sm"
-            >
-              <RotateCcw size={11} /> Start Over
-            </motion.button>
-          </div>
-        )}
+          {step !== "upload" && (
+            <div className="flex justify-end mb-3">
+              <motion.button
+                initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+                whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
+                onClick={handleReset}
+                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold text-gray-500 bg-white border border-gray-200 hover:border-gray-300 transition-colors shadow-sm"
+              >
+                <RotateCcw size={11} /> Start Over
+              </motion.button>
+            </div>
+          )}
+        </div>
 
         <AnimatePresence mode="wait">
           {step === "upload" && (
-            <motion.div key="upload" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, x: -40 }}>
+            <motion.div key="upload" className="max-w-4xl mx-auto px-6" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, x: -40 }}>
               {renderError && (
                 <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
                   className="mb-4 p-4 rounded-xl border border-red-200 bg-red-50 max-w-2xl mx-auto">
@@ -2721,20 +2705,22 @@ export default function VideoRenderStudio() {
           )}
 
           {step === "processing" && (
-            <motion.div key="processing" initial={{ opacity: 0, x: 40 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -40 }}>
+            <motion.div key="processing" className="max-w-4xl mx-auto px-6" initial={{ opacity: 0, x: 40 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -40 }}>
               <ProcessingView progress={renderProgress} />
             </motion.div>
           )}
 
           {step === "gallery" && (
-            <motion.div key="gallery" initial={{ opacity: 0, x: 40 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -40 }}>
-              <div className="text-center mb-6">
-                <motion.h2 initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-xl font-bold text-gray-900">{COPY.gallery.title}</motion.h2>
-                <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.1 }}
-                  className="text-sm text-gray-500 mt-1.5 max-w-md mx-auto italic">{COPY.gallery.subtitle}</motion.p>
-              </div>
-              <ComparisonSlider beforeSrc={previewUrl} afterSrc={renders.find(r => r.id === selectedRender)?.url ?? null} />
-              <RenderGallery renders={renders} selectedId={selectedRender} onSelect={setSelectedRender} />
+            <motion.div key="gallery" className="max-w-[1400px] mx-auto px-4 sm:px-6" initial={{ opacity: 0, x: 40 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -40 }}>
+              {/* Heading block dropped intentionally: the slider's own
+                  BEFORE/AFTER labels convey the comparison, and dropping
+                  ~80-100px of heading gives the render that vertical space
+                  on laptop viewports (720p). */}
+              <ComparisonSlider
+                beforeSrc={previewUrl}
+                afterSrc={renders.find(r => r.id === selectedRender)?.url ?? null}
+                fullWidth
+              />
               <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="flex justify-center mt-8">
                 <motion.button whileHover={{ scale: 1.04, y: -2 }} whileTap={{ scale: 0.96 }}
                   onClick={() => goToStep("video")}
@@ -2747,7 +2733,7 @@ export default function VideoRenderStudio() {
           )}
 
           {step === "video" && (
-            <motion.div key="video" initial={{ opacity: 0, x: 40 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -40 }}>
+            <motion.div key="video" className="max-w-4xl mx-auto px-6" initial={{ opacity: 0, x: 40 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -40 }}>
               <ComparisonSlider beforeSrc={previewUrl} afterSrc={renders.find(r => r.id === selectedRender)?.url ?? null} />
               <VideoSection
                 mode={videoMode}

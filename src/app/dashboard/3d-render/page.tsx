@@ -38,16 +38,12 @@ const VideoRenderStudio = dynamic(
 );
 
 export default function Page() {
+  // No frame — the dashboard layout now renders a light-theme Header above
+  // this page, so the page's light gradient butts directly up to the header
+  // chrome with no visible seam. A rounded/bordered card here would reintroduce
+  // the dark outline against the dark sidebar gutter.
   return (
-    <div
-      style={{
-        height: "100%",
-        borderRadius: 8,
-        overflow: "hidden",
-        border: "1px solid rgba(255,255,255,0.06)",
-        boxShadow: "0 10px 40px rgba(0,0,0,0.35)",
-      }}
-    >
+    <div style={{ height: "100%", overflow: "hidden" }}>
       <VideoRenderStudio />
     </div>
   );

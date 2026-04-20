@@ -23,14 +23,19 @@ export default function DashboardLayout({
   // should overlay the scene (transparent) instead of reserving 52px of
   // empty black space above it.
   const isImmersive = pathname === "/dashboard";
+  // The 3D-render wizard renders on a light page surface. A dark header
+  // above it produced a visible seam; the light-theme header blends into
+  // the page's top gradient so the nav controls read as part of the
+  // content surface instead of a chrome strip.
+  const isLightSurface = pathname === "/dashboard/3d-render";
 
   return (
     <div className="flex h-screen overflow-hidden" style={{ minHeight: "-webkit-fill-available", background: "#0a0c10" }}>
       <Sidebar />
       <ErrorBoundary>
         <div className="flex flex-col flex-1 min-w-0 overflow-hidden" style={{ transition: "flex 0.3s cubic-bezier(0.4, 0, 0.2, 1)" }}>
-          {!isImmersive && <BetaBanner />}
-          {!isImmersive && <Header />}
+          {!isImmersive && !isLightSurface && <BetaBanner />}
+          {!isImmersive && <Header theme={isLightSurface ? "light" : "dark"} />}
           <div className="flex-1 min-h-0 overflow-hidden" style={{ position: "relative" }}>
             {isImmersive && <Header floating />}
             {children}
