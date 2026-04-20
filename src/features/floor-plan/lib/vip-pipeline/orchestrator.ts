@@ -8,7 +8,8 @@
  * Phase 1.1: returns shouldFallThrough immediately.
  * Phase 1.2: adds structured logging + DB persistence.
  * Phase 1.3: Stage 1 (Prompt Intelligence) implemented.
- * Phase 1.4+: remaining stages implemented incrementally.
+ * Phase 1.4: Stage 2 (Parallel Image Generation) implemented.
+ * Phase 1.5+: remaining stages implemented incrementally.
  */
 
 import type { VIPPipelineConfig, VIPPipelineResult } from "./types";
@@ -16,6 +17,7 @@ import { VIPLogger } from "./logger";
 import type { VIPGenerationRecord } from "./logger";
 import { prisma } from "@/lib/db";
 import { runStage1PromptIntelligence } from "./stage-1-prompt";
+import { runStage2ParallelImageGen } from "./stage-2-images";
 
 export async function runVIPPipeline(
   config: VIPPipelineConfig,
@@ -31,6 +33,7 @@ export async function runVIPPipeline(
     log.logStageStart(1);
     const stage1Start = Date.now();
     let stage1Ms: number | undefined;
+    let stage2Ms: number | undefined;
 
     try {
       const { output: stage1Output, metrics: stage1Metrics } =
@@ -46,16 +49,44 @@ export async function runVIPPipeline(
         cost: `$${stage1Metrics.costUsd.toFixed(3)}`,
       });
 
-      // Stage 1 succeeded. Stages 2-7 not yet implemented — fall through
-      // to PIPELINE_REF. The Stage 1 output is logged but not used yet.
-      // NOTE: In Phase 1.3 the orchestrator completes synchronously before
-      // returning, so status always transitions to FALL_THROUGH/SUCCESS/FAILED
-      // before persist. If future phases introduce async stages that can hang
-      // (Vercel timeout, API hang, etc.), we will need a "heartbeat" pattern:
-      // persist a RUNNING row on entry, update status on completion.
-      log.logFallThrough(
-        "Stages 2-7 not yet implemented — Stage 1 succeeded, falling through",
-      );
+      // ── Stage 2: Parallel Image Generation ────────────────────────
+      log.logStageStart(2);
+      const stage2Start = Date.now();
+
+      try {
+        const { output: stage2Output, metrics: stage2Metrics } =
+          await runStage2ParallelImageGen(
+            { imagePrompts: stage1Output.imagePrompts },
+            log,
+          );
+        stage2Ms = Date.now() - stage2Start;
+
+        const successModels = stage2Output.images.map((i) => i.model);
+        const failedModels = stage2Metrics.perModel
+          .filter((m) => !m.success)
+          .map((m) => m.model);
+
+        log.logStageSuccess(2, stage2Ms, {
+          images: stage2Output.images.length,
+          succeeded: successModels.join(", "),
+          failed: failedModels.length > 0 ? failedModels.join(", ") : "none",
+          cost: `$${stage2Metrics.totalCostUsd.toFixed(3)}`,
+        });
+
+        // Stage 2 succeeded. Stages 3-7 not yet implemented — fall through.
+        // NOTE: If future phases introduce async stages that can hang
+        // (Vercel timeout, API hang, etc.), we will need a "heartbeat" pattern:
+        // persist a RUNNING row on entry, update status on completion.
+        log.logFallThrough(
+          "Stages 3-7 not yet implemented — Stage 1+2 succeeded, falling through",
+        );
+      } catch (stage2Err) {
+        stage2Ms = Date.now() - stage2Start;
+        const msg =
+          stage2Err instanceof Error ? stage2Err.message : String(stage2Err);
+        log.logStageFailure(2, stage2Ms, msg);
+        log.logFallThrough(`Stage 2 failed: ${msg}`);
+      }
     } catch (stage1Err) {
       stage1Ms = Date.now() - stage1Start;
       const msg =
@@ -66,9 +97,9 @@ export async function runVIPPipeline(
 
     const result: VIPPipelineResult = {
       success: false,
-      error: "VIP pipeline Stages 2-7 not yet implemented",
+      error: "VIP pipeline Stages 3-7 not yet implemented",
       shouldFallThrough: true,
-      timing: { stage1Ms, totalMs: Date.now() - startMs },
+      timing: { stage1Ms, stage2Ms, totalMs: Date.now() - startMs },
     };
 
     // Fire-and-forget DB persist — never blocks the response
