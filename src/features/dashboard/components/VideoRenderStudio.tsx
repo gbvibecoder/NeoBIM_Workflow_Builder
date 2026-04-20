@@ -388,10 +388,12 @@ function ComparisonSlider({
   // the same scale as BEFORE (cropping a thin band of empty render edge).
   // Beyond 20%, fall back to `contain` so we don't crop the actual building.
   //
-  // `fullWidth` (gallery step) forces `cover` regardless of the diff — the
-  // caller has opted in to the crop in exchange for no gray letterbox bars.
+  // `fullWidth` (gallery step) always uses `contain`: fidelity to the generated
+  // render is the whole point of this feature, so the entire render must be
+  // visible edge-to-edge even if its aspect ratio differs from the frame. Thin
+  // gray bars on one axis are acceptable; hiding part of the render is not.
   const afterFit: "cover" | "contain" = (() => {
-    if (fullWidth) return "cover";
+    if (fullWidth) return "contain";
     if (!afterAspect || imageAspect <= 0) return "contain";
     const diff = Math.abs(afterAspect - imageAspect) / imageAspect;
     return diff < 0.2 ? "cover" : "contain";
