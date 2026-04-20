@@ -35,10 +35,18 @@ export async function POST(req: NextRequest) {
   const userId = session.user.id;
 
   // Parse body
+  const MAX_PROMPT_LENGTH = 2000;
   const body = await req.json();
-  const prompt = body.prompt as string;
-  if (!prompt || typeof prompt !== "string" || !prompt.trim()) {
+  const rawPrompt = body.prompt;
+  if (!rawPrompt || typeof rawPrompt !== "string" || !rawPrompt.trim()) {
     return NextResponse.json({ error: "prompt is required" }, { status: 400 });
+  }
+  const prompt = rawPrompt.trim();
+  if (prompt.length > MAX_PROMPT_LENGTH) {
+    return NextResponse.json(
+      { error: `Prompt too long (${prompt.length} chars, max ${MAX_PROMPT_LENGTH})` },
+      { status: 400 },
+    );
   }
 
   // Rate limit: max 5 active jobs
@@ -61,7 +69,7 @@ export async function POST(req: NextRequest) {
     data: {
       userId,
       requestId,
-      prompt: prompt.trim(),
+      prompt,
       status: "QUEUED",
     },
   });
