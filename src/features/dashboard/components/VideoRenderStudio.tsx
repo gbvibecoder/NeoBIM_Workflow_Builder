@@ -2718,12 +2718,9 @@ export default function VideoRenderStudio() {
                   BEFORE/AFTER labels convey the comparison, and dropping
                   ~80-100px of heading gives the render that vertical space
                   on laptop viewports (720p). */}
-              <ComparisonSlider
-                beforeSrc={previewUrl}
-                afterSrc={renders.find(r => r.id === selectedRender)?.url ?? null}
-                fullWidth
-              />
-              <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="flex justify-center mt-8">
+              {/* CTA sits ABOVE the render so it stays visible on laptop
+                  viewports without scrolling past a tall render. */}
+              <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="flex justify-center mb-6">
                 <motion.button whileHover={{ scale: 1.04, y: -2 }} whileTap={{ scale: 0.96 }}
                   onClick={() => goToStep("video")}
                   className="px-7 py-3 rounded-xl text-white font-bold text-sm flex items-center gap-2.5"
@@ -2731,6 +2728,11 @@ export default function VideoRenderStudio() {
                   <Video size={15} /> Create 3D Video Walkthrough <ArrowRight size={15} />
                 </motion.button>
               </motion.div>
+              <ComparisonSlider
+                beforeSrc={previewUrl}
+                afterSrc={renders.find(r => r.id === selectedRender)?.url ?? null}
+                fullWidth
+              />
             </motion.div>
           )}
 
