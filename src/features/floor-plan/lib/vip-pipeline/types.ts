@@ -150,7 +150,10 @@ export interface Stage5Input {
   parsedConstraints: ParsedConstraints;
 }
 
-// Stage5Output = StripPackResult (no wrapper needed)
+export interface Stage5Output {
+  project: FloorPlanProject;
+  issues: string[];
+}
 
 // ─── Stage 6: Quality Gate ───────────────────────────────────────
 
