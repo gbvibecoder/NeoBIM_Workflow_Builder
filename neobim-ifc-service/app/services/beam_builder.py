@@ -16,8 +16,13 @@ def create_beam(
     elem: GeometryElement,
     storey: ifcopenshell.entity_instance,
     context: ifcopenshell.entity_instance,
+    storey_elevation: float = 0.0,
 ) -> ifcopenshell.entity_instance:
-    """Create an IfcBeam with I-section profile."""
+    """Create an IfcBeam with I-section profile.
+
+    `storey_elevation` lifts the beam onto its storey so multi-storey
+    frames stack correctly.
+    """
     props = elem.properties
     length = props.length or 6.0
     height = props.height or 0.4  # beam depth
@@ -30,14 +35,16 @@ def create_beam(
     from app.utils.ifc_helpers import assign_to_storey
     assign_to_storey(model, storey, beam)
 
-    # Position from vertices
+    # Position from vertices. Emitters put absolute world Z on v0.z; use it
+    # when present, fall back to storey_elevation only when v0.z is zero.
     if len(elem.vertices) >= 2:
         v0, v1 = elem.vertices[0], elem.vertices[1]
-        cx, cy, cz = v0.x, v0.y, v0.z
+        cx, cy = v0.x, v0.y
+        cz = v0.z if v0.z else storey_elevation
         dx = v1.x - v0.x
         dy = v1.y - v0.y
     else:
-        cx, cy, cz = 0.0, 0.0, 0.0
+        cx, cy, cz = 0.0, 0.0, storey_elevation
         dx, dy = 1.0, 0.0
 
     dir_len = math.sqrt(dx * dx + dy * dy)

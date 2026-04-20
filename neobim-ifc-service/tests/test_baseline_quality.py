@@ -99,11 +99,12 @@ FLOORS_BY_DISCIPLINE: dict[str, dict[str, int]] = {
 SIZE_BAND_BYTES: dict[str, tuple[int, int]] = {
     "architectural": (8_000, 2_000_000),
     "structural":    (8_000, 2_000_000),
-    # MEP has the fewest elements in the fixture (3 segments + systems),
-    # so the output is smaller. Floor tuned against observed 4,801-byte
-    # baseline with 10% headroom below — catches empty/truncated regressions
-    # without tripping on normal per-run variation.
-    "mep":           (4_000, 2_000_000),
+    # MEP has the fewest elements in the fixture (3 segments + systems) and
+    # since the default rich mode is "off" those segments are bodyless
+    # (Pset + IfcSystem grouping only, no IfcExtrudedAreaSolid). That keeps
+    # the output smaller than pre-fix output had bodies — hence the lower
+    # floor. Rich mode "mep"/"full" re-enables bodies and pushes size back up.
+    "mep":           (2_500, 2_000_000),
     "combined":      (10_000, 5_000_000),
 }
 

@@ -55,6 +55,9 @@ from app.services.property_sets import (
     add_space_psets,
     add_beam_psets,
 )
+from app.services.presentation import StyleCache, apply_color
+from app.services.enrichment import enrich_building
+from app.services.classification import attach_omniclass
 from app.utils.guid import new_guid
 
 log = structlog.get_logger()
@@ -77,6 +80,25 @@ def _element_in_discipline(elem: GeometryElement, discipline: str) -> bool:
     return elem.type in DISCIPLINE_TYPES.get(discipline, set())
 
 
+# ── Rich-mode → MEP geometry gate ────────────────────────────────────
+#
+# Mirrors the TypeScript-side resolver in src/features/ifc/lib/rich-mode.ts.
+# Python currently only honours the MEP flag — Phase 2+ will grow this table
+# as Python gains curtain-wall and rebar builders. Unknown modes fall
+# through to the default "off" (bodyless MEP).
+_MEP_GEOMETRY_BY_MODE: dict[str, bool] = {
+    "off": False,
+    "arch-only": False,
+    "mep": True,
+    "structural": False,
+    "full": True,
+}
+
+
+def _emit_mep_geometry(rich_mode: str | None) -> bool:
+    return _MEP_GEOMETRY_BY_MODE.get(rich_mode or "off", False)
+
+
 # ── Main build function ──────────────────────────────────────────────
 
 
@@ -87,6 +109,7 @@ def build_ifc(
     site_name: str = "Default Site",
     author: str = "NeoBIM",
     discipline: Discipline = "combined",
+    emit_mep_geometry: bool = False,
 ) -> tuple[ifcopenshell.file, EntityCounts, list[BuildFailure]]:
     """Build a complete IFC4 model from MassingGeometry.
 
@@ -167,21 +190,27 @@ def build_ifc(
         "Plumbing": [],
         "Electrical": [],
     }
+    # One presentation-style cache per build — reused across every element
+    # so the output stays compact while every geometry item carries a
+    # discipline-appropriate IfcStyledItem for the viewer to paint.
+    style_cache = StyleCache(model)
 
     for storey_data in geometry.storeys:
         ifc_storey = ifc_storeys.get(storey_data.index)
         if not ifc_storey:
             continue
+        storey_elevation = storey_data.elevation
 
         # First pass: create walls (needed before windows/doors for opening relationships)
         for elem in storey_data.elements:
             if elem.type != "wall" or not _element_in_discipline(elem, discipline):
                 continue
             try:
-                ifc_wall = create_wall(model, elem, ifc_storey, body_context)
+                ifc_wall = create_wall(model, elem, ifc_storey, body_context, storey_elevation=storey_elevation)
                 wall_lookup[elem.id] = ifc_wall
                 assign_material_to_element(model, ifc_wall, _get_wall_mat(elem.properties.is_partition or False))
                 add_wall_psets(model, ifc_wall, elem, building_type)
+                apply_color(model, ifc_wall, "wall-partition" if elem.properties.is_partition else "wall-exterior", style_cache)
                 counts.IfcWall += 1
             except Exception as e:
                 log.warning(
@@ -212,64 +241,91 @@ def build_ifc(
                     ifc_slab = create_slab(
                         model, elem, ifc_storey, body_context,
                         footprint=geometry.footprint,
-                        elevation=storey_data.elevation if elem.type == "slab" else storey_data.elevation + storey_data.height,
+                        elevation=storey_elevation if elem.type == "slab" else storey_elevation + storey_data.height,
                     )
                     is_roof = elem.type == "roof"
                     assign_material_to_element(model, ifc_slab, roof_mat if is_roof else slab_mat)
                     add_slab_psets(model, ifc_slab, elem, is_roof=is_roof)
+                    apply_color(model, ifc_slab, "slab-roof" if is_roof else "slab-floor", style_cache)
                     counts.IfcSlab += 1
 
                 elif elem.type == "column":
-                    ifc_col = create_column(model, elem, ifc_storey, body_context)
+                    ifc_col = create_column(model, elem, ifc_storey, body_context, storey_elevation=storey_elevation)
                     add_column_psets(model, ifc_col, elem)
+                    apply_color(model, ifc_col, "column", style_cache)
                     counts.IfcColumn += 1
 
                 elif elem.type == "window":
                     parent_wall = wall_lookup.get(elem.properties.parent_wall_id or "")
-                    ifc_win = create_window(model, elem, ifc_storey, body_context, parent_wall)
+                    ifc_win = create_window(model, elem, ifc_storey, body_context, parent_wall, storey_elevation=storey_elevation)
                     add_window_psets(model, ifc_win, elem)
+                    apply_color(model, ifc_win, "window", style_cache)
                     counts.IfcWindow += 1
                     if parent_wall:
                         counts.IfcOpeningElement += 1
 
                 elif elem.type == "door":
                     parent_wall = wall_lookup.get(elem.properties.parent_wall_id or "")
-                    ifc_door = create_door(model, elem, ifc_storey, body_context, parent_wall)
+                    ifc_door = create_door(model, elem, ifc_storey, body_context, parent_wall, storey_elevation=storey_elevation)
                     add_door_psets(model, ifc_door, elem)
+                    apply_color(model, ifc_door, "door", style_cache)
                     counts.IfcDoor += 1
                     if parent_wall:
                         counts.IfcOpeningElement += 1
 
                 elif elem.type == "space":
-                    ifc_space = create_space(model, elem, ifc_storey, body_context)
+                    ifc_space = create_space(model, elem, ifc_storey, body_context, storey_elevation=storey_elevation)
                     add_space_psets(model, ifc_space, elem)
+                    apply_color(model, ifc_space, "space", style_cache)
                     counts.IfcSpace += 1
 
                 elif elem.type == "beam":
-                    ifc_beam = create_beam(model, elem, ifc_storey, body_context)
+                    ifc_beam = create_beam(model, elem, ifc_storey, body_context, storey_elevation=storey_elevation)
                     add_beam_psets(model, ifc_beam, elem)
+                    apply_color(model, ifc_beam, "beam", style_cache)
                     counts.IfcBeam += 1
 
                 elif elem.type == "stair":
-                    create_stair(model, elem, ifc_storey, body_context)
+                    ifc_stair = create_stair(model, elem, ifc_storey, body_context, storey_elevation=storey_elevation)
+                    apply_color(model, ifc_stair, "stair", style_cache)
                     counts.IfcStairFlight += 1
 
                 elif elem.type == "duct":
-                    ifc_duct = create_duct(model, elem, ifc_storey, body_context)
+                    ifc_duct = create_duct(
+                        model, elem, ifc_storey, body_context,
+                        storey_elevation=storey_elevation,
+                        emit_geometry=emit_mep_geometry,
+                    )
+                    apply_color(model, ifc_duct, "duct", style_cache)
                     mep_elements["HVAC"].append(ifc_duct)
                     counts.IfcDuctSegment += 1
 
                 elif elem.type == "pipe":
-                    ifc_pipe = create_pipe(model, elem, ifc_storey, body_context)
+                    ifc_pipe = create_pipe(
+                        model, elem, ifc_storey, body_context,
+                        storey_elevation=storey_elevation,
+                        emit_geometry=emit_mep_geometry,
+                    )
+                    apply_color(model, ifc_pipe, "pipe", style_cache)
                     mep_elements["Plumbing"].append(ifc_pipe)
                     counts.IfcPipeSegment += 1
 
                 elif elem.type == "cable-tray":
-                    ifc_tray = create_cable_tray(model, elem, ifc_storey, body_context)
+                    ifc_tray = create_cable_tray(
+                        model, elem, ifc_storey, body_context,
+                        storey_elevation=storey_elevation,
+                        emit_geometry=emit_mep_geometry,
+                    )
+                    apply_color(model, ifc_tray, "cable-tray", style_cache)
                     mep_elements["Electrical"].append(ifc_tray)
 
                 elif elem.type == "equipment":
-                    ifc_equip = create_equipment(model, elem, ifc_storey, body_context)
+                    ifc_equip = create_equipment(
+                        model, elem, ifc_storey, body_context,
+                        storey_elevation=storey_elevation,
+                        emit_geometry=emit_mep_geometry,
+                    )
+                    apply_color(model, ifc_equip, "equipment", style_cache)
                     mep_elements["HVAC"].append(ifc_equip)
 
                 elif elem.type in ("balcony", "canopy", "parapet"):
@@ -305,6 +361,20 @@ def build_ifc(
             if elements:
                 create_mep_system(model, building, sys_name, elements)
 
+    # ── Enrichment: real-world features the massing-generator skips ──
+    # Parapets, podium, ceilings, roof railing, entrance canopy — these
+    # turn a bare geometric skeleton into something that reads as a real
+    # building in the viewer. Architectural disciplines get the full set;
+    # structural / MEP only get what applies (podium, ceiling soffit).
+    # Failures are logged but never abort the build.
+    if discipline in ("architectural", "combined"):
+        enrich_building(model, geometry, ifc_storeys, body_context, style_cache)
+
+    # ── Classification: OmniClass references on every element type ──
+    # Makes the IFC legible to downstream cost/spec tools. Always on —
+    # classification is cheap and every professional IFC carries it.
+    attach_omniclass(model)
+
     elapsed = round((time.monotonic() - start) * 1000, 1)
     log.info(
         "ifc_build_complete",
@@ -332,6 +402,7 @@ def build_multi_discipline(
     (ifc_bytes, entity_counts, per_element_failures).
     """
     results: dict[str, tuple[bytes, EntityCounts, list[BuildFailure]]] = {}
+    emit_mep_geometry = _emit_mep_geometry(request.options.rich_mode)
 
     for discipline in request.options.disciplines:
         model, counts, failures = build_ifc(
@@ -341,6 +412,7 @@ def build_multi_discipline(
             site_name=request.options.site_name,
             author=request.options.author,
             discipline=discipline,
+            emit_mep_geometry=emit_mep_geometry,
         )
 
         # Write to bytes

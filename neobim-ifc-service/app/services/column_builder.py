@@ -16,8 +16,13 @@ def create_column(
     elem: GeometryElement,
     storey: ifcopenshell.entity_instance,
     context: ifcopenshell.entity_instance,
+    storey_elevation: float = 0.0,
 ) -> ifcopenshell.entity_instance:
-    """Create an IfcColumn at the element's position."""
+    """Create an IfcColumn at the element's position.
+
+    `storey_elevation` is the Z floor for this column — without it every
+    storey's columns stack up at ground, producing the "flying slab" bug.
+    """
     props = elem.properties
     height = props.height or 3.0
     radius = props.radius or 0.25
@@ -29,16 +34,20 @@ def create_column(
     from app.utils.ifc_helpers import assign_to_storey
     assign_to_storey(model, storey, column)
 
-    # Position at first vertex
-    cx, cy = 0.0, 0.0
+    # Position at first vertex. Emitters put absolute world Z on the vertex
+    # (TS massing-generator line 848: `z: elevation`); fall back to the
+    # storey elevation only when v0.z is zero (storey-local emitters).
+    cx, cy, cz = 0.0, 0.0, storey_elevation
     if elem.vertices:
-        cx, cy = elem.vertices[0].x, elem.vertices[0].y
+        v0 = elem.vertices[0]
+        cx, cy = v0.x, v0.y
+        cz = v0.z if v0.z else storey_elevation
 
     column.ObjectPlacement = model.create_entity(
         "IfcLocalPlacement",
         RelativePlacement=model.create_entity(
             "IfcAxis2Placement3D",
-            Location=model.create_entity("IfcCartesianPoint", Coordinates=(cx, cy, 0.0)),
+            Location=model.create_entity("IfcCartesianPoint", Coordinates=(cx, cy, cz)),
         ),
     )
 
