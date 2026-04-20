@@ -81,6 +81,7 @@ When disabled (default), the pipeline is completely skipped.
 vip-pipeline/
 ├── types.ts              — All VIP-specific interfaces
 ├── orchestrator.ts       — runVIPPipeline() entry point
+├── logger.ts             — VIPLogger (ANSI dev / JSON prod)
 ├── stage-1-prompt.ts     — Prompt intelligence
 ├── stage-2-images.ts     — Parallel image generation
 ├── stage-3-jury.ts       — Vision jury (Claude Sonnet)
@@ -91,12 +92,35 @@ vip-pipeline/
 └── README.md             — This file
 ```
 
+## Observability
+
+Every VIP pipeline run is persisted in the `VipGeneration` Postgres table
+(`vip_generations`). The admin API at `GET /api/admin/vip-generations`
+exposes pagination and filtering by status/userId.
+
+Console output uses VIPLogger:
+- Dev: colored ANSI box-drawing (human-readable)
+- Prod: single-line JSON per event (grep-friendly)
+
+**Future**: Phase 1.7 will add Upstash Redis hot counters for real-time
+success rate / latency percentiles and a Grafana-style admin dashboard.
+
+## Retention Policy
+
+VipGeneration grows ~1k rows/day at steady state. Plan to add a 90-day
+retention policy (Postgres scheduled function or Vercel cron job) before
+we hit 100k rows. Not blocking Phase 1.2 — implement in Phase 1.7
+alongside the metrics dashboard.
+
+Until then, the `@@index([userId, createdAt(sort: Desc)])` compound index
+keeps admin queries fast up to ~365k rows.
+
 ## Phase Plan
 
-- **Phase 1.1** (current): Scaffolding — types, stubs, feature flag
-- **Phase 1.2**: Stage 1 (Prompt Intelligence) + Stage 4 (Room Extraction)
-- **Phase 1.3**: Stage 2 (Image Generation) — start with GPT-Image-1 only
-- **Phase 1.4**: Stage 3 (Vision Jury) + add Gemini Imagen
-- **Phase 1.5**: Stage 5 (Synthesis) + Stage 7 (Delivery)
-- **Phase 1.6**: Stage 6 (Quality Gate) + retry loop
-- **Phase 1.7**: Add NanoBanana Pro, tuning, A/B testing vs PIPELINE_REF
+- **Phase 1.1**: Scaffolding — types, stubs, feature flag
+- **Phase 1.2** (current): Observability — VIPLogger, VipGeneration table, admin API
+- **Phase 1.3**: Stage 1 (Prompt Intelligence) + Stage 4 (Room Extraction)
+- **Phase 1.4**: Stage 2 (Image Generation) — start with GPT-Image-1 only
+- **Phase 1.5**: Stage 3 (Vision Jury) + add Gemini Imagen
+- **Phase 1.6**: Stage 5 (Synthesis) + Stage 7 (Delivery)
+- **Phase 1.7**: Stage 6 (Quality Gate) + retry loop + Redis counters + dashboard + retention

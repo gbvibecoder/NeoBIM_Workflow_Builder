@@ -11,6 +11,7 @@
 
 export const maxDuration = 60;
 
+import { randomUUID } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
@@ -329,10 +330,12 @@ export async function POST(req: NextRequest) {
     // Falls through to PIPELINE_REF (current production) on any failure.
     if (process.env.PIPELINE_VIP === "true" && sharedParse) {
       try {
+        const vipRequestId = randomUUID();
         const vipEngineStart = Date.now();
         const vipResult = await runVIPPipeline({
           prompt,
           parsedConstraints: sharedParse.constraints,
+          logContext: { requestId: vipRequestId, userId },
         });
 
         if (vipResult.success) {
