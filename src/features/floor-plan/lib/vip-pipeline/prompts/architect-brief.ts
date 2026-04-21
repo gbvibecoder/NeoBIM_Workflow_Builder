@@ -83,41 +83,6 @@ INDIAN RESIDENTIAL TYPOLOGIES:
 - Courtyard Home: Central open courtyard. Rooms arranged around it (South Indian style).
 
 ═══════════════════════════════════════════════════════════════
-MANDATORY ADJACENCY RULES
-═══════════════════════════════════════════════════════════════
-
-These four rules are HARD architectural requirements. They MUST
-appear BOTH in the brief's constraints[] array (prefixed
-"adjacency:") AND mirrored verbatim in the image generation
-prompt (see CORRECTNESS REQUIREMENTS inside the IMAGE GENERATION
-PROMPT GUIDELINES section below). Downstream stages read only
-these two channels; anything expressed only in English prose
-elsewhere in the brief is invisible to them.
-
-1. ENSUITE ATTACHMENT (critical):
-   The Master Bedroom MUST share a wall with its attached ensuite
-   bathroom. The ensuite MUST have its door ONLY from inside the
-   Master Bedroom (no door to corridor). Name the ensuite
-   "Master Bathroom" to mark this relationship.
-
-2. KITCHEN ADJACENCY:
-   The Kitchen MUST be directly adjacent to the Dining area,
-   sharing a wall or direct opening. A serving hatch or open
-   counter is acceptable. Kitchen MUST NOT be isolated behind
-   other rooms.
-
-3. POOJA DIRECT ACCESS (if Pooja Room is present):
-   If a Pooja Room is present, it MUST have its door opening
-   directly into the Living Room or a main corridor. Pooja Room
-   MUST NEVER be accessed through a bedroom, bathroom, or kitchen.
-
-4. BEDROOM PRIVACY:
-   Each bedroom MUST be accessed directly from a corridor,
-   hallway, or living area. NO bedroom may be accessed through
-   another bedroom (except the Master Ensuite from the Master
-   Bedroom).
-
-═══════════════════════════════════════════════════════════════
 BRIEF PRODUCTION RULES
 ═══════════════════════════════════════════════════════════════
 
@@ -187,24 +152,6 @@ styleGuide should be a short string like:
 - "blueprint, black-on-white, professional architectural drawing"
 
 You MUST produce exactly 1 imagePrompt with model string "gpt-image-1.5".
-
-CORRECTNESS REQUIREMENTS (MANDATORY — append these verbatim):
-
-The image prompt text MUST include an explicit architectural
-correctness clause. Insert these exact sentences into the
-imagePrompt.prompt string — place them after the spatial
-description and before the closing style statement (e.g.
-"Black walls on white background..."). Include each sentence
-only when the corresponding room is in roomList:
-
-- Master Bedroom present (always true for residential):
-  "Master Bedroom and Master Bathroom share a wall, with a door between them (not through corridor)."
-- Multiple bedrooms present (always true for 2BHK+):
-  "All bedrooms accessed directly from corridor or living area, never through another bedroom."
-- Dining area present:
-  "Kitchen adjacent to Dining."
-- Pooja Room present:
-  "Pooja Room door opens to Living Room or corridor, not through a bedroom."
 
 ═══════════════════════════════════════════════════════════════
 EDGE CASE HANDLING
