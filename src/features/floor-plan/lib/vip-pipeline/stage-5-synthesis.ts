@@ -558,21 +558,60 @@ export async function runStage5Synthesis(
   const envelope = computeEnvelope(plotWidthFt, plotDepthFt, input.municipality);
   if (envelope.fallbackReason) issues.push(envelope.fallbackReason);
 
-  // Step 2: Transform pixels → feet (into the usable envelope).
+  // Step 2: Transform pixels → feet using the FULL plot dimensions.
+  // The generated image was rendered for the full plot, so pixel→feet
+  // scaling must use full plot. Previously used envelope dims here,
+  // which uniformly compressed every room (bug caught in pre-test
+  // review: 14ft master → 11.9ft on Mumbai).
   const transformed = transformToFeet(
     extraction.rooms,
     plotBoundsPx,
-    envelope.usableWidthFt,
-    envelope.usableDepthFt,
+    plotWidthFt,
+    plotDepthFt,
     issues,
   );
 
-  // Shift rooms inward by (originX, originY) so they live inside
-  // the setback margin. No-op when envelope.applied === false.
+  // Shift rooms inward by (originX, originY) so they live inside the
+  // setback margin, then CLIP overflow. No-op when envelope.applied
+  // === false (envelope == full plot). Small overflow shrinks the
+  // room dimension; large overflow shifts the room inward.
   if (envelope.applied) {
+    const maxX = envelope.originX + envelope.usableWidthFt;
+    const maxY = envelope.originY + envelope.usableDepthFt;
+
     for (const r of transformed) {
-      r.placed.x = Math.round((r.placed.x + envelope.originX) * 10) / 10;
-      r.placed.y = Math.round((r.placed.y + envelope.originY) * 10) / 10;
+      r.placed.x = r.placed.x + envelope.originX;
+      r.placed.y = r.placed.y + envelope.originY;
+
+      if (r.placed.x + r.placed.width > maxX) {
+        const overflow = r.placed.x + r.placed.width - maxX;
+        if (overflow < r.placed.width * 0.3) {
+          r.placed.width = Math.max(6, r.placed.width - overflow);
+          issues.push(
+            `Room "${r.name}" width clipped by ${overflow.toFixed(1)}ft to fit setback envelope`,
+          );
+        } else {
+          r.placed.x = Math.max(envelope.originX, maxX - r.placed.width);
+          issues.push(`Room "${r.name}" shifted to fit setback envelope`);
+        }
+      }
+      if (r.placed.y + r.placed.depth > maxY) {
+        const overflow = r.placed.y + r.placed.depth - maxY;
+        if (overflow < r.placed.depth * 0.3) {
+          r.placed.depth = Math.max(6, r.placed.depth - overflow);
+          issues.push(
+            `Room "${r.name}" depth clipped by ${overflow.toFixed(1)}ft to fit setback envelope`,
+          );
+        } else {
+          r.placed.y = Math.max(envelope.originY, maxY - r.placed.depth);
+          issues.push(`Room "${r.name}" shifted to fit setback envelope`);
+        }
+      }
+
+      r.placed.x = Math.round(r.placed.x * 10) / 10;
+      r.placed.y = Math.round(r.placed.y * 10) / 10;
+      r.placed.width = Math.round(r.placed.width * 10) / 10;
+      r.placed.depth = Math.round(r.placed.depth * 10) / 10;
     }
   }
 

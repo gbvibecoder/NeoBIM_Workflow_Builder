@@ -245,4 +245,84 @@ describe("evaluateEntranceDoor", () => {
     expect(r.score).toBe(5);
     expect(r.reason).toMatch(/No main_entrance/i);
   });
+
+  // ─── Phase 2.5 P0-B: envelope-aware cardinal-side tolerance ──────
+  //
+  // When setbacks are applied, the main door sits on the building wall
+  // (inset from the plot edge by setback_ft). Reading floor.boundary
+  // gave a distance > tolerance, so the dim collapsed to neutral 5/10
+  // on every urban plot with setbacks. The fix reads
+  // project.metadata.plot_usable_area when present.
+
+  function wallAtMmY(yMm: number, xStart = 2000, xEnd = 7000): Wall {
+    return {
+      id: "w_main",
+      type: "exterior",
+      material: "brick",
+      centerline: {
+        start: { x: xStart, y: yMm },
+        end: { x: xEnd, y: yMm },
+      },
+      thickness_mm: 230,
+      height_mm: 3000,
+      openings: [],
+      line_weight: "thick",
+      is_load_bearing: true,
+    };
+  }
+
+  function mumbaiProjectWithSouthDoor(
+    withEnvelopeMeta: boolean,
+  ): FloorPlanProject {
+    const FT_TO_MM = 304.8;
+    // Mumbai 40x40 plot: side setback 4.9ft, front 9.8ft.
+    const originXMm = 4.9 * FT_TO_MM; // 1493.5
+    const originYMm = 9.8 * FT_TO_MM; // 2987.04
+    // South wall of the BUILDING (inset from plot's south edge).
+    const wall = wallAtMmY(originYMm);
+    const rooms = [makeRoom("foy", "Foyer", "foyer")];
+    const door = makeDoor("d_main", "foy", "foy", {
+      id: "d_main",
+      type: "main_entrance",
+      wall_id: wall.id,
+    });
+    const project = makeProject(rooms, [door], [wall]);
+    if (withEnvelopeMeta) {
+      (project.metadata as unknown as Record<string, unknown>).plot_usable_area =
+        {
+          width_ft: 30.2,
+          depth_ft: 20.4,
+          origin_x_ft: 4.9,
+          origin_y_ft: 9.8,
+        };
+    }
+    return project;
+  }
+
+  it("P0-B: envelope metadata present → south-inset main door identified as S (10/10)", () => {
+    const project = mumbaiProjectWithSouthDoor(true);
+    const r = evaluateEntranceDoor(project, makeBrief("S"));
+    // With envelope-aware bounds, the inset south wall is at envelope minY.
+    expect(r.score).toBe(10);
+    expect(r.reason).toMatch(/on S/i);
+  });
+
+  it("P0-B: envelope metadata absent → falls back to floor.boundary (neutral 5/10)", () => {
+    const project = mumbaiProjectWithSouthDoor(false);
+    const r = evaluateEntranceDoor(project, makeBrief("S"));
+    // Without envelope metadata, the 2987mm inset is > 12000*0.15=1800mm
+    // tolerance, so wallCardinalSide returns null → neutral 5/10.
+    // (This captures the pre-fix behavior when setbacks are off.)
+    expect(r.score).toBe(5);
+    expect(r.reason).toMatch(/not on a cardinal edge/i);
+  });
+
+  it("P0-B: envelope metadata present + mismatch — opposite facing → 1/10", () => {
+    // Same Mumbai inset south wall, but brief declares "N" — should
+    // detect "S" correctly (via envelope) and mark opposite.
+    const project = mumbaiProjectWithSouthDoor(true);
+    const r = evaluateEntranceDoor(project, makeBrief("N"));
+    expect(r.score).toBe(1);
+    expect(r.reason).toMatch(/opposite/i);
+  });
 });

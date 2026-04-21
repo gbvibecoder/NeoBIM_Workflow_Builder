@@ -97,6 +97,53 @@ function polygonBounds(points: { x: number; y: number }[]): {
   return { minX, maxX, minY, maxY };
 }
 
+/**
+ * Phase 2.5 P0-B fix: when setbacks are applied, the main door sits at
+ * the envelope edge (inset from the plot edge by setback_ft). Reading
+ * floor.boundary (the full plot) yielded distances > tolerance, so the
+ * dim returned neutral 5/10 on every urban plot with setbacks.
+ *
+ * Prefer project.metadata.plot_usable_area (written by Stage 5 P0-A)
+ * when present — it is the envelope the building actually sits in. Fall
+ * back to floor.boundary when absent (flag off, or older projects).
+ */
+function resolveBuildingBounds(project: FloorPlanProject): {
+  minX: number;
+  maxX: number;
+  minY: number;
+  maxY: number;
+} {
+  const meta = project.metadata as unknown as Record<string, unknown> | undefined;
+  const usable = meta?.plot_usable_area as
+    | {
+        width_ft: number;
+        depth_ft: number;
+        origin_x_ft: number;
+        origin_y_ft: number;
+      }
+    | undefined;
+
+  if (
+    usable &&
+    typeof usable.origin_x_ft === "number" &&
+    typeof usable.origin_y_ft === "number" &&
+    typeof usable.width_ft === "number" &&
+    typeof usable.depth_ft === "number" &&
+    usable.width_ft > 0 &&
+    usable.depth_ft > 0
+  ) {
+    const FT_TO_MM = 304.8;
+    return {
+      minX: usable.origin_x_ft * FT_TO_MM,
+      minY: usable.origin_y_ft * FT_TO_MM,
+      maxX: (usable.origin_x_ft + usable.width_ft) * FT_TO_MM,
+      maxY: (usable.origin_y_ft + usable.depth_ft) * FT_TO_MM,
+    };
+  }
+
+  return polygonBounds(project.floors[0].boundary.points);
+}
+
 function wallCardinalSide(
   wall: { centerline: { start: { x: number; y: number }; end: { x: number; y: number } } },
   plot: { minX: number; maxX: number; minY: number; maxY: number },
@@ -165,7 +212,7 @@ export function evaluateEntranceDoor(
     return { score: 5, reason: "Main door references unknown wall (neutral)" };
   }
 
-  const plot = polygonBounds(floor.boundary.points);
+  const plot = resolveBuildingBounds(project);
   const side = wallCardinalSide(wall, plot);
   if (!side) {
     return { score: 5, reason: "Main door wall not on a cardinal edge (neutral)" };
