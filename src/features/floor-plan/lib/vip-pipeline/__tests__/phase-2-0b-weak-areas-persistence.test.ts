@@ -145,7 +145,7 @@ function stage6Result({
         dimensions: {
           roomCountMatch: 5, noDuplicateNames: 5, dimensionPlausibility: 5,
           vastuCompliance: 5, orientationCorrect: 5, connectivity: 5,
-          exteriorWindows: 5,
+          exteriorWindows: 5, bedroomPrivacy: 5, entranceDoor: 5,
         },
         reasoning: "test",
         recommendation,

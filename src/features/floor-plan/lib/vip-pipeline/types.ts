@@ -165,7 +165,9 @@ export type QualityDimension =
   | "vastuCompliance"
   | "orientationCorrect"
   | "connectivity"
-  | "exteriorWindows";
+  | "exteriorWindows"
+  | "bedroomPrivacy"
+  | "entranceDoor";
 
 export interface QualityVerdict {
   score: number; // 0-100 weighted average
