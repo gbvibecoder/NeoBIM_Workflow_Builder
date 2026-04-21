@@ -17,6 +17,8 @@ import type {
   ExtractedRoom,
   RectPx,
   ArchitectBrief,
+  AdjacencyDeclaration,
+  AdjacencyRelationship,
 } from "./types";
 import type { VIPLogger } from "./logger";
 import type {
@@ -271,6 +273,136 @@ function buildSpine(
   };
 }
 
+// ─── Adjacency Compliance (Phase 2.3) ────────────────────────────
+
+export interface AdjacencyCheckResult {
+  declaration: AdjacencyDeclaration;
+  status: "satisfied" | "violated" | "unknown";
+  note: string;
+}
+
+export interface AdjacencyReport {
+  declared: number;
+  satisfied: number;
+  violated: number;
+  unknown: number;
+  /** 0-100 compliance percentage; drives Stage 6 adjacencyCompliance scoring. */
+  compliancePct: number;
+  checks: AdjacencyCheckResult[];
+}
+
+/** Returns the room whose lowercased name contains (or is contained by) `target`. */
+function findRoomByName<T extends { name: string }>(rooms: T[], target: string): T | undefined {
+  const t = target.toLowerCase().trim();
+  if (!t) return undefined;
+  const exact = rooms.find((r) => r.name.toLowerCase() === t);
+  if (exact) return exact;
+  return rooms.find(
+    (r) => r.name.toLowerCase().includes(t) || t.includes(r.name.toLowerCase()),
+  );
+}
+
+/** Do two rooms share any wall (by room_ids membership)? */
+function sharesWall(
+  aId: string,
+  bId: string,
+  walls: Array<{ room_ids: string[] }>,
+): boolean {
+  return walls.some((w) => w.room_ids.includes(aId) && w.room_ids.includes(bId));
+}
+
+/** Is there a direct door between a and b? */
+function hasDoorBetween(
+  aId: string,
+  bId: string,
+  doors: Array<{ between: [string, string] | string[] }>,
+): boolean {
+  return doors.some((d) => {
+    const between = d.between as string[];
+    return between.includes(aId) && between.includes(bId);
+  });
+}
+
+/**
+ * Evaluate each declared adjacency against the resolved geometry.
+ * Best-effort: no room placement adjustment; produces a report Stage 6 can score.
+ * Exported for unit testing; internal callers use it via the main Stage 5 flow.
+ */
+export function evaluateAdjacencies(
+  adjacencies: AdjacencyDeclaration[],
+  spRooms: Array<{ id: string; name: string; type: string }>,
+  walls: Array<{ room_ids: string[] }>,
+  doors: Array<{ between: [string, string] | string[] }>,
+): AdjacencyReport {
+  const checks: AdjacencyCheckResult[] = [];
+
+  for (const decl of adjacencies) {
+    const roomA = findRoomByName(spRooms, decl.a);
+    const roomB = findRoomByName(spRooms, decl.b);
+
+    if (!roomA || !roomB) {
+      checks.push({
+        declaration: decl,
+        status: "unknown",
+        note: `Room(s) not found in layout (a=${roomA ? "ok" : "missing"}, b=${roomB ? "ok" : "missing"})`,
+      });
+      continue;
+    }
+
+    const result = checkRelationship(
+      decl.relationship,
+      roomA.id,
+      roomB.id,
+      walls,
+      doors,
+    );
+    checks.push({ declaration: decl, status: result.status, note: result.note });
+  }
+
+  const satisfied = checks.filter((c) => c.status === "satisfied").length;
+  const violated = checks.filter((c) => c.status === "violated").length;
+  const unknown = checks.filter((c) => c.status === "unknown").length;
+  const declared = checks.length;
+  const evaluable = satisfied + violated;
+  const compliancePct = evaluable === 0 ? 100 : Math.round((satisfied / evaluable) * 100);
+
+  return { declared, satisfied, violated, unknown, compliancePct, checks };
+}
+
+function checkRelationship(
+  relationship: AdjacencyRelationship,
+  aId: string,
+  bId: string,
+  walls: Array<{ room_ids: string[] }>,
+  doors: Array<{ between: [string, string] | string[] }>,
+): { status: "satisfied" | "violated" | "unknown"; note: string } {
+  const wall = sharesWall(aId, bId, walls);
+  const door = hasDoorBetween(aId, bId, doors);
+
+  switch (relationship) {
+    case "attached":
+      // Share a wall AND have a door between them (the "internal from a" semantic
+      // needs door-side inspection which our door model doesn't expose; we treat
+      // any direct door as satisfying the attachment).
+      if (wall && door) return { status: "satisfied", note: "shared wall + door present" };
+      if (wall && !door) return { status: "violated", note: "share wall but no direct door" };
+      return { status: "violated", note: "no shared wall" };
+    case "adjacent":
+      if (wall) return { status: "satisfied", note: "shared wall" };
+      return { status: "violated", note: "no shared wall" };
+    case "direct-access":
+      if (door) return { status: "satisfied", note: "direct door present" };
+      return { status: "violated", note: "no direct door" };
+    case "connected":
+      // Minimal "connected" check: direct door OR both rooms share a door with any
+      // hallway/corridor node. We don't resolve full graph reachability here.
+      if (door) return { status: "satisfied", note: "direct door present" };
+      return { status: "unknown", note: "corridor reachability not resolved" };
+    default:
+      return { status: "unknown", note: "unrecognized relationship" };
+  }
+}
+
 // ─── Main Entry Point ────────────────────────────────────────────
 
 export async function runStage5Synthesis(
@@ -323,6 +455,7 @@ export async function runStage5Synthesis(
     facing,
     styleCues: [],
     constraints: [],
+    adjacencies: input.adjacencies ?? [],
   };
 
   const spRooms = buildStripPackRooms(transformed, brief);
@@ -415,6 +548,22 @@ export async function runStage5Synthesis(
 
   // Override generation_model metadata
   project.metadata.generation_model = "vip-pipeline";
+
+  // Phase 2.3: evaluate declared adjacencies against the resolved geometry
+  // and stash the report into metadata so Stage 6 can score it.
+  const adjacencyReport = evaluateAdjacencies(
+    input.adjacencies ?? [],
+    spRooms,
+    walls,
+    doorResult.doors,
+  );
+  const meta = project.metadata as unknown as Record<string, unknown>;
+  meta.adjacency_report = adjacencyReport;
+  if (adjacencyReport.violated > 0) {
+    issues.push(
+      `Adjacency: ${adjacencyReport.violated}/${adjacencyReport.declared} declared relationships violated`,
+    );
+  }
 
   const durationMs = Date.now() - startMs;
   if (logger) logger.logStageCost(5, 0); // Pure code, $0

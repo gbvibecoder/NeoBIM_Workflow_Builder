@@ -33,6 +33,23 @@ export interface Stage1Input {
   parsedConstraints: ParsedConstraints;
 }
 
+/**
+ * Phase 2.3: Declared room-to-room relationships the architect wants
+ * Stage 5 to honor during synthesis. Stage 6 scores compliance.
+ */
+export type AdjacencyRelationship =
+  | "attached"        // share a wall, internal door from a (e.g. Master ↔ ensuite)
+  | "adjacent"        // share a wall, door OK from either side (e.g. Kitchen ↔ Dining)
+  | "direct-access"   // b's door opens into a (e.g. Pooja into Living)
+  | "connected";      // reachable via direct corridor (no bedroom-through-bedroom)
+
+export interface AdjacencyDeclaration {
+  a: string;                      // room name from roomList
+  b: string;                      // room name from roomList
+  relationship: AdjacencyRelationship;
+  reason?: string;
+}
+
 export interface ArchitectBrief {
   projectType: string;
   roomList: Array<{ name: string; type: string; approxAreaSqft?: number }>;
@@ -41,6 +58,8 @@ export interface ArchitectBrief {
   facing: string;
   styleCues: string[];
   constraints: string[];
+  /** Phase 2.3: declared adjacencies. Defaults to []. */
+  adjacencies: AdjacencyDeclaration[];
 }
 
 export interface ImageGenPrompt {
@@ -149,6 +168,8 @@ export interface Stage5Input {
   plotDepthFt: number;
   facing: string;
   parsedConstraints: ParsedConstraints;
+  /** Phase 2.3: adjacencies passed from Stage 1 brief. */
+  adjacencies?: AdjacencyDeclaration[];
 }
 
 export interface Stage5Output {
@@ -165,7 +186,8 @@ export type QualityDimension =
   | "vastuCompliance"
   | "orientationCorrect"
   | "connectivity"
-  | "exteriorWindows";
+  | "exteriorWindows"
+  | "adjacencyCompliance";
 
 export interface QualityVerdict {
   score: number; // 0-100 weighted average

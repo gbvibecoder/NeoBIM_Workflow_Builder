@@ -195,6 +195,7 @@ describe("(b) Monotonic progress 5→10→20→35→45→60→75→85→100", ()
           facing: "north",
           styleCues: [],
           constraints: [],
+          adjacencies: [],
         },
         imagePrompts: [{ model: "gpt-image-1.5", prompt: "x", styleGuide: "y" }],
       },
@@ -252,7 +253,8 @@ describe("(b) Monotonic progress 5→10→20→35→45→60→75→85→100", ()
           score: 85,
           dimensions: {
             roomCountMatch: 9, noDuplicateNames: 10, dimensionPlausibility: 8,
-            vastuCompliance: 8, orientationCorrect: 9, connectivity: 8, exteriorWindows: 8,
+            vastuCompliance: 8, orientationCorrect: 9, adjacencyCompliance: 8,
+            connectivity: 8, exteriorWindows: 8,
           },
           reasoning: "good",
           recommendation: "pass",
