@@ -20,19 +20,7 @@ export function LightHero() {
         justifyContent: "center",
       }}
     >
-      {/* Layer 1: warm radial glow — full viewport width */}
-      <div
-        aria-hidden="true"
-        style={{
-          position: "absolute",
-          inset: 0,
-          pointerEvents: "none",
-          zIndex: 0,
-          background:
-            "radial-gradient(ellipse 80% 60% at 50% 45%, rgba(255, 245, 225, 0.85) 0%, rgba(255, 248, 235, 0.4) 35%, rgba(250, 250, 247, 0) 75%)",
-        }}
-      />
-      {/* Layer 2: dot grid with radial fade mask — full viewport width */}
+      {/* Dot grid with radial fade mask — full viewport width */}
       <div
         aria-hidden="true"
         style={{
