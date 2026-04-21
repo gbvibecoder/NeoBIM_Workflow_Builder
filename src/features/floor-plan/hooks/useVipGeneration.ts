@@ -66,6 +66,10 @@ export function useVipGeneration() {
   const [project, setProject] = useState<FloorPlanProject | null>(null);
   // Phase 2.3 Workstream C: approval-gate state.
   const [intermediateImage, setIntermediateImage] = useState<string | null>(null);
+  // Phase 2.6: in-flight approval/regeneration actions (drive button
+  // disabled + spinner states in ImageApprovalGate).
+  const [approving, setApproving] = useState(false);
+  const [regenerating, setRegenerating] = useState(false);
 
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const startTimeRef = useRef<number>(0);
@@ -202,33 +206,41 @@ export function useVipGeneration() {
   }, [stopPolling]);
 
   // Phase 2.3 Workstream C: user approves the Stage 2 image.
+  // Phase 2.6: tracks `approving` so the gate can disable buttons + show spinner.
   const approveImage = useCallback(async () => {
     const jobId = jobIdRef.current;
-    if (!jobId) return;
+    if (!jobId || approving || regenerating) return;
+    setApproving(true);
+    setErrorMessage(null);
     try {
       const res = await fetch(`/api/vip-jobs/${jobId}/approve`, { method: "POST" });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        setErrorMessage(data.error ?? "Failed to approve image");
+        setErrorMessage(data.error ?? "Failed to approve image. Try again?");
         return;
       }
       setStatus("polling");
       setIntermediateImage(null);
       setStageLabel("Generating CAD geometry...");
     } catch {
-      setErrorMessage("Network error approving image");
+      setErrorMessage("Network error approving image. Try again?");
+    } finally {
+      setApproving(false);
     }
-  }, []);
+  }, [approving, regenerating]);
 
   // Phase 2.3 Workstream C: user rejects the image and wants a fresh one.
+  // Phase 2.6: tracks `regenerating` so the gate can disable buttons + show spinner.
   const regenerateImage = useCallback(async () => {
     const jobId = jobIdRef.current;
-    if (!jobId) return;
+    if (!jobId || approving || regenerating) return;
+    setRegenerating(true);
+    setErrorMessage(null);
     try {
       const res = await fetch(`/api/vip-jobs/${jobId}/regenerate-image`, { method: "POST" });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        setErrorMessage(data.error ?? "Failed to regenerate image");
+        setErrorMessage(data.error ?? "Failed to regenerate image. Try again?");
         return;
       }
       // Poll will update status/progress as Stage 2 re-runs.
@@ -236,9 +248,11 @@ export function useVipGeneration() {
       setIntermediateImage(null);
       setStageLabel("Regenerating image...");
     } catch {
-      setErrorMessage("Network error regenerating image");
+      setErrorMessage("Network error regenerating image. Try again?");
+    } finally {
+      setRegenerating(false);
     }
-  }, []);
+  }, [approving, regenerating]);
 
   return {
     status,
@@ -249,6 +263,8 @@ export function useVipGeneration() {
     errorMessage,
     project,
     intermediateImage,
+    approving,
+    regenerating,
     startGeneration,
     cancel,
     approveImage,

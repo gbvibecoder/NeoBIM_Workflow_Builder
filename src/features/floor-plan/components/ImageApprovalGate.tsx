@@ -1,5 +1,7 @@
 /**
  * Phase 2.3 Workstream C — Image approval gate UI.
+ * Phase 2.6 — Now the default UX for every VIP generation (no longer
+ * gated by PIPELINE_VIP_APPROVAL_GATE flag). Adds loading/error states.
  *
  * Shown when a VipJob is AWAITING_APPROVAL after Stage 2. The user
  * sees the generated image and picks:
@@ -20,6 +22,12 @@ interface ImageApprovalGateProps {
   onApprove: () => void;
   onRegenerate: () => void;
   onCancel?: () => void;
+  /** True while an approve request is in flight — disables buttons, shows spinner. */
+  approving?: boolean;
+  /** True while a regenerate request is in flight — disables buttons, shows spinner. */
+  regenerating?: boolean;
+  /** If set, renders a red error banner above the buttons (e.g. network failure). */
+  errorMessage?: string | null;
 }
 
 export function ImageApprovalGate({
@@ -27,8 +35,12 @@ export function ImageApprovalGate({
   onApprove,
   onRegenerate,
   onCancel,
+  approving = false,
+  regenerating = false,
+  errorMessage = null,
 }: ImageApprovalGateProps) {
   const dataUrl = `data:image/png;base64,${imageBase64}`;
+  const busy = approving || regenerating;
 
   return (
     <div
@@ -85,6 +97,7 @@ export function ImageApprovalGate({
             <button
               onClick={onCancel}
               aria-label="Cancel generation"
+              disabled={busy}
               style={{
                 background: "transparent",
                 border: "1px solid rgba(255,255,255,0.08)",
@@ -92,7 +105,8 @@ export function ImageApprovalGate({
                 borderRadius: 8,
                 padding: "6px 10px",
                 fontSize: 11,
-                cursor: "pointer",
+                cursor: busy ? "not-allowed" : "pointer",
+                opacity: busy ? 0.4 : 1,
               }}
             >
               Cancel
@@ -133,9 +147,29 @@ export function ImageApprovalGate({
             If it looks off, regenerate just the image for ~$0.034.
           </p>
 
+          {errorMessage && (
+            <div
+              role="alert"
+              style={{
+                marginBottom: 14,
+                padding: "10px 12px",
+                borderRadius: 10,
+                background: "rgba(239,68,68,0.08)",
+                border: "1px solid rgba(239,68,68,0.28)",
+                color: "#FCA5A5",
+                fontSize: 12,
+                lineHeight: 1.5,
+              }}
+            >
+              {errorMessage}
+            </div>
+          )}
+
           <div style={{ display: "flex", gap: 10 }}>
             <button
               onClick={onRegenerate}
+              disabled={busy}
+              aria-busy={regenerating}
               style={{
                 flex: 1,
                 padding: "12px 16px",
@@ -145,13 +179,21 @@ export function ImageApprovalGate({
                 color: "#D5D7E5",
                 fontSize: 13,
                 fontWeight: 600,
-                cursor: "pointer",
+                cursor: busy ? "not-allowed" : "pointer",
+                opacity: busy && !regenerating ? 0.35 : 1,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 8,
               }}
             >
-              Regenerate image (~$0.034)
+              {regenerating && <Spinner tone="light" />}
+              {regenerating ? "Regenerating…" : "Regenerate image (~$0.034)"}
             </button>
             <button
               onClick={onApprove}
+              disabled={busy}
+              aria-busy={approving}
               style={{
                 flex: 1.4,
                 padding: "12px 16px",
@@ -162,15 +204,41 @@ export function ImageApprovalGate({
                 fontSize: 13,
                 fontWeight: 700,
                 letterSpacing: "-0.01em",
-                cursor: "pointer",
+                cursor: busy ? "not-allowed" : "pointer",
+                opacity: busy && !approving ? 0.5 : 1,
                 boxShadow: "0 8px 24px rgba(79,138,255,0.28)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 8,
               }}
             >
-              Looks good → generate CAD (~$0.06)
+              {approving && <Spinner tone="dark" />}
+              {approving ? "Starting CAD…" : "Looks good → generate CAD (~$0.06)"}
             </button>
           </div>
         </div>
       </div>
     </div>
+  );
+}
+
+function Spinner({ tone }: { tone: "light" | "dark" }) {
+  const color = tone === "dark" ? "#fff" : "#D5D7E5";
+  return (
+    <span
+      aria-hidden="true"
+      style={{
+        width: 14,
+        height: 14,
+        borderRadius: "50%",
+        border: `2px solid ${color}`,
+        borderTopColor: "transparent",
+        display: "inline-block",
+        animation: "iag-spin 0.8s linear infinite",
+      }}
+    >
+      <style>{`@keyframes iag-spin { to { transform: rotate(360deg); } }`}</style>
+    </span>
   );
 }
