@@ -41,6 +41,8 @@ export interface ArchitectBrief {
   facing: string;
   styleCues: string[];
   constraints: string[];
+  /** Phase 2.4 P0-A: city name for setback resolution (e.g., "MUMBAI", "BENGALURU"). */
+  municipality?: string;
 }
 
 export interface ImageGenPrompt {
@@ -149,6 +151,8 @@ export interface Stage5Input {
   plotDepthFt: number;
   facing: string;
   parsedConstraints: ParsedConstraints;
+  /** Phase 2.4 P0-A: municipality for setback resolution (from Stage 1 brief). */
+  municipality?: string;
 }
 
 export interface Stage5Output {

@@ -120,6 +120,11 @@ BRIEF PRODUCTION RULES
    If rooms exceed plot area, scale down non-critical rooms proportionally and add
    a warning constraint.
 
+9. municipality: if the user prompt or parsed data mentions a specific Indian city
+   (Mumbai, Bengaluru/Bangalore, Delhi, Pune, Hyderabad, etc.), populate
+   municipality with that city name in UPPERCASE. If no city is mentioned, leave
+   it unset — downstream synthesis will use a safe default setback. Do not guess.
+
 ═══════════════════════════════════════════════════════════════
 IMAGE GENERATION PROMPT GUIDELINES
 ═══════════════════════════════════════════════════════════════

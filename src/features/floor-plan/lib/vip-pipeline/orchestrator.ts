@@ -90,6 +90,7 @@ async function runStage4And5Block(
           plotDepthFt: stage1Output.brief.plotDepthFt,
           facing: stage1Output.brief.facing,
           parsedConstraints,
+          municipality: stage1Output.brief.municipality,
         },
         log,
       );
