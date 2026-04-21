@@ -26,9 +26,15 @@ export async function POST(req: NextRequest) {
   const rawBody = await req.text();
   const signature = req.headers.get("upstash-signature");
 
-  // In dev mode without QStash, allow unsigned requests from localhost
-  const isDev = process.env.NODE_ENV === "development";
-  if (!isDev) {
+  // Phase 2.4 GA.3: explicit opt-in bypass (replaces implicit NODE_ENV check).
+  // Hard-fails if SKIP_QSTASH_SIG_VERIFY=true leaks into production.
+  const skipVerify = process.env.SKIP_QSTASH_SIG_VERIFY === "true";
+  if (skipVerify && process.env.NODE_ENV === "production") {
+    throw new Error(
+      "SECURITY: SKIP_QSTASH_SIG_VERIFY must not be true in production",
+    );
+  }
+  if (!skipVerify) {
     const valid = await verifyQstashSignature(signature, rawBody);
     if (!valid) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

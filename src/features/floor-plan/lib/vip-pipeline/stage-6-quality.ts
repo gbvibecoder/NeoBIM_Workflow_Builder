@@ -20,6 +20,7 @@ import type { FloorPlanProject } from "@/types/floor-plan-cad";
 import type { ArchitectBrief } from "./types";
 import { Stage6RawOutputSchema } from "./schemas";
 import { createAnthropicClient } from "./clients";
+import { evaluateBedroomPrivacy, evaluateEntranceDoor } from "./quality-evaluators";
 
 // ─── Constants ───────────────────────────────────────────────────
 
@@ -36,7 +37,24 @@ const DIMENSION_WEIGHTS: Record<QualityDimension, number> = {
   orientationCorrect: 1.5,
   connectivity: 1.0,
   exteriorWindows: 1.0,
+  // Phase 2.4 P0-B: scored locally from FloorPlanProject, not by LLM.
+  bedroomPrivacy: 1.0,
+  entranceDoor: 1.5,
 };
+
+/** LLM-scored dimensions (what the tool_use schema asks for). */
+const LLM_DIMS = [
+  "roomCountMatch",
+  "noDuplicateNames",
+  "dimensionPlausibility",
+  "vastuCompliance",
+  "orientationCorrect",
+  "connectivity",
+  "exteriorWindows",
+] as const;
+
+/** Locally-scored dimensions (Phase 2.4 P0-B). */
+const LOCAL_DIMS = ["bedroomPrivacy", "entranceDoor"] as const;
 
 const PASS_THRESHOLD = 65;
 const RETRY_THRESHOLD = 45;
@@ -132,6 +150,8 @@ const ALL_DIMS: QualityDimension[] = [
   "orientationCorrect",
   "connectivity",
   "exteriorWindows",
+  "bedroomPrivacy",
+  "entranceDoor",
 ];
 
 function computeVerdict(
@@ -215,12 +235,23 @@ ${input.brief.styleCues.some((s) => s.toLowerCase().includes("vastu"))
     const raw = parsed.data;
 
     const safeDimensions = {} as Record<QualityDimension, number>;
-    for (const dim of ALL_DIMS) {
+    for (const dim of LLM_DIMS) {
       const val = raw.dimensions[dim as keyof typeof raw.dimensions];
       safeDimensions[dim] = typeof val === "number" ? Math.max(1, Math.min(10, val)) : 5;
     }
 
-    return { output: computeVerdict(safeDimensions, raw.reasoning), metrics: { inputTokens, outputTokens, costUsd } };
+    // Phase 2.4 P0-B: deterministic evaluators for bedroomPrivacy + entranceDoor.
+    const privacyResult = evaluateBedroomPrivacy(input.project);
+    const entranceResult = evaluateEntranceDoor(input.project, input.brief);
+    safeDimensions.bedroomPrivacy = Math.max(1, Math.min(10, privacyResult.score));
+    safeDimensions.entranceDoor = Math.max(1, Math.min(10, entranceResult.score));
+
+    const mergedReasoning = `${raw.reasoning} | bedroomPrivacy: ${privacyResult.reason} | entranceDoor: ${entranceResult.reason}`;
+
+    // LOCAL_DIMS is the intentional inclusion set — retained for callers/tests.
+    void LOCAL_DIMS;
+
+    return { output: computeVerdict(safeDimensions, mergedReasoning), metrics: { inputTokens, outputTokens, costUsd } };
   } finally {
     clearTimeout(timer);
   }

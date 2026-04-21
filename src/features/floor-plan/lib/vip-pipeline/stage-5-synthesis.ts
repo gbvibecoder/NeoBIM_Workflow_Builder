@@ -33,6 +33,7 @@ import { buildWalls } from "../strip-pack/wall-builder";
 import { placeDoors } from "../strip-pack/door-placer";
 import { placeWindows } from "../strip-pack/window-placer";
 import type { ParsedConstraints } from "../structured-parser";
+import { computeEnvelope } from "./constants/setbacks";
 
 // ─── Public Types ────────────────────────────────────────────────
 
@@ -284,14 +285,28 @@ export async function runStage5Synthesis(
   // Step 1: Resolve plot bounds
   const plotBoundsPx = resolvePlotBounds(extraction, issues);
 
-  // Step 2: Transform pixels → feet
+  // Phase 2.4 P0-A: resolve building envelope after setbacks.
+  // When the feature flag is off, envelope == full plot (no-op).
+  const envelope = computeEnvelope(plotWidthFt, plotDepthFt, input.municipality);
+  if (envelope.fallbackReason) issues.push(envelope.fallbackReason);
+
+  // Step 2: Transform pixels → feet (into the usable envelope).
   const transformed = transformToFeet(
     extraction.rooms,
     plotBoundsPx,
-    plotWidthFt,
-    plotDepthFt,
+    envelope.usableWidthFt,
+    envelope.usableDepthFt,
     issues,
   );
+
+  // Shift rooms inward by (originX, originY) so they live inside
+  // the setback margin. No-op when envelope.applied === false.
+  if (envelope.applied) {
+    for (const r of transformed) {
+      r.placed.x = Math.round((r.placed.x + envelope.originX) * 10) / 10;
+      r.placed.y = Math.round((r.placed.y + envelope.originY) * 10) / 10;
+    }
+  }
 
   if (transformed.length === 0) {
     throw new Error("Stage 5: all rooms eliminated during transform — 0 rooms");
@@ -327,13 +342,45 @@ export async function runStage5Synthesis(
 
   const spRooms = buildStripPackRooms(transformed, brief);
   const normalizedFacing = normalizeFacing(facing);
+  // Full plot rect — stored in StripPackResult for renderer boundary.
   const plotRect: Rect = { x: 0, y: 0, width: plotWidthFt, depth: plotDepthFt };
+  // Building envelope (= plotRect when setbacks disabled).
+  const buildingRect: Rect = {
+    x: envelope.originX,
+    y: envelope.originY,
+    width: envelope.usableWidthFt,
+    depth: envelope.usableDepthFt,
+  };
 
-  // Step 6: Build spine, walls, doors, windows
-  const spine = buildSpine(spRooms, plotWidthFt, plotDepthFt, normalizedFacing);
+  // Step 6: Build spine inside the usable envelope, then translate
+  // into plot coordinates so walls/doors/windows line up with rooms.
+  const spine = buildSpine(
+    spRooms,
+    envelope.usableWidthFt,
+    envelope.usableDepthFt,
+    normalizedFacing,
+  );
+  if (envelope.applied) {
+    spine.spine = {
+      ...spine.spine,
+      x: spine.spine.x + envelope.originX,
+      y: spine.spine.y + envelope.originY,
+    };
+    spine.front_strip = {
+      ...spine.front_strip,
+      x: spine.front_strip.x + envelope.originX,
+      y: spine.front_strip.y + envelope.originY,
+    };
+    spine.back_strip = {
+      ...spine.back_strip,
+      x: spine.back_strip.x + envelope.originX,
+      y: spine.back_strip.y + envelope.originY,
+    };
+  }
   spine.remaining_front = [spine.front_strip];
 
-  const walls = buildWalls({ rooms: spRooms, spine, plot: plotRect });
+  // Walls enclose the BUILDING envelope (inset from plot line).
+  const walls = buildWalls({ rooms: spRooms, spine, plot: buildingRect });
 
   // Wire wall_ids onto rooms
   const wallsByRoom = new Map<string, string[]>();
@@ -415,6 +462,17 @@ export async function runStage5Synthesis(
 
   // Override generation_model metadata
   project.metadata.generation_model = "vip-pipeline";
+
+  // Phase 2.4 P0-A: write setback metadata so renderers / quality gate
+  // / downstream tooling can see what envelope the building sits in.
+  const meta = project.metadata as unknown as Record<string, unknown>;
+  meta.setback_applied = envelope.applied ? envelope.rule : null;
+  meta.plot_usable_area = {
+    width_ft: envelope.usableWidthFt,
+    depth_ft: envelope.usableDepthFt,
+    origin_x_ft: envelope.originX,
+    origin_y_ft: envelope.originY,
+  };
 
   const durationMs = Date.now() - startMs;
   if (logger) logger.logStageCost(5, 0); // Pure code, $0

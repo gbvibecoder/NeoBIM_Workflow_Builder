@@ -24,6 +24,8 @@ const ArchitectBriefSchema = z.object({
   facing: z.string(),
   styleCues: z.array(z.string()),
   constraints: z.array(z.string()),
+  // Phase 2.4 P0-A: optional city for setback resolution.
+  municipality: z.string().optional(),
 });
 
 const ImageGenPromptSchema = z.object({
