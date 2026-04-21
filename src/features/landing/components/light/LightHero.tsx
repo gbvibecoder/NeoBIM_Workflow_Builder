@@ -11,20 +11,16 @@ export function LightHero() {
     <section
       aria-label="Hero"
       style={{
+        position: "relative",
+        overflow: "hidden",
         minHeight: "72vh",
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
         justifyContent: "center",
-        textAlign: "center",
-        padding: "160px 24px 64px",
-        maxWidth: 1200,
-        margin: "0 auto",
-        position: "relative",
-        overflow: "hidden",
       }}
     >
-      {/* Layer 1: warm radial glow */}
+      {/* Layer 1: warm radial glow — full viewport width */}
       <div
         aria-hidden="true"
         style={{
@@ -36,7 +32,7 @@ export function LightHero() {
             "radial-gradient(ellipse 80% 60% at 50% 45%, rgba(255, 245, 225, 0.85) 0%, rgba(255, 248, 235, 0.4) 35%, rgba(250, 250, 247, 0) 75%)",
         }}
       />
-      {/* Layer 2: dot grid with radial fade mask */}
+      {/* Layer 2: dot grid with radial fade mask — full viewport width */}
       <div
         aria-hidden="true"
         style={{
@@ -54,7 +50,20 @@ export function LightHero() {
             "radial-gradient(ellipse 70% 65% at 50% 50%, black 30%, transparent 80%)",
         }}
       />
-      <div className="light-reveal" style={{ position: "relative", zIndex: 1 }}>
+
+      {/* Content — constrained width, above decorative layers */}
+      <div
+        className="light-reveal"
+        style={{
+          position: "relative",
+          zIndex: 1,
+          textAlign: "center",
+          maxWidth: 1200,
+          width: "100%",
+          padding: "160px 24px 64px",
+          margin: "0 auto",
+        }}
+      >
         {/* Mono label */}
         <p
           style={{
@@ -213,24 +222,23 @@ export function LightHero() {
 
       <style>{`
         @media (max-width: 1024px) {
-          section[aria-label="Hero"] {
+          section[aria-label="Hero"] .light-reveal {
             padding-top: 120px !important;
           }
         }
         @media (max-width: 768px) {
           section[aria-label="Hero"] {
-            padding-top: 100px !important;
             min-height: auto !important;
+          }
+          section[aria-label="Hero"] .light-reveal {
+            padding-top: 100px !important;
           }
           section[aria-label="Hero"] h1 {
             font-size: clamp(2rem, 7vw, 2.5rem) !important;
           }
-          section[aria-label="Hero"] p:nth-of-type(2) {
-            font-size: 16px !important;
-          }
         }
         @media (max-width: 480px) {
-          section[aria-label="Hero"] {
+          section[aria-label="Hero"] .light-reveal {
             padding: 100px 16px 48px !important;
           }
           .light-hero-ctas {
