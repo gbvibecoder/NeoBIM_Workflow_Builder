@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { Check } from "lucide-react";
 import { useLocale } from "@/hooks/useLocale";
+import { LightHeroPipeline } from "./LightHeroPipeline";
 
 export function LightHero() {
   const { t } = useLocale();
@@ -207,6 +208,9 @@ export function LightHero() {
           ))}
         </div>
       </div>
+
+      {/* Animated pipeline visual — hidden on mobile */}
+      <LightHeroPipeline />
 
       <style>{`
         @media (max-width: 1024px) {
