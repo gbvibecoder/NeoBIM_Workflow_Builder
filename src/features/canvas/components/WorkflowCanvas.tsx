@@ -194,7 +194,7 @@ function WorkflowCanvasInner({ workflowId: urlWorkflowId, templateId, forceNew =
     return () => {
       if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
     };
-  }, [isDirty, currentWorkflow?.id, isSaving, saveWorkflow]);
+  }, [isDirty, currentWorkflow?.id, isSaving, saveWorkflow, urlWorkflowId]);
 
   // ─── Restore execution artifacts from DB ─────────────────────────
   const restoreAbortRef = useRef<AbortController | null>(null);

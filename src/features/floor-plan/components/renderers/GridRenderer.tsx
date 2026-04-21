@@ -98,7 +98,7 @@ function GridRendererBase({ viewport, gridSize_mm, viewMode }: GridRendererProps
     }
 
     return { lines, labels };
-  }, [viewport.x, viewport.y, viewport.zoom, viewport.canvasWidth, viewport.canvasHeight, gridSize_mm]);
+  }, [viewport, gridSize_mm]);
 
   const majorColor = viewMode === "cad" ? "#E0E0E0" : "#ECECEC";
   const minorColor = viewMode === "cad" ? "#F0F0F0" : "#F5F5F5";

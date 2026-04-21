@@ -1539,6 +1539,9 @@ function ApiKeysSection({ saveStatus, onSaveStatusChange }: {
       // Invalidate any in-flight load so its result/error never lands on a
       // remounted component (fixes the false "Request timed out" flash that
       // appeared within 1s of opening the tab in strict mode / on remount).
+      // Intentional live-ref read: cleanup MUST see the current counter,
+      // so copying to a local variable would defeat the guard.
+      // eslint-disable-next-line react-hooks/exhaustive-deps
       loadIdRef.current++;
     };
   }, [loadKeys]);
