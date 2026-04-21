@@ -850,6 +850,12 @@ model VipJob {
   intermediateImage String?   // base64 of the Stage 2 GPT image
   intermediateBrief Json?     // full stage 1 output (brief + imagePrompts)
   userApproval      String?   // 'pending' | 'approved' | 'regenerating'
+  // Phase 2.6: stage-by-stage log for the Pipeline Logs Panel UI.
+  // Array of StageLogEntry objects — one entry per logStageStart /
+  // logStageSuccess / logStageFailure hit by the orchestrator. Written
+  // incrementally from the worker so the UI can poll and render each
+  // stage as it completes. Shape defined in vip-pipeline/types.ts.
+  stageLog          Json?
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 

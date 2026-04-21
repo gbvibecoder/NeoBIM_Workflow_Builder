@@ -19,10 +19,24 @@ import { verifyQstashSignature } from "@/lib/qstash";
 import { parseConstraints } from "@/features/floor-plan/lib/structured-parser";
 import { runVIPPipeline } from "@/features/floor-plan/lib/vip-pipeline/orchestrator";
 import { runVIPPipelinePhaseA } from "@/features/floor-plan/lib/vip-pipeline/orchestrator-gated";
+import {
+  appendStageLogEntry,
+  createStageLogPersister,
+} from "@/features/floor-plan/lib/vip-pipeline/stage-log-store";
 
 const PIPELINE_TIMEOUT_MS = 550_000; // 550s safety margin vs Vercel's 600s
-/** Phase 2.3 Workstream C: feature flag for the image approval gate. */
-const APPROVAL_GATE_ENABLED = process.env.PIPELINE_VIP_APPROVAL_GATE === "true";
+/**
+ * Phase 2.6: image approval gate is now the DEFAULT flow. The legacy
+ * monolithic path (no user approval between Stages 2 and 3) is reachable
+ * only as an explicit emergency-rollback opt-in via PIPELINE_VIP_MONOLITHIC.
+ *
+ * Why: gated flow gives the user a chance to reject the Stage 2 image
+ * before paying $0.06+ for CAD extraction, and surfaces the pipeline's
+ * intermediate state in the Logs Panel. The invariant here is "gated by
+ * default, monolithic only if ops says so."
+ */
+const USE_MONOLITHIC_FALLBACK =
+  process.env.PIPELINE_VIP_MONOLITHIC === "true";
 
 export async function POST(req: NextRequest) {
   // ── QStash signature verification ──
@@ -78,14 +92,30 @@ export async function POST(req: NextRequest) {
     if (!apiKey) throw new Error("OPENAI_API_KEY not set");
 
     await updateJob(jobId, { progress: 5, currentStage: "parse" });
+    const parseStartIso = new Date().toISOString();
+    const parseStart = Date.now();
     const parseRes = await parseConstraints(job.prompt, apiKey);
+    const parseDurationMs = Date.now() - parseStart;
     await updateJob(jobId, { progress: 10, currentStage: "parse" });
+    // Phase 2.6: log the parse stage on the timeline so users see the
+    // pipeline kickoff (not just stages 1-7).
+    await appendStageLogEntry(jobId, {
+      stage: 0,
+      name: "Parse Constraints",
+      status: "success",
+      startedAt: parseStartIso,
+      completedAt: new Date().toISOString(),
+      durationMs: parseDurationMs,
+      summary: `plot: ${parseRes.constraints?.plot?.width_ft ?? "?"}×${parseRes.constraints?.plot?.depth_ft ?? "?"}ft`,
+      output: { constraintsKeys: Object.keys(parseRes.constraints ?? {}) },
+    });
 
-    // ── Phase 2.3 Workstream C: image approval gate ──
-    // When the feature flag is on, run Phase A only (Stages 1-2) and
-    // pause for user approval. The user later hits /api/vip-jobs/[id]/approve
-    // which enqueues /api/vip-jobs/worker/resume to run Stages 3-7.
-    if (APPROVAL_GATE_ENABLED) {
+    // ── Phase 2.6: gated path is now the DEFAULT flow ──
+    // Run Phase A (Stages 1-2) and pause for user approval. The user
+    // hits /api/vip-jobs/[id]/approve which enqueues worker/resume to
+    // run Stages 3-7. To fall back to the legacy monolithic pipeline
+    // (emergency rollback only), set PIPELINE_VIP_MONOLITHIC=true.
+    if (!USE_MONOLITHIC_FALLBACK) {
       const phaseA = await runVIPPipelinePhaseA({
         prompt: job.prompt,
         parsedConstraints: parseRes.constraints,
@@ -93,6 +123,7 @@ export async function POST(req: NextRequest) {
         onProgress: async (progress, stage) => {
           await updateJob(jobId, { progress, currentStage: stage });
         },
+        onStageLog: createStageLogPersister(jobId),
       });
 
       if (!phaseA.success) {
@@ -133,7 +164,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ status: "AWAITING_APPROVAL", jobId });
     }
 
-    // ── Legacy path: run full pipeline monolithically (no gate) ──
+    // ── Legacy monolithic path — PIPELINE_VIP_MONOLITHIC=true only ──
     const pipelinePromise = runVIPPipeline({
       prompt: job.prompt,
       parsedConstraints: parseRes.constraints,
@@ -141,6 +172,7 @@ export async function POST(req: NextRequest) {
       onProgress: async (progress, stage) => {
         await updateJob(jobId, { progress, currentStage: stage });
       },
+      onStageLog: createStageLogPersister(jobId),
     });
 
     const timeoutPromise = new Promise<never>((_, reject) =>

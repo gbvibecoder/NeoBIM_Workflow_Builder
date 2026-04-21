@@ -31,6 +31,7 @@ import { useFeatureFlags } from "@/features/floor-plan/hooks/useFeatureFlags";
 import { useVipGeneration } from "@/features/floor-plan/hooks/useVipGeneration";
 import { VipGenerationProgress } from "@/features/floor-plan/components/VipGenerationProgress";
 import { ImageApprovalGate } from "@/features/floor-plan/components/ImageApprovalGate";
+import { PipelineLogsPanel } from "@/features/floor-plan/components/PipelineLogsPanel";
 
 interface FloorPlanViewerProps {
   /** Pre-loaded geometry from pipeline (e.g. navigated from result showcase) */
@@ -584,7 +585,17 @@ export function FloorPlanViewer({ initialGeometry, initialPrompt, initialProject
     />
   ) : null;
 
+  // Phase 2.6: Pipeline Logs Panel — visible whenever the VIP hook is
+  // non-idle, so users can watch the pipeline advance stage-by-stage
+  // regardless of whether the progress overlay or approval gate is up.
+  const pipelineLogsPanel =
+    featureFlags.vipJobsEnabled && vip.status !== "idle" ? (
+      <PipelineLogsPanel stageLog={vip.stageLog} pipelineStatus={vip.status} />
+    ) : null;
+
   // Phase 2.3 Workstream C: image approval gate overlay.
+  // Phase 2.6: gated flow is the default — pass approving/regenerating/
+  // errorMessage through so the gate can disable buttons + show feedback.
   // Shown when the pipeline has paused after Stage 2 and is waiting
   // for the user to approve or regenerate the generated image.
   const approvalGate =
@@ -595,6 +606,9 @@ export function FloorPlanViewer({ initialGeometry, initialPrompt, initialProject
         imageBase64={vip.intermediateImage}
         onApprove={vip.approveImage}
         onRegenerate={vip.regenerateImage}
+        approving={vip.approving}
+        regenerating={vip.regenerating}
+        errorMessage={vip.errorMessage}
         onCancel={() => {
           vip.cancel();
           useFloorPlanStore.setState({ isGenerating: false });
@@ -638,6 +652,7 @@ export function FloorPlanViewer({ initialGeometry, initialPrompt, initialProject
         {errorOverlay}
         {vipOverlay}
         {approvalGate}
+        {pipelineLogsPanel}
       </div>
     );
   }
@@ -703,6 +718,7 @@ export function FloorPlanViewer({ initialGeometry, initialPrompt, initialProject
         {errorOverlay}
         {vipOverlay}
         {approvalGate}
+        {pipelineLogsPanel}
       </div>
     );
   }
@@ -973,6 +989,9 @@ export function FloorPlanViewer({ initialGeometry, initialPrompt, initialProject
 
       {/* Keyboard shortcuts overlay */}
       <ShortcutOverlay />
+
+      {/* Phase 2.6: Pipeline Logs Panel (visible whenever VIP is active). */}
+      {pipelineLogsPanel}
 
       {/* Print stylesheet */}
       <style jsx global>{`

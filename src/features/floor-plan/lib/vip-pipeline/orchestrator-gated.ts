@@ -62,7 +62,8 @@ export async function runVIPPipelinePhaseA(
   config: VIPPipelineConfig,
 ): Promise<VIPPhaseAResult> {
   const { requestId, userId } = config.logContext;
-  const log = new VIPLogger(requestId, userId, config.prompt);
+  const log = new VIPLogger(requestId, userId, config.prompt, config.onStageLog);
+  if (config.existingStageLog) log.seedStageLog(config.existingStageLog);
 
   // Stage 1
   let stage1Output: Stage1Output;
@@ -78,7 +79,10 @@ export async function runVIPPipelinePhaseA(
     stage1Output = output;
     stage1Ms = Date.now() - t0;
     stage1CostUsd = metrics.costUsd;
-    log.logStageSuccess(1, stage1Ms, { rooms: output.brief.roomList.length });
+    log.logStageSuccess(1, stage1Ms, {
+      rooms: output.brief.roomList.length,
+      costUsd: metrics.costUsd,
+    });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     log.logStageFailure(1, 0, msg);
@@ -94,7 +98,10 @@ export async function runVIPPipelinePhaseA(
       log,
     );
     const stage2Ms = Date.now() - t0;
-    log.logStageSuccess(2, stage2Ms, { images: output.images.length });
+    log.logStageSuccess(2, stage2Ms, {
+      images: output.images.length,
+      costUsd: metrics.totalCostUsd,
+    });
 
     const gptImage = output.images.find((i) => i.model === "gpt-image-1.5");
     if (!gptImage || !gptImage.base64) {
@@ -141,7 +148,8 @@ export async function runVIPPipelinePhaseB(
 ): Promise<VIPPipelineResult> {
   const { intermediate, config } = input;
   const { requestId, userId } = config.logContext;
-  const log = new VIPLogger(requestId, userId, config.prompt);
+  const log = new VIPLogger(requestId, userId, config.prompt, config.onStageLog);
+  if (config.existingStageLog) log.seedStageLog(config.existingStageLog);
   const startMs = input.startMs;
 
   // Re-seed logger with Phase-A cost/time so the final computeTotalCost is complete.
@@ -295,7 +303,8 @@ export async function runVIPPipelineRegenerateImage(
   startStage1CostUsd: number,
 ): Promise<VIPPhaseAResult> {
   const { requestId, userId } = config.logContext;
-  const log = new VIPLogger(requestId, userId, config.prompt);
+  const log = new VIPLogger(requestId, userId, config.prompt, config.onStageLog);
+  if (config.existingStageLog) log.seedStageLog(config.existingStageLog);
 
   try {
     log.logStageStart(2, "Stage 2 (user-requested regenerate)");
@@ -305,7 +314,10 @@ export async function runVIPPipelineRegenerateImage(
       log,
     );
     const stage2Ms = Date.now() - t0;
-    log.logStageSuccess(2, stage2Ms, { images: output.images.length });
+    log.logStageSuccess(2, stage2Ms, {
+      images: output.images.length,
+      costUsd: metrics.totalCostUsd,
+    });
 
     const gptImage = output.images.find((i) => i.model === "gpt-image-1.5");
     if (!gptImage || !gptImage.base64) {
