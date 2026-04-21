@@ -10,6 +10,8 @@ import { IntegrationBanner } from "@/features/ifc/components/IntegrationBanner";
 import { ContextMenu, type ContextMenuData } from "@/features/ifc/components/ContextMenu";
 import { ViewCube } from "@/features/ifc/components/ViewCube";
 import { UI, SHORTCUTS } from "@/features/ifc/components/constants";
+import { Sparkles } from "lucide-react";
+import { IFCEnhancerModal, type EnhanceSuccess } from "@/features/ifc/components/IFCEnhancerModal";
 import {
   saveLastIFCFile,
   loadLastIFCFile,
@@ -54,6 +56,8 @@ export default function IFCViewerPage() {
   const [measureUnit, setMeasureUnit] = useState<"m" | "ft">("m");
   const [cameraCSS, setCameraCSS] = useState("rotateX(0deg) rotateY(0deg)");
   const [panelWidth, setPanelWidth] = useState(300);
+  const [enhancerOpen, setEnhancerOpen] = useState(false);
+  const [currentFile, setCurrentFile] = useState<{ name: string; buffer: ArrayBuffer } | null>(null);
 
   const viewportRef = useRef<ViewportHandle | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -95,6 +99,10 @@ export default function IFCViewerPage() {
       if (opts?.cache !== false) {
         void saveLastIFCFile(buffer, filename);
       }
+      /* Also keep an in-memory copy so the IFC Enhancer can read the bytes
+         without a round-trip to IndexedDB. Must slice BEFORE loadFile since
+         the worker transfer neuters the original ArrayBuffer. */
+      setCurrentFile({ name: filename, buffer: buffer.slice(0) });
       if (!viewportRef.current?.loadFile) {
         console.warn("[ifc-restore] loadBufferIntoViewer called but viewport not ready");
         setLoading(false);
@@ -269,10 +277,46 @@ export default function IFCViewerPage() {
     setSpatialTree([]);
     setBottomPanelOpen(false);
     setError(null);
+    setCurrentFile(null);
     /* User explicitly closed the model — drop the cached file so the next
        refresh shows the empty upload screen again. */
     void clearLastIFCFile();
   }, []);
+
+  const handleApplyEnhancement = useCallback(
+    async (res: EnhanceSuccess) => {
+      /* Snapshot the current working buffer BEFORE loading the enhanced
+         file. If the enhanced IFC crashes the web-ifc parser (schema edge
+         cases), we restore the previous file so the user isn't stranded
+         with an empty viewer and a cleared cache. */
+      const fallback = currentFile
+        ? { name: currentFile.name, buffer: currentFile.buffer.slice(0) }
+        : null;
+
+      try {
+        await viewportRef.current?.loadFile(res.modifiedBuffer.slice(0), res.filename);
+        /* Enhanced file loaded successfully — persist it as the new current file. */
+        setCurrentFile({ name: res.filename, buffer: res.modifiedBuffer.slice(0) });
+        void saveLastIFCFile(res.modifiedBuffer, res.filename);
+      } catch (err) {
+        console.warn("[ifc-enhance] enhanced file failed to load, restoring previous:", err);
+        setError(
+          `The modified IFC couldn't be parsed — restoring the previous model. (${
+            err instanceof Error ? err.message : "unknown error"
+          })`,
+        );
+        if (fallback) {
+          try {
+            await viewportRef.current?.loadFile(fallback.buffer, fallback.name);
+            setCurrentFile({ name: fallback.name, buffer: fallback.buffer.slice(0) });
+          } catch (restoreErr) {
+            console.error("[ifc-enhance] fallback also failed:", restoreErr);
+          }
+        }
+      }
+    },
+    [currentFile],
+  );
 
   const handleFileInput = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -458,6 +502,60 @@ export default function IFCViewerPage() {
 
           {/* View cube */}
           {hasModel && <ViewCube viewportRef={viewportRef} cameraMatrixCSS={cameraCSS} />}
+
+          {/* IFC Enhancer button */}
+          {hasModel && (
+            <button
+              type="button"
+              onClick={() => setEnhancerOpen(true)}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = "translateY(-1px)";
+                e.currentTarget.style.boxShadow = "0 0 0 1px rgba(0,245,255,0.55), 0 10px 28px rgba(0,245,255,0.28)";
+                const icon = e.currentTarget.querySelector("[data-ifce-icon]") as HTMLElement | null;
+                if (icon) icon.style.transform = "rotate(-12deg) scale(1.08)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = "translateY(0)";
+                e.currentTarget.style.boxShadow = "0 0 0 1px rgba(0,245,255,0.3), 0 6px 18px rgba(0,245,255,0.18)";
+                const icon = e.currentTarget.querySelector("[data-ifce-icon]") as HTMLElement | null;
+                if (icon) icon.style.transform = "rotate(0deg) scale(1)";
+              }}
+              style={{
+                position: "absolute",
+                top: 12,
+                right: 12,
+                zIndex: 15,
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 8,
+                padding: "8px 14px",
+                fontSize: 12.5,
+                fontWeight: 600,
+                letterSpacing: "0.3px",
+                color: "#07070D",
+                background: "linear-gradient(90deg, #00F5FF 0%, #4F8AFF 100%)",
+                border: "none",
+                borderRadius: UI.radius.md,
+                boxShadow: "0 0 0 1px rgba(0,245,255,0.3), 0 6px 18px rgba(0,245,255,0.18)",
+                cursor: "pointer",
+                transition: "transform 0.16s ease, box-shadow 0.16s ease",
+                userSelect: "none",
+              }}
+            >
+              <span
+                data-ifce-icon
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  transition: "transform 0.18s ease",
+                }}
+              >
+                <Sparkles size={14} color="#07070D" strokeWidth={2.5} />
+              </span>
+              <span>IFC Enhancer</span>
+            </button>
+          )}
 
           {/* Context menu */}
           {contextMenu && (
@@ -730,6 +828,14 @@ export default function IFCViewerPage() {
           </button>
         )}
       </div>
+
+      {/* IFC Enhancer modal */}
+      <IFCEnhancerModal
+        open={enhancerOpen}
+        onClose={() => setEnhancerOpen(false)}
+        sourceFile={currentFile}
+        onApplyToViewer={handleApplyEnhancement}
+      />
     </div>
   );
 }
