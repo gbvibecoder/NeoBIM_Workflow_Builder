@@ -11,6 +11,10 @@
     {
       "path": "/api/cron/reconcile-subscriptions",
       "schedule": "*/30 * * * *"
+    },
+    {
+      "path": "/api/cron/cleanup-stuck-vip-jobs",
+      "schedule": "*/15 * * * *"
     }
   ]
 }

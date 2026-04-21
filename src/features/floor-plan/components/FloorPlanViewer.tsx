@@ -27,6 +27,9 @@ import { FloorPlanErrorBoundary } from "@/features/floor-plan/components/ErrorBo
 import { OptionPicker, type FloorPlanOption } from "@/features/floor-plan/components/OptionPicker";
 import { displayToMm, formatDimension, type DisplayUnit } from "@/features/floor-plan/lib/unit-conversion";
 import { worldToScreen, screenToWorld } from "@/features/floor-plan/lib/geometry";
+import { useFeatureFlags } from "@/features/floor-plan/hooks/useFeatureFlags";
+import { useVipGeneration } from "@/features/floor-plan/hooks/useVipGeneration";
+import { VipGenerationProgress } from "@/features/floor-plan/components/VipGenerationProgress";
 
 interface FloorPlanViewerProps {
   /** Pre-loaded geometry from pipeline (e.g. navigated from result showcase) */
@@ -118,16 +121,55 @@ export function FloorPlanViewer({ initialGeometry, initialPrompt, initialProject
   const undoToastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [editingRoomId, setEditingRoomId] = useState<string | null>(null);
 
+  // ── VIP Generation (Phase 1.11a) ──
+  const featureFlags = useFeatureFlags();
+  const vip = useVipGeneration();
+
+  // Ref keeps current flag value readable from stale useCallback closures.
+  // Without this, executeGeneration (memoized with []) captures the initial
+  // false from before the async feature-flags fetch completes.
+  const vipEnabledRef = useRef(featureFlags.vipJobsEnabled);
+  useEffect(() => {
+    vipEnabledRef.current = featureFlags.vipJobsEnabled;
+  }, [featureFlags.vipJobsEnabled]);
+
   // Clean up on unmount
   useEffect(() => {
     return () => { abortRef.current?.abort(); };
   }, []);
 
+  // ── VIP completion handler: load project into editor when job finishes ──
+  useEffect(() => {
+    if (vip.status === "completed" && vip.project) {
+      const store = useFloorPlanStore.getState();
+      store.setProject(vip.project);
+      useFloorPlanStore.setState({
+        isGenerating: false,
+        dataSource: "pipeline",
+        projectModified: false,
+      });
+    }
+  }, [vip.status, vip.project]);
+
   /**
    * Core generation function — calls /api/generate-floor-plan and loads result.
    * Used by both the validation flow and the direct (skip/template) flow.
+   *
+   * Phase 1.11a: when PIPELINE_VIP_JOBS=true, routes to async VIP background
+   * job instead of sync PIPELINE_REF.
    */
   const executeGeneration = useCallback(async (prompt: string) => {
+    // ── VIP async path (feature-flagged) ──
+    // Read from ref (not closure) — see vipEnabledRef comment above.
+    if (vipEnabledRef.current) {
+      const store = useFloorPlanStore.getState();
+      store.startGeneration(prompt);
+      setGenerationError(null);
+      vip.startGeneration(prompt);
+      return;
+    }
+
+    // ── Existing sync PIPELINE_REF path (unchanged) ──
     abortRef.current?.abort();
     const controller = new AbortController();
     abortRef.current = controller;
@@ -508,6 +550,28 @@ export function FloorPlanViewer({ initialGeometry, initialPrompt, initialProject
     />
   ) : null;
 
+  // VIP generation progress overlay (Phase 1.11a)
+  const vipOverlay = featureFlags.vipJobsEnabled && (vip.status === "creating" || vip.status === "polling" || vip.status === "failed") ? (
+    <VipGenerationProgress
+      status={vip.status}
+      progress={vip.progress}
+      stageLabel={vip.stageLabel}
+      costUsd={vip.costUsd}
+      errorMessage={vip.errorMessage}
+      onCancel={() => {
+        vip.cancel();
+        useFloorPlanStore.setState({ isGenerating: false });
+      }}
+      onRetry={() => {
+        const prompt = useFloorPlanStore.getState().originalPrompt;
+        if (prompt) {
+          vip.cancel();
+          executeGeneration(prompt);
+        }
+      }}
+    />
+  ) : null;
+
   // Show multi-option picker (Phase 2 — Midjourney approach)
   if (pendingOptions) {
     return (
@@ -542,6 +606,7 @@ export function FloorPlanViewer({ initialGeometry, initialPrompt, initialProject
           prompt={originalPrompt ?? undefined}
         />
         {errorOverlay}
+        {vipOverlay}
       </div>
     );
   }
@@ -605,6 +670,7 @@ export function FloorPlanViewer({ initialGeometry, initialPrompt, initialProject
           />
         )}
         {errorOverlay}
+        {vipOverlay}
       </div>
     );
   }

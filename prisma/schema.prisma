@@ -53,6 +53,8 @@ model User {
   videoShareLinks   VideoShareLink[]
   videoLikes        CommunityVideoLike[]
   survey            UserSurvey?
+  vipGenerations    VipGeneration[]
+  vipJobs           VipJob[]
 
   @@map("users")
 }
@@ -778,4 +780,70 @@ model MaterialPriceCache {
   @@index([state, materialCode, fetchedAt])
   @@index([materialCode, fetchedAt])
   @@map("material_price_cache")
+}
+
+// ─── VIP Pipeline Observability ─────────────────────────────────
+
+enum VipGenerationStatus {
+  RUNNING
+  SUCCESS
+  FALL_THROUGH
+  FAILED
+}
+
+model VipGeneration {
+  id                String              @id @default(cuid())
+  userId            String
+  requestId         String              @unique
+  prompt            String
+  status            VipGenerationStatus @default(RUNNING)
+  pipelineUsed      String?
+  stageTimings      Json?
+  stageCosts        Json?
+  stageErrors       Json?
+  finalScore        Int?
+  totalDurationMs   Int?
+  totalCostUsd      Float?
+  fallThroughReason String?
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([status])
+  @@map("vip_generations")
+}
+
+// ─── VIP Background Jobs ────────────────────────────────────────
+
+enum VipJobStatus {
+  QUEUED
+  RUNNING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+model VipJob {
+  id             String       @id @default(cuid())
+  userId         String
+  requestId      String       @unique
+  prompt         String
+  status         VipJobStatus @default(QUEUED)
+  progress       Int          @default(0)
+  currentStage   String?
+  resultProject  Json?
+  errorMessage   String?
+  costUsd        Float        @default(0)
+  startedAt      DateTime?
+  completedAt    DateTime?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([status])
+  @@map("vip_jobs")
 }
