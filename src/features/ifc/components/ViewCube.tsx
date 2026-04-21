@@ -59,7 +59,7 @@ export function ViewCube({ viewportRef, cameraMatrixCSS }: ViewCubeProps) {
       style={{
         position: "absolute",
         top: 12,
-        right: 12,
+        left: 12,
         width: CONTAINER,
         height: CONTAINER,
         perspective: 240,
