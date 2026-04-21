@@ -229,31 +229,19 @@ export async function runVIPPipeline(
             });
             await fireProgress(config, 45, "stage3");
 
-            if (v.recommendation === "pass") {
-              // Branch 1a: PASS — run Stages 4+5 on original GPT image
-              const s45 = await runStage4And5Block(
-                gptImage, stage1Output, config, config.parsedConstraints, log,
-              );
-              stage4Ms = s45.stage4Ms;
-              stage5Ms = s45.stage5Ms;
-              if (s45.project) candidateProject = s45.project;
-            } else if (v.recommendation === "retry") {
-              // Branch 1b: RETRY — run on original first, then retry
-              const s45First = await runStage4And5Block(
-                gptImage, stage1Output, config, config.parsedConstraints, log,
-              );
-              stage4Ms = s45First.stage4Ms;
-              stage5Ms = s45First.stage5Ms;
-              if (s45First.project) candidateProject = s45First.project;
-            } else {
-              // Branch 1c: Stage 3 FAIL — run Stages 4+5 anyway (let Stage 6 decide)
-              const s45 = await runStage4And5Block(
-                gptImage, stage1Output, config, config.parsedConstraints, log,
-              );
-              stage4Ms = s45.stage4Ms;
-              stage5Ms = s45.stage5Ms;
-              if (s45.project) candidateProject = s45.project;
-            }
+            // Stage 3 verdict is advisory — v.recommendation is logged
+            // above for telemetry but does NOT branch behavior here. S4+5
+            // always run on the GPT image; the Stage 6 quality gate
+            // decides whether to retry. Phase 1.6 had three pass/retry/
+            // fail branches that all called runStage4And5Block with
+            // identical args (intended retry never implemented at this
+            // layer) — collapsed in Phase 2.0a.
+            const s45 = await runStage4And5Block(
+              gptImage, stage1Output, config, config.parsedConstraints, log,
+            );
+            stage4Ms = s45.stage4Ms;
+            stage5Ms = s45.stage5Ms;
+            if (s45.project) candidateProject = s45.project;
           } catch (stage3Err) {
             // Branch 3: Stage 3 API failure — skip jury, run S4+5 directly
             stage3Ms = Date.now() - stage3Start;
