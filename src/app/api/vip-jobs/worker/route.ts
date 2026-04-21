@@ -18,8 +18,11 @@ import { prisma } from "@/lib/db";
 import { verifyQstashSignature } from "@/lib/qstash";
 import { parseConstraints } from "@/features/floor-plan/lib/structured-parser";
 import { runVIPPipeline } from "@/features/floor-plan/lib/vip-pipeline/orchestrator";
+import { runVIPPipelinePhaseA } from "@/features/floor-plan/lib/vip-pipeline/orchestrator-gated";
 
 const PIPELINE_TIMEOUT_MS = 550_000; // 550s safety margin vs Vercel's 600s
+/** Phase 2.3 Workstream C: feature flag for the image approval gate. */
+const APPROVAL_GATE_ENABLED = process.env.PIPELINE_VIP_APPROVAL_GATE === "true";
 
 export async function POST(req: NextRequest) {
   // ── QStash signature verification ──
@@ -72,7 +75,59 @@ export async function POST(req: NextRequest) {
     const parseRes = await parseConstraints(job.prompt, apiKey);
     await updateJob(jobId, { progress: 10, currentStage: "parse" });
 
-    // ── Run VIP pipeline with timeout protection ──
+    // ── Phase 2.3 Workstream C: image approval gate ──
+    // When the feature flag is on, run Phase A only (Stages 1-2) and
+    // pause for user approval. The user later hits /api/vip-jobs/[id]/approve
+    // which enqueues /api/vip-jobs/worker/resume to run Stages 3-7.
+    if (APPROVAL_GATE_ENABLED) {
+      const phaseA = await runVIPPipelinePhaseA({
+        prompt: job.prompt,
+        parsedConstraints: parseRes.constraints,
+        logContext: { requestId: job.requestId, userId: job.userId },
+        onProgress: async (progress, stage) => {
+          await updateJob(jobId, { progress, currentStage: stage });
+        },
+      });
+
+      if (!phaseA.success) {
+        await prisma.vipJob.update({
+          where: { id: jobId },
+          data: {
+            status: "FAILED",
+            errorMessage: phaseA.error,
+            completedAt: new Date(),
+          },
+        });
+        return NextResponse.json({ status: "FAILED", reason: phaseA.error });
+      }
+
+      const intermediatePayload = {
+        stage1Output: phaseA.stage1Output,
+        stage2Output: phaseA.stage2Output,
+        stage1Ms: phaseA.stage1Ms,
+        stage2Ms: phaseA.stage2Ms,
+        stage1CostUsd: phaseA.stage1CostUsd,
+        stage2CostUsd: phaseA.stage2CostUsd,
+      };
+
+      await prisma.vipJob.update({
+        where: { id: jobId },
+        data: {
+          status: "AWAITING_APPROVAL",
+          progress: 35,
+          currentStage: "awaiting-approval",
+          intermediateBrief: JSON.parse(JSON.stringify(intermediatePayload)),
+          intermediateImage: phaseA.gptImageBase64,
+          userApproval: "pending",
+          pausedAt: new Date(),
+          pausedStage: 2,
+        },
+      });
+
+      return NextResponse.json({ status: "AWAITING_APPROVAL", jobId });
+    }
+
+    // ── Legacy path: run full pipeline monolithically (no gate) ──
     const pipelinePromise = runVIPPipeline({
       prompt: job.prompt,
       parsedConstraints: parseRes.constraints,
