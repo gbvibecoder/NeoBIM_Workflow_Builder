@@ -5,10 +5,7 @@
  * for extraction-readiness: label legibility, room count, wall
  * completeness, etc. Returns PASS / RETRY / FAIL verdict.
  *
- * Single-image evaluation (GPT only). Imagen passes through
- * untouched for rendering use in Phase 1.10.
- *
- * Planned implementation: Phase 1.6
+ * Single-image evaluation. (Phase 2.0a: Imagen pass-through removed.)
  */
 
 import type Anthropic from "@anthropic-ai/sdk";

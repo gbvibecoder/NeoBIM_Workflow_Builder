@@ -9,7 +9,7 @@
  * Phase 1.2: adds structured logging + DB persistence.
  * Phase 1.3: Stage 1 (Prompt Intelligence) implemented.
  * Phase 1.4: Stage 2 (Parallel Image Generation) implemented.
- * Phase 1.5: 2-provider alignment (GPT Image 1.5 + Imagen 4).
+ * Phase 1.5: 2-provider alignment (GPT Image 1.5 + Imagen 4). Phase 2.0a: Imagen removed (dead code).
  * Phase 1.6: Stage 3 (Extraction Readiness Jury) implemented.
  * Phase 1.7: Stage 4 (Room Extraction with GPT-4o Vision) implemented.
  * Phase 1.8: Stage 5 (Synthesis: pixels → feet → FloorPlanProject).
@@ -198,7 +198,10 @@ export async function runVIPPipeline(
         );
 
         if (!gptImage || !gptImage.base64) {
-          // Branch 2: GPT image missing — only Imagen succeeded
+          // GPT-Image-1.5 produced no usable image (content filter /
+          // missing base64). With Imagen removed we have no fallback,
+          // but Stage 2 would have thrown upstream if all providers
+          // failed — so this only trips if base64 is empty.
           log.logStageStart(3);
           log.logStageFailure(3, 0, "No GPT image to evaluate — skipping jury");
           log.logFallThrough(

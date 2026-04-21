@@ -18,9 +18,10 @@ Stage 1: Prompt Intelligence
   Parse user prompt → enrich into architect brief → synthesize
   model-specific image generation prompts (2–5 models).
 
-Stage 2: Parallel Image Generation
-  Fire all image models in parallel (GPT-Image-1, Gemini Imagen,
-  Imagen 4 Standard). Each produces a floor plan image.
+Stage 2: Image Generation
+  GPT Image 1.5 produces a 2D floor plan image. (Imagen 4 was
+  removed in Phase 2.0a — its output wasn't consumed downstream
+  and it hallucinated labels like "TECHNFICALL" / "KITCHAN".)
 
 Stage 3: Vision Jury
   Claude Sonnet evaluates all generated images and picks the best
@@ -68,7 +69,6 @@ VIP errors never 500 the endpoint. PIPELINE_REF is the fallback.
 Each stage reads its required API key from `process.env` directly:
 - `OPENAI_API_KEY` — GPT-Image-1, GPT-4o Vision
 - `ANTHROPIC_API_KEY` — Claude Sonnet (jury + quality gate)
-- `GOOGLE_AI_API_KEY` — Gemini Imagen
 
 No API keys are passed through the orchestrator config.
 
@@ -110,18 +110,21 @@ success rate / latency percentiles and a Grafana-style admin dashboard.
 
 ## Provider Configuration
 
-Stage 2 runs 2 image generators in parallel (Phase 1.5 decision):
-- **gpt-image-1.5** (OpenAI) — $0.034/image, primary generator
-- **imagen-4.0-generate-001** (Google) — $0.04/image, secondary generator
+Stage 2 runs a single image generator:
+- **gpt-image-1.5** (OpenAI) — $0.034/image
 
-Nano Banana Pro (`gemini-3-pro-image-preview`) was removed in Phase 1.5:
-preview model, frequent 503s, 3.9x more expensive than Imagen 4.
+History:
+- Phase 1.5 added `imagen-4.0-generate-001` (Google, $0.04/image) in
+  parallel with GPT Image 1.5.
+- Phase 2.0a removed Imagen — its output was consumed nowhere
+  downstream (extraction uses GPT Image 1.5 exclusively because
+  Imagen hallucinated labels like "TECHNFICALL" / "KITCHAN"). Saves
+  ~$0.04/generation.
+- Nano Banana Pro (`gemini-3-pro-image-preview`) was removed in
+  Phase 1.5: preview model, frequent 503s, 3.9x more expensive.
 
 To re-add a provider, create a new file in `providers/` and add one line
-to the `PROVIDERS` registry in `stage-2-images.ts`:
-```ts
-// "gemini-3-pro-image-preview": { generate: nanoBanana.generateImage, costPerImage: 0.134 },
-```
+to the `PROVIDERS` registry in `stage-2-images.ts`.
 
 ## Retention Policy
 
@@ -139,6 +142,6 @@ keeps admin queries fast up to ~365k rows.
 - **Phase 1.2** (current): Observability — VIPLogger, VipGeneration table, admin API
 - **Phase 1.3**: Stage 1 (Prompt Intelligence) + Stage 4 (Room Extraction)
 - **Phase 1.4**: Stage 2 (Image Generation) — start with GPT-Image-1 only
-- **Phase 1.5**: Stage 3 (Vision Jury) + add Gemini Imagen
+- **Phase 1.5**: Stage 3 (Vision Jury) + add Gemini Imagen (removed in Phase 2.0a)
 - **Phase 1.6**: Stage 5 (Synthesis) + Stage 7 (Delivery)
 - **Phase 1.7**: Stage 6 (Quality Gate) + retry loop + Redis counters + dashboard + retention
