@@ -137,7 +137,7 @@ function WallRendererBase({ walls, viewport, viewMode, selectedIds }: WallRender
       }
     }
     return fills;
-  }, [walls, viewport.x, viewport.y, viewport.zoom, viewport.canvasWidth, viewport.canvasHeight]);
+  }, [walls, viewport]);
 
   const juncStroke = viewMode === "cad" ? "#1A1A1A" : "#404040";
   const juncFill = viewMode === "cad" ? "#FFFFFF" : "#F0F0F0";

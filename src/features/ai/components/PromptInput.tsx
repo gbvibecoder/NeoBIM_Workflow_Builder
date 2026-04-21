@@ -169,7 +169,7 @@ export function PromptInput({ onClose }: PromptInputProps) {
     setPreviewNodes([]);
     setPromptModeActive(false);
     onClose?.();
-  }, [prompt, isGenerating, resetCanvas, addNode, addEdge, setPromptModeActive, onClose]);
+  }, [prompt, isGenerating, resetCanvas, addNode, addEdge, updateNode, setPromptModeActive, onClose]);
 
   const canClose = !isGenerating;
 

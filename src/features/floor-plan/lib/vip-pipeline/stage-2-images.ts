@@ -1,11 +1,10 @@
 /**
- * Stage 2: Parallel Image Generation
+ * Stage 2: Image Generation (single-provider)
  *
- * Fires 3 image models in parallel via Promise.allSettled.
- * Returns all successfully generated images (≥1 required).
- * Per-provider failures are logged as warnings, not stage errors.
- *
- * Planned implementation: Phase 1.4
+ * Phase 2.0a: Imagen 4 was removed — its output was consumed nowhere
+ * downstream (extraction uses GPT Image 1.5 exclusively because Imagen
+ * hallucinates labels like "TECHNFICALL" / "KITCHAN"). Kept parallel
+ * Promise.allSettled scaffolding for future provider additions.
  */
 
 import type {
@@ -17,7 +16,6 @@ import type {
 import type { VIPLogger } from "./logger";
 import { ImageGenError } from "./providers/types";
 import * as gptImage from "./providers/gpt-image";
-import * as imagen from "./providers/imagen";
 
 // ─── Public Types ────────────────────────────────────────────────
 
@@ -48,10 +46,6 @@ const PROVIDERS: Record<
   "gpt-image-1.5": {
     generate: gptImage.generateImage,
     costPerImage: gptImage.COST_PER_IMAGE,
-  },
-  "imagen-4.0-generate-001": {
-    generate: imagen.generateImage,
-    costPerImage: imagen.COST_PER_IMAGE,
   },
 };
 

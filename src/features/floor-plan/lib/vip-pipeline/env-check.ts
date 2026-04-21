@@ -15,16 +15,11 @@ const REQUIRED_VIP_ENV_VARS = [
   "NEXT_PUBLIC_APP_URL",
 ] as const;
 
-const RECOMMENDED_VIP_ENV_VARS = [
-  "GOOGLE_AI_API_KEY",
-] as const;
-
 let validated = false;
 
 /**
  * Validates that all env vars required by the VIP pipeline are set.
- * Throws on missing required vars. Warns on missing recommended vars.
- * Caches result — only runs once per process.
+ * Throws with all missing vars in one error. Caches — runs once per process.
  */
 export function validateVipEnvVars(): void {
   if (validated) return;
@@ -39,12 +34,6 @@ export function validateVipEnvVars(): void {
       `VIP pipeline misconfigured: missing required env var(s): ${missing.join(", ")}. ` +
       `Set them in your environment or disable PIPELINE_VIP_JOBS.`,
     );
-  }
-
-  for (const key of RECOMMENDED_VIP_ENV_VARS) {
-    if (!process.env[key]) {
-      console.warn(`[VIP] Recommended env var ${key} is not set — Imagen provider will be unavailable`);
-    }
   }
 
   validated = true;
