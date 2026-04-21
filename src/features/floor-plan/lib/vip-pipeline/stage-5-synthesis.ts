@@ -17,6 +17,8 @@ import type {
   ExtractedRoom,
   RectPx,
   ArchitectBrief,
+  AdjacencyDeclaration,
+  AdjacencyRelationship,
 } from "./types";
 import type { VIPLogger } from "./logger";
 import type {
@@ -93,7 +95,7 @@ function resolvePlotBounds(extraction: ExtractedRooms, issues: string[]): RectPx
 
 // ─── Pixel → Feet Transform ─────────────────────────────────────
 
-interface TransformedRoom {
+export interface TransformedRoom {
   name: string;
   type: string;
   placed: Rect; // feet, Y-UP, SW origin
@@ -272,6 +274,272 @@ function buildSpine(
   };
 }
 
+// ─── Adjacency Enforcement (Phase 2.3 Option X) ─────────────────
+
+const SHARE_EPS = 0.5; // feet tolerance for "two rooms share a wall"
+const OVERLAP_EPS = 0.3; // feet tolerance for "rooms don't overlap"
+
+/**
+ * Do rectangles A and B share a wall (edge-adjacency with line overlap)?
+ * Corners-only touching returns false.
+ */
+function rectsShareWall(A: Rect, B: Rect): boolean {
+  const horizAdj = Math.abs(A.y + A.depth - B.y) < SHARE_EPS || Math.abs(B.y + B.depth - A.y) < SHARE_EPS;
+  const horizOverlap = Math.min(A.x + A.width, B.x + B.width) - Math.max(A.x, B.x) > SHARE_EPS;
+  const vertAdj = Math.abs(A.x + A.width - B.x) < SHARE_EPS || Math.abs(B.x + B.width - A.x) < SHARE_EPS;
+  const vertOverlap = Math.min(A.y + A.depth, B.y + B.depth) - Math.max(A.y, B.y) > SHARE_EPS;
+  return (horizAdj && horizOverlap) || (vertAdj && vertOverlap);
+}
+
+function rectsOverlap(A: Rect, B: Rect): boolean {
+  return !(
+    A.x + A.width <= B.x + OVERLAP_EPS ||
+    B.x + B.width <= A.x + OVERLAP_EPS ||
+    A.y + A.depth <= B.y + OVERLAP_EPS ||
+    B.y + B.depth <= A.y + OVERLAP_EPS
+  );
+}
+
+function findRoomByAdjacencyName(rooms: TransformedRoom[], target: string): TransformedRoom | undefined {
+  const t = target.toLowerCase().trim();
+  if (!t) return undefined;
+  const exact = rooms.find((r) => r.name.toLowerCase() === t);
+  if (exact) return exact;
+  return rooms.find(
+    (r) => r.name.toLowerCase().includes(t) || t.includes(r.name.toLowerCase()),
+  );
+}
+
+/**
+ * Phase 2.3 Option X: post-placement swap. For each declared
+ * "attached" adjacency (a, b), if a and b don't already share a wall,
+ * try placing b flush against each of a's four sides. First side that
+ * fits inside the plot AND doesn't overlap any non-{a,b} room wins.
+ *
+ * Mutates rooms[].placed in place.
+ *
+ * Heuristic — NOT a constraint solver:
+ *   - Only handles "attached" (critical ensuite case)
+ *   - "adjacent" / "direct-access" / "connected" are left to the
+ *     evaluation report
+ *   - If no side fits (dense layout), logs a warning and leaves b
+ *     where it was.
+ *   - Cascading effects: moving b to a's side may leave a gap where
+ *     b used to be. That's acceptable — gaps become void area and
+ *     the overall layout remains valid.
+ */
+export function enforceAttachedAdjacencies(
+  rooms: TransformedRoom[],
+  adjacencies: AdjacencyDeclaration[],
+  plotWidthFt: number,
+  plotDepthFt: number,
+  issues: string[],
+): { attempted: number; satisfied: number; moved: number; unfixable: number } {
+  let attempted = 0;
+  let satisfied = 0;
+  let moved = 0;
+  let unfixable = 0;
+
+  for (const decl of adjacencies) {
+    if (decl.relationship !== "attached") continue;
+    attempted++;
+
+    const a = findRoomByAdjacencyName(rooms, decl.a);
+    const b = findRoomByAdjacencyName(rooms, decl.b);
+    if (!a || !b) {
+      issues.push(
+        `Adjacency enforce: could not find room(s) for "${decl.a}" ↔ "${decl.b}"`,
+      );
+      unfixable++;
+      continue;
+    }
+    if (a === b) continue;
+
+    if (rectsShareWall(a.placed, b.placed)) {
+      satisfied++;
+      continue;
+    }
+
+    // Try placing b on each side of a.
+    const sides: Array<{ name: string; x: number; y: number }> = [
+      { name: "east",  x: a.placed.x + a.placed.width,   y: a.placed.y }, // b flush right of a, aligned at bottom
+      { name: "west",  x: a.placed.x - b.placed.width,   y: a.placed.y },
+      { name: "north", x: a.placed.x,                    y: a.placed.y + a.placed.depth },
+      { name: "south", x: a.placed.x,                    y: a.placed.y - b.placed.depth },
+    ];
+
+    let placed = false;
+    for (const side of sides) {
+      if (side.x < -OVERLAP_EPS || side.y < -OVERLAP_EPS) continue;
+      if (side.x + b.placed.width > plotWidthFt + OVERLAP_EPS) continue;
+      if (side.y + b.placed.depth > plotDepthFt + OVERLAP_EPS) continue;
+
+      const candidate: Rect = {
+        x: Math.max(0, side.x),
+        y: Math.max(0, side.y),
+        width: b.placed.width,
+        depth: b.placed.depth,
+      };
+
+      // Reject if candidate overlaps any OTHER room (not a or b).
+      const overlapsOther = rooms.some((r) => {
+        if (r === a || r === b) return false;
+        return rectsOverlap(candidate, r.placed);
+      });
+      if (overlapsOther) continue;
+
+      b.placed.x = candidate.x;
+      b.placed.y = candidate.y;
+      placed = true;
+      moved++;
+      satisfied++;
+      issues.push(
+        `Adjacency enforce: moved "${b.name}" to ${side.name} side of "${a.name}" so they share a wall.`,
+      );
+      break;
+    }
+
+    if (!placed) {
+      issues.push(
+        `Adjacency enforce: could not place "${b.name}" adjacent to "${a.name}" — no side fit. Layout may be too dense.`,
+      );
+      unfixable++;
+    }
+  }
+
+  return { attempted, satisfied, moved, unfixable };
+}
+
+// ─── Adjacency Compliance (Phase 2.3) ────────────────────────────
+
+export interface AdjacencyCheckResult {
+  declaration: AdjacencyDeclaration;
+  status: "satisfied" | "violated" | "unknown";
+  note: string;
+}
+
+export interface AdjacencyReport {
+  declared: number;
+  satisfied: number;
+  violated: number;
+  unknown: number;
+  /** 0-100 compliance percentage; drives Stage 6 adjacencyCompliance scoring. */
+  compliancePct: number;
+  checks: AdjacencyCheckResult[];
+}
+
+/** Returns the room whose lowercased name contains (or is contained by) `target`. */
+function findRoomByName<T extends { name: string }>(rooms: T[], target: string): T | undefined {
+  const t = target.toLowerCase().trim();
+  if (!t) return undefined;
+  const exact = rooms.find((r) => r.name.toLowerCase() === t);
+  if (exact) return exact;
+  return rooms.find(
+    (r) => r.name.toLowerCase().includes(t) || t.includes(r.name.toLowerCase()),
+  );
+}
+
+/** Do two rooms share any wall (by room_ids membership)? */
+function sharesWall(
+  aId: string,
+  bId: string,
+  walls: Array<{ room_ids: string[] }>,
+): boolean {
+  return walls.some((w) => w.room_ids.includes(aId) && w.room_ids.includes(bId));
+}
+
+/** Is there a direct door between a and b? */
+function hasDoorBetween(
+  aId: string,
+  bId: string,
+  doors: Array<{ between: [string, string] | string[] }>,
+): boolean {
+  return doors.some((d) => {
+    const between = d.between as string[];
+    return between.includes(aId) && between.includes(bId);
+  });
+}
+
+/**
+ * Evaluate each declared adjacency against the resolved geometry.
+ * Best-effort: no room placement adjustment; produces a report Stage 6 can score.
+ * Exported for unit testing; internal callers use it via the main Stage 5 flow.
+ */
+export function evaluateAdjacencies(
+  adjacencies: AdjacencyDeclaration[],
+  spRooms: Array<{ id: string; name: string; type: string }>,
+  walls: Array<{ room_ids: string[] }>,
+  doors: Array<{ between: [string, string] | string[] }>,
+): AdjacencyReport {
+  const checks: AdjacencyCheckResult[] = [];
+
+  for (const decl of adjacencies) {
+    const roomA = findRoomByName(spRooms, decl.a);
+    const roomB = findRoomByName(spRooms, decl.b);
+
+    if (!roomA || !roomB) {
+      checks.push({
+        declaration: decl,
+        status: "unknown",
+        note: `Room(s) not found in layout (a=${roomA ? "ok" : "missing"}, b=${roomB ? "ok" : "missing"})`,
+      });
+      continue;
+    }
+
+    const result = checkRelationship(
+      decl.relationship,
+      roomA.id,
+      roomB.id,
+      walls,
+      doors,
+    );
+    checks.push({ declaration: decl, status: result.status, note: result.note });
+  }
+
+  const satisfied = checks.filter((c) => c.status === "satisfied").length;
+  const violated = checks.filter((c) => c.status === "violated").length;
+  const unknown = checks.filter((c) => c.status === "unknown").length;
+  const declared = checks.length;
+  const evaluable = satisfied + violated;
+  const compliancePct = evaluable === 0 ? 100 : Math.round((satisfied / evaluable) * 100);
+
+  return { declared, satisfied, violated, unknown, compliancePct, checks };
+}
+
+function checkRelationship(
+  relationship: AdjacencyRelationship,
+  aId: string,
+  bId: string,
+  walls: Array<{ room_ids: string[] }>,
+  doors: Array<{ between: [string, string] | string[] }>,
+): { status: "satisfied" | "violated" | "unknown"; note: string } {
+  const wall = sharesWall(aId, bId, walls);
+  const door = hasDoorBetween(aId, bId, doors);
+
+  switch (relationship) {
+    case "attached":
+      // Share a wall AND have a door between them (the "internal from a" semantic
+      // needs door-side inspection which our door model doesn't expose; we treat
+      // any direct door as satisfying the attachment).
+      if (wall && door) return { status: "satisfied", note: "shared wall + door present" };
+      if (wall && !door) return { status: "violated", note: "share wall but no direct door" };
+      return { status: "violated", note: "no shared wall" };
+    case "adjacent":
+      if (wall) return { status: "satisfied", note: "shared wall" };
+      return { status: "violated", note: "no shared wall" };
+    case "direct-access":
+      if (door) return { status: "satisfied", note: "direct door present" };
+      return { status: "violated", note: "no direct door" };
+    case "connected":
+      // Minimal "connected" check: direct door OR both rooms share a door with any
+      // hallway/corridor node. We don't resolve full graph reachability here.
+      if (door) return { status: "satisfied", note: "direct door present" };
+      return { status: "unknown", note: "corridor reachability not resolved" };
+    default:
+      return { status: "unknown", note: "unrecognized relationship" };
+  }
+}
+
 // ─── Main Entry Point ────────────────────────────────────────────
 
 export async function runStage5Synthesis(
@@ -325,6 +593,19 @@ export async function runStage5Synthesis(
     }
   }
 
+  // Step 4.5 (Phase 2.3 Option X): enforce "attached" adjacencies
+  // BEFORE we build walls/doors so the final geometry reflects the
+  // architect's declared relationships (ensuite attachment, etc.).
+  // This mutates transformed[].placed in place; subsequent stages
+  // pick up the corrected positions.
+  const enforceStats = enforceAttachedAdjacencies(
+    transformed,
+    input.adjacencies ?? [],
+    plotWidthFt,
+    plotDepthFt,
+    issues,
+  );
+
   // Step 5: Build StripPackRooms
   const brief: ArchitectBrief = {
     projectType: "residential",
@@ -338,6 +619,7 @@ export async function runStage5Synthesis(
     facing,
     styleCues: [],
     constraints: [],
+    adjacencies: input.adjacencies ?? [],
   };
 
   const spRooms = buildStripPackRooms(transformed, brief);
@@ -473,6 +755,22 @@ export async function runStage5Synthesis(
     origin_x_ft: envelope.originX,
     origin_y_ft: envelope.originY,
   };
+
+  // Phase 2.3: evaluate declared adjacencies against the resolved geometry
+  // and stash the report into metadata so Stage 6 can score it.
+  const adjacencyReport = evaluateAdjacencies(
+    input.adjacencies ?? [],
+    spRooms,
+    walls,
+    doorResult.doors,
+  );
+  meta.adjacency_report = adjacencyReport;
+  meta.adjacency_enforce_stats = enforceStats;
+  if (adjacencyReport.violated > 0) {
+    issues.push(
+      `Adjacency: ${adjacencyReport.violated}/${adjacencyReport.declared} declared relationships violated`,
+    );
+  }
 
   const durationMs = Date.now() - startMs;
   if (logger) logger.logStageCost(5, 0); // Pure code, $0

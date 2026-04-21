@@ -87,6 +87,26 @@ const TOOL_SCHEMA: Anthropic.Tool = {
             description:
               "Hard constraints and inferred assumptions. Prefix inferred items with 'inferred:', vastu with 'vastu:', warnings with 'warning:'.",
           },
+          adjacencies: {
+            type: "array" as const,
+            description:
+              "Phase 2.3: declared room-to-room relationships Stage 5 will honor and Stage 6 will score. Default to [] if none relevant.",
+            items: {
+              type: "object" as const,
+              required: ["a", "b", "relationship"],
+              properties: {
+                a: { type: "string" as const, description: "First room name (must match a roomList entry)" },
+                b: { type: "string" as const, description: "Second room name (must match a roomList entry)" },
+                relationship: {
+                  type: "string" as const,
+                  enum: ["attached", "adjacent", "direct-access", "connected"],
+                  description:
+                    "attached = share wall + internal door from a; adjacent = share wall either side; direct-access = b's door opens into a; connected = reachable via corridor.",
+                },
+                reason: { type: "string" as const, description: "Optional short rationale." },
+              },
+            },
+          },
         },
       },
       imagePrompts: {

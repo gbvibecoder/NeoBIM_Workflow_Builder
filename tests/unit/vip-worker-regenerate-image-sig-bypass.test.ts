@@ -1,5 +1,6 @@
 /**
- * Phase 2.4 GA.3: Verify the QStash signature bypass is opt-in only.
+ * Phase 2.4 GA.3 (Phase 2.3 port): Verify the QStash signature bypass is
+ * opt-in only on /api/vip-jobs/worker/regenerate-image (Phase 2.3 Workstream C).
  *
  * - SKIP_QSTASH_SIG_VERIFY=true + NODE_ENV=production → throws
  * - SKIP_QSTASH_SIG_VERIFY=true + NODE_ENV=development → skips verify
@@ -41,22 +42,26 @@ vi.mock("@/lib/db", () => ({
   },
 }));
 
-vi.mock("@/features/floor-plan/lib/vip-pipeline/orchestrator", () => ({
-  runVIPPipeline: vi.fn(async () => ({
+vi.mock("@/features/floor-plan/lib/vip-pipeline/orchestrator-gated", () => ({
+  runVIPPipelineRegenerateImage: vi.fn(async () => ({
     success: true,
-    project: { floors: [], metadata: {} },
-    qualityScore: 80,
-    retried: false,
-    timing: { totalMs: 1000 },
-    warnings: [],
+    stage1Output: {},
+    stage2Output: {},
+    stage1Ms: 0,
+    stage2Ms: 0,
+    stage1CostUsd: 0,
+    stage2CostUsd: 0,
+    gptImageBase64: "",
   })),
 }));
 
 vi.mock("@/features/floor-plan/lib/structured-parser", () => ({
-  parseConstraints: vi.fn(() => ({ plot: { width_ft: 40, depth_ft: 40 }, rooms: [] })),
+  parseConstraints: vi.fn(async () => ({
+    constraints: { plot: { width_ft: 40, depth_ft: 40 }, rooms: [] },
+  })),
 }));
 
-describe("Phase 2.4 GA.3 — QStash signature bypass is opt-in only (worker/route)", () => {
+describe("Phase 2.4 GA.3 — QStash signature bypass is opt-in only (worker/regenerate-image)", () => {
   const originalEnv = { ...process.env };
 
   beforeEach(() => {
@@ -71,11 +76,11 @@ describe("Phase 2.4 GA.3 — QStash signature bypass is opt-in only (worker/rout
     vi.resetModules();
   });
 
-  async function callWorker(body: unknown, signature?: string): Promise<Response> {
-    const { POST } = await import("@/app/api/vip-jobs/worker/route");
+  async function callRegen(body: unknown, signature?: string): Promise<Response> {
+    const { POST } = await import("@/app/api/vip-jobs/worker/regenerate-image/route");
     const headers: Record<string, string> = { "content-type": "application/json" };
     if (signature) headers["upstash-signature"] = signature;
-    const req = new Request("http://localhost/api/vip-jobs/worker", {
+    const req = new Request("http://localhost/api/vip-jobs/worker/regenerate-image", {
       method: "POST",
       headers,
       body: JSON.stringify(body),
@@ -86,7 +91,7 @@ describe("Phase 2.4 GA.3 — QStash signature bypass is opt-in only (worker/rout
   it("throws when SKIP_QSTASH_SIG_VERIFY=true in production", async () => {
     (process.env as Record<string, string>).NODE_ENV = "production";
     process.env.SKIP_QSTASH_SIG_VERIFY = "true";
-    await expect(callWorker({ jobId: "job_1" })).rejects.toThrow(
+    await expect(callRegen({ jobId: "job_1" })).rejects.toThrow(
       /SKIP_QSTASH_SIG_VERIFY must not be true in production/,
     );
     expect(qstashMocks.verify).not.toHaveBeenCalled();
@@ -95,9 +100,10 @@ describe("Phase 2.4 GA.3 — QStash signature bypass is opt-in only (worker/rout
   it("skips verification when SKIP_QSTASH_SIG_VERIFY=true in development", async () => {
     (process.env as Record<string, string>).NODE_ENV = "development";
     process.env.SKIP_QSTASH_SIG_VERIFY = "true";
-    prismaMocks.findUnique.mockResolvedValue({ id: "job_1", status: "COMPLETED" });
-    const res = await callWorker({ jobId: "job_1" });
-    expect(res.status).toBe(200);
+    prismaMocks.findUnique.mockResolvedValue(null);
+    const res = await callRegen({ jobId: "job_1" });
+    // Job not found → 404, but verify was NOT called (signature skipped).
+    expect(res.status).toBe(404);
     expect(qstashMocks.verify).not.toHaveBeenCalled();
   });
 
@@ -105,7 +111,7 @@ describe("Phase 2.4 GA.3 — QStash signature bypass is opt-in only (worker/rout
     (process.env as Record<string, string>).NODE_ENV = "production";
     delete process.env.SKIP_QSTASH_SIG_VERIFY;
     qstashMocks.verify.mockResolvedValue(false);
-    const res = await callWorker({ jobId: "job_1" }, "sig-v1=bad");
+    const res = await callRegen({ jobId: "job_1" }, "sig-v1=bad");
     expect(res.status).toBe(401);
     expect(qstashMocks.verify).toHaveBeenCalled();
   });
@@ -114,7 +120,7 @@ describe("Phase 2.4 GA.3 — QStash signature bypass is opt-in only (worker/rout
     (process.env as Record<string, string>).NODE_ENV = "development";
     process.env.SKIP_QSTASH_SIG_VERIFY = "false";
     qstashMocks.verify.mockResolvedValue(false);
-    const res = await callWorker({ jobId: "job_1" }, "sig-v1=bad");
+    const res = await callRegen({ jobId: "job_1" }, "sig-v1=bad");
     expect(res.status).toBe(401);
     expect(qstashMocks.verify).toHaveBeenCalled();
   });

@@ -124,6 +124,7 @@ function makeBrief(facing: string): ArchitectBrief {
     facing,
     styleCues: [],
     constraints: [],
+    adjacencies: [],
   };
 }
 

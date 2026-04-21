@@ -83,6 +83,47 @@ INDIAN RESIDENTIAL TYPOLOGIES:
 - Courtyard Home: Central open courtyard. Rooms arranged around it (South Indian style).
 
 ═══════════════════════════════════════════════════════════════
+ADJACENCY DECLARATIONS
+═══════════════════════════════════════════════════════════════
+
+Good floor plans honor a few natural architectural relationships.
+Declare these in the brief's adjacencies array so downstream
+stages can enforce them during layout and score them for quality.
+Each entry has a, b, relationship, and an optional reason. Use
+soft architectural judgement — you don't have to exhaustively
+enumerate every pair; focus on the ones that matter.
+
+Typical declarations worth making in a standard home:
+
+- Master Bedroom and its ensuite bathroom share a wall, with the
+  bathroom accessed from inside the bedroom. Express this as
+  { a: "Master Bedroom", b: "<ensuite name>", relationship: "attached",
+  reason: "ensuite" }. Name the ensuite something like
+  "Master Bathroom" or "Master Ensuite" so Stage 5 can match it.
+
+- The Kitchen sits next to the Dining area so food flows between
+  them naturally. Declare { a: "Kitchen", b: "Dining",
+  relationship: "adjacent", reason: "food flow" } when both are
+  in the roomList.
+
+- A Pooja Room's door opens into the Living Room or the main
+  corridor — never through a bedroom. When a Pooja Room is
+  included, add { a: "Living Room", b: "Pooja Room",
+  relationship: "direct-access", reason: "sacred access" } (or
+  substitute the corridor/hallway room for "Living Room" if the
+  plan uses a central corridor).
+
+- Secondary bedrooms reach the public areas through a corridor,
+  not through other bedrooms. When 2+ bedrooms exist alongside
+  a hallway, declare { a: "Hallway", b: "<Bedroom N>",
+  relationship: "connected" } for each secondary bedroom.
+
+Use exact roomList names for a and b. If a relationship doesn't
+apply to this plan (e.g., a 1BHK has no dining to make adjacent
+to the kitchen), just omit it. An empty adjacencies array is
+valid.
+
+═══════════════════════════════════════════════════════════════
 BRIEF PRODUCTION RULES
 ═══════════════════════════════════════════════════════════════
 
@@ -124,6 +165,9 @@ BRIEF PRODUCTION RULES
    (Mumbai, Bengaluru/Bangalore, Delhi, Pune, Hyderabad, etc.), populate
    municipality with that city name in UPPERCASE. If no city is mentioned, leave
    it unset — downstream synthesis will use a safe default setback. Do not guess.
+
+10. adjacencies: populate per the ADJACENCY DECLARATIONS section above.
+    Use exact roomList names for a and b. Empty array is valid for tiny/odd plans.
 
 ═══════════════════════════════════════════════════════════════
 IMAGE GENERATION PROMPT GUIDELINES

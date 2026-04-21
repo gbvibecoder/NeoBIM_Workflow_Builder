@@ -46,6 +46,45 @@ export async function scheduleVipWorker(jobId: string): Promise<string> {
 }
 
 /**
+ * Phase 2.3 Workstream C: resume a paused VipJob by enqueuing Phase B
+ * (Stages 3-7) against /api/vip-jobs/worker/resume.
+ */
+export async function scheduleVipWorkerResume(jobId: string): Promise<string> {
+  const client = getClient();
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  const workerUrl = `${appUrl}/api/vip-jobs/worker/resume`;
+
+  const result = await client.publishJSON({
+    url: workerUrl,
+    body: { jobId },
+    retries: 0,
+    timeout: "10m",
+  });
+
+  return result.messageId;
+}
+
+/**
+ * Phase 2.3 Workstream C: regenerate the Stage 2 image for a paused
+ * VipJob. Targets /api/vip-jobs/worker/regenerate-image. Runs Stage 2
+ * only, updates intermediate state, stays AWAITING_APPROVAL.
+ */
+export async function scheduleVipWorkerRegenerateImage(jobId: string): Promise<string> {
+  const client = getClient();
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  const workerUrl = `${appUrl}/api/vip-jobs/worker/regenerate-image`;
+
+  const result = await client.publishJSON({
+    url: workerUrl,
+    body: { jobId },
+    retries: 0,
+    timeout: "10m",
+  });
+
+  return result.messageId;
+}
+
+/**
  * Verify that a request came from QStash (signature validation).
  * Returns true if valid, false otherwise.
  */

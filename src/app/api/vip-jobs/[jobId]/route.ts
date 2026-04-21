@@ -43,6 +43,11 @@ export async function GET(
       startedAt: true,
       completedAt: true,
       createdAt: true,
+      // Phase 2.3 Workstream C: the image approval gate fields.
+      intermediateImage: true,
+      userApproval: true,
+      pausedAt: true,
+      pausedStage: true,
     },
   });
 
@@ -67,6 +72,16 @@ export async function GET(
 
   if (job.status === "COMPLETED" && job.resultProject) {
     result.resultProject = job.resultProject;
+  }
+
+  // Phase 2.3 Workstream C: surface the approval-gate fields only when
+  // the job is actually awaiting approval. The base64 image can be
+  // several hundred KB, so we skip it once past the gate.
+  if (job.status === "AWAITING_APPROVAL") {
+    result.intermediateImage = job.intermediateImage ?? null;
+    result.userApproval = job.userApproval ?? null;
+    result.pausedAt = job.pausedAt?.toISOString() ?? null;
+    result.pausedStage = job.pausedStage ?? null;
   }
 
   return NextResponse.json(result, {

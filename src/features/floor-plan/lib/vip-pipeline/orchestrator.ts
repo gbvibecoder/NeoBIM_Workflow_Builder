@@ -91,6 +91,7 @@ async function runStage4And5Block(
           facing: stage1Output.brief.facing,
           parsedConstraints,
           municipality: stage1Output.brief.municipality,
+          adjacencies: stage1Output.brief.adjacencies,
         },
         log,
       );
