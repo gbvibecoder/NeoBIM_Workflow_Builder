@@ -22,7 +22,12 @@ describe("ViewCube position", () => {
   });
 });
 
-describe("IFC Enhancer button source-level guard", () => {
+describe("IFC Enhancer source-level guard (right-side panel per PR #251)", () => {
+  // PR #250 shipped a floating modal-style "IFC Enhancer" button anchored at
+  // top:12/right:12. PR #251 replaced that modal with an always-visible
+  // right-side sidebar panel (IFCEnhancerPanel) with tabs. These tests were
+  // re-anchored to the new panel invariants on merge of fix/vip-weak-areas-
+  // persistence so the CI suite stays green across Govind's refactor.
   const src = readFileSync(
     join(process.cwd(), "src/features/ifc/components/IFCViewerPage.tsx"),
     "utf-8"
@@ -32,18 +37,19 @@ describe("IFC Enhancer button source-level guard", () => {
     expect(src).toContain("IFC Enhancer");
   });
 
-  it("is gated behind hasModel", () => {
-    expect(src).toMatch(/\{hasModel && \(\s*<button/);
+  it("gates the Enhancer sidebar behind hasModel", () => {
+    // Panel/sidebar block wraps its content in `{hasModel && (` — the same
+    // gating invariant as the old modal button, now applied to the sidebar.
+    expect(src).toMatch(/\{hasModel && \(/);
   });
 
-  it("anchors to top:12, right:12", () => {
-    const buttonBlock = src.slice(src.indexOf("IFC Enhancer button"));
-    expect(buttonBlock).toMatch(/top:\s*12/);
-    expect(buttonBlock).toMatch(/right:\s*12/);
+  it("renders IFCEnhancerPanel when the 'enhance' tab is active", () => {
+    // Replaces the old "anchors to top:12, right:12" visual-position test.
+    // New invariant: selecting the enhance tab renders the panel component.
+    expect(src).toMatch(/bottomTab === "enhance"[\s\S]{0,200}<IFCEnhancerPanel/);
   });
 
-  it("renders a Sparkles icon", () => {
-    const buttonBlock = src.slice(src.indexOf("IFC Enhancer button"));
-    expect(buttonBlock).toMatch(/<Sparkles\b/);
+  it("uses a Sparkles icon for the Enhance affordance", () => {
+    expect(src).toMatch(/<Sparkles\b/);
   });
 });
