@@ -9,6 +9,7 @@
 
 import { useState, useRef, useCallback, useEffect } from "react";
 import type { FloorPlanProject } from "@/types/floor-plan-cad";
+import type { StageLogEntry } from "@/features/floor-plan/lib/vip-pipeline/types";
 
 // ─── Types ───────────────────────────────────────────────────────
 
@@ -49,6 +50,8 @@ interface VipJobResponse {
   userApproval?: string | null;
   pausedAt?: string | null;
   pausedStage?: number | null;
+  // Phase 2.6: stage-by-stage log for the Pipeline Logs Panel.
+  stageLog?: StageLogEntry[] | null;
 }
 
 const POLL_INTERVAL_MS = 3_000;
@@ -70,6 +73,8 @@ export function useVipGeneration() {
   // disabled + spinner states in ImageApprovalGate).
   const [approving, setApproving] = useState(false);
   const [regenerating, setRegenerating] = useState(false);
+  // Phase 2.6: stage-by-stage log for the Pipeline Logs Panel.
+  const [stageLog, setStageLog] = useState<StageLogEntry[]>([]);
 
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const startTimeRef = useRef<number>(0);
@@ -117,6 +122,10 @@ export function useVipGeneration() {
         STAGE_LABELS[job.currentStage ?? ""] ?? job.currentStage ?? "",
       );
       setCostUsd(job.costUsd);
+      // Phase 2.6: refresh the stage log on every poll. The worker
+      // replaces the column atomically on each event, so we can trust
+      // the array we receive as authoritative.
+      if (Array.isArray(job.stageLog)) setStageLog(job.stageLog);
 
       if (job.status === "COMPLETED" && job.resultProject) {
         stopPolling();
@@ -159,6 +168,7 @@ export function useVipGeneration() {
     setCostUsd(0);
     setErrorMessage(null);
     setProject(null);
+    setStageLog([]);
     stopPolling();
 
     try {
@@ -265,6 +275,7 @@ export function useVipGeneration() {
     intermediateImage,
     approving,
     regenerating,
+    stageLog,
     startGeneration,
     cancel,
     approveImage,

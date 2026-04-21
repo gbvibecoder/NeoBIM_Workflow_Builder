@@ -136,7 +136,8 @@ export async function runVIPPipeline(
   config: VIPPipelineConfig,
 ): Promise<VIPPipelineResult> {
   const { requestId, userId } = config.logContext;
-  const log = new VIPLogger(requestId, userId, config.prompt);
+  const log = new VIPLogger(requestId, userId, config.prompt, config.onStageLog);
+  if (config.existingStageLog) log.seedStageLog(config.existingStageLog);
   const startMs = Date.now();
 
   try {

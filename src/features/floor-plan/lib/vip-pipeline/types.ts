@@ -24,6 +24,45 @@ export interface VIPPipelineConfig {
   };
   /** Optional progress callback for background job progress reporting. Fire-and-forget — errors are logged, not thrown. */
   onProgress?: (progress: number, stage: string) => Promise<void>;
+  /**
+   * Phase 2.6: called after every stage lifecycle event (start/success/failure).
+   * Receives the full accumulated stage-log array so the caller can replace
+   * the persisted value atomically. Fire-and-forget — errors are swallowed
+   * by the logger.
+   */
+  onStageLog?: (entries: StageLogEntry[]) => Promise<void> | void;
+  /**
+   * Phase 2.6: seed entries to prepend to the in-memory stage log. Used
+   * when resuming in a fresh worker invocation (Phase B / regenerate)
+   * so new events extend the existing timeline instead of replacing it.
+   */
+  existingStageLog?: StageLogEntry[];
+}
+
+// ─── Phase 2.6: Stage Log Entry ──────────────────────────────────
+// One entry per VIP pipeline stage, written incrementally by the
+// VIPLogger as the orchestrator progresses. Persisted to
+// vip_jobs.stageLog and surfaced in the Pipeline Logs Panel UI.
+
+export type StageLogStatus = "running" | "success" | "failed" | "skipped";
+
+export interface StageLogEntry {
+  /** Stage number — 0 = parse (pre-orchestrator), 1-7 = VIP pipeline stages. */
+  stage: number;
+  name: string;
+  status: StageLogStatus;
+  /** ISO timestamp of logStageStart (or equivalent). */
+  startedAt: string;
+  /** ISO timestamp of logStageSuccess / logStageFailure. Unset while running. */
+  completedAt?: string;
+  durationMs?: number;
+  costUsd?: number;
+  /** Short human-readable summary for the collapsed log row. */
+  summary?: string;
+  /** Structured stage output / metadata for the expanded row. */
+  output?: Record<string, unknown>;
+  /** Present when status === "failed". */
+  error?: string;
 }
 
 // ─── Stage 1: Prompt Intelligence ────────────────────────────────

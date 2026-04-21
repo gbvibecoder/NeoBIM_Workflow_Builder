@@ -19,6 +19,10 @@ import { verifyQstashSignature } from "@/lib/qstash";
 import { parseConstraints } from "@/features/floor-plan/lib/structured-parser";
 import { runVIPPipeline } from "@/features/floor-plan/lib/vip-pipeline/orchestrator";
 import { runVIPPipelinePhaseA } from "@/features/floor-plan/lib/vip-pipeline/orchestrator-gated";
+import {
+  appendStageLogEntry,
+  createStageLogPersister,
+} from "@/features/floor-plan/lib/vip-pipeline/stage-log-store";
 
 const PIPELINE_TIMEOUT_MS = 550_000; // 550s safety margin vs Vercel's 600s
 /**
@@ -88,8 +92,23 @@ export async function POST(req: NextRequest) {
     if (!apiKey) throw new Error("OPENAI_API_KEY not set");
 
     await updateJob(jobId, { progress: 5, currentStage: "parse" });
+    const parseStartIso = new Date().toISOString();
+    const parseStart = Date.now();
     const parseRes = await parseConstraints(job.prompt, apiKey);
+    const parseDurationMs = Date.now() - parseStart;
     await updateJob(jobId, { progress: 10, currentStage: "parse" });
+    // Phase 2.6: log the parse stage on the timeline so users see the
+    // pipeline kickoff (not just stages 1-7).
+    await appendStageLogEntry(jobId, {
+      stage: 0,
+      name: "Parse Constraints",
+      status: "success",
+      startedAt: parseStartIso,
+      completedAt: new Date().toISOString(),
+      durationMs: parseDurationMs,
+      summary: `plot: ${parseRes.constraints?.plot?.width_ft ?? "?"}×${parseRes.constraints?.plot?.depth_ft ?? "?"}ft`,
+      output: { constraintsKeys: Object.keys(parseRes.constraints ?? {}) },
+    });
 
     // ── Phase 2.6: gated path is now the DEFAULT flow ──
     // Run Phase A (Stages 1-2) and pause for user approval. The user
@@ -104,6 +123,7 @@ export async function POST(req: NextRequest) {
         onProgress: async (progress, stage) => {
           await updateJob(jobId, { progress, currentStage: stage });
         },
+        onStageLog: createStageLogPersister(jobId),
       });
 
       if (!phaseA.success) {
@@ -152,6 +172,7 @@ export async function POST(req: NextRequest) {
       onProgress: async (progress, stage) => {
         await updateJob(jobId, { progress, currentStage: stage });
       },
+      onStageLog: createStageLogPersister(jobId),
     });
 
     const timeoutPromise = new Promise<never>((_, reject) =>

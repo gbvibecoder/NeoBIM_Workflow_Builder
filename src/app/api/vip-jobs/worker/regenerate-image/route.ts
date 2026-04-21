@@ -12,6 +12,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { verifyQstashSignature } from "@/lib/qstash";
 import { runVIPPipelineRegenerateImage } from "@/features/floor-plan/lib/vip-pipeline/orchestrator-gated";
+import {
+  createStageLogPersister,
+  readStageLog,
+} from "@/features/floor-plan/lib/vip-pipeline/stage-log-store";
 import type {
   Stage1Output,
   Stage2Output,
@@ -71,6 +75,11 @@ export async function POST(req: NextRequest) {
         prompt: job.prompt,
         parsedConstraints: parseRes.constraints,
         logContext: { requestId: job.requestId, userId: job.userId },
+        // Phase 2.6: retain the existing log and stream the new Stage 2
+        // attempt into it so the UI shows both the original and the
+        // regenerate attempt on the timeline.
+        onStageLog: createStageLogPersister(jobId),
+        existingStageLog: readStageLog(job.stageLog as unknown),
       },
       prior.stage1Ms,
       prior.stage1CostUsd,

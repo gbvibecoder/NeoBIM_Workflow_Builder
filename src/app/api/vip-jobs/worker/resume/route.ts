@@ -17,6 +17,10 @@ import { prisma } from "@/lib/db";
 import { verifyQstashSignature } from "@/lib/qstash";
 import { parseConstraints } from "@/features/floor-plan/lib/structured-parser";
 import { runVIPPipelinePhaseB } from "@/features/floor-plan/lib/vip-pipeline/orchestrator-gated";
+import {
+  createStageLogPersister,
+  readStageLog,
+} from "@/features/floor-plan/lib/vip-pipeline/stage-log-store";
 import type {
   Stage1Output,
   Stage2Output,
@@ -99,6 +103,11 @@ export async function POST(req: NextRequest) {
             .update({ where: { id: jobId }, data: { progress, currentStage: stage } })
             .catch(() => {});
         },
+        // Phase 2.6: carry over Phase A's stage log so Stage 3-7 entries
+        // extend the timeline instead of overwriting it, and keep the
+        // DB column in sync as new stages complete.
+        onStageLog: createStageLogPersister(jobId),
+        existingStageLog: readStageLog(job.stageLog as unknown),
       },
       startMs: Date.now() - intermediateBrief.stage1Ms - intermediateBrief.stage2Ms,
     });

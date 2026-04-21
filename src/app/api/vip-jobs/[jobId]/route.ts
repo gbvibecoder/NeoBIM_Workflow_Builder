@@ -48,6 +48,8 @@ export async function GET(
       userApproval: true,
       pausedAt: true,
       pausedStage: true,
+      // Phase 2.6: stage-by-stage log for the Pipeline Logs Panel UI.
+      stageLog: true,
     },
   });
 
@@ -68,6 +70,10 @@ export async function GET(
     startedAt: job.startedAt?.toISOString() ?? null,
     completedAt: job.completedAt?.toISOString() ?? null,
     createdAt: job.createdAt.toISOString(),
+    // Phase 2.6: stage log drives the Pipeline Logs Panel. Always
+    // included so the panel can render mid-flight. Null when the
+    // worker hasn't written any entries yet (QUEUED state).
+    stageLog: job.stageLog ?? null,
   };
 
   if (job.status === "COMPLETED" && job.resultProject) {
