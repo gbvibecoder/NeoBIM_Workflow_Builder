@@ -30,6 +30,7 @@ import { worldToScreen, screenToWorld } from "@/features/floor-plan/lib/geometry
 import { useFeatureFlags } from "@/features/floor-plan/hooks/useFeatureFlags";
 import { useVipGeneration } from "@/features/floor-plan/hooks/useVipGeneration";
 import { VipGenerationProgress } from "@/features/floor-plan/components/VipGenerationProgress";
+import { ImageApprovalGate } from "@/features/floor-plan/components/ImageApprovalGate";
 
 interface FloorPlanViewerProps {
   /** Pre-loaded geometry from pipeline (e.g. navigated from result showcase) */
@@ -583,6 +584,24 @@ export function FloorPlanViewer({ initialGeometry, initialPrompt, initialProject
     />
   ) : null;
 
+  // Phase 2.3 Workstream C: image approval gate overlay.
+  // Shown when the pipeline has paused after Stage 2 and is waiting
+  // for the user to approve or regenerate the generated image.
+  const approvalGate =
+    featureFlags.vipJobsEnabled &&
+    vip.status === "awaiting-approval" &&
+    vip.intermediateImage ? (
+      <ImageApprovalGate
+        imageBase64={vip.intermediateImage}
+        onApprove={vip.approveImage}
+        onRegenerate={vip.regenerateImage}
+        onCancel={() => {
+          vip.cancel();
+          useFloorPlanStore.setState({ isGenerating: false });
+        }}
+      />
+    ) : null;
+
   // Show multi-option picker (Phase 2 — Midjourney approach)
   if (pendingOptions) {
     return (
@@ -618,6 +637,7 @@ export function FloorPlanViewer({ initialGeometry, initialPrompt, initialProject
         />
         {errorOverlay}
         {vipOverlay}
+        {approvalGate}
       </div>
     );
   }
@@ -682,6 +702,7 @@ export function FloorPlanViewer({ initialGeometry, initialPrompt, initialProject
         )}
         {errorOverlay}
         {vipOverlay}
+        {approvalGate}
       </div>
     );
   }

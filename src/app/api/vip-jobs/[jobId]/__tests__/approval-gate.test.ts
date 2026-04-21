@@ -46,7 +46,7 @@ beforeEach(async () => {
 describe("Phase 2.3 — POST /api/vip-jobs/[jobId]/approve", () => {
   it("returns 401 when not authenticated", async () => {
     const { auth } = await import("@/lib/auth");
-    vi.mocked(auth).mockResolvedValue(null);
+    vi.mocked(auth).mockResolvedValue(null as unknown as Awaited<ReturnType<typeof auth>>);
     const POST = await importApprove();
     const res = await POST(makeReq(), { params: Promise.resolve({ jobId: "j1" }) });
     expect(res.status).toBe(401);
@@ -107,7 +107,7 @@ describe("Phase 2.3 — POST /api/vip-jobs/[jobId]/approve", () => {
 describe("Phase 2.3 — POST /api/vip-jobs/[jobId]/regenerate-image", () => {
   it("returns 401 when not authenticated", async () => {
     const { auth } = await import("@/lib/auth");
-    vi.mocked(auth).mockResolvedValue(null);
+    vi.mocked(auth).mockResolvedValue(null as unknown as Awaited<ReturnType<typeof auth>>);
     const POST = await importRegen();
     const res = await POST(makeReq(), { params: Promise.resolve({ jobId: "j1" }) });
     expect(res.status).toBe(401);
