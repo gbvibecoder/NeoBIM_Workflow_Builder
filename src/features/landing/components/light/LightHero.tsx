@@ -20,9 +20,23 @@ export function LightHero() {
         padding: "160px 24px 64px",
         maxWidth: 1200,
         margin: "0 auto",
+        position: "relative",
+        overflow: "hidden",
       }}
     >
-      <div className="light-reveal">
+      {/* Subtle radial glow — warm cream, editorial depth */}
+      <div
+        aria-hidden="true"
+        style={{
+          position: "absolute",
+          inset: 0,
+          pointerEvents: "none",
+          zIndex: 0,
+          background:
+            "radial-gradient(ellipse 80% 60% at 50% 45%, rgba(255, 248, 235, 0.55) 0%, rgba(255, 248, 235, 0.25) 30%, rgba(250, 250, 247, 0) 70%)",
+        }}
+      />
+      <div className="light-reveal" style={{ position: "relative", zIndex: 1 }}>
         {/* Mono label */}
         <p
           style={{
