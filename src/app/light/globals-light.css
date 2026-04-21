@@ -10,7 +10,7 @@
   --light-surface: #F3F4F0;
   --light-ink: #1A1F2E;
   --light-soft: #5A6478;
-  --light-accent: #2E5C8A;
+  --light-accent: #1A1F2E;
   --light-border: rgba(26, 31, 46, 0.08);
   --light-border-strong: rgba(26, 31, 46, 0.14);
   --light-success: #2D7A4F;
@@ -35,7 +35,7 @@
 
 /* ── Selection ───────────────────────────────────────────── */
 .light-theme ::selection {
-  background: rgba(46, 92, 138, 0.15);
+  background: rgba(26, 31, 46, 0.12);
   color: var(--light-ink);
 }
 
@@ -150,4 +150,29 @@
   border-radius: 8px;
   font-size: 14px;
   font-weight: 600;
+}
+
+/* ── Details / Summary (FAQ accordion) ───────────────────── */
+.light-theme summary::-webkit-details-marker {
+  display: none;
+}
+.light-theme summary {
+  list-style: none;
+}
+
+/* Smooth open/close — progressive enhancement */
+@supports (interpolate-size: allow-keywords) {
+  .light-theme details {
+    interpolate-size: allow-keywords;
+  }
+  .light-theme details > .light-faq-answer {
+    transition: opacity 200ms ease-out, height 200ms ease-out;
+    opacity: 0;
+    height: 0;
+    overflow: hidden;
+  }
+  .light-theme details[open] > .light-faq-answer {
+    opacity: 1;
+    height: auto;
+  }
 }

@@ -143,7 +143,7 @@ export function LightNav() {
               fontFamily: "var(--font-dm-sans), sans-serif",
             }}
             onMouseEnter={(e) => {
-              (e.currentTarget as HTMLElement).style.background = "#26527A";
+              (e.currentTarget as HTMLElement).style.background = "#0E1220";
             }}
             onMouseLeave={(e) => {
               (e.currentTarget as HTMLElement).style.background =
