@@ -47,9 +47,11 @@ export function LightHeroPipeline() {
 @keyframes d4{0%,60%{stroke-dashoffset:200}68%{stroke-dashoffset:0}96%{stroke-dashoffset:0}100%{stroke-dashoffset:200}}
 .lhp-d1{animation-name:d1}.lhp-d2{animation-name:d2}.lhp-d3{animation-name:d3}.lhp-d4{animation-name:d4}
 
-/* ── N4 surface fills ── */
-@keyframes sf{0%,62%{fill-opacity:0}72%{fill-opacity:1}96%{fill-opacity:1}100%{fill-opacity:0}}
-.lhp-sf{animation-name:sf}
+/* ── N4 surface fills (per-face shading) ── */
+@keyframes sf-top{0%,62%{fill-opacity:0}72%{fill-opacity:0.18}96%{fill-opacity:0.18}100%{fill-opacity:0}}
+@keyframes sf-front{0%,62%{fill-opacity:0}72%{fill-opacity:0.12}96%{fill-opacity:0.12}100%{fill-opacity:0}}
+@keyframes sf-right{0%,62%{fill-opacity:0}72%{fill-opacity:0.07}96%{fill-opacity:0.07}100%{fill-opacity:0}}
+.lhp-sf-top{animation-name:sf-top}.lhp-sf-front{animation-name:sf-front}.lhp-sf-right{animation-name:sf-right}
 
 /* ── N5 table row stagger + highlight ── */
 @keyframes r1{0%,82%{opacity:0}84%{opacity:1}96%{opacity:1}100%{opacity:0}}
@@ -106,9 +108,11 @@ export function LightHeroPipeline() {
         <g className="lhp-a lhp-n1">
           <text x={75} y={40} textAnchor="middle" fontSize={9} fontWeight={500} letterSpacing="0.12em" fill="#5A6478" fontFamily="var(--font-jetbrains), monospace">BRIEF</text>
           <rect x={10} y={48} width={130} height={84} rx={8} fill="#FAFAF7" stroke="rgba(26,31,46,0.12)" strokeWidth={1} filter="url(#cs)" />
-          <line className="lhp-ld lhp-a lhp-d1" x1={26} y1={76} x2={124} y2={76} stroke="#1A1F2E" strokeWidth={1.2} strokeLinecap="round" />
-          <line className="lhp-ld lhp-a lhp-d1" x1={26} y1={90} x2={98}  y2={90} stroke="#1A1F2E" strokeWidth={1.2} strokeLinecap="round" />
-          <line className="lhp-ld lhp-a lhp-d1" x1={26} y1={104} x2={70} y2={104} stroke="#1A1F2E" strokeWidth={1.2} strokeLinecap="round" />
+          {/* AI sparkle glyph — 4-point star */}
+          <path className="lhp-a lhp-d1" d="M28,67 L30,63 L32,67 L36,69 L32,71 L30,75 L28,71 L24,69 Z" fill="#4A6B4D" fillOpacity={0.55} />
+          <line className="lhp-ld lhp-a lhp-d1" x1={26} y1={80} x2={124} y2={80} stroke="#1A1F2E" strokeWidth={1.2} strokeLinecap="round" />
+          <line className="lhp-ld lhp-a lhp-d1" x1={26} y1={94} x2={98}  y2={94} stroke="#1A1F2E" strokeWidth={1.2} strokeLinecap="round" />
+          <line className="lhp-ld lhp-a lhp-d1" x1={26} y1={108} x2={70} y2={108} stroke="#1A1F2E" strokeWidth={1.2} strokeLinecap="round" />
         </g>
 
         {/* ═══ NODE 2 — FLOOR PLAN ═══ */}
@@ -154,10 +158,10 @@ export function LightHeroPipeline() {
         <g className="lhp-a lhp-n4">
           <text x={603} y={40} textAnchor="middle" fontSize={9} fontWeight={500} letterSpacing="0.12em" fill="#5A6478" fontFamily="var(--font-jetbrains), monospace">3D MODEL</text>
           <rect x={538} y={48} width={130} height={84} rx={8} fill="#FAFAF7" stroke="rgba(26,31,46,0.12)" strokeWidth={1} filter="url(#cs)" />
-          {/* Filled surfaces (sage tints) */}
-          <polygon className="lhp-a lhp-sf" points={`${n4.Dx},${n4.Dy} ${n4.Ax},${n4.Ay} ${n4.Bx},${n4.By} ${n4.Cx},${n4.Cy}`} fill="#4A6B4D" fillOpacity={0} />
-          <polygon className="lhp-a lhp-sf" points={`${n4.Bx},${n4.By} ${n4.Fx},${n4.Fy} ${n4.Gx},${n4.Gy} ${n4.Cx},${n4.Cy}`} fill="#4A6B4D" fillOpacity={0} />
-          <polygon className="lhp-a lhp-sf" points={`${n4.Ax},${n4.Ay} ${n4.Ex},${n4.Ey} ${n4.Fx},${n4.Fy} ${n4.Bx},${n4.By}`} fill="#4A6B4D" fillOpacity={0} />
+          {/* Filled surfaces — rendered BEFORE wireframe so edges stay on top */}
+          <polygon className="lhp-a lhp-sf-front" points={`${n4.Dx},${n4.Dy} ${n4.Ax},${n4.Ay} ${n4.Bx},${n4.By} ${n4.Cx},${n4.Cy}`} fill="#4A6B4D" fillOpacity={0} />
+          <polygon className="lhp-a lhp-sf-right" points={`${n4.Bx},${n4.By} ${n4.Fx},${n4.Fy} ${n4.Gx},${n4.Gy} ${n4.Cx},${n4.Cy}`} fill="#4A6B4D" fillOpacity={0} />
+          <polygon className="lhp-a lhp-sf-top" points={`${n4.Ax},${n4.Ay} ${n4.Ex},${n4.Ey} ${n4.Fx},${n4.Fy} ${n4.Bx},${n4.By}`} fill="#4A6B4D" fillOpacity={0} />
           {/* Wireframe edges */}
           <line className="lhp-ld lhp-a lhp-d4" x1={n4.Ax} y1={n4.Ay} x2={n4.Bx} y2={n4.By} stroke="#1A1F2E" strokeWidth={0.8} />
           <line className="lhp-ld lhp-a lhp-d4" x1={n4.Bx} y1={n4.By} x2={n4.Cx} y2={n4.Cy} stroke="#1A1F2E" strokeWidth={0.8} />
@@ -194,7 +198,9 @@ export function LightHeroPipeline() {
         @media (prefers-reduced-motion: reduce) {
           .lhp-a { animation: none !important; }
           .lhp-ld { stroke-dashoffset: 0 !important; }
-          .lhp-sf { fill-opacity: 0.06 !important; }
+          .lhp-sf-top { fill-opacity: 0.18 !important; }
+          .lhp-sf-front { fill-opacity: 0.12 !important; }
+          .lhp-sf-right { fill-opacity: 0.07 !important; }
           .lhp-dot { display: none; }
           .lhp-n1,.lhp-n2,.lhp-n3,.lhp-n4,.lhp-n5,
           .lhp-c1,.lhp-c2,.lhp-c3,.lhp-c4,
