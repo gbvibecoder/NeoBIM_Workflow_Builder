@@ -50,6 +50,7 @@ const LLM_DIMS = [
   "dimensionPlausibility",
   "vastuCompliance",
   "orientationCorrect",
+  "adjacencyCompliance",
   "connectivity",
   "exteriorWindows",
 ] as const;
