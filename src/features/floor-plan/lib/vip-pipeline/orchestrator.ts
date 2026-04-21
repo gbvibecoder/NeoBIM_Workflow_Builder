@@ -273,6 +273,10 @@ export async function runVIPPipeline(
     let qualityScore = 0;
     let retryCount = 0;
     let finalProject: FloorPlanProject | undefined;
+    // Tracks the Stage 6 verdict.weakAreas matching the attempt that
+    // produced the final qualityScore — initial verdict if no retry,
+    // retry verdict if retry beat original.
+    let finalWeakAreas: string[] = [];
 
     if (candidateProject) {
       log.logStageStart(6);
@@ -284,6 +288,7 @@ export async function runVIPPipeline(
         );
         stage6Ms = Date.now() - s6Start;
         qualityScore = s6Output.verdict.score;
+        finalWeakAreas = s6Output.verdict.weakAreas;
         log.logStageSuccess(6, stage6Ms, {
           score: qualityScore,
           recommendation: s6Output.verdict.recommendation,
@@ -326,8 +331,10 @@ export async function runVIPPipeline(
                   if (retryScore > qualityScore) {
                     finalProject = retryS45.project;
                     qualityScore = retryScore;
+                    finalWeakAreas = retryS6.verdict.weakAreas;
                   } else {
                     finalProject = candidateProject;
+                    // finalWeakAreas keeps the original-attempt value
                   }
                 }
               }
@@ -364,7 +371,7 @@ export async function runVIPPipeline(
         totalCostUsd,
         totalMs: Date.now() - startMs,
         retried: retryCount > 0,
-        weakAreas: [],
+        weakAreas: finalWeakAreas,
       }, log);
       stage7Ms = Date.now() - s7Start;
       log.logStageSuccess(7, stage7Ms, { qualityScore });
