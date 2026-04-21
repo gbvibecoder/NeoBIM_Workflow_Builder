@@ -2788,6 +2788,15 @@ const en = {
   'admin.support.loadingTemplates': 'Loading templates...',
   'admin.support.confirmDelete': 'Click delete again to confirm',
   'admin.support.uses': 'uses',
+
+  // ===== LIGHT THEME LANDING PAGE =====
+  'light.heroLabel': 'FOR ARCHITECTS',
+  'light.heroLine1': 'From brief to',
+  'light.heroLine1Em': 'building',
+  'light.heroLine2': 'in one workflow.',
+  'light.heroSubtitle': 'AI-powered concept design. Upload a brief, get 3D massing, renders, and cost estimates — in minutes, not weeks.',
+  'light.tryDemo': 'Try the Demo',
+  'light.trustFreeTier': 'Free tier available',
 } as const;
 
 const de: Record<keyof typeof en, string | string[]> = {
@@ -5570,6 +5579,15 @@ const de: Record<keyof typeof en, string | string[]> = {
   'admin.support.loadingTemplates': 'Vorlagen werden geladen...',
   'admin.support.confirmDelete': 'Zum Bestätigen erneut auf Löschen klicken',
   'admin.support.uses': 'Verwendungen',
+
+  // ===== LIGHT THEME LANDING PAGE =====
+  'light.heroLabel': 'FÜR ARCHITEKTEN',
+  'light.heroLine1': 'Vom Briefing zum',
+  'light.heroLine1Em': 'Gebäude',
+  'light.heroLine2': 'in einem Workflow.',
+  'light.heroSubtitle': 'KI-gestütztes Konzeptdesign. Briefing hochladen, 3D-Massenmodelle, Renderings und Kostenschätzungen erhalten — in Minuten, nicht Wochen.',
+  'light.tryDemo': 'Demo ausprobieren',
+  'light.trustFreeTier': 'Kostenlose Version verfügbar',
 };
 
 const translations: Record<Locale, Record<string, string | readonly string[]>> = { en, de };
