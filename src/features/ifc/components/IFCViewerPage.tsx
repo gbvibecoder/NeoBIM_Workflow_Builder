@@ -10,8 +10,8 @@ import { IntegrationBanner } from "@/features/ifc/components/IntegrationBanner";
 import { ContextMenu, type ContextMenuData } from "@/features/ifc/components/ContextMenu";
 import { ViewCube } from "@/features/ifc/components/ViewCube";
 import { UI, SHORTCUTS } from "@/features/ifc/components/constants";
-import { Sparkles } from "lucide-react";
-import { IFCEnhancerModal, type EnhanceSuccess } from "@/features/ifc/components/IFCEnhancerModal";
+import { Sparkles, PanelRightClose, PanelRightOpen } from "lucide-react";
+import { IFCEnhancerPanel, type EnhanceSuccess } from "@/features/ifc/components/IFCEnhancerPanel";
 import {
   saveLastIFCFile,
   loadLastIFCFile,
@@ -31,7 +31,10 @@ function useBreakpoint() {
   useEffect(() => {
     const check = () => {
       const w = window.innerWidth;
-      setBp(w <= 768 ? "mobile" : w <= 1024 ? "tablet" : "desktop");
+      /* "mobile" triggers the bottom-sheet panel UX; reserve it for truly
+         phone-sized widths (portrait iPhone ≈ 390–430, landscape up to ~820).
+         Tablets and narrow laptop windows stay on the right-side panel. */
+      setBp(w <= 480 ? "mobile" : w <= 1024 ? "tablet" : "desktop");
     };
     check();
     window.addEventListener("resize", check);
@@ -48,15 +51,14 @@ export default function IFCViewerPage() {
   const [loadMessage, setLoadMessage] = useState("");
   const [selectedElement, setSelectedElement] = useState<IFCElementData | null>(null);
   const [spatialTree, setSpatialTree] = useState<SpatialNode[]>([]);
-  const [bottomPanelOpen, setBottomPanelOpen] = useState(false);
-  const [bottomTab, setBottomTab] = useState<"tree" | "properties">("tree");
+  const [bottomPanelOpen, setBottomPanelOpen] = useState(true);
+  const [bottomTab, setBottomTab] = useState<"tree" | "properties" | "enhance">("enhance");
   const [error, setError] = useState<string | null>(null);
   const [contextMenu, setContextMenu] = useState<ContextMenuData | null>(null);
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [measureUnit, setMeasureUnit] = useState<"m" | "ft">("m");
   const [cameraCSS, setCameraCSS] = useState("rotateX(0deg) rotateY(0deg)");
-  const [panelWidth, setPanelWidth] = useState(300);
-  const [enhancerOpen, setEnhancerOpen] = useState(false);
+  const [panelWidth, setPanelWidth] = useState(360);
   const [currentFile, setCurrentFile] = useState<{ name: string; buffer: ArrayBuffer } | null>(null);
 
   const viewportRef = useRef<ViewportHandle | null>(null);
@@ -70,7 +72,10 @@ export default function IFCViewerPage() {
       if (!resizingRef.current) return;
       e.preventDefault();
       const newWidth = window.innerWidth - e.clientX;
-      setPanelWidth(Math.max(220, Math.min(500, newWidth)));
+      /* Cap max at 70% of window width so the panel can never fully swallow
+         the viewport on narrow laptop windows. Min 240 keeps forms readable. */
+      const cap = Math.min(640, Math.floor(window.innerWidth * 0.7));
+      setPanelWidth(Math.max(240, Math.min(cap, newWidth)));
     };
     const onMouseUp = () => {
       resizingRef.current = false;
@@ -225,6 +230,10 @@ export default function IFCViewerPage() {
   const handleLoadComplete = useCallback(() => {
     setLoading(false);
     setBottomPanelOpen(true);
+    /* Snap to Enhance tab after a fresh load so the feature surface is the
+       first thing the user sees — they just dropped a file in, now they can
+       modify it. Users can manually switch to Tree/Properties any time. */
+    setBottomTab("enhance");
   }, []);
 
   const handleError = useCallback((message: string) => {
@@ -503,60 +512,6 @@ export default function IFCViewerPage() {
           {/* View cube */}
           {hasModel && <ViewCube viewportRef={viewportRef} cameraMatrixCSS={cameraCSS} />}
 
-          {/* IFC Enhancer button */}
-          {hasModel && (
-            <button
-              type="button"
-              onClick={() => setEnhancerOpen(true)}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.transform = "translateY(-1px)";
-                e.currentTarget.style.boxShadow = "0 0 0 1px rgba(0,245,255,0.55), 0 10px 28px rgba(0,245,255,0.28)";
-                const icon = e.currentTarget.querySelector("[data-ifce-icon]") as HTMLElement | null;
-                if (icon) icon.style.transform = "rotate(-12deg) scale(1.08)";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.transform = "translateY(0)";
-                e.currentTarget.style.boxShadow = "0 0 0 1px rgba(0,245,255,0.3), 0 6px 18px rgba(0,245,255,0.18)";
-                const icon = e.currentTarget.querySelector("[data-ifce-icon]") as HTMLElement | null;
-                if (icon) icon.style.transform = "rotate(0deg) scale(1)";
-              }}
-              style={{
-                position: "absolute",
-                top: 12,
-                right: 12,
-                zIndex: 15,
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 8,
-                padding: "8px 14px",
-                fontSize: 12.5,
-                fontWeight: 600,
-                letterSpacing: "0.3px",
-                color: "#07070D",
-                background: "linear-gradient(90deg, #00F5FF 0%, #4F8AFF 100%)",
-                border: "none",
-                borderRadius: UI.radius.md,
-                boxShadow: "0 0 0 1px rgba(0,245,255,0.3), 0 6px 18px rgba(0,245,255,0.18)",
-                cursor: "pointer",
-                transition: "transform 0.16s ease, box-shadow 0.16s ease",
-                userSelect: "none",
-              }}
-            >
-              <span
-                data-ifce-icon
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  transition: "transform 0.18s ease",
-                }}
-              >
-                <Sparkles size={14} color="#07070D" strokeWidth={2.5} />
-              </span>
-              <span>IFC Enhancer</span>
-            </button>
-          )}
-
           {/* Context menu */}
           {contextMenu && (
             <ContextMenu
@@ -586,23 +541,33 @@ export default function IFCViewerPage() {
           )}
         </div>
 
-        {/* ── Right panel (desktop/tablet) ── */}
-        {hasModel && bottomPanelOpen && bp !== "mobile" && (
+        {/* ── Right sidebar — ALWAYS visible when a model is loaded, on ALL
+            viewport sizes. `bottomPanelOpen` only controls whether it's
+            expanded (full width with tabs & content) or collapsed to a 56px
+            icon rail. No breakpoint gate: on narrow windows the viewport is
+            cramped but the sidebar is guaranteed visible. The bright cyan
+            border-left + outer glow makes it unmistakable. */}
+        {hasModel && (
           <div
             style={{
-              width: bp === "tablet" ? 260 : panelWidth,
-              flexShrink: 0,
-              borderLeft: "1px solid rgba(255,255,255,0.04)",
-              background: "rgba(18,18,30,0.92)",
+              width: bottomPanelOpen ? (bp === "tablet" || bp === "mobile" ? 260 : panelWidth) : 56,
+              position: "absolute",
+              top: 0,
+              right: 0,
+              bottom: 0,
+              borderLeft: "2px solid rgba(0,245,255,0.5)",
+              background: "rgba(12,12,20,0.98)",
               backdropFilter: "blur(12px)",
+              boxShadow: "-8px 0 24px rgba(0,0,0,0.5), inset 2px 0 0 rgba(0,245,255,0.12)",
               display: "flex",
               flexDirection: "column",
               overflow: "hidden",
-              position: "relative",
+              transition: "width 0.22s cubic-bezier(0.4, 0, 0.2, 1)",
+              zIndex: 20,
             }}
           >
-            {/* Resize handle */}
-            {bp === "desktop" && (
+            {/* Resize handle — shown whenever the panel is expanded */}
+            {bottomPanelOpen && (
               <div
                 onMouseDown={() => {
                   resizingRef.current = true;
@@ -625,217 +590,245 @@ export default function IFCViewerPage() {
               />
             )}
 
-            {/* Panel header with tabs */}
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                borderBottom: "1px solid rgba(255,255,255,0.04)",
-                background: UI.bg.base,
-                flexShrink: 0,
-              }}
-            >
-              {(["tree", "properties"] as const).map((tab) => (
-                <button
-                  key={tab}
-                  onClick={() => setBottomTab(tab)}
+            {bottomPanelOpen ? (
+              <>
+                {/* Panel header with tabs */}
+                <div
                   style={{
-                    flex: 1,
-                    padding: "10px 0",
-                    background: bottomTab === tab ? "transparent" : "transparent",
-                    borderWidth: 0,
-                    borderBottomWidth: 2,
-                    borderBottomStyle: "solid",
-                    borderBottomColor: bottomTab === tab ? UI.accent.blue : "transparent",
-                    color: bottomTab === tab ? UI.accent.blue : UI.text.tertiary,
-                    fontSize: 11,
-                    fontWeight: 600,
-                    cursor: "pointer",
-                    textTransform: "uppercase",
-                    letterSpacing: "0.5px",
-                    transition: "color 0.15s",
+                    display: "flex",
+                    alignItems: "center",
+                    borderBottom: "1px solid rgba(255,255,255,0.04)",
+                    background: UI.bg.base,
+                    flexShrink: 0,
                   }}
                 >
-                  {tab === "tree" ? "Model Tree" : "Properties"}
-                </button>
-              ))}
-              {/* Collapse button */}
-              <button
-                onClick={() => setBottomPanelOpen(false)}
-                title="Collapse panel ([ key)"
-                style={{
-                  width: 32,
-                  height: 32,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  background: "none",
-                  border: "none",
-                  color: UI.text.tertiary,
-                  cursor: "pointer",
-                  fontSize: 14,
-                  flexShrink: 0,
-                  transition: "color 0.15s",
-                }}
-                onMouseEnter={(e) => { e.currentTarget.style.color = UI.text.primary; }}
-                onMouseLeave={(e) => { e.currentTarget.style.color = UI.text.tertiary; }}
-              >
-                &#x203A;
-              </button>
-            </div>
+                  {(["tree", "properties", "enhance"] as const).map((tab) => {
+                    const active = bottomTab === tab;
+                    const label = tab === "tree" ? "Tree" : tab === "properties" ? "Properties" : "Enhance";
+                    const isEnhance = tab === "enhance";
+                    const activeColor = isEnhance ? UI.accent.cyan : UI.accent.blue;
+                    return (
+                      <button
+                        key={tab}
+                        onClick={() => setBottomTab(tab)}
+                        style={{
+                          flex: 1,
+                          padding: "10px 0",
+                          background: "transparent",
+                          borderWidth: 0,
+                          borderBottomWidth: 2,
+                          borderBottomStyle: "solid",
+                          borderBottomColor: active ? activeColor : "transparent",
+                          color: active ? activeColor : UI.text.tertiary,
+                          fontSize: 10.5,
+                          fontWeight: 600,
+                          cursor: "pointer",
+                          textTransform: "uppercase",
+                          letterSpacing: "0.5px",
+                          transition: "color 0.15s",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          gap: 5,
+                        }}
+                      >
+                        {isEnhance && <Sparkles size={11} strokeWidth={2.2} />}
+                        {label}
+                      </button>
+                    );
+                  })}
+                  {/* Minimize button */}
+                  <button
+                    onClick={() => setBottomPanelOpen(false)}
+                    title="Minimize panel ([ key)"
+                    aria-label="Minimize side panel"
+                    style={{
+                      width: 34,
+                      height: 34,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      background: "none",
+                      border: "none",
+                      color: UI.text.secondary,
+                      cursor: "pointer",
+                      flexShrink: 0,
+                      transition: "color 0.15s, background 0.15s",
+                      borderRadius: 6,
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.color = UI.text.primary;
+                      e.currentTarget.style.background = "rgba(255,255,255,0.04)";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.color = UI.text.secondary;
+                      e.currentTarget.style.background = "transparent";
+                    }}
+                  >
+                    <PanelRightClose size={16} strokeWidth={2} />
+                  </button>
+                </div>
 
-            {/* Panel content */}
-            <div style={{ flex: 1, overflow: "hidden" }}>
-              {bottomTab === "tree" && (
-                <ModelTree
-                  tree={spatialTree}
-                  selectedID={selectedElement?.expressID ?? null}
-                  viewportRef={viewportRef}
-                />
-              )}
-              {bottomTab === "properties" && <PropertiesPanel element={selectedElement} />}
-            </div>
+                {/* Panel content */}
+                <div style={{ flex: 1, overflow: "hidden" }}>
+                  {bottomTab === "tree" && (
+                    <ModelTree
+                      tree={spatialTree}
+                      selectedID={selectedElement?.expressID ?? null}
+                      viewportRef={viewportRef}
+                    />
+                  )}
+                  {bottomTab === "properties" && <PropertiesPanel element={selectedElement} />}
+                  {bottomTab === "enhance" && (
+                    <IFCEnhancerPanel
+                      sourceFile={currentFile}
+                      onApplyToViewer={handleApplyEnhancement}
+                    />
+                  )}
+                </div>
+              </>
+            ) : (
+              /* ── Collapsed rail — 48px icon sidebar ── */
+              <CollapsedRail
+                activeTab={bottomTab}
+                onPickTab={(tab) => {
+                  setBottomTab(tab);
+                  setBottomPanelOpen(true);
+                }}
+                onExpand={() => setBottomPanelOpen(true)}
+              />
+            )}
           </div>
         )}
 
-        {/* Collapsed panel toggle (desktop/tablet) */}
-        {hasModel && !bottomPanelOpen && bp !== "mobile" && (
-          <button
-            onClick={() => setBottomPanelOpen(true)}
-            title="Open panel ([ key)"
-            style={{
-              width: 24,
-              flexShrink: 0,
-              background: UI.bg.base,
-              borderWidth: 0,
-              borderLeftWidth: 1,
-              borderLeftStyle: "solid",
-              borderLeftColor: "rgba(255,255,255,0.04)",
-              color: UI.text.tertiary,
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontSize: 12,
-              transition: "background 0.15s, color 0.15s",
-              writingMode: "vertical-lr",
-              letterSpacing: "1px",
-            }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = UI.bg.hover; e.currentTarget.style.color = UI.text.secondary; }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = UI.bg.base; e.currentTarget.style.color = UI.text.tertiary; }}
-          >
-            &#x2039;
-          </button>
-        )}
-
-        {/* ── Mobile: bottom sheet ── */}
-        {hasModel && bottomPanelOpen && bp === "mobile" && (
-          <div
-            style={{
-              position: "absolute",
-              bottom: 0,
-              left: 0,
-              right: 0,
-              height: "60vh",
-              zIndex: 30,
-              borderRadius: `${UI.radius.lg}px ${UI.radius.lg}px 0 0`,
-              boxShadow: "0 -4px 20px rgba(0,0,0,0.4)",
-              background: "rgba(18,18,30,0.95)",
-              backdropFilter: "blur(12px)",
-              display: "flex",
-              flexDirection: "column",
-              overflow: "hidden",
-            }}
-          >
-            {/* Drag indicator */}
-            <div style={{ display: "flex", justifyContent: "center", padding: "8px 0 4px" }}>
-              <div style={{ width: 32, height: 4, borderRadius: 2, background: "rgba(255,255,255,0.15)" }} />
-            </div>
-            {/* Tab header */}
-            <div style={{ display: "flex", borderBottom: "1px solid rgba(255,255,255,0.04)", flexShrink: 0 }}>
-              {(["tree", "properties"] as const).map((tab) => (
-                <button
-                  key={tab}
-                  onClick={() => setBottomTab(tab)}
-                  style={{
-                    flex: 1,
-                    padding: "10px 0",
-                    background: "transparent",
-                    borderWidth: 0,
-                    borderBottomWidth: 2,
-                    borderBottomStyle: "solid",
-                    borderBottomColor: bottomTab === tab ? UI.accent.blue : "transparent",
-                    color: bottomTab === tab ? UI.accent.blue : UI.text.tertiary,
-                    fontSize: 11,
-                    fontWeight: 600,
-                    cursor: "pointer",
-                    textTransform: "uppercase",
-                    letterSpacing: "0.5px",
-                  }}
-                >
-                  {tab === "tree" ? "Model Tree" : "Properties"}
-                </button>
-              ))}
-              <button
-                onClick={() => setBottomPanelOpen(false)}
-                style={{
-                  width: 40,
-                  background: "none",
-                  border: "none",
-                  color: UI.text.tertiary,
-                  cursor: "pointer",
-                  fontSize: 16,
-                }}
-              >
-                &#x2715;
-              </button>
-            </div>
-            {/* Panel content */}
-            <div style={{ flex: 1, overflow: "hidden" }}>
-              {bottomTab === "tree" && (
-                <ModelTree tree={spatialTree} selectedID={selectedElement?.expressID ?? null} viewportRef={viewportRef} />
-              )}
-              {bottomTab === "properties" && <PropertiesPanel element={selectedElement} />}
-            </div>
-          </div>
-        )}
-
-        {/* Mobile: FAB to open panel */}
-        {hasModel && bp === "mobile" && !bottomPanelOpen && (
-          <button
-            onClick={() => setBottomPanelOpen(true)}
-            style={{
-              position: "absolute",
-              bottom: 16,
-              right: 16,
-              width: 48,
-              height: 48,
-              borderRadius: 24,
-              background: UI.accent.blue,
-              color: UI.text.primary,
-              border: "none",
-              fontSize: 18,
-              fontWeight: 700,
-              cursor: "pointer",
-              boxShadow: "0 4px 16px rgba(79,138,255,0.4)",
-              zIndex: 25,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            &#9776;
-          </button>
-        )}
       </div>
 
-      {/* IFC Enhancer modal */}
-      <IFCEnhancerModal
-        open={enhancerOpen}
-        onClose={() => setEnhancerOpen(false)}
-        sourceFile={currentFile}
-        onApplyToViewer={handleApplyEnhancement}
-      />
+    </div>
+  );
+}
+
+/* ─── Collapsed-rail sidebar (shown when panel is minimized on desktop/tablet) ─── */
+
+interface CollapsedRailProps {
+  activeTab: "tree" | "properties" | "enhance";
+  onPickTab: (tab: "tree" | "properties" | "enhance") => void;
+  onExpand: () => void;
+}
+
+function CollapsedRail({ activeTab, onPickTab, onExpand }: CollapsedRailProps) {
+  const items: {
+    id: "tree" | "properties" | "enhance";
+    label: string;
+    char: string;
+  }[] = [
+    { id: "enhance", label: "Enhance", char: "✨" },
+    { id: "tree", label: "Tree", char: "🗂" },
+    { id: "properties", label: "Properties", char: "ⓘ" },
+  ];
+
+  return (
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        padding: "8px 0",
+        gap: 4,
+        height: "100%",
+      }}
+    >
+      {/* Top: expand button */}
+      <button
+        type="button"
+        onClick={onExpand}
+        title="Maximize panel ([ key)"
+        aria-label="Maximize side panel"
+        style={{
+          width: 36,
+          height: 36,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          background: "rgba(0,245,255,0.08)",
+          border: "1px solid rgba(0,245,255,0.3)",
+          color: UI.accent.cyan,
+          cursor: "pointer",
+          borderRadius: 8,
+          marginBottom: 6,
+          transition: "background 0.15s, transform 0.15s",
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.background = "rgba(0,245,255,0.14)";
+          e.currentTarget.style.transform = "translateY(-1px)";
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.background = "rgba(0,245,255,0.08)";
+          e.currentTarget.style.transform = "translateY(0)";
+        }}
+      >
+        <PanelRightOpen size={16} strokeWidth={2} />
+      </button>
+
+      {/* Tab icons — clicking any expands panel and switches to that tab */}
+      {items.map((item) => {
+        const isActive = item.id === activeTab;
+        return (
+          <button
+            key={item.id}
+            type="button"
+            onClick={() => onPickTab(item.id)}
+            title={item.label}
+            aria-label={`Open ${item.label}`}
+            style={{
+              width: 36,
+              height: 36,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              background: isActive ? "rgba(79,138,255,0.12)" : "transparent",
+              border: `1px solid ${isActive ? "rgba(79,138,255,0.35)" : "transparent"}`,
+              color: isActive ? UI.accent.blue : UI.text.secondary,
+              cursor: "pointer",
+              borderRadius: 8,
+              fontSize: 15,
+              transition: "background 0.15s, color 0.15s",
+            }}
+            onMouseEnter={(e) => {
+              if (isActive) return;
+              e.currentTarget.style.background = "rgba(255,255,255,0.04)";
+              e.currentTarget.style.color = UI.text.primary;
+            }}
+            onMouseLeave={(e) => {
+              if (isActive) return;
+              e.currentTarget.style.background = "transparent";
+              e.currentTarget.style.color = UI.text.secondary;
+            }}
+          >
+            {item.id === "enhance" ? (
+              <Sparkles size={16} strokeWidth={2} />
+            ) : (
+              <span aria-hidden>{item.char}</span>
+            )}
+          </button>
+        );
+      })}
+
+      {/* Vertical label at bottom */}
+      <div style={{ flex: 1 }} />
+      <span
+        style={{
+          writingMode: "vertical-rl",
+          transform: "rotate(180deg)",
+          letterSpacing: "1.5px",
+          textTransform: "uppercase",
+          fontWeight: 600,
+          fontSize: 9,
+          color: UI.text.tertiary,
+          padding: "8px 0",
+        }}
+      >
+        Enhancer
+      </span>
     </div>
   );
 }
