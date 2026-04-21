@@ -341,9 +341,9 @@ export function LightPricing() {
                   onMouseEnter={(e) => {
                     const el = e.currentTarget as HTMLElement;
                     if (plan.highlighted) {
-                      el.style.background = "#A84736";
+                      el.style.background = "#3A5640";
                     } else {
-                      el.style.background = "rgba(200, 88, 64, 0.06)";
+                      el.style.background = "rgba(74, 107, 77, 0.06)";
                     }
                   }}
                   onMouseLeave={(e) => {
