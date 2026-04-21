@@ -133,6 +133,15 @@ export function FloorPlanViewer({ initialGeometry, initialPrompt, initialProject
     vipEnabledRef.current = featureFlags.vipJobsEnabled;
   }, [featureFlags.vipJobsEnabled]);
 
+  // Same stale-closure protection for the vip hook object. `vip` re-creates
+  // every render (new `startGeneration` / `cancel` references), so an
+  // executeGeneration memoized with [] would capture the first render's
+  // stale handles. Route calls through vipRef.current instead.
+  const vipRef = useRef(vip);
+  useEffect(() => {
+    vipRef.current = vip;
+  }, [vip]);
+
   // Clean up on unmount
   useEffect(() => {
     return () => { abortRef.current?.abort(); };
@@ -160,12 +169,14 @@ export function FloorPlanViewer({ initialGeometry, initialPrompt, initialProject
    */
   const executeGeneration = useCallback(async (prompt: string) => {
     // ── VIP async path (feature-flagged) ──
-    // Read from ref (not closure) — see vipEnabledRef comment above.
+    // Read flag and hook through refs (not closure) — see vipEnabledRef /
+    // vipRef comments above. Prevents stale-closure regressions like the
+    // 2026-04-20 prod bug.
     if (vipEnabledRef.current) {
       const store = useFloorPlanStore.getState();
       store.startGeneration(prompt);
       setGenerationError(null);
-      vip.startGeneration(prompt);
+      vipRef.current.startGeneration(prompt);
       return;
     }
 
@@ -526,7 +537,7 @@ export function FloorPlanViewer({ initialGeometry, initialPrompt, initialProject
         }
         break;
     }
-  }, []);
+  }, [showUndoToast]);
 
   useEffect(() => {
     window.addEventListener("keydown", handleKeyDown);

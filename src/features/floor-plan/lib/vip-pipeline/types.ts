@@ -44,7 +44,7 @@ export interface ArchitectBrief {
 }
 
 export interface ImageGenPrompt {
-  model: string; // e.g., "gpt-image-1.5", "imagen-4.0-generate-001"
+  model: string; // e.g., "gpt-image-1.5"
   prompt: string;
   negativePrompt?: string;
   styleGuide: string;
@@ -52,14 +52,14 @@ export interface ImageGenPrompt {
 
 export interface Stage1Output {
   brief: ArchitectBrief;
-  /** Expected length 2–5. Orchestrator validates at runtime. */
+  /** Expected length 1 (gpt-image-1.5 only). Orchestrator validates at runtime. */
   imagePrompts: ImageGenPrompt[];
 }
 
-// ─── Stage 2: Parallel Image Generation ──────────────────────────
+// ─── Stage 2: Image Generation ───────────────────────────────────
 
 export interface Stage2Input {
-  /** Expected length 2–5. Orchestrator validates at runtime. */
+  /** Expected length 1 (gpt-image-1.5 only). Orchestrator validates at runtime. */
   imagePrompts: ImageGenPrompt[];
 }
 

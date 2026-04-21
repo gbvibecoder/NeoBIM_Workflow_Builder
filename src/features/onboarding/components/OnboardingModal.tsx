@@ -39,7 +39,7 @@ export function OnboardingModal() {
       dismiss();
       router.push("/dashboard/templates");
     }
-  }, [step, dismiss, router]);
+  }, [step, dismiss, router, STEPS.length]);
 
   if (!visible) return null;
 

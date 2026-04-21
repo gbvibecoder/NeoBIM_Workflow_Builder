@@ -79,7 +79,7 @@ export function InteractiveDotGrid({
     }
 
     rafRef.current = requestAnimationFrame(draw);
-  }, [dotColor, activeColor, dotSize, activeDotSize, spacing, glowRadius]);
+  }, [dotColor, dotSize, activeDotSize, spacing, glowRadius]);
 
   useEffect(() => {
     const canvas = canvasRef.current;

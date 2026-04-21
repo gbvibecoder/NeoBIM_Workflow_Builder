@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useMemo, useState, useRef } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence, useScroll, useTransform, useInView } from "framer-motion";
 import {
@@ -911,11 +911,11 @@ export default function LandingPage() {
 
   // ─── Video Showcase state ───────────────────────────────────────────────────
   const SHOWCASE_R2 = "https://pub-27d9a7371b6d47ff94fee1a3228f1720.r2.dev/workflow-demos";
-  const DEMO_VIDEOS = [
+  const DEMO_VIDEOS = useMemo(() => [
     { id: "wv-01", title: t('landing.demoVideo1Title'), subtitle: t('landing.demoVideo1Subtitle'), category: t('landing.demoVideo1Category'), duration: "1:32", url: `${SHOWCASE_R2}/text-to-concept-building.mp4`, nodes: [t('landing.demoVideo1Node1'), t('landing.demoVideo1Node2'), t('landing.demoVideo1Node3')], spec: t('landing.demoVideo1Spec'), previewStart: 105 },
     { id: "wv-02", title: t('landing.demoVideo2Title'), subtitle: t('landing.demoVideo2Subtitle'), category: t('landing.demoVideo2Category'), duration: "2:45", url: `${SHOWCASE_R2}/floor-plan-demo.mp4`, nodes: [t('landing.demoVideo2Node1'), t('landing.demoVideo2Node2'), t('landing.demoVideo2Node3')], spec: t('landing.demoVideo2Spec'), previewStart: 0 },
     { id: "wv-03", title: t('landing.demoVideo3Title'), subtitle: t('landing.demoVideo3Subtitle'), category: t('landing.demoVideo3Category'), duration: "1:45", url: `${SHOWCASE_R2}/3d-model-preview.mp4`, nodes: [t('landing.demoVideo3Node1'), t('landing.demoVideo3Node2'), t('landing.demoVideo3Node3')], spec: t('landing.demoVideo3Spec'), previewStart: 0 },
-  ];
+  ], [t]);
   interface LandingVideo { id: string; title: string; category: string; videoUrl: string; duration: string | null; views: number; likes: number; author: { name: string | null; image: string | null } }
   const [communityVideos, setCommunityVideos] = useState<LandingVideo[]>([]);
   const videoRefs = useRef<Record<string, HTMLVideoElement | null>>({});
@@ -943,7 +943,7 @@ export default function LandingPage() {
     } else {
       Object.values(refs).forEach(v => { if (v) v.pause(); });
     }
-  }, [videoSectionInView]);
+  }, [videoSectionInView, DEMO_VIDEOS]);
 
   useEffect(() => {
     try {

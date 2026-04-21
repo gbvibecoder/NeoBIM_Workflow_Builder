@@ -206,7 +206,7 @@ export const FileUploadInput = memo(function FileUploadInput({ nodeId, data, acc
       // Set filename immediately (base64 follows async)
       updateNode(nodeId, { data: { ...currentNode.data, inputValue: file.name, fileSize: file.size } });
     }
-  }, [nodeId, updateNode, maxMB, t]);
+  }, [nodeId, updateNode, maxMB, t, accept]);
 
   /* Auto-attach the file the user is viewing in the IFC Viewer (bridged via
      the shared IndexedDB cache). This effect lives in the node itself so we

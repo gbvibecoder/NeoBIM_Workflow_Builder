@@ -3,12 +3,10 @@
  *
  * Claude Sonnet 4.6 interprets the user's prompt and produces:
  *   1. ArchitectBrief — structured architectural interpretation
- *   2. imagePrompts[] — 3 model-specific image generation prompts
+ *   2. imagePrompts[] — 1 prompt for GPT Image 1.5 (Imagen removed in Phase 2.0a)
  *
  * Uses Anthropic tool_use for guaranteed structured JSON output.
  * Reads ANTHROPIC_API_KEY from process.env (matches codebase pattern).
- *
- * Planned implementation: Phase 1.3
  */
 
 import type Anthropic from "@anthropic-ai/sdk";
@@ -38,8 +36,8 @@ export interface Stage1Metrics {
 const TOOL_SCHEMA: Anthropic.Tool = {
   name: "produce_architect_brief",
   description:
-    "Produce an architect brief and exactly 3 image generation prompts for a floor plan request. " +
-    "Call this tool with the complete brief and both image prompts.",
+    "Produce an architect brief and exactly 1 image generation prompt for a floor plan request. " +
+    "Call this tool with the complete brief and the image prompt for gpt-image-1.5.",
   input_schema: {
     type: "object" as const,
     required: ["brief", "imagePrompts"],
@@ -93,8 +91,8 @@ const TOOL_SCHEMA: Anthropic.Tool = {
       },
       imagePrompts: {
         type: "array" as const,
-        minItems: 2,
-        maxItems: 2,
+        minItems: 1,
+        maxItems: 1,
         items: {
           type: "object" as const,
           required: ["model", "prompt", "styleGuide"],
@@ -105,8 +103,7 @@ const TOOL_SCHEMA: Anthropic.Tool = {
             styleGuide: { type: "string" as const },
           },
         },
-        description:
-          "Exactly 2 prompts in order: [0] gpt-image-1.5, [1] imagen-4.0-generate-001.",
+        description: "Exactly 1 prompt for gpt-image-1.5.",
       },
     },
   },
@@ -179,8 +176,8 @@ function buildUserMessage(input: Stage1Input): string {
 
   lines.push("");
   lines.push(
-    "Produce the architect brief and exactly 3 image generation prompts " +
-      "(gpt-image-1.5 FIRST, imagen-4.0-generate-001 SECOND).",
+    "Produce the architect brief and exactly 1 image generation prompt " +
+      "for gpt-image-1.5.",
   );
 
   return lines.join("\n");
@@ -252,9 +249,9 @@ export async function runStage1PromptIntelligence(
     if (output.brief.roomList.length === 0) {
       throw new Error("Stage 1: Claude produced empty roomList");
     }
-    if (output.imagePrompts.length !== 2) {
+    if (output.imagePrompts.length !== 1) {
       throw new Error(
-        `Stage 1: expected exactly 2 image prompts, got ${output.imagePrompts.length}`,
+        `Stage 1: expected exactly 1 image prompt, got ${output.imagePrompts.length}`,
       );
     }
 

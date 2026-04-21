@@ -79,7 +79,7 @@ export default function BillingPage() {
       });
       window.history.replaceState({}, "", "/dashboard/billing");
     }
-  }, [searchParams, userRole]);
+  }, [searchParams, userRole, t]);
 
   useEffect(() => {
     api.executions.list({ limit: 1000 })

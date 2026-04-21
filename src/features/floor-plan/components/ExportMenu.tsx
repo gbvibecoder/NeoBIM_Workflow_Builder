@@ -282,7 +282,7 @@ function PdfSettings({
     } finally {
       setExporting(false);
     }
-  }, [project, floor, paperSize, scale, titleBlock, roomFills, dimensions, displayUnit, setExporting, onClose]);
+  }, [project, floor, paperSize, scale, titleBlock, roomFills, dimensions, displayUnit, setExporting, onClose, onExportError]);
 
   return (
     <SettingsShell title="PDF Settings" onBack={onBack} onClose={onClose} exporting={exporting} onExport={handleExport}>
@@ -355,7 +355,7 @@ function DxfSettings({
     } finally {
       setExporting(false);
     }
-  }, [floor, project, includeDimensions, includeRoomLabels, includeGrid, displayUnit, setExporting, onClose]);
+  }, [floor, project, includeDimensions, includeRoomLabels, includeGrid, displayUnit, setExporting, onClose, onExportError]);
 
   return (
     <SettingsShell title="DXF Settings" onBack={onBack} onClose={onClose} exporting={exporting} onExport={handleExport}>
@@ -416,7 +416,7 @@ function SvgSettings({
     } finally {
       setExporting(false);
     }
-  }, [floor, project, includeRoomFills, includeDimensions, includeGrid, displayUnit, setExporting, onClose]);
+  }, [floor, project, includeRoomFills, includeDimensions, includeGrid, displayUnit, setExporting, onClose, onExportError]);
 
   return (
     <SettingsShell title="SVG Settings" onBack={onBack} onClose={onClose} exporting={exporting} onExport={handleExport}>
@@ -468,7 +468,7 @@ function PngSettings({
     } finally {
       setExporting(false);
     }
-  }, [dpi, transparent, project, setExporting, onClose]);
+  }, [dpi, transparent, project, setExporting, onClose, onExportError]);
 
   return (
     <SettingsShell title="PNG Settings" onBack={onBack} onClose={onClose} exporting={exporting} onExport={handleExport}>
