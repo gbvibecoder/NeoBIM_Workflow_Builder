@@ -138,7 +138,7 @@ export function LightPricing() {
                   position: "relative",
                   background: "var(--light-surface)",
                   border: plan.highlighted
-                    ? "2px solid var(--light-ink)"
+                    ? "1.5px solid var(--light-accent)"
                     : "1px solid var(--light-border)",
                   borderRadius: 10,
                   padding: "32px 24px",
@@ -173,7 +173,7 @@ export function LightPricing() {
                       top: -12,
                       left: "50%",
                       transform: "translateX(-50%)",
-                      background: "var(--light-ink)",
+                      background: "var(--light-accent)",
                       color: "#fff",
                       fontSize: 10,
                       fontWeight: 600,
@@ -328,28 +328,28 @@ export function LightPricing() {
                     fontFamily: "var(--font-dm-sans), sans-serif",
                     ...(plan.highlighted
                       ? {
-                          background: "var(--light-ink)",
+                          background: "var(--light-accent)",
                           color: "#fff",
                           border: "none",
                         }
                       : {
                           background: "transparent",
-                          color: "var(--light-ink)",
-                          border: "1px solid var(--light-ink)",
+                          color: "var(--light-accent)",
+                          border: "1px solid var(--light-accent)",
                         }),
                   }}
                   onMouseEnter={(e) => {
                     const el = e.currentTarget as HTMLElement;
                     if (plan.highlighted) {
-                      el.style.background = "#0E1220";
+                      el.style.background = "#3A5640";
                     } else {
-                      el.style.background = "rgba(26, 31, 46, 0.05)";
+                      el.style.background = "rgba(74, 107, 77, 0.06)";
                     }
                   }}
                   onMouseLeave={(e) => {
                     const el = e.currentTarget as HTMLElement;
                     if (plan.highlighted) {
-                      el.style.background = "var(--light-ink)";
+                      el.style.background = "var(--light-accent)";
                     } else {
                       el.style.background = "transparent";
                     }

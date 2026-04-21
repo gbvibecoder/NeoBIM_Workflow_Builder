@@ -101,7 +101,7 @@ export function LightHero() {
               border: "none",
             }}
             onMouseEnter={(e) => {
-              (e.currentTarget as HTMLElement).style.background = "#0E1220";
+              (e.currentTarget as HTMLElement).style.background = "#3A5640";
             }}
             onMouseLeave={(e) => {
               (e.currentTarget as HTMLElement).style.background =
@@ -131,7 +131,7 @@ export function LightHero() {
             }}
             onMouseEnter={(e) => {
               (e.currentTarget as HTMLElement).style.background =
-                "rgba(26, 31, 46, 0.05)";
+                "rgba(74, 107, 77, 0.06)";
             }}
             onMouseLeave={(e) => {
               (e.currentTarget as HTMLElement).style.background = "transparent";
