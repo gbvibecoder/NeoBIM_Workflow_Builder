@@ -10,7 +10,7 @@
   --light-surface: #F3F4F0;
   --light-ink: #1A1F2E;
   --light-soft: #5A6478;
-  --light-accent: #4A6B4D;
+  --light-accent: #C85840;
   --light-border: rgba(26, 31, 46, 0.08);
   --light-border-strong: rgba(26, 31, 46, 0.14);
   --light-success: #2D7A4F;
@@ -35,7 +35,7 @@
 
 /* ── Selection ───────────────────────────────────────────── */
 .light-theme ::selection {
-  background: rgba(74, 107, 77, 0.15);
+  background: rgba(200, 88, 64, 0.15);
   color: var(--light-ink);
 }
 
