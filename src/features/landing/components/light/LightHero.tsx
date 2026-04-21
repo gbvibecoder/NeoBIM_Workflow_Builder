@@ -24,7 +24,7 @@ export function LightHero() {
         overflow: "hidden",
       }}
     >
-      {/* Subtle radial glow — warm cream, editorial depth */}
+      {/* Layer 1: warm radial glow */}
       <div
         aria-hidden="true"
         style={{
@@ -33,7 +33,25 @@ export function LightHero() {
           pointerEvents: "none",
           zIndex: 0,
           background:
-            "radial-gradient(ellipse 80% 60% at 50% 45%, rgba(255, 248, 235, 0.55) 0%, rgba(255, 248, 235, 0.25) 30%, rgba(250, 250, 247, 0) 70%)",
+            "radial-gradient(ellipse 80% 60% at 50% 45%, rgba(255, 245, 225, 0.85) 0%, rgba(255, 248, 235, 0.4) 35%, rgba(250, 250, 247, 0) 75%)",
+        }}
+      />
+      {/* Layer 2: dot grid with radial fade mask */}
+      <div
+        aria-hidden="true"
+        style={{
+          position: "absolute",
+          inset: 0,
+          pointerEvents: "none",
+          zIndex: 0,
+          backgroundImage:
+            "radial-gradient(circle, rgba(26, 31, 46, 0.18) 1px, transparent 1px)",
+          backgroundSize: "24px 24px",
+          backgroundPosition: "0 0",
+          WebkitMaskImage:
+            "radial-gradient(ellipse 70% 65% at 50% 50%, black 30%, transparent 80%)",
+          maskImage:
+            "radial-gradient(ellipse 70% 65% at 50% 50%, black 30%, transparent 80%)",
         }}
       />
       <div className="light-reveal" style={{ position: "relative", zIndex: 1 }}>
