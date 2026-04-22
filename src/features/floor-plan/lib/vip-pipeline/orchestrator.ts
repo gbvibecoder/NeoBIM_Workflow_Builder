@@ -92,6 +92,10 @@ async function runStage4And5Block(
           parsedConstraints,
           municipality: stage1Output.brief.municipality,
           adjacencies: stage1Output.brief.adjacencies,
+          // Phase 2.9: brief + userPrompt for the fidelity-mode
+          // scenario classifier and dimension enhancer.
+          brief: stage1Output.brief,
+          userPrompt: config.prompt,
         },
         log,
       );
@@ -102,6 +106,24 @@ async function runStage4And5Block(
       doors: s5Metrics.doorCount,
       windows: s5Metrics.windowCount,
       issues: s5Output.issues.length,
+      path: s5Metrics.path ?? "strip-pack",
+      // Phase 2.9: classifier + enhancement telemetry (mirrors
+      // orchestrator-gated). Undefined on strip-pack path.
+      enhancement: s5Metrics.enhancement
+        ? {
+            classified: s5Metrics.enhancement.classification.enhanceDimensions,
+            plotSize: s5Metrics.enhancement.classification.plotSizeCategory,
+            biasDetected: s5Metrics.enhancement.classification.hasGridSquareBias,
+            residential: s5Metrics.enhancement.classification.isResidential,
+            reasons: s5Metrics.enhancement.classification.reasonsForFallback,
+            dimCorrectionApplied: s5Metrics.enhancement.dimensionCorrection.applied,
+            dimCorrectionRollback:
+              s5Metrics.enhancement.dimensionCorrection.rollbackReason,
+            adjEnforcementApplied: s5Metrics.enhancement.adjacencyEnforcement.applied,
+            adjEnforcementRollback:
+              s5Metrics.enhancement.adjacencyEnforcement.rollbackReason,
+          }
+        : undefined,
     });
     await fireProgress(config, 75, "stage5");
 

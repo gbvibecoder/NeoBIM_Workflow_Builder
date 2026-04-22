@@ -213,6 +213,18 @@ export interface Stage5Input {
   municipality?: string;
   /** Phase 2.3: adjacencies passed from Stage 1 brief. */
   adjacencies?: AdjacencyDeclaration[];
+  /**
+   * Phase 2.9: Stage 1 brief — used by the scenario classifier (room-
+   * type lookup) and the dimension enhancer (target areas). When absent
+   * the fidelity runner skips the adaptive enhancement path.
+   */
+  brief?: ArchitectBrief;
+  /**
+   * Phase 2.9: original user prompt — used by the classifier to detect
+   * commercial vs. residential intent. Absent → treated as residential
+   * (conservative).
+   */
+  userPrompt?: string;
 }
 
 export interface Stage5Output {

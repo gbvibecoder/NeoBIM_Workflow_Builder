@@ -49,6 +49,56 @@ export interface Stage5Metrics {
   path?: "fidelity" | "strip-pack";
   /** Phase 2.7C — Stage 4 average confidence that drove the path choice. */
   avgConfidence?: number;
+  /**
+   * Phase 2.9 — fidelity-mode adaptive enhancement telemetry. Populated
+   * only when the fidelity runner evaluated the classifier / enhancer /
+   * adjacency passes. Undefined in strip-pack mode.
+   */
+  enhancement?: Phase29Telemetry;
+}
+
+/**
+ * Phase 2.9 telemetry: what the classifier decided, what the enhancer +
+ * adjacency passes produced, and whether their output was kept or
+ * rolled back because of overlaps. Consumed by the Pipeline Logs Panel.
+ */
+export interface Phase29Telemetry {
+  classification: {
+    enhanceDimensions: boolean;
+    isRectangular: boolean;
+    plotSqft: number;
+    plotSizeCategory: "tiny" | "small" | "standard" | "large" | "luxury";
+    isResidential: boolean;
+    hasGridSquareBias: boolean;
+    roomCount: number;
+    reasonsForFallback: string[];
+  };
+  dimensionCorrection: {
+    attempted: boolean;
+    applied: boolean;
+    rollbackReason?: string;
+    records: Array<{
+      room: string;
+      originalArea: number;
+      targetArea: number;
+      correctedArea: number;
+      action: string;
+      note?: string;
+    }>;
+  };
+  adjacencyEnforcement: {
+    attempted: boolean;
+    applied: boolean;
+    rollbackReason?: string;
+    records: Array<{
+      a: string;
+      b: string;
+      relationship: string;
+      action: string;
+      edge?: "left" | "right" | "top" | "bottom";
+      note?: string;
+    }>;
+  };
 }
 
 // ─── Zone / Wet / Sacred Inference ───────────────────────────────
