@@ -295,14 +295,28 @@ describe("placeFidelityWindows", () => {
     }
   });
 
-  it("skips windows for hallway/pooja/store rooms", () => {
+  it("skips windows for hallway / corridor / store / closet rooms (Phase 2.11.3: pooja now gets vent)", () => {
+    // Phase 2.11.3 updated the policy so pooja/prayer/mandir get a
+    // ventilation-grade window when they touch an exterior wall. Only
+    // true circulation/utility types remain null-policy.
     const rooms = buildFidelityRooms([
       { name: "Hallway", type: "hallway", placed: { x: 0, y: 0, width: 10, depth: 3 }, confidence: 0.9, labelAsShown: "H" },
-      { name: "Pooja", type: "pooja", placed: { x: 10, y: 0, width: 5, depth: 4 }, confidence: 0.9, labelAsShown: "P" },
+      { name: "Store", type: "store", placed: { x: 10, y: 0, width: 5, depth: 4 }, confidence: 0.9, labelAsShown: "S" },
     ]);
     const walls = deriveWalls(rooms);
     const windows = placeFidelityWindows(rooms, walls, [], "north", 15, 10);
     expect(windows.length).toBe(0);
+  });
+
+  it("places a ventilation window on a pooja room with an exterior wall (Phase 2.11.3)", () => {
+    const rooms = buildFidelityRooms([
+      { name: "Pooja", type: "pooja", placed: { x: 0, y: 0, width: 6, depth: 5 }, confidence: 0.9, labelAsShown: "P" },
+    ]);
+    const walls = deriveWalls(rooms);
+    const windows = placeFidelityWindows(rooms, walls, [], "north", 6, 5);
+    expect(windows.length).toBeGreaterThanOrEqual(1);
+    expect(windows[0].kind).toBe("ventilation");
+    expect(windows[0].width_ft).toBeCloseTo(1.5);
   });
 });
 
@@ -315,7 +329,7 @@ describe("validateFidelity — flag but don't mutate", () => {
       { name: "B", type: "bedroom", placed: { x: 8, y: 0, width: 10, depth: 10 }, confidence: 0.9, labelAsShown: "B" },
     ]);
     // Overlap area = 2 × 10 = 20 sqft — well above the 0.5 sqft threshold.
-    const issues = validateFidelity(rooms, 20, 10, []);
+    const issues = validateFidelity(rooms, [], 20, 10, []);
     expect(issues.some((i) => /overlap/i.test(i))).toBe(true);
     // Rooms positions untouched.
     expect(rooms[0].placed).toEqual({ x: 0, y: 0, width: 10, depth: 10 });
@@ -327,20 +341,20 @@ describe("validateFidelity — flag but don't mutate", () => {
       { name: "A", type: "bedroom", placed: { x: 0, y: 0, width: 50, depth: 10 }, confidence: 0.9, labelAsShown: "A" },
     ]);
     // Plot is 20×10. Room width 50 blows past.
-    const issues = validateFidelity(rooms, 20, 10, []);
+    const issues = validateFidelity(rooms, [], 20, 10, []);
     expect(issues.some((i) => /beyond plot/i.test(i))).toBe(true);
     expect(rooms[0].placed).toEqual({ x: 0, y: 0, width: 50, depth: 10 });
   });
 
-  it("flags when door count is insufficient for roomCount - 1 connectivity", () => {
+  it("flags habitable rooms with no door (Phase 2.11.2 per-room coverage)", () => {
     const rooms = buildFidelityRooms([
       { name: "A", type: "bedroom", placed: { x: 0, y: 0, width: 10, depth: 10 }, confidence: 0.9, labelAsShown: "A" },
       { name: "B", type: "bedroom", placed: { x: 11, y: 0, width: 10, depth: 10 }, confidence: 0.9, labelAsShown: "B" },
       { name: "C", type: "bedroom", placed: { x: 22, y: 0, width: 10, depth: 10 }, confidence: 0.9, labelAsShown: "C" },
     ]);
-    // Three rooms, zero doors → insufficient connectivity.
-    const issues = validateFidelity(rooms, 40, 10, []);
-    expect(issues.some((i) => /disconnected|doors for/.test(i))).toBe(true);
+    // Three rooms, zero doors, zero walls → every habitable room flagged.
+    const issues = validateFidelity(rooms, [], 40, 10, []);
+    expect(issues.filter((i) => /has no door/.test(i)).length).toBe(3);
   });
 });
 
@@ -369,9 +383,10 @@ describe("runStage5FidelityMode — ensuite stays attached (no Option X, no move
 
     const result = await runStage5FidelityMode(stage5Input(ex), undefined);
     const roomsOut = result.output.project.floors[0].rooms;
-    // Our 3 input rooms must all appear; toFloorPlanProject may add a
-    // synthetic hallway room for the spine — that's fine.
-    expect(roomsOut.length).toBeGreaterThanOrEqual(3);
+    // Phase 2.11.1: fidelity mode must NOT inject a synthetic Hallway room
+    // from the stub spine — exactly the 3 input rooms should appear.
+    expect(roomsOut.length).toBe(3);
+    expect(roomsOut.every((r) => r.type !== "corridor")).toBe(true);
 
     // Metadata should reflect fidelity path + confidence.
     const meta = result.output.project.metadata as unknown as Record<string, unknown>;
