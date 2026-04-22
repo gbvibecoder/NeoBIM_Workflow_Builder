@@ -15,6 +15,11 @@
  * monolithic runVIPPipeline: the user just picked this image, so
  * regenerating it silently would defeat the purpose of the gate.
  *
+ * Phase 2.12 — same reasoning applies to the Stage 3 vision-jury
+ * retry. In gated mode the user has already seen and approved the
+ * Stage 2 image, so we never regenerate it based on the jury verdict.
+ * `visionJuryRetries` is always stamped as 0 in gated deliveries.
+ *
  * Backward compat: the existing runVIPPipeline is unchanged and still
  * drives the legacy (no-gate) code path.
  */
@@ -343,6 +348,9 @@ export async function runVIPPipelinePhaseB(
       totalMs: Date.now() - startMs,
       retried: false,
       weakAreas: finalWeakAreas,
+      // Phase 2.12 — gated mode never auto-retries Stage 2 (the user
+      // already approved this image), so the retry count is 0.
+      visionJuryRetries: 0,
     },
     log,
   );
@@ -356,6 +364,7 @@ export async function runVIPPipelinePhaseB(
     project: s7Output.project,
     qualityScore,
     retried: false,
+    visionJuryRetries: 0,
     timing: {
       stage1Ms: intermediate.stage1Ms,
       stage2Ms: intermediate.stage2Ms,

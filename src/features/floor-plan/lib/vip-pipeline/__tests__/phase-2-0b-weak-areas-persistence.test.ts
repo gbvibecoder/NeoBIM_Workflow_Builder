@@ -32,6 +32,14 @@ vi.mock("@/features/floor-plan/lib/vip-pipeline/stage-2-images", () => ({
 }));
 vi.mock("@/features/floor-plan/lib/vip-pipeline/stage-3-jury", () => ({
   runStage3ExtractionJury: vi.fn(),
+  // Phase 2.12 — constants/helpers imported by orchestrator.ts. Default
+  // `shouldRetryAtStage3` returns false so pre-2.12 tests keep asserting
+  // the single-shot Stage 2+3 flow with no regeneration.
+  STAGE_2_MAX_RETRIES: 1,
+  STAGE_3_RETRY_SCORE_THRESHOLD: 70,
+  shouldRetryAtStage3: () => false,
+  appendRetryHintToPrompts: (p: unknown) => p,
+  buildStage3RetryHint: () => "",
 }));
 vi.mock("@/features/floor-plan/lib/vip-pipeline/stage-4-extract", () => ({
   runStage4RoomExtraction: vi.fn(),
