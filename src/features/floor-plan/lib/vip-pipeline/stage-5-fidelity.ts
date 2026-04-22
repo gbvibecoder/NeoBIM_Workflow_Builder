@@ -600,8 +600,69 @@ function shouldHaveWindow(type: string): { width: number; kind: "standard" | "la
   if (["utility", "laundry"].includes(type)) {
     return { width: VENT_WINDOW_FT, kind: "ventilation", sill: 6 };
   }
-  // Hallway, corridor, pooja, store, closet → no window by default.
+  // Phase 2.11.3 — Pooja / prayer / mandir get a small ventilation
+  // opening when they touch an exterior wall. Vastu orthodoxy doesn't
+  // forbid pooja-room windows; a ventilation slit is conventional for
+  // incense airflow and lifts exteriorWindows scoring without
+  // violating the type's sacred character.
+  if (["pooja", "prayer", "mandir"].includes(type)) {
+    return { width: VENT_WINDOW_FT, kind: "ventilation", sill: 5 };
+  }
+  // Hallway, corridor, store, closet → no window by default.
   return null;
+}
+
+/**
+ * Phase 2.11.3 — build a WindowPlacement at the midpoint of `wall`. Factored
+ * out so the wall-centric primary pass AND the room-centric coverage pass
+ * share one implementation of the midpoint/orientation/wallSide math.
+ */
+function makeWindowAtMidpoint(
+  wall: WallSegment,
+  room: StripPackRoom,
+  widthFt: number,
+  kind: "standard" | "large" | "ventilation",
+  sillFt: number,
+  plotW: number,
+  plotD: number,
+): WindowPlacement {
+  const wallSide: Facing =
+    wall.orientation === "horizontal"
+      ? feq(wall.start.y, plotD, EDGE_EPS)
+        ? "north"
+        : feq(wall.start.y, 0, EDGE_EPS)
+          ? "south"
+          : "north"
+      : feq(wall.start.x, plotW, EDGE_EPS)
+        ? "east"
+        : feq(wall.start.x, 0, EDGE_EPS)
+          ? "west"
+          : "north";
+
+  if (wall.orientation === "horizontal") {
+    const midX = (wall.start.x + wall.end.x) / 2;
+    return {
+      on_room: room.name,
+      start: { x: midX - widthFt / 2, y: wall.start.y },
+      end: { x: midX + widthFt / 2, y: wall.start.y },
+      wall_side: wallSide,
+      width_ft: widthFt,
+      kind,
+      wall_id: wall.id,
+      sill_height_ft: sillFt,
+    };
+  }
+  const midY = (wall.start.y + wall.end.y) / 2;
+  return {
+    on_room: room.name,
+    start: { x: wall.start.x, y: midY - widthFt / 2 },
+    end: { x: wall.start.x, y: midY + widthFt / 2 },
+    wall_side: wallSide,
+    width_ft: widthFt,
+    kind,
+    wall_id: wall.id,
+    sill_height_ft: sillFt,
+  };
 }
 
 function placeFidelityWindows(
@@ -614,8 +675,12 @@ function placeFidelityWindows(
 ): WindowPlacement[] {
   const windows: WindowPlacement[] = [];
   const roomsById = new Map(rooms.map((r) => [r.id, r]));
-  const doorWallIds = new Set(doors.map((d) => d.wall_id).filter(Boolean));
+  const doorWallIds = new Set(doors.map((d) => d.wall_id).filter((x): x is string => !!x));
+  /** Walls already taken by a placed window (so the coverage pass below can't double-dip). */
+  const windowWallIds = new Set<string>();
 
+  // 1. Wall-centric primary pass — one window per exterior wall long
+  //    enough to host a policy-grade opening.
   for (const w of walls) {
     if (w.type !== "external") continue;
     if (w.room_ids.length !== 1) continue;
@@ -631,38 +696,46 @@ function placeFidelityWindows(
     // entrance is the only exterior door; still defensive).
     if (doorWallIds.has(w.id)) continue;
 
-    const wallSide: Facing = ((): Facing => {
-      if (w.orientation === "horizontal") {
-        return feq(w.start.y, plotD, EDGE_EPS) ? "north" : feq(w.start.y, 0, EDGE_EPS) ? "south" : "north";
-      }
-      return feq(w.start.x, plotW, EDGE_EPS) ? "east" : feq(w.start.x, 0, EDGE_EPS) ? "west" : "north";
-    })();
+    windows.push(
+      makeWindowAtMidpoint(w, room, policy.width, policy.kind, policy.sill, plotW, plotD),
+    );
+    windowWallIds.add(w.id);
+  }
 
-    if (w.orientation === "horizontal") {
-      const midX = (w.start.x + w.end.x) / 2;
-      windows.push({
-        on_room: room.name,
-        start: { x: midX - policy.width / 2, y: w.start.y },
-        end: { x: midX + policy.width / 2, y: w.start.y },
-        wall_side: wallSide,
-        width_ft: policy.width,
-        kind: policy.kind,
-        wall_id: w.id,
-        sill_height_ft: policy.sill,
-      });
-    } else {
-      const midY = (w.start.y + w.end.y) / 2;
-      windows.push({
-        on_room: room.name,
-        start: { x: w.start.x, y: midY - policy.width / 2 },
-        end: { x: w.start.x, y: midY + policy.width / 2 },
-        wall_side: wallSide,
-        width_ft: policy.width,
-        kind: policy.kind,
-        wall_id: w.id,
-        sill_height_ft: policy.sill,
-      });
-    }
+  // 2. Phase 2.11.3 — coverage pass: every habitable room that touches
+  //    an exterior wall should end up with ≥ 1 window. The wall-centric
+  //    pass above skips exterior walls that are too short for the
+  //    policy's preferred width; here we degrade to VENT_WINDOW_FT
+  //    (1.5 ft) as long as the wall can still hold it with a 0.5 ft
+  //    frame margin. Rooms whose policy is null (corridor / closet) are
+  //    intentionally left alone.
+  const roomsWithWindows = new Set(windows.map((w) => w.on_room));
+  for (const room of rooms) {
+    if (roomsWithWindows.has(room.name)) continue;
+    const policy = shouldHaveWindow(room.type);
+    if (!policy) continue;
+
+    const candidates = walls
+      .filter((w) => w.type === "external")
+      .filter((w) => w.room_ids.length === 1 && w.room_ids[0] === room.id)
+      .filter((w) => !doorWallIds.has(w.id))
+      .filter((w) => !windowWallIds.has(w.id))
+      .filter((w) => segmentLength(w) >= VENT_WINDOW_FT + 0.5);
+    if (candidates.length === 0) continue;
+    candidates.sort((a, b) => segmentLength(b) - segmentLength(a));
+    const w = candidates[0];
+
+    // Prefer the policy's declared width if it still fits; otherwise
+    // degrade to the ventilation floor.
+    const len = segmentLength(w);
+    const fits = len >= policy.width + 0.5;
+    const width = fits ? policy.width : VENT_WINDOW_FT;
+    const kind = fits ? policy.kind : ("ventilation" as const);
+    const sill = fits ? policy.sill : 6;
+
+    windows.push(makeWindowAtMidpoint(w, room, width, kind, sill, plotW, plotD));
+    windowWallIds.add(w.id);
+    roomsWithWindows.add(room.name);
   }
 
   return windows;

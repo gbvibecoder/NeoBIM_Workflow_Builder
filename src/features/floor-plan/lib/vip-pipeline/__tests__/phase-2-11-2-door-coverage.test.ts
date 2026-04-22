@@ -66,6 +66,22 @@ function mkExtraction(rooms: ExtractedRoom[]): ExtractedRooms {
   };
 }
 
+/** Infer a rough Stage 5 room type from the extraction room name so the
+ *  door-coverage tests see the real habitable-vs-circulation split. */
+function inferType(name: string): string {
+  const n = name.toLowerCase();
+  if (n.includes("master bedroom")) return "master_bedroom";
+  if (n.includes("master bathroom") || n.includes("master bath")) return "master_bathroom";
+  if (n.includes("bedroom")) return "bedroom";
+  if (n.includes("bathroom") || n.includes("bath")) return "bathroom";
+  if (n.includes("living")) return "living";
+  if (n.includes("kitchen")) return "kitchen";
+  if (n.includes("dining")) return "dining";
+  if (n.includes("pooja")) return "pooja";
+  if (n.includes("hallway") || n.includes("corridor")) return "corridor";
+  return "bedroom"; // test default: habitable
+}
+
 function mkInput(ex: ExtractedRooms, plotWidthFt = 40, plotDepthFt = 40): Stage5Input {
   return {
     extraction: ex,
@@ -74,7 +90,15 @@ function mkInput(ex: ExtractedRooms, plotWidthFt = 40, plotDepthFt = 40): Stage5
     facing: "north",
     parsedConstraints: {
       plot: { width_ft: plotWidthFt, depth_ft: plotDepthFt, facing: "north" },
-      rooms: [],
+      rooms: ex.rooms.map((r) => ({
+        id: r.name,
+        name: r.name,
+        function: inferType(r.name),
+        dim_width_ft: 10,
+        dim_depth_ft: 10,
+        is_wet: false,
+        is_sacred: false,
+      })),
       adjacency_pairs: [],
       connects_all_groups: [],
       vastu_required: false,

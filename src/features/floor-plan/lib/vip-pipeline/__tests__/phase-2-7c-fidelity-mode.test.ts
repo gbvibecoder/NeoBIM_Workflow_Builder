@@ -295,14 +295,28 @@ describe("placeFidelityWindows", () => {
     }
   });
 
-  it("skips windows for hallway/pooja/store rooms", () => {
+  it("skips windows for hallway / corridor / store / closet rooms (Phase 2.11.3: pooja now gets vent)", () => {
+    // Phase 2.11.3 updated the policy so pooja/prayer/mandir get a
+    // ventilation-grade window when they touch an exterior wall. Only
+    // true circulation/utility types remain null-policy.
     const rooms = buildFidelityRooms([
       { name: "Hallway", type: "hallway", placed: { x: 0, y: 0, width: 10, depth: 3 }, confidence: 0.9, labelAsShown: "H" },
-      { name: "Pooja", type: "pooja", placed: { x: 10, y: 0, width: 5, depth: 4 }, confidence: 0.9, labelAsShown: "P" },
+      { name: "Store", type: "store", placed: { x: 10, y: 0, width: 5, depth: 4 }, confidence: 0.9, labelAsShown: "S" },
     ]);
     const walls = deriveWalls(rooms);
     const windows = placeFidelityWindows(rooms, walls, [], "north", 15, 10);
     expect(windows.length).toBe(0);
+  });
+
+  it("places a ventilation window on a pooja room with an exterior wall (Phase 2.11.3)", () => {
+    const rooms = buildFidelityRooms([
+      { name: "Pooja", type: "pooja", placed: { x: 0, y: 0, width: 6, depth: 5 }, confidence: 0.9, labelAsShown: "P" },
+    ]);
+    const walls = deriveWalls(rooms);
+    const windows = placeFidelityWindows(rooms, walls, [], "north", 6, 5);
+    expect(windows.length).toBeGreaterThanOrEqual(1);
+    expect(windows[0].kind).toBe("ventilation");
+    expect(windows[0].width_ft).toBeCloseTo(1.5);
   });
 });
 
