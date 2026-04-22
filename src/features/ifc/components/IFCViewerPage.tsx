@@ -12,6 +12,17 @@ import { ViewCube } from "@/features/ifc/components/ViewCube";
 import { UI, SHORTCUTS } from "@/features/ifc/components/constants";
 import { Sparkles, PanelRightClose, PanelRightOpen } from "lucide-react";
 import { IFCEnhancerPanel, type EnhanceSuccess } from "@/features/ifc/components/IFCEnhancerPanel";
+import { IFCEnhancePanel, type IFCEnhancePanelHandle } from "@/features/ifc/components/IFCEnhancePanel";
+
+/**
+ * Sidebar tab identifiers.
+ *
+ * Historically `"enhance"` referenced the IFC-text mutator panel (add floor,
+ * remove floor, add room). As of Phase 1 of the new Enhance-with-AI feature
+ * that panel is renamed "Editor" (`"editor"`), and `"enhance-ai"` is the new
+ * 4th tab that (in later phases) applies visual-only enhancements.
+ */
+type SidebarTab = "tree" | "properties" | "editor" | "enhance-ai";
 import {
   saveLastIFCFile,
   loadLastIFCFile,
@@ -52,7 +63,7 @@ export default function IFCViewerPage() {
   const [selectedElement, setSelectedElement] = useState<IFCElementData | null>(null);
   const [spatialTree, setSpatialTree] = useState<SpatialNode[]>([]);
   const [bottomPanelOpen, setBottomPanelOpen] = useState(true);
-  const [bottomTab, setBottomTab] = useState<"tree" | "properties" | "enhance">("enhance");
+  const [bottomTab, setBottomTab] = useState<SidebarTab>("editor");
   const [error, setError] = useState<string | null>(null);
   const [contextMenu, setContextMenu] = useState<ContextMenuData | null>(null);
   const [showShortcuts, setShowShortcuts] = useState(false);
@@ -62,6 +73,7 @@ export default function IFCViewerPage() {
   const [currentFile, setCurrentFile] = useState<{ name: string; buffer: ArrayBuffer } | null>(null);
 
   const viewportRef = useRef<ViewportHandle | null>(null);
+  const enhancePanelRef = useRef<IFCEnhancePanelHandle | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const resizingRef = useRef(false);
   const bp = useBreakpoint();
@@ -97,6 +109,11 @@ export default function IFCViewerPage() {
      cache restore (no FileReader needed — we persisted the bytes). */
   const loadBufferIntoViewer = useCallback(
     async (buffer: ArrayBuffer, filename: string, opts?: { cache?: boolean }) => {
+      /* Reset any active Tier 1 enhancement BEFORE the worker re-parses. Once
+         the new parse swaps meshMap, the engine's stored originalMaterials
+         would point to garbage meshes (memory leak + silent Reset failure). */
+      await enhancePanelRef.current?.resetIfApplied();
+
       /* Persist BEFORE the transfer. saveLastIFCFile copies the bytes
          into a Blob synchronously (before any await), so the snapshot is
          captured in-microtask — before loadFile's postMessage detaches
@@ -230,10 +247,10 @@ export default function IFCViewerPage() {
   const handleLoadComplete = useCallback(() => {
     setLoading(false);
     setBottomPanelOpen(true);
-    /* Snap to Enhance tab after a fresh load so the feature surface is the
+    /* Snap to Editor tab after a fresh load so the feature surface is the
        first thing the user sees — they just dropped a file in, now they can
-       modify it. Users can manually switch to Tree/Properties any time. */
-    setBottomTab("enhance");
+       modify it. Users can manually switch to Tree/Properties/Enhance any time. */
+    setBottomTab("editor");
   }, []);
 
   const handleError = useCallback((message: string) => {
@@ -244,8 +261,14 @@ export default function IFCViewerPage() {
   const handleSelect = useCallback((element: IFCElementData | null) => {
     setSelectedElement(element);
     if (element) {
-      setBottomTab("properties");
       setBottomPanelOpen(true);
+      /* Auto-switch to Properties ONLY from Tree — the "pick in tree, see
+         properties" flow. On Editor / Enhance, the user is actively working;
+         yanking them to Properties on a stray canvas click is the Phase-2
+         regression. setSelectedElement still updates Properties data in the
+         background, so manually switching to Properties later shows fresh
+         data. Staying on Properties = stay; Tree → Properties; else stay. */
+      setBottomTab((prev) => (prev === "tree" ? "properties" : prev));
     }
   }, []);
 
@@ -294,6 +317,10 @@ export default function IFCViewerPage() {
 
   const handleApplyEnhancement = useCallback(
     async (res: EnhanceSuccess) => {
+      /* Reset Tier 1 enhancement before the Editor-driven reload — same
+         contract as loadBufferIntoViewer. */
+      await enhancePanelRef.current?.resetIfApplied();
+
       /* Snapshot the current working buffer BEFORE loading the enhanced
          file. If the enhanced IFC crashes the web-ifc parser (schema edge
          cases), we restore the previous file so the user isn't stranded
@@ -602,11 +629,17 @@ export default function IFCViewerPage() {
                     flexShrink: 0,
                   }}
                 >
-                  {(["tree", "properties", "enhance"] as const).map((tab) => {
+                  {(["tree", "properties", "editor", "enhance-ai"] as const).map((tab) => {
                     const active = bottomTab === tab;
-                    const label = tab === "tree" ? "Tree" : tab === "properties" ? "Properties" : "Enhance";
-                    const isEnhance = tab === "enhance";
-                    const activeColor = isEnhance ? UI.accent.cyan : UI.accent.blue;
+                    const label =
+                      tab === "tree" ? "Tree"
+                      : tab === "properties" ? "Properties"
+                      : tab === "editor" ? "Editor"
+                      : "Enhance";
+                    /* Cyan accent is reserved for the new AI Enhance tab — signals
+                       it's the flagship feature. Editor uses the standard blue. */
+                    const isEnhanceAI = tab === "enhance-ai";
+                    const activeColor = isEnhanceAI ? UI.accent.cyan : UI.accent.blue;
                     return (
                       <button
                         key={tab}
@@ -632,7 +665,7 @@ export default function IFCViewerPage() {
                           gap: 5,
                         }}
                       >
-                        {isEnhance && <Sparkles size={11} strokeWidth={2.2} />}
+                        {isEnhanceAI && <Sparkles size={11} strokeWidth={2.2} />}
                         {label}
                       </button>
                     );
@@ -679,11 +712,31 @@ export default function IFCViewerPage() {
                     />
                   )}
                   {bottomTab === "properties" && <PropertiesPanel element={selectedElement} />}
-                  {bottomTab === "enhance" && (
+                  {bottomTab === "editor" && (
                     <IFCEnhancerPanel
                       sourceFile={currentFile}
                       onApplyToViewer={handleApplyEnhancement}
                     />
+                  )}
+                  {/* IFCEnhancePanel stays mounted (just hidden) while a
+                      model is loaded so its engine ref — which holds the
+                      pre-apply material snapshots — survives tab switches.
+                      Unmounting would drop the snapshots and strand the
+                      scene in "enhanced but un-resettable" state. */}
+                  {hasModel && (
+                    <div
+                      style={{
+                        display: bottomTab === "enhance-ai" ? "flex" : "none",
+                        flexDirection: "column",
+                        height: "100%",
+                      }}
+                    >
+                      <IFCEnhancePanel
+                        ref={enhancePanelRef}
+                        viewportRef={viewportRef}
+                        hasModel={hasModel}
+                      />
+                    </div>
                   )}
                 </div>
               </>
@@ -710,18 +763,19 @@ export default function IFCViewerPage() {
 /* ─── Collapsed-rail sidebar (shown when panel is minimized on desktop/tablet) ─── */
 
 interface CollapsedRailProps {
-  activeTab: "tree" | "properties" | "enhance";
-  onPickTab: (tab: "tree" | "properties" | "enhance") => void;
+  activeTab: SidebarTab;
+  onPickTab: (tab: SidebarTab) => void;
   onExpand: () => void;
 }
 
 function CollapsedRail({ activeTab, onPickTab, onExpand }: CollapsedRailProps) {
   const items: {
-    id: "tree" | "properties" | "enhance";
+    id: SidebarTab;
     label: string;
     char: string;
   }[] = [
-    { id: "enhance", label: "Enhance", char: "✨" },
+    { id: "enhance-ai", label: "Enhance", char: "✨" },
+    { id: "editor", label: "Editor", char: "✎" },
     { id: "tree", label: "Tree", char: "🗂" },
     { id: "properties", label: "Properties", char: "ⓘ" },
   ];
@@ -804,7 +858,7 @@ function CollapsedRail({ activeTab, onPickTab, onExpand }: CollapsedRailProps) {
               e.currentTarget.style.color = UI.text.secondary;
             }}
           >
-            {item.id === "enhance" ? (
+            {item.id === "enhance-ai" ? (
               <Sparkles size={16} strokeWidth={2} />
             ) : (
               <span aria-hidden>{item.char}</span>
