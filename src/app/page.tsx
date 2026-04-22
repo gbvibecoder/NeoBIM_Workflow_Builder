@@ -8,7 +8,7 @@ import {
   Box, Play, Image as ImageIcon, FileCode,
   MousePointerClick, Workflow, Layers, Settings, Target, Calendar,
   ChevronUp, ChevronDown, ClipboardList, Send, Copy, Building2, Star,
-  Film, Eye, Heart, Upload, Menu, X,
+  Film, Eye, Heart, Upload, Menu, X, Sun, Moon,
 } from "lucide-react";
 import { MiniWorkflowDiagram } from "@/features/workflows/components/MiniWorkflowDiagram";
 import { PREBUILT_WORKFLOWS } from "@/features/workflows/constants/prebuilt-workflows";
@@ -1056,6 +1056,29 @@ export default function LandingPage() {
 
           <div className="landing-nav-cta" style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0, marginLeft: "auto" }}>
             <LanguageSwitcher />
+            {/* Theme toggle pill — dark active, light links to /light */}
+            <div className="landing-theme-toggle" style={{
+              display: "flex", borderRadius: 20, overflow: "hidden", height: 34,
+              border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.03)",
+            }}>
+              <Link href="/light" style={{
+                display: "flex", alignItems: "center", padding: "0 10px",
+                color: "#5C5C78", textDecoration: "none", fontSize: 0,
+                transition: "color 0.2s, background 0.2s",
+              }}
+                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = "#9898B0"; (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.04)"; }}
+                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = "#5C5C78"; (e.currentTarget as HTMLElement).style.background = "transparent"; }}
+                aria-label="Switch to light mode"
+              >
+                <Sun size={14} />
+              </Link>
+              <span style={{
+                display: "flex", alignItems: "center", padding: "0 10px",
+                background: "rgba(79,138,255,0.15)", color: "#4F8AFF", fontSize: 0,
+              }} aria-label="Dark mode active">
+                <Moon size={14} />
+              </span>
+            </div>
             <Link href="/login" className="landing-login-link" style={{
               padding: "9px 18px", borderRadius: 10, fontSize: 13, fontWeight: 600,
               color: "#9898B0", background: "transparent",
