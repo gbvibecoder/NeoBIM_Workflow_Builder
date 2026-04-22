@@ -1748,6 +1748,17 @@ const Viewport = forwardRef<ViewportHandle, ViewportProps>(function Viewport(
           worker.postMessage({ type: "getProperties", expressID, requestId: reqId });
         });
       },
+
+      getWallPsets: (): ReadonlyMap<number, { isExternal: boolean | null; fireRating: string | null }> => wallPsetsRef.current,
+
+      syncMeshBaseline: (mesh: Mesh, material: Material | Material[]) => {
+        /* Baseline = the material hover/select systems will restore to after
+           their transient overlays. Enhance (and future tier renderers) call
+           this whenever they persist a material swap outside the transient
+           flow. Without it, hover-out and select-release snap back to the
+           pre-Enhance gray captured at mesh creation. */
+        originalMaterialsRef.current.set(mesh.uuid, material);
+      },
     }),
     [loadFile, applyViewMode, applyColorBy, toggleSectionPlane, selectElement, clearSelection, clearModel, onSelect]
   );

@@ -12,7 +12,7 @@ import { ViewCube } from "@/features/ifc/components/ViewCube";
 import { UI, SHORTCUTS } from "@/features/ifc/components/constants";
 import { Sparkles, PanelRightClose, PanelRightOpen } from "lucide-react";
 import { IFCEnhancerPanel, type EnhanceSuccess } from "@/features/ifc/components/IFCEnhancerPanel";
-import { IFCEnhancePanel } from "@/features/ifc/components/IFCEnhancePanel";
+import { IFCEnhancePanel, type IFCEnhancePanelHandle } from "@/features/ifc/components/IFCEnhancePanel";
 
 /**
  * Sidebar tab identifiers.
@@ -73,6 +73,7 @@ export default function IFCViewerPage() {
   const [currentFile, setCurrentFile] = useState<{ name: string; buffer: ArrayBuffer } | null>(null);
 
   const viewportRef = useRef<ViewportHandle | null>(null);
+  const enhancePanelRef = useRef<IFCEnhancePanelHandle | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const resizingRef = useRef(false);
   const bp = useBreakpoint();
@@ -108,6 +109,11 @@ export default function IFCViewerPage() {
      cache restore (no FileReader needed — we persisted the bytes). */
   const loadBufferIntoViewer = useCallback(
     async (buffer: ArrayBuffer, filename: string, opts?: { cache?: boolean }) => {
+      /* Reset any active Tier 1 enhancement BEFORE the worker re-parses. Once
+         the new parse swaps meshMap, the engine's stored originalMaterials
+         would point to garbage meshes (memory leak + silent Reset failure). */
+      await enhancePanelRef.current?.resetIfApplied();
+
       /* Persist BEFORE the transfer. saveLastIFCFile copies the bytes
          into a Blob synchronously (before any await), so the snapshot is
          captured in-microtask — before loadFile's postMessage detaches
@@ -255,8 +261,14 @@ export default function IFCViewerPage() {
   const handleSelect = useCallback((element: IFCElementData | null) => {
     setSelectedElement(element);
     if (element) {
-      setBottomTab("properties");
       setBottomPanelOpen(true);
+      /* Auto-switch to Properties ONLY from Tree — the "pick in tree, see
+         properties" flow. On Editor / Enhance, the user is actively working;
+         yanking them to Properties on a stray canvas click is the Phase-2
+         regression. setSelectedElement still updates Properties data in the
+         background, so manually switching to Properties later shows fresh
+         data. Staying on Properties = stay; Tree → Properties; else stay. */
+      setBottomTab((prev) => (prev === "tree" ? "properties" : prev));
     }
   }, []);
 
@@ -305,6 +317,10 @@ export default function IFCViewerPage() {
 
   const handleApplyEnhancement = useCallback(
     async (res: EnhanceSuccess) => {
+      /* Reset Tier 1 enhancement before the Editor-driven reload — same
+         contract as loadBufferIntoViewer. */
+      await enhancePanelRef.current?.resetIfApplied();
+
       /* Snapshot the current working buffer BEFORE loading the enhanced
          file. If the enhanced IFC crashes the web-ifc parser (schema edge
          cases), we restore the previous file so the user isn't stranded
@@ -702,11 +718,25 @@ export default function IFCViewerPage() {
                       onApplyToViewer={handleApplyEnhancement}
                     />
                   )}
-                  {bottomTab === "enhance-ai" && (
-                    <IFCEnhancePanel
-                      viewportRef={viewportRef}
-                      hasModel={hasModel}
-                    />
+                  {/* IFCEnhancePanel stays mounted (just hidden) while a
+                      model is loaded so its engine ref — which holds the
+                      pre-apply material snapshots — survives tab switches.
+                      Unmounting would drop the snapshots and strand the
+                      scene in "enhanced but un-resettable" state. */}
+                  {hasModel && (
+                    <div
+                      style={{
+                        display: bottomTab === "enhance-ai" ? "flex" : "none",
+                        flexDirection: "column",
+                        height: "100%",
+                      }}
+                    >
+                      <IFCEnhancePanel
+                        ref={enhancePanelRef}
+                        viewportRef={viewportRef}
+                        hasModel={hasModel}
+                      />
+                    </div>
                   )}
                 </div>
               </>

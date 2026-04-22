@@ -8,6 +8,7 @@ import type {
   Mesh,
   Box3,
   Object3D,
+  Material,
 } from "three";
 
 export interface IFCModelInfo {
@@ -178,6 +179,24 @@ export interface ViewportHandle {
    * empty array if not found or no model loaded.
    */
   getPropertySets: (expressID: number) => Promise<PropertySet[]>;
+
+  /**
+   * Snapshot of Pset_WallCommon values pushed by the worker at parse time
+   * (Phase 1 added the map and the message plumbing; this accessor is the
+   * Phase-2 read surface for the Tier 1 classifier). Empty until the
+   * `metadata` worker message lands. Keys are wall expressIDs.
+   */
+  getWallPsets: () => ReadonlyMap<number, { isExternal: boolean | null; fireRating: string | null }>;
+
+  /**
+   * Update Viewport's internal "baseline material" cache for a mesh. Hover
+   * and selection systems restore to this baseline after transient overlays;
+   * any caller that changes `mesh.material` outside the normal hover/select
+   * transient flow (Tier 1 Enhance, future tier renderers) MUST call this so
+   * hover-out and selection-release restore to the *new* baseline, not the
+   * pre-swap gray. Phase-2 fix for hover-reverts-to-gray regression.
+   */
+  syncMeshBaseline: (mesh: Mesh, material: Material | Material[]) => void;
 }
 
 /* IFC element type IDs (web-ifc constants) */
