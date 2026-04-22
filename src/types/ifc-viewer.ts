@@ -1,5 +1,15 @@
 /* ─── IFC Viewer Types ────────────────────────────────────────────────────── */
 
+import type {
+  Scene,
+  PerspectiveCamera,
+  WebGLRenderer,
+  Group,
+  Mesh,
+  Box3,
+  Object3D,
+} from "three";
+
 export interface IFCModelInfo {
   modelID: number;
   schema: string;
@@ -90,6 +100,24 @@ export interface ViewerState {
   bannerDismissed: boolean;
 }
 
+/**
+ * Scene references exposed for the Enhance feature.
+ * Returns null if the model has not yet finished loading.
+ */
+export interface SceneRefs {
+  scene: Scene;
+  camera: PerspectiveCamera;
+  renderer: WebGLRenderer;
+  modelGroup: Group;
+}
+
+/**
+ * Tier identifier for enhancement groups.
+ * Determines which subgroup in the internal enhancement group receives mounted
+ * objects, so each tier can be independently unmounted.
+ */
+export type EnhancementTier = 1 | 2 | 3 | 4;
+
 export interface ViewportHandle {
   loadFile: (buffer: ArrayBuffer, filename: string) => Promise<void>;
   fitToView: () => void;
@@ -114,6 +142,42 @@ export interface ViewportHandle {
   unloadModel: () => void;
   setMeasureUnit: (unit: "m" | "ft") => void;
   onCameraChange: (cb: ((css: string) => void) | null) => void;
+
+  /* ── Enhance feature surface (Phase 1 scaffold) ──
+     See IFC_ENGINE_AUDIT_2026-04-21.md §7 Risk 1 for the origin of this
+     contract. Every method must be safe to call before a model is loaded. */
+
+  /** Access the live scene graph. Null before first model load. */
+  getSceneRefs: () => SceneRefs | null;
+
+  /** Read-only view of expressID -> Mesh[] (maintained internally). */
+  getMeshMap: () => ReadonlyMap<number, Mesh[]>;
+
+  /** Read-only view of expressID -> IFC type-code (maintained internally). */
+  getTypeMap: () => ReadonlyMap<number, number>;
+
+  /** Computed on demand: IFCSPACE expressID -> axis-aligned Box3 in world coordinates. */
+  getSpaceBounds: () => Map<number, Box3>;
+
+  /**
+   * Mount one or more Object3Ds into the scene under the enhancement group for
+   * the given tier. Safe no-op if the scene is not ready. The Object3Ds become
+   * children of a tier-specific subgroup so they can be unmounted together.
+   */
+  mountEnhancements: (nodes: Object3D[], opts: { tier: EnhancementTier }) => void;
+
+  /**
+   * Remove mounted enhancement nodes. Omit `tier` to unmount every tier (full
+   * reset). Disposes geometry and materials for mesh descendants.
+   */
+  unmountEnhancements: (tier?: EnhancementTier) => void;
+
+  /**
+   * Property sets for an element. Lazy-fetched via the worker; walls also have
+   * Pset_WallCommon pushed at parse time (see `ifc-worker.ts`). Resolves to
+   * empty array if not found or no model loaded.
+   */
+  getPropertySets: (expressID: number) => Promise<PropertySet[]>;
 }
 
 /* IFC element type IDs (web-ifc constants) */

@@ -121,6 +121,17 @@ interface ElementData {
   quantities: QuantityEntry[];
 }
 
+/**
+ * Minimal Pset_WallCommon extraction pushed at parse time for Tier 1
+ * classification (exterior vs interior walls, fire rating). Extended lazily
+ * per-element via `handleGetProperties` for everything else — extracting every
+ * PSet for every element at parse time would balloon memory on 147 MB+ files.
+ */
+interface WallPsetEntry {
+  isExternal: boolean | null;
+  fireRating: string | null;
+}
+
 /* ─── State ───────────────────────────────────────────────────────────────── */
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -282,12 +293,16 @@ async function handleParse(buffer: ArrayBuffer, filename: string) {
     storeyIndexMap.clear();
     const tree = buildSpatialTree();
 
+    /* ── Extract Pset_WallCommon for every wall (Tier 1 classifier input) ── */
+    const wallPsets = extractWallPsets();
+
     /* ── Send metadata ── */
     post({
       type: "metadata",
       typeEntries: [...typeMap.entries()],
       storeyEntries: [...storeyMap.entries()],
       storeyIndexEntries: [...storeyIndexMap.entries()],
+      wallPsetEntries: [...wallPsets.entries()],
     });
 
     post({ type: "spatialTree", tree });
@@ -461,6 +476,95 @@ function buildSpatialTree(): SpatialNode[] {
   } catch { /* failed */ }
 
   return tree;
+}
+
+/* ─── Wall Pset_WallCommon extraction (parse-time, for Tier 1 classifier) ── */
+
+/**
+ * Single-pass walk of IFCRELDEFINESBYPROPERTIES that pulls IsExternal +
+ * FireRating out of Pset_WallCommon for every IFCWALL / IFCWALLSTANDARDCASE.
+ * Walls with no Pset_WallCommon still appear in the result with
+ * `{ isExternal: null, fireRating: null }` so consumers never need to check
+ * `.has()` — they can just read the entry.
+ */
+function extractWallPsets(): Map<number, WallPsetEntry> {
+  const result = new Map<number, WallPsetEntry>();
+  if (!api || modelID < 0) return result;
+
+  /* Index walls so the rel walk can early-reject non-wall elements. */
+  const wallExpressIDs = new Set<number>();
+  for (const [eid, tid] of typeMap.entries()) {
+    if (tid === IFCWALL || tid === IFCWALLSTANDARDCASE) {
+      wallExpressIDs.add(eid);
+      result.set(eid, { isExternal: null, fireRating: null });
+    }
+  }
+  if (wallExpressIDs.size === 0) return result;
+
+  try {
+    const propRels = api.GetLineIDsWithType(modelID, IFCRELDEFINESBYPROPERTIES);
+    for (let i = 0; i < propRels.size(); i++) {
+      try {
+        const rel = api.GetLine(modelID, propRels.get(i), false);
+        const related = rel?.RelatedObjects;
+        if (!related) continue;
+
+        /* Collect the wall expressIDs this rel touches (usually 0 or 1). */
+        const relatedWallIDs: number[] = [];
+        const len = related.length ?? related.size?.() ?? 0;
+        for (let j = 0; j < len; j++) {
+          const ref = related[j] ?? related.get?.(j);
+          const refID = typeof ref === "object" ? ref.value : ref;
+          if (typeof refID === "number" && wallExpressIDs.has(refID)) {
+            relatedWallIDs.push(refID);
+          }
+        }
+        if (relatedWallIDs.length === 0) continue;
+
+        const psetRef = rel.RelatingPropertyDefinition;
+        const psetID = typeof psetRef === "object" ? psetRef.value : psetRef;
+        if (!psetID) continue;
+
+        const pset = api.GetLine(modelID, psetID, false);
+        if (!pset || pset.type !== IFCPROPERTYSET) continue;
+        if (safeString(pset.Name) !== "Pset_WallCommon") continue;
+
+        const props = pset.HasProperties;
+        if (!props) continue;
+
+        let isExternal: boolean | null = null;
+        let fireRating: string | null = null;
+        const propsLen = props.length ?? props.size?.() ?? 0;
+        for (let k = 0; k < propsLen; k++) {
+          const propRef = props[k] ?? props.get?.(k);
+          const propID = typeof propRef === "object" ? propRef.value : propRef;
+          if (!propID) continue;
+          try {
+            const prop = api.GetLine(modelID, propID, false);
+            if (!prop || prop.type !== IFCPROPERTYSINGLEVALUE) continue;
+            const name = safeString(prop.Name);
+            const nominal = prop.NominalValue;
+            const rawVal = nominal != null
+              ? (typeof nominal === "object" && "value" in nominal ? nominal.value : nominal)
+              : null;
+            if (name === "IsExternal") {
+              /* IFC encodes booleans as STEP ".T."/".F." or true/false or 1/0 depending on the toolchain. */
+              if (rawVal === true || rawVal === 1 || rawVal === ".T." || rawVal === "T") isExternal = true;
+              else if (rawVal === false || rawVal === 0 || rawVal === ".F." || rawVal === "F") isExternal = false;
+            } else if (name === "FireRating") {
+              fireRating = rawVal == null ? null : String(rawVal);
+            }
+          } catch { /* skip property */ }
+        }
+
+        for (const wallID of relatedWallIDs) {
+          result.set(wallID, { isExternal, fireRating });
+        }
+      } catch { /* skip rel */ }
+    }
+  } catch { /* no rels */ }
+
+  return result;
 }
 
 /* ─── Property Extraction ─────────────────────────────────────────────────── */

@@ -12,6 +12,17 @@ import { ViewCube } from "@/features/ifc/components/ViewCube";
 import { UI, SHORTCUTS } from "@/features/ifc/components/constants";
 import { Sparkles, PanelRightClose, PanelRightOpen } from "lucide-react";
 import { IFCEnhancerPanel, type EnhanceSuccess } from "@/features/ifc/components/IFCEnhancerPanel";
+import { IFCEnhancePanel } from "@/features/ifc/components/IFCEnhancePanel";
+
+/**
+ * Sidebar tab identifiers.
+ *
+ * Historically `"enhance"` referenced the IFC-text mutator panel (add floor,
+ * remove floor, add room). As of Phase 1 of the new Enhance-with-AI feature
+ * that panel is renamed "Editor" (`"editor"`), and `"enhance-ai"` is the new
+ * 4th tab that (in later phases) applies visual-only enhancements.
+ */
+type SidebarTab = "tree" | "properties" | "editor" | "enhance-ai";
 import {
   saveLastIFCFile,
   loadLastIFCFile,
@@ -52,7 +63,7 @@ export default function IFCViewerPage() {
   const [selectedElement, setSelectedElement] = useState<IFCElementData | null>(null);
   const [spatialTree, setSpatialTree] = useState<SpatialNode[]>([]);
   const [bottomPanelOpen, setBottomPanelOpen] = useState(true);
-  const [bottomTab, setBottomTab] = useState<"tree" | "properties" | "enhance">("enhance");
+  const [bottomTab, setBottomTab] = useState<SidebarTab>("editor");
   const [error, setError] = useState<string | null>(null);
   const [contextMenu, setContextMenu] = useState<ContextMenuData | null>(null);
   const [showShortcuts, setShowShortcuts] = useState(false);
@@ -230,10 +241,10 @@ export default function IFCViewerPage() {
   const handleLoadComplete = useCallback(() => {
     setLoading(false);
     setBottomPanelOpen(true);
-    /* Snap to Enhance tab after a fresh load so the feature surface is the
+    /* Snap to Editor tab after a fresh load so the feature surface is the
        first thing the user sees — they just dropped a file in, now they can
-       modify it. Users can manually switch to Tree/Properties any time. */
-    setBottomTab("enhance");
+       modify it. Users can manually switch to Tree/Properties/Enhance any time. */
+    setBottomTab("editor");
   }, []);
 
   const handleError = useCallback((message: string) => {
@@ -602,11 +613,17 @@ export default function IFCViewerPage() {
                     flexShrink: 0,
                   }}
                 >
-                  {(["tree", "properties", "enhance"] as const).map((tab) => {
+                  {(["tree", "properties", "editor", "enhance-ai"] as const).map((tab) => {
                     const active = bottomTab === tab;
-                    const label = tab === "tree" ? "Tree" : tab === "properties" ? "Properties" : "Enhance";
-                    const isEnhance = tab === "enhance";
-                    const activeColor = isEnhance ? UI.accent.cyan : UI.accent.blue;
+                    const label =
+                      tab === "tree" ? "Tree"
+                      : tab === "properties" ? "Properties"
+                      : tab === "editor" ? "Editor"
+                      : "Enhance";
+                    /* Cyan accent is reserved for the new AI Enhance tab — signals
+                       it's the flagship feature. Editor uses the standard blue. */
+                    const isEnhanceAI = tab === "enhance-ai";
+                    const activeColor = isEnhanceAI ? UI.accent.cyan : UI.accent.blue;
                     return (
                       <button
                         key={tab}
@@ -632,7 +649,7 @@ export default function IFCViewerPage() {
                           gap: 5,
                         }}
                       >
-                        {isEnhance && <Sparkles size={11} strokeWidth={2.2} />}
+                        {isEnhanceAI && <Sparkles size={11} strokeWidth={2.2} />}
                         {label}
                       </button>
                     );
@@ -679,10 +696,16 @@ export default function IFCViewerPage() {
                     />
                   )}
                   {bottomTab === "properties" && <PropertiesPanel element={selectedElement} />}
-                  {bottomTab === "enhance" && (
+                  {bottomTab === "editor" && (
                     <IFCEnhancerPanel
                       sourceFile={currentFile}
                       onApplyToViewer={handleApplyEnhancement}
+                    />
+                  )}
+                  {bottomTab === "enhance-ai" && (
+                    <IFCEnhancePanel
+                      viewportRef={viewportRef}
+                      hasModel={hasModel}
                     />
                   )}
                 </div>
@@ -710,18 +733,19 @@ export default function IFCViewerPage() {
 /* ─── Collapsed-rail sidebar (shown when panel is minimized on desktop/tablet) ─── */
 
 interface CollapsedRailProps {
-  activeTab: "tree" | "properties" | "enhance";
-  onPickTab: (tab: "tree" | "properties" | "enhance") => void;
+  activeTab: SidebarTab;
+  onPickTab: (tab: SidebarTab) => void;
   onExpand: () => void;
 }
 
 function CollapsedRail({ activeTab, onPickTab, onExpand }: CollapsedRailProps) {
   const items: {
-    id: "tree" | "properties" | "enhance";
+    id: SidebarTab;
     label: string;
     char: string;
   }[] = [
-    { id: "enhance", label: "Enhance", char: "✨" },
+    { id: "enhance-ai", label: "Enhance", char: "✨" },
+    { id: "editor", label: "Editor", char: "✎" },
     { id: "tree", label: "Tree", char: "🗂" },
     { id: "properties", label: "Properties", char: "ⓘ" },
   ];
@@ -804,7 +828,7 @@ function CollapsedRail({ activeTab, onPickTab, onExpand }: CollapsedRailProps) {
               e.currentTarget.style.color = UI.text.secondary;
             }}
           >
-            {item.id === "enhance" ? (
+            {item.id === "enhance-ai" ? (
               <Sparkles size={16} strokeWidth={2} />
             ) : (
               <span aria-hidden>{item.char}</span>
