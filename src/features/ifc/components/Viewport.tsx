@@ -21,6 +21,9 @@ import type {
   SpatialNode,
   IFCModelInfo,
   MeasurementData,
+  SceneRefs,
+  EnhancementTier,
+  PropertySet,
 } from "@/types/ifc-viewer";
 import { IFC_TYPE_NAMES } from "@/types/ifc-viewer";
 
@@ -132,6 +135,15 @@ const Viewport = forwardRef<ViewportHandle, ViewportProps>(function Viewport(
   const edgesGroupRef = useRef<Group>(new Group());
   const measureGroupRef = useRef<Group>(new Group());
   const gridRef = useRef<GridHelper | null>(null);
+
+  /* Enhance feature scaffolding — tier-scoped group so each tier can be
+     unmounted independently. Created lazily in the scene-setup effect. */
+  const enhancementGroupRef = useRef<Group | null>(null);
+  const enhancementTierGroupsRef = useRef<Map<EnhancementTier, Group>>(new Map());
+
+  /* Wall PSet data pushed by the worker at parse time (IsExternal, FireRating
+     from Pset_WallCommon). Empty until the `metadata` worker message lands. */
+  const wallPsetsRef = useRef<Map<number, { isExternal: boolean | null; fireRating: string | null }>>(new Map());
 
   /* Worker */
   const workerRef = useRef<Worker | null>(null);
@@ -473,6 +485,13 @@ const Viewport = forwardRef<ViewportHandle, ViewportProps>(function Viewport(
     scene.add(modelGroupRef.current);
     scene.add(edgesGroupRef.current);
     scene.add(measureGroupRef.current);
+
+    /* Enhancement group — parent for Tier 1-4 mounts. Children are added under
+       tier-specific subgroups (lazy in `mountEnhancements`). */
+    const enhancementGroup = new Group();
+    enhancementGroup.name = "enhancementGroup";
+    scene.add(enhancementGroup);
+    enhancementGroupRef.current = enhancementGroup;
 
     /* Animation loop */
     const animate = () => {
@@ -1075,6 +1094,23 @@ const Viewport = forwardRef<ViewportHandle, ViewportProps>(function Viewport(
     storeyIndexRef.current.clear();
     originalMaterialsRef.current.clear();
     hiddenRef.current.clear();
+    wallPsetsRef.current.clear();
+
+    /* Dispose any mounted enhancement children so a fresh load starts clean. */
+    const enhancementGroup = enhancementGroupRef.current;
+    if (enhancementGroup) {
+      for (const tierGroup of enhancementTierGroupsRef.current.values()) {
+        tierGroup.traverse((obj) => {
+          if (obj instanceof Mesh) {
+            obj.geometry.dispose();
+            if (Array.isArray(obj.material)) obj.material.forEach((m) => m.dispose());
+            else (obj.material as Material).dispose();
+          }
+        });
+        enhancementGroup.remove(tierGroup);
+      }
+      enhancementTierGroupsRef.current.clear();
+    }
     selectedIDRef.current = null;
     selectedIDsRef.current.clear();
     hoverIDRef.current = null;
@@ -1152,6 +1188,13 @@ const Viewport = forwardRef<ViewportHandle, ViewportProps>(function Viewport(
               }
               for (const [sid, idx] of msg.storeyIndexEntries) {
                 storeyIndexRef.current.set(sid, idx);
+              }
+              /* wallPsetEntries is only emitted by the Phase-1 worker; absent
+                 when the worker chunk is being served from a stale cache. */
+              if (Array.isArray(msg.wallPsetEntries)) {
+                for (const [eid, entry] of msg.wallPsetEntries) {
+                  wallPsetsRef.current.set(eid, entry);
+                }
               }
               break;
 
@@ -1622,6 +1665,99 @@ const Viewport = forwardRef<ViewportHandle, ViewportProps>(function Viewport(
       },
       onCameraChange: (cb: ((css: string) => void) | null) => {
         onCameraChangeRef.current = cb;
+      },
+
+      /* ── Enhance feature surface (Phase 1 scaffold) ──────────────────── */
+
+      getSceneRefs: (): SceneRefs | null => {
+        const scene = sceneRef.current;
+        const camera = cameraRef.current;
+        const renderer = rendererRef.current;
+        const modelGroup = modelGroupRef.current;
+        if (!scene || !camera || !renderer || !modelGroup) return null;
+        return { scene, camera, renderer, modelGroup };
+      },
+
+      getMeshMap: (): ReadonlyMap<number, Mesh[]> => meshMapRef.current,
+
+      getTypeMap: (): ReadonlyMap<number, number> => expressIDToTypeRef.current,
+
+      getSpaceBounds: (): Map<number, Box3> => {
+        const bounds = new Map<number, Box3>();
+        const meshMap = meshMapRef.current;
+        const typeMap = expressIDToTypeRef.current;
+        for (const [expressID, meshes] of meshMap.entries()) {
+          if (typeMap.get(expressID) !== IFCSPACE) continue;
+          const box = new Box3();
+          for (const m of meshes) box.expandByObject(m);
+          if (!box.isEmpty()) bounds.set(expressID, box);
+        }
+        return bounds;
+      },
+
+      mountEnhancements: (nodes: Object3D[], opts: { tier: EnhancementTier }) => {
+        const enhancementGroup = enhancementGroupRef.current;
+        if (!enhancementGroup) return;
+        let tierGroup = enhancementTierGroupsRef.current.get(opts.tier);
+        if (!tierGroup) {
+          tierGroup = new Group();
+          tierGroup.name = `enhancement-tier-${opts.tier}`;
+          enhancementGroup.add(tierGroup);
+          enhancementTierGroupsRef.current.set(opts.tier, tierGroup);
+        }
+        for (const node of nodes) tierGroup.add(node);
+      },
+
+      unmountEnhancements: (tier?: EnhancementTier) => {
+        const enhancementGroup = enhancementGroupRef.current;
+        if (!enhancementGroup) return;
+        const disposeTree = (root: Object3D) => {
+          root.traverse((obj) => {
+            if (obj instanceof Mesh) {
+              obj.geometry.dispose();
+              if (Array.isArray(obj.material)) obj.material.forEach((m) => m.dispose());
+              else (obj.material as Material).dispose();
+            }
+          });
+        };
+
+        if (tier === undefined) {
+          for (const tg of enhancementTierGroupsRef.current.values()) {
+            disposeTree(tg);
+            enhancementGroup.remove(tg);
+          }
+          enhancementTierGroupsRef.current.clear();
+          return;
+        }
+
+        const tierGroup = enhancementTierGroupsRef.current.get(tier);
+        if (!tierGroup) return;
+        disposeTree(tierGroup);
+        enhancementGroup.remove(tierGroup);
+        enhancementTierGroupsRef.current.delete(tier);
+      },
+
+      getPropertySets: (expressID: number): Promise<PropertySet[]> => {
+        return new Promise((resolve) => {
+          const worker = workerRef.current;
+          if (!worker) { resolve([]); return; }
+          const reqId = ++requestIdRef.current;
+          propertyCallbacksRef.current.set(reqId, (data) => {
+            resolve(data?.propertySets ?? []);
+          });
+          worker.postMessage({ type: "getProperties", expressID, requestId: reqId });
+        });
+      },
+
+      getWallPsets: (): ReadonlyMap<number, { isExternal: boolean | null; fireRating: string | null }> => wallPsetsRef.current,
+
+      syncMeshBaseline: (mesh: Mesh, material: Material | Material[]) => {
+        /* Baseline = the material hover/select systems will restore to after
+           their transient overlays. Enhance (and future tier renderers) call
+           this whenever they persist a material swap outside the transient
+           flow. Without it, hover-out and select-release snap back to the
+           pre-Enhance gray captured at mesh creation. */
+        originalMaterialsRef.current.set(mesh.uuid, material);
       },
     }),
     [loadFile, applyViewMode, applyColorBy, toggleSectionPlane, selectElement, clearSelection, clearModel, onSelect]
