@@ -24,7 +24,7 @@
  *     only grow/shrink around that center.
  */
 
-import type { ArchitectBrief, RectPx } from "./types";
+import type { ArchitectBrief } from "./types";
 import type { Rect } from "../strip-pack/types";
 import type { TransformedRoom } from "./stage-5-synthesis";
 

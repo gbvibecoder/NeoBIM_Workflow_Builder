@@ -52,9 +52,6 @@ const PLOT_SIZE_BOUNDS: Array<{ max: number; cat: PlotSizeCategory }> = [
   { max: Infinity, cat: "luxury" },
 ];
 
-/** Rectangularity tolerance: plotBounds area vs (w*h) within 5%. */
-const RECT_TOLERANCE = 0.05;
-
 /** Commercial-prompt signal words — any hit flips isResidential=false. */
 const COMMERCIAL_MARKERS = [
   /\boffice\b/i,
