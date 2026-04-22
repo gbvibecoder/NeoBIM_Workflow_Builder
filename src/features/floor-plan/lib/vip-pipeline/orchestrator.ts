@@ -90,6 +90,8 @@ async function runStage4And5Block(
           plotDepthFt: stage1Output.brief.plotDepthFt,
           facing: stage1Output.brief.facing,
           parsedConstraints,
+          municipality: stage1Output.brief.municipality,
+          adjacencies: stage1Output.brief.adjacencies,
         },
         log,
       );
@@ -134,7 +136,8 @@ export async function runVIPPipeline(
   config: VIPPipelineConfig,
 ): Promise<VIPPipelineResult> {
   const { requestId, userId } = config.logContext;
-  const log = new VIPLogger(requestId, userId, config.prompt);
+  const log = new VIPLogger(requestId, userId, config.prompt, config.onStageLog);
+  if (config.existingStageLog) log.seedStageLog(config.existingStageLog);
   const startMs = Date.now();
 
   try {
@@ -362,7 +365,11 @@ export async function runVIPPipeline(
 
     // ── Stage 7: Delivery ────────────────────────────────────────
     if (finalProject) {
-      log.logStageStart(7);
+      // Phase 2.7D: dropped logStageStart(7). Stage 7 is sync + <5ms,
+      // so the start/success pair raced Prisma persists and sometimes
+      // froze the row as status="running". logStageSuccess on its own
+      // triggers finalizeStageEntry's synthesize-entry fallback, which
+      // writes a single success entry — no running intermediate.
       const s7Start = Date.now();
       const totalCostUsd = log.computeTotalCost();
       const { output: s7Output } = runStage7Delivery({

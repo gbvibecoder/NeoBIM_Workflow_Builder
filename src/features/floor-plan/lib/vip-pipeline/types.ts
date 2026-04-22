@@ -24,6 +24,45 @@ export interface VIPPipelineConfig {
   };
   /** Optional progress callback for background job progress reporting. Fire-and-forget — errors are logged, not thrown. */
   onProgress?: (progress: number, stage: string) => Promise<void>;
+  /**
+   * Phase 2.6: called after every stage lifecycle event (start/success/failure).
+   * Receives the full accumulated stage-log array so the caller can replace
+   * the persisted value atomically. Fire-and-forget — errors are swallowed
+   * by the logger.
+   */
+  onStageLog?: (entries: StageLogEntry[]) => Promise<void> | void;
+  /**
+   * Phase 2.6: seed entries to prepend to the in-memory stage log. Used
+   * when resuming in a fresh worker invocation (Phase B / regenerate)
+   * so new events extend the existing timeline instead of replacing it.
+   */
+  existingStageLog?: StageLogEntry[];
+}
+
+// ─── Phase 2.6: Stage Log Entry ──────────────────────────────────
+// One entry per VIP pipeline stage, written incrementally by the
+// VIPLogger as the orchestrator progresses. Persisted to
+// vip_jobs.stageLog and surfaced in the Pipeline Logs Panel UI.
+
+export type StageLogStatus = "running" | "success" | "failed" | "skipped";
+
+export interface StageLogEntry {
+  /** Stage number — 0 = parse (pre-orchestrator), 1-7 = VIP pipeline stages. */
+  stage: number;
+  name: string;
+  status: StageLogStatus;
+  /** ISO timestamp of logStageStart (or equivalent). */
+  startedAt: string;
+  /** ISO timestamp of logStageSuccess / logStageFailure. Unset while running. */
+  completedAt?: string;
+  durationMs?: number;
+  costUsd?: number;
+  /** Short human-readable summary for the collapsed log row. */
+  summary?: string;
+  /** Structured stage output / metadata for the expanded row. */
+  output?: Record<string, unknown>;
+  /** Present when status === "failed". */
+  error?: string;
 }
 
 // ─── Stage 1: Prompt Intelligence ────────────────────────────────
@@ -31,6 +70,23 @@ export interface VIPPipelineConfig {
 export interface Stage1Input {
   prompt: string;
   parsedConstraints: ParsedConstraints;
+}
+
+/**
+ * Phase 2.3: Declared room-to-room relationships the architect wants
+ * Stage 5 to honor during synthesis. Stage 6 scores compliance.
+ */
+export type AdjacencyRelationship =
+  | "attached"        // share a wall, internal door from a (e.g. Master ↔ ensuite)
+  | "adjacent"        // share a wall, door OK from either side (e.g. Kitchen ↔ Dining)
+  | "direct-access"   // b's door opens into a (e.g. Pooja into Living)
+  | "connected";      // reachable via direct corridor (no bedroom-through-bedroom)
+
+export interface AdjacencyDeclaration {
+  a: string;                      // room name from roomList
+  b: string;                      // room name from roomList
+  relationship: AdjacencyRelationship;
+  reason?: string;
 }
 
 export interface ArchitectBrief {
@@ -41,6 +97,10 @@ export interface ArchitectBrief {
   facing: string;
   styleCues: string[];
   constraints: string[];
+  /** Phase 2.4 P0-A: city name for setback resolution (e.g., "MUMBAI", "BENGALURU"). */
+  municipality?: string;
+  /** Phase 2.3: declared adjacencies. Defaults to []. */
+  adjacencies: AdjacencyDeclaration[];
 }
 
 export interface ImageGenPrompt {
@@ -149,6 +209,10 @@ export interface Stage5Input {
   plotDepthFt: number;
   facing: string;
   parsedConstraints: ParsedConstraints;
+  /** Phase 2.4 P0-A: municipality for setback resolution (from Stage 1 brief). */
+  municipality?: string;
+  /** Phase 2.3: adjacencies passed from Stage 1 brief. */
+  adjacencies?: AdjacencyDeclaration[];
 }
 
 export interface Stage5Output {
@@ -165,7 +229,10 @@ export type QualityDimension =
   | "vastuCompliance"
   | "orientationCorrect"
   | "connectivity"
-  | "exteriorWindows";
+  | "exteriorWindows"
+  | "adjacencyCompliance"
+  | "bedroomPrivacy"
+  | "entranceDoor";
 
 export interface QualityVerdict {
   score: number; // 0-100 weighted average

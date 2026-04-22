@@ -43,6 +43,13 @@ export async function GET(
       startedAt: true,
       completedAt: true,
       createdAt: true,
+      // Phase 2.3 Workstream C: the image approval gate fields.
+      intermediateImage: true,
+      userApproval: true,
+      pausedAt: true,
+      pausedStage: true,
+      // Phase 2.6: stage-by-stage log for the Pipeline Logs Panel UI.
+      stageLog: true,
     },
   });
 
@@ -63,10 +70,24 @@ export async function GET(
     startedAt: job.startedAt?.toISOString() ?? null,
     completedAt: job.completedAt?.toISOString() ?? null,
     createdAt: job.createdAt.toISOString(),
+    // Phase 2.6: stage log drives the Pipeline Logs Panel. Always
+    // included so the panel can render mid-flight. Null when the
+    // worker hasn't written any entries yet (QUEUED state).
+    stageLog: job.stageLog ?? null,
   };
 
   if (job.status === "COMPLETED" && job.resultProject) {
     result.resultProject = job.resultProject;
+  }
+
+  // Phase 2.3 Workstream C: surface the approval-gate fields only when
+  // the job is actually awaiting approval. The base64 image can be
+  // several hundred KB, so we skip it once past the gate.
+  if (job.status === "AWAITING_APPROVAL") {
+    result.intermediateImage = job.intermediateImage ?? null;
+    result.userApproval = job.userApproval ?? null;
+    result.pausedAt = job.pausedAt?.toISOString() ?? null;
+    result.pausedStage = job.pausedStage ?? null;
   }
 
   return NextResponse.json(result, {

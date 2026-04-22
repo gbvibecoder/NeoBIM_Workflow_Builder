@@ -9,6 +9,7 @@
 
 import { useState, useRef, useCallback, useEffect } from "react";
 import type { FloorPlanProject } from "@/types/floor-plan-cad";
+import type { StageLogEntry } from "@/features/floor-plan/lib/vip-pipeline/types";
 
 // ─── Types ───────────────────────────────────────────────────────
 
@@ -16,6 +17,10 @@ export type VipGenerationStatus =
   | "idle"
   | "creating"
   | "polling"
+  // Phase 2.3 Workstream C: image approval gate — Stage 2 image is
+  // ready and the user must approve or regenerate before Stage 3+
+  // runs.
+  | "awaiting-approval"
   | "completed"
   | "failed";
 
@@ -40,6 +45,13 @@ interface VipJobResponse {
   costUsd: number;
   errorMessage: string | null;
   resultProject?: FloorPlanProject;
+  // Phase 2.3 Workstream C
+  intermediateImage?: string | null;
+  userApproval?: string | null;
+  pausedAt?: string | null;
+  pausedStage?: number | null;
+  // Phase 2.6: stage-by-stage log for the Pipeline Logs Panel.
+  stageLog?: StageLogEntry[] | null;
 }
 
 const POLL_INTERVAL_MS = 3_000;
@@ -55,6 +67,22 @@ export function useVipGeneration() {
   const [costUsd, setCostUsd] = useState(0);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [project, setProject] = useState<FloorPlanProject | null>(null);
+  // Phase 2.3 Workstream C: approval-gate state.
+  const [intermediateImage, setIntermediateImage] = useState<string | null>(null);
+  // Phase 2.6: in-flight approval/regeneration actions (drive button
+  // disabled + spinner states in ImageApprovalGate).
+  // Phase 2.6.1: also mirrored into refs so the click-handler guard is
+  // synchronous. useState alone has a race — a double-click that fires
+  // before React commits the setApproving(true) re-render would close
+  // over the stale `approving=false` and send a second /approve request.
+  // Refs are read/written synchronously so the second call hits
+  // approvingRef.current === true and returns before the fetch.
+  const [approving, setApproving] = useState(false);
+  const [regenerating, setRegenerating] = useState(false);
+  const approvingRef = useRef(false);
+  const regeneratingRef = useRef(false);
+  // Phase 2.6: stage-by-stage log for the Pipeline Logs Panel.
+  const [stageLog, setStageLog] = useState<StageLogEntry[]>([]);
 
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const startTimeRef = useRef<number>(0);
@@ -102,6 +130,10 @@ export function useVipGeneration() {
         STAGE_LABELS[job.currentStage ?? ""] ?? job.currentStage ?? "",
       );
       setCostUsd(job.costUsd);
+      // Phase 2.6: refresh the stage log on every poll. The worker
+      // replaces the column atomically on each event, so we can trust
+      // the array we receive as authoritative.
+      if (Array.isArray(job.stageLog)) setStageLog(job.stageLog);
 
       if (job.status === "COMPLETED" && job.resultProject) {
         stopPolling();
@@ -109,18 +141,31 @@ export function useVipGeneration() {
         setStatus("completed");
         setProgress(100);
         setStageLabel("Done!");
+      } else if (job.status === "AWAITING_APPROVAL") {
+        // Phase 2.3 Workstream C: keep polling interval active — the
+        // user's Approve/Regenerate click shifts the row back to
+        // RUNNING/AWAITING_APPROVAL which the next poll picks up.
+        setStatus("awaiting-approval");
+        setIntermediateImage(job.intermediateImage ?? null);
+        setStageLabel("Image ready — approve to continue");
       } else if (job.status === "FAILED" || job.status === "CANCELLED") {
         stopPolling();
         setStatus("failed");
         setErrorMessage(
           job.errorMessage ?? "Something went wrong generating your floor plan. Try again?",
         );
+      } else {
+        // QUEUED or RUNNING: if we were previously in awaiting-approval
+        // and the user approved, transition back to polling.
+        if (status === "awaiting-approval" && (job.status === "RUNNING" || job.status === "QUEUED")) {
+          setStatus("polling");
+          setIntermediateImage(null);
+        }
       }
-      // QUEUED or RUNNING — continue polling
     } catch {
       // Network error — continue polling (might be transient)
     }
-  }, [stopPolling]);
+  }, [stopPolling, status]);
 
   const startGeneration = useCallback(async (prompt: string) => {
     // Reset state
@@ -131,6 +176,7 @@ export function useVipGeneration() {
     setCostUsd(0);
     setErrorMessage(null);
     setProject(null);
+    setStageLog([]);
     stopPolling();
 
     try {
@@ -174,7 +220,63 @@ export function useVipGeneration() {
     setCurrentStage(null);
     setStageLabel("");
     setErrorMessage(null);
+    setIntermediateImage(null);
   }, [stopPolling]);
+
+  // Phase 2.3 Workstream C: user approves the Stage 2 image.
+  // Phase 2.6.1: ref-based in-flight guard (synchronous). Prevents a
+  // fast double-click from sending two /approve requests — the second
+  // hit lands after ref is true and returns before touching fetch.
+  const approveImage = useCallback(async () => {
+    const jobId = jobIdRef.current;
+    if (!jobId || approvingRef.current || regeneratingRef.current) return;
+    approvingRef.current = true;
+    setApproving(true);
+    setErrorMessage(null);
+    try {
+      const res = await fetch(`/api/vip-jobs/${jobId}/approve`, { method: "POST" });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setErrorMessage(data.error ?? "Failed to approve image. Try again?");
+        return;
+      }
+      setStatus("polling");
+      setIntermediateImage(null);
+      setStageLabel("Generating CAD geometry...");
+    } catch {
+      setErrorMessage("Network error approving image. Try again?");
+    } finally {
+      approvingRef.current = false;
+      setApproving(false);
+    }
+  }, []);
+
+  // Phase 2.3 Workstream C: user rejects the image and wants a fresh one.
+  // Phase 2.6.1: ref-based in-flight guard (same rationale as approveImage).
+  const regenerateImage = useCallback(async () => {
+    const jobId = jobIdRef.current;
+    if (!jobId || approvingRef.current || regeneratingRef.current) return;
+    regeneratingRef.current = true;
+    setRegenerating(true);
+    setErrorMessage(null);
+    try {
+      const res = await fetch(`/api/vip-jobs/${jobId}/regenerate-image`, { method: "POST" });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setErrorMessage(data.error ?? "Failed to regenerate image. Try again?");
+        return;
+      }
+      // Poll will update status/progress as Stage 2 re-runs.
+      setStatus("polling");
+      setIntermediateImage(null);
+      setStageLabel("Regenerating image...");
+    } catch {
+      setErrorMessage("Network error regenerating image. Try again?");
+    } finally {
+      regeneratingRef.current = false;
+      setRegenerating(false);
+    }
+  }, []);
 
   return {
     status,
@@ -184,7 +286,13 @@ export function useVipGeneration() {
     costUsd,
     errorMessage,
     project,
+    intermediateImage,
+    approving,
+    regenerating,
+    stageLog,
     startGeneration,
     cancel,
+    approveImage,
+    regenerateImage,
   };
 }

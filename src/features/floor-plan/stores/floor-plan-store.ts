@@ -159,6 +159,16 @@ interface FloorPlanState {
   lastQualityFlags: QualityFlag[];
   lastFeasibilityWarnings: InfeasibilityWarning[];
 
+  // Phase 2.7A — VIP-native quality surface populated by the VIP completion
+  // handler in FloorPlanViewer from `project.metadata.generation_*` fields.
+  // Lives alongside the legacy `lastQualityFlags` because the VIP pipeline
+  // emits a single summary score (Stage 6) instead of per-dim flags.
+  // `null` = no VIP job has completed in this session; banner falls back
+  // to the legacy flags-based rendering.
+  vipQualityScore: number | null;
+  vipWeakAreas: string[];
+  vipQualityRecommendation: "pass" | "retry" | "fail" | null;
+
   // Phase 2 — multi-option generation (Midjourney approach)
   generatedOptions: FloorPlanOption[] | null;
   selectedOptionIndex: number;
@@ -321,6 +331,15 @@ interface FloorPlanState {
     flags: QualityFlag[],
     warnings: InfeasibilityWarning[],
   ) => void;
+  // Phase 2.7A — VIP completion handler calls this with the Stage 6 verdict
+  // lifted off project.metadata. Pass null to clear.
+  setVipQualityResults: (
+    results: {
+      score: number | null;
+      weakAreas: string[];
+      recommendation: "pass" | "retry" | "fail" | null;
+    } | null,
+  ) => void;
   completeGeneration: (geometry: FloorPlanGeometry, name?: string) => void;
   saveToStorage: () => void;
   setProjectModified: (v: boolean) => void;
@@ -386,6 +405,9 @@ export const useFloorPlanStore = create<FloorPlanState>()((set, get) => ({
   lastLayoutMetrics: null,
   lastQualityFlags: [],
   lastFeasibilityWarnings: [],
+  vipQualityScore: null,
+  vipWeakAreas: [],
+  vipQualityRecommendation: null,
   generatedOptions: null,
   selectedOptionIndex: 0,
   _clipboard: null,
@@ -430,6 +452,9 @@ export const useFloorPlanStore = create<FloorPlanState>()((set, get) => ({
       lastLayoutMetrics: null,
       lastQualityFlags: [],
       lastFeasibilityWarnings: [],
+      vipQualityScore: null,
+      vipWeakAreas: [],
+      vipQualityRecommendation: null,
     });
   },
 
@@ -1764,6 +1789,11 @@ export const useFloorPlanStore = create<FloorPlanState>()((set, get) => ({
     lastLayoutMetrics: null,
     lastQualityFlags: [],
     lastFeasibilityWarnings: [],
+    // Phase 2.7A — also clear the VIP-native quality surface so the banner
+    // doesn't show a stale score while the next gen is running.
+    vipQualityScore: null,
+    vipWeakAreas: [],
+    vipQualityRecommendation: null,
   }),
 
   updateGenerationStep: (step, progress) => set({
@@ -1780,6 +1810,21 @@ export const useFloorPlanStore = create<FloorPlanState>()((set, get) => ({
     lastQualityFlags: flags,
     lastFeasibilityWarnings: warnings,
   }),
+
+  // Phase 2.7A — VIP pipeline carries its quality verdict on
+  // project.metadata.generation_* (stamped by runStage7Delivery). The
+  // FloorPlanViewer completion handler lifts those fields and pushes them
+  // here so the banner can render red/yellow/green truthfully. Pass null
+  // to clear the surface (e.g. when the user loads a non-VIP project).
+  setVipQualityResults: (results) => set(
+    results === null
+      ? { vipQualityScore: null, vipWeakAreas: [], vipQualityRecommendation: null }
+      : {
+          vipQualityScore: results.score,
+          vipWeakAreas: results.weakAreas,
+          vipQualityRecommendation: results.recommendation,
+        },
+  ),
 
   completeGeneration: (geometry, name) => {
     get().loadFromGeometry(geometry, name, get().originalPrompt ?? undefined);

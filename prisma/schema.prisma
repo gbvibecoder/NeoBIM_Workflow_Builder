@@ -820,6 +820,7 @@ model VipGeneration {
 enum VipJobStatus {
   QUEUED
   RUNNING
+  AWAITING_APPROVAL
   COMPLETED
   FAILED
   CANCELLED
@@ -838,6 +839,23 @@ model VipJob {
   costUsd        Float        @default(0)
   startedAt      DateTime?
   completedAt    DateTime?
+  // Phase 2.3 Workstream C: image approval gate.
+  // When the worker completes Stage 2, it stores the stage1+stage2
+  // outputs here as JSON, sets status=AWAITING_APPROVAL, and waits
+  // for the user to click Approve (→ /api/vip-jobs/[id]/approve) or
+  // Regenerate image (→ /api/vip-jobs/[id]/regenerate-image). A
+  // second QStash message then picks up stages 3-7.
+  pausedAt          DateTime?
+  pausedStage       Int?
+  intermediateImage String?   // base64 of the Stage 2 GPT image
+  intermediateBrief Json?     // full stage 1 output (brief + imagePrompts)
+  userApproval      String?   // 'pending' | 'approved' | 'regenerating'
+  // Phase 2.6: stage-by-stage log for the Pipeline Logs Panel UI.
+  // Array of StageLogEntry objects — one entry per logStageStart /
+  // logStageSuccess / logStageFailure hit by the orchestrator. Written
+  // incrementally from the worker so the UI can poll and render each
+  // stage as it completes. Shape defined in vip-pipeline/types.ts.
+  stageLog          Json?
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 

@@ -18,17 +18,40 @@ import { prisma } from "@/lib/db";
 import { verifyQstashSignature } from "@/lib/qstash";
 import { parseConstraints } from "@/features/floor-plan/lib/structured-parser";
 import { runVIPPipeline } from "@/features/floor-plan/lib/vip-pipeline/orchestrator";
+import { runVIPPipelinePhaseA } from "@/features/floor-plan/lib/vip-pipeline/orchestrator-gated";
+import {
+  appendStageLogEntry,
+  createStageLogPersister,
+} from "@/features/floor-plan/lib/vip-pipeline/stage-log-store";
 
 const PIPELINE_TIMEOUT_MS = 550_000; // 550s safety margin vs Vercel's 600s
+/**
+ * Phase 2.6: image approval gate is now the DEFAULT flow. The legacy
+ * monolithic path (no user approval between Stages 2 and 3) is reachable
+ * only as an explicit emergency-rollback opt-in via PIPELINE_VIP_MONOLITHIC.
+ *
+ * Why: gated flow gives the user a chance to reject the Stage 2 image
+ * before paying $0.06+ for CAD extraction, and surfaces the pipeline's
+ * intermediate state in the Logs Panel. The invariant here is "gated by
+ * default, monolithic only if ops says so."
+ */
+const USE_MONOLITHIC_FALLBACK =
+  process.env.PIPELINE_VIP_MONOLITHIC === "true";
 
 export async function POST(req: NextRequest) {
   // ── QStash signature verification ──
   const rawBody = await req.text();
   const signature = req.headers.get("upstash-signature");
 
-  // In dev mode without QStash, allow unsigned requests from localhost
-  const isDev = process.env.NODE_ENV === "development";
-  if (!isDev) {
+  // Phase 2.4 GA.3: explicit opt-in bypass (replaces implicit NODE_ENV check).
+  // Hard-fails if SKIP_QSTASH_SIG_VERIFY=true leaks into production.
+  const skipVerify = process.env.SKIP_QSTASH_SIG_VERIFY === "true";
+  if (skipVerify && process.env.NODE_ENV === "production") {
+    throw new Error(
+      "SECURITY: SKIP_QSTASH_SIG_VERIFY must not be true in production",
+    );
+  }
+  if (!skipVerify) {
     const valid = await verifyQstashSignature(signature, rawBody);
     if (!valid) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -69,10 +92,79 @@ export async function POST(req: NextRequest) {
     if (!apiKey) throw new Error("OPENAI_API_KEY not set");
 
     await updateJob(jobId, { progress: 5, currentStage: "parse" });
+    const parseStartIso = new Date().toISOString();
+    const parseStart = Date.now();
     const parseRes = await parseConstraints(job.prompt, apiKey);
+    const parseDurationMs = Date.now() - parseStart;
     await updateJob(jobId, { progress: 10, currentStage: "parse" });
+    // Phase 2.6: log the parse stage on the timeline so users see the
+    // pipeline kickoff (not just stages 1-7).
+    await appendStageLogEntry(jobId, {
+      stage: 0,
+      name: "Parse Constraints",
+      status: "success",
+      startedAt: parseStartIso,
+      completedAt: new Date().toISOString(),
+      durationMs: parseDurationMs,
+      summary: `plot: ${parseRes.constraints?.plot?.width_ft ?? "?"}×${parseRes.constraints?.plot?.depth_ft ?? "?"}ft`,
+      output: { constraintsKeys: Object.keys(parseRes.constraints ?? {}) },
+    });
 
-    // ── Run VIP pipeline with timeout protection ──
+    // ── Phase 2.6: gated path is now the DEFAULT flow ──
+    // Run Phase A (Stages 1-2) and pause for user approval. The user
+    // hits /api/vip-jobs/[id]/approve which enqueues worker/resume to
+    // run Stages 3-7. To fall back to the legacy monolithic pipeline
+    // (emergency rollback only), set PIPELINE_VIP_MONOLITHIC=true.
+    if (!USE_MONOLITHIC_FALLBACK) {
+      const phaseA = await runVIPPipelinePhaseA({
+        prompt: job.prompt,
+        parsedConstraints: parseRes.constraints,
+        logContext: { requestId: job.requestId, userId: job.userId },
+        onProgress: async (progress, stage) => {
+          await updateJob(jobId, { progress, currentStage: stage });
+        },
+        onStageLog: createStageLogPersister(jobId),
+      });
+
+      if (!phaseA.success) {
+        await prisma.vipJob.update({
+          where: { id: jobId },
+          data: {
+            status: "FAILED",
+            errorMessage: phaseA.error,
+            completedAt: new Date(),
+          },
+        });
+        return NextResponse.json({ status: "FAILED", reason: phaseA.error });
+      }
+
+      const intermediatePayload = {
+        stage1Output: phaseA.stage1Output,
+        stage2Output: phaseA.stage2Output,
+        stage1Ms: phaseA.stage1Ms,
+        stage2Ms: phaseA.stage2Ms,
+        stage1CostUsd: phaseA.stage1CostUsd,
+        stage2CostUsd: phaseA.stage2CostUsd,
+      };
+
+      await prisma.vipJob.update({
+        where: { id: jobId },
+        data: {
+          status: "AWAITING_APPROVAL",
+          progress: 35,
+          currentStage: "awaiting-approval",
+          intermediateBrief: JSON.parse(JSON.stringify(intermediatePayload)),
+          intermediateImage: phaseA.gptImageBase64,
+          userApproval: "pending",
+          pausedAt: new Date(),
+          pausedStage: 2,
+        },
+      });
+
+      return NextResponse.json({ status: "AWAITING_APPROVAL", jobId });
+    }
+
+    // ── Legacy monolithic path — PIPELINE_VIP_MONOLITHIC=true only ──
     const pipelinePromise = runVIPPipeline({
       prompt: job.prompt,
       parsedConstraints: parseRes.constraints,
@@ -80,6 +172,7 @@ export async function POST(req: NextRequest) {
       onProgress: async (progress, stage) => {
         await updateJob(jobId, { progress, currentStage: stage });
       },
+      onStageLog: createStageLogPersister(jobId),
     });
 
     const timeoutPromise = new Promise<never>((_, reject) =>

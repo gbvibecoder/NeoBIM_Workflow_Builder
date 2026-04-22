@@ -16,6 +16,14 @@ const RoomItemSchema = z.object({
   approxAreaSqft: z.number().optional(),
 });
 
+// Phase 2.3: declared adjacencies (Workstream A)
+const AdjacencyDeclarationSchema = z.object({
+  a: z.string(),
+  b: z.string(),
+  relationship: z.enum(["attached", "adjacent", "direct-access", "connected"]),
+  reason: z.string().optional(),
+});
+
 const ArchitectBriefSchema = z.object({
   projectType: z.string(),
   roomList: z.array(RoomItemSchema),
@@ -24,6 +32,10 @@ const ArchitectBriefSchema = z.object({
   facing: z.string(),
   styleCues: z.array(z.string()),
   constraints: z.array(z.string()),
+  // Phase 2.4 P0-A: optional city for setback resolution.
+  municipality: z.string().optional(),
+  // Phase 2.3: adjacency declarations emitted by Stage 1 brief.
+  adjacencies: z.array(AdjacencyDeclarationSchema).default([]),
 });
 
 const ImageGenPromptSchema = z.object({
@@ -70,6 +82,8 @@ const QualityDimensionsSchema = z.object({
   orientationCorrect: z.number(),
   connectivity: z.number(),
   exteriorWindows: z.number(),
+  // Phase 2.3: adjacency compliance. Default 8 (neutral) if adjacencyReport missing.
+  adjacencyCompliance: z.number().default(8),
 });
 
 export const Stage6RawOutputSchema = z.object({

@@ -2788,6 +2788,41 @@ const en = {
   'admin.support.loadingTemplates': 'Loading templates...',
   'admin.support.confirmDelete': 'Click delete again to confirm',
   'admin.support.uses': 'uses',
+
+  // ===== LIGHT THEME LANDING PAGE =====
+  'light.heroLabel': 'FOR ARCHITECTS',
+  'light.heroLine1': 'From brief to',
+  'light.heroLine1Em': 'building',
+  'light.heroLine2': 'in one workflow.',
+  'light.heroSubtitle': 'AI-powered concept design. Upload a brief, get 3D massing, renders, and cost estimates — in minutes, not weeks.',
+  'light.tryDemo': 'Try the Demo',
+  'light.trustFreeTier': 'Free tier available',
+
+  // ── Phase 2: What It Does ──
+  'light.howLabel': 'HOW IT WORKS',
+  'light.howTitle': 'Three steps to launch.',
+  'light.step1Title': 'Upload Your Brief',
+  'light.step1Desc': 'Paste a project brief or upload a PDF. BuildFlow understands site constraints, building types, and client requirements automatically.',
+  'light.step2Title': 'Pick Your Outputs',
+  'light.step2Desc': 'Choose what you need: 3D massing, floor plans, concept renders, or detailed cost estimates. Mix and match per project.',
+  'light.step3Title': 'Present to Clients',
+  'light.step3Desc': 'Download polished deliverables in minutes. Export to IFC, PDF reports, or share a live link with your client directly.',
+
+  // ── Phase 2: Product Proof ──
+  'light.proofLabel': 'LIVE DEMO',
+  'light.proofTitle': 'Text Brief \u2192 3D Massing \u2192 Concept Render',
+  'light.proofSubtitle': 'A complete workflow in 90 seconds.',
+  'light.proofAriaLabel': 'Product demonstration video showing a text brief turned into a 3D massing model and concept render',
+
+  // ── Phase 2: Pricing ──
+  'light.pricingLabel': 'PRICING',
+  'light.pricingTitle': 'Simple, transparent pricing.',
+  'light.pricingSubtitle': 'Start free. Scale when you need to. Cancel anytime.',
+  'light.mostPopular': 'MOST POPULAR',
+
+  // ── Phase 2: FAQ ──
+  'light.faqLabel': 'COMMON QUESTIONS',
+  'light.faqTitle': 'Frequently asked.',
 } as const;
 
 const de: Record<keyof typeof en, string | string[]> = {
@@ -5570,6 +5605,41 @@ const de: Record<keyof typeof en, string | string[]> = {
   'admin.support.loadingTemplates': 'Vorlagen werden geladen...',
   'admin.support.confirmDelete': 'Zum Bestätigen erneut auf Löschen klicken',
   'admin.support.uses': 'Verwendungen',
+
+  // ===== LIGHT THEME LANDING PAGE =====
+  'light.heroLabel': 'FÜR ARCHITEKTEN',
+  'light.heroLine1': 'Vom Briefing zum',
+  'light.heroLine1Em': 'Gebäude',
+  'light.heroLine2': 'in einem Workflow.',
+  'light.heroSubtitle': 'KI-gestütztes Konzeptdesign. Briefing hochladen, 3D-Massenmodelle, Renderings und Kostenschätzungen erhalten — in Minuten, nicht Wochen.',
+  'light.tryDemo': 'Demo ausprobieren',
+  'light.trustFreeTier': 'Kostenlose Version verfügbar',
+
+  // ── Phase 2: What It Does ──
+  'light.howLabel': 'SO FUNKTIONIERT\u2019S',
+  'light.howTitle': 'Drei Schritte zum Start.',
+  'light.step1Title': 'Briefing hochladen',
+  'light.step1Desc': 'Projektbriefing einfügen oder PDF hochladen. BuildFlow erkennt Standortbedingungen, Gebäudetypen und Kundenanforderungen automatisch.',
+  'light.step2Title': 'Ergebnisse auswählen',
+  'light.step2Desc': 'Wählen Sie aus: 3D-Massenmodelle, Grundrisse, Konzeptrenderings oder detaillierte Kostenschätzungen. Kombinieren Sie je nach Projekt.',
+  'light.step3Title': 'Kunden präsentieren',
+  'light.step3Desc': 'Erhalten Sie professionelle Ergebnisse in Minuten. Export als IFC, PDF-Bericht oder teilen Sie einen Live-Link direkt mit Ihrem Kunden.',
+
+  // ── Phase 2: Product Proof ──
+  'light.proofLabel': 'LIVE-DEMO',
+  'light.proofTitle': 'Textbriefing \u2192 3D-Masse \u2192 Konzeptrendering',
+  'light.proofSubtitle': 'Ein kompletter Workflow in 90 Sekunden.',
+  'light.proofAriaLabel': 'Produktdemonstrationsvideo: Textbriefing wird zu einem 3D-Massenmodell und Konzeptrendering',
+
+  // ── Phase 2: Pricing ──
+  'light.pricingLabel': 'PREISE',
+  'light.pricingTitle': 'Einfach, transparent.',
+  'light.pricingSubtitle': 'Kostenlos starten. Skalieren bei Bedarf. Jederzeit kündbar.',
+  'light.mostPopular': 'BELIEBT',
+
+  // ── Phase 2: FAQ ──
+  'light.faqLabel': 'HÄUFIGE FRAGEN',
+  'light.faqTitle': 'Häufig gestellt.',
 };
 
 const translations: Record<Locale, Record<string, string | readonly string[]>> = { en, de };

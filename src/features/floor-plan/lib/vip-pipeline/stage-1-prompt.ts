@@ -15,6 +15,7 @@ import type { VIPLogger } from "./logger";
 import { ARCHITECT_BRIEF_SYSTEM_PROMPT } from "./prompts/architect-brief";
 import { Stage1OutputSchema } from "./schemas";
 import { createAnthropicClient } from "./clients";
+import { pruneBrief } from "./stage-1-pruner";
 
 // ─── Cost Constants (Claude Sonnet 4.6) ──────────────────────────
 
@@ -86,6 +87,26 @@ const TOOL_SCHEMA: Anthropic.Tool = {
             items: { type: "string" as const },
             description:
               "Hard constraints and inferred assumptions. Prefix inferred items with 'inferred:', vastu with 'vastu:', warnings with 'warning:'.",
+          },
+          adjacencies: {
+            type: "array" as const,
+            description:
+              "Phase 2.3: declared room-to-room relationships Stage 5 will honor and Stage 6 will score. Default to [] if none relevant.",
+            items: {
+              type: "object" as const,
+              required: ["a", "b", "relationship"],
+              properties: {
+                a: { type: "string" as const, description: "First room name (must match a roomList entry)" },
+                b: { type: "string" as const, description: "Second room name (must match a roomList entry)" },
+                relationship: {
+                  type: "string" as const,
+                  enum: ["attached", "adjacent", "direct-access", "connected"],
+                  description:
+                    "attached = share wall + internal door from a; adjacent = share wall either side; direct-access = b's door opens into a; connected = reachable via corridor.",
+                },
+                reason: { type: "string" as const, description: "Optional short rationale." },
+              },
+            },
           },
         },
       },
@@ -238,7 +259,7 @@ export async function runStage1PromptIntelligence(
         `Stage 1: LLM returned malformed output: ${parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ")}`,
       );
     }
-    const output: Stage1Output = parsed.data;
+    let output: Stage1Output = parsed.data;
 
     // ── Post-call validation ──
     if (output.brief.projectType === "NOT_FLOOR_PLAN") {
@@ -253,6 +274,24 @@ export async function runStage1PromptIntelligence(
       throw new Error(
         `Stage 1: expected exactly 1 image prompt, got ${output.imagePrompts.length}`,
       );
+    }
+
+    // ── Phase 2.7B: belt-and-suspenders pruning pass ──
+    // The system prompt now forbids auto-adding Porch/Foyer/Utility/etc.
+    // and caps room count by plot size. This pass enforces the same rules
+    // in code, catching any phantom rooms the LLM slipped in anyway and
+    // logging each drop into brief.constraints (visible in the Logs Panel).
+    const pruneResult = pruneBrief(output.brief, input.prompt);
+    if (pruneResult.droppedNames.length > 0) {
+      output = { ...output, brief: pruneResult.brief };
+      if (logger) {
+        for (const w of pruneResult.warnings) {
+          // Fire-and-forget console warning so the drop shows up in dev logs.
+          try {
+            console.warn(`[Stage 1 pruner] ${w}`);
+          } catch { /* never throw */ }
+        }
+      }
     }
 
     return {

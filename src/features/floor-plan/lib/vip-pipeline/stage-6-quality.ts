@@ -20,6 +20,7 @@ import type { FloorPlanProject } from "@/types/floor-plan-cad";
 import type { ArchitectBrief } from "./types";
 import { Stage6RawOutputSchema } from "./schemas";
 import { createAnthropicClient } from "./clients";
+import { evaluateBedroomPrivacy, evaluateEntranceDoor } from "./quality-evaluators";
 
 // ─── Constants ───────────────────────────────────────────────────
 
@@ -34,9 +35,28 @@ const DIMENSION_WEIGHTS: Record<QualityDimension, number> = {
   dimensionPlausibility: 2.0,
   vastuCompliance: 1.5,
   orientationCorrect: 1.5,
+  adjacencyCompliance: 1.5,
   connectivity: 1.0,
   exteriorWindows: 1.0,
+  // Phase 2.4 P0-B: scored locally from FloorPlanProject, not by LLM.
+  bedroomPrivacy: 1.0,
+  entranceDoor: 1.5,
 };
+
+/** LLM-scored dimensions (what the tool_use schema asks for). */
+const LLM_DIMS = [
+  "roomCountMatch",
+  "noDuplicateNames",
+  "dimensionPlausibility",
+  "vastuCompliance",
+  "orientationCorrect",
+  "adjacencyCompliance",
+  "connectivity",
+  "exteriorWindows",
+] as const;
+
+/** Locally-scored dimensions (Phase 2.4 P0-B). */
+const LOCAL_DIMS = ["bedroomPrivacy", "entranceDoor"] as const;
 
 const PASS_THRESHOLD = 65;
 const RETRY_THRESHOLD = 45;
@@ -67,6 +87,7 @@ const TOOL_SCHEMA: Anthropic.Tool = {
           "dimensionPlausibility",
           "vastuCompliance",
           "orientationCorrect",
+          "adjacencyCompliance",
           "connectivity",
           "exteriorWindows",
         ],
@@ -76,6 +97,7 @@ const TOOL_SCHEMA: Anthropic.Tool = {
           dimensionPlausibility: { type: "number" as const, description: "1-10: Are room dimensions architecturally reasonable?" },
           vastuCompliance: { type: "number" as const, description: "1-10: If vastu required, check placements. If not, score 8." },
           orientationCorrect: { type: "number" as const, description: "1-10: Is the entrance on the correct facing side?" },
+          adjacencyCompliance: { type: "number" as const, description: "1-10: Did Stage 5 honor the declared adjacencies? Use the ADJACENCY REPORT when provided (10 if compliancePct≥90, 8 if ≥70, 5 if ≥40, 3 otherwise). If no adjacencies declared, score 8." },
           connectivity: { type: "number" as const, description: "1-10: Can every room be reached via doors?" },
           exteriorWindows: { type: "number" as const, description: "1-10: Do habitable rooms have exterior windows?" },
         },
@@ -112,6 +134,39 @@ function summarizeProject(project: FloorPlanProject, brief: ArchitectBrief): str
   const briefRoomNames = brief.roomList.map((r) => r.name).join(", ");
   const vastuRequired = brief.styleCues.some((s) => s.toLowerCase().includes("vastu"));
 
+  // Phase 2.3: surface the Stage-5 adjacency compliance report so the LLM
+  // can score the adjacencyCompliance dimension from objective data instead
+  // of guessing. Falls through gracefully when no adjacencies were declared.
+  const meta = project.metadata as unknown as Record<string, unknown>;
+  const report = meta.adjacency_report as
+    | {
+        declared: number;
+        satisfied: number;
+        violated: number;
+        unknown: number;
+        compliancePct: number;
+        checks?: Array<{
+          declaration: { a: string; b: string; relationship: string };
+          status: string;
+          note: string;
+        }>;
+      }
+    | undefined;
+  let adjacencyBlock = "";
+  if (report && report.declared > 0) {
+    const detail = (report.checks ?? [])
+      .map(
+        (c) =>
+          `  - ${c.status.toUpperCase()}: ${c.declaration.a} ↔ ${c.declaration.b} (${c.declaration.relationship}) — ${c.note}`,
+      )
+      .join("\n");
+    adjacencyBlock = `\n\nADJACENCY REPORT (Stage 5 best-effort check):
+Declared: ${report.declared}, satisfied: ${report.satisfied}, violated: ${report.violated}, unknown: ${report.unknown}, compliancePct: ${report.compliancePct}
+${detail}`;
+  } else {
+    adjacencyBlock = `\n\nADJACENCY REPORT: no adjacencies declared by Stage 1 — score adjacencyCompliance as 8 (neutral).`;
+  }
+
   return `FLOOR PLAN SUMMARY:
 Plot: ${brief.plotWidthFt}×${brief.plotDepthFt}ft, ${brief.facing}-facing
 Vastu required: ${vastuRequired ? "YES" : "NO"}
@@ -119,7 +174,7 @@ Expected rooms (from brief): ${briefRoomNames}
 Total walls: ${floor.walls.length}, doors: ${floor.doors.length}, windows: ${floor.windows.length}
 
 ACTUAL ROOMS (${floor.rooms.length}):
-${roomLines.join("\n")}`;
+${roomLines.join("\n")}${adjacencyBlock}`;
 }
 
 // ─── Score Calculator ────────────────────────────────────────────
@@ -130,8 +185,11 @@ const ALL_DIMS: QualityDimension[] = [
   "dimensionPlausibility",
   "vastuCompliance",
   "orientationCorrect",
+  "adjacencyCompliance",
   "connectivity",
   "exteriorWindows",
+  "bedroomPrivacy",
+  "entranceDoor",
 ];
 
 function computeVerdict(
@@ -215,12 +273,23 @@ ${input.brief.styleCues.some((s) => s.toLowerCase().includes("vastu"))
     const raw = parsed.data;
 
     const safeDimensions = {} as Record<QualityDimension, number>;
-    for (const dim of ALL_DIMS) {
+    for (const dim of LLM_DIMS) {
       const val = raw.dimensions[dim as keyof typeof raw.dimensions];
       safeDimensions[dim] = typeof val === "number" ? Math.max(1, Math.min(10, val)) : 5;
     }
 
-    return { output: computeVerdict(safeDimensions, raw.reasoning), metrics: { inputTokens, outputTokens, costUsd } };
+    // Phase 2.4 P0-B: deterministic evaluators for bedroomPrivacy + entranceDoor.
+    const privacyResult = evaluateBedroomPrivacy(input.project);
+    const entranceResult = evaluateEntranceDoor(input.project, input.brief);
+    safeDimensions.bedroomPrivacy = Math.max(1, Math.min(10, privacyResult.score));
+    safeDimensions.entranceDoor = Math.max(1, Math.min(10, entranceResult.score));
+
+    const mergedReasoning = `${raw.reasoning} | bedroomPrivacy: ${privacyResult.reason} | entranceDoor: ${entranceResult.reason}`;
+
+    // LOCAL_DIMS is the intentional inclusion set — retained for callers/tests.
+    void LOCAL_DIMS;
+
+    return { output: computeVerdict(safeDimensions, mergedReasoning), metrics: { inputTokens, outputTokens, costUsd } };
   } finally {
     clearTimeout(timer);
   }

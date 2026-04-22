@@ -32,7 +32,7 @@ interface ValidatedRoom {
 }
 
 interface ValidationIssue {
-  type: "OVER_AREA" | "UNDER_AREA" | "MISSING_ESSENTIAL" | "IMPOSSIBLE_DIMS" | "NO_PLOT_SIZE" | "ROOM_TOO_SMALL" | "ROOM_TOO_LARGE";
+  type: "OVER_AREA" | "UNDER_AREA" | "MISSING_ESSENTIAL" | "IMPOSSIBLE_DIMS" | "NO_PLOT_SIZE" | "ROOM_TOO_SMALL" | "ROOM_TOO_LARGE" | "FACING_CORRECTED";
   message: string;
   severity: "error" | "warning" | "info";
 }
@@ -152,9 +152,55 @@ export async function POST(req: NextRequest) {
 
 // ── Validation Logic ─────────────────────────────────────────────────────────
 
-function buildValidation(parsed: ParsedConstraints, prompt: string): Omit<ValidationResult, "parser_model"> {
+/**
+ * Phase 2.3 Workstream B: deterministic facing correction.
+ *
+ * The LLM parser occasionally returns a facing that doesn't match an
+ * explicit "N/S/E/W facing" or "<direction>-facing" phrase in the prompt.
+ * When the prompt is unambiguous, trust the regex over the LLM.
+ */
+export function correctFacingIfPromptExplicit(
+  parsedFacing: string | null | undefined,
+  prompt: string,
+): { facing: string | null; overridden: boolean } {
+  const tests: Array<{ re: RegExp; dir: "N" | "S" | "E" | "W" | "NE" | "NW" | "SE" | "SW" }> = [
+    { re: /\b(?:north[- ]?east|northeast)[- ]?facing\b/i, dir: "NE" },
+    { re: /\b(?:north[- ]?west|northwest)[- ]?facing\b/i, dir: "NW" },
+    { re: /\b(?:south[- ]?east|southeast)[- ]?facing\b/i, dir: "SE" },
+    { re: /\b(?:south[- ]?west|southwest)[- ]?facing\b/i, dir: "SW" },
+    { re: /\bnorth[- ]?facing\b/i, dir: "N" },
+    { re: /\bsouth[- ]?facing\b/i, dir: "S" },
+    { re: /\beast[- ]?facing\b/i, dir: "E" },
+    { re: /\bwest[- ]?facing\b/i, dir: "W" },
+  ];
+  for (const t of tests) {
+    if (t.re.test(prompt)) {
+      const matchedDir = t.dir;
+      const current = (parsedFacing ?? "").toUpperCase();
+      if (current !== matchedDir) {
+        return { facing: matchedDir, overridden: true };
+      }
+      return { facing: matchedDir, overridden: false };
+    }
+  }
+  return { facing: parsedFacing ?? null, overridden: false };
+}
+
+export function buildValidation(parsed: ParsedConstraints, prompt: string): Omit<ValidationResult, "parser_model"> {
   const issues: ValidationIssue[] = [];
   const adjustments: Adjustment[] = [];
+
+  // Phase 2.3 Workstream B: correct LLM facing slips.
+  const facingCorrection = correctFacingIfPromptExplicit(parsed.plot.facing, prompt);
+  if (facingCorrection.overridden) {
+    const wasValue = parsed.plot.facing ?? "unset";
+    parsed.plot.facing = facingCorrection.facing as typeof parsed.plot.facing;
+    issues.push({
+      type: "FACING_CORRECTED",
+      message: `Plot facing corrected to ${facingCorrection.facing} based on explicit prompt text (LLM parser had ${wasValue}).`,
+      severity: "info",
+    });
+  }
 
   // ── Resolve plot dimensions ──
   let plotW = parsed.plot.width_ft;
@@ -209,7 +255,10 @@ function buildValidation(parsed: ParsedConstraints, prompt: string): Omit<Valida
 
   // ── Check A: Missing essentials ──
   const hasKitchen = rooms.some(r => r.type === "kitchen");
-  const hasBathroom = rooms.some(r => r.type === "bathroom" || r.type === "master_bathroom" || r.type === "powder_room");
+  const hasMasterBath = rooms.some(r => r.type === "master_bathroom");
+  const hasCommonBath = rooms.some(r => r.type === "bathroom" || r.type === "powder_room");
+  const hasMasterBed = rooms.some(r => r.type === "master_bedroom");
+  const bedroomCount = countBedrooms(parsed.rooms);
 
   if (!hasKitchen) {
     const [kw, kd] = DEFAULT_DIMS.kitchen;
@@ -230,22 +279,54 @@ function buildValidation(parsed: ParsedConstraints, prompt: string): Omit<Valida
     });
   }
 
-  if (!hasBathroom) {
+  // Phase 2.3 Workstream B: ensuite-aware bathroom auto-add. Indian BHK
+  // convention means 3BHK+ implies a master ensuite + common bathroom,
+  // not just a generic single "bathroom".
+  if (hasMasterBed && !hasMasterBath) {
     const [bw, bd] = DEFAULT_DIMS.bathroom;
+    rooms.push({
+      name: "Master Bathroom", type: "master_bathroom",
+      requested_sqft: null, adjusted_sqft: bw * bd,
+      width_ft: bw, depth_ft: bd,
+      source: "added",
+      adjustment_reason: "Ensuite bathroom attached to Master Bedroom",
+    });
+    adjustments.push({
+      room_name: "Master Bathroom", original_sqft: null, adjusted_sqft: bw * bd,
+      reason: "Ensuite bathroom attached to Master Bedroom (Indian BHK convention)",
+      type: "added", user_can_undo: true,
+    });
+    issues.push({
+      type: "MISSING_ESSENTIAL",
+      message: "Added a Master Bathroom as an ensuite for the Master Bedroom (35 sqft).",
+      severity: "info",
+    });
+  }
+
+  // Common bathroom: always for 2BHK+; mandatory if no bathroom at all exists.
+  const needCommonBath =
+    !hasCommonBath && (bedroomCount >= 2 || (!hasMasterBed && !hasMasterBath));
+  if (needCommonBath) {
+    const [bw, bd] = DEFAULT_DIMS.bathroom;
+    const reason = hasMasterBed
+      ? "Common bathroom for non-master bedrooms (Indian BHK convention)"
+      : "Every home needs a bathroom";
     rooms.push({
       name: "Bathroom", type: "bathroom",
       requested_sqft: null, adjusted_sqft: bw * bd,
       width_ft: bw, depth_ft: bd,
-      source: "added", adjustment_reason: "Every home needs a bathroom",
+      source: "added", adjustment_reason: reason,
     });
     adjustments.push({
       room_name: "Bathroom", original_sqft: null, adjusted_sqft: bw * bd,
-      reason: "Every home needs a bathroom", type: "added", user_can_undo: true,
+      reason, type: "added", user_can_undo: true,
     });
     issues.push({
       type: "MISSING_ESSENTIAL",
-      message: "No bathroom found in your description. We added one (35 sqft).",
-      severity: "warning",
+      message: hasMasterBed
+        ? `Added a common bathroom for the ${bedroomCount - 1} non-master bedroom${bedroomCount - 1 === 1 ? "" : "s"} (35 sqft).`
+        : "No bathroom found in your description. We added one (35 sqft).",
+      severity: hasMasterBed ? "info" : "warning",
     });
   }
 
@@ -316,9 +397,17 @@ function buildValidation(parsed: ParsedConstraints, prompt: string): Omit<Valida
   const existingTypes = new Set(rooms.map(r => r.type));
 
   if (!existingTypes.has("pooja") && plotArea >= 1000) {
+    // Phase 2.3 Workstream B: if the user's prompt mentions vastu OR pooja,
+    // pre-check it so the modal reflects the intent instead of showing it
+    // as a throwaway option.
+    const promptMentionsPooja = /\b(pooja|pooja room|prayer room|mandir)\b/i.test(prompt);
+    const vastuRequired = parsed.vastu_required === true;
     optionalRooms.push({
       name: "Pooja Room", type: "pooja", default_sqft: 20, default_width: 5, default_depth: 4,
-      description: "Prayer/worship room", checked_by_default: false,
+      description: vastuRequired
+        ? "Prayer/worship room (pre-selected because vastu was requested)"
+        : "Prayer/worship room",
+      checked_by_default: promptMentionsPooja || vastuRequired,
     });
   }
   if (!existingTypes.has("utility") && plotArea >= 700) {
