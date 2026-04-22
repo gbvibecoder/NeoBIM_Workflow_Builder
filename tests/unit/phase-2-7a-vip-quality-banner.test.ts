@@ -180,7 +180,7 @@ describe("Legacy / VIP banner precedence (contract-level sanity)", () => {
     // must still show the truthful VIP banner.
     useFloorPlanStore.getState().setQualityResults(null, [
       { severity: "warning", code: "SOME_FLAG", message: "legacy flag leftover" },
-    ] as unknown as Parameters<typeof useFloorPlanStore.getState.prototype.setQualityResults>[1], []);
+    ] as unknown as Parameters<ReturnType<typeof useFloorPlanStore.getState>["setQualityResults"]>[1], []);
     useFloorPlanStore.getState().setVipQualityResults({
       score: 42, weakAreas: [], recommendation: "fail",
     });
@@ -194,7 +194,7 @@ describe("Legacy / VIP banner precedence (contract-level sanity)", () => {
   it("Legacy path remains reachable: vipQualityScore stays null, legacy flags drive the banner", () => {
     useFloorPlanStore.getState().setQualityResults(null, [
       { severity: "critical", code: "FOO", message: "bar" },
-    ] as unknown as Parameters<typeof useFloorPlanStore.getState.prototype.setQualityResults>[1], []);
+    ] as unknown as Parameters<ReturnType<typeof useFloorPlanStore.getState>["setQualityResults"]>[1], []);
     const s = useFloorPlanStore.getState();
     expect(s.vipQualityScore).toBeNull();
     expect(s.lastQualityFlags.length).toBe(1);
