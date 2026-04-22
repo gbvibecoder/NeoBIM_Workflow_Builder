@@ -9,7 +9,7 @@
  */
 
 import type Anthropic from "@anthropic-ai/sdk";
-import type { Stage3Input, Stage3Output, JuryDimension } from "./types";
+import type { Stage3Input, Stage3Output, JuryDimension, JuryVerdict, ImageGenPrompt } from "./types";
 import type { VIPLogger } from "./logger";
 import { Stage3RawOutputSchema } from "./schemas";
 import { createAnthropicClient } from "./clients";
@@ -34,6 +34,80 @@ const DIMENSION_WEIGHTS: Record<JuryDimension, number> = {
 
 const PASS_THRESHOLD = 70;
 const RETRY_THRESHOLD = 50;
+
+// ─── Phase 2.12 — Vision-Jury Retry Loop ─────────────────────────
+//
+// Stage 2 (GPT-Image) is non-deterministic; Stage 3 (the vision jury)
+// already scores the generated image but its `recommendation` was
+// advisory only — the pipeline proceeded to Stage 4 regardless.
+// Phase 2.12 wires the verdict into a single-shot retry: if the jury
+// flags a retry (or the composite score falls below threshold), the
+// orchestrator regenerates Stage 2 once with a retry hint appended to
+// the GPT-Image prompt, then re-scores with Stage 3 before continuing.
+//
+// STAGE_2_MAX_RETRIES caps the loop at 1 additional iteration (hard
+// max 2 total Stage 2 + Stage 3 passes) so one bad roll can't trigger
+// an unbounded cost spiral. STAGE_3_RETRY_SCORE_THRESHOLD mirrors
+// PASS_THRESHOLD above — we retry whenever we didn't get a clean pass.
+
+/** Max additional Stage 2 regenerations triggered by a bad jury verdict. */
+export const STAGE_2_MAX_RETRIES = 1;
+
+/** Composite jury score below this triggers a retry (in addition to `recommendation === 'retry'`). */
+export const STAGE_3_RETRY_SCORE_THRESHOLD = 70;
+
+/**
+ * Decide whether to regenerate the Stage 2 image based on the Stage 3
+ * verdict. Returns true only when both:
+ *   - the verdict signals trouble (recommendation "retry" | "fail",
+ *     or score below the retry threshold), AND
+ *   - we have retry budget left (retryCount < STAGE_2_MAX_RETRIES).
+ *
+ * The caller increments retryCount after a retry fires, so on the
+ * second call (retryCount === 1) this always returns false — keeping
+ * the loop bounded even if the retry image still scores poorly.
+ */
+export function shouldRetryAtStage3(
+  stage3Output: Stage3Output,
+  retryCount: number,
+): boolean {
+  if (retryCount >= STAGE_2_MAX_RETRIES) return false;
+  const v = stage3Output.verdict;
+  return v.recommendation === "retry" || v.score < STAGE_3_RETRY_SCORE_THRESHOLD;
+}
+
+/**
+ * Build the retry-hint suffix appended to the GPT-Image prompt on a
+ * vision-jury retry. Includes the previous score and weak areas so
+ * the generator knows what to fix. Pure / deterministic — no I/O.
+ */
+export function buildStage3RetryHint(verdict: JuryVerdict, attempt: number): string {
+  const weakList =
+    verdict.weakAreas.length > 0 ? verdict.weakAreas.join(", ") : "none flagged";
+  return (
+    `\n\n[RETRY ATTEMPT ${attempt}] The previous image scored ${verdict.score}/100 on ` +
+    `the extraction-readiness jury. Weak areas: ${weakList}. Regenerate with careful ` +
+    `attention to: clear room labels (one label per room, no duplicates, no typos), ` +
+    `complete exterior walls, correct room count matching the brief, and clean ` +
+    `rectangular (never L-shaped or rotated) room shapes.`
+  );
+}
+
+/**
+ * Apply the retry hint to the GPT-Image prompt only. Non-GPT prompts
+ * (if ever re-added) pass through unchanged so a single misbehaving
+ * provider can't poison the rest of the batch.
+ */
+export function appendRetryHintToPrompts(
+  prompts: ImageGenPrompt[],
+  verdict: JuryVerdict,
+  attempt: number,
+): ImageGenPrompt[] {
+  const hint = buildStage3RetryHint(verdict, attempt);
+  return prompts.map((p) =>
+    p.model === "gpt-image-1.5" ? { ...p, prompt: p.prompt + hint } : p,
+  );
+}
 
 // ─── Public Types ────────────────────────────────────────────────
 

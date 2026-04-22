@@ -44,6 +44,14 @@ vi.mock("../stage-3-jury", () => ({
     },
     metrics: { inputTokens: 100, outputTokens: 50, costUsd: 0.013 },
   }),
+  // Phase 2.12 — constants/helpers imported by orchestrator.ts. Score
+  // 82 above recommends pass, so shouldRetryAtStage3 returning false
+  // matches the existing single-attempt expectation.
+  STAGE_2_MAX_RETRIES: 1,
+  STAGE_3_RETRY_SCORE_THRESHOLD: 70,
+  shouldRetryAtStage3: () => false,
+  appendRetryHintToPrompts: (p: unknown) => p,
+  buildStage3RetryHint: () => "",
 }));
 vi.mock("../stage-4-extract", () => ({
   runStage4RoomExtraction: vi.fn().mockResolvedValue({

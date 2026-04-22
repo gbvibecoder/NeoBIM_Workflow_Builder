@@ -313,6 +313,14 @@ export interface Stage7Input {
   totalMs: number;
   retried: boolean;
   weakAreas: string[];
+  /**
+   * Phase 2.12 — number of Stage 2+3 vision-jury retries that fired
+   * before extraction. 0 = first image passed the jury (happy path),
+   * 1 = jury flagged a retry and we regenerated once. Hard-capped at
+   * STAGE_2_MAX_RETRIES (currently 1). Separate from `retried`, which
+   * tracks the Stage 6 quality-gate retry path.
+   */
+  visionJuryRetries?: number;
 }
 
 export interface Stage7Output {
@@ -342,6 +350,12 @@ export type VIPPipelineResult =
       project: FloorPlanProject;
       qualityScore: number;
       retried: boolean;
+      /**
+       * Phase 2.12 — vision-jury retry count (0 or 1). Mirrors the
+       * value stamped into `project.metadata.generation_vision_jury_retries`
+       * so orchestration callers can log it without unwrapping metadata.
+       */
+      visionJuryRetries?: number;
       timing: VIPTiming;
       warnings: string[];
     }
