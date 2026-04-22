@@ -71,8 +71,16 @@ export function useVipGeneration() {
   const [intermediateImage, setIntermediateImage] = useState<string | null>(null);
   // Phase 2.6: in-flight approval/regeneration actions (drive button
   // disabled + spinner states in ImageApprovalGate).
+  // Phase 2.6.1: also mirrored into refs so the click-handler guard is
+  // synchronous. useState alone has a race — a double-click that fires
+  // before React commits the setApproving(true) re-render would close
+  // over the stale `approving=false` and send a second /approve request.
+  // Refs are read/written synchronously so the second call hits
+  // approvingRef.current === true and returns before the fetch.
   const [approving, setApproving] = useState(false);
   const [regenerating, setRegenerating] = useState(false);
+  const approvingRef = useRef(false);
+  const regeneratingRef = useRef(false);
   // Phase 2.6: stage-by-stage log for the Pipeline Logs Panel.
   const [stageLog, setStageLog] = useState<StageLogEntry[]>([]);
 
@@ -216,10 +224,13 @@ export function useVipGeneration() {
   }, [stopPolling]);
 
   // Phase 2.3 Workstream C: user approves the Stage 2 image.
-  // Phase 2.6: tracks `approving` so the gate can disable buttons + show spinner.
+  // Phase 2.6.1: ref-based in-flight guard (synchronous). Prevents a
+  // fast double-click from sending two /approve requests — the second
+  // hit lands after ref is true and returns before touching fetch.
   const approveImage = useCallback(async () => {
     const jobId = jobIdRef.current;
-    if (!jobId || approving || regenerating) return;
+    if (!jobId || approvingRef.current || regeneratingRef.current) return;
+    approvingRef.current = true;
     setApproving(true);
     setErrorMessage(null);
     try {
@@ -235,15 +246,17 @@ export function useVipGeneration() {
     } catch {
       setErrorMessage("Network error approving image. Try again?");
     } finally {
+      approvingRef.current = false;
       setApproving(false);
     }
-  }, [approving, regenerating]);
+  }, []);
 
   // Phase 2.3 Workstream C: user rejects the image and wants a fresh one.
-  // Phase 2.6: tracks `regenerating` so the gate can disable buttons + show spinner.
+  // Phase 2.6.1: ref-based in-flight guard (same rationale as approveImage).
   const regenerateImage = useCallback(async () => {
     const jobId = jobIdRef.current;
-    if (!jobId || approving || regenerating) return;
+    if (!jobId || approvingRef.current || regeneratingRef.current) return;
+    regeneratingRef.current = true;
     setRegenerating(true);
     setErrorMessage(null);
     try {
@@ -260,9 +273,10 @@ export function useVipGeneration() {
     } catch {
       setErrorMessage("Network error regenerating image. Try again?");
     } finally {
+      regeneratingRef.current = false;
       setRegenerating(false);
     }
-  }, [approving, regenerating]);
+  }, []);
 
   return {
     status,
