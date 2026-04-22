@@ -182,6 +182,23 @@ export interface ExtractedRoom {
   labelAsShown: string; // text as visible in image (may differ from name)
 }
 
+/**
+ * Phase 2.10.2 — image-drift metrics attached to every Stage 4 output
+ * where the Stage 2 image was available. `driftRatio` is the symmetric-
+ * difference area (image-content bbox XOR rooms-union bbox) divided by
+ * the image-content bbox area. `severity` buckets it per the documented
+ * gate (0.20 / 0.35 thresholds).
+ */
+export type DriftSeverity = "none" | "moderate" | "severe";
+
+export interface ExtractedRoomsDriftMetrics {
+  imageBboxPx: RectPx;
+  roomsUnionBboxPx: RectPx | null;
+  driftRatio: number;
+  driftFlagged: boolean;
+  severity: DriftSeverity;
+}
+
 export interface ExtractedRooms {
   imageSize: { width: number; height: number };
   plotBoundsPx: RectPx | null;
@@ -189,6 +206,8 @@ export interface ExtractedRooms {
   issues: string[];
   expectedRoomsMissing: string[];
   unexpectedRoomsFound: string[];
+  /** Phase 2.10.2 — present when the Stage 2 image buffer was available for drift analysis. */
+  driftMetrics?: ExtractedRoomsDriftMetrics;
 }
 
 export interface Stage4Input {

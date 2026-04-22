@@ -20,7 +20,10 @@ import type {
 } from "./types";
 import type { VIPLogger } from "./logger";
 import { pickBestMatch } from "./stage-4-matcher";
-import { applyStage4PostValidation } from "./stage-4-validators";
+import {
+  applyImageDriftGate,
+  applyStage4PostValidation,
+} from "./stage-4-validators";
 
 // ─── Constants ───────────────────────────────────────────────────
 
@@ -469,6 +472,21 @@ export async function runStage4RoomExtraction(
   // against the brief's approxAreaSqft. Both run post-clamp + post-
   // matcher so they operate on the final kept-rooms list.
   applyStage4PostValidation(extraction, input.brief);
+
+  // Phase 2.10.2: image-drift gate. Compare the Stage 2 image's
+  // visible-content bbox to the rooms-union bbox; attach metrics +
+  // an issue line so Stage 6 can penalise the quality score.
+  // Best-effort — a failure here is logged but does not break Stage 4.
+  if (input.image.base64) {
+    try {
+      const imageBuffer = Buffer.from(input.image.base64, "base64");
+      await applyImageDriftGate(extraction, imageBuffer);
+    } catch (err) {
+      extraction.issues.push(
+        `drift: gate threw ${err instanceof Error ? err.message : String(err)} — metrics absent`,
+      );
+    }
+  }
 
   if (extraction.rooms.length === 0) {
     throw new Error(

@@ -11,11 +11,22 @@
  * confuse downstream layout. Plausibility mismatches are FLAGGED,
  * never corrected — the fidelity-mode spirit of Phase 2.7C says the
  * image is the source of truth and violations surface as issues.
+ *
+ * Phase 2.10.2 — adds an image-drift gate on top of the Phase 2.8
+ * validators. Compares the Stage 2 image's visible-content bounding
+ * box to the Stage 4 rooms-union bounding box; flags mismatches so
+ * Stage 6 can penalise the quality score. Computation is pure CV —
+ * sharp raw-pixel scan + rectangle math — and returns a Zod-validated
+ * `ExtractedRoomsDriftMetrics` object.
  */
 
+import sharp from "sharp";
+import { z } from "zod";
 import type {
+  DriftSeverity,
   ExtractedRoom,
   ExtractedRooms,
+  ExtractedRoomsDriftMetrics,
   RectPx,
   Stage4Input,
 } from "./types";
@@ -158,6 +169,215 @@ export function recomputeMissing(
     if (!keptNames.has(expected.toLowerCase())) missing.push(expected);
   }
   return missing;
+}
+
+// ─── Phase 2.10.2 — image-drift gate ────────────────────────────
+
+/**
+ * Any non-white pixel counts as "content". 240 (out of 255) gives a
+ * small tolerance for antialiased off-white while still rejecting
+ * pure white paper backgrounds.
+ */
+const DRIFT_CONTENT_THRESHOLD = 240;
+
+/**
+ * XOR-area / image-bbox-area thresholds. Match the scope-doc:
+ * - ratio ≤ 0.20 → "none" (pass)
+ * - 0.20 <  ratio ≤ 0.35 → "moderate" (flag)
+ * - ratio > 0.35 → "severe" (recommend retry)
+ */
+const DRIFT_FLAG_THRESHOLD = 0.2;
+const DRIFT_SEVERE_THRESHOLD = 0.35;
+
+// ─── Zod schema (internal guard; external callers see the TS type) ──
+
+const RectPxSchema = z.object({
+  x: z.number().finite().nonnegative(),
+  y: z.number().finite().nonnegative(),
+  w: z.number().finite().nonnegative(),
+  h: z.number().finite().nonnegative(),
+});
+
+const DriftMetricsSchema = z.object({
+  imageBboxPx: RectPxSchema,
+  roomsUnionBboxPx: RectPxSchema.nullable(),
+  driftRatio: z.number().finite().min(0),
+  driftFlagged: z.boolean(),
+  severity: z.enum(["none", "moderate", "severe"]),
+});
+
+// ─── Image-content bbox ─────────────────────────────────────────
+
+/**
+ * Scan a rasterised image buffer for its non-white bounding box.
+ * Returns `null` when the image is entirely white (or entirely above
+ * the threshold). The scan is O(W·H); on a 1024×1024 image V8 runs it
+ * in ~15–25 ms, inside the 50 ms per-image budget.
+ */
+export async function computeImageContentBbox(
+  imageBuffer: Buffer,
+  threshold: number = DRIFT_CONTENT_THRESHOLD,
+): Promise<RectPx | null> {
+  const { data, info } = await sharp(imageBuffer)
+    .removeAlpha()
+    .grayscale()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  const W = info.width;
+  const H = info.height;
+  if (W === 0 || H === 0) return null;
+
+  let minX = W;
+  let minY = H;
+  let maxX = -1;
+  let maxY = -1;
+  for (let y = 0; y < H; y++) {
+    const rowBase = y * W;
+    for (let x = 0; x < W; x++) {
+      if (data[rowBase + x] < threshold) {
+        if (x < minX) minX = x;
+        if (y < minY) minY = y;
+        if (x > maxX) maxX = x;
+        if (y > maxY) maxY = y;
+      }
+    }
+  }
+  if (maxX < 0) return null;
+  return {
+    x: minX,
+    y: minY,
+    w: maxX - minX + 1,
+    h: maxY - minY + 1,
+  };
+}
+
+// ─── Rooms-union bbox ───────────────────────────────────────────
+
+/**
+ * Axis-aligned union bbox of the supplied rooms' rectPx. Returns
+ * `null` when the list is empty or all rects are degenerate.
+ */
+export function computeRoomsUnionBbox(rooms: ExtractedRoom[]): RectPx | null {
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  let any = false;
+  for (const r of rooms) {
+    if (r.rectPx.w <= 0 || r.rectPx.h <= 0) continue;
+    any = true;
+    if (r.rectPx.x < minX) minX = r.rectPx.x;
+    if (r.rectPx.y < minY) minY = r.rectPx.y;
+    if (r.rectPx.x + r.rectPx.w > maxX) maxX = r.rectPx.x + r.rectPx.w;
+    if (r.rectPx.y + r.rectPx.h > maxY) maxY = r.rectPx.y + r.rectPx.h;
+  }
+  if (!any) return null;
+  return {
+    x: minX,
+    y: minY,
+    w: Math.max(0, maxX - minX),
+    h: Math.max(0, maxY - minY),
+  };
+}
+
+// ─── Drift ratio ────────────────────────────────────────────────
+
+function rectArea(r: RectPx): number {
+  return Math.max(0, r.w) * Math.max(0, r.h);
+}
+
+function rectIntersectionArea(a: RectPx, b: RectPx): number {
+  const x0 = Math.max(a.x, b.x);
+  const y0 = Math.max(a.y, b.y);
+  const x1 = Math.min(a.x + a.w, b.x + b.w);
+  const y1 = Math.min(a.y + a.h, b.y + b.h);
+  if (x1 <= x0 || y1 <= y0) return 0;
+  return (x1 - x0) * (y1 - y0);
+}
+
+/**
+ * Drift = symmetric-difference area / image-content-bbox area.
+ *
+ *   XOR_area  = imageArea + roomsArea − 2·intersectionArea
+ *   drift     = XOR_area / imageArea
+ *
+ * When `roomsUnionBbox` is null (extraction returned nothing), drift
+ * is 1.0 — a full mismatch. When `imageBbox` has zero area, drift is
+ * 1.0 (degenerate; should never happen in practice).
+ */
+export function computeDriftRatio(
+  imageBbox: RectPx,
+  roomsUnionBbox: RectPx | null,
+): number {
+  const imgArea = rectArea(imageBbox);
+  if (imgArea <= 0) return 1;
+  if (!roomsUnionBbox) return 1;
+  const roomsArea = rectArea(roomsUnionBbox);
+  const inter = rectIntersectionArea(imageBbox, roomsUnionBbox);
+  const xor = imgArea + roomsArea - 2 * inter;
+  return xor / imgArea;
+}
+
+function severityFor(ratio: number): DriftSeverity {
+  if (ratio > DRIFT_SEVERE_THRESHOLD) return "severe";
+  if (ratio > DRIFT_FLAG_THRESHOLD) return "moderate";
+  return "none";
+}
+
+// ─── Public entry ──────────────────────────────────────────────
+
+/**
+ * Compute + validate drift metrics for a Stage 4 extraction.
+ *
+ * Returns `null` when the image is blank / unreadable (no content
+ * bbox), which is treated as "can't compute drift" rather than
+ * "drift is zero" — the caller should decide how to flag that.
+ */
+export async function computeImageDriftMetrics(
+  imageBuffer: Buffer,
+  rooms: ExtractedRoom[],
+): Promise<ExtractedRoomsDriftMetrics | null> {
+  const imageBboxPx = await computeImageContentBbox(imageBuffer);
+  if (!imageBboxPx) return null;
+  const roomsUnionBboxPx = computeRoomsUnionBbox(rooms);
+  const driftRatio = computeDriftRatio(imageBboxPx, roomsUnionBboxPx);
+  const severity = severityFor(driftRatio);
+  const driftFlagged = severity !== "none";
+  const metrics: ExtractedRoomsDriftMetrics = {
+    imageBboxPx,
+    roomsUnionBboxPx,
+    driftRatio,
+    driftFlagged,
+    severity,
+  };
+  // Zod-validate the computed object (defense-in-depth — catches
+  // NaN / negative-ratio bugs before they reach downstream consumers).
+  return DriftMetricsSchema.parse(metrics);
+}
+
+/**
+ * Mutating variant — attaches drift metrics + an issue line onto the
+ * extraction so Stage 6's dimensionPlausibility scorer and the
+ * Pipeline Logs Panel can surface the flag.
+ */
+export async function applyImageDriftGate(
+  extraction: ExtractedRooms,
+  imageBuffer: Buffer,
+): Promise<ExtractedRooms> {
+  const metrics = await computeImageDriftMetrics(imageBuffer, extraction.rooms);
+  if (!metrics) {
+    extraction.issues.push(
+      "drift: image content bbox empty (all-white or unreadable input); gate skipped",
+    );
+    return extraction;
+  }
+  extraction.driftMetrics = metrics;
+  if (metrics.driftFlagged) {
+    extraction.issues.push(
+      `drift: ${metrics.severity} (ratio ${metrics.driftRatio.toFixed(3)} > ${DRIFT_FLAG_THRESHOLD} threshold)`,
+    );
+  }
+  return extraction;
 }
 
 // ─── Public wrapper — run B2 + B3 + missing recompute in order ──
