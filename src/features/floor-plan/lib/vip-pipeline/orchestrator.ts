@@ -365,7 +365,11 @@ export async function runVIPPipeline(
 
     // ── Stage 7: Delivery ────────────────────────────────────────
     if (finalProject) {
-      log.logStageStart(7);
+      // Phase 2.7D: dropped logStageStart(7). Stage 7 is sync + <5ms,
+      // so the start/success pair raced Prisma persists and sometimes
+      // froze the row as status="running". logStageSuccess on its own
+      // triggers finalizeStageEntry's synthesize-entry fallback, which
+      // writes a single success entry — no running intermediate.
       const s7Start = Date.now();
       const totalCostUsd = log.computeTotalCost();
       const { output: s7Output } = runStage7Delivery({
