@@ -241,6 +241,11 @@ export async function runVIPPipelinePhaseB(
         // already does this; Phase B was silently dropping it.
         municipality: intermediate.stage1Output.brief.municipality,
         adjacencies: intermediate.stage1Output.brief.adjacencies,
+        // Phase 2.9: brief + userPrompt power the fidelity-mode
+        // scenario classifier and dimension enhancer. Without these
+        // the classifier stays gated OFF and rooms pass through unchanged.
+        brief: intermediate.stage1Output.brief,
+        userPrompt: config.prompt,
       },
       log,
     );
@@ -260,6 +265,22 @@ export async function runVIPPipelinePhaseB(
       doors: metrics.doorCount,
       windows: metrics.windowCount,
       issues: output.issues.length,
+      // Phase 2.9: surface classifier + enhancement outcome.
+      enhancement: metrics.enhancement
+        ? {
+            classified: metrics.enhancement.classification.enhanceDimensions,
+            plotSize: metrics.enhancement.classification.plotSizeCategory,
+            biasDetected: metrics.enhancement.classification.hasGridSquareBias,
+            residential: metrics.enhancement.classification.isResidential,
+            reasons: metrics.enhancement.classification.reasonsForFallback,
+            dimCorrectionApplied: metrics.enhancement.dimensionCorrection.applied,
+            dimCorrectionRollback:
+              metrics.enhancement.dimensionCorrection.rollbackReason,
+            adjEnforcementApplied: metrics.enhancement.adjacencyEnforcement.applied,
+            adjEnforcementRollback:
+              metrics.enhancement.adjacencyEnforcement.rollbackReason,
+          }
+        : undefined,
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
