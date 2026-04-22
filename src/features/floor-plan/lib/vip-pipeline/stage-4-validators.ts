@@ -23,6 +23,7 @@
 import sharp from "sharp";
 import { z } from "zod";
 import type {
+  DedupRename,
   DriftSeverity,
   ExtractedRoom,
   ExtractedRooms,
@@ -380,7 +381,92 @@ export async function applyImageDriftGate(
   return extraction;
 }
 
-// ─── Public wrapper — run B2 + B3 + missing recompute in order ──
+// ─── Phase 2.10.3 — duplicate-name dedup ────────────────────────
+//
+// GPT-Image-1.5 occasionally renders the same label twice ("BEDROOM 2"
+// drawn in two rooms). GPT-4o Vision dutifully reports both with
+// separate bounding boxes, and Phase 2.8 B1's matcher was extended to
+// keep both with reduced confidence. That was the right conservative
+// call at the time — but it leaves the downstream pipeline with two
+// rooms sharing a name, which confuses Stage 5's name→brief lookup
+// and Stage 6's noDuplicateNames scoring.
+//
+// Dedup policy:
+//   1. Scan extraction.rooms for duplicate names (case-insensitive).
+//   2. For the FIRST occurrence of each name, do nothing.
+//   3. For each subsequent occurrence, pick a brief room NOT yet in
+//      the extraction and rename to it.
+//   4. If no brief room remains, rename to "Room N" where N is the
+//      smallest integer that keeps the resulting name unique.
+//
+// All renames are recorded:
+//   - Structured: extraction.dedupRenames[]
+//   - Human-readable: extraction.issues[] entry prefixed "dedup:"
+//
+// The pass runs AFTER phantom filter (so we don't rename a room we're
+// about to drop) and BEFORE plausibility (so plausibility checks the
+// renamed room's expected area, not the duplicate-name placeholder).
+
+const DEDUP_FALLBACK_PREFIX = "Room";
+
+function normaliseName(name: string): string {
+  return name.trim().toLowerCase();
+}
+
+function buildBriefNameSet(brief: Stage4Input["brief"]): string[] {
+  return brief.roomList.map((r) => r.name).filter((n) => n && n.trim().length > 0);
+}
+
+function firstAvailableBriefName(
+  briefNames: string[],
+  usedNormalised: Set<string>,
+): string | null {
+  for (const name of briefNames) {
+    if (!usedNormalised.has(normaliseName(name))) return name;
+  }
+  return null;
+}
+
+function firstAvailableFallback(usedNormalised: Set<string>): string {
+  for (let n = 1; n < 1000; n++) {
+    const candidate = `${DEDUP_FALLBACK_PREFIX} ${n}`;
+    if (!usedNormalised.has(normaliseName(candidate))) return candidate;
+  }
+  // pathological — but let the caller see a suffix rather than loop forever
+  return `${DEDUP_FALLBACK_PREFIX} ${Date.now()}`;
+}
+
+export function dedupRoomNames(
+  rooms: ExtractedRoom[],
+  brief: Stage4Input["brief"],
+  issues: string[],
+): { rooms: ExtractedRoom[]; renames: DedupRename[] } {
+  const used = new Set<string>();
+  const renames: DedupRename[] = [];
+  const briefNames = buildBriefNameSet(brief);
+  const out: ExtractedRoom[] = [];
+  for (const r of rooms) {
+    const key = normaliseName(r.name);
+    if (!used.has(key)) {
+      used.add(key);
+      out.push(r);
+      continue;
+    }
+    // Duplicate — try brief-name pool first, fall back to "Room N"
+    const picked = firstAvailableBriefName(briefNames, used);
+    const reason = picked
+      ? "duplicate of existing extraction"
+      : "duplicate of existing extraction; no brief name available — fallback";
+    const newName = picked ?? firstAvailableFallback(used);
+    used.add(normaliseName(newName));
+    renames.push({ from: r.name, to: newName, reason });
+    issues.push(`dedup: renamed "${r.name}" → "${newName}" (${reason})`);
+    out.push({ ...r, name: newName });
+  }
+  return { rooms: out, renames };
+}
+
+// ─── Public wrapper — run B2 + dedup + B3 + missing recompute in order ──
 
 export function applyStage4PostValidation(
   extraction: ExtractedRooms,
@@ -396,6 +482,17 @@ export function applyStage4PostValidation(
     extraction.issues,
   );
   extraction.rooms = kept;
+
+  // Phase 2.10.3 dedup — AFTER phantom drop (don't spend rename slots on
+  // rooms we're about to discard) and BEFORE plausibility (so flagging
+  // runs on the final name).
+  const { rooms: deduped, renames } = dedupRoomNames(
+    extraction.rooms,
+    brief,
+    extraction.issues,
+  );
+  extraction.rooms = deduped;
+  if (renames.length > 0) extraction.dedupRenames = renames;
 
   // B3: plausibility flag (AFTER phantom drop — don't waste cycles
   // flagging rooms we're about to discard).

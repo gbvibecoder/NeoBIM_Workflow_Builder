@@ -11,6 +11,8 @@
 
 import type Anthropic from "@anthropic-ai/sdk";
 import type {
+  DriftSeverity,
+  ExtractedRoomsDriftMetrics,
   Stage6Input,
   Stage6Output,
   QualityDimension,
@@ -177,6 +179,57 @@ ACTUAL ROOMS (${floor.rooms.length}):
 ${roomLines.join("\n")}${adjacencyBlock}`;
 }
 
+// ─── Phase 2.10.3 — drift-severity penalty on dimensionPlausibility ──
+//
+// When Stage 4 attached `driftMetrics` (see Phase 2.10.2), propagate
+// the severity into Stage 6 scoring so the overall quality number
+// actually moves when the image ↔ rooms bbox mismatch is flagged.
+//
+//   moderate (0.20 < ratio ≤ 0.35) → -5 on dimensionPlausibility
+//   severe  (ratio > 0.35)         → -10 on dimensionPlausibility,
+//                                    force recommendation to "retry"
+//                                    (unless already "fail"),
+//                                    ensure dimensionPlausibility is
+//                                    in weakAreas.
+//
+// Dimensions are clamped to [1, 10] inside computeVerdict, so -10 from
+// a 10/10 score bottoms out at 1/10, not 0. The downstream weakAreas
+// test (`score < 6`) naturally picks up the degraded dimension.
+
+const DRIFT_PENALTY_MODERATE = 5;
+const DRIFT_PENALTY_SEVERE = 10;
+
+export interface DriftPenaltyResult {
+  dimensions: Record<QualityDimension, number>;
+  severity: DriftSeverity;
+  appliedPenalty: number;
+}
+
+/**
+ * Pure helper — apply the drift penalty to a dimensions map. Returns
+ * a new map; does not mutate the input.
+ */
+export function applyDriftPenalty(
+  dimensions: Record<QualityDimension, number>,
+  driftMetrics: ExtractedRoomsDriftMetrics | undefined,
+): DriftPenaltyResult {
+  if (!driftMetrics || driftMetrics.severity === "none") {
+    return { dimensions: { ...dimensions }, severity: "none", appliedPenalty: 0 };
+  }
+  const penalty =
+    driftMetrics.severity === "severe"
+      ? DRIFT_PENALTY_SEVERE
+      : DRIFT_PENALTY_MODERATE;
+  return {
+    dimensions: {
+      ...dimensions,
+      dimensionPlausibility: dimensions.dimensionPlausibility - penalty,
+    },
+    severity: driftMetrics.severity,
+    appliedPenalty: penalty,
+  };
+}
+
 // ─── Score Calculator ────────────────────────────────────────────
 
 const ALL_DIMS: QualityDimension[] = [
@@ -284,12 +337,35 @@ ${input.brief.styleCues.some((s) => s.toLowerCase().includes("vastu"))
     safeDimensions.bedroomPrivacy = Math.max(1, Math.min(10, privacyResult.score));
     safeDimensions.entranceDoor = Math.max(1, Math.min(10, entranceResult.score));
 
-    const mergedReasoning = `${raw.reasoning} | bedroomPrivacy: ${privacyResult.reason} | entranceDoor: ${entranceResult.reason}`;
+    // Phase 2.10.3 — apply image-drift penalty onto dimensionPlausibility
+    // before the verdict is scored. See applyDriftPenalty for semantics.
+    const driftResult = applyDriftPenalty(safeDimensions, input.driftMetrics);
+    Object.assign(safeDimensions, driftResult.dimensions);
+
+    const driftNote = driftResult.severity === "none"
+      ? ""
+      : ` | drift: severity=${driftResult.severity} ratio=${input.driftMetrics?.driftRatio.toFixed(3) ?? "—"} penalty=-${driftResult.appliedPenalty}`;
+    const mergedReasoning = `${raw.reasoning} | bedroomPrivacy: ${privacyResult.reason} | entranceDoor: ${entranceResult.reason}${driftNote}`;
 
     // LOCAL_DIMS is the intentional inclusion set — retained for callers/tests.
     void LOCAL_DIMS;
 
-    return { output: computeVerdict(safeDimensions, mergedReasoning), metrics: { inputTokens, outputTokens, costUsd } };
+    const verdictOutput = computeVerdict(safeDimensions, mergedReasoning);
+
+    // Severe drift escalates the recommendation (unless the verdict
+    // already recommends "fail") and guarantees dimensionPlausibility is
+    // in weakAreas — weakAreas is already populated when dim < 6, but
+    // we enforce it here to make the severe-drift signal unambiguous.
+    if (driftResult.severity === "severe") {
+      if (verdictOutput.verdict.recommendation !== "fail") {
+        verdictOutput.verdict.recommendation = "retry";
+      }
+      if (!verdictOutput.verdict.weakAreas.includes("dimensionPlausibility")) {
+        verdictOutput.verdict.weakAreas.push("dimensionPlausibility");
+      }
+    }
+
+    return { output: verdictOutput, metrics: { inputTokens, outputTokens, costUsd } };
   } finally {
     clearTimeout(timer);
   }
