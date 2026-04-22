@@ -22,7 +22,13 @@ import {
   classify,
 } from "../stage-4-matcher";
 import { buildSystemPrompt } from "../stage-4-extract";
-import type { ArchitectBrief } from "../types";
+import {
+  dropPhantomRooms,
+  flagPlausibility,
+  recomputeMissing,
+  applyStage4PostValidation,
+} from "../stage-4-validators";
+import type { ArchitectBrief, ExtractedRoom, ExtractedRooms, RectPx } from "../types";
 
 // ─── B1 — discriminator-weighted matcher ───────────────────────
 
@@ -261,5 +267,190 @@ describe("Phase 2.8 A4 — phantom-suppression clauses", () => {
   it("sets a minimum 4×4 ft (≈16 sqft) threshold", () => {
     const p = buildSystemPrompt(sampleBrief());
     expect(p).toMatch(/4×4 ft[\s\S]*16 sqft/);
+  });
+});
+
+// ─── B2 — phantom filter ────────────────────────────────────────
+
+// Helpers for the validator tests. Assume 1024px image of a 40×40 ft
+// plot (so plotBoundsPx.w/h = 1024, and 1 sqft ≈ 655 px² — i.e. a
+// 25.6×25.6 px rect ≈ 1 sqft).
+const PLOT_BOUNDS: RectPx = { x: 0, y: 0, w: 1024, h: 1024 };
+const PLOT_W = 40;
+const PLOT_D = 40;
+
+function mkRoom(
+  name: string,
+  areaSqft: number,
+  confidence = 0.9,
+): ExtractedRoom {
+  // Square rect with the given area in sqft.
+  const sidePx = Math.round(Math.sqrt(areaSqft) * (1024 / 40));
+  return {
+    name,
+    rectPx: { x: 0, y: 0, w: sidePx, h: sidePx },
+    confidence,
+    labelAsShown: name,
+  };
+}
+
+describe("Phase 2.8 B2 — phantom room filter", () => {
+  it("drops rooms below 12 sqft for standard room types", () => {
+    const brief = sampleBrief();
+    const rooms: ExtractedRoom[] = [
+      mkRoom("Master Bedroom", 140),
+      mkRoom("Hallway", 0.4), // the prod phantom
+      mkRoom("Common Bathroom", 30),
+    ];
+    const issues: string[] = [];
+    const res = dropPhantomRooms(rooms, PLOT_BOUNDS, PLOT_W, PLOT_D, brief, issues);
+    expect(res.kept.map((r) => r.name)).toEqual(["Master Bedroom", "Common Bathroom"]);
+    expect(res.droppedNames).toContain("Hallway");
+    expect(issues.some((m) => /phantom: dropped "Hallway"/.test(m))).toBe(true);
+  });
+
+  it("keeps small pooja rooms at 8 sqft (exemption for small room types)", () => {
+    // Brief has Pooja Room with type="pooja". 10 sqft is below the
+    // 12-sqft default but above the 8-sqft exempt threshold.
+    const brief = sampleBrief();
+    const rooms: ExtractedRoom[] = [
+      mkRoom("Pooja Room", 10),
+    ];
+    const issues: string[] = [];
+    const res = dropPhantomRooms(rooms, PLOT_BOUNDS, PLOT_W, PLOT_D, brief, issues);
+    expect(res.kept).toHaveLength(1);
+    expect(res.kept[0].name).toBe("Pooja Room");
+  });
+
+  it("still drops pooja rooms below the 8-sqft exempt threshold", () => {
+    const brief = sampleBrief();
+    const rooms: ExtractedRoom[] = [
+      mkRoom("Pooja Room", 4), // too small even for exemption
+    ];
+    const issues: string[] = [];
+    const res = dropPhantomRooms(rooms, PLOT_BOUNDS, PLOT_W, PLOT_D, brief, issues);
+    expect(res.kept).toHaveLength(0);
+    expect(res.droppedNames).toEqual(["Pooja Room"]);
+  });
+
+  it("is a no-op when plotBoundsPx is null (can't compute ft area)", () => {
+    const brief = sampleBrief();
+    const rooms: ExtractedRoom[] = [mkRoom("Tiny", 0.1)];
+    const issues: string[] = [];
+    const res = dropPhantomRooms(rooms, null, PLOT_W, PLOT_D, brief, issues);
+    expect(res.kept).toEqual(rooms);
+    expect(res.droppedNames).toEqual([]);
+  });
+});
+
+describe("Phase 2.8 B2 — recomputeMissing after phantom drop", () => {
+  it("rebuilds expectedRoomsMissing against the kept list", () => {
+    const brief = sampleBrief();
+    // Keep only Master Bedroom + Living Room. Other 6 expected rooms
+    // should surface as missing.
+    const kept: ExtractedRoom[] = [
+      mkRoom("Master Bedroom", 140),
+      mkRoom("Living Room", 280),
+    ];
+    const missing = recomputeMissing(
+      kept,
+      brief.roomList.map((r) => r.name),
+    );
+    expect(missing).toContain("Bedroom 2");
+    expect(missing).toContain("Master Bathroom");
+    expect(missing).not.toContain("Master Bedroom");
+    expect(missing).not.toContain("Living Room");
+  });
+});
+
+// ─── B3 — plausibility flag ─────────────────────────────────────
+
+describe("Phase 2.8 B3 — plausibility flag against brief.approxAreaSqft", () => {
+  it("flags a room extracted at <40% of expected area", () => {
+    const brief = sampleBrief(); // Master Bedroom expected ~168 sqft
+    const rooms: ExtractedRoom[] = [mkRoom("Master Bedroom", 60)]; // 36% of 168
+    const issues: string[] = [];
+    flagPlausibility(rooms, PLOT_BOUNDS, PLOT_W, PLOT_D, brief, issues);
+    expect(issues.length).toBe(1);
+    expect(issues[0]).toMatch(/plausibility.*Master Bedroom.*ratio/i);
+  });
+
+  it("flags a room extracted at >250% of expected area", () => {
+    const brief = sampleBrief(); // Common Bathroom expected ~35 sqft
+    const rooms: ExtractedRoom[] = [mkRoom("Common Bathroom", 120)]; // ~343% of 35
+    const issues: string[] = [];
+    flagPlausibility(rooms, PLOT_BOUNDS, PLOT_W, PLOT_D, brief, issues);
+    expect(issues.length).toBe(1);
+    expect(issues[0]).toMatch(/Common Bathroom/);
+  });
+
+  it("does NOT flag extractions within the plausibility band", () => {
+    const brief = sampleBrief(); // Master Bedroom expected ~168 sqft
+    const rooms: ExtractedRoom[] = [
+      mkRoom("Master Bedroom", 140), // ~83% of expected
+      mkRoom("Bedroom 2", 130), // ~108% of 120 expected
+    ];
+    const issues: string[] = [];
+    flagPlausibility(rooms, PLOT_BOUNDS, PLOT_W, PLOT_D, brief, issues);
+    expect(issues).toEqual([]);
+  });
+
+  it("skips rooms not present in the brief (can't judge plausibility)", () => {
+    const brief = sampleBrief();
+    const rooms: ExtractedRoom[] = [mkRoom("Mystery Room", 5)];
+    const issues: string[] = [];
+    flagPlausibility(rooms, PLOT_BOUNDS, PLOT_W, PLOT_D, brief, issues);
+    expect(issues).toEqual([]);
+  });
+
+  it("does NOT mutate room coordinates — flag only", () => {
+    const brief = sampleBrief();
+    const rooms: ExtractedRoom[] = [mkRoom("Master Bedroom", 60)];
+    const snapshotBefore = JSON.stringify(rooms);
+    const issues: string[] = [];
+    flagPlausibility(rooms, PLOT_BOUNDS, PLOT_W, PLOT_D, brief, issues);
+    expect(JSON.stringify(rooms)).toBe(snapshotBefore);
+  });
+});
+
+// ─── applyStage4PostValidation (combined wrapper) ──────────────
+
+describe("Phase 2.8 — applyStage4PostValidation composes B2 + B3 + missing recompute", () => {
+  it("drops phantom, flags plausibility mismatches, and recomputes missing in one pass", () => {
+    const brief = sampleBrief();
+    // Start with the prod-failure shape:
+    //   - legitimate rooms (bedrooms, living, kitchen)
+    //   - a phantom Hallway
+    //   - a Master Bedroom sized to ~60 sqft (implausible)
+    const extraction: ExtractedRooms = {
+      imageSize: { width: 1024, height: 1024 },
+      plotBoundsPx: PLOT_BOUNDS,
+      rooms: [
+        mkRoom("Master Bedroom", 60), // implausible
+        mkRoom("Bedroom 2", 120), // OK
+        mkRoom("Living Room", 280), // OK
+        mkRoom("Kitchen", 80), // OK
+        mkRoom("Hallway", 0.4), // phantom
+      ],
+      issues: [],
+      expectedRoomsMissing: [],
+      unexpectedRoomsFound: [],
+    };
+    applyStage4PostValidation(extraction, brief);
+    // Hallway dropped.
+    expect(extraction.rooms.map((r) => r.name)).toEqual([
+      "Master Bedroom",
+      "Bedroom 2",
+      "Living Room",
+      "Kitchen",
+    ]);
+    // Master Bedroom flagged as implausible.
+    expect(
+      extraction.issues.some((m) => /plausibility.*Master Bedroom/i.test(m)),
+    ).toBe(true);
+    expect(extraction.issues.some((m) => /phantom: dropped "Hallway"/.test(m))).toBe(true);
+    // Missing list reflects the now-kept rooms.
+    expect(extraction.expectedRoomsMissing).toContain("Master Bathroom");
+    expect(extraction.expectedRoomsMissing).not.toContain("Master Bedroom");
   });
 });

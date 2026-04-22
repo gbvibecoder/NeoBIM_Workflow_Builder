@@ -20,6 +20,7 @@ import type {
 } from "./types";
 import type { VIPLogger } from "./logger";
 import { pickBestMatch } from "./stage-4-matcher";
+import { applyStage4PostValidation } from "./stage-4-validators";
 
 // ─── Constants ───────────────────────────────────────────────────
 
@@ -428,6 +429,12 @@ export async function runStage4RoomExtraction(
   }
 
   const extraction = validateAndClamp(raw, input.brief);
+
+  // Phase 2.8 B2 + B3: drop phantom rooms (area < 12 sqft with
+  // exemption for pooja/store/powder) and flag out-of-band extractions
+  // against the brief's approxAreaSqft. Both run post-clamp + post-
+  // matcher so they operate on the final kept-rooms list.
+  applyStage4PostValidation(extraction, input.brief);
 
   if (extraction.rooms.length === 0) {
     throw new Error(
