@@ -32,6 +32,10 @@ import { useVipGeneration } from "@/features/floor-plan/hooks/useVipGeneration";
 import { VipGenerationProgress } from "@/features/floor-plan/components/VipGenerationProgress";
 import { ImageApprovalGate } from "@/features/floor-plan/components/ImageApprovalGate";
 import { PipelineLogsPanel } from "@/features/floor-plan/components/PipelineLogsPanel";
+import {
+  vipQualityBannerState,
+  type VipQualityRecommendation,
+} from "@/features/floor-plan/lib/vip-quality-tone";
 
 interface FloorPlanViewerProps {
   /** Pre-loaded geometry from pipeline (e.g. navigated from result showcase) */
@@ -56,6 +60,13 @@ export function FloorPlanViewer({ initialGeometry, initialPrompt, initialProject
   const dataSource = useFloorPlanStore((s) => s.dataSource);
   const lastQualityFlags = useFloorPlanStore((s) => s.lastQualityFlags);
   const lastFeasibilityWarnings = useFloorPlanStore((s) => s.lastFeasibilityWarnings);
+  // Phase 2.7A — VIP-native quality surface (lifted off project.metadata
+  // by the VIP completion handler below). When vipQualityScore is set,
+  // the banner renders a truthful red/yellow/green based on the Stage 6
+  // verdict; otherwise the banner falls back to the legacy flags path.
+  const vipQualityScore = useFloorPlanStore((s) => s.vipQualityScore);
+  const vipWeakAreas = useFloorPlanStore((s) => s.vipWeakAreas);
+  const vipQualityRecommendation = useFloorPlanStore((s) => s.vipQualityRecommendation);
 
   const loadFromGeometry = useFloorPlanStore((s) => s.loadFromGeometry);
   const loadFromSaved = useFloorPlanStore((s) => s.loadFromSaved);
@@ -150,10 +161,29 @@ export function FloorPlanViewer({ initialGeometry, initialPrompt, initialProject
   }, []);
 
   // ── VIP completion handler: load project into editor when job finishes ──
+  // Phase 2.7A: also lift Stage 6's quality verdict off the project metadata
+  // into the store so the top-of-editor banner renders a truthful
+  // red/yellow/green instead of the hard-coded "meets all Phase 1 quality
+  // checks" lie that the old code path emitted unconditionally for VIP jobs.
   useEffect(() => {
     if (vip.status === "completed" && vip.project) {
       const store = useFloorPlanStore.getState();
       store.setProject(vip.project);
+
+      // Extract Stage 6 verdict from the project metadata (stamped by
+      // runStage7Delivery). The fields can technically be undefined on
+      // legacy-typed projects, so we narrow defensively.
+      const meta = vip.project.metadata as unknown as Record<string, unknown>;
+      const rawScore = meta.generation_quality_score;
+      const score = typeof rawScore === "number" && Number.isFinite(rawScore) ? rawScore : null;
+      const weakAreas = Array.isArray(meta.generation_weak_areas)
+        ? (meta.generation_weak_areas as unknown[]).filter((x): x is string => typeof x === "string")
+        : [];
+      const rawRec = meta.generation_quality_recommendation;
+      const recommendation: VipQualityRecommendation | null =
+        rawRec === "pass" || rawRec === "retry" || rawRec === "fail" ? rawRec : null;
+      store.setVipQualityResults({ score, weakAreas, recommendation });
+
       useFloorPlanStore.setState({
         isGenerating: false,
         dataSource: "pipeline",
@@ -836,8 +866,61 @@ export function FloorPlanViewer({ initialGeometry, initialPrompt, initialProject
         </div>
       )}
 
-      {/* Phase 1 — quality banner. Surfaces honest layoutMetrics flags. */}
-      {dataSource === "pipeline" && (lastQualityFlags.length > 0 || lastFeasibilityWarnings.length > 0) && (() => {
+      {/* Phase 2.7A — VIP-native quality banner. Takes priority over the legacy
+          flags banners when a VIP job has completed (vipQualityScore !== null).
+          Renders red/yellow/green based on the Stage 6 verdict stamped into
+          project.metadata by runStage7Delivery. Replaces the unconditional
+          "meets all Phase 1 quality checks" lie that the legacy block emitted
+          for every VIP completion. */}
+      {dataSource === "pipeline" && vipQualityScore !== null && (() => {
+        const state = vipQualityBannerState(vipQualityScore, vipQualityRecommendation);
+        const palette =
+          state.tone === "red"
+            ? {
+                bar: "border-red-200 bg-red-50 text-red-800",
+                btn: "text-red-700 hover:bg-red-100",
+                icon: "⚠️",
+              }
+            : state.tone === "yellow"
+              ? {
+                  bar: "border-amber-200 bg-amber-50 text-amber-800",
+                  btn: "text-amber-700 hover:bg-amber-100",
+                  icon: "⚠️",
+                }
+              : {
+                  bar: "border-green-100 bg-green-50/70 text-green-700",
+                  btn: "text-green-700 hover:bg-green-100",
+                  icon: "✓",
+                };
+        const weakTail =
+          state.tone !== "green" && vipWeakAreas.length > 0
+            ? ` — weak: ${vipWeakAreas.slice(0, 3).join(", ")}${vipWeakAreas.length > 3 ? "…" : ""}`
+            : "";
+        return (
+          <div
+            data-testid="vip-quality-banner"
+            data-tone={state.tone}
+            className={`flex items-center gap-2 border-b px-3 py-1.5 text-[11px] print:hidden ${palette.bar}`}
+          >
+            <span className="shrink-0">{palette.icon}</span>
+            <span className="truncate">
+              {state.headline}
+              {weakTail}
+            </span>
+            <button
+              onClick={() => setRightPanelTab("quality")}
+              className={`ml-auto shrink-0 rounded px-2 py-0.5 text-[10px] font-semibold transition-colors ${palette.btn}`}
+            >
+              See metrics
+            </button>
+          </div>
+        );
+      })()}
+
+      {/* Phase 1 — quality banner (legacy sync path only). Surfaces honest
+          layoutMetrics flags. Phase 2.7A gates this so it doesn't fire on top
+          of the VIP banner above. */}
+      {dataSource === "pipeline" && vipQualityScore === null && (lastQualityFlags.length > 0 || lastFeasibilityWarnings.length > 0) && (() => {
         const critCount = lastQualityFlags.filter(f => f.severity === "critical").length;
         const warnCount = lastQualityFlags.filter(f => f.severity === "warning").length + lastFeasibilityWarnings.length;
         const hasCritical = critCount > 0;
@@ -870,8 +953,10 @@ export function FloorPlanViewer({ initialGeometry, initialPrompt, initialProject
         );
       })()}
 
-      {/* Phase 1 — green confirmation banner when no flags AND we have metrics. */}
-      {dataSource === "pipeline" && lastQualityFlags.length === 0 && lastFeasibilityWarnings.length === 0 && (
+      {/* Phase 1 — legacy green confirmation banner. Only fires when NEITHER
+          the VIP banner nor the legacy flags banner is active — i.e. a
+          legacy sync-path job with no flags. */}
+      {dataSource === "pipeline" && vipQualityScore === null && lastQualityFlags.length === 0 && lastFeasibilityWarnings.length === 0 && (
         <div className="flex items-center gap-2 border-b border-green-100 bg-green-50/70 px-3 py-1.5 text-[11px] text-green-700 print:hidden">
           <span className="shrink-0">✓</span>
           <span className="truncate">Layout meets all Phase 1 quality checks.</span>
