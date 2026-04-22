@@ -241,7 +241,15 @@ export async function runVIPPipelinePhaseB(
     );
     candidateProject = output.project;
     timings.stage5Ms = Date.now() - t0;
+    // Phase 2.7C: include Stage 5 path + Stage 4 avgConfidence in the log
+    // meta so the Pipeline Logs Panel can show whether fidelity or
+    // strip-pack ran, and why.
     log.logStageSuccess(5, timings.stage5Ms, {
+      path: metrics.path ?? "strip-pack",
+      avgConfidence:
+        typeof metrics.avgConfidence === "number"
+          ? Math.round(metrics.avgConfidence * 100) / 100
+          : undefined,
       rooms: metrics.roomCount,
       walls: metrics.wallCount,
       doors: metrics.doorCount,

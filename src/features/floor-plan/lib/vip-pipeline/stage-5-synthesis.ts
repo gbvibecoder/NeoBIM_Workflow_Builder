@@ -45,11 +45,18 @@ export interface Stage5Metrics {
   wallCount: number;
   doorCount: number;
   windowCount: number;
+  /** Phase 2.7C — which Stage 5 path ran. */
+  path?: "fidelity" | "strip-pack";
+  /** Phase 2.7C — Stage 4 average confidence that drove the path choice. */
+  avgConfidence?: number;
 }
 
 // ─── Zone / Wet / Sacred Inference ───────────────────────────────
+//
+// Phase 2.7C: exported so stage-5-fidelity can share classification
+// logic without duplicating the type lists.
 
-function inferZone(type: string): RoomZone {
+export function inferZone(type: string): RoomZone {
   if (["living", "drawing_room", "dining", "balcony", "verandah"].includes(type)) return "PUBLIC";
   if (["bedroom", "master_bedroom", "guest_bedroom", "kids_bedroom", "study", "pooja", "prayer"].includes(type)) return "PRIVATE";
   if (["kitchen", "bathroom", "master_bathroom", "toilet", "powder_room", "utility", "laundry", "store", "pantry", "servant_quarter"].includes(type)) return "SERVICE";
@@ -58,17 +65,17 @@ function inferZone(type: string): RoomZone {
   return "PUBLIC";
 }
 
-function isWet(type: string): boolean {
+export function isWet(type: string): boolean {
   return ["bathroom", "master_bathroom", "ensuite", "powder_room", "toilet", "kitchen", "utility", "laundry"].includes(type);
 }
 
-function isSacred(type: string): boolean {
+export function isSacred(type: string): boolean {
   return ["pooja", "prayer", "mandir"].includes(type);
 }
 
 // ─── Plot Bounds Resolution ──────────────────────────────────────
 
-function resolvePlotBounds(extraction: ExtractedRooms, issues: string[]): RectPx {
+export function resolvePlotBounds(extraction: ExtractedRooms, issues: string[]): RectPx {
   if (
     extraction.plotBoundsPx &&
     extraction.plotBoundsPx.w > 100 &&
@@ -103,7 +110,7 @@ export interface TransformedRoom {
   labelAsShown: string;
 }
 
-function transformToFeet(
+export function transformToFeet(
   rooms: ExtractedRoom[],
   plotBoundsPx: RectPx,
   plotWidthFt: number,
@@ -546,8 +553,24 @@ export async function runStage5Synthesis(
   input: Stage5Input,
   logger?: VIPLogger,
 ): Promise<{ output: Stage5Output; metrics: Stage5Metrics }> {
+  // Phase 2.7C: dispatch to fidelity mode when Stage 4 extraction is
+  // confident enough to trust as source of truth. Preserves image
+  // structure instead of re-laying out via strip-pack + Option X.
+  // Imported lazily to avoid ESM init-order with the fidelity module,
+  // which imports helpers from this file.
+  const { shouldDispatchFidelity, runStage5FidelityMode } = await import(
+    "./stage-5-fidelity"
+  );
+  const dispatch = shouldDispatchFidelity(input.extraction);
+  if (dispatch.use) {
+    return runStage5FidelityMode(input, logger);
+  }
+  // Fell through to legacy strip-pack path — surface the reason so
+  // the Logs Panel can explain why fidelity was skipped.
+
   const startMs = Date.now();
   const issues: string[] = [];
+  issues.push(`stage5: strip-pack path used (fidelity skipped: ${dispatch.reason})`);
   const { extraction, plotWidthFt, plotDepthFt, facing, parsedConstraints } = input;
 
   // Step 1: Resolve plot bounds
@@ -814,6 +837,15 @@ export async function runStage5Synthesis(
   const durationMs = Date.now() - startMs;
   if (logger) logger.logStageCost(5, 0); // Pure code, $0
 
+  // Phase 2.7C: tag the metrics so the Logs Panel can show which path ran.
+  const avgConfidence =
+    extraction.rooms.length > 0
+      ? extraction.rooms.reduce((s, r) => s + r.confidence, 0) / extraction.rooms.length
+      : 0;
+  const projMeta = project.metadata as unknown as Record<string, unknown>;
+  projMeta.generation_stage5_path = "strip-pack";
+  projMeta.generation_stage4_avg_confidence = Math.round(avgConfidence * 100) / 100;
+
   return {
     output: { project, issues },
     metrics: {
@@ -822,6 +854,8 @@ export async function runStage5Synthesis(
       wallCount: walls.length,
       doorCount: doorResult.doors.length,
       windowCount: windowResult.windows.length,
+      path: "strip-pack",
+      avgConfidence,
     },
   };
 }
