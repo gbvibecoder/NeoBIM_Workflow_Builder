@@ -295,7 +295,7 @@ function mkRoom(
 }
 
 describe("Phase 2.8 B2 — phantom room filter", () => {
-  it("drops rooms below 12 sqft for standard room types", () => {
+  it("drops rooms below the standard phantom threshold (Phase 2.10.4: 16 sqft)", () => {
     const brief = sampleBrief();
     const rooms: ExtractedRoom[] = [
       mkRoom("Master Bedroom", 140),
@@ -309,9 +309,9 @@ describe("Phase 2.8 B2 — phantom room filter", () => {
     expect(issues.some((m) => /phantom: dropped "Hallway"/.test(m))).toBe(true);
   });
 
-  it("keeps small pooja rooms at 8 sqft (exemption for small room types)", () => {
+  it("keeps small pooja rooms at 10 sqft (exemption for small room types)", () => {
     // Brief has Pooja Room with type="pooja". 10 sqft is below the
-    // 12-sqft default but above the 8-sqft exempt threshold.
+    // 16-sqft default (Phase 2.10.4) but above the 8-sqft exempt threshold.
     const brief = sampleBrief();
     const rooms: ExtractedRoom[] = [
       mkRoom("Pooja Room", 10),

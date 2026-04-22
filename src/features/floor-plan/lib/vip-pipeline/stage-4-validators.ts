@@ -34,8 +34,19 @@ import type {
 
 // ─── B2 — phantom filter ────────────────────────────────────────
 
-/** Default minimum room area in sqft. Rooms below this are likely wall gaps. */
-const PHANTOM_MIN_SQFT = 12;
+/**
+ * Default minimum room area in sqft. Rooms below this are likely wall
+ * gaps, door-frame outlines, or dimension-tick artefacts rather than
+ * real rooms.
+ *
+ * Phase 2.10.4: raised 12 → 16 sqft. 16 sqft = the minimum habitable
+ * closet size (4'×4'). 12 sqft was letting thin door-frame outlines
+ * and dimension-annotation rectangles through as "rooms" in some
+ * Phase 2.9 extractions, which Stage 5 then dutifully synthesised
+ * into tiny spurious boxes. 16 sqft aligns with the
+ * `DO NOT EXTRACT < 4×4 ft` clause in the Phase 2.10.1 prompt.
+ */
+const PHANTOM_MIN_SQFT = 16;
 /** Exempted minimum for intentionally small rooms (pooja, store, etc.). */
 const SMALL_ROOM_EXEMPT_MIN_SQFT = 8;
 /** Room TYPES for which we apply the exempt minimum instead of the default. */
