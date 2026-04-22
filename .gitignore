@@ -80,3 +80,12 @@ analytics-logs/
 *.pyc
 __pycache__/
 *.egg-info/
+
+# Phase 3.0 spike artefacts — PNG overlays + metrics JSON + per-stage
+# E2E dumps. Reproducible via `npm run spike:3-0-*` scripts; findings
+# captured in docs/phase-3-0-*-report.md.
+experiments/outputs/
+
+# tesseract.js English OCR weights — auto-downloaded at runtime to
+# the repo root when OCR first runs. Not a source artefact.
+eng.traineddata
