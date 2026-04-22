@@ -110,6 +110,98 @@
 .light-stagger > *:nth-child(4) { animation-delay: 240ms; }
 .light-stagger > *:nth-child(5) { animation-delay: 320ms; }
 
+/* ── Scroll Reveal (IntersectionObserver-driven) ─────────── */
+.lsr {
+  opacity: 0;
+  transform: translateY(20px);
+  transition: opacity 700ms cubic-bezier(0.16, 1, 0.3, 1),
+              transform 700ms cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: opacity, transform;
+}
+.lsr-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Stagger children inside a revealed container */
+.lsr-stagger > * {
+  opacity: 0;
+  transform: translateY(14px);
+  transition: opacity 500ms cubic-bezier(0.16, 1, 0.3, 1),
+              transform 500ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.lsr-stagger.lsr-visible > * {
+  opacity: 1;
+  transform: translateY(0);
+}
+.lsr-stagger.lsr-visible > *:nth-child(1) { transition-delay: 0ms; }
+.lsr-stagger.lsr-visible > *:nth-child(2) { transition-delay: 100ms; }
+.lsr-stagger.lsr-visible > *:nth-child(3) { transition-delay: 200ms; }
+.lsr-stagger.lsr-visible > *:nth-child(4) { transition-delay: 300ms; }
+.lsr-stagger.lsr-visible > *:nth-child(5) { transition-delay: 400ms; }
+.lsr-stagger.lsr-visible > *:nth-child(6) { transition-delay: 500ms; }
+
+/* ── Nav Link Underline Animation ────────────────────────── */
+.lnav-link {
+  position: relative;
+}
+.lnav-link::after {
+  content: "";
+  position: absolute;
+  bottom: 2px;
+  left: 14px;
+  right: 14px;
+  height: 1.5px;
+  background: var(--light-ink);
+  transform: scaleX(0);
+  transition: transform 250ms cubic-bezier(0.16, 1, 0.3, 1);
+  transform-origin: center;
+  border-radius: 1px;
+}
+.lnav-link:hover::after {
+  transform: scaleX(1);
+}
+
+/* ── Theme Toggle Pill ───────────────────────────────────── */
+.ltheme-toggle {
+  display: flex;
+  border-radius: 20px;
+  border: 1px solid var(--light-border);
+  overflow: hidden;
+  background: var(--light-surface);
+  height: 34px;
+}
+.ltheme-toggle-active {
+  display: flex;
+  align-items: center;
+  padding: 0 10px;
+  background: var(--light-ink);
+  color: #fff;
+  border: none;
+  cursor: default;
+  font-size: 0;
+}
+.ltheme-toggle-inactive {
+  display: flex;
+  align-items: center;
+  padding: 0 10px;
+  color: var(--light-soft);
+  text-decoration: none;
+  transition: color 200ms ease-out, background 200ms ease-out;
+  font-size: 0;
+}
+.ltheme-toggle-inactive:hover {
+  color: var(--light-ink);
+  background: rgba(26, 31, 46, 0.04);
+}
+
+/* ── Button Press Effect ─────────────────────────────────── */
+.light-theme button:active,
+.light-theme a[href]:active {
+  transform: scale(0.97);
+  transition-duration: 50ms;
+}
+
 /* ── Reduced Motion ──────────────────────────────────────── */
 @media (prefers-reduced-motion: reduce) {
   .light-theme *,
@@ -119,6 +211,8 @@
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+  .lsr { opacity: 1; transform: none; }
+  .lsr-stagger > * { opacity: 1; transform: none; }
 }
 
 /* ── Screen Reader Only ──────────────────────────────────── */

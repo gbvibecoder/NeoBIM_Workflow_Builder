@@ -3,6 +3,7 @@
 import { useRef, useEffect, useState } from "react";
 import { Play } from "lucide-react";
 import { useLocale } from "@/hooks/useLocale";
+import { ScrollReveal } from "./ScrollReveal";
 
 const VIDEO_URL =
   "https://pub-27d9a7371b6d47ff94fee1a3228f1720.r2.dev/workflow-demos/text-to-concept-building.mp4";
@@ -64,7 +65,7 @@ export function LightProductProof() {
         background: "var(--light-surface)",
       }}
     >
-      <div
+      <ScrollReveal
         style={{
           maxWidth: 900,
           margin: "0 auto",
@@ -178,7 +179,7 @@ export function LightProductProof() {
             {t("light.proofSubtitle")}
           </p>
         </div>
-      </div>
+      </ScrollReveal>
 
       <style>{`
         @media (max-width: 768px) {

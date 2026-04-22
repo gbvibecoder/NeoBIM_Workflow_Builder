@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { Check } from "lucide-react";
 import { useLocale } from "@/hooks/useLocale";
+import { ScrollReveal } from "./ScrollReveal";
 import type { TranslationKey } from "@/lib/i18n";
 
 interface Plan {
@@ -71,7 +72,7 @@ export function LightPricing() {
     >
       <div style={{ maxWidth: 1080, margin: "0 auto" }}>
         {/* Section header */}
-        <div style={{ textAlign: "center", marginBottom: 64 }}>
+        <ScrollReveal style={{ textAlign: "center", marginBottom: 64 }}>
           <p
             style={{
               fontSize: 11,
@@ -111,10 +112,11 @@ export function LightPricing() {
           >
             {t("light.pricingSubtitle")}
           </p>
-        </div>
+        </ScrollReveal>
 
         {/* 4-column grid */}
-        <div
+        <ScrollReveal
+          stagger
           className="light-pricing-grid"
           style={{
             display: "grid",
@@ -360,7 +362,7 @@ export function LightPricing() {
               </div>
             );
           })}
-        </div>
+        </ScrollReveal>
       </div>
 
       <style>{`
