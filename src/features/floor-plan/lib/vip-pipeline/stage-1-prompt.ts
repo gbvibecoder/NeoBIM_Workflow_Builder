@@ -24,6 +24,44 @@ const OUTPUT_COST_PER_M = 15; // $15 per million output tokens
 const API_TIMEOUT_MS = 45_000;
 const MODEL = "claude-sonnet-4-6";
 
+// ─── Phase 2.10.3 — label-uniqueness injection ───────────────────
+//
+// Deterministic suffix appended to every image-generation prompt
+// coming out of Stage 1. Works AROUND the LLM — Claude's brief
+// doesn't need to say anything about labels; we mechanically ensure
+// gpt-image-1.5 sees the uniqueness constraints + exact label list.
+//
+// Rationale: Phase 2.9 still shows occasional duplicate-label renders
+// ("BEDROOM 2" drawn twice) and missing labels on long room lists.
+// A deterministic augmentation is more reliable than trusting the
+// brief-producing LLM to include the clause verbatim.
+
+const LABEL_REQUIREMENTS_MARKER = "CRITICAL LABEL REQUIREMENTS:";
+
+/**
+ * Append the CRITICAL LABEL REQUIREMENTS block to an image-generation
+ * prompt. Idempotent — if the marker is already present, the prompt
+ * is returned unchanged (avoids double-suffix when callers compose
+ * augmentations multiple times).
+ */
+export function appendLabelRequirements(
+  prompt: string,
+  roomNames: string[],
+): string {
+  if (prompt.includes(LABEL_REQUIREMENTS_MARKER)) return prompt;
+  const labelList = roomNames.filter((n) => n && n.trim().length > 0).join(", ");
+  const suffix = `
+
+${LABEL_REQUIREMENTS_MARKER}
+- Every room label MUST appear EXACTLY ONCE.
+- Do NOT repeat any label (e.g., NOT two "BEDROOM 2").
+- Render ALL labels from the list below — missing labels = failure.
+- Labels must match EXACTLY: ${labelList}
+- Labels clearly visible INSIDE each room.
+- Use monospace sans-serif, 16-18px, black on white background.`;
+  return prompt + suffix;
+}
+
 // ─── Public Types ────────────────────────────────────────────────
 
 export interface Stage1Metrics {
@@ -293,6 +331,19 @@ export async function runStage1PromptIntelligence(
         }
       }
     }
+
+    // ── Phase 2.10.3: label-uniqueness injection ──
+    // Append the CRITICAL LABEL REQUIREMENTS block to every image prompt
+    // so gpt-image-1.5 has deterministic guidance on uniqueness +
+    // exact label text, regardless of what Claude's brief said.
+    const roomNamesForLabelInjection = output.brief.roomList.map((r) => r.name);
+    output = {
+      ...output,
+      imagePrompts: output.imagePrompts.map((ip) => ({
+        ...ip,
+        prompt: appendLabelRequirements(ip.prompt, roomNamesForLabelInjection),
+      })),
+    };
 
     return {
       output,

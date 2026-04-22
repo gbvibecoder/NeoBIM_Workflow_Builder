@@ -20,7 +20,10 @@ import type {
 } from "./types";
 import type { VIPLogger } from "./logger";
 import { pickBestMatch } from "./stage-4-matcher";
-import { applyStage4PostValidation } from "./stage-4-validators";
+import {
+  applyImageDriftGate,
+  applyStage4PostValidation,
+} from "./stage-4-validators";
 
 // ─── Constants ───────────────────────────────────────────────────
 
@@ -147,6 +150,19 @@ const TOOL_FUNCTION: OpenAI.Chat.Completions.ChatCompletionTool = {
 //       dimension plausibility before returning.
 //   A4: do-NOT-extract guidance for dimension lines, wall gaps, door
 //       arcs, entry labels, and sub-16-sqft rectangles.
+//
+// Phase 2.10.1 — Tighten the room-shape contract so extraction mirrors
+// the axis-aligned-rectangle contract Stage 5 downstream already
+// enforces on Rect. Adds:
+//   - Explicit "every room is a strict axis-aligned rectangle" clause
+//     (with maximal-inscribed-rectangle guidance for L-shaped regions).
+//   - Fixture exclusion: toilets, basins, sinks, stoves, counters are
+//     room CONTENTS, not room boundaries. Do not subdivide around them.
+//   - Window-stencil exclusion: the double parallel-line pattern on
+//     exterior walls is NOT a room.
+//   - Output-rules reiteration: "rectangle only; no polygons, no
+//     rotated boxes" — belt-and-braces given the JSON tool schema
+//     already rejects anything else (x/y/w/h scalars via strict:true).
 
 export function buildSystemPrompt(brief: Stage4Input["brief"]): string {
   const plotW = brief.plotWidthFt;
@@ -173,6 +189,19 @@ Pixel coordinate system: origin at top-left, X grows right, Y grows DOWN.
 
 EXPECTED ROOMS (with approximate areas from the architect's brief):
 ${roomLines}
+
+ROOM SHAPE CONTRACT (⚠️ MANDATORY — applies to every room you return):
+- Every room MUST be a strict AXIS-ALIGNED RECTANGLE expressed as {x, y, w, h} in pixels.
+- NO L-shapes, NO T-shapes, NO U-shapes, NO curved boundaries, NO rotated boxes,
+  NO overlapping extensions, NO polygon vertices.
+- If a room is drawn as an L-shape in the image, return the MAXIMAL INSCRIBED
+  axis-aligned rectangle that fits inside the L. Prefer the larger leg; do not
+  emit two overlapping rectangles to represent the two legs.
+- Rectangles MUST NOT overlap each other. If two drawn rooms share a wall, their
+  edges TOUCH but do not cross.
+- Interior fixtures (toilets, basins, sinks, stoves, counters, tubs, bedframes,
+  furniture) are room CONTENTS, not room subdivisions. Do not split a bathroom
+  around the toilet or a kitchen around the counter.
 
 YOUR TASK:
 1. Identify the exterior wall boundary (plot bounds) as a pixel rectangle.
@@ -210,6 +239,12 @@ DO NOT EXTRACT (these are NOT rooms):
   (e.g. the "40'0\\"" labels on the exterior edges of the image).
 - Wall thickness gaps — the dark lines BETWEEN rooms.
 - Door arc swept areas — the thin quarter-circles showing door swing.
+- Window stencils — the double parallel-line pattern drawn on exterior
+  walls to indicate a glazed opening. They are NOT a room.
+- Door-frame outlines — small rectangles drawn inside door openings.
+  They are NOT a room.
+- Interior fixtures (toilets, basins, sinks, stoves, bathtubs, counters,
+  beds, wardrobes, cabinets). These are room CONTENTS, never boundaries.
 - Entrance labels like "ENTRY" or "PORCH" floating above the roofline
   without a clearly enclosed rectangular space around them.
 - Any rectangle smaller than 4×4 ft (~${Math.round(4 * pxPerFt)} px on
@@ -221,7 +256,9 @@ return it as a room.
 OUTPUT RULES:
 - ALL coordinates must be within [0, ${IMAGE_SIZE}] — no negative values, no values > ${IMAGE_SIZE}.
 - x + w and y + h must not exceed ${IMAGE_SIZE}.
-- Each room gets a tight bounding box around its interior (inside the walls, not including wall thickness).
+- Each room gets a tight AXIS-ALIGNED bounding RECTANGLE around its interior
+  (inside the walls, not including wall thickness). No polygons, no rotated
+  boxes — the only shape the schema accepts is {x, y, w, h}.
 - confidence: 0.9-1.0 for clear matches, 0.6-0.8 for approximate matches, 0.3-0.5 for uncertain.
 - plotBounds should encompass the entire building footprint (exterior wall to exterior wall).`;
 }
@@ -435,6 +472,21 @@ export async function runStage4RoomExtraction(
   // against the brief's approxAreaSqft. Both run post-clamp + post-
   // matcher so they operate on the final kept-rooms list.
   applyStage4PostValidation(extraction, input.brief);
+
+  // Phase 2.10.2: image-drift gate. Compare the Stage 2 image's
+  // visible-content bbox to the rooms-union bbox; attach metrics +
+  // an issue line so Stage 6 can penalise the quality score.
+  // Best-effort — a failure here is logged but does not break Stage 4.
+  if (input.image.base64) {
+    try {
+      const imageBuffer = Buffer.from(input.image.base64, "base64");
+      await applyImageDriftGate(extraction, imageBuffer);
+    } catch (err) {
+      extraction.issues.push(
+        `drift: gate threw ${err instanceof Error ? err.message : String(err)} — metrics absent`,
+      );
+    }
+  }
 
   if (extraction.rooms.length === 0) {
     throw new Error(

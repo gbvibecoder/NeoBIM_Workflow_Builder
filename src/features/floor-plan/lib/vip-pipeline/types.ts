@@ -182,6 +182,34 @@ export interface ExtractedRoom {
   labelAsShown: string; // text as visible in image (may differ from name)
 }
 
+/**
+ * Phase 2.10.2 — image-drift metrics attached to every Stage 4 output
+ * where the Stage 2 image was available. `driftRatio` is the symmetric-
+ * difference area (image-content bbox XOR rooms-union bbox) divided by
+ * the image-content bbox area. `severity` buckets it per the documented
+ * gate (0.20 / 0.35 thresholds).
+ */
+export type DriftSeverity = "none" | "moderate" | "severe";
+
+export interface ExtractedRoomsDriftMetrics {
+  imageBboxPx: RectPx;
+  roomsUnionBboxPx: RectPx | null;
+  driftRatio: number;
+  driftFlagged: boolean;
+  severity: DriftSeverity;
+}
+
+/**
+ * Phase 2.10.3 — structured record of a duplicate-label auto-rename.
+ * The human-readable log lives in `issues`; this field carries the
+ * structured data for downstream consumers (Stage 6, Pipeline Logs).
+ */
+export interface DedupRename {
+  from: string;
+  to: string;
+  reason: string;
+}
+
 export interface ExtractedRooms {
   imageSize: { width: number; height: number };
   plotBoundsPx: RectPx | null;
@@ -189,6 +217,10 @@ export interface ExtractedRooms {
   issues: string[];
   expectedRoomsMissing: string[];
   unexpectedRoomsFound: string[];
+  /** Phase 2.10.2 — present when the Stage 2 image buffer was available for drift analysis. */
+  driftMetrics?: ExtractedRoomsDriftMetrics;
+  /** Phase 2.10.3 — set when the dedup validator rewrote any duplicate room names. */
+  dedupRenames?: DedupRename[];
 }
 
 export interface Stage4Input {
@@ -258,6 +290,14 @@ export interface Stage6Input {
   project: FloorPlanProject;
   brief: ArchitectBrief;
   parsedConstraints: ParsedConstraints;
+  /**
+   * Phase 2.10.3 — optional drift signal propagated from Stage 4's
+   * extraction. When present and severity !== "none", Stage 6 applies
+   * a penalty to dimensionPlausibility: moderate = -5, severe = -10.
+   * Severe also escalates the recommendation to "retry" (unless the
+   * score already recommends "fail").
+   */
+  driftMetrics?: ExtractedRoomsDriftMetrics;
 }
 
 export interface Stage6Output {

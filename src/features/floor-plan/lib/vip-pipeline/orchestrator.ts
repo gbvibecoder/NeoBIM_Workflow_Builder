@@ -18,7 +18,7 @@
  */
 
 import type { VIPPipelineConfig, VIPPipelineResult, GeneratedImage } from "./types";
-import type { Stage1Output } from "./types";
+import type { Stage1Output, ExtractedRoomsDriftMetrics } from "./types";
 import { VIPLogger } from "./logger";
 import type { VIPGenerationRecord } from "./logger";
 import { prisma } from "@/lib/db";
@@ -36,6 +36,8 @@ interface Stage4And5Result {
   stage4Ms: number;
   stage5Ms: number;
   project?: FloorPlanProject;
+  /** Phase 2.10.3 — piped from Stage 4 extraction to Stage 6 for weighted penalty. */
+  driftMetrics?: ExtractedRoomsDriftMetrics;
 }
 
 /** Run Stage 4 extraction + Stage 5 synthesis on a GPT image. */
@@ -127,7 +129,12 @@ async function runStage4And5Block(
     });
     await fireProgress(config, 75, "stage5");
 
-    return { stage4Ms, stage5Ms, project: s5Output.project };
+    return {
+      stage4Ms,
+      stage5Ms,
+      project: s5Output.project,
+      driftMetrics: stage4Output.extraction.driftMetrics,
+    };
   } catch (err) {
     stage5Ms = Date.now() - s5Start;
     const msg = err instanceof Error ? err.message : String(err);
@@ -174,6 +181,7 @@ export async function runVIPPipeline(
     let stage4Ms: number | undefined;
     let stage5Ms: number | undefined;
     let candidateProject: FloorPlanProject | undefined;
+    let candidateDriftMetrics: ExtractedRoomsDriftMetrics | undefined;
     let stage1Output: Awaited<ReturnType<typeof runStage1PromptIntelligence>>["output"] | undefined;
 
     try {
@@ -267,6 +275,7 @@ export async function runVIPPipeline(
             stage4Ms = s45.stage4Ms;
             stage5Ms = s45.stage5Ms;
             if (s45.project) candidateProject = s45.project;
+            if (s45.driftMetrics) candidateDriftMetrics = s45.driftMetrics;
           } catch (stage3Err) {
             // Branch 3: Stage 3 API failure — skip jury, run S4+5 directly
             stage3Ms = Date.now() - stage3Start;
@@ -279,6 +288,7 @@ export async function runVIPPipeline(
             stage4Ms = s45.stage4Ms;
             stage5Ms = s45.stage5Ms;
             if (s45.project) candidateProject = s45.project;
+            if (s45.driftMetrics) candidateDriftMetrics = s45.driftMetrics;
           }
         }
       } catch (stage2Err) {
@@ -308,7 +318,12 @@ export async function runVIPPipeline(
       const s6Start = Date.now();
       try {
         const { output: s6Output, metrics: s6Metrics } = await runStage6QualityGate(
-          { project: candidateProject, brief: stage1Output!.brief, parsedConstraints: config.parsedConstraints },
+          {
+            project: candidateProject,
+            brief: stage1Output!.brief,
+            parsedConstraints: config.parsedConstraints,
+            driftMetrics: candidateDriftMetrics,
+          },
           log,
         );
         stage6Ms = Date.now() - s6Start;
@@ -348,7 +363,13 @@ export async function runVIPPipeline(
                   // Re-run Stage 6 on retry result
                   log.logStageStart(6, "Quality Gate (retry)");
                   const { output: retryS6 } = await runStage6QualityGate(
-                    { project: retryS45.project, brief: stage1Output!.brief, parsedConstraints: config.parsedConstraints }, log,
+                    {
+                      project: retryS45.project,
+                      brief: stage1Output!.brief,
+                      parsedConstraints: config.parsedConstraints,
+                      driftMetrics: retryS45.driftMetrics,
+                    },
+                    log,
                   );
                   const retryScore = retryS6.verdict.score;
                   log.logStageSuccess(6, Date.now() - s6Start, { score: retryScore, note: "retry attempt" });

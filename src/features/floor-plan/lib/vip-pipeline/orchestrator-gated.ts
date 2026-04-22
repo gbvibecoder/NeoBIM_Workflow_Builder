@@ -305,6 +305,7 @@ export async function runVIPPipelinePhaseB(
         project: candidateProject,
         brief: intermediate.stage1Output.brief,
         parsedConstraints: config.parsedConstraints,
+        driftMetrics: stage4Output.extraction.driftMetrics,
       },
       log,
     );
