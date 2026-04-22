@@ -93,7 +93,11 @@ const TOOL_SCHEMA: Anthropic.Tool = {
         ],
         properties: {
           roomCountMatch: { type: "number" as const, description: "1-10: Does the project contain all rooms from the brief?" },
-          noDuplicateNames: { type: "number" as const, description: "1-10: Is every room uniquely named?" },
+          noDuplicateNames: {
+            type: "number" as const,
+            description:
+              "1-10: Is every room's NAME (the human-readable label like \"Bedroom 1\", \"Bedroom 2\", \"Master Bedroom\") unique? Do NOT penalize rooms that share the same TYPE TAG (e.g. two rooms with type=\"bedroom\" is FINE — that's a category, not a duplicate name). Only penalize when two rooms have IDENTICAL NAMES. Score 10 if all names distinct; score 1 if ≥ 2 rooms share an exact name.",
+          },
           dimensionPlausibility: { type: "number" as const, description: "1-10: Are room dimensions architecturally reasonable?" },
           vastuCompliance: { type: "number" as const, description: "1-10: If vastu required, check placements. If not, score 8." },
           orientationCorrect: { type: "number" as const, description: "1-10: Is the entrance on the correct facing side?" },
@@ -247,6 +251,23 @@ Score vastuCompliance by matching each room's DIR tag against the ideal:
 CENTER for any non-circulation room is a Brahmastan violation (score ≤ 3).`
     : "";
 
+  // Phase 2.11.5 — deterministic name-uniqueness stamp. Scan the room
+  // NAMES (not types) and emit either "All unique — score noDuplicateNames
+  // as 10" or an explicit list of duplicates. This removes ambiguity
+  // when the LLM otherwise conflates shared `type` tags with duplicate
+  // names (the Phase 2.10 E2E failure mode).
+  const nameCounts = new Map<string, number>();
+  for (const r of floor.rooms) {
+    const key = r.name.trim();
+    nameCounts.set(key, (nameCounts.get(key) ?? 0) + 1);
+  }
+  const duplicates = Array.from(nameCounts.entries())
+    .filter(([, n]) => n > 1)
+    .map(([name, n]) => `"${name}" (appears ${n} times)`);
+  const nameUniquenessBlock = duplicates.length === 0
+    ? `\nNAME UNIQUENESS: all ${floor.rooms.length} room NAMES are distinct — score noDuplicateNames as 10. Shared TYPE tags (e.g. three rooms typed "bedroom") are NOT duplicates.`
+    : `\nNAME UNIQUENESS: the following NAMES appear more than once — score noDuplicateNames ≤ 4: ${duplicates.join(", ")}`;
+
   return `FLOOR PLAN SUMMARY:
 Plot: ${brief.plotWidthFt}×${brief.plotDepthFt}ft, ${brief.facing}-facing
 Vastu required: ${vastuRequired ? "YES" : "NO"}
@@ -254,7 +275,7 @@ Expected rooms (from brief): ${briefRoomNames}
 Total walls: ${floor.walls.length}, doors: ${floor.doors.length}, windows: ${floor.windows.length}
 
 ACTUAL ROOMS (${floor.rooms.length}):
-${roomLines.join("\n")}${adjacencyBlock}${vastuBlock}`;
+${roomLines.join("\n")}${nameUniquenessBlock}${adjacencyBlock}${vastuBlock}`;
 }
 
 // ─── Score Calculator ────────────────────────────────────────────
@@ -320,8 +341,13 @@ Be strict on critical dimensions (roomCountMatch, noDuplicateNames, dimensionPla
 Be moderate on architectural dimensions (vastuCompliance, orientationCorrect).
 Be lenient on nice-to-have dimensions (connectivity, exteriorWindows).
 
+NAME vs TYPE CLARIFICATION (Phase 2.11.5) — critical for noDuplicateNames:
+- A room NAME is the human-readable label shown inside parentheses: "Master Bedroom", "Bedroom 2", "Bedroom 3", "Living Room".
+- A room TYPE is the category tag after the name: (master_bedroom), (bedroom), (bedroom), (living). Multiple rooms legitimately SHARE a type — three bedrooms all typed "bedroom" is expected and correct.
+- noDuplicateNames scores whether NAMES are unique. Bedroom 1 + Bedroom 2 + Bedroom 3 all have DIFFERENT names → noDuplicateNames = 10. Only score low when two or more rooms share an EXACT name string ("Bedroom" appearing twice, for example).
+
 ${input.brief.styleCues.some((s) => s.toLowerCase().includes("vastu"))
-  ? "Vastu IS required. Check: Pooja NE, Master SW, Kitchen SE."
+  ? "Vastu IS required. Use the VASTU PLACEMENT REFERENCE block at the end of the summary (if present) and each room's DIR tag to score vastuCompliance deterministically."
   : "Vastu is NOT required. Score vastuCompliance as 8 (neutral)."}`,
         tools: [TOOL_SCHEMA],
         tool_choice: { type: "tool" as const, name: "produce_quality_verdict" },
