@@ -315,7 +315,7 @@ describe("validateFidelity — flag but don't mutate", () => {
       { name: "B", type: "bedroom", placed: { x: 8, y: 0, width: 10, depth: 10 }, confidence: 0.9, labelAsShown: "B" },
     ]);
     // Overlap area = 2 × 10 = 20 sqft — well above the 0.5 sqft threshold.
-    const issues = validateFidelity(rooms, 20, 10, []);
+    const issues = validateFidelity(rooms, [], 20, 10, []);
     expect(issues.some((i) => /overlap/i.test(i))).toBe(true);
     // Rooms positions untouched.
     expect(rooms[0].placed).toEqual({ x: 0, y: 0, width: 10, depth: 10 });
@@ -327,20 +327,20 @@ describe("validateFidelity — flag but don't mutate", () => {
       { name: "A", type: "bedroom", placed: { x: 0, y: 0, width: 50, depth: 10 }, confidence: 0.9, labelAsShown: "A" },
     ]);
     // Plot is 20×10. Room width 50 blows past.
-    const issues = validateFidelity(rooms, 20, 10, []);
+    const issues = validateFidelity(rooms, [], 20, 10, []);
     expect(issues.some((i) => /beyond plot/i.test(i))).toBe(true);
     expect(rooms[0].placed).toEqual({ x: 0, y: 0, width: 50, depth: 10 });
   });
 
-  it("flags when door count is insufficient for roomCount - 1 connectivity", () => {
+  it("flags habitable rooms with no door (Phase 2.11.2 per-room coverage)", () => {
     const rooms = buildFidelityRooms([
       { name: "A", type: "bedroom", placed: { x: 0, y: 0, width: 10, depth: 10 }, confidence: 0.9, labelAsShown: "A" },
       { name: "B", type: "bedroom", placed: { x: 11, y: 0, width: 10, depth: 10 }, confidence: 0.9, labelAsShown: "B" },
       { name: "C", type: "bedroom", placed: { x: 22, y: 0, width: 10, depth: 10 }, confidence: 0.9, labelAsShown: "C" },
     ]);
-    // Three rooms, zero doors → insufficient connectivity.
-    const issues = validateFidelity(rooms, 40, 10, []);
-    expect(issues.some((i) => /disconnected|doors for/.test(i))).toBe(true);
+    // Three rooms, zero doors, zero walls → every habitable room flagged.
+    const issues = validateFidelity(rooms, [], 40, 10, []);
+    expect(issues.filter((i) => /has no door/.test(i)).length).toBe(3);
   });
 });
 

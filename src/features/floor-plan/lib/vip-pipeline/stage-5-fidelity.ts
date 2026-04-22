@@ -337,6 +337,74 @@ function lookupRoom(rooms: StripPackRoom[], id: string): StripPackRoom | undefin
   return rooms.find((r) => r.id === id);
 }
 
+/**
+ * Phase 2.11.2 — minimum wall length required to host a door. Matches the
+ * existing `doorWidth = Math.min(3, segmentLength − 0.4) < 1.5` guard:
+ * a 1.9 ft wall produces a 1.5 ft door after the 0.4 ft frame margin.
+ */
+const DOOR_MIN_WALL_LEN_FT = 1.9;
+
+/**
+ * Build a `DoorPlacement` at the midpoint of `wall` between `betweenA` and
+ * `betweenB`. Extracted Phase 2.11.2 so the pair pass, the entrance pass,
+ * AND the coverage pass below can all share the same midpoint/orientation
+ * math without drifting. Marks the door as main entrance if requested.
+ */
+function makeDoorAtMidpoint(
+  wall: WallSegment,
+  betweenA: string,
+  betweenB: string,
+  maxWidthFt: number,
+  isMainEntrance = false,
+): DoorPlacement {
+  const len = segmentLength(wall);
+  const doorWidth = Math.min(maxWidthFt, len - 0.4);
+  if (wall.orientation === "vertical") {
+    const midY = (wall.start.y + wall.end.y) / 2;
+    return {
+      start: { x: wall.start.x, y: midY - doorWidth / 2 },
+      end: { x: wall.start.x, y: midY + doorWidth / 2 },
+      between: [betweenA, betweenB],
+      width_ft: doorWidth,
+      orientation: "vertical",
+      wall_id: wall.id,
+      ...(isMainEntrance ? { is_main_entrance: true } : {}),
+    };
+  }
+  const midX = (wall.start.x + wall.end.x) / 2;
+  return {
+    start: { x: midX - doorWidth / 2, y: wall.start.y },
+    end: { x: midX + doorWidth / 2, y: wall.start.y },
+    between: [betweenA, betweenB],
+    width_ft: doorWidth,
+    orientation: "horizontal",
+    wall_id: wall.id,
+    ...(isMainEntrance ? { is_main_entrance: true } : {}),
+  };
+}
+
+/** Rooms that we consider "habitable" — always need a door; corridors / porches / voids don't. */
+function isHabitable(type: string): boolean {
+  return (
+    isWet(type) ||
+    isSacred(type) ||
+    [
+      "living",
+      "drawing_room",
+      "dining",
+      "hall",
+      "bedroom",
+      "master_bedroom",
+      "guest_bedroom",
+      "kids_bedroom",
+      "study",
+      "balcony",
+      "verandah",
+      "foyer",
+    ].includes(type)
+  );
+}
+
 function placeFidelityDoors(
   rooms: StripPackRoom[],
   walls: WallSegment[],
@@ -361,8 +429,7 @@ function placeFidelityDoors(
   }
 
   for (const [, w] of bestByPair) {
-    const doorWidth = Math.min(INTERIOR_DOOR_WIDTH_FT, segmentLength(w) - 0.4);
-    if (doorWidth < 1.5) continue; // Wall too short to host a door cleanly.
+    if (segmentLength(w) < DOOR_MIN_WALL_LEN_FT) continue; // Wall too short.
 
     const [aName, bName] = w.room_ids.map(
       (id) => lookupRoom(rooms, id)?.name ?? id,
@@ -372,34 +439,16 @@ function placeFidelityDoors(
     const bRoom = lookupRoom(rooms, w.room_ids[1]);
     const aIsPrimary = aRoom ? isCirculation(aRoom.type) : false;
     const bIsPrimary = bRoom ? isCirculation(bRoom.type) : false;
-    const between: [string, string] =
+    const [primaryName, secondaryName] =
       aIsPrimary && !bIsPrimary
         ? [aName, bName]
         : bIsPrimary && !aIsPrimary
           ? [bName, aName]
           : [aName, bName];
 
-    if (w.orientation === "vertical") {
-      const midY = (w.start.y + w.end.y) / 2;
-      doors.push({
-        start: { x: w.start.x, y: midY - doorWidth / 2 },
-        end: { x: w.start.x, y: midY + doorWidth / 2 },
-        between,
-        width_ft: doorWidth,
-        orientation: "vertical",
-        wall_id: w.id,
-      });
-    } else {
-      const midX = (w.start.x + w.end.x) / 2;
-      doors.push({
-        start: { x: midX - doorWidth / 2, y: w.start.y },
-        end: { x: midX + doorWidth / 2, y: w.start.y },
-        between,
-        width_ft: doorWidth,
-        orientation: "horizontal",
-        wall_id: w.id,
-      });
-    }
+    doors.push(
+      makeDoorAtMidpoint(w, primaryName, secondaryName, INTERIOR_DOOR_WIDTH_FT),
+    );
   }
 
   // 2. Entrance door — place on the exterior wall of a circulation-ish
@@ -407,33 +456,73 @@ function placeFidelityDoors(
   //    room touches the facing edge, pick the largest room on it.
   const entranceWall = pickEntranceWall(rooms, walls, facing, plotW, plotD);
   if (entranceWall) {
-    const w = entranceWall;
-    const len = segmentLength(w);
-    const doorWidth = Math.min(ENTRANCE_DOOR_WIDTH_FT, Math.max(2.5, len - 0.4));
-    const roomName = lookupRoom(rooms, w.room_ids[0])?.name ?? "entrance";
-    if (w.orientation === "horizontal") {
-      const midX = (w.start.x + w.end.x) / 2;
-      doors.push({
-        start: { x: midX - doorWidth / 2, y: w.start.y },
-        end: { x: midX + doorWidth / 2, y: w.start.y },
-        between: [roomName, "exterior"],
-        width_ft: doorWidth,
-        orientation: "horizontal",
-        wall_id: w.id,
-        is_main_entrance: true,
+    const roomName = lookupRoom(rooms, entranceWall.room_ids[0])?.name ?? "entrance";
+    const len = segmentLength(entranceWall);
+    // Entrance widths clamp differently from interior (≥2.5, ≤3.5) — build
+    // the door with a custom max and a floor of 2.5 ft to match prior behavior.
+    const maxW = Math.max(2.5, Math.min(ENTRANCE_DOOR_WIDTH_FT, len - 0.4));
+    doors.push(
+      makeDoorAtMidpoint(entranceWall, roomName, "exterior", maxW, true),
+    );
+  }
+
+  // 3. Phase 2.11.2 — coverage guarantee: every habitable room MUST have
+  //    at least one door. The pair pass above only emits a door when two
+  //    rooms share an interior wall long enough to host it; a room whose
+  //    only shared walls are too short — or which shares walls only with
+  //    rooms that already got their door via a different pair — falls
+  //    through. This pass backfills a door on the best unused wall of
+  //    any such room. Prefers interior walls to a circulation neighbour,
+  //    then interior walls to any neighbour, then exterior walls.
+  const wallsWithDoors = new Set(
+    doors.map((d) => d.wall_id).filter((x): x is string => !!x),
+  );
+  const roomsCovered = new Set<string>();
+  for (const d of doors) {
+    if (!d.wall_id) continue;
+    const w = walls.find((x) => x.id === d.wall_id);
+    if (!w) continue;
+    for (const rid of w.room_ids) roomsCovered.add(rid);
+  }
+
+  for (const room of rooms) {
+    if (roomsCovered.has(room.id)) continue;
+    if (!isHabitable(room.type)) continue; // corridors, porches, voids — skip
+
+    const candidates = walls
+      .filter((w) => w.room_ids.includes(room.id))
+      .filter((w) => !wallsWithDoors.has(w.id))
+      .filter((w) => segmentLength(w) >= DOOR_MIN_WALL_LEN_FT);
+    if (candidates.length === 0) continue; // room too small or fully enclosed by short walls
+
+    const scoreWall = (w: WallSegment): number => {
+      const otherIds = w.room_ids.filter((id) => id !== room.id);
+      const toCirc = otherIds.some((id) => {
+        const r = lookupRoom(rooms, id);
+        return r && isCirculation(r.type);
       });
-    } else {
-      const midY = (w.start.y + w.end.y) / 2;
-      doors.push({
-        start: { x: w.start.x, y: midY - doorWidth / 2 },
-        end: { x: w.start.x, y: midY + doorWidth / 2 },
-        between: [roomName, "exterior"],
-        width_ft: doorWidth,
-        orientation: "vertical",
-        wall_id: w.id,
-        is_main_entrance: true,
-      });
-    }
+      // Priority: internal-to-circulation > internal-to-habitable > external
+      let score = 0;
+      if (w.type === "internal") score += 1000;
+      if (toCirc) score += 500;
+      score += segmentLength(w); // longer walls preferred within the same bucket
+      return score;
+    };
+    candidates.sort((a, b) => scoreWall(b) - scoreWall(a));
+
+    const w = candidates[0];
+    const roomName = room.name;
+    const otherIds = w.room_ids.filter((id) => id !== room.id);
+    const otherName =
+      w.type === "external" || otherIds.length === 0
+        ? "exterior"
+        : lookupRoom(rooms, otherIds[0])?.name ?? "exterior";
+
+    doors.push(
+      makeDoorAtMidpoint(w, roomName, otherName, INTERIOR_DOOR_WIDTH_FT),
+    );
+    wallsWithDoors.add(w.id);
+    for (const rid of w.room_ids) roomsCovered.add(rid);
   }
 
   return doors;
@@ -583,6 +672,7 @@ function placeFidelityWindows(
 
 function validateFidelity(
   rooms: StripPackRoom[],
+  walls: WallSegment[],
   plotWidthFt: number,
   plotDepthFt: number,
   doors: DoorPlacement[],
@@ -623,10 +713,22 @@ function validateFidelity(
     }
   }
 
-  // Connectivity heuristic — need at least roomCount - 1 doors for a tree.
-  if (doors.length < rooms.length - 1 && rooms.length > 1) {
+  // Phase 2.11.2 — per-room door coverage. The placeFidelityDoors coverage
+  // pass should have placed a door on every habitable room; if any still
+  // lack one, it means ALL their incident walls were too short (< 1.9 ft)
+  // to host a door. Flag the specific rooms so Stage 6 / logs can surface.
+  const wallsById = new Map(walls.map((w) => [w.id, w]));
+  const roomsCovered = new Set<string>();
+  for (const d of doors) {
+    const w = d.wall_id ? wallsById.get(d.wall_id) : undefined;
+    if (!w) continue;
+    for (const rid of w.room_ids) roomsCovered.add(rid);
+  }
+  for (const r of rooms) {
+    if (!isHabitable(r.type)) continue;
+    if (roomsCovered.has(r.id)) continue;
     issues.push(
-      `fidelity: only ${doors.length} doors for ${rooms.length} rooms — some rooms may be disconnected in the extracted image`,
+      `fidelity: habitable room "${r.name}" has no door — all incident walls under the 1.9 ft threshold`,
     );
   }
 
@@ -781,7 +883,7 @@ export async function runStage5FidelityMode(
   const windows = placeFidelityWindows(spRooms, walls, doors, nFacing, plotWidthFt, plotDepthFt);
 
   // 9. Validation (flag, don't fix).
-  issues.push(...validateFidelity(spRooms, plotWidthFt, plotDepthFt, doors));
+  issues.push(...validateFidelity(spRooms, walls, plotWidthFt, plotDepthFt, doors));
 
   // 10. StripPackResult + convert.
   const plotRect: Rect = { x: 0, y: 0, width: plotWidthFt, depth: plotDepthFt };
