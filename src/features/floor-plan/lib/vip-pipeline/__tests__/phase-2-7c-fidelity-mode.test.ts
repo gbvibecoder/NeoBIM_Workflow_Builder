@@ -369,9 +369,10 @@ describe("runStage5FidelityMode — ensuite stays attached (no Option X, no move
 
     const result = await runStage5FidelityMode(stage5Input(ex), undefined);
     const roomsOut = result.output.project.floors[0].rooms;
-    // Our 3 input rooms must all appear; toFloorPlanProject may add a
-    // synthetic hallway room for the spine — that's fine.
-    expect(roomsOut.length).toBeGreaterThanOrEqual(3);
+    // Phase 2.11.1: fidelity mode must NOT inject a synthetic Hallway room
+    // from the stub spine — exactly the 3 input rooms should appear.
+    expect(roomsOut.length).toBe(3);
+    expect(roomsOut.every((r) => r.type !== "corridor")).toBe(true);
 
     // Metadata should reflect fidelity path + confidence.
     const meta = result.output.project.metadata as unknown as Record<string, unknown>;

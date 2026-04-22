@@ -132,6 +132,15 @@ export interface SpineLayout {
   /** Which side of the plot is the front (entrance side). */
   entrance_side: Facing;
   hallway_width_ft: number;
+  /**
+   * Phase 2.11.1 — set true when the spine rect is a type-satisfying
+   * stub (e.g., fidelity-mode synthesis on an extraction that has no
+   * corridor). When true, the converter must NOT emit a phantom
+   * "Hallway" Room from `spine`; callers that derive circulation
+   * geometry from the spine should also skip. Undefined or false
+   * means the spine is a real corridor produced by strip-pack.
+   */
+  synthetic?: boolean;
 }
 
 // ───────────────────────────────────────────────────────────────────────────

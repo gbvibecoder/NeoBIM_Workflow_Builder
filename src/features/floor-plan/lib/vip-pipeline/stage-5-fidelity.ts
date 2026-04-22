@@ -648,6 +648,12 @@ function buildStubSpine(
   facing: Facing,
 ): SpineLayout {
   const hallway = rooms.find((r) => r.type === "hallway" || r.type === "corridor" || r.type === "passage");
+  // Phase 2.11.1 — fidelity mode's spine is ALWAYS synthetic: the Rect is
+  // only here to satisfy SpineLayout's shape contract. Set synthetic=true
+  // so the converter skips emitting a phantom "Hallway" Room. When the
+  // extraction contains a real corridor/hallway room, that room is
+  // already in `rooms` and will be emitted by the normal for-loop in
+  // converter.buildRooms — we never want DOUBLE emission.
   const hallwayRect: Rect = hallway?.placed
     ? hallway.placed
     : { x: 0, y: plotD * 0.5, width: plotW, depth: 0.01 };
@@ -661,6 +667,7 @@ function buildStubSpine(
     orientation: hallwayRect.width >= hallwayRect.depth ? "horizontal" : "vertical",
     entrance_side: entranceSide,
     hallway_width_ft: Math.max(3.5, hallwayRect.depth),
+    synthetic: true,
   };
 }
 
