@@ -138,17 +138,40 @@ const TOOL_FUNCTION: OpenAI.Chat.Completions.ChatCompletionTool = {
 // GPT-4o's own `matchedName` when it already hits an expected room.
 
 // ─── System Prompt ───────────────────────────────────────────────
+//
+// Phase 2.8 A1/A2/A4 — Anchor GPT-4o Vision to:
+//   A1: plot-in-feet ↔ image-in-pixels scale (so it doesn't default to
+//       square-shaped rooms that lose the actual image proportions).
+//   A2: expected areas per room (from Stage 1 brief) so it can self-check
+//       dimension plausibility before returning.
+//   A4: do-NOT-extract guidance for dimension lines, wall gaps, door
+//       arcs, entry labels, and sub-16-sqft rectangles.
 
-function buildSystemPrompt(brief: Stage4Input["brief"]): string {
-  const roomNames = brief.roomList
-    .map((r) => `"${r.name}" (${r.type})`)
-    .join(", ");
+export function buildSystemPrompt(brief: Stage4Input["brief"]): string {
+  const plotW = brief.plotWidthFt;
+  const plotD = brief.plotDepthFt;
+  const pxPerFt = Math.max(1, Math.round(IMAGE_SIZE / Math.max(plotW, plotD)));
+
+  // Phase 2.8 A2: emit each expected room with its approximate area
+  // from the Stage 1 brief. When the brief omits an area, the line
+  // drops the area suffix so the LLM doesn't have a fake 0-sqft anchor.
+  const roomLines = brief.roomList
+    .map((r) => {
+      const areaSuffix = r.approxAreaSqft
+        ? `, ~${Math.round(r.approxAreaSqft)} sqft`
+        : "";
+      return `  "${r.name}" (${r.type}${areaSuffix})`;
+    })
+    .join("\n");
 
   return `You are a precise computer vision system extracting room bounding boxes from a 2D architectural floor plan image.
 
-The image is ${IMAGE_SIZE}×${IMAGE_SIZE} pixels. Pixel coordinate system: origin at top-left, X grows right, Y grows DOWN.
+The image is ${IMAGE_SIZE}×${IMAGE_SIZE} pixels and represents a ${plotW}×${plotD} ft plot.
+Scale: approximately ${pxPerFt} pixels per foot.
+Pixel coordinate system: origin at top-left, X grows right, Y grows DOWN.
 
-EXPECTED ROOMS: ${roomNames}
+EXPECTED ROOMS (with approximate areas from the architect's brief):
+${roomLines}
 
 YOUR TASK:
 1. Identify the exterior wall boundary (plot bounds) as a pixel rectangle.
@@ -157,12 +180,48 @@ YOUR TASK:
 4. If a room label in the image doesn't match any expected name, use the label as-is for matchedName.
 5. If duplicate labels exist (e.g., "Bedroom 2" appears twice), include BOTH with their individual bounding boxes. Set confidence lower (0.4-0.6) for duplicates.
 
-RULES:
+MATCHING RULES:
+- The label text in the image is the PRIMARY signal — use it first.
+- BUT visual features override ambiguous labels:
+    * A small room with plumbing / toilet fixtures → BATHROOM regardless of the text
+    * A room with a bed icon or bedside furniture → BEDROOM
+    * A room with a kitchen counter / sink → KITCHEN
+- If a label could plausibly match multiple expected rooms (e.g. "Master Bath"
+  could fuzzy-match both "Master Bedroom" and "Master Bathroom"), pick by
+  the ROOM'S VISUAL TYPE — plumbing → bathroom, bed → bedroom. Do NOT
+  resolve the ambiguity in favour of a longer word overlap.
+
+DIMENSION RULES:
+- Measure each room's bounding box PRECISELY. Rooms are rarely perfectly
+  square. A room drawn as a 10×14 rectangle should come out roughly
+  10×14 (${Math.round(10 * pxPerFt)}×${Math.round(14 * pxPerFt)} px at
+  this scale), NOT 12×12 — do not default to square proportions when
+  the drawing shows otherwise.
+- Use the ${pxPerFt} px/ft scale as a sanity check: a "12×10 ft"
+  expected room should be roughly ${Math.round(12 * pxPerFt)}×${Math.round(10 * pxPerFt)} px.
+- Compare each extracted room's area against the approximate area in
+  the EXPECTED ROOMS list. If your extracted area differs from the
+  expected area by more than ±50%, re-examine the image carefully
+  before returning.
+
+DO NOT EXTRACT (these are NOT rooms):
+- Dimension lines, measurement callouts, or plot-size annotations
+  (e.g. the "40'0\\"" labels on the exterior edges of the image).
+- Wall thickness gaps — the dark lines BETWEEN rooms.
+- Door arc swept areas — the thin quarter-circles showing door swing.
+- Entrance labels like "ENTRY" or "PORCH" floating above the roofline
+  without a clearly enclosed rectangular space around them.
+- Any rectangle smaller than 4×4 ft (~${Math.round(4 * pxPerFt)} px on
+  each side, ≈16 sqft) — likely a wall gap or artifact, not a room.
+
+If you see a label but no clear enclosed room boundary around it, DO NOT
+return it as a room.
+
+OUTPUT RULES:
 - ALL coordinates must be within [0, ${IMAGE_SIZE}] — no negative values, no values > ${IMAGE_SIZE}.
 - x + w and y + h must not exceed ${IMAGE_SIZE}.
 - Each room gets a tight bounding box around its interior (inside the walls, not including wall thickness).
 - confidence: 0.9-1.0 for clear matches, 0.6-0.8 for approximate matches, 0.3-0.5 for uncertain.
-- Include ALL rooms visible in the image, even if not in the expected list.
 - plotBounds should encompass the entire building footprint (exterior wall to exterior wall).`;
 }
 
