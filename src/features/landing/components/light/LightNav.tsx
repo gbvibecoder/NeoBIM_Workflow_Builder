@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { Menu, X } from "lucide-react";
+import { Menu, X, Sun, Moon } from "lucide-react";
 import { useLocale } from "@/hooks/useLocale";
 import { LanguageSwitcher } from "@/shared/components/ui/LanguageSwitcher";
 
@@ -92,6 +92,13 @@ export function LightNav() {
             <a
               key={link.href}
               href={link.href}
+              className="lnav-link"
+              onClick={(e) => {
+                e.preventDefault();
+                document
+                  .getElementById(link.href.slice(1))
+                  ?.scrollIntoView({ behavior: "smooth" });
+              }}
               style={{
                 fontSize: 14,
                 fontWeight: 400,
@@ -100,6 +107,7 @@ export function LightNav() {
                 padding: "8px 14px",
                 borderRadius: 6,
                 fontFamily: "var(--font-dm-sans), sans-serif",
+                transition: "color 200ms ease-out",
               }}
               onMouseEnter={(e) => {
                 (e.currentTarget as HTMLElement).style.color =
@@ -127,6 +135,15 @@ export function LightNav() {
           }}
         >
           <LanguageSwitcher />
+          {/* Theme toggle pill */}
+          <div className="ltheme-toggle">
+            <span className="ltheme-toggle-active" aria-label="Light mode active">
+              <Sun size={14} />
+            </span>
+            <Link href="/" className="ltheme-toggle-inactive" aria-label="Switch to dark mode">
+              <Moon size={14} />
+            </Link>
+          </div>
           <Link
             href="/register"
             style={{
@@ -201,7 +218,13 @@ export function LightNav() {
             <a
               key={link.href}
               href={link.href}
-              onClick={closeMenu}
+              onClick={(e) => {
+                e.preventDefault();
+                closeMenu();
+                document
+                  .getElementById(link.href.slice(1))
+                  ?.scrollIntoView({ behavior: "smooth" });
+              }}
               style={{
                 display: "block",
                 padding: "14px 16px",

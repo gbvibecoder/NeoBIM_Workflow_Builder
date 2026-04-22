@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Plus } from "lucide-react";
 import { useLocale } from "@/hooks/useLocale";
+import { ScrollReveal } from "./ScrollReveal";
 import type { TranslationKey } from "@/lib/i18n";
 
 const FAQ_ITEMS: { qKey: TranslationKey; aKey: TranslationKey }[] = [
@@ -28,7 +29,7 @@ export function LightFAQ() {
     >
       <div style={{ maxWidth: 680, margin: "0 auto" }}>
         {/* Section header */}
-        <div style={{ textAlign: "center", marginBottom: 48 }}>
+        <ScrollReveal style={{ textAlign: "center", marginBottom: 48 }}>
           <p
             style={{
               fontSize: 11,
@@ -55,10 +56,10 @@ export function LightFAQ() {
           >
             {t("light.faqTitle")}
           </h2>
-        </div>
+        </ScrollReveal>
 
         {/* FAQ list */}
-        <div>
+        <ScrollReveal stagger>
           {FAQ_ITEMS.map((item, i) => {
             const isOpen = openIndex === i;
             const isLast = i === FAQ_ITEMS.length - 1;
@@ -125,7 +126,7 @@ export function LightFAQ() {
               </details>
             );
           })}
-        </div>
+        </ScrollReveal>
       </div>
 
       <style>{`

@@ -3,6 +3,7 @@
 import { Upload, Layers, Presentation } from "lucide-react";
 import { useLocale } from "@/hooks/useLocale";
 import type { TranslationKey } from "@/lib/i18n";
+import { ScrollReveal } from "./ScrollReveal";
 
 const STEPS = [
   { num: "01", icon: Upload, titleKey: "light.step1Title" as TranslationKey, descKey: "light.step1Desc" as TranslationKey },
@@ -23,7 +24,7 @@ export function LightWhatItDoes() {
       }}
     >
       {/* Section header */}
-      <div style={{ textAlign: "center", marginBottom: 64 }}>
+      <ScrollReveal style={{ textAlign: "center", marginBottom: 64 }}>
         <p
           style={{
             fontSize: 11,
@@ -50,10 +51,11 @@ export function LightWhatItDoes() {
         >
           {t("light.howTitle")}
         </h2>
-      </div>
+      </ScrollReveal>
 
       {/* 3-column grid */}
-      <div
+      <ScrollReveal
+        stagger
         className="light-steps-grid"
         style={{
           display: "grid",
@@ -137,7 +139,7 @@ export function LightWhatItDoes() {
             </p>
           </div>
         ))}
-      </div>
+      </ScrollReveal>
 
       <style>{`
         @media (max-width: 768px) {
