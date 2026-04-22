@@ -326,24 +326,149 @@ function LogRow({
         </div>
       )}
       {open && entry.output && (
-        <pre
-          data-testid="pipeline-logs-row-output"
+        <>
+          {entry.stage === 5 && (
+            <EnhancementBlock output={entry.output} />
+          )}
+          <pre
+            data-testid="pipeline-logs-row-output"
+            style={{
+              marginTop: 6,
+              marginLeft: 24,
+              padding: 8,
+              borderRadius: 6,
+              background: "rgba(255,255,255,0.03)",
+              color: "#B2B6C8",
+              fontSize: 10.5,
+              maxHeight: 160,
+              overflow: "auto",
+              whiteSpace: "pre-wrap",
+              wordBreak: "break-word",
+            }}
+          >
+            {JSON.stringify(entry.output, null, 2)}
+          </pre>
+        </>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Phase 2.9 — Stage 5 "adaptive enhancement" readout. Renders a compact
+ * card above the raw JSON whenever the Stage 5 log entry carries a
+ * `metrics.enhancement` payload. Gives the user visibility into:
+ *   - Whether the classifier gated enhancement ON or OFF (with reason).
+ *   - Whether dimension correction / adjacency enforcement actually ran,
+ *     and whether either was rolled back on overlap.
+ */
+function EnhancementBlock({
+  output,
+}: {
+  output: Record<string, unknown>;
+}) {
+  const e = output.enhancement as Record<string, unknown> | undefined;
+  if (!e || typeof e !== "object") return null;
+
+  const classified = e.classified === true;
+  const reasons = Array.isArray(e.reasons) ? (e.reasons as unknown[]) : [];
+  const dimApplied = e.dimCorrectionApplied === true;
+  const adjApplied = e.adjEnforcementApplied === true;
+  const dimRollback = typeof e.dimCorrectionRollback === "string" ? e.dimCorrectionRollback : undefined;
+  const adjRollback = typeof e.adjEnforcementRollback === "string" ? e.adjEnforcementRollback : undefined;
+
+  const badgeBg = classified
+    ? dimRollback || adjRollback
+      ? "rgba(251, 191, 36, 0.12)"
+      : "rgba(52, 211, 153, 0.12)"
+    : "rgba(148, 163, 184, 0.10)";
+  const badgeColor = classified
+    ? dimRollback || adjRollback
+      ? "#FBBF24"
+      : "#34D399"
+    : "#94A3B8";
+  const badgeLabel = classified
+    ? dimRollback || adjRollback
+      ? "REVERTED"
+      : "ON"
+    : "OFF";
+
+  return (
+    <div
+      data-testid="pipeline-logs-phase-29-block"
+      style={{
+        marginTop: 6,
+        marginLeft: 24,
+        padding: "8px 10px",
+        borderRadius: 6,
+        background: "rgba(255,255,255,0.025)",
+        border: "1px solid rgba(255,255,255,0.05)",
+        fontSize: 11,
+        color: "#B2B6C8",
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+        <span style={{ fontWeight: 600, color: "#DDE0EE", letterSpacing: "0.4px" }}>
+          Phase 2.9 — adaptive enhancement
+        </span>
+        <span
           style={{
-            marginTop: 6,
-            marginLeft: 24,
-            padding: 8,
-            borderRadius: 6,
-            background: "rgba(255,255,255,0.03)",
-            color: "#B2B6C8",
-            fontSize: 10.5,
-            maxHeight: 160,
-            overflow: "auto",
-            whiteSpace: "pre-wrap",
-            wordBreak: "break-word",
+            padding: "1px 6px",
+            borderRadius: 4,
+            background: badgeBg,
+            color: badgeColor,
+            fontSize: 10,
+            fontWeight: 700,
+            letterSpacing: "0.6px",
           }}
         >
-          {JSON.stringify(entry.output, null, 2)}
-        </pre>
+          {badgeLabel}
+        </span>
+      </div>
+      {!classified && reasons.length > 0 && (
+        <ul style={{ margin: 0, paddingLeft: 18, color: "#8F93A8" }}>
+          {reasons.slice(0, 3).map((r, i) => (
+            <li key={i}>{String(r)}</li>
+          ))}
+        </ul>
+      )}
+      {classified && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+          <EnhancementRow
+            label="dimension correction"
+            applied={dimApplied}
+            rollback={dimRollback}
+          />
+          <EnhancementRow
+            label="adjacency enforcement"
+            applied={adjApplied}
+            rollback={adjRollback}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function EnhancementRow({
+  label,
+  applied,
+  rollback,
+}: {
+  label: string;
+  applied: boolean;
+  rollback?: string;
+}) {
+  const color = rollback ? "#FBBF24" : applied ? "#34D399" : "#94A3B8";
+  const status = rollback ? "reverted" : applied ? "applied" : "not run";
+  return (
+    <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
+      <span style={{ width: 150, color: "#8F93A8" }}>{label}</span>
+      <span style={{ color, fontWeight: 600 }}>{status}</span>
+      {rollback && (
+        <span style={{ color: "#8F93A8", fontSize: 10 }}>
+          — {rollback.replace(/^rollback\s*—\s*/, "")}
+        </span>
       )}
     </div>
   );

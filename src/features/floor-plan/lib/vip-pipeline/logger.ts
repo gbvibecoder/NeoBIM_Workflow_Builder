@@ -409,7 +409,40 @@ function buildSummary(meta: Record<string, unknown> | undefined): string | undef
     }
     if (parts.length >= 3) break;
   }
+
+  // Phase 2.9: append a compact enhancement badge for Stage 5 rows
+  // (e.g. "enhance: ON ✓", "enhance: OFF · no bias", "enhance: reverted").
+  const enhancementBadge = formatEnhancementBadge(meta);
+  if (enhancementBadge) parts.push(enhancementBadge);
+
   return parts.length > 0 ? parts.join(" · ") : undefined;
+}
+
+/**
+ * Phase 2.9: short badge describing the classifier / enhancement
+ * outcome. Pulled out of `buildSummary` so the Logs Panel can render
+ * it both inline and in a dedicated expanded block.
+ */
+function formatEnhancementBadge(
+  meta: Record<string, unknown> | undefined,
+): string | undefined {
+  const e = meta?.enhancement as Record<string, unknown> | undefined;
+  if (!e || typeof e !== "object") return undefined;
+  if (e.classified === true) {
+    if (e.dimCorrectionRollback || e.adjEnforcementRollback) {
+      return "enhance: reverted (overlap)";
+    }
+    const bits: string[] = [];
+    if (e.dimCorrectionApplied === true) bits.push("dims");
+    if (e.adjEnforcementApplied === true) bits.push("adj");
+    return bits.length > 0 ? `enhance: ON · ${bits.join("+")}` : "enhance: ON";
+  }
+  if (e.classified === false) {
+    const reasons = Array.isArray(e.reasons) ? (e.reasons as unknown[]) : [];
+    const first = reasons.length > 0 ? String(reasons[0]).slice(0, 40) : "gated";
+    return `enhance: OFF · ${first}`;
+  }
+  return undefined;
 }
 
 /**
