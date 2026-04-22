@@ -235,6 +235,11 @@ export async function runVIPPipelinePhaseB(
         plotDepthFt: intermediate.stage1Output.brief.plotDepthFt,
         facing: intermediate.stage1Output.brief.facing,
         parsedConstraints: config.parsedConstraints,
+        // Phase 2.7D: thread the Stage 1 brief's municipality through to
+        // Stage 5 so setback resolution (when PHASE_2_4_SETBACKS is on)
+        // can look up the city-specific envelope. Monolithic orchestrator
+        // already does this; Phase B was silently dropping it.
+        municipality: intermediate.stage1Output.brief.municipality,
         adjacencies: intermediate.stage1Output.brief.adjacencies,
       },
       log,
@@ -291,10 +296,13 @@ export async function runVIPPipelinePhaseB(
   }
 
   // Stage 7 — delivery (synchronous, $0)
-  // Phase 2.6.1: wrapped with logStageStart + logStageSuccess so the
-  // Logs Panel reflects delivery completion. Previously Stage 7 wrote
-  // no entry at all, so a completed job would render only 6 rows.
-  log.logStageStart(7);
+  // Phase 2.6.1: wired into the log so the Logs Panel shows row 7.
+  // Phase 2.7D: dropped the leading logStageStart(7) — Stage 7 is
+  // sync + <5ms, so the start/success pair produced a tiny "running"
+  // window that racing Prisma persists could freeze into the DB. The
+  // logger's finalizeStageEntry synthesizes a success-only entry when
+  // no prior running exists, so a single logStageSuccess(7, ...) call
+  // produces exactly one log entry with no "running" intermediate.
   const s7Start = Date.now();
   const totalCostUsd = log.computeTotalCost();
   const { output: s7Output } = runStage7Delivery(
