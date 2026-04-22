@@ -52,8 +52,16 @@ import {
   isWet,
   isSacred,
   type Stage5Metrics,
+  type Phase29Telemetry,
   type TransformedRoom,
 } from "./stage-5-synthesis";
+import { classifyScenario } from "./stage-5-classifier";
+import {
+  applyDimensionCorrection,
+  detectOverlaps,
+  clipAllToPlot,
+} from "./stage-5-enhance";
+import { enforceDeclaredAdjacencies } from "./stage-5-adjacency";
 
 // Shared epsilon for feet-space comparisons. Pixel→feet scaling plus
 // the 0.1ft rounding below make 0.15ft a safe tolerance for "same edge"
@@ -721,8 +729,24 @@ export async function runStage5FidelityMode(
     if (pr) room.type = pr.function;
   }
 
-  // 5. Build StripPackRooms with .placed preserved from transformed.
-  const spRooms = buildFidelityRooms(transformed);
+  // 5b. Phase 2.9 — adaptive dimension enhancement + adjacency
+  //     enforcement. Classifier-gated so that we only mutate when the
+  //     scenario is boring enough (rectangular plot, sane room count,
+  //     residential prompt, grid-square bias detected). Every pass is
+  //     rolled back cleanly if it introduces overlaps or clipping —
+  //     the pre-correction state is the guaranteed fallback.
+  const enhancement = runPhase29Enhancement(
+    transformed,
+    input,
+    plotWidthFt,
+    plotDepthFt,
+    issues,
+  );
+  const enhanced = enhancement.rooms;
+
+  // 6. Build StripPackRooms with .placed preserved from (possibly
+  //    enhanced) transformed rooms.
+  const spRooms = buildFidelityRooms(enhanced);
 
   // 6. Derive walls directly from room edges.
   const walls = deriveWalls(spRooms);
@@ -806,8 +830,154 @@ export async function runStage5FidelityMode(
       windowCount: windows.length,
       path: "fidelity",
       avgConfidence,
+      enhancement: enhancement.telemetry,
     },
   };
+}
+
+// ─── Phase 2.9: adaptive enhancement ────────────────────────────
+
+interface Phase29Result {
+  rooms: TransformedRoom[];
+  telemetry: Phase29Telemetry;
+}
+
+/**
+ * Phase 2.9 enhancement: run the classifier, then (if gated ON) apply
+ * dimension correction + declared-adjacency enforcement, with a fresh
+ * overlap check after each pass. Each pass is either kept in full or
+ * rolled back in full — never partially applied.
+ *
+ * Order matters:
+ *   1. Dimension correction FIRST (rooms get their right sizes).
+ *   2. Adjacency enforcement SECOND (smaller room snaps to larger's
+ *      edge; works best once larger is at its true size).
+ *   3. Final plot-clip safety net (last line of defense).
+ *
+ * Any step that produces an overlap or can't run cleanly is reverted.
+ */
+function runPhase29Enhancement(
+  transformed: TransformedRoom[],
+  input: Stage5Input,
+  plotWidthFt: number,
+  plotDepthFt: number,
+  issues: string[],
+): Phase29Result {
+  const classification = classifyScenario({
+    extraction: input.extraction,
+    brief: input.brief,
+    userPrompt: input.userPrompt,
+    plotWidthFt,
+    plotDepthFt,
+  });
+
+  const telemetry: Phase29Telemetry = {
+    classification: {
+      enhanceDimensions: classification.enhanceDimensions,
+      isRectangular: classification.isRectangular,
+      plotSqft: classification.plotSqft,
+      plotSizeCategory: classification.plotSizeCategory,
+      isResidential: classification.isResidential,
+      hasGridSquareBias: classification.hasGridSquareBias,
+      roomCount: classification.roomCount,
+      reasonsForFallback: classification.reasonsForFallback,
+    },
+    dimensionCorrection: { attempted: false, applied: false, records: [] },
+    adjacencyEnforcement: { attempted: false, applied: false, records: [] },
+  };
+
+  let current = transformed;
+
+  // ─ Pass 1: dimension correction (only when classifier allows). ─
+  if (classification.enhanceDimensions && input.brief) {
+    telemetry.dimensionCorrection.attempted = true;
+    const snapshot = current.map((r) => ({ ...r, placed: { ...r.placed } }));
+    const correction = applyDimensionCorrection({
+      rooms: current,
+      brief: input.brief,
+      plotWidthFt,
+      plotDepthFt,
+    });
+    telemetry.dimensionCorrection.records = correction.applied.map((r) => ({
+      room: r.room,
+      originalArea: r.originalArea,
+      targetArea: r.targetArea,
+      correctedArea: r.correctedArea,
+      action: r.action,
+      note: r.note,
+    }));
+
+    const overlaps = detectOverlaps(correction.rooms);
+    if (overlaps.length > 0) {
+      const reason =
+        `rollback — correction produced ${overlaps.length} overlap` +
+        `${overlaps.length === 1 ? "" : "s"} (${overlaps
+          .slice(0, 3)
+          .map((o) => `${o.a}×${o.b}`)
+          .join(", ")})`;
+      telemetry.dimensionCorrection.rollbackReason = reason;
+      issues.push(`fidelity 2.9: dimension correction reverted — ${reason}`);
+      current = snapshot;
+    } else {
+      telemetry.dimensionCorrection.applied = true;
+      current = correction.rooms;
+    }
+  }
+
+  // ─ Pass 2: declared-adjacency enforcement. ─
+  const declaredPairs = (input.adjacencies ?? []).filter(
+    (d) => d.relationship === "attached" || d.relationship === "direct-access",
+  );
+  if (classification.enhanceDimensions && declaredPairs.length > 0) {
+    telemetry.adjacencyEnforcement.attempted = true;
+    const snapshot = current.map((r) => ({ ...r, placed: { ...r.placed } }));
+    const adj = enforceDeclaredAdjacencies({
+      rooms: current,
+      adjacencies: input.adjacencies ?? [],
+      brief: input.brief,
+      plotWidthFt,
+      plotDepthFt,
+    });
+    telemetry.adjacencyEnforcement.records = adj.records.map((r) => ({
+      a: r.a,
+      b: r.b,
+      relationship: r.relationship,
+      action: r.action,
+      edge: r.edge,
+      note: r.note,
+    }));
+
+    const overlaps = detectOverlaps(adj.rooms);
+    if (overlaps.length > 0) {
+      const reason =
+        `rollback — adjacency enforcement produced ${overlaps.length} overlap` +
+        `${overlaps.length === 1 ? "" : "s"} (${overlaps
+          .slice(0, 3)
+          .map((o) => `${o.a}×${o.b}`)
+          .join(", ")})`;
+      telemetry.adjacencyEnforcement.rollbackReason = reason;
+      issues.push(`fidelity 2.9: adjacency enforcement reverted — ${reason}`);
+      current = snapshot;
+    } else {
+      telemetry.adjacencyEnforcement.applied = true;
+      current = adj.rooms;
+    }
+  }
+
+  // ─ Final safety net: clip any drift to plot bounds. ─
+  if (telemetry.dimensionCorrection.applied || telemetry.adjacencyEnforcement.applied) {
+    const clipResult = clipAllToPlot(current, plotWidthFt, plotDepthFt);
+    if (clipResult.clips.length > 0) {
+      for (const c of clipResult.clips) {
+        issues.push(
+          `fidelity 2.9: clipped "${c.room}" to plot bounds after enhancement`,
+        );
+      }
+      current = clipResult.rooms;
+    }
+  }
+
+  return { rooms: current, telemetry };
 }
 
 // ─── Test-only exports ──────────────────────────────────────────
@@ -819,6 +989,7 @@ export const __internals = {
   validateFidelity,
   buildFidelityRooms,
   shouldDispatchFidelity,
+  runPhase29Enhancement,
 };
 
 /**
