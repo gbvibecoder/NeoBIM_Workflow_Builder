@@ -19,6 +19,7 @@ import type {
   RectPx,
 } from "./types";
 import type { VIPLogger } from "./logger";
+import { pickBestMatch } from "./stage-4-matcher";
 
 // ─── Constants ───────────────────────────────────────────────────
 
@@ -128,31 +129,13 @@ const TOOL_FUNCTION: OpenAI.Chat.Completions.ChatCompletionTool = {
 };
 
 // ─── Fuzzy Name Matching ─────────────────────────────────────────
-
-function wordOverlapScore(a: string, b: string): number {
-  const wordsA = a.toLowerCase().split(/\s+/).filter((w) => w.length >= 1);
-  const wordsB = new Set(
-    b.toLowerCase().split(/\s+/).filter((w) => w.length >= 1),
-  );
-  if (wordsA.length === 0) return 0;
-  let matches = 0;
-  for (const w of wordsA) {
-    if (wordsB.has(w)) matches++;
-  }
-  return matches / Math.max(wordsA.length, wordsB.size);
-}
-
-function bestMatchName(
-  label: string,
-  expectedNames: string[],
-): { name: string; score: number } {
-  let best = { name: label, score: 0 };
-  for (const name of expectedNames) {
-    const score = wordOverlapScore(label, name);
-    if (score > best.score) best = { name, score };
-  }
-  return best;
-}
+//
+// Phase 2.8 B1: the old word-overlap scorer tied "Master Bath" at 0.5
+// against both "Master Bedroom" and "Master Bathroom" and let list order
+// pick — consistently mismatching baths to bedrooms. Replaced with the
+// discriminator-weighted `pickBestMatch` in stage-4-matcher.ts, which
+// hard-zeros disjoint discriminators (bath ↔ bedroom) and prefers
+// GPT-4o's own `matchedName` when it already hits an expected room.
 
 // ─── System Prompt ───────────────────────────────────────────────
 
@@ -233,12 +216,14 @@ function validateAndClamp(
       continue;
     }
 
-    // Fuzzy match name
-    let name = r.matchedName;
-    const match = bestMatchName(r.labelAsShown, expectedNames);
-    if (match.score >= 0.5) {
-      name = match.name;
-    } else if (!expectedSet.has(r.matchedName.toLowerCase())) {
+    // Phase 2.8 B1: prefer GPT-4o's matchedName when it exactly hits an
+    // expected room; otherwise fall back to discriminator-weighted fuzzy
+    // match on labelAsShown. The new matcher treats "Master Bath" →
+    // "Master Bedroom" as a hard NO-MATCH (different discriminators) so
+    // we no longer produce the "Master Bedroom 2" duplicate bug.
+    const match = pickBestMatch(r.labelAsShown, r.matchedName, expectedNames);
+    let name = match.name;
+    if (match.source === "fallback" && !expectedSet.has(r.matchedName.toLowerCase())) {
       unexpectedRoomsFound.push(r.labelAsShown);
     }
 
