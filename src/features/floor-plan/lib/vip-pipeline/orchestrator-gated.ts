@@ -169,11 +169,25 @@ export async function runVIPPipelinePhaseB(
   const timings: Record<string, number> = {};
 
   // Stage 3 — jury (advisory only in gated mode)
+  // Phase 2.6.1: added logStageSuccess so the Logs Panel can flip the
+  // Stage 3 row to ✓ when the jury finishes. Before this, logStageStart
+  // pushed a running entry that was never finalized, and the stage
+  // module's internal logStageCost only backfilled costUsd — leaving
+  // the entry permanently as status="running" in VipJob.stageLog.
   try {
     log.logStageStart(3);
     const t0 = Date.now();
-    await runStage3ExtractionJury({ gptImage, brief: intermediate.stage1Output.brief }, log);
+    const { output: s3Output, metrics: s3Metrics } =
+      await runStage3ExtractionJury(
+        { gptImage, brief: intermediate.stage1Output.brief },
+        log,
+      );
     timings.stage3Ms = Date.now() - t0;
+    log.logStageSuccess(3, timings.stage3Ms, {
+      score: s3Output.verdict.score,
+      recommendation: s3Output.verdict.recommendation,
+      costUsd: s3Metrics.costUsd,
+    });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     log.logStageFailure(3, 0, msg);
@@ -191,6 +205,12 @@ export async function runVIPPipelinePhaseB(
     );
     stage4Output = res.output;
     timings.stage4Ms = Date.now() - t0;
+    log.logStageSuccess(4, timings.stage4Ms, {
+      rooms: res.output.extraction.rooms.length,
+      missing: res.output.extraction.expectedRoomsMissing.length,
+      issues: res.output.extraction.issues.length,
+      costUsd: res.metrics.costUsd,
+    });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     log.logStageFailure(4, 0, msg);
@@ -208,7 +228,7 @@ export async function runVIPPipelinePhaseB(
   try {
     log.logStageStart(5);
     const t0 = Date.now();
-    const { output } = await runStage5Synthesis(
+    const { output, metrics } = await runStage5Synthesis(
       {
         extraction: stage4Output.extraction,
         plotWidthFt: intermediate.stage1Output.brief.plotWidthFt,
@@ -221,6 +241,13 @@ export async function runVIPPipelinePhaseB(
     );
     candidateProject = output.project;
     timings.stage5Ms = Date.now() - t0;
+    log.logStageSuccess(5, timings.stage5Ms, {
+      rooms: metrics.roomCount,
+      walls: metrics.wallCount,
+      doors: metrics.doorCount,
+      windows: metrics.windowCount,
+      issues: output.issues.length,
+    });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     log.logStageFailure(5, 0, msg);
@@ -239,7 +266,7 @@ export async function runVIPPipelinePhaseB(
   try {
     log.logStageStart(6);
     const t0 = Date.now();
-    const { output } = await runStage6QualityGate(
+    const { output, metrics } = await runStage6QualityGate(
       {
         project: candidateProject,
         brief: intermediate.stage1Output.brief,
@@ -250,6 +277,12 @@ export async function runVIPPipelinePhaseB(
     qualityScore = output.verdict.score;
     finalWeakAreas = output.verdict.weakAreas;
     timings.stage6Ms = Date.now() - t0;
+    log.logStageSuccess(6, timings.stage6Ms, {
+      score: qualityScore,
+      recommendation: output.verdict.recommendation,
+      weakAreas: output.verdict.weakAreas,
+      costUsd: metrics.costUsd,
+    });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     log.logStageFailure(6, 0, msg);
@@ -257,7 +290,12 @@ export async function runVIPPipelinePhaseB(
     qualityScore = 0;
   }
 
-  // Stage 7 — delivery
+  // Stage 7 — delivery (synchronous, $0)
+  // Phase 2.6.1: wrapped with logStageStart + logStageSuccess so the
+  // Logs Panel reflects delivery completion. Previously Stage 7 wrote
+  // no entry at all, so a completed job would render only 6 rows.
+  log.logStageStart(7);
+  const s7Start = Date.now();
   const totalCostUsd = log.computeTotalCost();
   const { output: s7Output } = runStage7Delivery(
     {
@@ -270,7 +308,8 @@ export async function runVIPPipelinePhaseB(
     },
     log,
   );
-  timings.stage7Ms = 0;
+  timings.stage7Ms = Date.now() - s7Start;
+  log.logStageSuccess(7, timings.stage7Ms, { qualityScore });
 
   log.logSuccess(qualityScore);
 
