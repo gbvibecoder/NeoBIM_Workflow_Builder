@@ -143,14 +143,109 @@ export async function POST(req: Request) {
         plan: normalizedPlan,
       });
     } catch (razorpayError) {
+      // KEEP this log — it is the ops smoking-gun for prod incidents.
       console.error('[razorpay/checkout] Subscription creation failed:', razorpayError);
+
+      const classified = classifyRazorpayCheckoutError(razorpayError);
+      // Log the bucket so dashboards can chart "% PAYMENT_SERVICE_UNAVAILABLE
+      // over time" without parsing the full Razorpay error object every time.
+      console.warn('[razorpay/checkout] classified as:', {
+        code: classified.code,
+        status: classified.status,
+        razorpayCode: classified.razorpayCode,
+      });
       return NextResponse.json(
-        formatErrorResponse({ title: 'Payment setup failed', message: 'Unable to create subscription. Please try again.', code: 'RAZORPAY_001' }),
-        { status: 500 },
+        {
+          error: {
+            title: classified.title,
+            message: classified.message,
+            code: classified.code,
+            ...(classified.razorpayCode && { razorpayCode: classified.razorpayCode }),
+          },
+        },
+        { status: classified.status },
       );
     }
   } catch (error: unknown) {
     console.error('[razorpay/checkout] Unexpected error:', error);
     return NextResponse.json(formatErrorResponse(UserErrors.INTERNAL_ERROR), { status: 500 });
   }
+}
+
+// ─── Razorpay error classification ──────────────────────────────────────────
+//
+// Razorpay SDK errors look like:
+//   { statusCode: 400, error: { code, description, source, step, reason, field } }
+// We map them into three client-facing buckets so the UI can render the
+// right modal copy without leaking SDK internals.
+
+type RazorpayErrorCode = 'PLAN_UNAVAILABLE' | 'PAYMENT_SERVICE_UNAVAILABLE' | 'UNKNOWN';
+
+interface RazorpaySdkError {
+  statusCode?: number;
+  error?: {
+    code?: string;
+    description?: string;
+    field?: string;
+    step?: string;
+    reason?: string;
+  };
+  message?: string;
+  code?: string;
+}
+
+function classifyRazorpayCheckoutError(err: unknown): {
+  code: RazorpayErrorCode;
+  title: string;
+  message: string;
+  status: number;
+  razorpayCode?: string;
+} {
+  const e = (err ?? {}) as RazorpaySdkError;
+  const razorpayCode = e.error?.code;
+  const description = e.error?.description || e.message || '';
+  const field = e.error?.field;
+  const step = e.error?.step;
+  const status = e.statusCode;
+  const networkCode = typeof e.code === 'string' ? e.code : '';
+
+  // Plan-related: stale plan_id, deleted/inactive plan, mode-mismatched plan_id.
+  const isPlanError =
+    field === 'plan_id' ||
+    step === 'plan_id' ||
+    /plan/i.test(description);
+  if (isPlanError) {
+    return {
+      code: 'PLAN_UNAVAILABLE',
+      title: 'Plan unavailable',
+      message: 'This plan is temporarily unavailable. Please try a different plan or contact support.',
+      status: 422,
+      razorpayCode,
+    };
+  }
+
+  // Service unavailable: missing/5xx status, network errors, fetch failures.
+  const isServiceError =
+    !status ||
+    (status >= 500 && status < 600) ||
+    /ECONNREFUSED|ENOTFOUND|ETIMEDOUT|EAI_AGAIN|fetch failed|network|timeout/i.test(
+      `${networkCode} ${description}`,
+    );
+  if (isServiceError) {
+    return {
+      code: 'PAYMENT_SERVICE_UNAVAILABLE',
+      title: 'Payment service unavailable',
+      message: 'Our payment partner is temporarily unavailable. Please try again in a moment.',
+      status: 503,
+      razorpayCode,
+    };
+  }
+
+  return {
+    code: 'UNKNOWN',
+    title: 'Checkout failed',
+    message: description || 'Unable to start checkout. Please try again or contact support.',
+    status: 500,
+    razorpayCode,
+  };
 }
