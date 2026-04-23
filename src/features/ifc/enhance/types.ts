@@ -180,3 +180,72 @@ export interface RoofFootprint {
   /** Set true iff extraction fell back to the AABB rectangle. */
   isFallback: boolean;
 }
+
+/* ─── Phase 4a — building details (railings, window frames, sills) ─────────
+   Additive. Tier 4 mounts its own group under
+   `ViewportHandle.mountEnhancements(nodes, { tier: 4 })` and never touches
+   IFC model materials or the tier1/2/3 groups. Tier 4 is pure additive
+   geometry — railings along cantilever floor-slab edges, 4-sided window
+   frames (+ optional mullion/transom), and concrete sills below each
+   window. Reset cascade is tier4 → tier3 → tier2 → tier1. */
+
+export type WindowFrameColor = "aluminum" | "white-pvc" | "wood";
+/** Railing style — "metal" today; "glass" reserved for Phase 4b. Union
+ *  is extensible so the panel can grow options without breaking callers. */
+export type RailingStyle = "metal";
+
+export interface Tier4Toggles {
+  /** Master switch. */
+  enabled: boolean;
+  /** Balcony railings along cantilever slabs. */
+  railings: boolean;
+  /** Railing style — metal-only for Phase 4a. */
+  railingStyle: RailingStyle;
+  /** Window frames + optional mullion/transom. */
+  windowFrames: boolean;
+  /** Window frame colour. */
+  frameColor: WindowFrameColor;
+  /** Window sills below each frame. */
+  windowSills: boolean;
+}
+
+export const DEFAULT_TIER4_TOGGLES: Tier4Toggles = {
+  enabled: true,
+  railings: true,
+  railingStyle: "metal",
+  windowFrames: true,
+  frameColor: "aluminum",
+  windowSills: true,
+};
+
+export interface Tier4ApplyResult {
+  success: boolean;
+  message?: string;
+  /** Number of balcony polygons detected (pre-filter). */
+  balconyEdgesDetected: number;
+  /** Legacy field — kept so existing callers that read `railingsBuilt`
+   *  keep working. Since the hotfix, this equals `balconyCount`. */
+  railingsBuilt: number;
+  /** Distinct window EXPRESS IDs that received a frame. Not mesh count. */
+  windowsFramed: number;
+  /** Distinct window EXPRESS IDs that received a sill. Not mesh count. */
+  sillsBuilt: number;
+  durationMs: number;
+  /** Hotfix: distinct balcony polygons that got a railing. */
+  balconyCount?: number;
+}
+
+/** A balcony polygon — a portion of a floor slab that cantilevers past
+ *  the building's wall footprint. `points` is a closed CCW loop in world
+ *  XZ; `railSegments` is the subset of polygon edges that correspond to
+ *  a real slab perimeter and therefore need a railing. Edges lying along
+ *  the wall boundary (synthetic closures from the clip step) are excluded
+ *  from `railSegments`. */
+export interface BalconyPolygon {
+  points: Vector2[];
+  railSegments: Array<{ start: Vector2; end: Vector2 }>;
+  /** World Y of the slab's top surface — railing base. */
+  slabY: number;
+  /** Absolute polygon area (shoelace). */
+  areaM2: number;
+}

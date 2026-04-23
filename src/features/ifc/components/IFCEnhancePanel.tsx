@@ -26,12 +26,14 @@ import {
   Wand2,
   MapPin,
   Home,
+  Building2,
 } from "lucide-react";
 import { UI } from "@/features/ifc/components/constants";
 import type { ViewportHandle } from "@/types/ifc-viewer";
 import {
   DEFAULT_TIER2_TOGGLES,
   DEFAULT_TIER3_TOGGLES,
+  DEFAULT_TIER4_TOGGLES,
   DEFAULT_TOGGLES,
   type DeckMaterial,
   type EnhanceStatus,
@@ -44,6 +46,9 @@ import {
   type Tier2Toggles,
   type Tier3ApplyResult,
   type Tier3Toggles,
+  type Tier4ApplyResult,
+  type Tier4Toggles,
+  type WindowFrameColor,
 } from "@/features/ifc/enhance/types";
 import {
   createTier1Engine,
@@ -58,6 +63,10 @@ import {
   createTier3Engine,
   type Tier3Engine,
 } from "@/features/ifc/enhance/tier3/tier3-engine";
+import {
+  createTier4Engine,
+  type Tier4Engine,
+} from "@/features/ifc/enhance/tier4/tier4-engine";
 
 /* ─── Props + imperative handle ──────────────────────────────────────── */
 
@@ -168,6 +177,7 @@ export const IFCEnhancePanel = forwardRef<IFCEnhancePanelHandle, IFCEnhancePanel
     const [toggles, setToggles] = useState<EnhanceToggles>(DEFAULT_TOGGLES);
     const [tier2Toggles, setTier2Toggles] = useState<Tier2Toggles>(DEFAULT_TIER2_TOGGLES);
     const [tier3Toggles, setTier3Toggles] = useState<Tier3Toggles>(DEFAULT_TIER3_TOGGLES);
+    const [tier4Toggles, setTier4Toggles] = useState<Tier4Toggles>(DEFAULT_TIER4_TOGGLES);
     const [status, setStatus] = useState<EnhanceStatus>({ kind: "idle" });
     const [expanded, setExpanded] = useState({
       materials: true,
@@ -175,16 +185,19 @@ export const IFCEnhancePanel = forwardRef<IFCEnhancePanelHandle, IFCEnhancePanel
       lighting: true,
       context: true,
       roof: true,
+      "building-details": true,
     });
     const [tier2Counts, setTier2Counts] = useState<{
       ground: number;
     } | null>(null);
     const [tier3Result, setTier3Result] = useState<Tier3ApplyResult | null>(null);
+    const [tier4Result, setTier4Result] = useState<Tier4ApplyResult | null>(null);
 
     /* Engines live in refs so tab switches don't recreate them and lose state. */
     const engineRef = useRef<Tier1Engine | null>(null);
     const tier2EngineRef = useRef<Tier2Engine | null>(null);
     const tier3EngineRef = useRef<Tier3Engine | null>(null);
+    const tier4EngineRef = useRef<Tier4Engine | null>(null);
 
     const isLoading = status.kind === "loading";
     const isApplied = status.kind === "applied";
@@ -194,11 +207,16 @@ export const IFCEnhancePanel = forwardRef<IFCEnhancePanelHandle, IFCEnhancePanel
       panelRef,
       () => ({
         resetIfApplied: async () => {
-          /* Order: tier3 → tier2 → tier1. Stack-unwind: roof comes off
-             first (it depends on the IFC slab being hidden), then site
-             context, finally building materials + env. This keeps the
-             scene coherent at every frame — no "gray walls with a
-             floating parapet" intermediate state. */
+          /* Order: tier4 → tier3 → tier2 → tier1. Stack-unwind: building
+             details come off first (they hang off wall / window / slab
+             meshes that tier3 would otherwise unhide), then roof (it
+             depends on the IFC slab being hidden), then site context,
+             finally building materials + env. This keeps the scene
+             coherent at every frame. */
+          const tier4 = tier4EngineRef.current;
+          if (tier4 && tier4.isApplied()) {
+            await tier4.reset();
+          }
           const tier3 = tier3EngineRef.current;
           if (tier3 && tier3.isApplied()) {
             await tier3.reset();
@@ -213,6 +231,7 @@ export const IFCEnhancePanel = forwardRef<IFCEnhancePanelHandle, IFCEnhancePanel
           }
           setTier2Counts(null);
           setTier3Result(null);
+          setTier4Result(null);
           setStatus({ kind: "idle" });
         },
       }),
@@ -225,6 +244,7 @@ export const IFCEnhancePanel = forwardRef<IFCEnhancePanelHandle, IFCEnhancePanel
         overrideToggles?: EnhanceToggles,
         overrideTier2?: Tier2Toggles,
         overrideTier3?: Tier3Toggles,
+        overrideTier4?: Tier4Toggles,
       ) => {
         if (!viewportRef.current) {
           setStatus({ kind: "error", message: "Viewer not ready." });
@@ -233,26 +253,29 @@ export const IFCEnhancePanel = forwardRef<IFCEnhancePanelHandle, IFCEnhancePanel
         const nextToggles = overrideToggles ?? toggles;
         const nextTier2 = overrideTier2 ?? tier2Toggles;
         const nextTier3 = overrideTier3 ?? tier3Toggles;
+        const nextTier4 = overrideTier4 ?? tier4Toggles;
         if (overrideToggles) setToggles(overrideToggles);
         if (overrideTier2) setTier2Toggles(overrideTier2);
         if (overrideTier3) setTier3Toggles(overrideTier3);
+        if (overrideTier4) setTier4Toggles(overrideTier4);
 
         if (!engineRef.current) engineRef.current = createTier1Engine(viewportRef.current);
         if (!tier2EngineRef.current) tier2EngineRef.current = createTier2Engine(viewportRef.current);
         if (!tier3EngineRef.current) tier3EngineRef.current = createTier3Engine(viewportRef.current);
+        if (!tier4EngineRef.current) tier4EngineRef.current = createTier4Engine(viewportRef.current);
 
         setStatus({ kind: "loading", step: "Starting", progress: 0 });
         try {
-          /* Tier 1 (materials + HDRI + lighting) — 0.0 → 0.4 of combined. */
+          /* Tier 1 (materials + HDRI + lighting) — 0.0 → 0.3 of combined. */
           const tier1Result = await engineRef.current.apply(nextToggles, (step, progress) => {
-            setStatus({ kind: "loading", step, progress: progress * 0.4 });
+            setStatus({ kind: "loading", step, progress: progress * 0.3 });
           });
           if (!tier1Result.success) {
             setStatus({ kind: "error", message: tier1Result.message ?? "Tier 1 apply failed." });
             return;
           }
 
-          /* Tier 2 (site context — ground only post-strip) — 0.4 → 0.7.
+          /* Tier 2 (site context — ground only post-strip) — 0.3 → 0.55.
              Skip quietly if master toggle off. */
           let tier2Result: Awaited<ReturnType<Tier2Engine["apply"]>> = {
             success: true,
@@ -264,7 +287,7 @@ export const IFCEnhancePanel = forwardRef<IFCEnhancePanelHandle, IFCEnhancePanel
               nextTier2,
               nextToggles.hdriPreset,
               nextToggles.quality,
-              (step, progress) => setStatus({ kind: "loading", step, progress: 0.4 + progress * 0.3 }),
+              (step, progress) => setStatus({ kind: "loading", step, progress: 0.3 + progress * 0.25 }),
             );
             if (!tier2Result.success) {
               setStatus({ kind: "error", message: tier2Result.message ?? "Tier 2 apply failed." });
@@ -275,7 +298,7 @@ export const IFCEnhancePanel = forwardRef<IFCEnhancePanelHandle, IFCEnhancePanel
             await tier2EngineRef.current.reset();
           }
 
-          /* Tier 3 (roof treatment) — 0.7 → 1.0. Skip quietly if master
+          /* Tier 3 (roof treatment) — 0.55 → 0.8. Skip quietly if master
              enabled toggle off, but reset any prior roof so the scene
              reflects the new state. */
           let tier3Out: Tier3ApplyResult = {
@@ -288,7 +311,7 @@ export const IFCEnhancePanel = forwardRef<IFCEnhancePanelHandle, IFCEnhancePanel
               nextTier3,
               nextToggles.hdriPreset,
               nextToggles.quality,
-              (step, progress) => setStatus({ kind: "loading", step, progress: 0.7 + progress * 0.3 }),
+              (step, progress) => setStatus({ kind: "loading", step, progress: 0.55 + progress * 0.25 }),
             );
             if (!tier3Out.success) {
               setStatus({ kind: "error", message: tier3Out.message ?? "Tier 3 apply failed." });
@@ -298,8 +321,35 @@ export const IFCEnhancePanel = forwardRef<IFCEnhancePanelHandle, IFCEnhancePanel
             await tier3EngineRef.current.reset();
           }
 
+          /* Tier 4 (building details — railings / frames / sills) —
+             0.8 → 1.0. Skip quietly if master enabled toggle off, but
+             reset any prior details so the scene reflects the new
+             state. */
+          let tier4Out: Tier4ApplyResult = {
+            success: true,
+            balconyEdgesDetected: 0,
+            railingsBuilt: 0,
+            windowsFramed: 0,
+            sillsBuilt: 0,
+            balconyCount: 0,
+            durationMs: 0,
+          };
+          if (nextTier4.enabled) {
+            tier4Out = await tier4EngineRef.current.apply(
+              nextTier4,
+              (step, progress) => setStatus({ kind: "loading", step, progress: 0.8 + progress * 0.2 }),
+            );
+            if (!tier4Out.success) {
+              setStatus({ kind: "error", message: tier4Out.message ?? "Tier 4 apply failed." });
+              return;
+            }
+          } else if (tier4EngineRef.current?.isApplied()) {
+            await tier4EngineRef.current.reset();
+          }
+
           setTier2Counts({ ground: tier2Result.groundAreaM2 });
           setTier3Result(tier3Out);
+          setTier4Result(tier4Out);
           setStatus({ kind: "applied", toggles: nextToggles, counts: tier1Result.counts });
         } catch (err) {
           setStatus({
@@ -308,16 +358,19 @@ export const IFCEnhancePanel = forwardRef<IFCEnhancePanelHandle, IFCEnhancePanel
           });
         }
       },
-      [toggles, tier2Toggles, tier3Toggles, viewportRef],
+      [toggles, tier2Toggles, tier3Toggles, tier4Toggles, viewportRef],
     );
 
     /* ── Reset button handler ── */
     const handleReset = useCallback(async () => {
       try {
-        /* Stack unwind: tier3 → tier2 → tier1. Roof depends on the IFC
-           slab being hidden, so it must come off before anything else
-           touches the model; site context next so the ground doesn't
-           float under the building mid-reset; Tier 1 last. */
+        /* Stack unwind: tier4 → tier3 → tier2 → tier1. Building details
+           come off first (they hang off wall / window / slab meshes);
+           roof next (it depends on the IFC slab being hidden); site
+           context next so the ground doesn't float under the building
+           mid-reset; Tier 1 last. */
+        const tier4 = tier4EngineRef.current;
+        if (tier4 && tier4.isApplied()) await tier4.reset();
         const tier3 = tier3EngineRef.current;
         if (tier3 && tier3.isApplied()) await tier3.reset();
         const tier2 = tier2EngineRef.current;
@@ -326,6 +379,7 @@ export const IFCEnhancePanel = forwardRef<IFCEnhancePanelHandle, IFCEnhancePanel
         if (tier1 && tier1.isApplied()) await tier1.reset();
         setTier2Counts(null);
         setTier3Result(null);
+        setTier4Result(null);
         setStatus({ kind: "idle" });
       } catch (err) {
         setStatus({
@@ -346,9 +400,17 @@ export const IFCEnhancePanel = forwardRef<IFCEnhancePanelHandle, IFCEnhancePanel
       /* Reset every tier to its documented defaults — "Auto" means Auto
          end-to-end, not a merge of prior user tweaks. Phase 3.5a: the
          Tier 3 "auto" style defers the gable-vs-flat choice to the
-         engine's storey-count heuristic at apply time. */
+         engine's storey-count heuristic at apply time. Phase 4a adds
+         tier 4 defaults (railings on, window frames aluminum, sills
+         on). */
       setTier3Toggles(DEFAULT_TIER3_TOGGLES);
-      await handleApply(autoTier1, DEFAULT_TIER2_TOGGLES, DEFAULT_TIER3_TOGGLES);
+      setTier4Toggles(DEFAULT_TIER4_TOGGLES);
+      await handleApply(
+        autoTier1,
+        DEFAULT_TIER2_TOGGLES,
+        DEFAULT_TIER3_TOGGLES,
+        DEFAULT_TIER4_TOGGLES,
+      );
     }, [handleApply, viewportRef]);
 
     const classifiedSummary = useMemo(() => {
@@ -386,8 +448,26 @@ export const IFCEnhancePanel = forwardRef<IFCEnhancePanelHandle, IFCEnhancePanel
           }
         }
       }
+      /* Phase 4a — building details summary. Only render the items the
+         user actually enabled, so an "all off" tier 4 stays silent. The
+         counters below now report DISTINCT window ELEMENTS and DISTINCT
+         BALCONIES (hotfix) — not sub-mesh counts. */
+      if (tier4Result && tier4Toggles.enabled) {
+        if (tier4Toggles.windowFrames && tier4Result.windowsFramed > 0) {
+          rows.push(`${tier4Result.windowsFramed} windows framed`);
+        }
+        if (tier4Toggles.windowSills && tier4Result.sillsBuilt > 0) {
+          rows.push(`${tier4Result.sillsBuilt} sills`);
+        }
+        /* Prefer the explicit `balconyCount` field; `railingsBuilt` is a
+           legacy compatibility alias that now holds the same value. */
+        const balconyCount = tier4Result.balconyCount ?? tier4Result.railingsBuilt;
+        if (tier4Toggles.railings && balconyCount > 0) {
+          rows.push(`${balconyCount} balcon${balconyCount === 1 ? "y" : "ies"}`);
+        }
+      }
       return rows.join(" · ");
-    }, [status, tier2Counts, tier3Result, tier3Toggles.enabled]);
+    }, [status, tier2Counts, tier3Result, tier3Toggles.enabled, tier4Result, tier4Toggles.enabled, tier4Toggles.windowFrames, tier4Toggles.windowSills, tier4Toggles.railings]);
 
     const anyDisabled = !hasModel || isLoading;
 
@@ -801,6 +881,134 @@ export const IFCEnhancePanel = forwardRef<IFCEnhancePanelHandle, IFCEnhancePanel
                     </div>
                   </>
                 )}
+              </Section>
+
+              {/* ── BUILDING DETAILS (Phase 4a) ── */}
+              <Section
+                expanded={expanded["building-details"]}
+                onToggle={() =>
+                  setExpanded((p) => ({ ...p, "building-details": !p["building-details"] }))
+                }
+                title="Building details"
+              >
+                <div style={rowStyle}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <Building2 size={13} color={UI.accent.cyan} aria-hidden />
+                    <span>Enable building details</span>
+                  </div>
+                  <button
+                    type="button"
+                    aria-label="Toggle building details master"
+                    disabled={anyDisabled}
+                    onClick={() =>
+                      setTier4Toggles((p) => ({ ...p, enabled: !p.enabled }))
+                    }
+                    style={switchStyle(tier4Toggles.enabled)}
+                  >
+                    <span style={switchThumbStyle(tier4Toggles.enabled)} />
+                  </button>
+                </div>
+
+                {/* Balcony railings */}
+                <div style={rowStyle}>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                    <span>Balcony railings</span>
+                    <span style={{ fontSize: 10.5, color: UI.text.tertiary }}>
+                      Metal top + base rail with balusters along cantilever edges
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    aria-label="Toggle balcony railings"
+                    disabled={anyDisabled || !tier4Toggles.enabled}
+                    onClick={() =>
+                      setTier4Toggles((p) => ({ ...p, railings: !p.railings }))
+                    }
+                    style={switchStyle(tier4Toggles.railings)}
+                  >
+                    <span style={switchThumbStyle(tier4Toggles.railings)} />
+                  </button>
+                </div>
+
+                {/* Window frames */}
+                <div style={rowStyle}>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                    <span>Window frames</span>
+                    <span style={{ fontSize: 10.5, color: UI.text.tertiary }}>
+                      4-sided frame · mullion ≥ 1.2 m · transom ≥ 1.5 m
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    aria-label="Toggle window frames"
+                    disabled={anyDisabled || !tier4Toggles.enabled}
+                    onClick={() =>
+                      setTier4Toggles((p) => ({ ...p, windowFrames: !p.windowFrames }))
+                    }
+                    style={switchStyle(tier4Toggles.windowFrames)}
+                  >
+                    <span style={switchThumbStyle(tier4Toggles.windowFrames)} />
+                  </button>
+                </div>
+
+                {/* Frame color picker */}
+                <div style={{ padding: "4px 10px 10px" }}>
+                  <div
+                    style={{
+                      fontSize: 10.5,
+                      color: UI.text.tertiary,
+                      marginBottom: 6,
+                      letterSpacing: "0.4px",
+                      textTransform: "uppercase",
+                    }}
+                  >
+                    Frame color
+                  </div>
+                  <div style={{ display: "flex", gap: 6 }}>
+                    {(
+                      [
+                        { id: "aluminum", label: "Aluminum" },
+                        { id: "white-pvc", label: "White PVC" },
+                        { id: "wood", label: "Wood" },
+                      ] as Array<{ id: WindowFrameColor; label: string }>
+                    ).map((c) => (
+                      <button
+                        key={c.id}
+                        type="button"
+                        disabled={
+                          anyDisabled || !tier4Toggles.enabled || !tier4Toggles.windowFrames
+                        }
+                        onClick={() =>
+                          setTier4Toggles((p) => ({ ...p, frameColor: c.id }))
+                        }
+                        style={pickerBtnStyle(tier4Toggles.frameColor === c.id)}
+                      >
+                        <span>{c.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Window sills */}
+                <div style={rowStyle}>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                    <span>Window sills</span>
+                    <span style={{ fontSize: 10.5, color: UI.text.tertiary }}>
+                      Concrete ledge below each frame
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    aria-label="Toggle window sills"
+                    disabled={anyDisabled || !tier4Toggles.enabled}
+                    onClick={() =>
+                      setTier4Toggles((p) => ({ ...p, windowSills: !p.windowSills }))
+                    }
+                    style={switchStyle(tier4Toggles.windowSills)}
+                  >
+                    <span style={switchThumbStyle(tier4Toggles.windowSills)} />
+                  </button>
+                </div>
               </Section>
             </>
           )}
