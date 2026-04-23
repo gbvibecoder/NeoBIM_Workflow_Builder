@@ -1,11 +1,31 @@
 import Razorpay from 'razorpay';
 import crypto from 'crypto';
 
-// Initialize Razorpay — uses placeholder during build
-export const razorpay = new Razorpay({
-  key_id: process.env.RAZORPAY_KEY_ID || 'rzp_placeholder',
-  key_secret: process.env.RAZORPAY_KEY_SECRET || 'placeholder_secret',
-});
+// In production we refuse to initialize with a placeholder — a missing key
+// is a deployment bug, not a reason to silently sign requests with garbage
+// and have the failure surface as "Payment Failed" in the Razorpay modal.
+// Dev keeps the fallback so contributors without Razorpay set up can boot.
+function resolveRazorpayCredentials(): { key_id: string; key_secret: string } {
+  const key_id = process.env.RAZORPAY_KEY_ID;
+  const key_secret = process.env.RAZORPAY_KEY_SECRET;
+
+  if (process.env.NODE_ENV === 'production') {
+    if (!key_id || !key_secret) {
+      throw new Error(
+        '[razorpay] RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET are required in production. ' +
+          'Set them in Vercel → Settings → Environment Variables and redeploy.',
+      );
+    }
+    return { key_id, key_secret };
+  }
+
+  return {
+    key_id: key_id || 'rzp_placeholder',
+    key_secret: key_secret || 'placeholder_secret',
+  };
+}
+
+export const razorpay = new Razorpay(resolveRazorpayCredentials());
 
 // ── Razorpay plan configuration (INR) ──────────────────────────────────────
 export const RAZORPAY_PLANS = {
