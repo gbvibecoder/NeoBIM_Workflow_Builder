@@ -15,16 +15,24 @@
  * Phase 1.8: Stage 5 (Synthesis: pixels → feet → FloorPlanProject).
  * Phase 1.9: Background jobs (QStash + VipJob).
  * Phase 1.10: Stage 6 (Quality Gate) + Stage 7 (Delivery) + retry loop.
+ * Phase 2.12: Stage 3 vision-jury retry loop — regenerates Stage 2
+ *   once when the jury flags the image, BEFORE Stage 4 burns GPT-4o
+ *   tokens on a bad extraction target.
  */
 
-import type { VIPPipelineConfig, VIPPipelineResult, GeneratedImage } from "./types";
-import type { Stage1Output } from "./types";
+import type { VIPPipelineConfig, VIPPipelineResult, GeneratedImage, Stage3Output } from "./types";
+import type { Stage1Output, ExtractedRoomsDriftMetrics } from "./types";
 import { VIPLogger } from "./logger";
 import type { VIPGenerationRecord } from "./logger";
 import { prisma } from "@/lib/db";
 import { runStage1PromptIntelligence } from "./stage-1-prompt";
 import { runStage2ParallelImageGen } from "./stage-2-images";
-import { runStage3ExtractionJury } from "./stage-3-jury";
+import {
+  runStage3ExtractionJury,
+  shouldRetryAtStage3,
+  appendRetryHintToPrompts,
+  STAGE_2_MAX_RETRIES,
+} from "./stage-3-jury";
 import { runStage4RoomExtraction } from "./stage-4-extract";
 import { runStage5Synthesis } from "./stage-5-synthesis";
 import { runStage6QualityGate } from "./stage-6-quality";
@@ -36,6 +44,8 @@ interface Stage4And5Result {
   stage4Ms: number;
   stage5Ms: number;
   project?: FloorPlanProject;
+  /** Phase 2.10.3 — piped from Stage 4 extraction to Stage 6 for weighted penalty. */
+  driftMetrics?: ExtractedRoomsDriftMetrics;
 }
 
 /** Run Stage 4 extraction + Stage 5 synthesis on a GPT image. */
@@ -127,7 +137,12 @@ async function runStage4And5Block(
     });
     await fireProgress(config, 75, "stage5");
 
-    return { stage4Ms, stage5Ms, project: s5Output.project };
+    return {
+      stage4Ms,
+      stage5Ms,
+      project: s5Output.project,
+      driftMetrics: stage4Output.extraction.driftMetrics,
+    };
   } catch (err) {
     stage5Ms = Date.now() - s5Start;
     const msg = err instanceof Error ? err.message : String(err);
@@ -135,6 +150,164 @@ async function runStage4And5Block(
     log.logFallThrough(`Stage 5 failed: ${msg}`);
     return { stage4Ms, stage5Ms };
   }
+}
+
+/**
+ * Phase 2.12 — combined result of the Stage 2 + Stage 3 retry loop.
+ * `gptImage` is the final accepted image (initial or retried) when
+ * available. `stage3Output` is the verdict attached to that image;
+ * undefined when Stage 3 itself failed or there was no image to score.
+ * Timings record the INITIAL attempt for the legacy timing fields —
+ * retry work is logged via the stage-log-store, not the scalar timings.
+ */
+interface Stage2And3Result {
+  gptImage?: GeneratedImage;
+  stage3Output?: Stage3Output;
+  visionJuryRetries: number;
+  stage2Ms?: number;
+  stage3Ms?: number;
+}
+
+/**
+ * Run Stage 2 (image gen) then Stage 3 (jury), with up to
+ * STAGE_2_MAX_RETRIES regenerations when Stage 3 signals the image is
+ * too weak for extraction. Phase 2.12.
+ *
+ * Design notes:
+ *   - The retry hint is appended to the GPT-Image prompt only; Stage 1
+ *     prompts are not mutated (a fresh copy is built per attempt).
+ *   - If Stage 2 fails on a retry, we keep the last accepted image
+ *     rather than aborting — the original still had *some* signal.
+ *   - If Stage 3 fails on any attempt, we break out of the loop and
+ *     proceed with whatever gptImage we have, since the decision
+ *     predicate needs a verdict.
+ *   - Only the initial attempt's timings are returned; retry timings
+ *     flow through the VIPLogger's stage-log entries for observability.
+ */
+async function runStage2And3WithRetry(
+  stage1Output: Stage1Output,
+  config: VIPPipelineConfig,
+  log: VIPLogger,
+): Promise<Stage2And3Result> {
+  let gptImage: GeneratedImage | undefined;
+  let stage3Output: Stage3Output | undefined;
+  let visionJuryRetries = 0;
+  let stage2Ms: number | undefined;
+  let stage3Ms: number | undefined;
+
+  for (let attempt = 0; attempt <= STAGE_2_MAX_RETRIES; attempt++) {
+    // ── Stage 2 ──
+    log.logStageStart(
+      2,
+      attempt > 0 ? `Stage 2 (vision-jury retry ${attempt})` : undefined,
+    );
+    const s2Start = Date.now();
+    let attemptImages: GeneratedImage[] = [];
+    try {
+      const prompts =
+        attempt === 0 || !stage3Output
+          ? stage1Output.imagePrompts
+          : appendRetryHintToPrompts(
+              stage1Output.imagePrompts,
+              stage3Output.verdict,
+              attempt,
+            );
+      const { output, metrics } = await runStage2ParallelImageGen(
+        { imagePrompts: prompts },
+        log,
+      );
+      attemptImages = output.images;
+      const ms = Date.now() - s2Start;
+      if (attempt === 0) stage2Ms = ms;
+
+      const successModels = output.images.map((i) => i.model);
+      const failedModels = metrics.perModel
+        .filter((m) => !m.success)
+        .map((m) => m.model);
+
+      log.logStageSuccess(2, ms, {
+        images: output.images.length,
+        succeeded: successModels.join(", "),
+        failed: failedModels.length > 0 ? failedModels.join(", ") : "none",
+        cost: `$${metrics.totalCostUsd.toFixed(3)}`,
+        retryAttempt: attempt,
+      });
+      await fireProgress(
+        config,
+        35,
+        attempt > 0 ? `stage2_retry${attempt}` : "stage2",
+      );
+    } catch (stage2Err) {
+      const ms = Date.now() - s2Start;
+      if (attempt === 0) stage2Ms = ms;
+      const msg = stage2Err instanceof Error ? stage2Err.message : String(stage2Err);
+      log.logStageFailure(2, ms, msg);
+      // Initial failure: nothing to do. Retry failure: we keep the
+      // prior-accepted image (gptImage remains set from attempt 0).
+      break;
+    }
+
+    const attemptGpt = attemptImages.find((i) => i.model === "gpt-image-1.5");
+    if (!attemptGpt || !attemptGpt.base64) {
+      if (attempt === 0) {
+        // No usable image from initial attempt — emit a synthetic Stage 3
+        // failure for telemetry parity with the pre-2.12 code path.
+        log.logStageStart(3);
+        log.logStageFailure(3, 0, "No GPT image to evaluate — skipping jury");
+        log.logFallThrough(
+          "Stage 3 skipped: no GPT image for extraction jury",
+        );
+      }
+      break;
+    }
+    // Accept this attempt's image as the current best. If Stage 3 on
+    // the retry later disagrees, we're out of retry budget anyway.
+    gptImage = attemptGpt;
+
+    // ── Stage 3 ──
+    log.logStageStart(
+      3,
+      attempt > 0 ? `Stage 3 (retry attempt ${attempt})` : undefined,
+    );
+    const s3Start = Date.now();
+    try {
+      const { output, metrics } = await runStage3ExtractionJury(
+        { gptImage: attemptGpt, brief: stage1Output.brief },
+        log,
+      );
+      stage3Output = output;
+      const ms = Date.now() - s3Start;
+      if (attempt === 0) stage3Ms = ms;
+      const v = output.verdict;
+      log.logStageSuccess(3, ms, {
+        score: v.score,
+        recommendation: v.recommendation,
+        weakAreas: v.weakAreas.length > 0 ? v.weakAreas.join(", ") : "none",
+        retryAttempt: attempt,
+        cost: `$${metrics.costUsd.toFixed(3)}`,
+      });
+      await fireProgress(
+        config,
+        45,
+        attempt > 0 ? `stage3_retry${attempt}` : "stage3",
+      );
+    } catch (stage3Err) {
+      const ms = Date.now() - s3Start;
+      if (attempt === 0) stage3Ms = ms;
+      const msg = stage3Err instanceof Error ? stage3Err.message : String(stage3Err);
+      log.logStageFailure(3, ms, msg);
+      // Without a verdict we can't drive the retry decision — exit
+      // the loop and let Stage 4+5 run on the current gptImage.
+      stage3Output = undefined;
+      break;
+    }
+
+    if (!shouldRetryAtStage3(stage3Output, attempt)) break;
+    visionJuryRetries++;
+    // Loop continues to next attempt with the retry hint baked in.
+  }
+
+  return { gptImage, stage3Output, visionJuryRetries, stage2Ms, stage3Ms };
 }
 
 /** Fire progress callback. Never throws — errors are logged and swallowed. */
@@ -174,7 +347,10 @@ export async function runVIPPipeline(
     let stage4Ms: number | undefined;
     let stage5Ms: number | undefined;
     let candidateProject: FloorPlanProject | undefined;
+    let candidateDriftMetrics: ExtractedRoomsDriftMetrics | undefined;
     let stage1Output: Awaited<ReturnType<typeof runStage1PromptIntelligence>>["output"] | undefined;
+    // Phase 2.12: count of vision-jury-triggered Stage 2 regenerations.
+    let visionJuryRetries = 0;
 
     try {
       const { output: s1Out, metrics: stage1Metrics } =
@@ -192,99 +368,34 @@ export async function runVIPPipeline(
       });
       await fireProgress(config, 20, "stage1");
 
-      // ── Stage 2: Parallel Image Generation ────────────────────────
-      log.logStageStart(2);
-      const stage2Start = Date.now();
+      // ── Stage 2 + Stage 3 (Phase 2.12 vision-jury retry loop) ────
+      // The helper runs Stage 2 → Stage 3 with up to
+      // STAGE_2_MAX_RETRIES (=1) regenerations when the jury flags
+      // the image. Each iteration logs its own stage rows through
+      // VIPLogger. Timings record the INITIAL attempt so VIPTiming
+      // stays comparable to pre-2.12 runs; retry timings flow via
+      // the stage-log store (visible in the Pipeline Logs panel).
+      const s23 = await runStage2And3WithRetry(stage1Output, config, log);
+      stage2Ms = s23.stage2Ms;
+      stage3Ms = s23.stage3Ms;
+      visionJuryRetries = s23.visionJuryRetries;
 
-      try {
-        const { output: stage2Output, metrics: stage2Metrics } =
-          await runStage2ParallelImageGen(
-            { imagePrompts: stage1Output.imagePrompts },
-            log,
-          );
-        stage2Ms = Date.now() - stage2Start;
-
-        const successModels = stage2Output.images.map((i) => i.model);
-        const failedModels = stage2Metrics.perModel
-          .filter((m) => !m.success)
-          .map((m) => m.model);
-
-        log.logStageSuccess(2, stage2Ms, {
-          images: stage2Output.images.length,
-          succeeded: successModels.join(", "),
-          failed: failedModels.length > 0 ? failedModels.join(", ") : "none",
-          cost: `$${stage2Metrics.totalCostUsd.toFixed(3)}`,
-        });
-        await fireProgress(config, 35, "stage2");
-
-        // ── Stage 3: Extraction Readiness Jury ────────────────────────
-        const gptImage = stage2Output.images.find(
-          (i) => i.model === "gpt-image-1.5",
+      if (s23.gptImage) {
+        // Stage 3 verdict is advisory for Stage 4 branching in the
+        // pre-2.12 sense — the retry loop above has already acted on
+        // it. S4+5 now run on the best gptImage we have. Stage 6
+        // continues to drive its own downstream retry (quality-gate).
+        const s45 = await runStage4And5Block(
+          s23.gptImage,
+          stage1Output,
+          config,
+          config.parsedConstraints,
+          log,
         );
-
-        if (!gptImage || !gptImage.base64) {
-          // GPT-Image-1.5 produced no usable image (content filter /
-          // missing base64). With Imagen removed we have no fallback,
-          // but Stage 2 would have thrown upstream if all providers
-          // failed — so this only trips if base64 is empty.
-          log.logStageStart(3);
-          log.logStageFailure(3, 0, "No GPT image to evaluate — skipping jury");
-          log.logFallThrough(
-            "Stage 3 skipped: no GPT image for extraction jury",
-          );
-        } else {
-          log.logStageStart(3);
-          const stage3Start = Date.now();
-
-          try {
-            const { output: stage3Output, metrics: stage3Metrics } =
-              await runStage3ExtractionJury(
-                { gptImage, brief: stage1Output.brief },
-                log,
-              );
-            stage3Ms = Date.now() - stage3Start;
-
-            const v = stage3Output.verdict;
-            log.logStageSuccess(3, stage3Ms, {
-              score: v.score,
-              recommendation: v.recommendation,
-              weakAreas:
-                v.weakAreas.length > 0 ? v.weakAreas.join(", ") : "none",
-              cost: `$${stage3Metrics.costUsd.toFixed(3)}`,
-            });
-            await fireProgress(config, 45, "stage3");
-
-            // Stage 3 verdict is advisory — v.recommendation is logged
-            // above for telemetry but does NOT branch behavior here. S4+5
-            // always run on the GPT image; the Stage 6 quality gate
-            // decides whether to retry. Phase 1.6 had three pass/retry/
-            // fail branches that all called runStage4And5Block with
-            // identical args (intended retry never implemented at this
-            // layer) — collapsed in Phase 2.0a.
-            const s45 = await runStage4And5Block(
-              gptImage, stage1Output, config, config.parsedConstraints, log,
-            );
-            stage4Ms = s45.stage4Ms;
-            stage5Ms = s45.stage5Ms;
-            if (s45.project) candidateProject = s45.project;
-          } catch (stage3Err) {
-            // Branch 3: Stage 3 API failure — skip jury, run S4+5 directly
-            stage3Ms = Date.now() - stage3Start;
-            const msg = stage3Err instanceof Error ? stage3Err.message : String(stage3Err);
-            log.logStageFailure(3, stage3Ms, msg);
-            // Still try S4+5 without jury feedback
-            const s45 = await runStage4And5Block(
-              gptImage, stage1Output, config, config.parsedConstraints, log,
-            );
-            stage4Ms = s45.stage4Ms;
-            stage5Ms = s45.stage5Ms;
-            if (s45.project) candidateProject = s45.project;
-          }
-        }
-      } catch (stage2Err) {
-        stage2Ms = Date.now() - stage2Start;
-        const msg = stage2Err instanceof Error ? stage2Err.message : String(stage2Err);
-        log.logStageFailure(2, stage2Ms, msg);
+        stage4Ms = s45.stage4Ms;
+        stage5Ms = s45.stage5Ms;
+        if (s45.project) candidateProject = s45.project;
+        if (s45.driftMetrics) candidateDriftMetrics = s45.driftMetrics;
       }
     } catch (stage1Err) {
       stage1Ms = Date.now() - stage1Start;
@@ -308,7 +419,12 @@ export async function runVIPPipeline(
       const s6Start = Date.now();
       try {
         const { output: s6Output, metrics: s6Metrics } = await runStage6QualityGate(
-          { project: candidateProject, brief: stage1Output!.brief, parsedConstraints: config.parsedConstraints },
+          {
+            project: candidateProject,
+            brief: stage1Output!.brief,
+            parsedConstraints: config.parsedConstraints,
+            driftMetrics: candidateDriftMetrics,
+          },
           log,
         );
         stage6Ms = Date.now() - s6Start;
@@ -348,7 +464,13 @@ export async function runVIPPipeline(
                   // Re-run Stage 6 on retry result
                   log.logStageStart(6, "Quality Gate (retry)");
                   const { output: retryS6 } = await runStage6QualityGate(
-                    { project: retryS45.project, brief: stage1Output!.brief, parsedConstraints: config.parsedConstraints }, log,
+                    {
+                      project: retryS45.project,
+                      brief: stage1Output!.brief,
+                      parsedConstraints: config.parsedConstraints,
+                      driftMetrics: retryS45.driftMetrics,
+                    },
+                    log,
                   );
                   const retryScore = retryS6.verdict.score;
                   log.logStageSuccess(6, Date.now() - s6Start, { score: retryScore, note: "retry attempt" });
@@ -401,9 +523,10 @@ export async function runVIPPipeline(
         totalMs: Date.now() - startMs,
         retried: retryCount > 0,
         weakAreas: finalWeakAreas,
+        visionJuryRetries,
       }, log);
       stage7Ms = Date.now() - s7Start;
-      log.logStageSuccess(7, stage7Ms, { qualityScore });
+      log.logStageSuccess(7, stage7Ms, { qualityScore, visionJuryRetries });
       await fireProgress(config, 100, "stage7");
       log.logSuccess(qualityScore);
 
@@ -414,6 +537,7 @@ export async function runVIPPipeline(
         project: s7Output.project,
         qualityScore,
         retried: retryCount > 0,
+        visionJuryRetries,
         timing: { stage1Ms, stage2Ms, stage3Ms, stage4Ms, stage5Ms, stage6Ms, stage7Ms, totalMs: Date.now() - startMs },
         warnings: [],
       };

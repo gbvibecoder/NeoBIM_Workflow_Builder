@@ -42,6 +42,8 @@ export function runStage7Delivery(
   meta.generation_cost_usd = input.totalCostUsd;
   meta.generation_time_ms = input.totalMs;
   meta.generation_retried = input.retried;
+  // Phase 2.12 — vision-jury retry count (0 = first image passed jury).
+  meta.generation_vision_jury_retries = input.visionJuryRetries ?? 0;
   meta.generation_weak_areas = input.weakAreas;
   meta.generation_timestamp = new Date().toISOString();
 

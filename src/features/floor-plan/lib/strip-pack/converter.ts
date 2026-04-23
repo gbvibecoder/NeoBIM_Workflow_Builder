@@ -167,22 +167,33 @@ export function toFloorPlanProject(
 function buildRooms(result: StripPackResult): Room[] {
   const out: Room[] = [];
   // Hallway as a Room (renderer expects circulation rooms in the schedule).
+  //
+  // Phase 2.11.1 — skip this injection when the spine is synthetic (e.g.,
+  // fidelity mode's buildStubSpine, which creates a 0.01-ft-deep stub
+  // purely to satisfy SpineLayout's Rect typing). Emitting the stub
+  // produced a "Hallway 40×0 ft" room that Stage 6 then flagged as a
+  // dimensionPlausibility violation. If the fidelity extraction DID
+  // contain a real corridor room, that room is already in result.rooms
+  // and will be emitted by the loop below — so guarding here prevents
+  // double-emission without suppressing legitimate circulation.
   const spineRect = result.spine.spine;
-  out.push({
-    id: HALLWAY_ID,
-    name: "Hallway",
-    type: "corridor",
-    boundary: rectToPolygon(spineRect),
-    area_sqm: spineRect.width * spineRect.depth * SQM_PER_SQFT,
-    perimeter_mm: 2 * (spineRect.width + spineRect.depth) * FT_TO_MM,
-    natural_light_required: false,
-    ventilation_required: false,
-    label_position: {
-      x: (spineRect.x + spineRect.width / 2) * FT_TO_MM,
-      y: (spineRect.y + spineRect.depth / 2) * FT_TO_MM,
-    },
-    wall_ids: [],
-  });
+  if (!result.spine.synthetic) {
+    out.push({
+      id: HALLWAY_ID,
+      name: "Hallway",
+      type: "corridor",
+      boundary: rectToPolygon(spineRect),
+      area_sqm: spineRect.width * spineRect.depth * SQM_PER_SQFT,
+      perimeter_mm: 2 * (spineRect.width + spineRect.depth) * FT_TO_MM,
+      natural_light_required: false,
+      ventilation_required: false,
+      label_position: {
+        x: (spineRect.x + spineRect.width / 2) * FT_TO_MM,
+        y: (spineRect.y + spineRect.depth / 2) * FT_TO_MM,
+      },
+      wall_ids: [],
+    });
+  }
 
   for (const r of result.rooms) {
     if (!r.placed) continue;
