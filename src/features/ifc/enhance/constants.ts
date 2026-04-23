@@ -135,3 +135,58 @@ export const GROUND_TEXTURE_SPECS = {
     metalness: 0,
   },
 } as const;
+
+/* ─── Phase 3.5a — Tier 3 roof treatment constants ────────────────────────
+   Additive. Every number above is frozen. These drive parapet, terrace
+   deck, bulkhead (HVAC + stair access), and pitched gable synthesis in
+   `tier3/`. */
+
+/** Parapet dimensions — standard architectural guard height. */
+export const PARAPET = {
+  heightM: 1.0,
+  thicknessM: 0.15,
+} as const;
+
+/** Terrace deck geometry. */
+export const DECK = {
+  /** Anti-z-fight offset above the (hidden) original roof slab top surface. */
+  elevationAboveSlabM: 0.01,
+  /** Target world-space plank width — drives UV scaling on the deck plane. */
+  plankWidthM: 0.15,
+} as const;
+
+/** Bulkhead (HVAC + stair access) constants. */
+export const BULKHEAD = {
+  stairWidthM: 2.0,
+  stairDepthM: 2.0,
+  stairHeightM: 2.5,
+  stairInsetFromEdgeM: 1.0,
+
+  hvacWidthM: 0.9,
+  hvacHeightM: 0.7,
+  hvacDepthM: 0.6,
+  hvacInsetFromEdgeM: 1.5,
+  hvacSpacingMinM: 2.0,
+
+  hvac2CountThresholdM2: 50,
+  hvac3CountThresholdM2: 100,
+
+  hvacColor: 0x454a52,
+  hvacMetalness: 0.6,
+  hvacRoughness: 0.45,
+
+  doorWidthM: 0.9,
+  doorHeightM: 2.0,
+  doorColor: 0x2a1e16,
+} as const;
+
+/** Pitched gable roof constants. */
+export const GABLE = {
+  defaultPitchDeg: 30,
+  minPitchDeg: 15,
+  maxPitchDeg: 45,
+  eaveOverhangM: 0.25,
+  fasciaThicknessM: 0.03,
+  /** Tile UV scale — 1 texture tile ≈ 1 m of slope. */
+  tileUvScalePerMeter: 1.0,
+} as const;
