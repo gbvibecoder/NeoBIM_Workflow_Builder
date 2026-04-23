@@ -25,18 +25,25 @@ import {
   CheckCircle2,
   Wand2,
   MapPin,
+  Home,
 } from "lucide-react";
 import { UI } from "@/features/ifc/components/constants";
 import type { ViewportHandle } from "@/types/ifc-viewer";
 import {
   DEFAULT_TIER2_TOGGLES,
+  DEFAULT_TIER3_TOGGLES,
   DEFAULT_TOGGLES,
+  type DeckMaterial,
   type EnhanceStatus,
   type EnhanceToggles,
   type GroundType,
   type HDRIPreset,
   type MaterialQuality,
+  type RidgeDirection,
+  type RoofStyle,
   type Tier2Toggles,
+  type Tier3ApplyResult,
+  type Tier3Toggles,
 } from "@/features/ifc/enhance/types";
 import {
   createTier1Engine,
@@ -47,6 +54,10 @@ import {
   createTier2Engine,
   type Tier2Engine,
 } from "@/features/ifc/enhance/tier2/tier2-engine";
+import {
+  createTier3Engine,
+  type Tier3Engine,
+} from "@/features/ifc/enhance/tier3/tier3-engine";
 
 /* ─── Props + imperative handle ──────────────────────────────────────── */
 
@@ -156,20 +167,24 @@ export const IFCEnhancePanel = forwardRef<IFCEnhancePanelHandle, IFCEnhancePanel
   function IFCEnhancePanel({ viewportRef, hasModel }, panelRef) {
     const [toggles, setToggles] = useState<EnhanceToggles>(DEFAULT_TOGGLES);
     const [tier2Toggles, setTier2Toggles] = useState<Tier2Toggles>(DEFAULT_TIER2_TOGGLES);
+    const [tier3Toggles, setTier3Toggles] = useState<Tier3Toggles>(DEFAULT_TIER3_TOGGLES);
     const [status, setStatus] = useState<EnhanceStatus>({ kind: "idle" });
     const [expanded, setExpanded] = useState({
       materials: true,
       environment: true,
       lighting: true,
       context: true,
+      roof: true,
     });
     const [tier2Counts, setTier2Counts] = useState<{
       ground: number;
     } | null>(null);
+    const [tier3Result, setTier3Result] = useState<Tier3ApplyResult | null>(null);
 
     /* Engines live in refs so tab switches don't recreate them and lose state. */
     const engineRef = useRef<Tier1Engine | null>(null);
     const tier2EngineRef = useRef<Tier2Engine | null>(null);
+    const tier3EngineRef = useRef<Tier3Engine | null>(null);
 
     const isLoading = status.kind === "loading";
     const isApplied = status.kind === "applied";
@@ -179,10 +194,15 @@ export const IFCEnhancePanel = forwardRef<IFCEnhancePanelHandle, IFCEnhancePanel
       panelRef,
       () => ({
         resetIfApplied: async () => {
-          /* Order: tier2 first (removes site context from scene), then
-             tier1 (restores mesh materials + env). Keeps scene coherent
-             while resetting — never shows "textured building with mixed
-             site" state. */
+          /* Order: tier3 → tier2 → tier1. Stack-unwind: roof comes off
+             first (it depends on the IFC slab being hidden), then site
+             context, finally building materials + env. This keeps the
+             scene coherent at every frame — no "gray walls with a
+             floating parapet" intermediate state. */
+          const tier3 = tier3EngineRef.current;
+          if (tier3 && tier3.isApplied()) {
+            await tier3.reset();
+          }
           const tier2 = tier2EngineRef.current;
           if (tier2 && tier2.isApplied()) {
             await tier2.reset();
@@ -192,6 +212,7 @@ export const IFCEnhancePanel = forwardRef<IFCEnhancePanelHandle, IFCEnhancePanel
             await tier1.reset();
           }
           setTier2Counts(null);
+          setTier3Result(null);
           setStatus({ kind: "idle" });
         },
       }),
@@ -203,6 +224,7 @@ export const IFCEnhancePanel = forwardRef<IFCEnhancePanelHandle, IFCEnhancePanel
       async (
         overrideToggles?: EnhanceToggles,
         overrideTier2?: Tier2Toggles,
+        overrideTier3?: Tier3Toggles,
       ) => {
         if (!viewportRef.current) {
           setStatus({ kind: "error", message: "Viewer not ready." });
@@ -210,24 +232,27 @@ export const IFCEnhancePanel = forwardRef<IFCEnhancePanelHandle, IFCEnhancePanel
         }
         const nextToggles = overrideToggles ?? toggles;
         const nextTier2 = overrideTier2 ?? tier2Toggles;
+        const nextTier3 = overrideTier3 ?? tier3Toggles;
         if (overrideToggles) setToggles(overrideToggles);
         if (overrideTier2) setTier2Toggles(overrideTier2);
+        if (overrideTier3) setTier3Toggles(overrideTier3);
 
         if (!engineRef.current) engineRef.current = createTier1Engine(viewportRef.current);
         if (!tier2EngineRef.current) tier2EngineRef.current = createTier2Engine(viewportRef.current);
+        if (!tier3EngineRef.current) tier3EngineRef.current = createTier3Engine(viewportRef.current);
 
         setStatus({ kind: "loading", step: "Starting", progress: 0 });
         try {
-          /* Tier 1 (materials + HDRI + lighting) — 0.0 → 0.5 of combined. */
+          /* Tier 1 (materials + HDRI + lighting) — 0.0 → 0.4 of combined. */
           const tier1Result = await engineRef.current.apply(nextToggles, (step, progress) => {
-            setStatus({ kind: "loading", step, progress: progress * 0.5 });
+            setStatus({ kind: "loading", step, progress: progress * 0.4 });
           });
           if (!tier1Result.success) {
             setStatus({ kind: "error", message: tier1Result.message ?? "Tier 1 apply failed." });
             return;
           }
 
-          /* Tier 2 (site context — ground only post-strip) — 0.5 → 1.0.
+          /* Tier 2 (site context — ground only post-strip) — 0.4 → 0.7.
              Skip quietly if master toggle off. */
           let tier2Result: Awaited<ReturnType<Tier2Engine["apply"]>> = {
             success: true,
@@ -239,7 +264,7 @@ export const IFCEnhancePanel = forwardRef<IFCEnhancePanelHandle, IFCEnhancePanel
               nextTier2,
               nextToggles.hdriPreset,
               nextToggles.quality,
-              (step, progress) => setStatus({ kind: "loading", step, progress: 0.5 + progress * 0.5 }),
+              (step, progress) => setStatus({ kind: "loading", step, progress: 0.4 + progress * 0.3 }),
             );
             if (!tier2Result.success) {
               setStatus({ kind: "error", message: tier2Result.message ?? "Tier 2 apply failed." });
@@ -250,7 +275,31 @@ export const IFCEnhancePanel = forwardRef<IFCEnhancePanelHandle, IFCEnhancePanel
             await tier2EngineRef.current.reset();
           }
 
+          /* Tier 3 (roof treatment) — 0.7 → 1.0. Skip quietly if master
+             enabled toggle off, but reset any prior roof so the scene
+             reflects the new state. */
+          let tier3Out: Tier3ApplyResult = {
+            success: true,
+            resolvedStyle: "skipped",
+            durationMs: 0,
+          };
+          if (nextTier3.enabled) {
+            tier3Out = await tier3EngineRef.current.apply(
+              nextTier3,
+              nextToggles.hdriPreset,
+              nextToggles.quality,
+              (step, progress) => setStatus({ kind: "loading", step, progress: 0.7 + progress * 0.3 }),
+            );
+            if (!tier3Out.success) {
+              setStatus({ kind: "error", message: tier3Out.message ?? "Tier 3 apply failed." });
+              return;
+            }
+          } else if (tier3EngineRef.current?.isApplied()) {
+            await tier3EngineRef.current.reset();
+          }
+
           setTier2Counts({ ground: tier2Result.groundAreaM2 });
+          setTier3Result(tier3Out);
           setStatus({ kind: "applied", toggles: nextToggles, counts: tier1Result.counts });
         } catch (err) {
           setStatus({
@@ -259,20 +308,24 @@ export const IFCEnhancePanel = forwardRef<IFCEnhancePanelHandle, IFCEnhancePanel
           });
         }
       },
-      [toggles, tier2Toggles, viewportRef],
+      [toggles, tier2Toggles, tier3Toggles, viewportRef],
     );
 
     /* ── Reset button handler ── */
     const handleReset = useCallback(async () => {
       try {
-        /* Tier 2 first — pull the site context out of the scene. Then tier
-           1 so mesh materials + env restore cleanly without a visible
-           "site but gray building" intermediate frame. */
+        /* Stack unwind: tier3 → tier2 → tier1. Roof depends on the IFC
+           slab being hidden, so it must come off before anything else
+           touches the model; site context next so the ground doesn't
+           float under the building mid-reset; Tier 1 last. */
+        const tier3 = tier3EngineRef.current;
+        if (tier3 && tier3.isApplied()) await tier3.reset();
         const tier2 = tier2EngineRef.current;
         if (tier2 && tier2.isApplied()) await tier2.reset();
         const tier1 = engineRef.current;
         if (tier1 && tier1.isApplied()) await tier1.reset();
         setTier2Counts(null);
+        setTier3Result(null);
         setStatus({ kind: "idle" });
       } catch (err) {
         setStatus({
@@ -290,11 +343,12 @@ export const IFCEnhancePanel = forwardRef<IFCEnhancePanelHandle, IFCEnhancePanel
         return;
       }
       const autoTier1 = recommendedToggles(vp.getMeshMap().size);
-      /* Post-strip: Tier 2 has only a ground plane. DEFAULT_TIER2_TOGGLES
-         is tuned (auto ground-type picks grass). No per-model tweaking
-         needed since the ground is cheap to render regardless of building
-         complexity. */
-      await handleApply(autoTier1, DEFAULT_TIER2_TOGGLES);
+      /* Reset every tier to its documented defaults — "Auto" means Auto
+         end-to-end, not a merge of prior user tweaks. Phase 3.5a: the
+         Tier 3 "auto" style defers the gable-vs-flat choice to the
+         engine's storey-count heuristic at apply time. */
+      setTier3Toggles(DEFAULT_TIER3_TOGGLES);
+      await handleApply(autoTier1, DEFAULT_TIER2_TOGGLES, DEFAULT_TIER3_TOGGLES);
     }, [handleApply, viewportRef]);
 
     const classifiedSummary = useMemo(() => {
@@ -310,8 +364,30 @@ export const IFCEnhancePanel = forwardRef<IFCEnhancePanelHandle, IFCEnhancePanel
       if (tier2Counts && tier2Counts.ground > 0) {
         rows.push(`${tier2Counts.ground.toLocaleString()} m² site`);
       }
+      /* Phase 3.5a — roof treatment summary. Three flavours:
+           - Flat terrace: "Flat terrace roof (wood deck, N bulkheads)"
+           - Gable:        "Gable roof (30°, E-W ridge)"
+           - Skipped:      "Roof: skipped (already authored)" */
+      if (tier3Result) {
+        if (tier3Result.resolvedStyle === "flat-terrace") {
+          const bulkCount =
+            (tier3Result.hvacCount ?? 0) + (tier3Result.stairBulkhead ? 1 : 0);
+          rows.push(
+            `Flat terrace roof (wood deck, ${bulkCount} bulkhead${bulkCount === 1 ? "" : "s"})`,
+          );
+        } else if (tier3Result.resolvedStyle === "gable") {
+          const dir = tier3Result.ridgeDirection === "ew" ? "E-W" : "N-S";
+          rows.push(`Gable roof (${tier3Result.pitchDeg ?? "?"}°, ${dir} ridge)`);
+        } else {
+          /* skipped — only show if user explicitly enabled it, to avoid
+             noise when the roof master toggle is off. */
+          if (tier3Toggles.enabled) {
+            rows.push("Roof: skipped (already authored)");
+          }
+        }
+      }
       return rows.join(" · ");
-    }, [status, tier2Counts]);
+    }, [status, tier2Counts, tier3Result, tier3Toggles.enabled]);
 
     const anyDisabled = !hasModel || isLoading;
 
@@ -507,6 +583,224 @@ export const IFCEnhancePanel = forwardRef<IFCEnhancePanelHandle, IFCEnhancePanel
                     ))}
                   </div>
                 </div>
+              </Section>
+
+              {/* ── ROOF (Phase 3.5a) ── */}
+              <Section
+                expanded={expanded.roof}
+                onToggle={() => setExpanded((p) => ({ ...p, roof: !p.roof }))}
+                title="Roof"
+              >
+                <div style={rowStyle}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <Home size={13} color={UI.accent.cyan} aria-hidden />
+                    <span>Enable roof synthesis</span>
+                  </div>
+                  <button
+                    type="button"
+                    aria-label="Toggle roof synthesis"
+                    disabled={anyDisabled}
+                    onClick={() =>
+                      setTier3Toggles((p) => ({ ...p, enabled: !p.enabled }))
+                    }
+                    style={switchStyle(tier3Toggles.enabled)}
+                  >
+                    <span style={switchThumbStyle(tier3Toggles.enabled)} />
+                  </button>
+                </div>
+
+                {/* Style picker — always visible when master enabled */}
+                <div style={{ padding: "4px 10px 10px" }}>
+                  <div
+                    style={{
+                      fontSize: 10.5,
+                      color: UI.text.tertiary,
+                      marginBottom: 6,
+                      letterSpacing: "0.4px",
+                      textTransform: "uppercase",
+                    }}
+                  >
+                    Style
+                  </div>
+                  <div style={{ display: "flex", gap: 6 }}>
+                    {(
+                      [
+                        { id: "auto", label: "Auto" },
+                        { id: "gable", label: "Gable" },
+                        { id: "flat-terrace", label: "Flat" },
+                      ] as Array<{ id: RoofStyle; label: string }>
+                    ).map((s) => (
+                      <button
+                        key={s.id}
+                        type="button"
+                        disabled={anyDisabled || !tier3Toggles.enabled}
+                        onClick={() =>
+                          setTier3Toggles((p) => ({ ...p, style: s.id }))
+                        }
+                        style={pickerBtnStyle(tier3Toggles.style === s.id)}
+                      >
+                        <span>{s.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Flat-terrace sub-controls — shown for "auto" (unknown yet)
+                    and "flat-terrace". */}
+                {(tier3Toggles.style === "auto" ||
+                  tier3Toggles.style === "flat-terrace") && (
+                  <>
+                    <div style={{ padding: "4px 10px 10px" }}>
+                      <div
+                        style={{
+                          fontSize: 10.5,
+                          color: UI.text.tertiary,
+                          marginBottom: 6,
+                          letterSpacing: "0.4px",
+                          textTransform: "uppercase",
+                        }}
+                      >
+                        Deck material
+                      </div>
+                      <div style={{ display: "flex", gap: 6 }}>
+                        {(
+                          [
+                            { id: "wood", label: "Wood", enabled: true },
+                            { id: "ceramic", label: "Ceramic", enabled: false },
+                            { id: "concrete", label: "Concrete", enabled: false },
+                          ] as Array<{ id: DeckMaterial; label: string; enabled: boolean }>
+                        ).map((d) => (
+                          <button
+                            key={d.id}
+                            type="button"
+                            title={d.enabled ? undefined : "Coming soon"}
+                            disabled={
+                              anyDisabled || !tier3Toggles.enabled || !d.enabled
+                            }
+                            onClick={() =>
+                              setTier3Toggles((p) => ({
+                                ...p,
+                                deckMaterial: d.id,
+                              }))
+                            }
+                            style={{
+                              ...pickerBtnStyle(
+                                tier3Toggles.deckMaterial === d.id && d.enabled,
+                              ),
+                              opacity: d.enabled ? 1 : 0.45,
+                            }}
+                          >
+                            <span>{d.label}</span>
+                            {!d.enabled && (
+                              <span
+                                style={{
+                                  fontSize: 9,
+                                  color: UI.text.tertiary,
+                                  marginTop: 2,
+                                }}
+                              >
+                                soon
+                              </span>
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div style={rowStyle}>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                        <span>Bulkheads + HVAC</span>
+                        <span style={{ fontSize: 10.5, color: UI.text.tertiary }}>
+                          Stair access box + condenser units
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        aria-label="Toggle bulkheads"
+                        disabled={anyDisabled || !tier3Toggles.enabled}
+                        onClick={() =>
+                          setTier3Toggles((p) => ({ ...p, bulkheads: !p.bulkheads }))
+                        }
+                        style={switchStyle(tier3Toggles.bulkheads)}
+                      >
+                        <span style={switchThumbStyle(tier3Toggles.bulkheads)} />
+                      </button>
+                    </div>
+                  </>
+                )}
+
+                {/* Gable sub-controls — only for explicit gable */}
+                {tier3Toggles.style === "gable" && (
+                  <>
+                    <div style={{ padding: "4px 10px 10px" }}>
+                      <div
+                        style={{
+                          fontSize: 10.5,
+                          color: UI.text.tertiary,
+                          marginBottom: 6,
+                          letterSpacing: "0.4px",
+                          textTransform: "uppercase",
+                        }}
+                      >
+                        Pitch: {tier3Toggles.pitchDeg}°
+                      </div>
+                      <input
+                        type="range"
+                        min={15}
+                        max={45}
+                        step={1}
+                        value={tier3Toggles.pitchDeg}
+                        disabled={anyDisabled || !tier3Toggles.enabled}
+                        onChange={(e) =>
+                          setTier3Toggles((p) => ({
+                            ...p,
+                            pitchDeg: Number(e.target.value),
+                          }))
+                        }
+                        style={{ width: "100%", accentColor: UI.accent.cyan }}
+                      />
+                    </div>
+                    <div style={{ padding: "4px 10px 10px" }}>
+                      <div
+                        style={{
+                          fontSize: 10.5,
+                          color: UI.text.tertiary,
+                          marginBottom: 6,
+                          letterSpacing: "0.4px",
+                          textTransform: "uppercase",
+                        }}
+                      >
+                        Ridge direction
+                      </div>
+                      <div style={{ display: "flex", gap: 6 }}>
+                        {(
+                          [
+                            { id: "auto", label: "Auto" },
+                            { id: "ns", label: "N-S" },
+                            { id: "ew", label: "E-W" },
+                          ] as Array<{ id: RidgeDirection; label: string }>
+                        ).map((r) => (
+                          <button
+                            key={r.id}
+                            type="button"
+                            disabled={anyDisabled || !tier3Toggles.enabled}
+                            onClick={() =>
+                              setTier3Toggles((p) => ({
+                                ...p,
+                                ridgeDirection: r.id,
+                              }))
+                            }
+                            style={pickerBtnStyle(
+                              tier3Toggles.ridgeDirection === r.id,
+                            )}
+                          >
+                            <span>{r.label}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </>
+                )}
               </Section>
             </>
           )}

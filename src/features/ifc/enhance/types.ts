@@ -93,3 +93,51 @@ export interface Tier2ApplyResult {
   groundAreaM2: number;
   durationMs: number;
 }
+
+/* ─── Phase 3.5a — Tier 3 roof treatment ─────────────────────────────────
+   Additive. Phase 2 + Phase 3 Tier 2 types above are unchanged. Tier 3 is
+   orchestrated by `tier3/tier3-engine.ts` and mounts roof geometry under
+   `ViewportHandle.mountEnhancements(nodes, { tier: 3 })`. It NEVER swaps
+   materials on the IFC model — it only hides the original roof-slab via
+   `mesh.visible = false` and builds supplementary roof elements above. */
+
+export type RoofStyle = "auto" | "gable" | "flat-terrace";
+export type DeckMaterial = "wood" | "ceramic" | "concrete";
+export type RidgeDirection = "auto" | "ns" | "ew";
+
+export interface Tier3Toggles {
+  /** Master switch. */
+  enabled: boolean;
+  /** Style — "auto" picks gable for 1-storey, flat-terrace for 2+. */
+  style: RoofStyle;
+  /** Deck material — only consulted when style resolves to flat-terrace. */
+  deckMaterial: DeckMaterial;
+  /** Pitch angle in degrees — only consulted when style resolves to gable. */
+  pitchDeg: number;
+  /** Ridge direction — only consulted when style resolves to gable. */
+  ridgeDirection: RidgeDirection;
+  /** HVAC + stair bulkhead toggle — only consulted for flat-terrace. */
+  bulkheads: boolean;
+}
+
+export const DEFAULT_TIER3_TOGGLES: Tier3Toggles = {
+  enabled: true,
+  style: "auto",
+  deckMaterial: "wood",
+  pitchDeg: 30,
+  ridgeDirection: "auto",
+  bulkheads: true,
+};
+
+export interface Tier3ApplyResult {
+  success: boolean;
+  resolvedStyle: "gable" | "flat-terrace" | "skipped";
+  message?: string;
+  parapetLengthM?: number;
+  deckAreaM2?: number;
+  hvacCount?: number;
+  stairBulkhead?: boolean;
+  pitchDeg?: number;
+  ridgeDirection?: "ns" | "ew";
+  durationMs: number;
+}
