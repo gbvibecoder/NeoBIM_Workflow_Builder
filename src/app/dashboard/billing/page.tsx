@@ -210,13 +210,32 @@ export default function BillingPage() {
   const handleRazorpayCheckout = async (planKey: string) => {
     setPaymentMethodModal(null);
     setUpgradingTo(planKey);
+
+    // Step 1: Create Razorpay subscription on server, with a 30s safety net.
+    // Without this guard a hung edge proxy keeps the spinner alive indefinitely.
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30_000);
+
     try {
-      // Step 1: Create Razorpay subscription on server
-      const res = await fetch('/api/razorpay/checkout', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ plan: planKey }),
-      });
+      let res: Response;
+      try {
+        res = await fetch('/api/razorpay/checkout', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ plan: planKey }),
+          signal: controller.signal,
+        });
+      } catch (fetchErr) {
+        const aborted =
+          (fetchErr instanceof DOMException && fetchErr.name === 'AbortError') ||
+          (typeof fetchErr === 'object' && fetchErr !== null && 'name' in fetchErr && (fetchErr as { name: string }).name === 'AbortError');
+        throw new RazorpayCheckoutError(
+          'PAYMENT_SERVICE_UNAVAILABLE',
+          aborted
+            ? 'Checkout request timed out after 30 seconds.'
+            : 'We could not reach our payment service.',
+        );
+      }
 
       // Server may have failed — read the body either way so we can classify.
       let data: {
@@ -237,74 +256,89 @@ export default function BillingPage() {
         const serverMessage = data.error?.message;
         // Trust the server's classification when present; otherwise fall back
         // to status-based heuristics so we still pick the right modal copy.
+        // 401/403 maps to AUTHENTICATION_ERROR so the modal asks the user to refresh.
         const code =
           serverCode ||
-          (res.status === 0 || res.status >= 500
-            ? 'PAYMENT_SERVICE_UNAVAILABLE'
-            : /plan/i.test(serverMessage || '')
-              ? 'PLAN_UNAVAILABLE'
-              : 'UNKNOWN');
+          (res.status === 401 || res.status === 403
+            ? 'AUTHENTICATION_ERROR'
+            : res.status === 0 || res.status >= 500
+              ? 'PAYMENT_SERVICE_UNAVAILABLE'
+              : /plan/i.test(serverMessage || '')
+                ? 'PLAN_UNAVAILABLE'
+                : 'UNKNOWN');
         throw new RazorpayCheckoutError(code, serverMessage || 'Failed to create Razorpay subscription');
       }
 
       // Step 2: Open Razorpay checkout widget
       const Razorpay = (window as unknown as { Razorpay?: new (opts: Record<string, unknown>) => { open: () => void; on: (event: string, cb: (response?: unknown) => void) => void } }).Razorpay;
       if (!Razorpay) {
-        setPaymentError({
-          code: 'PAYMENT_SERVICE_UNAVAILABLE',
-          message: 'Payment gateway script did not load.',
-          planName: planKey,
-        });
-        setUpgradingTo(null);
-        return;
+        throw new RazorpayCheckoutError(
+          'PAYMENT_SERVICE_UNAVAILABLE',
+          'Payment gateway script did not load.',
+        );
       }
 
-      const rzp = new Razorpay({
-        key: data.razorpayKeyId,
-        subscription_id: data.subscriptionId,
-        name: 'BuildFlow',
-        description: `${planKey} Plan Subscription`,
-        prefill: {
-          email: data.email || session?.user?.email || '',
-          name: data.name || session?.user?.name || '',
-        },
-        theme: { color: '#4F8AFF' },
-        handler: async (response: { razorpay_payment_id: string; razorpay_subscription_id: string; razorpay_signature: string }) => {
-          // Step 3: Verify payment on server
-          try {
-            toast.loading(t('billing.paymentSuccess'), { id: 'razorpay-verify' });
-            const verifyRes = await fetch('/api/razorpay/verify', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(response),
-            });
-            const verifyData = await verifyRes.json();
-            toast.dismiss('razorpay-verify');
+      // The Razorpay constructor itself can throw if the SDK was loaded but
+      // misconfigured (rare, but seen in stale-CDN scenarios). Wrap so the
+      // error bubbles into the modal instead of an unhandled exception.
+      let rzp: { open: () => void; on: (event: string, cb: (response?: unknown) => void) => void };
+      try {
+        rzp = new Razorpay({
+          key: data.razorpayKeyId,
+          subscription_id: data.subscriptionId,
+          name: 'BuildFlow',
+          description: `${planKey} Plan Subscription`,
+          prefill: {
+            email: data.email || session?.user?.email || '',
+            name: data.name || session?.user?.name || '',
+          },
+          theme: { color: '#4F8AFF' },
+          handler: async (response: { razorpay_payment_id: string; razorpay_subscription_id: string; razorpay_signature: string }) => {
+            // Step 3: Verify payment on server
+            try {
+              toast.loading(t('billing.paymentSuccess'), { id: 'razorpay-verify' });
+              const verifyRes = await fetch('/api/razorpay/verify', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(response),
+              });
+              const verifyData = await verifyRes.json();
+              toast.dismiss('razorpay-verify');
 
-            if (verifyData.success) {
-              toast.success(t('billing.planUpgraded'), { icon: <CheckCircle2 size={18} />, duration: 3000 });
-              await updateSession();
-              window.location.href = `/thank-you/subscription?plan=${planKey}`;
-            } else {
-              toast.error(verifyData.error?.message || 'Payment verification failed. Contact support.');
+              if (verifyData.success) {
+                toast.success(t('billing.planUpgraded'), { icon: <CheckCircle2 size={18} />, duration: 3000 });
+                await updateSession();
+                window.location.href = `/thank-you/subscription?plan=${planKey}`;
+              } else {
+                toast.error(verifyData.error?.message || 'Payment verification failed. Contact support.');
+              }
+            } catch {
+              toast.dismiss('razorpay-verify');
+              toast.error('Payment verification failed. Your payment is safe — please contact support.');
             }
-          } catch {
-            toast.dismiss('razorpay-verify');
-            toast.error('Payment verification failed. Your payment is safe — please contact support.');
-          }
-          setUpgradingTo(null);
-        },
-        modal: {
-          ondismiss: () => {
             setUpgradingTo(null);
           },
-        },
-      });
+          modal: {
+            ondismiss: () => {
+              setUpgradingTo(null);
+            },
+          },
+        });
+      } catch (constructorErr) {
+        console.error('[billing/razorpay] Razorpay constructor threw:', constructorErr);
+        throw new RazorpayCheckoutError(
+          'PAYMENT_SERVICE_UNAVAILABLE',
+          'Payment gateway failed to initialize.',
+        );
+      }
 
-      rzp.on('payment.failed', (response?: unknown) => {
+      // Razorpay fires `payment.failed` for declined/cancelled bank flows and
+      // `payment.error` for SDK-internal issues — handle both with one path
+      // so neither outcome ever falls through to a stale spinner.
+      const handleRazorpayFailureEvent = (eventName: string) => (response?: unknown) => {
         const failure = response as { error?: { description?: string; code?: string; reason?: string } } | undefined;
         const reason = failure?.error?.description || failure?.error?.reason;
-        console.error('[billing/razorpay] payment.failed event:', failure?.error);
+        console.error(`[billing/razorpay] ${eventName} event:`, failure?.error);
         setPaymentError({
           // Keep code distinct from server-side codes so support can tell the
           // failure happened *inside* the Razorpay modal, not before it opened.
@@ -313,7 +347,9 @@ export default function BillingPage() {
           planName: planKey,
         });
         setUpgradingTo(null);
-      });
+      };
+      rzp.on('payment.failed', handleRazorpayFailureEvent('payment.failed'));
+      rzp.on('payment.error', handleRazorpayFailureEvent('payment.error'));
 
       rzp.open();
     } catch (err) {
@@ -325,6 +361,8 @@ export default function BillingPage() {
         planName: planKey,
       });
       setUpgradingTo(null);
+    } finally {
+      clearTimeout(timeoutId);
     }
   };
 
