@@ -2,6 +2,8 @@
    Tier 1 feature surface. Consumed by classifier, material-catalog,
    tier1-engine, and IFCEnhancePanel. */
 
+import type { Vector2 } from "three";
+
 /**
  * Classifier output. Every IFC mesh in the model receives exactly one tag,
  * which drives material assignment in the catalog. `space` is a sentinel —
@@ -140,4 +142,41 @@ export interface Tier3ApplyResult {
   pitchDeg?: number;
   ridgeDirection?: "ns" | "ew";
   durationMs: number;
+  /* Phase 3.5b — polygon-aware footprint telemetry. Absent when tier3
+     was skipped or failed before extraction. */
+  shapeType?: RoofShapeType;
+  vertexCount?: number;
+  /** True iff polygon extraction bailed to an AABB rectangle. */
+  usedFallback?: boolean;
+}
+
+/* ─── Phase 3.5b — polygon-aware footprint ────────────────────────────────
+   Replaces Phase 3.5a's AABB-only footprint. The 2D outline of the roof
+   slab is extracted from the top-facing triangles of the roof-slab mesh(es),
+   chained into a closed CCW loop, simplified, and classified. All tier3
+   builders (parapet, deck, bulkheads, gable) read from this shape; gable
+   specifically uses the inscribed AABB because ridge+slope topology is
+   rectangular by construction. `Vector2` components use `(x, y) = (worldX,
+   worldZ)` — the 2D "y" is always the horizontal Z axis, never world Y. */
+
+export type RoofShapeType = "rectangle" | "circular" | "polygon";
+
+export interface RoofFootprint {
+  /** Ordered closed loop, CCW winding in (X, Z). No duplicate close vertex. */
+  vertices: Vector2[];
+  vertexCount: number;
+  shapeType: RoofShapeType;
+  /** World Y of the roof slab's top surface — parapet base / eave elevation. */
+  topY: number;
+  /** True geometric centroid of the polygon (NOT the AABB centre). */
+  centerX: number;
+  centerZ: number;
+  /** Polygon area via shoelace, absolute value. */
+  areaM2: number;
+  /** Axis-aligned bounds — useful for gable ridge + coarse HVAC layout. */
+  aabb: { minX: number; maxX: number; minZ: number; maxZ: number };
+  /** Which AABB axis is longer — drives gable ridge default. */
+  longerAxis: "x" | "z";
+  /** Set true iff extraction fell back to the AABB rectangle. */
+  isFallback: boolean;
 }

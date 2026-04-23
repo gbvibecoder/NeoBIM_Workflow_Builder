@@ -108,10 +108,7 @@ export class Tier3Engine {
 
     const storeyCount = detectStoreyCount(classified.counts);
 
-    onProgress("Resolving roof style", 0.1);
-    const resolvedStyle = resolveRoofStyle(toggles.style, storeyCount);
-
-    onProgress("Locating roof slabs", 0.15);
+    onProgress("Locating roof slabs", 0.1);
     const slabMeshes = findRoofSlabMeshes(meshMap, classified.tags);
     if (slabMeshes.length === 0) {
       const result: Tier3ApplyResult = {
@@ -124,7 +121,9 @@ export class Tier3Engine {
       return result;
     }
 
-    onProgress("Extracting footprint", 0.25);
+    /* Extract footprint BEFORE resolving style — the polygon's shapeType
+       feeds into the style decision (circular → forced flat-terrace). */
+    onProgress("Extracting footprint", 0.2);
     let footprint;
     try {
       footprint = extractFootprint(slabMeshes);
@@ -138,6 +137,19 @@ export class Tier3Engine {
       this.lastResult = result;
       return result;
     }
+
+    onProgress("Resolving roof style", 0.25);
+    const resolvedStyle = resolveRoofStyle(
+      toggles.style,
+      storeyCount,
+      footprint.shapeType,
+    );
+
+    /* If the user explicitly asked for gable but we're forced to flat by
+       a circular footprint, surface this in the result message so the
+       panel status banner can explain the behaviour. */
+    const circularOverride =
+      footprint.shapeType === "circular" && toggles.style === "gable";
 
     /* Hide the original flat slab now — if anything below throws, reset()
        will restore visibility via slabHider. */
@@ -155,6 +167,12 @@ export class Tier3Engine {
       success: true,
       resolvedStyle,
       durationMs: 0,
+      shapeType: footprint.shapeType,
+      vertexCount: footprint.vertexCount,
+      usedFallback: footprint.isFallback,
+      ...(circularOverride && {
+        message: "Circular footprint — gable overridden to flat-terrace.",
+      }),
     };
 
     try {
@@ -177,7 +195,8 @@ export class Tier3Engine {
         });
         this.ownedMaterials.add(deck.material as Material);
         root.add(deck);
-        result.deckAreaM2 = Math.round(footprint.widthM * footprint.depthM);
+        /* Polygon-aware: use the actual polygon area, not widthM × depthM. */
+        result.deckAreaM2 = Math.round(footprint.areaM2);
 
         if (toggles.bulkheads) {
           onProgress("Placing bulkheads", 0.8);

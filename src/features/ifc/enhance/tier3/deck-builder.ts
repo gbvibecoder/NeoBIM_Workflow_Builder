@@ -1,24 +1,28 @@
-/* ─── IFC Enhance — Tier 3 terrace deck builder ──────────────────────────
-   Lays a wooden deck plane over the hidden roof-slab. Textures are pulled
-   from Phase 2's cache (same slug+quality key) so re-apply is instant.
+/* ─── IFC Enhance — Tier 3 polygon-aware deck builder ────────────────────
+   Phase 3.5b: the deck is now a `ShapeGeometry` built from the polygon
+   footprint rather than a rectangular `PlaneGeometry`. Three.js's
+   ear-clipping triangulator handles non-convex shapes — circles, L-
+   shapes, T-shapes all produce valid deck meshes that exactly match the
+   parapet's outline.
 
-   Ceramic and concrete deck variants are declared in the type surface but
-   fall through to wood in 3.5a — the panel greys them out with a "coming
-   soon" affordance, so this path is defensive rather than user-reachable. */
+   UV mapping is re-computed as planar world-space coordinates scaled by
+   plank width so the wood pattern is continuous across the deck
+   regardless of shape. Ceramic/concrete variants still fall through to
+   the wood spec in 3.5b. */
 
 import {
   DoubleSide,
+  Float32BufferAttribute,
   Mesh,
   MeshStandardMaterial,
-  PlaneGeometry,
+  Shape,
+  ShapeGeometry,
   type Texture,
   type WebGLRenderer,
 } from "three";
-import { DECK } from "../constants";
-import { PBR_BY_TAG } from "../constants";
+import { DECK, PBR_BY_TAG } from "../constants";
 import { loadPBRTextures } from "../texture-loader";
-import type { DeckMaterial, MaterialQuality } from "../types";
-import type { RoofFootprint } from "./polygon-extractor";
+import type { DeckMaterial, MaterialQuality, RoofFootprint } from "../types";
 
 export interface BuildDeckParams {
   footprint: RoofFootprint;
@@ -27,51 +31,55 @@ export interface BuildDeckParams {
   renderer: WebGLRenderer;
 }
 
-/**
- * Build a deck mesh sized to the roof footprint. Always returns a single
- * Mesh (no Group) — keeps the engine's dispose logic simple.
- */
 export async function buildDeck({
   footprint,
   deckMaterial,
   quality,
   renderer,
 }: BuildDeckParams): Promise<Mesh> {
-  /* Phase 3.5a only ships wood; ceramic/concrete fall through to the same
-     wood spec for now. The UI greys those options out, so users never see
-     this fallback. */
   const spec = PBR_BY_TAG["floor-slab"];
   if (!spec) {
     throw new Error("deck-builder: floor-slab PBR spec missing from catalog");
   }
 
-  /* Fetch through the shared texture cache — zero re-downloads if the
-     Phase 2 material catalog already pulled these for interior floors. */
   const textures = await loadPBRTextures(spec, quality, renderer);
 
-  /* UV scaling: we want plank width ≈ DECK.plankWidthM in world space.
-     PlaneGeometry's default UVs span 0..1 across the whole plane, so to
-     make each "tile" of the wood texture occupy `plankWidthM` metres we
-     repeat `widthM / plankWidthM` times. Same formula on the other axis,
-     using the texture's own tile size. */
-  const repeatU = footprint.widthM / DECK.plankWidthM;
-  const repeatV = footprint.depthM / spec.tilingMetres;
+  /* Build the Shape in 2D.
 
-  const map = cloneWithRepeat(textures.map, repeatU, repeatV);
-  const normalMap = cloneWithRepeat(textures.normalMap, repeatU, repeatV);
-  const roughnessMap = cloneWithRepeat(textures.roughnessMap, repeatU, repeatV);
-  const aoMap = textures.aoMap
-    ? cloneWithRepeat(textures.aoMap, repeatU, repeatV)
-    : undefined;
+     World (worldX, worldZ) maps to Shape (shapeX = worldX, shapeY = -worldZ).
+     After `geo.rotateX(-π/2)`:
+       - local +X stays world +X
+       - local +Y rotates to world -Z
+       - local +Z (the default ShapeGeometry normal) rotates to world +Y
+     So a vertex authored at shape (worldX, -worldZ, 0) lands at world
+     (worldX, 0, -(-worldZ)) = (worldX, 0, worldZ). And the deck normal
+     points +Y — faces up.
 
-  /* Longer axis decides plank orientation — rotate UVs 90° when Z is the
-     longer axis so the grain runs "down" the longer dimension. */
-  if (footprint.longerAxis === "z") {
-    rotateUVs90(map);
-    rotateUVs90(normalMap);
-    rotateUVs90(roughnessMap);
-    if (aoMap) rotateUVs90(aoMap);
+     Negating Y flips the winding, so the CCW world polygon becomes CW in
+     shape space. We reverse the vertex order to restore CCW — Three.js's
+     shape triangulator expects CCW outer contours. */
+  const flipped = footprint.vertices.map((v) => ({ x: v.x, y: -v.y }));
+  const shapeVerts = flipped.slice().reverse();
+
+  const shape = new Shape();
+  shape.moveTo(shapeVerts[0].x, shapeVerts[0].y);
+  for (let i = 1; i < shapeVerts.length; i++) {
+    shape.lineTo(shapeVerts[i].x, shapeVerts[i].y);
   }
+  shape.closePath();
+
+  const geo = new ShapeGeometry(shape);
+  geo.rotateX(-Math.PI / 2);
+
+  /* Planar UV mapping in world XZ, scaled to target plank width. Running
+     U along the longer AABB axis keeps plank grain parallel to the
+     building's longest dimension — the same heuristic 3.5a used. */
+  computePlanarDeckUVs(geo, footprint.longerAxis, spec.tilingMetres);
+
+  const map = cloneTexture(textures.map);
+  const normalMap = cloneTexture(textures.normalMap);
+  const roughnessMap = cloneTexture(textures.roughnessMap);
+  const aoMap = textures.aoMap ? cloneTexture(textures.aoMap) : undefined;
 
   const material = new MeshStandardMaterial({
     roughness: spec.roughness,
@@ -85,32 +93,55 @@ export async function buildDeck({
   });
   material.name = `enhance-tier3-deck-${deckMaterial}`;
 
-  const geometry = new PlaneGeometry(footprint.widthM, footprint.depthM);
-  geometry.rotateX(-Math.PI / 2); // lie flat on XZ
-
-  const mesh = new Mesh(geometry, material);
-  mesh.position.set(
-    footprint.centerX,
-    footprint.topY + DECK.elevationAboveSlabM,
-    footprint.centerZ,
-  );
+  const mesh = new Mesh(geo, material);
+  mesh.position.y = footprint.topY + DECK.elevationAboveSlabM;
   mesh.receiveShadow = true;
   mesh.castShadow = false;
   mesh.name = "enhance-tier3-deck";
   return mesh;
 }
 
-/* Clone a cached texture so `repeat`/`rotation` overrides don't poison
-   the shared cache entry. The underlying image/GPU upload is shared. */
-function cloneWithRepeat(source: Texture, repeatU: number, repeatV: number): Texture {
+function cloneTexture(source: Texture): Texture {
   const t = source.clone();
-  t.repeat.set(repeatU, repeatV);
+  /* The deck authors its own UVs in world units, so texture.repeat stays
+     at (1, 1) — we bake the tiling into the UVs instead. */
+  t.repeat.set(1, 1);
   t.needsUpdate = true;
   return t;
 }
 
-function rotateUVs90(t: Texture): void {
-  t.center.set(0.5, 0.5);
-  t.rotation = Math.PI / 2;
-  t.needsUpdate = true;
+/**
+ * Compute planar world-space UVs over the deck geometry so every wood
+ * plank is `DECK.plankWidthM` wide and `spec.tilingMetres` long in the
+ * perpendicular direction, regardless of polygon shape.
+ *
+ * After `rotateX(-π/2)`, the geometry's position attribute stores world
+ * X in the X slot, world Z in the Z slot, and Y ≈ 0 in the Y slot.
+ * UVs are authored directly from those XZ components.
+ */
+function computePlanarDeckUVs(
+  geo: ShapeGeometry,
+  longerAxis: "x" | "z",
+  textureTileMetres: number,
+): void {
+  const positions = geo.getAttribute("position");
+  if (!positions) return;
+  const count = positions.count;
+  const uvs = new Float32Array(count * 2);
+
+  const uScale = 1 / DECK.plankWidthM;
+  const vScale = 1 / textureTileMetres;
+
+  for (let i = 0; i < count; i++) {
+    const x = positions.getX(i);
+    const z = positions.getZ(i);
+    if (longerAxis === "x") {
+      uvs[i * 2] = x * uScale;
+      uvs[i * 2 + 1] = z * vScale;
+    } else {
+      uvs[i * 2] = z * uScale;
+      uvs[i * 2 + 1] = x * vScale;
+    }
+  }
+  geo.setAttribute("uv", new Float32BufferAttribute(uvs, 2));
 }
