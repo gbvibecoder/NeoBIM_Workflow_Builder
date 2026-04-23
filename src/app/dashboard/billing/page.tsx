@@ -13,6 +13,7 @@ import {
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { useLocale } from "@/hooks/useLocale";
+import { PaymentErrorModal } from "@/features/billing/components/PaymentErrorModal";
 // trackPurchase moved to /thank-you/subscription page
 
 interface UsageStats {
@@ -35,6 +36,18 @@ const BlueprintGrid = ({ color, opacity = 0.04 }: { color: string; opacity?: num
 
 const TIER_ORDER = ["Free", "Mini", "Starter", "Pro", "Team"];
 
+/**
+ * Carries a server-classified Razorpay error code through the catch block
+ * so the PaymentErrorModal renders the right copy.
+ * Codes match those returned by /api/razorpay/checkout.
+ */
+class RazorpayCheckoutError extends Error {
+  constructor(public readonly code: string, message: string) {
+    super(message);
+    this.name = "RazorpayCheckoutError";
+  }
+}
+
 export default function BillingPage() {
   const { t } = useLocale();
   const { data: session, update: updateSession } = useSession();
@@ -54,6 +67,11 @@ export default function BillingPage() {
     plan: string;
     planKey: string;
     planName: string;
+  } | null>(null);
+  const [paymentError, setPaymentError] = useState<{
+    code?: string;
+    message?: string;
+    planName?: string;
   } | null>(null);
 
   const userRole = (session?.user as { role?: string })?.role || "FREE";
@@ -199,15 +217,44 @@ export default function BillingPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ plan: planKey }),
       });
-      const data = await res.json();
-      if (!data.subscriptionId || !data.razorpayKeyId) {
-        throw new Error(data.error?.message || 'Failed to create Razorpay subscription');
+
+      // Server may have failed — read the body either way so we can classify.
+      let data: {
+        subscriptionId?: string;
+        razorpayKeyId?: string;
+        email?: string;
+        name?: string;
+        error?: { code?: string; message?: string; razorpayCode?: string };
+      } = {};
+      try {
+        data = await res.json();
+      } catch {
+        // Non-JSON response (e.g. 502 from edge proxy) — treat as service outage.
+      }
+
+      if (!res.ok || !data.subscriptionId || !data.razorpayKeyId) {
+        const serverCode = data.error?.code;
+        const serverMessage = data.error?.message;
+        // Trust the server's classification when present; otherwise fall back
+        // to status-based heuristics so we still pick the right modal copy.
+        const code =
+          serverCode ||
+          (res.status === 0 || res.status >= 500
+            ? 'PAYMENT_SERVICE_UNAVAILABLE'
+            : /plan/i.test(serverMessage || '')
+              ? 'PLAN_UNAVAILABLE'
+              : 'UNKNOWN');
+        throw new RazorpayCheckoutError(code, serverMessage || 'Failed to create Razorpay subscription');
       }
 
       // Step 2: Open Razorpay checkout widget
-      const Razorpay = (window as unknown as { Razorpay: new (opts: Record<string, unknown>) => { open: () => void; on: (event: string, cb: () => void) => void } }).Razorpay;
+      const Razorpay = (window as unknown as { Razorpay?: new (opts: Record<string, unknown>) => { open: () => void; on: (event: string, cb: (response?: unknown) => void) => void } }).Razorpay;
       if (!Razorpay) {
-        toast.error('Payment gateway is loading. Please try again in a moment.');
+        setPaymentError({
+          code: 'PAYMENT_SERVICE_UNAVAILABLE',
+          message: 'Payment gateway script did not load.',
+          planName: planKey,
+        });
         setUpgradingTo(null);
         return;
       }
@@ -254,14 +301,29 @@ export default function BillingPage() {
         },
       });
 
-      rzp.on('payment.failed', () => {
-        toast.error('Payment failed. Please try again.');
+      rzp.on('payment.failed', (response?: unknown) => {
+        const failure = response as { error?: { description?: string; code?: string; reason?: string } } | undefined;
+        const reason = failure?.error?.description || failure?.error?.reason;
+        console.error('[billing/razorpay] payment.failed event:', failure?.error);
+        setPaymentError({
+          // Keep code distinct from server-side codes so support can tell the
+          // failure happened *inside* the Razorpay modal, not before it opened.
+          code: 'PAYMENT_FAILED',
+          message: reason || 'Your payment did not complete.',
+          planName: planKey,
+        });
         setUpgradingTo(null);
       });
 
       rzp.open();
-    } catch {
-      toast.error(t('billing.checkoutFailed'));
+    } catch (err) {
+      console.error('[billing/razorpay] checkout failed:', err);
+      const isCheckoutErr = err instanceof RazorpayCheckoutError;
+      setPaymentError({
+        code: isCheckoutErr ? err.code : 'PAYMENT_SERVICE_UNAVAILABLE',
+        message: isCheckoutErr ? err.message : 'We could not reach our payment service.',
+        planName: planKey,
+      });
       setUpgradingTo(null);
     }
   };
@@ -1064,6 +1126,15 @@ export default function BillingPage() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Graceful payment error modal — replaces red toast for checkout failures */}
+      <PaymentErrorModal
+        open={!!paymentError}
+        onClose={() => setPaymentError(null)}
+        errorCode={paymentError?.code}
+        errorMessage={paymentError?.message}
+        planName={paymentError?.planName}
+      />
 
       {/* Razorpay checkout.js script */}
       <Script src="https://checkout.razorpay.com/v1/checkout.js" strategy="lazyOnload" />
