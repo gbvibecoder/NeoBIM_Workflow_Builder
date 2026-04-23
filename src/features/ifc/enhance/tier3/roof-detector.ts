@@ -8,7 +8,7 @@
    safer architecturally-plausible result. */
 
 import type { Mesh } from "three";
-import type { EnhanceTag, RoofStyle } from "../types";
+import type { EnhanceTag, RoofShapeType, RoofStyle } from "../types";
 
 type EnhanceTagCounts = Partial<Record<EnhanceTag, number>>;
 
@@ -34,15 +34,38 @@ export function detectStoreyCount(counts: EnhanceTagCounts): number {
 }
 
 /**
- * Map the user's style preference + detected storey count to a concrete
- * roof style. "auto" → gable for single-storey, flat-terrace otherwise.
- * An explicit user choice ("gable" or "flat-terrace") wins regardless of
- * storey count so they can always override.
+ * Map (userStyle, storeyCount, shapeType) → concrete roof style.
+ *
+ * Routing order matters:
+ *   1. Circular footprints force flat-terrace regardless of user choice —
+ *      gable ridge+slope topology is fundamentally rectangular and can't
+ *      be drawn over a disc without going to hip/dome (future phase).
+ *   2. Explicit user choice ("gable" or "flat-terrace") wins for non-
+ *      circular shapes.
+ *   3. Auto: single-storey → gable, 2+ storey → flat-terrace (same
+ *      3.5a heuristic).
+ *
+ * The `shapeType` argument is optional so legacy callers that pre-date
+ * Phase 3.5b still compile — defaults to `"polygon"` which means "no
+ * circular override".
  */
 export function resolveRoofStyle(
   userStyle: RoofStyle,
   storeyCount: number,
+  shapeType: RoofShapeType = "polygon",
 ): "gable" | "flat-terrace" {
+  /* Circular buildings: gable topology doesn't fit a disc, force flat.
+     We log when this override kicks in so a "gable" user preference
+     going silently to flat-terrace is debuggable from devtools. */
+  if (shapeType === "circular") {
+    if (userStyle === "gable") {
+      // eslint-disable-next-line no-console
+      console.info(
+        "[tier3] Circular footprint detected — forcing flat-terrace (gable unsupported on circular plans)",
+      );
+    }
+    return "flat-terrace";
+  }
   if (userStyle === "gable") return "gable";
   if (userStyle === "flat-terrace") return "flat-terrace";
   /* userStyle === "auto" */

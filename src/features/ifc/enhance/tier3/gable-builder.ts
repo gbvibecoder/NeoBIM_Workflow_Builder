@@ -8,9 +8,14 @@
    fascias sit along the eaves — without them the slope edges read too
    paper-thin in rendered output.
 
-   Phase 3.5a scope: axis-aligned footprint, single ridge, no hips, no
-   dormers. Non-rectangular footprints degrade to their AABB via the
-   upstream polygon-extractor — L-shaped plans fall to 3.5c. */
+   Phase 3.5b scope: gable ridge and eave geometry is axis-aligned to the
+   footprint's AABB. Polygon-aware extraction (shipped in 3.5b) still
+   gives us rich metadata — but gable topology is rectangular by
+   construction, so non-rectangular polygons with user-forced gable end
+   up with eaves overhanging empty space at concave corners. Circular
+   footprints are force-promoted to flat-terrace in `roof-detector.ts`
+   and never reach this builder. Irregular polygons with user-forced
+   gable remain a 3.5c concern. */
 
 import {
   BoxGeometry,
@@ -21,8 +26,7 @@ import {
   Mesh,
 } from "three";
 import { GABLE } from "../constants";
-import type { RidgeDirection } from "../types";
-import type { RoofFootprint } from "./polygon-extractor";
+import type { RidgeDirection, RoofFootprint } from "../types";
 
 export interface GableStats {
   group: Group;
@@ -65,10 +69,22 @@ function buildGableInternal(
   );
   const pitchRad = (clampedPitchDeg * Math.PI) / 180;
 
+  /* Gable topology is rectangular by construction — consume the polygon
+     via its AABB rather than via vertex-centroid. Axis-aligned naming
+     preserves 3.5a's math verbatim. */
+  const minX = footprint.aabb.minX;
+  const maxX = footprint.aabb.maxX;
+  const minZ = footprint.aabb.minZ;
+  const maxZ = footprint.aabb.maxZ;
+  const widthM = maxX - minX;
+  const depthM = maxZ - minZ;
+  const centerX = (minX + maxX) / 2;
+  const centerZ = (minZ + maxZ) / 2;
+
   /* Figure out which axis is the ridge (long) vs the fall (short). */
   const isEW = resolvedDirection === "ew";
-  const ridgeSpanM = isEW ? footprint.widthM : footprint.depthM;
-  const fallSpanM = isEW ? footprint.depthM : footprint.widthM;
+  const ridgeSpanM = isEW ? widthM : depthM;
+  const fallSpanM = isEW ? depthM : widthM;
 
   const ridgeLengthM = ridgeSpanM + 2 * GABLE.eaveOverhangM;
   const horizontalRunM = fallSpanM / 2 + GABLE.eaveOverhangM;
@@ -86,10 +102,10 @@ function buildGableInternal(
   if (isEW) {
     /* Ridge runs along X at Z = centerZ. Slopes face ±Z. */
     const southSlope = buildSlope({
-      eaveA: [footprint.minX - GABLE.eaveOverhangM, eaveY, footprint.minZ - GABLE.eaveOverhangM],
-      eaveB: [footprint.maxX + GABLE.eaveOverhangM, eaveY, footprint.minZ - GABLE.eaveOverhangM],
-      ridgeB: [footprint.maxX + GABLE.eaveOverhangM, ridgeY, footprint.centerZ],
-      ridgeA: [footprint.minX - GABLE.eaveOverhangM, ridgeY, footprint.centerZ],
+      eaveA: [minX - GABLE.eaveOverhangM, eaveY, minZ - GABLE.eaveOverhangM],
+      eaveB: [maxX + GABLE.eaveOverhangM, eaveY, minZ - GABLE.eaveOverhangM],
+      ridgeB: [maxX + GABLE.eaveOverhangM, ridgeY, centerZ],
+      ridgeA: [minX - GABLE.eaveOverhangM, ridgeY, centerZ],
       ridgeLengthM,
       slopeLengthM,
       material: tileMaterial,
@@ -98,10 +114,10 @@ function buildGableInternal(
     group.add(southSlope);
 
     const northSlope = buildSlope({
-      eaveA: [footprint.maxX + GABLE.eaveOverhangM, eaveY, footprint.maxZ + GABLE.eaveOverhangM],
-      eaveB: [footprint.minX - GABLE.eaveOverhangM, eaveY, footprint.maxZ + GABLE.eaveOverhangM],
-      ridgeB: [footprint.minX - GABLE.eaveOverhangM, ridgeY, footprint.centerZ],
-      ridgeA: [footprint.maxX + GABLE.eaveOverhangM, ridgeY, footprint.centerZ],
+      eaveA: [maxX + GABLE.eaveOverhangM, eaveY, maxZ + GABLE.eaveOverhangM],
+      eaveB: [minX - GABLE.eaveOverhangM, eaveY, maxZ + GABLE.eaveOverhangM],
+      ridgeB: [minX - GABLE.eaveOverhangM, ridgeY, centerZ],
+      ridgeA: [maxX + GABLE.eaveOverhangM, ridgeY, centerZ],
       ridgeLengthM,
       slopeLengthM,
       material: tileMaterial,
@@ -113,18 +129,18 @@ function buildGableInternal(
        extended by the eave overhang. */
     group.add(
       buildGableEndTriangle({
-        bottomA: [footprint.minX, eaveY, footprint.minZ],
-        bottomB: [footprint.minX, eaveY, footprint.maxZ],
-        apex: [footprint.minX, ridgeY, footprint.centerZ],
+        bottomA: [minX, eaveY, minZ],
+        bottomB: [minX, eaveY, maxZ],
+        apex: [minX, ridgeY, centerZ],
         material: wallMaterial,
         name: "enhance-tier3-gable-end-W",
       }),
     );
     group.add(
       buildGableEndTriangle({
-        bottomA: [footprint.maxX, eaveY, footprint.maxZ],
-        bottomB: [footprint.maxX, eaveY, footprint.minZ],
-        apex: [footprint.maxX, ridgeY, footprint.centerZ],
+        bottomA: [maxX, eaveY, maxZ],
+        bottomB: [maxX, eaveY, minZ],
+        apex: [maxX, ridgeY, centerZ],
         material: wallMaterial,
         name: "enhance-tier3-gable-end-E",
       }),
@@ -135,9 +151,9 @@ function buildGableInternal(
       length: ridgeLengthM,
       thickness: GABLE.fasciaThicknessM,
       centre: [
-        footprint.centerX,
+        centerX,
         eaveY - GABLE.fasciaThicknessM / 2,
-        footprint.minZ - GABLE.eaveOverhangM + GABLE.fasciaThicknessM / 2,
+        minZ - GABLE.eaveOverhangM + GABLE.fasciaThicknessM / 2,
       ],
       axisAligned: "x",
       material: wallMaterial,
@@ -147,9 +163,9 @@ function buildGableInternal(
       length: ridgeLengthM,
       thickness: GABLE.fasciaThicknessM,
       centre: [
-        footprint.centerX,
+        centerX,
         eaveY - GABLE.fasciaThicknessM / 2,
-        footprint.maxZ + GABLE.eaveOverhangM - GABLE.fasciaThicknessM / 2,
+        maxZ + GABLE.eaveOverhangM - GABLE.fasciaThicknessM / 2,
       ],
       axisAligned: "x",
       material: wallMaterial,
@@ -158,10 +174,10 @@ function buildGableInternal(
   } else {
     /* NS ridge — ridge runs along Z at X = centerX. Slopes face ±X. */
     const westSlope = buildSlope({
-      eaveA: [footprint.minX - GABLE.eaveOverhangM, eaveY, footprint.minZ - GABLE.eaveOverhangM],
-      eaveB: [footprint.minX - GABLE.eaveOverhangM, eaveY, footprint.maxZ + GABLE.eaveOverhangM],
-      ridgeB: [footprint.centerX, ridgeY, footprint.maxZ + GABLE.eaveOverhangM],
-      ridgeA: [footprint.centerX, ridgeY, footprint.minZ - GABLE.eaveOverhangM],
+      eaveA: [minX - GABLE.eaveOverhangM, eaveY, minZ - GABLE.eaveOverhangM],
+      eaveB: [minX - GABLE.eaveOverhangM, eaveY, maxZ + GABLE.eaveOverhangM],
+      ridgeB: [centerX, ridgeY, maxZ + GABLE.eaveOverhangM],
+      ridgeA: [centerX, ridgeY, minZ - GABLE.eaveOverhangM],
       ridgeLengthM,
       slopeLengthM,
       material: tileMaterial,
@@ -170,10 +186,10 @@ function buildGableInternal(
     group.add(westSlope);
 
     const eastSlope = buildSlope({
-      eaveA: [footprint.maxX + GABLE.eaveOverhangM, eaveY, footprint.maxZ + GABLE.eaveOverhangM],
-      eaveB: [footprint.maxX + GABLE.eaveOverhangM, eaveY, footprint.minZ - GABLE.eaveOverhangM],
-      ridgeB: [footprint.centerX, ridgeY, footprint.minZ - GABLE.eaveOverhangM],
-      ridgeA: [footprint.centerX, ridgeY, footprint.maxZ + GABLE.eaveOverhangM],
+      eaveA: [maxX + GABLE.eaveOverhangM, eaveY, maxZ + GABLE.eaveOverhangM],
+      eaveB: [maxX + GABLE.eaveOverhangM, eaveY, minZ - GABLE.eaveOverhangM],
+      ridgeB: [centerX, ridgeY, minZ - GABLE.eaveOverhangM],
+      ridgeA: [centerX, ridgeY, maxZ + GABLE.eaveOverhangM],
       ridgeLengthM,
       slopeLengthM,
       material: tileMaterial,
@@ -183,18 +199,18 @@ function buildGableInternal(
 
     group.add(
       buildGableEndTriangle({
-        bottomA: [footprint.maxX, eaveY, footprint.minZ],
-        bottomB: [footprint.minX, eaveY, footprint.minZ],
-        apex: [footprint.centerX, ridgeY, footprint.minZ],
+        bottomA: [maxX, eaveY, minZ],
+        bottomB: [minX, eaveY, minZ],
+        apex: [centerX, ridgeY, minZ],
         material: wallMaterial,
         name: "enhance-tier3-gable-end-S",
       }),
     );
     group.add(
       buildGableEndTriangle({
-        bottomA: [footprint.minX, eaveY, footprint.maxZ],
-        bottomB: [footprint.maxX, eaveY, footprint.maxZ],
-        apex: [footprint.centerX, ridgeY, footprint.maxZ],
+        bottomA: [minX, eaveY, maxZ],
+        bottomB: [maxX, eaveY, maxZ],
+        apex: [centerX, ridgeY, maxZ],
         material: wallMaterial,
         name: "enhance-tier3-gable-end-N",
       }),
@@ -204,9 +220,9 @@ function buildGableInternal(
       length: ridgeLengthM,
       thickness: GABLE.fasciaThicknessM,
       centre: [
-        footprint.minX - GABLE.eaveOverhangM + GABLE.fasciaThicknessM / 2,
+        minX - GABLE.eaveOverhangM + GABLE.fasciaThicknessM / 2,
         eaveY - GABLE.fasciaThicknessM / 2,
-        footprint.centerZ,
+        centerZ,
       ],
       axisAligned: "z",
       material: wallMaterial,
@@ -216,9 +232,9 @@ function buildGableInternal(
       length: ridgeLengthM,
       thickness: GABLE.fasciaThicknessM,
       centre: [
-        footprint.maxX + GABLE.eaveOverhangM - GABLE.fasciaThicknessM / 2,
+        maxX + GABLE.eaveOverhangM - GABLE.fasciaThicknessM / 2,
         eaveY - GABLE.fasciaThicknessM / 2,
-        footprint.centerZ,
+        centerZ,
       ],
       axisAligned: "z",
       material: wallMaterial,
