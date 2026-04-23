@@ -69,12 +69,26 @@ const optionalSchema = z.object({
   MESHY_API_KEY: z.string().optional(),
 });
 
+// Razorpay env vars are validated by validateRazorpayEnv() (runs inside
+// validateEnv at boot). Declared here so the typed `env` proxy exposes them.
+const razorpaySchema = z.object({
+  RAZORPAY_KEY_ID: z.string().optional(),
+  RAZORPAY_KEY_SECRET: z.string().optional(),
+  NEXT_PUBLIC_RAZORPAY_KEY_ID: z.string().optional(),
+  RAZORPAY_MINI_PLAN_ID: z.string().optional(),
+  RAZORPAY_STARTER_PLAN_ID: z.string().optional(),
+  RAZORPAY_PRO_PLAN_ID: z.string().optional(),
+  RAZORPAY_TEAM_PLAN_ID: z.string().optional(),
+  RAZORPAY_WEBHOOK_SECRET: z.string().optional(),
+});
+
 // ─── Types ──────────────────────────────────────────────────────────────────
 
 export type RequiredEnv = z.infer<typeof requiredSchema>;
 export type RecommendedEnv = z.infer<typeof recommendedSchema>;
 export type OptionalEnv = z.infer<typeof optionalSchema>;
-export type Env = RequiredEnv & RecommendedEnv & OptionalEnv;
+export type RazorpayEnv = z.infer<typeof razorpaySchema>;
+export type Env = RequiredEnv & RecommendedEnv & OptionalEnv & RazorpayEnv;
 
 // ─── Validation ─────────────────────────────────────────────────────────────
 
@@ -195,17 +209,113 @@ export function validateEnv(): Env {
     console.warn(lines.join("\n"));
   }
 
+  // ── RAZORPAY ────────────────────────────────────────────────────────
+  validateRazorpayEnv(raw);
+
   // OPTIONAL — silent. We still parse to populate the typed env object.
   const recommended = recommendedSchema.parse(raw);
   const optional = optionalSchema.parse(raw);
+  const razorpay = razorpaySchema.parse(raw);
 
   cachedEnv = {
     ...requiredResult.data,
     ...recommended,
     ...optional,
+    ...razorpay,
   };
 
   return cachedEnv;
+}
+
+// ─── Razorpay env validation ────────────────────────────────────────────────
+//
+// In production: missing required vars throw (deployment is broken — fail loud).
+// In dev:        missing vars warn (so contributors can run without Razorpay).
+// Always:        if both keys are present and prefix-modes disagree, throw.
+//                A live/test mismatch silently wedges the entire payment flow
+//                ("Payment Failed" inside the Razorpay modal) and is the exact
+//                regression that motivated this validator.
+
+const RAZORPAY_REQUIRED_KEYS = [
+  "RAZORPAY_KEY_ID",
+  "RAZORPAY_KEY_SECRET",
+  "NEXT_PUBLIC_RAZORPAY_KEY_ID",
+  "RAZORPAY_WEBHOOK_SECRET",
+] as const;
+
+const RAZORPAY_REQUIRED_PLAN_IDS = [
+  "RAZORPAY_MINI_PLAN_ID",
+  "RAZORPAY_STARTER_PLAN_ID",
+  "RAZORPAY_PRO_PLAN_ID",
+  "RAZORPAY_TEAM_PLAN_ID",
+] as const;
+
+function razorpayKeyMode(key: string | undefined): "live" | "test" | "unknown" {
+  if (!key) return "unknown";
+  if (key.startsWith("rzp_live_")) return "live";
+  if (key.startsWith("rzp_test_")) return "test";
+  return "unknown";
+}
+
+export function validateRazorpayEnv(raw: NodeJS.ProcessEnv): void {
+  const isProd = raw.NODE_ENV === "production";
+
+  const missingKeys = RAZORPAY_REQUIRED_KEYS.filter(
+    (k) => !raw[k] || raw[k]!.trim().length === 0,
+  );
+  const missingPlans = RAZORPAY_REQUIRED_PLAN_IDS.filter(
+    (k) => !raw[k] || raw[k]!.trim().length === 0,
+  );
+
+  if (missingKeys.length > 0 || missingPlans.length > 0) {
+    const lines: string[] = [];
+    if (missingKeys.length > 0) {
+      lines.push(`  • Missing keys/secrets: ${missingKeys.join(", ")}`);
+    }
+    if (missingPlans.length > 0) {
+      lines.push(`  • Missing plan IDs: ${missingPlans.join(", ")}`);
+    }
+
+    if (isProd) {
+      const errMsg =
+        "\n❌ RAZORPAY ENV VALIDATION FAILED:\n\n" +
+        lines.join("\n") +
+        "\n\nRazorpay checkout is broken without these. Set them in Vercel → " +
+        "Settings → Environment Variables (Production), then redeploy.\n";
+      console.error(errMsg);
+      throw new Error(errMsg);
+    } else {
+      console.warn(
+        [
+          "",
+          "⚠️  Razorpay env vars missing (dev) — payment flow will fail at runtime:",
+          ...lines,
+          "",
+        ].join("\n"),
+      );
+    }
+  }
+
+  // Mode-parity assertion — always enforced when both keys are present.
+  // A mismatch is the textbook cause of the production "Payment Failed" modal.
+  const serverKey = raw.RAZORPAY_KEY_ID;
+  const clientKey = raw.NEXT_PUBLIC_RAZORPAY_KEY_ID;
+  if (serverKey && clientKey) {
+    const serverMode = razorpayKeyMode(serverKey);
+    const clientMode = razorpayKeyMode(clientKey);
+    if (serverMode !== clientMode) {
+      const errMsg =
+        "\n❌ RAZORPAY KEY MODE MISMATCH:\n\n" +
+        `  • RAZORPAY_KEY_ID            is "${serverMode}" mode (prefix: ${serverKey.slice(0, 9)}…)\n` +
+        `  • NEXT_PUBLIC_RAZORPAY_KEY_ID is "${clientMode}" mode (prefix: ${clientKey.slice(0, 9)}…)\n\n` +
+        "Both keys MUST share the same prefix (rzp_live_ or rzp_test_).\n" +
+        "Mixing modes silently wedges checkout — server creates the\n" +
+        "subscription with one key, the modal opens with the other,\n" +
+        "and Razorpay rejects it as 'Payment Failed'. Fix in Vercel env.\n";
+      console.error(errMsg);
+      throw new Error(errMsg);
+    }
+  }
 }
 
 /**
