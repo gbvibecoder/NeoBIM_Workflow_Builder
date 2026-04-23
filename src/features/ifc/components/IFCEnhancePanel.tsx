@@ -24,9 +24,6 @@ import {
   AlertTriangle,
   CheckCircle2,
   Wand2,
-  Trees,
-  Lamp,
-  Milestone,
   MapPin,
 } from "lucide-react";
 import { UI } from "@/features/ifc/components/constants";
@@ -39,7 +36,6 @@ import {
   type GroundType,
   type HDRIPreset,
   type MaterialQuality,
-  type RoadSide,
   type Tier2Toggles,
 } from "@/features/ifc/enhance/types";
 import {
@@ -169,9 +165,6 @@ export const IFCEnhancePanel = forwardRef<IFCEnhancePanelHandle, IFCEnhancePanel
     });
     const [tier2Counts, setTier2Counts] = useState<{
       ground: number;
-      trees: number;
-      shrubs: number;
-      lamps: number;
     } | null>(null);
 
     /* Engines live in refs so tab switches don't recreate them and lose state. */
@@ -234,13 +227,11 @@ export const IFCEnhancePanel = forwardRef<IFCEnhancePanelHandle, IFCEnhancePanel
             return;
           }
 
-          /* Tier 2 (site context) — 0.5 → 1.0. Skip quietly if master toggle off. */
+          /* Tier 2 (site context — ground only post-strip) — 0.5 → 1.0.
+             Skip quietly if master toggle off. */
           let tier2Result: Awaited<ReturnType<Tier2Engine["apply"]>> = {
             success: true,
             groundAreaM2: 0,
-            treesPlaced: 0,
-            shrubsPlaced: 0,
-            lampsPlaced: 0,
             durationMs: 0,
           };
           if (nextTier2.context) {
@@ -259,12 +250,7 @@ export const IFCEnhancePanel = forwardRef<IFCEnhancePanelHandle, IFCEnhancePanel
             await tier2EngineRef.current.reset();
           }
 
-          setTier2Counts({
-            ground: tier2Result.groundAreaM2,
-            trees: tier2Result.treesPlaced,
-            shrubs: tier2Result.shrubsPlaced,
-            lamps: tier2Result.lampsPlaced,
-          });
+          setTier2Counts({ ground: tier2Result.groundAreaM2 });
           setStatus({ kind: "applied", toggles: nextToggles, counts: tier1Result.counts });
         } catch (err) {
           setStatus({
@@ -303,15 +289,12 @@ export const IFCEnhancePanel = forwardRef<IFCEnhancePanelHandle, IFCEnhancePanel
         setStatus({ kind: "error", message: "Viewer not ready." });
         return;
       }
-      const meshMap = vp.getMeshMap();
-      const autoTier1 = recommendedToggles(meshMap.size);
-      /* Auto picks the defaults for Phase 3 context — they're already tuned
-         (20 trees, 15 shrubs, east road, lamps on). For truly massive
-         models (>5000 elements) we halve tree/shrub counts to stay snappy. */
-      const autoTier2: Tier2Toggles = meshMap.size > 5000
-        ? { ...DEFAULT_TIER2_TOGGLES, treeCount: 10, shrubCount: 8 }
-        : DEFAULT_TIER2_TOGGLES;
-      await handleApply(autoTier1, autoTier2);
+      const autoTier1 = recommendedToggles(vp.getMeshMap().size);
+      /* Post-strip: Tier 2 has only a ground plane. DEFAULT_TIER2_TOGGLES
+         is tuned (auto ground-type picks grass). No per-model tweaking
+         needed since the ground is cheap to render regardless of building
+         complexity. */
+      await handleApply(autoTier1, DEFAULT_TIER2_TOGGLES);
     }, [handleApply, viewportRef]);
 
     const classifiedSummary = useMemo(() => {
@@ -324,11 +307,8 @@ export const IFCEnhancePanel = forwardRef<IFCEnhancePanelHandle, IFCEnhancePanel
       if (c["door"]) rows.push(`${c["door"]} doors`);
       if (c["floor-slab"]) rows.push(`${c["floor-slab"]} floor slabs`);
       if (c["roof-slab"]) rows.push(`${c["roof-slab"]} roof slabs`);
-      if (tier2Counts) {
-        if (tier2Counts.ground > 0) rows.push(`${tier2Counts.ground.toLocaleString()} m² site`);
-        if (tier2Counts.trees > 0) rows.push(`${tier2Counts.trees} trees`);
-        if (tier2Counts.shrubs > 0) rows.push(`${tier2Counts.shrubs} shrubs`);
-        if (tier2Counts.lamps > 0) rows.push(`${tier2Counts.lamps} lamps`);
+      if (tier2Counts && tier2Counts.ground > 0) {
+        rows.push(`${tier2Counts.ground.toLocaleString()} m² site`);
       }
       return rows.join(" · ");
     }, [status, tier2Counts]);
@@ -509,7 +489,7 @@ export const IFCEnhancePanel = forwardRef<IFCEnhancePanelHandle, IFCEnhancePanel
                     <span style={switchThumbStyle(tier2Toggles.ground)} />
                   </button>
                 </div>
-                <div style={{ padding: "4px 10px 8px" }}>
+                <div style={{ padding: "4px 10px 10px" }}>
                   <div style={{ fontSize: 10.5, color: UI.text.tertiary, marginBottom: 6, letterSpacing: "0.4px", textTransform: "uppercase" }}>
                     Ground type
                   </div>
@@ -526,118 +506,6 @@ export const IFCEnhancePanel = forwardRef<IFCEnhancePanelHandle, IFCEnhancePanel
                       </button>
                     ))}
                   </div>
-                </div>
-
-                {/* Sidewalk */}
-                <div style={rowStyle}>
-                  <span>Sidewalk ring</span>
-                  <button
-                    type="button"
-                    aria-label="Toggle sidewalk"
-                    disabled={anyDisabled || !tier2Toggles.context}
-                    onClick={() => setTier2Toggles((p) => ({ ...p, sidewalk: !p.sidewalk }))}
-                    style={switchStyle(tier2Toggles.sidewalk)}
-                  >
-                    <span style={switchThumbStyle(tier2Toggles.sidewalk)} />
-                  </button>
-                </div>
-
-                {/* Road */}
-                <div style={rowStyle}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                    <Milestone size={13} color={UI.text.secondary} aria-hidden />
-                    <span>Road</span>
-                  </div>
-                  <button
-                    type="button"
-                    aria-label="Toggle road"
-                    disabled={anyDisabled || !tier2Toggles.context}
-                    onClick={() => setTier2Toggles((p) => ({ ...p, road: !p.road }))}
-                    style={switchStyle(tier2Toggles.road)}
-                  >
-                    <span style={switchThumbStyle(tier2Toggles.road)} />
-                  </button>
-                </div>
-                <div style={{ padding: "4px 10px 8px" }}>
-                  <div style={{ fontSize: 10.5, color: UI.text.tertiary, marginBottom: 6, letterSpacing: "0.4px", textTransform: "uppercase" }}>
-                    Road side
-                  </div>
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(5, minmax(0,1fr))", gap: 6 }}>
-                    {(["north", "east", "south", "west", "none"] as RoadSide[]).map((s) => (
-                      <button
-                        key={s}
-                        type="button"
-                        disabled={anyDisabled || !tier2Toggles.context || !tier2Toggles.road}
-                        onClick={() => setTier2Toggles((p) => ({ ...p, roadSide: s }))}
-                        style={pickerBtnStyle(tier2Toggles.roadSide === s)}
-                      >
-                        <span style={{ textTransform: "capitalize" }}>{s}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Trees slider */}
-                <div style={{ ...rowStyle, flexDirection: "column", alignItems: "stretch", gap: 6 }}>
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                      <Trees size={13} color={UI.accent.green} aria-hidden />
-                      <span>Trees</span>
-                    </div>
-                    <span style={{ fontVariantNumeric: "tabular-nums", color: UI.text.primary, fontWeight: 600 }}>
-                      {tier2Toggles.treeCount}
-                    </span>
-                  </div>
-                  <input
-                    type="range"
-                    min={0}
-                    max={40}
-                    value={tier2Toggles.treeCount}
-                    disabled={anyDisabled || !tier2Toggles.context}
-                    onChange={(e) => setTier2Toggles((p) => ({ ...p, treeCount: Number(e.target.value) }))}
-                    style={{ width: "100%", accentColor: UI.accent.cyan }}
-                  />
-                </div>
-
-                {/* Shrubs slider */}
-                <div style={{ ...rowStyle, flexDirection: "column", alignItems: "stretch", gap: 6 }}>
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                    <span>Shrubs</span>
-                    <span style={{ fontVariantNumeric: "tabular-nums", color: UI.text.primary, fontWeight: 600 }}>
-                      {tier2Toggles.shrubCount}
-                    </span>
-                  </div>
-                  <input
-                    type="range"
-                    min={0}
-                    max={30}
-                    value={tier2Toggles.shrubCount}
-                    disabled={anyDisabled || !tier2Toggles.context}
-                    onChange={(e) => setTier2Toggles((p) => ({ ...p, shrubCount: Number(e.target.value) }))}
-                    style={{ width: "100%", accentColor: UI.accent.cyan }}
-                  />
-                </div>
-
-                {/* Lamps */}
-                <div style={rowStyle}>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                      <Lamp size={13} color={UI.text.secondary} aria-hidden />
-                      <span>Street lamps</span>
-                    </div>
-                    <span style={{ fontSize: 10.5, color: UI.text.tertiary }}>
-                      PointLights glow at Night preset
-                    </span>
-                  </div>
-                  <button
-                    type="button"
-                    aria-label="Toggle street lamps"
-                    disabled={anyDisabled || !tier2Toggles.context}
-                    onClick={() => setTier2Toggles((p) => ({ ...p, lamps: !p.lamps }))}
-                    style={switchStyle(tier2Toggles.lamps)}
-                  >
-                    <span style={switchThumbStyle(tier2Toggles.lamps)} />
-                  </button>
                 </div>
               </Section>
             </>
