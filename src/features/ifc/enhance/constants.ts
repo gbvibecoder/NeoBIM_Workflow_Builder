@@ -100,76 +100,14 @@ export const TEXTURE_SUFFIXES = {
   metal: "_metal_2k.jpg",
 } as const;
 
-/* ─── Phase 3 — Tier 2 Site Context constants ────────────────────────────
-   Additive. Phase 2 constants above are frozen. */
-
-/** Target real-world tree height (metres). Model scale = target / modelHeight. */
-export const TARGET_TREE_HEIGHT_M = 8;
-
-/** Target real-world shrub height (metres). */
-export const TARGET_SHRUB_HEIGHT_M = 1.2;
-
-/**
- * Quaternius Ultimate Stylized Nature Pack (CC0) tree GLBs. Order matches
- * the procedural fallback variants (deciduous → maple → pine) so if a GLB
- * fails to load, the substituted procedural tree looks similar. File sizes
- * (April 2026): deciduous 3.4 MB · maple 3.4 MB · pine 2.7 MB.
- */
-export const TREE_MODELS = [
-  "/models/enhance/trees/tree_deciduous.glb",
-  "/models/enhance/trees/tree_maple.glb",
-  "/models/enhance/trees/tree_pine.glb",
-] as const;
-
-/**
- * Quaternius shrub GLBs. File sizes: round 473 KB · tall 342 KB.
- */
-export const SHRUB_MODELS = [
-  "/models/enhance/shrubs/shrub_round.glb",
-  "/models/enhance/shrubs/shrub_tall.glb",
-] as const;
-
-export const PLACEMENT_EXCLUSION = {
-  /** Min distance from building footprint edge. */
-  buildingBufferM: 2.5,
-  /** Min distance between two trees. */
-  treeSpacingM: 3.0,
-  /** Min distance between two shrubs. */
-  shrubSpacingM: 1.5,
-  /** Min distance from road edge. */
-  roadBufferM: 1.2,
-  /** Min distance from sidewalk edge. */
-  sidewalkBufferM: 0.5,
-} as const;
+/* ─── Phase 3 — Tier 2 Site Context constants (ground-only, post-strip) ──
+   Additive. Phase 2 constants above are frozen. Trees, shrubs, road,
+   sidewalk, and street lamps are removed — only the ground plane remains. */
 
 /** Site extent — ground plane half-side = building max-extent × this. */
 export const GROUND_SIZE_MULTIPLIER = 5;
 
-export const ROAD = {
-  widthM: 7.0,
-  offsetFromBuildingM: 12.0,
-  laneMarkerWidthM: 0.15,
-  laneMarkerLengthM: 3.0,
-  laneMarkerGapM: 6.0,
-} as const;
-
-export const SIDEWALK = {
-  widthM: 2.0,
-  heightM: 0.15,
-} as const;
-
-export const LAMP = {
-  postHeightM: 6.0,
-  postRadiusM: 0.08,
-  armLengthM: 1.2,
-  headRadiusM: 0.25,
-  spacingM: 10.0,
-  nightIntensity: 1.2,
-  nightRange: 15.0,
-  nightColor: 0xffd8a8,
-} as const;
-
-/** Re-used texture specs for Phase 3 site meshes (share Phase 2 texture
+/** Re-used texture specs for the ground plane (share Phase 2 texture
     cache via `loadPBRTextures` — same slug+quality key). */
 export const GROUND_TEXTURE_SPECS = {
   grass: {
