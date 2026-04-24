@@ -408,51 +408,67 @@ function PaidPlan(props: PlanCardProps & { kind: "mini" | "starter" | "pro" }) {
         })}
       </div>
 
-      <div style={{ fontSize: 11, color: "var(--text-tertiary)", lineHeight: 1.55, fontStyle: "italic" }}>
-        {props.honestNote}
-      </div>
-
-      <motion.button
-        type="button"
-        onClick={props.onSelect}
-        disabled={props.loading}
-        whileHover={{ scale: props.loading ? 1 : 1.02 }}
-        whileTap={{ scale: props.loading ? 1 : 0.97 }}
+      {/* Bottom cluster — honest note + CTA + subtitle anchored to the
+          card's bottom edge via `marginTop: "auto"`. Because the grid has
+          `align-items: stretch`, all three cards share the tallest card's
+          height. Without this anchor the CTA buttons would sit at
+          different y-positions (taglines and honest-notes have different
+          line counts). With the anchor, Get Mini / Get Starter / Go Pro
+          all share the same baseline. */}
+      <div
         style={{
-          padding: "14px 22px",
-          borderRadius: 12,
-          background: theme.ctaGradient,
-          border: "none",
-          color: "#fff",
-          fontSize: 14.5,
-          fontWeight: 700,
-          cursor: props.loading ? "wait" : "pointer",
-          opacity: props.loading ? 0.85 : 1,
+          marginTop: "auto",
           display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          gap: 8,
-          boxShadow: theme.ctaShadow,
-          letterSpacing: "-0.005em",
+          flexDirection: "column",
+          gap: 14,
         }}
       >
-        {props.loading ? (
-          <>
-            <Loader2 size={14} className="spin-anim" />
-            {t("survey.scene4.processing")}
-          </>
-        ) : (
-          <>
-            {props.ctaLabel}
-            <ArrowRight size={14} />
-          </>
-        )}
-      </motion.button>
-      {props.ctaSubtitle && (
-        <div style={{ fontSize: 11, color: "var(--text-disabled)", textAlign: "center", marginTop: -8 }}>
-          {props.ctaSubtitle}
+        <div style={{ fontSize: 11, color: "var(--text-tertiary)", lineHeight: 1.55, fontStyle: "italic" }}>
+          {props.honestNote}
         </div>
-      )}
+
+        <motion.button
+          type="button"
+          onClick={props.onSelect}
+          disabled={props.loading}
+          whileHover={{ scale: props.loading ? 1 : 1.02 }}
+          whileTap={{ scale: props.loading ? 1 : 0.97 }}
+          style={{
+            padding: "14px 22px",
+            borderRadius: 12,
+            background: theme.ctaGradient,
+            border: "none",
+            color: "#fff",
+            fontSize: 14.5,
+            fontWeight: 700,
+            cursor: props.loading ? "wait" : "pointer",
+            opacity: props.loading ? 0.85 : 1,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 8,
+            boxShadow: theme.ctaShadow,
+            letterSpacing: "-0.005em",
+          }}
+        >
+          {props.loading ? (
+            <>
+              <Loader2 size={14} className="spin-anim" />
+              {t("survey.scene4.processing")}
+            </>
+          ) : (
+            <>
+              {props.ctaLabel}
+              <ArrowRight size={14} />
+            </>
+          )}
+        </motion.button>
+        {props.ctaSubtitle && (
+          <div style={{ fontSize: 11, color: "var(--text-disabled)", textAlign: "center", marginTop: -6 }}>
+            {props.ctaSubtitle}
+          </div>
+        )}
+      </div>
 
       <style jsx>{`
         @keyframes plancardSpin {
