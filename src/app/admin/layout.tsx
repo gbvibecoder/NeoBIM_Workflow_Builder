@@ -7,7 +7,7 @@ import Link from "next/link";
 import {
   LayoutDashboard, Users, CreditCard, Workflow,
   BarChart3, MessageSquareHeart, Settings, ChevronLeft, ChevronRight,
-  LogOut, Shield, Menu, X, TrendingUp, Brain, ClipboardList,
+  LogOut, Shield, Menu, X, TrendingUp, Brain, ClipboardList, Calendar,
 } from "lucide-react";
 import { ADMIN_COOKIE_NAME } from "@/lib/admin-auth";
 import { useLocale } from "@/hooks/useLocale";
@@ -22,6 +22,7 @@ const NAV_ITEMS = [
   { href: "/admin/growth",    labelKey: "admin.nav.growth" as const,    icon: TrendingUp },
   { href: "/admin/analytics", labelKey: "admin.nav.analytics" as const, icon: BarChart3 },
   { href: "/admin/survey-analytics", labelKey: "admin.nav.surveys" as const, icon: ClipboardList },
+  { href: "/admin/demo-requests", labelKey: "admin.nav.demoRequests" as const, icon: Calendar },
   { href: "/admin/support",   labelKey: "admin.nav.feedback" as const,  icon: MessageSquareHeart },
   { href: "/admin/roadmap",   labelKey: "admin.nav.roadmap" as const,   icon: Brain },
   { href: "/admin/settings",  labelKey: "admin.nav.settings" as const,  icon: Settings },

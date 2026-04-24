@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { checkEndpointRateLimit, getClientIp } from "@/lib/rate-limit";
+import { prisma } from "@/lib/db";
 import {
   sendInboundLeadNotification,
   sendDemoRequestConfirmationEmail,
@@ -36,27 +37,33 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Please provide a valid company name." }, { status: 400 });
     }
 
-    // Fire-and-forget: log to file (best-effort, filesystem may be read-only on Vercel)
-    import("fs/promises").then(async (fs) => {
-      const path = await import("path");
-      const logDir = path.join(process.cwd(), "analytics-logs");
-      const logFile = path.join(logDir, "demo-requests.jsonl");
-      await fs.mkdir(logDir, { recursive: true });
-      await fs.appendFile(
-        logFile,
-        JSON.stringify({
-          type: "book-demo",
-          name,
-          email,
-          phone: phone || null,
-          company,
-          role: role || null,
-          message: message || null,
-          timestamp: new Date().toISOString(),
-        }) + "\n",
-        "utf-8"
-      );
-    }).catch(() => {});
+    // Persist to DB — this is the source of truth for the /admin/demo-requests
+    // kanban. Vercel's filesystem is read-only so the old JSONL append would
+    // drop submissions silently in prod. We still fire-and-forget so a DB
+    // hiccup can't take down the form — the team notification email below is
+    // a secondary safety net.
+    const ua = req.headers.get("user-agent");
+    const referer = req.headers.get("referer");
+    const utmSource = typeof body?.utmSource === "string" ? body.utmSource.slice(0, 200) : null;
+    const utmMedium = typeof body?.utmMedium === "string" ? body.utmMedium.slice(0, 200) : null;
+    const utmCampaign = typeof body?.utmCampaign === "string" ? body.utmCampaign.slice(0, 200) : null;
+
+    prisma.demoRequest.create({
+      data: {
+        name,
+        email,
+        phone: phone || null,
+        company,
+        roleTitle: role || null,
+        message: message || null,
+        ipAddress: ip,
+        userAgent: ua ? ua.slice(0, 500) : null,
+        referrer: referer ? referer.slice(0, 500) : null,
+        utmSource,
+        utmMedium,
+        utmCampaign,
+      },
+    }).catch((err) => console.error("[book-demo] Failed to persist demo request", err));
 
     // Fan out two emails in parallel — neither blocks the HTTP response.
     // 1) Team notification → buildflow786@gmail.com (via TEAM_NOTIFICATION_EMAIL

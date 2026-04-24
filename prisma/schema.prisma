@@ -457,6 +457,51 @@ enum FeedbackStatus {
   DECLINED
 }
 
+// ─── Demo Requests (inbound leads from /book-demo) ───────────────
+//
+// Every /book-demo form submission lands here alongside the email
+// notifications, so admins have a persistent record (email is lossy —
+// inboxes get cluttered, messages get archived, attribution is lost).
+// Status drives the admin kanban: NEW → CONTACTED → SCHEDULED →
+// COMPLETED (or CANCELLED if the lead goes cold).
+
+model DemoRequest {
+  id          String            @id @default(cuid())
+  name        String
+  email       String
+  phone       String?
+  company     String
+  roleTitle   String?           // job title / role — "Architect", "Principal", etc. (avoid collision with UserRole enum)
+  message     String?
+  status      DemoRequestStatus @default(NEW)
+  adminNote   String?           // admin's private notes about the lead
+  contactedAt DateTime?         // set when admin marks CONTACTED
+  scheduledAt DateTime?         // set when admin marks SCHEDULED
+  completedAt DateTime?         // set when admin marks COMPLETED
+  // First-touch attribution — captured at submission time.
+  ipAddress   String?
+  userAgent   String?
+  referrer    String?
+  utmSource   String?
+  utmMedium   String?
+  utmCampaign String?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  @@index([status])
+  @@index([email])
+  @@index([createdAt])
+  @@map("demo_requests")
+}
+
+enum DemoRequestStatus {
+  NEW
+  CONTACTED
+  SCHEDULED
+  COMPLETED
+  CANCELLED
+}
+
 // ─── Admin Dashboard ─────────────────────────────────────────────
 
 model AdminAccount {
