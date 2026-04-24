@@ -283,22 +283,21 @@ function PaidPlan(props: PlanCardProps & { kind: "mini" | "starter" | "pro" }) {
         }}
       />
 
-      {/* Badge — Most Popular / Best Value / Recommended.
-          All three cards now use the SAME top-right position for full
-          symmetry. Previously Starter's badge was centered on the card's
-          top border via a translate(-50%, -50%) trick — but because the
-          card has overflow:hidden (needed to clip the aurora shimmer),
-          the upper half of a "floating" badge got visually sliced off.
-          Keeping the badge fully inside the card fixes the clipping,
-          matches MINI/PRO positioning exactly, and leaves Starter's
-          "featured" emphasis to the stronger glow + faster shimmer +
-          larger price + distinct green theme. */}
+      {/* Badge — Best Value / Most Popular / Recommended.
+          Horizontally centered on every card's top band for full
+          symmetry and a deliberate, balanced look. Positioned INSIDE
+          the card (top:14) so overflow:hidden (needed for aurora
+          shimmer clipping) doesn't slice the badge. The outer div
+          owns positioning; the inner motion.div owns animation —
+          this prevents Framer's animate-to-y:0 transform from
+          stomping the `translate(-50%, 0)` centering. */}
       {props.badgeLabel && (
         <div
           style={{
             position: "absolute",
-            top: 16,
-            right: 16,
+            top: 14,
+            left: "50%",
+            transform: "translateX(-50%)",
             zIndex: 2,
           }}
         >
