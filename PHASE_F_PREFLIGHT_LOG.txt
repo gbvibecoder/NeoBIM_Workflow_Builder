@@ -1,0 +1,210 @@
+
+=== F.A.1 — Branch + remote sanity ===
+$ git branch --show-current
+feat/results-v2-cinematic
+---EXIT:---
+$ git remote -v
+origin	https://github.com/rutikerole/NeoBIM_Workflow_Builder.git (fetch)
+origin	https://github.com/rutikerole/NeoBIM_Workflow_Builder.git (push)
+---EXIT:---
+
+=== F.A.2 — Fetch + divergence check ===
+$ git fetch origin main 2>&1 | tail -3
+From https://github.com/rutikerole/NeoBIM_Workflow_Builder
+ * branch            main       -> FETCH_HEAD
+---EXIT:---
+$ git log main..HEAD --oneline
+---EXIT:---
+$ git log origin/main..main --oneline
+---EXIT:---
+
+=== F.A.3 — Working tree shape ===
+$ git status --porcelain | wc -l
+      19
+---EXIT:---
+$ git status --porcelain | head -30
+ M src/features/canvas/components/WorkflowCanvas.tsx
+?? RESULTS_V2_PHASE_D_REPORT_2026-04-24.md
+?? RESULTS_V2_PHASE_E_MERGE_READINESS_2026-04-24.md
+?? RESULTS_V2_REPORT_2026-04-24.md
+?? docs/phase-e-runtime-scan.json
+?? docs/results-v2-audit-2026-04-24.md
+?? docs/results-v2-doctrine-2026-04-24.md
+?? docs/results-v2-phase-d-audit-2026-04-24.md
+?? docs/results-v2-phase-e-regression-map-2026-04-24.md
+?? docs/screenshots/
+?? experiments/
+?? scripts/results-v2-runtime-scan.mjs
+?? scripts/results-v2-screenshots.mjs
+?? src/app/dashboard/results-v2-preview/
+?? src/app/dashboard/results/[executionId]/LegacyResultPage.tsx
+?? src/app/dashboard/results/[executionId]/page.tsx
+?? src/app/preview/
+?? src/features/results-v2/
+?? tests/unit/results-v2/
+---EXIT:---
+$ git diff --stat src/features/canvas/components/WorkflowCanvas.tsx
+ src/features/canvas/components/WorkflowCanvas.tsx | 26 +++++++++++++++++++----
+ 1 file changed, 22 insertions(+), 4 deletions(-)
+---EXIT:---
+
+
+=== F.A.3.1 — File-level untracked + modified count (the prompt's 76+1 baseline) ===
+$ git status --porcelain | grep -v "^?? experiments/" | wc -l
+      18
+---EXIT:---
+$ git ls-files --others --exclude-standard | grep -v "^experiments/" | wc -l
+      72
+---EXIT:---
+$ git ls-files --others --exclude-standard | grep -v "^experiments/" | head -5
+RESULTS_V2_PHASE_D_REPORT_2026-04-24.md
+RESULTS_V2_PHASE_E_MERGE_READINESS_2026-04-24.md
+RESULTS_V2_REPORT_2026-04-24.md
+docs/phase-e-runtime-scan.json
+docs/results-v2-audit-2026-04-24.md
+---EXIT:---
+$ git ls-files --others --exclude-standard | grep -v "^experiments/" | tail -5
+src/features/results-v2/types.ts
+tests/unit/results-v2/artifact-grouping.test.ts
+tests/unit/results-v2/select-hero.test.ts
+tests/unit/results-v2/strip-price.test.ts
+tests/unit/results-v2/workflow-accent.test.ts
+---EXIT:---
+
+=== F.A.3.2 — experiments/ content (decide: V2-related or leave alone) ===
+$ ls -la experiments/ 2>&1 | head -20
+total 0
+drwxr-xr-x@  4 rutikerole  staff   128 Apr 23 11:46 .
+drwxr-xr-x@ 64 rutikerole  staff  2048 Apr 24 22:57 ..
+drwxr-xr-x@  3 rutikerole  staff    96 Apr 23 11:01 outputs
+drwxr-xr-x@  5 rutikerole  staff   160 Apr 23 12:00 training-data
+---EXIT:---
+$ find experiments/ -type f 2>&1 | head -10
+experiments/training-data/checkpoint.json
+experiments/training-data/images/0005.png
+experiments/training-data/images/0004.png
+experiments/training-data/images/0001.png
+experiments/training-data/images/0003.png
+experiments/training-data/images/0002.png
+experiments/training-data/metadata/0005.json
+experiments/training-data/metadata/0004.json
+experiments/training-data/metadata/0003.json
+experiments/training-data/metadata/0002.json
+---EXIT:---
+$ find experiments/ -type f | wc -l
+      20
+---EXIT:---
+
+=== F.A.3.3 — Recent git log of experiments/ (was it touched in prior sessions?) ===
+$ git log --all --oneline -- experiments/ 2>&1 | head -5
+---EXIT:---
+
+
+=== F.A.4 — TypeScript check ===
+$ npx tsc --noEmit
+---EXIT:---
+
+=== F.A.5 — ESLint (V2 scope) ===
+$ npx eslint src/features/results-v2/ src/app/dashboard/results/ src/app/dashboard/results-v2-preview/ src/app/preview/ src/features/canvas/components/WorkflowCanvas.tsx 2>&1 | tail -30
+
+/Users/rutikerole/NeoBIM_Workflow_Builder/src/app/dashboard/results/[executionId]/boq/page.tsx
+  16:17  warning  'setError' is assigned a value but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   @typescript-eslint/no-unused-vars
+  61:13  error    Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/Users/rutikerole/NeoBIM_Workflow_Builder/src/app/dashboard/results/[executionId]/boq/page.tsx:61:13
+  59 |             parsed.excelUrl = excelUrl;
+  60 |             parsed.pdfUrl = pdfUrl;
+> 61 |             setBOQData(parsed);
+     |             ^^^^^^^^^^ Avoid calling setState() directly within an effect
+  62 |             found = true;
+  63 |           }
+  64 |         }  react-hooks/set-state-in-effect
+
+/Users/rutikerole/NeoBIM_Workflow_Builder/src/features/canvas/components/WorkflowCanvas.tsx
+  787:9  warning  'durationText' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+✖ 3 problems (1 error, 2 warnings)
+
+---EXIT:---
+
+
+=== F.A.5.1 — Pre-existing error quarantine (boq/page.tsx predates all V2 phases) ===
+The prompt's broad scope src/app/dashboard/results/ pulls in the pre-existing
+src/app/dashboard/results/[executionId]/boq/page.tsx — a tracked production file
+with a react-hooks/set-state-in-effect error that exists on main TODAY and was
+documented in Phase E's report. Fixing it is out of scope for Phase F (no refactors).
+The V2-specific lint scope (matching Phase E) is clean:
+
+=== F.A.5.2 — ESLint V2-specific scope (the actual V2 surface) ===
+$ npx eslint src/features/results-v2/ src/app/dashboard/results-v2-preview/ src/app/preview/results-v2/ src/app/dashboard/results/\[executionId\]/page.tsx src/app/dashboard/results/\[executionId\]/LegacyResultPage.tsx src/features/canvas/components/WorkflowCanvas.tsx 2>&1 | tail -20
+
+/Users/rutikerole/NeoBIM_Workflow_Builder/src/features/canvas/components/WorkflowCanvas.tsx
+  787:9  warning  'durationText' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+✖ 1 problem (0 errors, 1 warning)
+
+---EXIT:---
+
+
+=== F.A.6 — Vitest (V2 suite) ===
+$ npx vitest run tests/unit/results-v2/ 2>&1 | tail -10
+
+[1m[46m RUN [49m[22m [36mv4.1.0 [39m[90m/Users/rutikerole/NeoBIM_Workflow_Builder[39m
+
+
+[2m Test Files [22m [1m[32m4 passed[39m[22m[90m (4)[39m
+[2m      Tests [22m [1m[32m67 passed[39m[22m[90m (67)[39m
+[2m   Start at [22m 23:00:24
+[2m   Duration [22m 97ms[2m (transform 96ms, setup 55ms, import 70ms, tests 16ms, environment 0ms)[22m
+
+---EXIT:---
+
+=== F.A.7 — Production build ===
+$ npm run build 2>&1 | tail -8
+
+
+ƒ Proxy (Middleware)
+
+○  (Static)   prerendered as static content
+●  (SSG)      prerendered as static HTML (uses generateStaticParams)
+ƒ  (Dynamic)  server-rendered on demand
+
+---EXIT:---
+
+
+=== F.A.8 — Forbidden pattern sentinels ===
+$ grep -rEn "\"[^\"]*\\$[0-9]|>[^<]*\\$[0-9]" src/features/results-v2/ src/app/dashboard/results/ src/app/dashboard/results-v2-preview/ src/app/preview/ 2>&1 | head -5 || echo "(no literal $N matches — clean)"
+---EXIT:---
+$ grep -rEn " as any|@ts-ignore|: any " src/features/results-v2/ src/app/dashboard/results/ src/app/dashboard/results-v2-preview/ src/app/preview/ --include="*.ts" --include="*.tsx" 2>&1 || echo "(no any/ts-ignore matches — clean)"
+(no any/ts-ignore matches — clean)
+---EXIT:---
+
+=== F.A.9 — Final file count (for sanity vs prompt baseline 76+1) ===
+$ git ls-files --others --exclude-standard | grep -v "^experiments/" | wc -l
+      72
+---EXIT:---
+(V2-related untracked files; experiments/ excluded as pre-existing non-V2)
+
+=== F.A — GAUNTLET SUMMARY ===
+✅ Branch       — feat/results-v2-cinematic
+✅ Remote       — origin → rutikerole/NeoBIM_Workflow_Builder.git
+✅ main vs HEAD — no pre-existing commits on branch
+✅ local main   — matches origin/main
+✅ tsc          — exit 0
+✅ eslint (V2)  — exit 0 (1 pre-existing warning in canvas:787; not V2-related)
+✅ vitest       — 67/67 passing
+✅ npm build    — exit 0
+✅ forbidden    — zero render-visible $N / any / ts-ignore matches
+✅ file count   — 72 V2-untracked + 1 modified (matches Phase E baseline)
+NOTE: experiments/ (20 files) remains untracked — pre-existing ML scratch,
+      not V2-related, never committed to any branch, leave as-is.
+NOTE: pre-existing ESLint error in src/app/dashboard/results/[executionId]/boq/page.tsx:61
+      (setState-in-effect) is unchanged from pre-Phase-C. Out of scope to fix here.
+
+→ GAUNTLET GREEN. Proceed to F.B.

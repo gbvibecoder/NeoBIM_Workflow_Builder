@@ -1,0 +1,287 @@
+{
+  "url": "http://localhost:3456/preview/results-v2",
+  "runAt": "2026-04-24T16:42:46.396Z",
+  "totalEvents": 33,
+  "fatalEvents": 0,
+  "noiseEvents": 33,
+  "byKind": {
+    "console.error": 19,
+    "requestfailed": 14
+  },
+  "events": [
+    {
+      "kind": "console.error",
+      "text": "Loading the script 'https://va.vercel-scripts.com/v1/script.debug.js' violates the following Content Security Policy directive: \"script-src 'self' 'unsafe-eval' 'unsafe-inline' https://js.stripe.com https://checkout.razorpay.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://connect.facebook.net https://www.googletagmanager.com https://www.google-analytics.com https://www.googleadservices.com https://googleads.g.doubleclick.net https://www.clarity.ms blob: data:\". Note that 'script-src-elem' was not explicitly set, so 'script-src' is used as a fallback. The action has been blocked.",
+      "location": {
+        "url": "webpack-internal:///(app-pages-browser)/./node_modules/@vercel/analytics/dist/react/index.mjs",
+        "lineNumber": 119,
+        "columnNumber": 0
+      },
+      "noise": true
+    },
+    {
+      "kind": "requestfailed",
+      "url": "https://va.vercel-scripts.com/v1/script.debug.js",
+      "failure": "csp",
+      "noise": true
+    },
+    {
+      "kind": "console.error",
+      "text": "Loading the script 'https://va.vercel-scripts.com/v1/speed-insights/script.debug.js' violates the following Content Security Policy directive: \"script-src 'self' 'unsafe-eval' 'unsafe-inline' https://js.stripe.com https://checkout.razorpay.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://connect.facebook.net https://www.googletagmanager.com https://www.google-analytics.com https://www.googleadservices.com https://googleads.g.doubleclick.net https://www.clarity.ms blob: data:\". Note that 'script-src-elem' was not explicitly set, so 'script-src' is used as a fallback. The action has been blocked.",
+      "location": {
+        "url": "webpack-internal:///(app-pages-browser)/./node_modules/@vercel/speed-insights/dist/next/index.mjs",
+        "lineNumber": 122,
+        "columnNumber": 0
+      },
+      "noise": true
+    },
+    {
+      "kind": "requestfailed",
+      "url": "https://va.vercel-scripts.com/v1/speed-insights/script.debug.js",
+      "failure": "csp",
+      "noise": true
+    },
+    {
+      "kind": "console.error",
+      "text": "Loading the image 'https://fastly.picsum.photos/id/258/1440/900.jpg?hmac=JThuqzWv90OcQsztlSQFERJj68web4JV9g24OpiwmEw' violates the following Content Security Policy directive: \"img-src 'self' blob: data: https://oaidalleapiprodscus.blob.core.windows.net https://picsum.photos https://images.unsplash.com https://lh3.googleusercontent.com https://*.vercel.app https://www.facebook.com https://www.google-analytics.com https://www.googletagmanager.com https://www.googleadservices.com https://googleads.g.doubleclick.net https://www.google.com https://www.google.co.in https://www.clarity.ms https://pub-27d9a7371b6d47ff94fee1a3228f1720.r2.dev https://i.ibb.co\". The action has been blocked.",
+      "location": {
+        "url": "http://localhost:3456/preview/results-v2",
+        "lineNumber": 0,
+        "columnNumber": 0
+      },
+      "noise": true
+    },
+    {
+      "kind": "requestfailed",
+      "url": "https://fastly.picsum.photos/id/258/1440/900.jpg?hmac=JThuqzWv90OcQsztlSQFERJj68web4JV9g24OpiwmEw",
+      "failure": "csp",
+      "noise": true
+    },
+    {
+      "kind": "console.error",
+      "text": "Failed to load resource: the server responded with a status of 403 ()",
+      "location": {
+        "url": "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4",
+        "lineNumber": 0,
+        "columnNumber": 0
+      },
+      "noise": true
+    },
+    {
+      "kind": "console.error",
+      "text": "Failed to load resource: the server responded with a status of 403 ()",
+      "location": {
+        "url": "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4",
+        "lineNumber": 0,
+        "columnNumber": 0
+      },
+      "noise": true
+    },
+    {
+      "kind": "console.error",
+      "text": "Connecting to 'https://pagead2.googlesyndication.com/ccm/collect?rcb=12&frm=0&en=page_view&dl=http%3A%2F%2Flocalhost%3A3456%2Fpreview%2Fresults-v2&scrsrc=www.googletagmanager.com&rnd=1204800473.1777048950&navt=n&npa=1&gtm=45be64m2v9249434746za200zd9249434746xec&gcs=G100&gcd=13p3p3p3p5l1&dma_cps=-&dma=0&tag_exp=0~115938465~115938469~117266401~118167059&apve=1&apvf=f&apvc=1&tids=AW-18089516768&tid=AW-18089516768&tft=1777048950185&tfd=1219' violates the following Content Security Policy directive: \"connect-src 'self' blob: data: https://api.openai.com https://api.stability.ai https://*.upstash.io https://api.stripe.com https://api.razorpay.com https://*.razorpay.com https://lumberjack.razorpay.com https://api.klingai.com https://*.klingai.com https://*.fal.ai https://fal.run https://www.facebook.com https://connect.facebook.net https://*.r2.cloudflarestorage.com https://www.google-analytics.com https://analytics.google.com https://*.google-analytics.com https://*.googletagmanager.com https://www.googleadservices.com https://googleads.g.doubleclick.net https://td.doubleclick.net https://stats.g.doubleclick.net https://www.clarity.ms https://*.clarity.ms https://pub-27d9a7371b6d47ff94fee1a3228f1720.r2.dev\". The action has been blocked.",
+      "location": {
+        "url": "https://www.googletagmanager.com/gtag/js?id=AW-18089516768",
+        "lineNumber": 147,
+        "columnNumber": 0
+      },
+      "noise": true
+    },
+    {
+      "kind": "console.error",
+      "text": "Fetch API cannot load https://pagead2.googlesyndication.com/ccm/collect?rcb=12&frm=0&en=page_view&dl=http%3A%2F%2Flocalhost%3A3456%2Fpreview%2Fresults-v2&scrsrc=www.googletagmanager.com&rnd=1204800473.1777048950&navt=n&npa=1&gtm=45be64m2v9249434746za200zd9249434746xec&gcs=G100&gcd=13p3p3p3p5l1&dma_cps=-&dma=0&tag_exp=0~115938465~115938469~117266401~118167059&apve=1&apvf=f&apvc=1&tids=AW-18089516768&tid=AW-18089516768&tft=1777048950185&tfd=1219. Refused to connect because it violates the document's Content Security Policy.",
+      "location": {
+        "url": "https://www.googletagmanager.com/gtag/js?id=AW-18089516768",
+        "lineNumber": 147,
+        "columnNumber": 0
+      },
+      "noise": true
+    },
+    {
+      "kind": "console.error",
+      "text": "Connecting to 'https://pagead2.googlesyndication.com/ccm/collect?rcb=3&frm=0&ae=g&en=page_view&dl=http%3A%2F%2Flocalhost%3A3456%2Fpreview%2Fresults-v2&scrsrc=www.googletagmanager.com&rnd=1204800473.1777048950&navt=n&npa=1&ep.ads_data_redaction=0&gtm=45He64m2v9249211078za200zd9249211078xea&gcs=G100&gcd=13p3p3p3p5l1&dma_cps=-&dma=0&tag_exp=0~115616986~115938465~115938469~117266401&apve=1&apvf=f&apvc=0&tft=1777048950186&tfd=1219' violates the following Content Security Policy directive: \"connect-src 'self' blob: data: https://api.openai.com https://api.stability.ai https://*.upstash.io https://api.stripe.com https://api.razorpay.com https://*.razorpay.com https://lumberjack.razorpay.com https://api.klingai.com https://*.klingai.com https://*.fal.ai https://fal.run https://www.facebook.com https://connect.facebook.net https://*.r2.cloudflarestorage.com https://www.google-analytics.com https://analytics.google.com https://*.google-analytics.com https://*.googletagmanager.com https://www.googleadservices.com https://googleads.g.doubleclick.net https://td.doubleclick.net https://stats.g.doubleclick.net https://www.clarity.ms https://*.clarity.ms https://pub-27d9a7371b6d47ff94fee1a3228f1720.r2.dev\". The action has been blocked.",
+      "location": {
+        "url": "https://www.googletagmanager.com/gtm.js?id=GTM-MD563HH5",
+        "lineNumber": 112,
+        "columnNumber": 0
+      },
+      "noise": true
+    },
+    {
+      "kind": "console.error",
+      "text": "Fetch API cannot load https://pagead2.googlesyndication.com/ccm/collect?rcb=3&frm=0&ae=g&en=page_view&dl=http%3A%2F%2Flocalhost%3A3456%2Fpreview%2Fresults-v2&scrsrc=www.googletagmanager.com&rnd=1204800473.1777048950&navt=n&npa=1&ep.ads_data_redaction=0&gtm=45He64m2v9249211078za200zd9249211078xea&gcs=G100&gcd=13p3p3p3p5l1&dma_cps=-&dma=0&tag_exp=0~115616986~115938465~115938469~117266401&apve=1&apvf=f&apvc=0&tft=1777048950186&tfd=1219. Refused to connect because it violates the document's Content Security Policy.",
+      "location": {
+        "url": "https://www.googletagmanager.com/gtm.js?id=GTM-MD563HH5",
+        "lineNumber": 112,
+        "columnNumber": 0
+      },
+      "noise": true
+    },
+    {
+      "kind": "console.error",
+      "text": "Loading the image 'https://pagead2.googlesyndication.com/ccm/collect?rcb=12&frm=0&en=page_view&dl=http%3A%2F%2Flocalhost%3A3456%2Fpreview%2Fresults-v2&scrsrc=www.googletagmanager.com&rnd=1204800473.1777048950&navt=n&npa=1&gtm=45be64m2v9249434746za200zd9249434746xec&gcs=G100&gcd=13p3p3p3p5l1&dma_cps=-&dma=0&tag_exp=0~115938465~115938469~117266401~118167059&apve=1&apvf=f&apvc=1&tids=AW-18089516768&tid=AW-18089516768&tft=1777048950185&tfd=1219' violates the following Content Security Policy directive: \"img-src 'self' blob: data: https://oaidalleapiprodscus.blob.core.windows.net https://picsum.photos https://images.unsplash.com https://lh3.googleusercontent.com https://*.vercel.app https://www.facebook.com https://www.google-analytics.com https://www.googletagmanager.com https://www.googleadservices.com https://googleads.g.doubleclick.net https://www.google.com https://www.google.co.in https://www.clarity.ms https://pub-27d9a7371b6d47ff94fee1a3228f1720.r2.dev https://i.ibb.co\". The action has been blocked.",
+      "location": {
+        "url": "http://localhost:3456/preview/results-v2",
+        "lineNumber": 0,
+        "columnNumber": 0
+      },
+      "noise": true
+    },
+    {
+      "kind": "requestfailed",
+      "url": "https://pagead2.googlesyndication.com/ccm/collect?rcb=12&frm=0&en=page_view&dl=http%3A%2F%2Flocalhost%3A3456%2Fpreview%2Fresults-v2&scrsrc=www.googletagmanager.com&rnd=1204800473.1777048950&navt=n&npa=1&gtm=45be64m2v9249434746za200zd9249434746xec&gcs=G100&gcd=13p3p3p3p5l1&dma_cps=-&dma=0&tag_exp=0~115938465~115938469~117266401~118167059&apve=1&apvf=f&apvc=1&tids=AW-18089516768&tid=AW-18089516768&tft=1777048950185&tfd=1219",
+      "failure": "csp",
+      "noise": true
+    },
+    {
+      "kind": "console.error",
+      "text": "Loading the image 'https://pagead2.googlesyndication.com/ccm/collect?rcb=3&frm=0&ae=g&en=page_view&dl=http%3A%2F%2Flocalhost%3A3456%2Fpreview%2Fresults-v2&scrsrc=www.googletagmanager.com&rnd=1204800473.1777048950&navt=n&npa=1&ep.ads_data_redaction=0&gtm=45He64m2v9249211078za200zd9249211078xea&gcs=G100&gcd=13p3p3p3p5l1&dma_cps=-&dma=0&tag_exp=0~115616986~115938465~115938469~117266401&apve=1&apvf=f&apvc=0&tft=1777048950186&tfd=1219' violates the following Content Security Policy directive: \"img-src 'self' blob: data: https://oaidalleapiprodscus.blob.core.windows.net https://picsum.photos https://images.unsplash.com https://lh3.googleusercontent.com https://*.vercel.app https://www.facebook.com https://www.google-analytics.com https://www.googletagmanager.com https://www.googleadservices.com https://googleads.g.doubleclick.net https://www.google.com https://www.google.co.in https://www.clarity.ms https://pub-27d9a7371b6d47ff94fee1a3228f1720.r2.dev https://i.ibb.co\". The action has been blocked.",
+      "location": {
+        "url": "http://localhost:3456/preview/results-v2",
+        "lineNumber": 0,
+        "columnNumber": 0
+      },
+      "noise": true
+    },
+    {
+      "kind": "requestfailed",
+      "url": "https://pagead2.googlesyndication.com/ccm/collect?rcb=3&frm=0&ae=g&en=page_view&dl=http%3A%2F%2Flocalhost%3A3456%2Fpreview%2Fresults-v2&scrsrc=www.googletagmanager.com&rnd=1204800473.1777048950&navt=n&npa=1&ep.ads_data_redaction=0&gtm=45He64m2v9249211078za200zd9249211078xea&gcs=G100&gcd=13p3p3p3p5l1&dma_cps=-&dma=0&tag_exp=0~115616986~115938465~115938469~117266401&apve=1&apvf=f&apvc=0&tft=1777048950186&tfd=1219",
+      "failure": "csp",
+      "noise": true
+    },
+    {
+      "kind": "console.error",
+      "text": "Failed to load resource: the server responded with a status of 403 ()",
+      "location": {
+        "url": "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4",
+        "lineNumber": 0,
+        "columnNumber": 0
+      },
+      "noise": true
+    },
+    {
+      "kind": "requestfailed",
+      "url": "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4",
+      "failure": "net::ERR_ABORTED",
+      "noise": true
+    },
+    {
+      "kind": "console.error",
+      "text": "Failed to load resource: the server responded with a status of 403 ()",
+      "location": {
+        "url": "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4",
+        "lineNumber": 0,
+        "columnNumber": 0
+      },
+      "noise": true
+    },
+    {
+      "kind": "console.error",
+      "text": "Loading the image 'https://fastly.picsum.photos/id/972/1440/900.jpg?hmac=qZJJzTiwlK4CWyX37UhAFxZW0CzzACXFmcGVS60JXG4' violates the following Content Security Policy directive: \"img-src 'self' blob: data: https://oaidalleapiprodscus.blob.core.windows.net https://picsum.photos https://images.unsplash.com https://lh3.googleusercontent.com https://*.vercel.app https://www.facebook.com https://www.google-analytics.com https://www.googletagmanager.com https://www.googleadservices.com https://googleads.g.doubleclick.net https://www.google.com https://www.google.co.in https://www.clarity.ms https://pub-27d9a7371b6d47ff94fee1a3228f1720.r2.dev https://i.ibb.co\". The action has been blocked.",
+      "location": {
+        "url": "http://localhost:3456/preview/results-v2",
+        "lineNumber": 0,
+        "columnNumber": 0
+      },
+      "noise": true
+    },
+    {
+      "kind": "requestfailed",
+      "url": "https://fastly.picsum.photos/id/972/1440/900.jpg?hmac=qZJJzTiwlK4CWyX37UhAFxZW0CzzACXFmcGVS60JXG4",
+      "failure": "csp",
+      "noise": true
+    },
+    {
+      "kind": "console.error",
+      "text": "Loading the image 'https://fastly.picsum.photos/id/85/1440/900.jpg?hmac=j2A7G4zzhPYen8j5mcklkM1oqtMLGPBWtmNSkd0cySg' violates the following Content Security Policy directive: \"img-src 'self' blob: data: https://oaidalleapiprodscus.blob.core.windows.net https://picsum.photos https://images.unsplash.com https://lh3.googleusercontent.com https://*.vercel.app https://www.facebook.com https://www.google-analytics.com https://www.googletagmanager.com https://www.googleadservices.com https://googleads.g.doubleclick.net https://www.google.com https://www.google.co.in https://www.clarity.ms https://pub-27d9a7371b6d47ff94fee1a3228f1720.r2.dev https://i.ibb.co\". The action has been blocked.",
+      "location": {
+        "url": "http://localhost:3456/preview/results-v2",
+        "lineNumber": 0,
+        "columnNumber": 0
+      },
+      "noise": true
+    },
+    {
+      "kind": "requestfailed",
+      "url": "https://fastly.picsum.photos/id/85/1440/900.jpg?hmac=j2A7G4zzhPYen8j5mcklkM1oqtMLGPBWtmNSkd0cySg",
+      "failure": "csp",
+      "noise": true
+    },
+    {
+      "kind": "console.error",
+      "text": "Loading the image 'https://fastly.picsum.photos/id/258/1440/900.jpg?hmac=JThuqzWv90OcQsztlSQFERJj68web4JV9g24OpiwmEw' violates the following Content Security Policy directive: \"img-src 'self' blob: data: https://oaidalleapiprodscus.blob.core.windows.net https://picsum.photos https://images.unsplash.com https://lh3.googleusercontent.com https://*.vercel.app https://www.facebook.com https://www.google-analytics.com https://www.googletagmanager.com https://www.googleadservices.com https://googleads.g.doubleclick.net https://www.google.com https://www.google.co.in https://www.clarity.ms https://pub-27d9a7371b6d47ff94fee1a3228f1720.r2.dev https://i.ibb.co\". The action has been blocked.",
+      "location": {
+        "url": "http://localhost:3456/preview/results-v2",
+        "lineNumber": 0,
+        "columnNumber": 0
+      },
+      "noise": true
+    },
+    {
+      "kind": "requestfailed",
+      "url": "https://fastly.picsum.photos/id/258/1440/900.jpg?hmac=JThuqzWv90OcQsztlSQFERJj68web4JV9g24OpiwmEw",
+      "failure": "csp",
+      "noise": true
+    },
+    {
+      "kind": "console.error",
+      "text": "Loading the image 'https://fastly.picsum.photos/id/258/1440/900.jpg?hmac=JThuqzWv90OcQsztlSQFERJj68web4JV9g24OpiwmEw' violates the following Content Security Policy directive: \"img-src 'self' blob: data: https://oaidalleapiprodscus.blob.core.windows.net https://picsum.photos https://images.unsplash.com https://lh3.googleusercontent.com https://*.vercel.app https://www.facebook.com https://www.google-analytics.com https://www.googletagmanager.com https://www.googleadservices.com https://googleads.g.doubleclick.net https://www.google.com https://www.google.co.in https://www.clarity.ms https://pub-27d9a7371b6d47ff94fee1a3228f1720.r2.dev https://i.ibb.co\". The action has been blocked.",
+      "location": {
+        "url": "http://localhost:3456/preview/results-v2",
+        "lineNumber": 0,
+        "columnNumber": 0
+      },
+      "noise": true
+    },
+    {
+      "kind": "requestfailed",
+      "url": "https://fastly.picsum.photos/id/258/1440/900.jpg?hmac=JThuqzWv90OcQsztlSQFERJj68web4JV9g24OpiwmEw",
+      "failure": "csp",
+      "noise": true
+    },
+    {
+      "kind": "console.error",
+      "text": "Loading the image 'https://fastly.picsum.photos/id/258/1440/900.jpg?hmac=JThuqzWv90OcQsztlSQFERJj68web4JV9g24OpiwmEw' violates the following Content Security Policy directive: \"img-src 'self' blob: data: https://oaidalleapiprodscus.blob.core.windows.net https://picsum.photos https://images.unsplash.com https://lh3.googleusercontent.com https://*.vercel.app https://www.facebook.com https://www.google-analytics.com https://www.googletagmanager.com https://www.googleadservices.com https://googleads.g.doubleclick.net https://www.google.com https://www.google.co.in https://www.clarity.ms https://pub-27d9a7371b6d47ff94fee1a3228f1720.r2.dev https://i.ibb.co\". The action has been blocked.",
+      "location": {
+        "url": "http://localhost:3456/preview/results-v2",
+        "lineNumber": 0,
+        "columnNumber": 0
+      },
+      "noise": true
+    },
+    {
+      "kind": "requestfailed",
+      "url": "https://fastly.picsum.photos/id/258/1440/900.jpg?hmac=JThuqzWv90OcQsztlSQFERJj68web4JV9g24OpiwmEw",
+      "failure": "csp",
+      "noise": true
+    },
+    {
+      "kind": "console.error",
+      "text": "Loading the image 'https://fastly.picsum.photos/id/972/1440/900.jpg?hmac=qZJJzTiwlK4CWyX37UhAFxZW0CzzACXFmcGVS60JXG4' violates the following Content Security Policy directive: \"img-src 'self' blob: data: https://oaidalleapiprodscus.blob.core.windows.net https://picsum.photos https://images.unsplash.com https://lh3.googleusercontent.com https://*.vercel.app https://www.facebook.com https://www.google-analytics.com https://www.googletagmanager.com https://www.googleadservices.com https://googleads.g.doubleclick.net https://www.google.com https://www.google.co.in https://www.clarity.ms https://pub-27d9a7371b6d47ff94fee1a3228f1720.r2.dev https://i.ibb.co\". The action has been blocked.",
+      "location": {
+        "url": "http://localhost:3456/preview/results-v2",
+        "lineNumber": 0,
+        "columnNumber": 0
+      },
+      "noise": true
+    },
+    {
+      "kind": "requestfailed",
+      "url": "https://fastly.picsum.photos/id/972/1440/900.jpg?hmac=qZJJzTiwlK4CWyX37UhAFxZW0CzzACXFmcGVS60JXG4",
+      "failure": "csp",
+      "noise": true
+    },
+    {
+      "kind": "requestfailed",
+      "url": "https://picsum.photos/seed/bf-interior-1/1440/900",
+      "failure": "net::ERR_ABORTED",
+      "noise": true
+    },
+    {
+      "kind": "requestfailed",
+      "url": "https://fastly.picsum.photos/id/258/1440/900.jpg?hmac=JThuqzWv90OcQsztlSQFERJj68web4JV9g24OpiwmEw",
+      "failure": "net::ERR_ABORTED",
+      "noise": true
+    }
+  ]
+}
