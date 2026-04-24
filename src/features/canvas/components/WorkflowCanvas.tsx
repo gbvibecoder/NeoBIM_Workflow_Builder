@@ -409,6 +409,11 @@ function WorkflowCanvasInner({ workflowId: urlWorkflowId, templateId, forceNew =
   const [showLog, setShowLog] = useState(false);
   const [showShowcase, setShowShowcase] = useState(false);
   const prevExecutingRef = useRef(false);
+  // Tracks the pre-run async waterfall (eligibility check + auto-save) that
+  // runs BEFORE runWorkflow() reaches startExecution() and flips isExecuting.
+  // Without this, the Run button stays visually "Run" for 2–5 seconds and
+  // users click it multiple times thinking nothing happened.
+  const [isStartingRun, setIsStartingRun] = useState(false);
 
   const addLogEntry = useCallback((entry: LogEntry) => {
     setLogEntries(prev => [...prev.slice(-199), entry]);
@@ -643,6 +648,12 @@ function WorkflowCanvasInner({ workflowId: urlWorkflowId, templateId, forceNew =
   }, []);
 
   const handleRun  = useCallback(async () => {
+    // Re-entry guard — covers rapid double-clicks, Enter-key spamming, and the
+    // cmd+Enter shortcut firing while the async pre-run waterfall is already
+    // in flight. Without this, clicks 2/3/4 each fire their own eligibility
+    // pre-check + save cycle.
+    if (isStartingRun || isExecuting) return;
+
     // #1: Validate that input nodes have content before running
     const inputNodes = nodes.filter((n) => {
       const data = n.data as Record<string, unknown>;
@@ -667,48 +678,69 @@ function WorkflowCanvasInner({ workflowId: urlWorkflowId, templateId, forceNew =
       return;
     }
 
-    // #2: Pre-execution eligibility check (show popup BEFORE execution, never errors in log)
-    if (!isDemoMode) {
-      try {
-        const catalogueIds = nodes.map((n) => (n.data as Record<string, unknown>).catalogueId as string).filter(Boolean);
-        const eligRes = await fetch("/api/check-execution-eligibility", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ catalogueIds }),
-        });
-        if (eligRes.ok) {
-          const eligibility = await eligRes.json();
-          if (!eligibility.canExecute && eligibility.blocks?.length > 0) {
-            // Show the first blocking reason as a popup
-            const block = eligibility.blocks[0];
-            setRateLimitHit({
-              title: block.title,
-              message: block.message,
-              action: block.action,
-              actionUrl: block.actionUrl,
-            });
-            return;
-          }
-        }
-      } catch {
-        // Pre-check failed — don't block execution, let backend handle it
-      }
-    }
+    // ── Flip pre-run flag IMMEDIATELY so the button disables in the same
+    // React tick as the click event. Without this, the button remains
+    // visually "Run" for 2–5s while the eligibility check + auto-save
+    // awaits resolve, and users click it multiple times. `startExecution`
+    // inside runWorkflow (which flips isExecuting=true) happens AFTER
+    // those awaits, too late for immediate feedback.
+    setIsStartingRun(true);
+    try {
+      // #2 + #3 PARALLELIZED: eligibility pre-check + auto-save run concurrently
+      // since neither depends on the other. Pre-fix, these two were sequential
+      // and each took 0.5–2s → ~2–4s wait. With Promise.all they overlap so
+      // the pre-run window collapses to max(eligibility, save) ≈ 1–2s.
+      const catalogueIds = nodes
+        .map((n) => (n.data as Record<string, unknown>).catalogueId as string)
+        .filter(Boolean);
+      const wfId = currentWorkflow?.id;
+      const isPersisted = wfId && wfId.length >= 20 && wfId.startsWith("c");
 
-    // #3: Auto-save unsaved workflow before execution (so execution can persist to DB)
-    const wfId = currentWorkflow?.id;
-    const isPersisted = wfId && wfId.length >= 20 && wfId.startsWith("c");
-    if (!isPersisted && !isDemoMode) {
-      const savedId = await saveWorkflow();
+      const eligibilityCheck: Promise<{ canExecute: boolean; blocks?: Array<{ title: string; message: string; action?: string; actionUrl?: string }> } | null> = isDemoMode
+        ? Promise.resolve(null)
+        : fetch("/api/check-execution-eligibility", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ catalogueIds }),
+          })
+            .then((res) => (res.ok ? res.json() : null))
+            .catch(() => null); // pre-check failure falls through to backend enforcement
+
+      const saveWorkflowIfNeeded: Promise<string | null> =
+        !isPersisted && !isDemoMode ? saveWorkflow() : Promise.resolve(null);
+
+      const [eligibility, savedId] = await Promise.all([
+        eligibilityCheck,
+        saveWorkflowIfNeeded,
+      ]);
+
+      // Eligibility block takes priority — if blocked, abort before runWorkflow.
+      if (eligibility && !eligibility.canExecute && eligibility.blocks && eligibility.blocks.length > 0) {
+        const block = eligibility.blocks[0];
+        setRateLimitHit({
+          title: block.title,
+          message: block.message,
+          action: block.action,
+          actionUrl: block.actionUrl,
+        });
+        return;
+      }
+
       if (savedId) {
         toast.success(tLocale('toast.workflowSaved'), { duration: 2000 });
       }
-    }
 
-    executionStartRef.current = Date.now();
-    await runWorkflow();
-    executionStartRef.current = null;
-  }, [runWorkflow, nodes, tLocale, currentWorkflow?.id, isDemoMode, saveWorkflow, setRateLimitHit]);
+      executionStartRef.current = Date.now();
+      await runWorkflow();
+      executionStartRef.current = null;
+    } finally {
+      // Always clear — whether we completed, hit an eligibility block, or
+      // threw inside runWorkflow. By this point isExecuting has either
+      // taken over (Stop button visible) OR we've returned to idle (Run
+      // button should re-enable).
+      setIsStartingRun(false);
+    }
+  }, [runWorkflow, nodes, tLocale, currentWorkflow?.id, isDemoMode, saveWorkflow, setRateLimitHit, isStartingRun, isExecuting]);
   const handleSave = useCallback(async () => {
     if (isDemoMode) {
       toast.info(tLocale('toast.demoSaveHint'), { duration: 3000 });
@@ -779,6 +811,7 @@ function WorkflowCanvasInner({ workflowId: urlWorkflowId, templateId, forceNew =
             workflowName={workflowName}
             creationMode={creationMode}
             isExecuting={isExecuting}
+            isStartingRun={isStartingRun}
             isDirty={isDirty}
             isSaving={isSaving}
             isNodeLibraryOpen={isNodeLibraryOpen}
