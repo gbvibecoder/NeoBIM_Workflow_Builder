@@ -56,6 +56,10 @@ const recommendedSchema = z.object({
   // Rate limiting
   UPSTASH_REDIS_REST_URL: z.string().optional(),
   UPSTASH_REDIS_REST_TOKEN: z.string().optional(),
+  // QStash (background video jobs + existing VIP worker)
+  QSTASH_TOKEN: z.string().optional(),
+  QSTASH_CURRENT_SIGNING_KEY: z.string().optional(),
+  QSTASH_NEXT_SIGNING_KEY: z.string().optional(),
 });
 
 const optionalSchema = z.object({
@@ -67,6 +71,11 @@ const optionalSchema = z.object({
   META_CAPI_ACCESS_TOKEN: z.string().optional(),
   FAL_KEY: z.string().optional(),
   MESHY_API_KEY: z.string().optional(),
+  NEXT_PUBLIC_APP_URL: z.string().optional(),
+  /** Feature flag for background VideoJob pipeline (QStash worker + DB state).
+   *  "true" switches GN-009 to the new path; "false" (default) preserves the
+   *  legacy client-side polling behavior. */
+  VIDEO_BG_JOBS: z.enum(["true", "false"]).optional().default("false"),
 });
 
 // Razorpay env vars are validated by validateRazorpayEnv() (runs inside
@@ -135,6 +144,16 @@ const RECOMMENDED_FEATURES: readonly RecommendedFeatureCheck[] = [
     envVars: ["UPSTASH_REDIS_REST_URL", "UPSTASH_REDIS_REST_TOKEN"],
     whatBreaks:
       "Per-user rate limits cannot be enforced; in production this fails closed (rate limit checks block) — DO NOT deploy without Redis",
+  },
+  {
+    feature: "Background video jobs (VIP + Kling VideoJob worker)",
+    envVars: [
+      "QSTASH_TOKEN",
+      "QSTASH_CURRENT_SIGNING_KEY",
+      "QSTASH_NEXT_SIGNING_KEY",
+    ],
+    whatBreaks:
+      "VideoJob pipeline cannot enqueue workers; GN-009 silently keeps using legacy client polling. VIP background jobs also fail to schedule.",
   },
 ];
 

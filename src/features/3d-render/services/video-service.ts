@@ -16,24 +16,27 @@
  */
 
 import { generateId } from "@/lib/utils";
+import {
+  KLING_BASE_URL,
+  KLING_IMAGE2VIDEO_PATH,
+  KLING_TEXT2VIDEO_PATH,
+  KLING_OMNI_PATH,
+  COST_PER_SECOND,
+  MODELS,
+  VideoServiceError,
+  extractKlingVideoUrl,
+  klingFetch,
+  type KlingTaskResponse,
+} from "@/features/3d-render/services/kling-client";
 
-// ─── Configuration ──────────────────────────────────────────────────────────
-
-const KLING_BASE_URL = "https://api.klingai.com";
-const KLING_IMAGE2VIDEO_PATH = "/v1/videos/image2video";
-const KLING_OMNI_PATH = "/v1/videos/omni-video";
-const COST_PER_SECOND = 0.10;
+// ─── Local (legacy) constants ───────────────────────────────────────────────
+// REQUEST_TIMEOUT_MS + POLL_INTERVAL_MS are only consumed by the legacy
+// synchronous generateWalkthroughVideo path below — kept for back-compat.
 const REQUEST_TIMEOUT_MS = 600_000; // 10 minutes
 const POLL_INTERVAL_MS = 8_000;     // 8 seconds between status checks
-const JWT_EXPIRY_SECONDS = 1800;
 
-// Model names for /v1/videos/image2video — v2.x only (v3 uses the Omni endpoint).
-// Order matters: createTask tries each model in sequence and uses the first
-// one that succeeds. The "master" variant is the highest-quality tier inside
-// the v2.1 release line; we try it FIRST for the best output, with v2-6
-// as a graceful fallback if the user's Kling account doesn't have master
-// tier access (returns "model not available" → loop continues).
-const MODELS = ["kling-v2-1-master", "kling-v2-6"] as const;
+// Satisfy "used" analysis when the legacy path is tree-shaken.
+void KLING_BASE_URL;
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -58,175 +61,13 @@ export interface VideoResult {
   shotCount: number;
 }
 
-interface KlingTaskResponse {
-  code: number;
-  message: string;
-  request_id: string;
-  data: {
-    task_id: string;
-    task_status: string;           // "submitted" | "processing" | "succeed" | "failed"
-    task_status_msg?: string;
-    task_result?: {
-      videos?: Array<{
-        id: string;
-        url: string;
-        duration: string;
-      }>;
-      // Omni endpoint uses "works" instead of "videos"
-      works?: Array<{
-        resource?: {
-          resource?: string;  // video URL in Omni format
-          width?: number;
-          height?: number;
-          duration?: string;
-        };
-      }>;
-    };
-  };
-}
-
-// ─── Error Handling ─────────────────────────────────────────────────────────
-
-class VideoServiceError extends Error {
-  constructor(
-    message: string,
-    public statusCode: number,
-    public retryable: boolean
-  ) {
-    super(message);
-    this.name = "VideoServiceError";
-  }
-}
-
-// ─── JWT Token Generation ───────────────────────────────────────────────────
-
-function generateJwtToken(): string {
-  const accessKey = process.env.KLING_ACCESS_KEY;
-  const secretKey = process.env.KLING_SECRET_KEY;
-
-  if (!accessKey || !secretKey) {
-    throw new VideoServiceError(
-      "KLING_ACCESS_KEY and KLING_SECRET_KEY environment variables are required",
-      500,
-      false
-    );
-  }
-
-  const now = Math.floor(Date.now() / 1000);
-  const header = { alg: "HS256", typ: "JWT" };
-  const payload = {
-    iss: accessKey,
-    exp: now + JWT_EXPIRY_SECONDS,
-    nbf: now - 5,
-    iat: now,
-  };
-
-  const encodedHeader = base64UrlEncode(JSON.stringify(header));
-  const encodedPayload = base64UrlEncode(JSON.stringify(payload));
-  const signingInput = `${encodedHeader}.${encodedPayload}`;
-
-  const crypto = require("crypto");
-  const signature = crypto
-    .createHmac("sha256", secretKey)
-    .update(signingInput)
-    .digest("base64url");
-
-  return `${signingInput}.${signature}`;
-}
-
-function base64UrlEncode(str: string): string {
-  return Buffer.from(str)
-    .toString("base64")
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_")
-    .replace(/=+$/, "");
-}
-
-// ─── API Helpers ────────────────────────────────────────────────────────────
-
-const KLING_1303_RETRY_DELAY_MS = 30_000;
-const KLING_1303_MAX_RETRIES = 3;
-
-async function klingFetch(
-  path: string,
-  options: { method: string; body?: unknown }
-): Promise<KlingTaskResponse> {
-  for (let attempt = 0; attempt <= KLING_1303_MAX_RETRIES; attempt++) {
-    const token = generateJwtToken();
-    const url = `${KLING_BASE_URL}${path}`;
-
-    if (attempt === 0) {
-    }
-
-    const res = await fetch(url, {
-      method: options.method,
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: options.body ? JSON.stringify(options.body) : undefined,
-    });
-
-    if (!res.ok) {
-      let errorMessage = `Kling API HTTP ${res.status}`;
-      let errorCode: number | undefined;
-      try {
-        const errData = await res.json();
-        errorCode = errData?.code;
-        if (errData?.code === 1102) {
-          errorMessage = "Kling account balance is empty — please top up your Kling AI account at klingai.com to generate professional videos";
-        } else if (errData?.message) {
-          errorMessage = `Kling API error: ${errData.message} (code ${errData.code})`;
-        }
-      } catch {
-        const text = await res.text().catch(() => "Unknown error");
-        errorMessage = `Kling API HTTP ${res.status}: ${text.slice(0, 300)}`;
-      }
-
-      // Retry on 1303 (parallel task slot limit)
-      if (errorCode === 1303 && attempt < KLING_1303_MAX_RETRIES) {
-        console.warn(`[KLING] Rate limited (1303), waiting 30s before retry... (attempt ${attempt + 1}/${KLING_1303_MAX_RETRIES})`);
-        await new Promise(r => setTimeout(r, KLING_1303_RETRY_DELAY_MS));
-        continue;
-      }
-
-      console.error("[Video] Kling HTTP error", { status: res.status, path, errorMessage });
-      throw new VideoServiceError(errorMessage, res.status, res.status >= 500);
-    }
-
-    const data = (await res.json()) as KlingTaskResponse;
-
-    if (data.code !== 0) {
-      // Retry on 1303 (parallel task slot limit)
-      if (data.code === 1303 && attempt < KLING_1303_MAX_RETRIES) {
-        console.warn(`[KLING] Rate limited (1303), waiting 30s before retry... (attempt ${attempt + 1}/${KLING_1303_MAX_RETRIES})`);
-        await new Promise(r => setTimeout(r, KLING_1303_RETRY_DELAY_MS));
-        continue;
-      }
-
-      console.error("[Video] Kling API error", { code: data.code, message: data.message, requestId: data.request_id });
-      const msg = data.code === 1102
-        ? "Kling account balance is empty — please top up your Kling AI account at klingai.com"
-        : `Kling API error: ${data.message} (code ${data.code})`;
-      throw new VideoServiceError(msg, 400, false);
-    }
-
-    return data;
-  }
-
-  // Should not reach here, but satisfy TypeScript
-  throw new VideoServiceError("Kling API: max retries exceeded", 429, true);
-}
-
 /**
  * Poll a Kling task until it completes or fails.
  */
 async function pollTask(taskId: string): Promise<KlingTaskResponse> {
   const deadline = Date.now() + REQUEST_TIMEOUT_MS;
-  let attempt = 0;
 
   while (Date.now() < deadline) {
-    attempt++;
     const result = await klingFetch(
       `${KLING_IMAGE2VIDEO_PATH}/${taskId}`,
       { method: "GET" }
@@ -681,8 +522,6 @@ export function buildArchitecturalMultiShot(
 
 // ─── Text-to-Video (no image required) ──────────────────────────────────────
 
-const KLING_TEXT2VIDEO_PATH = "/v1/videos/text2video";
-
 /**
  * Create a Kling text-to-video task, trying model names in priority order.
  * Used when no upstream render image is available (e.g. PDF → summary → video).
@@ -785,8 +624,8 @@ export async function checkDualTextVideoStatus(
   const extStatus = extResult.data.task_status as VideoTaskStatus["exteriorStatus"];
   const intStatus = intResult.data.task_status as VideoTaskStatus["interiorStatus"];
 
-  const extUrl = extResult.data.task_result?.videos?.[0]?.url ?? null;
-  const intUrl = intResult.data.task_result?.videos?.[0]?.url ?? null;
+  const extUrl = extractKlingVideoUrl(extResult);
+  const intUrl = extractKlingVideoUrl(intResult);
 
   const statusToProgress = (s: string) =>
     s === "succeed" ? 100 : s === "processing" ? 50 : s === "submitted" ? 10 : 0;
@@ -1023,8 +862,11 @@ export async function submitFloorPlanWalkthrough(
   const isLocalhost = authUrl.includes("localhost") || authUrl.includes("127.0.0.1");
 
   if (isLocalhost) {
+    // Localhost branch actually uses v2.6 via image2video (Kling Omni can't
+    // reach localhost — it needs a public URL). Report `usedOmni: false`
+    // honestly so UI labels and metadata reflect reality.
     const result = await createTask(imageUrl, prompt, negativePrompt, "10", "16:9", mode);
-    return { taskId: result.data.task_id, submittedAt: Date.now(), usedOmni: true, durationSeconds: 10 };
+    return { taskId: result.data.task_id, submittedAt: Date.now(), usedOmni: false, durationSeconds: 10 };
   }
 
   // Production: always Kling 3.0 Omni — no fallback
@@ -1044,7 +886,10 @@ export async function checkSingleVideoStatus(taskId: string): Promise<{
   hasFailed: boolean;
   failureMessage: string | null;
 }> {
-  // Try Omni endpoint first, fall back to image2video — both return videos[].url
+  // Try Omni endpoint first, fall back to image2video. Response shape varies:
+  // image2video/text2video use videos[].url; some Kling 3.0 Omni responses
+  // use works[].resource.resource — extractKlingVideoUrl handles both (audit
+  // Issue #7 — previously Omni succeeds but videoUrl was null → silent timeout).
   let result: KlingTaskResponse;
   try {
     result = await klingFetch(`${KLING_OMNI_PATH}/${taskId}`, { method: "GET" });
@@ -1053,7 +898,7 @@ export async function checkSingleVideoStatus(taskId: string): Promise<{
   }
 
   const taskStatus = result.data.task_status as "submitted" | "processing" | "succeed" | "failed";
-  const videoUrl = result.data.task_result?.videos?.[0]?.url ?? null;
+  const videoUrl = extractKlingVideoUrl(result);
 
   const progress = taskStatus === "succeed" ? 100 : taskStatus === "processing" ? 50 : taskStatus === "submitted" ? 10 : 0;
   const hasFailed = taskStatus === "failed";
@@ -1095,8 +940,8 @@ export async function checkDualVideoStatus(
   const extStatus = extResult.data.task_status as VideoTaskStatus["exteriorStatus"];
   const intStatus = intResult.data.task_status as VideoTaskStatus["interiorStatus"];
 
-  const extUrl = extResult.data.task_result?.videos?.[0]?.url ?? null;
-  const intUrl = intResult.data.task_result?.videos?.[0]?.url ?? null;
+  const extUrl = extractKlingVideoUrl(extResult);
+  const intUrl = extractKlingVideoUrl(intResult);
 
   // Calculate progress: exterior = 33% weight (5s), interior = 67% weight (10s)
   const statusToProgress = (s: string) =>

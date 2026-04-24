@@ -47,8 +47,12 @@ export async function POST(req: NextRequest) {
     userRole === "PLATFORM_ADMIN" ||
     userRole === "TEAM_ADMIN";
 
-  // Parse body first so we can read executionId for verification + rate-limit deduplication
-  const { catalogueId, executionId, tileInstanceId, inputData, userApiKey } = await req.json();
+  // Parse body first so we can read executionId for verification + rate-limit deduplication.
+  // `executionId` is the CLIENT-generated correlation id; `dbExecutionId` is the real
+  // Execution.id (if the workflow was persisted). Both travel in the body because the
+  // legacy contract already carries `executionId` and many consumers assume it's the
+  // client one — we add dbExecutionId alongside instead of repurposing.
+  const { catalogueId, executionId, dbExecutionId, tileInstanceId, inputData, userApiKey } = await req.json();
 
   // ── Email verification + FREE tier lifetime gate ──────────────────────────
   //
@@ -267,11 +271,17 @@ export async function POST(req: NextRequest) {
   // Fail mode: open on Prisma errors. The regen cap is a soft-money-saver,
   // not a security boundary. A brief Neon outage allowing one extra regen
   // is better UX than blocking the user entirely on a transient DB hiccup.
-  if (!isAdmin && executionId && tileInstanceId && alreadyCounted) {
+  // Phase 2.5 fix: the original code gated + queried by `executionId`, which
+  // is the CLIENT-generated correlation id (see handler ctx plumbing, Phase 2
+  // §2 Q1). CUIDs never matched it → findFirst always returned null →
+  // `if (!exec) return false` fell through → regen cap was a server-side
+  // no-op in production. Using `dbExecutionId` (Phase 2 ctx-plumbed, the real
+  // Execution.id) enforces the cap as originally intended.
+  if (!isAdmin && dbExecutionId && tileInstanceId && alreadyCounted) {
     try {
       const overLimit = await prisma.$transaction(async (tx) => {
         const exec = await tx.execution.findFirst({
-          where: { id: executionId, userId },
+          where: { id: dbExecutionId, userId },
           select: { tileResults: true, metadata: true },
         });
         if (!exec) return false; // Demo / unsaved exec — no enforcement
@@ -294,7 +304,7 @@ export async function POST(req: NextRequest) {
         counts[tileInstanceId] = newCount;
         const updatedMetadata: ExecutionMetadata = { ...metadata, regenerationCounts: counts };
         await tx.execution.update({
-          where: { id: executionId },
+          where: { id: dbExecutionId },
           data: {
             // Double-cast through unknown — Prisma.InputJsonValue is recursive
             // and TypeScript can't simplify the ExecutionMetadata union to it.
@@ -360,6 +370,7 @@ export async function POST(req: NextRequest) {
       userEmail,
       isAdmin,
       apiKey,
+      dbExecutionId: typeof dbExecutionId === "string" && dbExecutionId.length >= 20 ? dbExecutionId : undefined,
     };
 
     const result = await handler(ctx);

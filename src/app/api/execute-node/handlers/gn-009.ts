@@ -10,6 +10,7 @@ import {
   buildFloorPlanCombinedPrompt,
 } from "./deps";
 import type { NodeHandler } from "./types";
+import { createVideoJobAndEnqueue } from "@/features/3d-render/services/video-job-service";
 
 /**
  * GN-009 — Video Walkthrough Generator (Kling Official API + Three.js fallback)
@@ -21,7 +22,15 @@ import type { NodeHandler } from "./types";
  *   3. Three.js client-side fallback (no Kling keys)
  */
 export const handleGN009: NodeHandler = async (ctx) => {
-  const { inputData, tileInstanceId, executionId, apiKey } = ctx;
+  const { inputData, tileInstanceId, executionId, apiKey, userId, dbExecutionId } = ctx;
+  /**
+   * Feature flag for the QStash-backed background VideoJob pipeline.
+   * When "true", each Kling submit branch below creates a VideoJob row +
+   * enqueues a worker instead of returning taskIds to the client.
+   * When anything else (including undefined), preserves the legacy behavior
+   * so rollback is instant by flipping the env var.
+   */
+  const useBackgroundJobs = process.env.VIDEO_BG_JOBS === "true";
   // ── Video Walkthrough Generator ────────────────────────────────────
   // Generates a cinematic walkthrough video. Supports three paths:
   // 1. Image-to-video via Kling API (when upstream GN-003 provides a render image)
@@ -331,6 +340,66 @@ export const handleGN009: NodeHandler = async (ctx) => {
 
         logger.debug("[GN-009] Floor plan task submitted! taskId:", submitted.taskId, "usedOmni:", submitted.usedOmni, "duration:", submitted.durationSeconds);
 
+        // ── New path: background VideoJob via QStash worker ────────────────
+        if (useBackgroundJobs) {
+          const videoJobId = await createVideoJobAndEnqueue({
+            userId,
+            executionId: executionId ?? "local",
+            dbExecutionId,
+            nodeId: tileInstanceId,
+            pipeline: "omni",
+            isRenovation: false,
+            isFloorPlan: true,
+            segments: [
+              {
+                kind: "single",
+                taskId: submitted.taskId,
+                durationSeconds: submitted.durationSeconds,
+              },
+            ],
+            buildingDescription: buildingDesc,
+          });
+          logger.debug("[GN-009] BG-JOBS floor-plan VideoJob created:", videoJobId);
+          logger.debug("========== GN-009 VIDEO WALKTHROUGH END ==========");
+          return {
+            id: generateId(),
+            executionId: executionId ?? "local",
+            tileInstanceId,
+            type: "video" as const,
+            data: {
+              name: `walkthrough_${generateId()}.mp4`,
+              videoUrl: "",
+              downloadUrl: "",
+              label: submitted.usedOmni
+                ? `Floor Plan → Kling 3.0 Walkthrough — ${submitted.durationSeconds}s (generating...)`
+                : `Floor Plan → Cinematic Walkthrough — ${submitted.durationSeconds}s (generating...)`,
+              content: `${submitted.durationSeconds}s AEC walkthrough: exterior + interior in one continuous shot — ${buildingDesc.slice(0, 100)}`,
+              durationSeconds: submitted.durationSeconds,
+              shotCount: 1,
+              pipeline: submitted.usedOmni
+                ? `floor plan → Kling 3.0 Omni (std, ${submitted.durationSeconds}s) → MP4`
+                : `floor plan → Kling v2.6 (pro, ${submitted.durationSeconds}s) → MP4`,
+              costUsd: submitted.durationSeconds * 0.10,
+              videoGenerationStatus: "queued" as const,
+              videoJobId,
+              generationProgress: 0,
+              isFloorPlanInput: true,
+              usedOmni: submitted.usedOmni,
+            },
+            metadata: {
+              engine: "kling-official",
+              real: true,
+              videoJobId,
+              submittedAt: submitted.submittedAt,
+              isFloorPlanInput: true,
+              usedOmni: submitted.usedOmni,
+              videoPipeline: "omni" as const,
+            },
+            createdAt: new Date(),
+          };
+        }
+
+        // ── Legacy path: client polls Kling directly via taskIds ───────────
         const fpArtifact = {
           id: generateId(),
           executionId: executionId ?? "local",
@@ -457,19 +526,75 @@ export const handleGN009: NodeHandler = async (ctx) => {
 
         logger.debug("[GN-009] Dual tasks submitted! exterior:", submitted.exteriorTaskId, "interior:", submitted.interiorTaskId);
 
-        const renovationDuration = 20; // 10s exterior + 10s interior
-        const standardDuration = 15; // 5s exterior + 10s interior
-        const totalDuration = isRenovationInput ? renovationDuration : standardDuration;
+        const exteriorDuration = isRenovationInput ? 10 : 5;
+        const interiorDuration = 10;
+        const totalDuration = exteriorDuration + interiorDuration;
         const videoLabel = isRenovationInput
           ? `Building Renovation Walkthrough — ${totalDuration}s (generating...)`
           : `AEC Cinematic Walkthrough — ${totalDuration}s (generating...)`;
         const videoContent = isRenovationInput
-          ? `${totalDuration}s renovation walkthrough: 10s exterior sweep + 10s renovated interior — ${buildingDesc.slice(0, 100)}`
-          : `${totalDuration}s AEC walkthrough: 5s exterior + 10s interior — ${buildingDesc.slice(0, 100)}`;
+          ? `${totalDuration}s renovation walkthrough: ${exteriorDuration}s exterior sweep + ${interiorDuration}s renovated interior — ${buildingDesc.slice(0, 100)}`
+          : `${totalDuration}s AEC walkthrough: ${exteriorDuration}s exterior + ${interiorDuration}s interior — ${buildingDesc.slice(0, 100)}`;
         const videoPipelineLabel = isRenovationInput
           ? "building photo → gpt-image-1 renovation render → Kling Official API (pro, image2video) → 2x MP4 video"
           : "concept render → Kling Official API (pro, image2video) → 2x MP4 video";
 
+        // ── New path: background VideoJob via QStash worker ────────────────
+        if (useBackgroundJobs) {
+          const videoJobId = await createVideoJobAndEnqueue({
+            userId,
+            executionId: executionId ?? "local",
+            dbExecutionId,
+            nodeId: tileInstanceId,
+            pipeline: "image2video",
+            isRenovation: isRenovationInput,
+            isFloorPlan: false,
+            segments: [
+              { kind: "exterior", taskId: submitted.exteriorTaskId, durationSeconds: exteriorDuration },
+              { kind: "interior", taskId: submitted.interiorTaskId, durationSeconds: interiorDuration },
+            ],
+            buildingDescription: buildingDesc,
+          });
+          logger.debug("[GN-009] BG-JOBS dual-image2video VideoJob created:", videoJobId);
+          logger.debug("========== GN-009 VIDEO WALKTHROUGH END ==========");
+          return {
+            id: generateId(),
+            executionId: executionId ?? "local",
+            tileInstanceId,
+            type: "video" as const,
+            data: {
+              name: `walkthrough_${generateId()}.mp4`,
+              videoUrl: "",
+              downloadUrl: "",
+              label: videoLabel,
+              content: videoContent,
+              durationSeconds: totalDuration,
+              shotCount: 2,
+              pipeline: videoPipelineLabel,
+              costUsd: isRenovationInput ? 2.04 : 1.50,
+              segments: [],
+              videoGenerationStatus: "queued" as const,
+              videoJobId,
+              videoPipeline: "image2video" as const,
+              generationProgress: 0,
+              isFloorPlanInput: false,
+              isRenovation: isRenovationInput,
+              ...(renovationRenderUrl && { renovationRenderUrl }),
+            },
+            metadata: {
+              engine: "kling-official",
+              real: true,
+              videoJobId,
+              videoPipeline: "image2video" as const,
+              submittedAt: submitted.submittedAt,
+              isFloorPlanInput: false,
+              isRenovation: isRenovationInput,
+            },
+            createdAt: new Date(),
+          };
+        }
+
+        // ── Legacy path: client polls Kling directly via taskIds ───────────
         const dualArtifact = {
           id: generateId(),
           executionId: executionId ?? "local",
@@ -541,6 +666,65 @@ export const handleGN009: NodeHandler = async (ctx) => {
       "pro",
     );
 
+    // Fix audit Issue #18: distinguish text-prompt flow from PDF-brief flow.
+    const hasPdfSource = originalPdfText != null;
+    const textLabel = hasPdfSource
+      ? "AEC Cinematic Walkthrough — 15s (generating from PDF summary...)"
+      : "AEC Cinematic Walkthrough — 15s (generating from text prompt...)";
+    const textPipelineLabel = hasPdfSource
+      ? "PDF summary → Kling Official API (pro, text2video) → 2x MP4 video"
+      : "Text prompt → Kling Official API (pro, text2video) → 2x MP4 video";
+
+    // ── New path: background VideoJob via QStash worker ──────────────────
+    if (useBackgroundJobs) {
+      const videoJobId = await createVideoJobAndEnqueue({
+        userId,
+        executionId: executionId ?? "local",
+        dbExecutionId,
+        nodeId: tileInstanceId,
+        pipeline: "text2video",
+        isRenovation: false,
+        isFloorPlan: false,
+        segments: [
+          { kind: "exterior", taskId: submitted.exteriorTaskId, durationSeconds: 5 },
+          { kind: "interior", taskId: submitted.interiorTaskId, durationSeconds: 10 },
+        ],
+        buildingDescription: buildingDesc,
+      });
+      logger.debug("[GN-009] BG-JOBS text2video VideoJob created:", videoJobId);
+      return {
+        id: generateId(),
+        executionId: executionId ?? "local",
+        tileInstanceId,
+        type: "video" as const,
+        data: {
+          name: `walkthrough_${generateId()}.mp4`,
+          videoUrl: "",
+          downloadUrl: "",
+          label: textLabel,
+          content: `15s ultra-realistic walkthrough: 5s exterior orbit + 10s interior flythrough — ${buildingDesc.slice(0, 100)}`,
+          durationSeconds: 15,
+          shotCount: 2,
+          pipeline: textPipelineLabel,
+          costUsd: 1.50,
+          segments: [],
+          videoGenerationStatus: "queued" as const,
+          videoJobId,
+          videoPipeline: "text2video" as const,
+          generationProgress: 0,
+        },
+        metadata: {
+          engine: "kling-official",
+          real: true,
+          videoJobId,
+          videoPipeline: "text2video" as const,
+          submittedAt: submitted.submittedAt,
+        },
+        createdAt: new Date(),
+      };
+    }
+
+    // ── Legacy path: client polls Kling directly via taskIds ─────────────
     return {
       id: generateId(),
       executionId: executionId ?? "local",
@@ -550,11 +734,11 @@ export const handleGN009: NodeHandler = async (ctx) => {
         name: `walkthrough_${generateId()}.mp4`,
         videoUrl: "",
         downloadUrl: "",
-        label: "AEC Cinematic Walkthrough — 15s (generating from PDF summary...)",
+        label: textLabel,
         content: `15s ultra-realistic walkthrough: 5s exterior orbit + 10s interior flythrough — ${buildingDesc.slice(0, 100)}`,
         durationSeconds: 15,
         shotCount: 2,
-        pipeline: "PDF summary → Kling Official API (pro, text2video) → 2x MP4 video",
+        pipeline: textPipelineLabel,
         costUsd: 1.50,
         segments: [],
         videoGenerationStatus: "processing",

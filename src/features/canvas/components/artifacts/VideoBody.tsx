@@ -6,6 +6,8 @@ import { useUIStore } from "@/shared/stores/ui-store";
 import { useExecutionStore } from "@/features/execution/stores/execution-store";
 import { useLocale } from "@/hooks/useLocale";
 import type { VideoArtifactData, VideoSegment } from "@/types/execution";
+import { useVideoJob } from "@/features/execution/hooks/useVideoJob";
+import { SegmentedVideoPlayer } from "@/features/canvas/components/artifacts/SegmentedVideoPlayer";
 
 interface VideoBodyProps {
   data: VideoArtifactData;
@@ -22,6 +24,13 @@ export function VideoBody({ data: rawData, nodeId }: VideoBodyProps) {
 
   // Check if video is still generating
   const artData = data as unknown as Record<string, unknown>;
+
+  // useVideoJob is called unconditionally here to respect Rules of Hooks —
+  // the actual branching on videoJobId happens AFTER all legacy hooks below
+  // have also run. The hook is a no-op when videoJobId is null.
+  const videoJobId = typeof artData?.videoJobId === "string" ? artData.videoJobId : null;
+  const { data: jobView } = useVideoJob(videoJobId);
+
   const isGenerating = artData?.videoGenerationStatus === "processing" ||
     artData?.videoGenerationStatus === "client-rendering" ||
     (videoGenProgress && (videoGenProgress.status === "processing" || videoGenProgress.status === "rendering"));
@@ -85,6 +94,39 @@ export function VideoBody({ data: rawData, nodeId }: VideoBodyProps) {
     setCurrentSegmentIndex(index);
     setIsPlaying(true);
   };
+
+  // ── New path (VIDEO_BG_JOBS): artifact carries videoJobId → defer all
+  // rendering to the segment-aware player driven by useVideoJob. Placed
+  // AFTER every legacy hook call above so Rules of Hooks stays intact.
+  if (videoJobId) {
+    if (!jobView) {
+      return (
+        <div style={{ padding: "0 12px 10px 14px" }}>
+          <div
+            style={{
+              padding: "18px 14px",
+              borderRadius: 8,
+              background: "rgba(0,245,255,0.05)",
+              border: "1px solid rgba(0,245,255,0.15)",
+              textAlign: "center",
+              fontSize: 11,
+              color: "#00F5FF",
+              fontFamily: "var(--font-jetbrains), monospace",
+            }}
+          >
+            <Loader2 size={16} style={{ animation: "spin 1.2s linear infinite", marginBottom: 6 }} />
+            <div>Loading job state…</div>
+            <style>{`@keyframes spin { from {transform:rotate(0deg)} to {transform:rotate(360deg)} }`}</style>
+          </div>
+        </div>
+      );
+    }
+    return (
+      <div style={{ padding: "0 12px 10px 14px" }}>
+        <SegmentedVideoPlayer view={jobView} heightPx={180} compact />
+      </div>
+    );
+  }
 
   // ── Generating State UI ──────────────────────────────────────────────
   if (isGenerating || (isFailed && !hasVideoUrl)) {
