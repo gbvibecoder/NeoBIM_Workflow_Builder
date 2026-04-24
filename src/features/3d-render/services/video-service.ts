@@ -723,7 +723,21 @@ export async function submitDualWalkthrough(
   imageUrl: string,
   buildingDescription: string,
   mode: "std" | "pro" = "pro",
-  options?: { isFloorPlan?: boolean; roomInfo?: string; isRenovation?: boolean },
+  options?: {
+    isFloorPlan?: boolean;
+    roomInfo?: string;
+    isRenovation?: boolean;
+    /**
+     * Phase 3 — separate reference image for the INTERIOR Kling task only.
+     * Kling image2video anchors on its input image; passing the exterior
+     * image to both tasks produces "exterior with interior-flavored camera
+     * motion" for the interior segment. When this field is set (typically
+     * a GPT-Image-1-generated eye-level interior render from the handler),
+     * the interior Kling task uses it instead of `imageUrl`. Exterior task
+     * is unaffected. Falls back to `imageUrl` when undefined.
+     */
+    interiorImageUrl?: string;
+  },
 ): Promise<SubmittedVideoTasks> {
 
   const negativePrompt = "zoom in, close-up, tight shot, cropped building, partial view, dolly forward, approach, moving closer, blur, distortion, low quality, warped geometry, melting walls, deformed architecture, shaky camera, noise, artifacts, morphing surfaces, bent lines, wobbly structure, jittery motion, flickering textures, plastic appearance, fisheye distortion, floating objects, wireframe, cartoon, sketch, low polygon, unrealistic proportions, text overlay, watermark, oversaturated colors, CGI look, video game graphics, toy model, miniature, tilt-shift, abstract, surreal, people walking, cars moving, birds flying, lens flare";
@@ -745,9 +759,18 @@ export async function submitDualWalkthrough(
   // Renovation exterior gets 10s (needs time to pan across full building)
   // Non-renovation keeps 5s exterior + 10s interior
   const exteriorDuration = options?.isRenovation ? "10" : "5";
+
+  // Phase 3 — interior Kling task takes a dedicated interior reference image
+  // when the caller provides one (typically a GPT-Image-1 eye-level render),
+  // falling back to the shared exterior image when absent (pre-Phase-3 behavior).
+  // Without a separate reference, Kling's image2video anchors on the exterior
+  // photo and produces exterior-looking content for the interior segment even
+  // with a strong interior prompt (documented in Phase 3 diagnostic plan).
+  const interiorSourceImage = options?.interiorImageUrl ?? imageUrl;
+
   const [exteriorResult, interiorResult] = await Promise.all([
-    createTask(imageUrl, exteriorPrompt, negativePrompt, exteriorDuration, "16:9", mode),
-    createTask(imageUrl, interiorPrompt, negativePrompt, "10", "16:9", mode),
+    createTask(imageUrl,             exteriorPrompt, negativePrompt, exteriorDuration, "16:9", mode),
+    createTask(interiorSourceImage,  interiorPrompt, negativePrompt, "10",             "16:9", mode),
   ]);
 
 
