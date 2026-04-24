@@ -189,14 +189,12 @@ function RegisterForm() {
         localStorage.setItem("pending_referral_code", referralCode);
       }
       trackCompleteRegistration({ content_name: "google_signup" });
-      // Fire sign_up_complete before Google redirect — no email available
-      // pre-OAuth, so Enhanced Conversions is skipped on the Google path
-      // (Google's own OAuth callback data covers that matching on the ad side).
-      pushToDataLayer("sign_up_complete", { method: "google" });
-      const signupAdsLabel = process.env.NEXT_PUBLIC_GOOGLE_ADS_SIGNUP_LABEL;
-      if (signupAdsLabel) {
-        trackAdsConversion(signupAdsLabel);
-      }
+      // Google Ads conversion + sign_up_complete dataLayer push are DEFERRED
+      // to /onboard, which fires only when events.createUser confirms a
+      // freshly created user. Firing here would count cancellations at the
+      // Google consent screen and returning-user sign-ins as new signups.
+      // See src/app/onboard/GoogleAdsSignupFire.tsx.
+      sessionStorage.setItem("pending_google_signup_conversion", "1");
       await signIn("google", { callbackUrl: "/onboard" });
     } catch (err) {
       setError(extractErrorMessage(err, t('auth.somethingWentWrong')));

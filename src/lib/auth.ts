@@ -3,6 +3,7 @@ import { PrismaAdapter } from "@auth/prisma-adapter";
 import CredentialsProvider from "next-auth/providers/credentials";
 import GoogleProvider from "next-auth/providers/google";
 import bcrypt from "bcryptjs";
+import { cookies } from "next/headers";
 import { prisma } from "@/lib/db";
 import { authConfig } from "@/lib/auth.config";
 import { trackLogin } from "@/lib/analytics";
@@ -109,6 +110,30 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         // Never block sign-in if analytics fails
       }
       return true;
+    },
+  },
+  events: {
+    // Fires exclusively when the PrismaAdapter inserts a new user row,
+    // which in this codebase only happens on Google OAuth first sign-in
+    // (credentials signups go through /api/auth/register directly and
+    // never trigger the adapter). Sets a short-lived, client-readable
+    // cookie that /onboard uses as the authoritative "this is a brand-new
+    // user" signal before firing the Google Ads signup conversion.
+    async createUser({ user }) {
+      if (!user?.id) return;
+      try {
+        const cookieStore = await cookies();
+        cookieStore.set("bf_signup_just_created", "1", {
+          maxAge: 120,
+          httpOnly: false,
+          path: "/",
+          sameSite: "lax",
+          secure: process.env.NODE_ENV === "production",
+        });
+      } catch {
+        // Cookie setting can fail outside a request context — fail silent
+        // so sign-in is never blocked.
+      }
     },
   },
   providers: [
