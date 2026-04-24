@@ -180,6 +180,55 @@ export async function sendDemoRequestConfirmationEmail(data: {
   });
 }
 
+// ── Paid subscription activation (team-facing) ────────────────────────────
+//
+// Sent to TEAM_NOTIFICATION_EMAIL exactly once per subscription — on FIRST
+// activation (FREE → paid). Renewal charges do NOT trigger this because the
+// webhook gate fires only when previousRole === 'FREE'. Gives the team
+// immediate visibility into who's converting, with the contact details
+// needed for manual onboarding / follow-up.
+
+export async function sendPaidSubscriptionNotification(data: {
+  name: string | null;
+  email: string;
+  phone: string | null;
+  plan: string;           // "MINI" | "STARTER" | "PRO" | "TEAM_ADMIN"
+  amountInr: number;      // monthly amount in INR
+  gateway: 'razorpay' | 'stripe';
+  subscriptionId: string;
+}): Promise<void> {
+  const planDisplay = planDisplayName(data.plan);
+  const rows = [
+    `<tr><td style="padding:6px 12px;color:#9898B0;font-size:13px;font-weight:600;width:140px;">Name</td><td style="padding:6px 12px;color:#F0F0F5;font-size:13px;">${escapeHtml(data.name ?? 'Unknown')}</td></tr>`,
+    `<tr><td style="padding:6px 12px;color:#9898B0;font-size:13px;font-weight:600;">Email</td><td style="padding:6px 12px;color:#F0F0F5;font-size:13px;"><a href="mailto:${escapeHtml(data.email)}" style="color:#4F8AFF;">${escapeHtml(data.email)}</a></td></tr>`,
+  ];
+  if (data.phone) {
+    rows.push(`<tr><td style="padding:6px 12px;color:#9898B0;font-size:13px;font-weight:600;">Phone</td><td style="padding:6px 12px;color:#F0F0F5;font-size:13px;"><a href="tel:${escapeHtml(data.phone)}" style="color:#4F8AFF;">${escapeHtml(data.phone)}</a></td></tr>`);
+  }
+  rows.push(`<tr><td style="padding:6px 12px;color:#9898B0;font-size:13px;font-weight:600;">Plan</td><td style="padding:6px 12px;color:#34D399;font-size:13px;font-weight:700;">${escapeHtml(planDisplay)} · ₹${data.amountInr.toLocaleString('en-IN')}/month</td></tr>`);
+  rows.push(`<tr><td style="padding:6px 12px;color:#9898B0;font-size:13px;font-weight:600;">Gateway</td><td style="padding:6px 12px;color:#F0F0F5;font-size:13px;text-transform:capitalize;">${escapeHtml(data.gateway)}</td></tr>`);
+  rows.push(`<tr><td style="padding:6px 12px;color:#9898B0;font-size:13px;font-weight:600;">Subscription</td><td style="padding:6px 12px;color:#9898B0;font-size:12px;font-family:'SFMono-Regular',Consolas,monospace;">${escapeHtml(data.subscriptionId)}</td></tr>`);
+
+  const html = `<!DOCTYPE html><html><body style="margin:0;padding:20px;background:#0A0A14;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+    <div style="max-width:560px;margin:0 auto;background:#111120;border-radius:12px;border:1px solid rgba(255,255,255,0.06);overflow:hidden;">
+      <div style="padding:20px 24px;background:linear-gradient(135deg,rgba(52,211,153,0.12),rgba(16,185,129,0.06));border-bottom:1px solid rgba(52,211,153,0.18);">
+        <div style="font-size:10px;font-weight:700;color:#34D399;letter-spacing:2px;text-transform:uppercase;margin-bottom:4px;">💸 New paid subscription</div>
+        <div style="font-size:16px;font-weight:700;color:#F0F0F5;">${escapeHtml(data.name ?? data.email)} is now on ${escapeHtml(planDisplay)}</div>
+        <div style="font-size:12px;color:#9898B0;margin-top:4px;">${new Date().toUTCString()}</div>
+      </div>
+      <div style="padding:16px 12px;">
+        <table width="100%" cellpadding="0" cellspacing="0">${rows.join('')}</table>
+      </div>
+    </div>
+  </body></html>`;
+
+  await sendEmail({
+    to: TEAM_NOTIFICATION_EMAIL,
+    subject: `[BuildFlow] 🎉 New ${planDisplay} subscription: ${data.name ?? data.email}`,
+    html,
+  });
+}
+
 export async function sendPlanChangedEmail(
   email: string,
   name: string | null,

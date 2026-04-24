@@ -7,6 +7,7 @@ import {
   sendWelcomeEmail,
   sendPaymentFailedEmail,
   sendSubscriptionCanceledEmail,
+  sendPaidSubscriptionNotification,
 } from '@/shared/services/email';
 import { checkWebhookIdempotency, clearWebhookIdempotency } from '@/lib/webhook-idempotency';
 import { trackServerPurchase } from '@/lib/server-conversions';
@@ -136,14 +137,14 @@ async function activateSubscription(subscription: {
   // Find user by subscription ID or notes.userId
   let user = await prisma.user.findFirst({
     where: { razorpaySubscriptionId: subscription.id },
-    select: { id: true, email: true, name: true, role: true },
+    select: { id: true, email: true, name: true, role: true, phoneNumber: true },
   });
 
   // If not found by sub ID, try notes.userId
   if (!user && subscription.notes?.userId) {
     user = await prisma.user.findUnique({
       where: { id: subscription.notes.userId },
-      select: { id: true, email: true, name: true, role: true },
+      select: { id: true, email: true, name: true, role: true, phoneNumber: true },
     });
   }
 
@@ -221,6 +222,36 @@ async function activateSubscription(subscription: {
   // Send welcome email on first activation
   if (previousRole === 'FREE' && user.email) {
     sendWelcomeEmail(user.email, user.name, newRole).catch((err) => console.error("[webhook] Failed to send welcome email:", err));
+
+    // Team notification to buildflow786@gmail.com — fires ONCE per subscription
+    // (this block only runs on FREE → paid transition). Renewal charges
+    // (subscription.charged events) re-enter this function but previousRole
+    // will already be paid, so we skip. Phone is best-effort: Prisma first,
+    // Razorpay payment contact as fallback.
+    void (async () => {
+      let phone = user.phoneNumber ?? null;
+      if (!phone) {
+        try {
+          const invoices = await razorpay.invoices.all({ subscription_id: subscription.id, count: 1 });
+          const paymentId = invoices.items?.[0]?.payment_id;
+          if (paymentId) {
+            const payment = await razorpay.payments.fetch(paymentId);
+            if (payment?.contact) phone = String(payment.contact);
+          }
+        } catch (err) {
+          console.warn('[webhook] Could not enrich phone from Razorpay payment:', err);
+        }
+      }
+      sendPaidSubscriptionNotification({
+        name: user.name,
+        email: user.email!,
+        phone,
+        plan: newRole,
+        amountInr: getPlanValueINR(newRole),
+        gateway: 'razorpay',
+        subscriptionId: subscription.id,
+      }).catch((err) => console.error('[webhook] Failed to send team subscription notification:', err));
+    })();
 
     // Server-side conversion: Meta CAPI (fire-and-forget)
     trackServerPurchase({
