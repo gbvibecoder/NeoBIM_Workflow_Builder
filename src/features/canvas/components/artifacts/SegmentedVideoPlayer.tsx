@@ -27,6 +27,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Loader2, Film, CheckCircle2, XCircle, Clock } from "lucide-react";
 import type { VideoJobClientView } from "@/types/video-job";
+import { GeneratingVideoBackdrop } from "@/shared/components/ui/GeneratingVideoBackdrop";
 
 export interface SegmentedVideoPlayerProps {
   view: VideoJobClientView;
@@ -105,52 +106,53 @@ export function SegmentedVideoPlayer({
   }
 
   // ── Pure generating card (no segments playable yet) ───────────────────
+  // Phase 4 — wraps the existing loading UI with a blurred-looping sample
+  // video backdrop so the user sees ambient motion during the 2–8 min Kling
+  // wait, not a static spinner. Real video takes over when segments complete.
   if (!hasAnyPlayable) {
     return (
-      <div
-        style={{
-          padding: compact ? "20px 16px" : "28px 20px",
-          borderRadius: 8,
-          background:
-            "linear-gradient(135deg, rgba(0,245,255,0.04), rgba(139,92,246,0.04))",
-          border: "1px solid rgba(0,245,255,0.12)",
-          textAlign: "center",
-        }}
-      >
-        <Loader2
-          size={compact ? 18 : 26}
-          style={{
-            color: "#00F5FF",
-            animation: "spin 1.5s linear infinite",
-            marginBottom: 10,
-          }}
-        />
+      <GeneratingVideoBackdrop compact={compact}>
         <div
           style={{
-            fontSize: compact ? 11 : 13,
-            fontWeight: 600,
-            color: "#00F5FF",
-            marginBottom: 6,
-            fontFamily: "var(--font-jetbrains), monospace",
+            padding: compact ? "20px 16px" : "28px 20px",
+            textAlign: "center",
           }}
         >
-          Generating walkthrough…
+          <Loader2
+            size={compact ? 18 : 26}
+            style={{
+              color: "#00F5FF",
+              animation: "spin 1.5s linear infinite",
+              marginBottom: 10,
+            }}
+          />
+          <div
+            style={{
+              fontSize: compact ? 11 : 13,
+              fontWeight: 600,
+              color: "#00F5FF",
+              marginBottom: 6,
+              fontFamily: "var(--font-jetbrains), monospace",
+            }}
+          >
+            Generating walkthrough…
+          </div>
+          <div
+            style={{
+              fontSize: compact ? 9 : 11,
+              color: "#D0D0E0",
+              marginBottom: 10,
+            }}
+          >
+            {view.segments.length > 1
+              ? `${view.segments.length} segments · streams in as each completes`
+              : "1 segment"}
+          </div>
+          <ProgressBar value={view.progress} />
+          <SegmentChipRow segments={view.segments} compact={compact} />
+          <style>{`@keyframes spin { from {transform:rotate(0deg)} to {transform:rotate(360deg)} }`}</style>
         </div>
-        <div
-          style={{
-            fontSize: compact ? 9 : 11,
-            color: "#5C5C78",
-            marginBottom: 10,
-          }}
-        >
-          {view.segments.length > 1
-            ? `${view.segments.length} segments · streams in as each completes`
-            : "1 segment"}
-        </div>
-        <ProgressBar value={view.progress} />
-        <SegmentChipRow segments={view.segments} compact={compact} />
-        <style>{`@keyframes spin { from {transform:rotate(0deg)} to {transform:rotate(360deg)} }`}</style>
-      </div>
+      </GeneratingVideoBackdrop>
     );
   }
 

@@ -12,6 +12,7 @@ import { COLORS } from "@/features/execution/components/result-showcase/constant
 import type { ShowcaseData } from "@/features/execution/components/result-showcase/useShowcaseData";
 import { useVideoJob } from "@/features/execution/hooks/useVideoJob";
 import { SegmentedVideoPlayer } from "@/features/canvas/components/artifacts/SegmentedVideoPlayer";
+import { GeneratingVideoBackdrop } from "@/shared/components/ui/GeneratingVideoBackdrop";
 
 interface MediaTabProps {
   data: ShowcaseData;
@@ -151,12 +152,16 @@ export function MediaTab({ data, onExpandVideo, onCreateVideo, isCreatingVideo =
       {!videoJobId && isVideoGenerating && !data.videoData?.videoUrl && (
         <section>
           <SectionTitle>{t('showcase.videoWalkthrough')}</SectionTitle>
+          {/* Phase 4 — GeneratingVideoBackdrop shows a blurred looping sample
+              video behind the progress UI so users don't stare at a flat
+              gradient for 2–8 minutes. */}
+          <GeneratingVideoBackdrop minHeightPx={280}>
           <div style={{
-            borderRadius: 12,
-            overflow: "hidden",
+            // boxShadow removed in post-Phase-4 cleanup: wrapper's `overflow:
+            // hidden` was clipping the drop shadow, so the line was silently
+            // invisible post-Phase-4. Wrapper's dark-gradient + blur already
+            // provides the depth cue, no shadow needed here.
             position: "relative",
-            boxShadow: "0 8px 40px rgba(0,0,0,0.5)",
-            background: "linear-gradient(135deg, #0a0a0f 0%, #111122 100%)",
             padding: "48px 24px",
             display: "flex",
             flexDirection: "column",
@@ -229,6 +234,7 @@ export function MediaTab({ data, onExpandVideo, onCreateVideo, isCreatingVideo =
               })}
             </div>
           </div>
+          </GeneratingVideoBackdrop>
         </section>
       )}
 
