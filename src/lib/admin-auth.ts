@@ -4,7 +4,8 @@ import crypto from "crypto";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 export const ADMIN_COOKIE_NAME = "bf_admin_session";
-const SESSION_MAX_AGE = 60 * 60 * 24 * 7; // 7 days
+const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 7; // 7 days
+const COOKIE_VERSION = "v2";
 
 // ─── Environment-based Admin Seeding ─────────────────────────────────────────
 //
@@ -54,11 +55,60 @@ export async function ensureDefaultAdmin(): Promise<void> {
   }
 }
 
-/** Validate admin credentials against DB. Returns admin account or null. */
+// ─── HMAC-signed session cookies ─────────────────────────────────────────────
+//
+// Admin sessions are stateless: the cookie carries {adminId, issuedAt} signed
+// with NEXTAUTH_SECRET. The DB is not consulted for session validity — only to
+// confirm the admin still exists and is active. This allows multiple admins
+// (or one admin on multiple machines) to be logged in concurrently without
+// overwriting each other, which is the bug the v1 (DB-stored token) scheme had.
+// ─────────────────────────────────────────────────────────────────────────────
+
+function getSigningSecret(): string {
+  const secret = process.env.NEXTAUTH_SECRET;
+  if (!secret || secret.length < 16) {
+    throw new Error("[admin-auth] NEXTAUTH_SECRET is required (>=16 chars) to sign admin sessions");
+  }
+  return secret;
+}
+
+function hmac(payload: string): string {
+  return crypto.createHmac("sha256", getSigningSecret()).update(payload).digest("base64url");
+}
+
+/** Produce a signed cookie value for the given admin id. */
+export function signAdminSessionCookie(adminId: string): string {
+  const issuedAt = Date.now();
+  const payload = `${COOKIE_VERSION}.${adminId}.${issuedAt}`;
+  return `${payload}.${hmac(payload)}`;
+}
+
+/** Verify cookie signature + expiry. Returns adminId or null. */
+function verifyAdminSessionCookie(cookieValue: string): { adminId: string } | null {
+  const parts = cookieValue.split(".");
+  if (parts.length !== 4) return null;
+  const [version, adminId, issuedAtStr, sig] = parts;
+  if (version !== COOKIE_VERSION || !adminId || !issuedAtStr || !sig) return null;
+
+  const expected = hmac(`${version}.${adminId}.${issuedAtStr}`);
+  const a = Buffer.from(sig);
+  const b = Buffer.from(expected);
+  if (a.length !== b.length) return null;
+  if (!crypto.timingSafeEqual(a, b)) return null;
+
+  const issuedAt = Number(issuedAtStr);
+  if (!Number.isFinite(issuedAt)) return null;
+  const ageSeconds = (Date.now() - issuedAt) / 1000;
+  if (ageSeconds < 0 || ageSeconds > SESSION_MAX_AGE_SECONDS) return null;
+
+  return { adminId };
+}
+
+/** Validate admin credentials against DB. Returns admin info + signed cookie value, or null. */
 export async function validateAdminCredentials(
   username: string,
   password: string,
-): Promise<{ id: string; username: string; displayName: string; role: string; sessionToken: string } | null> {
+): Promise<{ id: string; username: string; displayName: string; role: string; sessionCookie: string } | null> {
   await ensureDefaultAdmin();
 
   const admin = await prisma.adminAccount.findUnique({
@@ -71,61 +121,44 @@ export async function validateAdminCredentials(
   const valid = await bcrypt.compare(password, admin.passwordHash);
   if (!valid) return null;
 
-  // Generate a cryptographically secure session token
-  const rawToken = crypto.randomBytes(32).toString("hex");
-
-  // Store a bcrypt hash of the token in the DB (never store plaintext)
-  const tokenHash = await bcrypt.hash(rawToken, 10);
   await prisma.adminAccount.update({
     where: { id: admin.id },
-    data: { sessionToken: tokenHash, lastLoginAt: new Date() },
+    data: { lastLoginAt: new Date() },
   });
 
-  // Return the raw token — this goes into the cookie
-  return { id: admin.id, username: admin.username, displayName: admin.displayName, role: admin.role, sessionToken: rawToken };
+  return {
+    id: admin.id,
+    username: admin.username,
+    displayName: admin.displayName,
+    role: admin.role,
+    sessionCookie: signAdminSessionCookie(admin.id),
+  };
 }
 
-/** Build Set-Cookie header value for admin session */
-export function getAdminSessionCookie(adminId: string, sessionToken: string): string {
-  const value = `${adminId}:${sessionToken}`;
+/** Build Set-Cookie header value for admin session. */
+export function getAdminSessionCookie(sessionCookie: string): string {
   const securePart = process.env.NODE_ENV === "production" ? "; secure" : "";
-  return `${ADMIN_COOKIE_NAME}=${value}; path=/; max-age=${SESSION_MAX_AGE}; samesite=strict; httponly${securePart}`;
+  return `${ADMIN_COOKIE_NAME}=${sessionCookie}; path=/; max-age=${SESSION_MAX_AGE_SECONDS}; samesite=strict; httponly${securePart}`;
 }
 
-/** Parse cookie value into adminId and sessionToken */
-export function parseAdminCookie(cookieValue: string): { adminId: string; sessionToken: string } | null {
-  const colonIdx = cookieValue.indexOf(":");
-  if (colonIdx === -1) return null;
-  const adminId = cookieValue.slice(0, colonIdx);
-  const sessionToken = cookieValue.slice(colonIdx + 1);
-  if (!adminId || !sessionToken) return null;
-  return { adminId, sessionToken };
-}
-
-/** Validate a session token against the DB (compares raw token vs stored hash) */
+/** Validate a session cookie: check signature, expiry, and that admin is still active. */
 export async function validateAdminSession(
   cookieValue: string,
 ): Promise<{ id: string; username: string; displayName: string; role: string } | null> {
-  const parsed = parseAdminCookie(cookieValue);
-  if (!parsed) {
-    return null;
-  }
+  const verified = verifyAdminSessionCookie(cookieValue);
+  if (!verified) return null;
 
   const admin = await prisma.adminAccount.findUnique({
-    where: { id: parsed.adminId },
-    select: { id: true, username: true, displayName: true, role: true, sessionToken: true, isActive: true },
+    where: { id: verified.adminId },
+    select: { id: true, username: true, displayName: true, role: true, isActive: true },
   });
 
-  if (!admin || !admin.isActive || !admin.sessionToken) return null;
-
-  // Compare raw token from cookie against the bcrypt hash in DB
-  const tokenValid = await bcrypt.compare(parsed.sessionToken, admin.sessionToken);
-  if (!tokenValid) return null;
+  if (!admin || !admin.isActive) return null;
 
   return { id: admin.id, username: admin.username, displayName: admin.displayName, role: admin.role };
 }
 
-/** Check if a cookie string contains an admin session (client-side check) */
+/** Check if a cookie string contains an admin session (client-side presence check only). */
 export function isAdminAuthenticated(cookieHeader: string | null): boolean {
   if (!cookieHeader) return false;
   return cookieHeader.includes(`${ADMIN_COOKIE_NAME}=`);
