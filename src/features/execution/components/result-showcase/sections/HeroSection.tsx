@@ -7,6 +7,8 @@ import { useLocale } from "@/hooks/useLocale";
 import { useExecutionStore } from "@/features/execution/stores/execution-store";
 import { COLORS } from "@/features/execution/components/result-showcase/constants";
 import type { VideoInfo } from "@/features/execution/components/result-showcase/useShowcaseData";
+import { useVideoJob } from "@/features/execution/hooks/useVideoJob";
+import { SegmentedVideoPlayer } from "@/features/canvas/components/artifacts/SegmentedVideoPlayer";
 
 interface HeroSectionProps {
   videoData: VideoInfo | null;
@@ -52,8 +54,62 @@ export function HeroSection({ videoData, heroImageUrl, onExpandVideo, onRetryVid
     }
   }, [hasSegments, segments, segmentIndex]);
 
+  // ── New path (VIDEO_BG_JOBS): drive rendering from VideoJob state. ────────
+  // useVideoJob MUST be called after every legacy hook above so Rules of
+  // Hooks is preserved. Hook is a no-op when videoJobId is null.
+  const videoJobId = videoData?.videoJobId ?? null;
+  const { data: jobView } = useVideoJob(videoJobId);
+
   const isGenerating = videoGenProgress && (videoGenProgress.status === "rendering" || videoGenProgress.status === "processing" || videoGenProgress.status === "submitting");
   const isFailed = videoGenProgress?.status === "failed";
+
+  // ── Early return: videoJobId path takes priority. Replaces the URL-driven
+  // <video> player with SegmentedVideoPlayer, which handles every state
+  // (queued / processing / partial / complete / failed) internally. The
+  // gradient-overlay metadata strip is intentionally dropped for this
+  // branch — SegmentedVideoPlayer's built-in <video controls> covers
+  // fullscreen + native download, and MediaTab's export row carries the
+  // R2 download URL once the job terminalizes.
+  if (videoJobId) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, scale: 0.98 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+        style={{
+          borderRadius: 12,
+          overflow: "hidden",
+          position: "relative",
+          boxShadow: "0 8px 40px rgba(0,0,0,0.5)",
+          background: "#0a0a0f",
+          padding: 12,
+        }}
+      >
+        {jobView ? (
+          <SegmentedVideoPlayer view={jobView} heightPx={360} compact={false} />
+        ) : (
+          <div
+            style={{
+              minHeight: 280,
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 12,
+              color: COLORS.CYAN,
+              fontSize: 13,
+              fontWeight: 600,
+              fontFamily: "var(--font-jetbrains), monospace",
+            }}
+          >
+            <Loader2 size={28} style={{ animation: "spin 1.2s linear infinite" }} />
+            <div>{t('showcase.renderingWalkthrough')}</div>
+            <style>{`@keyframes spin { from {transform:rotate(0deg)} to {transform:rotate(360deg)} }`}</style>
+          </div>
+        )}
+      </motion.div>
+    );
+  }
 
   if (!videoData?.videoUrl && !heroImageUrl && !isGenerating && !isFailed) return null;
 

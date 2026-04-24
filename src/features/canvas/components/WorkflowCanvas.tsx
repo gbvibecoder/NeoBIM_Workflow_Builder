@@ -235,6 +235,14 @@ function WorkflowCanvasInner({ workflowId: urlWorkflowId, templateId, forceNew =
             startedAt: latest.startedAt,
             completedAt: latest.completedAt,
           });
+          // Phase 2.5 — expose the DB Execution.id so regenerateNode (called
+          // without running a fresh workflow first) can thread it through the
+          // ctx plumbing. Without this call, the reload-then-regen path would
+          // leave currentDbExecutionId as null (the store is session-only),
+          // and the regenerated VideoJob wouldn't durability-patch. Using
+          // getState() because the setter is a stable reference we don't
+          // need to subscribe to.
+          useExecutionStore.getState().setCurrentDbExecutionId(latest.id);
         }
         // Hydrate persisted UI state from execution.metadata so reload-time
         // restores BOQ quantity edits, in-flight video render progress,

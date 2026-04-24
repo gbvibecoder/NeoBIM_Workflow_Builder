@@ -60,6 +60,10 @@ export interface VideoInfo {
   costUsd?: number;
   nodeId: string;
   segments?: VideoSegmentInfo[];
+  /** Set by the VIDEO_BG_JOBS pipeline. When present, the media tab routes
+   *  rendering to useVideoJob + SegmentedVideoPlayer instead of the raw
+   *  videoUrl (which stays empty until the first segment completes). */
+  videoJobId?: string;
 }
 
 export interface ProceduralModelData {
@@ -275,6 +279,7 @@ export function useShowcaseData(): ShowcaseData {
         costUsd: (d.costUsd as number) ?? (meta.costUsd as number) ?? undefined,
         nodeId: videoArtifact.tileInstanceId,
         segments,
+        videoJobId: (d.videoJobId as string) ?? (meta.videoJobId as string) ?? undefined,
       };
     }
 

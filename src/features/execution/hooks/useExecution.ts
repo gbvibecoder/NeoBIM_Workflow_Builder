@@ -94,6 +94,7 @@ const DEMO_NODE_IDS = new Set(["TR-003", "GN-003"]);
 async function executeNode(
   node: WorkflowNode,
   executionId: string,
+  dbExecutionId: string | null,
   previousArtifact?: ExecutionArtifact | null,
   useRealExecution = false,
   demoMode = false
@@ -717,6 +718,10 @@ async function executeNode(
         body: JSON.stringify({
           catalogueId,
           executionId,
+          // DB-persisted execution id (Phase 2) — enables the VideoJob worker
+          // to locate and patch Execution.tileResults at terminal transition.
+          // Null when the workflow isn't persisted; the handler accepts that.
+          dbExecutionId,
           tileInstanceId: node.id,
           inputData,
         }),
@@ -1479,6 +1484,11 @@ export function useExecution({ onLog }: UseExecutionOptions = {}) {
 
     // Auto-save workflow before execution so results can be persisted to DB
     let dbExecutionId: string | null = null;
+    // Phase 2.5 — clear any stale value from a prior run BEFORE attempting
+    // persistence. Guards against a failed /api/executions POST leaving the
+    // previous run's id in the store, which would cause regenerateNode to
+    // write durability patches into the wrong Execution row.
+    useExecutionStore.getState().setCurrentDbExecutionId(null);
     let workflowId = currentWorkflow?.id;
     const isPersisted = workflowId && workflowId.length >= 20 && workflowId.startsWith("c");
 
@@ -1515,6 +1525,11 @@ export function useExecution({ onLog }: UseExecutionOptions = {}) {
         if (res.ok) {
           const { execution: dbEx } = await res.json() as { execution: { id: string } };
           dbExecutionId = dbEx.id;
+          // Phase 2.5 — expose the DB id to regenerateNode (runs outside this
+          // closure) via the Zustand store, so regenerated VideoJobs carry
+          // the correlation and the worker's terminal patch can durably
+          // write the regenerated video URL into Execution.tileResults.
+          useExecutionStore.getState().setCurrentDbExecutionId(dbExecutionId);
           log("info", "Execution record created", dbExecutionId);
         }
       } catch {
@@ -1648,7 +1663,7 @@ export function useExecution({ onLog }: UseExecutionOptions = {}) {
           }
         }
 
-        const artifact = await executeNode(node, executionId, upstreamArtifact, useReal, isDemoMode);
+        const artifact = await executeNode(node, executionId, dbExecutionId, upstreamArtifact, useReal, isDemoMode);
         artifactMap.set(node.id, artifact);
 
         // Diagnostics: capture output summary + fold any node-emitted deep
@@ -2138,7 +2153,18 @@ export function useExecution({ onLog }: UseExecutionOptions = {}) {
 
     try {
       const upstreamArtifact = getUpstreamArtifact(nodeId, workflowEdges, artifacts);
-      const artifact = await executeNode(node, executionId, upstreamArtifact, useReal, isDemoMode);
+      // Phase 2.5 — read dbExecutionId from the Zustand store set by
+      // runWorkflow (or the page-mount hydration in WorkflowCanvas.tsx).
+      // Using .getState() (not a subscribed hook) for the latest value at
+      // click time; regenerateNode is a useCallback and we don't want the
+      // closed-over-at-registration value. When null (demo/unsaved, or
+      // reload path without hydration), the VideoJob is created without
+      // durability linkage and advanceVideoJob's patch gracefully no-ops —
+      // live UI still works via useVideoJob, only post-reload / exports /
+      // share are degraded. Hydration in WorkflowCanvas closes the common
+      // reload-then-regen path.
+      const dbExecId = useExecutionStore.getState().currentDbExecutionId;
+      const artifact = await executeNode(node, executionId, dbExecId, upstreamArtifact, useReal, isDemoMode);
       addArtifact(nodeId, artifact);
       updateNodeStatus(nodeId, "success");
       trackRegenerationUsed(nodeId, node.data.catalogueId);

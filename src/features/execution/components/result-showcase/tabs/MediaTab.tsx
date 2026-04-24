@@ -10,6 +10,8 @@ import { useExecutionStore } from "@/features/execution/stores/execution-store";
 import { ConfidenceBadge } from "@/shared/components/ui/ConfidenceBadge";
 import { COLORS } from "@/features/execution/components/result-showcase/constants";
 import type { ShowcaseData } from "@/features/execution/components/result-showcase/useShowcaseData";
+import { useVideoJob } from "@/features/execution/hooks/useVideoJob";
+import { SegmentedVideoPlayer } from "@/features/canvas/components/artifacts/SegmentedVideoPlayer";
 
 interface MediaTabProps {
   data: ShowcaseData;
@@ -48,6 +50,12 @@ export function MediaTab({ data, onExpandVideo, onCreateVideo, isCreatingVideo =
     if (!data.videoData?.nodeId) return null;
     return s.videoGenProgress.get(data.videoData.nodeId) ?? null;
   });
+
+  // When the artifact was produced by the VIDEO_BG_JOBS pipeline, defer to
+  // useVideoJob + SegmentedVideoPlayer (below). Hook is called unconditionally
+  // per Rules of Hooks; with videoJobId=null it's a no-op.
+  const videoJobId = data.videoData?.videoJobId ?? null;
+  const { data: jobView } = useVideoJob(videoJobId);
 
   const isVideoGenerating = videoGenProgress && (videoGenProgress.status === "rendering" || videoGenProgress.status === "processing" || videoGenProgress.status === "submitting");
 
@@ -129,8 +137,18 @@ export function MediaTab({ data, onExpandVideo, onCreateVideo, isCreatingVideo =
         />
       )}
 
-      {/* Video Generation Progress */}
-      {isVideoGenerating && !data.videoData?.videoUrl && (
+      {/* ── VIDEO_BG_JOBS pipeline: stream segments as they land ─────────────
+          This replaces both the legacy "generating" progress card AND the
+          completed video section for any artifact with videoJobId set. */}
+      {videoJobId && jobView && (
+        <section>
+          <SectionTitle>{t('showcase.videoWalkthrough')}</SectionTitle>
+          <SegmentedVideoPlayer view={jobView} heightPx={420} compact={false} />
+        </section>
+      )}
+
+      {/* Video Generation Progress (legacy path only — videoJobId path uses SegmentedVideoPlayer above) */}
+      {!videoJobId && isVideoGenerating && !data.videoData?.videoUrl && (
         <section>
           <SectionTitle>{t('showcase.videoWalkthrough')}</SectionTitle>
           <div style={{
@@ -214,8 +232,8 @@ export function MediaTab({ data, onExpandVideo, onCreateVideo, isCreatingVideo =
         </section>
       )}
 
-      {/* Video Section */}
-      {data.videoData?.videoUrl && (
+      {/* Video Section (legacy path only — videoJobId path handled above) */}
+      {!videoJobId && data.videoData?.videoUrl && (
         <section>
           <SectionTitle>{t('showcase.videoWalkthrough')}</SectionTitle>
           <div style={{

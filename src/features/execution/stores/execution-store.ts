@@ -27,6 +27,17 @@ interface ExecutionState {
   isRateLimited: boolean;
   setRateLimited: (value: boolean) => void;
 
+  // Phase 2.5 — DB Execution.id for the currently-running workflow run, when
+  // the workflow is persisted. Set by runWorkflow after /api/executions POST
+  // returns. Cleared when a new run starts. Used by regenerateNode to thread
+  // dbExecutionId into the Phase 2 ctx plumbing so the worker's terminal
+  // patch (advanceVideoJob → patchExecutionArtifact) can write regenerated
+  // video URLs into Execution.tileResults. Session-only — NOT persisted;
+  // server row is the source of truth and any reload path hydrates via
+  // WorkflowCanvas.tsx's setCurrentDbExecutionId call.
+  currentDbExecutionId: string | null;
+  setCurrentDbExecutionId: (id: string | null) => void;
+
   // Artifacts by tile instance ID
   artifacts: Map<string, ExecutionArtifact>;
 
@@ -214,6 +225,7 @@ export const useExecutionStore = create<ExecutionState>()((set, get) => ({
   isExecuting: false,
   executionProgress: 0,
   isRateLimited: false,
+  currentDbExecutionId: null,
   artifacts: new Map(),
   previousArtifacts: new Map(),
   videoGenProgress: new Map(),
@@ -224,6 +236,8 @@ export const useExecutionStore = create<ExecutionState>()((set, get) => ({
   currentTrace: null,
 
   setRateLimited: (value) => set({ isRateLimited: value }),
+
+  setCurrentDbExecutionId: (id) => set({ currentDbExecutionId: id }),
 
   startExecution: (execution) =>
     set((state) => ({

@@ -48,6 +48,15 @@ export interface NodeHandlerContext {
 
   // From the request body (optional override)
   apiKey: string | undefined;
+
+  /**
+   * DB-side Execution.id for the current workflow run, if the workflow was
+   * persisted. `executionId` above is a CLIENT-generated correlation id; it
+   * does NOT equal Execution.id. The client sends both in the body so
+   * handlers that need to record durable rows (e.g. GN-009 → VideoJob) can
+   * link them to the real Execution row. Undefined for demo / unsaved runs.
+   */
+  dbExecutionId: string | undefined;
 }
 
 export type NodeHandlerResult = ExecutionArtifact | NextResponse;

@@ -12,6 +12,7 @@ import { useLocale } from "@/hooks/useLocale";
 import { useExecutionStore } from "@/features/execution/stores/execution-store";
 import { useUIStore } from "@/shared/stores/ui-store";
 import type { ExecutionArtifact } from "@/types/execution";
+import { useVideoJob } from "@/features/execution/hooks/useVideoJob";
 
 const INPUT_NODE_IDS = new Set(["IN-001","IN-002","IN-003","IN-004","IN-005","IN-006","IN-007","IN-008"]);
 
@@ -349,6 +350,16 @@ const ProgressBar = memo(function ProgressBar({ status, color }: { status: NodeS
 const InlineResult = memo(function InlineResult({ artifact, nodeId }: { artifact: ExecutionArtifact; nodeId: string }) {
   const d = artifact.data as Record<string, unknown>;
 
+  // Phase 2.5 — VIDEO_BG_JOBS thumbnail fallback. New-path artifacts keep
+  // d.videoUrl empty in client memory even after the worker terminalizes
+  // (Stream 1's patch writes to DB, not in-memory state). Mirror the pattern
+  // shipped in FullscreenVideoPlayer.tsx (Phase 2) — unconditional hook at
+  // the top so Rules of Hooks holds for every artifact type. Hook is a no-op
+  // for null videoJobId (documented in Phase 1 §4.6), so the ~8 non-video
+  // artifact branches below pay zero polling cost.
+  const videoJobId = typeof d?.videoJobId === "string" ? d.videoJobId : null;
+  const { data: jobView } = useVideoJob(videoJobId);
+
   if (artifact.type === "text") {
     const text = (d?.content as string) ?? "";
     const lines = text.split("\n").slice(0, 4);
@@ -513,8 +524,22 @@ const InlineResult = memo(function InlineResult({ artifact, nodeId }: { artifact
   }
 
   if (artifact.type === "video") {
-    const videoUrl = d?.videoUrl as string;
-    const durationSec = (d?.durationSeconds as number) ?? 15;
+    // Phase 2.5 — resolve thumbnail URL with useVideoJob fallback. Matches
+    // the same fallback chain as FullscreenVideoPlayer (Phase 2): prefer the
+    // artifact's own videoUrl (legacy path, or new-path after DB patch +
+    // refresh), then downloadUrl, then the live VideoJob's primaryVideoUrl.
+    // When every source is empty we render a placeholder — NEVER <video src="">
+    // which shows the browser's broken-video icon.
+    const fallbackJobUrl = jobView?.primaryVideoUrl ?? "";
+    const thumbnailUrl =
+      (typeof d?.videoUrl === "string" && d.videoUrl)
+        ? d.videoUrl
+        : (typeof d?.downloadUrl === "string" && d.downloadUrl)
+          ? d.downloadUrl
+          : fallbackJobUrl;
+    const durationSec = (d?.durationSeconds as number)
+      ?? jobView?.totalDurationSeconds
+      ?? 15;
     return (
       <div style={{
         padding: "8px 0 2px",
@@ -531,13 +556,26 @@ const InlineResult = memo(function InlineResult({ artifact, nodeId }: { artifact
             useUIStore.getState().setVideoPlayerNodeId(nodeId);
           }}
         >
-          {/* Video thumbnail — frozen on first frame */}
-          <video
-            src={videoUrl ? `${videoUrl}#t=0.1` : undefined}
-            preload="metadata"
-            muted
-            style={{ width: "100%", height: 90, objectFit: "cover", borderRadius: 8, display: "block" }}
-          />
+          {thumbnailUrl ? (
+            /* Video thumbnail — frozen on first frame */
+            <video
+              src={`${thumbnailUrl}#t=0.1`}
+              preload="metadata"
+              muted
+              style={{ width: "100%", height: 90, objectFit: "cover", borderRadius: 8, display: "block" }}
+            />
+          ) : (
+            /* Placeholder when no URL is available yet (e.g. new-path job in
+               flight, or terminal-but-pre-refresh). Clicking still opens the
+               fullscreen player which has its own VideoJob fallback. */
+            <div
+              style={{
+                width: "100%", height: 90, borderRadius: 8,
+                background: "linear-gradient(135deg, #0a0a0f 0%, #111122 100%)",
+                display: "block",
+              }}
+            />
+          )}
           {/* Play button overlay */}
           <div style={{
             position: "absolute", top: "50%", left: "50%",

@@ -6,6 +6,7 @@ import { X, Download, Clock, Clapperboard, Film, DollarSign, Building2, DoorOpen
 import { useUIStore } from "@/shared/stores/ui-store";
 import { useExecutionStore } from "@/features/execution/stores/execution-store";
 import type { VideoSegment } from "@/types/execution";
+import { useVideoJob } from "@/features/execution/hooks/useVideoJob";
 
 export function FullscreenVideoPlayer() {
   const nodeId = useUIStore(s => s.videoPlayerNodeId);
@@ -43,29 +44,75 @@ export function FullscreenVideoPlayer() {
   const isOpen = !!(nodeId && artifact && artifact.type === "video");
 
   const d = isOpen ? (artifact.data as Record<string, unknown>) : null;
+
+  // Phase 2 / VIDEO_BG_JOBS: when the artifact carries a videoJobId, the
+  // in-memory d.videoUrl / d.segments stay empty even after the worker
+  // terminalizes (the Stream 1 patch writes to DB, not client state). Fall
+  // through to useVideoJob for live URLs. Hook is called unconditionally
+  // per Rules of Hooks — null videoJobId is a no-op.
+  const videoJobId = typeof d?.videoJobId === "string" ? d.videoJobId : null;
+  const { data: jobView } = useVideoJob(videoJobId);
+
+  // Derive segments: prefer in-memory artifact segments; if the new-path job
+  // has completed segments of its own, promote them so playback works even
+  // before the user refreshes to pick up the patched artifact.
   const rawSegments = d?.segments;
-  const segments: VideoSegment[] = Array.isArray(rawSegments) ? rawSegments : [];
+  const artifactSegments: VideoSegment[] = Array.isArray(rawSegments) ? rawSegments : [];
+  const jobSegments: VideoSegment[] = videoJobId && jobView
+    ? jobView.playableSegments.map((s) => ({
+        videoUrl: s.url,
+        downloadUrl: s.url,
+        durationSeconds: s.durationSeconds,
+        label: s.kind === "exterior"
+          ? `Exterior — ${s.durationSeconds}s`
+          : s.kind === "interior"
+            ? `Interior — ${s.durationSeconds}s`
+            : `Walkthrough — ${s.durationSeconds}s`,
+      }))
+    : [];
+  const segments: VideoSegment[] = artifactSegments.length > 0
+    ? artifactSegments
+    : jobSegments;
   const hasSegments = segments.length > 1;
 
   const currentSegment = hasSegments ? segments[currentSegmentIndex] : null;
+  const fallbackJobUrl = jobView?.primaryVideoUrl ?? "";
   const videoUrl = hasSegments
     ? (currentSegment?.videoUrl ?? "")
-    : (typeof d?.videoUrl === "string" ? d.videoUrl : typeof d?.downloadUrl === "string" ? d.downloadUrl : "");
-  const downloadUrl = typeof d?.downloadUrl === "string" ? d.downloadUrl : typeof d?.videoUrl === "string" ? d.videoUrl : "";
+    : (typeof d?.videoUrl === "string" && d.videoUrl
+        ? d.videoUrl
+        : typeof d?.downloadUrl === "string" && d.downloadUrl
+          ? d.downloadUrl
+          : fallbackJobUrl);
+  const downloadUrl =
+    (typeof d?.downloadUrl === "string" && d.downloadUrl)
+      ? d.downloadUrl
+      : (typeof d?.videoUrl === "string" && d.videoUrl)
+        ? d.videoUrl
+        : fallbackJobUrl;
   const fileName = typeof d?.name === "string" ? d.name : "walkthrough.mp4";
   const shotCount = typeof d?.shotCount === "number" ? d.shotCount : (hasSegments ? segments.length : 1);
-  const totalDurationSec = typeof d?.durationSeconds === "number" ? d.durationSeconds : 15;
+  const totalDurationSec = typeof d?.durationSeconds === "number" && d.durationSeconds
+    ? d.durationSeconds
+    : (jobView?.totalDurationSeconds ?? 15);
   const defaultModel = d?.usedOmni === true ? "Kling 3.0 Omni" : "Kling 2.6";
   const pipeline = typeof d?.pipeline === "string" ? d.pipeline : defaultModel;
-  const costUsd = typeof d?.costUsd === "number" ? d.costUsd : null;
+  const costUsd = typeof d?.costUsd === "number"
+    ? d.costUsd
+    : (jobView?.costUsd ?? null);
 
+  // Reset transient playback state when the modal closes. Using the effect's
+  // cleanup function (instead of a sync setState on isOpen=false) keeps
+  // react-hooks/set-state-in-effect happy — the rule permits state updates
+  // that happen during teardown, not during the effect body.
   useEffect(() => {
-    if (!isOpen) {
+    if (!isOpen) return;
+    return () => {
       setCurrentSegmentIndex(0);
       setCurrentTime(0);
       setVideoDuration(0);
       setIsPlaying(false);
-    }
+    };
   }, [isOpen]);
 
   // Handle segment end — auto-advance
