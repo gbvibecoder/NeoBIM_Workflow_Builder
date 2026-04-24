@@ -816,7 +816,7 @@ export default function ContactPage() {
               <div style={{ padding: "20px 24px", display: "flex", gap: 12 }}>
                 {[
                   { icon: Instagram, href: "https://www.instagram.com/buildflow_live/", label: "Instagram", color: "#E1306C" },
-                  { icon: Linkedin, href: "https://www.linkedin.com/in/buildflow/", label: "LinkedIn", color: "#0A66C2" },
+                  { icon: Linkedin, href: "https://www.linkedin.com/company/trybuildflow/", label: "LinkedIn", color: "#0A66C2" },
                   { icon: Mail, href: `mailto:${CONTACT_EMAIL}`, label: "Email", color: "#4F8AFF" },
                 ].map(s => (
                   <a
@@ -985,7 +985,7 @@ export default function ContactPage() {
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             {[
               { icon: Instagram, href: "https://www.instagram.com/buildflow_live/", label: "Instagram", color: "#E1306C" },
-              { icon: Linkedin, href: "https://www.linkedin.com/in/buildflow/", label: "LinkedIn", color: "#0A66C2" },
+              { icon: Linkedin, href: "https://www.linkedin.com/company/trybuildflow/", label: "LinkedIn", color: "#0A66C2" },
               { icon: Mail, href: `mailto:${CONTACT_EMAIL}`, label: "Email", color: "#4F8AFF" },
             ].map(s => (
               <a key={s.label} href={s.href} target={s.href.startsWith("mailto:") ? undefined : "_blank"} rel={s.href.startsWith("mailto:") ? undefined : "noopener noreferrer"} aria-label={s.label}

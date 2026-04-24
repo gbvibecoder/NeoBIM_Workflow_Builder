@@ -7,7 +7,7 @@ import { CONTACT_EMAIL } from "@/constants/contact";
 
 const SOCIAL_LINKS = [
   { icon: Instagram, href: "https://www.instagram.com/buildflow_live/", label: "Instagram", color: "#E1306C" },
-  { icon: Linkedin, href: "https://www.linkedin.com/in/buildflow/", label: "LinkedIn", color: "#0A66C2" },
+  { icon: Linkedin, href: "https://www.linkedin.com/company/trybuildflow/", label: "LinkedIn", color: "#0A66C2" },
   { icon: Mail, href: `mailto:${CONTACT_EMAIL}`, label: "Email", color: "#4F8AFF" },
 ];
 

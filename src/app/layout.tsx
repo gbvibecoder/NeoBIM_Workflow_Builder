@@ -182,7 +182,7 @@ export default function RootLayout({
         description: siteDescription,
         sameAs: [
           "https://www.instagram.com/buildflow_live/",
-          "https://www.linkedin.com/in/buildflow/",
+          "https://www.linkedin.com/company/trybuildflow/",
         ],
       },
       // WebSite Schema

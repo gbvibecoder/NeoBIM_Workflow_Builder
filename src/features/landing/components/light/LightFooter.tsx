@@ -14,7 +14,7 @@ const SOCIAL_LINKS = [
   },
   {
     icon: Linkedin,
-    href: "https://www.linkedin.com/in/buildflow/",
+    href: "https://www.linkedin.com/company/trybuildflow/",
     label: "LinkedIn",
   },
   {
