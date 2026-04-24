@@ -66,7 +66,7 @@ const TEMPLATE_PREVIEWS: Record<string, { type: "video"; url: string; start: num
   "wf-06": { type: "video", url: `${R2}/floor-plan-to-video-render.mp4`, start: 2 },
   "wf-05": { type: "video", url: `${R2}/interactive-3d-model.mp4`, start: 8 },
   "wf-03": { type: "video", url: `${R2}/text-to-concept-building.mp4`, start: 132 },
-  "wf-11": { type: "video", url: `/videos/img-to-renovation.mp4`, start: 0 },
+  "wf-11": { type: "video", url: `${R2}/img-to-renovation.mp4`, start: 0 },
 };
 
 
