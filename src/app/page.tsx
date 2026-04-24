@@ -1607,6 +1607,38 @@ export default function LandingPage() {
                 {t('landing.watchDemos')}
               </Link>
 
+              {/* Book Demo CTA — visible, attractive, sends to /book-demo form */}
+              <Link
+                href="/book-demo"
+                onClick={() => trackLead({ content_name: "hero_cta_book_demo" })}
+                style={{
+                  display: "flex", alignItems: "center", gap: 8,
+                  padding: "10px 20px", borderRadius: 10,
+                  border: "1px solid rgba(79,138,255,0.35)",
+                  background: "linear-gradient(135deg, rgba(79,138,255,0.12), rgba(99,102,241,0.08))",
+                  color: "#A5B4FC", fontSize: 14, fontWeight: 700,
+                  textDecoration: "none", transition: "all 0.25s",
+                  boxShadow: "0 0 20px rgba(79,138,255,0.1)",
+                }}
+                onMouseEnter={e => {
+                  const el = e.currentTarget as HTMLElement;
+                  el.style.background = "linear-gradient(135deg, rgba(79,138,255,0.2), rgba(99,102,241,0.15))";
+                  el.style.borderColor = "rgba(79,138,255,0.55)";
+                  el.style.boxShadow = "0 0 32px rgba(79,138,255,0.25)";
+                  el.style.color = "#C7D2FE";
+                }}
+                onMouseLeave={e => {
+                  const el = e.currentTarget as HTMLElement;
+                  el.style.background = "linear-gradient(135deg, rgba(79,138,255,0.12), rgba(99,102,241,0.08))";
+                  el.style.borderColor = "rgba(79,138,255,0.35)";
+                  el.style.boxShadow = "0 0 20px rgba(79,138,255,0.1)";
+                  el.style.color = "#A5B4FC";
+                }}
+              >
+                <Calendar size={15} />
+                {t('landing.bookDemo')}
+              </Link>
+
               {/* Explore Community CTA */}
               <a
                 href="#community"
@@ -1637,24 +1669,6 @@ export default function LandingPage() {
                 {t('landing.exploreCommunity')}
                 <ChevronDown size={14} style={{ opacity: 0.6 }} />
               </a>
-            </motion.div>
-
-            {/* Demo link */}
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.85, duration: 0.5 }}
-              style={{ marginTop: 12, textAlign: "center" }}
-            >
-              <Link href="/demo" style={{
-                fontSize: 13, color: "rgba(255,255,255,0.35)", textDecoration: "none",
-                transition: "color 0.2s",
-              }}
-                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = "rgba(255,255,255,0.6)"; }}
-                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = "rgba(255,255,255,0.35)"; }}
-              >
-                {t('landing.tryDemoNoAccount')} →
-              </Link>
             </motion.div>
 
             {/* Trust signals */}
@@ -1928,16 +1942,10 @@ export default function LandingPage() {
                 ))}
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-                <Link href="/demo" style={{ display: "flex", alignItems: "center", gap: 7, padding: "10px 20px", borderRadius: 10, background: "linear-gradient(135deg, rgba(0,245,255,0.1), rgba(139,92,246,0.08))", border: "1px solid rgba(0,245,255,0.2)", color: "#00F5FF", fontSize: 13, fontWeight: 700, textDecoration: "none", transition: "all 0.2s", whiteSpace: "nowrap" }}
-                  onMouseEnter={e => { const el = e.currentTarget; el.style.background = "linear-gradient(135deg, rgba(0,245,255,0.18), rgba(139,92,246,0.14))"; el.style.boxShadow = "0 0 24px rgba(0,245,255,0.12)"; }}
-                  onMouseLeave={e => { const el = e.currentTarget; el.style.background = "linear-gradient(135deg, rgba(0,245,255,0.1), rgba(139,92,246,0.08))"; el.style.boxShadow = "none"; }}
-                >
-                  <Play size={13} />
-                  {t('landing.tryDemo')}
-                </Link>
-                <Link href="/book-demo" style={{ display: "flex", alignItems: "center", gap: 7, padding: "10px 20px", borderRadius: 10, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", color: "#9898B0", fontSize: 13, fontWeight: 600, textDecoration: "none", transition: "all 0.2s", whiteSpace: "nowrap" }}
-                  onMouseEnter={e => { const el = e.currentTarget; el.style.color = "#F0F0F5"; el.style.borderColor = "rgba(255,255,255,0.15)"; }}
-                  onMouseLeave={e => { const el = e.currentTarget; el.style.color = "#9898B0"; el.style.borderColor = "rgba(255,255,255,0.08)"; }}
+                {/* Book a Demo — primary action here since demo videos already play above. */}
+                <Link href="/book-demo" onClick={() => trackLead({ content_name: "showcase_cta_book_demo" })} style={{ display: "flex", alignItems: "center", gap: 7, padding: "10px 20px", borderRadius: 10, background: "linear-gradient(135deg, rgba(79,138,255,0.14), rgba(99,102,241,0.1))", border: "1px solid rgba(79,138,255,0.35)", color: "#A5B4FC", fontSize: 13, fontWeight: 700, textDecoration: "none", transition: "all 0.2s", whiteSpace: "nowrap", boxShadow: "0 0 18px rgba(79,138,255,0.1)" }}
+                  onMouseEnter={e => { const el = e.currentTarget; el.style.background = "linear-gradient(135deg, rgba(79,138,255,0.22), rgba(99,102,241,0.16))"; el.style.borderColor = "rgba(79,138,255,0.55)"; el.style.color = "#C7D2FE"; el.style.boxShadow = "0 0 28px rgba(79,138,255,0.22)"; }}
+                  onMouseLeave={e => { const el = e.currentTarget; el.style.background = "linear-gradient(135deg, rgba(79,138,255,0.14), rgba(99,102,241,0.1))"; el.style.borderColor = "rgba(79,138,255,0.35)"; el.style.color = "#A5B4FC"; el.style.boxShadow = "0 0 18px rgba(79,138,255,0.1)"; }}
                 >
                   <Calendar size={13} />
                   {t('landing.bookDemo')}

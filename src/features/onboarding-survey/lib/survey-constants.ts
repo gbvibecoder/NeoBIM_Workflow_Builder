@@ -6,9 +6,9 @@ import type {
 
 // ── Scene 1: Discovery sources ─────────────────────────────────────────────
 export const DISCOVERY_OPTIONS: DiscoveryOption[] = [
+  { id: "social",      emoji: "📸",  labelKey: "survey.discovery.social",      subtitleKey: "survey.discovery.socialSub",      colorRgb: "225, 48, 108",  reaction: "spin"    },
   { id: "linkedin",    emoji: "🕵️",  labelKey: "survey.discovery.linkedin",    subtitleKey: "survey.discovery.linkedinSub",    colorRgb: "10, 102, 194",  reaction: "scan"    },
   { id: "twitter",     emoji: "🐦",  labelKey: "survey.discovery.twitter",     subtitleKey: "survey.discovery.twitterSub",     colorRgb: "29, 161, 242",  reaction: "bounce"  },
-  { id: "university",  emoji: "🎓",  labelKey: "survey.discovery.university",  subtitleKey: "survey.discovery.universitySub",  colorRgb: "139, 92, 246",  reaction: "spin"    },
   { id: "friend",      emoji: "👥",  labelKey: "survey.discovery.friend",      subtitleKey: "survey.discovery.friendSub",      colorRgb: "16, 185, 129",  reaction: "wave"    },
   { id: "google",      emoji: "🔍",  labelKey: "survey.discovery.google",      subtitleKey: "survey.discovery.googleSub",      colorRgb: "234, 67, 53",   reaction: "pulse"   },
   { id: "accident",    emoji: "🎲",  labelKey: "survey.discovery.accident",    subtitleKey: "survey.discovery.accidentSub",    colorRgb: "245, 158, 11",  reaction: "shuffle" },

@@ -372,18 +372,6 @@ export default function BookDemoPage() {
         </Link>
 
         <div className="book-demo-nav-actions" style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <Link href="/demo" className="book-demo-nav-btn" style={{
-            display: "flex", alignItems: "center", gap: 6,
-            padding: "8px 14px", borderRadius: 8,
-            border: "1px solid rgba(0,245,255,0.15)",
-            background: "rgba(0,245,255,0.04)",
-            color: COLORS.cyan, fontSize: 13, fontWeight: 600,
-            textDecoration: "none", transition: "all 0.15s",
-            whiteSpace: "nowrap",
-          }}>
-            <Play size={13} />
-            {t('bookDemo.tryDemo')}
-          </Link>
           <Link href="/dashboard" className="book-demo-nav-btn" style={{
             display: "flex", alignItems: "center", gap: 6,
             padding: "8px 14px", borderRadius: 8,
@@ -617,16 +605,16 @@ export default function BookDemoPage() {
                       {t('bookDemo.reachOut')}
                     </p>
                     <div style={{ display: "flex", gap: 12, justifyContent: "center" }}>
-                      <Link href="/demo" style={{
+                      <Link href="/" style={{
                         display: "flex", alignItems: "center", gap: 6,
                         padding: "10px 20px", borderRadius: 10,
-                        border: "1px solid rgba(0,245,255,0.2)",
-                        background: "rgba(0,245,255,0.05)",
-                        color: COLORS.cyan, fontSize: 13, fontWeight: 600,
+                        border: "1px solid rgba(255,255,255,0.1)",
+                        background: "rgba(255,255,255,0.03)",
+                        color: COLORS.textSecondary, fontSize: 13, fontWeight: 600,
                         textDecoration: "none",
                       }}>
-                        <Play size={14} />
-                        {t('bookDemo.tryNow')}
+                        <ArrowLeft size={14} />
+                        {t('bookDemo.backToHome')}
                       </Link>
                       <Link href="/dashboard" style={{
                         display: "flex", alignItems: "center", gap: 6,

@@ -8,6 +8,7 @@ import {
   sendPaymentFailedEmail,
   sendSubscriptionCanceledEmail,
   sendPlanChangedEmail,
+  sendPaidSubscriptionNotification,
 } from '@/shared/services/email';
 import { checkWebhookIdempotency, clearWebhookIdempotency } from '@/lib/webhook-idempotency';
 import { invalidateUserRoleCache } from '@/lib/auth';
@@ -243,7 +244,7 @@ async function updateUserSubscription(
 
   const user = await prisma.user.findFirst({
     where: { stripeCustomerId },
-    select: { id: true, email: true, name: true, role: true },
+    select: { id: true, email: true, name: true, role: true, phoneNumber: true },
   });
 
   if (!user) {
@@ -354,6 +355,37 @@ async function updateUserSubscription(
       const TIER_ORDER = ['FREE', 'MINI', 'STARTER', 'PRO', 'TEAM_ADMIN'];
       const type = TIER_ORDER.indexOf(plan) > TIER_ORDER.indexOf(previousRole) ? 'upgrade' : 'downgrade';
       sendPlanChangedEmail(user.email, user.name, previousRole, plan, type).catch((err) => console.error("[webhook] Failed to send plan changed email:", err));
+    }
+
+    // Team notification to buildflow786@gmail.com — fires ONCE per user on
+    // first paid activation (FREE → any paid tier). Upgrades between paid
+    // tiers (Starter → Pro) go through sendPlanChangedEmail above but do
+    // NOT fire this team ping — the team already knows about paid users.
+    // Phone: prefer DB, fall back to Stripe Customer.phone (single cheap
+    // API call, tolerated failures).
+    if (previousRole === 'FREE' && plan !== 'FREE' && user.email) {
+      void (async () => {
+        let phone = user.phoneNumber ?? null;
+        if (!phone) {
+          try {
+            const customer = await stripe.customers.retrieve(stripeCustomerId);
+            if (customer && !customer.deleted && customer.phone) {
+              phone = customer.phone;
+            }
+          } catch (err) {
+            console.warn('[webhook] Could not enrich phone from Stripe customer:', err);
+          }
+        }
+        sendPaidSubscriptionNotification({
+          name: user.name,
+          email: user.email!,
+          phone,
+          plan,
+          amountInr: getPlanValueINR(plan),
+          gateway: 'stripe',
+          subscriptionId: sub.id,
+        }).catch((err) => console.error('[webhook] Failed to send team subscription notification:', err));
+      })();
     }
   } catch (dbError) {
     console.error('[STRIPE_WEBHOOK] CRITICAL: DB update failed! User paid but role not updated.', {

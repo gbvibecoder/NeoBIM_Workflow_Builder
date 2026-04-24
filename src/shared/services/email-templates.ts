@@ -257,3 +257,89 @@ export function planChangedEmail(
     ${button('View Your Plan', `${BASE_URL}/dashboard/billing`)}
   `);
 }
+
+// ── Demo Request Confirmation (user-facing) ────────────────────────────────
+//
+// Fires from /api/book-demo right after the team notification. Confirms the
+// submission landed, sets expectation on response time, and gives the user a
+// direct reply-to so they can add context or reschedule without re-submitting.
+
+export function demoRequestConfirmationEmail(data: {
+  name: string;
+  company?: string;
+  role?: string;
+  message?: string;
+}): string {
+  const displayName = safeName(data.name);
+  const companyLine = data.company
+    ? `<tr><td style="padding:6px 0;color:#7C7C96;font-size:12px;width:120px;">Company</td><td style="padding:6px 0;color:#F0F0F5;font-size:13px;">${escapeHtml(data.company)}</td></tr>`
+    : '';
+  const roleLine = data.role
+    ? `<tr><td style="padding:6px 0;color:#7C7C96;font-size:12px;width:120px;">Role</td><td style="padding:6px 0;color:#F0F0F5;font-size:13px;">${escapeHtml(data.role)}</td></tr>`
+    : '';
+  const messageBlock = data.message
+    ? `<div style="background:rgba(79,138,255,0.04);border:1px solid rgba(79,138,255,0.1);border-radius:10px;padding:14px 16px;margin:16px 0;">
+         <div style="font-size:10px;font-weight:700;color:#4F8AFF;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">What you're looking to solve</div>
+         <div style="font-size:13px;color:#D0D0DC;line-height:1.6;white-space:pre-wrap;">${escapeHtml(data.message)}</div>
+       </div>`
+    : '';
+
+  return layout(`
+    <!-- Hero -->
+    <div style="text-align:center;margin-bottom:24px;">
+      <div style="display:inline-block;width:64px;height:64px;border-radius:50%;background:linear-gradient(135deg,#4F8AFF 0%,#6366F1 100%);line-height:64px;text-align:center;font-size:30px;margin-bottom:16px;">
+        &#128197;
+      </div>
+      <h1 style="font-size:24px;font-weight:800;color:#F0F0F5;margin:0 0 8px;letter-spacing:-0.4px;">
+        Got it, ${displayName} — your demo is queued
+      </h1>
+      <p style="font-size:14px;color:#9898B0;margin:0;line-height:1.55;">
+        Thanks for reaching out. One of us will personally review your request and
+        email you back within <strong style="color:#F0F0F5;">24 hours</strong> with
+        a calendar invite for a 20–30 minute walkthrough tailored to your practice.
+      </p>
+    </div>
+
+    <!-- Divider -->
+    <div style="height:1px;background:linear-gradient(90deg,transparent,rgba(79,138,255,0.2),transparent);margin:24px 0;"></div>
+
+    <!-- What we'll cover -->
+    <div style="font-size:11px;font-weight:700;color:#4F8AFF;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:14px;">What we'll cover</div>
+    <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:8px;">
+      <tr><td width="28" valign="top" style="padding-bottom:10px;"><div style="width:20px;height:20px;border-radius:6px;background:rgba(0,245,255,0.1);border:1px solid rgba(0,245,255,0.2);text-align:center;line-height:20px;font-size:11px;font-weight:800;color:#00F5FF;">1</div></td>
+          <td valign="top" style="padding:0 0 10px 10px;font-size:13px;color:#D0D0DC;line-height:1.55;"><strong style="color:#F0F0F5;">Your workflow today</strong> — where time is lost on briefs, renders, BOQs.</td></tr>
+      <tr><td width="28" valign="top" style="padding-bottom:10px;"><div style="width:20px;height:20px;border-radius:6px;background:rgba(139,92,246,0.1);border:1px solid rgba(139,92,246,0.2);text-align:center;line-height:20px;font-size:11px;font-weight:800;color:#8B5CF6;">2</div></td>
+          <td valign="top" style="padding:0 0 10px 10px;font-size:13px;color:#D0D0DC;line-height:1.55;"><strong style="color:#F0F0F5;">Live platform walkthrough</strong> — text prompt → 3D model → IFC → BOQ.</td></tr>
+      <tr><td width="28" valign="top" style="padding-bottom:10px;"><div style="width:20px;height:20px;border-radius:6px;background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.2);text-align:center;line-height:20px;font-size:11px;font-weight:800;color:#10B981;">3</div></td>
+          <td valign="top" style="padding:0 0 10px 10px;font-size:13px;color:#D0D0DC;line-height:1.55;"><strong style="color:#F0F0F5;">Fit for your practice</strong> — which workflows to start with, pricing, onboarding.</td></tr>
+    </table>
+
+    <!-- Submission summary -->
+    <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.04);border-radius:10px;padding:14px 16px;margin:20px 0;">
+      <div style="font-size:10px;font-weight:700;color:#7C7C96;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">Your submission</div>
+      <table width="100%" cellpadding="0" cellspacing="0">
+        <tr><td style="padding:6px 0;color:#7C7C96;font-size:12px;width:120px;">Name</td><td style="padding:6px 0;color:#F0F0F5;font-size:13px;">${displayName}</td></tr>
+        ${companyLine}
+        ${roleLine}
+      </table>
+    </div>
+
+    ${messageBlock}
+
+    <!-- Secondary CTA: explore while you wait -->
+    <div style="text-align:center;margin-top:24px;">
+      <p style="font-size:12px;color:#7C7C96;margin:0 0 12px;line-height:1.5;">
+        While you wait, poke around the dashboard — no commitment needed.
+      </p>
+      ${button('Open Dashboard →', `${BASE_URL}/dashboard`)}
+    </div>
+
+    <!-- Reply-to line -->
+    <div style="margin-top:28px;padding-top:20px;border-top:1px solid rgba(255,255,255,0.04);text-align:center;">
+      <p style="font-size:12px;color:#7C7C96;line-height:1.55;margin:0;">
+        Need to reschedule or add context? Just reply to this email or write to
+        <a href="mailto:${CONTACT_EMAIL}" style="color:#4F8AFF;text-decoration:none;">${CONTACT_EMAIL}</a>.
+      </p>
+    </div>
+  `);
+}

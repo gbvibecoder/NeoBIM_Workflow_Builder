@@ -29,7 +29,6 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
     }
 
-    // admin.sessionToken is the raw token (DB stores a bcrypt hash of it)
     await logAudit(admin.id, "ADMIN_LOGIN", "admin", admin.id, {
       username: admin.username,
       success: true,
@@ -39,7 +38,7 @@ export async function POST(req: Request) {
       success: true,
       admin: { id: admin.id, displayName: admin.displayName, role: admin.role },
     });
-    response.headers.set("Set-Cookie", getAdminSessionCookie(admin.id, admin.sessionToken));
+    response.headers.set("Set-Cookie", getAdminSessionCookie(admin.sessionCookie));
     return response;
   } catch {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });

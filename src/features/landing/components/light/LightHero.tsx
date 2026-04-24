@@ -141,9 +141,9 @@ export function LightHero() {
             {t("landing.getStartedFree")}
           </Link>
 
-          {/* Ghost CTA */}
+          {/* Ghost CTA — Book Demo */}
           <Link
-            href="/demo"
+            href="/book-demo"
             style={{
               display: "inline-flex",
               alignItems: "center",
@@ -167,7 +167,7 @@ export function LightHero() {
               (e.currentTarget as HTMLElement).style.background = "transparent";
             }}
           >
-            {t("light.tryDemo")}
+            {t("light.bookDemo")}
           </Link>
         </div>
 

@@ -2,6 +2,7 @@ export type SceneNumber = 1 | 2 | 3 | 4;
 
 export type PricingAction =
   | "chose_free"
+  | "chose_mini"
   | "chose_starter"
   | "chose_pro"
   | "explore_more"

@@ -17,7 +17,7 @@ import type { PricingAction } from "@/features/onboarding-survey/types/survey";
 interface Scene4Props {
   onPick: (action: PricingAction) => void;
   /** Which paid plan is mid-checkout — used to show per-card spinner. */
-  loadingPlan?: "starter" | "pro" | null;
+  loadingPlan?: "mini" | "starter" | "pro" | null;
 }
 
 export function Scene4_Pricing({ onPick, loadingPlan }: Scene4Props) {
@@ -34,6 +34,14 @@ export function Scene4_Pricing({ onPick, loadingPlan }: Scene4Props) {
     const t1 = setTimeout(() => setCelebrating(false), 1500);
     return () => clearTimeout(t1);
   }, []);
+
+  const miniFeatures = [
+    t("survey.scene4.mini.f1"),
+    t("survey.scene4.mini.f2"),
+    t("survey.scene4.mini.f3"),
+    t("survey.scene4.mini.f4"),
+    t("survey.scene4.mini.f5"),
+  ];
 
   const starterFeatures = [
     t("survey.scene4.starter.f1"),
@@ -134,12 +142,17 @@ export function Scene4_Pricing({ onPick, loadingPlan }: Scene4Props) {
         </p>
       </motion.div>
 
-      {/* Plans — Free / Starter (Most Popular) / Pro */}
+      {/* Plans — Mini (₹99) / Starter (Most Popular) / Pro */}
       <div className="survey-plans-grid" style={{ width: "100%", maxWidth: 1080 }}>
         <style>{`
           .survey-plans-grid {
             display: grid;
-            grid-template-columns: 1fr 1.18fr 1fr;
+            /* Equal columns — all three cards render at the same width and
+               height so the grid reads as a symmetric triptych. Starter's
+               "featured" status is communicated purely via its stronger
+               glow, faster aurora shimmer, larger price, and the centered
+               top badge — not via physical size. */
+            grid-template-columns: 1fr 1fr 1fr;
             gap: 16px;
             align-items: stretch;
           }
@@ -149,16 +162,19 @@ export function Scene4_Pricing({ onPick, loadingPlan }: Scene4Props) {
         `}</style>
 
         <PlanCard
-          kind="free"
-          label={t("survey.scene4.free.label")}
-          priceLabel={t("survey.scene4.free.price")}
-          tagline={t("survey.scene4.free.tagline")}
-          ctaLabel={t("survey.scene4.free.cta")}
-          ctaSubtitle={t("survey.scene4.free.ctaSub")}
-          honestNote={t("survey.scene4.free.honest")}
-          featureLabels={[]}
-          onSelect={() => onPick("chose_free")}
-          loading={false}
+          kind="mini"
+          label={t("survey.scene4.mini.label")}
+          priceLabel="₹"
+          priceNumeric={99}
+          priceSuffix={t("survey.scene4.mini.priceSuffix")}
+          tagline={t("survey.scene4.mini.tagline")}
+          ctaLabel={t("survey.scene4.mini.cta")}
+          ctaSubtitle={t("survey.scene4.mini.ctaSub")}
+          honestNote={t("survey.scene4.mini.honest")}
+          featureLabels={miniFeatures}
+          onSelect={() => onPick("chose_mini")}
+          badgeLabel={t("survey.scene4.mini.badge")}
+          loading={loadingPlan === "mini"}
         />
 
         <PlanCard
@@ -195,10 +211,13 @@ export function Scene4_Pricing({ onPick, loadingPlan }: Scene4Props) {
         />
       </div>
 
-      {/* Explore-more tertiary affordance — routes to full /dashboard/billing */}
+      {/* Tertiary affordance — bail-out path to the free/limited experience.
+          Mirrors the old "chose_free" flow: finalize + redirect straight to
+          /dashboard. Kept as a low-emphasis dashed pill so it doesn't steal
+          attention from the paid CTAs, but now clearly labelled. */}
       <motion.button
         type="button"
-        onClick={() => onPick("explore_more")}
+        onClick={() => onPick("chose_free")}
         disabled={anyLoading}
         initial={{ opacity: 0, y: 6 }}
         animate={{ opacity: 1, y: 0 }}
@@ -222,7 +241,7 @@ export function Scene4_Pricing({ onPick, loadingPlan }: Scene4Props) {
           letterSpacing: "0.005em",
         }}
       >
-        {t("survey.scene4.exploreMore")}
+        {t("survey.scene4.tryFree")}
         <ArrowUpRight size={14} />
       </motion.button>
       <div
@@ -233,7 +252,7 @@ export function Scene4_Pricing({ onPick, loadingPlan }: Scene4Props) {
           textAlign: "center",
         }}
       >
-        {t("survey.scene4.exploreMoreSub")}
+        {t("survey.scene4.tryFreeSub")}
       </div>
 
       {/* Social proof */}

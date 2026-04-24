@@ -7,7 +7,7 @@ import { useLocale } from "@/hooks/useLocale";
 import { SPRING } from "@/features/onboarding-survey/lib/scene-motion";
 import { PREBUILT_WORKFLOWS_MAP } from "@/features/workflows/constants/prebuilt-workflows";
 
-type PlanKind = "free" | "starter" | "pro";
+type PlanKind = "free" | "mini" | "starter" | "pro";
 
 interface PlanCardProps {
   kind: PlanKind;
@@ -28,8 +28,40 @@ interface PlanCardProps {
 
 const FEATURE_ICONS = [Sparkles, Box, Film, FileSpreadsheet, Zap, Check];
 
-/** Aurora-themed colour palette for paid plans — keeps the onboarding mood. */
+/**
+ * Aurora-themed colour palette for paid plans.
+ *
+ * Tuned for a left-to-right temperature progression:
+ *   MINI → warm amber (entry, chai vibe)
+ *   STARTER → cool emerald/teal (featured, fresh)
+ *   PRO → deep indigo/violet (premium)
+ *
+ * Previously MINI slid into rose (#F43F5E) and PRO into hot pink (#EC4899).
+ * Together with Starter's green, the three cards read like a rainbow.
+ * The updated palette keeps each tier distinguishable but stays within a
+ * coherent family — amber stays amber, pro stays blue-violet, no stray
+ * pinks bleeding into either card.
+ */
 const PAID_THEME = {
+  mini: {
+    bgGradient:
+      "linear-gradient(145deg, rgba(245,158,11,0.08), rgba(249,115,22,0.06), rgba(217,119,6,0.05))",
+    border: "rgba(245,158,11,0.32)",
+    shadow:
+      "0 18px 56px rgba(0,0,0,0.45), 0 0 36px rgba(245,158,11,0.14), inset 0 1px 0 rgba(255,255,255,0.06)",
+    auroraGradient:
+      "linear-gradient(90deg, transparent, rgba(245,158,11,0.9), rgba(249,115,22,0.9), rgba(217,119,6,0.9), transparent)",
+    accentText: "#FCD34D",
+    priceGradient: "linear-gradient(135deg, #F59E0B, #F97316, #D97706)",
+    iconBg: "rgba(245,158,11,0.14)",
+    iconBorder: "rgba(245,158,11,0.28)",
+    iconColor: "#FCD34D",
+    ctaGradient: "linear-gradient(135deg, #F59E0B 0%, #F97316 50%, #D97706 100%)",
+    ctaShadow: "0 8px 28px rgba(245,158,11,0.35), inset 0 1px 0 rgba(255,255,255,0.2)",
+    badgeBg: "linear-gradient(135deg, rgba(245,158,11,0.28), rgba(249,115,22,0.28))",
+    badgeBorder: "rgba(245,158,11,0.5)",
+    badgeText: "#FDE68A",
+  },
   starter: {
     bgGradient:
       "linear-gradient(145deg, rgba(16,185,129,0.08), rgba(20,184,166,0.06), rgba(34,211,238,0.06))",
@@ -51,22 +83,22 @@ const PAID_THEME = {
   },
   pro: {
     bgGradient:
-      "linear-gradient(145deg, rgba(79,138,255,0.06), rgba(139,92,246,0.05), rgba(236,72,153,0.05))",
+      "linear-gradient(145deg, rgba(79,138,255,0.06), rgba(99,102,241,0.06), rgba(139,92,246,0.05))",
     border: "rgba(79,138,255,0.3)",
     shadow:
-      "0 18px 56px rgba(0,0,0,0.45), 0 0 40px rgba(79,138,255,0.08), inset 0 1px 0 rgba(255,255,255,0.06)",
+      "0 18px 56px rgba(0,0,0,0.45), 0 0 40px rgba(99,102,241,0.10), inset 0 1px 0 rgba(255,255,255,0.06)",
     auroraGradient:
-      "linear-gradient(90deg, transparent, rgba(79,138,255,0.9), rgba(139,92,246,0.9), rgba(236,72,153,0.9), transparent)",
+      "linear-gradient(90deg, transparent, rgba(79,138,255,0.9), rgba(99,102,241,0.9), rgba(139,92,246,0.9), transparent)",
     accentText: "#A5B4FC",
-    priceGradient: "linear-gradient(135deg, #4F8AFF, #8B5CF6, #EC4899)",
-    iconBg: "rgba(79,138,255,0.14)",
-    iconBorder: "rgba(79,138,255,0.25)",
+    priceGradient: "linear-gradient(135deg, #4F8AFF, #6366F1, #8B5CF6)",
+    iconBg: "rgba(99,102,241,0.16)",
+    iconBorder: "rgba(99,102,241,0.28)",
     iconColor: "#A5B4FC",
     ctaGradient: "linear-gradient(135deg, #4F8AFF 0%, #6366F1 50%, #8B5CF6 100%)",
-    ctaShadow: "0 8px 28px rgba(79,138,255,0.4), inset 0 1px 0 rgba(255,255,255,0.2)",
-    badgeBg: "linear-gradient(135deg, rgba(79,138,255,0.2), rgba(139,92,246,0.2))",
-    badgeBorder: "rgba(79,138,255,0.35)",
-    badgeText: "#A5B4FC",
+    ctaShadow: "0 8px 28px rgba(99,102,241,0.4), inset 0 1px 0 rgba(255,255,255,0.2)",
+    badgeBg: "linear-gradient(135deg, rgba(79,138,255,0.22), rgba(139,92,246,0.22))",
+    badgeBorder: "rgba(99,102,241,0.45)",
+    badgeText: "#C7D2FE",
   },
 } as const;
 
@@ -187,8 +219,8 @@ function FreePlan(props: PlanCardProps) {
   );
 }
 
-// ── Paid plan (Starter or Pro, themed) ─────────────────────────────────
-function PaidPlan(props: PlanCardProps & { kind: "starter" | "pro" }) {
+// ── Paid plan (Mini, Starter, or Pro — themed) ─────────────────────────
+function PaidPlan(props: PlanCardProps & { kind: "mini" | "starter" | "pro" }) {
   const { t } = useLocale();
   const theme = PAID_THEME[props.kind];
   const [price, setPrice] = useState(0);
@@ -212,11 +244,15 @@ function PaidPlan(props: PlanCardProps & { kind: "starter" | "pro" }) {
 
   return (
     <motion.div
-      whileHover={{ y: emphasized ? -10 : -6 }}
+      whileHover={{ y: -6 }}
       transition={SPRING.smooth}
       style={{
         position: "relative",
-        padding: emphasized ? "34px 28px" : "30px 26px",
+        // Uniform padding so all three cards share the same geometry.
+        // Starter still reads as "featured" via its stronger glow, faster
+        // aurora shimmer, larger price, and the centered top badge — but
+        // the cards are pixel-symmetric.
+        padding: "32px 26px",
         borderRadius: 20,
         background: theme.bgGradient,
         border: `1px solid ${theme.border}`,
@@ -228,8 +264,6 @@ function PaidPlan(props: PlanCardProps & { kind: "starter" | "pro" }) {
         gap: 18,
         color: "var(--text-primary)",
         overflow: "hidden",
-        // Subtle scale-up for the emphasized card so the eye lands there first.
-        transform: emphasized ? "translateY(-6px)" : undefined,
       }}
     >
       {/* Aurora shimmer sweep across the top border */}
@@ -249,40 +283,54 @@ function PaidPlan(props: PlanCardProps & { kind: "starter" | "pro" }) {
         }}
       />
 
-      {/* Badge — Most Popular / Premium / Recommended */}
+      {/* Badge — Most Popular / Best Value / Recommended.
+          All three cards now use the SAME top-right position for full
+          symmetry. Previously Starter's badge was centered on the card's
+          top border via a translate(-50%, -50%) trick — but because the
+          card has overflow:hidden (needed to clip the aurora shimmer),
+          the upper half of a "floating" badge got visually sliced off.
+          Keeping the badge fully inside the card fixes the clipping,
+          matches MINI/PRO positioning exactly, and leaves Starter's
+          "featured" emphasis to the stronger glow + faster shimmer +
+          larger price + distinct green theme. */}
       {props.badgeLabel && (
-        <motion.div
-          initial={{ opacity: 0, y: -4 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1, duration: 0.4 }}
+        <div
           style={{
             position: "absolute",
-            top: emphasized ? -1 : 16,
-            right: emphasized ? "50%" : 16,
-            transform: emphasized ? "translate(50%, -50%)" : undefined,
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 5,
-            padding: emphasized ? "5px 14px" : "3px 10px",
-            borderRadius: 999,
-            background: theme.badgeBg,
-            border: `1px solid ${theme.badgeBorder}`,
-            fontSize: emphasized ? 10.5 : 10,
-            fontWeight: 700,
-            letterSpacing: "0.14em",
-            textTransform: "uppercase",
-            color: theme.badgeText,
-            whiteSpace: "nowrap",
-            backdropFilter: "blur(6px)",
-            WebkitBackdropFilter: "blur(6px)",
+            top: 16,
+            right: 16,
+            zIndex: 2,
           }}
         >
-          <Sparkles size={10} />
-          {props.badgeLabel}
-        </motion.div>
+          <motion.div
+            initial={{ opacity: 0, y: -4 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1, duration: 0.4 }}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 5,
+              padding: "3px 10px",
+              borderRadius: 999,
+              background: theme.badgeBg,
+              border: `1px solid ${theme.badgeBorder}`,
+              fontSize: 10,
+              fontWeight: 700,
+              letterSpacing: "0.14em",
+              textTransform: "uppercase",
+              color: theme.badgeText,
+              whiteSpace: "nowrap",
+              backdropFilter: "blur(6px)",
+              WebkitBackdropFilter: "blur(6px)",
+            }}
+          >
+            <Sparkles size={10} />
+            {props.badgeLabel}
+          </motion.div>
+        </div>
       )}
 
-      <div style={{ marginTop: emphasized && props.badgeLabel ? 8 : 0 }}>
+      <div>
         <div
           style={{
             fontSize: 11,
@@ -353,51 +401,67 @@ function PaidPlan(props: PlanCardProps & { kind: "starter" | "pro" }) {
         })}
       </div>
 
-      <div style={{ fontSize: 11, color: "var(--text-tertiary)", lineHeight: 1.55, fontStyle: "italic" }}>
-        {props.honestNote}
-      </div>
-
-      <motion.button
-        type="button"
-        onClick={props.onSelect}
-        disabled={props.loading}
-        whileHover={{ scale: props.loading ? 1 : 1.02 }}
-        whileTap={{ scale: props.loading ? 1 : 0.97 }}
+      {/* Bottom cluster — honest note + CTA + subtitle anchored to the
+          card's bottom edge via `marginTop: "auto"`. Because the grid has
+          `align-items: stretch`, all three cards share the tallest card's
+          height. Without this anchor the CTA buttons would sit at
+          different y-positions (taglines and honest-notes have different
+          line counts). With the anchor, Get Mini / Get Starter / Go Pro
+          all share the same baseline. */}
+      <div
         style={{
-          padding: "14px 22px",
-          borderRadius: 12,
-          background: theme.ctaGradient,
-          border: "none",
-          color: "#fff",
-          fontSize: 14.5,
-          fontWeight: 700,
-          cursor: props.loading ? "wait" : "pointer",
-          opacity: props.loading ? 0.85 : 1,
+          marginTop: "auto",
           display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          gap: 8,
-          boxShadow: theme.ctaShadow,
-          letterSpacing: "-0.005em",
+          flexDirection: "column",
+          gap: 14,
         }}
       >
-        {props.loading ? (
-          <>
-            <Loader2 size={14} className="spin-anim" />
-            {t("survey.scene4.processing")}
-          </>
-        ) : (
-          <>
-            {props.ctaLabel}
-            <ArrowRight size={14} />
-          </>
-        )}
-      </motion.button>
-      {props.ctaSubtitle && (
-        <div style={{ fontSize: 11, color: "var(--text-disabled)", textAlign: "center", marginTop: -8 }}>
-          {props.ctaSubtitle}
+        <div style={{ fontSize: 11, color: "var(--text-tertiary)", lineHeight: 1.55, fontStyle: "italic" }}>
+          {props.honestNote}
         </div>
-      )}
+
+        <motion.button
+          type="button"
+          onClick={props.onSelect}
+          disabled={props.loading}
+          whileHover={{ scale: props.loading ? 1 : 1.02 }}
+          whileTap={{ scale: props.loading ? 1 : 0.97 }}
+          style={{
+            padding: "14px 22px",
+            borderRadius: 12,
+            background: theme.ctaGradient,
+            border: "none",
+            color: "#fff",
+            fontSize: 14.5,
+            fontWeight: 700,
+            cursor: props.loading ? "wait" : "pointer",
+            opacity: props.loading ? 0.85 : 1,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 8,
+            boxShadow: theme.ctaShadow,
+            letterSpacing: "-0.005em",
+          }}
+        >
+          {props.loading ? (
+            <>
+              <Loader2 size={14} className="spin-anim" />
+              {t("survey.scene4.processing")}
+            </>
+          ) : (
+            <>
+              {props.ctaLabel}
+              <ArrowRight size={14} />
+            </>
+          )}
+        </motion.button>
+        {props.ctaSubtitle && (
+          <div style={{ fontSize: 11, color: "var(--text-disabled)", textAlign: "center", marginTop: -6 }}>
+            {props.ctaSubtitle}
+          </div>
+        )}
+      </div>
 
       <style jsx>{`
         @keyframes plancardSpin {
