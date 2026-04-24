@@ -774,6 +774,7 @@ const en = {
   'dash.templateShowcase': 'Workflow Templates',
   'dash.templateShowcaseSub': 'Pre-built pipelines ready to run. Pick one and start building.',
   'dash.viewAll': 'View All Templates',
+  'dash.bookDemo': 'Book a Demo',
   'dash.quickStartSection': 'Quick Start',
   'dash.quickStartDesc': 'Get your first output in under 2 minutes',
   'dash.corePipelines': 'Core Pipelines',
@@ -2811,6 +2812,7 @@ const en = {
   'light.heroLine2': 'in one workflow.',
   'light.heroSubtitle': 'AI-powered concept design. Upload a brief, get 3D massing, renders, and cost estimates — in minutes, not weeks.',
   'light.tryDemo': 'Try the Demo',
+  'light.bookDemo': 'Book a Demo',
   'light.trustFreeTier': 'Free tier available',
 
   // ── Phase 2: What It Does ──
@@ -3609,6 +3611,7 @@ const de: Record<keyof typeof en, string | string[]> = {
   'dash.templateShowcase': 'Workflow-Vorlagen',
   'dash.templateShowcaseSub': 'Fertige Pipelines zum Starten. Wählen Sie eine und bauen Sie los.',
   'dash.viewAll': 'Alle Vorlagen anzeigen',
+  'dash.bookDemo': 'Demo buchen',
   'dash.quickStartSection': 'Schnellstart',
   'dash.quickStartDesc': 'Erste Ergebnisse in unter 2 Minuten',
   'dash.corePipelines': 'Kern-Pipelines',
@@ -5643,6 +5646,7 @@ const de: Record<keyof typeof en, string | string[]> = {
   'light.heroLine2': 'in einem Workflow.',
   'light.heroSubtitle': 'KI-gestütztes Konzeptdesign. Briefing hochladen, 3D-Massenmodelle, Renderings und Kostenschätzungen erhalten — in Minuten, nicht Wochen.',
   'light.tryDemo': 'Demo ausprobieren',
+  'light.bookDemo': 'Demo buchen',
   'light.trustFreeTier': 'Kostenlose Version verfügbar',
 
   // ── Phase 2: What It Does ──

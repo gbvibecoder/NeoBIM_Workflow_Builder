@@ -6,6 +6,7 @@ import {
   planChangedEmail,
   verificationEmail,
   passwordResetEmail,
+  demoRequestConfirmationEmail,
 } from './email-templates';
 import { CONTACT_EMAIL } from "@/constants/contact";
 
@@ -151,6 +152,32 @@ function escapeHtml(str: string): string {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
+}
+
+// ── Demo-request confirmation (user-facing) ───────────────────────────────
+//
+// Sent to the form submitter right after the team notification so they get
+// immediate acknowledgement + clear expectation on the 24-hour calendar
+// invite. Failures are logged but don't block the request — the team
+// notification is the source of truth.
+
+export async function sendDemoRequestConfirmationEmail(data: {
+  email: string;
+  name: string;
+  company?: string;
+  role?: string;
+  message?: string;
+}): Promise<void> {
+  await sendEmail({
+    to: data.email,
+    subject: 'Your BuildFlow demo is queued — we\'ll be in touch within 24 hours',
+    html: demoRequestConfirmationEmail({
+      name: data.name,
+      company: data.company,
+      role: data.role,
+      message: data.message,
+    }),
+  });
 }
 
 export async function sendPlanChangedEmail(

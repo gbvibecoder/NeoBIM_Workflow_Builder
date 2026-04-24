@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { checkEndpointRateLimit, getClientIp } from "@/lib/rate-limit";
-import { sendInboundLeadNotification } from "@/shared/services/email";
+import {
+  sendInboundLeadNotification,
+  sendDemoRequestConfirmationEmail,
+} from "@/shared/services/email";
 
 const EMAIL_REGEX = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*\.[a-zA-Z]{2,}$/;
 
@@ -55,7 +58,12 @@ export async function POST(req: Request) {
       );
     }).catch(() => {});
 
-    // Send notification email to team
+    // Fan out two emails in parallel — neither blocks the HTTP response.
+    // 1) Team notification → buildflow786@gmail.com (via TEAM_NOTIFICATION_EMAIL
+    //    → CONTACT_EMAIL fallback). Internal lead routing.
+    // 2) User confirmation → the submitter's inbox. Acknowledges the request
+    //    and sets the 24-hour calendar-invite expectation, so the user has
+    //    proof of submission immediately instead of waiting for the rep.
     sendInboundLeadNotification({
       type: "Demo Request",
       name,
@@ -64,7 +72,15 @@ export async function POST(req: Request) {
       company,
       role,
       message,
-    }).catch((err) => console.error("[book-demo] Failed to send notification email", err));
+    }).catch((err) => console.error("[book-demo] Failed to send team notification email", err));
+
+    sendDemoRequestConfirmationEmail({
+      email,
+      name,
+      company,
+      role,
+      message,
+    }).catch((err) => console.error("[book-demo] Failed to send user confirmation email", err));
 
     return NextResponse.json({ success: true });
   } catch (error) {

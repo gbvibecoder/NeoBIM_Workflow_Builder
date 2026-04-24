@@ -148,17 +148,17 @@ export default async function TemplatePage({
             Use This Template Free →
           </Link>
           <Link
-            href="/demo"
+            href="/book-demo"
             style={{
               display: "inline-flex", alignItems: "center", gap: 8,
               padding: "14px 24px", borderRadius: 12,
-              border: "1px solid rgba(255,255,255,0.08)",
-              background: "transparent",
-              color: "#9898B0", fontSize: 14, fontWeight: 600,
+              border: "1px solid rgba(79,138,255,0.3)",
+              background: "rgba(79,138,255,0.06)",
+              color: "#A5B4FC", fontSize: 14, fontWeight: 600,
               textDecoration: "none",
             }}
           >
-            Try Demo First
+            Book a Demo
           </Link>
         </div>
 

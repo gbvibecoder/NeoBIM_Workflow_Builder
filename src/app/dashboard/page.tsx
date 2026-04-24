@@ -8,7 +8,7 @@ import {
   ArrowRight, Play, Plus, Zap, ChevronDown,
   Type, FileText, Image as ImageIcon, Box, Sliders, MapPin,
   Sparkles, Palette, Building2, FileSpreadsheet, X, ChevronRight,
-  Layers, Trophy, Crown,
+  Layers, Trophy, Crown, Calendar,
 } from "lucide-react";
 import { PREBUILT_WORKFLOWS } from "@/features/workflows/constants/prebuilt-workflows";
 import { useWorkflowStore } from "@/features/workflows/stores/workflow-store";
@@ -737,12 +737,12 @@ export default function DashboardPage() {
         </section>
 
         {/* ═══════════════════════════════════════════════════════════════
-            EXPLORE TEMPLATES CTA
+            EXPLORE TEMPLATES CTA + BOOK DEMO
             ═══════════════════════════════════════════════════════════════ */}
         <motion.div
           initial="hidden" whileInView="visible" viewport={{ once: true }}
           variants={fadeIn} transition={{ duration: 0.6, ease }}
-          style={{ textAlign: "center", padding: "48px 32px 56px" }}
+          style={{ textAlign: "center", padding: "48px 32px 56px", display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap" }}
         >
           <Link
             href="/dashboard/templates"
@@ -759,6 +759,25 @@ export default function DashboardPage() {
             }}
           >
             {t("dash.viewAll")} <ArrowRight size={16} />
+          </Link>
+          {/* Book a Demo — companion CTA for users who want a guided walkthrough
+              instead of exploring templates on their own. Styled distinctly so
+              it reads as a second option, not a duplicate of View All. */}
+          <Link
+            href="/book-demo"
+            style={{
+              display: "inline-flex", alignItems: "center", gap: 10,
+              padding: "14px 32px", borderRadius: 16,
+              background: "linear-gradient(135deg, rgba(79,138,255,0.14), rgba(99,102,241,0.1))",
+              border: "1px solid rgba(79,138,255,0.35)",
+              color: "#C7D2FE", fontSize: 15, fontWeight: 700,
+              textDecoration: "none", letterSpacing: "0.01em",
+              backdropFilter: "blur(12px)",
+              boxShadow: "0 0 20px rgba(79,138,255,0.1)",
+              transition: "all 0.35s cubic-bezier(0.22, 1, 0.36, 1)",
+            }}
+          >
+            <Calendar size={15} /> {t("dash.bookDemo")}
           </Link>
         </motion.div>
 

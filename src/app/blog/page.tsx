@@ -6,8 +6,8 @@ import Link from "next/link";
 import {
   ArrowLeft, ArrowRight, Clock, Building2, Layers, FileSpreadsheet,
   Cpu, FileText, Box, Palette, PenTool, Mail, Image as ImageIcon,
-  MonitorPlay, Zap, ChevronDown, BarChart3, AlertTriangle, CheckCircle2,
-  Timer, Quote, Hash,
+  Zap, ChevronDown, BarChart3, AlertTriangle, CheckCircle2,
+  Timer, Quote, Hash, Calendar,
 } from "lucide-react";
 
 // ─── Constants ──────────────────────────────────────────────────────────────
@@ -1723,7 +1723,7 @@ export default function BlogArticle() {
                   Try BuildFlow Free <ArrowRight size={16} />
                 </Link>
                 <Link
-                  href="/demo"
+                  href="/book-demo"
                   style={{
                     display: "inline-flex", alignItems: "center", gap: 8,
                     padding: "14px 28px", borderRadius: 14,
@@ -1742,7 +1742,7 @@ export default function BlogArticle() {
                     e.currentTarget.style.color = COLORS.textSecondary;
                   }}
                 >
-                  <MonitorPlay size={16} /> Try the Demo
+                  <Calendar size={16} /> Book a Demo
                 </Link>
               </div>
             </div>

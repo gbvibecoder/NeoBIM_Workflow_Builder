@@ -5,7 +5,7 @@ import Link from "next/link";
 import { motion, AnimatePresence, useScroll, useTransform, useInView } from "framer-motion";
 import {
   Play, Pause, X, Volume2, VolumeX, Maximize,
-  ArrowRight, ChevronDown, Clock,
+  ArrowRight, ChevronDown, Clock, Calendar,
 } from "lucide-react";
 import CommunityVideoSection from "@/features/community/components/CommunityVideoSection";
 
@@ -1203,8 +1203,8 @@ export default function WorkflowShowcasePage() {
               Start with any workflow or design from scratch. No coding — just drag, connect, and run.
             </p>
             <div style={{ display: "flex", justifyContent: "center", gap: 12, flexWrap: "wrap" }}>
-              <Link href="/demo" style={{ padding: "11px 24px", borderRadius: 8, fontSize: 14, fontWeight: 700, color: "#000", background: `linear-gradient(135deg, ${C.cyan}, ${C.blue})`, textDecoration: "none", boxShadow: `0 4px 20px rgba(${rgb(C.cyan)}, 0.25)`, display: "flex", alignItems: "center", gap: 8 }}>
-                <Play size={14} fill="#000" /> Try Live Demo
+              <Link href="/book-demo" style={{ padding: "11px 24px", borderRadius: 8, fontSize: 14, fontWeight: 700, color: "#fff", background: `linear-gradient(135deg, ${C.blue}, ${C.violet})`, textDecoration: "none", boxShadow: `0 4px 20px rgba(${rgb(C.blue)}, 0.3)`, display: "flex", alignItems: "center", gap: 8 }}>
+                <Calendar size={14} /> Book a Demo
               </Link>
               <Link href="/dashboard" style={{ padding: "11px 24px", borderRadius: 8, fontSize: 14, fontWeight: 600, color: C.text, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", textDecoration: "none", display: "flex", alignItems: "center", gap: 8 }}>
                 Start Building <ArrowRight size={14} />
