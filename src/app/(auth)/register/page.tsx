@@ -8,7 +8,7 @@ import { Mail, Lock, User, Chrome, Loader2, Eye, EyeOff, Gift } from "lucide-rea
 import { motion } from "framer-motion";
 import { useLocale } from "@/hooks/useLocale";
 import { LanguageSwitcher } from "@/shared/components/ui/LanguageSwitcher";
-import { trackCompleteRegistration, trackRegisterPageView } from "@/lib/meta-pixel";
+import { trackAdsConversion, trackCompleteRegistration, trackRegisterPageView } from "@/lib/meta-pixel";
 import { pushToDataLayer, pushEnhancedConversionData } from "@/lib/gtm";
 import { validateEmail, validatePhone, normalizePhone } from "@/lib/form-validation";
 
@@ -151,6 +151,15 @@ function RegisterForm() {
       });
       pushToDataLayer("sign_up_complete", { method: "credentials", event_id: signupEventId });
 
+      // Enhanced Conversions data above is hashed and queued; gtag pairs it with
+      // this conversion event using transaction_id as the join key.
+      const signupAdsLabel = process.env.NEXT_PUBLIC_GOOGLE_ADS_SIGNUP_LABEL;
+      if (signupAdsLabel) {
+        trackAdsConversion(signupAdsLabel, {
+          transaction_id: signupEventId,
+        });
+      }
+
       // Auto-login: for email use email creds, for phone use phone creds
       if (isEmail) {
         await signIn("credentials", {
@@ -184,6 +193,10 @@ function RegisterForm() {
       // pre-OAuth, so Enhanced Conversions is skipped on the Google path
       // (Google's own OAuth callback data covers that matching on the ad side).
       pushToDataLayer("sign_up_complete", { method: "google" });
+      const signupAdsLabel = process.env.NEXT_PUBLIC_GOOGLE_ADS_SIGNUP_LABEL;
+      if (signupAdsLabel) {
+        trackAdsConversion(signupAdsLabel);
+      }
       await signIn("google", { callbackUrl: "/onboard" });
     } catch (err) {
       setError(extractErrorMessage(err, t('auth.somethingWentWrong')));

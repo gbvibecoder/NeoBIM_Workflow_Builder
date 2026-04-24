@@ -10,7 +10,7 @@ import {
   Share2, Copy, Check, ArrowRight, Crown, Rocket,
 } from "lucide-react";
 import { pushToDataLayer, pushEnhancedConversionData } from "@/lib/gtm";
-import { trackPurchase } from "@/lib/meta-pixel";
+import { trackAdsConversion, trackPurchase } from "@/lib/meta-pixel";
 import { getPurchaseEventId, getPlanValueINR } from "@/lib/plan-pricing";
 
 /* ── Confetti burst canvas ───────────────────────────────────── */
@@ -226,6 +226,15 @@ function Content() {
       value,
       ...(eventID && { event_id: eventID }),
     });
+
+    const purchaseAdsLabel = process.env.NEXT_PUBLIC_GOOGLE_ADS_PURCHASE_LABEL;
+    if (purchaseAdsLabel) {
+      trackAdsConversion(purchaseAdsLabel, {
+        value,
+        currency: "INR",
+        ...(eventID && { transaction_id: eventID }),
+      });
+    }
   }, [session, plan, userRole, planFromUrl]);
 
   useEffect(() => {
