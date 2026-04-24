@@ -437,11 +437,21 @@ function WorkflowCanvasInner({ workflowId: urlWorkflowId, templateId, forceNew =
         setTimeout(() => setEdgeFlowing(node.id, false), i * edgeDelay + 300);
       });
 
-      // Show grand reveal showcase after a short delay
-      const timer = setTimeout(() => setShowShowcase(true), 500);
+      // Phase D rewire: under NEXT_PUBLIC_RESULTS_V2, navigate to the V2 result
+      // URL instead of opening the legacy overlay. Falls back to the overlay
+      // when (a) the flag is OFF or (b) no execution id is available.
+      const timer = setTimeout(() => {
+        const state = useExecutionStore.getState();
+        const execId = state.currentExecution?.id ?? state.currentDbExecutionId ?? null;
+        if (process.env.NEXT_PUBLIC_RESULTS_V2 === "true" && execId) {
+          router.push(`/dashboard/results/${execId}`);
+        } else {
+          setShowShowcase(true);
+        }
+      }, 500);
       return () => { clearTimeout(timer); };
     }
-  }, [isExecuting, artifacts, storeNodes, setEdgeFlowing]);
+  }, [isExecuting, artifacts, storeNodes, setEdgeFlowing, router]);
   const [nodes, setNodes, onNodesChange] = useNodesState(storeNodes as unknown as Node[]);
   const [edges, setEdges, onEdgesChange] = useEdgesState(storeEdges as Edge[]);
 
@@ -1002,7 +1012,15 @@ function WorkflowCanvasInner({ workflowId: urlWorkflowId, templateId, forceNew =
               <motion.button
                 className="view-results-fab"
                 key="view-results-fab"
-                onClick={() => setShowShowcase(true)}
+                onClick={() => {
+                  const state = useExecutionStore.getState();
+                  const execId = state.currentExecution?.id ?? state.currentDbExecutionId ?? null;
+                  if (process.env.NEXT_PUBLIC_RESULTS_V2 === "true" && execId) {
+                    router.push(`/dashboard/results/${execId}`);
+                  } else {
+                    setShowShowcase(true);
+                  }
+                }}
                 initial={{ opacity: 0, y: 16 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: 8 }}
