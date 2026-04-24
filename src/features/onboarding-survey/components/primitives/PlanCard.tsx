@@ -283,31 +283,24 @@ function PaidPlan(props: PlanCardProps & { kind: "mini" | "starter" | "pro" }) {
         }}
       />
 
-      {/* Badge — Most Popular / Premium / Recommended.
-          The outer div owns POSITIONING; the inner motion.div owns
-          ANIMATION. If we set both on a single motion element, Framer's
-          transform (from animating `y`) would stomp our inline
-          `transform: translate(-50%, -50%)` after the entry animation
-          completes, and the emphasized "MOST POPULAR" badge would drift
-          left of the card's horizontal center. */}
+      {/* Badge — Most Popular / Best Value / Recommended.
+          All three cards now use the SAME top-right position for full
+          symmetry. Previously Starter's badge was centered on the card's
+          top border via a translate(-50%, -50%) trick — but because the
+          card has overflow:hidden (needed to clip the aurora shimmer),
+          the upper half of a "floating" badge got visually sliced off.
+          Keeping the badge fully inside the card fixes the clipping,
+          matches MINI/PRO positioning exactly, and leaves Starter's
+          "featured" emphasis to the stronger glow + faster shimmer +
+          larger price + distinct green theme. */}
       {props.badgeLabel && (
         <div
-          style={
-            emphasized
-              ? {
-                  position: "absolute",
-                  top: 0,
-                  left: "50%",
-                  transform: "translate(-50%, -50%)",
-                  zIndex: 2,
-                }
-              : {
-                  position: "absolute",
-                  top: 16,
-                  right: 16,
-                  zIndex: 2,
-                }
-          }
+          style={{
+            position: "absolute",
+            top: 16,
+            right: 16,
+            zIndex: 2,
+          }}
         >
           <motion.div
             initial={{ opacity: 0, y: -4 }}
@@ -317,11 +310,11 @@ function PaidPlan(props: PlanCardProps & { kind: "mini" | "starter" | "pro" }) {
               display: "inline-flex",
               alignItems: "center",
               gap: 5,
-              padding: emphasized ? "5px 14px" : "3px 10px",
+              padding: "3px 10px",
               borderRadius: 999,
               background: theme.badgeBg,
               border: `1px solid ${theme.badgeBorder}`,
-              fontSize: emphasized ? 10.5 : 10,
+              fontSize: 10,
               fontWeight: 700,
               letterSpacing: "0.14em",
               textTransform: "uppercase",
@@ -337,7 +330,7 @@ function PaidPlan(props: PlanCardProps & { kind: "mini" | "starter" | "pro" }) {
         </div>
       )}
 
-      <div style={{ marginTop: emphasized && props.badgeLabel ? 8 : 0 }}>
+      <div>
         <div
           style={{
             fontSize: 11,
