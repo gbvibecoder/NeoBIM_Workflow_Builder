@@ -140,7 +140,13 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID!,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
-      allowDangerousEmailAccountLinking: false,
+      // Google always returns verified emails (email_verified in the ID token),
+      // so linking a Google login to an existing same-email User row is safe.
+      // Without this, a user who signed up with password and later clicks
+      // "Continue with Google" hits OAuthAccountNotLinked instead of having
+      // their account auto-linked. The "dangerous" label only applies to
+      // providers that don't verify email ownership.
+      allowDangerousEmailAccountLinking: true,
     }),
     CredentialsProvider({
       name: "credentials",
