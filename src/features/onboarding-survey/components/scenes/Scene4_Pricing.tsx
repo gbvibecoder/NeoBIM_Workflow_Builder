@@ -147,7 +147,12 @@ export function Scene4_Pricing({ onPick, loadingPlan }: Scene4Props) {
         <style>{`
           .survey-plans-grid {
             display: grid;
-            grid-template-columns: 1fr 1.18fr 1fr;
+            /* Equal columns — all three cards render at the same width and
+               height so the grid reads as a symmetric triptych. Starter's
+               "featured" status is communicated purely via its stronger
+               glow, faster aurora shimmer, larger price, and the centered
+               top badge — not via physical size. */
+            grid-template-columns: 1fr 1fr 1fr;
             gap: 16px;
             align-items: stretch;
           }

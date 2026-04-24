@@ -28,22 +28,35 @@ interface PlanCardProps {
 
 const FEATURE_ICONS = [Sparkles, Box, Film, FileSpreadsheet, Zap, Check];
 
-/** Aurora-themed colour palette for paid plans — keeps the onboarding mood. */
+/**
+ * Aurora-themed colour palette for paid plans.
+ *
+ * Tuned for a left-to-right temperature progression:
+ *   MINI → warm amber (entry, chai vibe)
+ *   STARTER → cool emerald/teal (featured, fresh)
+ *   PRO → deep indigo/violet (premium)
+ *
+ * Previously MINI slid into rose (#F43F5E) and PRO into hot pink (#EC4899).
+ * Together with Starter's green, the three cards read like a rainbow.
+ * The updated palette keeps each tier distinguishable but stays within a
+ * coherent family — amber stays amber, pro stays blue-violet, no stray
+ * pinks bleeding into either card.
+ */
 const PAID_THEME = {
   mini: {
     bgGradient:
-      "linear-gradient(145deg, rgba(245,158,11,0.08), rgba(249,115,22,0.06), rgba(244,63,94,0.05))",
+      "linear-gradient(145deg, rgba(245,158,11,0.08), rgba(249,115,22,0.06), rgba(217,119,6,0.05))",
     border: "rgba(245,158,11,0.32)",
     shadow:
       "0 18px 56px rgba(0,0,0,0.45), 0 0 36px rgba(245,158,11,0.14), inset 0 1px 0 rgba(255,255,255,0.06)",
     auroraGradient:
-      "linear-gradient(90deg, transparent, rgba(245,158,11,0.9), rgba(249,115,22,0.9), rgba(244,63,94,0.9), transparent)",
+      "linear-gradient(90deg, transparent, rgba(245,158,11,0.9), rgba(249,115,22,0.9), rgba(217,119,6,0.9), transparent)",
     accentText: "#FCD34D",
-    priceGradient: "linear-gradient(135deg, #F59E0B, #F97316, #F43F5E)",
+    priceGradient: "linear-gradient(135deg, #F59E0B, #F97316, #D97706)",
     iconBg: "rgba(245,158,11,0.14)",
     iconBorder: "rgba(245,158,11,0.28)",
     iconColor: "#FCD34D",
-    ctaGradient: "linear-gradient(135deg, #F59E0B 0%, #F97316 50%, #EC4899 100%)",
+    ctaGradient: "linear-gradient(135deg, #F59E0B 0%, #F97316 50%, #D97706 100%)",
     ctaShadow: "0 8px 28px rgba(245,158,11,0.35), inset 0 1px 0 rgba(255,255,255,0.2)",
     badgeBg: "linear-gradient(135deg, rgba(245,158,11,0.28), rgba(249,115,22,0.28))",
     badgeBorder: "rgba(245,158,11,0.5)",
@@ -70,22 +83,22 @@ const PAID_THEME = {
   },
   pro: {
     bgGradient:
-      "linear-gradient(145deg, rgba(79,138,255,0.06), rgba(139,92,246,0.05), rgba(236,72,153,0.05))",
+      "linear-gradient(145deg, rgba(79,138,255,0.06), rgba(99,102,241,0.06), rgba(139,92,246,0.05))",
     border: "rgba(79,138,255,0.3)",
     shadow:
-      "0 18px 56px rgba(0,0,0,0.45), 0 0 40px rgba(79,138,255,0.08), inset 0 1px 0 rgba(255,255,255,0.06)",
+      "0 18px 56px rgba(0,0,0,0.45), 0 0 40px rgba(99,102,241,0.10), inset 0 1px 0 rgba(255,255,255,0.06)",
     auroraGradient:
-      "linear-gradient(90deg, transparent, rgba(79,138,255,0.9), rgba(139,92,246,0.9), rgba(236,72,153,0.9), transparent)",
+      "linear-gradient(90deg, transparent, rgba(79,138,255,0.9), rgba(99,102,241,0.9), rgba(139,92,246,0.9), transparent)",
     accentText: "#A5B4FC",
-    priceGradient: "linear-gradient(135deg, #4F8AFF, #8B5CF6, #EC4899)",
-    iconBg: "rgba(79,138,255,0.14)",
-    iconBorder: "rgba(79,138,255,0.25)",
+    priceGradient: "linear-gradient(135deg, #4F8AFF, #6366F1, #8B5CF6)",
+    iconBg: "rgba(99,102,241,0.16)",
+    iconBorder: "rgba(99,102,241,0.28)",
     iconColor: "#A5B4FC",
     ctaGradient: "linear-gradient(135deg, #4F8AFF 0%, #6366F1 50%, #8B5CF6 100%)",
-    ctaShadow: "0 8px 28px rgba(79,138,255,0.4), inset 0 1px 0 rgba(255,255,255,0.2)",
-    badgeBg: "linear-gradient(135deg, rgba(79,138,255,0.2), rgba(139,92,246,0.2))",
-    badgeBorder: "rgba(79,138,255,0.35)",
-    badgeText: "#A5B4FC",
+    ctaShadow: "0 8px 28px rgba(99,102,241,0.4), inset 0 1px 0 rgba(255,255,255,0.2)",
+    badgeBg: "linear-gradient(135deg, rgba(79,138,255,0.22), rgba(139,92,246,0.22))",
+    badgeBorder: "rgba(99,102,241,0.45)",
+    badgeText: "#C7D2FE",
   },
 } as const;
 
@@ -231,11 +244,15 @@ function PaidPlan(props: PlanCardProps & { kind: "mini" | "starter" | "pro" }) {
 
   return (
     <motion.div
-      whileHover={{ y: emphasized ? -10 : -6 }}
+      whileHover={{ y: -6 }}
       transition={SPRING.smooth}
       style={{
         position: "relative",
-        padding: emphasized ? "34px 28px" : "30px 26px",
+        // Uniform padding so all three cards share the same geometry.
+        // Starter still reads as "featured" via its stronger glow, faster
+        // aurora shimmer, larger price, and the centered top badge — but
+        // the cards are pixel-symmetric.
+        padding: "32px 26px",
         borderRadius: 20,
         background: theme.bgGradient,
         border: `1px solid ${theme.border}`,
@@ -247,8 +264,6 @@ function PaidPlan(props: PlanCardProps & { kind: "mini" | "starter" | "pro" }) {
         gap: 18,
         color: "var(--text-primary)",
         overflow: "hidden",
-        // Subtle scale-up for the emphasized card so the eye lands there first.
-        transform: emphasized ? "translateY(-6px)" : undefined,
       }}
     >
       {/* Aurora shimmer sweep across the top border */}
@@ -268,37 +283,58 @@ function PaidPlan(props: PlanCardProps & { kind: "mini" | "starter" | "pro" }) {
         }}
       />
 
-      {/* Badge — Most Popular / Premium / Recommended */}
+      {/* Badge — Most Popular / Premium / Recommended.
+          The outer div owns POSITIONING; the inner motion.div owns
+          ANIMATION. If we set both on a single motion element, Framer's
+          transform (from animating `y`) would stomp our inline
+          `transform: translate(-50%, -50%)` after the entry animation
+          completes, and the emphasized "MOST POPULAR" badge would drift
+          left of the card's horizontal center. */}
       {props.badgeLabel && (
-        <motion.div
-          initial={{ opacity: 0, y: -4 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1, duration: 0.4 }}
-          style={{
-            position: "absolute",
-            top: emphasized ? -1 : 16,
-            right: emphasized ? "50%" : 16,
-            transform: emphasized ? "translate(50%, -50%)" : undefined,
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 5,
-            padding: emphasized ? "5px 14px" : "3px 10px",
-            borderRadius: 999,
-            background: theme.badgeBg,
-            border: `1px solid ${theme.badgeBorder}`,
-            fontSize: emphasized ? 10.5 : 10,
-            fontWeight: 700,
-            letterSpacing: "0.14em",
-            textTransform: "uppercase",
-            color: theme.badgeText,
-            whiteSpace: "nowrap",
-            backdropFilter: "blur(6px)",
-            WebkitBackdropFilter: "blur(6px)",
-          }}
+        <div
+          style={
+            emphasized
+              ? {
+                  position: "absolute",
+                  top: 0,
+                  left: "50%",
+                  transform: "translate(-50%, -50%)",
+                  zIndex: 2,
+                }
+              : {
+                  position: "absolute",
+                  top: 16,
+                  right: 16,
+                  zIndex: 2,
+                }
+          }
         >
-          <Sparkles size={10} />
-          {props.badgeLabel}
-        </motion.div>
+          <motion.div
+            initial={{ opacity: 0, y: -4 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1, duration: 0.4 }}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 5,
+              padding: emphasized ? "5px 14px" : "3px 10px",
+              borderRadius: 999,
+              background: theme.badgeBg,
+              border: `1px solid ${theme.badgeBorder}`,
+              fontSize: emphasized ? 10.5 : 10,
+              fontWeight: 700,
+              letterSpacing: "0.14em",
+              textTransform: "uppercase",
+              color: theme.badgeText,
+              whiteSpace: "nowrap",
+              backdropFilter: "blur(6px)",
+              WebkitBackdropFilter: "blur(6px)",
+            }}
+          >
+            <Sparkles size={10} />
+            {props.badgeLabel}
+          </motion.div>
+        </div>
       )}
 
       <div style={{ marginTop: emphasized && props.badgeLabel ? 8 : 0 }}>
