@@ -43,9 +43,7 @@ next-env.d.ts
 public/models/*.glb
 
 # Demo videos (served from R2 CDN, not git)
-# Exception: img-to-renovation.mp4 is tracked directly
 public/videos/*.mp4
-!public/videos/img-to-renovation.mp4
 
 # Test artifacts
 coverage/

@@ -8,6 +8,7 @@ import { useLocale } from "@/hooks/useLocale";
 import type { VideoArtifactData, VideoSegment } from "@/types/execution";
 import { useVideoJob } from "@/features/execution/hooks/useVideoJob";
 import { SegmentedVideoPlayer } from "@/features/canvas/components/artifacts/SegmentedVideoPlayer";
+import { GeneratingVideoBackdrop } from "@/shared/components/ui/GeneratingVideoBackdrop";
 
 interface VideoBodyProps {
   data: VideoArtifactData;
@@ -129,14 +130,14 @@ export function VideoBody({ data: rawData, nodeId }: VideoBodyProps) {
   }
 
   // ── Generating State UI ──────────────────────────────────────────────
+  // Phase 4 — wrapped with GeneratingVideoBackdrop so the canvas node body
+  // shows a blurred looping sample video behind the progress UI (instead of
+  // a flat gradient). Failed state keeps the static background for clarity.
   if (isGenerating || (isFailed && !hasVideoUrl)) {
     return (
       <div style={{ padding: "0 12px 10px 14px" }}>
+        <GeneratingVideoBackdrop compact minHeightPx={isFailed ? undefined : 180}>
         <div style={{
-          borderRadius: 8,
-          overflow: "hidden",
-          background: "linear-gradient(135deg, rgba(0,245,255,0.03), rgba(139,92,246,0.03))",
-          border: "1px solid rgba(0,245,255,0.12)",
           padding: "20px 16px",
           textAlign: "center",
         }}>
@@ -300,6 +301,7 @@ export function VideoBody({ data: rawData, nodeId }: VideoBodyProps) {
             50% { opacity: 0.6; }
           }
         `}</style>
+        </GeneratingVideoBackdrop>
       </div>
     );
   }

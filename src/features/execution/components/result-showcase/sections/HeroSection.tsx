@@ -9,6 +9,7 @@ import { COLORS } from "@/features/execution/components/result-showcase/constant
 import type { VideoInfo } from "@/features/execution/components/result-showcase/useShowcaseData";
 import { useVideoJob } from "@/features/execution/hooks/useVideoJob";
 import { SegmentedVideoPlayer } from "@/features/canvas/components/artifacts/SegmentedVideoPlayer";
+import { GeneratingVideoBackdrop } from "@/shared/components/ui/GeneratingVideoBackdrop";
 
 interface HeroSectionProps {
   videoData: VideoInfo | null;
@@ -88,24 +89,30 @@ export function HeroSection({ videoData, heroImageUrl, onExpandVideo, onRetryVid
         {jobView ? (
           <SegmentedVideoPlayer view={jobView} heightPx={360} compact={false} />
         ) : (
-          <div
-            style={{
-              minHeight: 280,
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: 12,
-              color: COLORS.CYAN,
-              fontSize: 13,
-              fontWeight: 600,
-              fontFamily: "var(--font-jetbrains), monospace",
-            }}
-          >
-            <Loader2 size={28} style={{ animation: "spin 1.2s linear infinite" }} />
-            <div>{t('showcase.renderingWalkthrough')}</div>
-            <style>{`@keyframes spin { from {transform:rotate(0deg)} to {transform:rotate(360deg)} }`}</style>
-          </div>
+          // Phase 4 — blurred looping sample video behind the initial-poll
+          // loading state (fires before jobView has any data from the first
+          // /api/video-jobs/[id] response — typically 0–5s, but shows during
+          // transient failures too).
+          <GeneratingVideoBackdrop minHeightPx={280}>
+            <div
+              style={{
+                minHeight: 280,
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 12,
+                color: COLORS.CYAN,
+                fontSize: 13,
+                fontWeight: 600,
+                fontFamily: "var(--font-jetbrains), monospace",
+              }}
+            >
+              <Loader2 size={28} style={{ animation: "spin 1.2s linear infinite" }} />
+              <div>{t('showcase.renderingWalkthrough')}</div>
+              <style>{`@keyframes spin { from {transform:rotate(0deg)} to {transform:rotate(360deg)} }`}</style>
+            </div>
+          </GeneratingVideoBackdrop>
         )}
       </motion.div>
     );
@@ -147,7 +154,11 @@ export function HeroSection({ videoData, heroImageUrl, onExpandVideo, onRetryVid
           }}
         />
       ) : isGenerating ? (
-        /* ── Video Generation Progress ── */
+        /* ── Video Generation Progress ──
+           Phase 4 — blurred looping sample video backdrop replaces the
+           flat gradient so the user sees ambient motion during the 2–8
+           min Kling wait. */
+        <GeneratingVideoBackdrop minHeightPx={280} borderRadiusPx={0}>
         <div style={{
           width: "100%",
           minHeight: 280,
@@ -157,7 +168,6 @@ export function HeroSection({ videoData, heroImageUrl, onExpandVideo, onRetryVid
           alignItems: "center",
           justifyContent: "center",
           gap: 20,
-          background: "linear-gradient(135deg, #0a0a0f 0%, #111122 100%)",
         }}>
           <motion.div
             animate={{ rotate: 360 }}
@@ -223,6 +233,7 @@ export function HeroSection({ videoData, heroImageUrl, onExpandVideo, onRetryVid
             })}
           </div>
         </div>
+        </GeneratingVideoBackdrop>
       ) : isFailed ? (
         /* ── Video Generation Failed ── */
         <div style={{

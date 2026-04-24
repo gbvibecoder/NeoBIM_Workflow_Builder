@@ -63,6 +63,7 @@ import type {
   VideoPipeline,
   VideoSegmentKind,
   VideoSegmentRecord,
+  VideoSegmentStatus,
 } from "@/types/video-job";
 
 // ─── Constants ──────────────────────────────────────────────────────────────
@@ -247,10 +248,42 @@ export async function advanceVideoJob(
         }
       }
     } else {
-      // ── Poll each outstanding segment.
+      // ── Poll each outstanding segment. Write to DB immediately after each
+      // terminal transition so the client sees the [complete, processing]
+      // intermediate state. Without this, both segments completing in one
+      // worker invocation atomically flip together and the streaming UX dies.
+      //
+      // Phase 3 fix. The end-of-function DB write below still runs and handles
+      // the job-level status flip, failureReason, costUsd, completedAt.
       for (const seg of segments) {
         if (seg.status === "complete" || seg.status === "failed") continue;
+
+        const wasInFlight = seg.status === "submitted" || seg.status === "processing";
         await pollAndPersistSegment(seg, job.pipeline as VideoPipeline, videoJobId);
+        // Type assertion to VideoSegmentStatus is required (and correct):
+        // TypeScript narrowed seg.status to "submitted" | "processing" above
+        // via the `continue` guard at the top of the loop. The await call
+        // mutates seg.status through a reference — invisible to TS's flow
+        // analysis, which keeps the old narrowed type after the await. This
+        // widens back to the full VideoSegmentStatus union, which is the
+        // actual runtime type of the value post-await.
+        const statusAfter = seg.status as VideoSegmentStatus;
+        const nowTerminal = statusAfter === "complete" || statusAfter === "failed";
+
+        if (wasInFlight && nowTerminal) {
+          // Persist segment transition immediately. Job-level status stays
+          // "processing" here — the end-of-function update computes and writes
+          // the final status (complete / partial / failed) after all segments
+          // have been polled.
+          await prisma.videoJob.update({
+            where: { id: videoJobId },
+            data: {
+              segments: segments as unknown as object,
+              status: "processing",
+              lastPolledAt: new Date(),
+            },
+          });
+        }
       }
     }
 

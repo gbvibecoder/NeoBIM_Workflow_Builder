@@ -28,6 +28,16 @@ interface CanvasToolbarProps {
   workflowName: string;
   creationMode: CreationMode;
   isExecuting: boolean;
+  /**
+   * True while the pre-run async waterfall (eligibility check + auto-save)
+   * is in flight — BEFORE `isExecuting` flips to true inside runWorkflow.
+   * The Run button's existing ternary only reacts to `isExecuting`, which
+   * leaves a 2–5s window where the button looks clickable but doing nothing
+   * visible. This flag closes that gap: the button immediately disables +
+   * shows "Starting…" on click, then the regular Stop button takes over
+   * when execution actually begins.
+   */
+  isStartingRun?: boolean;
   isDirty: boolean;
   isSaving: boolean;
   isNodeLibraryOpen: boolean;
@@ -116,6 +126,7 @@ export function CanvasToolbar({
   workflowName,
   creationMode,
   isExecuting,
+  isStartingRun = false,
   isDirty,
   isSaving,
   isNodeLibraryOpen,
@@ -174,7 +185,7 @@ export function CanvasToolbar({
       if (meta && e.key === "s") { e.preventDefault(); if (!isSaving) handleSave(); }
       if (meta && e.key === "z" && !e.shiftKey) { e.preventDefault(); onUndo(); }
       if (meta && (e.key === "y" || (e.key === "z" && e.shiftKey))) { e.preventDefault(); onRedo(); }
-      if (meta && e.key === "Enter") { e.preventDefault(); if (!isExecuting) onRun(); }
+      if (meta && e.key === "Enter") { e.preventDefault(); if (!isExecuting && !isStartingRun) onRun(); }
       if (e.key === "Escape" && isExecuting) onStop();
     };
   });
@@ -207,7 +218,10 @@ export function CanvasToolbar({
   const currentMode = MODE_CONFIG[creationMode];
 
   const nodes = useWorkflowStore(selectWfNodes);
-  const isWorkflowReady = nodes.length > 0 && !isExecuting;
+  // `isStartingRun` folds into this so every styling branch already tied to
+  // isWorkflowReady (disabled state, borders, cursor, hover) flips immediately
+  // on click — no need to thread a second flag through every style prop.
+  const isWorkflowReady = nodes.length > 0 && !isExecuting && !isStartingRun;
 
   // Save button state
   const canSave = isDirty || isUntitled;
@@ -638,8 +652,22 @@ export function CanvasToolbar({
                   }
                 }}
               >
-                <Play size={13} fill="currentColor" />
-                {t('canvas.runWorkflow')}
+                {isStartingRun ? (
+                  <>
+                    <Loader2 size={13} style={{ animation: "spin 0.9s linear infinite" }} />
+                    {/* Plain literal — no i18n key yet; t() returns the key
+                        verbatim when the key is missing, which would render
+                        "canvas.starting" to the user. Add the key to i18n.ts
+                        in a follow-up to localize. */}
+                    Starting…
+                    <style>{`@keyframes spin { from {transform:rotate(0deg)} to {transform:rotate(360deg)} }`}</style>
+                  </>
+                ) : (
+                  <>
+                    <Play size={13} fill="currentColor" />
+                    {t('canvas.runWorkflow')}
+                  </>
+                )}
               </button>
 
               <button

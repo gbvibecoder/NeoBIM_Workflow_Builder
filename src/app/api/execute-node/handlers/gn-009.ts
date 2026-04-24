@@ -520,8 +520,44 @@ export const handleGN009: NodeHandler = async (ctx) => {
           logger.debug("[GN-009] Renovation skipped — missing:", !dalleKey ? "OPENAI_API_KEY" : "originalPhotoBase64");
         }
 
+        // Phase 3 — generate a GPT-Image-1 eye-level interior reference so the Kling
+        // interior task has an actual interior image to animate. Without this, both
+        // Kling tasks shared the exterior image and the interior segment produced
+        // exterior-looking content (visual bug). Reuses the helper already battle-
+        // tested in the cinematic pipeline (generateLifestyleImage).
+        //
+        // Graceful fallback: if GPT-Image-1 fails for any reason (key missing, rate
+        // limit, bad image), interiorImageUrl stays undefined and the interior Kling
+        // task falls back to the exterior image — same as pre-Phase-3 behavior. Job
+        // still proceeds; no hard failure.
+        let interiorImageUrl: string | undefined;
+        if (dalleKey && klingSourceImage) {
+          try {
+            logger.debug("[GN-009] Phase 3: generating GPT-Image-1 interior reference...");
+            const { generateLifestyleImage } = await import("@/features/3d-render/services/cinematic-pipeline");
+            const interiorRef = await generateLifestyleImage({
+              floorPlanRef: klingSourceImage,    // exterior image as architectural reference
+              description: buildingDesc,
+              primaryRoom: "Living Room",         // safe default — generateLifestyleImage
+                                                  // has room-aware furniture prompt templates;
+                                                  // Living Room produces strong generic-interior
+                                                  // content that works across building types.
+              apiKey: dalleKey,
+            });
+            interiorImageUrl = interiorRef.url;
+            logger.debug("[GN-009] Phase 3: interior reference ready:", interiorImageUrl?.slice(0, 100));
+          } catch (interiorErr) {
+            const msg = interiorErr instanceof Error ? interiorErr.message : String(interiorErr);
+            logger.warn("[GN-009] Phase 3: interior reference generation failed — falling back to exterior image for interior segment. " + msg);
+            // Non-fatal — interiorImageUrl stays undefined, submitDualWalkthrough
+            // falls back to the exterior image for the interior segment (matches
+            // pre-Phase-3 behavior). User sees same suboptimal content only on failure.
+          }
+        }
+
         const submitted = await submitDualWalkthrough(klingSourceImage, buildingDesc, "pro", {
           isRenovation: isRenovationInput,
+          interiorImageUrl,   // Phase 3 — undefined on failure → falls back to exterior image
         });
 
         logger.debug("[GN-009] Dual tasks submitted! exterior:", submitted.exteriorTaskId, "interior:", submitted.interiorTaskId);
@@ -571,7 +607,7 @@ export const handleGN009: NodeHandler = async (ctx) => {
               durationSeconds: totalDuration,
               shotCount: 2,
               pipeline: videoPipelineLabel,
-              costUsd: isRenovationInput ? 2.04 : 1.50,
+              costUsd: isRenovationInput ? 2.08 : 1.54, // Phase 3: +$0.04 for GPT-Image-1 interior reference
               segments: [],
               videoGenerationStatus: "queued" as const,
               videoJobId,
@@ -609,7 +645,7 @@ export const handleGN009: NodeHandler = async (ctx) => {
             durationSeconds: totalDuration,
             shotCount: 2,
             pipeline: videoPipelineLabel,
-            costUsd: isRenovationInput ? 2.04 : 1.50, // 10s+10s for renovation, 5s+10s standard
+            costUsd: isRenovationInput ? 2.08 : 1.54, // Phase 3: +$0.04 for GPT-Image-1 interior reference (10s+10s renovation, 5s+10s standard)
             segments: [],
             videoGenerationStatus: "processing",
             videoPipeline: "image2video",
