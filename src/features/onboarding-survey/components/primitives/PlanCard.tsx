@@ -7,7 +7,7 @@ import { useLocale } from "@/hooks/useLocale";
 import { SPRING } from "@/features/onboarding-survey/lib/scene-motion";
 import { PREBUILT_WORKFLOWS_MAP } from "@/features/workflows/constants/prebuilt-workflows";
 
-type PlanKind = "free" | "starter" | "pro";
+type PlanKind = "free" | "mini" | "starter" | "pro";
 
 interface PlanCardProps {
   kind: PlanKind;
@@ -30,6 +30,25 @@ const FEATURE_ICONS = [Sparkles, Box, Film, FileSpreadsheet, Zap, Check];
 
 /** Aurora-themed colour palette for paid plans — keeps the onboarding mood. */
 const PAID_THEME = {
+  mini: {
+    bgGradient:
+      "linear-gradient(145deg, rgba(245,158,11,0.08), rgba(249,115,22,0.06), rgba(244,63,94,0.05))",
+    border: "rgba(245,158,11,0.32)",
+    shadow:
+      "0 18px 56px rgba(0,0,0,0.45), 0 0 36px rgba(245,158,11,0.14), inset 0 1px 0 rgba(255,255,255,0.06)",
+    auroraGradient:
+      "linear-gradient(90deg, transparent, rgba(245,158,11,0.9), rgba(249,115,22,0.9), rgba(244,63,94,0.9), transparent)",
+    accentText: "#FCD34D",
+    priceGradient: "linear-gradient(135deg, #F59E0B, #F97316, #F43F5E)",
+    iconBg: "rgba(245,158,11,0.14)",
+    iconBorder: "rgba(245,158,11,0.28)",
+    iconColor: "#FCD34D",
+    ctaGradient: "linear-gradient(135deg, #F59E0B 0%, #F97316 50%, #EC4899 100%)",
+    ctaShadow: "0 8px 28px rgba(245,158,11,0.35), inset 0 1px 0 rgba(255,255,255,0.2)",
+    badgeBg: "linear-gradient(135deg, rgba(245,158,11,0.28), rgba(249,115,22,0.28))",
+    badgeBorder: "rgba(245,158,11,0.5)",
+    badgeText: "#FDE68A",
+  },
   starter: {
     bgGradient:
       "linear-gradient(145deg, rgba(16,185,129,0.08), rgba(20,184,166,0.06), rgba(34,211,238,0.06))",
@@ -187,8 +206,8 @@ function FreePlan(props: PlanCardProps) {
   );
 }
 
-// ── Paid plan (Starter or Pro, themed) ─────────────────────────────────
-function PaidPlan(props: PlanCardProps & { kind: "starter" | "pro" }) {
+// ── Paid plan (Mini, Starter, or Pro — themed) ─────────────────────────
+function PaidPlan(props: PlanCardProps & { kind: "mini" | "starter" | "pro" }) {
   const { t } = useLocale();
   const theme = PAID_THEME[props.kind];
   const [price, setPrice] = useState(0);

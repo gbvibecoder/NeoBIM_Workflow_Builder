@@ -58,13 +58,20 @@ export function trackPricingView() {
 }
 
 export function trackPricingClick(
-  plan: "free" | "starter" | "pro" | "explore_more"
+  plan: "free" | "mini" | "starter" | "pro" | "explore_more"
 ) {
   pushToDataLayer("pricing_cta_click", { plan });
   // Paid-plan clicks = InitiateCheckout conversion signal (Meta + GA4).
   // Values mirror the actual Razorpay subscription amount the user is about
   // to pay, so attribution downstream (Meta CAPI, GA4 ecommerce) is honest.
-  if (plan === "starter") {
+  if (plan === "mini") {
+    trackInitiateCheckout({
+      value: 99,
+      currency: "INR",
+      content_name: "mini_plan",
+      content_category: "onboarding",
+    });
+  } else if (plan === "starter") {
     trackInitiateCheckout({
       value: 799,
       currency: "INR",

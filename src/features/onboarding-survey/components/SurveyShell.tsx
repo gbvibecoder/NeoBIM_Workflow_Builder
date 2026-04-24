@@ -36,7 +36,7 @@ interface SurveyShellProps {
 }
 
 /** Razorpay plan key as understood by /api/razorpay/checkout. */
-type PaidPlanKey = "STARTER" | "PRO";
+type PaidPlanKey = "MINI" | "STARTER" | "PRO";
 
 interface RazorpayInstance {
   open: () => void;
@@ -53,7 +53,7 @@ export function SurveyShell({ initial }: SurveyShellProps) {
   const timer = useSceneTimer();
 
   const [redirecting, setRedirecting] = useState(false);
-  const [loadingPlan, setLoadingPlan] = useState<"starter" | "pro" | null>(null);
+  const [loadingPlan, setLoadingPlan] = useState<"mini" | "starter" | "pro" | null>(null);
   const [hoverRgb, setHoverRgb] = useState<string | null>(null);
 
   // Funnel top — fire once on mount so GA4 can measure register → survey_start drop-off.
@@ -121,7 +121,7 @@ export function SurveyShell({ initial }: SurveyShellProps) {
    */
   const openRazorpay = useCallback(
     async (planKey: PaidPlanKey, action: PricingAction) => {
-      const planLower = planKey.toLowerCase() as "starter" | "pro";
+      const planLower = planKey.toLowerCase() as "mini" | "starter" | "pro";
       setLoadingPlan(planLower);
       try {
         const res = await fetch("/api/razorpay/checkout", {
@@ -150,7 +150,10 @@ export function SurveyShell({ initial }: SurveyShellProps) {
             email: data.email || "",
             name: data.name || "",
           },
-          theme: { color: planKey === "STARTER" ? "#10B981" : "#4F8AFF" },
+          theme: {
+            color:
+              planKey === "STARTER" ? "#10B981" : planKey === "PRO" ? "#4F8AFF" : "#F59E0B",
+          },
           handler: async (response: {
             razorpay_payment_id: string;
             razorpay_subscription_id: string;
@@ -212,6 +215,7 @@ export function SurveyShell({ initial }: SurveyShellProps) {
       // Analytics — fire before any await so events land even if checkout aborts.
       if (action === "chose_pro") trackPricingClick("pro");
       else if (action === "chose_starter") trackPricingClick("starter");
+      else if (action === "chose_mini") trackPricingClick("mini");
       else if (action === "explore_more") trackPricingClick("explore_more");
       else trackPricingClick("free");
       trackPricing(action);
@@ -233,11 +237,12 @@ export function SurveyShell({ initial }: SurveyShellProps) {
 
       // Paid plan → open Razorpay immediately. Survey completion is deferred
       // to the verify-success handler inside openRazorpay, so a dismissed
-      // widget or failed payment does NOT persist a `chose_pro` /
-      // `chose_starter` row in the DB. Don't flip `redirecting`: the user
+      // widget or failed payment does NOT persist a `chose_mini` / `chose_pro`
+      // / `chose_starter` row in the DB. Don't flip `redirecting`: the user
       // must be able to dismiss and retry without reloading the page.
-      if (action === "chose_starter" || action === "chose_pro") {
-        const planKey: PaidPlanKey = action === "chose_pro" ? "PRO" : "STARTER";
+      if (action === "chose_mini" || action === "chose_starter" || action === "chose_pro") {
+        const planKey: PaidPlanKey =
+          action === "chose_pro" ? "PRO" : action === "chose_starter" ? "STARTER" : "MINI";
         await openRazorpay(planKey, action);
       }
     },

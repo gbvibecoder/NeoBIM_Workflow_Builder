@@ -33,6 +33,7 @@ export default async function OnboardPage() {
         teamSize: existing.teamSize,
         pricingAction:
           existing.pricingAction === "chose_free" ||
+          existing.pricingAction === "chose_mini" ||
           existing.pricingAction === "chose_starter" ||
           existing.pricingAction === "chose_pro" ||
           existing.pricingAction === "explore_more" ||

@@ -18,6 +18,7 @@ function num(v: unknown): number | null {
 
 const ALLOWED_PRICING = new Set([
   "chose_free",
+  "chose_mini",
   "chose_starter",
   "chose_pro",
   "explore_more",
