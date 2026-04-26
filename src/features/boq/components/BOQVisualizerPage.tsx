@@ -61,11 +61,22 @@ export function BOQVisualizerPage({ data, executionId }: BOQVisualizerPageProps)
 
   const totals = useMemo(() => computeTotals(recalcLines), [recalcLines]);
 
-  // Total project cost = recalculated hard costs + proportional soft costs
-  // Soft cost ratio is relative to hard costs (not total), so when hard costs
-  // change via price sliders the soft costs scale proportionally.
-  const softCostRatio = data.hardCosts > 0 ? data.softCosts / data.hardCosts : 0;
-  const recalcTotalProject = totals.totalCost + totals.totalCost * softCostRatio;
+  // Total project cost — must match the result-page hero (which displays
+  // data._totalCost = data.hardCosts + data.softCosts) when no price
+  // overrides are applied. The BOQ artifact stores three buckets:
+  //   data.hardCosts = lineSum + escalation
+  //   data.softCosts = professional fees, contingency, PM, etc.
+  //   data.totalCost = hardCosts + softCosts (the canonical project cost)
+  // `totals.totalCost` is just the sum of recalculated line totals (no
+  // escalation, no soft costs), so we scale the original hardCosts and
+  // softCosts proportionally to how price sliders moved the line sum.
+  // At baseline (no overrides) scale = 1 → recalcTotalProject = data.totalCost,
+  // matching the result page exactly.
+  const baseLineSum = data.subtotalMaterial + data.subtotalLabor + data.subtotalEquipment;
+  const scale = baseLineSum > 0 ? totals.totalCost / baseLineSum : 1;
+  const recalcHardCosts = data.hardCosts * scale;
+  const recalcSoftCosts = data.softCosts * scale;
+  const recalcTotalProject = recalcHardCosts + recalcSoftCosts;
   const costPerM2 = data.gfa > 0 ? recalcTotalProject / data.gfa : data.benchmark.costPerM2;
 
   // Price change handler with flash animation
@@ -111,18 +122,19 @@ export function BOQVisualizerPage({ data, executionId }: BOQVisualizerPageProps)
       boqSheet["!cols"] = [{ wch: 16 }, { wch: 40 }, { wch: 6 }, { wch: 10 }, { wch: 8 }, { wch: 10 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 16 }, { wch: 14 }, { wch: 10 }];
       XLSX.utils.book_append_sheet(wb, boqSheet, "Bill of Quantities");
 
-      // Summary sheet
+      // Summary sheet — Hard/Soft costs scale with line totals so the
+      // exported summary stays consistent with the on-screen hero.
       const summaryData = [
         ["Project", data.projectName],
         ["Location", data.location],
         ["Date", data.date],
         ["GFA (m²)", data.gfa],
         [""],
-        ["Hard Costs (₹)", totals.totalCost],
+        ["Hard Costs (₹)", recalcHardCosts],
         ["Material (₹)", totals.subtotalMaterial],
         ["Labour (₹)", totals.subtotalLabor],
         ["Equipment (₹)", totals.subtotalEquipment],
-        ["Soft Costs (₹)", data.softCosts],
+        ["Soft Costs (₹)", recalcSoftCosts],
         ["Total Project Cost (₹)", recalcTotalProject],
         [""],
         ["AACE Class", data.aaceClass || "Class 4"],
@@ -144,7 +156,7 @@ export function BOQVisualizerPage({ data, executionId }: BOQVisualizerPageProps)
     } catch {
       toast.error("Excel generation failed", { description: "Could not generate Excel file. Try running the EX-002 node in your workflow." });
     }
-  }, [data.excelUrl, data.projectName, data.location, data.date, data.gfa, data.softCosts, data.aaceClass, data.confidenceLevel, recalcLines, recalcTotalProject, totals]);
+  }, [data.excelUrl, data.projectName, data.location, data.date, data.gfa, data.aaceClass, data.confidenceLevel, recalcLines, recalcTotalProject, recalcHardCosts, recalcSoftCosts, totals]);
 
   const handleExportPDF = useCallback(async () => {
     if (data.pdfUrl) {
@@ -191,8 +203,8 @@ export function BOQVisualizerPage({ data, executionId }: BOQVisualizerPageProps)
       doc.setTextColor(13, 148, 136);
       doc.text(fmtINR(recalcTotalProject), margin + 4, y + 14);
       doc.setTextColor(17, 24, 39);
-      doc.text(fmtINR(totals.totalCost), margin + 55, y + 14);
-      doc.text(fmtINR(data.softCosts), margin + 105, y + 14);
+      doc.text(fmtINR(recalcHardCosts), margin + 55, y + 14);
+      doc.text(fmtINR(recalcSoftCosts), margin + 105, y + 14);
       doc.text(`${data.gfa.toLocaleString()} m²`, margin + 145, y + 14);
       doc.setFontSize(8);
       doc.setFont("helvetica", "normal");
@@ -275,7 +287,7 @@ export function BOQVisualizerPage({ data, executionId }: BOQVisualizerPageProps)
     } catch {
       toast.error("PDF generation failed", { description: "Could not generate PDF. Try running the EX-003 node in your workflow." });
     }
-  }, [data.pdfUrl, data.projectName, data.location, data.date, data.gfa, data.softCosts, data.aaceClass, data.confidenceLevel, data.disclaimer, recalcLines, recalcTotalProject, totals]);
+  }, [data.pdfUrl, data.projectName, data.location, data.date, data.gfa, data.aaceClass, data.confidenceLevel, data.disclaimer, recalcLines, recalcTotalProject, recalcHardCosts, recalcSoftCosts, totals]);
 
   const handleExportCSV = useCallback(() => {
     // Generate CSV from current recalculated lines
@@ -309,7 +321,7 @@ export function BOQVisualizerPage({ data, executionId }: BOQVisualizerPageProps)
           <HeroStats
             totalCost={recalcTotalProject}
             costPerM2={costPerM2}
-            hardCosts={totals.totalCost}
+            hardCosts={recalcHardCosts}
             ifcQualityScore={data.ifcQuality?.score ?? 0}
             benchmarkLow={data.benchmark.benchmarkLow}
             benchmarkHigh={data.benchmark.benchmarkHigh}

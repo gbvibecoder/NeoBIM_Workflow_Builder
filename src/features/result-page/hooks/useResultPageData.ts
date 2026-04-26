@@ -286,13 +286,19 @@ export function useResultPageData(executionId: string): ResultPageData {
   // Sources of truth (live store first, API fetch as fallback / hydration source)
   const liveArtifacts = useExecutionStore(s => s.artifacts);
   const liveExecution = useExecutionStore(s => s.currentExecution);
+  const liveDbExecutionId = useExecutionStore(s => s.currentDbExecutionId);
   const videoGenProgress = useExecutionStore(s => s.videoGenProgress);
   const nodes = useWorkflowStore(s => s.nodes);
   const currentWorkflow = useWorkflowStore(s => s.currentWorkflow);
   const hydrateDiagnostics = useExecutionStore(selectHydrateDiagnostics);
 
+  // The URL id is the DB CUID (post-canvas-run navigation); the in-memory
+  // currentExecution.id is a 12-char generateId() value. Recognize either
+  // so a fresh post-run mount uses live artifacts directly without a
+  // round-trip to /api/executions/[id].
   const matchesLive =
-    liveExecution?.id === executionId && liveArtifacts.size > 0;
+    (liveExecution?.id === executionId || liveDbExecutionId === executionId) &&
+    liveArtifacts.size > 0;
 
   const [fetched, setFetched] = useState<FetchedState>({
     status: "loading",

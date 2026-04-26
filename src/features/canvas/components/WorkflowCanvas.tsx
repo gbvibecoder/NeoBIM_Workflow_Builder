@@ -449,7 +449,14 @@ function WorkflowCanvasInner({ workflowId: urlWorkflowId, templateId, forceNew =
       // the View Results FAB once the id lands.
       const timer = setTimeout(() => {
         const state = useExecutionStore.getState();
-        const execId = state.currentExecution?.id ?? state.currentDbExecutionId ?? null;
+        // Prefer the DB execution id (CUID) for the URL — only that id can be
+        // looked up by /api/executions/[id] on a refresh or hard nav. The
+        // in-memory currentExecution.id is a 12-char generateId() value used
+        // for live state correlation; using it as the URL id leads to
+        // "Nothing under this address" on cold reloads and on the BOQ
+        // visualizer's API fallback. Fall back to the in-memory id only when
+        // no DB record exists (demo mode, persistence skipped).
+        const execId = state.currentDbExecutionId ?? state.currentExecution?.id ?? null;
         if (execId) router.push(`/dashboard/results/${execId}`);
       }, 500);
       return () => { clearTimeout(timer); };
@@ -1010,7 +1017,9 @@ function WorkflowCanvasInner({ workflowId: urlWorkflowId, templateId, forceNew =
                 key="view-results-fab"
                 onClick={() => {
                   const state = useExecutionStore.getState();
-                  const execId = state.currentExecution?.id ?? state.currentDbExecutionId ?? null;
+                  // Same precedence as the auto-navigation effect — DB id wins
+                  // so /api/executions/[id] can resolve it on a hard reload.
+                  const execId = state.currentDbExecutionId ?? state.currentExecution?.id ?? null;
                   if (execId) router.push(`/dashboard/results/${execId}`);
                 }}
                 initial={{ opacity: 0, y: 16 }}
