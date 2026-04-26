@@ -94,7 +94,10 @@ export function PageHeader({ data, initialNote, showNorthArrow, onNoteChange }: 
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          padding: "14px clamp(16px, 3vw, 28px)",
+          // Phase 5.2: right padding reserves ~80px for the floating
+          // avatar zone (top:12 right:16 + 40px plate + 16px buffer)
+          // so Run Again / Share / Annotate buttons don't sit under it.
+          padding: "14px clamp(80px, 6vw, 100px) 14px clamp(16px, 3vw, 28px)",
           gap: 16,
         }}
       >
