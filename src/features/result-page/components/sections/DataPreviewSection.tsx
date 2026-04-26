@@ -58,14 +58,14 @@ export function DataPreviewSection({ data, index }: DataPreviewSectionProps) {
     : data.tableData;
 
   const statTiles = deriveStatStrip(data);
-  const costSegments = isBoqHero ? deriveCostComposition(data) : null;
+  const costComposition = isBoqHero ? deriveCostComposition(data) : null;
 
   const hasContent =
     data.kpiMetrics.length > 0 ||
     tablesToShow.length > 0 ||
     data.jsonData.length > 0 ||
     !!statTiles ||
-    !!costSegments;
+    !!costComposition;
 
   if (!hasContent) return null;
 
@@ -85,7 +85,9 @@ export function DataPreviewSection({ data, index }: DataPreviewSectionProps) {
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           {/* Phase 4 enrichments — workflow-aware stat strip + (BOQ only) cost composition bar */}
           {statTiles ? <StatStrip tiles={statTiles} /> : null}
-          {costSegments ? <CostCompositionBar segments={costSegments} /> : null}
+          {costComposition ? (
+            <CostCompositionBar composition={costComposition} totalCost={data.boqSummary?.totalCost ?? 0} />
+          ) : null}
 
           {data.kpiMetrics.length > 0 ? <KpiGrid metrics={data.kpiMetrics} /> : null}
           {tablesToShow.map((t, i) => (
