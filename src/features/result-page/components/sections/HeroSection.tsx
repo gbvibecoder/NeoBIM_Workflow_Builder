@@ -30,6 +30,11 @@ import { PhotoDevelop } from "@/features/result-page/components/animations/Photo
 import { LiveCostBreakdownDonut } from "@/features/result-page/components/animations/LiveCostBreakdownDonut";
 import { RoomScheduleCascade } from "@/features/result-page/components/animations/RoomScheduleCascade";
 import { RoomAreaDonut } from "@/features/result-page/components/animations/RoomAreaDonut";
+import {
+  ElementCategoryCascade,
+  __extractIfcCategories,
+} from "@/features/result-page/components/animations/ElementCategoryCascade";
+import { ElementDistributionDonut } from "@/features/result-page/components/animations/ElementDistributionDonut";
 import { normalizeRegion } from "@/features/result-page/lib/normalize-region";
 import type { HeroKind } from "@/features/result-page/lib/select-hero";
 import type {
@@ -741,6 +746,31 @@ function Model3DVariant({ data, model }: { data: ResultPageData; model: Model3DD
               </div>
             </div>
           ))}
+        </div>
+      ) : null}
+
+      {/* Phase 4.2 Fix 2 — IFC signature theater: cascade + donut when an
+          IFC artifact is present. The existing IsometricBuilding wireframe
+          stays as ambient watermark in the corner. */}
+      {ifcFile && __extractIfcCategories(data).length > 0 ? (
+        <div className="ifc-hero-grid" style={{ display: "grid", gridTemplateColumns: "minmax(0, 1.3fr) minmax(0, 1fr)", gap: "clamp(20px, 3vw, 36px)", alignItems: "start", marginBottom: 24, position: "relative" }}>
+          <div>
+            <ElementCategoryCascade data={data} />
+          </div>
+          <div className="ifc-hero-donut" style={{ display: "flex", justifyContent: "center", alignItems: "flex-start", paddingTop: 8 }}>
+            <ElementDistributionDonut data={data} />
+          </div>
+          <style>{`
+            @media (max-width: 900px) {
+              .ifc-hero-grid {
+                grid-template-columns: minmax(0, 1fr) !important;
+              }
+              .ifc-hero-donut {
+                justify-content: flex-start !important;
+                padding-top: 0 !important;
+              }
+            }
+          `}</style>
         </div>
       ) : null}
 
