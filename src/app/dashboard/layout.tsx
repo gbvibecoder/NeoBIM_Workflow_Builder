@@ -23,11 +23,15 @@ export default function DashboardLayout({
   // should overlay the scene (transparent) instead of reserving 52px of
   // empty black space above it.
   const isImmersive = pathname === "/dashboard";
-  // The 3D-render wizard renders on a light page surface. A dark header
-  // above it produced a visible seam; the light-theme header blends into
-  // the page's top gradient so the nav controls read as part of the
-  // content surface instead of a chrome strip.
-  const isLightSurface = pathname === "/dashboard/3d-render";
+  // Pages whose top-edge surface is a light cream/white (Phase 4.2 result
+  // page redesign + 3D render wizard + light editors). UserMenu adopts a
+  // light-tone trigger (white avatar bg, dark text) on these surfaces so
+  // it reads cleanly. Dark-surface pages (canvas, IFC viewer, immersive
+  // landing, settings dark shell) keep the dark-tone trigger.
+  const isLightSurface =
+    pathname === "/dashboard/3d-render" ||
+    pathname === "/dashboard/floor-plan" ||
+    pathname.startsWith("/dashboard/results/");
 
   return (
     <div className="flex h-screen overflow-hidden" style={{ minHeight: "-webkit-fill-available", background: "#0a0c10" }}>
