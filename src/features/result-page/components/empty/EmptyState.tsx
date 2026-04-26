@@ -27,7 +27,7 @@ export function EmptyState({
     <motion.div
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4 }}
+      transition={{ duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] }}
       style={{
         minHeight: "60vh",
         display: "flex",
@@ -45,32 +45,30 @@ export function EmptyState({
           width: 64,
           height: 64,
           borderRadius: 18,
-          background: "rgba(255,255,255,0.04)",
-          border: "1px solid rgba(255,255,255,0.08)",
+          background: "#F3F4F6",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          color: "rgba(245,245,250,0.7)",
+          color: "#6B7280",
         }}
       >
         {icon}
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 8, maxWidth: 480 }}>
-        <h2 style={{ margin: 0, fontSize: 22, fontWeight: 600, color: "#F5F5FA", letterSpacing: "-0.01em" }}>
+        <h2 style={{ margin: 0, fontSize: 22, fontWeight: 600, color: "#111827", letterSpacing: "-0.01em" }}>
           {title}
         </h2>
-        <p style={{ margin: 0, fontSize: 14, color: "rgba(245,245,250,0.6)", lineHeight: 1.6 }}>{description}</p>
+        <p style={{ margin: 0, fontSize: 14, color: "#6B7280", lineHeight: 1.6 }}>{description}</p>
       </div>
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "center" }}>
         {primaryHref && primaryLabel ? (
           <Link
             href={primaryHref}
             style={{
-              padding: "10px 20px",
+              padding: "10px 18px",
               borderRadius: 10,
-              background: "rgba(0,245,255,0.12)",
-              border: "1px solid rgba(0,245,255,0.35)",
-              color: "#00F5FF",
+              background: "#0D9488",
+              color: "#FFFFFF",
               fontSize: 13,
               fontWeight: 600,
               textDecoration: "none",
@@ -83,11 +81,11 @@ export function EmptyState({
           <Link
             href={secondaryHref}
             style={{
-              padding: "10px 20px",
+              padding: "10px 18px",
               borderRadius: 10,
-              background: "rgba(255,255,255,0.04)",
-              border: "1px solid rgba(255,255,255,0.10)",
-              color: "rgba(245,245,250,0.85)",
+              background: "#FFFFFF",
+              border: "1px solid rgba(0,0,0,0.10)",
+              color: "#4B5563",
               fontSize: 13,
               fontWeight: 600,
               textDecoration: "none",

@@ -4,15 +4,15 @@ import { useCallback, useState } from "react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import {
+  Download,
   FileDown,
   Film,
-  File as FileIcon,
-  Download,
   Image as ImageIcon,
-  FileText,
+  Layers,
   Table2,
   Code2,
-  Layers,
+  FileText,
+  File as FileIcon,
   Loader2,
   Sparkles,
   AlertTriangle,
@@ -20,35 +20,37 @@ import {
 import { useExecutionStore } from "@/features/execution/stores/execution-store";
 import { useWorkflowStore } from "@/features/workflows/stores/workflow-store";
 import { formatBytes } from "@/lib/utils";
+import { ScrollReveal } from "@/features/result-page/components/ScrollReveal";
+import { SectionHeader } from "@/features/result-page/components/sections/SectionHeader";
 import type { ResultPageData } from "@/features/result-page/hooks/useResultPageData";
 
-interface ExportTabProps {
+interface ExportsSectionProps {
   data: ResultPageData;
 }
 
 interface DownloadCard {
   id: string;
   icon: React.ReactNode;
+  iconColor: string;
+  iconBg: string;
   title: string;
   subtitle: string;
-  color: string;
   action: (() => void | Promise<void>) | string;
   primary?: boolean;
   ifcBadge?: { variant: "rich" | "lean"; tooltip?: string };
 }
 
 /**
- * Export tab — jargon stripped per D2/D4:
- *  - Removed RECOMMENDED chip on the PDF card
- *  - Removed "All exports concept-level" footer
- *  - Kept Rich/Lean IFC engine badge (real signal for BIM pros, audit §4.4 row 1)
+ * Downloads grid in BOQ-visualizer aesthetic. RECOMMENDED chip is gone
+ * (Phase 1's clutter); concept-level footer is gone. The Rich/Lean IFC
+ * badge stays — that's signal, not jargon.
  */
-export function ExportTab({ data }: ExportTabProps) {
+export function ExportsSection({ data }: ExportsSectionProps) {
   const artifacts = useExecutionStore(s => s.artifacts);
   const nodes = useWorkflowStore(s => s.nodes);
   const [generating, setGenerating] = useState<string | null>(null);
 
-  const handleGeneratePDF = useCallback(async () => {
+  const handlePDF = useCallback(async () => {
     setGenerating("pdf");
     toast.loading("Generating PDF report…", { id: "result-pdf-gen" });
     try {
@@ -60,35 +62,13 @@ export function ExportTab({ data }: ExportTabProps) {
         artifacts,
         nodeLabels: labels,
       });
-      toast.success("PDF report downloaded", { id: "result-pdf-gen" });
+      toast.success("PDF downloaded", { id: "result-pdf-gen" });
     } catch {
       toast.error("PDF generation failed", { id: "result-pdf-gen" });
     } finally {
       setGenerating(null);
     }
   }, [artifacts, nodes, data.projectTitle]);
-
-  const handleExportCsv = useCallback(() => {
-    setGenerating("csv");
-    try {
-      data.tableData.forEach((table, idx) => {
-        const lines = [
-          table.headers.join(","),
-          ...table.rows.map(row =>
-            row
-              .map(cell => {
-                const s = String(cell);
-                return s.includes(",") || s.includes('"') ? `"${s.replace(/"/g, '""')}"` : s;
-              })
-              .join(","),
-          ),
-        ];
-        downloadBlob(lines.join("\n"), `${table.label ?? `table_${idx + 1}`}.csv`, "text/csv");
-      });
-    } finally {
-      setGenerating(null);
-    }
-  }, [data.tableData]);
 
   const handleExportJson = useCallback(() => {
     setGenerating("json");
@@ -126,21 +106,23 @@ export function ExportTab({ data }: ExportTabProps) {
 
   cards.push({
     id: "pdf",
-    icon: <FileDown size={20} aria-hidden="true" />,
+    icon: <FileDown size={18} />,
+    iconColor: "#0D9488",
+    iconBg: "#F0FDFA",
     title: "Full PDF Report",
-    subtitle: "All artifacts bundled into a single shareable PDF",
-    color: "#00F5FF",
-    action: handleGeneratePDF,
+    subtitle: "All artifacts bundled for sharing with the client",
+    action: handlePDF,
     primary: true,
   });
 
   if (data.videoData?.downloadUrl) {
     cards.push({
       id: "video",
-      icon: <Film size={20} aria-hidden="true" />,
+      icon: <Film size={18} />,
+      iconColor: "#7C3AED",
+      iconBg: "#F5F3FF",
       title: "Video walkthrough · MP4",
       subtitle: `${data.videoData.durationSeconds}s · ${data.videoData.shotCount} shots`,
-      color: "#A78BFA",
       action: data.videoData.downloadUrl,
     });
   }
@@ -148,10 +130,11 @@ export function ExportTab({ data }: ExportTabProps) {
   data.allImageUrls.forEach((url, i) => {
     cards.push({
       id: `image-${i}`,
-      icon: <ImageIcon size={20} aria-hidden="true" />,
+      icon: <ImageIcon size={18} />,
+      iconColor: "#0D9488",
+      iconBg: "#F0FDFA",
       title: `Render ${data.allImageUrls.length > 1 ? i + 1 : ""}`.trim(),
-      subtitle: "Hi-res render · PNG",
-      color: "#10B981",
+      subtitle: "Hi-res concept render · PNG",
       action: url,
     });
   });
@@ -159,33 +142,51 @@ export function ExportTab({ data }: ExportTabProps) {
   if (data.svgContent) {
     cards.push({
       id: "svg",
-      icon: <Layers size={20} aria-hidden="true" />,
+      icon: <Layers size={18} />,
+      iconColor: "#0D9488",
+      iconBg: "#F0FDFA",
       title: "Floor plan · SVG",
       subtitle: "Scalable vector drawing",
-      color: "#14B8A6",
       action: handleExportSvg,
     });
   }
 
   if (data.tableData.length > 0) {
-    const totalRows = data.tableData.reduce((sum, t) => sum + t.rows.length, 0);
+    const totalRows = data.tableData.reduce((s, t) => s + t.rows.length, 0);
     cards.push({
       id: "csv",
-      icon: <Table2 size={20} aria-hidden="true" />,
+      icon: <Table2 size={18} />,
+      iconColor: "#1E40AF",
+      iconBg: "#EFF6FF",
       title: "Table data · CSV",
       subtitle: `${data.tableData.length} tables · ${totalRows} rows`,
-      color: "#6366F1",
-      action: handleExportCsv,
+      action: () => {
+        data.tableData.forEach((table, idx) => {
+          const lines = [
+            table.headers.join(","),
+            ...table.rows.map(r =>
+              r
+                .map(c => {
+                  const s = String(c);
+                  return s.includes(",") || s.includes('"') ? `"${s.replace(/"/g, '""')}"` : s;
+                })
+                .join(","),
+            ),
+          ];
+          downloadBlob(lines.join("\n"), `${table.label ?? `table_${idx + 1}`}.csv`, "text/csv");
+        });
+      },
     });
   }
 
   if (data.jsonData.length > 0 || data.kpiMetrics.length > 0 || data.tableData.length > 0) {
     cards.push({
       id: "json",
-      icon: <Code2 size={20} aria-hidden="true" />,
+      icon: <Code2 size={18} />,
+      iconColor: "#7C3AED",
+      iconBg: "#F5F3FF",
       title: "Structured data · JSON",
-      subtitle: "Programmatic export of all metrics + tables",
-      color: "#EC4899",
+      subtitle: "Programmatic export of all KPIs + tables",
       action: handleExportJson,
     });
   }
@@ -193,16 +194,17 @@ export function ExportTab({ data }: ExportTabProps) {
   if (data.textContent) {
     cards.push({
       id: "text",
-      icon: <FileText size={20} aria-hidden="true" />,
+      icon: <FileText size={18} />,
+      iconColor: "#D97706",
+      iconBg: "#FEF3C7",
       title: "Text report · TXT",
       subtitle: `${data.textContent.split(/\s+/).filter(Boolean).length} words`,
-      color: "#F59E0B",
       action: handleExportText,
     });
   }
 
   data.fileDownloads.forEach((file, i) => {
-    const fileName = ensureFileExt(file.name, file.type);
+    const fileName = ensureExt(file.name, file.type);
     const needsBlob = !!file._rawContent || !!file.downloadUrl?.startsWith("data:");
     const blobAction = needsBlob
       ? () => {
@@ -230,107 +232,111 @@ export function ExportTab({ data }: ExportTabProps) {
           variant: file.ifcEngine === "ifcopenshell" ? "rich" : "lean",
           tooltip:
             file.ifcEngine === "ifcopenshell"
-              ? "Generated via IfcOpenShell (Python). Full geometry."
-              : `Python IFC service unavailable${file.ifcServiceSkipReason ? ` (${file.ifcServiceSkipReason})` : ""}.`,
+              ? "Generated via IfcOpenShell — full geometry."
+              : `Python IFC service unavailable${
+                  file.ifcServiceSkipReason ? ` (${file.ifcServiceSkipReason})` : ""
+                }.`,
         }
       : undefined;
     cards.push({
       id: `file-${i}`,
-      icon: <FileIcon size={20} aria-hidden="true" />,
+      icon: <FileIcon size={18} />,
+      iconColor: "#4B5563",
+      iconBg: "#F3F4F6",
       title: fileName,
       subtitle: file.size > 0 ? formatBytes(file.size) : file.type || "File",
-      color: "#64748B",
       action: blobAction ?? file.downloadUrl ?? "#",
       ifcBadge,
     });
   });
 
-  if (cards.length === 0) {
-    return (
-      <p style={{ padding: 60, textAlign: "center", color: "rgba(245,245,250,0.5)", fontSize: 13 }}>
-        No downloadable artifacts for this run.
-      </p>
-    );
-  }
+  if (cards.length === 0) return null;
 
   const [primary, ...rest] = cards;
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
-      {primary?.primary ? (
-        <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}>
-          <DownloadCardLarge card={primary} isGenerating={generating === primary.id} />
-        </motion.div>
-      ) : null}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))",
-          gap: 10,
-        }}
-      >
-        {rest.map((c, i) => (
-          <DownloadCardSmall
-            key={c.id}
-            card={c}
-            isGenerating={generating === c.id}
-            delay={0.04 * i}
-          />
-        ))}
-      </div>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingTop: 14, borderTop: "1px solid rgba(255,255,255,0.06)" }}>
-        <span style={{ fontSize: 11, color: "rgba(245,245,250,0.5)" }}>
-          {data.totalArtifacts} artifacts · {cards.length} downloadable
-        </span>
-      </div>
-    </div>
+    <ScrollReveal>
+      <section style={{ padding: "0 clamp(12px, 3vw, 24px)" }}>
+        <SectionHeader
+          icon={<Download size={16} />}
+          label="Downloads"
+          title="Export this run"
+          subtitle="Hand off to clients, downstream tools, or your team."
+        />
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          {primary?.primary ? <PrimaryDownloadCard card={primary} isGenerating={generating === primary.id} /> : null}
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))",
+              gap: 10,
+            }}
+          >
+            {rest.map((c, i) => (
+              <DownloadCardSmall key={c.id} card={c} isGenerating={generating === c.id} delay={0.04 * i} />
+            ))}
+          </div>
+        </div>
+      </section>
+    </ScrollReveal>
   );
 }
 
-function DownloadCardLarge({ card, isGenerating }: { card: DownloadCard; isGenerating: boolean }) {
+function PrimaryDownloadCard({ card, isGenerating }: { card: DownloadCard; isGenerating: boolean }) {
   const node = (
-    <span
+    <div
       style={{
         display: "flex",
         alignItems: "center",
-        gap: 16,
+        gap: 18,
         padding: "20px 22px",
-        borderRadius: 14,
-        background: `linear-gradient(135deg, ${card.color}10 0%, ${card.color}03 100%)`,
-        border: `1px solid ${card.color}40`,
+        background: "#FFFFFF",
+        border: "1px solid rgba(13,148,136,0.22)",
+        borderRadius: 16,
+        boxShadow: "0 4px 14px rgba(13,148,136,0.08)",
         cursor: "pointer",
+        transition: "all 0.2s",
         textDecoration: "none",
+      }}
+      onMouseEnter={e => {
+        e.currentTarget.style.boxShadow = "0 8px 22px rgba(13,148,136,0.14)";
+        e.currentTarget.style.transform = "translateY(-2px)";
+      }}
+      onMouseLeave={e => {
+        e.currentTarget.style.boxShadow = "0 4px 14px rgba(13,148,136,0.08)";
+        e.currentTarget.style.transform = "translateY(0)";
       }}
     >
       <span
+        aria-hidden="true"
         style={{
-          width: 48,
-          height: 48,
-          borderRadius: 12,
-          background: `${card.color}18`,
+          width: 52,
+          height: 52,
+          borderRadius: 14,
+          background: card.iconBg,
+          color: card.iconColor,
           display: "inline-flex",
           alignItems: "center",
           justifyContent: "center",
-          color: card.color,
           flexShrink: 0,
         }}
       >
         {isGenerating ? <Loader2 size={22} className="result-export-spin" /> : card.icon}
       </span>
-      <span style={{ display: "flex", flexDirection: "column", gap: 4, flex: 1 }}>
-        <span style={{ fontSize: 15, fontWeight: 700, color: "#F5F5FA" }}>{card.title}</span>
-        <span style={{ fontSize: 12, color: "rgba(245,245,250,0.6)" }}>{card.subtitle}</span>
-      </span>
+      <div style={{ flex: 1 }}>
+        <div style={{ fontSize: 16, fontWeight: 700, color: "#111827", letterSpacing: "-0.005em" }}>{card.title}</div>
+        <div style={{ fontSize: 13, color: "#4B5563", marginTop: 4 }}>{card.subtitle}</div>
+      </div>
       <span
         style={{
           display: "inline-flex",
           alignItems: "center",
-          gap: 6,
-          padding: "8px 14px",
+          gap: 8,
+          padding: "10px 18px",
           borderRadius: 10,
-          background: `${card.color}18`,
-          color: card.color,
-          fontSize: 12,
+          background: "#0D9488",
+          color: "#FFFFFF",
+          fontSize: 13,
           fontWeight: 600,
         }}
       >
@@ -341,54 +347,67 @@ function DownloadCardLarge({ card, isGenerating }: { card: DownloadCard; isGener
         .result-export-spin { animation: result-export-spin 1s linear infinite; }
         @keyframes result-export-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
       `}</style>
-    </span>
+    </div>
   );
   return wrapAction(card, node);
 }
 
-function DownloadCardSmall({ card, isGenerating, delay }: { card: DownloadCard; isGenerating: boolean; delay: number }) {
+function DownloadCardSmall({
+  card,
+  isGenerating,
+  delay,
+}: {
+  card: DownloadCard;
+  isGenerating: boolean;
+  delay: number;
+}) {
   const inner = (
-    <span
+    <div
       style={{
         display: "flex",
         alignItems: "center",
         gap: 12,
-        padding: "12px 14px",
-        borderRadius: 10,
-        background: "rgba(255,255,255,0.03)",
-        border: "1px solid rgba(255,255,255,0.08)",
+        padding: "14px 16px",
+        background: "#FFFFFF",
+        border: "1px solid rgba(0,0,0,0.06)",
+        borderRadius: 14,
+        boxShadow: "0 2px 6px rgba(0,0,0,0.03)",
         cursor: "pointer",
         textDecoration: "none",
+        transition: "all 0.18s",
+      }}
+      onMouseEnter={e => {
+        e.currentTarget.style.boxShadow = "0 6px 14px rgba(0,0,0,0.06)";
+        e.currentTarget.style.transform = "translateY(-1px)";
+      }}
+      onMouseLeave={e => {
+        e.currentTarget.style.boxShadow = "0 2px 6px rgba(0,0,0,0.03)";
+        e.currentTarget.style.transform = "translateY(0)";
       }}
     >
       <span
+        aria-hidden="true"
         style={{
-          width: 36,
-          height: 36,
+          width: 38,
+          height: 38,
           borderRadius: 10,
-          background: `${card.color}14`,
+          background: card.iconBg,
+          color: card.iconColor,
           display: "inline-flex",
           alignItems: "center",
           justifyContent: "center",
-          color: card.color,
           flexShrink: 0,
         }}
       >
         {isGenerating ? <Loader2 size={18} className="result-export-spin" /> : card.icon}
       </span>
-      <span style={{ display: "flex", flexDirection: "column", gap: 2, flex: 1, minWidth: 0 }}>
-        <span
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 6,
-          }}
-        >
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
           <span
             style={{
-              fontSize: 12,
+              fontSize: 13,
               fontWeight: 600,
-              color: "#F5F5FA",
+              color: "#111827",
               overflow: "hidden",
               textOverflow: "ellipsis",
               whiteSpace: "nowrap",
@@ -397,24 +416,30 @@ function DownloadCardSmall({ card, isGenerating, delay }: { card: DownloadCard; 
             {card.title}
           </span>
           {card.ifcBadge ? <IfcEngineBadge variant={card.ifcBadge.variant} tooltip={card.ifcBadge.tooltip} /> : null}
-        </span>
-        <span
+        </div>
+        <div
           style={{
-            fontSize: 10,
-            color: "rgba(245,245,250,0.5)",
+            fontSize: 11,
+            color: "#6B7280",
             overflow: "hidden",
             textOverflow: "ellipsis",
             whiteSpace: "nowrap",
+            marginTop: 2,
           }}
         >
           {card.subtitle}
-        </span>
-      </span>
-      <Download size={14} aria-hidden="true" style={{ color: "rgba(245,245,250,0.4)", flexShrink: 0 }} />
-    </span>
+        </div>
+      </div>
+      <Download size={14} aria-hidden="true" style={{ color: "#9CA3AF", flexShrink: 0 }} />
+    </div>
   );
   return (
-    <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay }}>
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, margin: "-40px" }}
+      transition={{ duration: 0.4, delay }}
+    >
       {wrapAction(card, inner)}
     </motion.div>
   );
@@ -435,7 +460,14 @@ function wrapAction(card: DownloadCard, node: React.ReactNode): React.ReactNode 
       onClick={() => {
         void action();
       }}
-      style={{ background: "transparent", border: "none", padding: 0, width: "100%", textAlign: "left", cursor: "pointer" }}
+      style={{
+        background: "transparent",
+        border: "none",
+        padding: 0,
+        width: "100%",
+        textAlign: "left",
+        cursor: "pointer",
+      }}
     >
       {node}
     </button>
@@ -444,7 +476,7 @@ function wrapAction(card: DownloadCard, node: React.ReactNode): React.ReactNode 
 
 function IfcEngineBadge({ variant, tooltip }: { variant: "rich" | "lean"; tooltip?: string }) {
   const isRich = variant === "rich";
-  const color = isRich ? "#10B981" : "#FDCB6E";
+  const color = isRich ? "#059669" : "#D97706";
   const Icon = isRich ? Sparkles : AlertTriangle;
   return (
     <span
@@ -456,13 +488,12 @@ function IfcEngineBadge({ variant, tooltip }: { variant: "rich" | "lean"; toolti
         gap: 3,
         padding: "2px 6px",
         borderRadius: 4,
-        background: `${color}20`,
+        background: isRich ? "#ECFDF5" : "#FEF3C7",
         color,
         fontSize: 9,
         fontWeight: 700,
         letterSpacing: "0.04em",
         textTransform: "uppercase",
-        border: `1px solid ${color}40`,
         cursor: tooltip ? "help" : "default",
       }}
     >
@@ -472,8 +503,8 @@ function IfcEngineBadge({ variant, tooltip }: { variant: "rich" | "lean"; toolti
   );
 }
 
-function downloadBlob(content: string, filename: string, mimeType: string) {
-  const blob = new Blob([content], { type: mimeType });
+function downloadBlob(content: string, filename: string, mime: string) {
+  const blob = new Blob([content], { type: mime });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
@@ -482,7 +513,7 @@ function downloadBlob(content: string, filename: string, mimeType: string) {
   setTimeout(() => URL.revokeObjectURL(url), 100);
 }
 
-function ensureFileExt(name: string, fileType: string): string {
+function ensureExt(name: string, fileType: string): string {
   const map: Record<string, string> = {
     "IFC 4": ".ifc",
     "IFC4": ".ifc",
