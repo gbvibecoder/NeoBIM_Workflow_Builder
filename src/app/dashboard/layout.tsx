@@ -19,25 +19,18 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
-  // The dashboard landing page is an immersive 3D hero — the header bar
-  // should overlay the scene (transparent) instead of reserving 52px of
-  // empty black space above it.
   const isImmersive = pathname === "/dashboard";
   // Pages whose top-edge surface is a light cream/white (Phase 4.2 result
   // page redesign + 3D render wizard + light editors). UserMenu adopts a
-  // light-tone trigger (white avatar bg, dark text) on these surfaces so
-  // it reads cleanly. Dark-surface pages (canvas, IFC viewer, immersive
-  // landing, settings dark shell) keep the dark-tone trigger.
+  // light-tone trigger so the floating avatar reads cleanly against the
+  // cream surface. Dark-surface pages (canvas, IFC viewer, immersive
+  // landing, settings) keep the dark-tone trigger.
   const isLightSurface =
     pathname === "/dashboard/3d-render" ||
     pathname === "/dashboard/floor-plan" ||
     pathname.startsWith("/dashboard/results/");
-  // BetaBanner visibility — Phase 5.1 widens this to all light-surface
-  // pages so the cream/white pages (result page, BOQ visualizer, floor
-  // plan editor, 3D render wizard) read cleanly without a cyan-tinted
-  // chrome strip above them. Dark-surface pages still show the banner
-  // as before — it has visual contrast there. Immersive landing keeps
-  // the existing override.
+  // BetaBanner: hidden on light surfaces (cream pages stay clean) and on
+  // immersive landing.
   const hideBetaBanner = isImmersive || isLightSurface;
 
   return (
@@ -46,13 +39,20 @@ export default function DashboardLayout({
       <ErrorBoundary>
         <div className="flex flex-col flex-1 min-w-0 overflow-hidden" style={{ transition: "flex 0.3s cubic-bezier(0.4, 0, 0.2, 1)" }}>
           {!hideBetaBanner && <BetaBanner />}
-          {!isImmersive && <Header theme={isLightSurface ? "light" : "dark"} />}
+          {/* Phase 5.2: page content fills the full viewport vertically.
+              Header is no longer in this flex flow — it floats fixed
+              top-right via the sibling overlay below, same architectural
+              pattern as the bottom-right support chat. No more 56px black
+              strip reserved at the top of dark pages. */}
           <div className="flex-1 min-h-0 overflow-hidden" style={{ position: "relative" }}>
-            {isImmersive && <Header floating />}
             {children}
           </div>
         </div>
       </ErrorBoundary>
+      {/* Floating chrome overlay — sits OUTSIDE the flex column so it
+          reserves zero vertical space. Just an avatar circle in the
+          top-right corner. */}
+      <Header theme={isLightSurface ? "light" : "dark"} />
       <CommandPaletteLoader />
       <SessionGuard />
       <OnboardingModal />
