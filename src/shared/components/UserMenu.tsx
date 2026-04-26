@@ -39,6 +39,7 @@ export function UserMenu({ tone = "light" }: UserMenuProps) {
   const [dropdownPos, setDropdownPos] = useState<{ top: number; right: number } | null>(null);
 
   const triggerRef = useRef<HTMLButtonElement>(null);
+  const plateRef = useRef<HTMLDivElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   const isDark = tone === "dark";
@@ -47,8 +48,11 @@ export function UserMenu({ tone = "light" }: UserMenuProps) {
   const initial = (userName[0] ?? "U").toUpperCase();
 
   const updatePosition = useCallback(() => {
-    if (!triggerRef.current) return;
-    const rect = triggerRef.current.getBoundingClientRect();
+    // Anchor to the plate (not the inner button) so the dropdown aligns
+    // with the visible glass-pill edge, not the avatar circle's edge.
+    const anchor = plateRef.current ?? triggerRef.current;
+    if (!anchor) return;
+    const rect = anchor.getBoundingClientRect();
     const right = Math.max(12, window.innerWidth - rect.right);
     setDropdownPos({ top: rect.bottom + 8, right });
   }, []);
@@ -159,6 +163,9 @@ export function UserMenu({ tone = "light" }: UserMenuProps) {
         triggerShadow: "0 1px 2px rgba(0,0,0,0.3)",
         avatarBg: "linear-gradient(135deg, rgba(255,191,0,0.15), rgba(255,191,0,0.08))",
         avatarColor: "#FFBF00",
+        plateBg: "rgba(20,20,28,0.5)",
+        plateBorder: "1px solid rgba(255,255,255,0.06)",
+        plateShadow: "0 2px 12px rgba(0,0,0,0.4)",
       };
     }
     return {
@@ -169,6 +176,9 @@ export function UserMenu({ tone = "light" }: UserMenuProps) {
       triggerShadow: "0 1px 2px rgba(0,0,0,0.04)",
       avatarBg: "linear-gradient(135deg, #E0E7FF, #C7D2FE)",
       avatarColor: "#3730A3",
+      plateBg: "rgba(255,255,255,0.72)",
+      plateBorder: "1px solid rgba(0,0,0,0.04)",
+      plateShadow: "0 2px 8px rgba(0,0,0,0.06)",
     };
   }, [isDark]);
 
@@ -179,6 +189,27 @@ export function UserMenu({ tone = "light" }: UserMenuProps) {
 
   return (
     <>
+      {/* Glass plate anchor — wraps the avatar trigger so the chrome
+          reads as a deliberate top-right handle. Sticky page elements
+          scrolling underneath get softly de-emphasized through the
+          backdrop-blur layer rather than competing with the avatar. */}
+      <div
+        ref={plateRef}
+        className="user-menu-plate"
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: 4,
+          borderRadius: 9999,
+          background: palette.plateBg,
+          border: palette.plateBorder,
+          boxShadow: palette.plateShadow,
+          backdropFilter: "blur(12px)",
+          WebkitBackdropFilter: "blur(12px)",
+          pointerEvents: "auto",
+        }}
+      >
       <button
         ref={triggerRef}
         type="button"
@@ -244,6 +275,7 @@ export function UserMenu({ tone = "light" }: UserMenuProps) {
           )}
         </div>
       </button>
+      </div>
 
       {typeof document !== "undefined" &&
         createPortal(
