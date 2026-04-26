@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { ArrowLeft, Download, Share2, Building2, MapPin, Calendar, ChevronDown, FileText, FileSpreadsheet } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
 import type { BOQData } from "@/features/boq/components/types";
 
@@ -15,7 +15,22 @@ interface BOQHeaderProps {
 
 export function BOQHeader({ data, onExportExcel, onExportPDF, onExportCSV }: BOQHeaderProps) {
   const router = useRouter();
+  const params = useParams<{ executionId?: string }>();
   const [showExportMenu, setShowExportMenu] = useState(false);
+
+  // Back goes to the canonical parent (the execution's result page) rather
+  // than router.back() — browser history is unreliable here: the BOQ link
+  // can arrive via router.replace() (smart-share ?open=boq), via a hard
+  // <a> tag, or from a fresh tab. router.back() would land on whatever
+  // happens to be one entry up, which is sometimes a stale execution id.
+  const handleBack = () => {
+    const executionId = params?.executionId;
+    if (executionId && executionId !== "demo") {
+      router.push(`/dashboard/results/${executionId}`);
+    } else {
+      router.push("/dashboard");
+    }
+  };
 
   useEffect(() => {
     if (!showExportMenu) return;
@@ -58,7 +73,7 @@ export function BOQHeader({ data, onExportExcel, onExportPDF, onExportCSV }: BOQ
       {/* Left: Back + Project Info */}
       <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
         <button
-          onClick={() => router.back()}
+          onClick={handleBack}
           style={{
             display: "flex",
             alignItems: "center",
