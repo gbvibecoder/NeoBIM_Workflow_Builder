@@ -829,8 +829,10 @@ export default function TemplatesPage() {
         </div>
 
         {/* ════════════════════════════ FILTER BAR ════════════════════════════ */}
+        {/* Phase 5.1 Fix 3: top:56 keeps the chrome strip / avatar plate
+            visually clear above this sticky filter row when scrolled. */}
         <div className="tpl-filter-bar" style={{
-          position: "sticky", top: 0, zIndex: 20, padding: "14px 32px",
+          position: "sticky", top: 56, zIndex: 20, padding: "14px 32px",
           display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap",
           background: isSticky ? "rgba(7,7,13,0.92)" : "rgba(7,7,13,0.5)",
           backdropFilter: isSticky ? "blur(24px)" : "blur(10px)",
