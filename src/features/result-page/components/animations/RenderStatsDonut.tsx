@@ -66,12 +66,11 @@ export function RenderStatsDonut({ video }: RenderStatsDonutProps) {
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
 
-  let cumulative = 0;
+  const fractions = segments.map(s => s.pct / 100);
   const arcs = segments.map((seg, i) => {
-    const fraction = seg.pct / 100;
+    const fraction = fractions[i];
     const length = circumference * fraction;
-    const rotation = cumulative * 360 - 90;
-    cumulative += fraction;
+    const rotation = fractions.slice(0, i).reduce((s, x) => s + x, 0) * 360 - 90;
     const delay = 0.2 + i * 0.18;
     return { ...seg, length, rotation, delay };
   });

@@ -57,13 +57,44 @@ export function DataPreviewSection({ data, index }: DataPreviewSectionProps) {
       )
     : data.tableData;
 
+  // Phase 4.2 Fix 6.1 — filter out JSON artifacts that are already
+  // consumed by the hero's dedicated visualizer. Without this, the
+  // floor-plan-interactive workflow renders a noisy "Floor Plan Editor —
+  // 2BHK Apartment · 19 keys [Copy]" JSON dump card right next to the
+  // embedded editor that already displays the same data.
+  const hasFloorPlanInteractive = data.model3dData?.kind === "floor-plan-interactive";
+  const heroLabel = data.model3dData?.kind === "floor-plan-interactive"
+    ? data.model3dData.label?.toLowerCase()
+    : data.model3dData?.kind === "html-iframe"
+      ? data.model3dData.label?.toLowerCase()
+      : null;
+  const jsonToShow = data.jsonData.filter(item => {
+    // Hide json whose payload IS the hero's data (presence of floorPlanProject
+    // key is the marker)
+    if (hasFloorPlanInteractive && item.json && Object.prototype.hasOwnProperty.call(item.json, "floorPlanProject")) {
+      return false;
+    }
+    // Hide json whose label matches the hero's label (covers the
+    // "Floor Plan Editor — 2BHK Apartment" case)
+    if (heroLabel && item.label?.toLowerCase() === heroLabel) {
+      return false;
+    }
+    // Hide json that is the floor plan / interactive project blob even if
+    // the hero label drifts
+    const lbl = item.label?.toLowerCase() ?? "";
+    if (hasFloorPlanInteractive && (lbl.includes("floor plan") || lbl.includes("apartment") || lbl.includes("interactive"))) {
+      return false;
+    }
+    return true;
+  });
+
   const statTiles = deriveStatStrip(data);
   const costComposition = isBoqHero ? deriveCostComposition(data) : null;
 
   const hasContent =
     data.kpiMetrics.length > 0 ||
     tablesToShow.length > 0 ||
-    data.jsonData.length > 0 ||
+    jsonToShow.length > 0 ||
     !!statTiles ||
     !!costComposition;
 
@@ -93,7 +124,7 @@ export function DataPreviewSection({ data, index }: DataPreviewSectionProps) {
           {tablesToShow.map((t, i) => (
             <TablePreview key={i} table={t} index={i} />
           ))}
-          {data.jsonData.map((item, i) => (
+          {jsonToShow.map((item, i) => (
             <JsonExplorer key={i} label={item.label} json={item.json} />
           ))}
         </div>
